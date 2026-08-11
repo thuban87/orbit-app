@@ -1,0 +1,8 @@
+# Dependencies / build output (Expo scaffold will extend this)
+node_modules/
+.expo/
+
+# Graphify: graph.json + GRAPH_REPORT.md are committed; these two are
+# regenerated wholesale every build and would bloat history (CLAUDE.md).
+.planning/graphs/graph.html
+.planning/graphs/.last-build-snapshot.json
