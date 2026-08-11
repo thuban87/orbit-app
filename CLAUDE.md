@@ -26,6 +26,14 @@ Decisions split into two buckets. Make the ones in your bucket and report them a
 
 *Why this exists:* on the owner's other project, two plans deleted an ADR's anti-tamper price floor to close a quote-vs-charge bug. A floor-preserving fix existed and had been proposed by the phase's own code review. A cross-AI reviewer flagged the removal by name. It shipped anyway, unasked, because the work was labeled "a bug fix" — and the ADR had that exact removal sitting in its rejected-alternatives list.
 
+## Never push (non-negotiable)
+
+Agents never push; the owner pushes. `git push` is denied globally in
+`~/.claude/settings.json`, but that deny only matches the literal command — **any tool
+that pushes as a side effect is equally forbidden**: `gh repo create --push`, `gh pr
+merge`, `gh pr create` from an unpushed branch, workflow scripts, anything. Commit
+locally, then tell the owner what is ready to push and let him run it.
+
 ## Git worktrees are disabled (non-negotiable)
 
 `.planning/config.json` sets `workflow.use_worktrees: false`. Never run `git worktree` in this repo — not to isolate a fix, not to parallelize, not "just to be safe." Commit in place, on the current branch, where the owner can watch it happen.
