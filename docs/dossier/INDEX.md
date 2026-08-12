@@ -15,7 +15,7 @@ domain-research step and decline its brownfield-mapping offer — the dossier re
 
 | # | Slug | Domain | Status |
 |---|------|--------|--------|
-| 1 | `data` | Core contact schema & status engine | pending |
+| 1 | `data` | Core contact schema & status engine | **complete** |
 | 2 | `fields` | Custom fields | **complete** (HANDOFF §14) |
 | 3 | `fuel` | Conversational Fuel — storage & interaction | pending |
 | 4 | `log` | Interaction log & touchpoint updates | pending |
@@ -36,7 +36,7 @@ because they cascade into everything downstream. Order is a default, not a law.
 
 ---
 
-## 1. `data` — Core contact schema & status engine
+## 1. `data` — Core contact schema & status engine ✓
 
 The SQLite schema for the `contacts` table and everything derived from it. In the plugin,
 contacts are markdown files: **the filename is the identity**, frontmatter is the schema,
@@ -51,6 +51,11 @@ thresholds, snooze override) is a pure function that ports verbatim.
 - Plugin source: `src/types.ts` (191), `src/services/OrbitIndex.ts` (425)
 - HANDOFF: §3 (data layer), §4 (port list), §14 (custom-fields tables live beside this)
 - Likely overlaps: every other domain; heaviest with `fields`, `log`, `import`, `orrery`
+
+**Complete — see `docs/dossier/01-data.md`.** 28 questions over 7 rounds; no `[OPEN]` items.
+Note that this run **reversed HANDOFF §7's frequency-ordered orbit radius** (owner's
+explicit call) and **added a new screen** for never-contacted contacts that no domain in
+this index currently owns.
 
 ## 2. `fields` — Custom fields ✓
 
@@ -231,4 +236,35 @@ Appended by `/oa-interrogate` runs. When a domain's decision constrains a not-ye
 domain, it's recorded here so the later run inherits it. Format:
 `- [source domain → target domain] constraint — (date)`
 
-*(empty — no interrogations complete yet)*
+*Full text of each entry lives in the source domain's "Cross-domain constraints exported"
+section. Summarised here so a later run sees what binds it.*
+
+- [data → fields] `col_name` must be whitelist-**constructed**, never escaped; the importer
+  is a second, untrusted producer §14 did not anticipate — (2026-08-12)
+- [data → fields] Contact purge destroys that contact's `field_history` rows — scopes
+  §14.6, does not reverse it — (2026-08-12)
+- [data → import] Replace `loader.ts`'s frontmatter parsers; they cannot read the plugin's
+  own output. Contacts with no `last_contact` import genuinely empty — (2026-08-12)
+- [data → log] Interaction rows carry a local datetime, nullable note and their own channel;
+  fully editable, and edits change status. One DAO function alone writes `last_contact`,
+  recomputed as MAX after every insert/edit/delete — (2026-08-12)
+- [data → crud] Create form asks last-contact with a "not yet" option; duplicate names warn
+  but do not block; archive is the delete affordance — (2026-08-12)
+- [data → dashboard] Queries carry `WHERE last_contact IS NOT NULL`; never-contacted
+  contacts need their **own screen**, which no domain in this index owns yet — (2026-08-12)
+- [data → orrery] `ring_seq` is a global radius override (**reverses §7**), so frequency has
+  no visual encoding left on that screen; the sun is assignable and glows its subject's
+  status — (2026-08-12)
+- [data → widget] Favourites are ordered via a rank column; a widget tap writes a full
+  interaction row — (2026-08-12)
+- [data → notify] Never-contacted contacts must not fire decay notifications; snooze
+  suppresses notifications while the clock runs; SMS composer reads `contacts.phone` —
+  (2026-08-12)
+- [data → digest] `birthday` exists with an optional year; the keep/cut call is still
+  HANDOFF open question #7 — (2026-08-12)
+- [data → ai] Interaction channel must come from the newest interaction row, never a
+  contact column — fixes an incoherent fact sent to the provider — (2026-08-12)
+- [data → backup] **Export is load-bearing, not optional** — `allowBackup="false"` plus
+  deletion-on-uninstall makes it the only barrier to total loss — (2026-08-12)
+- [data → photos] `photo` is a nullable path column; purge must delete the file, which no
+  foreign key can reach — (2026-08-12)
