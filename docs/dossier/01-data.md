@@ -514,7 +514,11 @@ planner/researcher.
 ## Decisions made without you
 
 Orchestrator's picks on items that failed the divergence test or had no real alternative.
-Veto any of these cheaply at review.
+
+**Read each entry as the decision AS ADOPTED, stated in the affirmative** — not as a
+proposal, and not as something being overturned. "Never stored" means the value is derived
+and that is now the rule. These are settled; they are listed separately only to mark that
+the owner was not asked. If he disagrees with one, it changes.
 
 1. **`contacts` gets a surrogate primary key.** Identity is never a name or a path. No
    alternative survives contacts owning child rows (F1).
