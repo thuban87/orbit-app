@@ -378,6 +378,25 @@ at all — an unreliable backup is worse than a known absence of one.
 **[REJECTED] Plain Auto Backup** — puts third parties' private notes and phone numbers in
 Google Drive by default, which is precisely the argument §3 used to reject cloud storage.
 
+**[DECIDED — owner] Every migration version step is wrapped in a transaction, for
+per-step atomicity.** *Owner-originated: he specifically wanted rollback-ability here.*
+
+If the v4 step throws halfway, SQLite rolls v4 back entirely and the device sits cleanly at
+v3 with `user_version` unchanged, so the next launch retries v4 from a known state. This
+works because SQLite's DDL is transactional — verified empirically during this run by
+rolling back a `DELETE` + `ALTER TABLE … DROP COLUMN` pair and observing the column return.
+
+**Scope, stated precisely:** this is *per-step atomicity*, **not** down-migrations.
+Deliberately going v4 → v3 remains impossible, and HANDOFF §3 `[DECIDED]` migrations are
+forward-only. Nothing here reverses that.
+
+This also corrects HANDOFF §3's inaccurate claim that expo-sqlite ships a `user_version`
+helper (F16.2). It ships a docs *example* that runs statements in autocommit and writes
+`user_version` last, outside any transaction — so a mid-migration throw leaves the database
+half-migrated with the version unchanged, and the next launch re-runs from the top and
+wedges permanently. Given "no remote access to a user's database," that failure is
+unrecoverable for that user. No Expo guidance on transaction-wrapping exists either way.
+
 **Consequence, and it is sharp:** the database lives at `/data/data/<pkg>/files/SQLite/` and
 is **deleted on uninstall** (F15). With `allowBackup="false"` and no export feature yet, a
 lost, wiped or reset phone is total, unrecoverable loss. **This promotes HANDOFF §3's
@@ -510,9 +529,8 @@ Veto any of these cheaply at review.
 6. **`PRAGMA foreign_keys = ON` in `onInit`, before any transaction opens.** Off by default
    and a silent no-op inside a transaction — without this every `ON DELETE CASCADE` is
    decorative (F15).
-7. **Each migration version step is wrapped in a transaction.** Corrects HANDOFF §3's
-   inaccurate claim that expo-sqlite ships a `user_version` helper; the docs example is not
-   crash-safe and can wedge a device permanently (F16.2).
+7. *(Promoted out of this list — see "Migration crash-safety" under cluster G. The owner
+   confirmed this was his intent, not an orchestrator pick.)*
 8. **Dates use `date('now','localtime')`, never `date('now')`.** The `toISOString()`
    off-by-one exists in SQL too, and is easier to write by accident.
 9. **`formatLocalDate()` remains the only date formatter on the TypeScript side.**
