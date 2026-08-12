@@ -17,7 +17,7 @@ domain-research step and decline its brownfield-mapping offer — the dossier re
 |---|------|--------|--------|
 | 1 | `data` | Core contact schema & status engine | **complete** |
 | 2 | `fields` | Custom fields | **complete** (HANDOFF §14) |
-| 3 | `fuel` | Conversational Fuel — storage & interaction | pending |
+| 3 | `fuel` | Conversational Fuel — storage & interaction | **complete** |
 | 4 | `log` | Interaction log & touchpoint updates | pending |
 | 5 | `import` | Obsidian vault importer | pending |
 | 6 | `crud` | Contact create/edit flows & forms | pending |
@@ -75,6 +75,13 @@ to and what AI prompts (#13) consume, so its shape constrains both.
 - Plugin source: `src/components/FuelTooltip.tsx` (321, incl. pure parsers), `docs/AI Features.md`
 - HANDOFF: §1 (premise), §6 (capture attaches "as Conversational Fuel")
 - Likely overlaps: `capture`, `ai`, `data`, `dashboard`, `notify`
+
+**Complete — see `docs/dossier/03-fuel.md`.** 23 questions over 6 rounds; no `[OPEN]` items.
+Fuel became **per-item rows** with five kinds, of which `off_limits` is never transmitted and
+never glanceable. This run **interprets HANDOFF §6's "with their Conversational Fuel visible"**
+(the literal reading is not buildable on Android) and **adds an in-app compose screen** that no
+domain in this index owns. It also **declined a zero-egress AI mode** (no local provider on
+mobile) and put **fuel on the larger widget size**, both owner calls with costs recorded.
 
 ## 4. `log` — Interaction log & touchpoint updates
 
@@ -156,10 +163,15 @@ and what the screen does at 0–2 contacts. Perf claims are physical-device-only
 ## 10. `capture` — Share-sheet capture
 
 Zero-friction capture is why the plugin fell out of use and this exists (HANDOFF §6).
-Register Orbit as an Android share target: share text/link/image → pick contact → lands as
+Register Orbit as an Android share target: share text/link → pick contact → lands as
 fuel. Decides: accepted payload types, the pick-contact flow (speed is the whole point),
 what gets stored (URL vs fetched title vs raw text), and the Expo mechanics (config
 plugin / custom dev client implications — needs current-docs verification).
+
+*(Corrected by domain 3: this line read "text/link/image". **Images are out of scope** —
+HANDOFF §6 says "a link, article, or text" and the index had widened it with no decision
+behind it. No `image/*` intent filter. Much of the rest is now settled — see `03-fuel.md`'s
+`[fuel → capture]` constraints, including the required `EXTRA_SUBJECT` patch.)*
 
 - Plugin source: conceptual heir to `src/services/LinkListener.ts` (deleted; Obsidian-shaped)
 - HANDOFF: §6 (share-sheet DECIDED)
@@ -268,3 +280,25 @@ section. Summarised here so a later run sees what binds it.*
   deletion-on-uninstall makes it the only barrier to total loss — (2026-08-12)
 - [data → photos] `photo` is a nullable path column; purge must delete the file, which no
   foreign key can reach — (2026-08-12)
+- [fuel → capture] `expo-share-intent` must be **patched to read `EXTRA_SUBJECT`** or links
+  arrive unlabelled; capture writes the row on contact-pick (payload dies on background);
+  picker must not inherit `WHERE last_contact IS NOT NULL`; **images out of scope** —
+  (2026-08-12)
+- [fuel → ai] Fuel rows carry `kind`/`created_at`/`source`/`url` from migration 1;
+  `off_limits` is never transmitted and unreachable by any placeholder name; age must reach
+  the prompt; **no local provider on mobile, so no zero-egress mode exists** — (2026-08-12)
+- [fuel → notify] One collapsed line only (`BigTextStyle` hardcoded, 1024-char framework cap);
+  the action opens an **in-app compose screen**, not the SMS composer (`expo-sms` cannot run
+  headless); the lock-screen setting requires a **second channel** — (2026-08-12)
+- [fuel → dashboard] Every contact card carries a required one-line fuel preview, constraining
+  the grid layout — (2026-08-12)
+- [fuel → widget] Fuel renders only at the larger widget size; no privacy control governs
+  home-screen exposure — (2026-08-12)
+- [fuel → import] Routing rule is **hooks vs data** — frontmatter keys → custom fields, prose
+  bullets → fuel items; vault bold sub-headers map to kinds — (2026-08-12)
+- [fuel → backup] **01-data's export list omits fuel and must be amended** to include `kind`,
+  `label`, `url`, `created_at`, `source` — (2026-08-12)
+- [fuel → crud] Purge must delete fuel rows explicitly — FKs are off inside
+  `withExclusiveTransactionAsync`, so `ON DELETE CASCADE` is decorative — (2026-08-12)
+- [fuel → **unowned**] The in-app **compose screen** has no owning domain in this index — the
+  same gap 01-data created with the never-contacted screen — (2026-08-12)
