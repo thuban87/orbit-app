@@ -96,7 +96,10 @@ quick action) differ from the full update flow.
 - HANDOFF: §1, §6
 - Likely overlaps: `data`, `widget`, `notify`, `crud`, `ai`
 
-**Complete — see `docs/dossier/04-log.md`.** 29 questions over 8 rounds; no `[OPEN]` items.
+**Complete — see `docs/dossier/04-log.md`.** 37 questions over 10 rounds; no `[OPEN]` items.
+This domain also absorbed **`gravity`** and **`intensity`** (Cluster G) — the
+accumulated-familiarity and contact-rate quantities the owner identified as the reason the
+plugin became an app. They had no home in this index.
 The touchpoint row gained three axes the plugin never had — **channel** (with a first-class
 `unspecified`), **direction**, and **whether it connected** — plus an optional quality marker.
 This run **cut domain 5 entirely** (owner: no vault data migration; code porting per HANDOFF §4
@@ -359,3 +362,12 @@ section. Summarised here so a later run sees what binds it.*
   last speak" **must insert a row** — (2026-08-12)
 - [log → **index**] **Domain 5 (`import`) is cut**; four earlier constraints are moot and
   `import` leaves both `source` enums — (2026-08-12)
+- [log → data] **`gravity`** (age-decayed accumulated familiarity, with a floor) and
+  **`intensity`** (rate vs intended frequency, absorbing the cadence stat) are **derived, never
+  stored** — matching 01-data's rule for `status` — (2026-08-12)
+- [log → data] `gravity` depends on direction, so **one-tap routes write
+  `direction='outbound'`** — revises 04-log's own Cluster A — (2026-08-12)
+- [log → dashboard] The "nothing log-derived on the card" rule was **reaffirmed** when `gravity`
+  was added — profile only — (2026-08-12)
+- [log → orrery] `gravity` maps naturally onto body size or ring weight; **deliberately not**
+  encoded there in v1, recorded so it reads as considered rather than overlooked — (2026-08-12)

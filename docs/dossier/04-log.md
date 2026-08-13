@@ -1,6 +1,6 @@
 # Dossier 04 — `log` — Interaction log & touchpoint updates
 
-**Status:** complete · Interrogated 2026-08-12 · 29 questions over 8 rounds · No `[OPEN]`
+**Status:** complete · Interrogated 2026-08-12 · 37 questions over 10 rounds · No `[OPEN]`
 items remain in this domain (the `rogue` threshold value is exported to domain 9)
 
 ## Scope
@@ -15,6 +15,11 @@ that read the table. Dossier 01-data already settled the recency spine (single-w
 every route inserting a row); this domain settles what those rows *contain* and what they are
 *for*. It excludes the status math (01-data), fuel (03-fuel), and the widget/notification
 mechanics themselves (domains 11 and 12), but owns the constraints those inherit.
+
+**Added mid-session:** this domain also owns **`gravity`** and **`intensity`** (Cluster G) — the
+accumulated-familiarity and contact-rate quantities derived from the interaction log. The owner
+identified `gravity` as the idea that motivated turning the plugin into an app at all, and it
+had no home anywhere in the dossier index.
 
 ---
 
@@ -270,8 +275,13 @@ boundary; declined on privacy posture, which is explicitly the owner's call unde
 **[REJECTED] Newest N rows as channel + date** — more disclosure than aggregates for largely
 the same information, itemised. **[REJECTED] Nothing beyond today's baseline.**
 
-**[DECIDED] One statistic ships in v1: actual versus intended cadence.** "Set to Monthly —
-actually every 47 days."
+**[DECIDED — later SUPERSEDED within this session by Cluster G] One statistic ships in v1:
+actual versus intended cadence.** "Set to Monthly — actually every 47 days."
+
+> ⚠ **Superseded, not reversed.** Cluster G's `intensity` absorbs this statistic as its
+> long-run trailing view. The decision below still holds — exactly one cadence-shaped metric
+> ships — it is simply now a component of `intensity` rather than a standalone stat. Read
+> Cluster G for the live definition.
 Rationale: it is the only stat that is *actionable* at HANDOFF §10's scale — it either tells
 the user they are slipping or that the interval they chose was unrealistic, and the fix is one
 tap on `interval_days`. Every other candidate is decoration when a Monthly contact has three
@@ -428,6 +438,125 @@ plus captured offset** — best on paper, but for a hand-corrected row the offse
 the user was when they typed, not when the event happened, so it is wrong by construction in
 exactly the case it was added for.
 
+### Cluster G — Impact and intensity
+
+> **Added late in the session at the owner's request.** This is the concept that motivated
+> turning the plugin into an app, and it had no home in any domain. Owner's premise: people
+> are more graceful with you when you have a large pool of shared interactions — a small
+> disagreement gets blown out of proportion when measured against a thin history, and the same
+> disagreement lands softly for someone with a thick one. **Orbit status remains the product's
+> number one concept; impact is a close second.**
+
+**[DECIDED] The concept is TWO quantities, named `gravity` and `intensity`, presented together
+and never blended into one score.**
+
+| Quantity | What it is | Moves |
+|---|---|---|
+| **Gravity** | Accumulated familiarity — the grace buffer | Slowly, across the whole relationship |
+| **Intensity** | This period's contact rate versus intended frequency | Weekly-ish |
+
+**Naming is the owner's call**, taken over his own working title of "impact". `gravity` is the
+force that literally holds an orbit — more shared history holds more strongly — and it pairs
+with `rogue`, which is something that escaped it. It also survives next to `status`, `orbit`,
+`decay` and `frequency` without collision, and it maps cleanly onto a visual (body size / ring
+weight) if the orrery ever encodes it.
+**[REJECTED] "Impact"** — the owner's working name; colloquially reads as *how much I affect
+them*, rather than *how much history we have*. **[REJECTED] "History + Rate"** — plainest, but
+"history" already means the interaction timeline throughout this dossier. **[REJECTED] "Mass"**
+— technically the better physics (mass creates gravity) but reads oddly in a sentence about a
+person.
+
+Rationale: the owner's *examples* described a flow (5 contacts against a Weekly setting →
+"getting annoying"; 2 → "way to go the extra mile") but his *motivation* described a stock (the
+pool of history that buys grace). They can point in opposite directions for the same person on
+the same day — someone contacted constantly for three years and then not for two months has a
+large stock and a dead flow. Collapsing them leaves one motivation unserved.
+**[REJECTED] A single blended score** — hides its inputs, so when it moves you cannot tell which
+half moved, and the weighting becomes an arbitrary constant to fiddle with forever.
+**[REJECTED] Stock only** (no brake on over-contact — the half the owner said needs a home);
+**[REJECTED] flow only** (cannot express "we have twenty years of history", the motivating case).
+
+**[DECIDED] Gravity decays with age, toward a floor rather than to zero.** Recent
+interactions weigh more; old ones fade but never fully evaporate.
+Rationale: a pure lifetime total only ever rises, so it stops being informative and cannot show
+a relationship thinning — which is the signal wanted. A pure decay says a lapsed best friend is
+a stranger, which is false. The floor means history already built is never entirely lost, but it
+stops growing when you stop showing up.
+**[REJECTED] Lifetime total, no decay**; **[REJECTED] a rolling window** — a hard cutoff drops
+history off a cliff on an arbitrary date, and "we've known each other twenty years" becomes
+inexpressible.
+
+**[DECIDED] Intensity is displayed as a neutral rate, with no judgement.** "5× this week vs
+Weekly intended" — stated as fact, conclusion left to the user.
+Rationale: **frequency in this project is a FLOOR** ("reach out at least this often"), not a
+ceiling. An app that scolds you for talking to your mother daily because you set her to Weekly
+is wrong, and slightly insulting. The neutral rate delivers the visibility wanted with no risk
+of the app being wrong about a real relationship.
+**[REJECTED] A per-contact comfort ceiling** — another per-contact setting, guessed at precisely
+for the people you know least well, who are the ones this matters for. **[REJECTED] Deriving the
+threshold from `social_battery`** — that column describes *their effect on you*, not *their
+tolerance for you*: the wrong axis wearing a convenient hat. **[REJECTED] A fixed multiple of
+frequency** — one global constant governing every relationship.
+
+**[DECIDED — REVISES a decision taken earlier in this same session] One-tap routes record
+`direction = 'outbound'` rather than leaving it null.**
+
+> ⚠ **This modifies Cluster A**, which read: *"Direction is a nullable column … asked only in
+> the full logging flow. One-tap routes leave it null."* The nullable column survives and the
+> full flow still asks; what changes is that widget and notification taps now write `outbound`
+> instead of null.
+
+Rationale: intensity must know that *you* reached out — if they texted you five times that is
+not you being annoying — and direction was otherwise null on exactly the highest-volume paths,
+starving the feature that motivated the app.
+**Cost stated plainly:** this *is* a guess, and it is the same class of thing this dossier
+criticised the plugin for (F3's silent `'call'` default). It is defensible only because tapping
+"mark contacted" overwhelmingly does mean you reached out, and because it is correctable from
+the timeline. If it proves wrong in practice, the rejected alternative below is a drop-in
+replacement requiring no migration.
+**[REJECTED] Storing null and having the impact calculation treat null as outbound** — keeps the
+database strictly honest and confines the assumption to one documented place; rejected as more
+subtle to explain, but retained here as the escape hatch. **[REJECTED] Impact ignoring
+direction** — the "am I contacting too much" signal would fire when *they* are blowing up your
+phone, inverting its meaning. **[REJECTED] Asking direction on the quick path** — a widget tile
+physically cannot ask.
+
+**[DECIDED] Intensity ABSORBS the actual-versus-intended cadence statistic decided earlier in
+this session.** One quantity at two time horizons: intensity for the current period, and the
+long-run average as its trailing view — *"Monthly intended · 47-day average · 2× this month."*
+Rationale: two derived metrics over the same rows would sometimes tell contradictory stories,
+which is precisely the drift 01-data avoided by making status one number.
+**This supersedes the Cluster D cadence decision** rather than sitting beside it; that decision
+is now the trailing half of this one.
+**[REJECTED] Keeping cadence as a separate profile statistic.**
+
+**[DECIDED] Gravity and intensity appear on the contact profile ONLY.**
+Rationale: this **preserves** the Cluster D decision that nothing log-derived goes on the
+dashboard card, and leaves HANDOFF §12.4's layout pass free. The owner was explicitly shown that
+choosing otherwise would revise a decision taken hours earlier, and chose to preserve it.
+**Cost accepted:** a concept billed as the product's number two is only visible when you go
+looking for it — and the grace-buffer insight is arguably most useful *before* a difficult
+conversation rather than during a browse.
+**[REJECTED] A card encoding** (⚠ would have revised the card decision); **[REJECTED] a card
+encoding plus an orrery dimension** — a screen already carrying radius, angle, colour and ring
+style.
+
+**[DECIDED] Gravity is expressed as named tiers with a bar, never as a raw number.**
+Rationale, and it is a deliberate consistency check: streaks were rejected earlier in this
+session because a climbing number manufactures obligation and creates an incentive to log
+contact that did not happen — corrupting the log every other feature reads. A raw gravity score
+has the same shape. **Coarse tiers are what makes gravity unlike a streak:** they do not move
+for one more tap, so there is nothing to optimise. It still answers the only question being
+asked of it — *do I have a buffer with this person* — without inviting gamification.
+**[REJECTED] A raw 0–100 score** — the most gameable form. **[REJECTED] A plain phrase only** —
+least gameable, most human, but not comparable across contacts, so you cannot scan for who is
+thin.
+
+**Confirmed to the owner so it is not rebuilt:** the "I reach out and they never respond" half of
+his concern is already fully served by earlier decisions this session — the connected flag, the
+"Rarely responds" setting, and `rogue`. His instinct that the under-contact side can lean on
+orbit status is correct; it already does.
+
 ---
 
 ## Cross-domain constraints exported
@@ -465,8 +594,19 @@ exactly the case it was added for.
   question about frequency losing its visual encoding. **No domain owns it yet.** Also open:
   the `rogue` threshold value and how `rogue` renders. **HANDOFF §7's [REJECTED] "floating free
   with no orbit lines" was NOT adopted** — `rogue` must stay on rails and stay tappable.
-- **[log → dashboard]** Nothing log-derived is added to the contact card. The cadence statistic
-  ("set to Monthly — actually every 47 days") lives on the profile.
+- **[log → dashboard]** Nothing log-derived is added to the contact card — **reaffirmed** when
+  `gravity` was added and the owner declined a card encoding for it.
+- **[log → data]** Two new derived quantities: **`gravity`** (age-decayed accumulated
+  familiarity, with a floor) and **`intensity`** (this period's rate vs intended frequency,
+  absorbing the cadence statistic). Both are **derived, never stored**, matching 01-data's rule
+  for `status`. If either ever profiles as expensive, the answer is a cached column with a
+  single writer — never a stored score that rots.
+- **[log → data]** Gravity depends on `direction`, so **one-tap routes write
+  `direction='outbound'`** (revises this dossier's own Cluster A). Gravity also depends on the
+  connected flag, so the "Rarely responds" contacts feed it differently.
+- **[log → orrery]** `gravity` maps naturally onto body size or ring weight and was
+  **deliberately not** given an orrery encoding in v1 — recorded so domain 9 knows the option
+  was considered and left open rather than overlooked.
 - **[log → ai]** Interaction history reaches the prompt as **aggregates only** — counts,
   cadence, and the quality summary. **No interaction note text is ever transmitted**, because an
   interaction row has no `off_limits` analogue. The channel resolver must handle `unspecified`
@@ -505,6 +645,15 @@ exactly the case it was added for.
   not on archive. If it does, restoring lands the contact in instant deep decay.
 - UI copy for the connected / didn't-connect distinction (avoid "failed").
 - Whether the digest reads the quality marker (domain 14 also still owns keep/cut).
+- **Gravity's decay half-life and its floor value** — both tunable constants, and per CLAUDE.md
+  they sit at the top of their service file so tuning is a single-number edit.
+- **Gravity's tier count, boundaries and names** (thin / building / solid / deep are
+  placeholders), and how the bar renders.
+- **Intensity's period** — rolling 7 days, calendar week, or one interval-length as set per
+  contact. The last is probably right, since a Yearly contact has no meaningful "this week".
+- How gravity and intensity sit together on the profile without reading as a scorecard.
+- Whether gravity is ever surfaced *before* a difficult conversation, which is the use case that
+  motivated it but which "profile only" does not directly serve.
 
 ---
 
@@ -551,8 +700,13 @@ Veto any cheaply at review.
    did and are not hand-corrected.
 6. **`recorded_at` is set from the device clock at insert and never changes.**
 7. **The timeline orders by `occurred_at DESC`, tiebroken by `id DESC`.**
-8. **The cadence statistic ignores rows that did not connect** for "Rarely responds" contacts,
-   matching the recency rule, so the stat and the status never disagree.
+8. **Intensity ignores rows that did not connect** for "Rarely responds" contacts, matching the
+   recency rule, so the metric and the status never disagree.
+9. **`gravity` and `intensity` are derived at query time, never stored** — same reasoning
+   01-data used for `status`: a stored score rots silently because no trigger fires on the
+   passage of time.
+10. **Both reach the AI prompt**, since they are aggregates and the aggregates channel is
+    already decided. The gravity *tier name* is sent, not a number.
 
 ---
 
@@ -656,33 +810,3 @@ rather than an implementation detail.
 - `workpapers/04-log/overlap-read-surfaces.md` — profile / dashboard / digest / orrery
 - `workpapers/04-log/overlap-import-crud-backup.md` — the import, CRUD and export seams
   (largely superseded by the domain-5 cut; retained for its parse and export findings)
-
----
-
-## Cross-domain constraints exported
-
-*(populated at wrap-up)*
-
----
-
-## Deferred to phase discussion
-
-*(populated at wrap-up)*
-
----
-
-## Deferred to phase planning
-
-*(populated at wrap-up)*
-
----
-
-## Decisions made without you
-
-*(populated at wrap-up — veto any of these cheaply at review)*
-
----
-
-## Findings
-
-*(populated at wrap-up)*
