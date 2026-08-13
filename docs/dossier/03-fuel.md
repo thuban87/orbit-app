@@ -1,6 +1,7 @@
 # Dossier 03 — `fuel` — Conversational Fuel: storage & interaction
 
-**Status:** in-progress · Interrogated 2026-08-12 · 21 questions queued at start
+**Status:** complete · Interrogated 2026-08-12 · 23 questions over 6 rounds · No `[OPEN]`
+items remain
 
 ## Scope
 

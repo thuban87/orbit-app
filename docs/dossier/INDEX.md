@@ -18,8 +18,8 @@ domain-research step and decline its brownfield-mapping offer — the dossier re
 | 1 | `data` | Core contact schema & status engine | **complete** |
 | 2 | `fields` | Custom fields | **complete** (HANDOFF §14) |
 | 3 | `fuel` | Conversational Fuel — storage & interaction | **complete** |
-| 4 | `log` | Interaction log & touchpoint updates | pending |
-| 5 | `import` | Obsidian vault importer | pending |
+| 4 | `log` | Interaction log & touchpoint updates | **complete** |
+| 5 | `import` | Obsidian vault importer | **cut** (owner, 2026-08-12 — see `04-log.md`) |
 | 6 | `crud` | Contact create/edit flows & forms | pending |
 | 7 | `photos` | Photo handling | pending |
 | 8 | `dashboard` | Dashboard screen | pending |
@@ -96,7 +96,33 @@ quick action) differ from the full update flow.
 - HANDOFF: §1, §6
 - Likely overlaps: `data`, `widget`, `notify`, `crud`, `ai`
 
-## 5. `import` — Obsidian vault importer
+**Complete — see `docs/dossier/04-log.md`.** 29 questions over 8 rounds; no `[OPEN]` items.
+The touchpoint row gained three axes the plugin never had — **channel** (with a first-class
+`unspecified`), **direction**, and **whether it connected** — plus an optional quality marker.
+This run **cut domain 5 entirely** (owner: no vault data migration; code porting per HANDOFF §4
+is untouched), introduced a **fourth status, `rogue`**, extending 01-data's threshold model,
+added a **separate `events` table**, and put **stable ids on every user-data table** so a
+restore can merge. Platform verification established that **both one-tap routes write to SQLite
+headlessly** — and that a timed undo is broken on Android 14+. The owner also introduced a
+**two-view orrery** concept that no domain owns.
+
+## 5. `import` — Obsidian vault importer ✂ CUT
+
+**Cut by the owner on 2026-08-12** during the `log` interrogation. He was the plugin's only
+user, the vault remains on disk as reference, and the app starts clean with contacts entered by
+hand. This drops HANDOFF §15's first-move **#4** only.
+
+> **Do not confuse the two "migrations."** *Data* migration (vault files → SQLite) is cut.
+> *Code* porting (HANDOFF §4's port list — `AiService.ts`, `calculateStatus()`, schema types,
+> `formatLocalDate()`) is **untouched and still the plan.** The distinction is the owner's.
+
+Consequences: `[data → import]` ×3 and `[fuel → import]` are moot; the `import` value should be
+dropped from the fuel and interaction `source` enums; and 01-data's **F17** risk — the importer
+as a second, untrusted producer of `col_name` — disappears entirely (whitelist *construction*
+remains correct for the field editor regardless).
+
+<details>
+<summary>Original scope, retained for the record</summary>
 
 The bridge from the old life to the new one, and the de-facto seed-data mechanism
 (HANDOFF §15.4: "the existing vault files are effectively the schema specification").
@@ -109,6 +135,8 @@ reuse or replace them.
 - Plugin source: `src/schemas/loader.ts` parsers, `src/services/OrbitIndex.ts:parseContact`
 - HANDOFF: §15.4
 - Likely overlaps: `data`, `fields`, `fuel`, `log`, `photos`
+
+</details>
 
 ## 6. `crud` — Contact create/edit flows & forms
 
@@ -302,3 +330,32 @@ section. Summarised here so a later run sees what binds it.*
   `withExclusiveTransactionAsync`, so `ON DELETE CASCADE` is decorative — (2026-08-12)
 - [fuel → **unowned**] The in-app **compose screen** has no owning domain in this index — the
   same gap 01-data created with the never-contacted screen — (2026-08-12)
+- [log → data] `interactions` carries channel (6 values incl. `unspecified`), nullable
+  direction, a connected flag, optional quality, `occurred_at`/`recorded_at`, `source` and a
+  stable uid; a **separate `events` table** holds snooze/archive/restore — (2026-08-12)
+- [log → data] `contacts` gains a **"Rarely responds"** flag; for those contacts `last_contact`
+  is MAX over *connected* rows only — scopes 01-data's single-writer rule, does not reverse it
+  — (2026-08-12)
+- [log → data] **`rogue`** is a fourth status threshold plus a non-time entry path, with a
+  `reason` attribute — **extends** 01-data's continuous-progress model — (2026-08-12)
+- [log → **all**] **Every user-data table carries a stable, globally-unique id** so a restore
+  can merge instead of only replacing — (2026-08-12)
+- [log → notify] `rogue` fires no decay notifications; mark-contacted stays one-tap and writes
+  **headlessly**, but the background path is gated to non-foreground, so a tap while the app is
+  open is **silently dropped** unless both listeners are wired — (2026-08-12)
+- [log → widget] Small tiles keep §6's one-tap; the larger tile shows *Quick mark* + *Log
+  contact*. Widget taps are headless broadcasts with a **hardcoded 30 s budget**, and
+  **Android 15+ force-stop greys the widget** until next app launch — (2026-08-12)
+- [log → orrery] ⚠ **Owner introduced a TWO-VIEW orrery** (relationship-closeness vs status) —
+  his answer to 01-data's frequency-encoding question. **No domain owns it.** `rogue`'s
+  threshold and rendering are open; §7's rejected "floating free" was **not** adopted —
+  (2026-08-12)
+- [log → ai] History reaches the prompt as **aggregates only** — **no interaction note text is
+  ever transmitted**, since a row has no `off_limits` analogue. Quality summary included —
+  (2026-08-12)
+- [log → backup] Export must include `interactions` and `events`, and must **not** restore
+  `last_contact` as authoritative — (2026-08-12)
+- [log → crud] Purge must delete interactions **and** events explicitly; answering "when did you
+  last speak" **must insert a row** — (2026-08-12)
+- [log → **index**] **Domain 5 (`import`) is cut**; four earlier constraints are moot and
+  `import` leaves both `source` enums — (2026-08-12)
