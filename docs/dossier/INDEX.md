@@ -21,7 +21,7 @@ domain-research step and decline its brownfield-mapping offer — the dossier re
 | 4 | `log` | Interaction log & touchpoint updates | **complete** |
 | 5 | `import` | Obsidian vault importer | **cut** (owner, 2026-08-12 — see `04-log.md`) |
 | 6 | `crud` | Contact create/edit flows & forms | **complete** |
-| 7 | `photos` | Photo handling | pending |
+| 7 | `photos` | Photo handling | **complete** |
 | 8 | `dashboard` | Dashboard screen | pending |
 | 9 | `orrery` | Orbit view | pending |
 | 10 | `capture` | Share-sheet capture | pending |
@@ -176,6 +176,17 @@ what the importer does with the vault's existing photo references.
 - Plugin source: `src/utils/ImageScraper.ts` (151), `src/components/ContactCard.tsx:241-264`
 - HANDOFF: §14.3 (photo field), §4 (ImageScraper listed as delete)
 - Likely overlaps: `import`, `crud`, `data`, `dashboard`
+
+**Complete — see `docs/dossier/07-photos.md`.** 7 questions over 3 rounds; no `[OPEN]` items.
+Photo becomes **one 512×512 JPEG master** per contact under the persistent document dir, via a
+**library-only** picker (no camera, no permissions) with an **in-app Skia crop**. This run
+**reverses §14.3** — a URL entry path is **kept** alongside the picker — and **partially
+un-deletes §4's `ImageScraper`** (its download logic only, as `fetch`), the end state always a
+local file so §3's offline-read rule survives. The ported HSL-avatar hash is **quantized to a
+themed swatch set** to satisfy CLAUDE.md's no-hardcoded-colour rule. Platform verification
+established three hard downstream facts with no owning domain: the **widget can't read `file://`
+(needs base64)**, **notifications have no per-contact large icon** in managed Expo, and the
+**Skia `file://` path is undocumented** (spike or go base64).
 
 ## 8. `dashboard` — Dashboard screen
 
@@ -401,3 +412,21 @@ section. Summarised here so a later run sees what binds it.*
   was added — profile only — (2026-08-12)
 - [log → orrery] `gravity` maps naturally onto body size or ring weight; **deliberately not**
   encoded there in v1, recorded so it reads as considered rather than overlooked — (2026-08-12)
+- [photos → data] `contacts.photo` stores a **relative filename** under the document dir
+  (resolved to absolute at read), never an absolute/device-specific path — (2026-08-13)
+- [photos → crud/self] Replace/remove **deletes the old file inline** and is **non-undoable**
+  (no `field_history` for binaries); purge also deletes custom photo-field files — (2026-08-13)
+- [photos → fields] A custom field of type **`photo`** reuses this exact pipeline (512px master,
+  themed fallback, orphan/backup rules); not dropped from the §14.8 type set — (2026-08-13)
+- [photos → dashboard/orrery] One **512px master** per contact; `expo-image` for grid/profile,
+  Skia for the orrery; fallback is a **themed swatch + initials**, deterministic per contact —
+  (2026-08-13)
+- [photos → widget] Widget photos **must be base64 `data:` URIs** (RemoteViews can't read
+  `file://`), re-encoded from the 512px master, within RemoteViews byte ceilings — (2026-08-13)
+- [photos → notify] ⚠ **No per-notification large icon** in managed expo-notifications — a
+  contact photo on a decay notification needs a **bare-workflow native module**; scope call for
+  `notify` — (2026-08-13)
+- [photos → backup] Export **embeds photo bytes as base64** (contacts + self); restore writes
+  fresh files and **repoints paths**, never restoring stored paths verbatim — (2026-08-13)
+- [photos → **index**] This run **reverses §14.3** (URL entry kept) and **partially un-deletes
+  §4's `ImageScraper`** (download logic only); both owner-chosen and flagged — (2026-08-13)
