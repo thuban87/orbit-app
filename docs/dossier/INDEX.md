@@ -20,7 +20,7 @@ domain-research step and decline its brownfield-mapping offer — the dossier re
 | 3 | `fuel` | Conversational Fuel — storage & interaction | **complete** |
 | 4 | `log` | Interaction log & touchpoint updates | **complete** |
 | 5 | `import` | Obsidian vault importer | **cut** (owner, 2026-08-12 — see `04-log.md`) |
-| 6 | `crud` | Contact create/edit flows & forms | pending |
+| 6 | `crud` | Contact create/edit flows & forms | **complete** |
 | 7 | `photos` | Photo handling | pending |
 | 8 | `dashboard` | Dashboard screen | pending |
 | 9 | `orrery` | Orbit view | pending |
@@ -153,6 +153,17 @@ user's problem; SQLite makes it ours).
 - Plugin source: `src/components/FormRenderer.tsx`, `src/schemas/*.schema.ts`, `src/services/ContactManager.ts:57-146`
 - HANDOFF: §14.3, §14.7, §14.8
 - Likely overlaps: `fields`, `data`, `photos`, `log`
+
+**Complete — see `docs/dossier/06-crud.md`.** 12 questions over 4 rounds; no `[OPEN]` items.
+The create form is a **lean five-field set** (name, category, frequency, last-spoke, phone);
+custom fields render as a block after the fixed columns; defining a field stays a **settings
+trip** (no inline DDL from the form). This run **reversed 01-data** on `contact_link` —
+the owner chose **many links in a `contact_links` child table**, phone/email staying single
+columns. Contact lifecycle got its surfaces: **archive on the profile, purge+restore only from
+a dedicated Archived list** (two-stage), purge gated by an **impact-summary confirm**;
+never-contacted and archived are **separate homes**. Three net-new settings were **assigned
+away from this domain** — favourites rank (widget/dashboard), `ring_seq` and sun (orrery) —
+leaving only **"Rarely responds"** (edit form + profile label) here.
 
 ## 7. `photos` — Photo handling
 
@@ -367,6 +378,25 @@ section. Summarised here so a later run sees what binds it.*
   stored** — matching 01-data's rule for `status` — (2026-08-12)
 - [log → data] `gravity` depends on direction, so **one-tap routes write
   `direction='outbound'`** — revises 04-log's own Cluster A — (2026-08-12)
+- [crud → data] ⚠ **`contact_link` shape reversed**: single scalar column → a `contact_links`
+  child table (uid, url, optional label, order). phone/email stay single columns; actionable-tap
+  survives per row. Owner's explicit reversal of 01-data F/E — (2026-08-13)
+- [crud → data] Create is a **multi-row transaction through the single-writer DAO** (contact +
+  optional interaction row); "not yet/don't know" writes no row (NULL `last_contact`); backdated
+  create row is `source='manual'`, `direction=null` (never `outbound`) — (2026-08-13)
+- [crud → fields] `custom_field_defs` needs a **display-order column from migration 1** (§14.10
+  reorder; §14.1 has none); custom fields render as a block after fixed columns, never interleaved;
+  the `label→col_name` slugifier stays a **single producer** and must reserve the full fixed-column
+  name set — (2026-08-13)
+- [crud → capture] Inline-create is **name-only**, `last_contact` defaults **empty**
+  (never-contacted) — opposite of the standard form's "today" — (2026-08-13)
+- [crud → backup / self] Export/restore and **purge** must include `contact_links` explicitly —
+  (2026-08-13)
+- [crud → dashboard / orrery / widget] **Three editing surfaces assigned out of `crud`**:
+  favourites rank → dashboard/widget; `ring_seq` (drag) and sun assignment → orrery. Only "Rarely
+  responds" stays on the contact edit form — (2026-08-13)
+- [crud → data/log] Whether an **archived contact's clock runs** (open in 04-log) sets what the
+  **restore** confirm must warn about — instant deep decay on restore if it does — (2026-08-13)
 - [log → dashboard] The "nothing log-derived on the card" rule was **reaffirmed** when `gravity`
   was added — profile only — (2026-08-12)
 - [log → orrery] `gravity` maps naturally onto body size or ring weight; **deliberately not**
