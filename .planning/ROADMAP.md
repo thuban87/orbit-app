@@ -95,10 +95,10 @@ Recorded here because they bind phases that do not own them. Every planner/execu
   3. `types.ts` has no Obsidian coupling and `AiService.ts` compiles standalone with `fetch` + `response.ok` handling.
   4. Colours resolve through theme tokens; Biome and portrait-lock are configured.
 
-**Plans:** 5 plans
+**Plans:** 1/5 plans executed
 **Wave 1**
 
-- [ ] 01-01-PLAN.md — Expo SDK 57 scaffold + Biome/tsconfig/portrait-lock/Vitest + folder layout (FND-06)
+- [x] 01-01-PLAN.md — Expo SDK 57 scaffold + Biome/tsconfig/portrait-lock/Vitest + folder layout (FND-06)
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
@@ -337,7 +337,7 @@ Recorded here because they bind phases that do not own them. Every planner/execu
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Project Scaffold & Portable Code | 0/5 | Not started | - |
+| 1. Project Scaffold & Portable Code | 1/5 | In Progress|  |
 | 2. Data Foundation & Status Engine | 0/TBD | Not started | - |
 | 3. Custom Fields | 0/TBD | Not started | - |
 | 4. Contact CRUD & Lifecycle | 0/TBD | Not started | - |

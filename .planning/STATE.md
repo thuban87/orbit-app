@@ -5,14 +5,14 @@ milestone_name: milestone
 current_phase: 1
 current_phase_name: Project Scaffold & Portable Code
 status: executing
-last_updated: "2026-08-14T13:41:08.193Z"
+last_updated: "2026-08-14T17:51:03.967Z"
 last_activity: 2026-08-14
-last_activity_desc: Project initialized from the docs/dossier + HANDOFF decisions (PROJECT / REQUIREMENTS / ROADMAP derived, not re-derived).
+last_activity_desc: Phase 1 execution started
 progress:
   total_phases: 16
   completed_phases: 0
-  total_plans: 0
-  completed_plans: 0
+  total_plans: 5
+  completed_plans: 1
   percent: 0
 ---
 
@@ -27,10 +27,10 @@ See: .planning/PROJECT.md (updated 2026-08-14)
 
 ## Current Position
 
-Phase: 1 of 16 (Project Scaffold & Portable Code)
-Plan: 0 of TBD in current phase
+Phase: 1 (Project Scaffold & Portable Code) — EXECUTING
+Plan: 2 of 5
 Status: Ready to execute
-Last activity: 2026-08-14 — Project initialized from the docs/dossier + HANDOFF decisions (PROJECT / REQUIREMENTS / ROADMAP derived, not re-derived).
+Last activity: 2026-08-14 — Phase 1 execution started
 
 Progress: [░░░░░░░░░░] 0%
 
@@ -54,6 +54,7 @@ Progress: [░░░░░░░░░░] 0%
 - Trend: —
 
 *Updated after each plan completion*
+| Phase 1 P01 | 8min | 3 tasks | 26 files |
 
 ## Accumulated Context
 
@@ -67,6 +68,9 @@ Foundational decisions affecting current work:
 
 - Config: fine granularity (16 phases, one per domain), Vertical MVP, sequential execution (YOLO,
   quality models, research/plan-check/verifier/nyquist/source-grounding on, worktrees off).
+
+- [Phase 1]: 01-01: app.config.ts dedupes the expo-sqlite plugin (expo install pre-populated app.json's plugins array) to avoid a duplicate-plugin prebuild error
+- [Phase 1]: 01-01: shared check-colors.sh gate lands now (npm check:colors); first enforced in 01-03 when App.tsx's template #fff becomes the themed shell
 
 ### Pending Todos
 

@@ -16,7 +16,7 @@ roadmap phases. Items marked *(infra)* are foundation guarantees rather than end
 - [ ] **FND-03**: `types.ts` is free of Obsidian coupling (`TFile` stripped/generalised) and the extracted files typecheck. *(infra)*
 - [ ] **FND-04**: `AiService.ts` is ported with `requestUrl`→`fetch` and explicit `response.ok` handling, decoupled from Obsidian types (not yet wired to UI). *(infra)*
 - [ ] **FND-05**: A theme-token module and Zustand store scaffold exist (quest-board pattern); no hardcoded colours. *(infra)*
-- [ ] **FND-06**: Biome lint/format, portrait-lock, and the CLAUDE.md folder layout are configured. *(infra)*
+- [x] **FND-06**: Biome lint/format, portrait-lock, and the CLAUDE.md folder layout are configured. *(infra)*
 
 ### Data Foundation & Status Engine (DATA)
 
@@ -192,6 +192,7 @@ Tracked, not in the current roadmap. Reasons recorded in the dossier.
 | BKP-01…04 | Phase 16 | Pending |
 
 **Coverage:**
+
 - v1 requirements: 82 total
 - Mapped to phases: 82
 - Unmapped: 0 ✓
