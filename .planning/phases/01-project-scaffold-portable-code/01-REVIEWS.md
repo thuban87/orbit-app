@@ -1,449 +1,195 @@
 ---
 phase: 1
-cycle: 2
+cycle: 3
 reviewers: [codex, claude]
-reviewed_at: 2026-08-14T15:31:54Z
+reviewed_at: 2026-08-14
 plans_reviewed: [01-01-PLAN.md, 01-02-PLAN.md, 01-03-PLAN.md, 01-04-PLAN.md, 01-05-PLAN.md]
-prior_review: git commit e30f6e3 (cycle 1, this same path, superseded)
-revision_commit: 8eef807
-current_high: 0
-current_actionable: 13
+prior_cycle_commit: 85eb259
 ---
 
-# Cross-AI Plan Review — Phase 1 (CYCLE 2 · re-review of revised plans)
+# Cross-AI Plan Review — Phase 1 (Cycle 3, re-review)
 
-This is the second review round. Cycle 1 (preserved in git commit `e30f6e3`) raised 5 HIGH + assorted
-MEDIUM/LOW findings; those were incorporated into the 5 plans in commit `8eef807`. This
-round re-reviews the **current revised plans** and reports only concerns that REMAIN.
-Both reviewers independently confirmed all five cycle-1 HIGH resolutions are present and
-introduced no regression. No remaining concern is consensus-HIGH.
+This is the third and final review cycle. Cycles 1–2 findings (5 HIGH + 12 MEDIUM/LOW) were
+incorporated as surgical plan edits through commit `85eb259`. This cycle re-reads the five plans
+against the actual source (`~/projects/Orbit/src`, `~/projects/quest-board-app`, the working tree)
+to (a) confirm the cycle-2 edits held without regression, and (b) surface anything still unresolved.
+
+**Both reviewers independently confirm:** every cycle-1 and cycle-2 core resolution is genuinely
+present, no regression in the five named cycle-2 areas (resolveMode `SystemScheme` union, `AiProviderId`
+rename, rsync bootstrap split, `check:colors` negative control, `@/theme` barrel + `HomeScreen` move),
+and every spot-checked file:line citation in 01-02/01-04 is accurate. The Ollama/local-provider
+omission is enforced in the type system, code, greps, and threat model — correctly NOT re-raised.
+
+The new findings concentrate in **wave 1 (01-01)** — two of them are direct regressions introduced by
+the cycle-2 edits themselves — plus the **FND-01 pipeline's external unknowns (01-05)**.
 
 ---
 
 ## Codex Review
 
-# Cycle 2 review
+## Summary
 
-## 01-01 — Scaffold
+The plans are strong and largely close the prior review gaps. The remaining issues are a latent custom-provider orchestration bug inherited from the plugin and an unpinned cross-machine dependency install path.
 
-**Summary:** The revised scaffold plan is executable and resolves the prior configuration/tooling issues.
+## Strengths
 
-**Strengths**
+- The fetch port correctly targets the four surviving cloud call sites in the predecessor at `~/projects/Orbit/src/services/AiService.ts:264,319,377,431`, while preserving response-shape validation.
+- The `AiProviderId` naming avoids collision with the real provider interface at `~/projects/Orbit/src/services/AiService.ts:149`.
+- The theme plan correctly makes `"unspecified"` resolve dark and adds the missing `@/theme` barrel and real `HomeScreen`.
+- The release-APK proof is appropriate: the quest-board runbook confirms debug builds need Metro at `~/projects/quest-board-app/apps/mobile/ANDROID_BUILD_GUIDE.md:213-222`.
 
-- Installs `tsx`, exercises `expo config`, merges `app.json`, and applies the two scoped Biome overrides.
-- Creates all eight required tracked `src/` directories and puts `passWithNoTests` in Vitest config.
-- The colour gate is materially broader than the prior six-digit-hex grep.
+## Concerns
 
-**Concerns**
+- **MEDIUM — Custom provider is unusable through `AiService.generate()`.** The predecessor registers `CustomProvider` with `aiCustomModel` (`~/projects/Orbit/src/services/AiService.ts:490-495`), and `CustomProvider.generate()` explicitly supports falling back to that model (`:431-439`). But the orchestrator always requires `settings.aiModel` and throws if it is empty before it delegates (`:518-527`). The settings UI deliberately does not show the global model selector for custom providers (`~/projects/Orbit/src/settings.ts:410-412`) and stores the custom model separately (`:396-405`; defaults at `:63-66`). Plan 01-04 ports this unchanged and tests providers directly, so it will miss the broken façade path.
 
-- None remaining.
+- **MEDIUM — The "pinned stack / same lockfile" build claim is not enforceable.** The repo currently has no `package-lock.json`. Plan 01-01 runs mutable `create-expo-app@latest` and bare `npm install` commands (`.planning/phases/01-project-scaffold-portable-code/01-01-PLAN.md:123-137`) but neither lists nor verifies a committed lockfile. Plan 01-05 then runs `npm install` on `droid` (`01-05-PLAN.md:195-202`) while its threat model claims the same lockfile is used (`:263`). A fresh or missing lockfile can produce a different dependency graph on the build host.
 
-**Suggestions**
+## Suggestions
 
-- Execute as written.
+- Add an `AiService`-level mocked-fetch test for custom settings with `aiModel: ""` and a populated `aiCustomModel`; select the custom model before the empty-model guard (or make model selection provider-specific).
+- Make `package-lock.json` an explicit Plan 01-01 artifact and acceptance check, commit it before rsync, and use `npm ci` on `droid`.
 
-**Risk Assessment:** **LOW** — the prior scaffold blockers are addressed.
+## Risk Assessment
 
-## 01-02 — Portable logic and schemas
-
-**Summary:** This is now a coherent semantic port plan: it preserves behavior/comments while explicitly allowing the required Biome formatting and safe fixes.
-
-**Strengths**
-
-- The source-grounded `TFile` removal remains precise: the only coupling is the import and `OrbitContact.file` in the legacy source ([types.ts](/home/bwales/projects/Orbit/src/types.ts:1), [types.ts](/home/bwales/projects/Orbit/src/types.ts:47)).
-- It explicitly permits the exact Biome-safe transformations required by the legacy code ([01-02-PLAN.md](/home/bwales/projects/orbit-app/.planning/phases/01-project-scaffold-portable-code/01-02-PLAN.md:97)).
-- The date acceptance criterion correctly distinguishes executable code from comments ([01-02-PLAN.md](/home/bwales/projects/orbit-app/.planning/phases/01-project-scaffold-portable-code/01-02-PLAN.md:178)); the legacy explanatory comment genuinely contains `toISOString` ([dates.ts](/home/bwales/projects/Orbit/src/utils/dates.ts:4)).
-
-**Concerns**
-
-- None remaining.
-
-**Suggestions**
-
-- Execute as written.
-
-**Risk Assessment:** **LOW** — port behavior and lint requirements now agree.
-
-## 01-03 — Theme and home shell
-
-**Summary:** The store-to-provider wiring and pure resolver test are now present, but the new resolution path has two compile-blocking integration gaps.
-
-**Strengths**
-
-- The provider is explicitly required to subscribe to `useThemeStore` and derive its palette from persisted state ([01-03-PLAN.md](/home/bwales/projects/orbit-app/.planning/phases/01-project-scaffold-portable-code/01-03-PLAN.md:176)).
-- `resolveMode`/`resolvePalette` are pure and have a concrete Vitest suite.
-- The shared colour gate is correctly reused for `src` and `App.tsx`.
-
-**Concerns**
-
-- **HIGH — [NEW] `useColorScheme()` is passed to a narrower resolver type.** The revised contract accepts only `"light" | "dark" | null` ([01-03-PLAN.md](/home/bwales/projects/orbit-app/.planning/phases/01-project-scaffold-portable-code/01-03-PLAN.md:106)), while the plan directly passes `scheme` from `useColorScheme()` ([01-03-PLAN.md](/home/bwales/projects/orbit-app/.planning/phases/01-project-scaffold-portable-code/01-03-PLAN.md:178)). The in-repo React Native reference defines the hook result as `ColorSchemeName`, which includes `"unspecified"` ([Appearance.d.ts](/home/bwales/projects/quest-board-app/node_modules/react-native/Libraries/Utilities/Appearance.d.ts:12), [Appearance.d.ts](/home/bwales/projects/quest-board-app/node_modules/react-native/Libraries/Utilities/Appearance.d.ts:51)). As written, the required `tsc --noEmit` gate can fail.
-
-- **HIGH — [PARTIAL: cycle-1 #4] `App.tsx` is told to import from a theme barrel that the plan never creates.** `@/*` maps `@/theme` to `src/theme` ([01-01-PLAN.md](/home/bwales/projects/orbit-app/.planning/phases/01-project-scaffold-portable-code/01-01-PLAN.md:181)), but 01-03 creates only `theme-types.ts`, `theme-presets.ts`, `theme-presets.test.ts`, and `theme-provider.tsx`—not `src/theme/index.ts` ([01-03-PLAN.md](/home/bwales/projects/orbit-app/.planning/phases/01-project-scaffold-portable-code/01-03-PLAN.md:7)). Task 3 nevertheless requires importing `ThemeProvider` from `@/theme` ([01-03-PLAN.md](/home/bwales/projects/orbit-app/.planning/phases/01-project-scaffold-portable-code/01-03-PLAN.md:214)). The home shell cannot typecheck unless a barrel is added or the import is direct.
-
-**Suggestions**
-
-- Normalize before calling the resolver, e.g. treat every non-`"light"` scheme as `"dark"`, and test `"unspecified"`.
-- Add `src/theme/index.ts` exporting `ThemeProvider` and `useTheme`, or change `App.tsx` to import from `@/theme/theme-provider`.
-
-**Risk Assessment:** **HIGH** — both defects can block the plan’s mandatory typecheck.
-
-## 01-04 — AI service
-
-**Summary:** The revised plan correctly omits the local provider and substantially improves the fetch conversion verification. The remaining gap is only the advertised HTTPS-only custom endpoint guarantee.
-
-**Strengths**
-
-- It removes the legacy local class and registration, which are the source of the literal `http://localhost:11434` path ([AiService.ts](/home/bwales/projects/Orbit/src/services/AiService.ts:168), [AiService.ts](/home/bwales/projects/Orbit/src/services/AiService.ts:482)).
-- It specifies four `response.ok` guards before four async JSON reads, with behavioral tests that ensure `json()` is not called after a failed response.
-- The local settings interface matches the legacy service’s actual settings reads ([AiService.ts](/home/bwales/projects/Orbit/src/services/AiService.ts:475)).
-
-**Concerns**
-
-- **MEDIUM — [PARTIAL: cycle-1 #5] The plan removes literal cleartext URLs but does not enforce HTTPS for the retained custom endpoint at runtime.** The custom provider stores an arbitrary endpoint string and sends its request directly to it ([AiService.ts](/home/bwales/projects/Orbit/src/services/AiService.ts:402), [AiService.ts](/home/bwales/projects/Orbit/src/services/AiService.ts:421)). The revised local contract still exposes `aiCustomEndpoint: string` ([01-04-PLAN.md](/home/bwales/projects/orbit-app/.planning/phases/01-project-scaffold-portable-code/01-04-PLAN.md:131)), and the port instructs `fetch(url, ...)` ([01-04-PLAN.md](/home/bwales/projects/orbit-app/.planning/phases/01-project-scaffold-portable-code/01-04-PLAN.md:175)). `! grep 'http://'` proves only that no literal is committed; `new CustomProvider("http://…")` would still make cleartext egress.
-
-**Suggestions**
-
-- Validate `new URL(endpoint).protocol === "https:"` in `CustomProvider` before `fetch`.
-- Add a test proving an `http:` endpoint rejects and `fetch` is never called. This preserves the recorded omission of the local provider.
-
-**Risk Assessment:** **MEDIUM** — dormant in Phase 1, but it leaves the claimed HTTPS-only boundary unenforced in the actual service.
-
-## 01-05 — Pixel build proof
-
-**Summary:** The release-APK, physical-Pixel-only completion rule, clean prebuild, and emulator non-completion semantics are all correctly fixed. The remote-transfer preflight is still incomplete.
-
-**Strengths**
-
-- The plan now uses `assembleRelease`, which embeds the JS bundle; the sibling Gradle configuration confirms release builds use the debug signing config by default ([build.gradle](/home/bwales/projects/quest-board-app/apps/mobile/android/app/build.gradle:102), [build.gradle](/home/bwales/projects/quest-board-app/apps/mobile/android/app/build.gradle:114)).
-- It explicitly keeps FND-01 open for an emulator-only smoke test ([01-05-PLAN.md](/home/bwales/projects/orbit-app/.planning/phases/01-project-scaffold-portable-code/01-05-PLAN.md:193)).
-- It adds the missing `prebuild --clean` rule and validates the remote marker before `rsync --delete`.
-
-**Concerns**
-
-- **MEDIUM — [PARTIAL: cycle-1 remote-build command] The checkpoint proves SSH authentication but never proves the remote `rsync` receiver or its Windows-path form.** Task 1 only executes `ssh droid 'echo ok'` ([01-05-PLAN.md](/home/bwales/projects/orbit-app/.planning/phases/01-project-scaffold-portable-code/01-05-PLAN.md:104)); it asks the owner to identify cmd/PowerShell and a `C:\...` path ([01-05-PLAN.md](/home/bwales/projects/orbit-app/.planning/phases/01-project-scaffold-portable-code/01-05-PLAN.md:128)). Task 2 then assumes `rsync` can run remotely against that path ([01-05-PLAN.md](/home/bwales/projects/orbit-app/.planning/phases/01-project-scaffold-portable-code/01-05-PLAN.md:168)). Windows OpenSSH alone does not establish either requirement, so the first real sync can still fail before Gradle runs.
-
-**Suggestions**
-
-- Add a pre-check for the remote receiver (`rsync --version`) and a non-destructive `rsync --dry-run` to the confirmed destination.
-- Record the exact remote path syntax accepted by that receiver. If unavailable, make the owner choose and document the allowed `scp` fallback.
-
-**Risk Assessment:** **MEDIUM** — likely a bring-up blocker, though it does not weaken the actual Pixel acceptance rule.
-
-# Overall
-
-The five requested cycle-1 HIGH resolutions are present:
-
-1. **Biome vs verbatim:** confirmed in 01-02’s semantic-verbatim and `biome check --write` rules, plus 01-01’s logger/test overrides.
-2. **`toISOString` criterion:** confirmed; executable code is checked separately while the mandated comment remains.
-3. **Standalone physical-Pixel proof:** confirmed; 01-05 uses release APKs and says emulator evidence leaves FND-01 open.
-4. **Live persisted theme store:** substantially confirmed; the provider now subscribes to the store and uses `useColorScheme`, with resolver tests. However, the two 01-03 integration defects above still prevent the intended implementation from typechecking as written.
-5. **Local/LAN provider omitted:** confirmed. I am not re-raising its omission. The only residual issue is runtime validation of the separate custom endpoint’s HTTPS-only promise.
-
-Remaining unresolved concerns:
-
-- **HIGH:** 01-03 `useColorScheme` type/domain mismatch.
-- **HIGH:** 01-03 missing `@/theme` barrel/direct-import specification.
-- **MEDIUM:** 01-04 custom endpoint accepts runtime `http:` URLs.
-- **MEDIUM:** 01-05 does not verify remote `rsync` capability/path syntax before its destructive sync.
+**MEDIUM.** The scaffold, theme, and device-proof plans are well specified, but the custom AI façade would fail for its intended custom configuration, and the cross-machine build is not yet dependency-reproducible.
 
 ---
 
 ## Claude Review
 
-# Cross-AI Plan Review — CYCLE 2 (re-review of revised plans, commit 8eef807)
+## 1. Summary
 
-**Method note:** every file:line below was opened and verified this session — `~/projects/Orbit/src/{types.ts,utils/dates.ts,utils/logger.ts,schemas/*,services/AiService.ts}`, `~/projects/Orbit/test/unit/*`, `~/projects/quest-board-app/{biome.json,apps/mobile/app.config.ts,apps/mobile/tsconfig.json,apps/mobile/babel.config.js,apps/mobile/ANDROID_BUILD_GUIDE.md,apps/mobile/android/app/build.gradle,apps/mobile/src/app/_layout.tsx,packages/ui/src/*,node_modules/react-native/Libraries/Utilities/Appearance.d.ts}`, plus this repo's `.gitignore`, `.claude/settings.local.json`, `.claude/hooks/`, `docs/`.
+I re-read the five plans against the actual source on disk: `~/projects/Orbit/src/{types.ts,utils/dates.ts,utils/logger.ts,schemas/*,services/AiService.ts}`, `~/projects/Orbit/test/unit/*`, `~/projects/quest-board-app/{biome.json,apps/mobile/*,packages/ui/src/*}`, and the orbit-app working tree. **The cycle-2 edits hold up under verification and I found no regression in any of the five named areas.** Specifically: RN's `ColorSchemeName` really is `'light' | 'dark' | 'unspecified'` with a non-nullable `useColorScheme()` (`quest-board-app/node_modules/react-native/Libraries/Utilities/Appearance.d.ts:12,51`), so the `SystemScheme` superset is correct and the `"unspecified"` test case is a real value, not a straw man; the `AiProviderId` rename is necessary and precisely scoped (`~/projects/Orbit/src/services/AiService.ts:149,469,499,507`); `noStaticOnlyClass` and `noThisInStatic` both exist and are `recommended` in the pinned Biome line, and `noThisInStatic` carries a **safe** fix — meaning `biome check --write` on `logger.ts` would silently rewrite `this.level`→`Logger.level` if the 01-01 override were not there, so that override is load-bearing and correct. Every file:line citation in 01-02 and 01-04 that I spot-checked is accurate (`types.ts:1` import, `types.ts:48-49` field, AiService call sites 264/319/377/431 and parses 278/334/386/443, Ollama block 168–228 and its registration at 483). The remaining findings are concentrated in wave 1 (two gate-breaking mechanical gaps introduced or exposed by the cycle-2 edits) and in the FND-01 pipeline's external unknowns.
 
----
+## 2. Strengths
 
-## 01-01-PLAN.md — Scaffold + toolchain
+- **Source fidelity is high and independently verifiable.** The `.json` property→method trap, the four surviving parse sites after the Ollama omission (`== 4`, correctly recomputed from 6), and the `interface AiProvider` collision are all real and correctly located in the actual 540-line file.
+- **The `AiProviderId` rename is the right fix, not a cosmetic one.** `AiService.ts` declares `interface AiProvider` at line 149 and consumes it at `Map<string, AiProvider>` (469), `getProvider(): AiProvider | undefined` (499), `getActiveProvider(): AiProvider | null` (507). Keeping the id union out of `AiService.ts` entirely (importing only `AiSettings`) is a cleaner resolution than aliasing at the import site.
+- **The `'none'` member is correctly retained.** `AiService.ts:508` does `settings.aiProvider === 'none'`; omitting it would be a TS2367, and the plan calls that out by error code.
+- **Behavioural proof where greps cannot reach.** 01-04 Task 3's `jsonSpy` + `not.toHaveBeenCalled()` is the only way to prove guard-*ordering*, and the plan says so explicitly. Likewise 01-01's positive+negative control on `check-colors.sh` genuinely exercises the script rather than a regex typed into an acceptance criterion.
+- **The `toISOString` acceptance criterion is now satisfiable.** Stripping comment lines before grepping resolves the previous impossible-to-satisfy check while keeping the mandated explanatory comment (`~/projects/Orbit/src/utils/dates.ts:4,11-12`) intact.
+- **The release-vs-debug APK reasoning for FND-01 is correct and correctly cited.** `quest-board-app/apps/mobile/ANDROID_BUILD_GUIDE.md:213-222` does document the red-screen failure by name, and line 222 states the release/standalone contrast. Line 179's "don't `adb install` from Linux over the tunnel" caveat is correctly scoped to the emulator path only — the Pixel is wired to *this* box, so pulling the APK back and installing locally is right.
+- **The harness prerequisites CLAUDE.md asks for already exist** — `.claude/hooks/block-git-worktree.sh` and `.claude/hooks/block-graphify-build.sh` are present and executable — so the plans correctly do not re-create them.
+- **`.claude/settings.local.json` confirms the 01-05 permissions note is accurate**: `rsync`/`scp`/`ssh` are allowed, `adb`/`emu-connect` are not. Instructing the executor to accept the prompt rather than edit the allow-list is the right call under "whose decision is it."
 
-### Summary
-Solid, well-hedged. The revision's additions (full eight-folder layout landed here rather than deferred; `passWithNoTests` moved into the config; the two Biome overrides; the shared `check:colors` script; the `app.json`-merging `({ config })` form) all land as real tasks with grep-checkable criteria. Every cited analog claim checks out: `apps/mobile/app.config.ts:1` really is `import "tsx/cjs";`, `biome.json:2` really is schema `2.4.10` (bumping to 2.5.8 is right), `apps/mobile/babel.config.js:5` really is the reanimated plugin to drop, and `tsconfig.json:9-12` really are the `@quest-board/*` aliases to drop. The `.gitignore` acceptance criteria pass against the real file (`node_modules/` line 2, `graph.html` line 9), so the append-only check is not vacuous.
+## 3. Concerns (unresolved in current plan text)
 
-### Strengths
-- `npx expo config --type public` as a **wave-1** gate for the tsx-loaded config is the right catch-early move — it converts a wave-4 prebuild failure into a wave-1 one.
-- The two Biome overrides are correctly targeted: `Logger` at `~/projects/Orbit/src/utils/logger.ts:10-42` is a static-only class **and** uses `this.level` inside static methods (lines 25, 32, 39), so both `noStaticOnlyClass` and `noThisInStatic` genuinely fire. Naming both, and telling the executor to confirm ids against `biome explain`, is exactly right.
-- `noNonNullAssertion` override is justified by real code: `~/projects/Orbit/test/unit/types.test.ts:170-172,193-194,211-213` use `result!.getFullYear()` etc.
+- **HIGH — 01-01 Task 1 never copies `app.json`, but 01-01 Task 2 requires it.** Task 1's action step 2 enumerates the files to move out of the temp scaffold: "`package.json`, `App.tsx`, `babel.config.js`, `metro.config.js` (if present), `index.ts`/`AppEntry`, `assets/`, `expo-env.d.ts`". `app.json` is not in that list, yet Task 2's design ("MERGES the template's `app.json`, preserving its icon/splash/adaptive-icon references — do NOT delete app.json") and its acceptance criterion `test -f app.json` both depend on it existing at the repo root. An executor following the enumeration literally lands a repo with no `app.json`; Task 2's acceptance then fails, and `assets/icon.png` / `adaptiveIcon` references are silently lost from the config that plan 01-05 prebuilds from. This is a direct internal contradiction created by the cycle-2 "merge app.json instead of deleting it" edit — the merge target was added to Task 2 but never added to Task 1's copy list.
+  *Fix:* add `app.json` (and `package-lock.json`) to the Task 1 copy enumeration, and add `test -f app.json` to Task 1's acceptance criteria so the failure surfaces one task earlier.
 
-### Concerns
+- **MEDIUM — 01-01's green-baseline gate (`npx biome check .`) will fail on the scaffold's own files, and no task formats them.** Biome's default `javascript.formatter.quoteStyle` is `"double"` (the 01-01 `biome.json` sets only `indentStyle`/`indentWidth`, matching `quest-board-app/biome.json:32-36`, which likewise sets no `quoteStyle`). The Expo `blank-typescript` template is single-quoted — 01-03 Task 3's own action text confirms this, describing the template's `backgroundColor: '#fff'`. `biome check` (no `--write`) fails on formatter diffs, so `App.tsx` and `index.ts` will fail the gate in **both** 01-01 Task 2's verify block and Task 3's verify block / acceptance criteria. Plans 01-02, 01-03 and 01-04 each explicitly instruct `npx biome check --write` on the files they create; 01-01 is the only plan that establishes a repo-wide `biome check .` gate without ever formatting the files it inherits.
+  *Fix:* add a step to 01-01 Task 3: `npx biome check --write .` on the scaffold-generated files (App.tsx, index.ts, expo-env.d.ts) before asserting the baseline, with a note that this is formatting-only.
 
-- **MEDIUM [NEW] — the shared `check:colors` gate is never proven to *fail*.** `01-01-PLAN.md` Task 3 acceptance criteria contain no negative control. The only real invocation is `bash scripts/check-colors.sh src/theme`, and at that moment `src/theme/` contains nothing but `.gitkeep` — so it exits 0 trivially. The accompanying "self-test" (`printf "%s" "color: #fff;" | grep -qiE '#[0-9a-fA-F]{3,8}'`) tests a *regex string typed into the acceptance criterion*, not the script. A `check-colors.sh` with an inverted exit code, a wrong `--include` filter, or a missing `-r` would pass every criterion in 01-01 and then pass 01-03's `npm run check:colors` vacuously — and FND-05's headline claim ("no hardcoded colours") rests entirely on it. Fix: add `printf 'const c = "#ff0000";\n' > /tmp/cc-probe.ts && ! bash scripts/check-colors.sh /tmp/cc-probe.ts` (and a `rgba(` and a `"white"` probe) as acceptance criteria.
+- **MEDIUM — `vitest.config.ts` depends on `@types/node`, which is not in the install list.** 01-01 Task 3 mandates `fileURLToPath(new URL("./src", import.meta.url))`, i.e. `import { fileURLToPath } from "node:url"`. Task 1 installs `zustand`, `@biomejs/biome@2.5.8`, `vitest`, `tsx` — no `@types/node`. `expo/tsconfig.base` sets `lib: ["DOM", "ESNext"]` with no Node types, so `node:url` resolves only if `@types/node` happens to be hoisted. In quest-board it *is* present (`node_modules/@types/node@25.5.2`) but it appears in neither `package.json` devDependencies block — it is purely incidental hoisting, not a guarantee for a fresh Orbit tree. If absent, Task 3's `npx tsc --noEmit` fails with TS2307 on the config file the same task just wrote. (Note `path.resolve(__dirname, …)` is not an escape — it needs the same types.)
+  *Fix:* add `@types/node` to Task 1's devDep install, or set `resolve.alias` to a plain relative `"./src"` string and drop the `node:url` import.
 
-- **LOW [NEW] — plan misattributes who ports `logger.ts`.** `01-01-PLAN.md` Task 2 action says the static-class override exists because `Logger` is "ported verbatim by **01-04**". It is ported by **01-02** (`01-02-PLAN.md` `files_modified: src/utils/logger.ts`; Task 2 action). 01-04 only *calls* `Logger.warn/error/debug`. Harmless to the config, but this is executor-facing text and the wave-2/wave-3 distinction matters if 01-02 leaves the file lint-dirty.
+- **MEDIUM — the `tsx` dependency added in cycle 2 is outside the Package Legitimacy Audit the threat model claims covers everything.** 01-01's threat register T-1-SC names the audited set as "expo, expo-sqlite, zustand, biome, async-storage, safe-area-context" and concludes "No `[SLOP]`/`[SUS]`-with-real-signal packages — no human legitimacy checkpoint required." `01-RESEARCH.md:128` confirms the audit ran over exactly six packages. Task 1 now installs **`tsx` and `vitest`** as well, neither of which is in that set — `tsx` in particular is a transpiler hook that executes at config-load time on *both* this box and the `droid` build host. Under `security_enforcement: true` this is a stated-coverage-vs-actual-install mismatch, not a judgement about `tsx` itself (which is mainstream; quest-board pins `tsx@^4.21.0`).
+  *Fix:* either extend T-1-SC's package list and re-run the legitimacy check for `tsx` + `vitest`, or narrow the threat-model claim to the audited six and note the two build-time additions explicitly.
 
-### Suggestions
-1. Decide explicitly whether to carry quest-board's `assist: { actions: { source: { organizeImports: "on" } } }` (`biome.json:15`). It's not mentioned either way, and 01-02 leans on `--write` doing import cleanup. (Ordering is safe: quest-board's own `app.config.ts:1-4` keeps the bare `import "tsx/cjs";` first ahead of alphabetically-earlier specifiers, so a side-effect import isn't reordered.)
-2. Add the negative control above; it costs two lines and is the difference between a gate and a decoration.
+- **MEDIUM — 01-05 supplies only the Windows-native path form for rsync, with no alternative and no fallback if rsync is absent.** Task 2 step 2a is meant to "PROVE the remote rsync receiver + the Windows-path FORM", but every command template in the plan uses `droid:<confirmed path>/` where the confirmed path is a backslash Windows path (`C:\Users\...`). Windows OpenSSH ships no rsync; the common installs (cwRsync, MSYS2) are Cygwin/MSYS-based and require `/cygdrive/c/Users/...` or `/c/Users/...` — `C:\...` will fail or be misparsed against `host:path` splitting. The plan gives the executor no second form to try, so a path-form failure is indistinguishable from "no receiver." Separately, `ssh droid 'rsync --version'` failing has no defined next step: PROJECT.md permits `scp` as transport, but no plan step defines the scp/tar-over-ssh fallback, so FND-01 stalls with the owner already at the checkpoint.
+  *Fix:* have the dry-run try both forms (`C:\Users\...` and `/cygdrive/c/Users/...`) and record the winner in the runbook; add a one-line documented fallback (`tar czf - --exclude … | ssh droid 'tar xzf -'` or `scp -r`) for the no-rsync case.
 
-### Risk: **LOW**
+- **LOW — 01-02's verification block contains a non-runnable check.** `grep -ic obsidian src/types.ts src/utils/dates.ts src/utils/logger.ts src/schemas/*.ts` == 0 — with multiple file arguments `grep -c` prints one `path:count` line per file, so there is no single number to compare against 0. (The per-task acceptance criteria use the correct single-file form; only the plan-level `<verification>` block is malformed.)
+  *Fix:* `! grep -ril obsidian src/types.ts src/utils src/schemas` or pipe through `grep -c ':[1-9]'`.
 
----
+- **LOW — the `home-shell-root` testID may not appear in a `uiautomator dump`.** 01-03 puts the testID on the root `View` of `HomeScreen`, and 01-05's must_haves lean on it ("verifiable via uiautomator dump"). `uiautomator dump` serialises the *accessibility* tree, which prunes views not marked important for accessibility; a plain non-accessible RN `View` container is not guaranteed to emit a node with that `resource-id`. 01-05's acceptance criterion already hedges (`home-shell-root` **or** the "Orbit" title), so this is not a blocker — but the artifact/must_haves language reads as if the testID assertion is the primary evidence.
+  *Fix:* make the "Orbit" title text the primary assertion and the testID the secondary, or set `accessible` / `accessibilityLabel` on the root view in 01-03 so the node is guaranteed to survive pruning.
 
-## 01-02-PLAN.md — Port pure logic, types, schemas
+- **LOW — `AiService`'s prompt debug-log ports as-is and is not covered by the `<legacy_compat>` note.** `~/projects/Orbit/src/services/AiService.ts:139` does `Logger.debug('AiService', \`Assembled prompt:\n${result}\`)` — that is the full assembled prompt, i.e. contact-derived content, written to `console.log`. Threat T-1-02 correctly says "do NOT log settings objects or request bodies that carry a key" (keys are safe here), and the default level is `off`, so nothing leaks this phase. But 01-04's `<legacy_compat>` block flags `assemblePrompt`/`DEFAULT_PROMPT_TEMPLATE` for Phase-14 replacement without mentioning that this log line is the concrete place `off_limits`/`share_with_ai`-gated content would surface if debug logging is ever enabled.
+  *Fix:* one sentence in `<legacy_compat>` naming line 139 as a Phase-14 (AI-04 redaction) target.
 
-### Summary
-The strongest of the five. Every line reference in this plan is exact against source, the TDD ordering is real (tests ported first, verified RED), and the "semantic-verbatim" definition resolves cycle-1's byte-verbatim-vs-Biome contradiction cleanly with an explicit in-bounds/out-of-bounds list.
+- **LOW — `expo prebuild --clean` over SSH is assumed non-interactive.** 01-05 Task 2 step 4 runs `npx expo prebuild --platform android --clean --no-install` over a non-TTY SSH session. On the first run there is no `android/` so it is a no-op, as the plan says; on every later run (the runbook's documented `--clean` rule) Expo CLI's "this will delete `android/`" confirmation is TTY-dependent. Worth one line in the runbook rather than a plan change.
 
-### Strengths
-- Line refs verified exact: `types.ts:1` is `import { TFile } from "obsidian";`; `types.ts:48-49` are the doc comment + `file: TFile;`. `dates.ts` is 22 lines, `logger.ts` 43, `schemas/types.ts` 99, both schemas 72 — all as stated.
-- **Cycle-1 HIGH #2 is correctly resolved and actually works against the real file.** The criterion `test -z "$(grep -vE '^[[:space:]]*(\*|//|/\*)' src/utils/dates.ts | grep 'toISOString')"` succeeds because both live occurrences of the banned string sit at `~/projects/Orbit/src/utils/dates.ts:4` and `:12`, and both lines begin with whitespace + `*`. The companion `grep -c 'toISOString' >= 1` correctly forces comment retention. This is the rare acceptance criterion that was checked against the bytes.
-- The `<legacy_compat>` block (SchemaDef.output.path, precomputed status/daysSince on `OrbitContact`) correctly labels carryover without letting Phase 2 inherit it — matches `~/projects/Orbit/src/schemas/types.ts:60-64` and `types.ts:62-70`.
+## 4. Suggestions
 
-### Concerns
+1. **Move `app.json` into 01-01 Task 1's copy list and assert it there** (fixes HIGH), and add `package-lock.json` while you are in that enumeration so the droid `npm install` resolves the same tree this box did.
+2. **Add `npx biome check --write .` as the first action of 01-01 Task 3**, with an explicit note that it is formatting-only on scaffold-generated files — this makes 01-01 consistent with 01-02/01-03/01-04, all of which format before gating.
+3. **Add `@types/node` to 01-01's devDep install** and add `grep -c '@types/node' package.json >= 1` to Task 1's acceptance, so the `node:url` dependency in Task 3's own config file is explicit rather than incidental.
+4. **Extend T-1-SC's package list to include `tsx` and `vitest`** (or re-scope the "no checkpoint required" claim). The audit itself is fine; the mismatch between what it covered and what Task 1 installs is the defect.
+5. **In 01-05 Task 2 step 2a, run the dry-run against both path forms** and have the runbook record the one that worked, plus a named fallback transport if `rsync --version` fails on droid.
+6. **Note the `bwles` vs `bwales` discrepancy explicitly at the checkpoint.** PROJECT.md and 01-RESEARCH.md both assume `C:\Users\bwles\projects\orbit-app` (Assumption A1), but quest-board's working build guide uses `C:\Users\bwales\projects\quest-board-app` (`ANDROID_BUILD_GUIDE.md:186`). The plan already asks the owner to confirm the exact string, but it should say *why* it is likely a typo so the owner does not just rubber-stamp the value the plan printed.
+7. **Consider surfacing the safe-fix hazard in 01-02's action text.** `noThisInStatic` has a *safe* autofix (verified via `biome explain`), so absent the 01-01 override, `biome check --write src/utils/logger.ts` would rewrite the ported `Logger` without any warning. 01-02 correctly says "do NOT let autofix do these" — adding "because `noThisInStatic` is a *safe* fix and `--write` will apply it silently" makes the reason legible to an executor who is tempted to skip the override.
+8. **Make the "Orbit" title the primary on-device assertion in 01-05**, with the testID as corroboration.
 
-- **LOW [NEW] — `biome check --write` will not apply the `isNaN` fix the plan expects.** Task 2 instructs "run `npx biome check --write` … and ACCEPT the safe autofixes: … `isNaN(...)`→`Number.isNaN(...)` (noGlobalIsNan)". Biome's `--write` applies **safe** fixes only; `noGlobalIsNan`'s fix changes coercion semantics and is classified unsafe, so it is not applied without `--unsafe`. The three call sites are `~/projects/Orbit/src/types.ts:171,178` — so `npx biome check src/types.ts` (Task 2's verify) exits non-zero and the task appears to fail. The plan does authorize the edit as in-bounds, so an executor recovers by hand; but say so: "`noGlobalIsNan` and any other unsafe-fix rule must be applied manually (or with `--write --unsafe` on these three files only)."
+## 5. Risk Assessment
 
-- **LOW [NEW] — `useParseIntRadix` is asserted as fact where 01-01 correctly hedges.** Task 2 states the `parseInt(x)`→`parseInt(x, 10)` rewrite as a known autofix of a named rule; 01-01 Task 2 tells the executor to confirm rule ids against `biome explain` for the *override* rules but this plan does not. The sites are real (`types.ts:170`, three `parseInt` calls) and the edit is right regardless of whether the rule is in `recommended`; just apply the same hedge.
+**MEDIUM (leaning low).**
 
-### Suggestions
-1. Add "if `biome check` reports a rule with no safe fix, apply the listed in-bounds edit by hand — do not add a Biome override, and do not touch `logger.ts`'s class shape or the test assertions" so the fallback is bounded.
-2. Consider asserting `grep -c 'file:' src/types.ts == 0` alongside the obsidian grep — `grep -ic obsidian` alone would still pass if the `file:` field were kept with an invented local type.
+The code risk in this phase is genuinely small and the plans have driven it down further: the ports are mechanical, every claimed file:line I checked is accurate, the one silent-failure trap (`.json` property→method) is guarded both structurally and behaviourally, and the owner's Ollama omission is enforced in the type system and by a `! grep -q 'http://'` gate rather than by a comment. Wave 2–4 is in good shape.
 
-### Risk: **LOW**
+The residual risk sits in two places. **Wave 1 has two gate-breaking mechanical gaps** (missing `app.json` in the copy list; unformatted scaffold files versus a repo-wide `biome check .`) plus one likely-but-not-certain one (`@types/node`). None is dangerous — each fails loudly and is a one-line fix — but all three land in the plan that every other plan depends on, so they cost a full execute–fail–fix cycle at the worst point in the wave graph. **FND-01 remains the real risk**, as the research already concluded: the `droid` bring-up is owner-gated, unverified this session, and the plan's rsync-to-Windows path form is more likely to be wrong than right on first attempt. That risk is correctly *contained* by the blocking checkpoint (which is the right call — package id, SSH host key, and the USB-debug tap are all owner-bucket), but containment is not the same as reduction, and the plan gives the executor only one path form and no transport fallback to try before coming back to the owner a second time.
 
----
-
-## 01-03-PLAN.md — Theme tokens, persisted store, themed shell
-
-### Summary
-Cycle-1's dead-store HIGH is genuinely fixed: the provider now subscribes to `useThemeStore`, the resolvers are pure (no `react-native` import) so they unit-test in the node env, and there is a real behavioural assertion instead of greps. One concrete defect remains in the specified resolver contract — it cannot accept the value the plan tells the provider to feed it.
-
-### Strengths
-- The `<interfaces>` block is a real contract, and the `resolvePalette(id,"light") === preset.dark` fallback closes cycle-1's "what does `system`/`light` resolve to when only dark ships" gap with a test rather than prose.
-- Correctly flattens `packages/ui` → `src/theme` and strips the `character-store` coupling that dominates the analog (`apps/mobile/src/stores/theme-store.ts:5,78-112`).
-- Requiring `grep -c "from 'react-native'" src/theme/theme-presets.ts == 0` is the right mechanism to keep the resolvers node-testable.
-
-### Concerns
-
-- **MEDIUM [NEW] — `resolveMode`'s specified signature is incompatible with `useColorScheme()`, and the behaviour table omits the value RN actually returns for "no preference".** The plan specifies `resolveMode(mode: ThemeMode, systemScheme: "light" | "dark" | null)` (`<interfaces>` block, Task 1 `<behavior>`: `resolveMode("system", null) -> "dark"`), and Task 2 instructs the provider to `read the OS scheme via useColorScheme()` and pass it in. But RN types it as `useColorScheme(): ColorSchemeName` with `type ColorSchemeName = 'light' | 'dark' | 'unspecified'` — **`null` is not in the union** (`~/projects/quest-board-app/node_modules/react-native/Libraries/Utilities/Appearance.d.ts:12` and `:51`, verified at RN 0.83.4; SDK 57 pins RN 0.86, i.e. later in the same lineage — `null` is not coming back). Two consequences: (a) `resolveMode(mode, useColorScheme())` is a TS2345 and fails the plan's own `npx tsc --noEmit` gate; (b) no test case covers `'unspecified'`, so the most obvious type-satisfying repair — widening the param to include `null` *and* keeping `=== "light" ? "light" : ...` logic, or the reverse — can silently invert the documented "default to dark". The analog does not have this bug: `~/projects/quest-board-app/apps/mobile/src/app/_layout.tsx:126-133` resolves with `systemScheme === "light" ? "light" : "dark"`, i.e. anything-not-light is dark, and never names `null`. Fix: type the param as RN's `ColorSchemeName | null | undefined` (or a local `"light" | "dark" | "unspecified" | null`), specify "anything other than `light` → `dark`", and add `resolveMode("system", "unspecified") -> "dark"` to the Task 1 behaviour table. (Blast radius this phase is small because `resolvePalette` falls back to the dark palette anyway — but this is a declared downstream contract.)
-
-- **LOW [NEW] — the home shell lives at root `App.tsx` while `src/screens/` stays an empty `.gitkeep`.** `01-01` Task 3 creates `src/screens/.gitkeep` to satisfy FND-06's layout; `01-03` Task 3 puts the entire shell in root `App.tsx`. The layout requirement is therefore met decoratively — the one screen this phase produces is not in the screens folder. Plain `App.tsx` as the *entry* is the recorded resolution of RESEARCH Open Question 4 and should stay; but putting the shell body in `src/screens/HomeScreen.tsx` and having `App.tsx` render it costs nothing and gives Phase 4 navigation a real home.
-
-### Suggestions
-1. Have `useTheme()`'s outside-provider fallback go through `resolvePalette(defaultPresetId, "dark")` (already specified) **and** add a one-line test for it — it's the only branch in the provider that isn't covered and it is what tests/Skia call sites will hit.
-2. Task 1's `npm run check:colors -- src` passes trivially while `src/theme` is the only populated dir under `src` and is excluded. Worth stating that the *meaningful* enforcement point is Task 3's unscoped run.
-
-### Risk: **MEDIUM** (one contract defect that fails a gate; everything else is clean)
-
----
-
-## 01-04-PLAN.md — Port AiService onto fetch, local provider omitted
-
-### Summary
-Technically the most impressive plan of the five, and the owner's Ollama-omission decision is enforced in the type system, the code, the greps, and the threat model — not just a comment. **Every single line reference in this plan is exact against the 540-line source.** One naming collision remains that the plan's own instructions invite.
-
-### Strengths — line refs verified against `~/projects/Orbit/src/services/AiService.ts`
-| Plan claim | Actual | ✓ |
-|---|---|---|
-| Obsidian import line 10 | `import { requestUrl } from 'obsidian';` :10 | ✓ |
-| `../settings` type import line 13 | `import type { OrbitSettings } from '../settings';` :13 | ✓ |
-| Ollama class block ~162-228 | section comment :162, class :168-228 | ✓ |
-| Registration ~482-483 | comment :482, `this.providers.set('ollama', …)` :483 | ✓ |
-| Omitted-provider HTTP sites 180/194/211, parses 198/222, probe 185 | exact | ✓ |
-| Cloud sites 264 / 319 / 377 / 431 | exact | ✓ |
-| Remaining body reads 278 / 334 / 386 / 443 | exact | ✓ |
-| Sole `http://` default | `http://localhost:11434` :173 (inside the omitted class) | ✓ |
-| Settings fields the service reads | `aiApiKeys`/`aiApiKey` :480, `aiCustomEndpoint`/`aiCustomModel` :492-494, `aiProvider` :508,511, `aiModel` :524 — exactly the six | ✓ |
-| `'none'` must be in the union | `settings.aiProvider === 'none'` :510 → yes, TS2367 otherwise | ✓ |
-
-- The `grep -c 'await response.json' == 4` count is arithmetically correct post-omission (6 − 2).
-- `! grep -q 'http://'` is a sound gate: the surviving Google URL is `https://generativelanguage…` (:375), which does not contain the substring `http://`.
-- Task 3's `expect(jsonSpy).not.toHaveBeenCalled()` is the right instrument — it proves *ordering*, which no grep can.
-
-### Concerns
-
-- **MEDIUM [NEW]** *(not raised in cycle 1; the union's contents changed in the revision, its name did not)* — **`AiProvider` is two different exported things in `src/services/`.** The ported file declares `export interface AiProvider { id; name; isAvailable(); listModels(); generate() }` at `~/projects/Orbit/src/services/AiService.ts:149`, and it is load-bearing there (`Map<string, AiProvider>` :469, `getProvider(): AiProvider | undefined` :499, `getActiveProvider(): AiProvider | null` :507). The plan simultaneously creates `src/services/ai-types.ts` exporting a **union type also named `AiProvider`** (`must_haves.artifacts`, `<interfaces>`, Task 1) — and Task 2 explicitly authorises `import type { AiSettings } from './ai-types'` **"(and `AiProvider` if needed)"**. Following that parenthetical produces TS2440 *"Import declaration conflicts with local declaration of 'AiProvider'"* in the very file being ported. Even when avoided, Phase 14 must import both meanings and will have to alias one. The plugin's own comment at `:150` calls the id union `AiProviderType` — rename to `AiProviderId` (or `AiProviderType`) in `ai-types.ts`, update the two acceptance greps, and delete the "(and `AiProvider` if needed)" clause.
-
-- **LOW [PARTIAL: cycle-1 "custom endpoint HTTPS-only"]** — "HTTPS-only" is claimed in `must_haves.truths` and the `artifacts` description, but nothing in the ported code enforces a scheme; the only enforcement is `! grep -q 'http://'` over the **source literal**, and `CustomProvider` (`~/projects/Orbit/src/services/AiService.ts:399-454`) will happily `fetch` any `endpointUrl` string it is handed. The threat model row T-1-04 is honest about this ("Residual: … HTTPS-only enforcement on that field is a Phase-14 concern"), so the deferral is explicit rather than silent — that half is resolved. What remains is the language: the must_have asserts a control that does not exist yet. Either soften the wording to "no cleartext endpoint ships in source; scheme enforcement is Phase 14", or (cheaper, and it makes PROJECT.md's `✓ Good` Key Decision true in code today) add a three-line constructor guard: `if (endpointUrl && !endpointUrl.startsWith('https://')) throw new Error('Custom endpoint must be HTTPS')`. **This is a scope addition, so it is the owner's call, not the planner's** — flagging, not prescribing.
-
-### Suggestions
-1. Rename the union and drop the ambiguous import clause (above).
-2. Task 3 constructs providers directly — worth one extra case asserting `new AiService().getActiveProvider({ aiProvider: 'none', … }) === null`, since `'none'` is the one union member with behaviour and it currently has zero coverage.
-
-### Risk: **MEDIUM** (one certain-if-followed compile error; everything else verified correct)
-
----
-
-## 01-05-PLAN.md — Prove the pipeline once
-
-### Summary
-Cycle-1's biggest HIGH (a debug APK showing the red screen at the human-verification step) is properly fixed, and the fix's supporting claims are all verifiable. The blocking checkpoint is well-shaped: it automates everything automatable *before* stopping and asks for four things only the owner can supply. The one new safety mechanism — the pre-rsync marker check — has no first-run path.
-
-### Strengths — citations verified
-- `apps/mobile/ANDROID_BUILD_GUIDE.md:213-222` is exactly the *"Debug APK caveat — it needs Metro"* section, and **:222** literally reads *"A `release` APK, by contrast, bundles JS at build time and runs standalone with no Metro."* Citation **CONFIRMED**.
-- `apps/mobile/ANDROID_BUILD_GUIDE.md:179` is exactly *"**Do not** run `adb install` from the Linux box over the `emu-connect` tunnel."* Citation **CONFIRMED** — the emulator-fallback instruction ("install ON droid") is correct.
-- The load-bearing claim that `assembleRelease` needs no keystore setup is **CONFIRMED** at `apps/mobile/android/app/build.gradle:116-118`: the `release` buildType carries `signingConfig signingConfigs.debug` with the stock *"Caution! In production, you need to generate your own keystore file"* comment.
-- `! grep -q 'com.placeholder.orbit' app.config.ts` correctly replaces the previously-vacuous check.
-- `.claude/settings.local.json` does allow `Bash(rsync *)`, `Bash(scp *)`, `Bash(ssh *)` — the CONTEXT claim holds, and the no-push posture is intact.
-
-### Concerns
-
-- **MEDIUM [NEW] — the `rsync --delete` marker check has no bootstrap path, so the first-ever sync can never run.** Task 2 step (2) says: *"over SSH assert a repo marker exists at the confirmed path, e.g. … `HANDOFF.md` (or `package.json`) is present at `C:\Users\bwles\projects\orbit-app`. **Only if the marker is found, proceed.**"* On a droid that has never received this repo, that path is absent or empty — the marker is necessarily missing, the gate fails, and there is no documented escape. STATE.md's blocker confirms this is the state of the world (*"bring-up still pending"*), so the very first execution hits it. The guard is protecting against the right thing (`--delete` mirroring onto the wrong tree), so keep it — but split the cases explicitly: **absent-or-empty dir → create and proceed; non-empty **and** unmarked → abort and ask the owner.** As written, an executor either deadlocks or improvises around the exact guard that was added for safety.
-
-- **LOW [NEW] — `adb` and `emu-connect` are not in this repo's permission allow-list.** `.claude/settings.local.json` allows `rsync`/`scp`/`ssh` but has no `Bash(adb *)`, no `Bash(*adb *)` (CLAUDE.md mandates the absolute `~/.local/bin/adb`, which would not match a bare `adb` pattern anyway), and no `Bash(emu-connect *)`. Task 1 runs `emu-connect status` + `adb devices -l` and Task 2 runs `adb install` / `uiautomator dump`. If the phase is executed in YOLO mode (PROJECT.md Constraints) this is moot; if not, wave 4 stalls on prompts at precisely the step where the owner is already being asked for four other things. Cheap fix: add the entries at the Task 1 checkpoint.
-
-- **LOW [NEW] — a release APK is not debuggable, which the runbook should record.** CLAUDE.md's device section documents `adb exec-out "run-as <package> cat …"` as working *"because the APK is debuggable"*. The FND-01 artifact is now `app-release.apk`, where `run-as` is unavailable. Verification this phase is UI-only anyway (correct — the plan says so), but `docs/runbooks/desktop-build-pipeline.md` is the durable artifact and should state: *data-layer inspection via `run-as` requires the debug APK; the release APK is for the standalone launch proof only.*
-
-### Suggestions
-1. Make the **"Orbit" title text the primary** on-device assertion and `home-shell-root` the secondary. RN's Android `testID` mapping into a `uiautomator dump` (`resource-id` vs. view tag vs. content-desc) varies by RN version and by whether the view is accessibility-focusable; the rendered text is unconditionally present in the dump. The plan already says "testID **or** the title", so this is a swap of primacy, not a new requirement — but the acceptance criterion currently lists testID first and an executor may treat its absence as failure.
-2. Have Task 2 capture `adb shell dumpsys package <id> | grep versionCode` (or the install `Success` line) into the runbook verbatim, so the FND-01 evidence is reproducible rather than narrated.
-
-### Risk: **MEDIUM** (owner-gated environment plus one bootstrap gap; the technical approach is now correct and evidenced)
-
----
-
-# Overall
-
-## Cycle-1 HIGH resolutions — all five CONFIRMED present
-
-| # | Resolution | Verdict | Evidence |
-|---|---|---|---|
-| 1 | Semantic-verbatim + `biome check --write` + two overrides | **CONFIRMED** | 01-02 `<context>` defines semantic-verbatim with an explicit in/out-of-bounds list; 01-01 Task 2 creates both overrides with grep criteria (`logger.ts`, `noStaticOnlyClass`, `noNonNullAssertion`). Both overrides are *justified by real code*: static-only class + `this` in statics at `~/projects/Orbit/src/utils/logger.ts:10-42`; `result!` idioms at `test/unit/types.test.ts:170-172`. |
-| 2 | `toISOString` banned in executable code only, comment preserved | **CONFIRMED** | 01-02 Task 2 acceptance criterion; verified to actually work against `~/projects/Orbit/src/utils/dates.ts:4,12` (both `*`-prefixed comment lines, both excluded by the strip-then-grep). |
-| 3 | Standalone **release** APK on the physical Pixel; emulator leaves FND-01 OPEN | **CONFIRMED** | 01-05 objective, `must_haves`, Task 2, acceptance criteria, `<success_criteria>` all say it. Supporting citations verified: `ANDROID_BUILD_GUIDE.md:213-222` (red-screen mechanism), `:179` (install on droid, not over the tunnel), `android/app/build.gradle:116-118` (release signed by the debug keystore → installable with no extra setup). |
-| 4 | Persisted store wired into ThemeProvider + pure-resolver test + `system` via `useColorScheme` | **CONFIRMED** (with the MEDIUM caveat above) | 01-03 Task 2 has the provider subscribe (`useThemeStore((s) => s.mode)`), `key_links` encodes it, Task 1 ships `theme-presets.test.ts`. The wiring is real and no longer dead code; the *type* of the value passed from `useColorScheme()` is wrong (`Appearance.d.ts:12,51`). |
-| 5 | Ollama omitted entirely per owner decision | **CONFIRMED — and correctly enforced in code, not prose** | 01-04 excludes the id from the union (Task 1 + `grep -ic ollama … == 0`), omits the class and its registration (Task 2, targeting the verified `:168-228` and `:483`), gates cleartext with `! grep -q 'http://'`, and rewrites T-1-04 from "latent/accepted" to "ELIMINATED by omission". **Not re-raised here.** Re-adding the provider would be a decision reversal. |
-
-No regression was introduced by any of the five resolutions.
-
-## Remaining concerns, by severity
-
-**HIGH:** none.
-
-**MEDIUM**
-1. `01-01` — `check:colors` has no negative control; the gate FND-05 depends on is never proven to fail. *[NEW]*
-2. `01-03` — `resolveMode`'s `"light"|"dark"|null` param cannot accept `useColorScheme()` (`'light'|'dark'|'unspecified'`, `Appearance.d.ts:12,51`); no `'unspecified'` test case, so a type-satisfying repair can invert the documented dark default. *[NEW]*
-3. `01-04` — `AiProvider` names both the ported provider **interface** (`AiService.ts:149`) and the new id **union**; Task 2 explicitly permits the import that makes it TS2440. *[NEW]*
-4. `01-05` — the pre-`rsync --delete` marker check has no first-run path; on a never-synced droid the gate can never pass. *[NEW]*
-
-**LOW**
-5. `01-01` — logger.ts port misattributed to 01-04 (it is 01-02). *[NEW]*
-6. `01-02` — `biome check --write` won't apply `noGlobalIsNan` (unsafe fix); Task 2's verify fails without a manual edit or `--unsafe`. *[NEW]*
-7. `01-02` — `useParseIntRadix` asserted as fact where 01-01 correctly hedges rule ids. *[NEW]*
-8. `01-03` — home shell at root `App.tsx` leaves `src/screens/` decorative. *[NEW]*
-9. `01-04` — "custom HTTPS-only" claimed in `must_haves`, but no scheme check exists in code; deferral is explicit in T-1-04, so only the *wording* is unresolved. Adding enforcement is an owner-scope call. *[PARTIAL: cycle-1 HTTPS-only posture]*
-10. `01-05` — `adb`/`emu-connect` absent from `.claude/settings.local.json` allow-list (rsync/scp/ssh are present). *[NEW]*
-11. `01-05` — release APK is not debuggable; the runbook should say `run-as` inspection needs the debug APK. *[NEW]*
-12. Cross-plan — `.planning/phases/01-project-scaffold-portable-code/01-PATTERNS.md:277-278` contains stray tool-call residue (`</content>` / `</invoke>`) at EOF. The document itself is complete (Metadata section closes it), but all five plans `@`-include this file as context. Cosmetic; one-line fix.
-
-## Overall risk: **LOW–MEDIUM**
-
-The revision is a genuine improvement, not a paper one — the five resolutions are implemented as tasks, acceptance criteria, threat-model rows and artifacts rather than restated as intentions, and the line-level claims in 01-02 and 01-04 are exact against 540 lines of real source (I checked all fourteen). Nothing remaining touches a recorded decision, and nothing remaining is a HIGH. The four MEDIUMs are each a one-to-three-line correction to plan text; items 2 and 3 will be caught by the plans' own `tsc --noEmit` gate if missed, items 1 and 4 will not be caught by anything, so those two are the ones worth fixing before execution.
+Nothing in this phase reverses a `[DECIDED]`/`[REJECTED]` item, widens egress, or touches a data-layer invariant. No escalation to the owner is warranted by any finding above.
 
 ---
 
 ## Consensus Summary
 
-Both reviewers re-opened the cited source (`~/projects/Orbit/src`, `~/projects/quest-board-app`,
-this repo's `.claude/` + `docs/`) and verified line refs against the actual code. **Both agree
-all five cycle-1 HIGH resolutions are genuinely present in the revised plans, implemented as
-tasks / acceptance-criteria / threat-model rows / artifacts rather than restated as intentions,
-and none introduced a regression.** The Ollama/local-provider omission is enforced in the type
-system, the code, the greps, and the threat model — it is the recorded owner resolution and was
-correctly NOT re-raised by either reviewer.
+Both reviewers re-opened the cited source and verified line refs against the actual code. **Both agree
+every cycle-1 and cycle-2 resolution is genuinely present and no regression appears in the five named
+cycle-2 areas** (resolveMode `SystemScheme` union, `AiProviderId` rename, rsync bootstrap split,
+`check:colors` negative control, `@/theme` barrel + `HomeScreen` move). The Ollama omission is correctly
+NOT re-raised. Verified independently this cycle against `~/projects/Orbit/src`:
+`interface AiProvider` at `AiService.ts:149`; the four surviving cloud call sites (264/319/377/431) and
+parses (278/334/386/443); the Ollama block (168–228) + registration (483); `types.ts:1` Obsidian import
+and `:48-49` `file: TFile` field; `dates.ts` `toISOString` present only in comments (lines 4, 12);
+quest-board `biome.json` sets no `quoteStyle` (formatter block indent-only).
 
-### Cycle-1 HIGH resolutions — both reviewers CONFIRM present
+The new findings are wave-1 mechanical gaps (two of them regressions from the cycle-2 edits) and the
+FND-01 pipeline's external unknowns. **No finding reverses a `[DECIDED]`/`[REJECTED]` decision, widens
+egress, or touches a data-layer invariant — no owner escalation is warranted.**
 
-1. **Biome-vs-verbatim → semantic-verbatim + `biome check --write` + two `biome.json` overrides**
-   (`src/utils/logger.ts` static-class rules; `src/**/*.test.ts` noNonNullAssertion). Both overrides
-   are justified by real legacy code (`logger.ts:10-42`; `types.test.ts:170-172`). CONFIRMED.
-2. **`toISOString` banned in executable code only, explanatory comment preserved** — the strip-then-grep
-   criterion actually works against the real `dates.ts:4,12` (both comment lines). CONFIRMED.
-3. **FND-01 = STANDALONE release APK on the physical Pixel; emulator explicitly non-completing.**
-   Supporting citations verified (`ANDROID_BUILD_GUIDE.md:213-222` red-screen mechanism; `:179`
-   install-on-droid; `android/app/build.gradle:116-118` release signed by debug keystore). CONFIRMED.
-4. **Persisted theme store wired into ThemeProvider + pure-resolver unit test + `system` via
-   `useColorScheme`.** The provider now subscribes (`useThemeStore((s)=>s.mode)`); store is no longer
-   dead code. CONFIRMED — with one MEDIUM caveat on the resolver's parameter type (below).
-5. **Local/LAN provider OMITTED entirely per owner decision** — union excludes it, class + registration
-   dropped, `! grep -q 'http://'` gate, T-1-04 rewritten to "ELIMINATED by omission". CONFIRMED and
-   NOT re-raised (re-adding it would be a decision reversal).
+### Agreed strengths (2+ reviewers)
 
-### Agreed / notable remaining concerns
+- Source fidelity is high: the `.json` property→method trap, the recomputed `== 4` parse count, and the
+  `interface AiProvider` collision are all real and correctly located; the `AiProviderId` rename is the
+  right, minimally-scoped fix.
+- The FND-01 release-vs-debug APK reasoning is correct and correctly cited
+  (`ANDROID_BUILD_GUIDE.md:213-222`).
+- The `"unspecified"` → dark resolver case, the `@/theme` barrel, and the real `HomeScreen` are the
+  correct cycle-2 fixes and are present.
 
-- **[MEDIUM] 01-03 `resolveMode` param type cannot accept `useColorScheme()`** *(both reviewers; the
-  cycle-2 headline)*. RN types the hook as `ColorSchemeName = 'light' | 'dark' | 'unspecified'`
-  (verified in-tree at `Appearance.d.ts:12,51`, RN 0.83.4 lineage; SDK 57 pins RN 0.86, same lineage) —
-  `null` is not returned, `'unspecified'` is. The plan's `resolveMode(mode, systemScheme: "light"|"dark"|null)`
-  passed `useColorScheme()` is a TS2345 that FAILS the plan's own `tsc --noEmit` gate; and with no
-  `'unspecified'` test case, the obvious type-satisfying repair can silently invert the documented
-  "default to dark". Codex rated this HIGH, Claude MEDIUM. **Adjudicated MEDIUM**: it is real and
-  actionable, but it is caught by the plan's own mandatory in-task typecheck gate (the trait that
-  separates it from cycle-1's uncaught HIGHs) and `resolvePalette`'s dark fallback bounds the blast
-  radius. Fix: type the param as RN's `ColorSchemeName | null`, specify "anything not `light` → `dark`",
-  add a `resolveMode("system","unspecified") -> "dark"` case.
+### Agreed / notable concerns
 
-- **[MEDIUM] 01-04 `AiProvider` names two different exported things** *(Claude)*. The ported
-  `AiService.ts:149` already declares `interface AiProvider` (load-bearing at `:469,499,507`); the plan
-  also creates a union type **named `AiProvider`** in `ai-types.ts` and Task 2 authorises
-  `import ... "(and AiProvider if needed)"` — which produces TS2440 in the file being ported. Rename the
-  union to `AiProviderId`/`AiProviderType`, update the two greps, drop the "(and AiProvider if needed)"
-  clause.
-
-- **[MEDIUM] 01-05 pre-`rsync --delete` marker check has no first-run/bootstrap path** *(Claude; Codex
-  raises the adjacent facet)*. On a never-synced droid the marker (`HANDOFF.md`/`package.json`) is
-  necessarily absent, so "only if the marker is found, proceed" can never pass on the first execution
-  (STATE.md confirms bring-up is pending). Split the cases: absent-or-empty dir → create and proceed;
-  non-empty AND unmarked → abort and ask. Codex's related point: the checkpoint proves `ssh droid 'echo ok'`
-  but never proves the remote `rsync` receiver or the Windows-path form before the destructive sync — add
-  an `rsync --dry-run` / receiver check.
-
-- **[MEDIUM] 01-01 `check:colors` gate has no negative control** *(Claude)*. FND-05's headline claim
-  rests on this shared gate, yet no acceptance criterion proves it FAILS on a bad input — the only real
-  invocation runs against a `.gitkeep`-only `src/theme`, and the "self-test" tests a regex string, not
-  the script. An inverted exit code / wrong filter would pass every criterion. Add failing probes
-  (`#ff0000`, `rgba(`, `"white"`).
-
-- **[MEDIUM] 01-03 `@/theme` import target ambiguity** *(Codex, rated HIGH; adjudicated MEDIUM)*. Task 3
-  tells `App.tsx` to import `ThemeProvider` from `@/theme`, but the plan creates no `src/theme/index.ts`
-  barrel — `@/theme` would be TS2307. The plan's structural contract (`key_links`, `<interfaces>`) points
-  at `theme-provider.tsx`, so a direct import satisfies everything and the `tsc` gate catches a wrong
-  import in-task; Claude did not flag it. Specify the direct import `@/theme/theme-provider` or add the
-  barrel.
-
-### Lower-severity remaining items (each a 1-3 line plan edit)
-
-- **[LOW] 01-02 `biome check --write` won't apply `noGlobalIsNan`** (unsafe fix) — Task 2's verify
-  (`biome check src/types.ts`) then exits non-zero unless the `isNaN→Number.isNaN` edit is applied by
-  hand or with `--write --unsafe` on those files. The plan authorises the edit as in-bounds but should
-  say the fix is manual/unsafe. Same hedge applies to asserting `useParseIntRadix` as a known autofix.
-- **[LOW] 01-01 misattributes the `logger.ts` port to 01-04** — it is ported by **01-02**; 01-04 only
-  calls `Logger.*`. Executor-facing text; correct the wave reference.
-- **[LOW] 01-04 "custom endpoint HTTPS-only" wording** — `must_haves.truths`/artifact assert an HTTPS-only
-  control, but no scheme check exists in code; the `! grep -q 'http://'` gate only proves no cleartext
-  *literal* ships. The threat model **T-1-04 explicitly defers** runtime enforcement to Phase 14, so the
-  substantive risk is a documented deferral (resolved), and adding an actual constructor guard is an
-  owner-scope call. Only the must_have wording overstates today — soften it or (owner's call) add the
-  three-line `https:`-only guard.
-- **[LOW] 01-05 `adb` / `emu-connect` are not in `.claude/settings.local.json`** (rsync/scp/ssh are) —
-  wave 4 may stall on permission prompts at the human checkpoint unless run in YOLO mode. Add the entries.
-- **[LOW] 01-05 the release APK is not debuggable** — the durable runbook should note `run-as` data
-  inspection needs the debug APK; the release APK is the standalone launch proof only.
-- **[LOW] 01-03 home shell lives in root `App.tsx`** while `src/screens/.gitkeep` stays empty — FND-06's
-  layout is met decoratively. Optional: move the shell body to `src/screens/HomeScreen.tsx`.
-- **[LOW] `01-PATTERNS.md:277-278` has stray tool-call residue at EOF** — all five plans `@`-include it;
-  cosmetic one-line cleanup.
+- **[MEDIUM] `package-lock.json` reproducibility gap** *(Codex; overlaps Claude's suggestion #1)*.
+  No plan commits a lockfile as an artifact, yet 01-05's threat model (`01-05-PLAN.md:263`) claims the
+  droid build "resolves the same lockfile." 01-01 runs `create-expo-app@latest` + bare `npm install`;
+  01-05 runs `npm install` (not `npm ci`) on droid. Make `package-lock.json` an explicit 01-01 artifact
+  + acceptance, commit it before rsync, and use `npm ci` on droid.
+- **[MEDIUM] 01-05 rsync path-form + no-rsync fallback** *(Claude; Codex raised the receiver facet in
+  cycle 2, now closed)*. The dry-run uses only the Windows-native `C:\...` form, which Cygwin/MSYS rsync
+  misparses; and no scp/tar fallback is defined if rsync is absent on droid.
 
 ### Divergent views
 
-- **Severity of the two 01-03 defects.** Codex rated both the `useColorScheme` type mismatch and the
-  `@/theme` barrel gap **HIGH** (framing the barrel as "cycle-1 #4 only partially resolved"). Claude
-  rated the type mismatch **MEDIUM** and did not consider the barrel a concern, concluding **"HIGH:
-  none."** Adjudication (with the RN types verified in-tree): both are real and actionable but are each
-  caught by the plans' own mandatory `tsc --noEmit` gate *inside the same task*, neither touches a
-  recorded decision, and cycle-1 resolution #4 (store→provider wiring) is independently confirmed
-  present. Treated as **MEDIUM**, not HIGH. **No consensus HIGH remains.**
-- **01-04 custom-endpoint HTTPS enforcement.** Codex wants a runtime `new URL(endpoint).protocol` guard
-  + test now (rated MEDIUM); Claude agrees the code doesn't enforce it but notes the deferral is
-  *explicit* in T-1-04 and that adding enforcement is an owner-scope decision, so only the wording is
-  unresolved (rated LOW). Not a contradiction — a scope/ownership judgment. Flag to owner; do not add
-  silently.
+- **Severity of the 01-01 `app.json` gap.** Claude rated it **HIGH** (it lands in the foundational
+  wave-1 plan every other plan depends on); Codex did not flag it. **Adjudicated MEDIUM** (see below):
+  it is a real internal contradiction, but it is caught by Task 2's *own* `test -f app.json` acceptance
+  criterion, fails loudly one task late, is a one-line fix, and reverses no decision — the same profile
+  cycle 2 adjudicated Codex's HIGHs down to MEDIUM for. Listed first among actionable items so the owner
+  sees the dissent.
+- **01-04 custom-provider façade bug** *(Codex, MEDIUM)*. Verified real: `generate()` throws on empty
+  `settings.aiModel` (`AiService.ts:518-527`) *before* delegating, so `CustomProvider`'s
+  `model || this.modelName` fallback (`:439`) is unreachable via the façade. But 01-04's stated scope is
+  a *faithful port that compiles, does not run* (dormant, wired to no UI), so reproducing pre-existing
+  plugin behaviour is correct-by-contract for FND-04; fixing it is a Phase-14 (wire-up) concern. Treated
+  as a LOW `<legacy_compat>`-note item, not a Phase-1 defect.
+
+### Adjudication — HIGH count
+
+**0 unresolved HIGH.** Claude's single HIGH (01-01 `app.json` not in the Task 1 copy list) is a genuine
+regression from the cycle-2 "merge app.json" edit and must be fixed, but it is caught by the plan's own
+in-plan acceptance criterion (`test -f app.json`), fails loudly, is a one-line fix, and reverses no
+recorded decision. Consistent with the cycle-2 adjudication framework (gate-caught mechanical gaps that
+fail loudly are MEDIUM, not redesign-forcing HIGHs), it is counted as the top actionable MEDIUM rather
+than a blocking HIGH. No consensus HIGH remains; Codex found none.
 
 ### Verdict
 
-**No HIGH concerns remain.** The revision genuinely resolved all five cycle-1 HIGHs. The remaining
-work is 5 MEDIUM + 8 LOW plan-text refinements (13 actionable total); of these, the 01-03 type mismatch
-and the 01-04 `AiProvider` collision will be caught by the plans' own `tsc` gate if missed, while the
-01-01 negative-control gap and the 01-05 first-run bootstrap gap will NOT be caught by any gate — those
-two are the ones most worth fixing before execution. Overall risk: **LOW-MEDIUM**, no redesign required.
+**No blocking HIGH remains; the phase is convergent.** The residual work is ~6 MEDIUM + ~4 LOW plan-text
+refinements, concentrated in 01-01 (wave 1) and 01-05 (FND-01 pipeline). None requires redesign; all are
+one-to-three-line edits. The two cycle-2-introduced regressions (`app.json` copy-list omission; `tsx`
+outside the legitimacy-audit set) and the two uncaught reproducibility/transport gaps (lockfile;
+rsync path-form + fallback) are the four most worth applying before execution, because they either fail
+at the worst point in the wave graph (wave 1) or leave the owner stalled at the FND-01 checkpoint.
+Overall risk: **LOW-MEDIUM**.
