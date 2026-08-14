@@ -127,7 +127,7 @@ Recorded here because they bind phases that do not own them. Every planner/execu
   4. The launch sweep runs once per real foreground launch (not on a headless tap) and exposes hooks for later responsibilities.
   5. The newest-interaction-per-contact query and status scan benchmark acceptably on the Pixel.
 
-**Plans:** 2/6 plans executed
+**Plans:** 3/6 plans executed
 
 **Wave 1**
 
@@ -139,7 +139,7 @@ Recorded here because they bind phases that do not own them. Every planner/execu
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
-- [ ] 02-03-PLAN.md — Single-writer `last_contact` recency DAO + shared promise-chain mutex (DATA-04)
+- [x] 02-03-PLAN.md — Single-writer `last_contact` recency DAO + shared promise-chain mutex (DATA-04)
 - [ ] 02-04-PLAN.md — Query-time status engine + dashboard scan + newest-per-contact query (DATA-05)
 - [ ] 02-05-PLAN.md — Launch-sweep skeleton + hook registry + App.tsx migrate-gate/sweep wiring (DATA-06)
 
@@ -356,7 +356,7 @@ Recorded here because they bind phases that do not own them. Every planner/execu
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Project Scaffold & Portable Code | 5/5 | Complete    | 2026-08-14 |
-| 2. Data Foundation & Status Engine | 2/6 | In Progress|  |
+| 2. Data Foundation & Status Engine | 3/6 | In Progress|  |
 | 3. Custom Fields | 0/TBD | Not started | - |
 | 4. Contact CRUD & Lifecycle | 0/TBD | Not started | - |
 | 5. Photos | 0/TBD | Not started | - |
