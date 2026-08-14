@@ -85,13 +85,16 @@ None yet.
 
 ### Blockers/Concerns
 
-- **Build/test pipeline — transport decided, bring-up still pending** (PROJECT.md Context). Decided
-  2026-08-14: **rsync/scp over SSH** (global `git push` deny stays intact for all repos;
-  rsync/scp/ssh allowed in this repo's `settings.local.json`). Still to do before the loop runs, at
-  Phase 1 execution: (1) add a `droid` Host block to `~/.ssh/config` (or confirm Tailscale MagicDNS
-  resolves it) with the right user/key; (2) a one-time verification that `ssh droid` + a debug Gradle
-  build succeeds at `C:\Users\bwles\projects\orbit-app`. This box cannot build APKs; on-device
-  verification is Pixel-6-Pro-only.
+- **Build/test pipeline — RESOLVED / PROVEN (Phase 1, 2026-08-14).** FND-01 proved the full loop on
+  the physical Pixel 6 Pro. Findings: `ssh droid` resolves via **Tailscale MagicDNS** (no
+  `~/.ssh/config` Host block needed); Windows user is **`bwales`** (repo path
+  `C:\Users\bwales\projects\orbit-app`, not `bwles`); `droid` has **JDK 17 + Android SDK** but **no
+  `rsync`** → transport is **`scp`/tar-over-ssh** (rsync/scp/ssh allowed in `settings.local.json`;
+  global `git push` deny intact). Loop: commit → tar-over-ssh to `droid` → `npm ci` + `expo prebuild
+  --clean` (`CI=1`) + `gradlew.bat assembleRelease` → scp APK back → `adb -s 1A071FDEE002BU install`
+  on the Pixel. Full runbook: `docs/runbooks/desktop-build-pipeline.md`. This box still cannot build
+  APKs; on-device verification remains Pixel-only. Package id locked: `com.bwales.orbit` (display
+  name is a `src/constants/app-name.json` constant — owner may rename later).
 
 - **Autonomous run is gated at the foundation** (owner, 2026-08-14): run `/gsd-autonomous --to 3`,
   stop for a human look at the irreversible migration-1 schema + custom-fields, then continue
