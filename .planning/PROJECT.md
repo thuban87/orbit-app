@@ -41,8 +41,14 @@ lives in `.planning/REQUIREMENTS.md`; this is the thematic summary.
 
 ### Validated
 
-(None yet — `src/` is empty. HANDOFF/§4 and §14.8 say several files are "already ported"; the
-dossier verified this is the *plan*, not the state — 01-data F16, 13-ai. Ship to validate.)
+- **Foundation & portable code (Phase 1, 2026-08-14)** — Flat Expo SDK 57 app scaffolded; the ~900
+  lines of portable plugin logic/types/schemas extracted into `src/` decoupled from Obsidian
+  (`calculateStatus`, `formatLocalDate`, `logger`, schemas, `AiService` on `fetch`, dormant);
+  theme-token system + persisted store + themed home shell; Biome + portrait-lock. **FND-01 proven
+  on the physical Pixel 6 Pro** through the commit → `droid` desktop build → `adb install` loop
+  (`com.bwales.orbit`). Owner decision recorded: `OllamaProvider` omitted from the mobile AI port
+  (resolves HANDOFF §4 vs the HTTPS-only mobile decision). 56 tests green; cross-AI plan convergence
+  (0 HIGH) + deep code review (0 critical) applied.
 
 ### Active
 
