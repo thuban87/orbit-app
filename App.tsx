@@ -1,20 +1,21 @@
 import { StatusBar } from "expo-status-bar";
-import { StyleSheet, Text, View } from "react-native";
+import { SafeAreaProvider } from "react-native-safe-area-context";
+import { HomeScreen } from "@/screens/HomeScreen";
+import { ThemeProvider } from "@/theme";
 
+/**
+ * App entry: the thin shell. `ThemeProvider` reads the persisted `orbit-theme`
+ * store internally (so a rehydrated selection restyles the tree); the home
+ * shell body lives in `src/screens/HomeScreen.tsx`, not here. No expo-router —
+ * a single shell this phase (SKELETON.md).
+ */
 export default function App() {
   return (
-    <View style={styles.container}>
-      <Text>Open up App.tsx to start working on your app!</Text>
-      <StatusBar style="auto" />
-    </View>
+    <SafeAreaProvider>
+      <ThemeProvider>
+        <StatusBar style="light" />
+        <HomeScreen />
+      </ThemeProvider>
+    </SafeAreaProvider>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#fff",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-});
