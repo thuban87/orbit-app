@@ -52,6 +52,21 @@ Use them, ROADMAP success criteria, and codebase conventions to drive decisions.
 - `types.ts` line 1 imports `TFile` from `obsidian` and `OrbitContact` carries `file: TFile` —
   strip/generalise to an opaque ref so `types.ts` becomes 100% portable (HANDOFF §4).
 
+### AI provider port — Ollama OMITTED (owner decision, 2026-08-14)
+Resolves the conflict cross-AI review (Codex + Claude) surfaced between HANDOFF §4 ("port all 5
+provider implementations") and PROJECT.md Out-of-Scope / Key Decisions ("No Ollama/local AI on
+mobile; custom endpoint HTTPS-only; an `http://` LAN endpoint reopens the rejected LAN path + forces
+app-wide cleartext" — dossier 03-fuel, 13-ai, `[REJECTED]`).
+
+**The AiService port OMITS `OllamaProvider` entirely.** Port only the 4 cloud providers — OpenAI,
+Anthropic, Gemini, and the custom **HTTPS-only** endpoint. Drop the Ollama branch as a decoupling
+edit (in the same spirit as `requestUrl`→`fetch`), exclude `'ollama'` from the `AiProvider` union,
+and land **no `http://` cleartext path** in `src/`. This enforces the `[REJECTED]` mobile-Ollama
+decision in the code itself, not merely in a comment.
+
+**Do NOT re-add Ollama per HANDOFF §4** — the owner resolved the conflict in favour of the later,
+more specific mobile decision. Re-introducing it is a decision reversal, not a bug fix.
+
 </decisions>
 
 <code_context>
