@@ -27,7 +27,7 @@ domain-research step and decline its brownfield-mapping offer — the dossier re
 | 10 | `capture` | Share-sheet capture | **complete** |
 | 11 | `notify` | Actionable notifications | **complete** |
 | 12 | `widget` | Home screen widget | **complete** |
-| 13 | `ai` | AI message suggestions | pending |
+| 13 | `ai` | AI message suggestions | **complete** |
 | 14 | `digest` | Weekly digest & birthday alerts | pending |
 | 15 | `backup` | Backup, export & data portability | pending |
 
@@ -349,6 +349,22 @@ monetisation (HANDOFF open question #1).
 - HANDOFF: §3 (AI = sole network exception), §8 (monetisation), §4
 - Likely overlaps: `fuel`, `log`, `data`, `fields`, `backup` (settings surface)
 
+**Complete — see `docs/dossier/13-ai.md`.** 9 questions over 4 rounds; no `[OPEN]` items.
+**Verified `AiService.ts` is NOT yet ported — the repo `src/` is empty** (HANDOFF §4's "already
+ported" is the plan, not the state). Most of the AI privacy boundary was **already decided
+upstream** (03-fuel Cluster E, 04-log Cluster D) and was not reopened. This run settled the
+gaps: AI Suggest lives on **both the compose screen and the profile**, a suggestion becomes an
+**editable draft → Send** (Copy is the only guaranteed handoff — SMS prefill is unreliable);
+custom fields reach the prompt **only via a new opt-in `share_with_ai` per-field flag**; **one
+global editable template** survives; **all three cloud providers** ship with a **HTTPS-only
+Custom endpoint** (⚠ **upholds the [REJECTED] LAN zero-egress path** — an `http://` LAN endpoint
+would reopen it and force app-wide cleartext); models chosen by **dynamic fetch**; **keys in
+`expo-secure-store`, excluded from export**; and AI stays **free BYO-key, monetisation deferred**
+(HANDOFF Q1's AI half). Platform verification (2026-08-14) established the endpoints/shapes are
+current, only Anthropic's Sonnet 4 ID is dead, `fetch` doesn't throw on 4xx/5xx, and a plain-http
+LAN endpoint is blocked without a global cleartext switch. Exports a **new `custom_field_defs`
+flag** to fields/crud and confirms the **compose screen** (still unowned) has a second consumer.
+
 ## 14. `digest` — Weekly digest & birthday alerts
 
 HANDOFF open question #7: neither has been discussed for mobile — this session is the
@@ -618,3 +634,20 @@ section. Summarised here so a later run sees what binds it.*
   by **two tap regions** (whole tile = mark, name/chevron = profile); mechanism change, not an intent
   reversal. **Self-swap stretch CUT from v1.** No new screen introduced (Message/profile reuse
   existing surfaces); only net-new UI is the widget layouts + an in-app "Add widget" button — (2026-08-14)
+- [ai → fields/crud] `custom_field_defs` gains a **`share_with_ai`** flag (default false); the field
+  editor needs a per-field toggle; the prompt binds flagged fields to `col_name`, shows by label. A
+  *defs*-table column (not `contact_custom_values`), so §14 index/DROP rules are untouched — (2026-08-14)
+- [ai → backup] **API keys are NEVER exported** (in `expo-secure-store`, re-entered per provider on a
+  new device); exportable AI settings are the non-secret ones (provider, model, template, HTTPS
+  custom-endpoint URL, `share_with_ai` flags), which live in SQLite settings — (2026-08-14)
+- [ai → compose(unowned)/notify/widget] The compose screen must host an **"AI Suggest"** → **editable
+  draft**; **Copy is the guaranteed handoff** (SMS prefill unreliable, 03-fuel F8). AI is a **second
+  consumer** of the still-unowned compose screen; the profile is the second entry point — (2026-08-14)
+- [ai → data] AI adds **no per-contact columns**; reads recency via 04-log's single query and flagged
+  custom fields by `col_name`; writes only via decided `source='ai'` paths — (2026-08-14)
+- [ai → self/INDEX] ⚠ **Custom endpoint is HTTPS-only** — an `http://` LAN endpoint would reopen the
+  **[REJECTED] LAN zero-egress path** (03-fuel) and force app-wide `usesCleartextTraffic`; both
+  declined, boundary upheld. Only Anthropic `claude-sonnet-4-20250514` is a dead model ID — (2026-08-14)
+- [ai → planning] Port hazards: `fetch` doesn't throw on 4xx/5xx (add `response.ok` checks);
+  `AbortController` Cancel is **on-device-unverified** for `expo/fetch`; no built-in timeout; redact
+  the assembled-prompt debug log (`AiService.ts:139`) — (2026-08-14)
