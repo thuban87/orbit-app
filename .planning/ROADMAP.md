@@ -16,7 +16,7 @@ onto the dossier domains; a `[DECIDED]`/`[REJECTED]` decision is implemented, ne
 
 ## Phases
 
-- [ ] **Phase 1: Project Scaffold & Portable Code** — Expo/RN app, theme tokens, and the ~900 lines of portable plugin source extracted into `src/`.
+- [x] **Phase 1: Project Scaffold & Portable Code** — Expo/RN app, theme tokens, and the ~900 lines of portable plugin source extracted into `src/`. (completed 2026-08-14)
 - [ ] **Phase 2: Data Foundation & Status Engine** — migration-1 SQLite scaffold, all core tables, single-writer `last_contact` DAO, continuous status, launch-sweep skeleton.
 - [ ] **Phase 3: Custom Fields** — HANDOFF §14 two-table design, 7 parsers, `field_history`, quarantine sweep, and the field editor.
 - [ ] **Phase 4: Contact CRUD & Lifecycle** — create/edit forms, `contact_links`, archive/restore/purge, the contact profile scaffold.
@@ -95,7 +95,7 @@ Recorded here because they bind phases that do not own them. Every planner/execu
   3. `types.ts` has no Obsidian coupling and `AiService.ts` compiles standalone with `fetch` + `response.ok` handling.
   4. Colours resolve through theme tokens; Biome and portrait-lock are configured.
 
-**Plans:** 4/5 plans executed
+**Plans:** 5/5 plans complete
 **Wave 1**
 
 - [x] 01-01-PLAN.md — Expo SDK 57 scaffold + Biome/tsconfig/portrait-lock/Vitest + folder layout (FND-06)
@@ -111,7 +111,7 @@ Recorded here because they bind phases that do not own them. Every planner/execu
 
 **Wave 4** *(blocked on Wave 3 completion)*
 
-- [ ] 01-05-PLAN.md — Prove the desktop-build → Pixel install pipeline once, owner-gated (FND-01)
+- [x] 01-05-PLAN.md — Prove the desktop-build → Pixel install pipeline once, owner-gated (FND-01)
 
 ### Phase 2: Data Foundation & Status Engine
 
@@ -337,7 +337,7 @@ Recorded here because they bind phases that do not own them. Every planner/execu
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Project Scaffold & Portable Code | 4/5 | In Progress|  |
+| 1. Project Scaffold & Portable Code | 5/5 | Complete   | 2026-08-14 |
 | 2. Data Foundation & Status Engine | 0/TBD | Not started | - |
 | 3. Custom Fields | 0/TBD | Not started | - |
 | 4. Contact CRUD & Lifecycle | 0/TBD | Not started | - |
