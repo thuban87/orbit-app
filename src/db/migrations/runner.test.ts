@@ -6,10 +6,11 @@
  * user_version unadvanced with no partial schema) is the load-bearing
  * assertion — an unreachable device must never wedge on a half-applied step.
  */
+
+import { afterEach, describe, expect, it } from "vitest";
 import { nodeSqliteExecutor, openTestDb } from "@/db/__testkit__/node-sqlite";
 import { runMigrations } from "@/db/migrations/runner";
 import type { Migration, MigrationDeps, SqlExecutor } from "@/db/types";
-import { afterEach, describe, expect, it } from "vitest";
 
 const deps: MigrationDeps = { now: "2026-08-14", newUid: () => "uid-fixed" };
 
@@ -69,7 +70,9 @@ describe("runMigrations", () => {
 
     // Re-running the identical set must not re-run step 1 (would throw
     // "table t1 already exists") and must leave user_version unchanged.
-    await expect(runMigrations(exec, [createT1], 1, deps)).resolves.toBeUndefined();
+    await expect(
+      runMigrations(exec, [createT1], 1, deps),
+    ).resolves.toBeUndefined();
     expect(await userVersion(exec)).toBe(1);
   });
 
@@ -138,7 +141,9 @@ describe("runMigrations", () => {
       version: 1,
       apply: async (e, d) => {
         seen.push(d);
-        await e.execAsync("CREATE TABLE seeded (uid TEXT NOT NULL, at TEXT NOT NULL)");
+        await e.execAsync(
+          "CREATE TABLE seeded (uid TEXT NOT NULL, at TEXT NOT NULL)",
+        );
         await e.runAsync("INSERT INTO seeded (uid, at) VALUES (?, ?)", [
           d.newUid(),
           d.now,
