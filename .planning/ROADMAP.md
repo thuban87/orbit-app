@@ -17,7 +17,7 @@ onto the dossier domains; a `[DECIDED]`/`[REJECTED]` decision is implemented, ne
 ## Phases
 
 - [x] **Phase 1: Project Scaffold & Portable Code** — Expo/RN app, theme tokens, and the ~900 lines of portable plugin source extracted into `src/`. (completed 2026-08-14)
-- [ ] **Phase 2: Data Foundation & Status Engine** — migration-1 SQLite scaffold, all core tables, single-writer `last_contact` DAO, continuous status, launch-sweep skeleton.
+- [x] **Phase 2: Data Foundation & Status Engine** — migration-1 SQLite scaffold, all core tables, single-writer `last_contact` DAO, continuous status, launch-sweep skeleton. (completed 2026-08-14)
 - [ ] **Phase 3: Custom Fields** — HANDOFF §14 two-table design, 7 parsers, `field_history`, quarantine sweep, and the field editor.
 - [ ] **Phase 4: Contact CRUD & Lifecycle** — create/edit forms, `contact_links`, archive/restore/purge, the contact profile scaffold.
 - [ ] **Phase 5: Photos** — library picker + URL path, in-app Skia crop, 512px master, themed initials fallback.
@@ -127,7 +127,7 @@ Recorded here because they bind phases that do not own them. Every planner/execu
   4. The launch sweep runs once per real foreground launch (not on a headless tap) and exposes hooks for later responsibilities.
   5. The newest-interaction-per-contact query and status scan benchmark acceptably on the Pixel.
 
-**Plans:** 5/6 plans executed
+**Plans:** 6/6 plans complete
 
 **Wave 1**
 
@@ -145,7 +145,7 @@ Recorded here because they bind phases that do not own them. Every planner/execu
 
 **Wave 4** *(blocked on Wave 3 completion)*
 
-- [ ] 02-06-PLAN.md — On-device Pixel benchmark + `localtime` probe + `allowBackup=false` (DATA-07)
+- [x] 02-06-PLAN.md — On-device Pixel benchmark + `localtime` probe + `allowBackup=false` (DATA-07)
 
 ### Phase 3: Custom Fields
 
@@ -356,7 +356,7 @@ Recorded here because they bind phases that do not own them. Every planner/execu
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Project Scaffold & Portable Code | 5/5 | Complete    | 2026-08-14 |
-| 2. Data Foundation & Status Engine | 5/6 | In Progress|  |
+| 2. Data Foundation & Status Engine | 6/6 | Complete   | 2026-08-14 |
 | 3. Custom Fields | 0/TBD | Not started | - |
 | 4. Contact CRUD & Lifecycle | 0/TBD | Not started | - |
 | 5. Photos | 0/TBD | Not started | - |
