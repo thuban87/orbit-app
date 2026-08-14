@@ -24,7 +24,7 @@ domain-research step and decline its brownfield-mapping offer — the dossier re
 | 7 | `photos` | Photo handling | **complete** |
 | 8 | `dashboard` | Dashboard screen | **complete** |
 | 9 | `orrery` | Orbit view | **complete** |
-| 10 | `capture` | Share-sheet capture | pending |
+| 10 | `capture` | Share-sheet capture | **complete** |
 | 11 | `notify` | Actionable notifications | pending |
 | 12 | `widget` | Home screen widget | pending |
 | 13 | `ai` | AI message suggestions | pending |
@@ -259,6 +259,22 @@ behind it. No `image/*` intent filter. Much of the rest is now settled — see `
 - Plugin source: conceptual heir to `src/services/LinkListener.ts` (deleted; Obsidian-shaped)
 - HANDOFF: §6 (share-sheet DECIDED)
 - Likely overlaps: `fuel`, `notify`, `crud`
+
+**Complete — see `docs/dossier/10-capture.md`.** 10 questions over 3 rounds; no `[OPEN]` items.
+The heavy investigation was already produced during the 03-fuel run and read first-hand this
+run; the platform facts were **re-verified 2026-08-13** (nothing changed). The picker is a
+**grid of faces, keyboard closed, ordered favourites → capture-MRU**; **single tap commits,
+long-press enters multi-select** (owner refinement); capture offers an **optional skippable
+note** (owner, over the orchestrator's fire-and-forget pick) that edits display text while the
+`url` stays canonical. Post-capture: **toast, then return to the source app** via a plain
+`finish()`. Payload is **split** (URL canonical, best-available text). The intent filter
+registers **`text/plain` only** (not the library's `text/*` default — `text/*` errors on
+`text/html`). **Capture is never a touchpoint** and **Direct Share is out** (native cost +
+system-ranked ordering + names/avatars leaving the sandbox + 30-day-staleness fighting the decay
+premise). **No capture inbox — `contact_id` stays NOT NULL** (settled now, not retrofittable).
+This run **records `launchMode="singleTask"` as an app-wide side effect** binding domains 11/12's
+back-stack design, and flags that **domain 8's never-contacted screen must render fuel** or
+captures onto new/never-contacted people are invisible.
 
 ## 11. `notify` — Actionable notifications
 
@@ -504,3 +520,20 @@ section. Summarised here so a later run sees what binds it.*
   only the widget forces a custom dev client — (2026-08-13)
 - [orrery → INDEX] Frequency gets **no visual encoding** on the orrery (closes 01-data's exported
   question); `gravity` stays **off** the orrery in v1 (confirms 04-log) — (2026-08-13)
+- [capture → fuel] The captured **display text is user-editable prose; the `url` column stays
+  canonical and separate**; `contact_id` on a fuel row is **NOT NULL** (no inbox, settled now as
+  not-retrofittable) — (2026-08-13)
+- [capture → notify/widget] ⚠ Adopting `expo-share-intent` imposes **`launchMode="singleTask"`
+  app-wide**; notification/widget/deep-link taps reuse one activity via `onNewIntent` (not fresh
+  `onCreate`), and with Android 15 background-activity-launch limits the **post-tap back-stack needs
+  explicit design in 11/12** — (2026-08-13)
+- [capture → dashboard] Domain 8's **never-contacted screen must render fuel**, or captures onto a
+  never-contacted / inline-created contact are invisible until first contact — (2026-08-13)
+- [capture → data/planning] A **cold-start share runs migrations + launch sweeps before the picker
+  can query**; whether the picker may read first is a planning call (a read-only `contacts` query is
+  untouched by a `contact_custom_values` DROP COLUMN) — (2026-08-13)
+- [capture → log/crud] Reaffirmed: capture is **not a touchpoint** (no `last_contact`/interaction
+  write, not even opt-in) and creates contacts only via the **name-only** inline path — (2026-08-13)
+- [capture → self] Registers **`text/plain` only** (not the library's `text/*` default, which errors
+  on `text/html`); **Direct Share declined** (native module + system-ranked ordering + names/avatars
+  to system storage + 30-day-staleness vs the decay premise) — (2026-08-13)
