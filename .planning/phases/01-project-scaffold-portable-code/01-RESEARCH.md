@@ -400,18 +400,21 @@ export function formatLocalDate(date: Date = new Date()): string {
 | A5 | The SDK-57 default template uses expo-router; a single home shell may not need it | Standard Stack | If router is skipped, home shell is a plain `App.tsx` — simpler, fine for FND-01. |
 | A6 | `schemas/types.ts` `output.path` field + "photo URL" comment (Obsidian vestiges) are harmless to port verbatim now | Portable Source Map | They are types/comments with no import coupling; later phases rework them (HANDOFF §14.9). Zero compile risk. |
 
-## Open Questions
+## Open Questions (RESOLVED)
+
+All four are resolved and the plans implement the resolutions — Q1/Q2 are routed to the owner
+checkpoint in plan 01-05; Q3/Q4 are settled at Claude's discretion and reflected in the plans.
 
 1. **Android package id string** — What exactly? (`com.bwales.orbit`? `com.thuban.orbit`?)
-   - What we know: `C:\Users\bwles` suggests `bwles`; changing it after first install requires uninstall.
-   - Recommendation: Owner confirms before the first `app.config.ts` commit (planner: `checkpoint:human-verify`).
+   - What we know: `C:\Users\bwls` suggests the Windows username; changing it after first install requires uninstall.
+   - **RESOLVED → owner checkpoint (01-05 Task 1, `autonomous: false`).** A `com.placeholder.orbit` placeholder is set at scaffold and replaced at the blocking human checkpoint before the first build. Not agent-invented.
 2. **SSH host + Windows shell** — Is `droid` a `~/.ssh/config` alias or Tailscale MagicDNS? cmd or PowerShell over SSH?
    - What we know: STATE.md says the `droid` Host block + first `ssh droid` verification are still pending.
-   - Recommendation: Owner-gated bring-up task before FND-01 can be proven.
+   - **RESOLVED → owner checkpoint (01-05 Task 1).** The `droid` bring-up (SSH host block, first-auth, toolchain confirm, on-device USB-debug tap) is gated on the owner before FND-01 is proven.
 3. **Dev-client now or later?** — Add `expo-dev-client` this phase for on-device hot reload, or defer to the first native-only feature?
-   - Recommendation: Defer. A plain debug APK proves the pipeline; dev-client lands with Skia/widget. (Claude's discretion.)
+   - **RESOLVED → defer.** A plain debug APK proves the pipeline; `expo-dev-client` lands with the first native-only feature (Skia/widget). (Claude's discretion; reflected in the plans — not added this phase.)
 4. **expo-router vs plain App entry** for the home shell?
-   - Recommendation: Claude's discretion; plain `App.tsx` is the minimal FND-01 proof, expo-router matches quest-board if navigation is imminent (Phase 4+).
+   - **RESOLVED → plain `App.tsx`.** The minimal FND-01 proof needs no router; expo-router can be adopted when navigation is imminent (Phase 4+). (Claude's discretion; plan 01-03 uses plain `App.tsx`, matching SKELETON.md.)
 
 ## Environment Availability
 
