@@ -274,5 +274,3 @@ None — every file has a strong analog. The two genuinely new artifacts this ph
 **Analog search scope:** `~/projects/Orbit/src/{types.ts, utils/, schemas/, services/AiService.ts}` + `~/projects/Orbit/test/unit/`; `~/projects/quest-board-app/{biome.json, apps/mobile/{app.config.ts, tsconfig.json, babel.config.js, index.js, src/stores/theme-store.ts}, packages/ui/src/{theme-types.ts, theme-presets.ts, theme-provider.tsx}}`
 **Files scanned:** 14 analog files read directly (not estimated)
 **Pattern extraction date:** 2026-08-14
-</content>
-</invoke>
