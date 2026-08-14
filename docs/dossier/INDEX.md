@@ -29,7 +29,7 @@ domain-research step and decline its brownfield-mapping offer — the dossier re
 | 12 | `widget` | Home screen widget | **complete** |
 | 13 | `ai` | AI message suggestions | **complete** |
 | 14 | `digest` | Weekly digest & birthday alerts | **complete** |
-| 15 | `backup` | Backup, export & data portability | pending |
+| 15 | `backup` | Backup, export & data portability | **complete** |
 
 Domains are numbered in recommended interrogation order — data-model decisions first,
 because they cascade into everything downstream. Order is a default, not a law.
@@ -404,6 +404,22 @@ other domains' decisions — they only get their own interrogation if something 
 - HANDOFF: §3 (backup [OPEN]), §8 (differentiators)
 - Likely overlaps: `data`, `fields`, `photos`, `ai`
 
+**Complete — see `docs/dossier/15-backup.md`.** 11 questions over 3 rounds; no `[OPEN]` items.
+The plugin has **no backup predecessor** (its one JSON writer is a lossy read-only AI-agent
+dump), so this is net-new. Resolves HANDOFF §3's `[OPEN]` backup item: v1 ships **both a manual
+share-sheet export AND an automatic rotating folder backup** (SAF persisted grant, app-launch
+sweep, ~7 kept, once/day — "cloud" is just that folder synced, no integration), with an
+**overdue nudge** because export is the only loss barrier. Encryption is **optional, off by
+default** (plaintext JSON is the anti-lock-in feature; AES-256-GCM behind a passphrase when on,
+auto-backups reusing a Keystore-cached passphrase). Restore **offers Merge (default) and
+Replace-all** — *not* a reversal of 04-log's rejected replace-**only** — with **newest-edit-wins**
+conflict resolution, which ⚠ **forces a new `modified_at` column on every mergeable table in
+migration 1** (joins uid as un-backfillable). Restore **migrates an older backup forward and
+rejects a newer one** (`user_version`-stamped). Scope is **full app state minus secrets**; keys
+stay excluded, `field_history` excluded (resolving 01-data's OPEN), schedules re-registered.
+Platform-verified (SDK 57): SAF is legacy-import-only but durable; `expo-crypto` v55 now ships
+AES-GCM. Also reconciled the incomplete 01-data export list and the PK-vs-uid ambiguity.
+
 ---
 
 ## Cross-domain constraint log
@@ -688,3 +704,33 @@ section. Summarised here so a later run sees what binds it.*
   Pixel** (pre-57 repeat bugs #34782/#30577; emulator won't do) and re-registers across reboot;
   idempotent re-registration; the "skews hard" quality threshold and delivery-day/hour constants —
   (2026-08-14)
+- [backup → data/log/ALL] ⚠ **New migration-1 column: `modified_at` on every mergeable table**
+  (contacts, interactions, events, fuel, categories, defs, custom values, self, contact_links),
+  maintained by every writer — the newest-edit-wins merge rule needs it; **un-backfillable** like
+  the uid. Neither 01-data nor 04-log provisioned it — (2026-08-14)
+- [backup → data] The globally-unique **uid must be a DISTINCT column from the local PK** (merge
+  keys on the uid across devices; recommend an app-generated UUID) — resolves the 01-data/04-log
+  ambiguity — (2026-08-14)
+- [backup → fields] Restore **recreates dynamic `contact_custom_values` columns via ALTER TABLE
+  ADD COLUMN from defs before loading values**, never adds an index/UNIQUE (breaks §14 DROP-COLUMN
+  expiry); quarantined defs restore with `quarantined_at` intact — (2026-08-14)
+- [backup → log/data] Restore **recomputes `last_contact` (MAX), never restores it authoritative**;
+  a lossy backup restored Replace-all relocates contacts to never-contacted — restore-preview must
+  show interaction counts (reaffirms `[log → backup]`) — (2026-08-14)
+- [backup → photos] Restore writes base64 photo bytes to **fresh files + repoints relative paths**,
+  never restores stored paths verbatim (reaffirms `[photos → backup]`) — (2026-08-14)
+- [backup → ai/notify/digest] **API keys never exported**; non-secret AI settings + notification/
+  digest **on-off toggles** are; the notification/digest **schedules are re-registered on restore,
+  not exported** — (2026-08-14)
+- [backup → planning] Manual = `expo-sharing` (new File API); auto = `StorageAccessFramework` from
+  **`expo-file-system/legacy`** (no new-API equivalent), persisted-URI grant, flat files in a
+  user-picked sub-folder, launch-sweep rotation; restore-read via `getDocumentAsync` (evictable
+  cache copy). Encryption = `expo-crypto` v55 AES-GCM + a PBKDF2 (JS or RNQC), passphrase cached in
+  `expo-secure-store` for unattended auto-encrypt — (2026-08-14)
+- [backup → security posture] The plaintext-default backup written via SAF lands **outside the
+  `allowBackup=false` sandbox**, readable by any app with storage access — a real egress surface;
+  encryption is the opt-in mitigation, recorded so the default is a conscious posture — (2026-08-14)
+- [backup → INDEX] **Every dossier domain is now complete.** HANDOFF §3's backup `[OPEN]` is closed
+  and §8's anti-lock-in differentiator is **readable plaintext JSON** (CSV deferred post-v1). Ready
+  for `/gsd-new-project` (skip its domain-research + brownfield-mapping steps — the dossier replaces
+  both) — (2026-08-14)
