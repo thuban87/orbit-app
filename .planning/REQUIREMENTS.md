@@ -12,8 +12,8 @@ roadmap phases. Items marked *(infra)* are foundation guarantees rather than end
 ### Foundation & Portable Code (FND)
 
 - [ ] **FND-01**: The Expo/RN app builds and launches to a home shell on the Pixel 6 Pro through the desktop-build → install pipeline (pipeline verified once). *(infra)*
-- [ ] **FND-02**: The portable plugin files are extracted into `src/` as tracked, linted, typed source — `calculateStatus()` + `FREQUENCY_DAYS`/`Frequency`/`OrbitStatus`/`SocialBattery`, `schemas/types.ts`, both built-in schemas, `formatLocalDate()`, `logger.ts`. *(infra)*
-- [ ] **FND-03**: `types.ts` is free of Obsidian coupling (`TFile` stripped/generalised) and the extracted files typecheck. *(infra)*
+- [x] **FND-02**: The portable plugin files are extracted into `src/` as tracked, linted, typed source — `calculateStatus()` + `FREQUENCY_DAYS`/`Frequency`/`OrbitStatus`/`SocialBattery`, `schemas/types.ts`, both built-in schemas, `formatLocalDate()`, `logger.ts`. *(infra)*
+- [x] **FND-03**: `types.ts` is free of Obsidian coupling (`TFile` stripped/generalised) and the extracted files typecheck. *(infra)*
 - [ ] **FND-04**: `AiService.ts` is ported with `requestUrl`→`fetch` and explicit `response.ok` handling, decoupled from Obsidian types (not yet wired to UI). *(infra)*
 - [ ] **FND-05**: A theme-token module and Zustand store scaffold exist (quest-board pattern); no hardcoded colours. *(infra)*
 - [x] **FND-06**: Biome lint/format, portrait-lock, and the CLAUDE.md folder layout are configured. *(infra)*
