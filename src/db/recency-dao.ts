@@ -278,6 +278,23 @@ export function createContactWithInteraction(
   exec: SqlExecutor,
   input: CreateContactInput,
 ): Promise<{ contactId: number; interactionId: number | null }> {
+  // WR-02: `interval_days` divides PROGRESS_SQL (status.ts). A 0 or negative
+  // interval makes `elapsed / interval_days` evaluate to SQL NULL, every
+  // STATUS_SQL comparison against NULL is false, and the row silently buckets
+  // as 'stable' forever. Migration 1 is irreversible so a `CHECK (interval_days
+  // > 0)` cannot be retrofitted without a table rebuild — the guard lives in TS
+  // (CLAUDE.md: "logic that would live in a Postgres function lives in
+  // TypeScript"). Reject at this single write chokepoint before the insert.
+  if (!Number.isInteger(input.intervalDays) || input.intervalDays <= 0) {
+    // Reject (not synchronously throw) so this stays consistent with the
+    // Promise-returning contract — a caller's `.catch()` sees it, and no
+    // transaction is ever opened.
+    return Promise.reject(
+      new Error(
+        `intervalDays must be a positive integer, got ${input.intervalDays}`,
+      ),
+    );
+  }
   return inWriteTransaction(exec, async () => {
     const contactResult = await exec.runAsync(
       `INSERT INTO contacts

@@ -234,6 +234,38 @@ describe("recency DAO — createContactWithInteraction atomicity", () => {
   });
 });
 
+describe("recency DAO — intervalDays write-boundary guard (WR-02)", () => {
+  it.each([0, -1, -30, 1.5, Number.NaN])(
+    "rejects a non-positive / non-integer intervalDays (%p) and writes nothing",
+    async (bad) => {
+      await expect(
+        createContactWithInteraction(exec, {
+          uid: uid(),
+          name: "Bad",
+          intervalDays: bad,
+          now: NOW,
+        }),
+      ).rejects.toThrow(/positive integer/);
+
+      // The guard fires before the insert — no orphan contact row is created.
+      const row = await exec.getFirstAsync<{ n: number }>(
+        "SELECT COUNT(*) AS n FROM contacts",
+      );
+      expect(row?.n ?? 0).toBe(0);
+    },
+  );
+
+  it("accepts a positive integer intervalDays", async () => {
+    const { contactId } = await createContactWithInteraction(exec, {
+      uid: uid(),
+      name: "Good",
+      intervalDays: 1,
+      now: NOW,
+    });
+    expect(contactId).toBeGreaterThan(0);
+  });
+});
+
 describe("recency DAO — rollback and serialization", () => {
   it("rolls back the whole write when the interaction insert fails", async () => {
     const c = await makeContact();
