@@ -1,5 +1,10 @@
 import "tsx/cjs";
 import type { ConfigContext, ExpoConfig } from "expo/config";
+// Relative import (not the `@/` alias): this file is evaluated by Node via the
+// tsx/cjs hook at prebuild time, which does not resolve the metro/tsconfig
+// `@/*` path alias. The display name lives in one place so a future rename is
+// a one-line edit — DECOUPLED from the install-locked android.package below.
+import { APP_NAME } from "./src/constants/app";
 
 // Functional config form: MERGES the template's app.json (preserving its
 // icon/splash/adaptive-icon references) and layers Orbit's fields on top.
@@ -7,15 +12,16 @@ import type { ConfigContext, ExpoConfig } from "expo/config";
 // config at prebuild — without it, prebuild fails to load the config.
 export default ({ config }: ConfigContext): ExpoConfig => ({
   ...config,
-  name: "Orbit",
+  name: APP_NAME,
   slug: "orbit",
   // Config-layer portrait lock (CLAUDE.md — the app is portrait-locked).
   orientation: "portrait",
   android: {
     ...config.android,
-    // Placeholder Android application id. The real package id is confirmed by
-    // the owner at the FND-01 checkpoint (plan 01-05) before the first build.
-    package: "com.placeholder.orbit",
+    // Owner-confirmed Android application id (FND-01 checkpoint, plan 01-05).
+    // Install-locked and STABLE: it does NOT track the display name (APP_NAME).
+    // Changing it after the first install requires uninstall/reinstall.
+    package: "com.bwales.orbit",
     predictiveBackGestureEnabled: false,
   },
   // Pre-register the Phase 2 native dep so the first prebuild covers it.

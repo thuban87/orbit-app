@@ -1,4 +1,5 @@
 import { StyleSheet, Text, View } from "react-native";
+import { APP_NAME } from "@/constants/app";
 import { useTheme } from "@/theme";
 
 /**
@@ -6,8 +7,9 @@ import { useTheme } from "@/theme";
  *
  * Every colour comes from `useTheme().colors.*`; there is not one hardcoded
  * colour value here (CLAUDE.md). The root view carries `testID`
- * `home-shell-root` and the title the visible text "Orbit" so plan 01-05 can
- * assert the rendered shell on the Pixel via `uiautomator dump`.
+ * `home-shell-root` and the title renders `APP_NAME` (the single source of the
+ * display name — currently "Orbit") so plan 01-05 can assert the rendered
+ * shell on the Pixel via `uiautomator dump`.
  */
 export function HomeScreen() {
   const { colors } = useTheme();
@@ -19,10 +21,10 @@ export function HomeScreen() {
     >
       <Text
         accessibilityRole="header"
-        accessibilityLabel="Orbit"
+        accessibilityLabel={APP_NAME}
         style={[styles.title, { color: colors.textPrimary }]}
       >
-        Orbit
+        {APP_NAME}
       </Text>
       <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
         Your people, in orbit.
