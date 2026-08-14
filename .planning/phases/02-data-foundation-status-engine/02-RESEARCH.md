@@ -555,18 +555,18 @@ export function installSweepTrigger() {
 
 | # | Claim | Section | Risk if Wrong |
 |---|-------|---------|---------------|
-| A1 | The **fuel table is NOT in migration 1** (ships in Phase 7 / FUEL-01, where its columns must be complete). The `[fuel→ai]` "columns exist from migration 1" is read as an un-backfillability guarantee for the fuel table's own creating migration, and adding a new table later is a "routine migration" per the dossier's `reach_methods` reasoning. **CONTEXT.md's authoritative scope fence does not list fuel among migration-1 tables.** | Open Questions Q1 | If wrong, fuel gets deferred a phase (routine to add later, low blast radius) OR must be added to migration 1 now — see Q1 for the ready DDL either way |
+| A1 | **[RESOLVED 2026-08-14 — SUPERSEDED. Owner decided the fuel table SHIPS IN MIGRATION 1, created empty, with FUEL-01's columns. See Q1 (RESOLVED) and 02-CONTEXT.md.]** ~~The fuel table is NOT in migration 1~~ — this assumption is no longer operative; the plans create the empty `fuel` table in migration 1. | Open Questions Q1 | Resolved by owner decision — no residual risk |
 | A2 | `contact_custom_values` carries its own `uid` + `modified_at` (mergeable-table rule) despite being 1:1 with contacts | Code Example 1b | Minor: an extra column pair if the owner intends to key merge on the parent contact's uid instead |
 | A3 | `field_history` needs no `uid`/`modified_at` (excluded from export per `[backup]`, purged with the contact) | Code Example 1b | Minor: if a future decision exports history, it would need un-backfillable merge columns |
 | A4 | `rogueK` (`ROGUE_K`) default = 3× the interval; exact value is an owner/Phase-6/9 tunable | Code Example 3 | Cosmetic only — a single top-of-file constant, no schema impact |
 | A5 | `uid` generated via `expo-crypto randomUUID()` (SDK 57) | Don't Hand-Roll | If unavailable, use another UUID source — no schema impact (still a TEXT uid) |
 | A6 | Node-side tests use `node:sqlite` (SQLite 3.51.2) as a semantics harness; on-device (3.50.3) is authoritative for migration/DAO/localtime | Validation Architecture | Version skew is 3.51.2 vs 3.50.3 — negligible for Phase-2 DDL/query semantics; localtime still needs the on-device probe (P6) |
 
-**If this table is non-empty:** A1 in particular needs planner/owner confirmation before the migration-1 DDL is frozen (it is irreversible).
+**If this table is non-empty:** A1 was the only migration-freeze blocker and is now **RESOLVED** — the owner chose fuel IN migration 1 (2026-08-14); the plans implement it.
 
-## Open Questions
+## Open Questions (RESOLVED)
 
-1. **Does the fuel table ship in migration 1, or in Phase 7?** *(highest priority — irreversible)*
+1. **[RESOLVED 2026-08-14 — owner chose MIGRATION 1.]** Does the fuel table ship in migration 1, or in Phase 7? *(was highest priority — irreversible; now settled: the empty `fuel` table ships in migration 1 with FUEL-01's columns.)*
    - What we know: `[fuel→ai]` says "Fuel rows carry `kind`/`created_at`/`source`/`url` **from migration 1**"; FUEL-01 (Phase 7) says "**Migration creates** the fuel table (uid, `contact_id` NOT NULL, kind, label, text, url, created_at, source, modified_at)"; the task's additional-context lists fuel columns under migration-1 DDL.
    - What's unclear: CONTEXT.md's authoritative in-scope table list (DATA-03 + the custom-fields carve-in) does **not** include a fuel table. So the two sources conflict on *which migration* creates it.
    - Recommendation: **Confirm with the planner/owner before freezing migration 1.** Adding a new *table* later is a routine migration (unlike un-backfillable columns), so deferring to Phase 7 is safe; but if the owner wants it in migration 1, the ready DDL is:
