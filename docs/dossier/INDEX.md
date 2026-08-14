@@ -25,7 +25,7 @@ domain-research step and decline its brownfield-mapping offer — the dossier re
 | 8 | `dashboard` | Dashboard screen | **complete** |
 | 9 | `orrery` | Orbit view | **complete** |
 | 10 | `capture` | Share-sheet capture | **complete** |
-| 11 | `notify` | Actionable notifications | pending |
+| 11 | `notify` | Actionable notifications | **complete** |
 | 12 | `widget` | Home screen widget | pending |
 | 13 | `ai` | AI message suggestions | pending |
 | 14 | `digest` | Weekly digest & birthday alerts | pending |
@@ -289,6 +289,24 @@ frequency-of-nagging policy.
 - HANDOFF: §6
 - Likely overlaps: `fuel`, `log`, `data`, `digest`, `widget`
 
+**Complete — see `docs/dossier/11-notify.md`.** 16 questions over 5 rounds; no `[OPEN]` items. Two
+platform verifiers closed the one gap the prior fuel/log runs left — the **scheduling
+architecture** — and the platform dictated it: **scheduled-notification content freezes at schedule
+time** and the **background-task sweep is hard-gated on network** (won't run offline), so the engine
+is **pre-scheduled dated notifications, reconciled at launch/foreground, cancelled on
+mark/snooze/mute**, with **fuzzy (no-permission) delivery** at a **fixed morning hour inside a quiet
+window**, **per-contact and naturally staggered** (Android 15 Cooldown penalises bursts). The
+notification body is **GENERIC** — this run **⚠ further narrows HANDOFF §6 / 03-fuel Cluster D**
+(fuel is visible only on the compose screen the tap opens, not in the notification text) because
+frozen content cannot show live fuel. The action set is **refined to two buttons** (mark-contacted +
+snooze; body-tap opens compose, "open" dropped), reminders **re-nag ~weekly (replacing)**, and
+rogue/"Rarely responds" get **no notification — in-app only**. The owner **added a per-contact
+"reminders off" mute** (against the recommendation), **kept the private lock-screen second channel**
+(considered for reversal after the generic-body call, upheld), and **claimed birthday notifications
+for this domain** (resolving HANDOFF Q7's birthday half — **domain 14 keeps only the weekly
+digest**). **No per-contact photo** on notifications without native code (declined). Alert
+feel/importance is **punted to the §12.4 design pass**.
+
 ## 12. `widget` — Home screen widget
 
 Favourites grid; tap = preset action (primary: mark contacted), long-press = deep link
@@ -537,3 +555,31 @@ section. Summarised here so a later run sees what binds it.*
 - [capture → self] Registers **`text/plain` only** (not the library's `text/*` default, which errors
   on `text/html`); **Direct Share declined** (native module + system-ranked ordering + names/avatars
   to system storage + 30-day-staleness vs the decay premise) — (2026-08-13)
+- [notify → fuel] ⚠ **Refines 03-fuel Cluster D:** the decay notification body is **generic** (fuel
+  only on the compose screen, **not the notification text** — narrows §6 further, owner-chosen,
+  forced by frozen scheduled content); action set is **two buttons** (mark-contacted + snooze;
+  body-tap opens compose, "open" dropped; inline capture stays available-for-later); the **second
+  lock-screen channel is reaffirmed** (considered for reversal, upheld on name sensitivity) — (2026-08-14)
+- [notify → data] New nullable **"reminders off" mute** column on `contacts` (owner add, suppresses
+  decay scheduling only; contact still decays/appears); scheduling cutoff is the **shared rogue
+  constant** (09-orrery). No decay notif for never-contacted/snoozed/rogue/Rarely-responds/muted —
+  (2026-08-14)
+- [notify → crud] The mute toggle needs a per-contact **edit surface** beside "Rarely responds"
+  (**additive** to 06-crud's lean form, not a reversal) — (2026-08-14)
+- [notify → log] The **headless Snooze action** writes an `events` snooze row and must be
+  **double-wired** (background task + foreground listener), extending 04-log's mark-contacted
+  double-write to snooze — (2026-08-14)
+- [notify → digest (14)] Notify owns **all notifications incl. birthday-morning alerts** (resolves
+  HANDOFF Q7's birthday half — **keep**); **14 owns only the weekly digest** and must not assume it
+  owns birthday alerts. Rogue/"gone quiet" are surfaced **in-app**, not notified — (2026-08-14)
+- [notify → dashboard] Birthday notification reuses **08's single birthday parser** and depends on
+  its **two flagged fixes** (day-of drop; Feb-29→Mar-1) landing first — (2026-08-14)
+- [notify → widget (12)] Shares the **headless-write path** and app-wide **singleTask/onNewIntent**
+  back-stack; 12 inherits notify's **"Back → dashboard"** resolution as the pattern — (2026-08-14)
+- [notify → backup (15)] Export the **notification settings** (master + per-type toggles, lock-screen
+  visibility); the **schedule is derived** (rebuilt by launch-reconcile on restore), not exported —
+  (2026-08-14)
+- [notify → planning] Engine = **pre-scheduled dated notifications + launch/foreground reconcile**
+  (cancel/replace on `decay:<contactId>`), **generic body**, fuzzy no-permission delivery;
+  `expo-background-task` is an **offline-intolerant** best-effort backstop only (hard-gated on
+  `NetworkType.CONNECTED`). Device spike: headless action task init with **no FCM** — (2026-08-14)
