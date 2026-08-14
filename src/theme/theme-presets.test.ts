@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
   DEFAULT_PRESET_ID,
-  THEME_PRESETS,
   resolveMode,
   resolvePalette,
+  THEME_PRESETS,
 } from "./theme-presets";
 
 describe("resolveMode", () => {
