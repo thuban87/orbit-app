@@ -5,14 +5,15 @@ milestone_name: milestone
 current_phase: 1
 current_phase_name: Project Scaffold & Portable Code
 status: executing
-last_updated: "2026-08-14T18:06:16.389Z"
+stopped_at: Completed 01-04-PLAN.md
+last_updated: "2026-08-14T18:15:44.425Z"
 last_activity: 2026-08-14
 last_activity_desc: Phase 1 execution started
 progress:
   total_phases: 16
   completed_phases: 0
   total_plans: 5
-  completed_plans: 3
+  completed_plans: 4
   percent: 0
 ---
 
@@ -28,7 +29,7 @@ See: .planning/PROJECT.md (updated 2026-08-14)
 ## Current Position
 
 Phase: 1 (Project Scaffold & Portable Code) — EXECUTING
-Plan: 4 of 5
+Plan: 5 of 5
 Status: Ready to execute
 Last activity: 2026-08-14 — Phase 1 execution started
 
@@ -57,6 +58,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 1 P01 | 8min | 3 tasks | 26 files |
 | Phase 01 P02 | 3min | 3 tasks | 8 files |
 | Phase 01 P03 | 3min | 3 tasks | 8 files |
+| Phase 01 P04 | 5min | 3 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -73,6 +75,8 @@ Foundational decisions affecting current work:
 
 - [Phase 1]: 01-01: app.config.ts dedupes the expo-sqlite plugin (expo install pre-populated app.json's plugins array) to avoid a duplicate-plugin prebuild error
 - [Phase 1]: 01-01: shared check-colors.sh gate lands now (npm check:colors); first enforced in 01-03 when App.tsx's template #fff becomes the themed shell
+- [Phase 01]: 01-04: AiService ported onto fetch with explicit response.ok guards before every await response.json(); Obsidian-decoupled via local AiSettings interface; dormant (no screen wired)
+- [Phase 01]: 01-04: Ollama/local-LAN provider OMITTED entirely (owner decision) — no http:// cleartext path in src/; id union named AiProviderId to avoid TS2440 vs ported interface AiProvider
 
 ### Pending Todos
 
@@ -102,3 +106,9 @@ None yet.
 See REQUIREMENTS.md "v2 / Deferred Requirements" and the per-domain "Deferred to phase discussion /
 planning" sections in docs/dossier/*.md — those are the authoritative hand-off lists for each phase's
 `/gsd-discuss-phase` and `/gsd-plan-phase` steps.
+
+## Session
+
+**Last session:** 2026-08-14T18:15:35.519Z
+**Stopped at:** Completed 01-04-PLAN.md
+**Resume file:** None
