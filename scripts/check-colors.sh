@@ -35,13 +35,16 @@ quote="[\"']"
 pattern="#[0-9a-fA-F]{3,8}\b|rgba?\(|hsla?\(|${quote}${named}${quote}"
 
 # --include applies only to files discovered via directory recursion, so a
-# directly-named file target is always scanned. Matches under /theme/ are the
-# one sanctioned exception and are filtered out.
+# directly-named file target is always scanned. Matches whose FILE PATH is under
+# /theme/ are the one sanctioned exception and are filtered out. The exclusion is
+# anchored to the path field (everything before grep's first `:` = path:lineno:content)
+# so a forbidden literal on a non-theme line that merely mentions "/theme/" in its
+# content (e.g. a comment or import) is NOT evaded (WR-01).
 matches=$(grep -rEniI \
   --include='*.ts' --include='*.tsx' \
   "$pattern" \
   "${existing[@]}" 2>/dev/null \
-  | grep -vE '/theme/' || true)
+  | grep -vE '^[^:]*/theme/' || true)
 
 if [ -n "$matches" ]; then
   {
