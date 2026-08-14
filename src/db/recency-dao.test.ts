@@ -158,6 +158,75 @@ describe("recency DAO — MAX recompute over current rows", () => {
   });
 });
 
+describe("recency DAO — (id, contactId) scoping guards recency (WR-04)", () => {
+  it("editTouchpoint rejects a mismatched contactId and leaves the real contact's recency intact", async () => {
+    const a = await makeContact();
+    const { interactionId } = await recordTouchpoint(exec, {
+      contactId: a,
+      uid: uid(),
+      occurredAt: "2026-07-01 10:00:00",
+      now: NOW,
+    });
+    const b = await makeContact();
+
+    // Edit A's interaction but claim it belongs to B: must fail loudly, not
+    // silently leave A's last_contact stale while recomputing B.
+    await expect(
+      editTouchpoint(exec, {
+        interactionId,
+        contactId: b,
+        occurredAt: "2026-01-01 10:00:00",
+        now: NOW,
+      }),
+    ).rejects.toThrow(/no interaction matched/);
+
+    // A's row and recency are untouched; B never had an interaction.
+    const row = await exec.getFirstAsync<{ occurred_at: string }>(
+      "SELECT occurred_at FROM interactions WHERE id = ?",
+      [interactionId],
+    );
+    expect(row?.occurred_at).toBe("2026-07-01 10:00:00");
+    expect(await lastContact(a)).toBe("2026-07-01 10:00:00");
+    expect(await lastContact(b)).toBeNull();
+  });
+
+  it("deleteTouchpoint rejects a mismatched contactId and deletes nothing", async () => {
+    const a = await makeContact();
+    const { interactionId } = await recordTouchpoint(exec, {
+      contactId: a,
+      uid: uid(),
+      occurredAt: "2026-07-01 10:00:00",
+      now: NOW,
+    });
+    const b = await makeContact();
+
+    await expect(
+      deleteTouchpoint(exec, { interactionId, contactId: b, now: NOW }),
+    ).rejects.toThrow(/no interaction matched/);
+
+    // A's interaction still exists and its recency is intact.
+    expect(await interactionCount(a)).toBe(1);
+    expect(await lastContact(a)).toBe("2026-07-01 10:00:00");
+  });
+
+  it("editTouchpoint still works for a correctly-paired (id, contactId)", async () => {
+    const a = await makeContact();
+    const { interactionId } = await recordTouchpoint(exec, {
+      contactId: a,
+      uid: uid(),
+      occurredAt: "2026-07-01 10:00:00",
+      now: NOW,
+    });
+    await editTouchpoint(exec, {
+      interactionId,
+      contactId: a,
+      occurredAt: "2026-08-01 10:00:00",
+      now: NOW,
+    });
+    expect(await lastContact(a)).toBe("2026-08-01 10:00:00");
+  });
+});
+
 describe("recency DAO — connected-only filter for rarely_responds", () => {
   it("counts only connected rows and ignores a later non-connecting attempt", async () => {
     const c = await makeContact(1);

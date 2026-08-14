@@ -239,19 +239,32 @@ export function editTouchpoint(
   input: EditTouchpointInput,
 ): Promise<void> {
   return inWriteTransaction(exec, async () => {
-    await exec.runAsync(
+    // WR-04: scope by BOTH keys. Recompute uses the caller-supplied contactId,
+    // so if (interactionId, contactId) don't actually pair, an id-only UPDATE
+    // would edit contact A's row while recomputing contact B — leaving A's
+    // last_contact stale (the exact "recency silently wrong after a mutation"
+    // failure this module's invariant guards against). Scoping by contact_id
+    // makes a mismatch update 0 rows; asserting changes === 1 turns that into a
+    // loud rollback instead of silent corruption.
+    const result = await exec.runAsync(
       `UPDATE interactions
           SET occurred_at = ?,
               connected   = COALESCE(?, connected),
               modified_at = ?
-        WHERE id = ?`,
+        WHERE id = ? AND contact_id = ?`,
       [
         input.occurredAt,
         input.connected ?? null,
         input.now,
         input.interactionId,
+        input.contactId,
       ],
     );
+    if (result.changes !== 1) {
+      throw new Error(
+        `editTouchpoint: no interaction matched id=${input.interactionId} for contactId=${input.contactId} (changed ${result.changes})`,
+      );
+    }
     await recomputeLastContact(exec, input.contactId, input.now);
   });
 }
@@ -262,9 +275,18 @@ export function deleteTouchpoint(
   input: DeleteTouchpointInput,
 ): Promise<void> {
   return inWriteTransaction(exec, async () => {
-    await exec.runAsync("DELETE FROM interactions WHERE id = ?", [
-      input.interactionId,
-    ]);
+    // WR-04: scope by BOTH keys (see editTouchpoint). A mismatched pair must not
+    // delete contact A's interaction while recomputing contact B — assert
+    // exactly one row was deleted, else roll back loudly.
+    const result = await exec.runAsync(
+      "DELETE FROM interactions WHERE id = ? AND contact_id = ?",
+      [input.interactionId, input.contactId],
+    );
+    if (result.changes !== 1) {
+      throw new Error(
+        `deleteTouchpoint: no interaction matched id=${input.interactionId} for contactId=${input.contactId} (changed ${result.changes})`,
+      );
+    }
     await recomputeLastContact(exec, input.contactId, input.now);
   });
 }
