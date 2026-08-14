@@ -8,14 +8,12 @@ import type { ThemeMode, ThemePresetId } from "@/theme/theme-types";
  * Persisted theme-selection store (FND-05).
  *
  * Holds ONLY the user's selection (`mode` + `presetId`) — the resolved palette
- * is derived in `ThemeProvider`, never stored. Persisted to AsyncStorage under
- * `orbit-theme`; on launch the selection rehydrates and drives the provider,
- * restyling the app. This is a live store wired into `ThemeProvider`, not dead
- * scaffolding.
+ * is derived in `ThemeProvider`, never stored. Persisted to AsyncStorage; on
+ * launch the selection rehydrates and drives the provider, restyling the app.
+ * This is a live store wired into `ThemeProvider`, not dead scaffolding.
  *
- * Flattened from quest-board's per-character store: Orbit has no characters this
- * phase, so the `character-store` coupling and its full-state `.subscribe`
- * listener are deliberately dropped.
+ * Deliberately flat: the per-profile coupling and full-state `.subscribe`
+ * listener of the analog store were dropped — Orbit has no such entity yet.
  */
 interface ThemeStore {
   mode: ThemeMode;
