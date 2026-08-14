@@ -13,8 +13,8 @@
  * Also asserts the module is derived-never-stored: it issues no write statement.
  */
 import { readFileSync } from "node:fs";
-import { fileURLToPath } from "node:url";
 import type { DatabaseSync } from "node:sqlite";
+import { fileURLToPath } from "node:url";
 import { beforeEach, describe, expect, it } from "vitest";
 import { nodeSqliteExecutor, openTestDb } from "@/db/__testkit__/node-sqlite";
 import { migration001 } from "@/db/migrations/001-initial";
