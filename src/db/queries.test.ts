@@ -14,13 +14,13 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { nodeSqliteExecutor, openTestDb } from "@/db/__testkit__/node-sqlite";
 import { migration001 } from "@/db/migrations/001-initial";
+import { runMigrations } from "@/db/migrations/runner";
 import {
   NEWEST_FOR_CONTACT,
   NEWEST_PER_CONTACT,
   STATUS_SCAN,
   statusOrder,
 } from "@/db/queries";
-import { runMigrations } from "@/db/migrations/runner";
 import type { SqlExecutor } from "@/db/types";
 import { formatLocalDate } from "@/utils/dates";
 
@@ -166,9 +166,21 @@ describe("NEWEST_PER_CONTACT", () => {
       intervalDays: 10,
       lastContact: daysAgo(1),
     });
-    await seedInteraction({ contactId: a, occurredAt: daysAgo(9), channel: "text" });
-    await seedInteraction({ contactId: a, occurredAt: daysAgo(1), channel: "call" });
-    await seedInteraction({ contactId: b, occurredAt: daysAgo(4), channel: "email" });
+    await seedInteraction({
+      contactId: a,
+      occurredAt: daysAgo(9),
+      channel: "text",
+    });
+    await seedInteraction({
+      contactId: a,
+      occurredAt: daysAgo(1),
+      channel: "call",
+    });
+    await seedInteraction({
+      contactId: b,
+      occurredAt: daysAgo(4),
+      channel: "email",
+    });
 
     const rows = await exec.getAllAsync<NewestRow>(NEWEST_PER_CONTACT);
     const byContact = new Map(rows.map((r) => [r.contact_id, r]));
@@ -184,8 +196,16 @@ describe("NEWEST_PER_CONTACT", () => {
       lastContact: daysAgo(1),
     });
     // Two rows for the SAME occurred_at — the later-inserted (higher id) is newest.
-    await seedInteraction({ contactId: c, occurredAt: daysAgo(2), channel: "first" });
-    await seedInteraction({ contactId: c, occurredAt: daysAgo(2), channel: "second" });
+    await seedInteraction({
+      contactId: c,
+      occurredAt: daysAgo(2),
+      channel: "first",
+    });
+    await seedInteraction({
+      contactId: c,
+      occurredAt: daysAgo(2),
+      channel: "second",
+    });
 
     const rows = await exec.getAllAsync<NewestRow>(NEWEST_PER_CONTACT);
     expect(rows).toHaveLength(1);
@@ -205,9 +225,21 @@ describe("NEWEST_FOR_CONTACT", () => {
       intervalDays: 10,
       lastContact: daysAgo(1),
     });
-    await seedInteraction({ contactId: a, occurredAt: daysAgo(9), channel: "old" });
-    await seedInteraction({ contactId: a, occurredAt: daysAgo(2), channel: "newA" });
-    await seedInteraction({ contactId: b, occurredAt: daysAgo(1), channel: "newB" });
+    await seedInteraction({
+      contactId: a,
+      occurredAt: daysAgo(9),
+      channel: "old",
+    });
+    await seedInteraction({
+      contactId: a,
+      occurredAt: daysAgo(2),
+      channel: "newA",
+    });
+    await seedInteraction({
+      contactId: b,
+      occurredAt: daysAgo(1),
+      channel: "newB",
+    });
 
     const row = await exec.getFirstAsync<NewestRow>(NEWEST_FOR_CONTACT, [a]);
     expect(row?.channel).toBe("newA");
@@ -220,8 +252,16 @@ describe("NEWEST_FOR_CONTACT", () => {
       intervalDays: 10,
       lastContact: daysAgo(1),
     });
-    await seedInteraction({ contactId: c, occurredAt: daysAgo(3), channel: "lo" });
-    await seedInteraction({ contactId: c, occurredAt: daysAgo(3), channel: "hi" });
+    await seedInteraction({
+      contactId: c,
+      occurredAt: daysAgo(3),
+      channel: "lo",
+    });
+    await seedInteraction({
+      contactId: c,
+      occurredAt: daysAgo(3),
+      channel: "hi",
+    });
 
     const row = await exec.getFirstAsync<NewestRow>(NEWEST_FOR_CONTACT, [c]);
     expect(row?.channel).toBe("hi");
@@ -238,9 +278,7 @@ describe("statusOrder", () => {
 
   it("sorts a mixed list most-urgent first", () => {
     const list = ["stable", "rogue", "snoozed", "wobble", "decay"] as const;
-    const sorted = [...list].sort(
-      (a, b) => statusOrder[a] - statusOrder[b],
-    );
+    const sorted = [...list].sort((a, b) => statusOrder[a] - statusOrder[b]);
     expect(sorted).toEqual(["rogue", "decay", "wobble", "stable", "snoozed"]);
   });
 });
