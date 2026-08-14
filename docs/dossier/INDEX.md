@@ -22,7 +22,7 @@ domain-research step and decline its brownfield-mapping offer — the dossier re
 | 5 | `import` | Obsidian vault importer | **cut** (owner, 2026-08-12 — see `04-log.md`) |
 | 6 | `crud` | Contact create/edit flows & forms | **complete** |
 | 7 | `photos` | Photo handling | **complete** |
-| 8 | `dashboard` | Dashboard screen | pending |
+| 8 | `dashboard` | Dashboard screen | **complete** |
 | 9 | `orrery` | Orbit view | pending |
 | 10 | `capture` | Share-sheet capture | pending |
 | 11 | `notify` | Actionable notifications | pending |
@@ -200,6 +200,20 @@ placement, offline-render guarantee.
 - Plugin source: `src/components/ContactGrid.tsx`, `OrbitHeader.tsx`, `ContactCard.tsx`, `BirthdayBanner.tsx`
 - HANDOFF: §7, §12.4
 - Likely overlaps: `fuel`, `data`, `photos`, `digest`, `orrery`
+
+**Complete — see `docs/dossier/08-dashboard.md`.** 16 questions over 4 rounds; no `[OPEN]` items.
+The dashboard is a **flat list** (no category grouping), the picker's full sort/filter set, and a
+**name+fuel search** that becomes the home for 03-fuel's previously-unowned cross-contact fuel
+search. The dashboard is the app's **home screen**; it **adopts the never-contacted screen** (a
+domain-8-owned sibling list), gives **snoozed** contacts a reveal-on-demand segment, and shows
+**counts** on the actionable hidden populations. Cards gain a **category label** and a **favourite
+marker**; favourites are **marked on the profile, ordered on a shared "Manage favourites" screen**
+(resolving 06-crud's punt). A **birthday banner ships** (resolving the dashboard half of HANDOFF
+Q7) that **overrides snooze/never-contacted suppression except archived** — a scoped exception,
+not a reversal; the digest and birthday notifications stay open for domains 14/11. Platform
+verification established the **change-listener is blind to headless one-tap writes** (re-query on
+focus instead) and flagged **two birthday-parser bugs** to fix.</new_string>
+
 
 ## 9. `orrery` — Orbit view
 
@@ -430,3 +444,25 @@ section. Summarised here so a later run sees what binds it.*
   fresh files and **repoints paths**, never restoring stored paths verbatim — (2026-08-13)
 - [photos → **index**] This run **reverses §14.3** (URL entry kept) and **partially un-deletes
   §4's `ImageScraper`** (download logic only); both owner-chosen and flagged — (2026-08-13)
+- [dashboard → fuel] 03-fuel's unowned **cross-contact fuel search is the dashboard search box**
+  (name AND fuel text, `LIKE`, `off_limits` excluded) — (2026-08-13)
+- [dashboard → INDEX/self] Domain 8 **adopts and owns the never-contacted screen** (separate
+  sibling list, counted entry); the **dashboard is the app home screen**; nav mechanism deferred —
+  (2026-08-13)
+- [dashboard → data] Default query excludes never-contacted, archived, and snoozed; a **snoozed
+  segment** reveals snoozed on demand (does not reverse 01-data C) — (2026-08-13)
+- [dashboard → widget (12)/profile] Favourites are **marked with a profile star** and **ordered on
+  a net-new "Manage favourites" screen shared with the widget config** — resolves 06-crud's
+  8/12 punt; the (unowned) profile screen gains a favourite toggle — (2026-08-13)
+- [dashboard → orrery (9)] Rogue is **not** hidden from the dashboard; the card's rogue rendering
+  **inherits domain 9's rogue visual** rather than inventing one — (2026-08-13)
+- [dashboard → 14 (digest)/11 (notify)] Domain 8 owns the **birthday BANNER** (7-day, tap→profile,
+  **overrides snooze/never-contacted suppression, excludes archived only** — scoped exception, not
+  a reversal). It does **not** own birthday notifications (11) or the weekly digest (14); both stay
+  open under HANDOFF Q7 and must not assume dashboard space — (2026-08-13)
+- [dashboard → 14/planning] The ported birthday parser has **two bugs to fix** in the new single
+  parser: a **day-of drop** (contact vanishes on their birthday; `"🎉 Today!"` branch dead) and
+  **Feb-29→Mar-1** in non-leap years — (2026-08-13)
+- [dashboard → data/photos] Freshness = **re-query on focus + AppState-active**, because
+  `addDatabaseChangeListener` (connection-scoped `sqlite3_update_hook`) is **blind to headless
+  one-tap writes**; async query API only; `recyclingKey` is a correctness requirement — (2026-08-13)
