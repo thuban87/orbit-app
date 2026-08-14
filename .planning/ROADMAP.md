@@ -127,11 +127,11 @@ Recorded here because they bind phases that do not own them. Every planner/execu
   4. The launch sweep runs once per real foreground launch (not on a headless tap) and exposes hooks for later responsibilities.
   5. The newest-interaction-per-contact query and status scan benchmark acceptably on the Pixel.
 
-**Plans:** 6 plans
+**Plans:** 1/6 plans executed
 
 **Wave 1**
 
-- [ ] 02-01-PLAN.md — Crash-safe `user_version` migration runner + `node:sqlite` test harness (DATA-01)
+- [x] 02-01-PLAN.md — Crash-safe `user_version` migration runner + `node:sqlite` test harness (DATA-01)
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
@@ -356,7 +356,7 @@ Recorded here because they bind phases that do not own them. Every planner/execu
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Project Scaffold & Portable Code | 5/5 | Complete    | 2026-08-14 |
-| 2. Data Foundation & Status Engine | 0/6 | Not started | - |
+| 2. Data Foundation & Status Engine | 1/6 | In Progress|  |
 | 3. Custom Fields | 0/TBD | Not started | - |
 | 4. Contact CRUD & Lifecycle | 0/TBD | Not started | - |
 | 5. Photos | 0/TBD | Not started | - |

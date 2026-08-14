@@ -5,15 +5,15 @@ milestone_name: milestone
 current_phase: 2
 current_phase_name: Data Foundation & Status Engine
 status: executing
-stopped_at: Completed 01-04-PLAN.md
-last_updated: "2026-08-14T21:59:05.296Z"
+stopped_at: Completed 02-01-PLAN.md
+last_updated: "2026-08-14T22:05:27.446Z"
 last_activity: 2026-08-14
-last_activity_desc: Phase 1 complete, transitioned to Phase 2
+last_activity_desc: Phase 2 execution started
 progress:
   total_phases: 16
   completed_phases: 1
-  total_plans: 5
-  completed_plans: 5
+  total_plans: 11
+  completed_plans: 6
   percent: 6
 ---
 
@@ -24,14 +24,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-08-14)
 
 **Core value:** Collapse the taps between "you're overdue with X" and the message actually being sent.
-**Current focus:** Phase 1 — Project Scaffold & Portable Code
+**Current focus:** Phase 2 — Data Foundation & Status Engine
 
 ## Current Position
 
-Phase: 2 — Data Foundation & Status Engine
-Plan: Not started
+Phase: 2 (Data Foundation & Status Engine) — EXECUTING
+Plan: 2 of 6
 Status: Ready to execute
-Last activity: 2026-08-14 — Phase 1 complete, transitioned to Phase 2
+Last activity: 2026-08-14 — Phase 2 execution started
 
 Progress: [░░░░░░░░░░] 0%
 
@@ -60,6 +60,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 01 P03 | 3min | 3 tasks | 8 files |
 | Phase 01 P04 | 5min | 3 tasks | 3 files |
 | Phase 01 P05 | 26min | 2 tasks | 7 files |
+| Phase 02 P01 | 3min | 2 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -78,6 +79,9 @@ Foundational decisions affecting current work:
 - [Phase 1]: 01-01: shared check-colors.sh gate lands now (npm check:colors); first enforced in 01-03 when App.tsx's template #fff becomes the themed shell
 - [Phase 01]: 01-04: AiService ported onto fetch with explicit response.ok guards before every await response.json(); Obsidian-decoupled via local AiSettings interface; dormant (no screen wired)
 - [Phase 01]: 01-04: Ollama/local-LAN provider OMITTED entirely (owner decision) — no http:// cleartext path in src/; id union named AiProviderId to avoid TS2440 vs ported interface AiProvider
+- [Phase 02]: runMigrations canonical 4-arg signature (exec, migrations, targetVersion, deps); deps required and threaded into every migration.apply
+- [Phase 02]: Migration runner sets no bootstrap PRAGMA — WAL/foreign_keys/busy_timeout are the caller's job (Plan 02 openAndMigrate)
+- [Phase 02]: user_version bump interpolated as integer literal (never bound), guarded by Number.isInteger
 
 ### Pending Todos
 
@@ -113,6 +117,6 @@ planning" sections in docs/dossier/*.md — those are the authoritative hand-off
 
 ## Session
 
-**Last session:** 2026-08-14T20:18:05.143Z
-**Stopped at:** Completed 01-04-PLAN.md
+**Last session:** 2026-08-14T22:05:27.435Z
+**Stopped at:** Completed 02-01-PLAN.md
 **Resume file:** None

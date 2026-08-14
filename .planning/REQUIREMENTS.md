@@ -20,7 +20,7 @@ roadmap phases. Items marked *(infra)* are foundation guarantees rather than end
 
 ### Data Foundation & Status Engine (DATA)
 
-- [ ] **DATA-01**: On launch the app reads `PRAGMA user_version`, runs forward-only migrations in strict order each wrapped in its own transaction, and sets `foreign_keys=ON` + WAL + a busy_timeout before any transaction opens. *(infra)*
+- [x] **DATA-01**: On launch the app reads `PRAGMA user_version`, runs forward-only migrations in strict order each wrapped in its own transaction, and sets `foreign_keys=ON` + WAL + a busy_timeout before any transaction opens. *(infra)*
 - [ ] **DATA-02**: Migration 1 creates `contacts` with a surrogate PK, a distinct globally-unique `uid`, `created_at`, `modified_at`, `interval_days`, `category_id`, `social_battery`, optional-year `birthday`, `phone`, `email`, `photo`, `last_contact`, favourite rank, `ring_seq`, `archived_at`, snooze, "Rarely responds", and reminders-off — every un-backfillable column present from day one. *(infra)*
 - [ ] **DATA-03**: Migration 1 also creates `categories` (seeded Family/Friends/Work/Community, user-editable, reorderable), the single-row self/profile record, `contact_links`, `interactions`, and a separate `events` table; every mergeable table carries `uid` + `modified_at`. *(infra)*
 - [ ] **DATA-04**: Exactly one DAO function writes `contacts.last_contact` (= MAX over the contact's current interaction rows, recomputed after every insert/edit/delete, in a transaction, behind a JS mutex shared with headless writers). *(infra)*
