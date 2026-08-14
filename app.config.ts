@@ -24,6 +24,13 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     // Changing it after the first install requires uninstall/reinstall.
     package: "com.bwales.orbit",
     predictiveBackGestureEnabled: false,
+    // PII-at-rest mitigation (T-02-13, dossier cluster G — [DECIDED]). The
+    // app-private SQLite file holds third-party notes; allowBackup=false keeps
+    // it out of OS auto-backup / `adb backup` so it cannot be pulled off-device.
+    // Zero-dependency: Expo maps this to android:allowBackup="false" in the
+    // generated release manifest (asserted on droid during the prebuild in
+    // Task 3). This ENFORCES a recorded decision — never "fix" it back to true.
+    allowBackup: false,
   },
   // Pre-register the Phase 2 native dep so the first prebuild covers it.
   // Deduped: `expo install` already added expo-sqlite to app.json's plugins,
