@@ -38,6 +38,14 @@ day one.
 though the custom-fields FEATURE (parsers, `sortExpr`, quarantine sweep, editor) is Phase 3. Every
 `contact_custom_values` column is declared TEXT forever (HANDOFF §14.2); never index/UNIQUE them.
 
+**Fuel table ALSO ships in migration 1 (owner decision, 2026-08-14) — created EMPTY.** Resolving the
+`[fuel→ai]`/ROADMAP "fuel columns from migration 1" constraint vs FUEL-01's migration-agnostic wording:
+migration 1 creates the `fuel` table with FUEL-01's columns (`uid`, `contact_id` NOT NULL, `kind`,
+`label`, `text`, `url`, `created_at`, `source`, `modified_at`). It starts EMPTY — the fuel LOGIC/UI
+(the 5 kinds incl. never-transmitted `off_limits`, ranked projection, profile editor, cross-contact
+search) is **Phase 7**, which adds NO new migration. This locks the fuel schema shape upfront (the
+un-backfillable philosophy).
+
 **Explicitly NOT this phase:** the custom-fields LOGIC/UI (Phase 3), contact CRUD/forms (Phase 4),
 photos (Phase 5), the interaction-log UI + gravity/intensity/rogue rendering (Phase 6), the actual
 sweep RESPONSIBILITIES (they land in their owning phases — Phase 2 builds only the skeleton + hooks).
