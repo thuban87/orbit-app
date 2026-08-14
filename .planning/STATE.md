@@ -6,14 +6,14 @@ current_phase: 2
 current_phase_name: Data Foundation & Status Engine
 status: executing
 stopped_at: Completed 02-01-PLAN.md
-last_updated: "2026-08-14T22:05:27.446Z"
+last_updated: "2026-08-14T22:13:03.891Z"
 last_activity: 2026-08-14
 last_activity_desc: Phase 2 execution started
 progress:
   total_phases: 16
   completed_phases: 1
   total_plans: 11
-  completed_plans: 6
+  completed_plans: 7
   percent: 6
 ---
 
@@ -29,7 +29,7 @@ See: .planning/PROJECT.md (updated 2026-08-14)
 ## Current Position
 
 Phase: 2 (Data Foundation & Status Engine) — EXECUTING
-Plan: 2 of 6
+Plan: 3 of 6
 Status: Ready to execute
 Last activity: 2026-08-14 — Phase 2 execution started
 
@@ -61,6 +61,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 01 P04 | 5min | 3 tasks | 3 files |
 | Phase 01 P05 | 26min | 2 tasks | 7 files |
 | Phase 02 P01 | 3min | 2 tasks | 5 files |
+| Phase 02 P02 | 4min | 3 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -82,6 +83,8 @@ Foundational decisions affecting current work:
 - [Phase 02]: runMigrations canonical 4-arg signature (exec, migrations, targetVersion, deps); deps required and threaded into every migration.apply
 - [Phase 02]: Migration runner sets no bootstrap PRAGMA — WAL/foreign_keys/busy_timeout are the caller's job (Plan 02 openAndMigrate)
 - [Phase 02]: user_version bump interpolated as integer literal (never bound), guarded by Number.isInteger
+- [Phase 02]: Migration 1 freezes all ten tables + every un-backfillable column from day one (irreversible on unreachable devices)
+- [Phase 02]: fuel table ships empty in migration 1 (owner decision); custom-fields tables ship, logic is Phase 3; index/UNIQUE ban is value-column-scoped so uid UNIQUE autoindex stays
 
 ### Pending Todos
 
@@ -117,6 +120,6 @@ planning" sections in docs/dossier/*.md — those are the authoritative hand-off
 
 ## Session
 
-**Last session:** 2026-08-14T22:05:27.435Z
+**Last session:** 2026-08-14T22:12:25.177Z
 **Stopped at:** Completed 02-01-PLAN.md
 **Resume file:** None

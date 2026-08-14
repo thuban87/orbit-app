@@ -127,7 +127,7 @@ Recorded here because they bind phases that do not own them. Every planner/execu
   4. The launch sweep runs once per real foreground launch (not on a headless tap) and exposes hooks for later responsibilities.
   5. The newest-interaction-per-contact query and status scan benchmark acceptably on the Pixel.
 
-**Plans:** 1/6 plans executed
+**Plans:** 2/6 plans executed
 
 **Wave 1**
 
@@ -135,7 +135,7 @@ Recorded here because they bind phases that do not own them. Every planner/execu
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 02-02-PLAN.md — Migration-1 DDL (all 10 tables, un-backfillable columns, seeds, empty fuel + custom-fields tables) + WAL/FK bootstrap (DATA-02, DATA-03)
+- [x] 02-02-PLAN.md — Migration-1 DDL (all 10 tables, un-backfillable columns, seeds, empty fuel + custom-fields tables) + WAL/FK bootstrap (DATA-02, DATA-03)
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
@@ -356,7 +356,7 @@ Recorded here because they bind phases that do not own them. Every planner/execu
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Project Scaffold & Portable Code | 5/5 | Complete    | 2026-08-14 |
-| 2. Data Foundation & Status Engine | 1/6 | In Progress|  |
+| 2. Data Foundation & Status Engine | 2/6 | In Progress|  |
 | 3. Custom Fields | 0/TBD | Not started | - |
 | 4. Contact CRUD & Lifecycle | 0/TBD | Not started | - |
 | 5. Photos | 0/TBD | Not started | - |
