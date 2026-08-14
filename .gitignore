@@ -2,6 +2,9 @@
 node_modules/
 .expo/
 
+# Personal/local Claude Code settings — never commit (per-machine allows)
+.claude/settings.local.json
+
 # Graphify: graph.json + GRAPH_REPORT.md are committed; these two are
 # regenerated wholesale every build and would bloat history (CLAUDE.md).
 .planning/graphs/graph.html

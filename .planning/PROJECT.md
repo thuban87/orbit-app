@@ -117,13 +117,14 @@ dossier verified this is the *plan*, not the state — 01-data F16, 13-ai. Ship 
   it in place; never clone it into this repo.
 - **Build & test pipeline (owner-defined, 2026-08-14).** This Linux box **cannot build Android APKs**
   (2012 Ivy Bridge CPU can't run a modern x86_64 emulator; no local Gradle/APK path). The intended
-  loop: commit → get the code to the owner's Windows 11 desktop (SSH host `droid`, repo at
-  `C:\Users\bwles\projects\orbit-app`) → build debug/release APK there via SSH (Android Studio is
-  installed on the desktop) → pull the APK back to this box → `adb install` on the **Pixel 6 Pro**
-  wired to this box → drive/test via `adb` / `uiautomator`. Getting code to the desktop is either a
-  **project-scoped GitHub push** (owner will allow for this repo only — see Constraints) or a direct
-  `rsync`/`scp` over SSH (avoids the push question). The desktop emulator is a fallback test target;
-  perf claims are physical-Pixel-only (CLAUDE.md).
+  loop: commit → **`rsync`/`scp` the repo over SSH** to the owner's Windows 11 desktop (SSH host
+  `droid`, repo at `C:\Users\bwles\projects\orbit-app`) → build debug/release APK there via SSH
+  (Android Studio is installed on the desktop) → pull the APK back to this box → `adb install` on the
+  **Pixel 6 Pro** wired to this box → drive/test via `adb` / `uiautomator`. **Transport decided
+  (2026-08-14): rsync/scp, NOT git push** — this keeps CLAUDE.md's global no-push rule fully intact
+  for every repo (see Constraints). Source is pinned to `/home/bwales/projects/orbit-app`, dest to
+  `C:\Users\bwles\projects\orbit-app`, build invoked only there. The desktop emulator is a fallback
+  test target; perf claims are physical-Pixel-only (CLAUDE.md).
 - **Intended execution style:** the owner plans to run the whole project autonomously end-to-end,
   sequentially (parallelization off).
 - **Surfaces the dossier discovered with no INDEX owner:** the **never-contacted screen** (now owned by
@@ -155,11 +156,13 @@ dossier verified this is the *plan*, not the state — 01-data F16, 13-ai. Ship 
   AppState background. Portrait-locked at the config layer.
 - **Dates**: use `formatLocalDate()` on the TS side and `date('now','localtime')` in SQL — never
   `toISOString().split('T')[0]` / `date('now')` (UTC off-by-one; already fixed once in the plugin).
-- **Git — push posture (owner-relaxed for THIS repo, pending implementation).** CLAUDE.md's global rule
-  is "agents never push; the owner pushes," with `git push` denied in `~/.claude/settings.json`. The
-  owner has decided to allow push **for orbit-app only** to feed the desktop build. Until that allow is
-  actually scoped (a project-local `settings.local.json` grant, global deny intact for other repos),
-  agents commit locally and do not push. Reversing the global rule elsewhere remains the owner's call.
+- **Git — push posture stays fully denied (transport is rsync, decided 2026-08-14).** CLAUDE.md's
+  global rule "agents never push; the owner pushes" is **unchanged** — `git push` remains denied in
+  `~/.claude/settings.json` for every repo. The owner considered a repo-scoped push allow but it can't
+  be expressed cleanly (in Claude Code `deny` beats `allow` and merges across sources, so a local
+  allow can't override the global deny; and Bash rules aren't directory-scoped). So code reaches the
+  desktop via **`rsync`/`scp` over SSH** instead — `Bash(rsync *)`/`Bash(scp *)`/`Bash(ssh *)` are
+  allowed in this repo's `settings.local.json` only. Agents still never `git push`.
 - **No git worktrees** (`.planning/config.json` `use_worktrees:false`; blocked by a PreToolUse hook to
   add). Commit in place on the current branch.
 - **No local APK build** — verification that needs a running app goes through the desktop-build → Pixel

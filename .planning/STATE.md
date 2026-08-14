@@ -64,11 +64,17 @@ None yet.
 
 ### Blockers/Concerns
 
-- **Build/test pipeline needs owner action before it runs** (PROJECT.md Context): (1) a project-scoped
-  GitHub push allow for orbit-app (global `git push` deny stays for other repos) OR a decision to
-  `rsync`/`scp` to the desktop instead; (2) a one-time verification that `ssh droid` builds a debug APK
-  at `C:\Users\bwles\projects\orbit-app`. This box cannot build APKs; on-device verification is
-  Pixel-6-Pro-only. Resolve at the start of Phase 1 execution.
+- **Build/test pipeline — transport decided, bring-up still pending** (PROJECT.md Context). Decided
+  2026-08-14: **rsync/scp over SSH** (global `git push` deny stays intact for all repos;
+  rsync/scp/ssh allowed in this repo's `settings.local.json`). Still to do before the loop runs, at
+  Phase 1 execution: (1) add a `droid` Host block to `~/.ssh/config` (or confirm Tailscale MagicDNS
+  resolves it) with the right user/key; (2) a one-time verification that `ssh droid` + a debug Gradle
+  build succeeds at `C:\Users\bwles\projects\orbit-app`. This box cannot build APKs; on-device
+  verification is Pixel-6-Pro-only.
+- **Autonomous run is gated at the foundation** (owner, 2026-08-14): run `/gsd-autonomous --to 3`,
+  stop for a human look at the irreversible migration-1 schema + custom-fields, then continue
+  `--from 4`. `--converge` needs `workflow.plan_review_convergence=true` (currently false) and a
+  reviewer CLI (or `--claude` for self-review) — confirm before using it.
 - **Graphify is disabled** in config until its ADR-bridge scripts (`adr-registry.ts`,
   `normalize-graph-docrefs.ts`) and build-blocking hooks are ported from quest-board (a Phase 1/2
   foundation task). Do not run `graphify build` before then — the stock build silently corrupts.
