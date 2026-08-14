@@ -48,22 +48,44 @@ export function registerSweepHook(fn: SweepHook): void {
 
 // Module-level re-entrancy guard: keeps a single launch from double-running.
 let running = false;
+// DEFER-ONE (WR-03): a real background→active launch that overlaps an in-flight
+// sweep sets this flag; the in-flight run drains it with one more pass rather
+// than DROPPING that launch's sweep. A burst of overlapping launches coalesces
+// to a single extra pass (the flag is reset at the top of each pass), so no real
+// launch is silently skipped, but the hooks never double-run for one launch.
+let pendingRerun = false;
 
 /**
- * Run every registered hook once, in registration order. Idempotent within a
- * launch: a re-entrant call while a run is in flight returns immediately rather
- * than double-running the hooks. The `running` flag is reset in `finally` so a
- * throwing hook never wedges the runner shut.
+ * Run every registered hook once, in registration order. Concurrency contract:
+ *   - A re-entrant call while a run is IN FLIGHT does NOT double-run the hooks
+ *     for the current launch — it instead requests exactly ONE follow-up pass
+ *     (`pendingRerun`), so an overlapping real `background → active` launch is
+ *     DEFERRED, not dropped (WR-03). Multiple overlapping calls coalesce into a
+ *     single follow-up pass.
+ *   - The follow-up pass runs after the current pass settles, guaranteeing the
+ *     "runs once per real foreground launch" contract later phases' quarantine-
+ *     expiry / archived-purge / schedule-reconcile hooks depend on.
+ * The `running` flag is reset in `finally` so a throwing hook never wedges the
+ * runner shut.
  */
 export async function runLaunchSweep(): Promise<void> {
-  if (running) return;
+  if (running) {
+    pendingRerun = true;
+    return;
+  }
   running = true;
   try {
-    for (const hook of hooks) {
-      await hook();
-    }
+    do {
+      // Reset before the pass so any overlapping call DURING it is captured for
+      // exactly one more pass (coalescing a burst into a single follow-up).
+      pendingRerun = false;
+      for (const hook of hooks) {
+        await hook();
+      }
+    } while (pendingRerun);
   } finally {
     running = false;
+    pendingRerun = false;
   }
 }
 
@@ -99,4 +121,5 @@ export function installSweepTrigger(appState: AppStateLike): {
 export function __resetSweepForTest(): void {
   hooks.length = 0;
   running = false;
+  pendingRerun = false;
 }

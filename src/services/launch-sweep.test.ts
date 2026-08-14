@@ -75,18 +75,58 @@ describe("runLaunchSweep — hook registry", () => {
     expect(order).toEqual(["first", "second"]);
   });
 
-  it("is idempotent within a launch: a re-entrant call does not double-run hooks", async () => {
+  it("never runs the hooks CONCURRENTLY: an overlapping call does not double-run within the in-flight pass", async () => {
+    // A hook that blocks on a controllable gate lets us prove no concurrent
+    // second pass starts while the first is still awaiting.
+    let calls = 0;
+    let release!: () => void;
+    const gate = new Promise<void>((r) => {
+      release = r;
+    });
+    registerSweepHook(async () => {
+      calls += 1;
+      await gate;
+    });
+
+    const first = runLaunchSweep();
+    const overlapping = runLaunchSweep(); // arrives while pass 1 is gated
+    await flush();
+    expect(calls).toBe(1); // pass 2 has NOT started — no concurrency
+
+    release();
+    await Promise.all([first, overlapping]);
+    // The overlapping launch was DEFERRED, not dropped (WR-03): exactly one
+    // follow-up pass runs after the first settles.
+    expect(calls).toBe(2);
+  });
+
+  it("DEFERS an overlapping launch instead of dropping it (WR-03)", async () => {
     let calls = 0;
     registerSweepHook(async () => {
       calls += 1;
     });
 
-    // Start one run (do not await), then call again while the first is in flight.
+    // Two overlapping launches: the second must still get its sweep, one pass
+    // later — not silently discarded as the old `if (running) return` did.
     const first = runLaunchSweep();
-    const reentrant = runLaunchSweep();
-    await Promise.all([first, reentrant]);
+    const second = runLaunchSweep();
+    await Promise.all([first, second]);
 
-    expect(calls).toBe(1);
+    expect(calls).toBe(2);
+  });
+
+  it("COALESCES a burst of overlapping launches into a single follow-up pass", async () => {
+    let calls = 0;
+    registerSweepHook(async () => {
+      calls += 1;
+    });
+
+    // Three launches arrive while the first pass is in flight; defer-ONE means
+    // they collapse into exactly one extra pass (2 total), never three.
+    const runs = [runLaunchSweep(), runLaunchSweep(), runLaunchSweep()];
+    await Promise.all(runs);
+
+    expect(calls).toBe(2);
   });
 
   it("has an EMPTY registry by default (Phase 2 registers nothing)", async () => {
