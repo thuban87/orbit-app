@@ -10,13 +10,13 @@
  * `date('now','localtime')` probe (P6) — over the real migration-1 fixture.
  */
 import { beforeEach, describe, expect, it } from "vitest";
+import { nodeSqliteExecutor, openTestDb } from "@/db/__testkit__/node-sqlite";
 import {
   ACCEPTABLE_MS,
   type BenchmarkResult,
   runBenchmark,
   seedBenchmarkData,
 } from "@/db/benchmark";
-import { nodeSqliteExecutor, openTestDb } from "@/db/__testkit__/node-sqlite";
 import { migration001 } from "@/db/migrations/001-initial";
 import { runMigrations } from "@/db/migrations/runner";
 import type { SqlExecutor } from "@/db/types";
