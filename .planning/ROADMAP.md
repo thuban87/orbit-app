@@ -140,7 +140,7 @@ Recorded here because they bind phases that do not own them. Every planner/execu
 **Wave 3** *(blocked on Wave 2 completion)*
 
 - [x] 02-03-PLAN.md — Single-writer `last_contact` recency DAO + shared promise-chain mutex (DATA-04)
-- [ ] 02-04-PLAN.md — Query-time status engine + dashboard scan + newest-per-contact query (DATA-05)
+- [x] 02-04-PLAN.md — Query-time status engine + dashboard scan + newest-per-contact query (DATA-05)
 - [ ] 02-05-PLAN.md — Launch-sweep skeleton + hook registry + App.tsx migrate-gate/sweep wiring (DATA-06)
 
 **Wave 4** *(blocked on Wave 3 completion)*
