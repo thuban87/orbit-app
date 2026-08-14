@@ -1,18 +1,19 @@
-import "tsx/cjs";
 import type { ConfigContext, ExpoConfig } from "expo/config";
-// Relative import (not the `@/` alias): this file is evaluated by Node via the
-// tsx/cjs hook at prebuild time, which does not resolve the metro/tsconfig
-// `@/*` path alias. The display name lives in one place so a future rename is
-// a one-line edit — DECOUPLED from the install-locked android.package below.
-import { APP_NAME } from "./src/constants/app";
+// Import the display name from JSON (NOT from `src/constants/app.ts`). Expo
+// evaluates this config in Node via its own TS-stripping loader, which can
+// `require` a `.json` natively but NOT a `.ts` — importing a `.ts` here would
+// force a global `tsx/cjs` loader hook, and that hook pollutes metro's module
+// resolution and breaks the embedded release JS bundle. JSON keeps the display
+// name a single source shared with the app without any hook. A rename is a
+// one-line edit in app-name.json, DECOUPLED from the install-locked package id.
+import appName from "./src/constants/app-name.json";
 
 // Functional config form: MERGES the template's app.json (preserving its
 // icon/splash/adaptive-icon references) and layers Orbit's fields on top.
-// Loads via the `tsx/cjs` hook on line 1 so Expo can evaluate this TypeScript
-// config at prebuild — without it, prebuild fails to load the config.
+// Expo loads this TypeScript config natively (no `tsx/cjs` hook needed).
 export default ({ config }: ConfigContext): ExpoConfig => ({
   ...config,
-  name: APP_NAME,
+  name: appName.APP_NAME,
   slug: "orbit",
   // Config-layer portrait lock (CLAUDE.md — the app is portrait-locked).
   orientation: "portrait",
