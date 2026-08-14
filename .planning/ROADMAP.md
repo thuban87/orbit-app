@@ -127,7 +127,25 @@ Recorded here because they bind phases that do not own them. Every planner/execu
   4. The launch sweep runs once per real foreground launch (not on a headless tap) and exposes hooks for later responsibilities.
   5. The newest-interaction-per-contact query and status scan benchmark acceptably on the Pixel.
 
-**Plans:** TBD
+**Plans:** 6 plans
+
+**Wave 1**
+
+- [ ] 02-01-PLAN.md — Crash-safe `user_version` migration runner + `node:sqlite` test harness (DATA-01)
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [ ] 02-02-PLAN.md — Migration-1 DDL (all 10 tables, un-backfillable columns, seeds, empty fuel + custom-fields tables) + WAL/FK bootstrap (DATA-02, DATA-03)
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
+- [ ] 02-03-PLAN.md — Single-writer `last_contact` recency DAO + shared promise-chain mutex (DATA-04)
+- [ ] 02-04-PLAN.md — Query-time status engine + dashboard scan + newest-per-contact query (DATA-05)
+- [ ] 02-05-PLAN.md — Launch-sweep skeleton + hook registry + App.tsx migrate-gate/sweep wiring (DATA-06)
+
+**Wave 4** *(blocked on Wave 3 completion)*
+
+- [ ] 02-06-PLAN.md — On-device Pixel benchmark + `localtime` probe + `allowBackup=false` (DATA-07)
 
 ### Phase 3: Custom Fields
 
@@ -338,7 +356,7 @@ Recorded here because they bind phases that do not own them. Every planner/execu
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Project Scaffold & Portable Code | 5/5 | Complete    | 2026-08-14 |
-| 2. Data Foundation & Status Engine | 0/TBD | Not started | - |
+| 2. Data Foundation & Status Engine | 0/6 | Not started | - |
 | 3. Custom Fields | 0/TBD | Not started | - |
 | 4. Contact CRUD & Lifecycle | 0/TBD | Not started | - |
 | 5. Photos | 0/TBD | Not started | - |
