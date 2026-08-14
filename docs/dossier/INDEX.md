@@ -23,7 +23,7 @@ domain-research step and decline its brownfield-mapping offer — the dossier re
 | 6 | `crud` | Contact create/edit flows & forms | **complete** |
 | 7 | `photos` | Photo handling | **complete** |
 | 8 | `dashboard` | Dashboard screen | **complete** |
-| 9 | `orrery` | Orbit view | pending |
+| 9 | `orrery` | Orbit view | **complete** |
 | 10 | `capture` | Share-sheet capture | pending |
 | 11 | `notify` | Actionable notifications | pending |
 | 12 | `widget` | Home screen widget | pending |
@@ -226,6 +226,22 @@ and what the screen does at 0–2 contacts. Perf claims are physical-device-only
 - Plugin source: none — this feature has no predecessor
 - HANDOFF: §7 (mostly DECIDED, one REJECTED alternative recorded)
 - Likely overlaps: `data`, `dashboard`, `theme` tokens (via CLAUDE.md conventions)
+
+**Complete — see `docs/dossier/09-orrery.md`.** 13 questions over 5 rounds; no `[OPEN]` items. The
+owner's **two-view orrery** (04-log's unowned concept) is now owned and specified: **both views
+ship, status is the default**, they **share a closeness-radius (`ring_seq`)** and differ only in
+motion+colour, and a **toggle morphs between them on one Skia canvas**. This run **drops HANDOFF
+§7's `tap-to-freeze` by obsolescence** — the owner confirmed **no live body-loop** (bodies are
+placed by timestamp on focus; at ~5°/day nothing visibly moves), so there is nothing to freeze.
+`rogue` (04-log's export) is settled: **max-drift cold/extinguished body, ring faded to a trace,
+threshold = a multiple of the interval** (value deferred). **Frequency gets no visual encoding**
+(closing 01-data's exported question), and **`gravity` stays off the orrery** (confirming 04-log).
+The owner **added a user-selectable self-sun colour** (rejecting all three offered options — self
+has no status, so "pick your own star"). An **empty-state prompt** ships for the sun-only new-user
+orrery. Cosmetics: an **animated twinkle starfield + a pulsing sun**, which keeps pause-on-blur
+live. Platform verification (Expo SDK 57: Skia 2.6.2 + Reanimated 4.5.1) **resolved 07-photos'
+`file://` question** (works directly, base64 fallback wired) and corrected §7's stale "Skia render
+loop" wording — Reanimated is now the animation engine.
 
 ## 10. `capture` — Share-sheet capture
 
@@ -466,3 +482,25 @@ section. Summarised here so a later run sees what binds it.*
 - [dashboard → data/photos] Freshness = **re-query on focus + AppState-active**, because
   `addDatabaseChangeListener` (connection-scoped `sqlite3_update_hook`) is **blind to headless
   one-tap writes**; async query API only; `recyclingKey` is a correctness requirement — (2026-08-13)
+- [orrery → dashboard] The card's **rogue visual** = cold/extinguished desaturated body + faded
+  status ring (no rings/drift on a card); resolves 08-dashboard's inherit-domain-9 note —
+  (2026-08-13)
+- [orrery → notify/data] `rogue` time-threshold = **a multiple of the interval**, a **single shared
+  constant** for both orrery rendering and notify's decay-suppression (never computed twice) —
+  (2026-08-13)
+- [orrery → theme] New tokens: a **`rogue`/extinguished** status colour, a **themed star-colour
+  palette** (user-selectable self-sun), and the **relationship-view muted palette** — all through
+  tokens, incl. Skia (P1 confirms Skia accepts runtime token/HSL colours) — (2026-08-13)
+- [orrery → data/backup] Orrery adds **no new per-contact columns** (radius=`ring_seq`;
+  angle/status/`rogue` derived). Only new state is **one app-level self-sun colour setting**,
+  exported with the sun assignment — (2026-08-13)
+- [orrery → photos] Closes 07-photos' Skia `file://` item for this surface: planets use
+  `useImage(file://)` on the 512px master, fallback = themed swatch + initials via **bundled font /
+  Paragraph API**; orrery needs **no** base64 (unlike widget); one Pixel spike lands in this
+  domain's build phase — (2026-08-13)
+- [orrery → INDEX] ⚠ **HANDOFF §7 `tap-to-freeze` dropped by obsolescence** (owner-confirmed no
+  live body-loop; nothing moves to freeze). §7's "Skia runs its own render loop" wording is stale —
+  **Reanimated is the animation engine** (Skia's own clock removed). Orrery **runs in Expo Go**;
+  only the widget forces a custom dev client — (2026-08-13)
+- [orrery → INDEX] Frequency gets **no visual encoding** on the orrery (closes 01-data's exported
+  question); `gravity` stays **off** the orrery in v1 (confirms 04-log) — (2026-08-13)
