@@ -28,7 +28,7 @@ domain-research step and decline its brownfield-mapping offer — the dossier re
 | 11 | `notify` | Actionable notifications | **complete** |
 | 12 | `widget` | Home screen widget | **complete** |
 | 13 | `ai` | AI message suggestions | **complete** |
-| 14 | `digest` | Weekly digest & birthday alerts | pending |
+| 14 | `digest` | Weekly digest & birthday alerts | **complete** |
 | 15 | `backup` | Backup, export & data portability | pending |
 
 Domains are numbered in recommended interrogation order — data-model decisions first,
@@ -377,6 +377,21 @@ notification, a screen, or cut; birthdays folded into `notify`.
 - HANDOFF: §12.7
 - Likely overlaps: `notify`, `dashboard`, `data`
 
+**Complete — see `docs/dossier/14-digest.md`.** 7 questions over 3 rounds; no `[OPEN]` items.
+Investigation established the plugin digest is a **manual palette command**, not scheduled — and
+that **both birthday surfaces were already owned** (banner→08, notification→11), leaving domain 14
+**only the weekly digest**. It **ships (keep)** as a **weekly Sunday-morning notification opening a
+dedicated "your week" screen** — resolving HANDOFF Q7's digest half. The screen's payload is the
+two things the dashboard cannot give on a schedule: a **retrospective** ("who you reached this
+week" — **all** touchpoints, no connected/direction predicate, honoring §1 no-obligation) and **the
+overlooked** — the non-nagged `rogue` / "Rarely responds" / never-contacted populations 11-notify
+keeps out of the shade. The digest **reads the quality marker** for a gentle "felt effortful" line
+(the purpose 04-log added it for; streak-caution recorded). Delivery is **one native
+`WEEKLY` trigger** (platform-verified: Android-native, AlarmManager-backed, survives reboot, fires
+even if the app is never opened), **static generic body + compute-on-open** (frozen content), a
+**third notification type defaulting on**, **firing unconditionally** with a calm empty state. The
+digest adds **no new schema** (a pure read surface, like the widget).
+
 ## 15. `backup` — Backup, export & data portability
 
 JSON export is agreed in principle (HANDOFF §3 [OPEN]); it is also the anti-lock-in
@@ -651,3 +666,25 @@ section. Summarised here so a later run sees what binds it.*
 - [ai → planning] Port hazards: `fetch` doesn't throw on 4xx/5xx (add `response.ok` checks);
   `AbortController` Cancel is **on-device-unverified** for `expo/fetch`; no built-in timeout; redact
   the assembled-prompt debug log (`AiService.ts:139`) — (2026-08-14)
+- [digest → INDEX] HANDOFF Q7's **digest half = KEEP**; birthdays are untouched (banner→08,
+  notification→11, "14 must not assume it owns birthday alerts"). Digest = a **weekly Sunday-morning
+  notification → a dedicated "your week" screen** — (2026-08-14)
+- [digest → data/self] The digest adds **NO new schema and no persistent/scheduled per-contact
+  state** (a pure read surface, like the widget); nothing for backup to carry but the on/off toggle
+  — (2026-08-14)
+- [digest → notify] Third notification **type** on 11's settings (master + decay + birthday +
+  **digest**), **defaults on**, rides 11's single `POST_NOTIFICATIONS` value-moment (no new ask),
+  delivers in 11's morning quiet-window; but mechanism is **one native `WEEKLY` trigger** (not
+  per-contact dated), tap → digest screen, **Back → dashboard** (inherits 11's back-stack) —
+  (2026-08-14)
+- [digest → data/log] Retrospective counts **all** interaction rows in a 7-day window (no
+  connected/direction predicate, archived excluded); the overlooked section is **NOT** suppressed by
+  the reminders-off mute (mute governs decay *pushes* only) — a muted contact gone rogue still shows;
+  rogue uses the **shared rogue constant** (09) — (2026-08-14)
+- [digest → backup] Export only the **digest on/off toggle** (with 11's notification settings); the
+  weekly **schedule is derived** (re-register the WEEKLY trigger on restore/launch), not exported —
+  (2026-08-14)
+- [digest → planning] Device spike: confirm the **`WEEKLY` trigger fires once/week on the physical
+  Pixel** (pre-57 repeat bugs #34782/#30577; emulator won't do) and re-registers across reboot;
+  idempotent re-registration; the "skews hard" quality threshold and delivery-day/hour constants —
+  (2026-08-14)
