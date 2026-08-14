@@ -26,7 +26,8 @@
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
-    "check:colors": "bash scripts/check-colors.sh"
+    "check:colors": "bash scripts/check-colors.sh",
+    "test": "vitest run"
   },
   "private": true
 }
