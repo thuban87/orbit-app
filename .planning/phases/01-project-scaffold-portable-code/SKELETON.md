@@ -24,7 +24,7 @@ build → install → launch stack, proven once.
 | State | Zustand + `persist` → AsyncStorage | quest-board pattern; theme preference is the first persisted store. No network. |
 | Theme | Token module (`src/theme`) with `useTheme()`; one space-dark preset | Every colour resolves through tokens — CLAUDE.md forbids hardcoded colours anywhere, including future Skia. Hex literals live ONLY in `theme-presets.ts`. Finished palette is the owner's later call (HANDOFF §7). |
 | Auth | None — no accounts, no backend | Local-first product commitment (HANDOFF §3). |
-| Deployment / build target | `droid` (Windows desktop) over SSH/Tailscale builds the debug APK; Pixel 6 Pro is the install target | This Linux box cannot compile Android APKs by hardware (2012 Ivy Bridge). Transport is rsync/scp — NEVER git push (global deny). |
+| Deployment / build target | `droid` (Windows desktop) over SSH/Tailscale builds the APK; the physical Pixel 6 Pro is the install target and the REQUIRED FND-01 proof (emulator ≠ FND-01). The one-time FND-01 proof uses a STANDALONE `assembleRelease` APK (JS bundle embedded, no Metro at the human checkpoint); day-to-day iteration uses `assembleDebug` + Metro-on-this-box + `adb reverse tcp:8081`. | This Linux box cannot compile Android APKs by hardware (2012 Ivy Bridge). Transport is rsync/scp — NEVER git push (global deny). A debug APK ships no embedded bundle, so it needs Metro live or it renders the RN red screen (quest-board ANDROID_BUILD_GUIDE.md:213-222) — hence the release build for the standalone proof. |
 | Lint/format | Biome 2.5.8 | Pinned; quest-board convention (single tool, version-pinned schema). |
 | Test runner | Vitest for pure logic (node env, co-located `src/**/*.test.ts`) | The pure functions test without an RN runtime; the plugin's own suites are ported. RN-component testing deferred until there are components worth rendering. |
 | Directory layout | `src/{theme,stores,services,schemas,utils,db,components,screens}` | CLAUDE.md repo layout. `@/*` tsconfig alias → `./src/*`. |
@@ -35,7 +35,7 @@ build → install → launch stack, proven once.
 - [x] Routing — one real route: the plain `App.tsx` home shell — plan 01-03
 - [ ] Database — **intentionally none this phase** (local-first; SQLite is Phase 2). The skeleton's "real interaction" is the themed render, not a DB read/write.
 - [x] UI — one interactive/rendered element wired to real infrastructure: the themed home shell reading `useTheme().colors.*`, with theme state in a persisted Zustand store — plan 01-03
-- [x] Deployment — the debug APK built on droid and installed/launched on the Pixel through the documented pipeline (`docs/runbooks/desktop-build-pipeline.md`) — plan 01-05
+- [x] Deployment — a standalone release APK built on droid and installed/launched on the physical Pixel through the documented pipeline (`docs/runbooks/desktop-build-pipeline.md`, which also records the debug+Metro iteration loop) — plan 01-05
 
 Additionally (portable-code landing, part of Phase 1 scope but not the skeleton's happy path):
 the ~350 lines of pure logic/types (`calculateStatus` + helpers, schemas, `formatLocalDate`,
@@ -51,7 +51,7 @@ surfaced.
 - expo-router / navigation → added when the first multi-screen flow lands (Phase 4+)
 - Skia, Reanimated, the widget module, share-intent, notifications → their owning phases (5, 10, 11, 12, 13)
 - A finished visual palette / additional theme presets → the owner's visual-design pass (HANDOFF §7)
-- `expo-dev-client` on-device hot reload → deferred; a plain debug APK proves the pipeline. Add it with the first native-only feature.
+- `expo-dev-client` on-device hot reload → deferred; the standalone release APK proves the pipeline (FND-01), and a debug APK + Metro covers day-to-day iteration. Add dev-client with the first native-only feature.
 
 ## Subsequent Slice Plan
 
