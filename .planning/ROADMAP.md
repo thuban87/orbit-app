@@ -81,7 +81,12 @@ Recorded here because they bind phases that do not own them. Every planner/execu
   2. `calculateStatus()`, the frequency/status/battery types, both built-in schemas, `formatLocalDate()`, and `logger.ts` live in `src/`, lint clean, and typecheck.
   3. `types.ts` has no Obsidian coupling and `AiService.ts` compiles standalone with `fetch` + `response.ok` handling.
   4. Colours resolve through theme tokens; Biome and portrait-lock are configured.
-**Plans:** TBD
+**Plans:** 5 plans
+- [ ] 01-01-PLAN.md — Expo SDK 57 scaffold + Biome/tsconfig/portrait-lock/Vitest + folder layout (FND-06)
+- [ ] 01-02-PLAN.md — Port pure logic + types + built-in schemas + Vitest suites, Obsidian-free (FND-02, FND-03)
+- [ ] 01-03-PLAN.md — Theme tokens + useTheme provider + persisted Zustand store + themed home shell (FND-05)
+- [ ] 01-04-PLAN.md — Port AiService.ts onto fetch, dormant/standalone (FND-04)
+- [ ] 01-05-PLAN.md — Prove the desktop-build → Pixel install pipeline once, owner-gated (FND-01)
 
 ### Phase 2: Data Foundation & Status Engine
 **Goal:** The migration-1 SQLite scaffold — every core table and un-backfillable column, the single-writer recency DAO, query-time status, and the launch-sweep skeleton — correct and irreversible-safe from day one.
@@ -262,7 +267,7 @@ Recorded here because they bind phases that do not own them. Every planner/execu
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Project Scaffold & Portable Code | 0/TBD | Not started | - |
+| 1. Project Scaffold & Portable Code | 0/5 | Not started | - |
 | 2. Data Foundation & Status Engine | 0/TBD | Not started | - |
 | 3. Custom Fields | 0/TBD | Not started | - |
 | 4. Contact CRUD & Lifecycle | 0/TBD | Not started | - |
