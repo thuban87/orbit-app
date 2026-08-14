@@ -26,7 +26,7 @@ domain-research step and decline its brownfield-mapping offer — the dossier re
 | 9 | `orrery` | Orbit view | **complete** |
 | 10 | `capture` | Share-sheet capture | **complete** |
 | 11 | `notify` | Actionable notifications | **complete** |
-| 12 | `widget` | Home screen widget | pending |
+| 12 | `widget` | Home screen widget | **complete** |
 | 13 | `ai` | AI message suggestions | pending |
 | 14 | `digest` | Weekly digest & birthday alerts | pending |
 | 15 | `backup` | Backup, export & data portability | pending |
@@ -319,6 +319,22 @@ goal (widget self-updating into a profile view) in or out.
 - HANDOFF: §6, §12.3; CLAUDE.md widget note
 - Likely overlaps: `log`, `notify`, `data`, `photos`
 
+**Complete — see `docs/dossier/12-widget.md`.** 9 questions over 3 rounds; no `[OPEN]` items. The
+widget has **no plugin predecessor**, so the run is inbound constraints + platform verification of
+`react-native-android-widget@0.22.0` (rasterised-PNG architecture) and current Android App-Widget
+APIs. Closes HANDOFF §12.3 **open-question #3** (the action set): tap = mark-contacted (small tile,
+per 04-log); the **larger tile carries Quick mark · Log contact · Message**, the Message action a
+**net-new** path deep-linking to **11-notify's compose screen**. Status is now **shown on the tile**
+(status-colour avatar) but never **reorders** it — favourites stay in **static manual rank**; ~6 at
+default size, exact count a **device spike**. ⚠ **HANDOFF §6's literal `long-press` is unbuildable**
+(RemoteViews has no long-press) — replaced by **two tap regions** (whole tile = mark, name/chevron =
+profile); flagged as a mechanism change, not an intent reversal. The **self-swap-to-profile stretch
+goal is CUT from v1**; config is a **global mirror** (no per-instance state, so the widget adds **no
+new schema and nothing for backup**); freshness is **event-push + launch-refresh** (accepting
+as-of-last-render staleness). Platform verification established **Android 15 force-stop greys the
+widget** (never the sole route; re-push on boot) and that **"Back → dashboard" is a JS-navigation
+concern** (`TaskStackBuilder` doesn't compose with app-wide `singleTask`).
+
 ## 13. `ai` — AI message suggestions
 
 `AiService.ts` (540 lines, 5 providers) ports nearly as-is — swap `requestUrl` for
@@ -583,3 +599,22 @@ section. Summarised here so a later run sees what binds it.*
   (cancel/replace on `decay:<contactId>`), **generic body**, fuzzy no-permission delivery;
   `expo-background-task` is an **offline-intolerant** best-effort backstop only (hard-gated on
   `NetworkType.CONNECTED`). Device spike: headless action task init with **no FCM** — (2026-08-14)
+- [widget → data/backup] The widget adds **no new schema and no new persistent state** (global
+  mirror + self-swap cut + no per-instance config): it only reads favourites rank, derived status,
+  fuel and photo path, all already present. **Backup needs nothing widget-specific** — (2026-08-14)
+- [widget → log] Small-tile tap and larger-tile **Quick mark** write 04-log's exact `source='widget'`
+  row via the single-writer DAO + JS mutex inside the **30 s** headless budget; **Log contact**
+  deep-links the full log flow — (2026-08-14)
+- [widget → notify/capture] ⚠ **"Back → dashboard" is a JS-navigation concern** — native
+  `TaskStackBuilder` does **not** compose with app-wide `singleTask`+`onNewIntent` (sharpens
+  11-notify's exported pattern into its mechanism); widget/notify share the same back-stack model —
+  (2026-08-14)
+- [widget → photos] Tile uses **base64 `data:` thumbnails pre-scaled below the 512px master**, never
+  the full master, never `http(s)`; safe favourites-count per resolution is a **device spike**
+  (RemoteViews bitmap-memory ceiling real but unquantified) — (2026-08-14)
+- [widget → notify] The larger tile's **Message** action deep-links to **11-notify's in-app compose
+  screen** (fuel visible), not the OS SMS app — one compose surface, no second design — (2026-08-14)
+- [widget → INDEX] ⚠ **HANDOFF §6's literal `long-press` is unbuildable** on RemoteViews — replaced
+  by **two tap regions** (whole tile = mark, name/chevron = profile); mechanism change, not an intent
+  reversal. **Self-swap stretch CUT from v1.** No new screen introduced (Message/profile reuse
+  existing surfaces); only net-new UI is the widget layouts + an in-app "Add widget" button — (2026-08-14)
