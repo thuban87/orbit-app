@@ -6,15 +6,15 @@ current_phase: 2
 current_phase_name: Data Foundation & Status Engine
 status: executing
 stopped_at: Completed 02-04-PLAN.md
-last_updated: "2026-08-14T22:34:00.000Z"
+last_updated: "2026-08-14T22:34:20.915Z"
 last_activity: 2026-08-14
-last_activity_desc: Executed 02-04 query-time status engine (DATA-05)
+last_activity_desc: Executed 02-04 query-time status engine
 progress:
   total_phases: 16
   completed_phases: 1
   total_plans: 11
-  completed_plans: 9
-  percent: 82
+  completed_plans: 10
+  percent: 6
 ---
 
 # Project State
@@ -29,7 +29,7 @@ See: .planning/PROJECT.md (updated 2026-08-14)
 ## Current Position
 
 Phase: 2 (Data Foundation & Status Engine) — EXECUTING
-Plan: 5 of 6
+Plan: 6 of 6
 Status: 02-04 complete (DATA-05); ready for 02-05
 Last activity: 2026-08-14 — Executed 02-04 query-time status engine
 
@@ -64,6 +64,7 @@ Progress: [████████░░] 82%
 | Phase 02 P02 | 4min | 3 tasks | 4 files |
 | Phase 02 P03 | 5min | 2 tasks | 4 files |
 | Phase 02 P04 | 8min | 2 tasks | 4 files |
+| Phase 02 P05 | 3min | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -87,6 +88,8 @@ Foundational decisions affecting current work:
 - [Phase 02]: user_version bump interpolated as integer literal (never bound), guarded by Number.isInteger
 - [Phase 02]: Migration 1 freezes all ten tables + every un-backfillable column from day one (irreversible on unreachable devices)
 - [Phase 02]: fuel table ships empty in migration 1 (owner decision); custom-fields tables ship, logic is Phase 3; index/UNIQUE ban is value-column-scoped so uid UNIQUE autoindex stays
+- [Phase ?]: 02-05: AppState is dependency-injected into launch-sweep (not statically imported) so the module is node-testable and App.tsx owns the sole react-native binding
+- [Phase ?]: 02-05: launch sweep fires only on a tracked background->active transition (not any raw active) and installs only after openAndMigrate() resolves — correcting two review MEDIUMs
 
 ### Pending Todos
 
@@ -122,6 +125,6 @@ planning" sections in docs/dossier/*.md — those are the authoritative hand-off
 
 ## Session
 
-**Last session:** 2026-08-14T22:21:57.287Z
+**Last session:** 2026-08-14T22:34:01.965Z
 **Stopped at:** Completed 02-01-PLAN.md
 **Resume file:** None

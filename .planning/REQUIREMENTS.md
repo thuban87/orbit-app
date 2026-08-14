@@ -25,7 +25,7 @@ roadmap phases. Items marked *(infra)* are foundation guarantees rather than end
 - [x] **DATA-03**: Migration 1 also creates `categories` (seeded Family/Friends/Work/Community, user-editable, reorderable), the single-row self/profile record, `contact_links`, `interactions`, and a separate `events` table; every mergeable table carries `uid` + `modified_at`. *(infra)*
 - [x] **DATA-04**: Exactly one DAO function writes `contacts.last_contact` (= MAX over the contact's current interaction rows, recomputed after every insert/edit/delete, in a transaction, behind a JS mutex shared with headless writers). *(infra)*
 - [x] **DATA-05**: Status/progress is computed at query time (never stored) as elapsed ÷ interval, bucketed at 80%/100%, resolving day-granular at local midnight; SQL uses `date('now','localtime')`. *(infra)*
-- [ ] **DATA-06**: A launch-sweep entry point runs once per real foreground launch (never on module import or a headless tap) and is structured to host quarantine expiry, history retention, archived-purge, schedule reconcile, and backup rotation. *(infra)*
+- [x] **DATA-06**: A launch-sweep entry point runs once per real foreground launch (never on module import or a headless tap) and is structured to host quarantine expiry, history retention, archived-purge, schedule reconcile, and backup rotation. *(infra)*
 - [ ] **DATA-07**: An on-device benchmark on the Pixel confirms the newest-interaction-per-contact query and the status scan are acceptably fast. *(infra)*
 
 ### Custom Fields (FLD)
