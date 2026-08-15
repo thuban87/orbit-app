@@ -49,7 +49,7 @@
  *   byte-identical. Phases 4/6 inherit this contract.
  * -----------------------------------------------------------------------------
  */
-import { withMutex } from "@/db/mutex";
+import { inWriteTransaction } from "@/db/transaction";
 import type { SqlExecutor } from "@/db/types";
 
 /** A touchpoint to record against an existing contact. */
@@ -189,27 +189,6 @@ async function insertInteraction(
     ],
   );
   return result.lastInsertRowId;
-}
-
-/**
- * Run `body` inside the shared mutex and a hand-rolled transaction. COMMIT on
- * success; ROLLBACK (best-effort) and re-throw the ORIGINAL error on failure.
- */
-function inWriteTransaction<T>(
-  exec: SqlExecutor,
-  body: () => Promise<T>,
-): Promise<T> {
-  return withMutex(async () => {
-    await exec.execAsync("BEGIN");
-    try {
-      const value = await body();
-      await exec.execAsync("COMMIT");
-      return value;
-    } catch (error) {
-      await exec.execAsync("ROLLBACK").catch(() => {});
-      throw error;
-    }
-  });
 }
 
 /** Record a touchpoint against an existing contact, then recompute recency. */
