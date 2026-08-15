@@ -23,7 +23,8 @@
  *     FAIL this assertion.
  */
 import { beforeEach, describe, expect, it } from "vitest";
-import { createContactFull } from "@/db/contacts-dao";
+import { createContactFull, updateContactFull } from "@/db/contacts-dao";
+import { recordTouchpoint } from "@/db/recency-dao";
 import { nodeSqliteExecutor, openTestDb } from "@/db/__testkit__/node-sqlite";
 import { migration001 } from "@/db/migrations/001-initial";
 import { runMigrations } from "@/db/migrations/runner";
@@ -64,6 +65,34 @@ async function phone(contactId: number): Promise<string | null> {
     [contactId],
   );
   return row?.phone ?? null;
+}
+
+async function name(contactId: number): Promise<string | null> {
+  const row = await exec.getFirstAsync<{ name: string }>(
+    "SELECT name FROM contacts WHERE id = ?",
+    [contactId],
+  );
+  return row?.name ?? null;
+}
+
+/** Read a snapshot of the mutable metadata columns for an edit round-trip. */
+async function metadata(contactId: number): Promise<{
+  name: string;
+  category_id: number | null;
+  interval_days: number;
+  social_battery: string | null;
+  birthday: string | null;
+  phone: string | null;
+  email: string | null;
+  rarely_responds: number;
+  reminders_off: number;
+} | null> {
+  return exec.getFirstAsync(
+    `SELECT name, category_id, interval_days, social_battery, birthday, phone,
+            email, rarely_responds, reminders_off
+       FROM contacts WHERE id = ?`,
+    [contactId],
+  );
 }
 
 async function contactCount(): Promise<number> {
@@ -252,5 +281,290 @@ describe("createContactFull — mid-composition ROLLBACK (T-04-03 atomicity)", (
     expect(await contactCount()).toBe(0);
     expect(await totalInteractions()).toBe(0);
     expect(await totalValueRows()).toBe(0);
+  });
+});
+
+// =============================================================================
+// Plan 05 — updateContactFull: metadata edit + rarely_responds recompute +
+// first-interaction-on-edit + rollback.
+// =============================================================================
+
+const EDIT_NOW = "2026-08-15 10:00:00";
+
+describe("updateContactFull — metadata edit (every col except last_contact)", () => {
+  it("changes name/category/interval/phone/email/battery/birthday/reminders and leaves last_contact unchanged when rarely_responds is unchanged", async () => {
+    const { contactId } = await createContactFull(exec, {
+      uid: uid(),
+      name: "Old",
+      intervalDays: 14,
+      now: NOW,
+      firstInteraction: { uid: uid(), occurredAt: "2026-08-10 09:00:00" },
+    });
+    // last_contact is set by the create's first interaction.
+    expect(await lastContact(contactId)).toBe("2026-08-10 09:00:00");
+
+    await updateContactFull(exec, {
+      id: contactId,
+      name: "New Name",
+      categoryId: 2,
+      intervalDays: 30,
+      socialBattery: "high",
+      birthday: "03-14",
+      phone: "+44 7700 900999",
+      email: "new@example.com",
+      rarelyResponds: 0, // unchanged (create default is 0)
+      remindersOff: 1,
+      now: EDIT_NOW,
+    });
+
+    const m = await metadata(contactId);
+    expect(m?.name).toBe("New Name");
+    expect(m?.category_id).toBe(2);
+    expect(m?.interval_days).toBe(30);
+    expect(m?.social_battery).toBe("high");
+    expect(m?.birthday).toBe("03-14");
+    expect(m?.phone).toBe("+44 7700 900999");
+    expect(m?.email).toBe("new@example.com");
+    expect(m?.reminders_off).toBe(1);
+    // last_contact is NOT touched by the metadata edit (single-writer DATA-04).
+    expect(await lastContact(contactId)).toBe("2026-08-10 09:00:00");
+  });
+
+  it("rejects a non-positive intervalDays before any write (guard mirrors create)", async () => {
+    const { contactId } = await createContactFull(exec, {
+      uid: uid(),
+      name: "Guarded",
+      intervalDays: 14,
+      now: NOW,
+    });
+    await expect(
+      updateContactFull(exec, {
+        id: contactId,
+        name: "Guarded",
+        intervalDays: 0,
+        rarelyResponds: 0,
+        remindersOff: 0,
+        now: EDIT_NOW,
+      }),
+    ).rejects.toThrow(/positive integer/);
+    // Unchanged.
+    expect((await metadata(contactId))?.interval_days).toBe(14);
+  });
+});
+
+describe("updateContactFull — rarely_responds flip recomputes last_contact (Pitfall 2)", () => {
+  it("flipping 1→0 recomputes last_contact to MAX over ALL rows", async () => {
+    // rarely_responds contact: one connected (older) + one non-connected (newer).
+    const { contactId } = await createContactFull(exec, {
+      uid: uid(),
+      name: "Rarely",
+      intervalDays: 14,
+      now: NOW,
+      rarelyResponds: 1,
+      firstInteraction: {
+        uid: uid(),
+        occurredAt: "2026-08-01 09:00:00",
+        connected: 1,
+      },
+    });
+    // A newer, NON-connected attempt — does not advance recency while flag is on.
+    await recordTouchpoint(exec, {
+      contactId,
+      uid: uid(),
+      occurredAt: "2026-08-10 09:00:00",
+      now: NOW,
+      connected: 0,
+    });
+    // With the flag ON, last_contact is the connected row only.
+    expect(await lastContact(contactId)).toBe("2026-08-01 09:00:00");
+
+    // Flip 1→0: now ALL rows count → MAX is the newer non-connected row.
+    await updateContactFull(exec, {
+      id: contactId,
+      name: "Rarely",
+      intervalDays: 14,
+      rarelyResponds: 0,
+      remindersOff: 0,
+      now: EDIT_NOW,
+    });
+    expect(await lastContact(contactId)).toBe("2026-08-10 09:00:00");
+  });
+
+  it("flipping 0→1 recomputes last_contact to MAX over connected rows only", async () => {
+    // rarely_responds OFF: one connected (older) + one non-connected (newer).
+    const { contactId } = await createContactFull(exec, {
+      uid: uid(),
+      name: "Normal",
+      intervalDays: 14,
+      now: NOW,
+      rarelyResponds: 0,
+      firstInteraction: {
+        uid: uid(),
+        occurredAt: "2026-08-01 09:00:00",
+        connected: 1,
+      },
+    });
+    await recordTouchpoint(exec, {
+      contactId,
+      uid: uid(),
+      occurredAt: "2026-08-10 09:00:00",
+      now: NOW,
+      connected: 0,
+    });
+    // With the flag OFF, last_contact is the newest row regardless of connected.
+    expect(await lastContact(contactId)).toBe("2026-08-10 09:00:00");
+
+    // Flip 0→1: connected-only → MAX falls back to the older connected row.
+    await updateContactFull(exec, {
+      id: contactId,
+      name: "Normal",
+      intervalDays: 14,
+      rarelyResponds: 1,
+      remindersOff: 0,
+      now: EDIT_NOW,
+    });
+    expect(await lastContact(contactId)).toBe("2026-08-01 09:00:00");
+  });
+});
+
+describe("updateContactFull — first-interaction-on-edit (owner ruling 2026-08-14)", () => {
+  it("writes a FIRST interaction (source=manual, direction=null) for a never-contacted contact and sets last_contact via the single writer", async () => {
+    // "Not yet" create → last_contact NULL, 0 interactions.
+    const { contactId } = await createContactFull(exec, {
+      uid: uid(),
+      name: "NotYet",
+      intervalDays: 14,
+      now: NOW,
+    });
+    expect(await lastContact(contactId)).toBeNull();
+    expect(await interactionCount(contactId)).toBe(0);
+
+    await updateContactFull(exec, {
+      id: contactId,
+      name: "NotYet",
+      intervalDays: 14,
+      rarelyResponds: 0,
+      remindersOff: 0,
+      now: EDIT_NOW,
+      firstInteraction: { uid: uid(), occurredAt: "2026-08-12 08:00:00" },
+    });
+
+    expect(await interactionCount(contactId)).toBe(1);
+    expect(await lastContact(contactId)).toBe("2026-08-12 08:00:00");
+    const row = await exec.getFirstAsync<{
+      source: string;
+      direction: string | null;
+    }>("SELECT source, direction FROM interactions WHERE contact_id = ?", [
+      contactId,
+    ]);
+    expect(row?.source).toBe("manual");
+    expect(row?.direction).toBeNull();
+  });
+
+  it("rejects a firstInteraction for an ALREADY-CONTACTED contact and rolls back (no new interaction, metadata unchanged)", async () => {
+    const { contactId } = await createContactFull(exec, {
+      uid: uid(),
+      name: "AlreadyContacted",
+      intervalDays: 14,
+      now: NOW,
+      firstInteraction: { uid: uid(), occurredAt: "2026-08-10 09:00:00" },
+    });
+    expect(await interactionCount(contactId)).toBe(1);
+
+    await expect(
+      updateContactFull(exec, {
+        id: contactId,
+        name: "Renamed", // would-be metadata change, must roll back
+        intervalDays: 14,
+        rarelyResponds: 0,
+        remindersOff: 0,
+        now: EDIT_NOW,
+        firstInteraction: { uid: uid(), occurredAt: "2026-08-11 09:00:00" },
+      }),
+    ).rejects.toThrow();
+
+    // No second interaction, last_contact untouched, name unchanged (rollback).
+    expect(await interactionCount(contactId)).toBe(1);
+    expect(await lastContact(contactId)).toBe("2026-08-10 09:00:00");
+    expect(await name(contactId)).toBe("AlreadyContacted");
+  });
+
+  it("rejects a firstInteraction whose occurredAt is in the future before any transaction opens", async () => {
+    const { contactId } = await createContactFull(exec, {
+      uid: uid(),
+      name: "FutureEdit",
+      intervalDays: 14,
+      now: NOW,
+    });
+    await expect(
+      updateContactFull(exec, {
+        id: contactId,
+        name: "FutureEdit",
+        intervalDays: 14,
+        rarelyResponds: 0,
+        remindersOff: 0,
+        now: EDIT_NOW,
+        // occurredAt strictly after `now` (lexical > is chronological here).
+        firstInteraction: { uid: uid(), occurredAt: "2026-08-15 10:00:01" },
+      }),
+    ).rejects.toThrow(/future|occurredAt|occurred_at/i);
+    // Nothing written.
+    expect(await interactionCount(contactId)).toBe(0);
+    expect(await lastContact(contactId)).toBeNull();
+  });
+});
+
+describe("updateContactFull — mid-composition ROLLBACK (T-04-03 atomicity)", () => {
+  it("rolls back the metadata UPDATE when a custom-value write fails after it", async () => {
+    const { contactId } = await createContactFull(exec, {
+      uid: uid(),
+      name: "Original",
+      intervalDays: 14,
+      now: NOW,
+    });
+
+    await expect(
+      updateContactFull(exec, {
+        id: contactId,
+        name: "Changed", // the metadata UPDATE runs BEFORE the failing value write
+        intervalDays: 14,
+        rarelyResponds: 0,
+        remindersOff: 0,
+        now: EDIT_NOW,
+        customValues: [{ col: "no_such_column", value: "x" }],
+      }),
+    ).rejects.toThrow();
+
+    // A sequential two-transaction impl would leave name = "Changed".
+    expect(await name(contactId)).toBe("Original");
+  });
+});
+
+describe("updateContactFull — custom values compose without deadlock (Pitfall 1, edit side)", () => {
+  it("writes custom values in the same call without hanging", async () => {
+    await addColumn("nickname");
+    const { contactId } = await createContactFull(exec, {
+      uid: uid(),
+      name: "WithValues",
+      intervalDays: 14,
+      now: NOW,
+    });
+
+    await updateContactFull(exec, {
+      id: contactId,
+      name: "WithValues",
+      intervalDays: 14,
+      rarelyResponds: 0,
+      remindersOff: 0,
+      now: EDIT_NOW,
+      customValues: [{ col: "nickname", value: "Nick" }],
+    });
+
+    const row = await exec.getFirstAsync<{ nickname: string | null }>(
+      "SELECT nickname FROM contact_custom_values WHERE contact_id = ?",
+      [contactId],
+    );
+    expect(row?.nickname).toBe("Nick");
+    expect(await totalValueRows()).toBe(1);
   });
 });

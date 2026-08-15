@@ -13,10 +13,13 @@
  */
 import { beforeEach, describe, expect, it } from "vitest";
 import {
+  getContactForEdit,
   getContactHeader,
   isDuplicateName,
   listCategories,
 } from "@/db/contact-read";
+import type { CustomFieldDef } from "@/db/field-types";
+import { upsertValue } from "@/db/field-values-dao";
 import { nodeSqliteExecutor, openTestDb } from "@/db/__testkit__/node-sqlite";
 import { migration001 } from "@/db/migrations/001-initial";
 import { runMigrations } from "@/db/migrations/runner";
@@ -120,5 +123,102 @@ describe("getContactHeader — by-id light read (archived-reachable by design)",
 
   it("returns null for a missing id", async () => {
     expect(await getContactHeader(exec, 9999)).toBeNull();
+  });
+});
+
+// =============================================================================
+// Plan 05 — getContactForEdit: the edit-form initial-values assembly.
+// =============================================================================
+
+/** Add a value column directly (independent of Plan 03's createField DDL). */
+async function addColumn(col: string): Promise<void> {
+  await exec.execAsync(
+    `ALTER TABLE contact_custom_values ADD COLUMN "${col}" TEXT`,
+  );
+}
+
+/** Insert a live custom-field def row; returns nothing (defs are built by hand). */
+function makeDef(
+  colName: string,
+  overrides: Partial<CustomFieldDef> = {},
+): CustomFieldDef {
+  return {
+    id: 1,
+    uid: uid(),
+    col_name: colName,
+    label: colName,
+    type: "text",
+    options: null,
+    show_on_new: 0,
+    always_show: 0,
+    display_order: 0,
+    quarantined_at: null,
+    share_with_ai: 0,
+    created_at: NOW,
+    modified_at: NOW,
+    ...overrides,
+  };
+}
+
+/** Insert a contact with an optional category + last_contact; return its id. */
+async function makeContactRow(
+  name: string,
+  opts: { categoryId?: number | null; lastContact?: string | null } = {},
+): Promise<number> {
+  const r = await exec.runAsync(
+    `INSERT INTO contacts
+       (uid, name, category_id, interval_days, last_contact, created_at, modified_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    [
+      uid(),
+      name,
+      opts.categoryId ?? null,
+      30,
+      opts.lastContact ?? null,
+      NOW,
+      NOW,
+    ],
+  );
+  return r.lastInsertRowId;
+}
+
+describe("getContactForEdit — row + category label + custom-value map", () => {
+  it("returns the contacts row (incl. last_contact), the category label, and the value map keyed by col_name", async () => {
+    const cats = await listCategories(exec);
+    const family = cats[0]; // "Family"
+    const id = await makeContactRow("Editable", {
+      categoryId: family.id,
+      lastContact: "2026-08-10 09:00:00",
+    });
+    await addColumn("nickname");
+    const def = makeDef("nickname");
+    await upsertValue(exec, id, uid(), "nickname", "Eddie", NOW);
+
+    const result = await getContactForEdit(exec, id, [def]);
+    expect(result).not.toBeNull();
+    expect(result?.contact.id).toBe(id);
+    expect(result?.contact.name).toBe("Editable");
+    // last_contact is present so the UI can decide whether to show last-spoke.
+    expect(result?.contact.last_contact).toBe("2026-08-10 09:00:00");
+    expect(result?.categoryLabel).toBe("Family");
+    expect(result?.values.nickname).toBe("Eddie");
+  });
+
+  it("returns a null category label when category_id is null", async () => {
+    const id = await makeContactRow("NoCat", { categoryId: null });
+    const result = await getContactForEdit(exec, id, []);
+    expect(result?.categoryLabel).toBeNull();
+    expect(result?.contact.category_id).toBeNull();
+    expect(result?.values).toEqual({});
+  });
+
+  it("returns last_contact NULL for a never-contacted contact", async () => {
+    const id = await makeContactRow("NeverSpoke", { lastContact: null });
+    const result = await getContactForEdit(exec, id, []);
+    expect(result?.contact.last_contact).toBeNull();
+  });
+
+  it("returns null for a missing id", async () => {
+    expect(await getContactForEdit(exec, 9999, [])).toBeNull();
   });
 });
