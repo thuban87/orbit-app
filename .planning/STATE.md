@@ -6,14 +6,14 @@ current_phase: 4
 current_phase_name: Contact CRUD & Lifecycle
 status: executing
 stopped_at: Completed 04-03-PLAN.md
-last_updated: "2026-08-15T06:03:02.695Z"
+last_updated: "2026-08-15T06:11:58.246Z"
 last_activity: 2026-08-15
 last_activity_desc: Phase 4 execution started
 progress:
   total_phases: 16
   completed_phases: 3
   total_plans: 28
-  completed_plans: 23
+  completed_plans: 24
   percent: 19
 ---
 
@@ -29,7 +29,7 @@ See: .planning/PROJECT.md (updated 2026-08-14)
 ## Current Position
 
 Phase: 4 (Contact CRUD & Lifecycle) — EXECUTING
-Plan: 5 of 9
+Plan: 6 of 9
 Status: Ready to execute
 Last activity: 2026-08-15 — Phase 4 execution started
 
@@ -80,6 +80,7 @@ Progress: [████████░░] 82%
 | Phase 04 P02 | 3 | 3 tasks | 6 files |
 | Phase 04 P03 | 9min | 3 tasks | 9 files |
 | Phase 04 P05 | 20min | 3 tasks | 4 files |
+| Phase 04 P04 | 12min | 2 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -130,6 +131,8 @@ Foundational decisions affecting current work:
 - [Phase 04]: 04-03: TriStateLastSpoke is purely controlled (no internal default overriding value); consumers seed create=Today / edit-never-contacted=Not yet. Native picker has no maximumDate so a future pick still fires onChange and shows the locked rejection copy. datetimepicker config plugin registered in app.config.ts for the deferred desktop prebuild
 - [Phase ?]: 04-05: updateContactFull edits every contacts column except last_contact; recency moves only via recomputeLastContactCore in the same txn on a rarely_responds flip (Pitfall 2)
 - [Phase ?]: 04-05: first-interaction-on-edit honoured only when stored last_contact IS NULL; already-contacted rejects (Phase 6 owns timeline edits); getContactForEdit by-id seek stays archived-reachable by design
+- [Phase ?]: 04-04: create-form input shaping extracted to node-tested create-contact-logic.ts (canSave gate + buildCreateInput); .tsx screens are device-UAT — the repo's -logic.ts convention
+- [Phase ?]: 04-04: native category Picker uses a 'No category' sentinel (-1) mapped back to null on change, keeping category nullable without a custom modal
 
 ### Pending Todos
 
@@ -165,6 +168,6 @@ planning" sections in docs/dossier/*.md — those are the authoritative hand-off
 
 ## Session
 
-**Last session:** 2026-08-15T06:02:24.264Z
+**Last session:** 2026-08-15T06:11:35.940Z
 **Stopped at:** Completed 04-03-PLAN.md
 **Resume file:** None
