@@ -7,8 +7,9 @@
  *
  * Node-pure: takes `exec: SqlExecutor`.
  */
-import { defsForEditForm, getValuesForContact } from "@/db/field-values-dao";
+
 import type { CustomFieldDef } from "@/db/field-types";
+import { defsForEditForm, getValuesForContact } from "@/db/field-values-dao";
 import type { SqlExecutor } from "@/db/types";
 
 /**

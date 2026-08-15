@@ -23,11 +23,11 @@
  *     FAIL this assertion.
  */
 import { beforeEach, describe, expect, it } from "vitest";
-import { createContactFull, updateContactFull } from "@/db/contacts-dao";
-import { recordTouchpoint } from "@/db/recency-dao";
 import { nodeSqliteExecutor, openTestDb } from "@/db/__testkit__/node-sqlite";
+import { createContactFull, updateContactFull } from "@/db/contacts-dao";
 import { migration001 } from "@/db/migrations/001-initial";
 import { runMigrations } from "@/db/migrations/runner";
+import { recordTouchpoint } from "@/db/recency-dao";
 import type { SqlExecutor } from "@/db/types";
 
 const NOW = "2026-08-14 12:00:00";

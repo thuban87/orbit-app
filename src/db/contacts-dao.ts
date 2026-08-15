@@ -47,12 +47,13 @@
  *
  * Node-pure: takes `exec: SqlExecutor`; imports the shared `inWriteTransaction`.
  */
+
+import { upsertValueCore } from "@/db/field-values-dao";
 import {
+  type FirstInteractionInput,
   insertInteractionCore,
   recomputeLastContactCore,
-  type FirstInteractionInput,
 } from "@/db/recency-dao";
-import { upsertValueCore } from "@/db/field-values-dao";
 import { inWriteTransaction } from "@/db/transaction";
 import type { SqlExecutor } from "@/db/types";
 import { newUid } from "@/db/uid";
@@ -304,10 +305,9 @@ export function updateContactFull(
     const stored = await exec.getFirstAsync<{
       rarely_responds: number;
       last_contact: string | null;
-    }>(
-      "SELECT rarely_responds, last_contact FROM contacts WHERE id = ?",
-      [input.id],
-    );
+    }>("SELECT rarely_responds, last_contact FROM contacts WHERE id = ?", [
+      input.id,
+    ]);
     if (!stored) {
       throw new Error(`updateContactFull: no contact with id=${input.id}`);
     }
@@ -352,7 +352,10 @@ export function updateContactFull(
 
     // Recompute through the single writer IFF the flag flipped OR a first
     // interaction was inserted — inside the SAME transaction (Pitfall 2).
-    if (input.rarelyResponds !== stored.rarely_responds || firstInteractionInserted) {
+    if (
+      input.rarelyResponds !== stored.rarely_responds ||
+      firstInteractionInserted
+    ) {
       await recomputeLastContactCore(exec, input.id, input.now);
     }
   });
