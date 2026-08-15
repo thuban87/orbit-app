@@ -385,16 +385,139 @@ describe("recency DAO — rollback and serialization", () => {
   });
 });
 
+describe("recency DAO — one-tap record path (LOG-01 / LOG-06)", () => {
+  it("rejects a future occurredAt BEFORE any transaction: no row written, last_contact unchanged", async () => {
+    const c = await makeContact();
+    await recordTouchpoint(exec, {
+      contactId: c,
+      uid: uid(),
+      occurredAt: "2026-06-01 10:00:00",
+      now: NOW,
+    });
+    expect(await lastContact(c)).toBe("2026-06-01 10:00:00");
+    expect(await interactionCount(c)).toBe(1);
+
+    // A future occurred_at (relative to `now`) must reject at the guard, before
+    // the transaction opens — otherwise PROGRESS_SQL goes negative and the
+    // contact buckets 'stable' forever.
+    await expect(
+      recordTouchpoint(exec, {
+        contactId: c,
+        uid: uid(),
+        occurredAt: "2026-09-01 10:00:00",
+        now: NOW,
+      }),
+    ).rejects.toThrow(/future/i);
+
+    // Nothing was written and recency did not move.
+    expect(await interactionCount(c)).toBe(1);
+    expect(await lastContact(c)).toBe("2026-06-01 10:00:00");
+  });
+
+  it("stores the one-tap defaults (outbound / unspecified / connected=1 / manual) verbatim and sets last_contact", async () => {
+    const c = await makeContact();
+    const occurred = "2026-08-14 09:15:00";
+    await recordTouchpoint(exec, {
+      contactId: c,
+      uid: uid(),
+      occurredAt: occurred,
+      now: NOW,
+      channel: "unspecified",
+      direction: "outbound",
+      connected: 1,
+      quality: null,
+      source: "manual",
+    });
+
+    const row = await exec.getFirstAsync<{
+      occurred_at: string;
+      channel: string;
+      direction: string | null;
+      connected: number;
+      quality: string | null;
+      source: string;
+    }>(
+      `SELECT occurred_at, channel, direction, connected, quality, source
+         FROM interactions WHERE contact_id = ? ORDER BY id DESC LIMIT 1`,
+      [c],
+    );
+    expect(row?.occurred_at).toBe(occurred);
+    expect(row?.channel).toBe("unspecified");
+    expect(row?.direction).toBe("outbound");
+    expect(row?.connected).toBe(1);
+    expect(row?.quality).toBeNull();
+    expect(row?.source).toBe("manual");
+    expect(await lastContact(c)).toBe(occurred);
+  });
+
+  it("same-DATE, different-TIME taps make two distinct rows AND advance last_contact to the later time", async () => {
+    const c = await makeContact();
+    // Both times are BEFORE `now` (12:00) so the future guard allows them; the
+    // later of the two (11:30) is what recency must advance to.
+    await recordTouchpoint(exec, {
+      contactId: c,
+      uid: uid(),
+      occurredAt: "2026-08-14 09:00:00",
+      now: NOW,
+    });
+    await recordTouchpoint(exec, {
+      contactId: c,
+      uid: uid(),
+      occurredAt: "2026-08-14 11:30:00",
+      now: NOW,
+    });
+    expect(await interactionCount(c)).toBe(2);
+    // MAX is over the FULL YYYY-MM-DD HH:MM:SS — a later same-day tap DOES move
+    // the stored value (only date()-granular status is day-stable).
+    expect(await lastContact(c)).toBe("2026-08-14 11:30:00");
+  });
+
+  it("identical-timestamp taps make two distinct rows; last_contact equals that timestamp", async () => {
+    const c = await makeContact();
+    const t = "2026-08-14 09:00:00";
+    await recordTouchpoint(exec, {
+      contactId: c,
+      uid: uid(),
+      occurredAt: t,
+      now: NOW,
+    });
+    await recordTouchpoint(exec, {
+      contactId: c,
+      uid: uid(),
+      occurredAt: t,
+      now: NOW,
+    });
+    expect(await interactionCount(c)).toBe(2);
+    // A second identical-timestamp tap does not move the stored MAX.
+    expect(await lastContact(c)).toBe(t);
+  });
+
+  it("allows an occurredAt exactly equal to now (equal is not future)", async () => {
+    const c = await makeContact();
+    await recordTouchpoint(exec, {
+      contactId: c,
+      uid: uid(),
+      occurredAt: NOW,
+      now: NOW,
+    });
+    expect(await interactionCount(c)).toBe(1);
+    expect(await lastContact(c)).toBe(NOW);
+  });
+});
+
 describe("recency DAO — local wall-clock timestamp contract (DATA-05)", () => {
   it("round-trips occurred_at as the same local string, with no UTC day shift", async () => {
     const c = await makeContact();
     // An evening local time: a toISOString() conversion here would shift the day.
     const local = "2026-08-14 23:30:00";
+    // `now` is the NEXT morning so this evening occurred_at is in the PAST — the
+    // future-date guard (rejectFutureOccurredAt) allows it, and the round-trip is
+    // what we assert.
     await recordTouchpoint(exec, {
       contactId: c,
       uid: uid(),
       occurredAt: local,
-      now: NOW,
+      now: "2026-08-15 08:00:00",
     });
     const row = await exec.getFirstAsync<{ occurred_at: string }>(
       "SELECT occurred_at FROM interactions WHERE contact_id = ? ORDER BY id DESC LIMIT 1",

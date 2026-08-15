@@ -49,6 +49,7 @@
  *   byte-identical. Phases 4/6 inherit this contract.
  * -----------------------------------------------------------------------------
  */
+import { rejectFutureOccurredAt } from "@/db/log-guards";
 import { inWriteTransaction } from "@/db/transaction";
 import type { SqlExecutor } from "@/db/types";
 
@@ -204,6 +205,17 @@ export function recordTouchpoint(
   exec: SqlExecutor,
   input: RecordTouchpointInput,
 ): Promise<{ interactionId: number }> {
+  // LOG-06 GUARD: reject a FUTURE occurred_at BEFORE any transaction opens
+  // (mirrors createContactWithInteraction's WR-02 reject shape and
+  // updateContactFull's GUARD 2). rejectFutureOccurredAt throws synchronously;
+  // wrap it so a violation surfaces as a rejected Promise — a caller's `.catch()`
+  // sees it and no transaction is ever started (no row written, recency
+  // untouched). The single-writer invariant below is unchanged.
+  try {
+    rejectFutureOccurredAt(input.occurredAt, input.now);
+  } catch (err) {
+    return Promise.reject(err);
+  }
   return inWriteTransaction(exec, async () => {
     const interactionId = await insertInteraction(
       exec,
