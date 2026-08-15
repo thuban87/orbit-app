@@ -30,6 +30,7 @@ import {
 } from "react-native";
 import { Avatar } from "@/components/Avatar";
 import { GravityBar } from "@/components/GravityBar";
+import { IntensityLine } from "@/components/IntensityLine";
 import { OverflowMenu } from "@/components/OverflowMenu";
 import { TimelineRow } from "@/components/TimelineRow";
 import {
@@ -58,7 +59,11 @@ import {
 import { newUid } from "@/db/uid";
 import type { RootStackScreenProps } from "@/navigation/types";
 import type { GravityResult } from "@/services/gravity-logic";
-import { computeContactGravity } from "@/services/impact";
+import {
+  computeContactGravity,
+  computeContactIntensity,
+} from "@/services/impact";
+import type { IntensityResult } from "@/services/intensity-logic";
 import { useTheme } from "@/theme";
 import { Logger } from "@/utils/logger";
 
@@ -106,6 +111,12 @@ export function ContactProfileScreen({
   // computed at read time from the shared impact inputs. null when the contact
   // has no interaction history yet (nothing to show a buffer for).
   const [gravity, setGravity] = useState<GravityResult | null>(null);
+  // Derived-never-stored intensity (LOG-03) — this period's contact RATE vs the
+  // intended frequency + the long-run trailing cadence, from the SAME impact
+  // inputs gravity uses (so the two can never disagree). NEUTRAL, profile-only,
+  // presented BESIDE gravity, never blended into one score. null when there is
+  // no interaction history yet.
+  const [intensity, setIntensity] = useState<IntensityResult | null>(null);
   // In-flight latch for the one-tap log — blocks a double-fire while the write
   // is open, and dims the button.
   const [logging, setLogging] = useState(false);
@@ -132,13 +143,17 @@ export function ContactProfileScreen({
       setHeader(row);
       setTimeline(rows);
       setStatus(statusRow);
-      // Derive gravity from the SAME impact inputs intensity will use (Plan 06);
-      // hide it until there is interaction history to build a buffer from.
-      setGravity(
-        impactInputs && impactInputs.interactions.length > 0
-          ? computeContactGravity(impactInputs, localDateTime())
-          : null,
+      // Derive gravity AND intensity from the SAME impact inputs (read once so
+      // they can never disagree); hide both until there is interaction history.
+      // localDateTime() is captured once so both derivations share one "now".
+      const now = localDateTime();
+      const hasHistory =
+        impactInputs !== null && impactInputs.interactions.length > 0;
+      setGravity(hasHistory ? computeContactGravity(impactInputs, now) : null);
+      setIntensity(
+        hasHistory ? computeContactIntensity(impactInputs, now) : null,
       );
+      // (impactInputs is narrowed non-null by `hasHistory` above.)
     } catch (err) {
       Logger.error(LOG_SCOPE, "failed to load contact", err);
       Alert.alert("Couldn't load this contact", "Please go back and retry.");
@@ -406,9 +421,12 @@ export function ContactProfileScreen({
         </Text>
       </Pressable>
 
-      {/* Impact section — gravity (LOG-03), derived-never-stored and PROFILE-ONLY
-          (Cluster G: nothing log-derived on the dashboard card). Intensity joins
-          here in Plan 06. Hidden until there is interaction history. */}
+      {/* Impact section — gravity + intensity (LOG-03), both derived-never-stored
+          and PROFILE-ONLY (Cluster G: nothing log-derived on the dashboard card).
+          The two are presented SIDE BY SIDE, never blended into one score:
+          gravity is the accumulated-familiarity tier (named, coloured); intensity
+          is a NEUTRAL this-period rate + trailing cadence (text tokens only).
+          Hidden until there is interaction history. */}
       {gravity ? (
         <View testID="contact-profile-impact" style={styles.impact}>
           <GravityBar
@@ -416,6 +434,7 @@ export function ContactProfileScreen({
             tierIndex={gravity.tierIndex}
             tierCount={gravity.tierCount}
           />
+          {intensity ? <IntensityLine intensity={intensity} /> : null}
         </View>
       ) : null}
 
