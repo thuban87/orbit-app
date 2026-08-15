@@ -30,8 +30,8 @@
  * (`firstInteractionOccurredAt`) — one source of truth for the CRUD-02 rule.
  */
 import type { LastSpokeValue } from "@/components/tri-state-last-spoke-logic";
-import type { UpdateContactFullInput } from "@/db/contacts-dao";
 import type { ContactForEdit } from "@/db/contact-read";
+import type { UpdateContactFullInput } from "@/db/contacts-dao";
 import { firstInteractionOccurredAt } from "./create-contact-logic";
 
 /** The edit form's controlled state (the screen owns the React state). */
@@ -131,7 +131,9 @@ export function buildBirthdayForStorage(
  */
 export function seedEditState(result: ContactForEdit): EditFormState {
   const c = result.contact;
-  const { birthdayInput, birthdayYearUnknown } = parseBirthdayForForm(c.birthday);
+  const { birthdayInput, birthdayYearUnknown } = parseBirthdayForForm(
+    c.birthday,
+  );
   return {
     name: c.name,
     categoryId: c.category_id,
