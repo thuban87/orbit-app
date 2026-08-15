@@ -21,6 +21,37 @@
  * `isSafeColName` (throwing on an unsafe name) before double-quoting — belt and
  * suspenders at the boundary, mirroring every other interpolation site in the
  * phase. Node-pure: no DB/UI/expo import.
+ *
+ * =============================================================================
+ * SORTS RAW STORED TEXT — DIVERGES FROM THE PERMISSIVE RENDER PARSER (WR-01):
+ *   The number/toggle CASTs below run over the RAW stored TEXT bytes. Storage
+ *   is TEXT forever and is NEVER canonicalized: the field-parsers.ts parsers are
+ *   read-time-only and `applyTypeChange` leaves value bytes byte-identical
+ *   (§14.2 blast-radius-zero, CLAUDE.md invariant — no value rewrite on a type
+ *   change). So a value that RENDERS clean can SORT wrong when it is a
+ *   non-canonical legacy value left behind by a type change:
+ *     - toggle "yes"/"true" (from a text→toggle change) parses to canonical "1"
+ *       and renders On, but CAST('yes' AS INTEGER) = 0 → sorts into the false
+ *       group.
+ *     - number "1,000" parses clean (commas stripped → 1000) and renders 1000,
+ *       but CAST('1,000' AS REAL) = 1.0 → sorts as 1.
+ *   This divergence is INTENTIONAL and is NOT a bug to "fix" here: rewriting
+ *   stored values to canonical form is forbidden by the type-change invariant,
+ *   and replicating the JS parser in SQL is not feasible (toggle word-forms in
+ *   particular cannot be canonicalized in pure SQL). The tap-to-fix error state
+ *   already surfaces these non-canonical values on the profile; re-editing a
+ *   flagged value through its widget rewrites it to canonical form and it then
+ *   sorts correctly. It is latent in Phase 3 — `sortExpr` has no runtime
+ *   consumer yet.
+ *
+ *   <legacy_compat> HANDOFF TO PHASE 8 (first sortExpr consumer — dashboard
+ *   sort/filter): decide how flagged / non-canonical rows should ORDER relative
+ *   to canonical ones (e.g. sort tap-to-fix values last, exclude them from a
+ *   numeric filter, or drive users to fix them before the sort is meaningful).
+ *   Do NOT resolve it by rewriting storage. Whatever Phase 8 chooses, it layers
+ *   ON TOP of this expression; this helper stays a pure raw-TEXT ordering.
+ *   </legacy_compat>
+ * =============================================================================
  */
 import { isSafeColName } from "@/db/col-name";
 import type { CustomFieldDef } from "@/db/field-types";
