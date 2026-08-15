@@ -196,15 +196,31 @@ Recorded here because they bind phases that do not own them. Every planner/execu
   4. Never-contacted and archived are reachable as separate homes.
 
 **Plans:** 9 plans
+**Wave 1**
 
 - [ ] 04-01-PLAN.md — Navigation shell (react-navigation native-stack) + Settings relocation (CRUD-05)
 - [ ] 04-02-PLAN.md — Contact create + shared reads DAO (composed atomic create) (CRUD-01, CRUD-02)
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
 - [ ] 04-03-PLAN.md — Create-form inputs (FrequencyPicker, TriStateLastSpoke) + native picker install (CRUD-01)
-- [ ] 04-04-PLAN.md — CreateContactScreen + ContactProfile scaffold (CRUD-01, CRUD-02)
 - [ ] 04-05-PLAN.md — Contact metadata edit + rarely_responds recompute + edit assembly DAO (CRUD-03)
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
+- [ ] 04-04-PLAN.md — CreateContactScreen + ContactProfile scaffold (CRUD-01, CRUD-02)
+
+**Wave 4** *(blocked on Wave 3 completion)*
+
 - [ ] 04-06-PLAN.md — EditContactScreen (always-show fields + toggles + birthday) (CRUD-03)
+
+**Wave 5** *(blocked on Wave 4 completion)*
+
 - [ ] 04-07-PLAN.md — Contact links (contact-links-dao + LinksEditor, tappable open) (CRUD-04)
 - [ ] 04-08-PLAN.md — Archive / restore + Archived home + overflow menu (CRUD-05)
+
+**Wave 6** *(blocked on Wave 5 completion)*
+
 - [ ] 04-09-PLAN.md — Purge fan-out + impact summary + danger token (CRUD-06)
 
 ### Phase 5: Photos
