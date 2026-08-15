@@ -348,6 +348,6 @@ export function createContactWithInteraction(
  * both inside its ONE outer transaction.
  */
 export {
-  recomputeLastContact as recomputeLastContactCore,
   insertInteraction as insertInteractionCore,
+  recomputeLastContact as recomputeLastContactCore,
 };

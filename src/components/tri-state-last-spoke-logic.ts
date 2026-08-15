@@ -29,7 +29,10 @@ export const FUTURE_DATE_MESSAGE =
  * local YYYY-MM-DD strings (lexicographic order matches chronological order for
  * that format), so time-of-day is ignored — picking today is never "future".
  */
-export function isFutureLocalDate(picked: Date, now: Date = new Date()): boolean {
+export function isFutureLocalDate(
+  picked: Date,
+  now: Date = new Date(),
+): boolean {
   return formatLocalDate(picked) > formatLocalDate(now);
 }
 

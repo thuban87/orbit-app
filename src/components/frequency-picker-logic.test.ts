@@ -21,7 +21,9 @@ describe("UNIT_FACTORS", () => {
 
 describe("INVALID_INTERVAL_MESSAGE", () => {
   it("is the exact locked copy", () => {
-    expect(INVALID_INTERVAL_MESSAGE).toBe("Enter a whole number greater than 0.");
+    expect(INVALID_INTERVAL_MESSAGE).toBe(
+      "Enter a whole number greater than 0.",
+    );
   });
 });
 

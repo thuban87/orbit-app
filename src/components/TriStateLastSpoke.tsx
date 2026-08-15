@@ -157,7 +157,10 @@ export function TriStateLastSpoke({
           onPress={pickNotYet}
           style={[
             styles.segment,
-            { backgroundColor: notYetC.background, borderColor: notYetC.border },
+            {
+              backgroundColor: notYetC.background,
+              borderColor: notYetC.border,
+            },
           ]}
         >
           <Text style={{ color: notYetC.text }}>Not yet</Text>
