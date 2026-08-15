@@ -454,3 +454,65 @@ export function listArchived(exec: SqlExecutor): Promise<ArchivedContactRow[]> {
       ORDER BY archived_at DESC`,
   );
 }
+
+// =============================================================================
+// PHOTO (PHOTO-03 / PHOTO-05 write half) — dedicated atomic single-column writers.
+//
+// These exist because `updateContactMetadataCore` deliberately OMITS `photo` from
+// its SET list (RESEARCH Pitfall 6, VERIFIED lines 249-252) — the photo write is
+// decoupled from the metadata form so the inline old-file delete can pair with the
+// DB update in the pipeline/caller. They mirror `archiveContact` exactly: ONE
+// `inWriteTransaction`, a `?`-bound single-column UPDATE, and a `changes===1`
+// loud-failure guard (a bad id throws → rollback).
+//
+// The stored value is the RELATIVE filename (`avatars/<name>.<ext>`) — never an
+// absolute or cache URI (RESEARCH Anti-Patterns; Pitfalls 1 & 3). NO file
+// `delete()` lives here: the DAO is node-pure (imports only `@/db/*`); the FS side
+// effect is the pipeline's job, kept out of the transaction (same reasoning as
+// purge's post-commit hook).
+// =============================================================================
+
+/**
+ * Set a contact's photo to a RELATIVE filename + bump `modified_at`. Asserts
+ * exactly one row changed (a bad id throws → rollback). `last_contact` untouched.
+ */
+export function setContactPhoto(
+  exec: SqlExecutor,
+  id: number,
+  relative: string,
+  now: string,
+): Promise<void> {
+  return inWriteTransaction(exec, async () => {
+    const result = await exec.runAsync(
+      "UPDATE contacts SET photo = ?, modified_at = ? WHERE id = ?",
+      [relative, now, id],
+    );
+    if (result.changes !== 1) {
+      throw new Error(
+        `setContactPhoto: no contact matched id=${id} (changed ${result.changes})`,
+      );
+    }
+  });
+}
+
+/**
+ * Clear a contact's photo (`photo = NULL`) + bump `modified_at`. Asserts exactly
+ * one row changed (a bad id throws → rollback). `last_contact` untouched.
+ */
+export function clearContactPhoto(
+  exec: SqlExecutor,
+  id: number,
+  now: string,
+): Promise<void> {
+  return inWriteTransaction(exec, async () => {
+    const result = await exec.runAsync(
+      "UPDATE contacts SET photo = NULL, modified_at = ? WHERE id = ?",
+      [now, id],
+    );
+    if (result.changes !== 1) {
+      throw new Error(
+        `clearContactPhoto: no contact matched id=${id} (changed ${result.changes})`,
+      );
+    }
+  });
+}
