@@ -7,6 +7,8 @@
  *
  * Node-pure: takes `exec: SqlExecutor`.
  */
+import { defsForEditForm, getValuesForContact } from "@/db/field-values-dao";
+import type { CustomFieldDef } from "@/db/field-types";
 import type { SqlExecutor } from "@/db/types";
 
 /**
@@ -76,4 +78,80 @@ export function getContactHeader(
     "SELECT id, name, rarely_responds, archived_at FROM contacts WHERE id = ?",
     [contactId],
   );
+}
+
+/** The full `contacts` row plus the joined category label, for the edit form. */
+export interface ContactEditRow {
+  id: number;
+  uid: string;
+  name: string;
+  category_id: number | null;
+  interval_days: number;
+  social_battery: string | null;
+  birthday: string | null;
+  phone: string | null;
+  email: string | null;
+  photo: string | null;
+  /** Present so the edit form can decide whether to show the last-spoke control. */
+  last_contact: string | null;
+  favourite_rank: number | null;
+  ring_seq: number | null;
+  archived_at: string | null;
+  snooze_until: string | null;
+  rarely_responds: number;
+  reminders_off: number;
+  created_at: string;
+  modified_at: string;
+  /** The joined `categories.name`, or null when `category_id` is null. */
+  category_label: string | null;
+}
+
+/** The assembled edit-form initial values (§14.10 read layer). */
+export interface ContactForEdit {
+  contact: ContactEditRow;
+  categoryLabel: string | null;
+  values: Record<string, string | null>;
+}
+
+/**
+ * Assemble the edit form's initial values (§14.10 read layer): the full `contacts`
+ * row (incl. `last_contact`, so the form can decide whether to surface the
+ * last-spoke control for a never-contacted contact) + the category label + the
+ * contact's custom-value map (every non-quarantined field via `defsForEditForm`).
+ * Returns null for a missing id.
+ *
+ * NOTE the `WHERE c.id = ?` seek INTENTIONALLY does NOT filter `archived_at IS
+ * NULL`: an archived contact stays reachable only by future/direct routes (a deep
+ * link or a later phase) — no Phase-4 surface routes to an archived profile/edit,
+ * so a blanket archived filter is unnecessary here (archived-read reconciliation,
+ * Plan 05). Any NEW live/list surface must still filter `archived_at IS NULL`.
+ *
+ * Pure read (NO transaction); every value `?`-bound; the LEFT JOIN interpolates no
+ * identifier.
+ */
+export async function getContactForEdit(
+  exec: SqlExecutor,
+  contactId: number,
+  defs: CustomFieldDef[],
+): Promise<ContactForEdit | null> {
+  const contact = await exec.getFirstAsync<ContactEditRow>(
+    `SELECT c.*, cat.name AS category_label
+       FROM contacts c
+       LEFT JOIN categories cat ON cat.id = c.category_id
+      WHERE c.id = ?`,
+    [contactId],
+  );
+  if (!contact) {
+    return null;
+  }
+  const values = await getValuesForContact(
+    exec,
+    contactId,
+    defsForEditForm(defs),
+  );
+  return {
+    contact,
+    categoryLabel: contact.category_label ?? null,
+    values,
+  };
 }
