@@ -133,6 +133,14 @@ const DEFAULT_CONNECTED = 1;
  * contact is `rarely_responds` — and refreshes `modified_at`. No qualifying row
  * yields NULL. This is the ONLY statement in the codebase that writes
  * `contacts.last_contact`.
+ *
+ * NON-REENTRANCY (mirrors transaction.ts): this is a non-mutexed CORE — call it
+ * ONLY inside an already-open `inWriteTransaction`. It is exported as
+ * `recomputeLastContactCore` (below) so the Plan-02 `createContactFull`
+ * composition can invoke it inside the ONE outer transaction WITHOUT nesting the
+ * non-reentrant mutex (mutex.ts:32-36 → a nested `inWriteTransaction` is a
+ * PERMANENT hang). Invoking it bare, outside an open transaction, writes
+ * `last_contact` outside the single-writer mutex and defeats DATA-04.
  */
 async function recomputeLastContact(
   exec: SqlExecutor,
@@ -328,3 +336,18 @@ export function createContactWithInteraction(
     return { contactId, interactionId };
   });
 }
+
+/**
+ * NON-mutexed CORE exports (Plan 02 composition primitives). These are the same
+ * private functions the wrappers above call — aliased, NOT renamed, so the four
+ * internal call sites (`recordTouchpoint` / `editTouchpoint` / `deleteTouchpoint`
+ * / `createContactWithInteraction`) stay untouched. They assume BEGIN is already
+ * open and take NO mutex: call them ONLY inside an already-open
+ * `inWriteTransaction` (never bare, never nested — see the non-reentrancy note on
+ * `recomputeLastContact` and in transaction.ts). `createContactFull` composes
+ * both inside its ONE outer transaction.
+ */
+export {
+  recomputeLastContact as recomputeLastContactCore,
+  insertInteraction as insertInteractionCore,
+};

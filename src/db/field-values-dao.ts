@@ -104,17 +104,44 @@ export function upsertValue(
   value: string | null,
   now: string,
 ): Promise<void> {
-  return inWriteTransaction(exec, async () => {
-    assertSafeCol(colName);
-    const col = `"${colName}"`;
-    await exec.runAsync(
+  return inWriteTransaction(exec, () =>
+    upsertValueCore(exec, contactId, uid, colName, value, now),
+  );
+}
+
+/**
+ * NON-mutexed UPSERT core (Plan 02 composition primitive). The body of
+ * `upsertValue` MINUS its `inWriteTransaction` wrapper — it assumes BEGIN is
+ * ALREADY open and takes NO mutex, so `createContactFull` can call it inside its
+ * ONE outer transaction WITHOUT nesting the non-reentrant mutex (a nested
+ * `inWriteTransaction` is a PERMANENT hang — see transaction.ts). Call it ONLY
+ * inside an already-open transaction; the public `upsertValue` is the standalone
+ * entry for callers that hold no transaction.
+ *
+ * `uid` is the per-contact ROW uid (UID CONTRACT above): written on INSERT only;
+ * the `ON CONFLICT(contact_id) DO UPDATE` branch never rewrites it. `col_name` is
+ * the ONLY interpolated identifier (guarded + double-quoted); every runtime value
+ * is `?`-bound.
+ */
+export function upsertValueCore(
+  exec: SqlExecutor,
+  contactId: number,
+  uid: string,
+  colName: string,
+  value: string | null,
+  now: string,
+): Promise<void> {
+  assertSafeCol(colName);
+  const col = `"${colName}"`;
+  return exec
+    .runAsync(
       `INSERT INTO contact_custom_values (contact_id, uid, modified_at, ${col})
        VALUES (?, ?, ?, ?)
        ON CONFLICT(contact_id) DO UPDATE
          SET ${col} = excluded.${col}, modified_at = excluded.modified_at`,
       [contactId, uid, now, value],
-    );
-  });
+    )
+    .then(() => undefined);
 }
 
 // --- Pure visibility selectors (HANDOFF §14.7) -------------------------------
