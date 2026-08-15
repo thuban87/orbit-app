@@ -1,4 +1,5 @@
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
+import type { PhotoTargetDescriptor } from "@/services/photos/photo-storage";
 
 /**
  * The single route → params contract for the app's native-stack navigator
@@ -24,6 +25,18 @@ export type RootStackParamList = {
   Profile: { contactId: number };
   Edit: { contactId: number };
   Archived: undefined;
+  /**
+   * The in-app Skia crop screen (PHOTO-01). Params are SERIALIZABLE only — a raw
+   * cache URI to crop, a target descriptor object, and (customField only) a
+   * serializable `requestId` correlation key so Plan 08's widget can match the
+   * published crop-success to the awaiting field. NO callback params (native-stack
+   * serialization + deep-link safety); contact/profile leave `requestId` undefined.
+   */
+  CropPhoto: {
+    rawUri: string;
+    target: PhotoTargetDescriptor;
+    requestId?: string;
+  };
 };
 
 /**

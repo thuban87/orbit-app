@@ -2,6 +2,7 @@ import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { ArchivedContactsScreen } from "@/screens/ArchivedContactsScreen";
 import { ContactProfileScreen } from "@/screens/ContactProfileScreen";
 import { CreateContactScreen } from "@/screens/CreateContactScreen";
+import { CropPhotoScreen } from "@/screens/CropPhotoScreen";
 import { CustomFieldsScreen } from "@/screens/CustomFieldsScreen";
 import { EditContactScreen } from "@/screens/EditContactScreen";
 import { HomeScreen } from "@/screens/HomeScreen";
@@ -56,6 +57,7 @@ export function RootNavigator() {
       <Stack.Screen name="Profile" component={ContactProfileScreen} />
       <Stack.Screen name="Edit" component={EditContactScreen} />
       <Stack.Screen name="Archived" component={ArchivedContactsScreen} />
+      <Stack.Screen name="CropPhoto" component={CropPhotoScreen} />
     </Stack.Navigator>
   );
 }
