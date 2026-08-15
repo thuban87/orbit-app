@@ -26,6 +26,7 @@ import DateTimePicker, {
   type DateTimePickerEvent,
 } from "@react-native-community/datetimepicker";
 import { Picker } from "@react-native-picker/picker";
+import { useFocusEffect } from "@react-navigation/native";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Alert,
@@ -39,6 +40,7 @@ import {
 } from "react-native";
 import { FieldValueInput } from "@/components/FieldValueInput";
 import { FrequencyPicker } from "@/components/FrequencyPicker";
+import { PhotoSourcePicker } from "@/components/PhotoSourcePicker";
 import { type LinkDraft, LinksEditor } from "@/components/LinksEditor";
 import { TriStateLastSpoke } from "@/components/TriStateLastSpoke";
 import type { LastSpokeValue } from "@/components/tri-state-last-spoke-logic";
@@ -49,6 +51,7 @@ import {
 } from "@/db/contact-links-dao";
 import {
   getContactForEdit,
+  getContactHeader,
   isDuplicateName,
   listCategories,
 } from "@/db/contact-read";
@@ -139,6 +142,14 @@ export function EditContactScreen({
   const [neverContacted, setNeverContacted] = useState(false);
   const [showBirthdayPicker, setShowBirthdayPicker] = useState(false);
   const [saving, setSaving] = useState(false);
+  // Photo held as SEPARATE screen state — NOT in EditFormState. The photo is
+  // written IMMEDIATELY through its own dedicated setContactPhoto/clearContactPhoto
+  // DAO (RESEARCH Pitfall 6: updateContactMetadataCore deliberately omits `photo`),
+  // never through the metadata Save path. Keeping it out of EditFormState keeps
+  // buildEditInput/updateContactFull clean AND lets the focus re-read update only
+  // the photo without reseeding — and discarding — unsaved form edits.
+  const [photo, setPhoto] = useState<string | null>(null);
+  const [photoModifiedAt, setPhotoModifiedAt] = useState<string | undefined>();
 
   const load = useCallback(async () => {
     try {
@@ -156,6 +167,8 @@ export function EditContactScreen({
       setEditDefs(defsForEditForm(defs));
       setNeverContacted(isNeverContacted(result));
       setForm(seedEditState(result));
+      setPhoto(result.contact.photo);
+      setPhotoModifiedAt(result.contact.modified_at);
       setSeededLinks(result.links);
       setLinksDraft(toLinkDrafts(result.links));
     } catch (err) {
@@ -167,6 +180,28 @@ export function EditContactScreen({
   useEffect(() => {
     void load();
   }, [load]);
+
+  // LIGHT photo-only re-read: refresh ONLY the photo + its cache-bust token, never
+  // the form. Wired to `useFocusEffect` so returning from CropPhotoScreen (which
+  // writes setContactPhoto then goBack()s) updates the edit-surface avatar WITHOUT
+  // calling load() — reseeding `form` would DISCARD the user's unsaved name/phone/
+  // etc. edits. Also fired by the picker's `onChanged` (its Remove branch writes
+  // the DAO inline).
+  const refreshPhoto = useCallback(async () => {
+    try {
+      const row = await getContactHeader(getExecutor(), contactId);
+      setPhoto(row?.photo ?? null);
+      setPhotoModifiedAt(row?.modified_at);
+    } catch (err) {
+      Logger.error(LOG_SCOPE, "failed to refresh photo", err);
+    }
+  }, [contactId]);
+
+  useFocusEffect(
+    useCallback(() => {
+      void refreshPhoto();
+    }, [refreshPhoto]),
+  );
 
   // Narrow, typed field setter so each control mutates one key immutably.
   const setField = useCallback(
@@ -352,6 +387,22 @@ export function EditContactScreen({
         >
           Edit contact
         </Text>
+      </View>
+
+      {/* Photo (edit-only — contactId always exists here). Held as SEPARATE state,
+          written through its own DAO by PhotoSourcePicker/CropPhotoScreen, refreshed
+          via the photo-only useFocusEffect above — never through the metadata Save. */}
+      <View style={styles.field}>
+        <Text style={[styles.label, { color: colors.textSecondary }]}>
+          Photo
+        </Text>
+        <PhotoSourcePicker
+          target={{ kind: "contact", contactId }}
+          photo={photo}
+          name={form.name}
+          cacheBust={photoModifiedAt}
+          onChanged={refreshPhoto}
+        />
       </View>
 
       {/* -- Fixed block. Surfaces frequency + last-spoke + phone first (UI-SPEC
