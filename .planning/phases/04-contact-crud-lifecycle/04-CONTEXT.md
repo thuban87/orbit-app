@@ -73,6 +73,20 @@ widget), `ring_seq` drag + sun assignment (orrery).
   helper "Attempts to reach out won't reset their orbit"; profile renders
   "Rarely responds · attempts don't reset the orbit."
 
+### Navigation shell (resolved during planning, 2026-08-14 — owner)
+- Phase 4 introduces the app's **real navigation shell** using **`@react-navigation/native` with the
+  native-stack navigator** (owner-approved). This fulfills the Phase-3 forward note
+  (`HomeScreen.tsx`: "Phase 4 introduces the real navigation shell") and the dossier's platform
+  workpapers, which design against `@react-navigation/native` by name (`useFocusEffect`,
+  `useIsFocused`, navigator deep-link reset for dashboard/orrery/widget). Reverses nothing — the
+  prior "dependency-free routing" was an explicitly temporary Phase-1→3 state.
+- Adds native deps (`react-native-screens`, `react-native-safe-area-context`) via `npx expo install`;
+  requires a native rebuild through the desktop pipeline. Install via `expo install` (not bare npm).
+- The existing hand-rolled `HomeScreen` `useState` route is migrated into the navigator; the
+  Custom-Fields reachability route relocates into a Settings stack alongside the new Archived-contacts
+  screen. `rejected: expo-router` (larger file-based refactor for the same engine), `rejected:
+  keep hand-rolled` (reinvents back-stack/params for 15+ screens).
+
 ### Claude's Discretion (deferred to planning by 06-crud)
 - Single-renderer-vs-two-sections form architecture (fixed columns need widgets the 7-type
   `FieldType` union can't express: category-over-live-table, `interval_days`, partial-date birthday,
