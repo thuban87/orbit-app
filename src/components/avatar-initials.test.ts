@@ -9,7 +9,11 @@
  * so this module emits an INDEX only — no colour ever leaves it.
  */
 import { describe, expect, it } from "vitest";
-import { getInitials, hashName, swatchIndex } from "@/components/avatar-initials";
+import {
+  getInitials,
+  hashName,
+  swatchIndex,
+} from "@/components/avatar-initials";
 
 describe("getInitials — first char of first two words, uppercased, sliced to 2", () => {
   it("two-word name → both initials", () => {
@@ -71,7 +75,9 @@ describe("swatchIndex — in [0, count) and stable per name", () => {
   });
 
   it("is whitespace-insensitive at the edges (trims before hashing)", () => {
-    expect(swatchIndex("  Ada Lovelace  ", 8)).toBe(swatchIndex("Ada Lovelace", 8));
+    expect(swatchIndex("  Ada Lovelace  ", 8)).toBe(
+      swatchIndex("Ada Lovelace", 8),
+    );
   });
 
   it("an empty name maps to index 0 (the neutral swatch)", () => {

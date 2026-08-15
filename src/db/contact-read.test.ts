@@ -39,20 +39,25 @@ beforeEach(async () => {
   await runMigrations(exec, [migration001], 1, { now: NOW, newUid: uid });
 });
 
-/** Insert a bare contact row (optionally archived / rarely_responds) and return its id. */
+/** Insert a bare contact row (optionally archived / rarely_responds / photo) and return its id. */
 async function makeContact(
   name: string,
-  opts: { archived?: boolean; rarelyResponds?: number } = {},
+  opts: {
+    archived?: boolean;
+    rarelyResponds?: number;
+    photo?: string | null;
+  } = {},
 ): Promise<number> {
   const r = await exec.runAsync(
     `INSERT INTO contacts
-       (uid, name, interval_days, rarely_responds, archived_at, created_at, modified_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+       (uid, name, interval_days, rarely_responds, photo, archived_at, created_at, modified_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       uid(),
       name,
       30,
       opts.rarelyResponds ?? 0,
+      opts.photo ?? null,
       opts.archived ? NOW : null,
       NOW,
       NOW,
@@ -112,6 +117,17 @@ describe("getContactHeader — by-id light read (archived-reachable by design)",
     expect(header?.name).toBe("Priya");
     expect(header?.rarely_responds).toBe(1);
     expect(header?.archived_at).toBeNull();
+    // The Avatar-backing fields (Plan 05-03): a photo-less contact returns null
+    // photo, and modified_at is present (the cross-session cache-bust token).
+    expect(header?.photo).toBeNull();
+    expect(header?.modified_at).toBe(NOW);
+  });
+
+  it("returns the stored relative photo path for a photo-bearing contact (PHOTO-04)", async () => {
+    const id = await makeContact("Framed", { photo: "avatars/contact-1.jpg" });
+    const header = await getContactHeader(exec, id);
+    expect(header?.photo).toBe("avatars/contact-1.jpg");
+    expect(header?.modified_at).toBe(NOW);
   });
 
   it("loads an archived contact by id (no archived filter on this by-id seek)", async () => {

@@ -70,14 +70,25 @@ export function getContactHeader(
   name: string;
   rarely_responds: number;
   archived_at: string | null;
+  /** Stored RELATIVE photo path (`avatars/…`), or null — the Avatar `photo` prop. */
+  photo: string | null;
+  /**
+   * Second-resolution row timestamp — the cross-session cache-bust token the
+   * profile passes to `<Avatar cacheBust={…}>`. The sub-second collision (two
+   * replaces in one wall-clock second) is closed separately by the per-write
+   * revision in `photo-cache-bust-store`.
+   */
+  modified_at: string;
 } | null> {
   return exec.getFirstAsync<{
     id: number;
     name: string;
     rarely_responds: number;
     archived_at: string | null;
+    photo: string | null;
+    modified_at: string;
   }>(
-    "SELECT id, name, rarely_responds, archived_at FROM contacts WHERE id = ?",
+    "SELECT id, name, rarely_responds, archived_at, photo, modified_at FROM contacts WHERE id = ?",
     [contactId],
   );
 }

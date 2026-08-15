@@ -28,6 +28,7 @@ import {
   Text,
   View,
 } from "react-native";
+import { Avatar } from "@/components/Avatar";
 import { OverflowMenu } from "@/components/OverflowMenu";
 import { getContactHeader } from "@/db/contact-read";
 import { archiveContact } from "@/db/contacts-dao";
@@ -44,6 +45,10 @@ type Header = {
   name: string;
   rarely_responds: number;
   archived_at: string | null;
+  /** Stored relative photo path (`avatars/…`) or null — drives the Avatar. */
+  photo: string | null;
+  /** Second-resolution row timestamp — the Avatar's cross-session cache-bust. */
+  modified_at: string;
 };
 
 export function ContactProfileScreen({
@@ -105,6 +110,14 @@ export function ContactProfileScreen({
         >
           <Text style={{ color: colors.textSecondary }}>Back</Text>
         </Pressable>
+
+        <Avatar
+          photo={header?.photo ?? null}
+          name={header?.name ?? ""}
+          contactId={contactId}
+          cacheBust={header?.modified_at}
+          size={64}
+        />
 
         <Text
           testID="contact-profile-name"
