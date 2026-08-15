@@ -27,7 +27,7 @@ import DateTimePicker, {
 } from "@react-native-community/datetimepicker";
 import { Picker } from "@react-native-picker/picker";
 import { useFocusEffect } from "@react-navigation/native";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert,
   Pressable,
@@ -62,6 +62,8 @@ import type { CustomFieldDef } from "@/db/field-types";
 import { defsForEditForm } from "@/db/field-values-dao";
 import { newUid } from "@/db/uid";
 import type { RootStackScreenProps } from "@/navigation/types";
+import { deletePhoto } from "@/services/photos/photo-storage";
+import { takeStagedPhotos } from "@/stores/photo-result-store";
 import { useTheme } from "@/theme";
 import { parseDate } from "@/types";
 import { formatLocalDate } from "@/utils/dates";
@@ -150,6 +152,13 @@ export function EditContactScreen({
   // the photo without reseeding — and discarding — unsaved form edits.
   const [photo, setPhoto] = useState<string | null>(null);
   const [photoModifiedAt, setPhotoModifiedAt] = useState<string | undefined>();
+  // The custom-field values actually COMMITTED to the DB — seeded pre-edit, and
+  // updated on a successful Save. The teardown reconcile (below) deletes only the
+  // staged cv- files this session persisted that NO committed value references, so
+  // it can never delete a saved photo (a re-crop-in-place path equals its
+  // committed value → referenced → kept). A ref so the unmount cleanup reads the
+  // latest committed set, not a stale render closure.
+  const committedValuesRef = useRef<Record<string, string | null>>({});
 
   const load = useCallback(async () => {
     try {
@@ -167,6 +176,8 @@ export function EditContactScreen({
       setEditDefs(defsForEditForm(defs));
       setNeverContacted(isNeverContacted(result));
       setForm(seedEditState(result));
+      // The committed baseline for orphan cleanup: the pre-edit custom values.
+      committedValuesRef.current = { ...result.values };
       setPhoto(result.contact.photo);
       setPhotoModifiedAt(result.contact.modified_at);
       setSeededLinks(result.links);
@@ -202,6 +213,34 @@ export function EditContactScreen({
       void refreshPhoto();
     }, [refreshPhoto]),
   );
+
+  // ORPHAN CLEANUP (review cycle-2 MED custom-field orphan): a custom photo crop
+  // persists its ~40 KB cv- master to disk BEFORE Save commits the field value, so
+  // a Cancel / back-out / failed Save would leak it. On unmount, drain the staged
+  // ledger and delete ONLY the staged files no COMMITTED value references — the
+  // same "delete only files no committed row references" invariant purge (05-07)
+  // uses, so a saved photo is NEVER deleted (a re-crop-in-place path equals its
+  // committed value → referenced → kept). "If uncertain, don't delete": a missed
+  // cleanup is bounded (self-healing on re-crop + purge-cleaned by 05-07), an
+  // erroneous delete of a referenced file is not. Runs once, on real unmount.
+  useEffect(() => {
+    return () => {
+      const staged = takeStagedPhotos();
+      if (staged.length === 0) {
+        return;
+      }
+      const committed = new Set(
+        Object.values(committedValuesRef.current).filter(
+          (v): v is string => v != null,
+        ),
+      );
+      for (const relPath of staged) {
+        if (!committed.has(relPath)) {
+          deletePhoto(relPath);
+        }
+      }
+    };
+  }, []);
 
   // Narrow, typed field setter so each control mutates one key immutably.
   const setField = useCallback(
@@ -244,6 +283,7 @@ export function EditContactScreen({
         setEditDefs(defsForEditForm(defs));
         setNeverContacted(isNeverContacted(result));
         setForm(seedEditState(result));
+        committedValuesRef.current = { ...result.values };
         // seededLinks is unchanged: applyLinkDiff rolled back, so the DB links
         // still equal the original baseline — keep it as the retry diff baseline.
       }
@@ -287,6 +327,10 @@ export function EditContactScreen({
         Alert.alert("Couldn't save contact. Please try again.");
         return;
       }
+
+      // Custom values (incl. any cv- photo path) are now COMMITTED — update the
+      // orphan-cleanup baseline so the teardown reconcile keeps the saved photo.
+      committedValuesRef.current = { ...form.values };
 
       // Metadata (incl. the first interaction) is now COMMITTED and last_contact
       // is set. Clear the never-contacted first-interaction intent in LOCAL STATE
@@ -659,6 +703,7 @@ export function EditContactScreen({
               <FieldValueInput
                 testID={`edit-contact-custom-${def.col_name}`}
                 field={def}
+                contactId={contactId}
                 value={form.values[def.col_name] ?? null}
                 onChange={(v) =>
                   setForm((prev) =>

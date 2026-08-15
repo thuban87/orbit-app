@@ -67,6 +67,7 @@ import {
   PhotoPipelineError,
 } from "@/services/photos/photo-pipeline";
 import { bumpPhotoCacheBust } from "@/stores/photo-cache-bust-store";
+import { publishCropResult } from "@/stores/photo-result-store";
 import { useTheme } from "@/theme";
 import { Logger } from "@/utils/logger";
 
@@ -289,10 +290,15 @@ export function CropPhotoScreen({
       } else if (target.kind === "profile") {
         await setProfilePhoto(exec, relative, now);
         bumpPhotoCacheBust(relative);
+      } else if (target.kind === "customField" && route.params.requestId) {
+        // customField: the master is already persisted at its derivable cv- path;
+        // no DB write here (the field value is set through the edit form's Save).
+        // Publish the crop-success on the serializable requestId (the cv- relPath)
+        // so the awaiting widget sets its value on focus, and bump the cache-bust
+        // token (requestId IS the relPath) so a same-second re-crop redecodes.
+        publishCropResult(route.params.requestId, true);
+        bumpPhotoCacheBust(route.params.requestId);
       }
-      // customField: the master is already persisted at its derivable cv- path;
-      // no DB write here (the field value is set through the edit form's Save).
-      // `route.params.requestId` is carried through untouched for Plan 08.
       navigation.goBack();
     } catch (err) {
       Logger.error(LOG_SCOPE, "failed to save cropped photo", err);

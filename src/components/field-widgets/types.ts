@@ -13,12 +13,23 @@
 export interface FieldWidgetProps {
   /** The stored TEXT value (or `null`/`""` when absent). */
   value: string | null;
-  /** Emits the raw string on edit — never a coerced/typed value. */
-  onChange: (value: string) => void;
+  /**
+   * Emits the value on edit — never a coerced/typed value. `string | null` so the
+   * photo widget's Remove can emit `onChange(null)` to clear the field; the other
+   * six widgets only ever pass a `string`, which this wider signature accepts.
+   */
+  onChange: (value: string | null) => void;
   /** Accessibility label for uiautomator verification at the --to 3 gate. */
   label: string;
   /** Parsed option list — dropdown only; ignored by other widgets. */
   options?: string[];
+  /**
+   * The contact being edited — photo widget ONLY (edit-only gate + derivable
+   * `cv-` filename). Undefined on the create form / def preview → disabled.
+   */
+  contactId?: number;
+  /** The field's stable `col_name` — photo widget ONLY (derivable filename). */
+  colName?: string;
   /** Stable testID mirroring the `HomeScreen` verification pattern. */
   testID?: string;
 }

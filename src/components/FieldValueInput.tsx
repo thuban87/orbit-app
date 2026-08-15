@@ -19,13 +19,23 @@ import { TextAreaFieldWidget } from "./field-widgets/TextAreaFieldWidget";
 import { TextFieldWidget } from "./field-widgets/TextFieldWidget";
 import { ToggleFieldWidget } from "./field-widgets/ToggleFieldWidget";
 
-/** The minimal DEFS shape the dispatcher reads. */
-type FieldSpec = Pick<CustomFieldDef, "type" | "label" | "options">;
+/**
+ * The minimal DEFS shape the dispatcher reads. `col_name` is OPTIONAL: the edit/
+ * create forms pass a full `CustomFieldDef` (which has it, and the photo case
+ * needs it), but `FieldDefForm`'s throwaway `previewField` literal has no
+ * col_name — keeping it optional lets that preview keep compiling unchanged.
+ */
+type FieldSpec = Pick<CustomFieldDef, "type" | "label" | "options"> & {
+  col_name?: string;
+};
 
 export interface FieldValueInputProps {
   field: FieldSpec;
   value: string | null;
-  onChange: (value: string) => void;
+  /** `string | null` so the photo widget's Remove can clear via `onChange(null)`. */
+  onChange: (value: string | null) => void;
+  /** The contact being edited — forwarded to the photo widget ONLY (edit-only). */
+  contactId?: number;
   testID?: string;
 }
 
@@ -50,6 +60,7 @@ export function FieldValueInput({
   field,
   value,
   onChange,
+  contactId,
   testID,
 }: FieldValueInputProps) {
   const shared = { value, onChange, label: field.label, testID };
@@ -71,7 +82,15 @@ export function FieldValueInput({
     case "number":
       return <NumberFieldWidget {...shared} />;
     case "photo":
-      return <PhotoFieldWidget {...shared} />;
+      // Photo ONLY: thread contactId + col_name so the widget is edit-gated and
+      // can derive its stable `cv-` filename. Every other case ignores them.
+      return (
+        <PhotoFieldWidget
+          {...shared}
+          contactId={contactId}
+          colName={field.col_name}
+        />
+      );
     default:
       return <TextFieldWidget {...shared} />;
   }
