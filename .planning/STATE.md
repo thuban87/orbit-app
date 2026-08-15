@@ -5,15 +5,15 @@ milestone_name: milestone
 current_phase: 6
 current_phase_name: Interaction Log, Status & Impact
 status: ready
-stopped_at: Completed 06-01-PLAN.md
-last_updated: "2026-08-15T20:01:38.880Z"
+stopped_at: Completed 06-02-PLAN.md
+last_updated: "2026-08-15T20:12:55.995Z"
 last_activity: 2026-08-15
-last_activity_desc: Phase 6 execution started
+last_activity_desc: Completed 06-02 (events writer + interleaved timeline)
 progress:
   total_phases: 16
   completed_phases: 5
   total_plans: 42
-  completed_plans: 37
+  completed_plans: 39
   percent: 31
 ---
 
@@ -29,8 +29,8 @@ See: .planning/PROJECT.md (updated 2026-08-14)
 ## Current Position
 
 Phase: 6 (Interaction Log, Status & Impact) — EXECUTING
-Next: `/gsd-verify-work 5` then `/gsd-plan-phase 6` (or resume autonomous from Phase 6)
-Last activity: 2026-08-15 — Phase 6 execution started
+Next: continue Phase 6 (execute next plan) then `/gsd-verify-work 6`
+Last activity: 2026-08-15 — Completed 06-02 (events writer + interleaved timeline)
 
 Progress: [███░░░░░░░] 31% (5/16 phases complete)
 
@@ -92,6 +92,7 @@ Progress: [███░░░░░░░] 31% (5/16 phases complete)
 | Phase 05-photos P06 | 4min | 2 tasks | 4 files |
 | Phase 05-photos P08 | 14min | 2 tasks | 8 files |
 | Phase 6 P01 | 10min | 2 tasks | 5 files |
+| Phase 06 P02 | 12min | 3 tasks | 10 files |
 
 ## Accumulated Context
 
@@ -158,6 +159,7 @@ Foundational decisions affecting current work:
 - [Phase 05]: 05-05: EditContactScreen holds photo as SEPARATE screen state (NOT EditFormState; edit-contact-logic.ts intentionally untouched — metadata Save omits photo per RESEARCH Pitfall 6); a photo-only useFocusEffect getContactHeader re-read refreshes the avatar after crop WITHOUT reseeding/discarding unsaved form edits
 - [Phase 05]: 05-07: purge photo cleanup (buildPhotoPurgeCleanup) is the onPurgeExtensions adapter — POST-COMMIT it rebuilds filenames from contactId alone (rows already deleted): main contact-<id>.jpg + one cv-<id>-<col>.jpg per surviving photo def. listDefs(exec, { includeQuarantined: true }) is REQUIRED so a purge during a photo field's quarantine window still deletes its cv- file (PHOTO-05, no leak); idempotent + internally error-resilient; registered at the Archived-list purge without touching the two-stage guard
 - [Phase 05]: 05-06: url-image.downloadImageToCache uses fetch (NOT File.downloadFileAsync — it exposes neither headers nor the final redirect URL); isImageUrl is an https-ONLY scheme allowlist (extension NOT required — image/* content-type is the authoritative gate) applied to BOTH the submitted URL and the redirect-resolved response.url; byte cap is stream-enforced (reader.cancel at cap) with an absent/invalid/over-cap content-length up-front + post-read re-verify fallback; bytes land in the evictable cache subdir, never the document dir; the raw cache uri then feeds the identical crop pipeline (one-time WRITE, no read-path network). Settings "Your photo" seeds from getProfile with a stable 'You' fallback (never a blank swatch), reloads on focus, and reuses Plan 05's profile-target Remove (no Settings-side Remove, no contactId)
+- [Phase 06]: 06-02: events-dao is immutable insert-only (recordEvent/recordEventCore, no update path); archive/restore emit events composed inside their existing transaction, archived-state-guarded so a no-op/wrong-state transition throws and writes no spurious event; purge surfaces+deletes events; timeline UNION-ALL interleave keyed ${kind}-${id} with kind_order final tiebreak — LOG-02 events writer + read half; single-writer DATA-04 intact (no last_contact write added)
 
 ### Pending Todos
 
@@ -193,8 +195,8 @@ planning" sections in docs/dossier/*.md — those are the authoritative hand-off
 
 ## Session
 
-**Last session:** 2026-08-15T20:01:38.869Z
-**Stopped at:** Completed 06-01-PLAN.md
+**Last session:** 2026-08-15T20:12:34.468Z
+**Stopped at:** Completed 06-02-PLAN.md
 **Resume file:** None
 
 ## Phase 4 — Closeout (2026-08-15) ✅ COMPLETE
