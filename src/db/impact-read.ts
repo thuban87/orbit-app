@@ -36,42 +36,53 @@ export interface ImpactInputs {
  * `direction`) ordered `occurred_at DESC, id DESC` for a deterministic order
  * (the id tiebreak makes identical-timestamp rows stable). Returns null when the
  * contact row is missing; an empty interactions array when the contact exists
- * but has no touchpoints (never throws). Two read-only `?`-bound SELECTs, no
- * transaction.
+ * but has no touchpoints (never throws).
+ *
+ * MED-2 SINGLE-SNAPSHOT: policy (interval_days / rarely_responds) and the
+ * interaction history are read in ONE `?`-bound `LEFT JOIN` statement, not two
+ * un-transactioned SELECTs. A concurrent write (a touchpoint insert, or an
+ * `updateContactFull` flipping `rarely_responds`) committing BETWEEN two separate
+ * reads would otherwise yield a mixed-state input set until the next refresh;
+ * one statement guarantees gravity and intensity see a consistent snapshot. Still
+ * read-only — no write, no transaction; the `LEFT JOIN` preserves the "contact
+ * exists but has no interactions" case as a single row whose interaction columns
+ * are NULL (filtered out below), distinct from a missing contact (zero rows).
  */
 export async function getImpactInputs(
   exec: SqlExecutor,
   contactId: number,
 ): Promise<ImpactInputs | null> {
-  const contact = await exec.getFirstAsync<{
+  const rows = await exec.getAllAsync<{
     interval_days: number;
     rarely_responds: number;
-  }>("SELECT interval_days, rarely_responds FROM contacts WHERE id = ?", [
-    contactId,
-  ]);
-  if (!contact) {
-    return null;
-  }
-
-  const rows = await exec.getAllAsync<{
-    occurred_at: string;
-    connected: number;
+    occurred_at: string | null;
+    connected: number | null;
     direction: string | null;
   }>(
-    `SELECT occurred_at, connected, direction
-       FROM interactions
-      WHERE contact_id = ?
-      ORDER BY occurred_at DESC, id DESC`,
+    `SELECT c.interval_days, c.rarely_responds,
+            i.occurred_at, i.connected, i.direction
+       FROM contacts c
+       LEFT JOIN interactions i ON i.contact_id = c.id
+      WHERE c.id = ?
+      ORDER BY i.occurred_at DESC, i.id DESC`,
     [contactId],
   );
 
+  // Zero rows → no such contact. One-or-more rows → the contact exists; a lone
+  // row with a NULL occurred_at is the no-interactions case (LEFT JOIN filler).
+  if (rows.length === 0) {
+    return null;
+  }
+
   return {
-    intervalDays: contact.interval_days,
-    rarelyResponds: contact.rarely_responds,
-    interactions: rows.map((r) => ({
-      occurredAt: r.occurred_at,
-      connected: r.connected,
-      direction: r.direction,
-    })),
+    intervalDays: rows[0].interval_days,
+    rarelyResponds: rows[0].rarely_responds,
+    interactions: rows
+      .filter((r) => r.occurred_at !== null)
+      .map((r) => ({
+        occurredAt: r.occurred_at as string,
+        connected: r.connected as number,
+        direction: r.direction,
+      })),
   };
 }

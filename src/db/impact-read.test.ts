@@ -150,6 +150,46 @@ describe("getImpactInputs — the shared impact-inputs read", () => {
     expect(inputs).toBeNull();
   });
 
+  it("returns policy + interactions together as one consistent snapshot (MED-2 shape unchanged)", async () => {
+    // The single LEFT JOIN must still yield the exact ImpactInputs shape both
+    // gravity and intensity consume: policy fields from the contact row, plus the
+    // full interaction list, from ONE read.
+    const c = await makeContact(45, 1);
+    await recordTouchpoint(exec, {
+      contactId: c,
+      uid: uid(),
+      occurredAt: "2026-05-01 10:00:00",
+      now: NOW,
+      direction: "outbound",
+      connected: 1,
+    });
+    await recordTouchpoint(exec, {
+      contactId: c,
+      uid: uid(),
+      occurredAt: "2026-07-01 10:00:00",
+      now: NOW,
+      direction: "mutual",
+      connected: 0,
+    });
+    const inputs = await getImpactInputs(exec, c);
+    expect(inputs).toEqual({
+      intervalDays: 45,
+      rarelyResponds: 1,
+      interactions: [
+        {
+          occurredAt: "2026-07-01 10:00:00",
+          connected: 0,
+          direction: "mutual",
+        },
+        {
+          occurredAt: "2026-05-01 10:00:00",
+          connected: 1,
+          direction: "outbound",
+        },
+      ],
+    });
+  });
+
   it("preserves a null direction (the DAO does not coerce it)", async () => {
     const c = await makeContact();
     // recordTouchpoint defaults direction to null when not passed.
