@@ -6,14 +6,14 @@ current_phase: 3
 current_phase_name: Custom Fields
 status: executing
 stopped_at: Completed 02-01-PLAN.md
-last_updated: "2026-08-15T02:09:46.599Z"
+last_updated: "2026-08-15T02:16:59.808Z"
 last_activity: 2026-08-15
 last_activity_desc: Phase 3 execution started
 progress:
   total_phases: 16
   completed_phases: 2
   total_plans: 19
-  completed_plans: 16
+  completed_plans: 17
   percent: 13
 ---
 
@@ -29,7 +29,7 @@ See: .planning/PROJECT.md (updated 2026-08-14)
 ## Current Position
 
 Phase: 3 (Custom Fields) — EXECUTING
-Plan: 6 of 8
+Plan: 7 of 8
 Status: Ready to execute
 Last activity: 2026-08-15 — Phase 3 execution started
 
@@ -72,6 +72,7 @@ Progress: [████████░░] 82%
 | Phase 03-custom-fields P03 | 4 min | 2 tasks | 4 files |
 | Phase 03-custom-fields P04 | 8min | 2 tasks | 2 files |
 | Phase 03 P05 | 12min | 2 tasks | 2 files |
+| Phase 03-custom-fields P06 | 3min | 2 tasks | 10 files |
 
 ## Accumulated Context
 
@@ -106,6 +107,9 @@ Foundational decisions affecting current work:
 - [Phase ?]: 03-04: upsertValue runs inside the shared inWriteTransaction (serialized with DDL/sweep), keyed on contact_id; uid is the per-contact ROW uid, written on INSERT only
 - [Phase ?]: 03-04: custom-field visibility — profile=value-present OR always_show, create=show_on_new, edit=all non-quarantined; quarantined hidden everywhere (§14.7)
 - [Phase 03]: Type change is ONE UPDATE custom_field_defs SET type + same-txn field_history snapshot; contact_custom_values value bytes never rewritten (FLD-04, T-03-02) — §14.2 blast-radius-zero invariant; unconvertible values flagged at read time, never coerced or cleared
+- [Phase ?]: Custom-field value widgets stay controlled over TEXT storage; canonicalisation/flagging lives in the parser layer, not the UI (T-03-04)
+- [Phase ?]: Dropdown built from Pressable+Modal+FlatList (zero picker deps); modal scrim is colors.background at opacity to avoid a colour literal
+- [Phase ?]: Tap-to-fix error emphasis composed from accent+borderStrong; no dedicated error token yet (owner may add at --to 3 gate)
 
 ### Pending Todos
 
@@ -141,6 +145,6 @@ planning" sections in docs/dossier/*.md — those are the authoritative hand-off
 
 ## Session
 
-**Last session:** 2026-08-15T02:09:15.122Z
+**Last session:** 2026-08-15T02:16:38.804Z
 **Stopped at:** Completed 02-01-PLAN.md
 **Resume file:** None
