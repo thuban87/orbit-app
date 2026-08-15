@@ -6,7 +6,7 @@ current_phase: 5
 current_phase_name: Photos
 status: ready
 stopped_at: Completed 05-05-PLAN.md
-last_updated: "2026-08-15T14:44:20.234Z"
+last_updated: "2026-08-15T14:54:46.948Z"
 last_activity: 2026-08-15
 last_activity_desc: Executed 05-05 (library pick + Skia crop + PhotoSourcePicker)
 progress:
@@ -30,7 +30,7 @@ See: .planning/PROJECT.md (updated 2026-08-14)
 
 Phase: 5 (Photos) — EXECUTING
 Next: Phase 5 — Photos (not started) — resume in a fresh session with `/gsd-autonomous --from 5 --to 8 --converge --claude --codex --claude --max-cycles 3`
-Last activity: 2026-08-15 — Executed 05-05 (library pick + Skia crop + PhotoSourcePicker)
+Last activity: 2026-08-15 — Executed 05-06 (pasted-URL download-once + Settings self photo; https-only allowlist + streamed byte cap)
 
 Progress: [██░░░░░░░░] 25% (4/16 phases complete)
 
@@ -89,6 +89,7 @@ Progress: [██░░░░░░░░] 25% (4/16 phases complete)
 | Phase 05-photos P04 | 4min | 2 tasks | 3 files |
 | Phase 05-photos P07 | 6min | 2 tasks | 3 files |
 | Phase 05-photos P05 | 15min | 2 tasks | 5 files |
+| Phase 05-photos P06 | 4min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -154,6 +155,7 @@ Foundational decisions affecting current work:
 - [Phase 05]: 05-05: PhotoSourcePicker is the single target-kind-aware Add/Change/Remove for contact/profile/customField (system Photo Picker, no runtime permission); a pick threads requestId (= derivable cv- relPath) ONLY for customField; Remove switches on target.kind and deletes the correct derivable file inline (no contactId deref on profile). CropPhoto route params are serializable-only (target descriptor + string requestId, no callbacks)
 - [Phase 05]: 05-05: EditContactScreen holds photo as SEPARATE screen state (NOT EditFormState; edit-contact-logic.ts intentionally untouched — metadata Save omits photo per RESEARCH Pitfall 6); a photo-only useFocusEffect getContactHeader re-read refreshes the avatar after crop WITHOUT reseeding/discarding unsaved form edits
 - [Phase 05]: 05-07: purge photo cleanup (buildPhotoPurgeCleanup) is the onPurgeExtensions adapter — POST-COMMIT it rebuilds filenames from contactId alone (rows already deleted): main contact-<id>.jpg + one cv-<id>-<col>.jpg per surviving photo def. listDefs(exec, { includeQuarantined: true }) is REQUIRED so a purge during a photo field's quarantine window still deletes its cv- file (PHOTO-05, no leak); idempotent + internally error-resilient; registered at the Archived-list purge without touching the two-stage guard
+- [Phase 05]: 05-06: url-image.downloadImageToCache uses fetch (NOT File.downloadFileAsync — it exposes neither headers nor the final redirect URL); isImageUrl is an https-ONLY scheme allowlist (extension NOT required — image/* content-type is the authoritative gate) applied to BOTH the submitted URL and the redirect-resolved response.url; byte cap is stream-enforced (reader.cancel at cap) with an absent/invalid/over-cap content-length up-front + post-read re-verify fallback; bytes land in the evictable cache subdir, never the document dir; the raw cache uri then feeds the identical crop pipeline (one-time WRITE, no read-path network). Settings "Your photo" seeds from getProfile with a stable 'You' fallback (never a blank swatch), reloads on focus, and reuses Plan 05's profile-target Remove (no Settings-side Remove, no contactId)
 
 ### Pending Todos
 
@@ -189,7 +191,7 @@ planning" sections in docs/dossier/*.md — those are the authoritative hand-off
 
 ## Session
 
-**Last session:** 2026-08-15T14:43:00.000Z
+**Last session:** 2026-08-15T14:54:35.011Z
 **Stopped at:** Completed 05-05-PLAN.md
 **Resume file:** None
 
