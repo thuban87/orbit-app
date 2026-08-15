@@ -60,7 +60,7 @@ roadmap phases. Items marked *(infra)* are foundation guarantees rather than end
 - [x] **LOG-01**: A user can log a touchpoint in one tap (instant log, all defaults) and optionally refine channel, direction, connected, quality, note, and date+time on the resulting row.
 - [x] **LOG-02**: A contact profile shows a full scrollable timeline of touchpoints and read-only, visually-distinct events, newest first; each touchpoint is editable and deletable in place, edits (incl. date/time) change status, and deletes are unrecoverable.
 - [ ] **LOG-03**: The profile shows `gravity` (named tiers + bar) and `intensity` (neutral rate vs intended, plus the long-run cadence), both derived-never-stored and profile-only.
-- [ ] **LOG-04**: A "Rarely responds" contact's `last_contact` is MAX over connected rows only; its label renders on the profile; a non-connecting attempt does not reset its orbit.
+- [x] **LOG-04**: A "Rarely responds" contact's `last_contact` is MAX over connected rows only; its label renders on the profile; a non-connecting attempt does not reset its orbit.
 - [ ] **LOG-05**: A contact reaches `rogue` at a shared multiple-of-interval constant or via "Rarely responds"; `rogue` (with a `reason`) is surfaced in-app only, never notified.
 - [x] **LOG-06**: Same-day repeat taps insert distinct rows; a future `occurred_at` is rejected; times store as local wall-clock as written.
 
