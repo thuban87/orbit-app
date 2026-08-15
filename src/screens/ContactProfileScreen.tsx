@@ -30,10 +30,12 @@ import {
 } from "react-native";
 import { Avatar } from "@/components/Avatar";
 import { OverflowMenu } from "@/components/OverflowMenu";
+import { TimelineRow } from "@/components/TimelineRow";
 import { getContactHeader } from "@/db/contact-read";
 import { archiveContact } from "@/db/contacts-dao";
 import { getExecutor, localDateTime } from "@/db/database";
 import { recordTouchpoint } from "@/db/recency-dao";
+import { listTimeline, type TimelineItem } from "@/db/timeline-read";
 import { newUid } from "@/db/uid";
 import type { RootStackScreenProps } from "@/navigation/types";
 import { useTheme } from "@/theme";
@@ -60,16 +62,24 @@ export function ContactProfileScreen({
   const { colors } = useTheme();
   const { contactId } = route.params;
   const [header, setHeader] = useState<Header | null>(null);
+  const [timeline, setTimeline] = useState<TimelineItem[]>([]);
   // In-flight latch for the one-tap log — blocks a double-fire while the write
   // is open, and dims the button.
   const [logging, setLogging] = useState(false);
 
+  // The SINGLE unified read: the header AND the interleaved timeline, so both
+  // refresh together on focus and after an in-place log (LOG-02 read half).
   const load = useCallback(async () => {
     try {
-      const row = await getContactHeader(getExecutor(), contactId);
+      const exec = getExecutor();
+      const [row, rows] = await Promise.all([
+        getContactHeader(exec, contactId),
+        listTimeline(exec, contactId),
+      ]);
       setHeader(row);
+      setTimeline(rows);
     } catch (err) {
-      Logger.error(LOG_SCOPE, "failed to load contact header", err);
+      Logger.error(LOG_SCOPE, "failed to load contact", err);
       Alert.alert("Couldn't load this contact", "Please go back and retry.");
     }
   }, [contactId]);
@@ -224,20 +234,24 @@ export function ContactProfileScreen({
         </Text>
       </Pressable>
 
-      {/* Read surfaces (timeline / gravity / fuel) are later-phase — scaffold only. */}
-      <View
-        testID="contact-profile-timeline-stub"
-        style={[
-          styles.sectionStub,
-          { backgroundColor: colors.surface, borderColor: colors.border },
-        ]}
-      >
+      {/* The real interleaved timeline (LOG-02 read half): touchpoints (editable
+          next plan) + read-only events, newest-first. */}
+      <View testID="contact-profile-timeline" style={styles.timeline}>
         <Text style={[styles.sectionHeading, { color: colors.textSecondary }]}>
           Timeline
         </Text>
-        <Text style={[styles.sectionBody, { color: colors.textSecondary }]}>
-          Coming in a later phase.
-        </Text>
+        {timeline.length === 0 ? (
+          <Text
+            testID="contact-profile-timeline-empty"
+            style={[styles.sectionBody, { color: colors.textSecondary }]}
+          >
+            No touchpoints yet
+          </Text>
+        ) : (
+          timeline.map((item) => (
+            <TimelineRow key={`${item.kind}-${item.id}`} item={item} />
+          ))
+        )}
       </View>
     </ScrollView>
   );
@@ -288,10 +302,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "700",
   },
-  sectionStub: {
-    borderWidth: 1,
-    borderRadius: 10,
-    padding: 12,
+  timeline: {
     gap: 8,
   },
   sectionHeading: {
