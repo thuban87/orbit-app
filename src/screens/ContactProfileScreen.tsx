@@ -29,6 +29,7 @@ import {
   View,
 } from "react-native";
 import { Avatar } from "@/components/Avatar";
+import { GravityBar } from "@/components/GravityBar";
 import { OverflowMenu } from "@/components/OverflowMenu";
 import { TimelineRow } from "@/components/TimelineRow";
 import {
@@ -43,6 +44,7 @@ import {
 } from "@/db/contact-status-read";
 import { archiveContact } from "@/db/contacts-dao";
 import { getExecutor, localDateTime } from "@/db/database";
+import { getImpactInputs } from "@/db/impact-read";
 import {
   deleteTouchpoint,
   editTouchpointFull,
@@ -55,6 +57,8 @@ import {
 } from "@/db/timeline-read";
 import { newUid } from "@/db/uid";
 import type { RootStackScreenProps } from "@/navigation/types";
+import type { GravityResult } from "@/services/gravity-logic";
+import { computeContactGravity } from "@/services/impact";
 import { useTheme } from "@/theme";
 import { Logger } from "@/utils/logger";
 
@@ -98,6 +102,10 @@ export function ContactProfileScreen({
   // Query-time status + rogue reason (DERIVED-NEVER-STORED). null for a
   // never-contacted contact — see getContactStatus's NULL guard.
   const [status, setStatus] = useState<ContactStatusRow | null>(null);
+  // Derived-never-stored gravity (LOG-03) — the accumulated-familiarity tier,
+  // computed at read time from the shared impact inputs. null when the contact
+  // has no interaction history yet (nothing to show a buffer for).
+  const [gravity, setGravity] = useState<GravityResult | null>(null);
   // In-flight latch for the one-tap log — blocks a double-fire while the write
   // is open, and dims the button.
   const [logging, setLogging] = useState(false);
@@ -115,14 +123,22 @@ export function ContactProfileScreen({
   const load = useCallback(async () => {
     try {
       const exec = getExecutor();
-      const [row, rows, statusRow] = await Promise.all([
+      const [row, rows, statusRow, impactInputs] = await Promise.all([
         getContactHeader(exec, contactId),
         listTimeline(exec, contactId),
         getContactStatus(exec, contactId),
+        getImpactInputs(exec, contactId),
       ]);
       setHeader(row);
       setTimeline(rows);
       setStatus(statusRow);
+      // Derive gravity from the SAME impact inputs intensity will use (Plan 06);
+      // hide it until there is interaction history to build a buffer from.
+      setGravity(
+        impactInputs && impactInputs.interactions.length > 0
+          ? computeContactGravity(impactInputs, localDateTime())
+          : null,
+      );
     } catch (err) {
       Logger.error(LOG_SCOPE, "failed to load contact", err);
       Alert.alert("Couldn't load this contact", "Please go back and retry.");
@@ -390,6 +406,19 @@ export function ContactProfileScreen({
         </Text>
       </Pressable>
 
+      {/* Impact section — gravity (LOG-03), derived-never-stored and PROFILE-ONLY
+          (Cluster G: nothing log-derived on the dashboard card). Intensity joins
+          here in Plan 06. Hidden until there is interaction history. */}
+      {gravity ? (
+        <View testID="contact-profile-impact" style={styles.impact}>
+          <GravityBar
+            tierName={gravity.tierName}
+            tierIndex={gravity.tierIndex}
+            tierCount={gravity.tierCount}
+          />
+        </View>
+      ) : null}
+
       {/* The real interleaved timeline (LOG-02 read half): touchpoints (editable
           next plan) + read-only events, newest-first. */}
       <View testID="contact-profile-timeline" style={styles.timeline}>
@@ -528,6 +557,9 @@ const styles = StyleSheet.create({
   logContactText: {
     fontSize: 16,
     fontWeight: "700",
+  },
+  impact: {
+    gap: 8,
   },
   timeline: {
     gap: 8,
