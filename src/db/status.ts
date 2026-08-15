@@ -71,3 +71,29 @@ export const STATUS_SQL = `CASE
     WHEN (${PROGRESS_SQL}) >= ${STABLE_MAX} THEN 'wobble'
     ELSE 'stable'
   END`;
+
+/**
+ * Query-time rogue REASON over PROGRESS_SQL — WHY a contact is rogue, or NULL.
+ *
+ * The branch order is IDENTICAL to STATUS_SQL (the rarely_responds branch FIRST,
+ * then the beyond-decay ROGUE_K branch) so status and reason can NEVER disagree:
+ * whichever branch STATUS_SQL takes to reach 'rogue', REASON_SQL takes the same
+ * branch to name it. A rarely_responds contact past ROGUE_K therefore reads
+ * 'unresponsive' (branch 1 wins in both), matching STATUS_SQL's 'rogue' via its
+ * own branch 1. Non-rogue buckets (decay / wobble / stable) map to NULL.
+ *
+ * Only the existing code CONSTANTS (WOBBLE_MAX, ROGUE_K, PROGRESS_SQL) are
+ * interpolated — never user input, matching this module's injection posture. See
+ * the NULL note on PROGRESS_SQL: a NULL last_contact makes every comparison false
+ * → ELSE NULL here, but a standalone by-id caller must still guard NULL itself
+ * (STATUS_SQL alone would bucket it 'stable').
+ *
+ * The BRANCH LOGIC (rarely_responds-first, ROGUE_K threshold) is CITED and firm;
+ * the reason VALUE NAMING ('overdue' / 'unresponsive') is the RESEARCH A4
+ * assumption for the in-app label copy.
+ */
+export const REASON_SQL = `CASE
+    WHEN rarely_responds = 1 AND (${PROGRESS_SQL}) >= ${WOBBLE_MAX} THEN 'unresponsive'
+    WHEN (${PROGRESS_SQL}) >= ${ROGUE_K} THEN 'overdue'
+    ELSE NULL
+  END`;
