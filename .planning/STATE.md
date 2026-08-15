@@ -5,15 +5,15 @@ milestone_name: milestone
 current_phase: 5
 current_phase_name: Photos
 status: ready
-stopped_at: Completed 05-04-PLAN.md
-last_updated: "2026-08-15T14:25:42.683Z"
+stopped_at: Completed 05-07-PLAN.md
+last_updated: "2026-08-15T14:32:20.764Z"
 last_activity: 2026-08-15
-last_activity_desc: Completed 05-04 (crop geometry + photo pipeline)
+last_activity_desc: Completed 05-07 (purge photo cleanup adapter, PHOTO-05)
 progress:
   total_phases: 16
   completed_phases: 4
   total_plans: 36
-  completed_plans: 33
+  completed_plans: 34
   percent: 25
 ---
 
@@ -87,6 +87,7 @@ Progress: [██░░░░░░░░] 25% (4/16 phases complete)
 | Phase 05 P02 | 15min | 3 tasks | 7 files |
 | Phase 05 P03 | 10 min | 2 tasks | 7 files |
 | Phase 05-photos P04 | 4min | 2 tasks | 3 files |
+| Phase 05-photos P07 | 6min | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -148,6 +149,7 @@ Foundational decisions affecting current work:
 - [Phase 04]: Purge non-DB cleanup (photo unlink, notification cancel) runs POST-COMMIT via an idempotent onPurgeExtensions adapter (Phases 5/11 register it) — never awaited inside the SQLite transaction/mutex
 - [Phase 05]: 05-04: crop-geometry.ts is PURE + node-tested (cropRectFromTransform → clamped source-pixel rect); its in-file header is the binding CONTRACT (input units + centre-origin convention, positive tx reveals source LEFT) the 05-05 crop screen's geometry init must match; only the visual convention stays for on-device UAT (Assumption A1)
 - [Phase 05]: 05-04: photo-pipeline.persistCroppedMaster crops the ORIGINAL rawUri via expo-image-manipulator (crop→resize 512→JPEG q0.75), never a Skia makeImageSnapshot; copies out of evictable cache via Plan 02's crash-safe persistMaster (no pre-delete added); returns the RELATIVE path only and imports NO DAO (caller owns the write); decode failures throw PhotoPipelineError mapped to the SPEC copy
+- [Phase 05]: 05-07: purge photo cleanup (buildPhotoPurgeCleanup) is the onPurgeExtensions adapter — POST-COMMIT it rebuilds filenames from contactId alone (rows already deleted): main contact-<id>.jpg + one cv-<id>-<col>.jpg per surviving photo def. listDefs(exec, { includeQuarantined: true }) is REQUIRED so a purge during a photo field's quarantine window still deletes its cv- file (PHOTO-05, no leak); idempotent + internally error-resilient; registered at the Archived-list purge without touching the two-stage guard
 
 ### Pending Todos
 
@@ -183,8 +185,8 @@ planning" sections in docs/dossier/*.md — those are the authoritative hand-off
 
 ## Session
 
-**Last session:** 2026-08-15T14:25:42.672Z
-**Stopped at:** Completed 05-04-PLAN.md
+**Last session:** 2026-08-15T14:32:20.754Z
+**Stopped at:** Completed 05-07-PLAN.md
 **Resume file:** None
 
 ## Phase 4 — Closeout (2026-08-15) ✅ COMPLETE
