@@ -21,6 +21,7 @@ import { migration001 } from "@/db/migrations/001-initial";
 import { runMigrations } from "@/db/migrations/runner";
 import {
   PROGRESS_SQL,
+  REASON_SQL,
   ROGUE_K,
   STABLE_MAX,
   STATUS_SQL,
@@ -79,12 +80,14 @@ interface Row {
   id: number;
   progress: number;
   status: string;
+  reason: string | null;
 }
 
-/** Evaluate PROGRESS_SQL / STATUS_SQL for one contact via a SELECT. */
+/** Evaluate PROGRESS_SQL / STATUS_SQL / REASON_SQL for one contact via a SELECT. */
 async function evaluate(id: number): Promise<Row> {
   const row = await exec.getFirstAsync<Row>(
-    `SELECT id, (${PROGRESS_SQL}) AS progress, (${STATUS_SQL}) AS status
+    `SELECT id, (${PROGRESS_SQL}) AS progress, (${STATUS_SQL}) AS status,
+            (${REASON_SQL}) AS reason
        FROM contacts WHERE id = ?`,
     [id],
   );
@@ -242,6 +245,84 @@ describe("day-granular resolution at local midnight", () => {
     expect(a.status).toBe(b.status);
     // And the progress is exactly 5/30 — proving neither row shifted to day 4 or 6.
     expect(a.progress).toBeCloseTo(5 / 30, 5);
+  });
+});
+
+describe("REASON_SQL — rogue reason (mirrors STATUS_SQL branch order)", () => {
+  it("reports 'overdue' at progress >= ROGUE_K (rogue-by-time), agreeing with STATUS_SQL", async () => {
+    // 35 / 10 = 3.5 (>= ROGUE_K = 3) → status rogue, reason overdue.
+    const id = await seedContact({
+      name: "Overdue",
+      intervalDays: 10,
+      lastContact: daysAgo(35),
+    });
+    const row = await evaluate(id);
+    expect(row.status).toBe("rogue");
+    expect(row.reason).toBe("overdue");
+  });
+
+  it("reports 'unresponsive' on the rarely_responds path (progress >= WOBBLE_MAX), agreeing with STATUS_SQL", async () => {
+    // 12 / 10 = 1.2 — rogue for a rarely_responds contact even below ROGUE_K.
+    const id = await seedContact({
+      name: "Unresponsive",
+      intervalDays: 10,
+      lastContact: daysAgo(12),
+      rarelyResponds: true,
+    });
+    const row = await evaluate(id);
+    expect(row.status).toBe("rogue");
+    expect(row.reason).toBe("unresponsive");
+  });
+
+  it("fires the rarely_responds branch FIRST: a rarely_responds contact past ROGUE_K reads 'unresponsive', matching STATUS_SQL's branch order", async () => {
+    // 35 / 10 = 3.5 (>= ROGUE_K) AND rarely_responds — branch 1 wins in both
+    // STATUS_SQL and REASON_SQL, so reason is 'unresponsive', never 'overdue'.
+    const id = await seedContact({
+      name: "UnresponsivePastRogue",
+      intervalDays: 10,
+      lastContact: daysAgo(35),
+      rarelyResponds: true,
+    });
+    const row = await evaluate(id);
+    expect(row.status).toBe("rogue");
+    expect(row.reason).toBe("unresponsive");
+  });
+
+  it("returns NULL for non-rogue buckets (stable / wobble / decay)", async () => {
+    const stable = await evaluate(
+      await seedContact({ name: "S", intervalDays: 10, lastContact: daysAgo(5) }),
+    );
+    expect(stable.status).toBe("stable");
+    expect(stable.reason).toBeNull();
+
+    const wobble = await evaluate(
+      await seedContact({ name: "W", intervalDays: 10, lastContact: daysAgo(9) }),
+    );
+    expect(wobble.status).toBe("wobble");
+    expect(wobble.reason).toBeNull();
+
+    const decay = await evaluate(
+      await seedContact({
+        name: "D",
+        intervalDays: 10,
+        lastContact: daysAgo(20),
+      }),
+    );
+    expect(decay.status).toBe("decay");
+    expect(decay.reason).toBeNull();
+  });
+
+  it("does NOT promote a rarely_responds contact below WOBBLE_MAX to a reason", async () => {
+    // 9 / 10 = 0.9 — still wobble; no rogue, so no reason.
+    const id = await seedContact({
+      name: "RarelyWobbleReason",
+      intervalDays: 10,
+      lastContact: daysAgo(9),
+      rarelyResponds: true,
+    });
+    const row = await evaluate(id);
+    expect(row.status).toBe("wobble");
+    expect(row.reason).toBeNull();
   });
 });
 
