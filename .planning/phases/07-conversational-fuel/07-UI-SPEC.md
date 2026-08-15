@@ -1,10 +1,11 @@
 ---
 phase: 7
 slug: conversational-fuel
-status: draft
+status: approved
 shadcn_initialized: false
 preset: none
 created: 2026-08-15
+reviewed_at: 2026-08-15
 ---
 
 # Phase 7 — UI Design Contract
