@@ -163,15 +163,44 @@ export function CustomFieldsScreen({ onBack }: CustomFieldsScreenProps) {
   async function handleEdit(field: CustomFieldDef, draft: FieldDefDraft) {
     const exec = getExecutor();
     try {
+      const labelChanged = draft.label !== field.label;
+      const curationChanged =
+        draft.show_on_new !== field.show_on_new ||
+        draft.always_show !== field.always_show;
+      const typeChanged = draft.type !== field.type;
+      const optionsChanged = draft.options !== field.options;
+
+      // ALL-OR-NOTHING ON CANCEL (WR-03): the pre-flight summary is an
+      // interactive gate, and the pre-flights (preflightTypeChange /
+      // preflightOptionsChange) are strictly READ-ONLY. Run the gate FIRST,
+      // before ANY write, so that cancelling it discards the entire edit —
+      // label/curation are no longer committed ahead of a cancelled type or
+      // options change. A type change and an options edit are mutually
+      // exclusive gates (a type change to dropdown carries its options through
+      // the type pre-flight), mirroring the original branch structure.
+      if (typeChanged) {
+        const pf = await preflightTypeChange(exec, field, draft.type);
+        if (!(await confirmSummary("Change field type", typeSummary(pf)))) {
+          return; // cancelled — nothing has been written
+        }
+      } else if (optionsChanged) {
+        const pf = await preflightOptionsChange(exec, field, draft.options);
+        if (
+          !(await confirmSummary("Change dropdown options", optionsSummary(pf)))
+        ) {
+          return; // cancelled — nothing has been written
+        }
+      }
+
+      // Every gate passed — apply each diff. Each DAO op owns its OWN
+      // `inWriteTransaction`; they are NEVER composed inside an outer
+      // transaction (the shared mutex is non-reentrant — transaction.ts).
       // Label — a stable-slug rename edits `label` only.
-      if (draft.label !== field.label) {
+      if (labelChanged) {
         await renameField(exec, field.id, draft.label, localDateTime());
       }
       // Curation flags — persisted via updateFieldCuration.
-      if (
-        draft.show_on_new !== field.show_on_new ||
-        draft.always_show !== field.always_show
-      ) {
+      if (curationChanged) {
         await updateFieldCuration(
           exec,
           field.id,
@@ -180,41 +209,27 @@ export function CustomFieldsScreen({ onBack }: CustomFieldsScreenProps) {
           localDateTime(),
         );
       }
-
-      if (draft.type !== field.type) {
-        // Type change — pre-flight summary is the single confirmation, then
-        // applyTypeChange with the CURRENT type so history records the move.
-        const pf = await preflightTypeChange(exec, field, draft.type);
-        if (await confirmSummary("Change field type", typeSummary(pf))) {
-          await applyTypeChange(
-            exec,
-            { id: field.id, col_name: field.col_name, type: field.type },
-            draft.type,
-            localDateTime(),
-          );
-          // The new type's options (dropdown) still need persisting.
-          if (draft.type === "dropdown" && draft.options !== field.options) {
-            await changeFieldOptions(
-              exec,
-              field.id,
-              draft.options,
-              localDateTime(),
-            );
-          }
-        }
-      } else if (draft.options !== field.options) {
-        // Same-type options edit — pre-flight summary then changeFieldOptions.
-        const pf = await preflightOptionsChange(exec, field, draft.options);
-        if (
-          await confirmSummary("Change dropdown options", optionsSummary(pf))
-        ) {
-          await changeFieldOptions(
-            exec,
-            field.id,
-            draft.options,
-            localDateTime(),
-          );
-        }
+      // Type change — applyTypeChange with the CURRENT type so field_history
+      // records the transition (blast radius zero — no value rewrite).
+      if (typeChanged) {
+        await applyTypeChange(
+          exec,
+          { id: field.id, col_name: field.col_name, type: field.type },
+          draft.type,
+          localDateTime(),
+        );
+      }
+      // Options persist whenever the edited field IS a dropdown and its options
+      // moved — covering both a same-type options edit and a type change INTO
+      // dropdown (matches the original behaviour, which only wrote options when
+      // draft.type === "dropdown").
+      if (optionsChanged && draft.type === "dropdown") {
+        await changeFieldOptions(
+          exec,
+          field.id,
+          draft.options,
+          localDateTime(),
+        );
       }
 
       setEditor(null);
