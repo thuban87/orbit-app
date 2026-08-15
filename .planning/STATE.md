@@ -5,16 +5,16 @@ milestone_name: milestone
 current_phase: 5
 current_phase_name: Photos
 status: ready
-stopped_at: Completed 05-05-PLAN.md
-last_updated: "2026-08-15T14:54:46.948Z"
+stopped_at: Completed 05-08-PLAN.md
+last_updated: "2026-08-15T15:05:07.437Z"
 last_activity: 2026-08-15
-last_activity_desc: Executed 05-05 (library pick + Skia crop + PhotoSourcePicker)
+last_activity_desc: Executed 05-08 (custom photo field on the shared picker/crop pipeline, edit-only; orphan-cleanup ledger)
 progress:
   total_phases: 16
-  completed_phases: 4
+  completed_phases: 5
   total_plans: 36
-  completed_plans: 35
-  percent: 25
+  completed_plans: 36
+  percent: 31
 ---
 
 # Project State
@@ -28,11 +28,11 @@ See: .planning/PROJECT.md (updated 2026-08-14)
 
 ## Current Position
 
-Phase: 5 (Photos) — EXECUTING
-Next: Phase 5 — Photos (not started) — resume in a fresh session with `/gsd-autonomous --from 5 --to 8 --converge --claude --codex --claude --max-cycles 3`
-Last activity: 2026-08-15 — Executed 05-06 (pasted-URL download-once + Settings self photo; https-only allowlist + streamed byte cap)
+Phase: 5 (Photos) — all 8 plans executed (code-complete; on-device UAT + verify-work outstanding)
+Next: `/gsd-verify-work 5` then `/gsd-plan-phase 6` (or resume autonomous from Phase 6)
+Last activity: 2026-08-15 — Executed 05-08 (custom photo field on the shared picker/crop pipeline, edit-only; orphan-cleanup ledger)
 
-Progress: [██░░░░░░░░] 25% (4/16 phases complete)
+Progress: [███░░░░░░░] 31% (5/16 phases complete)
 
 ## Performance Metrics
 
@@ -90,6 +90,7 @@ Progress: [██░░░░░░░░] 25% (4/16 phases complete)
 | Phase 05-photos P07 | 6min | 2 tasks | 3 files |
 | Phase 05-photos P05 | 15min | 2 tasks | 5 files |
 | Phase 05-photos P06 | 4min | 2 tasks | 4 files |
+| Phase 05-photos P08 | 14min | 2 tasks | 8 files |
 
 ## Accumulated Context
 
@@ -191,7 +192,7 @@ planning" sections in docs/dossier/*.md — those are the authoritative hand-off
 
 ## Session
 
-**Last session:** 2026-08-15T14:54:35.011Z
+**Last session:** 2026-08-15T15:04:55.802Z
 **Stopped at:** Completed 05-05-PLAN.md
 **Resume file:** None
 
