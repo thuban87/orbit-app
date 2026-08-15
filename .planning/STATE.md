@@ -182,3 +182,11 @@ planning" sections in docs/dossier/*.md — those are the authoritative hand-off
 **Last session:** 2026-08-15T06:49:44.814Z
 **Stopped at:** Completed 04-09-PLAN.md
 **Resume file:** None
+
+## Deferred Verification
+
+| Phase | State | Resume |
+|-------|-------|--------|
+| 4 | verification_deferred_human (code-complete; on-device UAT pending) | build via desktop→Pixel pipeline, run the 10 UAT items in 04-VERIFICATION.md, then `/gsd-verify-work 4` |
+
+**Phase 4 closeout (2026-08-15):** all 9 plans executed, cross-AI plan convergence (2 cycles) + code review (0 blockers) applied; 343 unit tests green (tsc/check:colors/biome clean). Paused before Phase 5 per owner (usage limits). Open owner items: (1) code-review **WR-03** — edit always upserts an all-null `contact_custom_values` row bumping `modified_at` (harmless now, adds Phase-16 merge churn) — product/merge-semantics decision; (2) ROADMAP.md:47 still lists "archived-contact purge (Phase 4)" in the launch sweep, contradicting the UI-SPEC indefinite-retention copy the code follows — update or confirm auto-expiry intent.
