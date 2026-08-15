@@ -6,14 +6,14 @@ current_phase: 4
 current_phase_name: Contact CRUD & Lifecycle
 status: executing
 stopped_at: Completed 04-07-PLAN.md
-last_updated: "2026-08-15T06:32:40.460Z"
+last_updated: "2026-08-15T06:41:16.359Z"
 last_activity: 2026-08-15
 last_activity_desc: Phase 4 execution started
 progress:
   total_phases: 16
   completed_phases: 3
   total_plans: 28
-  completed_plans: 26
+  completed_plans: 27
   percent: 19
 ---
 
@@ -29,7 +29,7 @@ See: .planning/PROJECT.md (updated 2026-08-14)
 ## Current Position
 
 Phase: 4 (Contact CRUD & Lifecycle) — EXECUTING
-Plan: 8 of 9
+Plan: 9 of 9
 Status: Ready to execute
 Last activity: 2026-08-15 — Phase 4 execution started
 
@@ -83,6 +83,7 @@ Progress: [████████░░] 82%
 | Phase 04 P04 | 12min | 2 tasks | 5 files |
 | Phase 04 P06 | 20min | 1 tasks | 4 files |
 | Phase 04 P07 | 8min | 3 tasks | 7 files |
+| Phase 04 P08 | 5min | 3 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -138,6 +139,8 @@ Foundational decisions affecting current work:
 - [Phase ?]: 04-07: contact_links persistence = editor draft state + one applyLinkDiff(seeded, current) on Save (all-or-nothing-on-cancel, a38c763); never immediate-per-row writes
 - [Phase ?]: 04-07: link-open uses a POSITIVE https?:// allowlist (dot-free scheme strip + https:// re-prefix) — file://, intent://, javascript:// never handed to Linking.openURL as typed (T-04-09); no canOpenURL/queries manifest
 - [Phase ?]: 04-07: two-transaction save (updateContactFull then applyLinkDiff); partial-save re-seeds metadata, keeps linksDraft, stays on form, explicit partial-save copy
+- [Phase 04]: 04-08: archive/restore are metadata-only archived_at UPDATEs (assertOneChange, last_contact untouched); listArchived is the sole inverse read (archived_at IS NOT NULL); by-id getContactHeader/getContactForEdit seeks stay archived-reachable by design — no NEW unfiltered live/list surface
+- [Phase 04]: 04-08: restore is a pure flag flip in v1 (RESEARCH-A3 events-row DEFERRED — no events writer/type vocabulary in src); no auto-purge sweep registered (retention INDEFINITE per UI-SPEC); Archive on profile ⋯ (reversible, low-emphasis), Restore only on the Archived list — purge (Plan 09) never one tap from the reversible action
 
 ### Pending Todos
 
@@ -173,6 +176,6 @@ planning" sections in docs/dossier/*.md — those are the authoritative hand-off
 
 ## Session
 
-**Last session:** 2026-08-15T06:32:40.450Z
+**Last session:** 2026-08-15T06:40:39.796Z
 **Stopped at:** Completed 04-07-PLAN.md
 **Resume file:** None
