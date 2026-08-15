@@ -25,3 +25,8 @@ expo-env.d.ts
 *.p12
 *.key
 *.mobileprovision
+
+# Android build artifacts pulled from the desktop build pipeline
+app-release.apk
+app-debug.apk
+*.apk

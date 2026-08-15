@@ -2,13 +2,13 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-current_phase: 4
-current_phase_name: Contact CRUD & Lifecycle
-status: verifying
-stopped_at: Completed 04-09-PLAN.md
+current_phase: 5
+current_phase_name: Photos
+status: ready
+stopped_at: Phase 4 complete — executed, code-reviewed, verified on-device (Pixel)
 last_updated: "2026-08-15T06:49:44.826Z"
 last_activity: 2026-08-15
-last_activity_desc: Phase 4 execution started
+last_activity_desc: Phase 4 complete + on-device UAT passed; paused before Phase 5 per owner
 progress:
   total_phases: 16
   completed_phases: 4
@@ -24,16 +24,15 @@ progress:
 See: .planning/PROJECT.md (updated 2026-08-14)
 
 **Core value:** Collapse the taps between "you're overdue with X" and the message actually being sent.
-**Current focus:** Phase 4 — Contact CRUD & Lifecycle
+**Current focus:** Phase 5 — Photos (next; not started)
 
 ## Current Position
 
-Phase: 4 (Contact CRUD & Lifecycle) — EXECUTING
-Plan: 9 of 9
-Status: Phase complete — ready for verification
-Last activity: 2026-08-15 — Phase 4 execution started
+Phase: 4 (Contact CRUD & Lifecycle) — ✅ COMPLETE (9/9 plans; verification passed; on-device UAT passed on the physical Pixel)
+Next: Phase 5 — Photos (not started) — resume in a fresh session with `/gsd-autonomous --from 5 --to 8 --converge --claude --codex --claude --max-cycles 3`
+Last activity: 2026-08-15 — Phase 4 complete; paused before Phase 5 per owner
 
-Progress: [████████░░] 82%
+Progress: [██░░░░░░░░] 25% (4/16 phases complete)
 
 ## Performance Metrics
 
@@ -162,10 +161,10 @@ None yet.
   APKs; on-device verification remains Pixel-only. Package id locked: `com.bwales.orbit` (display
   name is a `src/constants/app-name.json` constant — owner may rename later).
 
-- **Autonomous run is gated at the foundation** (owner, 2026-08-14): run `/gsd-autonomous --to 3`,
-  stop for a human look at the irreversible migration-1 schema + custom-fields, then continue
-  `--from 4`. `--converge` needs `workflow.plan_review_convergence=true` (currently false) and a
-  reviewer CLI (or `--claude` for self-review) — confirm before using it.
+- **Autonomous foundation gate — SATISFIED (2026-08-15).** The `--to 3` human look happened, and
+  Phase 4 has since run with `--converge` (convergence is enabled; reviewers = codex + claude, owner
+  overrode the Claude-self-review guard). Resume the remaining phases with:
+  `/gsd-autonomous --from 5 --to 8 --converge --claude --codex --claude --max-cycles 3`.
 
 - **Graphify is disabled** in config until its ADR-bridge scripts (`adr-registry.ts`,
   `normalize-graph-docrefs.ts`) and build-blocking hooks are ported from quest-board (a Phase 1/2
@@ -179,14 +178,23 @@ planning" sections in docs/dossier/*.md — those are the authoritative hand-off
 
 ## Session
 
-**Last session:** 2026-08-15T06:49:44.814Z
-**Stopped at:** Completed 04-09-PLAN.md
+**Last session:** 2026-08-15
+**Stopped at:** Phase 4 complete + verified on-device; paused before Phase 5 (owner)
 **Resume file:** None
 
-## Deferred Verification
+## Phase 4 — Closeout (2026-08-15) ✅ COMPLETE
 
-| Phase | State | Resume |
-|-------|-------|--------|
-| 4 |  on-device UAT PASSED 2026-08-15 (release APK on Pixel); 3 minor affordances left for owner spot-check | build via desktop→Pixel pipeline, run the 10 UAT items in 04-VERIFICATION.md, then `/gsd-verify-work 4` |
+Phase 4 (Contact CRUD & Lifecycle) is **DONE**: all 9 plans executed; cross-AI plan convergence
+(2 cycles, codex + claude) + code review (0 blockers, WR-01/WR-02 fixed) applied; 343 unit tests green
+(tsc / check:colors / biome clean); and **on-device UAT PASSED on the physical Pixel** — a release APK
+was built via the desktop pipeline and driven through create→edit→archive→purge, the last-spoke ruling
+(both branches), the WR-01 on-focus refresh, and the danger purge-confirm (see 04-VERIFICATION.md
+"On-device UAT"). Verification status: **passed**.
 
-**Phase 4 closeout (2026-08-15):** all 9 plans executed, cross-AI plan convergence (2 cycles) + code review (0 blockers) applied; 343 unit tests green (tsc/check:colors/biome clean). Paused before Phase 5 per owner (usage limits). Open owner items: (1) code-review **WR-03** — edit always upserts an all-null `contact_custom_values` row bumping `modified_at` (harmless now, adds Phase-16 merge churn) — product/merge-semantics decision; (2) ROADMAP.md:47 still lists "archived-contact purge (Phase 4)" in the launch sweep, contradicting the UI-SPEC indefinite-retention copy the code follows — update or confirm auto-expiry intent.
+**Optional (non-blocking) items — these do NOT hold Phase 5:**
+- code-review **WR-03**: the edit form always upserts an all-null `contact_custom_values` row, bumping
+  `modified_at` (harmless now; adds Phase-16 restore-merge churn) — a product/merge-semantics call.
+- **ROADMAP.md** launch-sweep line lists "archived-contact purge (Phase 4)", contradicting the UI-SPEC
+  indefinite-retention copy the code follows — fix the line, or confirm auto-expiry was intended.
+- 3 minor UI affordances not tapped on-device (they render correctly): a link's tap-to-open, the native
+  date picker via "Pick date", and the Restore action.
