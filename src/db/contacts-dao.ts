@@ -49,6 +49,7 @@
  */
 
 import { upsertValueCore } from "@/db/field-values-dao";
+import { assertSafeRelative } from "@/db/photo-relative-path";
 import {
   type FirstInteractionInput,
   insertInteractionCore,
@@ -476,12 +477,18 @@ export function listArchived(exec: SqlExecutor): Promise<ArchivedContactRow[]> {
  * Set a contact's photo to a RELATIVE filename + bump `modified_at`. Asserts
  * exactly one row changed (a bad id throws → rollback). `last_contact` untouched.
  */
-export function setContactPhoto(
+export async function setContactPhoto(
   exec: SqlExecutor,
   id: number,
   relative: string,
   now: string,
 ): Promise<void> {
+  // Defense-in-depth: reject a non-`avatars/<name>.<ext>` value BEFORE the UPDATE
+  // (and before opening the transaction). A stored absolute/`cache://`/`file://`
+  // value would otherwise throw synchronously in `resolvePhotoUri` during render,
+  // crashing the screen. Shares the single allowlist with the FS chokepoint.
+  // `async` so the fail-fast throw surfaces as a rejection (not a sync throw).
+  assertSafeRelative(relative);
   return inWriteTransaction(exec, async () => {
     const result = await exec.runAsync(
       "UPDATE contacts SET photo = ?, modified_at = ? WHERE id = ?",

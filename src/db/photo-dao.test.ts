@@ -91,6 +91,28 @@ describe("setContactPhoto / clearContactPhoto (PHOTO-03/05)", () => {
   it("throws on a bad id (clear)", async () => {
     await expect(clearContactPhoto(exec, 9999, NOW)).rejects.toThrow();
   });
+
+  it("rejects an unsafe relative BEFORE the UPDATE (row untouched) — M4", async () => {
+    const id = await seedContact("Erin");
+    // An absolute/`file://` value must never reach the DB: it would throw
+    // synchronously in `resolvePhotoUri` during render (uncaught → crash).
+    for (const bad of [
+      "file:///etc/passwd",
+      "/abs/contact-1.jpg",
+      "avatars/../secret.jpg",
+      "avatars/contact-1.gif",
+      "cache://x.jpg",
+      "",
+    ]) {
+      await expect(setContactPhoto(exec, id, bad, LATER)).rejects.toThrow(
+        /unsafe photo relative path/,
+      );
+    }
+    // Nothing was written: photo stays NULL and modified_at is unchanged.
+    const row = await readContact(id);
+    expect(row?.photo).toBeNull();
+    expect(row?.modified_at).toBe(NOW);
+  });
 });
 
 describe("profile-dao — self record writers/readers (PHOTO-03/05)", () => {
@@ -126,5 +148,17 @@ describe("profile-dao — self record writers/readers (PHOTO-03/05)", () => {
 
   it("getProfilePhoto returns null when unset", async () => {
     expect(await getProfilePhoto(exec)).toBeNull();
+  });
+
+  it("setProfilePhoto rejects an unsafe relative BEFORE the UPDATE — M4", async () => {
+    for (const bad of ["file:///etc/passwd", "/abs/profile.jpg", ""]) {
+      await expect(setProfilePhoto(exec, bad, LATER)).rejects.toThrow(
+        /unsafe photo relative path/,
+      );
+    }
+    // The seed row is untouched: photo still NULL, modified_at unchanged.
+    expect(await getProfilePhoto(exec)).toBeNull();
+    const profile = await getProfile(exec);
+    expect(profile?.modified_at).toBe(NOW);
   });
 });

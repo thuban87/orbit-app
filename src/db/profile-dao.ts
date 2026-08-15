@@ -19,6 +19,7 @@
  * SECURITY (T-05-03): every value is `?`-bound; no identifier is interpolated.
  * Node-pure: takes `exec: SqlExecutor`; imports the shared `inWriteTransaction`.
  */
+import { assertSafeRelative } from "@/db/photo-relative-path";
 import { inWriteTransaction } from "@/db/transaction";
 import type { SqlExecutor } from "@/db/types";
 
@@ -33,11 +34,17 @@ export interface ProfileRecord {
  * Set the self photo to a RELATIVE filename + bump `modified_at`. Asserts exactly
  * one row changed (the id=1 seed row always exists; a mismatch throws → rollback).
  */
-export function setProfilePhoto(
+export async function setProfilePhoto(
   exec: SqlExecutor,
   relative: string,
   now: string,
 ): Promise<void> {
+  // Defense-in-depth: reject a non-`avatars/<name>.<ext>` value BEFORE the UPDATE
+  // (and before opening the transaction) — a bad stored value would throw
+  // synchronously in `resolvePhotoUri` during render. Same allowlist as the FS
+  // chokepoint, imported (never duplicated). `async` so the fail-fast throw
+  // surfaces as a rejection (not a sync throw).
+  assertSafeRelative(relative);
   return inWriteTransaction(exec, async () => {
     const result = await exec.runAsync(
       "UPDATE profile SET photo = ?, modified_at = ? WHERE id = 1",

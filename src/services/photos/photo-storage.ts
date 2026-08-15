@@ -40,6 +40,7 @@
  */
 import { Directory, File, Paths } from "expo-file-system";
 import { isSafeColName } from "@/db/col-name";
+import { assertSafeRelative } from "@/db/photo-relative-path";
 import { Logger } from "@/utils/logger";
 
 const LOG_SCOPE = "photo-storage";
@@ -56,25 +57,11 @@ export type PhotoTargetDescriptor =
   | { kind: "profile" }
   | { kind: "customField"; contactId: number; colName: string };
 
-/**
- * Allowlist boundary guard for a RAW relative string reaching the FS entry
- * points. Requires the exact `avatars/<name>.<ext>` shape — `<name>` from the
- * derivable charset `[A-Za-z0-9_-]+` and `<ext>` one of the image extensions —
- * so `..`, a leading `/`, a Windows drive/backslash, a `file://`/absolute
- * prefix, and a null byte are all rejected by construction. This is independent
- * of and additive to the positive-int/`isSafeColName` builder throws.
- */
-const SAFE_RELATIVE = /^avatars\/[A-Za-z0-9_-]+\.(jpg|jpeg|png|webp)$/;
-
-function assertSafeRelative(relative: string): void {
-  if (
-    typeof relative !== "string" ||
-    relative.includes("\0") ||
-    !SAFE_RELATIVE.test(relative)
-  ) {
-    throw new Error(`unsafe photo relative path: ${JSON.stringify(relative)}`);
-  }
-}
+// The `avatars/<name>.<ext>` allowlist guard (`assertSafeRelative`) lives in the
+// node-pure `@/db/photo-relative-path` module so the FS chokepoint here and the
+// DAO write boundary (`setContactPhoto` / `setProfilePhoto`) assert the identical
+// shape from a single source. It is independent of and additive to the
+// positive-int/`isSafeColName` builder throws below.
 
 /** A positive integer contactId is required before it reaches a filename. */
 function assertContactId(contactId: number): void {
