@@ -160,7 +160,7 @@ Recorded here because they bind phases that do not own them. Every planner/execu
   3. Quarantine hides a populated field without touching data; the launch sweep expires it (DELETE def + DROP COLUMN atomically) and prunes history on the 30-day schedule.
   4. Every custom-field sort/filter goes through `sortExpr()`, and no custom value column is indexed or UNIQUE.
 
-**Plans:** 1/8 plans executed
+**Plans:** 2/8 plans executed
 
 **Wave 1**
 
@@ -168,7 +168,7 @@ Recorded here because they bind phases that do not own them. Every planner/execu
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 03-02-PLAN.md — 7 permissive parsers + `isValueInOptions` + guarded `sortExpr()` (FLD-04, FLD-06)
+- [x] 03-02-PLAN.md — 7 permissive parsers + `isValueInOptions` + guarded `sortExpr()` (FLD-04, FLD-06)
 - [ ] 03-03-PLAN.md — Transactional DDL (atomic create / non-mutexed drop core + public dropField / atomic dynamic delete-quarantine) + field-defs metadata DAO incl. `updateFieldCuration` (FLD-01, FLD-02, FLD-03, FLD-05, FLD-06)
 - [ ] 03-04-PLAN.md — Custom-value read/serialized UPSERT + §14.7 visibility selectors (FLD-01, FLD-07)
 
@@ -377,7 +377,7 @@ Recorded here because they bind phases that do not own them. Every planner/execu
 |-------|----------------|--------|-----------|
 | 1. Project Scaffold & Portable Code | 5/5 | Complete    | 2026-08-14 |
 | 2. Data Foundation & Status Engine | 6/6 | Complete    | 2026-08-14 |
-| 3. Custom Fields | 1/8 | In Progress|  |
+| 3. Custom Fields | 2/8 | In Progress|  |
 | 4. Contact CRUD & Lifecycle | 0/TBD | Not started | - |
 | 5. Photos | 0/TBD | Not started | - |
 | 6. Interaction Log, Status & Impact | 0/TBD | Not started | - |
