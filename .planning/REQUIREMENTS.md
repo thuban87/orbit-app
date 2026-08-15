@@ -30,8 +30,8 @@ roadmap phases. Items marked *(infra)* are foundation guarantees rather than end
 
 ### Custom Fields (FLD)
 
-- [ ] **FLD-01**: Migration creates `custom_field_defs` (id, col_name, label, type, options, show_on_new, display-order, quarantined_at, share_with_ai), `contact_custom_values` (one TEXT column per field), and `field_history`. *(infra)*
-- [ ] **FLD-02**: A user can create a custom field (label, one of 7 types, dropdown options, show_on_new, always-show) from settings; creation runs INSERT def + ALTER TABLE ADD COLUMN in one transaction; `col_name` is whitelist-constructed and cannot collide with any fixed-column name.
+- [x] **FLD-01**: Migration creates `custom_field_defs` (id, col_name, label, type, options, show_on_new, display-order, quarantined_at, share_with_ai), `contact_custom_values` (one TEXT column per field), and `field_history`. *(infra)*
+- [x] **FLD-02**: A user can create a custom field (label, one of 7 types, dropdown options, show_on_new, always-show) from settings; creation runs INSERT def + ALTER TABLE ADD COLUMN in one transaction; `col_name` is whitelist-constructed and cannot collide with any fixed-column name.
 - [ ] **FLD-03**: A user can rename (metadata-only RENAME COLUMN), reorder, and change the type/options of a custom field.
 - [ ] **FLD-04**: Changing a field's type runs a pre-flight through the target parser (7 parsers total), auto-converts clean values, flags unconvertible ones as a tap-to-fix error state, destroys no data, and snapshots to `field_history` in the same transaction — with no extra confirmation prompt.
 - [ ] **FLD-05**: Deleting a field is dynamic — immediate Delete when empty, else Quarantine (reversible ~30 days, data untouched); the launch sweep expires quarantined defs (DELETE def + DROP COLUMN in one transaction) and prunes `field_history` on the same schedule.

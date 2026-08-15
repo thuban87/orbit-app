@@ -160,11 +160,11 @@ Recorded here because they bind phases that do not own them. Every planner/execu
   3. Quarantine hides a populated field without touching data; the launch sweep expires it (DELETE def + DROP COLUMN atomically) and prunes history on the 30-day schedule.
   4. Every custom-field sort/filter goes through `sortExpr()`, and no custom value column is indexed or UNIQUE.
 
-**Plans:** 8 plans
+**Plans:** 1/8 plans executed
 
 **Wave 1**
 
-- [ ] 03-01-PLAN.md — Shared `CustomFieldDef` type + reserved-column whitelist + `col_name` slugifier + single `inWriteTransaction` (`src/db/transaction.ts`) (FLD-01, FLD-02)
+- [x] 03-01-PLAN.md — Shared `CustomFieldDef` type + reserved-column whitelist + `col_name` slugifier + single `inWriteTransaction` (`src/db/transaction.ts`) (FLD-01, FLD-02)
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
@@ -377,7 +377,7 @@ Recorded here because they bind phases that do not own them. Every planner/execu
 |-------|----------------|--------|-----------|
 | 1. Project Scaffold & Portable Code | 5/5 | Complete    | 2026-08-14 |
 | 2. Data Foundation & Status Engine | 6/6 | Complete    | 2026-08-14 |
-| 3. Custom Fields | 0/TBD | Not started | - |
+| 3. Custom Fields | 1/8 | In Progress|  |
 | 4. Contact CRUD & Lifecycle | 0/TBD | Not started | - |
 | 5. Photos | 0/TBD | Not started | - |
 | 6. Interaction Log, Status & Impact | 0/TBD | Not started | - |

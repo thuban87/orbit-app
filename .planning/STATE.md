@@ -4,16 +4,16 @@ milestone: v1.0
 milestone_name: milestone
 current_phase: 3
 current_phase_name: Custom Fields
-status: completed
+status: executing
 stopped_at: Completed 02-01-PLAN.md
-last_updated: "2026-08-14T23:42:23.761Z"
-last_activity: 2026-08-14
-last_activity_desc: Phase 2 complete, transitioned to Phase 3
+last_updated: "2026-08-15T01:45:43.396Z"
+last_activity: 2026-08-15
+last_activity_desc: Phase 3 execution started
 progress:
   total_phases: 16
   completed_phases: 2
-  total_plans: 11
-  completed_plans: 11
+  total_plans: 19
+  completed_plans: 12
   percent: 13
 ---
 
@@ -24,14 +24,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-08-14)
 
 **Core value:** Collapse the taps between "you're overdue with X" and the message actually being sent.
-**Current focus:** Phase 2 — Data Foundation & Status Engine
+**Current focus:** Phase 3 — Custom Fields
 
 ## Current Position
 
-Phase: 3 — Custom Fields
-Plan: Not started
-Status: 02-04 complete (DATA-05); ready for 02-05
-Last activity: 2026-08-14 — Phase 2 complete, transitioned to Phase 3
+Phase: 3 (Custom Fields) — EXECUTING
+Plan: 2 of 8
+Status: Ready to execute
+Last activity: 2026-08-15 — Phase 3 execution started
 
 Progress: [████████░░] 82%
 
@@ -67,6 +67,7 @@ Progress: [████████░░] 82%
 | Phase 02 P04 | 8min | 2 tasks | 4 files |
 | Phase 02 P05 | 3min | 2 tasks | 3 files |
 | Phase 02 P06 | 45min | 3 tasks | 3 files |
+| Phase 03 P01 | 4min | 3 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -92,6 +93,9 @@ Foundational decisions affecting current work:
 - [Phase 02]: fuel table ships empty in migration 1 (owner decision); custom-fields tables ship, logic is Phase 3; index/UNIQUE ban is value-column-scoped so uid UNIQUE autoindex stays
 - [Phase ?]: 02-05: AppState is dependency-injected into launch-sweep (not statically imported) so the module is node-testable and App.tsx owns the sole react-native binding
 - [Phase ?]: 02-05: launch sweep fires only on a tracked background->active transition (not any raw active) and installs only after openAndMigrate() resolves — correcting two review MEDIUMs
+- [Phase ?]: col_name is whitelist-CONSTRUCTED at a single chokepoint (col-name.ts); slugify guarantees [a-z][a-z0-9_]* and never escapes user text
+- [Phase ?]: RESERVED_COLUMN_NAMES is drift-guarded by a node:sqlite test asserting whitelist superset-of live schema
+- [Phase ?]: Single shared inWriteTransaction (src/db/transaction.ts) imported not copied; non-reentrancy documented in-file (review HIGH-1)
 
 ### Pending Todos
 
@@ -127,6 +131,6 @@ planning" sections in docs/dossier/*.md — those are the authoritative hand-off
 
 ## Session
 
-**Last session:** 2026-08-14T23:24:02.718Z
+**Last session:** 2026-08-15T01:45:13.138Z
 **Stopped at:** Completed 02-01-PLAN.md
 **Resume file:** None
