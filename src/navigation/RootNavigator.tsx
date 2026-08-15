@@ -1,12 +1,11 @@
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
-import { StyleSheet, Text, View } from "react-native";
+import { ArchivedContactsScreen } from "@/screens/ArchivedContactsScreen";
 import { ContactProfileScreen } from "@/screens/ContactProfileScreen";
 import { CreateContactScreen } from "@/screens/CreateContactScreen";
 import { CustomFieldsScreen } from "@/screens/CustomFieldsScreen";
 import { EditContactScreen } from "@/screens/EditContactScreen";
 import { HomeScreen } from "@/screens/HomeScreen";
 import { SettingsScreen } from "@/screens/SettingsScreen";
-import { useTheme } from "@/theme";
 import type { RootStackParamList, RootStackScreenProps } from "./types";
 
 /**
@@ -25,11 +24,10 @@ import type { RootStackParamList, RootStackScreenProps } from "./types";
  *
  * `enableScreens` is NOT called manually — native-stack enables it.
  *
- * Routes whose screens land in later plans (`Archived`) register themed
- * placeholder components defined here so the navigator type-checks and every
- * route is reachable now; each later plan swaps its placeholder for the real
- * screen. `Settings`/`CustomFields` were wired in Plan 04-01, `Create`/`Profile`
- * in Plans 04-04/04-05, and `Edit` (the real edit form) in Plan 04-06.
+ * Every Phase-4 route now points at its real screen: `Settings`/`CustomFields`
+ * (Plan 04-01), `Create`/`Profile` (Plans 04-04/04-05), `Edit` (Plan 04-06),
+ * and `Archived` — the real ArchivedContactsScreen replacing the Plan 04-01
+ * placeholder (Plan 08).
  */
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
@@ -45,32 +43,6 @@ function CustomFieldsRoute({
   return <CustomFieldsScreen onBack={() => navigation.goBack()} />;
 }
 
-/**
- * A themed "Coming soon" placeholder for a route whose real screen ships in a
- * later plan. Resolves its colours through the theme so it satisfies
- * `check:colors` and restyles with the active preset.
- */
-function makePlaceholder(label: string) {
-  return function Placeholder() {
-    const { colors } = useTheme();
-    return (
-      <View
-        testID={`placeholder-${label}`}
-        style={[styles.placeholder, { backgroundColor: colors.background }]}
-      >
-        <Text style={[styles.placeholderTitle, { color: colors.textPrimary }]}>
-          {label}
-        </Text>
-        <Text style={[styles.placeholderBody, { color: colors.textSecondary }]}>
-          Coming soon
-        </Text>
-      </View>
-    );
-  };
-}
-
-const ArchivedPlaceholder = makePlaceholder("Archived contacts");
-
 export function RootNavigator() {
   return (
     <Stack.Navigator
@@ -83,26 +55,7 @@ export function RootNavigator() {
       <Stack.Screen name="Create" component={CreateContactScreen} />
       <Stack.Screen name="Profile" component={ContactProfileScreen} />
       <Stack.Screen name="Edit" component={EditContactScreen} />
-      <Stack.Screen name="Archived" component={ArchivedPlaceholder} />
+      <Stack.Screen name="Archived" component={ArchivedContactsScreen} />
     </Stack.Navigator>
   );
 }
-
-const styles = StyleSheet.create({
-  placeholder: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-    paddingHorizontal: 32,
-  },
-  placeholderTitle: {
-    fontSize: 24,
-    fontWeight: "700",
-    textAlign: "center",
-  },
-  placeholderBody: {
-    fontSize: 15,
-    textAlign: "center",
-  },
-});
