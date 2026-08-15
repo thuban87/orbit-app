@@ -167,3 +167,121 @@ must fix the parity fixture; the editor's new-row draft/commit boundary needs to
   actionable-HIGH but frames it as an owner privacy-posture decision (the plans + 07-PATTERNS are
   internally inconsistent on whether search is an "ai-hiding" surface), so it should be resolved by
   explicit decision, not silently.
+
+---
+
+# Cross-AI Plan Review — Phase 7, Cycle 2
+
+`cycle: 2` · `reviewed_at: 2026-08-15` · reviewers: **codex** (external CLI) + **claude** (read-only).
+Revision addressing cycle-1's 2 HIGH + 3 MEDIUM + 1 LOW re-reviewed against the actual spine on
+disk (`001-initial.ts`, `events-dao.ts`, `contact-links-dao.ts`, `transaction.ts`, `purge-dao.ts`,
+`gravity-logic.ts`, `queries.ts`, `LinksEditor.tsx`, `ContactProfileScreen.tsx`).
+
+## Cycle-1 items — disposition (both reviewers concur)
+
+| # | Cycle-1 finding | Status | Evidence |
+|---|-----------------|--------|----------|
+| HIGH-1 | searchFuel must exclude unconfirmed `source='ai'` | **RESOLVED** | 07-04-PLAN.md:80,82,88,90 — `source != 'ai'` in the snippet subquery AND the `EXISTS` predicate; ai-never-matches test (manual/user/share DO match); threat T-07-02 (:147) restated. Coherence decision recorded in the header (:88). |
+| HIGH-2 | `LIKE` wildcard escaping missing; test can't pass | **RESOLVED** | 07-04-PLAN.md:84 — JS-escape `\`→`\\`, `%`→`\%`, `_`→`\_` (backslash first); mandatory `LIKE ? ESCAPE '\'` on all three predicates (:88); literal-`%`/`_` tests (:90); the false "?-binding makes %/_ literal" claim is gone (:84,:146 now say binding does NOT make them literal). |
+| MED-3 | blank/NULL-text row wins ranking, blanks the strip | **RESOLVED** | 07-02-PLAN.md:112,119 — `AND NULLIF(TRIM(text),'') IS NOT NULL` on the ranked projection ONLY; blank-text-skip test (:121d); `listFuelForEditor` still returns all rows. Matches nullable schema 001-initial.ts:173-176. |
+| MED-4 | FuelEditor draft/commit boundary underspecified | **RESOLVED (new-row half)** | 07-01-PLAN.md:158 — single transient draft; `onAdd` only on explicit Add with non-blank text; no blank-row insert; immediate-write decision not reopened. *(The existing-ROW edit half is now surfaced as a new C2 finding below.)* |
+| MED-5 | parity test fixture can false-fail | **RESOLVED** | 07-02-PLAN.md:121e — parity compares `getRankedFuel` vs `compareFuel` over an ELIGIBLE-only fixture (off_limits/ai/blank removed in setup); exclusion sweeps kept as separate tests. |
+| LOW-6 | "only place fuel is read" header conflicts with purge | **RESOLVED** | 07-01-PLAN.md:131,139 — reworded to "the ONLY user-facing / projection fuel read path"; purge-dao maintenance read/delete explicitly EXEMPT. Verified against real purge-dao.ts:103-106 (count) and :184-188 (delete fan-out). |
+
+All six cycle-1 findings — including both HIGHs — are genuinely resolved in the plan text and
+verified against source. No cycle-1 item is STILL-OPEN.
+
+## New findings (Cycle 2)
+
+### MEDIUM (codex; claude concurs) — existing-row edit has no viable state owner
+**07-01-PLAN.md:156-159** · analog **LinksEditor.tsx:132-149**
+
+The cycle-1 MED-4 fix pinned the NEW-row draft but left the EXISTING-row edit path
+self-contradictory: 07-01:156-158 calls the editor "controlled … fully controlled from the loaded
+list (no per-row local mirror)" AND commits existing-row edits "on blur/save via onEdit(id, patch)".
+The controlled analog LinksEditor (`value={link.url}` + `onChangeText → onUpdate(index,…)`,
+LinksEditor.tsx:132-149) works only because the parent mutates a per-row draft array **every
+keystroke** and defers the DB write to one Save (diff-on-save). Fuel's locked model is the opposite
+— per-item **immediate** writes — so `value={row.text}` bound to the loaded list with commit-on-blur
+and no per-row mirror is not implementable: the input freezes at `row.text` until `load()` runs, so
+keystrokes never appear (or the executor silently reverts to per-keystroke writes). This is NOT the
+locked immediate-write decision and NOT the new-row draft — it is the transient edit-text owner
+during typing. **Fix:** specify existing-row inputs as uncontrolled (`defaultValue={row.text}` +
+`onEndEditing/onBlur → onEdit(id, patch) → immediate write → load()`), OR explicitly permit a
+per-row edit-draft that commits on blur — either satisfies immediate-write; the current
+"controlled + no mirror + blur" wording cannot. A wording clarification in 07-01 Task 3, not a
+design change.
+
+### MEDIUM (codex; claude concurs, leaning LOW) — blank/whitespace optional fields aren't normalized to NULL at any boundary
+**07-01-PLAN.md:20, :92-94, :102, :160**
+
+07-01's must_have promises optional label/text/url are "stored NULL when blank", but `addFuelCore`
+only coalesces `null`/`undefined` (:92-94, :102) and the `TextInput` fields (:160) emit `""`. So a
+blank label/url/text entered in the UI is stored `""`, not NULL — violating the stated contract
+(and the DAO test only proves the null-in→null-stored path, which the UI never exercises). Ranking
+is still safe (getRankedFuel's `NULLIF(TRIM(text),'')` catches `""` text), so impact is low, but the
+contract gap is real. **Fix:** normalize `value.trim().length === 0 ? null : value` at ONE boundary
+(UI `onAdd`/`onEdit` or the DAO) + a DAO/UI test for empty and whitespace-only optionals. This same
+JS `.trim()` boundary also closes the LOW below.
+
+### LOW (codex) — `NULLIF(TRIM(text),'')` doesn't catch tabs/newlines; fuel text is multiline
+**07-02-PLAN.md:112-113** · multiline input **07-01-PLAN.md:160**
+
+SQLite one-arg `TRIM()` strips only ASCII space (0x20), not `\t`/`\r`/`\n`. Because fuel text is a
+multiline input (07-01:160), a newline-only row (`"\n"`) survives `NULLIF(TRIM(text),'')`, becomes
+eligible, can top the ranking, and renders an effectively blank promoted strip. **Fix:** normalize
+whitespace-to-NULL at the input boundary with JS `.trim()` (the MEDIUM above — a single fix covers
+both) and/or widen the predicate to `TRIM(text, ' \t\r\n')`; add a newline-only ranked-projection
+test. Subsumed by the blank→NULL normalization fix.
+
+### LOW (codex) — literal-backslash search case is untested
+**07-04-PLAN.md:84 vs :90**
+
+Escaping does `\`→`\\` FIRST (:84), but the planned ESCAPE tests (:90) cover only `%` and `_`. The
+backslash is the escape char itself and the first transform, so a literal-`\` search test protects
+the correctness of the `%`/`_` escaping that follows. **Fix:** add a literal-`\` search case to
+fuel-read.test.ts. Cheap test-completeness; optional.
+
+## Verified sound (both reviewers, against source)
+
+- **No new migration.** Full fuel schema shipped migration 1 (001-initial.ts:167-179); all 4 plans
+  leave it untouched. Confirm-flip is a plain `UPDATE source='manual'` (07-03).
+- **Writer split correct.** `*Core` (non-mutexed) + mutexed wrapper mirrors events-dao.ts:62-93 and
+  contact-links-dao.ts:83-146 inside the non-reentrant `inWriteTransaction` (transaction.ts:11-57,
+  42-57); cores compose, never nest; assertOneChange scoped by (id, contact_id) matches
+  contact-links-dao.ts:63-74,116-146.
+- **Determinism:** kind CASE (from the single FUEL_KIND_PRIORITY tunable) → `created_at DESC` →
+  `id DESC`; parity over eligible fixture. RANK_CASE built only from a closed code constant;
+  contact_id sole bound value.
+- **Single choke point:** listFuelForEditor is the only off_limits-surfacing read; getRankedFuel and
+  searchFuel both exclude off_limits AND `source='ai'` in-query.
+- **Search columns real:** contacts.name (NOT NULL) + contacts.archived_at exist (001-initial.ts:
+  61-82); `archived_at IS NULL` matches the queries.ts:23-28 convention.
+- **Local wall-clock:** fuel-age copies gravity-logic.ts:82-98 parseLocalMs; ContactProfileScreen
+  load() (:134-161) uses localDateTime() (imported :47), never toISOString.
+- **Purge not duplicated:** no plan touches purge-dao (fuel count :105, delete :188 left intact).
+- **Wave 3 isolation:** 07-03 (fuel-dao/FuelEditor/ContactProfileScreen) and 07-04
+  (fuel-read/search/navigation/settings) share no files_modified; 07-02 also touches FuelEditor/
+  ContactProfileScreen but is Wave 2 (sequential, not concurrent with Wave 3).
+- **FUEL-01..06** all mapped: 01→P1, 02→P1+P2, 03→P2, 04→P2, 05→P4, 06→P2+P3. Zero net-new theme
+  tokens.
+
+## Consensus Summary (Cycle 2)
+
+Both reviewers independently confirm all six cycle-1 findings RESOLVED, including both prior HIGHs,
+and find **no new HIGH**. The correctness core (no-migration, writer split, ranking parity +
+determinism, off_limits/ai exclusion, wave isolation, local wall-clock) is verified against the
+actual spine. The remaining gaps are two MEDIUM plan-wording items on the FuelEditor — the
+existing-row edit-state owner (implementation-blocking as literally worded) and blank/whitespace →
+NULL normalization at the input boundary — plus two LOW test/normalization completeness notes (the
+whitespace-TRIM edge folds into the same normalization fix; a literal-`\` search test). None reverse
+a locked decision; all are 07-01/07-04 clarifications.
+
+### Agreed concerns (2+ reviewers)
+- MEDIUM existing-row edit-state owner (07-01 Task 3 wording is self-contradictory vs the immediate-
+  write model).
+- MEDIUM blank/whitespace optional fields not normalized to NULL at any boundary (07-01).
+
+### Divergent views
+- Severity of blank→NULL: codex MEDIUM; claude concurs it is actionable but leans LOW (ranking stays
+  safe via `NULLIF(TRIM(text),'')`; the breach is the stated NULL-when-blank contract, not behavior).
