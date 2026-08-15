@@ -5,15 +5,15 @@ milestone_name: milestone
 current_phase: 5
 current_phase_name: Photos
 status: ready
-stopped_at: Completed 05-03-PLAN.md
-last_updated: "2026-08-15T14:18:12.413Z"
+stopped_at: Completed 05-04-PLAN.md
+last_updated: "2026-08-15T14:25:42.683Z"
 last_activity: 2026-08-15
-last_activity_desc: Phase 5 execution started
+last_activity_desc: Completed 05-04 (crop geometry + photo pipeline)
 progress:
   total_phases: 16
   completed_phases: 4
   total_plans: 36
-  completed_plans: 31
+  completed_plans: 33
   percent: 25
 ---
 
@@ -86,6 +86,7 @@ Progress: [██░░░░░░░░] 25% (4/16 phases complete)
 | Phase 04 P09 | 20min | 2 tasks | 3 files |
 | Phase 05 P02 | 15min | 3 tasks | 7 files |
 | Phase 05 P03 | 10 min | 2 tasks | 7 files |
+| Phase 05-photos P04 | 4min | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -145,6 +146,8 @@ Foundational decisions affecting current work:
 - [Phase 04]: 04-08: restore is a pure flag flip in v1 (RESEARCH-A3 events-row DEFERRED — no events writer/type vocabulary in src); no auto-purge sweep registered (retention INDEFINITE per UI-SPEC); Archive on profile ⋯ (reversible, low-emphasis), Restore only on the Archived list — purge (Plan 09) never one tap from the reversible action
 - [Phase 04]: purgeContact asserts archived_at IS NOT NULL and exactly-one-row-deleted inside its transaction — the archive→purge two-stage safety is enforced at the write boundary, not just UI routing
 - [Phase 04]: Purge non-DB cleanup (photo unlink, notification cancel) runs POST-COMMIT via an idempotent onPurgeExtensions adapter (Phases 5/11 register it) — never awaited inside the SQLite transaction/mutex
+- [Phase 05]: 05-04: crop-geometry.ts is PURE + node-tested (cropRectFromTransform → clamped source-pixel rect); its in-file header is the binding CONTRACT (input units + centre-origin convention, positive tx reveals source LEFT) the 05-05 crop screen's geometry init must match; only the visual convention stays for on-device UAT (Assumption A1)
+- [Phase 05]: 05-04: photo-pipeline.persistCroppedMaster crops the ORIGINAL rawUri via expo-image-manipulator (crop→resize 512→JPEG q0.75), never a Skia makeImageSnapshot; copies out of evictable cache via Plan 02's crash-safe persistMaster (no pre-delete added); returns the RELATIVE path only and imports NO DAO (caller owns the write); decode failures throw PhotoPipelineError mapped to the SPEC copy
 
 ### Pending Todos
 
@@ -180,8 +183,8 @@ planning" sections in docs/dossier/*.md — those are the authoritative hand-off
 
 ## Session
 
-**Last session:** 2026-08-15T14:18:12.403Z
-**Stopped at:** Completed 05-03-PLAN.md
+**Last session:** 2026-08-15T14:25:42.672Z
+**Stopped at:** Completed 05-04-PLAN.md
 **Resume file:** None
 
 ## Phase 4 — Closeout (2026-08-15) ✅ COMPLETE

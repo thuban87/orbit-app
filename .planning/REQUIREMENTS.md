@@ -49,7 +49,7 @@ roadmap phases. Items marked *(infra)* are foundation guarantees rather than end
 
 ### Photos (PHOTO)
 
-- [ ] **PHOTO-01**: A user can set a contact's (and their own) photo from the system photo library (no camera, no runtime permission) and frame it with an in-app Skia crop.
+- [x] **PHOTO-01**: A user can set a contact's (and their own) photo from the system photo library (no camera, no runtime permission) and frame it with an in-app Skia crop.
 - [ ] **PHOTO-02**: A user can also set a photo by pasting a URL, which downloads once to the same local master.
 - [x] **PHOTO-03**: Each photo is stored as one 512×512 JPEG master under the persistent document dir (copied out of cache), referenced by a relative filename resolved to `file://` at read. *(infra)*
 - [x] **PHOTO-04**: A contact with no photo shows a deterministic initials avatar coloured from a themed swatch set (no free HSL, no hardcoded colour).
