@@ -5,8 +5,9 @@
  * initials split, the ported rolling hash, and the swatch-index quantization)
  * unit-test in the node Vitest env — `Avatar.tsx` imports react-native/expo-image
  * and cannot load there. The legacy plugin coloured avatars with a free
- * `hsl(hash % 360, …)`; that free-hue output is BARRED (CLAUDE.md / check:colors),
- * so this module emits an INDEX only — no colour ever leaves it.
+ * HSL hue derived from hash-mod-360; that free-hue output is BARRED
+ * (CLAUDE.md / check:colors), so this module emits an INDEX only — no colour
+ * ever leaves it.
  */
 import { describe, expect, it } from "vitest";
 import {
