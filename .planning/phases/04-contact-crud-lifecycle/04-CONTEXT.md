@@ -67,6 +67,16 @@ widget), `ring_seq` drag + sun assignment (orrery).
 - A capture-created **name-only** contact refines later via a prominent **"Add details"** affordance on
   its profile that opens the **full edit form**, surfacing **frequency + last-spoke + phone first**
   (they drive the decay→SMS core loop). No separate slim mini-form.
+- **Last-spoke on the edit/refine form (resolved 2026-08-14 — owner, over reviewer escalation):**
+  the edit form **DOES surface a last-spoke control for never-contacted contacts** (`last_contact IS
+  NULL`). Setting it writes a **FIRST interaction through the single-writer DAO** (identical mechanism
+  to the create form's tri-state — `source='manual'`, `direction=null`, future dates rejected), NOT a
+  direct `last_contact` column write. This closes the never-contacted dead-end (a "Not yet"/captured
+  contact can record its first contact without waiting for Phase 6) while preserving the single-writer
+  invariant. **Correcting/editing an already-logged contact's recency timeline stays Phase 6**
+  (interaction log). So: `last_contact IS NULL` → the edit form shows the tri-state last-spoke control;
+  `last_contact` already set → no last-spoke control on the edit form (Phase 6 owns timeline edits).
+  This ENFORCES CONTEXT Area 3; Plan 06's blanket removal of the control is superseded.
 - The **duplicate-name warning fires on save** (non-blocking: "You already have a Chris — save
   anyway?"), symmetric across create and edit — avoids querying on every keystroke.
 - **"Rarely responds" copy accepted as dossier-specified**: toggle labelled "Rarely responds" with
