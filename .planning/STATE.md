@@ -5,10 +5,10 @@ milestone_name: milestone
 current_phase: 5
 current_phase_name: Photos
 status: ready
-stopped_at: Phase 4 complete — executed, code-reviewed, verified on-device (Pixel)
-last_updated: "2026-08-15T06:49:44.826Z"
+stopped_at: Phase 5 planned (8 plans) — cross-AI convergence in progress
+last_updated: "2026-08-15T08:13:50.725Z"
 last_activity: 2026-08-15
-last_activity_desc: Phase 4 complete + on-device UAT passed; paused before Phase 5 per owner
+last_activity_desc: Phase 5 UI-SPEC + research + 8 plans done; converging before execute (paused per owner)
 progress:
   total_phases: 16
   completed_phases: 4
@@ -178,9 +178,9 @@ planning" sections in docs/dossier/*.md — those are the authoritative hand-off
 
 ## Session
 
-**Last session:** 2026-08-15
-**Stopped at:** Phase 4 complete + verified on-device; paused before Phase 5 (owner)
-**Resume file:** None
+**Last session:** 2026-08-15T08:13:50.715Z
+**Stopped at:** Phase 5 UI-SPEC approved
+**Resume file:** .planning/phases/05-photos/05-UI-SPEC.md
 
 ## Phase 4 — Closeout (2026-08-15) ✅ COMPLETE
 
@@ -192,9 +192,12 @@ was built via the desktop pipeline and driven through create→edit→archive→
 "On-device UAT"). Verification status: **passed**.
 
 **Optional (non-blocking) items — these do NOT hold Phase 5:**
+
 - code-review **WR-03**: the edit form always upserts an all-null `contact_custom_values` row, bumping
   `modified_at` (harmless now; adds Phase-16 restore-merge churn) — a product/merge-semantics call.
+
 - **ROADMAP.md** launch-sweep line lists "archived-contact purge (Phase 4)", contradicting the UI-SPEC
   indefinite-retention copy the code follows — fix the line, or confirm auto-expiry was intended.
+
 - 3 minor UI affordances not tapped on-device (they render correctly): a link's tap-to-open, the native
   date picker via "Pick date", and the Restore action.
