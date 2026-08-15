@@ -235,7 +235,30 @@ Recorded here because they bind phases that do not own them. Every planner/execu
   2. Each photo is one 512px JPEG under the document dir, stored as a relative path resolved at read.
   3. A photo-less contact shows a deterministic themed-swatch initials avatar (no hardcoded colour); replace/remove deletes the old file and purge deletes photo files.
 
-**Plans:** TBD
+**Plans:** 8 plans
+
+**Wave 1**
+
+- [ ] 05-01-PLAN.md — Native enablement (7 modules, picker plugin camera/mic off, Reanimated babel, gesture root) + avatarSwatches/avatarSwatchText tokens (PHOTO-04)
+
+**Wave 2** *(blocked on Wave 1)*
+
+- [ ] 05-02-PLAN.md — photo-storage chokepoint (derivable filenames, rel↔file://, delete-before-copy) + setContactPhoto/clearContactPhoto + net-new profile-dao (PHOTO-03, PHOTO-05)
+
+**Wave 3** *(blocked on Wave 2)*
+
+- [ ] 05-03-PLAN.md — avatar-initials + Avatar component + profile header wiring (PHOTO-04)
+- [ ] 05-04-PLAN.md — crop-geometry (pure) + photo-pipeline (512px JPEG master, no snapshot) (PHOTO-01, PHOTO-03)
+- [ ] 05-07-PLAN.md — purge-photo-cleanup adapter (derive+delete from contactId) + Archived-list registration (PHOTO-05)
+
+**Wave 4** *(blocked on Wave 3)*
+
+- [ ] 05-05-PLAN.md — CropPhotoScreen (Skia/Reanimated) + PhotoSourcePicker + EditContactScreen wiring (PHOTO-01, PHOTO-05)
+
+**Wave 5** *(blocked on Wave 4)*
+
+- [ ] 05-06-PLAN.md — pasted-URL path (https-only) + self-record photo in Settings (PHOTO-02, PHOTO-01)
+- [ ] 05-08-PLAN.md — custom `photo`-field widget wired to the pipeline (edit-only) (PHOTO-01, PHOTO-05)
 
 ### Phase 6: Interaction Log, Status & Impact
 
@@ -405,7 +428,7 @@ Recorded here because they bind phases that do not own them. Every planner/execu
 | 2. Data Foundation & Status Engine | 6/6 | Complete    | 2026-08-14 |
 | 3. Custom Fields | 8/8 | Complete    | 2026-08-15 |
 | 4. Contact CRUD & Lifecycle | 9/9 | Complete   | 2026-08-15 |
-| 5. Photos | 0/TBD | Not started | - |
+| 5. Photos | 0/8 | Not started | - |
 | 6. Interaction Log, Status & Impact | 0/TBD | Not started | - |
 | 7. Conversational Fuel | 0/TBD | Not started | - |
 | 8. Dashboard & Never-Contacted Screen | 0/TBD | Not started | - |
