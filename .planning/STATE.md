@@ -5,15 +5,15 @@ milestone_name: milestone
 current_phase: 4
 current_phase_name: Contact CRUD & Lifecycle
 status: executing
-stopped_at: Completed 04-01-PLAN.md
-last_updated: "2026-08-15T05:43:53.489Z"
+stopped_at: Completed 04-03-PLAN.md
+last_updated: "2026-08-15T05:55:00.454Z"
 last_activity: 2026-08-15
 last_activity_desc: Phase 4 execution started
 progress:
   total_phases: 16
   completed_phases: 3
   total_plans: 28
-  completed_plans: 21
+  completed_plans: 22
   percent: 19
 ---
 
@@ -29,7 +29,7 @@ See: .planning/PROJECT.md (updated 2026-08-14)
 ## Current Position
 
 Phase: 4 (Contact CRUD & Lifecycle) — EXECUTING
-Plan: 3 of 9
+Plan: 4 of 9
 Status: Ready to execute
 Last activity: 2026-08-15 — Phase 4 execution started
 
@@ -78,6 +78,7 @@ Progress: [████████░░] 82%
 | Phase 3 P8 | 5min | 3 tasks | 3 files |
 | Phase 04 P01 | 5min | 4 tasks | 8 files |
 | Phase 04 P02 | 3 | 3 tasks | 6 files |
+| Phase 04 P03 | 9min | 3 tasks | 9 files |
 
 ## Accumulated Context
 
@@ -124,6 +125,8 @@ Foundational decisions affecting current work:
 - [Phase 4]: 04-01: Settings hosts two rows (Custom Fields, Archived) not three — UI-SPEC 'Custom Fields' and 'Reachability' name the same CustomFieldsScreen; CustomFieldsScreen wired via a goBack() wrapper, DAO logic untouched
 - [Phase 4]: 04-01: danger token #E5484D landed in wave 1 (ThemePalette + space-dark preset), relocated from Plan 09; Plans 03/04/06/09 consume colors.danger, none re-adds it
 - [Phase ?]: 04-02: createContactFull composes non-mutexed cores in ONE transaction (never nests the non-reentrant mutex); phone in the create INSERT (CRUD-01); future occurredAt rejected pre-transaction (CRUD-02)
+- [Phase 04]: 04-03: FrequencyPicker + TriStateLastSpoke built as controlled RN components; correctness-critical validation (interval>0 integer; future-date rejection) extracted into react-native-free logic modules so it is unit-tested in the node/.test.ts Vitest harness the .tsx files cannot load under (17 new cases)
+- [Phase 04]: 04-03: TriStateLastSpoke is purely controlled (no internal default overriding value); consumers seed create=Today / edit-never-contacted=Not yet. Native picker has no maximumDate so a future pick still fires onChange and shows the locked rejection copy. datetimepicker config plugin registered in app.config.ts for the deferred desktop prebuild
 
 ### Pending Todos
 
@@ -159,6 +162,6 @@ planning" sections in docs/dossier/*.md — those are the authoritative hand-off
 
 ## Session
 
-**Last session:** 2026-08-15T05:43:31.336Z
-**Stopped at:** Completed 04-01-PLAN.md
+**Last session:** 2026-08-15T05:54:48.796Z
+**Stopped at:** Completed 04-03-PLAN.md
 **Resume file:** None
