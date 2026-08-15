@@ -25,7 +25,7 @@ export type ResolvedMode = "light" | "dark";
  */
 export type SystemScheme = "light" | "dark" | "unspecified" | null | undefined;
 
-/** The 9 base dynamic tokens every theme preset defines. */
+/** The 11 base dynamic tokens every theme preset defines. */
 export interface ThemePalette {
   background: string;
   surface: string;
@@ -44,6 +44,25 @@ export interface ThemePalette {
    * it via `useTheme().colors.danger`; none re-adds it.
    */
   danger: string;
+  /**
+   * Deterministic initials-avatar swatch set (PHOTO-04). The predecessor plugin
+   * coloured avatars with a free `hsl(hash(name) % 360, 65%, 45%)`, which the
+   * no-hardcoded-colour rule bars (a raw hue that never restyles with the theme).
+   * Instead the avatar quantizes the same name hash onto this FINITE, themed
+   * array — `index = abs(hash(name)) % avatarSwatches.length` — so the same
+   * person always gets the same swatch and the whole set restyles when the theme
+   * profile changes, exactly like every other token. Populated in `theme-presets`
+   * (the only colour-literal file). `readonly` because the pick only ever indexes
+   * it. Length >= 1 (8 recommended for glance-ability across the grid/orrery).
+   */
+  avatarSwatches: readonly string[];
+  /**
+   * The single on-swatch foreground for the avatar initials glyph (PHOTO-04).
+   * One readable near-white used on ALL swatches so the initials stay legible
+   * regardless of which swatch the hash picks; the glyph MUST use this token,
+   * never a raw colour.
+   */
+  avatarSwatchText: string;
 }
 
 /** Identifier union for the shipped presets. Only one preset ships this phase. */

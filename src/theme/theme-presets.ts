@@ -29,6 +29,24 @@ export const THEME_PRESETS: Record<ThemePresetId, ThemePreset> = {
       border: "#2A3048",
       borderStrong: "#3C4568",
       danger: "#E5484D",
+      // Deterministic avatar swatch set (PHOTO-04). 8 muted, deep-space-harmonised
+      // hues distinguishable on the #0B0E1A background (UI-SPEC seeds — an
+      // infrastructure default, owner-tunable like the rest of space-dark). The
+      // avatar indexes this by `abs(hash(name)) % 8`; order is stable so a
+      // person's colour never shifts. Never reorder without accepting that every
+      // existing contact's swatch changes.
+      avatarSwatches: [
+        "#5B6CB8",
+        "#4E8A8A",
+        "#8A6BB0",
+        "#B07A5B",
+        "#5B9E6B",
+        "#B05B7A",
+        "#9E9E5B",
+        "#5B8AB0",
+      ],
+      // One near-white foreground for the initials glyph on every swatch above.
+      avatarSwatchText: "#F2F4FB",
     },
   },
 };
