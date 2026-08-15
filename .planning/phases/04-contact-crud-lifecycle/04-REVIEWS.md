@@ -194,3 +194,18 @@ Both reviewers verified the phase's three load-bearing technical claims against 
   - *Claude-only:* (d) the create path **silently drops `phone`** (a named CRUD-01 field the form collects but never passes to the DAO); (e) Plan 06 **removes the last-spoke control from the edit form, reversing the owner-accepted CONTEXT Area 3 decision** ("surface frequency + last-spoke + phone first" on the refine path) inside a plan with only a code comment — a CLAUDE.md decision-authority escalation, not a planner call.
 
   *(Synthesizer note: I verified all five against the source on disk and all five hold. (a)–(c) are latent/forward in Phase 4 — no current route reaches an archived contact's edit screen, and purge is only reached from the Archived list — but each is a cheap, structural hardening of an invariant/irreversible path and should be incorporated. (d) is live data loss against an explicit requirement. (e) requires owner escalation before 04-06 executes.)*
+
+---
+
+## Cycle 2 Review (2026-08-15) — codex + independent Claude, verifying the revision
+
+**Both reviewers: every cycle-1 finding RESOLVED** — 5 HIGH + the contested archived-read item + the full MEDIUM/LOW set, each verified against source on disk (recency-dao, migrations, queries, theme, field-values-dao, app.config). The owner's last-spoke ruling is recorded in 04-CONTEXT.md and enforced in Plans 05/06 (tri-state iff `last_contact IS NULL`, writing a first interaction via the single writer). All four deferrals judged legitimate and recorded. No regression to the lifecycle safeguards. Consensus risk: LOW (claude) / MEDIUM (codex) — zero HIGH.
+
+**New concerns raised in cycle 2 (all non-HIGH — closed in cycle 3):**
+- **MEDIUM (codex)** — `createContactFull` `rowUid` is optional in the input but passed unconditionally to `upsertValueCore`, which requires a non-null UID (strict TS). Mint the values-row uid inside the DAO when `customValues` is non-empty (or make it required then).
+- **MEDIUM (codex)** — a link-write failure occurs *after* the metadata transaction commits (two-transaction design), yet the plan shows a generic "Couldn't save contact"; the contact details actually saved. Use explicit partial-save copy ("Contact saved — links couldn't be saved") and re-seed the committed metadata state (Plan 07).
+- **LOW (codex)** — the archived-by-id no-filter rationale (Plans 05/08) claims it enables archived-list editing, but the Archived list exposes only Restore/Delete. Narrow the rationale to future/direct-route access (there is no Phase-4 edit-from-archived path).
+- **LOW (claude)** — Plan 01's slice-summary line still reads "native header + back gesture", contradicting the plan's own `headerShown:false` + system-Back fix. Correct the stale wording.
+- **LOW (claude)** — `computeImpact` returns an `events` count that `impactSummaryLines` never renders (harmless now: no events writer, count is always 0). Add a note to surface events in the blast-radius copy when the events subsystem lands.
+- **LOW (claude)** — `TriStateLastSpoke`'s initial-value contract is implicit (Plan 03 "default Today" vs Plan 06 "default Not yet"). Specify the component is purely controlled — `value` is authoritative; no internal default overrides it.
+- **DOC** — ROADMAP.md still nominally assigns archived-contact purge to Phase 4; update it to reflect the recorded indefinite-retention deferral (removes the cross-phase contradiction).
