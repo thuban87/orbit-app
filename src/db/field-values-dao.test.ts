@@ -13,7 +13,13 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { nodeSqliteExecutor, openTestDb } from "@/db/__testkit__/node-sqlite";
 import type { CustomFieldDef } from "@/db/field-types";
-import { getValuesForContact, upsertValue } from "@/db/field-values-dao";
+import {
+  defsForCreateForm,
+  defsForEditForm,
+  getValuesForContact,
+  upsertValue,
+  visibleDefsForProfile,
+} from "@/db/field-values-dao";
 import { migration001 } from "@/db/migrations/001-initial";
 import { runMigrations } from "@/db/migrations/runner";
 import type { SqlExecutor } from "@/db/types";
@@ -218,5 +224,79 @@ describe("getValuesForContact — dynamic whitelist-built read (FLD-01)", () => 
     await expect(
       getValuesForContact(exec, c, [def({ col_name: "bad-name!" })]),
     ).rejects.toThrow(/unsafe custom-field col_name/);
+  });
+});
+
+describe("visibility selectors — the three §14.7 surfaces (FLD-07)", () => {
+  // A representative def set: one show_on_new, one always_show, one plain, and
+  // one quarantined — spanning every visibility axis, deliberately out of order
+  // to prove the selectors sort by display_order.
+  const onNew = def({ col_name: "nickname", show_on_new: 1, display_order: 2 });
+  const alwaysShown = def({
+    col_name: "birthday",
+    always_show: 1,
+    display_order: 0,
+  });
+  const plain = def({ col_name: "city", display_order: 1 });
+  const quarantined = def({
+    col_name: "old_field",
+    show_on_new: 1,
+    always_show: 1,
+    display_order: 3,
+    quarantined_at: NOW,
+  });
+  const allDefs = [onNew, alwaysShown, plain, quarantined];
+  const cols = (defs: CustomFieldDef[]) => defs.map((d) => d.col_name);
+
+  it("defsForCreateForm returns only non-quarantined show_on_new, ordered", () => {
+    // onNew is show_on_new; quarantined is show_on_new too but excluded.
+    expect(cols(defsForCreateForm(allDefs))).toEqual(["nickname"]);
+  });
+
+  it("defsForEditForm returns every non-quarantined field, ordered by display_order", () => {
+    expect(cols(defsForEditForm(allDefs))).toEqual([
+      "birthday",
+      "city",
+      "nickname",
+    ]);
+  });
+
+  it("visibleDefsForProfile shows value-present OR always_show, hides empty non-always", () => {
+    // city has a value; birthday is always_show (no value); nickname is empty
+    // and not always_show → hidden; old_field is quarantined → hidden.
+    const values = { city: "Leeds", nickname: null } as Record<
+      string,
+      string | null
+    >;
+    expect(cols(visibleDefsForProfile(allDefs, values))).toEqual([
+      "birthday",
+      "city",
+    ]);
+  });
+
+  it("visibleDefsForProfile treats an always_show field with no value as visible", () => {
+    expect(cols(visibleDefsForProfile([alwaysShown], {}))).toEqual([
+      "birthday",
+    ]);
+  });
+
+  it("visibleDefsForProfile hides an empty non-always_show field", () => {
+    expect(visibleDefsForProfile([plain], {})).toEqual([]);
+    expect(visibleDefsForProfile([plain], { city: null })).toEqual([]);
+  });
+
+  it("a quarantined field appears in NONE of the three surfaces", () => {
+    const q = [quarantined];
+    expect(defsForCreateForm(q)).toEqual([]);
+    expect(defsForEditForm(q)).toEqual([]);
+    // Even with a value AND always_show, quarantine wins.
+    expect(visibleDefsForProfile(q, { old_field: "x" })).toEqual([]);
+  });
+
+  it("does not mutate the input defs array", () => {
+    const input = [onNew, alwaysShown, plain];
+    const snapshot = cols(input);
+    defsForEditForm(input);
+    expect(cols(input)).toEqual(snapshot);
   });
 });

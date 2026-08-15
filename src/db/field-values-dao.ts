@@ -116,3 +116,56 @@ export function upsertValue(
     );
   });
 }
+
+// --- Pure visibility selectors (HANDOFF §14.7) -------------------------------
+//
+// The three surfaces where a custom field can appear. All are PURE functions
+// over an already-loaded defs list (+ a value map for the profile), so Phase 4's
+// forms and profile call them with data they already hold — NO DB access. A
+// QUARANTINED field (quarantined_at set) is excluded from ALL THREE. There is NO
+// per-profile view configuration or per-profile exception — that was explicitly
+// dropped/declined (03-CONTEXT.md "Where fields appear"). Each returns a new
+// array ordered by display_order; the input array is never mutated.
+
+/** A field is live (usable on a surface) when it is not quarantined. */
+function isLive(d: CustomFieldDef): boolean {
+  return d.quarantined_at === null;
+}
+
+/** Order a filtered def list by display_order without mutating the input. */
+function byDisplayOrder(defs: CustomFieldDef[]): CustomFieldDef[] {
+  return [...defs].sort((a, b) => a.display_order - b.display_order);
+}
+
+/**
+ * Create-contact form: only `show_on_new` (and non-quarantined) fields, ordered
+ * by display_order (§14.7).
+ */
+export function defsForCreateForm(defs: CustomFieldDef[]): CustomFieldDef[] {
+  return byDisplayOrder(defs.filter((d) => isLive(d) && d.show_on_new === 1));
+}
+
+/**
+ * Edit form: EVERY non-quarantined field, ordered by display_order. There is NO
+ * curation config on the edit surface (§14.7) — editing an existing contact can
+ * touch any live field.
+ */
+export function defsForEditForm(defs: CustomFieldDef[]): CustomFieldDef[] {
+  return byDisplayOrder(defs.filter(isLive));
+}
+
+/**
+ * Profile: a non-quarantined field shows when `always_show` is set OR the value
+ * map holds a non-null value for its col_name (§14.7). An empty, non-always_show
+ * field is hidden. Ordered by display_order.
+ */
+export function visibleDefsForProfile(
+  defs: CustomFieldDef[],
+  values: Record<string, string | null>,
+): CustomFieldDef[] {
+  return byDisplayOrder(
+    defs.filter(
+      (d) => isLive(d) && (d.always_show === 1 || values[d.col_name] != null),
+    ),
+  );
+}
