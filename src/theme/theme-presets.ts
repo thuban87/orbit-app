@@ -47,6 +47,16 @@ export const THEME_PRESETS: Record<ThemePresetId, ThemePreset> = {
       ],
       // One near-white foreground for the initials glyph on every swatch above.
       avatarSwatchText: "#F2F4FB",
+      // In-app rogue status-label hue (owner-approved 2026-08-15) — an amber
+      // attention colour legible on #0B0E1A and deliberately distinct from accent
+      // (#6C8CFF) and danger (#E5484D): rogue is a STATUS, not a destructive
+      // action. Infrastructure seed, owner-tunable like the rest of space-dark.
+      rogue: "#E0904A",
+      // Ordered gravity-tier ramp (owner-approved 2026-08-15), ONE entry per tier
+      // (thin→deep), indexed by gravity tierIndex in Plan 06-05's GravityBar.
+      // Deep-space-harmonised seeds ascending in warmth/weight; ORDER IS STABLE —
+      // reordering restyles every tier. Infrastructure seed, owner-tunable.
+      gravityTiers: ["#4E5A7A", "#5B8AB0", "#5B9E8A", "#C9A24E"],
     },
   },
 };

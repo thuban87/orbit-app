@@ -87,3 +87,37 @@ describe("avatar swatch tokens (PHOTO-04)", () => {
     expect(palette.avatarSwatchText.length).toBeGreaterThan(0);
   });
 });
+
+describe("status/gravity colour tokens (LOG-05, owner-approved 2026-08-15)", () => {
+  // Plan 06-05's impact.ts is a sibling in this wave and may not exist yet, so
+  // the tier count is mirrored here as a literal. The contract (theme-types.ts)
+  // is one colour PER gravity tier — thin/building/solid/deep — hence an EXACT
+  // length assertion, not `>=`, so a stray extra/missing entry is caught.
+  const GRAVITY_TIER_COUNT = 4;
+
+  it("every preset's dark palette exposes a non-empty-string rogue token", () => {
+    for (const preset of Object.values(THEME_PRESETS)) {
+      expect(typeof preset.dark.rogue).toBe("string");
+      expect(preset.dark.rogue.length).toBeGreaterThan(0);
+    }
+  });
+
+  it("every preset's dark palette exposes a gravityTiers ramp with exactly one colour per gravity tier", () => {
+    for (const preset of Object.values(THEME_PRESETS)) {
+      expect(Array.isArray(preset.dark.gravityTiers)).toBe(true);
+      // Exact parity with the gravity tier count — one colour PER tier, so
+      // `gravityTiers[tierIndex]` is always in range and never over-provisions.
+      expect(preset.dark.gravityTiers).toHaveLength(GRAVITY_TIER_COUNT);
+      for (const tier of preset.dark.gravityTiers) {
+        expect(typeof tier).toBe("string");
+        expect(tier.length).toBeGreaterThan(0);
+      }
+    }
+  });
+
+  it("resolvePalette surfaces both status/gravity tokens for space-dark/dark", () => {
+    const palette = resolvePalette("space-dark", "dark");
+    expect(palette.rogue.length).toBeGreaterThan(0);
+    expect(palette.gravityTiers).toHaveLength(GRAVITY_TIER_COUNT);
+  });
+});

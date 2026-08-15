@@ -63,6 +63,26 @@ export interface ThemePalette {
    * never a raw colour.
    */
   avatarSwatchText: string;
+  /**
+   * In-app ROGUE status-label colour (owner-approved 2026-08-15). The emphasis
+   * hue for the profile's "no longer in a working orbit" label (Plan 06-04) — a
+   * STATUS/attention hue, DISTINCT from `danger` (danger is destructive-action
+   * red; rogue is a state, not an action), so it is its own token and never
+   * reuses danger. Seeded in `theme-presets` (the only colour-literal file), an
+   * infrastructure default the owner may retune like avatarSwatches. Consumed via
+   * `useTheme().colors.rogue`; rogue is in-app only, never a notification.
+   */
+  rogue: string;
+  /**
+   * Ordered GRAVITY-TIER colour ramp (owner-approved 2026-08-15). ONE entry per
+   * gravity tier, indexed by the gravity `tierIndex` (Plan 06-05's GravityBar):
+   * `gravityTiers[tierIndex]`. Length MUST equal Plan 05's `GRAVITY_TIERS` count
+   * (4: thin/building/solid/deep) so the index is always in range. Ascending
+   * thin→deep; ORDER-STABLE — reordering restyles every tier. Seeded in
+   * `theme-presets` (the only colour-literal file), owner-tunable like
+   * avatarSwatches. `readonly` because consumers only ever index it.
+   */
+  gravityTiers: readonly string[];
 }
 
 /** Identifier union for the shipped presets. Only one preset ships this phase. */
