@@ -75,16 +75,27 @@ export interface RecordTouchpointInput {
   source?: string;
 }
 
-/** An edit to an existing interaction's recency-relevant fields. */
-export interface EditTouchpointInput {
+/**
+ * A full edit to an existing interaction — every editable column is supplied
+ * (the refine form seeds them all from the stored row), so the write SETs each
+ * one unconditionally rather than COALESCE-ing. Recency is ALWAYS recomputed.
+ */
+export interface EditTouchpointFullInput {
   interactionId: number;
   contactId: number;
-  /** New local wall-clock `occurred_at`. */
+  /** New local wall-clock `occurred_at` (`YYYY-MM-DD HH:MM:SS`). */
   occurredAt: string;
   /** Local wall-clock now — new `modified_at`. */
   now: string;
-  /** Optional new connected flag (0/1); omitted keeps the stored value. */
-  connected?: number;
+  /** call|text|in-person|email|other|unspecified. */
+  channel: string;
+  /** outbound|inbound|mutual|null. */
+  direction: string | null;
+  /** 0/1 — drives the rarely_responds recency filter. */
+  connected: number;
+  /** good|fine|hard|null. */
+  quality: string | null;
+  note: string | null;
 }
 
 /** A deletion of an existing interaction. */
@@ -229,14 +240,32 @@ export function recordTouchpoint(
 }
 
 /**
- * Edit an existing interaction's `occurred_at` (and optionally `connected`),
- * then recompute recency. Lowering the newest row moves last_contact back to the
- * next-highest remaining row — recompute, not last-write-wins.
+ * The SINGLE interaction-edit path (LOG-01/02/04/06). Updates EVERY editable
+ * column of the matched (id, contact_id) row — occurred_at, channel, direction,
+ * connected, quality, note, modified_at — then ALWAYS recomputes recency. Because
+ * recompute is an idempotent MAX over current rows, "always recompute" is correct
+ * regardless of which field changed: a note-only edit is a no-op MAX, lowering the
+ * newest row moves last_contact back, and editing a rarely_responds row to
+ * connected=0 drops it from the filtered MAX. Recompute, not last-write-wins.
+ *
+ * This is the ONLY exported edit path — the redundant Phase-2 `editTouchpoint`
+ * (occurred_at + connected only, no future-date guard, no production caller) was
+ * removed so no unguarded exported edit path survives (Plan 03 review #1).
  */
-export function editTouchpoint(
+export function editTouchpointFull(
   exec: SqlExecutor,
-  input: EditTouchpointInput,
+  input: EditTouchpointFullInput,
 ): Promise<void> {
+  // LOG-06 GUARD: reject a FUTURE occurred_at BEFORE any transaction opens
+  // (mirrors recordTouchpoint). A future occurred_at makes PROGRESS_SQL go
+  // negative → the contact buckets 'stable' forever. Reject as a rejected
+  // Promise so a caller's `.catch()` sees it and no transaction is started
+  // (no row changed, recency untouched).
+  try {
+    rejectFutureOccurredAt(input.occurredAt, input.now);
+  } catch (err) {
+    return Promise.reject(err);
+  }
   return inWriteTransaction(exec, async () => {
     // WR-04: scope by BOTH keys. Recompute uses the caller-supplied contactId,
     // so if (interactionId, contactId) don't actually pair, an id-only UPDATE
@@ -248,12 +277,20 @@ export function editTouchpoint(
     const result = await exec.runAsync(
       `UPDATE interactions
           SET occurred_at = ?,
-              connected   = COALESCE(?, connected),
+              channel     = ?,
+              direction   = ?,
+              connected   = ?,
+              quality     = ?,
+              note        = ?,
               modified_at = ?
         WHERE id = ? AND contact_id = ?`,
       [
         input.occurredAt,
-        input.connected ?? null,
+        input.channel,
+        input.direction,
+        input.connected,
+        input.quality,
+        input.note,
         input.now,
         input.interactionId,
         input.contactId,
@@ -261,7 +298,7 @@ export function editTouchpoint(
     );
     if (result.changes !== 1) {
       throw new Error(
-        `editTouchpoint: no interaction matched id=${input.interactionId} for contactId=${input.contactId} (changed ${result.changes})`,
+        `editTouchpointFull: no interaction matched id=${input.interactionId} for contactId=${input.contactId} (changed ${result.changes})`,
       );
     }
     await recomputeLastContact(exec, input.contactId, input.now);
@@ -352,8 +389,9 @@ export function createContactWithInteraction(
 /**
  * NON-mutexed CORE exports (Plan 02 composition primitives). These are the same
  * private functions the wrappers above call — aliased, NOT renamed, so the four
- * internal call sites (`recordTouchpoint` / `editTouchpoint` / `deleteTouchpoint`
- * / `createContactWithInteraction`) stay untouched. They assume BEGIN is already
+ * internal call sites (`recordTouchpoint` / `editTouchpointFull` /
+ * `deleteTouchpoint` / `createContactWithInteraction`) stay untouched. They
+ * assume BEGIN is already
  * open and take NO mutex: call them ONLY inside an already-open
  * `inWriteTransaction` (never bare, never nested — see the non-reentrancy note on
  * `recomputeLastContact` and in transaction.ts). `createContactFull` composes

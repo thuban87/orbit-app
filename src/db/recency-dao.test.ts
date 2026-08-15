@@ -16,7 +16,7 @@ import { runMigrations } from "@/db/migrations/runner";
 import {
   createContactWithInteraction,
   deleteTouchpoint,
-  editTouchpoint,
+  editTouchpointFull,
   recordTouchpoint,
 } from "@/db/recency-dao";
 import type { SqlExecutor } from "@/db/types";
@@ -49,6 +49,67 @@ async function interactionCount(contactId: number): Promise<number> {
     [contactId],
   );
   return row?.n ?? 0;
+}
+
+/**
+ * Read one interaction's current editable columns — the refine form seeds the
+ * full edit from the stored row, so tests that change a single field mirror that
+ * by fetching the row and overriding just the field under test.
+ */
+async function readInteraction(interactionId: number): Promise<{
+  occurred_at: string;
+  channel: string;
+  direction: string | null;
+  connected: number;
+  quality: string | null;
+  note: string | null;
+}> {
+  const row = await exec.getFirstAsync<{
+    occurred_at: string;
+    channel: string;
+    direction: string | null;
+    connected: number;
+    quality: string | null;
+    note: string | null;
+  }>(
+    "SELECT occurred_at, channel, direction, connected, quality, note FROM interactions WHERE id = ?",
+    [interactionId],
+  );
+  if (!row) throw new Error(`no interaction ${interactionId}`);
+  return row;
+}
+
+/**
+ * Apply a full edit seeded from the stored row plus the given overrides — the
+ * production shape: the refine form always emits every editable column, so a
+ * single-field change carries the unchanged siblings verbatim.
+ */
+async function editFull(
+  interactionId: number,
+  contactId: number,
+  now: string,
+  overrides: Partial<{
+    occurredAt: string;
+    channel: string;
+    direction: string | null;
+    connected: number;
+    quality: string | null;
+    note: string | null;
+  }> = {},
+): Promise<void> {
+  const cur = await readInteraction(interactionId);
+  await editTouchpointFull(exec, {
+    interactionId,
+    contactId,
+    now,
+    occurredAt: overrides.occurredAt ?? cur.occurred_at,
+    channel: overrides.channel ?? cur.channel,
+    direction:
+      overrides.direction !== undefined ? overrides.direction : cur.direction,
+    connected: overrides.connected ?? cur.connected,
+    quality: overrides.quality !== undefined ? overrides.quality : cur.quality,
+    note: overrides.note !== undefined ? overrides.note : cur.note,
+  });
 }
 
 async function makeContact(rarelyResponds = 0): Promise<number> {
@@ -117,11 +178,8 @@ describe("recency DAO — MAX recompute over current rows", () => {
     });
     expect(await lastContact(c)).toBe("2026-07-01 10:00:00");
 
-    await editTouchpoint(exec, {
-      interactionId,
-      contactId: c,
+    await editFull(interactionId, c, NOW, {
       occurredAt: "2026-03-01 10:00:00",
-      now: NOW,
     });
     // Correcting the newest row down must NOT keep its old value — recompute wins.
     expect(await lastContact(c)).toBe("2026-05-01 10:00:00");
@@ -159,7 +217,7 @@ describe("recency DAO — MAX recompute over current rows", () => {
 });
 
 describe("recency DAO — (id, contactId) scoping guards recency (WR-04)", () => {
-  it("editTouchpoint rejects a mismatched contactId and leaves the real contact's recency intact", async () => {
+  it("editTouchpointFull rejects a mismatched contactId and leaves the real contact's recency intact", async () => {
     const a = await makeContact();
     const { interactionId } = await recordTouchpoint(exec, {
       contactId: a,
@@ -172,11 +230,16 @@ describe("recency DAO — (id, contactId) scoping guards recency (WR-04)", () =>
     // Edit A's interaction but claim it belongs to B: must fail loudly, not
     // silently leave A's last_contact stale while recomputing B.
     await expect(
-      editTouchpoint(exec, {
+      editTouchpointFull(exec, {
         interactionId,
         contactId: b,
         occurredAt: "2026-01-01 10:00:00",
         now: NOW,
+        channel: "call",
+        direction: "outbound",
+        connected: 1,
+        quality: null,
+        note: null,
       }),
     ).rejects.toThrow(/no interaction matched/);
 
@@ -209,7 +272,7 @@ describe("recency DAO — (id, contactId) scoping guards recency (WR-04)", () =>
     expect(await lastContact(a)).toBe("2026-07-01 10:00:00");
   });
 
-  it("editTouchpoint still works for a correctly-paired (id, contactId)", async () => {
+  it("editTouchpointFull still works for a correctly-paired (id, contactId)", async () => {
     const a = await makeContact();
     const { interactionId } = await recordTouchpoint(exec, {
       contactId: a,
@@ -217,13 +280,145 @@ describe("recency DAO — (id, contactId) scoping guards recency (WR-04)", () =>
       occurredAt: "2026-07-01 10:00:00",
       now: NOW,
     });
-    await editTouchpoint(exec, {
-      interactionId,
-      contactId: a,
+    await editFull(interactionId, a, NOW, {
       occurredAt: "2026-08-01 10:00:00",
-      now: NOW,
     });
     expect(await lastContact(a)).toBe("2026-08-01 10:00:00");
+  });
+});
+
+describe("recency DAO — editTouchpointFull (single full edit path, LOG-01/02/04/06)", () => {
+  it("updates every editable column for the matched (id, contactId) row", async () => {
+    const c = await makeContact();
+    const { interactionId } = await recordTouchpoint(exec, {
+      contactId: c,
+      uid: uid(),
+      occurredAt: "2026-07-01 10:00:00",
+      now: NOW,
+      channel: "unspecified",
+      direction: "outbound",
+      connected: 1,
+      quality: null,
+      note: null,
+    });
+
+    await editTouchpointFull(exec, {
+      interactionId,
+      contactId: c,
+      occurredAt: "2026-06-15 18:45:00",
+      now: NOW,
+      channel: "call",
+      direction: "inbound",
+      connected: 0,
+      quality: "good",
+      note: "caught up over the phone",
+    });
+
+    const row = await exec.getFirstAsync<{
+      occurred_at: string;
+      channel: string;
+      direction: string | null;
+      connected: number;
+      quality: string | null;
+      note: string | null;
+      modified_at: string;
+    }>(
+      `SELECT occurred_at, channel, direction, connected, quality, note, modified_at
+         FROM interactions WHERE id = ?`,
+      [interactionId],
+    );
+    expect(row?.occurred_at).toBe("2026-06-15 18:45:00");
+    expect(row?.channel).toBe("call");
+    expect(row?.direction).toBe("inbound");
+    expect(row?.connected).toBe(0);
+    expect(row?.quality).toBe("good");
+    expect(row?.note).toBe("caught up over the phone");
+    expect(row?.modified_at).toBe(NOW);
+    // Only interaction, connected=0 on a NORMAL contact still counts → recency
+    // follows the edited occurred_at.
+    expect(await lastContact(c)).toBe("2026-06-15 18:45:00");
+  });
+
+  it("a note-only edit (same occurred_at) leaves last_contact unchanged", async () => {
+    const c = await makeContact();
+    await recordTouchpoint(exec, {
+      contactId: c,
+      uid: uid(),
+      occurredAt: "2026-05-01 10:00:00",
+      now: NOW,
+    });
+    const { interactionId } = await recordTouchpoint(exec, {
+      contactId: c,
+      uid: uid(),
+      occurredAt: "2026-07-01 10:00:00",
+      now: NOW,
+    });
+    expect(await lastContact(c)).toBe("2026-07-01 10:00:00");
+
+    // Change ONLY the note; occurred_at is carried verbatim → recompute is a
+    // no-op MAX and recency does not move.
+    await editFull(interactionId, c, NOW, { note: "added a detail" });
+    expect(await lastContact(c)).toBe("2026-07-01 10:00:00");
+    expect((await readInteraction(interactionId)).note).toBe("added a detail");
+  });
+
+  it("rejects a FUTURE occurredAt BEFORE the transaction: no row changed, last_contact unchanged", async () => {
+    const c = await makeContact();
+    const { interactionId } = await recordTouchpoint(exec, {
+      contactId: c,
+      uid: uid(),
+      occurredAt: "2026-06-01 10:00:00",
+      now: NOW,
+    });
+    expect(await lastContact(c)).toBe("2026-06-01 10:00:00");
+
+    // A future occurred_at (relative to `now`) must reject at the guard, before
+    // the transaction opens — the same LOG-06 invariant as the record path.
+    await expect(
+      editTouchpointFull(exec, {
+        interactionId,
+        contactId: c,
+        occurredAt: "2026-09-01 10:00:00",
+        now: NOW,
+        channel: "call",
+        direction: "outbound",
+        connected: 1,
+        quality: null,
+        note: null,
+      }),
+    ).rejects.toThrow(/future/i);
+
+    // Nothing changed — occurred_at and recency are untouched.
+    expect((await readInteraction(interactionId)).occurred_at).toBe(
+      "2026-06-01 10:00:00",
+    );
+    expect(await lastContact(c)).toBe("2026-06-01 10:00:00");
+  });
+
+  it("does not advance recency when a rarely_responds row is edited to connected=0", async () => {
+    const c = await makeContact(1);
+    // A connected row anchors recency.
+    await recordTouchpoint(exec, {
+      contactId: c,
+      uid: uid(),
+      occurredAt: "2026-05-01 10:00:00",
+      now: NOW,
+      connected: 1,
+    });
+    // A later connected row that we will downgrade to a non-connecting attempt.
+    const { interactionId } = await recordTouchpoint(exec, {
+      contactId: c,
+      uid: uid(),
+      occurredAt: "2026-08-01 10:00:00",
+      now: NOW,
+      connected: 1,
+    });
+    expect(await lastContact(c)).toBe("2026-08-01 10:00:00");
+
+    // Edit the later row to NOT-connected: on a rarely_responds contact the
+    // filtered MAX drops it, so recency falls back to the earlier connected row.
+    await editFull(interactionId, c, NOW, { connected: 0 });
+    expect(await lastContact(c)).toBe("2026-05-01 10:00:00");
   });
 });
 
