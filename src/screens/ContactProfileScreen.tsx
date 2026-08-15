@@ -36,6 +36,11 @@ import {
   type TouchpointRefineValue,
 } from "@/components/TouchpointRefineForm";
 import { getContactHeader } from "@/db/contact-read";
+import {
+  type ContactStatusRow,
+  getContactStatus,
+  type RogueReason,
+} from "@/db/contact-status-read";
 import { archiveContact } from "@/db/contacts-dao";
 import { getExecutor, localDateTime } from "@/db/database";
 import {
@@ -54,6 +59,21 @@ import { useTheme } from "@/theme";
 import { Logger } from "@/utils/logger";
 
 const LOG_SCOPE = "contact-profile";
+
+/**
+ * Human copy for a rogue reason (in-app label only — never a notification).
+ * 'overdue' = beyond-decay time; 'unresponsive' = the Rarely-responds path.
+ */
+function rogueReasonText(reason: RogueReason): string | null {
+  switch (reason) {
+    case "overdue":
+      return "overdue";
+    case "unresponsive":
+      return "unresponsive";
+    default:
+      return null;
+  }
+}
 
 /** The light header read the scaffold renders. */
 type Header = {
@@ -75,6 +95,9 @@ export function ContactProfileScreen({
   const { contactId } = route.params;
   const [header, setHeader] = useState<Header | null>(null);
   const [timeline, setTimeline] = useState<TimelineItem[]>([]);
+  // Query-time status + rogue reason (DERIVED-NEVER-STORED). null for a
+  // never-contacted contact — see getContactStatus's NULL guard.
+  const [status, setStatus] = useState<ContactStatusRow | null>(null);
   // In-flight latch for the one-tap log — blocks a double-fire while the write
   // is open, and dims the button.
   const [logging, setLogging] = useState(false);
@@ -92,12 +115,14 @@ export function ContactProfileScreen({
   const load = useCallback(async () => {
     try {
       const exec = getExecutor();
-      const [row, rows] = await Promise.all([
+      const [row, rows, statusRow] = await Promise.all([
         getContactHeader(exec, contactId),
         listTimeline(exec, contactId),
+        getContactStatus(exec, contactId),
       ]);
       setHeader(row);
       setTimeline(rows);
+      setStatus(statusRow);
     } catch (err) {
       Logger.error(LOG_SCOPE, "failed to load contact", err);
       Alert.alert("Couldn't load this contact", "Please go back and retry.");
@@ -302,6 +327,23 @@ export function ContactProfileScreen({
         />
       </View>
 
+      {/* Rogue status label + reason — in-app only (never a notification),
+          styled through the themed `colors.rogue` token (a status hue, NOT
+          danger). Nothing renders for a never-contacted contact (status null)
+          or any non-rogue status. */}
+      {status?.status === "rogue" ? (
+        <Text testID="contact-profile-rogue" style={styles.rogueLabel}>
+          <Text style={{ color: colors.rogue }}>
+            No longer in a working orbit
+          </Text>
+          {rogueReasonText(status.reason) ? (
+            <Text style={{ color: colors.textSecondary }}>
+              {` · ${rogueReasonText(status.reason)}`}
+            </Text>
+          ) : null}
+        </Text>
+      ) : null}
+
       {header?.rarely_responds === 1 ? (
         <Text
           testID="contact-profile-rarely-responds"
@@ -457,6 +499,10 @@ const styles = StyleSheet.create({
   title: {
     flex: 1,
     fontSize: 24,
+    fontWeight: "700",
+  },
+  rogueLabel: {
+    fontSize: 14,
     fontWeight: "700",
   },
   rarelyLabel: {
