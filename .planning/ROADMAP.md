@@ -235,15 +235,15 @@ Recorded here because they bind phases that do not own them. Every planner/execu
   2. Each photo is one 512px JPEG under the document dir, stored as a relative path resolved at read.
   3. A photo-less contact shows a deterministic themed-swatch initials avatar (no hardcoded colour); replace/remove deletes the old file and purge deletes photo files.
 
-**Plans:** 8 plans
+**Plans:** 2/8 plans executed
 
 **Wave 1**
 
-- [ ] 05-01-PLAN.md — Native enablement (7 modules, picker plugin camera/mic off, Reanimated babel, gesture root) + avatarSwatches/avatarSwatchText tokens (PHOTO-04)
+- [x] 05-01-PLAN.md — Native enablement (7 modules, picker plugin camera/mic off, Reanimated babel, gesture root) + avatarSwatches/avatarSwatchText tokens (PHOTO-04)
 
 **Wave 2** *(blocked on Wave 1)*
 
-- [ ] 05-02-PLAN.md — photo-storage chokepoint (derivable filenames, rel↔file://, crash-safe copy-to-temp-then-atomic-overwrite-move + launch-time tmp/bak reconciliation sweep) + setContactPhoto/clearContactPhoto + net-new profile-dao (PHOTO-03, PHOTO-05)
+- [x] 05-02-PLAN.md — photo-storage chokepoint (derivable filenames, rel↔file://, crash-safe copy-to-temp-then-atomic-overwrite-move + launch-time tmp/bak reconciliation sweep) + setContactPhoto/clearContactPhoto + net-new profile-dao (PHOTO-03, PHOTO-05)
 
 **Wave 3** *(blocked on Wave 2)*
 
@@ -428,7 +428,7 @@ Recorded here because they bind phases that do not own them. Every planner/execu
 | 2. Data Foundation & Status Engine | 6/6 | Complete    | 2026-08-14 |
 | 3. Custom Fields | 8/8 | Complete    | 2026-08-15 |
 | 4. Contact CRUD & Lifecycle | 9/9 | Complete   | 2026-08-15 |
-| 5. Photos | 0/8 | Not started | - |
+| 5. Photos | 2/8 | In Progress|  |
 | 6. Interaction Log, Status & Impact | 0/TBD | Not started | - |
 | 7. Conversational Fuel | 0/TBD | Not started | - |
 | 8. Dashboard & Never-Contacted Screen | 0/TBD | Not started | - |
