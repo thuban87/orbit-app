@@ -360,3 +360,97 @@ export function updateContactFull(
     }
   });
 }
+
+// =============================================================================
+// ARCHIVE / RESTORE (CRUD-05) — the reversible half of the two-stage lifecycle.
+//
+// Archive is a SOFT visibility flag: `archived_at` is set (hides the contact
+// from every LIVE read — STATUS_SCAN and isDuplicateName already filter
+// `archived_at IS NULL`, queries.ts / contact-read.ts). Restore nulls it back.
+// Both are metadata-only UPDATEs that assert EXACTLY ONE row changed (a bad id
+// throws → rollback, mirroring updateContactMetadataCore's loud-failure guard),
+// and NEITHER touches `last_contact` (single-writer DATA-04 stays intact — the
+// SET list is archived_at + modified_at only).
+//
+// listArchived is the SOLE inverse read (`archived_at IS NOT NULL`); every
+// live/list surface keeps the `archived_at IS NULL` filter. The by-id
+// getContactHeader / getContactForEdit seeks stay archived-reachable by design
+// (no Phase-4 surface routes to an archived profile/edit) — see the plan's
+// archived-read reconciliation note.
+//
+// DEFERRAL (RESEARCH A3): restore does NOT write an `events` row. There is no
+// events writer or event-`type` vocabulary in src/ yet (only the table exists,
+// migration 001). Writing an ad-hoc events row now would invent an unspecified
+// type vocabulary; the lifecycle-events row is deferred to when that writer is
+// established. Restore in v1 is a pure `archived_at` flag flip.
+//
+// SECURITY (T-04-02): every value is `?`-bound; no interpolation.
+// =============================================================================
+
+/** One archived contact as surfaced by the Archived list. */
+export interface ArchivedContactRow {
+  id: number;
+  name: string;
+  /** When it was archived — the list orders by this, most-recent first. */
+  archived_at: string;
+}
+
+/**
+ * Archive a contact: set `archived_at` to `now` (a reversible flag). The contact
+ * then fails every `archived_at IS NULL` live read and appears in listArchived.
+ * `last_contact` is untouched. Throws (→ rollback) if no row matched.
+ */
+export function archiveContact(
+  exec: SqlExecutor,
+  id: number,
+  now: string,
+): Promise<void> {
+  return inWriteTransaction(exec, async () => {
+    const result = await exec.runAsync(
+      "UPDATE contacts SET archived_at = ?, modified_at = ? WHERE id = ?",
+      [now, now, id],
+    );
+    if (result.changes !== 1) {
+      throw new Error(
+        `archiveContact: no contact matched id=${id} (changed ${result.changes})`,
+      );
+    }
+  });
+}
+
+/**
+ * Restore an archived contact: null `archived_at` (a pure flag flip in v1 — the
+ * RESEARCH-A3 events-row contract is DEFERRED; see the header note). The contact
+ * reappears in live reads and leaves listArchived. `last_contact` is untouched.
+ * Throws (→ rollback) if no row matched.
+ */
+export function restoreContact(
+  exec: SqlExecutor,
+  id: number,
+  now: string,
+): Promise<void> {
+  return inWriteTransaction(exec, async () => {
+    const result = await exec.runAsync(
+      "UPDATE contacts SET archived_at = NULL, modified_at = ? WHERE id = ?",
+      [now, id],
+    );
+    if (result.changes !== 1) {
+      throw new Error(
+        `restoreContact: no contact matched id=${id} (changed ${result.changes})`,
+      );
+    }
+  });
+}
+
+/**
+ * List archived contacts — the SOLE inverse read (`archived_at IS NOT NULL`),
+ * most-recently-archived first. A pure read (no transaction).
+ */
+export function listArchived(exec: SqlExecutor): Promise<ArchivedContactRow[]> {
+  return exec.getAllAsync<ArchivedContactRow>(
+    `SELECT id, name, archived_at
+       FROM contacts
+      WHERE archived_at IS NOT NULL
+      ORDER BY archived_at DESC`,
+  );
+}
