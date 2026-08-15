@@ -14,6 +14,7 @@ import { getExecutor, openAndMigrate } from "@/db/database";
 import { RootNavigator } from "@/navigation/RootNavigator";
 import { registerFieldSweep } from "@/services/field-sweep";
 import { installSweepTrigger } from "@/services/launch-sweep";
+import { registerPhotoReconcileSweep } from "@/services/photos/photo-reconcile-sweep";
 import { ThemeProvider, useTheme } from "@/theme";
 import { Logger } from "@/utils/logger";
 
@@ -43,6 +44,9 @@ import { Logger } from "@/utils/logger";
 // remounts), and registering the same hook twice would double-run it — so this
 // module-scope flag makes registration idempotent across effect re-entries.
 let fieldSweepRegistered = false;
+// One-shot guard for the photo-write reconciliation hook (PHOTO-03/05), on the
+// SAME registry and under the SAME re-entrancy reasoning as the field sweep.
+let photoReconcileRegistered = false;
 
 function AppShell() {
   const { colors } = useTheme();
@@ -78,6 +82,13 @@ function AppShell() {
     if (!fieldSweepRegistered) {
       registerFieldSweep(getExecutor);
       fieldSweepRegistered = true;
+    }
+    // Register the photo-write reconciliation (PHOTO-03/05) on the same registry,
+    // once only, BEFORE the trigger fires its cold-start sweep. FS-only, no
+    // executor. No background timer — the launch sweep is the recovery path.
+    if (!photoReconcileRegistered) {
+      registerPhotoReconcileSweep();
+      photoReconcileRegistered = true;
     }
     const subscription = installSweepTrigger(AppState);
     return () => subscription.remove();
