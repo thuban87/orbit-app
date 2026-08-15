@@ -290,13 +290,21 @@ describe("REASON_SQL — rogue reason (mirrors STATUS_SQL branch order)", () => 
 
   it("returns NULL for non-rogue buckets (stable / wobble / decay)", async () => {
     const stable = await evaluate(
-      await seedContact({ name: "S", intervalDays: 10, lastContact: daysAgo(5) }),
+      await seedContact({
+        name: "S",
+        intervalDays: 10,
+        lastContact: daysAgo(5),
+      }),
     );
     expect(stable.status).toBe("stable");
     expect(stable.reason).toBeNull();
 
     const wobble = await evaluate(
-      await seedContact({ name: "W", intervalDays: 10, lastContact: daysAgo(9) }),
+      await seedContact({
+        name: "W",
+        intervalDays: 10,
+        lastContact: daysAgo(9),
+      }),
     );
     expect(wobble.status).toBe("wobble");
     expect(wobble.reason).toBeNull();
