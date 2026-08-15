@@ -5,15 +5,15 @@ milestone_name: milestone
 current_phase: 4
 current_phase_name: Contact CRUD & Lifecycle
 status: executing
-stopped_at: Completed 04-03-PLAN.md
-last_updated: "2026-08-15T06:19:55.874Z"
+stopped_at: Completed 04-07-PLAN.md
+last_updated: "2026-08-15T06:32:40.460Z"
 last_activity: 2026-08-15
 last_activity_desc: Phase 4 execution started
 progress:
   total_phases: 16
   completed_phases: 3
   total_plans: 28
-  completed_plans: 25
+  completed_plans: 26
   percent: 19
 ---
 
@@ -29,7 +29,7 @@ See: .planning/PROJECT.md (updated 2026-08-14)
 ## Current Position
 
 Phase: 4 (Contact CRUD & Lifecycle) — EXECUTING
-Plan: 7 of 9
+Plan: 8 of 9
 Status: Ready to execute
 Last activity: 2026-08-15 — Phase 4 execution started
 
@@ -82,6 +82,7 @@ Progress: [████████░░] 82%
 | Phase 04 P05 | 20min | 3 tasks | 4 files |
 | Phase 04 P04 | 12min | 2 tasks | 5 files |
 | Phase 04 P06 | 20min | 1 tasks | 4 files |
+| Phase 04 P07 | 8min | 3 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -134,6 +135,9 @@ Foundational decisions affecting current work:
 - [Phase ?]: 04-05: first-interaction-on-edit honoured only when stored last_contact IS NULL; already-contacted rejects (Phase 6 owns timeline edits); getContactForEdit by-id seek stays archived-reachable by design
 - [Phase ?]: 04-04: create-form input shaping extracted to node-tested create-contact-logic.ts (canSave gate + buildCreateInput); .tsx screens are device-UAT — the repo's -logic.ts convention
 - [Phase ?]: 04-04: native category Picker uses a 'No category' sentinel (-1) mapped back to null on change, keeping category nullable without a custom modal
+- [Phase ?]: 04-07: contact_links persistence = editor draft state + one applyLinkDiff(seeded, current) on Save (all-or-nothing-on-cancel, a38c763); never immediate-per-row writes
+- [Phase ?]: 04-07: link-open uses a POSITIVE https?:// allowlist (dot-free scheme strip + https:// re-prefix) — file://, intent://, javascript:// never handed to Linking.openURL as typed (T-04-09); no canOpenURL/queries manifest
+- [Phase ?]: 04-07: two-transaction save (updateContactFull then applyLinkDiff); partial-save re-seeds metadata, keeps linksDraft, stays on form, explicit partial-save copy
 
 ### Pending Todos
 
@@ -169,6 +173,6 @@ planning" sections in docs/dossier/*.md — those are the authoritative hand-off
 
 ## Session
 
-**Last session:** 2026-08-15T06:19:49.094Z
-**Stopped at:** Completed 04-03-PLAN.md
+**Last session:** 2026-08-15T06:32:40.450Z
+**Stopped at:** Completed 04-07-PLAN.md
 **Resume file:** None
