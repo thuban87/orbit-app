@@ -8,6 +8,7 @@ import {
   Text,
   View,
 } from "react-native";
+import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { getExecutor, openAndMigrate } from "@/db/database";
 import { RootNavigator } from "@/navigation/RootNavigator";
@@ -115,13 +116,20 @@ function AppShell() {
 }
 
 export default function App() {
+  // `GestureHandlerRootView` MUST wrap the OUTERMOST tree (outside
+  // `SafeAreaProvider`) so react-native-gesture-handler can intercept touches
+  // for the whole app — the crop-screen pan/pinch gestures (later Phase-5 plans)
+  // depend on it. `flex: 1` lets it fill the screen; without it the tree
+  // collapses to zero height.
   return (
-    <SafeAreaProvider>
-      <ThemeProvider>
-        <StatusBar style="light" />
-        <AppShell />
-      </ThemeProvider>
-    </SafeAreaProvider>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <SafeAreaProvider>
+        <ThemeProvider>
+          <StatusBar style="light" />
+          <AppShell />
+        </ThemeProvider>
+      </SafeAreaProvider>
+    </GestureHandlerRootView>
   );
 }
 

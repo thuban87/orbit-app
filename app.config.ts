@@ -38,11 +38,41 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   // `@react-native-community/datetimepicker` ships a config plugin (Plan 04-03)
   // and `expo install` instructs registering it here; `@react-native-picker/picker`
   // ships none, so it needs no plugins entry.
-  plugins: [
-    ...new Set([
-      ...(config.plugins ?? []),
-      "expo-sqlite",
-      "@react-native-community/datetimepicker",
-    ]),
-  ],
+  //
+  // Phase-5 photo pipeline (Plan 05-01) adds two native config plugins:
+  //   - `expo-image` — `expo install` explicitly instructed registering it; a
+  //     bare string entry keeps this "framework init" a SINGLE prebuild.
+  //   - `expo-image-picker` — a `[name, options]` TUPLE that hardens the picker
+  //     to library-only. `cameraPermission:false`/`microphonePermission:false`
+  //     keep CAMERA and RECORD_AUDIO out of the generated release manifest
+  //     (T-05-01 information-disclosure mitigation; dossier Cluster A).
+  //
+  // The string-only entries dedupe via the Set exactly as before. The picker
+  // TUPLE canNOT be deduped by the Set (a `["expo-image-picker", opts]` array is
+  // a distinct Set member from the bare `"expo-image-picker"` string), so the
+  // full plugin list is deduped BY NAME below and the tuple appended exactly once.
+  plugins: (() => {
+    const pluginName = (
+      entry: NonNullable<ExpoConfig["plugins"]>[number],
+    ): string => (Array.isArray(entry) ? (entry[0] as string) : (entry as string));
+
+    const stringPlugins = [
+      ...new Set([
+        ...(config.plugins ?? []),
+        "expo-sqlite",
+        "@react-native-community/datetimepicker",
+        "expo-image",
+      ]),
+    ];
+
+    const pickerPlugin: [string, Record<string, unknown>] = [
+      "expo-image-picker",
+      { cameraPermission: false, microphonePermission: false },
+    ];
+
+    return [
+      ...stringPlugins.filter((p) => pluginName(p) !== "expo-image-picker"),
+      pickerPlugin,
+    ];
+  })(),
 });
