@@ -151,3 +151,45 @@ test-spec refinement:
 
 **Overall risk: MEDIUM.** No blockers to planning-convergence; all six items are cheap PLAN.md /
 test-spec edits.
+
+---
+
+## Cycle 2 (2026-08-15) — verification pass + owner-decision fold-in
+
+**Reviewer:** claude (read-only, code-grounded). *Codex was attempted this cycle but its review agent
+stalled mid-run and produced no output; cycle 1 was a full codex+claude pass, and this cycle is a
+thorough code-grounded confirmation over the revised plans.*
+
+**Scope:** confirm the six cycle-1 findings are incorporated, and review the three OWNER decisions
+folded in (`495305f`): events WRITER built this phase, tunables approved, status/gravity colour tokens.
+
+### Cycle-1 findings — all RESOLVED (verified in the plan text)
+1. `editTouchpoint` retired (06-03 Task 1 removes it; `editTouchpointFull` is the sole guarded edit path). ✓
+2. Timeline `kind_order` tiebreak + `${kind}-${id}` React key/testID (06-02). ✓
+3. Same-day `last_contact` test split into different-time-advances vs identical-timestamp-unchanged (06-01). ✓
+4. Intensity sorts qualifying rows ascending before cadence (06-06) + descending-input test. ✓
+5. `parseLocalDateTime` seeds the refine picker preserving time-of-day (06-03 Task 2). ✓
+6. Every mutation handler calls the single unified `load()` (06-01/06-03). ✓
+
+### Owner-decision scope — verified against the code (file:line)
+- **Events writer (06-02):** `EventType` = archive|restore|snooze|unsnooze matches dossier `04-log.md:~571`;
+  `recordEvent`/`recordEventCore` insert-only, NO update path (immutable, dossier `~699`); the retrofit
+  composes `recordEventCore` INSIDE `archiveContact`/`restoreContact`'s existing
+  `inWriteTransaction(exec, …)` (verified contacts-dao.ts:409/433; `newUid` imported :60) — no nested
+  mutex, no second transaction, no `last_contact` write; events columns match the INSERT
+  (migration-1 events table verified); purge already `DELETE FROM events` (purge-dao.ts:183) + now
+  surfaces the count. Snooze/unsnooze reserved, not written (no producer yet). Threat T-06-11 (event
+  immutability + single-writer intact) dispositioned. **Correct.**
+- **Tokens (06-04):** `rogue` + `gravityTiers` added to `ThemePalette` (theme-types.ts) + seeded in
+  theme-presets.ts (the sole colour-literal file) + preset test extended — mirrors the existing
+  `danger`/`avatarSwatches` pattern; added wave 4, consumed wave 4 (rogue label) / wave 5 (GravityBar,
+  index clamped), so tokens exist before consumption; tier ramp length in lockstep with `GRAVITY_TIERS`
+  (4). No hardcoded colour. **Correct.**
+- **Tunables:** gravity 365d/floor 0.15/tiers, intensity period = one interval, ROGUE_K=3 (status.ts:41)
+  stamped OWNER-APPROVED; zero stale "surface-to-owner" flags remain. **Correct.**
+
+### Result
+No unresolved HIGH; no actionable non-HIGH. The single-`last_contact`-writer invariant, derived-never-stored,
+local wall-clock, no-new-migration, and acyclic one-plan-per-wave graph all hold. **Phase 6 plans converged.**
+
+CYCLE_SUMMARY: current_high=0 current_actionable=0
