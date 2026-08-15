@@ -90,10 +90,19 @@ function parseOptions(options: string | null): string[] {
   }
 }
 
-/** Build the DEFS `options` JSON TEXT from the editor rows (empty → null). */
+/**
+ * Build the DEFS `options` JSON TEXT from the editor rows (empty → null).
+ * De-duplicates (preserving first-occurrence order) so a dropdown never
+ * persists repeated option strings — duplicates would collide in
+ * DropdownFieldWidget's `keyExtractor={(item) => item}` (duplicate React keys →
+ * dev warning + unstable reconciliation) and make `includes`/`isValueInOptions`
+ * membership ambiguous.
+ */
 function buildOptions(type: FieldType, rows: string[]): string | null {
   if (type !== "dropdown") return null;
-  const cleaned = rows.map((r) => r.trim()).filter((r) => r.length > 0);
+  const cleaned = [
+    ...new Set(rows.map((r) => r.trim()).filter((r) => r.length > 0)),
+  ];
   return cleaned.length > 0 ? JSON.stringify(cleaned) : null;
 }
 
