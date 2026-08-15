@@ -6,14 +6,14 @@ current_phase: 4
 current_phase_name: Contact CRUD & Lifecycle
 status: executing
 stopped_at: Completed 04-01-PLAN.md
-last_updated: "2026-08-15T05:36:32.971Z"
+last_updated: "2026-08-15T05:43:53.489Z"
 last_activity: 2026-08-15
 last_activity_desc: Phase 4 execution started
 progress:
   total_phases: 16
   completed_phases: 3
   total_plans: 28
-  completed_plans: 20
+  completed_plans: 21
   percent: 19
 ---
 
@@ -29,7 +29,7 @@ See: .planning/PROJECT.md (updated 2026-08-14)
 ## Current Position
 
 Phase: 4 (Contact CRUD & Lifecycle) — EXECUTING
-Plan: 2 of 9
+Plan: 3 of 9
 Status: Ready to execute
 Last activity: 2026-08-15 — Phase 4 execution started
 
@@ -77,6 +77,7 @@ Progress: [████████░░] 82%
 | Phase 03-custom-fields P07 | 12min | 2 tasks | 4 files |
 | Phase 3 P8 | 5min | 3 tasks | 3 files |
 | Phase 04 P01 | 5min | 4 tasks | 8 files |
+| Phase 04 P02 | 3 | 3 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -122,6 +123,7 @@ Foundational decisions affecting current work:
 - [Phase 4]: 04-01: RootStackParamList is a type alias (not interface) to satisfy createNativeStackNavigator's ParamListBase; not-yet-built routes register themed placeholders swapped by later plans
 - [Phase 4]: 04-01: Settings hosts two rows (Custom Fields, Archived) not three — UI-SPEC 'Custom Fields' and 'Reachability' name the same CustomFieldsScreen; CustomFieldsScreen wired via a goBack() wrapper, DAO logic untouched
 - [Phase 4]: 04-01: danger token #E5484D landed in wave 1 (ThemePalette + space-dark preset), relocated from Plan 09; Plans 03/04/06/09 consume colors.danger, none re-adds it
+- [Phase ?]: 04-02: createContactFull composes non-mutexed cores in ONE transaction (never nests the non-reentrant mutex); phone in the create INSERT (CRUD-01); future occurredAt rejected pre-transaction (CRUD-02)
 
 ### Pending Todos
 
@@ -157,6 +159,6 @@ planning" sections in docs/dossier/*.md — those are the authoritative hand-off
 
 ## Session
 
-**Last session:** 2026-08-15T05:36:32.960Z
+**Last session:** 2026-08-15T05:43:31.336Z
 **Stopped at:** Completed 04-01-PLAN.md
 **Resume file:** None
