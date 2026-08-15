@@ -311,7 +311,20 @@ Recorded here because they bind phases that do not own them. Every planner/execu
   2. One ranked projection (kind priority then recency) produces the line the card, notification, and widget all reuse; age renders and drives ranking without ever hiding data.
   3. Cross-contact search matches name AND fuel text with `off_limits` excluded; `source='ai'` items render unconfirmed and are excluded from prompts until confirmed.
 
-**Plans:** TBD
+**Plans:** 4 plans
+
+**Wave 1**
+
+- [ ] 07-01-PLAN.md — Fuel writer DAO + shared read + FuelEditor mounted on the profile (add/edit/delete, 5 kinds) (FUEL-01, FUEL-02)
+
+**Wave 2** *(blocked on Wave 1)*
+
+- [ ] 07-02-PLAN.md — Pure kind-priority ranking + age + getRankedFuel (off_limits + source='ai' excluded in-query) + RankedFuelLine (FUEL-02, FUEL-03, FUEL-04, FUEL-06)
+
+**Wave 3** *(blocked on Wave 2)*
+
+- [ ] 07-03-PLAN.md — AI-unconfirmed state + confirm-flip source 'ai'→'manual' (no migration) (FUEL-06)
+- [ ] 07-04-PLAN.md — Cross-contact search query + minimal FuelSearch screen (name AND fuel text, off_limits + archived excluded) (FUEL-05)
 
 ### Phase 8: Dashboard & Never-Contacted Screen
 
@@ -454,7 +467,7 @@ Recorded here because they bind phases that do not own them. Every planner/execu
 | 4. Contact CRUD & Lifecycle | 9/9 | Complete   | 2026-08-15 |
 | 5. Photos | 8/8 | Complete   | 2026-08-15 |
 | 6. Interaction Log, Status & Impact | 6/6 | Complete   | 2026-08-15 |
-| 7. Conversational Fuel | 0/TBD | Not started | - |
+| 7. Conversational Fuel | 0/4 | Not started | - |
 | 8. Dashboard & Never-Contacted Screen | 0/TBD | Not started | - |
 | 9. Compose Screen & SMS Handoff | 0/TBD | Not started | - |
 | 10. Share-Sheet Capture | 0/TBD | Not started | - |
