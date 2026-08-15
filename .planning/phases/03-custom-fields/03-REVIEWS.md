@@ -1,178 +1,140 @@
 ---
 phase: 3
-cycle: 2
-reviewers: [claude, codex]
+cycle: 3
+reviewers: [codex, claude]
 reviewed_at: 2026-08-14
-plans_reviewed: [03-01-PLAN.md, 03-02-PLAN.md, 03-03-PLAN.md, 03-04-PLAN.md, 03-05-PLAN.md, 03-06-PLAN.md, 03-07-PLAN.md, 03-08-PLAN.md]
-prior_cycle_commit: 91eb6c5
+plans_reviewed: [03-03-PLAN.md, 03-07-PLAN.md]
+scope: re-review of cycle-2's 3 concurrency/correctness residuals (0 HIGH); only 03-03 + 03-07 changed (commit c7fa916)
 ---
 
-# Cross-AI Plan Review — Phase 3 (Custom Fields) — CYCLE 2 (RE-REVIEW)
+# Cross-AI Plan Review — Phase 3 (Custom Fields), Cycle 3
 
-Re-review of the eight Phase-3 plans after commit `91eb6c5` incorporated cycle 1's 2 HIGH + 14
-actionable findings. Focus: did the fixes hold WITHOUT regression, and is the mutex/transaction
-restructure correct (no remaining deadlock or lost-write path)? Only findings that REMAIN unresolved
-in the current plans are counted — cycle-1 findings now incorporated are not recounted.
+Focused re-review of the two plans revised to close cycle-2's three residuals:
+(1) complete write-serialization of the remaining field-def writers + the history prune,
+(2) the sweep scan→drop TOCTOU, (3) the strict-`<` expiry off-by-one. Both reviewers verified the
+plans against the actual code on disk (`src/db/mutex.ts`, `src/db/recency-dao.ts`,
+`src/db/migrations/001-initial.ts`, `src/services/launch-sweep.ts`). Plan 01 artifacts
+(`src/db/transaction.ts`, `col-name.ts`, `field-types.ts`) are not built yet — the authoritative
+`inWriteTransaction` reference is the private function in `recency-dao.ts:198-213`.
 
-Running inside Claude Code, so the Claude review is done in-session (grounded against the code on
-disk); Codex ran as the independent external CLI. Both read the actual source (`src/db/mutex.ts`,
-`src/db/recency-dao.ts`, `src/db/migrations/001-initial.ts`, `src/services/launch-sweep.ts`), not the
-plan text in isolation.
+## Codex Review
 
----
+## Summary
 
-## Cycle-1 fixes — verification (all FULLY RESOLVED)
+One unresolved MEDIUM plan-text contradiction remains. The intended implementation fixes
+serialization, TOCTOU, and boundary handling; however, Plan 03 still twice instructs the sweep to
+call `dropField`, which bypasses the required stale-under-lock re-check.
 
-| Cycle-1 finding | Fix incorporated | Verified against code |
-|---|---|---|
-| HIGH-1 sweep self-deadlock | 03-07 calls public `dropField` DIRECTLY (no outer withMutex); per-def try/catch; no-hang + second-`runLaunchSweep` tests | `withMutex` non-reentrant confirmed `mutex.ts:32-36`; sweep loop `03-07:90` calls bare; no double-acquire path |
-| HIGH-2 upsertValue race + check→drop atomicity | `upsertValue` inside `inWriteTransaction` (03-04); `dropField` split into non-mutexed core `dropFieldColumns` + public `dropField`; `deleteOrQuarantineField` does check+drop in ONE `inWriteTransaction` via the core; single-BEGIN test | `03-03:103-126`, `03-04:86-92`; core is not exported, composed only within field-ddl.ts — no cross-module nesting |
-| inWriteTransaction extracted | 03-01 Task 3 creates `src/db/transaction.ts`, recency-dao imports it; no verbatim copies | `03-01:169-207`; current private copy at `recency-dao.ts:198-213` moves verbatim; call sites unchanged |
-| isSafeColName at all interp sites | 03-02 sortExpr guards; 03-03 create/drop/isFieldEmpty guard; 03-04 read/upsert guard; 03-05 preflight/apply guard | present in every plan's task body + done criteria |
-| datetime('now','localtime',?) window | 03-07 uses datetime not date | `03-07:84,97` (but see LOW below — operator off-by-one) |
-| isValueInOptions dropdown membership | 03-02 exports it; 03-06 flags on it; 03-05/08 preflightOptionsChange | `03-02:87-96`, `03-06:128-132`, `03-05:89-97` |
-| show_on_new/always_show DAO | 03-03 updateFieldCuration | `03-03:178-180` |
-| depends_on fixes | 03-02→[03-01], 03-05→[03-01,03-02], 03-08→[...,03-07] | confirmed in frontmatter |
-| uid contract | 03-04 UID CONTRACT block (one per contact, INSERT-only) | `03-04:96-104` |
-| field_history operation encoding | 03-05 `type_change:<old>-><new>` | `03-05:124` |
-| quarantined-collision create | 03-08 builds existing set from listDefs({includeQuarantined:true}); 03-01 test | `03-08:130-132`, `03-01:153-156` |
-| atomic-rollback test fixture | 03-03 pre-seeds an orphan physical column so ADD COLUMN is the failing statement | `03-03:129-137` |
+## Concerns
 
-No decision reversal in any plan. TEXT-forever, no index/UNIQUE on value columns,
-type-change = UPDATE-defs.type-only (byte-identical), sole sortExpr, 30d fixed window, and
-photo/share_with_ai deferral are all upheld.
+- **MEDIUM** — `03-03-PLAN.md:55-59` and `03-03-PLAN.md:126-129` say Plan 07 calls public `dropField`
+  directly, contradicting the required and otherwise specified `expireFieldIfStale` route at
+  `03-03-PLAN.md:64-67,142-156` and `03-07-PLAN.md:101-108`. Direct `dropField` would not nest the
+  mutex, but it would omit the under-lock `quarantined_at` re-check and could drop a field restored
+  after the candidate scan. Remove the two stale `dropField` references.
 
----
+No new deadlock is introduced by the intended path: `expireFieldIfStale` owns one transaction and
+calls the non-mutexed core; Plan 07 calls it bare. This matches the non-reentrant promise chain in
+`src/db/mutex.ts:32-35`, the hand-rolled shared transaction pattern in `src/db/recency-dao.ts:198-212`,
+and avoids wedging the registry, whose hook awaits block while `running` remains true
+(`src/services/launch-sweep.ts:76-88`).
 
-## Claude Review (in-session, grounded)
+## Verdict
+
+1. **Write serialization complete: Yes.** The remaining def writers are each specified inside
+   `inWriteTransaction` (`03-03-PLAN.md:205-233`), with single-BEGIN tests (`03-03-PLAN.md:249-252`);
+   the history prune is likewise serialized (`03-07-PLAN.md:111-117`). No writer bypass remains.
+2. **Sweep TOCTOU fixed: No — plan contradiction remains.** The correct implementation is fully
+   specified (`03-03-PLAN.md:142-156`; `03-07-PLAN.md:101-108`), but the conflicting `dropField`
+   instructions above must be removed for the plan to be unambiguous.
+3. **Off-by-one fixed: Yes.** Candidate scan and under-lock re-check both use strict `<`
+   (`03-07-PLAN.md:91-100`; `03-03-PLAN.md:145-147`), with exact-30-day coverage
+   (`03-07-PLAN.md:130-132`). The history prune deliberately remains `<=` (`03-07-PLAN.md:111-116`).
+
+## Claude Review
 
 ### Summary
-The restructure is correct. I traced every path that acquires the mutex and found no double-acquire:
-`deleteOrQuarantineField` opens ONE `inWriteTransaction` and calls the NON-mutexed core
-`dropFieldColumns` (never the public `dropField`), so check+drop share exactly one transaction with no
-nested mutex; the sweep calls the public `dropField` bare (one acquisition per def); `upsertValue` and
-`applyTypeChange` each run in one `inWriteTransaction` with no nested transactional call. Both cycle-1
-HIGHs are fully resolved and the fixes are backed by acceptance tests (single-BEGIN atomicity proof;
-no-hang + second-`runLaunchSweep` registry-not-wedged proof). All 14 actionable items are incorporated
-into task bodies, done-criteria, or threat rows. No recorded decision is weakened.
 
-### Strengths
-- No path double-acquires the non-reentrant mutex (`mutex.ts:32-36`). The private/public split of the
-  drop logic is the right shape: composition happens through a non-mutexed core, never by nesting.
-- Check+drop atomicity is enforced AND tested (03-03 test (f): assert exactly ONE BEGIN).
-- `upsertValue` — the cycle-1 permanent-data-loss path — is now serialized (`03-04:86-92`).
-- Cited line references remain accurate (verified FieldType@`schemas/types.ts:20`,
-  localDateTime@`database.ts:45`, expoExecutor@`database.ts:57`, ready-gated effect@`App.tsx:65-68`,
-  migration table shapes@`001-initial.ts:127-163`).
+All three cycle-2 residuals are fixed in the authoritative plan text and are consistent with the
+real mutex/transaction semantics. No new deadlock, no writer bypasses the shared mutex, no decision
+reversal. One actionable MEDIUM confirmed independently: two leftover sentences in 03-03 still assert
+the sweep calls `dropField` directly, contradicting the rest of the plan.
+
+### Verification against the code
+
+- **Non-reentrancy is real.** `src/db/mutex.ts:32-36` — `chain.then(fn, fn)` then
+  `chain = run.catch(...)`. Calling `withMutex` (via `inWriteTransaction`) inside an already-running
+  `withMutex` body queues behind the current run's own tail, which cannot settle until the body it is
+  awaiting returns → permanent deadlock. The fix's whole shape (non-mutexed `dropFieldColumns` core
+  composed inside each mutex-owning entry; sweep calls `expireFieldIfStale` bare; history prune is a
+  SEPARATE sequential `inWriteTransaction` after the loop, never nested) correctly avoids this.
+
+- **Residual 1 — serialization complete.** `03-03-PLAN.md:205-233` wraps every remaining def writer
+  (rename/changeFieldOptions/updateFieldCuration/quarantine/restore) in its own `inWriteTransaction`;
+  `03-03-PLAN.md:249-252` asserts exactly one BEGIN per writer and zero for `listDefs`/`isFieldEmpty`.
+  `03-07-PLAN.md:111-117` wraps the `field_history` prune in `inWriteTransaction`. Enumerating every
+  writer in the phase (createField, dropField, deleteOrQuarantineField, expireFieldIfStale, the five
+  defs-dao writers, the prune) leaves no bare writer; `dropFieldColumns` is a private core only ever
+  called inside an owned transaction. **Resolved.**
+
+- **Residual 2 — sweep TOCTOU.** `03-03-PLAN.md:142-156`: `expireFieldIfStale` opens ONE
+  `inWriteTransaction`; the guard `SELECT ... quarantined_at IS NOT NULL AND quarantined_at <
+  datetime('now','localtime', ?)` and the `dropFieldColumns` core call are both inside that single
+  transaction body — the re-check and the drop are genuinely one transaction. It calls the non-mutexed
+  core, never public `dropField`, so no nesting. `03-07-PLAN.md:101-108` calls `expireFieldIfStale`
+  bare. Because `restoreField` is now mutex-serialized (`03-03-PLAN.md:228-233`), a restore ordered
+  before the expiry transaction is seen by the guard SELECT and the field survives; the mandatory
+  SWEEP-TOCTOU test (`03-07-PLAN.md:133-139`) asserts exactly this. Even in the unorderable race the
+  drop is snapshot-to-`field_history`-first, so no silent data loss. **Resolved in the authoritative
+  text** — but see the MEDIUM below.
+
+- **Residual 3 — strict `<`.** `03-07-PLAN.md:91-100` (candidate scan) and `03-03-PLAN.md:145-147`
+  (under-lock re-check) both use strict `<` with the SAME `windowModifier`; the prune stays `<=`
+  by explicit design (`03-07-PLAN.md:111-116`); boundary tests cover exactly-30 (survives) and
+  exactly-31 (expires) (`03-07-PLAN.md:130-132`). Time only advances, so a def passing the scan cannot
+  fail the later guard on clock drift alone. **Resolved.**
 
 ### Concerns
-- **MEDIUM — def-metadata writers bypass the shared serialization boundary.** 03-03 Task 2 specifies
-  `renameField`, `changeFieldOptions`, `updateFieldCuration`, `quarantineField`, `restoreField` as bare
-  single `UPDATE`s (only `reorderFields` is wrapped in `inWriteTransaction`), and 03-07's history prune
-  is a bare `DELETE` (`03-07:96`). `mutex.ts:8-20`/`recency-dao.ts:22-31` document why the mutex exists:
-  a bare write on the shared connection issued while an explicit `BEGIN` transaction is open is captured
-  into that transaction and rolled back with it. A user-initiated metadata edit that overlaps the async
-  launch-sweep's in-flight `dropField` transaction on a background→active resume would be captured. I
-  rate this MEDIUM (not HIGH as Codex does): the contact-VALUE write path is serialized, the exposed
-  writes are def-metadata (a lost edit is re-doable, not corrupted contact data), and every scenario
-  needs the async sweep to overlap a user bare-write in a single-user app. But it is a real gap against
-  the project's own "every writer through the shared mutex" contract, which cycle 1 applied only to
-  `upsertValue`. Cheap, local fix.
-- **MEDIUM — sweep expiry TOCTOU: a field restored after the stale-def scan is still dropped.** 03-07
-  selects stale defs in a bare SELECT (`03-07:84`) then per-def awaits `dropField` (`03-07:90`) with the
-  stale def object. If `restoreField` nulls `quarantined_at` between the scan and that def's drop, the
-  drop fires anyway (it re-checks nothing). Serializing the writers (concern above) does NOT fix this —
-  `dropField` must re-read `quarantined_at` inside its own transaction for the expiry path. Narrow
-  (launch-timed, single-user) and the data is snapshotted to `field_history` first, so it is a
-  reversible-quarantine violation rather than permanent loss — MEDIUM.
-- **LOW — expiry predicate contradicts its own boundary test.** `03-07:84` uses
-  `quarantined_at <= datetime('now','localtime','-30 days')`, but the boundary test (`03-07:108`)
-  requires a field quarantined EXACTLY 30 days ago to NOT expire. With `<=`, exactly-30-days expires.
-  The plan's stated intent is "older than 30 days" → the operator should be `<` (or the test reworded).
-  This would surface as a failing test at execution, but the plan should specify the correct operator.
 
-### Risk Assessment
-**LOW–MEDIUM.** The restructure the cycle targeted is correct; no deadlock or contact-value lost-write
-remains. The residual items are adjacent writers not brought into the boundary, a narrow launch-time
-TOCTOU, and a boundary-operator off-by-one — all small, local plan edits, none reopening a decision.
+- **MEDIUM (actionable)** — `03-03-PLAN.md:59` ("…is what Plan 07's sweep calls DIRECTLY") and
+  `03-03-PLAN.md:128` ("Plan 07's sweep calls THIS directly") are stale cycle-1/2 wording about the
+  public `dropField`. They contradict the authoritative cycle-3 text at `03-03-PLAN.md:30`, `64-67`,
+  `142-156` (esp. line 156: "the sweep calls `expireFieldIfStale` (never `dropField`)") and all of
+  `03-07-PLAN.md` (`79-80`, `101-108`). Plan 07 — the plan that actually implements the sweep — never
+  instructs a `dropField` call, and its mandatory TOCTOU test would fail if one were used, so an
+  executor is well-guarded; but the two stray sentences should be deleted so the plan is internally
+  consistent and cannot be misread into reopening the TOCTOU. **Fix:** in 03-03, change line 59 to say
+  the public `dropField` is the drop primitive exercised by the drop-mechanics tests (the sweep calls
+  `expireFieldIfStale`), and delete "Plan 07's sweep calls THIS directly — and" from line 128,
+  keeping the non-reentrancy warning.
 
----
+### Verdict
 
-## Codex Review (external CLI)
+No HIGH concerns. No new deadlock, no writer bypass, no boundary/operator disagreement, no decision
+reversal. All three residuals are substantively fixed; one plan-hygiene MEDIUM remains.
 
-### Summary
-"The revised core restructure fixes both recorded HIGHs: no planned double mutex acquisition, and
-`deleteOrQuarantineField` performs the emptiness check plus drop core in one transaction." Codex then
-raises two concurrency gaps it rates HIGH.
+## Consensus Summary
 
-### Strengths (Codex)
-- `withMutex` confirmed non-reentrant — nested acquisition would deadlock (`mutex.ts:32`).
-- Extraction preserves the correct hand-rolled transaction semantics (`recency-dao.ts:194`).
-- Sweep self-deadlock correctly avoided; `deleteOrQuarantineField` calls the non-mutexed core only from
-  its one outer transaction (`03-03:112,117`, `03-07:90`).
-- `upsertValue` now serialized through `inWriteTransaction` (`03-04:86`).
+Both reviewers independently reach the same conclusion: the three cycle-2 residuals are fixed in the
+authoritative plan text and are consistent with the actual non-reentrant `withMutex` chain and
+hand-rolled transaction pattern in the code. No new deadlock, no bare writer, no boundary mismatch,
+no decision reversal.
 
-### Concerns (Codex)
-- **HIGH (Codex) — sweep/restore TOCTOU.** Same mechanism as Claude's MEDIUM sweep-TOCTOU. Codex: "add
-  an expiry-specific, mutex-owned transaction that re-reads/verifies the def is still stale immediately
-  before invoking the private drop core; serialize restore with the same boundary." (`03-07:84,90`,
-  `03-03:168,181`)
-- **HIGH (Codex) — not every custom-field writer participates in the shared boundary.** Same mechanism
-  as Claude's MEDIUM metadata-writer concern. Codex: "route every mutating custom-field DAO operation and
-  sweep prune through `inWriteTransaction` — using non-mutexed cores only when composing within an
-  already-owned transaction." (`03-03:168`, `03-07:96`)
-- **LOW (Codex) — expiry predicate vs boundary test** (`<=` vs the exactly-30-days test) — same as
-  Claude's LOW. Also notes the "injected clock" test phrasing (`03-07:82`) can't inject into SQLite's
-  built-in `now`; the test must drive `quarantined_at` values relative to real now (which the plan's
-  40/5/31/30-day fixtures already do — so this is wording, not a defect).
+### Agreed Strengths
+- Write-serialization is now complete — every def writer and the history prune run through one
+  `inWriteTransaction` (single-BEGIN tests asserted); pure reads take none.
+- The core/wrapper split correctly avoids nesting the non-reentrant mutex; the sweep composes
+  `expireFieldIfStale` (own txn) and a separate sequential prune txn — no deadlock path.
+- The under-lock `quarantined_at` re-check shares the drop's single transaction, closing the
+  scan→drop TOCTOU; strict `<` expiry vs deliberate `<=` retention prune agree with the boundary tests.
 
-### Risk Assessment (Codex)
-**HIGH** — on the two concurrency gaps.
-
----
-
-## Consensus & Orchestrator Verification
-
-Both reviewers agree the **restructure is correct**: no reintroduced nested-mutex deadlock, check+drop
-share exactly one transaction, `upsertValue` is serialized. I independently verified each load-bearing
-claim against the code on disk (not the plan text): `mutex.ts:32-36` non-reentrant; the non-mutexed
-core `dropFieldColumns` is unexported and composed only inside field-ddl.ts; the sweep calls the public
-`dropField` bare. **Both cycle-1 HIGHs are FULLY RESOLVED.**
-
-Both reviewers independently surfaced the **same three residual items** (strong agreement on
-mechanism):
-1. def-metadata writers + sweep prune are not routed through the shared mutex;
-2. the sweep scan→drop TOCTOU can expire a just-restored field;
-3. the expiry operator (`<=`) contradicts the exactly-30-days boundary test.
-
-**Divergence — severity of items 1 and 2.** Codex rates both HIGH; I rate both MEDIUM. Orchestrator's
-call: **MEDIUM, actionable, not counted as unresolved HIGH.** Grounds: (a) the contact-VALUE write path
-(`upsertValue`) — cycle-1's permanent-loss path — is serialized; the remaining bare writes are
-def-metadata whose loss is a re-doable edit; (b) the sweep TOCTOU snapshots to `field_history` before
-dropping, so it is a reversible-quarantine violation, not permanent data loss; (c) both require the
-async launch-sweep to overlap a user bare-write in a single-user local app; (d) the fixes are small,
-local plan edits. They are nonetheless genuine gaps against the project's own stated "every writer
-through the shared mutex" contract and should be incorporated before execution.
-
-No finding reverses or weakens a `[DECIDED]`/owner item — no escalation.
-
-### Agreed Concerns (both reviewers, prioritized — all actionable, none HIGH)
-1. **Serialize the remaining custom-field writers.** Route `renameField`, `changeFieldOptions`,
-   `updateFieldCuration`, `quarantineField`, `restoreField` (03-03 Task 2) and the `field_history`
-   prune (03-07 Task 1) through `inWriteTransaction`, completing the boundary that cycle 1 applied only
-   to `upsertValue`. Compose via non-mutexed cores only where already inside an owned transaction.
-2. **Guard the sweep expiry TOCTOU.** In the expiry path, re-read `quarantined_at` inside `dropField`'s
-   transaction (or a sweep-specific expiry op that re-verifies staleness) so a field restored between
-   the stale-def scan and the drop is not expired. Serialization alone does not fix this.
-3. **Fix the expiry operator.** Change `03-07`'s predicate to `<` (or reword the exactly-30-days test)
-   so "older than 30 days" is internally consistent.
+### Agreed Concerns
+- **MEDIUM (both reviewers, actionable):** `03-03-PLAN.md:59` and `:128` still assert the sweep calls
+  public `dropField` directly — stale text contradicting the rest of 03-03 and all of 03-07, which
+  route the sweep through `expireFieldIfStale`. Remove/correct the two clauses so the plan is
+  unambiguous and cannot be misread into skipping the under-lock re-check.
 
 ### Divergent Views
-- HIGH vs MEDIUM on items 1 and 2 (resolved above as MEDIUM/actionable).
-
-### Not counted
-- 03-06 declares `depends_on: [03-02]` and imports the `CustomFieldDef` type transitively via 03-01;
-  safe under sequential wave ordering (03-06 Wave 3 > 03-02 Wave 2 > 03-01 Wave 1) — not
-  execution-breaking, optional edge to add.
-- The 03-07 "injected clock" wording — the test drives `quarantined_at` values relative to real now,
-  which is sound; no clock injection is actually required.
+None. Codex tags the contradiction as blocking residual #2's verdict; Claude confirms the same finding
+but notes 03-07's implementing text and mandatory TOCTOU test guard the executor, making it a
+plan-hygiene MEDIUM rather than a HIGH. Both agree on zero HIGH and on the single required edit.
