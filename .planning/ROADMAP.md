@@ -281,7 +281,7 @@ Recorded here because they bind phases that do not own them. Every planner/execu
 
 **Wave 2** *(blocked on Wave 1)*
 
-- [ ] 06-02-PLAN.md — Interleaved timeline read (touchpoints ⋈ events, events empty v1) + TimelineRow render (LOG-02)
+- [ ] 06-02-PLAN.md — Events writer (immutable events-dao + archive/restore retrofit) + interleaved timeline read + TimelineRow render + purge events surfacing (LOG-02)
 
 **Wave 3** *(blocked on Wave 2)*
 
@@ -289,7 +289,7 @@ Recorded here because they bind phases that do not own them. Every planner/execu
 
 **Wave 4** *(blocked on Wave 3)*
 
-- [ ] 06-04-PLAN.md — Rogue reason (REASON_SQL) + single-contact query-time status read + in-app rogue label (LOG-05, LOG-04)
+- [ ] 06-04-PLAN.md — Rogue reason (REASON_SQL) + single-contact query-time status read + status/gravity colour tokens (rogue + gravityTiers) + in-app rogue label (LOG-05, LOG-04)
 
 **Wave 5** *(blocked on Wave 4)*
 
