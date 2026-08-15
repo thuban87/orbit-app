@@ -253,6 +253,18 @@ export function EditContactScreen({
         return;
       }
 
+      // Metadata (incl. the first interaction) is now COMMITTED and last_contact
+      // is set. Clear the never-contacted first-interaction intent in LOCAL STATE
+      // immediately, independent of the links diff or any reseed. This is the
+      // load-bearing guard against re-emitting firstInteraction on a retry: if we
+      // instead relied on the best-effort reseedMetadataAfterPartialSave() below
+      // and that reseed itself threw, a retry would re-emit firstInteraction, the
+      // DAO would reject the double-log, and the form would wedge until remount.
+      if (neverContacted && input.firstInteraction) {
+        setNeverContacted(false);
+        setField("lastSpoke", { kind: "not-yet" });
+      }
+
       // Metadata is COMMITTED. Now the links diff in its own transaction.
       try {
         await applyLinkDiff(exec, {
