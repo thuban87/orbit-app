@@ -1,8 +1,10 @@
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { StyleSheet, Text, View } from "react-native";
+import { CustomFieldsScreen } from "@/screens/CustomFieldsScreen";
 import { HomeScreen } from "@/screens/HomeScreen";
+import { SettingsScreen } from "@/screens/SettingsScreen";
 import { useTheme } from "@/theme";
-import type { RootStackParamList } from "./types";
+import type { RootStackParamList, RootStackScreenProps } from "./types";
 
 /**
  * The app's real navigation shell (Phase 4) — a native-stack navigator that
@@ -29,6 +31,18 @@ import type { RootStackParamList } from "./types";
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
 /**
+ * Thin route wrapper: `CustomFieldsScreen` stays prop-driven (its `onBack`
+ * contract is unchanged and testable) — the navigator supplies the back action
+ * via `navigation.goBack()`. We deliberately do NOT refactor `onBack` to call
+ * `useNavigation` inside the screen; the wrapper keeps that concern here.
+ */
+function CustomFieldsRoute({
+  navigation,
+}: RootStackScreenProps<"CustomFields">) {
+  return <CustomFieldsScreen onBack={() => navigation.goBack()} />;
+}
+
+/**
  * A themed "Coming soon" placeholder for a route whose real screen ships in a
  * later plan. Resolves its colours through the theme so it satisfies
  * `check:colors` and restyles with the active preset.
@@ -52,8 +66,6 @@ function makePlaceholder(label: string) {
   };
 }
 
-const SettingsPlaceholder = makePlaceholder("Settings");
-const CustomFieldsPlaceholder = makePlaceholder("Custom Fields");
 const CreatePlaceholder = makePlaceholder("New contact");
 const ProfilePlaceholder = makePlaceholder("Profile");
 const EditPlaceholder = makePlaceholder("Edit contact");
@@ -66,8 +78,8 @@ export function RootNavigator() {
       screenOptions={{ headerShown: false }}
     >
       <Stack.Screen name="Home" component={HomeScreen} />
-      <Stack.Screen name="Settings" component={SettingsPlaceholder} />
-      <Stack.Screen name="CustomFields" component={CustomFieldsPlaceholder} />
+      <Stack.Screen name="Settings" component={SettingsScreen} />
+      <Stack.Screen name="CustomFields" component={CustomFieldsRoute} />
       <Stack.Screen name="Create" component={CreatePlaceholder} />
       <Stack.Screen name="Profile" component={ProfilePlaceholder} />
       <Stack.Screen name="Edit" component={EditPlaceholder} />
