@@ -2,7 +2,7 @@
 phase: 5
 reviewers: [codex, claude]
 reviewed_at: 2026-08-15
-cycle: 1
+cycle: 3
 plans_reviewed: [05-01-PLAN.md, 05-02-PLAN.md, 05-03-PLAN.md, 05-04-PLAN.md, 05-05-PLAN.md, 05-06-PLAN.md, 05-07-PLAN.md, 05-08-PLAN.md]
 ---
 
@@ -378,4 +378,144 @@ risk-posture decision). Both agree a plan change to `persistMaster` is warranted
 - No migration needed (001-initial.ts:51). DAO placement correct; FS work post-commit (purge-dao.ts:205).
 - Colour tokenised incl. Skia (check-colors.sh:37). Manipulator output not Skia snapshot; relative paths stored.
 - Wave graph acyclic, no same-wave files_modified collision. Missing 05-08→05-07 dep is semantic, not a cycle/collision.
+```
+
+---
+---
+
+# Cross-AI Plan Review — Phase 5 (Photos) — Cycle 3 (final)
+
+Re-review after the cycle-2 replan (commit `e8fb645`), which claimed all of cycle-2's **1 HIGH + 6
+actionable** items shipped. Two independent reviewers again: **codex** (OpenAI codex-cli 0.144.1, run
+over the revised plans + source) and **claude** (read-only, independent). Every cycle-2 item was
+re-verified against the ACTUAL code on disk — including, this cycle, the **installed Android native
+source** of `expo-file-system`, which turned out to be decisive.
+
+`reviewed_at: 2026-08-15` · `cycle: 3` · `plans_reviewed: [05-01..05-08]`
+
+## Headline: the HIGH is STILL-OPEN — and both reviewers independently verified why
+
+The cycle-2 HIGH (replacement atomicity) was fixed on a **false premise**. The plan ships
+`tmp.move(dest, { overwrite: true })` as the PRIMARY persist strategy, asserting it is a "single
+atomic overwrite move" ("VERIFIED SDK-57 semantics"), and demotes the recoverable `.bak` swap to a
+*conditional* fallback gated on "IF build-time verification shows `File.move(..,{overwrite:true})` is
+NOT atomic". **It is not atomic on Android.** The installed `expo-file-system@57.0.4` native
+implementation does **delete-then-rename**, verified on disk:
+
+- `FileSystemPath.move()` → `file.moveTo(asCopyOrMoveDestination(overwrite))`
+  (`node_modules/expo/node_modules/expo-file-system/android/src/main/java/expo/modules/filesystem/FileSystemPath.kt:174-187`).
+- `CopyMoveStrategy.moveTo(spec)`: `val resolved = spec.resolve(file)` runs BEFORE `tryNativeMove`
+  (`.../fsops/CopyMoveStrategy.kt:37-46`).
+- `DestinationSpec.resolve()` delegates straight to `prepareAsDestination`
+  (`.../fsops/DestinationSpec.kt:27-29`).
+- `LocalFile.prepareAsDestination()` for an existing File→File target with `overwrite=true` calls
+  **`it.deleteRecursively()`** — the prior master is DELETED during resolve
+  (`.../fsops/CopyMoveStrategy.kt:88-91`) — and only THEN `tryNativeMove` does `file.renameTo(target)`
+  (`:96-104`).
+
+So a process kill between the delete and the rename leaves `dest` **gone** and the new bytes
+stranded at `*.tmp`. Worse, the launch reconcile as specified would **complete the data loss**:
+`reconcilePhotoDir` treats an orphan `*.tmp` as "delete it — the canonical dest is authoritative and
+untouched" (`05-02-PLAN.md:108,116`), but here dest is NOT untouched — it was deleted — so the sweep
+deletes the only surviving copy. Net: on a crash mid-replace the user loses BOTH the old photo and
+the new crop (DB points at a missing file → Avatar falls back to initials). This is the exact
+irreversible-no-backup loss the cycle-2 HIGH was raised to close, and the `.d.ts` the plan tells the
+executor to verify against (`05-02-PLAN.md:92,114`) only exposes `overwrite?: boolean`
+(`File.types.d.ts:17-23`) — it cannot reveal the native delete-then-rename, so an executor following
+the plan literally would ship the unsafe path.
+
+The `.bak` swap (currently the *conditional* fallback) IS crash-safe even under delete-then-rename,
+because the destructive step becomes a *rename of dest → dest.bak* (preserving the prior master)
+before `tmp → dest`, and the reconcile restores `.bak → dest` if interrupted. **The fix is to make
+the `.bak` swap the UNCONDITIONAL, shipped strategy** (not gated on a `.d.ts` check that can't see the
+truth), and to correct the plan's atomicity claims accordingly.
+
+## Cycle-2 re-verification (both reviewers, verified against disk)
+
+| Cycle-2 item | Status | Disk evidence |
+|---|---|---|
+| **[HIGH] Replacement atomicity** (persistMaster copy→tmp then `tmp.move(dest,{overwrite:true})` no pre-delete; `photo-reconcile-sweep.ts` on the Phase-2 registry; failure tests) | **STILL-OPEN** | Wiring is real and correct: `registerSweepHook(fn: SweepHook)` (`src/services/launch-sweep.ts:44-47`), `registerPhotoReconcileSweep` mirrors `registerFieldSweep` (`src/services/field-sweep.ts:83`), App.tsx registers it ready-gated under a one-shot guard beside `registerFieldSweep`, before `installSweepTrigger`, no timer (`App.tsx:73-83`; `05-02-PLAN.md:180-193`). **But the atomicity premise is false**: the shipped PRIMARY `tmp.move(dest,{overwrite:true})` is delete-then-rename on the installed Android impl (`FileSystemPath.kt:174-187`, `CopyMoveStrategy.kt:37-46,88-91,96-104`, `DestinationSpec.kt:27-29`), so it can still permanently lose the prior master; the `.bak` swap must be made unconditional. must_haves truth (`05-02-PLAN.md:22`) + T-05-10 (`:213`) still assert the atomic-overwrite move is safe. |
+| **[MED] Per-write monotonic cache-bust token** (`photo-cache-bust-store.ts`) | **RESOLVED** | Net-new store with a per-path MONOTONIC counter (`05-03-PLAN.md:125-126`, not `Date.now`), folded into `cacheKey`+`recyclingKey`; contact/profile writes bump it (`05-05-PLAN.md:103`), custom-field writes bump it (`05-08-PLAN.md:137`). Justified by real second-resolution `localDateTime` (`src/db/database.ts:41-45`). |
+| **[MED] Custom-field staged-file orphan cleanup** (staged ledger + reconcile on cancel/unmount, never deletes a saved photo) | **RESOLVED** | `markPhotoStaged`/`takeStagedPhotos` ledger (`05-08-PLAN.md:78,97,102`); teardown deletes only staged files NOT referenced by the COMMITTED values, keeps re-crop-in-place (equal→referenced→kept), "if uncertain DO NOT delete" (`05-08-PLAN.md:142`) — mirrors purge's "delete only files no committed row references" invariant; form value model is nullable + persists via guarded upsert (`EditContactScreen.tsx` / `field-values-dao.ts`). |
+| **[MED] URL size cap stream-enforced / reject absent-invalid content-length + byteLength recheck** | **RESOLVED** | `fetch` (not `downloadFileAsync`); stream-abort at cap via `response.body.getReader`, fallback rejects absent/non-numeric/over-cap `content-length` up front AND re-verifies actual `byteLength` after read; redirect final-URL re-validated via `isImageUrl(response.url)` (`05-06-PLAN.md:86,90,99`). |
+| **[MED] Generic FS boundary guard `assertSafeRelative`** (allowlist `avatars/<name>.<ext>`; reject `..`/absolute/backslash/nullbyte/bad-ext) on resolve/persist/delete + traversal test | **RESOLVED** | Private `assertSafeRelative` at the top of `resolvePhotoUriFromDocumentUri`/`persistMaster`/`deletePhoto`, allowlisted shape, independent of + additive to the builder throws; traversal test enumerated (`05-02-PLAN.md:106,112-113,118,125`); builder `col_name` guard reuses the real `isSafeColName` boundary (`src/db/col-name.ts`, `field-values-dao.ts:45-49`). (See New LOW re: null-byte test input.) |
+| **[LOW] Stale "delete-before-copy" phrasing fixed everywhere** | **PARTIAL** | Fixed in all three flagged PLAN files (`05-02`/`05-05`/`05-08` now read atomic-overwrite-move / "never a pre-delete"; grep finds no stale phrasing in any `05-0X-PLAN.md`). STILL present in phase docs the plan directs executors to READ: `05-RESEARCH.md:13,59,169,300,483,497` and `05-PATTERNS.md:182` ("Delete-before-copy; store relative…"). Not PLAN.md, but actionable doc-hygiene — scrub alongside the HIGH replan since 05-02 read_first points executors at RESEARCH. |
+| **[LOW] 05-08 `depends_on` includes 05-07** | **RESOLVED** | `05-08-PLAN.md:6` = `["05-03","05-04","05-05","05-07"]`; graph-legal — 05-07 is wave 3, so `max(3,3,4,3)+1 = 5` keeps 05-08 in wave 5, files disjoint (`purge-photo-cleanup.*`/`ArchivedContactsScreen.tsx` vs 05-08's set). |
+
+## New concerns (Cycle 3)
+
+- **[codex / LOW → claude concur] Null-byte test input missing from the boundary-guard test
+  enumeration.** `05-02-PLAN.md:106,113,125` REQUIRE null-byte rejection, but the enumerated test
+  inputs at `:118` (`../../etc/passwd`, `/abs/path`, `avatars/../secret.jpg`, backslash, bad ext) omit
+  an explicit null-byte string. Add one so the required behavior is actually exercised.
+- **[claude / note — not a plan change] `expo-file-system` is installed at a NESTED path**
+  (`node_modules/expo/node_modules/expo-file-system@57.0.4`), not top-level — the atomicity truth is
+  in its Android `.kt` sources, NOT the `.d.ts`. The plan's "confirm against the installed SDK-57
+  `.d.ts`" instruction (`05-02-PLAN.md:92,114`) points at an artifact that cannot reveal the
+  delete-then-rename behavior; the HIGH remediation should redirect that verification to the native
+  source and record the finding so it is not re-derived wrong.
+
+## Non-negotiable checks (both reviewers, verified)
+
+| Check | Result | Evidence |
+|---|---|---|
+| PHOTO-01…05 coverage | PASS | Distributed across 05-01..08; ROADMAP §Phase 5. PHOTO-01 (05-05 library+crop, 05-06 URL, 05-08 custom), PHOTO-02 (05-06), PHOTO-03 (05-02/04 master), PHOTO-04 (05-03 initials), PHOTO-05 (05-07 purge + 05-05/08 remove/clear). |
+| Acyclic graph, correct waves, NO same-wave file collision | PASS | Wave 3 (05-03/04/07) and wave 5 (05-06/08) have disjoint `files_modified` (frontmatter scan); all deps point to earlier waves. |
+| Theme-token colours incl. Skia | PASS | `avatarSwatches`/`avatarSwatchText` in theme (`05-01`); Avatar + crop token-only, `check:colors` gate (`05-03:126`, `05-05:102`). |
+| No network on read path; relative→`file://` | PASS | `resolvePhotoUri` yields local `file://` only; URL fetch is write-path-only (`05-06:86,90`). |
+| 512px master via image-manipulator, not Skia snapshot | PASS | `05-04:40-42,109` — manipulate original URI, forbids `makeImageSnapshot`. |
+| Reanimated shared values (no per-frame setState) | PASS | One-time init only; gesture/render via shared values (`05-05:101-103,110-113`). |
+| DAOs in `src/db`; no new migration | PASS | `contacts.photo`+`profile.photo` pre-exist (`001-initial.ts:56,72`); dedicated writers mirror `archiveContact`'s `changes!==1` guard; `updateContactMetadataCore` verified to omit `photo`. |
+| Proportionate threat model | **FAIL (the HIGH)** | T-05-10 (`05-02-PLAN.md:213`) mitigates the irreversible-write threat with the atomic-overwrite-move claim disproved by `CopyMoveStrategy.kt:88-91,96-104`. Fix rides with the HIGH. |
+
+## Consensus Summary (Cycle 3)
+
+The cycle-2 replan landed **5 of 6** actionable items cleanly (cache-bust, custom-field orphan
+ledger, URL size cap, FS boundary guard, 05-08→05-07 dep) and all non-negotiables except the HIGH.
+**But the HIGH — replacement atomicity — is STILL-OPEN, and both reviewers independently converged on
+the same disk evidence:** the shipped PRIMARY `tmp.move(dest,{overwrite:true})` is delete-then-rename
+on the installed `expo-file-system@57.0.4` Android implementation, so it retains the irreversible
+prior-master-loss window the fix was meant to close, and the reconcile sweep would complete the loss.
+The remedy is already written into the plan as the *conditional* `.bak` swap fallback — it simply must
+be made the **unconditional, shipped** strategy, with the plan's atomicity claims (must_haves truth
+`:22`, action `:107,114`, success_criteria `:127`, T-05-10 `:213`) and its verification target
+(`.d.ts` → native `.kt`) corrected. Not yet executable.
+
+### Agreed concerns (2 reviewers) — priority order
+
+1. **[HIGH] Replacement atomicity STILL-OPEN.** `File.move({overwrite:true})` on Android LocalFile is
+   delete-then-rename (`FileSystemPath.kt:174-187`, `CopyMoveStrategy.kt:37-46,88-91,96-104`,
+   `DestinationSpec.kt:27-29`). Mandate the `.bak` swap unconditionally; fix the atomicity claims and
+   redirect verification to the native source.
+2. **[LOW] Null-byte input missing from the 05-02 boundary-guard test enumeration** (`:118`).
+3. **[LOW] Stale "delete-before-copy" wording** in `05-RESEARCH.md` + `05-PATTERNS.md:182` (executor is
+   directed to read RESEARCH) — scrub with the HIGH replan.
+
+### Divergent views
+
+None. codex rated the HIGH STILL-OPEN with a `FAIL` on the threat model; claude independently
+re-traced the native Kotlin and concurs fully (correcting its own cycle-2 "RESOLVED with caveat"
+lean — the caveat is now a confirmed defect). Both agree a real `05-02-PLAN.md` change is required
+before execution.
+
+### Codex Cycle-3 raw output (preserved)
+
+```
+## Verdict
+**Revise before execution.** The replacement-atomicity fix is not valid against the installed Android `expo-file-system` implementation.
+
+## Cycle-2 re-verification
+- Replacement atomicity + reconcile sweep — STILL-OPEN. Plan specifies temp-copy, reconciliation, ready-gated registration, no timer (05-02-PLAN.md:114-118,180-193; launch-sweep.ts:44-47,92-115; App.tsx:70-83). But typings only promise overwrite (File.types.d.ts:17-23) while the installed Android impl deletes the destination before the move (CopyMoveStrategy.kt:88-103). tmp.move(dest,{overwrite:true}) can still lose dest; require the .bak swap unconditionally.
+- Per-write monotonic cache bust — RESOLVED (05-03:125-126; 05-05:103; 05-08:137; database.ts:41-50).
+- Custom-field staged-file orphan cleanup — RESOLVED (05-08:100-103,136-137,142-143; EditContactScreen.tsx:235-253; field-values-dao.ts:99-144).
+- URL download size cap — RESOLVED (05-06:86,90,99).
+- Generic FS boundary guard — RESOLVED (05-02:106,112-113,118,125; col-name.ts / field-values-dao.ts:45-49).
+- Stale delete-before-copy wording; 05-08→05-07 dep — STILL-OPEN (dep fixed 05-08:6; stale guidance remains in 05-RESEARCH.md:13,59,169,300,483,497 and 05-PATTERNS.md:182).
+
+## New concerns
+- LOW — add an explicit null-byte input to the boundary-guard unit tests (05-02:118 omits it though :106,113,125 require null-byte rejection).
+
+## Non-negotiable checks
+- PHOTO-01…05 coverage PASS; acyclic/waves/no collision PASS; theme tokens incl Skia PASS; no network on read / relative→file:// PASS; 512px manipulator not snapshot PASS; Reanimated shared values PASS; DAOs in src/db, no migration PASS.
+- Proportionate threat model FAIL — the high-risk irreversible-write mitigation relies on the false atomic-overwrite claim (05-02:213); the installed Android source disproves it (CopyMoveStrategy.kt:88-103).
 ```
