@@ -18,7 +18,8 @@
  * this scaffold needs. Every colour resolves through `useTheme().colors.*`
  * (CLAUDE.md / check:colors).
  */
-import { useCallback, useEffect, useState } from "react";
+import { useFocusEffect } from "@react-navigation/native";
+import { useCallback, useState } from "react";
 import {
   Alert,
   Pressable,
@@ -63,9 +64,17 @@ export function ContactProfileScreen({
     }
   }, [contactId]);
 
-  useEffect(() => {
-    void load();
-  }, [load]);
+  // Reload on focus, not just on mount: the only route into Edit is this
+  // profile's "Add details", so Edit always sits directly above Profile in the
+  // native stack. Saving via navigation.navigate("Profile", { contactId }) pops
+  // back to THIS existing instance without remounting — an on-mount effect would
+  // never re-run, leaving a renamed name / stale "Rarely responds" label. `load`
+  // is a stable useCallback (keyed on contactId), so the focus effect is stable.
+  useFocusEffect(
+    useCallback(() => {
+      void load();
+    }, [load]),
+  );
 
   // Archive (the overflow's only action this phase): flip archived_at, then
   // leave the now-hidden profile back to Home. Reversible — Restore lives on the
