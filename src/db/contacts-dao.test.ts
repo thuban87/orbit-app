@@ -24,7 +24,13 @@
  */
 import { beforeEach, describe, expect, it } from "vitest";
 import { nodeSqliteExecutor, openTestDb } from "@/db/__testkit__/node-sqlite";
-import { createContactFull, updateContactFull } from "@/db/contacts-dao";
+import {
+  archiveContact,
+  createContactFull,
+  listArchived,
+  restoreContact,
+  updateContactFull,
+} from "@/db/contacts-dao";
 import { migration001 } from "@/db/migrations/001-initial";
 import { runMigrations } from "@/db/migrations/runner";
 import { recordTouchpoint } from "@/db/recency-dao";
@@ -566,5 +572,182 @@ describe("updateContactFull — custom values compose without deadlock (Pitfall 
     );
     expect(row?.nickname).toBe("Nick");
     expect(await totalValueRows()).toBe(1);
+  });
+});
+
+// =============================================================================
+// Plan 08 — archiveContact / restoreContact / listArchived: the reversible
+// half of the two-stage lifecycle (CRUD-05). Archive flips archived_at (hides
+// from every live read); restore nulls it; listArchived is the sole inverse
+// read (archived_at IS NOT NULL). Neither touches last_contact.
+// =============================================================================
+
+const ARCHIVE_NOW = "2026-08-16 09:00:00";
+
+async function archivedAt(contactId: number): Promise<string | null> {
+  const row = await exec.getFirstAsync<{ archived_at: string | null }>(
+    "SELECT archived_at FROM contacts WHERE id = ?",
+    [contactId],
+  );
+  return row?.archived_at ?? null;
+}
+
+/** The live-contact predicate STATUS_SCAN / isDuplicateName share — Pitfall 4. */
+async function liveNameMatches(name: string): Promise<number> {
+  const row = await exec.getFirstAsync<{ n: number }>(
+    "SELECT COUNT(*) AS n FROM contacts WHERE name = ? AND archived_at IS NULL",
+    [name],
+  );
+  return row?.n ?? 0;
+}
+
+describe("archiveContact — flips archived_at, hides from live reads", () => {
+  it("sets archived_at, drops the contact from an archived_at IS NULL read, and surfaces it in listArchived", async () => {
+    const { contactId } = await createContactFull(exec, {
+      uid: uid(),
+      name: "Chris",
+      intervalDays: 14,
+      now: NOW,
+      firstInteraction: { uid: uid(), occurredAt: "2026-08-10 09:00:00" },
+    });
+    // Live before archive.
+    expect(await liveNameMatches("Chris")).toBe(1);
+
+    await archiveContact(exec, contactId, ARCHIVE_NOW);
+
+    expect(await archivedAt(contactId)).toBe(ARCHIVE_NOW);
+    // Pitfall 4: an archived row no longer satisfies the live predicate.
+    expect(await liveNameMatches("Chris")).toBe(0);
+    // It IS the inverse read now.
+    const archived = await listArchived(exec);
+    expect(archived.map((r) => r.id)).toContain(contactId);
+  });
+
+  it("does NOT touch last_contact", async () => {
+    const { contactId } = await createContactFull(exec, {
+      uid: uid(),
+      name: "Keeps",
+      intervalDays: 14,
+      now: NOW,
+      firstInteraction: { uid: uid(), occurredAt: "2026-08-10 09:00:00" },
+    });
+    expect(await lastContact(contactId)).toBe("2026-08-10 09:00:00");
+
+    await archiveContact(exec, contactId, ARCHIVE_NOW);
+
+    expect(await lastContact(contactId)).toBe("2026-08-10 09:00:00");
+  });
+
+  it("throws (→ rollback) for a non-matching id and writes nothing", async () => {
+    await expect(archiveContact(exec, 9999, ARCHIVE_NOW)).rejects.toThrow();
+    expect((await listArchived(exec)).length).toBe(0);
+  });
+});
+
+describe("restoreContact — nulls archived_at, returns to live reads", () => {
+  it("clears archived_at so the contact reappears in a live read and leaves listArchived", async () => {
+    const { contactId } = await createContactFull(exec, {
+      uid: uid(),
+      name: "Back",
+      intervalDays: 14,
+      now: NOW,
+      firstInteraction: { uid: uid(), occurredAt: "2026-08-10 09:00:00" },
+    });
+    await archiveContact(exec, contactId, ARCHIVE_NOW);
+    expect(await liveNameMatches("Back")).toBe(0);
+
+    await restoreContact(exec, contactId, "2026-08-17 09:00:00");
+
+    expect(await archivedAt(contactId)).toBeNull();
+    expect(await liveNameMatches("Back")).toBe(1);
+    expect((await listArchived(exec)).map((r) => r.id)).not.toContain(
+      contactId,
+    );
+  });
+
+  it("does NOT touch last_contact", async () => {
+    const { contactId } = await createContactFull(exec, {
+      uid: uid(),
+      name: "RestoreKeeps",
+      intervalDays: 14,
+      now: NOW,
+      firstInteraction: { uid: uid(), occurredAt: "2026-08-10 09:00:00" },
+    });
+    await archiveContact(exec, contactId, ARCHIVE_NOW);
+
+    await restoreContact(exec, contactId, "2026-08-17 09:00:00");
+
+    expect(await lastContact(contactId)).toBe("2026-08-10 09:00:00");
+  });
+
+  it("throws (→ rollback) for a non-matching id", async () => {
+    await expect(
+      restoreContact(exec, 9999, "2026-08-17 09:00:00"),
+    ).rejects.toThrow();
+  });
+});
+
+describe("archiveContact — same-name archived contact stays hidden from the live predicate (Pitfall 4)", () => {
+  it("an archived contact does not collide with a same-name live duplicate check", async () => {
+    const { contactId: first } = await createContactFull(exec, {
+      uid: uid(),
+      name: "Sam Lee",
+      intervalDays: 14,
+      now: NOW,
+    });
+    await archiveContact(exec, first, ARCHIVE_NOW);
+
+    // A new live contact reusing the archived one's name: the live predicate
+    // sees ONLY the live row, never the archived namesake.
+    await createContactFull(exec, {
+      uid: uid(),
+      name: "Sam Lee",
+      intervalDays: 14,
+      now: NOW,
+    });
+    expect(await liveNameMatches("Sam Lee")).toBe(1);
+  });
+});
+
+describe("listArchived — inverse read, most-recently-archived first", () => {
+  it("returns only archived contacts ordered by archived_at DESC", async () => {
+    const { contactId: a } = await createContactFull(exec, {
+      uid: uid(),
+      name: "Ada",
+      intervalDays: 14,
+      now: NOW,
+    });
+    const { contactId: b } = await createContactFull(exec, {
+      uid: uid(),
+      name: "Bo",
+      intervalDays: 14,
+      now: NOW,
+    });
+    const { contactId: c } = await createContactFull(exec, {
+      uid: uid(),
+      name: "Cy",
+      intervalDays: 14,
+      now: NOW,
+    });
+    // c never archived → must NOT appear.
+    await archiveContact(exec, a, "2026-08-16 09:00:00");
+    await archiveContact(exec, b, "2026-08-18 09:00:00"); // newer
+
+    const archived = await listArchived(exec);
+    expect(archived.map((r) => r.id)).toEqual([b, a]); // DESC: newer first
+    expect(archived.map((r) => r.id)).not.toContain(c);
+    // Shape: id + name + archived_at.
+    expect(archived[0]).toMatchObject({ id: b, name: "Bo" });
+    expect(archived[0]?.archived_at).toBe("2026-08-18 09:00:00");
+  });
+
+  it("returns an empty array when nothing is archived", async () => {
+    await createContactFull(exec, {
+      uid: uid(),
+      name: "Live",
+      intervalDays: 14,
+      now: NOW,
+    });
+    expect(await listArchived(exec)).toEqual([]);
   });
 });
