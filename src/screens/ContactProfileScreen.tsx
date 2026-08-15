@@ -5,11 +5,14 @@
  * placeholder overflow `⋯`; the read surfaces (timeline, gravity/intensity,
  * fuel) are owned by later phases and appear here as clearly-labelled stubs.
  *
- * The `⋯` is a low-emphasis (`textSecondary`) placeholder with a 44px hit area
- * and an `accessibilityLabel` (UI-SPEC D2 flag) — its real Archive action lands
- * in Plan 08, so it is inert here. "Add details" (accent text-link) opens the
- * full edit form (`Edit`), surfacing frequency/last-spoke/phone first — the
- * name-only refine path.
+ * The `⋯` is a low-emphasis (`textSecondary`) `OverflowMenu` whose sole action
+ * this phase is Archive (Plan 08) — a reversible `archived_at` flag flip that
+ * hides the contact from every live surface, then navigates off the (now hidden)
+ * profile back to Home. Archive is deliberately NOT styled destructive and is
+ * never adjacent to purge (purge lands on the Archived list in Plan 09 — the
+ * two-stage guarantee). "Add details" (accent text-link) opens the full edit
+ * form (`Edit`), surfacing frequency/last-spoke/phone first — the name-only
+ * refine path.
  *
  * The light `getContactHeader` read (name + rarely_responds) is the only data
  * this scaffold needs. Every colour resolves through `useTheme().colors.*`
@@ -24,8 +27,10 @@ import {
   Text,
   View,
 } from "react-native";
+import { OverflowMenu } from "@/components/OverflowMenu";
 import { getContactHeader } from "@/db/contact-read";
-import { getExecutor } from "@/db/database";
+import { archiveContact } from "@/db/contacts-dao";
+import { getExecutor, localDateTime } from "@/db/database";
 import type { RootStackScreenProps } from "@/navigation/types";
 import { useTheme } from "@/theme";
 import { Logger } from "@/utils/logger";
@@ -62,6 +67,19 @@ export function ContactProfileScreen({
     void load();
   }, [load]);
 
+  // Archive (the overflow's only action this phase): flip archived_at, then
+  // leave the now-hidden profile back to Home. Reversible — Restore lives on the
+  // Archived list (Settings), never here (two-stage guarantee).
+  const doArchive = useCallback(async () => {
+    try {
+      await archiveContact(getExecutor(), contactId, localDateTime());
+      navigation.popToTop();
+    } catch (err) {
+      Logger.error(LOG_SCOPE, "failed to archive contact", err);
+      Alert.alert("Couldn't archive", "Please try again.");
+    }
+  }, [contactId, navigation]);
+
   return (
     <ScrollView
       testID="contact-profile-screen"
@@ -87,20 +105,15 @@ export function ContactProfileScreen({
           {header?.name ?? ""}
         </Text>
 
-        <Pressable
-          testID="contact-profile-overflow"
-          accessibilityRole="button"
-          accessibilityLabel="More actions"
-          hitSlop={16}
-          onPress={() => {
-            // Placeholder — the real overflow menu (Archive) lands in Plan 08.
-          }}
-          style={styles.overflowBtn}
-        >
-          <Text style={[styles.overflowGlyph, { color: colors.textSecondary }]}>
-            ⋯
-          </Text>
-        </Pressable>
+        <OverflowMenu
+          actions={[
+            {
+              label: "Archive",
+              testID: "contact-profile-archive",
+              onPress: () => void doArchive(),
+            },
+          ]}
+        />
       </View>
 
       {header?.rarely_responds === 1 ? (
@@ -161,16 +174,6 @@ const styles = StyleSheet.create({
   },
   title: {
     flex: 1,
-    fontSize: 24,
-    fontWeight: "700",
-  },
-  overflowBtn: {
-    minWidth: 44,
-    minHeight: 44,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  overflowGlyph: {
     fontSize: 24,
     fontWeight: "700",
   },
