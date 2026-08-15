@@ -19,7 +19,7 @@ onto the dossier domains; a `[DECIDED]`/`[REJECTED]` decision is implemented, ne
 - [x] **Phase 1: Project Scaffold & Portable Code** — Expo/RN app, theme tokens, and the ~900 lines of portable plugin source extracted into `src/`. (completed 2026-08-14)
 - [x] **Phase 2: Data Foundation & Status Engine** — migration-1 SQLite scaffold, all core tables, single-writer `last_contact` DAO, continuous status, launch-sweep skeleton. (completed 2026-08-14)
 - [x] **Phase 3: Custom Fields** — HANDOFF §14 two-table design, 7 parsers, `field_history`, quarantine sweep, and the field editor. (completed 2026-08-15)
-- [ ] **Phase 4: Contact CRUD & Lifecycle** — create/edit forms, `contact_links`, archive/restore/purge, the contact profile scaffold.
+- [x] **Phase 4: Contact CRUD & Lifecycle** — create/edit forms, `contact_links`, archive/restore/purge, the contact profile scaffold. (completed 2026-08-15)
 - [ ] **Phase 5: Photos** — library picker + URL path, in-app Skia crop, 512px master, themed initials fallback.
 - [ ] **Phase 6: Interaction Log, Status & Impact** — touchpoint rows, editable timeline, gravity/intensity, rogue, "Rarely responds".
 - [ ] **Phase 7: Conversational Fuel** — per-item rows (5 kinds incl. `off_limits`), ranked projection, profile editor, cross-contact search.
@@ -195,7 +195,7 @@ Recorded here because they bind phases that do not own them. Every planner/execu
   3. Archive hides a contact everywhere and is restorable; purge from the Archived list shows an impact summary and deletes all owned rows + the photo file + scheduled notifications in one transaction.
   4. Never-contacted and archived are reachable as separate homes.
 
-**Plans:** 8/9 plans executed
+**Plans:** 9/9 plans complete
 **Wave 1**
 
 - [x] 04-01-PLAN.md — Navigation shell (react-navigation native-stack) + Settings relocation (CRUD-05)
@@ -221,7 +221,7 @@ Recorded here because they bind phases that do not own them. Every planner/execu
 
 **Wave 6** *(blocked on Wave 5 completion)*
 
-- [ ] 04-09-PLAN.md — Purge fan-out + impact summary + danger token (CRUD-06)
+- [x] 04-09-PLAN.md — Purge fan-out + impact summary + danger token (CRUD-06)
 
 ### Phase 5: Photos
 
@@ -404,7 +404,7 @@ Recorded here because they bind phases that do not own them. Every planner/execu
 | 1. Project Scaffold & Portable Code | 5/5 | Complete    | 2026-08-14 |
 | 2. Data Foundation & Status Engine | 6/6 | Complete    | 2026-08-14 |
 | 3. Custom Fields | 8/8 | Complete    | 2026-08-15 |
-| 4. Contact CRUD & Lifecycle | 8/9 | In Progress|  |
+| 4. Contact CRUD & Lifecycle | 9/9 | Complete   | 2026-08-15 |
 | 5. Photos | 0/TBD | Not started | - |
 | 6. Interaction Log, Status & Impact | 0/TBD | Not started | - |
 | 7. Conversational Fuel | 0/TBD | Not started | - |

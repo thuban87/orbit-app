@@ -4,17 +4,17 @@ milestone: v1.0
 milestone_name: milestone
 current_phase: 4
 current_phase_name: Contact CRUD & Lifecycle
-status: executing
-stopped_at: Completed 04-07-PLAN.md
-last_updated: "2026-08-15T06:41:16.359Z"
+status: verifying
+stopped_at: Completed 04-09-PLAN.md
+last_updated: "2026-08-15T06:49:44.826Z"
 last_activity: 2026-08-15
 last_activity_desc: Phase 4 execution started
 progress:
   total_phases: 16
-  completed_phases: 3
+  completed_phases: 4
   total_plans: 28
-  completed_plans: 27
-  percent: 19
+  completed_plans: 28
+  percent: 25
 ---
 
 # Project State
@@ -30,7 +30,7 @@ See: .planning/PROJECT.md (updated 2026-08-14)
 
 Phase: 4 (Contact CRUD & Lifecycle) — EXECUTING
 Plan: 9 of 9
-Status: Ready to execute
+Status: Phase complete — ready for verification
 Last activity: 2026-08-15 — Phase 4 execution started
 
 Progress: [████████░░] 82%
@@ -84,6 +84,7 @@ Progress: [████████░░] 82%
 | Phase 04 P06 | 20min | 1 tasks | 4 files |
 | Phase 04 P07 | 8min | 3 tasks | 7 files |
 | Phase 04 P08 | 5min | 3 tasks | 6 files |
+| Phase 04 P09 | 20min | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -141,6 +142,8 @@ Foundational decisions affecting current work:
 - [Phase ?]: 04-07: two-transaction save (updateContactFull then applyLinkDiff); partial-save re-seeds metadata, keeps linksDraft, stays on form, explicit partial-save copy
 - [Phase 04]: 04-08: archive/restore are metadata-only archived_at UPDATEs (assertOneChange, last_contact untouched); listArchived is the sole inverse read (archived_at IS NOT NULL); by-id getContactHeader/getContactForEdit seeks stay archived-reachable by design — no NEW unfiltered live/list surface
 - [Phase 04]: 04-08: restore is a pure flag flip in v1 (RESEARCH-A3 events-row DEFERRED — no events writer/type vocabulary in src); no auto-purge sweep registered (retention INDEFINITE per UI-SPEC); Archive on profile ⋯ (reversible, low-emphasis), Restore only on the Archived list — purge (Plan 09) never one tap from the reversible action
+- [Phase 04]: purgeContact asserts archived_at IS NOT NULL and exactly-one-row-deleted inside its transaction — the archive→purge two-stage safety is enforced at the write boundary, not just UI routing
+- [Phase 04]: Purge non-DB cleanup (photo unlink, notification cancel) runs POST-COMMIT via an idempotent onPurgeExtensions adapter (Phases 5/11 register it) — never awaited inside the SQLite transaction/mutex
 
 ### Pending Todos
 
@@ -176,6 +179,6 @@ planning" sections in docs/dossier/*.md — those are the authoritative hand-off
 
 ## Session
 
-**Last session:** 2026-08-15T06:40:39.796Z
-**Stopped at:** Completed 04-07-PLAN.md
+**Last session:** 2026-08-15T06:49:44.814Z
+**Stopped at:** Completed 04-09-PLAN.md
 **Resume file:** None

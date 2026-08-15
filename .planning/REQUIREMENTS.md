@@ -45,7 +45,7 @@ roadmap phases. Items marked *(infra)* are foundation guarantees rather than end
 - [x] **CRUD-03**: A user can edit a contact; the edit form always shows every non-quarantined field plus dedicated phone/email inputs, a links area, and the "Rarely responds" and reminders-off toggles.
 - [x] **CRUD-04**: A user can hold many links per contact in a `contact_links` child table (add/edit/remove, optional label, ordered), each tappable to open; phone and email stay single tappable columns.
 - [x] **CRUD-05**: A user can archive a contact from its profile (hidden everywhere, restorable); restore and purge live only on a dedicated Archived list (two-stage).
-- [ ] **CRUD-06**: Purge shows an impact-summary confirmation and, in one transaction, deletes the contact plus its interactions, events, fuel, custom values, `contact_links`, the photo file, and scheduled notifications.
+- [x] **CRUD-06**: Purge shows an impact-summary confirmation and, in one transaction, deletes the contact plus its interactions, events, fuel, custom values, `contact_links`, the photo file, and scheduled notifications.
 
 ### Photos (PHOTO)
 
