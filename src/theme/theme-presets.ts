@@ -28,6 +28,7 @@ export const THEME_PRESETS: Record<ThemePresetId, ThemePreset> = {
       textSecondary: "#8B93B0",
       border: "#2A3048",
       borderStrong: "#3C4568",
+      danger: "#E5484D",
     },
   },
 };

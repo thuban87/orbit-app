@@ -25,7 +25,7 @@ export type ResolvedMode = "light" | "dark";
  */
 export type SystemScheme = "light" | "dark" | "unspecified" | null | undefined;
 
-/** The 8 base dynamic tokens every theme preset defines. */
+/** The 9 base dynamic tokens every theme preset defines. */
 export interface ThemePalette {
   background: string;
   surface: string;
@@ -35,6 +35,15 @@ export interface ThemePalette {
   textSecondary: string;
   border: string;
   borderStrong: string;
+  /**
+   * Destructive/danger emphasis (owner-approved #E5484D, 2026-08-14). Used by
+   * in-app rendered destructive controls (the Archived "Delete permanently"
+   * button) and validation/warning emphasis (invalid interval, future date,
+   * duplicate-name). The native `Alert.alert` `style: "destructive"` needs no
+   * token (OS-rendered). Added in Phase-4 wave 1 so Plans 03/04/06/09 consume
+   * it via `useTheme().colors.danger`; none re-adds it.
+   */
+  danger: string;
 }
 
 /** Identifier union for the shipped presets. Only one preset ships this phase. */
