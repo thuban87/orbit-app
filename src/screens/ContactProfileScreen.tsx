@@ -33,6 +33,8 @@ import { OverflowMenu } from "@/components/OverflowMenu";
 import { getContactHeader } from "@/db/contact-read";
 import { archiveContact } from "@/db/contacts-dao";
 import { getExecutor, localDateTime } from "@/db/database";
+import { recordTouchpoint } from "@/db/recency-dao";
+import { newUid } from "@/db/uid";
 import type { RootStackScreenProps } from "@/navigation/types";
 import { useTheme } from "@/theme";
 import { Logger } from "@/utils/logger";
@@ -58,6 +60,9 @@ export function ContactProfileScreen({
   const { colors } = useTheme();
   const { contactId } = route.params;
   const [header, setHeader] = useState<Header | null>(null);
+  // In-flight latch for the one-tap log — blocks a double-fire while the write
+  // is open, and dims the button.
+  const [logging, setLogging] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -80,6 +85,41 @@ export function ContactProfileScreen({
       void load();
     }, [load]),
   );
+
+  // One-tap "Log contact" (LOG-01) — the primary action of this slice. Records a
+  // touchpoint through the SINGLE writer (recordTouchpoint) with the Cluster-G
+  // one-tap defaults: direction='outbound' passed EXPLICITLY (the DAO defaults
+  // direction to null, which would starve gravity), channel='unspecified',
+  // connected=1, quality=null, source='manual'. occurredAt/now both come from
+  // localDateTime() — never toISOString (DATA-05 local wall-clock contract).
+  const doLogContact = useCallback(async () => {
+    if (logging) {
+      return; // Guard the double-fire while the write is in flight.
+    }
+    setLogging(true);
+    try {
+      const stamp = localDateTime();
+      await recordTouchpoint(getExecutor(), {
+        contactId,
+        uid: newUid(),
+        occurredAt: stamp,
+        now: stamp,
+        channel: "unspecified",
+        direction: "outbound",
+        connected: 1,
+        quality: null,
+        source: "manual",
+      });
+      // In-place log does NOT re-fire useFocusEffect (the screen stays focused),
+      // so refresh every derived surface through the SINGLE unified load().
+      await load();
+    } catch (err) {
+      Logger.error(LOG_SCOPE, "failed to log contact", err);
+      Alert.alert("Couldn't log contact", "Please try again.");
+    } finally {
+      setLogging(false);
+    }
+  }, [contactId, logging, load]);
 
   // Archive (the overflow's only action this phase): flip archived_at, then
   // leave the now-hidden profile back to Home. Reversible — Restore lives on the
@@ -159,6 +199,31 @@ export function ContactProfileScreen({
         </Text>
       </Pressable>
 
+      <Pressable
+        testID="contact-profile-log-contact"
+        accessibilityRole="button"
+        accessibilityLabel="Log contact"
+        accessibilityState={{ disabled: logging }}
+        disabled={logging}
+        onPress={() => void doLogContact()}
+        style={[
+          styles.logContact,
+          {
+            backgroundColor: logging ? colors.surface : colors.accent,
+            borderColor: logging ? colors.border : colors.accent,
+          },
+        ]}
+      >
+        <Text
+          style={[
+            styles.logContactText,
+            { color: logging ? colors.textSecondary : colors.background },
+          ]}
+        >
+          Log contact
+        </Text>
+      </Pressable>
+
       {/* Read surfaces (timeline / gravity / fuel) are later-phase — scaffold only. */}
       <View
         testID="contact-profile-timeline-stub"
@@ -210,6 +275,18 @@ const styles = StyleSheet.create({
   addDetailsText: {
     fontSize: 16,
     fontWeight: "600",
+  },
+  logContact: {
+    minHeight: 44,
+    borderWidth: 1,
+    borderRadius: 8,
+    padding: 12,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  logContactText: {
+    fontSize: 16,
+    fontWeight: "700",
   },
   sectionStub: {
     borderWidth: 1,
