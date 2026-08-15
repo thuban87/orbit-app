@@ -160,7 +160,24 @@ Recorded here because they bind phases that do not own them. Every planner/execu
   3. Quarantine hides a populated field without touching data; the launch sweep expires it (DELETE def + DROP COLUMN atomically) and prunes history on the 30-day schedule.
   4. Every custom-field sort/filter goes through `sortExpr()`, and no custom value column is indexed or UNIQUE.
 
-**Plans:** TBD
+**Plans:** 8 plans
+
+**Wave 1**
+
+- [ ] 03-01-PLAN.md — Shared `CustomFieldDef` type + reserved-column whitelist + `col_name` slugifier (FLD-02)
+- [ ] 03-02-PLAN.md — 7 permissive parsers + `sortExpr()` (FLD-04, FLD-06)
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [ ] 03-03-PLAN.md — Transactional DDL (atomic create / snapshot-drop / dynamic delete-quarantine) + field-defs metadata DAO (FLD-01, FLD-02, FLD-03, FLD-05, FLD-06)
+- [ ] 03-04-PLAN.md — Custom-value read/UPSERT + §14.7 visibility selectors (FLD-01, FLD-07)
+- [ ] 03-05-PLAN.md — Type-change pre-flight + apply (`UPDATE defs.type` + same-txn `field_history` snapshot, values byte-identical) (FLD-04)
+- [ ] 03-06-PLAN.md — 7 RN value widgets + `FieldValueInput` + `CustomFieldValue` tap-to-fix (FLD-04, FLD-07)
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
+- [ ] 03-07-PLAN.md — Quarantine-expiry + history-retention launch sweep + App wiring (FLD-05)
+- [ ] 03-08-PLAN.md — CustomFieldsScreen + FieldDefForm + in-app reachability (FLD-02, FLD-03, FLD-04, FLD-05, FLD-07)
 
 ### Phase 4: Contact CRUD & Lifecycle
 
