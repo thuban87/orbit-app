@@ -42,7 +42,7 @@ roadmap phases. Items marked *(infra)* are foundation guarantees rather than end
 
 - [x] **CRUD-01**: A user can create a contact via a lean form (name, category, frequency incl. a custom "every N", "when did you last speak" defaulting to today with an explicit "not yet / don't know", phone) plus any `show_on_new` custom fields; a duplicate name warns but does not block.
 - [x] **CRUD-02**: A last-spoke date writes a contact row + one interaction row through the single-writer DAO in one transaction (`source='manual'`, `direction=null`); "not yet / don't know" writes no interaction row (never-contacted); a future date is rejected.
-- [ ] **CRUD-03**: A user can edit a contact; the edit form always shows every non-quarantined field plus dedicated phone/email inputs, a links area, and the "Rarely responds" and reminders-off toggles.
+- [x] **CRUD-03**: A user can edit a contact; the edit form always shows every non-quarantined field plus dedicated phone/email inputs, a links area, and the "Rarely responds" and reminders-off toggles.
 - [ ] **CRUD-04**: A user can hold many links per contact in a `contact_links` child table (add/edit/remove, optional label, ordered), each tappable to open; phone and email stay single tappable columns.
 - [x] **CRUD-05**: A user can archive a contact from its profile (hidden everywhere, restorable); restore and purge live only on a dedicated Archived list (two-stage).
 - [ ] **CRUD-06**: Purge shows an impact-summary confirmation and, in one transaction, deletes the contact plus its interactions, events, fuel, custom values, `contact_links`, the photo file, and scheduled notifications.
