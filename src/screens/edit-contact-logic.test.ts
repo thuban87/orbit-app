@@ -45,7 +45,7 @@ function forEdit(
   values: Record<string, string | null> = {},
 ): ContactForEdit {
   const contact = contactRow(overrides);
-  return { contact, categoryLabel: contact.category_label, values };
+  return { contact, categoryLabel: contact.category_label, values, links: [] };
 }
 
 function deps(overrides: Partial<BuildEditInputDeps> = {}): BuildEditInputDeps {

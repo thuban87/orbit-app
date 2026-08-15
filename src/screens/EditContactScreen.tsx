@@ -39,8 +39,14 @@ import {
 } from "react-native";
 import { FieldValueInput } from "@/components/FieldValueInput";
 import { FrequencyPicker } from "@/components/FrequencyPicker";
+import { type LinkDraft, LinksEditor } from "@/components/LinksEditor";
 import { TriStateLastSpoke } from "@/components/TriStateLastSpoke";
 import type { LastSpokeValue } from "@/components/tri-state-last-spoke-logic";
+import {
+  applyLinkDiff,
+  type ContactLinkRow,
+  type DraftLink,
+} from "@/db/contact-links-dao";
 import {
   getContactForEdit,
   isDuplicateName,
@@ -85,6 +91,33 @@ function confirmDuplicate(name: string): Promise<boolean> {
   });
 }
 
+/** Seed the editable links draft from the assembled (ordered) links. */
+function toLinkDrafts(links: ContactLinkRow[]): LinkDraft[] {
+  return links.map((l) => ({
+    id: l.id,
+    uid: l.uid,
+    url: l.url,
+    label: l.label,
+  }));
+}
+
+/**
+ * Shape the draft for `applyLinkDiff`: trim url/label, empty label → null, and
+ * DROP blank-url rows (an added-then-untyped row, or a cleared existing link).
+ * Dropping a cleared existing (id-bearing) row makes the diff DELETE it — the
+ * intuitive "empty the URL to remove the link" behaviour.
+ */
+function buildLinksForDiff(draft: LinkDraft[]): DraftLink[] {
+  return draft
+    .map((l) => ({
+      id: l.id,
+      uid: l.uid,
+      url: l.url.trim(),
+      label: l.label && l.label.trim().length > 0 ? l.label.trim() : null,
+    }))
+    .filter((l) => l.url.length > 0);
+}
+
 export function EditContactScreen({
   navigation,
   route,
@@ -97,6 +130,10 @@ export function EditContactScreen({
   );
   const [editDefs, setEditDefs] = useState<CustomFieldDef[]>([]);
   const [form, setForm] = useState<EditFormState | null>(null);
+  // Links: the seeded snapshot (the diff baseline) + the editable draft. Add/edit/
+  // remove mutate ONLY the draft; nothing hits the DB until Save's applyLinkDiff.
+  const [seededLinks, setSeededLinks] = useState<ContactLinkRow[]>([]);
+  const [linksDraft, setLinksDraft] = useState<LinkDraft[]>([]);
   // Captured from the seed: a never-contacted contact (last_contact IS NULL) is
   // the ONLY case that shows the last-spoke control (owner ruling — see header).
   const [neverContacted, setNeverContacted] = useState(false);
@@ -119,6 +156,8 @@ export function EditContactScreen({
       setEditDefs(defsForEditForm(defs));
       setNeverContacted(isNeverContacted(result));
       setForm(seedEditState(result));
+      setSeededLinks(result.links);
+      setLinksDraft(toLinkDrafts(result.links));
     } catch (err) {
       Logger.error(LOG_SCOPE, "failed to load edit-form data", err);
       Alert.alert("Couldn't load the form", "Please reopen this screen.");
@@ -137,10 +176,46 @@ export function EditContactScreen({
     [],
   );
 
+  // Links draft mutators — all local state; nothing persists until Save.
+  const addLinkRow = useCallback(() => {
+    setLinksDraft((prev) => [...prev, { uid: newUid(), url: "", label: null }]);
+  }, []);
+  const updateLinkRow = useCallback(
+    (index: number, patch: Partial<Pick<LinkDraft, "url" | "label">>) => {
+      setLinksDraft((prev) =>
+        prev.map((l, i) => (i === index ? { ...l, ...patch } : l)),
+      );
+    },
+    [],
+  );
+  const removeLinkRow = useCallback((index: number) => {
+    setLinksDraft((prev) => prev.filter((_, i) => i !== index));
+  }, []);
+
   const savable = useMemo(
     () => form !== null && canSave(form) && !saving,
     [form, saving],
   );
+
+  // Re-seed ONLY the metadata form from the just-committed row after a partial
+  // save (links failed but metadata committed) — so the user never sees a stale
+  // or rolled-back view. Deliberately leaves `linksDraft` INTACT for retry.
+  async function reseedMetadataAfterPartialSave() {
+    try {
+      const exec = getExecutor();
+      const defs = await listDefs(exec, { includeQuarantined: false });
+      const result = await getContactForEdit(exec, contactId, defs);
+      if (result) {
+        setEditDefs(defsForEditForm(defs));
+        setNeverContacted(isNeverContacted(result));
+        setForm(seedEditState(result));
+        // seededLinks is unchanged: applyLinkDiff rolled back, so the DB links
+        // still equal the original baseline — keep it as the retry diff baseline.
+      }
+    } catch (err) {
+      Logger.error(LOG_SCOPE, "failed to re-seed after partial save", err);
+    }
+  }
 
   async function handleSave() {
     if (!form || !canSave(form) || saving) {
@@ -156,15 +231,48 @@ export function EditContactScreen({
           return; // Cancel — nothing is written.
         }
       }
+      const now = localDateTime();
       const input = buildEditInput(form, {
-        now: localDateTime(),
+        now,
         contactId,
         rowUid: newUid(), // ALWAYS mint fresh — upsert's ON CONFLICT never rewrites uid.
         interactionUid: newUid(),
         editColNames: editDefs.map((d) => d.col_name),
         neverContacted,
       });
-      await updateContactFull(exec, input);
+
+      // TWO-TRANSACTION BOUNDARY (by design): metadata (updateContactFull) and
+      // links (applyLinkDiff) are SEPARATE transactions, so link writes never
+      // bloat the metadata transaction. Metadata FIRST.
+      try {
+        await updateContactFull(exec, input);
+      } catch (err) {
+        // Metadata failed → NOTHING persisted. Generic save-failure copy.
+        Logger.error(LOG_SCOPE, "failed to save contact metadata", err);
+        Alert.alert("Couldn't save contact. Please try again.");
+        return;
+      }
+
+      // Metadata is COMMITTED. Now the links diff in its own transaction.
+      try {
+        await applyLinkDiff(exec, {
+          contactId,
+          seeded: seededLinks,
+          current: buildLinksForDiff(linksDraft),
+          now,
+        });
+      } catch (err) {
+        // PARTIAL SAVE: the links diff rolled back atomically, but the contact
+        // METADATA STAYS COMMITTED. Do NOT show the generic "Couldn't save
+        // contact" copy (it would falsely imply nothing saved). Re-seed the
+        // metadata from the committed row, KEEP linksDraft for retry, and STAY
+        // on the form (no navigation).
+        Logger.error(LOG_SCOPE, "links save failed (metadata committed)", err);
+        await reseedMetadataAfterPartialSave();
+        Alert.alert("Contact saved — some links couldn't be saved. Try again.");
+        return;
+      }
+
       navigation.navigate("Profile", { contactId });
     } catch (err) {
       Logger.error(LOG_SCOPE, "failed to save contact", err);
@@ -341,6 +449,24 @@ export function EditContactScreen({
           placeholder="Email address"
           placeholderTextColor={colors.textSecondary}
           style={inputStyle}
+        />
+      </View>
+
+      {/* Links (CRUD-04): grouped with the reach fields (phone/email/links per
+          CONTEXT Area 2 / UI-SPEC), AFTER email and BEFORE the toggles. Edited as
+          draft state; persisted once on Save via applyLinkDiff (all-or-nothing on
+          cancel — back out without Save persists no link change). Phone/email stay
+          their own dedicated inputs above, NEVER part of the links list. */}
+      <View style={styles.field}>
+        <Text style={[styles.label, { color: colors.textSecondary }]}>
+          Links
+        </Text>
+        <LinksEditor
+          testID="edit-contact-links"
+          links={linksDraft}
+          onAdd={addLinkRow}
+          onUpdate={updateLinkRow}
+          onRemove={removeLinkRow}
         />
       </View>
 

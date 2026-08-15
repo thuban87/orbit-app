@@ -8,6 +8,7 @@
  * Node-pure: takes `exec: SqlExecutor`.
  */
 
+import { type ContactLinkRow, listLinks } from "@/db/contact-links-dao";
 import type { CustomFieldDef } from "@/db/field-types";
 import { defsForEditForm, getValuesForContact } from "@/db/field-values-dao";
 import type { SqlExecutor } from "@/db/types";
@@ -112,6 +113,8 @@ export interface ContactForEdit {
   contact: ContactEditRow;
   categoryLabel: string | null;
   values: Record<string, string | null>;
+  /** The contact's links, ORDER BY display_order — seeds the edit form's links draft (CRUD-04). */
+  links: ContactLinkRow[];
 }
 
 /**
@@ -150,9 +153,11 @@ export async function getContactForEdit(
     contactId,
     defsForEditForm(defs),
   );
+  const links = await listLinks(exec, contactId);
   return {
     contact,
     categoryLabel: contact.category_label ?? null,
     values,
+    links,
   };
 }

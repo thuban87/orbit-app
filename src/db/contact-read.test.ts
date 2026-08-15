@@ -222,3 +222,45 @@ describe("getContactForEdit — row + category label + custom-value map", () => 
     expect(await getContactForEdit(exec, 9999, [])).toBeNull();
   });
 });
+
+// =============================================================================
+// Plan 07 — getContactForEdit now also assembles the contact's links (CRUD-04).
+// =============================================================================
+
+/** Insert a link row directly with an explicit display_order. */
+async function addLinkRow(
+  contactId: number,
+  url: string,
+  order: number,
+  label: string | null = null,
+): Promise<void> {
+  await exec.runAsync(
+    `INSERT INTO contact_links
+       (uid, contact_id, url, label, display_order, created_at, modified_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    [uid(), contactId, url, label, order, NOW, NOW],
+  );
+}
+
+describe("getContactForEdit — links assembly (ORDER BY display_order)", () => {
+  it("returns the contact's links ordered by display_order (not insertion order)", async () => {
+    const id = await makeContactRow("Linked");
+    // Insert out of order: display_order 1 first, then 0.
+    await addLinkRow(id, "https://second", 1, "Second");
+    await addLinkRow(id, "https://first", 0);
+    const result = await getContactForEdit(exec, id, []);
+    expect(result?.links.map((l) => l.url)).toEqual([
+      "https://first",
+      "https://second",
+    ]);
+    // Optional label round-trips (null for the unlabelled row).
+    expect(result?.links[0].label).toBeNull();
+    expect(result?.links[1].label).toBe("Second");
+  });
+
+  it("returns an empty links array for a contact with no links", async () => {
+    const id = await makeContactRow("NoLinks");
+    const result = await getContactForEdit(exec, id, []);
+    expect(result?.links).toEqual([]);
+  });
+});
