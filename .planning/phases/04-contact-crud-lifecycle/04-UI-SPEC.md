@@ -1,7 +1,9 @@
 ---
 phase: 4
 slug: contact-crud-lifecycle
-status: draft
+status: approved
+reviewed_at: 2026-08-14
+danger_token: "#E5484D"
 shadcn_initialized: false
 preset: none
 created: 2026-08-14
@@ -88,7 +90,7 @@ Palette is the shipped `space-dark` preset (dark-first; `theme-presets.ts`). The
 | Accent (10%) | `accent` → `#6C8CFF` | See reserved-for list |
 | Text | `textPrimary` → `#E6E9F5`, `textSecondary` → `#8B93B0` | Primary content vs. meta/placeholder/muted |
 | Structure | `border` → `#2A3048`, `borderStrong` → `#3C4568` | Default vs. emphasized borders |
-| **Destructive (NEW — see flag)** | `danger` → **recommended `#E5484D`** (owner confirms) | Purge "Delete permanently" button, duplicate-name/validation warning emphasis |
+| **Destructive (NEW)** | `danger` = **`#E5484D`** ✅ owner-approved 2026-08-14 | Purge "Delete permanently" button, duplicate-name/validation warning emphasis |
 
 **Accent reserved for (explicit — never "all interactive elements"):**
 - The single **primary submit button fill** on the create form and edit form ("Save contact" / "Save changes"), text on it in `background`.
@@ -98,7 +100,7 @@ Palette is the shipped `space-dark` preset (dark-first; `theme-presets.ts`). The
 
 Accent is NOT used for: destructive actions, the "Not yet" segment, plain rows, borders on inactive controls, or the overflow `⋯` trigger (low-emphasis, `textSecondary`).
 
-### ⚠ Required decision — add a `danger` token (owner call)
+### ✅ Resolved — add a `danger` token = `#E5484D` (owner-approved 2026-08-14)
 
 **There is no destructive/danger token in the palette today.** `ThemePalette` has 8 tokens; none is red/destructive. Phase 3 deliberately deferred this: its tap-to-fix error emphasis was *composed* from `accent` + `borderStrong` because no dedicated token existed (STATE.md: *"Tap-to-fix error emphasis composed from accent+borderStrong; no dedicated error token yet — owner may add at --to 3 gate"*).
 
@@ -211,6 +213,6 @@ No component registry is in use. Native dependencies referenced (`@react-native-
 - [ ] Dimension 5 Spacing: PASS
 - [ ] Dimension 6 Registry Safety: PASS
 
-**Open item for owner before/at checker gate:** approve the new `danger` token addition to `ThemePalette` + `space-dark` (recommended `#E5484D`). Purge styling (CRUD-06) and `check:colors` both depend on it; the executor must not inline a hex.
+**RESOLVED (owner, 2026-08-14):** the new `danger` token = **`#E5484D`**, to be added to `ThemePalette` + the `space-dark` preset. Purge styling (CRUD-06) and `check:colors` both depend on it; the executor must reference the `danger` token, never inline a hex. Adding this token to `ThemePalette` (interface + every preset) is a REQUIRED task of this phase.
 
-**Approval:** pending
+**Approval:** APPROVED — gsd-ui-checker VERIFIED 6/6 (3 non-blocking flags); owner approved the `danger` token = `#E5484D` (2026-08-14). Planner note: add `accessibilityLabel` to the `⋯` (overflow) and `✕` (remove-link) glyph controls (D2 flag).
