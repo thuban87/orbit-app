@@ -3,7 +3,7 @@ phase: 6
 reviewers: [codex, claude]
 reviewed_at: 2026-08-15
 plans_reviewed: [06-01-PLAN.md, 06-02-PLAN.md, 06-03-PLAN.md, 06-04-PLAN.md, 06-05-PLAN.md, 06-06-PLAN.md]
-cycle: 1
+cycle: 2
 ---
 
 # Cross-AI Plan Review — Phase 6 (Interaction Log, Status & Impact)
@@ -151,6 +151,136 @@ test-spec refinement:
 
 **Overall risk: MEDIUM.** No blockers to planning-convergence; all six items are cheap PLAN.md /
 test-spec edits.
+
+---
+
+# Cross-AI Plan Review — Phase 6 · Cycle 2
+
+Re-review after (a) cycle-1's 6 findings were incorporated and (b) three OWNER decisions were folded
+in: events **writer** built this phase (archive/restore emit immutable events), gravity/intensity
+tunables + `ROGUE_K=3` **owner-approved**, and new `rogue` + `gravityTiers` colour tokens added.
+Two reviewers, both source-grounded against the code on disk: **codex** (gpt-5.6-terra, codex-cli
+0.144.1, ran in-repo) and **claude** (this session, read-only). The three resolved owner decisions
+were NOT re-litigated.
+
+## Cycle-1 findings — all RESOLVED in the plan text (re-verified on disk)
+
+- **#1 unguarded legacy `editTouchpoint`** → **RESOLVED.** Plan 03 retires it (Task 1, `06-03-PLAN.md:65-80,119,130`).
+  Confirmed uncalled: `grep editTouchpoint\b src/ | grep -v test` returns only its own definition +
+  doc-comment in `recency-dao.ts` — no production caller. (One stale artifacts line survives — see C2-#2.)
+- **#2 timeline testID/key + cross-table id collision** → **RESOLVED.** Plan 02 keys rows `${kind}-${id}`
+  and orders `occurred_at DESC, id DESC, kind_order DESC` (`06-02-PLAN.md:28-30,204,212,216`); the two
+  independent PK sequences are confirmed at `001-initial.ts:98` (interactions) and `:117` (events).
+- **#3 same-day `last_contact` MAX test** → **RESOLVED.** Plan 01 now splits the assertion
+  (different-time → advances; identical-timestamp → unchanged) at `06-01-PLAN.md:107-108,118,126`; matches
+  `recomputeLastContact`'s MAX-over-full-datetime at `recency-dao.ts:150-162`.
+- **#4 intensity negative-gap on newest-first input** → **RESOLVED.** Plan 06 requires an ascending
+  sort before cadence + a descending-input regression test (`06-06-PLAN.md:91,99,107`).
+- **#5 strict local datetime parser for picker seeding** → **RESOLVED (with a residual — see C2-#3).**
+  Plan 03 adds `parseLocalDateTime` and seeds both dialogs through it, never `types.ts parseDate`
+  (`06-03-PLAN.md:150,155,190`). `dates.ts` confirmed format-only (no parser) at `dates.ts:17-22`.
+- **#6 unified `load()` after in-place mutations** → **RESOLVED.** Every plan states each mutation
+  handler + each new read routes through the single `load` useCallback (`ContactProfileScreen.tsx:62-70`
+  confirmed as the one focus-effect callback). Plans 01/02/03/04/05/06 all say "single unified `load()`".
+
+## What both reviewers confirmed correct in the NEW owner-decision scope (verified on disk)
+
+- **Events writer is immutable + insert-only.** Plan 02 exposes only `recordEvent`/`recordEventCore`/
+  `EventType`, no update path (`06-02-PLAN.md:132,136,144`). `EventType = archive|restore|snooze|unsnooze`
+  matches the dossier; snooze/unsnooze reserved, no producer this phase. No `INSERT INTO events` exists in
+  `src/` today (grep, non-test) — genuinely net-new.
+- **Retrofit composes inside the ONE transaction.** archive/restore call `recordEventCore` inside their
+  existing `inWriteTransaction` (`06-02-PLAN.md:53-54,171`); `newUid` already imported (`contacts-dao.ts:60`);
+  `recomputeLastContactCore` already composed the same way (`contacts-dao.ts:360`). No nested mutex, no
+  second transaction, no `last_contact` write added (T-06-11).
+- **Purge deletes + surfaces events.** `DELETE FROM events` confirmed at `purge-dao.ts:183`; Plan 02 keeps
+  the explicit delete (cascade decorative, FKs off in-txn) and adds the events line to `impactSummaryLines`
+  (currently omitted, `purge-dao.ts:131,136-152`).
+- **Tokens exist before consumption.** Plan 04 adds `rogue` + `gravityTiers` to `ThemePalette`
+  (`theme-types.ts`, currently absent — verified) and seeds them in `theme-presets.ts` only (the sole
+  colour-literal file), mirroring `danger`/`avatarSwatches` exactly; test extended like the avatar-swatch
+  block (`theme-presets.test.ts:63-89`). Added wave 4, consumed waves 4/5.
+- **Tunables owner-approved, no stale flags.** `HALF_LIFE_DAYS=365`, `FLOOR_W=0.15`, the 4 `GRAVITY_TIERS`,
+  `INTENSITY_PERIOD_DAYS=interval_days`, and `ROGUE_K=3` are all labelled OWNER-APPROVED 2026-08-15
+  (`06-05-PLAN.md:131,162`; `06-06-PLAN.md:89,97,129`; `06-04-PLAN.md:78`). No "ASSUMED/surface-to-owner"
+  flag remains for them.
+- **Invariants intact:** single `last_contact` writer preserved (`recency-dao.ts:150-162` the only `SET
+  last_contact`); gravity/intensity derived-never-stored (no write statement); `REASON_SQL` mirrors
+  `STATUS_SQL` branch order (`status.ts:67-73`, rarely_responds branch first) so status/reason cannot
+  disagree; no new migration; waves 1→6 each own their wave with `depends_on` the prior → no same-wave
+  `files_modified` overlap.
+
+## Cycle-2 findings (most-severe first)
+
+### C2-#1 [codex MEDIUM · claude MEDIUM] — archive/restore can emit a spurious event on a wrong-state call
+`06-02-PLAN.md:164-171` · `src/db/contacts-dao.ts:411,435`
+
+`archiveContact`/`restoreContact` scope only by `id` and assert `changes===1` — they do NOT gate on the
+current archived state. SQLite counts a matched row as changed even when the written value equals the
+stored one, so `restoreContact` on a LIVE contact (`archived_at` already NULL → set NULL) passes
+`changes===1`, and post-retrofit would emit a spurious `'restore'` event; likewise a double-`archive`
+emits a second `'archive'`. Reachability is UI-gated today (archive only from a live profile, restore only
+from the Archived list), so this is **latent** — but the events log is the new "record of what the app
+did", a no-op "Restored" row is dishonest, and the project's own convention is structural guards, not UI
+routing (cf. `purge-dao.ts:10-14` "structural, not merely UI routing").
+
+**Fix (planner call — it touches shipped Phase-4 DAO behavior, so decide explicitly):** either add
+`AND archived_at IS NULL` to archive / `AND archived_at IS NOT NULL` to restore (turning a wrong-state
+call into a 0-row loud rollback → no event) with a "no-op transition emits no event" test; OR state in
+Plan 02 that UI routing makes the wrong-state call unreachable and the spurious event is accepted, with
+that rationale recorded. Do not leave it unaddressed.
+
+### C2-#2 [codex LOW · claude agree] — Plan 03 artifacts line contradicts its own retirement task
+`06-03-PLAN.md:227` (vs `:25,65-80,119,130`)
+
+The artifacts summary still reads "existing editTouchpoint **untouched**", directly contradicting Task 1,
+which REMOVES `editTouchpoint`. A confused executor could read the artifacts line as license to keep the
+unguarded path. **Fix:** rewrite `:227` to "editTouchpoint **removed** (the retired unguarded edit path);
+or guarded in place if a production caller is discovered" to match Task 1.
+
+### C2-#3 [codex LOW · claude LOW] — gravityTiers test asserts `length >=` but the contract says "MUST equal"
+`06-04-PLAN.md:152` (contract) vs `:156` (test spec)
+
+The token contract says `gravityTiers` length MUST equal the 4 `GRAVITY_TIERS`, but the planned test
+asserts only `length >= tier count`. `>=` is *safe* for the `gravityTiers[tierIndex]` indexing contract
+(an extra token is harmless, index stays in range), so this is not a correctness bug — but the test is
+looser than the stated one-colour-per-tier parity. **Fix (cheap):** assert `toHaveLength(GRAVITY_TIERS.length)`
+so an accidental extra/missing token is caught. Keep asserting shape/presence (not exact hex) so a retune
+doesn't break the test.
+
+### C2-#4 [codex MEDIUM · claude LOW — downgraded] — picker parser strictness is defensive-only here
+`06-03-PLAN.md:155` · `src/db/migrations/001-initial.ts:101`
+
+Codex notes `parseLocalDateTime` builds `new Date(y, m-1, d, H, M, S)`, and JS silently normalizes
+out-of-range components (month 13 → next Jan) while `occurred_at` is unconstrained `TEXT`. **Claude
+downgrade:** the parser only ever seeds the picker FROM a stored `occurred_at`, and every writer of that
+column routes through the single writer with app-generated `localDateTime()`/`combineDateAndTime` output —
+it never sees user free-text. Strict anchoring is a reasonable belt-and-suspenders (add an anchored
+six-component regex + bounds/round-trip check + a malformed-input test) but is **not required** for any
+reachable input. Optional; no plan change strictly needed.
+
+## Suggestions (non-blocking, no plan change required)
+
+- **Naming (codex):** `INTENSITY_PERIOD_DAYS` is described as a top-of-file tunable but is really derived
+  per-contact from `inputs.intervalDays` (`06-06-PLAN.md:97`). A resolver name (`getIntensityPeriodDays(intervalDays)`)
+  would read truer. Cosmetic.
+- **Doc drift (claude):** `theme-types.ts:28` reads "The 11 base dynamic tokens"; adding `rogue` +
+  `gravityTiers` makes 13. Trivial, executor-catchable while editing the interface — worth a one-word
+  touch, not a plan change.
+- **Housekeeping (codex):** older RESEARCH/PATTERNS notes still describe the writer/tokens/tunables as
+  deferred/open; refreshing them would prevent execution-time confusion.
+
+## Consensus summary
+
+Both reviewers independently re-verified every load-bearing premise against disk and agree the cycle-1
+fixes landed and the new owner-decision scope (events writer, tokens, tunables) is **soundly planned and
+matches the code**. No HIGH findings, no data-corruption or reversed-decision findings. The only agreed
+substantive item is **C2-#1** (latent spurious lifecycle event — a planner decision that touches shipped
+Phase-4 DAO behavior); the rest are two cheap intra-plan doc/test-spec alignments (C2-#2, C2-#3) plus one
+optional defensive hardening (C2-#4) and three non-blocking suggestions.
+
+**Overall risk: LOW.** No blockers to planning-convergence. C2-#1 needs an explicit planner disposition
+(guard vs. accept-with-rationale); C2-#2 and C2-#3 are one-line PLAN.md edits.
 
 ---
 
