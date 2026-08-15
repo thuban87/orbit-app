@@ -76,6 +76,33 @@ The `[OPEN]` item (HANDOFF §14.5 / dossier 02-fields): the quarantine + `field_
 is **30 days, FIXED** — a single top-of-file tunable constant, NOT user-configurable (no settings surface).
 Consistent with §14.7's "drop unnecessary configuration" theme; configurability is a clean v2 add.
 
+### Type-change semantics — RESOLVED by the CLAUDE.md non-negotiable invariant (planner call, not a reversal)
+Research flagged an apparent conflict: §14.4/§14.6/FLD-04 say clean values "convert automatically" +
+"snapshot to field_history in the same transaction," while §14.2 + **CLAUDE.md (non-negotiable)** say a
+type change "must not touch `contact_custom_values` at all / blast radius zero." These reconcile — and
+CLAUDE.md's invariant is the dominant authority, so enforcing it is a planner call:
+- A type change is **ONE `UPDATE custom_field_defs SET type=?`** — `contact_custom_values` is NOT touched;
+  stored TEXT value bytes are NEVER rewritten.
+- "Auto-convert" = the clean values are VALID under the new type and render/sort correctly automatically
+  (read-time parse via the widget + `sortExpr`); "flag the rest" = a value that fails the target parser
+  renders as a **tap-to-fix error state** on the profile — never coerced or cleared.
+- `field_history` snapshots the **pre-change state** (old type + affected values, `operation='type_change'`)
+  in the SAME transaction as the defs `UPDATE`, purely for undo (§14.6's "one mechanism, two uses").
+This is surfaced for the owner's `--to 3` review; it does not reverse any decision (it enforces the
+strongest one). The 7 parsers are therefore **read-time validators/interpreters**, not value rewriters.
+
+### Sub-decisions (Claude's discretion / plan-ordering — none reverse a decision)
+- **`col_name` is a STABLE internal slug** set at creation; renaming a field updates `label` (metadata)
+  only — `col_name` does not change (it is never user-visible and is referenced by `sortExpr`/queries).
+  FLD-03's "metadata-only RENAME COLUMN" is satisfied by the cheap `label` UPDATE; a literal `RENAME
+  COLUMN` is unnecessary churn. (Planner may revisit if convergence review objects.)
+- **`share_with_ai` toggle** — DEFER surfacing it in the editor to Phase 14 (AI); the column exists, but
+  a toggle whose effect doesn't exist yet is dead UI. Phase 14 adds the toggle when it reads the flag.
+- **`photo` custom-field widget** — DEFER the picker to reuse Phase 5's photo pipeline; `photo` stays a
+  valid field type, its editor widget lands minimal/deferred (flag in the plan).
+- **Dropdown options edited to exclude a stored value** — render that out-of-list value as the SAME
+  tap-to-fix error state as an unconvertible type change (consistency), never silently drop it.
+
 ### Where fields appear (§14.7 — `[DECIDED]`, one surface configurable)
 New contact form: per-field `show_on_new` (curated). Edit form: EVERY non-quarantined field, NO config.
 Profile: automatic whenever a field has a value + one global `always_show` flag per field. `[DECIDED-dropped]`
