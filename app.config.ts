@@ -32,8 +32,17 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     // Task 3). This ENFORCES a recorded decision — never "fix" it back to true.
     allowBackup: false,
   },
-  // Pre-register the Phase 2 native dep so the first prebuild covers it.
-  // Deduped: `expo install` already added expo-sqlite to app.json's plugins,
-  // and a duplicate plugin entry is a prebuild error.
-  plugins: [...new Set([...(config.plugins ?? []), "expo-sqlite"])],
+  // Pre-register the native deps that ship a config plugin so the first
+  // prebuild covers them. Deduped: `expo install` already added expo-sqlite to
+  // app.json's plugins, and a duplicate plugin entry is a prebuild error.
+  // `@react-native-community/datetimepicker` ships a config plugin (Plan 04-03)
+  // and `expo install` instructs registering it here; `@react-native-picker/picker`
+  // ships none, so it needs no plugins entry.
+  plugins: [
+    ...new Set([
+      ...(config.plugins ?? []),
+      "expo-sqlite",
+      "@react-native-community/datetimepicker",
+    ]),
+  ],
 });
