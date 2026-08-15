@@ -3,6 +3,7 @@ import { StyleSheet, Text, View } from "react-native";
 import { ContactProfileScreen } from "@/screens/ContactProfileScreen";
 import { CreateContactScreen } from "@/screens/CreateContactScreen";
 import { CustomFieldsScreen } from "@/screens/CustomFieldsScreen";
+import { EditContactScreen } from "@/screens/EditContactScreen";
 import { HomeScreen } from "@/screens/HomeScreen";
 import { SettingsScreen } from "@/screens/SettingsScreen";
 import { useTheme } from "@/theme";
@@ -24,11 +25,11 @@ import type { RootStackParamList, RootStackScreenProps } from "./types";
  *
  * `enableScreens` is NOT called manually — native-stack enables it.
  *
- * Routes whose screens land in later plans (`Create`, `Profile`, `Edit`,
- * `Archived`) register themed placeholder components defined here so the
- * navigator type-checks and every route is reachable now; each later plan
- * swaps its placeholder for the real screen. `Settings` and `CustomFields`
- * are wired to their real screens in Plan 04-01 Task 3.
+ * Routes whose screens land in later plans (`Archived`) register themed
+ * placeholder components defined here so the navigator type-checks and every
+ * route is reachable now; each later plan swaps its placeholder for the real
+ * screen. `Settings`/`CustomFields` were wired in Plan 04-01, `Create`/`Profile`
+ * in Plans 04-04/04-05, and `Edit` (the real edit form) in Plan 04-06.
  */
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
@@ -68,7 +69,6 @@ function makePlaceholder(label: string) {
   };
 }
 
-const EditPlaceholder = makePlaceholder("Edit contact");
 const ArchivedPlaceholder = makePlaceholder("Archived contacts");
 
 export function RootNavigator() {
@@ -82,7 +82,7 @@ export function RootNavigator() {
       <Stack.Screen name="CustomFields" component={CustomFieldsRoute} />
       <Stack.Screen name="Create" component={CreateContactScreen} />
       <Stack.Screen name="Profile" component={ContactProfileScreen} />
-      <Stack.Screen name="Edit" component={EditPlaceholder} />
+      <Stack.Screen name="Edit" component={EditContactScreen} />
       <Stack.Screen name="Archived" component={ArchivedPlaceholder} />
     </Stack.Navigator>
   );
