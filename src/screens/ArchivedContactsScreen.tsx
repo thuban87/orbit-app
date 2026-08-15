@@ -30,6 +30,11 @@ import {
   restoreContact,
 } from "@/db/contacts-dao";
 import { getExecutor, localDateTime } from "@/db/database";
+import {
+  computeImpact,
+  impactSummaryLines,
+  purgeContact,
+} from "@/db/purge-dao";
 import type { RootStackScreenProps } from "@/navigation/types";
 import { useTheme } from "@/theme";
 import { Logger } from "@/utils/logger";
@@ -39,6 +44,43 @@ const LOG_SCOPE = "archived-contacts";
 /** "1 archived contact" / "N archived contacts". */
 function countLabel(n: number): string {
   return `${n} archived contact${n === 1 ? "" : "s"}`;
+}
+
+/**
+ * Promise wrapper over the native Alert so the impact-summary reads as ONE gate
+ * (mirrors CustomFieldsScreen.confirmSummary). The confirm keeps RN's built-in
+ * `style: "destructive"` (OS-rendered red — no theme token needed for the native
+ * Alert; the in-app trigger button carries the `danger` token instead).
+ */
+function confirmPurge(message: string): Promise<boolean> {
+  return new Promise((resolve) => {
+    Alert.alert(
+      "Delete permanently",
+      message,
+      [
+        { text: "Cancel", style: "cancel", onPress: () => resolve(false) },
+        {
+          text: "Delete permanently",
+          style: "destructive",
+          onPress: () => resolve(true),
+        },
+      ],
+      { cancelable: true, onDismiss: () => resolve(false) },
+    );
+  });
+}
+
+/**
+ * The locked impact-summary body (UI-SPEC "Destructive confirmation — purge"):
+ * "Permanently delete {name} and {parts}? This cannot be undone." The parts are
+ * the genuine multi-row children only (interactions / fuel items / links), each
+ * omitted when its count is 0 — never a custom-values or events count. When a
+ * contact owns no such children, the "and {parts}" clause is dropped so the copy
+ * stays grammatical.
+ */
+function purgeBody(name: string, parts: string[]): string {
+  const blast = parts.length > 0 ? ` and ${parts.join(", ")}` : "";
+  return `Permanently delete ${name}${blast}? This cannot be undone.`;
 }
 
 export function ArchivedContactsScreen({
@@ -71,6 +113,27 @@ export function ArchivedContactsScreen({
       } catch (err) {
         Logger.error(LOG_SCOPE, "failed to restore contact", err);
         Alert.alert("Couldn't restore", "Please try again.");
+      }
+    },
+    [load],
+  );
+
+  const doPurge = useCallback(
+    async (id: number, name: string) => {
+      try {
+        const exec = getExecutor();
+        const impact = await computeImpact(exec, id);
+        const confirmed = await confirmPurge(
+          purgeBody(name, impactSummaryLines(name, impact)),
+        );
+        if (!confirmed) {
+          return;
+        }
+        await purgeContact(exec, id);
+        await load();
+      } catch (err) {
+        Logger.error(LOG_SCOPE, "failed to delete contact permanently", err);
+        Alert.alert("Couldn't delete", "Please try again.");
       }
     },
     [load],
@@ -144,12 +207,17 @@ export function ArchivedContactsScreen({
                 >
                   <Text style={{ color: colors.accent }}>Restore</Text>
                 </Pressable>
-                {/*
-                  PLAN 09 SLOT: the per-row "Delete permanently" (danger) purge
-                  action lands here — the impact-summary single-confirm. It lives
-                  ONLY on this Archived list (never on the profile), keeping the
-                  irreversible action two stages from the reversible one.
-                */}
+                <Pressable
+                  testID={`archived-delete-${contact.id}`}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Delete ${contact.name} permanently`}
+                  onPress={() => void doPurge(contact.id, contact.name)}
+                  style={[styles.actionBtn, { borderColor: colors.danger }]}
+                >
+                  <Text style={{ color: colors.danger }}>
+                    Delete permanently
+                  </Text>
+                </Pressable>
               </View>
             </View>
           ))}
