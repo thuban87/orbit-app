@@ -10,7 +10,7 @@ Phase 5 builds a single photo pipeline reused by contacts, the self/profile reco
 
 The stack is entirely first-party Expo / Shopify / Software Mansion modules, none currently installed: `expo-image-picker`, `expo-image-manipulator`, `expo-file-system` (new class API), `expo-image`, `@shopify/react-native-skia`, `react-native-reanimated`, `react-native-gesture-handler`. All resolve to SDK-57-compatible versions via `npx expo install`. The two subtle correctness areas are (1) the **cache→document copy** (picker/manipulator write to evictable cache; skipping the copy silently loses avatars) and (2) the **purge cleanup adapter**, which receives only `contactId` **post-commit after the rows are already deleted** — so photo filenames must be *derivable from `contactId`* rather than read from the (now-gone) DB rows.
 
-**Primary recommendation:** Build the interactive crop as a **Skia `Canvas` preview driven by Reanimated shared values** (pan + pinch over a fixed 1:1 viewport, no rotation), but do the **actual pixel crop with `expo-image-manipulator.manipulate(originalUri).crop(rect).resize({512,512}).renderAsync().saveAsync(JPEG, 0.75)`** on the *original* source URI — never a Skia `makeImageSnapshot()` (that captures at lossy screen resolution). Compute the crop rect in source-pixel coordinates from the shared-value transform at confirm time. Then copy the manipulator's cache output into `Paths.document` with a **deterministic, `contactId`-derivable filename**, delete-before-copy on replace, and register the `onPurgeExtensions` adapter to delete those derivable filenames on purge.
+**Primary recommendation:** Build the interactive crop as a **Skia `Canvas` preview driven by Reanimated shared values** (pan + pinch over a fixed 1:1 viewport, no rotation), but do the **actual pixel crop with `expo-image-manipulator.manipulate(originalUri).crop(rect).resize({512,512}).renderAsync().saveAsync(JPEG, 0.75)`** on the *original* source URI — never a Skia `makeImageSnapshot()` (that captures at lossy screen resolution). Compute the crop rect in source-pixel coordinates from the shared-value transform at confirm time. Then copy the manipulator's cache output into `Paths.document` with a **deterministic, `contactId`-derivable filename**, using the crash-safe copy-to-temp-then-`.bak`-swap on replace (NEVER pre-delete the master — the native `File.move` is delete-then-rename; see 05-02-PLAN), and register the `onPurgeExtensions` adapter to delete those derivable filenames on purge.
 
 ## User Constraints
 
@@ -56,7 +56,7 @@ The stack is entirely first-party Expo / Shopify / Software Mansion modules, non
 |----|-------------|------------------|
 | PHOTO-01 | Set a contact's/own photo from the system photo library (no camera, no runtime permission) + frame with in-app Skia crop | `launchImageLibraryAsync({mediaTypes:['images']})` — no permission; Skia+Reanimated crop surface + ImageManipulator crop/resize (Standard Stack, Architecture Pattern 1 & 2) |
 | PHOTO-02 | Also set a photo by pasting a URL, downloading once to the same local master | `File.downloadFileAsync(url, cacheDir)` → same crop/manipulate/copy pipeline; content-type→ext re-ported from `ImageScraper` (Architecture Pattern 3) |
-| PHOTO-03 | One 512×512 JPEG master under the persistent document dir (copied out of cache), relative filename resolved to `file://` at read *(infra)* | `expo-file-system` class API `Paths.document` + `File.copy` (delete-before-copy); relative-store/`file://`-resolve helper (Architecture Pattern 4, Pitfalls 1 & 3) |
+| PHOTO-03 | One 512×512 JPEG master under the persistent document dir (copied out of cache), relative filename resolved to `file://` at read *(infra)* | `expo-file-system` class API `Paths.document` + `File.copy`/`File.move` (crash-safe `.bak` swap, never pre-delete); relative-store/`file://`-resolve helper (Architecture Pattern 4, Pitfalls 1 & 3) |
 | PHOTO-04 | No-photo contact shows a deterministic initials avatar from a themed swatch set (no free HSL, no hardcoded colour) | `avatarSwatches`/`avatarSwatchText` theme tokens; ported hash indexes swatch array; `check:colors` gate (Architecture Pattern 5) |
 | PHOTO-05 | Replacing/removing deletes the old file inline (non-undoable); purge deletes contact + custom photo-field files | Inline `File.delete()`; `onPurgeExtensions` adapter with `contactId`-derivable filenames (Architecture Pattern 6, Pitfall 2 — the load-bearing finding) |
 
@@ -297,11 +297,16 @@ const dir = new Directory(Paths.document, 'avatars');
 dir.create({ idempotent: true });
 const relative = `avatars/contact-${contactId}.jpg`;   // derivable on purge
 const dest = new File(Paths.document, relative);
-dest.delete();                                          // delete-before-copy (replace + overwrite-safe)
-await new File(out.uri).copy(dest);
+const tmp  = new File(Paths.document, relative + '.tmp');
+const bak  = new File(Paths.document, relative + '.bak');
+// CRASH-SAFE replace — NEVER pre-delete the sole master (see 05-02-PLAN, cycle-3 HIGH):
+await new File(out.uri).copy(tmp, { overwrite: true }); // new bytes → .tmp first
+if (dest.exists) await dest.move(bak, { overwrite: true }); // prior master aside → .bak
+await tmp.move(dest);                                   // put new bytes in place
+bak.delete();                                           // best-effort; sweep reconciles orphans
 // STORE `relative` (not dest.uri) in the DB TEXT column.
 ```
-> `create()` is sync and **throws if the file exists** unless `{ overwrite: true }`/`{ idempotent: true }`; `copy()` is async (`copySync()` exists), overwrite via `{ overwrite: true }`; `delete()` is sync. The dossier's deferred "await/overwrite semantics" question resolves this way: **`delete()`-before-`copy()`** is the safe defensive pattern (matches the dossier's interim recommendation). `[CITED: docs.expo.dev/versions/latest/sdk/filesystem]`
+> `create()` is sync and **throws if the file exists** unless `{ overwrite: true }`/`{ idempotent: true }`; `copy()`/`move()` are async, overwrite via `{ overwrite: true }`; `delete()` is sync. **DO NOT delete-before-copy / overwrite-move directly onto the master:** the installed `expo-file-system@57.0.4` Android `File.move` is delete-then-rename (not atomic), so a crash mid-replace would permanently lose the prior master (no backup exists). The crash-safe pattern is the **copy-to-`.tmp` → move prior master to `.bak` → move `.tmp` to dest → delete `.bak`** swap above, reconciled at launch (05-02-PLAN Task 1/3). `[CITED: docs.expo.dev/versions/latest/sdk/filesystem + installed native source]`
 > Read-time resolution: `` const uri = `${Paths.document.uri}${relative}` `` (relative → `file://`). Keep this in one `photo-storage.ts` helper — the single place the relative↔`file://` mapping is observable.
 
 ### Pattern 5: Deterministic themed-initials avatar
@@ -480,7 +485,7 @@ await purgeContact(exec, id, { onPurgeExtensions });
 |--------|----------|-----------|-------------------|-------------|
 | PHOTO-01 | crop-rect geometry: transform → source-pixel rect, clamped to bounds | unit (pure) | `npm test -- src/services/photos/crop-geometry.test.ts` | ❌ Wave 0 |
 | PHOTO-02 | URL isUrl + content-type→ext mapping (ported) | unit (pure) | `npm test -- src/services/photos/url-image.test.ts` | ❌ Wave 0 |
-| PHOTO-03 | relative↔`file://` resolution; filename scheme derivable from contactId; delete-before-copy ordering | unit (pure/mocked FS) | `npm test -- src/services/photos/photo-storage.test.ts` | ❌ Wave 0 |
+| PHOTO-03 | relative↔`file://` resolution; filename scheme derivable from contactId; crash-safe `.bak`-swap replace ordering (never pre-delete) | unit (pure/mocked FS) | `npm test -- src/services/photos/photo-storage.test.ts` | ❌ Wave 0 |
 | PHOTO-04 | `getInitials` (incl. single-word, empty) + `hashName % len` swatch index determinism | unit (pure) | `npm test -- src/components/avatar-initials.test.ts` | ❌ Wave 0 |
 | PHOTO-04 | `avatarSwatches`/`avatarSwatchText` present in every preset; no hex outside theme | unit + gate | `npm test -- src/theme/theme-presets.test.ts` && `npm run check:colors` | ⚠ extend existing |
 | PHOTO-05 | purge adapter derives + deletes contact + custom photo-field filenames from contactId (mocked FS) | unit (mocked FS, real defs read) | `npm test -- src/services/photos/purge-photo-cleanup.test.ts` | ❌ Wave 0 |
@@ -494,7 +499,7 @@ await purgeContact(exec, id, { onPurgeExtensions });
 ### Wave 0 Gaps
 - [ ] `src/services/photos/crop-geometry.test.ts` — covers PHOTO-01 (pure geometry)
 - [ ] `src/services/photos/url-image.test.ts` — covers PHOTO-02 (isUrl + ext map)
-- [ ] `src/services/photos/photo-storage.test.ts` — covers PHOTO-03 (rel↔file://, scheme, delete-before-copy)
+- [ ] `src/services/photos/photo-storage.test.ts` — covers PHOTO-03 (rel↔file://, scheme, crash-safe `.bak` swap)
 - [ ] `src/components/avatar-initials.test.ts` — covers PHOTO-04 (initials + swatch index)
 - [ ] `src/services/photos/purge-photo-cleanup.test.ts` — covers PHOTO-05 (derivable deletion)
 - [ ] Extend `src/theme/theme-presets.test.ts` — assert `avatarSwatches` non-empty + `avatarSwatchText` in every preset
