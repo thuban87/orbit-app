@@ -195,7 +195,17 @@ Recorded here because they bind phases that do not own them. Every planner/execu
   3. Archive hides a contact everywhere and is restorable; purge from the Archived list shows an impact summary and deletes all owned rows + the photo file + scheduled notifications in one transaction.
   4. Never-contacted and archived are reachable as separate homes.
 
-**Plans:** TBD
+**Plans:** 9 plans
+
+- [ ] 04-01-PLAN.md — Navigation shell (react-navigation native-stack) + Settings relocation (CRUD-05)
+- [ ] 04-02-PLAN.md — Contact create + shared reads DAO (composed atomic create) (CRUD-01, CRUD-02)
+- [ ] 04-03-PLAN.md — Create-form inputs (FrequencyPicker, TriStateLastSpoke) + native picker install (CRUD-01)
+- [ ] 04-04-PLAN.md — CreateContactScreen + ContactProfile scaffold (CRUD-01, CRUD-02)
+- [ ] 04-05-PLAN.md — Contact metadata edit + rarely_responds recompute + edit assembly DAO (CRUD-03)
+- [ ] 04-06-PLAN.md — EditContactScreen (always-show fields + toggles + birthday) (CRUD-03)
+- [ ] 04-07-PLAN.md — Contact links (contact-links-dao + LinksEditor, tappable open) (CRUD-04)
+- [ ] 04-08-PLAN.md — Archive / restore + Archived home + overflow menu (CRUD-05)
+- [ ] 04-09-PLAN.md — Purge fan-out + impact summary + danger token (CRUD-06)
 
 ### Phase 5: Photos
 
