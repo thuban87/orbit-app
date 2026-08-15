@@ -164,19 +164,22 @@ Recorded here because they bind phases that do not own them. Every planner/execu
 
 **Wave 1**
 
-- [ ] 03-01-PLAN.md — Shared `CustomFieldDef` type + reserved-column whitelist + `col_name` slugifier (FLD-02)
-- [ ] 03-02-PLAN.md — 7 permissive parsers + `sortExpr()` (FLD-04, FLD-06)
+- [ ] 03-01-PLAN.md — Shared `CustomFieldDef` type + reserved-column whitelist + `col_name` slugifier + single `inWriteTransaction` (`src/db/transaction.ts`) (FLD-01, FLD-02)
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 03-03-PLAN.md — Transactional DDL (atomic create / snapshot-drop / dynamic delete-quarantine) + field-defs metadata DAO (FLD-01, FLD-02, FLD-03, FLD-05, FLD-06)
-- [ ] 03-04-PLAN.md — Custom-value read/UPSERT + §14.7 visibility selectors (FLD-01, FLD-07)
-- [ ] 03-05-PLAN.md — Type-change pre-flight + apply (`UPDATE defs.type` + same-txn `field_history` snapshot, values byte-identical) (FLD-04)
-- [ ] 03-06-PLAN.md — 7 RN value widgets + `FieldValueInput` + `CustomFieldValue` tap-to-fix (FLD-04, FLD-07)
+- [ ] 03-02-PLAN.md — 7 permissive parsers + `isValueInOptions` + guarded `sortExpr()` (FLD-04, FLD-06)
+- [ ] 03-03-PLAN.md — Transactional DDL (atomic create / non-mutexed drop core + public dropField / atomic dynamic delete-quarantine) + field-defs metadata DAO incl. `updateFieldCuration` (FLD-01, FLD-02, FLD-03, FLD-05, FLD-06)
+- [ ] 03-04-PLAN.md — Custom-value read/serialized UPSERT + §14.7 visibility selectors (FLD-01, FLD-07)
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
-- [ ] 03-07-PLAN.md — Quarantine-expiry + history-retention launch sweep + App wiring (FLD-05)
+- [ ] 03-05-PLAN.md — Type-change + options pre-flight + apply (`UPDATE defs.type` + same-txn `field_history` snapshot encoding the transition, values byte-identical) (FLD-04)
+- [ ] 03-06-PLAN.md — 7 RN value widgets + `FieldValueInput` + `CustomFieldValue` tap-to-fix (FLD-04, FLD-07)
+- [ ] 03-07-PLAN.md — Quarantine-expiry + history-retention launch sweep (dropField called directly, datetime window) + App wiring (FLD-05)
+
+**Wave 4** *(blocked on Wave 3 completion)*
+
 - [ ] 03-08-PLAN.md — CustomFieldsScreen + FieldDefForm + in-app reachability (FLD-02, FLD-03, FLD-04, FLD-05, FLD-07)
 
 ### Phase 4: Contact CRUD & Lifecycle

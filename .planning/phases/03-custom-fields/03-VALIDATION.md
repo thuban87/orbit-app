@@ -51,7 +51,7 @@ created: 2026-08-14
 
 ## Wave 0 Requirements
 
-- [ ] `src/db/` field-defs + values DAOs, transactional DDL ops (add/rename/drop), `sortExpr`, 7 parsers, type-change pre-flight, quarantine-sweep hook
+- [ ] `src/db/` field-defs + values DAOs, transactional DDL ops (add/rename/drop), the single shared `inWriteTransaction` (`src/db/transaction.ts`, extracted from recency-dao), `sortExpr`, 7 parsers + `isValueInOptions`, type-change/options pre-flight, quarantine-sweep hook
 - [ ] node:sqlite test files above (reuse the Phase-2 testkit)
 - [ ] Vitest installed (Phase 1/2) — no framework install
 
