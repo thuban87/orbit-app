@@ -15,8 +15,8 @@
  * `gravity-logic` over an `ImpactInputs` shape, so it stays node-testable.
  */
 
-import { getImpactInputs } from "@/db/impact-read";
 import type { ImpactInputs } from "@/db/impact-read";
+import { getImpactInputs } from "@/db/impact-read";
 import {
   computeGravity,
   type GravityResult,

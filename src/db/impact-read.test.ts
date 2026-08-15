@@ -13,7 +13,10 @@ import { nodeSqliteExecutor, openTestDb } from "@/db/__testkit__/node-sqlite";
 import { getImpactInputs } from "@/db/impact-read";
 import { migration001 } from "@/db/migrations/001-initial";
 import { runMigrations } from "@/db/migrations/runner";
-import { createContactWithInteraction, recordTouchpoint } from "@/db/recency-dao";
+import {
+  createContactWithInteraction,
+  recordTouchpoint,
+} from "@/db/recency-dao";
 import type { SqlExecutor } from "@/db/types";
 
 const NOW = "2026-08-14 12:00:00";
@@ -65,7 +68,11 @@ describe("getImpactInputs — the shared impact-inputs read", () => {
     });
     const inputs = await getImpactInputs(exec, c);
     expect(inputs?.interactions).toEqual([
-      { occurredAt: "2026-06-01 10:00:00", connected: 1, direction: "outbound" },
+      {
+        occurredAt: "2026-06-01 10:00:00",
+        connected: 1,
+        direction: "outbound",
+      },
     ]);
   });
 

@@ -46,10 +46,9 @@ export async function getImpactInputs(
   const contact = await exec.getFirstAsync<{
     interval_days: number;
     rarely_responds: number;
-  }>(
-    "SELECT interval_days, rarely_responds FROM contacts WHERE id = ?",
-    [contactId],
-  );
+  }>("SELECT interval_days, rarely_responds FROM contacts WHERE id = ?", [
+    contactId,
+  ]);
   if (!contact) {
     return null;
   }

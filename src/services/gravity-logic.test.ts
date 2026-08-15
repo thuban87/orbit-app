@@ -8,10 +8,7 @@
  * "Rarely responds" contacts.
  */
 import { describe, expect, it } from "vitest";
-import {
-  computeGravity,
-  type GravityTunables,
-} from "@/services/gravity-logic";
+import { computeGravity, type GravityTunables } from "@/services/gravity-logic";
 import { computeContactGravity } from "@/services/impact";
 
 const NOW = "2026-08-14 12:00:00";
@@ -31,7 +28,10 @@ const TUNABLES: GravityTunables = {
 };
 
 /** A row at `daysAgo` before NOW, connected by default. */
-function rowDaysAgo(daysAgo: number, connected = 1): {
+function rowDaysAgo(
+  daysAgo: number,
+  connected = 1,
+): {
   occurredAt: string;
   connected: number;
 } {
