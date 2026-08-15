@@ -5,16 +5,16 @@ milestone_name: milestone
 current_phase: 6
 current_phase_name: Interaction Log, Status & Impact
 status: ready
-stopped_at: Completed 06-05-PLAN.md
-last_updated: "2026-08-15T21:00:00.000Z"
+stopped_at: Completed 06-06-PLAN.md
+last_updated: "2026-08-15T20:54:07.945Z"
 last_activity: 2026-08-15
-last_activity_desc: Completed 06-05 (gravity — derived-never-stored age-decay → named tier, profile-only GravityBar)
+last_activity_desc: Completed 06-06 (intensity — neutral derived-never-stored period-rate + trailing cadence, profile-only IntensityLine beside gravity); Phase 6 code-complete
 progress:
   total_phases: 16
-  completed_phases: 5
+  completed_phases: 6
   total_plans: 42
   completed_plans: 42
-  percent: 31
+  percent: 38
 ---
 
 # Project State
@@ -28,11 +28,11 @@ See: .planning/PROJECT.md (updated 2026-08-14)
 
 ## Current Position
 
-Phase: 6 (Interaction Log, Status & Impact) — EXECUTING
-Next: continue Phase 6 (execute 06-06 intensity) then `/gsd-verify-work 6`
-Last activity: 2026-08-15 — Completed 06-05 (gravity — derived-never-stored age-decay → named tier, profile-only GravityBar)
+Phase: 6 (Interaction Log, Status & Impact) — CODE-COMPLETE (all 6 plans executed)
+Next: on-device UAT on the Pixel (impact section: intensity beside gravity, profile-only, rarely-responds ignores non-connected) then `/gsd-verify-work 6`
+Last activity: 2026-08-15 — Completed 06-06 (intensity — neutral derived-never-stored period-rate + trailing cadence, profile-only IntensityLine beside gravity)
 
-Progress: [███░░░░░░░] 31% (5/16 phases complete)
+Progress: [████░░░░░░] 38% (6/16 phases complete)
 
 ## Performance Metrics
 
@@ -96,6 +96,8 @@ Progress: [███░░░░░░░] 31% (5/16 phases complete)
 | Phase 06 P03 | 7min | 3 tasks | 7 files |
 | Phase 06 P04 | 5min | 3 tasks | 8 files |
 | Phase 06 P05 | 18min | 3 tasks | 7 files |
+| Phase 06 P06 | 6min | 2 tasks | 5 files |
+| Phase 06 P06 | 6min | 2 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -163,6 +165,7 @@ Foundational decisions affecting current work:
 - [Phase 05]: 05-07: purge photo cleanup (buildPhotoPurgeCleanup) is the onPurgeExtensions adapter — POST-COMMIT it rebuilds filenames from contactId alone (rows already deleted): main contact-<id>.jpg + one cv-<id>-<col>.jpg per surviving photo def. listDefs(exec, { includeQuarantined: true }) is REQUIRED so a purge during a photo field's quarantine window still deletes its cv- file (PHOTO-05, no leak); idempotent + internally error-resilient; registered at the Archived-list purge without touching the two-stage guard
 - [Phase 05]: 05-06: url-image.downloadImageToCache uses fetch (NOT File.downloadFileAsync — it exposes neither headers nor the final redirect URL); isImageUrl is an https-ONLY scheme allowlist (extension NOT required — image/* content-type is the authoritative gate) applied to BOTH the submitted URL and the redirect-resolved response.url; byte cap is stream-enforced (reader.cancel at cap) with an absent/invalid/over-cap content-length up-front + post-read re-verify fallback; bytes land in the evictable cache subdir, never the document dir; the raw cache uri then feeds the identical crop pipeline (one-time WRITE, no read-path network). Settings "Your photo" seeds from getProfile with a stable 'You' fallback (never a blank swatch), reloads on focus, and reuses Plan 05's profile-target Remove (no Settings-side Remove, no contactId)
 - [Phase 06]: 06-05: gravity is DERIVED-NEVER-STORED (no column, no write) — computeGravity is a pure age-decay-toward-a-floor weighted sum (weight = FLOOR_W + (1-FLOOR_W)·2^(-ageDays/HALF_LIFE_DAYS)) → highest tier whose threshold ≤ raw; monotone in recency, superset-never-lowers, floor-never-zero. Tunables (HALF_LIFE_DAYS=365, FLOOR_W=0.15, 4 GRAVITY_TIERS thin=0/building=3/solid=8/deep=18) top-of-file in impact.ts (owner-approved-tunable). getImpactInputs is the SINGLE read feeding gravity + intensity (same rows). computeContactGravity mirrors recency's connected filter (rarely_responds → connected rows only); direction is NOT a gravity input. GravityBar shows tier NAME + tier-discrete bar (never raw), fill via colors.gravityTiers[tierIndex] (clamped), track colors.border; profile-only, hidden until interaction history exists
+- [Phase 06]: 06-06: intensity is DERIVED-NEVER-STORED, PROFILE-ONLY, and NEUTRAL — computeIntensity (pure, react-native-free, node-tested) counts direction outbound|mutual within one interval-length (INTENSITY_PERIOD_DAYS = interval_days via intensityPeriodDays(), A3 owner-approved), rarely_responds=1 additionally requires connected=1 (mirrors recency/gravity); inbound-only volume never raises currentCount. trailingAvgGapDays = mean consecutive gap over ALL qualifying history, SORTED ASCENDING before differencing (getImpactInputs delivers DESC), null when <2 rows (no divide-by-zero). computeContactIntensity orchestrates in impact.ts from the SAME getImpactInputs read gravity uses. IntensityLine renders a neutral rate + intended-frequency + trailing-average via colors.textPrimary/textSecondary ONLY (no danger/warning, no gravityTiers/rogue tokens), trailing clause omitted when null, neutral empty state; rendered BESIDE GravityBar in contact-profile-impact, never blended. Completes LOG-03 (both halves) and Phase 6 code
 - [Phase 06]: 06-02: events-dao is immutable insert-only (recordEvent/recordEventCore, no update path); archive/restore emit events composed inside their existing transaction, archived-state-guarded so a no-op/wrong-state transition throws and writes no spurious event; purge surfaces+deletes events; timeline UNION-ALL interleave keyed ${kind}-${id} with kind_order final tiebreak — LOG-02 events writer + read half; single-writer DATA-04 intact (no last_contact write added)
 
 ### Pending Todos
@@ -200,7 +203,7 @@ planning" sections in docs/dossier/*.md — those are the authoritative hand-off
 ## Session
 
 **Last session:** 2026-08-15T21:00:00.000Z
-**Stopped at:** Completed 06-05-PLAN.md
+**Stopped at:** Completed 06-06-PLAN.md
 **Resume file:** None
 
 ## Phase 4 — Closeout (2026-08-15) ✅ COMPLETE

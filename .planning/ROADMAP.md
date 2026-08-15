@@ -21,7 +21,7 @@ onto the dossier domains; a `[DECIDED]`/`[REJECTED]` decision is implemented, ne
 - [x] **Phase 3: Custom Fields** — HANDOFF §14 two-table design, 7 parsers, `field_history`, quarantine sweep, and the field editor. (completed 2026-08-15)
 - [x] **Phase 4: Contact CRUD & Lifecycle** — create/edit forms, `contact_links`, archive/restore/purge, the contact profile scaffold. (completed 2026-08-15)
 - [x] **Phase 5: Photos** — library picker + URL path, in-app Skia crop, 512px master, themed initials fallback. (completed 2026-08-15)
-- [ ] **Phase 6: Interaction Log, Status & Impact** — touchpoint rows, editable timeline, gravity/intensity, rogue, "Rarely responds".
+- [x] **Phase 6: Interaction Log, Status & Impact** — touchpoint rows, editable timeline, gravity/intensity, rogue, "Rarely responds". (completed 2026-08-15)
 - [ ] **Phase 7: Conversational Fuel** — per-item rows (5 kinds incl. `off_limits`), ranked projection, profile editor, cross-contact search.
 - [ ] **Phase 8: Dashboard & Never-Contacted Screen** — the home screen, sort/filter/search, birthday banner, favourites, freshness, empty states.
 - [ ] **Phase 9: Compose Screen & SMS Handoff** — the in-app message surface (fuel visible, Send→SMS, Copy) that notify/widget/AI all open.
@@ -273,7 +273,7 @@ Recorded here because they bind phases that do not own them. Every planner/execu
   3. `gravity` (tiers + bar) and `intensity` (neutral rate + long-run cadence) render on the profile only, derived-never-stored.
   4. A "Rarely responds" contact computes recency over connected rows only and shows its label; a contact goes `rogue` at the shared constant / via the setting, surfaced in-app only.
 
-**Plans:** 5/6 plans executed
+**Plans:** 6/6 plans complete
 
 **Wave 1**
 
@@ -297,7 +297,7 @@ Recorded here because they bind phases that do not own them. Every planner/execu
 
 **Wave 6** *(blocked on Wave 5)*
 
-- [ ] 06-06-PLAN.md — Intensity (neutral rate + trailing cadence) + IntensityLine, profile-only (LOG-03)
+- [x] 06-06-PLAN.md — Intensity (neutral rate + trailing cadence) + IntensityLine, profile-only (LOG-03)
 
 ### Phase 7: Conversational Fuel
 
@@ -453,7 +453,7 @@ Recorded here because they bind phases that do not own them. Every planner/execu
 | 3. Custom Fields | 8/8 | Complete    | 2026-08-15 |
 | 4. Contact CRUD & Lifecycle | 9/9 | Complete   | 2026-08-15 |
 | 5. Photos | 8/8 | Complete   | 2026-08-15 |
-| 6. Interaction Log, Status & Impact | 5/6 | In Progress|  |
+| 6. Interaction Log, Status & Impact | 6/6 | Complete   | 2026-08-15 |
 | 7. Conversational Fuel | 0/TBD | Not started | - |
 | 8. Dashboard & Never-Contacted Screen | 0/TBD | Not started | - |
 | 9. Compose Screen & SMS Handoff | 0/TBD | Not started | - |
