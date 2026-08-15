@@ -1,9 +1,9 @@
 ---
 phase: 06-interaction-log-status-impact
 verified: 2026-08-15T16:12:00Z
-status: human_needed
-overall: passed-pending-uat
-score: 4/4 criteria code-complete · 6/6 requirements code-complete
+status: passed
+overall: passed
+score: 4/4 criteria code-verified + core on-device UAT PASSED · 6/6 requirements code-verified
 behavior_unverified: 0
 overrides_applied: 0
 gates:
@@ -11,6 +11,18 @@ gates:
   check_colors: pass (exit 0)
   biome: pass (exit 0, 142 files)
   vitest: pass (44 files, 529 tests)
+on_device_uat_verified:  # driven on the physical Pixel 6 Pro (1A071FDEE002BU) via an incremental release APK, 2026-08-15
+  - "Incremental release APK (Phase 6 = pure src/, no native/deps change) built + installed + launched, no crash; created a contact and drove the full profile"
+  - "LOG-01 one-tap: 'Log contact' wrote an outbound touchpoint (timeline 1→2 rows, distinct testIDs timeline-row-touchpoint-1/-2) and refreshed every surface in place via the single unified load()"
+  - "LOG-03 intensity: flipped from 'No outbound contact logged yet' → '1× this period · Monthly intended' when the outbound log landed (counts outbound only); GravityBar rendered 'Thin' tier + fill, profile-only"
+  - "LOG-02 timeline: interleaved rows render newest-first with ${kind}-${id} keys; touchpoint rows carry Add detail/Delete affordances"
+  - "LOG-02 delete: the Delete Alert stated permanence ('no undo and no backup — it can't be recovered'); confirming removed the row and recomputed/refreshed in place (intensity reverted)"
+  - "Events writer (owner decision 1): archiving the contact wrote an 'archive' event — PROVEN on-device by the purge impact confirm reading 'Permanently delete Dana and 1 interaction, 1 event?'; purge then deleted contact+interaction+event and the Archived list returned to its empty state"
+  - "All surfaces theme-tokened (space-dark), no crash across create→log→delete→archive→purge"
+on_device_uat_remaining:  # lower-risk; all are UI renders of code-verified logic (529 tests)
+  - "Viewing archive/restore events IN the timeline read-only — blocked by the missing dashboard (Phase 8): a live/archived contact's profile can't be reopened yet. Events WRITE + interleave are code-verified (contacts-dao.test.ts, timeline-read.test.ts) and the write was proven on-device via the purge count."
+  - "Refine form's native two-dialog date+time picker + inline future-rejection (the 'Add detail' affordance renders; the pure carry-state/parse logic is node-tested)"
+  - "Rogue label + Rarely-responds label render (needs a contact driven past ROGUE_K / rarely_responds toggled; REASON_SQL + labels code-verified)"
 human_verification:
   - test: "One-tap 'Log contact' button records a touchpoint and refreshes every profile surface"
     expected: "Single tap writes a row (source=manual, outbound, connected=1) through the single writer; status/impact/timeline update"
