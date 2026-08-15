@@ -130,10 +130,10 @@ describe("changeFieldOptions / updateFieldCuration", () => {
   it("changeFieldOptions edits options only", async () => {
     const id = await makeDef({ col_name: "tier", type: "dropdown" });
 
-    await changeFieldOptions(exec, id, '["gold","silver"]', LATER);
+    await changeFieldOptions(exec, id, '["basic","premium"]', LATER);
 
     const def = await readDef(id);
-    expect(def.options).toBe('["gold","silver"]');
+    expect(def.options).toBe('["basic","premium"]');
     expect(def.modified_at).toBe(LATER);
   });
 
