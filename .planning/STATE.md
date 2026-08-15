@@ -5,10 +5,10 @@ milestone_name: milestone
 current_phase: 5
 current_phase_name: Photos
 status: ready
-stopped_at: Phase 5 planned (8 plans) — cross-AI convergence in progress
+stopped_at: Phase 5 plan-phase — checker iter 2/3 found 1 blocker + 1 warning on Plan 05-08 (widget contactId/col_name threading undeclared in files_modified); one revision away from clean; cross-AI convergence not yet started
 last_updated: "2026-08-15T08:13:50.725Z"
 last_activity: 2026-08-15
-last_activity_desc: Phase 5 UI-SPEC + research + 8 plans done; converging before execute (paused per owner)
+last_activity_desc: Phase 5 lead-up (UI-SPEC+research+8 plans+1 revision) done; held before next revision per usage-limit checkpoint + owner headroom gate
 progress:
   total_phases: 16
   completed_phases: 4
