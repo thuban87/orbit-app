@@ -32,4 +32,32 @@ describe("rejectFutureOccurredAt", () => {
       rejectFutureOccurredAt("2026-08-15 12:00:01", "2026-08-15 12:00:00"),
     ).toThrow(/future/i);
   });
+
+  // MED-1: a lexical `>` alone lets a malformed value (which sorts BEFORE a real
+  // `now`) slip past the future check and get persisted. Strict shape + calendar
+  // validation must REJECT these before the compare.
+  it.each([
+    ["empty string", ""],
+    ["whitespace only", "   "],
+    ["a bare date with no time", "2026-08-15"],
+    ["a nonsense calendar datetime", "2026-13-40 99:99:99"],
+    ["non-date text", "not-a-date"],
+    ["a non-zero-padded value", "2026-8-1 9:5:3"],
+    ["an impossible calendar day (Feb 30)", "2026-02-30 10:00:00"],
+    ["a trailing-whitespace value", "2026-08-01 10:00:00 "],
+  ])("throws when occurredAt is %s (malformed → reject)", (_label, bad) => {
+    expect(() => rejectFutureOccurredAt(bad, "2026-08-15 12:00:00")).toThrow();
+  });
+
+  it("throws when now itself is malformed", () => {
+    expect(() =>
+      rejectFutureOccurredAt("2026-08-01 10:00:00", "not-a-date"),
+    ).toThrow();
+  });
+
+  it("allows a well-formed past value at the boundary of the year", () => {
+    expect(() =>
+      rejectFutureOccurredAt("2025-12-31 23:59:59", "2026-08-15 12:00:00"),
+    ).not.toThrow();
+  });
 });
