@@ -184,3 +184,198 @@ the *wiring waves* (05-05 and 05-08) carry several defects that would fail the p
 None material. codex rated the crop-geometry-init and delete-before-copy as HIGH; claude rates both
 MEDIUM-actionable (the geometry inputs are obtainable on-screen; delete-before-copy degrades to the
 initials fallback and was a dossier interim recommendation). Both agree they need a plan change.
+
+---
+---
+
+# Cross-AI Plan Review — Phase 5 (Photos) — Cycle 2
+
+Re-review after the cycle-1 replan (commit `3080eb1`). Two independent reviewers again: **codex**
+(OpenAI codex-cli 0.144.1, run over the revised plans + source) and **claude** (read-only,
+independent). Every cycle-1 finding was re-verified against the ACTUAL code on disk, and each plan's
+claims were traced to the file:line it cites — not taken from the plan's own prose.
+
+`reviewed_at: 2026-08-15` · `cycle: 2` · `plans_reviewed: [05-01..05-08]`
+
+## Cycle-1 verification (both reviewers concur)
+
+All four cycle-1 HIGHs and the actionable set are **RESOLVED in the plans AND consistent with the
+real source**:
+
+| Cycle-1 finding | Status | Disk evidence |
+|---|---|---|
+| **[HIGH] 05-08 prop contracts** (`onChange(null)`, `col_name`, widget `contactId`/`colName`) | **RESOLVED** | `types.ts:17` is still `onChange:(value:string)=>void`; `FieldValueInput.tsx:23` `FieldSpec` still excludes `col_name`; `EditContactScreen.tsx:608` `<FieldValueInput>` passes no `contactId` — 05-08 widens `onChange` to `string\|null`, adds OPTIONAL `col_name` (so `FieldDefForm.tsx:130` `previewField` + `setPreviewValue:335` and `CreateContactScreen.tsx:89` `Record<string,string\|null>` all still compile UNCHANGED — verified), and threads `contactId`+`colName` to the photo case only. |
+| **[HIGH] 05-05 `form.photo` / EditFormState** | **RESOLVED** | `edit-contact-logic.ts:38-69` EditFormState has NO `photo`; 05-05 holds photo as SEPARATE screen state seeded from `getContactForEdit` (`contact-read.ts:96,106` ContactEditRow already carries `photo`+`modified_at`), leaving `edit-contact-logic.ts` correctly out of `files_modified`. |
+| **[HIGH] contact/profile post-crop refresh** | **RESOLVED** | `ContactProfileScreen.tsx:21,32,59,73` already reloads via `useFocusEffect`→`getContactHeader`; 05-03 adds `photo`+`modified_at` to that header read; 05-05 adds a photo-ONLY `refreshPhoto` `useFocusEffect` to `EditContactScreen` (which today has mount-only `load` at `:143`, no focus effect) that does NOT reseed the form → unsaved edits survive. Serializable nav params only (no callback). |
+| **[HIGH] 05-07 `listDefs` signature + quarantine leak** | **RESOLVED** | `field-defs-dao.ts:177-180` `listDefs(exec,{includeQuarantined:boolean})` is a required arg; 05-07 calls it with `{includeQuarantined:true}`, filters `type==='photo'`, and its test seeds a QUARANTINED photo def to prove the cv- file is deleted (PHOTO-05 quarantine window). |
+| [MED] 05-02 copy-to-temp-then-rename + failure test | RESOLVED (with caveat, see below) | 05-02 action/behavior fully specify copy→tmp then rename-over + a mocked-FS failure-path test. |
+| [MED] `resolvePhotoUriFromDocumentUri` pure seam | RESOLVED | 05-02 exports the pure `(documentUri, relative)` composer + thin `resolvePhotoUri` wrapper. |
+| [MED] 05-06 final-URL/redirect + content-type SSRF | RESOLVED (with caveat) | 05-06 drops `downloadFileAsync` for `fetch`, re-validates the redirect-resolved `response.url` via https-only `isImageUrl`, requires `image/*`, caps size. |
+| [MED] `getProfile` self-name source | RESOLVED | 05-02 adds `getProfile→{name,photo,modified_at}`; 05-06 uses it with a stable `'You'` fallback. |
+| [MED] FS path-helper validation | RESOLVED (partial — see New MED-3) | 05-02 validates the filename BUILDERS (positive-int `contactId`, `isSafeColName`). |
+| [MED] cacheBust via `modified_at` (stale-image-on-replace) | RESOLVED (with caveat — see New MED-1) | 05-03/05/06 thread `cacheBust={modified_at}` into `Avatar` `cacheKey`/`recyclingKey`. |
+| [MED] 05-03 `contact-read.test.ts` | RESOLVED | declared in `files_modified`; asserts `photo` (rel + null) + `modified_at`. |
+| [HIGH→MED] crop-geometry screen init | RESOLVED | 05-05 Task 1 specifies one-time init: intrinsic dims from decoded Skia image, viewport measure, `baseScale=viewport/min(srcW,srcH)`, shared-value seed; `crop-geometry.ts` header is the matching contract. |
+| [LOW] 05-01 plugin dedupe-by-name + comment | RESOLVED | 05-01 dedupes plugins BY NAME before appending the tuple; updates the `9→11 tokens` doc comment. |
+
+**Deferrals reviewed and judged reasonable:** (a) 05-08 keeps `depends_on:["05-03","05-04","05-05"]`
+and does NOT add 05-06 — correct, since 05-06 is itself wave 5 and there is no compile-time coupling
+(adding it would illegally push 05-08 to wave 6 for a purely integration-time relationship). (b) The
+"add photo to EditFormState" cycle-1 suggestion was deliberately reworked to separate screen state,
+with a sound rationale (keeps the metadata Save path / `buildEditInput` clean; photo writes through
+its own dedicated DAO per 05-RESEARCH Pitfall 6).
+
+**Non-negotiables (both reviewers, verified):** no new migration (`001-initial.ts:56,72` both `photo TEXT`
+exist); DAOs in `src/db`, FS work post-commit (`purge-dao.ts:67,205`); tokenised colour incl. Skia
+(`check-colors.sh` gate, swatches in `src/theme`); 512px master via `expo-image-manipulator`, never a
+Skia snapshot; relative→`file://` at read only, no network on any read path; Reanimated shared values
+for the crop (no per-frame setState); **acyclic wave graph with NO same-wave `files_modified`
+collision** (wave 3 = 05-03/04/07 disjoint; wave 5 = 05-06/08 disjoint — confirmed by file scan).
+
+## Codex Review (Cycle 2, full)
+
+Verdict: **revise before execution.** 6 of 7 cycle-1 items RESOLVED; one STILL-OPEN (replacement
+atomicity), plus 5 new concerns. (Full text preserved below.)
+
+- **[codex / HIGH] Replacement is not transactionally compensated.** The new temp-first copy protects
+  only against a *copy* failure, but persistMaster then explicitly deletes `dest` before
+  `tmp.move(dest)` (`05-02-PLAN.md:101`), and the crop flow persists the file BEFORE the DAO write
+  (`05-05-PLAN.md:102`); DAO failures are loud, normal paths here (`contacts-dao.ts:267`). A move/DAO
+  failure can leave the DB path pointing at new bytes despite reporting failure, or leave no master.
+  Keep the old master as a backup until the DAO/form write succeeds; restore on failure; test the
+  move/DAO-failure compensation.
+- **[codex / MEDIUM] Cache-bust not reliably unique.** The fix keys the image cache on `modified_at`
+  (`05-03-PLAN.md:119`) but timestamps are second-resolution (`database.ts:41` `localDateTime` →
+  `YYYY-MM-DD HH:MM:SS`). Two replaces in one second reuse the same stable path AND cache key → stale
+  decode persists. Use a per-write revision token independent of the timestamp.
+- **[codex / MEDIUM] Generic relative-path FS APIs accept unvalidated paths.** 05-02 validates the
+  filename BUILDERS only; the exported generic `resolvePhotoUri`/`persistMaster`/`deletePhoto` take a
+  raw `relative` string, and `photo TEXT` has no schema constraint (`001-initial.ts:61`). Add an
+  allowlisted relative-path validator at the generic FS boundary and test traversal rejection.
+- **[codex / MEDIUM] URL size cap trusts an optional/spoofable header.** 05-06 caps only
+  `content-length` before reading (`05-06-PLAN.md:90`); a chunked or falsely-small response is read
+  fully into memory. Enforce the cap while streaming, or reject absent/invalid `content-length`.
+- **[codex / MEDIUM] Custom-field crop can orphan a file on Cancel/failed Save.** The crop screen
+  persists the cv- file but does NO DB write (`05-05-PLAN.md:102`); 05-08 only updates in-memory form
+  state, and values persist only inside the form's Save transaction (`contacts-dao.ts:301`).
+  Navigating away or a failed Save leaks the `cv-*` bytes. Stage the file until Save, or add
+  deterministic cancel/save-failure cleanup.
+- **[codex / LOW] 05-08 should declare its behavioral dependency on 05-07.** It documents that
+  custom-field purge cleanup is provided by 05-07 (`05-08-PLAN.md:52`) but omits it from `depends_on`.
+  Adding `05-07` is graph-legal (it is wave 3, no file collision).
+
+## Claude Review (Cycle 2, independent)
+
+Verdict: **one HIGH worth an owner risk-posture call, else revise-lite.** I independently re-traced
+every cycle-1 fix to disk and concur they are genuinely RESOLVED (table above). On the new concerns I
+agree with codex's MEDIUMs and add mechanism corrections; I part company on the *framing* of the HIGH.
+
+- **[claude / HIGH — concur, corrected mechanism] Replacement has an irreversible-loss window on
+  crash — owner risk-posture call.** codex's DAO-centric framing is partly off: because the master
+  path is STABLE and derivable (`avatars/contact-${id}.jpg`), a *DAO-write* failure after the file
+  replace is NON-destructive — the DB path is byte-identical before/after and the new bytes ARE the
+  user's just-cropped image; the only fallout is `modified_at` not bumping (a stale-decode cosmetic).
+  The REAL hazard is inside `persistMaster` (`05-02-PLAN.md:101`): it **deletes `dest` before**
+  `tmp.move(dest)`. If the process is killed between the delete and the move (or the rename fails),
+  the prior master is gone, the new bytes are stranded at `*.tmp`, and there is NO launch-time sweep
+  to reconcile — permanent loss with no backup, exactly the doctrine this project treats as sacred
+  ("no server, no backup; treat every write as irreversible"). The plan's "compensate by re-attempting
+  the move" does not survive a process kill. Cheap fix: NEVER pre-delete `dest` — use an atomic
+  move/replace if `expo-file-system`'s `File.move` supports overwrite (confirm the `.d.ts`), OR
+  rename `dest→dest.bak` then `tmp→dest` then delete `.bak`, with a launch-time `.tmp`/`.bak`
+  reconciliation. **This is a risk/safety-posture decision (owner's bucket): the owner should decide
+  whether the narrow crash window is acceptable or the .bak/atomic-replace fix ships.** Also: the
+  stale "delete-before-copy" wording (New LOW-1) actively invites an executor to reintroduce the
+  pre-delete.
+- **[claude / MEDIUM — concur] Sub-second cache-bust collision.** Verified `localDateTime` is
+  second-resolution; the cycle-1 stale-image fix therefore has a residual sub-second hole. A monotonic
+  per-write counter or a random token as the `cacheBust` closes it.
+- **[claude / MEDIUM — concur] Custom-field orphan on Cancel/failed-Save.** Confirmed values persist
+  only in the form Save `inWriteTransaction`. Mitigating context worth recording: the cv- path is
+  derivable and STABLE, so a re-crop overwrites the orphan and a later purge (05-07) cleans it — the
+  leak is self-healing and bounded (~one 40 KB file), not permanent. Still worth a stage-until-save or
+  a cancel-cleanup, but this is MEDIUM-bounded, not data corruption.
+- **[claude / MEDIUM — concur] URL size cap.** Proportionate given user-initiated, write-path-only,
+  evictable-cache download bounded by the 512px re-encode — but the plan's own claim to "bound DoS"
+  is only as strong as a present, honest `content-length`. Stream-enforce or reject-absent.
+- **[claude / LOW-1] Stale "delete-before-copy" phrasing contradicts the fixed design.** The
+  copy-to-temp-then-rename rewrite left three stale phrases that still say the old, rejected approach:
+  `05-02-PLAN.md:182` (success_criteria "persistMaster delete-before-copies into the document dir"),
+  `05-05-PLAN.md:169` (T-05-05 "delete-before-copy on replace prevents orphan accumulation"), and
+  `05-08-PLAN.md:172` (T-05-05 "delete-before-copy on replace"). Given the project's data-loss
+  sensitivity, these should be corrected so no executor reintroduces the pre-delete.
+- **[claude / LOW-2 — concur] 05-08 `depends_on` 05-07.** Semantic-accuracy only; graph-legal (05-07
+  is wave 3). Optional.
+
+## Consensus Summary (Cycle 2)
+
+The cycle-1 replan **landed cleanly**: all four HIGHs and the full actionable set are resolved in the
+plans and consistent with the real source, deferrals are sound, and every non-negotiable holds
+(no migration, DAO placement, tokenised Skia, 512px manipulator master, local-first reads, shared-value
+crop, acyclic collision-free wave graph). The phase is close to executable.
+
+One item survives, and it is the same one both reviewers independently surface: **replacement
+atomicity.** codex rates it HIGH on transactional grounds; claude concurs it is HIGH but relocates the
+real hazard to the `persistMaster` pre-delete crash window (the DAO-ordering half is non-destructive
+thanks to stable paths) and flags it as an **owner risk-posture decision** — the narrow window vs. the
+cheap atomic-replace / `.bak`-reconcile fix. The remaining four MEDIUMs (sub-second cache-bust, generic
+FS-path validation, URL size cap, custom-field orphan) and two LOWs (stale delete-before-copy wording,
+05-08→05-07 dep) are small, largely proportionate hardening/clarity edits.
+
+### Agreed concerns (2 reviewers) — priority order
+
+1. **[HIGH] Replacement atomicity** — `persistMaster` pre-deletes `dest` before the rename; crash/failure
+   window can irreversibly lose the prior master (no backup, no launch sweep). Owner risk-posture call:
+   accept the window or ship atomic move-replace / `.bak`+reconcile.
+2. **[MEDIUM] Sub-second cache-bust collision** — `modified_at` is second-resolution; use a per-write token.
+3. **[MEDIUM] Custom-field orphan** on Cancel/failed-Save (self-healing + purge-cleaned, but a bounded leak).
+4. **[MEDIUM] URL download size cap** trusts `content-length` (chunked/spoof bypass).
+5. **[MEDIUM] Generic FS APIs** accept an unvalidated `relative` string (builders are validated; add a boundary guard).
+
+### Codex-only
+
+- [LOW] 05-08 add 05-07 to `depends_on` (graph-legal, wave 3).
+
+### Claude-only
+
+- [LOW] Stale "delete-before-copy" phrasing in 05-02:182 / 05-05:169 / 05-08:172 — correct the text so
+  the rejected pre-delete is not reintroduced.
+
+### Divergent views
+
+Only on the HIGH's *mechanism/severity framing*, not its existence: codex frames it as a transactional
+DAO-ordering failure (HIGH); claude shows the DAO half is non-destructive under stable paths and pins
+the true irreversible-loss risk to the `persistMaster` pre-delete crash window (HIGH, and an owner
+risk-posture decision). Both agree a plan change to `persistMaster` is warranted.
+
+---
+
+### Codex Cycle-2 raw output (preserved)
+
+```
+# Phase 5 review — revise before execution
+
+`npx tsc --noEmit` passes on the current baseline. I reviewed the real source, not only the revised plans.
+
+## Cycle-1 findings
+- 05-08 prop contracts — RESOLVED (types.ts:17, FieldValueInput.tsx:23, EditContactScreen.tsx:608; 05-08-PLAN.md:133)
+- 05-05 undeclared form.photo / reload — RESOLVED (edit-contact-logic.ts:38, EditContactScreen.tsx:143; 05-05-PLAN.md:134)
+- Contact/profile refresh after crop — RESOLVED (ContactProfileScreen.tsx:73; 05-03-PLAN.md:120, 05-05-PLAN.md:135)
+- 05-07 listDefs signature + quarantined purge leak — RESOLVED (field-defs-dao.ts:177; 05-07-PLAN.md:88)
+- 05-03 missing header-read test coverage — RESOLVED (contact-read.ts:65, contact-read.test.ts:106; 05-03-PLAN.md:120)
+- Crop-screen geometry initialization — RESOLVED (05-05-PLAN.md:100)
+- Replacement safety on failed copy/DAO write — STILL-OPEN (05-02-PLAN.md:101, 05-05-PLAN.md:102, contacts-dao.ts:267)
+
+## New concerns
+- HIGH — replacement is not transactionally compensated (keep old master as backup until DAO/form write succeeds).
+- MEDIUM — cache bust not reliably unique (modified_at second-resolution, database.ts:41).
+- MEDIUM — generic relative-path FS APIs accept unvalidated paths (001-initial.ts:61).
+- MEDIUM — URL size cap trusts optional/spoofable content-length (05-06-PLAN.md:90).
+- MEDIUM — custom-field crop can orphan a file on Cancel/failed Save (contacts-dao.ts:301, 05-05-PLAN.md:102, 05-08-PLAN.md:131).
+- LOW — 05-08 should declare its behavioral dependency on 05-07 (graph-legal, wave 3).
+
+## Non-negotiable checks
+- No migration needed (001-initial.ts:51). DAO placement correct; FS work post-commit (purge-dao.ts:205).
+- Colour tokenised incl. Skia (check-colors.sh:37). Manipulator output not Skia snapshot; relative paths stored.
+- Wave graph acyclic, no same-wave files_modified collision. Missing 05-08→05-07 dep is semantic, not a cycle/collision.
+```
