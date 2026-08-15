@@ -5,15 +5,15 @@ milestone_name: milestone
 current_phase: 4
 current_phase_name: Contact CRUD & Lifecycle
 status: executing
-stopped_at: Phase 04 UI-SPEC approved
-last_updated: "2026-08-15T05:25:15.010Z"
+stopped_at: Completed 04-01-PLAN.md
+last_updated: "2026-08-15T05:36:32.971Z"
 last_activity: 2026-08-15
-last_activity_desc: Phase 3 complete, transitioned to Phase 4
+last_activity_desc: Phase 4 execution started
 progress:
   total_phases: 16
   completed_phases: 3
-  total_plans: 19
-  completed_plans: 19
+  total_plans: 28
+  completed_plans: 20
   percent: 19
 ---
 
@@ -24,14 +24,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-08-14)
 
 **Core value:** Collapse the taps between "you're overdue with X" and the message actually being sent.
-**Current focus:** Phase 3 — Custom Fields
+**Current focus:** Phase 4 — Contact CRUD & Lifecycle
 
 ## Current Position
 
-Phase: 4 — Contact CRUD & Lifecycle
-Plan: Not started
+Phase: 4 (Contact CRUD & Lifecycle) — EXECUTING
+Plan: 2 of 9
 Status: Ready to execute
-Last activity: 2026-08-15 — Phase 3 complete, transitioned to Phase 4
+Last activity: 2026-08-15 — Phase 4 execution started
 
 Progress: [████████░░] 82%
 
@@ -76,6 +76,7 @@ Progress: [████████░░] 82%
 | Phase 03-custom-fields P06 | 3min | 2 tasks | 10 files |
 | Phase 03-custom-fields P07 | 12min | 2 tasks | 4 files |
 | Phase 3 P8 | 5min | 3 tasks | 3 files |
+| Phase 04 P01 | 5min | 4 tasks | 8 files |
 
 ## Accumulated Context
 
@@ -117,6 +118,10 @@ Foundational decisions affecting current work:
 - [Phase 3]: Plan 03-08: the pre-flight summary Alert is the single confirmation (§14.4) — no separate second prompt
 - [Phase 3]: Plan 03-08: FieldDefForm emits an edit-draft delta; CustomFieldsScreen diffs it and routes each change to the matching DAO op
 - [Phase 3]: Plan 03-08: reachability is a dependency-free HomeScreen route useState (no navigation library); Phase 4 relocates it into Settings
+- [Phase 4]: 04-01: react-navigation native-stack is the app shell (headerShown:false — each screen owns its Back chrome); Android system Back walks the stack (predictive-back off)
+- [Phase 4]: 04-01: RootStackParamList is a type alias (not interface) to satisfy createNativeStackNavigator's ParamListBase; not-yet-built routes register themed placeholders swapped by later plans
+- [Phase 4]: 04-01: Settings hosts two rows (Custom Fields, Archived) not three — UI-SPEC 'Custom Fields' and 'Reachability' name the same CustomFieldsScreen; CustomFieldsScreen wired via a goBack() wrapper, DAO logic untouched
+- [Phase 4]: 04-01: danger token #E5484D landed in wave 1 (ThemePalette + space-dark preset), relocated from Plan 09; Plans 03/04/06/09 consume colors.danger, none re-adds it
 
 ### Pending Todos
 
@@ -152,6 +157,6 @@ planning" sections in docs/dossier/*.md — those are the authoritative hand-off
 
 ## Session
 
-**Last session:** 2026-08-15T03:43:25.512Z
-**Stopped at:** Phase 04 UI-SPEC approved
-**Resume file:** .planning/phases/04-contact-crud-lifecycle/04-UI-SPEC.md
+**Last session:** 2026-08-15T05:36:32.960Z
+**Stopped at:** Completed 04-01-PLAN.md
+**Resume file:** None
