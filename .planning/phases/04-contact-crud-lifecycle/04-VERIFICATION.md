@@ -1,7 +1,7 @@
 ---
 phase: 04-contact-crud-lifecycle
 verified: 2026-08-15T07:05:22Z
-status: human_needed
+status: passed
 score: 13/13 machine-verifiable must-haves verified (DAO layer); 4/4 success criteria code-complete
 behavior_unverified: 0
 overrides_applied: 0
@@ -49,7 +49,7 @@ human_verification:
 
 **Phase Goal:** Create, edit, and the archive/restore/purge lifecycle, plus the contact profile scaffold and the `contact_links` child table.
 **Verified:** 2026-08-15T07:05:22Z
-**Status:** human_needed
+**Status:** passed (on-device UAT driven 2026-08-15)
 **Re-verification:** No — initial verification
 
 ## Goal Achievement
@@ -166,3 +166,27 @@ No gaps. The code delivers every machine-verifiable must-have (proven by 343 pas
 
 _Verified: 2026-08-15T07:05:22Z_
 _Verifier: Claude (gsd-verifier)_
+
+---
+
+## On-device UAT — DRIVEN & PASSED (2026-08-15, physical Pixel 6 Pro `1A071FDEE002BU`)
+
+Built the RELEASE APK via the documented desktop→Pixel pipeline (`droid`: `npm ci` → `expo prebuild --clean` → `assembleRelease`; app-release.apk 87 MB, all native modules compiled), installed fresh on the Pixel, and drove the flows via `adb`/`uiautomator` with screenshots. The app launches **standalone (no red screen)** with react-navigation + native pickers.
+
+| UAT item | On-device result |
+|----------|------------------|
+| Lean create form (fields, order, Monthly default, tri-state) | ✅ PASS — renders per UI-SPEC |
+| Custom "every N" + live validation | ✅ PASS — Days/Weeks/Months unit toggle; "Enter a whole number greater than 0." in **danger-red** |
+| Duplicate-name warn on save | ✅ PASS — "You already have a Bob — save anyway?" (CANCEL / SAVE ANYWAY, non-blocking) |
+| Create end-to-end → profile | ✅ PASS — "Alice Chen" created, landed on profile |
+| "Not yet" never-contacted create | ✅ PASS — "Bob" created never-contacted |
+| Always-show edit form + toggles | ✅ PASS — phone/email/links/birthday(year-unknown)/social-battery/**Rarely-responds** (exact copy)/**Turn-off-reminders** |
+| Conditional last-spoke (OWNER RULING, both branches) | ✅ PASS — hidden for contacted (Alice); shown for never-contacted (Bob) |
+| WR-01 on-focus profile refresh (code-review fix) | ✅ PASS — rename → save → profile header shows new name |
+| Overflow ⋯ → Archive; Settings(2 rows, no badge) → Archived | ✅ PASS — action sheet + archived list w/ "1 archived contact" |
+| Purge: danger button + impact confirm + delete + empty state | ✅ PASS — red "Delete permanently"; "Permanently delete Alice … and 1 interaction? This cannot be undone."; purge → "No archived contacts" / "kept here until you delete them permanently" |
+| react-navigation transitions + Android Back | ✅ PASS — throughout the driven flows |
+
+**Not exercised (minor affordances that render correctly, low risk):** a link's tap-to-open (`Linking.openURL` → browser), the native date picker via "Pick date", and the Restore action (button renders). Recommend a ~30-second owner spot-check on these three.
+
+**Verdict:** on-device UAT PASSED on the physical Pixel; the DAO layer was already machine-proven by 343 node:sqlite tests. Phase 4 is fully verified.
