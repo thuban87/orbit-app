@@ -8,8 +8,9 @@ import {
   View,
 } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
-import { openAndMigrate } from "@/db/database";
+import { getExecutor, openAndMigrate } from "@/db/database";
 import { HomeScreen } from "@/screens/HomeScreen";
+import { registerFieldSweep } from "@/services/field-sweep";
 import { installSweepTrigger } from "@/services/launch-sweep";
 import { ThemeProvider, useTheme } from "@/theme";
 import { Logger } from "@/utils/logger";
@@ -35,6 +36,12 @@ import { Logger } from "@/utils/logger";
  * module scope. `AppShell` lives INSIDE `ThemeProvider` so its loading view can
  * resolve colours through the theme tokens (CLAUDE.md: no hardcoded colour).
  */
+// One-shot guard: the field-expiry hook must be registered on the launch-sweep
+// registry EXACTLY once. The `ready`-gated effect below can re-run (Strict Mode,
+// remounts), and registering the same hook twice would double-run it — so this
+// module-scope flag makes registration idempotent across effect re-entries.
+let fieldSweepRegistered = false;
+
 function AppShell() {
   const { colors } = useTheme();
   const [ready, setReady] = useState(false);
@@ -63,6 +70,13 @@ function AppShell() {
   //    `ready`), so its immediate cold-start sweep never precedes the DB.
   useEffect(() => {
     if (!ready) return;
+    // Register the launch field sweep (FLD-05) on the registry BEFORE the trigger
+    // fires its cold-start sweep — once only (module guard), and only now that
+    // migration has resolved so `getExecutor()` has a live connection.
+    if (!fieldSweepRegistered) {
+      registerFieldSweep(getExecutor);
+      fieldSweepRegistered = true;
+    }
     const subscription = installSweepTrigger(AppState);
     return () => subscription.remove();
   }, [ready]);

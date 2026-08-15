@@ -122,3 +122,13 @@ export function getDb(): SQLite.SQLiteDatabase {
   }
   return cachedDb;
 }
+
+/**
+ * The `SqlExecutor` over the cached, migrated connection — the minimal accessor
+ * services (e.g. the launch field sweep) use to obtain the executor without
+ * importing expo-sqlite themselves. Throws (via `getDb`) if called before
+ * `openAndMigrate()` has resolved.
+ */
+export function getExecutor(): SqlExecutor {
+  return expoExecutor(getDb());
+}
