@@ -59,3 +59,31 @@ describe("resolvePalette", () => {
     }
   });
 });
+
+describe("avatar swatch tokens (PHOTO-04)", () => {
+  it("every preset's dark palette exposes a non-empty avatarSwatches array", () => {
+    for (const preset of Object.values(THEME_PRESETS)) {
+      expect(Array.isArray(preset.dark.avatarSwatches)).toBe(true);
+      expect(preset.dark.avatarSwatches.length).toBeGreaterThan(0);
+      // Every swatch must be a non-empty string (the deterministic-pick indexes
+      // this array, so a hole would render a contact with no colour).
+      for (const swatch of preset.dark.avatarSwatches) {
+        expect(typeof swatch).toBe("string");
+        expect(swatch.length).toBeGreaterThan(0);
+      }
+    }
+  });
+
+  it("every preset's dark palette exposes a non-empty avatarSwatchText token", () => {
+    for (const preset of Object.values(THEME_PRESETS)) {
+      expect(typeof preset.dark.avatarSwatchText).toBe("string");
+      expect(preset.dark.avatarSwatchText.length).toBeGreaterThan(0);
+    }
+  });
+
+  it("resolvePalette surfaces both avatar tokens for space-dark/dark", () => {
+    const palette = resolvePalette("space-dark", "dark");
+    expect(palette.avatarSwatches.length).toBeGreaterThan(0);
+    expect(palette.avatarSwatchText.length).toBeGreaterThan(0);
+  });
+});
