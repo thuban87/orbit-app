@@ -55,8 +55,8 @@ export interface BuildCreateInputDeps {
  * Can the form be saved? Name is the ONLY required field; an invalid custom
  * interval blocks Save so a non-positive interval never reaches the DAO.
  */
-export function canSave(_state: CreateFormState): boolean {
-  throw new Error("not implemented");
+export function canSave(state: CreateFormState): boolean {
+  return state.name.trim().length > 0 && state.intervalValid;
 }
 
 /**
@@ -65,10 +65,17 @@ export function canSave(_state: CreateFormState): boolean {
  * `YYYY-MM-DD HH:MM:SS` contract).
  */
 export function firstInteractionOccurredAt(
-  _lastSpoke: LastSpokeValue,
-  _now: string,
+  lastSpoke: LastSpokeValue,
+  now: string,
 ): string | null {
-  throw new Error("not implemented");
+  switch (lastSpoke.kind) {
+    case "today":
+      return now;
+    case "date":
+      return `${lastSpoke.date} 00:00:00`;
+    default:
+      return null;
+  }
 }
 
 /**
@@ -78,8 +85,31 @@ export function firstInteractionOccurredAt(
  * the tri-state: "not yet" omits it entirely.
  */
 export function buildCreateInput(
-  _state: CreateFormState,
-  _deps: BuildCreateInputDeps,
+  state: CreateFormState,
+  deps: BuildCreateInputDeps,
 ): CreateContactFullInput {
-  throw new Error("not implemented");
+  const occurredAt = firstInteractionOccurredAt(state.lastSpoke, deps.now);
+  const input: CreateContactFullInput = {
+    uid: deps.contactUid,
+    name: state.name.trim(),
+    intervalDays: state.intervalDays,
+    now: deps.now,
+    phone: state.phone.trim() || null,
+    categoryId: state.categoryId,
+    rarelyResponds: 0,
+    rowUid: deps.rowUid,
+    customValues: deps.createColNames.map((col) => ({
+      col,
+      value: state.values[col] ?? null,
+    })),
+  };
+  if (occurredAt !== null) {
+    input.firstInteraction = {
+      uid: deps.interactionUid,
+      occurredAt,
+      source: "manual",
+      direction: null,
+    };
+  }
+  return input;
 }

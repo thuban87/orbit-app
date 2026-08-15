@@ -2,15 +2,17 @@ import { describe, expect, it } from "vitest";
 import type { LastSpokeValue } from "@/components/tri-state-last-spoke-logic";
 import {
   type BuildCreateInputDeps,
-  type CreateFormState,
   buildCreateInput,
+  type CreateFormState,
   canSave,
   firstInteractionOccurredAt,
 } from "./create-contact-logic";
 
 const NOW = "2026-08-15 14:30:00";
 
-function deps(overrides: Partial<BuildCreateInputDeps> = {}): BuildCreateInputDeps {
+function deps(
+  overrides: Partial<BuildCreateInputDeps> = {},
+): BuildCreateInputDeps {
   return {
     now: NOW,
     contactUid: "c-uid",
@@ -67,15 +69,18 @@ describe("firstInteractionOccurredAt", () => {
 
 describe("buildCreateInput", () => {
   it("passes the typed phone through (CRUD-01 fix), trimmed, empty→null", () => {
-    expect(buildCreateInput(state({ phone: "  555-1234 " }), deps()).phone).toBe(
-      "555-1234",
-    );
+    expect(
+      buildCreateInput(state({ phone: "  555-1234 " }), deps()).phone,
+    ).toBe("555-1234");
     expect(buildCreateInput(state({ phone: "" }), deps()).phone).toBeNull();
     expect(buildCreateInput(state({ phone: "   " }), deps()).phone).toBeNull();
   });
 
   it("trims the name and carries category + rarelyResponds=0 + uids", () => {
-    const out = buildCreateInput(state({ name: "  Chris ", categoryId: 3 }), deps());
+    const out = buildCreateInput(
+      state({ name: "  Chris ", categoryId: 3 }),
+      deps(),
+    );
     expect(out.name).toBe("Chris");
     expect(out.categoryId).toBe(3);
     expect(out.rarelyResponds).toBe(0);
@@ -98,7 +103,10 @@ describe("buildCreateInput", () => {
   });
 
   it("Today → firstInteraction occurredAt=now, manual, direction null", () => {
-    const out = buildCreateInput(state({ lastSpoke: { kind: "today" } }), deps());
+    const out = buildCreateInput(
+      state({ lastSpoke: { kind: "today" } }),
+      deps(),
+    );
     expect(out.firstInteraction).toEqual({
       uid: "i-uid",
       occurredAt: NOW,
