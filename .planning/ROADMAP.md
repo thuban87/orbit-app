@@ -18,7 +18,7 @@ onto the dossier domains; a `[DECIDED]`/`[REJECTED]` decision is implemented, ne
 
 - [x] **Phase 1: Project Scaffold & Portable Code** — Expo/RN app, theme tokens, and the ~900 lines of portable plugin source extracted into `src/`. (completed 2026-08-14)
 - [x] **Phase 2: Data Foundation & Status Engine** — migration-1 SQLite scaffold, all core tables, single-writer `last_contact` DAO, continuous status, launch-sweep skeleton. (completed 2026-08-14)
-- [ ] **Phase 3: Custom Fields** — HANDOFF §14 two-table design, 7 parsers, `field_history`, quarantine sweep, and the field editor.
+- [x] **Phase 3: Custom Fields** — HANDOFF §14 two-table design, 7 parsers, `field_history`, quarantine sweep, and the field editor. (completed 2026-08-15)
 - [ ] **Phase 4: Contact CRUD & Lifecycle** — create/edit forms, `contact_links`, archive/restore/purge, the contact profile scaffold.
 - [ ] **Phase 5: Photos** — library picker + URL path, in-app Skia crop, 512px master, themed initials fallback.
 - [ ] **Phase 6: Interaction Log, Status & Impact** — touchpoint rows, editable timeline, gravity/intensity, rogue, "Rarely responds".
@@ -160,7 +160,7 @@ Recorded here because they bind phases that do not own them. Every planner/execu
   3. Quarantine hides a populated field without touching data; the launch sweep expires it (DELETE def + DROP COLUMN atomically) and prunes history on the 30-day schedule.
   4. Every custom-field sort/filter goes through `sortExpr()`, and no custom value column is indexed or UNIQUE.
 
-**Plans:** 7/8 plans executed
+**Plans:** 8/8 plans complete
 
 **Wave 1**
 
@@ -180,7 +180,7 @@ Recorded here because they bind phases that do not own them. Every planner/execu
 
 **Wave 4** *(blocked on Wave 3 completion)*
 
-- [ ] 03-08-PLAN.md — CustomFieldsScreen + FieldDefForm + in-app reachability (FLD-02, FLD-03, FLD-04, FLD-05, FLD-07)
+- [x] 03-08-PLAN.md — CustomFieldsScreen + FieldDefForm + in-app reachability (FLD-02, FLD-03, FLD-04, FLD-05, FLD-07)
 
 ### Phase 4: Contact CRUD & Lifecycle
 
@@ -377,7 +377,7 @@ Recorded here because they bind phases that do not own them. Every planner/execu
 |-------|----------------|--------|-----------|
 | 1. Project Scaffold & Portable Code | 5/5 | Complete    | 2026-08-14 |
 | 2. Data Foundation & Status Engine | 6/6 | Complete    | 2026-08-14 |
-| 3. Custom Fields | 7/8 | In Progress|  |
+| 3. Custom Fields | 8/8 | Complete   | 2026-08-15 |
 | 4. Contact CRUD & Lifecycle | 0/TBD | Not started | - |
 | 5. Photos | 0/TBD | Not started | - |
 | 6. Interaction Log, Status & Impact | 0/TBD | Not started | - |
