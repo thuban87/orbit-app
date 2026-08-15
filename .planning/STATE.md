@@ -5,15 +5,15 @@ milestone_name: milestone
 current_phase: 6
 current_phase_name: Interaction Log, Status & Impact
 status: ready
-stopped_at: Completed 06-04-PLAN.md
-last_updated: "2026-08-15T20:33:31.000Z"
+stopped_at: Completed 06-05-PLAN.md
+last_updated: "2026-08-15T21:00:00.000Z"
 last_activity: 2026-08-15
-last_activity_desc: Completed 06-04 (rogue reason REASON_SQL + getContactStatus + status/gravity colour tokens + in-app rogue label)
+last_activity_desc: Completed 06-05 (gravity — derived-never-stored age-decay → named tier, profile-only GravityBar)
 progress:
   total_phases: 16
   completed_phases: 5
   total_plans: 42
-  completed_plans: 41
+  completed_plans: 42
   percent: 31
 ---
 
@@ -29,8 +29,8 @@ See: .planning/PROJECT.md (updated 2026-08-14)
 ## Current Position
 
 Phase: 6 (Interaction Log, Status & Impact) — EXECUTING
-Next: continue Phase 6 (execute next plan) then `/gsd-verify-work 6`
-Last activity: 2026-08-15 — Completed 06-04 (rogue reason + status/gravity colour tokens + in-app rogue label)
+Next: continue Phase 6 (execute 06-06 intensity) then `/gsd-verify-work 6`
+Last activity: 2026-08-15 — Completed 06-05 (gravity — derived-never-stored age-decay → named tier, profile-only GravityBar)
 
 Progress: [███░░░░░░░] 31% (5/16 phases complete)
 
@@ -95,6 +95,7 @@ Progress: [███░░░░░░░] 31% (5/16 phases complete)
 | Phase 06 P02 | 12min | 3 tasks | 10 files |
 | Phase 06 P03 | 7min | 3 tasks | 7 files |
 | Phase 06 P04 | 5min | 3 tasks | 8 files |
+| Phase 06 P05 | 18min | 3 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -161,6 +162,7 @@ Foundational decisions affecting current work:
 - [Phase 05]: 05-05: EditContactScreen holds photo as SEPARATE screen state (NOT EditFormState; edit-contact-logic.ts intentionally untouched — metadata Save omits photo per RESEARCH Pitfall 6); a photo-only useFocusEffect getContactHeader re-read refreshes the avatar after crop WITHOUT reseeding/discarding unsaved form edits
 - [Phase 05]: 05-07: purge photo cleanup (buildPhotoPurgeCleanup) is the onPurgeExtensions adapter — POST-COMMIT it rebuilds filenames from contactId alone (rows already deleted): main contact-<id>.jpg + one cv-<id>-<col>.jpg per surviving photo def. listDefs(exec, { includeQuarantined: true }) is REQUIRED so a purge during a photo field's quarantine window still deletes its cv- file (PHOTO-05, no leak); idempotent + internally error-resilient; registered at the Archived-list purge without touching the two-stage guard
 - [Phase 05]: 05-06: url-image.downloadImageToCache uses fetch (NOT File.downloadFileAsync — it exposes neither headers nor the final redirect URL); isImageUrl is an https-ONLY scheme allowlist (extension NOT required — image/* content-type is the authoritative gate) applied to BOTH the submitted URL and the redirect-resolved response.url; byte cap is stream-enforced (reader.cancel at cap) with an absent/invalid/over-cap content-length up-front + post-read re-verify fallback; bytes land in the evictable cache subdir, never the document dir; the raw cache uri then feeds the identical crop pipeline (one-time WRITE, no read-path network). Settings "Your photo" seeds from getProfile with a stable 'You' fallback (never a blank swatch), reloads on focus, and reuses Plan 05's profile-target Remove (no Settings-side Remove, no contactId)
+- [Phase 06]: 06-05: gravity is DERIVED-NEVER-STORED (no column, no write) — computeGravity is a pure age-decay-toward-a-floor weighted sum (weight = FLOOR_W + (1-FLOOR_W)·2^(-ageDays/HALF_LIFE_DAYS)) → highest tier whose threshold ≤ raw; monotone in recency, superset-never-lowers, floor-never-zero. Tunables (HALF_LIFE_DAYS=365, FLOOR_W=0.15, 4 GRAVITY_TIERS thin=0/building=3/solid=8/deep=18) top-of-file in impact.ts (owner-approved-tunable). getImpactInputs is the SINGLE read feeding gravity + intensity (same rows). computeContactGravity mirrors recency's connected filter (rarely_responds → connected rows only); direction is NOT a gravity input. GravityBar shows tier NAME + tier-discrete bar (never raw), fill via colors.gravityTiers[tierIndex] (clamped), track colors.border; profile-only, hidden until interaction history exists
 - [Phase 06]: 06-02: events-dao is immutable insert-only (recordEvent/recordEventCore, no update path); archive/restore emit events composed inside their existing transaction, archived-state-guarded so a no-op/wrong-state transition throws and writes no spurious event; purge surfaces+deletes events; timeline UNION-ALL interleave keyed ${kind}-${id} with kind_order final tiebreak — LOG-02 events writer + read half; single-writer DATA-04 intact (no last_contact write added)
 
 ### Pending Todos
@@ -197,8 +199,8 @@ planning" sections in docs/dossier/*.md — those are the authoritative hand-off
 
 ## Session
 
-**Last session:** 2026-08-15T20:33:31.000Z
-**Stopped at:** Completed 06-04-PLAN.md
+**Last session:** 2026-08-15T21:00:00.000Z
+**Stopped at:** Completed 06-05-PLAN.md
 **Resume file:** None
 
 ## Phase 4 — Closeout (2026-08-15) ✅ COMPLETE
