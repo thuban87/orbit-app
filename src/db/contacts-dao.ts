@@ -48,6 +48,7 @@
  * Node-pure: takes `exec: SqlExecutor`; imports the shared `inWriteTransaction`.
  */
 
+import { recordEventCore } from "@/db/events-dao";
 import { upsertValueCore } from "@/db/field-values-dao";
 import { assertSafeRelative } from "@/db/photo-relative-path";
 import {
@@ -368,10 +369,27 @@ export function updateContactFull(
 // Archive is a SOFT visibility flag: `archived_at` is set (hides the contact
 // from every LIVE read — STATUS_SCAN and isDuplicateName already filter
 // `archived_at IS NULL`, queries.ts / contact-read.ts). Restore nulls it back.
-// Both are metadata-only UPDATEs that assert EXACTLY ONE row changed (a bad id
-// throws → rollback, mirroring updateContactMetadataCore's loud-failure guard),
-// and NEITHER touches `last_contact` (single-writer DATA-04 stays intact — the
-// SET list is archived_at + modified_at only).
+//
+// EVENTS (LOG-02, this phase): archive now emits an immutable 'archive' event and
+// restore a 'restore' event, each recorded via `recordEventCore` composed INSIDE
+// the function's ONE existing `inWriteTransaction` (no nested mutex, no second
+// transaction — transaction.ts non-reentrancy; mirrors recency-dao's *Core
+// composition). The ONLY addition to each write is that events INSERT — the SET
+// list on `contacts` is unchanged (archived_at + modified_at only), so
+// `last_contact` is STILL untouched (single-writer DATA-04 intact). The prior
+// RESEARCH-A3 "events deferred" default is SUPERSEDED by the owner decision that
+// established the events writer (events-dao.ts).
+//
+// ARCHIVED-STATE GUARD (C2-#1): each UPDATE carries an archived-state predicate —
+// archive `... WHERE id=? AND archived_at IS NULL`, restore `... WHERE id=? AND
+// archived_at IS NOT NULL`. SQLite counts an identical-value UPDATE as
+// changes===1, so an id-only UPDATE would let a no-op/wrong-state transition
+// (re-archiving an already-archived contact, restoring a live one) "succeed" and
+// emit a FALSE event. The predicate makes a wrong-state transition match 0 rows,
+// so the `changes===1` guard throws BEFORE the event INSERT — NO spurious event
+// is written and the caller learns the transition didn't apply. This tightens
+// Phase-4 semantics (a redundant archive/restore now throws instead of silently
+// re-stamping) — an owner-approved structural guard.
 //
 // listArchived is the SOLE inverse read (`archived_at IS NOT NULL`); every
 // live/list surface keeps the `archived_at IS NULL` filter. The by-id
@@ -379,13 +397,8 @@ export function updateContactFull(
 // (no Phase-4 surface routes to an archived profile/edit) — see the plan's
 // archived-read reconciliation note.
 //
-// DEFERRAL (RESEARCH A3): restore does NOT write an `events` row. There is no
-// events writer or event-`type` vocabulary in src/ yet (only the table exists,
-// migration 001). Writing an ad-hoc events row now would invent an unspecified
-// type vocabulary; the lifecycle-events row is deferred to when that writer is
-// established. Restore in v1 is a pure `archived_at` flag flip.
-//
-// SECURITY (T-04-02): every value is `?`-bound; no interpolation.
+// SECURITY (T-04-02 / T-06-11): every value is `?`-bound; no interpolation. The
+// events INSERT adds no second `last_contact` writer.
 // =============================================================================
 
 /** One archived contact as surfaced by the Archived list. */
@@ -397,9 +410,12 @@ export interface ArchivedContactRow {
 }
 
 /**
- * Archive a contact: set `archived_at` to `now` (a reversible flag). The contact
- * then fails every `archived_at IS NULL` live read and appears in listArchived.
- * `last_contact` is untouched. Throws (→ rollback) if no row matched.
+ * Archive a contact: set `archived_at` to `now` (a reversible flag) and emit one
+ * immutable 'archive' event, in ONE transaction. The archived-state predicate
+ * (`archived_at IS NULL`) means only a REAL live→archived transition matches: a
+ * no-op re-archive matches 0 rows and throws before the event INSERT (no spurious
+ * event). The contact then fails every `archived_at IS NULL` live read and
+ * appears in listArchived. `last_contact` is untouched.
  */
 export function archiveContact(
   exec: SqlExecutor,
@@ -408,22 +424,34 @@ export function archiveContact(
 ): Promise<void> {
   return inWriteTransaction(exec, async () => {
     const result = await exec.runAsync(
-      "UPDATE contacts SET archived_at = ?, modified_at = ? WHERE id = ?",
+      "UPDATE contacts SET archived_at = ?, modified_at = ? WHERE id = ? AND archived_at IS NULL",
       [now, now, id],
     );
     if (result.changes !== 1) {
       throw new Error(
-        `archiveContact: no contact matched id=${id} (changed ${result.changes})`,
+        `archiveContact: no live contact matched id=${id} (changed ${result.changes})`,
       );
     }
+    // Immutable lifecycle event, composed inside THIS transaction (non-mutexed
+    // core — never nest inWriteTransaction). Only reached on a real transition.
+    await recordEventCore(exec, {
+      contactId: id,
+      uid: newUid(),
+      type: "archive",
+      occurredAt: now,
+      detail: null,
+      now,
+    });
   });
 }
 
 /**
- * Restore an archived contact: null `archived_at` (a pure flag flip in v1 — the
- * RESEARCH-A3 events-row contract is DEFERRED; see the header note). The contact
- * reappears in live reads and leaves listArchived. `last_contact` is untouched.
- * Throws (→ rollback) if no row matched.
+ * Restore an archived contact: null `archived_at` and emit one immutable
+ * 'restore' event, in ONE transaction. The archived-state predicate
+ * (`archived_at IS NOT NULL`) means only a REAL archived→live transition matches:
+ * restoring a live contact matches 0 rows and throws before the event INSERT (no
+ * spurious event). The contact reappears in live reads and leaves listArchived.
+ * `last_contact` is untouched.
  */
 export function restoreContact(
   exec: SqlExecutor,
@@ -432,14 +460,24 @@ export function restoreContact(
 ): Promise<void> {
   return inWriteTransaction(exec, async () => {
     const result = await exec.runAsync(
-      "UPDATE contacts SET archived_at = NULL, modified_at = ? WHERE id = ?",
+      "UPDATE contacts SET archived_at = NULL, modified_at = ? WHERE id = ? AND archived_at IS NOT NULL",
       [now, id],
     );
     if (result.changes !== 1) {
       throw new Error(
-        `restoreContact: no contact matched id=${id} (changed ${result.changes})`,
+        `restoreContact: no archived contact matched id=${id} (changed ${result.changes})`,
       );
     }
+    // Immutable lifecycle event, composed inside THIS transaction (non-mutexed
+    // core — never nest inWriteTransaction). Only reached on a real transition.
+    await recordEventCore(exec, {
+      contactId: id,
+      uid: newUid(),
+      type: "restore",
+      occurredAt: now,
+      detail: null,
+      now,
+    });
   });
 }
 

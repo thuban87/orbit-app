@@ -18,6 +18,7 @@
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { nodeSqliteExecutor, openTestDb } from "@/db/__testkit__/node-sqlite";
+import { archiveContact, createContactFull } from "@/db/contacts-dao";
 import { migration001 } from "@/db/migrations/001-initial";
 import { runMigrations } from "@/db/migrations/runner";
 import {
@@ -170,7 +171,7 @@ describe("computeImpact — per-child counts + hasCustomValues (CRUD-06)", () =>
 });
 
 describe("impactSummaryLines — pure omit-zero render helper", () => {
-  it("renders interactions / fuel / links only, in order, pluralised", () => {
+  it("renders interactions / events / fuel / links, in order, pluralised", () => {
     const lines = impactSummaryLines("Chris", {
       interactions: 12,
       events: 5,
@@ -178,11 +179,16 @@ describe("impactSummaryLines — pure omit-zero render helper", () => {
       links: 1,
       hasCustomValues: true,
     });
-    // events + custom values are NOT rendered as blast-radius lines.
-    expect(lines).toEqual(["12 interactions", "4 fuel items", "1 link"]);
+    // events ARE now surfaced (Phase 6 writer landed); custom values still are not.
+    expect(lines).toEqual([
+      "12 interactions",
+      "5 events",
+      "4 fuel items",
+      "1 link",
+    ]);
   });
 
-  it("omits any child whose count is 0", () => {
+  it("omits any child whose count is 0 (incl. events)", () => {
     const lines = impactSummaryLines("Chris", {
       interactions: 1,
       events: 0,
@@ -193,7 +199,7 @@ describe("impactSummaryLines — pure omit-zero render helper", () => {
     expect(lines).toEqual(["1 interaction", "2 links"]);
   });
 
-  it("returns an empty array when there are no multi-row children", () => {
+  it("renders an events-only blast radius when events is the sole child", () => {
     const lines = impactSummaryLines("Chris", {
       interactions: 0,
       events: 3,
@@ -201,7 +207,18 @@ describe("impactSummaryLines — pure omit-zero render helper", () => {
       links: 0,
       hasCustomValues: true,
     });
-    // events present but never rendered → no lines.
+    // events now surfaced → one line; custom values never rendered.
+    expect(lines).toEqual(["3 events"]);
+  });
+
+  it("returns an empty array when there are no rendered children", () => {
+    const lines = impactSummaryLines("Chris", {
+      interactions: 0,
+      events: 0,
+      fuel: 0,
+      links: 0,
+      hasCustomValues: true,
+    });
     expect(lines).toEqual([]);
   });
 });
@@ -230,6 +247,31 @@ describe("purgeContact — archived-guarded one-transaction fan-out (T-04-12/13)
 
   it("throws for a missing contact id and deletes nothing", async () => {
     await expect(purgeContact(exec, 9999)).rejects.toThrow();
+  });
+
+  it("archive→event→purge round-trip: the emitted 'archive' event is gone after purge", async () => {
+    // A live contact archived through the REAL retrofit emits an 'archive' event.
+    const { contactId } = await createContactFull(exec, {
+      uid: uid(),
+      name: "RoundTrip",
+      intervalDays: 14,
+      now: NOW,
+    });
+    await archiveContact(exec, contactId, NOW);
+
+    const eventsBefore = await exec.getFirstAsync<{ n: number }>(
+      "SELECT COUNT(*) AS n FROM events WHERE contact_id = ?",
+      [contactId],
+    );
+    expect(eventsBefore?.n).toBe(1);
+
+    await purgeContact(exec, contactId);
+
+    const eventsAfter = await exec.getFirstAsync<{ n: number }>(
+      "SELECT COUNT(*) AS n FROM events WHERE contact_id = ?",
+      [contactId],
+    );
+    expect(eventsAfter?.n).toBe(0);
   });
 
   it("rolls the whole fan-out back when a delete fails mid-transaction", async () => {

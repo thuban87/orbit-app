@@ -592,6 +592,15 @@ async function archivedAt(contactId: number): Promise<string | null> {
   return row?.archived_at ?? null;
 }
 
+/** The event types recorded against a contact, oldest first. */
+async function eventTypes(contactId: number): Promise<string[]> {
+  const rows = await exec.getAllAsync<{ type: string }>(
+    "SELECT type FROM events WHERE contact_id = ? ORDER BY id",
+    [contactId],
+  );
+  return rows.map((r) => r.type);
+}
+
 /** The live-contact predicate STATUS_SCAN / isDuplicateName share — Pitfall 4. */
 async function liveNameMatches(name: string): Promise<number> {
   const row = await exec.getFirstAsync<{ n: number }>(
@@ -642,6 +651,40 @@ describe("archiveContact — flips archived_at, hides from live reads", () => {
     await expect(archiveContact(exec, 9999, ARCHIVE_NOW)).rejects.toThrow();
     expect((await listArchived(exec)).length).toBe(0);
   });
+
+  it("emits exactly one immutable 'archive' event on a real transition", async () => {
+    const { contactId } = await createContactFull(exec, {
+      uid: uid(),
+      name: "Evt",
+      intervalDays: 14,
+      now: NOW,
+      firstInteraction: { uid: uid(), occurredAt: "2026-08-10 09:00:00" },
+    });
+    expect(await eventTypes(contactId)).toEqual([]);
+
+    await archiveContact(exec, contactId, ARCHIVE_NOW);
+
+    expect(await eventTypes(contactId)).toEqual(["archive"]);
+  });
+
+  it("a no-op archive (already archived) throws and writes ZERO events (C2-#1)", async () => {
+    const { contactId } = await createContactFull(exec, {
+      uid: uid(),
+      name: "AlreadyArchived",
+      intervalDays: 14,
+      now: NOW,
+    });
+    await archiveContact(exec, contactId, ARCHIVE_NOW);
+    expect(await eventTypes(contactId)).toEqual(["archive"]);
+
+    // Re-archiving an already-archived contact is a wrong-state no-op: the
+    // archived-state predicate matches 0 rows → the changes===1 guard throws →
+    // NO spurious second event is written.
+    await expect(
+      archiveContact(exec, contactId, "2026-08-17 09:00:00"),
+    ).rejects.toThrow();
+    expect(await eventTypes(contactId)).toEqual(["archive"]);
+  });
 });
 
 describe("restoreContact — nulls archived_at, returns to live reads", () => {
@@ -684,6 +727,38 @@ describe("restoreContact — nulls archived_at, returns to live reads", () => {
     await expect(
       restoreContact(exec, 9999, "2026-08-17 09:00:00"),
     ).rejects.toThrow();
+  });
+
+  it("emits exactly one immutable 'restore' event on a real transition", async () => {
+    const { contactId } = await createContactFull(exec, {
+      uid: uid(),
+      name: "RestoreEvt",
+      intervalDays: 14,
+      now: NOW,
+    });
+    await archiveContact(exec, contactId, ARCHIVE_NOW);
+    expect(await eventTypes(contactId)).toEqual(["archive"]);
+
+    await restoreContact(exec, contactId, "2026-08-17 09:00:00");
+
+    expect(await eventTypes(contactId)).toEqual(["archive", "restore"]);
+  });
+
+  it("a no-op restore (contact is live) throws and writes ZERO events (C2-#1)", async () => {
+    const { contactId } = await createContactFull(exec, {
+      uid: uid(),
+      name: "StillLive",
+      intervalDays: 14,
+      now: NOW,
+    });
+    expect(await eventTypes(contactId)).toEqual([]);
+
+    // Restoring a live (never-archived) contact is a wrong-state no-op: the
+    // archived-state predicate matches 0 rows → throws → NO event written.
+    await expect(
+      restoreContact(exec, contactId, "2026-08-17 09:00:00"),
+    ).rejects.toThrow();
+    expect(await eventTypes(contactId)).toEqual([]);
   });
 });
 

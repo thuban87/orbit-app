@@ -46,9 +46,9 @@ const LOG_SCOPE = "purge-dao";
 /**
  * The blast radius of a purge. The multi-row children carry a COUNT; the
  * single-row `contact_custom_values` is a BOOLEAN (one row per contact — a field
- * count would be meaningless, review fix). `events` is counted for completeness
- * but is NOT rendered in Phase 4 (no events writer exists yet); Phase 6 MUST
- * surface it in the impact copy when the events subsystem lands.
+ * count would be meaningless, review fix). `events` is now a genuine blast-radius
+ * child: the Phase-6 events writer (events-dao) landed, so archive/restore emit
+ * immutable events and `impactSummaryLines` surfaces the events count.
  */
 export interface PurgeImpact {
   interactions: number;
@@ -125,10 +125,11 @@ export async function computeImpact(
 
 /**
  * The pure, unit-tested render helper: the ordered, omit-zero blast-radius parts
- * for the impact-summary confirm. Renders ONLY the genuine multi-row children —
- * interactions, fuel items, links — each `"${n} ${label}"` (pluralised), and
- * omits any whose count is 0. `contact_custom_values` (a single 0/1 row, not a
- * field count) and `events` (no Phase-4 writer) are DELIBERATELY not rendered.
+ * for the impact-summary confirm. Renders the genuine multi-row children —
+ * interactions, events, fuel items, links — each `"${n} ${label}"` (pluralised),
+ * and omits any whose count is 0. `events` IS surfaced now (the Phase-6 events
+ * writer landed); `contact_custom_values` (a single 0/1 row, not a field count)
+ * remains DELIBERATELY not rendered.
  *
  * `name` is part of the caller's sentence ("Permanently delete {name} and
  * {parts}?"), not of these fragments — the screen owns the surrounding copy.
@@ -141,6 +142,9 @@ export function impactSummaryLines(
   const lines: string[] = [];
   if (impact.interactions > 0) {
     lines.push(plural(impact.interactions, "interaction", "interactions"));
+  }
+  if (impact.events > 0) {
+    lines.push(plural(impact.events, "event", "events"));
   }
   if (impact.fuel > 0) {
     lines.push(plural(impact.fuel, "fuel item", "fuel items"));
