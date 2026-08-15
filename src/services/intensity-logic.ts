@@ -121,6 +121,14 @@ export function computeIntensity(
     if (rarelyResponds === 1 && i.connected !== 1) {
       return false;
     }
+    // LOW-3: exclude any row dated AFTER now. Write guards forbid a future
+    // occurred_at, but a device-clock rollback or a legacy/corrupt row could
+    // still surface one; without this upper bound it would inflate both the
+    // this-period count and the trailing cadence. Mirrors gravity-logic's
+    // `Math.max(0, ageDays)` age-clamp posture — a future row never counts.
+    if (parseLocalMs(i.occurredAt) > nowMs) {
+      return false;
+    }
     return true;
   });
 

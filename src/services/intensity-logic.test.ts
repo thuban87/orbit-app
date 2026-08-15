@@ -88,6 +88,36 @@ describe("computeIntensity — this-period window", () => {
   });
 });
 
+describe("computeIntensity — future rows excluded (LOW-3 upper bound)", () => {
+  it("excludes a future-dated qualifying row from currentCount and the cadence", () => {
+    // rowDaysAgo(-5) is 5 days AFTER now (a clock rollback / legacy corrupt row).
+    // It must not inflate the this-period count nor the trailing cadence.
+    const withFuture = computeIntensity(
+      [rowDaysAgo(-5), rowDaysAgo(10), rowDaysAgo(20)],
+      30,
+      0,
+      NOW,
+    );
+    // Without the upper bound this would be 3 (and the cadence would fold in the
+    // future gap); with it, only the two past rows qualify.
+    expect(withFuture.currentCount).toBe(2);
+
+    // The trailing cadence matches the same two past rows with NO future row —
+    // proving the future row is excluded from the gap set, not just the count.
+    const pastOnly = computeIntensity(
+      [rowDaysAgo(10), rowDaysAgo(20)],
+      30,
+      0,
+      NOW,
+    );
+    expect(withFuture.trailingAvgGapDays).toBeCloseTo(
+      pastOnly.trailingAvgGapDays as number,
+      5,
+    );
+    expect(withFuture.trailingAvgGapDays).toBeCloseTo(10, 5);
+  });
+});
+
 describe("computeIntensity — rarely-responds connected scope (mirrors recency)", () => {
   it("ignores non-connected outbound attempts for a rarely-responds contact", () => {
     const r = computeIntensity(
