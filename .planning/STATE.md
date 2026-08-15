@@ -6,14 +6,14 @@ current_phase: 7
 current_phase_name: Conversational Fuel
 status: ready
 stopped_at: "Phase 7 pre-execution COMPLETE + CONVERGED — UI-SPEC approved (6/6); research (no migration); 4 plans; plan-checker PASS; cross-AI 3 cycles (2H/3M+1L → 0/0, all incorporated). Owner decision: AI-fuel confirm = flip source->manual (no migration). PAUSED before Phase 7 execution per owner."
-last_updated: "2026-08-15T23:47:03.452Z"
+last_updated: "2026-08-15T23:57:31.985Z"
 last_activity: 2026-08-15
 last_activity_desc: Phase 7 execution started
 progress:
   total_phases: 16
   completed_phases: 6
   total_plans: 46
-  completed_plans: 42
+  completed_plans: 43
   percent: 38
 ---
 
@@ -167,6 +167,7 @@ Foundational decisions affecting current work:
 - [Phase 06]: 06-05: gravity is DERIVED-NEVER-STORED (no column, no write) — computeGravity is a pure age-decay-toward-a-floor weighted sum (weight = FLOOR_W + (1-FLOOR_W)·2^(-ageDays/HALF_LIFE_DAYS)) → highest tier whose threshold ≤ raw; monotone in recency, superset-never-lowers, floor-never-zero. Tunables (HALF_LIFE_DAYS=365, FLOOR_W=0.15, 4 GRAVITY_TIERS thin=0/building=3/solid=8/deep=18) top-of-file in impact.ts (owner-approved-tunable). getImpactInputs is the SINGLE read feeding gravity + intensity (same rows). computeContactGravity mirrors recency's connected filter (rarely_responds → connected rows only); direction is NOT a gravity input. GravityBar shows tier NAME + tier-discrete bar (never raw), fill via colors.gravityTiers[tierIndex] (clamped), track colors.border; profile-only, hidden until interaction history exists
 - [Phase 06]: 06-06: intensity is DERIVED-NEVER-STORED, PROFILE-ONLY, and NEUTRAL — computeIntensity (pure, react-native-free, node-tested) counts direction outbound|mutual within one interval-length (INTENSITY_PERIOD_DAYS = interval_days via intensityPeriodDays(), A3 owner-approved), rarely_responds=1 additionally requires connected=1 (mirrors recency/gravity); inbound-only volume never raises currentCount. trailingAvgGapDays = mean consecutive gap over ALL qualifying history, SORTED ASCENDING before differencing (getImpactInputs delivers DESC), null when <2 rows (no divide-by-zero). computeContactIntensity orchestrates in impact.ts from the SAME getImpactInputs read gravity uses. IntensityLine renders a neutral rate + intended-frequency + trailing-average via colors.textPrimary/textSecondary ONLY (no danger/warning, no gravityTiers/rogue tokens), trailing clause omitted when null, neutral empty state; rendered BESIDE GravityBar in contact-profile-impact, never blended. Completes LOG-03 (both halves) and Phase 6 code
 - [Phase 06]: 06-02: events-dao is immutable insert-only (recordEvent/recordEventCore, no update path); archive/restore emit events composed inside their existing transaction, archived-state-guarded so a no-op/wrong-state transition throws and writes no spurious event; purge surfaces+deletes events; timeline UNION-ALL interleave keyed ${kind}-${id} with kind_order final tiebreak — LOG-02 events writer + read half; single-writer DATA-04 intact (no last_contact write added)
+- [Phase 7]: 07-01: fuel-read is the single projection read choke point (listFuelForEditor the ONLY read surfacing off_limits); FuelEditor controlled (draft=only local state, existing rows uncontrolled defaultValue+commit-on-blur); BLANK->NULL at onAdd/onEdit boundary; age/ranked-line/AI/search deferred to Plans 02-04
 
 ### Pending Todos
 
@@ -202,7 +203,7 @@ planning" sections in docs/dossier/*.md — those are the authoritative hand-off
 
 ## Session
 
-**Last session:** 2026-08-15T21:00:00.000Z
+**Last session:** 2026-08-15T23:57:21.258Z
 **Stopped at:** Completed 06-06-PLAN.md
 **Resume file:** None
 
