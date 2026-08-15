@@ -17,7 +17,7 @@
  * and an event can share a numeric id, which would collide on both React key and
  * testID (timeline-read.ts cross-table note).
  */
-import { StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 import type { TimelineItem } from "@/db/timeline-read";
 import { useTheme } from "@/theme";
 
@@ -31,9 +31,16 @@ const EVENT_LABELS: Record<string, string> = {
 
 interface TimelineRowProps {
   item: TimelineItem;
+  /**
+   * Open the refine form for THIS touchpoint (screen owns the DAO call). Passed
+   * only for touchpoint rows — events stay read-only.
+   */
+  onEdit?: () => void;
+  /** Confirm + delete THIS touchpoint (screen owns the Alert + DAO call). */
+  onDelete?: () => void;
 }
 
-export function TimelineRow({ item }: TimelineRowProps) {
+export function TimelineRow({ item, onEdit, onDelete }: TimelineRowProps) {
   const { colors } = useTheme();
   const testID = `timeline-row-${item.kind}-${item.id}`;
 
@@ -87,6 +94,36 @@ export function TimelineRow({ item }: TimelineRowProps) {
           {item.note}
         </Text>
       ) : null}
+      {onEdit || onDelete ? (
+        <View style={styles.actions}>
+          {onEdit ? (
+            <Pressable
+              testID={`${testID}-edit`}
+              accessibilityRole="button"
+              accessibilityLabel="Add detail"
+              hitSlop={8}
+              onPress={onEdit}
+            >
+              <Text style={[styles.action, { color: colors.accent }]}>
+                Add detail
+              </Text>
+            </Pressable>
+          ) : null}
+          {onDelete ? (
+            <Pressable
+              testID={`${testID}-delete`}
+              accessibilityRole="button"
+              accessibilityLabel="Delete touchpoint"
+              hitSlop={8}
+              onPress={onDelete}
+            >
+              <Text style={[styles.action, { color: colors.danger }]}>
+                Delete
+              </Text>
+            </Pressable>
+          ) : null}
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -112,5 +149,16 @@ const styles = StyleSheet.create({
   },
   note: {
     fontSize: 15,
+  },
+  actions: {
+    flexDirection: "row",
+    gap: 20,
+    marginTop: 4,
+    minHeight: 44,
+    alignItems: "center",
+  },
+  action: {
+    fontSize: 14,
+    fontWeight: "600",
   },
 });

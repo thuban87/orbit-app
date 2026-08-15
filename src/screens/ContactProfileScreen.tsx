@@ -31,11 +31,23 @@ import {
 import { Avatar } from "@/components/Avatar";
 import { OverflowMenu } from "@/components/OverflowMenu";
 import { TimelineRow } from "@/components/TimelineRow";
+import {
+  TouchpointRefineForm,
+  type TouchpointRefineValue,
+} from "@/components/TouchpointRefineForm";
 import { getContactHeader } from "@/db/contact-read";
 import { archiveContact } from "@/db/contacts-dao";
 import { getExecutor, localDateTime } from "@/db/database";
-import { recordTouchpoint } from "@/db/recency-dao";
-import { listTimeline, type TimelineItem } from "@/db/timeline-read";
+import {
+  deleteTouchpoint,
+  editTouchpointFull,
+  recordTouchpoint,
+} from "@/db/recency-dao";
+import {
+  listTimeline,
+  type TimelineItem,
+  type TimelineTouchpoint,
+} from "@/db/timeline-read";
 import { newUid } from "@/db/uid";
 import type { RootStackScreenProps } from "@/navigation/types";
 import { useTheme } from "@/theme";
@@ -66,6 +78,14 @@ export function ContactProfileScreen({
   // In-flight latch for the one-tap log — blocks a double-fire while the write
   // is open, and dims the button.
   const [logging, setLogging] = useState(false);
+  // The touchpoint currently open in the refine form (null = form closed) and
+  // its controlled value. The parent owns both — the form is presentational.
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [refineValue, setRefineValue] = useState<TouchpointRefineValue | null>(
+    null,
+  );
+  // In-flight latch for the refine save — blocks a double-fire.
+  const [savingEdit, setSavingEdit] = useState(false);
 
   // The SINGLE unified read: the header AND the interleaved timeline, so both
   // refresh together on focus and after an in-place log (LOG-02 read half).
@@ -143,6 +163,100 @@ export function ContactProfileScreen({
       Alert.alert("Couldn't archive", "Please try again.");
     }
   }, [contactId, navigation]);
+
+  // Open the refine form for a touchpoint (LOG-01). Seed the controlled value
+  // from the stored row verbatim — occurred_at flows in as-is, and the form
+  // seeds its date+time dialogs via parseLocalDateTime (time-of-day preserved),
+  // NOT types.ts parseDate.
+  const openEdit = useCallback((tp: TimelineTouchpoint) => {
+    setEditingId(tp.id);
+    setRefineValue({
+      occurredAt: tp.occurred_at,
+      channel: tp.channel,
+      direction: tp.direction,
+      connected: tp.connected,
+      quality: tp.quality,
+      note: tp.note,
+    });
+  }, []);
+
+  const cancelEdit = useCallback(() => {
+    setEditingId(null);
+    setRefineValue(null);
+  }, []);
+
+  // Save the refine edit through the SINGLE full edit path (editTouchpointFull),
+  // which always recomputes recency, then refresh every derived surface through
+  // the SINGLE unified load() — an in-place edit does NOT re-fire useFocusEffect,
+  // so a partial reload would leave status/gravity/intensity stale.
+  const saveEdit = useCallback(async () => {
+    if (editingId === null || !refineValue || savingEdit) {
+      return;
+    }
+    setSavingEdit(true);
+    try {
+      await editTouchpointFull(getExecutor(), {
+        interactionId: editingId,
+        contactId,
+        now: localDateTime(),
+        occurredAt: refineValue.occurredAt,
+        channel: refineValue.channel,
+        direction: refineValue.direction,
+        connected: refineValue.connected,
+        quality: refineValue.quality,
+        note: refineValue.note,
+      });
+      setEditingId(null);
+      setRefineValue(null);
+      await load();
+    } catch (err) {
+      Logger.error(LOG_SCOPE, "failed to save touchpoint edit", err);
+      Alert.alert("Couldn't save", "Please try again.");
+    } finally {
+      setSavingEdit(false);
+    }
+  }, [editingId, refineValue, savingEdit, contactId, load]);
+
+  // Delete a touchpoint behind a confirm whose copy states the deletion is
+  // PERMANENT and unrecoverable (dossier Cluster C — no undo, no backup, no
+  // server). deleteTouchpoint recomputes recency (moving it back when the newest
+  // row is removed); then the SINGLE unified load() refreshes every surface.
+  const doDelete = useCallback(
+    (tp: TimelineTouchpoint) => {
+      Alert.alert(
+        "Delete this touchpoint?",
+        "This permanently deletes it. There's no undo and no backup — it can't be recovered.",
+        [
+          { text: "Cancel", style: "cancel" },
+          {
+            text: "Delete",
+            style: "destructive",
+            onPress: () => {
+              void (async () => {
+                try {
+                  await deleteTouchpoint(getExecutor(), {
+                    interactionId: tp.id,
+                    contactId,
+                    now: localDateTime(),
+                  });
+                  // If the deleted row was open in the refine form, close it.
+                  if (editingId === tp.id) {
+                    setEditingId(null);
+                    setRefineValue(null);
+                  }
+                  await load();
+                } catch (err) {
+                  Logger.error(LOG_SCOPE, "failed to delete touchpoint", err);
+                  Alert.alert("Couldn't delete", "Please try again.");
+                }
+              })();
+            },
+          },
+        ],
+      );
+    },
+    [contactId, editingId, load],
+  );
 
   return (
     <ScrollView
@@ -249,10 +363,77 @@ export function ContactProfileScreen({
           </Text>
         ) : (
           timeline.map((item) => (
-            <TimelineRow key={`${item.kind}-${item.id}`} item={item} />
+            <TimelineRow
+              key={`${item.kind}-${item.id}`}
+              item={item}
+              // Edit + delete affordances on touchpoints ONLY — events stay
+              // read-only (no callbacks passed).
+              onEdit={
+                item.kind === "touchpoint" ? () => openEdit(item) : undefined
+              }
+              onDelete={
+                item.kind === "touchpoint" ? () => doDelete(item) : undefined
+              }
+            />
           ))
         )}
       </View>
+
+      {editingId !== null && refineValue ? (
+        <View
+          testID="contact-profile-refine"
+          style={[
+            styles.refinePanel,
+            { backgroundColor: colors.surface, borderColor: colors.border },
+          ]}
+        >
+          <Text
+            style={[styles.sectionHeading, { color: colors.textSecondary }]}
+          >
+            Refine touchpoint
+          </Text>
+          <TouchpointRefineForm
+            value={refineValue}
+            onChange={setRefineValue}
+            now={localDateTime()}
+          />
+          <View style={styles.refineActions}>
+            <Pressable
+              testID="contact-profile-refine-cancel"
+              accessibilityRole="button"
+              accessibilityLabel="Cancel"
+              onPress={cancelEdit}
+              style={[styles.refineBtn, { borderColor: colors.border }]}
+            >
+              <Text style={{ color: colors.textSecondary }}>Cancel</Text>
+            </Pressable>
+            <Pressable
+              testID="contact-profile-refine-save"
+              accessibilityRole="button"
+              accessibilityLabel="Save"
+              accessibilityState={{ disabled: savingEdit }}
+              disabled={savingEdit}
+              onPress={() => void saveEdit()}
+              style={[
+                styles.refineBtn,
+                {
+                  backgroundColor: savingEdit ? colors.surface : colors.accent,
+                  borderColor: savingEdit ? colors.border : colors.accent,
+                },
+              ]}
+            >
+              <Text
+                style={{
+                  color: savingEdit ? colors.textSecondary : colors.background,
+                  fontWeight: "700",
+                }}
+              >
+                Save
+              </Text>
+            </Pressable>
+          </View>
+        </View>
+      ) : null}
     </ScrollView>
   );
 }
@@ -313,5 +494,24 @@ const styles = StyleSheet.create({
   },
   sectionBody: {
     fontSize: 15,
+  },
+  refinePanel: {
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 16,
+    gap: 16,
+  },
+  refineActions: {
+    flexDirection: "row",
+    gap: 12,
+    justifyContent: "flex-end",
+  },
+  refineBtn: {
+    minHeight: 44,
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 20,
+    alignItems: "center",
+    justifyContent: "center",
   },
 });
