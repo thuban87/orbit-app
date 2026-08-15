@@ -36,6 +36,7 @@ import {
   purgeContact,
 } from "@/db/purge-dao";
 import type { RootStackScreenProps } from "@/navigation/types";
+import { buildPhotoPurgeCleanup } from "@/services/photos/purge-photo-cleanup";
 import { useTheme } from "@/theme";
 import { Logger } from "@/utils/logger";
 
@@ -129,7 +130,9 @@ export function ArchivedContactsScreen({
         if (!confirmed) {
           return;
         }
-        await purgeContact(exec, id);
+        await purgeContact(exec, id, {
+          onPurgeExtensions: buildPhotoPurgeCleanup(exec),
+        });
         await load();
       } catch (err) {
         Logger.error(LOG_SCOPE, "failed to delete contact permanently", err);
