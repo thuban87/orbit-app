@@ -167,12 +167,18 @@ export async function deleteFuelCore(
 // --- Standalone wrappers (own ONE transaction each) --------------------------
 
 /** Add one fuel row (standalone). Wraps `addFuelCore` in one transaction. */
-export function addFuel(exec: SqlExecutor, input: NewFuelItem): Promise<number> {
+export function addFuel(
+  exec: SqlExecutor,
+  input: NewFuelItem,
+): Promise<number> {
   return inWriteTransaction(exec, () => addFuelCore(exec, input));
 }
 
 /** Edit one fuel row (standalone). Wraps `editFuelCore` in one transaction. */
-export function editFuel(exec: SqlExecutor, input: EditFuelInput): Promise<void> {
+export function editFuel(
+  exec: SqlExecutor,
+  input: EditFuelInput,
+): Promise<void> {
   return inWriteTransaction(exec, () => editFuelCore(exec, input));
 }
 

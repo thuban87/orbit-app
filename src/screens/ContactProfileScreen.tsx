@@ -29,6 +29,11 @@ import {
   View,
 } from "react-native";
 import { Avatar } from "@/components/Avatar";
+import {
+  type FuelDraft,
+  FuelEditor,
+  type FuelEditPatch,
+} from "@/components/FuelEditor";
 import { GravityBar } from "@/components/GravityBar";
 import { IntensityLine } from "@/components/IntensityLine";
 import { OverflowMenu } from "@/components/OverflowMenu";
@@ -45,6 +50,8 @@ import {
 } from "@/db/contact-status-read";
 import { archiveContact } from "@/db/contacts-dao";
 import { getExecutor, localDateTime } from "@/db/database";
+import { addFuel, deleteFuel, editFuel } from "@/db/fuel-dao";
+import { type FuelItem, listFuelForEditor } from "@/db/fuel-read";
 import { getImpactInputs } from "@/db/impact-read";
 import {
   deleteTouchpoint,
@@ -104,6 +111,10 @@ export function ContactProfileScreen({
   const { contactId } = route.params;
   const [header, setHeader] = useState<Header | null>(null);
   const [timeline, setTimeline] = useState<TimelineItem[]>([]);
+  // The contact's conversational fuel (FUEL-01/02) — read through the single
+  // fuel-read choke point (all kinds incl off_limits, newest-first). Editing is
+  // in-place and immediate: every add/edit/delete writes then re-runs load().
+  const [fuel, setFuel] = useState<FuelItem[]>([]);
   // Query-time status + rogue reason (DERIVED-NEVER-STORED). null for a
   // never-contacted contact — see getContactStatus's NULL guard.
   const [status, setStatus] = useState<ContactStatusRow | null>(null);
@@ -134,15 +145,17 @@ export function ContactProfileScreen({
   const load = useCallback(async () => {
     try {
       const exec = getExecutor();
-      const [row, rows, statusRow, impactInputs] = await Promise.all([
+      const [row, rows, statusRow, impactInputs, fuelRows] = await Promise.all([
         getContactHeader(exec, contactId),
         listTimeline(exec, contactId),
         getContactStatus(exec, contactId),
         getImpactInputs(exec, contactId),
+        listFuelForEditor(exec, contactId),
       ]);
       setHeader(row);
       setTimeline(rows);
       setStatus(statusRow);
+      setFuel(fuelRows);
       // Derive gravity AND intensity from the SAME impact inputs (read once so
       // they can never disagree); hide both until there is interaction history.
       // localDateTime() is captured once so both derivations share one "now".
@@ -314,6 +327,93 @@ export function ContactProfileScreen({
     [contactId, editingId, load],
   );
 
+  // Add a fuel item (FUEL-01) through the mutexed fuel-dao writer, then the
+  // SINGLE unified load() (an in-place mutation does NOT re-fire useFocusEffect).
+  // uid/createdAt/now are minted here; source='user' for a profile-typed item;
+  // the draft's optionals are already NULL-normalized by FuelEditor.
+  const doAddFuel = useCallback(
+    async (draft: FuelDraft) => {
+      try {
+        const stamp = localDateTime();
+        await addFuel(getExecutor(), {
+          uid: newUid(),
+          contactId,
+          kind: draft.kind,
+          label: draft.label,
+          text: draft.text,
+          url: draft.url,
+          createdAt: stamp,
+          source: "user",
+          now: stamp,
+        });
+        await load();
+      } catch (err) {
+        Logger.error(LOG_SCOPE, "failed to add fuel", err);
+        Alert.alert("Couldn't save fuel.", "Please try again.");
+      }
+    },
+    [contactId, load],
+  );
+
+  // Edit a fuel item (FUEL-02). FuelEditor commits ONE field at a time (blur /
+  // kind-select), so merge the already-normalized patch onto the current row from
+  // `fuel` state and write the full (kind,label,text,url) set through editFuel,
+  // then the SINGLE unified load(). created_at is never touched (age is stable).
+  const doEditFuel = useCallback(
+    async (id: number, patch: FuelEditPatch) => {
+      const current = fuel.find((f) => f.id === id);
+      if (!current) {
+        return;
+      }
+      try {
+        await editFuel(getExecutor(), {
+          id,
+          contactId,
+          kind: patch.kind ?? current.kind,
+          label: patch.label !== undefined ? patch.label : current.label,
+          text: patch.text !== undefined ? patch.text : current.text,
+          url: patch.url !== undefined ? patch.url : current.url,
+          now: localDateTime(),
+        });
+        await load();
+      } catch (err) {
+        Logger.error(LOG_SCOPE, "failed to edit fuel", err);
+        Alert.alert("Couldn't save fuel.", "Please try again.");
+      }
+    },
+    [contactId, fuel, load],
+  );
+
+  // Delete a fuel item behind the permanent-delete confirm (the same "no undo, no
+  // backup" copy shipped for touchpoint deletion — the guarantee is identical).
+  const doDeleteFuel = useCallback(
+    (id: number) => {
+      Alert.alert(
+        "Delete this fuel item?",
+        "This permanently deletes it. There's no undo and no backup — it can't be recovered.",
+        [
+          { text: "Cancel", style: "cancel" },
+          {
+            text: "Delete",
+            style: "destructive",
+            onPress: () => {
+              void (async () => {
+                try {
+                  await deleteFuel(getExecutor(), { id, contactId });
+                  await load();
+                } catch (err) {
+                  Logger.error(LOG_SCOPE, "failed to delete fuel", err);
+                  Alert.alert("Couldn't delete.", "Please try again.");
+                }
+              })();
+            },
+          },
+        ],
+      );
+    },
+    [contactId, load],
+  );
+
   return (
     <ScrollView
       testID="contact-profile-screen"
@@ -437,6 +537,23 @@ export function ContactProfileScreen({
           {intensity ? <IntensityLine intensity={intensity} /> : null}
         </View>
       ) : null}
+
+      {/* Conversational Fuel (FUEL-01/02) — the controlled per-item editor:
+          add/edit/delete across the 5 kinds + optional label/url, off_limits
+          editable and marked private here. Every mutation routes through
+          fuel-dao then the SINGLE unified load(). */}
+      <View testID="contact-profile-fuel" style={styles.fuel}>
+        <Text style={[styles.sectionHeading, { color: colors.textSecondary }]}>
+          Conversational Fuel
+        </Text>
+        <FuelEditor
+          testID="contact-profile-fuel-editor"
+          items={fuel}
+          onAdd={(draft) => void doAddFuel(draft)}
+          onEdit={(id, patch) => void doEditFuel(id, patch)}
+          onDelete={doDeleteFuel}
+        />
+      </View>
 
       {/* The real interleaved timeline (LOG-02 read half): touchpoints (editable
           next plan) + read-only events, newest-first. */}
@@ -578,6 +695,9 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
   impact: {
+    gap: 8,
+  },
+  fuel: {
     gap: 8,
   },
   timeline: {

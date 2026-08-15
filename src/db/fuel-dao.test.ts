@@ -248,9 +248,7 @@ describe("deleteFuel — removes matching (id, contact_id), both-keys scoped", (
       now: NOW,
     });
 
-    await expect(
-      deleteFuel(exec, { id, contactId: c2 }),
-    ).rejects.toThrow();
+    await expect(deleteFuel(exec, { id, contactId: c2 })).rejects.toThrow();
 
     const rows = await allFuel(c1);
     expect(rows.length).toBe(1);
