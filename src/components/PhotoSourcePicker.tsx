@@ -28,8 +28,16 @@
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import * as ImagePicker from "expo-image-picker";
-import { useCallback } from "react";
-import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
+import { useCallback, useState } from "react";
+import {
+  ActivityIndicator,
+  Alert,
+  Pressable,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from "react-native";
 import { Avatar } from "@/components/Avatar";
 import { clearContactPhoto } from "@/db/contacts-dao";
 import { getExecutor, localDateTime } from "@/db/database";
@@ -42,6 +50,11 @@ import {
   type PhotoTargetDescriptor,
   profilePhotoRelPath,
 } from "@/services/photos/photo-storage";
+import {
+  downloadImageToCache,
+  isImageUrl,
+  UrlImageError,
+} from "@/services/photos/url-image";
 import { useTheme } from "@/theme";
 import { Logger } from "@/utils/logger";
 
@@ -95,6 +108,12 @@ export function PhotoSourcePicker({
   const { colors } = useTheme();
   const navigation =
     useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+
+  // "Paste image URL" reveal state — a plain toggle + text buffer (not a
+  // render-loop concern), gated so a submit-in-flight can't double-fire.
+  const [urlEntryOpen, setUrlEntryOpen] = useState(false);
+  const [urlText, setUrlText] = useState("");
+  const [submittingUrl, setSubmittingUrl] = useState(false);
 
   // Stable recycling identity for the preview Avatar across the three kinds.
   const avatarId =
@@ -168,6 +187,57 @@ export function PhotoSourcePicker({
     }
   }, [target, onChanged, onValueChange]);
 
+  // Add from URL: validate https-only up front, download ONCE to cache, then
+  // hand the raw cache uri to the SAME crop→pipeline flow a picked image uses —
+  // threading the derivable requestId ONLY for a customField target (Plan 05
+  // convention). Each failure maps to its 05-UI-SPEC error copy by `kind`.
+  const submitUrl = useCallback(async () => {
+    if (submittingUrl) {
+      return;
+    }
+    const url = urlText.trim();
+    if (!isImageUrl(url)) {
+      Alert.alert(
+        "That doesn't look like an image URL.",
+        "Check the link and try again.",
+      );
+      return;
+    }
+    setSubmittingUrl(true);
+    try {
+      const rawUri = await downloadImageToCache(url);
+      navigation.navigate("CropPhoto", {
+        rawUri,
+        target,
+        requestId:
+          target.kind === "customField"
+            ? customFieldPhotoRelPath(target.contactId, target.colName)
+            : undefined,
+      });
+      // Collapse the entry on a successful hand-off to the crop screen.
+      setUrlEntryOpen(false);
+      setUrlText("");
+    } catch (err) {
+      Logger.error(LOG_SCOPE, "failed to download image from url", err);
+      if (err instanceof UrlImageError && err.kind === "network") {
+        Alert.alert(
+          "Couldn't fetch that image.",
+          "Check your connection or try a different link.",
+        );
+      } else if (err instanceof UrlImageError && err.kind === "invalid") {
+        Alert.alert(
+          "That doesn't look like an image URL.",
+          "Check the link and try again.",
+        );
+      } else {
+        // content-type / decode / write failures (and any non-typed error).
+        Alert.alert("That image couldn't be used.", "Try a JPEG or PNG.");
+      }
+    } finally {
+      setSubmittingUrl(false);
+    }
+  }, [submittingUrl, urlText, navigation, target]);
+
   const hasPhoto = photo != null;
 
   return (
@@ -205,16 +275,55 @@ export function PhotoSourcePicker({
               Remove photo
             </Text>
           </Pressable>
+        ) : urlEntryOpen ? (
+          // URL entry state: a themed input + "Add from URL" submit (44px). On
+          // submit → https-only validate → download once → crop pipeline.
+          <View style={styles.urlEntry}>
+            <TextInput
+              testID="photo-source-url-input"
+              value={urlText}
+              onChangeText={setUrlText}
+              editable={!submittingUrl}
+              placeholder="https://…"
+              placeholderTextColor={colors.textSecondary}
+              autoCapitalize="none"
+              autoCorrect={false}
+              keyboardType="url"
+              inputMode="url"
+              style={[
+                styles.urlInput,
+                {
+                  backgroundColor: colors.surface,
+                  borderColor: colors.border,
+                  color: colors.textPrimary,
+                },
+              ]}
+            />
+            <Pressable
+              testID="photo-source-url-submit"
+              accessibilityRole="button"
+              accessibilityLabel="Add from URL"
+              accessibilityState={{ disabled: submittingUrl }}
+              disabled={submittingUrl}
+              onPress={() => void submitUrl()}
+              style={[styles.urlSubmit, { backgroundColor: colors.accent }]}
+            >
+              {submittingUrl ? (
+                <ActivityIndicator color={colors.background} />
+              ) : (
+                <Text style={[styles.actionText, { color: colors.background }]}>
+                  Add from URL
+                </Text>
+              )}
+            </Pressable>
+          </View>
         ) : (
-          // The URL entry point (the actual submit is wired in Plan 06 — this
-          // renders the affordance only; it stubs no fake save).
+          // The "Paste image URL" affordance reveals the URL entry above.
           <Pressable
             testID="photo-source-paste-url"
             accessibilityRole="button"
             accessibilityLabel="Paste image URL"
-            onPress={() => {
-              // Plan 06 wires the URL download/submit; no-op placeholder here.
-            }}
+            onPress={() => setUrlEntryOpen(true)}
             style={styles.actionBtn}
           >
             <Text style={[styles.actionText, { color: colors.textSecondary }]}>
@@ -244,5 +353,22 @@ const styles = StyleSheet.create({
   actionText: {
     fontSize: 16,
     fontWeight: "600",
+  },
+  urlEntry: {
+    gap: 8,
+  },
+  urlInput: {
+    minHeight: 44,
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    fontSize: 16,
+  },
+  urlSubmit: {
+    minHeight: 44,
+    borderRadius: 8,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 16,
   },
 });

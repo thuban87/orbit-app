@@ -1,8 +1,15 @@
-import { useNavigation } from "@react-navigation/native";
+import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
+import { useCallback, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { PhotoSourcePicker } from "@/components/PhotoSourcePicker";
+import { getExecutor } from "@/db/database";
+import { getProfile } from "@/db/profile-dao";
 import type { RootStackParamList } from "@/navigation/types";
 import { useTheme } from "@/theme";
+import { Logger } from "@/utils/logger";
+
+const LOG_SCOPE = "settings-screen";
 
 /**
  * SettingsScreen — the low-traffic host for the two CRUD-05 "separate homes":
@@ -23,6 +30,37 @@ export function SettingsScreen() {
   const { colors } = useTheme();
   const navigation =
     useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+
+  // Self-record photo seed. `name` is nullable (the id=1 seed row carries no name
+  // until a self-name editor ships), so a stable "You" fallback below keeps the
+  // initials avatar deterministic ("Y") rather than a permanently blank swatch.
+  const [selfPhoto, setSelfPhoto] = useState<string | null>(null);
+  const [selfName, setSelfName] = useState<string | null>(null);
+  const [selfModifiedAt, setSelfModifiedAt] = useState<string | undefined>(
+    undefined,
+  );
+
+  // Reload the self record so a set/remove made on the crop screen refreshes when
+  // it goBack()s here (mirrors ContactProfileScreen's reload-on-focus). The
+  // sub-second same-path replace is closed elsewhere: the crop screen's profile
+  // branch calls bumpPhotoCacheBust(profilePhotoRelPath()), which Avatar folds
+  // into its cache key — so this only needs the coarse `modified_at` cache-bust.
+  const reloadProfile = useCallback(async () => {
+    try {
+      const profile = await getProfile(getExecutor());
+      setSelfPhoto(profile?.photo ?? null);
+      setSelfName(profile?.name ?? null);
+      setSelfModifiedAt(profile?.modified_at);
+    } catch (err) {
+      Logger.error(LOG_SCOPE, "failed to load self profile", err);
+    }
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      void reloadProfile();
+    }, [reloadProfile]),
+  );
 
   return (
     <ScrollView
@@ -46,6 +84,25 @@ export function SettingsScreen() {
         >
           Settings
         </Text>
+      </View>
+
+      <View
+        testID="settings-your-photo-row"
+        style={[
+          styles.row,
+          { backgroundColor: colors.surface, borderColor: colors.border },
+        ]}
+      >
+        <Text style={[styles.rowLabel, { color: colors.textPrimary }]}>
+          Your photo
+        </Text>
+        <PhotoSourcePicker
+          target={{ kind: "profile" }}
+          photo={selfPhoto}
+          name={selfName ?? "You"}
+          cacheBust={selfModifiedAt}
+          onChanged={() => void reloadProfile()}
+        />
       </View>
 
       <Pressable
