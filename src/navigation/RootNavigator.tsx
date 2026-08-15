@@ -1,5 +1,6 @@
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { StyleSheet, Text, View } from "react-native";
+import { ContactProfileScreen } from "@/screens/ContactProfileScreen";
 import { CreateContactScreen } from "@/screens/CreateContactScreen";
 import { CustomFieldsScreen } from "@/screens/CustomFieldsScreen";
 import { HomeScreen } from "@/screens/HomeScreen";
@@ -67,7 +68,6 @@ function makePlaceholder(label: string) {
   };
 }
 
-const ProfilePlaceholder = makePlaceholder("Profile");
 const EditPlaceholder = makePlaceholder("Edit contact");
 const ArchivedPlaceholder = makePlaceholder("Archived contacts");
 
@@ -81,7 +81,7 @@ export function RootNavigator() {
       <Stack.Screen name="Settings" component={SettingsScreen} />
       <Stack.Screen name="CustomFields" component={CustomFieldsRoute} />
       <Stack.Screen name="Create" component={CreateContactScreen} />
-      <Stack.Screen name="Profile" component={ProfilePlaceholder} />
+      <Stack.Screen name="Profile" component={ContactProfileScreen} />
       <Stack.Screen name="Edit" component={EditPlaceholder} />
       <Stack.Screen name="Archived" component={ArchivedPlaceholder} />
     </Stack.Navigator>
