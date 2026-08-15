@@ -1,34 +1,26 @@
-import { useState } from "react";
+import { useNavigation } from "@react-navigation/native";
+import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { APP_NAME } from "@/constants/app";
-import { CustomFieldsScreen } from "@/screens/CustomFieldsScreen";
+import type { RootStackParamList } from "@/navigation/types";
 import { useTheme } from "@/theme";
 
 /**
- * The themed home shell — the Walking Skeleton's single real UI interaction.
+ * The themed home shell — now a native-stack route (Phase 4's real navigation
+ * shell). The Phase-1→3 dependency-free `useState<Route>` toggle is gone; the
+ * shell reaches other surfaces through `navigation.navigate`. The Custom Fields
+ * entry moved into Settings (CRUD-05's low-traffic home), so Home offers a
+ * primary "New contact" action and a "Settings" entry.
  *
  * Every colour comes from `useTheme().colors.*`; there is not one hardcoded
- * colour value here (CLAUDE.md). The root view carries `testID`
- * `home-shell-root` and the title renders `APP_NAME` (the single source of the
- * display name — currently "Orbit") so plan 01-05 can assert the rendered
- * shell on the Pixel via `uiautomator dump`.
- *
- * REACHABILITY (Plan 08): a dependency-free screen-state toggle routes to the
- * Custom Fields management surface — no navigation library is installed and the
- * phase stays dependency-free. Phase 4 introduces the real navigation shell and
- * relocates this entry into a Settings surface; until then the `route` state
- * selects between the home shell and `CustomFieldsScreen`, which returns here
- * via its `onBack`.
+ * colour value here (CLAUDE.md). The root view keeps its `testID`
+ * `home-shell-root` and the title renders `APP_NAME` so the on-device UAT can
+ * assert the rendered shell via `uiautomator dump`.
  */
-type Route = "home" | "custom-fields";
-
 export function HomeScreen() {
   const { colors } = useTheme();
-  const [route, setRoute] = useState<Route>("home");
-
-  if (route === "custom-fields") {
-    return <CustomFieldsScreen onBack={() => setRoute("home")} />;
-  }
+  const navigation =
+    useNavigation<NativeStackNavigationProp<RootStackParamList>>();
 
   return (
     <View
@@ -47,17 +39,32 @@ export function HomeScreen() {
       </Text>
 
       <Pressable
-        testID="home-custom-fields-entry"
+        testID="home-new-contact-entry"
         accessibilityRole="button"
-        accessibilityLabel="Custom Fields"
-        onPress={() => setRoute("custom-fields")}
+        accessibilityLabel="New contact"
+        onPress={() => navigation.navigate("Create")}
+        style={[
+          styles.primaryEntry,
+          { backgroundColor: colors.accent, borderColor: colors.accent },
+        ]}
+      >
+        <Text style={[styles.primaryEntryText, { color: colors.background }]}>
+          New contact
+        </Text>
+      </Pressable>
+
+      <Pressable
+        testID="home-settings-entry"
+        accessibilityRole="button"
+        accessibilityLabel="Settings"
+        onPress={() => navigation.navigate("Settings")}
         style={[
           styles.entry,
           { backgroundColor: colors.surface, borderColor: colors.border },
         ]}
       >
         <Text style={[styles.entryText, { color: colors.textPrimary }]}>
-          Custom Fields
+          Settings
         </Text>
       </Pressable>
     </View>
@@ -78,8 +85,18 @@ const styles = StyleSheet.create({
   subtitle: {
     fontSize: 15,
   },
-  entry: {
+  primaryEntry: {
     marginTop: 24,
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+  primaryEntryText: {
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  entry: {
     borderWidth: 1,
     borderRadius: 10,
     paddingHorizontal: 20,

@@ -1,3 +1,4 @@
+import { NavigationContainer } from "@react-navigation/native";
 import { StatusBar } from "expo-status-bar";
 import { useEffect, useState } from "react";
 import {
@@ -9,7 +10,7 @@ import {
 } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { getExecutor, openAndMigrate } from "@/db/database";
-import { HomeScreen } from "@/screens/HomeScreen";
+import { RootNavigator } from "@/navigation/RootNavigator";
 import { registerFieldSweep } from "@/services/field-sweep";
 import { installSweepTrigger } from "@/services/launch-sweep";
 import { ThemeProvider, useTheme } from "@/theme";
@@ -103,7 +104,14 @@ function AppShell() {
     );
   }
 
-  return <HomeScreen />;
+  // Mount the navigator only in the ready && !error branch, so no screen renders
+  // before migration resolves. NavigationContainer sits INSIDE ThemeProvider (see
+  // App below) so every screen's chrome resolves theme tokens + safe-area insets.
+  return (
+    <NavigationContainer>
+      <RootNavigator />
+    </NavigationContainer>
+  );
 }
 
 export default function App() {
