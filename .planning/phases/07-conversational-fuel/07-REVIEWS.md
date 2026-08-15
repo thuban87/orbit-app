@@ -2,7 +2,7 @@
 phase: 7
 reviewers: [codex, claude]
 reviewed_at: 2026-08-15
-cycle: 1
+cycle: 3
 plans_reviewed: [07-01-PLAN.md, 07-02-PLAN.md, 07-03-PLAN.md, 07-04-PLAN.md]
 ---
 
@@ -285,3 +285,94 @@ a locked decision; all are 07-01/07-04 clarifications.
 ### Divergent views
 - Severity of blank→NULL: codex MEDIUM; claude concurs it is actionable but leans LOW (ranking stays
   safe via `NULLIF(TRIM(text),'')`; the breach is the stated NULL-when-blank contract, not behavior).
+
+---
+
+# Cross-AI Plan Review — Phase 7, Cycle 3 (final)
+
+`cycle: 3` · `reviewed_at: 2026-08-15` · reviewers: **codex** (external CLI, codex-cli 0.144.1) +
+**claude** (read-only). The cycle-2 revision addressed all 3 actionable items (uncontrolled
+existing-row inputs + blank→NULL normalization; multi-char `TRIM` in the ranked projection;
+literal-`\` search ESCAPE test). Both reviewers re-verified against the actual spine on disk
+(`001-initial.ts`, `events-dao.ts`, `contact-links-dao.ts`, `transaction.ts`, `purge-dao.ts`,
+`queries.ts`, `gravity-logic.ts`, `ContactProfileScreen.tsx`, `LinksEditor.tsx`).
+
+## Cycle-2 items — disposition (both reviewers concur)
+
+| # | Cycle-2 finding | Status | Evidence |
+|---|-----------------|--------|----------|
+| C2-MED (edit owner) | existing-row edit had no viable state owner | **RESOLVED** | 07-01-PLAN.md:158 — existing rows use UNCONTROLLED inputs (`defaultValue={row.text/label/url}` keyed by row id; commit on `onEndEditing`/blur → onEdit → immediate write → `load()`); acceptance :171 restates it. New-item draft is the ONLY persistent local state. Verified against the controlled-links contrast LinksEditor.tsx:132-148 (which only works via per-keystroke `onUpdate` + diff-on-save `applyLinkDiff`, contact-links-dao.ts:198 — the opposite of fuel's immediate-write model). |
+| C2-MED (blank→NULL) | blank/whitespace optionals not normalized to NULL | **RESOLVED** | 07-01-PLAN.md:160 — `const v = raw.trim(); return v.length===0 ? null : v;` at the single onAdd/onEdit commit boundary; acceptance :172 adds an empty + whitespace-only optional → NULL test. Removes reliance on SQL `TRIM()` catching `\t\r\n`. |
+| C2-LOW (multi-char TRIM) | one-arg `TRIM` doesn't strip tabs/newlines | **RESOLVED (residual wording)** | 07-02-PLAN.md:112 behavior + :127 acceptance both carry `NULLIF(TRIM(text, char(9)||char(10)||char(13)||' '),'')`. **But** the inline SQL sketch at 07-02-PLAN.md:119 still shows the stale one-arg `NULLIF(TRIM(text), '')` immediately before restating the widened form — an internal contradiction (the single C3 actionable below). |
+| C2-LOW (literal-`\` test) | literal-backslash search case untested | **RESOLVED** | 07-04-PLAN.md:90 — seed `path\to`, search `\`, assert it matches (proves the `\`→`\\` escape-first step); acceptance :97 lists literal-`%`/`_`/`\` ESCAPE cases. |
+
+## New / residual finding (Cycle 3) — the ONLY open actionable
+
+### MEDIUM (codex) / LOW (claude, leaning) — stale one-arg `TRIM` SQL sketch contradicts the widened guard
+**07-02-PLAN.md:119** (vs the correct form at **:112** and acceptance **:127**)
+
+The action prose at 07-02-PLAN.md:119 writes the getRankedFuel SQL inline as
+`… AND NULLIF(TRIM(text), '') IS NOT NULL, ORDER BY …` (one-arg `TRIM`, strips ASCII space only)
+and then, in the very next sentence, describes the predicate as
+`NULLIF(TRIM(text, char(9)||char(10)||char(13)||' '),'') IS NOT NULL` (the widened, tab/newline-safe
+form that behavior :112 and acceptance :127 mandate). The two are contradictory within one paragraph.
+An executor copying the first inline sketch literally would ship the weaker predicate.
+
+**Impact is bounded** (why claude leans LOW): the cycle-2 input-boundary normalization
+(07-01-PLAN.md:160) already stores any whitespace/newline-only optional as NULL, so a UI-entered
+`"\n"` never reaches the row; and acceptance criterion :127 carries the correct widened form, which
+governs the executor. The residual exposure is a directly-seeded/AI-written (Phase 14) whitespace-only
+row bypassing the UI — exactly the defense-in-depth case the widened predicate exists for.
+
+**Fix (one-line plan edit, no design change):** in 07-02-PLAN.md:119 replace the inline
+`NULLIF(TRIM(text), '')` sketch with `NULLIF(TRIM(text, char(9)||char(10)||char(13)||' '), '') IS NOT NULL`
+so the action, behavior (:112), and acceptance (:127) all read identically. Both reviewers agree this
+is the sole remaining plan-text change; it does not reverse any locked decision.
+
+## Verified sound (both reviewers, against source)
+
+- **No new migration.** Full fuel schema shipped migration 1 (001-initial.ts:167-179); all 4 plans
+  leave it untouched. Confirm-flip is a plain `UPDATE source='manual'` (07-03).
+- **Writer split correct.** `*Core` (non-mutexed) + mutexed wrapper mirrors events-dao.ts:62-93 and
+  contact-links-dao.ts:83-146 inside the non-reentrant `inWriteTransaction` (transaction.ts:42-57);
+  cores compose, never nest; assertOneChange scoped by (id, contact_id) matches contact-links-dao.ts:
+  62-74,116-146.
+- **Single choke point / exclusions:** listFuelForEditor is the only off_limits-surfacing read;
+  getRankedFuel AND searchFuel both exclude off_limits AND `source='ai'` in-query (07-02:119 /
+  07-04:88), never a UI filter.
+- **Determinism + parity:** kind CASE from the single FUEL_KIND_PRIORITY tunable → `created_at DESC`
+  → `id DESC`; precedence recent>gift>topic>fact matches dossier 03-fuel.md:240-242 (and its
+  explicitly-REJECTED "newest regardless of kind"); parity test over an eligible-only fixture;
+  RANK_CASE built from a closed code constant, contact_id the sole bound value.
+- **Search escaping:** `?`-bound + mandatory `LIKE ? ESCAPE '\'` on all three predicates (name,
+  snippet subquery, EXISTS); `\`→`\\`→`%`→`\%`→`_`→`\_` (backslash first); archived excluded via
+  `archived_at IS NULL` (queries.ts:26 convention; contacts.name NOT NULL + archived_at at
+  001-initial.ts:65,76).
+- **Local wall-clock:** fuel-age copies gravity-logic.ts:82 parseLocalMs; ContactProfileScreen
+  load() (:134) uses localDateTime() (imported :47), never toISOString.
+- **Age never hides/destroys:** display + rank only; no launch sweep, no age-keyed DELETE/UPDATE.
+- **Purge not duplicated:** no plan touches purge-dao (fuel count :105, delete fan-out :188 intact).
+- **Wave-3 isolation:** 07-03 (fuel-dao/FuelEditor/ContactProfileScreen) and 07-04
+  (fuel-read/search/navigation/settings) share no files_modified.
+- **FUEL-01..06 mapped:** 01→P1, 02→P1+P2, 03→P2, 04→P2, 05→P4, 06→P2+P3 (REQUIREMENTS.md:69-74).
+  Zero net-new theme tokens.
+
+## Consensus Summary (Cycle 3)
+
+Both reviewers independently confirm all cycle-2 findings RESOLVED and find **no new HIGH**. Both
+also independently surfaced the SAME single residual: the stale one-arg `TRIM(text)` SQL sketch at
+07-02-PLAN.md:119 contradicting the widened tab/newline-safe guard now in the behavior (:112) and
+acceptance (:127). codex rates it MEDIUM (an executor could implement the weaker predicate); claude
+concurs it is actionable but leans LOW (input-boundary normalization + the governing acceptance
+criterion already carry the correct form; the residual exposure is only a directly-seeded/AI-written
+whitespace-only row). The correctness core (no-migration, writer split, ranking parity + determinism,
+off_limits/ai exclusion, search escaping, wave isolation, local wall-clock, purge untouched) is
+verified against the actual spine. The single fix is a one-line reconciliation of 07-02:119; it
+reverses no locked decision.
+
+### Agreed concerns (2+ reviewers)
+- The 07-02:119 stale one-arg `TRIM` inline SQL sketch (reconcile to the widened multi-char form).
+
+### Divergent views
+- Severity of the 07-02:119 residual: codex MEDIUM; claude LOW-leaning (bounded by the input-boundary
+  normalization and the governing acceptance criterion :127).
