@@ -243,7 +243,7 @@ Recorded here because they bind phases that do not own them. Every planner/execu
 
 **Wave 2** *(blocked on Wave 1)*
 
-- [ ] 05-02-PLAN.md — photo-storage chokepoint (derivable filenames, rel↔file://, delete-before-copy) + setContactPhoto/clearContactPhoto + net-new profile-dao (PHOTO-03, PHOTO-05)
+- [ ] 05-02-PLAN.md — photo-storage chokepoint (derivable filenames, rel↔file://, crash-safe copy-to-temp-then-atomic-overwrite-move + launch-time tmp/bak reconciliation sweep) + setContactPhoto/clearContactPhoto + net-new profile-dao (PHOTO-03, PHOTO-05)
 
 **Wave 3** *(blocked on Wave 2)*
 
