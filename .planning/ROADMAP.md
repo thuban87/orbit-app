@@ -273,7 +273,7 @@ Recorded here because they bind phases that do not own them. Every planner/execu
   3. `gravity` (tiers + bar) and `intensity` (neutral rate + long-run cadence) render on the profile only, derived-never-stored.
   4. A "Rarely responds" contact computes recency over connected rows only and shows its label; a contact goes `rogue` at the shared constant / via the setting, surfaced in-app only.
 
-**Plans:** 3/6 plans executed
+**Plans:** 4/6 plans executed
 
 **Wave 1**
 
@@ -289,7 +289,7 @@ Recorded here because they bind phases that do not own them. Every planner/execu
 
 **Wave 4** *(blocked on Wave 3)*
 
-- [ ] 06-04-PLAN.md — Rogue reason (REASON_SQL) + single-contact query-time status read + status/gravity colour tokens (rogue + gravityTiers) + in-app rogue label (LOG-05, LOG-04)
+- [x] 06-04-PLAN.md — Rogue reason (REASON_SQL) + single-contact query-time status read + status/gravity colour tokens (rogue + gravityTiers) + in-app rogue label (LOG-05, LOG-04)
 
 **Wave 5** *(blocked on Wave 4)*
 
@@ -453,7 +453,7 @@ Recorded here because they bind phases that do not own them. Every planner/execu
 | 3. Custom Fields | 8/8 | Complete    | 2026-08-15 |
 | 4. Contact CRUD & Lifecycle | 9/9 | Complete   | 2026-08-15 |
 | 5. Photos | 8/8 | Complete   | 2026-08-15 |
-| 6. Interaction Log, Status & Impact | 3/6 | In Progress|  |
+| 6. Interaction Log, Status & Impact | 4/6 | In Progress|  |
 | 7. Conversational Fuel | 0/TBD | Not started | - |
 | 8. Dashboard & Never-Contacted Screen | 0/TBD | Not started | - |
 | 9. Compose Screen & SMS Handoff | 0/TBD | Not started | - |
