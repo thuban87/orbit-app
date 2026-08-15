@@ -1,8 +1,9 @@
 /**
  * Impact orchestration + tunables (LOG-03) — the profile-only "impact" concept
- * from docs/dossier/04-log.md Cluster G. This phase ships the GRAVITY half
- * (accumulated familiarity, the grace buffer); intensity (Plan 06-06) will add
- * its own tunables + orchestration alongside these.
+ * from docs/dossier/04-log.md Cluster G. Plan 06-05 shipped the GRAVITY half
+ * (accumulated familiarity, the grace buffer); Plan 06-06 adds the INTENSITY
+ * half (this-period contact rate vs the intended frequency) with its own period
+ * tunable + orchestration alongside these.
  *
  * DERIVED-NEVER-STORED: gravity is computed at read time from the interaction
  * rows (via `getImpactInputs`), never written to a column. A stored score would
@@ -23,6 +24,10 @@ import {
   type GravityTier,
   type GravityTunables,
 } from "@/services/gravity-logic";
+import {
+  computeIntensity,
+  type IntensityResult,
+} from "@/services/intensity-logic";
 
 // --- Gravity tunables (top-of-file, single-number edit — CLAUDE.md) ----------
 //
@@ -84,6 +89,46 @@ export function computeContactGravity(
     rows.map((i) => ({ occurredAt: i.occurredAt, connected: i.connected })),
     now,
     GRAVITY_TUNABLES,
+  );
+}
+
+// --- Intensity tunable (top-of-file policy, single-number edit — CLAUDE.md) --
+//
+// OWNER-APPROVED 2026-08-15 (A3 — "one interval-length"). The intensity period
+// defaults to the CONTACT'S OWN interval_days rather than a fixed calendar
+// window: a Yearly contact has no meaningful "this week", so the period must
+// scale with the intended frequency. This is a POLICY the owner may still
+// retune (e.g. two interval-lengths, or a floor/cap) — it is not a placeholder.
+// `computeContactIntensity` reads the period from inputs.intervalDays via this
+// policy so the whole tuning surface stays here at the top of the file.
+
+/**
+ * Resolve the intensity PERIOD (days) for a contact from its interval. A3:
+ * one interval-length. A future retune (a multiplier, a floor for very short
+ * intervals, a cap for Yearly) belongs HERE, in this single function.
+ */
+export function intensityPeriodDays(intervalDays: number): number {
+  return intervalDays;
+}
+
+/**
+ * Derive a contact's intensity from its impact inputs at read time.
+ *
+ * Delegates to the pure `computeIntensity` with the period = one interval-length
+ * (the owner-approved policy above) and the contact's `rarelyResponds` flag (so
+ * the pure core applies the recency-mirroring connected scope). `direction` and
+ * `connected` filtering both live inside `computeIntensity`; this orchestrator
+ * only supplies the period + flag. DERIVED-NEVER-STORED — no write.
+ */
+export function computeContactIntensity(
+  inputs: ImpactInputs,
+  now: string,
+): IntensityResult {
+  return computeIntensity(
+    inputs.interactions,
+    intensityPeriodDays(inputs.intervalDays),
+    inputs.rarelyResponds,
+    now,
   );
 }
 
