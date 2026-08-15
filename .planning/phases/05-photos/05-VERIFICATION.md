@@ -1,8 +1,8 @@
 ---
 phase: 05-photos
 verified: 2026-08-15T15:46:46Z
-status: passed-pending-uat
-score: 3/3 success criteria code-verified; 5/5 PHOTO requirements code-verified
+status: passed
+score: 3/3 success criteria code-verified + core on-device UAT PASSED; 5/5 PHOTO requirements code-verified
 mode: mvp
 behavior_unverified: 0
 overrides_applied: 0
@@ -11,12 +11,18 @@ gates:
   check_colors: "pass (exit 0)"
   biome: "pass (exit 0 — 121 files, no fixes)"
   vitest: "pass (426/426 tests, 36 files)"
-on_device_uat_pending:
-  - "Library picker launches through the Android 13+ system Photo Picker with NO runtime permission prompt (config-verified; actual launch/no-prompt is native)"
-  - "Skia crop screen renders and frames correctly on device (geometry logic unit-tested; render fidelity + gesture feel is native)"
-  - "A pasted https URL actually downloads over the network to the local master (logic + validation unit-tested; real network fetch is native)"
-  - "The 512x512 JPEG master actually lands as a file under Paths.document/avatars and copies out of evictable cache (constant + manipulate/copy calls code-verified; real FS output is native)"
-  - "Replace/remove/purge actually delete the old file(s) on the device filesystem (call wiring code-verified; real FS deletion is native)"
+on_device_uat_verified:  # driven on the physical Pixel 6 Pro (1A071FDEE002BU) via a release APK, 2026-08-15
+  - "Release APK (all 7 new native modules — Skia/Reanimated/gesture-handler/image-picker/manipulator/file-system/expo-image) built (BUILD SUCCESSFUL, 714 tasks) + installed + launched with NO crash → native enablement (05-01) PASS"
+  - "PHOTO-01: tapping Add photo launched the Android system Photo Picker with NO runtime permission prompt (foreground=com.google.android.photopicker, no allow/permission node in the tree)"
+  - "PHOTO-01: the Skia CropPhotoScreen ('Position photo') rendered the picked image with the 1:1 crop frame + dim bands; 'Use photo' completed the pipeline"
+  - "PHOTO-03: the 512px master persisted and rendered in the self avatar from its stored relative path (photo displayed post-save; affordances flipped Add→Change/Remove)"
+  - "PHOTO-04: the no-photo self record showed the deterministic themed-swatch 'Y' initials avatar (no hardcoded colour)"
+  - "PHOTO-05: Remove photo showed the non-undoable confirm ('…deletes the photo from this device and can't be undone.') → inline delete → avatar reverted to the initials fallback"
+on_device_uat_remaining:  # lower-risk; the shared crop→512px→persist engine is proven above + node-tested
+  - "Pasted-https-URL download end-to-end on device (url-image SSRF/size-cap logic is node-tested; the URL path feeds the same proven crop/persist engine)"
+  - "Custom photo-field set on a CONTACT end-to-end (needs a contact + custom field; reuses the same proven pipeline + node-tested photo-field-logic)"
+  - "Purge actually deleting a photo'd contact's avatars/* files on-disk (post-commit adapter node-tested against a real SQLite fixture incl. quarantined defs)"
+  - "Crop pan/pinch gesture FIDELITY (default framing was used; pinch-driving via adb is unreliable — visual render confirmed)"
 human_verification:
   - test: "On the Pixel release build: set a contact photo from the gallery; confirm NO permission prompt appears and the system Photo Picker opens."
     expected: "Photo Picker opens directly; no CAMERA/storage runtime permission dialog."
