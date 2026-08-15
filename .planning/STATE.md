@@ -5,15 +5,15 @@ milestone_name: milestone
 current_phase: 5
 current_phase_name: Photos
 status: ready
-stopped_at: Completed 05-07-PLAN.md
-last_updated: "2026-08-15T14:32:20.764Z"
+stopped_at: Completed 05-05-PLAN.md
+last_updated: "2026-08-15T14:44:20.234Z"
 last_activity: 2026-08-15
-last_activity_desc: Completed 05-07 (purge photo cleanup adapter, PHOTO-05)
+last_activity_desc: Executed 05-05 (library pick + Skia crop + PhotoSourcePicker)
 progress:
   total_phases: 16
   completed_phases: 4
   total_plans: 36
-  completed_plans: 34
+  completed_plans: 35
   percent: 25
 ---
 
@@ -30,7 +30,7 @@ See: .planning/PROJECT.md (updated 2026-08-14)
 
 Phase: 5 (Photos) — EXECUTING
 Next: Phase 5 — Photos (not started) — resume in a fresh session with `/gsd-autonomous --from 5 --to 8 --converge --claude --codex --claude --max-cycles 3`
-Last activity: 2026-08-15 — Phase 5 execution started
+Last activity: 2026-08-15 — Executed 05-05 (library pick + Skia crop + PhotoSourcePicker)
 
 Progress: [██░░░░░░░░] 25% (4/16 phases complete)
 
@@ -88,6 +88,7 @@ Progress: [██░░░░░░░░] 25% (4/16 phases complete)
 | Phase 05 P03 | 10 min | 2 tasks | 7 files |
 | Phase 05-photos P04 | 4min | 2 tasks | 3 files |
 | Phase 05-photos P07 | 6min | 2 tasks | 3 files |
+| Phase 05-photos P05 | 15min | 2 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -149,6 +150,9 @@ Foundational decisions affecting current work:
 - [Phase 04]: Purge non-DB cleanup (photo unlink, notification cancel) runs POST-COMMIT via an idempotent onPurgeExtensions adapter (Phases 5/11 register it) — never awaited inside the SQLite transaction/mutex
 - [Phase 05]: 05-04: crop-geometry.ts is PURE + node-tested (cropRectFromTransform → clamped source-pixel rect); its in-file header is the binding CONTRACT (input units + centre-origin convention, positive tx reveals source LEFT) the 05-05 crop screen's geometry init must match; only the visual convention stays for on-device UAT (Assumption A1)
 - [Phase 05]: 05-04: photo-pipeline.persistCroppedMaster crops the ORIGINAL rawUri via expo-image-manipulator (crop→resize 512→JPEG q0.75), never a Skia makeImageSnapshot; copies out of evictable cache via Plan 02's crash-safe persistMaster (no pre-delete added); returns the RELATIVE path only and imports NO DAO (caller owns the write); decode failures throw PhotoPipelineError mapped to the SPEC copy
+- [Phase 05]: 05-05: CropPhotoScreen is the repo's first Skia render-loop surface — pan/pinch 1:1 crop with the transform driven ONLY by Reanimated shared values via useDerivedValue (no per-frame setState, no makeImageSnapshot); one-time geometry init from the decoded image dims + a screen-width-derived viewport (baseScale=viewport/min(srcW,srcH)); Use photo → cropRectFromTransform → persistCroppedMaster → per-kind DAO write + bumpPhotoCacheBust; A4 decode-failure downscale feeds ONE uri to both preview geometry and pipeline crop
+- [Phase 05]: 05-05: PhotoSourcePicker is the single target-kind-aware Add/Change/Remove for contact/profile/customField (system Photo Picker, no runtime permission); a pick threads requestId (= derivable cv- relPath) ONLY for customField; Remove switches on target.kind and deletes the correct derivable file inline (no contactId deref on profile). CropPhoto route params are serializable-only (target descriptor + string requestId, no callbacks)
+- [Phase 05]: 05-05: EditContactScreen holds photo as SEPARATE screen state (NOT EditFormState; edit-contact-logic.ts intentionally untouched — metadata Save omits photo per RESEARCH Pitfall 6); a photo-only useFocusEffect getContactHeader re-read refreshes the avatar after crop WITHOUT reseeding/discarding unsaved form edits
 - [Phase 05]: 05-07: purge photo cleanup (buildPhotoPurgeCleanup) is the onPurgeExtensions adapter — POST-COMMIT it rebuilds filenames from contactId alone (rows already deleted): main contact-<id>.jpg + one cv-<id>-<col>.jpg per surviving photo def. listDefs(exec, { includeQuarantined: true }) is REQUIRED so a purge during a photo field's quarantine window still deletes its cv- file (PHOTO-05, no leak); idempotent + internally error-resilient; registered at the Archived-list purge without touching the two-stage guard
 
 ### Pending Todos
@@ -185,8 +189,8 @@ planning" sections in docs/dossier/*.md — those are the authoritative hand-off
 
 ## Session
 
-**Last session:** 2026-08-15T14:32:20.754Z
-**Stopped at:** Completed 05-07-PLAN.md
+**Last session:** 2026-08-15T14:43:00.000Z
+**Stopped at:** Completed 05-05-PLAN.md
 **Resume file:** None
 
 ## Phase 4 — Closeout (2026-08-15) ✅ COMPLETE
