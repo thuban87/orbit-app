@@ -30,7 +30,9 @@ interface PhotoResultStore {
   /** Publish a crop-success for `requestId` (the derivable cv- relPath). */
   publish: (requestId: string, success: boolean) => void;
   /** Return + clear the result ONLY when its requestId matches; else leave it. */
-  consume: (requestId: string) => { requestId: string; success: boolean } | null;
+  consume: (
+    requestId: string,
+  ) => { requestId: string; success: boolean } | null;
   /** Record a cv- relPath staged to disk before the form Save committed it. */
   markStaged: (relPath: string) => void;
   /** Return the staged set and clear it (drain-once). */

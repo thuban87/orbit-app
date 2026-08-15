@@ -41,8 +41,8 @@ import {
   Canvas,
   Fill,
   Group,
-  Image as SkiaImage,
   Rect,
+  Image as SkiaImage,
   useImage,
 } from "@shopify/react-native-skia";
 import { ImageManipulator, SaveFormat } from "expo-image-manipulator";
@@ -57,14 +57,14 @@ import {
 } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import { useDerivedValue, useSharedValue } from "react-native-reanimated";
-import { clearContactPhoto, setContactPhoto } from "@/db/contacts-dao";
+import { setContactPhoto } from "@/db/contacts-dao";
 import { getExecutor, localDateTime } from "@/db/database";
 import { setProfilePhoto } from "@/db/profile-dao";
 import type { RootStackScreenProps } from "@/navigation/types";
 import { cropRectFromTransform } from "@/services/photos/crop-geometry";
 import {
-  persistCroppedMaster,
   PhotoPipelineError,
+  persistCroppedMaster,
 } from "@/services/photos/photo-pipeline";
 import { bumpPhotoCacheBust } from "@/stores/photo-cache-bust-store";
 import { publishCropResult } from "@/stores/photo-result-store";
@@ -164,17 +164,7 @@ export function CropPhotoScreen({
     ty.value = 0;
     initedRef.current = true;
     setReady(true);
-  }, [
-    image,
-    viewport,
-    scale,
-    tx,
-    ty,
-    svViewport,
-    svBaseScale,
-    svSrcW,
-    svSrcH,
-  ]);
+  }, [image, viewport, scale, tx, ty, svViewport, svBaseScale, svSrcW, svSrcH]);
 
   // Decode-failure fallback (A4): if the raw source has not decoded within the
   // window, downscale it ONCE and retry the preview on the smaller copy. The
@@ -310,7 +300,17 @@ export function CropPhotoScreen({
     } finally {
       setBusy(false);
     }
-  }, [ready, busy, sourceUri, target, navigation, scale, tx, ty]);
+  }, [
+    ready,
+    busy,
+    sourceUri,
+    target,
+    navigation,
+    scale,
+    tx,
+    ty,
+    route.params.requestId,
+  ]);
 
   return (
     <View
@@ -434,7 +434,10 @@ export function CropPhotoScreen({
           <Text
             style={[
               styles.useText,
-              { color: ready && !busy ? colors.background : colors.textSecondary },
+              {
+                color:
+                  ready && !busy ? colors.background : colors.textSecondary,
+              },
             ]}
           >
             Use photo

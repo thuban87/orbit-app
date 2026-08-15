@@ -15,19 +15,16 @@
  *     (name is null until a future self-name editor lands).
  */
 import { beforeEach, describe, expect, it } from "vitest";
-import {
-  clearContactPhoto,
-  setContactPhoto,
-} from "@/db/contacts-dao";
 import { nodeSqliteExecutor, openTestDb } from "@/db/__testkit__/node-sqlite";
+import { clearContactPhoto, setContactPhoto } from "@/db/contacts-dao";
 import { migration001 } from "@/db/migrations/001-initial";
+import { runMigrations } from "@/db/migrations/runner";
 import {
   clearProfilePhoto,
   getProfile,
   getProfilePhoto,
   setProfilePhoto,
 } from "@/db/profile-dao";
-import { runMigrations } from "@/db/migrations/runner";
 import type { SqlExecutor } from "@/db/types";
 
 const NOW = "2026-08-15 12:00:00";

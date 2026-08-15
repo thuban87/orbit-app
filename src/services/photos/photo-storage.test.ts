@@ -85,8 +85,8 @@ import {
   contactPhotoRelPath,
   customFieldPhotoRelPath,
   deletePhoto,
-  persistMaster,
   type PhotoTargetDescriptor,
+  persistMaster,
   profilePhotoRelPath,
   reconcilePhotoDir,
   relPathForTarget,
@@ -165,9 +165,7 @@ describe("assertSafeRelative — generic boundary guard at the FS entry points",
 
   it("rejects traversal / absolute / backslash / bad-ext / bad-dir via resolve", () => {
     for (const b of bad) {
-      expect(() =>
-        resolvePhotoUriFromDocumentUri("file:///doc/", b),
-      ).toThrow();
+      expect(() => resolvePhotoUriFromDocumentUri("file:///doc/", b)).toThrow();
     }
   });
 
@@ -189,21 +187,27 @@ describe("persistMaster — crash-safe, never pre-deletes the master", () => {
   it("happy path: copy -> .tmp, prior master -> .bak, .tmp -> dest, delete .bak", async () => {
     h.exists.add(DEST); // prior master present
 
-    const rel = await persistMaster("file:///cache/x.jpg", "avatars/contact-42.jpg");
+    const rel = await persistMaster(
+      "file:///cache/x.jpg",
+      "avatars/contact-42.jpg",
+    );
 
     expect(rel).toBe("avatars/contact-42.jpg");
     expect(h.exists.has(DEST)).toBe(true); // new bytes in place
     expect(h.exists.has(`${DEST}.tmp`)).toBe(false);
     expect(h.exists.has(`${DEST}.bak`)).toBe(false); // swap completed, bak cleaned
     // Ordering: copy-to-tmp precedes the prior-master move-aside.
-    const copyIdx = h.ops.findIndex((o) => o === `copy file:///cache/x.jpg -> ${DEST}.tmp`);
-    const bakIdx = h.ops.findIndex((o) => o === `move ${DEST} -> ${DEST}.bak`);
+    const copyIdx = h.ops.indexOf(`copy file:///cache/x.jpg -> ${DEST}.tmp`);
+    const bakIdx = h.ops.indexOf(`move ${DEST} -> ${DEST}.bak`);
     expect(copyIdx).toBeGreaterThanOrEqual(0);
     expect(bakIdx).toBeGreaterThan(copyIdx);
   });
 
   it("first-ever set (no prior master) skips the .bak move-aside", async () => {
-    const rel = await persistMaster("file:///cache/x.jpg", "avatars/contact-9.jpg");
+    const rel = await persistMaster(
+      "file:///cache/x.jpg",
+      "avatars/contact-9.jpg",
+    );
 
     expect(rel).toBe("avatars/contact-9.jpg");
     expect(h.exists.has("file:///doc/avatars/contact-9.jpg")).toBe(true);
@@ -263,9 +267,9 @@ describe("reconcilePhotoDir — pure orphan tmp/bak reconciliation", () => {
   });
 
   it("deletes a *.bak whose canonical dest exists (swap completed)", () => {
-    expect(
-      reconcilePhotoDir(["contact-7.jpg", "contact-7.jpg.bak"]),
-    ).toEqual([{ kind: "deleteBak", relative: "avatars/contact-7.jpg.bak" }]);
+    expect(reconcilePhotoDir(["contact-7.jpg", "contact-7.jpg.bak"])).toEqual([
+      { kind: "deleteBak", relative: "avatars/contact-7.jpg.bak" },
+    ]);
   });
 
   it("restores a *.bak whose canonical dest is MISSING (swap interrupted)", () => {

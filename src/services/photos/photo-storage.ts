@@ -72,9 +72,7 @@ function assertSafeRelative(relative: string): void {
     relative.includes("\0") ||
     !SAFE_RELATIVE.test(relative)
   ) {
-    throw new Error(
-      `unsafe photo relative path: ${JSON.stringify(relative)}`,
-    );
+    throw new Error(`unsafe photo relative path: ${JSON.stringify(relative)}`);
   }
 }
 
@@ -194,7 +192,9 @@ export async function persistMaster(
   }
 
   // (3) Put the new bytes in place (dest no longer exists after step 2).
-  await new File(Paths.document, tmpRel).move(new File(Paths.document, relative));
+  await new File(Paths.document, tmpRel).move(
+    new File(Paths.document, relative),
+  );
 
   // (4) Best-effort delete the .bak (a stale one is reconciled at launch).
   try {
@@ -215,7 +215,11 @@ export function deletePhoto(relative: string): void {
   try {
     new File(Paths.document, relative).delete();
   } catch (error) {
-    Logger.error(LOG_SCOPE, `deletePhoto best-effort failed for ${relative}`, error);
+    Logger.error(
+      LOG_SCOPE,
+      `deletePhoto best-effort failed for ${relative}`,
+      error,
+    );
   }
 }
 
@@ -243,7 +247,10 @@ export function reconcilePhotoDir(entries: string[]): ReconcileAction[] {
     } else if (entry.endsWith(".bak")) {
       const canonical = entry.slice(0, -".bak".length);
       if (present.has(canonical)) {
-        actions.push({ kind: "deleteBak", relative: `${AVATARS_DIR}/${entry}` });
+        actions.push({
+          kind: "deleteBak",
+          relative: `${AVATARS_DIR}/${entry}`,
+        });
       } else {
         actions.push({
           kind: "restoreBak",

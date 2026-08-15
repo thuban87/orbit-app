@@ -184,7 +184,11 @@ async function readCappedBytes(response: Response): Promise<Uint8Array> {
   // the real size after buffering (catches a header that under-reported).
   const header = response.headers.get("content-length");
   const declared = header != null ? Number(header) : Number.NaN;
-  if (!Number.isFinite(declared) || declared <= 0 || declared > MAX_DOWNLOAD_BYTES) {
+  if (
+    !Number.isFinite(declared) ||
+    declared <= 0 ||
+    declared > MAX_DOWNLOAD_BYTES
+  ) {
     throw new UrlImageError(
       "content",
       `content-length missing/invalid/over-cap: ${JSON.stringify(header)}`,
@@ -219,7 +223,10 @@ async function readCappedBytes(response: Response): Promise<Uint8Array> {
 export async function downloadImageToCache(url: string): Promise<string> {
   // (1) Submitted-scheme allowlist.
   if (!isImageUrl(url)) {
-    throw new UrlImageError("invalid", `not an https url: ${JSON.stringify(url)}`);
+    throw new UrlImageError(
+      "invalid",
+      `not an https url: ${JSON.stringify(url)}`,
+    );
   }
 
   // (2) Fetch (follows redirects). Only a genuine transport failure is `network`.
@@ -265,7 +272,11 @@ export async function downloadImageToCache(url: string): Promise<string> {
       intermediates: true,
       idempotent: true,
     });
-    const file = new File(Paths.cache, CACHE_SUBDIR, `download-${Date.now()}.${ext}`);
+    const file = new File(
+      Paths.cache,
+      CACHE_SUBDIR,
+      `download-${Date.now()}.${ext}`,
+    );
     file.create({ overwrite: true });
     file.write(bytes);
     return file.uri;

@@ -68,7 +68,7 @@ export function buildPhotoPurgeCleanup(
 
     // (2) One cv- file per SURVIVING photo def. includeQuarantined:true so a
     //     purge during a photo field's quarantine window never leaks its file.
-    let defs;
+    let defs: Awaited<ReturnType<typeof listDefs>>;
     try {
       defs = await listDefs(exec, { includeQuarantined: true });
     } catch (err) {

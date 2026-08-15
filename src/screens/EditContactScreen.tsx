@@ -40,8 +40,8 @@ import {
 } from "react-native";
 import { FieldValueInput } from "@/components/FieldValueInput";
 import { FrequencyPicker } from "@/components/FrequencyPicker";
-import { PhotoSourcePicker } from "@/components/PhotoSourcePicker";
 import { type LinkDraft, LinksEditor } from "@/components/LinksEditor";
+import { PhotoSourcePicker } from "@/components/PhotoSourcePicker";
 import { TriStateLastSpoke } from "@/components/TriStateLastSpoke";
 import type { LastSpokeValue } from "@/components/tri-state-last-spoke-logic";
 import {

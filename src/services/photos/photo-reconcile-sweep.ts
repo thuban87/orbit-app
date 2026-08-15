@@ -17,8 +17,9 @@
  * `ready`-gated App effect, never at module top-level (P5 — a headless tap must
  * never reach the sweep).
  */
-import { reconcilePhotoWrites } from "@/services/photos/photo-storage";
+
 import { registerSweepHook } from "@/services/launch-sweep";
+import { reconcilePhotoWrites } from "@/services/photos/photo-storage";
 import { Logger } from "@/utils/logger";
 
 /**

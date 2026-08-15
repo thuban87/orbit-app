@@ -101,7 +101,9 @@ describe("buildPhotoPurgeCleanup — derives + deletes photo files from contactI
     await buildPhotoPurgeCleanup(exec)(contactId);
 
     // Main + BOTH photo defs (live AND quarantined) — three deletes, no more.
-    expect(deletePhotoMock).toHaveBeenCalledWith(contactPhotoRelPath(contactId));
+    expect(deletePhotoMock).toHaveBeenCalledWith(
+      contactPhotoRelPath(contactId),
+    );
     expect(deletePhotoMock).toHaveBeenCalledWith(
       customFieldPhotoRelPath(contactId, "headshot"),
     );
@@ -123,7 +125,9 @@ describe("buildPhotoPurgeCleanup — derives + deletes photo files from contactI
     await buildPhotoPurgeCleanup(exec)(contactId);
 
     expect(deletePhotoMock).toHaveBeenCalledTimes(1);
-    expect(deletePhotoMock).toHaveBeenCalledWith(contactPhotoRelPath(contactId));
+    expect(deletePhotoMock).toHaveBeenCalledWith(
+      contactPhotoRelPath(contactId),
+    );
   });
 
   it("is internally error-resilient — one failing delete does not abort the rest", async () => {
