@@ -195,7 +195,7 @@ Recorded here because they bind phases that do not own them. Every planner/execu
   3. Archive hides a contact everywhere and is restorable; purge from the Archived list shows an impact summary and deletes all owned rows + the photo file + scheduled notifications in one transaction.
   4. Never-contacted and archived are reachable as separate homes.
 
-**Plans:** 5/9 plans executed
+**Plans:** 6/9 plans executed
 **Wave 1**
 
 - [x] 04-01-PLAN.md — Navigation shell (react-navigation native-stack) + Settings relocation (CRUD-05)
@@ -212,7 +212,7 @@ Recorded here because they bind phases that do not own them. Every planner/execu
 
 **Wave 4** *(blocked on Wave 3 completion)*
 
-- [ ] 04-06-PLAN.md — EditContactScreen (always-show fields + toggles + birthday) (CRUD-03)
+- [x] 04-06-PLAN.md — EditContactScreen (always-show fields + toggles + birthday) (CRUD-03)
 
 **Wave 5** *(blocked on Wave 4 completion)*
 
@@ -404,7 +404,7 @@ Recorded here because they bind phases that do not own them. Every planner/execu
 | 1. Project Scaffold & Portable Code | 5/5 | Complete    | 2026-08-14 |
 | 2. Data Foundation & Status Engine | 6/6 | Complete    | 2026-08-14 |
 | 3. Custom Fields | 8/8 | Complete    | 2026-08-15 |
-| 4. Contact CRUD & Lifecycle | 5/9 | In Progress|  |
+| 4. Contact CRUD & Lifecycle | 6/9 | In Progress|  |
 | 5. Photos | 0/TBD | Not started | - |
 | 6. Interaction Log, Status & Impact | 0/TBD | Not started | - |
 | 7. Conversational Fuel | 0/TBD | Not started | - |
