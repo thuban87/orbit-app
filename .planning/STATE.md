@@ -6,14 +6,14 @@ current_phase: 3
 current_phase_name: Custom Fields
 status: executing
 stopped_at: Completed 02-01-PLAN.md
-last_updated: "2026-08-15T01:57:53.286Z"
+last_updated: "2026-08-15T02:04:09.984Z"
 last_activity: 2026-08-15
 last_activity_desc: Phase 3 execution started
 progress:
   total_phases: 16
   completed_phases: 2
   total_plans: 19
-  completed_plans: 14
+  completed_plans: 15
   percent: 13
 ---
 
@@ -29,7 +29,7 @@ See: .planning/PROJECT.md (updated 2026-08-14)
 ## Current Position
 
 Phase: 3 (Custom Fields) — EXECUTING
-Plan: 4 of 8
+Plan: 5 of 8
 Status: Ready to execute
 Last activity: 2026-08-15 — Phase 3 execution started
 
@@ -70,6 +70,7 @@ Progress: [████████░░] 82%
 | Phase 03 P01 | 4min | 3 tasks | 7 files |
 | Phase 03 P02 | 2min | 2 tasks | 4 files |
 | Phase 03-custom-fields P03 | 4 min | 2 tasks | 4 files |
+| Phase 03-custom-fields P04 | 8min | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -101,6 +102,8 @@ Foundational decisions affecting current work:
 - [Phase ?]: Drop logic split into a non-mutexed core (dropFieldColumns) composed by dropField, deleteOrQuarantineField, and expireFieldIfStale — never nesting the non-reentrant mutex (HIGH-1)
 - [Phase ?]: expireFieldIfStale re-verifies quarantined_at under the lock (strict < window) so a field restored after the sweep's scan survives (review cycle-2 TOCTOU)
 - [Phase ?]: Every custom-field def writer runs in its own inWriteTransaction — completes the every-writer-through-the-shared-mutex contract
+- [Phase ?]: 03-04: upsertValue runs inside the shared inWriteTransaction (serialized with DDL/sweep), keyed on contact_id; uid is the per-contact ROW uid, written on INSERT only
+- [Phase ?]: 03-04: custom-field visibility — profile=value-present OR always_show, create=show_on_new, edit=all non-quarantined; quarantined hidden everywhere (§14.7)
 
 ### Pending Todos
 
@@ -136,6 +139,6 @@ planning" sections in docs/dossier/*.md — those are the authoritative hand-off
 
 ## Session
 
-**Last session:** 2026-08-15T01:57:42.113Z
+**Last session:** 2026-08-15T02:03:45.302Z
 **Stopped at:** Completed 02-01-PLAN.md
 **Resume file:** None

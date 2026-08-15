@@ -36,7 +36,7 @@ roadmap phases. Items marked *(infra)* are foundation guarantees rather than end
 - [x] **FLD-04**: Changing a field's type runs a pre-flight through the target parser (7 parsers total), auto-converts clean values, flags unconvertible ones as a tap-to-fix error state, destroys no data, and snapshots to `field_history` in the same transaction — with no extra confirmation prompt.
 - [x] **FLD-05**: Deleting a field is dynamic — immediate Delete when empty, else Quarantine (reversible ~30 days, data untouched); the launch sweep expires quarantined defs (DELETE def + DROP COLUMN in one transaction) and prunes `field_history` on the same schedule.
 - [x] **FLD-06**: Every custom-field sort/filter routes through the single `sortExpr()`; no custom value column is ever indexed or made UNIQUE. *(infra)*
-- [ ] **FLD-07**: A field shows on a profile whenever it has a value (or always, if its always-show flag is on); the create form shows only `show_on_new` fields, the edit form shows every non-quarantined field.
+- [x] **FLD-07**: A field shows on a profile whenever it has a value (or always, if its always-show flag is on); the create form shows only `show_on_new` fields, the edit form shows every non-quarantined field.
 
 ### Contact CRUD & Lifecycle (CRUD)
 
