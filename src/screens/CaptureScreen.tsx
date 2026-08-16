@@ -385,6 +385,7 @@ export function CaptureScreen(_props: RootStackScreenProps<"Capture">) {
     // contradicting the stated contract. Dismiss + re-arm the auto-return, nothing more.
     const note = noteText.trim();
     if (note.length === 0) {
+      setNoteText("");
       setNoteOpen(false);
       armAutoReturn();
       return;
@@ -418,6 +419,8 @@ export function CaptureScreen(_props: RootStackScreenProps<"Capture">) {
           await captureMultiNote(getExecutor(), writtenRows, composed, stamp);
         }
       }
+      // SG-02: clear the draft after a successful note so it can't reappear later.
+      setNoteText("");
       setNoteOpen(false);
       armAutoReturn();
     } catch (err) {
@@ -432,6 +435,9 @@ export function CaptureScreen(_props: RootStackScreenProps<"Capture">) {
   // Note Skip — dismiss the note field and arm the auto-return with the unchanged
   // single-tap / multi display text (no write).
   const onNoteSkip = useCallback(() => {
+    // SG-02: clear the draft so a stale note can't resurface if "Add a note" is
+    // reopened on a later capture within the same screen instance.
+    setNoteText("");
     setNoteOpen(false);
     armAutoReturn();
   }, [armAutoReturn]);
