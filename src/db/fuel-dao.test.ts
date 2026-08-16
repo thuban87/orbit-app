@@ -21,10 +21,12 @@ import { nodeSqliteExecutor, openTestDb } from "@/db/__testkit__/node-sqlite";
 import {
   addFuel,
   addFuelCore,
+  confirmFuel,
   deleteFuel,
   editFuel,
   type FuelKind,
 } from "@/db/fuel-dao";
+import { getRankedFuel } from "@/db/fuel-read";
 import { migration001 } from "@/db/migrations/001-initial";
 import { runMigrations } from "@/db/migrations/runner";
 import { inWriteTransaction } from "@/db/transaction";
@@ -252,6 +254,89 @@ describe("deleteFuel — removes matching (id, contact_id), both-keys scoped", (
 
     const rows = await allFuel(c1);
     expect(rows.length).toBe(1);
+  });
+});
+
+describe("confirmFuel — flips source 'ai'→'manual', both-keys scoped (FUEL-06)", () => {
+  it("flips source to 'manual', bumps modified_at, and leaves every other column untouched", async () => {
+    const c = await seedContact();
+    const id = await addFuel(exec, {
+      uid: "ai-uid-1",
+      contactId: c,
+      kind: "topic",
+      label: "Sailing",
+      text: "Ask about the regatta",
+      url: "https://example.com/regatta",
+      createdAt: NOW,
+      source: "ai",
+      now: NOW,
+    });
+
+    await confirmFuel(exec, { id, contactId: c, now: LATER });
+
+    const rows = await allFuel(c);
+    expect(rows.length).toBe(1);
+    expect(rows[0]).toMatchObject({
+      uid: "ai-uid-1",
+      contact_id: c,
+      kind: "topic",
+      label: "Sailing",
+      text: "Ask about the regatta",
+      url: "https://example.com/regatta",
+      created_at: NOW,
+      source: "manual",
+      modified_at: LATER,
+    });
+  });
+
+  it("throws (rolls back) when the contactId does not match the row's contact (0 changes)", async () => {
+    const c1 = await seedContact("Alex");
+    const c2 = await seedContact("Blair");
+    const id = await addFuel(exec, {
+      uid: uid(),
+      contactId: c1,
+      kind: "fact",
+      text: "keep me AI",
+      createdAt: NOW,
+      source: "ai",
+      now: NOW,
+    });
+
+    await expect(
+      confirmFuel(exec, { id, contactId: c2, now: LATER }),
+    ).rejects.toThrow();
+
+    // The original row is untouched — still 'ai'.
+    const rows = await allFuel(c1);
+    expect(rows[0]).toMatchObject({ source: "ai", modified_at: NOW });
+  });
+
+  it("makes an unconfirmed 'ai' row rank only after confirmation (getRankedFuel gate)", async () => {
+    const c = await seedContact();
+    const id = await addFuel(exec, {
+      uid: uid(),
+      contactId: c,
+      kind: "topic",
+      text: "AI-proposed talking point",
+      createdAt: NOW,
+      source: "ai",
+      now: NOW,
+    });
+
+    // Unconfirmed 'ai' is excluded from the ranked / prompt-facing read.
+    const before = await getRankedFuel(exec, c);
+    expect(before.length).toBe(0);
+
+    await confirmFuel(exec, { id, contactId: c, now: LATER });
+
+    // After the flip to 'manual', the same row ranks normally.
+    const after = await getRankedFuel(exec, c);
+    expect(after.length).toBe(1);
+    expect(after[0]).toMatchObject({
+      id,
+      source: "manual",
+      text: "AI-proposed talking point",
+    });
   });
 });
 
