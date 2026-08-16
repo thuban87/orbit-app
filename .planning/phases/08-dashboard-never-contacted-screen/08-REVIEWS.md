@@ -191,3 +191,59 @@ contract are cheap consistency fixes). → one more `--reviews` pass to incorpor
 A-1/A-2), then a final re-review.
 
 **CYCLE_SUMMARY: current_high=0 current_actionable=3**
+
+---
+
+# Cross-AI Plan Review — Phase 8, Cycle 3 (final)
+
+Both reviewers re-verified. **All 5 Cycle-2 findings (MEDIUM-4/5/6, A-1, A-2) are RESOLVED**, and both
+confirmed **no regression** of the 7 earlier fixes — claude explicitly traced the never-contacted-only
+case through the new empty-state precedence and confirmed HIGH-2 still yields `hidden` (not `firstrun`)
+because the four-count gate lives inside precedence branch (4) (`activeFilter==='all' && !hasTerm`). Claude
+rated overall risk LOW with one informational note; codex's final adversarial pass surfaced two NEW items.
+
+## New findings (Cycle 3)
+
+### MEDIUM-7 — `listDashboard` filter construction was internally contradictory
+**Reviewer: codex** · **08-01-PLAN.md** (prior "fixed base + append" action)
+
+The plan's behavior said the `snoozed` filter reveals future-snoozed rows and `favourites` relaxes the
+never-contacted/snooze exclusions, but the action specified a fixed restrictive base WHERE
+(`last_contact IS NOT NULL AND snooze_until <= now`) and only "appended" the filter (replacing the base
+only for a search term). Literally implemented, the `snoozed` filter is always empty (`snooze_until > now`
+AND `snooze_until <= now`) and a never-contacted favourite never shows. **RESOLVED:** 08-01's action now
+selects among FOUR mutually-exclusive population branches — term (archived-only + EXISTS, highest
+precedence), favourites (archived-only + `favourite_rank IS NOT NULL`, reveals never-contacted/snoozed
+favourites), snoozed (archived-only + FUTURE `snooze_until`, reveals the hidden population), default
+(restrictive base with needs-attention/category/battery narrowing within it) — all sharing the identical
+CASE-wrapped projection + tiebreak, with per-branch tests.
+
+### LOW-3 — Birthday parser type contradicted its null-input contract
+**Reviewer: codex** · **08-02-PLAN.md**
+
+The plan promised `null → null` but declared `daysUntilBirthday(stored: string, …)`; `contacts.birthday`
+is nullable (`001-initial.ts:69`) and `edit-contact-logic.ts:98` types it `string | null`. **RESOLVED:**
+signature is now `daysUntilBirthday(stored: string | null, today: Date): number | null` with an early
+null/empty guard and `null → null` / `'' → null` tests.
+
+### Informational (claude, no action) — "rogue at the far end" wording vs `progress DESC`
+The A-1 `progress DESC` status sort can place a `rarely_responds`-`rogue` row (rogue via the non-time
+branch) below a higher-`progress` `decay` row. This is the deliberate A-1 tradeoff (progress-ordering to
+avoid a null-branch status CASE) and matches `STATUS_SCAN`; flagged only so the executor does NOT revert
+the sort to a status-string CASE and reintroduce the null-`'stable'` bug. No plan change.
+
+## Resolution (2026-08-15)
+Cycle 3 is the configured max cycle (`--max-cycles 3`). MEDIUM-7 and LOW-3 were incorporated in a final
+targeted pass (four-branch DAO + nullable parser signature) and **verified on disk by the orchestrator**
+(08-01 passes `verify.plan-structure`, 0 errors; per-branch tests present). A fourth confirmation
+re-review was not spawned (cycle cap reached); both fixes are mechanical, source-grounded, and
+self-verified. All 12 findings across the three cycles are resolved.
+
+## Consensus Summary (Cycle 3) — CONVERGED
+**Overall risk: LOW.** The seven Cycle-1 and three Cycle-2 findings are genuinely resolved; the two
+Cycle-3 findings are incorporated and verified. No HIGH remains; no actionable review finding sits outside
+the PLAN.md files. Remaining risk is execution fidelity — the fix-bearing source files do not exist yet, so
+these contracts must be re-verified at code-review time against the produced `src/` code (per "review the
+code, not the diff").
+
+**CYCLE_SUMMARY: current_high=0 current_actionable=0**
