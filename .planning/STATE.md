@@ -6,9 +6,9 @@ current_phase: 8
 current_phase_name: Dashboard & Never-Contacted Screen
 status: ready
 stopped_at: Completed 08-10-PLAN.md (retire standalone FuelSearch route/screen; Settings Search row -> Manage favourites, DASH-06/02)
-last_updated: "2026-08-16T05:37:20.125Z"
+last_updated: "2026-08-16T06:00:00.000Z"
 last_activity: 2026-08-16
-last_activity_desc: Completed 08-10 (retire standalone FuelSearch route/screen; Settings Search row → Manage favourites) — Phase 8 code complete
+last_activity_desc: Applied all six 08-CODE-REVIEW fixes (MEDIUM-1 + LOW-1..5), atomic commits on main — tsc/check:colors clean, npm test 666/666; 08-CODE-REVIEW status → fixed
 progress:
   total_phases: 16
   completed_phases: 8
@@ -30,7 +30,7 @@ See: .planning/PROJECT.md (updated 2026-08-14)
 
 Phase: 8 (Dashboard & Never-Contacted Screen) — all 10 plans executed (code complete; end-of-phase Pixel UAT pending)
 Next: Phase 8 verification / on-device Pixel UAT (Settings shows "Manage favourites" and no "Search" row; dashboard search still works), then Phase 9. The 08-07 OPEN owner decision (dashboard had no Settings entry point) is RESOLVED — 08-09 added the owner-approved top-right Settings gear (dashboard-settings-entry) → navigate("Settings").
-Last activity: 2026-08-16 — Completed 08-10 (retire standalone FuelSearch route/screen; Settings Search row → Manage favourites)
+Last activity: 2026-08-16 — Applied all six 08-CODE-REVIEW fixes (MEDIUM-1 + LOW-1..5) as atomic commits on main; tsc/check:colors clean, npm test 666/666
 
 Progress: [████░░░░░░] 38% (6/16 phases complete)
 

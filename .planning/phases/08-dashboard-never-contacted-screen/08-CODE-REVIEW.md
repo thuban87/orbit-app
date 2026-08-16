@@ -2,7 +2,8 @@
 phase: 8
 reviewer: claude
 reviewed_at: 2026-08-16
-status: findings
+status: fixed
+fixed_at: 2026-08-16
 high: 0
 medium: 1
 low: 5
@@ -54,3 +55,25 @@ and/or split the term-independent reads into an effect keyed on `[filter,sort]`.
 
 ## Verdict
 Overall risk LOW; 0 HIGH. All six findings scheduled for fix (owner directive 2026-08-16), then rebuild.
+
+## Resolution (2026-08-16) — ALL SIX FIXED
+
+Each finding fixed and committed atomically on `main` (worktrees off). Gates after all six:
+`tsc --noEmit` clean · `check:colors` clean · `npm test` 666/666 (was 676; −10 searchFuel tests deleted with LOW-3).
+
+- **MEDIUM-1** — FIXED (`951e333`). `BirthdayBanner` read now driven by `useFocusEffect`
+  (mirrors `NeverContactedScreen`); re-queries on focus and recomputes `today` each run.
+  Cancelled-flag guard kept.
+- **LOW-1** — FIXED (`7951e71`). `onRefresh` captures `reload()`'s canceller in a ref, cancels a
+  prior in-flight pull, and tears down on unmount.
+- **LOW-2** — FIXED (`8b5bb13`). `onReorder` computes `newIds` and calls `persist` OUTSIDE the
+  `setRows` updater; the updater is now pure (`setRows(nextRows)`).
+- **LOW-3** — FIXED (`9ac5262`). Deleted `FuelSearchResultRow.tsx`, `searchFuel`/`SEARCH_FUEL`/
+  `FuelSearchResult` in `fuel-read.ts`, and their tests (+`seedArchivedContact`/`addFuelRow`
+  helpers). No production importer remained. Shared fragments (`RANKED_FUEL_EXCLUSIONS`/`RANK_CASE`/
+  `escapeLike`) and `getRankedFuel` kept — `dashboard-read.ts` uses them.
+- **LOW-4** — FIXED (`ec02df4`). Debounced the search term (~220ms) into `debouncedTerm`; the read
+  and the empty-state gate key on it, so a keystroke burst fires one reload after it settles.
+  Behaviour identical; clear button still uses the immediate `term`. No DAO contract change.
+- **LOW-5** — FIXED (`82f71cb`). `ManageFavouritesScreen` load switched to `useFocusEffect` so a
+  favourite mutated elsewhere is reflected on return; the "Focus-effect load" comment is now accurate.
