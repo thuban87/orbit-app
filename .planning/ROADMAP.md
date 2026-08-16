@@ -25,7 +25,7 @@ onto the dossier domains; a `[DECIDED]`/`[REJECTED]` decision is implemented, ne
 - [x] **Phase 7: Conversational Fuel** — per-item rows (5 kinds incl. `off_limits`), ranked projection, profile editor, cross-contact search. (completed 2026-08-16)
 - [x] **Phase 8: Dashboard & Never-Contacted Screen** — the home screen, sort/filter/search, birthday banner, favourites, freshness, empty states. (completed 2026-08-16)
 - [x] **Phase 9: Compose Screen & SMS Handoff** — the in-app message surface (fuel visible, Send→SMS, Copy) that notify/widget/AI all open. (completed 2026-08-16)
-- [ ] **Phase 10: Share-Sheet Capture** — Android share target, grid-of-faces picker, `EXTRA_SUBJECT` patch, inline create.
+- [x] **Phase 10: Share-Sheet Capture** — Android share target, grid-of-faces picker, `EXTRA_SUBJECT` patch, inline create. (completed 2026-08-16)
 - [ ] **Phase 11: Actionable Notifications** — pre-scheduled + launch-reconcile engine, decay + birthday, headless actions, mute, settings.
 - [ ] **Phase 12: Home Screen Widget** — favourites grid, headless mark, Quick mark · Log contact · Message, add-widget button.
 - [ ] **Phase 13: Orrery** — the two-view Skia solar system, rogue rendering, assignable/self-colour sun, ambient layer.
@@ -400,7 +400,7 @@ Recorded here because they bind phases that do not own them. Every planner/execu
   2. A single tap writes the fuel row immediately (`topic`/`share`, `EXTRA_SUBJECT` label with bare-URL fallback, `url` canonical), long-press multi-selects, and capture never marks a touchpoint.
   3. A user can inline-create a name-only contact (lands never-contacted); a toast confirms and Orbit returns to the source app.
 
-**Plans:** 5/6 plans executed
+**Plans:** 6/6 plans complete
 
 **Wave 1** *(parallel — independent: native build + correctness cores)*
 
@@ -418,7 +418,7 @@ Recorded here because they bind phases that do not own them. Every planner/execu
 
 **Wave 4** *(blocked on Wave 3)*
 
-- [ ] 10-06-PLAN.md — CaptureScreen enrichment: long-press multi-select + optional note + inline name-only create + tap-to-reveal search (CAP-02, CAP-04)
+- [x] 10-06-PLAN.md — CaptureScreen enrichment: long-press multi-select + optional note + inline name-only create + tap-to-reveal search (CAP-02, CAP-04)
 
 ### Phase 11: Actionable Notifications
 
@@ -521,7 +521,7 @@ Recorded here because they bind phases that do not own them. Every planner/execu
 | 7. Conversational Fuel | 4/4 | Complete   | 2026-08-16 |
 | 8. Dashboard & Never-Contacted Screen | 10/10 | Complete   | 2026-08-16 |
 | 9. Compose Screen & SMS Handoff | 2/2 | Complete   | 2026-08-16 |
-| 10. Share-Sheet Capture | 5/6 | In Progress|  |
+| 10. Share-Sheet Capture | 6/6 | Complete   | 2026-08-16 |
 | 11. Actionable Notifications | 0/TBD | Not started | - |
 | 12. Home Screen Widget | 0/TBD | Not started | - |
 | 13. Orrery | 0/TBD | Not started | - |
