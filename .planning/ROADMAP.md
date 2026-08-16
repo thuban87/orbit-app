@@ -433,7 +433,7 @@ Recorded here because they bind phases that do not own them. Every planner/execu
   3. No decay notification fires for never-contacted/snoozed/rogue/Rarely-responds/muted; a user can permanently mute a still-decaying contact; birthday notifications fire day-of for non-archived contacts.
   4. `POST_NOTIFICATIONS` is asked at a value moment; master + per-type toggles + private-by-default lock-screen visibility work; denial degrades to in-app.
 
-**Plans:** 11/13 plans executed
+**Plans:** 12/13 plans executed
 
 Plans:
 **Wave 1**
@@ -458,7 +458,7 @@ Plans:
 
 **Wave 4** *(blocked on Wave 3 completion)*
 
-- [ ] 11-11-PLAN.md — Settings Notifications section (toggles, permission value moment, time controls)
+- [x] 11-11-PLAN.md — Settings Notifications section (toggles, permission value moment, time controls)
 - [ ] 11-13-PLAN.md — App.tsx wiring: sweep registration, channels/category init, headless import, response gate mount
 
 ### Phase 12: Home Screen Widget
@@ -548,7 +548,7 @@ Plans:
 | 8. Dashboard & Never-Contacted Screen | 10/10 | Complete   | 2026-08-16 |
 | 9. Compose Screen & SMS Handoff | 2/2 | Complete   | 2026-08-16 |
 | 10. Share-Sheet Capture | 6/6 | Complete   | 2026-08-16 |
-| 11. Actionable Notifications | 11/13 | In Progress|  |
+| 11. Actionable Notifications | 12/13 | In Progress|  |
 | 12. Home Screen Widget | 0/TBD | Not started | - |
 | 13. Orrery | 0/TBD | Not started | - |
 | 14. AI Message Suggestions | 0/TBD | Not started | - |
