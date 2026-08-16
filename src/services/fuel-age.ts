@@ -50,10 +50,26 @@ function parseLocalMs(stored: string): number {
 
 const MS_PER_DAY = 86_400_000;
 
-/** Local midnight (00:00:00) of the day containing `ms`. */
-function startOfLocalDay(ms: number): number {
-  const d = new Date(ms);
-  return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+/**
+ * Whole calendar days between two local timestamps, DST-safe. Anchors each stamp's
+ * LOCAL Y/M/D to UTC midnight and diffs — UTC has no DST, so every day is exactly
+ * 24h and the quotient is an exact integer count of calendar days regardless of
+ * any DST transition in the span.
+ *
+ * Why not `(startOfLocalDay(now) - startOfLocalDay(created)) / MS_PER_DAY`
+ * (review MEDIUM-1): on a spring-forward day two consecutive LOCAL midnights are
+ * only 23h apart, so `floor(23h / 24h) === 0` — a row created the day before the
+ * transition reads "today" a day later. The UTC anchoring removes the DST-skewed
+ * elapsed ms entirely. `Math.round` guards float noise (values are exact anyway).
+ */
+function calendarDaysBetween(createdMs: number, nowMs: number): number {
+  const created = new Date(createdMs);
+  const now = new Date(nowMs);
+  return Math.round(
+    (Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()) -
+      Date.UTC(created.getFullYear(), created.getMonth(), created.getDate())) /
+      MS_PER_DAY,
+  );
 }
 
 /** `n unit ago`, pluralised (`1 day ago`, `3 days ago`). */
@@ -77,9 +93,7 @@ export function formatFuelAge(createdAt: string, now: string): string {
   const createdMs = parseLocalMs(createdAt);
   const nowMs = parseLocalMs(now);
 
-  const days = Math.floor(
-    (startOfLocalDay(nowMs) - startOfLocalDay(createdMs)) / MS_PER_DAY,
-  );
+  const days = calendarDaysBetween(createdMs, nowMs);
   if (days <= 0) {
     return "today";
   }

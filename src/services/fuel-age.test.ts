@@ -8,7 +8,7 @@
  *
  * All `now` values are fixed local strings so the boundaries are deterministic.
  */
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import { formatFuelAge } from "@/services/fuel-age";
 
 const NOW = "2026-08-15 12:00:00";
@@ -48,6 +48,37 @@ describe("formatFuelAge — today / days / months / years, local wall-clock", ()
     // UTC conversion. Fixed same-day now proves the local parse.
     expect(formatFuelAge("2026-08-15 22:00:00", "2026-08-15 23:00:00")).toBe(
       "today",
+    );
+  });
+});
+
+describe("formatFuelAge — DST spring-forward day delta (MEDIUM-1)", () => {
+  const originalTZ = process.env.TZ;
+  afterEach(() => {
+    // Restore so no sibling test inherits the forced zone.
+    if (originalTZ === undefined) {
+      delete process.env.TZ;
+    } else {
+      process.env.TZ = originalTZ;
+    }
+  });
+
+  it("counts a calendar day across US spring-forward as '1 day ago', not 'today'", () => {
+    // 2026-03-08 is US spring-forward (02:00 → 03:00): two consecutive LOCAL
+    // midnights are only 23h apart, so the old elapsed-ms/24h delta floored
+    // 23h → 0 and read "today" a day later. The calendar-component delta reads
+    // one real day. Force the zone so this is meaningful regardless of the
+    // runner's TZ (Node re-reads process.env.TZ on each Date op).
+    process.env.TZ = "America/New_York";
+    expect(formatFuelAge("2026-03-08 12:00:00", "2026-03-09 12:00:00")).toBe(
+      "1 day ago",
+    );
+  });
+
+  it("counts a multi-day span straddling spring-forward without an off-by-one", () => {
+    process.env.TZ = "America/New_York";
+    expect(formatFuelAge("2026-03-06 09:00:00", "2026-03-10 09:00:00")).toBe(
+      "4 days ago",
     );
   });
 });
