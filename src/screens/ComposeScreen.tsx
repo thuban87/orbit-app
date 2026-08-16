@@ -291,21 +291,14 @@ export function ComposeScreen({ navigation, route }: RootStackScreenProps<"Compo
     );
   }
 
-  // "ready" — derive the controls (A1). WHILE the probe is pending (smsAvailable
-  // === null) use the interim literal so NEITHER Send NOR the SMS-unavailable
-  // helper renders and Copy stays the sole primary; once the probe settles to a
-  // concrete boolean, the pure resolver decides.
+  // "ready" — derive the controls (A1) through the pure resolver UNCONDITIONALLY.
+  // The resolver owns the interim (smsAvailable === null, probe pending) case too,
+  // so no capability arithmetic is re-derived inline here (WR-02): while pending it
+  // returns Send hidden / Copy sole primary / no helper; once the probe settles to a
+  // concrete boolean it decides from the matrix.
   const phone = header.phone?.trim() || null;
   const hasPhone = phone != null;
-  const controls: ComposeControls =
-    smsAvailable === null
-      ? {
-          send: "hidden",
-          copyEmphasis: "primary",
-          addNumber: !hasPhone,
-          smsUnavailableHelper: false,
-        }
-      : resolveComposeControls(hasPhone, smsAvailable);
+  const controls: ComposeControls = resolveComposeControls(hasPhone, smsAvailable);
 
   const now = localDateTime();
   const copyPrimary = controls.copyEmphasis === "primary";

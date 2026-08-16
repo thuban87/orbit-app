@@ -44,11 +44,29 @@ export interface ComposeControls {
 /**
  * Resolve the compose Send/Copy controls. Pure: same inputs → same output; no I/O;
  * never throws.
+ *
+ * `smsAvailable === null` is the INTERIM (probe-pending) state — the device SMS
+ * capability is UNKNOWN, not false. While pending, NEITHER Send NOR the
+ * SMS-unavailable helper renders and Copy stays the sole primary, so there is no
+ * wrong-state flash; the add-number affordance still follows `!hasPhone` (that is
+ * knowable without the probe). Folding this here keeps ALL capability arithmetic in
+ * this one node-tested place — the screen never re-derives it inline (WR-02).
  */
 export function resolveComposeControls(
   hasPhone: boolean,
-  smsAvailable: boolean,
+  smsAvailable: boolean | null,
 ): ComposeControls {
+  // (0) Probe pending (capability UNKNOWN): Send hidden, Copy sole primary, no
+  // helper. add-number is knowable now, so it tracks `!hasPhone`.
+  if (smsAvailable === null) {
+    return {
+      send: "hidden",
+      copyEmphasis: "primary",
+      addNumber: !hasPhone,
+      smsUnavailableHelper: false,
+    };
+  }
+
   // (1) No number: SMS capability is irrelevant — Copy is the sole primary and an
   // add-number affordance appears. Checked FIRST so a missing number always wins.
   if (!hasPhone) {

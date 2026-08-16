@@ -52,6 +52,24 @@ describe("resolveComposeControls — CMP-03 Send/Copy capability matrix", () => 
     });
   });
 
+  it("probe pending (smsAvailable null), no phone → Send hidden, Copy primary, add-number, no helper (WR-02)", () => {
+    expect(resolveComposeControls(false, null)).toEqual({
+      send: "hidden",
+      copyEmphasis: "primary",
+      addNumber: true,
+      smsUnavailableHelper: false,
+    });
+  });
+
+  it("probe pending (smsAvailable null), phone present → Send hidden, Copy primary, no add-number, no helper (WR-02)", () => {
+    expect(resolveComposeControls(true, null)).toEqual({
+      send: "hidden",
+      copyEmphasis: "primary",
+      addNumber: false,
+      smsUnavailableHelper: false,
+    });
+  });
+
   it("is pure — same inputs yield a deep-equal output, never throws (CMP-03)", () => {
     expect(resolveComposeControls(true, true)).toEqual(
       resolveComposeControls(true, true),
