@@ -30,7 +30,7 @@
  */
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   AppState,
   FlatList,
@@ -178,11 +178,22 @@ export function HomeScreen() {
     };
   }, [reload]);
 
-  // Freshness path 3 — pull-to-refresh.
+  // Freshness path 3 — pull-to-refresh. Capture the returned canceller (like the
+  // focus + AppState paths) and hold it in a ref so an in-flight pull-refresh
+  // read is cancelled if a newer pull starts or the screen unmounts mid-read.
+  const pullCancelRef = useRef<(() => void) | undefined>(undefined);
   const onRefresh = useCallback(() => {
     setRefreshing(true);
-    reload();
+    pullCancelRef.current?.();
+    pullCancelRef.current = reload();
   }, [reload]);
+
+  // Tear down any in-flight pull-refresh read on unmount.
+  useEffect(() => {
+    return () => {
+      pullCancelRef.current?.();
+    };
+  }, []);
 
   const goToProfile = useCallback(
     (contactId: number) => navigation.navigate("Profile", { contactId }),
