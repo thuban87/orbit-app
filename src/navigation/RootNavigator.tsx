@@ -1,5 +1,6 @@
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { ArchivedContactsScreen } from "@/screens/ArchivedContactsScreen";
+import { ComposeScreen } from "@/screens/ComposeScreen";
 import { ContactProfileScreen } from "@/screens/ContactProfileScreen";
 import { CreateContactScreen } from "@/screens/CreateContactScreen";
 import { CropPhotoScreen } from "@/screens/CropPhotoScreen";
@@ -68,6 +69,7 @@ export function RootNavigator() {
         name="ManageFavourites"
         component={ManageFavouritesScreen}
       />
+      <Stack.Screen name="Compose" component={ComposeScreen} />
     </Stack.Navigator>
   );
 }
