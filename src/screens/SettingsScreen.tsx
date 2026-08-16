@@ -106,6 +106,21 @@ export function SettingsScreen() {
       </View>
 
       <Pressable
+        testID="settings-search-row"
+        accessibilityRole="button"
+        accessibilityLabel="Search"
+        onPress={() => navigation.navigate("FuelSearch")}
+        style={[
+          styles.row,
+          { backgroundColor: colors.surface, borderColor: colors.border },
+        ]}
+      >
+        <Text style={[styles.rowLabel, { color: colors.textPrimary }]}>
+          Search
+        </Text>
+      </Pressable>
+
+      <Pressable
         testID="settings-custom-fields-row"
         accessibilityRole="button"
         accessibilityLabel="Custom Fields"

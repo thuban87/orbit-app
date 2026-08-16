@@ -37,6 +37,12 @@ export type RootStackParamList = {
     target: PhotoTargetDescriptor;
     requestId?: string;
   };
+  /**
+   * The minimal cross-contact fuel search screen (FUEL-05). Carries no params —
+   * the term lives in the screen's local state. Reached from Settings in Phase 7;
+   * Phase 8 absorbs the query + result row into the dashboard search box.
+   */
+  FuelSearch: undefined;
 };
 
 /**
