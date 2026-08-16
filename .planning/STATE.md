@@ -5,16 +5,16 @@ milestone_name: milestone
 current_phase: 9
 current_phase_name: Compose Screen & SMS Handoff
 status: executing
-stopped_at: "Phase 9 (Compose Screen & SMS Handoff) EXECUTING — 09-01 of 2 complete. 09-01 landed the compose prerequisites: resolveComposeControls (pure CMP-03 resolver), expo-sms + expo-clipboard (~57.0.1, no config-plugin entry), and an additive phone widen on getContactHeader. npm test 673/673, tsc + check:colors clean, no deviations. NEXT: 09-02 (ComposeScreen + profile Message entry + Compose route + Back→dashboard). Native-dep change ⇒ end-of-phase on-device UAT needs expo prebuild --clean + release APK. Phase 8 remains COMPLETE & VERIFIED. Commits local on main, NOT pushed."
-last_updated: "2026-08-16T09:15:12.729Z"
+stopped_at: "Phase 9 (Compose Screen & SMS Handoff) — BOTH plans executed (09-01 + 09-02 of 2). 09-02 shipped ComposeScreen.tsx (entry-agnostic, self-fetching on { contactId }): getRankedFuel read-only fuel cards, blank draft, capability-gated Send (expo-sms)/Copy (expo-clipboard)/add-number via resolveComposeControls behind an interim literal while smsAvailable===null; explicit loading|ready|missing|error state + per-focus reset + cancelled-flag guard; Send in-flight latch; Back (software pill + Android hardware BackHandler) resets to Home; additive Compose route; profile 'Message' entry button. npm test 673/673, tsc + check:colors clean, no code/logic deviations (2 reword-only JSDoc fixes to satisfy the plan's own zero-match greps). CMP-01/02/03 code-complete. NEXT: code-review + on-device Pixel UAT — native modules (expo-sms/expo-clipboard) require expo prebuild --clean + release APK (a Metro reload will NOT surface them). Phase 8 remains COMPLETE & VERIFIED. Commits local on main, NOT pushed."
+last_updated: "2026-08-16T09:24:18.370Z"
 last_activity: 2026-08-16
-last_activity_desc: Phase 9 execution started
+last_activity_desc: "Plan 09-02 complete (ComposeScreen + Compose route + profile Message entry; CMP-01/02/03 code-complete, pending on-device UAT)"
 progress:
   total_phases: 16
-  completed_phases: 8
+  completed_phases: 9
   total_plans: 58
-  completed_plans: 57
-  percent: 50
+  completed_plans: 58
+  percent: 56
 ---
 
 # Project State
@@ -28,9 +28,9 @@ See: .planning/PROJECT.md (updated 2026-08-14)
 
 ## Current Position
 
-Phase: 9 (Compose Screen & SMS Handoff) — EXECUTING (09-01 of 2 complete)
-Next: Plan 09-02 (ComposeScreen assembly + profile "Message" entry + Compose route + Back→dashboard). Then code-review + on-device Pixel UAT — this phase added native modules (expo-sms/expo-clipboard) so UAT requires a full `expo prebuild --clean` + release APK (a Metro JS reload will NOT surface the native modules).
-Last activity: 2026-08-16 — Plan 09-01 complete (compose prerequisites: resolver + native deps + phone widen)
+Phase: 9 (Compose Screen & SMS Handoff) — BOTH plans executed (09-01 + 09-02 of 2)
+Next: code-review + on-device Pixel UAT for the full profile→Message→fuel+draft→Send/Copy→Back-to-dashboard slice — this phase added native modules (expo-sms/expo-clipboard) so UAT requires a full `expo prebuild --clean` + release APK (a Metro JS reload will NOT surface the native modules). SUMMARY D2/D3/D4 are human_judgment (native handoff, hardware-Back, re-focus no-stale-flash).
+Last activity: 2026-08-16 — Plan 09-02 complete (ComposeScreen + Compose route + profile Message entry; CMP-01/02/03 code-complete, pending on-device UAT)
 
 Progress: [████░░░░░░] 38% (6/16 phases complete)
 
@@ -111,6 +111,7 @@ Progress: [████░░░░░░] 38% (6/16 phases complete)
 | Phase 08 P09 | 18min | 3 tasks | 1 files |
 | Phase 08 P10 | 2min | 2 tasks | 3 files |
 | Phase 09 P01 | 3min | 3 tasks | 6 files |
+| Phase 09 P02 | 10min | 3 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -200,6 +201,8 @@ Foundational decisions affecting current work:
 - [Phase ?]: [Phase 8]: 08-10: standalone FuelSearch route + screen retired (search relocated to the dashboard, Plan 09 — expected relocation, NOT a reversal); FuelSearchResultRow + searchFuel DAO kept. Settings loses the Search row, gains a Manage-favourites row -> ManageFavourites (2nd entry into the shared reorder screen).
 
 - [Phase 9]: 09-01: the three compose prerequisites landed ahead of the screen. (1) `resolveComposeControls(hasPhone, smsAvailable)` + `ComposeControls` (src/logic/compose-logic.ts) is the pure, react-native/expo/db-free, node-tested CMP-03 Send/Copy capability gate — no-phone branch FIRST so a missing number always wins over SMS capability ((false,true) ≡ (false,false)); phone+no-SMS → Send hidden, Copy primary, helper line; phone+SMS → Send shown, Copy secondary. Mirrors the dashboard-empty-logic resolver idiom (explicit-precedence header comment, one exported interface + one pure resolve fn). (2) `expo-sms` + `expo-clipboard` installed via `npx expo install` at SDK-57-pinned `~57.0.1` (both first-party Expo modules, no postinstall — T-09-SC mitigated, no blocking-human legitimacy checkpoint needed); NO app.config.ts plugins entry added (neither ships a config plugin — a bogus entry is a prebuild error, 01-01 deduped-plugins lesson). Native-dep change ⇒ Plan-02 on-device UAT needs `expo prebuild --clean` + release APK. (3) `getContactHeader` widened PURELY ADDITIVELY to return `phone: string | null` (append to SELECT + both type literals; light by-id seek kept — NO join, NOT switched to getContactForEdit) — the 08-06 favourite_rank idiom; the two field-wise callers (ContactProfileScreen local Header type, EditContactScreen refreshPhoto) + contact-read.test.ts stay green. npm test 673/673, tsc + check:colors clean. No deviations.
+- [Phase ?]: 09-02: interim controls literal while smsAvailable===null (Send hidden, Copy sole primary) keeps resolveComposeControls called only with a concrete boolean — no wrong-state flash on first mount or re-focus
+- [Phase ?]: 09-02: SMS capability probe runs separately from the header/fuel load so a rejected isAvailableAsync() degrades to false without failing the load; a null getContactHeader (deleted contact) exits to the dashboard
 
 ### Pending Todos
 
@@ -235,7 +238,7 @@ planning" sections in docs/dossier/*.md — those are the authoritative hand-off
 
 ## Session
 
-**Last session:** 2026-08-16T09:15:12.716Z
+**Last session:** 2026-08-16T09:23:50.098Z
 **Stopped at:** Completed 09-01-PLAN.md (compose prerequisites: pure resolver + expo-sms/expo-clipboard + additive phone widen). 09-02 (the ComposeScreen assembly) still to execute. Then code-review + on-device Pixel UAT (native-dep change ⇒ `expo prebuild --clean` + release APK; a Metro reload will NOT surface the native modules).
 **Resume file:** .planning/phases/09-compose-screen-sms-handoff/09-02-PLAN.md
 

@@ -24,7 +24,7 @@ onto the dossier domains; a `[DECIDED]`/`[REJECTED]` decision is implemented, ne
 - [x] **Phase 6: Interaction Log, Status & Impact** — touchpoint rows, editable timeline, gravity/intensity, rogue, "Rarely responds". (completed 2026-08-15)
 - [x] **Phase 7: Conversational Fuel** — per-item rows (5 kinds incl. `off_limits`), ranked projection, profile editor, cross-contact search. (completed 2026-08-16)
 - [x] **Phase 8: Dashboard & Never-Contacted Screen** — the home screen, sort/filter/search, birthday banner, favourites, freshness, empty states. (completed 2026-08-16)
-- [ ] **Phase 9: Compose Screen & SMS Handoff** — the in-app message surface (fuel visible, Send→SMS, Copy) that notify/widget/AI all open.
+- [x] **Phase 9: Compose Screen & SMS Handoff** — the in-app message surface (fuel visible, Send→SMS, Copy) that notify/widget/AI all open. (completed 2026-08-16)
 - [ ] **Phase 10: Share-Sheet Capture** — Android share target, grid-of-faces picker, `EXTRA_SUBJECT` patch, inline create.
 - [ ] **Phase 11: Actionable Notifications** — pre-scheduled + launch-reconcile engine, decay + birthday, headless actions, mute, settings.
 - [ ] **Phase 12: Home Screen Widget** — favourites grid, headless mark, Quick mark · Log contact · Message, add-widget button.
@@ -378,7 +378,7 @@ Recorded here because they bind phases that do not own them. Every planner/execu
   2. Back from compose lands on the dashboard.
   3. With no phone number, Copy still works and an "add number" affordance appears.
 
-**Plans:** 1/2 plans executed
+**Plans:** 2/2 plans complete
 
 **Wave 1**
 
@@ -386,7 +386,7 @@ Recorded here because they bind phases that do not own them. Every planner/execu
 
 **Wave 2** *(blocked on Wave 1)*
 
-- [ ] 09-02-PLAN.md — ComposeScreen (fuel visible, blank draft, Send/Copy, Back→dashboard) + Compose route + profile "Message" entry (CMP-01, CMP-02, CMP-03)
+- [x] 09-02-PLAN.md — ComposeScreen (fuel visible, blank draft, Send/Copy, Back→dashboard) + Compose route + profile "Message" entry (CMP-01, CMP-02, CMP-03)
 
 ### Phase 10: Share-Sheet Capture
 
@@ -502,7 +502,7 @@ Recorded here because they bind phases that do not own them. Every planner/execu
 | 6. Interaction Log, Status & Impact | 6/6 | Complete   | 2026-08-15 |
 | 7. Conversational Fuel | 4/4 | Complete   | 2026-08-16 |
 | 8. Dashboard & Never-Contacted Screen | 10/10 | Complete   | 2026-08-16 |
-| 9. Compose Screen & SMS Handoff | 1/2 | In Progress|  |
+| 9. Compose Screen & SMS Handoff | 2/2 | Complete   | 2026-08-16 |
 | 10. Share-Sheet Capture | 0/TBD | Not started | - |
 | 11. Actionable Notifications | 0/TBD | Not started | - |
 | 12. Home Screen Widget | 0/TBD | Not started | - |
