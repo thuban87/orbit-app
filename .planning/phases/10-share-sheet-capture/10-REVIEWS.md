@@ -2,7 +2,7 @@
 phase: 10
 slug: share-sheet-capture
 reviewers: [codex, claude-subagent, plan-checker]
-cycle: 1
+cycle: 2
 date: 2026-08-16
 status: findings-open
 ---
@@ -119,3 +119,44 @@ hardening) is correctly pushed to physical-Pixel UAT.
 
 ### Reviewer: plan-checker (internal, VERIFICATION PASSED w/ 2 warnings)
 - W1 `captureMultiAttach` return-id contract (→ A1). W2 VALIDATION.md reconciliation (→ D1).
+
+---
+
+# Cycle 2 — Verification of fixes (codex + claude-subagent)
+
+**A1, A2, A3, A5, A6, A7, A8, A9, A10 — RESOLVED** and code-grounded by BOTH reviewers (A1's returned-ids
+contract is consistent across 10-03/10-05/10-06; no invariant regressed). The following remain/were newly
+introduced and MUST be incorporated into executable PLAN.md content (or explicitly deferred/rejected):
+
+### A4-refine — [HIGH/actionable] Cold-start `ShareIntentGate` navigation must be reactive to navigator readiness  · plan 10-04 · (codex HIGH + claude LOW — same mechanism)
+The gate navigates in a `useEffect` keyed only on `hasShareIntent`, guarded by the **non-reactive**
+`navigationRef.current?.isReady()`. If that effect runs one tick before `NavigationContainer` reports ready, it
+no-ops and — since `hasShareIntent` never changes again — never retries, stranding the primary cold-start share.
+The child-of-NavigationContainer placement makes it usually-correct, but the cold-start flow is CAP-01's #1 path
+and must be bulletproof. **Change:** drive navigation from `NavigationContainer`'s `onReady` (or key the effect on
+an `isReady` **state** flag set in `onReady`), so a pending share navigates whether `hasShareIntent` or readiness
+settles last. Keep the distinct killed-app cold-start UAT (10-04) which will catch a regression.
+
+### B1 — [MEDIUM] The atomic multi-note write must live in a node-tested DAO, not inline in the screen  · plans 10-03 (owner) + 10-06 · (claude)
+The A8 fix has `CaptureScreen.tsx` import and open `inWriteTransaction` directly, looping `editFuelCore` over
+`writtenRows` — correctness-critical write-atomicity/rollback logic in a Pixel-UAT-only component. This violates
+CLAUDE.md ("Queries go through DAOs in `src/db/`, never inline in components") AND 10-03's own objective (keep
+write-atomicity out of the `.tsx` screen, in tested DAO/read modules). The single-row path correctly uses the
+`editFuel` DAO; only the multi path is off-pattern. **Change:** add `captureMultiNote(exec, rows:{id,contactId}[],
+text, now): Promise<void>` to `capture-dao.ts` (owned by 10-03) composing `editFuelCore × N` in ONE
+`inWriteTransaction`, with a node test asserting all-N-updated + mid-loop rollback (mirroring the
+`captureMultiAttach` atomicity test). 10-06 Task 2 calls it instead of opening the transaction inline; update
+10-06's verify to grep the DAO call, and add `capture-dao` to 10-06's read deps.
+
+### B2 — [MEDIUM] In-flight write guard against duplicate commits from rapid taps  · plans 10-05, 10-06 · (codex)
+A face tap, multi-select Done, or inline "Create & save" can invoke concurrent writes before state re-renders.
+**Change:** an `isCommittingRef` set before the first `await`, disabling the relevant controls while set and cleared
+on completion/failure, on all three commit paths.
+
+### B3 — [LOW] Multi-select Done needs an N>0 guard  · plans 10-06, 10-03 · (codex)
+Toggling the last selected face off then tapping Done can commit an empty transaction / show "Saved to 0 contacts."
+**Change:** disable Done at zero selection and guard the handler before `captureMultiAttach`.
+
+### B4 — [LOW] Destructure `{ contactId }` from `createContactFull`'s object return  · plan 10-06 · (claude)
+`createContactFull` returns `{contactId, interactionId}` (contacts-dao.ts:109), not a bare id; 10-06's action uses
+`contactId` as if bare. **Change:** one-word tightening — "destructure `{ contactId }`".
