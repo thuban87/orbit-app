@@ -150,16 +150,17 @@ export function ManageFavouritesScreen({
 
   const onReorder = useCallback(
     ({ from, to }: ReorderableListReorderEvent) => {
-      setRows((prev) => {
-        const currentIds = prev.map((r) => r.id);
-        const newIds = computeReorder(currentIds, from, to);
-        const byId = new Map(prev.map((r) => [r.id, r] as const));
-        const nextRows = newIds.map((id) => byId.get(id) as FavouriteRow);
-        void persist(newIds);
-        return nextRows;
-      });
+      // Compute the new order from the CURRENT rows and persist OUTSIDE the
+      // setState updater — the updater must stay pure, so a StrictMode /
+      // re-entrant render can't fire rewriteFavouriteRanks twice per drag.
+      const currentIds = rows.map((r) => r.id);
+      const newIds = computeReorder(currentIds, from, to);
+      const byId = new Map(rows.map((r) => [r.id, r] as const));
+      const nextRows = newIds.map((id) => byId.get(id) as FavouriteRow);
+      setRows(nextRows);
+      void persist(newIds);
     },
-    [persist],
+    [rows, persist],
   );
 
   return (
