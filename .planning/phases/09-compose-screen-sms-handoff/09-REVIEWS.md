@@ -113,3 +113,29 @@ None.
 app.config.ts" contradict the plans, which correctly reuse getRankedFuel and add no plugin entry. Plans
 override the spec on the safer side.)
 ```
+
+---
+
+## Cycle 2 (re-review of the revised plans)
+
+**Combined verdict:** 0 HIGH · 3 actionable (all from codex; the Claude re-review returned 0/0).
+- codex `CYCLE_SUMMARY: high=0 actionable_nonhigh=3`
+- claude `CLAUDE_SUMMARY: high=0 actionable_nonhigh=0`
+
+Both confirmed A2–A5 fully resolved and every newly-cited symbol verified against source. Codex found
+A1 only PARTIALLY resolved plus two new issues (Claude missed these; codex is correct):
+
+- **B1 (MEDIUM) — A1 focus-refresh does not reset the state machine.** `smsAvailable` inits `null` but is
+  never reset (nor `screenState` to `"loading"`) on each `useFocusEffect` run — returning from Edit after
+  adding a phone can render the prior SMS result/helper while the new probe is pending (the flash A1
+  forbids). Require `setScreenState("loading")` + `setSmsAvailable(null)` at each focus-load start, plus an
+  active/request (cancelled-flag) guard in cleanup so a stale load/probe cannot overwrite the latest
+  focused state.
+- **B2 (MEDIUM) — `goHome` written as a void value, not a callback.** 09-02 `<action>` says
+  `goHome = navigation.reset(...)`; `reset` returns `void`, so as written it resets during render and
+  cannot bind to `onPress`/BackHandler. Require the callback form (PATTERNS.md:90):
+  `const goHome = useCallback(() => navigation.reset({ index:0, routes:[{ name:'Home' }] }), [navigation])`.
+- **B3 (LOW) — label single-source claim vs FuelEditor drift.** `fuel-kind-label.ts` is described as the
+  single label source, but `FuelEditor.tsx:72` keeps its own five literal labels + local `kindLabel`.
+  Narrow the helper's claim to **compose-local** (preferred — avoid scope creep into a shipped component),
+  or add FuelEditor to the plan to derive from `fuelKindLabel`.
