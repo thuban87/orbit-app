@@ -4,7 +4,7 @@ slug: share-sheet-capture
 reviewers: [codex, claude-subagent, plan-checker]
 cycle: 3
 date: 2026-08-16
-status: converged-with-2-residuals
+status: converged
 ---
 
 # Phase 10 — Cross-AI Plan Review
@@ -170,7 +170,8 @@ Toggling the last selected face off then tapping Done can commit an empty transa
 - **codex: needs another cycle** for one MEDIUM (C1).
 
 Both residuals are non-blocking, non-corrupting plan-text refinements (no locked-decision impact). Max-cycles (3)
-reached — surfaced to the owner at the pre-execution pause; to be applied (per owner preference) before Wave 1.
+reached — surfaced to the owner at the pre-execution pause. **Owner chose "apply fixes + run executors now"
+(2026-08-16); C1 + C2 applied to 10-06 before Wave 1 — CONVERGED.**
 
 ### C1 — [MEDIUM] Split Close vs hardware-Back semantics in the multi-select handler  · plan 10-06 · (codex)
 The A6 shared handler branches on multi-select-active for BOTH triggers, so the Close pill wrongly *exits multi-select*
