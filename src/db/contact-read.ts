@@ -98,6 +98,18 @@ export function getContactHeader(
    * the user-invoked SMS/Copy on the compose screen — this read crosses no network.
    */
   phone: string | null;
+  /**
+   * The contact's active snooze date (`YYYY-MM-DD`), or null when not snoozed —
+   * the profile's Snooze-reminders status line reads it (Plan 11-09, NOTIF-03).
+   * PURELY ADDITIVE widening (same idiom as favourite_rank/phone above): the two
+   * other callers read this seek field-wise (ContactProfileScreen destructures a
+   * local Header type; EditContactScreen refreshPhoto reads only
+   * photo/modified_at; contact-read.test.ts asserts fields individually), so
+   * adding this field breaks neither typecheck nor test. It is a bare local
+   * `YYYY-MM-DD` string — the profile renders it DIRECTLY (never via
+   * `new Date(str)`, which reintroduces the forbidden UTC evening off-by-one).
+   */
+  snooze_until: string | null;
 } | null> {
   return exec.getFirstAsync<{
     id: number;
@@ -108,8 +120,9 @@ export function getContactHeader(
     modified_at: string;
     favourite_rank: number | null;
     phone: string | null;
+    snooze_until: string | null;
   }>(
-    "SELECT id, name, rarely_responds, archived_at, photo, modified_at, favourite_rank, phone FROM contacts WHERE id = ?",
+    "SELECT id, name, rarely_responds, archived_at, photo, modified_at, favourite_rank, phone, snooze_until FROM contacts WHERE id = ?",
     [contactId],
   );
 }
