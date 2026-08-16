@@ -433,7 +433,7 @@ Recorded here because they bind phases that do not own them. Every planner/execu
   3. No decay notification fires for never-contacted/snoozed/rogue/Rarely-responds/muted; a user can permanently mute a still-decaying contact; birthday notifications fire day-of for non-archived contacts.
   4. `POST_NOTIFICATIONS` is asked at a value moment; master + per-type toggles + private-by-default lock-screen visibility work; denial degrades to in-app.
 
-**Plans:** 10/13 plans executed
+**Plans:** 11/13 plans executed
 
 Plans:
 **Wave 1**
@@ -449,7 +449,7 @@ Plans:
 - [x] 11-06-PLAN.md — channels (private/public decay + birthday) + POST_NOTIFICATIONS permission
 - [x] 11-07-PLAN.md — notification-actions shared handler + module-scope headless task
 - [x] 11-08-PLAN.md — purge notification-cancel adapter composed into the purge fan-out
-- [ ] 11-09-PLAN.md — Edit-form "Mute reminders" relabel + Profile in-app snooze presets
+- [x] 11-09-PLAN.md — Edit-form "Mute reminders" relabel + Profile in-app snooze presets
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
@@ -548,7 +548,7 @@ Plans:
 | 8. Dashboard & Never-Contacted Screen | 10/10 | Complete   | 2026-08-16 |
 | 9. Compose Screen & SMS Handoff | 2/2 | Complete   | 2026-08-16 |
 | 10. Share-Sheet Capture | 6/6 | Complete   | 2026-08-16 |
-| 11. Actionable Notifications | 10/13 | In Progress|  |
+| 11. Actionable Notifications | 11/13 | In Progress|  |
 | 12. Home Screen Widget | 0/TBD | Not started | - |
 | 13. Orrery | 0/TBD | Not started | - |
 | 14. AI Message Suggestions | 0/TBD | Not started | - |
