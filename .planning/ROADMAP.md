@@ -26,7 +26,7 @@ onto the dossier domains; a `[DECIDED]`/`[REJECTED]` decision is implemented, ne
 - [x] **Phase 8: Dashboard & Never-Contacted Screen** — the home screen, sort/filter/search, birthday banner, favourites, freshness, empty states. (completed 2026-08-16)
 - [x] **Phase 9: Compose Screen & SMS Handoff** — the in-app message surface (fuel visible, Send→SMS, Copy) that notify/widget/AI all open. (completed 2026-08-16)
 - [x] **Phase 10: Share-Sheet Capture** — Android share target, grid-of-faces picker, `EXTRA_SUBJECT` patch, inline create. (completed 2026-08-16)
-- [ ] **Phase 11: Actionable Notifications** — pre-scheduled + launch-reconcile engine, decay + birthday, headless actions, mute, settings.
+- [x] **Phase 11: Actionable Notifications** — pre-scheduled + launch-reconcile engine, decay + birthday, headless actions, mute, settings. (completed 2026-08-16)
 - [ ] **Phase 12: Home Screen Widget** — favourites grid, headless mark, Quick mark · Log contact · Message, add-widget button.
 - [ ] **Phase 13: Orrery** — the two-view Skia solar system, rogue rendering, assignable/self-colour sun, ambient layer.
 - [ ] **Phase 14: AI Message Suggestions** — providers + keys, editable-draft flow, prompt assembly, `share_with_ai`.
@@ -433,7 +433,7 @@ Recorded here because they bind phases that do not own them. Every planner/execu
   3. No decay notification fires for never-contacted/snoozed/rogue/Rarely-responds/muted; a user can permanently mute a still-decaying contact; birthday notifications fire day-of for non-archived contacts.
   4. `POST_NOTIFICATIONS` is asked at a value moment; master + per-type toggles + private-by-default lock-screen visibility work; denial degrades to in-app.
 
-**Plans:** 12/13 plans executed
+**Plans:** 13/13 plans complete
 
 Plans:
 **Wave 1**
@@ -459,7 +459,7 @@ Plans:
 **Wave 4** *(blocked on Wave 3 completion)*
 
 - [x] 11-11-PLAN.md — Settings Notifications section (toggles, permission value moment, time controls)
-- [ ] 11-13-PLAN.md — App.tsx wiring: sweep registration, channels/category init, headless import, response gate mount
+- [x] 11-13-PLAN.md — App.tsx wiring: sweep registration, channels/category init, headless import, response gate mount
 
 ### Phase 12: Home Screen Widget
 
@@ -548,7 +548,7 @@ Plans:
 | 8. Dashboard & Never-Contacted Screen | 10/10 | Complete   | 2026-08-16 |
 | 9. Compose Screen & SMS Handoff | 2/2 | Complete   | 2026-08-16 |
 | 10. Share-Sheet Capture | 6/6 | Complete   | 2026-08-16 |
-| 11. Actionable Notifications | 12/13 | In Progress|  |
+| 11. Actionable Notifications | 13/13 | Complete   | 2026-08-16 |
 | 12. Home Screen Widget | 0/TBD | Not started | - |
 | 13. Orrery | 0/TBD | Not started | - |
 | 14. AI Message Suggestions | 0/TBD | Not started | - |
