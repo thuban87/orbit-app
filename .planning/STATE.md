@@ -2,13 +2,13 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-current_phase: 10
-current_phase_name: Share-Sheet Capture
-status: passed
-stopped_at: "Phase 10 (Share-Sheet Capture) COMPLETE & VERIFIED. 6/6 plans executed (4 waves) + 3-cycle cross-AI convergence (codex + read-only-Claude subagent; 16 findings resolved) + code-review 0-blockers (5 findings fixed incl. WR-01 stray-tap wrong-contact guard) + gsd-verifier 12/12 code truths + ON-DEVICE PIXEL UAT PASSED (release APK: text/plain share→grid picker keyboard-closed, EXTRA_SUBJECT patch label, single-tap→'Saved to'→finish()-return, NO touchpoint [profile shows 'no outbound contact logged'], multi-select 'Saved to 2 contacts', inline-create name-only→never-contacted; F1 submit-behind-keyboard FIXED via keyboard-Done + re-verified; F2 search-reveal false-alarm; F3 note-surface keyboard = minor follow-up). npm test 707/707, tsc+check:colors+biome clean. CAP-01/02/03/04 delivered. STOPPED before Phase 11 per owner directive. Phases 1–9 remain COMPLETE & VERIFIED; commits local on main, NOT pushed. Resume Phase 11 (Actionable Notifications): /gsd-autonomous --from 11 --to 11 --converge --claude --codex --claude --max-cycles 3 (same overrides: read-only-Claude reviewer; pause before executors if usage-checking)."
-last_updated: "2026-08-16T15:45:00.000Z"
+current_phase: 11
+current_phase_name: Actionable Notifications
+status: in_progress
+stopped_at: "Phase 11 (Actionable Notifications) PRE-EXECUTION in progress under /gsd-autonomous --from 11 --to 12 --converge --claude --codex (owner overrides: read-only-Claude reviewer substituted for the broken claude-CLI reviewer + the Claude self-review guard; PAUSE before executors for a usage-headroom check). DONE: smart-discuss 11-CONTEXT.md (owner REVERSED dossier 11-notify Cluster A '[REJECTED] user-set delivery hour in v1' — delivery-hour + quiet-window are now USER-TUNABLE Settings controls, 9am / 9pm–8am defaults) + 11-UI-SPEC.md APPROVED (checker 6/6; typography FLAG non-blocking; edit-form mute toggle already exists → relabel-only). NEXT: plan-phase (research→plan→check) + codex + read-only-Claude convergence (≤3 cycles) → PAUSE before executors. Phases 1–10 COMPLETE & VERIFIED (Phase 10 on-device Pixel UAT passed); 10/16 (63%). Commits local on main, NOT pushed. NOTE: state.record-session clobbered this frontmatter from the stale body once (regressed current_phase 10→9); body Current Position was fixed to prevent recurrence."
+last_updated: "2026-08-16T18:00:00.000Z"
 last_activity: 2026-08-16
-last_activity_desc: "Phase 10 COMPLETE & VERIFIED (on-device Pixel UAT PASSED + F1 fixed/re-verified). Milestone 10/16 (63%). STOPPED before Phase 11 per owner. Device has UAT test data (fuel on Dad/Bob + contacts SkiBuddy/DeckGuy) — owner will clear."
+last_activity_desc: "Phase 11 UI-SPEC approved (commit 2c0628a). Discuss + UI-SPEC done; planning + convergence next, then owner usage-headroom pause before executors. Phases 1–10 done, 10/16 (63%)."
 progress:
   total_phases: 16
   completed_phases: 10
@@ -28,11 +28,11 @@ See: .planning/PROJECT.md (updated 2026-08-14)
 
 ## Current Position
 
-Phase: 9 (Compose Screen & SMS Handoff) — BOTH plans executed (09-01 + 09-02 of 2)
-Next: code-review + on-device Pixel UAT for the full profile→Message→fuel+draft→Send/Copy→Back-to-dashboard slice — this phase added native modules (expo-sms/expo-clipboard) so UAT requires a full `expo prebuild --clean` + release APK (a Metro JS reload will NOT surface the native modules). SUMMARY D2/D3/D4 are human_judgment (native handoff, hardware-Back, re-focus no-stale-flash).
-Last activity: 2026-08-16 — Plan 09-02 complete (ComposeScreen + Compose route + profile Message entry; CMP-01/02/03 code-complete, pending on-device UAT)
+Phase: 11 (Actionable Notifications) — PRE-EXECUTION in progress (discuss + UI-SPEC done; planning + convergence next)
+Next: plan-phase (research → plan → plan-check) then codex + read-only-Claude plan-review convergence (≤3 cycles), then PAUSE before executors for owner usage-headroom check. Executors + code-review + verify + on-device Pixel UAT follow after the pause.
+Last activity: 2026-08-16 — 11-CONTEXT.md + 11-UI-SPEC.md approved & committed (owner reversal: delivery-hour + quiet-window user-tunable in Settings)
 
-Progress: [████░░░░░░] 38% (6/16 phases complete)
+Progress: [██████░░░░] 63% (10/16 phases complete)
 
 ## Performance Metrics
 
@@ -238,9 +238,9 @@ planning" sections in docs/dossier/*.md — those are the authoritative hand-off
 
 ## Session
 
-**Last session:** 2026-08-16T10:59:35.432Z
-**Stopped at:** Phase 10 UI-SPEC approved
-**Resume file:** .planning/phases/10-share-sheet-capture/10-UI-SPEC.md
+**Last session:** 2026-08-16T18:00:00.000Z
+**Stopped at:** Phase 11 UI-SPEC approved (planning + convergence next; pause before executors)
+**Resume file:** .planning/phases/11-actionable-notifications/11-UI-SPEC.md
 
 ## Phase 4 — Closeout (2026-08-15) ✅ COMPLETE
 
