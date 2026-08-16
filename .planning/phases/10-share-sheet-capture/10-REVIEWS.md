@@ -2,9 +2,9 @@
 phase: 10
 slug: share-sheet-capture
 reviewers: [codex, claude-subagent, plan-checker]
-cycle: 2
+cycle: 3
 date: 2026-08-16
-status: findings-open
+status: converged-with-2-residuals
 ---
 
 # Phase 10 — Cross-AI Plan Review
@@ -160,3 +160,26 @@ Toggling the last selected face off then tapping Done can commit an empty transa
 ### B4 — [LOW] Destructure `{ contactId }` from `createContactFull`'s object return  · plan 10-06 · (claude)
 `createContactFull` returns `{contactId, interactionId}` (contacts-dao.ts:109), not a bare id; 10-06's action uses
 `contactId` as if bare. **Change:** one-word tightening — "destructure `{ contactId }`".
+
+---
+
+# Cycle 3 — Final verification (codex + claude-subagent)
+
+**A4-refine, B1, B2, B3, B4 — ALL RESOLVED** and code-grounded by BOTH reviewers. Verdicts:
+- **claude-subagent: CONVERGED / execution-ready** — every invariant holds; one benign LOW (C2).
+- **codex: needs another cycle** for one MEDIUM (C1).
+
+Both residuals are non-blocking, non-corrupting plan-text refinements (no locked-decision impact). Max-cycles (3)
+reached — surfaced to the owner at the pre-execution pause; to be applied (per owner preference) before Wave 1.
+
+### C1 — [MEDIUM] Split Close vs hardware-Back semantics in the multi-select handler  · plan 10-06 · (codex)
+The A6 shared handler branches on multi-select-active for BOTH triggers, so the Close pill wrongly *exits multi-select*
+instead of cancelling, and Back's zero-selected path cancels. **Change (standard Android pattern):** hardware **Back**
+exits multi-select whenever the mode is active (any selection count), else `resetShareIntent()`+`finishActivity()`;
+the **Close pill** ALWAYS cancels (`resetShareIntent()`+`finishActivity()`). *(UX detail — flagged for owner
+preference; recommended default is the standard pattern above.)*
+
+### C2 — [LOW] Gate the note-Done write on the shared `isCommittingRef`  · plan 10-06 · (claude)
+B2's latch covers the three initial write paths but not the note-recompose write; a rapid double-tap on
+`capture-note-done` re-applies the same composed text. Idempotent/benign (redundant `UPDATE` bumping `modified_at`,
+no invariant broken), but trivially tightened. **Change:** gate `capture-note-done` on the same `isCommittingRef`.
