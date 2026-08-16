@@ -75,6 +75,13 @@ type Header = {
   name: string;
   photo: string | null;
   modified_at: string;
+  /**
+   * Non-null when the contact is archived. Archiving "hides the contact from
+   * every live surface" (Phase-4 commitment) — compose is entry-agnostic and
+   * reused by Phases 11/12/14, so an archived contact must be treated exactly
+   * like a missing one (route Home, render no Send/Copy/fuel surface).
+   */
+  archived_at: string | null;
   /** The SMS-handoff source — null (or whitespace-only) means no phone (CMP-03). */
   phone: string | null;
 };
@@ -133,9 +140,14 @@ export function ComposeScreen({ navigation, route }: RootStackScreenProps<"Compo
           if (cancelled) {
             return;
           }
-          // A stale/deleted contact — exit to the dashboard, never render a "no
-          // phone" (or any) surface for a contact that no longer exists.
-          if (row === null) {
+          // A stale/deleted OR archived contact — exit to the dashboard, never
+          // render a "no phone" (or any) Send/Copy/fuel surface. `getContactHeader`
+          // intentionally does NOT filter `archived_at IS NULL` (it stays loadable
+          // by id), so an entry-agnostic re-entry from Phase 11/12/14 could open an
+          // archived contact here; archiving must hide the contact from EVERY live
+          // surface, so treat archived exactly like missing. Guarded by the same
+          // `if (!cancelled)` as the null-header branch above.
+          if (row === null || row.archived_at !== null) {
             setScreenState("missing");
             goHome();
             return;
@@ -145,6 +157,7 @@ export function ComposeScreen({ navigation, route }: RootStackScreenProps<"Compo
             name: row.name,
             photo: row.photo,
             modified_at: row.modified_at,
+            archived_at: row.archived_at,
             phone: row.phone,
           });
           setFuel(fuelRows);
