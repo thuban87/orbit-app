@@ -87,6 +87,17 @@ export function getContactHeader(
    * fields individually), so adding this field breaks neither typecheck nor test.
    */
   favourite_rank: number | null;
+  /**
+   * The contact's phone number, or null when unset — the SMS-handoff source the
+   * compose screen reads to decide Send vs the add-a-number affordance (Plan 09,
+   * CMP-03). PURELY ADDITIVE widening (same idiom as favourite_rank above): the
+   * two other callers read this seek field-wise (ContactProfileScreen destructures
+   * a local Header type; EditContactScreen refreshPhoto reads only
+   * photo/modified_at; contact-read.test.ts asserts fields individually), so adding
+   * this field breaks neither typecheck nor test. Phone only leaves the device via
+   * the user-invoked SMS/Copy on the compose screen — this read crosses no network.
+   */
+  phone: string | null;
 } | null> {
   return exec.getFirstAsync<{
     id: number;
@@ -96,8 +107,9 @@ export function getContactHeader(
     photo: string | null;
     modified_at: string;
     favourite_rank: number | null;
+    phone: string | null;
   }>(
-    "SELECT id, name, rarely_responds, archived_at, photo, modified_at, favourite_rank FROM contacts WHERE id = ?",
+    "SELECT id, name, rarely_responds, archived_at, photo, modified_at, favourite_rank, phone FROM contacts WHERE id = ?",
     [contactId],
   );
 }
