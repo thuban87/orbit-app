@@ -13,7 +13,14 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { nodeSqliteExecutor, openTestDb } from "@/db/__testkit__/node-sqlite";
 import type { FuelKind } from "@/db/fuel-dao";
 import { addFuel } from "@/db/fuel-dao";
-import { getRankedFuel, listFuelForEditor, searchFuel } from "@/db/fuel-read";
+import {
+  RANK_CASE,
+  RANKED_FUEL_EXCLUSIONS,
+  escapeLike,
+  getRankedFuel,
+  listFuelForEditor,
+  searchFuel,
+} from "@/db/fuel-read";
 import { migration001 } from "@/db/migrations/001-initial";
 import { runMigrations } from "@/db/migrations/runner";
 import type { SqlExecutor } from "@/db/types";
@@ -499,5 +506,83 @@ describe("searchFuel — name OR fuel text, off_limits/ai/archived excluded, esc
     expect(rows.length).toBe(1);
     expect(rows[0]?.contactId).toBe(c);
     expect(rows[0]?.snippet).toContain("sushi");
+  });
+});
+
+/**
+ * Extraction parity (Phase 8 Task 1) — the exported RANKED_FUEL_EXCLUSIONS +
+ * RANK_CASE fragments, spliced into an INDEPENDENT SELECT, must select and rank
+ * fuel IDENTICALLY to getRankedFuel over the same seeded fixture. This is the
+ * drift guard: if a future edit changes one exclusion in RANKED_FUEL but not the
+ * exported constant (or vice versa), these assertions fail. getRankedFuel's own
+ * behaviour is already covered above — this proves the export is the same source.
+ */
+describe("exported RANKED_FUEL_EXCLUSIONS + RANK_CASE — parity with getRankedFuel", () => {
+  /** The independent projection built ONLY from the exported fragments. */
+  function independentRankedFuel(exec: SqlExecutor, contactId: number) {
+    return exec.getAllAsync<{ id: number; text: string | null }>(
+      `SELECT id, text
+         FROM fuel
+        WHERE contact_id = ?
+          AND ${RANKED_FUEL_EXCLUSIONS}
+        ORDER BY ${RANK_CASE}, created_at DESC, id DESC`,
+      [contactId],
+    );
+  }
+
+  it("selects + orders the SAME rows getRankedFuel does over a mixed fixture", async () => {
+    const c = await seedContact();
+    await addRow(c, { kind: "fact", created_at: "2026-08-14 09:00:00" });
+    await addRow(c, { kind: "recent", created_at: "2026-08-08 09:00:00" });
+    await addRow(c, { kind: "recent", created_at: "2026-08-12 09:00:00" });
+    await addRow(c, { kind: "gift", created_at: "2026-08-12 09:00:00" });
+    await addRow(c, { kind: "topic", created_at: "2026-08-12 09:00:00" });
+    // Excluded classes — each must be dropped by BOTH sides identically.
+    await addRow(c, { kind: "off_limits", created_at: "2026-08-15 09:00:00" });
+    await addRow(c, {
+      kind: "recent",
+      created_at: "2026-08-15 10:00:00",
+      source: "ai",
+    });
+    await addRow(c, {
+      kind: "recent",
+      created_at: "2026-08-15 11:00:00",
+      text: "  ",
+    });
+
+    const canonical = (await getRankedFuel(exec, c)).map((r) => r.id);
+    const independent = (await independentRankedFuel(exec, c)).map((r) => r.id);
+    expect(independent).toEqual(canonical);
+    // And the promoted top line is the same row on both sides.
+    expect(independent[0]).toBe(canonical[0]);
+  });
+
+  it("the exported fragment excludes off_limits / 'ai' / blank exactly as getRankedFuel", async () => {
+    const c = await seedContact();
+    await addRow(c, { kind: "off_limits", created_at: NOW, text: "private" });
+    await addRow(c, {
+      kind: "recent",
+      created_at: NOW,
+      source: "ai",
+      text: "ai guess",
+    });
+    await addRow(c, { kind: "gift", created_at: NOW, text: "\v\f " });
+    const survivor = await addRow(c, {
+      kind: "topic",
+      created_at: NOW,
+      text: "real note",
+    });
+    const independent = (await independentRankedFuel(exec, c)).map((r) => r.id);
+    expect(independent).toEqual([survivor.id]);
+  });
+});
+
+describe("exported escapeLike — backslash-first ordering preserved", () => {
+  it("escapes backslash before % and _ (so added escapes are not re-escaped)", () => {
+    expect(escapeLike("50%")).toBe("50\\%");
+    expect(escapeLike("a_b")).toBe("a\\_b");
+    // Backslash escaped FIRST: a literal `\%` becomes `\\` + `\%`.
+    expect(escapeLike("\\%")).toBe("\\\\\\%");
+    expect(escapeLike("plain")).toBe("plain");
   });
 });

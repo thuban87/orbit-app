@@ -75,8 +75,11 @@ export function listFuelForEditor(
  * indices — never user input. `contact_id` remains the SOLE `?`-bound value in
  * `getRankedFuel`. There is therefore no injection surface; a `?`-bind is neither
  * possible (SQLite cannot bind an identifier / a CASE branch) nor needed.
+ *
+ * Reused by dashboard-read.ts (Phase 8) — the single source for the card fuel
+ * line ORDER BY (exported so the dashboard card ranks fuel identically, no drift).
  */
-const RANK_CASE = `CASE kind
+export const RANK_CASE = `CASE kind
 ${FUEL_KIND_PRIORITY.map((kind, i) => `      WHEN '${kind}' THEN ${i}`).join("\n")}
       ELSE ${FUEL_KIND_PRIORITY.length}
     END`;
@@ -106,12 +109,32 @@ ${FUEL_KIND_PRIORITY.map((kind, i) => `      WHEN '${kind}' THEN ${i}`).join("\n
  * sole `?`-bound value. Returns `[]` for a contact with no eligible fuel. Pure
  * read — no transaction.
  */
+
+/**
+ * The three glanceable-projection exclusion predicates, as ONE reusable SQL
+ * fragment over the bare `kind` / `source` / `text` columns of a single `fuel`
+ * table (or a subquery selecting from `fuel` with no alias):
+ *
+ *   1. `kind != 'off_limits'`  — private notes never reach a glanceable surface.
+ *   2. `source != 'ai'`        — an unconfirmed AI proposal never reads as fact.
+ *   3. non-blank text          — the extended-charset TRIM/NULLIF drop of a
+ *      NULL/blank/whitespace-only row (VT 11, FF 12, NBSP 160 included), so a
+ *      blank row cannot top the ranking and render an empty strip.
+ *
+ * Reused by dashboard-read.ts (Phase 8) — the single source for the card fuel
+ * line + search exclusions. `RANKED_FUEL` below interpolates this constant so
+ * getRankedFuel and every dashboard reuse are LITERALLY the same predicate text
+ * (a parity test in fuel-read.test.ts guards against drift). Bare column names
+ * (no table prefix) keep it splice-able into any single-fuel-table subquery.
+ */
+export const RANKED_FUEL_EXCLUSIONS = `kind != 'off_limits'
+     AND source != 'ai'
+     AND NULLIF(TRIM(text, char(9) || char(10) || char(11) || char(12) || char(13) || char(160) || ' '), '') IS NOT NULL`;
+
 const RANKED_FUEL = `SELECT id, contact_id, kind, label, text, url, created_at, source
     FROM fuel
    WHERE contact_id = ?
-     AND kind != 'off_limits'
-     AND source != 'ai'
-     AND NULLIF(TRIM(text, char(9) || char(10) || char(11) || char(12) || char(13) || char(160) || ' '), '') IS NOT NULL
+     AND ${RANKED_FUEL_EXCLUSIONS}
    ORDER BY ${RANK_CASE}, created_at DESC, id DESC`;
 
 /**
@@ -143,8 +166,11 @@ export interface FuelSearchResult {
  *
  * ORDER MATTERS: escape the backslash FIRST (it is the escape char), THEN `%`
  * and `_` — otherwise the backslashes we add for `%`/`_` would be re-escaped.
+ *
+ * Reused by dashboard-read.ts (Phase 8) — the single LIKE escaper for the
+ * dashboard search term (exported so the card search escapes identically).
  */
-function escapeLike(term: string): string {
+export function escapeLike(term: string): string {
   return term.replace(/\\/g, "\\\\").replace(/%/g, "\\%").replace(/_/g, "\\_");
 }
 
