@@ -1,0 +1,99 @@
+/**
+ * Pure share-payload resolver — proof (CAP-02 / CAP-03).
+ *
+ * resolveCapturePayload(input) maps an incoming share payload to a fuel row's
+ * `{ displayText, url }` and recomposes the display text when the user adds an
+ * optional note (the `note — base` composition). EXPLICIT precedence, proven
+ * off-device (RESEARCH §Q6):
+ *   - base label = first non-blank of `title` (EXTRA_SUBJECT) then `text` (prose /
+ *     bare-URL fallback);
+ *   - `url` = `webUrl ?? null` — ALWAYS the canonical first-http match, NEVER
+ *     derived from or overwritten by prose/title/note;
+ *   - a non-blank note leads: `note — base`; the base is NEVER discarded;
+ *   - blank / whitespace-only display text normalizes to null at the boundary
+ *     (fuel-read's RANKED_FUEL_EXCLUSIONS drops blank text in-query).
+ */
+import { describe, expect, it } from "vitest";
+import { resolveCapturePayload } from "@/logic/capture-logic";
+
+describe("resolveCapturePayload — CAP-03 payload → { displayText, url } (Task 1)", () => {
+  it("bare URL + EXTRA_SUBJECT title (Chrome) → title is the display text, url is the URL", () => {
+    expect(
+      resolveCapturePayload({
+        text: "https://x.com/a",
+        webUrl: "https://x.com/a",
+        title: "Page Title",
+      }),
+    ).toEqual({ displayText: "Page Title", url: "https://x.com/a" });
+  });
+
+  it("bare URL, no title → the bare URL is the display text (fallback), url is the URL", () => {
+    expect(
+      resolveCapturePayload({ text: "https://x.com/a", webUrl: "https://x.com/a" }),
+    ).toEqual({ displayText: "https://x.com/a", url: "https://x.com/a" });
+  });
+
+  it("plain text selection → the text is the display text, url is null", () => {
+    expect(
+      resolveCapturePayload({ text: "call the plumber", webUrl: null }),
+    ).toEqual({ displayText: "call the plumber", url: null });
+  });
+
+  it("prose containing a URL → the whole prose is the display text, url is the first http match", () => {
+    expect(
+      resolveCapturePayload({
+        text: "great read https://x.com/a about foo",
+        webUrl: "https://x.com/a",
+      }),
+    ).toEqual({
+      displayText: "great read https://x.com/a about foo",
+      url: "https://x.com/a",
+    });
+  });
+
+  it("multi-URL prose → only the FIRST http match lands in url; the whole prose stays the display text", () => {
+    expect(
+      resolveCapturePayload({
+        text: "compare https://a.com/1 and https://b.com/2",
+        webUrl: "https://a.com/1",
+      }),
+    ).toEqual({
+      displayText: "compare https://a.com/1 and https://b.com/2",
+      url: "https://a.com/1",
+    });
+  });
+
+  it("whitespace-only text, no title → displayText null, url null (empty-payload defensive case)", () => {
+    expect(resolveCapturePayload({ text: "   ", webUrl: null })).toEqual({
+      displayText: null,
+      url: null,
+    });
+  });
+
+  it("extended-whitespace text (tab/VT/FF/NBSP) → displayText null (mirrors the fuel-read TRIM set)", () => {
+    expect(
+      resolveCapturePayload({ text: "\t ", webUrl: null }),
+    ).toEqual({ displayText: null, url: null });
+  });
+
+  it("title present but blank → falls back to the text as the base", () => {
+    expect(
+      resolveCapturePayload({ text: "the prose", webUrl: null, title: "   " }),
+    ).toEqual({ displayText: "the prose", url: null });
+  });
+
+  it("url is always webUrl ?? null — never derived from the title", () => {
+    expect(
+      resolveCapturePayload({
+        text: "https://x.com/a",
+        webUrl: null,
+        title: "Page Title",
+      }),
+    ).toEqual({ displayText: "Page Title", url: null });
+  });
+
+  it("is pure — same inputs yield a deep-equal output, never throws", () => {
+    const input = { text: "call the plumber", webUrl: null };
+    expect(resolveCapturePayload(input)).toEqual(resolveCapturePayload(input));
+  });
+});
