@@ -433,7 +433,7 @@ Recorded here because they bind phases that do not own them. Every planner/execu
   3. No decay notification fires for never-contacted/snoozed/rogue/Rarely-responds/muted; a user can permanently mute a still-decaying contact; birthday notifications fire day-of for non-archived contacts.
   4. `POST_NOTIFICATIONS` is asked at a value moment; master + per-type toggles + private-by-default lock-screen visibility work; denial degrades to in-app.
 
-**Plans:** 8/13 plans executed
+**Plans:** 9/13 plans executed
 
 Plans:
 **Wave 1**
@@ -453,7 +453,7 @@ Plans:
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
-- [ ] 11-10-PLAN.md — notification-schedule reconcile diff + launch-sweep registration
+- [x] 11-10-PLAN.md — notification-schedule reconcile diff + launch-sweep registration
 - [ ] 11-12-PLAN.md — Notification tap routing: pure resolver + response gate (body→Compose/Profile)
 
 **Wave 4** *(blocked on Wave 3 completion)*
@@ -548,7 +548,7 @@ Plans:
 | 8. Dashboard & Never-Contacted Screen | 10/10 | Complete   | 2026-08-16 |
 | 9. Compose Screen & SMS Handoff | 2/2 | Complete   | 2026-08-16 |
 | 10. Share-Sheet Capture | 6/6 | Complete   | 2026-08-16 |
-| 11. Actionable Notifications | 8/13 | In Progress|  |
+| 11. Actionable Notifications | 9/13 | In Progress|  |
 | 12. Home Screen Widget | 0/TBD | Not started | - |
 | 13. Orrery | 0/TBD | Not started | - |
 | 14. AI Message Suggestions | 0/TBD | Not started | - |
