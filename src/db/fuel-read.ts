@@ -140,10 +140,7 @@ export interface FuelSearchResult {
  * and `_` — otherwise the backslashes we add for `%`/`_` would be re-escaped.
  */
 function escapeLike(term: string): string {
-  return term
-    .replace(/\\/g, "\\\\")
-    .replace(/%/g, "\\%")
-    .replace(/_/g, "\\_");
+  return term.replace(/\\/g, "\\\\").replace(/%/g, "\\%").replace(/_/g, "\\_");
 }
 
 /**
