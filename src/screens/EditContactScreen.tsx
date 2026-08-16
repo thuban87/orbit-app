@@ -62,6 +62,7 @@ import type { CustomFieldDef } from "@/db/field-types";
 import { defsForEditForm } from "@/db/field-values-dao";
 import { newUid } from "@/db/uid";
 import type { RootStackScreenProps } from "@/navigation/types";
+import { reconcileSchedule } from "@/services/notifications/notification-schedule";
 import { deletePhoto } from "@/services/photos/photo-storage";
 import { takeStagedPhotos } from "@/stores/photo-result-store";
 import { useTheme } from "@/theme";
@@ -331,6 +332,22 @@ export function EditContactScreen({
       // Custom values (incl. any cv- photo path) are now COMMITTED — update the
       // orphan-cleanup baseline so the teardown reconcile keeps the saved photo.
       committedValuesRef.current = { ...form.values };
+
+      // RECONCILE-AFTER-SAVE (review item B): reminders_off + interval_days are
+      // now persisted (updateContactFull committed above). After H5/A a future
+      // decay notification is pre-parked per eligible contact, so muting a contact
+      // or changing its interval must cancel/re-arm the OS schedule IMMEDIATELY —
+      // the launch-only reconcile would let the stale notification fire first
+      // (NOTIF-03). Fire-and-forget + Logger-guarded: it must NOT block the save or
+      // the navigation, and a stale/purged row or OS hiccup must not surface as an
+      // unhandled rejection. Placed here so it runs on a successful metadata commit
+      // even if the later links diff fails (the mute/interval change is already
+      // persisted). reconcileSchedule is self-coordinating (concurrent calls
+      // coalesce), and the app is alive here so channels exist — a full reconcile
+      // is safe, exactly as the settings-change reconcile does.
+      void reconcileSchedule(getExecutor()).catch((e) =>
+        Logger.error(LOG_SCOPE, "reconcile after edit-save failed", e),
+      );
 
       // Metadata (incl. the first interaction) is now COMMITTED and last_contact
       // is set. Clear the never-contacted first-interaction intent in LOCAL STATE
@@ -679,17 +696,20 @@ export function EditContactScreen({
       <View style={styles.field}>
         <View style={styles.toggleRow}>
           <Text style={[styles.toggleLabel, { color: colors.textPrimary }]}>
-            Turn off reminders
+            Mute reminders
           </Text>
           <Switch
             testID="edit-contact-reminders-off"
-            accessibilityLabel="Turn off reminders"
+            accessibilityLabel="Mute reminders"
             value={form.remindersOff === 1}
             onValueChange={(v) => setField("remindersOff", v ? 1 : 0)}
             trackColor={{ false: colors.border, true: colors.accent }}
             thumbColor={colors.surfaceElevated}
           />
         </View>
+        <Text style={[styles.helper, { color: colors.textSecondary }]}>
+          Keep them in Orbit, but never get reminders about them.
+        </Text>
       </View>
 
       {/* -- Custom block: EVERY non-quarantined field, AFTER the fixed block -- */}
