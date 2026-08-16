@@ -11,11 +11,13 @@
  */
 import { beforeEach, describe, expect, it } from "vitest";
 import { nodeSqliteExecutor, openTestDb } from "@/db/__testkit__/node-sqlite";
+import type { FuelKind } from "@/db/fuel-dao";
 import { addFuel } from "@/db/fuel-dao";
-import { listFuelForEditor } from "@/db/fuel-read";
+import { getRankedFuel, listFuelForEditor } from "@/db/fuel-read";
 import { migration001 } from "@/db/migrations/001-initial";
 import { runMigrations } from "@/db/migrations/runner";
 import type { SqlExecutor } from "@/db/types";
+import { compareFuel } from "@/services/fuel-ranking";
 
 const NOW = "2026-08-15 12:00:00";
 
@@ -139,5 +141,199 @@ describe("listFuelForEditor — all kinds incl off_limits, newest-first, isolate
     const c = await seedContact();
     const rows = await listFuelForEditor(exec, c);
     expect(rows).toEqual([]);
+  });
+});
+
+/** Insert one fuel row against `c` and return its rowid + the fields we ranked on. */
+async function addRow(
+  c: number,
+  row: {
+    kind: FuelKind;
+    created_at: string;
+    source?: string;
+    text?: string | null;
+  },
+): Promise<{
+  id: number;
+  kind: FuelKind;
+  created_at: string;
+  source: string;
+  text: string | null;
+}> {
+  const source = row.source ?? "user";
+  const text = row.text === undefined ? "some text" : row.text;
+  const id = await addFuel(exec, {
+    uid: uid(),
+    contactId: c,
+    kind: row.kind,
+    text,
+    createdAt: row.created_at,
+    source,
+    now: NOW,
+  });
+  return { id, kind: row.kind, created_at: row.created_at, source, text };
+}
+
+/** Every non-empty subset of the 5 kinds — for the off_limits absence sweep. */
+function nonEmptySubsets<T>(items: readonly T[]): T[][] {
+  const out: T[][] = [];
+  for (let mask = 1; mask < 1 << items.length; mask++) {
+    const subset: T[] = [];
+    for (let i = 0; i < items.length; i++) {
+      if (mask & (1 << i)) subset.push(items[i]);
+    }
+    out.push(subset);
+  }
+  return out;
+}
+
+describe("getRankedFuel — off_limits / source='ai' / blank excluded in-query, ranked", () => {
+  const ALL_KINDS: readonly FuelKind[] = [
+    "recent",
+    "gift",
+    "topic",
+    "fact",
+    "off_limits",
+  ];
+
+  it("NEVER returns an off_limits row, for EVERY kind-population combination", async () => {
+    // A separate contact per subset — a clean absence sweep across all 31
+    // non-empty combinations of which kinds are populated.
+    for (const subset of nonEmptySubsets(ALL_KINDS)) {
+      const c = await seedContact();
+      for (const kind of subset) {
+        await addRow(c, { kind, created_at: "2026-08-12 09:00:00" });
+      }
+      const rows = await getRankedFuel(exec, c);
+      expect(rows.some((r) => r.kind === "off_limits")).toBe(false);
+      // Every non-off_limits kind in the subset survives (all non-blank, user).
+      const expected = subset.filter((k) => k !== "off_limits").length;
+      expect(rows.length).toBe(expected);
+    }
+  });
+
+  it("excludes an unconfirmed source='ai' row; a confirmed source='manual' row ranks", async () => {
+    const c = await seedContact();
+    await addRow(c, {
+      kind: "recent",
+      created_at: "2026-08-14 09:00:00",
+      source: "ai",
+      text: "AI GUESS",
+    });
+    const manual = await addRow(c, {
+      kind: "topic",
+      created_at: "2026-08-10 09:00:00",
+      source: "manual",
+      text: "confirmed",
+    });
+    const rows = await getRankedFuel(exec, c);
+    expect(rows.some((r) => r.source === "ai")).toBe(false);
+    expect(rows.map((r) => r.id)).toEqual([manual.id]);
+    expect(rows[0]?.text).toBe("confirmed");
+  });
+
+  it("also excludes source='share' never — 'user'/'manual'/'share' all rank", async () => {
+    const c = await seedContact();
+    const u = await addRow(c, {
+      kind: "recent",
+      created_at: "2026-08-14 09:00:00",
+      source: "user",
+    });
+    const s = await addRow(c, {
+      kind: "gift",
+      created_at: "2026-08-13 09:00:00",
+      source: "share",
+    });
+    const m = await addRow(c, {
+      kind: "topic",
+      created_at: "2026-08-12 09:00:00",
+      source: "manual",
+    });
+    const rows = await getRankedFuel(exec, c);
+    // recent > gift > topic by kind priority.
+    expect(rows.map((r) => r.id)).toEqual([u.id, s.id, m.id]);
+  });
+
+  it("ranks a week-old `recent` ABOVE a day-old `fact` (kind beats recency)", async () => {
+    const c = await seedContact();
+    const fact = await addRow(c, {
+      kind: "fact",
+      created_at: "2026-08-14 09:00:00",
+    });
+    const recent = await addRow(c, {
+      kind: "recent",
+      created_at: "2026-08-08 09:00:00",
+    });
+    const rows = await getRankedFuel(exec, c);
+    expect(rows.map((r) => r.id)).toEqual([recent.id, fact.id]);
+  });
+
+  it("a NULL / blank / whitespace-only top-priority row is NOT rows[0] (MEDIUM-3)", async () => {
+    const c = await seedContact();
+    // Newest + highest priority BUT blank/NULL/whitespace text → must be skipped.
+    await addRow(c, {
+      kind: "recent",
+      created_at: "2026-08-15 09:00:00",
+      text: null,
+    });
+    await addRow(c, {
+      kind: "recent",
+      created_at: "2026-08-15 08:00:00",
+      text: "   \n\t  ",
+    });
+    const usable = await addRow(c, {
+      kind: "gift",
+      created_at: "2026-08-10 09:00:00",
+      text: "real gift idea",
+    });
+    const rows = await getRankedFuel(exec, c);
+    expect(rows.map((r) => r.id)).toEqual([usable.id]);
+    expect(rows[0]?.text).toBe("real gift idea");
+    // But the editor read still surfaces ALL rows, blanks included (unchanged).
+    const editor = await listFuelForEditor(exec, c);
+    expect(editor.length).toBe(3);
+  });
+
+  it("SQL order == compareFuel order over an ELIGIBLE-only fixture (parity, MEDIUM-5)", async () => {
+    const c = await seedContact();
+    // A mixed fixture spanning kinds, sources, dates, ties, and excluded rows.
+    const inserted = [
+      await addRow(c, { kind: "fact", created_at: "2026-08-14 09:00:00" }),
+      await addRow(c, { kind: "recent", created_at: "2026-08-08 09:00:00" }),
+      await addRow(c, { kind: "recent", created_at: "2026-08-12 09:00:00" }),
+      await addRow(c, { kind: "gift", created_at: "2026-08-12 09:00:00" }),
+      await addRow(c, { kind: "topic", created_at: "2026-08-12 09:00:00" }),
+      // Same kind + same created_at → id DESC tiebreak.
+      await addRow(c, { kind: "topic", created_at: "2026-08-12 09:00:00" }),
+      // Excluded rows — must be dropped from BOTH sides before comparing.
+      await addRow(c, {
+        kind: "off_limits",
+        created_at: "2026-08-15 09:00:00",
+      }),
+      await addRow(c, {
+        kind: "recent",
+        created_at: "2026-08-15 10:00:00",
+        source: "ai",
+      }),
+      await addRow(c, {
+        kind: "recent",
+        created_at: "2026-08-15 11:00:00",
+        text: "  ",
+      }),
+    ];
+
+    // Derive the eligible set with the SAME predicate getRankedFuel applies.
+    const eligible = inserted.filter(
+      (r) =>
+        r.kind !== "off_limits" &&
+        r.source !== "ai" &&
+        r.text !== null &&
+        r.text.trim() !== "",
+    );
+    const expectedIds = [...eligible].sort(compareFuel).map((r) => r.id);
+
+    const rows = await getRankedFuel(exec, c);
+    // Compare the SAME row set on both sides (never the full mixed fixture).
+    expect(rows.map((r) => r.id)).toEqual(expectedIds);
   });
 });
