@@ -452,6 +452,23 @@ export function HomeScreen() {
       testID="dashboard-root"
       style={[styles.root, { backgroundColor: colors.background }]}
     >
+      {/* Owner-approved addition (beyond the plan text): a Settings entry — the
+          08-07 dashboard rewrite dropped the placeholder's Settings row, leaving
+          the (existing) Settings route UI-unreachable. A minimal top-right gear
+          restores reach; exact styling is the owner's later design pass. */}
+      <View style={styles.topBar}>
+        <Pressable
+          testID="dashboard-settings-entry"
+          accessibilityRole="button"
+          accessibilityLabel="Settings"
+          onPress={() => navigation.navigate("Settings")}
+          style={styles.settingsEntry}
+        >
+          <Text style={[styles.settingsGlyph, { color: colors.textSecondary }]}>
+            ⚙
+          </Text>
+        </Pressable>
+      </View>
       <FlatList
         data={error ? [] : rows}
         keyExtractor={(item) => String(item.id)}
@@ -489,6 +506,23 @@ export function HomeScreen() {
 const styles = StyleSheet.create({
   root: {
     flex: 1,
+  },
+  topBar: {
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    paddingTop: 8,
+  },
+  settingsEntry: {
+    minHeight: 44,
+    minWidth: 44,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  settingsGlyph: {
+    fontSize: 22,
+    fontWeight: "600",
   },
   content: {
     padding: 16,
