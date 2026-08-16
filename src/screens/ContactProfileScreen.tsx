@@ -37,6 +37,7 @@ import {
 import { GravityBar } from "@/components/GravityBar";
 import { IntensityLine } from "@/components/IntensityLine";
 import { OverflowMenu } from "@/components/OverflowMenu";
+import { RankedFuelLine } from "@/components/RankedFuelLine";
 import { TimelineRow } from "@/components/TimelineRow";
 import {
   TouchpointRefineForm,
@@ -51,7 +52,11 @@ import {
 import { archiveContact } from "@/db/contacts-dao";
 import { getExecutor, localDateTime } from "@/db/database";
 import { addFuel, deleteFuel, editFuel } from "@/db/fuel-dao";
-import { type FuelItem, listFuelForEditor } from "@/db/fuel-read";
+import {
+  type FuelItem,
+  getRankedFuel,
+  listFuelForEditor,
+} from "@/db/fuel-read";
 import { getImpactInputs } from "@/db/impact-read";
 import {
   deleteTouchpoint,
@@ -115,6 +120,12 @@ export function ContactProfileScreen({
   // fuel-read choke point (all kinds incl off_limits, newest-first). Editing is
   // in-place and immediate: every add/edit/delete writes then re-runs load().
   const [fuel, setFuel] = useState<FuelItem[]>([]);
+  // The single ranked projection (FUEL-03) — kind priority then recency, with
+  // off_limits / unconfirmed source='ai' / blank text excluded IN-QUERY by
+  // getRankedFuel. rankedFuel[0] is the one promoted line rendered above the
+  // editor; it is recomputed by the SAME unified load() on every fuel mutation
+  // (no second ranking in the UI). Empty when there is no rankable fuel.
+  const [rankedFuel, setRankedFuel] = useState<FuelItem[]>([]);
   // Query-time status + rogue reason (DERIVED-NEVER-STORED). null for a
   // never-contacted contact — see getContactStatus's NULL guard.
   const [status, setStatus] = useState<ContactStatusRow | null>(null);
@@ -145,17 +156,20 @@ export function ContactProfileScreen({
   const load = useCallback(async () => {
     try {
       const exec = getExecutor();
-      const [row, rows, statusRow, impactInputs, fuelRows] = await Promise.all([
-        getContactHeader(exec, contactId),
-        listTimeline(exec, contactId),
-        getContactStatus(exec, contactId),
-        getImpactInputs(exec, contactId),
-        listFuelForEditor(exec, contactId),
-      ]);
+      const [row, rows, statusRow, impactInputs, fuelRows, rankedFuelRows] =
+        await Promise.all([
+          getContactHeader(exec, contactId),
+          listTimeline(exec, contactId),
+          getContactStatus(exec, contactId),
+          getImpactInputs(exec, contactId),
+          listFuelForEditor(exec, contactId),
+          getRankedFuel(exec, contactId),
+        ]);
       setHeader(row);
       setTimeline(rows);
       setStatus(statusRow);
       setFuel(fuelRows);
+      setRankedFuel(rankedFuelRows);
       // Derive gravity AND intensity from the SAME impact inputs (read once so
       // they can never disagree); hide both until there is interaction history.
       // localDateTime() is captured once so both derivations share one "now".
@@ -546,9 +560,19 @@ export function ContactProfileScreen({
         <Text style={[styles.sectionHeading, { color: colors.textSecondary }]}>
           Conversational Fuel
         </Text>
+        {/* The one ranked projection (FUEL-03): the top-ranked item's text as a
+            promoted line above the editor. Renders nothing when there is no
+            rankable fuel; rankedFuel[0] is guaranteed non-blank by getRankedFuel,
+            so the strip never renders empty over a real row. Refreshes with every
+            fuel mutation via the SINGLE unified load() — no second ranking here. */}
+        <RankedFuelLine
+          testID="contact-profile-fuel-ranked"
+          text={rankedFuel[0]?.text}
+        />
         <FuelEditor
           testID="contact-profile-fuel-editor"
           items={fuel}
+          now={localDateTime()}
           onAdd={(draft) => void doAddFuel(draft)}
           onEdit={(id, patch) => void doEditFuel(id, patch)}
           onDelete={doDeleteFuel}

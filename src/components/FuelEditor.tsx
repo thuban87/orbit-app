@@ -53,6 +53,7 @@ import {
 } from "react-native";
 import type { FuelKind } from "@/db/fuel-dao";
 import type { FuelItem } from "@/db/fuel-read";
+import { formatFuelAge } from "@/services/fuel-age";
 import { useTheme } from "@/theme";
 import { normaliseLinkUrl } from "./LinksEditor";
 
@@ -96,6 +97,8 @@ export interface FuelEditPatch {
 
 export interface FuelEditorProps {
   items: FuelItem[];
+  /** Local wall-clock now (caller-supplied `localDateTime()`) — for row age. */
+  now: string;
   onAdd: (draft: FuelDraft) => void;
   onEdit: (id: number, patch: FuelEditPatch) => void;
   onDelete: (id: number) => void;
@@ -210,11 +213,13 @@ function KindPicker({
 function FuelRow({
   item,
   index,
+  now,
   onEdit,
   onDelete,
 }: {
   item: FuelItem;
   index: number;
+  now: string;
   onEdit: (id: number, patch: FuelEditPatch) => void;
   onDelete: (id: number) => void;
 }) {
@@ -247,6 +252,14 @@ function FuelRow({
           value={item.kind}
           onSelect={(kind) => onEdit(item.id, { kind })}
         />
+        {/* Fuel age (FUEL-04) — DISPLAY + rank only; never hides/deletes a row.
+            Persisted rows carry a real created_at; the draft row omits it. */}
+        <Text
+          testID={`fuel-editor-age-${index}`}
+          style={[styles.age, { color: colors.textSecondary }]}
+        >
+          {formatFuelAge(item.created_at, now)}
+        </Text>
         <Pressable
           testID={`fuel-editor-remove-${index}`}
           accessibilityRole="button"
@@ -475,6 +488,7 @@ function DraftRow({
 
 export function FuelEditor({
   items,
+  now,
   onAdd,
   onEdit,
   onDelete,
@@ -503,6 +517,7 @@ export function FuelEditor({
             key={item.id}
             item={item}
             index={index}
+            now={now}
             onEdit={onEdit}
             onDelete={onDelete}
           />
@@ -581,6 +596,11 @@ const styles = StyleSheet.create({
     minWidth: 44,
     justifyContent: "center",
     alignItems: "center",
+  },
+  age: {
+    fontSize: 13,
+    fontWeight: "600",
+    textAlign: "right",
   },
   removeBtn: {
     minHeight: 44,
