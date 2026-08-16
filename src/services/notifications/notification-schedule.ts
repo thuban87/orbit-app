@@ -265,6 +265,14 @@ function buildBirthdayRequest(
     now,
   );
 
+  // A birthday is date-specific: nextAllowedFireInstant rolls a past/quiet slot
+  // to the NEXT day (correct for decay's date-agnostic re-nag, wrong here). If
+  // the roll moved the slot off the birthday day, do NOT fire a day late with
+  // "It's {name}'s birthday today." copy — skip this occurrence entirely.
+  if (formatLocalDate(fireInstant) !== formatLocalDate(nextBday)) {
+    return null;
+  }
+
   const occurrenceKey = formatLocalDate(fireInstant);
   return {
     identifier: birthdayIdentifier(c.id),

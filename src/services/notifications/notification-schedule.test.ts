@@ -396,6 +396,68 @@ describe("reconcileSchedule — malformed birthday guard (item E)", () => {
 });
 
 // ============================================================================
+// BIRTHDAY same-day-only (CR-01) — a date-specific birthday fires on the
+// birthday morning or NOT AT ALL; it must never roll to the next day and fire
+// a day late with "It's {name}'s birthday today." copy.
+// ============================================================================
+
+describe("reconcileSchedule — birthday must not roll off its own day (CR-01)", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("does NOT schedule a birthday whose 9am slot already passed today (afternoon)", async () => {
+    // Freeze the clock to 15:00 local on the birthday — today's 9am delivery
+    // slot is already in the past, so nextAllowedFireInstant would roll it to
+    // TOMORROW 09:00 while keeping the "today" body. The fix skips it instead.
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 7, 16, 15, 0, 0));
+
+    await enable(); // default deliveryHour = 9
+    const id = await seedContact({
+      name: "Afternoon Amy",
+      lastContact: null, // birthday-only (excluded from decay)
+      birthday: birthdayMMDD(0), // birthday is TODAY
+    });
+
+    await reconcileSchedule(exec);
+
+    // No birthday notification at all — and specifically no wrong-day "today"
+    // alert scheduled for tomorrow.
+    expect(scheduledFor(birthdayIdentifier(id))).toBeUndefined();
+    expect(recorded().some((r) => r.content.data?.kind === "birthday")).toBe(
+      false,
+    );
+  });
+
+  it("schedules a today birthday normally when its 9am slot is still ahead (morning)", async () => {
+    // Freeze the clock to 06:00 local on the birthday — today's 9am delivery
+    // slot is still in the future, so it schedules on the birthday morning.
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 7, 16, 6, 0, 0));
+
+    await enable(); // default deliveryHour = 9
+    const id = await seedContact({
+      name: "Morning Mo",
+      lastContact: null,
+      birthday: birthdayMMDD(0), // birthday is TODAY
+    });
+
+    await reconcileSchedule(exec);
+
+    const req = scheduledFor(birthdayIdentifier(id));
+    expect(req).toBeDefined();
+    // Fires TODAY at 9am (the birthday day), not rolled to tomorrow.
+    expectFireDayHour(req, dayAhead(0), 9);
+    expect(req?.content.body).toBe(birthdayBody("Morning Mo"));
+    expect(req?.content.data).toMatchObject({
+      kind: "birthday",
+      contactId: id,
+    });
+  });
+});
+
+// ============================================================================
 // STALE CANCEL + full-request diff (H3 + items C/F).
 // ============================================================================
 
