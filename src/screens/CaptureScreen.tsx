@@ -9,28 +9,49 @@
  *   - The payload is drained from `useShareIntentContext()` and resolved ONCE via
  *     `resolveCapturePayload` (the pure 10-02 resolver) into `{ displayText, url }`.
  *     The url column is ALWAYS canonical and NEVER opened during capture (store
- *     only — no Linking.openURL anywhere in this file, T-10-01/T-10-05).
+ *     only — the screen never navigates to or opens the url, T-10-01/T-10-05).
+ *   - A single tap writes the fuel row IMMEDIATELY (kind='topic', source='share'),
+ *     BEFORE any prompt — `resetOnBackground` kills an un-written payload, so the
+ *     write must not wait behind the optional note (T-10-04 / D-CAP write-on-pick).
+ *   - Capture writes ONLY fuel. It NEVER touches `contacts.last_contact` or writes
+ *     an interaction row — capture is not a touchpoint (DATA-04 single-writer).
+ *   - The commit is guarded by `isCommittingRef` (set BEFORE the first `await`,
+ *     cleared in `finally`) and the faces disable while committing, so a rapid
+ *     double-tap cannot write two rows (B2). A SINGLE `localDateTime()` stamp is
+ *     reused for createdAt + now (A10).
+ *   - The returned rowid + contactId are retained in `writtenRows` so the optional
+ *     note (10-06) can `editFuel` the exact row by id + contactId — there is NO
+ *     uid-based fuel lookup (A1/A2).
+ *   - Confirmation ("Saved to {name}") + auto-return use setState + a `useRef`
+ *     setTimeout — NEVER a per-frame React-state animation (CLAUDE.md). The timer
+ *     is cleared on unmount and cancelled the moment the note affordance is touched.
  *   - Close / system Back cancels WITHOUT writing — resetShareIntent() then
  *     finishActivity() (the native module from 10-01) returns to the source app.
  *   - Every colour resolves through `useTheme().colors.*` — zero hex literals
  *     (CLAUDE.md / check:colors). `Avatar` is used verbatim (size 64,
  *     cacheBust=modified_at) — its recyclingKey anti-face-flash is a correctness
  *     requirement in the recycling grid.
- *
- * The single-tap commit (write the fuel row + confirmation + auto-return) is wired
- * in Task 2 of this plan; this task renders the picker and registers the route.
  * =============================================================================
  */
 import { useFocusEffect } from "@react-navigation/native";
 import { useShareIntentContext } from "expo-share-intent";
-import { useCallback, useMemo, useState } from "react";
-import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  Alert,
+  FlatList,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
 import { Avatar } from "@/components/Avatar";
 import {
   type CapturePickRow,
   listCapturePickContacts,
 } from "@/db/capture-read";
-import { getExecutor } from "@/db/database";
+import { getExecutor, localDateTime } from "@/db/database";
+import { addFuel } from "@/db/fuel-dao";
+import { newUid } from "@/db/uid";
 import { resolveCapturePayload } from "@/logic/capture-logic";
 import type { RootStackScreenProps } from "@/navigation/types";
 import { useTheme } from "@/theme";
@@ -38,6 +59,17 @@ import { Logger } from "@/utils/logger";
 import { finishActivity } from "../../modules/orbit-share-finish";
 
 const LOG_SCOPE = "capture";
+
+/**
+ * How long the "Saved to {name}" confirmation shows before Orbit finishes back to
+ * the source app (the brief-toast-then-return lock, CONTEXT #3). A single-number
+ * tunable per CLAUDE.md — touching the note affordance cancels this timer entirely
+ * so the note is never rushed.
+ */
+const AUTO_RETURN_MS = 1500;
+
+/** One fuel row written by the single-tap commit, retained for the 10-06 note. */
+type WrittenRow = { id: number; contactId: number };
 
 /** The recycling-grid cell union: a real face, or the always-present ＋ tile. */
 type GridItem = { kind: "face"; row: CapturePickRow } | { kind: "new" };
@@ -72,6 +104,21 @@ export function CaptureScreen(_props: RootStackScreenProps<"Capture">) {
   );
 
   const [rows, setRows] = useState<CapturePickRow[]>([]);
+  // The just-written rows, retained so the 10-06 note can editFuel the exact row by
+  // id + contactId (A1/A2). Set the instant the single-tap write resolves.
+  const [writtenRows, setWrittenRows] = useState<WrittenRow[]>([]);
+  // Drives the confirmation surface + face-tile disabling. `committing` disables the
+  // grid while a write is in flight; `savedName` (non-null) shows "Saved to {name}".
+  const [committing, setCommitting] = useState(false);
+  const [savedName, setSavedName] = useState<string | null>(null);
+
+  // In-flight latch for the single-tap commit (B2). A ref (not state) so the guard
+  // is synchronous — set BEFORE the first await, cleared in finally — and a rapid
+  // double-tap that fires before a re-render still early-returns.
+  const isCommittingRef = useRef(false);
+  // The auto-return timer id; cleared on unmount and cancelled when the note
+  // affordance is touched (setState + setTimeout, never a per-frame animation).
+  const returnTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Cancel the share and return to the source app WITHOUT writing. (The focused
   // hardware/system-Back handler is formalized in 10-06's shared close handler, A6;
@@ -102,6 +149,73 @@ export function CaptureScreen(_props: RootStackScreenProps<"Capture">) {
       };
     }, []),
   );
+
+  // Clear a pending auto-return timer on unmount (no finish/setState after teardown).
+  useEffect(() => {
+    return () => {
+      if (returnTimer.current) {
+        clearTimeout(returnTimer.current);
+        returnTimer.current = null;
+      }
+    };
+  }, []);
+
+  // Single-tap commit — write ONE fuel row immediately, then confirm + auto-return.
+  // Guarded against a rapid double-tap by `isCommittingRef` (set before the first
+  // await, cleared in finally) AND the `committing` state disabling the faces (B2).
+  const onPickFace = useCallback(
+    async (row: CapturePickRow) => {
+      if (isCommittingRef.current) {
+        return;
+      }
+      isCommittingRef.current = true;
+      setCommitting(true);
+      try {
+        // ONE stamp reused for createdAt + now (A10) — not two independent calls.
+        const stamp = localDateTime();
+        const fuelId = await addFuel(getExecutor(), {
+          uid: newUid(),
+          contactId: row.id,
+          kind: "topic",
+          source: "share",
+          text: payload.displayText,
+          url: payload.url,
+          createdAt: stamp,
+          now: stamp,
+        });
+        // Retain the rowid + contactId for the 10-06 note recompose (A1/A2) — there
+        // is no uid-based fuel lookup; the note edits this exact row by id+contactId.
+        setWrittenRows([{ id: fuelId, contactId: row.id }]);
+        setSavedName(row.name);
+        // Arm the auto-return (setState + setTimeout, never a per-frame animation).
+        if (returnTimer.current) {
+          clearTimeout(returnTimer.current);
+        }
+        returnTimer.current = setTimeout(() => {
+          returnTimer.current = null;
+          resetShareIntent();
+          finishActivity();
+        }, AUTO_RETURN_MS);
+      } catch (err) {
+        Logger.error(LOG_SCOPE, "failed to write capture fuel", err);
+        // Leave the payload intact (still live until background) for a retry.
+        Alert.alert("Couldn't save", "Please try again.");
+      } finally {
+        isCommittingRef.current = false;
+        setCommitting(false);
+      }
+    },
+    [payload, resetShareIntent],
+  );
+
+  // Touching "Add a note" cancels the auto-return so the note is never rushed. The
+  // note field + its recompose write land in 10-06; here this is the timer cancel.
+  const onAddNote = useCallback(() => {
+    if (returnTimer.current) {
+      clearTimeout(returnTimer.current);
+      returnTimer.current = null;
+    }
+  }, []);
 
   // ---- Render --------------------------------------------------------------
 
@@ -194,8 +308,6 @@ export function CaptureScreen(_props: RootStackScreenProps<"Capture">) {
     </View>
   );
 
-  // The face tile's single-tap commit (onPress) is wired in Task 2; here the tiles
-  // render (faces, names, testIDs) so the grid + route are verifiable now.
   const renderItem = ({ item }: { item: GridItem }) => {
     if (item.kind === "new") {
       return (
@@ -224,6 +336,9 @@ export function CaptureScreen(_props: RootStackScreenProps<"Capture">) {
         testID={`capture-face-${row.id}`}
         accessibilityRole="button"
         accessibilityLabel={`Save to ${row.name}`}
+        accessibilityState={{ disabled: committing }}
+        disabled={committing}
+        onPress={() => void onPickFace(row)}
         style={styles.tile}
       >
         <Avatar
@@ -258,6 +373,37 @@ export function CaptureScreen(_props: RootStackScreenProps<"Capture">) {
         ListHeaderComponent={header}
         keyboardShouldPersistTaps="handled"
       />
+
+      {/* Confirmation + optional-note surface — "Saved to {name}" + the note
+          affordance (which cancels the auto-return). Shown via setState after the
+          write; the note field + recompose write land in 10-06, editing the exact
+          `writtenRows` row(s) by id + contactId. */}
+      {savedName !== null && writtenRows.length > 0 ? (
+        <View
+          style={[
+            styles.confirmSurface,
+            { backgroundColor: colors.surface, borderColor: colors.border },
+          ]}
+        >
+          <Text
+            testID="capture-confirmation-toast"
+            style={[styles.confirmText, { color: colors.textPrimary }]}
+          >
+            Saved to {savedName}
+          </Text>
+          <Pressable
+            testID="capture-note-affordance"
+            accessibilityRole="button"
+            accessibilityLabel="Add a note"
+            onPress={onAddNote}
+            style={styles.noteAffordance}
+          >
+            <Text style={[styles.noteAffordanceText, { color: colors.accent }]}>
+              Add a note
+            </Text>
+          </Pressable>
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -353,5 +499,30 @@ const styles = StyleSheet.create({
   errorText: {
     fontSize: 24,
     fontWeight: "700",
+  },
+  confirmSurface: {
+    position: "absolute",
+    left: 16,
+    right: 16,
+    bottom: 16,
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 16,
+    gap: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  confirmText: {
+    fontSize: 13,
+    fontWeight: "600",
+  },
+  noteAffordance: {
+    minHeight: 44,
+    justifyContent: "center",
+  },
+  noteAffordanceText: {
+    fontSize: 16,
+    fontWeight: "600",
   },
 });
