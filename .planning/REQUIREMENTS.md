@@ -83,7 +83,7 @@ roadmap phases. Items marked *(infra)* are foundation guarantees rather than end
 
 - [x] **DASH-01**: The dashboard is the app's home screen: a flat list excluding never-contacted, archived, and currently-snoozed contacts, status-sorted by default with name / least-recent / most-recent options.
 - [x] **DASH-02**: A user can filter by needs-attention, category, social battery, favourites, and a snoozed segment, and search by name+fuel.
-- [ ] **DASH-03**: Each card carries avatar (themed fallback), status ring (incl. the rogue visual), name, a required one-line fuel preview, a category label, and a favourite marker — nothing log-derived.
+- [x] **DASH-03**: Each card carries avatar (themed fallback), status ring (incl. the rogue visual), name, a required one-line fuel preview, a category label, and a favourite marker — nothing log-derived.
 - [x] **DASH-04**: A "Not yet contacted (N)" sibling screen that renders fuel and a count-less "Archived" entry are reachable from the dashboard; the snoozed segment shows a count.
 - [x] **DASH-05**: A 7-day birthday banner (soonest-first, tap→profile) shows for any non-archived contact — overriding snooze/never-contacted suppression — using the single birthday parser with the day-of-drop and Feb-29 bugs fixed.
 - [x] **DASH-06**: A user can mark a favourite via a profile star and order favourites by drag on a shared "Manage favourites" screen.
