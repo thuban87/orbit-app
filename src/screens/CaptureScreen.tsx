@@ -253,6 +253,14 @@ export function CaptureScreen(_props: RootStackScreenProps<"Capture">) {
   // the first await, cleared in finally) AND `committing` disabling the faces (B2).
   const onPickFace = useCallback(
     async (row: CapturePickRow) => {
+      // WR-01: once a commit has landed the confirmation surface + auto-return own
+      // the screen — the grid is locked (see `locked` in render). This early return
+      // is the defensive twin of that disable: a tap that slips through before the
+      // re-render must not write a SECOND row to a DIFFERENT contact during the
+      // ~1.5s auto-return window.
+      if (savedLabel !== null) {
+        return;
+      }
       if (isCommittingRef.current) {
         return;
       }
@@ -285,7 +293,7 @@ export function CaptureScreen(_props: RootStackScreenProps<"Capture">) {
         setCommitting(false);
       }
     },
-    [payload, armAutoReturn],
+    [payload, savedLabel, armAutoReturn],
   );
 
   // Long-press a face → enter multi-select with that face selected.
@@ -618,6 +626,13 @@ export function CaptureScreen(_props: RootStackScreenProps<"Capture">) {
     </View>
   );
 
+  // WR-01: the grid is inert once a write is in flight (`committing`) OR a commit has
+  // already landed (`savedLabel !== null`) — the confirmation surface + auto-return
+  // own the screen after a successful commit, so no further pick is allowed until
+  // return. This closes the ~1.5s window where a stray tap on a DIFFERENT face would
+  // otherwise write a second wrong-contact fuel row.
+  const locked = committing || savedLabel !== null;
+
   const renderItem = ({ item }: { item: GridItem }) => {
     if (item.kind === "new") {
       return (
@@ -625,7 +640,8 @@ export function CaptureScreen(_props: RootStackScreenProps<"Capture">) {
           testID="capture-new-contact-tile"
           accessibilityRole="button"
           accessibilityLabel="New contact"
-          disabled={committing}
+          accessibilityState={{ disabled: locked }}
+          disabled={locked}
           onPress={onOpenInlineCreate}
           style={[styles.tile, styles.newTile, { borderColor: colors.accent }]}
         >
@@ -651,8 +667,8 @@ export function CaptureScreen(_props: RootStackScreenProps<"Capture">) {
         accessibilityLabel={
           multiSelect ? `Select ${row.name}` : `Save to ${row.name}`
         }
-        accessibilityState={{ disabled: committing, selected: isSelected }}
-        disabled={committing}
+        accessibilityState={{ disabled: locked, selected: isSelected }}
+        disabled={locked}
         onPress={() => (multiSelect ? onToggleFace(row) : void onPickFace(row))}
         onLongPress={() => onLongPressFace(row)}
         style={[
