@@ -128,3 +128,66 @@ gaps in SQL projection and predicate text, each fixable with small edits before 
 incorporate all seven into the PLAN.md files, then re-review.
 
 **CYCLE_SUMMARY: current_high=2 current_actionable=5**
+
+---
+
+# Cross-AI Plan Review — Phase 8, Cycle 2 (re-review after fixes)
+
+Both reviewers re-verified the 6 revised plans against source. **All 7 Cycle-1 findings are RESOLVED**
+(HIGH-1 CASE-wrap + literal-null across all three never-contacted paths; HIGH-2 four-count first-run
+gate + pinned `countLiveContacts`; MEDIUM-1 strict leap-aware calendar validation; MEDIUM-2 unique +
+count-equality + scoped-UPDATE favourite-rank guard, no deadlock/TOCTOU; MEDIUM-3 `contact-read.ts`
+declared + all three `getContactHeader` callers verified additive-safe; LOW-1 qualified tiebreak; LOW-2
+term-wins precedence consistent across 08-01/08-09). Claude rated overall risk LOW; codex found three
+new second-order gaps the fixes exposed. Divergence is real reviewer value — the three below are
+codex-unique and legitimate.
+
+## New findings (Cycle 2)
+
+### MEDIUM-4 — Empty-state precedence is undefined once Plan 09 layers in filters/search
+**Reviewer: codex** · **08-07-PLAN.md:73** + **08-09-PLAN.md:76,101** vs **08-UI-SPEC.md:233**
+
+`selectDashboardEmptyState` (08-07) decides first-run / hidden / none from the aggregate population
+counts + `rowCount` only. But Plan 09 adds a category/favourites/battery filter and a live search term,
+each of which can legitimately yield zero rows while the populations are non-empty. With no precedence
+rule, a zero-result *filter* or *search* would fall through to the default hidden-population copy
+("Everyone's tucked away" / "{N} not yet contacted →") instead of the filter/search-specific empty state
+the UI-SPEC intends. **Fix:** define an explicit empty-state precedence — an active search term's empty
+state, then an active filter's empty state, then (only for the unfiltered default list) the
+population-count helper. Thread the active filter/term into the empty-state decision (08-07 helper input
+or a 08-09 wrapper) and test a zero-result category filter with a non-empty population.
+
+### MEDIUM-5 — `DashboardRow.status` type contradicts the HIGH-1 fix
+**Reviewer: codex** · **08-01-PLAN.md:127,132** vs **src/db/contact-status-read.ts:19** and **08-04-PLAN.md:78**
+
+The HIGH-1 fix makes `status`/`progress` NULL for never-contacted rows, but the `DashboardRow` type is
+described as `status (ProfileStatus)` — and `ProfileStatus` excludes null. The card already expects
+`ProfileStatus | null` (08-04-PLAN.md:78). Leaving the row type non-null forces a cast or a `tsc`
+failure. **Fix:** specify `DashboardRow.status: ProfileStatus | null` and `progress: number | null` in
+08-01.
+
+### MEDIUM-6 — A dual name-AND-fuel match renders a fuel snippet against the stated contract
+**Reviewer: codex** · **08-01-PLAN.md:129,140** vs **src/db/fuel-read.ts:176**
+
+The card contract says a *name* match has `snippet = null`, but the prescribed snippet subquery mirrors
+`searchFuel`, whose snippet runs whenever the fuel matches — so a contact matching BOTH name and fuel
+gets a snippet, contradicting the stated contract. **Fix:** either add a name-match guard so a
+name-only intent shows no snippet, OR update the contract to "snippet renders whenever the fuel text
+matches, regardless of a concurrent name match" and state it explicitly. Add a test for a both-fields
+match. (Low user impact; resolve the contract inconsistency.)
+
+## Advisory (Cycle 2, LOW — claude; noted, not blocking)
+- **A-1** — the `sort='status'` ORDER BY expression for now-NULL-status rows is left implicit; correct
+  iff the executor models `STATUS_SCAN`'s `ORDER BY progress DESC` (NULLs last), which the plan cites.
+  Pin it at execution/code-review, not a plan defect.
+- **A-2** — an empty `orderedIds` in `rewriteFavouriteRanks` is a silent no-op (0===0 passes both
+  guards, zero UPDATEs commit). Harmless and unreachable from the drag UI; acceptable as-is.
+
+## Consensus Summary (Cycle 2)
+**Overall risk: LOW–MEDIUM.** The seven Cycle-1 issues are genuinely and completely corrected against
+verified source; no fix introduced a HIGH regression. Three codex-unique second-order gaps remain
+(MEDIUM-4 empty-state precedence is the substantive one; MEDIUM-5 type consistency and MEDIUM-6 snippet
+contract are cheap consistency fixes). → one more `--reviews` pass to incorporate MEDIUM-4/5/6 (and pin
+A-1/A-2), then a final re-review.
+
+**CYCLE_SUMMARY: current_high=0 current_actionable=3**
