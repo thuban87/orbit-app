@@ -345,7 +345,9 @@ export function CaptureScreen(_props: RootStackScreenProps<"Capture">) {
       // optional note can recompose all N rows by id + contactId (A1).
       const written = await captureMultiAttach(getExecutor(), newRows);
       setWrittenRows(written);
-      setSavedLabel(`Saved to ${written.length} contacts`);
+      // SG-03: N=1 is reachable (long-press one face, immediately Done), so singularise.
+      const n = written.length;
+      setSavedLabel(`Saved to ${n} ${n === 1 ? "contact" : "contacts"}`);
       // Drop the multi-select bar; the confirmation surface takes over.
       setMultiSelect(false);
       setSelected(new Set());
