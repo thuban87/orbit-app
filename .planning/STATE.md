@@ -5,15 +5,15 @@ milestone_name: milestone
 current_phase: 7
 current_phase_name: Conversational Fuel
 status: ready
-stopped_at: Completed 07-02-PLAN.md (ranked projection + fuel age)
-last_updated: "2026-08-16T00:07:29.431Z"
+stopped_at: Completed 07-03-PLAN.md (AI-unconfirmed state + confirm-flip)
+last_updated: "2026-08-16T00:15:00.000Z"
 last_activity: 2026-08-15
-last_activity_desc: "Phase 7 execution — 07-02 complete (ranked projection + fuel age)"
+last_activity_desc: Completed 07-03-PLAN.md (confirmFuel source flip + AI-unconfirmed row treatment)
 progress:
   total_phases: 16
   completed_phases: 6
   total_plans: 46
-  completed_plans: 45
+  completed_plans: 46
   percent: 38
 ---
 
@@ -28,9 +28,9 @@ See: .planning/PROJECT.md (updated 2026-08-14)
 
 ## Current Position
 
-Phase: 7 (Conversational Fuel) — EXECUTING
-Next: on-device UAT on the Pixel (impact section: intensity beside gravity, profile-only, rarely-responds ignores non-connected) then `/gsd-verify-work 6`
-Last activity: 2026-08-15 — Phase 7 execution started
+Phase: 7 (Conversational Fuel) — EXECUTING (07-03 of 04 done)
+Next: execute 07-04-PLAN.md (fuel search), then on-device UAT on the Pixel (seed a source='ai' fuel row → verify Suggested-by-AI render, Confirm joins ranked line, Dismiss removes) + `/gsd-verify-work 7`
+Last activity: 2026-08-15 — Completed 07-03 (confirmFuel source flip + AI-unconfirmed row treatment)
 
 Progress: [████░░░░░░] 38% (6/16 phases complete)
 
@@ -98,6 +98,7 @@ Progress: [████░░░░░░] 38% (6/16 phases complete)
 | Phase 06 P05 | 18min | 3 tasks | 7 files |
 | Phase 06 P06 | 6min | 2 tasks | 5 files |
 | Phase 06 P06 | 6min | 2 tasks | 5 files |
+| Phase 07 P03 | 5min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -168,6 +169,7 @@ Foundational decisions affecting current work:
 - [Phase 06]: 06-06: intensity is DERIVED-NEVER-STORED, PROFILE-ONLY, and NEUTRAL — computeIntensity (pure, react-native-free, node-tested) counts direction outbound|mutual within one interval-length (INTENSITY_PERIOD_DAYS = interval_days via intensityPeriodDays(), A3 owner-approved), rarely_responds=1 additionally requires connected=1 (mirrors recency/gravity); inbound-only volume never raises currentCount. trailingAvgGapDays = mean consecutive gap over ALL qualifying history, SORTED ASCENDING before differencing (getImpactInputs delivers DESC), null when <2 rows (no divide-by-zero). computeContactIntensity orchestrates in impact.ts from the SAME getImpactInputs read gravity uses. IntensityLine renders a neutral rate + intended-frequency + trailing-average via colors.textPrimary/textSecondary ONLY (no danger/warning, no gravityTiers/rogue tokens), trailing clause omitted when null, neutral empty state; rendered BESIDE GravityBar in contact-profile-impact, never blended. Completes LOG-03 (both halves) and Phase 6 code
 - [Phase 06]: 06-02: events-dao is immutable insert-only (recordEvent/recordEventCore, no update path); archive/restore emit events composed inside their existing transaction, archived-state-guarded so a no-op/wrong-state transition throws and writes no spurious event; purge surfaces+deletes events; timeline UNION-ALL interleave keyed ${kind}-${id} with kind_order final tiebreak — LOG-02 events writer + read half; single-writer DATA-04 intact (no last_contact write added)
 - [Phase 7]: 07-01: fuel-read is the single projection read choke point (listFuelForEditor the ONLY read surfacing off_limits); FuelEditor controlled (draft=only local state, existing rows uncontrolled defaultValue+commit-on-blur); BLANK->NULL at onAdd/onEdit boundary; age/ranked-line/AI/search deferred to Plans 02-04
+- [Phase 7]: 07-03: confirming an AI-suggested fuel item (FUEL-06) is a SINGLE unconditional `UPDATE fuel SET source='manual', modified_at=? WHERE id=? AND contact_id=?` (both-keys assertOneChange), mirroring editFuel's mutexed-wrapper/non-mutexed-core split — NO migration, NO ai_confirmed_at column; provenance is INTENTIONALLY erased on confirm (locked owner decision 2026-08-15, RESEARCH Open Q1) — do NOT "restore provenance" as a later bug fix. "Unconfirmed AI" IS exactly source='ai'; getRankedFuel's existing source!='ai' exclusion is what confirmation lifts (row starts ranking only after the flip). FuelEditor renders source='ai' rows distinct (borderStrong + "Suggested by AI" pill + helper + Confirm(accent)/Dismiss(textSecondary), existing tokens only); Confirm→confirmFuel→load(), Dismiss reuses onDelete→deleteFuel→load(). No producer of source='ai' rows exists until Phase 14
 
 ### Pending Todos
 
@@ -203,8 +205,8 @@ planning" sections in docs/dossier/*.md — those are the authoritative hand-off
 
 ## Session
 
-**Last session:** 2026-08-16T00:07:29.421Z
-**Stopped at:** Completed 07-02-PLAN.md (ranked projection + fuel age)
+**Last session:** 2026-08-16T00:15:00.000Z
+**Stopped at:** Completed 07-03-PLAN.md (AI-unconfirmed state + confirm-flip)
 **Resume file:** None
 
 ## Phase 4 — Closeout (2026-08-15) ✅ COMPLETE
