@@ -97,7 +97,11 @@ export function resolveCapturePayload(input: CaptureInput): CapturePayload {
 
   // note leads; base is appended after the em-dash and never discarded. note-only
   // (no base present) -> note alone, no trailing separator.
-  const composed = note ? (base ? `${note}${NOTE_SEPARATOR}${base}` : note) : base;
+  const composed = note
+    ? base
+      ? `${note}${NOTE_SEPARATOR}${base}`
+      : note
+    : base;
 
   return { displayText: nonBlank(composed), url };
 }

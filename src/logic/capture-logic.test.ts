@@ -29,7 +29,10 @@ describe("resolveCapturePayload — CAP-03 payload → { displayText, url } (Tas
 
   it("bare URL, no title → the bare URL is the display text (fallback), url is the URL", () => {
     expect(
-      resolveCapturePayload({ text: "https://x.com/a", webUrl: "https://x.com/a" }),
+      resolveCapturePayload({
+        text: "https://x.com/a",
+        webUrl: "https://x.com/a",
+      }),
     ).toEqual({ displayText: "https://x.com/a", url: "https://x.com/a" });
   });
 
@@ -71,9 +74,10 @@ describe("resolveCapturePayload — CAP-03 payload → { displayText, url } (Tas
   });
 
   it("extended-whitespace text (tab/VT/FF/NBSP) → displayText null (mirrors the fuel-read TRIM set)", () => {
-    expect(
-      resolveCapturePayload({ text: "\t ", webUrl: null }),
-    ).toEqual({ displayText: null, url: null });
+    expect(resolveCapturePayload({ text: "\t ", webUrl: null })).toEqual({
+      displayText: null,
+      url: null,
+    });
   });
 
   it("title present but blank → falls back to the text as the base", () => {
@@ -115,7 +119,11 @@ describe("resolveCapturePayload — CAP-03 note composition `note — base` (Tas
 
   it("note + plain text (base = the prose) → base survives, note leads, url null [A5]", () => {
     expect(
-      resolveCapturePayload({ text: "the prose", webUrl: null, note: "my words" }),
+      resolveCapturePayload({
+        text: "the prose",
+        webUrl: null,
+        note: "my words",
+      }),
     ).toEqual({ displayText: "my words — the prose", url: null });
   });
 
@@ -137,12 +145,18 @@ describe("resolveCapturePayload — CAP-03 note composition `note — base` (Tas
 
   it("label-only (no note) → base unchanged from Task 1", () => {
     expect(
-      resolveCapturePayload({ text: "https://x/a", webUrl: "https://x/a", title: "T" }),
+      resolveCapturePayload({
+        text: "https://x/a",
+        webUrl: "https://x/a",
+        title: "T",
+      }),
     ).toEqual({ displayText: "T", url: "https://x/a" });
   });
 
   it("note containing an embedded ` — ` → preserved verbatim, no special handling", () => {
-    expect(resolveCapturePayload({ text: "", webUrl: null, note: "a — b — c" })).toEqual({
+    expect(
+      resolveCapturePayload({ text: "", webUrl: null, note: "a — b — c" }),
+    ).toEqual({
       displayText: "a — b — c",
       url: null,
     });
