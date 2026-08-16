@@ -51,6 +51,7 @@ import {
 } from "@/db/contact-status-read";
 import { archiveContact } from "@/db/contacts-dao";
 import { getExecutor, localDateTime } from "@/db/database";
+import { clearFavouriteRank, setFavouriteRank } from "@/db/favourites-dao";
 import { addFuel, confirmFuel, deleteFuel, editFuel } from "@/db/fuel-dao";
 import {
   type FuelItem,
@@ -106,6 +107,8 @@ type Header = {
   photo: string | null;
   /** Second-resolution row timestamp — the Avatar's cross-session cache-bust. */
   modified_at: string;
+  /** The contact's favourite rank, or null — drives the header star's state. */
+  favourite_rank: number | null;
 };
 
 export function ContactProfileScreen({
@@ -246,6 +249,30 @@ export function ContactProfileScreen({
       Alert.alert("Couldn't archive", "Please try again.");
     }
   }, [contactId, navigation]);
+
+  // Toggle the favourite star (DASH-06): mark when not a favourite, clear when
+  // it is, through the guarded favourites-dao (changes===1, transactional, the
+  // recency column untouched), then the SINGLE unified load() reconciles the
+  // header's favourite_rank so the star reflects the persisted state. Reversible
+  // and non-destructive → NO confirmation dialog (dossier: reversible acts don't
+  // gate). The current state is read off the freshly-loaded header, never a
+  // stale snapshot. localDateTime() supplies the local wall-clock `now`.
+  const isFavourite = header?.favourite_rank != null;
+  const doToggleFavourite = useCallback(async () => {
+    const currentlyFavourite = header?.favourite_rank != null;
+    try {
+      const now = localDateTime();
+      if (currentlyFavourite) {
+        await clearFavouriteRank(getExecutor(), contactId, now);
+      } else {
+        await setFavouriteRank(getExecutor(), contactId, now);
+      }
+      await load();
+    } catch (err) {
+      Logger.error(LOG_SCOPE, "failed to toggle favourite", err);
+      Alert.alert("Couldn't update favourite", "Please try again.");
+    }
+  }, [contactId, header?.favourite_rank, load]);
 
   // Open the refine form for a touchpoint (LOG-01). Seed the controlled value
   // from the stored row verbatim — occurred_at flows in as-is, and the form
@@ -484,6 +511,29 @@ export function ContactProfileScreen({
           {header?.name ?? ""}
         </Text>
 
+        {/* Favourite star toggle (DASH-06): marks/clears favourite_rank through
+            the guarded DAO, reversible → no confirmation. The marked star uses
+            colors.accent (OD-2 provisional favourite token — the owner may
+            substitute a dedicated favourite hue/glyph). The accessibilityLabel
+            flips with the persisted state so uiautomator UAT can read it. */}
+        <Pressable
+          testID="contact-profile-favourite-star"
+          accessibilityRole="button"
+          accessibilityLabel={isFavourite ? "Remove favourite" : "Mark favourite"}
+          accessibilityState={{ selected: isFavourite }}
+          onPress={() => void doToggleFavourite()}
+          style={styles.favouriteStar}
+        >
+          <Text
+            style={[
+              styles.favouriteGlyph,
+              { color: isFavourite ? colors.accent : colors.textSecondary },
+            ]}
+          >
+            {isFavourite ? "★" : "☆"}
+          </Text>
+        </Pressable>
+
         <OverflowMenu
           actions={[
             {
@@ -713,6 +763,15 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 24,
     fontWeight: "700",
+  },
+  favouriteStar: {
+    minWidth: 44,
+    minHeight: 44,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  favouriteGlyph: {
+    fontSize: 24,
   },
   rogueLabel: {
     fontSize: 14,

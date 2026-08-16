@@ -79,6 +79,14 @@ export function getContactHeader(
    * revision in `photo-cache-bust-store`.
    */
   modified_at: string;
+  /**
+   * The contact's favourite rank, or null when it is not a favourite — the
+   * profile favourite star's persisted state (Plan 06, DASH-06). PURELY ADDITIVE
+   * widening: the two other callers read this seek field-wise (EditContactScreen
+   * refreshPhoto reads only photo/modified_at; contact-read.test.ts asserts
+   * fields individually), so adding this field breaks neither typecheck nor test.
+   */
+  favourite_rank: number | null;
 } | null> {
   return exec.getFirstAsync<{
     id: number;
@@ -87,8 +95,9 @@ export function getContactHeader(
     archived_at: string | null;
     photo: string | null;
     modified_at: string;
+    favourite_rank: number | null;
   }>(
-    "SELECT id, name, rarely_responds, archived_at, photo, modified_at FROM contacts WHERE id = ?",
+    "SELECT id, name, rarely_responds, archived_at, photo, modified_at, favourite_rank FROM contacts WHERE id = ?",
     [contactId],
   );
 }

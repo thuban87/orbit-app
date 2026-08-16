@@ -121,6 +121,8 @@ describe("getContactHeader — by-id light read (archived-reachable by design)",
     // photo, and modified_at is present (the cross-session cache-bust token).
     expect(header?.photo).toBeNull();
     expect(header?.modified_at).toBe(NOW);
+    // The additive favourite_rank field (Plan 06): a non-favourite reads null.
+    expect(header?.favourite_rank).toBeNull();
   });
 
   it("returns the stored relative photo path for a photo-bearing contact (PHOTO-04)", async () => {
