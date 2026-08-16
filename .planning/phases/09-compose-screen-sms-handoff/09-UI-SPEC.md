@@ -1,10 +1,11 @@
 ---
 phase: 9
 slug: compose-screen-sms-handoff
-status: draft
+status: approved
 shadcn_initialized: false
 preset: none
 created: 2026-08-16
+reviewed_at: 2026-08-16
 ---
 
 # Phase 9 — UI Design Contract
