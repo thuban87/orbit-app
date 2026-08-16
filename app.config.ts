@@ -66,6 +66,15 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
         "expo-sqlite",
         "@react-native-community/datetimepicker",
         "expo-image",
+        // Phase-11 notifications (Plan 11-01, NOTIF-01). Bare string entry —
+        // Orbit needs no plugin options (no custom notification icon/sound, no
+        // FCM google-services.json: the FCM-less local-notification path is the
+        // decided architecture). The Set-dedupe handles it exactly like the
+        // other string plugins; no tuple append and no exact-alarm permission.
+        // `expo-task-manager` (the peer module `registerTaskAsync` requires for
+        // the killed-app headless task) ships NO config plugin, so it adds no
+        // plugins entry — installing the dependency alone is sufficient.
+        "expo-notifications",
       ]),
     ];
 
