@@ -30,9 +30,13 @@ lengths, timing, mute placement) plus the 7 orchestrator picks.
 - **Birthday notification body**: `"It's {Name}'s birthday today."` — plain text, no emoji. Tap → profile.
 - **Birthday lead time**: day-of morning only. No earlier "coming up" notification (the existing
   7-day dashboard banner covers the lead-up).
-- **Alert feel / channel importance**: DEFAULT importance — silent, no heads-up peek — for BOTH
-  decay and birthday channels. Calm, consistent with the anti-nag mandate. (Channel importance is
-  immutable at creation, so this is fixed before the build per the dossier.)
+- **Alert feel / channel importance**: silent, no heads-up peek — for BOTH decay and birthday
+  channels. Calm, consistent with the anti-nag mandate. Implemented as **Android `IMPORTANCE_LOW`** —
+  the owner's chosen intent is silent/calm, and Android's `IMPORTANCE_DEFAULT` actually PLAYS A SOUND,
+  so `LOW` is the correct silent-but-still-visible tier (corrected 2026-08-16 after cross-AI review
+  flagged the mislabel; this HONORS the owner's "silent, no heads-up" choice — NOT a reversal).
+  Channel importance is immutable at creation, so it is fixed before the build; lock-screen
+  private/public visibility is an independent per-channel property still governing the two decay channels.
 
 ### Cadence & snooze (accepted as recommended)
 - **Re-nag cadence**: flat weekly. A still-overdue, unacted contact re-reminds ~weekly, each

@@ -500,3 +500,66 @@ Single external reviewer (Codex) + this session's code-grounded verification. Co
 concerns HIGH; on source-grounding, one (state-change reconcile / NOTIF-03) is retained as HIGH and
 the other (foreground handler) is downgraded to MEDIUM (narrow impact, tap routing unaffected). H1–H5
 independently confirmed RESOLVED against the source.
+
+---
+
+## Claude Review (read-only subagent) — Cycle 2
+
+CYCLE_SUMMARY (Claude): current_high=1 current_actionable=2
+
+All five cycle-1 HIGH (H1–H5) verified RESOLVED against code. NEW issues introduced by the H5 fix:
+
+### HIGH
+- **[11-04/11-10] Unbounded pre-scheduled set — no horizon/cap → silent drops.** `DECAY_ELIGIBLE_WHERE`
+  has no lower progress bound (returns ~the whole address book incl. all `stable`); 11-10 schedules a
+  DATE trigger per candidate + birthday with no bound/prioritization/horizon. Android/expo SILENTLY
+  DROPS scheduled notifications past its pending cap — a silent-failure class CLAUDE.md elevates, in an
+  un-repairable local DB. FIX: bound the horizon (pre-schedule only contacts whose fire instant is
+  within N days, or the soonest-N; the launch reconcile rolls it forward); Pixel-UAT at realistic
+  volume proving no drops. N is a top-of-file tunable.
+
+### Actionable (MEDIUM/LOW)
+- **[11-10] MEDIUM — index-based stagger churns the diff + missing ORDER BY + unspecified
+  `requestsEqual` granularity.** Stagger keyed on array index with NO `ORDER BY` → fire-minute shifts on
+  any earlier-contact change → reschedule churn + brittle test; exact-instant compare churns, date-only
+  misses an hour edit. FIX: deterministic `ORDER BY id`; stagger by contactId; specify granularity.
+- **[11-06] LOW — stale task title** "DEFAULT-importance channel set" while behavior is `IMPORTANCE_LOW`.
+
+---
+
+## Orchestrator Merged Actionable Set — Cycle 2 (Codex + Claude, deduped)
+
+Cycle-1 H1–H5 are RESOLVED (both reviewers, code-grounded). NEW items — all consequences of the H5
+pre-scheduling fix — MUST be incorporated into the relevant PLAN.md or explicitly deferred/rejected:
+
+**HIGH**
+A. **[11-04/11-10] Bound the pre-scheduled horizon** (Claude). Do NOT pre-schedule a DATE trigger for
+   every eligible contact — Android's pending cap causes silent drops. Pre-schedule only
+   contacts/birthdays whose next fire instant is within a bounded horizon (top-of-file tunable
+   HORIZON_DAYS) or the soonest-N; the launch/foreground reconcile rolls it forward. Pixel-UAT asserting
+   no drops at realistic volume (e.g. 200+ contacts).
+B. **[11-07/11-09/edit-save] In-app state changes must cancel/reschedule the pre-parked notification
+   IMMEDIATELY** (Codex) — else an in-app snooze/mute/interval-edit is DEFEATED by an already-scheduled
+   future notification that fires anyway (NOTIF-03 violation). Additive to the foreground-reconcile
+   cadence, NOT a reversal: call `reconcileSchedule(getExecutor())` (or targeted per-contact
+   cancel+reschedule) AFTER the in-app snooze/clear write (11-09), AFTER the edit-save mute/interval
+   write, and AFTER the headless mark/snooze (11-07). Add a "snooze/mute-before-scheduled-fire suppresses
+   it" test. (Realises NOTIF-01's "cancelled on mark/snooze/mute/interval-edit".)
+
+**Actionable (MEDIUM/LOW)**
+C. [11-10] Deterministic `ORDER BY id` + stagger by contactId (not array index) + specify `requestsEqual`
+   fire-instant granularity (catch an hour change, invariant to stagger). (Claude)
+D. [11-13/11-01] Decide foreground presentation: add a module-scope `Notifications.setNotificationHandler`
+   preserving silence (`shouldPlaySound:false`, no banner) OR document deliberate foreground suppression;
+   add the handler stub to the 11-01 mock. (Codex)
+E. [11-10] Guard malformed birthdays: `today + daysUntilBirthday(null)` yields an Invalid Date (not a
+   throw) — SKIP the candidate when `daysUntilBirthday()` returns null; add a malformed-row test. (Codex)
+F. [11-10] `requestsEqual` omits `content.body`/title → a renamed contact keeps stale text. Include
+   body+title in the diff, or document accepted staleness. (Codex)
+G. [11-05/11-10] Ensure a contact that crossed overdue while the app was CLOSED gets its first nudge at
+   its due-date morning (the pre-scheduled fire), not a weekly tick up to ~6 days later — schedule the
+   first occurrence at the due-date morning (≥ today's window if already past), then weekly ticks. (Codex)
+H. [11-06] Retitle 11-06 Task-1 → "LOW-importance channel set" (both).
+
+Also (orchestrator, this cycle): 11-CONTEXT.md §"Timing & controls" alert-feel wording reconciled
+DEFAULT→`IMPORTANCE_LOW` to match the silent intent (honors the owner's choice; flagged for the pause).
