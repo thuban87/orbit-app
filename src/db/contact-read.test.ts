@@ -39,25 +39,27 @@ beforeEach(async () => {
   await runMigrations(exec, [migration001], 1, { now: NOW, newUid: uid });
 });
 
-/** Insert a bare contact row (optionally archived / rarely_responds / photo) and return its id. */
+/** Insert a bare contact row (optionally archived / rarely_responds / photo / phone) and return its id. */
 async function makeContact(
   name: string,
   opts: {
     archived?: boolean;
     rarelyResponds?: number;
     photo?: string | null;
+    phone?: string | null;
   } = {},
 ): Promise<number> {
   const r = await exec.runAsync(
     `INSERT INTO contacts
-       (uid, name, interval_days, rarely_responds, photo, archived_at, created_at, modified_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+       (uid, name, interval_days, rarely_responds, photo, phone, archived_at, created_at, modified_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       uid(),
       name,
       30,
       opts.rarelyResponds ?? 0,
       opts.photo ?? null,
+      opts.phone ?? null,
       opts.archived ? NOW : null,
       NOW,
       NOW,
@@ -123,6 +125,20 @@ describe("getContactHeader — by-id light read (archived-reachable by design)",
     expect(header?.modified_at).toBe(NOW);
     // The additive favourite_rank field (Plan 06): a non-favourite reads null.
     expect(header?.favourite_rank).toBeNull();
+    // The additive phone field (Plan 09, CMP-03): a phone-less contact reads null.
+    expect(header?.phone).toBeNull();
+  });
+
+  it("returns the stored phone for a phone-bearing contact (CMP-03)", async () => {
+    const id = await makeContact("Dialled", { phone: "+15551234567" });
+    const header = await getContactHeader(exec, id);
+    expect(header?.phone).toBe("+15551234567");
+  });
+
+  it("returns phone === null for a phone-less contact (CMP-03)", async () => {
+    const id = await makeContact("Unlisted");
+    const header = await getContactHeader(exec, id);
+    expect(header?.phone).toBeNull();
   });
 
   it("returns the stored relative photo path for a photo-bearing contact (PHOTO-04)", async () => {
