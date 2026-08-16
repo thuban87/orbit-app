@@ -6,14 +6,14 @@ current_phase: 8
 current_phase_name: Dashboard & Never-Contacted Screen
 status: ready
 stopped_at: Phase 8 PLANNED + cross-AI converged (3 cycles, codex+claude, 12 findings resolved) — awaiting owner usage-headroom OK before execute
-last_updated: "2026-08-16T04:25:39.590Z"
+last_updated: "2026-08-16T04:33:51.364Z"
 last_activity: 2026-08-16
 last_activity_desc: Phase 8 execution started
 progress:
   total_phases: 16
   completed_phases: 7
   total_plans: 56
-  completed_plans: 49
+  completed_plans: 50
   percent: 44
 ---
 
@@ -102,6 +102,7 @@ Progress: [████░░░░░░] 38% (6/16 phases complete)
 | Phase 07 P04 | 3min | 2 tasks | 7 files |
 | Phase 08 P01 | 25min | 2 tasks | 4 files |
 | Phase 08 P02 | 4min | 1 tasks | 2 files |
+| Phase 08 P03 | 4min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -178,6 +179,8 @@ Foundational decisions affecting current work:
 
 - [Phase 8]: 08-02: `daysUntilBirthday(stored, today)` in src/logic/birthday-logic.ts is the SINGLE pure, node-tested birthday parser (react-native-free) reused by the Plan 06 banner (DASH-05) and Phase 11 notification (NOTIF-04). Both ported Obsidian bugs fixed: Bug 1 (day-of drop) via LOCAL-MIDNIGHT vs LOCAL-MIDNIGHT difference so today-is-birthday === 0 at any time of day; Bug 2 (Feb-29 → Mar-1 silent overflow) via an EXPLICIT observation branch — non-leap years observe Feb-28 (exported `FEB_29_OBSERVED_DAY=28`, a flagged LOW-severity owner taste call recorded in a top-of-file comment; the bug is the SILENT overflow, so switching to Mar-1 is a one-constant+one-branch change, NOT a bug fix). Strict regex (`^\d{2}-\d{2}$` / `^\d{4}-\d{2}-\d{2}$`) + EXPLICIT month/day range validation run BEFORE any `new Date(...)` (MEDIUM-1: `02-30`/`13-01`/non-leap `2021-02-29` → null, never silently normalized); MM-DD is February-leap-PERMISSIVE (year unknown, `02-29` valid) while YYYY-MM-DD validates against its real year (leap `2020-02-29` valid). Early `null`/empty/whitespace guard → null (nullable `contacts.birthday`, edit-contact-logic.ts:98); the stored year never affects the next-occurrence math. 28 Vitest node tests green; tsc/biome clean.
 
+- [Phase 8]: 08-03: favourites-dao is the ONLY new Phase-8 writer — `setFavouriteRank` appends at `favourite_rank = COALESCE(MAX,-1)+1` (first → 0) / `clearFavouriteRank` NULLs it, both single-column `?`-bound UPDATEs mirroring setContactPhoto/clearContactPhoto (changes===1 guard, modified_at bumped, the recency column NEVER written → DATA-04 single-writer invariant intact, grep-verified 0 refs). `rewriteFavouriteRanks` enforces the MEDIUM-2 mismatched-id-count guarantee in ONE inWriteTransaction: (1) unique-id check, (2) `orderedIds.length` == current live-favourite count (`favourite_rank IS NOT NULL AND archived_at IS NULL`), (3) per-row `UPDATE … WHERE id=? AND favourite_rank IS NOT NULL AND archived_at IS NULL` with changes===1 — so a partial / over-long / duplicate / stale (archived or never-favourite) list rolls back the whole batch and can never rank a non-favourite/archived row; N raw UPDATEs, NEVER a wrapped single-write DAO in the loop (non-reentrant mutex → deadlock). Empty `orderedIds` is an ACCEPTED no-op (0===0), documented in-file so it's not read as a missing guard (A-2). `computeReorder` (src/logic/favourites-reorder-logic.ts) is the pure node-tested drag→order move — returns a NEW array, permutation-invariant, input never mutated, out-of-range indices CLAMPED into [0,length-1] not thrown; it feeds rewriteFavouriteRanks from the Plan-08 Manage-favourites drag-end. 26 tests green (15 DAO + 11 reorder); tsc/biome/check:colors clean.
+
 ### Pending Todos
 
 None yet.
@@ -212,8 +215,8 @@ planning" sections in docs/dossier/*.md — those are the authoritative hand-off
 
 ## Session
 
-**Last session:** 2026-08-16T04:25:39.579Z
-**Stopped at:** Completed 08-02-PLAN.md (daysUntilBirthday parser — DASH-05)
+**Last session:** 2026-08-16T04:32:57.816Z
+**Stopped at:** Completed 08-03-PLAN.md (favourites write layer: favourites-dao + computeReorder — DASH-06)
 **Resume file:** None
 
 ## Phase 4 — Closeout (2026-08-15) ✅ COMPLETE

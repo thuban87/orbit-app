@@ -86,7 +86,7 @@ roadmap phases. Items marked *(infra)* are foundation guarantees rather than end
 - [ ] **DASH-03**: Each card carries avatar (themed fallback), status ring (incl. the rogue visual), name, a required one-line fuel preview, a category label, and a favourite marker — nothing log-derived.
 - [x] **DASH-04**: A "Not yet contacted (N)" sibling screen that renders fuel and a count-less "Archived" entry are reachable from the dashboard; the snoozed segment shows a count.
 - [x] **DASH-05**: A 7-day birthday banner (soonest-first, tap→profile) shows for any non-archived contact — overriding snooze/never-contacted suppression — using the single birthday parser with the day-of-drop and Feb-29 bugs fixed.
-- [ ] **DASH-06**: A user can mark a favourite via a profile star and order favourites by drag on a shared "Manage favourites" screen.
+- [x] **DASH-06**: A user can mark a favourite via a profile star and order favourites by drag on a shared "Manage favourites" screen.
 - [x] **DASH-07**: The dashboard renders with no network and refreshes via focus + AppState-active + pull-to-refresh (not the change-listener), using async queries and `recyclingKey`, with cause-aware empty states.
 
 ### Compose consumers' shared surface — see CMP; and the Orrery (ORR)
