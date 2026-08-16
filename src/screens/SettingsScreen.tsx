@@ -19,7 +19,7 @@ import {
   getAppSettings,
   updateAppSettings,
 } from "@/db/app-settings-dao";
-import { getExecutor } from "@/db/database";
+import { getExecutor, localDateTime } from "@/db/database";
 import { getProfile } from "@/db/profile-dao";
 import type { RootStackParamList } from "@/navigation/types";
 import { reconcileSchedule } from "@/services/notifications/notification-schedule";
@@ -140,7 +140,7 @@ export function SettingsScreen() {
   const persist = useCallback(async (patch: AppSettingsPatch) => {
     const exec = getExecutor();
     try {
-      await updateAppSettings(exec, patch, new Date().toISOString());
+      await updateAppSettings(exec, patch, localDateTime());
       const next = await getAppSettings(exec);
       setSettings(next);
       void reconcileSchedule(exec);
