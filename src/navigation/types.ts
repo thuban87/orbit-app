@@ -53,6 +53,17 @@ export type RootStackParamList = {
    * registrations this phase adds.
    */
   ManageFavourites: undefined;
+  /**
+   * The entry-agnostic compose surface (CMP-01/02/03). Params are SERIALIZABLE
+   * ONLY — a bare `contactId`, NO callback params (native-stack serialization +
+   * deep-link safety), the same additive posture as `NeverContacted` /
+   * `ManageFavourites`. The screen self-fetches header + fuel + SMS capability
+   * from the id alone, so Phase 11 (notification), Phase 12 (widget), and Phase
+   * 14 (AI) can open it with just a contact id and no wiring. Registered
+   * additively; `initialRouteName` stays `Home` and every existing route is
+   * untouched.
+   */
+  Compose: { contactId: number };
 };
 
 /**
