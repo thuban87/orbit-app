@@ -25,7 +25,8 @@
  * control, a 24/700 title. Every colour resolves through `useTheme().colors.*`
  * (CLAUDE.md / check:colors).
  */
-import { useCallback, useEffect, useState } from "react";
+import { useFocusEffect } from "@react-navigation/native";
+import { useCallback, useState } from "react";
 import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
 import ReorderableList, {
   type ReorderableListReorderEvent,
@@ -109,26 +110,32 @@ export function ManageFavouritesScreen({
   }, []);
 
   // Focus-effect load with a cancelled-flag guard so a fast back-out can't set
-  // state on an unmounted screen.
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const next = await listFavourites(getExecutor());
-        if (!cancelled) {
-          setRows(next);
+  // state on an unmounted screen — and so a favourite marked/unmarked elsewhere
+  // (e.g. the profile star) is reflected on every return to this screen.
+  useFocusEffect(
+    useCallback(() => {
+      let cancelled = false;
+      (async () => {
+        try {
+          const next = await listFavourites(getExecutor());
+          if (!cancelled) {
+            setRows(next);
+          }
+        } catch (err) {
+          if (!cancelled) {
+            Logger.error(LOG_SCOPE, "failed to load favourites", err);
+            Alert.alert(
+              "Couldn't load favourites",
+              "Please go back and retry.",
+            );
+          }
         }
-      } catch (err) {
-        if (!cancelled) {
-          Logger.error(LOG_SCOPE, "failed to load favourites", err);
-          Alert.alert("Couldn't load favourites", "Please go back and retry.");
-        }
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+      })();
+      return () => {
+        cancelled = true;
+      };
+    }, []),
+  );
 
   const persist = useCallback(
     async (orderedIds: number[]) => {
