@@ -75,9 +75,9 @@ roadmap phases. Items marked *(infra)* are foundation guarantees rather than end
 
 ### Compose Screen & SMS Handoff (CMP)
 
-- [ ] **CMP-01**: A compose screen shows a contact's full fuel and an editable message draft, with a Send control that hands off to the SMS composer and a Copy control that always works.
+- [x] **CMP-01**: A compose screen shows a contact's full fuel and an editable message draft, with a Send control that hands off to the SMS composer and a Copy control that always works.
 - [ ] **CMP-02**: The compose screen is reachable from the profile and (as later phases land) from a notification tap, the widget Message action, and AI Suggest; Back goes to the dashboard.
-- [ ] **CMP-03**: The compose screen degrades gracefully when a contact has no phone number (Copy still works; an "add number" affordance appears).
+- [x] **CMP-03**: The compose screen degrades gracefully when a contact has no phone number (Copy still works; an "add number" affordance appears).
 
 ### Dashboard & Never-Contacted Screen (DASH)
 

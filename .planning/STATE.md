@@ -4,16 +4,16 @@ milestone: v1.0
 milestone_name: milestone
 current_phase: 9
 current_phase_name: Compose Screen & SMS Handoff
-status: planned
-stopped_at: "Phase 9 (Compose Screen & SMS Handoff) PRE-EXECUTION COMPLETE, PAUSED before executor agents (owner usage-headroom check). Done: smart-discuss (CONTEXT) + UI-SPEC (checker-approved) + research + 2 plans (internal plan-checker PASSED) + cross-AI convergence 3 cycles (codex + read-only-Claude subagent; 0 HIGH throughout; 5→3→3 actionable resolved; 3 minor residuals C1-C3 in 09-REVIEWS.md, tsc forces C1). NOTHING executed — no src/ changes. Phase 8 remains COMPLETE & VERIFIED. Commits local on main, NOT pushed."
-last_updated: "2026-08-16T09:09:34.524Z"
+status: executing
+stopped_at: "Phase 9 (Compose Screen & SMS Handoff) EXECUTING — 09-01 of 2 complete. 09-01 landed the compose prerequisites: resolveComposeControls (pure CMP-03 resolver), expo-sms + expo-clipboard (~57.0.1, no config-plugin entry), and an additive phone widen on getContactHeader. npm test 673/673, tsc + check:colors clean, no deviations. NEXT: 09-02 (ComposeScreen + profile Message entry + Compose route + Back→dashboard). Native-dep change ⇒ end-of-phase on-device UAT needs expo prebuild --clean + release APK. Phase 8 remains COMPLETE & VERIFIED. Commits local on main, NOT pushed."
+last_updated: "2026-08-16T09:15:12.729Z"
 last_activity: 2026-08-16
 last_activity_desc: Phase 9 execution started
 progress:
   total_phases: 16
   completed_phases: 8
   total_plans: 58
-  completed_plans: 56
+  completed_plans: 57
   percent: 50
 ---
 
@@ -28,9 +28,9 @@ See: .planning/PROJECT.md (updated 2026-08-14)
 
 ## Current Position
 
-Phase: 9 (Compose Screen & SMS Handoff) — EXECUTING
-Next: Phase 8 verification / on-device Pixel UAT (Settings shows "Manage favourites" and no "Search" row; dashboard search still works), then Phase 9. The 08-07 OPEN owner decision (dashboard had no Settings entry point) is RESOLVED — 08-09 added the owner-approved top-right Settings gear (dashboard-settings-entry) → navigate("Settings").
-Last activity: 2026-08-16 — Phase 9 execution started
+Phase: 9 (Compose Screen & SMS Handoff) — EXECUTING (09-01 of 2 complete)
+Next: Plan 09-02 (ComposeScreen assembly + profile "Message" entry + Compose route + Back→dashboard). Then code-review + on-device Pixel UAT — this phase added native modules (expo-sms/expo-clipboard) so UAT requires a full `expo prebuild --clean` + release APK (a Metro JS reload will NOT surface the native modules).
+Last activity: 2026-08-16 — Plan 09-01 complete (compose prerequisites: resolver + native deps + phone widen)
 
 Progress: [████░░░░░░] 38% (6/16 phases complete)
 
@@ -110,6 +110,7 @@ Progress: [████░░░░░░] 38% (6/16 phases complete)
 | Phase 08 P07 | 6min | 2 tasks | 3 files |
 | Phase 08 P09 | 18min | 3 tasks | 1 files |
 | Phase 08 P10 | 2min | 2 tasks | 3 files |
+| Phase 09 P01 | 3min | 3 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -198,6 +199,8 @@ Foundational decisions affecting current work:
 - [Phase 8]: 08-09: HomeScreen gains the full controls layer (DASH-02/04/06 complete). Filter/sort selection PERSISTS via useDashboardPrefs (setFilter/setSort); the search term is LOCAL useState; all three are `reload` deps so a change re-queries through the Plan-07 focus-effect callback-change mechanism (no manual re-run). Chips assembled from real tables: all · needs-attention · one per category (listCategories) · one per social-battery value (Charger/Neutral/Drain) · favourites · snoozed (live countSnoozed, 0 until Phase 11). Sort control = a 4-Pressable row (Status/Name (A–Z)/Least recent/Most recent), no segmented-control dep, container testID `dashboard-sort-control` + options `dashboard-sort-option-{key}`. Live search box (`dashboard-search-input`, placeholder "Search people and notes") + `dashboard-search-clear` threads `term` into listDashboard — the DAO owns name/fuel matching + off_limits/ai/archived exclusions + the LOW-2 favourites+term precedence (NO component-side .filter of private data, NO special-casing; T-08-20/21 mitigated). Empty states fully via selectDashboardEmptyState with live activeFilter + hasTerm: search-empty (`dashboard-search-empty`, "No matches for {term}") wins before filter-empty; favourites filter-empty renders "No favourites yet" + pointer to the profile star (MEDIUM-4). Favourites-chip "Manage" affordance = a separate header link shown only when favourites is active (FilterChipRow stays purely presentational) → navigate("ManageFavourites"). OWNER-APPROVED addition beyond the plan text: a top-right Settings gear (`dashboard-settings-entry`, ⚙ token glyph, accessibilityLabel "Settings") → navigate("Settings"), fixing the 08-07 reachability gap (commit e9b6efb). Colours via tokens only; tsc + check:colors green; npm test 676/676. .tsx render/nav/persistence is end-of-phase Pixel UAT.
 - [Phase ?]: [Phase 8]: 08-10: standalone FuelSearch route + screen retired (search relocated to the dashboard, Plan 09 — expected relocation, NOT a reversal); FuelSearchResultRow + searchFuel DAO kept. Settings loses the Search row, gains a Manage-favourites row -> ManageFavourites (2nd entry into the shared reorder screen).
 
+- [Phase 9]: 09-01: the three compose prerequisites landed ahead of the screen. (1) `resolveComposeControls(hasPhone, smsAvailable)` + `ComposeControls` (src/logic/compose-logic.ts) is the pure, react-native/expo/db-free, node-tested CMP-03 Send/Copy capability gate — no-phone branch FIRST so a missing number always wins over SMS capability ((false,true) ≡ (false,false)); phone+no-SMS → Send hidden, Copy primary, helper line; phone+SMS → Send shown, Copy secondary. Mirrors the dashboard-empty-logic resolver idiom (explicit-precedence header comment, one exported interface + one pure resolve fn). (2) `expo-sms` + `expo-clipboard` installed via `npx expo install` at SDK-57-pinned `~57.0.1` (both first-party Expo modules, no postinstall — T-09-SC mitigated, no blocking-human legitimacy checkpoint needed); NO app.config.ts plugins entry added (neither ships a config plugin — a bogus entry is a prebuild error, 01-01 deduped-plugins lesson). Native-dep change ⇒ Plan-02 on-device UAT needs `expo prebuild --clean` + release APK. (3) `getContactHeader` widened PURELY ADDITIVELY to return `phone: string | null` (append to SELECT + both type literals; light by-id seek kept — NO join, NOT switched to getContactForEdit) — the 08-06 favourite_rank idiom; the two field-wise callers (ContactProfileScreen local Header type, EditContactScreen refreshPhoto) + contact-read.test.ts stay green. npm test 673/673, tsc + check:colors clean. No deviations.
+
 ### Pending Todos
 
 - **[08-07, owner decision] Dashboard Settings entry point — RESOLVED (2026-08-16, Plan 09).** The owner approved a top-right Settings gear (`dashboard-settings-entry`, accessibilityLabel "Settings") → `navigate("Settings")`, added in 08-09 (commit `e9b6efb`). Settings / CustomFields / Archived-via-Settings / Manage-favourites-row are reachable again. Exact gear styling is the owner's later design pass (a token-coloured ⚙ glyph ships for now).
@@ -232,9 +235,9 @@ planning" sections in docs/dossier/*.md — those are the authoritative hand-off
 
 ## Session
 
-**Last session:** 2026-08-16T08:05:19.000Z
-**Stopped at:** Phase 9 pre-execution complete — 2 plans converged over 3 cross-AI cycles (codex + read-only-Claude subagent). PAUSED before executor agents for owner usage-headroom check. On "go": `gsd-execute-phase 9 --no-transition` → code-review + fix → on-device Pixel UAT (native-dep change ⇒ `expo prebuild --clean` + release APK).
-**Resume file:** .planning/phases/09-compose-screen-sms-handoff/09-01-PLAN.md
+**Last session:** 2026-08-16T09:15:12.716Z
+**Stopped at:** Completed 09-01-PLAN.md (compose prerequisites: pure resolver + expo-sms/expo-clipboard + additive phone widen). 09-02 (the ComposeScreen assembly) still to execute. Then code-review + on-device Pixel UAT (native-dep change ⇒ `expo prebuild --clean` + release APK; a Metro reload will NOT surface the native modules).
+**Resume file:** .planning/phases/09-compose-screen-sms-handoff/09-02-PLAN.md
 
 ## Phase 4 — Closeout (2026-08-15) ✅ COMPLETE
 
