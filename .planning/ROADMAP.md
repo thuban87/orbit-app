@@ -378,7 +378,15 @@ Recorded here because they bind phases that do not own them. Every planner/execu
   2. Back from compose lands on the dashboard.
   3. With no phone number, Copy still works and an "add number" affordance appears.
 
-**Plans:** TBD
+**Plans:** 2 plans
+
+**Wave 1**
+
+- [ ] 09-01-PLAN.md — Native handoff deps (expo-sms/expo-clipboard) + pure Send/Copy capability resolver + phone read widening (CMP-01, CMP-03)
+
+**Wave 2** *(blocked on Wave 1)*
+
+- [ ] 09-02-PLAN.md — ComposeScreen (fuel visible, blank draft, Send/Copy, Back→dashboard) + Compose route + profile "Message" entry (CMP-01, CMP-02, CMP-03)
 
 ### Phase 10: Share-Sheet Capture
 
@@ -494,7 +502,7 @@ Recorded here because they bind phases that do not own them. Every planner/execu
 | 6. Interaction Log, Status & Impact | 6/6 | Complete   | 2026-08-15 |
 | 7. Conversational Fuel | 4/4 | Complete   | 2026-08-16 |
 | 8. Dashboard & Never-Contacted Screen | 10/10 | Complete   | 2026-08-16 |
-| 9. Compose Screen & SMS Handoff | 0/TBD | Not started | - |
+| 9. Compose Screen & SMS Handoff | 0/2 | Planned | - |
 | 10. Share-Sheet Capture | 0/TBD | Not started | - |
 | 11. Actionable Notifications | 0/TBD | Not started | - |
 | 12. Home Screen Widget | 0/TBD | Not started | - |
