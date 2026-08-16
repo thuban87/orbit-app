@@ -6,13 +6,13 @@ current_phase: 9
 current_phase_name: Compose Screen & SMS Handoff
 status: planned
 stopped_at: "Phase 9 (Compose Screen & SMS Handoff) PRE-EXECUTION COMPLETE, PAUSED before executor agents (owner usage-headroom check). Done: smart-discuss (CONTEXT) + UI-SPEC (checker-approved) + research + 2 plans (internal plan-checker PASSED) + cross-AI convergence 3 cycles (codex + read-only-Claude subagent; 0 HIGH throughout; 5→3→3 actionable resolved; 3 minor residuals C1-C3 in 09-REVIEWS.md, tsc forces C1). NOTHING executed — no src/ changes. Phase 8 remains COMPLETE & VERIFIED. Commits local on main, NOT pushed."
-last_updated: "2026-08-16T08:05:19.000Z"
+last_updated: "2026-08-16T09:09:34.524Z"
 last_activity: 2026-08-16
-last_activity_desc: "Phase 9 pre-execution complete + PAUSED before execute per owner directive. Plans converged. OPEN owner-taste items: A1 empty-draft Send/Copy (plan ships 'allow'), A2 two filled-accent primaries on the profile ('Message' + 'Log contact'). HAZARD: init.plan-phase can clobber STATE.md from stale data — restored to HEAD this run."
+last_activity_desc: Phase 9 execution started
 progress:
   total_phases: 16
   completed_phases: 8
-  total_plans: 56
+  total_plans: 58
   completed_plans: 56
   percent: 50
 ---
@@ -24,13 +24,13 @@ progress:
 See: .planning/PROJECT.md (updated 2026-08-14)
 
 **Core value:** Collapse the taps between "you're overdue with X" and the message actually being sent.
-**Current focus:** Phase 8 — Dashboard & Never-Contacted Screen
+**Current focus:** Phase 9 — Compose Screen & SMS Handoff
 
 ## Current Position
 
-Phase: 8 (Dashboard & Never-Contacted Screen) — all 10 plans executed (code complete; end-of-phase Pixel UAT pending)
+Phase: 9 (Compose Screen & SMS Handoff) — EXECUTING
 Next: Phase 8 verification / on-device Pixel UAT (Settings shows "Manage favourites" and no "Search" row; dashboard search still works), then Phase 9. The 08-07 OPEN owner decision (dashboard had no Settings entry point) is RESOLVED — 08-09 added the owner-approved top-right Settings gear (dashboard-settings-entry) → navigate("Settings").
-Last activity: 2026-08-16 — Applied all six 08-CODE-REVIEW fixes (MEDIUM-1 + LOW-1..5) as atomic commits on main; tsc/check:colors clean, npm test 666/666
+Last activity: 2026-08-16 — Phase 9 execution started
 
 Progress: [████░░░░░░] 38% (6/16 phases complete)
 
