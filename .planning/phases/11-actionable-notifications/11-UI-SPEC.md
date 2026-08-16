@@ -1,10 +1,11 @@
 ---
 phase: 11
 slug: actionable-notifications
-status: draft
+status: approved
 shadcn_initialized: false
 preset: none
 created: 2026-08-16
+reviewed_at: 2026-08-16
 ---
 
 # Phase 11 — UI Design Contract
@@ -219,4 +220,4 @@ No third-party UI registry, no new UI dependency. The only reused native module 
 - [ ] Dimension 5 Spacing: PASS
 - [ ] Dimension 6 Registry Safety: PASS
 
-**Approval:** pending
+**Approval:** APPROVED (2026-08-16) — 6/6 dimensions. Dimension 4 Typography is a non-blocking FLAG only: the `700` weight is inherited title-header chrome (see §Typography), not a weight this phase adds to any per-control text — accepted, no change required.
