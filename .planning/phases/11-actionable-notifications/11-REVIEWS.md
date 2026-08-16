@@ -1,7 +1,8 @@
 ---
 phase: 11
 reviewers: [codex]
-reviewed_at: 2026-08-16T19:45:35Z
+reviewed_at: 2026-08-16T21:03:58Z
+review_cycles: 3
 reviewer_models:
   codex: codex-cli 0.144.1 (default model, --dangerously-bypass-hook-trust)
 plans_reviewed:
@@ -563,3 +564,144 @@ H. [11-06] Retitle 11-06 Task-1 → "LOW-importance channel set" (both).
 
 Also (orchestrator, this cycle): 11-CONTEXT.md §"Timing & controls" alert-feel wording reconciled
 DEFAULT→`IMPORTANCE_LOW` to match the silent intent (honors the owner's choice; flagged for the pause).
+
+---
+
+# Cross-AI Plan Review — Cycle 3 (FINAL CONFIRMATION, Codex)
+
+Codex re-reviewed the CURRENT 13 PLAN.md files against source. Focus: confirm the cycle-2 fixes are
+resolved and that the cycle-2/cycle-3 CHANGES introduced no new HIGH. Owner-ruled items (Item G
+stateless; headless snooze re-arm launch-deferral; alert-feel=IMPORTANCE_LOW) were excluded from
+scope and NOT re-flagged.
+
+## Codex Review — Cycle 3 (raw)
+
+## Summary
+
+The cycle-1 fixes remain correctly specified, and the cycle-2 fixes for LOW channels, malformed birthdays, deterministic staggering, full-request diffs, and explicit foreground presentation are sound. However, cycle 2 introduced two new **HIGH** correctness concerns: the global horizon/cap deliberately drops required reminders when the app is not reopened, and fire-and-forget reconciles can race so an older snapshot re-installs a notification after a newer mute/snooze change.
+
+## Cycle-2 Fix Confirmation
+
+| Focus item | Status | Evidence |
+|---|---|---|
+| Horizon + `MAX_SCHEDULED_NOTIFICATIONS` cap | **STILL-BROKEN — HIGH** | [11-10-PLAN.md:101-102](/home/bwales/projects/orbit-app/.planning/phases/11-actionable-notifications/11-10-PLAN.md:101) filters to the horizon, takes only the global soonest-N, then cancels every existing identifier outside that desired set. The tests explicitly expect later candidates to be dropped [11-10-PLAN.md:131-132](/home/bwales/projects/orbit-app/.planning/phases/11-actionable-notifications/11-10-PLAN.md:131). There is no contact-count limit in the schema ([001-initial.ts:62-81](/home/bwales/projects/orbit-app/src/db/migrations/001-initial.ts:62)), and launch reconciliation only runs on cold start or `background → active` ([launch-sweep.ts:93-114](/home/bwales/projects/orbit-app/src/services/launch-sweep.ts:93)). Thus a birthday 36 days away—or any candidate past the cap—will not fire if Orbit is never reopened; an already-scheduled birthday can also be cancelled when nearer decay candidates enter the set. |
+| Immediate reconcile after snooze/mute/interval edit | **STILL-BROKEN — HIGH** | 11-09 starts reconciles fire-and-forget after writes ([11-09-PLAN.md:82](/home/bwales/projects/orbit-app/.planning/phases/11-actionable-notifications/11-09-PLAN.md:82), [11-09-PLAN.md:114](/home/bwales/projects/orbit-app/.planning/phases/11-actionable-notifications/11-09-PLAN.md:114)); Settings does the same ([11-11-PLAN.md:63](/home/bwales/projects/orbit-app/.planning/phases/11-actionable-notifications/11-11-PLAN.md:63)). No scheduler serialization is specified. The existing sweep lock only serializes registered sweep hooks ([launch-sweep.ts:49-88](/home/bwales/projects/orbit-app/src/services/launch-sweep.ts:49)); it does not cover direct `reconcileSchedule()` calls. The DB mutex only serializes transactions ([transaction.ts:42-56](/home/bwales/projects/orbit-app/src/db/transaction.ts:42)), not subsequent OS cancel/schedule calls. An older reconcile can read the pre-mute state, a newer reconcile can cancel it, and the older reconcile can finish last and re-schedule the stale notification. |
+| `contactId`-based stagger + `ORDER BY id` | **CONFIRMED** | The plan derives the stagger only from `contactId`, not array position ([11-10-PLAN.md:100](/home/bwales/projects/orbit-app/.planning/phases/11-actionable-notifications/11-10-PLAN.md:100), [11-10-PLAN.md:108](/home/bwales/projects/orbit-app/.planning/phases/11-actionable-notifications/11-10-PLAN.md:108)). `contacts.id` is an `INTEGER PRIMARY KEY` ([001-initial.ts:62-64](/home/bwales/projects/orbit-app/src/db/migrations/001-initial.ts:62)), and the planned reads explicitly order by it ([11-04-PLAN.md:76-80](/home/bwales/projects/orbit-app/.planning/phases/11-actionable-notifications/11-04-PLAN.md:76)). Candidate ordering therefore cannot shift an existing contact’s stagger. |
+| `requestsEqual` at hour granularity | **CONFIRMED** | The plan requires comparing the effective fire hour while ignoring minute stagger, plus channel/category/data/body/title ([11-10-PLAN.md:103](/home/bwales/projects/orbit-app/.planning/phases/11-actionable-notifications/11-10-PLAN.md:103)). That catches an actual delivery-hour/channel/privacy change without churn from a stable contact-specific minute offset. |
+| Foreground `setNotificationHandler` | **CONFIRMED** | 11-13 specifies a single module-scope handler with `shouldPlaySound:false`, `shouldShowBanner:false`, `shouldShowList:false`, and `shouldSetBadge:false` ([11-13-PLAN.md:72](/home/bwales/projects/orbit-app/.planning/phases/11-actionable-notifications/11-13-PLAN.md:72)). Module scope is appropriate: current `App.tsx` already keeps one-shot lifecycle state outside `AppShell` ([App.tsx:44-51](/home/bwales/projects/orbit-app/App.tsx:44)). |
+| Malformed-birthday guard | **CONFIRMED** | `daysUntilBirthday()` returns `null` for null, malformed, and calendar-invalid values ([birthday-logic.ts:136-147](/home/bwales/projects/orbit-app/src/logic/birthday-logic.ts:136)). 11-10 explicitly checks `days === null` before constructing the next date ([11-10-PLAN.md:100](/home/bwales/projects/orbit-app/.planning/phases/11-actionable-notifications/11-10-PLAN.md:100)), covering all parser failure paths. |
+| Cycle-1 HIGHs | **CONFIRMED, with H5 bounded by the new HIGH above** | H1 is correctly addressed: `getExecutor()` throws before migration ([database.ts:119-133](/home/bwales/projects/orbit-app/src/db/database.ts:119)), and 11-07 now awaits `openAndMigrate()` first ([11-07-PLAN.md:88-96](/home/bwales/projects/orbit-app/.planning/phases/11-actionable-notifications/11-07-PLAN.md:88)). H2 uses deterministic IDs against existing unique constraints ([001-initial.ts:96-125](/home/bwales/projects/orbit-app/src/db/migrations/001-initial.ts:96), [11-07-PLAN.md:89-96](/home/bwales/projects/orbit-app/.planning/phases/11-actionable-notifications/11-07-PLAN.md:89)). H3’s full diff is specified. H4 correctly uses LOW ([11-06-PLAN.md:67-73](/home/bwales/projects/orbit-app/.planning/phases/11-actionable-notifications/11-06-PLAN.md:67)). H5 correctly makes future candidates eligible, but the horizon/cap can still prevent their delivery. |
+
+## Current HIGH Concerns
+
+1. **HIGH — 11-10 Task 1: horizon/cap silently changes guaranteed notification delivery into best effort.**
+
+   The desired set is globally capped and all identifiers outside it are cancelled ([11-10-PLAN.md:101-102](/home/bwales/projects/orbit-app/.planning/phases/11-actionable-notifications/11-10-PLAN.md:101)). Since there is no background reconciler and the launch sweep cannot run while the app remains closed ([launch-sweep.ts:93-114](/home/bwales/projects/orbit-app/src/services/launch-sweep.ts:93)), reminders beyond 35 days or beyond the cap simply never get armed. This violates the stated pre-scheduled/no-reopen behavior, including birthday delivery.
+
+   Fix: resolve the unavoidable capacity-vs-guarantee conflict explicitly before execution. Either preserve delivery guarantees with a capacity-safe architecture/explicit supported contact limit, or obtain an owner ruling that overflow/far-horizon reminders are best-effort and update NOTIF-01/04 accordingly. At minimum, do not globally evict birthdays behind decay reminders; add explicit per-type priority/reservation and tests for an already-scheduled birthday surviving an influx of nearer decay candidates.
+
+2. **HIGH — 11-09 / 11-10 / 11-11: uncoordinated reconciles can restore stale OS state.**
+
+   The plans create several concurrent fire-and-forget callers but no scheduler-level exclusion. This defeats the very mute/snooze suppression the cycle-2 change was meant to guarantee.
+
+   Fix: make every `reconcileSchedule()` call pass through one module-level serial/coalescing coordinator. If a reconcile is requested while one is running, queue one final pass that re-reads the DB after the in-flight pass finishes; all direct UI callers and the launch-sweep hook must use it. Add a regression test where a stale pre-mute/snooze reconcile is paused, the newer write and reconcile complete, then the stale one resumes—asserting the final OS set reflects the newest state.
+
+## Current Actionable Non-HIGH Concerns
+
+- **LOW — 11-13 has no automated assertion for the new foreground handler.** The new mock explicitly supports `setNotificationHandler` so “the 11-13 test can assert” it ([11-01-PLAN.md:96](/home/bwales/projects/orbit-app/.planning/phases/11-actionable-notifications/11-01-PLAN.md:96)), but 11-13 modifies only `App.tsx` and lists no test file ([11-13-PLAN.md:7-8](/home/bwales/projects/orbit-app/.planning/phases/11-actionable-notifications/11-13-PLAN.md:7)). Add an App-level or extracted pure handler-config test asserting the four silent/suppressed values.
+
+## Risk Assessment
+
+**HIGH.** The prior fixes are largely preserved, but the new global capacity policy can prevent required notifications from ever being scheduled, and the new immediate-reconcile paths can leave the OS with stale state after a mute or snooze.
+
+---
+
+## Orchestrator Assessment — Cycle 3 (code-verified, Claude/Opus)
+
+CYCLE_SUMMARY: current_high=1 current_actionable=2
+
+Every Codex claim below was re-checked against the actual source on disk (per "review the code, not
+the diff"), not against the plan text.
+
+### Cycle-2 fix confirmation (code-verified)
+- **staggerFor(contactId) + ORDER BY id determinism** — CONFIRMED. 11-10:100/108 derive the minute
+  from `contactId`, not array index; `contacts.id` is `INTEGER PRIMARY KEY` (001-initial.ts:62); the
+  candidate reads order by id (11-04). Reordering candidates cannot shift a contact's minute.
+- **requestsEqual at HOUR granularity** — CONFIRMED. 11-10:103 truncates the fire instant to the hour
+  (catches a delivery-hour/quiet-window change) while staying invariant to the per-contact stagger
+  minutes, so a reconcile does not needlessly churn.
+- **Foreground setNotificationHandler** — CONFIRMED (design). 11-13:72 specifies a single module-scope
+  handler with shouldPlaySound/Banner/List/Badge all false; module scope matches App.tsx's existing
+  one-shot lifecycle state. (Gap: no automated test — see actionable #2.)
+- **Malformed-birthday null-guard** — CONFIRMED. `daysUntilBirthday()` returns null for null/malformed/
+  calendar-invalid values (birthday-logic.ts:136-147); 11-10:100 checks `days === null` before
+  constructing the date, covering all parser paths (Invalid Date is not a throw).
+- **Cycle-1 HIGHs (H1–H5)** — CONFIRMED still fixed. H1: getExecutor throws pre-migration
+  (database.ts:119-133) and 11-07 awaits openAndMigrate first. H2: deterministic actionUid + UNIQUE(uid).
+  H3: full-request diff specified. H4: IMPORTANCE_LOW (11-06:67-73). H5: future candidates eligible.
+  No cycle-2 edit regressed them.
+- **Horizon-bound + MAX_SCHEDULED cap (11-10)** — the mechanism is CONFIRMED correct as designed
+  (bounded desired set, sort-by-fireInstant, take soonest-N, cancel out-of-window ids, roll horizon
+  forward each foreground). See the two findings below for the two remaining edges.
+
+### Current HIGH Concerns
+
+1. **HIGH — Uncoordinated concurrent reconciles can re-install stale OS state (11-09 / 11-11 / 11-13
+   vs 11-10).** The cycle-2 item-B fix added ≥5 fire-and-forget `reconcileSchedule(getExecutor())` call
+   sites (edit-save 11-09:82; profile snooze + clear 11-09:114; settings per-type + time rows 11-11:63,80)
+   plus the launch-sweep hook (11-10:106). **None of the DIRECT calls share a serialization/coalescing
+   coordinator.** The only re-entrancy guard in the codebase is `running`/`pendingRerun` inside
+   `runLaunchSweep` (launch-sweep.ts:49-90), which serializes the SWEEP-hook path against ITSELF only —
+   it does not wrap direct `reconcileSchedule()` calls, and 11-10 explicitly calls reconcile "the
+   mutex-free async read/schedule path" (11-09:143). `reconcileSchedule` awaits at multiple points
+   (getAppSettings, the candidate reads, getAllScheduledNotificationsAsync, then a loop of cancel/
+   schedule), so two invocations interleave at await boundaries. A reconcile that read the DB BEFORE a
+   mute/snooze commit can finish AFTER a newer reconcile that cancelled the notification, re-arming the
+   stale schedule — defeating the exact immediate-suppression guarantee cycle-2 asserts as must_have
+   truths and T-11-STALE ("a notification cannot fire during a snooze or after a mute"). Realistic
+   trigger: two successive user taps (snooze A then snooze/clear B, or a foreground sweep overlapping a
+   snooze tap) within a reconcile's duration — plausible because a full-address-book reconcile spans the
+   native bridge for hundreds of ms. Self-heals on the next launch, generic body (no PII leak), but the
+   guarantee is falsified in the window → broken invariant.
+   **Fix (before execution):** funnel EVERY reconcile caller — the sweep hook AND all direct UI callers
+   (11-09, 11-11, 11-13) — through ONE module-level serial/coalescing coordinator in
+   notification-schedule.ts, mirroring launch-sweep's DEFER-ONE idiom: if a reconcile is in flight, set
+   a pendingRerun flag; when it settles, run exactly one more pass that RE-READS the DB (so the final
+   pass always reflects newest committed state; a burst coalesces to one trailing pass). Add a
+   regression test: pause a stale pre-mute reconcile, let the newer write + reconcile complete, resume
+   the stale one, assert the final OS set reflects the newest state.
+
+### Current Actionable Non-HIGH Concerns
+
+1. **[11-10] Cap eviction has no per-type priority — a near-horizon birthday can be evicted behind decay
+   reminders.** The soonest-N `MAX_SCHEDULED_NOTIFICATIONS` cap (11-10:101, step 3b) sorts the combined
+   decay+birthday candidate set purely by fireInstant, so an influx of nearer-firing decay candidates can
+   push a birthday out of the desired set. A birthday is date-specific and one-shot (NOTIF-04) — unlike a
+   decay nudge it cannot be "caught up." Mostly self-heals (as its fireInstant approaches `now` it sorts
+   to the front and is armed at the last within-horizon reconcile), so this is NOT a HIGH — but it is a
+   worthwhile robustness tweak consistent with the owner's accepted best-effort posture (Item G).
+   **PLAN.md change (11-10):** give birthday candidates priority/reservation within the cap (e.g. reserve
+   a birthday sub-quota, or stable-sort birthdays ahead of same-instant decay) so a within-horizon
+   birthday is not evicted by decay; add a test asserting an already-selected birthday survives an influx
+   of nearer decay candidates. (This is Codex's own "at minimum" fallback.) NOTE: the broader
+   "beyond-horizon/over-cap items don't fire until the app is reopened" framing is the DELIBERATE,
+   documented bounded-schedule tradeoff (must_haves truth #2, T-11-CAP, chosen over the WORSE
+   silent-OS-drop failure) and is owner risk-posture territory — not re-flagged as a defect.
+
+2. **[11-13] No automated assertion for the new foreground setNotificationHandler.** 11-01:96 added mock
+   support for `setNotificationHandler` explicitly "so the 11-13 test can assert" it, but 11-13 modifies
+   only App.tsx and lists no test file (11-13:7-8). **PLAN.md change (11-13):** add an App-level or
+   extracted-pure handler-config test asserting the four silent/suppressed values
+   (shouldPlaySound/Banner/List/Badge all false).
+
+### Owner-ruled items — NOT re-flagged (per 11-CONTEXT.md <owner_rulings_post_convergence>)
+- Item G (overdue-while-closed catch-up): stateless design kept; ~6-day worst case accepted.
+- Headless snooze +1-week re-arm: launch-deferral accepted.
+- Alert feel = IMPORTANCE_LOW: ratified.
+
+### Verdict
+Cycle-2 fixes are all CONFIRMED resolved and cycle-1 HIGHs stayed fixed. The cycle-2 changes introduced
+ONE new HIGH — the uncoordinated-reconcile race (a direct consequence of adding multiple fire-and-forget
+reconcile callers) — plus two actionable non-HIGH refinements. Recommend resolving the reconcile-
+serialization HIGH (add the DEFER-ONE coordinator) and folding the two actionables into 11-10/11-13
+before code execution.
