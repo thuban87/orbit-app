@@ -122,7 +122,7 @@ Top-to-bottom order:
 
 2. **Fuel reference section** — heading + read-only full-fuel list. Placed **above** the draft so the talking points are visible while composing ("fuel visible → send", HANDOFF §6). testID `compose-fuel`.
    - Heading: "CONVERSATIONAL FUEL" (13/700 uppercase, `letterSpacing 0.5`, `textSecondary`) — the shipped `sectionHeading`.
-   - Read-only list: **all fuel kinds EXCEPT `off_limits`**, `off_limits` excluded **in-query** (never fetched, never rendered — the never-transmitted invariant, HANDOFF §14 / FUEL-02). Reuse/extend `getRankedFuel`'s in-query exclusion per CONTEXT; a new "full fuel minus off_limits" projection is acceptable.
+   - Read-only list: **all fuel kinds EXCEPT `off_limits`**, `off_limits` excluded **in-query** (never fetched, never rendered — the never-transmitted invariant, HANDOFF §14 / FUEL-02). **Reuse `getRankedFuel`** (its `RANKED_FUEL_EXCLUSIONS` already exclude off_limits + unconfirmed `source='ai'` + blank in-query) and render **all** returned rows — do NOT build a new projection (a hand-rolled off_limits-only read would re-admit unconfirmed AI fuel onto this transmittable surface). Never `listFuelForEditor`, never a UI `.filter()`.
    - Each item = a **read-only card** mirroring `FuelEditor`'s row chrome (`surface` bg, `border`, radius 10, padding 12, gap 10) but with **static `Text`, no `TextInput`, no edit/delete/confirm affordances**: a kind label (13/600 `textSecondary`, human copy "Recent"/"Topic"/"Fact"/"Gift idea"), the fuel `text` (15/400 `textPrimary`), the optional `label` (13/600 `textSecondary`) when present, and the age via the shipped `formatFuelAge(created_at, now)` (13/600 `textSecondary`). testID `compose-fuel-item-{index}`.
    - Editing fuel is **not** offered here (stays on the profile `FuelEditor`).
 
@@ -201,9 +201,10 @@ On a successful `setStringAsync`, show a transient **"Copied"** confirmation for
 ## Registry Safety
 
 Not applicable — no shadcn, no external component registry. Native modules added this
-phase are first-party Expo packages, installed via `npx expo install` and registered
-in `app.config.ts`; both force a full `expo prebuild --clean` + release build for
-on-device UAT (not a JS-only Metro reload):
+phase are first-party Expo packages, installed via `npx expo install`. **Neither ships a
+config plugin — do NOT add an entry to the `app.config.ts` `plugins` array** (adding one is
+a prebuild error); autolinking picks them up. Both still force a full `expo prebuild --clean`
++ release build for on-device UAT (not a JS-only Metro reload):
 
 | Package | Role | API |
 |---------|------|-----|
