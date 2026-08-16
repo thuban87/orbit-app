@@ -4,11 +4,11 @@ milestone: v1.0
 milestone_name: milestone
 current_phase: 8
 current_phase_name: Dashboard & Never-Contacted Screen
-status: ready
-stopped_at: Completed 08-10-PLAN.md (retire standalone FuelSearch route/screen; Settings Search row -> Manage favourites, DASH-06/02)
-last_updated: "2026-08-16T06:00:00.000Z"
+status: passed
+stopped_at: "Phase 8 COMPLETE & VERIFIED — 10/10 plans executed + cross-AI converged (3 cycles, codex+claude, 12 findings) + code-reviewed (0 HIGH; 1 MED + 5 LOW all fixed) + on-device Pixel UAT (render/nav/favourite-write, no crashes) + 08-VERIFICATION passed. STOPPED here per owner directive (do NOT auto-start Phase 9 — context-rot). Commits local on main, NOT pushed."
+last_updated: "2026-08-16T06:20:00.000Z"
 last_activity: 2026-08-16
-last_activity_desc: Applied all six 08-CODE-REVIEW fixes (MEDIUM-1 + LOW-1..5), atomic commits on main — tsc/check:colors clean, npm test 666/666; 08-CODE-REVIEW status → fixed
+last_activity_desc: "Phase 8 verified passed (on-device UAT on the Pixel + code-review fixes). Milestone 8/16 (50%). Next: Phase 9 (Compose Screen & SMS Handoff) in a FRESH session — see 08 handoff."
 progress:
   total_phases: 16
   completed_phases: 8
