@@ -382,3 +382,121 @@ defer/reject it with rationale in that PLAN.md. Verified against source this cyc
 9. **[11-01/11-06]** Rename category id `decay-actions` → `decay_actions` (permanent identifier, defensive).
 10. **[11-03]** `clearSnooze` ALWAYS records an `unsnooze` event (not "optionally") — the events log is
     the only recovery mechanism.
+
+---
+
+# Orchestrator Merged Actionable Set — Cycle 2
+
+Cross-AI reviewer: **Codex** (codex-cli 0.144.1, default model). Re-reviewed the CURRENT (revised,
+commit bb99d4e) 13 PLAN.md files against the source on disk. This session (Claude/Opus) ran the
+source-grounding verification and the convergence assessment. Every load-bearing Codex claim was
+re-checked against the actual code before being accepted.
+
+CYCLE_SUMMARY: current_high=1 current_actionable=4
+
+## Cycle-1 HIGH disposition (all five RESOLVED, code-verified)
+
+- **H1 — RESOLVED.** `openAndMigrate()` is idempotent (`if (cachedDb) return cachedDb`,
+  src/db/database.ts:95) and `getExecutor()`→`getDb()` throws before open (database.ts:119); 11-07's
+  handler now `await openAndMigrate()` BEFORE `getExecutor()` — safe (no-op) on the foreground path,
+  and it opens+migrates in a fresh headless process. 11-01 installs + mocks `expo-task-manager`
+  (was absent from package.json). Killed-app write is logically sound; on-device headless delivery
+  stays an A2 Pixel-UAT gate.
+- **H2 — RESOLVED.** `actionUid(action,data)` is a PURE function
+  `notif:{action}:{kind}:{contactId}:{occurrenceKey}` (11-01), and `occurrenceKey` is minted at
+  schedule time (11-10) and carried IN the notification data payload — so it is stable across a
+  process restart. Both `interactions.uid` and events `uid` are `UNIQUE` (001-initial.ts:44,:99,:118);
+  the DAO inserts inside its transaction, so a re-delivered/cold-replayed tap collides on the UNIQUE
+  key and rolls back cleanly. The in-process `handledSet` is only the warm fast-path guard; the
+  durable dedup is the deterministic uid + UNIQUE rollback. `clearLastNotificationResponseAsync()`
+  is called after handling the cold-start response.
+- **H3 — RESOLVED.** 11-10 `reconcileSchedule` now does a FULL-REQUEST diff (`requestsEqual`
+  compares fire instant + channelId + categoryIdentifier + data) and cancels+reschedules under the
+  same stable identifier on ANY mismatch; 11-11 calls reconcile on every settings change. A
+  delivery-hour / quiet-window / lock-screen-channel edit now re-arms pending notifications
+  (re-privatise regression closed).
+- **H4 — RESOLVED (owner-ratification still pending).** All three channels are created at
+  `AndroidImportance.LOW` (11-06) — the genuinely silent, no-heads-up tier that is still visible in
+  the shade/lock screen; lock-screen visibility is expressed by PRIVATE/PUBLIC channel choice, never
+  a mutation. NOTE: 11-CONTEXT §"Alert feel" still records the DECIDED value as
+  `AndroidImportance.DEFAULT`; the plan hard-codes LOW to honour the stated INTENT (silent). This was
+  surfaced to the owner in cycle 1 and remains an owner sign-off item (the DECIDED text literally
+  says DEFAULT). Not a new finding.
+- **H5 — RESOLVED.** `listDecayEligibleCandidates` (11-04) drops the `>= WOBBLE_MAX` lower bound and
+  surfaces stable/wobble contacts plus `snooze_until`; `listBirthdayNotificationCandidates` returns
+  every non-archived contact with a birthday. 11-10 pre-schedules the future occurrence at
+  `max(dueDate, snooze_until)` + weekly ticks and the next day-of birthday. Reuses status.ts
+  (WOBBLE_MAX=1.0, ROGUE_K=3) and birthday-logic (this-year-or-next occurrence) — verified.
+
+## Current HIGH Concerns
+
+- **[11-07 / 11-09 / and the edit-save path] State changes made OUTSIDE a foreground reconcile do
+  not update the OS schedule, so a pre-scheduled notification can fire during a snooze / after a mute
+  — violating NOTIF-03.** The reconcile is launch/foreground-sweep-only (the DECIDED NOTIF-01
+  cadence). But: (a) the in-app profile snooze (11-09 Task 3) writes `snooze_until` and only re-runs
+  the profile `load()` — it neither cancels the already-scheduled `decay:<id>` alarm nor arms the
+  post-snooze one; (b) the edit-save path relabels the mute toggle (11-09 Task 1) but nothing cancels
+  the pending notification when a contact is muted or its interval changes; (c) the headless snooze
+  (11-07) cancels the current notification but does not pre-arm the +1-week occurrence. Because H5 now
+  keeps a future-dated notification sitting in the OS queue for every eligible contact, an in-app
+  snooze/mute of a contact whose notification is imminent (e.g. tomorrow morning) is defeated if the
+  user does not foreground the app again before it fires. This is a NOTIF-03 correctness gap, not a
+  reversal of the reconcile-on-foreground decision — the fix is ADDITIVE and compatible with it.
+  **Fix:** call `reconcileSchedule(getExecutor())` (or a targeted per-contact cancel+reschedule) after
+  the in-app snooze/clear write (11-09), after the edit-save mute/interval write, and after the
+  headless mark/snooze (11-07) so the OS schedule reflects the change immediately; add a
+  "snooze-before-scheduled-fire suppresses the notification" test. Confirm with the owner whether the
+  headless-snooze post-arm may remain launch-deferred (within the DECIDED cadence).
+
+## Current Actionable Non-HIGH Concerns
+
+- **[11-13 / 11-01] MEDIUM — No foreground-presentation handler is planned.** No
+  `Notifications.setNotificationHandler` anywhere in the plans or src; App init (11-13) only creates
+  channels/category and installs the sweep. Expo's default suppresses a notification that fires while
+  the app is foregrounded. Impact is narrow (a morning nudge landing while the app is open is an edge
+  case, and suppressing an in-app nudge may even be desirable), and tap/action routing is unaffected
+  (it uses the response listener + `getLastNotificationResponseAsync`, independent of the handler).
+  **Change:** make an explicit decision in 11-13; if presentation is wanted, add a module-scope
+  `setNotificationHandler` that preserves silence (`shouldPlaySound:false`, no banner, list/shade
+  only) and add its stub to the 11-01 mock.
+- **[11-10] MEDIUM — Malformed birthday is not guarded before scheduling.**
+  `listBirthdayNotificationCandidates` returns every row with `birthday IS NOT NULL` (11-04:69) with
+  no parseability check; 11-10's behavior computes `nextBday = today + daysUntilBirthday(birthday,
+  today)`, but `daysUntilBirthday` returns `null` for malformed/calendar-invalid input
+  (birthday-logic.ts:140) — `today + null` yields an Invalid Date, not a throw, so the per-candidate
+  try/catch does not necessarily catch it. **Change:** in 11-10, skip the candidate when
+  `daysUntilBirthday(...)` is `null`; add a malformed-birthday-row test.
+- **[11-10] LOW — `requestsEqual` omits the content body.** The full-request diff compares fire
+  instant + channel + category + data, but not `content.body`; `decayBody(name)`/`birthdayBody(name)`
+  freeze the contact name at schedule time, so a renamed contact keeps stale (generic, name-only)
+  text until its fire-instant/occurrenceKey changes. **Change:** include `content.body` (and title) in
+  `requestsEqual`, or document the accepted staleness.
+- **[11-05 / 11-10] LOW (confirm intent) — Overdue-while-closed contacts may wait up to ~6 days for
+  the first nudge.** `nextNudgeDate` anchors the weekly cadence to the due date and returns the next
+  today-or-future tick (11-05:61), so a contact that crossed overdue while the app was closed can have
+  its first post-reopen notification scheduled up to a week out rather than the next morning. Confirm
+  this matches the intended calm cadence; if an overdue contact should get a next-morning nudge on
+  reopen, add a "schedule today if already overdue" branch.
+
+Minor/cosmetic (no change to behavior): 11-06 Task-1 `<name>` still reads "DEFAULT-importance channel
+set" — a stale leftover; the task body correctly specifies `AndroidImportance.LOW`.
+
+## Assessment (convergence — Claude/Opus, code-verified)
+
+The revision cleanly resolves all five cycle-1 HIGHs, and each fix is grounded in the real code
+(openAndMigrate idempotency, UNIQUE(uid) rollback with a payload-carried deterministic occurrenceKey,
+the full-request diff, LOW importance, the lower-bound/​snooze-surfacing read change). No cycle-1 HIGH
+remains open. The one remaining HIGH is a still-open (not newly-introduced) coherence gap that H5
+made more consequential: user/headless state changes do not push to the OS schedule until the next
+foreground reconcile, so an in-app snooze/mute can be defeated by an already-pre-scheduled
+notification — a NOTIF-03 violation whose fix is additive and does not touch the DECIDED
+reconcile-on-foreground cadence. The four actionable items (foreground handler, malformed-birthday
+guard, body in the diff, overdue-cadence intent) are incremental. No unauthorized reversal of a
+[DECIDED]/[REJECTED]/owner-LOCKED item was found; the H4 LOW-vs-DECIDED-DEFAULT choice remains the
+already-surfaced owner sign-off item.
+
+### Consensus
+Single external reviewer (Codex) + this session's code-grounded verification. Codex rated two NEW
+concerns HIGH; on source-grounding, one (state-change reconcile / NOTIF-03) is retained as HIGH and
+the other (foreground handler) is downgraded to MEDIUM (narrow impact, tap routing unaffected). H1–H5
+independently confirmed RESOLVED against the source.
