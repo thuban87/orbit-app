@@ -106,12 +106,27 @@ export function HomeScreen() {
     [],
   );
   // The live search term — LOCAL state (not persisted, unlike sort/filter): a
-  // present term switches the list to the search result set via the DAO.
+  // present term switches the list to the search result set via the DAO. `term`
+  // is the immediate controlled-input value; `debouncedTerm` lags it and is what
+  // the read + the empty-state gate key on, so a burst of keystrokes fires ONE
+  // read after the burst settles rather than a full reload (list + counts +
+  // categories) per keystroke (LOW-4).
   const [term, setTerm] = useState("");
+  const [debouncedTerm, setDebouncedTerm] = useState("");
   const [error, setError] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
-  const hasTerm = term.trim() !== "";
+  // Debounce the term: settle ~220ms after the last keystroke. The empty-state
+  // gate reads `debouncedTerm` (via `hasTerm` below) so it stays consistent with
+  // the rows the read actually produced; the clear button uses the immediate
+  // `term` so it appears/hides without lag.
+  useEffect(() => {
+    const id = setTimeout(() => setDebouncedTerm(term), 220);
+    return () => clearTimeout(id);
+  }, [term]);
+
+  const hasTerm = debouncedTerm.trim() !== "";
+  const showClear = term.trim() !== "";
 
   /**
    * The single load: `listDashboard` + the four counts, guarded by a `cancelled`
@@ -126,7 +141,7 @@ export function HomeScreen() {
         const exec = getExecutor();
         const [list, live, neverContacted, snoozed, archived, cats] =
           await Promise.all([
-            listDashboard(exec, { filter, sort, term }),
+            listDashboard(exec, { filter, sort, term: debouncedTerm }),
             countLiveContacts(exec),
             countNeverContacted(exec),
             countSnoozed(exec),
@@ -151,7 +166,7 @@ export function HomeScreen() {
     return () => {
       cancelled = true;
     };
-  }, [filter, sort, term]);
+  }, [filter, sort, debouncedTerm]);
 
   // Freshness path 1 — re-query every time the dashboard regains focus.
   useFocusEffect(
@@ -271,7 +286,7 @@ export function HomeScreen() {
             },
           ]}
         />
-        {hasTerm ? (
+        {showClear ? (
           <Pressable
             testID="dashboard-search-clear"
             accessibilityRole="button"
@@ -431,7 +446,7 @@ export function HomeScreen() {
     // also active — never the hidden-population or filter copy.
     <View testID="dashboard-search-empty" style={styles.emptyState}>
       <Text style={[styles.emptyBody, { color: colors.textSecondary }]}>
-        {`No matches for "${term.trim()}"`}
+        {`No matches for "${debouncedTerm.trim()}"`}
       </Text>
     </View>
   ) : emptyState === "filter-empty" ? (
