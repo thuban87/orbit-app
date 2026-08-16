@@ -19,7 +19,6 @@ import {
   listFuelForEditor,
   RANK_CASE,
   RANKED_FUEL_EXCLUSIONS,
-  searchFuel,
 } from "@/db/fuel-read";
 import { migration001 } from "@/db/migrations/001-initial";
 import { runMigrations } from "@/db/migrations/runner";
@@ -45,16 +44,6 @@ async function seedContact(name = "Alex"): Promise<number> {
     `INSERT INTO contacts (uid, name, interval_days, created_at, modified_at)
      VALUES (?, ?, ?, ?, ?)`,
     [uid(), name, 30, NOW, NOW],
-  );
-  return result.lastInsertRowId;
-}
-
-/** Seed an ARCHIVED contact (archived_at set) — for the exclusion sweep. */
-async function seedArchivedContact(name = "Archie"): Promise<number> {
-  const result = await exec.runAsync(
-    `INSERT INTO contacts (uid, name, interval_days, archived_at, created_at, modified_at)
-     VALUES (?, ?, ?, ?, ?, ?)`,
-    [uid(), name, 30, NOW, NOW, NOW],
   );
   return result.lastInsertRowId;
 }
@@ -376,136 +365,6 @@ describe("getRankedFuel — off_limits / source='ai' / blank excluded in-query, 
     const rows = await getRankedFuel(exec, c);
     // Compare the SAME row set on both sides (never the full mixed fixture).
     expect(rows.map((r) => r.id)).toEqual(expectedIds);
-  });
-});
-
-/** Insert one fuel row with an explicit text/kind/source against `c`. */
-async function addFuelRow(
-  c: number,
-  opts: { kind?: FuelKind; text: string | null; source?: string },
-): Promise<void> {
-  await addFuel(exec, {
-    uid: uid(),
-    contactId: c,
-    kind: opts.kind ?? "topic",
-    text: opts.text,
-    createdAt: NOW,
-    source: opts.source ?? "user",
-    now: NOW,
-  });
-}
-
-describe("searchFuel — name OR fuel text, off_limits/ai/archived excluded, escaped", () => {
-  it("returns [] for an empty or whitespace-only term (guarded before querying)", async () => {
-    const c = await seedContact("Alex");
-    await addFuelRow(c, { text: "likes climbing" });
-    expect(await searchFuel(exec, "")).toEqual([]);
-    expect(await searchFuel(exec, "   \n\t ")).toEqual([]);
-  });
-
-  it("a NAME-only match returns the contact with snippet null", async () => {
-    const c = await seedContact("Alex");
-    // A fuel row that does NOT contain the term — so the match is name-only.
-    await addFuelRow(c, { text: "likes climbing" });
-    const rows = await searchFuel(exec, "ale");
-    expect(rows).toEqual([{ contactId: c, name: "Alex", snippet: null }]);
-  });
-
-  it("a FUEL-TEXT match returns the contact with the matching snippet", async () => {
-    const c = await seedContact("Blair");
-    await addFuelRow(c, { text: "just got back from Kyoto" });
-    const rows = await searchFuel(exec, "kyoto");
-    expect(rows).toEqual([
-      { contactId: c, name: "Blair", snippet: "just got back from Kyoto" },
-    ]);
-  });
-
-  it("an off_limits row containing the term NEVER matches and never surfaces as a snippet", async () => {
-    const c = await seedContact("Blair");
-    await addFuelRow(c, { kind: "off_limits", text: "secret divorce news" });
-    const rows = await searchFuel(exec, "divorce");
-    expect(rows).toEqual([]);
-    // And even when the contact matches by name, off_limits is never the snippet.
-    const c2 = await seedContact("Divorcia");
-    await addFuelRow(c2, { kind: "off_limits", text: "divorce filing" });
-    const byName = await searchFuel(exec, "divorc");
-    expect(byName).toEqual([
-      { contactId: c2, name: "Divorcia", snippet: null },
-    ]);
-  });
-
-  it("an unconfirmed source='ai' row NEVER matches; manual/user/share with the same text DO", async () => {
-    const aiC = await seedContact("Aiden");
-    await addFuelRow(aiC, { text: "loves jazz", source: "ai" });
-    // The name 'Aiden' must not be what surfaces it — search a fuel-only term.
-    expect(await searchFuel(exec, "jazz")).toEqual([]);
-
-    const manualC = await seedContact("Manny");
-    await addFuelRow(manualC, { text: "loves jazz", source: "manual" });
-    const userC = await seedContact("Uma");
-    await addFuelRow(userC, { text: "loves jazz", source: "user" });
-    const shareC = await seedContact("Shanna");
-    await addFuelRow(shareC, { text: "loves jazz", source: "share" });
-
-    const rows = await searchFuel(exec, "jazz");
-    // Ordered by name: Manny, Shanna, Uma — Aiden's 'ai' row excluded.
-    expect(rows).toEqual([
-      { contactId: manualC, name: "Manny", snippet: "loves jazz" },
-      { contactId: shareC, name: "Shanna", snippet: "loves jazz" },
-      { contactId: userC, name: "Uma", snippet: "loves jazz" },
-    ]);
-  });
-
-  it("an archived contact whose name OR fuel matches is NEVER returned", async () => {
-    const archived = await seedArchivedContact("Archie");
-    await addFuelRow(archived, { text: "mentions archery" });
-    // Matches by name ('Archie') and by fuel text ('archery') — still excluded.
-    expect(await searchFuel(exec, "arch")).toEqual([]);
-  });
-
-  it("literal-% ESCAPE: '50%' matches only a row literally containing % (not a wildcard)", async () => {
-    const hit = await seedContact("Percy");
-    await addFuelRow(hit, { text: "got a 50% raise" });
-    const miss = await seedContact("Fifty");
-    await addFuelRow(miss, { text: "turned 50 last week" });
-    const rows = await searchFuel(exec, "50%");
-    expect(rows).toEqual([
-      { contactId: hit, name: "Percy", snippet: "got a 50% raise" },
-    ]);
-  });
-
-  it("literal-_ ESCAPE: 'a_b' matches only a row literally containing _ (not a single-char wildcard)", async () => {
-    const hit = await seedContact("Uncle");
-    await addFuelRow(hit, { text: "handle is a_b online" });
-    const miss = await seedContact("Axb");
-    await addFuelRow(miss, { text: "handle is axb online" });
-    const rows = await searchFuel(exec, "a_b");
-    expect(rows).toEqual([
-      { contactId: hit, name: "Uncle", snippet: "handle is a_b online" },
-    ]);
-  });
-
-  it("literal-backslash ESCAPE: 'path\\to' matches a row containing a backslash (\\ treated as data)", async () => {
-    const hit = await seedContact("Bakke");
-    await addFuelRow(hit, { text: "config lives at path\\to\\file" });
-    const rows = await searchFuel(exec, "path\\to");
-    expect(rows).toEqual([
-      {
-        contactId: hit,
-        name: "Bakke",
-        snippet: "config lives at path\\to\\file",
-      },
-    ]);
-  });
-
-  it("dedups: a contact with TWO matching fuel rows appears exactly once", async () => {
-    const c = await seedContact("Dana");
-    await addFuelRow(c, { text: "loves sushi" });
-    await addFuelRow(c, { text: "sushi every friday" });
-    const rows = await searchFuel(exec, "sushi");
-    expect(rows.length).toBe(1);
-    expect(rows[0]?.contactId).toBe(c);
-    expect(rows[0]?.snippet).toContain("sushi");
   });
 });
 

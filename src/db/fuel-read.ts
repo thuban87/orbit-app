@@ -7,8 +7,11 @@
  * =============================================================================
  * LOAD-BEARING READ-PATH RULES — READ BEFORE ADDING A READER:
  *   1. This file is the ONLY user-facing / projection fuel read path. Every
- *      projection added later (getRankedFuel, Plan 02; searchFuel, Plan 04) lands
- *      HERE. purge-dao's MAINTENANCE reads — the impact count at `purge-dao.ts:105`
+ *      projection added later (getRankedFuel, Plan 02) lands HERE. (The standalone
+ *      cross-contact `searchFuel` projection was retired in Phase 8 — dashboard
+ *      search now lives in `dashboard-read.ts`'s `listDashboard`, which reuses the
+ *      shared `RANKED_FUEL_EXCLUSIONS` / `escapeLike` exports below.) purge-dao's
+ *      MAINTENANCE reads — the impact count at `purge-dao.ts:105`
  *      (`SELECT COUNT(*) … FROM fuel`) and the delete fan-out at `:188`
  *      (`DELETE FROM fuel …`) — are a SEPARATE maintenance path and are EXPLICITLY
  *      EXEMPT: do NOT "consolidate" them here (that would duplicate the purge
@@ -150,14 +153,6 @@ export function getRankedFuel(
   return exec.getAllAsync<FuelItem>(RANKED_FUEL, [contactId]);
 }
 
-/** One cross-contact search hit: a matching contact + one matching snippet. */
-export interface FuelSearchResult {
-  contactId: number;
-  name: string;
-  /** A matching non-off_limits, non-'ai' fuel text, or null on a name-only match. */
-  snippet: string | null;
-}
-
 /**
  * Escape a raw search term's LIKE metacharacters so `%` and `_` match ONLY a
  * row that literally contains that character — a `?`-bind stops SQL injection
@@ -172,60 +167,4 @@ export interface FuelSearchResult {
  */
 export function escapeLike(term: string): string {
   return term.replace(/\\/g, "\\\\").replace(/%/g, "\\%").replace(/_/g, "\\_");
-}
-
-/**
- * Cross-contact fuel search (FUEL-05). A contact matches when its `name` LIKE
- * %term% OR it has a non-off_limits, non-'ai' fuel row whose `text` LIKE %term%;
- * `snippet` is one such matching fuel text (NULL when the match was on name
- * only). One row per matching contact, ordered by `name`.
- *
- * COHERENCE WITH getRankedFuel (Addresses review HIGH-1): search excludes BOTH
- * off_limits AND unconfirmed source='ai', exactly mirroring `getRankedFuel`'s
- * exclusions — FUEL-05 mandates only off_limits, so the AI exclusion is a safe
- * SUPERSET that keeps an unconfirmed AI proposal a profile-only concept until
- * Plan 03's confirm flips 'ai' → 'manual', after which the row becomes
- * searchable. The two exclusions live IN THE QUERY (both the snippet subquery
- * AND the EXISTS predicate), never as a UI `.filter()` that could be refactored
- * away — the "off_limits never surfaces at a glance" guarantee is structural.
- *
- * ASCII-only case folding is EXPECTED, not a bug: SQLite's built-in LIKE folds
- * only ASCII (ICU is absent — dossier Cluster F). Do NOT "fix" it.
- *
- * SECURITY: the term is `?`-bound AND its LIKE metacharacters are escaped, with
- * `LIKE ? ESCAPE '\'` on ALL THREE predicates (name, snippet subquery, EXISTS)
- * — binding alone does not make `%`/`_` literal (T-07-04). The query is a static
- * string; no identifier or value is interpolated. Archived contacts
- * (`archived_at IS NOT NULL`) are excluded. Pure read — no transaction, no
- * network. An empty/whitespace term returns `[]` before querying.
- */
-const SEARCH_FUEL = `SELECT c.id AS contactId,
-         c.name AS name,
-         (SELECT f.text
-            FROM fuel f
-           WHERE f.contact_id = c.id
-             AND f.kind != 'off_limits'
-             AND f.source != 'ai'
-             AND f.text LIKE ? ESCAPE '\\'
-           LIMIT 1) AS snippet
-    FROM contacts c
-   WHERE c.archived_at IS NULL
-     AND (
-       c.name LIKE ? ESCAPE '\\'
-       OR EXISTS (SELECT 1
-                    FROM fuel f2
-                   WHERE f2.contact_id = c.id
-                     AND f2.kind != 'off_limits'
-                     AND f2.source != 'ai'
-                     AND f2.text LIKE ? ESCAPE '\\')
-     )
-   ORDER BY c.name`;
-
-export function searchFuel(
-  exec: SqlExecutor,
-  term: string,
-): Promise<FuelSearchResult[]> {
-  if (term.trim() === "") return Promise.resolve([]);
-  const like = `%${escapeLike(term)}%`;
-  return exec.getAllAsync<FuelSearchResult>(SEARCH_FUEL, [like, like, like]);
 }
