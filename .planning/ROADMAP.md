@@ -355,7 +355,7 @@ Recorded here because they bind phases that do not own them. Every planner/execu
 
 **Wave 3** *(blocked on Wave 2)*
 
-- [ ] 08-07-PLAN.md — HomeScreen → dashboard core (list + freshness + banner + counts + footer + empty states) (DASH-01, DASH-03, DASH-04, DASH-05, DASH-07)
+- [x] 08-07-PLAN.md — HomeScreen → dashboard core (list + freshness + banner + counts + footer + empty states) (DASH-01, DASH-03, DASH-04, DASH-05, DASH-07)
 - [x] 08-08-PLAN.md — ManageFavouritesScreen + drag-lib owner checkpoint + ManageFavourites route (DASH-06)
 
 **Wave 4** *(blocked on Wave 3)*

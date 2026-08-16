@@ -5,15 +5,15 @@ milestone_name: milestone
 current_phase: 8
 current_phase_name: Dashboard & Never-Contacted Screen
 status: ready
-stopped_at: Completed 08-08-PLAN.md (Manage-favourites drag-reorder screen + route, DASH-06)
-last_updated: "2026-08-16T00:10:00.000Z"
+stopped_at: Completed 08-07-PLAN.md (HomeScreen → dashboard core — list + freshness + banner + counts + footer + empty states, DASH-01/03/04/05/07)
+last_updated: "2026-08-16T05:19:34.723Z"
 last_activity: 2026-08-16
-last_activity_desc: Completed 08-08 (Manage-favourites drag-reorder screen)
+last_activity_desc: Completed 08-07 (HomeScreen → dashboard core)
 progress:
   total_phases: 16
   completed_phases: 7
   total_plans: 56
-  completed_plans: 54
+  completed_plans: 55
   percent: 44
 ---
 
@@ -29,8 +29,8 @@ See: .planning/PROJECT.md (updated 2026-08-14)
 ## Current Position
 
 Phase: 8 (Dashboard & Never-Contacted Screen) — EXECUTING
-Next: on-device UAT on the Pixel (fuel search: a name and a fuel word both return the contact; off_limits-only term returns no match; archived contact never appears — plus the 07-03 Suggested-by-AI/Confirm/Dismiss flow) + `/gsd-verify-work 7`
-Last activity: 2026-08-16 — Phase 8 execution started
+Next: Plan 08-09 (dashboard controls — filter chips + sort control + live search box). OPEN owner decision from 08-07: the dashboard rewrite removed the app's only Settings entry point and no phase-8 plan replaces it — decide the dashboard's Settings affordance (candidate: fold into Plan 09's header pass) before end-of-phase Pixel UAT.
+Last activity: 2026-08-16 — Completed 08-07 (HomeScreen → dashboard core)
 
 Progress: [████░░░░░░] 38% (6/16 phases complete)
 
@@ -107,6 +107,7 @@ Progress: [████░░░░░░] 38% (6/16 phases complete)
 | Phase 08 P05 | 2min | 2 tasks | 3 files |
 | Phase 08 P06 | 2min | 2 tasks | 4 files |
 | Phase 08 P08 | 4min | 2 tasks | 4 files |
+| Phase 08 P07 | 6min | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -190,9 +191,11 @@ Foundational decisions affecting current work:
 
 - [Phase 8]: 08-08: ManageFavouritesScreen (DASH-06) is the shared drag-reorder favourites home — reorder-ONLY (marking stays the profile star). Owner APPROVED adding react-native-reorderable-list@0.18.1 at the blocking-human legitimacy checkpoint (T-08-SC; created 2021, ~92k dl/wk, MIT, Reanimated-4-maintained), installed via `npx expo install`; the no-dep up/down-arrow fallback was NOT built. Loads listFavourites via an async cancelled-flag focus effect (offline); each row (FavouriteReorderRow, split so useReorderableDrag() runs inside a ReorderableList cell) = Avatar + name + a drag handle whose onPressIn starts the drag. onReorder computes computeReorder(currentIds, from, to) inside the setRows updater, mirrors local rows via an id→row Map, and fires rewriteFavouriteRanks(getExecutor(), newIds, localDateTime()) in ONE transaction (fire-and-forget; a persist failure alerts + re-reads via load()) — the tested reorder math + guarded DAO are reused verbatim, inWriteTransaction never nested (Pitfall 6). Drag/animation is entirely Reanimated-worklet-driven (no per-frame setState, CLAUDE.md); ReorderableList is a FlatList so Avatar's recyclingKey (contactId + cacheBust=modified_at) correctness holds. Route registered ADDITIVELY (types.ts ManageFavourites: undefined after NeverContacted + RootNavigator Stack.Screen); FuelSearch + NeverContacted untouched. Locked testIDs manage-favourites-root / -row-{id} / -handle-{id}. tsc + check:colors green; npm test 665/665. Navigation entry points (favourites-chip Manage, Plan 09; Settings row, Plan 10) land later by design; .tsx render + native drag is Pixel-UAT (drag perf only assessable on the physical Pixel).
 
+- [Phase 8]: 08-07: HomeScreen IS the dashboard core now. `selectDashboardEmptyState` (src/logic/dashboard-empty-logic.ts, pure/node-tested, 11 cases) is the SINGLE empty-state gate — explicit precedence rowCount>0→'none' → hasTerm→'search-empty' → activeFilter!=='all'→'filter-empty' → (unfiltered) all-four-populations-zero→'firstrun' else 'hidden'. First-run REQUIRES live===0 && neverContacted===0 && snoozed===0 && archived===0 (HIGH-2 — never-contacted-only / snoozed-only / archived-only users get the hidden-population pointer, NOT "Add your first contact"); the filter/search empties win BEFORE the population fallback so a zero-result filter/search over a non-empty population never shows the hidden copy (MEDIUM-4). No inline count arithmetic in the .tsx. HomeScreen renders the status-sorted listDashboard population as ContactCards (→Profile), mounts BirthdayBanner at top (→Profile), shows the "{N} contacts" header from countLiveContacts (only when live>0), and Not-yet-contacted(N)→NeverContacted + count-less Archived→Archived footer entries. FRESHNESS = useFocusEffect + AppState→"active" + pull-to-refresh (RefreshControl accent tint), a single reload() returning its own cancelled-flag canceller, async reads ONLY — the connection-scoped change listener is deliberately NOT used (T-08-18, blind to headless writes); grep-verified 0 addDatabaseChangeListener / 0 getAllSync|getFirstSync. filter-empty renders a calm generic region (dashboard-empty-filter) for now; the filter-specific + search-empty copy + the live chips/search box land in Plan 09 (threading activeFilter/hasTerm into the SAME gate). All colours via useTheme().colors.*; dashboard-root testID. tsc + check:colors clean; npm test 676/676. **OPEN owner decision:** the rewrite removed home-settings-entry — the app's ONLY navigate("Settings") path — and no phase-8 plan (07–10) adds a dashboard→Settings affordance (the UI-SPEC dashboard surface defines none). Settings/CustomFields/Archived-via-Settings/Manage-favourites-row are UI-unreachable until resolved; flagged in 08-07-SUMMARY (not auto-fixed — placement is a product/navigation call). Resolve before end-of-phase Pixel UAT.
+
 ### Pending Todos
 
-None yet.
+- **[08-07, owner decision] Dashboard has no Settings entry point.** The old placeholder HomeScreen's `home-settings-entry` was the sole path to the Settings screen; the dashboard rewrite removed it and the 08-UI-SPEC dashboard surface specs no replacement. Decide the affordance (gear in a header row / overflow / footer entry) and add it — candidate home is Plan 09's dashboard-controls header pass. Blocks a clean end-of-phase UAT (Settings currently unreachable).
 
 ### Blockers/Concerns
 
@@ -224,8 +227,8 @@ planning" sections in docs/dossier/*.md — those are the authoritative hand-off
 
 ## Session
 
-**Last session:** 2026-08-16T00:10:00.000Z
-**Stopped at:** Completed 08-08-PLAN.md (Manage-favourites drag-reorder screen + route, DASH-06)
+**Last session:** 2026-08-16T05:19:34.711Z
+**Stopped at:** Completed 08-07-PLAN.md (HomeScreen → dashboard core, DASH-01/03/04/05/07)
 **Resume file:** None
 
 ## Phase 4 — Closeout (2026-08-15) ✅ COMPLETE
