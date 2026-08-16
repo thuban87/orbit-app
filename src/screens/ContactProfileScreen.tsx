@@ -64,6 +64,7 @@ import {
   editTouchpointFull,
   recordTouchpoint,
 } from "@/db/recency-dao";
+import { clearSnooze, type SnoozePreset, snoozeContact } from "@/db/snooze-dao";
 import {
   listTimeline,
   type TimelineItem,
@@ -77,10 +78,27 @@ import {
   computeContactIntensity,
 } from "@/services/impact";
 import type { IntensityResult } from "@/services/intensity-logic";
+import { reconcileSchedule } from "@/services/notifications/notification-schedule";
 import { useTheme } from "@/theme";
+import { formatLocalDate } from "@/utils/dates";
 import { Logger } from "@/utils/logger";
 
 const LOG_SCOPE = "contact-profile";
+
+/**
+ * The in-app snooze presets (NOTIF-03) rendered as a row of tap-to-snooze chips.
+ * Each writes `snooze_until` through the mutexed snooze-dao. Order is display
+ * order; the labels are the UI-SPEC §3 copy.
+ */
+const SNOOZE_PRESETS: {
+  preset: SnoozePreset;
+  testID: string;
+  label: string;
+}[] = [
+  { preset: "3d", testID: "contact-profile-snooze-3d", label: "3 days" },
+  { preset: "1w", testID: "contact-profile-snooze-1w", label: "1 week" },
+  { preset: "1m", testID: "contact-profile-snooze-1m", label: "1 month" },
+];
 
 /**
  * Human copy for a rogue reason (in-app label only — never a notification).
@@ -109,6 +127,12 @@ type Header = {
   modified_at: string;
   /** The contact's favourite rank, or null — drives the header star's state. */
   favourite_rank: number | null;
+  /**
+   * The contact's active snooze date (`YYYY-MM-DD`) or null — drives the
+   * Snooze-reminders status line. Rendered DIRECTLY as a local date string
+   * (never `new Date(str)`, which would reintroduce the forbidden UTC off-by-one).
+   */
+  snooze_until: string | null;
 };
 
 export function ContactProfileScreen({
@@ -273,6 +297,68 @@ export function ContactProfileScreen({
       Alert.alert("Couldn't update favourite", "Please try again.");
     }
   }, [contactId, header?.favourite_rank, load]);
+
+  // In-app snooze presets (NOTIF-03): write snooze_until through the mutexed
+  // snooze-dao (uid minted here, local wall-clock now), then the SINGLE unified
+  // load() reconciles the header so the status line reflects the fresh row.
+  // Reversible, non-destructive → NO confirmation dialog. REVIEW ITEM B — after
+  // the write, fire reconcileSchedule (fire-and-forget, Logger-guarded, NOT
+  // awaited into the tap handler) so the pre-parked decay notification is
+  // cancelled and re-armed PAST snooze_until immediately — otherwise the already-
+  // scheduled notification would fire DURING the snooze. The app is alive here so
+  // channels exist and a full reconcile is safe (same pattern as the settings-
+  // change reconcile); reconcileSchedule is self-coordinating so it reads the
+  // freshly-committed row.
+  const doSnooze = useCallback(
+    async (preset: SnoozePreset) => {
+      try {
+        await snoozeContact(getExecutor(), {
+          contactId,
+          uid: newUid(),
+          preset,
+          now: localDateTime(),
+        });
+        await load();
+        void reconcileSchedule(getExecutor()).catch((e) =>
+          Logger.error(LOG_SCOPE, "reconcile after snooze failed", e),
+        );
+      } catch (err) {
+        Logger.error(LOG_SCOPE, "failed to snooze contact", err);
+        Alert.alert("Couldn't snooze", "Please try again.");
+      }
+    },
+    [contactId, load],
+  );
+
+  // Clear an active snooze (NULLs snooze_until, always writing an unsnooze event —
+  // item 10) then the unified load() reconciles the header, and reconcileSchedule
+  // re-arms the normal cadence immediately (item B, same fire-and-forget contract).
+  const doClearSnooze = useCallback(async () => {
+    try {
+      await clearSnooze(getExecutor(), {
+        contactId,
+        uid: newUid(),
+        now: localDateTime(),
+      });
+      await load();
+      void reconcileSchedule(getExecutor()).catch((e) =>
+        Logger.error(LOG_SCOPE, "reconcile after clear-snooze failed", e),
+      );
+    } catch (err) {
+      Logger.error(LOG_SCOPE, "failed to clear snooze", err);
+      Alert.alert("Couldn't clear snooze", "Please try again.");
+    }
+  }, [contactId, load]);
+
+  // Snoozed IFF snooze_until is a FUTURE local date. Both sides are bare local
+  // YYYY-MM-DD (the stored string + today via formatLocalDate), so a lexicographic
+  // string compare is correct — NEVER construct a Date from the stored string
+  // (that reintroduces the forbidden UTC evening off-by-one; review item 7). This
+  // mirrors the dashboard's bare-date snooze contract (snooze_until <= today =
+  // expired).
+  const isSnoozed =
+    header?.snooze_until != null &&
+    header.snooze_until > formatLocalDate(new Date());
 
   // Open the refine form for a touchpoint (LOG-01). Seed the controlled value
   // from the stored row verbatim — occurred_at flows in as-is, and the form
@@ -519,7 +605,9 @@ export function ContactProfileScreen({
         <Pressable
           testID="contact-profile-favourite-star"
           accessibilityRole="button"
-          accessibilityLabel={isFavourite ? "Remove favourite" : "Mark favourite"}
+          accessibilityLabel={
+            isFavourite ? "Remove favourite" : "Mark favourite"
+          }
           accessibilityState={{ selected: isFavourite }}
           onPress={() => void doToggleFavourite()}
           style={styles.favouriteStar}
@@ -627,6 +715,67 @@ export function ContactProfileScreen({
           Log contact
         </Text>
       </Pressable>
+
+      {/* Snooze reminders (NOTIF-03) — three tap-to-snooze presets in the
+          FilterChipRow filled-accent idiom (rendered in the unselected state:
+          surface fill + border + textSecondary label — none is a persisted
+          selection, they are actions). Each writes snooze_until through the
+          mutexed snooze-dao then re-drives the OS schedule (item B). A "Snoozed
+          until {date}" status + Clear affordance appear only while a future
+          snooze is active. Reversible, no confirmation, no danger token — the
+          block is state-neutral (UI-SPEC §3). */}
+      <View testID="contact-profile-snooze" style={styles.snooze}>
+        <Text style={[styles.sectionHeading, { color: colors.textSecondary }]}>
+          Snooze reminders
+        </Text>
+        <View style={styles.snoozeChips}>
+          {SNOOZE_PRESETS.map(({ preset, testID, label }) => (
+            <Pressable
+              key={preset}
+              testID={testID}
+              accessibilityRole="button"
+              accessibilityLabel={label}
+              onPress={() => void doSnooze(preset)}
+              style={[
+                styles.snoozeChip,
+                { backgroundColor: colors.surface, borderColor: colors.border },
+              ]}
+            >
+              <Text
+                numberOfLines={1}
+                style={[
+                  styles.snoozeChipLabel,
+                  { color: colors.textSecondary },
+                ]}
+              >
+                {label}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
+        {isSnoozed ? (
+          <View style={styles.snoozeStatusRow}>
+            {/* Render the stored YYYY-MM-DD DIRECTLY (item 7) — it is already the
+                correct local date; new Date(snooze_until) would re-add the UTC
+                off-by-one. */}
+            <Text
+              testID="contact-profile-snooze-status"
+              style={[styles.snoozeStatus, { color: colors.textSecondary }]}
+            >
+              Snoozed until {header?.snooze_until}
+            </Text>
+            <Pressable
+              testID="contact-profile-snooze-clear"
+              accessibilityRole="button"
+              accessibilityLabel="Clear snooze"
+              onPress={() => void doClearSnooze()}
+              style={[styles.snoozeClear, { borderColor: colors.border }]}
+            >
+              <Text style={{ color: colors.textSecondary }}>Clear snooze</Text>
+            </Pressable>
+          </View>
+        ) : null}
+      </View>
 
       {/* Impact section — gravity + intensity (LOG-03), both derived-never-stored
           and PROFILE-ONLY (Cluster G: nothing log-derived on the dashboard card).
@@ -820,6 +969,41 @@ const styles = StyleSheet.create({
   logContactText: {
     fontSize: 16,
     fontWeight: "700",
+  },
+  snooze: {
+    gap: 8,
+  },
+  snoozeChips: {
+    flexDirection: "row",
+    gap: 8,
+  },
+  snoozeChip: {
+    minHeight: 44,
+    justifyContent: "center",
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+  },
+  snoozeChipLabel: {
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  snoozeStatusRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+  },
+  snoozeStatus: {
+    fontSize: 13,
+    fontWeight: "600",
+  },
+  snoozeClear: {
+    minHeight: 44,
+    justifyContent: "center",
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 12,
   },
   impact: {
     gap: 8,
