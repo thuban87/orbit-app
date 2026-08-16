@@ -154,3 +154,27 @@ lengths, timing, mute placement) plus the 7 orchestrator picks.
 - Widget headless-write path + its Back→dashboard model (Phase 12 inherits this domain's pattern).
 
 </deferred>
+
+<research_resolutions>
+## Research Open Questions — Owner Resolutions (post-research, 2026-08-16)
+
+Surfaced by gsd-phase-researcher (11-RESEARCH.md); resolved by the owner before task breakdown:
+
+- **OQ-1 — Notification settings storage: NEW SQLite settings table** (a forward-only, additive
+  migration), NOT AsyncStorage. Rationale: backup-native (Phase 16 exports tables per the
+  [notify → backup] constraint); the scheduler reads settings in-DB. This introduces a new settings
+  table (e.g. `app_settings`) via the next migration — additive + defaulted, treated as
+  irreversible-safe per the data-layer migration rules. Intentionally diverges from the
+  theme/dashboard-prefs AsyncStorage pattern because these settings must be exported by backup.
+  (The per-contact `reminders_off` mute + `snooze_until` stay on the `contacts` row as already
+  designed — this table is only for the app-level notification settings.)
+- **OQ-2 — Birthday channel: SINGLE channel** (dossier default). The birthday channel does NOT
+  honour the lock-screen visibility toggle; a birthday name may appear on the lock screen. Only the
+  two DECAY channels split private/public. The lock-screen private-by-default posture still governs
+  decay.
+- **OQ-3 — Background-task backstop: OMIT in v1.** Ship pre-scheduled dated notifications +
+  launch/foreground reconcile only. Do NOT build the `expo-background-task` offline-gated sweep (it
+  is never the primary mechanism, is network-gated, and would need its own device spike). Recorded
+  as a possible v2 addition.
+
+</research_resolutions>
