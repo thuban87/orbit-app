@@ -583,6 +583,26 @@ export function ContactProfileScreen({
         </Text>
       </Pressable>
 
+      {/* "Message" (CMP-02): opens the entry-agnostic compose surface for this
+          contact. Filled-accent primary directly ABOVE "Log contact" — per the
+          UI-SPEC owner-taste note both ship as filled-accent primaries; the
+          existing "Log contact" styling is NOT changed (demoting one for hierarchy
+          is an owner call). Serializable { contactId } param only. */}
+      <Pressable
+        testID="contact-profile-message"
+        accessibilityRole="button"
+        accessibilityLabel={`Message ${header?.name ?? ""}`}
+        onPress={() => navigation.navigate("Compose", { contactId })}
+        style={[
+          styles.logContact,
+          { backgroundColor: colors.accent, borderColor: colors.accent },
+        ]}
+      >
+        <Text style={[styles.logContactText, { color: colors.background }]}>
+          Message
+        </Text>
+      </Pressable>
+
       <Pressable
         testID="contact-profile-log-contact"
         accessibilityRole="button"
