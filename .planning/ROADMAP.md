@@ -22,7 +22,7 @@ onto the dossier domains; a `[DECIDED]`/`[REJECTED]` decision is implemented, ne
 - [x] **Phase 4: Contact CRUD & Lifecycle** — create/edit forms, `contact_links`, archive/restore/purge, the contact profile scaffold. (completed 2026-08-15)
 - [x] **Phase 5: Photos** — library picker + URL path, in-app Skia crop, 512px master, themed initials fallback. (completed 2026-08-15)
 - [x] **Phase 6: Interaction Log, Status & Impact** — touchpoint rows, editable timeline, gravity/intensity, rogue, "Rarely responds". (completed 2026-08-15)
-- [ ] **Phase 7: Conversational Fuel** — per-item rows (5 kinds incl. `off_limits`), ranked projection, profile editor, cross-contact search.
+- [x] **Phase 7: Conversational Fuel** — per-item rows (5 kinds incl. `off_limits`), ranked projection, profile editor, cross-contact search. (completed 2026-08-16)
 - [ ] **Phase 8: Dashboard & Never-Contacted Screen** — the home screen, sort/filter/search, birthday banner, favourites, freshness, empty states.
 - [ ] **Phase 9: Compose Screen & SMS Handoff** — the in-app message surface (fuel visible, Send→SMS, Copy) that notify/widget/AI all open.
 - [ ] **Phase 10: Share-Sheet Capture** — Android share target, grid-of-faces picker, `EXTRA_SUBJECT` patch, inline create.
@@ -311,7 +311,7 @@ Recorded here because they bind phases that do not own them. Every planner/execu
   2. One ranked projection (kind priority then recency) produces the line the card, notification, and widget all reuse; age renders and drives ranking without ever hiding data.
   3. Cross-contact search matches name AND fuel text with `off_limits` excluded; `source='ai'` items render unconfirmed and are excluded from prompts until confirmed.
 
-**Plans:** 3/4 plans executed
+**Plans:** 4/4 plans complete
 
 **Wave 1**
 
@@ -324,7 +324,7 @@ Recorded here because they bind phases that do not own them. Every planner/execu
 **Wave 3** *(blocked on Wave 2)*
 
 - [x] 07-03-PLAN.md — AI-unconfirmed state + confirm-flip source 'ai'→'manual' (no migration) (FUEL-06)
-- [ ] 07-04-PLAN.md — Cross-contact search query + minimal FuelSearch screen (name AND fuel text, off_limits + archived excluded) (FUEL-05)
+- [x] 07-04-PLAN.md — Cross-contact search query + minimal FuelSearch screen (name AND fuel text, off_limits + archived excluded) (FUEL-05)
 
 ### Phase 8: Dashboard & Never-Contacted Screen
 
@@ -467,7 +467,7 @@ Recorded here because they bind phases that do not own them. Every planner/execu
 | 4. Contact CRUD & Lifecycle | 9/9 | Complete   | 2026-08-15 |
 | 5. Photos | 8/8 | Complete   | 2026-08-15 |
 | 6. Interaction Log, Status & Impact | 6/6 | Complete   | 2026-08-15 |
-| 7. Conversational Fuel | 3/4 | In Progress|  |
+| 7. Conversational Fuel | 4/4 | Complete   | 2026-08-16 |
 | 8. Dashboard & Never-Contacted Screen | 0/TBD | Not started | - |
 | 9. Compose Screen & SMS Handoff | 0/TBD | Not started | - |
 | 10. Share-Sheet Capture | 0/TBD | Not started | - |

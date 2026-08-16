@@ -70,7 +70,7 @@ roadmap phases. Items marked *(infra)* are foundation guarantees rather than end
 - [x] **FUEL-02**: Fuel supports 5 kinds (`recent`/`topic`/`fact`/`gift`/`off_limits`) plus an optional free label; `off_limits` items are never transmitted and never glanceable.
 - [x] **FUEL-03**: One ranked projection (kind priority then recency, `off_limits` excluded in-query) drives the card preview, the notification line, and the widget line.
 - [x] **FUEL-04**: Fuel age renders as "N days/months ago" and drives ranking; nothing is destroyed or hidden by age.
-- [ ] **FUEL-05**: A user can search across all contacts by name AND fuel text (LIKE, `off_limits` excluded).
+- [x] **FUEL-05**: A user can search across all contacts by name AND fuel text (LIKE, `off_limits` excluded).
 - [x] **FUEL-06**: AI-proposed fuel (`source='ai'`) renders as unconfirmed and is excluded from prompts until confirmed.
 
 ### Compose Screen & SMS Handoff (CMP)
