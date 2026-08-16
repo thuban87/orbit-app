@@ -6,14 +6,14 @@ current_phase: 8
 current_phase_name: Dashboard & Never-Contacted Screen
 status: ready
 stopped_at: Phase 8 PLANNED + cross-AI converged (3 cycles, codex+claude, 12 findings resolved) — awaiting owner usage-headroom OK before execute
-last_updated: "2026-08-16T04:40:17.643Z"
+last_updated: "2026-08-16T04:47:21.798Z"
 last_activity: 2026-08-16
 last_activity_desc: Phase 8 execution started
 progress:
   total_phases: 16
   completed_phases: 7
   total_plans: 56
-  completed_plans: 50
+  completed_plans: 51
   percent: 44
 ---
 
@@ -104,6 +104,7 @@ Progress: [████░░░░░░] 38% (6/16 phases complete)
 | Phase 08 P02 | 4min | 1 tasks | 2 files |
 | Phase 08 P03 | 4min | 2 tasks | 4 files |
 | Phase 08 P04 | 6min | 3 tasks | 3 files |
+| Phase 08 P05 | 2min | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -182,6 +183,7 @@ Foundational decisions affecting current work:
 
 - [Phase 8]: 08-04: three decoupled dashboard UI primitives, all purely presentational (explicit props, NO DB read / NO getExecutor / NO useNavigation — the caller wires onPress; threat T-08-10 no `.filter()` resurfacing private data). `ContactCard` (src/components/ContactCard.tsx) composes the LOCKED DASH-03 content contract from the existing `Avatar` + `RankedFuelLine` UNCHANGED: Avatar `contactId` + `cacheBust=modifiedAt` (anti-face-flash recyclingKey, a CORRECTNESS req not an optimization), a TOKEN-CLEAN status-ring placeholder (rogue=`colors.rogue`; stable/wobble/decay + the neutral never-contacted state differ ONLY by opacity over textSecondary/border — NO band hex invented, OD-1 left to owner) carrying a status-naming `accessibilityLabel` (Stable/Wobbling/Decaying/Rogue/"Not yet contacted") so uiautomator asserts the band without colour, a 1-line name, the ranked fuel line OR a fuel-match snippet (rule stays "snippet present → show snippet" because 08-01 sets snippet non-null on ANY fuel match incl. name+fuel, MEDIUM-6), a category chip hidden when null (surfaceElevated+textSecondary, OD-4), a provisional accent star (OD-2); `status: ProfileStatus|null` — null renders neutral, never "Stable". LOCKED testIDs present. NOTHING log-derived (no recency/days-ago/channel/gravity/intensity/quality). `FilterChipRow` (src/components/FilterChipRow.tsx) is a single-active horizontal ScrollView+Pressable chip control — active accent/borderStrong + `colors.background` label (filled-accent idiom), inactive surface/border + textSecondary; LOCKED `dashboard-filter-chip-{key}` testIDs mirroring DashboardFilter; count rendered in label (snoozed/favourites); parent owns active state. `useDashboardPrefs` (src/stores/dashboard-prefs-store.ts) persists last-used sort(default "status")+filter(default "all") via Zustand persist over AsyncStorage — copied theme-store VERBATIM (name orbit-dashboard-prefs, version 1, partialize {sort,filter}, warn-on-rehydrate); a device-local UI pref, NOT a SQLite row/migration (T-08-11 only enum values persist). No deviations; tsc + check:colors green across full src. On-device UAT of the rendered contract + persistence DEFERRED to the Plans 07/09 Pixel pass.
 - [Phase 8]: 08-03: favourites-dao is the ONLY new Phase-8 writer — `setFavouriteRank` appends at `favourite_rank = COALESCE(MAX,-1)+1` (first → 0) / `clearFavouriteRank` NULLs it, both single-column `?`-bound UPDATEs mirroring setContactPhoto/clearContactPhoto (changes===1 guard, modified_at bumped, the recency column NEVER written → DATA-04 single-writer invariant intact, grep-verified 0 refs). `rewriteFavouriteRanks` enforces the MEDIUM-2 mismatched-id-count guarantee in ONE inWriteTransaction: (1) unique-id check, (2) `orderedIds.length` == current live-favourite count (`favourite_rank IS NOT NULL AND archived_at IS NULL`), (3) per-row `UPDATE … WHERE id=? AND favourite_rank IS NOT NULL AND archived_at IS NULL` with changes===1 — so a partial / over-long / duplicate / stale (archived or never-favourite) list rolls back the whole batch and can never rank a non-favourite/archived row; N raw UPDATEs, NEVER a wrapped single-write DAO in the loop (non-reentrant mutex → deadlock). Empty `orderedIds` is an ACCEPTED no-op (0===0), documented in-file so it's not read as a missing guard (A-2). `computeReorder` (src/logic/favourites-reorder-logic.ts) is the pure node-tested drag→order move — returns a NEW array, permutation-invariant, input never mutated, out-of-range indices CLAMPED into [0,length-1] not thrown; it feeds rewriteFavouriteRanks from the Plan-08 Manage-favourites drag-end. 26 tests green (15 DAO + 11 reorder); tsc/biome/check:colors clean.
+- [Phase ?]: [Phase 8]: 08-05: NeverContactedScreen (DASH-04) is the 'Not yet contacted' inverse-population screen — reuses the shared ContactCard verbatim (a never-contacted row's status:null from listNeverContacted's literal-null projection drives the card's neutral state; status NEVER re-derived) and offers its OWN three-way sort (Oldest added default / Newest added / Name A-Z) wiring the NeverContactedSort union the DAO exposes; the three options live in a fixed-order SORT_OPTIONS constant whose keys ARE the union so the control cannot drift. Load runs in useFocusEffect with a cancelled-flag async guard (FuelSearch pattern), re-queried on focus AND on sort change, async-only, offline; calm never-contacted-empty state. Chrome mirrors ArchivedContactsScreen; sort control inline using the FilterChipRow filled-accent idiom, container testID never-contacted-sort-control. NeverContacted route registered ADDITIVELY (types.ts + RootNavigator) — FuelSearch route + initialRouteName Home untouched (Plan 10 retires FuelSearch). tsc + check:colors green; dashboard-read.test.ts 31 tests pass; .tsx render/nav/sort is Pixel-UAT at end of phase.
 
 ### Pending Todos
 
@@ -217,7 +219,7 @@ planning" sections in docs/dossier/*.md — those are the authoritative hand-off
 
 ## Session
 
-**Last session:** 2026-08-16T04:55:00.000Z
+**Last session:** 2026-08-16T04:47:12.013Z
 **Stopped at:** Completed 08-04-PLAN.md (dashboard UI primitives: ContactCard + FilterChipRow + dashboard-prefs-store — DASH-02/03/07)
 **Resume file:** None
 
