@@ -14,6 +14,7 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { getExecutor, openAndMigrate } from "@/db/database";
 import { navigationRef, ShareIntentGate } from "@/navigation/linking";
+import { NotificationResponseGate } from "@/navigation/notification-gate";
 import { RootNavigator } from "@/navigation/RootNavigator";
 import { registerFieldSweep } from "@/services/field-sweep";
 import { installSweepTrigger } from "@/services/launch-sweep";
@@ -203,6 +204,10 @@ function AppShell() {
   return (
     <NavigationContainer ref={navigationRef} onReady={() => setNavReady(true)}>
       <ShareIntentGate isReady={navReady} />
+      {/* Render-null gate: owns its own response listener + cold-start read; keyed
+          on the SAME reactive navReady flag as ShareIntentGate so a tap routes the
+          moment the navigator settles (body taps queued until ready). */}
+      <NotificationResponseGate isReady={navReady} />
       <RootNavigator />
     </NavigationContainer>
   );
