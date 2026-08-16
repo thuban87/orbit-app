@@ -1,4 +1,5 @@
 import { NavigationContainer } from "@react-navigation/native";
+import * as Notifications from "expo-notifications";
 import { ShareIntentProvider } from "expo-share-intent";
 import { StatusBar } from "expo-status-bar";
 import { useEffect, useState } from "react";
@@ -16,6 +17,16 @@ import { navigationRef, ShareIntentGate } from "@/navigation/linking";
 import { RootNavigator } from "@/navigation/RootNavigator";
 import { registerFieldSweep } from "@/services/field-sweep";
 import { installSweepTrigger } from "@/services/launch-sweep";
+// Module-scope side-effect import (Pitfall P5): importing headless-task RUNS its
+// `TaskManager.defineTask` + `registerTaskAsync` so a killed-app action tap reaches
+// the headless write path. React never mounts in the headless context, so no
+// component effect could do this — it MUST be a module-scope import. Importing it
+// runs NOTHING else (no reconcile, no sweep).
+import { ensureChannels } from "@/services/notifications/channels";
+import { ensureNotificationCategories } from "@/services/notifications/notification-actions";
+import "@/services/notifications/headless-task";
+import { FOREGROUND_NOTIFICATION_BEHAVIOR } from "@/services/notifications/notification-ids";
+import { registerNotificationScheduleSweep } from "@/services/notifications/notification-schedule";
 import { registerPhotoReconcileSweep } from "@/services/photos/photo-reconcile-sweep";
 import { ThemeProvider, useTheme } from "@/theme";
 import { Logger } from "@/utils/logger";
@@ -41,6 +52,19 @@ import { Logger } from "@/utils/logger";
  * module scope. `AppShell` lives INSIDE `ThemeProvider` so its loading view can
  * resolve colours through the theme tokens (CLAUDE.md: no hardcoded colour).
  */
+// Module-scope foreground-presentation handler (item D). Set EXACTLY ONCE when the
+// bundle loads (before the component, mirroring the headless registration) so it is
+// never re-registered per render. It returns the pure, node-tested
+// `FOREGROUND_NOTIFICATION_BEHAVIOR` const: the dashboard/orrery is the in-app
+// surface, so a nudge firing WHILE THE APP IS FOREGROUNDED is DELIBERATELY
+// suppressed (no banner, no shade-list) AND kept silent (shouldPlaySound:false) to
+// honour the calm/anti-nag mandate — made explicit here so it cannot drift with
+// Expo's default. Tap/action ROUTING is independent of this handler (it runs off
+// the response listener + getLastNotificationResponseAsync in NotificationResponseGate).
+Notifications.setNotificationHandler({
+  handleNotification: async () => FOREGROUND_NOTIFICATION_BEHAVIOR,
+});
+
 // One-shot guard: the field-expiry hook must be registered on the launch-sweep
 // registry EXACTLY once. The `ready`-gated effect below can re-run (Strict Mode,
 // remounts), and registering the same hook twice would double-run it — so this
@@ -49,6 +73,11 @@ let fieldSweepRegistered = false;
 // One-shot guard for the photo-write reconciliation hook (PHOTO-03/05), on the
 // SAME registry and under the SAME re-entrancy reasoning as the field sweep.
 let photoReconcileRegistered = false;
+// One-shot guard for the notification-schedule reconcile hook (NOTIF-01/04), on the
+// SAME registry and under the SAME re-entrancy reasoning. Registered ready-gated so
+// the reconcile fires once per real foreground launch — never at import, never on a
+// headless tap (T-11-SWEEP).
+let notificationScheduleRegistered = false;
 
 function AppShell() {
   const { colors } = useTheme();
@@ -98,8 +127,44 @@ function AppShell() {
       registerPhotoReconcileSweep();
       photoReconcileRegistered = true;
     }
-    const subscription = installSweepTrigger(AppState);
-    return () => subscription.remove();
+    // Register the notification-schedule reconcile (NOTIF-01/04) on the SAME
+    // registry, once only, BEFORE the trigger fires its cold-start sweep. The exec
+    // is taken lazily inside the hook; the reconcile is a launch-sweep hook ONLY
+    // (never called directly here) so it fires once per real foreground launch and
+    // is unreachable from the headless tap path (T-11-SWEEP / Pitfall P5).
+    if (!notificationScheduleRegistered) {
+      registerNotificationScheduleSweep(getExecutor);
+      notificationScheduleRegistered = true;
+    }
+
+    // item 6 / A1: AWAIT channels + the action category into existence BEFORE the
+    // trigger fires the cold-start reconcile (which begins scheduling immediately).
+    // Channel visibility is IMMUTABLE at creation, so a schedule landing before its
+    // private/public channel exists is a privacy landmine on a restore-into-fresh-
+    // install path — fire-and-forget would race the first scheduleNotificationAsync
+    // against channel creation. Both calls are idempotent and Logger-guarded.
+    let cancelled = false;
+    let subscription: { remove(): void } | null = null;
+    (async () => {
+      try {
+        await ensureChannels();
+        await ensureNotificationCategories();
+      } catch (err) {
+        Logger.error(
+          "bootstrap",
+          "notification channel/category init failed",
+          err,
+        );
+      }
+      // If the effect was torn down while channels initialised, do not install.
+      if (cancelled) return;
+      subscription = installSweepTrigger(AppState);
+    })();
+
+    return () => {
+      cancelled = true;
+      subscription?.remove();
+    };
   }, [ready]);
 
   if (error) {

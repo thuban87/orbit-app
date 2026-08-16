@@ -54,6 +54,30 @@ export const ACTION_MARK = "mark";
 export const ACTION_SNOOZE = "snooze";
 
 /**
+ * The foreground-presentation policy (item D, cycle-3 fix). A PURE, node-testable
+ * const returned verbatim by App.tsx's module-scope `Notifications.setNotificationHandler`
+ * — kept HERE (not inline in App.tsx) so the decision is unit-assertable without
+ * making the app shell node-loadable.
+ *
+ * All four flags are `false`: the dashboard/orrery is the in-app source of truth,
+ * so a nudge that fires WHILE THE APP IS FOREGROUNDED is DELIBERATELY suppressed
+ * (no banner, no shade-list entry) AND kept silent (`shouldPlaySound:false`) to
+ * honour the calm/anti-nag mandate. Making it an explicit const (rather than
+ * Expo's implicit default) means the behaviour is intentional and cannot silently
+ * drift if Expo's default flips. Tap/action ROUTING is independent of this handler
+ * (it runs off the response listener + getLastNotificationResponseAsync).
+ *
+ * Shaped to satisfy expo-notifications' `NotificationBehavior` (its required keys),
+ * but declared plainly so this module stays react-native/expo-free (node-loadable).
+ */
+export const FOREGROUND_NOTIFICATION_BEHAVIOR = {
+  shouldShowBanner: false,
+  shouldShowList: false,
+  shouldPlaySound: false,
+  shouldSetBadge: false,
+} as const;
+
+/**
  * Generic body builders — the verbatim UI-SPEC / CONTEXT copy, plain text, no
  * emoji. The name is the ONLY substitution (frozen-content invariant above).
  */

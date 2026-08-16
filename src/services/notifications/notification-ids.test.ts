@@ -11,6 +11,7 @@ import {
   DECAY_PUBLIC_CHANNEL,
   decayBody,
   decayIdentifier,
+  FOREGROUND_NOTIFICATION_BEHAVIOR,
   type NotificationData,
 } from "./notification-ids";
 
@@ -62,6 +63,18 @@ describe("category + action ids", () => {
   it("exports the two headless action ids", () => {
     expect(ACTION_MARK).toBe("mark");
     expect(ACTION_SNOOZE).toBe("snooze");
+  });
+});
+
+describe("foreground-presentation policy (item D — silent, no-banner)", () => {
+  it("suppresses banner + shade-list AND stays silent (all four flags false)", () => {
+    // The dashboard is the in-app surface, so a nudge firing while foregrounded
+    // is deliberately suppressed and kept silent (calm/anti-nag mandate). This is
+    // the coverage the 11-01 setNotificationHandler mock stub was added to enable.
+    expect(FOREGROUND_NOTIFICATION_BEHAVIOR.shouldShowBanner).toBe(false);
+    expect(FOREGROUND_NOTIFICATION_BEHAVIOR.shouldShowList).toBe(false);
+    expect(FOREGROUND_NOTIFICATION_BEHAVIOR.shouldPlaySound).toBe(false);
+    expect(FOREGROUND_NOTIFICATION_BEHAVIOR.shouldSetBadge).toBe(false);
   });
 });
 
