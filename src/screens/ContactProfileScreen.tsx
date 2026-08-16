@@ -51,7 +51,7 @@ import {
 } from "@/db/contact-status-read";
 import { archiveContact } from "@/db/contacts-dao";
 import { getExecutor, localDateTime } from "@/db/database";
-import { addFuel, deleteFuel, editFuel } from "@/db/fuel-dao";
+import { addFuel, confirmFuel, deleteFuel, editFuel } from "@/db/fuel-dao";
 import {
   type FuelItem,
   getRankedFuel,
@@ -398,6 +398,28 @@ export function ContactProfileScreen({
     [contactId, fuel, load],
   );
 
+  // Confirm an AI-suggested fuel item (FUEL-06): flip source 'ai'→'manual' through
+  // the mutexed confirmFuel writer, then the SINGLE unified load() (an in-place
+  // mutation does NOT re-fire useFocusEffect). No ranking is computed here — after
+  // load(), getRankedFuel re-reads and the now-'manual' item begins ranking. now is
+  // caller-supplied local wall-clock (never toISOString).
+  const doConfirmFuel = useCallback(
+    async (id: number) => {
+      try {
+        await confirmFuel(getExecutor(), {
+          id,
+          contactId,
+          now: localDateTime(),
+        });
+        await load();
+      } catch (err) {
+        Logger.error(LOG_SCOPE, "failed to confirm fuel", err);
+        Alert.alert("Couldn't save fuel.", "Please try again.");
+      }
+    },
+    [contactId, load],
+  );
+
   // Delete a fuel item behind the permanent-delete confirm (the same "no undo, no
   // backup" copy shipped for touchpoint deletion — the guarantee is identical).
   const doDeleteFuel = useCallback(
@@ -576,6 +598,7 @@ export function ContactProfileScreen({
           onAdd={(draft) => void doAddFuel(draft)}
           onEdit={(id, patch) => void doEditFuel(id, patch)}
           onDelete={doDeleteFuel}
+          onConfirm={(id) => void doConfirmFuel(id)}
         />
       </View>
 

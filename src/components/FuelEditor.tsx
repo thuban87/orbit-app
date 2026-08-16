@@ -36,9 +36,20 @@
  * exclusion. Every colour resolves through `useTheme().colors.*` (CLAUDE.md /
  * check:colors) — no net-new token, no raw hex.
  *
- * Age, the ranked line, the AI-unconfirmed state, and search are Plans 02–04 —
- * this slice renders only add/edit/delete across the 5 kinds + optional
- * label/url.
+ * AI-UNCONFIRMED STATE (FUEL-06, Plan 03): a row with `source === 'ai'` is an
+ * unconfirmed AI proposal (Phase 14 writes these). It renders DISTINCT — a
+ * `borderStrong` outline + a "Suggested by AI" pill + a helper line + a Confirm
+ * (`accent`) / Dismiss (`textSecondary`) pair — so a hallucinated fact never reads
+ * as the user's own note. Confirm routes to `onConfirm(id)` (parent flips
+ * source→'manual' via `confirmFuel`, then `load()`); Dismiss reuses `onDelete(id)`.
+ * Once confirmed the row is `source==='manual'` after `load()`, so it loses the
+ * badge/helper/Confirm/Dismiss and renders as an ordinary item — and only then is
+ * it excluded-no-more from the glanceable/prompt-facing `getRankedFuel`. Accent is
+ * the ONE primary action on the row; Dismiss is `textSecondary`, NOT `danger` (a
+ * dismissal is not a destructive-styled action). Existing tokens only — no net-new.
+ *
+ * Search is Plan 04 — this slice adds only the AI-unconfirmed render + confirm-flip
+ * atop the add/edit/delete + off_limits + age + ranked-line work of Plans 01/02.
  */
 import { useState } from "react";
 import {
@@ -102,6 +113,8 @@ export interface FuelEditorProps {
   onAdd: (draft: FuelDraft) => void;
   onEdit: (id: number, patch: FuelEditPatch) => void;
   onDelete: (id: number) => void;
+  /** Confirm an AI-suggested (`source==='ai'`) row — parent flips source→'manual'. */
+  onConfirm: (id: number) => void;
   testID?: string;
 }
 
@@ -216,15 +229,20 @@ function FuelRow({
   now,
   onEdit,
   onDelete,
+  onConfirm,
 }: {
   item: FuelItem;
   index: number;
   now: string;
   onEdit: (id: number, patch: FuelEditPatch) => void;
   onDelete: (id: number) => void;
+  onConfirm: (id: number) => void;
 }) {
   const { colors } = useTheme();
   const isOffLimits = item.kind === "off_limits";
+  // An unconfirmed AI proposal (Phase 14 writes these). Confirm flips it to
+  // 'manual' (Plan 03), after which it renders as an ordinary row.
+  const isAiUnconfirmed = item.source === "ai";
 
   const inputStyle = [
     styles.input,
@@ -242,7 +260,10 @@ function FuelRow({
         styles.row,
         {
           backgroundColor: colors.surface,
-          borderColor: isOffLimits ? colors.borderStrong : colors.border,
+          borderColor:
+            isOffLimits || isAiUnconfirmed
+              ? colors.borderStrong
+              : colors.border,
         },
       ]}
     >
@@ -283,6 +304,22 @@ function FuelRow({
           </View>
           <Text style={[styles.helper, { color: colors.textSecondary }]}>
             Never shared with AI, never shown at a glance.
+          </Text>
+        </View>
+      ) : null}
+
+      {isAiUnconfirmed ? (
+        <View style={styles.offLimits}>
+          <View
+            testID={`fuel-editor-ai-pill-${index}`}
+            style={[styles.pill, { borderColor: colors.border }]}
+          >
+            <Text style={[styles.pillText, { color: colors.textSecondary }]}>
+              Suggested by AI
+            </Text>
+          </View>
+          <Text style={[styles.helper, { color: colors.textSecondary }]}>
+            Confirm to use this — it won't be sent to AI until you do.
           </Text>
         </View>
       ) : null}
@@ -346,6 +383,34 @@ function FuelRow({
           </Text>
         </Pressable>
       </View>
+
+      {isAiUnconfirmed ? (
+        <View style={styles.draftActions}>
+          <Pressable
+            testID={`fuel-editor-dismiss-${index}`}
+            accessibilityRole="button"
+            accessibilityLabel="Dismiss AI suggestion"
+            onPress={() => onDelete(item.id)}
+            style={[styles.draftBtn, { borderColor: colors.border }]}
+          >
+            <Text style={{ color: colors.textSecondary }}>Dismiss</Text>
+          </Pressable>
+          <Pressable
+            testID={`fuel-editor-confirm-${index}`}
+            accessibilityRole="button"
+            accessibilityLabel="Confirm AI suggestion"
+            onPress={() => onConfirm(item.id)}
+            style={[
+              styles.draftBtn,
+              { backgroundColor: colors.accent, borderColor: colors.accent },
+            ]}
+          >
+            <Text style={{ color: colors.background, fontWeight: "600" }}>
+              Confirm
+            </Text>
+          </Pressable>
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -492,6 +557,7 @@ export function FuelEditor({
   onAdd,
   onEdit,
   onDelete,
+  onConfirm,
   testID,
 }: FuelEditorProps) {
   const { colors } = useTheme();
@@ -520,6 +586,7 @@ export function FuelEditor({
             now={now}
             onEdit={onEdit}
             onDelete={onDelete}
+            onConfirm={onConfirm}
           />
         ))
       )}
