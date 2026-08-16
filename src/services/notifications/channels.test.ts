@@ -1,21 +1,26 @@
 import {
   AndroidImportance,
   AndroidNotificationVisibility,
-  __reset,
   setNotificationChannelAsync,
 } from "expo-notifications";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { ensureChannels } from "./channels";
 import {
   BIRTHDAY_CHANNEL,
   DECAY_PRIVATE_CHANNEL,
   DECAY_PUBLIC_CHANNEL,
 } from "./notification-ids";
-import { ensureChannels } from "./channels";
 
 vi.mock("expo-notifications");
 
+// `vi.mocked` gives the typed Mock view (`.mock.calls`) that the real
+// expo-notifications signature lacks; at runtime vi.mock has swapped in the
+// __mocks__ double, so AndroidImportance.LOW here is the double's value and
+// matches what channels.ts writes.
+const setChannel = vi.mocked(setNotificationChannelAsync);
+
 afterEach(() => {
-  __reset();
+  vi.clearAllMocks();
 });
 
 /**
@@ -25,17 +30,13 @@ afterEach(() => {
  */
 function configById(): Record<
   string,
-  { importance?: number; lockscreenVisibility?: number }
+  { importance?: number; lockscreenVisibility?: number; sound?: unknown }
 > {
   const out: Record<
     string,
-    { importance?: number; lockscreenVisibility?: number }
+    { importance?: number; lockscreenVisibility?: number; sound?: unknown }
   > = {};
-  for (const call of setNotificationChannelAsync.mock.calls) {
-    const [id, config] = call as [
-      string,
-      { importance?: number; lockscreenVisibility?: number },
-    ];
+  for (const [id, config] of setChannel.mock.calls) {
     out[id] = config;
   }
   return out;
@@ -45,8 +46,8 @@ describe("ensureChannels — immutable, versioned, LOW-importance channel set", 
   it("creates exactly the three versioned channels", async () => {
     await ensureChannels();
 
-    expect(setNotificationChannelAsync).toHaveBeenCalledTimes(3);
-    const ids = setNotificationChannelAsync.mock.calls.map((c) => c[0]);
+    expect(setChannel).toHaveBeenCalledTimes(3);
+    const ids = setChannel.mock.calls.map((c) => c[0]);
     expect(ids).toEqual(
       expect.arrayContaining([
         DECAY_PRIVATE_CHANNEL,
@@ -86,35 +87,27 @@ describe("ensureChannels — immutable, versioned, LOW-importance channel set", 
 
   it("does not set a custom sound (LOW is silent by tier)", async () => {
     await ensureChannels();
-    for (const call of setNotificationChannelAsync.mock.calls) {
-      const [, config] = call as [string, { sound?: unknown }];
-      expect(config.sound == null || config.sound === undefined).toBe(true);
+    const cfg = configById();
+    for (const config of Object.values(cfg)) {
+      expect(config.sound == null).toBe(true);
     }
   });
 
   it("is idempotent — a second call re-issues the same create calls, never a mutate", async () => {
     await ensureChannels();
-    const first = setNotificationChannelAsync.mock.calls.map((c) => [
+    const first = setChannel.mock.calls.map((c) => [
       c[0],
-      (c[1] as { importance?: number; lockscreenVisibility?: number })
-        .importance,
-      (c[1] as { importance?: number; lockscreenVisibility?: number })
-        .lockscreenVisibility,
+      c[1].importance,
+      c[1].lockscreenVisibility,
     ]);
 
     await ensureChannels();
-    // Six calls total; the second triplet is byte-identical to the first —
-    // the same idempotent create, no diff/patch path against an existing id.
-    expect(setNotificationChannelAsync).toHaveBeenCalledTimes(6);
-    const second = setNotificationChannelAsync.mock.calls
+    // Six calls total; the second triplet is identical to the first — the same
+    // idempotent create, no diff/patch path against an existing id.
+    expect(setChannel).toHaveBeenCalledTimes(6);
+    const second = setChannel.mock.calls
       .slice(3)
-      .map((c) => [
-        c[0],
-        (c[1] as { importance?: number; lockscreenVisibility?: number })
-          .importance,
-        (c[1] as { importance?: number; lockscreenVisibility?: number })
-          .lockscreenVisibility,
-      ]);
+      .map((c) => [c[0], c[1].importance, c[1].lockscreenVisibility]);
     expect(second).toEqual(first);
   });
 });
