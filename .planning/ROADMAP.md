@@ -339,7 +339,7 @@ Recorded here because they bind phases that do not own them. Every planner/execu
   3. The "Not yet contacted (N)" screen (rendering fuel), a snoozed segment with a count, and a count-less Archived entry are reachable; the birthday banner overrides snooze/never-contacted suppression (archived excluded) with the parser bugs fixed.
   4. A user marks favourites via a profile star and orders them on a shared "Manage favourites" screen; the dashboard renders with no network and refreshes on focus/AppState/pull with async queries.
 
-**Plans:** 6/10 plans executed
+**Plans:** 7/10 plans executed
 
 **Wave 1** *(parallel — independent correctness cores)*
 
@@ -356,7 +356,7 @@ Recorded here because they bind phases that do not own them. Every planner/execu
 **Wave 3** *(blocked on Wave 2)*
 
 - [ ] 08-07-PLAN.md — HomeScreen → dashboard core (list + freshness + banner + counts + footer + empty states) (DASH-01, DASH-03, DASH-04, DASH-05, DASH-07)
-- [ ] 08-08-PLAN.md — ManageFavouritesScreen + drag-lib owner checkpoint + ManageFavourites route (DASH-06)
+- [x] 08-08-PLAN.md — ManageFavouritesScreen + drag-lib owner checkpoint + ManageFavourites route (DASH-06)
 
 **Wave 4** *(blocked on Wave 3)*
 
@@ -493,7 +493,7 @@ Recorded here because they bind phases that do not own them. Every planner/execu
 | 5. Photos | 8/8 | Complete   | 2026-08-15 |
 | 6. Interaction Log, Status & Impact | 6/6 | Complete   | 2026-08-15 |
 | 7. Conversational Fuel | 4/4 | Complete   | 2026-08-16 |
-| 8. Dashboard & Never-Contacted Screen | 6/10 | In Progress|  |
+| 8. Dashboard & Never-Contacted Screen | 7/10 | In Progress|  |
 | 9. Compose Screen & SMS Handoff | 0/TBD | Not started | - |
 | 10. Share-Sheet Capture | 0/TBD | Not started | - |
 | 11. Actionable Notifications | 0/TBD | Not started | - |

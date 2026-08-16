@@ -5,15 +5,15 @@ milestone_name: milestone
 current_phase: 8
 current_phase_name: Dashboard & Never-Contacted Screen
 status: ready
-stopped_at: Completed 08-06-PLAN.md (BirthdayBanner DASH-05 + profile favourite star DASH-06)
-last_updated: "2026-08-16T04:52:55.923Z"
+stopped_at: Completed 08-08-PLAN.md (Manage-favourites drag-reorder screen + route, DASH-06)
+last_updated: "2026-08-16T00:10:00.000Z"
 last_activity: 2026-08-16
-last_activity_desc: Completed 08-06 (BirthdayBanner + favourite star)
+last_activity_desc: Completed 08-08 (Manage-favourites drag-reorder screen)
 progress:
   total_phases: 16
   completed_phases: 7
   total_plans: 56
-  completed_plans: 52
+  completed_plans: 54
   percent: 44
 ---
 
@@ -106,6 +106,7 @@ Progress: [████░░░░░░] 38% (6/16 phases complete)
 | Phase 08 P04 | 6min | 3 tasks | 3 files |
 | Phase 08 P05 | 2min | 2 tasks | 3 files |
 | Phase 08 P06 | 2min | 2 tasks | 4 files |
+| Phase 08 P08 | 4min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -187,6 +188,8 @@ Foundational decisions affecting current work:
 - [Phase ?]: [Phase 8]: 08-05: NeverContactedScreen (DASH-04) is the 'Not yet contacted' inverse-population screen — reuses the shared ContactCard verbatim (a never-contacted row's status:null from listNeverContacted's literal-null projection drives the card's neutral state; status NEVER re-derived) and offers its OWN three-way sort (Oldest added default / Newest added / Name A-Z) wiring the NeverContactedSort union the DAO exposes; the three options live in a fixed-order SORT_OPTIONS constant whose keys ARE the union so the control cannot drift. Load runs in useFocusEffect with a cancelled-flag async guard (FuelSearch pattern), re-queried on focus AND on sort change, async-only, offline; calm never-contacted-empty state. Chrome mirrors ArchivedContactsScreen; sort control inline using the FilterChipRow filled-accent idiom, container testID never-contacted-sort-control. NeverContacted route registered ADDITIVELY (types.ts + RootNavigator) — FuelSearch route + initialRouteName Home untouched (Plan 10 retires FuelSearch). tsc + check:colors green; dashboard-read.test.ts 31 tests pass; .tsx render/nav/sort is Pixel-UAT at end of phase.
 - [Phase 8]: 08-06: BirthdayBanner (DASH-05) reads listBirthdayCandidates (archived-excluded ONLY — the DECIDED scoped exception overriding snooze/never-contacted suppression, dossier Cluster E; candidates NOT re-filtered to the dashboard population), computes the 7-day/soonest-first order in JS off the single daysUntilBirthday parser ('today' on day-of, 'in N days' otherwise), reads via an async cancelled-flag guard (offline), renders null when empty, and stays presentational (onPressContact(contactId) callback; Plan 07 mounts it + wires navigation). The profile favourite star (DASH-06) toggles favourite_rank via setFavouriteRank/clearFavouriteRank then the unified load() reconciles the header — reversible, non-destructive, NO confirmation; marked star uses colors.accent (OD-2 provisional token). getContactHeader widened PURELY ADDITIVELY to return favourite_rank (number|null) — the two other callers (EditContactScreen refreshPhoto, contact-read.test.ts field-wise asserts) stay green, MEDIUM-3 verified by tsc + 16-test run.
 
+- [Phase 8]: 08-08: ManageFavouritesScreen (DASH-06) is the shared drag-reorder favourites home — reorder-ONLY (marking stays the profile star). Owner APPROVED adding react-native-reorderable-list@0.18.1 at the blocking-human legitimacy checkpoint (T-08-SC; created 2021, ~92k dl/wk, MIT, Reanimated-4-maintained), installed via `npx expo install`; the no-dep up/down-arrow fallback was NOT built. Loads listFavourites via an async cancelled-flag focus effect (offline); each row (FavouriteReorderRow, split so useReorderableDrag() runs inside a ReorderableList cell) = Avatar + name + a drag handle whose onPressIn starts the drag. onReorder computes computeReorder(currentIds, from, to) inside the setRows updater, mirrors local rows via an id→row Map, and fires rewriteFavouriteRanks(getExecutor(), newIds, localDateTime()) in ONE transaction (fire-and-forget; a persist failure alerts + re-reads via load()) — the tested reorder math + guarded DAO are reused verbatim, inWriteTransaction never nested (Pitfall 6). Drag/animation is entirely Reanimated-worklet-driven (no per-frame setState, CLAUDE.md); ReorderableList is a FlatList so Avatar's recyclingKey (contactId + cacheBust=modified_at) correctness holds. Route registered ADDITIVELY (types.ts ManageFavourites: undefined after NeverContacted + RootNavigator Stack.Screen); FuelSearch + NeverContacted untouched. Locked testIDs manage-favourites-root / -row-{id} / -handle-{id}. tsc + check:colors green; npm test 665/665. Navigation entry points (favourites-chip Manage, Plan 09; Settings row, Plan 10) land later by design; .tsx render + native drag is Pixel-UAT (drag perf only assessable on the physical Pixel).
+
 ### Pending Todos
 
 None yet.
@@ -221,8 +224,8 @@ planning" sections in docs/dossier/*.md — those are the authoritative hand-off
 
 ## Session
 
-**Last session:** 2026-08-16T04:52:35.301Z
-**Stopped at:** Completed 08-06-PLAN.md (BirthdayBanner DASH-05 + profile favourite star DASH-06)
+**Last session:** 2026-08-16T00:10:00.000Z
+**Stopped at:** Completed 08-08-PLAN.md (Manage-favourites drag-reorder screen + route, DASH-06)
 **Resume file:** None
 
 ## Phase 4 — Closeout (2026-08-15) ✅ COMPLETE
