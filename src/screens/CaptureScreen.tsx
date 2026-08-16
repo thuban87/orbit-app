@@ -65,6 +65,7 @@ import {
   type CapturePickRow,
   listCapturePickContacts,
 } from "@/db/capture-read";
+import { createContactFull } from "@/db/contacts-dao";
 import { getExecutor, localDateTime } from "@/db/database";
 import { addFuel, editFuel, type NewFuelItem } from "@/db/fuel-dao";
 import { newUid } from "@/db/uid";
@@ -83,6 +84,13 @@ const LOG_SCOPE = "capture";
  * note is never rushed.
  */
 const AUTO_RETURN_MS = 1500;
+
+/**
+ * The `interval_days` an inline name-only create lands with — the app's Monthly
+ * default (the value the standard create form ships, `create-contact-logic`). A
+ * single-number tunable; the cadence is refined later on the profile.
+ */
+const INLINE_CREATE_INTERVAL_DAYS = 30;
 
 /** One fuel row written by a commit, retained for the optional-note recompose. */
 type WrittenRow = { id: number; contactId: number };
@@ -138,6 +146,18 @@ export function CaptureScreen(_props: RootStackScreenProps<"Capture">) {
   // just-written row(s)' display text to `note — base` (url untouched).
   const [noteOpen, setNoteOpen] = useState(false);
   const [noteText, setNoteText] = useState("");
+
+  // Inline name-only create (CAP-04): `inlineOpen` reveals the ＋-tile create sheet,
+  // `inlineName` is the single name field. Submit creates a never-contacted contact
+  // then captures the fuel row to it.
+  const [inlineOpen, setInlineOpen] = useState(false);
+  const [inlineName, setInlineName] = useState("");
+
+  // Tap-to-reveal search (CAP-01): demoted, NOT autofocused on entry — the keyboard
+  // stays closed on the fast path. `searchOpen` reveals the field; `searchText`
+  // live-filters the grid by name (in-memory, case-insensitive substring).
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchText, setSearchText] = useState("");
 
   // ONE in-flight latch shared by EVERY commit path (single-tap, multi Done, inline
   // create, note-Done — B2/C2). A ref (not state) so the guard is synchronous — set
@@ -396,6 +416,74 @@ export function CaptureScreen(_props: RootStackScreenProps<"Capture">) {
     armAutoReturn();
   }, [armAutoReturn]);
 
+  // Tap the ＋ tile → reveal the inline name-only create sheet.
+  const onOpenInlineCreate = useCallback(() => {
+    setInlineOpen(true);
+  }, []);
+
+  // Inline Create & save — create a NAME-ONLY contact (never-contacted) then capture
+  // the fuel row to it. A7: the empty/blank-name guard runs FIRST (submit is also
+  // disabled at trim-length 0) so a blank name can never reach createContactFull.
+  // B2: the shared isCommittingRef latch is set after the guard, before the first
+  // await, cleared in finally. B4: the contact id is DESTRUCTURED from
+  // createContactFull's `{ contactId, interactionId }` object return. Two
+  // transactions (create then addFuel) is acceptable (RESEARCH Q5).
+  const onInlineSubmit = useCallback(async () => {
+    const trimmedName = inlineName.trim();
+    if (trimmedName.length === 0) {
+      return;
+    }
+    if (isCommittingRef.current) {
+      return;
+    }
+    isCommittingRef.current = true;
+    setCommitting(true);
+    try {
+      // ONE stamp reused for the create + the fuel write (A10).
+      const stamp = localDateTime();
+      // NAME-ONLY: omit `firstInteraction` so last_contact stays NULL
+      // (never-contacted, CAP-04 — sharing a link is not "contacting").
+      const { contactId } = await createContactFull(getExecutor(), {
+        uid: newUid(),
+        name: trimmedName,
+        intervalDays: INLINE_CREATE_INTERVAL_DAYS,
+        now: stamp,
+      });
+      const fuelId = await addFuel(getExecutor(), {
+        uid: newUid(),
+        contactId,
+        kind: "topic",
+        source: "share",
+        text: payload.displayText,
+        url: payload.url,
+        createdAt: stamp,
+        now: stamp,
+      });
+      // Retain the row for the optional-note recompose (A1).
+      setWrittenRows([{ id: fuelId, contactId }]);
+      setSavedLabel(`Saved to ${trimmedName}`);
+      setInlineOpen(false);
+      setInlineName("");
+      armAutoReturn();
+    } catch (err) {
+      Logger.error(LOG_SCOPE, "failed inline-create capture", err);
+      Alert.alert("Couldn't save", "Please try again.");
+    } finally {
+      isCommittingRef.current = false;
+      setCommitting(false);
+    }
+  }, [inlineName, payload, armAutoReturn]);
+
+  // Reveal the demoted search field (autofocus happens only once revealed).
+  const onRevealSearch = useCallback(() => {
+    setSearchOpen(true);
+  }, []);
+
+  // Clear the query (✕) → restore the full grid; the field stays revealed.
+  const onClearSearch = useCallback(() => {
+    setSearchText("");
+  }, []);
+
   // ---- Render --------------------------------------------------------------
 
   const closePill = (
@@ -430,8 +518,17 @@ export function CaptureScreen(_props: RootStackScreenProps<"Capture">) {
     );
   }
 
+  // Live-filter by name when the search field is revealed and non-blank (in-memory
+  // case-insensitive substring — the set is small). The ＋ tile is always appended,
+  // filtered or not, so inline-create stays reachable from any query.
+  const query = searchText.trim().toLowerCase();
+  const visibleRows =
+    searchOpen && query.length > 0
+      ? rows.filter((row) => row.name.toLowerCase().includes(query))
+      : rows;
+
   const data: GridItem[] = [
-    ...rows.map((row): GridItem => ({ kind: "face", row })),
+    ...visibleRows.map((row): GridItem => ({ kind: "face", row })),
     { kind: "new" },
   ];
 
@@ -446,12 +543,13 @@ export function CaptureScreen(_props: RootStackScreenProps<"Capture">) {
         >
           Save to…
         </Text>
-        {/* Search reveal — icon-only, keyboard stays CLOSED (NOT autofocused). The
-            revealed search field + live filtering land in Task 3. */}
+        {/* Search reveal — icon-only, keyboard stays CLOSED (NOT autofocused) until
+            tapped: the field below autofocuses only once revealed (CAP-01). */}
         <Pressable
           testID="capture-search-reveal"
           accessibilityRole="button"
           accessibilityLabel="Search contacts"
+          onPress={onRevealSearch}
           style={styles.searchReveal}
         >
           <Text style={{ color: colors.textSecondary }}>🔍</Text>
@@ -484,6 +582,39 @@ export function CaptureScreen(_props: RootStackScreenProps<"Capture">) {
           </Text>
         ) : null}
       </View>
+
+      {/* Revealed search field — hidden until the reveal is tapped; autofocuses ONLY
+          when revealed so the keyboard never opens on the fast path. Live-filters the
+          grid by name; the ✕ clears the query and restores the full grid. */}
+      {searchOpen ? (
+        <View style={styles.searchFieldRow}>
+          <TextInput
+            testID="capture-search-input"
+            autoFocus
+            value={searchText}
+            onChangeText={setSearchText}
+            placeholder="Search people"
+            placeholderTextColor={colors.textSecondary}
+            style={[
+              styles.searchInput,
+              {
+                backgroundColor: colors.surface,
+                borderColor: colors.border,
+                color: colors.textPrimary,
+              },
+            ]}
+          />
+          <Pressable
+            testID="capture-search-clear"
+            accessibilityRole="button"
+            accessibilityLabel="Clear search"
+            onPress={onClearSearch}
+            style={styles.searchClear}
+          >
+            <Text style={{ color: colors.textSecondary }}>✕</Text>
+          </Pressable>
+        </View>
+      ) : null}
     </View>
   );
 
@@ -494,6 +625,8 @@ export function CaptureScreen(_props: RootStackScreenProps<"Capture">) {
           testID="capture-new-contact-tile"
           accessibilityRole="button"
           accessibilityLabel="New contact"
+          disabled={committing}
+          onPress={onOpenInlineCreate}
           style={[styles.tile, styles.newTile, { borderColor: colors.accent }]}
         >
           <View style={styles.newGlyphBox}>
@@ -597,6 +730,61 @@ export function CaptureScreen(_props: RootStackScreenProps<"Capture">) {
           >
             <Text style={[styles.multiDoneLabel, { color: colors.background }]}>
               Done · {selected.size}
+            </Text>
+          </Pressable>
+        </View>
+      ) : null}
+
+      {/* Inline name-only create sheet (CAP-04) — a single autofocused name field +
+          "Create & save". A7: submit is DISABLED at trim-length 0 (and the handler
+          guards again) so a blank name never reaches createContactFull. On submit a
+          never-contacted contact is created and the fuel row captured to it — NO
+          "add detail now?" prompt (detail is refined later on the profile). */}
+      {inlineOpen ? (
+        <View
+          testID="capture-inline-create"
+          style={[
+            styles.inlineSurface,
+            { backgroundColor: colors.surface, borderColor: colors.border },
+          ]}
+        >
+          <TextInput
+            testID="capture-inline-name-input"
+            autoFocus
+            value={inlineName}
+            onChangeText={setInlineName}
+            placeholder="Name"
+            placeholderTextColor={colors.textSecondary}
+            style={[
+              styles.inlineInput,
+              {
+                backgroundColor: colors.surface,
+                borderColor: colors.border,
+                color: colors.textPrimary,
+              },
+            ]}
+          />
+          <Pressable
+            testID="capture-inline-submit"
+            accessibilityRole="button"
+            accessibilityLabel="Create and save"
+            accessibilityState={{
+              disabled: inlineName.trim().length === 0 || committing,
+            }}
+            disabled={inlineName.trim().length === 0 || committing}
+            onPress={() => void onInlineSubmit()}
+            style={[
+              styles.inlineSubmit,
+              {
+                backgroundColor: colors.accent,
+                opacity: inlineName.trim().length === 0 || committing ? 0.5 : 1,
+              },
+            ]}
+          >
+            <Text
+              style={[styles.inlineSubmitLabel, { color: colors.background }]}
+            >
+              Create & save
             </Text>
           </Pressable>
         </View>
@@ -730,6 +918,27 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
   searchReveal: {
+    minWidth: 44,
+    minHeight: 44,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  searchFieldRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  searchInput: {
+    flex: 1,
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 15,
+    fontWeight: "400",
+    minHeight: 44,
+  },
+  searchClear: {
     minWidth: 44,
     minHeight: 44,
     alignItems: "center",
@@ -883,5 +1092,35 @@ const styles = StyleSheet.create({
   noteDoneText: {
     fontSize: 16,
     fontWeight: "600",
+  },
+  inlineSurface: {
+    position: "absolute",
+    left: 16,
+    right: 16,
+    bottom: 16,
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 16,
+    gap: 12,
+  },
+  inlineInput: {
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 15,
+    fontWeight: "400",
+    minHeight: 44,
+  },
+  inlineSubmit: {
+    minHeight: 44,
+    borderRadius: 8,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 16,
+  },
+  inlineSubmitLabel: {
+    fontSize: 16,
+    fontWeight: "700",
   },
 });
