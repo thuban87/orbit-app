@@ -137,7 +137,7 @@ describe("listCapturePickContacts — favourites → capture-MRU → rest", () =
   });
 
   it("reports last_captured NULL for a never-captured contact", async () => {
-    const c = await seedContact({ name: "Uncaptured" });
+    await seedContact({ name: "Uncaptured" });
 
     const rows = await listCapturePickContacts(exec);
     expect(rows[0]?.last_captured).toBeNull();
