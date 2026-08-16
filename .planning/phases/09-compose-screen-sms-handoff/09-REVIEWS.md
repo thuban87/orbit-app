@@ -139,3 +139,36 @@ A1 only PARTIALLY resolved plus two new issues (Claude missed these; codex is co
   single label source, but `FuelEditor.tsx:72` keeps its own five literal labels + local `kindLabel`.
   Narrow the helper's claim to **compose-local** (preferred — avoid scope creep into a shipped component),
   or add FuelEditor to the plan to derive from `fuelKindLabel`.
+
+---
+
+## Cycle 3 (final re-review — `--max-cycles 3` reached)
+
+**Combined verdict:** 0 HIGH · 3 residual actionable (2 MEDIUM + 1 LOW/taste). Both reviewers confirmed
+B1–B3 genuinely resolved and every newly-cited symbol verified against source. Trajectory across the
+loop: **5 → 3 → 3 actionable, 0 HIGH in every cycle** — converged in severity; the tail is
+diminishing-returns refinement. The automated loop ends here at the configured `--max-cycles 3`; the
+residuals below are escalated to the owner at the pre-execution pause.
+- codex `CYCLE_SUMMARY: high=0 actionable_nonhigh=2`
+- claude `CLAUDE_SUMMARY: high=0 actionable_nonhigh=1`
+
+**Residual items** (owner decides at the pause: apply before executing, or let the executor handle):
+
+- **C1 (MEDIUM, codex) — `phone` nullable at the `sendSMSAsync` call site.** 09-02 normalizes
+  `phone: string | null` then calls `sendSMSAsync(phone, draft)`; rendering Send off a separate
+  `controls` value does not narrow `phone` for TypeScript. Add `if (phone === null) return;` at the top of
+  the Send handler (before `setSending(true)`), or pass a proven string in. **`npx tsc --noEmit` is
+  already a task `<verify>`, so this cannot silently ship wrong — the executor is forced to resolve it;
+  it's a spec-completeness gap, not a latent runtime bug.**
+- **C2 (MEDIUM, codex) — B1's re-focus UAT scenario is fictional.** The plan's human-check cites
+  "Add phone → Edit → save → back on Compose," but `EditContactScreen.tsx:367` saves via
+  `navigate("Profile", …)`, so Compose is not re-focused by that path. The focus-reset itself is CORRECT
+  defensive code (Compose is entry-agnostic and re-entered by Android hardware-back and, later,
+  notification/widget/AI in Phases 11/12/14) — only the cited UAT path is wrong. Re-word the human-check
+  to a real re-focus path, or frame the reset as defensive-for-reuse.
+- **C3 (LOW / taste, claude) — B1 resets the whole surface to `loading` on every focus.** Resetting
+  `screenState → "loading"` (not just `smsAvailable → null`) briefly blanks fuel + draft chrome on every
+  re-focus — a fuller blink than the profile's keep-stale-content approach. No data loss (draft is local
+  `useState`; component stays mounted). A deliberate, defensible tradeoff; a cheaper variant exists (reset
+  `smsAvailable` only, keep loaded content, drop to `loading` only when there is no prior data). Purely
+  taste — owner's call.
