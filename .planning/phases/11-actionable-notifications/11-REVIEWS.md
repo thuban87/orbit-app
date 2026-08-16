@@ -705,3 +705,47 @@ ONE new HIGH — the uncoordinated-reconcile race (a direct consequence of addin
 reconcile callers) — plus two actionable non-HIGH refinements. Recommend resolving the reconcile-
 serialization HIGH (add the DEFER-ONE coordinator) and folding the two actionables into 11-10/11-13
 before code execution.
+
+---
+
+## Claude Review (read-only subagent) — Cycle 3
+
+CYCLE_SUMMARY (Claude): current_high=0 current_actionable=0
+
+All cycle-2 fixes (A–H) verified correct + code-grounded; no cycle-1 HIGH regressed; item G resolved by
+owner ruling. Horizon+cap, in-app reconcile (read-only, no mutex-nesting), `staggerFor` determinism,
+`requestsEqual` hour-granularity, foreground handler, malformed-birthday guard — all confirmed. "Safe to
+execute." (NOTE: Claude verified each reconcile call is individually mutex-safe but did NOT flag the
+multi-call interleaving race codex caught below — the complementary-reviewer catch.)
+
+---
+
+## Orchestrator Merged Result — Cycle 3 (Codex + Claude, divergence investigated)
+
+Reviewers diverged. Investigated → codex's finding is REAL (verified on disk: 5+ uncoordinated
+fire-and-forget `reconcileSchedule` callers — 11-09 edit-save + profile snooze/clear, 11-11 per-type +
+time rows, 11-10 sweep hook — with NO shared serialization; the DEFER-ONE idiom in launch-sweep.ts:49-90
+guards only the sweep path). Cycle-2 A–H confirmed resolved; cycle-1 H1–H5 not regressed; owner-ruled
+items excluded. **Remaining: 1 HIGH + 2 actionable.**
+
+**HIGH — Reconcile serialization race (11-09/11-11/11-13 vs 11-10).** The item-B fix added multiple
+fire-and-forget `reconcileSchedule(getExecutor())` callers with no coordinator. `reconcileSchedule`
+awaits (reads + `getAllScheduledNotificationsAsync` + cancel/schedule loop), so two invocations
+interleave: a reconcile that read the DB BEFORE a snooze/mute commit can finish AFTER a newer reconcile
+that cancelled the notification → RE-ARMS the stale schedule → the notification fires during a
+snooze/after a mute (NOTIF-03 violation; falsifies the T-11-STALE must_have item-B added). Bounded (race
+window; self-heals next launch; generic body = no PII leak). FIX: route EVERY reconcile caller (sweep
+hook + all direct UI callers in 11-09/11-11/11-13) through ONE module-level serial/coalescing coordinator
+mirroring launch-sweep's DEFER-ONE idiom (`running`/`pendingRerun`): if a reconcile is in flight, set
+`pendingRerun`; on settle run exactly one more pass that re-reads the DB (final pass reflects newest
+committed state; bursts coalesce). Add a stale-reconcile regression test.
+
+**Actionable:**
+- [11-10] Cap eviction has no per-type priority — a within-horizon one-shot birthday (NOTIF-04,
+  date-specific, cannot be caught up) can be evicted behind nearer-firing decay reminders. FIX:
+  reserve/prioritize birthdays within `MAX_SCHEDULED_NOTIFICATIONS`; + a test asserting a selected
+  birthday survives a decay influx. (The broad horizon/cap tradeoff is the accepted T-11-CAP owner
+  posture — not re-flagged.)
+- [11-13] The foreground `setNotificationHandler` has no automated test (11-01 added mock support "so
+  11-13 can assert" it, but 11-13 lists no test). FIX: add a handler-config test asserting
+  shouldPlaySound/Banner/List/Badge all false.
