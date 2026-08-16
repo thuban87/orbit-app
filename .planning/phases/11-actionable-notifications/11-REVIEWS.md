@@ -1,0 +1,303 @@
+---
+phase: 11
+reviewers: [codex]
+reviewed_at: 2026-08-16T19:45:35Z
+reviewer_models:
+  codex: codex-cli 0.144.1 (default model, --dangerously-bypass-hook-trust)
+plans_reviewed:
+  - 11-01-PLAN.md
+  - 11-02-PLAN.md
+  - 11-03-PLAN.md
+  - 11-04-PLAN.md
+  - 11-05-PLAN.md
+  - 11-06-PLAN.md
+  - 11-07-PLAN.md
+  - 11-08-PLAN.md
+  - 11-09-PLAN.md
+  - 11-10-PLAN.md
+  - 11-11-PLAN.md
+  - 11-12-PLAN.md
+  - 11-13-PLAN.md
+---
+
+# Cross-AI Plan Review — Phase 11 (Actionable Notifications)
+
+Cross-AI reviewer: **Codex** (codex-cli 0.144.1). This session (Claude/Opus) ran the
+source-grounding verification pass and the convergence assessment below. Per the project's
+"review the code, not the diff" mandate, every load-bearing Codex claim was re-checked against
+the actual source on disk before being accepted; the results are in the Verification Coverage
+and Assessment sections.
+
+---
+
+## Codex Review
+
+## Summary
+
+**Overall risk: HIGH — do not execute unchanged.** The plans fit several existing project invariants well, but the proposed scheduler cannot actually pre-schedule future decay or birthday alerts, and the action path is not safe for replay/duplicate delivery.
+
+## Strengths
+
+- The migration approach is compatible with the forward-only runner: migrations are sorted, transaction-wrapped, and atomically advance `user_version` in [src/db/migrations/runner.ts:32](/home/bwales/projects/orbit-app/src/db/migrations/runner.ts:32). Plan 11-02 is correctly additive; `snooze_until`, `reminders_off`, and `modified_at` already exist on `contacts` in [001-initial.ts:61](/home/bwales/projects/orbit-app/src/db/migrations/001-initial.ts:61).
+
+- Plans 11-03 and 11-07 respect the single-writer design. `recordTouchpoint` is mutexed and recomputes recency in one transaction ([recency-dao.ts:214](/home/bwales/projects/orbit-app/src/db/recency-dao.ts:214)); `recordEventCore` is the intended non-mutexed composition primitive ([events-dao.ts:55](/home/bwales/projects/orbit-app/src/db/events-dao.ts:55)).
+
+- Plan 11-04 correctly reuses the shared status and birthday primitives. `ROGUE_K`, `WOBBLE_MAX`, and local-date progress SQL already live in [status.ts:40](/home/bwales/projects/orbit-app/src/db/status.ts:40), while the dashboard’s snooze comparison is exactly the intended bare-date contract ([dashboard-read.ts:28](/home/bwales/projects/orbit-app/src/db/dashboard-read.ts:28)).
+
+- Plans 11-08 and 11-09 align with existing extension points: purge cleanup is explicitly post-commit ([purge-dao.ts:158](/home/bwales/projects/orbit-app/src/db/purge-dao.ts:158)), and the edit toggle is already wired to `form.remindersOff` ([EditContactScreen.tsx:679](/home/bwales/projects/orbit-app/src/screens/EditContactScreen.tsx:679)).
+
+- The navigation design is sound in principle: `Compose` and `Profile` routes accept the proposed `{contactId}` parameters ([types.ts:20](/home/bwales/projects/orbit-app/src/navigation/types.ts:20)), and the existing `navigationRef`/ready-gate pattern is reusable ([linking.ts:34](/home/bwales/projects/orbit-app/src/navigation/linking.ts:34)).
+
+## Concerns
+
+### Cross-cutting scheduler — HIGH
+
+**Plans 11-04 and 11-10 do not pre-schedule future notifications.** The decay read explicitly requires progress in `[WOBBLE_MAX, ROGUE_K)` ([11-04-PLAN.md:58](/home/bwales/projects/orbit-app/.planning/phases/11-actionable-notifications/11-04-PLAN.md:58)); stable and wobble contacts are excluded. Plan 11-10 then schedules only those returned candidates ([11-10-PLAN.md:60](/home/bwales/projects/orbit-app/.planning/phases/11-actionable-notifications/11-10-PLAN.md:60)). A contact that is stable when the app is last opened therefore has no notification pending for its future due date.
+
+The same flaw affects snoozes: a future `snooze_until` excludes the contact entirely, so the action cancels its reminder and no post-snooze reminder exists unless the user opens Orbit again after expiry.
+
+Birthday scheduling is also day-of-only: plan 11-04 filters with `daysUntilBirthday(...) === 0` ([11-04-PLAN.md:60](/home/bwales/projects/orbit-app/.planning/phases/11-actionable-notifications/11-04-PLAN.md:60)). This cannot deliver a birthday alert on a day when the app was not launched first.
+
+**Suggestion:** split “eligible to receive at a future date” from “currently overdue.” Schedule:
+
+- Decay for all contacted, live, non-muted, non-rarely-responding, non-rogue contacts, at `max(dueDate, snoozeUntil)` and then weekly ticks.
+- The next birthday occurrence for every valid, non-archived birthday, not just today’s.
+- Tests proving a stable contact, a future-snoozed contact, and a birthday next week receive a dated OS schedule.
+
+### Plans 11-10 and 11-11 — HIGH
+
+**Settings changes will not update existing scheduled notifications.** Plan 11-10 intentionally leaves an existing desired identifier untouched ([11-10-PLAN.md:65](/home/bwales/projects/orbit-app/.planning/phases/11-actionable-notifications/11-10-PLAN.md:65), [11-10-PLAN.md:93](/home/bwales/projects/orbit-app/.planning/phases/11-actionable-notifications/11-10-PLAN.md:93)). But delivery time, quiet hours, and lock-screen channel are all user-editable, and plan 11-11 promises immediate reconciliation.
+
+Because identifier presence is the only comparison, changing 9 AM to 10 AM, enabling public lock-screen names, or altering quiet hours leaves the old trigger/channel in place.
+
+**Suggestion:** diff the full desired request (date, channel, category, content/data) against the OS request. On mismatch, cancel and re-schedule using the same stable identifier. Add regression tests for every tunable setting changing an existing reminder.
+
+### Plans 11-01, 11-06, and 11-07 — HIGH
+
+**`decay-actions` is not a supported Expo category identifier.** The plans define `DECAY_CATEGORY="decay-actions"` ([11-01-PLAN.md:102](/home/bwales/projects/orbit-app/.planning/phases/11-actionable-notifications/11-01-PLAN.md:102)). Expo SDK 57 explicitly warns against `:` and `-` in category identifiers because categories may not work as expected. Use `decay_actions` before this unshipped identifier becomes permanent. [Expo Notifications SDK 57](https://docs.expo.dev/versions/v57.0.0/sdk/notifications/)
+
+**“DEFAULT importance” is not silent.** Plan 11-06 sets `AndroidImportance.DEFAULT` while calling it silent. Android defines DEFAULT as making noise; LOW is the non-audibly-intrusive tier. This contradicts the calm/silent requirement. [Android NotificationManager](https://developer.android.com/reference/android/app/NotificationManager)
+
+**Suggestion:** retain DEFAULT only if required by product policy, but explicitly configure `sound: null` and vibration off, then validate physical-device behavior. Otherwise use LOW and revise the decision record.
+
+### Plans 11-07, 11-12, and 11-13 — HIGH
+
+**The headless task cannot obtain a database executor in a fresh process.** Plan 11-07 directs the task to use `getExecutor()` ([11-07-PLAN.md:58](/home/bwales/projects/orbit-app/.planning/phases/11-actionable-notifications/11-07-PLAN.md:58)), but that accessor throws until `openAndMigrate()` has completed ([database.ts:115](/home/bwales/projects/orbit-app/src/db/database.ts:115)). In a headless TaskManager launch, React never mounts, so App’s `useEffect` at [App.tsx:67](/home/bwales/projects/orbit-app/App.tsx:67) does not run.
+
+**`expo-task-manager` is also absent.** [package.json:5](/home/bwales/projects/orbit-app/package.json:5) has neither `expo-notifications` nor `expo-task-manager`; plan 11-01 installs only the former. Expo requires `expo-task-manager` plus a module-scope `TaskManager.defineTask` before notification task registration. [Expo Notifications SDK 57](https://docs.expo.dev/versions/v57.0.0/sdk/notifications/) and [Expo TaskManager SDK 57](https://docs.expo.dev/versions/v57.0.0/sdk/task-manager/)
+
+**Suggestion:** install and mock `expo-task-manager`; have the headless task `await openAndMigrate()` before calling `getExecutor()`. Keep that path limited to migration/open + action write—never the launch sweep.
+
+### Plans 11-07 and 11-12 — HIGH
+
+**Action writes are not idempotent and cold-start replay can duplicate them.** Plan 11-07 mints a new UID every handler invocation ([11-07-PLAN.md:57](/home/bwales/projects/orbit-app/.planning/phases/11-actionable-notifications/11-07-PLAN.md:57)). That defeats the existing unique UID protections on interactions ([001-initial.ts:96](/home/bwales/projects/orbit-app/src/db/migrations/001-initial.ts:96)) and events ([001-initial.ts:115](/home/bwales/projects/orbit-app/src/db/migrations/001-initial.ts:115)): duplicate handler calls create valid duplicate rows.
+
+Plan 11-12 reprocesses `getLastNotificationResponseAsync()` but never clears or deduplicates it ([11-12-PLAN.md:77](/home/bwales/projects/orbit-app/.planning/phases/11-actionable-notifications/11-12-PLAN.md:77)). Expo provides `clearLastNotificationResponseAsync()` specifically to prevent already-handled response routing from recurring. [Expo Notifications SDK 57](https://docs.expo.dev/versions/v57.0.0/sdk/notifications/)
+
+This is the concrete warm/cold double-write risk: a background Task action, response listener, or later cold-start replay can each call the shared handler, and each currently produces a fresh interaction/event.
+
+**Suggestion:** make action processing exactly-once:
+
+- Include a per-scheduled-occurrence action token in notification data.
+- Persist a unique receipt/token transactionally with the interaction or snooze event, so duplicate delivery is a no-op.
+- Clear the last notification response after successful routing/handling.
+- Serialize the response gate through one `handleResponseOnce` function and test Task + listener + cold-start replay of the same response.
+
+### Plan 11-13 — MEDIUM
+
+**Channel/category initialization races the first reconcile.** The plan fires `ensureChannels()` and `ensureNotificationCategories()` without awaiting them, then immediately calls `installSweepTrigger`, whose cold-start sweep starts immediately ([App.tsx:83](/home/bwales/projects/orbit-app/App.tsx:83), [launch-sweep.ts:102](/home/bwales/projects/orbit-app/src/services/launch-sweep.ts:102)). The first schedule can therefore run before its channel/category exists.
+
+**Suggestion:** register the hook, then asynchronously await channel/category initialization, and only then install the sweep trigger. Also ensure channels before requesting permission at the Settings value moment.
+
+### Plan 11-09 — MEDIUM
+
+**The proposed snooze display call is type-incorrect and risks UTC parsing.** `formatLocalDate` accepts a `Date`, not a string ([dates.ts:17](/home/bwales/projects/orbit-app/src/utils/dates.ts:17)), but the plan proposes `formatLocalDate(snooze_until)` ([11-09-PLAN.md:90](/home/bwales/projects/orbit-app/.planning/phases/11-actionable-notifications/11-09-PLAN.md:90)).
+
+**Suggestion:** display the stored zero-padded `YYYY-MM-DD` directly, or parse it into `new Date(year, monthIndex, day)` using local components—never `new Date("YYYY-MM-DD")`.
+
+### Plan 11-12 — MEDIUM
+
+The warm listener is installed before `isReady`, but it does not queue a response that arrives before navigation readiness. It can no-op against `navigationRef.current` and never retry. The existing Share gate avoids this by keying work to reactive readiness ([linking.ts:40](/home/bwales/projects/orbit-app/src/navigation/linking.ts:40)).
+
+**Suggestion:** store a pending body-tap response until `isReady`, then route once; treat only Expo’s default action identifier as a body tap.
+
+## Plan coverage notes
+
+- **11-01:** Good shared-contract boundary, but add TaskManager and replace the category identifier.
+- **11-02 / 11-03:** Structurally solid and compatible with existing migrations/mutex composition. Define whether `clearSnooze` always records `unsnooze`; “optional” makes the audit trail inconsistent.
+- **11-04 / 11-05:** Good reuse of status/date primitives, but revise candidate semantics for actual pre-scheduling.
+- **11-06:** Versioned channels are the right approach; correct the silence behavior.
+- **11-07 / 11-12 / 11-13:** Need the headless bootstrap, initialization ordering, and exactly-once response design before implementation.
+- **11-08:** Correctly targets the existing post-commit extension slot in [ArchivedContactsScreen.tsx:122](/home/bwales/projects/orbit-app/src/screens/ArchivedContactsScreen.tsx:122).
+- **11-09:** The UI placement and DAO routing are appropriate after fixing local-date rendering.
+- **11-10 / 11-11:** Reconciliation needs full-request replacement, permission-state handling, and future-date scheduling.
+
+The foundational DAO, migration, purge, and navigation choices are strong. The execution order should be amended around scheduling and action delivery first; those are currently the blockers to a safe Phase 11.
+
+---
+
+## Verification Coverage (source-grounding pass — Claude/Opus)
+
+Every symbol the 13 PLAN.md files cite (functions, DAOs, columns, migrations, channel ids, file
+paths) was enumerated and checked against the source on disk with ripgrep/Read. Symbols listed
+under each plan's **"Artifacts this plan produces"** are EXCLUDED — they are NEW, created by this
+phase, and their absence is expected (not drift). A cited-but-missing EXISTING symbol is a HIGH
+finding.
+
+**Result: 0 MISSING existing symbols. All cited existing symbols VERIFIED.** (The one apparent gap —
+`edit-contact-logic.ts` — is a path imprecision, not a missing symbol: the file lives at
+`src/screens/edit-contact-logic.ts`, not `src/logic/`, and the cited mapping is present.)
+
+| Cited existing symbol | Plan(s) | Status | Evidence (file:line) |
+|---|---|---|---|
+| `WOBBLE_MAX` (=1.0), `ROGUE_K` (=3), `PROGRESS_SQL`, `STATUS_SQL` | 04, 10 | VERIFIED | src/db/status.ts:41,42,59,62 |
+| `daysUntilBirthday`, `FEB_29_OBSERVED_DAY` | 04, 05 | VERIFIED | src/logic/birthday-logic.ts:136, :29 |
+| `recordTouchpoint` + `RecordTouchpointInput` {contactId,uid,occurredAt,now,channel,direction,connected,quality,source}; `source` doc lists `notification` | 07 | VERIFIED | src/db/recency-dao.ts:215, :57-76 |
+| single-writer mutex / `inWriteTransaction` non-reentrancy note | 03, 07 | VERIFIED | src/db/recency-dao.ts:149-155 |
+| `recordEventCore` (non-mutexed core), `recordEvent`, `EventType` incl. `snooze`/`unsnooze` (RESERVED) | 03 | VERIFIED | src/db/events-dao.ts:62, :88, :38 |
+| `registerSweepHook`, `installSweepTrigger`, `SweepHook` | 10, 13 | VERIFIED | src/services/launch-sweep.ts:45, :102, :27 |
+| `registerFieldSweep` (lazy `getExec`, pushes one hook) | 10 | VERIFIED | src/services/field-sweep.ts:83-88 |
+| SNOOZE STORAGE CONTRACT, `BASE_WHERE` snooze clause, `listBirthdayCandidates` | 03, 04 | VERIFIED | src/db/dashboard-read.ts:33, :142-144, :336 |
+| contacts DDL: `reminders_off`, `snooze_until`, `interval_days`, `archived_at`; `interactions.uid`/events `uid` UNIQUE | 02, 03, 04, 09 | VERIFIED | src/db/migrations/001-initial.ts:79, :77, :67, :76, :99 |
+| `runMigrations` (forward-only user_version) | 02 | VERIFIED | src/db/migrations/runner.ts:32, :60 |
+| `TARGET_VERSION` (=1, pre-phase), migrations array `[migration001]`, `getExecutor`, `localDateTime` | 02, 07, 09, 13 | VERIFIED | src/db/database.ts:36, :106, :132, :45 |
+| `Migration`, `MigrationDeps`, `SqlExecutor` types | 02 | VERIFIED | src/db/types.ts:46, :36, :17 |
+| favourites-dao `inWriteTransaction` + `changes===1` + ?-bound UPDATE idiom | 02, 03 | VERIFIED | src/db/favourites-dao.ts:35-63 |
+| `onPurgeExtensions` POST-COMMIT best-effort hook | 08 | VERIFIED | src/db/purge-dao.ts:67, :214 |
+| `buildPhotoPurgeCleanup` (adapter-builder analog) | 08 | VERIFIED | src/services/photos/purge-photo-cleanup.ts:62 |
+| `doPurge` + `onPurgeExtensions: buildPhotoPurgeCleanup(exec)` single slot | 08 | VERIFIED | src/screens/ArchivedContactsScreen.tsx:122, :134 |
+| edit-form `reminders_off` Switch (testID `edit-contact-reminders-off`, `form.remindersOff`), "Rarely responds" neighbour | 09 | VERIFIED | src/screens/EditContactScreen.tsx:685, :687, :663 |
+| `remindersOff: c.reminders_off` mapping | 09 (context cites `edit-contact-logic.ts:148`) | VERIFIED (path is src/screens/, not src/logic/) | src/screens/edit-contact-logic.ts:148 |
+| `getContactHeader` (additive-widening idiom: favourite_rank, phone) | 09 | VERIFIED | src/db/contact-read.ts:65, :112 |
+| ContactProfile `Header` type, unified `load()`, Message/Log-contact action block | 09 | VERIFIED | src/screens/ContactProfileScreen.tsx:101, :159, :586-614 |
+| `FilterChipRow` (filled-accent chip idiom) | 09 | VERIFIED | src/components/FilterChipRow.tsx:40 |
+| `formatLocalDate` (takes a `Date`) | 09 | VERIFIED | src/utils/dates.ts:17 |
+| `newUid` | 07, 09 | VERIFIED | src/db/uid.ts:18 |
+| `navigationRef`, `ShareIntentGate`, reactive `isReady` gate | 12, 13 | VERIFIED | src/navigation/linking.ts:34, :19, :40 |
+| `Profile { contactId }`, `Compose { contactId }` routes | 12 | VERIFIED | src/navigation/types.ts:25, :66 |
+| SettingsScreen `useFocusEffect` reload, `styles.row`, ScrollView | 11 | VERIFIED | src/screens/SettingsScreen.tsx:59, :92, :66 |
+| App.tsx module guards `fieldSweepRegistered`/`photoReconcileRegistered`, ready-gated effect, `navReady`, ShareIntentGate mount | 13 | VERIFIED | App.tsx:48, :51, :62, :15 |
+| app.config.ts `stringPlugins` Set (expo-sqlite, datetimepicker, expo-image) | 01 | VERIFIED | app.config.ts:63-68 |
+| `@react-native-community/datetimepicker` dependency | 11 | VERIFIED | package.json (9.1.0) |
+
+**UNCHECKABLE (OS-runtime / third-party API semantics, not resolvable from this repo):** expo's
+warm-vs-headless notification-response delivery semantics; whether `Notifications.registerTaskAsync`
+functions without `expo-task-manager`; whether Android `IMPORTANCE_DEFAULT` is audibly silent;
+whether Expo rejects `-`/`:` in category identifiers. These are exactly the surfaces the plans
+queue for Pixel-UAT — but three of them (below) are also HIGH design/dependency concerns the code
+already contradicts and should not be deferred to on-device discovery.
+
+---
+
+## Assessment (convergence — Claude/Opus, code-verified)
+
+Codex's HIGH findings were re-verified against source. **Five hold as HIGH** (all code-grounded),
+including the pre-identified warm-tap double-write. Two of Codex's HIGH sub-claims are
+factually confirmed in this repo (`getExecutor` throws pre-open; `expo-task-manager` absent). One
+sub-claim (category-id hyphen) is downgraded to LOW (uncertain, and the plan uses hyphens in
+channel ids that Codex did not flag).
+
+### Confirmed HIGH concerns (unresolved in the plans)
+
+- **H1 — Headless action write will throw: no DB bootstrap + missing dependency (11-07, 11-01,
+  11-13).** `handleNotificationAction` obtains the executor via `getExecutor()`, which throws
+  `"getDb() called before openAndMigrate() completed"` (src/db/database.ts:119-140) whenever the DB
+  isn't open. `openAndMigrate` runs ONLY from App.tsx's mount effect — which never runs in a killed-app
+  headless TaskManager launch. So the marquee "killed-app one-tap mark/snooze" write fails. Additionally
+  `expo-task-manager` is absent from package.json and no plan installs it (11-01 installs only
+  expo-notifications), yet the headless task calls `TaskManager.defineTask`/`registerTaskAsync`. **Fix:**
+  11-07's headless task must `await openAndMigrate()` before `getExecutor()`; 11-01 must install +
+  mock `expo-task-manager`.
+
+- **H2 — Action writes are not idempotent; warm double-delivery AND cold-start replay duplicate
+  them (11-07, 11-12).** [the pre-identified concern] `handleNotificationAction` mints a fresh
+  `newUid()` per call (11-07). `interactions.uid` and events `uid` are `UNIQUE`
+  (001-initial.ts:99,:118) — that constraint WOULD dedupe a re-delivered tap if the uid were
+  deterministic, but a freshly-minted uid defeats it. Both the headless task (11-07) and the
+  foreground `addNotificationResponseReceivedListener` (11-12) funnel to the same handler, and
+  11-12 additionally re-reads `getLastNotificationResponseAsync()` on every cold start without ever
+  calling `clearLastNotificationResponseAsync()` — so a single tap can write twice (warm overlap) or
+  re-write on each relaunch (cold replay). The single-writer mutex serialises these writes; it does
+  NOT dedupe them → duplicate interaction rows / duplicate snooze events in an immutable,
+  un-repairable local DB. The plans only assert mutual exclusivity in a comment; there is no runtime
+  guard or test. **Fix:** derive a deterministic per-occurrence idempotency uid (so a re-delivery
+  collides on the UNIQUE key and no-ops), route both wirings through one `handleResponseOnce`, call
+  `clearLastNotificationResponseAsync()` after handling, and test Task + listener + cold-start replay
+  of the same response.
+
+- **H3 — Settings changes do not update already-scheduled notifications (11-10, 11-11).** 11-10's
+  reconcile diffs by identifier PRESENCE only and explicitly leaves an already-scheduled desired
+  identifier untouched (11-10-PLAN.md:65). But delivery hour, quiet-window, and the private/public
+  lock-screen channel are all user-editable (the owner's tunability reversal), and 11-11 promises an
+  immediate reconcile. As written, changing 9am→10am, flipping quiet hours, or turning lock-screen
+  public OFF again leaves the stale trigger/channel in place until it fires — including a **privacy
+  regression** (a name stays glanceable on the lock screen after the user re-privatises). **Fix:**
+  reconcile must diff the FULL desired request (fire date, channel, category, data) against the OS
+  request and cancel+reschedule on mismatch under the same stable identifier; add a regression test
+  per tunable.
+
+- **H4 — DEFAULT channel importance is not silent (11-06) [contradicts a DECIDED item — owner
+  ruling required].** 11-CONTEXT §"Alert feel" records `[DECIDED] AndroidImportance.DEFAULT —
+  silent, no heads-up`. That equivalence is factually wrong at the Android layer: `IMPORTANCE_DEFAULT`
+  makes a sound; `IMPORTANCE_LOW` is the silent tier. 11-06 faithfully implements DEFAULT with no
+  `sound: null`, so channels will make noise — contradicting the calm/anti-nag mandate. Channel
+  importance is **immutable at creation**, so shipping this wrong forces a channel-version bump for
+  every user to fix. This corrects/reverses a recorded decision, so per project rules it is the
+  **owner's** call to resolve — flagged, not endorsed. **Options:** keep DEFAULT but explicitly set
+  `sound: null` + vibration off (and validate on-device), OR change to `LOW` and revise the decision
+  record.
+
+- **H5 — Decay/birthday are only scheduled once already due; future occurrences are not
+  pre-scheduled (11-04, 11-10) [confirm product intent].** `listDecayDueCandidates` returns only
+  contacts already in `[WOBBLE_MAX, ROGUE_K)` (11-04); the birthday read returns only
+  `daysUntilBirthday()===0`. 11-10 schedules only those. So a contact that is stable/wobble (not yet
+  due) — or a birthday next week — has NO OS-scheduled notification; and a future `snooze_until`
+  excludes a contact so no post-expiry reminder is armed. The phase's premise is *pre-scheduled dated
+  notifications that fire without the app open*; as designed, a decaying contact gets nothing until
+  the user next launches Orbit (precisely when a disengaged user won't). This may be an accepted
+  "reconcile-on-launch" limitation, so it needs an explicit product-intent confirmation — but as the
+  plans stand it undercuts the stated architecture. **Fix (if intent is true pre-scheduling):**
+  schedule the next occurrence for every eligible live/non-muted/non-rogue contact at
+  `max(dueDate, snooze_until)` + weekly ticks, and the next birthday occurrence for every valid
+  birthday; test a stable contact, a future-snoozed contact, and a next-week birthday each receiving
+  a dated schedule.
+
+### Actionable non-HIGH concerns (not yet incorporated in a PLAN.md)
+
+- **A1 (11-13) — MEDIUM:** `ensureChannels()`/`ensureNotificationCategories()` are fire-and-forget,
+  then `installSweepTrigger` fires the cold-start sweep immediately (App.tsx:83, launch-sweep.ts:102)
+  — the first `scheduleNotificationAsync` can run before its channel/category exists. Await channel +
+  category init before installing the sweep trigger (and ensure channels before the Settings
+  permission value moment).
+- **A2 (11-09) — MEDIUM:** The snooze-status line proposes `formatLocalDate(snooze_until)`, but
+  `formatLocalDate` takes a `Date`, not a string (src/utils/dates.ts:17); coercing via
+  `new Date("YYYY-MM-DD")` reintroduces the UTC evening off-by-one CLAUDE.md forbids. Render the
+  stored `YYYY-MM-DD` directly, or parse with local components `new Date(y, mIdx, d)`.
+- **A3 (11-12) — LOW/MEDIUM:** The warm response listener is not queued against nav readiness; a
+  response arriving before `isReady` can no-op on `navigationRef.current` and never retry (the cold
+  path IS isReady-gated). Queue a pending body-tap until ready; treat only Expo's default action
+  identifier as a body tap.
+- **A4 (11-01/11-06) — LOW:** Category id `decay-actions` (and channel ids) use `-`. Codex flags
+  hyphens as risky in Expo category identifiers; uncertain (unverified against SDK 57, and the plan
+  hyphenates channel ids too). Cheap to switch the category id to `decay_actions` before it ships as
+  a permanent identifier — worth doing defensively.
+- **A5 (11-03) — LOW:** `clearSnooze` records an `unsnooze` event only "optionally"; make it always
+  record for a consistent audit trail (the events log is the only recovery mechanism).
+
+### Strengths corroborated (code-verified)
+
+The DAO/migration/purge/navigation foundations are sound: additive forward-only migration 002 fits
+`runMigrations` exactly; snooze-dao/recency composition respects the single-writer mutex and the
+`recordEventCore` non-mutexed primitive; 11-04 correctly reuses `status.ts` + `birthday-logic.ts`
+rather than recomputing; 11-08 targets the real POST-COMMIT `onPurgeExtensions` slot; the nav design
+reuses `navigationRef`/`ShareIntentGate` correctly. The blockers are concentrated in scheduling
+coverage (H5), settings reconciliation (H3), and the action-delivery path (H1, H2) — plus the
+immutable-channel importance decision (H4).
+
+### Consensus
+
+Single external reviewer (Codex) + this session's code-grounded verification. No divergence to
+reconcile; every HIGH retained is independently confirmed against the source on disk. The plans are
+**not safe to execute unchanged** — H1 and H2 break the headless action feature and risk duplicate
+writes into an un-repairable local DB; H3 has a privacy dimension; H4 is an immutable, expensive-to-
+reverse channel decision resting on a factual error; H5 needs a product-intent ruling.
