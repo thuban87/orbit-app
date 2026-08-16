@@ -97,3 +97,99 @@ describe("resolveCapturePayload — CAP-03 payload → { displayText, url } (Tas
     expect(resolveCapturePayload(input)).toEqual(resolveCapturePayload(input));
   });
 });
+
+describe("resolveCapturePayload — CAP-03 note composition `note — base` (Task 2, A5)", () => {
+  it("note + title (base = title) → `note — title`, note leads, url unchanged", () => {
+    expect(
+      resolveCapturePayload({
+        text: "https://x/a",
+        webUrl: "https://x/a",
+        title: "Page Title",
+        note: "for Dad, he asked about this",
+      }),
+    ).toEqual({
+      displayText: "for Dad, he asked about this — Page Title",
+      url: "https://x/a",
+    });
+  });
+
+  it("note + plain text (base = the prose) → base survives, note leads, url null [A5]", () => {
+    expect(
+      resolveCapturePayload({ text: "the prose", webUrl: null, note: "my words" }),
+    ).toEqual({ displayText: "my words — the prose", url: null });
+  });
+
+  it("note + bare URL, no title (base = the bare URL) → base survives as the URL, url stays canonical [A5]", () => {
+    expect(
+      resolveCapturePayload({
+        text: "https://x/a",
+        webUrl: "https://x/a",
+        note: "read this",
+      }),
+    ).toEqual({ displayText: "read this — https://x/a", url: "https://x/a" });
+  });
+
+  it("note-only = NO base present (empty text, no title) → note alone, no trailing separator", () => {
+    expect(
+      resolveCapturePayload({ text: "", webUrl: null, note: "just my note" }),
+    ).toEqual({ displayText: "just my note", url: null });
+  });
+
+  it("label-only (no note) → base unchanged from Task 1", () => {
+    expect(
+      resolveCapturePayload({ text: "https://x/a", webUrl: "https://x/a", title: "T" }),
+    ).toEqual({ displayText: "T", url: "https://x/a" });
+  });
+
+  it("note containing an embedded ` — ` → preserved verbatim, no special handling", () => {
+    expect(resolveCapturePayload({ text: "", webUrl: null, note: "a — b — c" })).toEqual({
+      displayText: "a — b — c",
+      url: null,
+    });
+  });
+
+  it("whitespace-only note → treated as absent, falls back to the base (base NOT dropped)", () => {
+    expect(
+      resolveCapturePayload({
+        text: "the prose",
+        webUrl: null,
+        note: "   ",
+      }),
+    ).toEqual({ displayText: "the prose", url: null });
+  });
+
+  it("extended-whitespace note (tab/NBSP) → treated as absent, base survives", () => {
+    expect(
+      resolveCapturePayload({
+        text: "https://x/a",
+        webUrl: "https://x/a",
+        title: "Page Title",
+        note: "\t ",
+      }),
+    ).toEqual({ displayText: "Page Title", url: "https://x/a" });
+  });
+
+  it("note over a whitespace-only text with a title → note leads the title (empty text is not the base)", () => {
+    expect(
+      resolveCapturePayload({
+        text: "   ",
+        webUrl: null,
+        title: "Page Title",
+        note: "my note",
+      }),
+    ).toEqual({ displayText: "my note — Page Title", url: null });
+  });
+
+  it("note never derives or overwrites url — a note over prose-with-URL keeps the first http match", () => {
+    expect(
+      resolveCapturePayload({
+        text: "great read https://x.com/a about foo",
+        webUrl: "https://x.com/a",
+        note: "worth a look",
+      }),
+    ).toEqual({
+      displayText: "worth a look — great read https://x.com/a about foo",
+      url: "https://x.com/a",
+    });
+  });
+});
