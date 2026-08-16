@@ -23,7 +23,7 @@ onto the dossier domains; a `[DECIDED]`/`[REJECTED]` decision is implemented, ne
 - [x] **Phase 5: Photos** — library picker + URL path, in-app Skia crop, 512px master, themed initials fallback. (completed 2026-08-15)
 - [x] **Phase 6: Interaction Log, Status & Impact** — touchpoint rows, editable timeline, gravity/intensity, rogue, "Rarely responds". (completed 2026-08-15)
 - [x] **Phase 7: Conversational Fuel** — per-item rows (5 kinds incl. `off_limits`), ranked projection, profile editor, cross-contact search. (completed 2026-08-16)
-- [ ] **Phase 8: Dashboard & Never-Contacted Screen** — the home screen, sort/filter/search, birthday banner, favourites, freshness, empty states.
+- [x] **Phase 8: Dashboard & Never-Contacted Screen** — the home screen, sort/filter/search, birthday banner, favourites, freshness, empty states. (completed 2026-08-16)
 - [ ] **Phase 9: Compose Screen & SMS Handoff** — the in-app message surface (fuel visible, Send→SMS, Copy) that notify/widget/AI all open.
 - [ ] **Phase 10: Share-Sheet Capture** — Android share target, grid-of-faces picker, `EXTRA_SUBJECT` patch, inline create.
 - [ ] **Phase 11: Actionable Notifications** — pre-scheduled + launch-reconcile engine, decay + birthday, headless actions, mute, settings.
@@ -339,7 +339,7 @@ Recorded here because they bind phases that do not own them. Every planner/execu
   3. The "Not yet contacted (N)" screen (rendering fuel), a snoozed segment with a count, and a count-less Archived entry are reachable; the birthday banner overrides snooze/never-contacted suppression (archived excluded) with the parser bugs fixed.
   4. A user marks favourites via a profile star and orders them on a shared "Manage favourites" screen; the dashboard renders with no network and refreshes on focus/AppState/pull with async queries.
 
-**Plans:** 9/10 plans executed
+**Plans:** 10/10 plans complete
 
 **Wave 1** *(parallel — independent correctness cores)*
 
@@ -364,7 +364,7 @@ Recorded here because they bind phases that do not own them. Every planner/execu
 
 **Wave 5** *(blocked on Wave 4)*
 
-- [ ] 08-10-PLAN.md — retire standalone FuelSearch + Settings Manage-favourites row (DASH-06, DASH-02)
+- [x] 08-10-PLAN.md — retire standalone FuelSearch + Settings Manage-favourites row (DASH-06, DASH-02)
 
 ### Phase 9: Compose Screen & SMS Handoff
 
@@ -493,7 +493,7 @@ Recorded here because they bind phases that do not own them. Every planner/execu
 | 5. Photos | 8/8 | Complete   | 2026-08-15 |
 | 6. Interaction Log, Status & Impact | 6/6 | Complete   | 2026-08-15 |
 | 7. Conversational Fuel | 4/4 | Complete   | 2026-08-16 |
-| 8. Dashboard & Never-Contacted Screen | 9/10 | In Progress|  |
+| 8. Dashboard & Never-Contacted Screen | 10/10 | Complete   | 2026-08-16 |
 | 9. Compose Screen & SMS Handoff | 0/TBD | Not started | - |
 | 10. Share-Sheet Capture | 0/TBD | Not started | - |
 | 11. Actionable Notifications | 0/TBD | Not started | - |

@@ -5,16 +5,16 @@ milestone_name: milestone
 current_phase: 8
 current_phase_name: Dashboard & Never-Contacted Screen
 status: ready
-stopped_at: Completed 08-09-PLAN.md (dashboard controls — filter chips + 4-option sort + live name+fuel search + persistence + owner-approved Settings gear, DASH-02/04/06)
-last_updated: "2026-08-16T05:30:39.213Z"
+stopped_at: Completed 08-10-PLAN.md (retire standalone FuelSearch route/screen; Settings Search row -> Manage favourites, DASH-06/02)
+last_updated: "2026-08-16T05:37:20.125Z"
 last_activity: 2026-08-16
-last_activity_desc: Completed 08-09 (dashboard controls — chips/sort/search + Settings gear)
+last_activity_desc: Completed 08-10 (retire standalone FuelSearch route/screen; Settings Search row → Manage favourites) — Phase 8 code complete
 progress:
   total_phases: 16
-  completed_phases: 7
+  completed_phases: 8
   total_plans: 56
-  completed_plans: 55
-  percent: 44
+  completed_plans: 56
+  percent: 50
 ---
 
 # Project State
@@ -28,9 +28,9 @@ See: .planning/PROJECT.md (updated 2026-08-14)
 
 ## Current Position
 
-Phase: 8 (Dashboard & Never-Contacted Screen) — EXECUTING
-Next: Plan 08-10 (retire the standalone Settings→FuelSearch entry now that dashboard search has relocated; Settings row → ManageFavourites). The 08-07 OPEN owner decision (dashboard had no Settings entry point) is RESOLVED — 08-09 added the owner-approved top-right Settings gear (dashboard-settings-entry) → navigate("Settings").
-Last activity: 2026-08-16 — Completed 08-09 (dashboard controls — chips/sort/search + Settings gear)
+Phase: 8 (Dashboard & Never-Contacted Screen) — all 10 plans executed (code complete; end-of-phase Pixel UAT pending)
+Next: Phase 8 verification / on-device Pixel UAT (Settings shows "Manage favourites" and no "Search" row; dashboard search still works), then Phase 9. The 08-07 OPEN owner decision (dashboard had no Settings entry point) is RESOLVED — 08-09 added the owner-approved top-right Settings gear (dashboard-settings-entry) → navigate("Settings").
+Last activity: 2026-08-16 — Completed 08-10 (retire standalone FuelSearch route/screen; Settings Search row → Manage favourites)
 
 Progress: [████░░░░░░] 38% (6/16 phases complete)
 
@@ -109,6 +109,7 @@ Progress: [████░░░░░░] 38% (6/16 phases complete)
 | Phase 08 P08 | 4min | 2 tasks | 4 files |
 | Phase 08 P07 | 6min | 2 tasks | 3 files |
 | Phase 08 P09 | 18min | 3 tasks | 1 files |
+| Phase 08 P10 | 2min | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -195,6 +196,7 @@ Foundational decisions affecting current work:
 - [Phase 8]: 08-07: HomeScreen IS the dashboard core now. `selectDashboardEmptyState` (src/logic/dashboard-empty-logic.ts, pure/node-tested, 11 cases) is the SINGLE empty-state gate — explicit precedence rowCount>0→'none' → hasTerm→'search-empty' → activeFilter!=='all'→'filter-empty' → (unfiltered) all-four-populations-zero→'firstrun' else 'hidden'. First-run REQUIRES live===0 && neverContacted===0 && snoozed===0 && archived===0 (HIGH-2 — never-contacted-only / snoozed-only / archived-only users get the hidden-population pointer, NOT "Add your first contact"); the filter/search empties win BEFORE the population fallback so a zero-result filter/search over a non-empty population never shows the hidden copy (MEDIUM-4). No inline count arithmetic in the .tsx. HomeScreen renders the status-sorted listDashboard population as ContactCards (→Profile), mounts BirthdayBanner at top (→Profile), shows the "{N} contacts" header from countLiveContacts (only when live>0), and Not-yet-contacted(N)→NeverContacted + count-less Archived→Archived footer entries. FRESHNESS = useFocusEffect + AppState→"active" + pull-to-refresh (RefreshControl accent tint), a single reload() returning its own cancelled-flag canceller, async reads ONLY — the connection-scoped change listener is deliberately NOT used (T-08-18, blind to headless writes); grep-verified 0 addDatabaseChangeListener / 0 getAllSync|getFirstSync. filter-empty renders a calm generic region (dashboard-empty-filter) for now; the filter-specific + search-empty copy + the live chips/search box land in Plan 09 (threading activeFilter/hasTerm into the SAME gate). All colours via useTheme().colors.*; dashboard-root testID. tsc + check:colors clean; npm test 676/676. **OPEN owner decision:** the rewrite removed home-settings-entry — the app's ONLY navigate("Settings") path — and no phase-8 plan (07–10) adds a dashboard→Settings affordance (the UI-SPEC dashboard surface defines none). Settings/CustomFields/Archived-via-Settings/Manage-favourites-row are UI-unreachable until resolved; flagged in 08-07-SUMMARY (not auto-fixed — placement is a product/navigation call). Resolve before end-of-phase Pixel UAT.
 
 - [Phase 8]: 08-09: HomeScreen gains the full controls layer (DASH-02/04/06 complete). Filter/sort selection PERSISTS via useDashboardPrefs (setFilter/setSort); the search term is LOCAL useState; all three are `reload` deps so a change re-queries through the Plan-07 focus-effect callback-change mechanism (no manual re-run). Chips assembled from real tables: all · needs-attention · one per category (listCategories) · one per social-battery value (Charger/Neutral/Drain) · favourites · snoozed (live countSnoozed, 0 until Phase 11). Sort control = a 4-Pressable row (Status/Name (A–Z)/Least recent/Most recent), no segmented-control dep, container testID `dashboard-sort-control` + options `dashboard-sort-option-{key}`. Live search box (`dashboard-search-input`, placeholder "Search people and notes") + `dashboard-search-clear` threads `term` into listDashboard — the DAO owns name/fuel matching + off_limits/ai/archived exclusions + the LOW-2 favourites+term precedence (NO component-side .filter of private data, NO special-casing; T-08-20/21 mitigated). Empty states fully via selectDashboardEmptyState with live activeFilter + hasTerm: search-empty (`dashboard-search-empty`, "No matches for {term}") wins before filter-empty; favourites filter-empty renders "No favourites yet" + pointer to the profile star (MEDIUM-4). Favourites-chip "Manage" affordance = a separate header link shown only when favourites is active (FilterChipRow stays purely presentational) → navigate("ManageFavourites"). OWNER-APPROVED addition beyond the plan text: a top-right Settings gear (`dashboard-settings-entry`, ⚙ token glyph, accessibilityLabel "Settings") → navigate("Settings"), fixing the 08-07 reachability gap (commit e9b6efb). Colours via tokens only; tsc + check:colors green; npm test 676/676. .tsx render/nav/persistence is end-of-phase Pixel UAT.
+- [Phase ?]: [Phase 8]: 08-10: standalone FuelSearch route + screen retired (search relocated to the dashboard, Plan 09 — expected relocation, NOT a reversal); FuelSearchResultRow + searchFuel DAO kept. Settings loses the Search row, gains a Manage-favourites row -> ManageFavourites (2nd entry into the shared reorder screen).
 
 ### Pending Todos
 
@@ -230,8 +232,8 @@ planning" sections in docs/dossier/*.md — those are the authoritative hand-off
 
 ## Session
 
-**Last session:** 2026-08-16T05:30:00.000Z
-**Stopped at:** Completed 08-09-PLAN.md (dashboard controls — filter chips + 4-option sort + live name+fuel search + persistence + owner-approved Settings gear, DASH-02/04/06)
+**Last session:** 2026-08-16T05:37:20.113Z
+**Stopped at:** Completed 08-10-PLAN.md (retire standalone FuelSearch route/screen; Settings Search row -> Manage favourites, DASH-06/02)
 **Resume file:** None
 
 ## Phase 4 — Closeout (2026-08-15) ✅ COMPLETE
