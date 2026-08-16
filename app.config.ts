@@ -15,6 +15,9 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   ...config,
   name: appName.APP_NAME,
   slug: "orbit",
+  // The expo-share-intent config plugin REQUIRES a scheme (Phase 10, CAP-01).
+  // None was previously set; "orbit" is the app's deep-link scheme.
+  scheme: "orbit",
   // Config-layer portrait lock (CLAUDE.md — the app is portrait-locked).
   orientation: "portrait",
   android: {
@@ -54,7 +57,8 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   plugins: (() => {
     const pluginName = (
       entry: NonNullable<ExpoConfig["plugins"]>[number],
-    ): string => (Array.isArray(entry) ? (entry[0] as string) : (entry as string));
+    ): string =>
+      Array.isArray(entry) ? (entry[0] as string) : (entry as string);
 
     const stringPlugins = [
       ...new Set([
@@ -70,9 +74,27 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       { cameraPermission: false, microphonePermission: false },
     ];
 
+    // Phase-10 share-sheet capture (Plan 10-01, CAP-01). Registers Orbit as a
+    // plain-text-ONLY Android share target — never a broader wildcard MIME type
+    // (attack-surface minimization; a wildcard would hit the text/html error
+    // branch). The multi-item intent-filter option is deliberately left unset so
+    // ACTION_SEND_MULTIPLE stays unregistered (multi-item share is out of v1).
+    // Like the picker, this is a `[name, options]` TUPLE — a distinct Set member
+    // from a bare string, so it cannot be Set-deduped; it is filtered out by name
+    // below and appended exactly once (the 01-01 duplicate-plugin prebuild hazard).
+    const shareIntentPlugin: [string, Record<string, unknown>] = [
+      "expo-share-intent",
+      { androidIntentFilters: ["text/plain"] },
+    ];
+
     return [
-      ...stringPlugins.filter((p) => pluginName(p) !== "expo-image-picker"),
+      ...stringPlugins.filter(
+        (p) =>
+          pluginName(p) !== "expo-image-picker" &&
+          pluginName(p) !== "expo-share-intent",
+      ),
       pickerPlugin,
+      shareIntentPlugin,
     ];
   })(),
 });
