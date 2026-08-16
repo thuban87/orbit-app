@@ -378,6 +378,17 @@ export function CaptureScreen(_props: RootStackScreenProps<"Capture">) {
   // (editFuelCore × N in ONE transaction) — the screen NEVER opens a transaction
   // inline (B1). A blank/whitespace note leaves the base untouched → treated as Skip.
   const onNoteDone = useCallback(async () => {
+    // WR-02: a blank/whitespace note is a true Skip — no recompose write. Without
+    // this guard the resolver returns `base` (the already-written display text) for a
+    // blank note, so `composed !== null` held and the row was needlessly rewritten to
+    // the SAME text, bumping `modified_at` on a latency-sensitive return path and
+    // contradicting the stated contract. Dismiss + re-arm the auto-return, nothing more.
+    const note = noteText.trim();
+    if (note.length === 0) {
+      setNoteOpen(false);
+      armAutoReturn();
+      return;
+    }
     if (isCommittingRef.current) {
       return;
     }
@@ -388,10 +399,11 @@ export function CaptureScreen(_props: RootStackScreenProps<"Capture">) {
         text: shareIntent.text ?? "",
         webUrl: shareIntent.webUrl,
         title: shareIntent.meta?.title,
-        note: noteText,
+        note,
       }).displayText;
-      // Only write when the recompose yields a non-blank text (a blank note leaves
-      // the base as-is — nothing to patch). ONE stamp for the edit `now` (A10).
+      // The recompose yields a non-blank text on the normal share path; the null case
+      // is the url-only edge (base null), unreachable from a real share. ONE stamp for
+      // the edit `now` (A10).
       if (composed !== null) {
         const stamp = localDateTime();
         if (writtenRows.length === 1) {
