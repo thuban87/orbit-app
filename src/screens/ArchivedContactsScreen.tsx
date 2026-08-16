@@ -36,6 +36,7 @@ import {
   purgeContact,
 } from "@/db/purge-dao";
 import type { RootStackScreenProps } from "@/navigation/types";
+import { buildNotificationPurgeCleanup } from "@/services/notifications/purge-notification-cleanup";
 import { buildPhotoPurgeCleanup } from "@/services/photos/purge-photo-cleanup";
 import { useTheme } from "@/theme";
 import { Logger } from "@/utils/logger";
@@ -130,8 +131,30 @@ export function ArchivedContactsScreen({
         if (!confirmed) {
           return;
         }
+        // POST-COMMIT best-effort fan-out — the purge has already committed by
+        // the time this runs (purge-dao module header). Compose the photo-file
+        // cleanup with the notification cancel, each awaited in its own
+        // try/catch so one failing cannot skip the other. Neither can undo the
+        // committed deletes; a failure is logged, never fatal.
+        const photoCleanup = buildPhotoPurgeCleanup(exec);
+        const notifCleanup = buildNotificationPurgeCleanup();
         await purgeContact(exec, id, {
-          onPurgeExtensions: buildPhotoPurgeCleanup(exec),
+          onPurgeExtensions: async (purgedId) => {
+            try {
+              await photoCleanup(purgedId);
+            } catch (err) {
+              Logger.error(LOG_SCOPE, "post-commit photo cleanup failed", err);
+            }
+            try {
+              await notifCleanup(purgedId);
+            } catch (err) {
+              Logger.error(
+                LOG_SCOPE,
+                "post-commit notification cleanup failed",
+                err,
+              );
+            }
+          },
         });
         await load();
       } catch (err) {
