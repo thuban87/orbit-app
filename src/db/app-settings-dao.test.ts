@@ -12,12 +12,12 @@
  * (The DAO read/write suites are appended in the same file by Plan 11-02 Task 2.)
  */
 import { beforeEach, describe, expect, it } from "vitest";
+import { nodeSqliteExecutor, openTestDb } from "@/db/__testkit__/node-sqlite";
 import {
   type AppSettings,
   getAppSettings,
   updateAppSettings,
 } from "@/db/app-settings-dao";
-import { nodeSqliteExecutor, openTestDb } from "@/db/__testkit__/node-sqlite";
 import { migration001 } from "@/db/migrations/001-initial";
 import { migration002 } from "@/db/migrations/002-app-settings";
 import { runMigrations } from "@/db/migrations/runner";
@@ -250,7 +250,11 @@ describe("app-settings-dao — validated write", () => {
   });
 
   it("persists the canonical 0/1 toggle inputs", async () => {
-    await updateAppSettings(exec, { decayEnabled: 0, birthdayEnabled: 1 }, LATER);
+    await updateAppSettings(
+      exec,
+      { decayEnabled: 0, birthdayEnabled: 1 },
+      LATER,
+    );
     const settings = await getAppSettings(exec);
     expect(settings.decayEnabled).toBe(0);
     expect(settings.birthdayEnabled).toBe(1);
@@ -286,13 +290,15 @@ describe("app-settings-dao — validated write", () => {
        VALUES (?, ?, ?, ?, ?, ?)`,
       [newUid(), "Sam", 30, NOW, NOW, NOW],
     );
-    const before = await exec.getFirstAsync<{ last_contact: string; modified_at: string }>(
-      "SELECT last_contact, modified_at FROM contacts WHERE name = 'Sam'",
-    );
+    const before = await exec.getFirstAsync<{
+      last_contact: string;
+      modified_at: string;
+    }>("SELECT last_contact, modified_at FROM contacts WHERE name = 'Sam'");
     await updateAppSettings(exec, { deliveryHour: 11 }, LATER);
-    const after = await exec.getFirstAsync<{ last_contact: string; modified_at: string }>(
-      "SELECT last_contact, modified_at FROM contacts WHERE name = 'Sam'",
-    );
+    const after = await exec.getFirstAsync<{
+      last_contact: string;
+      modified_at: string;
+    }>("SELECT last_contact, modified_at FROM contacts WHERE name = 'Sam'");
     expect(after).toEqual(before);
   });
 });
