@@ -182,7 +182,7 @@ Tracked, not in the current roadmap. Reasons recorded in the dossier.
 | LOG-01…06 | Phase 6 | Pending |
 | FUEL-01…06 | Phase 7 | Pending |
 | DASH-01…07 | Phase 8 | Pending |
-| CMP-01…03 | Phase 9 | Pending |
+| CMP-01…03 | Phase 9 | Complete |
 | CAP-01…04 | Phase 10 | Pending |
 | NOTIF-01…05 | Phase 11 | Pending |
 | WDG-01…03 | Phase 12 | Pending |
