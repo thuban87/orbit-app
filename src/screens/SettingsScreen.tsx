@@ -106,17 +106,17 @@ export function SettingsScreen() {
       </View>
 
       <Pressable
-        testID="settings-search-row"
+        testID="settings-manage-favourites-row"
         accessibilityRole="button"
-        accessibilityLabel="Search"
-        onPress={() => navigation.navigate("FuelSearch")}
+        accessibilityLabel="Manage favourites"
+        onPress={() => navigation.navigate("ManageFavourites")}
         style={[
           styles.row,
           { backgroundColor: colors.surface, borderColor: colors.border },
         ]}
       >
         <Text style={[styles.rowLabel, { color: colors.textPrimary }]}>
-          Search
+          Manage favourites
         </Text>
       </Pressable>
 
