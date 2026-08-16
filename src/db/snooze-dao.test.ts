@@ -99,7 +99,12 @@ describe("PRESET_MODIFIERS — the single top-of-file preset tunable", () => {
 describe("snoozeContact — set snooze_until (local date) + immutable snooze event", () => {
   it("writes snooze_until = local date('now','localtime','+7 days') for the 1w preset", async () => {
     const a = await seedContact();
-    await snoozeContact(exec, { contactId: a, uid: uid(), preset: "1w", now: LATER });
+    await snoozeContact(exec, {
+      contactId: a,
+      uid: uid(),
+      preset: "1w",
+      now: LATER,
+    });
     const row = await readRow(a);
     expect(row.snooze_until).toBe(await localDate("+7 days"));
   });
@@ -107,15 +112,30 @@ describe("snoozeContact — set snooze_until (local date) + immutable snooze eve
   it("honours the 3d and 1m presets", async () => {
     const a = await seedContact("A");
     const b = await seedContact("B");
-    await snoozeContact(exec, { contactId: a, uid: uid(), preset: "3d", now: LATER });
-    await snoozeContact(exec, { contactId: b, uid: uid(), preset: "1m", now: LATER });
+    await snoozeContact(exec, {
+      contactId: a,
+      uid: uid(),
+      preset: "3d",
+      now: LATER,
+    });
+    await snoozeContact(exec, {
+      contactId: b,
+      uid: uid(),
+      preset: "1m",
+      now: LATER,
+    });
     expect((await readRow(a)).snooze_until).toBe(await localDate("+3 days"));
     expect((await readRow(b)).snooze_until).toBe(await localDate("+1 month"));
   });
 
   it("a future snooze reads as STILL snoozed under the bare date() dashboard contract", async () => {
     const a = await seedContact();
-    await snoozeContact(exec, { contactId: a, uid: uid(), preset: "1w", now: LATER });
+    await snoozeContact(exec, {
+      contactId: a,
+      uid: uid(),
+      preset: "1w",
+      now: LATER,
+    });
     const row = await exec.getFirstAsync<{ expired: number }>(
       `SELECT (date(snooze_until) <= date('now','localtime')) AS expired
          FROM contacts WHERE id = ?`,
@@ -128,7 +148,12 @@ describe("snoozeContact — set snooze_until (local date) + immutable snooze eve
     const a = await seedContact();
     const before = await readRow(a);
     expect(before.last_contact).toBe(NOW);
-    await snoozeContact(exec, { contactId: a, uid: uid(), preset: "1w", now: LATER });
+    await snoozeContact(exec, {
+      contactId: a,
+      uid: uid(),
+      preset: "1w",
+      now: LATER,
+    });
     const after = await readRow(a);
     expect(after.modified_at).toBe(LATER);
     expect(after.last_contact).toBe(NOW); // unchanged — recency-dao stays sole writer
@@ -141,7 +166,12 @@ describe("snoozeContact — set snooze_until (local date) + immutable snooze eve
 
   it("throws + rolls back on a bad id, writing NEITHER the update NOR the event", async () => {
     await expect(
-      snoozeContact(exec, { contactId: 9999, uid: uid(), preset: "1w", now: LATER }),
+      snoozeContact(exec, {
+        contactId: 9999,
+        uid: uid(),
+        preset: "1w",
+        now: LATER,
+      }),
     ).rejects.toThrow(/no contact matched id=9999/);
     const orphanEvents = await exec.getAllAsync<{ n: number }>(
       "SELECT COUNT(*) AS n FROM events",
@@ -153,7 +183,12 @@ describe("snoozeContact — set snooze_until (local date) + immutable snooze eve
 describe("clearSnooze — NULL snooze_until + ALWAYS an unsnooze event (item 10)", () => {
   it("clears to NULL and ALWAYS writes exactly one unsnooze event, last_contact untouched", async () => {
     const a = await seedContact();
-    await snoozeContact(exec, { contactId: a, uid: uid(), preset: "1m", now: NOW });
+    await snoozeContact(exec, {
+      contactId: a,
+      uid: uid(),
+      preset: "1m",
+      now: NOW,
+    });
     await clearSnooze(exec, { contactId: a, uid: uid(), now: LATER });
     const row = await readRow(a);
     expect(row.snooze_until).toBeNull();
