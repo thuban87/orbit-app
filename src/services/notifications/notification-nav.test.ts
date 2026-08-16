@@ -23,7 +23,10 @@ describe("resolveNotificationNav", () => {
     ).toEqual({
       type: "reset",
       index: 1,
-      routes: [{ name: "Home" }, { name: "Compose", params: { contactId: 42 } }],
+      routes: [
+        { name: "Home" },
+        { name: "Compose", params: { contactId: 42 } },
+      ],
     });
   });
 
