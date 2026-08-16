@@ -122,12 +122,16 @@ describe("migration 002 — app_settings (forward-only, additive)", () => {
 
   it("enforces the single-row CHECK (id must be 1)", async () => {
     await migrateToV2();
+    // Wrap in an async fn: the node:sqlite adapter throws synchronously, whereas
+    // the on-device expo executor rejects — the wrapper normalises both to a
+    // rejected promise so the assertion holds against either executor.
     await expect(
-      exec.runAsync(
-        `INSERT INTO app_settings (id, notifications_enabled, decay_enabled, birthday_enabled, lockscreen_public, delivery_hour, quiet_start_hour, quiet_end_hour, created_at, modified_at)
+      (async () =>
+        exec.runAsync(
+          `INSERT INTO app_settings (id, notifications_enabled, decay_enabled, birthday_enabled, lockscreen_public, delivery_hour, quiet_start_hour, quiet_end_hour, created_at, modified_at)
          VALUES (2, 0, 1, 1, 0, 9, 21, 8, ?, ?)`,
-        [NOW, NOW],
-      ),
+          [NOW, NOW],
+        ))(),
     ).rejects.toThrow();
   });
 });

@@ -23,6 +23,7 @@
  */
 import * as SQLite from "expo-sqlite";
 import { migration001 } from "@/db/migrations/001-initial";
+import { migration002 } from "@/db/migrations/002-app-settings";
 import { runMigrations } from "@/db/migrations/runner";
 import type { SqlExecutor } from "@/db/types";
 import { newUid } from "@/db/uid";
@@ -33,7 +34,7 @@ import { formatLocalDate } from "@/utils/dates";
 /** Milliseconds a busy connection waits before erroring (concurrent headless access). */
 export const BUSY_TIMEOUT_MS = 5000;
 /** The schema version this build expects; the runner migrates up to this. */
-export const TARGET_VERSION = 1;
+export const TARGET_VERSION = 2;
 
 const DATABASE_NAME = "orbit.db";
 
@@ -103,10 +104,13 @@ export async function openAndMigrate(): Promise<SQLite.SQLiteDatabase> {
   await db.execAsync(`PRAGMA busy_timeout = ${BUSY_TIMEOUT_MS};`);
 
   const now = localDateTime();
-  await runMigrations(expoExecutor(db), [migration001], TARGET_VERSION, {
-    now,
-    newUid,
-  });
+  // Order does not matter — the runner sorts by version and applies ascending.
+  await runMigrations(
+    expoExecutor(db),
+    [migration001, migration002],
+    TARGET_VERSION,
+    { now, newUid },
+  );
 
   cachedDb = db;
   return db;
