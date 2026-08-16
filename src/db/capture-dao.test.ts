@@ -14,8 +14,8 @@
  *     `last_contact` stays NULL and the interactions table has zero rows (CAP-04).
  */
 import { beforeEach, describe, expect, it } from "vitest";
-import { captureMultiAttach, captureMultiNote } from "@/db/capture-dao";
 import { nodeSqliteExecutor, openTestDb } from "@/db/__testkit__/node-sqlite";
+import { captureMultiAttach, captureMultiNote } from "@/db/capture-dao";
 import type { NewFuelItem } from "@/db/fuel-dao";
 import { migration001 } from "@/db/migrations/001-initial";
 import { runMigrations } from "@/db/migrations/runner";

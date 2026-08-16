@@ -15,8 +15,8 @@
  * column, or index.
  */
 import { beforeEach, describe, expect, it } from "vitest";
-import { listCapturePickContacts } from "@/db/capture-read";
 import { nodeSqliteExecutor, openTestDb } from "@/db/__testkit__/node-sqlite";
+import { listCapturePickContacts } from "@/db/capture-read";
 import { migration001 } from "@/db/migrations/001-initial";
 import { runMigrations } from "@/db/migrations/runner";
 import type { SqlExecutor } from "@/db/types";
