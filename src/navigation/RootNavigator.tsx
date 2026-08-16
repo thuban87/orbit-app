@@ -7,6 +7,7 @@ import { CustomFieldsScreen } from "@/screens/CustomFieldsScreen";
 import { EditContactScreen } from "@/screens/EditContactScreen";
 import { FuelSearch } from "@/screens/FuelSearch";
 import { HomeScreen } from "@/screens/HomeScreen";
+import { ManageFavouritesScreen } from "@/screens/ManageFavouritesScreen";
 import { NeverContactedScreen } from "@/screens/NeverContactedScreen";
 import { SettingsScreen } from "@/screens/SettingsScreen";
 import type { RootStackParamList, RootStackScreenProps } from "./types";
@@ -64,6 +65,10 @@ export function RootNavigator() {
       <Stack.Screen
         name="NeverContacted"
         component={NeverContactedScreen}
+      />
+      <Stack.Screen
+        name="ManageFavourites"
+        component={ManageFavouritesScreen}
       />
     </Stack.Navigator>
   );

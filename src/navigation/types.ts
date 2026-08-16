@@ -51,6 +51,14 @@ export type RootStackParamList = {
    * nav registrations this phase adds).
    */
   NeverContacted: undefined;
+  /**
+   * The shared "Manage favourites" reorder screen (DASH-06). Carries no params
+   * (the favourites order lives in the screen's local state, seeded from
+   * `listFavourites`). Reached from the Settings row (Plan 10) and the
+   * favourites-chip Manage affordance (Plan 09) — the second of the two nav
+   * registrations this phase adds.
+   */
+  ManageFavourites: undefined;
 };
 
 /**
