@@ -400,13 +400,13 @@ Recorded here because they bind phases that do not own them. Every planner/execu
   2. A single tap writes the fuel row immediately (`topic`/`share`, `EXTRA_SUBJECT` label with bare-URL fallback, `url` canonical), long-press multi-selects, and capture never marks a touchpoint.
   3. A user can inline-create a name-only contact (lands never-contacted); a toast confirms and Orbit returns to the source app.
 
-**Plans:** 2/6 plans executed
+**Plans:** 3/6 plans executed
 
 **Wave 1** *(parallel — independent: native build + correctness cores)*
 
 - [x] 10-01-PLAN.md — Native enablement: expo-share-intent + patch-package, EXTRA_SUBJECT Kotlin patch, finish() module, text/plain plugin + scheme (CAP-01, CAP-03, CAP-04)
 - [x] 10-02-PLAN.md — capture-logic pure resolver: payload → display/url + `note — label` composition, node-tested (CAP-02, CAP-03)
-- [ ] 10-03-PLAN.md — capture DB layer: capture-read (favourites→MRU→rest) + capture-dao (multi-attach + no-touchpoint), node-tested (CAP-01, CAP-02, CAP-04)
+- [x] 10-03-PLAN.md — capture DB layer: capture-read (favourites→MRU→rest) + capture-dao (multi-attach + no-touchpoint), node-tested (CAP-01, CAP-02, CAP-04)
 
 **Wave 2** *(blocked on Wave 1)*
 
@@ -521,7 +521,7 @@ Recorded here because they bind phases that do not own them. Every planner/execu
 | 7. Conversational Fuel | 4/4 | Complete   | 2026-08-16 |
 | 8. Dashboard & Never-Contacted Screen | 10/10 | Complete   | 2026-08-16 |
 | 9. Compose Screen & SMS Handoff | 2/2 | Complete   | 2026-08-16 |
-| 10. Share-Sheet Capture | 2/6 | In Progress|  |
+| 10. Share-Sheet Capture | 3/6 | In Progress|  |
 | 11. Actionable Notifications | 0/TBD | Not started | - |
 | 12. Home Screen Widget | 0/TBD | Not started | - |
 | 13. Orrery | 0/TBD | Not started | - |
