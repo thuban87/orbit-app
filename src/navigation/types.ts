@@ -43,6 +43,14 @@ export type RootStackParamList = {
    * Phase 8 absorbs the query + result row into the dashboard search box.
    */
   FuelSearch: undefined;
+  /**
+   * The "Not yet contacted" sibling screen (DASH-04) — the inverse-population
+   * home. Carries no params (the sort lives in the screen's local state, default
+   * Oldest added). Reached from the dashboard's counted "Not yet contacted (N)"
+   * footer entry (Plan 07 wires that entry; this route is the first of the two
+   * nav registrations this phase adds).
+   */
+  NeverContacted: undefined;
 };
 
 /**
