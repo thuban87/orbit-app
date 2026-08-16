@@ -1,3 +1,6 @@
+import DateTimePicker, {
+  type DateTimePickerEvent,
+} from "@react-native-community/datetimepicker";
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useCallback, useState } from "react";
@@ -28,6 +31,23 @@ import { useTheme } from "@/theme";
 import { Logger } from "@/utils/logger";
 
 const LOG_SCOPE = "settings-screen";
+
+/** Which time control's native picker is open (null = none). */
+type ActivePicker = "delivery" | "quiet-start" | "quiet-end" | null;
+
+/** Format a 0-23 hour as a "h:MM AM/PM" wall-clock label (e.g. 9 → "9:00 AM"). */
+function formatHour(hour: number): string {
+  const period = hour < 12 ? "AM" : "PM";
+  const h12 = hour % 12 === 0 ? 12 : hour % 12;
+  return `${h12}:00 ${period}`;
+}
+
+/** A Date seeded to today at the given 0-23 hour — the time picker's initial value. */
+function seedForHour(hour: number): Date {
+  const d = new Date();
+  d.setHours(hour, 0, 0, 0);
+  return d;
+}
 
 /**
  * SettingsScreen — the low-traffic host for the two CRUD-05 "separate homes":
@@ -71,6 +91,7 @@ export function SettingsScreen() {
   // re-prompt (orchestrator pick 6 / T-11-PERM).
   const [settings, setSettings] = useState<AppSettings | null>(null);
   const [degraded, setDegraded] = useState(false);
+  const [activePicker, setActivePicker] = useState<ActivePicker>(null);
 
   // Reload the self record so a set/remove made on the crop screen refreshes when
   // it goBack()s here (mirrors ContactProfileScreen's reload-on-focus). The
@@ -151,6 +172,35 @@ export function SettingsScreen() {
     },
     [persist],
   );
+
+  // Time-picker pick handler. Extract the chosen hour (0-23) and persist it to the
+  // field the open row owns — the DAO re-validates the 0-23 bound (T-11-05) — then
+  // reconcile. Android dismiss/cancel (event.type !== "set") keeps the prior value.
+  const onPickTime = useCallback(
+    (event: DateTimePickerEvent, date?: Date) => {
+      const which = activePicker;
+      setActivePicker(null);
+      if (event.type !== "set" || !date || which === null) {
+        return;
+      }
+      const hour = date.getHours();
+      const field: AppSettingsPatch =
+        which === "delivery"
+          ? { deliveryHour: hour }
+          : which === "quiet-start"
+            ? { quietStartHour: hour }
+            : { quietEndHour: hour };
+      void persist(field);
+    },
+    [activePicker, persist],
+  );
+
+  const pickerSeedHour =
+    activePicker === "delivery"
+      ? (settings?.deliveryHour ?? 9)
+      : activePicker === "quiet-start"
+        ? (settings?.quietStartHour ?? 21)
+        : (settings?.quietEndHour ?? 8);
 
   return (
     <ScrollView
@@ -345,6 +395,118 @@ export function SettingsScreen() {
             When off, lock-screen reminders won't show who they're about.
           </Text>
         </View>
+
+        {/* Reminder time — the user-tunable delivery hour (the reversal). */}
+        <Pressable
+          testID="settings-notifications-time"
+          accessibilityRole="button"
+          accessibilityLabel={`Reminder time, ${formatHour(settings?.deliveryHour ?? 9)}`}
+          accessibilityState={{ disabled: !masterOn }}
+          disabled={!masterOn}
+          onPress={() => setActivePicker("delivery")}
+          style={[
+            styles.row,
+            { backgroundColor: colors.surface, borderColor: colors.border },
+          ]}
+        >
+          <View style={styles.toggleRow}>
+            <Text
+              style={[
+                styles.rowLabel,
+                { color: masterOn ? colors.textPrimary : colors.textSecondary },
+              ]}
+            >
+              Reminder time
+            </Text>
+            <Text
+              style={[
+                styles.rowValue,
+                { color: masterOn ? colors.accent : colors.textSecondary },
+              ]}
+            >
+              {formatHour(settings?.deliveryHour ?? 9)}
+            </Text>
+          </View>
+        </Pressable>
+
+        {/* Quiet-hours start — the user-tunable quiet-window start (the reversal). */}
+        <Pressable
+          testID="settings-notifications-quiet-start"
+          accessibilityRole="button"
+          accessibilityLabel={`Quiet hours start, ${formatHour(settings?.quietStartHour ?? 21)}`}
+          accessibilityState={{ disabled: !masterOn }}
+          disabled={!masterOn}
+          onPress={() => setActivePicker("quiet-start")}
+          style={[
+            styles.row,
+            { backgroundColor: colors.surface, borderColor: colors.border },
+          ]}
+        >
+          <View style={styles.toggleRow}>
+            <Text
+              style={[
+                styles.rowLabel,
+                { color: masterOn ? colors.textPrimary : colors.textSecondary },
+              ]}
+            >
+              Quiet hours start
+            </Text>
+            <Text
+              style={[
+                styles.rowValue,
+                { color: masterOn ? colors.accent : colors.textSecondary },
+              ]}
+            >
+              {formatHour(settings?.quietStartHour ?? 21)}
+            </Text>
+          </View>
+        </Pressable>
+
+        {/* Quiet-hours end — the user-tunable quiet-window end (the reversal). */}
+        <Pressable
+          testID="settings-notifications-quiet-end"
+          accessibilityRole="button"
+          accessibilityLabel={`Quiet hours end, ${formatHour(settings?.quietEndHour ?? 8)}`}
+          accessibilityState={{ disabled: !masterOn }}
+          disabled={!masterOn}
+          onPress={() => setActivePicker("quiet-end")}
+          style={[
+            styles.row,
+            { backgroundColor: colors.surface, borderColor: colors.border },
+          ]}
+        >
+          <View style={styles.toggleRow}>
+            <Text
+              style={[
+                styles.rowLabel,
+                { color: masterOn ? colors.textPrimary : colors.textSecondary },
+              ]}
+            >
+              Quiet hours end
+            </Text>
+            <Text
+              style={[
+                styles.rowValue,
+                { color: masterOn ? colors.accent : colors.textSecondary },
+              ]}
+            >
+              {formatHour(settings?.quietEndHour ?? 8)}
+            </Text>
+          </View>
+        </Pressable>
+        <Text style={[styles.helper, { color: colors.textSecondary }]}>
+          Reminders that would land inside quiet hours wait until the next
+          morning.
+        </Text>
+
+        {activePicker !== null ? (
+          <DateTimePicker
+            testID="settings-notifications-time-picker"
+            value={seedForHour(pickerSeedHour)}
+            mode="time"
+            onChange={onPickTime}
+          />
+        ) : null}
       </View>
 
       <View
@@ -450,6 +612,10 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   rowLabel: {
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  rowValue: {
     fontSize: 16,
     fontWeight: "600",
   },
