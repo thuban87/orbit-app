@@ -56,16 +56,17 @@ import {
   Pressable,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from "react-native";
 import { Avatar } from "@/components/Avatar";
-import { captureMultiAttach } from "@/db/capture-dao";
+import { captureMultiAttach, captureMultiNote } from "@/db/capture-dao";
 import {
   type CapturePickRow,
   listCapturePickContacts,
 } from "@/db/capture-read";
 import { getExecutor, localDateTime } from "@/db/database";
-import { addFuel, type NewFuelItem } from "@/db/fuel-dao";
+import { addFuel, editFuel, type NewFuelItem } from "@/db/fuel-dao";
 import { newUid } from "@/db/uid";
 import { resolveCapturePayload } from "@/logic/capture-logic";
 import type { RootStackScreenProps } from "@/navigation/types";
@@ -131,6 +132,12 @@ export function CaptureScreen(_props: RootStackScreenProps<"Capture">) {
   // contact ids. Long-press enters the mode; tap toggles; Done fans out.
   const [multiSelect, setMultiSelect] = useState(false);
   const [selected, setSelected] = useState<Set<number>>(new Set());
+
+  // Optional-note surface: `noteOpen` reveals the multiline field (cancelling the
+  // auto-return), `noteText` is its contents. On Done the note recomposes the
+  // just-written row(s)' display text to `note — base` (url untouched).
+  const [noteOpen, setNoteOpen] = useState(false);
+  const [noteText, setNoteText] = useState("");
 
   // ONE in-flight latch shared by EVERY commit path (single-tap, multi Done, inline
   // create, note-Done — B2/C2). A ref (not state) so the guard is synchronous — set
@@ -324,14 +331,70 @@ export function CaptureScreen(_props: RootStackScreenProps<"Capture">) {
     }
   }, [selected, payload, armAutoReturn]);
 
-  // Touching "Add a note" cancels the auto-return so the note is never rushed. The
-  // note field + its recompose write land in Task 2; here this is the timer cancel.
+  // Touching "Add a note" cancels the auto-return (the note is never rushed) and
+  // reveals the note field. No timer runs while the note is open.
   const onAddNote = useCallback(() => {
     if (returnTimer.current) {
       clearTimeout(returnTimer.current);
       returnTimer.current = null;
     }
+    setNoteOpen(true);
   }, []);
+
+  // Note Done — recompose the written row(s)' display text to `note — base` and
+  // patch text ONLY (url/created_at untouched). C2: gated on the SAME shared
+  // isCommittingRef latch (set before the first await, cleared in finally, the
+  // button disabled while set) so a rapid double-tap cannot re-apply. Keyed by BOTH
+  // id AND contactId — there is no uid-based fuel lookup (A1). Single row uses the
+  // `editFuel` DAO wrapper; N>1 applies atomically via the `captureMultiNote` DAO
+  // (editFuelCore × N in ONE transaction) — the screen NEVER opens a transaction
+  // inline (B1). A blank/whitespace note leaves the base untouched → treated as Skip.
+  const onNoteDone = useCallback(async () => {
+    if (isCommittingRef.current) {
+      return;
+    }
+    isCommittingRef.current = true;
+    setCommitting(true);
+    try {
+      const composed = resolveCapturePayload({
+        text: shareIntent.text ?? "",
+        webUrl: shareIntent.webUrl,
+        title: shareIntent.meta?.title,
+        note: noteText,
+      }).displayText;
+      // Only write when the recompose yields a non-blank text (a blank note leaves
+      // the base as-is — nothing to patch). ONE stamp for the edit `now` (A10).
+      if (composed !== null) {
+        const stamp = localDateTime();
+        if (writtenRows.length === 1) {
+          const { id, contactId } = writtenRows[0];
+          await editFuel(getExecutor(), {
+            id,
+            contactId,
+            text: composed,
+            now: stamp,
+          });
+        } else if (writtenRows.length > 1) {
+          await captureMultiNote(getExecutor(), writtenRows, composed, stamp);
+        }
+      }
+      setNoteOpen(false);
+      armAutoReturn();
+    } catch (err) {
+      Logger.error(LOG_SCOPE, "failed to apply capture note", err);
+      Alert.alert("Couldn't save", "Please try again.");
+    } finally {
+      isCommittingRef.current = false;
+      setCommitting(false);
+    }
+  }, [shareIntent, noteText, writtenRows, armAutoReturn]);
+
+  // Note Skip — dismiss the note field and arm the auto-return with the unchanged
+  // single-tap / multi display text (no write).
+  const onNoteSkip = useCallback(() => {
+    setNoteOpen(false);
+    armAutoReturn();
+  }, [armAutoReturn]);
 
   // ---- Render --------------------------------------------------------------
 
@@ -539,10 +602,12 @@ export function CaptureScreen(_props: RootStackScreenProps<"Capture">) {
         </View>
       ) : null}
 
-      {/* Confirmation + optional-note surface — the "Saved to …" toast + the note
-          affordance (which cancels the auto-return). Shown via setState after a
-          write; the note field + recompose write land in Task 2, editing the exact
-          `writtenRows` row(s) by id + contactId. */}
+      {/* Confirmation + optional-note surface — the "Saved to …" toast and, until
+          the note is opened, the "Add a note" affordance (which cancels the
+          auto-return). Once opened, the multiline note field + Done/Skip replace the
+          affordance; Done recomposes the written row(s)' display text to `note —
+          base` (url untouched), keyed by id + contactId. setState + setTimeout only,
+          never a per-frame animation. */}
       {savedLabel !== null && writtenRows.length > 0 ? (
         <View
           style={[
@@ -556,17 +621,74 @@ export function CaptureScreen(_props: RootStackScreenProps<"Capture">) {
           >
             {savedLabel}
           </Text>
-          <Pressable
-            testID="capture-note-affordance"
-            accessibilityRole="button"
-            accessibilityLabel="Add a note"
-            onPress={onAddNote}
-            style={styles.noteAffordance}
-          >
-            <Text style={[styles.noteAffordanceText, { color: colors.accent }]}>
-              Add a note
-            </Text>
-          </Pressable>
+
+          {noteOpen ? (
+            <View style={styles.noteBlock}>
+              <TextInput
+                testID="capture-note-input"
+                multiline
+                value={noteText}
+                onChangeText={setNoteText}
+                placeholder={
+                  'Add your words — e.g. "for Dad, he asked about this"'
+                }
+                placeholderTextColor={colors.textSecondary}
+                style={[
+                  styles.noteInput,
+                  {
+                    backgroundColor: colors.surface,
+                    borderColor: colors.border,
+                    color: colors.textPrimary,
+                  },
+                ]}
+              />
+              <View style={styles.noteActions}>
+                <Pressable
+                  testID="capture-note-skip"
+                  accessibilityRole="button"
+                  accessibilityLabel="Skip note"
+                  onPress={onNoteSkip}
+                  style={styles.noteSkip}
+                >
+                  <Text
+                    style={[
+                      styles.noteSkipText,
+                      { color: colors.textSecondary },
+                    ]}
+                  >
+                    Skip
+                  </Text>
+                </Pressable>
+                <Pressable
+                  testID="capture-note-done"
+                  accessibilityRole="button"
+                  accessibilityLabel="Save note"
+                  accessibilityState={{ disabled: committing }}
+                  disabled={committing}
+                  onPress={() => void onNoteDone()}
+                  style={styles.noteDone}
+                >
+                  <Text style={[styles.noteDoneText, { color: colors.accent }]}>
+                    Done
+                  </Text>
+                </Pressable>
+              </View>
+            </View>
+          ) : (
+            <Pressable
+              testID="capture-note-affordance"
+              accessibilityRole="button"
+              accessibilityLabel="Add a note"
+              onPress={onAddNote}
+              style={styles.noteAffordance}
+            >
+              <Text
+                style={[styles.noteAffordanceText, { color: colors.accent }]}
+              >
+                Add a note
+              </Text>
+            </Pressable>
+          )}
         </View>
       ) : null}
     </View>
@@ -712,9 +834,8 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 16,
     gap: 12,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
+    flexDirection: "column",
+    alignItems: "stretch",
   },
   confirmText: {
     fontSize: 13,
@@ -725,6 +846,41 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   noteAffordanceText: {
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  noteBlock: {
+    gap: 12,
+  },
+  noteInput: {
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 15,
+    fontWeight: "400",
+    minHeight: 88,
+    textAlignVertical: "top",
+  },
+  noteActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "flex-end",
+    gap: 16,
+  },
+  noteSkip: {
+    minHeight: 44,
+    justifyContent: "center",
+  },
+  noteSkipText: {
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  noteDone: {
+    minHeight: 44,
+    justifyContent: "center",
+  },
+  noteDoneText: {
     fontSize: 16,
     fontWeight: "600",
   },
