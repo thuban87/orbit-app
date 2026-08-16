@@ -2,18 +2,18 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-current_phase: 7
-current_phase_name: Conversational Fuel
+current_phase: 8
+current_phase_name: Dashboard & Never-Contacted Screen
 status: ready
 stopped_at: Phase 8 PLANNED + cross-AI converged (3 cycles, codex+claude, 12 findings resolved) — awaiting owner usage-headroom OK before execute
-last_updated: "2026-08-16T03:19:54.915Z"
+last_updated: "2026-08-16T04:19:12.462Z"
 last_activity: 2026-08-16
-last_activity_desc: Completed 07-04 (searchFuel + FuelSearch screen + reusable FuelSearchResultRow)
+last_activity_desc: Phase 8 execution started
 progress:
   total_phases: 16
   completed_phases: 7
   total_plans: 56
-  completed_plans: 46
+  completed_plans: 47
   percent: 44
 ---
 
@@ -24,13 +24,13 @@ progress:
 See: .planning/PROJECT.md (updated 2026-08-14)
 
 **Core value:** Collapse the taps between "you're overdue with X" and the message actually being sent.
-**Current focus:** Phase 7 — Conversational Fuel
+**Current focus:** Phase 8 — Dashboard & Never-Contacted Screen
 
 ## Current Position
 
-Phase: 7 (Conversational Fuel) — CODE-COMPLETE (04 of 04 done); on-device UAT pending
+Phase: 8 (Dashboard & Never-Contacted Screen) — EXECUTING
 Next: on-device UAT on the Pixel (fuel search: a name and a fuel word both return the contact; off_limits-only term returns no match; archived contact never appears — plus the 07-03 Suggested-by-AI/Confirm/Dismiss flow) + `/gsd-verify-work 7`
-Last activity: 2026-08-16 — Completed 07-04 (searchFuel + FuelSearch screen + reusable FuelSearchResultRow)
+Last activity: 2026-08-16 — Phase 8 execution started
 
 Progress: [████░░░░░░] 38% (6/16 phases complete)
 
@@ -100,6 +100,7 @@ Progress: [████░░░░░░] 38% (6/16 phases complete)
 | Phase 06 P06 | 6min | 2 tasks | 5 files |
 | Phase 07 P03 | 5min | 2 tasks | 4 files |
 | Phase 07 P04 | 3min | 2 tasks | 7 files |
+| Phase 08 P01 | 25min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -171,6 +172,7 @@ Foundational decisions affecting current work:
 - [Phase 06]: 06-02: events-dao is immutable insert-only (recordEvent/recordEventCore, no update path); archive/restore emit events composed inside their existing transaction, archived-state-guarded so a no-op/wrong-state transition throws and writes no spurious event; purge surfaces+deletes events; timeline UNION-ALL interleave keyed ${kind}-${id} with kind_order final tiebreak — LOG-02 events writer + read half; single-writer DATA-04 intact (no last_contact write added)
 - [Phase 7]: 07-01: fuel-read is the single projection read choke point (listFuelForEditor the ONLY read surfacing off_limits); FuelEditor controlled (draft=only local state, existing rows uncontrolled defaultValue+commit-on-blur); BLANK->NULL at onAdd/onEdit boundary; age/ranked-line/AI/search deferred to Plans 02-04
 - [Phase 7]: 07-03: confirming an AI-suggested fuel item (FUEL-06) is a SINGLE unconditional `UPDATE fuel SET source='manual', modified_at=? WHERE id=? AND contact_id=?` (both-keys assertOneChange), mirroring editFuel's mutexed-wrapper/non-mutexed-core split — NO migration, NO ai_confirmed_at column; provenance is INTENTIONALLY erased on confirm (locked owner decision 2026-08-15, RESEARCH Open Q1) — do NOT "restore provenance" as a later bug fix. "Unconfirmed AI" IS exactly source='ai'; getRankedFuel's existing source!='ai' exclusion is what confirmation lifts (row starts ranking only after the flip). FuelEditor renders source='ai' rows distinct (borderStrong + "Suggested by AI" pill + helper + Confirm(accent)/Dismiss(textSecondary), existing tokens only); Confirm→confirmFuel→load(), Dismiss reuses onDelete→deleteFuel→load(). No producer of source='ai' rows exists until Phase 14
+- [Phase 8]: 08-01: dashboard-read.ts is the single node-tested read chokepoint for the dashboard list / never-contacted / counts / birthday candidates; it COMPOSES status.ts (PROGRESS_SQL/STATUS_SQL) + the fuel fragments (RANKED_FUEL_EXCLUSIONS/RANK_CASE/escapeLike, newly EXPORTED from fuel-read.ts and guarded by a SQL parity test) rather than re-deriving thresholds/exclusions. listDashboard chooses among FOUR mutually-exclusive population branches (term > favourites > snoozed > default precedence) — NOT a fixed restrictive base + appended predicate (that construction is self-contradictory: snoozed always-empty, never-contacted favourites hidden); term/favourites/snoozed RELAX the base to archived-only, needs-attention/category/battery NARROW within it. Status/progress are CASE-wrapped (`CASE WHEN last_contact IS NULL THEN NULL ELSE (…) END`) and listNeverContacted selects LITERAL null status/progress so a never-contacted row NEVER reads STATUS_SQL's ELSE-'stable' (HIGH-1); DashboardRow.status is `ProfileStatus|null` matching ContactCard's prop (MEDIUM-5). Snippet renders whenever fuel matches regardless of a concurrent name match (MEDIUM-6); status sort = `progress DESC` (NULLs-last, A-1) not a status-string CASE; tiebreak qualifies `c.name` (LOW-1). countLiveContacts PINNED to `archived_at IS NULL AND last_contact IS NOT NULL` (the "{N} contacts" header + Plan-07 gate, HIGH-2). countSnoozed/snoozed-segment legitimately empty until Phase 11 writes snooze_until. Pure read (no writer/txn/network, async-only, no localtime on stored columns)
 - [Phase 7]: 07-04: searchFuel (FUEL-05) is the third projection on the fuel-read choke point — a ?-bound, `LIKE ? ESCAPE '\'`-escaped scan matching contact name OR non-off_limits/non-'ai' fuel text; off_limits AND unconfirmed source='ai' AND archived (archived_at IS NOT NULL) excluded IN-QUERY (both the snippet subquery and the EXISTS predicate), one row per contact ordered by name, empty/whitespace term → []. escapeLike escapes `\`→`%`→`_` (backslash FIRST) so a literal %/_ matches only rows literally containing it (binding alone does NOT make %/_ literal). AI exclusion is a safe SUPERSET of FUEL-05's off_limits-only mandate, aligning with getRankedFuel (unconfirmed-AI stays profile-only until 07-03's confirm flips to 'manual'). No FTS5, no migration (LIKE scan free at this scale — dossier Cluster F; FTS5 deferred to v2). FuelSearchResultRow is purely presentational (no DB/nav) and FuelSearch is a minimal Settings-reached screen — both are the reusable units Phase 8 absorbs into the dashboard search box (INDEX [dashboard → fuel]); Phase 8 relocating the box is expected, NOT a reversal
 
 ### Pending Todos
@@ -207,7 +209,7 @@ planning" sections in docs/dossier/*.md — those are the authoritative hand-off
 
 ## Session
 
-**Last session:** 2026-08-16T03:19:54.904Z
+**Last session:** 2026-08-16T04:19:12.446Z
 **Stopped at:** Phase 8 PLANNED + cross-AI converged (3 cycles, codex+claude, 12 findings resolved) — awaiting owner usage-headroom OK before execute
 **Resume file:** .planning/phases/08-dashboard-never-contacted-screen/08-01-PLAN.md
 
