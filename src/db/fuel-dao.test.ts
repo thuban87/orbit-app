@@ -216,6 +216,66 @@ describe("editFuel — bumps modified_at, preserves created_at, both-keys scoped
     const rows = await allFuel(c1);
     expect(rows[0]).toMatchObject({ kind: "topic", text: "keep me" });
   });
+
+  it("two sequential single-field patches to the SAME row BOTH persist (no stale-snapshot revert, HIGH-1)", async () => {
+    const c = await seedContact();
+    const id = await addFuel(exec, {
+      uid: uid(),
+      contactId: c,
+      kind: "topic",
+      label: "orig label",
+      text: "orig text",
+      url: "https://orig.example",
+      createdAt: NOW,
+      source: "user",
+      now: NOW,
+    });
+
+    // First patch: ONLY text (as a blur commit would send it).
+    await editFuel(exec, { id, contactId: c, text: "new text", now: LATER });
+    // Second patch to the SAME row: ONLY label. A full-row rewrite merged onto a
+    // stale snapshot would revert text back to "orig text"; the patch-scoped
+    // UPDATE must leave the just-written text intact.
+    await editFuel(exec, { id, contactId: c, label: "new label", now: LATER });
+
+    const rows = await allFuel(c);
+    expect(rows.length).toBe(1);
+    expect(rows[0]).toMatchObject({
+      kind: "topic",
+      label: "new label",
+      text: "new text", // preserved across the label-only patch
+      url: "https://orig.example", // untouched by either patch
+      created_at: NOW,
+      modified_at: LATER,
+    });
+  });
+
+  it("a kind-only patch leaves label/text/url untouched (patch-scoped UPDATE, HIGH-1)", async () => {
+    const c = await seedContact();
+    const id = await addFuel(exec, {
+      uid: uid(),
+      contactId: c,
+      kind: "topic",
+      label: "keep label",
+      text: "keep text",
+      url: "https://keep.example",
+      createdAt: NOW,
+      source: "user",
+      now: NOW,
+    });
+
+    await editFuel(exec, { id, contactId: c, kind: "gift", now: LATER });
+
+    const rows = await allFuel(c);
+    expect(rows[0]).toMatchObject({
+      kind: "gift",
+      label: "keep label",
+      text: "keep text",
+      url: "https://keep.example",
+      created_at: NOW,
+      modified_at: LATER,
+    });
+  });
 });
 
 describe("deleteFuel — removes matching (id, contact_id), both-keys scoped", () => {

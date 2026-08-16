@@ -345,8 +345,11 @@ export function ContactProfileScreen({
   // SINGLE unified load() (an in-place mutation does NOT re-fire useFocusEffect).
   // uid/createdAt/now are minted here; source='user' for a profile-typed item;
   // the draft's optionals are already NULL-normalized by FuelEditor.
+  // Returns true on a successful write + reload, false on failure — FuelEditor
+  // clears its draft only on true, so a failed insert keeps the user's typing
+  // (review MEDIUM-3).
   const doAddFuel = useCallback(
-    async (draft: FuelDraft) => {
+    async (draft: FuelDraft): Promise<boolean> => {
       try {
         const stamp = localDateTime();
         await addFuel(getExecutor(), {
@@ -361,32 +364,30 @@ export function ContactProfileScreen({
           now: stamp,
         });
         await load();
+        return true;
       } catch (err) {
         Logger.error(LOG_SCOPE, "failed to add fuel", err);
         Alert.alert("Couldn't save fuel.", "Please try again.");
+        return false;
       }
     },
     [contactId, load],
   );
 
   // Edit a fuel item (FUEL-02). FuelEditor commits ONE field at a time (blur /
-  // kind-select), so merge the already-normalized patch onto the current row from
-  // `fuel` state and write the full (kind,label,text,url) set through editFuel,
-  // then the SINGLE unified load(). created_at is never touched (age is stable).
+  // kind-select), so pass ONLY the changed field(s) straight through as a
+  // patch-scoped UPDATE (review HIGH-1) — do NOT merge onto the `fuel` render
+  // snapshot, which can be stale between a write and its load() refresh and would
+  // silently revert a concurrent field's just-committed edit. editFuel writes only
+  // the present columns; created_at is never touched (age is stable). blank→NULL
+  // normalization already happened at FuelEditor's commit boundary.
   const doEditFuel = useCallback(
     async (id: number, patch: FuelEditPatch) => {
-      const current = fuel.find((f) => f.id === id);
-      if (!current) {
-        return;
-      }
       try {
         await editFuel(getExecutor(), {
           id,
           contactId,
-          kind: patch.kind ?? current.kind,
-          label: patch.label !== undefined ? patch.label : current.label,
-          text: patch.text !== undefined ? patch.text : current.text,
-          url: patch.url !== undefined ? patch.url : current.url,
+          ...patch,
           now: localDateTime(),
         });
         await load();
@@ -395,7 +396,7 @@ export function ContactProfileScreen({
         Alert.alert("Couldn't save fuel.", "Please try again.");
       }
     },
-    [contactId, fuel, load],
+    [contactId, load],
   );
 
   // Confirm an AI-suggested fuel item (FUEL-06): flip source 'ai'→'manual' through
@@ -595,7 +596,7 @@ export function ContactProfileScreen({
           testID="contact-profile-fuel-editor"
           items={fuel}
           now={localDateTime()}
-          onAdd={(draft) => void doAddFuel(draft)}
+          onAdd={doAddFuel}
           onEdit={(id, patch) => void doEditFuel(id, patch)}
           onDelete={doDeleteFuel}
           onConfirm={(id) => void doConfirmFuel(id)}

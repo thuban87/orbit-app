@@ -69,15 +69,29 @@ export interface NewFuelItem {
   now: string;
 }
 
-/** An edit to an existing fuel row, scoped by BOTH id AND contactId. */
+/**
+ * A PATCH to an existing fuel row, scoped by BOTH id AND contactId. Only the
+ * fields PRESENT (`!== undefined`) are written — a caller sends just the field(s)
+ * that changed. This is deliberate (review HIGH-1): the UI commits one field at a
+ * time (blur / kind-select), and a full-row rewrite merged onto a stale React
+ * closure snapshot could silently revert a concurrent field's just-committed edit.
+ * A patch-scoped UPDATE touches ONLY the submitted columns, so no unread column is
+ * ever clobbered. `created_at` is never in the patch (age is stable from creation).
+ */
 export interface EditFuelInput {
   id: number;
   contactId: number;
-  kind: FuelKind;
-  /** Nullable — a blank optional is normalized to NULL at the commit boundary. */
-  label: string | null;
-  text: string | null;
-  url: string | null;
+  /** Present → UPDATE kind. Absent (`undefined`) → left untouched. */
+  kind?: FuelKind;
+  /**
+   * Present → UPDATE label (a blank optional is normalized to NULL at the commit
+   * boundary). Absent (`undefined`) → left untouched.
+   */
+  label?: string | null;
+  /** Present → UPDATE text. Absent (`undefined`) → left untouched. */
+  text?: string | null;
+  /** Present → UPDATE url. Absent (`undefined`) → left untouched. */
+  url?: string | null;
   /** Local wall-clock now — bumps `modified_at`; `created_at` is left untouched. */
   now: string;
 }
@@ -136,26 +150,46 @@ export async function addFuelCore(
 }
 
 /**
- * UPDATE kind/label/text/url + modified_at for the matching (id, contact_id) +
- * assertOneChange. NEVER touches `created_at` (age is stable from creation).
+ * PATCH-scoped UPDATE (review HIGH-1): SET only the columns PRESENT in the patch
+ * (`kind`/`label`/`text`/`url` that are `!== undefined`), always bump modified_at,
+ * for the matching (id, contact_id) + assertOneChange. An absent field is left
+ * exactly as stored — so committing one field never reverts another that a
+ * concurrent blur just wrote. NEVER touches `created_at` (age is stable).
+ *
+ * T-07-01 (SQL injection): the SET fragments (`"kind = ?"` …) are COMPILE-TIME
+ * code-constant column names from a closed hardcoded set; every VALUE is `?`-bound
+ * (id/contact_id included). No input is interpolated into the SQL text.
  */
 export async function editFuelCore(
   exec: SqlExecutor,
   input: EditFuelInput,
 ): Promise<void> {
+  const sets: string[] = [];
+  const params: (string | null)[] = [];
+  if (input.kind !== undefined) {
+    sets.push("kind = ?");
+    params.push(input.kind);
+  }
+  if (input.label !== undefined) {
+    sets.push("label = ?");
+    params.push(input.label);
+  }
+  if (input.text !== undefined) {
+    sets.push("text = ?");
+    params.push(input.text);
+  }
+  if (input.url !== undefined) {
+    sets.push("url = ?");
+    params.push(input.url);
+  }
+  sets.push("modified_at = ?");
+  params.push(input.now);
+
   const result = await exec.runAsync(
     `UPDATE fuel
-        SET kind = ?, label = ?, text = ?, url = ?, modified_at = ?
+        SET ${sets.join(", ")}
       WHERE id = ? AND contact_id = ?`,
-    [
-      input.kind,
-      input.label,
-      input.text,
-      input.url,
-      input.now,
-      input.id,
-      input.contactId,
-    ],
+    [...params, input.id, input.contactId],
   );
   assertOneChange("editFuel", input.id, input.contactId, result.changes);
 }

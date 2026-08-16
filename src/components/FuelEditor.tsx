@@ -110,7 +110,13 @@ export interface FuelEditorProps {
   items: FuelItem[];
   /** Local wall-clock now (caller-supplied `localDateTime()`) — for row age. */
   now: string;
-  onAdd: (draft: FuelDraft) => void;
+  /**
+   * Persist a new draft. Resolves `true` on a successful write + reload, `false`
+   * when the write failed (the parent surfaces its own error). The editor clears
+   * the draft ONLY on `true`, so a failed insert keeps the user's typing (review
+   * MEDIUM-3).
+   */
+  onAdd: (draft: FuelDraft) => Promise<boolean>;
   onEdit: (id: number, patch: FuelEditPatch) => void;
   onDelete: (id: number) => void;
   /** Confirm an AI-suggested (`source==='ai'`) row — parent flips source→'manual'. */
@@ -563,9 +569,14 @@ export function FuelEditor({
   const { colors } = useTheme();
   const [drafting, setDrafting] = useState(false);
 
-  const commitDraft = (draft: FuelDraft) => {
-    onAdd(draft);
-    setDrafting(false);
+  // Close the draft ONLY after the parent's write resolves true (review MEDIUM-3).
+  // On a failed insert the DraftRow stays mounted with its typed text intact so
+  // the user can retry — the parent has already surfaced the "Couldn't save" error.
+  const commitDraft = async (draft: FuelDraft) => {
+    const ok = await onAdd(draft);
+    if (ok) {
+      setDrafting(false);
+    }
   };
 
   return (
