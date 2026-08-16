@@ -339,12 +339,12 @@ Recorded here because they bind phases that do not own them. Every planner/execu
   3. The "Not yet contacted (N)" screen (rendering fuel), a snoozed segment with a count, and a count-less Archived entry are reachable; the birthday banner overrides snooze/never-contacted suppression (archived excluded) with the parser bugs fixed.
   4. A user marks favourites via a profile star and orders them on a shared "Manage favourites" screen; the dashboard renders with no network and refreshes on focus/AppState/pull with async queries.
 
-**Plans:** 1/10 plans executed
+**Plans:** 2/10 plans executed
 
 **Wave 1** *(parallel — independent correctness cores)*
 
 - [x] 08-01-PLAN.md — dashboard-read DAO (listDashboard/never-contacted/favourites/counts/birthday-candidates) + shared fuel-fragment extraction + node tests (DASH-01, DASH-02, DASH-04, DASH-07)
-- [ ] 08-02-PLAN.md — birthday-logic parser (day-of-drop + Feb-29 bugs fixed, both formats), node-tested (DASH-05)
+- [x] 08-02-PLAN.md — birthday-logic parser (day-of-drop + Feb-29 bugs fixed, both formats), node-tested (DASH-05)
 - [ ] 08-03-PLAN.md — favourites-dao (mark/clear/transactional reorder) + pure reorder-logic, node-tested (DASH-06)
 - [ ] 08-04-PLAN.md — ContactCard + FilterChipRow + dashboard-prefs store (DASH-02, DASH-03, DASH-07)
 
@@ -493,7 +493,7 @@ Recorded here because they bind phases that do not own them. Every planner/execu
 | 5. Photos | 8/8 | Complete   | 2026-08-15 |
 | 6. Interaction Log, Status & Impact | 6/6 | Complete   | 2026-08-15 |
 | 7. Conversational Fuel | 4/4 | Complete   | 2026-08-16 |
-| 8. Dashboard & Never-Contacted Screen | 1/10 | In Progress|  |
+| 8. Dashboard & Never-Contacted Screen | 2/10 | In Progress|  |
 | 9. Compose Screen & SMS Handoff | 0/TBD | Not started | - |
 | 10. Share-Sheet Capture | 0/TBD | Not started | - |
 | 11. Actionable Notifications | 0/TBD | Not started | - |
