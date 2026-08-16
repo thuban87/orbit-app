@@ -791,6 +791,8 @@ export function CaptureScreen(_props: RootStackScreenProps<"Capture">) {
             onChangeText={setInlineName}
             placeholder="Name"
             placeholderTextColor={colors.textSecondary}
+            returnKeyType="done"
+            onSubmitEditing={() => void onInlineSubmit()}
             style={[
               styles.inlineInput,
               {
