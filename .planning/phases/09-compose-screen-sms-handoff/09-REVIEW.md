@@ -19,10 +19,20 @@ findings:
   warning: 3
   info: 2
   total: 5
-status: issues_found
+status: fixed
+fix_applied: 2026-08-16
 ---
 
 # Phase 9: Code Review Report
+
+> **FIX STATUS (2026-08-16):** All 3 warnings addressed on `main`, committed in place (no worktree).
+> - **WR-01 — FIXED** (commit `01679fa`): compose Header now carries `archived_at`; load routes Home (screenState=missing) when `row.archived_at !== null`, under the same `!cancelled` guard as the missing-contact branch. Enforces the Phase-4 archive-hides-everywhere commitment for entry-agnostic re-entry (Phases 11/12/14). Requires human verification of the archive-load path on-device.
+> - **WR-02 — FIXED** (commit `7352ae1`): the probe-pending (`smsAvailable === null`) interim controls are folded into `resolveComposeControls` (now `boolean | null`); ComposeScreen calls the resolver unconditionally, so no capability arithmetic is re-derived inline. Node tests added for the null case across `hasPhone` true/false.
+> - **WR-03 — COVERED BY WR-02**: the capability decision now lives entirely in the node-tested pure module (interim + settled cases). The `.tsx` cancelled-flag / latch / focus-reset race paths remain device-UAT per this repo's `-logic`/`.tsx` split — no brittle `.tsx` unit tests / test renderer added, by design.
+> - **IN-01 — SKIPPED (intentional):** post-`await` `setCopied`/`setSending` unmount guard is a harmless consistency note on React 18/19 (no unmounted-setState warning); the latches are allowed to settle post-unmount.
+> - **IN-02 — SKIPPED (intentional, owner taste):** showing Send with an empty draft is intended — the user can still type in the OS SMS app, and empty Copy is equally benign.
+>
+> Verification after fixes: `npx tsc --noEmit` clean, `npm test` 675/675 pass, `npm run check:colors` exit 0.
 
 **Reviewed:** 2026-08-16T09:30:59Z
 **Depth:** deep
