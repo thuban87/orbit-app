@@ -14,11 +14,11 @@ import { nodeSqliteExecutor, openTestDb } from "@/db/__testkit__/node-sqlite";
 import type { FuelKind } from "@/db/fuel-dao";
 import { addFuel } from "@/db/fuel-dao";
 import {
-  RANK_CASE,
-  RANKED_FUEL_EXCLUSIONS,
   escapeLike,
   getRankedFuel,
   listFuelForEditor,
+  RANK_CASE,
+  RANKED_FUEL_EXCLUSIONS,
   searchFuel,
 } from "@/db/fuel-read";
 import { migration001 } from "@/db/migrations/001-initial";
