@@ -1,4 +1,5 @@
 import { NavigationContainer } from "@react-navigation/native";
+import { ShareIntentProvider } from "expo-share-intent";
 import { StatusBar } from "expo-status-bar";
 import { useEffect, useState } from "react";
 import {
@@ -11,6 +12,7 @@ import {
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { getExecutor, openAndMigrate } from "@/db/database";
+import { navigationRef, ShareIntentGate } from "@/navigation/linking";
 import { RootNavigator } from "@/navigation/RootNavigator";
 import { registerFieldSweep } from "@/services/field-sweep";
 import { installSweepTrigger } from "@/services/launch-sweep";
@@ -52,6 +54,12 @@ function AppShell() {
   const { colors } = useTheme();
   const [ready, setReady] = useState(false);
   const [error, setError] = useState<unknown>(null);
+  // Reactive navigator-readiness flag (A4-refine). `NavigationContainer`'s
+  // `onReady` flips this true once the container has mounted and reported ready;
+  // it is passed to `<ShareIntentGate/>` and keys its navigate effect alongside
+  // `hasShareIntent`, so a cold-start share that lands before the container is
+  // ready still navigates the moment readiness settles (no stranded intent).
+  const [navReady, setNavReady] = useState(false);
 
   // 1. Migrate before first render. Hold `ready` false until it resolves. A
   //    rejection (failed migration) is caught so the app surfaces a themed error
@@ -119,8 +127,17 @@ function AppShell() {
   // Mount the navigator only in the ready && !error branch, so no screen renders
   // before migration resolves. NavigationContainer sits INSIDE ThemeProvider (see
   // App below) so every screen's chrome resolves theme tokens + safe-area insets.
+  //
+  // The navigator (and therefore `<ShareIntentGate/>`) stays INSIDE this
+  // `ready && !error` branch (RESEARCH Q4): the share navigation and the picker's
+  // DB query resolve only AFTER `openAndMigrate()` resolves, so the picker never
+  // queries a half-built DB. `onReady` sets the reactive `navReady` flag that the
+  // ready-gated single-owner `<ShareIntentGate/>` keys its navigate effect on
+  // (with `hasShareIntent`) — driving the pending share to Capture the moment
+  // BOTH settle (A4/A4-refine), with no linking getInitialURL racing the provider.
   return (
-    <NavigationContainer>
+    <NavigationContainer ref={navigationRef} onReady={() => setNavReady(true)}>
+      <ShareIntentGate isReady={navReady} />
       <RootNavigator />
     </NavigationContainer>
   );
@@ -132,13 +149,23 @@ export default function App() {
   // for the whole app — the crop-screen pan/pinch gestures (later Phase-5 plans)
   // depend on it. `flex: 1` lets it fill the screen; without it the tree
   // collapses to zero height.
+  //
+  // `ShareIntentProvider` is the SOLE consumer of the native pending-share
+  // singleton (A4). It wraps the whole shell — mounting ABOVE the migration
+  // `ready` gate on purpose — so on a cold-start share it consumes the pending
+  // intent into context state WHILE migrations run; `hasShareIntent` PERSISTS
+  // (the capture screen resets it on cancel/commit) until the ready-gated
+  // `<ShareIntentGate/>` navigates. No `getInitialURL`/linking redirect competes
+  // with it; navigation is a single downstream reaction to its context state.
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
-        <ThemeProvider>
-          <StatusBar style="light" />
-          <AppShell />
-        </ThemeProvider>
+        <ShareIntentProvider>
+          <ThemeProvider>
+            <StatusBar style="light" />
+            <AppShell />
+          </ThemeProvider>
+        </ShareIntentProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>
   );
