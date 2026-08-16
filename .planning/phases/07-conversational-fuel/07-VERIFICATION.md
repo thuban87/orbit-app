@@ -1,9 +1,21 @@
 ---
 phase: 07-conversational-fuel
 verified: 2026-08-15T00:00:00Z
-status: passed-pending-uat
-score: 9/9 must-haves code-verified (3 SC + 6 FUEL) — RN render/flow items on-device UAT pending
+status: passed
+score: 9/9 must-haves code-verified (3 SC + 6 FUEL) + core on-device UAT PASSED
 behavior_unverified: 0
+on_device_uat_verified:  # driven on the physical Pixel 6 Pro (1A071FDEE002BU) via an incremental release APK, 2026-08-15
+  - "Incremental release APK (Phase 7 = pure src/) built + installed + launched, no crash; created a contact and drove the fuel surfaces"
+  - "FUEL-01/02: '+ Add fuel' → draft (default kind 'Topic', never off_limits) → typed text → Add committed a fuel row (source='user'); editor row shows kind + age 'today' + text/label/url fields + remove"
+  - "FUEL-03: the committed item surfaced in the ranked line (contact-profile-fuel-ranked-text); FUEL-04: per-row age rendered ('today')"
+  - "FUEL-02 off_limits marker: selecting the 'Off-limits' kind renders the '🔒 Off-limits · private / Never shared with AI, never shown at a glance.' marker on the draft"
+  - "FUEL-05: cross-contact search (Settings → Search) matched fuel text ('trail' → the contact with its snippet); a non-matching term shows the 'No matches' empty state; tapping a result opens the profile"
+  - "Purge impact surfaces the fuel count ('… 1 fuel item …') and the Phase-6 events count ('3 events') — purge removed contact+interaction+events+fuel; Archived list returned to empty"
+  - "All fuel surfaces theme-tokened (space-dark); no crash across create → add fuel → search → archive → restore → purge"
+on_device_uat_remaining:  # test-verified (robust); not conclusively driven on-device
+  - "Committing an OFF_LIMITS item then observing its exclusion from the ranked line AND search — my adb attempts to tap the draft-Add on an off_limits draft hit a locator/flakiness issue so the item never committed (purge count confirmed only the 1 Topic item). The exclusion is code-verified: getRankedFuel/searchFuel exclude off_limits by SQL predicate, proven by the 31-combination off_limits absence sweep + the ai/archived exclusion + parity tests. The off_limits KIND selectability + the private marker DID render on-device."
+  - "Fuel edit (uncontrolled-input patch commit) + delete confirm — affordances render on-device; behavior is code-verified (patch-scoped editFuel test incl. the no-stale-revert case; delete both-keys + assertOneChange)"
+  - "AI-unconfirmed render + Confirm/Dismiss — needs a seeded source='ai' row (no producer until Phase 14) and the release APK isn't run-as-debuggable; code-verified (confirmFuel flip test + ranked/search exclusion of source='ai')"
 overrides_applied: 0
 gates:
   vitest: "577 passed (48 files) — exit 0"
