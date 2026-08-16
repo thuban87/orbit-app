@@ -304,6 +304,30 @@ describe("getRankedFuel — off_limits / source='ai' / blank excluded in-query, 
     expect(editor.length).toBe(3);
   });
 
+  it("excludes a vertical-tab / form-feed / NBSP-only text row (SQL trim charset, MEDIUM-2)", async () => {
+    const c = await seedContact();
+    // Newest + highest priority BUT text is only VT (11) / FF (12) / NBSP (160)
+    // — chars ASCII TRIM would keep but JS String.trim() strips. Stored verbatim
+    // via the DAO (a non-UI write path that never hit blankToNull). The extended
+    // SQL trim set must drop it so it can't top the ranking and then render blank.
+    await addRow(c, {
+      kind: "recent",
+      created_at: "2026-08-15 09:00:00",
+      text: "\v\f ",
+    });
+    const usable = await addRow(c, {
+      kind: "gift",
+      created_at: "2026-08-10 09:00:00",
+      text: "real gift idea",
+    });
+    const rows = await getRankedFuel(exec, c);
+    expect(rows.map((r) => r.id)).toEqual([usable.id]);
+    expect(rows[0]?.text).toBe("real gift idea");
+    // The editor read still surfaces the whitespace-only row (unchanged).
+    const editor = await listFuelForEditor(exec, c);
+    expect(editor.length).toBe(2);
+  });
+
   it("SQL order == compareFuel order over an ELIGIBLE-only fixture (parity, MEDIUM-5)", async () => {
     const c = await seedContact();
     // A mixed fixture spanning kinds, sources, dates, ties, and excluded rows.

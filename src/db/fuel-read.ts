@@ -94,7 +94,12 @@ ${FUEL_KIND_PRIORITY.map((kind, i) => `      WHEN '${kind}' THEN ${i}`).join("\n
  *   3. non-blank text — `NULLIF(TRIM(text, <ws>), '') IS NOT NULL` drops a
  *      NULL/blank/whitespace-only row so it cannot top the ranking and render an
  *      EMPTY promoted strip (review MEDIUM-3). `fuel.text` is NULLable and Plan 01
- *      stores it NULL when blank.
+ *      stores it NULL when blank. The `<ws>` set matches JS `String.trim()` beyond
+ *      ASCII space/tab/LF/CR — it ALSO strips vertical-tab (11), form-feed (12),
+ *      and NBSP (160) (review MEDIUM-2), so a whitespace-only row written by a
+ *      non-UI path (seeded / imported / a confirmed AI row that never hit the UI's
+ *      `String.trim()` boundary) can't survive here, top the ranking, and then
+ *      render blank in `RankedFuelLine` (which trims with the wider JS set).
  *
  * Ordered by kind priority (RANK_CASE) then created_at DESC then id DESC, so
  * `rows[0]` is ALWAYS a usable, non-empty single ranked line. `contact_id` is the
@@ -106,7 +111,7 @@ const RANKED_FUEL = `SELECT id, contact_id, kind, label, text, url, created_at, 
    WHERE contact_id = ?
      AND kind != 'off_limits'
      AND source != 'ai'
-     AND NULLIF(TRIM(text, char(9) || char(10) || char(13) || ' '), '') IS NOT NULL
+     AND NULLIF(TRIM(text, char(9) || char(10) || char(11) || char(12) || char(13) || char(160) || ' '), '') IS NOT NULL
    ORDER BY ${RANK_CASE}, created_at DESC, id DESC`;
 
 /**
