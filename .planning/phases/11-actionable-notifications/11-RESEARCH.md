@@ -461,18 +461,18 @@ Birthday suppression is DIFFERENT: fires for **all except archived**, ignoring e
 | A5 | `reset({index:1, routes:[Home, Compose]})` is the right back-stack shape for a notification tap. | Pattern 5 | Low-Medium — verify on-device that Back from a cold-start tap lands on the dashboard, not exits the app. |
 | A6 | Mark-contacted from a notification writes the 04-log canonical row (`source='notification'`, `direction='outbound'`, `channel='unspecified'`, `connected=1`, `quality=null`). | Pattern 4 | Low — these are the 04-log DECIDED one-tap-route values; confirm the recordTouchpoint call passes them. |
 
-## Open Questions
+## Open Questions (RESOLVED 2026-08-16 — owner answers recorded in 11-CONTEXT.md `<research_resolutions>`)
 
-1. **OQ-1 — Where do notification settings live, given no SQLite settings table exists?**
+1. **OQ-1 — Where do notification settings live, given no SQLite settings table exists?** **[RESOLVED: NEW SQLite `app_settings` table via additive migration 002 — implemented by 11-02.]**
    - What we know: All current app-level settings (theme, dashboard-prefs, photo-cache-bust) are **Zustand + AsyncStorage** stores; there is **NO SQLite settings/kv table** (grep-confirmed — migration 1 has no such table). Backup (Phase 16 / 15-backup) is described as exporting "all tables + non-secret settings," and 13-ai says non-secret AI settings "live in SQLite settings" — but that table doesn't exist yet. `[notify → backup]` REQUIRES the notification settings be exportable.
    - What's unclear: Whether Phase 11 (a) adds a SQLite settings kv table via a new forward-only migration (backup's table-export then covers it naturally, and it seeds the AI settings home too), or (b) uses an AsyncStorage Zustand store (mirroring dashboard-prefs) and defers to Phase 16 to read AsyncStorage keys.
    - Recommendation: **Lean SQLite settings table via a new migration** — it satisfies the backup-export requirement structurally, matches the "logic/state that backup carries lives in SQLite" posture, and gives Phase 14 AI settings a home. But this is a storage-architecture call with a migration cost → surface to the owner/planner (it touches migration ordering). If AsyncStorage is chosen, the plan MUST add an explicit note that Phase 16 backup export/import must include these keys.
 
-2. **OQ-2 — Does the birthday channel honour the lock-screen visibility toggle?**
+2. **OQ-2 — Does the birthday channel honour the lock-screen visibility toggle?** **[RESOLVED: No — single private birthday channel (dossier default); only the two decay channels split private/public. Implemented by 11-06.]**
    - What we know: Orchestrator pick 2 gives birthdays their own channel; the note says "×1 (or ×2 if birthdays also honour the visibility toggle; the simpler single birthday channel is assumed)."
    - Recommendation: Single birthday channel (private), matching the assumed default. Flag for owner veto only if he wants birthday names on the public lock screen.
 
-3. **OQ-3 — Is a background-task backstop built at all in v1?**
+3. **OQ-3 — Is a background-task backstop built at all in v1?** **[RESOLVED: No — omit in v1; pre-scheduled + launch/foreground reconcile only. No `expo-background-task` in any plan.]**
    - What we know: The dossier calls it an "offline-intolerant best-effort backstop only." Its correctness value for a local-first app is marginal (it can't run offline) and it needs its own FCM-less-init proof.
    - Recommendation: **Omit the background-task backstop from v1** unless the owner wants it — the launch-reconcile is the decided primary and AlarmManager survives reboot/update. This avoids a second device spike and a network-gated code path of dubious value. Surface as a scope call; do not install `expo-background-task` unless the answer is yes.
 

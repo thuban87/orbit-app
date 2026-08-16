@@ -436,18 +436,29 @@ Recorded here because they bind phases that do not own them. Every planner/execu
 **Plans:** 13 plans
 
 Plans:
+**Wave 1**
+
 - [ ] 11-01-PLAN.md — Native enablement (expo-notifications + plugin), expo-notifications test double, shared notification-ids contract
 - [ ] 11-02-PLAN.md — app_settings migration (002, forward-only) + validated settings DAO (OQ-1 SQLite storage)
 - [ ] 11-03-PLAN.md — snooze-dao: first writer of snooze_until + immutable snooze/unsnooze events
 - [ ] 11-04-PLAN.md — notification-read: decay-suppression predicate + birthday candidates
 - [ ] 11-05-PLAN.md — fire-instant pure logic: quiet-window roll, stagger, 0–23 clamp, weekly cadence
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
 - [ ] 11-06-PLAN.md — channels (private/public decay + birthday) + POST_NOTIFICATIONS permission
 - [ ] 11-07-PLAN.md — notification-actions shared handler + module-scope headless task
 - [ ] 11-08-PLAN.md — purge notification-cancel adapter composed into the purge fan-out
 - [ ] 11-09-PLAN.md — Edit-form "Mute reminders" relabel + Profile in-app snooze presets
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
 - [ ] 11-10-PLAN.md — notification-schedule reconcile diff + launch-sweep registration
-- [ ] 11-11-PLAN.md — Settings Notifications section (toggles, permission value moment, time controls)
 - [ ] 11-12-PLAN.md — Notification tap routing: pure resolver + response gate (body→Compose/Profile)
+
+**Wave 4** *(blocked on Wave 3 completion)*
+
+- [ ] 11-11-PLAN.md — Settings Notifications section (toggles, permission value moment, time controls)
 - [ ] 11-13-PLAN.md — App.tsx wiring: sweep registration, channels/category init, headless import, response gate mount
 
 ### Phase 12: Home Screen Widget
