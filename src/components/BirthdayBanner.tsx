@@ -25,7 +25,8 @@
  *
  * Every colour resolves through `useTheme().colors.*` (CLAUDE.md / check:colors).
  */
-import { useEffect, useState } from "react";
+import { useFocusEffect } from "@react-navigation/native";
+import { useCallback, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { getExecutor } from "@/db/database";
 import { type BirthdayCandidate, listBirthdayCandidates } from "@/db/dashboard-read";
@@ -61,40 +62,45 @@ export function BirthdayBanner({ onPressContact }: BirthdayBannerProps) {
   const { colors } = useTheme();
   const [entries, setEntries] = useState<BirthdayEntry[]>([]);
 
-  // Async cancelled-flag load (the FuelSearch idiom): read the exclude-archived-
-  // only candidates once, then in JS compute daysUntilBirthday, keep the 0..7
-  // window, and sort soonest-first. A cancelled flag drops a stale async result.
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const candidates = await listBirthdayCandidates(getExecutor());
-        if (cancelled) return;
-        const today = new Date();
-        const inWindow: BirthdayEntry[] = [];
-        for (const c of candidates as BirthdayCandidate[]) {
-          const daysUntil = daysUntilBirthday(c.birthday, today);
-          if (daysUntil !== null && daysUntil <= WINDOW_DAYS) {
-            inWindow.push({ id: c.id, name: c.name, daysUntil });
+  // Async cancelled-flag load (the FuelSearch idiom), driven by `useFocusEffect`
+  // (mirrors NeverContactedScreen) so the banner RE-QUERIES every time the
+  // dashboard regains focus — a same-session birthday add and a midnight `today`
+  // rollover are both reflected without a cold restart (DASH-07 freshness). Each
+  // run recomputes `today = new Date()` inside the effect. A cancelled flag drops
+  // a stale async result.
+  useFocusEffect(
+    useCallback(() => {
+      let cancelled = false;
+      (async () => {
+        try {
+          const candidates = await listBirthdayCandidates(getExecutor());
+          if (cancelled) return;
+          const today = new Date();
+          const inWindow: BirthdayEntry[] = [];
+          for (const c of candidates as BirthdayCandidate[]) {
+            const daysUntil = daysUntilBirthday(c.birthday, today);
+            if (daysUntil !== null && daysUntil <= WINDOW_DAYS) {
+              inWindow.push({ id: c.id, name: c.name, daysUntil });
+            }
           }
+          // Soonest first; a stable name/id tiebreak keeps same-day rows ordered.
+          inWindow.sort(
+            (a, b) =>
+              a.daysUntil - b.daysUntil ||
+              a.name.localeCompare(b.name) ||
+              a.id - b.id,
+          );
+          setEntries(inWindow);
+        } catch (err) {
+          Logger.error(LOG_SCOPE, "failed to load birthdays", err);
+          if (!cancelled) setEntries([]);
         }
-        // Soonest first; a stable name/id tiebreak keeps same-day rows ordered.
-        inWindow.sort(
-          (a, b) =>
-            a.daysUntil - b.daysUntil ||
-            a.name.localeCompare(b.name) ||
-            a.id - b.id,
-        );
-        setEntries(inWindow);
-      } catch (err) {
-        Logger.error(LOG_SCOPE, "failed to load birthdays", err);
-        if (!cancelled) setEntries([]);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+      })();
+      return () => {
+        cancelled = true;
+      };
+    }, []),
+  );
 
   // Renders nothing when no contact has a birthday in the window.
   if (entries.length === 0) {
