@@ -182,3 +182,25 @@ Surfaced by gsd-phase-researcher (11-RESEARCH.md); resolved by the owner before 
   as a possible v2 addition.
 
 </research_resolutions>
+
+<owner_rulings_post_convergence>
+## Owner Rulings — Post-Convergence (2026-08-16)
+
+Made at the pre-executor pause after 2 cross-AI convergence cycles (codex + read-only-Claude):
+
+- **Item G (overdue-while-closed catch-up) — RULED: keep the STATELESS design.** A contact that
+  crosses overdue while Orbit is closed gets its first nudge at its due-date morning (the pre-scheduled
+  fire, if the app was open within the `HORIZON_DAYS` window before) — else at the next weekly tick
+  (worst case ~6 days). Do NOT add stored last-notified state; do NOT clamp overdue to today. This
+  matches the DECIDED flat-weekly + anti-nag posture; the dashboard showing overdue on reopen is the
+  mitigation. The 11-05 / 11-10 "deferred — owner call" notes are RESOLVED to "keep stateless" — no
+  plan/code change needed; do not re-open.
+- **Alert feel = `IMPORTANCE_LOW` — RATIFIED.** Honors the owner's "silent, no heads-up" choice
+  (Android `IMPORTANCE_DEFAULT` plays a sound; `LOW` is the silent tier). See §"Timing & controls".
+- **Headless snooze +1-week re-arm — launch-deferral ACCEPTED.** Re-scheduling from a killed-app
+  process risks the immutable-channel privacy landmine; the immediate `cancel` already gives NOTIF-03
+  suppression, and the +1-week re-arm settles on the next foreground reconcile.
+
+**Milestone directive:** after Phase 11 CLOSES (executed + verified/UAT), STOP. Do NOT begin Phase 12
+(Home Screen Widget) — not even discuss/plan — until the owner confirms usage limits.
+</owner_rulings_post_convergence>
