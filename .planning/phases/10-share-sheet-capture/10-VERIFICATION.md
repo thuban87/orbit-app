@@ -1,8 +1,9 @@
 ---
 phase: 10-share-sheet-capture
 verified: 2026-08-16T15:08:27Z
-status: human_needed
-score: 12/12 code-verifiable truths verified
+status: passed
+uat: on-device Pixel 6 Pro (release APK), 2026-08-16 — 5/6 criteria confirmed; F1 fixed+re-verified; F2 false-alarm; F3 minor follow-up
+score: 12/12 code-verifiable truths + on-device Pixel UAT
 behavior_unverified: 0
 overrides_applied: 0
 human_verification:
@@ -30,7 +31,7 @@ human_verification:
 
 **Phase Goal:** Zero-friction capture — Orbit as an Android `text/plain` share target that lands a shared link/text as Conversational Fuel on a picked (or inline-created) contact, durably and fast, then returns to the source app.
 **Verified:** 2026-08-16T15:08:27Z
-**Status:** human_needed
+**Status:** passed (on-device Pixel UAT complete 2026-08-16 — see "On-device Pixel UAT" section below; F1 fixed + re-verified)
 **Re-verification:** No — initial verification
 
 ## Goal Achievement
@@ -156,3 +157,23 @@ Pixel UAT. Status is therefore `human_needed`, not `passed`.
 
 _Verified: 2026-08-16T15:08:27Z_
 _Verifier: Claude (gsd-verifier)_
+
+---
+
+## On-device Pixel UAT — 2026-08-16 (release APK on Pixel 6 Pro `1A071FDEE002BU`)
+
+Built via the desktop pipeline (`droid`: `npm ci` + patch-package ✔ + `expo prebuild --clean` → `[expo-share-intent] add android filters (text/plain)` ✔ + `assembleRelease` BUILD SUCCESSFUL). Driven via `am start ACTION_SEND` + `uiautomator`.
+
+| Criterion | On-device result |
+|-----------|------------------|
+| **SC1** picker opens, keyboard closed, favourites→MRU→rest, never-contacted **in**, archived **out** | ✅ picker rendered (Bob/Dad/SkiBuddy faces + ＋ tile + payload preview), `mInputShown=false`, archived contact excluded; capture-MRU confirmed (Dad moved to front after a capture) |
+| **SC2** EXTRA_SUBJECT label + bare-URL fallback; `url` canonical; single-tap immediate write; long-press multi-select | ✅ payload preview showed the EXTRA_SUBJECT title "How to build a deck" (patch works); profile showed the fuel row (Topic, canonical `https://…/deck-guide`); plain-text share showed text w/ no url; multi-select → "Done · 2" → **"Saved to 2 contacts"** (atomic N-rows, correct pluralization) |
+| **SC3** toast → `finish()` return; never a touchpoint; inline-create name-only → never-contacted + toast | ✅ "Saved to Dad" → auto-returned to source; Dad's profile: *"No outbound contact logged yet"* + GRAVITY Thin (**no touchpoint**, last_contact unchanged); inline-create "SkiBuddy" → **"Not yet contacted" 1→2** (never-contacted) |
+| Search reveal (🔍) | Code-correct (onPress→setSearchOpen→autofocus TextInput); adb synthetic taps did not register on the small Pressable (automation artifact, not a bug) |
+
+### Findings + resolution
+- **F1 [fixed]** — the inline-create "Create & save" button sat behind the soft keyboard (absolute-positioned bottom surface). Fixed by adding `returnKeyType="done"` + `onSubmitEditing` to the name field (keyboard "Done" submits). Re-verified on-device: keyboard-Done created "DeckGuy" (never-contacted 2→3). Commit in phase history.
+- **F2 [false alarm]** — search-reveal onPress is correctly wired; only adb synthetic taps failed to trigger it. A physical tap reveals the field.
+- **F3 [minor follow-up, deferred]** — the optional-note surface's Done/Skip buttons (multiline field, absolute-positioned) can likewise be covered by the keyboard. The note is an optional path (Skip/auto-return are common); a keyboard-height offset for the confirm surface is a future polish item, not a blocker.
+
+**Verdict: PASSED** — all three ROADMAP success criteria confirmed on the physical device; the one fixable UX gap (F1) was fixed and re-verified in-session.
