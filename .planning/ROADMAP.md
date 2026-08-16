@@ -433,7 +433,22 @@ Recorded here because they bind phases that do not own them. Every planner/execu
   3. No decay notification fires for never-contacted/snoozed/rogue/Rarely-responds/muted; a user can permanently mute a still-decaying contact; birthday notifications fire day-of for non-archived contacts.
   4. `POST_NOTIFICATIONS` is asked at a value moment; master + per-type toggles + private-by-default lock-screen visibility work; denial degrades to in-app.
 
-**Plans:** TBD
+**Plans:** 13 plans
+
+Plans:
+- [ ] 11-01-PLAN.md — Native enablement (expo-notifications + plugin), expo-notifications test double, shared notification-ids contract
+- [ ] 11-02-PLAN.md — app_settings migration (002, forward-only) + validated settings DAO (OQ-1 SQLite storage)
+- [ ] 11-03-PLAN.md — snooze-dao: first writer of snooze_until + immutable snooze/unsnooze events
+- [ ] 11-04-PLAN.md — notification-read: decay-suppression predicate + birthday candidates
+- [ ] 11-05-PLAN.md — fire-instant pure logic: quiet-window roll, stagger, 0–23 clamp, weekly cadence
+- [ ] 11-06-PLAN.md — channels (private/public decay + birthday) + POST_NOTIFICATIONS permission
+- [ ] 11-07-PLAN.md — notification-actions shared handler + module-scope headless task
+- [ ] 11-08-PLAN.md — purge notification-cancel adapter composed into the purge fan-out
+- [ ] 11-09-PLAN.md — Edit-form "Mute reminders" relabel + Profile in-app snooze presets
+- [ ] 11-10-PLAN.md — notification-schedule reconcile diff + launch-sweep registration
+- [ ] 11-11-PLAN.md — Settings Notifications section (toggles, permission value moment, time controls)
+- [ ] 11-12-PLAN.md — Notification tap routing: pure resolver + response gate (body→Compose/Profile)
+- [ ] 11-13-PLAN.md — App.tsx wiring: sweep registration, channels/category init, headless import, response gate mount
 
 ### Phase 12: Home Screen Widget
 
