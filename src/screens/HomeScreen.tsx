@@ -38,6 +38,7 @@ import {
   RefreshControl,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from "react-native";
 import { BirthdayBanner } from "@/components/BirthdayBanner";
@@ -104,8 +105,13 @@ export function HomeScreen() {
   const [categories, setCategories] = useState<{ id: number; name: string }[]>(
     [],
   );
+  // The live search term — LOCAL state (not persisted, unlike sort/filter): a
+  // present term switches the list to the search result set via the DAO.
+  const [term, setTerm] = useState("");
   const [error, setError] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+
+  const hasTerm = term.trim() !== "";
 
   /**
    * The single load: `listDashboard` + the four counts, guarded by a `cancelled`
@@ -120,7 +126,7 @@ export function HomeScreen() {
         const exec = getExecutor();
         const [list, live, neverContacted, snoozed, archived, cats] =
           await Promise.all([
-            listDashboard(exec, { filter, sort }),
+            listDashboard(exec, { filter, sort, term }),
             countLiveContacts(exec),
             countNeverContacted(exec),
             countSnoozed(exec),
@@ -145,7 +151,7 @@ export function HomeScreen() {
     return () => {
       cancelled = true;
     };
-  }, [filter, sort]);
+  }, [filter, sort, term]);
 
   // Freshness path 1 — re-query every time the dashboard regains focus.
   useFocusEffect(
@@ -210,8 +216,11 @@ export function HomeScreen() {
   );
 
   // The cause-aware empty state — delegated to the pure gate (no inline count
-  // arithmetic; HIGH-2). `hasTerm: false` — there is no search box until Plan 09,
-  // which threads the live term + chips into this same helper (MEDIUM-4).
+  // arithmetic; HIGH-2). The live `activeFilter` (chip) + `hasTerm` (search box)
+  // are threaded in: the gate's precedence resolves a zero-result search →
+  // 'search-empty' BEFORE any filter/population branch, so a no-match search over
+  // a non-empty population (or with a filter also active) never shows the
+  // hidden-population or filter copy (MEDIUM-4).
   const emptyState = selectDashboardEmptyState({
     live: counts.live,
     neverContacted: counts.neverContacted,
@@ -219,7 +228,7 @@ export function HomeScreen() {
     archived: counts.archived,
     rowCount: rows.length,
     activeFilter: filter,
-    hasTerm: false,
+    hasTerm,
   });
 
   const listHeader = (
@@ -233,6 +242,38 @@ export function HomeScreen() {
           {`${counts.live} contact${counts.live === 1 ? "" : "s"}`}
         </Text>
       ) : null}
+      <View style={styles.searchRow}>
+        <TextInput
+          testID="dashboard-search-input"
+          value={term}
+          onChangeText={setTerm}
+          placeholder="Search people and notes"
+          placeholderTextColor={colors.textSecondary}
+          autoCorrect={false}
+          autoCapitalize="none"
+          style={[
+            styles.searchInput,
+            {
+              backgroundColor: colors.surface,
+              borderColor: colors.border,
+              color: colors.textPrimary,
+            },
+          ]}
+        />
+        {hasTerm ? (
+          <Pressable
+            testID="dashboard-search-clear"
+            accessibilityRole="button"
+            accessibilityLabel="Clear search"
+            onPress={() => setTerm("")}
+            style={[styles.searchClear, { borderColor: colors.border }]}
+          >
+            <Text style={[styles.searchClearText, { color: colors.textSecondary }]}>
+              Clear
+            </Text>
+          </Pressable>
+        ) : null}
+      </View>
       <FilterChipRow chips={chips} active={filter} onSelect={setFilter} />
       {filter === "favourites" ? (
         <Pressable
@@ -373,6 +414,15 @@ export function HomeScreen() {
         </Text>
       ) : null}
     </View>
+  ) : emptyState === "search-empty" ? (
+    // A search that matched nothing. The gate resolves 'search-empty' BEFORE any
+    // filter/population branch (MEDIUM-4), so this shows even when a filter is
+    // also active — never the hidden-population or filter copy.
+    <View testID="dashboard-search-empty" style={styles.emptyState}>
+      <Text style={[styles.emptyBody, { color: colors.textSecondary }]}>
+        {`No matches for "${term.trim()}"`}
+      </Text>
+    </View>
   ) : emptyState === "filter-empty" ? (
     // A non-'all' filter that yields nothing — the gate resolved 'filter-empty'
     // (MEDIUM-4: this fires BEFORE the hidden-population branch, so a zero-result
@@ -450,6 +500,29 @@ const styles = StyleSheet.create({
   },
   countHeader: {
     fontSize: 13,
+    fontWeight: "600",
+  },
+  searchRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  searchInput: {
+    flex: 1,
+    height: 44,
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+  },
+  searchClear: {
+    minHeight: 44,
+    justifyContent: "center",
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingHorizontal: 14,
+  },
+  searchClearText: {
+    fontSize: 14,
     fontWeight: "600",
   },
   sortControl: {
