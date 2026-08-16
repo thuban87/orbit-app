@@ -301,3 +301,84 @@ reconcile; every HIGH retained is independently confirmed against the source on 
 **not safe to execute unchanged** — H1 and H2 break the headless action feature and risk duplicate
 writes into an un-repairable local DB; H3 has a privacy dimension; H4 is an immutable, expensive-to-
 reverse channel decision resting on a factual error; H5 needs a product-intent ruling.
+
+---
+
+## Claude Review (read-only subagent) — Cycle 1
+
+> Second independent reviewer alongside Codex (the Claude CLI reviewer is skipped by the self-review
+> guard + a write-permission gap, so this read-only subagent substitutes — owner-approved override).
+
+CYCLE_SUMMARY (Claude): current_high=2 current_actionable=3
+
+### HIGH
+- **[11-07/11-13] Killed-app headless write throws and is silently swallowed.** `getExecutor()`→`getDb()`
+  throws `"getDb() called before openAndMigrate() completed"` (database.ts:119-124); `openAndMigrate()`
+  runs only in App.tsx's on-mount effect (App.tsx:14,28). A `registerTaskAsync` headless tap loads the
+  JS bundle but does not mount React, so `cachedDb` is null → every killed-app mark/snooze throws →
+  11-07's own try/catch swallows it, dropping the write silently. Defeats NOTIF-02's headless path.
+  FIX: `await openAndMigrate()` (idempotent) before `getExecutor()` in the shared handler / headless
+  task; assert the write in the A2 Pixel-UAT (read the row back via `run-as`).
+- **[11-07/11-12] Warm-tap double-write unguarded & untested.** Both wirings funnel to
+  `handleNotificationAction`, which mints a fresh `newUid()` per call; a warm tap delivered to both →
+  two touchpoints / two immutable snooze events (silent, permanent). No idempotency guard; VALIDATION
+  manual matrix only exercises the killed-app path. FIX: idempotency guard keyed on notification
+  identifier + actionIdentifier (or foreground-skips-when-headless-owns) + a Pixel-UAT assertion of
+  exactly-one-write-per-warm-tap.
+
+### Actionable (MEDIUM/LOW)
+- **[11-13]** `ensureChannels()` fire-and-forget races the reconcile that schedules to those channels;
+  channel visibility is immutable → privacy landmine on a restore-into-fresh-install path. FIX: await
+  channel/category init before registering/running the reconcile.
+- **[11-10/11-11]** A delivery-hour/quiet-window change does not reschedule already-pending
+  notifications (diff keys on identifier presence only, not fire instant). FIX: compare desired fire
+  instant vs the existing scheduled trigger; cancel+reschedule on mismatch.
+- **[11-12]** A foreground action tap for a stale/purged contactId becomes an unhandled promise
+  rejection (`void handleNotificationAction(...)`, no `.catch`). FIX: wrap the foreground call in a
+  Logger-guarded catch, mirroring the headless task.
+
+(Claude found NO unauthorized reversal of a [DECIDED]/[REJECTED]/owner-LOCKED item.)
+
+---
+
+## Orchestrator Merged Actionable Set — Cycle 1 (Codex + Claude, deduped)
+
+The `--reviews` replan MUST incorporate each item into the relevant PLAN.md
+(task/`<action>`/`<acceptance_criteria>`/`<verify>`/`must_haves`/`<threat_model>`) **or** explicitly
+defer/reject it with rationale in that PLAN.md. Verified against source this cycle:
+`expo-task-manager` and `expo-notifications` are BOTH absent from package.json.
+
+**HIGH**
+1. **[11-01/11-07/11-13] Headless DB-not-open.** `await openAndMigrate()` in the headless task before
+   `getExecutor()` (idempotent → safe on foreground too). Install + mock `expo-task-manager` in 11-01
+   (currently absent — `registerTaskAsync` needs it). Assert the killed-app write SUCCEEDS in A2 Pixel-UAT.
+2. **[11-07/11-12] Non-idempotent action writes** (warm double-delivery + cold-start
+   `getLastNotificationResponseAsync` replay). Deterministic per-occurrence idempotency uid; ONE
+   `handleResponseOnce`; `clearLastNotificationResponseAsync()` after handling. Add a Task+listener+
+   cold-replay unit test AND a Pixel-UAT single-write-per-tap assertion.
+3. **[11-10/11-11] Settings changes don't update scheduled notifications.** Diff the FULL desired
+   request (fire instant, channel, category, data) and cancel+reschedule on mismatch under the same
+   identifier — else delivery-hour/quiet-window/lock-screen-channel edits never apply (privacy
+   regression on re-privatising).
+4. **[11-06] "DEFAULT importance — silent, no heads-up" is inconsistent.** Android `IMPORTANCE_DEFAULT`
+   plays a sound. Implement the owner's stated INTENT (silent, no heads-up, still visible in
+   shade/lock-screen) via `IMPORTANCE_LOW` (or DEFAULT + `sound:null` + no vibration). Channel
+   importance is immutable at creation — get it right + version the channel id. This HONORS the owner's
+   decision (calm/silent); it is NOT a reversal. [Orchestrator note: surfacing to owner at the pause.]
+5. **[11-04/11-10] Pre-schedule FUTURE occurrences** (the dossier's "pre-scheduled dated" architecture),
+   not only already-overdue contacts. For every eligible (non-suppressed) contact, schedule the next
+   occurrence at its computed next-due morning instant (≥ `max(dueDate, snooze_until)`) plus the weekly
+   re-nag ticks, so a contact crossing overdue while the app is closed still fires; reconcile on launch.
+   Birthdays: schedule the next day-of morning. This realises NOTIF-01's "fires without the app open."
+
+**Actionable (MEDIUM/LOW)**
+6. **[11-13]** `await` `ensureChannels()` / `ensureNotificationCategories()` before installing the sweep trigger.
+7. **[11-09] UTC off-by-one.** `formatLocalDate(snooze_until)` passes a string to a `Date`-typed fn
+   (dates.ts:17) → reintroduces the forbidden UTC off-by-one. Render the stored `YYYY-MM-DD` directly or
+   parse with local components. (CLAUDE.md's already-fixed bug — must not reintroduce.)
+8. **[11-12]** Wrap the foreground `handleNotificationAction` in a Logger-guarded catch (stale/purged
+   contactId) AND queue the body-tap until navigation `isReady` (a pre-`isReady` response no-ops);
+   treat only Expo's default action id as a body tap.
+9. **[11-01/11-06]** Rename category id `decay-actions` → `decay_actions` (permanent identifier, defensive).
+10. **[11-03]** `clearSnooze` ALWAYS records an `unsnooze` event (not "optionally") — the events log is
+    the only recovery mechanism.
