@@ -30,7 +30,7 @@
  */
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   AppState,
   FlatList,
@@ -42,22 +42,38 @@ import {
 } from "react-native";
 import { BirthdayBanner } from "@/components/BirthdayBanner";
 import { ContactCard } from "@/components/ContactCard";
+import { type FilterChip, FilterChipRow } from "@/components/FilterChipRow";
+import { listCategories } from "@/db/contact-read";
 import { getExecutor } from "@/db/database";
 import {
   countArchived,
   countLiveContacts,
   countNeverContacted,
   countSnoozed,
+  type DashboardFilter,
   type DashboardRow,
+  type DashboardSort,
   listDashboard,
 } from "@/db/dashboard-read";
 import { selectDashboardEmptyState } from "@/logic/dashboard-empty-logic";
 import type { RootStackParamList } from "@/navigation/types";
 import { useDashboardPrefs } from "@/stores/dashboard-prefs-store";
 import { useTheme } from "@/theme";
+import type { SocialBattery } from "@/types";
 import { Logger } from "@/utils/logger";
 
 const LOG_SCOPE = "dashboard-home";
+
+/** The dashboard sort control's four options, in display order (08-UI-SPEC). */
+const SORT_OPTIONS: { key: DashboardSort; label: string }[] = [
+  { key: "status", label: "Status" },
+  { key: "name", label: "Name (A–Z)" },
+  { key: "least-recent", label: "Least recent" },
+  { key: "most-recent", label: "Most recent" },
+];
+
+/** The social-battery chip values (src/types.ts SocialBattery), in fixed order. */
+const BATTERY_VALUES: SocialBattery[] = ["Charger", "Neutral", "Drain"];
 
 /** The four population counts feeding the header + the empty-state gate. */
 interface PopulationCounts {
@@ -80,9 +96,14 @@ export function HomeScreen() {
     useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const sort = useDashboardPrefs((s) => s.sort);
   const filter = useDashboardPrefs((s) => s.filter);
+  const setSort = useDashboardPrefs((s) => s.setSort);
+  const setFilter = useDashboardPrefs((s) => s.setFilter);
 
   const [rows, setRows] = useState<DashboardRow[]>([]);
   const [counts, setCounts] = useState<PopulationCounts>(ZERO_COUNTS);
+  const [categories, setCategories] = useState<{ id: number; name: string }[]>(
+    [],
+  );
   const [error, setError] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -97,17 +118,19 @@ export function HomeScreen() {
     (async () => {
       try {
         const exec = getExecutor();
-        const [list, live, neverContacted, snoozed, archived] =
+        const [list, live, neverContacted, snoozed, archived, cats] =
           await Promise.all([
             listDashboard(exec, { filter, sort }),
             countLiveContacts(exec),
             countNeverContacted(exec),
             countSnoozed(exec),
             countArchived(exec),
+            listCategories(exec),
           ]);
         if (cancelled) return;
         setRows(list);
         setCounts({ live, neverContacted, snoozed, archived });
+        setCategories(cats);
         setError(false);
       } catch (err) {
         Logger.error(LOG_SCOPE, "failed to load dashboard", err);
@@ -160,6 +183,32 @@ export function HomeScreen() {
     [navigation],
   );
 
+  // The single-active chip list: all · needs-attention · one per category ·
+  // one per social-battery value · favourites · snoozed (with its live count).
+  // Selecting a chip persists it via `setFilter`; the store change re-runs
+  // `reload` through the focus effect (Plan 07's persisted-default mechanism).
+  const chips: FilterChip[] = useMemo(
+    () => [
+      { key: "all", label: "All" },
+      { key: "needs-attention", label: "Needs attention" },
+      ...categories.map(
+        (c): FilterChip => ({
+          key: `category-${c.id}` as DashboardFilter,
+          label: c.name,
+        }),
+      ),
+      ...BATTERY_VALUES.map(
+        (v): FilterChip => ({
+          key: `battery-${v}` as DashboardFilter,
+          label: v,
+        }),
+      ),
+      { key: "favourites", label: "Favourites" },
+      { key: "snoozed", label: "Snoozed", count: counts.snoozed },
+    ],
+    [categories, counts.snoozed],
+  );
+
   // The cause-aware empty state — delegated to the pure gate (no inline count
   // arithmetic; HIGH-2). `hasTerm: false` — there is no search box until Plan 09,
   // which threads the live term + chips into this same helper (MEDIUM-4).
@@ -184,6 +233,63 @@ export function HomeScreen() {
           {`${counts.live} contact${counts.live === 1 ? "" : "s"}`}
         </Text>
       ) : null}
+      <FilterChipRow chips={chips} active={filter} onSelect={setFilter} />
+      {filter === "favourites" ? (
+        <Pressable
+          testID="dashboard-favourites-manage"
+          accessibilityRole="button"
+          accessibilityLabel="Manage favourites"
+          onPress={() => navigation.navigate("ManageFavourites")}
+          style={styles.manageEntry}
+        >
+          <Text style={[styles.manageText, { color: colors.accent }]}>
+            Manage
+          </Text>
+        </Pressable>
+      ) : null}
+      <View
+        testID="dashboard-sort-control"
+        accessibilityRole="tablist"
+        style={styles.sortControl}
+      >
+        {SORT_OPTIONS.map((option) => {
+          const isActive = option.key === sort;
+          return (
+            <Pressable
+              key={option.key}
+              testID={`dashboard-sort-option-${option.key}`}
+              accessibilityRole="button"
+              accessibilityState={{ selected: isActive }}
+              accessibilityLabel={`Sort by ${option.label}`}
+              onPress={() => setSort(option.key)}
+              style={[
+                styles.sortOption,
+                isActive
+                  ? {
+                      backgroundColor: colors.accent,
+                      borderColor: colors.borderStrong,
+                    }
+                  : {
+                      backgroundColor: colors.surface,
+                      borderColor: colors.border,
+                    },
+              ]}
+            >
+              <Text
+                numberOfLines={1}
+                style={[
+                  styles.sortLabel,
+                  {
+                    color: isActive ? colors.background : colors.textSecondary,
+                  },
+                ]}
+              >
+                {option.label}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </View>
     </View>
   );
 
@@ -268,14 +374,26 @@ export function HomeScreen() {
       ) : null}
     </View>
   ) : emptyState === "filter-empty" ? (
-    // A calm generic empty region for a persisted non-'all' filter. The
-    // filter-specific copy ('No favourites yet' / 'No one in {category}') and the
-    // search-empty state are completed in Plan 09 when the chips + search box ship
-    // and thread `activeFilter` / `hasTerm` into the same gate (MEDIUM-4).
+    // A non-'all' filter that yields nothing — the gate resolved 'filter-empty'
+    // (MEDIUM-4: this fires BEFORE the hidden-population branch, so a zero-result
+    // filter over a non-empty population never shows the hidden copy). The
+    // favourites filter gets its own pointer-to-the-star copy; every other
+    // filter (category / battery / needs-attention / snoozed) gets a calm generic.
     <View testID="dashboard-empty-filter" style={styles.emptyState}>
-      <Text style={[styles.emptyBody, { color: colors.textSecondary }]}>
-        Nothing here right now.
-      </Text>
+      {filter === "favourites" ? (
+        <>
+          <Text style={[styles.emptyHeading, { color: colors.textPrimary }]}>
+            No favourites yet
+          </Text>
+          <Text style={[styles.emptyBody, { color: colors.textSecondary }]}>
+            Tap the star on a contact's profile to add them here.
+          </Text>
+        </>
+      ) : (
+        <Text style={[styles.emptyBody, { color: colors.textSecondary }]}>
+          Nothing here right now.
+        </Text>
+      )}
     </View>
   ) : null;
 
@@ -333,6 +451,32 @@ const styles = StyleSheet.create({
   countHeader: {
     fontSize: 13,
     fontWeight: "600",
+  },
+  sortControl: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  sortOption: {
+    minHeight: 44,
+    justifyContent: "center",
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+  },
+  sortLabel: {
+    fontSize: 14,
+    fontWeight: "600",
+  },
+  manageEntry: {
+    minHeight: 44,
+    justifyContent: "center",
+    alignSelf: "flex-start",
+    paddingHorizontal: 4,
+  },
+  manageText: {
+    fontSize: 15,
+    fontWeight: "700",
   },
   footer: {
     gap: 10,
