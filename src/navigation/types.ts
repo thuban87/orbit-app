@@ -64,6 +64,16 @@ export type RootStackParamList = {
    * untouched.
    */
   Compose: { contactId: number };
+  /**
+   * The share-sheet capture picker (CAP-01/04). Carries NO params — a system
+   * share is consumed by the `ShareIntentProvider` (the single owner of the
+   * native pending-share singleton), and the screen drains the payload via
+   * `useShareIntentContext()` rather than route params (serializable-only,
+   * deep-link-safe, no callbacks). Registered additively; `initialRouteName`
+   * stays `Home` and every existing route is untouched. The Stack.Screen for
+   * this route lands in Plan 10-05 with the screen component.
+   */
+  Capture: undefined;
 };
 
 /**
