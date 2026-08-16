@@ -652,8 +652,8 @@ export function CaptureScreen(_props: RootStackScreenProps<"Capture">) {
           testID="capture-new-contact-tile"
           accessibilityRole="button"
           accessibilityLabel="New contact"
-          accessibilityState={{ disabled: locked }}
-          disabled={locked}
+          accessibilityState={{ disabled: locked || multiSelect }}
+          disabled={locked || multiSelect}
           onPress={onOpenInlineCreate}
           style={[styles.tile, styles.newTile, { borderColor: colors.accent }]}
         >
