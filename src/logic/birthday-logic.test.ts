@@ -98,9 +98,9 @@ describe("daysUntilBirthday — Bug 1: day-of drop is fixed (local-midnight vs l
   });
 
   it("today IS the birthday (YYYY-MM-DD stored) → 0 regardless of stored year", () => {
-    expect(daysUntilBirthday("1990-08-15", localDate(2026, 8, 15, 23, 59))).toBe(
-      0,
-    );
+    expect(
+      daysUntilBirthday("1990-08-15", localDate(2026, 8, 15, 23, 59)),
+    ).toBe(0);
   });
 });
 
