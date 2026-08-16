@@ -23,6 +23,7 @@
  */
 import type { FuelKind } from "@/db/fuel-dao";
 import type { SqlExecutor } from "@/db/types";
+import { FUEL_KIND_PRIORITY } from "@/services/fuel-ranking";
 
 /** One fuel row as rendered by the profile editor. */
 export interface FuelItem {
@@ -59,4 +60,64 @@ export function listFuelForEditor(
   contactId: number,
 ): Promise<FuelItem[]> {
   return exec.getAllAsync<FuelItem>(LIST_FUEL_FOR_EDITOR, [contactId]);
+}
+
+/**
+ * The `ORDER BY` kind-priority CASE, built ONCE at module load FROM
+ * `FUEL_KIND_PRIORITY` (the single ranking tunable in fuel-ranking.ts) — so the
+ * SQL projection and the pure `compareFuel` can never drift (a parity test in
+ * fuel-read.test.ts asserts they agree). Each kind maps to its index; anything
+ * not listed (`off_limits` / unknown) falls to `ELSE = FUEL_KIND_PRIORITY.length`,
+ * mirroring `compareFuel`'s default bucket.
+ *
+ * T-07-01 (SQL injection): every value interpolated here is a COMPILE-TIME code
+ * constant from a closed hardcoded array — the kind strings and their integer
+ * indices — never user input. `contact_id` remains the SOLE `?`-bound value in
+ * `getRankedFuel`. There is therefore no injection surface; a `?`-bind is neither
+ * possible (SQLite cannot bind an identifier / a CASE branch) nor needed.
+ */
+const RANK_CASE = `CASE kind
+${FUEL_KIND_PRIORITY.map((kind, i) => `      WHEN '${kind}' THEN ${i}`).join("\n")}
+      ELSE ${FUEL_KIND_PRIORITY.length}
+    END`;
+
+/**
+ * The glanceable / prompt-facing ranked projection (FUEL-03). SELECTs the same 8
+ * FuelItem columns but — UNLIKE `listFuelForEditor` — EXCLUDES three classes of
+ * row IN THE QUERY (never a UI `.filter()`, which could be refactored away):
+ *
+ *   1. `kind != 'off_limits'` — private notes never reach a glanceable surface
+ *      (T-07-02). This is the structural access control.
+ *   2. `source != 'ai'` — an unconfirmed AI proposal never lands on a glance line
+ *      reading as fact, nor feeds back into a prompt (T-07-03). Plan 03's confirm
+ *      flips 'ai' → 'manual', after which the row ranks normally.
+ *   3. non-blank text — `NULLIF(TRIM(text, <ws>), '') IS NOT NULL` drops a
+ *      NULL/blank/whitespace-only row so it cannot top the ranking and render an
+ *      EMPTY promoted strip (review MEDIUM-3). `fuel.text` is NULLable and Plan 01
+ *      stores it NULL when blank.
+ *
+ * Ordered by kind priority (RANK_CASE) then created_at DESC then id DESC, so
+ * `rows[0]` is ALWAYS a usable, non-empty single ranked line. `contact_id` is the
+ * sole `?`-bound value. Returns `[]` for a contact with no eligible fuel. Pure
+ * read — no transaction.
+ */
+const RANKED_FUEL = `SELECT id, contact_id, kind, label, text, url, created_at, source
+    FROM fuel
+   WHERE contact_id = ?
+     AND kind != 'off_limits'
+     AND source != 'ai'
+     AND NULLIF(TRIM(text, char(9) || char(10) || char(13) || ' '), '') IS NOT NULL
+   ORDER BY ${RANK_CASE}, created_at DESC, id DESC`;
+
+/**
+ * Read a contact's ranked fuel projection — the ONE line every glanceable surface
+ * (card / notification / widget / compose / AI prompt) reuses. off_limits,
+ * unconfirmed source='ai', and blank/NULL text are excluded IN-QUERY (see
+ * `RANKED_FUEL`); `rows[0]` is the promoted top line. Pure read — no transaction.
+ */
+export function getRankedFuel(
+  exec: SqlExecutor,
+  contactId: number,
+): Promise<FuelItem[]> {
+  return exec.getAllAsync<FuelItem>(RANKED_FUEL, [contactId]);
 }
