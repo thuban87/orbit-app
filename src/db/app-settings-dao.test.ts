@@ -12,6 +12,11 @@
  * (The DAO read/write suites are appended in the same file by Plan 11-02 Task 2.)
  */
 import { beforeEach, describe, expect, it } from "vitest";
+import {
+  type AppSettings,
+  getAppSettings,
+  updateAppSettings,
+} from "@/db/app-settings-dao";
 import { nodeSqliteExecutor, openTestDb } from "@/db/__testkit__/node-sqlite";
 import { migration001 } from "@/db/migrations/001-initial";
 import { migration002 } from "@/db/migrations/002-app-settings";
@@ -133,5 +138,161 @@ describe("migration 002 — app_settings (forward-only, additive)", () => {
           [NOW, NOW],
         ))(),
     ).rejects.toThrow();
+  });
+});
+
+describe("app-settings-dao — read", () => {
+  it("getAppSettings returns the seeded defaults as a typed row", async () => {
+    await migrateToV2();
+    const settings = await getAppSettings(exec);
+    const expected: AppSettings = {
+      notificationsEnabled: 0,
+      decayEnabled: 1,
+      birthdayEnabled: 1,
+      lockscreenPublic: 0,
+      deliveryHour: 9,
+      quietStartHour: 21,
+      quietEndHour: 8,
+    };
+    expect(settings).toEqual(expected);
+  });
+
+  it("throws if the id=1 row is missing (never happens post-seed, loud by design)", async () => {
+    await migrateToV2();
+    await exec.runAsync("DELETE FROM app_settings WHERE id = 1");
+    await expect((async () => getAppSettings(exec))()).rejects.toThrow();
+  });
+});
+
+describe("app-settings-dao — validated write", () => {
+  beforeEach(async () => {
+    await migrateToV2();
+  });
+
+  it("updates only the supplied fields and bumps modified_at", async () => {
+    await updateAppSettings(
+      exec,
+      { notificationsEnabled: 1, deliveryHour: 7 },
+      LATER,
+    );
+    const settings = await getAppSettings(exec);
+    expect(settings.notificationsEnabled).toBe(1);
+    expect(settings.deliveryHour).toBe(7);
+    // Untouched fields keep their seeded defaults.
+    expect(settings.quietStartHour).toBe(21);
+    expect(settings.quietEndHour).toBe(8);
+    expect(settings.decayEnabled).toBe(1);
+
+    const row = await exec.getFirstAsync<{ modified_at: string }>(
+      "SELECT modified_at FROM app_settings WHERE id = 1",
+    );
+    expect(row?.modified_at).toBe(LATER);
+  });
+
+  it("roundtrips every field", async () => {
+    await updateAppSettings(
+      exec,
+      {
+        notificationsEnabled: 1,
+        decayEnabled: 0,
+        birthdayEnabled: 0,
+        lockscreenPublic: 1,
+        deliveryHour: 6,
+        quietStartHour: 22,
+        quietEndHour: 7,
+      },
+      LATER,
+    );
+    expect(await getAppSettings(exec)).toEqual({
+      notificationsEnabled: 1,
+      decayEnabled: 0,
+      birthdayEnabled: 0,
+      lockscreenPublic: 1,
+      deliveryHour: 6,
+      quietStartHour: 22,
+      quietEndHour: 7,
+    });
+  });
+
+  it.each([
+    ["deliveryHour", -1],
+    ["deliveryHour", 24],
+    ["deliveryHour", 9.5],
+    ["deliveryHour", Number.NaN],
+    ["quietStartHour", -1],
+    ["quietStartHour", 24],
+    ["quietEndHour", 25],
+    ["quietEndHour", 3.14],
+  ])(
+    "rejects out-of-range/non-integer %s=%s before any UPDATE",
+    async (field, value) => {
+      await expect(
+        (async () =>
+          updateAppSettings(
+            exec,
+            { [field]: value } as Parameters<typeof updateAppSettings>[1],
+            LATER,
+          ))(),
+      ).rejects.toThrow();
+      // The row must be unchanged: modified_at still the seed value.
+      const row = await exec.getFirstAsync<{ modified_at: string }>(
+        "SELECT modified_at FROM app_settings WHERE id = 1",
+      );
+      expect(row?.modified_at).toBe(NOW);
+    },
+  );
+
+  it("accepts the boundary hours 0 and 23", async () => {
+    await updateAppSettings(exec, { deliveryHour: 0, quietEndHour: 23 }, LATER);
+    const settings = await getAppSettings(exec);
+    expect(settings.deliveryHour).toBe(0);
+    expect(settings.quietEndHour).toBe(23);
+  });
+
+  it("persists the canonical 0/1 toggle inputs", async () => {
+    await updateAppSettings(exec, { decayEnabled: 0, birthdayEnabled: 1 }, LATER);
+    const settings = await getAppSettings(exec);
+    expect(settings.decayEnabled).toBe(0);
+    expect(settings.birthdayEnabled).toBe(1);
+  });
+
+  it("rejects a toggle value that is neither 0 nor 1", async () => {
+    await expect(
+      (async () =>
+        updateAppSettings(exec, { decayEnabled: 2 as 0 | 1 }, LATER))(),
+    ).rejects.toThrow();
+    const row = await exec.getFirstAsync<{ decay_enabled: number }>(
+      "SELECT decay_enabled FROM app_settings WHERE id = 1",
+    );
+    expect(row?.decay_enabled).toBe(1);
+  });
+
+  it("is a no-op that still bumps modified_at when the patch is empty", async () => {
+    await updateAppSettings(exec, {}, LATER);
+    const settings = await getAppSettings(exec);
+    expect(settings.deliveryHour).toBe(9);
+    const row = await exec.getFirstAsync<{ modified_at: string }>(
+      "SELECT modified_at FROM app_settings WHERE id = 1",
+    );
+    expect(row?.modified_at).toBe(LATER);
+  });
+
+  it("never references a per-contact column (writes only app_settings)", async () => {
+    // Guard the DATA-04 recency invariant by construction: a contacts write here
+    // would be a cross-table leak. Insert a contact, snapshot last_contact,
+    // update settings, assert the contact row is byte-identical.
+    await exec.runAsync(
+      `INSERT INTO contacts (uid, name, interval_days, last_contact, created_at, modified_at)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      [newUid(), "Sam", 30, NOW, NOW, NOW],
+    );
+    const before = await exec.getFirstAsync<{ last_contact: string; modified_at: string }>(
+      "SELECT last_contact, modified_at FROM contacts WHERE name = 'Sam'",
+    );
+    await updateAppSettings(exec, { deliveryHour: 11 }, LATER);
+    const after = await exec.getFirstAsync<{ last_contact: string; modified_at: string }>(
+      "SELECT last_contact, modified_at FROM contacts WHERE name = 'Sam'",
+    );
+    expect(after).toEqual(before);
   });
 });
