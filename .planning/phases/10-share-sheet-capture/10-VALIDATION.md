@@ -1,10 +1,11 @@
 ---
 phase: 10
 slug: share-sheet-capture
-status: draft
-nyquist_compliant: false
+status: approved
+nyquist_compliant: true
 wave_0_complete: false
 created: 2026-08-16
+reconciled: 2026-08-16
 ---
 
 # Phase 10 — Validation Strategy
@@ -43,11 +44,21 @@ created: 2026-08-16
 > share-intent native wiring, the `finish()` bridge, cold-start-to-picker, and the on-device
 > grid render are Pixel/API-36 manual UAT (see Manual-Only).
 
-| Task ID | Plan | Wave | Requirement | Threat Ref | Secure Behavior | Test Type | Automated Command | File Exists | Status |
-|---------|------|------|-------------|------------|-----------------|-----------|-------------------|-------------|--------|
-| _planner fills_ | | | CAP-0x | — | | unit | `npm test` | ❌ W0 | ⬜ pending |
+Reconciled to the 6 converged plans. Node-tested plans (10-02/10-03) carry the correctness-critical
+logic + write-atomicity; the native/screen plans (10-01/04/05/06) pair static `<automated>` checks
+(tsc / biome / `check:colors` / `expo config` eval / lockfile) with **manual Pixel UAT** for on-device
+behavior. Plan-checker confirmed every task has an `<automated>` verify or is a Wave-0 node-test.
 
-*Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
+| Plan | Wave | Requirement | Primary verification | Test Type | Automated Command |
+|------|------|-------------|----------------------|-----------|-------------------|
+| 10-02 (capture-logic resolver) | 1 | CAP-02, CAP-03 | payload→display/url + `note — base` composition (all 4 payload types × note) | unit (pure, node) | `npm test` |
+| 10-03 (capture-read + capture-dao) | 1 | CAP-01, CAP-02, CAP-04 | favourites→MRU→rest read; `captureMultiAttach` (N rows, one txn, returns ids) + `captureMultiNote` (editFuelCore×N, one txn, mid-loop rollback); **no-touchpoint** (last_contact NULL) | unit (node:sqlite) | `npm test` |
+| 10-01 (native foundation) | 1 | CAP-01, CAP-03, CAP-04 | `text/plain`+scheme plugin exactly-once (`expo config` eval); lockfile committed; patch applied | static + **Pixel UAT** | `npm test` · `tsc` · `expo config --type prebuild --json` |
+| 10-04 (nav wiring / ShareIntentGate) | 2 | CAP-01, CAP-04 | single-owner reactive cold-start routing (onReady + hasShareIntent) | static + **Pixel UAT** (killed-app cold-start) | `tsc` · `check:colors` |
+| 10-05 (single-tap screen) | 3 | CAP-01, CAP-02, CAP-03 | tap→one row→confirm→return; in-flight guard; writtenRows id threading | static + **Pixel UAT** | `tsc` · `check:colors` |
+| 10-06 (multi-select / note / inline-create) | 4 | CAP-02, CAP-04 | long-press multi-select (N rows + N-note atomic via DAO); Back handler; empty-name guard; N>0 guard | static + **Pixel UAT** | `tsc` · `check:colors` |
+
+*Status tracked during execution: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
 
 ---
 
