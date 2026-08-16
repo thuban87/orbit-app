@@ -400,7 +400,25 @@ Recorded here because they bind phases that do not own them. Every planner/execu
   2. A single tap writes the fuel row immediately (`topic`/`share`, `EXTRA_SUBJECT` label with bare-URL fallback, `url` canonical), long-press multi-selects, and capture never marks a touchpoint.
   3. A user can inline-create a name-only contact (lands never-contacted); a toast confirms and Orbit returns to the source app.
 
-**Plans:** TBD
+**Plans:** 6 plans
+
+**Wave 1** *(parallel — independent: native build + correctness cores)*
+
+- [ ] 10-01-PLAN.md — Native enablement: expo-share-intent + patch-package, EXTRA_SUBJECT Kotlin patch, finish() module, text/plain plugin + scheme (CAP-01, CAP-03, CAP-04)
+- [ ] 10-02-PLAN.md — capture-logic pure resolver: payload → display/url + `note — label` composition, node-tested (CAP-02, CAP-03)
+- [ ] 10-03-PLAN.md — capture DB layer: capture-read (favourites→MRU→rest) + capture-dao (multi-attach + no-touchpoint), node-tested (CAP-01, CAP-02, CAP-04)
+
+**Wave 2** *(blocked on Wave 1)*
+
+- [ ] 10-04-PLAN.md — Share-intent → navigation wiring: ShareIntentProvider + linking + navigationRef + Capture route (CAP-01, CAP-04)
+
+**Wave 3** *(blocked on Wave 2)*
+
+- [ ] 10-05-PLAN.md — CaptureScreen core: grid picker + single-tap commit + confirmation/auto-return via finish() + route registration (CAP-01, CAP-02, CAP-03)
+
+**Wave 4** *(blocked on Wave 3)*
+
+- [ ] 10-06-PLAN.md — CaptureScreen enrichment: long-press multi-select + optional note + inline name-only create + tap-to-reveal search (CAP-02, CAP-04)
 
 ### Phase 11: Actionable Notifications
 
@@ -503,7 +521,7 @@ Recorded here because they bind phases that do not own them. Every planner/execu
 | 7. Conversational Fuel | 4/4 | Complete   | 2026-08-16 |
 | 8. Dashboard & Never-Contacted Screen | 10/10 | Complete   | 2026-08-16 |
 | 9. Compose Screen & SMS Handoff | 2/2 | Complete   | 2026-08-16 |
-| 10. Share-Sheet Capture | 0/TBD | Not started | - |
+| 10. Share-Sheet Capture | 0/6 | Planned | - |
 | 11. Actionable Notifications | 0/TBD | Not started | - |
 | 12. Home Screen Widget | 0/TBD | Not started | - |
 | 13. Orrery | 0/TBD | Not started | - |
