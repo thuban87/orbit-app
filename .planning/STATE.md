@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-current_phase: 12
-current_phase_name: Home Screen Widget
-status: passed
-stopped_at: Phase 13 UI-SPEC approved
-last_updated: "2026-08-17T18:56:44.120Z"
+current_phase: 13
+current_phase_name: Orrery
+status: planned
+stopped_at: "Phase 13 (Orrery) PRE-EXECUTION COMPLETE — PAUSED before execute per owner (awaiting usage-headroom confirmation). Full pipeline done + committed locally on main (NOT pushed): smart-discuss (13-CONTEXT), UI-SPEC (checker-approved), RESEARCH, VALIDATION (Nyquist, 9 Wave-0 files), PATTERNS (18 files→analogs), 8 PLANs / 4 waves, plan-checker PASSED after 1 revision closing a REAL cross-plan blocker (rewriteRingSeq count-guard vs the sun-excluded N-1 rendered set — would break every ring_seq drag whenever a contact occupied the sun). Then a 2-cycle cross-AI convergence (codex `exec --sandbox read-only` WITHOUT the classifier-blocked bypass flag + an independent read-only Claude subagent; Claude self-review guard overridden per owner) that CONVERGED: cycle-1 = 2 codex HIGH (React Rules-of-Hooks from per-planet hooks in a map; incomplete responsive layoutMetrics) + 9 actionable → replan; cycle-2 = 2 HIGH (nullable photo→resolvePhotoUri type/fallback; never-contacted-sun null status) + Claude's check:colors test-hex build-gate bug + 4 more → replan; cycle-3 = BOTH reviewers READY-TO-EXECUTE, 0 HIGH / 0 actionable. Next: /gsd-execute-phase 13 on owner go-ahead. One owner-gated checkpoint: 13-08 is autonomous:false (desktop prebuild + Pixel device UAT + owner sign-off). NO npm-dep legitimacy checkpoint — zero new deps (Skia 2.6.2/Reanimated 4.5.1 already installed + proven by CropPhotoScreen); the only new asset is one bundled .ttf font for Skia initials. Migration 003 (adds sun_contact_id + self_sun_colour to app_settings) is the first schema change since Phase-11's 002 — forward-only, irreversible."
+last_updated: "2026-08-17T20:00:00.000Z"
 progress:
   total_phases: 16
   completed_phases: 12
-  total_plans: 85
+  total_plans: 93
   completed_plans: 85
   percent: 75
 ---
@@ -25,6 +25,20 @@ See: .planning/PROJECT.md (updated 2026-08-14)
 **Current focus:** Phase 9 — Compose Screen & SMS Handoff
 
 ## Current Position
+
+**CURRENT — Phase 13 (Orrery): PLANNED ✅ / PRE-EXECUTION COMPLETE / ⏸ PAUSED before execute** per owner (awaiting usage-headroom confirmation). The two-view Skia solar-system phase. This session ran the full pre-execution pipeline (discuss → UI-SPEC → research → validation → patterns → plan → 3-cycle cross-AI convergence) and stopped at the execute gate. All artifacts committed LOCALLY on main (NOT pushed).
+
+- **Convergence CONVERGED** — reviewers = codex `exec --sandbox read-only` WITHOUT the classifier-blocked bypass flag + an independent read-only Claude subagent (self-review guard overridden per owner). plan-checker PASSED after 1 revision closing a real cross-plan blocker (rewriteRingSeq count-guard vs the sun-excluded N-1 rendered set — would break every ring_seq drag whenever a contact occupied the sun). cycle-1: 2 codex HIGH (React Rules-of-Hooks per-planet hooks in a map → keyed OrbitBody/OrreryCanvas/SunBody; incomplete responsive geometry → shared deriveOrreryMetrics) + 9 actionable → replan. cycle-2: 2 HIGH (nullable photo→resolvePhotoUri type/fallback; never-contacted-sun null status) + Claude's real check:colors test-hex build-gate bug + 4 → replan. cycle-3: BOTH reviewers READY-TO-EXECUTE, 0 HIGH / 0 actionable.
+- **8 PLANs / 4 waves** (13-01..08). Migration 003 (adds sun_contact_id + self_sun_colour to app_settings) is the first schema change since Phase-11's 002 — forward-only + irreversible. ZERO new npm deps (Skia 2.6.2 / Reanimated 4.5.1 already installed + proven by CropPhotoScreen); the only new asset is one bundled .ttf font for the Skia initials fallback.
+- **Owner decision recorded:** sun-OCCUPANT assignment is a Settings picker (favourites → all contacts → "Me"/self), NOT an orrery long-press (owner rejected long-press as accident-prone); the ring_seq radial drag stays on the canvas. ORR-06's "assign the sun from the orrery" is intentionally relocated to Settings — do NOT mis-flag the canvas absence as a gap.
+- **Next: `/gsd-execute-phase 13` on owner go-ahead.** One owner-gated checkpoint — 13-08 (`autonomous:false`): desktop prebuild via `droid` + Pixel device UAT (render / morph / gestures / the one-off Skia `file://` decode spike / pause-on-blur / perf — Pixel-only) + owner sign-off.
+- Reviewer tooling (unchanged from Phase 12): gsd-review's built-in codex (`--dangerously-bypass-hook-trust`, classifier-blocked) + claude (`-p` Write-gap) paths are BOTH broken here — drive reviews manually (`codex exec --sandbox read-only` no bypass flag; read-only Claude subagent; aggregate into REVIEWS.md).
+
+Progress: [████████░░] 75% (12/16 phases complete; Phase 13 planned + convergence-verified, execution paused for owner usage confirmation)
+
+---
+
+_Phase-12 recap (historical — Phase 12 is COMPLETE + verified; see 12-VERIFICATION.md):_
 
 Phase: 12 (Home Screen Widget) — COMPLETE ✅ / verification passed (on-device UAT, 2026-08-17). All 8 plans executed (893/893 node tests); plan-checker PASSED + a 2-cycle codex+Claude convergence fixed 8 HIGH; on-device UAT on the physical Pixel: **killed-app headless mark exactly-once verified live in the device DB (the deferred Phase-11 killed-app check is now CLOSED)**, manifest hardened (one non-exported widget BOOT_COMPLETED receiver), release tap-to-update ~0.6s (50× under budget), deep-links + renders green, and owner-driven polish (the "Message" truncation + default-4×2-renders-large breakpoint) rebuilt + verified on device. Owner-accepted follow-up device-checks (NOT blockers, Phase-11-style): the reboot-receiver refresh (owner's phone) + the grid-capacity/bitmap ceiling. Two OUT-OF-SCOPE findings recorded (see 12-VERIFICATION.md): no direct "add another contact" UI path (pre-existing Phase-8/10 gap) + a debug-DB-won't-load-on-release anomaly.
 Next: Phase 13 (Orrery) — NOT started. It is a large new Skia render-loop phase (its own discuss→plan→converge→execute→device-UAT cycle); awaiting owner go-ahead before beginning.
@@ -238,9 +252,9 @@ planning" sections in docs/dossier/*.md — those are the authoritative hand-off
 
 ## Session
 
-**Last session:** 2026-08-17T18:56:44.107Z
-**Stopped at:** Phase 13 UI-SPEC approved
-**Resume file:** .planning/phases/13-orrery/13-UI-SPEC.md
+**Last session:** 2026-08-17
+**Stopped at:** Phase 13 (Orrery) PRE-EXECUTION COMPLETE — ⏸ PAUSED before execute per owner (awaiting usage-headroom confirmation). Full pipeline done + committed locally on main (NOT pushed): 13-CONTEXT (smart-discuss), 13-UI-SPEC (checker-approved), 13-RESEARCH, 13-VALIDATION (Nyquist), 13-PATTERNS, 8 PLANs / 4 waves, plan-checker PASSED (after 1 revision), 3-cycle cross-AI convergence CONVERGED (codex `exec --sandbox read-only` + independent read-only Claude subagent; 0 HIGH / 0 actionable). Next: `/gsd-execute-phase 13` on owner go-ahead (13-08 is autonomous:false → device UAT + sign-off).
+**Resume file:** .planning/phases/13-orrery/13-REVIEWS.md
 
 ## Phase 4 — Closeout (2026-08-15) ✅ COMPLETE
 
