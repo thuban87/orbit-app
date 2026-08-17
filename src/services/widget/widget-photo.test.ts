@@ -85,8 +85,9 @@ describe("encodeWidgetThumb", () => {
   it("returns null when saveAsync resolves with an undefined base64 (never …base64,undefined)", async () => {
     h.cfg = { saveBase64: undefined };
     const out = await encodeWidgetThumb("avatars/contact-1.jpg");
+    // Strict null (the initials-fallback signal): if the guard regressed and
+    // emitted "data:image/jpeg;base64,undefined", this would be that string.
     expect(out).toBeNull();
-    expect(out).not.toContain("undefined");
   });
 
   it("returns null when saveAsync resolves with an empty base64 string", async () => {
