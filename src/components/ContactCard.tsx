@@ -9,8 +9,8 @@
  *
  * LOCKED content contract (08-UI-SPEC § Card Content Contract): Avatar
  * (recyclingKey=contactId + cacheBust=modified_at — an anti-face-flash CORRECTNESS
- * requirement in the recycling FlatList, NOT an optimization), a status-ring
- * placeholder keyed to the band, the name (one line), the ranked fuel line OR a
+ * requirement in the recycling FlatList, NOT an optimization), a status ring
+ * coloured + weighted by the band, the name (one line), the ranked fuel line OR a
  * fuel-match snippet, a category label (hidden when null), and a favourite marker.
  *
  * NOTHING LOG-DERIVED (04-log D/G): no recency string, no "N days ago", no channel
@@ -19,11 +19,13 @@
  *
  * FLAGGED owner decisions (owner's bucket — executor must NOT invent hexes or
  * binding taste; see 08-UI-SPEC § Owner Decisions Required):
- *   - OD-1 status-ring band tokens: `stable`/`wobble`/`decay` have NO colour token
- *     today (only `rogue` exists). This ships a TOKEN-CLEAN placeholder —
- *     shape/opacity over existing tokens (`rogue`/`textSecondary`/`border`) plus an
- *     `accessibilityLabel` naming the status so uiautomator UAT asserts it without
- *     colour inspection. The coloured-band variant is the owner's call.
+ *   - OD-1 status-ring band tokens: RESOLVED 2026-08-16 — the owner approved the
+ *     shared `statusStable`/`statusWobble`/`statusDecay` tokens (joining `rogue`),
+ *     seeded in `theme-presets`. The opacity-only placeholder is RETIRED: the ring
+ *     now carries the real status colour + an escalating border WEIGHT (redundant
+ *     CVD channel) via the pure `ringVisual()` helper, with the
+ *     `accessibilityLabel` still naming the status so uiautomator UAT asserts it
+ *     without colour inspection.
  *   - OD-2 favourite marker: a provisional `accent` star (owner may swap in a
  *     dedicated favourite token / glyph).
  *   - OD-4 category chip: `surfaceElevated` + `textSecondary`, no per-category token.
@@ -40,6 +42,11 @@ import { Avatar } from "@/components/Avatar";
 import { RankedFuelLine } from "@/components/RankedFuelLine";
 import type { ProfileStatus } from "@/db/contact-status-read";
 import { useTheme } from "@/theme";
+import { ringVisual } from "./contact-card-ring";
+
+// Re-export the pure ring mapping so it is "exported from ContactCard" for app
+// consumers; unit tests import the RN-free `./contact-card-ring` module directly.
+export { ringVisual } from "./contact-card-ring";
 
 export interface ContactCardProps {
   /** The contact's id — feeds the Avatar recyclingKey, the testIDs, and onPress. */
@@ -99,21 +106,11 @@ export function ContactCard({
 }: ContactCardProps) {
   const { colors } = useTheme();
 
-  // OD-1 placeholder ring: rogue reads the one existing status token; the three
-  // bands (and the neutral never-contacted state) differentiate ONLY by
-  // shape/opacity over existing tokens. NO band hex is invented here — the
-  // coloured-band variant is the owner's decision (check:colors bars a literal).
-  const ringColor = status === "rogue" ? colors.rogue : colors.textSecondary;
-  const ringOpacity =
-    status === "rogue"
-      ? 1
-      : status === "decay"
-        ? 0.9
-        : status === "wobble"
-          ? 0.6
-          : status === "stable"
-            ? 0.35
-            : 0.2; // null / never-contacted → faint neutral
+  // Real status ring (OD-1 placeholder retired, owner-approved 2026-08-16): the
+  // shared status tokens carry the primary colour signal, escalating border
+  // WEIGHT is the redundant CVD channel, and opacity now only fades the
+  // never-contacted neutral. All colours resolve through useTheme().colors.*.
+  const ring = ringVisual(status, colors);
 
   return (
     <Pressable
@@ -134,15 +131,16 @@ export function ContactCard({
           size={48}
           cacheBust={modifiedAt}
         />
-        {/* OD-1 token-clean status ring (placeholder). */}
+        {/* Status ring — real colour + escalating weight (OD-1 retired). */}
         <View
           testID={`dashboard-card-status-${contactId}`}
           accessibilityLabel={statusLabel(status)}
           style={[
             styles.statusRing,
             {
-              borderColor: ringColor,
-              opacity: ringOpacity,
+              borderColor: ring.color,
+              borderWidth: ring.width,
+              opacity: ring.opacity,
               backgroundColor: colors.surface,
             },
           ]}
