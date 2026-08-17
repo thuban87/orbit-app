@@ -1,7 +1,8 @@
 ---
 phase: 13
 slug: orrery
-status: draft
+status: approved
+reviewed_at: 2026-08-17
 shadcn_initialized: false
 preset: none
 created: 2026-08-17
@@ -226,11 +227,11 @@ Both reuse the shipped row chrome (`surface` fill, `border`, `borderRadius 10`, 
 
 ## Checker Sign-Off
 
-- [ ] Dimension 1 Copywriting: PASS
-- [ ] Dimension 2 Visuals: PASS
-- [ ] Dimension 3 Color: PASS
-- [ ] Dimension 4 Typography: PASS
-- [ ] Dimension 5 Spacing: PASS
-- [ ] Dimension 6 Registry Safety: PASS
+- [x] Dimension 1 Copywriting: PASS
+- [x] Dimension 2 Visuals: PASS
+- [x] Dimension 3 Color: PASS
+- [x] Dimension 4 Typography: FLAG (non-blocking — 5 sizes / 3 weights, all inherited verbatim from shipped chrome with cited sources; no new scale introduced)
+- [x] Dimension 5 Spacing: PASS
+- [x] Dimension 6 Registry Safety: PASS
 
-**Approval:** pending
+**Approval:** approved 2026-08-17 (gsd-ui-checker — 5 PASS, 1 non-blocking FLAG; reuse claims verified against source)
