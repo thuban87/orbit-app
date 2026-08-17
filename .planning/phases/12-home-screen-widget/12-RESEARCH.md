@@ -463,9 +463,9 @@ export function registerWidgetSweep() { registerSweepHook(pushWidgetUpdate); }
 
 ## Open Questions
 
-1. **`orbit://` "Log" target** — see Pitfall 7 / A2. Recommendation: route to Profile; confirm with owner at planning.
-2. **Boot-receiver mechanism** — does the config plugin register a `BOOT_COMPLETED` receiver, or is a small custom plugin needed? Resolve during native enablement (Wave 1) on the desktop prebuild; the library exposes the native `RNWidgetJsCommunication#requestWidgetUpdate` entry, so the JS side is settled — only the receiver wiring is open.
-3. **Grid capacity per size bucket** — device spike on the physical Pixel (unquantifiable elsewhere).
+1. **`orbit://` "Log" target** — RESOLVED (pending owner ratification). Accepted default: "Log" → `orbit://contact/{id}` → **Profile** (reuses the existing route + the one-tap log there). This is a product/UX call in the owner's bucket, so it is recorded in 12-05 as an explicit owner-ratification item (confirm Profile / redirect at execution), NOT an implicit planner decision. See Pitfall 7 / A2.
+2. **Boot-receiver mechanism** — RESOLVED at device time. Plan 12-08 Task 1 writes + registers a CONCRETE native `BroadcastReceiver` (Kotlin/Java) via a config plugin (withDangerousMod + withAndroidManifest) whose `onReceive` calls `RNWidgetJsCommunication#requestWidgetUpdate(context, "OrbitFavourites")`; the plugin also asserts it does not duplicate a receiver the library already registers. Exact class/method confirmed against `node_modules` at the desktop prebuild.
+3. **Grid capacity per size bucket** — RESOLVED at device time. Device spike on the physical Pixel (12-08 UAT), unquantifiable elsewhere; tunes THUMB_PX / grid-capacity / the small↔large dp breakpoint.
 
 ## Environment Availability
 
