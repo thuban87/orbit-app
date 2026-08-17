@@ -155,16 +155,30 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       widgetConfig,
     ];
 
+    // Phase-12 home-screen widget boot re-push (Plan 12-08, WDG-03). A LOCAL
+    // config plugin (referenced by relative path; Expo resolves the .js) that,
+    // at prebuild, WRITES a concrete native Kotlin BroadcastReceiver
+    // (OrbitWidgetBootReceiver) into the app package + registers a single
+    // non-exported BOOT_COMPLETED receiver + the RECEIVE_BOOT_COMPLETED
+    // permission. It is a SEPARATE native path from the foreground refresh
+    // sweep: Android 15 greys a force-stopped/rebooted widget until launch, and
+    // the cold-boot receiver re-arms placed widgets before any launch. Ordered
+    // AFTER the widget plugin so the OrbitFavourites provider exists first. A
+    // bare-string local-path entry — deduped by name below like the tuples.
+    const bootReceiverPlugin = "./plugins/withWidgetBootReceiver";
+
     return [
       ...stringPlugins.filter(
         (p) =>
           pluginName(p) !== "expo-image-picker" &&
           pluginName(p) !== "expo-share-intent" &&
-          pluginName(p) !== "react-native-android-widget",
+          pluginName(p) !== "react-native-android-widget" &&
+          pluginName(p) !== bootReceiverPlugin,
       ),
       pickerPlugin,
       shareIntentPlugin,
       widgetPlugin,
+      bootReceiverPlugin,
     ];
   })(),
 });
