@@ -16,6 +16,7 @@ import { getExecutor, openAndMigrate } from "@/db/database";
 import { navigationRef, ShareIntentGate } from "@/navigation/linking";
 import { NotificationResponseGate } from "@/navigation/notification-gate";
 import { RootNavigator } from "@/navigation/RootNavigator";
+import { WidgetLinkingGate } from "@/navigation/widget-linking";
 import { registerFieldSweep } from "@/services/field-sweep";
 import { installSweepTrigger } from "@/services/launch-sweep";
 // Module-scope side-effect import (Pitfall P5): importing headless-task RUNS its
@@ -29,6 +30,7 @@ import "@/services/notifications/headless-task";
 import { FOREGROUND_NOTIFICATION_BEHAVIOR } from "@/services/notifications/notification-ids";
 import { registerNotificationScheduleSweep } from "@/services/notifications/notification-schedule";
 import { registerPhotoReconcileSweep } from "@/services/photos/photo-reconcile-sweep";
+import { registerWidgetSweep } from "@/services/widget/widget-refresh";
 import { ThemeProvider, useTheme } from "@/theme";
 import { Logger } from "@/utils/logger";
 
@@ -79,6 +81,12 @@ let photoReconcileRegistered = false;
 // the reconcile fires once per real foreground launch — never at import, never on a
 // headless tap (T-11-SWEEP).
 let notificationScheduleRegistered = false;
+// One-shot guard for the widget foreground-refresh hook (WDG-03), on the SAME
+// registry and under the SAME re-entrancy reasoning. Registered ready-gated so the
+// widget recompute fires once per real foreground launch — never at import, never
+// on a headless tap (this is a foreground SweepHook; the headless tap path never
+// reaches the sweep runner).
+let widgetSweepRegistered = false;
 
 function AppShell() {
   const { colors } = useTheme();
@@ -136,6 +144,16 @@ function AppShell() {
     if (!notificationScheduleRegistered) {
       registerNotificationScheduleSweep(getExecutor);
       notificationScheduleRegistered = true;
+    }
+    // Register the widget foreground-refresh recompute (WDG-03) on the SAME
+    // registry, once only, BEFORE the trigger fires its cold-start sweep — so a
+    // real foreground launch recomputes + re-pushes every placed OrbitFavourites
+    // instance (no polling). registerWidgetSweep plugs pushWidgetUpdate into the
+    // launch-sweep registry; it is a FOREGROUND SweepHook and is never reached
+    // from the headless tap path.
+    if (!widgetSweepRegistered) {
+      registerWidgetSweep();
+      widgetSweepRegistered = true;
     }
 
     // item 6 / A1: AWAIT channels + the action category into existence BEFORE the
@@ -208,6 +226,12 @@ function AppShell() {
           on the SAME reactive navReady flag as ShareIntentGate so a tap routes the
           moment the navigator settles (body taps queued until ready). */}
       <NotificationResponseGate isReady={navReady} />
+      {/* Render-null gate: owns its own Linking url listener + cold-start
+          getInitialURL read, resolves through the strict orbit:// allow-list
+          (12-04), and is keyed on the SAME reactive navReady flag as the other
+          gates so a widget deep link routes the moment the navigator settles
+          (pre-ready intents queue in the gate and flush on navReady). */}
+      <WidgetLinkingGate isReady={navReady} />
       <RootNavigator />
     </NavigationContainer>
   );
