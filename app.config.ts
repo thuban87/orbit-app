@@ -1,4 +1,10 @@
 import type { ConfigContext, ExpoConfig } from "expo/config";
+// Type-only import (fully erased at evaluation — no runtime `require`, so it
+// does NOT trip the tsx/cjs loader hazard the display-name comment below warns
+// about). Sources the widget config-plugin param shape from the INSTALLED
+// react-native-android-widget@0.22.0 types (config-plugin.type.d.ts), so the
+// widgetConfig below is checked against the library's real contract.
+import type { WithAndroidWidgetsParams } from "react-native-android-widget";
 // Import the display name from JSON (NOT from `src/constants/app.ts`). Expo
 // evaluates this config in Node via its own TS-stripping loader, which can
 // `require` a `.json` natively but NOT a `.ts` — importing a `.ts` here would
@@ -7,6 +13,47 @@ import type { ConfigContext, ExpoConfig } from "expo/config";
 // name a single source shared with the app without any hook. A rename is a
 // one-line edit in app-name.json, DECOUPLED from the install-locked package id.
 import appName from "./src/constants/app-name.json";
+
+// Phase-12 home-screen widget (Plan 12-02, WDG-01/02/03). The single net-new
+// native dependency `react-native-android-widget` ships an Expo config plugin
+// (referenced by the bare package name; Expo resolves its app.plugin.js) that
+// consumes this `WithAndroidWidgetsParams` object and, at PREBUILD (12-08, on
+// the desktop pipeline), generates the AppWidgetProvider + widget-info XML.
+// NOTHING renders yet — this plan only makes the dependency + config available
+// locally so the later native-surface slices (12-05..12-08) typecheck against
+// the library.
+//
+// TUNABLES (owner-adjustable, tuned on the Pixel in 12-08): the resize bounds
+// (min/max) and target cell span. `updatePeriodMillis: 0` is EVENT-PUSH ONLY
+// (WDG-03) — never raise it above 0: the library floors any positive value at
+// 30 min and the OS Doze-throttles it. Orbit pushes updates via
+// requestWidgetUpdate on data change, so polling is unnecessary and battery-
+// hostile.
+//
+// `name: "OrbitFavourites"` is the CONTRACT string every later
+// requestWidgetUpdate / requestPinWidget / registerWidgetTaskHandler call must
+// reference verbatim. `previewImage` is intentionally OMITTED — no committed
+// preview asset exists yet and a missing asset path fails prebuild; polish can
+// come later. Prop names/casing verified against the installed 0.22.0
+// config-plugin.type.d.ts (resizeMode / maxResizeWidth / maxResizeHeight).
+const widgetConfig: WithAndroidWidgetsParams = {
+  widgets: [
+    {
+      name: "OrbitFavourites",
+      label: "Orbit — Favourites",
+      description: "Your favourite people, at a glance.",
+      minWidth: "250dp",
+      minHeight: "110dp",
+      targetCellWidth: 4,
+      targetCellHeight: 2,
+      // Resize contract (WDG-03 — "one resizable widget").
+      resizeMode: "horizontal|vertical",
+      maxResizeWidth: "360dp",
+      maxResizeHeight: "220dp",
+      updatePeriodMillis: 0,
+    },
+  ],
+};
 
 // Functional config form: MERGES the template's app.json (preserving its
 // icon/splash/adaptive-icon references) and layers Orbit's fields on top.
@@ -96,14 +143,28 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       { androidIntentFilters: ["text/plain"] },
     ];
 
+    // Phase-12 home-screen widget (Plan 12-02, WDG-01/02/03). TUPLE of the
+    // config-plugin name (bare package name; Expo resolves app.plugin.js) + the
+    // widgetConfig declared at top-of-config. Like the picker/share tuples this
+    // is a distinct Set member from a bare string, so it is filtered out by name
+    // below and appended exactly once (the 01-01 duplicate-plugin prebuild
+    // hazard). A bare "react-native-android-widget" string would carry NO widget
+    // definition and prebuild would generate no widget provider.
+    const widgetPlugin: [string, WithAndroidWidgetsParams] = [
+      "react-native-android-widget",
+      widgetConfig,
+    ];
+
     return [
       ...stringPlugins.filter(
         (p) =>
           pluginName(p) !== "expo-image-picker" &&
-          pluginName(p) !== "expo-share-intent",
+          pluginName(p) !== "expo-share-intent" &&
+          pluginName(p) !== "react-native-android-widget",
       ),
       pickerPlugin,
       shareIntentPlugin,
+      widgetPlugin,
     ];
   })(),
 });
