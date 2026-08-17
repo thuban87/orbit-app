@@ -1,245 +1,184 @@
 ---
 phase: 12
 reviewers: [codex]
-reviewed_at: 2026-08-17T05:52:02Z
+reviewed_at: 2026-08-17T06:45:49Z
 plans_reviewed: [12-01-PLAN.md, 12-02-PLAN.md, 12-03-PLAN.md, 12-04-PLAN.md, 12-05-PLAN.md, 12-06-PLAN.md, 12-07-PLAN.md, 12-08-PLAN.md]
+review_cycle: 2
 ---
 
-# Cross-AI Plan Review — Phase 12
+# Cross-AI Plan Review — Phase 12 (Home Screen Widget)
+
+Cycle-2 review of the revised plans (commit cca05d9). Codex re-reviewed all 8 revised
+PLAN.md files independently, source-grounded against the live working tree.
 
 ## Codex Review
 
 ## Summary
 
-The plan is well-researched and correctly reuses the strongest existing seams: dashboard projection, DAO-only recency writes, launch-sweep gating, and notification-style navigation. However, three gaps currently prevent it from fully achieving WDG-03 and the preferred responsive-widget design: no event-push publishers are planned, resize is neither configured nor rendered by size, and the native boot-receiver implementation is underspecified.
+The plan is well researched and correctly reuses the right primitives: the favourites dashboard projection, the single-writer touchpoint DAO, the existing navigation-reset model, and the launch-sweep registry. The main release blocker is WDG-03 freshness: Plan 12-07 misses several real widget-visible writes, and its reorder hook is placed after a `load()` that only runs on failure. Fix that coverage before execution; otherwise the widget will visibly stale after normal edits.
 
-## 12-01 — Status palette / ContactCard
+## Plan-by-plan review
 
-**Summary:** Sound, low-risk foundation work that upgrades an explicitly temporary implementation.
-
-**Strengths**
-
-- It correctly replaces the existing opacity-only ring at [ContactCard.tsx](/home/bwales/projects/orbit-app/src/components/ContactCard.tsx:102) while preserving the existing status label and test ID at [ContactCard.tsx](/home/bwales/projects/orbit-app/src/components/ContactCard.tsx:139).
-- The palette extension matches the current token model: `rogue` is a flat palette field at [theme-types.ts](/home/bwales/projects/orbit-app/src/theme/theme-types.ts:66), and colour literals are already centralized in [theme-presets.ts](/home/bwales/projects/orbit-app/src/theme/theme-presets.ts:35).
-
-**Concerns**
-
-- **MEDIUM:** There is no ContactCard test today, and the proposed command masks test failures: `vitest … || tsc` succeeds if Vitest fails but TypeScript passes. `rg` finds theme tests but no ContactCard coverage.
-
-**Suggestions**
-
-- Add a pure `ringVisual(status, colors)` helper with unit coverage for colour, opacity, and width; update [theme-presets.test.ts](/home/bwales/projects/orbit-app/src/theme/theme-presets.test.ts:91) to assert the three new tokens.
-
-**Risk assessment:** LOW after fixing the test command.
-
-## 12-02 — Dependency and config plugin
-
-**Summary:** The human legitimacy gate and tuple-aware plugin insertion are appropriate, but the configuration does not actually guarantee a resizable widget.
+### 12-01 — Palette and ContactCard
 
 **Strengths**
 
-- The plan correctly respects the existing name-based tuple handling in [app.config.ts](/home/bwales/projects/orbit-app/app.config.ts:57).
-- The dependency is genuinely new; it is absent from [package.json](/home/bwales/projects/orbit-app/package.json:5), so the approval checkpoint is justified.
+- Correctly replaces the current opacity-only status signal: the card currently uses `textSecondary` except for rogue and differentiates stable/wobble/decay only by opacity. [`ContactCard.tsx:102`](</home/bwales/projects/orbit-app/src/components/ContactCard.tsx:102>)
+- The proposed tokens belong on the flat `ThemePalette`, alongside the existing `rogue` token. [`theme-types.ts:29`](</home/bwales/projects/orbit-app/src/theme/theme-types.ts:29>) [`theme-types.ts:66`](</home/bwales/projects/orbit-app/src/theme/theme-types.ts:66>)
 
 **Concerns**
 
-- **HIGH:** The plan runs `npx expo install react-native-android-widget` without pinning `0.22.0`. A later release can change the API validated by the research.
-- **HIGH:** `widgetConfig` has min dimensions but no `resizeMode`, `maxResizeWidth`, or `maxResizeHeight`. The library’s verified resize contract requires these manifest bounds, and resize events supply the dimensions needed to choose a layout ([platform-library.md](/home/bwales/projects/orbit-app/docs/dossier/workpapers/12-widget/platform-library.md:56)).
+- **MEDIUM:** The specified helper type is invalid: `ThemePalette["colors"]`. `ThemePalette` is itself the colour object; only `ResolvedTheme` has `.colors`. This would fail typecheck if implemented literally. [`theme-types.ts:29`](</home/bwales/projects/orbit-app/src/theme/theme-types.ts:29>) [`theme-provider.tsx:33`](</home/bwales/projects/orbit-app/src/theme/theme-provider.tsx:33>)
 
-**Suggestions**
+**Suggestion**
 
-- Install the reviewed artifact explicitly: `npx expo install react-native-android-widget@0.22.0`.
-- Define the resize bounds/mode in this plan, even if the exact breakpoint is tuned on Pixel later.
+- Specify `colors: ThemePalette` (or `ResolvedTheme["colors"]`), and import it type-only.
 
-**Risk assessment:** HIGH until responsive configuration and version pinning are added.
-
-## 12-03 — Thumbnail encoder and headless colours
-
-**Summary:** The architecture is correct: square masters, base64-only output, and palette resolution without a provider.
+### 12-02 — Native dependency/config
 
 **Strengths**
 
-- The encoder properly builds on the chainable image API already used by [photo-pipeline.ts](/home/bwales/projects/orbit-app/src/services/photos/photo-pipeline.ts:83).
-- Resolving the stored path through [resolvePhotoUri](/home/bwales/projects/orbit-app/src/services/photos/photo-storage.ts:130) preserves the existing safe-relative-path boundary.
-- The status source is consistent with the database’s derived bands at [status.ts](/home/bwales/projects/orbit-app/src/db/status.ts:67).
+- The human install checkpoint is appropriate.
+- It correctly follows the existing plugin-name dedupe pattern rather than appending a duplicate bare-string plugin. [`app.config.ts:57`](</home/bwales/projects/orbit-app/app.config.ts:57>)
 
 **Concerns**
 
-- **MEDIUM:** The proposed test only mocks `expo-image-manipulator`; importing `resolvePhotoUri` also loads native `expo-file-system`. Existing tests explicitly mock that dependency, e.g. [photo-storage.test.ts](/home/bwales/projects/orbit-app/src/services/photos/photo-storage.test.ts:26).
+- **LOW:** The package is not currently installed, so its config-property names cannot be verified from this checkout; `package.json` has no widget dependency. [`package.json:5`](</home/bwales/projects/orbit-app/package.json:5>)
 
-**Suggestions**
+**Suggestion**
 
-- Mock `@/services/photos/photo-storage` in `widget-photo.test.ts`, not just the manipulator.
-- Make thumbnail encode failures recoverable in the renderer, not fatal to the entire widget.
+- Keep the existing “inspect installed types before writing config” step, and add a post-install assertion that the plugin export itself is resolvable before downstream plans begin.
 
-**Risk assessment:** LOW.
-
-## 12-04 — Tile data and widget linking
-
-**Summary:** The data shaping is strong, but the favourites deep link violates the stated Back-to-dashboard contract.
+### 12-03 — Thumbnail and headless colours
 
 **Strengths**
 
-- It correctly uses `listDashboard`, whose favourite branch preserves manual rank and includes never-contacted/snoozed favourites ([dashboard-read.ts](/home/bwales/projects/orbit-app/src/db/dashboard-read.ts:166)).
-- It preserves `status` rather than re-deriving it; the row type explicitly permits `null` for never-contacted contacts ([dashboard-read.ts](/home/bwales/projects/orbit-app/src/db/dashboard-read.ts:73).
-- A pure strict resolver mirrors the existing notification resolver pattern at [notification-nav.ts](/home/bwales/projects/orbit-app/src/services/notifications/notification-nav.ts:27).
+- Reuses the correct photo storage boundary: persisted photos are relative paths resolved to `file://` only locally. [`photo-storage.ts:125`](</home/bwales/projects/orbit-app/src/services/photos/photo-storage.ts:125>)
+- The chosen manipulator API is the same chainable API used by the shipped photo pipeline. [`photo-pipeline.ts:83`](</home/bwales/projects/orbit-app/src/services/photos/photo-pipeline.ts:83>)
 
 **Concerns**
 
-- **HIGH:** The plan says every accepted URI resets onto `[Home, target]`, but `orbit://favourites` returns `navigate("ManageFavourites")`. Under the existing `singleTask` concern, this can leave Back returning to an arbitrary prior route rather than Home. The notification implementation uses `reset` specifically to prevent that ([notification-gate.tsx](/home/bwales/projects/orbit-app/src/navigation/notification-gate.tsx:82).
-- **LOW:** The resolver is typed `url: string` while its security contract promises to reject non-strings. Accept `unknown` if that guard is meant to be real and testable.
+- **MEDIUM:** `saveAsync({ base64: true })` is typed as returning `base64?: string`; the plan assumes it is always present. A malformed native result would produce a `data:image/jpeg;base64,undefined` URI rather than the intended initials fallback. [`ImageManipulator.types.d.ts:18`](</home/bwales/projects/orbit-app/node_modules/expo-image-manipulator/build/ImageManipulator.types.d.ts:18>)
 
-**Suggestions**
+**Suggestion**
 
-- Make the favourites result a reset: `[Home, ManageFavourites]`, index `1`.
-- Add query/fragment, port, encoded-path, negative-ID, and oversized-ID cases to the resolver tests.
+- Guard `typeof result.base64 === "string" && result.base64.length > 0`; log and return `null` otherwise. Add that case to `widget-photo.test.ts`.
 
-**Risk assessment:** MEDIUM; HIGH for the empty-widget navigation path until reset is fixed.
-
-## 12-05 — Mark seam and RemoteViews tree
-
-**Summary:** The DAO seam is excellent; the rendering plan lacks size selection and per-avatar fault isolation.
+### 12-04 — Tile shaping and deep links
 
 **Strengths**
 
-- It uses the only correct write path: [recordTouchpoint](/home/bwales/projects/orbit-app/src/db/recency-dao.ts:215) performs the interaction insert and recency recomputation in one transaction.
-- New UIDs are appropriate: `interactions.uid` is unique ([001-initial.ts](/home/bwales/projects/orbit-app/src/db/migrations/001-initial.ts:96)), so genuine repeated taps remain distinct.
-- It correctly keeps widget status data on the existing dashboard projection rather than issuing a second status query.
+- Correctly selects `listDashboard({ filter: "favourites" })`, whose favourites branch includes archived filtering, status/fuel projection, and static `favourite_rank` ordering. [`dashboard-read.ts:226`](</home/bwales/projects/orbit-app/src/db/dashboard-read.ts:226>)
+- The reset-based navigation aligns with the established notification pattern. [`notification-nav.ts:49`](</home/bwales/projects/orbit-app/src/services/notifications/notification-nav.ts:49>)
 
 **Concerns**
 
-- **HIGH:** It creates small and large layouts but `renderFavourites()` accepts no `widgetInfo`/size argument. The verified library contract provides width/height on `WIDGET_RESIZED` specifically so the handler can choose a tree ([platform-library.md](/home/bwales/projects/orbit-app/docs/dossier/workpapers/12-widget/platform-library.md:56)). As planned, one layout will be dead or all sizes will render identically.
-- **MEDIUM:** A single missing/corrupt photo makes `encodeWidgetThumb()` reject, which can fail the entire render instead of using initials. Existing photo code deliberately treats manipulation failure as a typed error ([photo-pipeline.ts](/home/bwales/projects/orbit-app/src/services/photos/photo-pipeline.ts:45)).
+- **MEDIUM:** “A sane bound” for contact IDs is unspecified. Without an explicit constant and tests at `max`/`max + 1`, the strict-parser claim is not reproducible.
+- **LOW:** The default grid-capacity constant and size-bucket capacities risk becoming two competing tuning sources.
 
-**Suggestions**
+**Suggestion**
 
-- Pass a size bucket from the task handler to `renderFavourites`, and select both capacity and small/large layout there.
-- Catch thumbnail failures per tile, log them, and render the themed initials fallback.
+- Define `MAX_WIDGET_CONTACT_ID = Number.MAX_SAFE_INTEGER` (or a documented tighter product bound) and test it.
+- Make `pickLayout()` the sole owner of capacity, or have it consume a named capacity map from `widget-data.ts`.
 
-**Risk assessment:** HIGH until resize routing is implemented.
-
-## 12-06 — Headless handler and refresh wrapper
-
-**Summary:** The headless DB bootstrap and sweep isolation are correctly designed, but freshness is only a helper—not a wired feature.
+### 12-05 — Mark seam and render tree
 
 **Strengths**
 
-- The ordering `openAndMigrate()` before `getExecutor()` matches the current hard requirement: `getExecutor()` throws before open ([database.ts](/home/bwales/projects/orbit-app/src/db/database.ts:120).
-- The plan correctly avoids executing the sweep in headless code; importing the sweep module is inert by design ([launch-sweep.ts](/home/bwales/projects/orbit-app/src/services/launch-sweep.ts:10).
-- The launch hook follows the current registry model ([launch-sweep.ts](/home/bwales/projects/orbit-app/src/services/launch-sweep.ts:45).
+- The mark seam correctly delegates to `recordTouchpoint`, which writes the interaction and recomputes `last_contact` inside the shared transaction path. [`recency-dao.ts:215`](</home/bwales/projects/orbit-app/src/db/recency-dao.ts:215>)
+- New UUIDs are appropriate for genuine repeated taps; `newUid()` is explicitly designed to produce a fresh UUID per call. [`uid.ts:14`](</home/bwales/projects/orbit-app/src/db/uid.ts:14>)
+- Per-tile image fallback is a sound containment boundary.
 
 **Concerns**
 
-- **HIGH:** Nothing calls `pushWidgetUpdate()` after ordinary foreground mutations. For example, manual logging only calls `load()` after `recordTouchpoint` ([ContactProfileScreen.tsx](/home/bwales/projects/orbit-app/src/screens/ContactProfileScreen.tsx:235)); favourite changes only call `load()` ([ContactProfileScreen.tsx](/home/bwales/projects/orbit-app/src/screens/ContactProfileScreen.tsx:285)); fuel mutations likewise only reload the screen ([ContactProfileScreen.tsx](/home/bwales/projects/orbit-app/src/screens/ContactProfileScreen.tsx:464)). This fails WDG-03’s event-push requirement.
+- **HIGH:** The plan treats the 30-second mark budget as “one SQLite write,” but the handler then re-renders every placed widget and re-encodes thumbnails. The library evidence says the handler has a hard 30-second budget and that each render is an off-screen bitmap operation. [`platform-library.md:72`](</home/bwales/projects/orbit-app/docs/dossier/workpapers/12-widget/platform-library.md:72>) [`platform-library.md:121`](</home/bwales/projects/orbit-app/docs/dossier/workpapers/12-widget/platform-library.md:121>)
+- **MEDIUM:** The physical UAT covers favourite capacity but not multiple simultaneously placed widget instances, which is the multiplier for this render cost.
 
-**Suggestions**
+**Suggestion**
 
-- Add a dedicated freshness task/plan that defines all publishers: create/edit/archive/restore/purge, photo changes, favourite toggle/reorder, fuel mutations, foreground mark, capture, and widget mark.
-- Prefer a centralized post-commit notification seam over manually remembering every screen call site; use fire-and-forget logging so a widget-render failure never rolls back a successful user write.
+- Add a headless timing budget: render the tapped widget directly with the supplied `renderWidget`, then make any all-instance refresh best-effort/coalesced.
+- Add a device UAT with two placed widget instances and photo-bearing favourites; record elapsed tap-to-update time.
 
-**Risk assessment:** HIGH until event publishers are planned and tested.
-
-## 12-07 — App mounting and Settings CTA
-
-**Summary:** Integration follows established gates, but it inherits the unresolved freshness and favourites-back-stack issues.
+### 12-06 — Handler and refresh wrapper
 
 **Strengths**
 
-- Mounting beside the existing gates is appropriate: the navigation container already uses a reactive `navReady` flag ([App.tsx](/home/bwales/projects/orbit-app/App.tsx:205)).
-- Registering the sweep before `installSweepTrigger` is correct; current hooks are registered in exactly that order ([App.tsx](/home/bwales/projects/orbit-app/App.tsx:115)).
-- The Settings screen already has themed row conventions and error logging to reuse ([SettingsScreen.tsx](/home/bwales/projects/orbit-app/src/screens/SettingsScreen.tsx:70)).
+- Correctly recognizes that a failing sweep hook would abort the unisolated hook loop. [`launch-sweep.ts:71`](</home/bwales/projects/orbit-app/src/services/launch-sweep.ts:71>)
+- `openAndMigrate()` must precede `getExecutor()` in headless code; the latter throws before initialization. [`database.ts:95`](</home/bwales/projects/orbit-app/src/db/database.ts:95>) [`database.ts:136`](</home/bwales/projects/orbit-app/src/db/database.ts:136>)
 
 **Concerns**
 
-- **MEDIUM:** The plan has only static checks for the CTA and gate mount. It does not test a rejected `requestPinWidget`, initial URI delivery, or the queued pre-ready navigation path.
-- **MEDIUM:** It depends on 12-04’s `navigate` result for favourites, so the empty widget can still break the Back-to-dashboard promise.
+- **MEDIUM:** `Number.isInteger(contactId)` alone accepts negative and unsafe integer IDs. The URI plan is stricter, but the widget-click path should enforce the same positive/safe-ID boundary before opening SQLite.
+- **MEDIUM:** `notifyWidgetDataChanged()` has no coalescing. Rapid reorder/fuel actions can queue expensive global renders and allow an older render to land after a newer write.
 
-**Suggestions**
+**Suggestion**
 
-- Add focused tests for the pure CTA result handler and the resolver’s reset intent.
-- Add a JS-level smoke test or explicit UAT script for cold-start `orbit://` delivery.
+- Require `Number.isSafeInteger(id) && id > 0`.
+- Implement a single-flight refresh with one pending rerun, matching the launch-sweep’s established re-entrancy approach. [`launch-sweep.ts:49`](</home/bwales/projects/orbit-app/src/services/launch-sweep.ts:49>)
 
-**Risk assessment:** MEDIUM.
-
-## 12-08 — Native boot path and device UAT
-
-**Summary:** Correctly reserves device-only claims for Pixel UAT, but the native receiver is not specified enough to implement safely.
+### 12-07 — App wiring and event freshness
 
 **Strengths**
 
-- Manifest hardening checks are essential because [app.config.ts](/home/bwales/projects/orbit-app/app.config.ts:23) currently sets `allowBackup: false`.
-- The plan correctly treats the killed-app path as device-only; Phase 11 likewise records it as unverified on-device ([11-VERIFICATION.md](/home/bwales/projects/orbit-app/.planning/phases/11-actionable-notifications/11-VERIFICATION.md:15).
+- Mounting the widget gate under the existing `navReady` state is consistent with both current gates. [`App.tsx:205`](</home/bwales/projects/orbit-app/App.tsx:205>)
+- Registering the sweep before `installSweepTrigger()` is necessary because the trigger starts the cold-start sweep immediately. [`App.tsx:120`](</home/bwales/projects/orbit-app/App.tsx:120>) [`launch-sweep.ts:102`](</home/bwales/projects/orbit-app/src/services/launch-sweep.ts:102>)
 
 **Concerns**
 
-- **HIGH:** A JavaScript Expo config plugin can modify the manifest, but it cannot itself be an Android `BroadcastReceiver`. The plan must explicitly generate or add a Kotlin/Java receiver class, register it, and ensure `RECEIVE_BOOT_COMPLETED` is present. Neither exists in the current repository.
-- **MEDIUM:** The UAT conflates device boot with force-stop recovery. Android 15 disables widget PendingIntents on force-stop and re-enables widgets only after the user launches the app; `BOOT_COMPLETED` then gives the app a chance to re-register work. Test cold boot and force-stop→manual-launch as separate cases. [Android’s Android-15 behavior documentation](https://developer.android.com/about/versions/15/behavior-changes-all) confirms this distinction.
-- **MEDIUM:** The plan should verify the custom receiver does not duplicate a receiver already installed by the widget library before adding another manifest entry.
+- **HIGH:** The planned successful reorder refresh is wired to the wrong location. `ManageFavouritesScreen.persist()` calls `rewriteFavouriteRanks()` on success, but `await load()` at line 152 is inside the `catch`; there is no success-side reload/publisher point. [`ManageFavouritesScreen.tsx:140`](</home/bwales/projects/orbit-app/src/screens/ManageFavouritesScreen.tsx:140>)
+- **HIGH:** The listed mutation coverage is incomplete for widget-visible fields:
+  - Editing or confirming fuel changes the ranked widget line but is omitted. [`ContactProfileScreen.tsx:497`](</home/bwales/projects/orbit-app/src/screens/ContactProfileScreen.tsx:497>) [`ContactProfileScreen.tsx:520`](</home/bwales/projects/orbit-app/src/screens/ContactProfileScreen.tsx:520>)
+  - Editing/deleting a touchpoint changes status and `last_contact` but is omitted. [`ContactProfileScreen.tsx:392`](</home/bwales/projects/orbit-app/src/screens/ContactProfileScreen.tsx:392>) [`ContactProfileScreen.tsx:420`](</home/bwales/projects/orbit-app/src/screens/ContactProfileScreen.tsx:420>)
+  - Contact edits can change name, interval, rarely-responds, and photo-related state, but the save flow has no planned publisher. [`EditContactScreen.tsx:320`](</home/bwales/projects/orbit-app/src/screens/EditContactScreen.tsx:320>)
+  - Photo set/clear updates `contacts.photo`, yet the photo path only refreshes its local UI. [`CropPhotoScreen.tsx:267`](</home/bwales/projects/orbit-app/src/screens/CropPhotoScreen.tsx:267>) [`PhotoSourcePicker.tsx:156`](</home/bwales/projects/orbit-app/src/components/PhotoSourcePicker.tsx:156>)
+  - Archive/restore changes whether a favourite belongs in the widget, but neither is covered. [`contacts-dao.ts:420`](</home/bwales/projects/orbit-app/src/db/contacts-dao.ts:420>) [`ArchivedContactsScreen.tsx:110`](</home/bwales/projects/orbit-app/src/screens/ArchivedContactsScreen.tsx:110>)
+  - Share capture can add or edit fuel for a favourite and is also omitted. [`CaptureScreen.tsx:251`](</home/bwales/projects/orbit-app/src/screens/CaptureScreen.tsx:251>) [`CaptureScreen.tsx:410`](</home/bwales/projects/orbit-app/src/screens/CaptureScreen.tsx:410>)
 
-**Suggestions**
+**Suggestion**
 
-- Resolve the native mechanism in 12-02/12-08 Task 1 with a prebuild assertion: receiver class, action filter, exported/enabled flags, permission, and invocation of `RNWidgetJsCommunication.requestWidgetUpdate`.
-- Make the Pixel gate record two separate results: reboot receiver refresh; force-stop gray state followed by manual-launch re-arm.
+- Move the reorder publisher immediately after successful `rewriteFavouriteRanks()`.
+- Expand the plan’s mutation inventory and wire post-commit notifications for every widget-projected change: contact metadata/photo/archive/restore, all touchpoint changes, all fuel changes including capture, favourite changes, and rank reorder.
+- Add focused tests or a checklist that proves each listed mutation causes exactly one coalesced widget refresh.
 
-**Risk assessment:** HIGH until the receiver implementation is concrete.
+### 12-08 — Boot receiver and device UAT
 
-## Overall risk assessment: HIGH
+**Strengths**
 
-The phase has a strong reuse strategy and a good device-validation posture, but it is not yet complete enough to guarantee the three core promises: responsive small/large layouts, event-driven freshness, and reliable native recovery. Fix the five HIGH findings before execution; the remaining work is then a manageable device-integration risk.
+- It correctly treats native generation as necessary; a JS config plugin can generate a receiver but cannot itself receive Android broadcasts.
+- Manifest-hardening checks protect the existing `allowBackup: false` configuration. [`app.config.ts:31`](</home/bwales/projects/orbit-app/app.config.ts:31>)
+- The split between reboot recovery and force-stop/manual-launch recovery is well scoped.
+
+**Concerns**
+
+- **MEDIUM:** The proposed custom receiver is `exported="true"` and its described `onReceive` invokes the update unconditionally. That unnecessarily permits explicit third-party broadcasts to wake/render the app. The library’s own widget receiver was verified as non-exported. [`platform-onetap-write.md:269`](</home/bwales/projects/orbit-app/docs/dossier/workpapers/04-log/platform-onetap-write.md:269>)
+- **LOW:** The local verification only checks that the plugin file exists; it does not load the plugin or validate its generated manifest/source until the desktop prebuild.
+
+**Suggestion**
+
+- Generate the boot receiver as `android:exported="false"` and guard `onReceive` with an exact `BOOT_COMPLETED` action check.
+- Add a local Node smoke test that imports the config plugin and validates its manifest transform before the remote build.
+
+## Risk assessment
+
+**HIGH until Plan 12-07 is corrected.** The architecture and device-validation strategy are strong, but the currently planned event-push wiring does not meet the decided “open, edit, favourite change, mark-contacted” freshness model and has a concrete success-path error for reorder. After expanding mutation coverage, coalescing refreshes, fixing the `ThemePalette` type, and bounding the headless render cost, the remaining risk is appropriately device-gated rather than structural.
 
 ---
 
 ## Consensus Summary
 
-Only one external reviewer (Codex) was invoked for this cycle; a separate Claude reviewer runs elsewhere in the convergence loop. Codex's verdict is source-grounded (166K tokens, file:line citations traced against the live working tree). Its plan-level consensus stands on its own until the Claude review is folded in.
-
-**Overall risk: HIGH.** The phase has a strong reuse strategy (dashboard projection, DAO-only recency writes, launch-sweep gating, notification-style navigation) and a sound device-validation posture, but three core promises are not yet guaranteed by the plans as written: responsive small/large layouts, event-driven freshness (WDG-03), and reliable native boot/force-stop recovery.
+Single external reviewer this cycle (Codex, source-grounded). Overall verdict: the
+architecture is sound and reuses the correct existing primitives, but the phase is
+**HIGH risk until Plan 12-07 is corrected** — the event-freshness wiring does not yet
+deliver the decided freshness model.
 
 ### Agreed Strengths
-- Correct reuse of the strongest existing seams: `listDashboard` projection, `recordTouchpoint` single-transaction write path, launch-sweep import isolation, and the notification `reset`-navigation pattern.
-- `openAndMigrate()`-before-`getExecutor()` ordering in the headless handler matches the current hard requirement in `database.ts`.
-- Device-only claims (killed-app / boot) correctly reserved for on-device Pixel UAT, consistent with Phase 11.
+- Correct reuse of shipped primitives: favourites dashboard projection (`dashboard-read.ts:226`), single-writer touchpoint DAO (`recency-dao.ts:215`), navigation-reset pattern (`notification-nav.ts:49`), and the launch-sweep registry.
+- Headless DB ordering (`openAndMigrate()` before `getExecutor()`) and sweep-registration ordering are correct.
 
-### Agreed Concerns (HIGH — fix before execution)
-1. **12-02** — `react-native-android-widget` installed without pinning `0.22.0`; a later release can break the researched API contract.
-2. **12-02** — `widgetConfig` declares min dimensions but no `resizeMode` / `maxResizeWidth` / `maxResizeHeight`; the library's resize contract needs these manifest bounds for a resizable widget.
-3. **12-04** — `orbit://favourites` returns `navigate("ManageFavourites")` instead of a `reset` onto `[Home, ManageFavourites]`, violating the stated Back-to-dashboard contract under `singleTask`.
-4. **12-05** — `renderFavourites()` takes no `widgetInfo`/size argument, so small vs large layouts cannot be selected; one layout ends up dead or all sizes render identically.
-5. **12-06** — No `pushWidgetUpdate()` publishers are wired after foreground mutations (manual log, favourite toggle, fuel edits all only call `load()`); this fails WDG-03's event-push requirement.
-6. **12-08** — A JS Expo config plugin cannot itself be an Android `BroadcastReceiver`; the plan must generate/register a concrete Kotlin/Java receiver with `RECEIVE_BOOT_COMPLETED`. Neither exists in the repo.
+### Agreed Concerns (highest priority)
+- **12-07 (HIGH):** Reorder refresh is wired into the failure-only `catch` path — no success-side publisher after `rewriteFavouriteRanks()`.
+- **12-07 (HIGH):** Mutation coverage is incomplete — fuel edits, touchpoint edit/delete, contact edits, photo set/clear, archive/restore, and share-capture fuel all mutate widget-visible fields but publish no refresh.
+- **12-05 (HIGH):** The 30-second headless budget is treated as a single SQLite write, ignoring the per-instance off-screen bitmap render + thumbnail re-encode cost.
 
 ### Divergent Views
-None — single reviewer this cycle.
-
----
-
-## Claude Review (independent in-session subagent — cycle 1)
-
-**Reviewer:** Claude (read-only in-session subagent, second independent perspective; codex is the CLI reviewer above)
-**Verdict:** 0 HIGH, 7 actionable non-HIGH. All ~25 cited `file:line`/behavior claims verified TRUE against source on disk — zero hallucinated references. Hard invariants all correctly planned (single-writer mark, no-sweep-in-headless, base64-only, no schema, token-only render, native-dep behind blocking-human checkpoint, manifest hardening). Owner-approved status hexes used (not the declined `#F07A3D`). No DECIDED/REJECTED reversals.
-
-### Concerns
-
-**MEDIUM**
-- **M1 — Plan 01 Task 3 verify masks test failures.** `npm run check:colors && npx tsc --noEmit && npx vitest run src/components 2>/dev/null || npx tsc --noEmit` parses as `((A && B && C) || D)` — if the vitest run (C) fails, `D=tsc` runs and the whole command exits 0. A ContactCard test broken by retiring the OD-1 opacity encoding would pass the gate. **Fix:** `npm run check:colors && npx tsc --noEmit && npx vitest run src/components` (no `|| tsc` fallback, no `2>/dev/null`).
-- **M2 — One bad photo blanks the entire grid.** Plan 03 `encodeWidgetThumb` throws (PhotoPipelineError convention) on decode failure; Plan 05 render calls it per tile with NO per-tile catch → an evicted/corrupt master rejects `renderFavourites` and the whole grid fails instead of falling back to the initials swatch. **Fix:** `encodeWidgetThumb` returns `null` on decode failure (or Plan 05 wraps each encode in try/catch → initials).
-- **M3 — `pushWidgetUpdate` is an unguarded launch-sweep hook.** `runLaunchSweep` (launch-sweep.ts:82) awaits hooks with NO per-hook isolation — a rejecting hook rejects the fire-and-forget sweep (unhandled rejection; may skip later hooks). **Fix:** wrap `pushWidgetUpdate` body in try/catch + `Logger.error` so it always resolves (matches notification-actions/headless-task guard discipline).
-- **M4 — WIDGET_CLICK double-delivery backstop deferred but not gated.** Plan 05 uses `newUid()` (distinct rows, LOG-06) on assumption A1 (OS delivers click once); 12-08 Task 3 asserts "exactly one row" but nothing REQUIRES the deterministic-uid backstop if the spike shows >1. **Fix:** 12-08 Task 3 — make the deterministic-uid backstop a required, gated follow-up if the killed-app UAT yields >1 interactions row.
-- **M5 — "Log contact" → Profile is a silent product decision (OWNER'S BUCKET).** WDG-02 lists the larger tile's "Log contact"; Plan 05 maps Log (✎) → `orbit://contact/{id}` → the read-only Profile screen because no Log route exists (A2). RESEARCH Open Q1 flagged this "→ Profile recommended; confirm with owner." A button labeled "Log" that opens Profile (not a logging flow) is a UX call. **Fix:** surface as an owner decision/checkpoint, or record in Plan 05 as an explicitly accepted owner decision with rationale — not an implicit planner call.
-
-**LOW**
-- **L1 — `WIDGET_ADDED`/`WIDGET_DELETED` enum values unverified** against the installed library (RESEARCH only verified WIDGET_CLICK/UPDATE/RESIZED). Likely correct; confirm against `node_modules/react-native-android-widget` during 12-06 execution.
-- **L2 — Boot-receiver class `RNWidgetJsCommunication#requestWidgetUpdate` + 30s budget are inherited (dossier workpaper), unverified this session.** Plan 08 already hedges; just verify the exact class against `node_modules` at prebuild.
-- **L3 (optional hygiene, not counted) — headless handler transitively imports `launch-sweep`.** Safe (launch-sweep has zero module-scope side effects, :10-14; handler never calls runLaunchSweep), but Plan 06's grep checks only the handler file, not the transitive graph. Optional: split `pushWidgetUpdate` from `registerWidgetSweep`, or note the invariant rests on launch-sweep import-purity.
-
-### Current HIGH Concerns
-None.
-
-### Current Actionable Non-HIGH Concerns
-- M1: Plan 01 — drop the `|| tsc` fallback + `2>/dev/null` so a broken ContactCard test fails the task.
-- M2: Plan 03/05 — graceful per-tile photo fallback (encode returns null / render catches → initials).
-- M3: Plan 06 — wrap `pushWidgetUpdate` in try/catch so a render failure can't reject the launch-sweep hook.
-- M4: Plan 08 — deterministic-uid backstop required if killed-app UAT yields >1 interactions row.
-- M5: Plan 05 — surface Log→Profile (owner's bucket) as an owner decision/checkpoint or record accepted rationale.
-- L1: Plan 06 — confirm `WIDGET_ADDED`/`WIDGET_DELETED` enum values against the installed library.
-- L2: Plan 08 — verify `RNWidgetJsCommunication#requestWidgetUpdate` against `node_modules` at prebuild.
+- None (single reviewer).
