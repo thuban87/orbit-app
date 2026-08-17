@@ -473,7 +473,16 @@ Plans:
   2. The larger tile adds Quick mark · Log contact · Message (→ the compose screen) plus the fuel line.
   3. Freshness is event-push + launch/boot refresh (no polling); an empty widget prompts "Choose favourites"; an in-app "Add widget" button works with graceful fallback; "Back → dashboard" is JS navigation.
 
-**Plans:** TBD
+**Plans:** 8 plans (6 waves)
+
+- [ ] 12-01-PLAN.md — Shared status palette (statusStable/Wobble/Decay tokens) + ContactCard OD-1 upgrade (WDG-01)
+- [ ] 12-02-PLAN.md — Native enablement: react-native-android-widget legitimacy checkpoint + install + config plugin (WDG-01/02/03)
+- [ ] 12-03-PLAN.md — Base64 thumbnail encoder + headless colour resolver (WDG-01)
+- [ ] 12-04-PLAN.md — Favourites tile shaper + strict orbit:// URI resolver & gate (WDG-01/02/03)
+- [ ] 12-05-PLAN.md — Headless mark write seam (node:sqlite) + RemoteViews render tree (WDG-01/02)
+- [ ] 12-06-PLAN.md — Event-push freshness + widget task handler + index.ts registration (WDG-01/02/03)
+- [ ] 12-07-PLAN.md — App wiring: orbit:// gate mount + launch refresh + Settings "Add Orbit widget" (WDG-02/03)
+- [ ] 12-08-PLAN.md — Desktop prebuild + manifest hardening + BOOT_COMPLETED receiver + Pixel device UATs (WDG-01/02/03)
 
 ### Phase 13: Orrery
 
