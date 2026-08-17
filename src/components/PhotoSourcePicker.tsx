@@ -55,6 +55,7 @@ import {
   isImageUrl,
   UrlImageError,
 } from "@/services/photos/url-image";
+import { notifyWidgetDataChanged } from "@/services/widget/widget-refresh";
 import { useTheme } from "@/theme";
 import { Logger } from "@/utils/logger";
 
@@ -167,6 +168,9 @@ export function PhotoSourcePicker({
           await clearContactPhoto(exec, target.contactId, now);
           deletePhoto(contactPhotoRelPath(target.contactId));
           onChanged?.();
+          // A contact photo is widget-visible (the tile avatar); clearing it must
+          // refresh the widget. Profile/customField cases are not widget-visible.
+          notifyWidgetDataChanged();
           break;
         case "profile":
           await clearProfilePhoto(exec, now);

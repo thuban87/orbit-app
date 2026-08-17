@@ -38,6 +38,7 @@ import { type FavouriteRow, listFavourites } from "@/db/dashboard-read";
 import { rewriteFavouriteRanks } from "@/db/favourites-dao";
 import { computeReorder } from "@/logic/favourites-reorder-logic";
 import type { RootStackScreenProps } from "@/navigation/types";
+import { notifyWidgetDataChanged } from "@/services/widget/widget-refresh";
 import { type ThemePalette, useTheme } from "@/theme";
 import { Logger } from "@/utils/logger";
 
@@ -145,6 +146,10 @@ export function ManageFavouritesScreen({
           orderedIds,
           localDateTime(),
         );
+        // A SUCCESSFUL reorder changes favourite_rank — the widget's tile order.
+        // Publish here on the success path (there is no reload on success); the
+        // catch below is the FAILURE path and must NOT refresh the widget.
+        notifyWidgetDataChanged();
       } catch (err) {
         Logger.error(LOG_SCOPE, "failed to persist favourite order", err);
         Alert.alert("Couldn't save order", "Please try again.");

@@ -66,6 +66,7 @@ import {
   PhotoPipelineError,
   persistCroppedMaster,
 } from "@/services/photos/photo-pipeline";
+import { notifyWidgetDataChanged } from "@/services/widget/widget-refresh";
 import { bumpPhotoCacheBust } from "@/stores/photo-cache-bust-store";
 import { publishCropResult } from "@/stores/photo-result-store";
 import { useTheme } from "@/theme";
@@ -277,6 +278,9 @@ export function CropPhotoScreen({
         // Sub-second cache-bust: a same-second replace shares `modified_at`, so
         // the per-write revision is what forces the returning Avatar to redecode.
         bumpPhotoCacheBust(relative);
+        // A contact photo is widget-visible (the tile avatar). Profile/customField
+        // photos are NOT, so this publish lives inside the contact branch only.
+        notifyWidgetDataChanged();
       } else if (target.kind === "profile") {
         await setProfilePhoto(exec, relative, now);
         bumpPhotoCacheBust(relative);

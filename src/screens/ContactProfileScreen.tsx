@@ -79,6 +79,7 @@ import {
 } from "@/services/impact";
 import type { IntensityResult } from "@/services/intensity-logic";
 import { reconcileSchedule } from "@/services/notifications/notification-schedule";
+import { notifyWidgetDataChanged } from "@/services/widget/widget-refresh";
 import { useTheme } from "@/theme";
 import { formatLocalDate } from "@/utils/dates";
 import { Logger } from "@/utils/logger";
@@ -253,6 +254,8 @@ export function ContactProfileScreen({
       // In-place log does NOT re-fire useFocusEffect (the screen stays focused),
       // so refresh every derived surface through the SINGLE unified load().
       await load();
+      // A manual log changes last_contact → derived status/fuelText on the widget.
+      notifyWidgetDataChanged();
     } catch (err) {
       Logger.error(LOG_SCOPE, "failed to log contact", err);
       Alert.alert("Couldn't log contact", "Please try again.");
@@ -267,6 +270,10 @@ export function ContactProfileScreen({
   const doArchive = useCallback(async () => {
     try {
       await archiveContact(getExecutor(), contactId, localDateTime());
+      // Archiving removes a (possibly-favourite) contact from the widget projection
+      // (archived_at IS NOT NULL). This handler navigates away with no load(), so
+      // publish right after the successful commit, before popToTop.
+      notifyWidgetDataChanged();
       navigation.popToTop();
     } catch (err) {
       Logger.error(LOG_SCOPE, "failed to archive contact", err);
@@ -292,6 +299,9 @@ export function ContactProfileScreen({
         await setFavouriteRank(getExecutor(), contactId, now);
       }
       await load();
+      // Favourite membership is the widget projection itself — mark/clear adds or
+      // removes this contact's tile.
+      notifyWidgetDataChanged();
     } catch (err) {
       Logger.error(LOG_SCOPE, "failed to toggle favourite", err);
       Alert.alert("Couldn't update favourite", "Please try again.");
@@ -405,6 +415,8 @@ export function ContactProfileScreen({
       setEditingId(null);
       setRefineValue(null);
       await load();
+      // A touchpoint edit recomputes recency → derived status may change.
+      notifyWidgetDataChanged();
     } catch (err) {
       Logger.error(LOG_SCOPE, "failed to save touchpoint edit", err);
       Alert.alert("Couldn't save", "Please try again.");
@@ -441,6 +453,9 @@ export function ContactProfileScreen({
                     setRefineValue(null);
                   }
                   await load();
+                  // Deleting the newest touchpoint moves last_contact back →
+                  // derived status may change on the widget.
+                  notifyWidgetDataChanged();
                 } catch (err) {
                   Logger.error(LOG_SCOPE, "failed to delete touchpoint", err);
                   Alert.alert("Couldn't delete", "Please try again.");
@@ -477,6 +492,8 @@ export function ContactProfileScreen({
           now: stamp,
         });
         await load();
+        // Fuel add can change the ranked fuelText shown on the widget tile.
+        notifyWidgetDataChanged();
         return true;
       } catch (err) {
         Logger.error(LOG_SCOPE, "failed to add fuel", err);
@@ -504,6 +521,8 @@ export function ContactProfileScreen({
           now: localDateTime(),
         });
         await load();
+        // Fuel edit can change the ranked fuelText shown on the widget tile.
+        notifyWidgetDataChanged();
       } catch (err) {
         Logger.error(LOG_SCOPE, "failed to edit fuel", err);
         Alert.alert("Couldn't save fuel.", "Please try again.");
@@ -526,6 +545,8 @@ export function ContactProfileScreen({
           now: localDateTime(),
         });
         await load();
+        // Confirming an AI fuel item lets it begin ranking → widget fuelText may change.
+        notifyWidgetDataChanged();
       } catch (err) {
         Logger.error(LOG_SCOPE, "failed to confirm fuel", err);
         Alert.alert("Couldn't save fuel.", "Please try again.");
@@ -551,6 +572,8 @@ export function ContactProfileScreen({
                 try {
                   await deleteFuel(getExecutor(), { id, contactId });
                   await load();
+                  // Deleting fuel can change the ranked fuelText on the widget tile.
+                  notifyWidgetDataChanged();
                 } catch (err) {
                   Logger.error(LOG_SCOPE, "failed to delete fuel", err);
                   Alert.alert("Couldn't delete.", "Please try again.");

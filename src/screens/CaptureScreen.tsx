@@ -71,6 +71,7 @@ import { addFuel, editFuel, type NewFuelItem } from "@/db/fuel-dao";
 import { newUid } from "@/db/uid";
 import { resolveCapturePayload } from "@/logic/capture-logic";
 import type { RootStackScreenProps } from "@/navigation/types";
+import { notifyWidgetDataChanged } from "@/services/widget/widget-refresh";
 import { useTheme } from "@/theme";
 import { Logger } from "@/utils/logger";
 import { finishActivity } from "../../modules/orbit-share-finish";
@@ -283,6 +284,10 @@ export function CaptureScreen(_props: RootStackScreenProps<"Capture">) {
         // uid-based fuel lookup; the note edits this exact row by id+contactId.
         setWrittenRows([{ id: fuelId, contactId: row.id }]);
         setSavedLabel(`Saved to ${row.name}`);
+        // Share→fuel on an EXISTING (possibly-favourite) contact can change the
+        // widget's ranked fuelText. (Inline-create targets a brand-new contact that
+        // cannot be a favourite yet, so it is excluded — see onInlineSubmit.)
+        notifyWidgetDataChanged();
         armAutoReturn();
       } catch (err) {
         Logger.error(LOG_SCOPE, "failed to write capture fuel", err);
@@ -345,6 +350,9 @@ export function CaptureScreen(_props: RootStackScreenProps<"Capture">) {
       // optional note can recompose all N rows by id + contactId (A1).
       const written = await captureMultiAttach(getExecutor(), newRows);
       setWrittenRows(written);
+      // Multi fan-out writes fuel to EXISTING contacts — any favourite among them
+      // can change its widget fuelText.
+      notifyWidgetDataChanged();
       // SG-03: N=1 is reachable (long-press one face, immediately Done), so singularise.
       const n = written.length;
       setSavedLabel(`Saved to ${n} ${n === 1 ? "contact" : "contacts"}`);
@@ -420,6 +428,9 @@ export function CaptureScreen(_props: RootStackScreenProps<"Capture">) {
         } else if (writtenRows.length > 1) {
           await captureMultiNote(getExecutor(), writtenRows, composed, stamp);
         }
+        // The note recompose rewrote the just-written fuel row(s)' display text on
+        // EXISTING contacts — any favourite among them can change its widget fuelText.
+        notifyWidgetDataChanged();
       }
       // SG-02: clear the draft after a successful note so it can't reappear later.
       setNoteText("");

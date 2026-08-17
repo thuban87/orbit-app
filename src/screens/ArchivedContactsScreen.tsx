@@ -38,6 +38,7 @@ import {
 import type { RootStackScreenProps } from "@/navigation/types";
 import { buildNotificationPurgeCleanup } from "@/services/notifications/purge-notification-cleanup";
 import { buildPhotoPurgeCleanup } from "@/services/photos/purge-photo-cleanup";
+import { notifyWidgetDataChanged } from "@/services/widget/widget-refresh";
 import { useTheme } from "@/theme";
 import { Logger } from "@/utils/logger";
 
@@ -112,6 +113,10 @@ export function ArchivedContactsScreen({
       try {
         await restoreContact(getExecutor(), id, localDateTime());
         await load();
+        // A restored favourite re-enters the widget projection (archived_at IS
+        // NULL again). Purge is excluded — an already-archived contact is already
+        // absent from the favourites branch, so purging it changes nothing.
+        notifyWidgetDataChanged();
       } catch (err) {
         Logger.error(LOG_SCOPE, "failed to restore contact", err);
         Alert.alert("Couldn't restore", "Please try again.");

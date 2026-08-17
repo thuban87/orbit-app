@@ -24,9 +24,17 @@ const h = vi.hoisted(() => ({
   exec: null as SqlExecutor | null,
   now: "2026-08-16 10:00:00",
   openAndMigrate: null as ReturnType<typeof Object> | null,
+  // Spy standing in for the widget event-push publisher (12-07). The real
+  // widget-refresh imports react-native-android-widget, which cannot load under
+  // the node vitest env — and the node-tested mark seam must NEVER fire a native
+  // requestWidgetUpdate. The stub lets the ACTION_MARK-only publish be asserted.
+  notifyWidget: vi.fn(),
 }));
 
 vi.mock("expo-notifications");
+vi.mock("@/services/widget/widget-refresh", () => ({
+  notifyWidgetDataChanged: h.notifyWidget,
+}));
 vi.mock("@/db/database", () => {
   const openAndMigrate = vi.fn(async () => null);
   h.openAndMigrate = openAndMigrate;
@@ -172,6 +180,10 @@ describe("handleNotificationAction — mark", () => {
     expect(row.quality).toBeNull();
 
     expect(cancel).toHaveBeenCalledWith(decayIdentifier(CONTACT_ID));
+
+    // A mark changes last_contact/derived status → the widget is refreshed once
+    // (headless-safe fire-and-forget, 12-07).
+    expect(h.notifyWidget).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -195,6 +207,9 @@ describe("handleNotificationAction — snooze", () => {
     expect(ev.uid).toBe(actionUid(ACTION_SNOOZE, DATA));
 
     expect(cancel).toHaveBeenCalledWith(decayIdentifier(CONTACT_ID));
+
+    // Snooze is NOT widget-visible → the widget publisher must not fire (12-07).
+    expect(h.notifyWidget).not.toHaveBeenCalled();
   });
 });
 

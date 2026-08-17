@@ -64,6 +64,7 @@ import { newUid } from "@/db/uid";
 import type { RootStackScreenProps } from "@/navigation/types";
 import { reconcileSchedule } from "@/services/notifications/notification-schedule";
 import { deletePhoto } from "@/services/photos/photo-storage";
+import { notifyWidgetDataChanged } from "@/services/widget/widget-refresh";
 import { takeStagedPhotos } from "@/stores/photo-result-store";
 import { useTheme } from "@/theme";
 import { parseDate } from "@/types";
@@ -348,6 +349,12 @@ export function EditContactScreen({
       void reconcileSchedule(getExecutor()).catch((e) =>
         Logger.error(LOG_SCOPE, "reconcile after edit-save failed", e),
       );
+
+      // Metadata is committed (name / frequency / rarely_responds → the widget's
+      // tile label + derived status). Publish here so it fires on a committed
+      // metadata save even if the later links diff fails. Photo is written
+      // separately (CropPhotoScreen / PhotoSourcePicker), so it is not covered here.
+      notifyWidgetDataChanged();
 
       // Metadata (incl. the first interaction) is now COMMITTED and last_contact
       // is set. Clear the never-contacted first-interaction intent in LOCAL STATE

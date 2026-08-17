@@ -41,6 +41,7 @@ import {
 import { getExecutor, localDateTime, openAndMigrate } from "@/db/database";
 import { recordTouchpoint } from "@/db/recency-dao";
 import { snoozeContact } from "@/db/snooze-dao";
+import { notifyWidgetDataChanged } from "@/services/widget/widget-refresh";
 import { Logger } from "@/utils/logger";
 import {
   ACTION_MARK,
@@ -141,6 +142,12 @@ export async function handleNotificationAction(
         connected: 1,
         quality: null,
       });
+      // A notification "Mark contacted" changes last_contact/derived status. This
+      // runs on BOTH the foreground listener AND the killed-app headless task;
+      // publishing is headless-safe because pushWidgetUpdate swallows its own
+      // errors (12-06). NOT published on the snooze branch (not widget-visible) nor
+      // on the UNIQUE-collision replay path (no data changed).
+      notifyWidgetDataChanged();
     } else {
       // The fixed +1-week headless snooze.
       await snoozeContact(exec, {
