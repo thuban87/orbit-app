@@ -144,3 +144,22 @@ Both agree the cycle-1 fixes landed and the plan is architecturally sound; diver
 - Overall risk: codex HIGH, Claude LOW. Resolution: C2-1/C2-2 are real but self-catching at `tsc`; C2-3 (check:colors) is the one that would actually block a clean verify. All are small, localized edits; none reopen a decision.
 
 CYCLE_SUMMARY: current_high=2 current_actionable=4
+
+---
+
+# Cross-AI Plan Review — Phase 13 (Orrery) — Cycle 3 (final confirmation)
+
+Both reviewers, independently, on the fully-incorporated plans:
+
+## Codex (cycle 3) — READY-TO-EXECUTE
+All 6 cycle-2 fixes LANDED (C2-1 13-05:127, C2-2 13-04:137 / contact-status-read.ts:74, C2-3 13-01:113 / check-colors.sh:35, C2-4 13-02:82 / 13-05:125, C2-5 13-01:111 / 13-04:75, C2-6 13-02:82). Remaining HIGH / execution-blocker: **None.**
+
+## Claude (cycle 3) — READY-TO-EXECUTE
+All 6 cycle-2 fixes LANDED, verified against real signatures (`resolvePhotoUri(relative: string)` photo-storage.ts:130; `getContactStatus` null-status contact-status-read.ts:20,72; check-colors.sh:35 pattern cannot match the gate-safe fragment construction; exported `SELF_SUN_COLOUR_RE`/`assertSelfSunColour`; canonical `ringInner`/`effectiveGap`). Data layer confirmed undisturbed: `rewriteRingSeq` clones favourites-dao's 3 guards incl. the `new Set` uniqueness clone (favourites-dao.ts:112) extended by `excludeContactId` scope; ring-seq-dao writes only `ring_seq`/`modified_at` (single-writer `last_contact` intact, grep-guarded); migration 003 additive ADD COLUMN, forward-only, no hex default (nullable FK `ON DELETE SET NULL`); `ROGUE_K` imported status.ts:42 never re-typed; ORR-01..06 fully covered (13-02/03/04 foundations → 13-05/06/07 features → 13-08 device UAT). Remaining HIGH / execution-blocker: **None.**
+
+## Convergence verdict
+**CONVERGED** after 2 replan cycles + a 3rd confirmation. Both external reviewers return READY-TO-EXECUTE with zero remaining HIGH concerns and zero actionable findings outside PLAN.md. Every cycle-1 finding (H1, H2, M3, M4, M5, M6, L7–L11) and cycle-2 finding (C2-1..C2-6) is incorporated as executable PLAN.md content.
+
+**Non-blocking note carried forward** (not a convergence blocker): the 13-04 palette-conformance test imports 13-01's exported `SELF_SUN_COLOUR_RE`; both plans are wave 1 with `depends_on: []` — a one-way (non-circular) build-order assumption that is safe under this repo's **sequential, worktrees-disabled** execution (13-01 lands before 13-04). It would only matter if wave-1 plans were ever run truly in parallel; recorded here since it lives only in plan prose.
+
+CYCLE_SUMMARY: current_high=0 current_actionable=0
