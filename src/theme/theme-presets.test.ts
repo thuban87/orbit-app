@@ -121,3 +121,31 @@ describe("status/gravity colour tokens (LOG-05, owner-approved 2026-08-15)", () 
     expect(palette.gravityTiers).toHaveLength(GRAVITY_TIER_COUNT);
   });
 });
+
+describe("shared status palette tokens (owner-approved 2026-08-16, UI-SPEC ⭐)", () => {
+  // The four status hues are the owner's locked decision (widget + ContactCard +
+  // Phase-13 orrery share them). Lock the three NEW tokens against their exact
+  // owner-approved hexes so a future seed drift fails loudly (Codex/Claude M1);
+  // `rogue` was locked at 2026-08-15 and stays #E0904A.
+  it("seeds the three new status tokens with their exact owner-approved hexes", () => {
+    const palette = resolvePalette(DEFAULT_PRESET_ID, "dark");
+    expect(palette.statusStable).toBe("#45B98A");
+    expect(palette.statusWobble).toBe("#E8C15C");
+    expect(palette.statusDecay).toBe("#E56A52");
+    // rogue is unchanged by this phase.
+    expect(palette.rogue).toBe("#E0904A");
+  });
+
+  it("every preset's dark palette exposes all three status tokens as non-empty strings", () => {
+    for (const preset of Object.values(THEME_PRESETS)) {
+      for (const token of [
+        "statusStable",
+        "statusWobble",
+        "statusDecay",
+      ] as const) {
+        expect(typeof preset.dark[token]).toBe("string");
+        expect(preset.dark[token].length).toBeGreaterThan(0);
+      }
+    }
+  });
+});

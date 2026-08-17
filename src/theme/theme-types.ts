@@ -74,6 +74,39 @@ export interface ThemePalette {
    */
   rogue: string;
   /**
+   * In-app STABLE status hue (owner-approved 2026-08-16, UI-SPEC). One of the
+   * three shared app-wide status tokens joining `rogue` — a STATE, not an action,
+   * so DISTINCT from `danger` (danger is destructive-action red; status is a
+   * state). `stable` = a healthy orbit, <80% of the contact interval elapsed
+   * (`status.ts` buckets). Consumed by the dashboard `ContactCard`, the Phase-12
+   * widget bitmap, and the Phase-13 orrery — one source of truth. Seeded in
+   * `theme-presets` (the only colour-literal file), owner-tunable like the other
+   * seeds. Consumed via `useTheme().colors.statusStable`.
+   */
+  statusStable: string;
+  /**
+   * In-app WOBBLE status hue (owner-approved 2026-08-16, UI-SPEC). Shared status
+   * token beside `statusStable`/`statusDecay`/`rogue` — a STATE, not an action,
+   * so DISTINCT from `danger`. `wobble` = approaching due, 80–100% of the contact
+   * interval elapsed (`status.ts` buckets). Consumed by the dashboard
+   * `ContactCard`, the Phase-12 widget bitmap, and the Phase-13 orrery — one
+   * source of truth. Seeded in `theme-presets` (the only colour-literal file),
+   * owner-tunable. Consumed via `useTheme().colors.statusWobble`.
+   */
+  statusWobble: string;
+  /**
+   * In-app DECAY status hue (owner-approved 2026-08-16, UI-SPEC). Shared status
+   * token beside `statusStable`/`statusWobble`/`rogue` — a STATE, not an action,
+   * so DISTINCT from `danger` (deliberately orange-shifted off `danger` so a
+   * decay STATUS never reads as a destructive ACTION). `decay` = overdue, >100%
+   * of the contact interval elapsed (`status.ts` buckets) — the "act now" state.
+   * Consumed by the dashboard `ContactCard`, the Phase-12 widget bitmap, and the
+   * Phase-13 orrery — one source of truth. Seeded in `theme-presets` (the only
+   * colour-literal file), owner-tunable. Consumed via
+   * `useTheme().colors.statusDecay`.
+   */
+  statusDecay: string;
+  /**
    * Ordered GRAVITY-TIER colour ramp (owner-approved 2026-08-15). ONE entry per
    * gravity tier, indexed by the gravity `tierIndex` (Plan 06-05's GravityBar):
    * `gravityTiers[tierIndex]`. Length MUST equal Plan 05's `GRAVITY_TIERS` count

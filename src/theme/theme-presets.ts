@@ -52,6 +52,16 @@ export const THEME_PRESETS: Record<ThemePresetId, ThemePreset> = {
       // (#6C8CFF) and danger (#E5484D): rogue is a STATUS, not a destructive
       // action. Infrastructure seed, owner-tunable like the rest of space-dark.
       rogue: "#E0904A",
+      // Shared app-wide STATUS hues (owner-approved 2026-08-16, UI-SPEC ⭐). The
+      // three net-new status tokens joining `rogue`, consumed by the dashboard
+      // ContactCard, the Phase-12 widget bitmap, and the Phase-13 orrery — one
+      // source of truth. stable = teal-green healthy orbit; wobble = gold caution;
+      // decay = coral "act now" (orange-shifted off danger #E5484D so status ≠
+      // destructive action). Owner-tunable like the other seeds; the #F07A3D decay
+      // alternative was considered and declined.
+      statusStable: "#45B98A",
+      statusWobble: "#E8C15C",
+      statusDecay: "#E56A52",
       // Ordered gravity-tier ramp (owner-approved 2026-08-15), ONE entry per tier
       // (thin→deep), indexed by gravity tierIndex in Plan 06-05's GravityBar.
       // Deep-space-harmonised seeds ascending in warmth/weight; ORDER IS STABLE —
