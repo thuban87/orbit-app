@@ -210,3 +210,36 @@ Only one external reviewer (Codex) was invoked for this cycle; a separate Claude
 
 ### Divergent Views
 None — single reviewer this cycle.
+
+---
+
+## Claude Review (independent in-session subagent — cycle 1)
+
+**Reviewer:** Claude (read-only in-session subagent, second independent perspective; codex is the CLI reviewer above)
+**Verdict:** 0 HIGH, 7 actionable non-HIGH. All ~25 cited `file:line`/behavior claims verified TRUE against source on disk — zero hallucinated references. Hard invariants all correctly planned (single-writer mark, no-sweep-in-headless, base64-only, no schema, token-only render, native-dep behind blocking-human checkpoint, manifest hardening). Owner-approved status hexes used (not the declined `#F07A3D`). No DECIDED/REJECTED reversals.
+
+### Concerns
+
+**MEDIUM**
+- **M1 — Plan 01 Task 3 verify masks test failures.** `npm run check:colors && npx tsc --noEmit && npx vitest run src/components 2>/dev/null || npx tsc --noEmit` parses as `((A && B && C) || D)` — if the vitest run (C) fails, `D=tsc` runs and the whole command exits 0. A ContactCard test broken by retiring the OD-1 opacity encoding would pass the gate. **Fix:** `npm run check:colors && npx tsc --noEmit && npx vitest run src/components` (no `|| tsc` fallback, no `2>/dev/null`).
+- **M2 — One bad photo blanks the entire grid.** Plan 03 `encodeWidgetThumb` throws (PhotoPipelineError convention) on decode failure; Plan 05 render calls it per tile with NO per-tile catch → an evicted/corrupt master rejects `renderFavourites` and the whole grid fails instead of falling back to the initials swatch. **Fix:** `encodeWidgetThumb` returns `null` on decode failure (or Plan 05 wraps each encode in try/catch → initials).
+- **M3 — `pushWidgetUpdate` is an unguarded launch-sweep hook.** `runLaunchSweep` (launch-sweep.ts:82) awaits hooks with NO per-hook isolation — a rejecting hook rejects the fire-and-forget sweep (unhandled rejection; may skip later hooks). **Fix:** wrap `pushWidgetUpdate` body in try/catch + `Logger.error` so it always resolves (matches notification-actions/headless-task guard discipline).
+- **M4 — WIDGET_CLICK double-delivery backstop deferred but not gated.** Plan 05 uses `newUid()` (distinct rows, LOG-06) on assumption A1 (OS delivers click once); 12-08 Task 3 asserts "exactly one row" but nothing REQUIRES the deterministic-uid backstop if the spike shows >1. **Fix:** 12-08 Task 3 — make the deterministic-uid backstop a required, gated follow-up if the killed-app UAT yields >1 interactions row.
+- **M5 — "Log contact" → Profile is a silent product decision (OWNER'S BUCKET).** WDG-02 lists the larger tile's "Log contact"; Plan 05 maps Log (✎) → `orbit://contact/{id}` → the read-only Profile screen because no Log route exists (A2). RESEARCH Open Q1 flagged this "→ Profile recommended; confirm with owner." A button labeled "Log" that opens Profile (not a logging flow) is a UX call. **Fix:** surface as an owner decision/checkpoint, or record in Plan 05 as an explicitly accepted owner decision with rationale — not an implicit planner call.
+
+**LOW**
+- **L1 — `WIDGET_ADDED`/`WIDGET_DELETED` enum values unverified** against the installed library (RESEARCH only verified WIDGET_CLICK/UPDATE/RESIZED). Likely correct; confirm against `node_modules/react-native-android-widget` during 12-06 execution.
+- **L2 — Boot-receiver class `RNWidgetJsCommunication#requestWidgetUpdate` + 30s budget are inherited (dossier workpaper), unverified this session.** Plan 08 already hedges; just verify the exact class against `node_modules` at prebuild.
+- **L3 (optional hygiene, not counted) — headless handler transitively imports `launch-sweep`.** Safe (launch-sweep has zero module-scope side effects, :10-14; handler never calls runLaunchSweep), but Plan 06's grep checks only the handler file, not the transitive graph. Optional: split `pushWidgetUpdate` from `registerWidgetSweep`, or note the invariant rests on launch-sweep import-purity.
+
+### Current HIGH Concerns
+None.
+
+### Current Actionable Non-HIGH Concerns
+- M1: Plan 01 — drop the `|| tsc` fallback + `2>/dev/null` so a broken ContactCard test fails the task.
+- M2: Plan 03/05 — graceful per-tile photo fallback (encode returns null / render catches → initials).
+- M3: Plan 06 — wrap `pushWidgetUpdate` in try/catch so a render failure can't reject the launch-sweep hook.
+- M4: Plan 08 — deterministic-uid backstop required if killed-app UAT yields >1 interactions row.
+- M5: Plan 05 — surface Log→Profile (owner's bucket) as an owner decision/checkpoint or record accepted rationale.
+- L1: Plan 06 — confirm `WIDGET_ADDED`/`WIDGET_DELETED` enum values against the installed library.
+- L2: Plan 08 — verify `RNWidgetJsCommunication#requestWidgetUpdate` against `node_modules` at prebuild.
