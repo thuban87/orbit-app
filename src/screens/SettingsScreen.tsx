@@ -12,6 +12,7 @@ import {
   Text,
   View,
 } from "react-native";
+import { requestPinWidget } from "react-native-android-widget";
 import { PhotoSourcePicker } from "@/components/PhotoSourcePicker";
 import {
   type AppSettings,
@@ -29,6 +30,7 @@ import {
 } from "@/services/notifications/permission";
 import { useTheme } from "@/theme";
 import { Logger } from "@/utils/logger";
+import { pinResultCopy } from "./settings-add-widget";
 
 const LOG_SCOPE = "settings-screen";
 
@@ -92,6 +94,11 @@ export function SettingsScreen() {
   const [settings, setSettings] = useState<AppSettings | null>(null);
   const [degraded, setDegraded] = useState(false);
   const [activePicker, setActivePicker] = useState<ActivePicker>(null);
+
+  // The "Add Orbit widget" fallback copy — null while there is nothing to show,
+  // set to the UI-SPEC fallback string when requestPinWidget can't pin (unsupported
+  // launcher / API < 26 / a rejected request). Surfaced inline under the row.
+  const [addWidgetCopy, setAddWidgetCopy] = useState<string | null>(null);
 
   // Reload the self record so a set/remove made on the crop screen refreshes when
   // it goBack()s here (mirrors ContactProfileScreen's reload-on-focus). The
@@ -201,6 +208,24 @@ export function SettingsScreen() {
       : activePicker === "quiet-start"
         ? (settings?.quietStartHour ?? 21)
         : (settings?.quietEndHour ?? 8);
+
+  // "Add Orbit widget": open the launcher's native pin prompt. requestPinWidget
+  // resolves false on an unsupported launcher / API < 26; a REJECTED promise is
+  // caught and mapped to false so it is treated identically (no crash, no dead
+  // button, no unhandled rejection — Codex MED). The pure pinResultCopy decides
+  // the copy: null (accepted → nothing to show) or the verbatim fallback string.
+  // The live pin prompt is a device-UAT (12-08); the provider must be prebuilt for
+  // the name to resolve (Assumption A5).
+  const onAddWidget = useCallback(async () => {
+    let accepted = false;
+    try {
+      accepted = await requestPinWidget({ widgetName: "OrbitFavourites" });
+    } catch (err) {
+      Logger.error(LOG_SCOPE, "requestPinWidget rejected", err);
+      accepted = false;
+    }
+    setAddWidgetCopy(pinResultCopy(accepted));
+  }, []);
 
   return (
     <ScrollView
@@ -528,6 +553,60 @@ export function SettingsScreen() {
         />
       </View>
 
+      <View testID="settings-home-screen-section" style={styles.section}>
+        <Text
+          accessibilityRole="header"
+          style={[styles.sectionHeading, { color: colors.textSecondary }]}
+        >
+          Home screen
+        </Text>
+
+        {/* "Add Orbit widget" — opens the launcher's native pin prompt via
+            requestPinWidget, degrading to the fallback copy on an unsupported
+            launcher / API < 26 / a rejected request (WDG-03). Leading widget
+            glyph + trailing chevron, consistent with the other rows. */}
+        <Pressable
+          testID="settings-add-widget"
+          accessibilityRole="button"
+          accessibilityLabel="Add Orbit widget"
+          onPress={() => void onAddWidget()}
+          style={[
+            styles.row,
+            styles.addWidgetRow,
+            { backgroundColor: colors.surface, borderColor: colors.border },
+          ]}
+        >
+          <Text
+            style={[styles.addWidgetGlyph, { color: colors.textSecondary }]}
+          >
+            ▦
+          </Text>
+          <Text
+            style={[
+              styles.rowLabel,
+              styles.addWidgetLabel,
+              { color: colors.textPrimary },
+            ]}
+          >
+            Add Orbit widget
+          </Text>
+          <Text
+            style={[styles.addWidgetChevron, { color: colors.textSecondary }]}
+          >
+            ›
+          </Text>
+        </Pressable>
+
+        {addWidgetCopy !== null ? (
+          <Text
+            testID="settings-add-widget-fallback"
+            style={[styles.helper, { color: colors.textSecondary }]}
+          >
+            {addWidgetCopy}
+          </Text>
+        ) : null}
+      </View>
+
       <Pressable
         testID="settings-manage-favourites-row"
         accessibilityRole="button"
@@ -613,6 +692,20 @@ const styles = StyleSheet.create({
   },
   rowLabel: {
     fontSize: 16,
+    fontWeight: "600",
+  },
+  addWidgetRow: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  addWidgetGlyph: {
+    fontSize: 18,
+  },
+  addWidgetLabel: {
+    flex: 1,
+  },
+  addWidgetChevron: {
+    fontSize: 20,
     fontWeight: "600",
   },
   rowValue: {
