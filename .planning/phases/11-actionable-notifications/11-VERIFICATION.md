@@ -1,7 +1,8 @@
 ---
 phase: 11-actionable-notifications
 verified: 2026-08-16T23:01:52Z
-status: human_needed
+status: passed
+closeout: owner-accepted 2026-08-16 (on-device UAT substantially passed; killed-app headless action deferred to a follow-up device check)
 score: 18/18 code-truths verified
 behavior_unverified: 5
 overrides_applied: 0
@@ -48,7 +49,12 @@ human_verification:
 
 **Phase Goal:** The decay + birthday reminder engine — pre-scheduled + launch-reconciled, generic-body, quiet-windowed, with headless one-tap actions and the reminders-off mute — that opens the compose screen.
 **Verified:** 2026-08-16T23:01:52Z
-**Status:** human_needed
+**Status:** passed — owner-accepted closeout after on-device Pixel UAT (2026-08-16)
+
+## On-Device UAT Outcome (owner-accepted closeout, 2026-08-16) — see 11-UAT-NOTES.md
+Release APK built via the desktop pipeline + installed on the Pixel. **Verified LIVE:** POST_NOTIFICATIONS value-moment dialog + grant; channels at IMPORTANCE_LOW (silent, FLAG_MUTE_HAPTIC); NOTIF-01 pre-scheduling as inexact RTC_WAKEUP (no exact-alarm) + reschedule-on-settings-change (item B/H3); a REAL birthday notification fired with the exact generic copy "It's Dad's birthday today." (silent, Silent-tray, `vis=PRIVATE`); tap → contact profile (routing); the in-app snooze-presets UI; migration v1→v2 with no crash; and the flat-weekly cadence (a decay nudge correctly scheduled a week out, not today). The earlier lock-screen concern is **softened** — the posted notification carries `vis=PRIVATE` (private applied at the notification level). **The ONE item not device-confirmed:** the killed-app FCM-less headless mark/snooze write (NOTIF-02 headless, the A2 spike) — not deliverable during the session (weekly cadence + quiet hours); it is verified in code review + the exactly-once unit test (real DAOs), and the owner accepted closing with this as a short follow-up device check on the next natural fire. Body-tap→Compose is pure-unit-tested; birthday→Profile confirmed live.
+
+### Original human_needed detail (retained for the follow-up check)
 **Re-verification:** No — initial verification
 
 ## Goal Achievement

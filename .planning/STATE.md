@@ -4,17 +4,17 @@ milestone: v1.0
 milestone_name: milestone
 current_phase: 11
 current_phase_name: Actionable Notifications
-status: human_needed
-stopped_at: "Phase 11 (Actionable Notifications) CODE-COMPLETE + VERIFIED-IN-CODE; verification status human_needed (on-device Pixel UAT pending — expected, as Phase 10). All 13 plans executed sequentially on main (worktrees off) after codex + read-only-Claude convergence resolved 8 HIGH across 3 cycles (headless-DB-not-open, idempotent warm/cold double-write, settings-not-rescheduling, IMPORTANCE_LOW-not-DEFAULT silent, future pre-scheduling, unbounded-schedule horizon cap, in-app-change reconcile, reconcile-serialization DEFER-ONE race). Code-review (deep): 1 Critical (CR-01 birthday wrong-day roll) + 1 Warning (WR-01 toISOString UTC leak) FIXED + regression test; 2 Info deferred (correctness-safe); all load-bearing invariants hold. gsd-verifier 18/18 code-truths. npm test 835/835, tsc + check:colors clean. Owner rulings recorded (item G STATELESS; IMPORTANCE_LOW ratified; headless +1w re-arm launch-deferred). REMAINING GATE = on-device Pixel UAT, 5 items: (1) real ~9am delivery + quiet-window roll + weekly re-nag; (2) killed-app FCM-less headless mark/snooze DB write [run-as] + body-tap→Compose→Back→dashboard; (3) mute/snooze/rogue/rarely/never suppression on the live schedule; (4) birthday day-of + tap→profile + CR-01 afternoon-open no-misfire; (5) POST_NOTIFICATIONS dialog + deny→degrade + private/public lock-screen. STOPPED per owner: do NOT run ANYTHING for Phase 12 (not even discuss/plan) until owner confirms usage limits. Device still has stale Phase-10 UAT data (owner to clear). Pre-existing biome debt in Phase-8/9 files (BirthdayBanner/HomeScreen/RootNavigator etc., untouched by Phase 11) noted, not a regression. Resume UAT: build release APK via desktop pipeline (ssh droid) → install on Pixel → drive the 5 items; or /gsd-verify-work 11."
-last_updated: "2026-08-16T20:30:00.000Z"
+status: passed
+stopped_at: "Phase 11 (Actionable Notifications) CLOSED — owner-accepted closeout after on-device Pixel UAT (2026-08-16). 13/13 plans, npm test 835/835, code-review (CR-01 birthday wrong-day + WR-01 toISOString FIXED + regression test), gsd-verifier 18/18 code-truths, after 3-cycle codex + read-only-Claude convergence (8 HIGH resolved: headless-DB-not-open, warm/cold double-write, settings-not-rescheduling, IMPORTANCE_LOW-not-DEFAULT silent, future pre-scheduling, unbounded-schedule horizon cap, in-app-change reconcile, reconcile-serialization DEFER-ONE race). ON-DEVICE UAT (release APK via desktop pipeline `droid`, installed on Pixel): VERIFIED LIVE — POST_NOTIFICATIONS value-moment dialog + grant; channels at IMPORTANCE_LOW (silent); NOTIF-01 inexact RTC_WAKEUP pre-schedule + reschedule-on-settings-change (item B/H3); a REAL birthday notification FIRED (exact copy 'It's Dad's birthday today.', silent, Silent-tray, vis=PRIVATE) → tap→profile; in-app snooze-presets UI; migration v1→v2 no-crash; flat-weekly cadence (decay correctly a week out, not day-of). Lock-screen finding SOFTENED (posted notification carries vis=PRIVATE = private applied at notification level). ONE DEFERRED device-check: killed-app FCM-less headless mark/snooze write (NOTIF-02 headless / A2 spike) — not deliverable during the session (weekly cadence + quiet hours); code-verified + exactly-once unit test drives real DAOs; owner accepted closing with a follow-up check on the next natural fire (see 11-UAT-NOTES.md / 11-VERIFICATION.md). Device left in TEST CONFIG (Dad=daily, delivery=9pm, quiet=10pm — restore on request). Pre-existing biome debt in Phase-8/9 files (untouched by 11) noted, not a regression. Commits LOCAL on main (~230 ahead of origin), NOT pushed — owner pushes. STOPPED per owner: do NOT run ANYTHING for Phase 12 (Home Screen Widget) — not even discuss/plan — until owner confirms usage limits."
+last_updated: "2026-08-16T22:15:00.000Z"
 last_activity: 2026-08-16
-last_activity_desc: "Phase 11 CODE-COMPLETE: 13/13 plans + 835 tests + code-review (CR-01/WR-01 fixed) + verifier 18/18 code-truths. Verification human_needed = on-device Pixel UAT pending (5 items). STOPPED before Phase 12 per owner (awaiting usage-limit confirmation). Phases 1–10 verified; Phase 11 code done, UAT pending."
+last_activity_desc: "Phase 11 CLOSED (owner-accepted) after on-device Pixel UAT — engine verified live (birthday delivery + tap→profile, pre-schedule/reschedule, silent LOW channels, snooze UI, migration v1→v2); killed-app headless action = 1 deferred follow-up device-check (code-verified). 11/16 phases (69%). STOPPED before Phase 12 per owner (awaiting usage-limit confirmation)."
 progress:
   total_phases: 16
-  completed_phases: 10
-  total_plans: 64
-  completed_plans: 64
-  percent: 63
+  completed_phases: 11
+  total_plans: 77
+  completed_plans: 77
+  percent: 69
 ---
 
 # Project State
@@ -28,11 +28,11 @@ See: .planning/PROJECT.md (updated 2026-08-14)
 
 ## Current Position
 
-Phase: 11 (Actionable Notifications) — PRE-EXECUTION in progress (discuss + UI-SPEC done; planning + convergence next)
-Next: plan-phase (research → plan → plan-check) then codex + read-only-Claude plan-review convergence (≤3 cycles), then PAUSE before executors for owner usage-headroom check. Executors + code-review + verify + on-device Pixel UAT follow after the pause.
-Last activity: 2026-08-16 — 11-CONTEXT.md + 11-UI-SPEC.md approved & committed (owner reversal: delivery-hour + quiet-window user-tunable in Settings)
+Phase: 11 (Actionable Notifications) — CLOSED (owner-accepted closeout after on-device Pixel UAT). Milestone PAUSED before Phase 12 per owner.
+Next: Phase 12 (Home Screen Widget) is ON HOLD — do NOT begin (not even discuss/plan) until owner confirms usage limits. Also pending: the one deferred Phase-11 device-check — the killed-app FCM-less headless mark/snooze write — on the next natural notification fire (code-verified; owner-accepted follow-up).
+Last activity: 2026-08-16 — Phase 11 executed (13 plans), deep code-review (CR-01/WR-01 fixed), verified (18/18 code-truths), and on-device UAT'd LIVE (real birthday delivery + tap→profile, pre-schedule/reschedule, silent LOW channels, snooze UI, migration v1→v2 no-crash).
 
-Progress: [██████░░░░] 63% (10/16 phases complete)
+Progress: [███████░░░] 69% (11/16 phases complete)
 
 ## Performance Metrics
 
