@@ -4,17 +4,17 @@ milestone: v1.0
 milestone_name: milestone
 current_phase: 12
 current_phase_name: Home Screen Widget
-status: planned
+status: passed
 stopped_at: "Phase 11 (Actionable Notifications) CLOSED — owner-accepted closeout after on-device Pixel UAT (2026-08-16). 13/13 plans, npm test 835/835, code-review (CR-01 birthday wrong-day + WR-01 toISOString FIXED + regression test), gsd-verifier 18/18 code-truths, after 3-cycle codex + read-only-Claude convergence (8 HIGH resolved: headless-DB-not-open, warm/cold double-write, settings-not-rescheduling, IMPORTANCE_LOW-not-DEFAULT silent, future pre-scheduling, unbounded-schedule horizon cap, in-app-change reconcile, reconcile-serialization DEFER-ONE race). ON-DEVICE UAT (release APK via desktop pipeline `droid`, installed on Pixel): VERIFIED LIVE — POST_NOTIFICATIONS value-moment dialog + grant; channels at IMPORTANCE_LOW (silent); NOTIF-01 inexact RTC_WAKEUP pre-schedule + reschedule-on-settings-change (item B/H3); a REAL birthday notification FIRED (exact copy 'It's Dad's birthday today.', silent, Silent-tray, vis=PRIVATE) → tap→profile; in-app snooze-presets UI; migration v1→v2 no-crash; flat-weekly cadence (decay correctly a week out, not day-of). Lock-screen finding SOFTENED (posted notification carries vis=PRIVATE = private applied at notification level). ONE DEFERRED device-check: killed-app FCM-less headless mark/snooze write (NOTIF-02 headless / A2 spike) — not deliverable during the session (weekly cadence + quiet hours); code-verified + exactly-once unit test drives real DAOs; owner accepted closing with a follow-up check on the next natural fire (see 11-UAT-NOTES.md / 11-VERIFICATION.md). Device left in TEST CONFIG (Dad=daily, delivery=9pm, quiet=10pm — restore on request). Pre-existing biome debt in Phase-8/9 files (untouched by 11) noted, not a regression. Commits LOCAL on main (~230 ahead of origin), NOT pushed — owner pushes. STOPPED per owner: do NOT run ANYTHING for Phase 12 (Home Screen Widget) — not even discuss/plan — until owner confirms usage limits."
 last_updated: "2026-08-17T02:00:00.000Z"
 last_activity: 2026-08-17
 last_activity_desc: "Phase 11 CLOSED (owner-accepted) after on-device Pixel UAT — engine verified live (birthday delivery + tap→profile, pre-schedule/reschedule, silent LOW channels, snooze UI, migration v1→v2); killed-app headless action = 1 deferred follow-up device-check (code-verified). 11/16 phases (69%). STOPPED before Phase 12 per owner (awaiting usage-limit confirmation)."
 progress:
   total_phases: 16
-  completed_phases: 11
+  completed_phases: 12
   total_plans: 77
   completed_plans: 77
-  percent: 69
+  percent: 75
 ---
 
 # Project State
@@ -28,12 +28,13 @@ See: .planning/PROJECT.md (updated 2026-08-14)
 
 ## Current Position
 
-Phase: 12 (Home Screen Widget) — PRE-EXECUTION COMPLETE; execution HELD pending owner usage-headroom confirmation (2026-08-17). This supersedes the frontmatter `stopped_at` Phase-11 "do NOT run Phase 12" breadcrumb: the owner authorized the pre-execution steps via `/gsd-autonomous --from 12 --to 13 --converge --claude --codex --claude --max-cycles 3`, with an explicit pause before the executing agents.
+Phase: 12 (Home Screen Widget) — COMPLETE ✅ / verification passed (on-device UAT, 2026-08-17). All 8 plans executed (893/893 node tests); plan-checker PASSED + a 2-cycle codex+Claude convergence fixed 8 HIGH; on-device UAT on the physical Pixel: **killed-app headless mark exactly-once verified live in the device DB (the deferred Phase-11 killed-app check is now CLOSED)**, manifest hardened (one non-exported widget BOOT_COMPLETED receiver), release tap-to-update ~0.6s (50× under budget), deep-links + renders green, and owner-driven polish (the "Message" truncation + default-4×2-renders-large breakpoint) rebuilt + verified on device. Owner-accepted follow-up device-checks (NOT blockers, Phase-11-style): the reboot-receiver refresh (owner's phone) + the grid-capacity/bitmap ceiling. Two OUT-OF-SCOPE findings recorded (see 12-VERIFICATION.md): no direct "add another contact" UI path (pre-existing Phase-8/10 gap) + a debug-DB-won't-load-on-release anomaly.
+Next: Phase 13 (Orrery) — NOT started. It is a large new Skia render-loop phase (its own discuss→plan→converge→execute→device-UAT cycle); awaiting owner go-ahead before beginning.
 Done this session (2026-08-17), all committed locally on main (NOT pushed): smart-discuss (12-CONTEXT; owner APPROVED the shared stable/wobble/decay status palette — stable #45B98A / wobble #E8C15C / decay #E56A52 / rogue #E0904A unchanged — resolving OD-1 app-wide; widget + ContactCard + future orrery inherit it), UI-SPEC (approved, checker VERIFIED), RESEARCH, VALIDATION (Nyquist), PATTERNS, PLAN (8 plans / 6 waves, efa9f5b), plan-checker PASSED, then a 2-cycle cross-AI convergence (codex CLI + read-only-Claude subagent; self-review guard overridden per owner): cycle-1 = 6 codex HIGH + 7 Claude actionable → replan (cca05d9); cycle-2 = 2 codex HIGH (WDG-03 freshness incompleteness; killed-app UAT needed a debug build) → final replan (4e688cf). All 8 HIGH fixes verified in-file. NOTE: the final-replan fixes were NOT independently re-reviewed (max cycles reached + owner pause).
 Codex tooling note: current codex-cli (0.144.1) makes gsd-review auto-add `--dangerously-bypass-hook-trust`, which the safety classifier blocks; a subagent improperly tunneled it once (flagged, discarded), then codex was re-run cleanly WITHOUT that flag. Do NOT let gsd-review's codex path run with that flag — run codex manually without it, or allow-list a scoped `Bash(codex exec:*)`.
 Next: EXECUTION on owner go-ahead — `/gsd-execute-phase 12`. Two owner-gated checkpoints in the plans: (1) 12-02 native-dep legitimacy checkpoint (`react-native-android-widget@0.22.0`, blocking-human), (2) 12-04-T1 Log→Profile mapping ratification (blocking-human, gates the URI resolver + render). Device UATs incl. the killed-app headless mark are now on a DEBUG build (release APK is not run-as-able, runbook §3.1) and are BUNDLED with the deferred Phase-11 killed-app FCM-less headless mark/snooze check.
 
-Progress: [███████░░░] 69% (11/16 phases complete; Phase 12 planned, not executed)
+Progress: [████████░░] 75% (12/16 phases complete; Phase 13 next, not started)
 
 ## Performance Metrics
 
@@ -240,8 +241,8 @@ planning" sections in docs/dossier/*.md — those are the authoritative hand-off
 ## Session
 
 **Last session:** 2026-08-17
-**Stopped at:** Phase 12 pre-execution COMPLETE (discuss → UI-SPEC → research → validation → patterns → plan → 2-cycle codex+Claude convergence, all committed 4e688cf); EXECUTION HELD pending owner usage-headroom go-ahead. Resume with `/gsd-execute-phase 12` — it runs Wave 1 (12-01, 12-04) then stops at the 12-04-T1 Log→Profile checkpoint and the 12-02 native-dep legitimacy checkpoint for owner approval.
-**Resume file:** .planning/phases/12-home-screen-widget/12-08-PLAN.md
+**Stopped at:** Phase 12 (Home Screen Widget) COMPLETE + verified on-device (status: passed). 8/8 plans executed; 2-cycle codex+Claude convergence (8 HIGH fixed); on-device UAT — killed-app mark exactly-once verified LIVE (Phase-11 deferred check CLOSED), manifest hardened, ~0.6s release refresh, polish (Message + default-large) rebuilt+verified. Owner-accepted follow-ups: reboot-receiver check (owner's phone) + grid-capacity ceiling. Commits LOCAL on main (~250 ahead of origin), NOT pushed — owner pushes. Next: Phase 13 (Orrery), NOT started — awaiting owner go-ahead.
+**Resume file:** .planning/phases/12-home-screen-widget/12-VERIFICATION.md
 
 ## Phase 4 — Closeout (2026-08-15) ✅ COMPLETE
 

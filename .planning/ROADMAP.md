@@ -27,7 +27,7 @@ onto the dossier domains; a `[DECIDED]`/`[REJECTED]` decision is implemented, ne
 - [x] **Phase 9: Compose Screen & SMS Handoff** — the in-app message surface (fuel visible, Send→SMS, Copy) that notify/widget/AI all open. (completed 2026-08-16)
 - [x] **Phase 10: Share-Sheet Capture** — Android share target, grid-of-faces picker, `EXTRA_SUBJECT` patch, inline create. (completed 2026-08-16)
 - [x] **Phase 11: Actionable Notifications** — pre-scheduled + launch-reconcile engine, decay + birthday, headless actions, mute, settings. (completed 2026-08-16)
-- [ ] **Phase 12: Home Screen Widget** — favourites grid, headless mark, Quick mark · Log contact · Message, add-widget button.
+- [x] **Phase 12: Home Screen Widget** — favourites grid, headless mark, Quick mark · Log contact · Message, add-widget button. (completed 2026-08-17)
 - [ ] **Phase 13: Orrery** — the two-view Skia solar system, rogue rendering, assignable/self-colour sun, ambient layer.
 - [ ] **Phase 14: AI Message Suggestions** — providers + keys, editable-draft flow, prompt assembly, `share_with_ai`.
 - [ ] **Phase 15: Weekly Digest** — one WEEKLY Sunday notification → a live "your week" screen.
@@ -558,7 +558,7 @@ Plans:
 | 9. Compose Screen & SMS Handoff | 2/2 | Complete   | 2026-08-16 |
 | 10. Share-Sheet Capture | 6/6 | Complete   | 2026-08-16 |
 | 11. Actionable Notifications | 13/13 | Complete   | 2026-08-16 |
-| 12. Home Screen Widget | 0/TBD | Not started | - |
+| 12. Home Screen Widget | 8/8 | Complete   | 2026-08-17 |
 | 13. Orrery | 0/TBD | Not started | - |
 | 14. AI Message Suggestions | 0/TBD | Not started | - |
 | 15. Weekly Digest | 0/TBD | Not started | - |
