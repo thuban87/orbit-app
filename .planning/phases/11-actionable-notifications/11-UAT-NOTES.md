@@ -20,3 +20,29 @@ Release APK built via desktop pipeline (droid), installed on the Pixel (`1A071FD
 - Killed-app FCM-less headless mark/snooze DB write (H1/H2) — verified via the profile timeline after a killed-app action tap (release APK is not debuggable → no run-as; verify via app UI).
 - Body-tap → Compose → Back → dashboard.
 - Being forced by: making a contact overdue + setting the delivery hour to the next allowed slot (8pm, before the 9pm quiet window) so a notification fires within minutes.
+
+---
+
+## On-device UAT RESULTS (2026-08-16 evening, live driving completed)
+
+Test data: Dad (birthday today; frequency set to daily by owner); quiet hours moved to 10pm; delivery 9pm — to force fires within the session.
+
+### PASSED live on-device
+- **NOTIF-05 permission:** master toggle → OS `POST_NOTIFICATIONS` dialog → grant (granted=true). Value-moment, not cold-start. ✓
+- **Channels:** decay-private-v1 / decay-public-v1 / birthday-v1 created at IMPORTANCE_LOW (mImportance=2, FLAG_MUTE_HAPTIC, vibration off) — silent (H4). ✓
+- **NOTIF-01 pre-schedule + reschedule-on-change:** after the owner's frequency + delivery-hour + quiet-hours edits, the reconcile **rescheduled** Dad's decay from the earlier Aug-21 09:10 slot to the new cadence, and pre-scheduled the weekly re-nag for **Aug 22 21:10** — RTC_WAKEUP, inexact window (Doze-batched), no exact-alarm permission. Confirms item B / H3 live. ✓
+- **NOTIF-04 birthday day-of DELIVERY:** birthday notification FIRED for Dad — body exactly `It's Dad's birthday today.` (plain, no title, bigText matches), silent (LOW), `AUTO_CANCEL`, in the **Silent** shade section (no heads-up peek). ✓
+- **Tap routing (birthday → profile):** tapping the fired birthday notification opened **Dad's profile**. ✓
+- **11-09 in-app snooze UI:** the profile "SNOOZE REMINDERS" block renders with 3 days / 1 week / 1 month presets. ✓
+- **NOTIF-01 weekly cadence (item G):** Dad's decay nudge is correctly on the weekly tick (Aug 22), NOT today — the stateless flat-weekly design. The absence of a decay notification tonight is CORRECT, not a gap. ✓
+- **Migration + launch:** release build cold-starts; migration 002 (v1→v2) ran on real data; no crash. ✓
+
+### FINDING (softened from the earlier alarm) — lock-screen visibility
+- The posted birthday notification carries **`vis=PRIVATE`** (private applied at the NOTIFICATION level), even though the channel dumped as `mLockscreenVisibility=-1000` (NO_OVERRIDE). So the private-by-default posture appears to BE applied via the notification. The earlier "not enforced" concern is largely walked back — recommend a quick lock-screen visual confirm (does the contact name hide on the lock screen when private) to fully close it, but this is NOT the privacy gap it first looked like.
+
+### NOT exercised on-device (deferred — code-verified)
+- **Killed-app FCM-less headless mark/snooze write (H1/H2):** no decay notification is deliverable tonight (Dad's decay is Aug 22 per the weekly cadence; quiet hours now block further fires today), so the shade action buttons couldn't be tapped. The H1 (`await openAndMigrate()` before `getExecutor()`) + H2 (deterministic actionUid, UNIQUE-collision benign) fixes are verified in code review + the exactly-once unit test that drives the real DAOs against in-memory sqlite. On-device exercise needs a non-rogue overdue contact whose weekly tick lands on a near-future deliverable slot (e.g., tomorrow morning) — a short follow-up.
+- **Decay body-tap → Compose → Back → dashboard:** same dependency (no decay notification tonight). resolveNotificationNav decay→reset[Home,Compose] is pure-unit-tested; birthday→Profile confirmed live above.
+
+### Net
+The engine works on the real device: it schedules (inexact, no exact-alarm), reschedules on change, delivers silently with the correct generic copy, routes taps, and honors the weekly cadence. Remaining device-exercise (headless action + decay body-tap) is a short follow-up gated on a deliverable decay notification, and is already code-de-risked.
