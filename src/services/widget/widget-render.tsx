@@ -68,10 +68,11 @@ const LOG_SCOPE = "widget-render";
 
 /**
  * The dp width at/above which a resized widget renders the LARGE (fuel + actions)
- * tree; below it, the SMALL mark-grid. Device-spike-tunable (12-08 measures the
- * real Pixel breakpoint). Single-number edit.
+ * tree; below it, the SMALL mark-grid. Device-spike-calibrated (12-08 on-device
+ * UAT): the default 4-cell Pixel placement measures ~296dp, so the breakpoint sits
+ * just below it (280) to render LARGE at the default size. Single-number edit.
  */
-const LARGE_MIN_WIDTH_DP = 300;
+const LARGE_MIN_WIDTH_DP = 280;
 
 /** Favourites shown in the SMALL grid before rank-truncation (device-tunable, 12-08). */
 const SMALL_CAPACITY = 6;
@@ -326,13 +327,18 @@ function ActionButton({
       clickAction={clickAction}
       clickActionData={clickActionData}
       style={{
+        // Content-sized (not a fixed 48dp box) so a longer label like "Message"
+        // renders in full instead of truncating to "Messa" (12-08 UAT); the lib
+        // has no minWidth, so horizontal padding keeps a comfortable tap area and
+        // `height: TAP_MIN_DP` holds the vertical touch floor.
         flexDirection: "column",
         alignItems: "center",
         justifyContent: "center",
         height: TAP_MIN_DP,
-        width: TAP_MIN_DP,
+        width: "wrap_content",
         marginLeft: SPACING_XS,
-        padding: SPACING_XS,
+        paddingHorizontal: SPACING_MD,
+        paddingVertical: SPACING_XS,
         backgroundColor: asColor(palette.surfaceElevated),
         borderRadius: SPACING_SM,
       }}
