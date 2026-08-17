@@ -109,3 +109,38 @@ Two independent source-grounded reviews. The **data layer is solid** (Claude tra
 - **Overall risk:** codex **HIGH** (render architecture must be fixed first); Claude **LOW–MEDIUM** (data layer solid). Resolution: the data layer is verifiably solid; the render-architecture HIGHs (H1/H2) are real plan-specification gaps, not code bugs — they are cheaply fixed by tightening the plans (component decomposition + shared metrics) before execution. No recorded decision is reopened by any finding.
 
 CYCLE_SUMMARY: current_high=2 current_actionable=9
+
+---
+
+# Cross-AI Plan Review — Phase 13 (Orrery) — Cycle 2 (post-incorporation)
+
+Both reviewers independently confirm **ALL 11 cycle-1 findings are RESOLVED** in the revised plans (H1 keyed component decomposition, H2 shared `deriveOrreryMetrics`, M3 dense read-time rank + regression test, M4 `Promise.all` sun-occupant read + archived→self fallback in both surfaces, M5 `useClock`-in-`OrreryCanvas` + worklet snapshot, M6 palette conformance test + error posture, L7–L11). Data layer re-verified solid; no CLAUDE.md violation; owner Settings-relocation respected. The edits surfaced a small set of NEW, localized issues.
+
+## Codex Review (cycle 2) — overall HIGH
+- Cycle-1: H1/M3/M5/L7–L11 RESOLVED; H2/M4/M6 PARTIAL (the partials == the new issues below).
+- **NEW HIGH — nullable photo → `resolvePhotoUri`.** orrery read returns `photo: string|null` but render calls `useImage(resolvePhotoUri(photo))`; `resolvePhotoUri` requires `string` (photo-storage.ts:130) → won't type-check + defeats the no-photo fallback. Fix: `photo ? resolvePhotoUri(photo) : null`, hook stays unconditional. (13-03:74, 13-05:125)
+- **NEW HIGH — never-contacted sun candidate → null status.** The picker includes never-contacted (13-03:151); `getContactStatus` returns `status:null` for them (contact-status-read.ts:25,70); `resolveSunOccupant` requires `status: ProfileStatus` (13-04:135); screen passes `statusRow?.status` (13-05:123). Define the no-status sun visual + accept `ProfileStatus|null` (or exclude never-contacted candidates).
+- **NEW MEDIUM — metrics safe-domain.** `effectiveGap` can be zero/negative on a short/transient-zero canvas; drag rank divides by it (13-02:78, 13-07:127). Add a minimum-viable-canvas guard + defer canvas/gestures until dims valid.
+- **NEW LOW — M6 coupling not actually shared.** Test hard-codes the regex; DAO validator is private (app-settings-dao.ts:114). Export a validator/regex or add a DAO test writing every palette token.
+
+## Claude Review (cycle 2) — overall LOW
+- All 11 cycle-1 findings RESOLVED (traced to plan + real code; `deriveOrreryMetrics` math checks out, guard clone faithful+symmetric, single-writer grep-pinned).
+- **NEW MEDIUM — `check:colors` gate FAILS on the validator test's hex literals.** The `self_sun_colour` accept-path test must contain a valid 6-hex literal (`#F2C14E`) to exercise the validator, but `npm run check:colors` (no-arg) scans all of `src` incl. `*.test.ts` (not under `/theme/`) and its regex `#[0-9a-fA-F]{3,8}\b` matches 6-hex. 13-01's own "check:colors clean" claim is self-contradictory, and 4 downstream plans gate on the no-arg check:colors verify. Fix: import `starPalette[0]` instead of a bare literal, OR target check:colors at non-test files, OR add a test-glob carve-out. (13-01:103,105; scripts/check-colors.sh; package.json)
+- **NEW LOW — never-contacted sun → null status** (same defect codex rated HIGH; Claude: loud self-catching tsc error, and `orrery-ring-logic` already has a null→neutral fallback the resolver can reuse — one-line spec note). (13-05:123, 13-04:135,103)
+- **NEW LOW — `deriveOrreryMetrics` key-aliasing** (`ringInner`/`effectiveGap` vs `RING_INNER`/`RING_GAP`): dual naming invites wiring raw `RING_GAP` into one consumer + compressed `effectiveGap` into another — the exact divergence H2 prevents. Use a single canonical key. (13-02:78,81)
+
+## Consensus Summary (cycle 2)
+Both agree the cycle-1 fixes landed and the plan is architecturally sound; divergence is only on the severity of the nullable-input type issues (codex HIGH, Claude LOW — both real, both self-catching at `tsc`). Claude uniquely caught a real BUILD-GATE bug (check:colors failing on test hex) that would block the verify step of 4 plans. Incorporate the union:
+
+### Actionable (for cycle-2 `--reviews` incorporation)
+- **C2-1 [HIGH] nullable-photo guard** — `photo ? resolvePhotoUri(photo) : null` in the orrery render (OrbitBody); keep `useImage` unconditional with a nullable source. (13-05, 13-03)
+- **C2-2 [HIGH] never-contacted sun status** — accept `ProfileStatus | null` in `resolveSunOccupant` + define the null-status sun glow (reuse `orrery-ring-logic`'s null→neutral fallback); thread `statusRow?.status ?? null`. (13-04, 13-05)
+- **C2-3 [MEDIUM] check:colors test-hex gate** — make the `self_sun_colour` validator accept-test use `starPalette[0]` (imported token), not a bare hex literal, so `npm run check:colors` stays green; add an acceptance note that no non-theme file introduces a hex literal. (13-01)
+- **C2-4 [MEDIUM] metrics safe-domain guard** — `deriveOrreryMetrics` clamps `effectiveGap` to a positive minimum; the screen defers `<Canvas>`/gestures until measured dims are valid (guard transient zero `onLayout` / div-by-zero). (13-02, 13-05, 13-07)
+- **C2-5 [LOW] M6 real DAO coupling** — export the `self_sun_colour` validator (or its regex) from `app-settings-dao` and have the conformance test assert every `starPalette` entry passes the ACTUAL DAO validator (not a duplicated regex). (13-01, 13-04)
+- **C2-6 [LOW] metrics canonical key** — `deriveOrreryMetrics` returns a single canonical key set consumed everywhere; drop the `RING_INNER`/`RING_GAP` aliasing. (13-02)
+
+### Divergent Views
+- Overall risk: codex HIGH, Claude LOW. Resolution: C2-1/C2-2 are real but self-catching at `tsc`; C2-3 (check:colors) is the one that would actually block a clean verify. All are small, localized edits; none reopen a decision.
+
+CYCLE_SUMMARY: current_high=2 current_actionable=4
