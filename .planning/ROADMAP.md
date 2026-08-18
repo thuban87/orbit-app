@@ -502,7 +502,7 @@ Plans:
 **Wave 1** *(parallel — independent foundations: no theme dep, no file overlap)*
 
 - [x] 13-01-PLAN.md — Migration 003 (sun_contact_id + self_sun_colour) + app-settings-dao widen (ORR-05, ORR-06)
-- [ ] 13-02-PLAN.md — Pure geometry-logic (angle/radius/drift/hit-test) + ring-reorder-logic (ORR-01, ORR-04, ORR-06)
+- [x] 13-02-PLAN.md — Pure geometry-logic (angle/radius/drift/hit-test) + ring-reorder-logic (ORR-01, ORR-04, ORR-06)
 - [ ] 13-03-PLAN.md — orrery-read scan + ring-seq-dao (first ring_seq writer) + sun-picker-read (ORR-01, ORR-06)
 - [ ] 13-04-PLAN.md — Theme tokens (starPalette/muted/rogueExtinguished) + orrery-ring-logic + sun-occupant-logic (ORR-01, ORR-04, ORR-05)
 

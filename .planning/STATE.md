@@ -6,7 +6,7 @@ current_phase: 13
 current_phase_name: Orrery
 status: in-progress
 stopped_at: "Phase 13 (Orrery) PRE-EXECUTION COMPLETE — PAUSED before execute per owner (awaiting usage-headroom confirmation). Full pipeline done + committed locally on main (NOT pushed): smart-discuss (13-CONTEXT), UI-SPEC (checker-approved), RESEARCH, VALIDATION (Nyquist, 9 Wave-0 files), PATTERNS (18 files→analogs), 8 PLANs / 4 waves, plan-checker PASSED after 1 revision closing a REAL cross-plan blocker (rewriteRingSeq count-guard vs the sun-excluded N-1 rendered set — would break every ring_seq drag whenever a contact occupied the sun). Then a 2-cycle cross-AI convergence (codex `exec --sandbox read-only` WITHOUT the classifier-blocked bypass flag + an independent read-only Claude subagent; Claude self-review guard overridden per owner) that CONVERGED: cycle-1 = 2 codex HIGH (React Rules-of-Hooks from per-planet hooks in a map; incomplete responsive layoutMetrics) + 9 actionable → replan; cycle-2 = 2 HIGH (nullable photo→resolvePhotoUri type/fallback; never-contacted-sun null status) + Claude's check:colors test-hex build-gate bug + 4 more → replan; cycle-3 = BOTH reviewers READY-TO-EXECUTE, 0 HIGH / 0 actionable. Next: /gsd-execute-phase 13 on owner go-ahead. One owner-gated checkpoint: 13-08 is autonomous:false (desktop prebuild + Pixel device UAT + owner sign-off). NO npm-dep legitimacy checkpoint — zero new deps (Skia 2.6.2/Reanimated 4.5.1 already installed + proven by CropPhotoScreen); the only new asset is one bundled .ttf font for Skia initials. Migration 003 (adds sun_contact_id + self_sun_colour to app_settings) is the first schema change since Phase-11's 002 — forward-only, irreversible."
-last_updated: "2026-08-18T00:22:00.000Z"
+last_updated: "2026-08-18T00:35:00.000Z"
 progress:
   total_phases: 16
   completed_phases: 12
@@ -127,6 +127,7 @@ Progress: [████████░░] 75% (12/16 phases complete; Phase 13 
 | Phase 09 P01 | 3min | 3 tasks | 6 files |
 | Phase 09 P02 | 10min | 3 tasks | 5 files |
 | Phase 13 P01 | 7min | 2 tasks | 6 files |
+| Phase 13 P02 | 5min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -254,8 +255,8 @@ planning" sections in docs/dossier/*.md — those are the authoritative hand-off
 ## Session
 
 **Last session:** 2026-08-18
-**Stopped at:** Phase 13 (Orrery) EXECUTING — Wave 1 plan 13-01 COMPLETE (Migration 003 + app-settings-dao widen). Migration 003 adds nullable `sun_contact_id` (FK ON DELETE SET NULL → self-revert) + `self_sun_colour` (NULL→starPalette[0] at render) to app_settings; TARGET_VERSION 2→3; DAO reads/writes/clears/validates both fields with an EXPORTED `SELF_SUN_COLOUR_RE`/`assertSelfSunColour` (13-04 palette-lock source of truth). 4 commits (2 RED test + 2 GREEN feat); full suite 913/913, tsc + check:colors green; migrations 001/002 byte-unchanged. In-scope regression auto-fixed: notification-schedule.test.ts harness migrated to v3 (getAppSettings now selects the v3 columns). Committed locally on main (NOT pushed). Next: remaining Wave-1 plans 13-02/03/04, then Wave 2 (13-05/06), Wave 3 (13-07), Wave 4 (13-08 device UAT, autonomous:false).
-**Resume file:** .planning/phases/13-orrery/13-01-SUMMARY.md
+**Stopped at:** Phase 13 (Orrery) EXECUTING — Wave 1 plans 13-01 + 13-02 COMPLETE. 13-02 = the pure, node-tested geometry + reorder math (RN/Skia/expo-free `*-logic.ts`): `orrery-geometry-logic.ts` (progressToAngle 0→top/clockwise/wraps A2-swappable · polarToXY · ringRadius · drawnRadius decay-drift + rogue-furthest + hard DRIFT_MAX clamp · evenSpreadAngle · hitTest nearest/tie/miss · shortestAngleDelta Pitfall-2 · **deriveOrreryMetrics** = the SINGLE measured-canvas metrics object with ONE canonical `ringInner`/`effectiveGap` pair (C2-6, no RING_INNER/RING_GAP alias) floored to a positive MIN_GAP so the 13-07 drag-release rank division is domain-safe on any/zero canvas (C2-4)) + `ring-reorder-logic.ts` (`computeRingReorder`, cloned verbatim from favourites-reorder-logic → feeds 13-03 rewriteRingSeq). WOBBLE_MAX/ROGUE_K imported from status.ts (never re-typed; STABLE_MAX intentionally not imported — unused, would fail biome noUnusedImports; the no-re-type rule is honored). 4 commits (2 RED test + 2 GREEN feat: 12715cd/cc9833e/187c1ce/3006b0b); 45 new vitest cases green (34 geometry + 11 reorder), tsc + check:colors + biome clean. REQUIREMENTS.md left unchanged — ORR-01/04/06 are contributed-to but not fully delivered until the render/DAO/settings plans (13-03/05/07), matching 13-01's convention. Committed locally on main (NOT pushed). Next: remaining Wave-1 plans 13-03/04, then Wave 2 (13-05/06), Wave 3 (13-07), Wave 4 (13-08 device UAT, autonomous:false).
+**Resume file:** .planning/phases/13-orrery/13-02-SUMMARY.md
 
 ## Phase 4 — Closeout (2026-08-15) ✅ COMPLETE
 
