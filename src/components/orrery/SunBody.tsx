@@ -28,7 +28,9 @@ import {
   useImage,
 } from "@shopify/react-native-skia";
 import { useMemo } from "react";
+import { useDerivedValue } from "react-native-reanimated";
 import { resolvePhotoUri } from "@/services/photos/photo-storage";
+import { useOrreryClock } from "./orrery-clock-context";
 
 export interface SunBodyProps {
   /** Canvas centre x (`C.cx`). */
@@ -53,8 +55,14 @@ export interface SunBodyProps {
   fontProvider: SkTypefaceFontProvider | null;
 }
 
-/** Soft-glow halo opacity (device-UAT tunable, 13-08; 13-07 pulses it). */
+/** Soft-glow halo opacity mid-point (device-UAT tunable, 13-08). */
 const GLOW_OPACITY = 0.35;
+/** Glow-radius pulse fraction (±10% of glowRadius). */
+const PULSE_RADIUS_FRAC = 0.1;
+/** Glow-opacity pulse fraction (±this of GLOW_OPACITY). */
+const PULSE_OPACITY_FRAC = 0.4;
+/** Pulse angular speed (rad/ms) → ~3.1s period (UI-SPEC ~2–4s). */
+const PULSE_SPEED = 0.002;
 
 export function SunBody({
   cx,
@@ -70,6 +78,26 @@ export function SunBody({
 }: SunBodyProps) {
   // C2-1: unconditional hook, null-guarded source.
   const image = useImage(photo ? resolvePhotoUri(photo) : null);
+
+  // ORR-03 — slow sun-glow pulse off the ambient clock provided by OrreryCanvas
+  // (M5 — SunBody never calls useClock itself). When no clock is in scope (unit
+  // harness), fall back to the static mid-point (no pulse). Bodies do NOT animate;
+  // only the sun's glow halo breathes (~3s) — radius ±10%, opacity ±40%.
+  const clock = useOrreryClock();
+  const pulseGlowRadius = useDerivedValue(() => {
+    if (!clock) {
+      return glowRadius;
+    }
+    const t = Math.sin(clock.value * PULSE_SPEED); // −1..1
+    return glowRadius * (1 + PULSE_RADIUS_FRAC * t);
+  });
+  const pulseGlowOpacity = useDerivedValue(() => {
+    if (!clock) {
+      return GLOW_OPACITY;
+    }
+    const t = Math.sin(clock.value * PULSE_SPEED); // −1..1
+    return GLOW_OPACITY * (1 + PULSE_OPACITY_FRAC * t);
+  });
 
   const fontSize = radius; // ~cap height fits the disc (device-UAT tunable, 13-08).
 
@@ -101,13 +129,13 @@ export function SunBody({
 
   return (
     <Group>
-      {/* Glow halo. */}
+      {/* Glow halo — pulses (radius + opacity) off the ambient clock. */}
       <Circle
         cx={cx}
         cy={cy}
-        r={glowRadius}
+        r={pulseGlowRadius}
         color={glowColor}
-        opacity={GLOW_OPACITY}
+        opacity={pulseGlowOpacity}
       />
       {/* Glow rim just outside the disc. */}
       <Circle cx={cx} cy={cy} r={radius + 2} color={glowColor} />

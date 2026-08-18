@@ -32,7 +32,11 @@
  * a photo that fails to decode falls back silently to a swatch + initials. Every
  * Skia colour resolves through `useTheme().colors.*` — no hex (check:colors).
  */
-import { useFocusEffect, useNavigation } from "@react-navigation/native";
+import {
+  useFocusEffect,
+  useIsFocused,
+  useNavigation,
+} from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import {
   Circle,
@@ -40,8 +44,9 @@ import {
   Group,
   useFonts,
 } from "@shopify/react-native-skia";
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  AppState,
   type LayoutChangeEvent,
   Pressable,
   StyleSheet,
@@ -256,6 +261,22 @@ export function OrreryScreen() {
   // C2-4: defer ALL layout until the canvas is measured.
   const dimsValid = canvas.width > 0 && canvas.height > 0;
 
+  // ORR-03 pause-on-blur (Pitfall 4): the ambient clock lives inside OrreryCanvas,
+  // so UNMOUNTING that subtree is what stops the loop — gating derived values would
+  // not. Mount it only when focused AND foregrounded AND measured. `useIsFocused`
+  // (@react-navigation) + an AppState 'change' listener (mirrors HomeScreen) feed a
+  // boolean; the RN chrome (header, toggle, empty state) stays mounted regardless.
+  const isFocused = useIsFocused();
+  const [appActive, setAppActive] = useState(
+    AppState.currentState === "active",
+  );
+  useEffect(() => {
+    const sub = AppState.addEventListener("change", (state) => {
+      setAppActive(state === "active");
+    });
+    return () => sub.remove();
+  }, []);
+
   // Resolve the sun occupant + glow at render (needs the live palette).
   const resolvedSun = resolveSunOccupant({
     sunContactId: sun.sunContactId,
@@ -412,6 +433,16 @@ export function OrreryScreen() {
     [handleTap],
   );
 
+  // Ambient star tones — passed as tokens (check:colors) into OrreryCanvas.
+  const starColors = useMemo(
+    () => [colors.textSecondary, colors.textPrimary, ...colors.starPalette],
+    [colors],
+  );
+
+  // The single mount gate for the clock-owning subtree (pause-on-blur).
+  const canvasVisible =
+    dimsValid && placement !== null && isFocused && appActive;
+
   const isEmpty = orbiting.length === 0;
 
   return (
@@ -453,11 +484,12 @@ export function OrreryScreen() {
         style={styles.canvasArea}
         onLayout={onCanvasLayout}
       >
-        {dimsValid && placement ? (
+        {canvasVisible && placement ? (
           <OrreryCanvas
             width={canvas.width}
             height={canvas.height}
             background={colors.background}
+            starColors={starColors}
             gesture={tapGesture}
           >
             <Group>{placement.rings}</Group>
