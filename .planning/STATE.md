@@ -4,14 +4,14 @@ milestone: v1.0
 milestone_name: milestone
 current_phase: 13
 current_phase_name: Orrery
-status: planned
+status: in-progress
 stopped_at: "Phase 13 (Orrery) PRE-EXECUTION COMPLETE — PAUSED before execute per owner (awaiting usage-headroom confirmation). Full pipeline done + committed locally on main (NOT pushed): smart-discuss (13-CONTEXT), UI-SPEC (checker-approved), RESEARCH, VALIDATION (Nyquist, 9 Wave-0 files), PATTERNS (18 files→analogs), 8 PLANs / 4 waves, plan-checker PASSED after 1 revision closing a REAL cross-plan blocker (rewriteRingSeq count-guard vs the sun-excluded N-1 rendered set — would break every ring_seq drag whenever a contact occupied the sun). Then a 2-cycle cross-AI convergence (codex `exec --sandbox read-only` WITHOUT the classifier-blocked bypass flag + an independent read-only Claude subagent; Claude self-review guard overridden per owner) that CONVERGED: cycle-1 = 2 codex HIGH (React Rules-of-Hooks from per-planet hooks in a map; incomplete responsive layoutMetrics) + 9 actionable → replan; cycle-2 = 2 HIGH (nullable photo→resolvePhotoUri type/fallback; never-contacted-sun null status) + Claude's check:colors test-hex build-gate bug + 4 more → replan; cycle-3 = BOTH reviewers READY-TO-EXECUTE, 0 HIGH / 0 actionable. Next: /gsd-execute-phase 13 on owner go-ahead. One owner-gated checkpoint: 13-08 is autonomous:false (desktop prebuild + Pixel device UAT + owner sign-off). NO npm-dep legitimacy checkpoint — zero new deps (Skia 2.6.2/Reanimated 4.5.1 already installed + proven by CropPhotoScreen); the only new asset is one bundled .ttf font for Skia initials. Migration 003 (adds sun_contact_id + self_sun_colour to app_settings) is the first schema change since Phase-11's 002 — forward-only, irreversible."
-last_updated: "2026-08-17T20:00:00.000Z"
+last_updated: "2026-08-18T00:22:00.000Z"
 progress:
   total_phases: 16
   completed_phases: 12
   total_plans: 93
-  completed_plans: 85
+  completed_plans: 86
   percent: 75
 ---
 
@@ -126,6 +126,7 @@ Progress: [████████░░] 75% (12/16 phases complete; Phase 13 
 | Phase 08 P10 | 2min | 2 tasks | 3 files |
 | Phase 09 P01 | 3min | 3 tasks | 6 files |
 | Phase 09 P02 | 10min | 3 tasks | 5 files |
+| Phase 13 P01 | 7min | 2 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -252,9 +253,9 @@ planning" sections in docs/dossier/*.md — those are the authoritative hand-off
 
 ## Session
 
-**Last session:** 2026-08-17
-**Stopped at:** Phase 13 (Orrery) PRE-EXECUTION COMPLETE — ⏸ PAUSED before execute per owner (awaiting usage-headroom confirmation). Full pipeline done + committed locally on main (NOT pushed): 13-CONTEXT (smart-discuss), 13-UI-SPEC (checker-approved), 13-RESEARCH, 13-VALIDATION (Nyquist), 13-PATTERNS, 8 PLANs / 4 waves, plan-checker PASSED (after 1 revision), 3-cycle cross-AI convergence CONVERGED (codex `exec --sandbox read-only` + independent read-only Claude subagent; 0 HIGH / 0 actionable). Next: `/gsd-execute-phase 13` on owner go-ahead (13-08 is autonomous:false → device UAT + sign-off).
-**Resume file:** .planning/phases/13-orrery/13-REVIEWS.md
+**Last session:** 2026-08-18
+**Stopped at:** Phase 13 (Orrery) EXECUTING — Wave 1 plan 13-01 COMPLETE (Migration 003 + app-settings-dao widen). Migration 003 adds nullable `sun_contact_id` (FK ON DELETE SET NULL → self-revert) + `self_sun_colour` (NULL→starPalette[0] at render) to app_settings; TARGET_VERSION 2→3; DAO reads/writes/clears/validates both fields with an EXPORTED `SELF_SUN_COLOUR_RE`/`assertSelfSunColour` (13-04 palette-lock source of truth). 4 commits (2 RED test + 2 GREEN feat); full suite 913/913, tsc + check:colors green; migrations 001/002 byte-unchanged. In-scope regression auto-fixed: notification-schedule.test.ts harness migrated to v3 (getAppSettings now selects the v3 columns). Committed locally on main (NOT pushed). Next: remaining Wave-1 plans 13-02/03/04, then Wave 2 (13-05/06), Wave 3 (13-07), Wave 4 (13-08 device UAT, autonomous:false).
+**Resume file:** .planning/phases/13-orrery/13-01-SUMMARY.md
 
 ## Phase 4 — Closeout (2026-08-15) ✅ COMPLETE
 

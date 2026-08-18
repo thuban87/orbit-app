@@ -501,7 +501,7 @@ Plans:
 
 **Wave 1** *(parallel — independent foundations: no theme dep, no file overlap)*
 
-- [ ] 13-01-PLAN.md — Migration 003 (sun_contact_id + self_sun_colour) + app-settings-dao widen (ORR-05, ORR-06)
+- [x] 13-01-PLAN.md — Migration 003 (sun_contact_id + self_sun_colour) + app-settings-dao widen (ORR-05, ORR-06)
 - [ ] 13-02-PLAN.md — Pure geometry-logic (angle/radius/drift/hit-test) + ring-reorder-logic (ORR-01, ORR-04, ORR-06)
 - [ ] 13-03-PLAN.md — orrery-read scan + ring-seq-dao (first ring_seq writer) + sun-picker-read (ORR-01, ORR-06)
 - [ ] 13-04-PLAN.md — Theme tokens (starPalette/muted/rogueExtinguished) + orrery-ring-logic + sun-occupant-logic (ORR-01, ORR-04, ORR-05)
@@ -579,7 +579,7 @@ Plans:
 | 10. Share-Sheet Capture | 6/6 | Complete   | 2026-08-16 |
 | 11. Actionable Notifications | 13/13 | Complete   | 2026-08-16 |
 | 12. Home Screen Widget | 8/8 | Complete   | 2026-08-17 |
-| 13. Orrery | 0/8 | Not started | - |
+| 13. Orrery | 1/8 | In progress | - |
 | 14. AI Message Suggestions | 0/TBD | Not started | - |
 | 15. Weekly Digest | 0/TBD | Not started | - |
 | 16. Backup, Export & Restore | 0/TBD | Not started | - |
