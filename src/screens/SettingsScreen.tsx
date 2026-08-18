@@ -100,6 +100,11 @@ export function SettingsScreen() {
   // launcher / API < 26 / a rejected request). Surfaced inline under the row.
   const [addWidgetCopy, setAddWidgetCopy] = useState<string | null>(null);
 
+  // "Your orbit" section (ORR-05 / relocated ORR-06). `selfSunColour` is the raw
+  // stored self-star hex or NULL; NULL resolves to `starPalette[0]` (gold) at
+  // RENDER — no stored hex default (the DAO cannot import theme). Loaded on focus.
+  const [selfSunColour, setSelfSunColour] = useState<string | null>(null);
+
   // Reload the self record so a set/remove made on the crop screen refreshes when
   // it goBack()s here (mirrors ContactProfileScreen's reload-on-focus). The
   // sub-second same-path replace is closed elsewhere: the crop screen's profile
@@ -134,11 +139,44 @@ export function SettingsScreen() {
     }
   }, []);
 
+  // Load the "Your orbit" settings (self-star colour, and — added in the sun
+  // picker below — the centre occupant). Read on focus so a change made
+  // elsewhere refreshes when this screen regains focus, mirroring reloadProfile.
+  const reloadOrbit = useCallback(async () => {
+    try {
+      const next = await getAppSettings(getExecutor());
+      setSelfSunColour(next.selfSunColour);
+    } catch (err) {
+      Logger.error(LOG_SCOPE, "failed to load orbit settings", err);
+    }
+  }, []);
+
   useFocusEffect(
     useCallback(() => {
       void reloadProfile();
       void reloadNotifications();
-    }, [reloadProfile, reloadNotifications]),
+      void reloadOrbit();
+    }, [reloadProfile, reloadNotifications, reloadOrbit]),
+  );
+
+  // M6: persist the tapped star token through the same try/catch + Logger.error
+  // posture as `persist` — if a future design pass seeds a non-`#RRGGBB`
+  // starPalette token the DAO validator throws, which is caught and logged here
+  // rather than escaping as an unhandled rejection. Reloads from the write.
+  const onPickStarColour = useCallback(
+    async (token: string) => {
+      try {
+        await updateAppSettings(
+          getExecutor(),
+          { selfSunColour: token },
+          localDateTime(),
+        );
+        await reloadOrbit();
+      } catch (err) {
+        Logger.error(LOG_SCOPE, "failed to persist star colour", err);
+      }
+    },
+    [reloadOrbit],
   );
 
   // Persist a patch to app_settings then fire-and-forget a reconcile so the OS
@@ -553,6 +591,58 @@ export function SettingsScreen() {
         />
       </View>
 
+      <View testID="settings-your-orbit-section" style={styles.section}>
+        <Text
+          accessibilityRole="header"
+          style={[styles.sectionHeading, { color: colors.textSecondary }]}
+        >
+          Your orbit
+        </Text>
+
+        {/* "Your star" — the self-sun colour, picked from the themed starPalette.
+            The selected swatch = selfSunColour, or starPalette[0] (gold) when
+            unset (NULL resolves to gold at RENDER — no stored hex default). Swatch
+            fills ARE starPalette TOKENS (legitimate token use, not hardcoded hex);
+            the accent ring marks the selection. Writes self_sun_colour (ORR-05). */}
+        <View
+          testID="settings-your-star-row"
+          style={[
+            styles.row,
+            { backgroundColor: colors.surface, borderColor: colors.border },
+          ]}
+        >
+          <Text style={[styles.rowLabel, { color: colors.textPrimary }]}>
+            Your star
+          </Text>
+          <View style={styles.swatchRow}>
+            {colors.starPalette.map((token, index) => {
+              const isSelected =
+                token === (selfSunColour ?? colors.starPalette[0]);
+              return (
+                <Pressable
+                  key={token}
+                  testID={`settings-star-swatch-${index}`}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Star colour ${index + 1}`}
+                  accessibilityState={{ selected: isSelected }}
+                  onPress={() => void onPickStarColour(token)}
+                  style={[
+                    styles.swatch,
+                    {
+                      backgroundColor: token,
+                      borderColor: isSelected ? colors.accent : colors.border,
+                    },
+                  ]}
+                />
+              );
+            })}
+          </View>
+          <Text style={[styles.helper, { color: colors.textSecondary }]}>
+            Pick the colour of your star at the centre of your orbit.
+          </Text>
+        </View>
+      </View>
+
       <View testID="settings-home-screen-section" style={styles.section}>
         <Text
           accessibilityRole="header"
@@ -711,6 +801,17 @@ const styles = StyleSheet.create({
   rowValue: {
     fontSize: 16,
     fontWeight: "600",
+  },
+  swatchRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 12,
+  },
+  swatch: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    borderWidth: 3,
   },
   toggleRow: {
     flexDirection: "row",
