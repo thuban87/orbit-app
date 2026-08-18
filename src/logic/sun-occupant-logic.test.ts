@@ -16,6 +16,9 @@ import { resolveSunOccupant } from "./sun-occupant-logic";
 
 const colors = THEME_PRESETS["space-dark"].dark;
 const starPalette = colors.starPalette;
+// A "picked" self-sun colour, sourced from the palette (not index 0, so it is
+// distinct from the gold default) — keeps the test hex-literal-free (C2-3).
+const PICKED = starPalette[3];
 
 const base = {
   starPalette,
@@ -28,11 +31,11 @@ describe("resolveSunOccupant", () => {
     const out = resolveSunOccupant({
       ...base,
       sunContactId: null,
-      selfSunColour: "#123ABC",
+      selfSunColour: PICKED,
       occupant: null,
     });
     expect(out.kind).toBe("self");
-    expect(out.glowColor).toBe("#123ABC");
+    expect(out.glowColor).toBe(PICKED);
     expect(out.photo).toBe("file:///self.jpg");
   });
 
@@ -51,14 +54,14 @@ describe("resolveSunOccupant", () => {
     const out = resolveSunOccupant({
       ...base,
       sunContactId: 5,
-      selfSunColour: "#123ABC",
+      selfSunColour: PICKED,
       occupant: { photo: "file:///c5.jpg", status: "wobble", archived: false },
     });
     expect(out.kind).toBe("contact");
     expect(out).toMatchObject({ contactId: 5, photo: "file:///c5.jpg" });
     expect(out.glowColor).toBe(colors.statusWobble);
     // The self star pick does NOT apply to a contact-sun.
-    expect(out.glowColor).not.toBe("#123ABC");
+    expect(out.glowColor).not.toBe(PICKED);
   });
 
   it("never-contacted contact (status null, C2-2) → contact, glow = the NEUTRAL border colour reused from orrery-ring-logic", () => {
@@ -79,11 +82,11 @@ describe("resolveSunOccupant", () => {
     const out = resolveSunOccupant({
       ...base,
       sunContactId: 9,
-      selfSunColour: "#123ABC",
+      selfSunColour: PICKED,
       occupant: { photo: "file:///c9.jpg", status: "stable", archived: true },
     });
     expect(out.kind).toBe("self");
-    expect(out.glowColor).toBe("#123ABC");
+    expect(out.glowColor).toBe(PICKED);
     expect(out.photo).toBe("file:///self.jpg");
   });
 
