@@ -508,7 +508,7 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1)*
 
-- [ ] 13-05-PLAN.md — OrreryScreen static render + SegmentedControl + font + Orrery route + dashboard ◎ button (ORR-01, ORR-03, ORR-04, ORR-05)
+- [x] 13-05-PLAN.md — OrreryScreen static render + SegmentedControl + font + Orrery route + dashboard ◎ button (ORR-01, ORR-03, ORR-04, ORR-05)
 - [ ] 13-06-PLAN.md — Settings "Your star" swatch + "Sun / centre" picker (ORR-05, ORR-06)
 
 **Wave 3** *(blocked on 13-05)*
@@ -579,7 +579,7 @@ Plans:
 | 10. Share-Sheet Capture | 6/6 | Complete   | 2026-08-16 |
 | 11. Actionable Notifications | 13/13 | Complete   | 2026-08-16 |
 | 12. Home Screen Widget | 8/8 | Complete   | 2026-08-17 |
-| 13. Orrery | 4/8 | In progress | - |
+| 13. Orrery | 5/8 | In progress | - |
 | 14. AI Message Suggestions | 0/TBD | Not started | - |
 | 15. Weekly Digest | 0/TBD | Not started | - |
 | 16. Backup, Export & Restore | 0/TBD | Not started | - |
