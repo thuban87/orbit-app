@@ -1,4 +1,11 @@
 import { describe, expect, it } from "vitest";
+// C2-5: import the ACTUAL DAO validator, not a re-inlined regex, so the palette
+// lock and the write path can never desync (loosening the DAO rule would fail
+// this suite too).
+import {
+  assertSelfSunColour,
+  SELF_SUN_COLOUR_RE,
+} from "@/db/app-settings-dao";
 import {
   DEFAULT_PRESET_ID,
   resolveMode,
@@ -142,6 +149,43 @@ describe("shared status palette tokens (owner-approved 2026-08-16, UI-SPEC ⭐)"
         "statusStable",
         "statusWobble",
         "statusDecay",
+      ] as const) {
+        expect(typeof preset.dark[token]).toBe("string");
+        expect(preset.dark[token].length).toBeGreaterThan(0);
+      }
+    }
+  });
+});
+
+describe("orrery theme tokens (ORR-04/ORR-05, UI-SPEC seeds)", () => {
+  it("seeds starPalette with gold #F2C14E at index 0 and >= 6 ordered colours", () => {
+    // This #F2C14E literal is check:colors-exempt (the test lives under /theme/).
+    const palette = resolvePalette(DEFAULT_PRESET_ID, "dark");
+    expect(palette.starPalette.length).toBeGreaterThanOrEqual(6);
+    expect(palette.starPalette[0]).toBe("#F2C14E");
+  });
+
+  it("M6 + C2-5: every starPalette entry passes the REAL self_sun_colour DAO validator", () => {
+    // Import the exported DAO rule (SELF_SUN_COLOUR_RE + assertSelfSunColour) and
+    // run every palette token through it — the SAME check updateAppSettings runs
+    // when a swatch is tapped. A non-6-hex seed (8-digit/3-digit/hsl()) fails here
+    // before it can throw on-device. NO re-inlined /^#[0-9A-Fa-f]{6}$/ regex.
+    for (const preset of Object.values(THEME_PRESETS)) {
+      for (const star of preset.dark.starPalette) {
+        expect(SELF_SUN_COLOUR_RE.test(star)).toBe(true);
+        // The actual write-path guard must not throw for any seeded token.
+        expect(() => assertSelfSunColour("selfSunColour", star)).not.toThrow();
+      }
+    }
+  });
+
+  it("exposes the muted morph endpoints and the extinguished-rogue body fill", () => {
+    for (const preset of Object.values(THEME_PRESETS)) {
+      for (const token of [
+        "mutedStable",
+        "mutedWobble",
+        "mutedDecay",
+        "rogueExtinguished",
       ] as const) {
         expect(typeof preset.dark[token]).toBe("string");
         expect(preset.dark[token].length).toBeGreaterThan(0);

@@ -67,6 +67,32 @@ export const THEME_PRESETS: Record<ThemePresetId, ThemePreset> = {
       // Deep-space-harmonised seeds ascending in warmth/weight; ORDER IS STABLE —
       // reordering restyles every tier. Infrastructure seed, owner-tunable.
       gravityTiers: ["#4E5A7A", "#5B8AB0", "#5B9E8A", "#C9A24E"],
+      // Ordered SELF-SUN star palette (ORR-05, UI-SPEC seeds — design-pass
+      // defaults, owner-tunable §12.4 like avatarSwatches/gravityTiers). Six
+      // astronomy-grounded spectral hues; gold at index 0 is the default self-sun
+      // that resolves `self_sun_colour = NULL` at render. Rose-red is nudged off
+      // statusDecay (#E56A52) and cyan off accent (#6C8CFF) so neither reads as a
+      // status/accent. EVERY entry is a 6-digit hex — a tapped swatch is written
+      // to self_sun_colour, whose DAO validator rejects anything else (M6). ORDER
+      // IS STABLE — reordering restyles every self-sun.
+      starPalette: [
+        "#F2C14E",
+        "#E8944A",
+        "#D96B7C",
+        "#A98BE0",
+        "#5CC6F0",
+        "#DCE6FF",
+      ],
+      // Desaturated same-hue morph endpoints (ORR-04, UI-SPEC seeds) — the low-
+      // saturation (NOT greyscale) colour each live status body fades toward in
+      // the orrery relationship morph. Owner-tunable like the other seeds.
+      mutedStable: "#7A9E92",
+      mutedWobble: "#C4B98F",
+      mutedDecay: "#C79285",
+      // Cold, dark EXTINGUISHED-ROGUE body fill (ORR-04, UI-SPEC seed). The rogue
+      // planet BODY uses this blue-grey; the rogue RING keeps the warm `rogue`
+      // amber (#E0904A) at faint-trace opacity. Owner-tunable.
+      rogueExtinguished: "#3E4A6B",
     },
   },
 };

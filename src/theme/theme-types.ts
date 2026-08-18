@@ -116,6 +116,45 @@ export interface ThemePalette {
    * avatarSwatches. `readonly` because consumers only ever index it.
    */
   gravityTiers: readonly string[];
+  /**
+   * Ordered SELF-SUN star colour set (ORR-05, UI-SPEC). ~6 curated star hues the
+   * user picks from for their own sun; `starPalette[0]` (gold) is the default
+   * self-sun applied when `self_sun_colour` is NULL (resolved at RENDER, never in
+   * the DAO/migration — Pitfall 3). ORDER-STABLE — reordering restyles every
+   * self-sun; never reorder without accepting that. EVERY entry MUST be a 6-digit
+   * `#RRGGBB` hex: a tapped swatch is written to `self_sun_colour`, whose DAO
+   * validator (`SELF_SUN_COLOUR_RE`, app-settings-dao) rejects anything else, so
+   * an 8-digit/3-digit/functional colour would throw inside `updateAppSettings`
+   * (M6 — a conformance test locks this against the real validator). Seeded in
+   * `theme-presets` (the only colour-literal file), owner-tunable like
+   * avatarSwatches. `readonly` because the picker only ever indexes it.
+   */
+  starPalette: readonly string[];
+  /**
+   * Desaturated STABLE endpoint (ORR-04, UI-SPEC). The low-saturation SAME-HUE
+   * (NOT greyscale) colour the orrery's relationship-morph fades a stable body
+   * toward. Distinct from `statusStable` (the full-saturation live hue). Seeded in
+   * `theme-presets` (the only colour-literal file), owner-tunable.
+   */
+  mutedStable: string;
+  /**
+   * Desaturated WOBBLE endpoint (ORR-04, UI-SPEC). The low-saturation same-hue
+   * colour the morph fades a wobble body toward. Owner-tunable seed.
+   */
+  mutedWobble: string;
+  /**
+   * Desaturated DECAY endpoint (ORR-04, UI-SPEC). The low-saturation same-hue
+   * colour the morph fades a decay body toward. Owner-tunable seed.
+   */
+  mutedDecay: string;
+  /**
+   * Cold, dark EXTINGUISHED-ROGUE body fill (ORR-04, UI-SPEC). The rogue planet's
+   * BODY is this cold blue-grey, distinct from the warm `rogue` amber (which stays
+   * the RING + in-app label hue) and from `statusDecay`. Rogue has no separate
+   * muted endpoint — it reads extinguished/cold in both views. Seeded in
+   * `theme-presets` (the only colour-literal file), owner-tunable.
+   */
+  rogueExtinguished: string;
 }
 
 /** Identifier union for the shipped presets. Only one preset ships this phase. */
