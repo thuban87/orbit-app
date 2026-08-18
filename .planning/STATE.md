@@ -11,7 +11,7 @@ progress:
   total_phases: 16
   completed_phases: 12
   total_plans: 93
-  completed_plans: 87
+  completed_plans: 88
   percent: 75
 ---
 
@@ -129,6 +129,7 @@ Progress: [████████░░] 75% (12/16 phases complete; Phase 13 
 | Phase 13 P01 | 7min | 2 tasks | 6 files |
 | Phase 13 P02 | 5min | 2 tasks | 4 files |
 | Phase 13 P03 | 5min | 3 tasks | 6 files |
+| Phase 13 P04 | 6min | 3 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -257,8 +258,8 @@ planning" sections in docs/dossier/*.md — those are the authoritative hand-off
 ## Session
 
 **Last session:** 2026-08-18
-**Stopped at:** Phase 13 (Orrery) EXECUTING — Wave 1 plans 13-01 + 13-02 + 13-03 COMPLETE. 13-03 = the orrery DATA LAYER, node:sqlite-tested (27 cases green): `orrery-read.ts` (`listOrbitingContacts` — composes status.ts PROGRESS_SQL/STATUS_SQL never re-derived, parity-guarded via the exported `ORBITING_SELECT`; dense read-time rank `COALESCE(ring_seq,1e9),created_at,id` so a stale stored ring_seq is harmless — M3; L11 snooze-divergence LOCK-tested; occupant-excluded via `?`-bound `AND id <> ?`; photo raw/nullable — C2-1 consumer null-guards), `ring-seq-dao.ts` (`rewriteRingSeq` — the FIRST contacts.ring_seq writer, rewriteFavouriteRanks 3-guard clone with the FIXED occupant-exclusion: `AND id <> ?` appended to BOTH the count guard and each scoped UPDATE so the guard's effective set == the sun-excluded N-1 rendered set; writes only ring_seq+modified_at, never last_contact — grep-pin 0; empty=no-op; localDateTime now), `sun-picker-read.ts` (`listSunCandidates` — favourites-first, non-archived, never-contacted included, no synthetic Me row). 6 commits (3 RED test + 3 GREEN feat: 2a7ded2/fb77e6b/dc7aeb9/823dae9/0328673/aa54c39); tsc + check:colors clean; no deviations. ring_seq column pre-existed from migration 001 (no migration shipped). Committed locally on main (NOT pushed). Next: remaining Wave-1 plan 13-04 (theme tokens + orrery-ring-logic + sun-occupant-logic), then Wave 2 (13-05/06), Wave 3 (13-07), Wave 4 (13-08 device UAT, autonomous:false).
-**Resume file:** .planning/phases/13-orrery/13-03-SUMMARY.md
+**Stopped at:** Phase 13 (Orrery) EXECUTING — Wave 1 plans 13-01 + 13-02 + 13-03 + 13-04 COMPLETE. 13-04 = the orrery VISUAL VOCABULARY (theme tokens + two pure resolver modules, node-tested, 29 cases green): (1) five owner-tunable `ThemePalette` tokens seeded in `space-dark.dark` ONLY — `starPalette` (6 colours, gold `#F2C14E` at index 0, then amber/rose-red/violet/cyan/ice-white), `mutedStable/Wobble/Decay` (desaturated same-hue morph endpoints), `rogueExtinguished` (cold blue-grey `#3E4A6B` rogue BODY fill) — with an M6/C2-5 conformance test that IMPORTS the real `SELF_SUN_COLOUR_RE`/`assertSelfSunColour` from app-settings-dao and locks every starPalette entry to the ACTUAL DAO write-path rule (no re-inlined regex). (2) `orrery-ring-logic.ts` `orreryRingStyle(status, colors)` — REUSES `ringVisual` for `{color,opacity,width}` (status→colour mapped once), adds the `strokeStyle` axis (solid→dashed→faded→faintTrace) + `bodyFill` (rogue ring=`colors.rogue`, body=`rogueExtinguished`); `null`→canonical NEUTRAL (`colors.border`), never throws — the single fallback sun-occupant reuses (C2-2). (3) `sun-occupant-logic.ts` `resolveSunOccupant(input)` — NULL/archived/missing→self (A7, glow `selfSunColour ?? starPalette[0]`), live contact→its status glow via `orreryRingStyle(status, colors).color`, never-contacted (status `null`)→the reused neutral border (C2-2); accepts `status: ProfileStatus | null`. 5 commits (1801915 feat tokens+M6; d35d528 RED→4cbfad5 GREEN ring-logic; c923b16 RED→10780dd GREEN sun-occupant); tsc + check:colors clean; no deviations (one in-flight fix: a placeholder hex in the logic test was re-sourced from the palette after check:colors flagged it — C2-3). Committed locally on main (NOT pushed). Next: Wave 2 (13-05 render / 13-06 Settings sun-picker), Wave 3 (13-07 drag-release), Wave 4 (13-08 device UAT, autonomous:false).
+**Resume file:** .planning/phases/13-orrery/13-04-SUMMARY.md
 
 ## Phase 4 — Closeout (2026-08-15) ✅ COMPLETE
 
