@@ -46,6 +46,7 @@ import {
 } from "@shopify/react-native-skia";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  Alert,
   AppState,
   type LayoutChangeEvent,
   Pressable,
@@ -57,6 +58,7 @@ import { Gesture } from "react-native-gesture-handler";
 import {
   Easing,
   runOnJS,
+  useDerivedValue,
   useSharedValue,
   withTiming,
 } from "react-native-reanimated";
@@ -68,9 +70,10 @@ import { SegmentedControl } from "@/components/SegmentedControl";
 import { getAppSettings } from "@/db/app-settings-dao";
 import { getContactHeader } from "@/db/contact-read";
 import { getContactStatus, type ProfileStatus } from "@/db/contact-status-read";
-import { getExecutor } from "@/db/database";
+import { getExecutor, localDateTime } from "@/db/database";
 import { listOrbitingContacts, type OrbitingContact } from "@/db/orrery-read";
 import { getProfile, getProfilePhoto } from "@/db/profile-dao";
+import { rewriteRingSeq } from "@/db/ring-seq-dao";
 import {
   deriveOrreryMetrics,
   drawnRadius,
@@ -84,6 +87,7 @@ import {
   shortestAngleDelta,
 } from "@/logic/orrery-geometry-logic";
 import { orreryRingStyle } from "@/logic/orrery-ring-logic";
+import { computeRingReorder } from "@/logic/ring-reorder-logic";
 import {
   resolveSunOccupant,
   type SunOccupantLookup,
@@ -94,6 +98,22 @@ import type { ThemePalette } from "@/theme/theme-types";
 import { Logger } from "@/utils/logger";
 
 const LOG_SCOPE = "orrery";
+
+/** Movement (px) past which a touch becomes a radial drag rather than a tap. */
+const PAN_MIN_DISTANCE = 10;
+/** Accent ghost-ring drag-preview stroke width + opacity. */
+const GHOST_STROKE = 2;
+const GHOST_OPACITY = 0.6;
+
+/** The worklet-safe metrics snapshot the pan drag reads on the UI thread (M5). */
+interface DragMetrics {
+  cx: number;
+  cy: number;
+  ringInner: number;
+  effectiveGap: number;
+  hitRadius: number;
+  count: number;
+}
 
 /** The orrery's two views; morph between them lands in 13-07 (inert here). */
 type OrreryView = "status" | "relationship";
@@ -433,6 +453,174 @@ export function OrreryScreen() {
     [handleTap],
   );
 
+  // ── ORR-06 radial drag → ring_seq ───────────────────────────────────────────
+  // M5: worklet-safe UI-thread snapshots — the resting body positions + a single
+  // metrics object — so the pan worklet never reads a plain JS array/number.
+  const bodiesShared = useSharedValue<OrreryBody[]>([]);
+  const dragMetrics = useSharedValue<DragMetrics>({
+    cx: 0,
+    cy: 0,
+    ringInner: 0,
+    effectiveGap: 1,
+    hitRadius: 0,
+    count: 0,
+  });
+  const activeDragId = useSharedValue<number | null>(null);
+  const dragRadius = useSharedValue(0);
+
+  // Mirror the current resting layout + metrics into the shared values whenever the
+  // placement or the settled view changes (M5 — the drag reads THESE, never JS).
+  useEffect(() => {
+    bodiesShared.value = hitBodies;
+    if (placement) {
+      dragMetrics.value = {
+        cx: placement.C.cx,
+        cy: placement.C.cy,
+        ringInner: placement.C.ringInner,
+        effectiveGap: placement.C.effectiveGap,
+        hitRadius: placement.C.HIT_RADIUS,
+        count: orbiting.length,
+      };
+    }
+  }, [hitBodies, placement, orbiting.length, bodiesShared, dragMetrics]);
+
+  // The JS-thread commit (off the worklet, via runOnJS): reorder the rendered
+  // (sun-excluded) orbiting list and rewrite ring_seq in ONE transaction, threading
+  // the current sun occupant as `excludeContactId` so the N−1 dragged list agrees
+  // with the DAO's guard (else a contact-sun reorder rolls back on Guard 2). A
+  // persist failure alerts + re-reads the persisted truth.
+  const commitRingSeq = useCallback(
+    async (movedId: number, targetRank: number) => {
+      const fromRank = orbiting.findIndex((c) => c.id === movedId);
+      if (fromRank < 0) {
+        return;
+      }
+      const currentOrderedIds = orbiting.map((c) => c.id);
+      const newIds = computeRingReorder(
+        currentOrderedIds,
+        fromRank,
+        targetRank,
+      );
+      try {
+        const exec = getExecutor();
+        await rewriteRingSeq(exec, newIds, localDateTime(), sun.sunContactId);
+        // Reflow: re-read the dense rank/radius from the persisted order.
+        const bodies = await listOrbitingContacts(exec, {
+          excludeContactId: sun.sunContactId,
+        });
+        setOrbiting(bodies);
+      } catch (err) {
+        Logger.error(LOG_SCOPE, "failed to commit ring reorder", err);
+        Alert.alert(
+          "Couldn't reorder",
+          "That change didn't stick. Please try again.",
+        );
+        // Restore the on-screen order to the persisted truth.
+        try {
+          const bodies = await listOrbitingContacts(getExecutor(), {
+            excludeContactId: sun.sunContactId,
+          });
+          setOrbiting(bodies);
+        } catch (reErr) {
+          Logger.error(
+            LOG_SCOPE,
+            "failed to reload after reorder error",
+            reErr,
+          );
+        }
+      }
+    },
+    [orbiting, sun.sunContactId],
+  );
+
+  // Latest-ref so the (stable) pan gesture always calls the current commit closure.
+  const commitRef = useRef(commitRingSeq);
+  useEffect(() => {
+    commitRef.current = commitRingSeq;
+  }, [commitRingSeq]);
+  const commitFromWorklet = useCallback(
+    (movedId: number, targetRank: number) => {
+      void commitRef.current(movedId, targetRank);
+    },
+    [],
+  );
+
+  const panGesture = useMemo(
+    () =>
+      Gesture.Pan()
+        .minDistance(PAN_MIN_DISTANCE)
+        .onBegin((e) => {
+          // Hit-test the touch-down body ON THE UI THREAD against the worklet-safe
+          // snapshot (a worklet-inline `hitTest`; nearest within HIT_RADIUS wins).
+          const bodies = bodiesShared.value;
+          const hr = dragMetrics.value.hitRadius;
+          let best: number | null = null;
+          let bestD2 = hr * hr;
+          for (let i = 0; i < bodies.length; i++) {
+            const b = bodies[i];
+            const d2 = (e.x - b.x) ** 2 + (e.y - b.y) ** 2;
+            if (d2 <= bestD2) {
+              bestD2 = d2;
+              best = b.id;
+            }
+          }
+          activeDragId.value = best;
+        })
+        .onUpdate((e) => {
+          if (activeDragId.value === null) {
+            return;
+          }
+          // Radius only — the angular component is ignored (live ghost-ring preview).
+          const m = dragMetrics.value;
+          const dx = e.x - m.cx;
+          const dy = e.y - m.cy;
+          dragRadius.value = Math.sqrt(dx * dx + dy * dy);
+        })
+        .onEnd((e) => {
+          if (activeDragId.value === null) {
+            return;
+          }
+          // H2: release radius → clamped rank via the SAME metrics object as render
+          // + hit-test (C.ringInner / C.effectiveGap; effectiveGap is floored > 0).
+          const m = dragMetrics.value;
+          const dx = e.x - m.cx;
+          const dy = e.y - m.cy;
+          const releaseRadius = Math.sqrt(dx * dx + dy * dy);
+          const maxRank = Math.max(0, m.count - 1);
+          const rawRank = Math.round(
+            (releaseRadius - m.ringInner) / m.effectiveGap,
+          );
+          const targetRank = Math.max(0, Math.min(rawRank, maxRank));
+          runOnJS(commitFromWorklet)(activeDragId.value, targetRank);
+        })
+        .onFinalize(() => {
+          activeDragId.value = null;
+          dragRadius.value = 0;
+        }),
+    [bodiesShared, dragMetrics, activeDragId, dragRadius, commitFromWorklet],
+  );
+
+  // Gesture.Race: a stationary touch → tap → Profile; movement past the threshold
+  // → the radial drag (both first hit-test the touch-down body).
+  const canvasGesture = useMemo(
+    () => Gesture.Race(tapGesture, panGesture),
+    [tapGesture, panGesture],
+  );
+
+  // The accent ghost-ring drag preview: the target rank's ring radius, shown only
+  // while a body is being dragged. cx/cy are the fixed canvas centre; r + opacity
+  // derive off the drag shared values (UI thread).
+  const ghostRingRadius = useDerivedValue(() => {
+    const m = dragMetrics.value;
+    const raw = (dragRadius.value - m.ringInner) / m.effectiveGap;
+    const maxRank = Math.max(0, m.count - 1);
+    const rank = Math.max(0, Math.min(Math.round(raw), maxRank));
+    return m.ringInner + rank * m.effectiveGap;
+  });
+  const ghostRingOpacity = useDerivedValue(() =>
+    activeDragId.value === null ? 0 : GHOST_OPACITY,
+  );
+
   // Ambient star tones — passed as tokens (check:colors) into OrreryCanvas.
   const starColors = useMemo(
     () => [colors.textSecondary, colors.textPrimary, ...colors.starPalette],
@@ -490,9 +678,19 @@ export function OrreryScreen() {
             height={canvas.height}
             background={colors.background}
             starColors={starColors}
-            gesture={tapGesture}
+            gesture={canvasGesture}
           >
             <Group>{placement.rings}</Group>
+            {/* Accent ghost-ring drag preview (hidden until a drag is active). */}
+            <Circle
+              cx={placement.C.cx}
+              cy={placement.C.cy}
+              r={ghostRingRadius}
+              style="stroke"
+              strokeWidth={GHOST_STROKE}
+              color={colors.accent}
+              opacity={ghostRingOpacity}
+            />
             <Group>{placement.planets}</Group>
             <SunBody
               cx={placement.C.cx}
