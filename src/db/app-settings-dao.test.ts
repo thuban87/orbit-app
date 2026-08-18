@@ -354,14 +354,26 @@ describe("app-settings-dao — sun fields (ORR-05 / ORR-06)", () => {
     expect(settings.selfSunColour).toBeNull();
   });
 
+  /** Insert a real contact so the FK on `sun_contact_id` is satisfiable. */
+  async function insertContact(name: string): Promise<number> {
+    const res = await exec.runAsync(
+      `INSERT INTO contacts (uid, name, interval_days, created_at, modified_at)
+       VALUES (?, ?, ?, ?, ?)`,
+      [newUid(), name, 30, NOW, NOW],
+    );
+    return res.lastInsertRowId;
+  }
+
   it("writes and reads back a positive-integer sunContactId", async () => {
-    await updateAppSettings(exec, { sunContactId: 5 }, LATER);
+    const cid = await insertContact("Sunny");
+    await updateAppSettings(exec, { sunContactId: cid }, LATER);
     const settings = await getAppSettings(exec);
-    expect(settings.sunContactId).toBe(5);
+    expect(settings.sunContactId).toBe(cid);
   });
 
   it("clears sunContactId back to null (self)", async () => {
-    await updateAppSettings(exec, { sunContactId: 5 }, LATER);
+    const cid = await insertContact("Sunny");
+    await updateAppSettings(exec, { sunContactId: cid }, LATER);
     await updateAppSettings(exec, { sunContactId: null }, LATER);
     const settings = await getAppSettings(exec);
     expect(settings.sunContactId).toBeNull();

@@ -21,6 +21,7 @@ import { nodeSqliteExecutor, openTestDb } from "@/db/__testkit__/node-sqlite";
 import { updateAppSettings } from "@/db/app-settings-dao";
 import { migration001 } from "@/db/migrations/001-initial";
 import { migration002 } from "@/db/migrations/002-app-settings";
+import { migration003 } from "@/db/migrations/003-orrery-settings";
 import { runMigrations } from "@/db/migrations/runner";
 import type { SqlExecutor } from "@/db/types";
 import { __resetSweepForTest, runLaunchSweep } from "@/services/launch-sweep";
@@ -65,7 +66,7 @@ beforeEach(async () => {
   uidCounter = 0;
   const db = openTestDb();
   exec = nodeSqliteExecutor(db);
-  await runMigrations(exec, [migration001, migration002], 2, {
+  await runMigrations(exec, [migration001, migration002, migration003], 3, {
     now: NOW,
     newUid: uid,
   });

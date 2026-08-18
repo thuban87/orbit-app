@@ -42,6 +42,18 @@ export interface AppSettings {
   quietStartHour: number;
   /** Quiet-window end hour (0-23). */
   quietEndHour: number;
+  /**
+   * Orrery sun occupant (ORR-06). A positive `contacts.id`, or NULL = self.
+   * The migration-003 FK (`ON DELETE SET NULL`) auto-reverts a hard-purged
+   * sun-contact to self.
+   */
+  sunContactId: number | null;
+  /**
+   * The user's own star colour (ORR-05) as a 6-hex string, or NULL = unresolved.
+   * NULL is resolved to `starPalette[0]` at RENDER time (never in this DAO — the
+   * DAO cannot import theme). Only `/^#[0-9A-Fa-f]{6}$/` values are writable.
+   */
+  selfSunColour: string | null;
 }
 
 /** A partial update — only the supplied fields are written. */
@@ -56,6 +68,8 @@ interface AppSettingsRow {
   delivery_hour: number;
   quiet_start_hour: number;
   quiet_end_hour: number;
+  sun_contact_id: number | null;
+  self_sun_colour: string | null;
 }
 
 /** The hour fields, validated to 0-23 integers on write. */
@@ -82,6 +96,8 @@ const COLUMN_OF: Record<keyof AppSettings, string> = {
   deliveryHour: "delivery_hour",
   quietStartHour: "quiet_start_hour",
   quietEndHour: "quiet_end_hour",
+  sunContactId: "sun_contact_id",
+  selfSunColour: "self_sun_colour",
 };
 
 /**
@@ -93,7 +109,8 @@ const COLUMN_OF: Record<keyof AppSettings, string> = {
 export async function getAppSettings(exec: SqlExecutor): Promise<AppSettings> {
   const row = await exec.getFirstAsync<AppSettingsRow>(
     `SELECT notifications_enabled, decay_enabled, birthday_enabled,
-            lockscreen_public, delivery_hour, quiet_start_hour, quiet_end_hour
+            lockscreen_public, delivery_hour, quiet_start_hour, quiet_end_hour,
+            sun_contact_id, self_sun_colour
        FROM app_settings
       WHERE id = 1`,
   );
@@ -108,6 +125,10 @@ export async function getAppSettings(exec: SqlExecutor): Promise<AppSettings> {
     deliveryHour: row.delivery_hour,
     quietStartHour: row.quiet_start_hour,
     quietEndHour: row.quiet_end_hour,
+    // Raw NULL passes straight through as null — the DAO NEVER resolves a
+    // palette colour (it cannot import theme); resolution happens at render.
+    sunContactId: row.sun_contact_id ?? null,
+    selfSunColour: row.self_sun_colour ?? null,
   };
 }
 
@@ -125,6 +146,49 @@ function assertToggle(field: string, v: unknown): void {
   if (v !== 0 && v !== 1) {
     throw new Error(
       `updateAppSettings: ${field} must be 0 or 1, got ${String(v)}`,
+    );
+  }
+}
+
+/** The sun-occupant fields validated to null or a positive integer on write. */
+const SUN_CONTACT_ID_FIELDS: Array<keyof AppSettings> = ["sunContactId"];
+
+/** The self-sun-colour fields validated to null or a 6-hex string on write. */
+const SELF_SUN_COLOUR_FIELDS: Array<keyof AppSettings> = ["selfSunColour"];
+
+/**
+ * The SINGLE constraint on what `self_sun_colour` may store: a 6-digit hex
+ * (`#RRGGBB`), case-insensitive. EXPORTED (C2-5) so 13-04's starPalette
+ * conformance test asserts every palette token against the ACTUAL DAO rule —
+ * a duplicated private regex could silently diverge from the palette lock.
+ * NOTE (M6): loosening this regex to admit a non-6-hex token (8-digit, 3-digit,
+ * or a functional colour form) widens what a `starPalette` swatch write may
+ * persist — do not change it without updating the 13-04 conformance test and
+ * the 13-06 swatch write.
+ */
+export const SELF_SUN_COLOUR_RE = /^#[0-9A-Fa-f]{6}$/;
+
+/** Throw unless `v` is null or a positive integer (`sun_contact_id`, ORR-06). */
+export function assertSunContactId(field: string, v: unknown): void {
+  if (v === null) return;
+  if (typeof v !== "number" || !Number.isInteger(v) || v <= 0) {
+    throw new Error(
+      `updateAppSettings: ${field} must be null or a positive integer, got ${String(v)}`,
+    );
+  }
+}
+
+/**
+ * Throw unless `v` is null or matches `SELF_SUN_COLOUR_RE` (`self_sun_colour`,
+ * ORR-05). EXPORTED alongside the regex so the write path and the 13-04 palette
+ * conformance test consume the SAME symbol (single source of truth). Palette
+ * MEMBERSHIP is enforced UI-side; this validator enforces only the hex SHAPE.
+ */
+export function assertSelfSunColour(field: string, v: unknown): void {
+  if (v === null) return;
+  if (typeof v !== "string" || !SELF_SUN_COLOUR_RE.test(v)) {
+    throw new Error(
+      `updateAppSettings: ${field} must be null or a 6-hex colour, got ${String(v)}`,
     );
   }
 }
@@ -151,6 +215,16 @@ export function updateAppSettings(
   for (const field of TOGGLE_FIELDS) {
     if (patch[field] !== undefined) {
       assertToggle(field, patch[field]);
+    }
+  }
+  for (const field of SUN_CONTACT_ID_FIELDS) {
+    if (patch[field] !== undefined) {
+      assertSunContactId(field, patch[field]);
+    }
+  }
+  for (const field of SELF_SUN_COLOUR_FIELDS) {
+    if (patch[field] !== undefined) {
+      assertSelfSunColour(field, patch[field]);
     }
   }
 
