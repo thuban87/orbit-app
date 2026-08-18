@@ -5,6 +5,8 @@ import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useCallback, useState } from "react";
 import {
+  FlatList,
+  Modal,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -20,8 +22,10 @@ import {
   getAppSettings,
   updateAppSettings,
 } from "@/db/app-settings-dao";
+import { getContactHeader } from "@/db/contact-read";
 import { getExecutor, localDateTime } from "@/db/database";
 import { getProfile } from "@/db/profile-dao";
+import { listSunCandidates, type SunCandidate } from "@/db/sun-picker-read";
 import type { RootStackParamList } from "@/navigation/types";
 import { reconcileSchedule } from "@/services/notifications/notification-schedule";
 import {
@@ -105,6 +109,14 @@ export function SettingsScreen() {
   // RENDER — no stored hex default (the DAO cannot import theme). Loaded on focus.
   const [selfSunColour, setSelfSunColour] = useState<string | null>(null);
 
+  // The centre occupant (relocated ORR-06): the raw stored id (NULL = self), the
+  // RESOLVED display name (with the M4 archived/missing→"Me" fallback), the
+  // favourites-first candidate list, and whether the picker modal is open.
+  const [sunContactId, setSunContactId] = useState<number | null>(null);
+  const [sunOccupantName, setSunOccupantName] = useState("Me");
+  const [sunCandidates, setSunCandidates] = useState<SunCandidate[]>([]);
+  const [sunPickerOpen, setSunPickerOpen] = useState(false);
+
   // Reload the self record so a set/remove made on the crop screen refreshes when
   // it goBack()s here (mirrors ContactProfileScreen's reload-on-focus). The
   // sub-second same-path replace is closed elsewhere: the crop screen's profile
@@ -143,9 +155,24 @@ export function SettingsScreen() {
   // picker below — the centre occupant). Read on focus so a change made
   // elsewhere refreshes when this screen regains focus, mirroring reloadProfile.
   const reloadOrbit = useCallback(async () => {
+    const exec = getExecutor();
     try {
-      const next = await getAppSettings(getExecutor());
+      const next = await getAppSettings(exec);
       setSelfSunColour(next.selfSunColour);
+      setSunContactId(next.sunContactId);
+      setSunCandidates(await listSunCandidates(exec));
+      // M4: resolve the occupant name, applying the SAME archived/missing→self
+      // fallback the canvas uses (resolveSunOccupant, 13-05) so Settings and the
+      // orrery never disagree about a hidden occupant. NULL → "Me"; a stored id
+      // whose contact is missing OR archived also shows "Me".
+      if (next.sunContactId === null) {
+        setSunOccupantName("Me");
+      } else {
+        const header = await getContactHeader(exec, next.sunContactId);
+        setSunOccupantName(
+          header && header.archived_at === null ? header.name : "Me",
+        );
+      }
     } catch (err) {
       Logger.error(LOG_SCOPE, "failed to load orbit settings", err);
     }
@@ -178,6 +205,36 @@ export function SettingsScreen() {
     },
     [reloadOrbit],
   );
+
+  // M6: persist the chosen centre occupant (a candidate id, or NULL for "Me")
+  // through the same try/catch + Logger.error posture. Closes the picker and
+  // reloads the displayed occupant from the write.
+  const onPickSunOccupant = useCallback(
+    async (id: number | null) => {
+      try {
+        await updateAppSettings(
+          getExecutor(),
+          { sunContactId: id },
+          localDateTime(),
+        );
+        setSunPickerOpen(false);
+        await reloadOrbit();
+      } catch (err) {
+        Logger.error(LOG_SCOPE, "failed to persist sun occupant", err);
+      }
+    },
+    [reloadOrbit],
+  );
+
+  // The picker list: a synthetic "Me" (NULL id) first, then the favourites-first
+  // candidates (already archived-excluded by listSunCandidates). This IS ORR-06's
+  // "assign the sun" — RELOCATED to Settings by owner decision, NOT an orrery
+  // gesture (the orrery long-press was rejected). Do not read the absence of an
+  // orrery sun-assignment gesture as an ORR-06 gap (L10 doc-sync pointer).
+  const sunOptions: Array<{ id: number | null; name: string }> = [
+    { id: null, name: "Me" },
+    ...sunCandidates.map((c) => ({ id: c.id as number | null, name: c.name })),
+  ];
 
   // Persist a patch to app_settings then fire-and-forget a reconcile so the OS
   // schedule re-arms immediately (the self-coordinating reconcile coalesces
@@ -641,6 +698,98 @@ export function SettingsScreen() {
             Pick the colour of your star at the centre of your orbit.
           </Text>
         </View>
+
+        {/* "Sun / centre" — the occupant picker (Me / favourites / all contacts),
+            writing sun_contact_id (NULL = Me). ORR-06 relocated to Settings by
+            owner decision — NOT an orrery gesture. The row shows the resolved
+            occupant name (M4: "Me" when the stored occupant is archived/missing). */}
+        <Pressable
+          testID="settings-sun-centre-row"
+          accessibilityRole="button"
+          accessibilityLabel={`Sun / centre, ${sunOccupantName}`}
+          onPress={() => setSunPickerOpen(true)}
+          style={[
+            styles.row,
+            { backgroundColor: colors.surface, borderColor: colors.border },
+          ]}
+        >
+          <View style={styles.toggleRow}>
+            <Text style={[styles.rowLabel, { color: colors.textPrimary }]}>
+              Sun / centre
+            </Text>
+            <Text style={[styles.rowValue, { color: colors.accent }]}>
+              {sunOccupantName}
+            </Text>
+          </View>
+          <Text style={[styles.helper, { color: colors.textSecondary }]}>
+            Choose who sits at the centre — you, or someone you orbit around.
+          </Text>
+        </Pressable>
+
+        <Modal
+          visible={sunPickerOpen}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setSunPickerOpen(false)}
+        >
+          <View style={styles.modalRoot}>
+            <Pressable
+              accessibilityLabel="Dismiss sun options"
+              style={StyleSheet.absoluteFill}
+              onPress={() => setSunPickerOpen(false)}
+            >
+              <View
+                style={[
+                  StyleSheet.absoluteFill,
+                  styles.scrim,
+                  { backgroundColor: colors.background },
+                ]}
+              />
+            </Pressable>
+
+            <View
+              testID="settings-sun-picker"
+              style={[
+                styles.sheet,
+                {
+                  backgroundColor: colors.surfaceElevated,
+                  borderColor: colors.border,
+                },
+              ]}
+            >
+              <FlatList
+                data={sunOptions}
+                keyExtractor={(item) =>
+                  item.id === null ? "me" : String(item.id)
+                }
+                renderItem={({ item }) => {
+                  const isSelected = item.id === sunContactId;
+                  return (
+                    <Pressable
+                      testID={`settings-sun-option-${item.id === null ? "me" : item.id}`}
+                      accessibilityRole="button"
+                      accessibilityLabel={item.name}
+                      accessibilityState={{ selected: isSelected }}
+                      onPress={() => void onPickSunOccupant(item.id)}
+                      style={[styles.option, { borderColor: colors.border }]}
+                    >
+                      <Text
+                        numberOfLines={1}
+                        style={{
+                          color: isSelected
+                            ? colors.accent
+                            : colors.textPrimary,
+                        }}
+                      >
+                        {item.name}
+                      </Text>
+                    </Pressable>
+                  );
+                }}
+              />
+            </View>
+          </View>
+        </Modal>
       </View>
 
       <View testID="settings-home-screen-section" style={styles.section}>
@@ -812,6 +961,25 @@ const styles = StyleSheet.create({
     height: 44,
     borderRadius: 22,
     borderWidth: 3,
+  },
+  modalRoot: {
+    flex: 1,
+    justifyContent: "center",
+    paddingHorizontal: 24,
+  },
+  scrim: {
+    opacity: 0.85,
+  },
+  sheet: {
+    borderWidth: 1,
+    borderRadius: 12,
+    maxHeight: "60%",
+    overflow: "hidden",
+  },
+  option: {
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderBottomWidth: StyleSheet.hairlineWidth,
   },
   toggleRow: {
     flexDirection: "row",
