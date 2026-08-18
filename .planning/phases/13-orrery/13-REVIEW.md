@@ -134,6 +134,14 @@ const rawRank = Math.round((ringReleaseRadius - m.ringInner) / m.effectiveGap);
 Alternatively treat a drop within a small radial tolerance of the pickup as a
 no-op (drop-to-same-place should not reorder).
 
+**Fix status:** FIXED (commit `fa3f433`). Added a pure `driftPush` helper
+(`drawnRadius − ringRadius`, post-clamp) in `orrery-geometry-logic.ts`; the drag
+snapshot carries each body's push, captured at `onBegin`, and both the release
+rank map and the live ghost preview subtract the dragged body's push before the
+`/ effectiveGap` division. A no-move release is now net-zero for every body
+(including rim-clamped). Node test covers the push bands, the clamp reduction,
+and the net-zero inversion property.
+
 ### WR-02: Orbit rings are drawn unclamped; at realistic contact counts planets compress below their own diameter and pile at the rim
 
 **File:** `src/logic/orrery-geometry-logic.ts:225-251`, consumed at `src/screens/OrreryScreen.tsx:340` and `:353-361`
@@ -162,6 +170,10 @@ radius to the same `DRIFT_MAX` bound the body uses so rings and bodies stay
 co-located, and/or derive `MIN_GAP` from `PLANET_RADIUS` so bodies never overlap
 by more than an intended amount.
 
+**Fix status:** DEFERRED TO OWNER — not fixed. This is a capacity/visual product
+call (owner's bucket per CLAUDE.md; a "grid-capacity" follow-up already exists),
+verified acceptable at device UAT. Left unchanged deliberately.
+
 ### WR-03: `getContactHeader` does not filter archived rows, so a soft-archived-then-not sun occupant can briefly resolve inconsistently across the two reads
 
 **File:** `src/screens/OrreryScreen.tsx:223-237`, `src/screens/SettingsScreen.tsx:168-175`
@@ -183,7 +195,18 @@ policy, not a live bug.
 archived/missing→self policy has one implementation. At minimum add a test
 asserting Settings and `resolveSunOccupant` agree for the archived-occupant case.
 
+**Fix status:** FIXED (commit `f6e46b2`). Extracted a single
+`sunOccupantIsSelf({ sunContactId, occupant })` predicate in
+`sun-occupant-logic.ts`; both `resolveSunOccupant` and Settings' occupant-name
+read now call it, so the archived/missing→self policy has one implementation.
+Node test covers the predicate and asserts it agrees with `resolveSunOccupant`'s
+self/contact resolution in every case.
+
 ## Info
+
+**Fix status (all Info):** NOT addressed — out of the fix scope (WR-01/WR-03
+only). IN-01/02/03/04 are cosmetic/doc-comment notes with no live defect; left
+for a future pass.
 
 ### IN-01: `assertSunContactId` accepts any positive integer; a non-existent id relies on the FK to reject at write time
 
