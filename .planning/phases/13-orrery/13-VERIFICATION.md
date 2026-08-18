@@ -146,3 +146,28 @@ No code-level gaps. All 22 node-observable truths verified against actual code o
 
 _Verified: 2026-08-18T01:59:58Z_
 _Verifier: Claude (gsd-verifier)_
+
+---
+
+## Device UAT — PARTIAL (2026-08-17, physical Pixel 6 Pro)
+
+**Method:** release APK built via the desktop pipeline (`droid`, BUILD SUCCESSFUL, prebuild picked up the new `assets/Inter-SemiBold.ttf`) + a debug APK for populated-DB UAT (orbit Metro stood up on port **8082** so quest-board's Metro on 8081 was untouched; this Pixel's `adb reverse` repointed 8081→8082).
+
+### ✅ Confirmed on device
+- **The Skia orrery RENDERS** (the #1 risk). Screenshots: the **Status | Relationship** segmented control (filled-accent), an animated **starfield**, the central **sun** with a **gold glow** (self-sun default `starPalette[0]`) drawn via the **bundled-font Paragraph fallback**, and the **empty-state** overlay. Colours all token-based, no red screen.
+- **Migration 003 works on device** — the DB is at `user_version = 3`; the new `sun_contact_id` / `self_sun_colour` columns are present; `app_settings` = `{sun_contact_id: null, self_sun_colour: null}` (self-sun, gold). Dashboard chrome + category chips render (DB open, `listCategories` works).
+- **Dashboard loads contacts** on the debug build (1 contact: "Alice", stable, favourited).
+- **`dashboard-orbit-entry` ◎ button** navigates to the orrery (correctly placed beside the ⚙ gear).
+
+### ⚠ OPEN FINDING — orrery renders EMPTY with a contacted contact present
+- The device DB has **Alice: `last_contact` = today, not archived, not the sun** → she is a valid orbiting candidate (verified: the `WHERE archived_at IS NULL AND last_contact IS NOT NULL` predicate returns Alice against the pulled DB). Yet the orrery shows **"Your orbit is empty"** (`orbiting.length === 0` in the component).
+- Ruled out: query correctness (`listOrbitingContacts` SQL is correct; `PROGRESS_SQL`/`STATUS_SQL` use only universally-available SQLite functions), the sun-occupant exclusion (sun is self/null), a first-focus race (persists across re-focus), and a `getProfile`/`getProfilePhoto` throw (both are null-safe on an absent self record).
+- **Root cause NOT pinned** because the debug build's JS console output did not reach the adb `logcat`/Metro-stdout channels available remotely (a temporary `console.warn` diagnostic never surfaced despite being in the served bundle) — remote observability wall.
+- **Fastest diagnosis (owner):** on the Pixel, open the RN dev menu (shake / `adb shell input keyevent 82`) → the LogBox / debugger shows the actual `[orrery] failed to load orrery` error + stack in one tap. That will pinpoint whether the load's `Promise.all([getProfilePhoto, getProfile, listOrbitingContacts])` / `getAppSettings` is silently catching, or a stale-bundle/data-environment artifact.
+
+### Not yet exercised (blocked by the empty-orbit finding + sparse data — only 1 contact)
+- Multi-body render + the two-view **morph** across bodies, **rogue** rendering, the **radial drag → ring_seq** persist round-trip, the **H2** large-orbit capacity (WR-02), the **Skia `file://` photo decode** (Alice has no photo), **pause-on-blur** with bodies, and on-device **perf/feel** (the owner's Task-3 sign-off).
+
+### Environmental notes (not product bugs)
+- The **cross-build DB anomaly** (Phase-12 finding: a debug-created DB won't load under a release build) is a dev-UAT artifact only — real users always have release-created DBs, which load fine.
+- Left running for owner follow-up: debug APK installed on the Pixel; orbit Metro on **8082** (reverse 8081→8082); quest-board's 8081 Metro untouched. Tree clean, all committed locally on `main`, nothing pushed.
