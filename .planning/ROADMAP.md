@@ -513,7 +513,7 @@ Plans:
 
 **Wave 3** *(blocked on 13-05)*
 
-- [ ] 13-07-PLAN.md — OrreryScreen morph + ambient/pause-on-blur + radial-drag→ring_seq (ORR-02, ORR-03, ORR-06)
+- [x] 13-07-PLAN.md — OrreryScreen morph + ambient/pause-on-blur + radial-drag→ring_seq (ORR-02, ORR-03, ORR-06)
 
 **Wave 4** *(blocked on Wave 3)*
 
@@ -579,7 +579,7 @@ Plans:
 | 10. Share-Sheet Capture | 6/6 | Complete   | 2026-08-16 |
 | 11. Actionable Notifications | 13/13 | Complete   | 2026-08-16 |
 | 12. Home Screen Widget | 8/8 | Complete   | 2026-08-17 |
-| 13. Orrery | 6/8 | In progress | - |
+| 13. Orrery | 7/8 | In progress | - |
 | 14. AI Message Suggestions | 0/TBD | Not started | - |
 | 15. Weekly Digest | 0/TBD | Not started | - |
 | 16. Backup, Export & Restore | 0/TBD | Not started | - |
