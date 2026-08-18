@@ -35,19 +35,26 @@ import {
   useImage,
 } from "@shopify/react-native-skia";
 import { useMemo } from "react";
+import {
+  interpolateColor,
+  type SharedValue,
+  useDerivedValue,
+} from "react-native-reanimated";
 import { resolvePhotoUri } from "@/services/photos/photo-storage";
 
 export interface OrbitBodyProps {
-  /** Body centre x (the DRAWN position — ring radius + drift). */
+  /** Body centre x at the STATUS (morph=0) position — the DRAWN position (radius + drift, statusAngle). */
   cx: number;
-  /** Body centre y (the DRAWN position). */
+  /** Body centre y at the STATUS (morph=0) position. */
   cy: number;
   /** Planet photo-circle radius (`C.PLANET_RADIUS`). */
   radius: number;
   /** Raw relative photo path or null (C2-1 — null-guarded before resolvePhotoUri). */
   photo: string | null;
-  /** The status body treatment / outline colour (`orreryRingStyle.bodyFill`). */
+  /** The FULL (status view) body treatment / outline colour (`orreryRingStyle.bodyFill`). */
   bodyFill: string;
+  /** The MUTED (relationship view) body outline colour the morph fades toward (`muted*`/`rogueExtinguished`). */
+  mutedFill: string;
   /** The deterministic fallback swatch (`avatarSwatches[swatchIndex(name)]`). */
   swatch: string;
   /** The on-swatch initials glyph colour (`avatarSwatchText`). */
@@ -56,6 +63,21 @@ export interface OrbitBodyProps {
   initials: string;
   /** The bundled-font provider from `useFonts`; null until the font loads. */
   fontProvider: SkTypefaceFontProvider | null;
+  /**
+   * The single view-morph shared value (0 = Status, 1 = Relationship). H1 — this
+   * body's morph `useDerivedValue`s live HERE (keyed child), never in a `.map()`.
+   */
+  morph: SharedValue<number>;
+  /** The FIXED drawn orbit radius (distance from centre) — the shared axis, never interpolated. */
+  orbitRadius: number;
+  /** The Status-view angle (`progressToAngle(progress)`) — the morph endpoint at morph=0. */
+  statusAngle: number;
+  /**
+   * The shortest signed delta from `statusAngle` to the Relationship even-spread
+   * angle (`shortestAngleDelta`, precomputed on JS) — the morph takes the short way
+   * across the 2π wrap (Pitfall 2). Angle at morph t = statusAngle + t·angleDelta.
+   */
+  angleDelta: number;
 }
 
 /** Status-outline stroke width around the planet disc. */
@@ -67,13 +89,35 @@ export function OrbitBody({
   radius,
   photo,
   bodyFill,
+  mutedFill,
   swatch,
   swatchText,
   initials,
   fontProvider,
+  morph,
+  orbitRadius,
+  statusAngle,
+  angleDelta,
 }: OrbitBodyProps) {
   // C2-1: unconditional hook, null-guarded source (photo may be null).
   const image = useImage(photo ? resolvePhotoUri(photo) : null);
+
+  // H1/ORR-02 — the per-body morph, off the JS thread (UI-thread worklets):
+  //  • ANGLE: statusAngle → restAngle via the precomputed shortestAngleDelta, so
+  //    the morph takes the short way across the 2π wrap (Pitfall 2). The whole body
+  //    is drawn at its FIXED status position (cx, cy) and TRANSLATED by the polar
+  //    delta between the status angle and the live morph angle — radius is FIXED
+  //    (the shared axis), never interpolated.
+  //  • COLOUR: the status-outline fades full → muted (`interpolateColor`).
+  const bodyTransform = useDerivedValue(() => {
+    const angle = statusAngle + morph.value * angleDelta;
+    const dx = orbitRadius * (Math.sin(angle) - Math.sin(statusAngle));
+    const dy = -orbitRadius * (Math.cos(angle) - Math.cos(statusAngle));
+    return [{ translateX: dx }, { translateY: dy }];
+  });
+  const outlineColor = useDerivedValue(() =>
+    interpolateColor(morph.value, [0, 1], [bodyFill, mutedFill]),
+  );
 
   // Inner disc sits inside the status outline ring.
   const innerR = Math.max(1, radius - OUTLINE_WIDTH / 2);
@@ -108,9 +152,11 @@ export function OrbitBody({
   );
 
   return (
-    <Group>
-      {/* Status body treatment — the coloured outline ring. */}
-      <Circle cx={cx} cy={cy} r={radius} color={bodyFill} />
+    // The whole body is placed at its status position and translated by the morph
+    // (radius fixed — only the angle moves). Colour morphs on the outline circle.
+    <Group transform={bodyTransform}>
+      {/* Status body treatment — the coloured outline ring (morphs full → muted). */}
+      <Circle cx={cx} cy={cy} r={radius} color={outlineColor} />
       {image ? (
         // Photo disc, clipped to a circle, cover-fit.
         <Group clip={circleClip}>

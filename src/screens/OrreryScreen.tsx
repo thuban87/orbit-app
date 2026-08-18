@@ -49,7 +49,12 @@ import {
   View,
 } from "react-native";
 import { Gesture } from "react-native-gesture-handler";
-import { runOnJS } from "react-native-reanimated";
+import {
+  Easing,
+  runOnJS,
+  useSharedValue,
+  withTiming,
+} from "react-native-reanimated";
 import { getInitials, swatchIndex } from "@/components/avatar-initials";
 import { OrbitBody } from "@/components/orrery/OrbitBody";
 import { OrreryCanvas } from "@/components/orrery/OrreryCanvas";
@@ -57,18 +62,21 @@ import { SunBody } from "@/components/orrery/SunBody";
 import { SegmentedControl } from "@/components/SegmentedControl";
 import { getAppSettings } from "@/db/app-settings-dao";
 import { getContactHeader } from "@/db/contact-read";
-import { getContactStatus } from "@/db/contact-status-read";
+import { getContactStatus, type ProfileStatus } from "@/db/contact-status-read";
 import { getExecutor } from "@/db/database";
 import { listOrbitingContacts, type OrbitingContact } from "@/db/orrery-read";
 import { getProfile, getProfilePhoto } from "@/db/profile-dao";
 import {
   deriveOrreryMetrics,
   drawnRadius,
+  evenSpreadAngle,
   hitTest,
+  MORPH_MS,
   type OrreryBody,
   polarToXY,
   progressToAngle,
   ringRadius,
+  shortestAngleDelta,
 } from "@/logic/orrery-geometry-logic";
 import { orreryRingStyle } from "@/logic/orrery-ring-logic";
 import {
@@ -77,6 +85,7 @@ import {
 } from "@/logic/sun-occupant-logic";
 import type { RootStackParamList } from "@/navigation/types";
 import { useTheme } from "@/theme";
+import type { ThemePalette } from "@/theme/theme-types";
 import { Logger } from "@/utils/logger";
 
 const LOG_SCOPE = "orrery";
@@ -105,6 +114,29 @@ const DEFAULT_SUN: SunRead = {
   sunContactName: "",
 };
 
+/**
+ * The relationship-view "muted" outline colour a body morphs toward (ORR-02/04): a
+ * desaturated same-hue token per live status. Rogue stays extinguished/cold in BOTH
+ * views (no separate muted endpoint) so it fades to its own `fullFill`. Orbiting
+ * bodies always carry a live status (never the null never-contacted case).
+ */
+function mutedBodyFill(
+  status: ProfileStatus,
+  fullFill: string,
+  colors: ThemePalette,
+): string {
+  switch (status) {
+    case "stable":
+      return colors.mutedStable;
+    case "wobble":
+      return colors.mutedWobble;
+    case "decay":
+      return colors.mutedDecay;
+    default:
+      return fullFill; // rogue → rogueExtinguished (both views)
+  }
+}
+
 export function OrreryScreen() {
   const { colors } = useTheme();
   const navigation =
@@ -120,6 +152,25 @@ export function OrreryScreen() {
   const [orbiting, setOrbiting] = useState<OrbitingContact[]>([]);
   const [sun, setSun] = useState<SunRead>(DEFAULT_SUN);
   const [canvas, setCanvas] = useState({ width: 0, height: 0 });
+
+  // ORR-02 — the SINGLE view-morph shared value (0 = Status default, 1 =
+  // Relationship). Every body's angle+colour interpolation reads it on the UI
+  // thread; the toggle drives it with one `withTiming` (event-driven, self-
+  // terminating — no pause-on-blur needed, unlike the ambient clock).
+  const morph = useSharedValue(0);
+
+  // Drive the morph on toggle: set React `view` (chrome/hit-test) AND animate the
+  // shared value with a single MORPH_MS ease-in-out timing.
+  const onChangeView = useCallback(
+    (next: OrreryView) => {
+      setView(next);
+      morph.value = withTiming(next === "relationship" ? 1 : 0, {
+        duration: MORPH_MS,
+        easing: Easing.inOut(Easing.ease),
+      });
+    },
+    [morph],
+  );
 
   // Refs the tap handler reads (kept in sync with the render-time placement) so the
   // gesture object stays stable across re-renders.
@@ -223,7 +274,11 @@ export function OrreryScreen() {
       return null;
     }
     const C = deriveOrreryMetrics(canvas.width, canvas.height, orbiting.length);
-    const hitBodies: OrreryBody[] = [];
+    const count = orbiting.length;
+    // The resting positions for EACH view — the tap hit-test snaps to whichever
+    // view `morph` settled on (a mid-morph tap hits the resting target; accepted).
+    const statusBodies: OrreryBody[] = [];
+    const restBodies: OrreryBody[] = [];
     const swatchCount = colors.avatarSwatches.length;
 
     const rings = orbiting.map((c, rank) => {
@@ -255,33 +310,66 @@ export function OrreryScreen() {
     const planets = orbiting.map((c, rank) => {
       const style = orreryRingStyle(c.status, colors);
       const dr = drawnRadius(c.progress, rank, c.status, C);
-      const { x, y } = polarToXY(C.cx, C.cy, dr, progressToAngle(c.progress));
-      hitBodies.push({ id: c.id, x, y });
+      // The two morph endpoints — status-progress angle ↔ even-spread angle — on
+      // the SAME fixed drawn radius (the shared axis). angleDelta takes the short
+      // way across the wrap (Pitfall 2).
+      const statusAngle = progressToAngle(c.progress);
+      const restAngle = evenSpreadAngle(rank, count);
+      const angleDelta = shortestAngleDelta(statusAngle, restAngle);
+      const statusPos = polarToXY(C.cx, C.cy, dr, statusAngle);
+      const restPos = polarToXY(C.cx, C.cy, dr, restAngle);
+      statusBodies.push({ id: c.id, x: statusPos.x, y: statusPos.y });
+      restBodies.push({ id: c.id, x: restPos.x, y: restPos.y });
       return (
         <OrbitBody
           key={`body-${c.id}`}
-          cx={x}
-          cy={y}
+          cx={statusPos.x}
+          cy={statusPos.y}
           radius={C.PLANET_RADIUS}
           photo={c.photo}
           bodyFill={style.bodyFill}
+          mutedFill={mutedBodyFill(c.status, style.bodyFill, colors)}
           swatch={colors.avatarSwatches[swatchIndex(c.name, swatchCount)]}
           swatchText={colors.avatarSwatchText}
           initials={getInitials(c.name)}
           fontProvider={fontProvider}
+          morph={morph}
+          orbitRadius={dr}
+          statusAngle={statusAngle}
+          angleDelta={angleDelta}
         />
       );
     });
 
-    return { C, hitBodies, rings, planets };
-    // `view` is intentionally NOT a dep: 13-05 always renders the status layout;
-    // the morph (view-driven) lands in 13-07.
-  }, [dimsValid, canvas.width, canvas.height, orbiting, colors, fontProvider]);
+    return { C, statusBodies, restBodies, rings, planets };
+    // `view` is intentionally NOT a dep: the ELEMENTS + both view endpoints are
+    // view-independent (the `morph` shared value drives the interpolation off the
+    // JS thread). Only the tap hit-test picks a view (a separate cheap memo below).
+  }, [
+    dimsValid,
+    canvas.width,
+    canvas.height,
+    orbiting,
+    colors,
+    fontProvider,
+    morph,
+  ]);
+
+  // The tap hit-test targets whichever view `morph` has settled on (M5 feeds the
+  // SAME resting set into the pan drag's worklet-safe snapshot).
+  const hitBodies = useMemo<OrreryBody[]>(() => {
+    if (!placement) {
+      return [];
+    }
+    return view === "relationship"
+      ? placement.restBodies
+      : placement.statusBodies;
+  }, [placement, view]);
 
   // Keep the tap-handler refs in sync with the current placement (render-time
   // assignment is idempotent). The sun hit-target is the resolved occupant.
   if (placement) {
-    bodiesRef.current = placement.hitBodies;
+    bodiesRef.current = hitBodies;
     hitRadiusRef.current = placement.C.HIT_RADIUS;
     sunRadiusRef.current = placement.C.SUN_RADIUS;
     sunHitRef.current = {
@@ -356,7 +444,7 @@ export function OrreryScreen() {
             { label: "Relationship", value: "relationship" },
           ]}
           value={view}
-          onChange={setView}
+          onChange={onChangeView}
         />
       </View>
 
