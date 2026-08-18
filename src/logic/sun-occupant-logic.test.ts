@@ -9,10 +9,11 @@
  * C2-3 gate-safety: the palette input is sourced from THEME_PRESETS (this test is
  * under /logic/, NOT check:colors-exempt) — never an inline hex fake palette.
  */
-import { THEME_PRESETS } from "@/theme/theme-presets";
+
 import { describe, expect, it } from "vitest";
+import { THEME_PRESETS } from "@/theme/theme-presets";
 import { orreryRingStyle } from "./orrery-ring-logic";
-import { resolveSunOccupant } from "./sun-occupant-logic";
+import { resolveSunOccupant, sunOccupantIsSelf } from "./sun-occupant-logic";
 
 const colors = THEME_PRESETS["space-dark"].dark;
 const starPalette = colors.starPalette;
@@ -99,5 +100,52 @@ describe("resolveSunOccupant", () => {
     });
     expect(out.kind).toBe("self");
     expect(out.glowColor).toBe(starPalette[0]);
+  });
+});
+
+describe("sunOccupantIsSelf — the single archived/missing→self policy (WR-03)", () => {
+  it("NULL sun id → self", () => {
+    expect(sunOccupantIsSelf({ sunContactId: null, occupant: null })).toBe(
+      true,
+    );
+  });
+
+  it("missing/unknown contact (occupant null) → self", () => {
+    expect(sunOccupantIsSelf({ sunContactId: 7, occupant: null })).toBe(true);
+  });
+
+  it("archived contact → self (never surface a hidden occupant)", () => {
+    expect(
+      sunOccupantIsSelf({ sunContactId: 9, occupant: { archived: true } }),
+    ).toBe(true);
+  });
+
+  it("a live, non-archived contact → NOT self", () => {
+    expect(
+      sunOccupantIsSelf({ sunContactId: 5, occupant: { archived: false } }),
+    ).toBe(false);
+  });
+
+  it("agrees with resolveSunOccupant's self/contact resolution in every case (Settings ↔ canvas)", () => {
+    const cases = [
+      { sunContactId: null, occupant: null },
+      { sunContactId: 7, occupant: null },
+      {
+        sunContactId: 9,
+        occupant: { photo: null, status: "stable" as const, archived: true },
+      },
+      {
+        sunContactId: 5,
+        occupant: { photo: null, status: "wobble" as const, archived: false },
+      },
+    ];
+    for (const c of cases) {
+      const resolved = resolveSunOccupant({
+        ...base,
+        selfSunColour: null,
+        ...c,
+      });
+      expect(sunOccupantIsSelf(c)).toBe(resolved.kind === "self");
+    }
   });
 });

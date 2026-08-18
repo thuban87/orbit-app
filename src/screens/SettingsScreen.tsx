@@ -26,6 +26,7 @@ import { getContactHeader } from "@/db/contact-read";
 import { getExecutor, localDateTime } from "@/db/database";
 import { getProfile } from "@/db/profile-dao";
 import { listSunCandidates, type SunCandidate } from "@/db/sun-picker-read";
+import { sunOccupantIsSelf } from "@/logic/sun-occupant-logic";
 import type { RootStackParamList } from "@/navigation/types";
 import { reconcileSchedule } from "@/services/notifications/notification-schedule";
 import {
@@ -161,18 +162,19 @@ export function SettingsScreen() {
       setSelfSunColour(next.selfSunColour);
       setSunContactId(next.sunContactId);
       setSunCandidates(await listSunCandidates(exec));
-      // M4: resolve the occupant name, applying the SAME archived/missing→self
-      // fallback the canvas uses (resolveSunOccupant, 13-05) so Settings and the
-      // orrery never disagree about a hidden occupant. NULL → "Me"; a stored id
-      // whose contact is missing OR archived also shows "Me".
-      if (next.sunContactId === null) {
-        setSunOccupantName("Me");
-      } else {
-        const header = await getContactHeader(exec, next.sunContactId);
-        setSunOccupantName(
-          header && header.archived_at === null ? header.name : "Me",
-        );
-      }
+      // M4: resolve the occupant name through the SAME self-fallback predicate the
+      // canvas uses (sunOccupantIsSelf, 13-05) so Settings and the orrery can never
+      // disagree about a hidden occupant. NULL → "Me"; a stored id whose contact is
+      // missing OR archived also shows "Me"; else the live contact's name.
+      const header =
+        next.sunContactId === null
+          ? null
+          : await getContactHeader(exec, next.sunContactId);
+      const isSelf = sunOccupantIsSelf({
+        sunContactId: next.sunContactId,
+        occupant: header ? { archived: header.archived_at !== null } : null,
+      });
+      setSunOccupantName(isSelf ? "Me" : (header?.name ?? "Me"));
     } catch (err) {
       Logger.error(LOG_SCOPE, "failed to load orbit settings", err);
     }

@@ -57,7 +57,30 @@ export interface SunOccupantInput {
 /** The resolved sun occupant: self, or a specific contact, plus its glow colour. */
 export type SunOccupant =
   | { kind: "self"; photo: string | null; glowColor: string }
-  | { kind: "contact"; contactId: number; photo: string | null; glowColor: string };
+  | {
+      kind: "contact";
+      contactId: number;
+      photo: string | null;
+      glowColor: string;
+    };
+
+/**
+ * The SINGLE archived/missing→self policy (A7). The stored sun occupant resolves
+ * to SELF when there is no contact id, OR its looked-up contact is missing, OR it
+ * is archived. Both the canvas (`resolveSunOccupant`) and Settings' occupant-name
+ * read call THIS, so the two can never silently disagree about a hidden occupant
+ * if the predicate later grows a dimension (e.g. a snooze/reminders-off flag).
+ */
+export function sunOccupantIsSelf(input: {
+  sunContactId: number | null;
+  occupant: Pick<SunOccupantLookup, "archived"> | null;
+}): boolean {
+  return (
+    input.sunContactId === null ||
+    input.occupant === null ||
+    input.occupant.archived
+  );
+}
 
 /**
  * Resolve the orrery sun occupant + glow colour. PURE. See the module contract:
@@ -65,12 +88,25 @@ export type SunOccupant =
  * colour (never-contacted → the neutral border reused from orrery-ring-logic).
  */
 export function resolveSunOccupant(input: SunOccupantInput): SunOccupant {
-  const { sunContactId, selfSunColour, starPalette, selfPhoto, occupant, colors } =
-    input;
+  const {
+    sunContactId,
+    selfSunColour,
+    starPalette,
+    selfPhoto,
+    occupant,
+    colors,
+  } = input;
 
-  // Self sun: explicit NULL id, OR an archived/missing occupant (A7). Glow is the
-  // picked star colour, falling back to the gold default resolved at read.
-  if (sunContactId === null || occupant === null || occupant.archived) {
+  // Self sun: explicit NULL id, OR an archived/missing occupant (A7) — via the
+  // shared predicate. Glow is the picked star colour, falling back to the gold
+  // default resolved at read. The trailing null legs are logically subsumed by
+  // `sunOccupantIsSelf` (they are two of its three cases); they remain only to
+  // narrow `sunContactId`/`occupant` to non-null for the contact branch below.
+  if (
+    sunOccupantIsSelf({ sunContactId, occupant }) ||
+    sunContactId === null ||
+    occupant === null
+  ) {
     return {
       kind: "self",
       photo: selfPhoto,
