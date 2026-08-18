@@ -10,21 +10,20 @@
  */
 import { describe, expect, it } from "vitest";
 import {
-  MIN_GAP,
-  PLANET_RADIUS,
-  RING_GAP_SEED,
   deriveOrreryMetrics,
   drawnRadius,
   evenSpreadAngle,
   hitTest,
+  MIN_GAP,
+  PLANET_RADIUS,
   polarToXY,
   progressToAngle,
+  RING_GAP_SEED,
   ringRadius,
   shortestAngleDelta,
 } from "@/logic/orrery-geometry-logic";
 
 const HALF_PI = Math.PI / 2;
-const TWO_PI = Math.PI * 2;
 
 describe("progressToAngle — 0 at top (12 o'clock), clockwise, wraps each interval", () => {
   it("0 → 0 rad (top)", () => {
