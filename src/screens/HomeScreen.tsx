@@ -484,6 +484,24 @@ export function HomeScreen() {
           restores reach; exact styling is the owner's later design pass. */}
       <View style={styles.topBar}>
         <Pressable
+          testID="dashboard-orbit-entry"
+          accessibilityRole="button"
+          accessibilityLabel="Orbit view"
+          onPress={() => navigation.navigate("Orrery")}
+          style={styles.settingsEntry}
+        >
+          {({ pressed }) => (
+            <Text
+              style={[
+                styles.settingsGlyph,
+                { color: pressed ? colors.accent : colors.textSecondary },
+              ]}
+            >
+              ◎
+            </Text>
+          )}
+        </Pressable>
+        <Pressable
           testID="dashboard-settings-entry"
           accessibilityRole="button"
           accessibilityLabel="Settings"

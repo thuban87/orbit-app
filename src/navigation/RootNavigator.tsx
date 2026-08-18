@@ -10,6 +10,7 @@ import { EditContactScreen } from "@/screens/EditContactScreen";
 import { HomeScreen } from "@/screens/HomeScreen";
 import { ManageFavouritesScreen } from "@/screens/ManageFavouritesScreen";
 import { NeverContactedScreen } from "@/screens/NeverContactedScreen";
+import { OrreryScreen } from "@/screens/OrreryScreen";
 import { SettingsScreen } from "@/screens/SettingsScreen";
 import type { RootStackParamList, RootStackScreenProps } from "./types";
 
@@ -72,6 +73,7 @@ export function RootNavigator() {
       />
       <Stack.Screen name="Compose" component={ComposeScreen} />
       <Stack.Screen name="Capture" component={CaptureScreen} />
+      <Stack.Screen name="Orrery" component={OrreryScreen} />
     </Stack.Navigator>
   );
 }

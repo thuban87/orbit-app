@@ -74,6 +74,15 @@ export type RootStackParamList = {
    * this route lands in Plan 10-05 with the screen component.
    */
   Capture: undefined;
+  /**
+   * The orrery "solar system" view (ORR-01/03/04/05). Carries NO params — the
+   * screen self-fetches the orbiting set + sun occupant from the DB on focus
+   * (serializable-only, deep-link-safe, no callbacks — the same additive posture
+   * as `Capture`/`Compose`). Reached from the dashboard header ◎ Orbit button.
+   * Registered additively; `initialRouteName` stays `Home` and every existing
+   * route is untouched.
+   */
+  Orrery: undefined;
 };
 
 /**
