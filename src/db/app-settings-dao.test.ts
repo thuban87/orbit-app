@@ -1,25 +1,32 @@
 /**
- * app_settings migration (002) proof (NOTIF-05 / OQ-1).
+ * app_settings migration (002/003) + DAO proof (NOTIF-05 / OQ-1 / ORR-05 / ORR-06).
  *
  * The single-row `app_settings` table is the backup-native (SQLite, OQ-1) home
- * for the app-level notification controls. This suite proves, node-side via the
- * node:sqlite adapter, that migration 002 is forward-only + additive: a fresh
- * v0 DB runs 001 then 002 in order and reaches v2 with the seeded id=1
- * defaults, an existing v1 DB upgrades without disturbing migration-001 data,
- * and a re-run at v2 is a no-op (idempotent by user_version).
+ * for the app-level notification controls (002) and the orrery sun controls
+ * (003). This suite proves, node-side via the node:sqlite adapter, that
+ * migration 002 is forward-only + additive, and that the DAO reads/writes/
+ * validates every field — the notification fields AND the two sun fields.
  *
- * Migration 001 is imported and run unchanged — 002 edits no shipped table.
- * (The DAO read/write suites are appended in the same file by Plan 11-02 Task 2.)
+ * Migration 001 is imported and run unchanged — 002/003 edit no shipped table.
+ *
+ * COLOUR-GATE SAFETY (C2-3): this file lives OUTSIDE src/**\/theme, so the
+ * no-arg `npm run check:colors` scans it. It therefore contains NO forbidden
+ * colour literal: every valid-6-hex accept input is ASSEMBLED from a
+ * non-`#`-prefixed hex fragment (`` `#${HEX_UPPER}` ``), so the gate's
+ * `#[0-9a-fA-F]{3,8}` pattern never matches the source (a `#` immediately
+ * followed by `$`), and every reject input is a string the gate does not match.
  */
 import { beforeEach, describe, expect, it } from "vitest";
 import { nodeSqliteExecutor, openTestDb } from "@/db/__testkit__/node-sqlite";
 import {
   type AppSettings,
   getAppSettings,
+  SELF_SUN_COLOUR_RE,
   updateAppSettings,
 } from "@/db/app-settings-dao";
 import { migration001 } from "@/db/migrations/001-initial";
 import { migration002 } from "@/db/migrations/002-app-settings";
+import { migration003 } from "@/db/migrations/003-orrery-settings";
 import { runMigrations } from "@/db/migrations/runner";
 import type { SqlExecutor } from "@/db/types";
 import { newUid } from "@/db/uid";
@@ -27,11 +34,38 @@ import { newUid } from "@/db/uid";
 const NOW = "2026-08-16 12:00:00";
 const LATER = "2026-08-16 13:30:00";
 
+// Gate-safe hex building blocks (C2-3): the fragment has NO leading `#`, so
+// neither the fragment nor the assembled `` `#${...}` `` template matches
+// check-colors' `#[0-9a-fA-F]{3,8}` pattern. `HEX_UPPER` is the gold value that
+// becomes `starPalette[0]` in 13-04.
+const HEX_UPPER = "F2C14E";
+const HEX_LOWER = "f2c14e";
+/** A valid 6-hex, upper-case — assembled, never a bare literal. */
+const VALID_HEX_UPPER = `#${HEX_UPPER}`;
+/** A valid 6-hex, lower-case — proves the case-insensitive character class. */
+const VALID_HEX_LOWER = `#${HEX_LOWER}`;
+/** `#` followed by non-hex chars — the gate does not match it. */
+const REJECT_BAD_CHARS = "#GGGGGG";
+/** A non-hex word NOT in the gate's named-colour list. */
+const REJECT_WORD = "crimson";
+/** A 3-char hex (too short for the 6-char rule) — assembled gate-safe. */
+const REJECT_SHORT = `#${HEX_UPPER.slice(0, 3)}`;
+/** An 8-char hex (too long for the 6-char rule) — assembled gate-safe. */
+const REJECT_LONG = `#${HEX_UPPER}${"AA"}`;
+
 let exec: SqlExecutor;
 
-/** Bring a fresh in-memory DB to v2 (001 then 002), the on-device launch path. */
+/** Bring a fresh in-memory DB to v2 (001 then 002), the pre-Phase-13 state. */
 async function migrateToV2(): Promise<void> {
   await runMigrations(exec, [migration001, migration002], 2, {
+    now: NOW,
+    newUid,
+  });
+}
+
+/** Bring a fresh in-memory DB to v3 (001+002+003), the current launch path. */
+async function migrateToV3(): Promise<void> {
+  await runMigrations(exec, [migration001, migration002, migration003], 3, {
     now: NOW,
     newUid,
   });
@@ -143,7 +177,7 @@ describe("migration 002 — app_settings (forward-only, additive)", () => {
 
 describe("app-settings-dao — read", () => {
   it("getAppSettings returns the seeded defaults as a typed row", async () => {
-    await migrateToV2();
+    await migrateToV3();
     const settings = await getAppSettings(exec);
     const expected: AppSettings = {
       notificationsEnabled: 0,
@@ -153,12 +187,15 @@ describe("app-settings-dao — read", () => {
       deliveryHour: 9,
       quietStartHour: 21,
       quietEndHour: 8,
+      // The two sun fields default NULL and read back as null (no resolution here).
+      sunContactId: null,
+      selfSunColour: null,
     };
     expect(settings).toEqual(expected);
   });
 
   it("throws if the id=1 row is missing (never happens post-seed, loud by design)", async () => {
-    await migrateToV2();
+    await migrateToV3();
     await exec.runAsync("DELETE FROM app_settings WHERE id = 1");
     await expect((async () => getAppSettings(exec))()).rejects.toThrow();
   });
@@ -166,7 +203,7 @@ describe("app-settings-dao — read", () => {
 
 describe("app-settings-dao — validated write", () => {
   beforeEach(async () => {
-    await migrateToV2();
+    await migrateToV3();
   });
 
   it("updates only the supplied fields and bumps modified_at", async () => {
@@ -211,6 +248,9 @@ describe("app-settings-dao — validated write", () => {
       deliveryHour: 6,
       quietStartHour: 22,
       quietEndHour: 7,
+      // The sun fields are untouched by this patch — still null.
+      sunContactId: null,
+      selfSunColour: null,
     });
   });
 
@@ -300,5 +340,100 @@ describe("app-settings-dao — validated write", () => {
       modified_at: string;
     }>("SELECT last_contact, modified_at FROM contacts WHERE name = 'Sam'");
     expect(after).toEqual(before);
+  });
+});
+
+describe("app-settings-dao — sun fields (ORR-05 / ORR-06)", () => {
+  beforeEach(async () => {
+    await migrateToV3();
+  });
+
+  it("reads both sun fields as null on a fresh seed", async () => {
+    const settings = await getAppSettings(exec);
+    expect(settings.sunContactId).toBeNull();
+    expect(settings.selfSunColour).toBeNull();
+  });
+
+  it("writes and reads back a positive-integer sunContactId", async () => {
+    await updateAppSettings(exec, { sunContactId: 5 }, LATER);
+    const settings = await getAppSettings(exec);
+    expect(settings.sunContactId).toBe(5);
+  });
+
+  it("clears sunContactId back to null (self)", async () => {
+    await updateAppSettings(exec, { sunContactId: 5 }, LATER);
+    await updateAppSettings(exec, { sunContactId: null }, LATER);
+    const settings = await getAppSettings(exec);
+    expect(settings.sunContactId).toBeNull();
+  });
+
+  it("writes and reads back a valid 6-hex selfSunColour (upper case)", async () => {
+    await updateAppSettings(exec, { selfSunColour: VALID_HEX_UPPER }, LATER);
+    const settings = await getAppSettings(exec);
+    expect(settings.selfSunColour).toBe(VALID_HEX_UPPER);
+  });
+
+  it("accepts a lower-case 6-hex selfSunColour (case-insensitive class)", async () => {
+    await updateAppSettings(exec, { selfSunColour: VALID_HEX_LOWER }, LATER);
+    const settings = await getAppSettings(exec);
+    expect(settings.selfSunColour).toBe(VALID_HEX_LOWER);
+  });
+
+  it("clears selfSunColour back to null (resolve to starPalette[0] at read)", async () => {
+    await updateAppSettings(exec, { selfSunColour: VALID_HEX_UPPER }, LATER);
+    await updateAppSettings(exec, { selfSunColour: null }, LATER);
+    const settings = await getAppSettings(exec);
+    expect(settings.selfSunColour).toBeNull();
+  });
+
+  it.each([
+    ["zero", 0],
+    ["negative", -3],
+    ["non-integer", 1.5],
+  ])(
+    "rejects a %s sunContactId before any UPDATE (no write)",
+    async (_label, value) => {
+      await expect(
+        (async () =>
+          updateAppSettings(exec, { sunContactId: value }, LATER))(),
+      ).rejects.toThrow();
+      const row = await exec.getFirstAsync<{
+        sun_contact_id: number | null;
+        modified_at: string;
+      }>("SELECT sun_contact_id, modified_at FROM app_settings WHERE id = 1");
+      expect(row?.sun_contact_id).toBeNull();
+      expect(row?.modified_at).toBe(NOW);
+    },
+  );
+
+  it.each([
+    ["a non-hex word", REJECT_WORD],
+    ["a too-short 3-hex", REJECT_SHORT],
+    ["a too-long 8-hex", REJECT_LONG],
+    ["bad hex chars", REJECT_BAD_CHARS],
+  ])(
+    "rejects %s selfSunColour before any UPDATE (no write)",
+    async (_label, value) => {
+      await expect(
+        (async () =>
+          updateAppSettings(exec, { selfSunColour: value }, LATER))(),
+      ).rejects.toThrow();
+      const row = await exec.getFirstAsync<{
+        self_sun_colour: string | null;
+        modified_at: string;
+      }>("SELECT self_sun_colour, modified_at FROM app_settings WHERE id = 1");
+      expect(row?.self_sun_colour).toBeNull();
+      expect(row?.modified_at).toBe(NOW);
+    },
+  );
+
+  it("exports the SELF_SUN_COLOUR_RE the write path validates against (palette lock)", async () => {
+    // 13-04's M6 conformance test imports THIS regex and runs every starPalette
+    // entry through it — the single source of truth for what is writable.
+    expect(SELF_SUN_COLOUR_RE.test(VALID_HEX_UPPER)).toBe(true);
+    expect(SELF_SUN_COLOUR_RE.test(VALID_HEX_LOWER)).toBe(true);
+    expect(SELF_SUN_COLOUR_RE.test(REJECT_SHORT)).toBe(false);
+    expect(SELF_SUN_COLOUR_RE.test(REJECT_LONG)).toBe(false);
+    expect(SELF_SUN_COLOUR_RE.test(REJECT_BAD_CHARS)).toBe(false);
   });
 });
