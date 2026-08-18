@@ -92,6 +92,12 @@ export interface OrreryBody {
   id: number;
   x: number;
   y: number;
+  /**
+   * The body's effective outward drift above its ring (`driftPush`), carried on
+   * the drag snapshot so the release-rank map can invert it (WR-01). Optional —
+   * hit-testing ignores it; only the 13-07 drag path reads it.
+   */
+  push?: number;
 }
 
 /**
@@ -155,6 +161,24 @@ export function drawnRadius(
     push = C.ROGUE_DRIFT_SPAN; // furthest
   }
   return Math.min(base + push, C.DRIFT_MAX); // hard clamp → always on-screen
+}
+
+/**
+ * The EFFECTIVE outward drift a body is DRAWN above its ring (13-07 drag-release
+ * inversion) — `drawnRadius − ringRadius`, i.e. the push AFTER the DRIFT_MAX clamp
+ * render applies, so a rim-clamped body reports its true (reduced) offset, not the
+ * nominal decay/rogue span. The drag-release rank map subtracts THIS from the
+ * finger radius so a drifted (decay/rogue) body inverts back to its OWN ring: a
+ * no-move release is net-zero for EVERY body, clamped or not. Reuses drawnRadius/
+ * ringRadius — the SAME push render applies — never a re-derived drift formula.
+ */
+export function driftPush(
+  progress: number,
+  rank: number,
+  status: ProfileStatus,
+  C: OrreryMetrics,
+): number {
+  return drawnRadius(progress, rank, status, C) - ringRadius(rank, C);
 }
 
 /**

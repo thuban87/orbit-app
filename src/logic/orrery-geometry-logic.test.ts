@@ -12,6 +12,7 @@ import { describe, expect, it } from "vitest";
 import {
   deriveOrreryMetrics,
   drawnRadius,
+  driftPush,
   evenSpreadAngle,
   hitTest,
   MIN_GAP,
@@ -110,6 +111,47 @@ describe("drawnRadius — stable/wobble on-ring, decay drifts, rogue furthest, c
     expect(drawnRadius(5, 10, "rogue", C)).toBe(C.DRIFT_MAX);
     expect(drawnRadius(2.99, 10, "decay", C)).toBeLessThanOrEqual(C.DRIFT_MAX);
     expect(drawnRadius(0.1, 10, "stable", C)).toBeLessThanOrEqual(C.DRIFT_MAX);
+  });
+});
+
+describe("driftPush — the effective drawn-above-ring offset the drag-release inverts (WR-01)", () => {
+  const C = deriveOrreryMetrics(600, 1000, 3); // ringInner 58, effectiveGap 34, DRIFT_MAX 276
+
+  it("stable/wobble bodies have zero push (drawn on their ring)", () => {
+    expect(driftPush(0.5, 0, "stable", C)).toBeCloseTo(0);
+    expect(driftPush(0.9, 1, "wobble", C)).toBeCloseTo(0);
+  });
+
+  it("a drifted (decay/rogue) body has a positive push equal to drawnRadius − ringRadius", () => {
+    expect(driftPush(2.0, 0, "decay", C)).toBeGreaterThan(0);
+    expect(driftPush(5, 0, "rogue", C)).toBeCloseTo(
+      drawnRadius(5, 0, "rogue", C) - ringRadius(0, C),
+    );
+  });
+
+  it("a rim-clamped body reports its REDUCED (post-DRIFT_MAX-clamp) push, not the nominal span", () => {
+    // rank 10 + rogue clamps drawnRadius to DRIFT_MAX, so the effective push is
+    // DRIFT_MAX − ringRadius(10), well below the nominal ROGUE_DRIFT_SPAN.
+    expect(driftPush(5, 10, "rogue", C)).toBeCloseTo(
+      C.DRIFT_MAX - ringRadius(10, C),
+    );
+    expect(driftPush(5, 10, "rogue", C)).toBeLessThan(C.ROGUE_DRIFT_SPAN);
+  });
+
+  it("net-zero: releasing a drifted body at its OWN drawn radius inverts back to its current rank", () => {
+    // The drag-release map: round((releaseRadius − driftPush − ringInner) / gap).
+    for (const [rank, status] of [
+      [2, "rogue"],
+      [1, "decay"],
+      [0, "stable"],
+    ] as const) {
+      const drawn = drawnRadius(2.0, rank, status, C);
+      const adjusted = drawn - driftPush(2.0, rank, status, C);
+      const invertedRank = Math.round(
+        (adjusted - C.ringInner) / C.effectiveGap,
+      );
+      expect(invertedRank).toBe(rank);
+    }
   });
 });
 

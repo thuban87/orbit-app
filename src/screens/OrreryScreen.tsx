@@ -77,6 +77,7 @@ import { rewriteRingSeq } from "@/db/ring-seq-dao";
 import {
   deriveOrreryMetrics,
   drawnRadius,
+  driftPush,
   evenSpreadAngle,
   hitTest,
   MORPH_MS,
@@ -359,8 +360,11 @@ export function OrreryScreen() {
       const angleDelta = shortestAngleDelta(statusAngle, restAngle);
       const statusPos = polarToXY(C.cx, C.cy, dr, statusAngle);
       const restPos = polarToXY(C.cx, C.cy, dr, restAngle);
-      statusBodies.push({ id: c.id, x: statusPos.x, y: statusPos.y });
-      restBodies.push({ id: c.id, x: restPos.x, y: restPos.y });
+      // WR-01: carry the body's effective outward drift so the drag-release rank
+      // map inverts it (the SAME push it is drawn at, via the shared helper).
+      const push = driftPush(c.progress, rank, c.status, C);
+      statusBodies.push({ id: c.id, x: statusPos.x, y: statusPos.y, push });
+      restBodies.push({ id: c.id, x: restPos.x, y: restPos.y, push });
       return (
         <OrbitBody
           key={`body-${c.id}`}
@@ -467,6 +471,10 @@ export function OrreryScreen() {
   });
   const activeDragId = useSharedValue<number | null>(null);
   const dragRadius = useSharedValue(0);
+  // WR-01: the dragged body's own effective drift push, captured at onBegin, so the
+  // release-rank map (and the live ghost preview) invert the outward drift and a
+  // no-move release maps back to the body's CURRENT rank (net-zero).
+  const draggedPush = useSharedValue(0);
 
   // Mirror the current resting layout + metrics into the shared values whenever the
   // placement or the settled view changes (M5 — the drag reads THESE, never JS).
@@ -555,6 +563,7 @@ export function OrreryScreen() {
           const bodies = bodiesShared.value;
           const hr = dragMetrics.value.hitRadius;
           let best: number | null = null;
+          let bestPush = 0;
           let bestD2 = hr * hr;
           for (let i = 0; i < bodies.length; i++) {
             const b = bodies[i];
@@ -562,9 +571,11 @@ export function OrreryScreen() {
             if (d2 <= bestD2) {
               bestD2 = d2;
               best = b.id;
+              bestPush = b.push ?? 0; // WR-01: invert THIS body's drift at release
             }
           }
           activeDragId.value = best;
+          draggedPush.value = bestPush;
         })
         .onUpdate((e) => {
           if (activeDragId.value === null) {
@@ -582,13 +593,17 @@ export function OrreryScreen() {
           }
           // H2: release radius → clamped rank via the SAME metrics object as render
           // + hit-test (C.ringInner / C.effectiveGap; effectiveGap is floored > 0).
+          // WR-01: subtract the dragged body's OWN drift push first — bodies are
+          // DRAWN at ringRadius + drift, so the raw finger radius over-counts by
+          // drift/effectiveGap; inverting it makes a no-move release net-zero.
           const m = dragMetrics.value;
           const dx = e.x - m.cx;
           const dy = e.y - m.cy;
           const releaseRadius = Math.sqrt(dx * dx + dy * dy);
+          const adjustedRadius = releaseRadius - draggedPush.value;
           const maxRank = Math.max(0, m.count - 1);
           const rawRank = Math.round(
-            (releaseRadius - m.ringInner) / m.effectiveGap,
+            (adjustedRadius - m.ringInner) / m.effectiveGap,
           );
           const targetRank = Math.max(0, Math.min(rawRank, maxRank));
           runOnJS(commitFromWorklet)(activeDragId.value, targetRank);
@@ -596,8 +611,16 @@ export function OrreryScreen() {
         .onFinalize(() => {
           activeDragId.value = null;
           dragRadius.value = 0;
+          draggedPush.value = 0;
         }),
-    [bodiesShared, dragMetrics, activeDragId, dragRadius, commitFromWorklet],
+    [
+      bodiesShared,
+      dragMetrics,
+      activeDragId,
+      dragRadius,
+      draggedPush,
+      commitFromWorklet,
+    ],
   );
 
   // Gesture.Race: a stationary touch → tap → Profile; movement past the threshold
@@ -612,7 +635,10 @@ export function OrreryScreen() {
   // derive off the drag shared values (UI thread).
   const ghostRingRadius = useDerivedValue(() => {
     const m = dragMetrics.value;
-    const raw = (dragRadius.value - m.ringInner) / m.effectiveGap;
+    // WR-01: subtract the dragged body's drift so the live preview lands on the
+    // SAME target rank the release commit will pick.
+    const raw =
+      (dragRadius.value - draggedPush.value - m.ringInner) / m.effectiveGap;
     const maxRank = Math.max(0, m.count - 1);
     const rank = Math.max(0, Math.min(Math.round(raw), maxRank));
     return m.ringInner + rank * m.effectiveGap;
