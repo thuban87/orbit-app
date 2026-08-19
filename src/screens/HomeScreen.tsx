@@ -543,6 +543,18 @@ export function HomeScreen() {
           />
         }
       />
+      <Pressable
+        testID="dashboard-create-fab"
+        accessibilityRole="button"
+        accessibilityLabel="Add contact"
+        onPress={() => navigation.navigate("Create")}
+        style={({ pressed }) => [
+          styles.fab,
+          { backgroundColor: colors.accent, opacity: pressed ? 0.85 : 1 },
+        ]}
+      >
+        <Text style={[styles.fabGlyph, { color: colors.background }]}>+</Text>
+      </Pressable>
     </View>
   );
 }
@@ -550,6 +562,22 @@ export function HomeScreen() {
 const styles = StyleSheet.create({
   root: {
     flex: 1,
+  },
+  fab: {
+    position: "absolute",
+    right: 20,
+    bottom: 28,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    alignItems: "center",
+    justifyContent: "center",
+    elevation: 6,
+  },
+  fabGlyph: {
+    fontSize: 32,
+    lineHeight: 34,
+    fontWeight: "600",
   },
   topBar: {
     flexDirection: "row",
