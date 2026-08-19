@@ -1,0 +1,43 @@
+{
+  "version": "1.0",
+  "timestamp": "2026-08-19T05:12:14-05:00",
+  "phase": 14,
+  "phase_name": "ai-message-suggestions",
+  "phase_dir": ".planning/phases/14-ai-message-suggestions",
+  "plan": 1,
+  "task": 0,
+  "total_tasks": 12,
+  "status": "paused",
+  "completed_tasks": [
+    {"id": 1, "name": "Research, AI design contract, and planning context", "status": "done", "commit": "2328867"},
+    {"id": 2, "name": "Split Phase 14 into six execution-ready plans and validation matrix", "status": "done", "commit": "uncommitted"}
+  ],
+  "remaining_tasks": [
+    {"id": 3, "name": "Complete two-reviewer convergence, maximum three cycles", "status": "not_started"},
+    {"id": 4, "name": "Obtain owner approval before execution", "status": "not_started"},
+    {"id": 5, "name": "Execute phase plans", "status": "not_started"}
+  ],
+  "blockers": [
+    {"description": "No valid Codex-plus-Claude review cycle has been captured for the corrected plan set.", "type": "external", "workaround": "Run the convergence sequence in Claude and save both reviewer outputs before execution."}
+  ],
+  "async_jobs": [],
+  "human_actions_pending": [
+    {"action": "Run and record plan-review convergence in Claude", "context": "The corrected plan set is ready, but review convergence is not complete.", "blocking": true}
+  ],
+  "decisions": [
+    {"decision": "Use direct typed fetch provider adapters and expo-secure-store; do not add an AI framework or provider SDK.", "rationale": "Bounded multi-provider BYO-key mobile generation.", "phase": 14},
+    {"decision": "Keep Compose as the sole editable draft surface and require a per-provider first-send prompt acknowledgement.", "rationale": "Preserves user authorship and makes outbound context inspectable.", "phase": 14}
+  ],
+  "uncommitted_files": [
+    ".planning/phases/14-ai-message-suggestions/14-01-PLAN.md",
+    ".planning/phases/14-ai-message-suggestions/14-02-PLAN.md",
+    ".planning/phases/14-ai-message-suggestions/14-03-PLAN.md",
+    ".planning/phases/14-ai-message-suggestions/14-04-PLAN.md",
+    ".planning/phases/14-ai-message-suggestions/14-05-PLAN.md",
+    ".planning/phases/14-ai-message-suggestions/14-06-PLAN.md",
+    ".planning/phases/14-ai-message-suggestions/14-VALIDATION.md",
+    ".planning/phases/14-ai-message-suggestions/14-REVIEWS.md"
+  ],
+  "next_action": "Read the Phase 14 artifacts in the handoff's required order, run and persist a full two-reviewer convergence cycle, and do not execute before the owner approves.",
+  "context_notes": "Phase 14 implementation has not started; the executor is interrupted. The old review record falsely stated readiness and has been corrected."
+}
