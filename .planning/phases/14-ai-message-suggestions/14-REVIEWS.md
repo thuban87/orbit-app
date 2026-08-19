@@ -14,9 +14,32 @@ supersedes the prior "no verdict recorded" state.
 **CYCLE_SUMMARY: current_high=7 current_actionable=4** (union of distinct concerns; nothing folded
 into PLAN.md yet).
 
-One HIGH (H3 below) is an **owner-bucket security-posture decision**, not a plan-quality fix — both
-reviewers flagged it, Claude by name-citing CLAUDE.md. Replanning is paused on the owner's direction
-for H3 before Cycle 2 (see "Owner decision required").
+One HIGH (H3 below) was an **owner-bucket security-posture decision**, not a plan-quality fix — both
+reviewers flagged it, Claude by name-citing CLAUDE.md. **The owner resolved it (2026-08-19):**
+implement airtight connection-time enforcement via a native module (see H3). Cycle 2 replan folds
+this in along with every other finding below.
+
+## Owner decisions (Cycle 1 → Cycle 2 replan directives)
+
+- **H3 — RESOLVED (2026-08-19): add native connection-time egress enforcement (chosen: airtight).**
+  Add a focused Android-first native module that wraps OkHttp with a **custom `Dns` implementation**:
+  resolve the Custom hostname → reject any resolved loopback/private/RFC1918/link-local/`.local`
+  address → connect to exactly the vetted IP so `fetch` cannot re-resolve to a different address
+  (closes active DNS-rebinding / TOCTOU). Route Custom-endpoint provider requests through this module.
+  This also enforces redirect safety at the native layer (fixes M3 — RN `fetch` silently follows 3xx
+  on Android). The must-have in 14-02 may now be stated truthfully as "loopback/private/link-local/
+  LAN-**resolving** Custom URLs fail before any bytes leave the device," and threat T-14-04 is
+  genuinely mitigated rather than best-effort.
+  - Governance note: this does NOT reverse a recorded decision. The locked scope (14-CONTEXT.md, "the
+    agent's Discretion") forbids provider SDKs / AI frameworks, not native modules; CONTEXT
+    "Established Patterns" already contemplates new Expo native modules via `npx expo install` +
+    config-plugin + clean prebuild/release-build UAT. The owner confirmed "no new deps" was
+    conditional ("unless we talk about it"), and we talked.
+  - Plan scope this adds: the native module + Expo config plugin registration; a typed JS wrapper the
+    AiService Custom adapter calls; unit tests for the JS validation/rejection logic; and an explicit
+    **on-device (Pixel) UAT** fixture that attempts an HTTPS→private-address escape and an HTTPS
+    redirect, with release approval contingent on its pass (raw-`fetch` mock tests cannot prove this —
+    both reviewers noted mocked-fetch can't establish native transport behavior).
 
 ---
 
@@ -49,12 +72,12 @@ for H3 before Cycle 2 (see "Owner decision required").
   module. So only URL-literal checks are possible (reject `http:`, credentials, loopback/RFC1918/
   link-local **IP literals**, `.local`). A public hostname that resolves to a private address
   (DNS-rebinding) cannot be caught pre-flight. The must-have as written is undeliverable.
-- Claude flags per CLAUDE.md: weakening/scoping a named security control is an **owner decision**, not
-  a silent executor/planner call. This is the escalation trigger.
-- **Candidate resolutions (all owner-bucket):** (a) rescope the must-have + T-14-04 to enforceable
-  URL-literal checks and record residual DNS-rebinding risk as accepted with owner sign-off;
-  (b) narrow Custom endpoints to a verifiable allowlist; (c) add a native connection-time
-  peer-address/redirect enforcement mechanism (violates the locked no-native-module scope).
+- Claude flagged per CLAUDE.md: weakening/scoping a named security control is an **owner decision**, not
+  a silent executor/planner call. This was the escalation trigger.
+- **✅ OWNER RESOLUTION (2026-08-19): option (c) — airtight native connection-time enforcement.** See
+  the "Owner decisions" block above for the full directive (custom OkHttp `Dns`, pin vetted IP, reject
+  private-resolving hosts, native redirect safety, on-device UAT). The planner must implement THIS, not
+  rescope/weaken the control.
 
 ### H4 — AbortController ownership is contradictory
 - **Reviewer:** Codex. **Where:** 14-02-PLAN.md Task 1; 14-05-PLAN.md Task 1.
@@ -148,13 +171,13 @@ immutable `ResolvedPrompt` shared across inspector/ack/payload; ComposeScreen's 
 
 ---
 
-## Owner decision required (blocks Cycle 2 replan)
+## Owner decision — RESOLVED (2026-08-19)
 
-**H3** must be resolved by the owner before replanning, because every candidate resolution changes the
-phase's recorded security posture or the locked no-native-module scope. Once the owner picks a
-direction, one replan (`gsd-plan-phase 14 --reviews --skip-research`) can fold H3's decision plus all
-other HIGH/actionable findings into the plan set, followed by Cycle 2 review. Do NOT begin execution:
-Phase 14 execution remains owner-gated even after convergence.
+**H3** is resolved: airtight native connection-time enforcement (see "Owner decisions" block). Cycle 2
+replan (`gsd-plan-phase 14 --reviews --skip-research`) folds H3's directive plus all other HIGH/
+actionable findings into the plan set, followed by Cycle 2 review. M3 (Android redirect no-op) is
+subsumed by H3's native path. Do NOT begin execution: Phase 14 execution remains owner-gated even
+after convergence.
 
 ## Reviewer tooling notes (for future cycles)
 - Codex: run manually — `codex exec --sandbox read-only --skip-git-repo-check --ephemeral -C <repo>
