@@ -171,3 +171,18 @@ _Verifier: Claude (gsd-verifier)_
 ### Environmental notes (not product bugs)
 - The **cross-build DB anomaly** (Phase-12 finding: a debug-created DB won't load under a release build) is a dev-UAT artifact only — real users always have release-created DBs, which load fine.
 - Left running for owner follow-up: debug APK installed on the Pixel; orbit Metro on **8082** (reverse 8081→8082); quest-board's 8081 Metro untouched. Tree clean, all committed locally on `main`, nothing pushed.
+
+---
+
+## Device UAT — update (2026-08-18): empty-orbit ROOT CAUSE isolated
+
+**Via an on-screen diagnostic (the debug console wasn't reaching remote channels), the orrery's empty state was traced to a runtime DB error, NOT the orrery logic:**
+
+- The orrery load's FIRST DB read (`getAppSettings`) throws at the native layer:
+  `Error: Call to function 'NativeStatement.runAsync' has been rejected. → Caused by: java.lang.NullPointerException` (the owner independently saw the sibling `NativeDatabase.prepareAsync` NPE). The load catches it (offline-read-path rule) → `setOrbiting([])` + the default gold self-sun — exactly the empty render observed.
+- `getAppSettings` is a trivial correct read (`getFirstAsync` over the v3 `app_settings` row, which exists); `getExecutor()` returns the never-closed cached singleton connection the **dashboard uses successfully**. So this is a native expo-sqlite connection/statement NPE, **not a bug in the Phase-13 orrery code** (which is node-verified and renders correctly on device).
+- **Assessment — likely a dev-mode Metro/Fast-Refresh artifact** (the classic expo-sqlite hot-reload symptom: the native DB is closed on reload while a cached JS ref lives on; the app has NO explicit `close()` and never closes the DB in code). Possibly compounded by this debug DB's WAL state (it is a Phase-12 debug-created DB; see the cross-build anomaly above). In a production release build there is no Fast Refresh — the DB opens once at launch and stays open — so this should not occur.
+- **NOT confirmed dev-only.** Definitive confirmation is a clean test that destroys the current test data: a RELEASE build + fresh (cleared) app data → add a contact via the new dashboard FAB → open the orrery. That is the owner's call (data loss + their device).
+- Ruled out (not the cause): the `listOrbitingContacts` query + `excludeContactId` null-handling (both correct — return Alice against the pulled DB); read concurrency (serializing the load's 3 reads did NOT fix the NPE); `getProfile`/`getProfilePhoto` (null-safe, `profile` table present); a stale bundle (the FAB + diagnostics loaded correctly, confirming current code was running).
+
+**Also added this session (owner-requested, outside orrery scope):** a persistent **add-contact FAB** on the dashboard (bottom-right, → the existing `Create` route) — restores the add affordance that had only existed in the first-run empty state since the Phase-8 rewrite. Verified rendering on device; `tsc`/`check:colors`/`npm test` (1009/1009) green.
