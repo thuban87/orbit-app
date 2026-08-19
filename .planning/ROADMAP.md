@@ -28,7 +28,7 @@ onto the dossier domains; a `[DECIDED]`/`[REJECTED]` decision is implemented, ne
 - [x] **Phase 10: Share-Sheet Capture** — Android share target, grid-of-faces picker, `EXTRA_SUBJECT` patch, inline create. (completed 2026-08-16)
 - [x] **Phase 11: Actionable Notifications** — pre-scheduled + launch-reconcile engine, decay + birthday, headless actions, mute, settings. (completed 2026-08-16)
 - [x] **Phase 12: Home Screen Widget** — favourites grid, headless mark, Quick mark · Log contact · Message, add-widget button. (completed 2026-08-17)
-- [ ] **Phase 13: Orrery** — the two-view Skia solar system, rogue rendering, assignable/self-colour sun, ambient layer.
+- [x] **Phase 13: Orrery** — the two-view Skia solar system, rogue rendering, assignable/self-colour sun, ambient layer. (completed 2026-08-18)
 - [ ] **Phase 14: AI Message Suggestions** — providers + keys, editable-draft flow, prompt assembly, `share_with_ai`.
 - [ ] **Phase 15: Weekly Digest** — one WEEKLY Sunday notification → a live "your week" screen.
 - [ ] **Phase 16: Backup, Export & Restore** — manual + auto SAF backup, optional encryption, Merge/Replace restore, forward-migrate.
@@ -517,7 +517,7 @@ Plans:
 
 **Wave 4** *(blocked on Wave 3)*
 
-- [ ] 13-08-PLAN.md — Desktop prebuild + Pixel device UAT + owner sign-off (ORR-01…06)
+- [x] 13-08-PLAN.md — Desktop prebuild + Pixel device UAT + owner sign-off (ORR-01…06)
 
 ### Phase 14: AI Message Suggestions
 
@@ -579,7 +579,7 @@ Plans:
 | 10. Share-Sheet Capture | 6/6 | Complete   | 2026-08-16 |
 | 11. Actionable Notifications | 13/13 | Complete   | 2026-08-16 |
 | 12. Home Screen Widget | 8/8 | Complete   | 2026-08-17 |
-| 13. Orrery | 7/8 | In progress | - |
+| 13. Orrery | 8/8 | Complete   | 2026-08-18 |
 | 14. AI Message Suggestions | 0/TBD | Not started | - |
 | 15. Weekly Digest | 0/TBD | Not started | - |
 | 16. Backup, Export & Restore | 0/TBD | Not started | - |

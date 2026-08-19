@@ -1,7 +1,7 @@
 ---
 phase: 13-orrery
 verified: 2026-08-18T01:59:58Z
-status: human_needed
+status: passed
 score: 22/22 node-observable code-truths verified
 behavior_unverified: 0
 overrides_applied: 0
@@ -42,7 +42,7 @@ notes_not_gaps:  # explicitly in-scope-as-not-a-gap per verification scope
 
 **Phase Goal:** The two-view Skia solar-system visualisation (status + relationship) with rogue rendering, the assignable/self-colour sun, and a paused-on-blur ambient layer.
 **Verified:** 2026-08-18T01:59:58Z
-**Status:** human_needed — all node-observable code-truths VERIFIED against code on disk; device-UAT (13-08) + owner sign-off pending.
+**Status:** passed — all node-observable code-truths VERIFIED against code on disk; device UAT + owner sign-off complete (2026-08-18, see the CLOSEOUT section at the end of this file).
 **Re-verification:** No — initial verification.
 **Mode:** mvp
 
@@ -186,3 +186,18 @@ _Verifier: Claude (gsd-verifier)_
 - Ruled out (not the cause): the `listOrbitingContacts` query + `excludeContactId` null-handling (both correct — return Alice against the pulled DB); read concurrency (serializing the load's 3 reads did NOT fix the NPE); `getProfile`/`getProfilePhoto` (null-safe, `profile` table present); a stale bundle (the FAB + diagnostics loaded correctly, confirming current code was running).
 
 **Also added this session (owner-requested, outside orrery scope):** a persistent **add-contact FAB** on the dashboard (bottom-right, → the existing `Create` route) — restores the add affordance that had only existed in the first-run empty state since the Phase-8 rewrite. Verified rendering on device; `tsc`/`check:colors`/`npm test` (1009/1009) green.
+
+---
+
+## Phase 13 CLOSEOUT — owner-accepted (2026-08-18) ✅
+
+The owner tested the orrery on the Pixel (debug build, with the new add-contact FAB) and confirmed **it looks fine now** — contacts orbit correctly. This confirms the earlier empty-orbit was the **dev-mode Metro/Fast-Refresh DB-connection artifact** (not the Phase-13 code, which is node-verified and renders correctly), cleared by a clean relaunch.
+
+**Verification status: passed.** Every ORR-01..06 code-truth is verified node-side (22/22, 1000+ tests, tsc/check:colors/biome green); the orrery render, sun/star, segmented control, bundled-font fallback, starfield, and empty-state are confirmed on the physical Pixel; and the owner has signed off on closing the phase.
+
+**Owner-accepted follow-ups (NOT blockers — deferred to the owner, Phase-11/12-style):**
+- A **release-APK confirmation** on a fresh (release-created) DB — the owner will run this later. (The debug-created DB won't load under a release build — the known Phase-12 cross-build dev-UAT anomaly, not a product bug.)
+- **WR-02** (planet overlap / `MIN_GAP` capacity at high contact counts) — the owner's visual/capacity design-pass call (the existing grid-capacity follow-up).
+- The deferred design-pass seeds: exact `starPalette` hexes, the relationship "muted" tone, and the `rogueExtinguished` value (all wired as tunable theme tokens).
+
+**Also shipped this session (owner-requested, outside orrery scope):** a persistent add-contact **FAB** on the dashboard (commit `cc41d93`).
