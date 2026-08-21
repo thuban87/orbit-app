@@ -1,503 +1,503 @@
 /**
- * AI Service — Provider abstraction layer.
+ * AI Service — neutral, bounded, cancellable provider adapters (Phase 14, AI-01).
  *
- * Supports 4 cloud providers: OpenAI, Anthropic, Google (Gemini), and a Custom
- * (OpenAI-compatible) HTTPS endpoint. All HTTP goes through the platform `fetch`
- * with an explicit ok-status check before every JSON body parse — `fetch`,
- * unlike the legacy plugin request helper, does NOT throw on 4xx/5xx, so a
- * non-ok body must be rejected before it is parsed as success.
+ * Four BYO-key providers: OpenAI, Anthropic, Google (Gemini) on raw `fetch` to
+ * their FIXED public hosts, and a user-controlled Custom HTTPS endpoint routed
+ * through the Plan 07 native `secureCustomFetch` transport (see Task 2). Every
+ * adapter implements the narrow {@link AiProvider} contract — `listModels()` for
+ * advisory discovery and `generate(input)` for one unary draft.
  *
- * The local/LAN provider is excluded per project scope (HTTPS-only) — no
- * cleartext transport path ships in this file.
+ * SECURITY / PRIVACY invariants baked into this module:
+ *   - CALLER-OWNED CANCELLATION (H4): an adapter forwards `input.signal` to the
+ *     transport and creates NO abort controller and NO timeout of its own. The
+ *     20s timeout and the controller live in the Compose caller (Plan 05).
+ *   - PER-CALL KEY ACCESSOR (C3-M2): `refreshProviders` injects a
+ *     `() => Promise<string|null>` closure over `ai-key-store`; it NEVER reads or
+ *     caches a key value. The accessor is invoked INSIDE `generate` /networked
+ *     `listModels` immediately before the request. A key never comes from
+ *     navigation params, SQLite, or the prompt builder.
+ *   - PAYLOAD IDENTITY (C3-M1): the request body text is exactly
+ *     `input.resolvedPrompt.payload` — the same immutable string the inspector
+ *     showed the user. Adapters read ONLY `payload`, nothing else off the prompt.
+ *   - SANITIZED ERRORS (T-14-05): every failure is an {@link AiError} whose
+ *     message is exactly its stable `code`. No key, endpoint URL, query string,
+ *     header, request body, or raw response text is ever surfaced or logged.
+ *   - NO auto-retry after transport/timeout uncertainty (T-14-07), no streaming,
+ *     no provider SDKs, no response-body diagnostics.
  *
- * Dormant this phase — plumbing only, wired to no screen. It must compile and
- * typecheck; it is not invoked at runtime yet.
+ * Response JSON is `unknown` at the network boundary: each adapter validates its
+ * expected text path and every draft passes the shared {@link parseSuggestionOutput}
+ * ceiling before it can become a suggestion.
  */
-import type { OrbitContact } from "@/types";
-import { formatLocalDate } from "@/utils/dates";
-import { Logger } from "@/utils/logger";
-import type { AiSettings } from "./ai-types";
+import type { ResolvedPrompt } from "@/ai/prompt-types";
+import { aiKeyStore } from "./ai-key-store";
+import type { AiCloudProviderId, AiSettings } from "./ai-types";
 
-// ─── Default Prompt Template ────────────────────────────────────
-
-export const DEFAULT_PROMPT_TEMPLATE = `You are a personal relationship assistant. Write a short, warm check-in message for the following contact.
-
-**Contact:** {{name}}
-**Category:** {{category}}
-**Days since last contact:** {{daysSinceContact}}
-**Social battery:** {{socialBattery}}
-**Last interaction:** {{lastInteraction}}
-
-**Conversational Fuel:**
-{{Conversational Fuel}}
-
-**Small Talk Data:**
-{{Small Talk Data}}
-
-Guidelines:
-- Keep it casual and authentic — not robotic
-- Reference specific topics from their Conversational Fuel or Small Talk Data if available
-- Match the tone to the relationship category (family = warm, work = professional but friendly)
-- Keep it under 3-4 sentences
-- Don't mention that you're an AI or that you're using data about them
-- No em dashes at all`;
-
-// ─── Context Extraction & Prompt Assembly ───────────────────────
+// ─── Neutral contract ───────────────────────────────────────────
 
 /**
- * Structured context extracted from a contact's file for AI prompt assembly.
+ * The neutral generation input. `resolvedPrompt` is the SAME immutable object
+ * Compose built (C3-M1 — adapters read only `resolvedPrompt.payload`). `signal`
+ * is the CALLER's AbortSignal (H4 — the adapter never replaces it).
  */
-export interface MessageContext {
-  name: string;
-  category: string;
-  daysSinceContact: number;
-  socialBattery: string;
-  lastInteraction: string;
+export interface GenerationInput {
+  readonly resolvedPrompt: ResolvedPrompt;
+  readonly model: string;
+  readonly temperature: number;
+  readonly maxOutputTokens: number;
+  readonly signal: AbortSignal;
 }
 
 /**
- * Extract a named section from markdown file content.
- * Looks for a `## ...SectionName` heading (tolerates emoji prefixes and extra words)
- * and captures all content until the next `##` heading or EOF.
- *
- * @param content - Full markdown file content
- * @param sectionName - Heading text to search for (without `##` prefix)
- * @returns Section content (trimmed) or "None available"
+ * Advisory model discovery. `list` carries fetched model ids; `manual` means
+ * discovery is unavailable/inapplicable and the UI must keep free-text entry
+ * (Custom is ALWAYS `manual` — C4-M1). Discovery NEVER throws.
  */
-export function extractSection(content: string, sectionName: string): string {
-  // Match ## headings that contain the section name anywhere in the line
-  // This handles emojis, prefixes like "The", etc.
-  const escaped = sectionName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const pattern = new RegExp(`^##\\s+.*${escaped}.*$`, "m");
-  const match = content.match(pattern);
-  if (!match || match.index === undefined) {
-    return "None available";
-  }
+export type ModelDiscovery =
+  | { readonly kind: "list"; readonly models: readonly string[] }
+  | { readonly kind: "manual" };
 
-  const startIdx = match.index + match[0].length;
-  const rest = content.slice(startIdx);
-
-  // Find the next ## heading (end of this section)
-  const nextHeading = rest.match(/^##\s+/m);
-  const sectionContent =
-    nextHeading && nextHeading.index !== undefined
-      ? rest.slice(0, nextHeading.index)
-      : rest;
-
-  const trimmed = sectionContent.trim();
-  return trimmed || "None available";
-}
+/** A `() => Promise<string|null>` key closure over `ai-key-store` (C3-M2). */
+export type KeyAccessor = () => Promise<string | null>;
 
 /**
- * Extract structured context from a contact and their file content.
- *
- * @param contact - OrbitContact with metadata
- * @param fileContent - Full markdown content of the contact's file
- * @returns MessageContext for prompt assembly
+ * The minimal key-store surface `AiService` depends on — a structural subset of
+ * `AiKeyStore` so a fake can be injected in tests without the native module.
  */
-export function extractContext(
-  contact: OrbitContact,
-  _fileContent: string,
-): MessageContext {
-  // Format last interaction info
-  let lastInteraction = "No previous interaction recorded";
-  if (contact.lastContact) {
-    const dateStr = formatLocalDate(contact.lastContact);
-    const type = contact.lastInteraction ?? "unknown";
-    lastInteraction = `${dateStr} (${type})`;
-  }
-
-  return {
-    name: contact.name,
-    category: contact.category ?? "Uncategorized",
-    daysSinceContact: contact.daysSinceContact,
-    socialBattery: contact.socialBattery ?? "Unknown",
-    lastInteraction,
-  };
+export interface AiKeyStoreLike {
+  getKey(provider: AiCloudProviderId): Promise<string | null>;
+  setKey(provider: AiCloudProviderId, key: string): Promise<void>;
+  deleteKey(provider: AiCloudProviderId): Promise<void>;
 }
 
-/**
- * Assemble a prompt by replacing {{placeholders}} in the template with context values.
- *
- * Known contact fields (name, category, etc.) are replaced first.
- * Any remaining {{...}} placeholders are treated as section names and
- * extracted dynamically from the contact's markdown file content.
- *
- * @param template - Prompt template with {{placeholders}}
- * @param context - MessageContext with known contact field values
- * @param fileContent - Full markdown content of the contact's file
- * @returns Assembled prompt string
- */
-export function assemblePrompt(
-  template: string,
-  context: MessageContext,
-  fileContent: string,
-): string {
-  // Step 1: Replace known contact fields
-  let result = template
-    .replace(/\{\{name\}\}/g, context.name)
-    .replace(/\{\{category\}\}/g, context.category)
-    .replace(/\{\{daysSinceContact\}\}/g, String(context.daysSinceContact))
-    .replace(/\{\{socialBattery\}\}/g, context.socialBattery)
-    .replace(/\{\{lastInteraction\}\}/g, context.lastInteraction);
-
-  // Step 2: Dynamically resolve any remaining {{...}} placeholders as section names
-  result = result.replace(/\{\{([^}]+)\}\}/g, (_match, sectionName: string) => {
-    return extractSection(fileContent, sectionName.trim());
-  });
-
-  Logger.debug("AiService", `Assembled prompt:\n${result}`);
-  return result;
-}
-
-// ─── Provider Interface ─────────────────────────────────────────
-
-/**
- * Common interface for all AI providers.
- * Each provider knows how to check availability, list models, and generate text.
- */
+/** The narrow adapter contract every provider implements. */
 export interface AiProvider {
-  /** Unique provider ID (matches AiProviderId values) */
-  id: string;
-  /** Human-readable provider name */
-  name: string;
-  /** Check if the provider is reachable and configured */
-  isAvailable(): Promise<boolean>;
-  /** List available models for this provider */
-  listModels(): Promise<string[]>;
-  /** Generate text from a prompt using the specified model */
-  generate(prompt: string, model: string): Promise<string>;
+  readonly id: AiCloudProviderId;
+  readonly name: string;
+  /** Advisory discovery; returns `manual` on ANY failure (never throws). */
+  listModels(signal?: AbortSignal): Promise<ModelDiscovery>;
+  /** Produce one validated draft, or throw a sanitized {@link AiError}. */
+  generate(input: GenerationInput): Promise<string>;
 }
 
-// ─── OpenAI Provider ────────────────────────────────────────────
+// ─── Sanitized error taxonomy ───────────────────────────────────
 
-/** Curated list of OpenAI budget/mid-tier models */
-const OPENAI_MODELS = ["gpt-4.1-nano", "gpt-4.1-mini", "gpt-5-mini"];
+/** Stable, sanitized failure codes — safe to surface to the UI/logs. */
+export type AiErrorCode =
+  | "not_configured"
+  | "invalid_endpoint"
+  | "blocked"
+  | "unauthorized"
+  | "rate_limited"
+  | "provider_error"
+  | "invalid_response"
+  | "network"
+  | "timeout"
+  | "cancelled"
+  | "unsupported_platform";
+
+/** A sanitized error — its `message` is EXACTLY the `code`, never raw detail. */
+export class AiError extends Error {
+  readonly code: AiErrorCode;
+  constructor(code: AiErrorCode) {
+    super(code);
+    this.code = code;
+    this.name = "AiError";
+  }
+}
+
+// ─── Shared response validation ─────────────────────────────────
+
+/** The shared post-parse draft ceiling: 1,200 CODE POINTS (not UTF-16 units). */
+const MAX_DRAFT_CODE_POINTS = 1_200;
 
 /**
- * OpenAI provider — API key auth, chat completions API.
+ * Validate an `unknown` provider result into a trimmed, non-empty, bounded
+ * draft. Rejects a non-string, an empty/whitespace-only draft, and any draft
+ * over {@link MAX_DRAFT_CODE_POINTS} code points (measured via `Array.from`, so
+ * astral characters count as one). Throws {@link AiError} `invalid_response`.
  */
+export function parseSuggestionOutput(value: unknown): string {
+  if (typeof value !== "string") throw new AiError("invalid_response");
+  const draft = value.trim();
+  if (draft.length === 0 || Array.from(draft).length > MAX_DRAFT_CODE_POINTS) {
+    throw new AiError("invalid_response");
+  }
+  return draft;
+}
+
+// ─── Shared adapter helpers ─────────────────────────────────────
+
+/** Map a resolved non-ok HTTP status to a sanitized code (no body read). */
+function classifyHttpStatus(status: number): AiErrorCode {
+  if (status === 401 || status === 403) return "unauthorized";
+  if (status === 429) return "rate_limited";
+  return "provider_error";
+}
+
+/** Map a `fetch` rejection to a sanitized code — abort wins, else network. */
+function mapTransportError(err: unknown, signal: AbortSignal): AiError {
+  if (signal.aborted) return new AiError("cancelled");
+  if (
+    err &&
+    typeof err === "object" &&
+    "name" in err &&
+    (err as { name: unknown }).name === "AbortError"
+  ) {
+    return new AiError("cancelled");
+  }
+  return new AiError("network");
+}
+
+/** Safely walk a path of string keys / numeric indices over `unknown` JSON. */
+function walk(root: unknown, path: ReadonlyArray<string | number>): unknown {
+  let cur = root;
+  for (const step of path) {
+    if (cur === null || typeof cur !== "object") return undefined;
+    cur = (cur as Record<string | number, unknown>)[step];
+  }
+  return cur;
+}
+
+/** Parse a resolved response as JSON, mapping any failure to invalid_response. */
+async function readJson(response: {
+  json(): Promise<unknown>;
+}): Promise<unknown> {
+  try {
+    return await response.json();
+  } catch {
+    throw new AiError("invalid_response");
+  }
+}
+
+/** The extracted string ids from a list-of-`{id}` payload (`data[].id`). */
+function extractIdList(data: unknown, key = "data"): string[] {
+  const arr = walk(data, [key]);
+  if (!Array.isArray(arr)) return [];
+  const ids: string[] = [];
+  for (const item of arr) {
+    const id = walk(item, ["id"]);
+    if (typeof id === "string" && id.length > 0) ids.push(id);
+  }
+  return ids;
+}
+
+// ─── OpenAI adapter ─────────────────────────────────────────────
+
+const OPENAI_CHAT_URL = "https://api.openai.com/v1/chat/completions";
+const OPENAI_MODELS_URL = "https://api.openai.com/v1/models";
+
+/** OpenAI — `Authorization: Bearer` header, chat-completions API. */
 export class OpenAiProvider implements AiProvider {
-  readonly id = "openai";
+  readonly id = "openai" as const;
   readonly name = "OpenAI";
-  private apiKey: string;
+  constructor(private readonly getKey: KeyAccessor) {}
 
-  constructor(apiKey: string) {
-    this.apiKey = apiKey;
+  async listModels(signal?: AbortSignal): Promise<ModelDiscovery> {
+    const key = await this.getKey();
+    if (!key) return { kind: "manual" };
+    try {
+      const res = await fetch(OPENAI_MODELS_URL, {
+        headers: { Authorization: `Bearer ${key}` },
+        signal,
+      });
+      if (!res.ok) return { kind: "manual" };
+      const models = extractIdList(await res.json());
+      return models.length > 0 ? { kind: "list", models } : { kind: "manual" };
+    } catch {
+      return { kind: "manual" };
+    }
   }
 
-  async isAvailable(): Promise<boolean> {
-    return this.apiKey.length > 0;
-  }
+  async generate(input: GenerationInput): Promise<string> {
+    if (input.signal.aborted) throw new AiError("cancelled");
+    const key = await this.getKey();
+    if (!key) throw new AiError("not_configured");
 
-  async listModels(): Promise<string[]> {
-    return [...OPENAI_MODELS];
-  }
-
-  async generate(prompt: string, model: string): Promise<string> {
-    if (!this.apiKey) {
-      throw new Error("OpenAI API key is not configured");
+    let response: Response;
+    try {
+      response = await fetch(OPENAI_CHAT_URL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${key}`,
+        },
+        body: JSON.stringify({
+          model: input.model,
+          messages: [{ role: "user", content: input.resolvedPrompt.payload }],
+          temperature: input.temperature,
+          max_completion_tokens: input.maxOutputTokens,
+        }),
+        signal: input.signal,
+      });
+    } catch (err) {
+      throw mapTransportError(err, input.signal);
     }
 
-    const response = await fetch("https://api.openai.com/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${this.apiKey}`,
-      },
-      body: JSON.stringify({
-        model,
-        messages: [{ role: "user", content: prompt }],
-        temperature: 0.7,
-      }),
-    });
-
-    if (!response.ok) {
-      throw new Error(`OpenAI request failed with status ${response.status}`);
-    }
-
-    const data = await response.json();
-    if (!data?.choices?.[0]?.message?.content) {
-      throw new Error("OpenAI returned an unexpected response format");
-    }
-    return data.choices[0].message.content;
+    if (!response.ok) throw new AiError(classifyHttpStatus(response.status));
+    const data = await readJson(response);
+    return parseSuggestionOutput(
+      walk(data, ["choices", 0, "message", "content"]),
+    );
   }
 }
 
-// ─── Anthropic Provider ─────────────────────────────────────────
+// ─── Anthropic adapter ──────────────────────────────────────────
 
-/** Curated list of Anthropic budget/mid-tier models */
-const ANTHROPIC_MODELS = [
-  "claude-haiku-4-5-20251001",
-  "claude-sonnet-4-20250514",
-];
+const ANTHROPIC_MESSAGES_URL = "https://api.anthropic.com/v1/messages";
+const ANTHROPIC_MODELS_URL = "https://api.anthropic.com/v1/models";
+const ANTHROPIC_VERSION = "2023-06-01";
+const ANTHROPIC_PAGE_LIMIT = 20;
 
-/**
- * Anthropic provider — x-api-key header auth, Messages API.
- */
+/** Anthropic — `x-api-key` header, Messages API, paginated model list. */
 export class AnthropicProvider implements AiProvider {
-  readonly id = "anthropic";
+  readonly id = "anthropic" as const;
   readonly name = "Anthropic";
-  private apiKey: string;
+  constructor(private readonly getKey: KeyAccessor) {}
 
-  constructor(apiKey: string) {
-    this.apiKey = apiKey;
+  async listModels(signal?: AbortSignal): Promise<ModelDiscovery> {
+    const key = await this.getKey();
+    if (!key) return { kind: "manual" };
+    const headers = { "x-api-key": key, "anthropic-version": ANTHROPIC_VERSION };
+    try {
+      const ids: string[] = [];
+      let afterId: string | undefined;
+      for (let page = 0; page < ANTHROPIC_PAGE_LIMIT; page += 1) {
+        const url = new URL(ANTHROPIC_MODELS_URL);
+        url.searchParams.set("limit", "100");
+        if (afterId) url.searchParams.set("after_id", afterId);
+        const res = await fetch(url.toString(), { headers, signal });
+        if (!res.ok) return { kind: "manual" };
+        const data = await res.json();
+        ids.push(...extractIdList(data));
+        const hasMore = walk(data, ["has_more"]) === true;
+        const lastId = walk(data, ["last_id"]);
+        if (!hasMore || typeof lastId !== "string" || lastId.length === 0) break;
+        afterId = lastId;
+      }
+      return ids.length > 0 ? { kind: "list", models: ids } : { kind: "manual" };
+    } catch {
+      return { kind: "manual" };
+    }
   }
 
-  async isAvailable(): Promise<boolean> {
-    return this.apiKey.length > 0;
-  }
+  async generate(input: GenerationInput): Promise<string> {
+    if (input.signal.aborted) throw new AiError("cancelled");
+    const key = await this.getKey();
+    if (!key) throw new AiError("not_configured");
 
-  async listModels(): Promise<string[]> {
-    return [...ANTHROPIC_MODELS];
-  }
-
-  async generate(prompt: string, model: string): Promise<string> {
-    if (!this.apiKey) {
-      throw new Error("Anthropic API key is not configured");
+    let response: Response;
+    try {
+      response = await fetch(ANTHROPIC_MESSAGES_URL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-api-key": key,
+          "anthropic-version": ANTHROPIC_VERSION,
+        },
+        body: JSON.stringify({
+          model: input.model,
+          max_tokens: input.maxOutputTokens,
+          temperature: input.temperature,
+          messages: [{ role: "user", content: input.resolvedPrompt.payload }],
+        }),
+        signal: input.signal,
+      });
+    } catch (err) {
+      throw mapTransportError(err, input.signal);
     }
 
-    const response = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": this.apiKey,
-        "anthropic-version": "2023-06-01",
-      },
-      body: JSON.stringify({
-        model,
-        max_tokens: 1024,
-        messages: [{ role: "user", content: prompt }],
-      }),
-    });
-
-    if (!response.ok) {
-      throw new Error(
-        `Anthropic request failed with status ${response.status}`,
-      );
-    }
-
-    const data = await response.json();
-    if (!data?.content?.[0]?.text) {
-      throw new Error("Anthropic returned an unexpected response format");
-    }
-    return data.content[0].text;
+    if (!response.ok) throw new AiError(classifyHttpStatus(response.status));
+    const data = await readJson(response);
+    return parseSuggestionOutput(walk(data, ["content", 0, "text"]));
   }
 }
 
-// ─── Google (Gemini) Provider ───────────────────────────────────
+// ─── Google (Gemini) adapter ────────────────────────────────────
 
-/** Curated list of Google Gemini budget/mid-tier models */
-const GOOGLE_MODELS = ["gemini-3-flash-preview", "gemini-2.5-flash"];
+const GEMINI_BASE = "https://generativelanguage.googleapis.com/v1beta";
 
 /**
- * Google Gemini provider — API key in query parameter, generateContent API.
+ * Google Gemini — the API key rides in the URL QUERY (`?key=…`), so extra care
+ * is taken that no failure path ever surfaces the URL/query/key (C2-M5): the
+ * only thing thrown is an {@link AiError} whose message is its bare code.
  */
 export class GoogleProvider implements AiProvider {
-  readonly id = "google";
+  readonly id = "google" as const;
   readonly name = "Google (Gemini)";
-  private apiKey: string;
+  constructor(private readonly getKey: KeyAccessor) {}
 
-  constructor(apiKey: string) {
-    this.apiKey = apiKey;
-  }
-
-  async isAvailable(): Promise<boolean> {
-    return this.apiKey.length > 0;
-  }
-
-  async listModels(): Promise<string[]> {
-    return [...GOOGLE_MODELS];
-  }
-
-  async generate(prompt: string, model: string): Promise<string> {
-    if (!this.apiKey) {
-      throw new Error("Google API key is not configured");
-    }
-
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${this.apiKey}`;
-
-    const response = await fetch(url, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }],
-      }),
-    });
-
-    if (!response.ok) {
-      throw new Error(
-        `Google Gemini request failed with status ${response.status}`,
+  async listModels(signal?: AbortSignal): Promise<ModelDiscovery> {
+    const key = await this.getKey();
+    if (!key) return { kind: "manual" };
+    try {
+      const res = await fetch(
+        `${GEMINI_BASE}/models?key=${encodeURIComponent(key)}`,
+        { signal },
       );
+      if (!res.ok) return { kind: "manual" };
+      const data = await res.json();
+      const models = extractGeminiModels(data);
+      return models.length > 0 ? { kind: "list", models } : { kind: "manual" };
+    } catch {
+      return { kind: "manual" };
+    }
+  }
+
+  async generate(input: GenerationInput): Promise<string> {
+    if (input.signal.aborted) throw new AiError("cancelled");
+    const key = await this.getKey();
+    if (!key) throw new AiError("not_configured");
+
+    const url = `${GEMINI_BASE}/models/${encodeURIComponent(
+      input.model,
+    )}:generateContent?key=${encodeURIComponent(key)}`;
+
+    let response: Response;
+    try {
+      response = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: input.resolvedPrompt.payload }] }],
+          generationConfig: {
+            temperature: input.temperature,
+            maxOutputTokens: input.maxOutputTokens,
+            candidateCount: 1,
+          },
+        }),
+        signal: input.signal,
+      });
+    } catch (err) {
+      throw mapTransportError(err, input.signal);
     }
 
-    const data = await response.json();
-    if (!data?.candidates?.[0]?.content?.parts?.[0]?.text) {
-      throw new Error("Google Gemini returned an unexpected response format");
-    }
-    return data.candidates[0].content.parts[0].text;
+    if (!response.ok) throw new AiError(classifyHttpStatus(response.status));
+    const data = await readJson(response);
+    return parseSuggestionOutput(
+      walk(data, ["candidates", 0, "content", "parts", 0, "text"]),
+    );
   }
 }
 
-// ─── Custom Endpoint Provider ───────────────────────────────────
+/** Extract generateContent-capable Gemini model ids (strip the `models/` prefix). */
+function extractGeminiModels(data: unknown): string[] {
+  const arr = walk(data, ["models"]);
+  if (!Array.isArray(arr)) return [];
+  const ids: string[] = [];
+  for (const item of arr) {
+    const name = walk(item, ["name"]);
+    const methods = walk(item, ["supportedGenerationMethods"]);
+    if (
+      typeof name === "string" &&
+      Array.isArray(methods) &&
+      methods.includes("generateContent")
+    ) {
+      ids.push(name.startsWith("models/") ? name.slice("models/".length) : name);
+    }
+  }
+  return ids;
+}
+
+// ─── Custom endpoint adapter ────────────────────────────────────
 
 /**
- * Custom endpoint provider — user-provided URL, OpenAI-compatible format.
+ * Custom — a user-controlled HTTPS endpoint (OpenAI-compatible response shape).
+ *
+ * NOTE: this Task-1 form dials the endpoint on raw `fetch`. Task 2 rewires
+ * `generate` to `validateCustomEndpoint` + the native `secureCustomFetch`
+ * transport (H2/H3) — the SSRF/rebinding/redirect surface lives ONLY here, on
+ * the user-controlled endpoint. Its `listModels()` is NON-networked (C4-M1).
  */
 export class CustomProvider implements AiProvider {
-  readonly id = "custom";
+  readonly id = "custom" as const;
   readonly name = "Custom endpoint";
-  private endpointUrl: string;
-  private apiKey: string;
-  private modelName: string;
+  constructor(
+    private readonly endpoint: string,
+    private readonly getKey: KeyAccessor,
+  ) {}
 
-  constructor(endpointUrl: string, apiKey: string, modelName: string) {
-    this.endpointUrl = endpointUrl;
-    this.apiKey = apiKey;
-    this.modelName = modelName;
+  async listModels(): Promise<ModelDiscovery> {
+    // Custom is free-text only — no endpoint request is ever made (C4-M1).
+    return { kind: "manual" };
   }
 
-  async isAvailable(): Promise<boolean> {
-    return this.endpointUrl.length > 0;
-  }
-
-  async listModels(): Promise<string[]> {
-    // Custom endpoint uses a single user-provided model name
-    return this.modelName ? [this.modelName] : [];
-  }
-
-  async generate(prompt: string, model: string): Promise<string> {
-    if (!this.endpointUrl) {
-      throw new Error("Custom endpoint URL is not configured");
-    }
+  async generate(input: GenerationInput): Promise<string> {
+    if (input.signal.aborted) throw new AiError("cancelled");
+    const key = await this.getKey();
 
     const headers: Record<string, string> = {
       "Content-Type": "application/json",
     };
-    if (this.apiKey) {
-      headers.Authorization = `Bearer ${this.apiKey}`;
+    if (key) headers.Authorization = `Bearer ${key}`;
+
+    let response: Response;
+    try {
+      response = await fetch(this.endpoint, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          model: input.model,
+          messages: [{ role: "user", content: input.resolvedPrompt.payload }],
+          temperature: input.temperature,
+          max_tokens: input.maxOutputTokens,
+        }),
+        signal: input.signal,
+      });
+    } catch (err) {
+      throw mapTransportError(err, input.signal);
     }
 
-    const response = await fetch(this.endpointUrl, {
-      method: "POST",
-      headers,
-      body: JSON.stringify({
-        model: model || this.modelName,
-        messages: [{ role: "user", content: prompt }],
-        temperature: 0.7,
-      }),
-    });
-
-    if (!response.ok) {
-      throw new Error(
-        `Custom endpoint request failed with status ${response.status}`,
-      );
-    }
-
-    const data = await response.json();
-    // Support OpenAI-compatible response format
-    if (data?.choices?.[0]?.message?.content) {
-      return data.choices[0].message.content;
-    }
-    // Fallback: try direct response field (some APIs use this)
-    if (data?.response) {
-      return data.response;
-    }
-    throw new Error("Custom endpoint returned an unexpected response format");
+    if (!response.ok) throw new AiError(classifyHttpStatus(response.status));
+    const data = await readJson(response);
+    return parseSuggestionOutput(
+      walk(data, ["choices", 0, "message", "content"]),
+    );
   }
 }
 
-// ─── AiService Orchestrator ─────────────────────────────────────
+// ─── AiService orchestrator ─────────────────────────────────────
 
 /**
- * Central AI service — manages provider registry and delegates generation.
- *
- * Usage:
- *   const service = new AiService();
- *   const provider = service.getActiveProvider(settings);
- *   if (provider) {
- *       const result = await service.generate(settings, 'Write a message...');
- *   }
+ * Builds and holds the four provider adapters. `refreshProviders` injects a
+ * provider-scoped key ACCESSOR into each adapter (C3-M2) — it never reads or
+ * retains a key value; the accessor is invoked inside `generate`/networked
+ * `listModels` immediately before the request. The Compose caller owns the
+ * request generation, abort controller, and 20s timeout (H4).
  */
 export class AiService {
-  private providers: Map<string, AiProvider> = new Map();
+  private readonly providers = new Map<AiCloudProviderId, AiProvider>();
 
-  /**
-   * Build provider instances from current settings.
-   * Called when settings change to refresh provider configuration.
-   */
+  constructor(private readonly keyStore: AiKeyStoreLike = aiKeyStore) {}
+
   refreshProviders(settings: AiSettings): void {
     this.providers.clear();
-
-    // Helper: get API key for a specific provider (per-provider → legacy fallback)
-    const keyFor = (provider: string): string =>
-      settings.aiApiKeys?.[provider] ?? settings.aiApiKey ?? "";
-
-    // Cloud providers — each gets its own API key
-    this.providers.set("openai", new OpenAiProvider(keyFor("openai")));
-    this.providers.set("anthropic", new AnthropicProvider(keyFor("anthropic")));
-    this.providers.set("google", new GoogleProvider(keyFor("google")));
-
-    // Custom — use endpoint URL + API key + model from settings
+    this.providers.set(
+      "openai",
+      new OpenAiProvider(() => this.keyStore.getKey("openai")),
+    );
+    this.providers.set(
+      "anthropic",
+      new AnthropicProvider(() => this.keyStore.getKey("anthropic")),
+    );
+    this.providers.set(
+      "google",
+      new GoogleProvider(() => this.keyStore.getKey("google")),
+    );
     this.providers.set(
       "custom",
-      new CustomProvider(
-        settings.aiCustomEndpoint,
-        keyFor("custom"),
-        settings.aiCustomModel,
+      new CustomProvider(settings.aiCustomEndpoint, () =>
+        this.keyStore.getKey("custom"),
       ),
     );
   }
 
-  /** Get a provider by ID */
-  getProvider(id: string): AiProvider | undefined {
+  getProvider(id: AiCloudProviderId): AiProvider | undefined {
     return this.providers.get(id);
   }
 
-  /**
-   * Get the currently active provider based on settings.
-   * Returns null if provider is 'none' or not found.
-   */
   getActiveProvider(settings: AiSettings): AiProvider | null {
-    if (settings.aiProvider === "none") {
-      return null;
-    }
+    if (settings.aiProvider === "none") return null;
     return this.providers.get(settings.aiProvider) ?? null;
-  }
-
-  /**
-   * Generate text using the active provider and configured model.
-   * @throws Error if no provider is configured, or if generation fails
-   */
-  async generate(settings: AiSettings, prompt: string): Promise<string> {
-    const provider = this.getActiveProvider(settings);
-    if (!provider) {
-      throw new Error(
-        "No AI provider is configured. Go to Settings → AI provider to set one up.",
-      );
-    }
-
-    const model = settings.aiModel;
-    if (!model) {
-      throw new Error(
-        "No AI model is selected. Go to Settings → AI provider to select a model.",
-      );
-    }
-
-    Logger.debug(
-      "AiService",
-      `Generating with ${provider.name}, model: ${model}`,
-    );
-
-    try {
-      const result = await provider.generate(prompt, model);
-      Logger.debug("AiService", `Generation complete (${result.length} chars)`);
-      return result;
-    } catch (error) {
-      Logger.error("AiService", `Generation failed: ${error}`);
-      throw error;
-    }
   }
 }

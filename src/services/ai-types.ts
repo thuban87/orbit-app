@@ -68,20 +68,18 @@ export interface AiGenerationRequest {
 }
 
 /**
- * Minimal settings shape the AI service reads. `aiApiKey` is optional so the
- * legacy `settings.aiApiKeys?.[provider] ?? settings.aiApiKey ?? ''` fallback
- * stays meaningful.
+ * Minimal, non-secret settings shape the AI service reads. It holds NO API key:
+ * the two legacy single/per-provider key fields are REMOVED (L1) — provider keys
+ * live EXCLUSIVELY in the device SecureStore (`ai-key-store.ts`) and are fetched
+ * through an injected per-call accessor immediately before a request (C3-M2),
+ * never carried in exportable settings.
  */
 export interface AiSettings {
   /** Active provider selection ('none' disables generation). */
   aiProvider: AiProviderId;
-  /** Legacy single API key — fallback when no per-provider key is set. */
-  aiApiKey?: string;
-  /** Per-provider API key map (preferred over the legacy single key). */
-  aiApiKeys?: Record<string, string>;
   /** Selected model id for the active provider. */
   aiModel: string;
-  /** Custom-endpoint URL (HTTPS-only; enforcement deferred to Phase 14). */
+  /** Custom-endpoint URL (validated https:// only — see custom-endpoint.ts). */
   aiCustomEndpoint: string;
   /** Model id sent to the custom endpoint. */
   aiCustomModel: string;
