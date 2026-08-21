@@ -3,7 +3,7 @@ import DateTimePicker, {
 } from "@react-native-community/datetimepicker";
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import {
   FlatList,
   Modal,
@@ -12,6 +12,7 @@ import {
   StyleSheet,
   Switch,
   Text,
+  TextInput,
   View,
 } from "react-native";
 import { requestPinWidget } from "react-native-android-widget";
@@ -28,6 +29,13 @@ import { getProfile } from "@/db/profile-dao";
 import { listSunCandidates, type SunCandidate } from "@/db/sun-picker-read";
 import { sunOccupantIsSelf } from "@/logic/sun-occupant-logic";
 import type { RootStackParamList } from "@/navigation/types";
+import { aiKeyStore } from "@/services/ai-key-store";
+import {
+  AI_PROVIDER_IDS,
+  type AiCloudProviderId,
+  type AiProviderId,
+} from "@/services/ai-types";
+import { AiService } from "@/services/AiService";
 import { reconcileSchedule } from "@/services/notifications/notification-schedule";
 import {
   getNotificationPermission,
@@ -35,6 +43,14 @@ import {
 } from "@/services/notifications/permission";
 import { useTheme } from "@/theme";
 import { Logger } from "@/utils/logger";
+import {
+  buildAiSettingsPatch,
+  CUSTOM_RETENTION_CAVEAT,
+  discoverModelsForField,
+  type ModelFieldState,
+  providerDisplayName,
+  validateEndpointForSave,
+} from "./settings-ai-logic";
 import { pinResultCopy } from "./settings-add-widget";
 
 const LOG_SCOPE = "settings-screen";
@@ -104,6 +120,28 @@ export function SettingsScreen() {
   // set to the UI-SPEC fallback string when requestPinWidget can't pin (unsupported
   // launcher / API < 26 / a rejected request). Surfaced inline under the row.
   const [addWidgetCopy, setAddWidgetCopy] = useState<string | null>(null);
+
+  // --- Optional-AI section (AI-01 / AI-03 / AI-04) --------------------------
+  // Non-secret provider config edited locally and persisted on "Save" via the
+  // DAO; the API key NEVER lives in this state as a stored value — it is entered
+  // transiently and routed straight to `ai-key-store` (SecureStore). `aiKeySet`
+  // is a boolean presence flag only (the key value is never read back or rendered).
+  const [aiProvider, setAiProvider] = useState<AiProviderId>("none");
+  const [aiModel, setAiModel] = useState("");
+  const [aiCustomEndpoint, setAiCustomEndpoint] = useState("");
+  const [aiCustomModel, setAiCustomModel] = useState("");
+  const [aiPromptTemplate, setAiPromptTemplate] = useState("");
+  const [aiKeyInput, setAiKeyInput] = useState("");
+  const [aiKeySet, setAiKeySet] = useState(false);
+  const [aiModelField, setAiModelField] = useState<ModelFieldState>({
+    kind: "manual",
+  });
+  const [aiEndpointError, setAiEndpointError] = useState<string | null>(null);
+  const [aiStatus, setAiStatus] = useState<string | null>(null);
+
+  // The AI service is stateless between calls; a single instance suffices for
+  // on-demand model discovery. It reads keys through the app-wide `aiKeyStore`.
+  const aiService = useMemo(() => new AiService(), []);
 
   // "Your orbit" section (ORR-05 / relocated ORR-06). `selfSunColour` is the raw
   // stored self-star hex or NULL; NULL resolves to `starPalette[0]` (gold) at
@@ -180,12 +218,37 @@ export function SettingsScreen() {
     }
   }, []);
 
+  // Load the non-secret AI config on focus. The API key is NOT read as a value —
+  // only its PRESENCE is probed (via `getKey() !== null`) so the UI can show
+  // "key saved" without ever rendering or serializing the credential (T-14-12).
+  const reloadAi = useCallback(async () => {
+    try {
+      const next = await getAppSettings(getExecutor());
+      setAiProvider(next.aiProvider);
+      setAiModel(next.aiModel);
+      setAiCustomEndpoint(next.aiCustomEndpoint);
+      setAiCustomModel(next.aiCustomModel);
+      setAiPromptTemplate(next.aiPromptTemplate);
+      setAiEndpointError(null);
+      // Presence-only key probe for the active cloud provider (never the value).
+      if (next.aiProvider !== "none") {
+        const key = await aiKeyStore.getKey(next.aiProvider);
+        setAiKeySet(key !== null);
+      } else {
+        setAiKeySet(false);
+      }
+    } catch (err) {
+      Logger.error(LOG_SCOPE, "failed to load AI settings", err);
+    }
+  }, []);
+
   useFocusEffect(
     useCallback(() => {
       void reloadProfile();
       void reloadNotifications();
       void reloadOrbit();
-    }, [reloadProfile, reloadNotifications, reloadOrbit]),
+      void reloadAi();
+    }, [reloadProfile, reloadNotifications, reloadOrbit, reloadAi]),
   );
 
   // M6: persist the tapped star token through the same try/catch + Logger.error
@@ -322,6 +385,118 @@ export function SettingsScreen() {
       accepted = false;
     }
     setAddWidgetCopy(pinResultCopy(accepted));
+  }, []);
+
+  // Switch the active provider locally. Reset the discovered model list (it is
+  // provider-specific) and re-probe the key presence for the new provider. This
+  // does not persist on its own — "Save AI settings" writes the config.
+  const onSelectAiProvider = useCallback(async (provider: AiProviderId) => {
+    setAiProvider(provider);
+    setAiModelField({ kind: "manual" });
+    setAiStatus(null);
+    setAiEndpointError(null);
+    if (provider !== "none") {
+      const key = await aiKeyStore.getKey(provider);
+      setAiKeySet(key !== null);
+    } else {
+      setAiKeySet(false);
+    }
+  }, []);
+
+  // On-demand model discovery. Advisory only — any failure (or Custom, which is
+  // always free-text) falls back to manual entry via the shared logic helper.
+  const onDiscoverAiModels = useCallback(async () => {
+    if (aiProvider === "none") return;
+    setAiStatus("Discovering models…");
+    aiService.refreshProviders({
+      aiProvider,
+      aiModel,
+      aiCustomEndpoint,
+      aiCustomModel,
+    });
+    const provider = aiService.getProvider(aiProvider);
+    if (!provider) {
+      setAiModelField({ kind: "manual" });
+      setAiStatus("Enter a model name manually.");
+      return;
+    }
+    const state = await discoverModelsForField(() => provider.listModels());
+    setAiModelField(state);
+    setAiStatus(
+      state.kind === "list"
+        ? `Found ${state.models.length} model${state.models.length === 1 ? "" : "s"}.`
+        : "No model list available — enter a model name manually.",
+    );
+  }, [aiProvider, aiModel, aiCustomEndpoint, aiCustomModel, aiService]);
+
+  // Persist the NON-SECRET config. The Custom endpoint is validated up front
+  // (H2); an invalid one blocks the save and surfaces an inline reason. The key
+  // is never part of this patch (buildAiSettingsPatch omits it — T-14-12).
+  const onSaveAiConfig = useCallback(async () => {
+    if (aiProvider === "custom" && aiCustomEndpoint.trim() !== "") {
+      const verdict = validateEndpointForSave(aiCustomEndpoint);
+      if (!verdict.ok) {
+        setAiEndpointError(verdict.reason);
+        setAiStatus(null);
+        return;
+      }
+    }
+    setAiEndpointError(null);
+    try {
+      const patch = buildAiSettingsPatch({
+        provider: aiProvider,
+        model: aiModel,
+        customModel: aiCustomModel,
+        customEndpoint: aiCustomEndpoint.trim(),
+        promptTemplate: aiPromptTemplate,
+      });
+      await updateAppSettings(getExecutor(), patch, localDateTime());
+      setAiStatus("AI settings saved.");
+      await reloadAi();
+    } catch (err) {
+      Logger.error(LOG_SCOPE, "failed to save AI settings", err);
+      setAiStatus("Couldn't save AI settings.");
+    }
+  }, [
+    aiProvider,
+    aiModel,
+    aiCustomModel,
+    aiCustomEndpoint,
+    aiPromptTemplate,
+    reloadAi,
+  ]);
+
+  // Store the entered key straight into SecureStore via ai-key-store. The input
+  // is cleared immediately after; the value is never persisted to app_settings
+  // and never read back for rendering (T-14-12).
+  const onSaveAiKey = useCallback(
+    async (provider: AiCloudProviderId) => {
+      const key = aiKeyInput.trim();
+      if (key === "") return;
+      try {
+        await aiKeyStore.setKey(provider, key);
+        setAiKeyInput("");
+        setAiKeySet(true);
+        setAiStatus("API key saved securely.");
+      } catch (err) {
+        Logger.error(LOG_SCOPE, "failed to save AI key", err);
+        setAiStatus("Couldn't save the API key.");
+      }
+    },
+    [aiKeyInput],
+  );
+
+  // Remove the stored key for the active cloud provider (idempotent).
+  const onRemoveAiKey = useCallback(async (provider: AiCloudProviderId) => {
+    try {
+      await aiKeyStore.deleteKey(provider);
+      setAiKeyInput("");
+      setAiKeySet(false);
+      setAiStatus("API key removed.");
+    } catch (err) {
+      Logger.error(LOG_SCOPE, "failed to remove AI key", err);
+      setAiStatus("Couldn't remove the API key.");
+    }
   }, []);
 
   return (
@@ -794,6 +969,348 @@ export function SettingsScreen() {
         </Modal>
       </View>
 
+      {/* AI message suggestions (AI-01/03/04). Opt-in, dormant until a provider
+          is chosen and a key is entered. The API key entry is masked and routed
+          straight to SecureStore — no key value is ever rendered or persisted to
+          app_settings. The first-send exact-prompt gate lives in Compose (H5). */}
+      <View testID="settings-ai-section" style={styles.section}>
+        <Text
+          accessibilityRole="header"
+          style={[styles.sectionHeading, { color: colors.textSecondary }]}
+        >
+          AI message suggestions
+        </Text>
+
+        <View
+          style={[
+            styles.row,
+            { backgroundColor: colors.surface, borderColor: colors.border },
+          ]}
+        >
+          <Text style={[styles.rowLabel, { color: colors.textPrimary }]}>
+            Provider
+          </Text>
+          <View style={styles.aiChipRow}>
+            {AI_PROVIDER_IDS.map((id) => {
+              const selected = id === aiProvider;
+              return (
+                <Pressable
+                  key={id}
+                  testID={`settings-ai-provider-${id}`}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected }}
+                  accessibilityLabel={`Provider ${providerDisplayName(id)}`}
+                  onPress={() => void onSelectAiProvider(id)}
+                  style={[
+                    styles.aiChip,
+                    {
+                      backgroundColor: selected ? colors.accent : colors.surface,
+                      borderColor: selected ? colors.accent : colors.border,
+                    },
+                  ]}
+                >
+                  <Text
+                    style={{
+                      color: selected ? colors.background : colors.textPrimary,
+                    }}
+                  >
+                    {providerDisplayName(id)}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+          <Text style={[styles.helper, { color: colors.textSecondary }]}>
+            Off by default. Orbit only sends anything to a provider you choose,
+            and only when you ask for a suggestion.
+          </Text>
+        </View>
+
+        {aiProvider !== "none" ? (
+          <>
+            {/* Cloud providers: discoverable model list + free-text fallback.
+                Custom is always free-text (its model field is below). */}
+            {aiProvider !== "custom" ? (
+              <View
+                style={[
+                  styles.row,
+                  {
+                    backgroundColor: colors.surface,
+                    borderColor: colors.border,
+                  },
+                ]}
+              >
+                <Text style={[styles.rowLabel, { color: colors.textPrimary }]}>
+                  Model
+                </Text>
+                {aiModelField.kind === "list" ? (
+                  <View style={styles.aiChipRow}>
+                    {aiModelField.models.map((m) => {
+                      const selected = m === aiModel;
+                      return (
+                        <Pressable
+                          key={m}
+                          testID={`settings-ai-model-${m}`}
+                          accessibilityRole="button"
+                          accessibilityState={{ selected }}
+                          accessibilityLabel={`Model ${m}`}
+                          onPress={() => setAiModel(m)}
+                          style={[
+                            styles.aiChip,
+                            {
+                              backgroundColor: selected
+                                ? colors.accent
+                                : colors.surface,
+                              borderColor: selected
+                                ? colors.accent
+                                : colors.border,
+                            },
+                          ]}
+                        >
+                          <Text
+                            style={{
+                              color: selected
+                                ? colors.background
+                                : colors.textPrimary,
+                            }}
+                          >
+                            {m}
+                          </Text>
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+                ) : null}
+                <TextInput
+                  testID="settings-ai-model-input"
+                  accessibilityLabel="Model name"
+                  value={aiModel}
+                  onChangeText={setAiModel}
+                  placeholder="e.g. gpt-4o-mini"
+                  placeholderTextColor={colors.textSecondary}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  style={[
+                    styles.aiInput,
+                    {
+                      color: colors.textPrimary,
+                      backgroundColor: colors.background,
+                      borderColor: colors.border,
+                    },
+                  ]}
+                />
+                <Pressable
+                  testID="settings-ai-discover"
+                  accessibilityRole="button"
+                  accessibilityLabel="Discover models"
+                  onPress={() => void onDiscoverAiModels()}
+                  style={[styles.aiButton, { borderColor: colors.accent }]}
+                >
+                  <Text style={{ color: colors.accent }}>Discover models</Text>
+                </Pressable>
+              </View>
+            ) : null}
+
+            {/* Custom provider: endpoint (validated on save) + free-text model. */}
+            {aiProvider === "custom" ? (
+              <View
+                style={[
+                  styles.row,
+                  {
+                    backgroundColor: colors.surface,
+                    borderColor: colors.border,
+                  },
+                ]}
+              >
+                <Text style={[styles.rowLabel, { color: colors.textPrimary }]}>
+                  Custom endpoint
+                </Text>
+                <TextInput
+                  testID="settings-ai-endpoint-input"
+                  accessibilityLabel="Custom endpoint URL"
+                  value={aiCustomEndpoint}
+                  onChangeText={setAiCustomEndpoint}
+                  placeholder="https://…"
+                  placeholderTextColor={colors.textSecondary}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  keyboardType="url"
+                  style={[
+                    styles.aiInput,
+                    {
+                      color: colors.textPrimary,
+                      backgroundColor: colors.background,
+                      borderColor: aiEndpointError
+                        ? colors.danger
+                        : colors.border,
+                    },
+                  ]}
+                />
+                {aiEndpointError ? (
+                  <Text
+                    testID="settings-ai-endpoint-error"
+                    style={[styles.helper, { color: colors.danger }]}
+                  >
+                    {aiEndpointError}
+                  </Text>
+                ) : null}
+                <Text style={[styles.rowLabel, { color: colors.textPrimary }]}>
+                  Model
+                </Text>
+                <TextInput
+                  testID="settings-ai-custom-model-input"
+                  accessibilityLabel="Custom model name"
+                  value={aiCustomModel}
+                  onChangeText={setAiCustomModel}
+                  placeholder="model id"
+                  placeholderTextColor={colors.textSecondary}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  style={[
+                    styles.aiInput,
+                    {
+                      color: colors.textPrimary,
+                      backgroundColor: colors.background,
+                      borderColor: colors.border,
+                    },
+                  ]}
+                />
+                <Text style={[styles.helper, { color: colors.textSecondary }]}>
+                  {CUSTOM_RETENTION_CAVEAT}
+                </Text>
+              </View>
+            ) : null}
+
+            {/* Masked API key — SecureStore only, never rendered or persisted. */}
+            <View
+              style={[
+                styles.row,
+                {
+                  backgroundColor: colors.surface,
+                  borderColor: colors.border,
+                },
+              ]}
+            >
+              <Text style={[styles.rowLabel, { color: colors.textPrimary }]}>
+                API key {aiKeySet ? "(saved)" : ""}
+              </Text>
+              <TextInput
+                testID="settings-ai-key-input"
+                accessibilityLabel="API key"
+                value={aiKeyInput}
+                onChangeText={setAiKeyInput}
+                placeholder={aiKeySet ? "•••••••• (saved)" : "Paste your key"}
+                placeholderTextColor={colors.textSecondary}
+                secureTextEntry
+                autoCapitalize="none"
+                autoCorrect={false}
+                style={[
+                  styles.aiInput,
+                  {
+                    color: colors.textPrimary,
+                    backgroundColor: colors.background,
+                    borderColor: colors.border,
+                  },
+                ]}
+              />
+              <View style={styles.aiButtonRow}>
+                <Pressable
+                  testID="settings-ai-key-save"
+                  accessibilityRole="button"
+                  accessibilityLabel="Save API key"
+                  onPress={() =>
+                    void onSaveAiKey(aiProvider as AiCloudProviderId)
+                  }
+                  style={[styles.aiButton, { borderColor: colors.accent }]}
+                >
+                  <Text style={{ color: colors.accent }}>Save key</Text>
+                </Pressable>
+                {aiKeySet ? (
+                  <Pressable
+                    testID="settings-ai-key-remove"
+                    accessibilityRole="button"
+                    accessibilityLabel="Remove API key"
+                    onPress={() =>
+                      void onRemoveAiKey(aiProvider as AiCloudProviderId)
+                    }
+                    style={[
+                      styles.aiButton,
+                      { borderColor: colors.borderStrong },
+                    ]}
+                  >
+                    <Text style={{ color: colors.textSecondary }}>
+                      Remove key
+                    </Text>
+                  </Pressable>
+                ) : null}
+              </View>
+              <Text style={[styles.helper, { color: colors.textSecondary }]}>
+                Your key is stored only in your device's secure keystore — never
+                in Orbit's database, a backup, or anything that leaves the phone.
+              </Text>
+            </View>
+
+            {/* Prompt-template editor (ai_prompt_template). Empty = built-in. */}
+            <View
+              style={[
+                styles.row,
+                {
+                  backgroundColor: colors.surface,
+                  borderColor: colors.border,
+                },
+              ]}
+            >
+              <Text style={[styles.rowLabel, { color: colors.textPrimary }]}>
+                Prompt template
+              </Text>
+              <TextInput
+                testID="settings-ai-template-input"
+                accessibilityLabel="Prompt template"
+                value={aiPromptTemplate}
+                onChangeText={setAiPromptTemplate}
+                placeholder="Leave empty to use Orbit's built-in template."
+                placeholderTextColor={colors.textSecondary}
+                multiline
+                style={[
+                  styles.aiInput,
+                  styles.aiTemplateInput,
+                  {
+                    color: colors.textPrimary,
+                    backgroundColor: colors.background,
+                    borderColor: colors.border,
+                  },
+                ]}
+              />
+            </View>
+          </>
+        ) : null}
+
+        <Pressable
+          testID="settings-ai-save"
+          accessibilityRole="button"
+          accessibilityLabel="Save AI settings"
+          onPress={() => void onSaveAiConfig()}
+          style={[
+            styles.row,
+            styles.aiSaveRow,
+            { backgroundColor: colors.accent, borderColor: colors.accent },
+          ]}
+        >
+          <Text style={{ color: colors.background, fontWeight: "600" }}>
+            Save AI settings
+          </Text>
+        </Pressable>
+
+        {aiStatus ? (
+          <Text
+            testID="settings-ai-status"
+            style={[styles.helper, { color: colors.textSecondary }]}
+          >
+            {aiStatus}
+          </Text>
+        ) : null}
+      </View>
+
       <View testID="settings-home-screen-section" style={styles.section}>
         <Text
           accessibilityRole="header"
@@ -997,5 +1514,42 @@ const styles = StyleSheet.create({
   degradedHeading: {
     fontSize: 16,
     fontWeight: "600",
+  },
+  aiChipRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  aiChip: {
+    borderWidth: 1,
+    borderRadius: 999,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+  },
+  aiInput: {
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 15,
+  },
+  aiTemplateInput: {
+    minHeight: 88,
+    textAlignVertical: "top",
+  },
+  aiButtonRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  aiButton: {
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    alignSelf: "flex-start",
+  },
+  aiSaveRow: {
+    alignItems: "center",
   },
 });
