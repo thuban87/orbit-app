@@ -29,7 +29,9 @@
  * expected text path and every draft passes the shared {@link parseSuggestionOutput}
  * ceiling before it can become a suggestion.
  */
+import { validateCustomEndpoint } from "@/ai/custom-endpoint";
 import type { ResolvedPrompt } from "@/ai/prompt-types";
+import { SecureFetchError, secureCustomFetch } from "@/ai/secure-fetch";
 import { aiKeyStore } from "./ai-key-store";
 import type { AiCloudProviderId, AiSettings } from "./ai-types";
 
@@ -145,6 +147,36 @@ function mapTransportError(err: unknown, signal: AbortSignal): AiError {
     (err as { name: unknown }).name === "AbortError"
   ) {
     return new AiError("cancelled");
+  }
+  return new AiError("network");
+}
+
+/**
+ * Map a native {@link SecureFetchError} to the neutral adapter error union. A
+ * redirect / private-resolution / host-mismatch is a blocked egress destination;
+ * everything else falls to a generic sanitized code. The native error is already
+ * sanitized (its message is its bare code), but we re-wrap so only the neutral
+ * {@link AiErrorCode} union ever escapes the adapter.
+ */
+function mapSecureFetchError(err: unknown, signal: AbortSignal): AiError {
+  if (signal.aborted) return new AiError("cancelled");
+  if (err instanceof SecureFetchError) {
+    switch (err.code) {
+      case "invalid_endpoint":
+        return new AiError("invalid_endpoint");
+      case "unsupported_platform":
+        return new AiError("unsupported_platform");
+      case "private_address":
+      case "redirect":
+      case "host_mismatch":
+        return new AiError("blocked");
+      case "timeout":
+        return new AiError("timeout");
+      case "cancelled":
+        return new AiError("cancelled");
+      default:
+        return new AiError("network");
+    }
   }
   return new AiError("network");
 }
@@ -404,10 +436,14 @@ function extractGeminiModels(data: unknown): string[] {
 /**
  * Custom — a user-controlled HTTPS endpoint (OpenAI-compatible response shape).
  *
- * NOTE: this Task-1 form dials the endpoint on raw `fetch`. Task 2 rewires
- * `generate` to `validateCustomEndpoint` + the native `secureCustomFetch`
- * transport (H2/H3) — the SSRF/rebinding/redirect surface lives ONLY here, on
- * the user-controlled endpoint. Its `listModels()` is NON-networked (C4-M1).
+ * This is the ONLY SSRF/rebinding/redirect surface, so `generate` refuses the
+ * endpoint through the SAME `validateCustomEndpoint` module the settings DAO used
+ * at save time (H2 — one shared validator, no duplicate) and then dials it ONLY
+ * through the Plan 07 native `secureCustomFetch` transport (H3), NEVER raw
+ * `fetch`. The native module owns DNS re-resolution rejection, redirect refusal,
+ * and the proxy pin — a `fetch` `redirect: "error"` init is a silent no-op on
+ * Android (M3), so this adapter does not rely on it. `listModels()` is
+ * NON-networked: Custom is free-text only (C4-M1).
  */
 export class CustomProvider implements AiProvider {
   readonly id = "custom" as const;
@@ -424,16 +460,24 @@ export class CustomProvider implements AiProvider {
 
   async generate(input: GenerationInput): Promise<string> {
     if (input.signal.aborted) throw new AiError("cancelled");
-    const key = await this.getKey();
 
+    // H2: reuse the save-time URL-literal validator before any transport call.
+    const validation = validateCustomEndpoint(this.endpoint);
+    if (!validation.ok || validation.url === "") {
+      throw new AiError("invalid_endpoint");
+    }
+
+    const key = await this.getKey();
     const headers: Record<string, string> = {
       "Content-Type": "application/json",
     };
     if (key) headers.Authorization = `Bearer ${key}`;
 
-    let response: Response;
+    let result: { status: number; ok: boolean; bodyText: string };
     try {
-      response = await fetch(this.endpoint, {
+      // H3: the native egress guard is the ONLY transport for Custom.
+      result = await secureCustomFetch({
+        url: validation.url,
         method: "POST",
         headers,
         body: JSON.stringify({
@@ -445,11 +489,16 @@ export class CustomProvider implements AiProvider {
         signal: input.signal,
       });
     } catch (err) {
-      throw mapTransportError(err, input.signal);
+      throw mapSecureFetchError(err, input.signal);
     }
 
-    if (!response.ok) throw new AiError(classifyHttpStatus(response.status));
-    const data = await readJson(response);
+    if (!result.ok) throw new AiError(classifyHttpStatus(result.status));
+    let data: unknown;
+    try {
+      data = JSON.parse(result.bodyText);
+    } catch {
+      throw new AiError("invalid_response");
+    }
     return parseSuggestionOutput(
       walk(data, ["choices", 0, "message", "content"]),
     );

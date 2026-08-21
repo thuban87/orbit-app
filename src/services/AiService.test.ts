@@ -11,6 +11,27 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ResolvedPrompt } from "@/ai/prompt-types";
+
+const secureCustomFetchMock = vi.fn();
+
+// Mock the secure-fetch wrapper so importing AiService never pulls the native
+// `orbit-secure-fetch` module (Expo async-require / `__DEV__`) into node. The
+// official adapters still use raw `fetch`; only the Custom adapter routes here.
+vi.mock("@/ai/secure-fetch", () => {
+  class SecureFetchError extends Error {
+    readonly code: string;
+    constructor(code: string) {
+      super(code);
+      this.code = code;
+      this.name = "SecureFetchError";
+    }
+  }
+  return {
+    SecureFetchError,
+    secureCustomFetch: (...args: unknown[]) => secureCustomFetchMock(...args),
+  };
+});
+
 import {
   AiError,
   type AiKeyStoreLike,
@@ -30,6 +51,7 @@ let fetchMock: ReturnType<typeof vi.fn>;
 beforeEach(() => {
   fetchMock = vi.fn();
   vi.stubGlobal("fetch", fetchMock);
+  secureCustomFetchMock.mockReset();
 });
 
 afterEach(() => {
@@ -107,14 +129,19 @@ describe("official adapters — valid response extraction", () => {
     ).resolves.toBe("gemini-text");
   });
 
-  it("Custom (OpenAI-compatible) extracts choices[0].message.content", async () => {
-    fetchMock.mockResolvedValueOnce(
-      okJson({ choices: [{ message: { content: "custom-text" } }] }),
-    );
+  it("Custom (OpenAI-compatible) extracts choices[0].message.content via secureCustomFetch", async () => {
+    secureCustomFetchMock.mockResolvedValueOnce({
+      status: 200,
+      ok: true,
+      bodyText: '{"choices":[{"message":{"content":"custom-text"}}]}',
+    });
     const p = new CustomProvider("https://api.example.com/v1/chat", staticKey("k"));
     await expect(
       p.generate(inputFor("hi", new AbortController().signal)),
     ).resolves.toBe("custom-text");
+    // Custom egress goes through the native transport, never raw fetch.
+    expect(secureCustomFetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 });
 
