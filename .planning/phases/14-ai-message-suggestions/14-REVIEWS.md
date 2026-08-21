@@ -1,5 +1,46 @@
 # Phase 14: AI Message Suggestions — Plan Reviews
 
+## Convergence status — Cycle 5 (final confirming review) — Claude APPROVE, Codex 1 residual HIGH (IANA-exhaustiveness)
+
+Cycle 5 (the owner-approved confirming review of commit `e07d604`) confirmed C4-M1/M2/L1 fully
+resolved by BOTH reviewers, and split only on C4-H1's residual:
+
+- **Claude verdict:** APPROVE — HIGH 0, MEDIUM 0, LOW 0. All four Cycle-4 items genuinely resolved;
+  the two layers are parity-enforced; the table-driven requirement guarantees per-row coverage.
+- **Codex verdict:** REQUEST_CHANGES — HIGH 1 (C5-H1, residual C4-H1: the canonical table is not
+  exhaustively complete under its own IANA "reject unless globally reachable" rule).
+
+**CYCLE_SUMMARY: current_high=1 current_actionable=0.** Trajectory: 11 → 10 → 12 → 4 → **1**.
+
+### C5-H1 — orchestrator assessment (real but marginal; part would WEAKEN the control)
+
+Codex's residual has three parts, assessed against the actual threat model (not accepted blindly):
+
+1. **Genuinely-missing obscure ranges — SAFE to add.** IPv6 `64:ff9b:1::/48` (local-use
+   translation), `100:0:0:1::/64`, `2001:2::/48` (benchmarking), `3fff::/20` + `5f00::/16` (recent
+   allocations); IPv4 `192.88.99.0/24` (deprecated 6to4 relay anycast). Adding these = strictly MORE
+   rejection. The realistic SSRF/rebinding surface (RFC1918/loopback/link-local/ULA/CGNAT/mapped/
+   standard NAT64 `64:ff9b::/96`) is ALREADY fully covered; these are edge/local-use prefixes with
+   negligible real exfil exposure on a consumer Android device.
+2. **Longest-prefix globally-reachable carve-outs (`192.0.0.9/.10` inside `192.0.0.0/24`;
+   `2001::/23` exceptions) — DECLINE.** This asks the egress guard to ALLOW more. Over-blocking a
+   handful of exotic globally-reachable /32s is the SAFE direction for an egress control; adding
+   carve-out exceptions introduces bypass surface for zero real benefit (no Custom AI endpoint lives
+   at 192.0.0.9). Per CLAUDE.md, a reviewer-suggested change that weakens a named security control is
+   not a bug fix — this part should not be implemented as written.
+3. **Shared machine-readable vector manifest across the Vitest + Kotlin suites — nice-to-have.**
+   Reasonable robustness improvement; would make "table-driven over every row" concrete across both
+   languages.
+
+Claude — equally source-grounding and specifically tasked to be rigorous on this airtight control —
+returned a clean APPROVE. The realistic threat surface is covered. C5-H1 is fundamentally an
+"how exhaustive is exhaustive" risk-posture call on the OWNER's airtight control, past the
+owner-set cycle budget → escalated to the owner (execution remains owner-gated regardless).
+Recommended: add the part-1 ranges + part-3 manifest (safe hardening that completes the IANA claim);
+decline the part-2 carve-outs (they weaken the guard).
+
+---
+
 ## Convergence status — Cycle 4 complete (owner-authorized 4th cycle), near-converged — owner escalation
 
 Cycle 4 reviewed the corrected 7-plan set (commit `7f5b9e2`) with both reviewers. **Reviewers still
