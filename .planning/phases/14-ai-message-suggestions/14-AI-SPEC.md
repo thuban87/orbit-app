@@ -18,10 +18,12 @@ Where §3–§6 below conflict with the following, **these override the SPEC bod
    adapters stay on raw `fetch` to fixed public hosts. Any §3 pitfall or guidance saying "adapters
    send through `fetch`" or "pass `redirect: \"error\"` to Custom requests" is superseded — RN
    `fetch` does not honor `redirect` on Android; native redirect-disabling owns that control.
-2. **Endpoint validation is URL-literal + connection-time.** `validateCustomEndpoint` (URL-literal
-   layer, full non-public IP-literal set) is the ONLY guard for numeric-IP-literal Custom URLs
-   (OkHttp does not consult the custom `Dns` for literals); a resolving private host is caught
-   natively at connection time. An EMPTY endpoint is a valid "unconfigured" value.
+2. **Endpoint validation is URL-literal + connection-time, in TWO layers.** OkHttp does not consult
+   the custom `Dns` for a numeric-IP-literal URL, so an IP-literal Custom URL is guarded by BOTH the
+   JS `validateCustomEndpoint` (URL-literal layer) AND Plan 07's native pre-`Call` literal check —
+   defense in depth, neither being the sole guard (C4-M2). Both enforce the identical canonical
+   non-public set (14-01 "C4-H1" table). A resolving private host is caught by the native `Dns` at
+   connection time. An EMPTY endpoint is a valid "unconfigured" value.
 3. **First-send inspection/acknowledgement lives in COMPOSE, not Settings.** The exact
    contact-specific `ResolvedPrompt` only exists in Compose; the per-provider acknowledgement is
    shown and durably persisted there (Plan 05), and the committed ack is ordered strictly BEFORE
