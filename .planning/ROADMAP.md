@@ -531,7 +531,7 @@ Plans:
   2. AI Suggest on compose and profile returns an editable draft (Copy guaranteed, Send → SMS).
   3. The prompt uses ranked fuel (minus `off_limits`), interaction aggregates only, gravity tier/intensity/quality, and only `share_with_ai`-flagged fields; it is shown before the first send per provider and always inspectable, and the debug log is redacted.
 
-**Plans:** TBD
+**Plans:** 7 (14-01..07), wave order 01/03 → 07 → 02 → 04 → 05 → 06
 
 ### Phase 15: Weekly Digest
 
@@ -580,6 +580,6 @@ Plans:
 | 11. Actionable Notifications | 13/13 | Complete   | 2026-08-16 |
 | 12. Home Screen Widget | 8/8 | Complete   | 2026-08-17 |
 | 13. Orrery | 8/8 | Complete   | 2026-08-18 |
-| 14. AI Message Suggestions | 0/TBD | Not started | - |
+| 14. AI Message Suggestions | 2/7 | Executing | - |
 | 15. Weekly Digest | 0/TBD | Not started | - |
 | 16. Backup, Export & Restore | 0/TBD | Not started | - |
