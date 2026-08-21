@@ -23,6 +23,7 @@ import {
   reorderFields,
   restoreField,
   updateFieldCuration,
+  updateFieldShareWithAi,
 } from "@/db/field-defs-dao";
 import type { NewFieldDef } from "@/db/field-types";
 import { migration001 } from "@/db/migrations/001-initial";
@@ -153,6 +154,47 @@ describe("changeFieldOptions / updateFieldCuration", () => {
   });
 });
 
+describe("updateFieldShareWithAi — the H7 edit-persistence writer", () => {
+  it("persists share_with_ai=1 written via the edit path and reads it back", async () => {
+    const id = await makeDef({ col_name: "nickname", share_with_ai: 0 });
+    expect((await readDef(id)).share_with_ai).toBe(0);
+
+    await updateFieldShareWithAi(exec, id, 1, LATER);
+
+    const def = await readDef(id);
+    expect(def.share_with_ai).toBe(1);
+    expect(def.modified_at).toBe(LATER);
+  });
+
+  it("toggles share_with_ai back to 0 and that persists (the H7 regression)", async () => {
+    const id = await makeDef({ col_name: "nickname", share_with_ai: 1 });
+    expect((await readDef(id)).share_with_ai).toBe(1);
+
+    await updateFieldShareWithAi(exec, id, 0, LATER);
+
+    expect((await readDef(id)).share_with_ai).toBe(0);
+  });
+
+  it("touches ONLY share_with_ai + modified_at — never the value column", async () => {
+    const id = await makeDef({ col_name: "nickname", label: "Nickname" });
+
+    await updateFieldShareWithAi(exec, id, 1, LATER);
+
+    const def = await readDef(id);
+    // label / col_name / type / quarantine untouched.
+    expect(def.label).toBe("Nickname");
+    expect(def.col_name).toBe("nickname");
+    expect(def.type).toBe("text");
+    expect(def.quarantined_at).toBeNull();
+    // The physical value column is untouched by a defs-row flag write.
+    expect(await valueColumns()).toContain("nickname");
+  });
+
+  it("throws on a non-existent id (changes !== 1)", async () => {
+    await expect(updateFieldShareWithAi(exec, 999, 1, LATER)).rejects.toThrow();
+  });
+});
+
 describe("quarantine / restore + listDefs visibility", () => {
   it("quarantine stamps quarantined_at without touching the value column", async () => {
     const id = await makeDef({ col_name: "nickname" });
@@ -230,6 +272,7 @@ describe("serialization — every mutating op runs through inWriteTransaction (r
     expect(await one((e) => renameField(e, id, "N", LATER))).toBe(1);
     expect(await one((e) => changeFieldOptions(e, id, null, LATER))).toBe(1);
     expect(await one((e) => updateFieldCuration(e, id, 1, 0, LATER))).toBe(1);
+    expect(await one((e) => updateFieldShareWithAi(e, id, 1, LATER))).toBe(1);
     expect(await one((e) => quarantineField(e, id, LATER))).toBe(1);
     expect(await one((e) => restoreField(e, id, LATER))).toBe(1);
 
