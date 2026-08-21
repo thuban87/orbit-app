@@ -28,6 +28,46 @@ export type AiProviderId =
   | "custom";
 
 /**
+ * The provider ids as a runtime array — the SINGLE source of truth the settings
+ * DAO validates an incoming `aiProvider` against (a bare `string` from a patch
+ * must be one of these). Kept in lockstep with `AiProviderId` above.
+ */
+export const AI_PROVIDER_IDS = [
+  "none",
+  "openai",
+  "anthropic",
+  "google",
+  "custom",
+] as const;
+
+/**
+ * The cloud providers that actually hold an API key — `none` (disabled) is
+ * excluded. This is the key-repository's provider scope (one namespaced
+ * SecureStore item per id); no key is ever keyed by `none`.
+ */
+export type AiCloudProviderId = Exclude<AiProviderId, "none">;
+
+/**
+ * Neutral, non-secret provider configuration — the export-safe shape that lives
+ * in `app_settings`. It deliberately holds NO API key: credentials live only in
+ * the device SecureStore (see `ai-key-store.ts`). `promptTemplate` empty means
+ * "use the built-in default".
+ */
+export interface AiProviderConfig {
+  provider: AiProviderId;
+  model: string;
+  customEndpoint: string;
+  customModel: string;
+  promptTemplate: string;
+}
+
+/** A neutral generation request — the prompt plus the resolved model id. */
+export interface AiGenerationRequest {
+  prompt: string;
+  model: string;
+}
+
+/**
  * Minimal settings shape the AI service reads. `aiApiKey` is optional so the
  * legacy `settings.aiApiKeys?.[provider] ?? settings.aiApiKey ?? ''` fallback
  * stays meaningful.

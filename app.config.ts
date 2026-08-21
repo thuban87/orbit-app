@@ -122,6 +122,12 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
         // the killed-app headless task) ships NO config plugin, so it adds no
         // plugins entry — installing the dependency alone is sufficient.
         "expo-notifications",
+        // Phase-14 BYO-key AI (Plan 14-01, AI-01). `npx expo install
+        // expo-secure-store` instructed registering this bare-string plugin — it
+        // is the device-only keystore boundary for provider API keys (no key ever
+        // enters SQLite). No plugin options needed; the Set-dedupe handles it like
+        // the other string plugins.
+        "expo-secure-store",
       ]),
     ];
 
