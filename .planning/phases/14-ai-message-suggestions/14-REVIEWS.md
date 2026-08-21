@@ -1,5 +1,55 @@
 # Phase 14: AI Message Suggestions — Plan Reviews
 
+## Convergence status — Cycle 4 complete (owner-authorized 4th cycle), near-converged — owner escalation
+
+Cycle 4 reviewed the corrected 7-plan set (commit `7f5b9e2`) with both reviewers. **Reviewers still
+split, but the gap narrowed sharply and the trajectory is clearly converging** (unresolved distinct
+concerns: 11 → 10 → 12 → **4**; each cycle's prior findings fully resolved):
+
+- **Claude verdict:** APPROVE — HIGH 0, MEDIUM 0, LOW 2 (both non-blocking, non-egress).
+- **Codex verdict:** REQUEST_CHANGES — HIGH 1, MEDIUM 2, LOW 1.
+
+Both confirmed all 12 Cycle-3 findings resolved (Codex marked C3-H1 and C3-L2 "not FULLY resolved"
+on completeness grounds — folded into the Cycle-4 findings below). The orchestrator re-verified the
+one load-bearing new source claim (C4-M1) against 14-02:104.
+
+**CYCLE_SUMMARY: current_high=1 current_actionable=3.** None reverse a recorded decision; C4-H1
+STRENGTHENS the owner's airtight control. All planner-bucket. The 4-cycle budget the owner set is
+reached; awaiting owner decision on the remaining small, concrete findings.
+
+### Cycle 4 — distinct concerns
+
+- **C4-H1 — HIGH (both reviewers; Claude LOW, Codex HIGH) — literal-rejection completeness/parity is
+  incomplete.** 14-01's `validateCustomEndpoint` enumerates a NARROWER non-public literal set
+  (loopback/RFC1918/link-local/CGNAT/ULA/mapped) than Plan 07's `isNonPublic`, and the test matrices
+  omit IANA ranges (IPv4 `0.0.0.0/8`, benchmark `198.18/15`, doc-nets, reserved; several IPv6
+  special-purpose). "Same as Plan 07" wording does not cure the narrower normative enumeration or the
+  missing tests. NOT an egress bypass (Plan 07's native pre-`Call` literal check runs the full set at
+  request time), but the two defense-in-depth layers are not genuinely identical as asserted. **Fix:**
+  define ONE shared authoritative rejection table (IANA-based, with NAT64/IPv4-mapped unwrap
+  semantics); drive BOTH the JS validator tests and the Kotlin unit tests table-driven over every
+  entry; add direct-IP-literal device fixtures (not only resolving hostnames). Also wire the module
+  `build.gradle` JUnit `testImplementation` + `src/test` source-set so the mandated Kotlin test
+  actually compiles/runs (Claude L2).
+- **C4-M1 — MEDIUM (source-verified) — Custom `listModels()` contradicts the free-text-only
+  contract.** 14-02:104 wires the Custom adapter's `generate` AND `listModels` through
+  `secureCustomFetch`, but 14-02:18/74 and 14-04 declare Custom models always free-text — so Custom
+  `listModels()` would fire an undefined extra endpoint request. **Fix:** make Custom `listModels()`
+  non-networked (return the manual-entry state); only Custom `generate` invokes the endpoint.
+- **C4-M2 — MEDIUM (self-inflicted ERRATA wording) — "ONLY guard" contradiction.** The §0 ERRATA (and
+  14-01's top-of-file comment) say `validateCustomEndpoint` is the "ONLY guard" for numeric-IP-literal
+  Custom URLs, contradicting the native pre-`Call` literal check that 14-07 also requires. An
+  implementer could omit the native layer. **Fix:** state that OkHttp's custom `Dns` is skipped for
+  literals, and that BOTH the JS validator AND the native request-handler precheck guard literal
+  hosts (defense in depth), neither being the "only" guard.
+- **C4-L1 — LOW (source-verified) — native evidence transfer not enforced.** 14-07 records the
+  `compileDebugKotlin` + native unit-test results in 14-07-SUMMARY, but 14-06 does not explicitly
+  require transferring those named results into 14-VALIDATION.md or fail when absent. **Fix:** add a
+  14-06 acceptance item requiring both native commands + results in 14-VALIDATION.md, missing/failed
+  evidence blocking release (C3-L2 residue).
+
+---
+
 ## Convergence status — Cycle 3 complete (MAX CYCLES), NOT converged — REVIEWERS SPLIT, owner escalation
 
 Cycle 3 reviewed the corrected 7-plan set (commit `a4da2bd`) with the same two reviewers. **They
