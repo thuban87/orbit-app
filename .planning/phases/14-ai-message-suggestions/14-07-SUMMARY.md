@@ -72,9 +72,17 @@ Airtight, connection-time egress guard for the user-controlled Custom AI provide
 - `npx tsc --noEmit` → **PASS** (exit 0).
 - `npm run check:colors` → **PASS** (exit 0).
 
-## Native compile + test gate — PENDING (orchestrator-driven, MUST pass before Plan 02)
+## Native compile + test gate — ✅ PASSED (orchestrator-driven, 2026-08-21, host LIVING-ROOM/`droid`)
 
-Per the plan's division of labor, this agent did NOT run the desktop Android toolchain. The following is the required exit gate of Plan 07; run it on the desktop build host per `docs/runbooks/desktop-build-pipeline.md` (transport = tar-over-ssh / scp, NEVER `git push`):
+**Result (verified before Plan 02):** clean tar-over-ssh sync → `npm ci` → `npx expo prebuild --platform android --clean` → gradle, all on `droid` per the runbook:
+- `:app:compileDebugKotlin` — **BUILD SUCCESSFUL** (48s) — the Kotlin module compiles + links inside the autolinked Expo/RN app.
+- `:orbit-secure-fetch:testDebugUnitTest` — **BUILD SUCCESSFUL** (22s); the `syncNonPublicVectors` byte-identity task ran. JUnit report `TEST-expo.modules.orbitsecurefetch.OrbitSecureFetchModuleTest.xml`: **tests="4" skipped="0" failures="0" errors="0"** (non-zero, all green — not a zero-test false pass).
+
+Gate status for 14-VALIDATION.md (Plan 06, C3-L2): **PASSED**.
+
+<details><summary>Gate commands (as run)</summary>
+
+Per the plan's division of labor, the executor did NOT run the desktop Android toolchain; the orchestrator ran the required exit gate on the desktop build host per `docs/runbooks/desktop-build-pipeline.md` (transport = tar-over-ssh / scp, NEVER `git push`):
 
 ```bash
 DEST='C:\Users\bwales\projects\orbit-app'
@@ -91,7 +99,9 @@ ssh -o BatchMode=yes droid "cd /d \"$DEST\\android\" & gradlew.bat :orbit-secure
 Notes for the orchestrator:
 - The autolinked gradle project for a local `modules/<name>` module is named after the directory; the unit-test task is expected to be `:orbit-secure-fetch:testDebugUnitTest`. If that path does not resolve, discover it with `gradlew.bat projects` (or `gradlew.bat :app:dependencies`) and run `<resolved-project>:testDebugUnitTest`.
 - The `syncNonPublicVectors` Copy task refreshes the test-resource manifest before tests; the committed copy is already byte-identical, so a clean checkout also passes.
-- Gate status to record in 14-VALIDATION.md (Plan 06, C3-L2): **PENDING** until this runs green.
+- Autolinked project resolved as expected to `:orbit-secure-fetch` (no name-discovery fallback needed).
+
+</details>
 
 ## Deviations from Plan
 
