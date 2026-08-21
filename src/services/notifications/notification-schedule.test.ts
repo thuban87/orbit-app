@@ -22,6 +22,7 @@ import { updateAppSettings } from "@/db/app-settings-dao";
 import { migration001 } from "@/db/migrations/001-initial";
 import { migration002 } from "@/db/migrations/002-app-settings";
 import { migration003 } from "@/db/migrations/003-orrery-settings";
+import { migration004 } from "@/db/migrations/004-ai-settings";
 import { runMigrations } from "@/db/migrations/runner";
 import type { SqlExecutor } from "@/db/types";
 import { __resetSweepForTest, runLaunchSweep } from "@/services/launch-sweep";
@@ -66,10 +67,14 @@ beforeEach(async () => {
   uidCounter = 0;
   const db = openTestDb();
   exec = nodeSqliteExecutor(db);
-  await runMigrations(exec, [migration001, migration002, migration003], 3, {
-    now: NOW,
-    newUid: uid,
-  });
+  // v4: getAppSettings (called by the reconcile under test) now SELECTs the
+  // Phase-14 AI columns, so the schema must include migration 004 (Plan 14-01).
+  await runMigrations(
+    exec,
+    [migration001, migration002, migration003, migration004],
+    4,
+    { now: NOW, newUid: uid },
+  );
   __resetExpo();
   __resetReconcileForTest();
 });

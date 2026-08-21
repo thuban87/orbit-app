@@ -27,6 +27,7 @@ import {
 import { migration001 } from "@/db/migrations/001-initial";
 import { migration002 } from "@/db/migrations/002-app-settings";
 import { migration003 } from "@/db/migrations/003-orrery-settings";
+import { migration004 } from "@/db/migrations/004-ai-settings";
 import { runMigrations } from "@/db/migrations/runner";
 import type { SqlExecutor } from "@/db/types";
 import { newUid } from "@/db/uid";
@@ -63,13 +64,28 @@ async function migrateToV2(): Promise<void> {
   });
 }
 
-/** Bring a fresh in-memory DB to v3 (001+002+003), the current launch path. */
-async function migrateToV3(): Promise<void> {
-  await runMigrations(exec, [migration001, migration002, migration003], 3, {
-    now: NOW,
-    newUid,
-  });
+/** Bring a fresh in-memory DB to v4 — the current launch path (adds AI cols). */
+async function migrateToV4(): Promise<void> {
+  await runMigrations(
+    exec,
+    [migration001, migration002, migration003, migration004],
+    4,
+    { now: NOW, newUid },
+  );
 }
+
+/** The disabled-by-default AI fields, for splicing into full-object expectations. */
+const AI_DEFAULTS = {
+  aiProvider: "none" as const,
+  aiModel: "",
+  aiCustomEndpoint: "",
+  aiCustomModel: "",
+  aiPromptTemplate: "",
+  aiAckOpenai: 0 as const,
+  aiAckAnthropic: 0 as const,
+  aiAckGoogle: 0 as const,
+  aiAckCustom: 0 as const,
+};
 
 beforeEach(() => {
   const db = openTestDb();
@@ -177,7 +193,7 @@ describe("migration 002 — app_settings (forward-only, additive)", () => {
 
 describe("app-settings-dao — read", () => {
   it("getAppSettings returns the seeded defaults as a typed row", async () => {
-    await migrateToV3();
+    await migrateToV4();
     const settings = await getAppSettings(exec);
     const expected: AppSettings = {
       notificationsEnabled: 0,
@@ -190,12 +206,14 @@ describe("app-settings-dao — read", () => {
       // The two sun fields default NULL and read back as null (no resolution here).
       sunContactId: null,
       selfSunColour: null,
+      // AI starts disabled: provider `none`, empty config, acks 0 (AI-01).
+      ...AI_DEFAULTS,
     };
     expect(settings).toEqual(expected);
   });
 
   it("throws if the id=1 row is missing (never happens post-seed, loud by design)", async () => {
-    await migrateToV3();
+    await migrateToV4();
     await exec.runAsync("DELETE FROM app_settings WHERE id = 1");
     await expect((async () => getAppSettings(exec))()).rejects.toThrow();
   });
@@ -203,7 +221,7 @@ describe("app-settings-dao — read", () => {
 
 describe("app-settings-dao — validated write", () => {
   beforeEach(async () => {
-    await migrateToV3();
+    await migrateToV4();
   });
 
   it("updates only the supplied fields and bumps modified_at", async () => {
@@ -251,6 +269,8 @@ describe("app-settings-dao — validated write", () => {
       // The sun fields are untouched by this patch — still null.
       sunContactId: null,
       selfSunColour: null,
+      // AI fields untouched by this patch — still the disabled defaults.
+      ...AI_DEFAULTS,
     });
   });
 
@@ -345,7 +365,7 @@ describe("app-settings-dao — validated write", () => {
 
 describe("app-settings-dao — sun fields (ORR-05 / ORR-06)", () => {
   beforeEach(async () => {
-    await migrateToV3();
+    await migrateToV4();
   });
 
   it("reads both sun fields as null on a fresh seed", async () => {
@@ -406,8 +426,7 @@ describe("app-settings-dao — sun fields (ORR-05 / ORR-06)", () => {
     "rejects a %s sunContactId before any UPDATE (no write)",
     async (_label, value) => {
       await expect(
-        (async () =>
-          updateAppSettings(exec, { sunContactId: value }, LATER))(),
+        (async () => updateAppSettings(exec, { sunContactId: value }, LATER))(),
       ).rejects.toThrow();
       const row = await exec.getFirstAsync<{
         sun_contact_id: number | null;
@@ -447,5 +466,164 @@ describe("app-settings-dao — sun fields (ORR-05 / ORR-06)", () => {
     expect(SELF_SUN_COLOUR_RE.test(REJECT_SHORT)).toBe(false);
     expect(SELF_SUN_COLOUR_RE.test(REJECT_LONG)).toBe(false);
     expect(SELF_SUN_COLOUR_RE.test(REJECT_BAD_CHARS)).toBe(false);
+  });
+});
+
+describe("app-settings-dao — AI settings (AI-01)", () => {
+  beforeEach(async () => {
+    await migrateToV4();
+  });
+
+  /** Read the raw ack column without going through the typed DAO reader. */
+  async function ackCustom(): Promise<number> {
+    const row = await exec.getFirstAsync<{ ai_ack_custom: number }>(
+      "SELECT ai_ack_custom FROM app_settings WHERE id = 1",
+    );
+    return row?.ai_ack_custom ?? -1;
+  }
+
+  it("persists a known provider + model and reloads them", async () => {
+    await updateAppSettings(
+      exec,
+      { aiProvider: "openai", aiModel: "gpt-4.1-mini" },
+      LATER,
+    );
+    const settings = await getAppSettings(exec);
+    expect(settings.aiProvider).toBe("openai");
+    expect(settings.aiModel).toBe("gpt-4.1-mini");
+  });
+
+  it("rejects an unknown provider before any UPDATE (no write)", async () => {
+    await expect(
+      (async () =>
+        updateAppSettings(exec, { aiProvider: "evilcorp" as never }, LATER))(),
+    ).rejects.toThrow();
+    const settings = await getAppSettings(exec);
+    expect(settings.aiProvider).toBe("none");
+    const row = await exec.getFirstAsync<{ modified_at: string }>(
+      "SELECT modified_at FROM app_settings WHERE id = 1",
+    );
+    expect(row?.modified_at).toBe(NOW);
+  });
+
+  it("rejects an http:// Custom endpoint on write and changes no row (H2)", async () => {
+    await expect(
+      (async () =>
+        updateAppSettings(
+          exec,
+          { aiCustomEndpoint: "http://api.example.com/v1" },
+          LATER,
+        ))(),
+    ).rejects.toThrow();
+    const settings = await getAppSettings(exec);
+    expect(settings.aiCustomEndpoint).toBe("");
+    const row = await exec.getFirstAsync<{ modified_at: string }>(
+      "SELECT modified_at FROM app_settings WHERE id = 1",
+    );
+    expect(row?.modified_at).toBe(NOW);
+  });
+
+  it("rejects a non-public IP-literal Custom endpoint on write (C4-H1)", async () => {
+    await expect(
+      (async () =>
+        updateAppSettings(
+          exec,
+          { aiCustomEndpoint: "https://192.168.1.10/v1" },
+          LATER,
+        ))(),
+    ).rejects.toThrow();
+    expect((await getAppSettings(exec)).aiCustomEndpoint).toBe("");
+  });
+
+  it("persists a valid public https Custom endpoint", async () => {
+    await updateAppSettings(
+      exec,
+      { aiCustomEndpoint: "https://api.example.com/v1/chat" },
+      LATER,
+    );
+    expect((await getAppSettings(exec)).aiCustomEndpoint).toBe(
+      "https://api.example.com/v1/chat",
+    );
+  });
+
+  it("accepts an EMPTY endpoint as unconfigured and clears a previous one (C3-M5)", async () => {
+    await updateAppSettings(
+      exec,
+      { aiCustomEndpoint: "https://api.example.com/v1" },
+      LATER,
+    );
+    expect((await getAppSettings(exec)).aiCustomEndpoint).toBe(
+      "https://api.example.com/v1",
+    );
+    // An empty string is a valid write that clears the prior value, no throw.
+    await updateAppSettings(exec, { aiCustomEndpoint: "" }, LATER);
+    expect((await getAppSettings(exec)).aiCustomEndpoint).toBe("");
+  });
+
+  it("does NOT let a generic patch set an aiAck* flag (C3-H3a)", async () => {
+    // Seed the ack to 1 directly (simulating Plan 05's dedicated writer).
+    await exec.runAsync(
+      "UPDATE app_settings SET ai_ack_custom = 1 WHERE id = 1",
+    );
+    // A generic patch attempting to flip it back to 0 (or set any ack) is dropped.
+    await updateAppSettings(
+      exec,
+      { aiAckCustom: 0, aiAckOpenai: 1 } as AppSettings,
+      LATER,
+    );
+    const settings = await getAppSettings(exec);
+    // The ack columns are untouched by the generic path.
+    expect(settings.aiAckCustom).toBe(1);
+    expect(settings.aiAckOpenai).toBe(0);
+  });
+
+  it("resets ai_ack_custom to 0 when the endpoint CHANGES (C3-H3b)", async () => {
+    await updateAppSettings(
+      exec,
+      { aiCustomEndpoint: "https://api.example.com/v1" },
+      LATER,
+    );
+    // Acknowledge the current recipient (Plan 05 writer, simulated).
+    await exec.runAsync(
+      "UPDATE app_settings SET ai_ack_custom = 1 WHERE id = 1",
+    );
+    expect(await ackCustom()).toBe(1);
+
+    // Writing a DIFFERENT endpoint must reset the ack in the same transaction.
+    await updateAppSettings(
+      exec,
+      { aiCustomEndpoint: "https://other.example.com/v1" },
+      LATER,
+    );
+    expect(await ackCustom()).toBe(0);
+  });
+
+  it("leaves ai_ack_custom untouched when the SAME endpoint is rewritten (C3-H3b)", async () => {
+    await updateAppSettings(
+      exec,
+      { aiCustomEndpoint: "https://api.example.com/v1" },
+      LATER,
+    );
+    await exec.runAsync(
+      "UPDATE app_settings SET ai_ack_custom = 1 WHERE id = 1",
+    );
+    // Re-writing the IDENTICAL endpoint (e.g. alongside a model change) keeps it.
+    await updateAppSettings(
+      exec,
+      { aiCustomEndpoint: "https://api.example.com/v1", aiCustomModel: "x" },
+      LATER,
+    );
+    expect(await ackCustom()).toBe(1);
+  });
+
+  it("persists the prompt-template override and custom model", async () => {
+    await updateAppSettings(
+      exec,
+      { aiPromptTemplate: "Say hi to {{name}}", aiCustomModel: "local-7b" },
+      LATER,
+    );
+    const settings = await getAppSettings(exec);
+    expect(settings.aiPromptTemplate).toBe("Say hi to {{name}}");
+    expect(settings.aiCustomModel).toBe("local-7b");
   });
 });
