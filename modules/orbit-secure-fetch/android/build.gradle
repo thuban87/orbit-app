@@ -1,0 +1,70 @@
+plugins {
+  id 'com.android.library'
+  id 'org.jetbrains.kotlin.android'
+  id 'expo-module-gradle-plugin'
+}
+
+group = 'expo.modules.orbitsecurefetch'
+version = '0.1.0'
+
+android {
+  namespace "expo.modules.orbitsecurefetch"
+  defaultConfig {
+    versionCode 1
+    versionName "0.1.0"
+  }
+  lintOptions {
+    abortOnError false
+  }
+  // JVM unit tests for the address-predicate core (isNonPublic) run under
+  // testDebugUnitTest. The shared IP-vector manifest lives in test resources.
+  testOptions {
+    unitTests {
+      includeAndroidResources = false
+    }
+  }
+  sourceSets {
+    test {
+      java.srcDirs += 'src/test/java'
+      resources.srcDirs += 'src/test/resources'
+    }
+  }
+}
+
+dependencies {
+  // OkHttp is already on the React Native classpath; pin the SAME version RN
+  // bundles (node_modules/react-native/gradle/libs.versions.toml -> 4.9.2) so
+  // the module compiles and links against exactly that API with no conflict.
+  implementation "com.squareup.okhttp3:okhttp:4.9.2"
+
+  // The address-predicate gate (C4-H1) needs a JVM test to execute — the
+  // orbit-share-finish analog ships no test wiring, so add JUnit here.
+  testImplementation "junit:junit:4.13.2"
+}
+
+// Keep the module's committed copy of the shared non-public IP-vector manifest
+// BYTE-IDENTICAL to the canonical source (src/ai/__fixtures__). Resolve the repo
+// root by walking up from this module until the canonical file is found, then
+// copy it into test resources before the unit tests run. The committed copy and
+// this task are belt-and-suspenders: the test also asserts byte-identity.
+def canonicalVectors = {
+  File d = projectDir
+  for (int i = 0; i < 8 && d != null; i++) {
+    File f = new File(d, 'src/ai/__fixtures__/non-public-vectors.json')
+    if (f.exists()) return f
+    d = d.parentFile
+  }
+  return null
+}()
+
+if (canonicalVectors != null) {
+  tasks.register('syncNonPublicVectors', Copy) {
+    from canonicalVectors
+    into 'src/test/resources'
+    rename { 'non-public-vectors.json' }
+  }
+  tasks.matching { it.name.startsWith('process') && it.name.contains('UnitTestJavaRes') }
+    .configureEach { dependsOn 'syncNonPublicVectors' }
+  tasks.matching { it.name.startsWith('test') }
+    .configureEach { dependsOn 'syncNonPublicVectors' }
+}
