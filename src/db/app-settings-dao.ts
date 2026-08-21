@@ -22,7 +22,11 @@
 import { validateCustomEndpoint } from "@/ai/custom-endpoint";
 import { inWriteTransaction } from "@/db/transaction";
 import type { SqlExecutor } from "@/db/types";
-import { AI_PROVIDER_IDS, type AiProviderId } from "@/services/ai-types";
+import {
+  AI_PROVIDER_IDS,
+  type AiCloudProviderId,
+  type AiProviderId,
+} from "@/services/ai-types";
 
 /**
  * The app-level notification settings, one row (id=1). Toggles are 0/1
@@ -373,6 +377,67 @@ export function updateAppSettings(
     if (result.changes !== 1) {
       throw new Error(
         `updateAppSettings: expected to update the id=1 row, changed ${result.changes}`,
+      );
+    }
+  });
+}
+
+/**
+ * Persist the FIRST-SEND acknowledgement for ONE provider (H5 / C2-H3). This is
+ * the H5 carve-out and the SOLE writer of any `ai_ack_*` column — the four ack
+ * flags are DELIBERATELY absent from `COLUMN_OF`, so the generic patch can never
+ * reach them (C3-H3a); only this narrow writer sets one to 1.
+ *
+ * The provider→column mapping is a FIXED allowlist `switch` over the closed
+ * `AiCloudProviderId` union: the column name is one of four SOURCE CONSTANTS,
+ * never interpolated from runtime data, so no unknown/forged id can select or
+ * synthesize a column (the `never` default is a compile-time exhaustiveness lock
+ * and a runtime guard). One `inWriteTransaction`, a `?`-bound single-column
+ * UPDATE + `modified_at` bump, and a `changes===1` loud-failure guard (a bad row
+ * count throws → rollback), mirroring the favourites/field-defs writer idiom.
+ *
+ * The Compose caller (Plan 05) `await`s this and only AFTER it RESOLVES may it
+ * create the AbortController / call `AiService.generate` — egress is ordered
+ * strictly after a durable ack (C2-H3). Writes ONLY `app_settings`; never a
+ * contact / interaction / fuel / `last_contact` column (DATA-04 intact).
+ */
+export function acknowledgeProvider(
+  exec: SqlExecutor,
+  provider: AiCloudProviderId,
+  now: string,
+): Promise<void> {
+  let column: string;
+  switch (provider) {
+    case "openai":
+      column = "ai_ack_openai";
+      break;
+    case "anthropic":
+      column = "ai_ack_anthropic";
+      break;
+    case "google":
+      column = "ai_ack_google";
+      break;
+    case "custom":
+      column = "ai_ack_custom";
+      break;
+    default: {
+      // Exhaustiveness lock: a new provider id must extend this allowlist here,
+      // never fall through to a generic/interpolated column write.
+      const _exhaustive: never = provider;
+      throw new Error(
+        `acknowledgeProvider: unknown provider ${String(_exhaustive)}`,
+      );
+    }
+  }
+
+  return inWriteTransaction(exec, async () => {
+    const result = await exec.runAsync(
+      `UPDATE app_settings SET ${column} = 1, modified_at = ? WHERE id = 1`,
+      [now],
+    );
+    if (result.changes !== 1) {
+      throw new Error(
+        `acknowledgeProvider: expected to update the id=1 row, changed ${result.changes}`,
       );
     }
   });

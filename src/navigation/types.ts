@@ -55,15 +55,22 @@ export type RootStackParamList = {
   ManageFavourites: undefined;
   /**
    * The entry-agnostic compose surface (CMP-01/02/03). Params are SERIALIZABLE
-   * ONLY — a bare `contactId`, NO callback params (native-stack serialization +
-   * deep-link safety), the same additive posture as `NeverContacted` /
-   * `ManageFavourites`. The screen self-fetches header + fuel + SMS capability
-   * from the id alone, so Phase 11 (notification), Phase 12 (widget), and Phase
-   * 14 (AI) can open it with just a contact id and no wiring. Registered
-   * additively; `initialRouteName` stays `Home` and every existing route is
-   * untouched.
+   * ONLY — a bare `contactId` plus the optional Phase-14 AI intent flag, NO
+   * callback params (native-stack serialization + deep-link safety), the same
+   * additive posture as `NeverContacted` / `ManageFavourites`. The screen
+   * self-fetches header + fuel + SMS capability from the id alone, so Phase 11
+   * (notification), Phase 12 (widget), and Phase 14 (AI) can open it with just a
+   * contact id and no wiring. Registered additively; `initialRouteName` stays
+   * `Home` and every existing route is untouched.
+   *
+   * `requestAiSuggestion` (Plan 14-05) is a SERIALIZABLE primitive the profile
+   * "AI draft" entry sets to `true` so Compose auto-starts one suggestion on
+   * focus. It is CONSUMED-ONCE: Compose clears it (`setParams`) before dispatch,
+   * so a focus reload / re-render cannot repeat the (potentially billable)
+   * request (T-14-16). Absent/`undefined` is the ordinary "opened to compose"
+   * case — no suggestion is auto-started.
    */
-  Compose: { contactId: number };
+  Compose: { contactId: number; requestAiSuggestion?: boolean };
   /**
    * The share-sheet capture picker (CAP-01/04). Carries NO params — a system
    * share is consumed by the `ShareIntentProvider` (the single owner of the

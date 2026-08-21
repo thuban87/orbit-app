@@ -19,6 +19,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { nodeSqliteExecutor, openTestDb } from "@/db/__testkit__/node-sqlite";
 import {
+  acknowledgeProvider,
   type AppSettings,
   getAppSettings,
   SELF_SUN_COLOUR_RE,
@@ -625,5 +626,97 @@ describe("app-settings-dao — AI settings (AI-01)", () => {
     const settings = await getAppSettings(exec);
     expect(settings.aiPromptTemplate).toBe("Say hi to {{name}}");
     expect(settings.aiCustomModel).toBe("local-7b");
+  });
+});
+
+describe("acknowledgeProvider — the SOLE ai_ack_* writer (H5 / C2-H3)", () => {
+  beforeEach(async () => {
+    await migrateToV4();
+  });
+
+  /** The provider→column allowlist, mirrored here to prove each maps 1:1. */
+  const CASES: Array<{ provider: Parameters<typeof acknowledgeProvider>[1]; column: string }> = [
+    { provider: "openai", column: "ai_ack_openai" },
+    { provider: "anthropic", column: "ai_ack_anthropic" },
+    { provider: "google", column: "ai_ack_google" },
+    { provider: "custom", column: "ai_ack_custom" },
+  ];
+
+  /** Read every ack column as a map for cross-column no-leak assertions. */
+  async function readAcks(): Promise<Record<string, number>> {
+    const row = await exec.getFirstAsync<Record<string, number>>(
+      `SELECT ai_ack_openai, ai_ack_anthropic, ai_ack_google, ai_ack_custom
+         FROM app_settings WHERE id = 1`,
+    );
+    return row ?? {};
+  }
+
+  for (const { provider, column } of CASES) {
+    it(`sets ONLY ${column} for provider '${provider}' and reloads acknowledged`, async () => {
+      await acknowledgeProvider(exec, provider, LATER);
+      const acks = await readAcks();
+      // The target column flipped to 1; the other three stayed 0.
+      for (const c of CASES) {
+        expect(acks[c.column]).toBe(c.column === column ? 1 : 0);
+      }
+      // The typed reader reflects the acknowledgement across a reload.
+      const settings = await getAppSettings(exec);
+      const flag = {
+        openai: settings.aiAckOpenai,
+        anthropic: settings.aiAckAnthropic,
+        google: settings.aiAckGoogle,
+        custom: settings.aiAckCustom,
+      }[provider];
+      expect(flag).toBe(1);
+    });
+  }
+
+  it("bumps modified_at and writes NOTHING outside the one ack column (write-spy)", async () => {
+    // Spy on every SQL statement issued during the ack write.
+    const statements: string[] = [];
+    const spied = {
+      ...exec,
+      runAsync: (sql: string, params?: unknown[]) => {
+        statements.push(sql);
+        return exec.runAsync(sql, params);
+      },
+      execAsync: (sql: string) => {
+        statements.push(sql);
+        return exec.execAsync(sql);
+      },
+    } as typeof exec;
+
+    await acknowledgeProvider(spied, "openai", LATER);
+
+    const joined = statements.join("\n").toLowerCase();
+    // Exactly ONE UPDATE, targeting app_settings' ack column + modified_at.
+    const updates = statements.filter((s) => /update/i.test(s));
+    expect(updates).toHaveLength(1);
+    expect(updates[0]).toMatch(/ai_ack_openai\s*=\s*1/);
+    expect(updates[0]).toMatch(/modified_at\s*=\s*\?/);
+    // No contact / interaction / fuel / last_contact write on this path (DATA-04).
+    expect(joined).not.toMatch(/\bcontacts\b/);
+    expect(joined).not.toMatch(/\binteractions\b/);
+    expect(joined).not.toMatch(/\bfuel\b/);
+    expect(joined).not.toMatch(/last_contact/);
+
+    const row = await exec.getFirstAsync<{ modified_at: string }>(
+      "SELECT modified_at FROM app_settings WHERE id = 1",
+    );
+    expect(row?.modified_at).toBe(LATER);
+  });
+
+  it("is idempotent — a second acknowledge keeps the flag at 1 (changes===1)", async () => {
+    await acknowledgeProvider(exec, "anthropic", LATER);
+    // A re-acknowledge still updates exactly one row (modified_at bump), no throw.
+    await expect(acknowledgeProvider(exec, "anthropic", NOW)).resolves.toBeUndefined();
+    expect((await getAppSettings(exec)).aiAckAnthropic).toBe(1);
+  });
+
+  it("throws (→ rollback) when the id=1 row is missing (assertOneChange)", async () => {
+    await exec.runAsync("DELETE FROM app_settings WHERE id = 1");
+    await expect(acknowledgeProvider(exec, "google", LATER)).rejects.toThrow(
+      /changed 0/,
+    );
   });
 });

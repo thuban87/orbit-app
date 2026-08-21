@@ -43,6 +43,7 @@ import {
   TouchpointRefineForm,
   type TouchpointRefineValue,
 } from "@/components/TouchpointRefineForm";
+import { getAppSettings } from "@/db/app-settings-dao";
 import { getContactHeader } from "@/db/contact-read";
 import {
   type ContactStatusRow,
@@ -170,6 +171,11 @@ export function ContactProfileScreen({
   // In-flight latch for the one-tap log — blocks a double-fire while the write
   // is open, and dims the button.
   const [logging, setLogging] = useState(false);
+  // Whether an AI provider is configured (aiProvider !== 'none'). Gates the
+  // additive "AI draft" entry (Plan 14-05) so a never-configured user never sees
+  // a control that leads to an inert Compose flow — the exact prompt + first-send
+  // acknowledgement all live in Compose, not here.
+  const [aiConfigured, setAiConfigured] = useState(false);
   // The touchpoint currently open in the refine form (null = form closed) and
   // its controlled value. The parent owns both — the form is presentational.
   const [editingId, setEditingId] = useState<number | null>(null);
@@ -184,20 +190,30 @@ export function ContactProfileScreen({
   const load = useCallback(async () => {
     try {
       const exec = getExecutor();
-      const [row, rows, statusRow, impactInputs, fuelRows, rankedFuelRows] =
-        await Promise.all([
-          getContactHeader(exec, contactId),
-          listTimeline(exec, contactId),
-          getContactStatus(exec, contactId),
-          getImpactInputs(exec, contactId),
-          listFuelForEditor(exec, contactId),
-          getRankedFuel(exec, contactId),
-        ]);
+      const [
+        row,
+        rows,
+        statusRow,
+        impactInputs,
+        fuelRows,
+        rankedFuelRows,
+        settings,
+      ] = await Promise.all([
+        getContactHeader(exec, contactId),
+        listTimeline(exec, contactId),
+        getContactStatus(exec, contactId),
+        getImpactInputs(exec, contactId),
+        listFuelForEditor(exec, contactId),
+        getRankedFuel(exec, contactId),
+        getAppSettings(exec),
+      ]);
       setHeader(row);
       setTimeline(rows);
       setStatus(statusRow);
       setFuel(fuelRows);
       setRankedFuel(rankedFuelRows);
+      // Show the additive "AI draft" entry only when a provider is configured.
+      setAiConfigured(settings.aiProvider !== "none");
       // Derive gravity AND intensity from the SAME impact inputs (read once so
       // they can never disagree); hide both until there is interaction history.
       // localDateTime() is captured once so both derivations share one "now".
@@ -713,6 +729,35 @@ export function ContactProfileScreen({
           Message
         </Text>
       </Pressable>
+
+      {/* "AI draft" (AI-02) — additive entry, shown only when a provider is
+          configured. Navigates to the SAME entry-agnostic Compose surface with a
+          serializable, consume-once `requestAiSuggestion` intent so Compose (the
+          sole editable-draft surface, which holds the real contact-specific
+          prompt + first-send acknowledgement) auto-starts one suggestion. Never a
+          parallel result surface. Accent-OUTLINE (secondary) so the filled
+          "Message"/"Log contact" primaries keep their hierarchy. */}
+      {aiConfigured ? (
+        <Pressable
+          testID="contact-profile-ai-draft"
+          accessibilityRole="button"
+          accessibilityLabel={`Draft a message with AI for ${header?.name ?? ""}`}
+          onPress={() =>
+            navigation.navigate("Compose", {
+              contactId,
+              requestAiSuggestion: true,
+            })
+          }
+          style={[
+            styles.logContact,
+            { backgroundColor: colors.background, borderColor: colors.accent },
+          ]}
+        >
+          <Text style={[styles.logContactText, { color: colors.accent }]}>
+            AI draft
+          </Text>
+        </Pressable>
+      ) : null}
 
       <Pressable
         testID="contact-profile-log-contact"

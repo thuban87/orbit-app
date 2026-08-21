@@ -51,6 +51,12 @@ import {
 import * as Clipboard from "expo-clipboard";
 import * as SMS from "expo-sms";
 import { Avatar } from "@/components/Avatar";
+import { readPromptContext } from "@/db/ai-context-read";
+import {
+  acknowledgeProvider as persistProviderAck,
+  type AppSettings,
+  getAppSettings,
+} from "@/db/app-settings-dao";
 import { getContactHeader } from "@/db/contact-read";
 import { getExecutor, localDateTime } from "@/db/database";
 import { type FuelItem, getRankedFuel } from "@/db/fuel-read";
@@ -59,10 +65,31 @@ import {
   type ComposeControls,
   resolveComposeControls,
 } from "@/logic/compose-logic";
+import {
+  AI_REQUEST_TIMEOUT_MS,
+  AiSuggestionLifecycle,
+  type AiSuggestionState,
+  type RequestConfig,
+} from "@/logic/ai-suggestion-logic";
+import { consumeAiSuggestionIntent } from "@/navigation/ai-suggestion-navigation";
+import type { ResolvedPrompt } from "@/ai/prompt-types";
+import { resolvePrompt, MAX_OUTPUT_TOKENS } from "@/ai/prompt-template";
+import { AiError, AiService } from "@/services/AiService";
+import type { AiCloudProviderId } from "@/services/ai-types";
+import {
+  buildInspectorViewState,
+  buildProviderAckViewState,
+} from "@/screens/settings-ai-logic";
 import { fuelKindLabel } from "@/services/fuel-kind-label";
 import { formatFuelAge } from "@/services/fuel-age";
 import { useTheme } from "@/theme";
 import { Logger } from "@/utils/logger";
+
+/**
+ * Generation temperature (AI-SPEC §4 — a single-number tuning surface). 0.7 for
+ * a warm-but-focused draft; the 120-token ceiling lives in `MAX_OUTPUT_TOKENS`.
+ */
+const AI_TEMPERATURE = 0.7;
 
 const LOG_SCOPE = "compose";
 
@@ -107,6 +134,103 @@ export function ComposeScreen({ navigation, route }: RootStackScreenProps<"Compo
   const [copied, setCopied] = useState(false);
   const copyTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // ---- AI Suggest (Plan 14-05) ---------------------------------------------
+  // The screen owns the SOLE AbortController + 20s timeout via the pure
+  // lifecycle; the adapter never creates its own (H4). All state below is read
+  // by the lifecycle's injected deps through refs so the single lifecycle
+  // instance never closes over stale values.
+  const [aiState, setAiState] = useState<AiSuggestionState>({ status: "idle" });
+  // Whether a provider is configured (aiProvider !== 'none') — gates the trigger.
+  const [aiAvailable, setAiAvailable] = useState(false);
+  // Latest loaded AI settings (provider/model/template/ack flags), via ref so the
+  // lifecycle deps always read the current values.
+  const settingsRef = useRef<AppSettings | null>(null);
+  // The one AiService instance (holds the four adapters; refreshed per request).
+  const serviceRef = useRef<AiService | null>(null);
+  if (serviceRef.current === null) {
+    serviceRef.current = new AiService();
+  }
+  // Providers already acknowledged this session (seeded from the ack flags on
+  // load, extended after a durable ack write). The H5 gate reads this.
+  const acknowledgedRef = useRef<Set<AiCloudProviderId>>(new Set());
+  // Live focus + mount facts for the stale guard (C3-H4).
+  const focusedRef = useRef(false);
+  const mountedRef = useRef(true);
+  // A ref mirror of the draft so `isDraftEmpty` never sees a stale closure.
+  const draftRef = useRef("");
+  // Consume-once latch for the profile→Compose intent (T-14-16).
+  const intentConsumedRef = useRef(false);
+
+  // Build the ONE lifecycle instance (its effects read the refs above). Created
+  // lazily on first render; refs are already initialised by this point.
+  const lifecycleRef = useRef<AiSuggestionLifecycle | null>(null);
+  if (lifecycleRef.current === null) {
+    lifecycleRef.current = new AiSuggestionLifecycle({
+      // Resolve the ONE immutable prompt for this request, exactly once.
+      resolvePrompt: async (): Promise<ResolvedPrompt> => {
+        const exec = getExecutor();
+        const context = await readPromptContext(exec, contactId);
+        const template = settingsRef.current?.aiPromptTemplate ?? "";
+        return resolvePrompt(template, context);
+      },
+      isProviderAcknowledged: (): boolean => {
+        const s = settingsRef.current;
+        if (!s || s.aiProvider === "none") return false;
+        return acknowledgedRef.current.has(s.aiProvider);
+      },
+      // The H5 carve-out: the SOLE ai_ack_* write. Its promise must RESOLVE
+      // before the lifecycle creates a controller / calls generate (C2-H3).
+      acknowledgeProvider: async (): Promise<void> => {
+        const s = settingsRef.current;
+        if (!s || s.aiProvider === "none") {
+          throw new AiError("not_configured");
+        }
+        const provider = s.aiProvider;
+        const exec = getExecutor();
+        await persistProviderAck(exec, provider, localDateTime());
+        acknowledgedRef.current.add(provider);
+      },
+      // Egress: forward the lifecycle's OWN signal (H4); the adapter reads only
+      // `resolved.payload` (C3-M1).
+      generate: (prompt, signal): Promise<string> => {
+        const s = settingsRef.current;
+        const service = serviceRef.current;
+        if (!s || !service) throw new AiError("not_configured");
+        service.refreshProviders(s);
+        const provider = service.getActiveProvider(s);
+        if (!provider) throw new AiError("not_configured");
+        const model =
+          s.aiProvider === "custom" ? s.aiCustomModel : s.aiModel;
+        return provider.generate({
+          resolvedPrompt: prompt,
+          model,
+          temperature: AI_TEMPERATURE,
+          maxOutputTokens: MAX_OUTPUT_TOKENS,
+          signal,
+        });
+      },
+      applyDraft: (text: string): void => {
+        draftRef.current = text;
+        setDraft(text);
+      },
+      isDraftEmpty: (): boolean => draftRef.current.trim().length === 0,
+      createController: (): AbortController => new AbortController(),
+      setTimer: (fn, ms) => setTimeout(fn, ms),
+      clearTimer: (handle) => clearTimeout(handle as ReturnType<typeof setTimeout>),
+      isActive: (): boolean => focusedRef.current && mountedRef.current,
+      currentConfig: (): RequestConfig => {
+        const s = settingsRef.current;
+        const provider = s?.aiProvider ?? "none";
+        const model =
+          provider === "custom" ? s?.aiCustomModel ?? "" : s?.aiModel ?? "";
+        return { provider, model, contactId };
+      },
+      sanitizeError: (err): string =>
+        err instanceof AiError ? err.code : "unknown",
+      onChange: (next): void => setAiState(next),
+    });
+  }
+
   // Back → dashboard (the one genuinely new nav behaviour, B2). `reset` is called
   // INSIDE the callback body (never at render — `navigation.reset(...)` returns
   // void, so a bare assignment would fire it during render and bind undefined to
@@ -125,21 +249,33 @@ export function ComposeScreen({ navigation, route }: RootStackScreenProps<"Compo
   useFocusEffect(
     useCallback(() => {
       let cancelled = false;
+      focusedRef.current = true;
       setScreenState("loading");
       setSmsAvailable(null);
 
       const exec = getExecutor();
       void (async () => {
         try {
-          // Header + fuel only (NOT the SMS probe — that runs separately below so
-          // it can neither block nor fail this load).
-          const [row, fuelRows] = await Promise.all([
+          // Header + fuel + AI settings (NOT the SMS probe — that runs separately
+          // below so it can neither block nor fail this load).
+          const [row, fuelRows, settings] = await Promise.all([
             getContactHeader(exec, contactId),
             getRankedFuel(exec, contactId),
+            getAppSettings(exec),
           ]);
           if (cancelled) {
             return;
           }
+          // Publish AI settings + seed the acknowledged-provider set from the
+          // persisted ack flags so a prior session's acknowledgement still counts.
+          settingsRef.current = settings;
+          const acked = new Set<AiCloudProviderId>();
+          if (settings.aiAckOpenai === 1) acked.add("openai");
+          if (settings.aiAckAnthropic === 1) acked.add("anthropic");
+          if (settings.aiAckGoogle === 1) acked.add("google");
+          if (settings.aiAckCustom === 1) acked.add("custom");
+          acknowledgedRef.current = acked;
+          setAiAvailable(settings.aiProvider !== "none");
           // A stale/deleted OR archived contact — exit to the dashboard, never
           // render a "no phone" (or any) Send/Copy/fuel surface. `getContactHeader`
           // intentionally does NOT filter `archived_at IS NULL` (it stays loadable
@@ -162,6 +298,22 @@ export function ComposeScreen({ navigation, route }: RootStackScreenProps<"Compo
           });
           setFuel(fuelRows);
           setScreenState("ready");
+
+          // Consume-once profile→Compose AI intent (T-14-16): auto-start ONE
+          // suggestion, but only when a provider is configured. Clear the param
+          // BEFORE dispatch so a focus reload / re-render cannot repeat it.
+          if (
+            consumeAiSuggestionIntent(
+              route.params.requestAiSuggestion,
+              intentConsumedRef.current,
+            )
+          ) {
+            intentConsumedRef.current = true;
+            navigation.setParams({ requestAiSuggestion: undefined });
+            if (settings.aiProvider !== "none") {
+              void lifecycleRef.current?.begin();
+            }
+          }
         } catch (err) {
           Logger.error(LOG_SCOPE, "failed to load contact", err);
           if (!cancelled) {
@@ -189,8 +341,13 @@ export function ComposeScreen({ navigation, route }: RootStackScreenProps<"Compo
 
       return () => {
         cancelled = true;
+        // Blur / navigation away / contactId change: the screen is no longer
+        // active and any in-flight AI request must abort (stale guard input +
+        // H4 controller teardown). dispose() is idempotent.
+        focusedRef.current = false;
+        lifecycleRef.current?.dispose();
       };
-    }, [contactId, goHome]),
+    }, [contactId, goHome, navigation, route.params.requestAiSuggestion]),
   );
 
   // Android hardware/system Back → dashboard too (consume the event so native-stack
@@ -212,6 +369,16 @@ export function ComposeScreen({ navigation, route }: RootStackScreenProps<"Compo
         clearTimeout(copyTimer.current);
         copyTimer.current = null;
       }
+    };
+  }, []);
+
+  // Track mount and abort any in-flight AI request on unmount (H4 + C3-H4). The
+  // focus-effect cleanup handles blur; this guards a hard unmount too.
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      lifecycleRef.current?.dispose();
     };
   }, []);
 
@@ -262,6 +429,252 @@ export function ComposeScreen({ navigation, route }: RootStackScreenProps<"Compo
       Alert.alert("Couldn't copy", "Please try again.");
     }
   }, [draft]);
+
+  // Map a sanitized AI error code to a short, user-facing line (never raw
+  // provider detail — the code is all that ever leaves the adapter, T-14-05).
+  const aiErrorText = (code: string): string => {
+    switch (code) {
+      case "timeout":
+        return "That took too long. Try again?";
+      case "cancelled":
+        return "Cancelled.";
+      case "not_configured":
+        return "Add an AI provider in Settings first.";
+      case "unauthorized":
+        return "Your API key was rejected. Check it in Settings.";
+      case "rate_limited":
+        return "The provider is rate-limiting. Try again shortly.";
+      case "blocked":
+      case "invalid_endpoint":
+        return "That endpoint was refused. Check it in Settings.";
+      default:
+        return "Couldn't draft a message. Try again?";
+    }
+  };
+
+  // The AI Suggest section — rendered in the reserved slot. Compose owns the sole
+  // controller/timeout via the lifecycle; every branch here only dispatches
+  // lifecycle actions (no direct network/DB work).
+  const renderAi = () => {
+    const ai = lifecycleRef.current;
+    if (!ai) return null;
+
+    // Trigger: shown only when a provider is configured AND nothing is in flight.
+    if (aiState.status === "idle") {
+      if (!aiAvailable) return null;
+      return (
+        <Pressable
+          testID="compose-ai-suggest"
+          accessibilityRole="button"
+          accessibilityLabel="Draft with AI"
+          onPress={() => void ai.begin()}
+          style={[
+            styles.aiTrigger,
+            { backgroundColor: colors.background, borderColor: colors.accent },
+          ]}
+        >
+          <Text style={[styles.aiTriggerText, { color: colors.accent }]}>
+            Draft with AI
+          </Text>
+        </Pressable>
+      );
+    }
+
+    if (aiState.status === "resolving" || aiState.status === "loading") {
+      return (
+        <View
+          testID="compose-ai-loading"
+          style={[
+            styles.aiPanel,
+            { backgroundColor: colors.surfaceElevated, borderColor: colors.border },
+          ]}
+        >
+          <Text style={[styles.aiPanelText, { color: colors.textSecondary }]}>
+            Drafting a message…
+          </Text>
+          <Pressable
+            testID="compose-ai-cancel"
+            accessibilityRole="button"
+            accessibilityLabel="Cancel"
+            onPress={() => ai.cancel()}
+            style={[styles.aiSecondaryBtn, { borderColor: colors.border }]}
+          >
+            <Text style={[styles.aiSecondaryText, { color: colors.textSecondary }]}>
+              Cancel
+            </Text>
+          </Pressable>
+        </View>
+      );
+    }
+
+    if (aiState.status === "needs-acknowledgement") {
+      // Same immutable ResolvedPrompt reference the lifecycle will hand to the
+      // adapter — the inspector + acknowledgement views read it unchanged (M1).
+      const ack = buildProviderAckViewState(aiState.provider, aiState.prompt);
+      const inspector = buildInspectorViewState(aiState.prompt);
+      return (
+        <View
+          testID="compose-ai-acknowledgement"
+          style={[
+            styles.aiPanel,
+            { backgroundColor: colors.surfaceElevated, borderColor: colors.border },
+          ]}
+        >
+          <Text style={[styles.aiPanelHeading, { color: colors.textPrimary }]}>
+            First message to {ack.providerName}
+          </Text>
+          <Text style={[styles.aiPanelText, { color: colors.textSecondary }]}>
+            This exact text will be sent to {ack.providerName}. Nothing else
+            leaves your device.
+          </Text>
+          {ack.retentionCaveat ? (
+            <Text style={[styles.aiPanelText, { color: colors.textSecondary }]}>
+              {ack.retentionCaveat}
+            </Text>
+          ) : null}
+          <ScrollView
+            testID="compose-ai-prompt"
+            style={[styles.aiPromptBox, { borderColor: colors.border }]}
+          >
+            <Text style={[styles.aiPromptText, { color: colors.textPrimary }]}>
+              {ack.prompt}
+            </Text>
+          </ScrollView>
+          {inspector.truncations.map((t, i) => (
+            <Text
+              key={`${t.category}-${i}`}
+              style={[styles.aiPanelMeta, { color: colors.textSecondary }]}
+            >
+              {t.category}: {t.detail}
+            </Text>
+          ))}
+          <View style={styles.aiPanelActions}>
+            <Pressable
+              testID="compose-ai-decline"
+              accessibilityRole="button"
+              accessibilityLabel="Not now"
+              onPress={() => ai.decline()}
+              style={[styles.aiSecondaryBtn, { borderColor: colors.border }]}
+            >
+              <Text style={[styles.aiSecondaryText, { color: colors.textSecondary }]}>
+                Not now
+              </Text>
+            </Pressable>
+            <Pressable
+              testID="compose-ai-acknowledge"
+              accessibilityRole="button"
+              accessibilityLabel="Send to provider"
+              onPress={() => void ai.acknowledge()}
+              style={[
+                styles.aiPrimaryBtn,
+                { backgroundColor: colors.accent, borderColor: colors.accent },
+              ]}
+            >
+              <Text style={[styles.aiPrimaryText, { color: colors.background }]}>
+                Acknowledge & continue
+              </Text>
+            </Pressable>
+          </View>
+        </View>
+      );
+    }
+
+    if (aiState.status === "confirm-replace") {
+      return (
+        <View
+          testID="compose-ai-confirm-replace"
+          style={[
+            styles.aiPanel,
+            { backgroundColor: colors.surfaceElevated, borderColor: colors.border },
+          ]}
+        >
+          <Text style={[styles.aiPanelHeading, { color: colors.textPrimary }]}>
+            Replace your draft?
+          </Text>
+          <Text style={[styles.aiPanelText, { color: colors.textSecondary }]}>
+            You already wrote something. Replace it with this suggestion?
+          </Text>
+          <ScrollView
+            testID="compose-ai-suggestion"
+            style={[styles.aiPromptBox, { borderColor: colors.border }]}
+          >
+            <Text style={[styles.aiPromptText, { color: colors.textPrimary }]}>
+              {aiState.suggestion}
+            </Text>
+          </ScrollView>
+          <View style={styles.aiPanelActions}>
+            <Pressable
+              testID="compose-ai-cancel-replace"
+              accessibilityRole="button"
+              accessibilityLabel="Keep my draft"
+              onPress={() => ai.cancelReplace()}
+              style={[styles.aiSecondaryBtn, { borderColor: colors.border }]}
+            >
+              <Text style={[styles.aiSecondaryText, { color: colors.textSecondary }]}>
+                Keep mine
+              </Text>
+            </Pressable>
+            <Pressable
+              testID="compose-ai-confirm"
+              accessibilityRole="button"
+              accessibilityLabel="Replace draft"
+              onPress={() => ai.confirmReplace()}
+              style={[
+                styles.aiPrimaryBtn,
+                { backgroundColor: colors.accent, borderColor: colors.accent },
+              ]}
+            >
+              <Text style={[styles.aiPrimaryText, { color: colors.background }]}>
+                Replace
+              </Text>
+            </Pressable>
+          </View>
+        </View>
+      );
+    }
+
+    // status === "error"
+    return (
+      <View
+        testID="compose-ai-error"
+        style={[
+          styles.aiPanel,
+          { backgroundColor: colors.surfaceElevated, borderColor: colors.border },
+        ]}
+      >
+        <Text style={[styles.aiPanelText, { color: colors.danger }]}>
+          {aiErrorText(aiState.code)}
+        </Text>
+        <View style={styles.aiPanelActions}>
+          <Pressable
+            testID="compose-ai-dismiss"
+            accessibilityRole="button"
+            accessibilityLabel="Dismiss"
+            onPress={() => ai.cancel()}
+            style={[styles.aiSecondaryBtn, { borderColor: colors.border }]}
+          >
+            <Text style={[styles.aiSecondaryText, { color: colors.textSecondary }]}>
+              Dismiss
+            </Text>
+          </Pressable>
+          <Pressable
+            testID="compose-ai-retry"
+            accessibilityRole="button"
+            accessibilityLabel="Retry"
+            onPress={() => void ai.retry()}
+            style={[
+              styles.aiPrimaryBtn,
+              { backgroundColor: colors.accent, borderColor: colors.accent },
+            ]}
+          >
+            <Text style={[styles.aiPrimaryText, { color: colors.background }]}>
+              Try again
+            </Text>
+          </Pressable>
+        </View>
+      </View>
+    );
+  };
 
   // ---- Render --------------------------------------------------------------
 
@@ -371,9 +784,11 @@ export function ComposeScreen({ navigation, route }: RootStackScreenProps<"Compo
         )}
       </View>
 
-      {/* Reserved AI-Suggest slot (Phase 14) — DO NOT build any AI control here;
-          this comment marks the layout room so Phase 14 slots in without a
-          re-layout. */}
+      {/* AI Suggest (Plan 14-05) — the single editable-draft AI flow. Compose
+          owns the sole AbortController + 20s timeout via the pure lifecycle; this
+          renders the trigger, loading+Cancel, the first-send acknowledgement
+          (showing the EXACT ResolvedPrompt), replacement confirmation, and Retry. */}
+      {renderAi()}
 
       {/* Draft — opens BLANK, multiline. */}
       <View testID="compose-draft" style={styles.section}>
@@ -383,7 +798,12 @@ export function ComposeScreen({ navigation, route }: RootStackScreenProps<"Compo
         <TextInput
           testID="compose-draft-input"
           value={draft}
-          onChangeText={setDraft}
+          onChangeText={(text) => {
+            // Keep the ref mirror in lockstep so the AI lifecycle's
+            // `isDraftEmpty` never reads a stale value.
+            draftRef.current = text;
+            setDraft(text);
+          }}
           multiline
           placeholder="Write your message…"
           placeholderTextColor={colors.textSecondary}
@@ -582,5 +1002,80 @@ const styles = StyleSheet.create({
   actionText: {
     fontSize: 16,
     fontWeight: "700",
+  },
+  aiTrigger: {
+    minHeight: 44,
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 20,
+    padding: 12,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  aiTriggerText: {
+    fontSize: 16,
+    fontWeight: "700",
+  },
+  aiPanel: {
+    borderWidth: 1,
+    borderRadius: 10,
+    padding: 12,
+    gap: 10,
+  },
+  aiPanelHeading: {
+    fontSize: 16,
+    fontWeight: "700",
+  },
+  aiPanelText: {
+    fontSize: 14,
+    fontWeight: "400",
+    lineHeight: 20,
+  },
+  aiPanelMeta: {
+    fontSize: 12,
+    fontWeight: "600",
+  },
+  aiPromptBox: {
+    borderWidth: 1,
+    borderRadius: 8,
+    padding: 10,
+    maxHeight: 220,
+  },
+  aiPromptText: {
+    fontSize: 13,
+    fontWeight: "400",
+    lineHeight: 19,
+  },
+  aiPanelActions: {
+    flexDirection: "row",
+    gap: 12,
+    justifyContent: "flex-end",
+    alignItems: "center",
+  },
+  aiPrimaryBtn: {
+    minHeight: 44,
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 16,
+    padding: 12,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  aiPrimaryText: {
+    fontSize: 15,
+    fontWeight: "700",
+  },
+  aiSecondaryBtn: {
+    minHeight: 44,
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 16,
+    padding: 12,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  aiSecondaryText: {
+    fontSize: 15,
+    fontWeight: "600",
   },
 });
