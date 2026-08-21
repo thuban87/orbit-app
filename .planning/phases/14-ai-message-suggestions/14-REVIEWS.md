@@ -1,5 +1,131 @@
 # Phase 14: AI Message Suggestions — Plan Reviews
 
+## Convergence status — Cycle 3 complete (MAX CYCLES), NOT converged — REVIEWERS SPLIT, owner escalation
+
+Cycle 3 reviewed the corrected 7-plan set (commit `a4da2bd`) with the same two reviewers. **They
+split:**
+
+- **Claude verdict:** APPROVE — HIGH 0, MEDIUM 0, LOW 2 (both non-blocking: optional IPv6
+  NAT64/6to4/Teredo hardening; a `note`/`detail` label fix). Confirmed all 10 Cycle-2 findings
+  resolved and the wave map internally consistent.
+- **Codex verdict:** REQUEST_CHANGES — HIGH 4, MEDIUM 6, LOW 2. Also confirmed all 10 Cycle-2
+  findings genuinely resolved and the wave map consistent, but surfaced deeper NEW issues Claude
+  missed — including several that are direct consequences of the Cycle-3 edits.
+
+**The orchestrator independently re-verified Codex's load-bearing claims against source** (per
+CLAUDE.md): the ack single-writer contradiction (`AppSettingsPatch = Partial<AppSettings>` +
+generic column loop, app-settings-dao.ts:60), `getImpactInputs` reading `contacts.interval_days`/
+`rarely_responds` (impact-read.ts:62), `detail` being an `events` column not `interactions`
+(001-initial.ts:122 vs 107), and `NewFieldDef` requiring `uid`/`col_name`/`display_order`/`now`
+(field-types.ts) all check out. The OkHttp semantics behind C3-H1/H2 (custom `Dns` is not consulted
+for numeric-IP literals; a system HTTP/SOCKS proxy bypasses the origin-pin) are established OkHttp
+behavior. **Codex's findings are real, not over-reach.**
+
+**CYCLE_SUMMARY: current_high=4 current_actionable=8** (union of distinct concerns; Claude's 2 LOWs
+are subsumed by Codex C3-H1/C3-M3). This is Cycle 3 = `--max-cycles 3`, so the workflow's replan
+loop stops here and hands the decision to the owner. Note: the raw unresolved count rose 10 → 12,
+but this is healthy churn — every Cycle-2 item was resolved; these 12 are entirely new, deeper
+findings (transport semantics, plan-vs-plan contradictions), several introduced by the Cycle-3
+fixes themselves. None reverse or weaken a recorded decision; the security-relevant HIGHs
+STRENGTHEN the owner's airtight H3 mandate.
+
+### Cycle 3 — distinct HIGH concerns (all Codex; orchestrator-verified)
+
+- **C3-H1 — native egress predicate is still an incomplete deny-list AND has an OkHttp IP-literal
+  bypass.** 14-07 Task 1. Two parts: (a) the enumerated `isNonPublic` list still omits
+  not-globally-reachable ranges (IPv4 `0.0.0.0/8`, benchmarking `198.18.0.0/15`, documentation
+  nets, reserved; IPv6 NAT64 `64:ff9b::/96`, and — if strict — 6to4/Teredo). (b) **More critical:**
+  a custom `okhttp3.Dns` is only consulted for *hostname* resolution — for a numeric-IP-literal URL
+  OkHttp builds the route WITHOUT calling `Dns`, so a CGNAT/ULA/IPv4-mapped **literal** URL bypasses
+  the native predicate entirely and is caught only by Plan 01's URL-literal validator, which does
+  NOT cover CGNAT/ULA/mapped literals. **Fix:** base the predicate on the IANA special-purpose
+  registries as an `isGloballyReachable` allowlist; validate the numeric `HttpUrl.host` natively
+  before creating the `Call` (independent of the DNS hook); unwrap `::ffff/96`; extend Plan 01's
+  literal validator to the same full set; add Kotlin behavioral tests + IP-literal device fixtures
+  (grep gates are insufficient for this control).
+
+- **C3-H2 — system-proxy bypass of the origin-pin.** 14-07 Task 1. The custom `Dns` does not
+  guarantee origin resolution when an Android system proxy is configured: for an HTTP proxy OkHttp
+  connects to the proxy and the proxy resolves the origin; SOCKS may receive the origin unresolved —
+  either way defeating "resolve once, pin the vetted origin IP." **Fix:** force the security client
+  to `Proxy.NO_PROXY` (or a proxy-aware strict origin validator); add a device test with an
+  HTTP/SOCKS proxy configured proving the origin cannot bypass validation.
+
+- **C3-H3 — ack single-writer invariant is unenforceable + no re-ack on Custom-endpoint change.**
+  14-01 vs 14-05. (a) Plan 01 folds the four ack columns into the generic `AppSettingsPatch`/
+  `COLUMN_OF`/validation, so any ordinary `updateSettings({aiAckCustom:1})` could set an ack —
+  defeating Plan 05's "acknowledgeProvider is the SOLE ack writer" gate (a privacy control). (b) A
+  Custom-endpoint change does not reset `ai_ack_custom`, so a *different* recipient inherits the old
+  endpoint's acknowledgement and receives the prompt with no fresh consent. **Fix:** exclude ack
+  fields from the generic patch/column loop; make `acknowledgeProvider` the only path that sets them
+  to 1; atomically reset `ai_ack_custom=0` whenever the canonical Custom endpoint changes; test
+  single-writer enforcement + endpoint-change re-acknowledgement.
+
+- **C3-H4 — stale-request egress after the ack await (regression from the C2-H3 fix).** 14-05. The
+  C2-H3 fix moved controller creation to AFTER `await acknowledgeProvider`, but nothing rechecks
+  request freshness once the await resolves — and no controller exists during the ack write, so
+  Cancel/unmount/navigation/provider-model/contact change during that window cannot abort it; a
+  naive `await ack(); startRequest()` then sends anyway. **Fix:** snapshot a request-generation
+  token + immutable provider/model/prompt before awaiting; after the ack resolves, recheck the token
+  is current, Compose is focused/mounted, and config is unchanged before creating the controller/
+  calling generate; add deferred-ack tests for cancel, unmount/navigation, and provider/model/
+  contact change.
+
+### Cycle 3 — actionable non-HIGH concerns (Codex)
+
+- **C3-M1 — `generate(input)` contract vs ResolvedPrompt reference-identity contradiction.** 14-02
+  defines `generate(input)` with `prompt: string`; 14-05/M1 require the SAME `ResolvedPrompt` object
+  to reach `AiService.generate` and be compared by reference — and Plan 02 does not depend on Plan
+  03's type. **Fix:** make Plan 02 depend on 14-03 and carry `resolvedPrompt: ResolvedPrompt`
+  (adapters read `.payload`), OR weaken the M1 identity claim to string-byte-equality at the adapter
+  boundary and test that.
+- **C3-M2 — key-read-timing contradiction.** 14-02 behavior says read the key immediately before
+  every call; the action says `refreshProviders` reads keys from the store (the existing code caches
+  key strings in provider instances). **Fix:** inject a provider-scoped key accessor called inside
+  `generate`/networked `listModels`; never retain keys during `refreshProviders`.
+- **C3-M3 — two false source claims in 14-03.** (a) `getImpactInputs` necessarily reads
+  `contacts.interval_days`/`rarely_responds`, contradicting "reads NOTHING else off a contact"
+  (they are internal derivation inputs, not serialized). (b) `detail` is an `events` column, not
+  `interactions` — the "interaction carrying note/detail" fixture can't be built as written. **Fix:**
+  distinguish internal derivation inputs (permit, prohibit serialization) from `PromptContext`-
+  exposed fields; seed `interactions.note` and `events.detail` separately and prove neither reaches
+  the prompt.
+- **C3-M4 — JS abort listener never removed on settlement (regression from the C2-M1 fix).** 14-07
+  Task 2 adds an abort listener but doesn't remove it on settle, so a late abort calls native
+  `cancel` for an already-settled request and creates an orphan tombstone no request clears. **Fix:**
+  remove the listener in `finally`; consume the native promise after abort without an unhandled
+  rejection; test that aborting after success/failure issues no `cancel`.
+- **C3-M5 — empty Custom endpoint fails the save-time validator.** The migration seeds
+  `ai_custom_endpoint DEFAULT ''`, but the DAO validates every endpoint patch with a validator that
+  only accepts complete HTTPS URLs — so clearing an endpoint, or persisting a whole non-Custom form
+  containing `""`, fails. **Fix:** treat empty as the valid "unconfigured" value; validate only
+  non-empty; require a non-empty valid endpoint only when Custom is selected/invoked; add
+  clear-and-switch-provider tests.
+- **C3-M6 — 14-AI-SPEC.md is stale and NO plan owns its regeneration.** AI-SPEC §3–6 still prescribes
+  raw Custom `fetch` + `redirect: "error"`, adapters sending through `fetch`, first-send inspection
+  at Settings, no native transport, and forbids any settings write on generation — all contradicted
+  by the owner-directed native module and Plan 05's ack carve-out. Unlike VALIDATION.md (owned by
+  Plan 06), nothing regenerates AI-SPEC. **Fix:** update AI-SPEC §3–6 (native Custom transport +
+  address/proxy tests, Compose-owned ack, the one pre-egress ack write), or assign that regeneration
+  to a plan.
+- **C3-L1 — `toNewFieldDefPayload(draft)` can't build a real `NewFieldDef`** (needs `uid`/`col_name`/
+  `display_order`/`now`) — regression from the C2-M4 helper extraction. **Fix:** helper returns only
+  draft-derived fields; the component adds create-only metadata.
+- **C3-L2 — Plan 07 records its compile gate in VALIDATION.md but doesn't own that file** (Plan 06
+  does) — regression from the C2-M2 edit. **Fix:** record in 14-07-SUMMARY.md and have Plan 06
+  transfer the evidence, or add VALIDATION.md to Plan 07's ownership.
+
+### Cycle 3 — owner escalation (max cycles reached)
+
+`--max-cycles 3` is reached and the plan set is NOT converged (4 HIGH + 8 actionable, all verified
+real, all planner-bucket, none reversing a recorded decision). The convergence loop's replan stops
+here per the gate. **Awaiting owner decision:** run a 4th replan+review cycle (recommended — the
+findings are concrete and several are self-inflicted by the Cycle-3 edits, so one pass would very
+likely clear them), accept-and-proceed, or stop for manual review. Execution remains owner-gated
+regardless.
+
+---
+
 ## Convergence status — Cycle 2 complete, NOT converged (5 HIGH + 5 actionable, all planner-bucket)
 
 Cycle 2 reviewed the corrected 7-plan set (commit `17534b4`) with the same two independent
