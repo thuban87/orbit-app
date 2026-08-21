@@ -71,3 +71,22 @@ Gate status (C3-L2 / C4-L1): **PASSED**. The full-build compile/link gate is `:a
 - Any API key, prompt, contact note/detail, raw provider response, request body/header, or full endpoint reaches a log, export, UI error, or this evidence file.
 - A Custom request reaches a non-public HTTPS destination or follows a redirect.
 - A cancelled/stale request changes the draft, a suggestion records a touchpoint or modifies `last_contact`, or a non-empty draft is replaced without confirmation.
+
+---
+
+## 14-06 Task 2 — Device UAT result: ⚠ BLOCKED (2026-08-21)
+
+Physical-Pixel UAT on debug (Metro, console) + release builds. **Result: BLOCKED — a release-blocking hang was found; the phase is NOT shippable.**
+
+**BLOCKER — AI suggestion hangs forever.** Triggering "AI Suggest" (profile→Compose) stalls on "Drafting a message…" indefinitely and never returns a suggestion. Traced (instrumented debug console) to the lifecycle **`resolving`** state: `resolvePrompt()` → `readPromptContext` (an expo-sqlite async read chain) **never settles** — not a rejection (`begin()` catches those → error), a true hang. **Reproduces on the RELEASE build** (not a dev-mode artifact). The `resolving` state has **no timeout** (the 20 s timer is armed only in `egress`, after resolving), so it hangs unbounded. Root cause not yet pinpointed (which sub-read never settles; an uncaught `NativeDatabase.execAsync` NPE was seen on debug). Passed every unit/JVM gate because `node:sqlite` (sync) cannot reproduce the `expo-sqlite` (async) hang.
+
+**Fix scope (resume):** pinpoint + fix the hanging read; add a `resolving`-state timeout/guard so it can never hang; regression test; re-UAT.
+
+**Device-verified GOOD before the blocker (record for reuse):**
+- Migration 004 live — `user_version = 4` (read from the on-device DB).
+- **No key/secret column** in `app_settings` (DB schema) — API key only in `expo-secure-store`, shown masked (`•••• (saved)`), raw key **0 occurrences** in the UI tree.
+- Real Gemini model **discovery works** — live model list returned over authenticated HTTPS (with a valid key).
+- Custom endpoint **rejects cleartext at save** — `http://…` → "The endpoint must use https://.".
+- **DATA-04 held** — the suggestion attempt left Alice/Dad `last_contact` unchanged (no touchpoint).
+
+**Not yet exercised** (blocked by the hang or needing infra): the first-send acknowledgement gate + exact-prompt inspector, a returned suggestion / editable draft, cancel/replace, sanitized error paths, and the native egress-escape fixtures (private-DNS / redirect / proxy).
