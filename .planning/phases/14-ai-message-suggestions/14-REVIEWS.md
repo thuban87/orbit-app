@@ -1,5 +1,101 @@
 # Phase 14: AI Message Suggestions — Plan Reviews
 
+## Convergence status — Cycle 2 complete, NOT converged (5 HIGH + 5 actionable, all planner-bucket)
+
+Cycle 2 reviewed the corrected 7-plan set (commit `17534b4`) with the same two independent
+reviewers (Codex CLI 0.148.0, run manually without the blocked bypass flag; and a read-only
+in-session Claude subagent). **Both reviewers independently confirmed all 11 Cycle-1 findings
+(H1–H7, M1–M3, L1) are genuinely resolved at the source level** — the Cycle-2 replan worked. Both
+returned REQUEST_CHANGES on NEW, deeper source-grounded findings (not recurrences).
+
+- **Codex verdict:** HIGH 3, MEDIUM 4, LOW 0 → REQUEST_CHANGES
+- **Claude verdict:** HIGH 2, MEDIUM 1, LOW 2 → REQUEST_CHANGES
+
+**CYCLE_SUMMARY: current_high=5 current_actionable=5** (union of distinct concerns; down from
+Cycle 1's 11 → decreasing, not stalled). None of the Cycle-2 findings reverse or weaken a recorded
+decision — C2-H2 *strengthens* the owner's airtight H3 control — so all are planner-bucket, no owner
+gate. Every load-bearing finding below was independently re-verified against source by the
+orchestrator before recording (per CLAUDE.md "review the code, not the diff").
+
+### Cycle 2 — distinct HIGH concerns
+
+- **C2-H1 — `category` is not a `contacts` column (source-verified).** Codex; Claude concurred on the
+  schema. 14-03-PLAN.md instructs `SELECT name, category` and enumerates `category: string` as a
+  direct `contacts` field, but `contacts` has `category_id INTEGER REFERENCES categories(id)`
+  (001-initial.ts:66) — the category *name* lives in `categories.name`. The AI-context read would
+  fail at runtime or invite an unplanned repair. **Fix:** resolve category via a narrow
+  `LEFT JOIN categories` selecting `categories.name AS categoryName`; keep the allowlist closed
+  (no broader contact row); update `PromptContext` + fixtures.
+
+- **C2-H2 — native deny-set is IPv4/legacy-centric; not "airtight" for IPv6/mapped/CGNAT
+  (design-judgment; both reviewers).** Codex (HIGH) + Claude (M-N3). 14-07 Task 1 rejects via
+  loopback/any-local/link-local/`isSiteLocalAddress()`/multicast/`.local`. Java
+  `Inet6Address.isSiteLocalAddress()` matches only deprecated `fec0::/10`, **not** IPv6 Unique-Local
+  `fc00::/7`; IPv4-mapped forms (`::ffff:10.0.0.1`) and CGNAT `100.64.0.0/10` are also uncaught. A
+  Custom hostname resolving only to those would pass the filter — defeating the owner's chosen
+  airtight guarantee. 14-06 device fixture tests only `127.0.0.1`/RFC1918, so the gap would ship
+  untested. **Fix:** specify the Kotlin predicate as *reject-unless-verifiably-public global unicast*,
+  explicitly unwrap IPv4-mapped IPv6 and re-check, and add `fc00::/7` + `100.64.0.0/10`; add an
+  IPv6-ULA (or IPv4-mapped) escape to the 14-06 device fixture as release-gating. (This implements the
+  owner's airtight H3 mandate more faithfully — it does not reverse it.)
+
+- **C2-H3 — first-send ack is not ordered before egress (source-verified).** Codex H5. 14-05 says
+  "on acknowledge call `acknowledgeProvider`" and tests eventual persistence, but never requires
+  *awaiting the committed ack transaction before* the lifecycle creates the controller / calls
+  `AiService.generate`. A write failure would not block egress. **Fix:** require
+  `await acknowledgeProvider(...)` to resolve before any controller creation / generate call; a write
+  failure keeps egress blocked. Add a deferred-DAO test proving no `generate` call occurs until the
+  commit resolves.
+
+- **C2-H4 — Plan 07 has an undeclared same-wave dependency on Plan 01 (source-verified).** Claude
+  H-N1. 14-07 (`depends_on: []`, `wave: 1`) requires `src/ai/secure-fetch.ts` to import
+  `validateCustomEndpoint` from `@/ai/custom-endpoint` (Plan 01, also wave 1) and grep/tsc/vitest-gates
+  on it — the wave-1 parallel run can execute 07's gate before 01 produces the module. **Fix:** add
+  `depends_on: ["14-01"]` to 14-07 and reflow waves.
+
+- **C2-H5 — Plan 04 has an undeclared same-wave dependency on Plan 02 (source-verified).** Claude
+  H-N2. 14-04 (`depends_on: ["14-01","14-03"]`, `wave: 2`) reads `AiService.ts (Plan 02 …)` and its
+  gate runs `npx vitest run … src/services/AiService.test.ts` — Plan 02's rewritten adapter/test, also
+  wave 2. **Fix:** add `"14-02"` to 14-04 `depends_on` and reflow waves.
+
+### Cycle 2 — actionable non-HIGH concerns
+
+- **C2-M1 — abort→native cancellation race (Codex M4).** 14-07 `cancel(requestId)` can arrive before
+  the native module records the `Call`, becoming a no-op while the request later starts. **Fix:**
+  maintain cancelled-request tombstones checked before enqueue and immediately after registration;
+  remove listeners on settlement; map `Call.isCanceled` to an abort code.
+
+- **C2-M2 — no native compile proof before Plan 02 depends on 07 (Codex M5, source-verified).** 14-07
+  only greps Kotlin; native compilation/autolinking is deferred to the final device gate. **Fix:** add
+  a clean Android prebuild + native Gradle compile/build check to 14-07 before Plan 02 relies on it.
+
+- **C2-M3 — private-resolution/redirect UAT lacks a concrete fixture + observer (Codex M6).** A generic
+  failed request can't distinguish native rejection from TLS/DNS/connectivity failure, nor prove the
+  redirect target received no payload. **Fix:** specify synthetic HTTPS origin/redirect-target
+  fixtures, controlled DNS resolution, valid certs where needed, and sanitized request-observation
+  criteria in 14-06.
+
+- **C2-M4 — FieldDefForm component test is not executable in the current setup (Codex M7,
+  source-verified).** 14-04's gate runs `src/components/field-def-form.test.tsx`, but neither
+  `react-test-renderer` nor `@testing-library/react-native` is installed (Vitest is Node/render-free).
+  **Fix:** extract draft hydration/`share_with_ai` payload construction into a pure tested helper and
+  cover it in Vitest; keep the rendered toggle for the explicit Pixel UAT (preferred over adding
+  renderer tooling to the dependency contract).
+
+- **C2-M5 — Gemini key-in-URL sanitization is untested (Claude L-N5, source-verified).**
+  `GoogleProvider.generate` embeds the key in the URL query (`…?key=${apiKey}`, AiService.ts:318);
+  Plan 02 keeps Gemini on raw `fetch`. **Fix:** add a named Plan 02 test asserting a Gemini failure's
+  sanitized error contains no URL/query string/key.
+
+### Cycle 2 — not counted as actionable
+
+- **VALIDATION.md staleness (Claude L-N4).** The coverage matrix still lists "Plans 01–05/01–06" and
+  omits Plan 07 / `secure-fetch.test.ts` / the M1 integration test. **Already tasked:** 14-06 Task 1
+  is charged with updating the matrix to add Plan 07 + those tests, so this is incorporated, not an
+  open action. (Cycle 3 should nonetheless confirm 14-06 explicitly names the plan-07 rows.)
+
+---
+
 ## Convergence status — Cycle 1 complete, NOT converged (owner gate on one HIGH)
 
 Two independent reviewers (Codex CLI 0.148.0, run manually without the blocked
