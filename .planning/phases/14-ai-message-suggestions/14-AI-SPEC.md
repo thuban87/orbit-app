@@ -5,6 +5,36 @@
 
 ---
 
+## 0. ERRATA — superseded by Cycle 1–4 plan-review decisions (authoritative; C3-M6)
+
+This SPEC predates the owner's Custom-egress decision and the Compose-owned acknowledgement design.
+Where §3–§6 below conflict with the following, **these override the SPEC body** (source of record:
+`14-REVIEWS.md`; implementation: Plans 07/02/05):
+
+1. **Custom transport is NATIVE, not raw `fetch`.** The user-controlled Custom endpoint is sent
+   ONLY through the Plan 07 native module `orbit-secure-fetch` (OkHttp with a custom `Dns` that
+   rejects non-public resolved/literal addresses and pins the vetted IP, `Proxy.NO_PROXY`, and
+   `followRedirects(false)`/`followSslRedirects(false)`). The official OpenAI/Anthropic/Gemini
+   adapters stay on raw `fetch` to fixed public hosts. Any §3 pitfall or guidance saying "adapters
+   send through `fetch`" or "pass `redirect: \"error\"` to Custom requests" is superseded — RN
+   `fetch` does not honor `redirect` on Android; native redirect-disabling owns that control.
+2. **Endpoint validation is URL-literal + connection-time.** `validateCustomEndpoint` (URL-literal
+   layer, full non-public IP-literal set) is the ONLY guard for numeric-IP-literal Custom URLs
+   (OkHttp does not consult the custom `Dns` for literals); a resolving private host is caught
+   natively at connection time. An EMPTY endpoint is a valid "unconfigured" value.
+3. **First-send inspection/acknowledgement lives in COMPOSE, not Settings.** The exact
+   contact-specific `ResolvedPrompt` only exists in Compose; the per-provider acknowledgement is
+   shown and durably persisted there (Plan 05), and the committed ack is ordered strictly BEFORE
+   any egress, with a stale-request recheck after the ack await.
+4. **The no-write generation boundary has ONE carve-out:** the per-provider acknowledgement flag
+   (and the `ai_ack_custom` reset when the Custom endpoint changes) is the only permitted settings
+   write on the AI path. No interaction/`last_contact`/fuel/cache/analytics/export write occurs.
+5. **`generate(input)` carries the immutable `ResolvedPrompt` object** (adapters read
+   `resolvedPrompt.payload`); keys are fetched via an injected accessor at call time, never cached
+   by `refreshProviders`.
+
+---
+
 ## 1. System Classification
 
 **System Type:** Content generation (single-turn editable message draft)
@@ -285,10 +315,13 @@ accept a key from navigation params, SQLite, or the prompt builder.
    401, 429, or 5xx. Check `response.ok` before calling `json()`, then map the status to a
    generic user-facing category; never display the response body, endpoint, request headers, or
    provider error text.
-2. **Letting a Custom URL escape the HTTPS boundary.** Validate with `new URL()` before both save
-   and request: protocol exactly `https:`, no username/password, and a non-empty host. Pass
-   `redirect: "error"` to Custom requests so an HTTPS endpoint cannot redirect an outbound prompt
-   to another location; reject malformed or cleartext URLs rather than trying to repair them.
+2. **Letting a Custom URL escape the HTTPS boundary.** (Superseded transport — see §0.) Validate a
+   non-empty endpoint with `new URL()` before both save and request: protocol exactly `https:`, no
+   username/password, non-empty host, and reject the full non-public IP-literal set (an empty
+   endpoint is the valid "unconfigured" value). Do NOT rely on a `fetch` `redirect: "error"` init
+   for Custom — it is a silent no-op on Android; redirect rejection and private-resolution blocking
+   are enforced by the Plan 07 native module (`orbit-secure-fetch`), through which ALL Custom egress
+   is routed. Reject malformed or cleartext URLs rather than trying to repair them.
 3. **Trusting a typed `response.json()` result.** JSON is `unknown` at the network boundary and
    each provider has a different success shape. Each adapter must validate its expected text
    path, and the shared layer must validate non-empty, bounded draft text before Compose can use
@@ -564,7 +597,7 @@ egress is explicitly approved.
 | Deterministic context allowlist and limit resolver | Any prompt construction | Omit forbidden/unavailable values, enforce rank-preserving limits, show truncation categories, and send only the exact inspected immutable result. |
 | Credential, Custom endpoint, and transport validation | Saving/configuring or starting a request | Block missing key/model, invalid URL, non-HTTPS URL, URL credentials, and redirects; do not repair/fallback to a different endpoint. |
 | Response, lifecycle, and replacement gate | Provider response, Cancel/timeout/unmount, or draft mutation | Reject malformed/empty/overlong results with a generic error; abort/ignore stale results; require replacement confirmation for a non-empty draft; never auto-retry or auto-send. |
-| No-write generation boundary | Every generation path | Keep generation read-only: no interaction, `last_contact`, fuel, settings, cache, analytics, backup, or export write may be performed from the request/result path. |
+| No-write generation boundary | Every generation path | Keep generation read-only EXCEPT the single acknowledgement carve-out (§0.4): the per-provider ack flag (and the `ai_ack_custom` reset on Custom-endpoint change) is the only permitted settings write. No interaction, `last_contact`, fuel, other-settings, cache, analytics, backup, or export write may be performed from the request/result path. |
 
 ### Offline (Flywheel)
 
