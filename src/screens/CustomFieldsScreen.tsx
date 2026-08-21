@@ -43,6 +43,7 @@ import {
   reorderFields,
   restoreField,
   updateFieldCuration,
+  updateFieldShareWithAi,
 } from "@/db/field-defs-dao";
 import {
   applyTypeChange,
@@ -167,6 +168,7 @@ export function CustomFieldsScreen({ onBack }: CustomFieldsScreenProps) {
       const curationChanged =
         draft.show_on_new !== field.show_on_new ||
         draft.always_show !== field.always_show;
+      const shareChanged = draft.share_with_ai !== field.share_with_ai;
       const typeChanged = draft.type !== field.type;
       const optionsChanged = draft.options !== field.options;
 
@@ -206,6 +208,17 @@ export function CustomFieldsScreen({ onBack }: CustomFieldsScreenProps) {
           field.id,
           draft.show_on_new,
           draft.always_show,
+          localDateTime(),
+        );
+      }
+      // AI-sharing opt-in — persisted via its own DEFS-row flag writer so a
+      // toggled opt-in survives the edit (H7). Same standalone-transaction idiom
+      // as the curation write; never composed inside an outer transaction.
+      if (shareChanged) {
+        await updateFieldShareWithAi(
+          exec,
+          field.id,
+          draft.share_with_ai,
           localDateTime(),
         );
       }

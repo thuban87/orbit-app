@@ -7,13 +7,16 @@
  * `makeColName` over the caller's existing-col_name set (built from
  * `listDefs({ includeQuarantined: true })` so a re-created label cannot collide
  * with a quarantined field's still-present column), minting `uid` via
- * `newUid`, taking the append `display_order` the caller supplies, stamping
- * `now` via `localDateTime` (written to BOTH created_at and modified_at), and
- * defaulting `share_with_ai` to 0 (no toggle this phase — deferred to Phase 14,
- * so surfacing one would be dead UI). On EDIT it emits the edited draft; the
- * caller (CustomFieldsScreen) diffs it against the original def and routes each
- * change through the matching DAO op (rename / changeFieldOptions /
- * updateFieldCuration / the pre-flight + applyTypeChange flow).
+ * `newUid`, taking the append `display_order` the caller supplies, and stamping
+ * `now` via `localDateTime` (written to BOTH created_at and modified_at). The
+ * create-default / edit-hydration of every editor field — including the Phase-14
+ * `share_with_ai` AI-sharing opt-in (OFF by default on create, hydrated from the
+ * stored value on edit) — lives in the node-tested `field-def-form-logic`
+ * helpers; the JSX only binds the themed `Switch` to `draft.share_with_ai`. On
+ * EDIT it emits the edited draft; the caller (CustomFieldsScreen) diffs it
+ * against the original def and routes each change through the matching DAO op
+ * (rename / changeFieldOptions / updateFieldCuration / updateFieldShareWithAi /
+ * the pre-flight + applyTypeChange flow).
  *
  * A live `FieldValueInput` preview renders the currently-selected type so the
  * owner can see the field's input at the --to 3 gate; the photo type shows the
@@ -30,6 +33,11 @@ import {
   TextInput,
   View,
 } from "react-native";
+import {
+  draftToFieldFields,
+  type FieldDefDraft,
+  hydrateFieldDefDraft,
+} from "@/components/field-def-form-logic";
 import { FieldValueInput } from "@/components/FieldValueInput";
 import { makeColName } from "@/db/col-name";
 import { localDateTime } from "@/db/database";
@@ -37,6 +45,10 @@ import type { CustomFieldDef, NewFieldDef, SqliteBool } from "@/db/field-types";
 import { newUid } from "@/db/uid";
 import type { FieldType } from "@/schemas/types";
 import { useTheme } from "@/theme";
+
+// Re-export so existing consumers (CustomFieldsScreen) keep importing the draft
+// type from the component; the canonical definition now lives in the pure logic.
+export type { FieldDefDraft } from "@/components/field-def-form-logic";
 
 /** Human labels for the 7 FieldType values (picker order mirrors the union). */
 const FIELD_TYPES: ReadonlyArray<{ value: FieldType; label: string }> = [
@@ -48,15 +60,6 @@ const FIELD_TYPES: ReadonlyArray<{ value: FieldType; label: string }> = [
   { value: "number", label: "Number" },
   { value: "photo", label: "Photo" },
 ];
-
-/** The edited-definition delta the caller diffs against the original def. */
-export interface FieldDefDraft {
-  label: string;
-  type: FieldType;
-  options: string | null;
-  show_on_new: SqliteBool;
-  always_show: SqliteBool;
-}
 
 interface CreateProps {
   mode: "create";
@@ -112,13 +115,18 @@ export function FieldDefForm(props: FieldDefFormProps) {
   const { colors } = useTheme();
 
   const initial = props.mode === "edit" ? props.field : null;
-  const [label, setLabel] = useState(initial?.label ?? "");
-  const [type, setType] = useState<FieldType>(initial?.type ?? "text");
+  // Seed every editor field through the node-tested hydration helper so the
+  // create-default (share_with_ai OFF) and edit-hydration (from the stored value)
+  // decision is proven off-device (C2-M4 / H7).
+  const seed = useMemo(() => hydrateFieldDefDraft(initial), [initial]);
+  const [label, setLabel] = useState(seed.label);
+  const [type, setType] = useState<FieldType>(seed.type);
   const [optionRows, setOptionRows] = useState<string[]>(
-    initial ? parseOptions(initial.options) : [],
+    parseOptions(seed.options),
   );
-  const [showOnNew, setShowOnNew] = useState(initial?.show_on_new === 1);
-  const [alwaysShow, setAlwaysShow] = useState(initial?.always_show === 1);
+  const [showOnNew, setShowOnNew] = useState(seed.show_on_new === 1);
+  const [alwaysShow, setAlwaysShow] = useState(seed.always_show === 1);
+  const [shareWithAi, setShareWithAi] = useState(seed.share_with_ai === 1);
   // A live, throwaway value so the owner can drive the previewed widget.
   const [previewValue, setPreviewValue] = useState<string | null>(null);
 
@@ -146,32 +154,31 @@ export function FieldDefForm(props: FieldDefFormProps) {
 
   function handleSubmit() {
     if (!canSubmit) return;
-    const trimmedLabel = label.trim();
-    if (props.mode === "create") {
-      const now = localDateTime();
-      const colName = makeColName(trimmedLabel, props.existingColNames);
-      const def: NewFieldDef = {
-        uid: newUid(),
-        col_name: colName,
-        label: trimmedLabel,
-        type,
-        options,
-        show_on_new: toBool(showOnNew),
-        always_show: toBool(alwaysShow),
-        display_order: props.nextDisplayOrder,
-        share_with_ai: 0,
-        now,
-      };
-      props.onSubmit(def);
-      return;
-    }
-    props.onSubmit({
-      label: trimmedLabel,
+    // Assemble the live draft, then project it to the draft-derived fields via the
+    // node-tested builder — carrying the toggled share_with_ai into BOTH paths so
+    // the edit path can no longer silently drop it (H7).
+    const draft: FieldDefDraft = {
+      label: label.trim(),
       type,
       options,
       show_on_new: toBool(showOnNew),
       always_show: toBool(alwaysShow),
-    });
+      share_with_ai: toBool(shareWithAi),
+    };
+    const fields = draftToFieldFields(draft);
+    if (props.mode === "create") {
+      // The component supplies the create-only metadata around the draft fields.
+      const def: NewFieldDef = {
+        ...fields,
+        uid: newUid(),
+        col_name: makeColName(fields.label, props.existingColNames),
+        display_order: props.nextDisplayOrder,
+        now: localDateTime(),
+      };
+      props.onSubmit(def);
+      return;
+    }
+    props.onSubmit(draft);
   }
 
   return (
@@ -318,6 +325,26 @@ export function FieldDefForm(props: FieldDefFormProps) {
         />
       </View>
 
+      {/* AI-sharing opt-in (AI-01) — OFF by default; only a deliberate opt-in
+          marks this field's value eligible for an AI suggestion payload. */}
+      <View style={styles.switchRow}>
+        <Text style={[styles.switchLabel, { color: colors.textPrimary }]}>
+          Share with AI suggestions
+        </Text>
+        <Switch
+          testID="field-def-share-with-ai"
+          accessibilityLabel="Share with AI suggestions"
+          value={shareWithAi}
+          onValueChange={setShareWithAi}
+          trackColor={{ false: colors.border, true: colors.accent }}
+          thumbColor={colors.surfaceElevated}
+        />
+      </View>
+      <Text style={[styles.helper, { color: colors.textSecondary }]}>
+        Off by default. When on, this field's value can be included in an AI
+        message suggestion — only if you enable AI and choose a provider.
+      </Text>
+
       {/* Live preview of the selected type's value widget */}
       <Text style={[styles.fieldLabel, { color: colors.textSecondary }]}>
         Preview
@@ -443,6 +470,11 @@ const styles = StyleSheet.create({
     fontSize: 15,
     flex: 1,
     paddingRight: 12,
+  },
+  helper: {
+    fontSize: 13,
+    lineHeight: 18,
+    marginTop: 4,
   },
   preview: {
     borderWidth: 1,

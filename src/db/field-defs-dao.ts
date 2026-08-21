@@ -131,6 +131,30 @@ export function updateFieldCuration(
 }
 
 /**
+ * Persist the per-field AI-sharing opt-in (`share_with_ai`, AI-01 / H7). A single
+ * DEFS-ROW flag write — the physical value column and every other def field are
+ * untouched — through the SAME `inWriteTransaction` + `changes===1` idiom as the
+ * sibling flag writers. This is the writer the edit path calls so a toggled opt-in
+ * PERSISTS (the currently-broken silent-drop): the create default (0) is set by
+ * `createField`; only this op changes it afterwards. No dynamic-column path, no
+ * `contact_custom_values` touch — `readPromptContext` reads `share_with_ai=1` defs.
+ */
+export function updateFieldShareWithAi(
+  exec: SqlExecutor,
+  id: number,
+  shareWithAi: SqliteBool,
+  now: string,
+): Promise<void> {
+  return inWriteTransaction(exec, async () => {
+    const result = await exec.runAsync(
+      "UPDATE custom_field_defs SET share_with_ai = ?, modified_at = ? WHERE id = ?",
+      [shareWithAi, now, id],
+    );
+    assertOneChange("updateFieldShareWithAi", id, result.changes);
+  });
+}
+
+/**
  * Quarantine a field (soft-delete): stamp `quarantined_at`. Data + column are
  * untouched.
  */
