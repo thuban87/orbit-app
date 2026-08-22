@@ -29,7 +29,7 @@ onto the dossier domains; a `[DECIDED]`/`[REJECTED]` decision is implemented, ne
 - [x] **Phase 11: Actionable Notifications** — pre-scheduled + launch-reconcile engine, decay + birthday, headless actions, mute, settings. (completed 2026-08-16)
 - [x] **Phase 12: Home Screen Widget** — favourites grid, headless mark, Quick mark · Log contact · Message, add-widget button. (completed 2026-08-17)
 - [x] **Phase 13: Orrery** — the two-view Skia solar system, rogue rendering, assignable/self-colour sun, ambient layer. (completed 2026-08-18)
-- [ ] **Phase 14: AI Message Suggestions** — providers + keys, editable-draft flow, prompt assembly, `share_with_ai`.
+- [x] **Phase 14: AI Message Suggestions** — providers + keys, editable-draft flow, prompt assembly, `share_with_ai`. ✅ owner-accepted 2026-08-22
 - [ ] **Phase 15: Weekly Digest** — one WEEKLY Sunday notification → a live "your week" screen.
 - [ ] **Phase 16: Backup, Export & Restore** — manual + auto SAF backup, optional encryption, Merge/Replace restore, forward-migrate.
 
@@ -580,6 +580,6 @@ Plans:
 | 11. Actionable Notifications | 13/13 | Complete   | 2026-08-16 |
 | 12. Home Screen Widget | 8/8 | Complete   | 2026-08-17 |
 | 13. Orrery | 8/8 | Complete   | 2026-08-18 |
-| 14. AI Message Suggestions | 6/7 (+gap iters 08→10, 09→11) | LiteLLM-sourced picker + frontier-3 + cap removed; node-verified (1305/1305) + device-UAT'd (picker verified, drafts owner-confirmed, egress guard smoke-PASS); owner release sign-off + push remain | - |
+| 14. AI Message Suggestions | 7/7 (+gap iters 08→10, 09→11) | Complete — owner-accepted (LiteLLM picker + frontier-3 + cap removed; node 1305/1305 + device-UAT'd; egress smoke-PASS). Local on main, not pushed | 2026-08-22 |
 | 15. Weekly Digest | 0/TBD | Not started | - |
 | 16. Backup, Export & Restore | 0/TBD | Not started | - |

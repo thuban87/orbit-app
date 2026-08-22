@@ -129,4 +129,14 @@ Per owner decision, the release-gating egress matrix was scoped to a **single on
 
 **Not covered (accepted per owner's smoke-test scope):** the full 7-case matrix with active zero-delivery listeners (redirect, IPv6-ULA, IPv4-mapped, proxy, direct IP-literal). Rests on the green JVM/Kotlin vector tests. The final release-approval decision line remains the owner's to record.
 
-**Cleanup note:** a throwaway Custom config was left on the device (endpoint `8-8-8-8.nip.io`, dummy model/key; the gemini key was removed for safety). Reset before real use.
+**Cleanup note:** a throwaway Custom config was left on the device (endpoint `8-8-8-8.nip.io`, dummy model/key; the gemini key was removed for safety, and the owner subsequently revoked the disposable key). Reset before real use.
+
+---
+
+## Owner decision — Phase 14 (2026-08-22)
+
+**APPROVED.** The owner accepts Phase 14 (AI Message Suggestions) as complete.
+
+Recorded honestly for the audit trail: the release-gating on-device egress escape matrix — originally resolved under **H3** as "all escape/redirect fixtures gate release," with the owner having *declined* weakening the guard (the `/32` carve-outs, "recorded intentional") — was **deliberately scoped down by the owner** on 2026-08-22 to a **single on-device smoke test**. That smoke test PASSED (native `OrbitSecureFetchModule` fires; address-specific block confirmed via a public control; first-send ack + exact-prompt inspector confirmed). The remaining sub-cases (HTTPS redirect, IPv6-ULA, IPv4-mapped, system-proxy, direct IP-literal — each with an active zero-delivery observer) were **not** exercised on-device and rest on the green JVM/Kotlin address-predicate tests (`secure-fetch.test.ts` + `OrbitSecureFetchModuleTest` over the shared `non-public-vectors.json`). This knowingly relaxes the original full-matrix release gate; the owner made this call explicitly after weighing it as a shipped-product control (not a personal-app edge case). Recorded intentional.
+
+Also accepted this cycle: the model list is now LiteLLM-sourced with a user-tap refresh (14-10), the frontier picker is the 3 latest-per-tier ids per provider (14-11), and the artificial output-token cap was removed (14-11). The Custom BYO-endpoint feature was **kept** (owner declined removing it).
