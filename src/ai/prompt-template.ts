@@ -41,10 +41,16 @@ export const PER_VALUE_LIMIT = 300;
 /** Max ranked fuel entries carried into a prompt, in rank order. */
 export const MAX_RANKED_FUEL = 8;
 /**
- * Output ceiling handed to adapters (AI-SPEC §4 — 120 tokens). The resolver does
- * not emit output; this is the shared source of the bound for Plan 02/05.
+ * Output budget handed to adapters. NOTE: for THINKING models (Gemini 2.5/3.x)
+ * this budget is spent on reasoning tokens BEFORE any message text — measured
+ * ~364 thinking tokens for a ~21-token reply (14-06 device UAT) — so the AI-SPEC §4
+ * value of 120 left ZERO room and produced empty/truncated drafts on device. Raised
+ * to 1024 for thinking headroom; the actual message length stays bounded by the
+ * separate MAX_DRAFT_CODE_POINTS (1,200) cap in AiService, so drafts don't balloon.
+ * The full per-provider / thinking-aware token strategy is being formalised in the
+ * Phase-14 model gap plan (which also supersedes the AI-SPEC §4 number).
  */
-export const MAX_OUTPUT_TOKENS = 120;
+export const MAX_OUTPUT_TOKENS = 1_024;
 
 /** The placeholder emitted for any unknown / dropped / blank value. */
 const NONE_AVAILABLE = "None available";
