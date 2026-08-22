@@ -45,12 +45,15 @@ export const MAX_RANKED_FUEL = 8;
  * this budget is spent on reasoning tokens BEFORE any message text — measured
  * ~364 thinking tokens for a ~21-token reply (14-06 device UAT) — so the AI-SPEC §4
  * value of 120 left ZERO room and produced empty/truncated drafts on device. Raised
- * to 1024 for thinking headroom; the actual message length stays bounded by the
+ * to 2048 for thinking headroom; the actual message length stays bounded by the
  * separate MAX_DRAFT_CODE_POINTS (1,200) cap in AiService, so drafts don't balloon.
- * The full per-provider / thinking-aware token strategy is being formalised in the
- * Phase-14 model gap plan (which also supersedes the AI-SPEC §4 number).
+ * (1024 still truncated richer prompts on device — measured 702–886 THINKING tokens
+ * for a fuel-rich contact, which alone can exhaust a smaller budget mid-sentence.)
+ * This is a stopgap: the robust fix is a per-provider, thinking-aware budget — e.g.
+ * a Gemini `thinkingConfig.thinkingBudget` cap so reasoning can't crowd out output —
+ * formalised in the Phase-14 model gap plan (which also supersedes AI-SPEC §4).
  */
-export const MAX_OUTPUT_TOKENS = 1_024;
+export const MAX_OUTPUT_TOKENS = 2_048;
 
 /** The placeholder emitted for any unknown / dropped / blank value. */
 const NONE_AVAILABLE = "None available";
