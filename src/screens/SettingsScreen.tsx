@@ -3,7 +3,7 @@ import DateTimePicker, {
 } from "@react-native-community/datetimepicker";
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   FlatList,
   Modal,
@@ -16,6 +16,17 @@ import {
   View,
 } from "react-native";
 import { requestPinWidget } from "react-native-android-widget";
+import {
+  loadCachedCatalog,
+  refreshModelCatalog,
+} from "@/ai/model-catalog-cache";
+import type { ModelCatalog } from "@/ai/model-catalog-filter";
+import { createFileCatalogStorage } from "@/ai/model-catalog-storage";
+import {
+  modelsFor,
+  resolveActiveCatalog,
+  SEED_CATALOG,
+} from "@/ai/model-registry";
 import { PhotoSourcePicker } from "@/components/PhotoSourcePicker";
 import {
   type AppSettings,
@@ -29,30 +40,30 @@ import { getProfile } from "@/db/profile-dao";
 import { listSunCandidates, type SunCandidate } from "@/db/sun-picker-read";
 import { sunOccupantIsSelf } from "@/logic/sun-occupant-logic";
 import type { RootStackParamList } from "@/navigation/types";
+import { AiService } from "@/services/AiService";
 import { aiKeyStore } from "@/services/ai-key-store";
 import {
   AI_PROVIDER_IDS,
   type AiCloudProviderId,
   type AiProviderId,
 } from "@/services/ai-types";
-import { AiService } from "@/services/AiService";
 import { reconcileSchedule } from "@/services/notifications/notification-schedule";
 import {
   getNotificationPermission,
   requestNotificationPermission,
 } from "@/services/notifications/permission";
+import { useAiModelPrefs } from "@/stores/ai-model-prefs-store";
 import { useTheme } from "@/theme";
 import { Logger } from "@/utils/logger";
+import { pinResultCopy } from "./settings-add-widget";
 import {
   buildAiSettingsPatch,
-  curatedModelsFor,
   CUSTOM_RETENTION_CAVEAT,
   discoverModelsForField,
   type ModelFieldState,
   providerDisplayName,
   validateEndpointForSave,
 } from "./settings-ai-logic";
-import { pinResultCopy } from "./settings-add-widget";
 
 const LOG_SCOPE = "settings-screen";
 
@@ -142,6 +153,34 @@ export function SettingsScreen() {
   const [aiModelAdvancedOpen, setAiModelAdvancedOpen] = useState(false);
   const [aiEndpointError, setAiEndpointError] = useState<string | null>(null);
   const [aiStatus, setAiStatus] = useState<string | null>(null);
+
+  // The LiteLLM-sourced model catalog the picker renders from (14-10). Starts on
+  // the BUNDLED seed (offline/first-run) and is overridden by the on-device cache
+  // once loaded/refreshed. `modelScope` (Frontier only / All models) is a persisted
+  // device-local UI preference in the AsyncStorage prefs store, not app_settings.
+  const [modelCatalog, setModelCatalog] = useState<ModelCatalog>(SEED_CATALOG);
+  const [aiRefreshing, setAiRefreshing] = useState(false);
+  const modelScope = useAiModelPrefs((s) => s.modelScope);
+  const setModelScope = useAiModelPrefs((s) => s.setModelScope);
+  // The device FS-backed cache store — a stable instance for the screen's lifetime.
+  const catalogStorage = useMemo(() => createFileCatalogStorage(), []);
+
+  // Load the on-device catalog cache ONCE on mount. This is a LOCAL file read (no
+  // network — local-first), so it is safe on a read path; a missing/corrupt cache
+  // resolves to the bundled seed. The network refresh is user-instigated ONLY (the
+  // "Refresh models" tap below), never here.
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      const cached = await loadCachedCatalog(catalogStorage);
+      if (!cancelled && cached) {
+        setModelCatalog(resolveActiveCatalog(cached));
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [catalogStorage]);
 
   // The AI service is stateless between calls; a single instance suffices for
   // on-demand model discovery. It reads keys through the app-wide `aiKeyStore`.
@@ -425,7 +464,7 @@ export function SettingsScreen() {
       setAiStatus("Enter a model name manually.");
       return;
     }
-    const state = await discoverModelsForField(aiProvider, () =>
+    const state = await discoverModelsForField(aiProvider, modelScope, () =>
       provider.listModels(),
     );
     setAiModelField(state);
@@ -434,7 +473,43 @@ export function SettingsScreen() {
         ? `Found ${state.models.length} model${state.models.length === 1 ? "" : "s"}.`
         : "No model list available — enter a model name manually.",
     );
-  }, [aiProvider, aiModel, aiCustomEndpoint, aiCustomModel, aiService]);
+  }, [
+    aiProvider,
+    aiModel,
+    aiCustomEndpoint,
+    aiCustomModel,
+    aiService,
+    modelScope,
+  ]);
+
+  // User-instigated "Refresh models" — the ONLY place the runtime LiteLLM fetch
+  // fires (never on a read path). A PLAIN public GET (no key, no user/contact
+  // data), NOT the Custom `orbit-secure-fetch` transport. On success the on-device
+  // cache is written and the picker re-renders from the fresh catalog; any failure
+  // degrades gracefully (the existing catalog/seed stays, free-text still works).
+  const onRefreshModels = useCallback(async () => {
+    setAiRefreshing(true);
+    setAiStatus("Refreshing model list…");
+    try {
+      const fresh = await refreshModelCatalog({
+        fetchImpl: (url, init) => fetch(url, init),
+        storage: catalogStorage,
+      });
+      setModelCatalog(fresh);
+      const count =
+        aiProvider === "openai" ||
+        aiProvider === "anthropic" ||
+        aiProvider === "google"
+          ? fresh.models[aiProvider].length
+          : 0;
+      setAiStatus(`Model list updated (${count} available).`);
+    } catch (err) {
+      Logger.warn(LOG_SCOPE, "model refresh failed", err);
+      setAiStatus("Couldn't refresh models — using the saved list.");
+    } finally {
+      setAiRefreshing(false);
+    }
+  }, [aiProvider, catalogStorage]);
 
   // Persist the NON-SECRET config. The Custom endpoint is validated up front
   // (H2); an invalid one blocks the save and surfaces an inline reason. The key
@@ -1053,9 +1128,30 @@ export function SettingsScreen() {
                 <Text style={[styles.rowLabel, { color: colors.textPrimary }]}>
                   Model
                 </Text>
-                {/* DEFAULT: curated frontier chat models (bundled, no key/network). */}
+
+                {/* Frontier only / All models — a persisted display toggle. The
+                    picker re-renders live from the cached LiteLLM catalog per
+                    selection (14-10). Exact ids always come from the catalog. */}
+                <View style={styles.aiScopeRow}>
+                  <Text
+                    style={[styles.rowLabel, { color: colors.textPrimary }]}
+                  >
+                    {modelScope === "frontier" ? "Frontier only" : "All models"}
+                  </Text>
+                  <Switch
+                    testID="settings-ai-model-scope"
+                    accessibilityLabel="Show frontier models only"
+                    value={modelScope === "frontier"}
+                    onValueChange={(on: boolean) =>
+                      setModelScope(on ? "frontier" : "all")
+                    }
+                  />
+                </View>
+
+                {/* DEFAULT picker: the LiteLLM-sourced catalog (cache-or-seed)
+                    filtered by the active scope — no API key, no network. */}
                 <View style={styles.aiChipRow}>
-                  {curatedModelsFor(aiProvider).map((m) => {
+                  {modelsFor(modelCatalog, aiProvider, modelScope).map((m) => {
                     const selected = m === aiModel;
                     return (
                       <Pressable
@@ -1091,8 +1187,24 @@ export function SettingsScreen() {
                   })}
                 </View>
                 <Text style={[styles.helper, { color: colors.textSecondary }]}>
-                  Curated current models — no API key needed to choose one.
+                  Model list from LiteLLM's public catalog — no API key needed
+                  to choose one.
                 </Text>
+
+                {/* User-instigated refresh: a plain public GET of LiteLLM's model
+                    catalog (no key, no personal data), never on a read path. */}
+                <Pressable
+                  testID="settings-ai-refresh-models"
+                  accessibilityRole="button"
+                  accessibilityLabel="Refresh model list"
+                  disabled={aiRefreshing}
+                  onPress={() => void onRefreshModels()}
+                  style={[styles.aiButton, { borderColor: colors.border }]}
+                >
+                  <Text style={{ color: colors.accent }}>
+                    {aiRefreshing ? "Refreshing…" : "Refresh models"}
+                  </Text>
+                </Pressable>
 
                 {/* ADVANCED: key-gated Discover (frontier-filtered) + free-text. */}
                 <Pressable
@@ -1592,6 +1704,12 @@ const styles = StyleSheet.create({
   aiChipRow: {
     flexDirection: "row",
     flexWrap: "wrap",
+    gap: 8,
+  },
+  aiScopeRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     gap: 8,
   },
   aiChip: {

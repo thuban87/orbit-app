@@ -1,104 +1,121 @@
 /**
- * Curated frontier chat-model registry — BUNDLED, node-pure static data (Plan 14-08).
+ * Catalog-driven model registry (14-10 — SUPERSEDES the 14-08 hand-curated arrays).
  *
- * WHY THIS MODULE EXISTS:
- *   The model picker used to render whatever a provider's raw catalog returned,
- *   which (per the 14-06 device UAT) meant a key was required just to see any list
- *   AND the list still offered deprecated ids (the Gemini 2.5 flash line, which
- *   404s "no longer available to new users" on a fresh key) plus wholly irrelevant
- *   non-chat families (tts / image / embedding / robotics / lyria / …). Provider
- *   `listModels` metadata does NOT flag deprecation, so runtime filtering alone
- *   cannot hide a dead-but-still-listed model (D-02). A curated allowlist is the
- *   only reliable fix, and shipping it as in-app data means the DEFAULT picker
- *   needs no key and makes ZERO network calls (local-first — D-01).
+ * WHY THIS MODULE CHANGED:
+ *   14-08 shipped three hand-typed frontier arrays (OPENAI/ANTHROPIC/GOOGLE), which
+ *   the owner had explicitly required be SOURCED from LiteLLM's maintained catalog
+ *   instead — a hand list goes stale within a release. This module now reads an
+ *   injected `ModelCatalog` (the on-device cache, or the bundled seed fallback) and
+ *   applies the user's "Frontier only / All models" scope. The catalog itself is
+ *   produced by `filterLiteLLMCatalog`; the ONLY thing maintained by hand here is
+ *   the short frontier-family GLOB set below — and even that only NARROWS ids that
+ *   always come from the live catalog.
  *
  * PURITY CONTRACT (grep-enforced by the test suite):
- *   This module imports ONLY the provider-id TYPE. It performs no I/O and never
- *   reaches the network — there is no default-path code that transmits anything.
- *
- * KEEPING IT CURRENT (D-06):
- *   The three per-provider arrays below are the ONLY thing to edit when a provider
- *   ships or retires a frontier model — a single-array change. The ids were
- *   verified against each provider's live model list at execution time (recorded
- *   in 14-08-SUMMARY.md); they are NOT planner guesses. Discovery + free-text
- *   remain the escape hatches for anything not (yet) curated (D-04/D-05).
+ *   No I/O and no network. The seed is bundled static data; the cache is read by
+ *   the separate `model-catalog-cache` I/O module and PASSED IN. Free-text entry
+ *   remains the escape hatch for any model not in the catalog.
  */
+import type { CatalogProvider, ModelCatalog } from "@/ai/model-catalog-filter";
+import { MODEL_CATALOG_SEED } from "@/ai/model-registry.seed.generated";
 import type { AiProviderId } from "@/services/ai-types";
 
-// ─── Tunable curated frontier lists (top-of-file — single-array edit per D-06) ──
+/** The bundled seed catalog — the offline / first-run fallback (D-01). */
+export const SEED_CATALOG: ModelCatalog = MODEL_CATALOG_SEED;
+
+/** The picker scope: the current-gen frontier subset, or the full chat set. */
+export type ModelScope = "frontier" | "all";
+
+// ─── Tunable frontier family globs (top-of-file — CLAUDE.md tunable-constants) ──
 //
-// Scope per provider = the current frontier CHAT tiers only (D-05):
-//   flagship / balanced / cheap-fast — never a tts/image/embedding/etc. family.
-// Ordered flagship-first; the screen renders them in this order.
+// The SINGLE hand-maintained knob. Each entry is a GLOB where `*` matches any run
+// of characters; a bare stem (e.g. `gpt-5*`) also matches the stem exactly. Exact
+// model ids ALWAYS come from the LiteLLM catalog — these patterns only pick which
+// FAMILIES count as "current-gen frontier". Update a pattern when a provider ships
+// a new frontier generation; never hand-list an individual id here.
+export const FRONTIER_PATTERNS: Record<CatalogProvider, readonly string[]> = {
+  openai: ["gpt-5*"],
+  anthropic: ["claude-*-5", "claude-haiku-4-5"],
+  google: ["gemini-3*"],
+};
 
-/** OpenAI GPT-5.x chat tiers (flagship / mini / nano). */
-const OPENAI_FRONTIER: readonly string[] = Object.freeze([
-  "gpt-5.5",
-  "gpt-5.4-mini",
-  "gpt-5.4-nano",
-]);
-
-/** Anthropic Claude chat tiers (Opus / Sonnet / Haiku). */
-const ANTHROPIC_FRONTIER: readonly string[] = Object.freeze([
-  "claude-opus-5",
-  "claude-sonnet-5",
-  "claude-haiku-4-5",
-]);
-
-/** Google Gemini 3.x chat tiers (Flash / Flash-Lite / Pro). */
-const GOOGLE_FRONTIER: readonly string[] = Object.freeze([
-  "gemini-3.7-flash",
-  "gemini-3.5-flash-lite",
-  "gemini-3.1-pro-preview",
-]);
-
-/** The single frozen empty list reused for `none`/`custom` (free-text only). */
+/** The frozen empty list reused for `none`/`custom` and no-match results. */
 const EMPTY: readonly string[] = Object.freeze([]);
 
-/**
- * The curated allowlist keyed by provider id. `none` and `custom` are DELIBERATELY
- * empty: `none` disables generation, and Custom is free-text only (C4-M1).
- */
-const CURATED: Record<AiProviderId, readonly string[]> = Object.freeze({
-  none: EMPTY,
-  openai: OPENAI_FRONTIER,
-  anthropic: ANTHROPIC_FRONTIER,
-  google: GOOGLE_FRONTIER,
-  custom: EMPTY,
-});
+/** The three cloud providers that have a catalog (none/custom do not). */
+function asCatalogProvider(provider: AiProviderId): CatalogProvider | null {
+  return provider === "openai" ||
+    provider === "anthropic" ||
+    provider === "google"
+    ? provider
+    : null;
+}
 
-/**
- * The curated frontier chat models for a provider — the BUNDLED default picker.
- * Returns a frozen, ordered array (empty for `none`/`custom`). No key, no network.
- */
-export function bundledModelsFor(provider: AiProviderId): readonly string[] {
-  return CURATED[provider] ?? EMPTY;
+/** Compile a single frontier glob into an anchored, case-insensitive RegExp. */
+function globToRegExp(pattern: string): RegExp {
+  const body = pattern
+    .split("*")
+    .map((seg) => seg.replace(/[.+?^${}()|[\]\\]/g, "\\$&"))
+    .join(".*");
+  return new RegExp(`^${body}$`, "i");
+}
+
+/** True when `id` matches ANY of the provider's frontier globs (case-insensitive). */
+export function matchesFrontier(
+  provider: CatalogProvider,
+  id: string,
+): boolean {
+  return FRONTIER_PATTERNS[provider].some((pat) => globToRegExp(pat).test(id));
 }
 
 /**
- * Narrow a raw discovered id list to the provider's curated frontier set (D-04).
- *
- * Discovery (advisory, key-gated) returns the provider's full catalog; this aligns
- * it with the curated frontier — intersecting by id (case-insensitive), preserving
- * the discovered order, and de-duplicating. Everything else falls away: the
- * non-chat families (tts/image/embedding/robotics/lyria/…), any deprecated id the
- * catalog still lists, and anything simply not curated. A legitimate model that is
- * not (yet) curated stays reachable via free-text entry, so nothing is permanently
- * hidden. `none`/`custom` have no curated set, so the result is always empty.
+ * Resolve the ACTIVE catalog the picker renders from: the on-device cache OVERRIDES
+ * the bundled seed once the user has refreshed; a `null` cache (offline / first run
+ * / corrupt) falls back to the seed. This is the cache-overrides-seed rule in one
+ * place — the caller loads the cache (I/O) and passes it (or null) in.
+ */
+export function resolveActiveCatalog(
+  cached: ModelCatalog | null,
+): ModelCatalog {
+  return cached ?? SEED_CATALOG;
+}
+
+/**
+ * The picker model list for a provider under the active scope. `none`/`custom`
+ * always yield an empty list (Custom is free-text only — C4-M1). `all` returns the
+ * provider's full deprecation-filtered chat set (catalog order); `frontier`
+ * narrows it to the frontier globs. Always returns a frozen array.
+ */
+export function modelsFor(
+  catalog: ModelCatalog,
+  provider: AiProviderId,
+  scope: ModelScope,
+): readonly string[] {
+  const cp = asCatalogProvider(provider);
+  if (!cp) return EMPTY;
+  const all = catalog.models[cp] ?? EMPTY;
+  if (scope === "all") return Object.freeze([...all]);
+  return Object.freeze(all.filter((id) => matchesFrontier(cp, id)));
+}
+
+/**
+ * Narrow a RAW discovered id list (a provider adapter's `listModels`, or any other
+ * catalog) to the provider's frontier globs (14-10 evolution of the 14-08 curated
+ * intersection). Preserves discovered order, de-duplicates case-insensitively, and
+ * returns empty for `none`/`custom`. Free-text stays the escape hatch for anything
+ * outside the frontier families.
  */
 export function filterToFrontier(
   provider: AiProviderId,
   discovered: readonly string[],
 ): readonly string[] {
-  const allow = new Set(
-    bundledModelsFor(provider).map((id) => id.toLowerCase()),
-  );
-  if (allow.size === 0) return EMPTY;
+  const cp = asCatalogProvider(provider);
+  if (!cp) return EMPTY;
   const seen = new Set<string>();
   const kept: string[] = [];
   for (const id of discovered) {
     const key = id.toLowerCase();
-    if (allow.has(key) && !seen.has(key)) {
+    if (!seen.has(key) && matchesFrontier(cp, id)) {
       seen.add(key);
       kept.push(id);
     }

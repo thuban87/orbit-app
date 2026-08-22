@@ -1,135 +1,152 @@
 /**
- * Curated frontier model-registry contract — node-tested off-device (C2-M4).
+ * Catalog-driven model registry — node-tested off-device (14-10, supersedes the
+ * 14-08 hand-curated arrays).
  *
- * These pin the curation invariants that the picker relies on (Plan 14-08):
- *   - The default list is BUNDLED static data — non-empty, frozen, and ordered —
- *     for the three cloud chat providers, and empty for `none`/`custom` (Custom is
- *     free-text only — C4-M1). No API key or network is needed to obtain it (D-01).
- *   - No curated id is a deprecated or non-chat model (D-02/D-05): the assertions
- *     read the CONTENT of the returned arrays, so head-comment prose cannot make a
- *     passing test lie.
- *   - `filterToFrontier` narrows a raw discovered catalog to the curated frontier
- *     set (D-04): it drops the non-chat families (tts/image/embedding/robotics/
- *     lyria/…) and the known-dead UAT id, keeps the curated ids, preserves the
- *     discovered order, and de-duplicates.
+ * These pin the invariants the picker relies on now that the model set is SOURCED
+ * from LiteLLM (never hand-typed):
+ *   - `modelsFor` reads an injected catalog (cache-or-seed) and applies the
+ *     "Frontier only / All models" scope; `none`/`custom` always return empty
+ *     (Custom is free-text only — C4-M1);
+ *   - `FRONTIER_PATTERNS` is the ONLY hand-maintained knob — a short per-provider
+ *     set of family GLOBS; exact ids ALWAYS come from the catalog;
+ *   - `resolveActiveCatalog` makes the on-device cache OVERRIDE the bundled seed,
+ *     and falls back to the seed when there is no cache (offline / first run);
+ *   - `filterToFrontier` narrows a raw discovered catalog to the frontier globs.
  */
 import { describe, expect, it } from "vitest";
-import { bundledModelsFor, filterToFrontier } from "@/ai/model-registry";
-import { AI_PROVIDER_IDS } from "@/services/ai-types";
+import type { ModelCatalog } from "@/ai/model-catalog-filter";
+import {
+  FRONTIER_PATTERNS,
+  filterToFrontier,
+  matchesFrontier,
+  modelsFor,
+  resolveActiveCatalog,
+  SEED_CATALOG,
+} from "@/ai/model-registry";
 
-/**
- * Non-chat / deprecated family tokens that must NEVER appear in a curated list.
- * Defined locally so the assertion is independent of the module under test.
- */
-const NON_CHAT_TOKENS = [
-  "tts",
-  "image",
-  "embed",
-  "embedding",
-  "robotics",
-  "lyria",
-  "veo",
-  "imagen",
-  "audio",
-  "vision",
-  "whisper",
-  "dall-e",
-  "sora",
-  "moderation",
-  "realtime",
-  "live",
-  "computer-use",
-  "deep-research",
-  "native-audio",
-  "guard",
-] as const;
+/** A deterministic synthetic catalog (independent of the live seed). */
+const CATALOG: ModelCatalog = {
+  source: "test",
+  generatedAt: "2026-08-22T00:00:00.000Z",
+  models: {
+    openai: ["gpt-4o", "gpt-5", "gpt-5.4-mini", "gpt-4.1"],
+    anthropic: ["claude-sonnet-4-6", "claude-sonnet-5", "claude-haiku-4-5"],
+    google: ["gemini-2.5-flash", "gemini-3.5-flash", "gemini-3.1-pro-preview"],
+  },
+};
 
-describe("bundledModelsFor — bundled default list, no key/network (D-01)", () => {
-  it("returns a non-empty, frozen list for each cloud chat provider", () => {
-    for (const provider of ["openai", "anthropic", "google"] as const) {
-      const list = bundledModelsFor(provider);
-      expect(list.length).toBeGreaterThan(0);
-      expect(Object.isFrozen(list)).toBe(true);
-    }
-  });
-
-  it("returns an empty (frozen) list for none and custom (free-text only)", () => {
-    for (const provider of ["none", "custom"] as const) {
-      const list = bundledModelsFor(provider);
-      expect(list).toEqual([]);
-      expect(Object.isFrozen(list)).toBe(true);
-    }
-  });
-
-  it("covers every provider id in the type union (no missing key)", () => {
-    for (const provider of AI_PROVIDER_IDS) {
-      // Must not throw and must return an array for every declared provider id.
-      expect(Array.isArray(bundledModelsFor(provider))).toBe(true);
-    }
-  });
-
-  it("contains NO non-chat / deprecated family token in any curated id", () => {
-    for (const provider of ["openai", "anthropic", "google"] as const) {
-      for (const id of bundledModelsFor(provider)) {
-        const lower = id.toLowerCase();
-        for (const token of NON_CHAT_TOKENS) {
-          expect(lower).not.toContain(token);
-        }
-      }
-    }
-  });
-
-  it("does NOT contain the known-dead UAT Gemini ids", () => {
-    const google = bundledModelsFor("google").map((m) => m.toLowerCase());
-    expect(google).not.toContain("gemini-2.5-flash");
-    expect(google).not.toContain("gemini-2.5-flash-lite");
+describe("FRONTIER_PATTERNS — the single hand-maintained knob", () => {
+  it("seeds the owner-specified family globs per provider", () => {
+    expect(FRONTIER_PATTERNS.openai).toEqual(["gpt-5*"]);
+    expect(FRONTIER_PATTERNS.anthropic).toEqual([
+      "claude-*-5",
+      "claude-haiku-4-5",
+    ]);
+    expect(FRONTIER_PATTERNS.google).toEqual(["gemini-3*"]);
   });
 });
 
-describe("filterToFrontier — narrow a raw catalog to the frontier set (D-04)", () => {
-  it("keeps curated frontier ids and drops non-chat + dead ids, preserving order", () => {
-    const curated = bundledModelsFor("google");
-    // Interleave the real frontier ids with junk a raw listModels would return.
-    const discovered = [
-      "gemini-2.5-flash-preview-tts", // tts family → drop
-      curated[0], // frontier → keep
-      "gemini-embedding-001", // embedding family → drop
-      "gemini-2.5-flash", // known-dead (UAT) → drop
-      curated[1], // frontier → keep
-      "imagen-4.0-generate", // image family → drop
-      "gemini-robotics-er-2-preview", // robotics family → drop
-      "lyria-3-pro-preview", // lyria family → drop
-      curated[2], // frontier → keep
-    ];
-    const filtered = filterToFrontier("google", discovered);
-    // Only the curated ids survive, in their discovered order.
-    expect(filtered).toEqual([curated[0], curated[1], curated[2]]);
+describe("matchesFrontier — glob family match", () => {
+  it("matches gpt-5* (including the exact stem)", () => {
+    expect(matchesFrontier("openai", "gpt-5")).toBe(true);
+    expect(matchesFrontier("openai", "gpt-5.4-mini")).toBe(true);
+    expect(matchesFrontier("openai", "gpt-4o")).toBe(false);
   });
-
-  it("de-duplicates while preserving first-seen order", () => {
-    const curated = bundledModelsFor("openai");
-    const discovered = [curated[1], curated[0], curated[1], curated[0]];
-    const filtered = filterToFrontier("openai", discovered);
-    expect(filtered).toEqual([curated[1], curated[0]]);
+  it("matches the anthropic mid-glob + explicit haiku", () => {
+    expect(matchesFrontier("anthropic", "claude-sonnet-5")).toBe(true);
+    expect(matchesFrontier("anthropic", "claude-opus-5")).toBe(true);
+    expect(matchesFrontier("anthropic", "claude-haiku-4-5")).toBe(true);
+    expect(matchesFrontier("anthropic", "claude-sonnet-4-6")).toBe(false);
   });
-
-  it("matches curated ids case-insensitively", () => {
-    const curated = bundledModelsFor("anthropic");
-    const filtered = filterToFrontier("anthropic", [curated[0].toUpperCase()]);
-    expect(filtered).toEqual([curated[0].toUpperCase()]);
+  it("matches gemini-3* only", () => {
+    expect(matchesFrontier("google", "gemini-3.5-flash")).toBe(true);
+    expect(matchesFrontier("google", "gemini-2.5-flash")).toBe(false);
   });
+  it("is case-insensitive", () => {
+    expect(matchesFrontier("openai", "GPT-5.4-Mini")).toBe(true);
+  });
+});
 
-  it("returns an empty frozen list when nothing intersects the frontier", () => {
-    const filtered = filterToFrontier("google", [
-      "gemini-2.5-flash",
-      "text-embedding-004",
+describe("modelsFor — scope-driven picker list", () => {
+  it("returns the FULL provider list in 'all' scope, catalog order preserved", () => {
+    expect(modelsFor(CATALOG, "openai", "all")).toEqual([
+      "gpt-4o",
+      "gpt-5",
+      "gpt-5.4-mini",
+      "gpt-4.1",
     ]);
-    expect(filtered).toEqual([]);
-    expect(Object.isFrozen(filtered)).toBe(true);
   });
+  it("returns only the frontier subset in 'frontier' scope", () => {
+    expect(modelsFor(CATALOG, "openai", "frontier")).toEqual([
+      "gpt-5",
+      "gpt-5.4-mini",
+    ]);
+    expect(modelsFor(CATALOG, "anthropic", "frontier")).toEqual([
+      "claude-sonnet-5",
+      "claude-haiku-4-5",
+    ]);
+    expect(modelsFor(CATALOG, "google", "frontier")).toEqual([
+      "gemini-3.5-flash",
+      "gemini-3.1-pro-preview",
+    ]);
+  });
+  it("returns empty for none/custom in any scope (free-text only)", () => {
+    for (const scope of ["frontier", "all"] as const) {
+      expect(modelsFor(CATALOG, "none", scope)).toEqual([]);
+      expect(modelsFor(CATALOG, "custom", scope)).toEqual([]);
+    }
+  });
+  it("returns a frozen array", () => {
+    expect(Object.isFrozen(modelsFor(CATALOG, "openai", "all"))).toBe(true);
+  });
+});
 
-  it("returns empty for none/custom (no curated set to intersect)", () => {
-    expect(filterToFrontier("custom", ["anything", "at-all"])).toEqual([]);
+describe("resolveActiveCatalog — cache overrides seed, seed is the fallback", () => {
+  it("returns the cached catalog when present (cache overrides seed)", () => {
+    expect(resolveActiveCatalog(CATALOG)).toBe(CATALOG);
+  });
+  it("falls back to the bundled seed when there is no cache (offline/first run)", () => {
+    expect(resolveActiveCatalog(null)).toBe(SEED_CATALOG);
+  });
+});
+
+describe("SEED_CATALOG — bundled, non-empty for every cloud provider", () => {
+  it("carries a non-empty list per provider and the LiteLLM source", () => {
+    expect(SEED_CATALOG.models.openai.length).toBeGreaterThan(0);
+    expect(SEED_CATALOG.models.anthropic.length).toBeGreaterThan(0);
+    expect(SEED_CATALOG.models.google.length).toBeGreaterThan(0);
+    expect(SEED_CATALOG.source).toContain(
+      "model_prices_and_context_window.json",
+    );
+  });
+  it("has a non-empty frontier intersection per provider (globs still match)", () => {
+    for (const p of ["openai", "anthropic", "google"] as const) {
+      expect(modelsFor(SEED_CATALOG, p, "frontier").length).toBeGreaterThan(0);
+    }
+  });
+});
+
+describe("filterToFrontier — narrow a raw discovered catalog to the frontier globs", () => {
+  it("keeps only frontier-matching ids, preserving discovered order + de-duping", () => {
+    const discovered = [
+      "gpt-4o",
+      "gpt-5.4-mini",
+      "gpt-4.1",
+      "gpt-5",
+      "gpt-5.4-mini",
+    ];
+    expect(filterToFrontier("openai", discovered)).toEqual([
+      "gpt-5.4-mini",
+      "gpt-5",
+    ]);
+  });
+  it("returns empty for none/custom (no frontier set to intersect)", () => {
+    expect(filterToFrontier("custom", ["anything"])).toEqual([]);
     expect(filterToFrontier("none", ["anything"])).toEqual([]);
+  });
+  it("returns a frozen empty list when nothing matches", () => {
+    const out = filterToFrontier("google", ["gemini-2.5-flash"]);
+    expect(out).toEqual([]);
+    expect(Object.isFrozen(out)).toBe(true);
   });
 });

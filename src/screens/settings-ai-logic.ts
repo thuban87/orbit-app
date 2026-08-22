@@ -25,7 +25,7 @@ import {
   type ValidateEndpointResult,
   validateCustomEndpoint,
 } from "@/ai/custom-endpoint";
-import { bundledModelsFor, filterToFrontier } from "@/ai/model-registry";
+import { filterToFrontier, type ModelScope } from "@/ai/model-registry";
 import type { ResolvedPrompt, TruncationNotice } from "@/ai/prompt-types";
 import type { AppSettingsPatch } from "@/db/app-settings-dao";
 import type { ModelDiscovery } from "@/services/AiService";
@@ -96,36 +96,45 @@ export type ModelFieldState =
   | { readonly kind: "list"; readonly models: readonly string[] }
   | { readonly kind: "manual" };
 
-/**
- * The BUNDLED curated frontier list the screen renders BY DEFAULT (D-03) — no key,
- * no network. Delegates to the model registry (the single curation source of
- * truth); `none`/`custom` return an empty list (Custom is free-text only — C4-M1).
- */
-export function curatedModelsFor(provider: AiProviderId): readonly string[] {
-  return bundledModelsFor(provider);
+/** De-duplicate case-insensitively, preserving first-seen order/casing. */
+function dedupePreserveOrder(ids: readonly string[]): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const id of ids) {
+    const key = id.toLowerCase();
+    if (!seen.has(key)) {
+      seen.add(key);
+      out.push(id);
+    }
+  }
+  return out;
 }
 
 /**
- * Orchestrate a model-discovery attempt into a model-field view-state. Discovery
- * is advisory and NEVER blocks manual entry (C4-M1): an empty list, a `manual`
- * result, OR any thrown error all fall back to free-text. The caller supplies the
- * active provider id and the discovery closure (a provider adapter's `listModels`)
- * so this stays pure/I/O-free.
+ * Orchestrate a provider `listModels` discovery attempt into a model-field
+ * view-state. Discovery is advisory and NEVER blocks manual entry (C4-M1): an
+ * empty list, a `manual` result, OR any thrown error all fall back to free-text.
+ * The caller supplies the active provider id, the picker `scope`, and the
+ * discovery closure (a provider adapter's `listModels`) so this stays pure/I/O-free.
  *
- * The raw discovered catalog is narrowed to the curated frontier set before
- * display (D-04): non-chat families and deprecated-but-still-listed ids fall away
- * via `filterToFrontier`. If nothing survives the filter the field degrades to
- * `{kind:'manual'}` exactly like an empty/unavailable discovery — free-text stays
- * the escape hatch for any legitimate model that is not (yet) curated.
+ * The raw discovered catalog is filtered by the active scope (14-10): in
+ * `frontier` scope only frontier-family ids survive (`filterToFrontier`); in `all`
+ * scope the full discovered list is kept (de-duplicated, order preserved). If
+ * nothing survives the field degrades to `{kind:'manual'}` exactly like an
+ * empty/unavailable discovery — free-text stays the escape hatch.
  */
 export async function discoverModelsForField(
   provider: AiProviderId,
+  scope: ModelScope,
   listModels: () => Promise<ModelDiscovery>,
 ): Promise<ModelFieldState> {
   try {
     const discovery = await listModels();
     if (discovery.kind === "list") {
-      const models = filterToFrontier(provider, discovery.models);
+      const models =
+        scope === "frontier"
+          ? filterToFrontier(provider, discovery.models)
+          : dedupePreserveOrder(discovery.models);
       if (models.length > 0) {
         return { kind: "list", models };
       }

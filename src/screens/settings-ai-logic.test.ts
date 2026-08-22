@@ -9,13 +9,12 @@
  * they were handed — never a rebuilt one (H5 / T-14-13).
  */
 import { describe, expect, it } from "vitest";
-import { bundledModelsFor } from "@/ai/model-registry";
+import { SEED_CATALOG } from "@/ai/model-registry";
 import type { ResolvedPrompt } from "@/ai/prompt-types";
 import {
   buildAiSettingsPatch,
   buildInspectorViewState,
   buildProviderAckViewState,
-  curatedModelsFor,
   discoverModelsForField,
   validateEndpointForSave,
 } from "@/screens/settings-ai-logic";
@@ -76,54 +75,59 @@ describe("validateEndpointForSave — reject before persistence (H2)", () => {
   });
 });
 
-describe("curatedModelsFor — bundled default list (D-03)", () => {
-  it("returns the registry's bundled frontier list for a cloud provider", () => {
-    expect(curatedModelsFor("google")).toEqual(bundledModelsFor("google"));
-    expect(curatedModelsFor("openai")).toEqual(bundledModelsFor("openai"));
-    expect(curatedModelsFor("anthropic")).toEqual(
-      bundledModelsFor("anthropic"),
+describe("discoverModelsForField — scope-filtered, free-text fallback (C4-M1)", () => {
+  it("in frontier scope filters a mixed discovered list to frontier ids only", async () => {
+    const state = await discoverModelsForField(
+      "google",
+      "frontier",
+      async () => ({
+        kind: "list",
+        models: [
+          "gemini-2.5-flash", // older gen → drop (not gemini-3*)
+          "gemini-3.5-flash", // frontier → keep
+          "gemini-embedding-001", // non-frontier → drop
+          "gemini-3.1-pro-preview", // frontier → keep
+        ],
+      }),
     );
-  });
-
-  it("returns an empty list for custom (free-text only) and none", () => {
-    expect(curatedModelsFor("custom")).toEqual([]);
-    expect(curatedModelsFor("none")).toEqual([]);
-  });
-});
-
-describe("discoverModelsForField — frontier-filtered, free-text fallback (C4-M1/D-04)", () => {
-  it("filters a mixed discovered list down to the frontier ids only", async () => {
-    const frontier = bundledModelsFor("google");
-    const state = await discoverModelsForField("google", async () => ({
+    expect(state).toEqual({
       kind: "list",
-      models: [
-        "gemini-2.5-flash-preview-tts", // non-chat → drop
-        frontier[0], // frontier → keep
-        "gemini-embedding-001", // non-chat → drop
-        "gemini-2.5-flash", // known-dead → drop
-        frontier[1], // frontier → keep
-      ],
-    }));
-    expect(state).toEqual({ kind: "list", models: [frontier[0], frontier[1]] });
+      models: ["gemini-3.5-flash", "gemini-3.1-pro-preview"],
+    });
   });
 
-  it("degrades an all-junk discovered list to manual (free-text)", async () => {
-    const state = await discoverModelsForField("google", async () => ({
+  it("in all scope keeps the full discovered list (deduped, order preserved)", async () => {
+    const state = await discoverModelsForField("google", "all", async () => ({
       kind: "list",
-      models: ["gemini-2.5-flash", "text-embedding-004", "imagen-4.0-generate"],
+      models: ["gemini-2.5-flash", "gemini-3.5-flash", "gemini-2.5-flash"],
     }));
+    expect(state).toEqual({
+      kind: "list",
+      models: ["gemini-2.5-flash", "gemini-3.5-flash"],
+    });
+  });
+
+  it("degrades an all-non-frontier list to manual in frontier scope", async () => {
+    const state = await discoverModelsForField(
+      "google",
+      "frontier",
+      async () => ({
+        kind: "list",
+        models: ["gemini-2.5-flash", "text-embedding-004"],
+      }),
+    );
     expect(state).toEqual({ kind: "manual" });
   });
 
   it("falls back to manual when discovery reports manual", async () => {
-    const state = await discoverModelsForField("openai", async () => ({
+    const state = await discoverModelsForField("openai", "all", async () => ({
       kind: "manual",
     }));
     expect(state).toEqual({ kind: "manual" });
   });
 
   it("falls back to manual on an empty list", async () => {
-    const state = await discoverModelsForField("openai", async () => ({
+    const state = await discoverModelsForField("openai", "all", async () => ({
       kind: "list",
       models: [],
     }));
@@ -131,10 +135,19 @@ describe("discoverModelsForField — frontier-filtered, free-text fallback (C4-M
   });
 
   it("falls back to manual if the discovery call throws (advisory — C4-M1)", async () => {
-    const state = await discoverModelsForField("anthropic", async () => {
-      throw new Error("boom");
-    });
+    const state = await discoverModelsForField(
+      "anthropic",
+      "frontier",
+      async () => {
+        throw new Error("boom");
+      },
+    );
     expect(state).toEqual({ kind: "manual" });
+  });
+
+  it("the seed's google frontier set is a subset a real discovery would keep", () => {
+    // Sanity: SEED_CATALOG is bundled and non-empty so the frontier path has data.
+    expect(SEED_CATALOG.models.google.length).toBeGreaterThan(0);
   });
 });
 
