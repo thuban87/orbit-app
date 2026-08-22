@@ -75,14 +75,15 @@ function inputFor(
   payload: string,
   signal: AbortSignal,
   model = "model-x",
-  thinkingBudget?: number | null,
+  maxOutputTokens?: number,
 ): GenerationInput {
   return {
     resolvedPrompt: makePrompt(payload),
     model,
     temperature: 0.7,
-    maxOutputTokens: 120,
-    ...(thinkingBudget === undefined ? {} : { thinkingBudget }),
+    // 14-11: `maxOutputTokens` is OPTIONAL — omitted means the adapter sends no
+    // output cap (Anthropic falls back to its required constant).
+    ...(maxOutputTokens === undefined ? {} : { maxOutputTokens }),
     signal,
   };
 }
@@ -379,10 +380,26 @@ describe("request body is built from resolvedPrompt.payload (C3-M1)", () => {
   });
 });
 
-// ─── Neutral thinkingBudget → Gemini thinkingConfig only (D-03/D-02) ─
+// ─── Output cap removed; Anthropic still sends required max_tokens (14-11) ─
 
-describe("neutral thinkingBudget maps to Gemini thinkingConfig only (D-03)", () => {
-  it("Gemini includes generationConfig.thinkingConfig.thinkingBudget when a number is passed", async () => {
+describe("output cap removed — adapters omit the cap; Anthropic keeps its required max_tokens (14-11)", () => {
+  it("Gemini OMITS maxOutputTokens AND thinkingConfig when no cap is passed (dynamic thinking default)", async () => {
+    fetchMock.mockResolvedValueOnce(
+      okJson({
+        candidates: [{ content: { parts: [{ text: "gemini-text" }] } }],
+      }),
+    );
+    const p = new GoogleProvider(staticKey("k"));
+    await p.generate(inputFor("hi", new AbortController().signal, "gem-1"));
+    const body = JSON.parse(fetchMock.mock.calls[0][1].body);
+    expect(body.generationConfig.maxOutputTokens).toBeUndefined();
+    expect(body.generationConfig.thinkingConfig).toBeUndefined();
+    // The unchanged fields still ride in generationConfig.
+    expect(body.generationConfig.temperature).toBe(0.7);
+    expect(body.generationConfig.candidateCount).toBe(1);
+  });
+
+  it("Gemini includes maxOutputTokens ONLY when a caller supplies one", async () => {
     fetchMock.mockResolvedValueOnce(
       okJson({
         candidates: [{ content: { parts: [{ text: "gemini-text" }] } }],
@@ -390,79 +407,79 @@ describe("neutral thinkingBudget maps to Gemini thinkingConfig only (D-03)", () 
     );
     const p = new GoogleProvider(staticKey("k"));
     await p.generate(
-      inputFor("hi", new AbortController().signal, "gem-1", 256),
+      inputFor("hi", new AbortController().signal, "gem-1", 999),
     );
     const body = JSON.parse(fetchMock.mock.calls[0][1].body);
-    expect(body.generationConfig.thinkingConfig).toEqual({
-      thinkingBudget: 256,
-    });
-    // The output ceiling still rides in generationConfig, unchanged.
-    expect(body.generationConfig.maxOutputTokens).toBe(120);
-  });
-
-  it("Gemini OMITS thinkingConfig when thinkingBudget is null", async () => {
-    fetchMock.mockResolvedValueOnce(
-      okJson({
-        candidates: [{ content: { parts: [{ text: "gemini-text" }] } }],
-      }),
-    );
-    const p = new GoogleProvider(staticKey("k"));
-    await p.generate(
-      inputFor("hi", new AbortController().signal, "gem-1", null),
-    );
-    const body = JSON.parse(fetchMock.mock.calls[0][1].body);
+    expect(body.generationConfig.maxOutputTokens).toBe(999);
     expect(body.generationConfig.thinkingConfig).toBeUndefined();
   });
 
-  it("Gemini OMITS thinkingConfig when thinkingBudget is undefined (absent)", async () => {
-    fetchMock.mockResolvedValueOnce(
-      okJson({
-        candidates: [{ content: { parts: [{ text: "gemini-text" }] } }],
-      }),
-    );
-    const p = new GoogleProvider(staticKey("k"));
-    await p.generate(inputFor("hi", new AbortController().signal));
-    const body = JSON.parse(fetchMock.mock.calls[0][1].body);
-    expect(body.generationConfig.thinkingConfig).toBeUndefined();
-  });
-
-  it("OpenAI ignores thinkingBudget — no thinkingConfig/reasoning field leaks in", async () => {
+  it("OpenAI OMITS max_completion_tokens when no cap is passed", async () => {
     fetchMock.mockResolvedValueOnce(
       okJson({ choices: [{ message: { content: "ok" } }] }),
     );
     const p = new OpenAiProvider(staticKey("k"));
-    await p.generate(inputFor("hi", new AbortController().signal, "gpt", 256));
+    await p.generate(inputFor("hi", new AbortController().signal, "gpt"));
     const body = JSON.parse(fetchMock.mock.calls[0][1].body);
+    expect(body.max_completion_tokens).toBeUndefined();
+    expect(body.max_tokens).toBeUndefined();
+    // No reasoning/thinking fields ever leak in.
     expect(body.thinkingConfig).toBeUndefined();
-    expect(body.thinkingBudget).toBeUndefined();
     expect(body.reasoning).toBeUndefined();
-    expect(body.reasoning_effort).toBeUndefined();
-    // Its own output field is untouched.
-    expect(body.max_completion_tokens).toBe(120);
   });
 
-  it("Anthropic ignores thinkingBudget — no thinkingConfig/thinking field leaks in", async () => {
+  it("Anthropic ALWAYS sends max_tokens (API requires it) — the passed value, or a fallback", async () => {
     fetchMock.mockResolvedValueOnce(okJson({ content: [{ text: "ok" }] }));
     const p = new AnthropicProvider(staticKey("k"));
+    // Passed the model's own maximum (as resolveMaxOutputTokens supplies).
     await p.generate(
-      inputFor("hi", new AbortController().signal, "claude", 256),
+      inputFor("hi", new AbortController().signal, "claude", 128000),
     );
-    const body = JSON.parse(fetchMock.mock.calls[0][1].body);
-    expect(body.thinkingConfig).toBeUndefined();
-    expect(body.thinking).toBeUndefined();
-    expect(body.thinkingBudget).toBeUndefined();
-    // Its own output field is untouched.
-    expect(body.max_tokens).toBe(120);
+    const withMax = JSON.parse(fetchMock.mock.calls[0][1].body);
+    expect(withMax.max_tokens).toBe(128000);
+    expect(withMax.thinkingConfig).toBeUndefined();
+    expect(withMax.thinking).toBeUndefined();
+
+    // Even with NO cap supplied, Anthropic still MUST send a numeric max_tokens.
+    fetchMock.mockResolvedValueOnce(okJson({ content: [{ text: "ok" }] }));
+    await p.generate(inputFor("hi", new AbortController().signal, "claude"));
+    const noMax = JSON.parse(fetchMock.mock.calls[1][1].body);
+    expect(typeof noMax.max_tokens).toBe("number");
+    expect(noMax.max_tokens).toBeGreaterThan(0);
   });
 
-  it("Gemini still reads ONLY resolvedPrompt.payload for content (C3-M1) with a thinkingBudget set", async () => {
+  it("Custom OMITS max_tokens when no cap is passed, includes it when supplied", async () => {
+    secureCustomFetchMock.mockResolvedValueOnce({
+      status: 200,
+      ok: true,
+      bodyText: '{"choices":[{"message":{"content":"c"}}]}',
+    });
+    const p = new CustomProvider(
+      "https://api.example.com/v1/chat",
+      staticKey("k"),
+    );
+    await p.generate(inputFor("hi", new AbortController().signal, "m"));
+    const body1 = JSON.parse(secureCustomFetchMock.mock.calls[0][0].body);
+    expect(body1.max_tokens).toBeUndefined();
+
+    secureCustomFetchMock.mockResolvedValueOnce({
+      status: 200,
+      ok: true,
+      bodyText: '{"choices":[{"message":{"content":"c"}}]}',
+    });
+    await p.generate(inputFor("hi", new AbortController().signal, "m", 8192));
+    const body2 = JSON.parse(secureCustomFetchMock.mock.calls[1][0].body);
+    expect(body2.max_tokens).toBe(8192);
+  });
+
+  it("Gemini still reads ONLY resolvedPrompt.payload for content (C3-M1)", async () => {
     fetchMock.mockResolvedValueOnce(
       okJson({
         candidates: [{ content: { parts: [{ text: "gemini-text" }] } }],
       }),
     );
     const payload = "exact-gemini-payload";
-    const input = inputFor(payload, new AbortController().signal, "gem-1", 256);
+    const input = inputFor(payload, new AbortController().signal, "gem-1");
     const p = new GoogleProvider(staticKey("k"));
     await p.generate(input);
     const body = JSON.parse(fetchMock.mock.calls[0][1].body);

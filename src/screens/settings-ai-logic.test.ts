@@ -76,23 +76,24 @@ describe("validateEndpointForSave — reject before persistence (H2)", () => {
 });
 
 describe("discoverModelsForField — scope-filtered, free-text fallback (C4-M1)", () => {
-  it("in frontier scope filters a mixed discovered list to frontier ids only", async () => {
+  it("in frontier scope resolves the latest-per-tier winners (tier order)", async () => {
     const state = await discoverModelsForField(
       "google",
       "frontier",
       async () => ({
         kind: "list",
         models: [
-          "gemini-2.5-flash", // older gen → drop (not gemini-3*)
-          "gemini-3.5-flash", // frontier → keep
-          "gemini-embedding-001", // non-frontier → drop
-          "gemini-3.1-pro-preview", // frontier → keep
+          "gemini-2.5-flash", // older flash → loses to 3.5-flash
+          "gemini-3.5-flash", // flash tier winner
+          "gemini-embedding-001", // no tier → drop
+          "gemini-3.1-pro-preview", // pro tier winner
         ],
       }),
     );
+    // 14-11: <=3 latest-per-tier winners, in FRONTIER_TIERS order (pro, flash).
     expect(state).toEqual({
       kind: "list",
-      models: ["gemini-3.5-flash", "gemini-3.1-pro-preview"],
+      models: ["gemini-3.1-pro-preview", "gemini-3.5-flash"],
     });
   });
 
@@ -107,13 +108,14 @@ describe("discoverModelsForField — scope-filtered, free-text fallback (C4-M1)"
     });
   });
 
-  it("degrades an all-non-frontier list to manual in frontier scope", async () => {
+  it("degrades a list with NO resolvable tier to manual in frontier scope", async () => {
     const state = await discoverModelsForField(
       "google",
       "frontier",
       async () => ({
         kind: "list",
-        models: ["gemini-2.5-flash", "text-embedding-004"],
+        // Neither id belongs to a pro/flash/flash-lite tier → no winner.
+        models: ["gemini-embedding-001", "text-embedding-004"],
       }),
     );
     expect(state).toEqual({ kind: "manual" });

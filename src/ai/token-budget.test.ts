@@ -1,61 +1,72 @@
 /**
- * Pins the per-provider, thinking-aware token budget contract (Plan 14-09,
- * D-01/D-02/D-04). Pure node logic — no network, no adapter import.
+ * Pins the catalog-aware max-output policy (Plan 14-11 — REMOVES 14-09's flat,
+ * thinking-aware cap). Pure node logic — no network, no adapter import.
  *
- * WHY THIS EXISTS: thinking models (Gemini 2.5/3.x) spend `maxOutputTokens` on
- * internal reasoning BEFORE any message (measured 364–886 THINKING tokens for a
- * short reply, 14-06 device UAT), so a single flat number starved the draft.
- * These tests fix the shape of the fix: Gemini caps reasoning with a
- * `thinkingBudget` and gets output headroom on top; the curated non-thinking
- * chat providers (OpenAI/Anthropic) get a tuned output allowance and NO reasoning
- * cap; a user endpoint / disabled provider assumes no reasoning field.
+ * WHY THIS CHANGED: the flat `maxOutputTokens` cap never controlled visible draft
+ * length (the 1,200-code-point post-parse trim in AiService does that, and stays)
+ * and on THINKING models it was spent on reasoning, returning empty/truncated
+ * drafts. So the cap is gone: OpenAI and Gemini send NO output cap (provider /
+ * model default — dynamic thinking on Gemini); only Anthropic sends a ceiling
+ * because its Messages API REQUIRES `max_tokens`, and that ceiling is the MODEL'S
+ * OWN maximum sourced from the LiteLLM catalog (a high fallback when the model is
+ * free-text / absent). Custom sends a high, non-binding default.
  */
 import { describe, expect, it } from "vitest";
-import { resolveTokenBudget } from "@/ai/token-budget";
+import type { ModelCatalog } from "@/ai/model-catalog-filter";
+import { resolveMaxOutputTokens } from "@/ai/token-budget";
 
-describe("resolveTokenBudget — per-provider thinking-aware budget", () => {
-  it("Gemini (google) caps reasoning AND allows a positive output budget", () => {
-    const budget = resolveTokenBudget("google");
-    expect(budget.thinkingBudget).not.toBeNull();
-    expect(typeof budget.thinkingBudget).toBe("number");
-    expect(budget.thinkingBudget as number).toBeGreaterThan(0);
-    expect(budget.maxOutputTokens).toBeGreaterThan(0);
+const CATALOG: ModelCatalog = {
+  source: "test",
+  generatedAt: "2026-08-22T00:00:00.000Z",
+  models: {
+    openai: ["gpt-5.6-sol"],
+    anthropic: ["claude-opus-5", "claude-haiku-4-5"],
+    google: ["gemini-3.7-flash"],
+  },
+  limits: {
+    openai: { "gpt-5.6-sol": 128000 },
+    anthropic: { "claude-opus-5": 128000, "claude-haiku-4-5": 64000 },
+    google: { "gemini-3.7-flash": 65536 },
+  },
+};
+
+describe("resolveMaxOutputTokens — catalog-aware, cap removed", () => {
+  it("Gemini (google) sends NO cap (model default → dynamic thinking)", () => {
+    expect(
+      resolveMaxOutputTokens("google", "gemini-3.7-flash", CATALOG),
+    ).toBeUndefined();
   });
 
-  it("OpenAI/Anthropic get a positive output allowance and NO reasoning cap (D-04)", () => {
-    for (const provider of ["openai", "anthropic"] as const) {
-      const budget = resolveTokenBudget(provider);
-      expect(budget.thinkingBudget).toBeNull();
-      expect(budget.maxOutputTokens).toBeGreaterThan(0);
-    }
+  it("OpenAI sends NO cap (provider default)", () => {
+    expect(
+      resolveMaxOutputTokens("openai", "gpt-5.6-sol", CATALOG),
+    ).toBeUndefined();
   });
 
-  it("custom / none assume no reasoning field (thinkingBudget null) with a safe output default", () => {
-    for (const provider of ["custom", "none"] as const) {
-      const budget = resolveTokenBudget(provider);
-      expect(budget.thinkingBudget).toBeNull();
-      expect(budget.maxOutputTokens).toBeGreaterThan(0);
-    }
-  });
-
-  it("Gemini reasoning is CAPPED, not unbounded: thinkingBudget <= maxOutputTokens", () => {
-    // A soft reasoning cap only helps if the request still leaves room for the
-    // message: the reasoning cap must sit at or below the total output budget so
-    // reasoning can never claim the entire allowance (the 14-06 failure).
-    const budget = resolveTokenBudget("google");
-    expect(budget.thinkingBudget as number).toBeLessThanOrEqual(
-      budget.maxOutputTokens,
+  it("Anthropic sends the MODEL'S OWN maximum from the catalog", () => {
+    expect(resolveMaxOutputTokens("anthropic", "claude-opus-5", CATALOG)).toBe(
+      128000,
     );
+    expect(
+      resolveMaxOutputTokens("anthropic", "claude-haiku-4-5", CATALOG),
+    ).toBe(64000);
   });
 
-  it("accepts an optional model argument without changing the frontier-chat budget", () => {
-    // `model` is reserved for future model-family branching; the curated frontier
-    // chat models do not need it yet, so passing one must not change the result.
-    expect(resolveTokenBudget("google", "gemini-3.7-flash")).toEqual(
-      resolveTokenBudget("google"),
+  it("Anthropic falls back to a high default when the model is free-text / absent", () => {
+    const max = resolveMaxOutputTokens(
+      "anthropic",
+      "some-custom-claude",
+      CATALOG,
     );
-    expect(resolveTokenBudget("openai", "gpt-some-model")).toEqual(
-      resolveTokenBudget("openai"),
-    );
+    expect(typeof max).toBe("number");
+    expect(max as number).toBeGreaterThanOrEqual(8192);
+  });
+
+  it("custom sends a high, non-binding default; none needs nothing", () => {
+    const custom = resolveMaxOutputTokens("custom", "whatever", CATALOG);
+    expect(typeof custom).toBe("number");
+    expect(custom as number).toBeGreaterThanOrEqual(8192);
+    // `none` disables generation entirely — no request is ever built.
+    expect(resolveMaxOutputTokens("none", "", CATALOG)).toBeUndefined();
   });
 });
