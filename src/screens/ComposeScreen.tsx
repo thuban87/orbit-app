@@ -73,7 +73,8 @@ import {
 } from "@/logic/ai-suggestion-logic";
 import { consumeAiSuggestionIntent } from "@/navigation/ai-suggestion-navigation";
 import type { ResolvedPrompt } from "@/ai/prompt-types";
-import { resolvePrompt, MAX_OUTPUT_TOKENS } from "@/ai/prompt-template";
+import { resolvePrompt } from "@/ai/prompt-template";
+import { resolveTokenBudget } from "@/ai/token-budget";
 import { AiError, AiService } from "@/services/AiService";
 import type { AiCloudProviderId } from "@/services/ai-types";
 import {
@@ -87,7 +88,9 @@ import { Logger } from "@/utils/logger";
 
 /**
  * Generation temperature (AI-SPEC §4 — a single-number tuning surface). 0.7 for
- * a warm-but-focused draft; the 120-token ceiling lives in `MAX_OUTPUT_TOKENS`.
+ * a warm-but-focused draft. The output/reasoning budget is NOT a flat constant:
+ * it is resolved per active provider by `resolveTokenBudget` (`@/ai/token-budget`),
+ * which caps a thinking model's reasoning and sizes output accordingly (14-09).
  */
 const AI_TEMPERATURE = 0.7;
 
@@ -201,11 +204,16 @@ export function ComposeScreen({ navigation, route }: RootStackScreenProps<"Compo
         if (!provider) throw new AiError("not_configured");
         const model =
           s.aiProvider === "custom" ? s.aiCustomModel : s.aiModel;
+        // Size the request per active provider: a thinking model (Gemini) gets a
+        // reasoning cap + output headroom; non-thinking chat providers get a tuned
+        // output allowance (14-09, replaces the flat MAX_OUTPUT_TOKENS stopgap).
+        const budget = resolveTokenBudget(s.aiProvider, model);
         return provider.generate({
           resolvedPrompt: prompt,
           model,
           temperature: AI_TEMPERATURE,
-          maxOutputTokens: MAX_OUTPUT_TOKENS,
+          maxOutputTokens: budget.maxOutputTokens,
+          thinkingBudget: budget.thinkingBudget,
           signal,
         });
       },

@@ -34,6 +34,16 @@ Where §3–§6 below conflict with the following, **these override the SPEC bod
 5. **`generate(input)` carries the immutable `ResolvedPrompt` object** (adapters read
    `resolvedPrompt.payload`); keys are fetched via an injected accessor at call time, never cached
    by `refreshProviders`.
+6. **The flat 120-token output ceiling in §4 is SUPERSEDED by a per-provider, thinking-aware
+   budget** (Plan 09, D-05). THINKING models (Gemini 2.5/3.x) spend a flat `maxOutputTokens` on
+   internal reasoning BEFORE any message — measured 364–886 THINKING tokens for a short reply
+   (14-06 device UAT) — so a single flat number produced empty / mid-sentence drafts on device.
+   Output sizing now lives in `src/ai/token-budget.ts` (`resolveTokenBudget`): Gemini gets a
+   `generationConfig.thinkingConfig.thinkingBudget` reasoning cap PLUS an output allowance sized to
+   cover actual thinking with margin; the curated non-thinking OpenAI/Anthropic chat models get a
+   tuned output allowance and no reasoning cap. The neutral `GenerationInput.thinkingBudget` is a
+   provider-agnostic concept mapped ONLY by the Gemini adapter. The SEPARATE 1,200-code-point
+   post-parse draft ceiling in `AiService.parseSuggestionOutput` is UNCHANGED.
 
 ---
 
@@ -381,7 +391,10 @@ Model IDs are user-selected and provider-specific: Settings dynamically lists mo
 network/key permits and always permits a free-text fallback; Custom is free-text only. Do not ship
 a stale curated list as the source of truth. Use a deterministic, single-draft profile at every
 provider: `temperature: 0.7`, one candidate, non-streaming, and a hard output ceiling of **120
-tokens** (plus a shared 1,200-character post-parse ceiling). The adapter maps `maxOutputTokens`
+tokens** (plus a shared 1,200-character post-parse ceiling). **SUPERSEDED — see ERRATA §0.6:** the
+flat 120-token ceiling is replaced by the per-provider, thinking-aware budget in
+`src/ai/token-budget.ts` (Gemini `thinkingConfig.thinkingBudget` reasoning cap + tuned output;
+OpenAI/Anthropic tuned output). The adapter maps `maxOutputTokens`
 to the provider's current field (`max_tokens`, `max_completion_tokens`, or Gemini generation
 config) rather than leaking one provider's parameter name into the neutral contract. No default
 model is hard-coded: `provider = none` is disabled until the person configures a model and key.

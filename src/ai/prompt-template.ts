@@ -40,20 +40,17 @@ export const TOTAL_LIMIT = 6_000;
 export const PER_VALUE_LIMIT = 300;
 /** Max ranked fuel entries carried into a prompt, in rank order. */
 export const MAX_RANKED_FUEL = 8;
-/**
- * Output budget handed to adapters. NOTE: for THINKING models (Gemini 2.5/3.x)
- * this budget is spent on reasoning tokens BEFORE any message text — measured
- * ~364 thinking tokens for a ~21-token reply (14-06 device UAT) — so the AI-SPEC §4
- * value of 120 left ZERO room and produced empty/truncated drafts on device. Raised
- * to 2048 for thinking headroom; the actual message length stays bounded by the
- * separate MAX_DRAFT_CODE_POINTS (1,200) cap in AiService, so drafts don't balloon.
- * (1024 still truncated richer prompts on device — measured 702–886 THINKING tokens
- * for a fuel-rich contact, which alone can exhaust a smaller budget mid-sentence.)
- * This is a stopgap: the robust fix is a per-provider, thinking-aware budget — e.g.
- * a Gemini `thinkingConfig.thinkingBudget` cap so reasoning can't crowd out output —
- * formalised in the Phase-14 model gap plan (which also supersedes AI-SPEC §4).
- */
-export const MAX_OUTPUT_TOKENS = 2_048;
+
+// Output sizing is NO LONGER a flat constant here. The former stopgap
+// `MAX_OUTPUT_TOKENS` (bumped 120 → 1024 → 2048) was fragile for THINKING models
+// (Gemini 2.5/3.x), which spend the flat budget on reasoning BEFORE any message
+// (14-06 device UAT: empty / mid-sentence drafts). Output sizing now belongs to
+// the per-provider, thinking-aware policy in `@/ai/token-budget`
+// (`resolveTokenBudget`), which caps Gemini reasoning via
+// `thinkingConfig.thinkingBudget` and sizes output on top. The final draft is
+// still independently bounded by the 1,200-code-point post-parse ceiling
+// (`MAX_DRAFT_CODE_POINTS`) in AiService. This supersedes the AI-SPEC §4 flat
+// 120-token ceiling (see 14-AI-SPEC ERRATA §0.6).
 
 /** The placeholder emitted for any unknown / dropped / blank value. */
 const NONE_AVAILABLE = "None available";
