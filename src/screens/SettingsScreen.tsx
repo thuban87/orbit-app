@@ -45,6 +45,7 @@ import { useTheme } from "@/theme";
 import { Logger } from "@/utils/logger";
 import {
   buildAiSettingsPatch,
+  curatedModelsFor,
   CUSTOM_RETENTION_CAVEAT,
   discoverModelsForField,
   type ModelFieldState,
@@ -136,6 +137,9 @@ export function SettingsScreen() {
   const [aiModelField, setAiModelField] = useState<ModelFieldState>({
     kind: "manual",
   });
+  // Discover + free-text live under an "Advanced" disclosure; the curated chips
+  // are the default picker (D-03). Collapsed by default, reset on provider switch.
+  const [aiModelAdvancedOpen, setAiModelAdvancedOpen] = useState(false);
   const [aiEndpointError, setAiEndpointError] = useState<string | null>(null);
   const [aiStatus, setAiStatus] = useState<string | null>(null);
 
@@ -393,6 +397,7 @@ export function SettingsScreen() {
   const onSelectAiProvider = useCallback(async (provider: AiProviderId) => {
     setAiProvider(provider);
     setAiModelField({ kind: "manual" });
+    setAiModelAdvancedOpen(false);
     setAiStatus(null);
     setAiEndpointError(null);
     if (provider !== "none") {
@@ -1006,7 +1011,9 @@ export function SettingsScreen() {
                   style={[
                     styles.aiChip,
                     {
-                      backgroundColor: selected ? colors.accent : colors.surface,
+                      backgroundColor: selected
+                        ? colors.accent
+                        : colors.surface,
                       borderColor: selected ? colors.accent : colors.border,
                     },
                   ]}
@@ -1030,8 +1037,9 @@ export function SettingsScreen() {
 
         {aiProvider !== "none" ? (
           <>
-            {/* Cloud providers: discoverable model list + free-text fallback.
-                Custom is always free-text (its model field is below). */}
+            {/* Cloud providers: curated frontier chips are the DEFAULT picker —
+                no API key, no network (D-01/D-03). Discover + free-text move under
+                an "Advanced" disclosure (D-04). Custom is free-text (row below). */}
             {aiProvider !== "custom" ? (
               <View
                 style={[
@@ -1045,71 +1053,134 @@ export function SettingsScreen() {
                 <Text style={[styles.rowLabel, { color: colors.textPrimary }]}>
                   Model
                 </Text>
-                {aiModelField.kind === "list" ? (
-                  <View style={styles.aiChipRow}>
-                    {aiModelField.models.map((m) => {
-                      const selected = m === aiModel;
-                      return (
-                        <Pressable
-                          key={m}
-                          testID={`settings-ai-model-${m}`}
-                          accessibilityRole="button"
-                          accessibilityState={{ selected }}
-                          accessibilityLabel={`Model ${m}`}
-                          onPress={() => setAiModel(m)}
-                          style={[
-                            styles.aiChip,
-                            {
-                              backgroundColor: selected
-                                ? colors.accent
-                                : colors.surface,
-                              borderColor: selected
-                                ? colors.accent
-                                : colors.border,
-                            },
-                          ]}
+                {/* DEFAULT: curated frontier chat models (bundled, no key/network). */}
+                <View style={styles.aiChipRow}>
+                  {curatedModelsFor(aiProvider).map((m) => {
+                    const selected = m === aiModel;
+                    return (
+                      <Pressable
+                        key={m}
+                        testID={`settings-ai-model-${m}`}
+                        accessibilityRole="button"
+                        accessibilityState={{ selected }}
+                        accessibilityLabel={`Model ${m}`}
+                        onPress={() => setAiModel(m)}
+                        style={[
+                          styles.aiChip,
+                          {
+                            backgroundColor: selected
+                              ? colors.accent
+                              : colors.surface,
+                            borderColor: selected
+                              ? colors.accent
+                              : colors.border,
+                          },
+                        ]}
+                      >
+                        <Text
+                          style={{
+                            color: selected
+                              ? colors.background
+                              : colors.textPrimary,
+                          }}
                         >
-                          <Text
-                            style={{
-                              color: selected
-                                ? colors.background
-                                : colors.textPrimary,
-                            }}
-                          >
-                            {m}
-                          </Text>
-                        </Pressable>
-                      );
-                    })}
-                  </View>
-                ) : null}
-                <TextInput
-                  testID="settings-ai-model-input"
-                  accessibilityLabel="Model name"
-                  value={aiModel}
-                  onChangeText={setAiModel}
-                  placeholder="e.g. gpt-4o-mini"
-                  placeholderTextColor={colors.textSecondary}
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                  style={[
-                    styles.aiInput,
-                    {
-                      color: colors.textPrimary,
-                      backgroundColor: colors.background,
-                      borderColor: colors.border,
-                    },
-                  ]}
-                />
+                          {m}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+                <Text style={[styles.helper, { color: colors.textSecondary }]}>
+                  Curated current models — no API key needed to choose one.
+                </Text>
+
+                {/* ADVANCED: key-gated Discover (frontier-filtered) + free-text. */}
                 <Pressable
-                  testID="settings-ai-discover"
+                  testID="settings-ai-model-advanced-toggle"
                   accessibilityRole="button"
-                  accessibilityLabel="Discover models"
-                  onPress={() => void onDiscoverAiModels()}
-                  style={[styles.aiButton, { borderColor: colors.accent }]}
+                  accessibilityState={{ expanded: aiModelAdvancedOpen }}
+                  accessibilityLabel="Advanced model options"
+                  onPress={() => setAiModelAdvancedOpen((open) => !open)}
+                  style={[styles.aiButton, { borderColor: colors.border }]}
                 >
-                  <Text style={{ color: colors.accent }}>Discover models</Text>
+                  <Text style={{ color: colors.accent }}>
+                    {aiModelAdvancedOpen
+                      ? "Advanced options — hide"
+                      : "Advanced options — discover or enter a model id"}
+                  </Text>
                 </Pressable>
+
+                {aiModelAdvancedOpen ? (
+                  <>
+                    {aiModelField.kind === "list" ? (
+                      <View style={styles.aiChipRow}>
+                        {aiModelField.models.map((m) => {
+                          const selected = m === aiModel;
+                          return (
+                            <Pressable
+                              key={m}
+                              testID={`settings-ai-discovered-${m}`}
+                              accessibilityRole="button"
+                              accessibilityState={{ selected }}
+                              accessibilityLabel={`Discovered model ${m}`}
+                              onPress={() => setAiModel(m)}
+                              style={[
+                                styles.aiChip,
+                                {
+                                  backgroundColor: selected
+                                    ? colors.accent
+                                    : colors.surface,
+                                  borderColor: selected
+                                    ? colors.accent
+                                    : colors.border,
+                                },
+                              ]}
+                            >
+                              <Text
+                                style={{
+                                  color: selected
+                                    ? colors.background
+                                    : colors.textPrimary,
+                                }}
+                              >
+                                {m}
+                              </Text>
+                            </Pressable>
+                          );
+                        })}
+                      </View>
+                    ) : null}
+                    <TextInput
+                      testID="settings-ai-model-input"
+                      accessibilityLabel="Model name"
+                      value={aiModel}
+                      onChangeText={setAiModel}
+                      placeholder="e.g. gpt-5.4-mini"
+                      placeholderTextColor={colors.textSecondary}
+                      autoCapitalize="none"
+                      autoCorrect={false}
+                      style={[
+                        styles.aiInput,
+                        {
+                          color: colors.textPrimary,
+                          backgroundColor: colors.background,
+                          borderColor: colors.border,
+                        },
+                      ]}
+                    />
+                    <Pressable
+                      testID="settings-ai-discover"
+                      accessibilityRole="button"
+                      accessibilityLabel="Discover models"
+                      onPress={() => void onDiscoverAiModels()}
+                      style={[styles.aiButton, { borderColor: colors.accent }]}
+                    >
+                      <Text style={{ color: colors.accent }}>
+                        Discover models
+                      </Text>
+                    </Pressable>
+                  </>
+                ) : null}
               </View>
             ) : null}
 
@@ -1248,7 +1319,8 @@ export function SettingsScreen() {
               </View>
               <Text style={[styles.helper, { color: colors.textSecondary }]}>
                 Your key is stored only in your device's secure keystore — never
-                in Orbit's database, a backup, or anything that leaves the phone.
+                in Orbit's database, a backup, or anything that leaves the
+                phone.
               </Text>
             </View>
 
