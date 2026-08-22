@@ -75,12 +75,14 @@ function inputFor(
   payload: string,
   signal: AbortSignal,
   model = "model-x",
+  thinkingBudget?: number | null,
 ): GenerationInput {
   return {
     resolvedPrompt: makePrompt(payload),
     model,
     temperature: 0.7,
     maxOutputTokens: 120,
+    ...(thinkingBudget === undefined ? {} : { thinkingBudget }),
     signal,
   };
 }
@@ -371,6 +373,94 @@ describe("request body is built from resolvedPrompt.payload (C3-M1)", () => {
     const body = JSON.parse(fetchMock.mock.calls[0][1].body);
     expect(body.messages[0].content).toBe(input.resolvedPrompt.payload);
     expect(body.messages[0].content).toBe(payload);
+  });
+});
+
+// ─── Neutral thinkingBudget → Gemini thinkingConfig only (D-03/D-02) ─
+
+describe("neutral thinkingBudget maps to Gemini thinkingConfig only (D-03)", () => {
+  it("Gemini includes generationConfig.thinkingConfig.thinkingBudget when a number is passed", async () => {
+    fetchMock.mockResolvedValueOnce(
+      okJson({
+        candidates: [{ content: { parts: [{ text: "gemini-text" }] } }],
+      }),
+    );
+    const p = new GoogleProvider(staticKey("k"));
+    await p.generate(inputFor("hi", new AbortController().signal, "gem-1", 256));
+    const body = JSON.parse(fetchMock.mock.calls[0][1].body);
+    expect(body.generationConfig.thinkingConfig).toEqual({
+      thinkingBudget: 256,
+    });
+    // The output ceiling still rides in generationConfig, unchanged.
+    expect(body.generationConfig.maxOutputTokens).toBe(120);
+  });
+
+  it("Gemini OMITS thinkingConfig when thinkingBudget is null", async () => {
+    fetchMock.mockResolvedValueOnce(
+      okJson({
+        candidates: [{ content: { parts: [{ text: "gemini-text" }] } }],
+      }),
+    );
+    const p = new GoogleProvider(staticKey("k"));
+    await p.generate(inputFor("hi", new AbortController().signal, "gem-1", null));
+    const body = JSON.parse(fetchMock.mock.calls[0][1].body);
+    expect(body.generationConfig.thinkingConfig).toBeUndefined();
+  });
+
+  it("Gemini OMITS thinkingConfig when thinkingBudget is undefined (absent)", async () => {
+    fetchMock.mockResolvedValueOnce(
+      okJson({
+        candidates: [{ content: { parts: [{ text: "gemini-text" }] } }],
+      }),
+    );
+    const p = new GoogleProvider(staticKey("k"));
+    await p.generate(inputFor("hi", new AbortController().signal));
+    const body = JSON.parse(fetchMock.mock.calls[0][1].body);
+    expect(body.generationConfig.thinkingConfig).toBeUndefined();
+  });
+
+  it("OpenAI ignores thinkingBudget — no thinkingConfig/reasoning field leaks in", async () => {
+    fetchMock.mockResolvedValueOnce(
+      okJson({ choices: [{ message: { content: "ok" } }] }),
+    );
+    const p = new OpenAiProvider(staticKey("k"));
+    await p.generate(inputFor("hi", new AbortController().signal, "gpt", 256));
+    const body = JSON.parse(fetchMock.mock.calls[0][1].body);
+    expect(body.thinkingConfig).toBeUndefined();
+    expect(body.thinkingBudget).toBeUndefined();
+    expect(body.reasoning).toBeUndefined();
+    expect(body.reasoning_effort).toBeUndefined();
+    // Its own output field is untouched.
+    expect(body.max_completion_tokens).toBe(120);
+  });
+
+  it("Anthropic ignores thinkingBudget — no thinkingConfig/thinking field leaks in", async () => {
+    fetchMock.mockResolvedValueOnce(
+      okJson({ content: [{ text: "ok" }] }),
+    );
+    const p = new AnthropicProvider(staticKey("k"));
+    await p.generate(inputFor("hi", new AbortController().signal, "claude", 256));
+    const body = JSON.parse(fetchMock.mock.calls[0][1].body);
+    expect(body.thinkingConfig).toBeUndefined();
+    expect(body.thinking).toBeUndefined();
+    expect(body.thinkingBudget).toBeUndefined();
+    // Its own output field is untouched.
+    expect(body.max_tokens).toBe(120);
+  });
+
+  it("Gemini still reads ONLY resolvedPrompt.payload for content (C3-M1) with a thinkingBudget set", async () => {
+    fetchMock.mockResolvedValueOnce(
+      okJson({
+        candidates: [{ content: { parts: [{ text: "gemini-text" }] } }],
+      }),
+    );
+    const payload = "exact-gemini-payload";
+    const input = inputFor(payload, new AbortController().signal, "gem-1", 256);
+    const p = new GoogleProvider(staticKey("k"));
+    await p.generate(input);
+    const body = JSON.parse(fetchMock.mock.calls[0][1].body);
+    expect(body.contents[0].parts[0].text).toBe(input.resolvedPrompt.payload);
+    expect(body.contents[0].parts[0].text).toBe(payload);
   });
 });
 
