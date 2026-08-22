@@ -52,13 +52,18 @@ export const CATALOG_PROVIDERS: readonly CatalogProvider[] = [
 
 /**
  * The persisted/bundled catalog shape. `models` is keyed by our provider ids and
- * each value is an ordered, de-duplicated, bare-id list. `source` records the
- * LiteLLM url and `generatedAt` the ISO instant the snapshot was filtered.
+ * each value is an ordered, de-duplicated, bare-id list. `limits` carries each
+ * model's own MAXIMUM output-token count (from LiteLLM), keyed by the same bare
+ * id — the only ceiling Anthropic sends now that the artificial cap is gone
+ * (14-11); a model absent from a provider's `limits` simply has no recorded max
+ * (the caller applies a safe fallback). `source` records the LiteLLM url and
+ * `generatedAt` the ISO instant the snapshot was filtered.
  */
 export interface ModelCatalog {
   readonly source: string;
   readonly generatedAt: string;
   readonly models: Record<CatalogProvider, readonly string[]>;
+  readonly limits: Record<CatalogProvider, Readonly<Record<string, number>>>;
 }
 
 /** The subset of a LiteLLM entry this module reads (all other fields ignored). */
@@ -66,6 +71,10 @@ interface LiteLLMEntry {
   readonly litellm_provider?: unknown;
   readonly mode?: unknown;
   readonly deprecation_date?: unknown;
+  /** The model's own max output ceiling — canonical field (14-11). */
+  readonly max_output_tokens?: unknown;
+  /** Legacy alias LiteLLM still emits alongside `max_output_tokens`. */
+  readonly max_tokens?: unknown;
 }
 
 /**
@@ -100,6 +109,36 @@ function isDeprecated(entry: LiteLLMEntry, now: Date): boolean {
 }
 
 /**
+ * Read a LiteLLM entry's own max output-token ceiling: prefer the canonical
+ * `max_output_tokens`, fall back to the legacy `max_tokens` LiteLLM still emits.
+ * Returns `null` when neither is a positive finite number (the model then has no
+ * recorded limit and the caller applies a safe fallback).
+ */
+function readMaxOutput(entry: LiteLLMEntry): number | null {
+  for (const raw of [entry.max_output_tokens, entry.max_tokens]) {
+    if (typeof raw === "number" && Number.isFinite(raw) && raw > 0) return raw;
+  }
+  return null;
+}
+
+/**
+ * Build the per-model limits map for one provider's DEDUPED id list from a
+ * lowercase-keyed max lookup. Only ids with a recorded max appear (a missing key
+ * means "no recorded limit"), keyed by the surviving id's canonical casing.
+ */
+function limitsFor(
+  ids: readonly string[],
+  maxByLower: ReadonlyMap<string, number>,
+): Record<string, number> {
+  const out: Record<string, number> = {};
+  for (const id of ids) {
+    const max = maxByLower.get(id.toLowerCase());
+    if (max !== undefined) out[id] = max;
+  }
+  return out;
+}
+
+/**
  * De-duplicate case-insensitively, preserving first-seen order AND the first-seen
  * casing (LiteLLM ids are the canonical casing the provider expects).
  */
@@ -131,6 +170,16 @@ export function filterLiteLLMCatalog(
   // Gemini ids gathered with their source-priority so the native provider wins
   // the dedup: [priorityIndex, normalizedId].
   const geminiBuf: Array<[number, string]> = [];
+  // Each bare id's own max output ceiling, first-seen wins (mirrors `dedupe`),
+  // keyed lowercase so the surviving-casing lookup is stable.
+  const maxByLower = new Map<string, number>();
+
+  const recordMax = (bare: string, entry: LiteLLMEntry): void => {
+    const key = bare.toLowerCase();
+    if (maxByLower.has(key)) return; // first-seen wins, matching dedupe
+    const max = readMaxOutput(entry);
+    if (max !== null) maxByLower.set(key, max);
+  };
 
   if (raw && typeof raw === "object") {
     for (const [id, value] of Object.entries(raw as Record<string, unknown>)) {
@@ -143,9 +192,13 @@ export function filterLiteLLMCatalog(
       const provider = entry.litellm_provider;
       if (provider === "openai") {
         if (id.startsWith("ft:")) continue; // fine-tune template, not selectable
-        openai.push(stripPrefix(id));
+        const bare = stripPrefix(id);
+        openai.push(bare);
+        recordMax(bare, entry);
       } else if (provider === "anthropic") {
-        anthropic.push(stripPrefix(id));
+        const bare = stripPrefix(id);
+        anthropic.push(bare);
+        recordMax(bare, entry);
       } else if (
         typeof provider === "string" &&
         GEMINI_SOURCES.includes(provider)
@@ -153,6 +206,7 @@ export function filterLiteLLMCatalog(
         const bare = stripPrefix(id);
         if (/^gemini/i.test(bare)) {
           geminiBuf.push([GEMINI_SOURCES.indexOf(provider), bare]);
+          recordMax(bare, entry);
         }
       }
     }
@@ -163,13 +217,20 @@ export function filterLiteLLMCatalog(
   geminiBuf.sort((a, b) => a[0] - b[0]);
   const google = geminiBuf.map(([, bare]) => bare);
 
+  const models = {
+    openai: dedupe(openai),
+    anthropic: dedupe(anthropic),
+    google: dedupe(google),
+  };
+
   return {
     source: LITELLM_MODELS_URL,
     generatedAt: now.toISOString(),
-    models: {
-      openai: dedupe(openai),
-      anthropic: dedupe(anthropic),
-      google: dedupe(google),
+    models,
+    limits: {
+      openai: limitsFor(models.openai, maxByLower),
+      anthropic: limitsFor(models.anthropic, maxByLower),
+      google: limitsFor(models.google, maxByLower),
     },
   };
 }

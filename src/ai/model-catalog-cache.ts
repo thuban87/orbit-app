@@ -60,16 +60,30 @@ export interface RefreshDeps {
   readonly signal?: AbortSignal;
 }
 
-/** True when the value is a ModelCatalog with all three provider arrays present. */
+/**
+ * True when the value is a ModelCatalog with all three provider arrays present
+ * AND the 14-11 per-provider `limits` map. A pre-14-11 cache (no `limits`) is
+ * rejected here, so it degrades to the bundled seed until the user refreshes —
+ * safer than accepting a cache that lacks the max-output ceilings Anthropic now
+ * sources from it.
+ */
 function isModelCatalog(value: unknown): value is ModelCatalog {
   if (!value || typeof value !== "object") return false;
   const models = (value as { models?: unknown }).models;
+  const limits = (value as { limits?: unknown }).limits;
   if (!models || typeof models !== "object") return false;
+  if (!limits || typeof limits !== "object") return false;
   const m = models as Record<string, unknown>;
+  const l = limits as Record<string, unknown>;
+  const isRecord = (v: unknown): boolean =>
+    !!v && typeof v === "object" && !Array.isArray(v);
   return (
     Array.isArray(m.openai) &&
     Array.isArray(m.anthropic) &&
-    Array.isArray(m.google)
+    Array.isArray(m.google) &&
+    isRecord(l.openai) &&
+    isRecord(l.anthropic) &&
+    isRecord(l.google)
   );
 }
 

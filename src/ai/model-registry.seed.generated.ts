@@ -8,16 +8,15 @@
  * drifts; the runtime refresh keeps a live device current between regenerations.
  *
  * Source: https://raw.githubusercontent.com/BerriAI/litellm/main/model_prices_and_context_window.json
- * Snapshot generatedAt: 2026-08-22T06:02:55.831Z
+ * Snapshot generatedAt: 2026-08-22T06:58:19.661Z
  */
 import type { ModelCatalog } from "./model-catalog-filter";
 
 export const MODEL_CATALOG_SEED: ModelCatalog = {
-  source:
-    "https://raw.githubusercontent.com/BerriAI/litellm/main/model_prices_and_context_window.json",
-  generatedAt: "2026-08-22T06:02:55.831Z",
-  models: {
-    openai: [
+  "source": "https://raw.githubusercontent.com/BerriAI/litellm/main/model_prices_and_context_window.json",
+  "generatedAt": "2026-08-22T06:58:19.661Z",
+  "models": {
+    "openai": [
       "gpt-3.5-turbo",
       "gpt-3.5-turbo-0125",
       "gpt-3.5-turbo-1106",
@@ -88,9 +87,9 @@ export const MODEL_CATALOG_SEED: ModelCatalog = {
       "o4-mini-2025-04-16",
       "container",
       "gpt-5-search-api",
-      "gpt-5-search-api-2025-10-14",
+      "gpt-5-search-api-2025-10-14"
     ],
-    anthropic: [
+    "anthropic": [
       "claude-haiku-4-5-20251001",
       "claude-haiku-4-5",
       "claude-sonnet-4-5",
@@ -107,9 +106,9 @@ export const MODEL_CATALOG_SEED: ModelCatalog = {
       "claude-opus-5",
       "claude-opus-4-8",
       "claude-mythos-5",
-      "claude-mythos-preview",
+      "claude-mythos-preview"
     ],
-    google: [
+    "google": [
       "gemini-robotics-er-2-preview",
       "gemini-robotics-er-1.6-preview",
       "gemini-2.5-flash",
@@ -143,7 +142,134 @@ export const MODEL_CATALOG_SEED: ModelCatalog = {
       "gemini-3.1-flash-lite-preview",
       "gemini-2.5-flash-lite-preview-09-2025",
       "gemini-2.5-flash-preview-09-2025",
-      "gemini-robotics-er-1.5-preview",
-    ],
+      "gemini-robotics-er-1.5-preview"
+    ]
   },
+  "limits": {
+    "openai": {
+      "gpt-3.5-turbo": 4096,
+      "gpt-3.5-turbo-0125": 4096,
+      "gpt-3.5-turbo-1106": 4096,
+      "gpt-3.5-turbo-16k": 4096,
+      "gpt-4": 4096,
+      "gpt-4-0613": 4096,
+      "gpt-4-1106-preview": 4096,
+      "gpt-4-turbo": 4096,
+      "gpt-4-turbo-2024-04-09": 4096,
+      "gpt-4.1": 32768,
+      "gpt-4.1-2025-04-14": 32768,
+      "gpt-4.1-mini": 32768,
+      "gpt-4.1-mini-2025-04-14": 32768,
+      "gpt-4.1-nano": 32768,
+      "gpt-4.1-nano-2025-04-14": 32768,
+      "gpt-4o": 16384,
+      "gpt-4o-2024-05-13": 4096,
+      "gpt-4o-2024-08-06": 16384,
+      "gpt-4o-2024-11-20": 16384,
+      "gpt-4o-audio-preview": 16384,
+      "gpt-4o-audio-preview-2024-12-17": 16384,
+      "gpt-4o-audio-preview-2025-06-03": 16384,
+      "gpt-audio": 16384,
+      "gpt-audio-1.5": 16384,
+      "gpt-audio-2025-08-28": 16384,
+      "gpt-audio-mini": 16384,
+      "gpt-audio-mini-2025-12-15": 16384,
+      "gpt-4o-mini": 16384,
+      "gpt-4o-mini-2024-07-18": 16384,
+      "gpt-4o-mini-audio-preview": 16384,
+      "gpt-4o-mini-audio-preview-2024-12-17": 16384,
+      "gpt-4o-mini-search-preview": 16384,
+      "gpt-4o-search-preview": 16384,
+      "gpt-5": 128000,
+      "gpt-5.1": 128000,
+      "gpt-5.1-2025-11-13": 128000,
+      "gpt-5.2": 128000,
+      "gpt-5.2-2025-12-11": 128000,
+      "gpt-5.6": 128000,
+      "gpt-5.6-sol": 128000,
+      "gpt-5.6-terra": 128000,
+      "gpt-5.6-luna": 128000,
+      "gpt-5.6-cyber": 128000,
+      "daybreak-red-latest": 128000,
+      "daybreak-blue-latest": 128000,
+      "chat-latest": 128000,
+      "gpt-5.5": 128000,
+      "gpt-5.5-2026-04-23": 128000,
+      "gpt-5.4": 128000,
+      "gpt-5.4-2026-03-05": 128000,
+      "gpt-5.4-mini": 128000,
+      "gpt-5.4-mini-2026-03-17": 128000,
+      "gpt-5.4-nano": 128000,
+      "gpt-5.4-nano-2026-03-17": 128000,
+      "gpt-5-2025-08-07": 128000,
+      "gpt-5-chat": 16384,
+      "gpt-5-mini": 128000,
+      "gpt-5-mini-2025-08-07": 128000,
+      "gpt-5-nano": 128000,
+      "gpt-5-nano-2025-08-07": 128000,
+      "o1": 100000,
+      "o1-2024-12-17": 100000,
+      "o3": 100000,
+      "o3-2025-04-16": 100000,
+      "o3-mini": 100000,
+      "o3-mini-2025-01-31": 100000,
+      "o4-mini": 100000,
+      "o4-mini-2025-04-16": 100000,
+      "gpt-5-search-api": 128000,
+      "gpt-5-search-api-2025-10-14": 128000
+    },
+    "anthropic": {
+      "claude-haiku-4-5-20251001": 64000,
+      "claude-haiku-4-5": 64000,
+      "claude-sonnet-4-5": 64000,
+      "claude-sonnet-4-5-20250929": 64000,
+      "claude-sonnet-5": 128000,
+      "claude-sonnet-4-6": 128000,
+      "claude-opus-4-5-20251101": 64000,
+      "claude-opus-4-5": 64000,
+      "claude-opus-4-6": 128000,
+      "claude-opus-4-6-20260205": 128000,
+      "claude-opus-4-7": 128000,
+      "claude-opus-4-7-20260416": 128000,
+      "claude-fable-5": 128000,
+      "claude-opus-5": 128000,
+      "claude-opus-4-8": 128000,
+      "claude-mythos-5": 128000,
+      "claude-mythos-preview": 128000
+    },
+    "google": {
+      "gemini-robotics-er-2-preview": 65536,
+      "gemini-robotics-er-1.6-preview": 65536,
+      "gemini-2.5-flash": 65535,
+      "gemini-2.5-flash-lite": 65535,
+      "gemini-flash-latest": 65535,
+      "gemini-flash-lite-latest": 65535,
+      "gemini-2.5-pro": 65535,
+      "gemini-2.5-computer-use-preview-10-2025": 64000,
+      "gemini-3.1-flash-lite": 65536,
+      "gemini-3.5-flash-lite": 65536,
+      "gemini-3-flash-preview": 65535,
+      "gemini-3.5-flash": 65535,
+      "gemini-3.6-flash": 65536,
+      "gemini-3.7-flash": 65536,
+      "gemini-omni-flash-preview": 65535,
+      "gemini-3.1-pro-preview": 65536,
+      "gemini-3.1-pro-preview-customtools": 65536,
+      "gemini-2.5-pro-preview-tts": 65535,
+      "gemini-exp-1114": 8192,
+      "gemini-exp-1206": 8192,
+      "gemini-gemma-2-27b-it": 8192,
+      "gemini-gemma-2-9b-it": 8192,
+      "gemini-2.5-flash-native-audio-latest": 8192,
+      "gemini-2.5-flash-native-audio-preview-09-2025": 8192,
+      "gemini-2.5-flash-native-audio-preview-12-2025": 8192,
+      "gemini-3.1-flash-live-preview": 65536,
+      "gemini-pro-latest": 65535,
+      "gemini-3-pro-preview": 65535,
+      "gemini-3.1-flash-lite-preview": 65536,
+      "gemini-2.5-flash-lite-preview-09-2025": 65535,
+      "gemini-2.5-flash-preview-09-2025": 65535,
+      "gemini-robotics-er-1.5-preview": 65535
+    }
+  }
 } as const;
