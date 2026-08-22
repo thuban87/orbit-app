@@ -9,11 +9,13 @@
  * they were handed — never a rebuilt one (H5 / T-14-13).
  */
 import { describe, expect, it } from "vitest";
+import { bundledModelsFor } from "@/ai/model-registry";
 import type { ResolvedPrompt } from "@/ai/prompt-types";
 import {
   buildAiSettingsPatch,
   buildInspectorViewState,
   buildProviderAckViewState,
+  curatedModelsFor,
   discoverModelsForField,
   validateEndpointForSave,
 } from "@/screens/settings-ai-logic";
@@ -74,30 +76,62 @@ describe("validateEndpointForSave — reject before persistence (H2)", () => {
   });
 });
 
-describe("discoverModelsForField — free-text fallback (C4-M1)", () => {
-  it("returns the fetched list when discovery yields models", async () => {
-    const state = await discoverModelsForField(async () => ({
+describe("curatedModelsFor — bundled default list (D-03)", () => {
+  it("returns the registry's bundled frontier list for a cloud provider", () => {
+    expect(curatedModelsFor("google")).toEqual(bundledModelsFor("google"));
+    expect(curatedModelsFor("openai")).toEqual(bundledModelsFor("openai"));
+    expect(curatedModelsFor("anthropic")).toEqual(
+      bundledModelsFor("anthropic"),
+    );
+  });
+
+  it("returns an empty list for custom (free-text only) and none", () => {
+    expect(curatedModelsFor("custom")).toEqual([]);
+    expect(curatedModelsFor("none")).toEqual([]);
+  });
+});
+
+describe("discoverModelsForField — frontier-filtered, free-text fallback (C4-M1/D-04)", () => {
+  it("filters a mixed discovered list down to the frontier ids only", async () => {
+    const frontier = bundledModelsFor("google");
+    const state = await discoverModelsForField("google", async () => ({
       kind: "list",
-      models: ["a", "b"],
+      models: [
+        "gemini-2.5-flash-preview-tts", // non-chat → drop
+        frontier[0], // frontier → keep
+        "gemini-embedding-001", // non-chat → drop
+        "gemini-2.5-flash", // known-dead → drop
+        frontier[1], // frontier → keep
+      ],
     }));
-    expect(state).toEqual({ kind: "list", models: ["a", "b"] });
+    expect(state).toEqual({ kind: "list", models: [frontier[0], frontier[1]] });
+  });
+
+  it("degrades an all-junk discovered list to manual (free-text)", async () => {
+    const state = await discoverModelsForField("google", async () => ({
+      kind: "list",
+      models: ["gemini-2.5-flash", "text-embedding-004", "imagen-4.0-generate"],
+    }));
+    expect(state).toEqual({ kind: "manual" });
   });
 
   it("falls back to manual when discovery reports manual", async () => {
-    const state = await discoverModelsForField(async () => ({ kind: "manual" }));
+    const state = await discoverModelsForField("openai", async () => ({
+      kind: "manual",
+    }));
     expect(state).toEqual({ kind: "manual" });
   });
 
   it("falls back to manual on an empty list", async () => {
-    const state = await discoverModelsForField(async () => ({
+    const state = await discoverModelsForField("openai", async () => ({
       kind: "list",
       models: [],
     }));
     expect(state).toEqual({ kind: "manual" });
   });
 
-  it("falls back to manual if the discovery call throws", async () => {
-    const state = await discoverModelsForField(async () => {
+  it("falls back to manual if the discovery call throws (advisory — C4-M1)", async () => {
+    const state = await discoverModelsForField("anthropic", async () => {
       throw new Error("boom");
     });
     expect(state).toEqual({ kind: "manual" });

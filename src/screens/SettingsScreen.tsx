@@ -420,7 +420,9 @@ export function SettingsScreen() {
       setAiStatus("Enter a model name manually.");
       return;
     }
-    const state = await discoverModelsForField(() => provider.listModels());
+    const state = await discoverModelsForField(aiProvider, () =>
+      provider.listModels(),
+    );
     setAiModelField(state);
     setAiStatus(
       state.kind === "list"

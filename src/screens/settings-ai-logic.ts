@@ -21,14 +21,15 @@
  * Settings must not construct an alternate prompt — a grep-enforced boundary. The
  * only prompt symbol it touches is the ResolvedPrompt TYPE it accepts.
  */
-import type { ResolvedPrompt, TruncationNotice } from "@/ai/prompt-types";
 import {
-  validateCustomEndpoint,
   type ValidateEndpointResult,
+  validateCustomEndpoint,
 } from "@/ai/custom-endpoint";
+import { bundledModelsFor, filterToFrontier } from "@/ai/model-registry";
+import type { ResolvedPrompt, TruncationNotice } from "@/ai/prompt-types";
 import type { AppSettingsPatch } from "@/db/app-settings-dao";
-import type { AiProviderId } from "@/services/ai-types";
 import type { ModelDiscovery } from "@/services/AiService";
+import type { AiProviderId } from "@/services/ai-types";
 
 /** Human-facing provider names (view-state only; ids stay the stored source). */
 const PROVIDER_NAMES: Record<AiProviderId, string> = {
@@ -96,18 +97,38 @@ export type ModelFieldState =
   | { readonly kind: "manual" };
 
 /**
+ * The BUNDLED curated frontier list the screen renders BY DEFAULT (D-03) — no key,
+ * no network. Delegates to the model registry (the single curation source of
+ * truth); `none`/`custom` return an empty list (Custom is free-text only — C4-M1).
+ */
+export function curatedModelsFor(provider: AiProviderId): readonly string[] {
+  return bundledModelsFor(provider);
+}
+
+/**
  * Orchestrate a model-discovery attempt into a model-field view-state. Discovery
  * is advisory and NEVER blocks manual entry (C4-M1): an empty list, a `manual`
  * result, OR any thrown error all fall back to free-text. The caller supplies the
- * discovery closure (a provider adapter's `listModels`) so this stays pure/I/O-free.
+ * active provider id and the discovery closure (a provider adapter's `listModels`)
+ * so this stays pure/I/O-free.
+ *
+ * The raw discovered catalog is narrowed to the curated frontier set before
+ * display (D-04): non-chat families and deprecated-but-still-listed ids fall away
+ * via `filterToFrontier`. If nothing survives the filter the field degrades to
+ * `{kind:'manual'}` exactly like an empty/unavailable discovery — free-text stays
+ * the escape hatch for any legitimate model that is not (yet) curated.
  */
 export async function discoverModelsForField(
+  provider: AiProviderId,
   listModels: () => Promise<ModelDiscovery>,
 ): Promise<ModelFieldState> {
   try {
     const discovery = await listModels();
-    if (discovery.kind === "list" && discovery.models.length > 0) {
-      return { kind: "list", models: discovery.models };
+    if (discovery.kind === "list") {
+      const models = filterToFrontier(provider, discovery.models);
+      if (models.length > 0) {
+        return { kind: "list", models };
+      }
     }
     return { kind: "manual" };
   } catch {
