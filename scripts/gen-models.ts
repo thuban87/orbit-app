@@ -19,7 +19,7 @@ import {
   filterLiteLLMCatalog,
   LITELLM_MODELS_URL,
   type ModelCatalog,
-} from "../src/ai/model-catalog-filter.ts";
+} from "../src/ai/model-catalog-filter";
 
 const SEED_PATH = fileURLToPath(
   new URL("../src/ai/model-registry.seed.generated.ts", import.meta.url),
