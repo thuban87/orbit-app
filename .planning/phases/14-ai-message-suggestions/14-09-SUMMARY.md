@@ -93,6 +93,8 @@ status: complete
 
 # Phase 14 Plan 09: Thinking-Aware Per-Provider Token Budget Summary
 
+> **SUPERSEDED (14-11):** the token budget is REMOVED. The output cap never bounded visible length (the 1,200-code-point post-parse trim does) and starved thinking models. As of 14-11 only Anthropic sends `max_tokens` (its API requires one, set to the model's own catalog maximum); OpenAI/Gemini omit the cap and Gemini omits `thinkingConfig` for its default dynamic thinking. The budget/thinking machinery below is historical.
+
 **Replaces the flat MAX_OUTPUT_TOKENS stopgap with `resolveTokenBudget`, giving Gemini a `thinkingConfig.thinkingBudget` reasoning cap plus output headroom so thinking models stop spending the whole budget on reasoning and emitting empty/truncated drafts.**
 
 ## Performance

@@ -90,3 +90,25 @@ Physical-Pixel UAT on debug (Metro, console) + release builds. **Result: BLOCKED
 - **DATA-04 held** — the suggestion attempt left Alice/Dad `last_contact` unchanged (no touchpoint).
 
 **Not yet exercised** (blocked by the hang or needing infra): the first-send acknowledgement gate + exact-prompt inspector, a returned suggestion / editable draft, cancel/replace, sanitized error paths, and the native egress-escape fixtures (private-DNS / redirect / proxy).
+
+---
+
+## 14-11 — Device UAT checklist (PENDING — owner's pass, nothing device-verified yet)
+
+The 14-11 model-layer bundle (frontier = 3 latest-per-tier per provider; artificial
+output cap removed) is proven node-side only (`npm test`, `tsc`, `check:colors`,
+biome). The following require the owner's on-device pass and are **NOT** verified:
+
+**Model picker (14-10 + 14-11):**
+- [ ] PENDING — Frontier scope shows EXACTLY three chips per cloud provider, one per named tier (Gemini: Pro / Flash / Flash-lite; Anthropic: Opus / Sonnet / Haiku; OpenAI: Sol / Terra / Luna).
+- [ ] PENDING — The "All models" toggle expands to the full deprecation-filtered chat set for the active provider.
+- [ ] PENDING — "Refresh models" (explicit tap) updates the on-device catalog from LiteLLM; a newer version shipping upstream re-resolves the tier chip without a code change.
+- [ ] PENDING — Offline / first-run falls back to the bundled seed (picker still populated with the committed resolutions).
+- [ ] PENDING — Free-text model entry still works as the escape hatch (none/custom always free-text).
+
+**Full-length drafts, cap removed (14-11):**
+- [ ] PENDING — Gemini **Pro** returns a complete, non-truncated multi-sentence draft (the tier most prone to spending budget on reasoning).
+- [ ] PENDING — Gemini **Flash** and **Flash-lite** each return full-length drafts.
+- [ ] PENDING — Anthropic draft succeeds (request carries the model's own `max_tokens` from the catalog).
+- [ ] PENDING — OpenAI and Custom drafts return full-length output with no artificial cap.
+- [ ] PENDING — No draft is truncated mid-sentence; visible length is bounded only by the 1,200-code-point post-parse trim.

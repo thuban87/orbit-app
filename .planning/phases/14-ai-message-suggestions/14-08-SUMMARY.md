@@ -52,6 +52,8 @@ metrics:
 
 # Phase 14 Plan 08: Curated Frontier Model Picker Summary
 
+> **SUPERSEDED (14-10, then 14-11):** the hand-curated frontier arrays were replaced by the LiteLLM-sourced catalog (14-10), and the frontier filter narrowed to exactly three latest-per-tier ids per provider (14-11). The curation approach recorded below is historical.
+
 Replaced the raw provider catalog in the AI model picker with a bundled, node-pure curated frontier CHAT-model list per provider, so the default picker needs no API key and no network call and can never offer a deprecated or non-chat model. Dynamic discovery and free-text survive as advanced escape hatches, with discovery now intersected against the same curated frontier set.
 
 ## What shipped

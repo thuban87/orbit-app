@@ -44,6 +44,25 @@ Where §3–§6 below conflict with the following, **these override the SPEC bod
    tuned output allowance and no reasoning cap. The neutral `GenerationInput.thinkingBudget` is a
    provider-agnostic concept mapped ONLY by the Gemini adapter. The SEPARATE 1,200-code-point
    post-parse draft ceiling in `AiService.parseSuggestionOutput` is UNCHANGED.
+7. **BOTH the flat cap (§4) AND Plan 09's per-provider thinking-aware budget (§0.6) are now
+   SUPERSEDED — the output cap is REMOVED entirely** (Plan 14-11). The cap never controlled visible
+   draft length (the 1,200-code-point post-parse trim does that, and STAYS) and on thinking models it
+   was spent on reasoning, returning empty/truncated drafts. As of 14-11:
+   - **Gemini** OMITS `maxOutputTokens` AND `thinkingConfig` from `generationConfig` — the model uses
+     its default DYNAMIC thinking and emits a full message (verified against
+     ai.google.dev/gemini-api/docs/thinking, 2026-08-22).
+   - **OpenAI** OMITS `max_completion_tokens` (provider default).
+   - **Anthropic** is the ONLY provider that still sends a ceiling, because its Messages API REQUIRES
+     `max_tokens` and it cannot be omitted (verified against the Anthropic API docs, 2026-08-22). The
+     value is the selected model's OWN maximum, sourced from the LiteLLM catalog (which now carries a
+     per-model `limits` map), with a high fallback (8192) for a free-text / absent model. The only
+     ceiling is the model's, not one we invented.
+   - **Custom** sends a high, non-binding default (its endpoint may require a max); the outbound
+     prompt payload is byte-identical — only generation-config size fields changed.
+   `src/ai/token-budget.ts` now exposes `resolveMaxOutputTokens(provider, model, catalog)`; the neutral
+   `GenerationInput.maxOutputTokens` is now OPTIONAL and `GenerationInput.thinkingBudget` and 14-09's
+   thinking-headroom constants are DELETED. The 1,200-code-point post-parse ceiling remains the sole
+   bound on visible length.
 
 ---
 
