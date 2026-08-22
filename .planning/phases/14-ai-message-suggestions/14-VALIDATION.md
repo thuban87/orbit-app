@@ -99,12 +99,13 @@ The 14-11 model-layer bundle (frontier = 3 latest-per-tier per provider; artific
 output cap removed) is proven node-side only (`npm test`, `tsc`, `check:colors`,
 biome). The following require the owner's on-device pass and are **NOT** verified:
 
-**Model picker (14-10 + 14-11):**
-- [ ] PENDING — Frontier scope shows EXACTLY three chips per cloud provider, one per named tier (Gemini: Pro / Flash / Flash-lite; Anthropic: Opus / Sonnet / Haiku; OpenAI: Sol / Terra / Luna).
-- [ ] PENDING — The "All models" toggle expands to the full deprecation-filtered chat set for the active provider.
-- [ ] PENDING — "Refresh models" (explicit tap) updates the on-device catalog from LiteLLM; a newer version shipping upstream re-resolves the tier chip without a code change.
-- [ ] PENDING — Offline / first-run falls back to the bundled seed (picker still populated with the committed resolutions).
-- [ ] PENDING — Free-text model entry still works as the escape hatch (none/custom always free-text).
+**Model picker (14-10 + 14-11) — orchestrator-driven on the physical Pixel release build (2026-08-22):**
+- [x] PASS — Frontier scope shows EXACTLY three chips per provider: Gemini `gemini-3.1-pro-preview` / `gemini-3.7-flash` / `gemini-3.5-flash-lite`; Anthropic `claude-opus-5` / `claude-sonnet-5` / `claude-haiku-4-5`; OpenAI `gpt-5.6-sol` / `gpt-5.6-terra` / `gpt-5.6-luna`. (uiautomator-confirmed, exactly 3 each.)
+- [x] PASS — "All models" toggle expands to the full catalog (Gemini → the full deprecation-filtered chat set incl. 2.5 line / latest aliases / computer-use; count returns to 3 on toggle back).
+- [x] PASS — "Refresh models" tap fetched the live LiteLLM catalog on-device; status line `settings-ai-status` read "Model list updated (17 available)." (keyless public GET, no crash).
+- [x] PASS — Offline (airplane mode) cold relaunch: dashboard renders and the picker still shows the 3 seed-backed frontier chips + "no API key needed" copy (bundled seed fallback works with zero network).
+- [~] PRESENT (not exercised) — the "Advanced options — discover or enter a model id" free-text/discover affordance is present; typing a free-text id was not driven (owner can confirm).
+- Note: the API key field renders masked (`•••••••• (saved)`) — SecureStore-backed, no raw key in the UI tree.
 
 **Full-length drafts, cap removed (14-11):**
 - [ ] PENDING — Gemini **Pro** returns a complete, non-truncated multi-sentence draft (the tier most prone to spending budget on reasoning).
