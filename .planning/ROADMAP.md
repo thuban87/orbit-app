@@ -580,6 +580,6 @@ Plans:
 | 11. Actionable Notifications | 13/13 | Complete   | 2026-08-16 |
 | 12. Home Screen Widget | 8/8 | Complete   | 2026-08-17 |
 | 13. Orrery | 8/8 | Complete   | 2026-08-18 |
-| 14. AI Message Suggestions | 6/7 (+gap iters 08→10, 09→11) | Model layer LiteLLM-sourced + frontier-3 + output-cap removed; node-verified (1305/1305); single device UAT (14-06 T2 incl. release-blocking egress fixtures) pending owner build | - |
+| 14. AI Message Suggestions | 6/7 (+gap iters 08→10, 09→11) | LiteLLM-sourced picker + frontier-3 + cap removed; node-verified (1305/1305) + device-UAT'd (picker verified, drafts owner-confirmed, egress guard smoke-PASS); owner release sign-off + push remain | - |
 | 15. Weekly Digest | 0/TBD | Not started | - |
 | 16. Backup, Export & Restore | 0/TBD | Not started | - |
