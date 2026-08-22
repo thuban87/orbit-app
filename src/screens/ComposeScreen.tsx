@@ -308,8 +308,13 @@ export function ComposeScreen({ navigation, route }: RootStackScreenProps<"Compo
               intentConsumedRef.current,
             )
           ) {
+            // Do NOT navigation.setParams() to clear the intent here: that mutates
+            // route.params.requestAiSuggestion — a dependency of THIS focus effect —
+            // which re-subscribes the effect and fires its cleanup dispose() on the
+            // request we JUST started, stranding it in 'resolving' forever. The
+            // one-shot is already guarded by intentConsumedRef; a fresh push/remount
+            // carries fresh params, and a re-focus of this mount is ref-guarded.
             intentConsumedRef.current = true;
-            navigation.setParams({ requestAiSuggestion: undefined });
             if (settings.aiProvider !== "none") {
               void lifecycleRef.current?.begin();
             }
@@ -347,7 +352,7 @@ export function ComposeScreen({ navigation, route }: RootStackScreenProps<"Compo
         focusedRef.current = false;
         lifecycleRef.current?.dispose();
       };
-    }, [contactId, goHome, navigation, route.params.requestAiSuggestion]),
+    }, [contactId, goHome, route.params.requestAiSuggestion]),
   );
 
   // Android hardware/system Back → dashboard too (consume the event so native-stack

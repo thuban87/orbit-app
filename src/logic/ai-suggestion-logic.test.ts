@@ -515,3 +515,30 @@ describe("AiSuggestionLifecycle — one immutable prompt across consumers (M1)",
     expect(h.deps.generate.mock.calls[0][0]).toBe(prompt);
   });
 });
+
+describe("AiSuggestionLifecycle — dispose never strands (regression)", () => {
+  it("dispose() during 'resolving' resets the visible state to idle", async () => {
+    // A resolvePrompt that only settles when we release it keeps the lifecycle in
+    // 'resolving' — the exact window in which a focus-effect cleanup used to strand
+    // the UI forever (self-inflicted setParams→dispose race; see ComposeScreen).
+    let release: (p: ResolvedPrompt) => void = () => {};
+    const pending = new Promise<ResolvedPrompt>((res) => {
+      release = res;
+    });
+    const h = makeHarness({ resolvePrompt: vi.fn(() => pending) });
+
+    const begun = h.lifecycle.begin();
+    expect(h.states.at(-1)?.status).toBe("resolving");
+
+    // Navigation away / unmount disposes the in-flight request.
+    h.lifecycle.dispose();
+    // MUST be reset to idle — never left stranded in 'resolving'.
+    expect(h.states.at(-1)?.status).toBe("idle");
+
+    // The now-stale deferred resolution must not resurrect the flow.
+    release(h.prompt);
+    await begun;
+    expect(h.states.at(-1)?.status).toBe("idle");
+    expect(h.deps.generate).not.toHaveBeenCalled();
+  });
+});

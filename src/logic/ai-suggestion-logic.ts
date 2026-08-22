@@ -362,6 +362,11 @@ export class AiSuggestionLifecycle {
    */
   dispose(): void {
     this.invalidate();
+    // Reset the visible state so a dispose (blur / contactId change / unmount)
+    // can NEVER strand the UI in 'resolving' or 'loading'. Mirrors onConfigChange.
+    if (this.state.status !== "idle") {
+      this.set({ status: "idle" });
+    }
   }
 
   /**
