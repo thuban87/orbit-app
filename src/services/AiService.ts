@@ -47,6 +47,16 @@ export interface GenerationInput {
   readonly model: string;
   readonly temperature: number;
   readonly maxOutputTokens: number;
+  /**
+   * NEUTRAL, provider-agnostic cap on a THINKING model's internal reasoning
+   * tokens (`null`/undefined = no cap / provider default). This is a CONCEPT, not
+   * a provider field name — mirroring how `maxOutputTokens` already maps to
+   * `max_tokens` / `max_completion_tokens` / Gemini config per adapter (D-03).
+   * Only the Gemini adapter maps it (to `generationConfig.thinkingConfig.thinkingBudget`);
+   * the OpenAI, Anthropic, and Custom adapters IGNORE it. The per-provider values
+   * are chosen by `resolveTokenBudget` in `@/ai/token-budget`.
+   */
+  readonly thinkingBudget?: number | null;
   readonly signal: AbortSignal;
 }
 
@@ -290,7 +300,10 @@ export class AnthropicProvider implements AiProvider {
   async listModels(signal?: AbortSignal): Promise<ModelDiscovery> {
     const key = await this.getKey();
     if (!key) return { kind: "manual" };
-    const headers = { "x-api-key": key, "anthropic-version": ANTHROPIC_VERSION };
+    const headers = {
+      "x-api-key": key,
+      "anthropic-version": ANTHROPIC_VERSION,
+    };
     try {
       const ids: string[] = [];
       let afterId: string | undefined;
@@ -304,10 +317,13 @@ export class AnthropicProvider implements AiProvider {
         ids.push(...extractIdList(data));
         const hasMore = walk(data, ["has_more"]) === true;
         const lastId = walk(data, ["last_id"]);
-        if (!hasMore || typeof lastId !== "string" || lastId.length === 0) break;
+        if (!hasMore || typeof lastId !== "string" || lastId.length === 0)
+          break;
         afterId = lastId;
       }
-      return ids.length > 0 ? { kind: "list", models: ids } : { kind: "manual" };
+      return ids.length > 0
+        ? { kind: "list", models: ids }
+        : { kind: "manual" };
     } catch {
       return { kind: "manual" };
     }
@@ -385,6 +401,25 @@ export class GoogleProvider implements AiProvider {
       input.model,
     )}:generateContent?key=${encodeURIComponent(key)}`;
 
+    // Gemini 2.5/3.x are THINKING models: reasoning tokens are spent from the
+    // output budget BEFORE any message. Map the neutral `thinkingBudget` concept
+    // (D-03) to `thinkingConfig.thinkingBudget` — the CURRENT Gemini field,
+    // verified against ai.google.dev/api/generate-content (GenerationConfig →
+    // thinkingConfig) on 2026-08-22 — to cap reasoning. Omit it entirely when the
+    // caller passes null/undefined so the provider default applies. This is the
+    // ONLY adapter that maps the field; no provider field name leaks into the
+    // neutral contract.
+    const generationConfig: Record<string, unknown> = {
+      temperature: input.temperature,
+      maxOutputTokens: input.maxOutputTokens,
+      candidateCount: 1,
+    };
+    if (typeof input.thinkingBudget === "number") {
+      generationConfig.thinkingConfig = {
+        thinkingBudget: input.thinkingBudget,
+      };
+    }
+
     let response: Response;
     try {
       response = await fetch(url, {
@@ -392,11 +427,7 @@ export class GoogleProvider implements AiProvider {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           contents: [{ parts: [{ text: input.resolvedPrompt.payload }] }],
-          generationConfig: {
-            temperature: input.temperature,
-            maxOutputTokens: input.maxOutputTokens,
-            candidateCount: 1,
-          },
+          generationConfig,
         }),
         signal: input.signal,
       });
@@ -425,7 +456,9 @@ function extractGeminiModels(data: unknown): string[] {
       Array.isArray(methods) &&
       methods.includes("generateContent")
     ) {
-      ids.push(name.startsWith("models/") ? name.slice("models/".length) : name);
+      ids.push(
+        name.startsWith("models/") ? name.slice("models/".length) : name,
+      );
     }
   }
   return ids;

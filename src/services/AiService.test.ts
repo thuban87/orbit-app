@@ -137,7 +137,10 @@ describe("official adapters — valid response extraction", () => {
       ok: true,
       bodyText: '{"choices":[{"message":{"content":"custom-text"}}]}',
     });
-    const p = new CustomProvider("https://api.example.com/v1/chat", staticKey("k"));
+    const p = new CustomProvider(
+      "https://api.example.com/v1/chat",
+      staticKey("k"),
+    );
     await expect(
       p.generate(inputFor("hi", new AbortController().signal)),
     ).resolves.toBe("custom-text");
@@ -333,9 +336,9 @@ describe("caller-owned cancellation (H4)", () => {
     const ctrl = new AbortController();
     ctrl.abort();
     const p = new OpenAiProvider(staticKey("k"));
-    await expect(
-      p.generate(inputFor("hi", ctrl.signal)),
-    ).rejects.toMatchObject({ code: "cancelled" });
+    await expect(p.generate(inputFor("hi", ctrl.signal))).rejects.toMatchObject(
+      { code: "cancelled" },
+    );
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
@@ -386,7 +389,9 @@ describe("neutral thinkingBudget maps to Gemini thinkingConfig only (D-03)", () 
       }),
     );
     const p = new GoogleProvider(staticKey("k"));
-    await p.generate(inputFor("hi", new AbortController().signal, "gem-1", 256));
+    await p.generate(
+      inputFor("hi", new AbortController().signal, "gem-1", 256),
+    );
     const body = JSON.parse(fetchMock.mock.calls[0][1].body);
     expect(body.generationConfig.thinkingConfig).toEqual({
       thinkingBudget: 256,
@@ -402,7 +407,9 @@ describe("neutral thinkingBudget maps to Gemini thinkingConfig only (D-03)", () 
       }),
     );
     const p = new GoogleProvider(staticKey("k"));
-    await p.generate(inputFor("hi", new AbortController().signal, "gem-1", null));
+    await p.generate(
+      inputFor("hi", new AbortController().signal, "gem-1", null),
+    );
     const body = JSON.parse(fetchMock.mock.calls[0][1].body);
     expect(body.generationConfig.thinkingConfig).toBeUndefined();
   });
@@ -435,11 +442,11 @@ describe("neutral thinkingBudget maps to Gemini thinkingConfig only (D-03)", () 
   });
 
   it("Anthropic ignores thinkingBudget — no thinkingConfig/thinking field leaks in", async () => {
-    fetchMock.mockResolvedValueOnce(
-      okJson({ content: [{ text: "ok" }] }),
-    );
+    fetchMock.mockResolvedValueOnce(okJson({ content: [{ text: "ok" }] }));
     const p = new AnthropicProvider(staticKey("k"));
-    await p.generate(inputFor("hi", new AbortController().signal, "claude", 256));
+    await p.generate(
+      inputFor("hi", new AbortController().signal, "claude", 256),
+    );
     const body = JSON.parse(fetchMock.mock.calls[0][1].body);
     expect(body.thinkingConfig).toBeUndefined();
     expect(body.thinking).toBeUndefined();
