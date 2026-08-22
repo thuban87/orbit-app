@@ -33,7 +33,11 @@ const RAW = {
 
   // OpenAI: a real chat model (keep), a fine-tune template (drop), a non-chat
   // family (drop), and a past-deprecated chat model (drop).
-  "gpt-5.4-mini": { mode: "chat", litellm_provider: "openai" },
+  "gpt-5.4-mini": {
+    mode: "chat",
+    litellm_provider: "openai",
+    max_output_tokens: 16384,
+  },
   "ft:gpt-4o-2024-08-06": { mode: "chat", litellm_provider: "openai" },
   "dall-e-3": { mode: "image_generation", litellm_provider: "openai" },
   "gpt-4-0314": {
@@ -44,8 +48,18 @@ const RAW = {
 
   // Anthropic: bare ids, kept as-is.
   "claude-opus-5": { mode: "anthropic-oops", litellm_provider: "anthropic" }, // wrong mode → drop
-  "claude-sonnet-5": { mode: "chat", litellm_provider: "anthropic" },
-  "claude-haiku-4-5": { mode: "chat", litellm_provider: "anthropic" },
+  "claude-sonnet-5": {
+    mode: "chat",
+    litellm_provider: "anthropic",
+    max_output_tokens: 128000,
+    max_tokens: 64000,
+  },
+  // legacy `max_tokens` only (no max_output_tokens) — must still be read.
+  "claude-haiku-4-5": {
+    mode: "chat",
+    litellm_provider: "anthropic",
+    max_tokens: 64000,
+  },
 
   // Gemini native (prefixed) — strip the `gemini/` prefix.
   "gemini/gemini-2.5-flash": { mode: "chat", litellm_provider: "gemini" },
@@ -115,6 +129,20 @@ describe("filterLiteLLMCatalog — mode/provider/deprecation mapping", () => {
 
   it("never lets a vertex-hosted non-gemini model leak into google", () => {
     expect(cat.models.google).not.toContain("claude-opus-4-5");
+  });
+
+  it("carries per-model max output, preferring max_output_tokens over legacy max_tokens", () => {
+    // max_output_tokens wins when both are present (sonnet: 128000, not 64000).
+    expect(cat.limits.anthropic["claude-sonnet-5"]).toBe(128000);
+    // legacy max_tokens is read when max_output_tokens is absent (haiku).
+    expect(cat.limits.anthropic["claude-haiku-4-5"]).toBe(64000);
+    // openai entry with only max_output_tokens.
+    expect(cat.limits.openai["gpt-5.4-mini"]).toBe(16384);
+  });
+
+  it("omits a limit for a model that declares neither max field", () => {
+    // The gemini fixtures carry no max fields, so no limit is recorded for them.
+    expect(cat.limits.google["gemini-2.5-flash"]).toBeUndefined();
   });
 
   it("de-duplicates case-insensitively, preserving first-seen id casing", () => {
