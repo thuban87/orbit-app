@@ -44,17 +44,18 @@ export interface FrontierTier {
   readonly exclude?: string;
 }
 
-export const FRONTIER_TIERS: Record<CatalogProvider, readonly FrontierTier[]> = {
-  // OpenAI names its current tiers `gpt-<ver>-sol|terra|luna`.
-  openai: [{ tier: "sol" }, { tier: "terra" }, { tier: "luna" }],
-  anthropic: [{ tier: "opus" }, { tier: "sonnet" }, { tier: "haiku" }],
-  google: [
-    { tier: "pro" },
-    // `flash` must NOT also match `flash-lite` (they are distinct tiers).
-    { tier: "flash", exclude: "flash-lite" },
-    { tier: "flash-lite" },
-  ],
-};
+export const FRONTIER_TIERS: Record<CatalogProvider, readonly FrontierTier[]> =
+  {
+    // OpenAI names its current tiers `gpt-<ver>-sol|terra|luna`.
+    openai: [{ tier: "sol" }, { tier: "terra" }, { tier: "luna" }],
+    anthropic: [{ tier: "opus" }, { tier: "sonnet" }, { tier: "haiku" }],
+    google: [
+      { tier: "pro" },
+      // `flash` must NOT also match `flash-lite` (they are distinct tiers).
+      { tier: "flash", exclude: "flash-lite" },
+      { tier: "flash-lite" },
+    ],
+  };
 
 /** The frozen empty list reused for `none`/`custom` and no-match results. */
 const EMPTY: readonly string[] = Object.freeze([]);

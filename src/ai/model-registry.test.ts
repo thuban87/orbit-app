@@ -20,8 +20,8 @@
 import { describe, expect, it } from "vitest";
 import type { ModelCatalog } from "@/ai/model-catalog-filter";
 import {
-  filterToFrontier,
   FRONTIER_TIERS,
+  filterToFrontier,
   modelsFor,
   resolveActiveCatalog,
   SEED_CATALOG,
@@ -128,7 +128,9 @@ describe("modelsFor — frontier resolves to ≤3 latest-per-tier winners", () =
   });
 
   it("returns a frozen array", () => {
-    expect(Object.isFrozen(modelsFor(CATALOG, "openai", "frontier"))).toBe(true);
+    expect(Object.isFrozen(modelsFor(CATALOG, "openai", "frontier"))).toBe(
+      true,
+    );
   });
 });
 
