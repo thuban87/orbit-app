@@ -48,6 +48,7 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "check:colors": "bash scripts/check-colors.sh",
+    "gen:models": "tsx scripts/gen-models.ts",
     "test": "vitest run",
     "postinstall": "patch-package"
   },
