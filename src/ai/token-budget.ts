@@ -1,126 +1,75 @@
 /**
- * Per-provider, thinking-aware output budget policy (Plan 14-09, D-01/D-02/D-04).
+ * Catalog-aware max-output policy (Plan 14-11 — REMOVES 14-09's flat, per-provider
+ * thinking-aware output cap).
  *
  * =============================================================================
- * WHY THIS EXISTS — READ BEFORE RETUNING:
- *   THINKING models (Gemini 2.5/3.x) spend `maxOutputTokens` on internal
- *   reasoning tokens BEFORE emitting a single message token. Device UAT (14-06)
- *   measured 364 thinking tokens for a ~21-token reply and 702–886 for a
- *   fuel-rich contact — a single flat `maxOutputTokens` was spent on reasoning
- *   and returned empty / mid-sentence drafts. Bumping the flat number (120 →
- *   1024 → 2048) stayed fragile. The robust fix is per-provider:
+ * WHY THE FLAT CAP IS GONE:
+ *   The flat `maxOutputTokens` never controlled visible draft length — the
+ *   1,200-code-point post-parse trim in `AiService.parseSuggestionOutput` does
+ *   that, and it STAYS. On THINKING models (Gemini 2.5/3.x) the cap was spent on
+ *   internal reasoning tokens BEFORE any message, returning empty / mid-sentence
+ *   drafts (14-06 device UAT). Bumping the flat number (120 → 1024 → 2048) stayed
+ *   fragile. The robust fix is to stop capping:
  *
- *     - Gemini gets a SOFT reasoning cap (`thinkingConfig.thinkingBudget`) so
- *       reasoning cannot claim the whole allowance, PLUS an output budget sized
- *       to cover the ACTUAL thinking (which overruns the soft cap — 256 → ~500
- *       measured) WITH MARGIN, then the message allowance on top. It is sized as
- *       `thinking-headroom + output-allowance`, deliberately NOT
- *       `thinkingBudget + output` (the budget is a soft target, not a hard wall).
- *     - The curated OpenAI/Anthropic frontier models are NON-thinking chat models
- *       (Plan 08 curated gpt-4.x / Sonnet-Haiku non-thinking tiers), so a tuned
- *       `maxOutputTokens` suffices and there is NO reasoning cap (D-04).
- *     - `none`/`custom` (a user-controlled endpoint) assume no reasoning field.
+ *     - Gemini  → OMIT `maxOutputTokens` AND `thinkingConfig` (model default =
+ *                 dynamic thinking; verified against ai.google.dev thinking docs
+ *                 2026-08-22). No cap → the model reasons as needed and still
+ *                 emits a full message.
+ *     - OpenAI  → OMIT `max_completion_tokens` (provider default).
+ *     - Anthropic → its Messages API REQUIRES `max_tokens` (verified against the
+ *                 Anthropic docs 2026-08-22 — it cannot be omitted), so send the
+ *                 MODEL'S OWN maximum sourced from the LiteLLM catalog. The only
+ *                 ceiling is the model's, not one we invented. Free-text / absent
+ *                 models get {@link ANTHROPIC_FALLBACK_MAX_OUTPUT}.
+ *     - Custom  → a user-controlled OpenAI-compatible endpoint may REQUIRE a max;
+ *                 send a high, non-binding default so it never truncates.
+ *     - none    → generation is disabled; no request is ever built.
  *
- *   The actual message length stays independently bounded by the unchanged
- *   1,200-code-point post-parse ceiling in `AiService.parseSuggestionOutput`, so
- *   a generous output budget here does not let drafts balloon.
- *
- *   IF a reasoning/thinking OpenAI or Anthropic model is ever curated (Plan 08's
- *   frontier is non-thinking today), do NOT reuse Gemini's field: the
- *   reasoning-control parameter name and shape differ per provider and change
- *   over time — add a per-provider control verified against that provider's
- *   CURRENT official docs at that time.
- *
- *   This module is node-pure: no `fetch`, no `AiService`, no I/O. All numbers are
+ *   This module is node-pure: no `fetch`, no `AiService`, no I/O. The catalog is
+ *   PASSED IN (the cache-or-seed the caller already resolved). All numbers are
  *   named constants below so retuning is a single-number edit (CLAUDE.md).
  * =============================================================================
  */
+import type { ModelCatalog } from "@/ai/model-catalog-filter";
 import type { AiProviderId } from "@/services/ai-types";
 
-// --- Tunable budget constants (single-number tuning surface) -----------------
+// --- Tunable constants (single-number tuning surface) ------------------------
 
 /**
- * Gemini SOFT reasoning cap, in tokens, mapped to
- * `generationConfig.thinkingConfig.thinkingBudget`. Measured device seed: 256 →
- * ~500 actual thinking tokens + a complete, non-truncated message (14-06 UAT).
- * It is a SOFT target Gemini can overrun; {@link GEMINI_THINKING_HEADROOM} is the
- * margin that absorbs the overrun.
+ * Anthropic max-output fallback when the selected model is free-text or absent
+ * from the catalog. High enough to never bind a short check-in draft; the real
+ * ceiling for a catalog model is that model's own maximum.
  */
-const GEMINI_THINKING_BUDGET = 256;
+export const ANTHROPIC_FALLBACK_MAX_OUTPUT = 8192;
 
 /**
- * Token headroom reserved for Gemini's ACTUAL reasoning above the soft cap.
- * Measured overrun tops out near 886 for a fuel-rich contact, so 1,024 leaves
- * margin even when the soft 256 cap is exceeded.
+ * A high, non-binding default for a user-controlled Custom endpoint that may
+ * require `max_tokens`. Not model-specific (the endpoint's model is arbitrary).
  */
-const GEMINI_THINKING_HEADROOM = 1_024;
+export const CUSTOM_MAX_OUTPUT = 8192;
 
 /**
- * Output-token allowance for the visible message, on TOP of the thinking
- * headroom. A warm 3–4 sentence check-in is short; 512 is comfortable and the
- * 1,200-code-point post-parse ceiling still bounds the final draft.
+ * Resolve the `maxOutputTokens` to send for the active provider, or `undefined`
+ * to OMIT any output cap. Pure and deterministic; no I/O.
+ *
+ *   - anthropic → the model's own catalog maximum (high fallback when absent);
+ *   - openai / google → `undefined` (the adapter omits the field → default);
+ *   - custom → a high non-binding default;
+ *   - none → `undefined` (generation disabled).
  */
-const GEMINI_OUTPUT_ALLOWANCE = 512;
-
-/**
- * Gemini `maxOutputTokens`: thinking headroom + message allowance. NOT
- * `thinkingBudget + output` — the budget is a soft target that overruns, so the
- * request must cover actual thinking WITH MARGIN plus the message (D-02).
- */
-const GEMINI_MAX_OUTPUT_TOKENS =
-  GEMINI_THINKING_HEADROOM + GEMINI_OUTPUT_ALLOWANCE;
-
-/**
- * Output-token allowance for the curated NON-thinking chat providers
- * (OpenAI/Anthropic — D-04). No reasoning is spent, so this is the whole budget.
- */
-const CHAT_OUTPUT_TOKENS = 512;
-
-/**
- * Safe default output allowance for `none` (disabled) and `custom` (a
- * user-controlled endpoint whose model may be anything). No reasoning field is
- * assumed for a user endpoint.
- */
-const DEFAULT_OUTPUT_TOKENS = 512;
-
-// --- Contract ----------------------------------------------------------------
-
-/**
- * A resolved per-request budget. `maxOutputTokens` is the neutral output ceiling
- * every adapter already maps to its provider field. `thinkingBudget` is the
- * NEUTRAL reasoning cap concept (tokens; `null` = no cap / provider default) —
- * only the Gemini adapter maps it (to `thinkingConfig.thinkingBudget`); other
- * adapters ignore it.
- */
-export interface TokenBudget {
-  readonly maxOutputTokens: number;
-  readonly thinkingBudget: number | null;
-}
-
-/**
- * Resolve the output budget for the active provider. Pure and deterministic; no
- * I/O. `model` is accepted now for future model-family branching but the curated
- * frontier chat models do not require it yet.
- */
-export function resolveTokenBudget(
+export function resolveMaxOutputTokens(
   provider: AiProviderId,
-  _model?: string,
-): TokenBudget {
+  model: string,
+  catalog: ModelCatalog,
+): number | undefined {
   switch (provider) {
-    case "google":
-      // Thinking model: cap reasoning (soft) + size output to cover actual
-      // thinking WITH MARGIN plus the message allowance (D-02).
-      return {
-        maxOutputTokens: GEMINI_MAX_OUTPUT_TOKENS,
-        thinkingBudget: GEMINI_THINKING_BUDGET,
-      };
-    case "openai":
     case "anthropic":
-      // Curated non-thinking chat models: tuned output, no reasoning cap (D-04).
-      return { maxOutputTokens: CHAT_OUTPUT_TOKENS, thinkingBudget: null };
+      return catalog.limits.anthropic[model] ?? ANTHROPIC_FALLBACK_MAX_OUTPUT;
+    case "custom":
+      return CUSTOM_MAX_OUTPUT;
     default:
-      // `none` (disabled) and `custom` (user endpoint): safe default, no assumed
-      // reasoning field.
-      return { maxOutputTokens: DEFAULT_OUTPUT_TOKENS, thinkingBudget: null };
+      // openai / google → no cap (provider / model default, dynamic thinking);
+      // none → generation disabled, no request built.
+      return undefined;
   }
 }

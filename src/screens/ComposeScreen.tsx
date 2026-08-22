@@ -37,6 +37,8 @@
  * focus's load/probe overwrite the latest focused state.
  */
 import { useFocusEffect } from "@react-navigation/native";
+import * as Clipboard from "expo-clipboard";
+import * as SMS from "expo-sms";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Alert,
@@ -48,41 +50,43 @@ import {
   TextInput,
   View,
 } from "react-native";
-import * as Clipboard from "expo-clipboard";
-import * as SMS from "expo-sms";
+import { loadCachedCatalog } from "@/ai/model-catalog-cache";
+import type { ModelCatalog } from "@/ai/model-catalog-filter";
+import { createFileCatalogStorage } from "@/ai/model-catalog-storage";
+import { resolveActiveCatalog, SEED_CATALOG } from "@/ai/model-registry";
+import { resolvePrompt } from "@/ai/prompt-template";
+import type { ResolvedPrompt } from "@/ai/prompt-types";
+import { resolveMaxOutputTokens } from "@/ai/token-budget";
 import { Avatar } from "@/components/Avatar";
 import { readPromptContext } from "@/db/ai-context-read";
 import {
-  acknowledgeProvider as persistProviderAck,
   type AppSettings,
   getAppSettings,
+  acknowledgeProvider as persistProviderAck,
 } from "@/db/app-settings-dao";
 import { getContactHeader } from "@/db/contact-read";
 import { getExecutor, localDateTime } from "@/db/database";
 import { type FuelItem, getRankedFuel } from "@/db/fuel-read";
-import type { RootStackScreenProps } from "@/navigation/types";
-import {
-  type ComposeControls,
-  resolveComposeControls,
-} from "@/logic/compose-logic";
 import {
   AI_REQUEST_TIMEOUT_MS,
   AiSuggestionLifecycle,
   type AiSuggestionState,
   type RequestConfig,
 } from "@/logic/ai-suggestion-logic";
+import {
+  type ComposeControls,
+  resolveComposeControls,
+} from "@/logic/compose-logic";
 import { consumeAiSuggestionIntent } from "@/navigation/ai-suggestion-navigation";
-import type { ResolvedPrompt } from "@/ai/prompt-types";
-import { resolvePrompt } from "@/ai/prompt-template";
-import { resolveTokenBudget } from "@/ai/token-budget";
-import { AiError, AiService } from "@/services/AiService";
-import type { AiCloudProviderId } from "@/services/ai-types";
+import type { RootStackScreenProps } from "@/navigation/types";
 import {
   buildInspectorViewState,
   buildProviderAckViewState,
 } from "@/screens/settings-ai-logic";
-import { fuelKindLabel } from "@/services/fuel-kind-label";
+import { AiError, AiService } from "@/services/AiService";
+import type { AiCloudProviderId } from "@/services/ai-types";
 import { formatFuelAge } from "@/services/fuel-age";
+import { fuelKindLabel } from "@/services/fuel-kind-label";
 import { useTheme } from "@/theme";
 import { Logger } from "@/utils/logger";
 
@@ -116,7 +120,10 @@ type Header = {
   phone: string | null;
 };
 
-export function ComposeScreen({ navigation, route }: RootStackScreenProps<"Compose">) {
+export function ComposeScreen({
+  navigation,
+  route,
+}: RootStackScreenProps<"Compose">) {
   const { colors } = useTheme();
   const { contactId } = route.params;
 
@@ -153,6 +160,10 @@ export function ComposeScreen({ navigation, route }: RootStackScreenProps<"Compo
   if (serviceRef.current === null) {
     serviceRef.current = new AiService();
   }
+  // The active model catalog (cache-overrides-seed) — its per-model `limits`
+  // supply Anthropic's REQUIRED `max_tokens` (14-11). Seed is the offline default;
+  // the cached catalog (if any) is loaded best-effort on focus below.
+  const catalogRef = useRef<ModelCatalog>(SEED_CATALOG);
   // Providers already acknowledged this session (seeded from the ack flags on
   // load, extended after a durable ack write). The H5 gate reads this.
   const acknowledgedRef = useRef<Set<AiCloudProviderId>>(new Set());
@@ -202,18 +213,22 @@ export function ComposeScreen({ navigation, route }: RootStackScreenProps<"Compo
         service.refreshProviders(s);
         const provider = service.getActiveProvider(s);
         if (!provider) throw new AiError("not_configured");
-        const model =
-          s.aiProvider === "custom" ? s.aiCustomModel : s.aiModel;
-        // Size the request per active provider: a thinking model (Gemini) gets a
-        // reasoning cap + output headroom; non-thinking chat providers get a tuned
-        // output allowance (14-09, replaces the flat MAX_OUTPUT_TOKENS stopgap).
-        const budget = resolveTokenBudget(s.aiProvider, model);
+        const model = s.aiProvider === "custom" ? s.aiCustomModel : s.aiModel;
+        // 14-11: no artificial output cap. Only Anthropic sends `max_tokens` (its
+        // API requires one), set to the selected model's OWN maximum from the
+        // catalog; OpenAI/Gemini omit it (undefined) so the model default applies
+        // (Gemini → dynamic thinking). Visible length is bounded by the
+        // 1,200-code-point post-parse trim in AiService, not here.
+        const maxOutputTokens = resolveMaxOutputTokens(
+          s.aiProvider,
+          model,
+          catalogRef.current,
+        );
         return provider.generate({
           resolvedPrompt: prompt,
           model,
           temperature: AI_TEMPERATURE,
-          maxOutputTokens: budget.maxOutputTokens,
-          thinkingBudget: budget.thinkingBudget,
+          maxOutputTokens,
           signal,
         });
       },
@@ -224,13 +239,14 @@ export function ComposeScreen({ navigation, route }: RootStackScreenProps<"Compo
       isDraftEmpty: (): boolean => draftRef.current.trim().length === 0,
       createController: (): AbortController => new AbortController(),
       setTimer: (fn, ms) => setTimeout(fn, ms),
-      clearTimer: (handle) => clearTimeout(handle as ReturnType<typeof setTimeout>),
+      clearTimer: (handle) =>
+        clearTimeout(handle as ReturnType<typeof setTimeout>),
       isActive: (): boolean => focusedRef.current && mountedRef.current,
       currentConfig: (): RequestConfig => {
         const s = settingsRef.current;
         const provider = s?.aiProvider ?? "none";
         const model =
-          provider === "custom" ? s?.aiCustomModel ?? "" : s?.aiModel ?? "";
+          provider === "custom" ? (s?.aiCustomModel ?? "") : (s?.aiModel ?? "");
         return { provider, model, contactId };
       },
       sanitizeError: (err): string =>
@@ -277,6 +293,14 @@ export function ComposeScreen({ navigation, route }: RootStackScreenProps<"Compo
           // Publish AI settings + seed the acknowledged-provider set from the
           // persisted ack flags so a prior session's acknowledgement still counts.
           settingsRef.current = settings;
+          // Best-effort refresh of the active catalog (cache-overrides-seed) so
+          // Anthropic's required `max_tokens` uses the freshest per-model max.
+          // Non-blocking and failure-tolerant — the seed default already works.
+          void loadCachedCatalog(createFileCatalogStorage())
+            .then((cached) => {
+              if (!cancelled) catalogRef.current = resolveActiveCatalog(cached);
+            })
+            .catch(() => undefined);
           const acked = new Set<AiCloudProviderId>();
           if (settings.aiAckOpenai === 1) acked.add("openai");
           if (settings.aiAckAnthropic === 1) acked.add("anthropic");
@@ -330,7 +354,10 @@ export function ComposeScreen({ navigation, route }: RootStackScreenProps<"Compo
         } catch (err) {
           Logger.error(LOG_SCOPE, "failed to load contact", err);
           if (!cancelled) {
-            Alert.alert("Couldn't load this contact", "Please go back and retry.");
+            Alert.alert(
+              "Couldn't load this contact",
+              "Please go back and retry.",
+            );
             setScreenState("error");
           }
         }
@@ -499,7 +526,10 @@ export function ComposeScreen({ navigation, route }: RootStackScreenProps<"Compo
           testID="compose-ai-loading"
           style={[
             styles.aiPanel,
-            { backgroundColor: colors.surfaceElevated, borderColor: colors.border },
+            {
+              backgroundColor: colors.surfaceElevated,
+              borderColor: colors.border,
+            },
           ]}
         >
           <Text style={[styles.aiPanelText, { color: colors.textSecondary }]}>
@@ -512,7 +542,9 @@ export function ComposeScreen({ navigation, route }: RootStackScreenProps<"Compo
             onPress={() => ai.cancel()}
             style={[styles.aiSecondaryBtn, { borderColor: colors.border }]}
           >
-            <Text style={[styles.aiSecondaryText, { color: colors.textSecondary }]}>
+            <Text
+              style={[styles.aiSecondaryText, { color: colors.textSecondary }]}
+            >
               Cancel
             </Text>
           </Pressable>
@@ -530,7 +562,10 @@ export function ComposeScreen({ navigation, route }: RootStackScreenProps<"Compo
           testID="compose-ai-acknowledgement"
           style={[
             styles.aiPanel,
-            { backgroundColor: colors.surfaceElevated, borderColor: colors.border },
+            {
+              backgroundColor: colors.surfaceElevated,
+              borderColor: colors.border,
+            },
           ]}
         >
           <Text style={[styles.aiPanelHeading, { color: colors.textPrimary }]}>
@@ -569,7 +604,12 @@ export function ComposeScreen({ navigation, route }: RootStackScreenProps<"Compo
               onPress={() => ai.decline()}
               style={[styles.aiSecondaryBtn, { borderColor: colors.border }]}
             >
-              <Text style={[styles.aiSecondaryText, { color: colors.textSecondary }]}>
+              <Text
+                style={[
+                  styles.aiSecondaryText,
+                  { color: colors.textSecondary },
+                ]}
+              >
                 Not now
               </Text>
             </Pressable>
@@ -583,7 +623,9 @@ export function ComposeScreen({ navigation, route }: RootStackScreenProps<"Compo
                 { backgroundColor: colors.accent, borderColor: colors.accent },
               ]}
             >
-              <Text style={[styles.aiPrimaryText, { color: colors.background }]}>
+              <Text
+                style={[styles.aiPrimaryText, { color: colors.background }]}
+              >
                 Acknowledge & continue
               </Text>
             </Pressable>
@@ -598,7 +640,10 @@ export function ComposeScreen({ navigation, route }: RootStackScreenProps<"Compo
           testID="compose-ai-confirm-replace"
           style={[
             styles.aiPanel,
-            { backgroundColor: colors.surfaceElevated, borderColor: colors.border },
+            {
+              backgroundColor: colors.surfaceElevated,
+              borderColor: colors.border,
+            },
           ]}
         >
           <Text style={[styles.aiPanelHeading, { color: colors.textPrimary }]}>
@@ -623,7 +668,12 @@ export function ComposeScreen({ navigation, route }: RootStackScreenProps<"Compo
               onPress={() => ai.cancelReplace()}
               style={[styles.aiSecondaryBtn, { borderColor: colors.border }]}
             >
-              <Text style={[styles.aiSecondaryText, { color: colors.textSecondary }]}>
+              <Text
+                style={[
+                  styles.aiSecondaryText,
+                  { color: colors.textSecondary },
+                ]}
+              >
                 Keep mine
               </Text>
             </Pressable>
@@ -637,7 +687,9 @@ export function ComposeScreen({ navigation, route }: RootStackScreenProps<"Compo
                 { backgroundColor: colors.accent, borderColor: colors.accent },
               ]}
             >
-              <Text style={[styles.aiPrimaryText, { color: colors.background }]}>
+              <Text
+                style={[styles.aiPrimaryText, { color: colors.background }]}
+              >
                 Replace
               </Text>
             </Pressable>
@@ -652,7 +704,10 @@ export function ComposeScreen({ navigation, route }: RootStackScreenProps<"Compo
         testID="compose-ai-error"
         style={[
           styles.aiPanel,
-          { backgroundColor: colors.surfaceElevated, borderColor: colors.border },
+          {
+            backgroundColor: colors.surfaceElevated,
+            borderColor: colors.border,
+          },
         ]}
       >
         <Text style={[styles.aiPanelText, { color: colors.danger }]}>
@@ -666,7 +721,9 @@ export function ComposeScreen({ navigation, route }: RootStackScreenProps<"Compo
             onPress={() => ai.cancel()}
             style={[styles.aiSecondaryBtn, { borderColor: colors.border }]}
           >
-            <Text style={[styles.aiSecondaryText, { color: colors.textSecondary }]}>
+            <Text
+              style={[styles.aiSecondaryText, { color: colors.textSecondary }]}
+            >
               Dismiss
             </Text>
           </Pressable>
@@ -724,7 +781,10 @@ export function ComposeScreen({ navigation, route }: RootStackScreenProps<"Compo
   // concrete boolean it decides from the matrix.
   const phone = header.phone?.trim() || null;
   const hasPhone = phone != null;
-  const controls: ComposeControls = resolveComposeControls(hasPhone, smsAvailable);
+  const controls: ComposeControls = resolveComposeControls(
+    hasPhone,
+    smsAvailable,
+  );
 
   const now = localDateTime();
   const copyPrimary = controls.copyEmphasis === "primary";
@@ -785,7 +845,9 @@ export function ComposeScreen({ navigation, route }: RootStackScreenProps<"Compo
                 {row.text ?? ""}
               </Text>
               {row.label ? (
-                <Text style={[styles.fuelMeta, { color: colors.textSecondary }]}>
+                <Text
+                  style={[styles.fuelMeta, { color: colors.textSecondary }]}
+                >
                   {row.label}
                 </Text>
               ) : null}
@@ -875,7 +937,10 @@ export function ComposeScreen({ navigation, route }: RootStackScreenProps<"Compo
             styles.actionBtn,
             copyPrimary
               ? { backgroundColor: colors.accent, borderColor: colors.accent }
-              : { backgroundColor: colors.background, borderColor: colors.accent },
+              : {
+                  backgroundColor: colors.background,
+                  borderColor: colors.accent,
+                },
           ]}
         >
           <Text

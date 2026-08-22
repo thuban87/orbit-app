@@ -46,17 +46,17 @@ export interface GenerationInput {
   readonly resolvedPrompt: ResolvedPrompt;
   readonly model: string;
   readonly temperature: number;
-  readonly maxOutputTokens: number;
   /**
-   * NEUTRAL, provider-agnostic cap on a THINKING model's internal reasoning
-   * tokens (`null`/undefined = no cap / provider default). This is a CONCEPT, not
-   * a provider field name — mirroring how `maxOutputTokens` already maps to
-   * `max_tokens` / `max_completion_tokens` / Gemini config per adapter (D-03).
-   * Only the Gemini adapter maps it (to `generationConfig.thinkingConfig.thinkingBudget`);
-   * the OpenAI, Anthropic, and Custom adapters IGNORE it. The per-provider values
-   * are chosen by `resolveTokenBudget` in `@/ai/token-budget`.
+   * OPTIONAL output-token ceiling (14-11 removed the artificial flat cap). When
+   * `undefined`, the adapter OMITS its provider output field entirely, so the
+   * provider / model default applies (Gemini then uses dynamic thinking). Only
+   * Anthropic requires a value — its Messages API mandates `max_tokens` — so its
+   * adapter falls back to a high constant if this is ever absent. Visible draft
+   * length is bounded solely by the 1,200-code-point post-parse trim, never here.
+   * The per-provider value is chosen by `resolveMaxOutputTokens` in
+   * `@/ai/token-budget`.
    */
-  readonly thinkingBudget?: number | null;
+  readonly maxOutputTokens?: number;
   readonly signal: AbortSignal;
 }
 
@@ -256,6 +256,16 @@ export class OpenAiProvider implements AiProvider {
     const key = await this.getKey();
     if (!key) throw new AiError("not_configured");
 
+    // 14-11: OMIT `max_completion_tokens` when no cap is set → provider default.
+    const body: Record<string, unknown> = {
+      model: input.model,
+      messages: [{ role: "user", content: input.resolvedPrompt.payload }],
+      temperature: input.temperature,
+    };
+    if (typeof input.maxOutputTokens === "number") {
+      body.max_completion_tokens = input.maxOutputTokens;
+    }
+
     let response: Response;
     try {
       response = await fetch(OPENAI_CHAT_URL, {
@@ -264,12 +274,7 @@ export class OpenAiProvider implements AiProvider {
           "Content-Type": "application/json",
           Authorization: `Bearer ${key}`,
         },
-        body: JSON.stringify({
-          model: input.model,
-          messages: [{ role: "user", content: input.resolvedPrompt.payload }],
-          temperature: input.temperature,
-          max_completion_tokens: input.maxOutputTokens,
-        }),
+        body: JSON.stringify(body),
         signal: input.signal,
       });
     } catch (err) {
@@ -290,6 +295,14 @@ const ANTHROPIC_MESSAGES_URL = "https://api.anthropic.com/v1/messages";
 const ANTHROPIC_MODELS_URL = "https://api.anthropic.com/v1/models";
 const ANTHROPIC_VERSION = "2023-06-01";
 const ANTHROPIC_PAGE_LIMIT = 20;
+
+/**
+ * Anthropic's Messages API REQUIRES `max_tokens` — it cannot be omitted (verified
+ * against the Anthropic docs 2026-08-22). `resolveMaxOutputTokens` always supplies
+ * the selected model's own maximum for this provider; this constant is the belt-
+ * and-braces fallback so the adapter never emits a request without `max_tokens`.
+ */
+const ANTHROPIC_REQUIRED_MAX_TOKENS = 8192;
 
 /** Anthropic — `x-api-key` header, Messages API, paginated model list. */
 export class AnthropicProvider implements AiProvider {
@@ -345,7 +358,9 @@ export class AnthropicProvider implements AiProvider {
         },
         body: JSON.stringify({
           model: input.model,
-          max_tokens: input.maxOutputTokens,
+          // REQUIRED by the API — never omitted. The model's own catalog maximum
+          // (via `resolveMaxOutputTokens`); a high fallback only if ever absent.
+          max_tokens: input.maxOutputTokens ?? ANTHROPIC_REQUIRED_MAX_TOKENS,
           temperature: input.temperature,
           messages: [{ role: "user", content: input.resolvedPrompt.payload }],
         }),
@@ -401,23 +416,19 @@ export class GoogleProvider implements AiProvider {
       input.model,
     )}:generateContent?key=${encodeURIComponent(key)}`;
 
-    // Gemini 2.5/3.x are THINKING models: reasoning tokens are spent from the
-    // output budget BEFORE any message. Map the neutral `thinkingBudget` concept
-    // (D-03) to `thinkingConfig.thinkingBudget` — the CURRENT Gemini field,
-    // verified against ai.google.dev/api/generate-content (GenerationConfig →
-    // thinkingConfig) on 2026-08-22 — to cap reasoning. Omit it entirely when the
-    // caller passes null/undefined so the provider default applies. This is the
-    // ONLY adapter that maps the field; no provider field name leaks into the
-    // neutral contract.
+    // Gemini 2.5/3.x are THINKING models: an output cap is spent on reasoning
+    // BEFORE any message, truncating the draft (14-06 UAT). 14-11 removes the cap
+    // entirely — OMIT `maxOutputTokens` so the model default applies, and OMIT
+    // `thinkingConfig` so the model uses DYNAMIC thinking (its default, verified
+    // against ai.google.dev/gemini-api/docs/thinking on 2026-08-22). Include
+    // `maxOutputTokens` only if a caller ever supplies one (Gemini normally does
+    // not). Visible length stays bounded by the 1,200-code-point post-parse trim.
     const generationConfig: Record<string, unknown> = {
       temperature: input.temperature,
-      maxOutputTokens: input.maxOutputTokens,
       candidateCount: 1,
     };
-    if (typeof input.thinkingBudget === "number") {
-      generationConfig.thinkingConfig = {
-        thinkingBudget: input.thinkingBudget,
-      };
+    if (typeof input.maxOutputTokens === "number") {
+      generationConfig.maxOutputTokens = input.maxOutputTokens;
     }
 
     let response: Response;
@@ -506,6 +517,18 @@ export class CustomProvider implements AiProvider {
     };
     if (key) headers.Authorization = `Bearer ${key}`;
 
+    // 14-11: OMIT `max_tokens` when no cap is set. A user-controlled endpoint may
+    // require one, so `resolveMaxOutputTokens` supplies a high, non-binding
+    // default for Custom; if ever absent the field is simply omitted.
+    const customBody: Record<string, unknown> = {
+      model: input.model,
+      messages: [{ role: "user", content: input.resolvedPrompt.payload }],
+      temperature: input.temperature,
+    };
+    if (typeof input.maxOutputTokens === "number") {
+      customBody.max_tokens = input.maxOutputTokens;
+    }
+
     let result: { status: number; ok: boolean; bodyText: string };
     try {
       // H3: the native egress guard is the ONLY transport for Custom.
@@ -513,12 +536,7 @@ export class CustomProvider implements AiProvider {
         url: validation.url,
         method: "POST",
         headers,
-        body: JSON.stringify({
-          model: input.model,
-          messages: [{ role: "user", content: input.resolvedPrompt.payload }],
-          temperature: input.temperature,
-          max_tokens: input.maxOutputTokens,
-        }),
+        body: JSON.stringify(customBody),
         signal: input.signal,
       });
     } catch (err) {
