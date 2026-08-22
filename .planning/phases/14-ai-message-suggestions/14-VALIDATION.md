@@ -108,8 +108,25 @@ biome). The following require the owner's on-device pass and are **NOT** verifie
 - Note: the API key field renders masked (`•••••••• (saved)`) — SecureStore-backed, no raw key in the UI tree.
 
 **Full-length drafts, cap removed (14-11):**
-- [ ] PENDING — Gemini **Pro** returns a complete, non-truncated multi-sentence draft (the tier most prone to spending budget on reasoning).
-- [ ] PENDING — Gemini **Flash** and **Flash-lite** each return full-length drafts.
-- [ ] PENDING — Anthropic draft succeeds (request carries the model's own `max_tokens` from the catalog).
-- [ ] PENDING — OpenAI and Custom drafts return full-length output with no artificial cap.
-- [ ] PENDING — No draft is truncated mid-sentence; visible length is bounded only by the 1,200-code-point post-parse trim.
+- [x] OWNER-CONFIRMED (2026-08-22) — owner tested generation on-device via the new picker and confirmed it works ("it's all working, including the generation using the new picker"). Per-tier breakdown (Pro vs Flash vs Flash-lite) not separately itemized by owner; no truncation reported.
+
+---
+
+## 14-06 egress guard — on-device SMOKE TEST (2026-08-22, release build, orchestrator-driven)
+
+Per owner decision, the release-gating egress matrix was scoped to a **single on-device smoke test** proving the native `orbit-secure-fetch` guard is wired and fires end-to-end, resting exhaustive vector coverage on the already-green JVM/Kotlin address-predicate tests (`secure-fetch.test.ts` + `OrbitSecureFetchModuleTest`, 4 green over the shared `non-public-vectors.json`).
+
+**Method:** Custom provider, controlled-DNS via `nip.io` (a real HTTPS hostname that passes save-time validation, so egress reaches the native `Dns` check at connection time — a raw IP-literal is rejected earlier by the URL validator). Gemini key removed first so no real/paid provider call was possible. Evidence is sanitized (no keys/prompts/endpoints/contact data retained).
+
+**Result — PASS:**
+
+| Endpoint | Resolves to | Outcome | Evidence |
+|---|---|---|---|
+| `10-0-0-1.nip.io` | `10.0.0.1` (private) | **fail-closed** — "That endpoint was refused. Check it in Settings." (~3s, no draft, no delivery) | native `expo.modules.orbitsecurefetch.OrbitSecureFetchModule` invoked (logcat); fast pre-connection rejection |
+| `8-8-8-8.nip.io` | `8.8.8.8` (public — CONTROL) | passes the address guard, fails later with a **different** generic error ("Couldn't draft a message. Try again?") | distinct error proves the block is address-specific, not a blanket custom-endpoint failure |
+
+**Incidental PASS** — first-send acknowledgement gate + exact-prompt inspector: before any egress, the dialog showed the exact bytes ("This exact text will be sent to Custom endpoint. Nothing else leaves your device.") containing only Alice's allowlisted fuel, with Send-to-provider / Not-now actions.
+
+**Not covered (accepted per owner's smoke-test scope):** the full 7-case matrix with active zero-delivery listeners (redirect, IPv6-ULA, IPv4-mapped, proxy, direct IP-literal). Rests on the green JVM/Kotlin vector tests. The final release-approval decision line remains the owner's to record.
+
+**Cleanup note:** a throwaway Custom config was left on the device (endpoint `8-8-8-8.nip.io`, dummy model/key; the gemini key was removed for safety). Reset before real use.
