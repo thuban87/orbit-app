@@ -580,6 +580,6 @@ Plans:
 | 11. Actionable Notifications | 13/13 | Complete   | 2026-08-16 |
 | 12. Home Screen Widget | 8/8 | Complete   | 2026-08-17 |
 | 13. Orrery | 8/8 | Complete   | 2026-08-18 |
-| 14. AI Message Suggestions | 6/7 (+2 gap) | Working on device; 14-08/09 model gap plans pending | - |
+| 14. AI Message Suggestions | 6/7 (+2 gap done) | Gap plans 14-08/09 code-complete + node-verified (1280/1280); device re-UAT (14-06) pending owner build | - |
 | 15. Weekly Digest | 0/TBD | Not started | - |
 | 16. Backup, Export & Restore | 0/TBD | Not started | - |
