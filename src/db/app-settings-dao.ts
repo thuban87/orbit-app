@@ -40,6 +40,12 @@ export interface AppSettings {
   decayEnabled: 0 | 1;
   /** Birthday reminders, gated by the master switch. */
   birthdayEnabled: 0 | 1;
+  /**
+   * Weekly-digest master toggle (DGST-01). Defaults ON (1); a durable OFF the
+   * launch sweep cannot re-enable. Gated by the notifications master switch and
+   * backup-exportable as a settings row (migration 005, owner-ruled).
+   */
+  digestEnabled: 0 | 1;
   /** Lock-screen preview visibility — 0 (private) by default (OQ-2). */
   lockscreenPublic: 0 | 1;
   /** Hour-of-day (0-23) the daily digest fires. */
@@ -100,6 +106,7 @@ type WritableSettingsKey =
   | "notificationsEnabled"
   | "decayEnabled"
   | "birthdayEnabled"
+  | "digestEnabled"
   | "lockscreenPublic"
   | "deliveryHour"
   | "quietStartHour"
@@ -117,6 +124,7 @@ interface AppSettingsRow {
   notifications_enabled: number;
   decay_enabled: number;
   birthday_enabled: number;
+  digest_enabled: number;
   lockscreen_public: number;
   delivery_hour: number;
   quiet_start_hour: number;
@@ -146,6 +154,7 @@ const TOGGLE_FIELDS: Array<keyof AppSettings> = [
   "notificationsEnabled",
   "decayEnabled",
   "birthdayEnabled",
+  "digestEnabled",
   "lockscreenPublic",
 ];
 
@@ -158,6 +167,7 @@ const COLUMN_OF: Record<WritableSettingsKey, string> = {
   notificationsEnabled: "notifications_enabled",
   decayEnabled: "decay_enabled",
   birthdayEnabled: "birthday_enabled",
+  digestEnabled: "digest_enabled",
   lockscreenPublic: "lockscreen_public",
   deliveryHour: "delivery_hour",
   quietStartHour: "quiet_start_hour",
@@ -180,7 +190,8 @@ const COLUMN_OF: Record<WritableSettingsKey, string> = {
 export async function getAppSettings(exec: SqlExecutor): Promise<AppSettings> {
   const row = await exec.getFirstAsync<AppSettingsRow>(
     `SELECT notifications_enabled, decay_enabled, birthday_enabled,
-            lockscreen_public, delivery_hour, quiet_start_hour, quiet_end_hour,
+            digest_enabled, lockscreen_public, delivery_hour, quiet_start_hour,
+            quiet_end_hour,
             sun_contact_id, self_sun_colour,
             ai_provider, ai_model, ai_custom_endpoint, ai_custom_model,
             ai_prompt_template, ai_ack_openai, ai_ack_anthropic,
@@ -195,6 +206,7 @@ export async function getAppSettings(exec: SqlExecutor): Promise<AppSettings> {
     notificationsEnabled: (row.notifications_enabled ? 1 : 0) as 0 | 1,
     decayEnabled: (row.decay_enabled ? 1 : 0) as 0 | 1,
     birthdayEnabled: (row.birthday_enabled ? 1 : 0) as 0 | 1,
+    digestEnabled: (row.digest_enabled ? 1 : 0) as 0 | 1,
     lockscreenPublic: (row.lockscreen_public ? 1 : 0) as 0 | 1,
     deliveryHour: row.delivery_hour,
     quietStartHour: row.quiet_start_hour,

@@ -29,6 +29,7 @@ import { migration001 } from "@/db/migrations/001-initial";
 import { migration002 } from "@/db/migrations/002-app-settings";
 import { migration003 } from "@/db/migrations/003-orrery-settings";
 import { migration004 } from "@/db/migrations/004-ai-settings";
+import { migration005 } from "@/db/migrations/005-digest-settings";
 import { runMigrations } from "@/db/migrations/runner";
 import type { SqlExecutor } from "@/db/types";
 import { newUid } from "@/db/uid";
@@ -65,12 +66,17 @@ async function migrateToV2(): Promise<void> {
   });
 }
 
-/** Bring a fresh in-memory DB to v4 — the current launch path (adds AI cols). */
-async function migrateToV4(): Promise<void> {
+/**
+ * Bring a fresh in-memory DB to v5 — the current launch path (adds the AI cols
+ * at v4 and the digest toggle at v5). getAppSettings now SELECTs digest_enabled,
+ * so every current-schema case must reach v5 (review M1/L4: the former v4 helper
+ * was migrated IN PLACE — renamed + version bumped — leaving no dead helper).
+ */
+async function migrateToV5(): Promise<void> {
   await runMigrations(
     exec,
-    [migration001, migration002, migration003, migration004],
-    4,
+    [migration001, migration002, migration003, migration004, migration005],
+    5,
     { now: NOW, newUid },
   );
 }
@@ -194,12 +200,14 @@ describe("migration 002 — app_settings (forward-only, additive)", () => {
 
 describe("app-settings-dao — read", () => {
   it("getAppSettings returns the seeded defaults as a typed row", async () => {
-    await migrateToV4();
+    await migrateToV5();
     const settings = await getAppSettings(exec);
     const expected: AppSettings = {
       notificationsEnabled: 0,
       decayEnabled: 1,
       birthdayEnabled: 1,
+      // Digest defaults ON (migration 005, DGST-01).
+      digestEnabled: 1,
       lockscreenPublic: 0,
       deliveryHour: 9,
       quietStartHour: 21,
@@ -214,7 +222,7 @@ describe("app-settings-dao — read", () => {
   });
 
   it("throws if the id=1 row is missing (never happens post-seed, loud by design)", async () => {
-    await migrateToV4();
+    await migrateToV5();
     await exec.runAsync("DELETE FROM app_settings WHERE id = 1");
     await expect((async () => getAppSettings(exec))()).rejects.toThrow();
   });
@@ -222,7 +230,7 @@ describe("app-settings-dao — read", () => {
 
 describe("app-settings-dao — validated write", () => {
   beforeEach(async () => {
-    await migrateToV4();
+    await migrateToV5();
   });
 
   it("updates only the supplied fields and bumps modified_at", async () => {
@@ -263,6 +271,8 @@ describe("app-settings-dao — validated write", () => {
       notificationsEnabled: 1,
       decayEnabled: 0,
       birthdayEnabled: 0,
+      // Untouched by this patch — still the seeded default (ON).
+      digestEnabled: 1,
       lockscreenPublic: 1,
       deliveryHour: 6,
       quietStartHour: 22,
@@ -332,6 +342,29 @@ describe("app-settings-dao — validated write", () => {
     expect(row?.decay_enabled).toBe(1);
   });
 
+  it("round-trips the digest toggle: write 0 reads 0, write 1 reads 1 (DGST-01)", async () => {
+    // Defaults ON — a durable OFF must persist (the launch sweep may not re-enable).
+    expect((await getAppSettings(exec)).digestEnabled).toBe(1);
+    await updateAppSettings(exec, { digestEnabled: 0 }, LATER);
+    expect((await getAppSettings(exec)).digestEnabled).toBe(0);
+    await updateAppSettings(exec, { digestEnabled: 1 }, LATER);
+    expect((await getAppSettings(exec)).digestEnabled).toBe(1);
+  });
+
+  it("rejects a non-0/1 digestEnabled before any UPDATE (assertToggle guard, T-15-05)", async () => {
+    await expect(
+      (async () =>
+        updateAppSettings(exec, { digestEnabled: 2 as 0 | 1 }, LATER))(),
+    ).rejects.toThrow();
+    // No write occurred: the column keeps its seeded default and modified_at is NOW.
+    const row = await exec.getFirstAsync<{
+      digest_enabled: number;
+      modified_at: string;
+    }>("SELECT digest_enabled, modified_at FROM app_settings WHERE id = 1");
+    expect(row?.digest_enabled).toBe(1);
+    expect(row?.modified_at).toBe(NOW);
+  });
+
   it("is a no-op that still bumps modified_at when the patch is empty", async () => {
     await updateAppSettings(exec, {}, LATER);
     const settings = await getAppSettings(exec);
@@ -366,7 +399,7 @@ describe("app-settings-dao — validated write", () => {
 
 describe("app-settings-dao — sun fields (ORR-05 / ORR-06)", () => {
   beforeEach(async () => {
-    await migrateToV4();
+    await migrateToV5();
   });
 
   it("reads both sun fields as null on a fresh seed", async () => {
@@ -472,7 +505,7 @@ describe("app-settings-dao — sun fields (ORR-05 / ORR-06)", () => {
 
 describe("app-settings-dao — AI settings (AI-01)", () => {
   beforeEach(async () => {
-    await migrateToV4();
+    await migrateToV5();
   });
 
   /** Read the raw ack column without going through the typed DAO reader. */
@@ -631,7 +664,7 @@ describe("app-settings-dao — AI settings (AI-01)", () => {
 
 describe("acknowledgeProvider — the SOLE ai_ack_* writer (H5 / C2-H3)", () => {
   beforeEach(async () => {
-    await migrateToV4();
+    await migrateToV5();
   });
 
   /** The provider→column allowlist, mirrored here to prove each maps 1:1. */
