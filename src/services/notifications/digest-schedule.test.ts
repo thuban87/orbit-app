@@ -280,9 +280,11 @@ describe("reconcileDigestSchedule — defer-one coordinator (H2/M4)", () => {
     // called twice total — an uncoordinated 2nd call would run a 3rd pass on
     // stale state and leave the digest ARMED).
     expect(cancelledIds()).toContain(DIGEST_IDENTIFIER);
+    // Assert the pass count BEFORE any further getAll read (which would itself
+    // increment the mock): exactly pass 1 + one trailing pass = two getAll calls.
+    expect(getAllMock).toHaveBeenCalledTimes(2);
     const all = await getAllScheduledNotificationsAsync();
     expect(all.some((e) => e.identifier === DIGEST_IDENTIFIER)).toBe(false);
-    expect(getAllMock).toHaveBeenCalledTimes(2);
   });
 });
 
