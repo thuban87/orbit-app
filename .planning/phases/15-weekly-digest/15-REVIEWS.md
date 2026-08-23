@@ -325,3 +325,80 @@ CYCLE_SUMMARY: current_high=1 current_actionable=4
 **Not converged** — 1 HIGH (H3 warm-tap Back→dashboard reset, codex-found + orchestrator-verified) + 4 actionable
 (M4 deterministic overlap test, M5 full-notification-suite verify, L3 top-bar layout, L4 dead helper). Proceeding
 to replan (Cycle 2 → Cycle 3, the max) then a final review.
+
+# ═══════════════════════════════════════════════════════════════
+# Cycle 3 (FINAL — max-cycles=3 reached)
+# ═══════════════════════════════════════════════════════════════
+
+## Cycle 3 — Verdict
+
+**0 HIGH across both reviewers.** All five Cycle-2 findings (H3/M4/M5/L3/L4) genuinely closed against the code;
+the two earlier HIGH fixes (H1 shared-persist, H2 defer-one coordinator) verified still intact/un-regressed.
+
+**Divergence on one residual MEDIUM (M4 test-determinism):**
+- **Codex:** `high=0 actionable=1` — wants the overlap test's mock barrier to add an explicit entry handshake
+  (mock resolves an `entered` deferred before awaiting release; the test `await entered.promise` before invoking
+  pass 2 + committing OFF; assert two `getAll` calls) so pass 1 is proven to have entered the barrier before the
+  settings write, eliminating a theoretical scheduling where the write wins and an uncoordinated impl passes by luck.
+- **Claude:** `high=0 actionable=0` — traced both paths and judged the current one-shot deferred barrier (15-03
+  acceptance) already discriminates deterministically (coordinated → CANCELLED, uncoordinated → ARMED), so no plan
+  change is needed.
+
+Both agree: no HIGH, no correctness/security/design/product defect remains; residual device-only risk (WEEKLY
+fire timing + Android weekday/hour round-trip) is already gated to the 15-06 owner UAT checkpoint.
+
+**Status: EFFECTIVELY CONVERGED at max cycles.** 0 HIGH; the lone residual is a contested, low-risk test-hardening
+nit that the executor can trivially adopt when writing the 15-03 overlap test (codex's exact handshake recipe is
+recorded above). Owner decision requested: accept + execute, or apply the one-line M4 test-barrier handshake first.
+
+---
+
+## Codex Review (Cycle 3)
+
+## Summary
+
+Four Cycle-2 findings are genuinely resolved in the revised plans. M4 is improved but still not fully deterministic: the test must wait until pass 1 has actually entered the barrier before changing settings.
+
+## Genuinely-fixed
+
+- **H3 — fixed.** The existing decay reset is exactly at [notification-nav.ts:63](/home/bwales/projects/orbit-app/src/services/notifications/notification-nav.ts:63). Plan 15-05 specifies the exact equivalent digest reset and a full-shape equality test at [15-05-PLAN.md:105](/home/bwales/projects/orbit-app/.planning/phases/15-weekly-digest/15-05-PLAN.md:105) and [15-05-PLAN.md:134](/home/bwales/projects/orbit-app/.planning/phases/15-weekly-digest/15-05-PLAN.md:134). The gate already forwards reset intents unchanged at [notification-gate.tsx:91](/home/bwales/projects/orbit-app/src/navigation/notification-gate.tsx:91), so no gate edit is required. Existing decay and birthday branches are explicitly preserved, with their exact output tests already present at [notification-nav.test.ts:16](/home/bwales/projects/orbit-app/src/services/notifications/notification-nav.test.ts:16).
+
+- **M5 — fixed.** Plan 15-03 runs `npx vitest run src/services/notifications/` both during the shared-mock task and final verification at [15-03-PLAN.md:140](/home/bwales/projects/orbit-app/.planning/phases/15-weekly-digest/15-03-PLAN.md:140) and [15-03-PLAN.md:293](/home/bwales/projects/orbit-app/.planning/phases/15-weekly-digest/15-03-PLAN.md:293). A spot run selected all eight existing notification suites. Execution itself was blocked only because this review sandbox cannot create Vitest’s temporary directory.
+
+- **L3 — fixed.** The current top bar is a flat ◎/⚙ row at [HomeScreen.tsx:485](/home/bwales/projects/orbit-app/src/screens/HomeScreen.tsx:485) with `justifyContent: "flex-end"` at [HomeScreen.tsx:582](/home/bwales/projects/orbit-app/src/screens/HomeScreen.tsx:582). Plan 15-04 explicitly wraps the glyphs in `topBarRight` and changes the outer row to `space-between` at [15-04-PLAN.md:181](/home/bwales/projects/orbit-app/.planning/phases/15-weekly-digest/15-04-PLAN.md:181), correctly placing “Your week” left.
+
+- **L4 — fixed.** The current helper is `migrateToV4` at [app-settings-dao.test.ts:69](/home/bwales/projects/orbit-app/src/db/app-settings-dao.test.ts:69), while the historical v2 helper and tests are isolated at [app-settings-dao.test.ts:60](/home/bwales/projects/orbit-app/src/db/app-settings-dao.test.ts:60). Plan 15-02 requires an in-place rename, every call-site update, and `grep -c migrateToV4 == 0` at [15-02-PLAN.md:142](/home/bwales/projects/orbit-app/.planning/phases/15-weekly-digest/15-02-PLAN.md:142). Migration-002 tests remain at v2.
+
+## Remaining or new Concerns
+
+- **MEDIUM — [15-03-PLAN.md:225](/home/bwales/projects/orbit-app/.planning/phases/15-weekly-digest/15-03-PLAN.md:225): the overlap test still lacks a barrier-entry handshake.** Calling pass 1 and immediately starting pass 2/settings mutation does not prove pass 1 has completed its `getAppSettings` read and reached `getAllScheduledNotificationsAsync`. The settings write could win, letting pass 1 read OFF; then even an uncoordinated implementation may leave the digest absent and pass accidentally—similar to the timing weakness in the current test at [notification-schedule.test.ts:779](/home/bwales/projects/orbit-app/src/services/notifications/notification-schedule.test.ts:779). Have the one-shot mock resolve a separate `entered` deferred immediately before awaiting `release`; the test must `await entered.promise` before invoking pass 2 and committing OFF. Then assert two total `getAll` calls.
+
+## Overall Risk
+
+**MEDIUM until M4 is tightened; LOW afterward.** No remaining HIGH concerns were found, and the other four Cycle-2 fixes align with the code on disk and the project non-negotiables.
+
+REVIEW_COUNTS: high=0 actionable_nonhigh=1
+
+---
+
+## Claude Review (Cycle 3 — fresh read-only subagent)
+
+**Verdict: `REVIEW_COUNTS: high=0 actionable_nonhigh=0`.** Every cited anchor verified on disk (decay reset
+notification-nav.ts:63-72; gate reset branch notification-gate.tsx:91-93; defer-one coordinator
+notification-schedule.ts:486-512 + __resetReconcileForTest:532; shared persist SettingsScreen.tsx:350-360 with
+onToggleMaster/onPickTime routing through it; migrateToV2@61/migrateToV4@69 + 6 call sites; TARGET_VERSION=4;
+topBar flex-end HomeScreen.tsx:584). H3 fixed (digest reset intent + deep-equal test, no gate edit, decay/birthday
+byte-unchanged, digest pre-check ordered before isNotificationData). M4 examined directly and judged already
+deterministic. M5/L3/L4 fixed. H1/H2 intact. "Ready to execute; residual risk is device-only, already gated to
+the 15-06 owner UAT checkpoint." Overall risk: LOW.
+
+---
+
+## CYCLE_SUMMARY (Cycle 3 — FINAL)
+
+CYCLE_SUMMARY: current_high=0 current_actionable=1
+
+**Converged on 0 HIGH at the max cycle (3).** The single residual (codex M4 test-barrier handshake) is a contested,
+low-risk test-determinism refinement Claude judged unnecessary — carried to the owner rather than triggering a
+4th cycle (max-cycles=3). Convergence trajectory of unresolved concerns: cycle 1 = 2H/5a → cycle 2 = 1H/4a →
+cycle 3 = 0H/1a.
