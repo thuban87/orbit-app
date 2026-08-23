@@ -80,6 +80,23 @@ clarification captured under Deferred (markdown export → Phase 16).
   line all tap → profile; (5) reuse the single birthday-parser fixes + rogue constant, no new date/threshold
   math; (6) no digest badge/count on icon or nav.
 
+### Persistence & schema — OWNER RULING (2026-08-23, escalated by research)
+- **The digest ON/OFF toggle persists as `app_settings.digest_enabled` via NEW migration 005** — an
+  `ALTER TABLE app_settings ADD COLUMN digest_enabled` mirroring the existing `decay_enabled` /
+  `birthday_enabled` columns (app-settings-dao.ts:117-119), **defaults ON** (1). This is the durable,
+  backup-exportable home consistent with its sibling notification toggles.
+- **Dossier reconciliation:** the two `[DECIDED]` lines ("digest adds NO new schema" vs "independently
+  toggleable / defaults on / exported") were in tension. Owner ruled: "no new schema" reads as **no new
+  TABLES and no new per-contact state** (still true — the digest is a pure read surface, stores nothing
+  per contact). The single global settings column is the toggle's proper home and is NOT a reversal of the
+  read-surface promise. Do NOT "bug-fix" the migration away as a schema violation — it is an owner decision.
+- **Migration numbering:** Phase 15 owns **005** (`digest_enabled`); Phase 16's reserved `sync_tombstones`
+  migration renumbers **005 → 006** (Phase 15 ships first; migrations are forward-only, ordered by ship
+  sequence). PHASE-16-SYNC-READINESS.md + the ROADMAP Phase-16 block were updated to 006.
+- Migration 005 is forward-only + irreversible (CLAUDE.md data rules): register it in `database.ts`, add a
+  `004-ai-settings`-style migration file + node:sqlite test, and thread `digest_enabled` through the
+  app-settings DAO + its type. Backup (Phase 16) exports it as a settings row (dossier [digest → backup]).
+
 ### Claude's Discretion (deferred to planning per dossier, not owner-facing taste)
 - The three queries: retrospective (7-day `interactions`, no connected/direction predicate, archived
   excluded); overlooked (rogue via shared constant + Rarely-responds gone-quiet + `last_contact IS NULL`,
