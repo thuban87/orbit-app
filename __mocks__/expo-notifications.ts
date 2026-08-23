@@ -28,6 +28,8 @@ export const DEFAULT_ACTION_IDENTIFIER =
 /** Enum-like objects the code reads (real Expo shapes, minimal members). */
 export const SchedulableTriggerInputTypes = {
   DATE: "date",
+  // 15-03 (DGST-01): the weekly-digest Sunday alarm schedules a WEEKLY trigger.
+  WEEKLY: "weekly",
 } as const;
 
 export const AndroidImportance = {
@@ -49,11 +51,18 @@ export interface ScheduledRequestDouble {
   content: {
     data?: Record<string, unknown>;
     body?: string;
+    // 15-03: the digest sets a frozen title; the DATE-trigger engine never does.
+    title?: string;
     categoryIdentifier?: string;
   };
   trigger: {
     channelId?: string;
     date?: number | Date;
+    // 15-03 WEEKLY-trigger facets — the digest reconcile diffs weekday/hour to
+    // detect a delivery-hour / weekday drift under the singleton digest id.
+    weekday?: number;
+    hour?: number;
+    minute?: number;
   };
 }
 
@@ -63,8 +72,46 @@ let scheduled: ScheduledRequestDouble[] = [];
 /** Latest handler passed to `setNotificationHandler` (item D — 11-13 asserts). */
 let lastNotificationHandler: unknown = null;
 
-export const scheduleNotificationAsync = vi.fn(async () => "mock-id");
-export const cancelScheduledNotificationAsync = vi.fn(async () => undefined);
+/**
+ * STATEFUL schedule (15-03 review M2): reconstruct a ScheduledRequestDouble from
+ * the request arg and, if no entry with that identifier is already scheduled, push
+ * it onto the backing store — so a later getAllScheduledNotificationsAsync ROUND-
+ * TRIPS the weekday/hour/channel it was scheduled with. This makes the digest
+ * two-pass idempotence a REAL convergence proof (second pass sees present+matching
+ * and leaves it) rather than a stub that always returns an id. The existing
+ * notification suites read mock CALL HISTORY (scheduleMock/cancelledIds), not this
+ * backing store, and their single-pass reconciles read `getAll` once BEFORE any
+ * schedule, so this mutation is safe for them (verified: node:sqlite runAsync is
+ * synchronous, so the coalescing test's mutate commits before pass 1 re-reads).
+ */
+export const scheduleNotificationAsync = vi.fn(
+  async (request?: unknown): Promise<string> => {
+    const req = (request ?? {}) as {
+      identifier?: string;
+      content?: ScheduledRequestDouble["content"];
+      trigger?: ScheduledRequestDouble["trigger"];
+    };
+    if (
+      req.identifier != null &&
+      !scheduled.some((e) => e.identifier === req.identifier)
+    ) {
+      scheduled.push({
+        identifier: req.identifier,
+        content: { ...(req.content ?? {}) },
+        trigger: { ...(req.trigger ?? {}) },
+      });
+    }
+    return "mock-id";
+  },
+);
+export const cancelScheduledNotificationAsync = vi.fn(
+  async (identifier?: string): Promise<undefined> => {
+    if (identifier != null) {
+      scheduled = scheduled.filter((e) => e.identifier !== identifier);
+    }
+    return undefined;
+  },
+);
 export const getAllScheduledNotificationsAsync = vi.fn(
   async (): Promise<ScheduledRequestDouble[]> => scheduled,
 );

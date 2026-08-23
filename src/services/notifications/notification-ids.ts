@@ -33,6 +33,16 @@ export function birthdayIdentifier(contactId: number): string {
 }
 
 /**
+ * The weekly-digest schedule identifier (DGST-01). A SINGLETON (not per-contact):
+ * exactly one WEEKLY trigger lives under this id, so a re-arm on every launch
+ * REPLACES the prior schedule instead of stacking. It is namespaced OUTSIDE the
+ * decay:/birthday: prefixes that `notification-schedule.ts` owns, so the
+ * decay/birthday reconcile's `isOwnedIdentifier` never matches — and never
+ * cancels — it (T-15-06; the digest has its own separate service + sweep hook).
+ */
+export const DIGEST_IDENTIFIER = "digest:weekly";
+
+/**
  * Versioned channel ids. Channel importance/visibility is IMMUTABLE at creation
  * in Android, so the version suffix is the ONLY way to change a channel's
  * properties in a later release (create a `-v2` channel, migrate). The two decay
@@ -42,6 +52,16 @@ export function birthdayIdentifier(contactId: number): string {
 export const DECAY_PRIVATE_CHANNEL = "decay-private-v1";
 export const DECAY_PUBLIC_CHANNEL = "decay-public-v1";
 export const BIRTHDAY_CHANNEL = "birthday-v1";
+
+/**
+ * The weekly-digest channel (DGST-01). Its own versioned id (`digest-v1`) — same
+ * immutable-at-creation reasoning as the channels above: a later importance /
+ * visibility change ships as `digest-v2` + migration, never a re-set. Created
+ * LOW importance / PRIVATE visibility (channels.ts), mirroring birthday — the
+ * frozen generic copy below names no one, so it is safe on a public lock screen
+ * while the channel stays PRIVATE regardless (T-15-04).
+ */
+export const DIGEST_CHANNEL = "digest-v1";
 
 /**
  * Action category + action ids for the headless decay buttons. The category id
@@ -88,6 +108,17 @@ export function decayBody(name: string): string {
 export function birthdayBody(name: string): string {
   return `It's ${name}'s birthday today.`;
 }
+
+/**
+ * The weekly-digest notification copy (UI-SPEC Notification Copy). FROZEN and
+ * GENERIC — it names no one and carries no counts or PII, so it is safe glanced
+ * on a public lock screen (T-15-04). Any live "who you reached" figure is
+ * computed on the screen the tap opens, NEVER baked into this scheduled body.
+ * Unlike the decay/birthday builders these take no argument: the digest is a
+ * singleton with a single fixed title/body.
+ */
+export const DIGEST_TITLE = "Your week in Orbit";
+export const DIGEST_BODY = "A look back at who you reached.";
 
 /**
  * The occurrence-scoped payload carried on every scheduled notification. The

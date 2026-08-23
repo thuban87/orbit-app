@@ -9,6 +9,7 @@ import {
   BIRTHDAY_CHANNEL,
   DECAY_PRIVATE_CHANNEL,
   DECAY_PUBLIC_CHANNEL,
+  DIGEST_CHANNEL,
 } from "./notification-ids";
 
 vi.mock("expo-notifications");
@@ -43,16 +44,17 @@ function configById(): Record<
 }
 
 describe("ensureChannels — immutable, versioned, LOW-importance channel set", () => {
-  it("creates exactly the three versioned channels", async () => {
+  it("creates exactly the four versioned channels", async () => {
     await ensureChannels();
 
-    expect(setChannel).toHaveBeenCalledTimes(3);
+    expect(setChannel).toHaveBeenCalledTimes(4);
     const ids = setChannel.mock.calls.map((c) => c[0]);
     expect(ids).toEqual(
       expect.arrayContaining([
         DECAY_PRIVATE_CHANNEL,
         DECAY_PUBLIC_CHANNEL,
         BIRTHDAY_CHANNEL,
+        DIGEST_CHANNEL,
       ]),
     );
   });
@@ -64,6 +66,7 @@ describe("ensureChannels — immutable, versioned, LOW-importance channel set", 
     expect(cfg[DECAY_PRIVATE_CHANNEL].importance).toBe(AndroidImportance.LOW);
     expect(cfg[DECAY_PUBLIC_CHANNEL].importance).toBe(AndroidImportance.LOW);
     expect(cfg[BIRTHDAY_CHANNEL].importance).toBe(AndroidImportance.LOW);
+    expect(cfg[DIGEST_CHANNEL].importance).toBe(AndroidImportance.LOW);
     // Never the sound-playing tier.
     expect(cfg[DECAY_PRIVATE_CHANNEL].importance).not.toBe(
       AndroidImportance.DEFAULT,
@@ -81,6 +84,10 @@ describe("ensureChannels — immutable, versioned, LOW-importance channel set", 
       AndroidNotificationVisibility.PUBLIC,
     );
     expect(cfg[BIRTHDAY_CHANNEL].lockscreenVisibility).toBe(
+      AndroidNotificationVisibility.PRIVATE,
+    );
+    // The digest is PRIVATE like birthday — generic copy, but PRIVATE regardless.
+    expect(cfg[DIGEST_CHANNEL].lockscreenVisibility).toBe(
       AndroidNotificationVisibility.PRIVATE,
     );
   });
@@ -102,11 +109,11 @@ describe("ensureChannels — immutable, versioned, LOW-importance channel set", 
     ]);
 
     await ensureChannels();
-    // Six calls total; the second triplet is identical to the first — the same
+    // Eight calls total; the second quartet is identical to the first — the same
     // idempotent create, no diff/patch path against an existing id.
-    expect(setChannel).toHaveBeenCalledTimes(6);
+    expect(setChannel).toHaveBeenCalledTimes(8);
     const second = setChannel.mock.calls
-      .slice(3)
+      .slice(4)
       .map((c) => [c[0], c[1].importance, c[1].lockscreenVisibility]);
     expect(second).toEqual(first);
   });

@@ -32,6 +32,7 @@ import {
   BIRTHDAY_CHANNEL,
   DECAY_PRIVATE_CHANNEL,
   DECAY_PUBLIC_CHANNEL,
+  DIGEST_CHANNEL,
 } from "./notification-ids";
 
 /**
@@ -53,6 +54,14 @@ export async function ensureChannels(): Promise<void> {
   });
   await setNotificationChannelAsync(BIRTHDAY_CHANNEL, {
     name: "Birthdays",
+    importance: AndroidImportance.LOW,
+    lockscreenVisibility: AndroidNotificationVisibility.PRIVATE,
+  });
+  // The weekly digest (DGST-01). LOW/PRIVATE like birthday — the frozen generic
+  // copy (DIGEST_TITLE/DIGEST_BODY) names no one, so a lock-screen glance is safe,
+  // but the channel is PRIVATE regardless. Create-only; never mutate (versioned id).
+  await setNotificationChannelAsync(DIGEST_CHANNEL, {
+    name: "Weekly digest",
     importance: AndroidImportance.LOW,
     lockscreenVisibility: AndroidNotificationVisibility.PRIVATE,
   });
