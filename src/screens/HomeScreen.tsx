@@ -45,7 +45,6 @@ import { BirthdayBanner } from "@/components/BirthdayBanner";
 import { ContactCard } from "@/components/ContactCard";
 import { type FilterChip, FilterChipRow } from "@/components/FilterChipRow";
 import { listCategories } from "@/db/contact-read";
-import { getExecutor } from "@/db/database";
 import {
   countArchived,
   countLiveContacts,
@@ -56,6 +55,7 @@ import {
   type DashboardSort,
   listDashboard,
 } from "@/db/dashboard-read";
+import { getExecutor } from "@/db/database";
 import { selectDashboardEmptyState } from "@/logic/dashboard-empty-logic";
 import type { RootStackParamList } from "@/navigation/types";
 import { useDashboardPrefs } from "@/stores/dashboard-prefs-store";
@@ -294,7 +294,9 @@ export function HomeScreen() {
             onPress={() => setTerm("")}
             style={[styles.searchClear, { borderColor: colors.border }]}
           >
-            <Text style={[styles.searchClearText, { color: colors.textSecondary }]}>
+            <Text
+              style={[styles.searchClearText, { color: colors.textSecondary }]}
+            >
               Clear
             </Text>
           </Pressable>
@@ -483,35 +485,60 @@ export function HomeScreen() {
           the (existing) Settings route UI-unreachable. A minimal top-right gear
           restores reach; exact styling is the owner's later design pass. */}
       <View style={styles.topBar}>
+        {/* Discreet retrospective entry (15-04) — LEFT, so the ◎/⚙ glyph cluster
+            stays grouped RIGHT (topBar splits via justifyContent:"space-between").
+            Text (not a glyph) reads as a retrospective link; no badge/count (locked). */}
         <Pressable
-          testID="dashboard-orbit-entry"
+          testID="dashboard-your-week-entry"
           accessibilityRole="button"
-          accessibilityLabel="Orbit view"
-          onPress={() => navigation.navigate("Orrery")}
-          style={styles.settingsEntry}
+          accessibilityLabel="Your week"
+          onPress={() => navigation.navigate("Digest")}
+          style={styles.yourWeekEntry}
         >
           {({ pressed }) => (
             <Text
               style={[
-                styles.settingsGlyph,
+                styles.yourWeekText,
                 { color: pressed ? colors.accent : colors.textSecondary },
               ]}
             >
-              ◎
+              Your week
             </Text>
           )}
         </Pressable>
-        <Pressable
-          testID="dashboard-settings-entry"
-          accessibilityRole="button"
-          accessibilityLabel="Settings"
-          onPress={() => navigation.navigate("Settings")}
-          style={styles.settingsEntry}
-        >
-          <Text style={[styles.settingsGlyph, { color: colors.textSecondary }]}>
-            ⚙
-          </Text>
-        </Pressable>
+        <View style={styles.topBarRight}>
+          <Pressable
+            testID="dashboard-orbit-entry"
+            accessibilityRole="button"
+            accessibilityLabel="Orbit view"
+            onPress={() => navigation.navigate("Orrery")}
+            style={styles.settingsEntry}
+          >
+            {({ pressed }) => (
+              <Text
+                style={[
+                  styles.settingsGlyph,
+                  { color: pressed ? colors.accent : colors.textSecondary },
+                ]}
+              >
+                ◎
+              </Text>
+            )}
+          </Pressable>
+          <Pressable
+            testID="dashboard-settings-entry"
+            accessibilityRole="button"
+            accessibilityLabel="Settings"
+            onPress={() => navigation.navigate("Settings")}
+            style={styles.settingsEntry}
+          >
+            <Text
+              style={[styles.settingsGlyph, { color: colors.textSecondary }]}
+            >
+              ⚙
+            </Text>
+          </Pressable>
+        </View>
       </View>
       <FlatList
         data={error ? [] : rows}
@@ -581,10 +608,23 @@ const styles = StyleSheet.create({
   },
   topBar: {
     flexDirection: "row",
-    justifyContent: "flex-end",
+    justifyContent: "space-between",
     alignItems: "center",
     paddingHorizontal: 16,
     paddingTop: 8,
+  },
+  topBarRight: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  yourWeekEntry: {
+    minHeight: 44,
+    justifyContent: "center",
+    paddingHorizontal: 4,
+  },
+  yourWeekText: {
+    fontSize: 15,
+    fontWeight: "600",
   },
   settingsEntry: {
     minHeight: 44,
