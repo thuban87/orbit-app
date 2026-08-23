@@ -23,6 +23,7 @@ import { migration001 } from "@/db/migrations/001-initial";
 import { migration002 } from "@/db/migrations/002-app-settings";
 import { migration003 } from "@/db/migrations/003-orrery-settings";
 import { migration004 } from "@/db/migrations/004-ai-settings";
+import { migration005 } from "@/db/migrations/005-digest-settings";
 import { runMigrations } from "@/db/migrations/runner";
 import type { SqlExecutor } from "@/db/types";
 import { __resetSweepForTest, runLaunchSweep } from "@/services/launch-sweep";
@@ -39,6 +40,7 @@ import {
   DECAY_CATEGORY,
   DECAY_PRIVATE_CHANNEL,
   DECAY_PUBLIC_CHANNEL,
+  DIGEST_IDENTIFIER,
   decayBody,
   decayIdentifier,
 } from "./notification-ids";
@@ -67,12 +69,15 @@ beforeEach(async () => {
   uidCounter = 0;
   const db = openTestDb();
   exec = nodeSqliteExecutor(db);
-  // v4: getAppSettings (called by the reconcile under test) now SELECTs the
-  // Phase-14 AI columns, so the schema must include migration 004 (Plan 14-01).
+  // v5: getAppSettings (called by the reconcile under test) now SELECTs the
+  // Phase-14 AI columns AND the Phase-15 digest_enabled column, so the schema must
+  // include migration 004 (Plan 14-01) and migration 005 (Plan 15-01) — otherwise
+  // the SELECT fails with `no such column: digest_enabled` (review M1). This is the
+  // CURRENT-schema harness that drives the live reconcile, so it MUST track v5.
   await runMigrations(
     exec,
-    [migration001, migration002, migration003, migration004],
-    4,
+    [migration001, migration002, migration003, migration004, migration005],
+    5,
     { now: NOW, newUid: uid },
   );
   __resetExpo();
@@ -490,20 +495,50 @@ describe("reconcileSchedule — stale cancel + full-request diff", () => {
     expect(scheduledFor(decayIdentifier(id))).toBeDefined();
   });
 
-  it("does NOT touch a non-owned identifier when master is off", async () => {
-    // notifications default OFF — do not enable.
+  it("does NOT touch the digest (non-owned) identifier when master is off (T-15-06)", async () => {
+    // notifications default OFF — do not enable. The decay/birthday engine cancels
+    // its OWN owned ids but MUST NEVER cancel the digest's singleton id (owned by
+    // the separate digest-schedule service). Uses the REAL DIGEST_IDENTIFIER from
+    // notification-ids, not a stale literal.
     __setScheduled([
       { identifier: decayIdentifier(1), content: {}, trigger: {} },
       { identifier: birthdayIdentifier(2), content: {}, trigger: {} },
-      { identifier: "digest:daily", content: {}, trigger: {} },
+      { identifier: DIGEST_IDENTIFIER, content: {}, trigger: {} },
     ]);
 
     await reconcileSchedule(exec);
 
     expect(cancelledIds()).toContain(decayIdentifier(1));
     expect(cancelledIds()).toContain(birthdayIdentifier(2));
-    expect(cancelledIds()).not.toContain("digest:daily");
+    expect(cancelledIds()).not.toContain(DIGEST_IDENTIFIER);
     expect(scheduleMock).not.toHaveBeenCalled();
+  });
+
+  it("does NOT cancel the digest id when master is ON with decay/birthday candidates present (T-15-06)", async () => {
+    await enable();
+    // A live decay candidate and a live birthday candidate — the reconcile arms
+    // both AND diffs the full owned set, yet the digest's id is unowned by this
+    // engine (isOwnedIdentifier matches only decay:/birthday:) so it is left alone.
+    const decayId = await seedContact({
+      name: "Owned Decay",
+      intervalDays: 30,
+      lastContact: dateOffset(-10),
+    });
+    const bdayId = await seedContact({
+      name: "Owned Bday",
+      lastContact: null,
+      birthday: birthdayMMDD(7),
+    });
+    __setScheduled([
+      { identifier: DIGEST_IDENTIFIER, content: {}, trigger: {} },
+    ]);
+
+    await reconcileSchedule(exec);
+
+    // The engine schedules its own candidates but NEVER cancels the digest id.
+    expect(scheduledFor(decayIdentifier(decayId))).toBeDefined();
+    expect(scheduledFor(birthdayIdentifier(bdayId))).toBeDefined();
+    expect(cancelledIds()).not.toContain(DIGEST_IDENTIFIER);
   });
 
   it("reschedules under the SAME id when the delivery hour crosses an HOUR (H3)", async () => {

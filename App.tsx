@@ -27,6 +27,7 @@ import { installSweepTrigger } from "@/services/launch-sweep";
 import { ensureChannels } from "@/services/notifications/channels";
 import { ensureNotificationCategories } from "@/services/notifications/notification-actions";
 import "@/services/notifications/headless-task";
+import { registerDigestScheduleSweep } from "@/services/notifications/digest-schedule";
 import { FOREGROUND_NOTIFICATION_BEHAVIOR } from "@/services/notifications/notification-ids";
 import { registerNotificationScheduleSweep } from "@/services/notifications/notification-schedule";
 import { registerPhotoReconcileSweep } from "@/services/photos/photo-reconcile-sweep";
@@ -81,6 +82,12 @@ let photoReconcileRegistered = false;
 // the reconcile fires once per real foreground launch — never at import, never on a
 // headless tap (T-11-SWEEP).
 let notificationScheduleRegistered = false;
+// One-shot guard for the weekly-digest reconcile hook (DGST-01), on the SAME
+// registry and under the SAME re-entrancy reasoning as the notification schedule.
+// Its OWN sweep hook (separate from the decay/birthday reconcile) — registered
+// ready-gated so the digest re-arms once per real foreground launch, never at
+// import, never on a headless tap.
+let digestScheduleRegistered = false;
 // One-shot guard for the widget foreground-refresh hook (WDG-03), on the SAME
 // registry and under the SAME re-entrancy reasoning. Registered ready-gated so the
 // widget recompute fires once per real foreground launch — never at import, never
@@ -144,6 +151,15 @@ function AppShell() {
     if (!notificationScheduleRegistered) {
       registerNotificationScheduleSweep(getExecutor);
       notificationScheduleRegistered = true;
+    }
+    // Register the weekly-digest reconcile (DGST-01) on the SAME registry, once
+    // only, BEFORE the trigger fires its cold-start sweep. Its OWN hook — the
+    // decay/birthday reconcile never touches digest:weekly (T-15-06). The digest-v1
+    // channel is already created by ensureChannels() (awaited below) before the
+    // sweep begins scheduling.
+    if (!digestScheduleRegistered) {
+      registerDigestScheduleSweep(getExecutor);
+      digestScheduleRegistered = true;
     }
     // Register the widget foreground-refresh recompute (WDG-03) on the SAME
     // registry, once only, BEFORE the trigger fires its cold-start sweep — so a

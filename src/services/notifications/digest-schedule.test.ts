@@ -34,17 +34,17 @@ import {
   type ScheduledRequestDouble,
 } from "../../../__mocks__/expo-notifications";
 import {
-  DIGEST_BODY,
-  DIGEST_CHANNEL,
-  DIGEST_IDENTIFIER,
-  DIGEST_TITLE,
-} from "./notification-ids";
-import {
   __resetDigestReconcileForTest,
   DIGEST_WEEKDAY,
   reconcileDigestSchedule,
   registerDigestScheduleSweep,
 } from "./digest-schedule";
+import {
+  DIGEST_BODY,
+  DIGEST_CHANNEL,
+  DIGEST_IDENTIFIER,
+  DIGEST_TITLE,
+} from "./notification-ids";
 
 vi.mock("expo-notifications");
 
@@ -117,7 +117,10 @@ function cancelledIds(): string[] {
 }
 
 /** A present digest entry seeded into the "currently scheduled" set. */
-function digestEntry(hour: number, weekday = DIGEST_WEEKDAY): ScheduledRequestDouble {
+function digestEntry(
+  hour: number,
+  weekday = DIGEST_WEEKDAY,
+): ScheduledRequestDouble {
   return {
     identifier: DIGEST_IDENTIFIER,
     content: {
@@ -177,7 +180,9 @@ describe("reconcileDigestSchedule — schedule + idempotence", () => {
     expect(scheduleMock).toHaveBeenCalledTimes(1);
     expect(cancelMock).not.toHaveBeenCalled();
     const all = await getAllScheduledNotificationsAsync();
-    expect(all.filter((e) => e.identifier === DIGEST_IDENTIFIER)).toHaveLength(1);
+    expect(all.filter((e) => e.identifier === DIGEST_IDENTIFIER)).toHaveLength(
+      1,
+    );
   });
 });
 
@@ -228,7 +233,9 @@ describe("reconcileDigestSchedule — delivery-hour / weekday drift", () => {
 
     await reconcileDigestSchedule(exec);
 
-    expect(cancelledIds().filter((x) => x === DIGEST_IDENTIFIER)).toHaveLength(1);
+    expect(cancelledIds().filter((x) => x === DIGEST_IDENTIFIER)).toHaveLength(
+      1,
+    );
     const req = scheduledDigest();
     expect(req).toBeDefined();
     expect(req?.trigger.hour).toBe(10);

@@ -165,7 +165,9 @@ let digestReconcilePending = false;
  * settings writers + the launch sweep); overlapping calls coalesce to one
  * trailing pass. Read-only on the DB (never nest a DAO write mutex here).
  */
-export async function reconcileDigestSchedule(exec: SqlExecutor): Promise<void> {
+export async function reconcileDigestSchedule(
+  exec: SqlExecutor,
+): Promise<void> {
   if (digestReconcileRunning) {
     digestReconcilePending = true;
     return;
@@ -191,9 +193,7 @@ export async function reconcileDigestSchedule(exec: SqlExecutor): Promise<void> 
  * can precede DB materialisation. Importing this module runs NOTHING (no
  * module-scope side effect).
  */
-export function registerDigestScheduleSweep(
-  getExec: () => SqlExecutor,
-): void {
+export function registerDigestScheduleSweep(getExec: () => SqlExecutor): void {
   registerSweepHook(async () => {
     await reconcileDigestSchedule(getExec());
   });
