@@ -47,6 +47,7 @@ import {
   type AiCloudProviderId,
   type AiProviderId,
 } from "@/services/ai-types";
+import { reconcileDigestSchedule } from "@/services/notifications/digest-schedule";
 import { reconcileSchedule } from "@/services/notifications/notification-schedule";
 import {
   getNotificationPermission,
@@ -354,6 +355,15 @@ export function SettingsScreen() {
       const next = await getAppSettings(exec);
       setSettings(next);
       void reconcileSchedule(exec);
+      // Fold the digest reconcile into the SHARED post-write path (review H1 /
+      // Pitfall 7): master ON/OFF, the delivery-hour picker, AND the digest
+      // toggle all route through `persist`, so every write that can affect the
+      // WEEKLY trigger arms/cancels/re-times it synchronously — not only the
+      // digest Switch, and not only at next launch. reconcileDigestSchedule
+      // re-reads settings fresh, is idempotent, and is defer-one guarded, so
+      // running it on every settings write is harmless (a quiet-window-only
+      // change reconciles to "matching -> leave").
+      void reconcileDigestSchedule(exec);
     } catch (err) {
       Logger.error(LOG_SCOPE, "failed to persist notification setting", err);
     }
@@ -734,6 +744,44 @@ export function SettingsScreen() {
           </View>
           <Text style={[styles.helper, { color: colors.textSecondary }]}>
             A morning nudge on a contact's birthday.
+          </Text>
+        </View>
+
+        {/* Weekly digest — gated by master. Persists + reconciles the WEEKLY
+            trigger through the shared persist path (review H1). */}
+        <View
+          style={[
+            styles.row,
+            { backgroundColor: colors.surface, borderColor: colors.border },
+          ]}
+        >
+          <View style={styles.toggleRow}>
+            <Text
+              style={[
+                styles.rowLabel,
+                { color: masterOn ? colors.textPrimary : colors.textSecondary },
+              ]}
+            >
+              Weekly digest
+            </Text>
+            <Switch
+              testID="settings-notifications-digest"
+              accessibilityRole="switch"
+              accessibilityLabel="Weekly digest"
+              accessibilityState={{
+                disabled: !masterOn,
+                checked: settings?.digestEnabled === 1,
+              }}
+              disabled={!masterOn}
+              value={settings?.digestEnabled === 1}
+              onValueChange={(v) => void persist({ digestEnabled: v ? 1 : 0 })}
+              trackColor={{ false: colors.border, true: colors.accent }}
+              thumbColor={colors.surfaceElevated}
+            />
+          </View>
+          <Text style={[styles.helper, { color: colors.textSecondary }]}>
+            A Sunday-morning look back at your week — who you reached, and who's
+            slipping quietly.
           </Text>
         </View>
 
