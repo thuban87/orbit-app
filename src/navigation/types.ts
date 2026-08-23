@@ -90,6 +90,16 @@ export type RootStackParamList = {
    * route is untouched.
    */
   Orrery: undefined;
+  /**
+   * The weekly "your week" digest screen (DGST-01/02/03). Carries NO params — the
+   * screen self-fetches the three digest reads + the backlog count on focus
+   * (serializable-only, deep-link-safe, no callbacks — the same additive posture
+   * as `Orrery`/`Capture`/`Compose`). Reached from the dashboard's discreet "Your
+   * week" top-bar entry (this plan) and, later, the Sunday notification tap
+   * (Plan 15-05). Registered additively; `initialRouteName` stays `Home` and
+   * every existing route is untouched.
+   */
+  Digest: undefined;
 };
 
 /**

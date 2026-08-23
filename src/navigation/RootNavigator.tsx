@@ -6,6 +6,7 @@ import { ContactProfileScreen } from "@/screens/ContactProfileScreen";
 import { CreateContactScreen } from "@/screens/CreateContactScreen";
 import { CropPhotoScreen } from "@/screens/CropPhotoScreen";
 import { CustomFieldsScreen } from "@/screens/CustomFieldsScreen";
+import { DigestScreen } from "@/screens/DigestScreen";
 import { EditContactScreen } from "@/screens/EditContactScreen";
 import { HomeScreen } from "@/screens/HomeScreen";
 import { ManageFavouritesScreen } from "@/screens/ManageFavouritesScreen";
@@ -63,10 +64,7 @@ export function RootNavigator() {
       <Stack.Screen name="Edit" component={EditContactScreen} />
       <Stack.Screen name="Archived" component={ArchivedContactsScreen} />
       <Stack.Screen name="CropPhoto" component={CropPhotoScreen} />
-      <Stack.Screen
-        name="NeverContacted"
-        component={NeverContactedScreen}
-      />
+      <Stack.Screen name="NeverContacted" component={NeverContactedScreen} />
       <Stack.Screen
         name="ManageFavourites"
         component={ManageFavouritesScreen}
@@ -74,6 +72,7 @@ export function RootNavigator() {
       <Stack.Screen name="Compose" component={ComposeScreen} />
       <Stack.Screen name="Capture" component={CaptureScreen} />
       <Stack.Screen name="Orrery" component={OrreryScreen} />
+      <Stack.Screen name="Digest" component={DigestScreen} />
     </Stack.Navigator>
   );
 }
