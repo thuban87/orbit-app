@@ -197,3 +197,131 @@ REVIEW_COUNTS: high=2 actionable_nonhigh=3
 CYCLE_SUMMARY: current_high=2 current_actionable=5
 
 **Not converged** — 2 HIGH (H1 shared-persist digest reconcile [both]; H2 defer-one overlap race [codex]) + 5 actionable (M1 test-harness v5 migration, M2 stateful mock, M3 drift-branch device step, L1 UAT testID/build, L2 foreground-drop accept). Proceeding to replan (`gsd-plan-phase 15 --reviews --skip-research`) then Cycle 2 review.
+
+# ═══════════════════════════════════════════════════════════════
+# Cycle 2 (post-replan review)
+# ═══════════════════════════════════════════════════════════════
+
+## Cycle 2 — Aggregated Actionable Findings (planner worklist)
+
+Both reviewers verified all 7 Cycle-1 fixes (H1/H2/M1/M2/M3/L1/L2) as GENUINELY RESOLVED against code.
+Divergence: Claude found 0 new (1 cosmetic LOW). Codex audited the tap-routing Back behavior Claude did
+not, and found a real NEW HIGH + 3 actionable. Aggregate = NOT converged.
+
+### HIGH
+
+- **H3 (NEW) — [codex, orchestrator-verified] Warm digest tap violates "Back → dashboard".**
+  15-05 (~:112) routes the digest body tap via `nav.navigate("Digest")`, which only lands Back-on-Home from a
+  COLD start. On a warm tap over `Home → Profile/Settings`, navigate pushes Digest on top → `goBack()` returns
+  to Profile/Settings. VERIFIED: the established Back→dashboard mechanism is a RESET onto `[Home, target]` —
+  `resolveNotificationNav` returns `{type:"reset", index:1, routes:[{name:"Home"},{name:"Compose"}]}` for decay
+  with the in-code comment "a reset (not a navigate) so Back ALWAYS lands on the dashboard regardless of the
+  stack" (T-11-BACKSTACK), applied by `applyBodyNav` (notification-gate.tsx:91-97). The dossier requires the
+  digest to inherit 11-notify's back-stack pattern (Back → dashboard).
+  **Fix:** the digest intent must be `{type:"reset", index:1, routes:[{name:"Home"},{name:"Digest"}]}` (mirror
+  decay), incorporated into `resolveNotificationNav` (the digest pre-check must return a reset intent, not rely
+  on a bare navigate), with a test asserting that exact reset shape for the digest kind.
+
+### MEDIUM
+
+- **M4 — [codex] The overlap regression test is not deterministically overlapping.**
+  15-03 (~:223) mirrors the existing coalescing test (notification-schedule.test.ts:779) which relies on
+  promise/SQLite timing rather than proving pass 1 captured the old setting before pass 2 became pending — an
+  uncoordinated impl could pass by luck.
+  **Fix:** use a deferred mock barrier — hold pass 1 after its old-state read, invoke the 2nd reconcile, commit
+  `digestEnabled=0`, then release pass 1 — making the stale-pass/trailing-pass ordering deterministic.
+
+- **M5 — [codex] Stateful shared-mock change requires the FULL notification suite, but verification omits it.**
+  Making the global expo mock stateful affects every notification suite, but 15-03 Task 1 runs only the
+  notification-IDs suite and final verification (~:291) omits the named-actions, channels, permission, and
+  purge-cleanup suites.
+  **Fix:** add the full notification suite to 15-03's automated verification so the M2 fix can't silently alter
+  shared test behavior.
+
+### LOW
+
+- **L3 — [codex] "Your week" entry layout stays right-aligned.**
+  15-04 (~:177) prepends the entry to a flat flex-end top bar (HomeScreen.tsx:582 `justifyContent:"flex-end"`),
+  leaving all three controls right-aligned. **Fix:** require a right-side wrapper for the ◎/⚙ cluster + a
+  `space-between`/spacer so "Your week" sits at the left.
+
+- **L4 — [claude] Dead `migrateToV4` helper after the M1 migration.**
+  15-02 repoints all getAppSettings blocks to `migrateToV5` but instructs "add migrateToV5 alongside
+  migrateToV4" → migrateToV4 ends with zero callers (possible Biome noUnusedVariables warning; non-blocking).
+  **Fix:** convert `migrateToV4`→`migrateToV5` in place (or drop it once unused). Cosmetic, no correctness impact.
+
+---
+
+## Codex Review (Cycle 2)
+
+## Summary
+
+The Cycle-1 revisions substantially address the original findings. One new HIGH navigation defect remains, plus three actionable non-high concerns.
+
+## What’s genuinely fixed
+
+- H1: `reconcileDigestSchedule` is placed in the shared Settings `persist` path, covering master, delivery-hour, and digest-toggle writes.
+- H2 implementation: the plan now prescribes the correct module-level defer-one coordinator and test reset. The regression test itself still needs deterministic synchronization, noted below.
+- M1: current-schema `getAppSettings` and notification-scheduler harnesses are explicitly migrated to v5; historical migration tests remain pinned.
+- M2: the Expo mock becomes stateful, making sequential idempotence and drift tests meaningful.
+- M3: device UAT changes delivery hour and verifies weekday/hour round-trip plus exactly one re-armed trigger.
+- L1: `dashboard-your-week-entry` is used, and the signed-off release build must be unmodified.
+- L2: foreground suppression is explicitly accepted and device-observed.
+- The local-first, local-date, migration-005, independent digest service, and non-decay-predicate requirements are preserved.
+
+## Remaining or new Concerns
+
+### HIGH — Warm notification taps do not guarantee Back returns to Dashboard
+
+[15-05-PLAN.md:112](/home/bwales/projects/orbit-app/.planning/phases/15-weekly-digest/15-05-PLAN.md:112) instructs the gate to call `nav.navigate("Digest")` and claims Back automatically returns to Home because Home is the initial route. That is only reliable on cold start. On a warm tap while the current stack is `Home → Profile` or `Home → Settings`, navigating pushes Digest above that route, so Digest’s `goBack()` returns to Profile/Settings, violating the plan’s must-have and UAT contract.
+
+The existing gate already distinguishes reset intents at [notification-gate.tsx:91](/home/bwales/projects/orbit-app/src/navigation/notification-gate.tsx:91), while `initialRouteName` at [RootNavigator.tsx:55](/home/bwales/projects/orbit-app/src/navigation/RootNavigator.tsx:55) does not reset an existing stack.
+
+Change the digest intent to reset to `[Home, Digest]`, and test that exact intent shape.
+
+### MEDIUM — The overlap regression test is not deterministically overlapping
+
+[15-03-PLAN.md:223](/home/bwales/projects/orbit-app/.planning/phases/15-weekly-digest/15-03-PLAN.md:223) says to mirror the existing test, which starts both reconciles and the mutation without a controlled barrier. The analog at [notification-schedule.test.ts:779](/home/bwales/projects/orbit-app/src/services/notifications/notification-schedule.test.ts:779) relies on promise/SQLite timing rather than proving that pass one captured the old setting before pass two became pending.
+
+Use a deferred mock barrier around the first pass: hold it after its old-state read, invoke the second reconcile, commit `digestEnabled=0`, then release the first pass. This makes the stale-pass/trailing-pass ordering deterministic and ensures an uncoordinated implementation cannot pass accidentally.
+
+### MEDIUM — Stateful shared-mock regressions are required but not executed
+
+The plan correctly warns that making the global Expo mock stateful requires the full notification suite at [15-03-PLAN.md:129](/home/bwales/projects/orbit-app/.planning/phases/15-weekly-digest/15-03-PLAN.md:129). However, Task 1 runs only the notification-IDs suite, and final verification at [15-03-PLAN.md:291](/home/bwales/projects/orbit-app/.planning/phases/15-weekly-digest/15-03-PLAN.md:291) omits the named actions, channels, permission, and purge-cleanup suites.
+
+Add the full notification-suite command to automated verification. Otherwise the M2 fix can alter shared test behavior without the promised guard running.
+
+### LOW — “Your week” will remain grouped on the right
+
+[15-04-PLAN.md:177](/home/bwales/projects/orbit-app/.planning/phases/15-weekly-digest/15-04-PLAN.md:177) says to prepend the entry while keeping the glyph cluster grouped right, but the current top bar is a flat list of Pressables and uses `justifyContent: "flex-end"` at [HomeScreen.tsx:582](/home/bwales/projects/orbit-app/src/screens/HomeScreen.tsx:582). Merely prepending the text leaves all three controls right-aligned.
+
+Explicitly require a right-side wrapper for the ◎/⚙ controls and a `space-between` or flexible spacer layout.
+
+## Overall Risk
+
+Moderate-high until the warm-tap stack behavior is corrected. The scheduling architecture and Cycle-1 data/settings fixes are otherwise materially improved; the remaining scheduling concerns are principally about proving the concurrency and mock changes reliably.
+
+REVIEW_COUNTS: high=1 actionable_nonhigh=3
+
+---
+
+## Claude Review (Cycle 2 — fresh read-only subagent)
+
+**Verdict: `REVIEW_COUNTS: high=0 actionable_nonhigh=0`.** All six revised plans hold up against the code on
+disk; every Cycle-1 finding (H1/H2/M1/M2/M3/L1/L2) is grounded in real file:line facts and its fix is correct
+and complete (verified: shared `persist` at SettingsScreen.tsx:350-360 covers master/delivery-hour/digest;
+defer-one mirrors notification-schedule.ts:486-512 + __resetReconcileForTest:532-535; only two test files call
+getAppSettings and both are migrated to v5; the stateless mock gap is real and the stateful fix makes idempotence
+provable; 15-06 drift step validates the weekday/hour round-trip; locked testID used; L2 foreground-drop
+explicitly accepted). One trivial LOW: the dead `migrateToV4` helper (= L4 above). "Nothing requires a plan
+change before execution." NOTE: Claude did not audit the warm-tap Back behavior that codex flagged as H3.
+
+---
+
+## CYCLE_SUMMARY (Cycle 2)
+
+CYCLE_SUMMARY: current_high=1 current_actionable=4
+
+**Not converged** — 1 HIGH (H3 warm-tap Back→dashboard reset, codex-found + orchestrator-verified) + 4 actionable
+(M4 deterministic overlap test, M5 full-notification-suite verify, L3 top-bar layout, L4 dead helper). Proceeding
+to replan (Cycle 2 → Cycle 3, the max) then a final review.
