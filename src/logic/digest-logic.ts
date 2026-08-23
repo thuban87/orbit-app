@@ -30,7 +30,9 @@ export const RETROSPECTIVE_WINDOW_DAYS = 6;
 
 /**
  * The effortful-marks window — deliberately WIDER than the retrospective so the
- * gentle line reads "a few recent conversations", not "this week". 14 days.
+ * gentle line reads "a few recent conversations", not "this week". `14` yields a
+ * 15-day INCLUSIVE window (today + the 14 prior days) via
+ * `date('now','localtime', windowModifier(EFFORTFUL_WINDOW_DAYS))`.
  */
 export const EFFORTFUL_WINDOW_DAYS = 14;
 
