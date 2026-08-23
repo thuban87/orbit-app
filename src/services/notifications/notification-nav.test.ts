@@ -30,6 +30,22 @@ describe("resolveNotificationNav", () => {
     });
   });
 
+  it("routes a digest body tap to a RESET onto [Home, Digest] (index 1)", () => {
+    expect(resolveNotificationNav({ kind: "digest" })).toEqual({
+      type: "reset",
+      index: 1,
+      routes: [{ name: "Home" }, { name: "Digest" }],
+    });
+  });
+
+  it("routes a digest tap to the SAME [Home, Digest] reset and forwards no contactId", () => {
+    expect(resolveNotificationNav({ kind: "digest", contactId: 99 })).toEqual({
+      type: "reset",
+      index: 1,
+      routes: [{ name: "Home" }, { name: "Digest" }],
+    });
+  });
+
   it("routes a birthday body tap to a navigate to Profile{contactId}", () => {
     expect(
       resolveNotificationNav({
