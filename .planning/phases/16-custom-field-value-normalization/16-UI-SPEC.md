@@ -1,7 +1,7 @@
 ---
 phase: 16
 slug: custom-field-value-normalization
-status: draft
+status: approved
 shadcn_initialized: false
 preset: none
 created: 2026-08-24
@@ -171,21 +171,33 @@ visible to assistive technology.
 
 ## UI Considerations
 
-Applicable state considerations resolved: **8 covered, 1 backstop, 0 unresolved.** This phase has no
-new navigator, list, form, or media surface; the rows below make preservation and the exceptional
-bootstrap state testable rather than treating a storage migration as visually invisible by assumption.
+Applicable state considerations resolved: **17 explicit, 2 backstop, 0 unresolved.** The confirmed
+element kinds are the bootstrap migration gate (`interactive-control`), Custom Fields definitions
+(`list-collection`), field/profile controls (`form`, `interactive-control`), and custom-photo paths
+(`media`). These rows make preservation and the exceptional bootstrap state testable rather than
+treating a storage migration as visually invisible by assumption.
 
 | Category | Element(s) | Status | Resolution / Reason |
 |----------|------------|--------|---------------------|
-| loading | Bootstrap migration gate | ✅ covered | Existing centred spinner remains until migration resolves; navigator does not mount early. |
-| error | Bootstrap migration gate | ✅ covered | Classified migration-006 integrity failure uses the exact plain-language copy above after rollback; unrelated bootstrap errors keep generic copy. |
-| empty | Custom Fields definitions collection | ✅ covered | Existing zero-active-definitions message and `New field` entry remain unchanged. |
-| populated | Active and quarantined definition collections | ✅ covered | Existing cards, display order, actions, and split quarantined section remain unchanged after normalized reads. |
-| partial | Field/profile values with invalid or out-of-list raw TEXT | ✅ covered | Existing parser mismatch row preserves raw value and the `Tap to fix` affordance; no coercion occurs. |
-| zero-one-many | Definition collections | ✅ covered | Zero uses the documented empty message; one and many use the same existing vertical cards and wrapping action cluster, without count copy. |
-| overflow | Custom Fields screen and field-definition form | ✅ covered | Existing `ScrollView` shells, wrapped action/type-chip rows, and option-input layout remain unchanged; no database label/identity is added. |
-| long-text | Field labels, options, values, and failure body | 🧪 backstop | Preserve the existing wrapping/scrolling behaviour; physical-device upgrade UAT must include long field label/options and a deliberately induced classified failure fixture to verify no clipping obscures recovery text. |
-| media | Custom-photo value paths | ✅ covered | No media presentation changes: stored relative photo paths remain byte-preserved and continue through the existing photo widget/path resolver. |
+| loading | Bootstrap migration gate | ✅ explicit | Keep the existing centred `ActivityIndicator` until `openAndMigrate()` resolves; do not mount the navigator early. |
+| error | Bootstrap migration gate | ✅ explicit | After rollback, a classified migration-006 integrity failure uses the exact plain-language copy above; unrelated bootstrap failures retain generic copy. |
+| long-text | Bootstrap migration gate | 🧪 backstop | Preserve wrapping within the existing centred error-view inset; physical-device UAT with a classified-failure fixture must show the full recovery instruction without clipping. |
+| empty | Custom Fields definitions collection | ✅ explicit | Preserve the zero-active-definitions message and unchanged `New field` entry. |
+| loading | Custom Fields definitions collection | ✅ explicit | Add no list-specific loading treatment; the existing bootstrap gate prevents a new migration-time partial list, and all established post-start list behaviour remains unchanged. |
+| error | Custom Fields definitions collection | ✅ explicit | Preserve the existing native read/mutation alert copy and reload/reopen recovery path; do not add a second error surface. |
+| populated | Custom Fields definitions collection | ✅ explicit | Preserve active cards in display order, their existing controls, and the quarantined section below them. |
+| partial | Custom Fields definitions collection | ✅ explicit | Preserve the current active/quarantined split and individual definition cards; invalid value content is handled by the field/profile controls below, never by hiding a definition. |
+| overflow | Custom Fields definitions collection | ✅ explicit | Preserve the existing `ScrollView` and wrapping action/type-chip rows; never expose database identity to make space. |
+| zero-one-many | Custom Fields definitions collection | ✅ explicit | Zero uses the documented empty message; one and many retain the existing vertical cards and action cluster without new count copy. |
+| empty | Field/profile controls | ✅ explicit | A `NULL` or empty normalized value retains its established blank-value presentation and distinct storage/presence semantics. |
+| loading | Field/profile controls | ✅ explicit | Add no optimistic or migration-specific in-flight treatment; preserve current control behaviour while an existing operation completes. |
+| error | Field/profile controls | ✅ explicit | Preserve the native error alert and existing recovery behaviour for rejected DAO operations; the invalid-value repair row remains available where applicable. |
+| partial | Field/profile controls | ✅ explicit | Preserve raw invalid or out-of-list TEXT, its outlined row, and the tappable `Tap to fix` repair affordance; do not coerce, hide, or clear it. |
+| long-text | Field/profile controls | 🧪 backstop | Preserve existing wrapping and scrolling for long field labels, options, and values; physical-device UAT must cover long labels/options without clipped repair or action text. |
+| empty | Custom-photo value paths | ✅ explicit | An absent custom photo keeps the existing blank-value/photo-widget presentation; it is never presented as a failed migration. |
+| loading | Custom-photo value paths | ✅ explicit | The migration introduces no media-loading treatment; preserve the existing photo-widget behaviour. |
+| error | Custom-photo value paths | ✅ explicit | Preserve existing resolver/error handling and do not introduce migration-specific media error copy. |
+| populated | Custom-photo value paths | ✅ explicit | Stored relative photo paths remain byte-preserved and continue through the existing photo widget/path resolver. |
 
 ---
 
@@ -201,11 +213,11 @@ No third-party registry is declared or used. The registry vetting gate is not tr
 
 ## Checker Sign-Off
 
-- [ ] Dimension 1 Copywriting: PASS
-- [ ] Dimension 2 Visuals: PASS
-- [ ] Dimension 3 Color: PASS
-- [ ] Dimension 4 Typography: PASS
-- [ ] Dimension 5 Spacing: PASS
-- [ ] Dimension 6 Registry Safety: PASS
+- [x] Dimension 1 Copywriting: PASS
+- [x] Dimension 2 Visuals: PASS
+- [x] Dimension 3 Color: PASS
+- [x] Dimension 4 Typography: PASS
+- [x] Dimension 5 Spacing: PASS
+- [x] Dimension 6 Registry Safety: PASS
 
-**Approval:** pending
+**Approval:** approved
