@@ -21,7 +21,7 @@ created: 2026-08-24
 | **Full suite command** | `npm test` |
 | **Estimated runtime** | ~30 seconds |
 
-> The node SQLite test adapter requires Node 22+; the current shell's Node 18 cannot run these database tests.
+> The node SQLite test adapter requires Node 22+. This environment is Node v22.22.2 (verified) and `node:sqlite` works — the existing DB suite runs green; no Node provisioning is required.
 
 ## Sampling Rate
 
@@ -47,7 +47,7 @@ created: 2026-08-24
 - [ ] `src/db/migrations/006-normalize-custom-field-values.test.ts` — create a real v5 dynamic-column fixture; assert success and rollback through `runMigrations`.
 - [ ] Convert dynamic-column fixture helpers in field DAO and lifecycle tests into normalized-row helpers while preserving their behavioral assertions.
 - [ ] Add a post-migration regression through unchanged create/edit/profile/AI projections.
-- [ ] Use Node 22+ to run the existing `node:sqlite` test adapter.
+- [x] Node 22+ for the existing `node:sqlite` test adapter — SATISFIED (this environment is Node v22.22.2; `node:sqlite` verified working). No provisioning step needed.
 
 ## Manual-Only Verifications
 

@@ -58,8 +58,9 @@ No external package, UI block, registry, or design-system initialization is perm
    blank value, never like a deleted field or an upgrade issue.
 4. **Migration integrity failure only:** when migration 006 throws its classified fail-closed
    conversion error, use the existing full-screen bootstrap error branch. It must render before the
-   navigator so no partially migrated database consumer mounts. Other bootstrap failures keep the
-   generic existing app-start wording.
+   navigator so no partially migrated database consumer mounts. Other bootstrap failures use the generic
+   app-start error state, whose body is corrected per D-06b to drop the false support-channel promise
+   (keeping "Your data is safe and unchanged. Please reopen the app.").
 5. **No Phase-17 UI:** no sync status, backup affordance, conflict badge, restore state, tombstone
    display, or value identity display is added.
 
@@ -136,6 +137,7 @@ using `textPrimary` and `textSecondary` on `background`.
 | Existing invalid-value repair | **Tap to fix.** Preserve verbatim and keep the whole invalid value row tappable. |
 | Classified migration-failure heading | **Couldn't safely update your custom fields** |
 | Classified migration-failure body (revised per D-06a) | **Orbit stopped before changing anything, so all your data is safe and unchanged. This version can't finish updating your custom fields on this device, and reopening won't change that. Nothing has been altered or lost.** |
+| Generic bootstrap-failure body (revised per D-06b) | Heading **Couldn't start Orbit**; body **Your data is safe and unchanged. Please reopen the app.** The prior "if this keeps happening, contact support." clause is REMOVED — the project has no support channel to honor. This applies to any non-classified bootstrap failure. |
 | Ordinary custom-fields load/mutation error | Preserve existing alert copy: **Couldn't load custom fields / Please reopen this screen.** and **Couldn't update field / Please try again.** |
 | Existing destructive confirmation | **Delete field**: **"{field label}" is empty and will be deleted permanently.** Actions: `Cancel` / destructive `Delete`. |
 | Existing reversible lifecycle confirmation | **Quarantine field**: **"{field label}" has values and will be quarantined for 30 days — you can restore it before then.** Actions: `Cancel` / `Quarantine`. |
@@ -159,7 +161,7 @@ same transaction and the upgrade proceeds silently (D-06a).
 | Bootstrap loading | `openAndMigrate()` pending | Preserve the existing centred accent `ActivityIndicator` on `background`. Navigator remains unmounted. |
 | Successful migration | Migration 006 commits and database opens | No new UI. Mount the existing navigator; Custom Fields, create/edit forms, profiles, sorting, filtering, AI projection, custom photos, and quarantine flows present exactly as before. |
 | Classified migration integrity failure | Legacy schema/value validation or post-copy proof fails | Roll back the migration, keep the database unchanged, then use the existing centred bootstrap error layout with the classified copy above. Do not mount navigation or offer field-level actions. |
-| Other bootstrap failure | Any non-classified open/migrate failure | Preserve the generic `Couldn't start Orbit` error state; do not mislabel it a custom-field conversion failure. |
+| Other bootstrap failure | Any non-classified open/migrate failure | Use the generic `Couldn't start Orbit` error state, body corrected per D-06b to drop the false support-channel promise (keep "Your data is safe and unchanged. Please reopen the app."); do not mislabel it a custom-field conversion failure. |
 | Custom Fields empty | Zero active definitions after a successful startup | Preserve the existing empty message and `New field` action. This is normal product state, never a migration warning. |
 | Custom Fields populated | One or more active definitions | Preserve active cards in display order with type metadata and existing management controls. Quarantined definitions stay below the active list in their existing section. |
 | Blank normalized value | A durable contact-field value row contains `NULL` or empty text | Present through the unchanged selector/widget/profile contract. `NULL` and empty text retain their existing distinct storage/presence semantics; neither produces a migration UI. |
