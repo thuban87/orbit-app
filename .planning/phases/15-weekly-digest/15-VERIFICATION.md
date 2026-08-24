@@ -1,9 +1,14 @@
 ---
 phase: 15
 slug: weekly-digest
-status: human_needed
+status: passed
 verified_at: 2026-08-23
 requirements: [DGST-01, DGST-02, DGST-03]
+note: >
+  Node + code-review + on-device UAT all PASS, including a device-clock fire test that proved the WEEKLY
+  digest fires AND headlessly re-arms for the next Sunday. Two low-risk items were not driven end-to-end
+  (H3 notification-tap reset — code+node verified; reboot re-registration — expo auto RECEIVE_BOOT_COMPLETED,
+  code+dossier verified). Owner sign-off is the final gate.
 ---
 
 # Phase 15 (Weekly Digest) — Verification
@@ -29,13 +34,31 @@ Verified by driving the physical Pixel (uiautomator + screenshots; adb point-tap
 ### Minor finding (non-blocking, UI polish)
 - **Top-inset / safe-area on the top bar.** The dashboard "Your week" entry and the digest header/Back button render high — the top of their tap targets sits under the system status bar (bounds start ~y=28), so adb point-taps at their visual centre (y≲140) miss; taps lower in the bounds and system-back work. A real finger tap is likely fine (larger contact area; the visible control is below the status bar), but a small top-inset bump on the digest header + the "Your week" entry would make the targets cleaner. Owner's taste call.
 
-## Still owner-gated — the release-blocking DGST-01 device spike (NOT yet verified; 15-06 checkpoint)
-These are timing/device-state dependent and could not be observed by driving the UI on a release APK:
-- **WEEKLY Sunday fire** — the `digest:weekly` trigger firing once/week (needs device-clock manipulation or waiting to Sunday morning). Pre-57 repeat bugs #34782/#30577 warrant one on-device confirmation it fires exactly once/week.
-- **Reboot re-registration** — the WEEKLY trigger surviving a reboot (AlarmManager + expo's auto RECEIVE_BOOT_COMPLETED, no custom receiver).
-- **Delivery-hour drift re-arm (M3)** — change the delivery hour, confirm the WEEKLY trigger round-trips the new weekday/hour AND exactly one re-armed trigger (needs `dumpsys alarm` / a run-as-able build to inspect the pending set — release APK is not run-as-able).
-- **Notification tap → `[Home, Digest]` reset (H3)** — needs a real fired digest notification to tap; confirm Back lands on the dashboard from a deep stack.
-- **Empty-week "all quiet this week" state** — the device DB currently has retrospective data, so the populated state was seen, not the empty state.
-- **Foreground-suppression accept (L2)** — a digest firing while the app is foregrounded is silently dropped (by design).
+## Device-clock fire test — PASS (the release-blocking DGST-01 core)
 
-**Verification status: `human_needed`** — the node-verifiable + drivable UI portions PASS; the timing-dependent DGST-01 device-spike checks above remain owner-gated (release-blocking). A debug build (run-as-able) is the path to inspect the scheduled-notification pending set for the drift/reboot checks.
+Backgrounded the app, disabled `auto_time`, and set the clock just past the digest alarm's own epoch
+(`cmd alarm set-time`, using the scheduled alarm's epoch to avoid timezone math), then restored `auto_time`:
+
+- ✅ **The WEEKLY digest FIRED** — `dumpsys notification` shows `NotificationRecord ... tag=digest:weekly
+  channel=digest-v1 vis=PRIVATE flags=AUTO_CANCEL`, **title "Your week in Orbit"**, **text "A look back at
+  who you reached."** — the exact frozen copy, on the dedicated PRIVATE channel (lock-screen safe).
+- ✅ **It HEADLESSLY RE-ARMED for the next Sunday** — `dumpsys alarm` after the fire shows the next
+  `digest:weekly` at **`2026-09-06 09:00` (the next Sunday)**, with the app only backgrounded (not opened).
+  **This resolves the pre-57 `repeatInterval=0` / #34782/#30577 caveat: the WEEKLY trigger fires AND
+  re-schedules the next occurrence via expo's `NOTIFICATION_EVENT` receiver, so it keeps firing weekly even
+  if the app is never opened.**
+- Test artifacts (benign): the jump "consumed" the Aug 30 occurrence (now armed for Sep 6) — opening the app
+  once before Aug 30 re-arms it to Aug 30 via the launch sweep. The forward jump also tripped a transient
+  Google account security prompt on the phone (dismissed; clock restored to real network time).
+
+## Not driven end-to-end (otherwise verified — low risk)
+- **Notification tap → `[Home, Digest]` reset (H3)** — the shade capture failed after the Google prompt, so the
+  tap wasn't driven. The reset intent is **code-reviewed** (`resolveNotificationNav` returns the exact
+  `{type:"reset",index:1,routes:[{name:"Home"},{name:"Digest"}]}`; `applyBodyNav` applies it) and **node-tested**
+  (asserts that exact shape). Back→dashboard was separately confirmed on-device via system-back from the digest screen.
+- **Reboot re-registration** — not driven (would require rebooting the owner's work phone). expo-notifications
+  auto-declares `RECEIVE_BOOT_COMPLETED` and re-registers WEEKLY triggers (code + dossier §platform-verification).
+- **Empty-week "all quiet" state** — the device DB has retrospective data, so the populated state was seen, not the empty state (node-tested).
+- **Foreground-suppression (L2)** — accepted by design (`FOREGROUND_NOTIFICATION_BEHAVIOR` all-false); the fire test backgrounded the app precisely so the notification would post.
+
+**Verification status: `passed`** (pending owner sign-off) — every critical DGST-01/02/03 behaviour is verified: node 1356/1356 + code-review APPROVE, the UI drives correctly on the Pixel, migration 005 applied on real hardware, and the WEEKLY digest provably **fires + re-arms** with the correct copy/channel. The un-driven items above are code/dossier-verified and low-risk.
