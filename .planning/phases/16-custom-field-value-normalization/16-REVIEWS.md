@@ -294,3 +294,220 @@ Not because the plans are bad — the research quality is well above average and
 Mitigating factors are real and worth weighting: the runner's per-step transaction is already proven and tested; the `node:sqlite` harness makes the actual SQL testable rather than mocked (I ran the existing suite green on Node 22.22.2 in 416ms); D-05's refusal of a dual-write mode removes the largest class of divergence bug; and the phase is deliberately scheduled "before more than test data exists," which is exactly the right time to do this.
 
 **Recommendation:** resolve the four HIGH findings and the tsc-gate MEDIUM before execution starts — items 1, 2, 3, 4, and 6 are all small, mechanical plan edits. Escalate item 5 (brick posture) and the `modified_at` provenance question (item 8) to the owner as explicit decisions rather than letting them ride inside Plan 01's blanket authorization checkpoint. The documentation gap (item 7) can land with Plan 07 but should not be dropped — CLAUDE.md's custom-field invariants going stale is how the *next* phase gets this wrong.
+
+---
+
+# Cycle 2 Re-Review (2026-08-24T20:07:07Z)
+
+Revised plans (8 plans, re-waved) re-reviewed by codex + claude opus 5. **Both reviewers: all five cycle-1 HIGHs RESOLVED at the data-safety level.** Codex overall risk HIGH (on a D-03 claim-precision point + a codex-sandbox Node false-positive); Claude overall risk **MEDIUM (down from HIGH)** — remaining items are execution-sequencing, all mechanical, none touching a recorded decision.
+
+## Orchestrator adjudication (cycle 2)
+
+- **Must fix before execute (mechanical):** HIGH-1 (Plan 02 first-tsc gate cannot pass — cycle-1 shared-file-overlap fix moved contact-read.test.ts + ai-context-read.test.ts, which import the retired 6-arg upsertValue, into wave-3 Plan 05, behind Plan 02's gate; Plan 02 <verification> prose is false — confirmed by `tsc --listFiles`); MEDIUM-2 (Plan 03 Task 1 tsc gate fails before Task 2 fixes CustomFieldsScreen:114); MEDIUM-3 (Plan 04 must WIDEN preflight `Pick` to `id|col_name`, keep object param — a literal 'replace with fieldDefId' re-breaks CustomFieldsScreen:184,189 in a plan that doesn't own the screen; order-sensitive vs Plan 03); MEDIUM-5 (runtime UPSERT omits `created_at NOT NULL` → self-healing INSERT branch throws).
+- **Must land before Plan 08 writes immutable ADR-001:** MEDIUM-4 — orphan `field_history` snapshot is a bounded 30-day local trace with no read surface + excluded from backup (D-10); Plan 01 header + ADR-001 Consequences must state it is NOT a recovery mechanism. Codex's photo-orphan MEDIUM is the same class (Plan 03 falsely claims contact-purge deletes orphaned photo files — `purge-photo-cleanup.ts:71-98` only enumerates surviving defs).
+- **Codex NEW HIGH (D-03 not DB-enforced):** downgraded to claim-precision. No SQL constraint enforces lower-bound cardinality; UNIQUE(contact_id,field_def_id) enforces at-most-one, seeding at all creation points + UPSERT maintain existence. Claude verified the invariant is continuous with no fourth writer. Fix = make the plan/ADR wording honest about HOW D-03 holds; NOT a data-safety hole, NOT a reversal of D-03.
+- **Codex Node-18 'NOT RESOLVED':** FALSE POSITIVE from codex's own ephemeral sandbox. Verified this environment is Node v22.22.2 and `node:sqlite` works; cycle-1 Claude ran the suite green here. Residue: stale line `16-VALIDATION.md:24` (non-gating doc) — correct it.
+- **LOW-6 → OWNER-BUCKET (pending decision):** 'contact support' promise removed from the classified copy still lives in the app-wide generic bootstrap branch (`App.tsx:211-213`, preserved verbatim). Plans strictly comply with D-06a; extending the fix is a scope/copy call for the owner.
+- **Other LOWs (planner bucket, incorporate or defer):** LOW-7 (`createContactWithInteraction` exported path bypasses seeding — no prod caller today; add a guard comment + ADR note); LOW-8 (`hasCustomValues` becomes universally true — keep unrendered, state shape); LOW-9 (reserved-columns drift guard goes vacuous at v6 — re-point or delete-with-reason); LOW-10 (Plan 02 'retain newUid for interactionUid' also needs the links draft uid at EditContactScreen:257); Plan 02 grep-gate wording contradiction (codex LOW).
+
+## Codex Review (cycle 2)
+
+## Summary
+
+Most cycle-1 findings are substantively addressed: lifecycle callers, UPSERTs, wave ordering, release/debug UAT separation, privacy filtering, migration evidence, and documentation are now explicitly planned. However, I would not approve execution yet: the revised plan still does not make D-03’s *complete* contact×definition matrix database-enforced, and it contains a real Node-version verification blocker.
+
+## Resolution status of prior findings
+
+| Finding | Status | Evidence |
+|---|---|---|
+| Quarantine → create → restore could leave a live field without a pair row | **RESOLVED** | Plan 02 now seeds rows for *all* definitions, including quarantined ones, and requires the end-to-end regression; Plan 03 correctly keeps restore metadata-only because the pair already exists. This fixes the actual current hole: [`restoreField`](../home/bwales/projects/orbit-app/src/db/field-defs-dao.ts:181) only clears `quarantined_at`. |
+| `CustomFieldsScreen.tsx` uncovered `isFieldEmpty` caller | **RESOLVED** | Plan 03 owns the screen and changes the current string call at [`CustomFieldsScreen.tsx:114`](/home/bwales/projects/orbit-app/src/screens/CustomFieldsScreen.tsx:114) to `d.id`, matching the planned bound-ID query. |
+| Malformed-fixture UAT impossible on release APK | **RESOLVED** | Plan 07 correctly separates silent success on release from malformed-fixture checks on debug + Metro + `run-as`, exactly matching the runbook’s restriction that release is not `run-as` debuggable. [`desktop-build-pipeline.md:193`](/home/bwales/projects/orbit-app/docs/runbooks/desktop-build-pipeline.md:193) |
+| Wave ordering versus TypeScript gate | **RESOLVED** | Plan 02 is now wave 2 and owns the first `tsc`; Plans 03–06 depend on it before their own gates. This matches the current stale write contract in [`contacts-dao.ts:171`](/home/bwales/projects/orbit-app/src/db/contacts-dao.ts:171). |
+| Bare `UPDATE` could silently lose a missing pair-row edit | **RESOLVED** | Plan 01 mandates pair-keyed UPSERT, including first-write, clear-to-NULL, and uid-preservation tests. This retains the current self-healing property of [`upsertValueCore`](../home/bwales/projects/orbit-app/src/db/field-values-dao.ts:126). |
+| `created_at` provenance unspecified | **RESOLVED** | Plan 01 defines and tests it: use legacy row `modified_at` for source-derived pairs; `deps.now` for synthesized blanks. This is necessary because legacy rows only have `modified_at`. [`001-initial.ts:148`](/home/bwales/projects/orbit-app/src/db/migrations/001-initial.ts:148) |
+| `tsc` cannot find string-literal legacy SQL writers | **PARTIALLY RESOLVED** | Plan 07 adds the correct runtime grep gate after all writers migrate. But Plan 02 still calls itself the producer of that grep assertion and names Task 2 “tsc + grep,” while its own action says it cannot pass until wave 3. [`16-02-PLAN.md:62`](/home/bwales/projects/orbit-app/.planning/phases/16-custom-field-value-normalization/16-02-PLAN.md:62), [`16-02-PLAN.md:121`](/home/bwales/projects/orbit-app/.planning/phases/16-custom-field-value-normalization/16-02-PLAN.md:121) |
+| `sortExpr()` parity claims were vacuous | **RESOLVED** | Plan 04 now explicitly treats it as latent/forward-looking and removes the parity claim. That matches its current zero-consumer status. [`field-sort.ts:44`](/home/bwales/projects/orbit-app/src/db/field-sort.ts:44) |
+| No ADR / CLAUDE / HANDOFF update | **RESOLVED** | Plan 08 owns ADR-001, the invariants update, and an appended HANDOFF supersession note. |
+| O(C×D) migration behind spinner unmeasured | **RESOLVED** | Plan 07 adds a 200×15 upper-bound fixture, timing, recording, and owner escalation if slow. |
+| Normalized read might widen AI egress | **RESOLVED** | Plan 01 requires defs-filtered maps; Plan 05 proves edit and AI exclusions. This targets the current allowlist path in [`ai-context-read.ts:158`](/home/bwales/projects/orbit-app/src/db/ai-context-read.ts:158). |
+| Permanent delete of a photo definition can orphan files | **PARTIALLY RESOLVED** | Plan 03 records an explicit bounded-local-orphan decision, but it incorrectly says contact purge will still delete those files. It will not: cleanup only enumerates *surviving* photo definitions. [`purge-photo-cleanup.ts:69`](/home/bwales/projects/orbit-app/src/services/photos/purge-photo-cleanup.ts:69) |
+| v5-only migration proof | **RESOLVED** | Plan 07 adds v1/v4/v5 → v6 runner coverage. This matches the runner’s pending-version behavior. [`runner.ts:43`](/home/bwales/projects/orbit-app/src/db/migrations/runner.ts:43) |
+| Plan 01/05 test-file overlap | **RESOLVED** | Plan 01 no longer owns the contact/AI read test files; Plan 05 is sole owner. |
+| Stale Node-18 blocker | **NOT RESOLVED** | The revised plans assert Node 22 is present, but this shell is Node `v18.19.1`, and `require("node:sqlite")` fails. The validation artifact also still records that Node 18 cannot run this harness. [`16-VALIDATION.md:24`](/home/bwales/projects/orbit-app/.planning/phases/16-custom-field-value-normalization/16-VALIDATION.md:24), [`node-sqlite.ts:6`](/home/bwales/projects/orbit-app/src/db/__testkit__/node-sqlite.ts:6) |
+| Inaccurate bootstrap-gate truth | **RESOLVED** | Plan 01 now correctly says classification changes copy only; both classified and generic failures keep navigation unmounted, matching [`App.tsx:205`](/home/bwales/projects/orbit-app/App.tsx:205). |
+| `purge-photo-cleanup.test.ts` falsely appears to cover v6 | **RESOLVED** | Plan 06 explicitly identifies the v1 pin and places genuine v6 purge coverage in `purge-dao.test.ts`. The pin is real. [`purge-photo-cleanup.test.ts:59`](/home/bwales/projects/orbit-app/src/services/photos/purge-photo-cleanup.test.ts:59) |
+
+## New concerns
+
+- **HIGH — D-03 is still not database-enforced as claimed.** The proposed `UNIQUE(contact_id, field_def_id)` constraint prevents duplicate rows, but cannot require a row for every extant contact×definition pair. Plan 01/02/03 seed rows through application code, which fixes supported flows but is explicitly not “the database, not application convention alone.” The migration schema needs an enforceable lower-bound strategy or the plans must not claim D-03 is database-enforced. [`16-01-PLAN.md:57`](/home/bwales/projects/orbit-app/.planning/phases/16-custom-field-value-normalization/16-01-PLAN.md:57), [`16-02-PLAN.md:96`](/home/bwales/projects/orbit-app/.planning/phases/16-custom-field-value-normalization/16-02-PLAN.md:96)
+
+- **MEDIUM — The accepted photo-orphan documentation contains a false assurance.** After permanently deleting a populated photo definition, its files cannot be enumerated by later contact purge because `listDefs(... includeQuarantined: true)` cannot return a deleted definition. The plan should say those files remain until a future cleanup mechanism, or actually add that cleanup; it must not claim purge removes them. [`16-03-PLAN.md:94`](/home/bwales/projects/orbit-app/.planning/phases/16-custom-field-value-normalization/16-03-PLAN.md:94), [`purge-photo-cleanup.ts:83`](/home/bwales/projects/orbit-app/src/services/photos/purge-photo-cleanup.ts:83)
+
+- **LOW — Plan 02’s grep-gate language is internally contradictory.** Its artifact and task name promise a Plan-02 grep assertion, but its action correctly defers it to Plan 07. Remove the earlier wording so an executor cannot treat a guaranteed-failing grep as a required gate. [`16-02-PLAN.md:62`](/home/bwales/projects/orbit-app/.planning/phases/16-custom-field-value-normalization/16-02-PLAN.md:62), [`16-02-PLAN.md:127`](/home/bwales/projects/orbit-app/.planning/phases/16-custom-field-value-normalization/16-02-PLAN.md:127)
+
+## Overall risk: HIGH
+
+The revised plans are much stronger, but the D-03 enforcement gap affects the core irreversible representation, and the stated Node environment cannot run the required migration suite. Resolve those before executing migration 006.
+
+---
+
+## Claude Opus 5 Review (cycle 2)
+
+I've verified the revised plans against the source. Here is the cycle-2 review.
+
+---
+
+# Cross-AI Plan Re-Review — Phase 16 (Cycle 2)
+
+## Summary
+
+The revision does real work. All five cycle-1 HIGH findings are addressed at the **data-safety** level — the pair-row invariant is now stated identically in Plans 01/02/03 and made free at restore, the UPSERT-on-pair mandate closes the silent-loss route, `CustomFieldsScreen.tsx` is owned with a signature audit, the device UAT is split across correctly-named APK variants, and D-06a is threaded through Plan 01, the UI-SPEC copy, and Plan 07's debug run. The new Plan 08 closes the documentation gap, and Plan 04's honest re-scoping of `sortExpr` is exactly right.
+
+What remains is not data-safety design — it is **execution sequencing**. Two of the revision's own edits create hard gates that cannot pass as written, and one of them (HIGH-1) was caused directly by the fix for a cycle-1 LOW. On a forward-only migration that matters more than usual: a plan that stalls on a red `tsc` mid-wave invites an executor to "fix it by deviation" on the value-write path, which is the exact code the phase exists to get right.
+
+I confirmed the migration protocol itself is sound, and found one reassuring fact neither cycle-1 review noted: **both** the loss-bearing and orphan-column states D-06/D-06a arbitrate are practically unreachable in production, because `createField` (`src/db/field-ddl.ts:78-102`) and `dropFieldColumns` (`:113-137`) each perform their def-write and their DDL inside one transaction. Neither branch is a live hazard; both are correct safety valves.
+
+---
+
+## Resolution status of cycle-1 findings
+
+### HIGH
+
+**(1) Quarantine→restore leaves a live field with no pair row (D-03) — RESOLVED.**
+The rule is now stated identically at all three creation points: migration (`16-01` Task 2 — "EVERY definition including quarantined ones"), create-contact (`16-02` Task 1 — `listDefs(includeQuarantined: true)`), and create-definition (`16-03` Task 1 — "every existing contact (including archived)"). `restoreField` correctly stays metadata-only, matching `src/db/field-defs-dao.ts:181-193`, which nulls `quarantined_at` and backfills nothing. The cross-plan regression (quarantine → create → restore → edit round-trips) is in `16-02` Task 1 *and* re-run end-to-end in `16-07` Task 1.
+
+I checked for a **fourth** creation point the plans might have missed. There are exactly two production writers of a `contacts` row: `contacts-dao.ts:133` (`createContactFull`) and `recency-dao.ts:358` (`createContactWithInteraction`). `CaptureScreen.tsx:485`'s inline name-only create routes through `createContactFull`, so it inherits the matrix for free. See **NEW LOW-7** for the second writer.
+
+**(2) `CustomFieldsScreen.tsx` uncovered caller — RESOLVED.**
+It is now in `16-03`'s `files_modified` with a dedicated Task 2. The cited call site is accurate: `src/screens/CustomFieldsScreen.tsx:114` — `empties[d.id] = await isFieldEmpty(exec, d.col_name);`. I verified the audit claim ("only the isFieldEmpty arg changed") holds against the other five call sites: `applyTypeChange` at `:228` and `deleteOrQuarantineField` at `:294` pass object literals already carrying `id`; `preflightTypeChange` (`:184`) and `preflightOptionsChange` (`:189`) pass the full `CustomFieldDef`. See **NEW MEDIUM-3** for the condition that has to hold in Plan 04 for that to stay true.
+
+**(3) Plan 07 malformed-fixture impossible on a release APK — RESOLVED.**
+Split into Task 2 (release, runbook §1) and Task 3 (debug + Metro, runbook §2, with `run-as`). The runbook citation is accurate: `docs/runbooks/desktop-build-pipeline.md:193-196` states "The `app-release.apk` is NOT `run-as`-debuggable… works **only on a DEBUG APK**." Task 3 names `assembleDebug`, cites the caveat by section, and adds the D-06a orphan observation alongside the loss-bearing one.
+
+**(4) Wave ordering vs the `tsc` gate — PARTIALLY RESOLVED.**
+Plan 02 is now the sole first `tsc` gate and 03/04/05/06 all depend on it. The *production* caller analysis is correct. But two test files that `tsc` does compile were moved out of Plan 01 into wave-3 Plan 05, and Plan 02's verification block asserts, incorrectly, that they don't exist. See **NEW HIGH-1**.
+
+**(5) Bare `UPDATE` = silent data loss — RESOLVED.**
+`16-01` Task 3 mandates `ON CONFLICT(contact_id, field_def_id) DO UPDATE`, forbids bare `UPDATE` by name, adds the `rg "ON CONFLICT\(contact_id\)"`-returns-nothing criterion, and tests the missing-row INSERT case. Propagated into `16-02` Task 1. The design is sound against the existing UID hazard documented at `src/db/field-values-dao.ts:26-36`: because each write mints a *fresh* uid, the pair-conflict path takes DO UPDATE and the discarded uid can never collide on `uid UNIQUE`. One gap in the column list — see **NEW MEDIUM-5**.
+
+### MEDIUM / LOW
+
+| Cycle-1 finding | Status |
+|---|---|
+| `created_at` unspecified for migrated rows | **PARTIALLY RESOLVED** — provenance is now precise for the migration (`16-01` Task 2, asserted for both a source-derived row and a synthesized blank, recorded in the summary for Phase 17). The **runtime** UPSERT column list still omits it → **NEW MEDIUM-5**. |
+| `tsc` can't see string-literal SQL writers → need a grep gate | **RESOLVED.** I ran `16-07` Task 1's exact command. It returns 11 executable lines today across `field-ddl.ts`, `field-type-change.ts`, `purge-dao.ts`, `field-defs-dao.ts`, `field-values-dao.ts` — all five files are owned by Plans 01/03/04/06, so the gate is achievable and complete. |
+| `sortExpr()` has zero runtime consumers → parity claims vacuous | **RESOLVED.** `16-04` Task 2 drops the parity claim, and `16-07` Task 2 explicitly drops the unperformable UAT observation. Verified: `src/db/field-sort.ts:44-45` says so itself, and `dashboard-read.ts` has no custom-field sort branch. The added `field_def_id`-join requirement in the JSDoc contract is the right call. |
+| No ADR / CLAUDE.md / HANDOFF update | **RESOLVED.** Plan 08 covers all three. Verified `docs/decisions/` does not exist — Plan 08's "first global ADR, directory created here" is accurate. Deferring the `adr-registry.ts` / `graph:build` step is correct: neither the registry, `scripts/normalize-graph-docrefs.ts`, nor the npm scripts exist yet, and CLAUDE.md requires porting them from quest-board first. |
+| Unbounded O(C·D) migration behind a bare spinner | **RESOLVED.** `16-07` Task 1 adds the 200×15 upper-bound fixture with recorded wall-clock, plus the observed duration in the release UAT, and routes a slow result back to the owner as a spinner conversation. |
+| Normalized read must filter by passed `defs` (AI-egress privacy) | **RESOLVED.** Now a `must_haves` truth in `16-01`, a threat row (T-16-17), a test in `16-01` Task 3, and an explicit "ABSENT from the returned map" assertion at *both* consumers in `16-05`. Correctly targets the real code: `contact-read.ts:196-200` passes `defsForEditForm(defs)`; `ai-context-read.ts:158-166` passes `sharedDefs`. |
+| Orphaned photo files on permanent delete | **RESOLVED as a documented decision.** Verified genuinely pre-existing: `purge-photo-cleanup.ts:71-98` enumerates surviving defs by `col_name`, and today's `dropFieldColumns` already deletes the def before that adapter could see it. Planner's bucket. Recorded in-file and in ADR-001. |
+| v5-centric migration proof | **RESOLVED.** `16-07` Task 1 parameterizes v1/v4/v5 → v6 through the real runner. |
+| Plan 01/05 shared-file overlap | **RESOLVED** — and this fix is what produced **NEW HIGH-1**. |
+| Stale Node-18 blocker | **RESOLVED.** Confirmed `v22.22.2`; every plan's `<verification>` now states it and drops the provisioning step. |
+| Plan 01 bootstrap-gate truth inaccurate | **RESOLVED.** The new wording ("both keep the navigator unmounted; classification changes the copy only, not the gating") matches `App.tsx:205-217`, and the plan's `~205-217` line reference is correct. |
+| `purge-photo-cleanup.test.ts` v1-pinned → false coverage | **RESOLVED.** Verified the pin at `src/services/photos/purge-photo-cleanup.test.ts:59` — `runMigrations(exec, [migration001], 1, …)`. `16-06` notes it, routes real v6 coverage through `purge-dao.test.ts`, and records the caveat in the summary. |
+
+*Also resolved but not on your list:* Plan 01 is no longer one 8-file task (now checkpoint + migration + DAO + App, 6 files); the `modified_at`/`created_at` provenance is now explicit and handed to Phase 17.
+
+---
+
+## New concerns
+
+### HIGH-1 — Plan 02's first-`tsc` gate cannot pass; its verification block asserts a claim that is false against the source
+
+`16-02` Task 2 verifies with `npx tsc --noEmit` and its `<verification>` states: *"It passes here because the only typed caller of the changed value-write API was contacts-dao."*
+
+That is not true. `tsconfig.json` includes `**/*.ts`, and I confirmed with `npx tsc --noEmit --listFiles` that both of these are in the program:
+
+- `src/db/contact-read.test.ts:23,229` — `import { upsertValue } …` / `await upsertValue(exec, id, uid(), "nickname", "Eddie", NOW)`
+- `src/db/ai-context-read.test.ts:17,163,164,224,247` — same legacy 6-arg contract
+
+`16-01` explicitly retires that export ("The legacy `upsertValue(...)` / `upsertValueCore` contract is RETIRED") and forbids a compatibility overload (D-05). So at Plan 02 Task 2, `tsc` fails with an unresolved import in two files **owned by Plan 05, which is wave 3** — after Plan 02.
+
+This is cycle-1 HIGH #4 surviving in a narrower form, and it was introduced by the fix for cycle-1 LOW "Plan 01/05 shared-file overlap": moving those two test files wholesale to Plan 05 removed the overlap and simultaneously moved them behind the gate that needs them.
+
+**Fix (small):** either (a) return the *import/call-site* conversion of `contact-read.test.ts` and `ai-context-read.test.ts` to Plan 01 or Plan 02 while leaving the richer fixture/assertion work in Plan 05, or (b) move Plan 05 to wave 2 alongside Plan 02 and make Plan 02's tsc gate the joint wave-2 exit. Either way, Plan 02's `<verification>` prose must be corrected — as written it will convince an executor that a red `tsc` is a bug in its own work.
+
+### MEDIUM-2 — Plan 03 Task 1's own `tsc` gate cannot pass before Task 2 runs
+
+`16-03` Task 1 re-keys `isFieldEmpty` to `(exec, fieldDefId: number)` and verifies with `… && npx tsc --noEmit`. But the sole production caller, `src/screens/CustomFieldsScreen.tsx:114`, still passes `d.col_name` (a string) until **Task 2** fixes it. Task 1's project-wide typecheck therefore fails on the file the next task owns.
+
+Under the execute-plan HARD GATE protocol, a task with failing acceptance criteria blocks the next task and, after two fix attempts, is logged as a deviation — so this either stalls the plan or gets papered over. Same class as cycle-1 HIGH #2, relocated from plan-scope to task-scope.
+
+**Fix:** drop `npx tsc --noEmit` from Task 1's verify (keep the targeted Vitest run) and let Task 2's existing `npx tsc --noEmit && npm run check:colors` be the plan's single compile gate — or merge the one-line screen edit into Task 1.
+
+### MEDIUM-3 — Plan 04 must *widen* the preflight `Pick`, not replace the parameter, or it re-creates the uncovered-caller finding in a plan that doesn't own the screen
+
+`16-04` Task 1 says preflight will read "by bound `field_def_id`", but the current signatures carry no `id`:
+
+- `src/db/field-type-change.ts:95-97` — `preflightTypeChange(exec, field: Pick<CustomFieldDef, "col_name">, target)`
+- `src/db/field-type-change.ts:124-126` — `preflightOptionsChange(exec, field: Pick<CustomFieldDef, "col_name">, options)`
+
+Widening to `Pick<CustomFieldDef, "id" | "col_name">` is source-compatible with `CustomFieldsScreen.tsx:184,189` (both pass a full def), so nothing else needs to change. But `16-04` never says "widen the Pick, keep the object parameter," and it does not list `CustomFieldsScreen.tsx` in `files_modified`. A literal reading — `preflightTypeChange(exec, fieldDefId: number, …)` — breaks both call sites in a plan that owns neither the screen nor the fix.
+
+Plans 03 and 04 are both wave 3 with identical `depends_on`, so this is order-sensitive: if 04 lands first, Plan 03 Task 2's acceptance criterion ("no other CustomFieldsScreen call site changed") is already false when it runs.
+
+**Fix:** one sentence in `16-04` Task 1's `<action>`: *"Widen the preflight `Pick` to `"id" | "col_name"` — keep the `field`-object parameter shape so `CustomFieldsScreen.tsx:184,189` stay source-compatible."* And add the same constraint to Plan 03 Task 2's read_first note so the audit has something to check against.
+
+### MEDIUM-4 — The D-06a orphan "snapshot" is a 30-day, UI-inaccessible trace; ADR-001 will record it as if it were preservation
+
+Plan 01 Task 2 snapshots the orphan column's non-NULL values to `field_history` and proceeds. But `src/services/field-sweep.ts:127-135` prunes `field_history` on every launch with `DELETE … WHERE created_at <= datetime('now','localtime','-30 days')`, there is no UI anywhere that reads `field_history`, and D-10 excludes it from backup/sync. So the snapshot is a forensic trace reachable only via `run-as` on a debug build, and it is gone in 30 days.
+
+That is consistent with the owner's D-06a reasoning (an orphan column has no def, so it was never user-visible — "nothing to lose"), and I am not reopening it. The problem is the wording: `16-01`'s truths, the `<threat_model>` row, and especially **Plan 08's immutable ADR-001** will all say "snapshotted to `field_history`," which a Phase-17 reader will reasonably take to mean recoverable.
+
+**Fix:** state the retention property once, in Plan 01's migration header and in ADR-001's Consequences — *"the orphan snapshot is a bounded 30-day local audit trace with no read surface and no backup path; it is not a recovery mechanism."*
+
+### MEDIUM-5 — The runtime UPSERT's column list omits `created_at`, which the table declares `NOT NULL`
+
+`16-01`'s Artifacts section declares `created_at TEXT NOT NULL` on `custom_field_values`. `16-01` Task 3's UPSERT spec names only `value`, `modified_at`, and `uid`:
+
+> "INSERT the pair with a fresh uid on first write; ON CONFLICT(contact_id, field_def_id) DO UPDATE SET value = excluded.value, modified_at = excluded.modified_at (uid on the INSERT branch only)."
+
+An INSERT that omits `created_at` violates the NOT NULL constraint. Because the full-matrix seeding means rows almost always pre-exist, the failing branch is precisely the **self-healing INSERT** that cycle-1 HIGH #5 exists to guarantee — so the missing-row case would trade silent loss for a hard throw. Better than silent, but not the intent, and it would surface as a mid-execution deviation on the phase's most sensitive write.
+
+This is the unfixed half of the cycle-1 `created_at` MEDIUM: the migration's provenance is now precise, the runtime writer's is not.
+
+**Fix:** add `created_at` to the INSERT branch (set from the same `now` as `modified_at`) and state that DO UPDATE never rewrites it — mirroring the uid rule. Add a test that a self-healed INSERT carries both timestamps.
+
+### LOW-6 — The "contact support" promise D-06a removed survives in the generic branch, and Plan 01 locks it in
+
+The revised classified copy (`16-UI-SPEC.md:138`) correctly drops it. But the *generic* branch at `App.tsx:211-213` already reads:
+
+> "Your data is safe and unchanged. Please reopen the app; if this keeps happening, contact support."
+
+`16-01` Task 4's acceptance criterion is "the generic branch is unchanged," and the UI-SPEC mandates preserving it verbatim. So after Phase 16 the app still promises a support channel the project cannot keep — one branch over from the one that was fixed, reachable from any bootstrap failure.
+
+Strictly the plans comply with D-06a, which scoped the correction to the classified body. But the owner's stated reason ("must not promise a support/recovery channel the project cannot keep") applies identically here. Worth surfacing to the owner as a one-line copy decision rather than shipping the contradiction.
+
+### LOW-7 — `createContactWithInteraction` remains an exported contact-creation path that bypasses pair seeding
+
+`src/db/recency-dao.ts:335-388` inserts a `contacts` row and writes no custom values. It has **no production caller** today (test-only: `recency-dao.test.ts`, `impact-read.test.ts`, `ai-context-read.test.ts`, `widget-mark.test.ts`), so it is not a live D-03 hole. But it is exported, un-deprecated, and is exactly the shape of hole D-03 exists to close — and Phase 17's restore path is a plausible future caller. No plan mentions it.
+
+**Fix:** a comment in `recency-dao.ts` (Plan 02 or 03) naming `createContactFull` as the only contact-creation path that satisfies D-03, and a line in ADR-001's Consequences.
+
+### LOW-8 — Purge impact accounting: `hasCustomValues` becomes universally true, and Plan 06 doesn't say what replaces it
+
+`src/db/purge-dao.ts:58,113-122` exposes `hasCustomValues: boolean` from `SELECT EXISTS(… contact_custom_values …)`. Under D-01 every contact gets a row for every definition, so this is `true` for every contact whenever any definition exists. `16-06` Task 1 says "impact accounting reflects the multi-row child" without stating the resulting shape.
+
+Currently harmless — `purge-dao.ts:129-132` records that it is "DELIBERATELY not rendered." But if it becomes a count and is ever surfaced, the confirm dialog would tell a user with all-blank fields that purging destroys "12 custom values." Worth one sentence: keep it unrendered, and say whether it stays a boolean or becomes a non-blank count.
+
+### LOW-9 — The reserved-columns drift guard goes silently vacuous at v6
+
+`src/db/reserved-columns.test.ts:31-46` asserts `RESERVED_COLUMN_NAMES` is a superset of `PRAGMA table_info(contact_custom_values)`. After migration 006 that table is dropped, and `PRAGMA table_info` on a nonexistent table returns zero rows rather than erroring — so half the drift guard passes trivially. `16-06` Task 2 says "derive from the actual version-six literal tables" but doesn't say to re-point that half at `custom_field_values` (or to delete it and say why). Worth being explicit, since the whole reserved-name mechanism becomes vestigial once `col_name` is never a physical column.
+
+### LOW-10 — Factual nit in Plan 02 Task 2
+
+"In `EditContactScreen` retain `newUid` only for `interactionUid`" — the screen also mints a **link** uid at `src/screens/EditContactScreen.tsx:257`. Taken literally, an executor could remove that. The grep criterion targets `rowUid` only, so the gate wouldn't catch it. One word: "retain `newUid` for `interactionUid` **and the links draft**."
+
+---
+
+## Overall risk: **MEDIUM**
+
+Down from HIGH, and I think that is earned rather than generous.
+
+The data-safety design is now sound where it counts. The pair-row invariant is genuinely continuous across all three creation points and I verified there is no fourth production writer. The UPSERT mandate closes the silent-loss route on the correct constraint. The defs-filtered read closes the AI-egress path at both consumers with explicit absence assertions. The proof matrix is realistic — parameterized prior versions, an upper-bound scale run, isolated rollback and orphan cases — and the device UAT is now executable on the right APK variants. The documentation reversal has an owner. And structurally, both states D-06/D-06a arbitrate are unreachable in production because the pre-006 def-write and DDL are already atomic, so the fail-closed brick is a valve, not a live hazard.
+
+What holds it at MEDIUM is that **two hard gates cannot pass as written** (HIGH-1, MEDIUM-2) and a third is order-dependent (MEDIUM-3). On ordinary work that is a scheduling nuisance. Here it is not: the failure mode is an executor hitting a red `tsc` on the value-write path mid-wave, being told by the plan's own prose that this shouldn't happen, and reaching for a deviation on `field-values-dao.ts` — the one file where a wrong call is unrecoverable on a user's device.
+
+**Recommendation:** fix HIGH-1, MEDIUM-2, MEDIUM-3, and MEDIUM-5 before execution starts. All four are mechanical plan edits — a wave move plus three sentences — and none touches a recorded decision. MEDIUM-4 is a one-paragraph honesty correction that must land before Plan 08 writes the immutable ADR. LOW-6 is the only item worth putting in front of the owner as a decision rather than fixing in the plans.
