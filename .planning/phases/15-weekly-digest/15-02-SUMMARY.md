@@ -14,7 +14,7 @@ provides:
   - "Migration 005: app_settings.digest_enabled INTEGER NOT NULL DEFAULT 1 (digest ON by default; forward-only, additive, start-state-independent)."
   - "TARGET_VERSION advanced 4 -> 5; migration005 registered in database.ts runMigrations list."
   - "digestEnabled (0|1) threaded through the app-settings DAO: readable via getAppSettings, writable + assertToggle-guarded via updateAppSettings."
-affects: [15-03 (schedule service reads digest_enabled + must bump its harness to v5), 15-05 (Settings toggle row writes digestEnabled), 16-sync (backup exports digest_enabled as a settings row; sync_tombstones renumbered to 006)]
+affects: [15-03 (schedule service reads digest_enabled + must bump its harness to v5), 15-05 (Settings toggle row writes digestEnabled), 17-backup (backup exports digest_enabled as a settings row; Phase 16 owns normalization migration 006 and Phase 17 owns tombstones 007)]
 
 # Tech tracking
 tech-stack:

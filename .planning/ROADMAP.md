@@ -10,8 +10,9 @@ every un-backfillable column and the single-writer recency DAO present from day 
 custom-fields subsystem. Phases 4–7 build the contact model users touch (CRUD, photos, the
 interaction log with gravity/intensity/rogue, and Conversational Fuel). Phases 8–13 deliver the
 daily surfaces and the friction loop (dashboard + never-contacted screen, the compose screen,
-share-sheet capture, actionable notifications, the widget, and the orrery). Phases 14–16 add AI
-suggestions, the weekly digest, and the load-bearing backup/export/restore. Phases map one-to-one
+share-sheet capture, actionable notifications, the widget, and the orrery). Phases 14–17 add AI
+suggestions, the weekly digest, custom-field value normalization, and the load-bearing
+backup/export/restore. Phases map one-to-one
 onto the dossier domains; a `[DECIDED]`/`[REJECTED]` decision is implemented, never reopened.
 
 ## Phases
@@ -31,7 +32,8 @@ onto the dossier domains; a `[DECIDED]`/`[REJECTED]` decision is implemented, ne
 - [x] **Phase 13: Orrery** — the two-view Skia solar system, rogue rendering, assignable/self-colour sun, ambient layer. (completed 2026-08-18)
 - [x] **Phase 14: AI Message Suggestions** — providers + keys, editable-draft flow, prompt assembly, `share_with_ai`. ✅ owner-accepted 2026-08-22
 - [ ] **Phase 15: Weekly Digest** — one WEEKLY Sunday notification → a live "your week" screen.
-- [ ] **Phase 16: Backup, Export & Restore** — manual + auto SAF backup, optional encryption, tombstone-aware Merge/Replace restore (reusable reconciliation core), forward-migrate.
+- [ ] **Phase 16: Custom Field Value Normalization** — replace dynamic custom-value columns with a sync-safe normalized row model, preserving every existing behavior and value.
+- [ ] **Phase 17: Backup, Export & Restore** — manual + auto SAF backup, optional encryption, tombstone-aware Merge/Replace restore (reusable reconciliation core), forward-migrate.
 
 ## Cross-phase constraints (from INDEX.md's constraint log — these cross phase boundaries)
 
@@ -45,7 +47,7 @@ Recorded here because they bind phases that do not own them. Every planner/execu
 
 - **One launch sweep, many responsibilities** (skeleton in Phase 2): quarantine expiry + history
   retention (Phase 3), archived-contact purge (Phase 4), notification schedule reconcile (Phase 11),
-  digest re-register (Phase 15), backup rotation (Phase 16). It runs once per real foreground launch —
+  digest re-register (Phase 15), custom-field cleanup (Phase 16), backup rotation (Phase 17). It runs once per real foreground launch —
   never on module import or a headless widget/notification tap.
 
 - **Un-backfillable columns exist from migration 1** (Phase 2): surrogate PK + distinct `uid`,
@@ -53,8 +55,9 @@ Recorded here because they bind phases that do not own them. Every planner/execu
   `kind`/`created_at`/`source`/`url`; `custom_field_defs` display-order and `share_with_ai`. Adding
   them later is impossible against un-reachable devices.
 
-- **`col_name` is whitelist-constructed, never escaped** (Phase 3), and the slugifier is a single
-  producer that reserves the entire fixed-column name set (Phase 4 exports the reserved set).
+- **The legacy dynamic-column custom-field rules are superseded by Phase 16.** It replaces value
+  columns with stable, normalized value rows; no new custom-field operation may require replicated
+  DDL. The Phase-3 `col_name` whitelist remains relevant only to safely read/migrate old schemas.
 
 - **The compose screen is one surface, built once** (Phase 9) and reused by notifications (11), the
   widget Message action (12), and AI Suggest (14). "Fuel visible" lives here, not in notification text.
@@ -63,13 +66,14 @@ Recorded here because they bind phases that do not own them. Every planner/execu
   notification decay-suppression (11), and the digest (15) — never computed three times.
 
 - **Photos are one 512px master** (Phase 5); the widget (12) re-encodes it to base64 (RemoteViews
-  can't read `file://`); the orrery (13) uses it via Skia `useImage`; backup (16) embeds base64.
+  can't read `file://`); the orrery (13) uses it via Skia `useImage`; backup (17) embeds base64.
 
-- **Keys in `expo-secure-store`, never exported** (Phase 14); backup (16) exports non-secret AI
+- **Keys in `expo-secure-store`, never exported** (Phase 14); backup (17) exports non-secret AI
   settings only.
 
 - **`modified_at` on every mergeable table + `uid` distinct from PK** (Phase 2) exist for backup's
-  newest-edit-wins Merge (Phase 16).
+  newest-edit-wins Merge (Phase 17). Phase 16 extends stable identity to custom-field definitions
+  and values before they participate in that Merge.
 
 - **App-wide `launchMode="singleTask"`** (imposed by `expo-share-intent`, Phase 10): notification (11)
   and widget (12) taps arrive via `onNewIntent`; "Back → dashboard" is a JS-navigation concern.
@@ -546,6 +550,7 @@ Plans:
   3. A gentle non-judgemental line appears when recent quality marks skew "hard"; no new schema is added.
 
 **Plans:** 6 plans / 4 waves
+
 - [ ] 15-01-PLAN.md — digest reads (retrospective/overlooked/gentle-line) + pure logic [wave 1]
 - [ ] 15-02-PLAN.md — migration 005 `digest_enabled` + app-settings DAO thread [wave 1]
 - [ ] 15-03-PLAN.md — WEEKLY `digest:weekly` schedule service + digest-v1 channel + launch-sweep hook + App wiring [wave 2]
@@ -553,27 +558,41 @@ Plans:
 - [ ] 15-05-PLAN.md — notification-tap routing (digest branch) + Settings "Weekly digest" toggle [wave 3]
 - [ ] 15-06-PLAN.md — owner-gated on-device UAT (weekly fire + reboot + screen + toggle) [wave 4]
 
-### Phase 16: Backup, Export & Restore
+### Phase 16: Custom Field Value Normalization
 
-**Goal:** The load-bearing loss backstop — manual + auto rotating backup, optional encryption, and a tombstone-aware Merge/Replace restore that forward-migrates — closing HANDOFF §3's open item. Its Merge logic is built as a documented, reusable **reconciliation core** the future sync milestone consumes directly (see `.planning/sync-milestone/`).
+**Goal:** Replace Phase 3's dynamic custom-value columns with a normalized, row-based model before UI/UX work and before more than test data exists — retaining the custom-field experience exactly while giving definitions and values stable identity suitable for later multi-device sync.
 **Mode:** mvp
 **Depends on:** Phase 15
-**Requirements:** BKP-01, BKP-02, BKP-03, BKP-04
-**⟢ Before planning — REQUIRED reading:** `.planning/sync-milestone/PHASE-16-SYNC-READINESS.md` (tombstone + reconciliation-core scope, the named Merge rules, and the deliberate v1.0 gap where child-row tombstones are deferred to the sync milestone). Do not plan this phase without it.
+**Requirements:** CFN-01, CFN-02, CFN-03, CFN-04
+**⟢ Before planning — REQUIRED reading:** `.planning/sync-milestone/SYNC-MILESTONE-INVESTIGATION.md` §§A.5/B.6 and `.planning/phases/17-backup-export-restore/17-CONTEXT.md` §"Planned prerequisite and numbering". Phase 17 must be re-discussed after this migration; do not let Phase 16 pre-decide its backup/sync conflict policy.
 **Success Criteria** (what must be TRUE):
 
-  1. A user can export full app state (tables + non-secret settings + base64 photos + tombstones, keys/`field_history` excluded) as one plaintext JSON file with a `user_version` manifest header.
-  2. An automatic rotating SAF-folder backup writes on the launch sweep (~7 kept, once/day, on change) with an overdue nudge; optional AES-256-GCM encryption covers manual and auto (Keystore-cached passphrase, loss warning at set time). This backup-at-rest passphrase is a distinct concern from any future E2EE sync key — the design keeps them separate.
-  3. Restore offers Merge (default, newest-`modified_at`-wins on `uid`, additive for child rows, recomputing `last_contact` after merge, and honouring tombstones so a purged contact is not resurrected) and Replace-all — recreating custom columns from defs, writing fresh photo files, re-registering schedules — migrating an older backup forward, rejecting a newer one, and previewing counts first.
-  4. Migration **006** adds a generic `sync_tombstones` table (`entity_type`/`entity_uid`/`deleted_at`, extensible without a new migration); `purgeContact()` writes a contact-level tombstone inside its own delete transaction, and Merge honours it (SC-3). *(Renumbered 005 → 006, 2026-08-23: Phase 15 ships first and owns migration 005 = `app_settings.digest_enabled`.)* Individually-deleted child rows (interactions/fuel/links) are **out of scope for v1.0 tombstoning** and are tracked as a known Merge gap for the sync milestone.
+  1. Migration **006** converts every extant dynamic custom-field value into a normalized row model without loss, including custom photos, and assigns stable `uid` identity to definitions and values. The migration is forward-only, transaction-safe, idempotently guarded by `user_version`, and leaves no future custom-field operation dependent on `ALTER TABLE` / `DROP COLUMN`.
+  2. All seven existing parsers, TEXT-forever value storage, type-change preflight, `field_history`, quarantine/restore/expiry, photo handling, visibility rules, and create/edit/profile field flows continue to behave correctly on the new store.
+  3. Every existing custom-field sort and filter works from the normalized rows with the same user-visible ordering and semantics; DAO/query boundaries remain safe and do not interpolate a user-provided identifier as SQL.
+  4. Tests cover migrated populated data and the established field lifecycle, including retype, quarantine expiry, permanently deleting a definition, and custom photo values. Existing test-profile data remains usable after on-device migration.
 
-**Reconciliation-core rules** (named here because the sync milestone reuses them): key on `uid` never local `id`; scalar contact metadata is last-write-wins by `modified_at`; child rows are additive (union by `uid`); derived columns (`last_contact`) are recomputed, never merged; tombstones win over stale rows; child→parent resolves by parent `uid` → local `id` at apply time. The Merge module stays row-set-agnostic (no assumption that every row is globally shared) so the sync milestone's device-local/synced partition applies without a rewrite.
+**Plans:** TBD — first establish the precise normalized schema, stable identifiers, and one-way migration proof; then port DAO/query/UI paths and run migration/lifecycle regression coverage. This phase changes no backup behavior and does not implement sync.
 
-**Plans:** TBD — intended **wave 0**: migration 006 + `purgeContact()` tombstone write + Merge tombstone-honouring; remaining waves build export/auto-backup/encryption/restore on top, with the Merge logic extracted as the standalone reconciliation module above. Full sync-readiness rationale in `.planning/sync-milestone/PHASE-16-SYNC-READINESS.md`.
+### Phase 17: Backup, Export & Restore
+
+**Goal:** The load-bearing loss backstop — manual + auto rotating backup, optional encryption, and a tombstone-aware Merge/Replace restore that forward-migrates. Its local reconciliation core is documented and reusable by the later sync milestone, without implementing sync now.
+**Mode:** mvp
+**Depends on:** Phase 16
+**Requirements:** BKP-01, BKP-02, BKP-03, BKP-04
+**⟢ Before planning — REQUIRED reading:** `.planning/phases/17-backup-export-restore/17-CONTEXT.md`, then run a fresh Phase 17 discussion against Phase 16's implemented schema. Do not plan this phase from its parked context alone.
+**Success Criteria** (what must be TRUE):
+
+  1. A user can export full non-secret app state, including normalized custom-field data, base64 photos, and tombstones, as one plaintext JSON file with a `user_version` manifest header.
+  2. Automatic rotating SAF-folder backup runs from the foreground launch sweep (~7 kept, once/day, on change) and gives the user a calm in-app health state/nudge based only on a successfully written automatic file. Optional AES-256-GCM backup encryption follows the locked passphrase and recovery rules in the Phase 17 context; it remains distinct from future sync E2EE.
+  3. Restore previews first, defaults to Merge, and offers confirmed Replace-all. Merge uses the reusable reconciliation core: `uid` identity, newer `modified_at` for mutable rows, child-parent resolution by uid, derived `last_contact` recomputation, and tombstone-aware deletion. Replace-all creates a verified pre-restore automatic backup when configured, recreates the normalized field model, writes fresh local photo files, and rebuilds derived schedules.
+  4. Migration **007** adds generic, indefinitely retained tombstones (`entity_type`, `entity_uid`, `deleted_at`) for every hard-deleted mergeable logical entity. Each delete writes its tombstone in the same transaction; a newer tombstone prevents resurrection and wins same-second ties. Export includes tombstones; old tombstone-less backups remain restorable.
+
+**Plans:** TBD — wave 0 is migration 007 plus every applicable hard-delete writer and reconciliation-core tests; subsequent waves build export, auto backup, encryption, and previewed restore. Full locked context is parked in `17-CONTEXT.md` and must be refreshed after Phase 16 executes.
 
 ## Progress
 
-**Execution Order:** Phases execute sequentially in numeric order: 1 → 2 → 3 → … → 16.
+**Execution Order:** Phases execute sequentially in numeric order: 1 → 2 → 3 → … → 17.
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
@@ -592,4 +611,5 @@ Plans:
 | 13. Orrery | 8/8 | Complete   | 2026-08-18 |
 | 14. AI Message Suggestions | 7/7 (+gap iters 08→10, 09→11) | Complete — owner-accepted (LiteLLM picker + frontier-3 + cap removed; node 1305/1305 + device-UAT'd; egress smoke-PASS). Local on main, not pushed | 2026-08-22 |
 | 15. Weekly Digest | 0/TBD | Not started | - |
-| 16. Backup, Export & Restore | 0/TBD | Not started | - |
+| 16. Custom Field Value Normalization | 0/TBD | Not started | - |
+| 17. Backup, Export & Restore | 0/TBD | Not started | - |

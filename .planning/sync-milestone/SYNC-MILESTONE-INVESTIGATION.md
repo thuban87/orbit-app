@@ -6,7 +6,7 @@
 (owner calls) before the multi-device sync milestone can be planned. This is the input to a
 future `/gsd-new-milestone`, not the milestone itself.
 
-Related: `PHASE-16-SYNC-READINESS.md` (what changes in the v1.0 roadmap *now*), `HANDOFF.md` §3
+Related: `PHASE-17-SYNC-READINESS.md` (what changes in the v1.0 roadmap *now*), `HANDOFF.md` §3
 (local-first, migration-path-stays-open), §9/§11 (E2EE was moot for local-only), §14 (custom fields).
 
 ---
@@ -25,8 +25,8 @@ These were settled by the owner on 2026-08-22 and are the fixed frame for everyt
 | D0.6 | **Targets: Android (exists) + Electron desktop + a web portal.** The web portal is expected to be "a bigger deal" than the Electron app. | Three client runtimes, not two. The web portal is the hardest E2EE surface (§G). |
 | D0.7 | **Privacy posture (owner's current stance, subject to §C.1 research):** metadata leaving the device is acceptable; photos leaving is acceptable *if the user is told they are not encrypted*; ciphertext leaving is fine. | Sets the *default* trust boundary; §C.1 tests it against real user expectations before it's final. |
 
-**Still explicitly open (owner has NOT ruled):** whether the §14 custom-field storage design survives
-Turso sync unchanged (§B.6), the exact E2EE scheme and what stays server-visible (§C), whether photos
+**Still explicitly open (owner has NOT ruled):** the exact sync conflict policy for the normalized
+custom-field rows (§B.6), the exact E2EE scheme and what stays server-visible (§C), whether photos
 are encrypted or flagged-plaintext (§D.2), and sequencing vs the design retool (§I).
 
 ---
@@ -81,23 +81,24 @@ what gates what. Spikes should run behind `SqlExecutor` on a throwaway branch an
   / notification task (30s budget, no full app), sharing the DB with the foreground process? Why: the
   widget's killed-app headless mark is a shipped, load-bearing feature. Resolve: exercise a headless
   write against the Turso DB on-device.
-- **A.5 — DDL replication (the custom-fields crux).** Q: Does Turso sync replicate `ALTER TABLE ADD
-  COLUMN` / `DROP COLUMN`? What happens when device A's quarantine sweep **drops a custom-field column**
-  while device B still has data in it? Why: this is the *actual* question behind "are custom fields
-  sync-safe," not EAV aesthetics (§B.6). Resolve: two-device schema-mutation spike.
+- **A.5 — Schema-migration replication.** Q: How does Turso sync behave when normal forward schema
+  migrations roll out across devices at different versions? Why: Phase 16 replaces per-field dynamic
+  DDL with normalized value rows, removing custom-field column creation/drop as the special sync
+  hazard. Resolve: a two-device version-skew migration spike.
 - **A.6 — Electron runtime.** Q: Which Turso/libSQL runtime backs the Electron client, and can it reuse
   the same DAOs + migrations? Why: desktop code reuse hinges on it. Resolve: stand up the adapter under
   Node/Electron, run migrations + a smoke test.
 
 ### B. Data model & conflict semantics
 
-- **B.1 — Tombstones.** Q: What tombstone shape do we need (entity_type, entity_uid, deleted_at,
-  revision, device_id)? Why: hard-delete + sync = resurrection. Note: **we are adding a tombstone
-  table in v1.0 Phase 16 already** (see `PHASE-16-SYNC-READINESS.md`) — this track decides whether the
-  v2.0 shape needs `revision`/`device_id` beyond what backup needs.
+- **B.1 — Tombstones.** Q: What v2 fields do generic tombstones need beyond Phase 17's
+  `entity_type`, `entity_uid`, and `deleted_at` — e.g. revision or device id? Why: hard-delete + sync
+  = resurrection. Phase 17 already covers every hard-deleted mergeable logical entity and retains
+  tombstones indefinitely; this track decides the additive v2 widening.
 - **B.2 — Derived columns.** Q: Confirm the rule "sync interaction rows, recompute `last_contact`
   locally after merge; never LWW the scalar." Any other derived/computed values? Why: LWW-ing a derived
-  column corrupts recency. Resolve: enumerate derived fields; Phase 16's recompute already models this.
+  column corrupts recency. Resolve: enumerate derived fields; Phase 17's reconciliation core already
+  models this.
 - **B.3 — Conflict granularity.** Q: Row-level LWW (whole contact row) vs field-level LWW vs
   additive-for-children? Which columns are safe as LWW scalars (name, birthday, interval, category) vs
   which need special handling? Why: whole-row LWW silently drops a concurrent edit to a different field.
@@ -110,11 +111,11 @@ what gates what. Spikes should run behind `SqlExecutor` on a throwaway branch an
   timestamp distinct from the localtime `modified_at`? Why: device wall clocks are not a trustworthy
   global order; but `modified_at` must stay local for the UI. Resolve: decide the ordering authority
   (server revision is the usual answer) and whether it's a new column or engine-provided.
-- **B.6 — Custom-field storage under sync.** Q: Does the §14 dynamic-column design survive Turso sync
-  (given A.5's answer), or must values move to a row model (EAV)? Why: **this is a `[DECIDED]` design
-  with load-bearing invariants — reversing it is an owner call, and only justified if A.5 proves the
-  column model can't replicate.** Resolve: A.5 spike first; if it fails, design options (incl. keeping
-  local dynamic columns *projected from* synced rows) before any rewrite decision.
+- **B.6 — Normalized custom-field conflict semantics.** Phase 16 has already made the owner-approved
+  move from dynamic columns to stable definition/value rows. Q: should definitions and values use
+  whole-row LWW, field-level merge, or a special policy when a definition is retyped/deleted while
+  another device edits a value? Resolve: classify those row types after the normal migration spike;
+  do not reopen the row-model decision.
 - **B.7 — Device-local vs synced partition.** Q: Which tables/columns are *per-device* and must NOT
   sync — `app_settings` (no uid today), `ring_seq`, favourites order, `snooze_until`, notification
   schedule, widget config? Why: syncing device-local view/state creates phantom conflicts and cross-
@@ -214,7 +215,7 @@ Ordered; several depend on a spike above. "TBD" = genuinely undecided; recommend
 | # | Decision | Depends on | Recommendation / status |
 |---|----------|-----------|-------------------------|
 | R1 | Adopt Turso, or abort after spikes | A.1–A.6 | Proceed to spikes; adopt only if A.3/A.4/A.5 pass. |
-| R2 | Custom fields: keep §14 columns vs rewrite to rows | A.5, B.6 | **Keep unless A.5 proves columns can't replicate.** Reversal is an owner call; don't pre-empt. |
+| R2 | Custom-field value storage | Decided in v1 Phase 16 | **Normalized rows.** Do not reopen dynamic columns; decide only v2 conflict policy for the rows. |
 | R3 | E2EE granularity: blob-per-row vs field-level | C.2–C.4 | Lean blob-per-row (sync is a dumb ciphertext pipe). Confirm after C.3/C.4. |
 | R4 | What metadata the cloud may see | C.3 | account id · object uid · revision · tombstone flag only. Confirm. |
 | R5 | Photos: E2E-encrypted vs flagged-plaintext | C.1, D.2 | **Owner call.** Flag the inconsistency; if plaintext, require in-UI disclosure. |
@@ -229,7 +230,8 @@ Ordered; several depend on a spike above. "TBD" = genuinely undecided; recommend
 ## 4. Recommended sequencing
 
 1. **Spike gate first (Track A + A.5).** One throwaway branch, behind `SqlExecutor`, no v1.0 code
-   touched: adapter fit, test suite, sync maturity, headless, **DDL replication**, Electron runtime.
+   touched: adapter fit, test suite, sync maturity, headless, **version-skew migration replication**,
+   Electron runtime.
    This is the go/no-go. If A.3/A.4/A.5 fail, we stop and reconsider (not automatically PowerSync — D0.3).
 2. **In parallel, non-code decisions that don't need the spike:** C.1 (privacy posture), C.3 (metadata
    boundary), R7 (web portal tier), R9 (sequencing). These are owner/product calls.
@@ -255,5 +257,6 @@ portal · hardening). This is a milestone, not "a phase or two."
 
 ## 6. Open items feeding back to v1.0
 
-Only one thing here needs action *before* the milestone, and it lives in v1.0: **tombstones + the
-reconciliation core in Phase 16.** See `PHASE-16-SYNC-READINESS.md`. Everything else waits for the gate.
+Two v1.0 prerequisites are now committed before the milestone: **normalized custom-field value rows
+in Phase 16**, then **tombstones + the reconciliation core in Phase 17**. See
+`PHASE-17-SYNC-READINESS.md`. Everything else waits for the gate.

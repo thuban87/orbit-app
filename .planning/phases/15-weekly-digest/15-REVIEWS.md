@@ -95,7 +95,8 @@ inverse of the overlooked population (decay-suppression.ts:58-62), `isOwnedIdent
 the digest-non-clobber test (notification-schedule.test.ts:498-506), `countNeverContacted` (dashboard-read.ts:306),
 app-settings toggle plumbing, the migration runner sort-by-version + TARGET_VERSION=4 (database.ts:39,109-115),
 the 004 ADD-COLUMN analog, the launch-sweep registry (launch-sweep.ts:45). Migration-005 owner ruling respected;
-the Phase-16 renumber to 006 confirmed in PHASE-16-SYNC-READINESS.md:41 and ROADMAP.md.
+the settled migration order (Phase 15=005, Phase 16=006 normalization, Phase 17=007 tombstones)
+confirmed in ROADMAP.md.
 
 **Strengths:** overlooked-inverse trap correctly avoided (STATUS_SQL='rogue', omit reminders_off, pre-filter
 last_contact NOT NULL, split by reason); timezone handling right (bare date() on stored col, date('now','localtime')

@@ -90,12 +90,12 @@ clarification captured under Deferred (markdown export → Phase 16).
   TABLES and no new per-contact state** (still true — the digest is a pure read surface, stores nothing
   per contact). The single global settings column is the toggle's proper home and is NOT a reversal of the
   read-surface promise. Do NOT "bug-fix" the migration away as a schema violation — it is an owner decision.
-- **Migration numbering:** Phase 15 owns **005** (`digest_enabled`); Phase 16's reserved `sync_tombstones`
-  migration renumbers **005 → 006** (Phase 15 ships first; migrations are forward-only, ordered by ship
-  sequence). PHASE-16-SYNC-READINESS.md + the ROADMAP Phase-16 block were updated to 006.
+- **Migration numbering:** Phase 15 owns **005** (`digest_enabled`); Phase 16 now owns normalized
+  custom-field migration **006**, and Phase 17 owns tombstones in **007**. Migrations remain
+  forward-only and ordered by ship sequence; see `PHASE-17-SYNC-READINESS.md`.
 - Migration 005 is forward-only + irreversible (CLAUDE.md data rules): register it in `database.ts`, add a
   `004-ai-settings`-style migration file + node:sqlite test, and thread `digest_enabled` through the
-  app-settings DAO + its type. Backup (Phase 16) exports it as a settings row (dossier [digest → backup]).
+  app-settings DAO + its type. Backup (Phase 17) exports it as a settings row (dossier [digest → backup]).
 
 ### Claude's Discretion (deferred to planning per dossier, not owner-facing taste)
 - The three queries: retrospective (7-day `interactions`, no connected/direction predicate, archived

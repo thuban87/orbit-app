@@ -132,12 +132,19 @@ roadmap phases. Items marked *(infra)* are foundation guarantees rather than end
 - [ ] **DGST-02**: The digest screen shows a retrospective ("reached this week" — all touchpoints in the window, no connected/direction predicate) and "the overlooked" (rogue + Rarely-responds gone-quiet + never-contacted backlog, mute ignored, archived excluded).
 - [ ] **DGST-03**: The digest surfaces a gentle, non-judgemental line when recent quality marks skew "hard"; it adds no new schema.
 
+### Custom Field Value Normalization (CFN)
+
+- [ ] **CFN-01**: Migration 006 replaces the dynamic custom-value columns with a normalized value-row model, preserving every existing value (including custom photos) and giving each field definition and value a stable `uid`. *(infra)*
+- [ ] **CFN-02**: Creating, editing, retyping, quarantining/restoring, permanently deleting, and viewing a custom field preserves the Phase-3 user-facing behavior: TEXT-forever storage, all seven parsers, `field_history`, and the existing visibility rules — without custom-field DDL.
+- [ ] **CFN-03**: Custom-field reads, sorts, and filters provide the same user-visible results from the normalized model; no user-provided identifier is interpolated into SQL. *(infra)*
+- [ ] **CFN-04**: Migration and lifecycle tests prove that existing populated test profiles remain usable, including retype/quarantine expiry/custom-photo cases. *(infra)*
+
 ### Backup, Export & Restore (BKP)
 
-- [ ] **BKP-01**: A user can export full app state (all tables + non-secret settings + base64 photos; API keys and `field_history` excluded) as a single plaintext JSON file via the share sheet, stamped with `user_version` and a manifest header.
-- [ ] **BKP-02**: An automatic rotating backup writes to a user-granted SAF folder on the launch sweep (~7 kept, once/day, only on change), with an overdue-backup nudge.
-- [ ] **BKP-03**: A user can optionally encrypt exports with a passphrase (AES-256-GCM; auto-backups reuse a Keystore-cached passphrase); the unrecoverable-loss warning is shown at passphrase-set time.
-- [ ] **BKP-04**: A user can restore via Merge (default, newest-`modified_at`-wins keyed on `uid`) or Replace-all; restore recreates custom columns from defs before values, recomputes `last_contact` (MAX), writes fresh photo files and repoints paths, re-registers schedules, migrates an older backup forward and rejects a newer one, and shows a preview with counts.
+- [ ] **BKP-01**: A user can export full non-secret app state (all relationship data, normalized custom-field rows, non-secret settings, base64 photos, and tombstones; API keys, encryption-key material, and `field_history` excluded) as a single plaintext JSON file via the share sheet, stamped with `user_version` and a manifest header.
+- [ ] **BKP-02**: An automatic rotating backup writes to a user-granted SAF folder on the foreground launch sweep (~7 kept, once/day, only on change), with a calm in-app health card/nudge based only on a successfully written automatic file.
+- [ ] **BKP-03**: A user can optionally encrypt exports with a passphrase (AES-256-GCM; auto-backups reuse a SecureStore-cached passphrase); setup warns plainly that it is unrecoverable, disable clears the cached passphrase, a normal change defaults to verified re-encryption of accessible automatic backups with a future-only alternative, and forgotten-password recovery can only establish a new passphrase for future files.
+- [ ] **BKP-04**: Restore previews first and offers Merge by default or confirmed Replace-all. Merge reconciles rows by `uid` and newest `modified_at`, resolves parent references by uid, recomputes `last_contact`, and honors generic tombstones (same-second ties favor deletion); Replace-all makes a verified pre-restore backup when configured, recreates the normalized field model, writes fresh photo files, re-registers schedules, migrates older backups forward, and rejects newer ones.
 
 ## v2 / Deferred Requirements
 
@@ -189,12 +196,13 @@ Tracked, not in the current roadmap. Reasons recorded in the dossier.
 | ORR-01…06 | Phase 13 | Pending |
 | AI-01…04 | Phase 14 | Pending |
 | DGST-01…03 | Phase 15 | Pending |
-| BKP-01…04 | Phase 16 | Pending |
+| CFN-01…04 | Phase 16 | Pending |
+| BKP-01…04 | Phase 17 | Pending |
 
 **Coverage:**
 
-- v1 requirements: 82 total
-- Mapped to phases: 82
+- v1 requirements: 86 total
+- Mapped to phases: 86
 - Unmapped: 0 ✓
 
 ---

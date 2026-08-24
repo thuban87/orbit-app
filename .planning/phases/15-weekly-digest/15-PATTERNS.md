@@ -143,8 +143,8 @@ future responsibility. Importing the module must run NOTHING (no module-scope si
 **Analog:** `src/db/migrations/004-ai-settings.ts` — exact structural copy.
 
 **OWNER-RULED (CONTEXT:83-98):** add `app_settings.digest_enabled INTEGER NOT NULL DEFAULT 1`. This is an
-owner decision, NOT a schema-violation "bug fix" — do not remove it. Phase 15 owns **005**; Phase 16's
-`sync_tombstones` renumbers to **006**.
+owner decision, NOT a schema-violation "bug fix" — do not remove it. The settled sequence is Phase 15
+**005**, Phase 16 custom-field normalization **006**, then Phase 17 tombstones **007**.
 
 **Structure to copy** (004-ai-settings.ts:36-104): header documenting additive/irreversible-safe; exported
 DDL const; a `Migration` object with `version` + `apply(exec, _deps)`:

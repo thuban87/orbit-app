@@ -1,10 +1,7 @@
-# Phase 17 — Backup, Export & Restore: Context Draft
+# Phase 17 — Backup, Export & Restore: Parked Context
 
-**Status:** staging draft, written before the roadmap phase insertion. It is not an active
-phase artifact yet.
-
-**Intended destination after the roadmap change:**
-`.planning/phases/17-backup-export-restore/17-CONTEXT.md`.
+**Status:** parked, provisional Phase 17 context. It records locked owner decisions but is not
+implementation context until it has been refreshed against Phase 16's completed migration.
 
 **Mandatory refresh:** a new Phase 17 discussion must replace this draft after the planned
 Phase 16 custom-field value normalization has executed. This draft preserves owner decisions;
@@ -24,10 +21,8 @@ the eventual synced/device-local partition after its Turso spikes.
 
 ## Planned prerequisite and numbering
 
-Before this phase can be planned or executed, insert a new **Phase 16: Custom Field Value
-Normalization**. It will replace the current dynamic-column custom-value store with a row model
-and use migration 006. The current backup phase becomes Phase 17, so its tombstone migration
-becomes **migration 007**.
+Phase 16 now precedes this phase. It replaces the dynamic-column custom-value store with a row
+model in migration 006. Consequently, this backup phase owns tombstones in **migration 007**.
 
 This is deliberate, not scope creep: dynamic custom-field columns are a serious multi-device
 sync risk because concurrent field creation/deletion would require replicated DDL. The row-model
@@ -158,9 +153,5 @@ it; a future sync apply path reuses it rather than implementing a second merge s
 
 ## Required next steps
 
-1. Restore the local GSD runtime/tooling before structural phase changes.
-2. Insert Phase 16 and renumber this backup work to Phase 17; update roadmap, requirements,
-   state, and sync handoffs atomically, including migration references.
-3. Move this draft to the Phase 17 directory as a **parked, provisional** context.
-4. Discuss, plan, execute, and verify Phase 16 custom-field normalization.
-5. Re-run Phase 17 discussion and replace this context using the actual post-migration codebase.
+1. Discuss, plan, execute, and verify Phase 16 custom-field normalization.
+2. Re-run Phase 17 discussion and replace this context using the actual post-migration codebase.
