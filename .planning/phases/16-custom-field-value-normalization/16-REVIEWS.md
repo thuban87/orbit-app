@@ -511,3 +511,7 @@ The data-safety design is now sound where it counts. The pair-row invariant is g
 What holds it at MEDIUM is that **two hard gates cannot pass as written** (HIGH-1, MEDIUM-2) and a third is order-dependent (MEDIUM-3). On ordinary work that is a scheduling nuisance. Here it is not: the failure mode is an executor hitting a red `tsc` on the value-write path mid-wave, being told by the plan's own prose that this shouldn't happen, and reaching for a deviation on `field-values-dao.ts` — the one file where a wrong call is unrecoverable on a user's device.
 
 **Recommendation:** fix HIGH-1, MEDIUM-2, MEDIUM-3, and MEDIUM-5 before execution starts. All four are mechanical plan edits — a wave move plus three sentences — and none touches a recorded decision. MEDIUM-4 is a one-paragraph honesty correction that must land before Plan 08 writes the immutable ADR. LOW-6 is the only item worth putting in front of the owner as a decision rather than fixing in the plans.
+
+## ⚠ Owner Resolution — cycle 2 (LOW-6)
+
+**D-06b:** Owner chose to FIX the generic branch too. The cycle-3 replan MUST correct the app-wide generic bootstrap error copy (App.tsx generic branch ~211-213 + the `16-UI-SPEC.md` "preserve verbatim" row) to drop the "contact support" promise, consistent with D-06a. See CONTEXT.md D-06b.
