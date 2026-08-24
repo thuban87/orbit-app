@@ -31,7 +31,7 @@ onto the dossier domains; a `[DECIDED]`/`[REJECTED]` decision is implemented, ne
 - [x] **Phase 13: Orrery** — the two-view Skia solar system, rogue rendering, assignable/self-colour sun, ambient layer. (completed 2026-08-18)
 - [x] **Phase 14: AI Message Suggestions** — providers + keys, editable-draft flow, prompt assembly, `share_with_ai`. ✅ owner-accepted 2026-08-22
 - [ ] **Phase 15: Weekly Digest** — one WEEKLY Sunday notification → a live "your week" screen.
-- [ ] **Phase 16: Backup, Export & Restore** — manual + auto SAF backup, optional encryption, Merge/Replace restore, forward-migrate.
+- [ ] **Phase 16: Backup, Export & Restore** — manual + auto SAF backup, optional encryption, tombstone-aware Merge/Replace restore (reusable reconciliation core), forward-migrate.
 
 ## Cross-phase constraints (from INDEX.md's constraint log — these cross phase boundaries)
 
@@ -545,21 +545,31 @@ Plans:
   2. The screen shows the "reached this week" retrospective (all touchpoints, no connected/direction predicate) and "the overlooked" (rogue + Rarely-responds gone-quiet + never-contacted backlog, mute ignored, archived excluded), with a calm empty state.
   3. A gentle non-judgemental line appears when recent quality marks skew "hard"; no new schema is added.
 
-**Plans:** TBD
+**Plans:** 6 plans / 4 waves
+- [ ] 15-01-PLAN.md — digest reads (retrospective/overlooked/gentle-line) + pure logic [wave 1]
+- [ ] 15-02-PLAN.md — migration 005 `digest_enabled` + app-settings DAO thread [wave 1]
+- [ ] 15-03-PLAN.md — WEEKLY `digest:weekly` schedule service + digest-v1 channel + launch-sweep hook + App wiring [wave 2]
+- [ ] 15-04-PLAN.md — DigestScreen "your week" + Digest route + dashboard "Your week" entry [wave 2]
+- [ ] 15-05-PLAN.md — notification-tap routing (digest branch) + Settings "Weekly digest" toggle [wave 3]
+- [ ] 15-06-PLAN.md — owner-gated on-device UAT (weekly fire + reboot + screen + toggle) [wave 4]
 
 ### Phase 16: Backup, Export & Restore
 
-**Goal:** The load-bearing loss backstop — manual + auto rotating backup, optional encryption, and a Merge/Replace restore that forward-migrates — closing HANDOFF §3's open item.
+**Goal:** The load-bearing loss backstop — manual + auto rotating backup, optional encryption, and a tombstone-aware Merge/Replace restore that forward-migrates — closing HANDOFF §3's open item. Its Merge logic is built as a documented, reusable **reconciliation core** the future sync milestone consumes directly (see `.planning/sync-milestone/`).
 **Mode:** mvp
 **Depends on:** Phase 15
 **Requirements:** BKP-01, BKP-02, BKP-03, BKP-04
+**⟢ Before planning — REQUIRED reading:** `.planning/sync-milestone/PHASE-16-SYNC-READINESS.md` (tombstone + reconciliation-core scope, the named Merge rules, and the deliberate v1.0 gap where child-row tombstones are deferred to the sync milestone). Do not plan this phase without it.
 **Success Criteria** (what must be TRUE):
 
-  1. A user can export full app state (tables + non-secret settings + base64 photos, keys/`field_history` excluded) as one plaintext JSON file with a `user_version` manifest header.
-  2. An automatic rotating SAF-folder backup writes on the launch sweep (~7 kept, once/day, on change) with an overdue nudge; optional AES-256-GCM encryption covers manual and auto (Keystore-cached passphrase, loss warning at set time).
-  3. Restore offers Merge (default, newest-`modified_at`-wins on `uid`) and Replace-all — recreating custom columns from defs, recomputing `last_contact`, writing fresh photo files, re-registering schedules — migrating an older backup forward, rejecting a newer one, and previewing counts first.
+  1. A user can export full app state (tables + non-secret settings + base64 photos + tombstones, keys/`field_history` excluded) as one plaintext JSON file with a `user_version` manifest header.
+  2. An automatic rotating SAF-folder backup writes on the launch sweep (~7 kept, once/day, on change) with an overdue nudge; optional AES-256-GCM encryption covers manual and auto (Keystore-cached passphrase, loss warning at set time). This backup-at-rest passphrase is a distinct concern from any future E2EE sync key — the design keeps them separate.
+  3. Restore offers Merge (default, newest-`modified_at`-wins on `uid`, additive for child rows, recomputing `last_contact` after merge, and honouring tombstones so a purged contact is not resurrected) and Replace-all — recreating custom columns from defs, writing fresh photo files, re-registering schedules — migrating an older backup forward, rejecting a newer one, and previewing counts first.
+  4. Migration **006** adds a generic `sync_tombstones` table (`entity_type`/`entity_uid`/`deleted_at`, extensible without a new migration); `purgeContact()` writes a contact-level tombstone inside its own delete transaction, and Merge honours it (SC-3). *(Renumbered 005 → 006, 2026-08-23: Phase 15 ships first and owns migration 005 = `app_settings.digest_enabled`.)* Individually-deleted child rows (interactions/fuel/links) are **out of scope for v1.0 tombstoning** and are tracked as a known Merge gap for the sync milestone.
 
-**Plans:** TBD
+**Reconciliation-core rules** (named here because the sync milestone reuses them): key on `uid` never local `id`; scalar contact metadata is last-write-wins by `modified_at`; child rows are additive (union by `uid`); derived columns (`last_contact`) are recomputed, never merged; tombstones win over stale rows; child→parent resolves by parent `uid` → local `id` at apply time. The Merge module stays row-set-agnostic (no assumption that every row is globally shared) so the sync milestone's device-local/synced partition applies without a rewrite.
+
+**Plans:** TBD — intended **wave 0**: migration 006 + `purgeContact()` tombstone write + Merge tombstone-honouring; remaining waves build export/auto-backup/encryption/restore on top, with the Merge logic extracted as the standalone reconciliation module above. Full sync-readiness rationale in `.planning/sync-milestone/PHASE-16-SYNC-READINESS.md`.
 
 ## Progress
 

@@ -1,0 +1,29 @@
+# Keep local commit workflows autonomous while preventing remote publication.
+prefix_rule(
+    pattern = ["git", "push"],
+    decision = "forbidden",
+    justification = "Remote pushes are disabled by project policy. Commit locally and let the user push.",
+    match = [
+        "git push",
+        "git push origin main",
+        "git push --force origin feature/example",
+    ],
+    not_match = [
+        "git pull --rebase",
+        "git commit -m update",
+    ],
+)
+
+prefix_rule(
+    pattern = ["gh", "pr", "create"],
+    decision = "forbidden",
+    justification = "Pull-request creation is disabled by project policy. Prepare local commits and let the user create the PR.",
+    match = [
+        "gh pr create",
+        "gh pr create --fill",
+    ],
+    not_match = [
+        "gh pr view 123",
+        "gh pr list",
+    ],
+)
