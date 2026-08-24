@@ -15,6 +15,10 @@ cycle: 1
 
 # Cross-AI Plan Review — Phase 16 (Custom Field Value Normalization)
 
+## ⚠ Owner Resolution — REQUIRED for cycle-2 replan (blocking)
+
+**D-06a (fail-closed brick, non-loss inconsistency):** Owner chose *snapshot + proceed for non-loss only*. LOSS-bearing inconsistencies (missing value column) still FAIL CLOSED unchanged. NON-LOSS inconsistencies (orphan dynamic column with no matching def) must NOT brick: snapshot the orphan data to `field_history` and drop it in the same transaction, then proceed. Also correct the classified migration-failure UI copy (`16-UI-SPEC.md`) so it names the permanent state honestly and does not promise a support channel. See `16-CONTEXT.md` D-06a. The replan MUST incorporate this into Plan 01 (migration) + the UI-SPEC copy row; do not re-open the loss-bearing fail-closed path.
+
 ## Consensus Summary
 
 Two independent source-grounded reviewers (Codex and Claude Opus 5) both rate the phase **HIGH risk** — not because the plans are weak (research quality and the migration-transaction protocol are strong) but because the blast radius is maximal: a forward-only, unrecoverable on-device SQLite migration (006), no backend, no remote repair, `allowBackup="false"`, and no shipped export (Phase 17 comes after). Both reviewers independently converged on the same core HIGH findings.
