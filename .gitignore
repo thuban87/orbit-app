@@ -5,6 +5,9 @@ node_modules/
 # Personal/local Claude Code settings — never commit (per-machine allows)
 .claude/settings.local.json
 
+# Local Codex sandbox permissions — each machine owns its own policy.
+/.codex/config.toml
+
 # Graphify: graph.json + GRAPH_REPORT.md are committed; these two are
 # regenerated wholesale every build and would bloat history (CLAUDE.md).
 .planning/graphs/graph.html
