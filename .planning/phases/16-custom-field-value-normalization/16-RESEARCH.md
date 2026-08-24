@@ -290,17 +290,13 @@ Phase 17 is intentionally not designed here. The next phase must consume normali
 | A2 | All persisted contacts, including archived ones, should receive blank pair rows when no legacy source row exists. | Migration proof protocol | Omitting archived values would lose data; owner wording says “live” but CFN preservation requires no loss. |
 | A3 | A source legacy row's shared `modified_at` should seed each migrated value record; no-source blanks use migration time. | Migration proof protocol | A future reconciliation may need a different documented migration timestamp policy. |
 
-## Open Questions
+## Open Questions — RESOLVED
 
-1. **Migration failure wording**
-   - What we know: successful upgrades must be silent; App bootstrap already catches a migration rejection and renders an error view instead of mounting database consumers. [VERIFIED: App.tsx:43-57] [VERIFIED: App.tsx:109-126]
-   - What's unclear: whether the existing generic copy is sufficiently clear for a migration-006 integrity failure.
-   - Recommendation: reuse the existing error branch and add narrow, plain wording only for the exceptional fail-closed conversion error; do not add success UI.
+1. **Migration failure wording — RESOLVED**
+   - Adopted decision: reuse the existing bootstrap error branch only for the classified, rolled-back migration-006 integrity failure. Per the approved UI-SPEC, render **Couldn't safely update your custom fields** and **Orbit stopped before changing your data. Please reopen the app; if this keeps happening, contact support.** Keep the navigator unmounted. Successful upgrades remain silent and non-classified bootstrap failures retain the generic app-start wording. [VERIFIED: 16-UI-SPEC.md:137-157]
 
-2. **Normalized child-key indexing**
-   - What we know: the unique pair constraint enforces correctness; SQLite documentation recommends child-key indexes for parent-delete efficiency. [CITED: https://www.sqlite.org/foreignkeys.html]
-   - What's unclear: whether one additional non-unique `field_def_id` index is warranted at Orbit's tens-of-contacts scale.
-   - Recommendation: use the unique pair constraint first; add only a targeted index justified by a lifecycle/query test, never a value-text index or uniqueness rule.
+2. **Normalized child-key indexing — RESOLVED**
+   - Adopted decision: ship only the database `UNIQUE(contact_id, field_def_id)` pair index/constraint for this migration. Do not add a separate `field_def_id` index unless a lifecycle or query test demonstrates a concrete need; never add a value-text index or a second uniqueness rule. [VERIFIED: Architecture Pattern 1; 16-UI-SPEC.md scope contract]
 
 ## Environment Availability
 
