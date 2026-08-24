@@ -47,6 +47,11 @@ No external package, UI block, registry, or design-system initialization is perm
    empty message, active definition cards, up/down/edit/delete-or-quarantine actions, and the
    quarantined section exactly as presently arranged. Do not expose row `uid`, `field_def_id`,
    `col_name`, database table names, migration version, or raw SQL concepts anywhere in the app.
+   **Primary visual anchor (preserved):** the `Custom Fields` heading is the page anchor; the accent
+   `New field` action immediately follows as the sole primary action. Existing definition cards form
+   the next visual level, with their type metadata and management controls subordinate to the field
+   label. The quarantined section remains below the active list and visually secondary. This hierarchy
+   is preserved; migration 006 adds no competing status, success, or warning treatment.
 3. **Existing form/profile interactions:** retain all seven widget presentations and current labels;
    retain the read-time `Tap to fix` affordance for invalid/retyped values; retain the one preflight
    confirmation for type/options changes. A blank normalized record must look exactly like today’s
@@ -69,12 +74,11 @@ bootstrap view and custom-field screens.
 |-------|-------|------------------------|
 | xs | 4px | Tight helper-text separation; inherited only |
 | sm | 8px | Compact control/form gaps and input/back-control vertical padding |
-| md | 12px | Definition-card padding, screen/header gap, bootstrap error gap |
-| lg | 16px | Custom Fields and form content padding |
-| xl | 24px | Existing major section separation; no new use in this phase |
-| 2xl | 32px | Horizontal inset of the centred bootstrap error view |
-| 3xl | 48px | Page-level spacing; no new use in this phase |
-| 4xl | 64px | Page-level spacing; no new use in this phase |
+| md | 16px | Definition-card padding, screen/header gap, bootstrap error gap, and Custom Fields/form content padding |
+| lg | 24px | Existing major section separation; no new use in this phase |
+| xl | 32px | Horizontal inset of the centred bootstrap error view |
+| 2xl | 48px | Page-level spacing; no new use in this phase |
+| 3xl | 64px | Page-level spacing; no new use in this phase |
 
 Exceptions: the inherited 44px minimum touch target is mandatory for existing interactive controls;
 it is already a multiple of four. Preserve existing 8px input/button radius and 10px definition-card
@@ -84,15 +88,16 @@ radius. Do not alter sizing or spacing merely because the DAO representation cha
 
 ## Typography
 
-The only phase-owned text is the classified migration-failure state. It uses exactly three existing
-sizes and two existing weights; existing Custom Fields typography (including 13px/600 labels and
-16px/600 definition labels) is preserved unchanged rather than re-specified or restyled.
+The effective type scale for this phase, including preserved Custom Fields surfaces, is exactly four
+sizes and two weights: 13px, 16px, 20px, and 24px at 400 regular or 600 semibold. The classified
+migration-failure state uses this scale without introducing a new font, weight, or hierarchy.
 
 | Role | Size | Weight | Line Height |
 |------|------|--------|-------------|
-| Failure body / recovery instruction | 15px | 400 regular | 22px (about 1.47) |
-| Failure heading | 20px | 700 bold | default platform line height |
-| Existing screen-title reference | 24px | 700 bold | default platform line height |
+| Compact helper / field label reference | 13px | 600 semibold | default platform line height |
+| Failure body / recovery instruction and standard body text | 16px | 400 regular | 24px (1.5) |
+| Failure heading | 20px | 600 semibold | 24px (1.2) |
+| `Custom Fields` screen-title reference | 24px | 600 semibold | 29px (about 1.2) |
 
 Use `textAlign: "center"` for the existing full-screen error view. Do not introduce a new font,
 weight, all-caps label, or migration-specific visual hierarchy.
