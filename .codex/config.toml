@@ -14,6 +14,7 @@ extends = ":workspace"
 [permissions.orbit-local.filesystem]
 ":root" = "deny"
 ":minimal" = "read"
+"/home/bwales/.codex/packages/standalone" = "read"
 
 [permissions.orbit-local.filesystem.":workspace_roots"]
 ".git" = "write"
