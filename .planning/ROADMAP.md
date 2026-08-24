@@ -572,7 +572,17 @@ Plans:
   3. Every existing custom-field sort and filter works from the normalized rows with the same user-visible ordering and semantics; DAO/query boundaries remain safe and do not interpolate a user-provided identifier as SQL.
   4. Tests cover migrated populated data and the established field lifecycle, including retype, quarantine expiry, permanently deleting a definition, and custom photo values. Existing test-profile data remains usable after on-device migration.
 
-**Plans:** TBD — first establish the precise normalized schema, stable identifiers, and one-way migration proof; then port DAO/query/UI paths and run migration/lifecycle regression coverage. This phase changes no backup behavior and does not implement sync.
+**Plans:** 8 plans / 4 waves (revised after cross-AI review — see 16-REVIEWS.md). This phase changes no backup behavior and does not implement sync.
+
+Plans:
+- [ ] 16-01-PLAN.md — migration 006 tracer: atomic legacy→normalized conversion (fail-closed + D-06a orphan snapshot-and-proceed), normalized value DAO (UPSERT-on-pair, defs-filtered read), bootstrap gate [wave 1]
+- [ ] 16-02-PLAN.md — create/edit caller migration: complete pair matrix incl. quarantined defs, rowUid removal, first tsc + legacy-table grep gate [wave 2]
+- [ ] 16-03-PLAN.md — field lifecycle on rows: createField/quarantine/permanent-delete, re-keyed isFieldEmpty + CustomFieldsScreen, race-safe sweep [wave 3]
+- [ ] 16-04-PLAN.md — type-change preflight/history on rows + latent static sortExpr expression [wave 3]
+- [ ] 16-05-PLAN.md — edit/profile + AI read projections over normalized rows (defs-filtered privacy) [wave 3]
+- [ ] 16-06-PLAN.md — normalized purge child deletion + v6 reserved-column derivation [wave 3]
+- [ ] 16-07-PLAN.md — cross-cutting proof matrix (parameterized v1/v4/v5 + 200×15 upper-bound) + release-success & debug-failure device UAT [wave 4]
+- [ ] 16-08-PLAN.md — documentation: ADR-001 + CLAUDE.md invariants sync + HANDOFF §14 supersession note [wave 4]
 
 ### Phase 17: Backup, Export & Restore
 

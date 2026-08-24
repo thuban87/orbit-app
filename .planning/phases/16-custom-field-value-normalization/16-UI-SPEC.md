@@ -135,15 +135,20 @@ using `textPrimary` and `textSecondary` on `background`.
 | Existing options-change confirmation | **Change dropdown options** — **{keep} of {total} will be kept. {flag} need your input — fix now or later.** Preserve the existing single confirmation with `Cancel` / `Apply`. |
 | Existing invalid-value repair | **Tap to fix.** Preserve verbatim and keep the whole invalid value row tappable. |
 | Classified migration-failure heading | **Couldn't safely update your custom fields** |
-| Classified migration-failure body | **Orbit stopped before changing your data. Please reopen the app; if this keeps happening, contact support.** |
+| Classified migration-failure body (revised per D-06a) | **Orbit stopped before changing anything, so all your data is safe and unchanged. This version can't finish updating your custom fields on this device, and reopening won't change that. Nothing has been altered or lost.** |
 | Ordinary custom-fields load/mutation error | Preserve existing alert copy: **Couldn't load custom fields / Please reopen this screen.** and **Couldn't update field / Please try again.** |
 | Existing destructive confirmation | **Delete field**: **"{field label}" is empty and will be deleted permanently.** Actions: `Cancel` / destructive `Delete`. |
 | Existing reversible lifecycle confirmation | **Quarantine field**: **"{field label}" has values and will be quarantined for 30 days — you can restore it before then.** Actions: `Cancel` / `Quarantine`. |
 
-The classified migration wording is used only after the transaction has failed and rolled back. It must
-not claim that repair, sync, backup, or data recovery is in progress, and must not expose schema or
-integrity-validation jargon. It deliberately names the next safe action (reopen) without inventing a
-new in-app retry button.
+The classified migration wording is used only after the transaction has failed and rolled back on a
+LOSS-bearing inconsistency (a definition whose backing value column is missing). It must not claim that
+repair, sync, backup, or data recovery is in progress, must not expose schema or integrity-validation
+jargon, and — per D-06a — must NOT promise a support/recovery channel the project cannot keep. Because a
+loss-bearing failure is deterministic and permanent on this build, the copy names that state honestly
+(it will not resolve on reopen) while affirming the data is safe and unchanged; it invents no in-app retry
+button and no "contact support" affordance. A NON-loss-bearing orphan dynamic column (no matching
+definition) does NOT reach this state at all — it is snapshotted to `field_history` and dropped in the
+same transaction and the upgrade proceeds silently (D-06a).
 
 ---
 
@@ -181,7 +186,7 @@ treating a storage migration as visually invisible by assumption.
 |----------|------------|--------|---------------------|
 | loading | Bootstrap migration gate | ✅ explicit | Keep the existing centred `ActivityIndicator` until `openAndMigrate()` resolves; do not mount the navigator early. |
 | error | Bootstrap migration gate | ✅ explicit | After rollback, a classified migration-006 integrity failure uses the exact plain-language copy above; unrelated bootstrap failures retain generic copy. |
-| long-text | Bootstrap migration gate | 🧪 backstop | Preserve wrapping within the existing centred error-view inset; physical-device UAT with a classified-failure fixture must show the full recovery instruction without clipping. |
+| long-text | Bootstrap migration gate | 🧪 backstop | Preserve wrapping within the existing centred error-view inset; physical-device UAT with a classified-failure fixture must show the full (revised, support-channel-free) failure message without clipping. |
 | empty | Custom Fields definitions collection | ✅ explicit | Preserve the zero-active-definitions message and unchanged `New field` entry. |
 | loading | Custom Fields definitions collection | ✅ explicit | Add no list-specific loading treatment; the existing bootstrap gate prevents a new migration-time partial list, and all established post-start list behaviour remains unchanged. |
 | error | Custom Fields definitions collection | ✅ explicit | Preserve the existing native read/mutation alert copy and reload/reopen recovery path; do not add a second error surface. |
