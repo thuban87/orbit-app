@@ -599,7 +599,7 @@ Plans:
   3. Restore previews first, defaults to Merge, and offers confirmed Replace-all. Merge uses the reusable reconciliation core: `uid` identity, newer `modified_at` for mutable rows, child-parent resolution by uid, derived `last_contact` recomputation, and tombstone-aware deletion. Replace-all creates a verified pre-restore automatic backup when configured, recreates the normalized field model, writes fresh local photo files, and rebuilds derived schedules.
   4. Migration **007** adds generic, indefinitely retained tombstones (`entity_type`, `entity_uid`, `deleted_at`) for every hard-deleted mergeable logical entity. Each delete writes its tombstone in the same transaction; a newer tombstone prevents resurrection and wins same-second ties. Export includes tombstones; old tombstone-less backups remain restorable.
 
-**Plans:** 2/12 plans executed — wave 0 gates native package provenance; subsequent waves establish migration 007/delete evidence, non-secret settings persistence, reconciliation, export, automatic SAF backup, encryption, transactional restore, UI, and Pixel UAT.
+**Plans:** 3/12 plans executed — wave 0 gates native package provenance; subsequent waves establish migration 007/delete evidence, non-secret settings persistence, reconciliation, export, automatic SAF backup, encryption, transactional restore, UI, and Pixel UAT.
 
 Plans:
 **Wave 1**
@@ -609,7 +609,7 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 17-03-PLAN.md — standalone interaction/fuel/link deletion evidence
+- [x] 17-03-PLAN.md — standalone interaction/fuel/link deletion evidence
 - [ ] 17-04-PLAN.md — permanent field deletion evidence and reusable reconciliation policy
 - [ ] 17-12-PLAN.md — non-secret singleton backup settings persistence and restore-composable DAO core
 
@@ -660,4 +660,4 @@ Plans:
 | 14. AI Message Suggestions | 7/7 (+gap iters 08→10, 09→11) | Complete — owner-accepted (LiteLLM picker + frontier-3 + cap removed; node 1305/1305 + device-UAT'd; egress smoke-PASS). Local on main, not pushed | 2026-08-22 |
 | 15. Weekly Digest | 0/TBD | Not started | - |
 | 16. Custom Field Value Normalization | 0/TBD | Not started | - |
-| 17. Backup, Export & Restore | 2/12 | In Progress|  |
+| 17. Backup, Export & Restore | 3/12 | In Progress|  |
