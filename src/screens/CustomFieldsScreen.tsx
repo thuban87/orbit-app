@@ -111,7 +111,7 @@ export function CustomFieldsScreen({ onBack }: CustomFieldsScreenProps) {
       const all = await listDefs(exec, { includeQuarantined: true });
       const empties: Record<number, boolean> = {};
       for (const d of all) {
-        empties[d.id] = await isFieldEmpty(exec, d.col_name);
+        empties[d.id] = await isFieldEmpty(exec, d.id);
       }
       setDefs(all);
       setEmptyById(empties);
