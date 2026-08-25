@@ -25,6 +25,7 @@ export function registerBackupSweep(getExec: () => SqlExecutor = getExecutor): v
       now,
       readPhotoBase64: readStoredPhotoBase64,
       directoryUri: settings.backupFolderUri,
+      retentionDays: settings.backupRetentionDays,
       storage: createSafStorage(),
     }).writeVerifiedSnapshot();
     if (result.status === "written") {

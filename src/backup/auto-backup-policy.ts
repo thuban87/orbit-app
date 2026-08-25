@@ -45,3 +45,11 @@ export function filesToPrune(
     .filter((file) => timestamp(file.name) < cutoff)
     .map((file) => file.name);
 }
+
+/** Filename-only retention for files older than the configured window. */
+export function isExpiredAutomaticBackup(name: string, keepDays: number, now: Date): boolean {
+  const match = /^(\d{4}-\d{2}-\d{2})T(\d{2})-(\d{2})-(\d{2})-(\d{3})Z\.json$/.exec(name.slice(AUTOMATIC_BACKUP_PREFIX.length));
+  if (!match) return false;
+  const timestamp = Date.parse(`${match[1]}T${match[2]}:${match[3]}:${match[4]}.${match[5]}Z`);
+  return Number.isFinite(timestamp) && timestamp < now.getTime() - keepDays * 86_400_000;
+}

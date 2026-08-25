@@ -1,6 +1,6 @@
 import { parseBackupManifest } from "@/backup/backup-schema";
 import { buildExportManifest } from "@/backup/export-manifest";
-import { automaticBackupFilename } from "@/backup/auto-backup-policy";
+import { automaticBackupFilename, isExpiredAutomaticBackup, isOwnedAutomaticBackup } from "@/backup/auto-backup-policy";
 import type { SqlExecutor } from "@/db/types";
 import type { SafStorage } from "@/services/backup/saf-storage";
 
@@ -40,6 +40,7 @@ export interface AutomaticBackupDependencies {
   now: Date;
   readPhotoBase64: (relativePath: string) => Promise<string>;
   directoryUri: string;
+  retentionDays: number;
   storage: SafStorage;
 }
 
@@ -97,6 +98,19 @@ export function createAutomaticBackupService(deps: AutomaticBackupDependencies):
         parseBackupManifest(JSON.parse(contents));
         const filename = automaticBackupFilename(deps.now);
         await deps.storage.writeVerified(deps.directoryUri, filename, contents);
+        // The just-written snapshot is protected by identity, not clock order:
+        // a rollback may make its filename look older than retained snapshots.
+        try {
+          const listed = await deps.storage.list(deps.directoryUri);
+          await Promise.all(listed.map(async (uri) => {
+            const name = decodeURIComponent(uri).split("/").pop() ?? "";
+            if (name !== filename && isOwnedAutomaticBackup(name) && isExpiredAutomaticBackup(name, deps.retentionDays, deps.now)) {
+              await deps.storage.remove(uri);
+            }
+          }));
+        } catch {
+          // Listing/pruning failure never negates a verified write or health.
+        }
         return { status: "written", filename } as const;
       } catch {
         return { status: "failed" } as const;
