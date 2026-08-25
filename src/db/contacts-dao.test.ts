@@ -32,6 +32,11 @@ import {
   updateContactFull,
 } from "@/db/contacts-dao";
 import { migration001 } from "@/db/migrations/001-initial";
+import { migration002 } from "@/db/migrations/002-app-settings";
+import { migration003 } from "@/db/migrations/003-orrery-settings";
+import { migration004 } from "@/db/migrations/004-ai-settings";
+import { migration005 } from "@/db/migrations/005-digest-settings";
+import { migration006 } from "@/db/migrations/006-normalize-custom-field-values";
 import { runMigrations } from "@/db/migrations/runner";
 import { recordTouchpoint } from "@/db/recency-dao";
 import type { SqlExecutor } from "@/db/types";
@@ -47,14 +52,42 @@ beforeEach(async () => {
   uidCounter = 0;
   const db = openTestDb();
   exec = nodeSqliteExecutor(db);
-  await runMigrations(exec, [migration001], 1, { now: NOW, newUid: uid });
+  await runMigrations(
+    exec,
+    [
+      migration001,
+      migration002,
+      migration003,
+      migration004,
+      migration005,
+      migration006,
+    ],
+    6,
+    { now: NOW, newUid: uid },
+  );
 });
 
-/** Add a value column directly (independent of Plan 03's createField DDL). */
-async function addColumn(col: string): Promise<void> {
-  await exec.execAsync(
-    `ALTER TABLE contact_custom_values ADD COLUMN "${col}" TEXT`,
+/** Add a normalized definition directly, independent of Plan 03's DDL work. */
+async function addDefinition(
+  colName: string,
+  quarantinedAt: string | null = null,
+): Promise<number> {
+  const result = await exec.runAsync(
+    `INSERT INTO custom_field_defs (
+       uid, col_name, label, type, options, display_order, quarantined_at,
+       created_at, modified_at
+     ) VALUES (?, ?, ?, 'text', NULL, ?, ?, ?, ?)`,
+    [
+      uid(),
+      colName,
+      colName,
+      uidCounter,
+      quarantinedAt,
+      NOW,
+      NOW,
+    ],
   );
+  return result.lastInsertRowId;
 }
 
 async function lastContact(contactId: number): Promise<string | null> {
@@ -125,7 +158,7 @@ async function totalInteractions(): Promise<number> {
 
 async function totalValueRows(): Promise<number> {
   const row = await exec.getFirstAsync<{ n: number }>(
-    "SELECT COUNT(*) AS n FROM contact_custom_values",
+    "SELECT COUNT(*) AS n FROM custom_field_values",
   );
   return row?.n ?? 0;
 }
@@ -193,9 +226,9 @@ describe("createContactFull — 'not yet / don't know' path", () => {
 });
 
 describe("createContactFull — custom values compose without deadlock (Pitfall 1)", () => {
-  it("completes (does not hang) writing both values under one per-contact uid", async () => {
-    await addColumn("nickname");
-    await addColumn("city");
+  it("seeds every live and quarantined definition with its own immutable uid, then upserts supplied pairs", async () => {
+    const nicknameDefId = await addDefinition("nickname");
+    const cityDefId = await addDefinition("city", "2026-08-13 09:00:00");
 
     const { contactId } = await createContactFull(exec, {
       uid: uid(),
@@ -204,24 +237,70 @@ describe("createContactFull — custom values compose without deadlock (Pitfall 
       now: NOW,
       firstInteraction: { uid: uid(), occurredAt: "2026-08-01 08:00:00" },
       customValues: [
-        { col: "nickname", value: "M" },
-        { col: "city", value: "Leeds" },
+        { fieldDefId: nicknameDefId, value: "M" },
       ],
     });
 
-    const row = await exec.getFirstAsync<{
-      nickname: string | null;
-      city: string | null;
+    const rows = await exec.getAllAsync<{
+      field_def_id: number;
+      value: string | null;
       uid: string;
     }>(
-      "SELECT nickname, city, uid FROM contact_custom_values WHERE contact_id = ?",
+      "SELECT field_def_id, value, uid FROM custom_field_values WHERE contact_id = ? ORDER BY field_def_id",
       [contactId],
     );
-    expect(row?.nickname).toBe("M");
-    expect(row?.city).toBe("Leeds");
-    // Exactly ONE values row (one per-contact uid), both values on it.
-    expect(await totalValueRows()).toBe(1);
-    expect(typeof row?.uid).toBe("string");
+    expect(rows).toEqual([
+      { field_def_id: nicknameDefId, value: "M", uid: expect.any(String) },
+      { field_def_id: cityDefId, value: null, uid: expect.any(String) },
+    ]);
+    expect(new Set(rows.map((row) => row.uid)).size).toBe(2);
+    expect(await totalValueRows()).toBe(2);
+  });
+});
+
+describe("createContactFull — quarantined definition matrix (D-03)", () => {
+  it("retains the seeded pair after restore and edit round-trips through its original uid", async () => {
+    const liveDefId = await addDefinition("nickname");
+    const quarantinedDefId = await addDefinition(
+      "favourite_city",
+      "2026-08-13 09:00:00",
+    );
+    const { contactId } = await createContactFull(exec, {
+      uid: uid(),
+      name: "Quinn",
+      intervalDays: 14,
+      now: NOW,
+      customValues: [{ fieldDefId: liveDefId, value: "Q" }],
+    });
+
+    const seeded = await exec.getFirstAsync<{ uid: string; value: string | null }>(
+      "SELECT uid, value FROM custom_field_values WHERE contact_id = ? AND field_def_id = ?",
+      [contactId, quarantinedDefId],
+    );
+    expect(seeded).toEqual({ uid: expect.any(String), value: null });
+
+    await exec.runAsync(
+      "UPDATE custom_field_defs SET quarantined_at = NULL WHERE id = ?",
+      [quarantinedDefId],
+    );
+    await updateContactFull(exec, {
+      id: contactId,
+      name: "Quinn",
+      intervalDays: 14,
+      rarelyResponds: 0,
+      remindersOff: 0,
+      now: EDIT_NOW,
+      customValues: [{ fieldDefId: quarantinedDefId, value: "Leeds" }],
+    });
+
+    const afterEdit = await exec.getFirstAsync<{
+      uid: string;
+      value: string | null;
+    }>(
+      "SELECT uid, value FROM custom_field_values WHERE contact_id = ? AND field_def_id = ?",
+      [contactId, quarantinedDefId],
+    );
+    expect(afterEdit).toEqual({ uid: seeded?.uid, value: "Leeds" });
   });
 });
 
@@ -269,8 +348,8 @@ describe("createContactFull — pre-transaction guards", () => {
 
 describe("createContactFull — mid-composition ROLLBACK (T-04-03 atomicity)", () => {
   it("rolls back contact + interaction + values when a custom-value write fails after the inserts", async () => {
-    // The customValues col does NOT exist on contact_custom_values, so
-    // upsertValueCore's INSERT throws AFTER the contact + interaction inserts.
+    // The customValues field-def id does NOT exist, so upsertValueCore's INSERT
+    // throws AFTER the contact + interaction inserts.
     // A sequential two-transaction impl would leave the first two committed.
     await expect(
       createContactFull(exec, {
@@ -279,7 +358,7 @@ describe("createContactFull — mid-composition ROLLBACK (T-04-03 atomicity)", (
         intervalDays: 30,
         now: NOW,
         firstInteraction: { uid: uid(), occurredAt: "2026-08-10 09:00:00" },
-        customValues: [{ col: "no_such_column", value: "x" }],
+        customValues: [{ fieldDefId: 9999, value: "x" }],
       }),
     ).rejects.toThrow();
 
@@ -537,7 +616,7 @@ describe("updateContactFull — mid-composition ROLLBACK (T-04-03 atomicity)", (
         rarelyResponds: 0,
         remindersOff: 0,
         now: EDIT_NOW,
-        customValues: [{ col: "no_such_column", value: "x" }],
+        customValues: [{ fieldDefId: 9999, value: "x" }],
       }),
     ).rejects.toThrow();
 
@@ -548,7 +627,7 @@ describe("updateContactFull — mid-composition ROLLBACK (T-04-03 atomicity)", (
 
 describe("updateContactFull — custom values compose without deadlock (Pitfall 1, edit side)", () => {
   it("writes custom values in the same call without hanging", async () => {
-    await addColumn("nickname");
+    const nicknameDefId = await addDefinition("nickname");
     const { contactId } = await createContactFull(exec, {
       uid: uid(),
       name: "WithValues",
@@ -563,14 +642,36 @@ describe("updateContactFull — custom values compose without deadlock (Pitfall 
       rarelyResponds: 0,
       remindersOff: 0,
       now: EDIT_NOW,
-      customValues: [{ col: "nickname", value: "Nick" }],
+      customValues: [{ fieldDefId: nicknameDefId, value: "Nick" }],
     });
 
-    const row = await exec.getFirstAsync<{ nickname: string | null }>(
-      "SELECT nickname FROM contact_custom_values WHERE contact_id = ?",
-      [contactId],
+    const row = await exec.getFirstAsync<{
+      uid: string;
+      value: string | null;
+    }>(
+      "SELECT uid, value FROM custom_field_values WHERE contact_id = ? AND field_def_id = ?",
+      [contactId, nicknameDefId],
     );
-    expect(row?.nickname).toBe("Nick");
+    expect(row?.value).toBe("Nick");
+    expect(await totalValueRows()).toBe(1);
+
+    await updateContactFull(exec, {
+      id: contactId,
+      name: "WithValues",
+      intervalDays: 14,
+      rarelyResponds: 0,
+      remindersOff: 0,
+      now: "2026-08-15 10:01:00",
+      customValues: [{ fieldDefId: nicknameDefId, value: null }],
+    });
+    const cleared = await exec.getFirstAsync<{
+      uid: string;
+      value: string | null;
+    }>(
+      "SELECT uid, value FROM custom_field_values WHERE contact_id = ? AND field_def_id = ?",
+      [contactId, nicknameDefId],
+    );
+    expect(cleared).toEqual({ uid: row?.uid, value: null });
     expect(await totalValueRows()).toBe(1);
   });
 });
