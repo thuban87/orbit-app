@@ -1,6 +1,11 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { nodeSqliteExecutor, openTestDb } from "@/db/__testkit__/node-sqlite";
-import { createField, deleteOrQuarantineField, dropField, expireFieldIfStale } from "@/db/field-ddl";
+import {
+  createField,
+  deleteOrQuarantineField,
+  dropField,
+  expireFieldIfStale,
+} from "@/db/field-ddl";
 import type { NewFieldDef } from "@/db/field-types";
 import { migration001 } from "@/db/migrations/001-initial";
 import { migration002 } from "@/db/migrations/002-app-settings";
@@ -19,11 +24,35 @@ let exec: SqlExecutor;
 beforeEach(async () => {
   uidCounter = 0;
   exec = nodeSqliteExecutor(openTestDb());
-  await runMigrations(exec, [migration001, migration002, migration003, migration004, migration005, migration006], 6, { now: NOW, newUid: uid });
+  await runMigrations(
+    exec,
+    [
+      migration001,
+      migration002,
+      migration003,
+      migration004,
+      migration005,
+      migration006,
+    ],
+    6,
+    { now: NOW, newUid: uid },
+  );
 });
 
 function newDef(overrides: Partial<NewFieldDef> = {}): NewFieldDef {
-  return { uid: uid(), col_name: "nickname", label: "Nickname", type: "text", options: null, show_on_new: 0, always_show: 0, display_order: 0, share_with_ai: 0, now: NOW, ...overrides };
+  return {
+    uid: uid(),
+    col_name: "nickname",
+    label: "Nickname",
+    type: "text",
+    options: null,
+    show_on_new: 0,
+    always_show: 0,
+    display_order: 0,
+    share_with_ai: 0,
+    now: NOW,
+    ...overrides,
+  };
 }
 
 async function seedContact(name: string, archived = false): Promise<number> {
@@ -35,13 +64,22 @@ async function seedContact(name: string, archived = false): Promise<number> {
 }
 
 async function defId(colName: string): Promise<number> {
-  const row = await exec.getFirstAsync<{ id: number }>("SELECT id FROM custom_field_defs WHERE col_name = ?", [colName]);
+  const row = await exec.getFirstAsync<{ id: number }>(
+    "SELECT id FROM custom_field_defs WHERE col_name = ?",
+    [colName],
+  );
   if (!row) throw new Error(`no def for ${colName}`);
   return row.id;
 }
 
-async function value(contactId: number, fieldDefId: number): Promise<string | null> {
-  const row = await exec.getFirstAsync<{ value: string | null }>("SELECT value FROM custom_field_values WHERE contact_id = ? AND field_def_id = ?", [contactId, fieldDefId]);
+async function value(
+  contactId: number,
+  fieldDefId: number,
+): Promise<string | null> {
+  const row = await exec.getFirstAsync<{ value: string | null }>(
+    "SELECT value FROM custom_field_values WHERE contact_id = ? AND field_def_id = ?",
+    [contactId, fieldDefId],
+  );
   return row?.value ?? null;
 }
 
@@ -53,7 +91,10 @@ describe("normalized field lifecycle", () => {
     const fieldDefId = await defId("nickname");
     expect(await value(live, fieldDefId)).toBeNull();
     expect(await value(archived, fieldDefId)).toBeNull();
-    const count = await exec.getFirstAsync<{ n: number }>("SELECT COUNT(*) AS n FROM custom_field_values WHERE field_def_id = ?", [fieldDefId]);
+    const count = await exec.getFirstAsync<{ n: number }>(
+      "SELECT COUNT(*) AS n FROM custom_field_values WHERE field_def_id = ?",
+      [fieldDefId],
+    );
     expect(count?.n).toBe(2);
   });
 
@@ -62,26 +103,67 @@ describe("normalized field lifecycle", () => {
     const bo = await seedContact("Bo");
     await createField(exec, newDef());
     const fieldDefId = await defId("nickname");
-    await exec.runAsync("UPDATE custom_field_values SET value = ? WHERE contact_id = ? AND field_def_id = ?", ["Al", alex, fieldDefId]);
-    await exec.runAsync("UPDATE custom_field_values SET value = ? WHERE contact_id = ? AND field_def_id = ?", ["", bo, fieldDefId]);
-    await dropField(exec, { id: fieldDefId, col_name: "nickname" }, "delete", NOW);
-    expect(await exec.getAllAsync("SELECT contact_id, old_value, operation FROM field_history WHERE field_col_name = ? ORDER BY contact_id", ["nickname"])).toEqual([
+    await exec.runAsync(
+      "UPDATE custom_field_values SET value = ? WHERE contact_id = ? AND field_def_id = ?",
+      ["Al", alex, fieldDefId],
+    );
+    await exec.runAsync(
+      "UPDATE custom_field_values SET value = ? WHERE contact_id = ? AND field_def_id = ?",
+      ["", bo, fieldDefId],
+    );
+    await dropField(
+      exec,
+      { id: fieldDefId, col_name: "nickname" },
+      "delete",
+      NOW,
+    );
+    expect(
+      await exec.getAllAsync(
+        "SELECT contact_id, old_value, operation FROM field_history WHERE field_col_name = ? ORDER BY contact_id",
+        ["nickname"],
+      ),
+    ).toEqual([
       { contact_id: alex, old_value: "Al", operation: "delete" },
       { contact_id: bo, old_value: "", operation: "delete" },
     ]);
-    expect(await exec.getFirstAsync("SELECT id FROM custom_field_defs WHERE id = ?", [fieldDefId])).toBeNull();
-    expect(await exec.getFirstAsync("SELECT id FROM custom_field_values WHERE field_def_id = ?", [fieldDefId])).toBeNull();
+    expect(
+      await exec.getFirstAsync(
+        "SELECT id FROM custom_field_defs WHERE id = ?",
+        [fieldDefId],
+      ),
+    ).toBeNull();
+    expect(
+      await exec.getFirstAsync(
+        "SELECT id FROM custom_field_values WHERE field_def_id = ?",
+        [fieldDefId],
+      ),
+    ).toBeNull();
   });
 
   it("deletes empty definitions but quarantines populated ones without removing pairs", async () => {
     const contactId = await seedContact("Alex");
     await createField(exec, newDef());
     const fieldDefId = await defId("nickname");
-    expect(await deleteOrQuarantineField(exec, { id: fieldDefId, col_name: "nickname" }, NOW)).toBe("deleted");
+    expect(
+      await deleteOrQuarantineField(
+        exec,
+        { id: fieldDefId, col_name: "nickname" },
+        NOW,
+      ),
+    ).toBe("deleted");
     await createField(exec, newDef({ col_name: "city", label: "City" }));
     const cityId = await defId("city");
-    await exec.runAsync("UPDATE custom_field_values SET value = ? WHERE contact_id = ? AND field_def_id = ?", ["Chicago", contactId, cityId]);
-    expect(await deleteOrQuarantineField(exec, { id: cityId, col_name: "city" }, NOW)).toBe("quarantined");
+    await exec.runAsync(
+      "UPDATE custom_field_values SET value = ? WHERE contact_id = ? AND field_def_id = ?",
+      ["Chicago", contactId, cityId],
+    );
+    expect(
+      await deleteOrQuarantineField(
+        exec,
+        { id: cityId, col_name: "city" },
+        NOW,
+      ),
+    ).toBe("quarantined");
     expect(await value(contactId, cityId)).toBe("Chicago");
   });
 
@@ -89,16 +171,46 @@ describe("normalized field lifecycle", () => {
     const contactId = await seedContact("Alex");
     await createField(exec, newDef());
     const fieldDefId = await defId("nickname");
-    await exec.runAsync("UPDATE custom_field_values SET value = ? WHERE contact_id = ? AND field_def_id = ?", ["Al", contactId, fieldDefId]);
-    await exec.runAsync("UPDATE custom_field_defs SET quarantined_at = datetime('now', 'localtime', '-40 days') WHERE id = ?", [fieldDefId]);
-    expect(await expireFieldIfStale(exec, { id: fieldDefId, col_name: "nickname" }, "-30 days", NOW)).toBe(true);
-    expect(await exec.getFirstAsync("SELECT old_value FROM field_history WHERE field_col_name = ? AND operation = ?", ["nickname", "quarantine_expiry"])).toEqual({ old_value: "Al" });
+    await exec.runAsync(
+      "UPDATE custom_field_values SET value = ? WHERE contact_id = ? AND field_def_id = ?",
+      ["Al", contactId, fieldDefId],
+    );
+    await exec.runAsync(
+      "UPDATE custom_field_defs SET quarantined_at = datetime('now', 'localtime', '-40 days') WHERE id = ?",
+      [fieldDefId],
+    );
+    expect(
+      await expireFieldIfStale(
+        exec,
+        { id: fieldDefId, col_name: "nickname" },
+        "-30 days",
+        NOW,
+      ),
+    ).toBe(true);
+    expect(
+      await exec.getFirstAsync(
+        "SELECT old_value FROM field_history WHERE field_col_name = ? AND operation = ?",
+        ["nickname", "quarantine_expiry"],
+      ),
+    ).toEqual({ old_value: "Al" });
   });
 
   it("does not delete a restored candidate", async () => {
     await createField(exec, newDef());
     const fieldDefId = await defId("nickname");
-    expect(await expireFieldIfStale(exec, { id: fieldDefId, col_name: "nickname" }, "-30 days", NOW)).toBe(false);
-    expect(await exec.getFirstAsync("SELECT id FROM custom_field_defs WHERE id = ?", [fieldDefId])).toEqual({ id: fieldDefId });
+    expect(
+      await expireFieldIfStale(
+        exec,
+        { id: fieldDefId, col_name: "nickname" },
+        "-30 days",
+        NOW,
+      ),
+    ).toBe(false);
+    expect(
+      await exec.getFirstAsync(
+        "SELECT id FROM custom_field_defs WHERE id = ?",
+        [fieldDefId],
+      ),
+    ).toEqual({ id: fieldDefId });
   });
 });

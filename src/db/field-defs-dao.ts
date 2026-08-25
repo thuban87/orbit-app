@@ -3,8 +3,8 @@
  * of `custom_field_defs`.
  *
  * These ops mutate the DEF ROW only (label, display_order, options, curation
- * flags, quarantine state); they never touch the physical value column. The DDL
- * that adds/drops columns lives in `field-ddl.ts`.
+ * flags, quarantine state); they never touch normalized value pairs. Lifecycle
+ * pair creation/deletion lives in `field-ddl.ts`.
  *
  * =============================================================================
  * EVERY MUTATING OP IS SERIALIZED THROUGH THE SHARED MUTEX (review cycle-2 MED):
@@ -30,14 +30,11 @@
  * loud-failure guard. Reads (`listDefs`, `isFieldEmpty`) take NO transaction.
  *
  * col_name is a STABLE slug (CONTEXT sub-decision): `renameField` edits `label`
- * ONLY — a literal RENAME COLUMN is unnecessary churn and would need a
- * field_history name-sync. `isFieldEmpty` is the ONE read that interpolates a
- * col_name; it guards with `isSafeColName` before double-quoting.
+ * ONLY, preserving the field_history compatibility key.
  *
  * TIMESTAMPS are local wall-clock supplied by the caller (never toISOString).
  * Node-pure: takes `exec: SqlExecutor`; imports the shared `inWriteTransaction`.
  */
-import { isSafeColName } from "@/db/col-name";
 import type { CustomFieldDef, SqliteBool } from "@/db/field-types";
 import { inWriteTransaction } from "@/db/transaction";
 import type { SqlExecutor } from "@/db/types";
@@ -213,19 +210,17 @@ export function listDefs(
 }
 
 /**
- * True when a field's value column holds no non-null value. `col_name` is the ONE
- * interpolated identifier here — guarded with `isSafeColName` before quoting. A
- * pure read: no transaction.
+ * True when no normalized pair for `fieldDefId` holds a non-null value. Empty
+ * string remains a present value. A pure bound read: no transaction.
  */
 export async function isFieldEmpty(
   exec: SqlExecutor,
-  colName: string,
+  fieldDefId: number,
 ): Promise<boolean> {
-  if (!isSafeColName(colName)) {
-    throw new Error(`unsafe custom-field col_name: ${JSON.stringify(colName)}`);
-  }
   const row = await exec.getFirstAsync<{ n: number }>(
-    `SELECT COUNT(*) AS n FROM contact_custom_values WHERE "${colName}" IS NOT NULL`,
+    `SELECT COUNT(*) AS n FROM custom_field_values
+      WHERE field_def_id = ? AND value IS NOT NULL`,
+    [fieldDefId],
   );
   return (row?.n ?? 0) === 0;
 }

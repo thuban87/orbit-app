@@ -2,12 +2,10 @@
  * Transactional custom-field DDL (FLD-02 / FLD-05 / FLD-06) — the correctness
  * core of the custom-fields subsystem.
  *
- * A custom field is a ROW in `custom_field_defs` AND a COLUMN in
- * `contact_custom_values` (two-table model, HANDOFF §14.1). Creating one is
- * `INSERT def + ALTER TABLE ADD COLUMN` in ONE transaction; deleting a populated
- * one is irreversible, so it snapshots every value to `field_history` and then
- * `DELETE def + DROP COLUMN` in ONE transaction — the operations whose atomicity
- * the whole subsystem's data-safety depends on.
+ * A custom field is a definition row with one normalized value row per contact.
+ * Creating one inserts the definition plus durable NULL pairs in ONE transaction;
+ * deleting a populated field snapshots its values to `field_history`, then removes
+ * its pairs and definition in the same transaction.
  *
  * =============================================================================
  * CONCURRENCY STRUCTURE — READ BEFORE EDITING (review HIGH-1 / HIGH-2b):
@@ -15,7 +13,7 @@
  *   non-reentrant mutex (mutex.ts:32-36 — a nested `inWriteTransaction` is a
  *   PERMANENT hang).
  *
- *     • `dropFieldColumns` is a PRIVATE, NON-mutexed core. It assumes the caller
+ *     • `dropFieldValues` is a PRIVATE, NON-mutexed core. It assumes the caller
  *       ALREADY holds the transaction: no BEGIN, no withMutex, no
  *       inWriteTransaction. It does snapshot + DELETE def + DROP COLUMN and
  *       NOTHING else.
@@ -30,53 +28,34 @@
  *       the core directly. Plan 07's sweep calls THIS, never `dropField`.
  * =============================================================================
  *
- * SECURITY (T-03-01): `col_name` is the ONLY interpolated identifier (identifiers
- * cannot be `?`-bound). It is made safe by construction in `makeColName` (Plan
- * 01) and re-checked with `isSafeColName` before EVERY interpolation site here,
- * then double-quoted. Every runtime value is `?`-bound.
+ * SECURITY (T-16-06): every runtime value is `?`-bound; `col_name` survives only
+ * as the immutable, bound `field_history.field_col_name` compatibility key.
  *
- * DATA-SAFETY (CLAUDE.md invariants): value columns are TEXT forever, never
- * indexed/UNIQUE (DROP COLUMN would fail); every destructive op snapshots to
- * `field_history` in the SAME transaction; DELETE def + DROP COLUMN are BOTH
- * explicit (ON DELETE CASCADE deletes rows, never columns).
+ * DATA-SAFETY: every destructive op snapshots non-NULL values to `field_history`
+ * before explicitly deleting normalized pairs and the definition.
  *
  * Node-pure control flow: takes `exec: SqlExecutor` as its first argument and
  * imports the shared `inWriteTransaction` — never expo `withTransactionAsync`.
  */
-import { isSafeColName } from "@/db/col-name";
 import type { CustomFieldDef, NewFieldDef } from "@/db/field-types";
+import { upsertValueCore } from "@/db/field-values-dao";
 import { inWriteTransaction } from "@/db/transaction";
 import type { SqlExecutor } from "@/db/types";
+import { newUid } from "@/db/uid";
 
 /** The identifying slice of a def a drop/expire op needs. */
 type DropTarget = Pick<CustomFieldDef, "id" | "col_name">;
 
 /**
- * Guard-then-quote a col_name for interpolation. Defence in depth: even a name
- * that bypassed `makeColName` cannot reach SQL — a bad name throws BEFORE any
- * write in the transaction, so the transaction rolls back untouched.
- */
-function quoteCol(colName: string): string {
-  if (!isSafeColName(colName)) {
-    throw new Error(`unsafe custom-field col_name: ${JSON.stringify(colName)}`);
-  }
-  return `"${colName}"`;
-}
-
-/**
- * Create a custom field: `INSERT def + ALTER TABLE ADD COLUMN` in ONE
- * transaction. A mid-op failure (e.g. a duplicate physical column) rolls back
- * BOTH — no orphan def, no orphan column (T-03-03). The value column is declared
- * TEXT forever and is never indexed/UNIQUE (CLAUDE.md invariant).
+ * Create a definition and a durable NULL pair for every existing contact,
+ * including archived contacts, in one serialized transaction.
  */
 export function createField(
   exec: SqlExecutor,
   def: NewFieldDef,
 ): Promise<void> {
-  // Guard the identifier BEFORE opening the transaction body's first write.
-  const col = quoteCol(def.col_name);
   return inWriteTransaction(exec, async () => {
-    await exec.runAsync(
+    const result = await exec.runAsync(
       `INSERT INTO custom_field_defs
          (uid, col_name, label, type, options, show_on_new, always_show,
           display_order, share_with_ai, created_at, modified_at)
@@ -95,10 +74,19 @@ export function createField(
         def.now,
       ],
     );
-    // col_name is the ONLY interpolated token (guarded + double-quoted above).
-    await exec.execAsync(
-      `ALTER TABLE contact_custom_values ADD COLUMN ${col} TEXT`,
+    const contacts = await exec.getAllAsync<{ id: number }>(
+      "SELECT id FROM contacts ORDER BY id",
     );
+    for (const contact of contacts) {
+      await upsertValueCore(
+        exec,
+        contact.id,
+        result.lastInsertRowId,
+        newUid(),
+        null,
+        def.now,
+      );
+    }
   });
 }
 
@@ -107,33 +95,38 @@ export function createField(
  * caller ALREADY holds the transaction — no BEGIN, no withMutex, no
  * inWriteTransaction. Snapshots every non-null value to `field_history` BEFORE
  * dropping (Pitfall 1 — the only recovery mechanism that exists), then DELETE
- * def + DROP COLUMN, both explicit (CASCADE never drops a column). NOT exported —
+ * normalized pairs + definition, both explicit. NOT exported —
  * composed by the three mutex-owning entries below.
  */
-async function dropFieldColumns(
+async function dropFieldValues(
   exec: SqlExecutor,
   def: DropTarget,
   operation: string,
   now: string,
 ): Promise<void> {
-  const col = quoteCol(def.col_name);
-  // (a) Snapshot every non-null value to field_history BEFORE the drop. The
-  //     col_name is the field_col_name literal (?-bound) AND the value column
-  //     read (interpolated identifier, guarded above).
+  // (a) Snapshot every non-null value to field_history BEFORE deleting the
+  //     current pairs. col_name is the immutable, bound history key.
   await exec.runAsync(
     `INSERT INTO field_history
        (contact_id, field_col_name, old_value, operation, created_at)
-     SELECT contact_id, ?, ${col}, ?, ?
-       FROM contact_custom_values
-      WHERE ${col} IS NOT NULL`,
-    [def.col_name, operation, now],
+     SELECT contact_id, ?, value, ?, ?
+       FROM custom_field_values
+      WHERE field_def_id = ? AND value IS NOT NULL`,
+    [def.col_name, operation, now, def.id],
   );
-  // (b) Delete the def row (explicit — CASCADE would delete value ROWS, not the
-  //     column).
+  // (b) Delete pairs explicitly before their definition, retaining a single
+  //     atomic snapshot/delete boundary without relying on cascade ordering.
+  await exec.runAsync(
+    "DELETE FROM custom_field_values WHERE field_def_id = ?",
+    [def.id],
+  );
+  // (c) Delete the definition after its dependent pairs.
   await exec.runAsync("DELETE FROM custom_field_defs WHERE id = ?", [def.id]);
-  // (c) Drop the physical value column (explicit — succeeds only because no
-  //     index/UNIQUE was ever added to it; FLD-06).
-  await exec.execAsync(`ALTER TABLE contact_custom_values DROP COLUMN ${col}`);
+
+  // A permanently deleted custom-PHOTO definition can leave at most one local
+  // photo file per contact. purge-photo-cleanup enumerates surviving definitions
+  // by col_name, so it cannot rediscover these files after this deletion; they
+  // remain bounded on-device orphans until a future history-driven cleanup.
 }
 
 /**
@@ -149,7 +142,7 @@ export function dropField(
   now: string,
 ): Promise<void> {
   return inWriteTransaction(exec, () =>
-    dropFieldColumns(exec, def, operation, now),
+    dropFieldValues(exec, def, operation, now),
   );
 }
 
@@ -157,7 +150,7 @@ export function dropField(
  * The dynamic delete action (FLD-05), ATOMIC (review HIGH-2b). Opens ONE
  * `inWriteTransaction` and INSIDE it does the emptiness check AND the drop —
  * so no concurrent value write can land between them (empty-at-drop-time is
- * enforced atomically). Empty → immediate drop via the NON-mutexed core (calling
+ * enforced atomically). Empty → immediate deletion via the NON-mutexed core (calling
  * the public `dropField` here would nest the mutex → deadlock); populated →
  * quarantine, leaving data + column untouched. Immediate delete is NEVER offered
  * for a populated field (§14.5 data-loss guard).
@@ -167,15 +160,17 @@ export function deleteOrQuarantineField(
   def: DropTarget,
   now: string,
 ): Promise<"deleted" | "quarantined"> {
-  const col = quoteCol(def.col_name);
   return inWriteTransaction(exec, async () => {
     const populated = await exec.getFirstAsync<{ one: number }>(
-      `SELECT 1 AS one FROM contact_custom_values WHERE ${col} IS NOT NULL LIMIT 1`,
+      `SELECT 1 AS one FROM custom_field_values
+        WHERE field_def_id = ? AND value IS NOT NULL
+        LIMIT 1`,
+      [def.id],
     );
     if (populated === null) {
       // Empty — call the core DIRECTLY (already inside this txn; do NOT call the
       // public dropField, which would nest the mutex and deadlock).
-      await dropFieldColumns(exec, def, "delete", now);
+      await dropFieldValues(exec, def, "delete", now);
       return "deleted";
     }
     await exec.runAsync(
@@ -214,7 +209,7 @@ export function expireFieldIfStale(
     if (stale === null) {
       return false;
     }
-    await dropFieldColumns(exec, def, "quarantine_expiry", now);
+    await dropFieldValues(exec, def, "quarantine_expiry", now);
     return true;
   });
 }
