@@ -667,3 +667,239 @@ off-by-one bug that can silently and indefinitely suppress protection for same-s
 edits. Both are narrow-but-real, self-contained fixes (a durable finalize journal or
 pre-commit canonical write for the first; a monotonic/collision-proof marker for the
 second) that do not require re-architecting the phase.
+
+---
+
+## Codex Review — Cycle 3
+
+> Run against commit e95fa98 ("fix(17): revise plans per cycle-2 cross-AI review"), the
+> current revised 12 plans, with the full Cycle 2 review text supplied as reference
+> context and an explicit instruction to judge whether the new `data_revision` counter
+> and `avatars/_restore_pending/` photo-staging/finalize-sweep designs are actually
+> complete, not merely present. Invoked directly via `gsd-tools query review-lane invoke
+> --slug codex` (the `gsd-review` workflow's own bash steps, run manually per this
+> project's codex-reviewer-bypass-flag constraint — no `--dangerously-bypass-hook-trust`
+> flag was used or needed). Resolved model: `gpt-5.6-terra (reasoning=low)` (source:
+> banner) — the same effort-resolution artifact noted in Cycles 1–2 applies again; not
+> requested or overridden by this reviewer session. Confirmed NOT a stubbed/empty
+> result (`"stubbed": false` in the lane's JSON result).
+
+## Resolved
+
+- **HIGH — durable post-commit photo recovery: FULLY RESOLVED.** Plan 17-08 now stages under `avatars/_restore_pending/`, not cache, before DB work; retains staged files on live finalization failure; and registers an idempotent foreground-launch finalizer/orphan collector ([17-08-PLAN.md:96-97](/home/bwales/projects/orbit-app/.planning/phases/17-backup-export-restore/17-08-PLAN.md:96), [17-08-PLAN.md:102](/home/bwales/projects/orbit-app/.planning/phases/17-backup-export-restore/17-08-PLAN.md:102), [17-08-PLAN.md:119-127](/home/bwales/projects/orbit-app/.planning/phases/17-backup-export-restore/17-08-PLAN.md:119)). This deliberately avoids the existing root-only `.tmp`/`.bak` reconciler ([photo-storage.ts:228](/home/bwales/projects/orbit-app/src/services/photos/photo-storage.ts:228)) and correctly uses the ready-gated launch registry, which runs only on real launches ([launch-sweep.ts:10](/home/bwales/projects/orbit-app/src/services/launch-sweep.ts:10)).
+
+- **HIGH — same-second automatic-backup marker: FULLY RESOLVED in design.** Migration 007 adds `data_revision`; tombstones bump it in-transaction ([17-02-PLAN.md:80-90](/home/bwales/projects/orbit-app/.planning/phases/17-backup-export-restore/17-02-PLAN.md:80)), and automatic backup compares revision snapshots rather than timestamps ([17-06-PLAN.md:70-72](/home/bwales/projects/orbit-app/.planning/phases/17-backup-export-restore/17-06-PLAN.md:70), [17-12-PLAN.md:64](/home/bwales/projects/orbit-app/.planning/phases/17-backup-export-restore/17-12-PLAN.md:64)).
+
+- **MEDIUM — purge `modified_at` clock wiring: FULLY RESOLVED.** The plan makes `PurgeOptions.now` required, makes the options bag non-optional, updates the real screen caller, and tests the exact bound value ([17-02-PLAN.md:101-108](/home/bwales/projects/orbit-app/.planning/phases/17-backup-export-restore/17-02-PLAN.md:101)). This fixes the current no-clock signature ([purge-dao.ts:169](/home/bwales/projects/orbit-app/src/db/purge-dao.ts:169)).
+
+- **LOW — read-only snapshot API: FULLY RESOLVED.** Plan 17-05 narrows the snapshot callback to `ReadOnlyExecutor`, requires export code to use it, and includes a compile-time acceptance criterion ([17-05-PLAN.md:75-79](/home/bwales/projects/orbit-app/.planning/phases/17-backup-export-restore/17-05-PLAN.md:75)).
+
+- **LOW — snapshot write-availability cost: FULLY RESOLVED.** It requires an in-code tradeoff comment and a 50-photo-library duration regression with a documented budget ([17-05-PLAN.md:77](/home/bwales/projects/orbit-app/.planning/phases/17-backup-export-restore/17-05-PLAN.md:77), [17-11-PLAN.md:61-65](/home/bwales/projects/orbit-app/.planning/phases/17-backup-export-restore/17-11-PLAN.md:61)).
+
+## Still Open / New Concerns
+
+- **HIGH — `data_revision` does not cover every exportable write path despite claiming it does.** Plan 17-06's exhaustive-looking list omits existing production writers for exported `contacts`, `profile`, and `custom_field_defs`: `snoozeContact`/`clearSnooze` ([snooze-dao.ts:78](/home/bwales/projects/orbit-app/src/db/snooze-dao.ts:78), [snooze-dao.ts:120](/home/bwales/projects/orbit-app/src/db/snooze-dao.ts:120)); favorite rank setters/reorder ([favourites-dao.ts:30](/home/bwales/projects/orbit-app/src/db/favourites-dao.ts:30), [favourites-dao.ts:105](/home/bwales/projects/orbit-app/src/db/favourites-dao.ts:105)); ring sequencing ([ring-seq-dao.ts:56](/home/bwales/projects/orbit-app/src/db/ring-seq-dao.ts:56)); profile photo writes ([profile-dao.ts:37](/home/bwales/projects/orbit-app/src/db/profile-dao.ts:37)); and field type changes ([field-type-change.ts:150](/home/bwales/projects/orbit-app/src/db/field-type-change.ts:150)). None of these files is in 17-06's scope/list ([17-06-PLAN.md:62-63](/home/bwales/projects/orbit-app/.planning/phases/17-backup-export-restore/17-06-PLAN.md:62)). Each can leave `data_revision` unchanged, causing a due backup to miss a real user edit indefinitely. Restore-apply's direct/core writes also need an explicit revision policy.
+
+- **HIGH — pending-photo paths are incompatible with the existing safety guard as written.** The plan says pending helpers reuse `assertSafeRelative` while producing `avatars/_restore_pending/...` paths ([17-08-PLAN.md:102](/home/bwales/projects/orbit-app/.planning/phases/17-backup-export-restore/17-08-PLAN.md:102)). The actual guard accepts only `avatars/<name>.<ext>` and rejects subdirectories ([photo-relative-path.ts:22](/home/bwales/projects/orbit-app/src/db/photo-relative-path.ts:22)). Moreover, `src/db/photo-relative-path.ts` is not in 17-08's `files_modified`. Add a separately named pending-path validator or safely extend the shared grammar, update the planned file scope, and test that canonical DB photo paths remain restricted to the existing flat grammar.
+
+- **MEDIUM — pending filename encoding is not reversibly specified.** `contact-<uid>.jpg` and `cv-<uid>-<colName>.jpg` must later be parsed back into UID and column name ([17-08-PLAN.md:102](/home/bwales/projects/orbit-app/.planning/phases/17-backup-export-restore/17-08-PLAN.md:102), [17-08-PLAN.md:125](/home/bwales/projects/orbit-app/.planning/phases/17-backup-export-restore/17-08-PLAN.md:125)). The plan provides no escaping/grammar ensuring hyphens in UUIDs or safe column names cannot make this ambiguous. Use a typed sidecar manifest or a delimiter/encoding with a tested inverse.
+
+No HANDOFF or ADR decision reversal found. The revised plan preserves the local-only/no-sync boundary and the normalized nullable-value model.
+
+## Risk Assessment
+
+**HIGH.** Cycle 2's five findings are genuinely incorporated. But the new correctness foundation—`data_revision`—still has concrete unplanned bypasses, and the new durable photo staging cannot pass its own existing path guard as specified. Both should be corrected before execution.
+
+---
+
+## Claude (Sonnet 5) Review — Cycle 3
+
+**Method.** Read `HANDOFF.md`, `CLAUDE.md`, all 12 current revised `17-*-PLAN.md` files
+(post-e95fa98) in full, `17-CONTEXT.md`, and every prior `17-REVIEWS.md` cycle (1 and 2)
+above, then independently drove the codex Cycle-3 lane myself via `gsd-tools query
+review-lane invoke --slug codex` (real invocation, confirmed non-stubbed via the lane's
+`"stubbed": false` JSON result — not a fabricated/predicted transcript), and
+independently verified every Cycle-2-resolution claim and every codex Cycle-3 finding
+against the real source on disk before accepting any of it: `src/db/snooze-dao.ts`,
+`src/db/favourites-dao.ts`, `src/db/ring-seq-dao.ts`, `src/db/profile-dao.ts`,
+`src/db/field-type-change.ts`, `src/db/capture-dao.ts`, `src/db/contacts-dao.ts`,
+`src/db/photo-relative-path.ts`, `src/services/photos/photo-storage.ts`,
+`src/services/launch-sweep.ts`, `src/db/col-name.ts`, `src/db/uid.ts`,
+`src/db/app-settings-dao.ts`, `src/db/database.ts`, `src/screens/ArchivedContactsScreen.tsx`,
+plus a repo-wide grep for every file calling `inWriteTransaction` in `src/db/*.ts` to
+independently re-derive the full write-chokepoint set 17-06 needed to cover (rather than
+trusting either the plan's or codex's enumeration). No `src/backup/` directory exists yet
+— the phase has not been executed, so all findings are against plan text and today's
+pre-Phase-17 source.
+
+### Escalation check (HANDOFF.md / ADR-001)
+
+No finding below reverses a `[DECIDED]`/`[REJECTED]` HANDOFF item or an ADR. Nothing in
+commit e95fa98 touches encryption scope, sync E2EE separation, or the custom-fields
+normalized model differently than Cycles 1–2 already assessed as clean. The new
+`data_revision`/`_restore_pending` machinery is new bookkeeping infrastructure, not a
+reversal of anything previously decided. **No owner escalation is required.**
+
+### Verification of codex's Cycle 3 findings (independently confirmed, with additional evidence)
+
+Both of codex's HIGHs are real and I independently reproduce them with concrete evidence
+codex did not cite, which strengthens rather than merely echoes its verdict:
+
+1. **`data_revision` write-chokepoint coverage — CONFIRMED, and worse than codex's own
+   citation list.** I re-derived the complete set of files calling `inWriteTransaction`
+   in `src/db/*.ts` independently of both the plan's and codex's enumeration
+   (`grep -rl inWriteTransaction src/db/*.ts`) and cross-checked it against 17-06 Task
+   1's explicit file list. Confirmed real, uncovered production writers to exportable
+   tables:
+   - `src/db/favourites-dao.ts` — `setFavouriteRank`/`clearFavouriteRank`/
+     `rewriteFavouriteRanks` (lines 30, 62, 105-143) write `contacts.favourite_rank` +
+     `modified_at` directly, with **no** accompanying event/tombstone write of any kind
+     — nothing in this file's transactions would ever bump `data_revision` under
+     17-06's plan as written. Not in 17-06's file list.
+   - `src/db/ring-seq-dao.ts` — `rewriteRingSeq` (lines 45-90) writes
+     `contacts.ring_seq` + `modified_at` directly, same shape as favourites, same gap.
+     Not in 17-06's file list.
+   - `src/db/profile-dao.ts` — `setProfilePhoto` (and its siblings for name) write the
+     `profile` table directly (`UPDATE profile SET photo = ?, modified_at = ? WHERE id
+     = 1`, line ~44). `profile` is an explicitly named exportable/mergeable table in
+     17-04's reconciliation registry and D-06's "categories, profile" export scope —
+     yet `profile-dao.ts` is absent from 17-06's entire file list, so profile-photo
+     changes can never advance `data_revision`.
+   - `src/db/field-type-change.ts` — its sole exported function (line ~157) issues
+     `UPDATE custom_field_defs SET type = ?, modified_at = ? WHERE id = ?` (line 173)
+     directly, bypassing `field-ddl.ts`/`field-defs-dao.ts` entirely. `custom_field_defs`
+     is one of the eight tables 17-06's own must-haves name by name as required
+     coverage, yet this is a distinct file from either DAO 17-06 lists, and a field-type
+     change is a common, ordinary user action.
+   
+   I also checked the one plausible **false positive** in codex's list: `src/db/
+   snooze-dao.ts`'s `snoozeContact`/`clearSnooze` both write `contacts.snooze_until`
+   directly, but **also** call `recordEventCore` unconditionally inside the same
+   transaction — and `events-dao.ts`'s `recordEventCore` **is** in 17-06's covered list.
+   Since the plan bumps *inside* the core function bodies it names, snooze mutations
+   would incidentally get a `data_revision` bump for free via the event insert riding
+   in the same transaction — this specific file is not actually a miss, though it is a
+   fragile, accidental pass-through (it would silently break if a future change ever
+   made the event insert conditional or removed it), not a designed guarantee. I did
+   not find any accompanying event/tombstone write in `favourites-dao.ts`, `ring-seq-
+   dao.ts`, `profile-dao.ts`, or `field-type-change.ts` that would offer the same
+   accidental cover — those four are unambiguous, confirmed gaps.
+   
+   I also checked `src/db/capture-dao.ts` (also calls `inWriteTransaction`, also absent
+   from 17-06's file list) and found it is **not** a gap: `captureMultiAttach`/its
+   sibling compose `addFuelCore`/`editFuelCore` directly inside their own transaction,
+   and those two cores are exactly what 17-06 Task 1 bumps from *inside* — so capture's
+   fan-out inherits the bump correctly through composition, the same mechanism that
+   saves the recompute-recency and reconciliation composition patterns elsewhere in
+   this phase.
+
+2. **Pending-photo path vs. `assertSafeRelative` — CONFIRMED exactly as codex states,
+   verified against the live regex.** `src/db/photo-relative-path.ts:22`:
+   `SAFE_RELATIVE = /^avatars\/[A-Za-z0-9_-]+\.(jpg|jpeg|png|webp)$/` — a single
+   path segment after `avatars/`, no `/` permitted in `[A-Za-z0-9_-]+`. 17-08's
+   `avatars/_restore_pending/contact-<uid>.jpg` fails this pattern outright (the
+   `_restore_pending/` segment contains a `/`), and the plan explicitly says
+   `deleteRestorePending` "reuse[s] the same `assertSafeRelative` guard `persistMaster`/
+   `deletePhoto` already apply" (17-08-PLAN.md task 2 action) — calling that guard on
+   a `_restore_pending/...` path throws immediately by construction. `src/db/photo-
+   relative-path.ts` is genuinely absent from 17-08's `files_modified`. I additionally
+   confirmed the **collision-avoidance** half of the design *is* sound: `reconcilePhotoWrites`
+   (`photo-storage.ts:258-267`) lists only direct entries of `avatars/` and only acts on
+   names ending `.tmp`/`.bak`; a `_restore_pending` subdirectory entry matches neither
+   suffix check and is silently skipped, so the two sweeps genuinely cannot collide once
+   the path-grammar bug above is separately fixed.
+
+### MEDIUM (independently verified, concur with codex)
+
+1. **Pending filename encoding is de facto reversible today but the plan never says
+   how, which is itself the gap.** I checked whether codex's ambiguity concern is a real
+   parsing hazard or a documentation gap: `col_name` is minted exclusively by
+   `slugify()`/`makeColName()` (`src/db/col-name.ts:34-43`) and is guaranteed to match
+   `^[a-z][a-z0-9_]*$` — **no hyphens are ever possible** in a `col_name`. `uid` is
+   always a fixed-width 36-character RFC-4122 UUID string (`src/db/uid.ts:18-38`, both
+   the `crypto.randomUUID()` path and the `Math.random` fallback produce the canonical
+   `8-4-4-4-12` hyphenated shape). Given both facts, `cv-<uid>-<colName>.jpg` **is**
+   unambiguously parseable by position (first 36 characters after `cv-` are always the
+   UID; the single `-` immediately after is a fixed separator; everything after that up
+   to `.jpg` is `colName`) — so this is not the "genuinely ambiguous, could silently
+   mis-parse a real UUID/column name" hazard codex's wording implies. But the plan text
+   never states this parsing algorithm or the two invariants (`col_name` hyphen-free,
+   `uid` fixed-width) it depends on — an executor implementing Task 3's "parse the
+   entry's kind/UID/colName back out of its filename (the inverse of
+   restorePendingRelPath)" with a naive `.split("-")` would break immediately on the
+   UID's own internal hyphens. Concur with codex that this needs an explicit, tested
+   parse algorithm (or a delimiter that cannot appear in either component, e.g. keeping
+   the UUID hyphens but using a character never in `col_name`/never in a UUID as the
+   uid/colName separator) — downgrading from "ambiguous" to "correct today by two
+   unstated invariants, and one plan-text sentence away from a real bug."
+
+### MEDIUM (new — not raised by codex)
+
+1. **`data_revision`/`last_backup_data_revision`, and the SAF-folder/health bookkeeping
+   columns 17-12 adds, are never explicitly excluded from the exported/restorable
+   settings snapshot anywhere in 17-05, 17-08, or 17-12.** Verified: 17-05's Task 1
+   explicit exclusion list for the settings object is "API-key state, cached
+   passphrases, raw encryption/KDF/key material, field_history, derived OS schedule
+   IDs, and local photo paths" — `data_revision`, `last_backup_data_revision`, the SAF
+   folder bookmark URI, and the last-successful-automatic-backup timestamp are named
+   in **none** of the three plans' inclusion or exclusion lists; 17-12 Task 2's own
+   language is ambiguous, bundling "folder metadata" and "automatic-success metadata"
+   into the same "durable non-secret settings" bullet as the fields that legitimately
+   should round-trip (cadence, retention, encryption-enabled). Two distinct concrete
+   risks follow if an executor reads this literally:
+   - If `data_revision`/`last_backup_data_revision` leak into the wire format and are
+     applied via Merge (whichever settings row wins per D-03's row-level LWW) or
+     Replace-all, the local monotonic counter that 17-06 was built specifically to make
+     collision-proof (Cycle 2's HIGH #2 fix) can be silently reset backward from an
+     older backup or a different device's snapshot — self-healing over time as new
+     writes continue incrementing from wherever it lands, but defeating the "changed"
+     signal's accuracy for however long it takes to recover.
+   - More concretely product-relevant: if the SAF folder bookmark URI and
+     last-successful-automatic-backup timestamp leak into the wire format and get
+     applied via Merge/Replace-all — e.g., restoring the same backup onto a **different**
+     device, or a fresh reinstall that never re-granted the SAF folder — the restoring
+     device could display "healthy, last backup succeeded" for a folder grant it was
+     never actually given on that install, directly contradicting D-16's "Successful
+     automatic-folder writes define backup health" and D-18's nudge-suppression logic,
+     and silently defeating threat T-17-09's own named mitigation ("Derive healthy from
+     verified automatic SAF metadata only") through a completely different code path
+     (restore) than the one that threat register entry was written against (17-09's UI).
+   
+   I found a mitigating factor that meaningfully reduces (but does not eliminate) the
+   risk: `updateAppSettingsCore`/`updateAppSettings`'s actual write path is gated by a
+   fixed `COLUMN_OF` allowlist (`src/db/app-settings-dao.ts:166`), and the codebase
+   already has a live precedent for deliberately excluding certain columns from that
+   generic patch surface (`ai_ack_google`/`ai_ack_custom` are "DELIBERATELY absent from
+   `COLUMN_OF`", per the file's own comment at line ~400) — so a competent executor
+   following the established pattern would plausibly keep `data_revision`/
+   `last_backup_data_revision`/folder/health columns out of `COLUMN_OF` too, even
+   without being told to. But unlike the `ai_ack_custom` reset behavior — which 17-12
+   explicitly calls out as a MUST-preserve parity requirement with its own acceptance
+   criterion and test — no Phase 17 plan states this requirement or asks for a
+   regression proving these columns can never be written through the generic settings
+   patch or the restore path. **Action needed:** add an explicit prohibition + test to
+   17-05 (export must never serialize `data_revision`/`last_backup_data_revision`/SAF
+   folder/health columns) and to 17-12 (these columns must never be added to
+   `COLUMN_OF` or made reachable via `updateAppSettingsCore`), mirroring the existing
+   `ai_ack_custom` treatment.
+
+### Risk Assessment
+
+**HIGH**, concurring with codex. Cycle 2's five findings are genuinely and verifiably
+incorporated into executable plan text — the tombstone/reconciliation work, the
+`inReadSnapshot` design, and the `sun_contact_id`/purge clock fix all hold up against
+source. But the two mechanisms Cycle 2 itself mandated to close its own HIGHs —
+`data_revision` and durable `_restore_pending` photo staging — each have a concrete,
+source-verified gap: `data_revision`'s chokepoint list omits at least four real
+production writers to exportable tables (`favourites-dao.ts`, `ring-seq-dao.ts`,
+`profile-dao.ts`, `field-type-change.ts`), and the `_restore_pending` path shape
+conflicts with the one safety guard (`assertSafeRelative`) the plan itself says it
+reuses. Both are narrow, mechanical, easily-scoped fixes (extend 17-06's file list by
+four files; either widen `SAFE_RELATIVE` or add a sibling pending-path validator and add
+`photo-relative-path.ts` to 17-08's file scope) — not a re-architecture — but as written
+today, an executor following the plans literally would ship a `data_revision` counter
+that still misses real user edits and a photo-staging helper that throws on its first
+call. The settings-snapshot field-scope ambiguity (data_revision/health columns not
+explicitly excluded from the wire format) is real but lower-severity, given the
+`COLUMN_OF` allowlist convention already narrows the blast radius; it belongs in the
+actionable-MEDIUM bucket rather than blocking execution on its own.
