@@ -15,7 +15,7 @@
  *
  * EXPLICIT FAN-OUT, NOT FK CASCADE (review T-04-13):
  *   Every owned child is deleted EXPLICITLY in ONE `inWriteTransaction`:
- *   interactions, events, fuel, contact_custom_values, contact_links,
+ *   interactions, events, fuel, custom_field_values, contact_links,
  *   `field_history`, then the contacts row. `field_history` has NO FK to
  *   `contacts` and never cascades — it MUST be deleted here or its rows would
  *   outlive the contact. The FK CASCADEs on the other children are live but we
@@ -45,8 +45,9 @@ const LOG_SCOPE = "purge-dao";
 
 /**
  * The blast radius of a purge. The multi-row children carry a COUNT; the
- * single-row `contact_custom_values` is a BOOLEAN (one row per contact — a field
- * count would be meaningless, review fix). `events` is now a genuine blast-radius
+ * normalized `custom_field_values` child is a BOOLEAN. Migration 006 creates one
+ * durable row per contact-and-definition pair, so a count would tell a user with
+ * all-blank fields that purge destroys N custom values. `events` is now a genuine blast-radius
  * child: the Phase-6 events writer (events-dao) landed, so archive/restore emit
  * immutable events and `impactSummaryLines` surfaces the events count.
  */
@@ -83,8 +84,10 @@ async function countRows(
 
 /**
  * Read the per-child blast radius of purging `contactId`: four `COUNT(*)` reads
- * for the multi-row children plus an `EXISTS` probe for the single custom-values
- * row. A pure read (no transaction). Every table name is a literal.
+ * for the multi-row children plus an `EXISTS` probe for normalized custom values.
+ * The boolean remains deliberately unrendered because v6 persists blank rows for
+ * every contact-and-definition pair. A pure read (no transaction). Every table
+ * name is a literal.
  */
 export async function computeImpact(
   exec: SqlExecutor,
@@ -111,7 +114,7 @@ export async function computeImpact(
     contactId,
   );
   const cv = await exec.getFirstAsync<{ present: number }>(
-    "SELECT EXISTS(SELECT 1 FROM contact_custom_values WHERE contact_id = ?) AS present",
+    "SELECT EXISTS(SELECT 1 FROM custom_field_values WHERE contact_id = ?) AS present",
     [contactId],
   );
   return {
@@ -128,8 +131,9 @@ export async function computeImpact(
  * for the impact-summary confirm. Renders the genuine multi-row children —
  * interactions, events, fuel items, links — each `"${n} ${label}"` (pluralised),
  * and omits any whose count is 0. `events` IS surfaced now (the Phase-6 events
- * writer landed); `contact_custom_values` (a single 0/1 row, not a field count)
- * remains DELIBERATELY not rendered.
+ * writer landed); `hasCustomValues` remains DELIBERATELY not rendered because v6
+ * custom-field rows include durable blanks and are not a meaningful blast-radius
+ * count for the user.
  *
  * `name` is part of the caller's sentence ("Permanently delete {name} and
  * {parts}?"), not of these fragments — the screen owns the surrounding copy.
@@ -187,7 +191,7 @@ export function purgeContact(
     await exec.runAsync("DELETE FROM events WHERE contact_id = ?", [contactId]);
     await exec.runAsync("DELETE FROM fuel WHERE contact_id = ?", [contactId]);
     await exec.runAsync(
-      "DELETE FROM contact_custom_values WHERE contact_id = ?",
+      "DELETE FROM custom_field_values WHERE contact_id = ?",
       [contactId],
     );
     await exec.runAsync("DELETE FROM contact_links WHERE contact_id = ?", [
