@@ -21,16 +21,24 @@ import { nodeSqliteExecutor, openTestDb } from "@/db/__testkit__/node-sqlite";
 import {
   acknowledgeProvider,
   type AppSettings,
+  type AppSettingsPatch,
+  type BackupBookkeepingPatch,
   getAppSettings,
+  getPortableSettingsSnapshot,
+  recordAutomaticBackupHealthCore,
   SELF_SUN_COLOUR_RE,
   updateAppSettings,
+  updateAppSettingsCore,
 } from "@/db/app-settings-dao";
 import { migration001 } from "@/db/migrations/001-initial";
 import { migration002 } from "@/db/migrations/002-app-settings";
 import { migration003 } from "@/db/migrations/003-orrery-settings";
 import { migration004 } from "@/db/migrations/004-ai-settings";
 import { migration005 } from "@/db/migrations/005-digest-settings";
+import { migration006 } from "@/db/migrations/006-normalize-custom-field-values";
+import { migration007 } from "@/db/migrations/007-tombstones";
 import { runMigrations } from "@/db/migrations/runner";
+import { inWriteTransaction } from "@/db/transaction";
 import type { SqlExecutor } from "@/db/types";
 import { newUid } from "@/db/uid";
 
@@ -67,16 +75,22 @@ async function migrateToV2(): Promise<void> {
 }
 
 /**
- * Bring a fresh in-memory DB to v5 — the current launch path (adds the AI cols
- * at v4 and the digest toggle at v5). getAppSettings now SELECTs digest_enabled,
- * so every current-schema case must reach v5 (review M1/L4: the former v4 helper
- * was migrated IN PLACE — renamed + version bumped — leaving no dead helper).
+ * Bring a fresh in-memory DB to v7. The DAO selects the backup columns added by
+ * migration 007, so every current-schema test needs the complete launch path.
  */
 async function migrateToV5(): Promise<void> {
   await runMigrations(
     exec,
-    [migration001, migration002, migration003, migration004, migration005],
-    5,
+    [
+      migration001,
+      migration002,
+      migration003,
+      migration004,
+      migration005,
+      migration006,
+      migration007,
+    ],
+    7,
     { now: NOW, newUid },
   );
 }
@@ -93,6 +107,31 @@ const AI_DEFAULTS = {
   aiAckGoogle: 0 as const,
   aiAckCustom: 0 as const,
 };
+
+const BACKUP_DEFAULTS = {
+  backupIntervalDays: 1,
+  backupRetentionDays: 7,
+  backupFolderUri: null,
+  backupFolderName: null,
+  backupFolderDiagnostic: null,
+  lastAutomaticBackupAt: null,
+  dataRevision: 0,
+  lastBackupDataRevision: 0,
+  encryptionEnabled: 0 as const,
+  backupNudgeDismissed: 0 as const,
+  modifiedAt: NOW,
+};
+
+type KeysOverlap<A, B> = Extract<keyof A, keyof B>;
+type IsNever<T> = [T] extends [never] ? true : false;
+const portableAndBookkeepingAreDisjoint: IsNever<
+  KeysOverlap<
+    Awaited<ReturnType<typeof getPortableSettingsSnapshot>>,
+    BackupBookkeepingPatch
+  >
+> = true;
+
+void portableAndBookkeepingAreDisjoint;
 
 beforeEach(() => {
   const db = openTestDb();
@@ -217,6 +256,7 @@ describe("app-settings-dao — read", () => {
       selfSunColour: null,
       // AI starts disabled: provider `none`, empty config, acks 0 (AI-01).
       ...AI_DEFAULTS,
+      ...BACKUP_DEFAULTS,
     };
     expect(settings).toEqual(expected);
   });
@@ -282,6 +322,7 @@ describe("app-settings-dao — validated write", () => {
       selfSunColour: null,
       // AI fields untouched by this patch — still the disabled defaults.
       ...AI_DEFAULTS,
+      ...BACKUP_DEFAULTS,
     });
   });
 
@@ -659,6 +700,106 @@ describe("app-settings-dao — AI settings (AI-01)", () => {
     const settings = await getAppSettings(exec);
     expect(settings.aiPromptTemplate).toBe("Say hi to {{name}}");
     expect(settings.aiCustomModel).toBe("local-7b");
+  });
+});
+
+describe("app-settings-dao — portable backup projection and local bookkeeping", () => {
+  beforeEach(async () => {
+    await migrateToV5();
+  });
+
+  it("returns an explicit portable projection without device-local bookkeeping", async () => {
+    const snapshot = await getPortableSettingsSnapshot(exec);
+    expect(snapshot).toMatchObject({
+      notificationsEnabled: 0,
+      digestEnabled: 1,
+      sunContactId: null,
+      aiProvider: "none",
+      aiModel: "",
+      aiCustomEndpoint: "",
+      aiCustomModel: "",
+      aiPromptTemplate: "",
+      backupIntervalDays: 1,
+      backupRetentionDays: 7,
+      modifiedAt: NOW,
+    });
+    const localOnlyKeys = [
+      "dataRevision",
+      "lastBackupDataRevision",
+      "backupFolderUri",
+      "backupFolderName",
+      "backupFolderDiagnostic",
+      "lastAutomaticBackupAt",
+      "encryptionEnabled",
+      "backupNudgeDismissed",
+    ];
+    for (const key of localOnlyKeys) {
+      expect(Object.keys(snapshot)).not.toContain(key);
+    }
+  });
+
+  it.each([0, -1, 1.5, 3651])(
+    "rejects malformed backup day values before writing (%s)",
+    async (days) => {
+      await expect(
+        updateAppSettings(exec, { backupIntervalDays: days }, LATER),
+      ).rejects.toThrow();
+      const row = await exec.getFirstAsync<{
+        backup_interval_days: number;
+        modified_at: string;
+      }>("SELECT backup_interval_days, modified_at FROM app_settings WHERE id = 1");
+      expect(row).toEqual({ backup_interval_days: 1, modified_at: NOW });
+    },
+  );
+
+  it("accepts the inclusive backup-day bounds", async () => {
+    await updateAppSettings(
+      exec,
+      { backupIntervalDays: 1, backupRetentionDays: 3650 },
+      LATER,
+    );
+    const settings = await getAppSettings(exec);
+    expect(settings.backupIntervalDays).toBe(1);
+    expect(settings.backupRetentionDays).toBe(3650);
+  });
+
+  it("preserves the custom-endpoint acknowledgement reset in the composable core", async () => {
+    await exec.runAsync(
+      "UPDATE app_settings SET ai_custom_endpoint = ?, ai_ack_custom = 1 WHERE id = 1",
+      ["https://api.example.com/v1"],
+    );
+    await inWriteTransaction(exec, () =>
+      updateAppSettingsCore(
+        exec,
+        { aiCustomEndpoint: "https://api.example.net/v1" },
+        LATER,
+      ),
+    );
+    expect((await getAppSettings(exec)).aiAckCustom).toBe(0);
+  });
+
+  it("records automatic-backup bookkeeping without advancing data revision", async () => {
+    await exec.runAsync("UPDATE app_settings SET data_revision = 12 WHERE id = 1");
+    await inWriteTransaction(exec, () =>
+      recordAutomaticBackupHealthCore(exec, {
+        backupFolderUri: "content://provider/tree/orbit",
+        backupFolderName: "Orbit backups",
+        lastAutomaticBackupAt: LATER,
+        lastBackupDataRevision: 12,
+      }),
+    );
+    expect(await exec.getFirstAsync<{ data_revision: number }>(
+      "SELECT data_revision FROM app_settings WHERE id = 1",
+    )).toEqual({ data_revision: 12 });
+    expect((await getAppSettings(exec)).lastBackupDataRevision).toBe(12);
+  });
+
+  // Compile-time lock: local bookkeeping can never be accepted by the generic
+  // portable settings patch, even if a future caller attempts it.
+  it("keeps bookkeeping fields out of the general settings patch type", () => {
+    // @ts-expect-error backupFolderUri is device-local bookkeeping, never portable.
+    const invalidPatch: AppSettingsPatch = { backupFolderUri: "content://local" };
+    expect(invalidPatch).toBeDefined();
   });
 });
 
