@@ -16,9 +16,8 @@ function deps(
   return {
     now: NOW,
     contactUid: "c-uid",
-    rowUid: "row-uid",
     interactionUid: "i-uid",
-    createColNames: [],
+    createDefs: [],
     ...overrides,
   };
 }
@@ -76,7 +75,7 @@ describe("buildCreateInput", () => {
     expect(buildCreateInput(state({ phone: "   " }), deps()).phone).toBeNull();
   });
 
-  it("trims the name and carries category + rarelyResponds=0 + uids", () => {
+  it("trims the name and carries category + rarelyResponds=0 + contact uid", () => {
     const out = buildCreateInput(
       state({ name: "  Chris ", categoryId: 3 }),
       deps(),
@@ -85,20 +84,26 @@ describe("buildCreateInput", () => {
     expect(out.categoryId).toBe(3);
     expect(out.rarelyResponds).toBe(0);
     expect(out.uid).toBe("c-uid");
-    expect(out.rowUid).toBe("row-uid");
+    expect(out).not.toHaveProperty("rowUid");
     expect(out.intervalDays).toBe(30);
     expect(out.now).toBe(NOW);
   });
 
-  it("maps show_on_new columns to their values, missing → null", () => {
+  it("maps show_on_new definition pairs to their values, missing → null", () => {
     const out = buildCreateInput(
       state({ values: { hobby: "chess", note: null } }),
-      deps({ createColNames: ["hobby", "note", "absent"] }),
+      deps({
+        createDefs: [
+          { id: 11, col_name: "hobby" },
+          { id: 12, col_name: "note" },
+          { id: 13, col_name: "absent" },
+        ],
+      }),
     );
     expect(out.customValues).toEqual([
-      { col: "hobby", value: "chess" },
-      { col: "note", value: null },
-      { col: "absent", value: null },
+      { fieldDefId: 11, value: "chess" },
+      { fieldDefId: 12, value: null },
+      { fieldDefId: 13, value: null },
     ]);
   });
 

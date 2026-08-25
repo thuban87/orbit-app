@@ -52,9 +52,8 @@ function deps(overrides: Partial<BuildEditInputDeps> = {}): BuildEditInputDeps {
   return {
     now: NOW,
     contactId: 7,
-    rowUid: "row-uid",
     interactionUid: "i-uid",
-    editColNames: [],
+    editDefs: [],
     neverContacted: false,
     ...overrides,
   };
@@ -183,7 +182,7 @@ describe("canSave", () => {
 });
 
 describe("buildEditInput", () => {
-  it("trims name/phone/email (empty->null) and carries id + rowUid + toggles", () => {
+  it("trims name/phone/email (empty->null) and carries id + toggles", () => {
     const out = buildEditInput(
       state({
         name: "  Chris ",
@@ -200,7 +199,7 @@ describe("buildEditInput", () => {
     expect(out.email).toBeNull();
     expect(out.rarelyResponds).toBe(1);
     expect(out.remindersOff).toBe(1);
-    expect(out.rowUid).toBe("row-uid");
+    expect(out).not.toHaveProperty("rowUid");
     expect(out.now).toBe(NOW);
   });
 
@@ -219,15 +218,21 @@ describe("buildEditInput", () => {
     ).toBe("1990-07-04");
   });
 
-  it("maps edit columns to values, missing -> null", () => {
+  it("maps edit definition pairs to values, missing -> null", () => {
     const out = buildEditInput(
       state({ values: { hobby: "chess", note: null } }),
-      deps({ editColNames: ["hobby", "note", "absent"] }),
+      deps({
+        editDefs: [
+          { id: 21, col_name: "hobby" },
+          { id: 22, col_name: "note" },
+          { id: 23, col_name: "absent" },
+        ],
+      }),
     );
     expect(out.customValues).toEqual([
-      { col: "hobby", value: "chess" },
-      { col: "note", value: null },
-      { col: "absent", value: null },
+      { fieldDefId: 21, value: "chess" },
+      { fieldDefId: 22, value: null },
+      { fieldDefId: 23, value: null },
     ]);
   });
 
