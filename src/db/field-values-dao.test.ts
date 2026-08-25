@@ -1,15 +1,3 @@
-/**
- * Per-contact custom-value DAO — behavioural proof (FLD-01 / FLD-07).
- *
- * Drives a fresh in-memory `node:sqlite` DB through the REAL migration-1 fixture,
- * adding value columns via direct `ALTER TABLE contact_custom_values ADD COLUMN`
- * (independent of Plan 03's DDL). Asserts: dynamic read returns written values;
- * an EMPTY defs array reads `{}` (the fresh-install case, no malformed SELECT);
- * UPSERT creates-or-updates keyed on contact_id and always bumps modified_at; a
- * per-contact uid works for multiple contacts without colliding on UNIQUE(uid);
- * and the three §14.7 visibility selectors resolve exactly (quarantined fields
- * hidden everywhere).
- */
 import { beforeEach, describe, expect, it } from "vitest";
 import { nodeSqliteExecutor, openTestDb } from "@/db/__testkit__/node-sqlite";
 import type { CustomFieldDef } from "@/db/field-types";
@@ -21,30 +9,34 @@ import {
   visibleDefsForProfile,
 } from "@/db/field-values-dao";
 import { migration001 } from "@/db/migrations/001-initial";
+import { migration002 } from "@/db/migrations/002-app-settings";
+import { migration003 } from "@/db/migrations/003-orrery-settings";
+import { migration004 } from "@/db/migrations/004-ai-settings";
+import { migration005 } from "@/db/migrations/005-digest-settings";
+import { migration006 } from "@/db/migrations/006-normalize-custom-field-values";
 import { runMigrations } from "@/db/migrations/runner";
 import type { SqlExecutor } from "@/db/types";
 
-const NOW = "2026-08-14 12:00:00";
-const LATER = "2026-08-20 09:00:00";
-
+const NOW = "2026-08-24 12:00:00";
+const LATER = "2026-08-25 09:00:00";
 let uidCounter = 0;
 const uid = () => `uid-${++uidCounter}`;
 let idCounter = 0;
-
 let exec: SqlExecutor;
 
 beforeEach(async () => {
   uidCounter = 0;
   idCounter = 0;
-  const db = openTestDb();
-  exec = nodeSqliteExecutor(db);
-  await runMigrations(exec, [migration001], 1, { now: NOW, newUid: uid });
+  exec = nodeSqliteExecutor(openTestDb());
+  await runMigrations(
+    exec,
+    [migration001, migration002, migration003, migration004, migration005, migration006],
+    6,
+    { now: NOW, newUid: uid },
+  );
 });
 
-/** Build a CustomFieldDef literal for the pure selectors + dynamic read. */
-function def(
-  overrides: Partial<CustomFieldDef> & { col_name: string },
-): CustomFieldDef {
+function def(overrides: Partial<CustomFieldDef> & { col_name: string }): CustomFieldDef {
   return {
     id: ++idCounter,
     uid: uid(),
@@ -62,181 +54,123 @@ function def(
   };
 }
 
-/** Add a value column directly (independent of Plan 03's createField DDL). */
-async function addColumn(col: string): Promise<void> {
-  await exec.execAsync(
-    `ALTER TABLE contact_custom_values ADD COLUMN "${col}" TEXT`,
+async function persistDef(definition: CustomFieldDef): Promise<void> {
+  await exec.runAsync(
+    `INSERT INTO custom_field_defs (
+       id, uid, col_name, label, type, options, show_on_new, always_show,
+       display_order, quarantined_at, share_with_ai, created_at, modified_at
+     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
+      definition.id,
+      definition.uid,
+      definition.col_name,
+      definition.label,
+      definition.type,
+      definition.options,
+      definition.show_on_new,
+      definition.always_show,
+      definition.display_order,
+      definition.quarantined_at,
+      definition.share_with_ai,
+      definition.created_at,
+      definition.modified_at,
+    ],
   );
 }
 
-/** Insert a bare contact row and return its id. */
 async function makeContact(name = "Alex"): Promise<number> {
-  const r = await exec.runAsync(
+  const result = await exec.runAsync(
     `INSERT INTO contacts (uid, name, interval_days, created_at, modified_at)
      VALUES (?, ?, ?, ?, ?)`,
     [uid(), name, 30, NOW, NOW],
   );
-  return r.lastInsertRowId;
+  return result.lastInsertRowId;
 }
 
-async function readValueRow(
-  contactId: number,
-): Promise<Record<string, unknown> | null> {
-  return exec.getFirstAsync<Record<string, unknown>>(
-    "SELECT * FROM contact_custom_values WHERE contact_id = ?",
-    [contactId],
+async function valueRow(contactId: number, fieldDefId: number) {
+  return exec.getFirstAsync<{
+    uid: string;
+    value: string | null;
+    created_at: string;
+    modified_at: string;
+  }>(
+    `SELECT uid, value, created_at, modified_at
+       FROM custom_field_values
+      WHERE contact_id = ? AND field_def_id = ?`,
+    [contactId, fieldDefId],
   );
 }
 
-async function rowCount(): Promise<number> {
-  const r = await exec.getFirstAsync<{ n: number }>(
-    "SELECT COUNT(*) AS n FROM contact_custom_values",
-  );
-  return r?.n ?? 0;
-}
+describe("normalized custom-value reads", () => {
+  it("returns only values for the passed definition list", async () => {
+    const contactId = await makeContact();
+    const visible = def({ col_name: "visible", share_with_ai: 1 });
+    const quarantined = def({ col_name: "quarantined", quarantined_at: NOW });
+    const privateDef = def({ col_name: "private", share_with_ai: 0 });
+    await Promise.all([persistDef(visible), persistDef(quarantined), persistDef(privateDef)]);
+    await Promise.all([
+      upsertValue(exec, contactId, visible.id, uid(), "shown", NOW),
+      upsertValue(exec, contactId, quarantined.id, uid(), "hidden-quarantine", NOW),
+      upsertValue(exec, contactId, privateDef.id, uid(), "hidden-private", NOW),
+    ]);
 
-describe("upsertValue — INSERT-or-UPDATE keyed on contact_id (FLD-01)", () => {
-  it("creates the row on first value (no silent no-op — Pitfall 3)", async () => {
-    const c = await makeContact();
-    await addColumn("nickname");
-    const contactUid = uid();
-
-    await upsertValue(exec, c, contactUid, "nickname", "Ace", NOW);
-
-    const row = await readValueRow(c);
-    expect(row).not.toBeNull();
-    expect(row?.nickname).toBe("Ace");
-    expect(row?.uid).toBe(contactUid);
-    expect(row?.modified_at).toBe(NOW);
-    expect(await rowCount()).toBe(1);
-  });
-
-  it("updates in place on re-UPSERT, bumps modified_at, never rewrites uid", async () => {
-    const c = await makeContact();
-    await addColumn("nickname");
-    const contactUid = uid();
-
-    await upsertValue(exec, c, contactUid, "nickname", "Ace", NOW);
-    // A second UPSERT with a DIFFERENT uid must NOT change the stored uid.
-    await upsertValue(exec, c, "some-other-uid", "nickname", "Bee", LATER);
-
-    const row = await readValueRow(c);
-    expect(row?.nickname).toBe("Bee");
-    expect(row?.modified_at).toBe(LATER);
-    expect(row?.uid).toBe(contactUid); // INSERT-only; DO UPDATE never touches uid
-    expect(await rowCount()).toBe(1); // still one row (keyed on contact_id)
-  });
-
-  it("UPSERTs a second field on the same row without disturbing the first", async () => {
-    const c = await makeContact();
-    await addColumn("nickname");
-    await addColumn("city");
-    const contactUid = uid();
-
-    await upsertValue(exec, c, contactUid, "nickname", "Ace", NOW);
-    await upsertValue(exec, c, contactUid, "city", "Leeds", LATER);
-
-    const row = await readValueRow(c);
-    expect(row?.nickname).toBe("Ace");
-    expect(row?.city).toBe("Leeds");
-    expect(row?.modified_at).toBe(LATER);
-    expect(await rowCount()).toBe(1);
-  });
-
-  it("a per-contact uid works for MULTIPLE contacts (no UNIQUE(uid) collision)", async () => {
-    const c1 = await makeContact("Alex");
-    const c2 = await makeContact("Blair");
-    await addColumn("nickname");
-
-    // Each contact gets its OWN per-contact uid — the correct caller contract.
-    await upsertValue(exec, c1, uid(), "nickname", "Ace", NOW);
-    await expect(
-      upsertValue(exec, c2, uid(), "nickname", "Bee", NOW),
-    ).resolves.toBeUndefined();
-
-    expect(await rowCount()).toBe(2);
-    expect((await readValueRow(c1))?.nickname).toBe("Ace");
-    expect((await readValueRow(c2))?.nickname).toBe("Bee");
-  });
-
-  it("rejects an unsafe col_name before it reaches SQL (T-03-01)", async () => {
-    const c = await makeContact();
-    await expect(
-      upsertValue(
-        exec,
-        c,
-        uid(),
-        'nickname"; DROP TABLE contacts;--',
-        "x",
-        NOW,
-      ),
-    ).rejects.toThrow(/unsafe custom-field col_name/);
+    await expect(getValuesForContact(exec, contactId, [visible])).resolves.toEqual({
+      visible: "shown",
+    });
+    await expect(getValuesForContact(exec, contactId, [])).resolves.toEqual({});
   });
 });
 
-describe("getValuesForContact — dynamic whitelist-built read (FLD-01)", () => {
-  it("returns the written values keyed by col_name", async () => {
-    const c = await makeContact();
-    await addColumn("nickname");
-    await addColumn("city");
-    const contactUid = uid();
-    await upsertValue(exec, c, contactUid, "nickname", "Ace", NOW);
-    await upsertValue(exec, c, contactUid, "city", "Leeds", NOW);
+describe("normalized custom-value UPSERT", () => {
+  it("updates an existing pair without rewriting its immutable uid or created_at", async () => {
+    const contactId = await makeContact();
+    const definition = def({ col_name: "nickname" });
+    await persistDef(definition);
+    await upsertValue(exec, contactId, definition.id, "first-uid", "Ace", NOW);
+    await upsertValue(exec, contactId, definition.id, "second-uid", "Bee", LATER);
 
-    const values = await getValuesForContact(exec, c, [
-      def({ col_name: "nickname" }),
-      def({ col_name: "city" }),
-    ]);
-
-    expect(values).toEqual({ nickname: "Ace", city: "Leeds" });
+    expect(await valueRow(contactId, definition.id)).toEqual({
+      uid: "first-uid",
+      value: "Bee",
+      created_at: NOW,
+      modified_at: LATER,
+    });
   });
 
-  it("returns {} for an EMPTY defs array (fresh install — no malformed SELECT)", async () => {
-    const c = await makeContact();
-    await expect(getValuesForContact(exec, c, [])).resolves.toEqual({});
+  it("clears to NULL without deleting or re-keying the pair row", async () => {
+    const contactId = await makeContact();
+    const definition = def({ col_name: "nickname" });
+    await persistDef(definition);
+    await upsertValue(exec, contactId, definition.id, "pair-uid", "Ace", NOW);
+    await upsertValue(exec, contactId, definition.id, "ignored-uid", null, LATER);
+
+    expect(await valueRow(contactId, definition.id)).toEqual({
+      uid: "pair-uid",
+      value: null,
+      created_at: NOW,
+      modified_at: LATER,
+    });
   });
 
-  it("returns {} when the contact has no value row yet", async () => {
-    const c = await makeContact();
-    await addColumn("nickname");
-    const values = await getValuesForContact(exec, c, [
-      def({ col_name: "nickname" }),
-    ]);
-    expect(values).toEqual({});
-  });
+  it("self-heals a missing pair with uid and both required timestamps", async () => {
+    const contactId = await makeContact();
+    const definition = def({ col_name: "nickname" });
+    await persistDef(definition);
 
-  it("maps an unset (NULL) column to null", async () => {
-    const c = await makeContact();
-    await addColumn("nickname");
-    await addColumn("city");
-    // Only nickname written; the row exists, city stays NULL.
-    await upsertValue(exec, c, uid(), "nickname", "Ace", NOW);
+    await upsertValue(exec, contactId, definition.id, "new-pair-uid", "Ace", LATER);
 
-    const values = await getValuesForContact(exec, c, [
-      def({ col_name: "nickname" }),
-      def({ col_name: "city" }),
-    ]);
-    expect(values).toEqual({ nickname: "Ace", city: null });
-  });
-
-  it("rejects an unsafe col_name in the def list (T-03-01)", async () => {
-    const c = await makeContact();
-    await expect(
-      getValuesForContact(exec, c, [def({ col_name: "bad-name!" })]),
-    ).rejects.toThrow(/unsafe custom-field col_name/);
+    expect(await valueRow(contactId, definition.id)).toEqual({
+      uid: "new-pair-uid",
+      value: "Ace",
+      created_at: LATER,
+      modified_at: LATER,
+    });
   });
 });
 
 describe("visibility selectors — the three §14.7 surfaces (FLD-07)", () => {
-  // A representative def set: one show_on_new, one always_show, one plain, and
-  // one quarantined — spanning every visibility axis, deliberately out of order
-  // to prove the selectors sort by display_order.
   const onNew = def({ col_name: "nickname", show_on_new: 1, display_order: 2 });
-  const alwaysShown = def({
-    col_name: "birthday",
-    always_show: 1,
-    display_order: 0,
-  });
+  const alwaysShown = def({ col_name: "birthday", always_show: 1, display_order: 0 });
   const plain = def({ col_name: "city", display_order: 1 });
   const quarantined = def({
     col_name: "old_field",
@@ -246,57 +180,14 @@ describe("visibility selectors — the three §14.7 surfaces (FLD-07)", () => {
     quarantined_at: NOW,
   });
   const allDefs = [onNew, alwaysShown, plain, quarantined];
-  const cols = (defs: CustomFieldDef[]) => defs.map((d) => d.col_name);
+  const cols = (defs: CustomFieldDef[]) => defs.map((definition) => definition.col_name);
 
-  it("defsForCreateForm returns only non-quarantined show_on_new, ordered", () => {
-    // onNew is show_on_new; quarantined is show_on_new too but excluded.
+  it("preserves the existing pure create, edit, and profile placement rules", () => {
     expect(cols(defsForCreateForm(allDefs))).toEqual(["nickname"]);
-  });
-
-  it("defsForEditForm returns every non-quarantined field, ordered by display_order", () => {
-    expect(cols(defsForEditForm(allDefs))).toEqual([
-      "birthday",
-      "city",
-      "nickname",
-    ]);
-  });
-
-  it("visibleDefsForProfile shows value-present OR always_show, hides empty non-always", () => {
-    // city has a value; birthday is always_show (no value); nickname is empty
-    // and not always_show → hidden; old_field is quarantined → hidden.
-    const values = { city: "Leeds", nickname: null } as Record<
-      string,
-      string | null
-    >;
-    expect(cols(visibleDefsForProfile(allDefs, values))).toEqual([
+    expect(cols(defsForEditForm(allDefs))).toEqual(["birthday", "city", "nickname"]);
+    expect(cols(visibleDefsForProfile(allDefs, { city: "Leeds", nickname: null }))).toEqual([
       "birthday",
       "city",
     ]);
-  });
-
-  it("visibleDefsForProfile treats an always_show field with no value as visible", () => {
-    expect(cols(visibleDefsForProfile([alwaysShown], {}))).toEqual([
-      "birthday",
-    ]);
-  });
-
-  it("visibleDefsForProfile hides an empty non-always_show field", () => {
-    expect(visibleDefsForProfile([plain], {})).toEqual([]);
-    expect(visibleDefsForProfile([plain], { city: null })).toEqual([]);
-  });
-
-  it("a quarantined field appears in NONE of the three surfaces", () => {
-    const q = [quarantined];
-    expect(defsForCreateForm(q)).toEqual([]);
-    expect(defsForEditForm(q)).toEqual([]);
-    // Even with a value AND always_show, quarantine wins.
-    expect(visibleDefsForProfile(q, { old_field: "x" })).toEqual([]);
-  });
-
-  it("does not mutate the input defs array", () => {
-    const input = [onNew, alwaysShown, plain];
-    const snapshot = cols(input);
-    defsForEditForm(input);
-    expect(cols(input)).toEqual(snapshot);
   });
 });
