@@ -128,6 +128,11 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
         // enters SQLite). No plugin options needed; the Set-dedupe handles it like
         // the other string plugins.
         "expo-secure-store",
+        // Phase-17 backup encryption (Plan 17-01). RNQC's Expo config plugin
+        // generates the native Nitro/C++ wiring required for the approved
+        // PBKDF2 and AES-256-GCM implementation. No sodium option is enabled:
+        // the backup envelope uses RNQC's standard native primitives only.
+        "react-native-quick-crypto",
       ]),
     ];
 
