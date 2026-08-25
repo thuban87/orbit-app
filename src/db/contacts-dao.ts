@@ -3,8 +3,8 @@
  * architectural task (RESEARCH Pattern 2).
  *
  * `createContactFull` writes a contact row + (for the Today / Pick-date path) its
- * first interaction through the single-writer recompute + any `show_on_new`
- * custom values — ALL in ONE `inWriteTransaction`. It COMPOSES the non-mutexed
+ * first interaction through the single-writer recompute + normalized custom
+ * values — ALL in ONE `inWriteTransaction`. It COMPOSES the non-mutexed
  * cores extracted from the recency + field-values DAOs; it must NEVER call the
  * wrapped `createContactWithInteraction` / `upsertValue` (each opens its own
  * `inWriteTransaction`, and the shared mutex is NON-REENTRANT — nesting it is a
@@ -21,7 +21,7 @@
  *   • The first interaction is `source='manual'`, `direction=null` (defaults in
  *     `insertInteractionCore`) — never `outbound`, which would pollute intensity
  *     math (T-04-04).
- *   • A throw ANYWHERE in the body (bad custom-values column, UNIQUE clash, …)
+ *   • A throw ANYWHERE in the body (invalid custom-value definition, UNIQUE clash, …)
  *     rolls back the contact + interaction + values TOGETHER — one transaction,
  *     not two (T-04-03; proven by the mid-composition ROLLBACK test).
  * =============================================================================
@@ -41,14 +41,14 @@
  * field). `email` / `social_battery` / `birthday` are INTENTIONALLY create-
  * excluded (edit-only per 06-crud Cluster A) — the omission is deliberate.
  *
- * SECURITY (T-04-02): every runtime value is `?`-bound. The ONLY interpolated
- * identifier is a custom `col_name`, and it reaches SQL solely through the guarded
- * `upsertValueCore` (`isSafeColName` + double-quote). No new interpolation site.
+ * SECURITY (T-16-04): every runtime value is `?`-bound. Normalized values carry
+ * a numeric `fieldDefId`; no custom SQL identifier reaches this composer.
  *
  * Node-pure: takes `exec: SqlExecutor`; imports the shared `inWriteTransaction`.
  */
 
 import { recordEventCore } from "@/db/events-dao";
+import { listDefs } from "@/db/field-defs-dao";
 import { upsertValueCore } from "@/db/field-values-dao";
 import { assertSafeRelative } from "@/db/photo-relative-path";
 import {
@@ -60,10 +60,10 @@ import { inWriteTransaction } from "@/db/transaction";
 import type { SqlExecutor } from "@/db/types";
 import { newUid } from "@/db/uid";
 
-/** One custom value to write on the new contact's `contact_custom_values` row. */
+/** One normalized custom-field value to write for a contact-definition pair. */
 export interface CustomValueInput {
-  /** The physical value column (an `isSafeColName`-constructed identifier). */
-  col: string;
+  /** The stable definition row that identifies this value pair. */
+  fieldDefId: number;
   value: string | null;
 }
 
@@ -89,13 +89,7 @@ export interface CreateContactFullInput {
    * interaction row is written and `last_contact` stays NULL (never-contacted).
    */
   firstInteraction?: FirstInteractionInput;
-  /**
-   * The per-contact `contact_custom_values` ROW uid. When omitted, one is minted
-   * here (safe: `ON CONFLICT(contact_id) DO UPDATE` never rewrites the persisted
-   * uid — mirrors Plan 06's always-mint resolution).
-   */
-  rowUid?: string;
-  /** `show_on_new` custom values to write on the new contact's values row. */
+  /** Custom values to UPSERT after the complete definition-pair matrix is seeded. */
   customValues?: CustomValueInput[];
 }
 
@@ -160,23 +154,33 @@ export function createContactFull(
       await recomputeLastContactCore(exec, contactId, input.now);
     }
 
-    // Custom values — resolve the per-contact values-row uid to a NON-NULL string
-    // ONCE before the loop, so an `undefined` uid can never reach upsertValueCore
-    // (strict TS: it requires a non-null string). Minting here is safe because the
-    // values row's persisted uid is written on INSERT only.
+    // Seed the durable pair matrix for EVERY definition, including quarantined
+    // definitions. Each INSERT receives an independent immutable uid; later
+    // submitted values UPSERT their matching pair and preserve that uid.
+    const definitions = await listDefs(exec, { includeQuarantined: true });
+    for (const definition of definitions) {
+      await upsertValueCore(
+        exec,
+        contactId,
+        definition.id,
+        newUid(),
+        null,
+        input.now,
+      );
+    }
+
+    // Apply submitted values only after every pair exists. The writer's UPDATE
+    // branch never rewrites uid or created_at, including when clearing to NULL.
     const customValues = input.customValues ?? [];
-    if (customValues.length > 0) {
-      const valuesRowUid = input.rowUid ?? newUid();
-      for (const cv of customValues) {
-        await upsertValueCore(
-          exec,
-          contactId,
-          valuesRowUid,
-          cv.col,
-          cv.value,
-          input.now,
-        );
-      }
+    for (const customValue of customValues) {
+      await upsertValueCore(
+        exec,
+        contactId,
+        customValue.fieldDefId,
+        newUid(),
+        customValue.value,
+        input.now,
+      );
     }
 
     return { contactId, interactionId };
@@ -222,13 +226,7 @@ export interface UpdateContactFullInput {
   birthday?: string | null;
   phone?: string | null;
   email?: string | null;
-  /**
-   * The per-contact `contact_custom_values` ROW uid. When omitted (and values are
-   * written), one is minted here (safe: `ON CONFLICT(contact_id) DO UPDATE` never
-   * rewrites the persisted uid — mirrors create's always-mint resolution).
-   */
-  rowUid?: string;
-  /** Custom values to write on the contact's values row. */
+  /** Custom values to UPSERT by their normalized definition pair. */
   customValues?: CustomValueInput[];
   /**
    * A FIRST interaction to record — honoured ONLY when the STORED `last_contact IS
@@ -318,20 +316,18 @@ export function updateContactFull(
     // reads the NEW rarely_responds flag.
     await updateContactMetadataCore(exec, input);
 
-    // Custom values — resolve the per-contact values-row uid ONCE (non-null string).
+    // UPSERT value pairs instead of deleting/re-keying them. A fresh uid is only
+    // relevant to a missing pair's INSERT branch; an existing pair retains it.
     const customValues = input.customValues ?? [];
-    if (customValues.length > 0) {
-      const valuesRowUid = input.rowUid ?? newUid();
-      for (const cv of customValues) {
-        await upsertValueCore(
-          exec,
-          input.id,
-          valuesRowUid,
-          cv.col,
-          cv.value,
-          input.now,
-        );
-      }
+    for (const customValue of customValues) {
+      await upsertValueCore(
+        exec,
+        input.id,
+        customValue.fieldDefId,
+        newUid(),
+        customValue.value,
+        input.now,
+      );
     }
 
     // FIRST-INTERACTION-ON-EDIT (owner ruling): honoured ONLY when the stored

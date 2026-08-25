@@ -331,6 +331,12 @@ export function deleteTouchpoint(
  * Create a contact and — unless it is the "not yet / don't know" path — its
  * first interaction, in ONE transaction. When `firstInteraction` is omitted, no
  * interaction row is written and `last_contact` stays NULL (never-contacted).
+ *
+ * This test-only helper writes NO custom values and therefore does NOT satisfy
+ * the D-03 pair-matrix invariant. `createContactFull` is the ONLY contact-
+ * creation path that seeds every normalized definition pair; any future
+ * production caller (for example a Phase 17 restore path) must route through it
+ * or replicate its complete-pair seeding.
  */
 export function createContactWithInteraction(
   exec: SqlExecutor,
