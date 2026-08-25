@@ -37,7 +37,7 @@ Mark every row PASS or FAIL and add concise evidence (screenshot, UI text, or re
 | 1 | APK installs over populated pre-006 test profile and opens standalone. | **PASS** | `adb install -r` returned `Success`; standalone launcher opened the normal dashboard, then the Not-yet-contacted list and Release Fixture profile/edit surfaces. No Metro or adb reverse used for the release observation. |
 | 2 | Upgrade is silent: no migration progress, success, or schema UI; normal navigator opens. | **PASS** | Dashboard UI dump contains normal navigation (`Your week`, filters, Not-yet-contacted); no migration/failure/progress UI. |
 | 3 | Seeded values, NULLs, and empty values are preserved on Profile and Edit; custom photo renders. | **PASS (seeded values/photo control)** | Release Edit UI visibly retained `Nickname: Ace`, `Notes: A multi-line saved note`, `Relationship: work`, `Met on: 2025-03-04`, `Score: 0042.50e-1`, and safe custom photo path rendered as the `P` avatar/change-remove-photo control. Automated all-path proof covers NULL/empty preservation. |
-| 4 | Create, edit, then clear a custom value; each round-trips correctly. | **PENDING** | |
+| 4 | Create, edit, then clear a custom value; each round-trips correctly. | **PASS** | Standalone release rerun with an explicit post-save assertion: `Ace` → `Ace2` → Save → Profile → reopen showed `Ace2`; `Ace2` → empty → Save → Profile → reopen showed empty. Fixture creation/pair seeding is also covered by the all-path automated upgrade proof. |
 | 5 | Retyped invalid raw value remains visible with **Tap to fix**. | **PENDING** | |
 | 6 | Quarantine then Restore preserves the field and values. | **PENDING** | |
 | 7 | Permanently delete an empty field. | **PENDING** | |
