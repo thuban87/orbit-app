@@ -1,6 +1,8 @@
 import { parseBackupManifest } from "@/backup/backup-schema";
 import { buildExportManifest } from "@/backup/export-manifest";
+import { automaticBackupFilename } from "@/backup/auto-backup-policy";
 import type { SqlExecutor } from "@/db/types";
+import type { SafStorage } from "@/services/backup/saf-storage";
 
 export interface LocalExportFile {
   readonly uri: string;
@@ -30,6 +32,15 @@ export interface ManualExportDependencies {
   readPhotoBase64: (relativePath: string) => Promise<string>;
   files: LocalExportFiles;
   share: ExportShareAdapter;
+}
+
+export interface AutomaticBackupDependencies {
+  exec: SqlExecutor;
+  exportedAt: string;
+  now: Date;
+  readPhotoBase64: (relativePath: string) => Promise<string>;
+  directoryUri: string;
+  storage: SafStorage;
 }
 
 /**
@@ -64,6 +75,31 @@ export function createManualExportService(deps: ManualExportDependencies): {
         }
       } catch {
         return { status: "export-failed" };
+      } finally {
+        inFlight = false;
+      }
+    },
+  };
+}
+
+/** One single-flight SAF snapshot. Health persistence deliberately belongs to the caller. */
+export function createAutomaticBackupService(deps: AutomaticBackupDependencies): {
+  writeVerifiedSnapshot(): Promise<{ status: "written"; filename: string } | { status: "failed" } | { status: "busy" }>;
+} {
+  let inFlight = false;
+  return {
+    async writeVerifiedSnapshot() {
+      if (inFlight) return { status: "busy" } as const;
+      inFlight = true;
+      try {
+        const manifest = await buildExportManifest(deps.exec, { exportedAt: deps.exportedAt, readPhotoBase64: deps.readPhotoBase64 });
+        const contents = JSON.stringify(manifest);
+        parseBackupManifest(JSON.parse(contents));
+        const filename = automaticBackupFilename(deps.now);
+        await deps.storage.writeVerified(deps.directoryUri, filename, contents);
+        return { status: "written", filename } as const;
+      } catch {
+        return { status: "failed" } as const;
       } finally {
         inFlight = false;
       }
