@@ -90,41 +90,55 @@ function expoExecutor(db: SQLite.SQLiteDatabase): SqlExecutor {
 }
 
 let cachedDb: SQLite.SQLiteDatabase | null = null;
+let openingDb: Promise<SQLite.SQLiteDatabase> | null = null;
 
 /**
  * Open `orbit.db`, set the connection PRAGMAs (WAL, foreign_keys=ON,
  * busy_timeout) BEFORE any transaction, then run migrations up to
  * `TARGET_VERSION`. Idempotent: subsequent calls return the cached connection.
  */
-export async function openAndMigrate(): Promise<SQLite.SQLiteDatabase> {
-  if (cachedDb) return cachedDb;
+export function openAndMigrate(): Promise<SQLite.SQLiteDatabase> {
+  if (cachedDb) return Promise.resolve(cachedDb);
+  if (openingDb) return openingDb;
 
-  const db = await SQLite.openDatabaseAsync(DATABASE_NAME);
+  const opening = (async () => {
+    const db = await SQLite.openDatabaseAsync(DATABASE_NAME);
 
-  // PRAGMAs BEFORE any transaction. foreign_keys is per-connection and a
-  // no-op inside a txn (P1); WAL is persistent; busy_timeout guards concurrency.
-  await db.execAsync("PRAGMA journal_mode = WAL;");
-  await db.execAsync("PRAGMA foreign_keys = ON;");
-  await db.execAsync(`PRAGMA busy_timeout = ${BUSY_TIMEOUT_MS};`);
+    // PRAGMAs BEFORE any transaction. foreign_keys is per-connection and a
+    // no-op inside a txn (P1); WAL is persistent; busy_timeout guards concurrency.
+    await db.execAsync("PRAGMA journal_mode = WAL;");
+    await db.execAsync("PRAGMA foreign_keys = ON;");
+    await db.execAsync(`PRAGMA busy_timeout = ${BUSY_TIMEOUT_MS};`);
 
-  const now = localDateTime();
-  // Order does not matter — the runner sorts by version and applies ascending.
-  await runMigrations(
-    expoExecutor(db),
-    [
-      migration001,
-      migration002,
-      migration003,
-      migration004,
-      migration005,
-      migration006,
-    ],
-    TARGET_VERSION,
-    { now, newUid },
+    const now = localDateTime();
+    // Order does not matter — the runner sorts by version and applies ascending.
+    await runMigrations(
+      expoExecutor(db),
+      [
+        migration001,
+        migration002,
+        migration003,
+        migration004,
+        migration005,
+        migration006,
+      ],
+      TARGET_VERSION,
+      { now, newUid },
+    );
+
+    cachedDb = db;
+    return db;
+  })();
+  openingDb = opening;
+  void opening.then(
+    () => {
+      if (openingDb === opening) openingDb = null;
+    },
+    () => {
+      if (openingDb === opening) openingDb = null;
+    },
   );
-
-  cachedDb = db;
-  return db;
+  return opening;
 }
 
 /**
