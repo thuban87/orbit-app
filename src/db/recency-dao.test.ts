@@ -12,6 +12,12 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { nodeSqliteExecutor, openTestDb } from "@/db/__testkit__/node-sqlite";
 import { migration001 } from "@/db/migrations/001-initial";
+import { migration002 } from "@/db/migrations/002-app-settings";
+import { migration003 } from "@/db/migrations/003-orrery-settings";
+import { migration004 } from "@/db/migrations/004-ai-settings";
+import { migration005 } from "@/db/migrations/005-digest-settings";
+import { migration006 } from "@/db/migrations/006-normalize-custom-field-values";
+import { migration007 } from "@/db/migrations/007-tombstones";
 import { runMigrations } from "@/db/migrations/runner";
 import {
   createContactWithInteraction,
@@ -32,7 +38,20 @@ beforeEach(async () => {
   uidCounter = 0;
   const db = openTestDb();
   exec = nodeSqliteExecutor(db);
-  await runMigrations(exec, [migration001], 1, { now: NOW, newUid: uid });
+  await runMigrations(
+    exec,
+    [
+      migration001,
+      migration002,
+      migration003,
+      migration004,
+      migration005,
+      migration006,
+      migration007,
+    ],
+    7,
+    { now: NOW, newUid: uid },
+  );
 });
 
 async function lastContact(contactId: number): Promise<string | null> {
@@ -49,6 +68,17 @@ async function interactionCount(contactId: number): Promise<number> {
     [contactId],
   );
   return row?.n ?? 0;
+}
+
+async function interactionTombstones(): Promise<
+  Array<{ entity_uid: string; deleted_at: string }>
+> {
+  return exec.getAllAsync(
+    `SELECT entity_uid, deleted_at
+       FROM tombstones
+      WHERE entity_type = 'interaction'
+      ORDER BY entity_uid`,
+  );
 }
 
 /**
@@ -284,6 +314,59 @@ describe("recency DAO — (id, contactId) scoping guards recency (WR-04)", () =>
       occurredAt: "2026-08-01 10:00:00",
     });
     expect(await lastContact(a)).toBe("2026-08-01 10:00:00");
+  });
+});
+
+describe("deleteTouchpoint — durable deletion evidence", () => {
+  it("writes the matching interaction tombstone in its one delete transaction", async () => {
+    const c = await makeContact();
+    const interactionUid = uid();
+    const { interactionId } = await recordTouchpoint(exec, {
+      contactId: c,
+      uid: interactionUid,
+      occurredAt: "2026-07-01 10:00:00",
+      now: NOW,
+    });
+
+    let transactions = 0;
+    const countingExec: SqlExecutor = {
+      ...exec,
+      execAsync: async (sql) => {
+        if (sql === "BEGIN") transactions += 1;
+        await exec.execAsync(sql);
+      },
+    };
+
+    await deleteTouchpoint(countingExec, {
+      interactionId,
+      contactId: c,
+      now: NOW,
+    });
+
+    expect(transactions).toBe(1);
+    expect(await interactionTombstones()).toEqual([
+      { entity_uid: interactionUid, deleted_at: NOW },
+    ]);
+  });
+
+  it("rolls back without a tombstone when the interaction/contact pair does not match", async () => {
+    const a = await makeContact();
+    const interactionUid = uid();
+    const { interactionId } = await recordTouchpoint(exec, {
+      contactId: a,
+      uid: interactionUid,
+      occurredAt: "2026-07-01 10:00:00",
+      now: NOW,
+    });
+    const b = await makeContact();
+
+    await expect(
+      deleteTouchpoint(exec, { interactionId, contactId: b, now: NOW }),
+    ).rejects.toThrow(/no interaction matched/);
+
+    expect(await interactionTombstones()).toEqual([]);
+    expect(await lastContact(a)).toBe("2026-07-01 10:00:00");
+    expect(await interactionCount(a)).toBe(1);
   });
 });
 
