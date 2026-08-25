@@ -15,7 +15,7 @@
  *
  *     • `dropFieldValues` is a PRIVATE, NON-mutexed core. It assumes the caller
  *       ALREADY holds the transaction: no BEGIN, no withMutex, no
- *       inWriteTransaction. It does snapshot + DELETE def + DROP COLUMN and
+ *       inWriteTransaction. It does snapshot + DELETE pairs + DELETE def and
  *       NOTHING else.
  *     • `dropField` is the PUBLIC drop primitive: it wraps the core in exactly
  *       ONE `inWriteTransaction`. It must NEVER be called from inside another
