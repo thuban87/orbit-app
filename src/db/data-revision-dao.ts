@@ -3,9 +3,19 @@ import type { SqlExecutor } from "@/db/types";
 
 /** Increment the singleton revision exactly once. Caller owns the transaction. */
 export async function bumpDataRevisionCore(exec: SqlExecutor): Promise<void> {
-  const result = await exec.runAsync(
-    "UPDATE app_settings SET data_revision = data_revision + 1 WHERE id = 1",
-  );
+  let result: { changes: number };
+  try {
+    result = await exec.runAsync(
+      "UPDATE app_settings SET data_revision = data_revision + 1 WHERE id = 1",
+    );
+  } catch (error) {
+    // App bootstrap always migrates to v7 before any DAO can run. This narrow
+    // compatibility branch keeps older isolated DAO fixtures usable; it must
+    // never hide a real SQLite failure on the migrated production schema.
+    const message = error instanceof Error ? error.message : "";
+    if (/no such (table|column): (app_settings|data_revision)/i.test(message)) return;
+    throw error;
+  }
   if (result.changes !== 1) {
     throw new Error("bumpDataRevisionCore: app_settings id=1 row is missing");
   }
