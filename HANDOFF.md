@@ -464,6 +464,17 @@ Field types: `text` · `textarea` · `dropdown` · `date` · `toggle` · `number
 
 Note also that UNIQUE is a *constraint* (no two rows may share a value), unrelated to column names being distinct; and a VIEW is a saved SQL query stored in the database, unrelated to the UI displaying a field. Neither applies to custom fields.
 
+### Phase 16 supersession note — 2026-08-24
+
+The user-facing custom-field behavior in this section remains the record of
+intent. Its dynamic-column storage model (§14.1, §14.2, §14.5, and §14.11) was
+superseded by Phase 16's forward-only migration 006 and
+`docs/decisions/ADR-001-normalized-custom-field-values.md`. Values now live as
+normalized `custom_field_values` rows keyed by contact and definition, rather
+than as dynamic columns. This preserves the §14 field types, raw-text handling,
+type-change safety, visibility, quarantine/restore, history, sweep, and custom
+photo behavior while removing custom-field DDL from future operations.
+
 ---
 
 
