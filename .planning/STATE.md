@@ -3,10 +3,10 @@ gsd_state_version: 1.0
 milestone: v1.0
 current_phase: 17
 current_phase_name: Backup, Export & Restore
-status: complete
-stopped_at: Phase 17 UI-SPEC approved
-last_updated: "2026-08-25T09:19:55.187Z"
-state_head: 969573c669dcf735aadd497af9af90fc1ca3bfc3
+status: planned
+stopped_at: "Phase 17 plans converged (cross-AI + codex terra-high audit, 0 HIGH) — ready to execute"
+last_updated: "2026-08-25T20:21:37.100Z"
+state_head: 14b7c2a1ed7432560c9fc89bf5d01152537311ae
 progress:
   total_phases: 17
   completed_phases: 14
@@ -22,9 +22,11 @@ milestone_name: milestone
 See: .planning/PROJECT.md (updated 2026-08-14)
 
 **Core value:** Collapse the taps between "you're overdue with X" and the message actually being sent.
-**Current focus:** Phase 16 — Custom Field Value Normalization
+**Current focus:** Phase 17 — Backup, Export & Restore (plans converged, ready to execute)
 
 ## Current Position
+
+**⟢ PHASE 17 (Backup, Export & Restore) — PLANS CONVERGED (2026-08-25), ready to execute.** 12 plans / 9 waves. Pipeline: discuss → UI-SPEC (approved) → research → pattern-map → plan → plan-checker PASSED → **cross-AI convergence (codex + headless Sonnet 5, 3 cycles: 22→5→4)** → **directed codex terra-high audit (sessions A+B: ~17 HIGH + 12 MED)** → **3-pass consolidated fix** (data_revision/boundary/migration · reconciliation+restore · photos+encryption) → checker PASSED → **2 confirmation rounds → 0 HIGH**. Ships migration **007** (tombstones + `data_revision` counter + reserved profile/category UIDs) and **008** (restore-photo-journal). Owner-ratified decisions: reserved-UID (profile+categories, D-02-preserving), reject-incompatible pair/col_name collisions (v1), secure-default crypto (fail-closed). One accepted non-HIGH nit (17-07 re-encryption observability). NOT executed, NOT pushed. Next: `/gsd-execute-phase 17`. See 17-REVIEWS.md, 17-AUDIT-A/B-FINDINGS.md.
 
 **⟢ PHASE 15 (Weekly Digest) — COMPLETE (2026-08-23), pending owner sign-off. Milestone `--to 15` halt reached.**
 5/6 plans EXECUTED + node-verified (vitest 1356/1356) + code-review APPROVE + **DEVICE UAT PASSED on the Pixel**:
