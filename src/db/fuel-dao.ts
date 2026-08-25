@@ -30,6 +30,7 @@
  * Node-pure: takes `exec: SqlExecutor`; imports the shared `inWriteTransaction`.
  */
 import { inWriteTransaction } from "@/db/transaction";
+import { insertTombstoneCore } from "@/db/tombstones-dao";
 import type { SqlExecutor } from "@/db/types";
 
 /**
@@ -225,8 +226,21 @@ export async function confirmFuelCore(
 /** DELETE the matching (id, contact_id) + assertOneChange. */
 export async function deleteFuelCore(
   exec: SqlExecutor,
-  input: { id: number; contactId: number },
+  input: { id: number; contactId: number; now: string },
 ): Promise<void> {
+  const target = await exec.getFirstAsync<{ uid: string }>(
+    "SELECT uid FROM fuel WHERE id = ? AND contact_id = ?",
+    [input.id, input.contactId],
+  );
+  if (!target) {
+    assertOneChange("deleteFuel", input.id, input.contactId, 0);
+    return;
+  }
+  await insertTombstoneCore(exec, {
+    entityType: "fuel",
+    entityUid: target.uid,
+    deletedAt: input.now,
+  });
   const result = await exec.runAsync(
     "DELETE FROM fuel WHERE id = ? AND contact_id = ?",
     [input.id, input.contactId],
@@ -267,7 +281,7 @@ export function confirmFuel(
 /** Delete one fuel row (standalone). Wraps `deleteFuelCore` in one transaction. */
 export function deleteFuel(
   exec: SqlExecutor,
-  input: { id: number; contactId: number },
+  input: { id: number; contactId: number; now: string },
 ): Promise<void> {
   return inWriteTransaction(exec, () => deleteFuelCore(exec, input));
 }

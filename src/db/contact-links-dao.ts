@@ -29,6 +29,7 @@
  * Node-pure: takes `exec: SqlExecutor`; imports the shared `inWriteTransaction`.
  */
 import { inWriteTransaction } from "@/db/transaction";
+import { insertTombstoneCore } from "@/db/tombstones-dao";
 import type { SqlExecutor } from "@/db/types";
 
 /** A stored link row, as returned by `listLinks`. */
@@ -136,8 +137,21 @@ async function updateLinkCore(
 /** DELETE the matching (id, contact_id) + assertOneChange. */
 async function removeLinkCore(
   exec: SqlExecutor,
-  params: { id: number; contactId: number },
+  params: { id: number; contactId: number; now: string },
 ): Promise<void> {
+  const target = await exec.getFirstAsync<{ uid: string }>(
+    "SELECT uid FROM contact_links WHERE id = ? AND contact_id = ?",
+    [params.id, params.contactId],
+  );
+  if (!target) {
+    assertOneChange("removeLink", params.id, params.contactId, 0);
+    return;
+  }
+  await insertTombstoneCore(exec, {
+    entityType: "contact_link",
+    entityUid: target.uid,
+    deletedAt: params.now,
+  });
   const result = await exec.runAsync(
     "DELETE FROM contact_links WHERE id = ? AND contact_id = ?",
     [params.id, params.contactId],
@@ -178,7 +192,7 @@ export function updateLink(
 /** Delete a link (standalone). Wraps `removeLinkCore`. */
 export function removeLink(
   exec: SqlExecutor,
-  params: { id: number; contactId: number },
+  params: { id: number; contactId: number; now: string },
 ): Promise<void> {
   return inWriteTransaction(exec, () => removeLinkCore(exec, params));
 }
@@ -229,7 +243,7 @@ export function applyLinkDiff(
     // (b) DELETE seeded rows the draft dropped.
     for (const s of seeded) {
       if (!currentIds.has(s.id)) {
-        await removeLinkCore(exec, { id: s.id, contactId });
+        await removeLinkCore(exec, { id: s.id, contactId, now });
       }
     }
 

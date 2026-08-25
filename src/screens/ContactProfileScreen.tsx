@@ -605,7 +605,11 @@ export function ContactProfileScreen({
             onPress: () => {
               void (async () => {
                 try {
-                  await deleteFuel(getExecutor(), { id, contactId });
+                  await deleteFuel(getExecutor(), {
+                    id,
+                    contactId,
+                    now: localDateTime(),
+                  });
                   await load();
                   // Deleting fuel can change the ranked fuelText on the widget tile.
                   notifyWidgetDataChanged();
