@@ -25,6 +25,7 @@ import { migration002 } from "@/db/migrations/002-app-settings";
 import { migration003 } from "@/db/migrations/003-orrery-settings";
 import { migration004 } from "@/db/migrations/004-ai-settings";
 import { migration005 } from "@/db/migrations/005-digest-settings";
+import { migration007 } from "@/db/migrations/007-tombstones";
 import { runMigrations } from "@/db/migrations/runner";
 import type { SqlExecutor } from "@/db/types";
 import { __resetSweepForTest, runLaunchSweep } from "@/services/launch-sweep";
@@ -61,12 +62,19 @@ beforeEach(async () => {
   uidCounter = 0;
   const db = openTestDb();
   exec = nodeSqliteExecutor(db);
-  // v5: getAppSettings (read by the reconcile under test) SELECTs digest_enabled,
-  // added by migration 005 (Plan 15-01) — so the harness must migrate to v5.
+  // v7: getAppSettings (read by the reconcile under test) reads the Phase-17
+  // backup settings, so this CURRENT-schema harness must match production.
   await runMigrations(
     exec,
-    [migration001, migration002, migration003, migration004, migration005],
-    5,
+    [
+      migration001,
+      migration002,
+      migration003,
+      migration004,
+      migration005,
+      migration007,
+    ],
+    7,
     { now: NOW, newUid: uid },
   );
   __resetExpo();

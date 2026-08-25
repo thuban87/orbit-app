@@ -381,6 +381,13 @@ describe("migration006 — lossless legacy custom-value normalization", () => {
     });
 
     await migrate();
+    // The migration itself remains a v6 proof. Exercise its lifecycle callers
+    // against the current production schema, where permanent deletes record
+    // Phase-17 tombstones.
+    await runMigrations(exec, [...legacyMigrations, migration006, migration007], 7, {
+      now: MIGRATION_NOW,
+      newUid: uid,
+    });
     const liveDefs = await listDefs(exec, { includeQuarantined: false });
     const initial = await getValuesForContact(exec, alex, liveDefs);
     expect(initial).toMatchObject({
@@ -505,12 +512,6 @@ describe("migration006 — lossless legacy custom-value normalization", () => {
       ),
     ).toEqual({ old_value: "private", field_col_name: "score" });
 
-    // purgeContact now writes Phase 17 deletion evidence, so run its required
-    // forward migration while retaining this v6 lifecycle regression.
-    await runMigrations(exec, [...legacyMigrations, migration006, migration007], 7, {
-      now: MIGRATION_NOW,
-      newUid: uid,
-    });
     await purgeContact(exec, blair, { now: MIGRATION_NOW });
     expect(
       await exec.getFirstAsync<{ n: number }>(
