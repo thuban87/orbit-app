@@ -598,7 +598,20 @@ Plans:
   3. Restore previews first, defaults to Merge, and offers confirmed Replace-all. Merge uses the reusable reconciliation core: `uid` identity, newer `modified_at` for mutable rows, child-parent resolution by uid, derived `last_contact` recomputation, and tombstone-aware deletion. Replace-all creates a verified pre-restore automatic backup when configured, recreates the normalized field model, writes fresh local photo files, and rebuilds derived schedules.
   4. Migration **007** adds generic, indefinitely retained tombstones (`entity_type`, `entity_uid`, `deleted_at`) for every hard-deleted mergeable logical entity. Each delete writes its tombstone in the same transaction; a newer tombstone prevents resurrection and wins same-second ties. Export includes tombstones; old tombstone-less backups remain restorable.
 
-**Plans:** TBD — wave 0 is migration 007 plus every applicable hard-delete writer and reconciliation-core tests; subsequent waves build export, auto backup, encryption, and previewed restore. Full locked context is parked in `17-CONTEXT.md` and must be refreshed after Phase 16 executes.
+**Plans:** 11 plans — wave 0 gates native package provenance; subsequent waves establish migration 007/delete evidence, reconciliation, export, automatic SAF backup, encryption, transactional restore, UI, and Pixel UAT.
+
+Plans:
+- [ ] 17-01-PLAN.md — blocking native-package provenance verification
+- [ ] 17-02-PLAN.md — migration 007, tombstones, purge evidence, and backup settings state
+- [ ] 17-03-PLAN.md — standalone interaction/fuel/link deletion evidence
+- [ ] 17-04-PLAN.md — permanent field deletion evidence and reusable reconciliation policy
+- [ ] 17-05-PLAN.md — validated plaintext manifest and manual share export
+- [ ] 17-06-PLAN.md — verified foreground SAF snapshots, retention, and health
+- [ ] 17-07-PLAN.md — native encrypted envelope and passphrase lifecycle
+- [ ] 17-08-PLAN.md — validated preview plus transactional Merge/Replace apply
+- [ ] 17-09-PLAN.md — Backup landing, settings, and temporary Dashboard entry
+- [ ] 17-10-PLAN.md — restore picker, preview, confirmation, and aggregate result UI
+- [ ] 17-11-PLAN.md — automated gates and owner-led Android release UAT
 
 ## Progress
 
