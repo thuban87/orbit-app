@@ -15,7 +15,7 @@ affects: [17-07 encryption, 17-09 backup-health-ui]
 actuals:
   tokens: 11200
   tasks: 3
-  commits: 4
+  commits: 5
 key-files:
   created: [src/backup/auto-backup-policy.ts, src/services/backup/saf-storage.ts, src/services/backup-sweep.ts, src/db/profile-dao.test.ts]
   modified: [src/db/data-revision-dao.ts, src/services/backup/backup-service.ts, App.tsx]
@@ -34,6 +34,7 @@ Orbit now uses a monotonic data revision to detect exportable changes and starts
 - Added one-per-logical-operation revision bumps to exportable write owners while preserving leaf-core composition and accepted no-op reorders.
 - Added revision, fan-out, archive/restore, rollback, mixed-link-diff, and profile-photo regression coverage.
 - Added strict automatic filenames, revision-based due policy, SAF write/read-back verification, single-flight service behavior, and foreground health bookkeeping.
+- Prunes only strict owned expired SAF snapshots after a successful verified write, while protecting the newly written file if device time rolled back.
 
 ## Task Commits
 
@@ -41,6 +42,7 @@ Orbit now uses a monotonic data revision to detect exportable changes and starts
 2. `beb1366` — automatic snapshot policy and SAF adapter
 3. `c27a110` — foreground launch registration and truthful health persistence
 4. `42d7feb` — legacy isolated DAO-fixture compatibility
+5. `9f15dcb` — verified snapshot retention hardening
 
 ## Verification
 
