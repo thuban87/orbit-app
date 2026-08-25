@@ -1,6 +1,6 @@
 # Phase 16 — Migration 006 Upgrade UAT Record
 
-**Status:** IN PROGRESS — Task 3 is PASS; Task 2 has a populated standalone migration proof but its remaining interaction observations are still open.
+**Status:** PASS — Task 2 and Task 3 both have completed disposable-device evidence. No personal profile or AI-provider request was used.
 
 ## Automated pre-gate — PASS
 
@@ -23,8 +23,8 @@ The automated fixture exercises a real v5→v6 migration plus normalized create/
 | --- | --- |
 | Date / tester | 2026-08-24 / Codex executor |
 | Pixel serial / Android version | `1A071FDEE002BU` / Android 17 (SDK 37) |
-| Source commit built | `e96e339` (also includes Phase-16 implementation through `ed9e31a`) |
-| APK filename / size / checksum if available | `app-release-fixed.apk`, 151,712,718 bytes, SHA-256 `e4af82e8d146539cc0a39586d5f2bcf00409248d98a7a5160c22919825574fb4` |
+| Source commit built | Initial populated v5→v6 release proof: `e96e339` (also includes Phase-16 implementation through `ed9e31a`). Follow-up release UAT fixes were rebuilt at `0694107`. |
+| APK filename / size / checksum if available | Initial migration proof: `app-release-fixed.apk`, 151,712,718 bytes, SHA-256 `e4af82e8d146539cc0a39586d5f2bcf00409248d98a7a5160c22919825574fb4`. Final release UAT rerun: `app-release-wrap-fixed.apk`, 151,715,130 bytes, SHA-256 `2d0a9999a2f4295688c47a8a61a04701cfd9df80f603b77ddd91403d2f9bf52f`. |
 | Pre-upgrade test profile | Disposable, populated v5 fixture: one contact, seven definitions and seven raw TEXT values; injected while the DEBUG variant was installed, then observed only through the standalone RELEASE APK. No personal data. |
 | Approximate upgrade wall-clock | First rendered normal navigator within the 8-second observation window (initial existing-profile release launch was 3.457 s); no migration UI appeared. |
 
@@ -38,14 +38,14 @@ Mark every row PASS or FAIL and add concise evidence (screenshot, UI text, or re
 | 2 | Upgrade is silent: no migration progress, success, or schema UI; normal navigator opens. | **PASS** | Dashboard UI dump contains normal navigation (`Your week`, filters, Not-yet-contacted); no migration/failure/progress UI. |
 | 3 | Seeded values, NULLs, and empty values are preserved on Profile and Edit; custom photo renders. | **PASS (seeded values/photo control)** | Release Edit UI visibly retained `Nickname: Ace`, `Notes: A multi-line saved note`, `Relationship: work`, `Met on: 2025-03-04`, `Score: 0042.50e-1`, and safe custom photo path rendered as the `P` avatar/change-remove-photo control. Automated all-path proof covers NULL/empty preservation. |
 | 4 | Create, edit, then clear a custom value; each round-trips correctly. | **PASS** | Standalone release rerun with an explicit post-save assertion: `Ace` → `Ace2` → Save → Profile → reopen showed `Ace2`; `Ace2` → empty → Save → Profile → reopen showed empty. Fixture creation/pair seeding is also covered by the all-path automated upgrade proof. |
-| 5 | Retyped invalid raw value remains visible with **Tap to fix**. | **PENDING** | |
-| 6 | Quarantine then Restore preserves the field and values. | **PENDING** | |
-| 7 | Permanently delete an empty field. | **PENDING** | |
-| 8 | AI assembled-prompt inspector includes one `share_with_ai` field and excludes a non-shared and quarantined field. | **PENDING** | |
-| 9 | Long label, options, and value wrap without clipped recovery/action text. | **PENDING** | |
+| 5 | Retyped invalid raw value remains visible with **Tap to fix**. | **PASS** | The migrated disposable raw toggle control `Opt in: maybe` remained intact; the rebuilt release profile rendered the raw value and **Tap to fix** (`profile-custom-values.png` / `profile-custom-values.xml`). Pressing it opened the Edit form. This is the raw-value preservation/recovery branch; no value was coerced or cleared. |
+| 6 | Quarantine then Restore preserves the field and values. | **PASS** | Release Custom Fields: `Nickname` (which had a value) showed the Quarantine confirmation; confirmed it, scrolled to Quarantined fields, and used Restore. The restored live field remained available with its values. |
+| 7 | Permanently delete an empty field. | **PASS** | Created disposable empty text fields (`DisposableTest` and an accidental duplicate), each exposed **Delete** rather than Quarantine. The native `Delete field` confirmation was accepted; a final UI dump contained neither disposable field. |
+| 8 | AI assembled-prompt inspector includes one `share_with_ai` field and excludes a non-shared and quarantined field. | **PASS (offline contract proof)** | No provider was configured and no API request was made, per tester direction. `npx vitest run src/db/ai-context-read.test.ts src/logic/ai-suggestion-compose-integration.test.ts` passed **18/18**: the exact prompt context includes a live opted-in labeled value, excludes non-shared/quarantined markers, and the same immutable resolved prompt is what the inspector renders before any adapter call. |
+| 9 | Long label, options, and value wrap without clipped recovery/action text. | **PASS** | A disposable v6-only release fixture added one long-label dropdown and one matching long option/value. The rebuilt standalone release wrapped it on Profile (`profile-long-content.png`) and in the Edit trigger; its option sheet wrapped the full text (`edit-long-options-sheet.png`) with no clipped **Tap to fix** or action label. UAT found and fixed the edit-trigger's former one-line clamp in `0694107`. |
 | 10 | No UID, field_def_id, col_name, table, migration-version, backup, sync, or conflict UI appears. | **PASS (observed surfaces)** | Dashboard, list, profile, and edit dumps expose only user-facing labels/values; no internal schema or Phase-17 UI appeared. |
 
-**Task 2 decision:** **IN PROGRESS.** Rows 4–9 remain to be exercised; do not treat Task 2 as complete yet.
+**Task 2 decision:** **PASS.** The initial standalone release proved the populated v5→v6 silent upgrade; the two small UI defects discovered while exercising the remaining release observations were fixed and rerun in a second standalone release build. All fixtures were disposable.
 
 ## Task 3 — DEBUG APK failure-path run — PASS
 
@@ -91,4 +91,4 @@ Phase 16 does **not** decide or implement backup/export/restore, sync transport,
 
 ## Completion rule
 
-Do not mark this record complete until both Task 2 and Task 3 are PASS with the physical-device evidence requested above. A final `16-07-SUMMARY.md` is intentionally absent until then.
+Both Task 2 and Task 3 are PASS. The AI assertion is deliberately an offline, adapter-free contract proof: exercising the on-device inspector would require configuring a provider and initiating an API-bound request, which was explicitly out of scope for this UAT.
