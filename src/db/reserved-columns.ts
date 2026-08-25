@@ -2,20 +2,19 @@
  * Reserved fixed-column whitelist (FLD-02, T-03-06) — the set of identifiers a
  * custom `col_name` may NEVER equal.
  *
- * `col_name` is the ONE identifier this subsystem interpolates (double-quoted)
- * into SQL. `makeColName` (col-name.ts) uniquifies every produced name against
- * THIS set so a custom field can never shadow a fixed column such as `phone`,
- * `email`, or the value-table's own `contact_id`/`uid`/`modified_at`.
+ * `col_name` remains a compatibility and filename key. `makeColName`
+ * (col-name.ts) uniquifies every produced name against THIS set so a custom
+ * field can never shadow a fixed column such as `phone`, `email`, or the
+ * normalized value-table's own literal columns.
  *
- * SOURCE OF TRUTH: transcribed from migrations/001-initial.ts —
+ * SOURCE OF TRUTH: transcribed from the v6 literal schema —
  *   • every column of `contacts` (CREATE_CONTACTS)
- *   • every FIXED column of `contact_custom_values` (contact_id, uid, modified_at;
- *     value columns are added dynamically in Phase 3 and are NOT reserved)
+ *   • every column of `custom_field_values` (migration 006)
  *   • the SQLite rowid aliases (rowid, oid, _rowid_), which name the same hidden
  *     column and would collide silently.
  *
  * DRIFT GUARD: this list is transcribed by hand, so reserved-columns.test.ts runs
- * the REAL migration001 and asserts this set is a SUPERSET of the live
+ * migrations 001 through 006 and asserts this set is a SUPERSET of the live
  * `PRAGMA table_info` column names. If a future migration adds a fixed column and
  * this whitelist is not updated, that test fails loudly rather than allowing a
  * silent name collision.
@@ -50,12 +49,16 @@ const CONTACTS_COLUMNS: readonly string[] = [
 ];
 
 /**
- * The FIXED columns of `contact_custom_values` (CREATE_CONTACT_CUSTOM_VALUES).
- * Value columns are added dynamically in Phase 3 and are deliberately excluded.
+ * The literal columns of `custom_field_values` (migration 006). This table no
+ * longer contains one dynamic schema column per custom definition.
  */
-const CONTACT_CUSTOM_VALUES_FIXED_COLUMNS: readonly string[] = [
-  "contact_id",
+const CUSTOM_FIELD_VALUES_COLUMNS: readonly string[] = [
+  "id",
   "uid",
+  "contact_id",
+  "field_def_id",
+  "value",
+  "created_at",
   "modified_at",
 ];
 
@@ -73,6 +76,6 @@ const ROWID_ALIASES: readonly string[] = ["rowid", "oid", "_rowid_"];
  */
 export const RESERVED_COLUMN_NAMES: ReadonlySet<string> = new Set<string>([
   ...CONTACTS_COLUMNS,
-  ...CONTACT_CUSTOM_VALUES_FIXED_COLUMNS,
+  ...CUSTOM_FIELD_VALUES_COLUMNS,
   ...ROWID_ALIASES,
 ]);
