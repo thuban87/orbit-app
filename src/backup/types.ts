@@ -15,6 +15,36 @@ export const BACKUP_FORMAT_VERSION = 1;
 /** Container/envelope evolution is independent from the plaintext manifest. */
 export const BACKUP_ENVELOPE_VERSION = 1;
 
+/**
+ * Compatibility contract for one encrypted-backup envelope version. This is
+ * deliberately caller-supplied until a physical-device benchmark approves a
+ * shipping profile; no service-level encryption default exists.
+ */
+export interface BackupEncryptionProfile {
+  formatVersion: number;
+  cipher: "AES-256-GCM";
+  kdf: {
+    id: "PBKDF2-HMAC-SHA256";
+    iterations: number;
+    derivedKeyLength: number;
+  };
+  saltLength: number;
+  ivLength: number;
+  maxCiphertextBytes: number;
+}
+
+/** The complete public schema of an encrypted backup envelope. Nothing else may be public. */
+export interface EncryptedBackupEnvelope {
+  formatVersion: number;
+  encrypted: true;
+  cipher: "AES-256-GCM";
+  kdf: BackupEncryptionProfile["kdf"];
+  saltBase64: string;
+  ivBase64: string;
+  /** Opaque AES-GCM ciphertext followed by its 16-byte authentication tag. */
+  ciphertextBase64: string;
+}
+
 export interface BackupManifest {
   backupFormatVersion: number;
   envelopeVersion: number;

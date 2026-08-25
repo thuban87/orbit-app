@@ -3,7 +3,6 @@ import { describe, expect, it, vi } from "vitest";
 import {
   BackupEnvelopeError,
   createBackupEnvelopeCrypto,
-  parseEnvelopeHeader,
 } from "@/services/backup/encryption";
 import type { BackupEncryptionProfile } from "@/backup/types";
 
@@ -82,12 +81,14 @@ describe("backup encryption envelope", () => {
   });
 
   it("rejects unknown public keys before decryption", () => {
-    const crypto = createBackupEnvelopeCrypto({ profiles: [profile], backend: createTestBackend() });
+    const backend = createTestBackend();
+    const crypto = createBackupEnvelopeCrypto({ profiles: [profile], backend });
     const envelope = crypto.encrypt({ passphrase: "passphrase", plaintext: new Uint8Array([1]), profile });
-    const deriveKey = vi.spyOn(createTestBackend(), "deriveKey");
+    const deriveKey = vi.spyOn(backend, "deriveKey");
+    deriveKey.mockClear();
 
-    expect(() => parseEnvelopeHeader({ ...envelope, benchmarkDurationMs: 48 }, [profile])).toThrow(BackupEnvelopeError);
-    expect(() => parseEnvelopeHeader({ ...envelope, kdf: { ...envelope.kdf, deviceModel: "Pixel" } }, [profile])).toThrow(
+    expect(() => crypto.decrypt({ passphrase: "passphrase", envelope: { ...envelope, benchmarkDurationMs: 48 } })).toThrow(BackupEnvelopeError);
+    expect(() => crypto.decrypt({ passphrase: "passphrase", envelope: { ...envelope, kdf: { ...envelope.kdf, deviceModel: "Pixel" } } })).toThrow(
       BackupEnvelopeError,
     );
     expect(deriveKey).not.toHaveBeenCalled();
