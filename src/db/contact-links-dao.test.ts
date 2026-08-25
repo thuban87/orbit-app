@@ -24,6 +24,12 @@ import {
   updateLink,
 } from "@/db/contact-links-dao";
 import { migration001 } from "@/db/migrations/001-initial";
+import { migration002 } from "@/db/migrations/002-app-settings";
+import { migration003 } from "@/db/migrations/003-orrery-settings";
+import { migration004 } from "@/db/migrations/004-ai-settings";
+import { migration005 } from "@/db/migrations/005-digest-settings";
+import { migration006 } from "@/db/migrations/006-normalize-custom-field-values";
+import { migration007 } from "@/db/migrations/007-tombstones";
 import { runMigrations } from "@/db/migrations/runner";
 import type { SqlExecutor } from "@/db/types";
 
@@ -38,7 +44,20 @@ beforeEach(async () => {
   uidCounter = 0;
   const db = openTestDb();
   exec = nodeSqliteExecutor(db);
-  await runMigrations(exec, [migration001], 1, { now: NOW, newUid: uid });
+  await runMigrations(
+    exec,
+    [
+      migration001,
+      migration002,
+      migration003,
+      migration004,
+      migration005,
+      migration006,
+      migration007,
+    ],
+    7,
+    { now: NOW, newUid: uid },
+  );
 });
 
 /** Insert a bare contact row and return its id. */
@@ -49,6 +68,17 @@ async function makeContact(name = "Linkable"): Promise<number> {
     [uid(), name, 30, NOW, NOW],
   );
   return r.lastInsertRowId;
+}
+
+async function linkTombstones(): Promise<
+  Array<{ entity_uid: string; deleted_at: string }>
+> {
+  return exec.getAllAsync(
+    `SELECT entity_uid, deleted_at
+       FROM tombstones
+      WHERE entity_type = 'contact_link'
+      ORDER BY entity_uid`,
+  );
 }
 
 describe("addLink — appends at MAX(display_order)+1 (first row → 0)", () => {
@@ -179,8 +209,20 @@ describe("removeLink — both-key scoped + assertOneChange (WR-04)", () => {
       now: NOW,
     });
     const [link] = await listLinks(exec, cid);
-    await removeLink(exec, { id: link.id, contactId: cid });
+    let transactions = 0;
+    const countingExec: SqlExecutor = {
+      ...exec,
+      execAsync: async (sql) => {
+        if (sql === "BEGIN") transactions += 1;
+        await exec.execAsync(sql);
+      },
+    };
+    await removeLink(countingExec, { id: link.id, contactId: cid, now: NOW });
     expect(await listLinks(exec, cid)).toEqual([]);
+    expect(transactions).toBe(1);
+    expect(await linkTombstones()).toEqual([
+      { entity_uid: link.uid, deleted_at: NOW },
+    ]);
   });
 
   it("throws (0 rows) when the contact_id does not match the link's owner", async () => {
@@ -195,9 +237,10 @@ describe("removeLink — both-key scoped + assertOneChange (WR-04)", () => {
     });
     const [link] = await listLinks(exec, a);
     await expect(
-      removeLink(exec, { id: link.id, contactId: b }),
+      removeLink(exec, { id: link.id, contactId: b, now: NOW }),
     ).rejects.toThrow();
     expect((await listLinks(exec, a)).length).toBe(1);
+    expect(await linkTombstones()).toEqual([]);
   });
 });
 
@@ -232,7 +275,20 @@ describe("applyLinkDiff — one atomic seeded-vs-current diff", () => {
       { uid: uid(), url: "https://l3", label: null },
     ];
 
-    await applyLinkDiff(exec, { contactId: cid, seeded, current, now: NOW });
+    let transactions = 0;
+    const countingExec: SqlExecutor = {
+      ...exec,
+      execAsync: async (sql) => {
+        if (sql === "BEGIN") transactions += 1;
+        await exec.execAsync(sql);
+      },
+    };
+    await applyLinkDiff(countingExec, {
+      contactId: cid,
+      seeded,
+      current,
+      now: NOW,
+    });
 
     const after = await listLinks(exec, cid);
     // L1 updated, L2 gone, L3 appended at MAX+1.
@@ -244,6 +300,10 @@ describe("applyLinkDiff — one atomic seeded-vs-current diff", () => {
     expect(after[1].label).toBeNull();
     // Append order preserved: L3 sits after the surviving L1.
     expect(after[0].display_order).toBeLessThan(after[1].display_order);
+    expect(transactions).toBe(1);
+    expect(await linkTombstones()).toEqual([
+      { entity_uid: seeded[1].uid, deleted_at: NOW },
+    ]);
   });
 
   it("rolls the WHOLE diff back on a mid-diff failure (no partial link state)", async () => {
@@ -278,5 +338,6 @@ describe("applyLinkDiff — one atomic seeded-vs-current diff", () => {
     // Nothing changed: the real link survives and the new insert was rolled back.
     const after = await listLinks(exec, cid);
     expect(after.map((l) => l.url)).toEqual(["https://real"]);
+    expect(await linkTombstones()).toEqual([]);
   });
 });

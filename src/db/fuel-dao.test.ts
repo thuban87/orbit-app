@@ -28,6 +28,12 @@ import {
 } from "@/db/fuel-dao";
 import { getRankedFuel } from "@/db/fuel-read";
 import { migration001 } from "@/db/migrations/001-initial";
+import { migration002 } from "@/db/migrations/002-app-settings";
+import { migration003 } from "@/db/migrations/003-orrery-settings";
+import { migration004 } from "@/db/migrations/004-ai-settings";
+import { migration005 } from "@/db/migrations/005-digest-settings";
+import { migration006 } from "@/db/migrations/006-normalize-custom-field-values";
+import { migration007 } from "@/db/migrations/007-tombstones";
 import { runMigrations } from "@/db/migrations/runner";
 import { inWriteTransaction } from "@/db/transaction";
 import type { SqlExecutor } from "@/db/types";
@@ -44,7 +50,20 @@ beforeEach(async () => {
   uidCounter = 0;
   const db = openTestDb();
   exec = nodeSqliteExecutor(db);
-  await runMigrations(exec, [migration001], 1, { now: NOW, newUid: uid });
+  await runMigrations(
+    exec,
+    [
+      migration001,
+      migration002,
+      migration003,
+      migration004,
+      migration005,
+      migration006,
+      migration007,
+    ],
+    7,
+    { now: NOW, newUid: uid },
+  );
 });
 
 /** Insert a bare contact so the fuel FK (contact_id) is satisfiable. */
@@ -74,6 +93,17 @@ async function allFuel(contactId: number): Promise<FuelRow[]> {
   return exec.getAllAsync<FuelRow>(
     "SELECT * FROM fuel WHERE contact_id = ? ORDER BY id",
     [contactId],
+  );
+}
+
+async function fuelTombstones(): Promise<
+  Array<{ entity_uid: string; deleted_at: string }>
+> {
+  return exec.getAllAsync(
+    `SELECT entity_uid, deleted_at
+       FROM tombstones
+      WHERE entity_type = 'fuel'
+      ORDER BY entity_uid`,
   );
 }
 
@@ -281,8 +311,9 @@ describe("editFuel — bumps modified_at, preserves created_at, both-keys scoped
 describe("deleteFuel — removes matching (id, contact_id), both-keys scoped", () => {
   it("deletes the matching row", async () => {
     const c = await seedContact();
+    const fuelUid = uid();
     const id = await addFuel(exec, {
-      uid: uid(),
+      uid: fuelUid,
       contactId: c,
       kind: "recent",
       text: "delete me",
@@ -291,10 +322,23 @@ describe("deleteFuel — removes matching (id, contact_id), both-keys scoped", (
       now: NOW,
     });
 
-    await deleteFuel(exec, { id, contactId: c });
+    let transactions = 0;
+    const countingExec: SqlExecutor = {
+      ...exec,
+      execAsync: async (sql) => {
+        if (sql === "BEGIN") transactions += 1;
+        await exec.execAsync(sql);
+      },
+    };
+
+    await deleteFuel(countingExec, { id, contactId: c, now: LATER });
 
     const rows = await allFuel(c);
     expect(rows.length).toBe(0);
+    expect(transactions).toBe(1);
+    expect(await fuelTombstones()).toEqual([
+      { entity_uid: fuelUid, deleted_at: LATER },
+    ]);
   });
 
   it("throws when the contactId does not match the row's contact (0 changes)", async () => {
@@ -310,10 +354,13 @@ describe("deleteFuel — removes matching (id, contact_id), both-keys scoped", (
       now: NOW,
     });
 
-    await expect(deleteFuel(exec, { id, contactId: c2 })).rejects.toThrow();
+    await expect(
+      deleteFuel(exec, { id, contactId: c2, now: LATER }),
+    ).rejects.toThrow();
 
     const rows = await allFuel(c1);
     expect(rows.length).toBe(1);
+    expect(await fuelTombstones()).toEqual([]);
   });
 });
 
