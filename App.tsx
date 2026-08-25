@@ -19,6 +19,7 @@ import { NotificationResponseGate } from "@/navigation/notification-gate";
 import { RootNavigator } from "@/navigation/RootNavigator";
 import { WidgetLinkingGate } from "@/navigation/widget-linking";
 import { registerFieldSweep } from "@/services/field-sweep";
+import { registerBackupSweep } from "@/services/backup-sweep";
 import { installSweepTrigger } from "@/services/launch-sweep";
 // Module-scope side-effect import (Pitfall P5): importing headless-task RUNS its
 // `TaskManager.defineTask` + `registerTaskAsync` so a killed-app action tap reaches
@@ -75,6 +76,7 @@ Notifications.setNotificationHandler({
 // remounts), and registering the same hook twice would double-run it — so this
 // module-scope flag makes registration idempotent across effect re-entries.
 let fieldSweepRegistered = false;
+let backupSweepRegistered = false;
 // One-shot guard for the photo-write reconciliation hook (PHOTO-03/05), on the
 // SAME registry and under the SAME re-entrancy reasoning as the field sweep.
 let photoReconcileRegistered = false;
@@ -136,6 +138,11 @@ function AppShell() {
     if (!fieldSweepRegistered) {
       registerFieldSweep(getExecutor);
       fieldSweepRegistered = true;
+    }
+    // Backup must register before the trigger's cold-start foreground sweep.
+    if (!backupSweepRegistered) {
+      registerBackupSweep(getExecutor);
+      backupSweepRegistered = true;
     }
     // Register the photo-write reconciliation (PHOTO-03/05) on the same registry,
     // once only, BEFORE the trigger fires its cold-start sweep. FS-only, no
