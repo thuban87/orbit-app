@@ -49,6 +49,11 @@ export const ADD_BACKUP_FOLDER_NAME = `
 ALTER TABLE app_settings
   ADD COLUMN backup_folder_name TEXT;`;
 
+/** Last known SAF access probe outcome; URI/diagnostic remain intact on loss. */
+export const ADD_BACKUP_FOLDER_ACCESSIBLE = `
+ALTER TABLE app_settings
+  ADD COLUMN backup_folder_accessible INTEGER NOT NULL DEFAULT 0;`;
+
 /** Last access failure detail, retained to diagnose a lost SAF destination. */
 export const ADD_BACKUP_FOLDER_DIAGNOSTIC = `
 ALTER TABLE app_settings
@@ -86,6 +91,7 @@ export const migration007: Migration = {
     await exec.execAsync(ADD_BACKUP_RETENTION_DAYS);
     await exec.execAsync(ADD_BACKUP_FOLDER_URI);
     await exec.execAsync(ADD_BACKUP_FOLDER_NAME);
+    await exec.execAsync(ADD_BACKUP_FOLDER_ACCESSIBLE);
     await exec.execAsync(ADD_BACKUP_FOLDER_DIAGNOSTIC);
     await exec.execAsync(ADD_LAST_AUTOMATIC_BACKUP_AT);
     await exec.execAsync(ADD_LAST_BACKUP_DATA_REVISION);
