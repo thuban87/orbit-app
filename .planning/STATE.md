@@ -4,14 +4,14 @@ milestone: v1.0
 current_phase: 17
 current_phase_name: Backup, Export & Restore
 status: planned
-stopped_at: "Phase 17 plans converged (cross-AI + codex terra-high audit, 0 HIGH) — ready to execute"
-last_updated: "2026-08-25T20:21:37.100Z"
-state_head: 14b7c2a1ed7432560c9fc89bf5d01152537311ae
+stopped_at: Completed 17-01-PLAN.md
+last_updated: "2026-08-25T21:09:41.141Z"
+state_head: 89f9e3ed55d8fdf634a30aabc148f2fb363815ad
 progress:
   total_phases: 17
   completed_phases: 14
   total_plans: 128
-  completed_plans: 114
+  completed_plans: 115
 milestone_name: milestone
 ---
 
@@ -22,7 +22,7 @@ milestone_name: milestone
 See: .planning/PROJECT.md (updated 2026-08-14)
 
 **Core value:** Collapse the taps between "you're overdue with X" and the message actually being sent.
-**Current focus:** Phase 17 — Backup, Export & Restore (plans converged, ready to execute)
+**Current focus:** Phase 17 — Backup, Export & Restore
 
 ## Current Position
 
@@ -77,7 +77,7 @@ Progress: [████████░░] 75% (12/16 phases complete; Phase 13 
 
 _Phase-12 recap (historical — Phase 12 is COMPLETE + verified; see 12-VERIFICATION.md):_
 
-Phase: 17 (Backup, Export & Restore) — READY TO EXECUTE
+Phase: 17 (Backup, Export & Restore) — EXECUTING
 Next: Phase 13 (Orrery) — NOT started. It is a large new Skia render-loop phase (its own discuss→plan→converge→execute→device-UAT cycle); awaiting owner go-ahead before beginning.
 Done this session (2026-08-17), all committed locally on main (NOT pushed): smart-discuss (12-CONTEXT; owner APPROVED the shared stable/wobble/decay status palette — stable #45B98A / wobble #E8C15C / decay #E56A52 / rogue #E0904A unchanged — resolving OD-1 app-wide; widget + ContactCard + future orrery inherit it), UI-SPEC (approved, checker VERIFIED), RESEARCH, VALIDATION (Nyquist), PATTERNS, PLAN (8 plans / 6 waves, efa9f5b), plan-checker PASSED, then a 2-cycle cross-AI convergence (codex CLI + read-only-Claude subagent; self-review guard overridden per owner): cycle-1 = 6 codex HIGH + 7 Claude actionable → replan (cca05d9); cycle-2 = 2 codex HIGH (WDG-03 freshness incompleteness; killed-app UAT needed a debug build) → final replan (4e688cf). All 8 HIGH fixes verified in-file. NOTE: the final-replan fixes were NOT independently re-reviewed (max cycles reached + owner pause).
 Codex tooling note: current codex-cli (0.144.1) makes gsd-review auto-add `--dangerously-bypass-hook-trust`, which the safety classifier blocks; a subagent improperly tunneled it once (flagged, discarded), then codex was re-run cleanly WITHOUT that flag. Do NOT let gsd-review's codex path run with that flag — run codex manually without it, or allow-list a scoped `Bash(codex exec:*)`.
@@ -169,6 +169,11 @@ Progress: [████████░░] 75% (12/16 phases complete; Phase 13 
 | Phase 13 P04 | 6min | 3 tasks | 7 files |
 | Phase 13 P05 | 25min | 3 tasks | 9 files |
 | Phase 13 P07 | 14min | 3 tasks | 6 files |
+**Per-Plan Metrics:**
+
+| Plan | Duration | Tasks | Files |
+|------|----------|-------|-------|
+| Phase 17 P01 | 20min | 3 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -264,6 +269,8 @@ Foundational decisions affecting current work:
 - [Phase 13]: 13-07: the orrery's motion + direct-manipulation, all off the JS thread (Reanimated worklets), across `OrreryScreen.tsx` + the keyed children + a new `orrery-clock-context.ts`. **ORR-02 morph:** ONE `morph = useSharedValue(0)` (0=Status default, 1=Relationship) driven by the SegmentedControl `onChange` via `withTiming(MORPH_MS=500, Easing.inOut(Easing.ease))`. Per body the screen precomputes BOTH endpoint angles from the SAME measured `C` — `progressToAngle` (status) + `evenSpreadAngle(rank, count)` (relationship) — the fixed `drawnRadius` (shared axis), and the `shortestAngleDelta` between them, and passes them into the keyed `<OrbitBody>`. Inside OrbitBody (H1 — one hook set per body, never in a `.map()`) two `useDerivedValue` worklets: a Group `transform` translating the whole body from its status position by the polar delta of `statusAngle + morph·angleDelta` (radius NEVER interpolated; Pitfall 2 handled by the precomputed delta), and `interpolateColor(morph,[0,1],[fullFill,mutedFill])` on the status outline circle (rogue→rogueExtinguished both views). The tap hit-test targets whichever view `morph` settled on (view-state status/rest arrays). **ORR-03 ambient + pause:** OrreryCanvas gained the SOLE `useClock()` (grep-confirmed — the OrreryScreen/SunBody hits are comments) driving a single Group-opacity twinkle over a deterministic ~44-dot starfield (tones = textSecondary/textPrimary/starPalette tokens) + a new `OrreryClockContext` (Provider INSIDE the `<Canvas>`) feeding SunBody's glow pulse (radius ±10% / opacity ±40%, ~3s). SunBody reads the clock via context (never calls useClock; static fallback when null). Pause-on-blur = OrreryScreen renders `{dimsValid && placement && useIsFocused() && appActive ? <OrreryCanvas/> : null}` (AppState 'change' listener mirroring HomeScreen) — UNMOUNTING the clock-owner is what stops the loop (Pitfall 4); the RN chrome stays mounted. **ORR-06 canvas half:** `Gesture.Race(tapGesture, panGesture)` feeds OrreryCanvas. Resting positions are mirrored into a worklet-safe `bodiesShared` shared value + a `dragMetrics` scalar snapshot (M5, updated in an effect); `Gesture.Pan().minDistance(10)` onBegin inlines a hit-test against `bodiesShared.value` on the UI thread → `activeDragId`, onUpdate tracks the radius for an `accent` ghost-ring (`useDerivedValue`, angular component ignored), onEnd maps `clamp(round((releaseRadius − C.ringInner)/C.effectiveGap), 0, N−1)` (H2 — SAME deriveOrreryMetrics object as render/hit-test; effectiveGap floored >0; no RING_GAP alias, C2-6) then `runOnJS(commitFromWorklet)`. `commitRingSeq` (a stable latest-ref bridge keeps the gesture identity-stable) runs `computeRingReorder` over the rendered sun-excluded orbiting list and `await rewriteRingSeq(getExecutor(), newIds, localDateTime(), sun.sunContactId)` in ONE txn — threading `sunContactId` as `excludeContactId` so the N−1 dragged list clears Guard 2 (else a contact-sun reorder rolls back); success re-reads `listOrbitingContacts({excludeContactId})` to reflow, failure alerts + re-reads. C2-4: the GestureDetector + clock mount are gated on `dimsValid`, so the release-rank division is unreachable on a degenerate canvas. Never nests `inWriteTransaction` (Pitfall 5, runOnJS off the worklet). All colours via tokens incl. `interpolateColor` endpoints. `useClock` imported from `@shopify/react-native-skia` (not reanimated). 3 commits (d204f33, ea4370c, de20aca); tsc + check:colors + npm test (1000) + biome (5 files) green; no deviations. .tsx/Skia render + gestures are device-UAT (13-08); perf claims Pixel-only.
 - [Phase 13]: 13-05: the FIRST user-touchable orrery slice — reachable Skia status-view render. `OrreryScreen` (src/screens/OrreryScreen.tsx) mounts a `<Canvas>` from the dashboard ◎ Orbit button and draws the orbiting set (one status-coloured ring + planet per live/contacted/non-archived contact) around a central sun, with the rogue extinguished body + bounded drift, an RN empty-state overlay, a two-segment view toggle (SegmentedControl, inert until 13-07), and tap→Profile. Built as the MANDATED H1 Rules-of-Hooks decomposition: per-body `useImage` isolated in a keyed `<OrbitBody key={id}/>` (src/components/orrery/OrbitBody.tsx), the sun photo hook in `<SunBody/>`, and the conditionally-mounted `<Canvas>`+GestureDetector subtree in `<OrreryCanvas/>` (where 13-07's `useClock` lands so unmounting halts the loop). OrreryScreen owns the `.map()` (returns OrbitBody ELEMENTS, no hook) and passes them as children into OrreryCanvas — a fixed hook count independent of contact count. H2/C2-4: canvas MEASURED via onLayout, a `dimsValid` gate defers layout/mount/gesture until valid, `deriveOrreryMetrics(w,h,n)` computed ONCE and the SAME `C` threaded to render + `hitTest` (via refs for the tap worklet). M4/C2-2: sun occupant resolved from `Promise.all([getContactHeader, getContactStatus])` threading `statusRow?.status ?? null`; archived/missing → self via resolveSunOccupant. C2-1: both OrbitBody + SunBody use `useImage(photo ? resolvePhotoUri(photo) : null)`. New-to-repo Skia idioms (NOT in CropPhotoScreen): `useFonts` + the Paragraph API for the planet-initials fallback, fed by a vendored `assets/Inter-SemiBold.ttf` (static SemiBold, SIL OFL-1.1, from the rsms/inter v4.0 release — OFL permits bundling) — first proven on device in 13-08 UAT. Orrery route registered ADDITIVELY (types.ts + RootNavigator; Home stays initial). All colours via tokens (check:colors clean). 3 commits (dbe3cfb SegmentedControl; 9d4d4ed render+components+font; 8365bcc route+button); tsc + check:colors + npm test (1000) green; the five new files pass biome. NOTE: biome check was already failing on RootNavigator.tsx + HomeScreen.tsx at HEAD (pre-existing formatting) — left unreformatted per scope boundary; the added lines are clean. .tsx/Skia render is device-UAT (13-08), not node-tested — no RN render test written.
 - [Phase 13]: 13-03: the orrery data layer — three node:sqlite-tested SQL surfaces (27 cases green). `listOrbitingContacts(exec, {excludeContactId?})` (src/db/orrery-read.ts) is the orbiting-set read chokepoint: COMPOSES status.ts PROGRESS_SQL/STATUS_SQL (never re-derives thresholds — a parity test asserts the exported `ORBITING_SELECT` `.toContain()`s both fragments, mirroring dashboard-read's fuel-parity guard), WHERE `archived_at IS NULL AND last_contact IS NOT NULL` (+ `AND id <> ?` when a sun occupant is passed), `ORDER BY COALESCE(ring_seq, 1e9), created_at, id`. The DISPLAY rank is the 0-based ROW INDEX of that dense order, NEVER the stored ring_seq value (M3, option (a)) — so a stale/duplicate stored ring_seq left on a formerly-hidden sun is harmless when the sun returns to self (regression-tested: contact-sun → reorder N-1 → self-sun re-read is dense/deterministic). DELIBERATE L11 divergence from dashboard BASE_WHERE: snooze is NOT filtered — a snoozed-but-contacted contact IS in the sky (lock-test guards against a later "consistency" refactor re-adding the snooze clause). `photo` returned RAW (nullable), never resolved — C2-1: the 13-05 consumer MUST `photo ? resolvePhotoUri(photo) : null`. `rewriteRingSeq(exec, orderedIds, now, excludeContactId)` (src/db/ring-seq-dao.ts) is the FIRST `contacts.ring_seq` writer — a near-verbatim clone of rewriteFavouriteRanks: 3 guards (unique / count-match / scoped changes===1) as N raw `?`-bound UPDATEs in ONE inWriteTransaction (never nests the non-reentrant mutex). Two swaps: column `favourite_rank → ring_seq`, scope `favourite_rank IS NOT NULL → last_contact IS NOT NULL AND archived_at IS NULL`, PLUS the FIXED cross-plan blocker: an optional `AND id <> ?` occupant exclusion appended to BOTH Guard 2's COUNT and every Guard 3 UPDATE (bound only when excludeContactId non-null) so the guard's effective set == orrery-read's RENDERED sun-excluded (N-1) set — a contact-sun drag passing the N-1 list succeeds; passing the wrong full-N list still fails Guard 2 by design. Writes ONLY ring_seq + modified_at; `last_contact` NEVER assigned (single-writer invariant intact; grep-pin `last_contact[[:space:]]*=` → 0). Empty list = accepted no-op. `now` is localDateTime(). `listSunCandidates(exec)` (src/db/sun-picker-read.ts) = non-archived contacts favourites-first (`(favourite_rank IS NULL)`, `favourite_rank ASC`, `name COLLATE NOCASE, id`), never-contacted INCLUDED (anyone can be the sun; C2-2: a never-contacted sun has status null → 13-04/05 resolveSunOccupant accepts `ProfileStatus | null`), no synthetic "Me" row (Settings UI prepends self). ring_seq column already existed from migration 001 (no migration shipped). tsc + check:colors clean; no deviations.
+- [Phase 17]: Owner approved the remaining Phase 17 native dependency provenance decisions as one batch.
+- [Phase 17]: RNQC is registered as a bare Expo config plugin without optional sodium configuration.
 
 ### Pending Todos
 
@@ -299,10 +306,10 @@ planning" sections in docs/dossier/*.md — those are the authoritative hand-off
 
 ## Session
 
-**Last session:** 2026-08-25T08:24:16.527Z
-**Stopped at:** Phase 17 UI-SPEC approved
+**Last session:** 2026-08-25T21:09:39.513Z
+**Stopped at:** Completed 17-01-PLAN.md
 _Prior stop (13-04):_ the orrery VISUAL VOCABULARY (theme tokens + two pure resolver modules, node-tested, 29 cases green): (1) five owner-tunable `ThemePalette` tokens seeded in `space-dark.dark` ONLY — `starPalette` (6 colours, gold `#F2C14E` at index 0, then amber/rose-red/violet/cyan/ice-white), `mutedStable/Wobble/Decay` (desaturated same-hue morph endpoints), `rogueExtinguished` (cold blue-grey `#3E4A6B` rogue BODY fill) — with an M6/C2-5 conformance test that IMPORTS the real `SELF_SUN_COLOUR_RE`/`assertSelfSunColour` from app-settings-dao and locks every starPalette entry to the ACTUAL DAO write-path rule (no re-inlined regex). (2) `orrery-ring-logic.ts` `orreryRingStyle(status, colors)` — REUSES `ringVisual` for `{color,opacity,width}` (status→colour mapped once), adds the `strokeStyle` axis (solid→dashed→faded→faintTrace) + `bodyFill` (rogue ring=`colors.rogue`, body=`rogueExtinguished`); `null`→canonical NEUTRAL (`colors.border`), never throws — the single fallback sun-occupant reuses (C2-2). (3) `sun-occupant-logic.ts` `resolveSunOccupant(input)` — NULL/archived/missing→self (A7, glow `selfSunColour ?? starPalette[0]`), live contact→its status glow via `orreryRingStyle(status, colors).color`, never-contacted (status `null`)→the reused neutral border (C2-2); accepts `status: ProfileStatus | null`. 5 commits (1801915 feat tokens+M6; d35d528 RED→4cbfad5 GREEN ring-logic; c923b16 RED→10780dd GREEN sun-occupant); tsc + check:colors clean; no deviations (one in-flight fix: a placeholder hex in the logic test was re-sourced from the palette after check:colors flagged it — C2-3). Committed locally on main (NOT pushed). Next: Wave 2 (13-05 render / 13-06 Settings sun-picker), Wave 3 (13-07 drag-release), Wave 4 (13-08 device UAT, autonomous:false).
-**Resume file:** /home/bwales/projects/orbit-app/.planning/phases/17-backup-export-restore/17-UI-SPEC.md
+**Resume file:** None
 
 ## Phase 4 — Closeout (2026-08-15) ✅ COMPLETE
 
