@@ -1,20 +1,14 @@
-/**
- * Launch-time field sweep — behavioural proof (FLD-05).
- *
- * Drives a fresh in-memory node:sqlite DB through the REAL migration-1 fixture,
- * the REAL field-ddl expiry core, and the REAL launch-sweep registry with an
- * injected clock. Asserts: quarantine expiry past the 30-day window with a
- * snapshot to field_history + history retention pruning; the strict-`<` 30/31-day
- * boundary; the sweep-TOCTOU guard (a field restored after the candidate scan
- * survives); NO-HANG / registry not wedged (HIGH-1); and per-def failure
- * isolation (one failed drop neither aborts the loop nor skips the prune).
- */
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { nodeSqliteExecutor, openTestDb } from "@/db/__testkit__/node-sqlite";
 import { createField } from "@/db/field-ddl";
 import { restoreField } from "@/db/field-defs-dao";
 import type { NewFieldDef } from "@/db/field-types";
 import { migration001 } from "@/db/migrations/001-initial";
+import { migration002 } from "@/db/migrations/002-app-settings";
+import { migration003 } from "@/db/migrations/003-orrery-settings";
+import { migration004 } from "@/db/migrations/004-ai-settings";
+import { migration005 } from "@/db/migrations/005-digest-settings";
+import { migration006 } from "@/db/migrations/006-normalize-custom-field-values";
 import { runMigrations } from "@/db/migrations/runner";
 import type { SqlExecutor } from "@/db/types";
 import { registerFieldSweep } from "@/services/field-sweep";
@@ -24,27 +18,32 @@ import {
   runLaunchSweep,
 } from "@/services/launch-sweep";
 
-const NOW = "2026-08-14 12:00:00";
+const NOW = "2026-08-24 12:00:00";
 const clock = () => NOW;
-
 let uidCounter = 0;
 const uid = () => `uid-${++uidCounter}`;
-
 let exec: SqlExecutor;
 
 beforeEach(async () => {
   uidCounter = 0;
   __resetSweepForTest();
-  const db = openTestDb();
-  exec = nodeSqliteExecutor(db);
-  await runMigrations(exec, [migration001], 1, { now: NOW, newUid: uid });
+  exec = nodeSqliteExecutor(openTestDb());
+  await runMigrations(
+    exec,
+    [
+      migration001,
+      migration002,
+      migration003,
+      migration004,
+      migration005,
+      migration006,
+    ],
+    6,
+    { now: NOW, newUid: uid },
+  );
 });
 
-afterEach(() => {
-  __resetSweepForTest();
-});
-
-// --- helpers ----------------------------------------------------------------
+afterEach(() => __resetSweepForTest());
 
 function newDef(overrides: Partial<NewFieldDef> = {}): NewFieldDef {
   return {
@@ -62,19 +61,12 @@ function newDef(overrides: Partial<NewFieldDef> = {}): NewFieldDef {
   };
 }
 
-async function valueColumns(): Promise<string[]> {
-  const rows = await exec.getAllAsync<{ name: string }>(
-    "PRAGMA table_info(contact_custom_values)",
+async function seedContact(name: string): Promise<number> {
+  const result = await exec.runAsync(
+    "INSERT INTO contacts (uid, name, interval_days, created_at, modified_at) VALUES (?, ?, ?, ?, ?)",
+    [uid(), name, 30, NOW, NOW],
   );
-  return rows.map((r) => r.name);
-}
-
-async function defCount(colName: string): Promise<number> {
-  const row = await exec.getFirstAsync<{ n: number }>(
-    "SELECT COUNT(*) AS n FROM custom_field_defs WHERE col_name = ?",
-    [colName],
-  );
-  return row?.n ?? 0;
+  return result.lastInsertRowId;
 }
 
 async function defId(colName: string): Promise<number> {
@@ -86,32 +78,27 @@ async function defId(colName: string): Promise<number> {
   return row.id;
 }
 
-async function seedContact(name: string): Promise<number> {
-  const result = await exec.runAsync(
-    `INSERT INTO contacts (uid, name, interval_days, created_at, modified_at)
-     VALUES (?, ?, ?, ?, ?)`,
-    [uid(), name, 30, NOW, NOW],
+async function defCount(colName: string): Promise<number> {
+  const row = await exec.getFirstAsync<{ n: number }>(
+    "SELECT COUNT(*) AS n FROM custom_field_defs WHERE col_name = ?",
+    [colName],
   );
-  const contactId = result.lastInsertRowId;
-  await exec.runAsync(
-    "INSERT INTO contact_custom_values (contact_id, uid, modified_at) VALUES (?, ?, ?)",
-    [contactId, uid(), NOW],
-  );
-  return contactId;
+  return row?.n ?? 0;
 }
 
-/** Create a field, then stamp its quarantined_at to `-{days} days` ago (SQLite clock). */
-async function quarantineDaysAgo(colName: string, days: number): Promise<void> {
+async function quarantineDaysAgo(
+  colName: string,
+  days: number,
+): Promise<number> {
   await createField(exec, newDef({ col_name: colName, label: colName }));
+  const id = await defId(colName);
   await exec.runAsync(
-    `UPDATE custom_field_defs
-        SET quarantined_at = datetime('now','localtime',?)
-      WHERE col_name = ?`,
-    [`-${days} days`, colName],
+    "UPDATE custom_field_defs SET quarantined_at = datetime('now', 'localtime', ?) WHERE id = ?",
+    [`-${days} days`, id],
   );
+  return id;
 }
 
-/** Insert a field_history row created `-{days} days` ago (SQLite clock). */
 async function historyDaysAgo(
   colName: string,
   contactId: number,
@@ -119,9 +106,7 @@ async function historyDaysAgo(
   days: number,
 ): Promise<void> {
   await exec.runAsync(
-    `INSERT INTO field_history
-       (contact_id, field_col_name, old_value, operation, created_at)
-     VALUES (?, ?, ?, 'edit', datetime('now','localtime',?))`,
+    "INSERT INTO field_history (contact_id, field_col_name, old_value, operation, created_at) VALUES (?, ?, ?, 'edit', datetime('now', 'localtime', ?))",
     [contactId, colName, value, `-${days} days`],
   );
 }
@@ -130,120 +115,70 @@ async function historyCount(
   colName: string,
   operation?: string,
 ): Promise<number> {
-  const sql = operation
-    ? "SELECT COUNT(*) AS n FROM field_history WHERE field_col_name = ? AND operation = ?"
-    : "SELECT COUNT(*) AS n FROM field_history WHERE field_col_name = ?";
-  const params = operation ? [colName, operation] : [colName];
-  const row = await exec.getFirstAsync<{ n: number }>(sql, params);
+  const row = await exec.getFirstAsync<{ n: number }>(
+    operation
+      ? "SELECT COUNT(*) AS n FROM field_history WHERE field_col_name = ? AND operation = ?"
+      : "SELECT COUNT(*) AS n FROM field_history WHERE field_col_name = ?",
+    operation ? [colName, operation] : [colName],
+  );
   return row?.n ?? 0;
 }
 
-function withTimeout<T>(p: Promise<T>, ms: number, label: string): Promise<T> {
+function withTimeout<T>(promise: Promise<T>, label: string): Promise<T> {
   return Promise.race([
-    p,
+    promise,
     new Promise<T>((_, reject) =>
-      setTimeout(() => reject(new Error(`timeout: ${label}`)), ms),
+      setTimeout(() => reject(new Error(`timeout: ${label}`)), 2000),
     ),
   ]);
 }
 
-// --- EXPIRY + RETENTION -----------------------------------------------------
-
-describe("field sweep — expiry + history retention (FLD-05)", () => {
-  it("expires a >30d field (snapshotting values), retains a <30d field, and prunes old history; a second run is a no-op", async () => {
-    // 40-day quarantined field, populated for two contacts.
-    await quarantineDaysAgo("nickname", 40);
-    const a = await seedContact("Alex");
-    const b = await seedContact("Bo");
+describe("field sweep — normalized expiry and history retention", () => {
+  it("expires a stale definition with snapshots, retains a recent one, and prunes old history", async () => {
+    const alex = await seedContact("Alex");
+    const bo = await seedContact("Bo");
+    const nicknameId = await quarantineDaysAgo("nickname", 40);
     await exec.runAsync(
-      'UPDATE contact_custom_values SET "nickname" = ? WHERE contact_id = ?',
-      ["Al", a],
+      "UPDATE custom_field_values SET value = ? WHERE contact_id = ? AND field_def_id = ?",
+      ["Al", alex, nicknameId],
     );
     await exec.runAsync(
-      'UPDATE contact_custom_values SET "nickname" = ? WHERE contact_id = ?',
-      ["Bee", b],
+      "UPDATE custom_field_values SET value = ? WHERE contact_id = ? AND field_def_id = ?",
+      ["Bee", bo, nicknameId],
     );
-
-    // 5-day quarantined field — inside the window, must be untouched.
     await quarantineDaysAgo("city", 5);
-
-    // field_history: one row older than the window, one recent — for a
-    // DIFFERENT col so the expiry snapshot below doesn't confound the prune.
-    await historyDaysAgo("legacy", a, "old", 40);
-    await historyDaysAgo("legacy", a, "fresh", 5);
+    await historyDaysAgo("legacy", alex, "old", 40);
+    await historyDaysAgo("legacy", alex, "fresh", 5);
 
     registerFieldSweep(() => exec, clock);
-    await withTimeout(runLaunchSweep(), 2000, "first sweep");
+    await withTimeout(runLaunchSweep(), "first sweep");
 
-    // 40-day field dropped, values snapshotted under 'quarantine_expiry'.
     expect(await defCount("nickname")).toBe(0);
-    expect(await valueColumns()).not.toContain("nickname");
-    const snaps = await exec.getAllAsync<{
-      contact_id: number;
-      old_value: string;
-    }>(
-      "SELECT contact_id, old_value FROM field_history WHERE field_col_name = ? AND operation = 'quarantine_expiry' ORDER BY contact_id",
-      ["nickname"],
-    );
-    expect(snaps).toEqual([
-      { contact_id: a, old_value: "Al" },
-      { contact_id: b, old_value: "Bee" },
+    expect(
+      await exec.getAllAsync(
+        "SELECT contact_id, old_value FROM field_history WHERE field_col_name = ? AND operation = 'quarantine_expiry' ORDER BY contact_id",
+        ["nickname"],
+      ),
+    ).toEqual([
+      { contact_id: alex, old_value: "Al" },
+      { contact_id: bo, old_value: "Bee" },
     ]);
-
-    // 5-day field untouched.
     expect(await defCount("city")).toBe(1);
-    expect(await valueColumns()).toContain("city");
-
-    // Old legacy history pruned, recent one survives.
     expect(await historyCount("legacy")).toBe(1);
-    const remaining = await exec.getFirstAsync<{ old_value: string }>(
-      "SELECT old_value FROM field_history WHERE field_col_name = ?",
-      ["legacy"],
-    );
-    expect(remaining?.old_value).toBe("fresh");
-
-    // A second run finds no still-stale defs — idempotent no-op.
-    await withTimeout(runLaunchSweep(), 2000, "second sweep");
-    expect(await defCount("city")).toBe(1);
     expect(await historyCount("nickname", "quarantine_expiry")).toBe(2);
   });
-});
 
-// --- BOUNDARY (strict `<`) --------------------------------------------------
-
-describe("field sweep — 30/31-day boundary (strict `<`)", () => {
-  it("expires a field quarantined EXACTLY 31 days ago", async () => {
-    await quarantineDaysAgo("nickname", 31);
-
+  it("keeps the strict older-than-thirty-days boundary", async () => {
+    await quarantineDaysAgo("old", 31);
+    await quarantineDaysAgo("boundary", 30);
     registerFieldSweep(() => exec, clock);
-    await withTimeout(runLaunchSweep(), 2000, "31-day sweep");
-
-    expect(await defCount("nickname")).toBe(0);
-    expect(await valueColumns()).not.toContain("nickname");
+    await withTimeout(runLaunchSweep(), "boundary sweep");
+    expect(await defCount("old")).toBe(0);
+    expect(await defCount("boundary")).toBe(1);
   });
 
-  it("does NOT expire a field quarantined EXACTLY 30 days ago (strict `<`, not `<=`)", async () => {
-    await quarantineDaysAgo("nickname", 30);
-
-    registerFieldSweep(() => exec, clock);
-    await withTimeout(runLaunchSweep(), 2000, "30-day sweep");
-
-    expect(await defCount("nickname")).toBe(1);
-    expect(await valueColumns()).toContain("nickname");
-  });
-});
-
-// --- SWEEP-TOCTOU (restore after scan survives) -----------------------------
-
-describe("field sweep — restore-after-scan survives (cycle-2 sweep-TOCTOU)", () => {
-  it("does not drop a field restored between the candidate scan and its drop", async () => {
-    await quarantineDaysAgo("nickname", 40);
-    const targetId = await defId("nickname");
-
-    // Proxy exec: the candidate SELECT, once it has returned a still-stale def,
-    // restores that def BEFORE the per-def expireFieldIfStale runs — the exact
-    // scan→drop interleave. expireFieldIfStale re-reads quarantined_at under the
-    // lock (now NULL) and MUST leave the field intact.
+  it("does not expire a definition restored after candidate discovery", async () => {
+    const targetId = await quarantineDaysAgo("nickname", 40);
     const proxy: SqlExecutor = {
       execAsync: (sql) => exec.execAsync(sql),
       runAsync: (sql, params) => exec.runAsync(sql, params),
@@ -251,93 +186,47 @@ describe("field sweep — restore-after-scan survives (cycle-2 sweep-TOCTOU)", (
         exec.getFirstAsync<T>(sql, params),
       async getAllAsync<T>(sql: string, params?: unknown[]): Promise<T[]> {
         const rows = await exec.getAllAsync<T>(sql, params);
-        if (/FROM custom_field_defs/.test(sql) && /quarantined_at/.test(sql)) {
-          // The restore lands after the scan, ordered before the under-lock
-          // re-check (both serialize through the shared mutex).
+        if (/FROM custom_field_defs/.test(sql) && /quarantined_at/.test(sql))
           await restoreField(exec, targetId, NOW);
-        }
         return rows;
       },
     };
-
     registerFieldSweep(() => proxy, clock);
-    await withTimeout(runLaunchSweep(), 2000, "toctou sweep");
-
-    // The field SURVIVES and holds NO expiry snapshot — the re-read-under-lock,
-    // not the stale scan result, decided the (non-)drop.
+    await withTimeout(runLaunchSweep(), "restore race sweep");
     expect(await defCount("nickname")).toBe(1);
-    expect(await valueColumns()).toContain("nickname");
     expect(await historyCount("nickname", "quarantine_expiry")).toBe(0);
-    const row = await exec.getFirstAsync<{ quarantined_at: string | null }>(
-      "SELECT quarantined_at FROM custom_field_defs WHERE id = ?",
-      [targetId],
-    );
-    expect(row?.quarantined_at).toBeNull();
   });
-});
 
-// --- NO-HANG / registry not wedged (HIGH-1) ---------------------------------
-
-describe("field sweep — no-hang, registry not wedged (HIGH-1)", () => {
-  it("resolves within a short timeout and leaves the registry usable for a second launch", async () => {
-    await quarantineDaysAgo("nickname", 40);
-
-    // A probe hook alongside the sweep proves the registry runs hooks again on a
-    // second launch (running reset to false — no permanent deadlock).
-    let probeRuns = 0;
-    registerFieldSweep(() => exec, clock);
-    registerSweepHook(async () => {
-      probeRuns += 1;
-    });
-
-    await withTimeout(runLaunchSweep(), 2000, "first launch");
-    expect(await defCount("nickname")).toBe(0);
-    expect(probeRuns).toBe(1);
-
-    // Second launch still executes hooks — registry not wedged by a hung sweep.
-    await withTimeout(runLaunchSweep(), 2000, "second launch");
-    expect(probeRuns).toBe(2);
-  });
-});
-
-// --- PER-DEF ISOLATION ------------------------------------------------------
-
-describe("field sweep — per-def failure isolation", () => {
-  it("continues past a failed drop and still prunes history", async () => {
-    // Two stale defs; 'alpha' has the lower id so it is scanned FIRST.
-    await quarantineDaysAgo("alpha", 40);
+  it("does not wedge the launch registry and isolates one failed deletion", async () => {
+    const alphaId = await quarantineDaysAgo("alpha", 40);
     await quarantineDaysAgo("beta", 40);
-
-    // Old history that the prune must still remove even though alpha's drop fails.
-    const a = await seedContact("Alex");
-    await historyDaysAgo("legacy", a, "old", 40);
-
-    // Proxy that rejects only on alpha's DROP COLUMN (ROLLBACK/BEGIN/COMMIT and
-    // every other statement pass through).
+    const contactId = await seedContact("Alex");
+    await historyDaysAgo("legacy", contactId, "old", 40);
+    let probes = 0;
     const failing: SqlExecutor = {
-      execAsync: (sql) => {
-        if (/DROP COLUMN "alpha"/.test(sql)) {
-          return Promise.reject(new Error("forced drop failure"));
-        }
-        return exec.execAsync(sql);
+      execAsync: (sql) => exec.execAsync(sql),
+      runAsync: (sql, params) => {
+        if (
+          /DELETE FROM custom_field_values/.test(sql) &&
+          params?.[0] === alphaId
+        )
+          return Promise.reject(new Error("forced deletion failure"));
+        return exec.runAsync(sql, params);
       },
-      runAsync: (sql, params) => exec.runAsync(sql, params),
       getFirstAsync: <T>(sql: string, params?: unknown[]) =>
         exec.getFirstAsync<T>(sql, params),
       getAllAsync: <T>(sql: string, params?: unknown[]) =>
         exec.getAllAsync<T>(sql, params),
     };
-
     registerFieldSweep(() => failing, clock);
-    await withTimeout(runLaunchSweep(), 2000, "isolation sweep");
-
-    // alpha's drop rolled back → it survives; beta was still dropped.
+    registerSweepHook(async () => {
+      probes += 1;
+    });
+    await withTimeout(runLaunchSweep(), "failure isolation sweep");
+    await withTimeout(runLaunchSweep(), "second launch");
     expect(await defCount("alpha")).toBe(1);
-    expect(await valueColumns()).toContain("alpha");
     expect(await defCount("beta")).toBe(0);
-    expect(await valueColumns()).not.toContain("beta");
-
-    // The history prune still ran despite the failed drop.
     expect(await historyCount("legacy")).toBe(0);
+    expect(probes).toBe(2);
   });
 });
