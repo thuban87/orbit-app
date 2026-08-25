@@ -25,6 +25,7 @@ import { migration003 } from "@/db/migrations/003-orrery-settings";
 import { migration004 } from "@/db/migrations/004-ai-settings";
 import { migration005 } from "@/db/migrations/005-digest-settings";
 import { migration006 } from "@/db/migrations/006-normalize-custom-field-values";
+import { migration007 } from "@/db/migrations/007-tombstones";
 import { runMigrations } from "@/db/migrations/runner";
 import {
   computeImpact,
@@ -55,8 +56,9 @@ beforeEach(async () => {
       migration004,
       migration005,
       migration006,
+      migration007,
     ],
-    6,
+    7,
     { now: NOW, newUid: uid },
   );
 });
@@ -296,7 +298,7 @@ describe("purgeContact — archived-guarded one-transaction fan-out (T-04-12/13)
     const target = await seedFullContact("Chris");
     const other = await seedFullContact("Bo");
 
-    await purgeContact(exec, target);
+    await purgeContact(exec, target, { now: NOW });
 
     expect(await ownedRowCount(target)).toBe(0);
     // The second contact keeps all 11 owned rows (contact + 10 children).
@@ -307,14 +309,14 @@ describe("purgeContact — archived-guarded one-transaction fan-out (T-04-12/13)
     const id = await seedFullContact("Live", { archived: false });
     const before = await ownedRowCount(id);
 
-    await expect(purgeContact(exec, id)).rejects.toThrow();
+    await expect(purgeContact(exec, id, { now: NOW })).rejects.toThrow();
 
     // Every child + the contact row survives — the guard fired before any delete.
     expect(await ownedRowCount(id)).toBe(before);
   });
 
   it("throws for a missing contact id and deletes nothing", async () => {
-    await expect(purgeContact(exec, 9999)).rejects.toThrow();
+    await expect(purgeContact(exec, 9999, { now: NOW })).rejects.toThrow();
   });
 
   it("archive→event→purge round-trip: the emitted 'archive' event is gone after purge", async () => {
@@ -333,7 +335,7 @@ describe("purgeContact — archived-guarded one-transaction fan-out (T-04-12/13)
     );
     expect(eventsBefore?.n).toBe(1);
 
-    await purgeContact(exec, contactId);
+    await purgeContact(exec, contactId, { now: NOW });
 
     const eventsAfter = await exec.getFirstAsync<{ n: number }>(
       "SELECT COUNT(*) AS n FROM events WHERE contact_id = ?",
@@ -357,7 +359,7 @@ describe("purgeContact — archived-guarded one-transaction fan-out (T-04-12/13)
       },
     };
 
-    await expect(purgeContact(guarded, id)).rejects.toThrow(boom);
+    await expect(purgeContact(guarded, id, { now: NOW })).rejects.toThrow(boom);
     expect(await ownedRowCount(id)).toBe(before);
   });
 });
@@ -368,6 +370,7 @@ describe("purgeContact — POST-COMMIT extension adapter (T-04-16)", () => {
     let contactRowsAtCallTime = -1;
 
     await purgeContact(exec, id, {
+      now: NOW,
       onPurgeExtensions: async (purgedId) => {
         const row = await exec.getFirstAsync<{ n: number }>(
           "SELECT COUNT(*) AS n FROM contacts WHERE id = ?",
@@ -387,10 +390,59 @@ describe("purgeContact — POST-COMMIT extension adapter (T-04-16)", () => {
 
     // A throwing best-effort adapter must not reject the purge or undo the commit.
     await expect(
-      purgeContact(exec, id, { onPurgeExtensions: adapter }),
+      purgeContact(exec, id, { now: NOW, onPurgeExtensions: adapter }),
     ).resolves.toBeUndefined();
 
     expect(adapter).toHaveBeenCalledWith(id);
     expect(await ownedRowCount(id)).toBe(0);
+  });
+});
+
+describe("purgeContact — deletion evidence and merge-safe sun state", () => {
+  it("captures every mergeable UID before fan-out deletion, excluding field history", async () => {
+    const contactId = await seedFullContact("Tombstoned");
+    const expected = await exec.getAllAsync<{
+      entity_type: string;
+      entity_uid: string;
+    }>(
+      `SELECT 'contact' AS entity_type, uid AS entity_uid FROM contacts WHERE id = ?
+       UNION ALL SELECT 'interaction', uid FROM interactions WHERE contact_id = ?
+       UNION ALL SELECT 'event', uid FROM events WHERE contact_id = ?
+       UNION ALL SELECT 'fuel', uid FROM fuel WHERE contact_id = ?
+       UNION ALL SELECT 'contact_link', uid FROM contact_links WHERE contact_id = ?
+       UNION ALL SELECT 'custom_field_value', uid FROM custom_field_values WHERE contact_id = ?
+       ORDER BY entity_type, entity_uid`,
+      [contactId, contactId, contactId, contactId, contactId, contactId],
+    );
+
+    await purgeContact(exec, contactId, { now: NOW });
+
+    expect(
+      await exec.getAllAsync<{ entity_type: string; entity_uid: string }>(
+        "SELECT entity_type, entity_uid FROM tombstones ORDER BY entity_type, entity_uid",
+      ),
+    ).toEqual(expected);
+    expect(
+      await exec.getFirstAsync<{ n: number }>(
+        "SELECT COUNT(*) AS n FROM tombstones WHERE entity_type = 'field_history'",
+      ),
+    ).toEqual({ n: 0 });
+  });
+
+  it("clears the current sun with the caller-supplied modified_at in the purge transaction", async () => {
+    const contactId = await seedFullContact("Sun");
+    const suppliedNow = "2026-08-25 17:42:01";
+    await exec.runAsync("UPDATE app_settings SET sun_contact_id = ?, modified_at = ? WHERE id = 1", [
+      contactId,
+      NOW,
+    ]);
+
+    await purgeContact(exec, contactId, { now: suppliedNow });
+
+    expect(
+      await exec.getFirstAsync<{ sun_contact_id: number | null; modified_at: string }>(
+        "SELECT sun_contact_id, modified_at FROM app_settings WHERE id = 1",
+      ),
+    ).toEqual({ sun_contact_id: null, modified_at: suppliedNow });
   });
 });
