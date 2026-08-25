@@ -13,6 +13,7 @@ import {
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { getExecutor, openAndMigrate } from "@/db/database";
+import { isMigration006IntegrityError } from "@/db/migrations/006-normalize-custom-field-values";
 import { navigationRef, ShareIntentGate } from "@/navigation/linking";
 import { NotificationResponseGate } from "@/navigation/notification-gate";
 import { RootNavigator } from "@/navigation/RootNavigator";
@@ -203,14 +204,18 @@ function AppShell() {
   }, [ready]);
 
   if (error) {
+    const isIntegrityFailure = isMigration006IntegrityError(error);
     return (
       <View style={[styles.loading, { backgroundColor: colors.background }]}>
         <Text style={[styles.errorTitle, { color: colors.textPrimary }]}>
-          Couldn't start Orbit
+          {isIntegrityFailure
+            ? "Couldn't safely update your custom fields"
+            : "Couldn't start Orbit"}
         </Text>
         <Text style={[styles.errorBody, { color: colors.textSecondary }]}>
-          Your data is safe and unchanged. Please reopen the app; if this keeps
-          happening, contact support.
+          {isIntegrityFailure
+            ? "Orbit stopped before changing anything, so all your data is safe and unchanged. This version can't finish updating your custom fields on this device, and reopening won't change that. Nothing has been altered or lost."
+            : "Your data is safe and unchanged. Please reopen the app."}
         </Text>
       </View>
     );
