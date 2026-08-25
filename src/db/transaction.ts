@@ -35,6 +35,13 @@ import { withMutex } from "@/db/mutex";
 import type { SqlExecutor } from "@/db/types";
 
 /**
+ * The deliberately narrow surface exposed to a consistent export read.  This is
+ * a structural guard against accidentally writing through the callback's
+ * executor; a caller can still deliberately close over its outer executor.
+ */
+export type ReadOnlyExecutor = Pick<SqlExecutor, "getFirstAsync" | "getAllAsync">;
+
+/**
  * Run `body` inside the shared mutex and a hand-rolled transaction. COMMIT on
  * success; ROLLBACK (best-effort) and re-throw the ORIGINAL error on failure.
  * See the non-reentrancy note above — never call this from inside itself.
@@ -47,6 +54,31 @@ export function inWriteTransaction<T>(
     await exec.execAsync("BEGIN");
     try {
       const value = await body();
+      await exec.execAsync("COMMIT");
+      return value;
+    } catch (error) {
+      await exec.execAsync("ROLLBACK").catch(() => {});
+      throw error;
+    }
+  });
+}
+
+/**
+ * Run a complete export read under the same non-reentrant mutex as writers.
+ *
+ * Correctness wins over responsiveness: a large photo library holds the shared
+ * mutex for the entire snapshot and can delay every app write.  Plan 17-11
+ * measures that deliberately conservative tradeoff against a realistic fixture.
+ * Never call this from inside `inWriteTransaction` or another `inReadSnapshot`.
+ */
+export function inReadSnapshot<T>(
+  exec: SqlExecutor,
+  body: (ro: ReadOnlyExecutor) => Promise<T>,
+): Promise<T> {
+  return withMutex(async () => {
+    await exec.execAsync("BEGIN");
+    try {
+      const value = await body(exec);
       await exec.execAsync("COMMIT");
       return value;
     } catch (error) {

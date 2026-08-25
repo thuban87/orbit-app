@@ -341,7 +341,7 @@ export async function getAppSettings(exec: SqlExecutor): Promise<AppSettings> {
  * sole export seam and must stay unable to read it.
  */
 export async function getPortableSettingsSnapshot(
-  exec: SqlExecutor,
+  exec: Pick<SqlExecutor, "getFirstAsync">,
 ): Promise<PortableSettingsSnapshot> {
   const row = await exec.getFirstAsync<Pick<
     AppSettingsRow,
