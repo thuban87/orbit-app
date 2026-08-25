@@ -18,6 +18,7 @@ import { navigationRef, ShareIntentGate } from "@/navigation/linking";
 import { NotificationResponseGate } from "@/navigation/notification-gate";
 import { RootNavigator } from "@/navigation/RootNavigator";
 import { WidgetLinkingGate } from "@/navigation/widget-linking";
+import { BackupEncryptionBenchmarkHarness } from "@/components/BackupEncryptionBenchmarkHarness";
 import { registerFieldSweep } from "@/services/field-sweep";
 import { registerBackupSweep } from "@/services/backup-sweep";
 import { installSweepTrigger } from "@/services/launch-sweep";
@@ -266,6 +267,10 @@ function AppShell() {
 }
 
 export default function App() {
+  // Task 17-07 only: a purpose-built release APK can opt into the native KDF
+  // timing harness. This literal is compiled in by Expo only for that one
+  // measurement build; ordinary product builds never mount the harness.
+  const benchmarkMode = process.env.EXPO_PUBLIC_BACKUP_ENCRYPTION_BENCHMARK === "1";
   // `GestureHandlerRootView` MUST wrap the OUTERMOST tree (outside
   // `SafeAreaProvider`) so react-native-gesture-handler can intercept touches
   // for the whole app — the crop-screen pan/pinch gestures (later Phase-5 plans)
@@ -285,7 +290,7 @@ export default function App() {
         <ShareIntentProvider>
           <ThemeProvider>
             <StatusBar style="light" />
-            <AppShell />
+            {benchmarkMode ? <BackupEncryptionBenchmarkHarness /> : <AppShell />}
           </ThemeProvider>
         </ShareIntentProvider>
       </SafeAreaProvider>
