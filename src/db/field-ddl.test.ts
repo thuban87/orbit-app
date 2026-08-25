@@ -13,6 +13,7 @@ import { migration003 } from "@/db/migrations/003-orrery-settings";
 import { migration004 } from "@/db/migrations/004-ai-settings";
 import { migration005 } from "@/db/migrations/005-digest-settings";
 import { migration006 } from "@/db/migrations/006-normalize-custom-field-values";
+import { migration007 } from "@/db/migrations/007-tombstones";
 import { runMigrations } from "@/db/migrations/runner";
 import type { SqlExecutor } from "@/db/types";
 
@@ -33,8 +34,9 @@ beforeEach(async () => {
       migration004,
       migration005,
       migration006,
+      migration007,
     ],
-    6,
+    7,
     { now: NOW, newUid: uid },
   );
 });
@@ -111,6 +113,14 @@ describe("normalized field lifecycle", () => {
       "UPDATE custom_field_values SET value = ? WHERE contact_id = ? AND field_def_id = ?",
       ["", bo, fieldDefId],
     );
+    const definitionUid = await exec.getFirstAsync<{ uid: string }>(
+      "SELECT uid FROM custom_field_defs WHERE id = ?",
+      [fieldDefId],
+    );
+    const valueUids = await exec.getAllAsync<{ uid: string }>(
+      "SELECT uid FROM custom_field_values WHERE field_def_id = ? ORDER BY uid",
+      [fieldDefId],
+    );
     await dropField(
       exec,
       { id: fieldDefId, col_name: "nickname" },
@@ -138,6 +148,18 @@ describe("normalized field lifecycle", () => {
         [fieldDefId],
       ),
     ).toBeNull();
+    expect(
+      await exec.getAllAsync(
+        "SELECT entity_type, entity_uid, deleted_at FROM tombstones ORDER BY entity_type, entity_uid",
+      ),
+    ).toEqual([
+      { entity_type: "custom_field_def", entity_uid: definitionUid?.uid, deleted_at: NOW },
+      ...valueUids.map(({ uid: entity_uid }) => ({
+        entity_type: "custom_field_value",
+        entity_uid,
+        deleted_at: NOW,
+      })),
+    ]);
   });
 
   it("deletes empty definitions but quarantines populated ones without removing pairs", async () => {
@@ -151,6 +173,9 @@ describe("normalized field lifecycle", () => {
         NOW,
       ),
     ).toBe("deleted");
+    const tombstonesAfterPermanentDelete = await exec.getFirstAsync<{ n: number }>(
+      "SELECT COUNT(*) AS n FROM tombstones WHERE entity_type IN ('custom_field_def', 'custom_field_value')",
+    );
     await createField(exec, newDef({ col_name: "city", label: "City" }));
     const cityId = await defId("city");
     await exec.runAsync(
@@ -165,6 +190,11 @@ describe("normalized field lifecycle", () => {
       ),
     ).toBe("quarantined");
     expect(await value(contactId, cityId)).toBe("Chicago");
+    expect(
+      await exec.getFirstAsync<{ n: number }>(
+        "SELECT COUNT(*) AS n FROM tombstones WHERE entity_type IN ('custom_field_def', 'custom_field_value')",
+      ),
+    ).toEqual(tombstonesAfterPermanentDelete);
   });
 
   it("retains the under-lock stale recheck and snapshots values when expiring", async () => {
@@ -212,5 +242,16 @@ describe("normalized field lifecycle", () => {
         [fieldDefId],
       ),
     ).toEqual({ id: fieldDefId });
+  });
+
+  it("rolls back without deletion evidence when asked to permanently delete a missing definition", async () => {
+    await expect(
+      dropField(exec, { id: 999, col_name: "missing" }, "delete", NOW),
+    ).rejects.toThrow();
+    expect(
+      await exec.getFirstAsync<{ n: number }>(
+        "SELECT COUNT(*) AS n FROM tombstones WHERE entity_type IN ('custom_field_def', 'custom_field_value')",
+      ),
+    ).toEqual({ n: 0 });
   });
 });

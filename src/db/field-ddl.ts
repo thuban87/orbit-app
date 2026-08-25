@@ -39,6 +39,7 @@
  */
 import type { CustomFieldDef, NewFieldDef } from "@/db/field-types";
 import { upsertValueCore } from "@/db/field-values-dao";
+import { insertTombstoneCore } from "@/db/tombstones-dao";
 import { inWriteTransaction } from "@/db/transaction";
 import type { SqlExecutor } from "@/db/types";
 import { newUid } from "@/db/uid";
@@ -104,6 +105,21 @@ async function dropFieldValues(
   operation: string,
   now: string,
 ): Promise<void> {
+  // Capture durable merge identities while the rows still exist. The callers
+  // already own a write transaction, so any later failed delete rolls these
+  // reads and tombstone writes back together with the history snapshot.
+  const definition = await exec.getFirstAsync<{ uid: string }>(
+    "SELECT uid FROM custom_field_defs WHERE id = ?",
+    [def.id],
+  );
+  if (definition === null) {
+    throw new Error(`custom field definition ${def.id} no longer exists`);
+  }
+  const values = await exec.getAllAsync<{ uid: string }>(
+    "SELECT uid FROM custom_field_values WHERE field_def_id = ? ORDER BY id",
+    [def.id],
+  );
+
   // (a) Snapshot every non-null value to field_history BEFORE deleting the
   //     current pairs. col_name is the immutable, bound history key.
   await exec.runAsync(
@@ -120,8 +136,26 @@ async function dropFieldValues(
     "DELETE FROM custom_field_values WHERE field_def_id = ?",
     [def.id],
   );
+  for (const value of values) {
+    await insertTombstoneCore(exec, {
+      entityType: "custom_field_value",
+      entityUid: value.uid,
+      deletedAt: now,
+    });
+  }
+  await insertTombstoneCore(exec, {
+    entityType: "custom_field_def",
+    entityUid: definition.uid,
+    deletedAt: now,
+  });
   // (c) Delete the definition after its dependent pairs.
-  await exec.runAsync("DELETE FROM custom_field_defs WHERE id = ?", [def.id]);
+  const deleted = await exec.runAsync(
+    "DELETE FROM custom_field_defs WHERE id = ?",
+    [def.id],
+  );
+  if (deleted.changes !== 1) {
+    throw new Error(`expected to delete one custom field definition, got ${deleted.changes}`);
+  }
 
   // A permanently deleted custom-PHOTO definition can leave at most one local
   // photo file per contact. purge-photo-cleanup enumerates surviving definitions
