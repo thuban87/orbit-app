@@ -1,10 +1,10 @@
 /**
  * Purge fan-out DAO — behavioural proof (CRUD-06).
  *
- * Drives a fresh in-memory `node:sqlite` DB through the REAL migration-1 fixture
+ * Drives a fresh in-memory `node:sqlite` DB through the REAL v6 migration fixture
  * and the REAL purge DAO, asserting the irreversible whole-contact delete:
  *   - computeImpact returns the correct per-child COUNT + a hasCustomValues
- *     boolean (contact_custom_values is ONE row per contact, not a field count).
+ *     boolean (custom_field_values is a multi-row child, deliberately not rendered).
  *   - impactSummaryLines is a pure omit-zero render helper: interactions / fuel /
  *     links only (never custom values, never events), a 0-count child → no line.
  *   - purgeContact on an ARCHIVED contact deletes every owned child (incl.
@@ -20,6 +20,11 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { nodeSqliteExecutor, openTestDb } from "@/db/__testkit__/node-sqlite";
 import { archiveContact, createContactFull } from "@/db/contacts-dao";
 import { migration001 } from "@/db/migrations/001-initial";
+import { migration002 } from "@/db/migrations/002-app-settings";
+import { migration003 } from "@/db/migrations/003-orrery-settings";
+import { migration004 } from "@/db/migrations/004-ai-settings";
+import { migration005 } from "@/db/migrations/005-digest-settings";
+import { migration006 } from "@/db/migrations/006-normalize-custom-field-values";
 import { runMigrations } from "@/db/migrations/runner";
 import {
   computeImpact,
@@ -34,12 +39,26 @@ let uidCounter = 0;
 const uid = () => `uid-${++uidCounter}`;
 
 let exec: SqlExecutor;
+let customValueDefIds: readonly number[] | undefined;
 
 beforeEach(async () => {
   uidCounter = 0;
+  customValueDefIds = undefined;
   const db = openTestDb();
   exec = nodeSqliteExecutor(db);
-  await runMigrations(exec, [migration001], 1, { now: NOW, newUid: uid });
+  await runMigrations(
+    exec,
+    [
+      migration001,
+      migration002,
+      migration003,
+      migration004,
+      migration005,
+      migration006,
+    ],
+    6,
+    { now: NOW, newUid: uid },
+  );
 });
 
 /** Insert a contact (archived by default) and return its id. */
@@ -87,10 +106,59 @@ async function seedLink(contactId: number): Promise<void> {
   );
 }
 
+async function seedDef(
+  colName: string,
+  displayOrder: number,
+): Promise<number> {
+  const result = await exec.runAsync(
+    `INSERT INTO custom_field_defs
+       (uid, col_name, label, type, options, show_on_new, always_show,
+        display_order, quarantined_at, share_with_ai, created_at, modified_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
+      uid(),
+      colName,
+      colName,
+      "text",
+      null,
+      0,
+      0,
+      displayOrder,
+      null,
+      0,
+      NOW,
+      NOW,
+    ],
+  );
+  return result.lastInsertRowId;
+}
+
 async function seedCustomValues(contactId: number): Promise<void> {
+  if (!customValueDefIds) {
+    customValueDefIds = [
+      await seedDef("nickname", 0),
+      await seedDef("note", 1),
+    ];
+  }
+  const [nicknameDefId, noteDefId] = customValueDefIds;
   await exec.runAsync(
-    "INSERT INTO contact_custom_values (contact_id, uid, modified_at) VALUES (?, ?, ?)",
-    [contactId, uid(), NOW],
+    `INSERT INTO custom_field_values
+       (uid, contact_id, field_def_id, value, created_at, modified_at)
+     VALUES (?, ?, ?, ?, ?, ?), (?, ?, ?, ?, ?, ?)`,
+    [
+      uid(),
+      contactId,
+      nicknameDefId,
+      "Al",
+      NOW,
+      NOW,
+      uid(),
+      contactId,
+      noteDefId,
+      "Friend from school",
+      NOW,
+      NOW,
+    ],
   );
 }
 
@@ -108,7 +176,7 @@ async function ownedRowCount(contactId: number): Promise<number> {
     ["interactions", "contact_id"],
     ["events", "contact_id"],
     ["fuel", "contact_id"],
-    ["contact_custom_values", "contact_id"],
+    ["custom_field_values", "contact_id"],
     ["contact_links", "contact_id"],
     ["field_history", "contact_id"],
     ["contacts", "id"],
@@ -143,7 +211,7 @@ async function seedFullContact(
 }
 
 describe("computeImpact — per-child counts + hasCustomValues (CRUD-06)", () => {
-  it("returns multi-row counts and a boolean for the single custom-values row", async () => {
+  it("returns multi-row counts and a boolean for normalized custom values", async () => {
     const id = await seedFullContact("Chris");
 
     const impact = await computeImpact(exec, id);
@@ -231,8 +299,8 @@ describe("purgeContact — archived-guarded one-transaction fan-out (T-04-12/13)
     await purgeContact(exec, target);
 
     expect(await ownedRowCount(target)).toBe(0);
-    // The second contact keeps all 10 of its owned rows (contact + 9 children).
-    expect(await ownedRowCount(other)).toBe(10);
+    // The second contact keeps all 11 owned rows (contact + 10 children).
+    expect(await ownedRowCount(other)).toBe(11);
   });
 
   it("REJECTS a live (non-archived) contact and deletes NOTHING (write-boundary guard)", async () => {
