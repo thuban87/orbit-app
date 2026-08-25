@@ -1,10 +1,11 @@
 ---
 phase: 17
 slug: backup-export-restore
-status: draft
+status: approved
 shadcn_initialized: false
 preset: none
 created: 2026-08-25
+reviewed_at: 2026-08-25T03:23:15-05:00
 ---
 
 # Phase 17 — UI Design Contract
@@ -244,38 +245,52 @@ restore outcome, or shame a user for stale backup health.
 
 ## UI Considerations
 
-Applicable state considerations resolved: **20 explicit, 4 backstop, 0 unresolved.** Confirmed
-element kinds: health/action landing (`static-content`, `interactive-control`), automatic-file
-metadata (`list-collection`), settings (`form`, `interactive-control`), restore preview
-(`static-content`, `form`, `interactive-control`), restore result (`static-content`,
-`interactive-control`), and selected backup file (`media`/file input).
+The user confirmed these element kinds: health/action landing (`static-content`,
+`interactive-control`), automatic-file metadata (`list-collection`, `static-content`), settings
+(`form`, `interactive-control`), restore preview (`static-content`, `form`,
+`interactive-control`), selected backup file (`media`/file input), restore result
+(`static-content`, `interactive-control`), and native folder launcher (`interactive-control`).
+
+Applicable state considerations resolved: **26 explicit, 6 backstop, 2 dismissed, 0 unresolved.**
+`Backstop` rows require the stated device UAT evidence; `dismissed` rows are intentionally
+inapplicable to a committed, parameter-driven result route.
 
 | Category | Element(s) | Status | Resolution / Reason |
 |----------|------------|--------|---------------------|
-| loading | Landing health/action surface | ✅ explicit | Neutral placeholder layout persists until focus reads resolve; health does not flash a false conclusion. |
-| error | Landing health and export actions | ✅ explicit | Lost-folder, stale, and export-preparation failures use the exact calm copy and recovery affordances above. |
-| populated | Automatic-backup metadata | ✅ explicit | Healthy hero shows last verified automatic success, singular-aware count, and folder name only when available. |
-| partial | Landing health | ✅ explicit | Destination without a verified automatic backup and a now-inaccessible destination are distinct states, not silently collapsed to healthy. |
-| overflow | Landing and settings | 🧪 backstop | Device UAT verifies 320dp width, long folder names in the selected-folder and `Open backup folder` labels, long localized dates, and the privacy note wrap without clipped controls. |
-| long-text | Hero/status/error/static reassurance | 🧪 backstop | Explanations wrap in the vertical scroll view; a11y labels expose elided folder values. Device UAT covers longest failure message. |
-| loading | Backup settings form | ✅ explicit | Disable save/mutation controls until settings load; preserve last saved values on rejected mutations. |
-| empty | Folder configuration form | ✅ explicit | No destination is the documented not-configured state with `Set up backups`/folder picker, never a blank unexplained row. |
-| loading | Native folder launcher | ✅ explicit | Disable `Open backup folder` while its best-effort Android launch request is pending; it never loads or lists folder contents in Orbit. |
-| error | Native folder launcher | ✅ explicit | Unsupported, disabled, and rejected actions keep settings intact and show the documented Files-app message; no in-app fallback browser. |
-| error | Positive-integer and encryption forms | ✅ explicit | Inline integer validation and passphrase mismatch/current-passphrase errors retain input and prevent the unsafe mutation. |
-| partial | Encryption change | ✅ explicit | Accessible automatic files may be re-encrypted; manual files retain old protection and future-only is an explicit alternate choice. |
-| long-text | Settings inputs and helper text | ✅ explicit | Inputs scroll horizontally as native text fields; helper/error text wraps; no smaller type is introduced. |
-| loading | Restore file/decrypt/validation/apply flow | ✅ explicit | Distinct picker, decrypt/validation, and non-dismissable apply progress prevent an empty preview or duplicate apply. |
-| error | Restore flow | ✅ explicit | Wrong passphrase, damaged/invalid file, newer-app file, and generic recoverable failure return to the appropriate prior step and always state local data is unchanged. |
-| populated | Restore preview | ✅ explicit | Aggregate date/version/encryption/counts plus Merge default and Replace-all impact summary; no sensitive audit list. |
-| partial | Restore preview | ✅ explicit | Older compatible files forward-migrate; newer files stop before preview; no best-effort partial restore. |
-| overflow | Restore preview | 🧪 backstop | Device UAT covers largest supported aggregate counts and long date/version metadata in a scrollable preview with final CTA reachable. |
-| long-text | Restore confirmation/error copy | ✅ explicit | Scroll/wrap text; native alert copy stays concise and does not use typed confirmation. |
-| populated | Restore result | ✅ explicit | A dedicated `RestoreResult` route renders only committed aggregate totals plus the conditional Replace-all pre-backup/no-destination disclosure and one return action. |
-| overflow | Restore result | 🧪 backstop | Device UAT verifies long aggregate values and Replace-all disclosure in the vertical result layout with `Return to Backup & Restore` reachable. |
-| long-text | Restore result | ✅ explicit | Totals/disclosure wrap at the established body size; no record names, audit list, or truncated final action is permitted. |
-| empty | Dashboard nudge eligibility | ✅ explicit | Zero meaningful user-created data suppresses the nudge; no first-run backup pressure. |
-| zero-one-many | Automatic backup count / restore totals | ✅ explicit | Use singular-aware `1 backup` vs `{N} backups`; aggregate outcome retains zero categories without per-row listings. |
+| loading | Landing health/action surface | ✅ explicit | Neutral placeholders persist until focus reads resolve; health never flashes a false conclusion. |
+| error | Landing health/action surface | ✅ explicit | Lost-folder and export-preparation failures use the exact calm copy and recovery affordances above. |
+| overflow | Landing health/action surface | 🧪 backstop | Device UAT at 320dp verifies no clipped action controls and a vertical scroll path. |
+| long-text | Landing health/action surface | 🧪 backstop | Hero, privacy, and error copy wrap; elided values are exposed through accessibility labels. |
+| empty | Automatic-backup metadata | ✅ explicit | Zero verified automatic files becomes the documented not-configured or no-success health state, not a blank metadata list. |
+| loading | Automatic-backup metadata | ✅ explicit | The landing placeholder is shown until metadata reads complete. |
+| error | Automatic-backup metadata | ✅ explicit | An unreadable folder is the distinct lost-folder state with a reconnect affordance. |
+| populated | Automatic-backup metadata | ✅ explicit | Healthy hero shows the last verified success, singular-aware count, and folder name only when available. |
+| partial | Automatic-backup metadata | ✅ explicit | A folder without a verified automatic backup and an inaccessible saved folder are distinct, not collapsed to healthy. |
+| overflow | Automatic-backup metadata | 🧪 backstop | Device UAT covers long folder names and localized dates without clipping the hero. |
+| zero-one-many | Automatic-backup metadata | ✅ explicit | Use `1 backup` versus `{N} backups`; no separate history list is introduced. |
+| long-text | Automatic-backup metadata | 🧪 backstop | Long folder names tail-ellipsis only with a full accessibility label; explanatory copy wraps. |
+| empty | Backup settings form | ✅ explicit | No destination is the documented folder-picker setup state, never a blank unexplained row. |
+| loading | Backup settings form | ✅ explicit | Disable save/mutation controls until settings load and retain the last saved value on rejected mutations. |
+| error | Backup settings form | ✅ explicit | Integer validation and passphrase errors retain input and prevent unsafe mutation. |
+| partial | Backup settings form | ✅ explicit | Encryption change supports accessible-file re-encryption while manual files retain old protection; future-only is explicit. |
+| long-text | Backup settings form | ✅ explicit | Native inputs scroll horizontally; helper/error text wraps with no smaller type. |
+| empty | Restore preview | ✅ explicit | No preview is rendered until a selected file decrypts, validates, and forward-migrates; selection remains available. |
+| loading | Restore preview | ✅ explicit | Picker, decrypt/validation, and non-dismissable apply progress are distinct so preview never appears empty or permits duplicate apply. |
+| error | Restore preview | ✅ explicit | Wrong passphrase, damaged/invalid file, newer-app file, and recoverable failure return to the right prior step and say local data is unchanged. |
+| partial | Restore preview | ✅ explicit | Compatible older files forward-migrate; newer files stop before preview; no best-effort partial restore. |
+| overflow | Restore preview | 🧪 backstop | Device UAT covers largest aggregate counts and long date/version metadata with the final CTA reachable. |
+| long-text | Restore preview | ✅ explicit | Confirmation and error copy wraps; native-alert content stays concise and needs no typed phrase. |
+| empty | Selected backup file | ✅ explicit | No file is the file-picker selection state; it has no blank preview or implicit restore. |
+| loading | Selected backup file | ✅ explicit | Decrypt, parse, validation, and migration show progress before any preview. |
+| error | Selected backup file | ✅ explicit | Invalid, damaged, unreadable, and newer-version files return to selection with the state-specific recovery copy. |
+| populated | Selected backup file | ✅ explicit | A valid file is represented only by the aggregate restore preview; no file thumbnail, paths, or record browser are shown. |
+| loading | Restore result | ◌ dismissed | This parameter-driven route is reached only after a committed apply and performs no independent content load. |
+| error | Restore result | ◌ dismissed | Pre-commit failures return to selection/preview; committed results have no retry/apply control. |
+| overflow | Restore result | 🧪 backstop | Device UAT verifies long aggregate values and the Replace-all disclosure with `Return to Backup & Restore` reachable. |
+| long-text | Restore result | ✅ explicit | Totals/disclosure wrap at the established body size; no record names, audit list, or truncated final action. |
+| loading | Native folder launcher | ✅ explicit | Disable `Open backup folder` while the best-effort Android launch request is pending; Orbit never lists folder contents. |
+| error | Native folder launcher | ✅ explicit | Unsupported, disabled, and rejected actions keep settings intact and show the documented Files-app message; no in-app browser. |
+| long-text | Native folder launcher | ✅ explicit | The row's selected-folder name follows the documented ellipsis/accessibility treatment; unavailable copy wraps. |
 
 ---
 
@@ -291,11 +306,11 @@ No third-party UI registry is declared or used. The registry vetting gate is not
 
 ## Checker Sign-Off
 
-- [ ] Dimension 1 Copywriting: PASS
-- [ ] Dimension 2 Visuals: PASS
-- [ ] Dimension 3 Color: PASS
-- [ ] Dimension 4 Typography: PASS
-- [ ] Dimension 5 Spacing: PASS
-- [ ] Dimension 6 Registry Safety: PASS
+- [x] Dimension 1 Copywriting: PASS
+- [x] Dimension 2 Visuals: PASS
+- [x] Dimension 3 Color: PASS
+- [x] Dimension 4 Typography: PASS
+- [x] Dimension 5 Spacing: PASS
+- [x] Dimension 6 Registry Safety: PASS
 
-**Approval:** pending
+**Approval:** approved 2026-08-25T03:23:15-05:00
