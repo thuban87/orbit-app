@@ -113,6 +113,7 @@ const BACKUP_DEFAULTS = {
   backupRetentionDays: 7,
   backupFolderUri: null,
   backupFolderName: null,
+  backupFolderAccessible: 0 as const,
   backupFolderDiagnostic: null,
   lastAutomaticBackupAt: null,
   dataRevision: 0,
@@ -323,6 +324,7 @@ describe("app-settings-dao — validated write", () => {
       // AI fields untouched by this patch — still the disabled defaults.
       ...AI_DEFAULTS,
       ...BACKUP_DEFAULTS,
+      modifiedAt: LATER,
     });
   });
 
@@ -728,6 +730,7 @@ describe("app-settings-dao — portable backup projection and local bookkeeping"
       "lastBackupDataRevision",
       "backupFolderUri",
       "backupFolderName",
+      "backupFolderAccessible",
       "backupFolderDiagnostic",
       "lastAutomaticBackupAt",
       "encryptionEnabled",
@@ -742,7 +745,7 @@ describe("app-settings-dao — portable backup projection and local bookkeeping"
     "rejects malformed backup day values before writing (%s)",
     async (days) => {
       await expect(
-        updateAppSettings(exec, { backupIntervalDays: days }, LATER),
+        (async () => updateAppSettings(exec, { backupIntervalDays: days }, LATER))(),
       ).rejects.toThrow();
       const row = await exec.getFirstAsync<{
         backup_interval_days: number;
