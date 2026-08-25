@@ -2,9 +2,9 @@
 schema_version: 1
 open_count: 0
 waived_count: 0
-fixed_count: 2
-total_count: 2
-last_updated: 2026-08-25T21:10:24.189Z
+fixed_count: 3
+total_count: 3
+last_updated: 2026-08-25T21:43:06.513Z
 ---
 
 # Broken Windows Ledger
@@ -17,6 +17,7 @@ last_updated: 2026-08-25T21:10:24.189Z
 |----|-------|------|------|------|-------------|--------|--------|-------------|-------------|
 | 1 | 17 | deviation | app.config.ts |  | Registered RNQC Expo config plugin because dynamic config required manual native wiring. | fixed |  | 2026-08-25T21:10:17.988Z | 2026-08-25T21:10:23.978Z |
 | 2 | 17 | deviation | .planning/REQUIREMENTS.md |  | Kept BKP-01 and BKP-03 pending because this dependency gate does not implement the product requirements. | fixed |  | 2026-08-25T21:10:18.202Z | 2026-08-25T21:10:24.189Z |
+| 3 | 17 | deviation | src/db/migrations/007-tombstones.ts |  | Added local-only backup_folder_accessible to preserve SAF access-probe health. | fixed |  | 2026-08-25T21:42:36.632Z | 2026-08-25T21:43:06.513Z |
 
 ````json
 [
@@ -43,6 +44,18 @@ last_updated: 2026-08-25T21:10:24.189Z
     "reason": "",
     "recorded_at": "2026-08-25T21:10:18.202Z",
     "resolved_at": "2026-08-25T21:10:24.189Z"
+  },
+  {
+    "id": 3,
+    "kind": "deviation",
+    "phase": "17",
+    "file": "src/db/migrations/007-tombstones.ts",
+    "line": null,
+    "description": "Added local-only backup_folder_accessible to preserve SAF access-probe health.",
+    "status": "fixed",
+    "reason": "",
+    "recorded_at": "2026-08-25T21:42:36.632Z",
+    "resolved_at": "2026-08-25T21:43:06.513Z"
   }
 ]
 ````
