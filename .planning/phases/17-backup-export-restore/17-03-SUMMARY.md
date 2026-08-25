@@ -106,7 +106,7 @@ None - plan executed exactly as written.
 
 ## Issues Encountered
 
-`state.advance-plan` could not parse the repository's existing unscoped `STATE.md` format, so it did not advance a plan counter. The normal tracking commands still recorded the session, metrics, decisions, requirements checkbox, and ROADMAP plan count.
+`state.advance-plan` could not parse the repository's existing unscoped `STATE.md` format, so it did not advance a plan counter. The normal tracking commands still recorded the session, metrics, decisions, and ROADMAP plan count. `BKP-04` had already been marked complete by Plan 17-02, so this plan did not alter requirements traceability.
 
 ## User Setup Required
 
