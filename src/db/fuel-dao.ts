@@ -30,6 +30,7 @@
  * Node-pure: takes `exec: SqlExecutor`; imports the shared `inWriteTransaction`.
  */
 import { inWriteTransaction } from "@/db/transaction";
+import { bumpDataRevisionCore } from "@/db/data-revision-dao";
 import { insertTombstoneCore } from "@/db/tombstones-dao";
 import type { SqlExecutor } from "@/db/types";
 
@@ -255,7 +256,11 @@ export function addFuel(
   exec: SqlExecutor,
   input: NewFuelItem,
 ): Promise<number> {
-  return inWriteTransaction(exec, () => addFuelCore(exec, input));
+  return inWriteTransaction(exec, async () => {
+    const id = await addFuelCore(exec, input);
+    await bumpDataRevisionCore(exec);
+    return id;
+  });
 }
 
 /** Edit one fuel row (standalone). Wraps `editFuelCore` in one transaction. */
@@ -263,7 +268,10 @@ export function editFuel(
   exec: SqlExecutor,
   input: EditFuelInput,
 ): Promise<void> {
-  return inWriteTransaction(exec, () => editFuelCore(exec, input));
+  return inWriteTransaction(exec, async () => {
+    await editFuelCore(exec, input);
+    await bumpDataRevisionCore(exec);
+  });
 }
 
 /**
@@ -275,7 +283,10 @@ export function confirmFuel(
   exec: SqlExecutor,
   input: ConfirmFuelInput,
 ): Promise<void> {
-  return inWriteTransaction(exec, () => confirmFuelCore(exec, input));
+  return inWriteTransaction(exec, async () => {
+    await confirmFuelCore(exec, input);
+    await bumpDataRevisionCore(exec);
+  });
 }
 
 /** Delete one fuel row (standalone). Wraps `deleteFuelCore` in one transaction. */

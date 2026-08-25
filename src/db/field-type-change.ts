@@ -46,6 +46,7 @@
  * `inWriteTransaction` — never expo `withTransactionAsync`.
  */
 import { isValueInOptions, parsers } from "@/db/field-parsers";
+import { bumpDataRevisionCore } from "@/db/data-revision-dao";
 import type { CustomFieldDef } from "@/db/field-types";
 import { inWriteTransaction } from "@/db/transaction";
 import type { SqlExecutor } from "@/db/types";
@@ -173,5 +174,6 @@ export function applyTypeChange(
       "UPDATE custom_field_defs SET type = ?, modified_at = ? WHERE id = ?",
       [target, now, field.id],
     );
+    await bumpDataRevisionCore(exec);
   });
 }

@@ -48,6 +48,7 @@
  */
 
 import { recordEventCore } from "@/db/events-dao";
+import { bumpDataRevisionCore } from "@/db/data-revision-dao";
 import { listDefs } from "@/db/field-defs-dao";
 import { upsertValueCore } from "@/db/field-values-dao";
 import { assertSafeRelative } from "@/db/photo-relative-path";
@@ -183,6 +184,7 @@ export function createContactFull(
       );
     }
 
+    await bumpDataRevisionCore(exec);
     return { contactId, interactionId };
   });
 }
@@ -356,6 +358,7 @@ export function updateContactFull(
     ) {
       await recomputeLastContactCore(exec, input.id, input.now);
     }
+    await bumpDataRevisionCore(exec);
   });
 }
 
@@ -438,6 +441,7 @@ export function archiveContact(
       detail: null,
       now,
     });
+    await bumpDataRevisionCore(exec);
   });
 }
 
@@ -474,6 +478,7 @@ export function restoreContact(
       detail: null,
       now,
     });
+    await bumpDataRevisionCore(exec);
   });
 }
 
@@ -533,6 +538,7 @@ export async function setContactPhoto(
         `setContactPhoto: no contact matched id=${id} (changed ${result.changes})`,
       );
     }
+    await bumpDataRevisionCore(exec);
   });
 }
 
@@ -555,5 +561,6 @@ export function clearContactPhoto(
         `clearContactPhoto: no contact matched id=${id} (changed ${result.changes})`,
       );
     }
+    await bumpDataRevisionCore(exec);
   });
 }

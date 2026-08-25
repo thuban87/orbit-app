@@ -52,6 +52,7 @@
 import { rejectFutureOccurredAt } from "@/db/log-guards";
 import { insertTombstoneCore } from "@/db/tombstones-dao";
 import { inWriteTransaction } from "@/db/transaction";
+import { bumpDataRevisionCore } from "@/db/data-revision-dao";
 import type { SqlExecutor } from "@/db/types";
 
 /** A touchpoint to record against an existing contact. */
@@ -236,6 +237,7 @@ export function recordTouchpoint(
       input,
     );
     await recomputeLastContact(exec, input.contactId, input.now);
+    await bumpDataRevisionCore(exec);
     return { interactionId };
   });
 }
@@ -303,6 +305,7 @@ export function editTouchpointFull(
       );
     }
     await recomputeLastContact(exec, input.contactId, input.now);
+    await bumpDataRevisionCore(exec);
   });
 }
 
@@ -403,6 +406,7 @@ export function createContactWithInteraction(
       await recomputeLastContact(exec, contactId, input.now);
     }
 
+    await bumpDataRevisionCore(exec);
     return { contactId, interactionId };
   });
 }

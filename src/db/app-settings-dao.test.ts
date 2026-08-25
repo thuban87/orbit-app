@@ -324,6 +324,7 @@ describe("app-settings-dao — validated write", () => {
       // AI fields untouched by this patch — still the disabled defaults.
       ...AI_DEFAULTS,
       ...BACKUP_DEFAULTS,
+      dataRevision: 1,
       modifiedAt: LATER,
     });
   });
@@ -866,11 +867,12 @@ describe("acknowledgeProvider — the SOLE ai_ack_* writer (H5 / C2-H3)", () => 
     await acknowledgeProvider(spied, "openai", LATER);
 
     const joined = statements.join("\n").toLowerCase();
-    // Exactly ONE UPDATE, targeting app_settings' ack column + modified_at.
+    // The acknowledgement update plus its outer-operation revision increment.
     const updates = statements.filter((s) => /update/i.test(s));
-    expect(updates).toHaveLength(1);
+    expect(updates).toHaveLength(2);
     expect(updates[0]).toMatch(/ai_ack_openai\s*=\s*1/);
     expect(updates[0]).toMatch(/modified_at\s*=\s*\?/);
+    expect(updates[1]).toMatch(/data_revision\s*=\s*data_revision\s*\+\s*1/);
     // No contact / interaction / fuel / last_contact write on this path (DATA-04).
     expect(joined).not.toMatch(/\bcontacts\b/);
     expect(joined).not.toMatch(/\binteractions\b/);

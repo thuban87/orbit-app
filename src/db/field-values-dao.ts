@@ -8,6 +8,7 @@
  * its Core counterpart is deliberately non-mutexed for an existing transaction.
  */
 import type { CustomFieldDef } from "@/db/field-types";
+import { bumpDataRevisionCore } from "@/db/data-revision-dao";
 import { inWriteTransaction } from "@/db/transaction";
 import type { SqlExecutor } from "@/db/types";
 
@@ -49,9 +50,10 @@ export function upsertValue(
   value: string | null,
   now: string,
 ): Promise<void> {
-  return inWriteTransaction(exec, () =>
-    upsertValueCore(exec, contactId, fieldDefId, uid, value, now),
-  );
+  return inWriteTransaction(exec, async () => {
+    await upsertValueCore(exec, contactId, fieldDefId, uid, value, now);
+    await bumpDataRevisionCore(exec);
+  });
 }
 
 /**

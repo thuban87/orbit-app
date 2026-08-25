@@ -31,6 +31,7 @@
  * closed preset→modifier constants are literal text.
  */
 import { recordEventCore } from "@/db/events-dao";
+import { bumpDataRevisionCore } from "@/db/data-revision-dao";
 import { inWriteTransaction } from "@/db/transaction";
 import type { SqlExecutor } from "@/db/types";
 
@@ -107,6 +108,7 @@ export function snoozeContact(
       now: input.now,
       detail: null,
     });
+    await bumpDataRevisionCore(exec);
   });
 }
 
@@ -139,5 +141,6 @@ export function clearSnooze(
       now: input.now,
       detail: null,
     });
+    await bumpDataRevisionCore(exec);
   });
 }

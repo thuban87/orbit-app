@@ -51,6 +51,7 @@
  * `now` is `localDateTime()` (never `toISOString()`); only `modified_at` is bumped.
  */
 import { inWriteTransaction } from "@/db/transaction";
+import { bumpDataRevisionCore } from "@/db/data-revision-dao";
 import type { SqlExecutor } from "@/db/types";
 
 export function rewriteRingSeq(
@@ -98,6 +99,9 @@ export function rewriteRingSeq(
           `rewriteRingSeq: id=${orderedIds[seq]} is not a live orbiting contact (changed ${result.changes})`,
         );
       }
+    }
+    if (orderedIds.length > 0) {
+      await bumpDataRevisionCore(exec);
     }
   });
 }

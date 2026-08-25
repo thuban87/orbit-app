@@ -14,6 +14,7 @@ import { migration003 } from "@/db/migrations/003-orrery-settings";
 import { migration004 } from "@/db/migrations/004-ai-settings";
 import { migration005 } from "@/db/migrations/005-digest-settings";
 import { migration006 } from "@/db/migrations/006-normalize-custom-field-values";
+import { migration007 } from "@/db/migrations/007-tombstones";
 import { runMigrations } from "@/db/migrations/runner";
 import type { SqlExecutor } from "@/db/types";
 
@@ -30,8 +31,8 @@ beforeEach(async () => {
   exec = nodeSqliteExecutor(openTestDb());
   await runMigrations(
     exec,
-    [migration001, migration002, migration003, migration004, migration005, migration006],
-    6,
+    [migration001, migration002, migration003, migration004, migration005, migration006, migration007],
+    7,
     { now: NOW, newUid: uid },
   );
 });

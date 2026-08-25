@@ -29,6 +29,7 @@
  * Node-pure: takes `exec: SqlExecutor`; imports the shared `inWriteTransaction`.
  */
 import { inWriteTransaction } from "@/db/transaction";
+import { bumpDataRevisionCore } from "@/db/data-revision-dao";
 import { insertTombstoneCore } from "@/db/tombstones-dao";
 import type { SqlExecutor } from "@/db/types";
 
@@ -137,7 +138,7 @@ async function updateLinkCore(
 /** DELETE the matching (id, contact_id) + assertOneChange. */
 async function removeLinkCore(
   exec: SqlExecutor,
-  params: { id: number; contactId: number; now: string },
+  params: { id: number; contactId: number; now: string; bumpRevision?: boolean },
 ): Promise<void> {
   const target = await exec.getFirstAsync<{ uid: string }>(
     "SELECT uid FROM contact_links WHERE id = ? AND contact_id = ?",
@@ -151,7 +152,7 @@ async function removeLinkCore(
     entityType: "contact_link",
     entityUid: target.uid,
     deletedAt: params.now,
-  });
+  }, { bumpRevision: params.bumpRevision });
   const result = await exec.runAsync(
     "DELETE FROM contact_links WHERE id = ? AND contact_id = ?",
     [params.id, params.contactId],
@@ -172,7 +173,11 @@ export function addLink(
     now: string;
   },
 ): Promise<number> {
-  return inWriteTransaction(exec, () => addLinkCore(exec, params));
+  return inWriteTransaction(exec, async () => {
+    const id = await addLinkCore(exec, params);
+    await bumpDataRevisionCore(exec);
+    return id;
+  });
 }
 
 /** Edit a link's url/label (standalone). Wraps `updateLinkCore`. */
@@ -186,7 +191,10 @@ export function updateLink(
     now: string;
   },
 ): Promise<void> {
-  return inWriteTransaction(exec, () => updateLinkCore(exec, params));
+  return inWriteTransaction(exec, async () => {
+    await updateLinkCore(exec, params);
+    await bumpDataRevisionCore(exec);
+  });
 }
 
 /** Delete a link (standalone). Wraps `removeLinkCore`. */
@@ -194,7 +202,10 @@ export function removeLink(
   exec: SqlExecutor,
   params: { id: number; contactId: number; now: string },
 ): Promise<void> {
-  return inWriteTransaction(exec, () => removeLinkCore(exec, params));
+  return inWriteTransaction(exec, async () => {
+    await removeLinkCore(exec, params);
+    // The tombstone core owns the standalone delete revision increment.
+  });
 }
 
 /**
@@ -220,6 +231,7 @@ export function applyLinkDiff(
 ): Promise<void> {
   const { contactId, seeded, current, now } = params;
   return inWriteTransaction(exec, async () => {
+    let changed = false;
     const seededById = new Map(seeded.map((l) => [l.id, l]));
     const currentIds = new Set(
       current
@@ -237,13 +249,20 @@ export function applyLinkDiff(
           label: row.label,
           now,
         });
+        changed = true;
       }
     }
 
     // (b) DELETE seeded rows the draft dropped.
     for (const s of seeded) {
       if (!currentIds.has(s.id)) {
-        await removeLinkCore(exec, { id: s.id, contactId, now });
+        await removeLinkCore(exec, {
+          id: s.id,
+          contactId,
+          now,
+          bumpRevision: false,
+        });
+        changed = true;
       }
     }
 
@@ -261,7 +280,11 @@ export function applyLinkDiff(
           label: row.label,
           now,
         });
+        changed = true;
       }
+    }
+    if (changed) {
+      await bumpDataRevisionCore(exec);
     }
   });
 }

@@ -21,6 +21,7 @@
  */
 import { validateCustomEndpoint } from "@/ai/custom-endpoint";
 import { inWriteTransaction } from "@/db/transaction";
+import { bumpDataRevisionCore } from "@/db/data-revision-dao";
 import type { SqlExecutor } from "@/db/types";
 import {
   AI_PROVIDER_IDS,
@@ -539,7 +540,10 @@ export function updateAppSettings(
   // Validate BEFORE opening the transaction so malformed user input leaves the
   // singleton unchanged. The core repeats validation for direct restore calls.
   validateAppSettingsPatch(patch);
-  return inWriteTransaction(exec, () => updateAppSettingsCore(exec, patch, now));
+  return inWriteTransaction(exec, async () => {
+    await updateAppSettingsCore(exec, patch, now);
+    await bumpDataRevisionCore(exec);
+  });
 }
 
 /**
@@ -714,5 +718,6 @@ export function acknowledgeProvider(
         `acknowledgeProvider: expected to update the id=1 row, changed ${result.changes}`,
       );
     }
+    await bumpDataRevisionCore(exec);
   });
 }

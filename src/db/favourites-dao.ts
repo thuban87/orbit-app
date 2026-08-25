@@ -13,6 +13,7 @@
  * Ordering is `favourite_rank ASC`; ranks need not be gap-free.
  */
 import { inWriteTransaction } from "@/db/transaction";
+import { bumpDataRevisionCore } from "@/db/data-revision-dao";
 import type { SqlExecutor } from "@/db/types";
 
 /**
@@ -45,6 +46,7 @@ export function setFavouriteRank(
         `setFavouriteRank: no contact matched id=${id} (changed ${result.changes})`,
       );
     }
+    await bumpDataRevisionCore(exec);
   });
 }
 
@@ -68,6 +70,7 @@ export function clearFavouriteRank(
         `clearFavouriteRank: no contact matched id=${id} (changed ${result.changes})`,
       );
     }
+    await bumpDataRevisionCore(exec);
   });
 }
 
@@ -138,6 +141,9 @@ export function rewriteFavouriteRanks(
           `rewriteFavouriteRanks: id=${orderedIds[rank]} is not a live favourite (changed ${result.changes})`,
         );
       }
+    }
+    if (orderedIds.length > 0) {
+      await bumpDataRevisionCore(exec);
     }
   });
 }

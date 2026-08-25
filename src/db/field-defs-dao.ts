@@ -36,6 +36,7 @@
  * Node-pure: takes `exec: SqlExecutor`; imports the shared `inWriteTransaction`.
  */
 import type { CustomFieldDef, SqliteBool } from "@/db/field-types";
+import { bumpDataRevisionCore } from "@/db/data-revision-dao";
 import { inWriteTransaction } from "@/db/transaction";
 import type { SqlExecutor } from "@/db/types";
 
@@ -62,6 +63,7 @@ export function renameField(
       [label, now, id],
     );
     assertOneChange("renameField", id, result.changes);
+    await bumpDataRevisionCore(exec);
   });
 }
 
@@ -84,6 +86,7 @@ export function reorderFields(
       );
       assertOneChange("reorderFields", id, result.changes);
     }
+    await bumpDataRevisionCore(exec);
   });
 }
 
@@ -103,6 +106,7 @@ export function changeFieldOptions(
       [options, now, id],
     );
     assertOneChange("changeFieldOptions", id, result.changes);
+    await bumpDataRevisionCore(exec);
   });
 }
 
@@ -124,6 +128,7 @@ export function updateFieldCuration(
       [showOnNew, alwaysShow, now, id],
     );
     assertOneChange("updateFieldCuration", id, result.changes);
+    await bumpDataRevisionCore(exec);
   });
 }
 
@@ -148,6 +153,7 @@ export function updateFieldShareWithAi(
       [shareWithAi, now, id],
     );
     assertOneChange("updateFieldShareWithAi", id, result.changes);
+    await bumpDataRevisionCore(exec);
   });
 }
 
@@ -166,6 +172,7 @@ export function quarantineField(
       [now, now, id],
     );
     assertOneChange("quarantineField", id, result.changes);
+    await bumpDataRevisionCore(exec);
   });
 }
 
@@ -186,6 +193,7 @@ export function restoreField(
       [now, id],
     );
     assertOneChange("restoreField", id, result.changes);
+    await bumpDataRevisionCore(exec);
   });
 }
 

@@ -20,6 +20,7 @@
  * Node-pure: takes `exec: SqlExecutor`; imports the shared `inWriteTransaction`.
  */
 import { assertSafeRelative } from "@/db/photo-relative-path";
+import { bumpDataRevisionCore } from "@/db/data-revision-dao";
 import { inWriteTransaction } from "@/db/transaction";
 import type { SqlExecutor } from "@/db/types";
 
@@ -55,6 +56,7 @@ export async function setProfilePhoto(
         `setProfilePhoto: profile row id=1 not updated (changed ${result.changes})`,
       );
     }
+    await bumpDataRevisionCore(exec);
   });
 }
 
@@ -76,6 +78,7 @@ export function clearProfilePhoto(
         `clearProfilePhoto: profile row id=1 not updated (changed ${result.changes})`,
       );
     }
+    await bumpDataRevisionCore(exec);
   });
 }
 

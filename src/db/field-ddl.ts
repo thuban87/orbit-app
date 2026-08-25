@@ -38,6 +38,7 @@
  * imports the shared `inWriteTransaction` — never expo `withTransactionAsync`.
  */
 import type { CustomFieldDef, NewFieldDef } from "@/db/field-types";
+import { bumpDataRevisionCore } from "@/db/data-revision-dao";
 import { upsertValueCore } from "@/db/field-values-dao";
 import { insertTombstoneCore } from "@/db/tombstones-dao";
 import { inWriteTransaction } from "@/db/transaction";
@@ -88,6 +89,7 @@ export function createField(
         def.now,
       );
     }
+    await bumpDataRevisionCore(exec);
   });
 }
 
@@ -211,6 +213,7 @@ export function deleteOrQuarantineField(
       "UPDATE custom_field_defs SET quarantined_at = ?, modified_at = ? WHERE id = ?",
       [now, now, def.id],
     );
+    await bumpDataRevisionCore(exec);
     return "quarantined";
   });
 }

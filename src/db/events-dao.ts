@@ -29,6 +29,7 @@
  * any input anywhere in this module; only static column names are literal text.
  */
 import { inWriteTransaction } from "@/db/transaction";
+import { bumpDataRevisionCore } from "@/db/data-revision-dao";
 import type { SqlExecutor } from "@/db/types";
 
 /**
@@ -89,5 +90,9 @@ export function recordEvent(
   exec: SqlExecutor,
   input: RecordEventInput,
 ): Promise<number> {
-  return inWriteTransaction(exec, () => recordEventCore(exec, input));
+  return inWriteTransaction(exec, async () => {
+    const id = await recordEventCore(exec, input);
+    await bumpDataRevisionCore(exec);
+    return id;
+  });
 }

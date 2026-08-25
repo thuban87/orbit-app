@@ -45,6 +45,7 @@ function assertTombstoneEntityType(value: unknown): asserts value is TombstoneEn
 export async function insertTombstoneCore(
   exec: SqlExecutor,
   input: TombstoneInput,
+  { bumpRevision = true }: { bumpRevision?: boolean } = {},
 ): Promise<void> {
   assertTombstoneEntityType(input.entityType);
   await exec.runAsync(
@@ -52,7 +53,9 @@ export async function insertTombstoneCore(
      VALUES (?, ?, ?)`,
     [input.entityType, input.entityUid, input.deletedAt],
   );
-  await bumpDataRevisionCore(exec);
+  if (bumpRevision) {
+    await bumpDataRevisionCore(exec);
+  }
 }
 
 /** Query durable evidence in deterministic order for export and reconciliation. */
