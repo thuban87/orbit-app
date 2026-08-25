@@ -13,11 +13,16 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { nodeSqliteExecutor, openTestDb } from "@/db/__testkit__/node-sqlite";
 import { readPromptContext } from "@/db/ai-context-read";
 import { recordEvent } from "@/db/events-dao";
-import { createField } from "@/db/field-ddl";
-import { quarantineField } from "@/db/field-defs-dao";
-import { upsertValue } from "@/db/field-values-dao";
+import { listDefs } from "@/db/field-defs-dao";
+import type { CustomFieldDef } from "@/db/field-types";
+import { getValuesForContact, upsertValue } from "@/db/field-values-dao";
 import { addFuel } from "@/db/fuel-dao";
 import { migration001 } from "@/db/migrations/001-initial";
+import { migration002 } from "@/db/migrations/002-app-settings";
+import { migration003 } from "@/db/migrations/003-orrery-settings";
+import { migration004 } from "@/db/migrations/004-ai-settings";
+import { migration005 } from "@/db/migrations/005-digest-settings";
+import { migration006 } from "@/db/migrations/006-normalize-custom-field-values";
 import { runMigrations } from "@/db/migrations/runner";
 import {
   createContactWithInteraction,
@@ -29,14 +34,21 @@ const NOW = "2026-08-14 12:00:00";
 
 let uidCounter = 0;
 const uid = () => `uid-${++uidCounter}`;
+let defIdCounter = 0;
 
 let exec: SqlExecutor;
 
 beforeEach(async () => {
   uidCounter = 0;
+  defIdCounter = 0;
   const db = openTestDb();
   exec = nodeSqliteExecutor(db);
-  await runMigrations(exec, [migration001], 1, { now: NOW, newUid: uid });
+  await runMigrations(
+    exec,
+    [migration001, migration002, migration003, migration004, migration005, migration006],
+    6,
+    { now: NOW, newUid: uid },
+  );
 });
 
 async function makeContact(
@@ -55,16 +67,51 @@ async function makeContact(
   return contactId;
 }
 
-/** Compile-only bridge while Plan 05 rewrites this legacy fixture for v6. */
-async function defIdFor(colName: string): Promise<number> {
-  const definition = await exec.getFirstAsync<{ id: number }>(
-    "SELECT id FROM custom_field_defs WHERE col_name = ?",
-    [colName],
+function makeDef(
+  colName: string,
+  overrides: Partial<CustomFieldDef> = {},
+): CustomFieldDef {
+  return {
+    id: ++defIdCounter,
+    uid: uid(),
+    col_name: colName,
+    label: colName,
+    type: "text",
+    options: null,
+    show_on_new: 0,
+    always_show: 0,
+    display_order: defIdCounter - 1,
+    quarantined_at: null,
+    share_with_ai: 0,
+    created_at: NOW,
+    modified_at: NOW,
+    ...overrides,
+  };
+}
+
+/** Seed definitions directly; this suite is deliberately independent of field DDL churn. */
+async function persistDef(definition: CustomFieldDef): Promise<void> {
+  await exec.runAsync(
+    `INSERT INTO custom_field_defs (
+       id, uid, col_name, label, type, options, show_on_new, always_show,
+       display_order, quarantined_at, share_with_ai, created_at, modified_at
+     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
+      definition.id,
+      definition.uid,
+      definition.col_name,
+      definition.label,
+      definition.type,
+      definition.options,
+      definition.show_on_new,
+      definition.always_show,
+      definition.display_order,
+      definition.quarantined_at,
+      definition.share_with_ai,
+      definition.created_at,
+      definition.modified_at,
+    ],
   );
-  if (!definition) {
-    throw new Error(`missing custom-field definition: ${colName}`);
-  }
-  return definition.id;
 }
 
 describe("readPromptContext — allowlist projection (H1)", () => {
@@ -150,48 +197,28 @@ describe("readPromptContext — allowlist projection (H1)", () => {
     });
 
     // Custom fields: unflagged (share_with_ai=0) and quarantined must NOT surface.
-    await createField(exec, {
-      uid: uid(),
-      col_name: "unflagged_field",
+    const unflaggedDef = makeDef("unflagged_field", {
       label: "Unflagged Field",
-      type: "text",
-      options: null,
-      show_on_new: 0,
-      always_show: 0,
       display_order: 0,
       share_with_ai: 0,
-      now: NOW,
     });
-    await createField(exec, {
-      uid: uid(),
-      col_name: "quarantined_field",
+    const quarantinedDef = makeDef("quarantined_field", {
       label: "Quarantined Field",
-      type: "text",
-      options: null,
-      show_on_new: 0,
-      always_show: 0,
       display_order: 1,
       share_with_ai: 1,
-      now: NOW,
+      quarantined_at: NOW,
     });
-    const unflaggedDefId = await defIdFor("unflagged_field");
-    const quarantinedDefId = await defIdFor("quarantined_field");
-    await upsertValue(exec, c, unflaggedDefId, uid(), "UNFLAGGED_MARKER", NOW);
+    await persistDef(unflaggedDef);
+    await persistDef(quarantinedDef);
+    await upsertValue(exec, c, unflaggedDef.id, uid(), "UNFLAGGED_MARKER", NOW);
     await upsertValue(
       exec,
       c,
-      quarantinedDefId,
+      quarantinedDef.id,
       uid(),
       "QUARANTINE_MARKER",
       NOW,
     );
-    // Quarantine the second def AFTER writing its value.
-    const qDef = (
-      await exec.getAllAsync<{ id: number }>(
-        "SELECT id FROM custom_field_defs WHERE col_name = 'quarantined_field'",
-      )
-    )[0];
-    await quarantineField(exec, qDef.id, NOW);
 
     const ctx = await readPromptContext(exec, c, NOW);
     const serialized = JSON.stringify(ctx);
@@ -225,22 +252,16 @@ describe("readPromptContext — allowlist projection (H1)", () => {
 
   it("surfaces a live share_with_ai=1 field keyed by label with its value", async () => {
     const c = await makeContact(30, 0, 1);
-    await createField(exec, {
-      uid: uid(),
-      col_name: "favorite_drink",
+    const favoriteDrink = makeDef("favorite_drink", {
       label: "Favorite Drink",
-      type: "text",
-      options: null,
-      show_on_new: 0,
-      always_show: 0,
       display_order: 0,
       share_with_ai: 1,
-      now: NOW,
     });
+    await persistDef(favoriteDrink);
     await upsertValue(
       exec,
       c,
-      await defIdFor("favorite_drink"),
+      favoriteDrink.id,
       uid(),
       "Cold brew",
       NOW,
@@ -252,22 +273,84 @@ describe("readPromptContext — allowlist projection (H1)", () => {
     ]);
   });
 
+  it("cannot widen the shared DAO map or prompt projection with non-shared and quarantined pairs", async () => {
+    const c = await makeContact(30, 0, 1);
+    const shared = makeDef("shared_fact", {
+      label: "Shared fact",
+      share_with_ai: 1,
+      display_order: 0,
+    });
+    const blank = makeDef("blank_fact", {
+      label: "Blank fact",
+      share_with_ai: 1,
+      display_order: 1,
+    });
+    const whitespace = makeDef("whitespace_fact", {
+      label: "Whitespace fact",
+      share_with_ai: 1,
+      display_order: 2,
+    });
+    const nullValue = makeDef("null_fact", {
+      label: "Null fact",
+      share_with_ai: 1,
+      display_order: 3,
+    });
+    const unshared = makeDef("private_fact", {
+      label: "Private fact",
+      display_order: 4,
+    });
+    const quarantined = makeDef("retired_fact", {
+      label: "Retired fact",
+      share_with_ai: 1,
+      quarantined_at: NOW,
+      display_order: 5,
+    });
+    for (const definition of [
+      shared,
+      blank,
+      whitespace,
+      nullValue,
+      unshared,
+      quarantined,
+    ]) {
+      await persistDef(definition);
+    }
+    await upsertValue(exec, c, shared.id, uid(), "Lives near the lake", NOW);
+    await upsertValue(exec, c, blank.id, uid(), "", NOW);
+    await upsertValue(exec, c, whitespace.id, uid(), "   ", NOW);
+    await upsertValue(exec, c, nullValue.id, uid(), null, NOW);
+    await upsertValue(exec, c, unshared.id, uid(), "PRIVATE_MARKER", NOW);
+    await upsertValue(exec, c, quarantined.id, uid(), "RETIRED_MARKER", NOW);
+
+    // This is the exact defs-filtered map supplied to readSharedFields.
+    const sharedDefs = (await listDefs(exec, { includeQuarantined: false })).filter(
+      (definition) => definition.share_with_ai === 1,
+    );
+    expect(await getValuesForContact(exec, c, sharedDefs)).toEqual({
+      shared_fact: "Lives near the lake",
+      blank_fact: "",
+      whitespace_fact: "   ",
+      null_fact: null,
+    });
+
+    const ctx = await readPromptContext(exec, c, NOW);
+    expect(ctx.sharedFields).toEqual([
+      { label: "Shared fact", value: "Lives near the lake" },
+    ]);
+    expect(JSON.stringify(ctx)).not.toContain("PRIVATE_MARKER");
+    expect(JSON.stringify(ctx)).not.toContain("RETIRED_MARKER");
+  });
+
   it("omits a blank/null opted-in value without erroring (less data, no disclosure)", async () => {
     const c = await makeContact(30, 0, 1);
-    await createField(exec, {
-      uid: uid(),
-      col_name: "hobby",
+    const hobby = makeDef("hobby", {
       label: "Hobby",
-      type: "text",
-      options: null,
-      show_on_new: 0,
-      always_show: 0,
       display_order: 0,
       share_with_ai: 1,
-      now: NOW,
     });
+    await persistDef(hobby);
     // A whitespace-only value is treated as absent.
-    await upsertValue(exec, c, await defIdFor("hobby"), uid(), "   ", NOW);
+    await upsertValue(exec, c, hobby.id, uid(), "   ", NOW);
 
     const ctx = await readPromptContext(exec, c, NOW);
     expect(ctx.sharedFields).toEqual([]);
