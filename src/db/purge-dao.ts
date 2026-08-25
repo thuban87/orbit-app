@@ -38,6 +38,10 @@
  * imports the shared `inWriteTransaction` — never expo `withTransactionAsync`.
  */
 import { inWriteTransaction } from "@/db/transaction";
+import {
+  insertTombstoneCore,
+  type TombstoneEntityType,
+} from "@/db/tombstones-dao";
 import type { SqlExecutor } from "@/db/types";
 import { Logger } from "@/utils/logger";
 
@@ -59,8 +63,10 @@ export interface PurgeImpact {
   hasCustomValues: boolean;
 }
 
-/** Optional post-commit cleanup registered by Phases 5/11. */
+/** Required purge timing plus optional post-commit cleanup registered by Phases 5/11. */
 export interface PurgeOptions {
+  /** Caller-supplied local wall-clock timestamp for the merge-visible sun update. */
+  now: string;
   /**
    * Idempotent best-effort OS cleanup (photo unlink, notification cancels), run
    * POST-COMMIT in its own try/catch — never awaited inside the transaction.
@@ -169,21 +175,63 @@ export function impactSummaryLines(
 export function purgeContact(
   exec: SqlExecutor,
   contactId: number,
-  opts?: PurgeOptions,
+  opts: PurgeOptions,
 ): Promise<void> {
   return inWriteTransaction(exec, async () => {
     // (1) Write-boundary guard: only an archived contact may be purged.
-    const row = await exec.getFirstAsync<{ archived_at: string | null }>(
-      "SELECT archived_at FROM contacts WHERE id = ?",
-      [contactId],
-    );
+    const row = await exec.getFirstAsync<{
+      archived_at: string | null;
+      uid: string;
+    }>("SELECT archived_at, uid FROM contacts WHERE id = ?", [contactId]);
     if (!row || row.archived_at === null) {
       throw new Error(
         `purgeContact: contact id=${contactId} is not archived — refusing to purge (no rows deleted)`,
       );
     }
 
-    // (2) Explicit fan-out of every owned child (incl. field_history, which has
+    // (2) Capture every mergeable UID before deleting it. field_history has no
+    //     merge identity and remains deliberately excluded from evidence.
+    const tombstoneSources: Array<{
+      entityType: TombstoneEntityType;
+      sql: string;
+    }> = [
+      {
+        entityType: "interaction",
+        sql: "SELECT uid FROM interactions WHERE contact_id = ?",
+      },
+      {
+        entityType: "event",
+        sql: "SELECT uid FROM events WHERE contact_id = ?",
+      },
+      { entityType: "fuel", sql: "SELECT uid FROM fuel WHERE contact_id = ?" },
+      {
+        entityType: "custom_field_value",
+        sql: "SELECT uid FROM custom_field_values WHERE contact_id = ?",
+      },
+      {
+        entityType: "contact_link",
+        sql: "SELECT uid FROM contact_links WHERE contact_id = ?",
+      },
+    ];
+    for (const source of tombstoneSources) {
+      const rows = await exec.getAllAsync<{ uid: string }>(source.sql, [
+        contactId,
+      ]);
+      for (const child of rows) {
+        await insertTombstoneCore(exec, {
+          entityType: source.entityType,
+          entityUid: child.uid,
+          deletedAt: opts.now,
+        });
+      }
+    }
+    await insertTombstoneCore(exec, {
+      entityType: "contact",
+      entityUid: row.uid,
+      deletedAt: opts.now,
+    });
+
+    // (3) Explicit fan-out of every owned child (incl. field_history, which has
     //     no FK and never cascades). Not relying on FK CASCADE — auditable.
     await exec.runAsync("DELETE FROM interactions WHERE contact_id = ?", [
       contactId,
@@ -201,7 +249,16 @@ export function purgeContact(
       contactId,
     ]);
 
-    // (3) The contact itself — assert exactly one row deleted.
+    // Keep an explicit merge-visible timestamp when the purged row was the sun;
+    // the WHERE makes this a harmless no-op for every other contact.
+    await exec.runAsync(
+      `UPDATE app_settings
+          SET sun_contact_id = NULL, modified_at = ?
+        WHERE id = 1 AND sun_contact_id = ?`,
+      [opts.now, contactId],
+    );
+
+    // (4) The contact itself — assert exactly one row deleted.
     const deleted = await exec.runAsync("DELETE FROM contacts WHERE id = ?", [
       contactId,
     ]);
@@ -215,7 +272,7 @@ export function purgeContact(
     // mutex is released. A throwing adapter is logged, never fatal, and cannot
     // undo the deletes above.
     try {
-      await opts?.onPurgeExtensions?.(contactId);
+      await opts.onPurgeExtensions?.(contactId);
     } catch (err) {
       Logger.error(
         LOG_SCOPE,

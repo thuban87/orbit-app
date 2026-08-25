@@ -144,6 +144,7 @@ export function ArchivedContactsScreen({
         const photoCleanup = buildPhotoPurgeCleanup(exec);
         const notifCleanup = buildNotificationPurgeCleanup();
         await purgeContact(exec, id, {
+          now: localDateTime(),
           onPurgeExtensions: async (purgedId) => {
             try {
               await photoCleanup(purgedId);

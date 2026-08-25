@@ -25,6 +25,7 @@ import { migration003 } from "@/db/migrations/003-orrery-settings";
 import { migration004 } from "@/db/migrations/004-ai-settings";
 import { migration005 } from "@/db/migrations/005-digest-settings";
 import { migration006 } from "@/db/migrations/006-normalize-custom-field-values";
+import { migration007 } from "@/db/migrations/007-tombstones";
 import { runMigrations } from "@/db/migrations/runner";
 import { purgeContact } from "@/db/purge-dao";
 import type { SqlExecutor } from "@/db/types";
@@ -504,14 +505,20 @@ describe("migration006 — lossless legacy custom-value normalization", () => {
       ),
     ).toEqual({ old_value: "private", field_col_name: "score" });
 
-    await purgeContact(exec, blair);
+    // purgeContact now writes Phase 17 deletion evidence, so run its required
+    // forward migration while retaining this v6 lifecycle regression.
+    await runMigrations(exec, [...legacyMigrations, migration006, migration007], 7, {
+      now: MIGRATION_NOW,
+      newUid: uid,
+    });
+    await purgeContact(exec, blair, { now: MIGRATION_NOW });
     expect(
       await exec.getFirstAsync<{ n: number }>(
         "SELECT COUNT(*) AS n FROM custom_field_values WHERE contact_id = ?",
         [blair],
       ),
     ).toEqual({ n: 0 });
-    expect(await userVersion()).toBe(6);
+    expect(await userVersion()).toBe(7);
     // Phase 17 backup/export/restore, tombstones, reconciliation, and sync
     // conflict policy are intentionally out of scope for this migration proof.
     expect(casey).toBeGreaterThan(0);
