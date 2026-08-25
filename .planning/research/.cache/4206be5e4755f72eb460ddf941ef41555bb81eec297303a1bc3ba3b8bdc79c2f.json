@@ -1,0 +1,1 @@
+{"content":"SQLite supports NOT NULL, UNIQUE, and FOREIGN KEY constraints; a UNIQUE(contact_id, field_def_id) constraint can enforce one current row per pair, with child-key indexes recommended for deletion efficiency.","source":"web","provider":"websearch","confidence":"LOW","fetched_at":"2026-08-24T17:50:25.975Z","ttl":86400000,"kind":"docs"}
