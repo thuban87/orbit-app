@@ -60,13 +60,14 @@ describe("migration007 — permanent tombstones and reserved singleton UIDs", ()
         backup_retention_days: number;
         last_backup_data_revision: number;
         backup_folder_uri: string | null;
+        backup_folder_accessible: number;
         backup_folder_diagnostic: string | null;
         last_automatic_backup_at: string | null;
         encryption_enabled: number;
         backup_nudge_dismissed: number;
       }>(
         `SELECT backup_interval_days, backup_retention_days, last_backup_data_revision,
-                backup_folder_uri, backup_folder_diagnostic, last_automatic_backup_at,
+                backup_folder_uri, backup_folder_accessible, backup_folder_diagnostic, last_automatic_backup_at,
                 encryption_enabled, backup_nudge_dismissed
            FROM app_settings WHERE id = 1`,
       ),
@@ -74,7 +75,8 @@ describe("migration007 — permanent tombstones and reserved singleton UIDs", ()
       backup_interval_days: 1,
       backup_retention_days: 7,
       last_backup_data_revision: 0,
-      backup_folder_uri: null,
+        backup_folder_uri: null,
+        backup_folder_accessible: 0,
       backup_folder_diagnostic: null,
       last_automatic_backup_at: null,
       encryption_enabled: 0,
