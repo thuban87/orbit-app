@@ -393,3 +393,277 @@ all-or-nothing restore), and the settings/tombstone interaction (`sun_contact_id
 concrete, traceable path to reintroducing a reference to a permanently deleted contact.
 None of these require re-architecting the phase; they need explicit mechanisms named in
 17-05 and 17-08 before execution, plus a small file-scope correction in 17-03.
+
+---
+
+## Codex Review — Cycle 2
+
+> Run against commit c9058e8 ("fix(17): revise plans per cycle-1 cross-AI review"), the
+> current revised 12 plans, with the full Cycle 1 review text supplied as reference
+> context. Resolved model: `gpt-5.6-terra (reasoning=low)` (source: banner) — the same
+> effort-resolution caveat noted in Cycle 1 applies again; this was not requested or
+> overridden by this reviewer session.
+
+## Summary
+
+The revision resolves most Cycle 1 gaps: the export snapshot, delete coverage,
+reconciliation completeness, encryption gating, UI recovery, and end-to-end migration
+test are now explicitly planned. However, the photo protocol still permits an
+unrecoverable post-commit missing-photo state, and the automatic-backup change marker
+is still mathematically unable to detect same-second writes. No `[DECIDED]`/`[REJECTED]`
+HANDOFF or ADR reversal found.
+
+## Resolved
+
+- **17-01 package provenance/prebuild check — FULLY RESOLVED.** The plan now requires Expo config inspection and a clean prebuild diff when warranted: `17-01-PLAN.md:75-80`.
+
+- **17-02 closed tombstone vocabulary — FULLY RESOLVED.** A runtime-guarded TypeScript union explicitly names the covered hard-delete entities: `17-02-PLAN.md:76-82`.
+
+- **17-02 capture purge UIDs before deletion — FULLY RESOLVED.** The action requires selecting/asserting every child UID and writing evidence before fan-out deletes: `17-02-PLAN.md:90-97`. This addresses the current purge, which only reads `archived_at` before deleting children (`src/db/purge-dao.ts:176-200`).
+
+- **17-03 fuel/link timestamp threading and production call-site scope — FULLY RESOLVED.** Both screens are in `files_modified` and the action specifies `now` through cores and `applyLinkDiff`: `17-03-PLAN.md:7`, `17-03-PLAN.md:64-76`. This covers the current timestamp-less fuel core (`src/db/fuel-dao.ts:226-235`), link core (`src/db/contact-links-dao.ts:137-146`), and diff delete call (`src/db/contact-links-dao.ts:229-233`).
+
+- **17-03 `applyLinkDiff` tombstone test — FULLY RESOLVED.** Dedicated compositional-path behavior, action, and acceptance criteria are present: `17-03-PLAN.md:68-76`.
+
+- **17-04 stale field-delete tombstone — FULLY RESOLVED.** The plan requires an exact-one definition-delete guard and rollback test: `17-04-PLAN.md:56-63`. Current code lacks that assertion (`src/db/field-ddl.ts:117-124`).
+
+- **17-04 complete reconciliation registry — FULLY RESOLVED.** Categories, profile, and immutable events are expressly assigned policies: `17-04-PLAN.md:72-81`.
+
+- **17-05 export read consistency — FULLY RESOLVED.** `inReadSnapshot` uses the same module-level mutex as writes, wraps the complete export in `BEGIN`/`COMMIT`, prohibits nesting, and has an ordering regression test: `17-05-PLAN.md:67-72`. This composes safely with the existing non-reentrant mutex because it is a sibling outermost primitive, not called from within `inWriteTransaction`; that limitation matches the current mutex semantics (`src/db/transaction.ts:12-23`, `src/db/mutex.ts:22-35`). It prevents interleaving from normal DAO writers, which use the shared wrapper (for example `src/db/fuel-dao.ts:240-272`).
+
+- **17-05 unreadable photo export behavior — FULLY RESOLVED.** A referenced missing/unreadable photo aborts the entire export with a typed repair-needed error: `17-05-PLAN.md:62-72`. This is necessary because current photo deletion is explicitly best-effort (`src/services/photos/photo-storage.ts:196-210`).
+
+- **17-06 retention edge cases — FULLY RESOLVED.** Lookalike files, unreadable listings, and clock rollback are all specified with tests: `17-06-PLAN.md:59-67`.
+
+- **17-07 release-build KDF benchmark and safe re-encryption — FULLY RESOLVED.** The checkpoint requires the release APK identity: `17-07-PLAN.md:67-85`; re-encryption uses write-new, decrypt-verify, then delete-old: `17-07-PLAN.md:89-101`.
+
+- **17-08 schedule failure contract — FULLY RESOLVED.** It is now a committed-with-resync-pending result and tests invoke the existing launch reconcilers: `17-08-PLAN.md:88-102`. Those reconcilers are registered at startup (`App.tsx:153-162`) and re-run from launch hooks (`src/services/notifications/notification-schedule.ts:515-524`, `src/services/notifications/digest-schedule.ts:191-198`).
+
+- **17-09 shared day-bound validator — FULLY RESOLVED.** UI must import the DAO-owned validator rather than duplicate `1..3650`: `17-09-PLAN.md:69-79`.
+
+- **17-10 expired preview token and interrupted UI — FULLY RESOLVED.** The missing-cache recovery and no persisted applying state are explicitly required and tested: `17-10-PLAN.md:57-65`, `17-10-PLAN.md:73-82`.
+
+- **17-11 v6→v7 populated end-to-end gate — FULLY RESOLVED.** It requires migration, export, and both restore modes over representative fixtures: `17-11-PLAN.md:56-63`.
+
+- **17-12 non-secret AI settings and acknowledgement-reset parity — FULLY RESOLVED.** Both are explicit behavior/action/acceptance requirements: `17-12-PLAN.md:73-81`. This preserves current endpoint-change acknowledgement behavior (`src/db/app-settings-dao.ts:367-383`).
+
+## Still Open / New Concerns
+
+- **HIGH — 17-08 photo staging relocates, rather than eliminates, the committed missing-photo risk.** Staging bytes in cache before the transaction only proves that cache is writable. The plan still commits DB state first and only then calls `persistMaster` into canonical storage; it explicitly accepts a per-photo failure after commit: `17-08-PLAN.md:88-100`. If the process dies after commit but before finalization—or `persistMaster` fails—DB rows can reference a canonical photo that was never written. The proposed existing launch reconciliation cannot recover cache-staged files because it only reconciles `.tmp`/`.bak` under the canonical avatars directory (`src/services/photos/photo-storage.ts:213-228`); cache staging creates neither. User-visible counts help a live process, but do not provide durable recovery after a kill. Require durable staging in the photo storage area plus a persistent finalize/retry journal, or finalize canonical files before commit with compensating cleanup/recovery.
+
+- **HIGH — 17-06's "same-second" marker claim is false; writes can be missed indefinitely.** The plan says `newMarker > storedMarker` permits a same-second edit after backup: `17-06-PLAN.md:65`. It does not: if both timestamps are equal to second precision, `newMarker === storedMarker`, so the backup is skipped until some later mutation advances the maximum. Current timestamps are explicitly second-granularity (`src/db/database.ts:46-55`). This remains unresolved from the Cycle 1 marker finding. Use a monotonically incremented export revision, or store a composite/change-log marker that cannot collide.
+
+- **MEDIUM — purge's required `modified_at` timestamp has no defined source or call-site update.** Plan 17-02 requires `UPDATE app_settings ... modified_at = ?` but does not define a `now` input, injected clock, or internal clock source: `17-02-PLAN.md:87-97`. Current `purgeContact` accepts only `(exec, contactId, opts)` (`src/db/purge-dao.ts:169-173`) and its production caller likewise supplies no timestamp (`src/screens/ArchivedContactsScreen.tsx:146-147`). The previous timestamp-threading correction in 17-03 is not mirrored here. Define a caller-supplied local-wall-clock `now`, add `ArchivedContactsScreen.tsx` to the plan scope, and test the exact timestamp.
+
+- **LOW — `inReadSnapshot` is a convention-only read boundary.** The plan says "with no writes inside it" but does not make that enforceable (`17-05-PLAN.md:70`). `SqlExecutor` has the same unrestricted write API available inside the callback (`src/db/types.ts:17-28`). This does not deadlock or defeat normal-writer isolation, but a future accidental write inside a snapshot would commit under a misleading API name. A narrowed read-only executor type would make the guarantee structural.
+
+## Risk Assessment
+
+**HIGH.** The revised plans are substantially stronger, and the mutex-based snapshot design is sound when used as specified. But the restore still has a post-commit data-integrity hole for photos, and automatic backups can silently omit same-second changes. Those affect the phase's central safety promises.
+
+---
+
+## Claude (Sonnet 5) Review — Cycle 2
+
+**Method.** Read `HANDOFF.md`, `CLAUDE.md`, all 12 revised `17-*-PLAN.md` files in full,
+`17-CONTEXT.md`, and the Cycle 1 `17-REVIEWS.md` sections above, then independently
+verified every Cycle-1 finding's resolution claim and the codex Cycle-2 findings above
+against the real source on disk: `src/db/transaction.ts`, `src/db/mutex.ts`,
+`src/db/types.ts`, `src/db/fuel-dao.ts`, `src/db/contact-links-dao.ts`,
+`src/db/purge-dao.ts`, `src/db/field-ddl.ts`, `src/db/field-values-dao.ts`,
+`src/db/app-settings-dao.ts`, `src/db/migrations/003-orrery-settings.ts`,
+`src/db/database.ts`, `src/db/contacts-dao.ts`, `src/services/photos/photo-storage.ts`,
+`src/utils/dates.ts`, `src/screens/ArchivedContactsScreen.tsx`, `App.tsx`,
+`src/services/notifications/notification-schedule.ts`,
+`src/services/notifications/digest-schedule.ts`, plus a repo-wide grep for every
+`DELETE FROM` in `src/db` to re-verify the tombstone-vocabulary completeness claim
+independently of both Cycle 1 reviews. No `src/backup/` directory exists yet — the
+phase has not been executed, so all findings are against plan text and today's
+pre-Phase-17 source. I also ran the codex Cycle-2 lane (`gpt-5.6-terra`,
+reasoning resolved to `low` by the review-lane runner, same `#3532`-adjacent
+effort-resolution artifact noted in Cycle 1 — not requested by this session) and
+independently verified its findings below rather than taking them on faith.
+
+### Escalation check (HANDOFF.md / ADR-001)
+
+No finding below reverses a `[DECIDED]`/`[REJECTED]` HANDOFF item or an ADR. The
+revisions extend Cycle 1's already-cleared D-06–D-18 resolution of HANDOFF's `[OPEN]`
+backup question; nothing in commit c9058e8 touches encryption scope, sync E2EE
+separation, or the custom-fields normalized model differently than Cycle 1 already
+assessed as clean. **No owner escalation is required.**
+
+### Verification of Cycle 1 resolutions (source-checked, not plan-text-only)
+
+All of the following are independently confirmed against real source, not just plan
+prose — I re-derived the same closed hard-delete set Cycle 1 found (`grep -rn "DELETE
+FROM" src/db/*.ts`: `contact_links` (`contact-links-dao.ts:142`, `purge-dao.ts:197`),
+`fuel` (`fuel-dao.ts:231`, `purge-dao.ts:192`), `interactions`
+(`recency-dao.ts:318`, `purge-dao.ts:188`), `events` (`purge-dao.ts:191`, no
+standalone), `custom_field_values`/`custom_field_defs` (`field-ddl.ts:120,124`,
+`purge-dao.ts:194`), `contacts` (`purge-dao.ts:205`), `field_history`
+(`purge-dao.ts:200`, correctly excluded from tombstones)) — this exactly matches
+17-02's `TombstoneEntityType` union (`'contact' | 'interaction' | 'event' | 'fuel' |
+'contact_link' | 'custom_field_def' | 'custom_field_value'`); the vocabulary is
+complete against the current tree.
+
+- **17-03/17-04 file-scope and guard gaps — confirmed FULLY RESOLVED.** `deleteFuelCore`
+  (`fuel-dao.ts:226-235`) and `removeLinkCore` (`contact-links-dao.ts:137-146`) today
+  really do take only `{id, contactId}`, exactly as both plans state, and 17-03 now
+  lists `src/screens/ContactProfileScreen.tsx`/`EditContactScreen.tsx` in
+  `files_modified`. `field-ddl.ts`'s `DropTarget = Pick<CustomFieldDef, "id" |
+  "col_name">` (line 47) really does omit `uid`, and its definition `DELETE` (line
+  124) really has no `changes === 1` guard today — 17-04's remedy targets exactly
+  these gaps.
+- **17-08 photo two-phase design and `createContactFull` avoidance — mechanically
+  sound.** `persistMaster(srcUri, relative)` (`photo-storage.ts:141-194`) takes any
+  source URI and does its own crash-safe `.tmp`/`.bak` swap into `avatars/`, which is
+  exactly the seam 17-08's post-commit finalize step calls unmodified. `createContactFull`
+  (`contacts-dao.ts:100-123`) does own its own `inWriteTransaction`, confirming 17-08's
+  note that restore must not call it directly (composing it would nest the mutex).
+- **17-05's `inReadSnapshot` design is architecturally sound against the real mutex.**
+  `inWriteTransaction` (`transaction.ts:42-57`) calls the single module-level
+  `withMutex` (`mutex.ts:22-36`), and I confirmed every `runAsync` call site in
+  `src/db/*.ts` sits inside a file that also uses `inWriteTransaction` — i.e., the
+  codebase's documented "every write goes through the one mutex" convention holds
+  today, which is the precondition 17-05's isolation guarantee depends on. A sibling
+  `inReadSnapshot` sharing the same `withMutex` chain will genuinely serialize against
+  every current writer.
+- **17-12's `ai_ack_custom` reset behavior — confirmed real and correctly targeted.**
+  `updateAppSettings` (`app-settings-dao.ts:313-383`) really does reset
+  `ai_ack_custom` on an endpoint change (lines ~367-378); 17-12 correctly requires
+  `updateAppSettingsCore` to reproduce this.
+- **17-02/17-04's `app_settings.sun_contact_id` FK — confirmed as described.**
+  `003-orrery-settings.ts:40` really declares `ON DELETE SET NULL` with no trigger
+  anywhere bumping `modified_at`; 17-02's explicit `UPDATE app_settings SET
+  sun_contact_id = NULL, modified_at = ?` ahead of the FK-triggering `DELETE`, plus
+  17-04's reference-to-tombstoned-parent fallback and 17-08's re-validation against
+  "whichever settings row wins," together close the resurrection path Cycle 1's HIGH
+  #3 described — **architecturally** resolved (see MEDIUM below for one loose
+  implementation thread).
+
+I independently reached the same "Resolved" set codex lists for 17-01, 17-06 (retention
+edge cases), 17-07, 17-09, 17-10, and 17-11, and confirmed the codex file:line citations
+for those (`App.tsx:153-162` registers `notification`/`digest` sweep hooks exactly as
+claimed; `notification-schedule.ts:515-524` and `digest-schedule.ts:191-198` register
+launch-sweep hooks that fully re-read DB state, confirming 17-08's post-commit
+schedule-rebuild-failure resolution is not aspirational).
+
+### HIGH (concur with codex, independently verified)
+
+1. **17-08's post-commit photo finalization has no durable recovery for an OS-level
+   process kill, not just a live in-process failure.** `reconcilePhotoDir`/
+   `reconcilePhotoWrites` (`photo-storage.ts:228-268`) only scan `avatars/*.tmp` and
+   `avatars/*.bak` — files `persistMaster` itself creates mid-swap. 17-08's pre-commit
+   staging writes each photo's decoded bytes to "a fresh OS temp/cache file" (task 2
+   action, item 1), which is **not** inside `avatars/` and carries no `.tmp`/`.bak`
+   marker the existing sweep recognizes. The plan's own residual-failure handling (a
+   caught `persistMaster` error → `photosNeedingAttention` count in the typed result)
+   only works for a **live, non-killed process** — the count is computed and returned
+   in-memory by the same call that would never return if the OS kills the app between
+   DB commit and that photo's finalize call. In that scenario: the DB row already
+   commits a canonical filename reference (Merge/Replace-all writes the resolved
+   `avatars/<name>` string as part of the committed transaction, per 17-08's own
+   design), the canonical file was never created, no `.tmp`/`.bak` artifact exists for
+   the launch sweep to find, and no `photosNeedingAttention` count was ever persisted
+   or surfaced — the contact silently ends up with a dangling photo reference and zero
+   diagnostic trail, indefinitely. This is a genuine relocation, not an elimination, of
+   Cycle 1's HIGH #2: the common-case (decode/disk-full) failure is now correctly
+   converted to a pre-commit whole-restore abort, but the process-kill-during-
+   finalization window is real, unaddressed, and arguably worse than Cycle 1's original
+   gap because it is now completely silent (no post-commit error log, no user-visible
+   count) rather than merely "logged privately." **Action needed:** either persist a
+   durable per-restore "photos pending finalization" marker (queryable by the existing
+   launch-sweep machinery, so a killed finalize resumes/reports on next launch) or
+   finalize canonical photo files from the already-verified staged bytes **before** the
+   DB transaction opens (using synthesized/placeholder-then-rename UID-keyed names that
+   don't depend on post-commit local ids), with compensating cleanup of any file whose
+   contact/definition never actually committed.
+
+2. **17-06's `newMarker > storedMarker` change-detection test cannot detect a
+   same-second collision, and the omission does not self-correct until an unrelated
+   later write occurs.** Verified: `localDateTime()`/`formatLocalDate()`
+   (`src/utils/dates.ts:17-22`, `src/db/database.ts:50-54`) produce
+   second-granularity strings (`YYYY-MM-DD HH:MM:SS`) with no sub-second component
+   anywhere in the codebase. 17-06's task 1 action text defines the "changed" check as
+   `newMarker > storedMarker` specifically because "a same-second edit after a
+   same-second backup is still eligible **next** due cycle" — but that claim is false:
+   if a user's edit lands in the exact same wall-clock second as the marker the prior
+   successful automatic backup recorded, `newMarker === storedMarker` on every
+   subsequent due-cycle check too, since nothing else advances the max. The most likely
+   real-world trigger is exactly the scenario this feature runs in most often: the
+   automatic-backup sweep is foreground-launch-triggered (17-06 task 2), so a user's
+   first edit of a session racing the same-second launch-time backup check is a
+   plausible, not merely theoretical, collision. The failure is silent — no error, no
+   degraded-health signal (17-06's health model derives from verified-write results,
+   not missed-detection) — and directly undermines the phase's D-08 "automatic
+   protection" promise for however long it takes an unrelated write to land in a
+   different second. **Action needed:** replace the wall-clock-derived scalar with a
+   marker that cannot tie across a real change — e.g., a monotonic revision counter
+   bumped by every exportable-table write (a real schema/DAO-wide change), or persist
+   the last-backed-up row *count* alongside the max timestamp as a cheap second signal,
+   or widen local timestamps to include a monotonic tiebreaker. This is not simply a
+   restatement of Cycle 1's MEDIUM (which only asked for a marker to be *defined* at
+   all) — the now-defined marker has a specific, verifiable off-by-one correctness bug.
+
+### MEDIUM
+
+1. **(concur with codex) 17-02's purge-time `app_settings.modified_at` bump has no
+   defined clock source or call-site wiring, mirroring the exact gap 17-03 correctly
+   caught for fuel/links but left unfixed here.** Verified: `purgeContact(exec,
+   contactId, opts?)` (`purge-dao.ts:169-173`) and its `PurgeOptions` type
+   (`purge-dao.ts:63-69`) carry no `now`/clock parameter today, and the sole
+   production caller, `src/screens/ArchivedContactsScreen.tsx:146`
+   (`await purgeContact(exec, id, {...})`), passes none. 17-02's task 3 action text
+   specifies the bound `UPDATE app_settings SET sun_contact_id = NULL, modified_at = ?
+   ... ` but never states where that `?` value comes from — an injected `now`
+   parameter (requiring a `PurgeOptions.now` addition and a call-site change this
+   plan's `files_modified` list does not include `ArchivedContactsScreen.tsx` for), or
+   an internal `localDateTime()` call inside the DAO (a deviation from the
+   established caller-supplied-clock convention 17-03 itself invokes as the reason
+   *not* to synthesize `now` inside a DAO). Left unresolved, this is exactly the kind
+   of gap that produces either a TypeScript compile surprise mid-execution or a
+   silent convention violation — and because this write is the mechanism Cycle 1's
+   HIGH #3 (`sun_contact_id` resurrection) depends on, an incorrectly-wired timestamp
+   here would reopen that HIGH in practice even though the surrounding design is
+   otherwise sound. **Action needed:** add a caller-supplied `now` to `PurgeOptions`
+   (or `purgeContact`'s signature) and add `ArchivedContactsScreen.tsx` to 17-02's
+   `files_modified`.
+
+### LOW
+
+1. **(concur with codex) `inReadSnapshot`'s "no writes inside it" rule is
+   convention-only, not type-enforced.** Verified `SqlExecutor`
+   (`src/db/types.ts:17-28`) exposes `runAsync`/`execAsync` identically whether called
+   from inside `inWriteTransaction` or a future `inReadSnapshot` — nothing stops a
+   later change from accidentally writing inside a "read" snapshot and having it
+   silently commit. A narrowed read-only executor view (even a thin wrapper type that
+   only exposes `getFirstAsync`/`getAllAsync`) would make the guarantee structural
+   rather than doc-comment-only. Not blocking for this phase, but worth a follow-up
+   note in `transaction.ts`.
+2. **No plan addresses the write-availability cost of `inReadSnapshot` blocking every
+   other app write for the full duration of a multi-table-plus-all-photo-bytes export.**
+   Because `inReadSnapshot` and `inWriteTransaction` share one non-reentrant
+   `withMutex` chain (verified above), an in-progress automatic backup (17-06,
+   foreground-launch-triggered) or manual export (17-05) holds that mutex for as long
+   as it takes to read every table and base64-encode every referenced photo — during
+   which every other write in the app, including headless notification-tap writes,
+   queues behind it. None of 17-05/17-06's tests or must-haves bound this duration or
+   test it against a larger photo library. This is a correctness-safe but
+   responsiveness-relevant gap the correctness fix (rightly) introduced; worth a
+   plan-text note acknowledging the tradeoff and, ideally, a rough size/duration test
+   at 17-11's integration-gate stage.
+
+### Risk Assessment
+
+**HIGH**, concurring with codex. The revision closed 19 of Cycle 1's 22 findings
+cleanly and verifiably against source — the tombstone audit, reconciliation
+completeness, encryption release-build gating, UI recovery paths, and the end-to-end
+migration/restore integration gate are all now real, executable plan text, not
+aspirational language. But two HIGHs remain: the photo-restore post-commit path is
+safe against live-process failure yet still open against an OS-level kill during
+finalization (a materially different, and less visible, failure mode than Cycle 1's
+original gap), and the newly-defined automatic-backup change marker has a verified
+off-by-one bug that can silently and indefinitely suppress protection for same-second
+edits. Both are narrow-but-real, self-contained fixes (a durable finalize journal or
+pre-commit canonical write for the first; a monotonic/collision-proof marker for the
+second) that do not require re-architecting the phase.
