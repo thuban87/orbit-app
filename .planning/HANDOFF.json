@@ -1,0 +1,46 @@
+{
+  "version": "1.0",
+  "timestamp": "2026-08-25T22:50:00.000Z",
+  "phase": "17",
+  "phase_name": "Backup, Export & Restore",
+  "phase_dir": ".planning/phases/17-backup-export-restore",
+  "plan": 7,
+  "task": 2,
+  "total_tasks": 3,
+  "status": "paused",
+  "completed_tasks": [
+    {
+      "id": 1,
+      "name": "Parameterize and benchmark one native encrypted backup envelope",
+      "status": "done",
+      "commits": ["9c333d4", "61d2817"]
+    }
+  ],
+  "remaining_tasks": [
+    {
+      "id": 2,
+      "name": "Approve the first versioned PBKDF2 profile from physical Pixel evidence",
+      "status": "blocked_on_human_decision"
+    },
+    {
+      "id": 3,
+      "name": "Add the passphrase cache and fail-closed lifecycle orchestration",
+      "status": "not_started"
+    }
+  ],
+  "blockers": [
+    {
+      "type": "decision",
+      "description": "No current-release Pixel benchmark or shipping encryption profile exists. The available release APK predates the new timing seam.",
+      "workaround": "Build and install a current release APK through the documented droid route, measure the seam, then approve the full versioned profile."
+    }
+  ],
+  "human_actions_pending": [
+    "Authorize the current-release Pixel benchmark route/harness and approve the measured versioned PBKDF2/AES-256-GCM profile, or provide an already measured full profile with release-build identity."
+  ],
+  "uncommitted_files": [
+    ".planning/milestone.lock (pre-existing/unrelated and intentionally untouched)"
+  ],
+  "next_action": "Resume 17-07 at Task 2 after the measured profile decision; preserve committed Task 1 work and do not invent benchmark evidence.",
+  "context_notes": "Pixel and droid are reachable; all Task 1 encryption tests and TypeScript verification passed."
+}
