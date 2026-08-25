@@ -903,3 +903,339 @@ call. The settings-snapshot field-scope ambiguity (data_revision/health columns 
 explicitly excluded from the wire format) is real but lower-severity, given the
 `COLUMN_OF` allowlist convention already narrows the blast radius; it belongs in the
 actionable-MEDIUM bucket rather than blocking execution on its own.
+
+---
+
+## Codex Review — Confirmation
+
+**Run details:** codex-cli 0.149.1, model resolved to `gpt-5.6-terra (reasoning=low)` (same
+lane-runner effort-resolution artifact noted in the cycle-1 review above — this is the
+`gsd-plan-checker` agent profile's `low` resolution under `model_profile: "quality"`, not a
+request for reduced effort). Invoked via `gsd-tools query review-lane invoke --slug codex`
+with a hand-built prompt (the standard `/gsd-review` prompt-assembly step does not include
+audit-findings files, so this run assembled its own: both audit files, `17-CONTEXT.md`'s
+D-01..D-18, and all 12 current PLAN.md files, verbatim, ~348KB). Output was non-empty,
+source-cited, and is reproduced in full below (lightly reformatted; no findings added,
+removed, or reworded).
+
+### Finding verdicts
+
+**AUDIT-A:** A-01 through A-05, A-07 through A-10 — RESOLVED. A-06 — PARTIAL (categories
+retained rather than tombstoned in Replace-all — see Claude's confirmation review below for
+why this is not actually an A-06/D-01 gap). A-11 — RESOLVED.
+
+**AUDIT-B:** B-1, B-2, B-4, B-5, B-6, B-8 through B-12, B-14 through B-16, B-18, B-19, B-20 —
+RESOLVED. B-3 — RESOLVED. B-7 — PARTIAL (same categories caveat as A-06). B-13 — PARTIAL
+(delete-journal retry logic assumes `deletePhoto` throws; the real helper catches and logs
+internally — **independently verified against `src/services/photos/photo-storage.ts:200-211`
+in Claude's review below; confirmed correct**). B-17 — PARTIAL (re-encryption crash recovery
+depends on the new passphrase being re-supplied by a retried change-passphrase call; a killed
+process loses it). B-21 — PARTIAL (a failed-enable double-fault — SQLite update fails, then
+the SecureStore delete compensation ALSO fails — can leave an orphaned cached secret behind
+while `encryption_enabled=false`).
+
+Full per-ID citations (plan:line) are preserved in the raw codex output at
+`/tmp/claude-1000/-home-bwales-projects-orbit-app/2c8ec29b-3fe5-46d3-b350-c70c787c2e44/scratchpad/gsd-review-F4Jxma/gsd-review-codex.md`
+(not committed — ephemeral run artifact); the verdicts above are a faithful summary.
+
+### NEW ISSUES INTRODUCED (as reported by codex)
+
+- **HIGH — OWNER-ESCALATION, D-01:** Replace-all explicitly leaves categories in place
+  because they have no prior delete writer; codex argues Replace-all is itself an
+  equivalent hard-delete/reconciliation path "discovered during planning" and retaining
+  categories absent from the backup violates D-01's deletion-evidence scope. `17-08:157`
+- **HIGH:** The claimed re-encryption crash recovery is not self-sufficient — before the
+  SecureStore switch, only the old passphrase survives a process kill, and it cannot verify
+  which candidate copies use an unknown new passphrase. `17-07:132`
+- **HIGH:** Delete-journal retries cannot work with the current `deletePhoto` contract — it
+  logs and swallows filesystem errors, while the plan deletes the journal row "on success"
+  and relies on catching an exception. `17-08:147`, `17-08:177`,
+  `src/services/photos/photo-storage.ts:200-210`
+- **MEDIUM:** Migration verification becomes stale once migration 008 is introduced — Plan
+  02's full-chain test asserts target/user version 7, while Plan 08 raises the real target to
+  8; Plan 11's integration language still says v6→v7. `17-02:99-101`, `17-08:7`, `17-11:25`,
+  `17-11:62`
+- **MEDIUM:** `recordAutomaticBackupHealthCore` is specified as transaction-only, but 17-06
+  Task 3's action text does not explicitly require wrapping its post-SAF metadata write in
+  `inWriteTransaction`. `17-12:91`, `17-06:116`, `17-06:131`
+
+### Codex's overall risk verdict
+
+"Most original findings are concretely addressed. I would not mark the plans fully confirmed
+yet: the category omission is a D-01 owner escalation, and the re-encryption recovery and
+photo-delete journal handling remain high-risk correctness gaps."
+
+**Claude's disposition on codex's findings:** the delete-journal/`deletePhoto` finding and
+the migration-008/full-chain-test finding are independently source-verified below and stand
+as-is. The `recordAutomaticBackupHealthCore` transaction-wrapping gap is confirmed as a real,
+if minor, plan-text omission. The re-encryption crash-recovery and B-21 orphaned-secret
+findings are real but are refined/downgraded below (they fail closed rather than corrupt or
+leak data). The D-01 owner-escalation framing for categories is **not accurate** — see below
+for why — but it correctly points at a real, more fundamental categories bug codex's prompt
+did not have enough schema context to find on its own.
+
+---
+
+## Claude (Sonnet 5) Review — Confirmation
+
+**Method:** Read all 12 current PLAN.md files in full (not just the touched ones — 17-01,
+17-03, 17-09, 17-10 confirmed unaffected by the three fix commits and free of new
+cross-references that would need updating), `17-CONTEXT.md`, `17-AUDIT-A-FINDINGS.md`,
+`17-AUDIT-B-FINDINGS.md`, and the prior `17-REVIEWS.md` cycles. Cross-checked plan claims
+against the real files on disk: `src/db/migrations/*` (current max is 006,
+`TARGET_VERSION = 6` in `database.ts`), `src/db/transaction.ts`, `src/db/recency-dao.ts`,
+`src/db/app-settings-dao.ts`, `src/services/photos/photo-storage.ts` (`deletePhoto`,
+`persistMaster`, `SAFE_RELATIVE`), `src/db/photo-relative-path.ts`,
+`src/services/ai-key-store.ts`, `src/services/launch-sweep.ts` (`runLaunchSweep`'s
+un-isolated hook loop), `App.tsx` (sweep-registration order/line numbers). No phase-17 code
+exists yet — this is entirely a pre-execution plan audit, matching the task's actual state
+(the three "audit pass" commits touched only `.planning/phases/17-backup-export-restore/*.md`).
+
+### A-01..A-11 / B-1..B-21 — coherence check
+
+Agrees with codex's verdicts for every finding except the categories items (A-06, B-7) and
+the migration-008 note. Independently spot-verified the highest-risk ones directly against
+plan text and source:
+
+- **A-08/A-09 coalescing rule (17-06 Task 1):** genuinely resolved, not superficial. The
+  plan explicitly enumerates every leaf-core-vs-outer-operation split by function name
+  (`upsertValueCore`, `recordEventCore`, `addLinkCore`/`updateLinkCore`/`removeLinkCore`,
+  `updateContactMetadataCore`, `insertInteractionCore`, `recomputeLastContactCore` — leaves;
+  every public wrapper — outer, bumps once), names the exact A-08 failure modes it closes
+  (`createContactFull`/`createField`'s N-composition, `archiveContact`/`restoreContact`'s
+  `recordEventCore` composition, `applyLinkDiff`'s multi-row diff), and requires a dedicated
+  regression file (`data-revision-dao.test.ts`) proving each. `inWriteTransaction`
+  (`src/db/transaction.ts:42-56`) is confirmed non-reentrant on disk, which is exactly why
+  the leaf/outer split is structurally necessary rather than cosmetic.
+- **B-9 (restore-pending path grammar):** confirmed against real source that
+  `SAFE_RELATIVE = /^avatars\/[A-Za-z0-9_-]+\.(jpg|jpeg|png|webp)$/`
+  (`src/db/photo-relative-path.ts:22`) has no path-separator allowance in its `<name>`
+  group, so it does reject any `_restore_pending/` subdirectory exactly as B-9 says; the
+  plan's fix (a separate `SAFE_RESTORE_PENDING_RELATIVE` grammar, never broadening the
+  canonical one) is the correct scoped fix, not a workaround.
+- **B-15 (schedule-hook isolation):** confirmed against real source that
+  `runLaunchSweep` (`src/services/launch-sweep.ts`) runs
+  `for (const hook of hooks) { await hook(); }` with **no per-hook try/catch** — a throw
+  from one hook aborts the whole pass. The plan's fix (wrap each of
+  `registerNotificationScheduleSweep`/`registerDigestScheduleSweep`'s own reconcile call,
+  mirroring `field-sweep.ts`'s established per-hook convention, without touching
+  `launch-sweep.ts` itself) is real and correctly scoped. `App.tsx` line numbers cited in
+  17-08 (`registerNotificationScheduleSweep` at 153, `registerDigestScheduleSweep` at 162)
+  are accurate as of the current tree.
+- **B-16 (fail-closed passphrase read):** confirmed `ai-key-store.ts`'s `getKey` collapses
+  every SecureStore failure to `null` (`src/services/ai-key-store.ts:86-93`, matching the
+  plan's description exactly); 17-07's three-state `getPassphrase`/`resolveWriteEncryptionMode`
+  design is a real, structurally different fix, not a restatement.
+
+### Disagreement with codex: categories is not a D-01 owner-escalation
+
+Codex's HIGH "OWNER-ESCALATION, D-01" finding says Replace-all's decision to leave
+`categories` rows in place (never tombstoned) when absent from an incoming file violates
+D-01's deletion-evidence scope. This does not hold up: D-01 requires tombstones for "every
+hard deletion of a mergeable logical entity ... and any equivalent hard-delete writer
+discovered during planning" — and 17-04 Task 2 explicitly verifies, by a repo-wide grep for
+`DELETE FROM categories`, that **no such writer exists anywhere in the app** (confirmed
+independently: `grep -rn "categories" src/db/*.ts` shows only `SELECT`/`LEFT JOIN` usage in
+`contact-read.ts`, `dashboard-read.ts`, `ai-context-read.ts`; there is no category CRUD
+surface at all today). Replace-all choosing not to invent deletion evidence for an entity
+type that has never had a delete path is a reasoned, in-bucket planner call consistent with
+D-01's own text, not a reversal of it. I would not count this as an owner-escalation.
+
+### New HIGH: categories carry an unstabilized per-install UID, and 17-04 registers them for UID reconciliation anyway
+
+This is a real, independently-found, unresolved HIGH that neither audit pass nor codex's
+confirmation run caught, and it is the actual bug underneath codex's mistaken D-01 framing.
+
+`src/db/migrations/001-initial.ts`'s `migration001.apply` seeds the four fixed categories
+with `deps.newUid()` — a **random UID minted fresh on every install** — in the exact same
+loop shape that, for the `profile` singleton, was the precise bug 17-02/migration-007 fixed
+via `RESERVED_PROFILE_UID` (source-verified: `001-initial.ts:217-231` seeds both `categories`
+and `profile` with `deps.newUid()` in the same `apply()` function; migration 007 later
+overwrites only `profile.uid`, never touching `categories.uid`). But 17-04 Task 2's
+`must_haves` and action text explicitly register `categories` in the reconciliation
+entity-policy registry as an ordinary UID-keyed, LWW-reconciled mergeable table — "The
+reconciliation entity-policy registry names every mergeable UID-bearing table (contacts,
+interactions, events, fuel, links, custom_field_defs, custom_field_values, categories,
+profile)" (17-04-PLAN.md:19) — with no reserved/fixed-UID treatment analogous to
+`RESERVED_PROFILE_UID`, and no plan anywhere (grepped across all 12 PLAN.md files) mentions
+a `categoryUid`/reserved-category-UID mechanism.
+
+**Failure scenario:** the single most common restore use case — reinstalling the app (or
+moving to a new phone) and restoring a backup — runs migration 001 fresh, minting four brand
+new random category UIDs on the destination that can never match the four different random
+UIDs the source device's backup carries. Per D-02/D-03's ordinary reconciliation rule
+("a missing row inserts"), every restore onto a fresh install therefore inserts four
+duplicate categories rather than matching the existing four. Because `categories` has (as
+17-04 itself confirms) **no delete writer at all**, these duplicates can never be cleaned up
+by any in-app action, permanently doubling (or, after repeated restores, further multiplying)
+the category picker's contents. No plan describes how `contacts.category_id` (currently a
+raw local `INTEGER REFERENCES categories(id)`, not a UID) gets translated to/from a portable
+`categoryUid` at the export/restore boundary either — a search of all 12 plans for
+`category_id`/`categoryId` returns zero hits — so it is not established that a restored
+contact's category assignment survives at all, let alone survives without duplication.
+
+This is the identical bug class B-4/A-11 already fixed for `profile`, just missed for
+`categories`. **Fix:** extend migration 007 (or a coordination note pointing at it) with a
+`RESERVED_CATEGORY_UIDS` mapping (four fixed constants, one per seeded category, applied the
+same unconditional-`UPDATE...WHERE`-by-`display_order`-or-`name` way `RESERVED_PROFILE_UID`
+is applied) so every install's four categories share stable UIDs, and add explicit
+`categoryUid` export/restore translation to 17-05/17-08 mirroring the existing
+`sunContactUid` treatment. This is squarely in-bucket (extending an already-approved pattern
+to a sibling entity with the identical defect), not an owner decision — but it is unresolved
+in the current plans and belongs in the HIGH bucket until a plan actually specifies it.
+
+### Confirmed: codex's `deletePhoto` finding is correct (independently verified against source)
+
+Read `src/services/photos/photo-storage.ts:200-211` directly:
+
+```ts
+export function deletePhoto(relative: string): void {
+  assertSafeRelative(relative);
+  try {
+    new File(Paths.document, relative).delete();
+  } catch (error) {
+    Logger.error(LOG_SCOPE, `deletePhoto best-effort failed for ${relative}`, error);
+  }
+}
+```
+
+`deletePhoto` is synchronous, returns `void`, and **structurally cannot throw** — every
+failure is caught and logged internally. 17-08's Task 2/Task 3 text for `action='delete'`
+journal rows ("a caught deletion failure leaves the journal row in place... for Task 3's
+sweep to retry", 17-08:147, and Task 3's identical framing at 17-08:177/185) depends on
+catching a thrown error from `deletePhoto` to distinguish success from failure. Since it
+never throws, any implementation following the plan literally will **always** take the
+success branch and delete the journal row immediately, regardless of whether the underlying
+file delete actually succeeded. This silently defeats the specific threat the plan itself
+names for this mechanism — T-17-56, "orphaned/superseded canonical photo masters left on
+disk" — for exactly the failure case (a real deletion failure) that mechanism exists to
+catch: a superseded photo (which may belong to a different, now-deleted or re-identified
+contact, given non-`AUTOINCREMENT` integer ids) can be left on disk permanently with no
+retry, the opposite of what B-13's fix and the `photoCleanupPending` reporting count are
+supposed to guarantee. `persistMaster` (the `finalize`-path counterpart, verified at
+`photo-storage.ts:141-170`) does throw on failure, so only the `delete`-action path is
+affected — but that is exactly the path this finding is about.
+
+**Fix:** either change `deletePhoto` to report success/failure (a boolean return or a
+throwing variant used only by the journal-drain path — its other existing caller(s) can keep
+the current best-effort void contract), or have the journal-drain code independently verify
+deletion (e.g., check the file no longer exists after calling `deletePhoto`) rather than
+relying on a catch block that will never fire.
+
+### Confirmed: migration-008 full-chain test will go stale (independently verified)
+
+`17-02-PLAN.md`'s Task 2 requires `src/db/migrations/full-chain.test.ts` to run the real
+registered migration array and assert `user_version === 7` (17-02-PLAN.md:91, 99, 101). Once
+17-08 lands migration 008 and raises `TARGET_VERSION` to 8 (17-08-PLAN.md:143: "raises
+`TARGET_VERSION` to 8, registered in `database.ts` after migration 007"), the same real
+registered array 17-02's test imports will reach `user_version === 8`, not 7, breaking that
+already-committed test. Neither 17-08 nor 17-11 (which explicitly coordinates with 17-02's
+full-chain test at 17-11-PLAN.md:64, but only to avoid duplicating the *schema* assertions,
+not to update the target-version number) instructs the implementer to revisit
+`full-chain.test.ts` when 008 lands. This is a real, actionable coordination gap — it will
+surface immediately as a failing test in TDD (not a silent risk), but as written today no
+plan owns fixing it.
+
+**Fix:** add one sentence to 17-08 Task 2's action text (or a 17-11 coordination note)
+instructing the implementer to update 17-02's `full-chain.test.ts` target-version assertion
+(or, better, have it assert against the imported `TARGET_VERSION` constant rather than a
+literal `7`, so it self-updates with any future migration).
+
+### Confirmed (minor): `recordAutomaticBackupHealthCore`'s transaction boundary is implied, not stated
+
+17-12 Task 2 states the core "is non-mutexed (assumes an already-open transaction, matching
+the core/wrapper convention this DAO already uses)" (17-12-PLAN.md:91), but 17-06 Task 3's
+action text — the only caller — says only "via Plan 17-12's dedicated backup-bookkeeping SQL
+core" (17-06-PLAN.md:131) without stating it must be invoked inside an `inWriteTransaction`
+body. Every other "core" call site in this phase's plans (Task 1's entire coalescing-rule
+list, restore-apply's tombstone/bump calls) is explicit about the enclosing transaction; this
+one relies on the reader inferring the established convention. Low risk given how
+consistently that convention is otherwise stated in this same phase, but it is a real,
+easily-closed gap: add "inside its own `inWriteTransaction`" to 17-06 Task 3's action text.
+
+### Refined (not new): re-encryption crash-recovery observability gap (B-17)
+
+Confirms codex's B-17 PARTIAL finding but reframes its severity. 17-07's resume logic is
+correctly fail-closed — the plan explicitly requires the automatic-write entry point to run
+the resume check first and block a fresh snapshot "since an automatic write can never fire
+while a re-encryption is genuinely incomplete" (17-07-PLAN.md:132). No data is lost or
+silently corrupted; a mid-passphrase-change process kill leaves automatic writes blocked
+until the user retries the change-passphrase flow with the same new passphrase. The gap is
+in **observability**, not safety: 17-07's launch-reconciliation table (17-07-PLAN.md:128)
+only distinguishes `present`/`absent`/`unavailable` passphrase-cache states, and during this
+stuck window the cache is still `present` (the OLD passphrase) — so this state is invisible
+to B-21's "needs attention" surfacing and would present to the user as ordinary healthy
+encryption with automatic backups just silently not running. Downgrading from codex's HIGH
+to **MEDIUM actionable**: 17-07 should define an explicit typed state (e.g. checked via the
+same directory-scan resume logic, surfaced independently of the three passphrase-cache
+states) so this is not silently indistinguishable from healthy.
+
+### Minor (LOW): B-21's failed-enable double-fault can orphan a cached secret
+
+17-07's ENABLE saga (17-07-PLAN.md:125) leaves `encryption_enabled` correctly `false` when
+both the SQLite update and its SecureStore-delete compensation fail, which is safe
+(launch reconciliation treats `enabled=false` as "normal (plaintext), regardless of
+passphrase state" per 17-07-PLAN.md:128) — but the orphaned secret itself is never swept or
+reported. Not a security or data-loss issue (writes stay plaintext, matching the visible
+`encryption_enabled=false` state), just a minor hygiene gap in an already-narrow double-fault
+edge case. Optional: have launch reconciliation or the next enable attempt clear a stale
+cached secret when `encryption_enabled=false`.
+
+### Overall
+
+The three-pass audit-fix was largely coherent, not superficial: the coalescing rule, the
+photo journal, the reconciliation reject-incompatible rule, and the encryption fail-closed
+posture all hold up against direct source verification, and cross-plan wiring (depends_on/wave
+ordering, shared type names like `getPortableSettingsSnapshot`/`updateAppSettingsCore`) is
+consistent everywhere checked. The large revisions did, however, leave two source-verified
+HIGH gaps (categories' unstabilized UID; `deletePhoto`'s non-throwing contract silently
+defeating the new delete-journal retry mechanism) that both audit passes missed because
+neither targeted category identity or the exact `deletePhoto` call contract, plus a handful of
+narrow, easily-scoped MEDIUM/LOW coordination gaps.
+
+CYCLE_SUMMARY: current_high=2 current_actionable=4
+
+## Current HIGH Concerns
+
+- Categories (`src/db/migrations/001-initial.ts` seed loop) are minted with a random
+  per-install UID exactly like the pre-fix `profile` row was, yet 17-04-PLAN.md:19
+  registers `categories` in the UID-keyed reconciliation registry with no
+  `RESERVED_PROFILE_UID`-equivalent fix. Every restore onto a fresh install (the most common
+  restore scenario) will insert four duplicate categories that can never be deleted (no
+  delete writer exists), and no plan specifies `contacts.category_id` <-> `categoryUid`
+  translation at all. Needs a `RESERVED_CATEGORY_UIDS` fix in migration 007 (mirroring
+  17-02's `RESERVED_PROFILE_UID`) plus explicit categoryUid export/restore wiring in
+  17-05/17-08.
+- `src/services/photos/photo-storage.ts:200-211`'s `deletePhoto` is synchronous, returns
+  `void`, and swallows every failure internally (verified on disk) — it structurally cannot
+  throw. 17-08-PLAN.md:147/177/185's `restore_photo_journal` `action='delete'` retry logic
+  ("a caught deletion failure leaves the journal row in place... for Task 3's sweep to
+  retry") depends on catching a thrown error that this function can never produce, so a real
+  deletion failure will always be treated as success and its journal row removed
+  immediately — silently defeating T-17-56's orphaned-photo-master mitigation for exactly
+  the case it exists to catch. Needs `deletePhoto` to report success/failure (or the
+  journal-drain code to verify deletion independently) before 17-08 executes.
+
+## Current Actionable Non-HIGH Concerns
+
+- 17-02-PLAN.md's `full-chain.test.ts` asserts the real registered migration chain reaches
+  `user_version === 7`; once 17-08 lands migration 008 (raising `TARGET_VERSION` to 8) this
+  assertion goes stale and the test will fail. No plan currently instructs updating it —
+  add a note to 17-08 Task 2 (or a 17-11 coordination note) to update or self-parameterize
+  that assertion.
+- 17-06-PLAN.md Task 3's action text calls Plan 17-12's `recordAutomaticBackupHealthCore`
+  (a non-mutexed core requiring an already-open transaction per 17-12-PLAN.md:91) without
+  explicitly stating the call must be wrapped in `inWriteTransaction`, unlike every other
+  core-call site in this phase's plans — add that phrase to 17-06 Task 3's action text.
+- 17-07-PLAN.md's launch-reconciliation table (17-07-PLAN.md:128) only distinguishes
+  `present`/`absent`/`unavailable` passphrase-cache states, so a process kill mid-passphrase-
+  change (old passphrase still cached, some files re-encrypted with the new one) is
+  indistinguishable from ordinary healthy encryption and silently blocks automatic writes
+  with no user-visible signal until the user happens to retry changing the passphrase with
+  the same new value — add an explicit typed "re-encryption incomplete" state to 17-07
+  Task 3, surfaced independently of the three passphrase-cache states.
+- 17-07-PLAN.md's ENABLE saga (17-07-PLAN.md:125) can leave an orphaned cached secret in
+  SecureStore when both the SQLite update and its delete-compensation fail during enable
+  (safe — `encryption_enabled` stays false and writes stay plaintext — but untidy); optional
+  fix: have launch reconciliation or the next enable attempt sweep a stale cached secret
+  when `encryption_enabled=false`.
