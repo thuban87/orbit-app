@@ -575,6 +575,7 @@ Plans:
 **Plans:** 8 plans / 4 waves (revised after cross-AI review — see 16-REVIEWS.md). This phase changes no backup behavior and does not implement sync.
 
 Plans:
+
 - [ ] 16-01-PLAN.md — migration 006 tracer: atomic legacy→normalized conversion (fail-closed + D-06a orphan snapshot-and-proceed), normalized value DAO (UPSERT-on-pair, defs-filtered read), bootstrap gate [wave 1]
 - [ ] 16-02-PLAN.md — create/edit caller migration: complete pair matrix incl. quarantined defs, rowUid removal, first tsc + legacy-table grep gate [wave 2]
 - [ ] 16-03-PLAN.md — field lifecycle on rows: createField/quarantine/permanent-delete, re-keyed isFieldEmpty + CustomFieldsScreen, race-safe sweep [wave 3]
@@ -601,18 +602,41 @@ Plans:
 **Plans:** 12 plans — wave 0 gates native package provenance; subsequent waves establish migration 007/delete evidence, non-secret settings persistence, reconciliation, export, automatic SAF backup, encryption, transactional restore, UI, and Pixel UAT.
 
 Plans:
+**Wave 1**
+
 - [ ] 17-01-PLAN.md — blocking native-package provenance verification
 - [ ] 17-02-PLAN.md — migration 007, tombstones, and purge evidence
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
 - [ ] 17-03-PLAN.md — standalone interaction/fuel/link deletion evidence
 - [ ] 17-04-PLAN.md — permanent field deletion evidence and reusable reconciliation policy
+- [ ] 17-12-PLAN.md — non-secret singleton backup settings persistence and restore-composable DAO core
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
 - [ ] 17-05-PLAN.md — validated plaintext manifest and manual share export
+
+**Wave 4** *(blocked on Wave 3 completion)*
+
 - [ ] 17-06-PLAN.md — verified foreground SAF snapshots, retention, and health
+
+**Wave 5** *(blocked on Wave 4 completion)*
+
 - [ ] 17-07-PLAN.md — native encrypted envelope and passphrase lifecycle
+
+**Wave 6** *(blocked on Wave 5 completion)*
+
 - [ ] 17-08-PLAN.md — validated preview plus transactional Merge/Replace apply
 - [ ] 17-09-PLAN.md — Backup landing, settings, and temporary Dashboard entry
+
+**Wave 7** *(blocked on Wave 6 completion)*
+
 - [ ] 17-10-PLAN.md — restore picker, preview, confirmation, and aggregate result UI
+
+**Wave 8** *(blocked on Wave 7 completion)*
+
 - [ ] 17-11-PLAN.md — automated gates and owner-led Android release UAT
-- [ ] 17-12-PLAN.md — non-secret singleton backup settings persistence and restore-composable DAO core
 
 ## Progress
 
