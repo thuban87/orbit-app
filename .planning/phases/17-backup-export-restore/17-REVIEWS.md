@@ -1239,3 +1239,337 @@ CYCLE_SUMMARY: current_high=2 current_actionable=4
   (safe — `encryption_enabled` stays false and writes stay plaintext — but untidy); optional
   fix: have launch reconciliation or the next enable attempt sweep a stale cached secret
   when `encryption_enabled=false`.
+
+## Codex Review — Final Confirmation
+
+**Run details:** codex-cli 0.149.1, invoked directly via `codex exec -s read-only -c
+model_reasoning_effort=high --skip-git-repo-check` (not through `gsd-tools review-lane
+invoke`, whose standard prompt-assembly does not include audit-findings/round-2-diff
+context — same hand-built-prompt approach the prior Confirmation cycle used). Ran once,
+completed without truncation in ~19 minutes, 187,274 tokens, non-stub — output is a fully
+cited, source-verified review (it opened and quoted `src/db/migrations/001-initial.ts`,
+`src/services/photos/photo-storage.ts:200`, `src/db/database.ts:115-126`, and every current
+PLAN.md directly rather than trusting the prompt's transcription). No TIMEOUT occurred; no
+retry was needed. Full raw output saved to
+`/tmp/claude-1000/-home-bwales-projects-orbit-app/2c8ec29b-3fe5-46d3-b350-c70c787c2e44/scratchpad/codex-run/codex-output.md`
+(not committed — ephemeral run artifact); the transcript below is verbatim from the run's
+final answer.
+
+### Finding verdicts (codex's own numbering, matching the 6 round-2 findings)
+
+1. **RESOLVED** — Migration 007 assigns four distinct `RESERVED_CATEGORY_UIDS` by
+   `display_order` in the same transaction as the distinct profile UID, and restore
+   translates source `category_id → uid →` destination ID before contact writes.
+   `17-02:102`, `17-08:159`.
+2. **RESOLVED** — Both delete-journal drains now call the new `photoFileExists` after
+   non-throwing `deletePhoto`, retain the journal row when presence remains, and specify
+   no-op-delete regressions. `17-08:155`, `17-08:157`, `src/services/photos/photo-storage.ts:200`.
+3. **PARTIAL** — The assertion is correctly changed to the imported `TARGET_VERSION`, but
+   the plan still says the migration-001–007 array reaches that dynamic target; after 008,
+   that is impossible unless the currently inline registry is explicitly exported and
+   reused by both bootstrap and test. `17-02:94`, `17-02:104`, `src/db/database.ts:117`.
+4. **RESOLVED** — The sole planned caller is now explicitly wrapped in its own
+   `inWriteTransaction`, and the core's doc-contract requires the same. `17-06:131`,
+   `17-12:91`.
+5. **PARTIAL** — The new scanner detects only an old+new pair. The specified per-file
+   protocol may already have deleted an old copy before the SecureStore switch, leaving
+   old cache plus new-only copies; the plan explicitly classifies all-new as normal. Also,
+   17-07 delegates surfacing to 17-09/10, but neither plan specifies that state. `17-07:134`,
+   `17-07:138`, `17-09:59`.
+6. **RESOLVED** — Launch reconciliation now best-effort deletes a present cached secret
+   when durable `encryption_enabled=false`, with a dedicated regression requirement.
+   `17-07:132`, `17-07:142`.
+
+### New issues introduced by round-2 (as reported by codex)
+
+- **MEDIUM — Replace-all category deletion is internally contradictory.** The behavior
+  reset sequence says to delete `categories`, while the detailed action later says
+  categories must remain in place and update by UID. An executor following the former
+  conflicts with the no-category-tombstone policy. `17-08:137`, `17-08:169`.
+- **MEDIUM — The "real registered migration array" is not concretely available to the
+  test.** `database.ts` currently embeds an unexported literal array. The plan must name
+  an exported shared registry (e.g. `MIGRATIONS`) and require both `openAndMigrate` and
+  `full-chain.test.ts` to import it; otherwise the test must hand-roll the list it
+  forbids, and 008 can be omitted. `17-02:104`, `src/db/database.ts:115`.
+- **MEDIUM — Re-encryption-incomplete has no planned UI consumer and misses a valid crash
+  boundary.** Add an explicit typed health/result state to 17-09's health resolver and UI;
+  define scanner behavior for old-cache/new-only states, not only old+new pairs.
+  `17-07:134`, `17-09:57`.
+
+### Codex's overall risk verdict
+
+"The category identity/foreign-key fix, photo-delete verification, transaction boundary,
+and stale-secret sweep are now concretely planned and source-consistent. I would not give
+final confirmation yet: resolve the dynamic migration-registry ambiguity, the Replace-all
+categories contradiction, and the incomplete/unwired re-encryption recovery state."
+
+**Claude's disposition on codex's findings:** all three PARTIAL/new-issue findings are
+independently source-verified below and stand, with one refinement — the finding-5 gap is
+downgraded from "misses a valid crash boundary" being a full re-open of the original HIGH
+to a scoped, still-actionable MEDIUM, because the actual write-blocking resume logic (a
+separate mechanism from the launch-reconciliation *reporting* scanner codex is describing)
+independently self-heals the scenario codex names; see below for why.
+
+---
+
+## Claude (Sonnet 5) Review — Final Confirmation
+
+**Method:** Read the round-2 diff (`git show 77b23d0`) in full, the complete current text
+of all 7 plans it touched (17-02, 17-04, 17-06, 17-07, 17-08, 17-11, 17-12) plus 17-09/17-10
+(to check the categories-fix's downstream UI consumers and the new passphrase state's
+consumers), and cross-checked every claim against the real source on disk:
+`src/db/migrations/001-initial.ts` (category/profile seed loop — confirmed `deps.newUid()`
+per-install random UID for both, `display_order` 0..3 stable; `contacts.category_id
+INTEGER REFERENCES categories(id)`, nullable, no `ON DELETE` clause), `src/services/photos/
+photo-storage.ts` (confirmed `deletePhoto` at lines 200-211 is exactly as claimed —
+synchronous, `void`, internal try/catch, structurally cannot throw; confirmed `photoFileExists`
+does not yet exist and is a genuinely new helper; confirmed `persistMaster`'s existing
+`new File(Paths.document, relative).exists` getter at line 174 is the exact primitive the
+plan says the new helper wraps), `src/db/transaction.ts` (`inWriteTransaction`'s
+non-reentrancy, confirming the Task-3 transaction-wrap fix is architecturally sound and not
+nested inside another mutex acquisition), `src/db/database.ts` (confirmed `TARGET_VERSION`
+is an exported const, and confirmed the migration array itself is an **inline, unexported
+literal** passed straight into `runMigrations` — this is the exact gap codex's finding 3
+identifies), `src/services/ai-key-store.ts` (confirmed the collapse-to-null pattern 17-07
+explicitly does NOT reuse), and `src/db/app-settings-dao.ts` (confirmed the existing
+`updateAppSettings`/C3-H3b ai_ack_custom special-case the 17-12 core/wrapper split must
+reproduce verbatim). No phase-17 application code exists yet — this remains entirely a
+pre-execution plan review; only `.planning/phases/17-backup-export-restore/*.md` has
+changed since the prior Confirmation cycle.
+
+### The 6 round-2 fixes — coherence check
+
+1. **Categories reserved UID — RESOLVED.** `RESERVED_CATEGORY_UIDS` (17-02, migration 007)
+   is a direct structural mirror of the already-landed `RESERVED_PROFILE_UID` fix: four
+   distinct, permanently fixed v4-shaped UUID literals keyed by `display_order` (the one
+   column migration001's seed loop guarantees is stable across the four rows), applied via
+   four unconditional `UPDATE categories SET uid = ? WHERE display_order = ?` statements in
+   the SAME migration-007 transaction as the profile UPDATE. No collision is possible
+   (`00000000-...-000000000001` for profile vs. `...000101`..`...000104` for categories,
+   both against a `UNIQUE` `uid` column) and the two UPDATEs are independent (different
+   tables, no shared row). 17-04's reconciliation registry correctly wires `categories`
+   to these constants (17-04:19, 17-04:92, matching the identical `profile` pattern), and
+   17-08 Task 1 adds a same-file structural check (a non-null `category_id` must match an
+   `id` in the file's own `categories` array) plus Task 2's translation (source `category_id`
+   → looked-up `uid` from the file's own `categories` array → destination local id via the
+   reconciled category id-map, falling back to null via 17-04's generic
+   reference-to-tombstoned-parent primitive). Ordering is correct: 17-04:30 and
+   17-08:122/159 both state categories/profile/contacts/definitions reconcile
+   parent-first, before any FK-child write, so the id-map exists before `category_id`
+   translation runs — this line predates round-2 and was not touched by it, confirming the
+   ordering guarantee was already in place and round-2's translation logic correctly
+   depends on it. This closes both the "duplicate categories on restore" bug and the
+   missing `contacts.category_id` translation the round-1 Confirmation review found.
+
+2. **`deletePhoto` verify-absence — RESOLVED.** Independently re-verified
+   `src/services/photos/photo-storage.ts:200-211` on disk — the function is exactly as the
+   plan describes (synchronous, `void`, internal try/catch/log, cannot throw). The new
+   `photoFileExists(relative): boolean` helper the plan specifies (17-08:159/161, files
+   list already includes `photo-storage.ts`/`photo-storage.test.ts` in the frontmatter
+   `files_modified`, so there is no missing-file gap) is correctly scoped as a thin wrapper
+   over the exact same `File(...).exists` getter `persistMaster` already reads internally
+   at line 174 — this is not a new dependency or a new I/O primitive, just a second read of
+   an existing check. Both drain call sites (Task 2's post-commit loop and Task 3's
+   launch-sweep) are updated identically to call `deletePhoto` then `photoFileExists` and
+   branch on the boolean, never on a catch. The dedicated regression the plan requires
+   (stub the underlying delete as a no-op, assert the journal row is retained) correctly
+   does not attempt to make `deletePhoto` throw, since it structurally cannot.
+
+3. **Full-chain test `TARGET_VERSION` — PARTIAL, agreeing with codex.** The literal-`7`
+   fix is real (17-02:104 now asserts against the imported `TARGET_VERSION` constant,
+   which does exist as an export — confirmed at `src/db/database.ts:41`). But codex's
+   deeper point is correct and I independently confirmed it by reading
+   `src/db/database.ts:113-126`: the migration **array** itself
+   (`[migration001, migration002, ..., migration006]`) is an **inline literal**, passed
+   directly to `runMigrations` inside `openAndMigrate` — it is never assigned to an
+   exported name. 17-02's action text requires the test to "import the actual registered
+   migration array... the same way `database.ts` does (import the real modules, do not
+   hand-roll a parallel migration list)" — but with no single exported array to import,
+   the test can only reconstruct an array with the same *contents* by importing each
+   `migrationNNN` individually and re-listing them in test-file source, which is itself a
+   second, independently-maintained list that must be kept in sync with `database.ts`'s
+   own inline array by hand. This is the exact same staleness problem the round-2 fix set
+   out to close (17-08's migration 008 must be added to `database.ts`'s inline array AND
+   to whatever list `full-chain.test.ts` builds) — parameterizing only the target-version
+   number does not fix it if the *membership* of the array is still two independently
+   hand-maintained lists. No plan (17-02, 17-08, or 17-11's coordination note) instructs
+   exporting a single shared `MIGRATIONS` array from `database.ts` for both call sites to
+   import. Concretely actionable: add that export to 17-02 (or note it for whichever plan
+   next touches `database.ts`) and have both `openAndMigrate` and `full-chain.test.ts`
+   import it.
+
+4. **`recordAutomaticBackupHealthCore` transaction wrap — RESOLVED.** Confirmed
+   `inWriteTransaction` (`src/db/transaction.ts:39-56`) is non-reentrant by design (a single
+   `withMutex` promise chain) and that the round-2 fix's call site (17-06 Task 3, the only
+   caller) is not nested inside another already-open transaction — it is a standalone
+   bookkeeping write issued after the automatic-write operation completes. The fix text
+   (17-06:131) and the core's own doc-contract (17-12:91) now agree explicitly, closing the
+   gap the prior Confirmation review flagged.
+
+5. **Re-encryption-incomplete state — PARTIAL, agreeing with codex but downgrading the
+   severity of the sub-finding it names.** Re-reading 17-07's two overlapping protocol
+   descriptions closely: the resume/crash-recovery text (17-07, the paragraph beginning
+   "For crash-recoverable state across a process kill...", unchanged by round-2) says the
+   SecureStore switch happens only once **every** targeted file's new-passphrase copy is
+   written+verified, and old-passphrase copies are deleted only **after** that switch. The
+   separate, older general per-file description ("(1) write a new... (2) verify... (3) only
+   after verification succeeds, delete the superseded old-passphrase file") reads, in
+   isolation, as an immediate per-file action. If an implementer follows the per-file text
+   literally rather than the batch-ordered resume text, an early file's old copy could be
+   deleted before the whole batch (and the SecureStore switch) completes — leaving a
+   directory state where an already-migrated file shows only its new-passphrase copy (no
+   paired original) while a not-yet-reached file still shows only its old-passphrase copy,
+   and the cache is STILL the OLD passphrase. Round-2's new
+   RE-ENCRYPTION-INCOMPLETE CHECK, which only fires when it finds an old-file-plus its
+   new-passphrase-counterpart PAIR, would find no pair in this scenario (the migrated
+   file has no paired original left to find; the pending file has no new counterpart yet)
+   and would misreport "normal" — the observability gap codex describes is real and
+   reachable given the plan's own internal ambiguity about deletion timing. **However**,
+   this is a reporting-only gap, not a data-safety one: the actual write-blocking logic
+   (17-07's separate "Resume logic, run as the FIRST step inside the shared lock by BOTH
+   the re-encryption entry point AND the automatic-write entry point") independently
+   re-derives and completes any incomplete per-file migration on its own next invocation,
+   regardless of what the launch-reconciliation *reporting* scanner said — so an automatic
+   write can still never fire against a genuinely incomplete migration, and the migration
+   still finishes on the very next automatic-write or passphrase-change attempt. The
+   remaining exposure is purely that the user sees "healthy" in the UI during a window
+   where nothing is actually broken but a resume is pending — consistent with, and not
+   worse than, the severity class the prior Confirmation review already assigned this
+   finding (MEDIUM/observability, downgraded from codex's original B-17 HIGH). Also
+   independently confirmed codex's second point: grepped 17-09-PLAN.md and 17-10-PLAN.md
+   for any reference to a re-encryption/incomplete state — none exists; 17-09:25 states
+   only "Landing actions use backup-service results rather than inventing health state in
+   the screen," so the new typed state 17-07 defines has no plan-specified consumer at all.
+   Actionable: (a) make the per-file deletion step explicitly wait for the batch-level
+   switch (or have the RE-ENCRYPTION-INCOMPLETE CHECK also treat "an accessible
+   new-passphrase file whose old-passphrase counterpart is ALREADY gone, while the cache is
+   still old" as incomplete, not just literal pairs), and (b) add a sentence to 17-09 Task
+   (or a 17-07 coordination note naming 17-09 explicitly) wiring the new state into the
+   settings/landing health display.
+
+6. **Enable-saga orphaned-secret cleanup — RESOLVED.** Confirmed the launch-reconciliation
+   sweep (17-07: "if `getPassphrase()` nevertheless reports `present`... best-effort
+   `SecureStore.deleteItemAsync` it here; never block reconciliation on this sweep's
+   outcome and never surface a failure from it") is correctly scoped to the
+   `encryption_enabled=false` branch only, never touches the `true` branches, and the
+   plan's own acceptance criteria require a dedicated regression proving it never blocks
+   reconciliation.
+
+### New issue, independently found (matches codex's first new-issue item): 17-08's
+Replace-all reset sequence is internally contradictory about deleting `categories`
+
+Read 17-08-PLAN.md's Behavior section and its detailed Task 2 action text side by side.
+The condensed Behavior bullet (17-08:137) states the reset sequence as: "(a) `UPDATE
+app_settings SET sun_contact_id = NULL`... (b) delete dependents before parents...
+(c) delete parents (**contacts, custom_field_defs, categories**) after their captured
+children... (d) insert incoming parents before incoming children..." — explicitly listing
+`categories` among the tables Replace-all deletes in step (c). The detailed action text
+immediately below it (17-08:169), which is the more authoritative, worked-through
+algorithm description, says the opposite: "`categories` has no delete writer today (17-04)
+and is not expected to differ in practice; leave its rows in place and update in place by
+uid rather than deleting/tombstoning them." This is not merely stylistic — it is a genuine
+implementability conflict, and a more serious one than a plain inconsistency, because 17-02's
+closed `TombstoneEntityType` vocabulary (`'contact' | 'interaction' | 'event' | 'fuel' |
+'contact_link' | 'custom_field_def' | 'custom_field_value'`) explicitly **excludes**
+`category`/`profile` ("Do not add category/profile to the vocabulary yet — they have no
+hard-delete writer today"), with both a TypeScript exhaustiveness check and a runtime guard
+enforcing it. An executor implementing step (c) literally — tombstoning a category row
+before deleting it, per the general step-(b)/(c) pattern applied to every other listed
+table — would either fail to compile (if `entity_type` is properly typed as the closed
+union) or throw at runtime (the stated fallback guard), immediately during TDD. This would
+surface loudly rather than corrupt data silently (matching this project's own precedent for
+classifying an immediately-TDD-visible contradiction as MEDIUM rather than HIGH — see
+finding 3's classification above), but it is a real, unresolved textual defect that
+round-2 did not touch (line 137 was not part of the round-2 diff) despite substantially
+expanding the categories-never-deleted invariant this line contradicts. **Fix:** remove
+`categories` from the Behavior bullet's step-(c) delete-parents list (17-08:137), and
+explicitly add it to the "insert or update the incoming validated rows parents-before-children"
+enumeration at 17-08:169 (which currently lists only "profile/custom_field_defs/contacts,
+then their children," omitting `categories` even though the surrounding text clearly
+intends categories to be one of the by-uid-updated parents).
+
+### Other checks performed, no issues found
+
+- **HANDOFF.md / ADR reversal check:** grepped `HANDOFF.md` for any category-related
+  decision — none exists. The categories reserved-UID mechanism and the "leave categories
+  in place, never delete" design are new engineering decisions this phase introduces from
+  scratch, not reversals of anything previously decided. No OWNER-ESCALATION applies.
+- **D-01/D-02/D-03/D-05 (17-CONTEXT.md) consistency:** re-confirmed the categories
+  retention design matches D-01's scope exactly ("any equivalent hard-delete writer
+  discovered during planning" — categories has none, confirmed via the same repo-wide
+  `DELETE FROM categories` grep 17-04 already performed) and D-02's "match by stable uid,
+  resolve children through parent UIDs before local IDs" requirement (the reserved-UID
+  mechanism is precisely what makes that possible for a per-install-random-seeded
+  singleton/fixed-set table). Not a reversal.
+- **Wave/dependency ordering:** `17-02` (wave 1) → `17-04` (wave 2, `depends_on: [17-02]`)
+  → `17-08` (wave 6, `depends_on: [17-04, ...]`) → `17-11` (wave 8, depends on everything)
+  — unchanged by round-2 and already correctly sequences the categories reserved-UID
+  constant's availability before its consumers. `17-06` (wave 4) already lists `17-12` in
+  `depends_on`, so the transaction-wrap fix's dependency (`recordAutomaticBackupHealthCore`
+  existing) was already satisfied before round-2.
+- **17-01/17-03/17-09/17-10 unaffected:** confirmed via `git show --stat 77b23d0` that only
+  17-02/04/06/07/08/11/12 changed; 17-09/17-10 were read in full for this cycle specifically
+  to check the new passphrase-state's UI wiring (see finding 5) and found genuinely
+  unaffected by round-2 itself, just missing a wiring update that round-2 should have
+  triggered.
+- **17-11's integration-test coordination note:** confirmed the category-translation
+  end-to-end assertion (two contacts on different source categories, differing local ids
+  across fixtures) and the `TARGET_VERSION`-based migration-chain language are both
+  correctly updated and consistent with 17-02/17-08's fixes.
+
+### Overall
+
+Round-2 coherently resolved 4 of the 6 prior-cycle findings outright (categories reserved
+UID, `deletePhoto` verify-absence, the transaction-wrap gap, the orphaned-secret sweep) and
+made real, substantive — but incomplete — progress on the other 2 (the migration-chain test
+still has a latent staleness path through an unexported array; the re-encryption-incomplete
+state has a narrow reporting blind spot and no UI consumer). Round-2 also left one
+pre-existing internal contradiction unresolved and freshly consequential (Replace-all's
+Behavior-bullet vs. action-text disagreement about deleting `categories`, now a
+TDD-breaking issue given how much round-2 built on top of the do-not-delete invariant).
+None of these are HIGH: the two original HIGH findings (categories, `deletePhoto`) are both
+now genuinely closed, no NEW HIGH was found by either codex or this review, and every
+open item would surface loudly during implementation (a compile error, a runtime throw
+from the closed tombstone vocabulary, or a failing test) rather than silently corrupting
+data or leaking content in production.
+
+CYCLE_SUMMARY: current_high=0 current_actionable=3
+
+## Current HIGH Concerns
+
+None.
+
+## Current Actionable Non-HIGH Concerns
+
+- 17-08-PLAN.md's Replace-all Behavior bullet (line 137: "(c) delete parents (contacts,
+  custom_field_defs, categories) after their captured children") contradicts the detailed
+  action text a few lines below (line 169: "categories has no delete writer today...
+  leave its rows in place... rather than deleting/tombstoning them") — and, taken
+  literally, would attempt to tombstone a `category` entity_type outside 17-02's closed
+  `TombstoneEntityType` vocabulary, which cannot compile/would throw at runtime. Remove
+  `categories` from the step-(c) delete list and explicitly add it to the by-uid
+  insert-or-update parent enumeration a few lines later (currently
+  "profile/custom_field_defs/contacts," omitting categories).
+- 17-02-PLAN.md's `full-chain.test.ts` now correctly asserts against the imported
+  `TARGET_VERSION` constant rather than a literal, but `src/db/database.ts`'s migration
+  array itself (`[migration001, ..., migration006]`) is an inline, unexported literal
+  passed directly into `runMigrations` — there is no single source of truth for the test
+  to import, so the test's own reconstructed array can still silently omit a future
+  migration (e.g. 17-08's migration 008) even though the version-number assertion
+  self-updates. Add an exported `MIGRATIONS` array (or equivalent) to `database.ts` and
+  have both `openAndMigrate` and `full-chain.test.ts` import that same array.
+- 17-07-PLAN.md's new re-encryption-incomplete check only fires on a literal
+  old-file-plus-new-file PAIR; a process kill after an early file's old copy is already
+  deleted but before the whole-batch SecureStore switch (reachable given the plan's own
+  ambiguity between its batch-ordered resume text and its per-file "delete old
+  immediately" text) produces a directory state the scanner reads as fully healthy/normal.
+  This does not cause a safety gap (the separate write-blocking resume logic still
+  self-heals on the next automatic-write/change-passphrase attempt), but it defeats the
+  fix's own observability goal. Additionally, neither 17-09 nor 17-10 (the UI plans)
+  reference the new "re-encryption incomplete" state at all — 17-09:25 explicitly limits
+  the UI to reflecting whatever health state the backup service reports, but no plan
+  specifies that report including this new state. Broaden the scanner to also treat "a
+  migrated file's new-passphrase copy exists with no paired original, while the cache is
+  still the old passphrase" as incomplete, and add a sentence to 17-09 (or a 17-07
+  coordination note naming 17-09) specifying how this state surfaces in Settings/landing
+  health.
