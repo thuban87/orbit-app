@@ -4,14 +4,14 @@ milestone: v1.0
 current_phase: 17
 current_phase_name: Backup, Export & Restore
 status: planned
-stopped_at: Completed 17-01-PLAN.md
-last_updated: "2026-08-25T21:09:41.141Z"
-state_head: 89f9e3ed55d8fdf634a30aabc148f2fb363815ad
+stopped_at: Completed 17-02-PLAN.md
+last_updated: "2026-08-25T21:18:55.881Z"
+state_head: a33e8191f139ba2e13aa99175f7e458c747df09e
 progress:
   total_phases: 17
   completed_phases: 14
   total_plans: 128
-  completed_plans: 115
+  completed_plans: 116
 milestone_name: milestone
 ---
 
@@ -174,6 +174,7 @@ Progress: [████████░░] 75% (12/16 phases complete; Phase 13 
 | Plan | Duration | Tasks | Files |
 |------|----------|-------|-------|
 | Phase 17 P01 | 20min | 3 tasks | 3 files |
+| Phase 17 P02 | 6m 20s | 3 tasks | 11 files |
 
 ## Accumulated Context
 
@@ -271,6 +272,8 @@ Foundational decisions affecting current work:
 - [Phase 13]: 13-03: the orrery data layer — three node:sqlite-tested SQL surfaces (27 cases green). `listOrbitingContacts(exec, {excludeContactId?})` (src/db/orrery-read.ts) is the orbiting-set read chokepoint: COMPOSES status.ts PROGRESS_SQL/STATUS_SQL (never re-derives thresholds — a parity test asserts the exported `ORBITING_SELECT` `.toContain()`s both fragments, mirroring dashboard-read's fuel-parity guard), WHERE `archived_at IS NULL AND last_contact IS NOT NULL` (+ `AND id <> ?` when a sun occupant is passed), `ORDER BY COALESCE(ring_seq, 1e9), created_at, id`. The DISPLAY rank is the 0-based ROW INDEX of that dense order, NEVER the stored ring_seq value (M3, option (a)) — so a stale/duplicate stored ring_seq left on a formerly-hidden sun is harmless when the sun returns to self (regression-tested: contact-sun → reorder N-1 → self-sun re-read is dense/deterministic). DELIBERATE L11 divergence from dashboard BASE_WHERE: snooze is NOT filtered — a snoozed-but-contacted contact IS in the sky (lock-test guards against a later "consistency" refactor re-adding the snooze clause). `photo` returned RAW (nullable), never resolved — C2-1: the 13-05 consumer MUST `photo ? resolvePhotoUri(photo) : null`. `rewriteRingSeq(exec, orderedIds, now, excludeContactId)` (src/db/ring-seq-dao.ts) is the FIRST `contacts.ring_seq` writer — a near-verbatim clone of rewriteFavouriteRanks: 3 guards (unique / count-match / scoped changes===1) as N raw `?`-bound UPDATEs in ONE inWriteTransaction (never nests the non-reentrant mutex). Two swaps: column `favourite_rank → ring_seq`, scope `favourite_rank IS NOT NULL → last_contact IS NOT NULL AND archived_at IS NULL`, PLUS the FIXED cross-plan blocker: an optional `AND id <> ?` occupant exclusion appended to BOTH Guard 2's COUNT and every Guard 3 UPDATE (bound only when excludeContactId non-null) so the guard's effective set == orrery-read's RENDERED sun-excluded (N-1) set — a contact-sun drag passing the N-1 list succeeds; passing the wrong full-N list still fails Guard 2 by design. Writes ONLY ring_seq + modified_at; `last_contact` NEVER assigned (single-writer invariant intact; grep-pin `last_contact[[:space:]]*=` → 0). Empty list = accepted no-op. `now` is localDateTime(). `listSunCandidates(exec)` (src/db/sun-picker-read.ts) = non-archived contacts favourites-first (`(favourite_rank IS NULL)`, `favourite_rank ASC`, `name COLLATE NOCASE, id`), never-contacted INCLUDED (anyone can be the sun; C2-2: a never-contacted sun has status null → 13-04/05 resolveSunOccupant accepts `ProfileStatus | null`), no synthetic "Me" row (Settings UI prepends self). ring_seq column already existed from migration 001 (no migration shipped). tsc + check:colors clean; no deviations.
 - [Phase 17]: Owner approved the remaining Phase 17 native dependency provenance decisions as one batch.
 - [Phase 17]: RNQC is registered as a bare Expo config plugin without optional sodium configuration.
+- [Phase 17]: D-01 migration 007 tombstones and indefinitely retained deletion evidence executed as owner-approved.
+- [Phase 17]: Migration 007 fixes profile and seeded category UIDs to reserved constants for ordinary cross-install UID reconciliation.
 
 ### Pending Todos
 
@@ -306,8 +309,8 @@ planning" sections in docs/dossier/*.md — those are the authoritative hand-off
 
 ## Session
 
-**Last session:** 2026-08-25T21:09:39.513Z
-**Stopped at:** Completed 17-01-PLAN.md
+**Last session:** 2026-08-25T21:18:54.263Z
+**Stopped at:** Completed 17-02-PLAN.md
 _Prior stop (13-04):_ the orrery VISUAL VOCABULARY (theme tokens + two pure resolver modules, node-tested, 29 cases green): (1) five owner-tunable `ThemePalette` tokens seeded in `space-dark.dark` ONLY — `starPalette` (6 colours, gold `#F2C14E` at index 0, then amber/rose-red/violet/cyan/ice-white), `mutedStable/Wobble/Decay` (desaturated same-hue morph endpoints), `rogueExtinguished` (cold blue-grey `#3E4A6B` rogue BODY fill) — with an M6/C2-5 conformance test that IMPORTS the real `SELF_SUN_COLOUR_RE`/`assertSelfSunColour` from app-settings-dao and locks every starPalette entry to the ACTUAL DAO write-path rule (no re-inlined regex). (2) `orrery-ring-logic.ts` `orreryRingStyle(status, colors)` — REUSES `ringVisual` for `{color,opacity,width}` (status→colour mapped once), adds the `strokeStyle` axis (solid→dashed→faded→faintTrace) + `bodyFill` (rogue ring=`colors.rogue`, body=`rogueExtinguished`); `null`→canonical NEUTRAL (`colors.border`), never throws — the single fallback sun-occupant reuses (C2-2). (3) `sun-occupant-logic.ts` `resolveSunOccupant(input)` — NULL/archived/missing→self (A7, glow `selfSunColour ?? starPalette[0]`), live contact→its status glow via `orreryRingStyle(status, colors).color`, never-contacted (status `null`)→the reused neutral border (C2-2); accepts `status: ProfileStatus | null`. 5 commits (1801915 feat tokens+M6; d35d528 RED→4cbfad5 GREEN ring-logic; c923b16 RED→10780dd GREEN sun-occupant); tsc + check:colors clean; no deviations (one in-flight fix: a placeholder hex in the logic test was re-sourced from the palette after check:colors flagged it — C2-3). Committed locally on main (NOT pushed). Next: Wave 2 (13-05 render / 13-06 Settings sun-picker), Wave 3 (13-07 drag-release), Wave 4 (13-08 device UAT, autonomous:false).
 **Resume file:** None
 
