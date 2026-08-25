@@ -29,6 +29,7 @@ import {
   View,
 } from "react-native";
 import { Avatar } from "@/components/Avatar";
+import { CustomFieldValue } from "@/components/CustomFieldValue";
 import {
   type FuelDraft,
   FuelEditor,
@@ -52,6 +53,12 @@ import {
 } from "@/db/contact-status-read";
 import { archiveContact } from "@/db/contacts-dao";
 import { getExecutor, localDateTime } from "@/db/database";
+import { listDefs } from "@/db/field-defs-dao";
+import type { CustomFieldDef } from "@/db/field-types";
+import {
+  getValuesForContact,
+  visibleDefsForProfile,
+} from "@/db/field-values-dao";
 import { clearFavouriteRank, setFavouriteRank } from "@/db/favourites-dao";
 import { addFuel, confirmFuel, deleteFuel, editFuel } from "@/db/fuel-dao";
 import {
@@ -144,6 +151,13 @@ export function ContactProfileScreen({
   const { colors } = useTheme();
   const { contactId } = route.params;
   const [header, setHeader] = useState<Header | null>(null);
+  // Custom values remain raw at rest.  The profile selects its live fields from
+  // definitions plus this map, then CustomFieldValue owns presentation and the
+  // invalid-value recovery affordance.
+  const [fieldDefs, setFieldDefs] = useState<CustomFieldDef[]>([]);
+  const [customValues, setCustomValues] = useState<
+    Record<string, string | null>
+  >({});
   const [timeline, setTimeline] = useState<TimelineItem[]>([]);
   // The contact's conversational fuel (FUEL-01/02) — read through the single
   // fuel-read choke point (all kinds incl off_limits, newest-first). Editing is
@@ -198,6 +212,7 @@ export function ContactProfileScreen({
         fuelRows,
         rankedFuelRows,
         settings,
+        defs,
       ] = await Promise.all([
         getContactHeader(exec, contactId),
         listTimeline(exec, contactId),
@@ -206,8 +221,12 @@ export function ContactProfileScreen({
         listFuelForEditor(exec, contactId),
         getRankedFuel(exec, contactId),
         getAppSettings(exec),
+        listDefs(exec, { includeQuarantined: false }),
       ]);
+      const values = await getValuesForContact(exec, contactId, defs);
       setHeader(row);
+      setFieldDefs(defs);
+      setCustomValues(values);
       setTimeline(rows);
       setStatus(statusRow);
       setFuel(fuelRows);
@@ -710,6 +729,28 @@ export function ContactProfileScreen({
         </Text>
       </Pressable>
 
+      {visibleDefsForProfile(fieldDefs, customValues).length > 0 ? (
+        <View
+          testID="contact-profile-custom-fields"
+          style={styles.customFields}
+        >
+          <Text
+            style={[styles.sectionHeading, { color: colors.textSecondary }]}
+          >
+            Details
+          </Text>
+          {visibleDefsForProfile(fieldDefs, customValues).map((field) => (
+            <CustomFieldValue
+              key={field.id}
+              testID={`contact-profile-custom-${field.col_name}`}
+              field={field}
+              value={customValues[field.col_name] ?? null}
+              onFix={() => navigation.navigate("Edit", { contactId })}
+            />
+          ))}
+        </View>
+      ) : null}
+
       {/* "Message" (CMP-02): opens the entry-agnostic compose surface for this
           contact. Filled-accent primary directly ABOVE "Log contact" — per the
           UI-SPEC owner-taste note both ship as filled-accent primaries; the
@@ -1074,6 +1115,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
   },
   impact: {
+    gap: 8,
+  },
+  customFields: {
     gap: 8,
   },
   fuel: {
