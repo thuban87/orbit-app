@@ -1,6 +1,6 @@
 {
   "version": "1.0",
-  "timestamp": "2026-08-25T22:50:00.000Z",
+  "timestamp": "2026-08-25T23:15:00.000Z",
   "phase": "17",
   "phase_name": "Backup, Export & Restore",
   "phase_dir": ".planning/phases/17-backup-export-restore",
@@ -31,16 +31,16 @@
   "blockers": [
     {
       "type": "decision",
-      "description": "No current-release Pixel benchmark or shipping encryption profile exists. The available release APK predates the new timing seam.",
-      "workaround": "Build and install a current release APK through the documented droid route, measure the seam, then approve the full versioned profile."
+      "description": "The current benchmark release APK is installed, but the attached Pixel is locked and the Android notification shade obscures Orbit, so sample results cannot be read.",
+      "workaround": "User unlocks the Pixel; then relaunch the installed release APK, capture samples, and approve the full versioned profile."
     }
   ],
   "human_actions_pending": [
-    "Authorize the current-release Pixel benchmark route/harness and approve the measured versioned PBKDF2/AES-256-GCM profile, or provide an already measured full profile with release-build identity."
+    "Unlock the attached Pixel and reply `unlocked`; after samples are captured, approve the measured versioned PBKDF2/AES-256-GCM profile."
   ],
   "uncommitted_files": [
     ".planning/milestone.lock (pre-existing/unrelated and intentionally untouched)"
   ],
-  "next_action": "Resume 17-07 at Task 2 after the measured profile decision; preserve committed Task 1 work and do not invent benchmark evidence.",
-  "context_notes": "Pixel and droid are reachable; all Task 1 encryption tests and TypeScript verification passed."
+  "next_action": "After the user unlocks the Pixel, resume 17-07 Task 2 to collect release samples; preserve committed Task 1 and harness work and do not invent benchmark evidence.",
+  "context_notes": "Task 1 tests and TypeScript verification passed. Harness commit 24f9144; fresh APK SHA-256 87af511c210aeae56df76df9b4300f18e216dbdcd3a2ad39db947b98625baffb was installed successfully."
 }
