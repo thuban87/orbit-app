@@ -54,6 +54,38 @@ describe("migration007 — permanent tombstones and reserved singleton UIDs", ()
         "SELECT data_revision FROM app_settings WHERE id = 1",
       ),
     ).toEqual({ data_revision: 0 });
+    expect(
+      await exec.getFirstAsync<{
+        backup_interval_days: number;
+        backup_retention_days: number;
+        last_backup_data_revision: number;
+        backup_folder_uri: string | null;
+        backup_folder_diagnostic: string | null;
+        last_automatic_backup_at: string | null;
+        encryption_enabled: number;
+        backup_nudge_dismissed: number;
+      }>(
+        `SELECT backup_interval_days, backup_retention_days, last_backup_data_revision,
+                backup_folder_uri, backup_folder_diagnostic, last_automatic_backup_at,
+                encryption_enabled, backup_nudge_dismissed
+           FROM app_settings WHERE id = 1`,
+      ),
+    ).toEqual({
+      backup_interval_days: 1,
+      backup_retention_days: 7,
+      last_backup_data_revision: 0,
+      backup_folder_uri: null,
+      backup_folder_diagnostic: null,
+      last_automatic_backup_at: null,
+      encryption_enabled: 0,
+      backup_nudge_dismissed: 0,
+    });
+    const columns = await exec.getAllAsync<{ name: string }>("PRAGMA table_info(app_settings)");
+    expect(columns.map(({ name }) => name)).not.toContain("passphrase");
+    expect(columns.map(({ name }) => name)).not.toContain("api_key");
+    expect(columns.map(({ name }) => name)).not.toContain("raw_encryption_key");
+    expect(columns.map(({ name }) => name)).not.toContain("kdf_secret");
+    expect(columns.map(({ name }) => name)).not.toContain("key_material");
     expect(await exec.getFirstAsync<{ uid: string }>("SELECT uid FROM profile WHERE id = 1")).toEqual({
       uid: RESERVED_PROFILE_UID,
     });
