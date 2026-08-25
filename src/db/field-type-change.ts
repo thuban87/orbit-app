@@ -6,7 +6,7 @@
  * BLAST RADIUS ZERO — READ BEFORE EDITING (§14.2, CLAUDE.md invariant, T-03-02):
  *   A custom field's `type` drives the UI WIDGET only; storage is TEXT forever.
  *   Changing a field's type is therefore ONE `UPDATE custom_field_defs SET type`
- *   and touches `contact_custom_values` NOT AT ALL. There is no ALTER COLUMN, no
+ *   and touches `custom_field_values` NOT AT ALL. There is no ALTER COLUMN, no
  *   value normalization, no "convert" pass over the value column. "Auto-convert
  *   clean values" means the clean values are ALREADY VALID under the new type and
  *   render/sort correctly at read time (via the widget + `sortExpr`); an
@@ -38,31 +38,18 @@
  * (`type_change:<old>-><new>`, e.g. `type_change:number->text`) so the snapshot
  * records WHAT changed. This is an audit trail; no undo surface is built here.
  *
- * SECURITY (T-03-01): `col_name` is the ONLY interpolated identifier (identifiers
- * cannot be `?`-bound). It is guarded by `isSafeColName` and double-quoted at
- * every interpolation site; every runtime value is a bound `?`.
+ * SECURITY (T-16-08): `col_name` is compatibility metadata only. Every SQL
+ * runtime value — including `field_def_id` — is bound with `?`; this module
+ * never interpolates metadata into SQL.
  *
  * Node-pure control flow: takes `exec: SqlExecutor` and imports the shared
  * `inWriteTransaction` — never expo `withTransactionAsync`.
  */
-import { isSafeColName } from "@/db/col-name";
 import { isValueInOptions, parsers } from "@/db/field-parsers";
 import type { CustomFieldDef } from "@/db/field-types";
 import { inWriteTransaction } from "@/db/transaction";
 import type { SqlExecutor } from "@/db/types";
 import type { FieldType } from "@/schemas/types";
-
-/**
- * Guard-then-quote a col_name for interpolation. Defence in depth: even a name
- * that bypassed `makeColName` cannot reach SQL — a bad name throws BEFORE any
- * read/write.
- */
-function quoteCol(colName: string): string {
-  if (!isSafeColName(colName)) {
-    throw new Error(`unsafe custom-field col_name: ${JSON.stringify(colName)}`);
-  }
-  return `"${colName}"`;
-}
 
 /** One stored value keyed by its owning contact. */
 interface ValueRow {
@@ -71,16 +58,17 @@ interface ValueRow {
 }
 
 /**
- * Read every non-null stored value for a field as `{ contact_id, value }` rows.
- * `col_name` is guarded + double-quoted (the ONE interpolated identifier); no
- * transaction is opened — this is the read the pre-flights share.
+ * Read every non-null normalized raw value for a field as `{ contact_id, value
+ * }` rows. `fieldDefId` is bound so a definition's compatibility `col_name`
+ * can never influence SQL; no transaction is opened — this is the read the
+ * pre-flights share.
  */
-function readValues(exec: SqlExecutor, colName: string): Promise<ValueRow[]> {
-  const col = quoteCol(colName);
+function readValues(exec: SqlExecutor, fieldDefId: number): Promise<ValueRow[]> {
   return exec.getAllAsync<ValueRow>(
-    `SELECT contact_id, ${col} AS value
-       FROM contact_custom_values
-      WHERE ${col} IS NOT NULL`,
+    `SELECT contact_id, value
+       FROM custom_field_values
+      WHERE field_def_id = ? AND value IS NOT NULL`,
+    [fieldDefId],
   );
 }
 
@@ -94,10 +82,10 @@ function readValues(exec: SqlExecutor, colName: string): Promise<ValueRow[]> {
  */
 export async function preflightTypeChange(
   exec: SqlExecutor,
-  field: Pick<CustomFieldDef, "col_name">,
+  field: Pick<CustomFieldDef, "id" | "col_name">,
   target: FieldType,
 ): Promise<{ total: number; convert: number[]; flag: number[] }> {
-  const rows = await readValues(exec, field.col_name);
+  const rows = await readValues(exec, field.id);
   const parse = parsers[target];
   const convert: number[] = [];
   const flag: number[] = [];
@@ -123,10 +111,10 @@ export async function preflightTypeChange(
  */
 export async function preflightOptionsChange(
   exec: SqlExecutor,
-  field: Pick<CustomFieldDef, "col_name">,
+  field: Pick<CustomFieldDef, "id" | "col_name">,
   nextOptions: string | null,
 ): Promise<{ total: number; keep: number[]; flag: number[] }> {
-  const rows = await readValues(exec, field.col_name);
+  const rows = await readValues(exec, field.id);
   const keep: number[] = [];
   const flag: number[] = [];
   for (const row of rows) {
@@ -144,7 +132,7 @@ export async function preflightOptionsChange(
 /**
  * Apply a type change (FLD-04): the ENTIRE write is a same-transaction
  * `field_history` audit snapshot of the pre-change state PLUS
- * `UPDATE custom_field_defs SET type`. `contact_custom_values` is NEVER touched —
+ * `UPDATE custom_field_defs SET type`. `custom_field_values` is NEVER touched —
  * no value is rewritten, cleared, or normalized (blast radius zero, §14.2 /
  * T-03-02). There is NO separate confirmation prompt beyond the pre-flight
  * summary (§14.4).
@@ -165,23 +153,22 @@ export function applyTypeChange(
   target: FieldType,
   now: string,
 ): Promise<void> {
-  const col = quoteCol(field.col_name);
   const operation = `type_change:${field.type}->${target}`;
   return inWriteTransaction(exec, async () => {
     // (a) Audit snapshot of the pre-change state — the col_name is BOTH the
-    //     field_col_name literal (?-bound) AND the value column read
-    //     (interpolated identifier, guarded above). This is the §14.6 snapshot;
-    //     the values themselves are left byte-identical.
+    //     compatibility key written to field_col_name and a bound value. The
+    //     normalized value row is selected solely by its bound field_def_id;
+    //     values themselves are left byte-identical.
     await exec.runAsync(
       `INSERT INTO field_history
          (contact_id, field_col_name, old_value, operation, created_at)
-       SELECT contact_id, ?, ${col}, ?, ?
-         FROM contact_custom_values
-        WHERE ${col} IS NOT NULL`,
-      [field.col_name, operation, now],
+       SELECT contact_id, ?, value, ?, ?
+         FROM custom_field_values
+        WHERE field_def_id = ? AND value IS NOT NULL`,
+      [field.col_name, operation, now, field.id],
     );
-    // (b) The ONLY def mutation. NO UPDATE of contact_custom_values, NO ALTER
-    //     COLUMN, NO value normalization — that is the whole point (T-03-02).
+    // (b) The ONLY def mutation. NO UPDATE of custom_field_values and no value
+    //     normalization — that is the whole point (T-16-08).
     await exec.runAsync(
       "UPDATE custom_field_defs SET type = ?, modified_at = ? WHERE id = ?",
       [target, now, field.id],
