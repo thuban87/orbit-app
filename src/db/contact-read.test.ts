@@ -22,6 +22,11 @@ import {
 import type { CustomFieldDef } from "@/db/field-types";
 import { upsertValue } from "@/db/field-values-dao";
 import { migration001 } from "@/db/migrations/001-initial";
+import { migration002 } from "@/db/migrations/002-app-settings";
+import { migration003 } from "@/db/migrations/003-orrery-settings";
+import { migration004 } from "@/db/migrations/004-ai-settings";
+import { migration005 } from "@/db/migrations/005-digest-settings";
+import { migration006 } from "@/db/migrations/006-normalize-custom-field-values";
 import { runMigrations } from "@/db/migrations/runner";
 import type { SqlExecutor } from "@/db/types";
 
@@ -29,14 +34,21 @@ const NOW = "2026-08-14 12:00:00";
 
 let uidCounter = 0;
 const uid = () => `uid-${++uidCounter}`;
+let defIdCounter = 0;
 
 let exec: SqlExecutor;
 
 beforeEach(async () => {
   uidCounter = 0;
+  defIdCounter = 0;
   const db = openTestDb();
   exec = nodeSqliteExecutor(db);
-  await runMigrations(exec, [migration001], 1, { now: NOW, newUid: uid });
+  await runMigrations(
+    exec,
+    [migration001, migration002, migration003, migration004, migration005, migration006],
+    6,
+    { now: NOW, newUid: uid },
+  );
 });
 
 /** Insert a bare contact row (optionally archived / rarely_responds / photo / phone) and return its id. */
@@ -164,20 +176,13 @@ describe("getContactHeader — by-id light read (archived-reachable by design)",
 // Plan 05 — getContactForEdit: the edit-form initial-values assembly.
 // =============================================================================
 
-/** Add a value column directly (independent of Plan 03's createField DDL). */
-async function addColumn(col: string): Promise<void> {
-  await exec.execAsync(
-    `ALTER TABLE contact_custom_values ADD COLUMN "${col}" TEXT`,
-  );
-}
-
 /** Insert a live custom-field def row; returns nothing (defs are built by hand). */
 function makeDef(
   colName: string,
   overrides: Partial<CustomFieldDef> = {},
 ): CustomFieldDef {
   return {
-    id: 1,
+    id: ++defIdCounter,
     uid: uid(),
     col_name: colName,
     label: colName,
@@ -192,6 +197,31 @@ function makeDef(
     modified_at: NOW,
     ...overrides,
   };
+}
+
+/** Seed definition metadata directly; normalized values are written through the DAO. */
+async function persistDef(definition: CustomFieldDef): Promise<void> {
+  await exec.runAsync(
+    `INSERT INTO custom_field_defs (
+       id, uid, col_name, label, type, options, show_on_new, always_show,
+       display_order, quarantined_at, share_with_ai, created_at, modified_at
+     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
+      definition.id,
+      definition.uid,
+      definition.col_name,
+      definition.label,
+      definition.type,
+      definition.options,
+      definition.show_on_new,
+      definition.always_show,
+      definition.display_order,
+      definition.quarantined_at,
+      definition.share_with_ai,
+      definition.created_at,
+      definition.modified_at,
+    ],
+  );
 }
 
 /** Insert a contact with an optional category + last_contact; return its id. */
@@ -224,8 +254,8 @@ describe("getContactForEdit — row + category label + custom-value map", () => 
       categoryId: family.id,
       lastContact: "2026-08-10 09:00:00",
     });
-    await addColumn("nickname");
     const def = makeDef("nickname");
+    await persistDef(def);
     await upsertValue(exec, id, def.id, uid(), "Eddie", NOW);
 
     const result = await getContactForEdit(exec, id, [def]);
@@ -236,6 +266,62 @@ describe("getContactForEdit — row + category label + custom-value map", () => 
     expect(result?.contact.last_contact).toBe("2026-08-10 09:00:00");
     expect(result?.categoryLabel).toBe("Family");
     expect(result?.values.nickname).toBe("Eddie");
+  });
+
+  it("preserves populated, null, empty, invalid, and photo values while excluding quarantined pairs", async () => {
+    const id = await makeContactRow("Normalized profile");
+    const defs = [
+      makeDef("nickname", { label: "Nickname", display_order: 0 }),
+      makeDef("notes", { label: "Notes", display_order: 1 }),
+      makeDef("unset_text", { label: "Unset text", display_order: 2 }),
+      makeDef("lucky_number", {
+        label: "Lucky number",
+        type: "number",
+        display_order: 3,
+      }),
+      makeDef("custom_photo", {
+        label: "Custom photo",
+        type: "photo",
+        display_order: 4,
+      }),
+      makeDef("retired_secret", {
+        label: "Retired secret",
+        quarantined_at: NOW,
+        display_order: 5,
+      }),
+    ];
+    await Promise.all(defs.map(persistDef));
+
+    await upsertValue(exec, id, defs[0].id, uid(), "Eddie", NOW);
+    await upsertValue(exec, id, defs[1].id, uid(), "", NOW);
+    // Raw normalized TEXT is preserved so the existing invalid-value repair UI remains available.
+    await upsertValue(exec, id, defs[2].id, uid(), null, NOW);
+    await upsertValue(exec, id, defs[3].id, uid(), "not-a-number", NOW);
+    await upsertValue(
+      exec,
+      id,
+      defs[4].id,
+      uid(),
+      `avatars/cv-${id}-custom_photo.jpg`,
+      NOW,
+    );
+    await upsertValue(exec, id, defs[5].id, uid(), "must-not-appear", NOW);
+
+    const result = await getContactForEdit(exec, id, defs);
+    expect(result?.values).toEqual({
+      nickname: "Eddie",
+      notes: "",
+      unset_text: null,
+      lucky_number: "not-a-number",
+      custom_photo: `avatars/cv-${id}-custom_photo.jpg`,
+    });
+    expect(result?.values).not.toHaveProperty("retired_secret");
+    expect(
+      await exec.getFirstAsync<{ value: string | null }>(
+        "SELECT value FROM custom_field_values WHERE contact_id = ? AND field_def_id = ?",
+        [id, defs[5].id],
+      ),
+    ).toEqual({ value: "must-not-appear" });
   });
 
   it("returns a null category label when category_id is null", async () => {
