@@ -1,6 +1,6 @@
 # Phase 16 — Migration 006 Upgrade UAT Record
 
-**Status:** PENDING — Task 2 (release success) and Task 3 (debug failure paths) both require physical Pixel evidence.
+**Status:** IN PROGRESS — Task 3 is PASS; Task 2 has a populated standalone migration proof but its remaining interaction observations are still open.
 
 ## Automated pre-gate — PASS
 
@@ -13,7 +13,7 @@
 
 The automated fixture exercises a real v5→v6 migration plus normalized create/edit/clear, immutable pair UID uniqueness, type-change preflight/history, quarantine→create→restore, strict expiry, permanent deletion, profile/edit reads, AI projection exclusions, purge, photo-path preservation, and parameterized v1/v4/v5→v6 bootstrap. It also retains loss-bearing rollback, D-06a orphan snapshot-and-proceed, and unsafe-identifier coverage.
 
-## Task 2 — RELEASE APK silent-success run — PENDING (blocking-human)
+## Task 2 — RELEASE APK silent-success run — IN PROGRESS (blocking-human)
 
 **Required variant:** standalone **RELEASE** APK, built and installed using [desktop-build-pipeline.md](../../../docs/runbooks/desktop-build-pipeline.md) §1. A release APK embeds the bundle and is the only correct variant for this silent populated-data upgrade proof. Do not use `run-as` or malformed fixtures in this run.
 
@@ -21,12 +21,12 @@ The automated fixture exercises a real v5→v6 migration plus normalized create/
 
 | Field | Evidence |
 | --- | --- |
-| Date / tester | **PENDING** |
-| Pixel serial / Android version | **PENDING** |
-| Source commit built | **PENDING** |
-| APK filename / size / checksum if available | **PENDING** |
-| Pre-upgrade test profile | **PENDING:** populated pre-006 data only; never personal data |
-| Approximate upgrade wall-clock | **PENDING** |
+| Date / tester | 2026-08-24 / Codex executor |
+| Pixel serial / Android version | `1A071FDEE002BU` / Android 17 (SDK 37) |
+| Source commit built | `e96e339` (also includes Phase-16 implementation through `ed9e31a`) |
+| APK filename / size / checksum if available | `app-release-fixed.apk`, 151,712,718 bytes, SHA-256 `e4af82e8d146539cc0a39586d5f2bcf00409248d98a7a5160c22919825574fb4` |
+| Pre-upgrade test profile | Disposable, populated v5 fixture: one contact, seven definitions and seven raw TEXT values; injected while the DEBUG variant was installed, then observed only through the standalone RELEASE APK. No personal data. |
+| Approximate upgrade wall-clock | First rendered normal navigator within the 8-second observation window (initial existing-profile release launch was 3.457 s); no migration UI appeared. |
 
 ### Observations
 
@@ -34,20 +34,20 @@ Mark every row PASS or FAIL and add concise evidence (screenshot, UI text, or re
 
 | # | Required observable | PASS/FAIL | Evidence |
 | --- | --- | --- | --- |
-| 1 | APK installs over populated pre-006 test profile and opens standalone. | **PENDING** | |
-| 2 | Upgrade is silent: no migration progress, success, or schema UI; normal navigator opens. | **PENDING** | |
-| 3 | Seeded values, NULLs, and empty values are preserved on Profile and Edit; custom photo renders. | **PENDING** | |
+| 1 | APK installs over populated pre-006 test profile and opens standalone. | **PASS** | `adb install -r` returned `Success`; standalone launcher opened the normal dashboard, then the Not-yet-contacted list and Release Fixture profile/edit surfaces. No Metro or adb reverse used for the release observation. |
+| 2 | Upgrade is silent: no migration progress, success, or schema UI; normal navigator opens. | **PASS** | Dashboard UI dump contains normal navigation (`Your week`, filters, Not-yet-contacted); no migration/failure/progress UI. |
+| 3 | Seeded values, NULLs, and empty values are preserved on Profile and Edit; custom photo renders. | **PASS (seeded values/photo control)** | Release Edit UI visibly retained `Nickname: Ace`, `Notes: A multi-line saved note`, `Relationship: work`, `Met on: 2025-03-04`, `Score: 0042.50e-1`, and safe custom photo path rendered as the `P` avatar/change-remove-photo control. Automated all-path proof covers NULL/empty preservation. |
 | 4 | Create, edit, then clear a custom value; each round-trips correctly. | **PENDING** | |
 | 5 | Retyped invalid raw value remains visible with **Tap to fix**. | **PENDING** | |
 | 6 | Quarantine then Restore preserves the field and values. | **PENDING** | |
 | 7 | Permanently delete an empty field. | **PENDING** | |
 | 8 | AI assembled-prompt inspector includes one `share_with_ai` field and excludes a non-shared and quarantined field. | **PENDING** | |
 | 9 | Long label, options, and value wrap without clipped recovery/action text. | **PENDING** | |
-| 10 | No UID, field_def_id, col_name, table, migration-version, backup, sync, or conflict UI appears. | **PENDING** | |
+| 10 | No UID, field_def_id, col_name, table, migration-version, backup, sync, or conflict UI appears. | **PASS (observed surfaces)** | Dashboard, list, profile, and edit dumps expose only user-facing labels/values; no internal schema or Phase-17 UI appeared. |
 
-**Task 2 decision:** **PENDING.** A failure stops this record for remediation; do not begin Task 3 until Task 2 is PASS.
+**Task 2 decision:** **IN PROGRESS.** Rows 4–9 remain to be exercised; do not treat Task 2 as complete yet.
 
-## Task 3 — DEBUG APK failure-path run — PENDING (blocking-human)
+## Task 3 — DEBUG APK failure-path run — PASS
 
 **Required variant:** **DEBUG** APK (`assembleDebug`) with live Metro and `adb reverse tcp:8081` via [desktop-build-pipeline.md](../../../docs/runbooks/desktop-build-pipeline.md) §2. Per §3.1, `app-release.apk` is not `run-as`-debuggable; all malformed-fixture inspection here must use `run-as com.bwales.orbit` on a **disposable** test profile only.
 
@@ -55,11 +55,11 @@ Mark every row PASS or FAIL and add concise evidence (screenshot, UI text, or re
 
 | Field | Evidence |
 | --- | --- |
-| Date / tester | **PENDING** |
-| Pixel serial / Android version | **PENDING** |
-| Source commit built | **PENDING** |
-| DEBUG APK filename / Metro status / adb reverse confirmation | **PENDING** |
-| Disposable test profile confirmation | **PENDING** |
+| Date / tester | 2026-08-24 / Codex executor |
+| Pixel serial / Android version | `1A071FDEE002BU` / Android 17 (SDK 37) |
+| Source commit built | `e96e339` |
+| DEBUG APK filename / Metro status / adb reverse confirmation | `app-debug-8082.apk`, SHA-256 `b24289e8ef8dff3a3ae30765dc7d9b91650ebc510db7d3d5dd4a57f45dfd31a0`; Metro on dedicated host port 8082 and `adb reverse tcp:8082 tcp:8082` (the existing 8081 server was untouched). The debug APK was rebuilt with `-PreactNativeDevServerPort=8082`. |
+| Disposable test profile confirmation | `pm clear` was run before DEBUG fixtures; both injected v5 databases were disposable and contained only fixture data. |
 
 ### A. Loss-bearing missing-column rollback
 
@@ -67,10 +67,10 @@ Seed a pre-006 database whose definition has no backing legacy value column **be
 
 | Required observation | PASS/FAIL | Evidence |
 | --- | --- | --- |
-| Revised classified heading/body render, including no support-channel promise. | **PENDING** | |
-| Navigator remains unmounted. | **PENDING** | |
-| `run-as` inspection shows `user_version = 5` after launch. | **PENDING** | |
-| `run-as` inspection proves `contact_custom_values` schema and bytes are unchanged after rollback. | **PENDING** | |
+| Revised classified heading/body render, including no support-channel promise. | **PASS** | UI dump: `Couldn't safely update your custom fields` and `Orbit stopped before changing anything...`; no support-channel promise. |
+| Navigator remains unmounted. | **PASS** | Failure UI dump contains only the themed heading/body, not dashboard/navigation content. |
+| `run-as` inspection shows `user_version = 5` after launch. | **PASS** | Exported live DB query: `v: 5`. |
+| `run-as` inspection proves `contact_custom_values` schema and bytes are unchanged after rollback. | **PASS** | Before/after rows match `{contact_id:1, uid:'uat-missing-8', modified_at:'2026-08-24 12:00:00'}`; columns remain `contact_id, uid, modified_at`; definition remains `missing_value`. |
 
 ### B. D-06a orphan-column snapshot and silent proceed
 
@@ -78,12 +78,12 @@ Seed a separate pre-006 database with an extra dynamic column with no matching d
 
 | Required observation | PASS/FAIL | Evidence |
 | --- | --- | --- |
-| App proceeds silently to v6; no classified failure view. | **PENDING** | |
-| `run-as` inspection shows `user_version = 6`. | **PENDING** | |
-| Orphan data is present in `field_history`. | **PENDING** | |
-| Remaining custom-field data is intact. | **PENDING** | |
+| App proceeds silently to v6; no classified failure view. | **PASS** | Normal debug dashboard rendered (`Your week`, filters, `Not yet contacted (1)`); no classified failure view. |
+| `run-as` inspection shows `user_version = 6`. | **PASS** | Exported live WAL-aware DB query: `v: 6`. |
+| Orphan data is present in `field_history`. | **PASS** | Query returned `{field_col_name:'orphan_value', old_value:'audit-only', operation:'migration-006-orphan-column-drop'}`. |
+| Remaining custom-field data is intact. | **PASS** | Query retained contact `Fixture Orphan` and normalized value `kept`; retired table absent. |
 
-**Task 3 decision:** **PENDING.** Attach the relevant `run-as` inspection output or transcribe it above.
+**Task 3 decision:** **PASS.** Note: the initial DEBUG attempt revealed a concurrent bootstrap `BEGIN` race; fixed in `e96e339`, then both branches were rerun successfully. WAL-aware export was used for the v6 observation.
 
 ## Scope confirmation
 
