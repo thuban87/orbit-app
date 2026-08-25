@@ -47,7 +47,6 @@ export function DropdownFieldWidget({
         ]}
       >
         <Text
-          numberOfLines={1}
           style={{
             color: selected ? colors.textPrimary : colors.textSecondary,
           }}
