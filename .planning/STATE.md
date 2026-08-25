@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.0
 current_phase: 17
 current_phase_name: Backup, Export & Restore
-status: planned
-stopped_at: Completed 17-12-PLAN.md
-last_updated: "2026-08-25T21:42:28.610Z"
-state_head: 13a44513ebf77bc75a9b693ba5fb986d36b9d995
+status: executing
+stopped_at: Resumed Plan 17-05 Task 2; preserving and completing the interrupted manual-export implementation
+last_updated: "2026-08-25T22:20:00.000Z"
+state_head: 3321a789a25ac1c265295937bcbd860a7227d50f
 progress:
   total_phases: 17
   completed_phases: 14
   total_plans: 128
-  completed_plans: 119
+  completed_plans: 120
 milestone_name: milestone
 ---
 
@@ -26,7 +26,7 @@ See: .planning/PROJECT.md (updated 2026-08-14)
 
 ## Current Position
 
-**⟢ PHASE 17 (Backup, Export & Restore) — PLANS CONVERGED (2026-08-25), ready to execute.** 12 plans / 9 waves. Pipeline: discuss → UI-SPEC (approved) → research → pattern-map → plan → plan-checker PASSED → **cross-AI convergence (codex + headless Sonnet 5, 3 cycles: 22→5→4)** → **directed codex terra-high audit (sessions A+B: ~17 HIGH + 12 MED)** → **3-pass consolidated fix** (data_revision/boundary/migration · reconciliation+restore · photos+encryption) → checker PASSED → **2 confirmation rounds → 0 HIGH**. Ships migration **007** (tombstones + `data_revision` counter + reserved profile/category UIDs) and **008** (restore-photo-journal). Owner-ratified decisions: reserved-UID (profile+categories, D-02-preserving), reject-incompatible pair/col_name collisions (v1), secure-default crypto (fail-closed). One accepted non-HIGH nit (17-07 re-encryption observability). NOT executed, NOT pushed. Next: `/gsd-execute-phase 17`. See 17-REVIEWS.md, 17-AUDIT-A/B-FINDINGS.md.
+**⟢ PHASE 17 (Backup, Export & Restore) — EXECUTING.** 6/12 plans complete. Plan 17-05 now produces a versioned, snapshot-consistent plaintext manifest and a verified manual-share path without changing automatic-backup health. Next: 17-06 foreground SAF snapshots, retention, and health. All commits remain local on `main`; nothing has been pushed.
 
 **⟢ PHASE 15 (Weekly Digest) — COMPLETE (2026-08-23), pending owner sign-off. Milestone `--to 15` halt reached.**
 5/6 plans EXECUTED + node-verified (vitest 1356/1356) + code-review APPROVE + **DEVICE UAT PASSED on the Pixel**:
@@ -319,10 +319,10 @@ planning" sections in docs/dossier/*.md — those are the authoritative hand-off
 
 ## Session
 
-**Last session:** 2026-08-25T21:42:26.973Z
-**Stopped at:** Completed 17-12-PLAN.md
+**Last session:** 2026-08-25T22:20:00.000Z
+**Stopped at:** Completed 17-05-PLAN.md; next is 17-06-PLAN.md.
 _Prior stop (13-04):_ the orrery VISUAL VOCABULARY (theme tokens + two pure resolver modules, node-tested, 29 cases green): (1) five owner-tunable `ThemePalette` tokens seeded in `space-dark.dark` ONLY — `starPalette` (6 colours, gold `#F2C14E` at index 0, then amber/rose-red/violet/cyan/ice-white), `mutedStable/Wobble/Decay` (desaturated same-hue morph endpoints), `rogueExtinguished` (cold blue-grey `#3E4A6B` rogue BODY fill) — with an M6/C2-5 conformance test that IMPORTS the real `SELF_SUN_COLOUR_RE`/`assertSelfSunColour` from app-settings-dao and locks every starPalette entry to the ACTUAL DAO write-path rule (no re-inlined regex). (2) `orrery-ring-logic.ts` `orreryRingStyle(status, colors)` — REUSES `ringVisual` for `{color,opacity,width}` (status→colour mapped once), adds the `strokeStyle` axis (solid→dashed→faded→faintTrace) + `bodyFill` (rogue ring=`colors.rogue`, body=`rogueExtinguished`); `null`→canonical NEUTRAL (`colors.border`), never throws — the single fallback sun-occupant reuses (C2-2). (3) `sun-occupant-logic.ts` `resolveSunOccupant(input)` — NULL/archived/missing→self (A7, glow `selfSunColour ?? starPalette[0]`), live contact→its status glow via `orreryRingStyle(status, colors).color`, never-contacted (status `null`)→the reused neutral border (C2-2); accepts `status: ProfileStatus | null`. 5 commits (1801915 feat tokens+M6; d35d528 RED→4cbfad5 GREEN ring-logic; c923b16 RED→10780dd GREEN sun-occupant); tsc + check:colors clean; no deviations (one in-flight fix: a placeholder hex in the logic test was re-sourced from the palette after check:colors flagged it — C2-3). Committed locally on main (NOT pushed). Next: Wave 2 (13-05 render / 13-06 Settings sun-picker), Wave 3 (13-07 drag-release), Wave 4 (13-08 device UAT, autonomous:false).
-**Resume file:** None
+**Resume file:** None (the interrupted-task handoff was consumed after Plan 17-05 completed).
 
 ## Phase 4 — Closeout (2026-08-15) ✅ COMPLETE
 
