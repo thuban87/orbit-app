@@ -140,9 +140,8 @@ export function CreateContactScreen({
       const input = buildCreateInput(formState, {
         now: localDateTime(),
         contactUid: newUid(),
-        rowUid: newUid(),
         interactionUid: newUid(),
-        createColNames: createDefs.map((d) => d.col_name),
+        createDefs,
       });
       const { contactId } = await createContactFull(exec, input);
       navigation.replace("Profile", { contactId });

@@ -10,16 +10,19 @@
  * the fully serialized context.
  */
 import { beforeEach, describe, expect, it } from "vitest";
-import { readPromptContext } from "@/db/ai-context-read";
 import { nodeSqliteExecutor, openTestDb } from "@/db/__testkit__/node-sqlite";
+import { readPromptContext } from "@/db/ai-context-read";
+import { recordEvent } from "@/db/events-dao";
 import { createField } from "@/db/field-ddl";
 import { quarantineField } from "@/db/field-defs-dao";
 import { upsertValue } from "@/db/field-values-dao";
 import { addFuel } from "@/db/fuel-dao";
 import { migration001 } from "@/db/migrations/001-initial";
 import { runMigrations } from "@/db/migrations/runner";
-import { recordEvent } from "@/db/events-dao";
-import { createContactWithInteraction, recordTouchpoint } from "@/db/recency-dao";
+import {
+  createContactWithInteraction,
+  recordTouchpoint,
+} from "@/db/recency-dao";
 import type { SqlExecutor } from "@/db/types";
 
 const NOW = "2026-08-14 12:00:00";
@@ -50,6 +53,18 @@ async function makeContact(
     now: NOW,
   });
   return contactId;
+}
+
+/** Compile-only bridge while Plan 05 rewrites this legacy fixture for v6. */
+async function defIdFor(colName: string): Promise<number> {
+  const definition = await exec.getFirstAsync<{ id: number }>(
+    "SELECT id FROM custom_field_defs WHERE col_name = ?",
+    [colName],
+  );
+  if (!definition) {
+    throw new Error(`missing custom-field definition: ${colName}`);
+  }
+  return definition.id;
 }
 
 describe("readPromptContext — allowlist projection (H1)", () => {
@@ -159,13 +174,14 @@ describe("readPromptContext — allowlist projection (H1)", () => {
       share_with_ai: 1,
       now: NOW,
     });
-    const rowUid = uid();
-    await upsertValue(exec, c, rowUid, "unflagged_field", "UNFLAGGED_MARKER", NOW);
+    const unflaggedDefId = await defIdFor("unflagged_field");
+    const quarantinedDefId = await defIdFor("quarantined_field");
+    await upsertValue(exec, c, unflaggedDefId, uid(), "UNFLAGGED_MARKER", NOW);
     await upsertValue(
       exec,
       c,
-      rowUid,
-      "quarantined_field",
+      quarantinedDefId,
+      uid(),
       "QUARANTINE_MARKER",
       NOW,
     );
@@ -221,7 +237,14 @@ describe("readPromptContext — allowlist projection (H1)", () => {
       share_with_ai: 1,
       now: NOW,
     });
-    await upsertValue(exec, c, uid(), "favorite_drink", "Cold brew", NOW);
+    await upsertValue(
+      exec,
+      c,
+      await defIdFor("favorite_drink"),
+      uid(),
+      "Cold brew",
+      NOW,
+    );
 
     const ctx = await readPromptContext(exec, c, NOW);
     expect(ctx.sharedFields).toEqual([
@@ -244,7 +267,7 @@ describe("readPromptContext — allowlist projection (H1)", () => {
       now: NOW,
     });
     // A whitespace-only value is treated as absent.
-    await upsertValue(exec, c, uid(), "hobby", "   ", NOW);
+    await upsertValue(exec, c, await defIdFor("hobby"), uid(), "   ", NOW);
 
     const ctx = await readPromptContext(exec, c, NOW);
     expect(ctx.sharedFields).toEqual([]);

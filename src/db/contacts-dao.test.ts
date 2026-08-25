@@ -77,15 +77,7 @@ async function addDefinition(
        uid, col_name, label, type, options, display_order, quarantined_at,
        created_at, modified_at
      ) VALUES (?, ?, ?, 'text', NULL, ?, ?, ?, ?)`,
-    [
-      uid(),
-      colName,
-      colName,
-      uidCounter,
-      quarantinedAt,
-      NOW,
-      NOW,
-    ],
+    [uid(), colName, colName, uidCounter, quarantinedAt, NOW, NOW],
   );
   return result.lastInsertRowId;
 }
@@ -236,9 +228,7 @@ describe("createContactFull — custom values compose without deadlock (Pitfall 
       intervalDays: 21,
       now: NOW,
       firstInteraction: { uid: uid(), occurredAt: "2026-08-01 08:00:00" },
-      customValues: [
-        { fieldDefId: nicknameDefId, value: "M" },
-      ],
+      customValues: [{ fieldDefId: nicknameDefId, value: "M" }],
     });
 
     const rows = await exec.getAllAsync<{
@@ -273,7 +263,10 @@ describe("createContactFull — quarantined definition matrix (D-03)", () => {
       customValues: [{ fieldDefId: liveDefId, value: "Q" }],
     });
 
-    const seeded = await exec.getFirstAsync<{ uid: string; value: string | null }>(
+    const seeded = await exec.getFirstAsync<{
+      uid: string;
+      value: string | null;
+    }>(
       "SELECT uid, value FROM custom_field_values WHERE contact_id = ? AND field_def_id = ?",
       [contactId, quarantinedDefId],
     );

@@ -74,12 +74,10 @@ export interface BuildEditInputDeps {
   now: string;
   /** The contact being edited. */
   contactId: number;
-  /** The per-contact custom-values row uid — ALWAYS a fresh `newUid()`. */
-  rowUid: string;
   /** The first-interaction uid — `newUid()` (unused unless never-contacted + Today/date). */
   interactionUid: string;
-  /** `defsForEditForm(defs).map(d => d.col_name)` — EVERY non-quarantined column. */
-  editColNames: string[];
+  /** `defsForEditForm(defs)` — EVERY non-quarantined normalized definition pair. */
+  editDefs: Array<{ id: number; col_name: string }>;
   /** The seeded `contact.last_contact IS NULL` flag — gates the firstInteraction path. */
   neverContacted: boolean;
 }
@@ -161,7 +159,7 @@ export function canSave(state: EditFormState): boolean {
 
 /**
  * Build the atomic-edit input for `updateContactFull`. `phone`/`email` are
- * trimmed and empty->null; `name` is trimmed. The custom block is `editColNames`
+ * trimmed and empty->null; `name` is trimmed. The custom block is `editDefs`
  * mapped to the current values (a missing key -> null). A `firstInteraction` is
  * added ONLY when the contact is never-contacted AND the tri-state is Today/Pick
  * date (owner ruling); otherwise it is omitted and no interaction is written.
@@ -185,10 +183,9 @@ export function buildEditInput(
     ),
     phone: state.phone.trim() || null,
     email: state.email.trim() || null,
-    rowUid: deps.rowUid,
-    customValues: deps.editColNames.map((col) => ({
-      col,
-      value: state.values[col] ?? null,
+    customValues: deps.editDefs.map((definition) => ({
+      fieldDefId: definition.id,
+      value: state.values[definition.col_name] ?? null,
     })),
   };
 

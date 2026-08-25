@@ -43,12 +43,10 @@ export interface BuildCreateInputDeps {
   now: string;
   /** The new contact row uid — `newUid()`. */
   contactUid: string;
-  /** The per-contact custom-values row uid — `newUid()`. */
-  rowUid: string;
   /** The first-interaction uid — `newUid()` (unused on the "not yet" path). */
   interactionUid: string;
-  /** `defsForCreateForm(defs).map(d => d.col_name)` — the show_on_new columns. */
-  createColNames: string[];
+  /** `defsForCreateForm(defs)` — the show_on_new normalized definition pairs. */
+  createDefs: Array<{ id: number; col_name: string }>;
 }
 
 /**
@@ -80,7 +78,7 @@ export function firstInteractionOccurredAt(
 
 /**
  * Build the atomic-create input for `createContactFull`. `phone` is trimmed and
- * empty→null; `name` is trimmed. The custom block is the `createColNames` mapped
+ * empty→null; `name` is trimmed. The custom block is the `createDefs` mapped
  * to the current values (a missing key → null). The `firstInteraction` follows
  * the tri-state: "not yet" omits it entirely.
  */
@@ -97,10 +95,9 @@ export function buildCreateInput(
     phone: state.phone.trim() || null,
     categoryId: state.categoryId,
     rarelyResponds: 0,
-    rowUid: deps.rowUid,
-    customValues: deps.createColNames.map((col) => ({
-      col,
-      value: state.values[col] ?? null,
+    customValues: deps.createDefs.map((definition) => ({
+      fieldDefId: definition.id,
+      value: state.values[definition.col_name] ?? null,
     })),
   };
   if (occurredAt !== null) {

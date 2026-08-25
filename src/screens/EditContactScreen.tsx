@@ -312,9 +312,8 @@ export function EditContactScreen({
       const input = buildEditInput(form, {
         now,
         contactId,
-        rowUid: newUid(), // ALWAYS mint fresh — upsert's ON CONFLICT never rewrites uid.
         interactionUid: newUid(),
-        editColNames: editDefs.map((d) => d.col_name),
+        editDefs,
         neverContacted,
       });
 

@@ -226,7 +226,7 @@ describe("getContactForEdit — row + category label + custom-value map", () => 
     });
     await addColumn("nickname");
     const def = makeDef("nickname");
-    await upsertValue(exec, id, uid(), "nickname", "Eddie", NOW);
+    await upsertValue(exec, id, def.id, uid(), "Eddie", NOW);
 
     const result = await getContactForEdit(exec, id, [def]);
     expect(result).not.toBeNull();
