@@ -300,6 +300,7 @@ Foundational decisions affecting current work:
 
 ### Pending Todos
 
+- **[Phase 17, minor] Validate restore progress with imported photo library.** Deferred device-UAT observation: use an import-sized disposable photo library to capture the transient applying/progress treatment and Back-interruption behavior. See `.planning/todos/pending/2026-08-26-validate-restore-progress-with-imported-photo-library.md`.
 - **[08-07, owner decision] Dashboard Settings entry point — RESOLVED (2026-08-16, Plan 09).** The owner approved a top-right Settings gear (`dashboard-settings-entry`, accessibilityLabel "Settings") → `navigate("Settings")`, added in 08-09 (commit `e9b6efb`). Settings / CustomFields / Archived-via-Settings / Manage-favourites-row are reachable again. Exact gear styling is the owner's later design pass (a token-coloured ⚙ glyph ships for now).
 
 ### Blockers/Concerns
