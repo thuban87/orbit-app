@@ -84,6 +84,7 @@ export function RestorePreviewScreen({
   const [applyError, setApplyError] = useState<string | null>(null);
   const executeRef = useRef<() => Promise<void>>(async () => {});
   const confirmedCandidateRef = useRef<RestoreCacheEntry | null>(null);
+  const allowNavigationRef = useRef(false);
   const runSingleApply = useRef(createRestoreApplySingleFlight(() => executeRef.current())).current;
 
   useEffect(() => {
@@ -91,7 +92,7 @@ export function RestorePreviewScreen({
   }, [route.params.token]);
 
   useEffect(() => navigation.addListener("beforeRemove", (event) => {
-    if (applying) event.preventDefault();
+    if (applying && !allowNavigationRef.current) event.preventDefault();
   }), [applying, navigation]);
 
   const returnToSelection = useCallback(() => {
@@ -114,6 +115,10 @@ export function RestorePreviewScreen({
         setApplyError(restoreApplyRecovery(result.status).message);
         return;
       }
+      // The success reset intentionally removes this route while `applying` is
+      // still true; permit that internal navigation while retaining the guard
+      // against user Back actions during the apply.
+      allowNavigationRef.current = true;
       restorePreviewCache.discard(route.params.token);
       navigation.reset({
         index: 1,

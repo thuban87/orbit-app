@@ -251,6 +251,10 @@ export function EditContactScreen({
     },
     [],
   );
+  const setIntervalValid = useCallback(
+    (valid: boolean) => setField("intervalValid", valid),
+    [setField],
+  );
 
   // Links draft mutators — all local state; nothing persists until Save.
   const addLinkRow = useCallback(() => {
@@ -525,7 +529,7 @@ export function EditContactScreen({
           testID="edit-contact-frequency"
           value={form.intervalDays}
           onChange={(v) => setField("intervalDays", v)}
-          onValidityChange={(v) => setField("intervalValid", v)}
+          onValidityChange={setIntervalValid}
         />
       </View>
 
