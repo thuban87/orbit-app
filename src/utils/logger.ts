@@ -34,11 +34,6 @@ export class Logger {
     }
   }
 
-  /** Fixed, redacted diagnostic codes that must reach native device logs. */
-  static diagnostic(source: string, code: string): void {
-    console.error(`[Orbit:${source}]`, code);
-  }
-
   /** Debug — index scans, file events, status calculations, API payloads. */
   static debug(source: string, message: string, ...args: unknown[]): void {
     if (this.level === "debug") {

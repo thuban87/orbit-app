@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const manifest = {
   backupFormatVersion: 1,
@@ -22,21 +22,15 @@ vi.mock("@/backup/export-manifest", () => ({
 }));
 
 import {
-  createAutomaticBackupReencryptionService,
   createAutomaticBackupService,
   createBackupEncryptionLifecycle,
-  createManualExportService,
+  createAutomaticBackupReencryptionService,
   createVerifiedPreRestoreSnapshot,
+  createManualExportService,
   loadBackupForPreview,
   resolveWriteEncryptionMode,
   withBackupServiceLock,
 } from "@/services/backup/backup-service";
-import { SafWriteError } from "@/services/backup/saf-write-error";
-import { Logger } from "@/utils/logger";
-
-afterEach(() => {
-  vi.restoreAllMocks();
-});
 
 describe("manual backup service", () => {
   beforeEach(() => {
@@ -417,116 +411,6 @@ describe("backup encryption safety", () => {
     });
     expect(writeVerified).not.toHaveBeenCalled();
     expect(mocks.buildExportManifest).not.toHaveBeenCalled();
-  });
-
-  it("emits only fixed pre-restore diagnostic codes for failed snapshot stages", async () => {
-    const failureCodes = [
-      "snapshot-export",
-      "encryption",
-      "saf-create",
-      "saf-write",
-      "saf-read-back",
-    ] as const;
-    for (const code of failureCodes) {
-      const diagnostic = vi
-        .spyOn(Logger, "diagnostic")
-        .mockImplementation(() => {});
-      if (code === "snapshot-export") {
-        mocks.buildExportManifest.mockRejectedValueOnce(
-          new Error("photo: content://private-data"),
-        );
-      }
-      const storage = {
-        writeVerified: async () => {
-          if (code.startsWith("saf-")) {
-            throw new SafWriteError(
-              code.replace("saf-", "") as "create" | "write" | "read-back",
-            );
-          }
-          return "content://private-data/snapshot.json";
-        },
-        list: async () => [],
-        remove: async () => {},
-      };
-      const snapshot = createVerifiedPreRestoreSnapshot({
-        exec: {} as never,
-        exportedAt: manifest.metadata.exportedAt,
-        now: new Date("2026-08-25T00:00:00.000Z"),
-        readPhotoBase64: async () => "",
-        directoryUri: "content://private-data",
-        retentionDays: 7,
-        storage,
-        encryption:
-          code === "encryption"
-            ? {
-                enabled: true,
-                passphrase: { status: "present", passphrase: "secret" },
-                encrypt: () => {
-                  throw new Error("passphrase=secret");
-                },
-              }
-            : undefined,
-      });
-
-      await expect(snapshot()).resolves.toEqual({ status: "failed" });
-      expect(diagnostic.mock.calls).toEqual([
-        ["backup-snapshot", `pre-restore-snapshot:${code}`],
-      ]);
-      diagnostic.mockRestore();
-    }
-  });
-
-  it("logs a redacted passphrase and retention stage without changing snapshot safety", async () => {
-    const diagnostic = vi
-      .spyOn(Logger, "diagnostic")
-      .mockImplementation(() => {});
-    const blocked = createVerifiedPreRestoreSnapshot({
-      exec: {} as never,
-      exportedAt: manifest.metadata.exportedAt,
-      now: new Date("2026-08-25T00:00:00.000Z"),
-      readPhotoBase64: async () => "",
-      directoryUri: "content://private-data",
-      retentionDays: 7,
-      storage: {
-        writeVerified: async () => "content://private-data/snapshot.json",
-        list: async () => [],
-        remove: async () => {},
-      },
-      encryption: {
-        enabled: true,
-        passphrase: {
-          status: "unavailable",
-          reason: "secure-store-read-failed",
-        },
-        encrypt: () => "never",
-      },
-    });
-    await expect(blocked()).resolves.toEqual({
-      status: "blocked",
-      reason: "passphrase-unavailable",
-    });
-
-    const retained = createVerifiedPreRestoreSnapshot({
-      exec: {} as never,
-      exportedAt: manifest.metadata.exportedAt,
-      now: new Date("2026-08-25T00:00:00.000Z"),
-      readPhotoBase64: async () => "",
-      directoryUri: "content://private-data",
-      retentionDays: 7,
-      storage: {
-        writeVerified: async () => "content://private-data/snapshot.json",
-        list: async () => {
-          throw new Error("content://private-data");
-        },
-        remove: async () => {},
-      },
-    });
-    await expect(retained()).resolves.toMatchObject({ status: "written" });
-
-    expect(diagnostic.mock.calls).toEqual([
-      ["backup-snapshot", "pre-restore-snapshot:passphrase-unavailable"],
-      ["backup-snapshot", "pre-restore-snapshot:retention"],
-    ]);
   });
 
   it("keeps the flag independent from the three passphrase read states", () => {
