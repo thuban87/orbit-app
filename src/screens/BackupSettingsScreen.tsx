@@ -110,9 +110,11 @@ export function BackupSettingsScreen({
 
   const chooseFolder = useCallback(async () => {
     try {
-      const result = await safStorage.requestDirectory(
-        settings?.backupFolderUri ?? undefined,
-      );
+      // Do not seed DocumentsUI with the previously persisted provider URI.
+      // Some providers (notably Drive) can leave the picker blank when the
+      // initial URI is stale or unsupported; the user can still choose the
+      // existing folder from the normal provider UI.
+      const result = await safStorage.requestDirectory();
       if (!result.granted || !result.directoryUri) return;
       await inWriteTransaction(getExecutor(), () =>
         recordAutomaticBackupHealthCore(getExecutor(), {
@@ -127,7 +129,7 @@ export function BackupSettingsScreen({
       Logger.error(LOG_SCOPE, "folder selection failed", error);
       Alert.alert("Couldn't choose folder", "Please try again.");
     }
-  }, [reload, safStorage, settings?.backupFolderUri]);
+  }, [reload, safStorage]);
 
   const openFolder = useCallback(async () => {
     if (
