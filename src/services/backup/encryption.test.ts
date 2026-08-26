@@ -5,6 +5,7 @@ import {
   createBackupEnvelopeCrypto,
 } from "@/services/backup/encryption";
 import type { BackupEncryptionProfile } from "@/backup/types";
+import { APPROVED_BACKUP_ENCRYPTION_PROFILE } from "@/services/backup/encryption";
 
 const profile: BackupEncryptionProfile = {
   formatVersion: 71,
@@ -46,6 +47,16 @@ function createTestBackend() {
 }
 
 describe("backup encryption envelope", () => {
+  it("freezes only the owner-approved physical-Pixel profile as the shipping default", () => {
+    expect(APPROVED_BACKUP_ENCRYPTION_PROFILE).toEqual({
+      formatVersion: 1,
+      cipher: "AES-256-GCM",
+      kdf: { id: "PBKDF2-HMAC-SHA256", iterations: 600_000, derivedKeyLength: 32 },
+      saltLength: 16,
+      ivLength: 12,
+      maxCiphertextBytes: 8_388_608,
+    });
+  });
   it("round-trips bytes through an explicit profile with random salt and IV", () => {
     const crypto = createBackupEnvelopeCrypto({ profiles: [profile], backend: createTestBackend() });
     const envelope = crypto.encrypt({
