@@ -17,6 +17,9 @@ const preview = {
   encrypted: false,
   rowCount: 12,
   photoCount: 3,
+  contactCount: 2,
+  relatedRowCount: 8,
+  tombstoneCount: 2,
 };
 
 describe("restore preview route safety", () => {
