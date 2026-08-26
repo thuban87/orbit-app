@@ -265,3 +265,16 @@ export function createAutomaticBackupService(deps: AutomaticBackupDependencies):
     },
   };
 }
+
+/**
+ * A Replace-all safety snapshot deliberately bypasses the caller's ordinary
+ * due/changed policy.  The underlying writer always builds, writes, and reads
+ * back a fresh SAF file whenever it is invoked; this named entry point prevents
+ * a restore caller from accidentally treating a "not due" decision as safety
+ * evidence.
+ */
+export function createVerifiedPreRestoreSnapshot(
+  deps: AutomaticBackupDependencies,
+): ReturnType<typeof createAutomaticBackupService>["writeVerifiedSnapshot"] {
+  return createAutomaticBackupService(deps).writeVerifiedSnapshot;
+}

@@ -24,6 +24,7 @@ vi.mock("@/backup/export-manifest", () => ({
 import {
   createAutomaticBackupService,
   createBackupEncryptionLifecycle,
+  createVerifiedPreRestoreSnapshot,
   createManualExportService,
   loadBackupForPreview,
   resolveWriteEncryptionMode,
@@ -208,6 +209,21 @@ describe("restore preview", () => {
 });
 
 describe("backup encryption safety", () => {
+  it("forces a verified pre-restore snapshot without consulting a due/changed policy", async () => {
+    const writeVerified = vi.fn();
+    const snapshot = createVerifiedPreRestoreSnapshot({
+      exec: {} as never,
+      exportedAt: manifest.metadata.exportedAt,
+      now: new Date("2026-08-25T00:00:00.000Z"),
+      readPhotoBase64: async () => "",
+      directoryUri: "content://backup",
+      retentionDays: 7,
+      storage: { writeVerified, list: async () => [], remove: async () => {} },
+    });
+    await expect(snapshot()).resolves.toMatchObject({ status: "written" });
+    expect(writeVerified).toHaveBeenCalledTimes(1);
+  });
+
   it("fails closed before writing a byte when enabled encryption has no usable passphrase", async () => {
     mocks.buildExportManifest.mockClear();
     const writeVerified = vi.fn();
