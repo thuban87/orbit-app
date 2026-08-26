@@ -1,5 +1,6 @@
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { ArchivedContactsScreen } from "@/screens/ArchivedContactsScreen";
+import { BackupScreen } from "@/screens/BackupScreen";
 import { CaptureScreen } from "@/screens/CaptureScreen";
 import { ComposeScreen } from "@/screens/ComposeScreen";
 import { ContactProfileScreen } from "@/screens/ContactProfileScreen";
@@ -73,6 +74,7 @@ export function RootNavigator() {
       <Stack.Screen name="Capture" component={CaptureScreen} />
       <Stack.Screen name="Orrery" component={OrreryScreen} />
       <Stack.Screen name="Digest" component={DigestScreen} />
+      <Stack.Screen name="Backup" component={BackupScreen} />
     </Stack.Navigator>
   );
 }

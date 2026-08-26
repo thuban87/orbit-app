@@ -1,5 +1,6 @@
 import { parseBackupManifest, UPDATE_FIRST_MESSAGE } from "@/backup/backup-schema";
 import { buildExportManifest } from "@/backup/export-manifest";
+import type { BackupEncryptionProfile } from "@/backup/types";
 import { BackupEnvelopeError, type BackupEnvelopeCrypto } from "@/services/backup/encryption";
 import { automaticBackupFilename, isExpiredAutomaticBackup, isOwnedAutomaticBackup } from "@/backup/auto-backup-policy";
 import type { SqlExecutor } from "@/db/types";
@@ -165,6 +166,13 @@ export interface ManualExportDependencies {
   readPhotoBase64: (relativePath: string) => Promise<string>;
   files: LocalExportFiles;
   share: ExportShareAdapter;
+  /** Optional protection for manual shares; plaintext needs an explicit UI override. */
+  encryption?: {
+    enabled: boolean;
+    passphrase: PassphraseReadResult;
+    crypto: BackupEnvelopeCrypto;
+    profile: BackupEncryptionProfile;
+  };
 }
 
 export interface AutomaticBackupDependencies {
@@ -188,22 +196,53 @@ export interface AutomaticBackupDependencies {
  * folder/health metadata: opening a share sheet is not automatic protection.
  */
 export function createManualExportService(deps: ManualExportDependencies): {
+  shareExport(options?: { readableOverride?: boolean }): Promise<ManualExportResult>;
   sharePlaintextExport(): Promise<ManualExportResult>;
 } {
   let inFlight = false;
   return {
-    async sharePlaintextExport(): Promise<ManualExportResult> {
+    async shareExport(options = {}): Promise<ManualExportResult> {
       if (inFlight) return { status: "busy" };
       inFlight = true;
       try {
+        const mode = resolveWriteEncryptionMode(
+          deps.encryption?.enabled === true && !options.readableOverride,
+          deps.encryption?.passphrase ?? { status: "absent" },
+        );
+        if (mode.mode === "blocked") return { status: "export-failed" };
         const manifest = await buildExportManifest(deps.exec, {
           exportedAt: deps.exportedAt,
           readPhotoBase64: deps.readPhotoBase64,
         });
+        const plaintext = JSON.stringify(manifest);
+        // Validate the portable source before encrypting or writing it.
+        parseBackupManifest(JSON.parse(plaintext));
+        const contents =
+          mode.mode === "encrypted"
+            ? JSON.stringify(
+                deps.encryption!.crypto.encrypt({
+                  passphrase: mode.passphrase,
+                  plaintext: new TextEncoder().encode(plaintext),
+                  profile: deps.encryption!.profile,
+                }),
+              )
+            : plaintext;
         const file = await deps.files.create();
-        await file.write(JSON.stringify(manifest));
-        // Read-back parse is the last safety gate before a portable file leaves Orbit.
-        parseBackupManifest(JSON.parse(await file.read()));
+        await file.write(contents);
+        const readBack = await file.read();
+        if (mode.mode === "encrypted") {
+          if (
+            loadBackupForPreview({
+              contents: readBack,
+              passphrase: mode.passphrase,
+              crypto: deps.encryption!.crypto,
+            }).status !== "ready"
+          ) {
+            return { status: "export-failed" };
+          }
+        } else {
+          parseBackupManifest(JSON.parse(readBack));
+        }
         try {
           if (!(await deps.share.isAvailable())) {
             return { status: "sharing-unavailable" };
@@ -218,6 +257,9 @@ export function createManualExportService(deps: ManualExportDependencies): {
       } finally {
         inFlight = false;
       }
+    },
+    sharePlaintextExport() {
+      return this.shareExport({ readableOverride: true });
     },
   };
 }

@@ -100,6 +100,20 @@ export type RootStackParamList = {
    * every existing route is untouched.
    */
   Digest: undefined;
+  /** Permanent local backup health/action surface (BKP-01..03). */
+  Backup: undefined;
+  /** Dedicated automatic-backup and encryption configuration screen. */
+  BackupSettings: { section?: "automatic" | "encryption" } | undefined;
+  /** Serializable hand-off from the picker to the later restore preview route. */
+  RestorePreview: { fileUri: string | null };
+  /** Aggregate-only committed restore outcome; never carries backup contents. */
+  RestoreResult: {
+    added: number;
+    updated: number;
+    newerLocalKept: number;
+    deletionsApplied: number;
+    replaceSafetySnapshot: "verified" | "not-configured" | null;
+  };
 };
 
 /**
