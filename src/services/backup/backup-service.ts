@@ -4,8 +4,13 @@ import type { BackupEncryptionProfile } from "@/backup/types";
 import { BackupEnvelopeError, type BackupEnvelopeCrypto } from "@/services/backup/encryption";
 import { automaticBackupFilename, isExpiredAutomaticBackup, isOwnedAutomaticBackup } from "@/backup/auto-backup-policy";
 import type { SqlExecutor } from "@/db/types";
-import type { SafStorage } from "@/services/backup/saf-storage";
-import type { BackupPassphraseStore, PassphraseReadResult } from "@/services/backup/passphrase-store";
+import type { SafReadableStorage, SafStorage } from "@/services/backup/saf-storage";
+import type {
+  BackupPassphraseChangeStore,
+  BackupPassphraseStore,
+  PassphraseReadResult,
+  PendingBackupPassphraseChange,
+} from "@/services/backup/passphrase-store";
 
 export type BackupPreviewResult =
   | { status: "ready"; preview: { exportedAt: string; backupFormatVersion: number; encrypted: boolean; rowCount: number; photoCount: number } }
@@ -138,6 +143,154 @@ export function createBackupEncryptionLifecycle(passphrases: BackupPassphraseSto
   };
 }
 
+export type AutomaticBackupReencryptionResult =
+  | { status: "changed"; reencryptedCount: number }
+  | { status: "wrong-current-passphrase" }
+  | { status: "needs-attention" }
+  | { status: "needs-recovery" };
+
+interface AutomaticBackupReencryptionDependencies {
+  readonly directoryUri: string;
+  readonly now: Date;
+  readonly crypto: BackupEnvelopeCrypto;
+  readonly profile: BackupEncryptionProfile;
+  readonly passphrases: BackupPassphraseChangeStore;
+  readonly storage: SafReadableStorage;
+}
+
+function ownedName(uri: string): string {
+  return decodeURIComponent(uri).split("/").pop() ?? "";
+}
+
+/**
+ * Converts one automatic file only after its new encrypted replacement has
+ * been read, decrypted, and schema-validated. A SecureStore journal retains
+ * both user-supplied secrets and replacement URIs through interruption, so a
+ * retry can finish source deletion without losing the active old secret.
+ */
+export function createAutomaticBackupReencryptionService(
+  deps: AutomaticBackupReencryptionDependencies,
+): {
+  change(input: {
+    currentPassphrase: string;
+    nextPassphrase: string;
+  }): Promise<AutomaticBackupReencryptionResult>;
+} {
+  return {
+    change: (input) => withBackupServiceLock(async () => {
+      const active = await deps.passphrases.getPassphrase();
+      if (active.status !== "present") return { status: "needs-attention" };
+      if (active.passphrase !== input.currentPassphrase) {
+        return { status: "wrong-current-passphrase" };
+      }
+
+      let pending: PendingBackupPassphraseChange;
+      const pendingRead = await deps.passphrases.getPendingPassphraseChange();
+      if (pendingRead.status === "unavailable") return { status: "needs-attention" };
+      if (pendingRead.status === "present") {
+        if (
+          pendingRead.change.oldPassphrase !== input.currentPassphrase
+          || pendingRead.change.nextPassphrase !== input.nextPassphrase
+        ) {
+          return { status: "needs-recovery" };
+        }
+        pending = pendingRead.change;
+      } else {
+        pending = {
+          oldPassphrase: input.currentPassphrase,
+          nextPassphrase: input.nextPassphrase,
+          replacements: [],
+        };
+        try {
+          await deps.passphrases.setPendingPassphraseChange(pending);
+        } catch {
+          return { status: "needs-attention" };
+        }
+      }
+
+      try {
+        const uris = (await deps.storage.list(deps.directoryUri))
+          .filter((uri) => isOwnedAutomaticBackup(ownedName(uri)));
+        const replacementUris = new Set(
+          pending.replacements.map((replacement) => replacement.replacementUri),
+        );
+        const sourceUris = uris.filter((uri) => !replacementUris.has(uri));
+        let reencryptedCount = 0;
+
+        for (const [index, sourceUri] of sourceUris.entries()) {
+          const prior = pending.replacements.find(
+            (replacement) => replacement.sourceUri === sourceUri,
+          );
+          if (prior) {
+            const replacementContents = await deps.storage.read(prior.replacementUri);
+            const replacementEnvelope: unknown = JSON.parse(replacementContents);
+            const replacementPlaintext = deps.crypto.decrypt({
+              passphrase: pending.nextPassphrase,
+              envelope: replacementEnvelope,
+            });
+            parseBackupManifest(JSON.parse(new TextDecoder().decode(replacementPlaintext)));
+            await deps.storage.remove(sourceUri);
+            continue;
+          }
+
+          const sourceContents = await deps.storage.read(sourceUri);
+          const sourceEnvelope: unknown = JSON.parse(sourceContents);
+          const sourcePlaintext = sourceEnvelope
+            && typeof sourceEnvelope === "object"
+            && (sourceEnvelope as Record<string, unknown>).encrypted === true
+            ? deps.crypto.decrypt({
+                passphrase: pending.oldPassphrase,
+                envelope: sourceEnvelope,
+              })
+            : new TextEncoder().encode(sourceContents);
+          parseBackupManifest(JSON.parse(new TextDecoder().decode(sourcePlaintext)));
+
+          const replacementContents = JSON.stringify(
+            deps.crypto.encrypt({
+              passphrase: pending.nextPassphrase,
+              plaintext: sourcePlaintext,
+              profile: deps.profile,
+            }),
+          );
+          const replacementUri = await deps.storage.writeVerified(
+            deps.directoryUri,
+            automaticBackupFilename(new Date(deps.now.getTime() + index + 1)),
+            replacementContents,
+          );
+          const verifiedReplacement: unknown = JSON.parse(
+            await deps.storage.read(replacementUri),
+          );
+          const verifiedPlaintext = deps.crypto.decrypt({
+            passphrase: pending.nextPassphrase,
+            envelope: verifiedReplacement,
+          });
+          parseBackupManifest(JSON.parse(new TextDecoder().decode(verifiedPlaintext)));
+
+          pending = {
+            ...pending,
+            replacements: [
+              ...pending.replacements,
+              { sourceUri, replacementUri },
+            ],
+          };
+          await deps.passphrases.setPendingPassphraseChange(pending);
+          await deps.storage.remove(sourceUri);
+          reencryptedCount += 1;
+        }
+
+        await deps.passphrases.setPassphrase(pending.nextPassphrase);
+        await deps.passphrases.clearPendingPassphraseChange();
+        return { status: "changed", reencryptedCount };
+      } catch {
+        // The journal and old active secret stay intact so the exact operation
+        // can be resumed after SAF/keystore recovery; no source is removed
+        // until a replacement has independently decrypted and parsed.
+        return { status: "needs-recovery" };
+      }
+    }),
+  };
+}
+
 export interface LocalExportFile {
   readonly uri: string;
   write(contents: string): Promise<void>;
@@ -205,9 +358,10 @@ export function createManualExportService(deps: ManualExportDependencies): {
       if (inFlight) return { status: "busy" };
       inFlight = true;
       try {
+        const encryption = deps.encryption;
         const mode = resolveWriteEncryptionMode(
-          deps.encryption?.enabled === true && !options.readableOverride,
-          deps.encryption?.passphrase ?? { status: "absent" },
+          encryption?.enabled === true && !options.readableOverride,
+          encryption?.passphrase ?? { status: "absent" },
         );
         if (mode.mode === "blocked") return { status: "export-failed" };
         const manifest = await buildExportManifest(deps.exec, {
@@ -217,25 +371,27 @@ export function createManualExportService(deps: ManualExportDependencies): {
         const plaintext = JSON.stringify(manifest);
         // Validate the portable source before encrypting or writing it.
         parseBackupManifest(JSON.parse(plaintext));
-        const contents =
-          mode.mode === "encrypted"
-            ? JSON.stringify(
-                deps.encryption!.crypto.encrypt({
-                  passphrase: mode.passphrase,
-                  plaintext: new TextEncoder().encode(plaintext),
-                  profile: deps.encryption!.profile,
-                }),
-              )
-            : plaintext;
+        let contents = plaintext;
+        if (mode.mode === "encrypted") {
+          if (!encryption) return { status: "export-failed" };
+          contents = JSON.stringify(
+            encryption.crypto.encrypt({
+              passphrase: mode.passphrase,
+              plaintext: new TextEncoder().encode(plaintext),
+              profile: encryption.profile,
+            }),
+          );
+        }
         const file = await deps.files.create();
         await file.write(contents);
         const readBack = await file.read();
         if (mode.mode === "encrypted") {
+          if (!encryption) return { status: "export-failed" };
           if (
             loadBackupForPreview({
               contents: readBack,
               passphrase: mode.passphrase,
-              crypto: deps.encryption!.crypto,
+              crypto: encryption.crypto,
             }).status !== "ready"
           ) {
             return { status: "export-failed" };
@@ -275,13 +431,17 @@ export function createAutomaticBackupService(deps: AutomaticBackupDependencies):
       inFlight = true;
       try {
         return await withBackupServiceLock(async () => {
-        const passphrase = deps.encryption?.passphrase ?? { status: "absent" as const };
-        const mode = resolveWriteEncryptionMode(deps.encryption?.enabled ?? false, passphrase);
+        const encryption = deps.encryption;
+        const passphrase = encryption?.passphrase ?? { status: "absent" as const };
+        const mode = resolveWriteEncryptionMode(encryption?.enabled ?? false, passphrase);
         if (mode.mode === "blocked") return { status: "blocked", reason: mode.reason } as const;
         const manifest = await buildExportManifest(deps.exec, { exportedAt: deps.exportedAt, readPhotoBase64: deps.readPhotoBase64 });
         const plaintext = JSON.stringify(manifest);
         parseBackupManifest(JSON.parse(plaintext));
-        const contents = mode.mode === "encrypted" ? deps.encryption!.encrypt(plaintext, mode.passphrase) : plaintext;
+        const contents = mode.mode === "encrypted"
+          ? encryption?.encrypt(plaintext, mode.passphrase)
+          : plaintext;
+        if (contents === undefined) return { status: "failed" } as const;
         const filename = automaticBackupFilename(deps.now);
         await deps.storage.writeVerified(deps.directoryUri, filename, contents);
         // The just-written snapshot is protected by identity, not clock order:

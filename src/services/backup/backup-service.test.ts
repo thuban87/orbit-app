@@ -165,7 +165,9 @@ describe("manual backup service", () => {
 
 describe("restore preview", () => {
   it("returns only aggregate metadata after wholly validating plaintext content", () => {
-    expect(loadBackupForPreview({ contents: JSON.stringify(manifest) })).toEqual({
+    expect(
+      loadBackupForPreview({ contents: JSON.stringify(manifest) }),
+    ).toEqual({
       status: "ready",
       preview: {
         exportedAt: manifest.metadata.exportedAt,
@@ -188,11 +190,13 @@ describe("restore preview", () => {
     const crypto = {
       decrypt: vi.fn(() => new TextEncoder().encode(JSON.stringify(manifest))),
     };
-    expect(loadBackupForPreview({
-      contents: JSON.stringify({ encrypted: true }),
-      passphrase: "correct horse battery staple",
-      crypto: crypto as never,
-    })).toEqual({
+    expect(
+      loadBackupForPreview({
+        contents: JSON.stringify({ encrypted: true }),
+        passphrase: "correct horse battery staple",
+        crypto: crypto as never,
+      }),
+    ).toEqual({
       status: "ready",
       preview: {
         exportedAt: manifest.metadata.exportedAt,
@@ -213,19 +217,46 @@ describe("backup encryption safety", () => {
   it("re-encrypts a verified automatic replacement before removing its old source and only then activates the new secret", async () => {
     const events: string[] = [];
     const entries = new Map<string, string>([
-      ["content://backup/orbit-auto-2026-08-24T00-00-00-000Z.json", JSON.stringify({ encrypted: true, passphrase: "old", plaintext: JSON.stringify(manifest) })],
+      [
+        "content://backup/orbit-auto-2026-08-24T00-00-00-000Z.json",
+        JSON.stringify({
+          encrypted: true,
+          passphrase: "old",
+          plaintext: JSON.stringify(manifest),
+        }),
+      ],
     ]);
     const passphrases = {
       active: "old",
-      pending: null as null | { oldPassphrase: string; nextPassphrase: string; replacements: Array<{ sourceUri: string; replacementUri: string }> },
+      pending: null as null | {
+        oldPassphrase: string;
+        nextPassphrase: string;
+        replacements: ReadonlyArray<{
+          sourceUri: string;
+          replacementUri: string;
+        }>;
+      },
     };
     const crypto = {
-      decrypt: ({ passphrase, envelope }: { passphrase: string; envelope: unknown }) => {
+      decrypt: ({
+        passphrase,
+        envelope,
+      }: {
+        passphrase: string;
+        envelope: unknown;
+      }) => {
         const input = envelope as { passphrase: string; plaintext: string };
-        if (passphrase !== input.passphrase) throw new Error("wrong passphrase");
+        if (passphrase !== input.passphrase)
+          throw new Error("wrong passphrase");
         return new TextEncoder().encode(input.plaintext);
       },
-      encrypt: ({ passphrase, plaintext }: { passphrase: string; plaintext: Uint8Array }) => ({
+      encrypt: ({
+        passphrase,
+        plaintext,
+      }: {
+        passphrase: string;
+        plaintext: Uint8Array;
+      }) => ({
         encrypted: true,
         passphrase,
         plaintext: new TextDecoder().decode(plaintext),
@@ -237,12 +268,27 @@ describe("backup encryption safety", () => {
       crypto: crypto as never,
       profile: { formatVersion: 1 } as never,
       passphrases: {
-        getPassphrase: async () => ({ status: "present" as const, passphrase: passphrases.active }),
-        setPassphrase: async (value) => { events.push("activate-new"); passphrases.active = value; },
+        getPassphrase: async () => ({
+          status: "present" as const,
+          passphrase: passphrases.active,
+        }),
+        setPassphrase: async (value) => {
+          events.push("activate-new");
+          passphrases.active = value;
+        },
         deletePassphrase: async () => {},
-        getPendingPassphraseChange: async () => passphrases.pending === null ? { status: "absent" as const } : { status: "present" as const, change: passphrases.pending },
-        setPendingPassphraseChange: async (change) => { events.push("journal"); passphrases.pending = change; },
-        clearPendingPassphraseChange: async () => { events.push("clear-journal"); passphrases.pending = null; },
+        getPendingPassphraseChange: async () =>
+          passphrases.pending === null
+            ? { status: "absent" as const }
+            : { status: "present" as const, change: passphrases.pending },
+        setPendingPassphraseChange: async (change) => {
+          events.push("journal");
+          passphrases.pending = change;
+        },
+        clearPendingPassphraseChange: async () => {
+          events.push("clear-journal");
+          passphrases.pending = null;
+        },
       },
       storage: {
         list: async () => [...entries.keys()],
@@ -253,13 +299,27 @@ describe("backup encryption safety", () => {
           entries.set(uri, contents);
           return uri;
         },
-        remove: async (uri) => { events.push("remove-old"); entries.delete(uri); },
+        remove: async (uri) => {
+          events.push("remove-old");
+          entries.delete(uri);
+        },
       },
     });
 
-    await expect(service.change({ currentPassphrase: "old", nextPassphrase: "new" })).resolves.toEqual({ status: "changed", reencryptedCount: 1 });
-    expect(events).toEqual(["journal", "write-verified", "journal", "remove-old", "activate-new", "clear-journal"]);
-    expect([...entries.values()]).toEqual([expect.stringContaining('"passphrase":"new"')]);
+    await expect(
+      service.change({ currentPassphrase: "old", nextPassphrase: "new" }),
+    ).resolves.toEqual({ status: "changed", reencryptedCount: 1 });
+    expect(events).toEqual([
+      "journal",
+      "write-verified",
+      "journal",
+      "remove-old",
+      "activate-new",
+      "clear-journal",
+    ]);
+    expect([...entries.values()]).toEqual([
+      expect.stringContaining('"passphrase":"new"'),
+    ]);
   });
 
   it("keeps the old secret and pending recovery journal when a source cannot be replaced", async () => {
@@ -271,22 +331,40 @@ describe("backup encryption safety", () => {
       crypto: {} as never,
       profile: {} as never,
       passphrases: {
-        getPassphrase: async () => ({ status: "present" as const, passphrase: active }),
-        setPassphrase: async (value) => { active = value; },
+        getPassphrase: async () => ({
+          status: "present" as const,
+          passphrase: active,
+        }),
+        setPassphrase: async (value) => {
+          active = value;
+        },
         deletePassphrase: async () => {},
-        getPendingPassphraseChange: async () => pending === null ? { status: "absent" as const } : { status: "present" as const, change: pending as never },
-        setPendingPassphraseChange: async (change) => { pending = change; },
-        clearPendingPassphraseChange: async () => { pending = null; },
+        getPendingPassphraseChange: async () =>
+          pending === null
+            ? { status: "absent" as const }
+            : { status: "present" as const, change: pending as never },
+        setPendingPassphraseChange: async (change) => {
+          pending = change;
+        },
+        clearPendingPassphraseChange: async () => {
+          pending = null;
+        },
       },
       storage: {
-        list: async () => ["content://backup/orbit-auto-2026-08-24T00-00-00-000Z.json"],
-        read: async () => { throw new Error("SAF permission revoked"); },
+        list: async () => [
+          "content://backup/orbit-auto-2026-08-24T00-00-00-000Z.json",
+        ],
+        read: async () => {
+          throw new Error("SAF permission revoked");
+        },
         writeVerified: async () => "content://backup/new.json",
         remove: async () => {},
       },
     });
 
-    await expect(service.change({ currentPassphrase: "old", nextPassphrase: "new" })).resolves.toEqual({ status: "needs-recovery" });
+    await expect(
+      service.change({ currentPassphrase: "old", nextPassphrase: "new" }),
+    ).resolves.toEqual({ status: "needs-recovery" });
     expect(active).toBe("old");
     expect(pending).not.toBeNull();
   });
@@ -317,31 +395,67 @@ describe("backup encryption safety", () => {
       directoryUri: "content://backup",
       retentionDays: 7,
       storage: { writeVerified, list: async () => [], remove: async () => {} },
-      encryption: { enabled: true, passphrase: { status: "unavailable", reason: "secure-store-read-failed" }, encrypt: () => "never" },
+      encryption: {
+        enabled: true,
+        passphrase: {
+          status: "unavailable",
+          reason: "secure-store-read-failed",
+        },
+        encrypt: () => "never",
+      },
     });
 
-    await expect(service.writeVerifiedSnapshot()).resolves.toEqual({ status: "blocked", reason: "passphrase-unavailable" });
+    await expect(service.writeVerifiedSnapshot()).resolves.toEqual({
+      status: "blocked",
+      reason: "passphrase-unavailable",
+    });
     expect(writeVerified).not.toHaveBeenCalled();
     expect(mocks.buildExportManifest).not.toHaveBeenCalled();
   });
 
   it("keeps the flag independent from the three passphrase read states", () => {
-    expect(resolveWriteEncryptionMode(false, { status: "unavailable", reason: "secure-store-read-failed" })).toEqual({ mode: "plaintext" });
-    expect(resolveWriteEncryptionMode(true, { status: "absent" })).toEqual({ mode: "blocked", reason: "passphrase-absent" });
-    expect(resolveWriteEncryptionMode(true, { status: "present", passphrase: "secret" })).toEqual({ mode: "encrypted", passphrase: "secret" });
+    expect(
+      resolveWriteEncryptionMode(false, {
+        status: "unavailable",
+        reason: "secure-store-read-failed",
+      }),
+    ).toEqual({ mode: "plaintext" });
+    expect(resolveWriteEncryptionMode(true, { status: "absent" })).toEqual({
+      mode: "blocked",
+      reason: "passphrase-absent",
+    });
+    expect(
+      resolveWriteEncryptionMode(true, {
+        status: "present",
+        passphrase: "secret",
+      }),
+    ).toEqual({ mode: "encrypted", passphrase: "secret" });
   });
 
   it("compensates a failed enable and never clears an enabled flag before SecureStore deletion", async () => {
     const calls: string[] = [];
-    const lifecycle = createBackupEncryptionLifecycle({
-      getPassphrase: async () => ({ status: "absent" }),
-      setPassphrase: async () => { calls.push("set-secret"); },
-      deletePassphrase: async () => { calls.push("delete-secret"); },
-    }, {
-      getEncryptionEnabled: async () => false,
-      setEncryptionEnabled: async () => { calls.push("set-flag"); throw new Error("sqlite unavailable"); },
+    const lifecycle = createBackupEncryptionLifecycle(
+      {
+        getPassphrase: async () => ({ status: "absent" }),
+        setPassphrase: async () => {
+          calls.push("set-secret");
+        },
+        deletePassphrase: async () => {
+          calls.push("delete-secret");
+        },
+      },
+      {
+        getEncryptionEnabled: async () => false,
+        setEncryptionEnabled: async () => {
+          calls.push("set-flag");
+          throw new Error("sqlite unavailable");
+        },
+      },
+    );
+    await expect(lifecycle.enable("secret")).resolves.toEqual({
+      status: "failed",
+      reason: "flag-update-failed",
     });
-    await expect(lifecycle.enable("secret")).resolves.toEqual({ status: "failed", reason: "flag-update-failed" });
     expect(calls).toEqual(["set-secret", "set-flag", "delete-secret"]);
   });
 
@@ -350,10 +464,14 @@ describe("backup encryption safety", () => {
     let release!: () => void;
     const first = withBackupServiceLock(async () => {
       order.push("first-start");
-      await new Promise<void>((resolve) => { release = resolve; });
+      await new Promise<void>((resolve) => {
+        release = resolve;
+      });
       order.push("first-end");
     });
-    const second = withBackupServiceLock(async () => { order.push("second"); });
+    const second = withBackupServiceLock(async () => {
+      order.push("second");
+    });
     await Promise.resolve();
     expect(order).toEqual(["first-start"]);
     release();

@@ -508,6 +508,24 @@ export function HomeScreen() {
         </Pressable>
         <View style={styles.topBarRight}>
           <Pressable
+            testID="dashboard-backup-entry"
+            accessibilityRole="button"
+            accessibilityLabel="Backup and Restore"
+            onPress={() => navigation.navigate("Backup")}
+            style={styles.backupEntry}
+          >
+            {({ pressed }) => (
+              <Text
+                style={[
+                  styles.backupText,
+                  { color: pressed ? colors.accent : colors.textSecondary },
+                ]}
+              >
+                Backup
+              </Text>
+            )}
+          </Pressable>
+          <Pressable
             testID="dashboard-orbit-entry"
             accessibilityRole="button"
             accessibilityLabel="Orbit view"
@@ -631,6 +649,15 @@ const styles = StyleSheet.create({
     minWidth: 44,
     justifyContent: "center",
     alignItems: "center",
+  },
+  backupEntry: {
+    minHeight: 44,
+    justifyContent: "center",
+    paddingHorizontal: 8,
+  },
+  backupText: {
+    fontSize: 14,
+    fontWeight: "600",
   },
   settingsGlyph: {
     fontSize: 22,
