@@ -12,7 +12,8 @@ interaction log with gravity/intensity/rogue, and Conversational Fuel). Phases 8
 daily surfaces and the friction loop (dashboard + never-contacted screen, the compose screen,
 share-sheet capture, actionable notifications, the widget, and the orrery). Phases 14–17 add AI
 suggestions, the weekly digest, custom-field value normalization, and the load-bearing
-backup/export/restore. Phases map one-to-one
+backup/export/restore. Phases 18–21 normalize the contact model, acquire selected system contacts,
+reconcile them safely, and reduce the friction of reaching out. Phases map one-to-one
 onto the dossier domains; a `[DECIDED]`/`[REJECTED]` decision is implemented, never reopened.
 
 ## Phases
@@ -34,6 +35,10 @@ onto the dossier domains; a `[DECIDED]`/`[REJECTED]` decision is implemented, ne
 - [ ] **Phase 15: Weekly Digest** — one WEEKLY Sunday notification → a live "your week" screen.
 - [ ] **Phase 16: Custom Field Value Normalization** — replace dynamic custom-value columns with a sync-safe normalized row model, preserving every existing behavior and value.
 - [ ] **Phase 17: Backup, Export & Restore** — manual + auto SAF backup, optional encryption, tombstone-aware Merge/Replace restore (reusable reconciliation core), forward-migrate.
+- [ ] **Phase 18: Contact Data Normalization** — normalized phone/email methods and the Bound/Unbound lifecycle, with system-contact linkage foundations.
+- [ ] **Phase 19: System Contact Import** — deliberate single/bulk system-contact acquisition, conservative duplicate evidence, initial linking, and resumable import review.
+- [ ] **Phase 20: Contact Reconciliation & Merge** — user-triggered one-way source reconciliation, durable review, and explicit atomic Orbit-to-Orbit merge.
+- [ ] **Phase 21: Interaction Assist & Reach Out** — shared Call/Text/Email routing, durable post-handoff assist confirmation, and widget Contact integration.
 
 ## Cross-phase constraints (from INDEX.md's constraint log — these cross phase boundaries)
 
@@ -638,9 +643,93 @@ Plans:
 
 - [ ] 17-11-PLAN.md — automated gates and owner-led Android release UAT
 
+### Phase 18: Contact Data Normalization
+
+**Goal:** Normalize phone/email into first-class, sync-ready contact methods and establish the Bound/Unbound lifecycle without losing existing relationship data or making system contacts authoritative.
+**Mode:** mvp
+**Depends on:** Phase 17
+**Requirements:** CDN-01, CDN-02, CDN-03, CDN-04
+
+#### Canonical refs
+
+`docs/dossier/18-contact-data-normalization.md` — **authoritative product-decision source; researcher and planner MUST read it in full before research or planning.**
+
+**Conflict preserved:** Dossier 18's scope/deferred text labels Interaction Assist as Phase 20, while the requested sequence and Dossier 21 place it in Phase 21. This roadmap makes no product reinterpretation; Phase 18 must not absorb Interaction Assist work.
+
+**Success Criteria** (what must be TRUE):
+
+  1. Phone and email are migrated from the old singular columns into ordered, first-class methods with stable identity, per-type primaries, canonical matching, extensions, and no duplicate authoritative storage; malformed methods remain storable but are not actionable.
+  2. Bound/Unbound is independent of cadence and preserves relationship history: existing contacts migrate Bound, `interval_days = NULL` means only never-assigned, and assigned cadence can never be cleared.
+  3. Bound-only proactive surfaces and the dedicated Unbound population honor the locked dashboard, Orrery, favourites, Never Contacted, notification, widget, and AI behavior; explicit person-level work and factual birthday behavior remain available as decided.
+  4. External system-contact links/provenance are structurally supported without changing Orbit identity or permitting source disappearance/refresh to delete or silently overwrite Orbit data; lossless backup includes the normalized model.
+
+**Plans:** 0 plans
+
+### Phase 19: System Contact Import
+
+**Goal:** Let users deliberately select system contacts and safely import or initially link them through conservative, resumable single/bulk review on Phase 18's normalized model.
+**Mode:** mvp
+**Depends on:** Phase 18
+**Requirements:** IMP-01, IMP-02, IMP-03, IMP-04
+
+#### Canonical refs
+
+`docs/dossier/19-system-contact-import.md` — **authoritative product-decision source; researcher and planner MUST read it in full before research or planning.**
+
+**Sequencing:** Phase 19 and Phase 20 are a tightly coupled two-phase sprint; Phase 19 must not expand into ongoing reconciliation or generic Orbit-to-Orbit merge.
+**Conflict to resolve before planning:** Dossier 19's `[DECIDED]` iOS native-picker statement conflicts with the existing v1 iOS deferral in PROJECT.md/REQUIREMENTS.md. This roadmap intentionally makes no scope choice.
+**Success Criteria** (what must be TRUE):
+
+  1. Intentional import is reachable from the Add flow and Settings through the privacy-preserving system picker path, with Android targeting the modern Android 17+ Contact Picker and no broad legacy contact permission; unsupported older Android versions leave Orbit otherwise usable.
+  2. A single pick always receives detailed review before create/link; bulk selection uses shared defaults of Unbound + Uncategorized, imports only name/phones/emails/birthday/photo, and processes large batches incrementally without an arbitrary app-level cap.
+  3. Exact external linkage is deterministic while all other duplicate evidence is conservative and advisory: ambiguous candidates never silently merge/link or block safe batch imports, and Phase 19 performs no generic Orbit-to-Orbit merge.
+  4. Accepted picker results become durable resumable import sessions; cancellation before ownership writes nothing, safe partial commits remain committed, independent photo failures do not invalidate contacts, and completion reports bridge to Unbound contacts.
+
+**Plans:** 0 plans
+
+### Phase 20: Contact Reconciliation & Merge
+
+**Goal:** Safely maintain selected system-contact links through user-triggered, one-way reconciliation and let users explicitly, atomically consolidate duplicate Orbit identities.
+**Mode:** mvp
+**Depends on:** Phase 18, Phase 19
+**Requirements:** RCN-01, RCN-02, RCN-03, RCN-04
+
+#### Canonical refs
+
+`docs/dossier/20-contact-reconciliation-merge.md` — **authoritative product-decision source; researcher and planner MUST read it in full before research or planning.**
+
+**Success Criteria** (what must be TRUE):
+
+  1. Per-contact update and Check linked contacts perform only user-triggered, System-Contacts-to-Orbit reconciliation across name, normalized methods, birthday, and photo; additive values can be recommended, while conflicts/removals/missing sources never silently overwrite or delete Orbit data.
+  2. Reconciliation reuses the shared card-grid workspace, combines multiple source links into one person card, remembers unchanged reviewed discrepancies narrowly, and preserves unresolved work in durable resumable sessions with an explicit result summary.
+  3. Users can invoke a serious explicit merge from duplicate/reconciliation detail or a profile: choose the survivor, resolve scalar conflicts, automatically consolidate compatible methods/children, recompute derived relationship values, and confirm one atomic no-simple-undo transaction.
+  4. Absorbed identities are retired/tombstoned rather than archived so future sync cannot resurrect them; Phase 20 does not add polling, source write-back, generic multi-device sync, or generic conflict machinery.
+
+**Plans:** 0 plans
+
+### Phase 21: Interaction Assist & Reach Out
+
+**Goal:** Provide a shared low-friction Call/Text/Email Reach Out path and optional durable Interaction Assist that asks users to confirm/log the outcome after native handoff.
+**Mode:** mvp
+**Depends on:** Phase 18, Phase 20
+**Requirements:** IAS-01, IAS-02, IAS-03, IAS-04
+
+#### Canonical refs
+
+`docs/dossier/21-interaction-assist-reach-out.md` — **authoritative product-decision source; researcher and planner MUST read it in full before research or planning.**
+
+**Success Criteria** (what must be TRUE):
+
+  1. Profile and larger-widget Contact routes open one shared Reach Out router for actionable Call/Text/Email methods, emphasize primaries, use no more than three taps when endpoint choice is needed, and retain coarse—not endpoint/provider—interaction history.
+  2. With Interaction Assist enabled, Orbit writes a pending assist immediately before native handoff; failed handoffs become failed, and an app-global non-modal return banner manages a durable queue capped at five unresolved assists and 24 hours.
+  3. Confirmations create outbound interactions at the original handoff time through the existing authoritative interaction/recency writer (including Call No answer); notes are optional, and archived/Unbound/merged/purged target handling follows the locked lifecycle rules without resurrection.
+  4. Interaction Assist remains wholly local and user-initiated: no passive call/text/email observation, delivery/read verification, background monitoring, or widget-side assist writer; the larger widget's Message action is superseded by Contact while all other widget architecture stays unchanged.
+
+**Plans:** 0 plans
+
 ## Progress
 
-**Execution Order:** Phases execute sequentially in numeric order: 1 → 2 → 3 → … → 17.
+**Execution Order:** Phases execute sequentially in numeric order: 1 → 2 → 3 → … → 21.
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
@@ -661,3 +750,7 @@ Plans:
 | 15. Weekly Digest | 0/TBD | Not started | - |
 | 16. Custom Field Value Normalization | 0/TBD | Not started | - |
 | 17. Backup, Export & Restore | 11/12 | In Progress|  |
+| 18. Contact Data Normalization | 0 | Not started | - |
+| 19. System Contact Import | 0 | Not started | - |
+| 20. Contact Reconciliation & Merge | 0 | Not started | - |
+| 21. Interaction Assist & Reach Out | 0 | Not started | - |

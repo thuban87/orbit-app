@@ -108,8 +108,8 @@ lives in `.planning/REQUIREMENTS.md`; this is the thematic summary.
 
 ## Context
 
-- **The dossier is the authoritative research.** `docs/dossier/` holds 15 completed domain files
-  (`01-data` … `15-backup`) plus `INDEX.md`, whose "Cross-domain constraint log" records every
+- **The dossier is the authoritative research.** `docs/dossier/` holds 21 completed domain files
+  (`01-data` … `21-interaction-assist-reach-out`) plus `INDEX.md`, whose "Cross-domain constraint log" records every
   `[source → target]` decision that binds a later phase. Each decision is tagged `[DECIDED]` /
   `[OPEN]` / `[REJECTED]`. Supporting evidence is in `docs/dossier/workpapers/`. This roadmap is
   **derived from** those decisions, not re-derived — a `[DECIDED]`/`[REJECTED]` item is not to be

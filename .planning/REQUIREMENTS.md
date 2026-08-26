@@ -146,6 +146,34 @@ roadmap phases. Items marked *(infra)* are foundation guarantees rather than end
 - [x] **BKP-03**: A user can optionally encrypt exports with a passphrase (AES-256-GCM; auto-backups reuse a SecureStore-cached passphrase); setup warns plainly that it is unrecoverable, disable clears the cached passphrase, a normal change defaults to verified re-encryption of accessible automatic backups with a future-only alternative, and forgotten-password recovery can only establish a new passphrase for future files.
 - [x] **BKP-04**: Restore previews first and offers Merge by default or confirmed Replace-all. Merge reconciles rows by `uid` and newest `modified_at`, resolves parent references by uid, recomputes `last_contact`, and honors generic tombstones (same-second ties favor deletion); Replace-all makes a verified pre-restore backup when configured, recreates the normalized field model, writes fresh photo files, re-registers schedules, migrates older backups forward, and rejects newer ones.
 
+### Contact Data Normalization (CDN)
+
+- [ ] **CDN-01**: Phone and email move from singular contact columns to ordered, first-class methods with stable identity, one primary per type, canonical equality, extensions, and no duplicate authoritative storage; incomplete methods remain storable but unavailable for unsupported actions. *(infra)*
+- [ ] **CDN-02**: Contacts support an independent Bound/Unbound lifecycle: existing contacts migrate Bound; Unbinding retains all relationship data; `interval_days = NULL` only means never assigned; a Bound contact always has positive cadence; once assigned, cadence is never cleared.
+- [ ] **CDN-03**: Bound-only cadence surfaces exclude Unbound contacts as decided while dedicated Unbound browsing, optional Never Contacted inclusion, birthday behavior, and explicit person-level AI preserve their locked behavior; Orbit identity remains independent of system-contact identity. *(infra)*
+- [ ] **CDN-04**: Lossless backup/export preserves normalized methods, Bound/Unbound state, cadence, external links, and provenance; source disappearance and source refresh never silently delete or overwrite Orbit-owned data. *(infra)*
+
+### System Contact Import (IMP)
+
+- [ ] **IMP-01**: A user can intentionally begin import from the Add flow or Settings through the privacy-preserving platform picker path; Android targets the modern Android 17+ Contact Picker without broad legacy contacts permission, while unsupported older Android versions leave Orbit usable. *(iOS picker scope remains a recorded v1 conflict; see ROADMAP Phase 19.)*
+- [ ] **IMP-02**: A single selected system contact receives review before create/link; bulk import uses shared defaults of Unbound + Uncategorized, imports only name/phones/emails/birthday/photo, and processes large selections incrementally without an arbitrary app-level cap.
+- [ ] **IMP-03**: Exact external linkage is deterministic; every other duplicate signal is conservative and advisory, so ambiguous candidates never silently merge/link or block safe batch imports, and generic Orbit-to-Orbit merge remains out of Phase 19.
+- [ ] **IMP-04**: Picker-owned import review is durable and resumable; cancellation before Orbit owns selection writes nothing, safe partial commits remain committed, photo failures do not invalidate contacts, and completion reports include a bridge to Unbound contacts.
+
+### Contact Reconciliation & Merge (RCN)
+
+- [ ] **RCN-01**: User-triggered per-contact and refresh-all reconciliation compares only name, phones, emails, birthday, and photo from System Contacts into Orbit; additions may be recommended, while conflicts, removals, and missing sources never silently overwrite or delete Orbit data.
+- [ ] **RCN-02**: Reconciliation reuses a durable card-grid review workspace, combines multiple source links into one Orbit-person card, narrowly remembers unchanged reviewed discrepancies, and reports resolved/unresolved results without background monitoring or source write-back.
+- [ ] **RCN-03**: A user can explicitly merge existing Orbit contacts by choosing a survivor, reviewing scalar conflicts, automatically consolidating compatible methods and child data, recomputing derived values, and confirming an atomic no-simple-undo operation.
+- [ ] **RCN-04**: An absorbed contact is retired/tombstoned rather than archived, preserving future-sync compatibility without implementing generic multi-device sync or conflict machinery. *(infra)*
+
+### Interaction Assist & Reach Out (IAS)
+
+- [ ] **IAS-01**: A shared Reach Out router lets a profile or larger-widget Contact action start Call, Text, or Email through actionable stored methods, emphasizing primaries and requiring at most three taps when endpoint selection is needed.
+- [ ] **IAS-02**: With the default-on global Interaction Assist setting, Orbit writes a durable pending assist immediately before native handoff; failures become failed, and eligible return prompts use an app-global non-modal banner with a five-item / 24-hour unresolved queue.
+- [ ] **IAS-03**: Confirmed assists create outbound coarse interactions at the original handoff time through the authoritative interaction/recency writer; Call No answer logs `connected=false`, notes are optional, and lifecycle handling never resurrects merged or purged contacts.
+- [ ] **IAS-04**: Interaction Assist is wholly local and user initiated: no passive monitoring, delivery/read verification, endpoint-level history, or widget-side assist writer; the larger widget's Message action becomes Contact while all other widget behavior remains unchanged.
+
 ## v2 / Deferred Requirements
 
 Tracked, not in the current roadmap. Reasons recorded in the dossier.
@@ -198,13 +226,17 @@ Tracked, not in the current roadmap. Reasons recorded in the dossier.
 | DGST-01…03 | Phase 15 | Pending |
 | CFN-01…04 | Phase 16 | Pending |
 | BKP-01…04 | Phase 17 | Pending |
+| CDN-01…04 | Phase 18 | Pending |
+| IMP-01…04 | Phase 19 | Pending |
+| RCN-01…04 | Phase 20 | Pending |
+| IAS-01…04 | Phase 21 | Pending |
 
 **Coverage:**
 
-- v1 requirements: 86 total
-- Mapped to phases: 86
+- v1 requirements: 102 total
+- Mapped to phases: 102
 - Unmapped: 0 ✓
 
 ---
 *Requirements defined: 2026-08-14*
-*Last updated: 2026-08-14 after initialization*
+*Last updated: 2026-08-26 after Phase 18–21 roadmap extension*

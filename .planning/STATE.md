@@ -5,10 +5,10 @@ current_phase: 17
 current_phase_name: Backup, Export & Restore
 status: executing
 stopped_at: Phase 17 UAT — final release checks passed; three device-environment observations remain
-last_updated: "2026-08-26T12:51:23-05:00"
+last_updated: "2026-08-26T12:57:09-05:00"
 state_head: 0f31f1d
 progress:
-  total_phases: 17
+  total_phases: 21
   completed_phases: 14
   total_plans: 128
   completed_plans: 125
@@ -184,15 +184,19 @@ Progress: [████████░░] 75% (12/16 phases complete; Phase 13 
 
 ## Accumulated Context
 
+### Roadmap Evolution
+
+- Phases 18–21 added after Phase 17: Contact Data Normalization → System Contact Import → Contact Reconciliation & Merge → Interaction Assist & Reach Out. Their externally completed product discussion is captured in the corresponding phase CONTEXT.md files and canonical dossiers.
+
 ### Decisions
 
 Decisions are logged in PROJECT.md Key Decisions table, and authoritatively in docs/dossier/ + HANDOFF.md.
 Foundational decisions affecting current work:
 
-- The dossier (docs/dossier/, 15 domains + INDEX cross-domain constraint log) and HANDOFF.md are the
+- The dossier (docs/dossier/, 21 domains + INDEX cross-domain constraint log) and HANDOFF.md are the
   authoritative decision record; `[DECIDED]`/`[REJECTED]` items are implemented, not reopened.
 
-- Config: fine granularity (16 phases, one per domain), Vertical MVP, sequential execution (YOLO,
+- Config: fine granularity (21 phases, one per domain), Vertical MVP, sequential execution (YOLO,
   quality models, research/plan-check/verifier/nyquist/source-grounding on, worktrees off).
 
 - [Phase 1]: 01-01: app.config.ts dedupes the expo-sqlite plugin (expo install pre-populated app.json's plugins array) to avoid a duplicate-plugin prebuild error
