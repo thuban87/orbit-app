@@ -666,15 +666,32 @@ Plans:
 **Plans:** 10 plans
 
 Plans:
+**Wave 1**
+
 - [ ] 18-01-PLAN.md — ratify and prove v9 normalized migration foundation
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
 - [ ] 18-02-PLAN.md — transactional method and lifecycle writes
 - [ ] 18-03-PLAN.md — Bound-aware query owners and policy reads
-- [ ] 18-04-PLAN.md — create/edit method and lifecycle forms
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
 - [ ] 18-05-PLAN.md — Unbound browsing, navigation, and settings
-- [ ] 18-06-PLAN.md — profile lifecycle and safe Compose method handoff
 - [ ] 18-07-PLAN.md — normalized backup/export/restore graph
+
+**Wave 4** *(blocked on Wave 3 completion)*
+
+- [ ] 18-04-PLAN.md — create/edit method and lifecycle forms
 - [ ] 18-09-PLAN.md — notification/widget lifecycle policy and Unbind effects
 - [ ] 18-10-PLAN.md — streamlined human export alongside lossless backup
+
+**Wave 5** *(blocked on Wave 4 completion)*
+
+- [ ] 18-06-PLAN.md — profile lifecycle and safe Compose method handoff
+
+**Wave 6** *(blocked on Wave 5 completion)*
+
 - [ ] 18-08-PLAN.md — complete verification and Android UAT
 
 ### Phase 19: System Contact Import
