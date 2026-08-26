@@ -35,14 +35,13 @@ No UI registry, raw colour, custom font, or web component library. Every control
 |-------|-------|-------|
 | xs | 4px | Inline label/badge gap |
 | sm | 8px | Field-label, compact-row, and chip gaps |
-| ~ | 10px | Method-card inner stack gap (established card value) |
-| md | 12px | Row/card padding, header gap, field-group gap |
-| lg | 16px | Screen padding and ordinary section separation |
-| xl | 24px | Major section/empty-state break |
-| 2xl | 32px | Do not introduce; retain only on an existing surface |
-| 3xl | 64px | Do not introduce |
+| md | 16px | Row/card padding, header gap, field-group gap, and screen padding |
+| lg | 24px | Major section and empty-state break |
+| xl | 32px | Large section break |
+| 2xl | 48px | Prominent empty-state separation |
+| 3xl | 64px | Maximum planned section separation |
 
-Exceptions: 44px minimum height/width for icon-only controls; existing 8px input/back, 10px row/card, and 12px modal-sheet radii are geometric precedent, not new spacing.
+Use only this scale for layout spacing. The 44px minimum height/width for icon-only controls is an accessibility exception; existing input/back and modal-sheet corner radii are geometric treatment, not spacing tokens.
 
 ---
 
@@ -53,9 +52,9 @@ Exceptions: 44px minimum height/width for icon-only controls; existing 8px input
 | Helper / section label | 13px | 600 | 18px |
 | Body / input / method value | 15px | 400 | 21px when multiline |
 | Row label / primary action | 16px | 600 | default |
-| Screen title | 24px | 700 | default |
+| Screen title | 24px | 600 | default |
 
-Use the app-established 400/600/700 weights only. Helper/error copy wraps; do not reduce below 13px. Method values and names tail-ellipsis only when a row action requires room, with a complete accessibility label.
+Use only 400 (regular) and 600 (semibold). Helper/error copy wraps; do not reduce below 13px. Method values and names tail-ellipsis only when a row action requires room, with a complete accessibility label.
 
 ---
 
@@ -80,6 +79,7 @@ Accent is reserved for **Save contact**, **Bind contact**, selected primary-meth
 
 Keep existing scroll-form chrome: Back + **New contact**, 16px padding, Name and Category first. Add **Orbit participation** before cadence and contact methods.
 
+- **Primary create/edit focal point and scan order:** after the standard title/name/category context, lead the eye through **Orbit participation** (Bound/Unbound) → the required cadence and visible phone/email method content that choice determines → the filled **Save contact** CTA. Save contact is the sole strong action; all other controls remain secondary or quiet.
 - Render 44px segmented/chip options **Bound** and **Unbound**; Bound is selected by default. Helpers: **“Bound contacts appear in your active orbit and receive cadence reminders.”** and **“Unbound contacts keep their details and history without active cadence reminders.”** Use selected accessibility state; never show `tracking_enabled`.
 - Bound shows the existing FrequencyPicker and cannot save without a positive cadence. Unbound hides Frequency when it has never been assigned; it may save with no cadence and zero methods.
 - Replace the singular Phone input with **Phone numbers**. Create begins with one empty phone row only where the old form showed Phone; discard that blank row on Save. A no-method contact is valid.
@@ -105,7 +105,7 @@ Add **Contact methods** below **Add details** and above message actions. Show on
 - Bound profiles retain current status, intensity, favourite star, snooze/cadence controls, and message/log hierarchy. Add secondary outlined 44px **Unbind contact** in the lifecycle area below active-management controls, never beside Archive.
 - Unbound profiles lead with a quiet `surface` lifecycle panel: heading **“Unbound”**, body **“This contact isn’t in your active orbit. Their details and history are still here.”**, and filled **Bind contact** CTA. A dormant positive cadence binds immediately. If cadence was never assigned, reveal FrequencyPicker below the panel and disable Bind until a positive cadence is selected.
 - While Unbound hide favourite star, status/rogue label, intensity, Snooze reminders, and every cadence-derived status treatment. Keep profile/history, gravity, custom fields, birthday, fuel, Archive, and explicit AI draft. Never claim a paused/reset elapsed status.
-- Unbind confirmation is native Alert: **“Unbind {name}?”** / **“This removes them from your active orbit, reminders, favourites, and widgets. Their history, details, and saved cadence stay.”** Actions **Cancel** and destructive-styled **Unbind contact**. On success refresh Profile. `favourite_rank` stays dormant and is restored by Bind.
+- Unbind confirmation is native Alert: **“Unbind {name}?”** / **“This removes them from your active orbit, reminders, favourites, and widgets. Their history, details, and saved cadence stay.”** Actions **Keep contact bound** and destructive-styled **Unbind contact**. On success refresh Profile. `favourite_rank` stays dormant and is restored by Bind.
 
 ### Dedicated Unbound population and search
 
@@ -144,7 +144,7 @@ Switches reuse `trackColor={{ false: border, true: accent }}` and `thumbColor: s
 | Unbound-list empty | **No unbound contacts** — **Contacts you unbind stay here, with their details and history ready when you want to bind them again.** |
 | Error | **Couldn’t load contacts. Please go back and retry.** / **Couldn’t save contact. Please try again.** |
 | Unbind confirm | **Unbind {name}?** — **This removes them from your active orbit, reminders, favourites, and widgets. Their history, details, and saved cadence stay.** |
-| Destructive confirmation | Unbind uses native **Cancel** / destructive **Unbind contact**. Method removal is reversible local draft editing until Save and needs no separate confirmation. |
+| Destructive confirmation | Unbind uses native **Keep contact bound** / destructive **Unbind contact**. Method removal is reversible local draft editing until Save and needs no separate confirmation. |
 
 Tone is plain, kind, and specific: Unbound is valid, not an error or incomplete setup. Never expose canonical/E.164 data, opaque external IDs, parser internals, or schema terminology.
 
