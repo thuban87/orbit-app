@@ -79,7 +79,6 @@ export function RestorePreviewScreen({
   );
   const [applying, setApplying] = useState(false);
   const [confirming, setConfirming] = useState(false);
-  const [destinationConfigured, setDestinationConfigured] = useState(false);
   const [applyError, setApplyError] = useState<string | null>(null);
   const executeRef = useRef<() => Promise<void>>(async () => {});
   const runSingleApply = useRef(createRestoreApplySingleFlight(() => executeRef.current())).current;
@@ -87,16 +86,6 @@ export function RestorePreviewScreen({
   useEffect(() => {
     setExpired(restorePreviewCache.read(route.params.token) === null);
   }, [route.params.token]);
-
-  useEffect(() => {
-    let cancelled = false;
-    void getAppSettings(getExecutor())
-      .then((settings) => {
-        if (!cancelled) setDestinationConfigured(Boolean(settings.backupFolderUri));
-      })
-      .catch((error) => Logger.error(LOG_SCOPE, "failed to check pre-restore destination", error));
-    return () => { cancelled = true; };
-  }, []);
 
   useEffect(() => navigation.addListener("beforeRemove", (event) => {
     if (applying) event.preventDefault();
@@ -142,12 +131,21 @@ export function RestorePreviewScreen({
     if (applying || confirming) return;
     if (mode === "replace-all") {
       setConfirming(true);
-      const accepted = await confirmReplace(destinationConfigured);
+      let configuredNow: boolean;
+      try {
+        configuredNow = Boolean((await getAppSettings(getExecutor())).backupFolderUri);
+      } catch (error) {
+        Logger.error(LOG_SCOPE, "failed to confirm pre-restore destination", error);
+        setConfirming(false);
+        setApplyError(restoreApplyRecovery("unexpected").message);
+        return;
+      }
+      const accepted = await confirmReplace(configuredNow);
       setConfirming(false);
       if (!accepted) return;
     }
     await runSingleApply();
-  }, [applying, confirming, destinationConfigured, mode, runSingleApply]);
+  }, [applying, confirming, mode, runSingleApply]);
 
   if (expired) {
     return (
