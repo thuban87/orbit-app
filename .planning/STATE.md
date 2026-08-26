@@ -6,7 +6,7 @@ current_phase_name: Backup, Export & Restore
 status: executing
 stopped_at: Resumed Plan 17-05 Task 2; preserving and completing the interrupted manual-export implementation
 last_updated: "2026-08-25T23:15:00.000Z"
-state_head: 24f9144
+state_head: 24f9144a35efabdb4d969bb28a6d63c56c3726e5
 progress:
   total_phases: 17
   completed_phases: 14
