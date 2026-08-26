@@ -5,12 +5,14 @@ import { BackupEnvelopeError, type BackupEnvelopeCrypto } from "@/services/backu
 import { automaticBackupFilename, isExpiredAutomaticBackup, isOwnedAutomaticBackup } from "@/backup/auto-backup-policy";
 import type { SqlExecutor } from "@/db/types";
 import type { SafReadableStorage, SafStorage } from "@/services/backup/saf-storage";
+import { SafWriteError } from "@/services/backup/saf-write-error";
 import type {
   BackupPassphraseChangeStore,
   BackupPassphraseStore,
   PassphraseReadResult,
   PendingBackupPassphraseChange,
 } from "@/services/backup/passphrase-store";
+import { Logger } from "@/utils/logger";
 
 export type BackupPreview = {
   exportedAt: string;
@@ -383,6 +385,50 @@ export interface AutomaticBackupDependencies {
     passphrase: PassphraseReadResult;
     encrypt(contents: string, passphrase: string): string;
   };
+  /** Temporary redacted native-log diagnostics for a destructive restore boundary. */
+  diagnosticScope?: "pre-restore-snapshot";
+}
+
+type PreRestoreSnapshotDiagnosticCode =
+  | "snapshot-export"
+  | "encryption"
+  | "passphrase-absent"
+  | "passphrase-unavailable"
+  | "saf-create"
+  | "saf-write"
+  | "saf-read-back"
+  | "retention"
+  | "unclassified";
+
+class AutomaticSnapshotStageError extends Error {
+  constructor(readonly code: PreRestoreSnapshotDiagnosticCode) {
+    super("automatic snapshot stage failed");
+  }
+}
+
+async function atAutomaticSnapshotStage<T>(
+  code: PreRestoreSnapshotDiagnosticCode,
+  operation: () => Promise<T> | T,
+): Promise<T> {
+  try {
+    return await operation();
+  } catch (error) {
+    if (error instanceof AutomaticSnapshotStageError || error instanceof SafWriteError) throw error;
+    throw new AutomaticSnapshotStageError(code);
+  }
+}
+
+function automaticSnapshotFailureCode(error: unknown): PreRestoreSnapshotDiagnosticCode {
+  if (error instanceof AutomaticSnapshotStageError) return error.code;
+  if (error instanceof SafWriteError) return `saf-${error.stage}`;
+  return "unclassified";
+}
+
+function logPreRestoreSnapshotDiagnostic(
+  scope: AutomaticBackupDependencies["diagnosticScope"],
+  code: PreRestoreSnapshotDiagnosticCode,
+): void {
+  if (scope) Logger.diagnostic("backup-snapshot", `${scope}:${code}`);
 }
 
 /**
@@ -475,16 +521,29 @@ export function createAutomaticBackupService(deps: AutomaticBackupDependencies):
         const encryption = deps.encryption;
         const passphrase = encryption?.passphrase ?? { status: "absent" as const };
         const mode = resolveWriteEncryptionMode(encryption?.enabled ?? false, passphrase);
-        if (mode.mode === "blocked") return { status: "blocked", reason: mode.reason } as const;
-        const manifest = await buildExportManifest(deps.exec, { exportedAt: deps.exportedAt, readPhotoBase64: deps.readPhotoBase64 });
-        const plaintext = JSON.stringify(manifest);
-        parseBackupManifest(JSON.parse(plaintext));
+        if (mode.mode === "blocked") {
+          logPreRestoreSnapshotDiagnostic(deps.diagnosticScope, mode.reason);
+          return { status: "blocked", reason: mode.reason } as const;
+        }
+        const manifest = await atAutomaticSnapshotStage("snapshot-export", () =>
+          buildExportManifest(deps.exec, { exportedAt: deps.exportedAt, readPhotoBase64: deps.readPhotoBase64 }),
+        );
+        const plaintext = await atAutomaticSnapshotStage("snapshot-export", () => {
+          const value = JSON.stringify(manifest);
+          parseBackupManifest(JSON.parse(value));
+          return value;
+        });
         const contents = mode.mode === "encrypted"
-          ? encryption?.encrypt(plaintext, mode.passphrase)
+          ? await atAutomaticSnapshotStage("encryption", () => encryption?.encrypt(plaintext, mode.passphrase))
           : plaintext;
-        if (contents === undefined) return { status: "failed" } as const;
+        if (contents === undefined) {
+          logPreRestoreSnapshotDiagnostic(deps.diagnosticScope, "encryption");
+          return { status: "failed" } as const;
+        }
         const filename = automaticBackupFilename(deps.now);
-        await deps.storage.writeVerified(deps.directoryUri, filename, contents);
+        await atAutomaticSnapshotStage("saf-write", () =>
+          deps.storage.writeVerified(deps.directoryUri, filename, contents),
+        );
         // The just-written snapshot is protected by identity, not clock order:
         // a rollback may make its filename look older than retained snapshots.
         try {
@@ -497,10 +556,15 @@ export function createAutomaticBackupService(deps: AutomaticBackupDependencies):
           }));
         } catch {
           // Listing/pruning failure never negates a verified write or health.
+          logPreRestoreSnapshotDiagnostic(deps.diagnosticScope, "retention");
         }
         return { status: "written", filename } as const;
         });
-      } catch {
+      } catch (error) {
+        logPreRestoreSnapshotDiagnostic(
+          deps.diagnosticScope,
+          automaticSnapshotFailureCode(error),
+        );
         return { status: "failed" } as const;
       } finally {
         inFlight = false;
@@ -519,5 +583,8 @@ export function createAutomaticBackupService(deps: AutomaticBackupDependencies):
 export function createVerifiedPreRestoreSnapshot(
   deps: AutomaticBackupDependencies,
 ): ReturnType<typeof createAutomaticBackupService>["writeVerifiedSnapshot"] {
-  return createAutomaticBackupService(deps).writeVerifiedSnapshot;
+  return createAutomaticBackupService({
+    ...deps,
+    diagnosticScope: "pre-restore-snapshot",
+  }).writeVerifiedSnapshot;
 }

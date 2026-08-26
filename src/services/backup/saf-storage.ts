@@ -1,6 +1,7 @@
 import * as FileSystem from "expo-file-system/legacy";
 import { Linking } from "react-native";
 import { isOwnedAutomaticBackup } from "@/backup/auto-backup-policy";
+import { SafWriteError } from "@/services/backup/saf-write-error";
 
 export interface SafStorage {
   /** Returns the provider URI only after the replacement can be read back. */
@@ -31,16 +32,29 @@ export interface SafFolderAdapter {
 export function createSafStorage(): SafReadableStorage & SafFolderAdapter {
   return {
     async writeVerified(directoryUri, name, contents) {
-      const uri = await FileSystem.StorageAccessFramework.createFileAsync(
-        directoryUri,
-        name.replace(/\.json$/, ""),
-        "application/json",
-      );
-      await FileSystem.StorageAccessFramework.writeAsStringAsync(uri, contents);
+      let uri: string;
+      try {
+        uri = await FileSystem.StorageAccessFramework.createFileAsync(
+          directoryUri,
+          name.replace(/\.json$/, ""),
+          "application/json",
+        );
+      } catch {
+        throw new SafWriteError("create");
+      }
+      try {
+        await FileSystem.StorageAccessFramework.writeAsStringAsync(uri, contents);
+      } catch {
+        throw new SafWriteError("write");
+      }
       // A read-back is both an access probe and the durable-write verification.
-      JSON.parse(
-        await FileSystem.StorageAccessFramework.readAsStringAsync(uri),
-      );
+      try {
+        JSON.parse(
+          await FileSystem.StorageAccessFramework.readAsStringAsync(uri),
+        );
+      } catch {
+        throw new SafWriteError("read-back");
+      }
       return uri;
     },
     list: (directoryUri) =>
