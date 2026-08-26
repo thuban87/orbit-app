@@ -357,7 +357,7 @@ The exact existing values are quoted verbatim above; Phase 18 appends migration 
 
 3. **Actionability threshold**
    - What we know: Methods can be stored while non-actionable; the parser distinguishes possible from valid and its default metadata is less strict than `/max`. [CITED: https://github.com/catamphetamine/libphonenumber-js/blob/master/README.md]
-   - Recommendation: Treat a parser result with `isPossible()` as action-ready in v1, retain malformed input as non-actionable, and lock representative country/extension tests before UI work. [ASSUMED]
+   - Resolution status: The planner must present a blocking human decision before normalizer implementation. The user selects `isPossible()`, `isValid()`, or a named alternative and records representative-country plus extension cases; no threshold is silently selected from this research recommendation.
 
 ## Environment Availability
 
@@ -388,8 +388,8 @@ The exact existing values are quoted verbatim above; Phase 18 appends migration 
 
 | Req ID | Behavior | Test Type | Automated Command | File Exists? |
 |--------|----------|-----------|-------------------|-------------|
-| CDN-01 | Migration copies scalar methods once as primary, drops scalar authority, preserves malformed input, dedupes same-contact canonical values, retains extension/order/UID. | Node SQLite migration + DAO unit | `npm test -- src/db/migrations/009-contact-data-normalization.test.ts src/db/contact-methods-dao.test.ts` | ❌ Wave 0 |
-| CDN-02 | All lifecycle transitions enforce Bound-positive cadence, Unbound history preservation, never-clear assigned cadence, and existing Bound migration. | Node SQLite DAO/constraint | `npm test -- src/db/contact-lifecycle-dao.test.ts src/db/migrations/009-contact-data-normalization.test.ts` | ❌ Wave 0 |
+| CDN-01 | Migration copies scalar methods once as primary, drops scalar authority, preserves malformed input, dedupes same-contact canonical values, retains extension/order/UID. | Node SQLite migration + DAO unit | `npm test -- src/db/migrations/009-contact-data-normalization.test.ts src/db/contact-methods-dao.test.ts` | Created by 18-01/18-02 |
+| CDN-02 | All lifecycle transitions enforce Bound-positive cadence, Unbound history preservation, never-clear assigned cadence, and existing Bound migration. | Node SQLite DAO/constraint | `npm test -- src/db/contact-lifecycle-dao.test.ts src/db/migrations/009-contact-data-normalization.test.ts` | Created by 18-01/18-02 |
 | CDN-03 | Every population query includes/excludes Unbound correctly; gravity remains, intensity/status cadence surfaces do not. | Read/logic unit | `npm test -- src/db/dashboard-read.test.ts src/db/orrery-read.test.ts src/db/notification-read.test.ts src/db/impact-read.test.ts` | Existing files require extension |
 | CDN-04 | Export/parse/restore round-trip carries methods, links, provenance, tracking, nullable/dormant cadence, and tombstones without destructive source semantics. | Backup integration | `npm test -- src/backup/export-manifest.test.ts src/backup/restore-apply.test.ts src/backup/backup-schema.test.ts` | Existing files require extension |
 
@@ -399,13 +399,12 @@ The exact existing values are quoted verbatim above; Phase 18 appends migration 
 - **Per wave merge:** `npm test && npx tsc --noEmit && npm run check:colors`.
 - **Phase gate:** full suite green, then owner-gated Android release UAT for migration-on-device, method UI, Bound/Unbound transitions, and refresh of widget/notifications.
 
-### Wave 0 Gaps
+### Planned Test Creation
 
-- [ ] `src/db/migrations/009-contact-data-normalization.test.ts` — start from a real v8 fixture and prove all scalar/method/lifecycle migration cases.
-- [ ] `src/db/contact-methods-dao.test.ts` — canonical same-contact collapse, primary promotion, shared cross-contact canonical value, invalid storage, ordering, and provenance.
-- [ ] `src/db/contact-lifecycle-dao.test.ts` — complete lifecycle matrix and SQL trigger rollback.
-- [ ] Extend `src/backup/export-manifest.test.ts`, `src/backup/restore-apply.test.ts`, and `src/backup/backup-schema.test.ts` before changing backup wire format.
-- [ ] Extend every query-owner test listed in the requirements map; test that Unbound never reaches a derived status SQL projection.
+- [ ] 18-01 creates `src/db/migrations/009-contact-data-normalization.test.ts` from a real v8 fixture and proves scalar/method/lifecycle migration cases.
+- [ ] 18-02 creates `src/db/contact-methods-dao.test.ts` and `src/db/contact-lifecycle-dao.test.ts` for collision, provenance, lifecycle matrix, and SQL-trigger rollback.
+- [ ] 18-07 extends `src/backup/export-manifest.test.ts`, `src/backup/restore-apply.test.ts`, and `src/backup/backup-schema.test.ts` before changing backup wire format.
+- [ ] 18-03 and 18-09 extend every query-owner test listed in the requirements map, including the invariant that Unbound never reaches a derived status SQL projection.
 
 ## Security Domain
 

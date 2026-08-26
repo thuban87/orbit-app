@@ -663,7 +663,7 @@ Plans:
   3. Bound-only proactive surfaces and the dedicated Unbound population honor the locked dashboard, Orrery, favourites, Never Contacted, notification, widget, and AI behavior; explicit person-level work and factual birthday behavior remain available as decided.
   4. External system-contact links/provenance are structurally supported without changing Orbit identity or permitting source disappearance/refresh to delete or silently overwrite Orbit data; lossless backup includes the normalized model.
 
-**Plans:** 8 plans
+**Plans:** 10 plans
 
 Plans:
 - [ ] 18-01-PLAN.md — ratify and prove v9 normalized migration foundation
@@ -673,6 +673,8 @@ Plans:
 - [ ] 18-05-PLAN.md — Unbound browsing, navigation, and settings
 - [ ] 18-06-PLAN.md — profile lifecycle and safe Compose method handoff
 - [ ] 18-07-PLAN.md — normalized backup/export/restore graph
+- [ ] 18-09-PLAN.md — notification/widget lifecycle policy and Unbind effects
+- [ ] 18-10-PLAN.md — streamlined human export alongside lossless backup
 - [ ] 18-08-PLAN.md — complete verification and Android UAT
 
 ### Phase 19: System Contact Import
