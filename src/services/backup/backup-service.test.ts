@@ -21,7 +21,13 @@ vi.mock("@/backup/export-manifest", () => ({
   buildExportManifest: mocks.buildExportManifest,
 }));
 
-import { createManualExportService } from "@/services/backup/backup-service";
+import {
+  createAutomaticBackupService,
+  createBackupEncryptionLifecycle,
+  createManualExportService,
+  resolveWriteEncryptionMode,
+  withBackupServiceLock,
+} from "@/services/backup/backup-service";
 
 describe("manual backup service", () => {
   beforeEach(() => {
@@ -151,5 +157,62 @@ describe("manual backup service", () => {
     });
     release();
     await expect(first).resolves.toEqual({ status: "shared" });
+  });
+});
+
+describe("backup encryption safety", () => {
+  it("fails closed before writing a byte when enabled encryption has no usable passphrase", async () => {
+    mocks.buildExportManifest.mockClear();
+    const writeVerified = vi.fn();
+    const service = createAutomaticBackupService({
+      exec: {} as never,
+      exportedAt: manifest.metadata.exportedAt,
+      now: new Date("2026-08-25T00:00:00.000Z"),
+      readPhotoBase64: async () => "",
+      directoryUri: "content://backup",
+      retentionDays: 7,
+      storage: { writeVerified, list: async () => [], remove: async () => {} },
+      encryption: { enabled: true, passphrase: { status: "unavailable", reason: "secure-store-read-failed" }, encrypt: () => "never" },
+    });
+
+    await expect(service.writeVerifiedSnapshot()).resolves.toEqual({ status: "blocked", reason: "passphrase-unavailable" });
+    expect(writeVerified).not.toHaveBeenCalled();
+    expect(mocks.buildExportManifest).not.toHaveBeenCalled();
+  });
+
+  it("keeps the flag independent from the three passphrase read states", () => {
+    expect(resolveWriteEncryptionMode(false, { status: "unavailable", reason: "secure-store-read-failed" })).toEqual({ mode: "plaintext" });
+    expect(resolveWriteEncryptionMode(true, { status: "absent" })).toEqual({ mode: "blocked", reason: "passphrase-absent" });
+    expect(resolveWriteEncryptionMode(true, { status: "present", passphrase: "secret" })).toEqual({ mode: "encrypted", passphrase: "secret" });
+  });
+
+  it("compensates a failed enable and never clears an enabled flag before SecureStore deletion", async () => {
+    const calls: string[] = [];
+    const lifecycle = createBackupEncryptionLifecycle({
+      getPassphrase: async () => ({ status: "absent" }),
+      setPassphrase: async () => { calls.push("set-secret"); },
+      deletePassphrase: async () => { calls.push("delete-secret"); },
+    }, {
+      getEncryptionEnabled: async () => false,
+      setEncryptionEnabled: async () => { calls.push("set-flag"); throw new Error("sqlite unavailable"); },
+    });
+    await expect(lifecycle.enable("secret")).resolves.toEqual({ status: "failed", reason: "flag-update-failed" });
+    expect(calls).toEqual(["set-secret", "set-flag", "delete-secret"]);
+  });
+
+  it("serializes queued lifecycle operations", async () => {
+    const order: string[] = [];
+    let release!: () => void;
+    const first = withBackupServiceLock(async () => {
+      order.push("first-start");
+      await new Promise<void>((resolve) => { release = resolve; });
+      order.push("first-end");
+    });
+    const second = withBackupServiceLock(async () => { order.push("second"); });
+    await Promise.resolve();
+    expect(order).toEqual(["first-start"]);
+    release();
+    await Promise.all([first, second]);
+    expect(order).toEqual(["first-start", "first-end", "second"]);
   });
 });
