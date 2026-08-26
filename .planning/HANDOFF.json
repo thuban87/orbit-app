@@ -1,58 +1,59 @@
 {
-  "version": "1.0",
-  "timestamp": "2026-08-26T03:45:51.136Z",
-  "phase": "17",
-  "phase_name": "Backup, Export & Restore",
-  "phase_dir": ".planning/phases/17-backup-export-restore",
-  "plan": 11,
-  "task": 2,
-  "total_tasks": 2,
-  "status": "paused",
+  "version": 1,
+  "timestamp": "2026-08-26T10:39:42.358Z",
+  "phase": {
+    "number": 17,
+    "name": "Backup, Export & Restore",
+    "directory": ".planning/phases/17-backup-export-restore"
+  },
+  "plan": {
+    "number": 11,
+    "task": 2,
+    "total_tasks": 2,
+    "status": "paused"
+  },
   "completed_tasks": [
     {
-      "id": 1,
-      "name": "Run complete node, type, color, package, migration, restore, photo-recovery, and crypto-boundary gates",
-      "status": "done",
-      "commit": "f9f2273",
-      "progress": "126 files / 1457 tests passed; TypeScript, color, and Expo public-config checks passed."
+      "task": 1,
+      "status": "completed",
+      "summary": "Phase-wide automated gates completed.",
+      "commit": "f9f2273"
     }
   ],
-  "remaining_tasks": [
+  "current_task": {
+    "task": 2,
+    "status": "in_progress",
+    "summary": "Release Pixel UAT is incomplete. A clean current-source release APK must be built before further UAT; the latest clean host build failed during Android CMake configuration."
+  },
+  "next_action": "Use one continuous Terra-high owner to capture or resolve the current clean-release CMake build failure through the documented persistent-SSH build path. After a successful APK build, stop and ask the user about remaining usage before install or UAT.",
+  "blockers": [
     {
-      "id": 2,
-      "name": "Build/install a release APK and run the complete disposable-data Pixel UAT",
-      "status": "awaiting_scope_discussion"
+      "type": "technical",
+      "summary": "Current clean-source release build failed in Android CMake configuration for armeabi-v7a; no clean APK was produced.",
+      "workaround": "Use a persistent SSH PTY on droid to retain full output and identify the first CMake error. Do not make speculative app changes or add diagnostics before a direct control experiment."
     }
   ],
-  "blockers": [],
-  "async_jobs": [],
   "human_actions_pending": [
     {
-      "action": "Discuss the exact device-UAT operations and disposable setup at the start of the next session",
-      "context": "The owner explicitly wants a brief alignment discussion before action. The documented droid build, Pixel install, and disposable-data test execution are already authorized after that discussion.",
+      "action": "After a successful clean release build, ask whether enough usage remains before installing the APK or resuming device UAT.",
       "blocking": true
     }
   ],
-  "decisions": [
-    {
-      "decision": "Use gpt-5.6-terra at high reasoning for Phase 17 execution/UAT agents.",
-      "rationale": "Explicit owner instruction; do not substitute routine inline execution.",
-      "phase": "17"
-    },
-    {
-      "decision": "Continue normal implementation without routine tracer checkpoints.",
-      "rationale": "The owner has instructed completion; only genuine external/device scope alignment should pause work.",
-      "phase": "17"
-    },
-    {
-      "decision": "The next agent may run the documented desktop build, Pixel install, and disposable-data UAT after discussing the precise scope with the owner.",
-      "rationale": "The owner reconfirmed that the old Pixel is appropriate for this testing and that previous build/install/device work is in scope.",
-      "phase": "17"
-    }
+  "context_notes": [
+    "a49b925 fixes a real Replace-restore preview-cache expiry by preserving the validated candidate through confirmation. The later generic restore failure occurred during the pre-restore safety snapshot, before database apply.",
+    "Temporary redacted snapshot diagnostics (a24bcb5) were reverted by 612ea7c. Do not restore diagnostic logging first.",
+    "A fresh, no-photo, plaintext manual export control passed and opened Android's native share chooser. Earlier manual-export/snapshot failures were fixture-specific or photo-related, not a proven baseline product defect.",
+    "The device has the previous diagnostic release installed and fresh app data with a minimal no-photo contact. Do not use it as proof for the clean current build."
+  ],
+  "working_agreement": [
+    "Keep one continuous owner on a debug thread: reproduce, source-test, fix only if proven, and verify. Do not split those steps into multiple context-heavy agents.",
+    "Use the smallest direct control before adding instrumentation. For the suspected photo path, prove a controlled photo-export reproduction before changing source or logging.",
+    "Build only after a real targeted source change, or to create the required clean UAT artifact. Never push or create a PR."
   ],
   "uncommitted_files": [
-    ".planning/milestone.lock (unrelated untracked file; preserve untouched)"
-  ],
-  "next_action": "Discuss exact Pixel UAT setup, then execute Plan 17-11 Task 2 through docs/runbooks/desktop-build-pipeline.md with a gpt-5.6-terra high-reasoning executor.",
-  "context_notes": "Plans 17-08 through 17-10 are complete. Plan 17-11 Task 1 is complete with 1457 passing tests. The sole remaining phase work is the owner-aligned physical Pixel UAT and phase closeout."
+    ".planning/debug/replace-apply-failure.md",
+    ".planning/milestone.lock",
+    "orbit-home.png",
+    "ui.xml"
+  ]
 }
