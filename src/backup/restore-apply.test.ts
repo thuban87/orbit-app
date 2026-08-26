@@ -1,4 +1,31 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+// Restore application injects the native photo operations. Keep its SQLite graph
+// tests node-only while exercising the production defaults in photo-storage.test.
+const photoMocks = vi.hoisted(() => ({
+  staged: [] as Array<[string, string]>,
+  persisted: [] as Array<[string, string]>,
+  deleted: [] as string[],
+  persistFails: false,
+  deleteLeavesFile: false,
+}));
+vi.mock("@/services/photos/photo-storage", () => ({
+  contactPhotoRelPath: (id: number) => `avatars/contact-${id}.jpg`,
+  customFieldPhotoRelPath: (id: number, colName: string) => `avatars/cv-${id}-${colName}.jpg`,
+  profilePhotoRelPath: () => "avatars/profile.jpg",
+  deletePhoto: (path: string) => { photoMocks.deleted.push(path); },
+  deleteRestorePending: () => {},
+  persistMaster: async (source: string, destination: string) => {
+    photoMocks.persisted.push([source, destination]);
+    if (photoMocks.persistFails) throw new Error("disk unavailable");
+  },
+  photoFileExists: () => photoMocks.deleteLeavesFile,
+  resolveRestorePendingUri: (relative: string) => `file:///doc/${relative}`,
+  restorePendingRelPath: (target: { kind: string; uid?: string }, session: string) => `avatars/_restore_pending/${target.kind}-${target.uid ?? "profile"}-${session}.jpg`,
+  stageRestorePendingBase64: async (base64: string, relative: string) => { photoMocks.staged.push([base64, relative]); },
+}));
+vi.mock("@/services/notifications/notification-schedule", () => ({ reconcileSchedule: async () => {} }));
+vi.mock("@/services/notifications/digest-schedule", () => ({ reconcileDigestSchedule: async () => {} }));
 import { buildExportManifest } from "@/backup/export-manifest";
 import { applyRestore } from "@/backup/restore-apply";
 import { nodeSqliteExecutor, openTestDb } from "@/db/__testkit__/node-sqlite";
@@ -24,7 +51,14 @@ async function db(): Promise<SqlExecutor> {
   return exec;
 }
 
-beforeEach(() => { uid = 0; });
+beforeEach(() => {
+  uid = 0;
+  photoMocks.staged = [];
+  photoMocks.persisted = [];
+  photoMocks.deleted = [];
+  photoMocks.persistFails = false;
+  photoMocks.deleteLeavesFile = false;
+});
 
 describe("applyRestore", () => {
   it("reconciles all decisions before one transaction and UID-maps an incoming contact", async () => {
@@ -65,5 +99,71 @@ describe("applyRestore", () => {
     await expect(destination.getFirstAsync<{ entity_uid: string }>(
       "SELECT entity_uid FROM tombstones WHERE entity_type = 'contact' AND entity_uid = 'old-local'",
     )).resolves.toEqual({ entity_uid: "old-local" });
+  });
+
+  it("stages only a winning incoming photo, journals it in the transaction, and reports a retryable finalize failure", async () => {
+    const source = await db();
+    await source.runAsync(
+      `INSERT INTO contacts (uid,name,photo,interval_days,rarely_responds,reminders_off,created_at,modified_at)
+       VALUES (?,?,?,?,?,?,?,?)`,
+      ["photo-contact", "Photo", "avatars/source.jpg", 14, 0, 0, NOW, "2026-08-25 12:01:00"],
+    );
+    const manifest = await buildExportManifest(source, { exportedAt: NOW, readPhotoBase64: async () => "YQ==" });
+    const destination = await db();
+    const result = await applyRestore(destination, manifest, "merge", {
+      sessionToken: "session", persistPhoto: async () => { throw new Error("disk unavailable"); },
+    });
+    expect(result).toMatchObject({ status: "applied", photosNeedingAttention: 1 });
+    expect(photoMocks.staged).toEqual([["YQ==", "avatars/_restore_pending/contact-photo-contact-session.jpg"]]);
+    await expect(destination.getFirstAsync<{ action: string }>("SELECT action FROM restore_photo_journal")).resolves.toEqual({ action: "finalize" });
+    await expect(destination.getFirstAsync<{ photo: string }>("SELECT photo FROM contacts WHERE uid=?", ["photo-contact"])).resolves.toEqual({ photo: "avatars/contact-1.jpg" });
+  });
+
+  it("never stages or journals a losing incoming photo over a newer local master", async () => {
+    const source = await db();
+    await source.runAsync(
+      `INSERT INTO contacts (uid,name,photo,interval_days,rarely_responds,reminders_off,created_at,modified_at)
+       VALUES (?,?,?,?,?,?,?,?)`,
+      ["same", "Older", "avatars/source.jpg", 14, 0, 0, NOW, NOW],
+    );
+    const manifest = await buildExportManifest(source, { exportedAt: NOW, readPhotoBase64: async () => "YQ==" });
+    const destination = await db();
+    await destination.runAsync(
+      `INSERT INTO contacts (uid,name,photo,interval_days,rarely_responds,reminders_off,created_at,modified_at)
+       VALUES (?,?,?,?,?,?,?,?)`,
+      ["same", "Newer", "avatars/local.jpg", 14, 0, 0, NOW, "2026-08-25 12:02:00"],
+    );
+    await expect(applyRestore(destination, manifest, "merge")).resolves.toMatchObject({ status: "applied" });
+    expect(photoMocks.staged).toEqual([]);
+    await expect(destination.getAllAsync("SELECT * FROM restore_photo_journal")).resolves.toEqual([]);
+  });
+
+  it("blocks a configured Replace-all until its forced verified safety snapshot succeeds", async () => {
+    const source = await db();
+    const manifest = await buildExportManifest(source, { exportedAt: NOW, readPhotoBase64: async () => "" });
+    const destination = await db();
+    await destination.runAsync("UPDATE app_settings SET backup_folder_uri=? WHERE id=1", ["content://configured"]);
+    await expect(applyRestore(destination, manifest, "replace-all")).resolves.toEqual({ status: "pre-restore-snapshot-failed" });
+    await expect(destination.getFirstAsync<{ count: number }>("SELECT count(*) AS count FROM contacts")).resolves.toEqual({ count: 0 });
+    const snapshot = vi.fn(async () => ({ status: "written" as const }));
+    await expect(applyRestore(destination, manifest, "replace-all", { createVerifiedPreRestoreSnapshot: snapshot })).resolves.toMatchObject({ status: "applied", preRestoreSnapshotCreated: true });
+    expect(snapshot).toHaveBeenCalledTimes(1);
+  });
+
+  it("commits restore while exposing schedule resync failures for the launch sweep to heal", async () => {
+    const source = await db();
+    await source.runAsync(
+      `INSERT INTO contacts (uid,name,interval_days,rarely_responds,reminders_off,created_at,modified_at)
+       VALUES (?,?,?,?,?,?,?)`,
+      ["schedule-contact", "Schedule", 14, 0, 0, NOW, "2026-08-25 12:01:00"],
+    );
+    const manifest = await buildExportManifest(source, { exportedAt: NOW, readPhotoBase64: async () => "" });
+    const destination = await db();
+    const result = await applyRestore(destination, manifest, "merge", {
+      reconcileNotificationSchedule: async () => { throw new Error("notification unavailable"); },
+      reconcileDigestSchedule: async () => { throw new Error("digest unavailable"); },
+    });
+    expect(result).toMatchObject({ status: "applied", scheduleResyncPending: true });
+    await expect(destination.getFirstAsync<{ uid: string }>("SELECT uid FROM contacts WHERE uid=?", ["schedule-contact"])).resolves.toEqual({ uid: "schedule-contact" });
   });
 });

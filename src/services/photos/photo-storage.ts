@@ -150,6 +150,23 @@ export async function stageRestorePending(srcUri: string, relative: string): Pro
   await new File(Paths.document, tmpRelative).move(new File(Paths.document, relative), { overwrite: true });
 }
 
+/**
+ * Decode portable backup bytes directly into the durable recovery namespace.
+ * This intentionally does not route through an OS cache URI: once this resolves,
+ * the bytes survive until the committed restore-photo journal can recover them.
+ */
+export async function stageRestorePendingBase64(base64: string, relative: string): Promise<void> {
+  assertSafeRestorePendingRelative(relative);
+  const tmpRelative = `${relative}.stage-tmp`;
+  assertSafeRestorePendingRelative(tmpRelative);
+  const binary = atob(base64);
+  const bytes = Uint8Array.from(binary, (char) => char.charCodeAt(0));
+  new Directory(Paths.document, RESTORE_PENDING_DIR).create({ intermediates: true, idempotent: true });
+  const tmp = new File(Paths.document, tmpRelative);
+  tmp.write(bytes);
+  await tmp.move(new File(Paths.document, relative), { overwrite: true });
+}
+
 export function listRestorePendingPhotos(): Array<{ relative: string; isStageTmpOrphan: boolean }> {
   const directory = new Directory(Paths.document, RESTORE_PENDING_DIR);
   if (!directory.exists) return [];

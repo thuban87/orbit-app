@@ -23,14 +23,14 @@ async function targetIsLive(exec: SqlExecutor, entry: RestorePhotoJournalEntry):
     if (!entry.contactUid) return false;
     return (await exec.getFirstAsync("SELECT id FROM contacts WHERE uid = ?", [entry.contactUid])) !== null;
   }
-  if (!entry.valueUid || !entry.contactUid) return false;
+  if (!entry.valueUid || !entry.contactUid || !entry.fieldDefUid) return false;
   return (await exec.getFirstAsync(
     `SELECT v.id
        FROM custom_field_values v
        JOIN custom_field_defs d ON d.id = v.field_def_id
        JOIN contacts c ON c.id = v.contact_id
-      WHERE v.uid = ? AND d.type = 'photo' AND c.uid = ?`,
-    [entry.valueUid, entry.contactUid],
+      WHERE v.uid = ? AND d.uid = ? AND d.type = 'photo' AND c.uid = ?`,
+    [entry.valueUid, entry.fieldDefUid, entry.contactUid],
   )) !== null;
 }
 

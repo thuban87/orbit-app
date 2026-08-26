@@ -57,6 +57,10 @@ vi.mock("expo-file-system", () => {
       h.exists.add(dest.uri);
       this.uri = dest.uri;
     }
+    write(_bytes: Uint8Array): void {
+      h.ops.push(`write ${this.uri}`);
+      h.exists.add(this.uri);
+    }
     delete(): void {
       h.ops.push(`delete ${this.uri}`);
       h.exists.delete(this.uri);
@@ -97,6 +101,7 @@ import {
   resolveRestorePendingUri,
   resolvePhotoUriFromDocumentUri,
   stageRestorePending,
+  stageRestorePendingBase64,
 } from "@/services/photos/photo-storage";
 
 const DEST = "file:///doc/avatars/contact-42.jpg";
@@ -204,6 +209,13 @@ describe("restore pending staging — separate recovery-only namespace", () => {
     expect(h.ops).toContain(`move file:///doc/${relative}.stage-tmp -> file:///doc/${relative}`);
     deleteRestorePending(relative);
     expect(h.ops).toContain(`delete file:///doc/${relative}`);
+  });
+
+  it("decodes backup bytes directly into durable staging, never through cache", async () => {
+    const relative = restorePendingRelPath({ kind: "contact", uid: "stable_uid" }, "session_2");
+    await stageRestorePendingBase64("YQ==", relative);
+    expect(h.ops).toContain(`write file:///doc/${relative}.stage-tmp`);
+    expect(h.ops).toContain(`move file:///doc/${relative}.stage-tmp -> file:///doc/${relative}`);
   });
 
   it("reports canonical existence only after validating a canonical relative path", () => {
