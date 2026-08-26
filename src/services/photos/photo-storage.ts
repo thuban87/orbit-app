@@ -40,13 +40,17 @@
  */
 import { Directory, File, Paths } from "expo-file-system";
 import { isSafeColName } from "@/db/col-name";
-import { assertSafeRelative } from "@/db/photo-relative-path";
+import {
+  assertSafeRelative,
+  assertSafeRestorePendingRelative,
+} from "@/db/photo-relative-path";
 import { Logger } from "@/utils/logger";
 
 const LOG_SCOPE = "photo-storage";
 
 /** The document-dir subdirectory every master + sidecar lives under. */
 const AVATARS_DIR = "avatars";
+const RESTORE_PENDING_DIR = `${AVATARS_DIR}/_restore_pending`;
 
 /**
  * The photo write target. Each maps to a `contactId`-derivable (or fixed, for
@@ -56,6 +60,11 @@ export type PhotoTargetDescriptor =
   | { kind: "contact"; contactId: number }
   | { kind: "profile" }
   | { kind: "customField"; contactId: number; colName: string };
+
+export type RestorePendingTarget =
+  | { kind: "contact"; uid: string }
+  | { kind: "profile" }
+  | { kind: "customField"; uid: string; colName: string };
 
 // The `avatars/<name>.<ext>` allowlist guard (`assertSafeRelative`) lives in the
 // node-pure `@/db/photo-relative-path` module so the FS chokepoint here and the
@@ -108,6 +117,59 @@ export function relPathForTarget(target: PhotoTargetDescriptor): string {
   }
 }
 
+/** A session-scoped staging name that can never be mistaken for a canonical DB path. */
+export function restorePendingRelPath(target: RestorePendingTarget, sessionToken: string): string {
+  if (!/^[A-Za-z0-9_-]+$/.test(sessionToken)) {
+    throw new Error("unsafe restore session token");
+  }
+  let name: string;
+  switch (target.kind) {
+    case "contact":
+      name = `contact-${target.uid}-${sessionToken}`;
+      break;
+    case "profile":
+      name = `profile-${sessionToken}`;
+      break;
+    case "customField":
+      if (!isSafeColName(target.colName)) throw new Error("unsafe custom-field col_name");
+      name = `cv-${target.uid}-${target.colName}-${sessionToken}`;
+      break;
+  }
+  const relative = `${RESTORE_PENDING_DIR}/${name}.jpg`;
+  assertSafeRestorePendingRelative(relative);
+  return relative;
+}
+
+/** Stage into an unambiguous temporary name, then atomically rename it ready. */
+export async function stageRestorePending(srcUri: string, relative: string): Promise<void> {
+  assertSafeRestorePendingRelative(relative);
+  const tmpRelative = `${relative}.stage-tmp`;
+  assertSafeRestorePendingRelative(tmpRelative);
+  new Directory(Paths.document, RESTORE_PENDING_DIR).create({ intermediates: true, idempotent: true });
+  await new File(srcUri).copy(new File(Paths.document, tmpRelative), { overwrite: true });
+  await new File(Paths.document, tmpRelative).move(new File(Paths.document, relative), { overwrite: true });
+}
+
+export function listRestorePendingPhotos(): Array<{ relative: string; isStageTmpOrphan: boolean }> {
+  const directory = new Directory(Paths.document, RESTORE_PENDING_DIR);
+  if (!directory.exists) return [];
+  return directory.list().map((entry) => {
+    const relative = `${RESTORE_PENDING_DIR}/${entry.name}`;
+    assertSafeRestorePendingRelative(relative);
+    return { relative, isStageTmpOrphan: relative.endsWith(".stage-tmp") };
+  });
+}
+
+/** Best-effort cleanup for recovery-only files. */
+export function deleteRestorePending(relative: string): void {
+  assertSafeRestorePendingRelative(relative);
+  try {
+    new File(Paths.document, relative).delete();
+  } catch (error) {
+    Logger.error(LOG_SCOPE, "restore pending cleanup failed", error);
+  }
+}
+
 /**
  * PURE rel -> `file://` composer (no native import): joins a document dir URI and
  * a validated relative filename. Guards `relative` first, so both this and the
@@ -129,6 +191,13 @@ export function resolvePhotoUriFromDocumentUri(
  */
 export function resolvePhotoUri(relative: string): string {
   return resolvePhotoUriFromDocumentUri(Paths.document.uri, relative);
+}
+
+/** Resolve a recovery-only staging file without widening canonical-path rules. */
+export function resolveRestorePendingUri(relative: string): string {
+  assertSafeRestorePendingRelative(relative);
+  const base = Paths.document.uri.endsWith("/") ? Paths.document.uri : `${Paths.document.uri}/`;
+  return `${base}${relative}`;
 }
 
 /**
@@ -208,6 +277,12 @@ export function deletePhoto(relative: string): void {
       error,
     );
   }
+}
+
+/** The only reliable completion signal for deletePhoto's best-effort contract. */
+export function photoFileExists(relative: string): boolean {
+  assertSafeRelative(relative);
+  return new File(Paths.document, relative).exists;
 }
 
 /** A single reconciliation step over the avatars dir listing. */

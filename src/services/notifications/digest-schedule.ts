@@ -195,7 +195,11 @@ export async function reconcileDigestSchedule(
  */
 export function registerDigestScheduleSweep(getExec: () => SqlExecutor): void {
   registerSweepHook(async () => {
-    await reconcileDigestSchedule(getExec());
+    try {
+      await reconcileDigestSchedule(getExec());
+    } catch (error) {
+      Logger.error("digest-schedule", "launch digest reconcile failed", error);
+    }
   });
 }
 

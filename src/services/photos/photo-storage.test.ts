@@ -85,12 +85,18 @@ import {
   contactPhotoRelPath,
   customFieldPhotoRelPath,
   deletePhoto,
+  deleteRestorePending,
+  listRestorePendingPhotos,
+  photoFileExists,
   type PhotoTargetDescriptor,
   persistMaster,
   profilePhotoRelPath,
   reconcilePhotoDir,
   relPathForTarget,
+  restorePendingRelPath,
+  resolveRestorePendingUri,
   resolvePhotoUriFromDocumentUri,
+  stageRestorePending,
 } from "@/services/photos/photo-storage";
 
 const DEST = "file:///doc/avatars/contact-42.jpg";
@@ -180,6 +186,31 @@ describe("assertSafeRelative — generic boundary guard at the FS entry points",
       resolvePhotoUriFromDocumentUri("file:///doc/", "avatars/contact-42.jpg"),
     ).toBe("file:///doc/avatars/contact-42.jpg");
     expect(() => deletePhoto("avatars/profile.png")).not.toThrow();
+  });
+});
+
+describe("restore pending staging — separate recovery-only namespace", () => {
+  it("uses a stable uid plus per-attempt token and never broadens canonical paths", () => {
+    const relative = restorePendingRelPath({ kind: "contact", uid: "contact_a" }, "session_1");
+    expect(relative).toBe("avatars/_restore_pending/contact-contact_a-session_1.jpg");
+    expect(() => resolvePhotoUriFromDocumentUri("file:///doc", relative)).toThrow();
+    expect(resolveRestorePendingUri(relative)).toBe(`file:///doc/${relative}`);
+  });
+
+  it("stages through .stage-tmp then makes the ready file visible", async () => {
+    const relative = restorePendingRelPath({ kind: "profile" }, "session_1");
+    await stageRestorePending("file:///source.jpg", relative);
+    expect(h.ops).toContain(`copy file:///source.jpg -> file:///doc/${relative}.stage-tmp`);
+    expect(h.ops).toContain(`move file:///doc/${relative}.stage-tmp -> file:///doc/${relative}`);
+    deleteRestorePending(relative);
+    expect(h.ops).toContain(`delete file:///doc/${relative}`);
+  });
+
+  it("reports canonical existence only after validating a canonical relative path", () => {
+    h.exists.add(DEST);
+    expect(photoFileExists("avatars/contact-42.jpg")).toBe(true);
+    expect(() => photoFileExists("avatars/_restore_pending/x.jpg")).toThrow();
+    expect(listRestorePendingPhotos()).toEqual([]);
   });
 });
 

@@ -22,6 +22,13 @@
 export const SAFE_RELATIVE = /^avatars\/[A-Za-z0-9_-]+\.(jpg|jpeg|png|webp)$/;
 
 /**
+ * Restore staging is intentionally a separate, narrower namespace. Canonical
+ * database paths must continue to satisfy SAFE_RELATIVE and can never point
+ * into this recovery-only directory.
+ */
+export const SAFE_RESTORE_PENDING_RELATIVE = /^avatars\/_restore_pending\/[A-Za-z0-9_-]+\.(jpg|jpeg|png|webp)(?:\.stage-tmp)?$/;
+
+/**
  * Throw unless `relative` is a safe `avatars/<name>.<ext>` relative path. Used at
  * the FS chokepoint AND at the DAO write boundary as defense-in-depth: a stored
  * absolute/`cache://` value would otherwise reach `resolvePhotoUri` and throw
@@ -35,5 +42,16 @@ export function assertSafeRelative(relative: string): void {
     !SAFE_RELATIVE.test(relative)
   ) {
     throw new Error(`unsafe photo relative path: ${JSON.stringify(relative)}`);
+  }
+}
+
+/** Throw unless a recovery-only restore staging path is safe. */
+export function assertSafeRestorePendingRelative(relative: string): void {
+  if (
+    typeof relative !== "string"
+    || relative.includes("\0")
+    || !SAFE_RESTORE_PENDING_RELATIVE.test(relative)
+  ) {
+    throw new Error(`unsafe restore pending photo path: ${JSON.stringify(relative)}`);
   }
 }

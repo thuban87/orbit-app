@@ -521,7 +521,11 @@ export function registerNotificationScheduleSweep(
   getExec: () => SqlExecutor,
 ): void {
   registerSweepHook(async () => {
-    await reconcileSchedule(getExec());
+    try {
+      await reconcileSchedule(getExec());
+    } catch (error) {
+      Logger.error("notification-schedule", "launch schedule reconcile failed", error);
+    }
   });
 }
 
