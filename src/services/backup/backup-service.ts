@@ -24,9 +24,15 @@ export type BackupPreviewResult =
   | { status: "ready"; preview: BackupPreview }
   | { status: "failed"; reason: "wrong-passphrase" | "damaged-or-incomplete" | "newer-app" };
 
+export type RestorePreviewAggregate = BackupPreview & {
+  contactCount: number;
+  relatedRowCount: number;
+  tombstoneCount: number;
+};
+
 /** A validated restore candidate remains private to the apply owner, never navigation. */
 export type ValidatedRestoreCandidate =
-  | { status: "ready"; preview: BackupPreview; manifest: BackupManifest }
+  | { status: "ready"; preview: RestorePreviewAggregate; manifest: BackupManifest }
   | { status: "failed"; reason: "wrong-passphrase" | "damaged-or-incomplete" | "newer-app" };
 
 /**
@@ -60,6 +66,9 @@ export function loadBackupForRestore(input: {
         encrypted,
         rowCount: rows.reduce((count, value) => count + value.length, manifest.profile ? 1 : 0),
         photoCount: photoRows.filter((row) => row?.photoBase64 !== null && row?.photoBase64 !== undefined).length,
+        contactCount: manifest.contacts.length,
+        relatedRowCount: manifest.interactions.length + manifest.events.length + manifest.fuel.length + manifest.contactLinks.length + manifest.customFieldDefs.length + manifest.customFieldValues.length,
+        tombstoneCount: manifest.tombstones.length,
       },
     };
   } catch (error) {
@@ -81,7 +90,13 @@ export function loadBackupForPreview(input: {
 }): BackupPreviewResult {
   const candidate = loadBackupForRestore(input);
   return candidate.status === "ready"
-    ? { status: "ready", preview: candidate.preview }
+    ? { status: "ready", preview: {
+      exportedAt: candidate.preview.exportedAt,
+      backupFormatVersion: candidate.preview.backupFormatVersion,
+      encrypted: candidate.preview.encrypted,
+      rowCount: candidate.preview.rowCount,
+      photoCount: candidate.preview.photoCount,
+    } }
     : candidate;
 }
 

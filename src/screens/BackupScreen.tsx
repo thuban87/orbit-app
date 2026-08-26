@@ -186,9 +186,12 @@ export function BackupScreen({ navigation }: RootStackScreenProps<"Backup">) {
     );
   }, [encryptionEnabled, runExport]);
 
-  const validateRestore = useCallback((contents: string, passphrase?: string) => {
+  const validateRestore = useCallback(async (contents: string, passphrase?: string) => {
     setRestoreStage("loading");
     setRestoreMessage(null);
+    // Let the loading announcement paint before a native crypto implementation
+    // performs decrypt/parse/validation work on this JS turn.
+    await new Promise<void>((resolve) => setTimeout(resolve, 0));
     try {
       const candidate = loadBackupForRestore({
         contents,
@@ -236,7 +239,7 @@ export function BackupScreen({ navigation }: RootStackScreenProps<"Backup">) {
         setRestoreStage("passphrase");
         return;
       }
-      validateRestore(contents);
+      void validateRestore(contents);
     } catch (error) {
       Logger.error(LOG_SCOPE, "restore document selection failed", error);
       setRestoreStage("idle");
@@ -246,7 +249,7 @@ export function BackupScreen({ navigation }: RootStackScreenProps<"Backup">) {
 
   const continueEncryptedRestore = useCallback(() => {
     if (!selectedEncryptedContents || !restorePassphrase) return;
-    validateRestore(selectedEncryptedContents, restorePassphrase);
+    void validateRestore(selectedEncryptedContents, restorePassphrase);
   }, [restorePassphrase, selectedEncryptedContents, validateRestore]);
 
   const heroAction = health?.kind === "not-configured" ? "Set up backups" : health?.kind === "lost-folder" ? "Choose folder" : "Manage backups";
@@ -287,7 +290,7 @@ export function BackupScreen({ navigation }: RootStackScreenProps<"Backup">) {
       </View>
 
       {restoreStage === "loading" ? <View testID="restore-preview-loading" accessibilityLiveRegion="polite" accessibilityLabel="Checking backup before preview" style={[styles.restoreNotice, { backgroundColor: colors.surface, borderColor: colors.border }]}><Text style={[styles.rowTitle, { color: colors.textPrimary }]}>Checking backup…</Text><Text style={[styles.actionHelper, { color: colors.textSecondary }]}>Orbit will only show a preview after this backup is ready.</Text></View> : null}
-      {restoreStage === "passphrase" ? <View testID="restore-passphrase-prompt" style={[styles.restoreNotice, { backgroundColor: colors.surface, borderColor: colors.border }]}><Text style={[styles.rowTitle, { color: colors.textPrimary }]}>Enter backup passphrase</Text><Text style={[styles.actionHelper, { color: colors.textSecondary }]}>This encrypted backup needs its passphrase before Orbit can preview it.</Text><TextInput testID="restore-passphrase-input" secureTextEntry value={restorePassphrase} onChangeText={setRestorePassphrase} accessibilityLabel="Backup passphrase" placeholder="Passphrase" placeholderTextColor={colors.textSecondary} style={[styles.passphraseInput, { color: colors.textPrimary, borderColor: colors.border, backgroundColor: colors.background }]} /><View style={styles.restorePromptActions}><Pressable accessibilityRole="button" accessibilityLabel="Choose another backup" onPress={() => { setSelectedEncryptedContents(null); setRestorePassphrase(""); setRestoreStage("idle"); void chooseRestore(); }} style={[styles.secondaryButton, { borderColor: colors.border }]}><Text style={{ color: colors.textSecondary }}>Choose another backup</Text></Pressable><Pressable accessibilityRole="button" accessibilityLabel="Continue to preview backup" accessibilityState={{ disabled: !restorePassphrase }} disabled={!restorePassphrase} onPress={continueEncryptedRestore} style={[styles.primaryButton, { backgroundColor: colors.accent, opacity: restorePassphrase ? 1 : 0.6 }]}><Text style={{ color: colors.textPrimary }}>Continue to preview backup</Text></Pressable></View></View> : null}
+      {restoreStage === "passphrase" ? <View testID="restore-passphrase-prompt" style={[styles.restoreNotice, { backgroundColor: colors.surface, borderColor: colors.border }]}><Text style={[styles.rowTitle, { color: colors.textPrimary }]}>Enter backup passphrase</Text><Text style={[styles.actionHelper, { color: colors.textSecondary }]}>This encrypted backup needs its passphrase before Orbit can preview it.</Text><TextInput testID="restore-passphrase-input" secureTextEntry value={restorePassphrase} onChangeText={setRestorePassphrase} accessibilityLabel="Backup passphrase" placeholder="Passphrase" placeholderTextColor={colors.textSecondary} style={[styles.passphraseInput, { color: colors.textPrimary, borderColor: colors.border, backgroundColor: colors.background }]} /><View style={styles.restorePromptActions}><Pressable accessibilityRole="button" accessibilityLabel="Choose another backup" onPress={() => { setSelectedEncryptedContents(null); setRestorePassphrase(""); setRestoreStage("idle"); void chooseRestore(); }} style={[styles.secondaryButton, { borderColor: colors.border }]}><Text style={{ color: colors.textSecondary }}>Choose another backup</Text></Pressable><Pressable accessibilityRole="button" accessibilityLabel={restoreMessage ? "Try passphrase again" : "Continue to preview backup"} accessibilityState={{ disabled: !restorePassphrase }} disabled={!restorePassphrase} onPress={continueEncryptedRestore} style={[styles.primaryButton, { backgroundColor: colors.accent, opacity: restorePassphrase ? 1 : 0.6 }]}><Text style={{ color: colors.textPrimary }}>{restoreMessage ? "Try passphrase again" : "Continue to preview backup"}</Text></Pressable></View></View> : null}
       {restoreMessage ? <View testID="restore-selection-error" accessibilityLiveRegion="polite" style={[styles.restoreNotice, { backgroundColor: colors.surface, borderColor: colors.border }]}><Text style={[styles.actionHelper, { color: colors.textSecondary }]}>{restoreMessage}</Text><Pressable accessibilityRole="button" accessibilityLabel="Choose another file" onPress={() => void chooseRestore()} style={styles.linkButton}><Text style={{ color: colors.accent }}>Choose another file</Text></Pressable></View> : null}
 
       <Pressable testID="backup-encryption" accessibilityRole="button" accessibilityLabel={`Encryption. ${encryptionEnabled ? "On — new backups are protected with your passphrase" : "Off — backups are readable JSON"}`} onPress={() => openSettings("encryption")} style={[styles.encryptionRow, { backgroundColor: colors.surface, borderColor: colors.border }]}>

@@ -1,14 +1,15 @@
 import type { BackupManifest } from "@/backup/types";
-import type { BackupPreview } from "@/services/backup/backup-service";
+import type { RestoreApplyResult, RestoreMode } from "@/backup/restore-apply";
+import type { RestorePreviewAggregate } from "@/services/backup/backup-service";
 
 export type RestorePreviewRoute = {
   readonly token: string;
-  readonly preview: BackupPreview;
+  readonly preview: RestorePreviewAggregate;
 };
 
 type RestoreCacheEntry = {
   readonly manifest: BackupManifest;
-  readonly preview: BackupPreview;
+  readonly preview: RestorePreviewAggregate;
 };
 
 export type RestorePreviewFailureReason =
@@ -77,5 +78,55 @@ export function restorePreviewFailure(reason: RestorePreviewFailureReason): Rest
     step: "selection",
     message: "This backup is damaged or incomplete. Your local data hasn't changed.",
     action: "Choose another file",
+  };
+}
+
+export function restoreApplyLabel(mode: RestoreMode): "Merge backup" | "Replace and restore" {
+  return mode === "merge" ? "Merge backup" : "Replace and restore";
+}
+
+export function replaceAllConfirmation(destinationConfigured: boolean): { title: string; message: string } {
+  return {
+    title: "Replace all local data?",
+    message: destinationConfigured
+      ? "Orbit will first create and verify a fresh automatic backup of this device."
+      : "Your current local data will be lost and no automatic backup destination is configured.",
+  };
+}
+
+export function createRestoreApplySingleFlight<T>(operation: () => Promise<T>): () => Promise<T> {
+  let pending: Promise<T> | null = null;
+  return () => {
+    if (pending) return pending;
+    pending = operation().finally(() => {
+      pending = null;
+    });
+    return pending;
+  };
+}
+
+/** Applying is intentionally React-local; a cold process always lands at Backup. */
+export function initialRestoreApplyState(): "idle" {
+  return "idle";
+}
+
+export function toRestoreResultParams(result: Extract<RestoreApplyResult, { status: "applied" }>) {
+  return {
+    added: result.inserted,
+    updated: result.updated,
+    newerLocalKept: result.retained,
+    deletionsApplied: result.deleted,
+    replaceSafetySnapshot: result.mode === "replace-all"
+      ? (result.preRestoreSnapshotCreated ? "verified" as const : "not-configured" as const)
+      : null,
+  };
+}
+
+export function restoreApplyRecovery(
+  _reason: Exclude<RestoreApplyResult["status"], "applied"> | "unexpected",
+): { step: "preview"; message: string } {
+  return {
+    step: "preview",
+    message: "Couldn't restore this backup. Your local data hasn't changed. Please try again.",
   };
 }

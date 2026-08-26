@@ -15,6 +15,7 @@ import { ManageFavouritesScreen } from "@/screens/ManageFavouritesScreen";
 import { NeverContactedScreen } from "@/screens/NeverContactedScreen";
 import { OrreryScreen } from "@/screens/OrreryScreen";
 import { RestorePreviewScreen } from "@/screens/RestorePreviewScreen";
+import { RestoreResultScreen } from "@/screens/RestoreResultScreen";
 import { SettingsScreen } from "@/screens/SettingsScreen";
 import type { RootStackParamList, RootStackScreenProps } from "./types";
 
@@ -79,6 +80,7 @@ export function RootNavigator() {
       <Stack.Screen name="Backup" component={BackupScreen} />
       <Stack.Screen name="BackupSettings" component={BackupSettingsScreen} />
       <Stack.Screen name="RestorePreview" component={RestorePreviewScreen} />
+      <Stack.Screen name="RestoreResult" component={RestoreResultScreen} />
     </Stack.Navigator>
   );
 }
