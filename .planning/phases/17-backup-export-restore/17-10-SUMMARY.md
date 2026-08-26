@@ -13,9 +13,9 @@ provides:
   - destructive Replace confirmation, single-flight apply, and aggregate result route
 affects: [17-11 device-uat, backup-restore]
 actuals:
-  tokens: 10965
+  tokens: 10939
   tasks: 2
-  commits: 6
+  commits: 7
 tech-stack:
   added: []
   patterns:
@@ -89,7 +89,7 @@ status: complete
 ## Task Commits
 
 1. **Task 1: Drive one validated plaintext backup from picker to Merge preview** — `56c8c0a` (RED), `2668347` (GREEN), `7cb0d68` (typed fixture)
-2. **Task 2: Confirm Replace-all, apply once, and present aggregate restore result** — `ea7b477` (RED), `d5c544a` (GREEN), `602871e` (aggregate fixture)
+2. **Task 2: Confirm Replace-all, apply once, and present aggregate restore result** — `ea7b477` (RED), `d5c544a` (GREEN), `602871e` (aggregate fixture), `3301e2b` (confirmation freshness fix)
 
 ## Files Created/Modified
 
@@ -118,7 +118,16 @@ status: complete
 - **Verification:** `npm test -- src/screens/backup-restore-logic.test.ts`, `npx tsc --noEmit`, and `npm run check:colors`.
 - **Committed in:** `d5c544a`
 
-**Total deviations:** 1 auto-fixed (Rule 1 bug)
+**2. [Rule 1 - Bug] Refreshed Replace-all destination immediately before confirmation**
+
+- **Found during:** Task 2 verification audit
+- **Issue:** The confirmation could use an initial asynchronous destination read that had not completed or had become stale, producing the wrong configured/unavailable safety disclosure.
+- **Fix:** Re-read the automatic destination directly before opening the native Replace-all alert; the restore engine independently re-reads it when enforcing the snapshot preflight.
+- **Files modified:** `src/screens/RestorePreviewScreen.tsx`
+- **Verification:** `npm test -- src/screens/backup-restore-logic.test.ts`, `npx tsc --noEmit`, and `npm run check:colors`.
+- **Committed in:** `3301e2b`
+
+**Total deviations:** 2 auto-fixed (Rule 1 bugs)
 
 ## Known Stubs
 
@@ -131,7 +140,7 @@ Plan 17-11 can exercise the Android picker, encrypted prompt, Replace safety-sna
 ## Self-Check: PASSED
 
 - All restore UI, cache-helper, and test files exist.
-- Task commits `56c8c0a`, `2668347`, `7cb0d68`, `ea7b477`, `d5c544a`, and `602871e` exist.
+- Task commits `56c8c0a`, `2668347`, `7cb0d68`, `ea7b477`, `d5c544a`, `602871e`, and `3301e2b` exist.
 - Focused restore logic and backup-service tests, TypeScript, color, and whitespace checks passed.
 
 ---
