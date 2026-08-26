@@ -18,8 +18,10 @@ Phase 18 establishes normalized phone/email contact methods and the Bound/Unboun
 - Bound/Unbound is independent of cadence and does not erase or restart relationship history. `interval_days = NULL` means only never assigned; Bound requires a positive cadence; once assigned, cadence is never cleared.
 - Orbit identity stays independent of system-contact identity. Source links can be stale/missing without deleting Orbit data, and source refresh is never destructive or silently authoritative.
 - Preserve all explicit deferrals in the dossier, including picker/import/reconciliation work, endpoint/provider interaction history, rich merge management, passive notification-listener detection, and reorder UI polish.
+- Unbinding preserves `favourite_rank` as dormant state; Bound-only favourite and widget reads hide it while Unbound, and rebinding restores the existing rank.
+- Active external contact links are unique by `(provider, external_contact_id)` for deterministic exact-link lookup; stale links remain as provenance and do not delete Orbit data.
 
-Leave exact schema, migration mechanics, parsing/actionability rules, Favourite dormant-state handling, and cross-surface query implementation to research/planning within those constraints.
+Leave exact schema, migration mechanics, parsing/actionability rules, and cross-surface query implementation to research/planning within those constraints.
 
 </decisions>
 
