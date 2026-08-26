@@ -1,6 +1,6 @@
 {
   "version": "1.0",
-  "timestamp": "2026-08-25T23:15:00.000Z",
+  "timestamp": "2026-08-25T23:20:00.000Z",
   "phase": "17",
   "phase_name": "Backup, Export & Restore",
   "phase_dir": ".planning/phases/17-backup-export-restore",
@@ -31,16 +31,16 @@
   "blockers": [
     {
       "type": "decision",
-      "description": "The current benchmark release APK is installed, but the attached Pixel is locked and the Android notification shade obscures Orbit, so sample results cannot be read.",
-      "workaround": "User unlocks the Pixel; then relaunch the installed release APK, capture samples, and approve the full versioned profile."
+      "description": "Measured release-build evidence is available, but the owner must select the permanent PBKDF2 iteration count before the profile can be frozen.",
+      "workaround": "Approve one measured candidate: 300k (27 ms median), 600k (53 ms), or 900k (80 ms)."
     }
   ],
   "human_actions_pending": [
-    "Unlock the attached Pixel and reply `unlocked`; after samples are captured, approve the measured versioned PBKDF2/AES-256-GCM profile."
+    "Approve the measured versioned PBKDF2/AES-256-GCM profile with 300k, 600k, or 900k PBKDF2 iterations."
   ],
   "uncommitted_files": [
     ".planning/milestone.lock (pre-existing/unrelated and intentionally untouched)"
   ],
-  "next_action": "After the user unlocks the Pixel, resume 17-07 Task 2 to collect release samples; preserve committed Task 1 and harness work and do not invent benchmark evidence.",
-  "context_notes": "Task 1 tests and TypeScript verification passed. Harness commit 24f9144; fresh APK SHA-256 87af511c210aeae56df76df9b4300f18e216dbdcd3a2ad39db947b98625baffb was installed successfully."
+  "next_action": "After the owner selects 300k, 600k, or 900k iterations, resume 17-07 Task 2 to record it and complete Task 3; preserve committed Task 1 and harness work.",
+  "context_notes": "Task 1 tests and TypeScript verification passed. Harness commit 24f9144; fresh APK SHA-256 87af511c210aeae56df76df9b4300f18e216dbdcd3a2ad39db947b98625baffb was installed successfully. Measured medians: 300k=27 ms, 600k=53 ms, 900k=80 ms."
 }
