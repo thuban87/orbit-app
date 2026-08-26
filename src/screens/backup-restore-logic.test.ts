@@ -1,8 +1,14 @@
 import { describe, expect, it } from "vitest";
 import {
+  createRestoreApplySingleFlight,
   createRestorePreviewCache,
+  initialRestoreApplyState,
   isEncryptedBackupEnvelope,
+  replaceAllConfirmation,
+  restoreApplyLabel,
+  restoreApplyRecovery,
   restorePreviewFailure,
+  toRestoreResultParams,
 } from "@/screens/backup-restore-logic";
 
 const preview = {
@@ -54,5 +60,66 @@ describe("restore preview route safety", () => {
       message: "This backup was made by a newer version of Orbit. Update Orbit, then try again. Your local data hasn't changed.",
       action: "Choose another file",
     });
+  });
+});
+
+describe("restore apply decisions", () => {
+  it("defaults to Merge and makes Replace-all explicitly destructive", () => {
+    expect(restoreApplyLabel("merge")).toBe("Merge backup");
+    expect(restoreApplyLabel("replace-all")).toBe("Replace and restore");
+    expect(replaceAllConfirmation(true).message).toContain(
+      "Orbit will first create and verify a fresh automatic backup of this device.",
+    );
+    expect(replaceAllConfirmation(false).message).toContain(
+      "Your current local data will be lost and no automatic backup destination is configured.",
+    );
+  });
+
+  it("shares one pending apply promise and never persists an applying state for a cold start", async () => {
+    let calls = 0;
+    let release: (() => void) | undefined;
+    const pending = new Promise<void>((resolve) => { release = resolve; });
+    const apply = createRestoreApplySingleFlight(async () => {
+      calls += 1;
+      await pending;
+    });
+
+    const first = apply();
+    const second = apply();
+    expect(second).toBe(first);
+    expect(calls).toBe(1);
+    expect(initialRestoreApplyState()).toBe("idle");
+    release?.();
+    await first;
+  });
+
+  it("projects only committed aggregate totals into the result route", () => {
+    expect(toRestoreResultParams({
+      status: "applied",
+      mode: "replace-all",
+      inserted: 3,
+      updated: 2,
+      retained: 4,
+      deleted: 1,
+      blocked: 0,
+      photosNeedingAttention: 0,
+      photoCleanupPending: 0,
+      scheduleResyncPending: false,
+      preRestoreSnapshotCreated: true,
+    })).toEqual({
+      added: 3,
+      updated: 2,
+      newerLocalKept: 4,
+      deletionsApplied: 1,
+      replaceSafetySnapshot: "verified",
+    });
+  });
+
+  it("keeps pre-commit apply failures on the preview with no optimistic result", () => {
+    expect(restoreApplyRecovery("pre-restore-snapshot-failed")).toEqual({
+      step: "preview",
+      message: "Couldn't restore this backup. Your local data hasn't changed. Please try again.",
+    });
+    expect(restoreApplyRecovery("incompatible-destination").step).toBe("preview");
   });
 });
