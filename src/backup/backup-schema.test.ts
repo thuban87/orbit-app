@@ -30,4 +30,28 @@ describe("parseBackupManifest", () => {
     pairs.customFieldValues = [{ uid: "v1", contactUid: "c", fieldDefUid: "d", value: null }, { uid: "v2", contactUid: "c", fieldDefUid: "d", value: null }];
     expect(() => parseBackupManifest(pairs)).toThrow(/duplicate custom/i);
   });
+
+  it("rejects secret-shaped settings and incomplete singleton settings", () => {
+    const secret = valid();
+    secret.appSettings.apiKey = "must-never-travel";
+    expect(() => parseBackupManifest(secret)).toThrow(/settings/i);
+
+    const incomplete = valid();
+    delete incomplete.appSettings.modifiedAt;
+    expect(() => parseBackupManifest(incomplete)).toThrow(/modified/i);
+  });
+
+  it("rejects a child whose same-file parent lost to a tombstone", () => {
+    const broken = valid();
+    broken.contacts = [{ uid: "contact", modifiedAt: "2026-08-25 12:00:00" }];
+    broken.interactions = [{ uid: "interaction", contactUid: "contact", modifiedAt: "2026-08-25 12:00:00" }];
+    broken.tombstones = [{ entityType: "contacts", entityUid: "contact", deletedAt: "2026-08-25 12:00:00" }];
+    expect(() => parseBackupManifest(broken)).toThrow(/surviving contact/i);
+  });
+
+  it("rejects malformed photo bytes before an apply can begin", () => {
+    const broken = valid();
+    broken.contacts = [{ uid: "contact", modifiedAt: "2026-08-25 12:00:00", photoBase64: "%%%" }];
+    expect(() => parseBackupManifest(broken)).toThrow(/photo/i);
+  });
 });

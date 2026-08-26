@@ -25,6 +25,7 @@ import {
   createAutomaticBackupService,
   createBackupEncryptionLifecycle,
   createManualExportService,
+  loadBackupForPreview,
   resolveWriteEncryptionMode,
   withBackupServiceLock,
 } from "@/services/backup/backup-service";
@@ -157,6 +158,28 @@ describe("manual backup service", () => {
     });
     release();
     await expect(first).resolves.toEqual({ status: "shared" });
+  });
+});
+
+describe("restore preview", () => {
+  it("returns only aggregate metadata after wholly validating plaintext content", () => {
+    expect(loadBackupForPreview({ contents: JSON.stringify(manifest) })).toEqual({
+      status: "ready",
+      preview: {
+        exportedAt: manifest.metadata.exportedAt,
+        backupFormatVersion: 1,
+        encrypted: false,
+        rowCount: 0,
+        photoCount: 0,
+      },
+    });
+  });
+
+  it("returns a typed structural failure without exposing file content", () => {
+    expect(loadBackupForPreview({ contents: "{not-json" })).toEqual({
+      status: "failed",
+      reason: "damaged-or-incomplete",
+    });
   });
 });
 
