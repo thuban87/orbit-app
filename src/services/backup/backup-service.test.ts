@@ -181,6 +181,30 @@ describe("restore preview", () => {
       reason: "damaged-or-incomplete",
     });
   });
+
+  it("maps an authenticated encrypted payload to the same aggregate preview", () => {
+    const crypto = {
+      decrypt: vi.fn(() => new TextEncoder().encode(JSON.stringify(manifest))),
+    };
+    expect(loadBackupForPreview({
+      contents: JSON.stringify({ encrypted: true }),
+      passphrase: "correct horse battery staple",
+      crypto: crypto as never,
+    })).toEqual({
+      status: "ready",
+      preview: {
+        exportedAt: manifest.metadata.exportedAt,
+        backupFormatVersion: 1,
+        encrypted: true,
+        rowCount: 0,
+        photoCount: 0,
+      },
+    });
+    expect(crypto.decrypt).toHaveBeenCalledWith({
+      passphrase: "correct horse battery staple",
+      envelope: { encrypted: true },
+    });
+  });
 });
 
 describe("backup encryption safety", () => {

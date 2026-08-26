@@ -45,8 +45,14 @@ describe("parseBackupManifest", () => {
     const broken = valid();
     broken.contacts = [{ uid: "contact", modifiedAt: "2026-08-25 12:00:00" }];
     broken.interactions = [{ uid: "interaction", contactUid: "contact", modifiedAt: "2026-08-25 12:00:00" }];
-    broken.tombstones = [{ entityType: "contacts", entityUid: "contact", deletedAt: "2026-08-25 12:00:00" }];
+    broken.tombstones = [{ entityType: "contact", entityUid: "contact", deletedAt: "2026-08-25 12:00:00" }];
     expect(() => parseBackupManifest(broken)).toThrow(/surviving contact/i);
+  });
+
+  it("rejects a category reference that cannot be resolved within the backup itself", () => {
+    const broken = valid();
+    broken.contacts = [{ uid: "contact", modifiedAt: "2026-08-25 12:00:00", categoryUid: "missing" }];
+    expect(() => parseBackupManifest(broken)).toThrow(/category/i);
   });
 
   it("rejects malformed photo bytes before an apply can begin", () => {

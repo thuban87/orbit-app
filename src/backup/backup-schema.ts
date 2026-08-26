@@ -3,6 +3,7 @@ import {
   type BackupManifest,
   BackupSchemaError,
 } from "@/backup/types";
+import { sameFileSurvivorUids } from "@/backup/reconciliation";
 
 /** Displayed before any preview or restore work for a file from a newer app. */
 export const UPDATE_FIRST_MESSAGE = "This backup was made by a newer version of Orbit. Update the app first.";
@@ -42,6 +43,66 @@ function uidSet(rows: RawManifest[], label: string): Set<string> {
   return seen;
 }
 
+const PORTABLE_SETTINGS_KEYS = new Set([
+  "notificationsEnabled", "decayEnabled", "birthdayEnabled", "digestEnabled",
+  "lockscreenPublic", "deliveryHour", "quietStartHour", "quietEndHour",
+  "selfSunColour", "aiProvider", "aiModel", "aiCustomEndpoint", "aiCustomModel",
+  "aiPromptTemplate", "backupIntervalDays", "backupRetentionDays", "modifiedAt",
+  "sunContactUid",
+]);
+
+const SECRET_SHAPED_KEY = /(?:api.?key|secret|passphrase|token|credential|password)/i;
+const TOMBSTONE_ENTITY_TYPES = new Set([
+  "contact",
+  "interaction",
+  "event",
+  "fuel",
+  "contact_link",
+  "custom_field_def",
+  "custom_field_value",
+]);
+
+function assertPortableSettings(settings: RawManifest, contacts: Set<string>): void {
+  if (typeof settings.modifiedAt !== "string") fail("appSettings has an invalid modifiedAt");
+  for (const key of Object.keys(settings)) {
+    if (SECRET_SHAPED_KEY.test(key) || !PORTABLE_SETTINGS_KEYS.has(key)) {
+      fail("appSettings contains a local-only or secret member");
+    }
+  }
+  if (settings.sunContactUid !== null && (typeof settings.sunContactUid !== "string" || !contacts.has(settings.sunContactUid))) {
+    fail("appSettings has an unknown sun contact UID");
+  }
+}
+
+function validBase64(value: unknown): value is string {
+  if (typeof value !== "string" || !/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(value)) return false;
+  // This intentionally verifies byte shape without relying on a native or Node
+  // decoder: padding can only appear at the final quantum under the regex.
+  return value.length > 0;
+}
+
+function reconciliationRows(rows: RawManifest[]): Array<{ uid: string; modified_at: string }> {
+  return rows.map((row) => {
+    if (typeof row.uid !== "string" || typeof row.modifiedAt !== "string") {
+      fail("backup has an invalid live row");
+    }
+    return { uid: row.uid, modified_at: row.modifiedAt };
+  });
+}
+
+function survivorsFor(
+  rows: RawManifest[],
+  tombstones: Array<{ entityType: string; entityUid: string; deletedAt: string }>,
+  entityType: string,
+): ReadonlySet<string> {
+  return sameFileSurvivorUids(
+    reconciliationRows(rows),
+    tombstones
+      .filter((row) => row.entityType === entityType)
+      .map((row) => ({ entity_uid: row.entityUid, deleted_at: row.deletedAt })),
+  );
+}
+
 function validate(manifest: RawManifest): BackupManifest {
   const requiredArrays = [
     "categories", "contacts", "interactions", "events", "fuel", "contactLinks", "customFieldDefs", "customFieldValues", "tombstones",
@@ -52,9 +113,7 @@ function validate(manifest: RawManifest): BackupManifest {
   const defs = uidSet(arrays.customFieldDefs, "customFieldDefs");
   for (const key of ["categories", "interactions", "events", "fuel", "contactLinks", "customFieldValues"] as const) uidSet(arrays[key], key);
   const settings = record(manifest.appSettings, "appSettings");
-  if (settings.sunContactUid !== null && (typeof settings.sunContactUid !== "string" || !contacts.has(settings.sunContactUid))) {
-    fail("appSettings has an unknown sun contact UID");
-  }
+  assertPortableSettings(settings, contacts);
   const pairs = new Set<string>();
   for (const contact of arrays.contacts) {
     if (contact.categoryUid !== null && contact.categoryUid !== undefined && (typeof contact.categoryUid !== "string" || !categories.has(contact.categoryUid))) {
@@ -80,12 +139,39 @@ function validate(manifest: RawManifest): BackupManifest {
   if (!Number.isInteger(manifest.envelopeVersion)) fail("envelopeVersion must be an integer");
   const tombstoneKeys = new Set<string>();
   const tombstones = arrays.tombstones.map((row) => {
-    if (typeof row.entityType !== "string" || typeof row.entityUid !== "string" || typeof row.deletedAt !== "string") fail("tombstones has an invalid row");
+    if (
+      typeof row.entityType !== "string"
+      || !TOMBSTONE_ENTITY_TYPES.has(row.entityType)
+      || typeof row.entityUid !== "string"
+      || row.entityUid.length === 0
+      || typeof row.deletedAt !== "string"
+    ) {
+      fail("tombstones has an invalid row");
+    }
     const key = `${row.entityType}\u0000${row.entityUid}`;
     if (tombstoneKeys.has(key)) fail("tombstones has a duplicate entity UID");
     tombstoneKeys.add(key);
     return { entityType: row.entityType, entityUid: row.entityUid, deletedAt: row.deletedAt };
   });
+  const survivingContacts = survivorsFor(arrays.contacts, tombstones, "contact");
+  const survivingDefs = survivorsFor(arrays.customFieldDefs, tombstones, "custom_field_def");
+  for (const [label, rows] of Object.entries({ interactions: arrays.interactions, events: arrays.events, fuel: arrays.fuel, contactLinks: arrays.contactLinks })) {
+    for (const row of rows) {
+      if (!survivingContacts.has(row.contactUid as string)) fail(`${label} has no surviving contact parent`);
+    }
+  }
+  for (const value of arrays.customFieldValues) {
+    if (!survivingContacts.has(value.contactUid as string)) fail("customFieldValues has no surviving contact parent");
+    if (!survivingDefs.has(value.fieldDefUid as string)) fail("customFieldValues has no surviving field definition parent");
+  }
+  for (const row of [...arrays.contacts, ...arrays.customFieldValues]) {
+    if (row.photoBase64 !== null && row.photoBase64 !== undefined && !validBase64(row.photoBase64)) {
+      fail("backup has invalid photo bytes");
+    }
+  }
+  if (profile && profile.photoBase64 !== null && profile.photoBase64 !== undefined && !validBase64(profile.photoBase64)) {
+    fail("backup has invalid photo bytes");
+  }
   return {
     backupFormatVersion: BACKUP_FORMAT_VERSION,
     envelopeVersion: manifest.envelopeVersion as number,

@@ -1,9 +1,57 @@
-import { parseBackupManifest } from "@/backup/backup-schema";
+import { parseBackupManifest, UPDATE_FIRST_MESSAGE } from "@/backup/backup-schema";
 import { buildExportManifest } from "@/backup/export-manifest";
+import { BackupEnvelopeError, type BackupEnvelopeCrypto } from "@/services/backup/encryption";
 import { automaticBackupFilename, isExpiredAutomaticBackup, isOwnedAutomaticBackup } from "@/backup/auto-backup-policy";
 import type { SqlExecutor } from "@/db/types";
 import type { SafStorage } from "@/services/backup/saf-storage";
 import type { BackupPassphraseStore, PassphraseReadResult } from "@/services/backup/passphrase-store";
+
+export type BackupPreviewResult =
+  | { status: "ready"; preview: { exportedAt: string; backupFormatVersion: number; encrypted: boolean; rowCount: number; photoCount: number } }
+  | { status: "failed"; reason: "wrong-passphrase" | "damaged-or-incomplete" | "newer-app" };
+
+/**
+ * The write-free restore boundary. It deliberately returns aggregate data only:
+ * callers retain the validated manifest privately until a later explicit apply.
+ */
+export function loadBackupForPreview(input: {
+  contents: string;
+  passphrase?: string;
+  crypto?: BackupEnvelopeCrypto;
+}): BackupPreviewResult {
+  try {
+    let raw: unknown = JSON.parse(input.contents);
+    let encrypted = false;
+    if (raw && typeof raw === "object" && (raw as Record<string, unknown>).encrypted === true) {
+      if (!input.crypto || !input.passphrase) return { status: "failed", reason: "wrong-passphrase" };
+      const decrypted = input.crypto.decrypt({ passphrase: input.passphrase, envelope: raw });
+      raw = JSON.parse(new TextDecoder().decode(decrypted));
+      encrypted = true;
+    }
+    const manifest = parseBackupManifest(raw);
+    const rows = [manifest.categories, manifest.contacts, manifest.interactions, manifest.events,
+      manifest.fuel, manifest.contactLinks, manifest.customFieldDefs, manifest.customFieldValues, manifest.tombstones];
+    const photoRows = [manifest.profile, ...manifest.contacts, ...manifest.customFieldValues];
+    return {
+      status: "ready",
+      preview: {
+        exportedAt: manifest.metadata.exportedAt,
+        backupFormatVersion: manifest.backupFormatVersion,
+        encrypted,
+        rowCount: rows.reduce((count, value) => count + value.length, manifest.profile ? 1 : 0),
+        photoCount: photoRows.filter((row) => row?.photoBase64 !== null && row?.photoBase64 !== undefined).length,
+      },
+    };
+  } catch (error) {
+    if (error instanceof BackupEnvelopeError && error.code === "authentication-failed") {
+      return { status: "failed", reason: "wrong-passphrase" };
+    }
+    if (error instanceof Error && error.message === UPDATE_FIRST_MESSAGE) {
+      return { status: "failed", reason: "newer-app" };
+    }
+    return { status: "failed", reason: "damaged-or-incomplete" };
+  }
+}
 
 export type WriteEncryptionMode =
   | { mode: "plaintext" }
