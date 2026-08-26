@@ -24,6 +24,7 @@ vi.mock("@/backup/export-manifest", () => ({
 import {
   createAutomaticBackupService,
   createBackupEncryptionLifecycle,
+  createAutomaticBackupReencryptionService,
   createVerifiedPreRestoreSnapshot,
   createManualExportService,
   loadBackupForPreview,
@@ -209,6 +210,87 @@ describe("restore preview", () => {
 });
 
 describe("backup encryption safety", () => {
+  it("re-encrypts a verified automatic replacement before removing its old source and only then activates the new secret", async () => {
+    const events: string[] = [];
+    const entries = new Map<string, string>([
+      ["content://backup/orbit-auto-2026-08-24T00-00-00-000Z.json", JSON.stringify({ encrypted: true, passphrase: "old", plaintext: JSON.stringify(manifest) })],
+    ]);
+    const passphrases = {
+      active: "old",
+      pending: null as null | { oldPassphrase: string; nextPassphrase: string; replacements: Array<{ sourceUri: string; replacementUri: string }> },
+    };
+    const crypto = {
+      decrypt: ({ passphrase, envelope }: { passphrase: string; envelope: unknown }) => {
+        const input = envelope as { passphrase: string; plaintext: string };
+        if (passphrase !== input.passphrase) throw new Error("wrong passphrase");
+        return new TextEncoder().encode(input.plaintext);
+      },
+      encrypt: ({ passphrase, plaintext }: { passphrase: string; plaintext: Uint8Array }) => ({
+        encrypted: true,
+        passphrase,
+        plaintext: new TextDecoder().decode(plaintext),
+      }),
+    };
+    const service = createAutomaticBackupReencryptionService({
+      directoryUri: "content://backup",
+      now: new Date("2026-08-25T00:00:00.000Z"),
+      crypto: crypto as never,
+      profile: { formatVersion: 1 } as never,
+      passphrases: {
+        getPassphrase: async () => ({ status: "present" as const, passphrase: passphrases.active }),
+        setPassphrase: async (value) => { events.push("activate-new"); passphrases.active = value; },
+        deletePassphrase: async () => {},
+        getPendingPassphraseChange: async () => passphrases.pending === null ? { status: "absent" as const } : { status: "present" as const, change: passphrases.pending },
+        setPendingPassphraseChange: async (change) => { events.push("journal"); passphrases.pending = change; },
+        clearPendingPassphraseChange: async () => { events.push("clear-journal"); passphrases.pending = null; },
+      },
+      storage: {
+        list: async () => [...entries.keys()],
+        read: async (uri) => entries.get(uri)!,
+        writeVerified: async (_directory, name, contents) => {
+          const uri = `content://backup/${name}`;
+          events.push("write-verified");
+          entries.set(uri, contents);
+          return uri;
+        },
+        remove: async (uri) => { events.push("remove-old"); entries.delete(uri); },
+      },
+    });
+
+    await expect(service.change({ currentPassphrase: "old", nextPassphrase: "new" })).resolves.toEqual({ status: "changed", reencryptedCount: 1 });
+    expect(events).toEqual(["journal", "write-verified", "journal", "remove-old", "activate-new", "clear-journal"]);
+    expect([...entries.values()]).toEqual([expect.stringContaining('"passphrase":"new"')]);
+  });
+
+  it("keeps the old secret and pending recovery journal when a source cannot be replaced", async () => {
+    let active = "old";
+    let pending: unknown = null;
+    const service = createAutomaticBackupReencryptionService({
+      directoryUri: "content://backup",
+      now: new Date("2026-08-25T00:00:00.000Z"),
+      crypto: {} as never,
+      profile: {} as never,
+      passphrases: {
+        getPassphrase: async () => ({ status: "present" as const, passphrase: active }),
+        setPassphrase: async (value) => { active = value; },
+        deletePassphrase: async () => {},
+        getPendingPassphraseChange: async () => pending === null ? { status: "absent" as const } : { status: "present" as const, change: pending as never },
+        setPendingPassphraseChange: async (change) => { pending = change; },
+        clearPendingPassphraseChange: async () => { pending = null; },
+      },
+      storage: {
+        list: async () => ["content://backup/orbit-auto-2026-08-24T00-00-00-000Z.json"],
+        read: async () => { throw new Error("SAF permission revoked"); },
+        writeVerified: async () => "content://backup/new.json",
+        remove: async () => {},
+      },
+    });
+
+    await expect(service.change({ currentPassphrase: "old", nextPassphrase: "new" })).resolves.toEqual({ status: "needs-recovery" });
+    expect(active).toBe("old");
+    expect(pending).not.toBeNull();
+  });
+
   it("forces a verified pre-restore snapshot without consulting a due/changed policy", async () => {
     const writeVerified = vi.fn();
     const snapshot = createVerifiedPreRestoreSnapshot({
