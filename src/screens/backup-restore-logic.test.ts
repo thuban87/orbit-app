@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  confirmReplaceAllRestore,
   createRestoreApplySingleFlight,
   createRestorePreviewCache,
   initialRestoreApplyState,
@@ -76,6 +77,61 @@ describe("restore apply decisions", () => {
     expect(replaceAllConfirmation(false).message).toContain(
       "Your current local data will be lost and no automatic backup destination is configured.",
     );
+  });
+
+  it("keeps a validated preview available while Replace-all awaits its confirmation", async () => {
+    const cache = createRestorePreviewCache();
+    const route = cache.store({
+      manifest: { private: "validated-before-confirmation" } as unknown as import("@/backup/types").BackupManifest,
+      preview,
+    });
+    let accept!: (accepted: boolean) => void;
+    const waitingForConfirmation = new Promise<boolean>((resolve) => { accept = resolve; });
+
+    const result = confirmReplaceAllRestore(
+      cache,
+      route.token,
+      async () => true,
+      async () => waitingForConfirmation,
+    );
+    cache.discard(route.token);
+    accept(true);
+
+    await expect(result).resolves.toMatchObject({
+      status: "confirmed",
+      candidate: { manifest: { private: "validated-before-confirmation" } },
+    });
+  });
+
+  it("does not open confirmation for an already expired preview", async () => {
+    let readDestinationCalls = 0;
+    let confirmationCalls = 0;
+
+    await expect(confirmReplaceAllRestore(
+      createRestorePreviewCache(),
+      "missing-token",
+      async () => { readDestinationCalls += 1; return true; },
+      async () => { confirmationCalls += 1; return true; },
+    )).resolves.toEqual({ status: "expired" });
+
+    expect(readDestinationCalls).toBe(0);
+    expect(confirmationCalls).toBe(0);
+  });
+
+  it("cancels Replace-all without consuming its validated candidate", async () => {
+    const cache = createRestorePreviewCache();
+    const route = cache.store({
+      manifest: { private: "keep-after-cancel" } as unknown as import("@/backup/types").BackupManifest,
+      preview,
+    });
+
+    await expect(confirmReplaceAllRestore(
+      cache,
+      route.token,
+      async () => false,
+      async () => false,
+    )).resolves.toEqual({ status: "cancelled" });
+    expect(cache.read(route.token)).toMatchObject({ manifest: { private: "keep-after-cancel" } });
   });
 
   it("shares one pending apply promise and never persists an applying state for a cold start", async () => {

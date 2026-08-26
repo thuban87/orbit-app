@@ -1,5 +1,5 @@
-import type { BackupManifest } from "@/backup/types";
 import type { RestoreApplyResult, RestoreMode } from "@/backup/restore-apply";
+import type { BackupManifest } from "@/backup/types";
 import type { RestorePreviewAggregate } from "@/services/backup/backup-service";
 
 export type RestorePreviewRoute = {
@@ -7,10 +7,15 @@ export type RestorePreviewRoute = {
   readonly preview: RestorePreviewAggregate;
 };
 
-type RestoreCacheEntry = {
+export type RestoreCacheEntry = {
   readonly manifest: BackupManifest;
   readonly preview: RestorePreviewAggregate;
 };
+
+export type ReplaceAllConfirmationResult =
+  | { readonly status: "confirmed"; readonly candidate: RestoreCacheEntry }
+  | { readonly status: "cancelled" }
+  | { readonly status: "expired" };
 
 export type RestorePreviewFailureReason =
   | "wrong-passphrase"
@@ -45,6 +50,25 @@ export function createRestorePreviewCache() {
 
 /** Deliberately process-local: a cold launch must re-select and re-validate. */
 export const restorePreviewCache = createRestorePreviewCache();
+
+/**
+ * Coordinates the async Replace-all confirmation with the validated preview
+ * candidate. The candidate never travels through navigation params.
+ */
+export async function confirmReplaceAllRestore(
+  cache: Pick<ReturnType<typeof createRestorePreviewCache>, "read">,
+  token: string,
+  readDestinationConfigured: () => Promise<boolean>,
+  confirm: (destinationConfigured: boolean) => Promise<boolean>,
+): Promise<ReplaceAllConfirmationResult> {
+  const candidate = cache.read(token);
+  if (!candidate) return { status: "expired" };
+
+  const destinationConfigured = await readDestinationConfigured();
+  const accepted = await confirm(destinationConfigured);
+  if (!accepted) return { status: "cancelled" };
+  return { status: "confirmed", candidate };
+}
 
 export function isEncryptedBackupEnvelope(contents: string): boolean {
   try {

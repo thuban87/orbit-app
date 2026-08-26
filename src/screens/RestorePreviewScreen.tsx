@@ -5,7 +5,9 @@ import { getAppSettings } from "@/db/app-settings-dao";
 import { getExecutor, localDateTime } from "@/db/database";
 import type { RootStackScreenProps } from "@/navigation/types";
 import {
+  confirmReplaceAllRestore,
   createRestoreApplySingleFlight,
+  type RestoreCacheEntry,
   replaceAllConfirmation,
   restoreApplyLabel,
   restoreApplyRecovery,
@@ -81,6 +83,7 @@ export function RestorePreviewScreen({
   const [confirming, setConfirming] = useState(false);
   const [applyError, setApplyError] = useState<string | null>(null);
   const executeRef = useRef<() => Promise<void>>(async () => {});
+  const confirmedCandidateRef = useRef<RestoreCacheEntry | null>(null);
   const runSingleApply = useRef(createRestoreApplySingleFlight(() => executeRef.current())).current;
 
   useEffect(() => {
@@ -96,7 +99,7 @@ export function RestorePreviewScreen({
   }, [navigation]);
 
   executeRef.current = async () => {
-    const cached = restorePreviewCache.read(route.params.token);
+    const cached = confirmedCandidateRef.current ?? restorePreviewCache.read(route.params.token);
     if (!cached) {
       setExpired(true);
       return;
@@ -131,21 +134,29 @@ export function RestorePreviewScreen({
     if (applying || confirming) return;
     if (mode === "replace-all") {
       setConfirming(true);
-      let configuredNow: boolean;
       try {
-        configuredNow = Boolean((await getAppSettings(getExecutor())).backupFolderUri);
+        const confirmation = await confirmReplaceAllRestore(
+          restorePreviewCache,
+          route.params.token,
+          async () => Boolean((await getAppSettings(getExecutor())).backupFolderUri),
+          confirmReplace,
+        );
+        if (confirmation.status === "cancelled") return;
+        if (confirmation.status === "expired") {
+          setExpired(true);
+          return;
+        }
+        confirmedCandidateRef.current = confirmation.candidate;
       } catch (error) {
         Logger.error(LOG_SCOPE, "failed to confirm pre-restore destination", error);
-        setConfirming(false);
         setApplyError(restoreApplyRecovery("unexpected").message);
         return;
+      } finally {
+        setConfirming(false);
       }
-      const accepted = await confirmReplace(configuredNow);
-      setConfirming(false);
-      if (!accepted) return;
     }
     await runSingleApply();
-  }, [applying, confirming, mode, runSingleApply]);
+  }, [applying, confirming, mode, route.params.token, runSingleApply]);
 
   if (expired) {
     return (
