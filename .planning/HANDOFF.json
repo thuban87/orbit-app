@@ -1,0 +1,63 @@
+{
+  "version": "1.0",
+  "timestamp": "2026-08-26T00:15:56.237Z",
+  "phase": "17",
+  "phase_name": "Backup, Export & Restore",
+  "phase_dir": ".planning/phases/17-backup-export-restore",
+  "plan": 8,
+  "task": 1,
+  "total_tasks": 3,
+  "status": "paused",
+  "completed_tasks": [
+    {
+      "id": 1,
+      "name": "Turn one selected file into a validated aggregate restore preview without writes",
+      "status": "in_progress",
+      "progress": "RED tests are committed in d8d0472; partial uncommitted schema and preview-service implementation must be preserved and completed."
+    }
+  ],
+  "remaining_tasks": [
+    {
+      "id": 1,
+      "name": "Finish and verify validated aggregate restore preview",
+      "status": "in_progress"
+    },
+    {
+      "id": 2,
+      "name": "Apply Merge and Replace-all through one outer transaction",
+      "status": "not_started"
+    },
+    {
+      "id": 3,
+      "name": "Register the foreground pending-photo journal drain",
+      "status": "not_started"
+    },
+    {
+      "id": 9,
+      "name": "Execute remaining Plans 17-09 through 17-11 in serial wave order",
+      "status": "not_started"
+    }
+  ],
+  "blockers": [],
+  "async_jobs": [],
+  "human_actions_pending": [],
+  "decisions": [
+    {
+      "decision": "Use the owner-approved v1 encrypted-backup profile: PBKDF2-HMAC-SHA256 at 600,000 iterations, 32-byte key, 16-byte salt, 12-byte IV, AES-256-GCM, 8 MiB ciphertext cap.",
+      "rationale": "Measured at 53 ms median on the current Pixel 6 Pro release build; it protects against offline guessing of a stolen encrypted backup without ordinary-app performance impact.",
+      "phase": "17"
+    },
+    {
+      "decision": "Continue executor dispatches on gpt-5.6-terra with high reasoning effort.",
+      "rationale": "Explicit user request.",
+      "phase": "17"
+    }
+  ],
+  "uncommitted_files": [
+    "src/backup/backup-schema.ts (partial Plan 17-08 Task 1)",
+    "src/services/backup/backup-service.ts (partial Plan 17-08 Task 1)",
+    ".planning/milestone.lock (pre-existing/unrelated and intentionally untouched)"
+  ],
+  "next_action": "Inspect and preserve the partial 17-08 Task 1 files and d8d0472 RED test commit, then finish Task 1 in place.",
+  "context_notes": "Plan 17-08 was intentionally paused immediately after the RED commit and first partial implementation edits. No code should be reset or re-dispatched as blank work."
+}
