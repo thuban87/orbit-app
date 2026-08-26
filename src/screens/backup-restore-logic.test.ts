@@ -16,7 +16,10 @@ const preview = {
 describe("restore preview route safety", () => {
   it("hands navigation only an opaque token and aggregate preview", () => {
     const cache = createRestorePreviewCache();
-    const route = cache.store({ manifest: { private: "never routed" }, preview });
+    const route = cache.store({
+      manifest: { private: "never routed" } as unknown as import("@/backup/types").BackupManifest,
+      preview,
+    });
 
     expect(route).toEqual({ token: expect.any(String), preview });
     expect(Object.values(route).flat()).not.toContain("never routed");
