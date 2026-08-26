@@ -1,63 +1,58 @@
 {
   "version": "1.0",
-  "timestamp": "2026-08-26T00:15:56.237Z",
+  "timestamp": "2026-08-26T03:45:51.136Z",
   "phase": "17",
   "phase_name": "Backup, Export & Restore",
   "phase_dir": ".planning/phases/17-backup-export-restore",
-  "plan": 8,
-  "task": 1,
-  "total_tasks": 3,
+  "plan": 11,
+  "task": 2,
+  "total_tasks": 2,
   "status": "paused",
   "completed_tasks": [
     {
       "id": 1,
-      "name": "Turn one selected file into a validated aggregate restore preview without writes",
-      "status": "in_progress",
-      "progress": "RED tests are committed in d8d0472; partial uncommitted schema and preview-service implementation must be preserved and completed."
+      "name": "Run complete node, type, color, package, migration, restore, photo-recovery, and crypto-boundary gates",
+      "status": "done",
+      "commit": "f9f2273",
+      "progress": "126 files / 1457 tests passed; TypeScript, color, and Expo public-config checks passed."
     }
   ],
   "remaining_tasks": [
     {
-      "id": 1,
-      "name": "Finish and verify validated aggregate restore preview",
-      "status": "in_progress"
-    },
-    {
       "id": 2,
-      "name": "Apply Merge and Replace-all through one outer transaction",
-      "status": "not_started"
-    },
-    {
-      "id": 3,
-      "name": "Register the foreground pending-photo journal drain",
-      "status": "not_started"
-    },
-    {
-      "id": 9,
-      "name": "Execute remaining Plans 17-09 through 17-11 in serial wave order",
-      "status": "not_started"
+      "name": "Build/install a release APK and run the complete disposable-data Pixel UAT",
+      "status": "awaiting_scope_discussion"
     }
   ],
   "blockers": [],
   "async_jobs": [],
-  "human_actions_pending": [],
+  "human_actions_pending": [
+    {
+      "action": "Discuss the exact device-UAT operations and disposable setup at the start of the next session",
+      "context": "The owner explicitly wants a brief alignment discussion before action. The documented droid build, Pixel install, and disposable-data test execution are already authorized after that discussion.",
+      "blocking": true
+    }
+  ],
   "decisions": [
     {
-      "decision": "Use the owner-approved v1 encrypted-backup profile: PBKDF2-HMAC-SHA256 at 600,000 iterations, 32-byte key, 16-byte salt, 12-byte IV, AES-256-GCM, 8 MiB ciphertext cap.",
-      "rationale": "Measured at 53 ms median on the current Pixel 6 Pro release build; it protects against offline guessing of a stolen encrypted backup without ordinary-app performance impact.",
+      "decision": "Use gpt-5.6-terra at high reasoning for Phase 17 execution/UAT agents.",
+      "rationale": "Explicit owner instruction; do not substitute routine inline execution.",
       "phase": "17"
     },
     {
-      "decision": "Continue executor dispatches on gpt-5.6-terra with high reasoning effort.",
-      "rationale": "Explicit user request.",
+      "decision": "Continue normal implementation without routine tracer checkpoints.",
+      "rationale": "The owner has instructed completion; only genuine external/device scope alignment should pause work.",
+      "phase": "17"
+    },
+    {
+      "decision": "The next agent may run the documented desktop build, Pixel install, and disposable-data UAT after discussing the precise scope with the owner.",
+      "rationale": "The owner reconfirmed that the old Pixel is appropriate for this testing and that previous build/install/device work is in scope.",
       "phase": "17"
     }
   ],
   "uncommitted_files": [
-    "src/backup/backup-schema.ts (partial Plan 17-08 Task 1)",
-    "src/services/backup/backup-service.ts (partial Plan 17-08 Task 1)",
-    ".planning/milestone.lock (pre-existing/unrelated and intentionally untouched)"
+    ".planning/milestone.lock (unrelated untracked file; preserve untouched)"
   ],
-  "next_action": "Inspect and preserve the partial 17-08 Task 1 files and d8d0472 RED test commit, then finish Task 1 in place.",
-  "context_notes": "Plan 17-08 was intentionally paused immediately after the RED commit and first partial implementation edits. No code should be reset or re-dispatched as blank work."
+  "next_action": "Discuss exact Pixel UAT setup, then execute Plan 17-11 Task 2 through docs/runbooks/desktop-build-pipeline.md with a gpt-5.6-terra high-reasoning executor.",
+  "context_notes": "Plans 17-08 through 17-10 are complete. Plan 17-11 Task 1 is complete with 1457 passing tests. The sole remaining phase work is the owner-aligned physical Pixel UAT and phase closeout."
 }
