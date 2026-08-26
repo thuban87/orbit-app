@@ -116,7 +116,7 @@ status: complete
 
 ## Issues Encountered
 
-None.
+`state.advance-plan` could not parse this repository's legacy STATE.md current-plan field. The remaining SDK updates succeeded: metrics, decisions, session state, requirement checkboxes, and ROADMAP plan progress now show Plan 17-09 complete (10/12).
 
 ## User Setup Required
 
