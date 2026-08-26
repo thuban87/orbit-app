@@ -1,5 +1,6 @@
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import type { PhotoTargetDescriptor } from "@/services/photos/photo-storage";
+import type { RestorePreviewRoute } from "@/screens/backup-restore-logic";
 
 /**
  * The single route → params contract for the app's native-stack navigator
@@ -104,8 +105,8 @@ export type RootStackParamList = {
   Backup: undefined;
   /** Dedicated automatic-backup and encryption configuration screen. */
   BackupSettings: { section?: "automatic" | "encryption" } | undefined;
-  /** Serializable hand-off from the picker to the later restore preview route. */
-  RestorePreview: { fileUri: string | null };
+  /** Serializable aggregate hand-off; the validated backup stays process-local. */
+  RestorePreview: RestorePreviewRoute;
   /** Aggregate-only committed restore outcome; never carries backup contents. */
   RestoreResult: {
     added: number;

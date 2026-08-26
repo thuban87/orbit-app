@@ -1,6 +1,8 @@
 import { useFocusEffect } from "@react-navigation/native";
+import * as DocumentPicker from "expo-document-picker";
+import { File } from "expo-file-system";
 import { useCallback, useState } from "react";
-import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import {
   getAppSettings,
   recordAutomaticBackupHealthCore,
@@ -10,6 +12,7 @@ import { inWriteTransaction } from "@/db/transaction";
 import type { RootStackScreenProps } from "@/navigation/types";
 import {
   createManualExportService,
+  loadBackupForRestore,
   type ManualExportResult,
 } from "@/services/backup/backup-service";
 import { backupPassphraseStore } from "@/services/backup/passphrase-store";
@@ -29,6 +32,11 @@ import {
   resolveBackupHealth,
   resolveBackupNudge,
 } from "./backup-health-logic";
+import {
+  isEncryptedBackupEnvelope,
+  restorePreviewCache,
+  restorePreviewFailure,
+} from "./backup-restore-logic";
 
 const LOG_SCOPE = "backup-screen";
 
@@ -56,6 +64,10 @@ export function BackupScreen({ navigation }: RootStackScreenProps<"Backup">) {
   const [encryptionEnabled, setEncryptionEnabled] = useState(false);
   const [showNudge, setShowNudge] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [restoreStage, setRestoreStage] = useState<"idle" | "loading" | "passphrase">("idle");
+  const [selectedEncryptedContents, setSelectedEncryptedContents] = useState<string | null>(null);
+  const [restorePassphrase, setRestorePassphrase] = useState("");
+  const [restoreMessage, setRestoreMessage] = useState<string | null>(null);
 
   const reload = useCallback(() => {
     let cancelled = false;
@@ -174,6 +186,69 @@ export function BackupScreen({ navigation }: RootStackScreenProps<"Backup">) {
     );
   }, [encryptionEnabled, runExport]);
 
+  const validateRestore = useCallback((contents: string, passphrase?: string) => {
+    setRestoreStage("loading");
+    setRestoreMessage(null);
+    try {
+      const candidate = loadBackupForRestore({
+        contents,
+        passphrase,
+        crypto: createBackupEnvelopeCrypto({
+          profiles: [APPROVED_BACKUP_ENCRYPTION_PROFILE],
+        }),
+      });
+      if (candidate.status !== "ready") {
+        const failure = restorePreviewFailure(candidate.reason);
+        setRestoreMessage(failure.message);
+        setRestoreStage(failure.step === "passphrase" ? "passphrase" : "idle");
+        if (failure.step === "selection") setSelectedEncryptedContents(null);
+        return;
+      }
+      const route = restorePreviewCache.store(candidate);
+      setSelectedEncryptedContents(null);
+      setRestorePassphrase("");
+      setRestoreStage("idle");
+      navigation.navigate("RestorePreview", route);
+    } catch (error) {
+      Logger.error(LOG_SCOPE, "restore preview validation failed", error);
+      setSelectedEncryptedContents(null);
+      setRestoreStage("idle");
+      setRestoreMessage("Couldn't restore this backup. Your local data hasn't changed. Please try again.");
+    }
+  }, [navigation]);
+
+  const chooseRestore = useCallback(async () => {
+    if (restoreStage === "loading") return;
+    setRestoreMessage(null);
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: ["application/json", "text/json"],
+        multiple: false,
+        copyToCacheDirectory: true,
+      });
+      if (result.canceled) return;
+      const asset = result.assets[0];
+      if (!asset) return;
+      const contents = await new File(asset.uri).text();
+      if (isEncryptedBackupEnvelope(contents)) {
+        setSelectedEncryptedContents(contents);
+        setRestorePassphrase("");
+        setRestoreStage("passphrase");
+        return;
+      }
+      validateRestore(contents);
+    } catch (error) {
+      Logger.error(LOG_SCOPE, "restore document selection failed", error);
+      setRestoreStage("idle");
+      setRestoreMessage("Couldn't restore this backup. Your local data hasn't changed. Please try again.");
+    }
+  }, [restoreStage, validateRestore]);
+
+  const continueEncryptedRestore = useCallback(() => {
+    if (!selectedEncryptedContents || !restorePassphrase) return;
+    validateRestore(selectedEncryptedContents, restorePassphrase);
+  }, [restorePassphrase, selectedEncryptedContents, validateRestore]);
+
   const heroAction = health?.kind === "not-configured" ? "Set up backups" : health?.kind === "lost-folder" ? "Choose folder" : "Manage backups";
   const heroDetail = health?.kind === "healthy"
     ? `Automatic backup: ${relativeTime(health.lastAutomaticBackupAt)}\n${health.automaticFileCount} backup${health.automaticFileCount === 1 ? "" : "s"} kept in ${health.folderName}`
@@ -206,10 +281,14 @@ export function BackupScreen({ navigation }: RootStackScreenProps<"Backup">) {
         <Pressable testID="backup-export" accessibilityRole="button" accessibilityLabel="Export now" accessibilityState={{ disabled: exporting }} disabled={exporting} onPress={onExport} style={[styles.actionCard, { backgroundColor: colors.surface, borderColor: colors.border, opacity: exporting ? 0.6 : 1 }]}>
           <Text style={[styles.actionIcon, { color: colors.accent }]}>⇧</Text><Text style={[styles.actionTitle, { color: colors.textPrimary }]}>Export now</Text><Text style={[styles.actionHelper, { color: colors.textSecondary }]}>Save a copy to share</Text>
         </Pressable>
-        <Pressable testID="backup-restore" accessibilityRole="button" accessibilityLabel="Restore a backup" onPress={() => navigation.navigate("RestorePreview", { fileUri: null })} style={[styles.actionCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+        <Pressable testID="backup-restore" accessibilityRole="button" accessibilityLabel="Restore a backup" accessibilityState={{ disabled: restoreStage === "loading" }} disabled={restoreStage === "loading"} onPress={() => void chooseRestore()} style={[styles.actionCard, { backgroundColor: colors.surface, borderColor: colors.border, opacity: restoreStage === "loading" ? 0.6 : 1 }]}>
           <Text style={[styles.actionIcon, { color: colors.textSecondary }]}>↥</Text><Text style={[styles.actionTitle, { color: colors.textPrimary }]}>Restore a backup</Text><Text style={[styles.actionHelper, { color: colors.textSecondary }]}>Preview before changing anything</Text>
         </Pressable>
       </View>
+
+      {restoreStage === "loading" ? <View testID="restore-preview-loading" accessibilityLiveRegion="polite" accessibilityLabel="Checking backup before preview" style={[styles.restoreNotice, { backgroundColor: colors.surface, borderColor: colors.border }]}><Text style={[styles.rowTitle, { color: colors.textPrimary }]}>Checking backup…</Text><Text style={[styles.actionHelper, { color: colors.textSecondary }]}>Orbit will only show a preview after this backup is ready.</Text></View> : null}
+      {restoreStage === "passphrase" ? <View testID="restore-passphrase-prompt" style={[styles.restoreNotice, { backgroundColor: colors.surface, borderColor: colors.border }]}><Text style={[styles.rowTitle, { color: colors.textPrimary }]}>Enter backup passphrase</Text><Text style={[styles.actionHelper, { color: colors.textSecondary }]}>This encrypted backup needs its passphrase before Orbit can preview it.</Text><TextInput testID="restore-passphrase-input" secureTextEntry value={restorePassphrase} onChangeText={setRestorePassphrase} accessibilityLabel="Backup passphrase" placeholder="Passphrase" placeholderTextColor={colors.textSecondary} style={[styles.passphraseInput, { color: colors.textPrimary, borderColor: colors.border, backgroundColor: colors.background }]} /><View style={styles.restorePromptActions}><Pressable accessibilityRole="button" accessibilityLabel="Choose another backup" onPress={() => { setSelectedEncryptedContents(null); setRestorePassphrase(""); setRestoreStage("idle"); void chooseRestore(); }} style={[styles.secondaryButton, { borderColor: colors.border }]}><Text style={{ color: colors.textSecondary }}>Choose another backup</Text></Pressable><Pressable accessibilityRole="button" accessibilityLabel="Continue to preview backup" accessibilityState={{ disabled: !restorePassphrase }} disabled={!restorePassphrase} onPress={continueEncryptedRestore} style={[styles.primaryButton, { backgroundColor: colors.accent, opacity: restorePassphrase ? 1 : 0.6 }]}><Text style={{ color: colors.textPrimary }}>Continue to preview backup</Text></Pressable></View></View> : null}
+      {restoreMessage ? <View testID="restore-selection-error" accessibilityLiveRegion="polite" style={[styles.restoreNotice, { backgroundColor: colors.surface, borderColor: colors.border }]}><Text style={[styles.actionHelper, { color: colors.textSecondary }]}>{restoreMessage}</Text><Pressable accessibilityRole="button" accessibilityLabel="Choose another file" onPress={() => void chooseRestore()} style={styles.linkButton}><Text style={{ color: colors.accent }}>Choose another file</Text></Pressable></View> : null}
 
       <Pressable testID="backup-encryption" accessibilityRole="button" accessibilityLabel={`Encryption. ${encryptionEnabled ? "On — new backups are protected with your passphrase" : "Off — backups are readable JSON"}`} onPress={() => openSettings("encryption")} style={[styles.encryptionRow, { backgroundColor: colors.surface, borderColor: colors.border }]}>
         <Text style={[styles.lock, { color: colors.textSecondary }]}>⌑</Text><View style={styles.encryptionCopy}><Text style={[styles.rowTitle, { color: colors.textPrimary }]}>Encryption</Text><Text style={[styles.actionHelper, { color: colors.textSecondary }]}>{encryptionEnabled ? "On — new backups are protected with your passphrase" : "Off — backups are readable JSON"}</Text></View><Text style={{ color: colors.textSecondary }}>›</Text>
@@ -223,5 +302,5 @@ export function BackupScreen({ navigation }: RootStackScreenProps<"Backup">) {
 }
 
 const styles = StyleSheet.create({
-  content: { padding: 16, gap: 24 }, header: { gap: 16, paddingTop: 8 }, back: { minHeight: 44, alignSelf: "flex-start", borderWidth: 1, borderRadius: 10, justifyContent: "center", paddingHorizontal: 16 }, title: { fontSize: 24, fontWeight: "700" }, hero: { borderWidth: 1, borderRadius: 14, padding: 16, gap: 12 }, placeholder: { height: 214, borderWidth: 1, borderRadius: 14 }, heroHeading: { flexDirection: "row", alignItems: "center", gap: 8 }, statusDot: { width: 10, height: 10, borderRadius: 5 }, heroTitle: { fontSize: 20, fontWeight: "700" }, body: { fontSize: 15, lineHeight: 21 }, detail: { borderTopWidth: StyleSheet.hairlineWidth, paddingTop: 12, fontSize: 14, lineHeight: 20 }, linkButton: { minHeight: 44, justifyContent: "center", alignSelf: "flex-start" }, actions: { flexDirection: "row", gap: 8 }, actionCard: { flex: 1, minHeight: 148, borderWidth: 1, borderRadius: 14, padding: 16, gap: 8 }, actionIcon: { fontSize: 24 }, actionTitle: { fontSize: 16, fontWeight: "700" }, actionHelper: { fontSize: 13, lineHeight: 18 }, encryptionRow: { minHeight: 76, borderWidth: 1, borderRadius: 14, padding: 16, flexDirection: "row", alignItems: "center", gap: 12 }, lock: { fontSize: 22 }, encryptionCopy: { flex: 1, gap: 4 }, rowTitle: { fontSize: 16, fontWeight: "700" }, nudge: { borderWidth: 1, borderRadius: 14, padding: 16, flexDirection: "row", gap: 8 }, nudgeCopy: { flex: 1, gap: 4 }, dismiss: { minHeight: 44, minWidth: 44, alignItems: "center", justifyContent: "center" }, privacy: { flexDirection: "row", gap: 8, paddingBottom: 24 }, privacyText: { flex: 1, fontSize: 13, lineHeight: 18 },
+  content: { padding: 16, gap: 24 }, header: { gap: 16, paddingTop: 8 }, back: { minHeight: 44, alignSelf: "flex-start", borderWidth: 1, borderRadius: 10, justifyContent: "center", paddingHorizontal: 16 }, title: { fontSize: 24, fontWeight: "700" }, hero: { borderWidth: 1, borderRadius: 14, padding: 16, gap: 12 }, placeholder: { height: 214, borderWidth: 1, borderRadius: 14 }, heroHeading: { flexDirection: "row", alignItems: "center", gap: 8 }, statusDot: { width: 10, height: 10, borderRadius: 5 }, heroTitle: { fontSize: 20, fontWeight: "700" }, body: { fontSize: 15, lineHeight: 21 }, detail: { borderTopWidth: StyleSheet.hairlineWidth, paddingTop: 12, fontSize: 14, lineHeight: 20 }, linkButton: { minHeight: 44, justifyContent: "center", alignSelf: "flex-start" }, actions: { flexDirection: "row", gap: 8 }, actionCard: { flex: 1, minHeight: 148, borderWidth: 1, borderRadius: 14, padding: 16, gap: 8 }, actionIcon: { fontSize: 24 }, actionTitle: { fontSize: 16, fontWeight: "700" }, actionHelper: { fontSize: 13, lineHeight: 18 }, encryptionRow: { minHeight: 76, borderWidth: 1, borderRadius: 14, padding: 16, flexDirection: "row", alignItems: "center", gap: 12 }, lock: { fontSize: 22 }, encryptionCopy: { flex: 1, gap: 4 }, rowTitle: { fontSize: 16, fontWeight: "700" }, nudge: { borderWidth: 1, borderRadius: 14, padding: 16, flexDirection: "row", gap: 8 }, nudgeCopy: { flex: 1, gap: 4 }, dismiss: { minHeight: 44, minWidth: 44, alignItems: "center", justifyContent: "center" }, privacy: { flexDirection: "row", gap: 8, paddingBottom: 24 }, privacyText: { flex: 1, fontSize: 13, lineHeight: 18 }, restoreNotice: { borderWidth: 1, borderRadius: 10, padding: 16, gap: 8 }, passphraseInput: { minHeight: 44, borderWidth: 1, borderRadius: 8, paddingHorizontal: 12, fontSize: 16 }, restorePromptActions: { gap: 8 }, secondaryButton: { minHeight: 44, borderWidth: 1, borderRadius: 8, justifyContent: "center", alignItems: "center", paddingHorizontal: 12 }, primaryButton: { minHeight: 44, borderRadius: 8, justifyContent: "center", alignItems: "center", paddingHorizontal: 12 },
 });

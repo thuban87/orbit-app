@@ -1,6 +1,6 @@
 import { parseBackupManifest, UPDATE_FIRST_MESSAGE } from "@/backup/backup-schema";
 import { buildExportManifest } from "@/backup/export-manifest";
-import type { BackupEncryptionProfile } from "@/backup/types";
+import type { BackupEncryptionProfile, BackupManifest } from "@/backup/types";
 import { BackupEnvelopeError, type BackupEnvelopeCrypto } from "@/services/backup/encryption";
 import { automaticBackupFilename, isExpiredAutomaticBackup, isOwnedAutomaticBackup } from "@/backup/auto-backup-policy";
 import type { SqlExecutor } from "@/db/types";
@@ -12,19 +12,32 @@ import type {
   PendingBackupPassphraseChange,
 } from "@/services/backup/passphrase-store";
 
+export type BackupPreview = {
+  exportedAt: string;
+  backupFormatVersion: number;
+  encrypted: boolean;
+  rowCount: number;
+  photoCount: number;
+};
+
 export type BackupPreviewResult =
-  | { status: "ready"; preview: { exportedAt: string; backupFormatVersion: number; encrypted: boolean; rowCount: number; photoCount: number } }
+  | { status: "ready"; preview: BackupPreview }
+  | { status: "failed"; reason: "wrong-passphrase" | "damaged-or-incomplete" | "newer-app" };
+
+/** A validated restore candidate remains private to the apply owner, never navigation. */
+export type ValidatedRestoreCandidate =
+  | { status: "ready"; preview: BackupPreview; manifest: BackupManifest }
   | { status: "failed"; reason: "wrong-passphrase" | "damaged-or-incomplete" | "newer-app" };
 
 /**
  * The write-free restore boundary. It deliberately returns aggregate data only:
  * callers retain the validated manifest privately until a later explicit apply.
  */
-export function loadBackupForPreview(input: {
+export function loadBackupForRestore(input: {
   contents: string;
   passphrase?: string;
   crypto?: BackupEnvelopeCrypto;
-}): BackupPreviewResult {
+}): ValidatedRestoreCandidate {
   try {
     let raw: unknown = JSON.parse(input.contents);
     let encrypted = false;
@@ -40,6 +53,7 @@ export function loadBackupForPreview(input: {
     const photoRows = [manifest.profile, ...manifest.contacts, ...manifest.customFieldValues];
     return {
       status: "ready",
+      manifest,
       preview: {
         exportedAt: manifest.metadata.exportedAt,
         backupFormatVersion: manifest.backupFormatVersion,
@@ -57,6 +71,18 @@ export function loadBackupForPreview(input: {
     }
     return { status: "failed", reason: "damaged-or-incomplete" };
   }
+}
+
+/** Compatibility-safe aggregate-only preview API for callers that never apply. */
+export function loadBackupForPreview(input: {
+  contents: string;
+  passphrase?: string;
+  crypto?: BackupEnvelopeCrypto;
+}): BackupPreviewResult {
+  const candidate = loadBackupForRestore(input);
+  return candidate.status === "ready"
+    ? { status: "ready", preview: candidate.preview }
+    : candidate;
 }
 
 export type WriteEncryptionMode =
