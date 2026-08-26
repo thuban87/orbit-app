@@ -34,6 +34,7 @@ import { registerDigestScheduleSweep } from "@/services/notifications/digest-sch
 import { FOREGROUND_NOTIFICATION_BEHAVIOR } from "@/services/notifications/notification-ids";
 import { registerNotificationScheduleSweep } from "@/services/notifications/notification-schedule";
 import { registerPhotoReconcileSweep } from "@/services/photos/photo-reconcile-sweep";
+import { registerRestorePhotoFinalizeSweep } from "@/services/photos/restore-photo-finalize-sweep";
 import { registerWidgetSweep } from "@/services/widget/widget-refresh";
 import { ThemeProvider, useTheme } from "@/theme";
 import { Logger } from "@/utils/logger";
@@ -81,6 +82,7 @@ let backupSweepRegistered = false;
 // One-shot guard for the photo-write reconciliation hook (PHOTO-03/05), on the
 // SAME registry and under the SAME re-entrancy reasoning as the field sweep.
 let photoReconcileRegistered = false;
+let restorePhotoFinalizeSweepRegistered = false;
 // One-shot guard for the notification-schedule reconcile hook (NOTIF-01/04), on the
 // SAME registry and under the SAME re-entrancy reasoning. Registered ready-gated so
 // the reconcile fires once per real foreground launch — never at import, never on a
@@ -151,6 +153,12 @@ function AppShell() {
     if (!photoReconcileRegistered) {
       registerPhotoReconcileSweep();
       photoReconcileRegistered = true;
+    }
+    // A committed restore-photo journal is drained only on real foreground
+    // launches, after migration readiness and before the cold-start sweep fires.
+    if (!restorePhotoFinalizeSweepRegistered) {
+      registerRestorePhotoFinalizeSweep(getExecutor);
+      restorePhotoFinalizeSweepRegistered = true;
     }
     // Register the notification-schedule reconcile (NOTIF-01/04) on the SAME
     // registry, once only, BEFORE the trigger fires its cold-start sweep. The exec
