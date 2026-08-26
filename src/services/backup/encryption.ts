@@ -6,6 +6,20 @@ const MAX_ITERATIONS = 10_000_000;
 const MAX_PROFILE_CIPHERTEXT_BYTES = 16 * 1024 * 1024;
 const encoder = new TextEncoder();
 
+/**
+ * Approved by the owner from the 2026-08-25 Pixel 6 Pro release benchmark:
+ * RNQC 1.1.7, 600,000 iterations, median PBKDF2 time 53 ms. This record is
+ * deliberately technical only; device/build evidence never enters envelopes.
+ */
+export const APPROVED_BACKUP_ENCRYPTION_PROFILE: BackupEncryptionProfile = {
+  formatVersion: 1,
+  cipher: "AES-256-GCM",
+  kdf: { id: "PBKDF2-HMAC-SHA256", iterations: 600_000, derivedKeyLength: 32 },
+  saltLength: 16,
+  ivLength: 12,
+  maxCiphertextBytes: 8_388_608,
+};
+
 export type BackupEnvelopeErrorCode =
   | "invalid-envelope"
   | "unsupported-profile"
