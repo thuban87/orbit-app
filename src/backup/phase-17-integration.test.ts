@@ -129,7 +129,8 @@ describe("Phase 17 composed backup regressions", () => {
 
   it("keeps the tombstone vocabulary exhaustive for every production hard-delete table", async () => {
     const dbDirectory = join(process.cwd(), "src", "db");
-    const files = (await readdir(dbDirectory)).filter((file) => file.endsWith(".ts") && !file.endsWith(".test.ts"));
+    const files = (await readdir(dbDirectory, { recursive: true }))
+      .filter((file) => file.endsWith(".ts") && !file.endsWith(".test.ts"));
     const writers = new Set<string>();
     for (const file of files) {
       const source = await readFile(join(dbDirectory, file), "utf8");
