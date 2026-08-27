@@ -4,8 +4,8 @@
   "phase": "18",
   "phase_name": "Contact Data Normalization",
   "phase_dir": ".planning/phases/18-contact-data-normalization",
-  "plan": "convergence cycle 3 reviews complete",
-  "task": "handoff before cycle-3 aggregation and replan",
+  "plan": "cycle 3 incorporated; internal scope gate paused",
+  "task": "owner decision on Phase 18 product boundary before any further replanning",
   "total_tasks": 8,
   "status": "paused",
   "completed_tasks": [
@@ -14,19 +14,20 @@
     {"id": 3, "name": "Staged verification-gate corrections and checker re-run", "status": "done", "commit": "cabc76b"},
     {"id": 4, "name": "External cycle 2 (Claude first, then flagless Codex)", "status": "done", "commit": "d423ae3"},
     {"id": 5, "name": "Cycle-2 review aggregate and plan incorporation", "status": "done", "commit": "d423ae3"},
-    {"id": 6, "name": "Cycle-3 Claude-first and flagless-Codex external reviews", "status": "done", "commit": null}
+    {"id": 6, "name": "Cycle-3 Claude-first and flagless-Codex external reviews", "status": "done", "commit": null},
+    {"id": 7, "name": "Aggregate Cycle-3 findings, incorporate them, and run the independent internal plan checker", "status": "done", "commit": "ba740f2, fa20e62"}
   ],
   "remaining_tasks": [
-    {"id": 7, "name": "Aggregate the completed cycle-3 Claude and Codex reviews into 18-REVIEWS.md, then replan all actionable findings and run final internal plan validation", "status": "not_started"},
-    {"id": 8, "name": "Report the post-cycle-3 convergence state and stop; do not start a fourth external review cycle", "status": "not_started"}
+    {"id": 8, "name": "Resolve the conflict between the broad locked Phase 18 dossier and the owner's intended data-normalization scope; only then rebaseline/replan or explicitly retain the broad rollout", "status": "blocked"}
   ],
   "blockers": [
-    {"description": "Cycle-3 Claude review found two HIGH and five actionable MEDIUM plan gaps; the paired Codex review found one additional MEDIUM primary-method invariant gap. Reviews are complete but not yet aggregated or incorporated.", "type": "technical", "workaround": "Read the exact artifacts named in context_notes, aggregate them, replan with source-grounded ownership, and run only internal validation afterward."}
+    {"description": "The Phase 18 dossier explicitly includes a broad Bound/Unbound rollout (dedicated UI/settings, dashboard/Orrery/notification/widget/AI policy, lossless backup changes, and Streamlined Export) while the owner now questions whether Phase 18 should instead be data normalization plus minimal compatibility only. No automated planning action can resolve that product-boundary conflict.", "type": "scope", "workaround": "Do not split plans or start a fourth review. Have the owner choose the Phase 18 boundary, then rebaseline the plan set against that decision."},
+    {"description": "The final independent checker confirmed all Cycle-3 findings have executable ownership but flagged Plan 18-05 as a scope-size blocker and Plans 18-02, 18-03, 18-07, and 18-09 as warnings. A split was started and then fully restored without a commit because it would have changed artifact count, not product scope.", "type": "planning", "workaround": "Treat file-count splitting as deferred until after the owner resolves the phase boundary."}
   ],
   "async_jobs": [],
   "human_actions_pending": [
     {"action": "Select the normalized-phone actionability threshold: isPossible(), isValid(), or a named alternative, and provide representative-country plus extension cases.", "context": "This is the existing 18-01 Task 1 durable/behavior-policy checkpoint.", "blocking": true},
-    {"action": "At execution time, approve or defer Streamlined Export PII egress at the 18-10 checkpoint.", "context": "The plan makes the share/export decision explicit.", "blocking": true}
+    {"action": "Decide whether Streamlined Export belongs in Phase 18 at all before execution planning resumes.", "context": "It is an explicitly locked Dossier Cluster R feature, but it is new product work beyond lossless Phase-17 backup/export and is now under owner scope review.", "blocking": true}
   ],
   "decisions": [
     {"decision": "Claude runs before Codex for every external review cycle.", "rationale": "Owner explicitly required Claude as a gate to avoid spending other reviewer usage when Claude fails.", "phase": "18"},
@@ -34,6 +35,6 @@
     {"decision": "Convergence has a hard maximum of three external cycles.", "rationale": "Owner reiterated the cap on 2026-08-26; after cycle 3, stop whether or not convergence is achieved.", "phase": "18"}
   ],
   "uncommitted_files": [".planning/ROADMAP.md"],
-  "next_action": "First aggregate the completed cycle-3 reviews and replan their findings. Then run the final internal plan checker and report the resulting convergence state. The owner capped external review at three cycles: do not start cycle 4 under any circumstances.",
-  "context_notes": "Cycle 3 is complete, with no active reviewer processes. Claude direct read-only review: /tmp/orbit-phase18-cycle3-20260826/claude.out (23,143 bytes; 2 HIGH, 5 MEDIUM). Flagless Codex review: /tmp/orbit-phase18-cycle3-20260826/codex-run/gsd-review-codex.md (gpt-5.6-terra reasoning=low; 1 MEDIUM). Claude findings: ring-seq-dao must share the Bound orbit predicate; migration must prove full app_settings/rebuilt-child schema and data preservation; replace-all/purge retain a typed non-mergeable residual field_history delete; dashboard first-run needs Unbound count; Never Contacted needs neutral Unbound projection/UI; backup schema must prevalidate lifecycle/cadence; Streamlined Export needs distinct artifact identity, UI-spec contract, and UAT. Codex finding: migration needs per-contact/per-type primary partial unique constraint and backup validation must reject duplicate primaries. Current plan commits include ee14aa2 scope split and 8cac8b9 export delivery correction. .planning/ROADMAP.md is intentionally uncommitted and now carries the Phase 18 12-plan/seven-wave metadata; never stage unrelated user changes. Do not mark Phase 18 planned, converged, or executed."
+  "next_action": "Stop. Do not start a fourth external review, split plans, execute Phase 18, or mark it planned/converged. The owner must first decide whether the broad lifecycle/product work locked in the dossier remains in Phase 18 or whether the phase is rebaselined to data normalization plus minimal compatibility. After that decision, replan once from the current safety baseline and run internal validation.",
+  "context_notes": "Cycle 3 is complete and incorporated. Claude direct read-only review: /tmp/orbit-phase18-cycle3-20260826/claude.out (2 HIGH, 5 MEDIUM); paired flagless Codex review: /tmp/orbit-phase18-cycle3-20260826/codex-run/gsd-review-codex.md (1 MEDIUM). Aggregate commit ba740f2; final-review incorporation commit fa20e62. The final internal checker confirmed every Cycle-3 issue has executable ownership, then flagged scope-size concerns: 18-05 blocker; 18-02, 18-03, 18-07, 18-09 warnings. An attempted split touched only 18-02/18-03, was interrupted before commit, and was fully restored; no new plan was created. Historical scope accounting: initial plan creation had 8 plans; internal revisions raised it to 10; review/revision work raised it to 12. The dossier itself explicitly requires downstream query updates across dashboard, Orrery, Never Contacted, notifications, widgets, AI context, CRUD, Compose, backup/export, and sync readiness. The owner is now reviewing whether that locked broad scope matches their intended Phase 18 purpose. .planning/ROADMAP.md remains intentionally uncommitted and must not be staged with any future Phase 18 commit."
 }
