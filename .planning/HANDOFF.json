@@ -1,0 +1,34 @@
+{
+  "version": "1.0",
+  "timestamp": "2026-08-27T02:49:58.565Z",
+  "phase": "18",
+  "phase_name": "Contact Data Normalization",
+  "phase_dir": ".planning/phases/18-contact-data-normalization",
+  "plan": "convergence cycle 1",
+  "task": "final internal plan-check revision",
+  "total_tasks": 3,
+  "status": "paused",
+  "completed_tasks": [
+    {"id": 1, "name": "Claude gate test and initial dual-review", "status": "done", "commit": "a311090"},
+    {"id": 2, "name": "Review-driven replanning", "status": "done", "commit": "185e89f"},
+    {"id": 3, "name": "First checker revision", "status": "done", "commit": "2a2a270"}
+  ],
+  "remaining_tasks": [
+    {"id": 4, "name": "Remove the premature repository-wide TypeScript gate from 18-02 and rerun the plan checker", "status": "not_started"},
+    {"id": 5, "name": "If the internal checker passes, perform external review cycle 2 (Claude first, then flagless Codex), aggregate, and continue convergence up to the three-cycle cap", "status": "not_started"}
+  ],
+  "blockers": [
+    {"description": "18-02 Task 3 requires npx tsc --noEmit before 18-04 migrates CreateContactScreen and EditContactScreen to the new aggregate input. This contradicts 18-VALIDATION.md, which reserves repository-wide TypeScript verification for 18-08.", "type": "technical", "workaround": "Remove the global TypeScript gate from 18-02 Task 3 and its wave gate; keep named targeted tests there and retain full TypeScript verification in 18-08."}
+  ],
+  "async_jobs": [],
+  "human_actions_pending": [
+    {"action": "At execution time, approve or defer Streamlined Export PII egress at the checkpoint added to 18-10.", "context": "The plan now makes this owner decision explicit instead of silently accepting a new share/export surface.", "blocking": true}
+  ],
+  "decisions": [
+    {"decision": "Claude runs before Codex for every external review cycle.", "rationale": "Owner explicitly required Claude as a gate to avoid wasting other reviewer usage when Claude fails.", "phase": "18"},
+    {"decision": "Use the documented direct read-only Claude headless command; never route Claude through gsd-review's Claude lane and never retry alternative invocation variants.", "rationale": "This exact path produced the successful initial review.", "phase": "18"}
+  ],
+  "uncommitted_files": [".planning/ROADMAP.md"],
+  "next_action": "Make the one 18-02 verification-gate revision described in the handoff, rerun gsd-plan-checker, then continue with external convergence cycle 2 only after it passes.",
+  "context_notes": "Initial external review and one replan/checker revision have completed. Cycle 2 has not started. Do not mark the phase planned or converged yet."
+}
