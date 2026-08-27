@@ -4,8 +4,8 @@
   "phase": "18",
   "phase_name": "Contact Data Normalization",
   "phase_dir": ".planning/phases/18-contact-data-normalization",
-  "plan": "convergence cycle 2 incorporated",
-  "task": "pre-cycle-3 internal revision gate",
+  "plan": "convergence cycle 3 reviews complete",
+  "task": "handoff before cycle-3 aggregation and replan",
   "total_tasks": 8,
   "status": "paused",
   "completed_tasks": [
@@ -13,16 +13,15 @@
     {"id": 2, "name": "Cycle-1 review replan and first checker revision", "status": "done", "commit": "2a2a270"},
     {"id": 3, "name": "Staged verification-gate corrections and checker re-run", "status": "done", "commit": "cabc76b"},
     {"id": 4, "name": "External cycle 2 (Claude first, then flagless Codex)", "status": "done", "commit": "d423ae3"},
-    {"id": 5, "name": "Cycle-2 review aggregate and plan incorporation", "status": "done", "commit": "d423ae3"}
+    {"id": 5, "name": "Cycle-2 review aggregate and plan incorporation", "status": "done", "commit": "d423ae3"},
+    {"id": 6, "name": "Cycle-3 Claude-first and flagless-Codex external reviews", "status": "done", "commit": null}
   ],
   "remaining_tasks": [
-    {"id": 6, "name": "Split 18-03's 21-file query/sun task into dependency-correct executable slices, then update Phase 18 Roadmap metadata without staging unrelated user changes", "status": "not_started"},
-    {"id": 7, "name": "Obtain the owner actionability threshold decision and record representative-country/extension cases at 18-01 Task 1", "status": "waiting_for_owner"},
-    {"id": 8, "name": "After the revision gate clears, run the final external cycle 3 (Claude first, then flagless Codex), aggregate it, and stop", "status": "not_started"}
+    {"id": 7, "name": "Aggregate the completed cycle-3 Claude and Codex reviews into 18-REVIEWS.md, then replan all actionable findings and run final internal plan validation", "status": "not_started"},
+    {"id": 8, "name": "Report the post-cycle-3 convergence state and stop; do not start a fourth external review cycle", "status": "not_started"}
   ],
   "blockers": [
-    {"description": "The independent plan checker considers 18-03 over scope: 21 files, with Task 2 spanning 17 files.", "type": "technical", "workaround": "Split the query/status/digest work from the Orrery sun/picker policy work and update plan waves/metadata carefully."},
-    {"description": "The phone actionability runtime policy is still a blocking owner checkpoint, and the latest checker will not pass while isPossible versus isValid remains unselected.", "type": "owner_decision", "workaround": "Owner selects isPossible(), isValid(), or a named alternative with representative-country and extension cases."}
+    {"description": "Cycle-3 Claude review found two HIGH and five actionable MEDIUM plan gaps; the paired Codex review found one additional MEDIUM primary-method invariant gap. Reviews are complete but not yet aggregated or incorporated.", "type": "technical", "workaround": "Read the exact artifacts named in context_notes, aggregate them, replan with source-grounded ownership, and run only internal validation afterward."}
   ],
   "async_jobs": [],
   "human_actions_pending": [
@@ -35,6 +34,6 @@
     {"decision": "Convergence has a hard maximum of three external cycles.", "rationale": "Owner reiterated the cap on 2026-08-26; after cycle 3, stop whether or not convergence is achieved.", "phase": "18"}
   ],
   "uncommitted_files": [".planning/ROADMAP.md"],
-  "next_action": "Do not start cycle 3 yet. First split the 18-03 scope blocker and record the owner-selected phone actionability threshold, then re-run gsd-plan-checker. If it clears, run the final Claude-first/flagless-Codex cycle 3 and stop.",
-  "context_notes": "Cycle 2 completed coherently: Claude direct read-only output was 24,105 bytes and flagless Codex used gpt-5.6-terra (reasoning=low). Cycle-2 aggregate/replan is d423ae3. No reviewer processes remain. Do not mark Phase 18 planned, converged, or executed. Do not include unrelated untracked files in commits."
+  "next_action": "First aggregate the completed cycle-3 reviews and replan their findings. Then run the final internal plan checker and report the resulting convergence state. The owner capped external review at three cycles: do not start cycle 4 under any circumstances.",
+  "context_notes": "Cycle 3 is complete, with no active reviewer processes. Claude direct read-only review: /tmp/orbit-phase18-cycle3-20260826/claude.out (23,143 bytes; 2 HIGH, 5 MEDIUM). Flagless Codex review: /tmp/orbit-phase18-cycle3-20260826/codex-run/gsd-review-codex.md (gpt-5.6-terra reasoning=low; 1 MEDIUM). Claude findings: ring-seq-dao must share the Bound orbit predicate; migration must prove full app_settings/rebuilt-child schema and data preservation; replace-all/purge retain a typed non-mergeable residual field_history delete; dashboard first-run needs Unbound count; Never Contacted needs neutral Unbound projection/UI; backup schema must prevalidate lifecycle/cadence; Streamlined Export needs distinct artifact identity, UI-spec contract, and UAT. Codex finding: migration needs per-contact/per-type primary partial unique constraint and backup validation must reject duplicate primaries. Current plan commits include ee14aa2 scope split and 8cac8b9 export delivery correction. .planning/ROADMAP.md is intentionally uncommitted and now carries the Phase 18 12-plan/seven-wave metadata; never stage unrelated user changes. Do not mark Phase 18 planned, converged, or executed."
 }
