@@ -395,7 +395,7 @@ The exact existing values are quoted verbatim above; Phase 18 appends migration 
 ### Sampling Rate
 
 - **Per task commit:** the task's named targeted Vitest command only.
-- **Waves 1–5:** no repository-wide test, TypeScript, or color gate while scalar and nullable-cadence consumers migrate; 18-08 owns the complete compatibility gate.
+- **Waves 1–6:** no repository-wide test, TypeScript, or color gate while scalar and nullable-cadence consumers migrate; 18-08 owns the complete compatibility gate.
 - **Phase gate:** full suite green, then owner-gated Android release UAT for migration-on-device, method UI, Bound/Unbound transitions, and refresh of widget/notifications.
 
 ### Planned Test Creation
@@ -403,7 +403,7 @@ The exact existing values are quoted verbatim above; Phase 18 appends migration 
 - [ ] 18-01 creates `src/db/migrations/009-contact-data-normalization.test.ts` from a real v8 fixture and proves scalar/method/lifecycle migration cases.
 - [ ] 18-02 creates `src/db/contact-methods-dao.test.ts` and `src/db/contact-lifecycle-dao.test.ts` for collision, provenance, lifecycle matrix, and SQL-trigger rollback.
 - [ ] 18-07 extends `src/backup/export-manifest.test.ts`, `src/backup/restore-apply.test.ts`, and `src/backup/backup-schema.test.ts` before changing backup wire format.
-- [ ] 18-03 and 18-09 extend every query-owner test listed in the requirements map, including the invariant that Unbound never reaches a derived status SQL projection.
+- [ ] 18-03, 18-12, and 18-09 extend every query-owner test listed in the requirements map, including the invariant that Unbound never reaches a derived status SQL projection or active Orrery/picker population.
 
 ## Security Domain
 

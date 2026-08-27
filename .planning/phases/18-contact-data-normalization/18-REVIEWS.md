@@ -40,7 +40,7 @@ Both reviewers required a replan. The shared release-blocker was that v9's durab
 | ID | Severity | Finding | Evidence-based disposition |
 |---|---|---|---|
 | H1 | HIGH | Purge did not own normalized child preview counts, tombstones, or explicit fan-out deletes. | Incorporated in 18-07 Task 2: `purge-dao.ts`/test use one typed TombstoneEntityType registry for preview, evidence, and deletion; tests cover methods, external links, and provenance. |
-| H2 | HIGH | Orrery's Unbound-sun self fallback was assigned to `orrery-read.ts`, which does not own the policy. | Incorporated in 18-03 Tasks 1–2: header exposes `trackingEnabled`; `sun-occupant-logic.ts`, its test, and OrreryScreen own the single fallback predicate. `sun-picker-read.ts` is pinned Bound-only. |
+| H2 | HIGH | Orrery's Unbound-sun self fallback was assigned to `orrery-read.ts`, which does not own the policy. | Cycle-2 incorporation began with 18-03’s header `trackingEnabled`; the post-cycle-2 scope split assigns the predicate, its test, OrreryScreen, and Bound-only `sun-picker-read.ts` to 18-12. |
 | H3 | HIGH | Bound-plus-NULL and assigned-to-NULL durable guards lacked a migration DDL owner. | Incorporated in 18-01 Task 1/3: two contacts-table CHECKs and an update trigger, with migration direct-SQL tests. 18-02 Task 2 exercises the shipped rules without editing migration 009. |
 | M4 | MEDIUM | Search could render Unbound contacted rows as stable and expose dormant favourite rank. | Incorporated in 18-03 Task 2 and 18-05 Task 3: search projects lifecycle plus neutral status/rank; Home consumes lifecycle for neutral rendering. |
 | M5 | MEDIUM | Shared nullable-cadence fragments in `status.ts`/`queries.ts` were unowned. | Incorporated in 18-03 Task 2 with source-adjacent tests; 18-08 Task 1 records benchmark.ts as an audited positive-cadence fragment consumer. |
@@ -52,23 +52,27 @@ Both reviewers required a replan. The shared release-blocker was that v9's durab
 | L11 | LOW | v1 forward migration could fail required-array validation. | Incorporated in 18-07 Task 1: materialize all v2 child/link/provenance/tombstone arrays before validation. |
 | L12 | LOW | Derived legacy method UIDs lacked a collision rule. | Incorporated in 18-07 Task 1: fixed `legacy-method:${contactUid}:${type}` format and newUid-shape disjointness test. |
 | L13 | LOW | `contact-methods-read.ts` had no named behavior suite. | Incorporated in 18-02 Task 1: adds `contact-methods-read.test.ts` and runs it. |
-| L14 | LOW | `sun-picker-read.ts` lifecycle behavior was undecided. | Incorporated in 18-03 Task 2: Bound-only candidates, retaining never-contacted Bound candidates. |
+| L14 | LOW | `sun-picker-read.ts` lifecycle behavior was undecided. | Post-cycle-2 scope split assigns 18-12 Task 2: Bound-only candidates, retaining never-contacted Bound candidates. |
 | C-L1 | LOW | 18-10 Task 3 routed through its decision checkpoint rather than the builder. | Incorporated in 18-10 Task 3: route to Task 2's builder. |
 
 ## Cycle 2 source-coverage audit
 
 | Source | Item | Covered by | Status |
 |---|---|---|---|
-| GOAL | First-class methods and non-destructive Bound/Unbound lifecycle without authoritative system contacts. | 18-01 through 18-11, with 18-08 final evidence ledger. | COVERED |
+| GOAL | First-class methods and non-destructive Bound/Unbound lifecycle without authoritative system contacts. | 18-01 through 18-12, with 18-08 final evidence ledger. | COVERED |
 | REQ | CDN-01 normalized ordered methods, actionability, and no scalar authority. | 18-01, 18-02, 18-04, 18-06, 18-07, 18-08, 18-10. | COVERED |
-| REQ | CDN-02 lifecycle, durable cadence invariant, preservation, and Bound-only behavior. | 18-01, 18-02, 18-03, 18-05, 18-06, 18-07, 18-09, 18-11. | COVERED |
-| REQ | CDN-03 dedicated Unbound browsing plus Bound-only proactive surfaces and explicit AI. | 18-03, 18-05, 18-06, 18-09, 18-11. | COVERED |
+| REQ | CDN-02 lifecycle, durable cadence invariant, preservation, and Bound-only behavior. | 18-01, 18-02, 18-03, 18-05, 18-06, 18-07, 18-09, 18-11, 18-12. | COVERED |
+| REQ | CDN-03 dedicated Unbound browsing plus Bound-only proactive surfaces and explicit AI. | 18-03, 18-05, 18-06, 18-09, 18-11, 18-12. | COVERED |
 | REQ | CDN-04 lossless normalized graph, tombstones, external-link provenance, and non-destructive restore. | 18-01, 18-02, 18-07, 18-08, 18-10. | COVERED |
-| RESEARCH | Parser boundary, FK-safe v9 rebuild, lifecycle SQL guards, nullable status fragments, and complete consumer audit. | 18-01, 18-02, 18-03, 18-08. | COVERED |
+| RESEARCH | Parser boundary, FK-safe v9 rebuild, lifecycle SQL guards, nullable status fragments, Orrery population/candidate ownership, and complete consumer audit. | 18-01, 18-02, 18-03, 18-08, 18-12. | COVERED |
 | RESEARCH | Mergeable external links/provenance, portable v1-to-v2 migration, restore reconciliation, and deletion evidence. | 18-01, 18-07. | COVERED |
-| CONTEXT | Zero-to-many methods; Bound/Unbound cadence invariant; preserved history/rank; active-link uniqueness; source non-authority; all stated deferrals. | 18-01, 18-02, 18-03, 18-04, 18-05, 18-07, 18-08. | COVERED |
+| CONTEXT | Zero-to-many methods; Bound/Unbound cadence invariant; preserved history/rank; active-link uniqueness; source non-authority; all stated deferrals. | 18-01, 18-02, 18-03, 18-04, 18-05, 18-07, 18-08, 18-12. | COVERED |
 
 No non-deferred source item is unplanned. The dossier deferrals remain out of plan scope.
+
+## Post-cycle-2 scope-split record — current executable ownership
+
+This is a checker-required plan-size correction, not a third review cycle and not a convergence claim. It preserves the Cycle 2 evidence/history above while making the current execution contract explicit: 18-03 retains direct header retrieval plus dashboard/search/status/digest/shared-fragment ownership in Wave 2; 18-12 follows in Wave 3 with Orrery population, sun candidates, `sun-occupant-logic`, its test, and OrreryScreen. Settings consumes that predicate in Wave 4. The settled targeted-only verification policy before 18-08 remains unchanged.
 
 ## Historical Cycle 1 record — incorporated, not current execution work
 
