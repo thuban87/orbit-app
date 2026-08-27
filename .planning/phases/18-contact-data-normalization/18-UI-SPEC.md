@@ -127,6 +127,16 @@ Add these rows using the existing Settings section/row shell.
 
 Switches reuse `trackColor={{ false: border, true: accent }}` and `thumbColor: surfaceElevated`. Do not expose source links, provenance, stale-source, import, merge, or reconciliation controls in Phase 18.
 
+### Streamlined Export
+
+On the existing Backup screen, add a separately labelled 44px `surface`/`border` row after the full recovery export controls: **Streamlined Export**. Accessibility label: **“Share a streamlined contact export”**. Helper copy: **“Share names, categories, and primary contact details. This is not a backup.”** The full recovery action keeps its existing backup/export label and state independently.
+
+- Empty: when no contact has an actionable primary phone or email, show **“No shareable contact details yet.”** and keep the action disabled with accessibility state `disabled`.
+- Loading: while the narrow artifact is being assembled or handed to the native share sheet, show **“Preparing Streamlined Export…”**, disable repeated taps, and preserve full backup controls.
+- Success: after the native share request resolves, show the existing transient success posture with **“Streamlined Export ready to share.”**; do not describe it as backup or recovery.
+- Error: retain screen state and show **“Couldn’t create Streamlined Export. Please try again.”** with the normal retry affordance. A share failure never changes full-backup health or availability.
+- Artifact identity is fixed: filename prefix `orbit-streamlined-export-`, `.txt` extension, `text/plain` MIME type, and native share-sheet title **“Share Streamlined Export”**. None may contain **“backup”**. The content may contain only name, category, and formatted actionable primary phone/email values; it never includes secondary, invalid, raw, canonical, extension, source, provenance, or recovery-graph data.
+
 ---
 
 ## Copywriting Contract
@@ -145,6 +155,9 @@ Switches reuse `trackColor={{ false: border, true: accent }}` and `thumbColor: s
 | Error | **Couldn’t load contacts. Please go back and retry.** / **Couldn’t save contact. Please try again.** |
 | Unbind confirm | **Unbind {name}?** — **This removes them from your active orbit, reminders, favourites, and widgets. Their history, details, and saved cadence stay.** |
 | Destructive confirmation | Unbind uses native **Keep contact bound** / destructive **Unbind contact**. Method removal is reversible local draft editing until Save and needs no separate confirmation. |
+| Streamlined Export | **Streamlined Export** — **Share names, categories, and primary contact details. This is not a backup.** |
+| Streamlined Export empty | **No shareable contact details yet.** |
+| Streamlined Export loading / success / error | **Preparing Streamlined Export…** / **Streamlined Export ready to share.** / **Couldn’t create Streamlined Export. Please try again.** |
 
 Tone is plain, kind, and specific: Unbound is valid, not an error or incomplete setup. Never expose canonical/E.164 data, opaque external IDs, parser internals, or schema terminology.
 
@@ -152,7 +165,7 @@ Tone is plain, kind, and specific: Unbound is valid, not an error or incomplete 
 
 ## UI Considerations
 
-Applicable state considerations resolved: **25 explicit, 5 backstop, 0 unresolved.**
+Applicable state considerations resolved: **30 explicit, 5 backstop, 0 unresolved.**
 
 | Category | Element(s) | Status | Resolution / Reason |
 |----------|------------|--------|---------------------|
@@ -183,6 +196,11 @@ Applicable state considerations resolved: **25 explicit, 5 backstop, 0 unresolve
 | error | Bind/Unbind | ✅ covered | Failure retains confirmed state and retry Alert. |
 | partial | Lifecycle panel | ✅ covered | Dormant cadence binds directly; never-assigned opens FrequencyPicker and blocks Bind until valid. |
 | long-text | Confirmation | ✅ covered | Concise native Alert body wraps in platform chrome. |
+| empty | Streamlined Export | ✅ covered | Disabled row and documented no-shareable-details copy when no actionable primary exists. |
+| loading | Streamlined Export | ✅ covered | Documented preparing copy, single-flight action, and full backup remains available. |
+| success | Streamlined Export | ✅ covered | Existing transient posture uses documented share-ready copy without recovery language. |
+| error | Streamlined Export | ✅ covered | Documented retry copy preserves screen and backup health. |
+| partial | Streamlined Export | ✅ covered | Each contact contributes at most formatted actionable primaries; secondary, invalid, extension, canonical, and provenance fields are absent. |
 
 ---
 
