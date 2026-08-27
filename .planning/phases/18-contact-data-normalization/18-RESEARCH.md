@@ -339,25 +339,24 @@ The exact existing values are quoted verbatim above; Phase 18 appends migration 
 | # | Claim | Section | Risk if Wrong |
 |---|-------|---------|---------------|
 | A1 | Name the internal Bound flag `tracking_enabled` and store it as integer 0/1. | Architecture Patterns | A different approved name requires mechanical schema/DAO/query updates. |
-| A2 | Preserve `favourite_rank` while Unbound and hide it from all favourite/widget reads, restoring its rank on Bind. | Consumer audit | Owner could instead want destructive rank clearing; behavior needs a product confirmation before locking UI copy. |
+| A2 | Preserve `favourite_rank` while Unbound and hide it from all favourite/widget reads, restoring its rank on Bind. | Consumer audit | Locked by `18-CONTEXT.md` Locked Invariants; 18-02 Task 2 and 18-03 Task 2 implement the non-destructive behavior. |
 | A3 | Use a contacts-table rebuild rather than bare `DROP COLUMN` to make the migration auditable and retain all constraints. | Pattern 1 | More migration code/tests than a platform-specific direct alteration. |
 | A4 | Use a trigger plus DAO validation to enforce never-clearing an assigned cadence. | Pattern 3 | Trigger shape must be proven against Expo SQLite / node SQLite versions. |
 | A5 | Introduce separately mergeable external-link and method-provenance child rows now. | Pattern 5 | The exact Phase 19 source payload may need an additional opaque-provider field. |
 
-## Open Questions
+## Open Questions and Decision Status
 
 1. **Favourite dormant-state resolution**
    - What we know: Unbound contacts must not appear as Favourites; the dossier leaves clear-versus-preserve rank open. [VERIFIED: docs/dossier/18-contact-data-normalization.md:286-299]
-   - Recommendation: Preserve rank dormant and scope all favourite/widget queries to Bound; it is reversible and preserves the user’s manual order on rebinding. [ASSUMED]
+   - **Status: RESOLVED.** `18-CONTEXT.md` Locked Invariants requires dormant `favourite_rank` preservation, Bound-only favourite/widget reads, and restoration on Bind. 18-02 Task 2 preserves the rank during lifecycle changes; 18-03 Task 2 owns the Bound-only favourite query policy, inherited by 18-09 widget work.
 
 2. **External link uniqueness policy**
    - What we know: One Orbit contact can own multiple system-contact links and source identity must remain independent. [VERIFIED: docs/dossier/18-contact-data-normalization.md:385-404]
-   - What's unclear: Whether `(provider, external_contact_id)` must be unique among active links or whether duplicate references are permitted until Phase 19 review.
-   - Recommendation: Make it unique for deterministic exact-link lookup while retaining stale rows; have the planner surface this as an explicit schema decision before implementation. [ASSUMED]
+   - **Status: RESOLVED.** `18-CONTEXT.md` Locked Invariants requires active-link uniqueness on `(provider, external_contact_id)` while stale links remain provenance. 18-01 Task 1 ratifies the partial active-link unique index and 18-01 Task 3 implements it in migration 009.
 
 3. **Actionability threshold**
    - What we know: Methods can be stored while non-actionable; the parser distinguishes possible from valid and its default metadata is less strict than `/max`. [CITED: https://github.com/catamphetamine/libphonenumber-js/blob/master/README.md]
-   - Resolution status: The planner must present a blocking human decision before normalizer implementation. The user selects `isPossible()`, `isValid()`, or a named alternative and records representative-country plus extension cases; no threshold is silently selected from this research recommendation.
+   - **Status: PENDING OWNER CHECKPOINT — not resolved.** 18-01 Task 1 is the blocking human decision that selects `isPossible()`, `isValid()`, or a named alternative and records representative-country plus extension cases; no threshold is silently selected. 18-VALIDATION.md 18-01-01 and its Manual-Only Verifications retain that owner-gated evidence.
 
 ## Environment Availability
 
@@ -395,8 +394,8 @@ The exact existing values are quoted verbatim above; Phase 18 appends migration 
 
 ### Sampling Rate
 
-- **Per task commit:** targeted Vitest command plus `npx tsc --noEmit` for changes to DAOs/types.
-- **Per wave merge:** `npm test && npx tsc --noEmit && npm run check:colors`.
+- **Per task commit:** the task's named targeted Vitest command only.
+- **Waves 1–5:** no repository-wide test, TypeScript, or color gate while scalar and nullable-cadence consumers migrate; 18-08 owns the complete compatibility gate.
 - **Phase gate:** full suite green, then owner-gated Android release UAT for migration-on-device, method UI, Bound/Unbound transitions, and refresh of widget/notifications.
 
 ### Planned Test Creation
