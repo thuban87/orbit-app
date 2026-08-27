@@ -1,15 +1,76 @@
 ---
 phase: 18
+review_cycles: [1, 2]
 reviewers: [claude, codex]
 reviewed_at: 2026-08-26T00:00:00-05:00
 plans_reviewed: [18-01-PLAN.md, 18-02-PLAN.md, 18-03-PLAN.md, 18-04-PLAN.md, 18-05-PLAN.md, 18-06-PLAN.md, 18-07-PLAN.md, 18-08-PLAN.md, 18-09-PLAN.md, 18-10-PLAN.md]
+cycle_2_plans_reviewed: [18-01-PLAN.md, 18-02-PLAN.md, 18-03-PLAN.md, 18-04-PLAN.md, 18-05-PLAN.md, 18-06-PLAN.md, 18-07-PLAN.md, 18-08-PLAN.md, 18-09-PLAN.md, 18-10-PLAN.md, 18-11-PLAN.md]
 models:
-  claude: "claude-opus-5"
-  codex: "gpt-5.6-terra (reasoning=low)"
+  cycle_1_claude: "claude-opus-5"
+  cycle_1_codex: "gpt-5.6-terra (reasoning=low)"
+  cycle_2_claude: "not declared in supplied review artifact"
+  cycle_2_codex: "not declared in supplied review artifact"
 model_sources:
-  claude: "explicit gate-test invocation"
-  codex: "banner"
+  cycle_1_claude: "explicit gate-test invocation"
+  cycle_1_codex: "banner"
+  cycle_2_claude: "/tmp/orbit-phase18-cycle2-20260826/claude.out contains no model banner"
+  cycle_2_codex: "/tmp/orbit-phase18-cycle2-20260826/codex-run/gsd-review-codex.md contains no model banner"
+cycle_2_sources:
+  claude: "/tmp/orbit-phase18-cycle2-20260826/claude.out (successful direct read-only review, 114 lines)"
+  codex: "/tmp/orbit-phase18-cycle2-20260826/codex-run/gsd-review-codex.md (successful flagless review, 37 lines)"
 ---
+
+# Cycle 2 aggregate — 2026-08-26
+
+## Reviewer record
+
+| Reviewer | Invocation/source | Model record | Scope read |
+|---|---|---|---|
+| Claude | Direct read-only review at `/tmp/orbit-phase18-cycle2-20260826/claude.out` | The supplied artifact does not declare a model; no model is inferred. | All 11 executable plans, Phase 18 context/research/dossier/validation/UI artifacts, ROADMAP/REQUIREMENTS, and cited migration/query/backup/UI seams. |
+| Codex | Flagless review at `/tmp/orbit-phase18-cycle2-20260826/codex-run/gsd-review-codex.md` | The supplied artifact does not declare a model; no model is inferred. | All executable plans plus source seams cited in its review. |
+
+## Consensus before replan
+
+Both reviewers required a replan. The shared release-blocker was that v9's durable cadence rules were demanded from 18-02 but not created by 18-01. Claude additionally found unowned purge/tombstone fan-out and an unowned Unbound-sun fallback. The actionable medium/low findings complete query, backup, test, and handoff ownership; they do not reopen the settled targeted-suite-before-18-08 policy or the two resolved research decisions.
+
+**Open before this replan:** 3 HIGH, 6 actionable MEDIUM, 6 actionable LOW. **Unresolved after incorporation:** 0 HIGH, 0 actionable MEDIUM, 0 actionable LOW. This is a review-incorporation record only; it does not mark Phase 18 planned, converged, or executed.
+
+## Current finding disposition
+
+| ID | Severity | Finding | Evidence-based disposition |
+|---|---|---|---|
+| H1 | HIGH | Purge did not own normalized child preview counts, tombstones, or explicit fan-out deletes. | Incorporated in 18-07 Task 2: `purge-dao.ts`/test use one typed TombstoneEntityType registry for preview, evidence, and deletion; tests cover methods, external links, and provenance. |
+| H2 | HIGH | Orrery's Unbound-sun self fallback was assigned to `orrery-read.ts`, which does not own the policy. | Incorporated in 18-03 Tasks 1–2: header exposes `trackingEnabled`; `sun-occupant-logic.ts`, its test, and OrreryScreen own the single fallback predicate. `sun-picker-read.ts` is pinned Bound-only. |
+| H3 | HIGH | Bound-plus-NULL and assigned-to-NULL durable guards lacked a migration DDL owner. | Incorporated in 18-01 Task 1/3: two contacts-table CHECKs and an update trigger, with migration direct-SQL tests. 18-02 Task 2 exercises the shipped rules without editing migration 009. |
+| M4 | MEDIUM | Search could render Unbound contacted rows as stable and expose dormant favourite rank. | Incorporated in 18-03 Task 2 and 18-05 Task 3: search projects lifecycle plus neutral status/rank; Home consumes lifecycle for neutral rendering. |
+| M5 | MEDIUM | Shared nullable-cadence fragments in `status.ts`/`queries.ts` were unowned. | Incorporated in 18-03 Task 2 with source-adjacent tests; 18-08 Task 1 records benchmark.ts as an audited positive-cadence fragment consumer. |
+| M6 | MEDIUM | Never Contacted preference could force unowned caller signature changes. | Incorporated in 18-05 Task 2: list/count read the one-row setting inside SQL, preserving existing callers. |
+| M7 | MEDIUM | Portable backup did not carry favourite rank despite an unverifiable preservation claim. | Incorporated in 18-07 Task 2: merge restore must not clobber an existing local dormant rank; rank remains intentionally outside the portable v2 wire schema and replace-all makes no rank claim. |
+| M8 | MEDIUM | `replaceAllReset` used untyped literal entity lists. | Incorporated in 18-07 Task 2: typed maps derive reset tombstone/delete sequences and replace-all proves all new child tombstones. |
+| M9 | MEDIUM | Settings cited the wrong DropdownFieldWidget path. | Incorporated in 18-05 Task 2: corrected to `src/components/field-widgets/DropdownFieldWidget.tsx`. |
+| L10 | LOW | 18-07 edited reconciliation without running its suite. | Incorporated in 18-07 Tasks 2–3: both named verification commands include `reconciliation.test.ts`. |
+| L11 | LOW | v1 forward migration could fail required-array validation. | Incorporated in 18-07 Task 1: materialize all v2 child/link/provenance/tombstone arrays before validation. |
+| L12 | LOW | Derived legacy method UIDs lacked a collision rule. | Incorporated in 18-07 Task 1: fixed `legacy-method:${contactUid}:${type}` format and newUid-shape disjointness test. |
+| L13 | LOW | `contact-methods-read.ts` had no named behavior suite. | Incorporated in 18-02 Task 1: adds `contact-methods-read.test.ts` and runs it. |
+| L14 | LOW | `sun-picker-read.ts` lifecycle behavior was undecided. | Incorporated in 18-03 Task 2: Bound-only candidates, retaining never-contacted Bound candidates. |
+| C-L1 | LOW | 18-10 Task 3 routed through its decision checkpoint rather than the builder. | Incorporated in 18-10 Task 3: route to Task 2's builder. |
+
+## Cycle 2 source-coverage audit
+
+| Source | Item | Covered by | Status |
+|---|---|---|---|
+| GOAL | First-class methods and non-destructive Bound/Unbound lifecycle without authoritative system contacts. | 18-01 through 18-11, with 18-08 final evidence ledger. | COVERED |
+| REQ | CDN-01 normalized ordered methods, actionability, and no scalar authority. | 18-01, 18-02, 18-04, 18-06, 18-07, 18-08, 18-10. | COVERED |
+| REQ | CDN-02 lifecycle, durable cadence invariant, preservation, and Bound-only behavior. | 18-01, 18-02, 18-03, 18-05, 18-06, 18-07, 18-09, 18-11. | COVERED |
+| REQ | CDN-03 dedicated Unbound browsing plus Bound-only proactive surfaces and explicit AI. | 18-03, 18-05, 18-06, 18-09, 18-11. | COVERED |
+| REQ | CDN-04 lossless normalized graph, tombstones, external-link provenance, and non-destructive restore. | 18-01, 18-02, 18-07, 18-08, 18-10. | COVERED |
+| RESEARCH | Parser boundary, FK-safe v9 rebuild, lifecycle SQL guards, nullable status fragments, and complete consumer audit. | 18-01, 18-02, 18-03, 18-08. | COVERED |
+| RESEARCH | Mergeable external links/provenance, portable v1-to-v2 migration, restore reconciliation, and deletion evidence. | 18-01, 18-07. | COVERED |
+| CONTEXT | Zero-to-many methods; Bound/Unbound cadence invariant; preserved history/rank; active-link uniqueness; source non-authority; all stated deferrals. | 18-01, 18-02, 18-03, 18-04, 18-05, 18-07, 18-08. | COVERED |
+
+No non-deferred source item is unplanned. The dossier deferrals remain out of plan scope.
+
+## Historical Cycle 1 record — incorporated, not current execution work
 
 # Cross-AI Plan Review — Phase 18
 
@@ -56,4 +117,3 @@ Claude assessed risk as **HIGH** because the irreversible migration, region poli
 ## Codex Review
 
 Codex assessed risk as **MEDIUM**: the architecture is sound but settings-schema ownership and explicit-AI behavior with nullable cadence block safe execution. It also highlighted legacy invalid-cadence handling and the 18-05 → 18-07 portable-settings dependency, incorporated above.
-
