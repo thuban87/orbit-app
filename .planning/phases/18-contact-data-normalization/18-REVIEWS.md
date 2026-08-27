@@ -1,6 +1,6 @@
 ---
 phase: 18
-review_cycles: [1, 2]
+review_cycles: [1, 2, 3]
 reviewers: [claude, codex]
 reviewed_at: 2026-08-26T00:00:00-05:00
 plans_reviewed: [18-01-PLAN.md, 18-02-PLAN.md, 18-03-PLAN.md, 18-04-PLAN.md, 18-05-PLAN.md, 18-06-PLAN.md, 18-07-PLAN.md, 18-08-PLAN.md, 18-09-PLAN.md, 18-10-PLAN.md]
@@ -10,6 +10,8 @@ models:
   cycle_1_codex: "gpt-5.6-terra (reasoning=low)"
   cycle_2_claude: "not declared in supplied review artifact"
   cycle_2_codex: "not declared in supplied review artifact"
+  cycle_3_claude: "claude-opus-5"
+  cycle_3_codex: "gpt-5.6-terra (reasoning=low)"
 model_sources:
   cycle_1_claude: "explicit gate-test invocation"
   cycle_1_codex: "banner"
@@ -18,7 +20,43 @@ model_sources:
 cycle_2_sources:
   claude: "/tmp/orbit-phase18-cycle2-20260826/claude.out (successful direct read-only review, 114 lines)"
   codex: "/tmp/orbit-phase18-cycle2-20260826/codex-run/gsd-review-codex.md (successful flagless review, 37 lines)"
+cycle_3_plans_reviewed: [18-01-PLAN.md, 18-02-PLAN.md, 18-03-PLAN.md, 18-04-PLAN.md, 18-05-PLAN.md, 18-06-PLAN.md, 18-07-PLAN.md, 18-08-PLAN.md, 18-09-PLAN.md, 18-10-PLAN.md, 18-11-PLAN.md, 18-12-PLAN.md]
+cycle_3_sources:
+  claude: "/tmp/orbit-phase18-cycle3-20260826/claude.out (successful direct read-only review, 23,143 bytes)"
+  codex: "/tmp/orbit-phase18-cycle3-20260826/codex-run/gsd-review-codex.md (successful flagless review, 2,384 bytes)"
 ---
+
+# Cycle 3 aggregate — 2026-08-26 (owner-capped final external cycle)
+
+## Reviewer record
+
+| Reviewer | Invocation/source | Model record | Verdict |
+|---|---|---|---|
+| Claude | Direct read-only invocation; output at `/tmp/orbit-phase18-cycle3-20260826/claude.out` | `claude-opus-5` | Replan required: 2 HIGH, 5 actionable MEDIUM. |
+| Codex | Flagless declared lane; output at `/tmp/orbit-phase18-cycle3-20260826/codex-run/gsd-review-codex.md` | `gpt-5.6-terra (reasoning=low)` | Replan required: 1 additional actionable MEDIUM. |
+
+Claude ran before Codex as required. This is the third and final external cycle authorized by the owner. Do not launch another external reviewer after incorporation; final assessment is the independent internal plan checker plus the explicit residual-risk report.
+
+## Consensus before final internal revision gate
+
+**Open before this replan:** 2 HIGH and 6 actionable MEDIUM concerns. Every concern below must become executable PLAN.md content with named ownership, behavior, acceptance criteria, and targeted verification. This record intentionally does not claim external convergence or that Phase 18 is ready to execute: no external reviewer will re-check the post-cycle-3 plan changes because the review cap has been reached.
+
+## Current finding disposition
+
+| ID | Severity | Finding | Required incorporation |
+|---|---|---|---|
+| C3-H1 | HIGH | Orrery's `rewriteRingSeq` count/update guards omit the Bound predicate after `listOrbitingContacts` becomes Bound-only, so one contacted Unbound contact makes every reorder throw. | 18-12 Task 2 owns `ring-seq-dao.ts` and its test alongside `orrery-read.ts`: use the same `tracking_enabled = 1` predicate in the COUNT and scoped UPDATE guards; prove reorder succeeds with a contacted Unbound contact; expand 18-08's ledger to all orbiting/favourite-set predicate consumers. |
+| C3-H2 | HIGH | Migration 009 rebuilds `app_settings` and relationship children without a proof that all existing columns, defaults, indexes, UNIQUE constraints, and data survive. | 18-01 Task 3 seeds every pre-v9 `app_settings` column with distinctive non-default values, asserts row equality after v9, and checks `PRAGMA table_info` plus `sqlite_master` schema/index/UNIQUE completeness for `app_settings` and each rebuilt child. It evaluates `legacy_alter_table` only as a blast-radius-reduction option; the completeness proof is mandatory whichever route is used. |
+| C3-M1 | MEDIUM | The typed `MergeableEntityType`/`TombstoneEntityType` refactor can silently omit non-mergeable `field_history` from purge and Replace-all deletion. | 18-07 Task 2 uses the typed maps plus an explicit exhaustively typed residual owned-table list including `field_history`, preserves FK-safe delete order, and proves in `restore-apply.test.ts` that Replace-all removes seeded history. |
+| C3-M2 | MEDIUM | Dashboard first-run detection has no Unbound count, so an all-Unbound user sees “Add your first contact” above an Unbound footer. | 18-05 Task 1 owns `dashboard-empty-logic.ts`/test and Home threading: add `unbound` to `DashboardEmptyInput`, require all five populations to be zero for first-run, and test zero/non-zero Unbound cases. |
+| C3-M3 | MEDIUM | Included Unbound Never Contacted rows can render a stale favourite star and active `ContactCard` chrome; `DashboardRow.trackingEnabled` is omitted by the unchecked list cast. | 18-03 Task 2 extends `listNeverContacted` to project `trackingEnabled` and NULL favourite rank for Unbound. 18-05 Task 2 owns `NeverContactedScreen.tsx`/test and requires the neutral Unbound row treatment with no favourite or status ring. |
+| C3-M4 | MEDIUM | Backup parsing admits illegal lifecycle/cadence combinations, so restore fails mid-transaction with a raw SQLite CHECK/trigger error instead of `BackupSchemaError`. | 18-07 Task 1 validates `intervalDays` as null or positive integer and `trackingEnabled` as 0/1 with Bound implying non-null cadence; its v1→v2 migration removes retired scalar keys. Task 3 adds negative parse and merge tests proving rejection before apply. |
+| C3-M5 | MEDIUM | Streamlined Export lacks a UI-spec copy/state contract, a distinct artifact identity, and device UAT despite being a new PII egress surface. | Before 18-10 execution, update the UI-SPEC copy/state tables. 18-10 Task 2 defines a filename prefix, extension, MIME type, and share-sheet title distinct from backup and tests that no artifact label contains “backup”; 18-08 Task 2 invokes and inspects the streamlined export in device UAT. |
+| C3-M6 | MEDIUM | DAO promotion cannot protect direct restore writes from two surviving primary methods of a type. | 18-01 Task 3 creates/tests a partial unique index on `(contact_id, method_type) WHERE is_primary = 1`; 18-07 Tasks 1/3 reject a graph with multiple surviving primaries per `(contactUid, type)` before restore, with migration direct-SQL and backup negative coverage. |
+
+## Final-cycle source-coverage note
+
+Claude read all 12 executable plans and the Phase 18 context/research/dossier/validation/UI/review artifacts; it source-checked migration, query/lifecycle, backup/restore, and UI consumer seams. Codex independently read the same plan set and relevant source seams. Their completed raw reviews remain the authoritative evidence for the detailed source locations above.
 
 # Cycle 2 aggregate — 2026-08-26
 
