@@ -60,8 +60,31 @@ export interface PurgeImpact {
   events: number;
   fuel: number;
   links: number;
+  methods: number;
+  externalLinks: number;
+  methodProvenance: number;
   hasCustomValues: boolean;
 }
+
+interface PurgeChildSpec {
+  countSql: string;
+  tombstoneSql: string;
+  deleteSql: string;
+}
+
+/** Every tombstone type is deliberately given a purge disposition here. */
+const PURGE_CHILDREN: Record<TombstoneEntityType, PurgeChildSpec | null> = {
+  contact: null,
+  interaction: { countSql: "SELECT COUNT(*) AS n FROM interactions WHERE contact_id = ?", tombstoneSql: "SELECT uid FROM interactions WHERE contact_id = ?", deleteSql: "DELETE FROM interactions WHERE contact_id = ?" },
+  event: { countSql: "SELECT COUNT(*) AS n FROM events WHERE contact_id = ?", tombstoneSql: "SELECT uid FROM events WHERE contact_id = ?", deleteSql: "DELETE FROM events WHERE contact_id = ?" },
+  fuel: { countSql: "SELECT COUNT(*) AS n FROM fuel WHERE contact_id = ?", tombstoneSql: "SELECT uid FROM fuel WHERE contact_id = ?", deleteSql: "DELETE FROM fuel WHERE contact_id = ?" },
+  custom_field_value: { countSql: "SELECT COUNT(*) AS n FROM custom_field_values WHERE contact_id = ?", tombstoneSql: "SELECT uid FROM custom_field_values WHERE contact_id = ?", deleteSql: "DELETE FROM custom_field_values WHERE contact_id = ?" },
+  contact_link: { countSql: "SELECT COUNT(*) AS n FROM contact_links WHERE contact_id = ?", tombstoneSql: "SELECT uid FROM contact_links WHERE contact_id = ?", deleteSql: "DELETE FROM contact_links WHERE contact_id = ?" },
+  contact_method: { countSql: "SELECT COUNT(*) AS n FROM contact_methods WHERE contact_id = ?", tombstoneSql: "SELECT uid FROM contact_methods WHERE contact_id = ?", deleteSql: "DELETE FROM contact_methods WHERE contact_id = ?" },
+  external_contact_link: { countSql: "SELECT COUNT(*) AS n FROM external_contact_links WHERE contact_id = ?", tombstoneSql: "SELECT uid FROM external_contact_links WHERE contact_id = ?", deleteSql: "DELETE FROM external_contact_links WHERE contact_id = ?" },
+  contact_method_provenance: { countSql: "SELECT COUNT(*) AS n FROM contact_method_provenance p JOIN contact_methods m ON m.id = p.method_id WHERE m.contact_id = ?", tombstoneSql: "SELECT p.uid FROM contact_method_provenance p JOIN contact_methods m ON m.id = p.method_id WHERE m.contact_id = ?", deleteSql: "DELETE FROM contact_method_provenance WHERE method_id IN (SELECT id FROM contact_methods WHERE contact_id = ?)" },
+  custom_field_def: null,
+};
 
 /** Required purge timing plus optional post-commit cleanup registered by Phases 5/11. */
 export interface PurgeOptions {
@@ -119,6 +142,9 @@ export async function computeImpact(
     "SELECT COUNT(*) AS n FROM contact_links WHERE contact_id = ?",
     contactId,
   );
+  const methods = await countRows(exec, PURGE_CHILDREN.contact_method!.countSql, contactId);
+  const externalLinks = await countRows(exec, PURGE_CHILDREN.external_contact_link!.countSql, contactId);
+  const methodProvenance = await countRows(exec, PURGE_CHILDREN.contact_method_provenance!.countSql, contactId);
   const cv = await exec.getFirstAsync<{ present: number }>(
     "SELECT EXISTS(SELECT 1 FROM custom_field_values WHERE contact_id = ?) AS present",
     [contactId],
@@ -128,6 +154,9 @@ export async function computeImpact(
     events,
     fuel,
     links,
+    methods,
+    externalLinks,
+    methodProvenance,
     hasCustomValues: (cv?.present ?? 0) === 1,
   };
 }
@@ -191,35 +220,14 @@ export function purgeContact(
 
     // (2) Capture every mergeable UID before deleting it. field_history has no
     //     merge identity and remains deliberately excluded from evidence.
-    const tombstoneSources: Array<{
-      entityType: TombstoneEntityType;
-      sql: string;
-    }> = [
-      {
-        entityType: "interaction",
-        sql: "SELECT uid FROM interactions WHERE contact_id = ?",
-      },
-      {
-        entityType: "event",
-        sql: "SELECT uid FROM events WHERE contact_id = ?",
-      },
-      { entityType: "fuel", sql: "SELECT uid FROM fuel WHERE contact_id = ?" },
-      {
-        entityType: "custom_field_value",
-        sql: "SELECT uid FROM custom_field_values WHERE contact_id = ?",
-      },
-      {
-        entityType: "contact_link",
-        sql: "SELECT uid FROM contact_links WHERE contact_id = ?",
-      },
-    ];
-    for (const source of tombstoneSources) {
-      const rows = await exec.getAllAsync<{ uid: string }>(source.sql, [
+    for (const [entityType, source] of Object.entries(PURGE_CHILDREN) as Array<[TombstoneEntityType, PurgeChildSpec | null]>) {
+      if (!source || entityType === "contact") continue;
+      const rows = await exec.getAllAsync<{ uid: string }>(source.tombstoneSql, [
         contactId,
       ]);
       for (const child of rows) {
         await insertTombstoneCore(exec, {
-          entityType: source.entityType,
+          entityType,
           entityUid: child.uid,
           deletedAt: opts.now,
         });
@@ -233,18 +241,9 @@ export function purgeContact(
 
     // (3) Explicit fan-out of every owned child (incl. field_history, which has
     //     no FK and never cascades). Not relying on FK CASCADE — auditable.
-    await exec.runAsync("DELETE FROM interactions WHERE contact_id = ?", [
-      contactId,
-    ]);
-    await exec.runAsync("DELETE FROM events WHERE contact_id = ?", [contactId]);
-    await exec.runAsync("DELETE FROM fuel WHERE contact_id = ?", [contactId]);
-    await exec.runAsync(
-      "DELETE FROM custom_field_values WHERE contact_id = ?",
-      [contactId],
-    );
-    await exec.runAsync("DELETE FROM contact_links WHERE contact_id = ?", [
-      contactId,
-    ]);
+    for (const entityType of ["contact_method_provenance", "interaction", "event", "fuel", "custom_field_value", "contact_link", "external_contact_link", "contact_method"] as const) {
+      await exec.runAsync(PURGE_CHILDREN[entityType]!.deleteSql, [contactId]);
+    }
     await exec.runAsync("DELETE FROM field_history WHERE contact_id = ?", [
       contactId,
     ]);

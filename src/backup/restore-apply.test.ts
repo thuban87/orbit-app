@@ -188,4 +188,22 @@ describe("applyRestore", () => {
       "SELECT canonical_region,label,extension FROM contact_methods WHERE uid=?", ["method-a"],
     )).resolves.toEqual({ canonical_region: "US", label: "Mobile", extension: "42" });
   });
+
+  it("demotes a retained primary before inserting a lexically earlier replacement primary", async () => {
+    const source = await db();
+    const destination = await db();
+    for (const exec of [source, destination]) {
+      await exec.runAsync("INSERT INTO contacts (uid,name,interval_days,rarely_responds,reminders_off,created_at,modified_at) VALUES (?,?,?,?,?,?,?)", ["shared-contact", "Shared", 14, 0, 0, NOW, "2026-08-25 12:00:00"]);
+    }
+    const sourceContact = await source.getFirstAsync<{ id: number }>("SELECT id FROM contacts WHERE uid=?", ["shared-contact"]);
+    const destinationContact = await destination.getFirstAsync<{ id: number }>("SELECT id FROM contacts WHERE uid=?", ["shared-contact"]);
+    await source.runAsync("INSERT INTO contact_methods (uid,contact_id,method_type,raw_value,display_value,is_actionable,is_primary,display_order,created_at,modified_at) VALUES (?,?,?,?,?,?,?,?,?,?)", ["a-promoted", sourceContact!.id, "phone", "new", "new", 1, 1, 0, NOW, "2026-08-25 12:01:00"]);
+    await destination.runAsync("INSERT INTO contact_methods (uid,contact_id,method_type,raw_value,display_value,is_actionable,is_primary,display_order,created_at,modified_at) VALUES (?,?,?,?,?,?,?,?,?,?)", ["z-retained", destinationContact!.id, "phone", "old", "old", 1, 1, 0, NOW, NOW]);
+    const manifest = await buildExportManifest(source, { exportedAt: NOW, readPhotoBase64: async () => "" });
+
+    await expect(applyRestore(destination, manifest, "merge")).resolves.toMatchObject({ status: "applied" });
+    await expect(destination.getAllAsync<{ uid: string; is_primary: number }>("SELECT uid,is_primary FROM contact_methods ORDER BY uid")).resolves.toEqual([
+      { uid: "a-promoted", is_primary: 1 }, { uid: "z-retained", is_primary: 0 },
+    ]);
+  });
 });

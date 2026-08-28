@@ -46,19 +46,22 @@ type PhotoTarget = RestorePendingTarget & { valueUid?: string; fieldDefUid?: str
 type FinalizeCandidate = { target: PhotoTarget; relativePath: string };
 type DeleteCandidate = { target: PhotoTarget; canonicalRelativePath: string; clearReference: boolean };
 
-const entities: readonly MergeableEntityType[] = ["categories", "profile", "contacts", "custom_field_defs", "interactions", "events", "fuel", "contact_links", "custom_field_values"];
-const tableOf: Record<MergeableEntityType, string> = { categories: "categories", profile: "profile", contacts: "contacts", interactions: "interactions", events: "events", fuel: "fuel", contact_links: "contact_links", custom_field_defs: "custom_field_defs", custom_field_values: "custom_field_values" };
-const tombstoneEntity: Record<MergeableEntityType, string | null> = { contacts: "contact", interactions: "interaction", events: "event", fuel: "fuel", contact_links: "contact_link", custom_field_defs: "custom_field_def", custom_field_values: "custom_field_value", categories: null, profile: null };
+const entities: readonly MergeableEntityType[] = ["categories", "profile", "contacts", "custom_field_defs", "contact_methods", "external_contact_links", "contact_method_provenance", "interactions", "events", "fuel", "contact_links", "custom_field_values"];
+const tableOf: Record<MergeableEntityType, string> = { categories: "categories", profile: "profile", contacts: "contacts", contact_methods: "contact_methods", external_contact_links: "external_contact_links", contact_method_provenance: "contact_method_provenance", interactions: "interactions", events: "events", fuel: "fuel", contact_links: "contact_links", custom_field_defs: "custom_field_defs", custom_field_values: "custom_field_values" };
+const tombstoneEntity: Record<MergeableEntityType, string | null> = { contacts: "contact", contact_methods: "contact_method", external_contact_links: "external_contact_link", contact_method_provenance: "contact_method_provenance", interactions: "interaction", events: "event", fuel: "fuel", contact_links: "contact_link", custom_field_defs: "custom_field_def", custom_field_values: "custom_field_value", categories: null, profile: null };
 
 function incomingRows(manifest: BackupManifest, entity: MergeableEntityType): Row[] {
-  const raw: Record<string, unknown>[] = entity === "profile" ? (manifest.profile ? [manifest.profile] : []) : entity === "contact_links" ? manifest.contactLinks : entity === "custom_field_defs" ? manifest.customFieldDefs : entity === "custom_field_values" ? manifest.customFieldValues : manifest[entity] as Record<string, unknown>[];
+  const raw: Record<string, unknown>[] = entity === "profile" ? (manifest.profile ? [manifest.profile] : []) : entity === "contact_links" ? manifest.contactLinks : entity === "contact_methods" ? manifest.contactMethods : entity === "external_contact_links" ? manifest.externalContactLinks : entity === "contact_method_provenance" ? manifest.contactMethodProvenance : entity === "custom_field_defs" ? manifest.customFieldDefs : entity === "custom_field_values" ? manifest.customFieldValues : manifest[entity] as Record<string, unknown>[];
   return raw.map((row) => ({ ...row, modified_at: row.modifiedAt as string } as Row));
 }
 async function localRows(exec: SqlExecutor, entity: MergeableEntityType): Promise<Row[]> {
   const sql: Record<MergeableEntityType, string> = {
     categories: "SELECT uid,name,display_order AS displayOrder,created_at AS createdAt,modified_at FROM categories",
     profile: "SELECT uid,name,created_at AS createdAt,modified_at FROM profile",
-    contacts: "SELECT c.uid,c.name,cat.uid AS categoryUid,c.interval_days AS intervalDays,c.social_battery AS socialBattery,c.birthday,c.phone,c.email,c.archived_at AS archivedAt,c.snooze_until AS snoozeUntil,c.rarely_responds AS rarelyResponds,c.reminders_off AS remindersOff,c.created_at AS createdAt,c.modified_at FROM contacts c LEFT JOIN categories cat ON cat.id=c.category_id",
+    contacts: "SELECT c.uid,c.name,cat.uid AS categoryUid,c.interval_days AS intervalDays,c.social_battery AS socialBattery,c.birthday,c.archived_at AS archivedAt,c.snooze_until AS snoozeUntil,c.rarely_responds AS rarelyResponds,c.reminders_off AS remindersOff,c.created_at AS createdAt,c.modified_at FROM contacts c LEFT JOIN categories cat ON cat.id=c.category_id",
+    contact_methods: "SELECT m.uid,c.uid AS contactUid,m.method_type AS methodType,m.raw_value AS rawValue,m.display_value AS displayValue,m.canonical_value AS canonicalValue,m.canonical_region AS canonicalRegion,m.label,m.extension,m.is_actionable AS isActionable,m.is_primary AS isPrimary,m.display_order AS displayOrder,m.created_at AS createdAt,m.modified_at FROM contact_methods m JOIN contacts c ON c.id=m.contact_id",
+    external_contact_links: "SELECT l.uid,c.uid AS contactUid,l.provider,l.external_contact_id AS externalContactId,l.is_active AS isActive,l.created_at AS createdAt,l.modified_at FROM external_contact_links l JOIN contacts c ON c.id=l.contact_id",
+    contact_method_provenance: "SELECT p.uid,m.uid AS methodUid,l.uid AS externalContactLinkUid,p.source_method_id AS sourceMethodId,p.created_at AS createdAt,p.modified_at FROM contact_method_provenance p JOIN contact_methods m ON m.id=p.method_id LEFT JOIN external_contact_links l ON l.id=p.external_contact_link_id",
     interactions: "SELECT i.uid,c.uid AS contactUid,i.occurred_at AS occurredAt,i.recorded_at AS recordedAt,i.channel,i.direction,i.connected,i.quality,i.note,i.source,i.modified_at FROM interactions i JOIN contacts c ON c.id=i.contact_id",
     events: "SELECT e.uid,c.uid AS contactUid,e.type,e.occurred_at AS occurredAt,e.detail,e.recorded_at AS recordedAt,e.modified_at FROM events e JOIN contacts c ON c.id=e.contact_id",
     fuel: "SELECT f.uid,c.uid AS contactUid,f.kind,f.label,f.text,f.url,f.created_at AS createdAt,f.source,f.modified_at FROM fuel f JOIN contacts c ON c.id=f.contact_id",
@@ -76,10 +79,58 @@ function incomingTombstones(manifest: BackupManifest, entity: MergeableEntityTyp
   const type = tombstoneEntity[entity];
   return type ? manifest.tombstones.filter((row) => row.entityType === type).map((row) => ({ entity_uid: row.entityUid, deleted_at: row.deletedAt })) : [];
 }
-async function idMap(exec: SqlExecutor, table: "contacts" | "categories" | "custom_field_defs"): Promise<Map<string, number>> {
+async function idMap(exec: SqlExecutor, table: "contacts" | "categories" | "custom_field_defs" | "contact_methods" | "external_contact_links"): Promise<Map<string, number>> {
   return new Map((await exec.getAllAsync<{ uid: string; id: number }>(`SELECT uid,id FROM ${table}`)).map((row) => [row.uid, row.id]));
 }
 function writes(plan: Plan, entity: MergeableEntityType): ReconciliationAction[] { return plan[entity].filter((a) => a.kind === "insert" || a.kind === "update"); }
+function updateRetained(action: ReconciliationAction): void {
+  if (action.kind === "retain") action.kind = "update";
+}
+function normalizedWinner(actions: ReconciliationAction[]): ReconciliationAction {
+  return [...actions].sort((left, right) => {
+    const stamp = String(right.row?.modified_at ?? "").localeCompare(String(left.row?.modified_at ?? ""));
+    return stamp || left.uid.localeCompare(right.uid);
+  })[0]!;
+}
+/** Normalize natural-key collisions after UID reconciliation, before survivors and writes are derived. */
+function normalizePlan(plan: Plan): void {
+  const redirects = new Map<string, string>();
+  const liveMethods = plan.contact_methods.filter((action) => action.row && ["insert", "update", "retain"].includes(action.kind));
+  const byCanonical = new Map<string, ReconciliationAction[]>();
+  for (const action of liveMethods) {
+    const row = action.row!;
+    if (typeof row.canonicalValue !== "string" || row.canonicalValue.length === 0) continue;
+    const key = `${row.contactUid}\0${row.methodType}\0${row.canonicalValue}`;
+    byCanonical.set(key, [...(byCanonical.get(key) ?? []), action]);
+  }
+  for (const actions of byCanonical.values()) if (actions.length > 1) {
+    const winner = normalizedWinner(actions);
+    for (const loser of actions) if (loser !== winner) { redirects.set(loser.uid, winner.uid); loser.kind = "delete"; }
+  }
+  for (const action of plan.contact_method_provenance) {
+    if (action.row && typeof action.row.methodUid === "string" && redirects.has(action.row.methodUid)) {
+      action.row.methodUid = redirects.get(action.row.methodUid)!;
+      updateRetained(action);
+    }
+  }
+  const livePrimary = plan.contact_methods.filter((action) => action.row && action.kind !== "delete" && action.kind !== "blocked" && action.row.isPrimary === 1);
+  const byPrimary = new Map<string, ReconciliationAction[]>();
+  for (const action of livePrimary) { const row = action.row!; const key = `${row.contactUid}\0${row.methodType}`; byPrimary.set(key, [...(byPrimary.get(key) ?? []), action]); }
+  for (const actions of byPrimary.values()) if (actions.length > 1) {
+    const winner = normalizedWinner(actions);
+    for (const loser of actions) if (loser !== winner) { loser.row!.isPrimary = 0; updateRetained(loser); }
+  }
+  const liveLinks = plan.external_contact_links.filter((action) => action.row && action.kind !== "delete" && action.kind !== "blocked" && action.row.isActive === 1);
+  const byActiveLink = new Map<string, ReconciliationAction[]>();
+  for (const action of liveLinks) { const row = action.row!; const key = `${row.provider}\0${row.externalContactId}`; byActiveLink.set(key, [...(byActiveLink.get(key) ?? []), action]); }
+  for (const actions of byActiveLink.values()) if (actions.length > 1) {
+    const winner = normalizedWinner(actions);
+    for (const loser of actions) if (loser !== winner) { loser.row!.isActive = 0; updateRetained(loser); }
+  }
+}
+function survivorSet(actions: ReconciliationAction[]): ReadonlySet<string> {
+  return new Set(actions.filter((action) => ["insert", "update", "retain"].includes(action.kind) && action.row).map((action) => action.uid));
+}
 function assertCompleteIncomingPairs(manifest: BackupManifest): void {
   const pairs = new Set(manifest.customFieldValues.map((row) => `${row.contactUid}\0${row.fieldDefUid}`));
   for (const contact of manifest.contacts) for (const def of manifest.customFieldDefs) if (!pairs.has(`${contact.uid}\0${def.uid}`)) throw new Error("restore manifest is missing a normalized custom-field value pair");
@@ -94,18 +145,27 @@ async function upsertParents(exec: SqlExecutor, plan: Plan): Promise<void> {
 }
 async function upsertContacts(exec: SqlExecutor, plan: Plan): Promise<void> {
   const categories = await idMap(exec, "categories");
-  for (const a of writes(plan, "contacts")) { const r = a.row!; const category = typeof r.categoryUid === "string" ? categories.get(r.categoryUid) ?? null : null; await exec.runAsync("INSERT INTO contacts (uid,name,category_id,interval_days,social_battery,birthday,phone,email,archived_at,snooze_until,rarely_responds,reminders_off,created_at,modified_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(uid) DO UPDATE SET name=excluded.name,category_id=excluded.category_id,interval_days=excluded.interval_days,social_battery=excluded.social_battery,birthday=excluded.birthday,phone=excluded.phone,email=excluded.email,archived_at=excluded.archived_at,snooze_until=excluded.snooze_until,rarely_responds=excluded.rarely_responds,reminders_off=excluded.reminders_off,modified_at=excluded.modified_at", [r.uid,r.name,category,r.intervalDays,r.socialBattery ?? null,r.birthday ?? null,r.phone ?? null,r.email ?? null,r.archivedAt ?? null,r.snoozeUntil ?? null,r.rarelyResponds,r.remindersOff,r.createdAt,r.modified_at]); }
+  for (const a of writes(plan, "contacts")) { const r = a.row!; const category = typeof r.categoryUid === "string" ? categories.get(r.categoryUid) ?? null : null; await exec.runAsync("INSERT INTO contacts (uid,name,category_id,interval_days,social_battery,birthday,archived_at,snooze_until,rarely_responds,reminders_off,created_at,modified_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(uid) DO UPDATE SET name=excluded.name,category_id=excluded.category_id,interval_days=excluded.interval_days,social_battery=excluded.social_battery,birthday=excluded.birthday,archived_at=excluded.archived_at,snooze_until=excluded.snooze_until,rarely_responds=excluded.rarely_responds,reminders_off=excluded.reminders_off,modified_at=excluded.modified_at", [r.uid,r.name,category,r.intervalDays,r.socialBattery ?? null,r.birthday ?? null,r.archivedAt ?? null,r.snoozeUntil ?? null,r.rarelyResponds,r.remindersOff,r.createdAt,r.modified_at]); }
 }
 async function upsertChildren(exec: SqlExecutor, plan: Plan): Promise<void> {
   const contacts = await idMap(exec, "contacts"); const defs = await idMap(exec, "custom_field_defs");
-  for (const entity of ["interactions","events","fuel","contact_links","custom_field_values"] as const) for (const a of writes(plan, entity)) {
+  for (const entity of ["contact_methods", "external_contact_links", "interactions","events","fuel","contact_links","custom_field_values"] as const) for (const a of writes(plan, entity).sort((left, right) => {
+    const leftActive = entity === "contact_methods" ? left.row?.isPrimary : entity === "external_contact_links" ? left.row?.isActive : 0;
+    const rightActive = entity === "contact_methods" ? right.row?.isPrimary : entity === "external_contact_links" ? right.row?.isActive : 0;
+    return Number(leftActive) - Number(rightActive) || left.uid.localeCompare(right.uid);
+  })) {
     const r = a.row!; const contact = contacts.get(r.contactUid as string); if (!contact) throw new Error("restore parent disappeared during apply");
+    if (entity === "contact_methods") await exec.runAsync("INSERT INTO contact_methods (uid,contact_id,method_type,raw_value,display_value,canonical_value,canonical_region,label,extension,is_actionable,is_primary,display_order,created_at,modified_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(uid) DO UPDATE SET contact_id=excluded.contact_id,method_type=excluded.method_type,raw_value=excluded.raw_value,display_value=excluded.display_value,canonical_value=excluded.canonical_value,canonical_region=excluded.canonical_region,label=excluded.label,extension=excluded.extension,is_actionable=excluded.is_actionable,is_primary=excluded.is_primary,display_order=excluded.display_order,modified_at=excluded.modified_at", [r.uid,contact,r.methodType,r.rawValue,r.displayValue,r.canonicalValue ?? null,r.canonicalRegion ?? null,r.label ?? null,r.extension ?? null,r.isActionable,r.isPrimary,r.displayOrder,r.createdAt,r.modified_at]);
+    if (entity === "external_contact_links") await exec.runAsync("INSERT INTO external_contact_links (uid,contact_id,provider,external_contact_id,is_active,created_at,modified_at) VALUES (?,?,?,?,?,?,?) ON CONFLICT(uid) DO UPDATE SET contact_id=excluded.contact_id,provider=excluded.provider,external_contact_id=excluded.external_contact_id,is_active=excluded.is_active,modified_at=excluded.modified_at", [r.uid,contact,r.provider,r.externalContactId,r.isActive,r.createdAt,r.modified_at]);
     if (entity === "interactions") await exec.runAsync("INSERT INTO interactions (uid,contact_id,occurred_at,recorded_at,channel,direction,connected,quality,note,source,modified_at) VALUES (?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(uid) DO UPDATE SET contact_id=excluded.contact_id,occurred_at=excluded.occurred_at,recorded_at=excluded.recorded_at,channel=excluded.channel,direction=excluded.direction,connected=excluded.connected,quality=excluded.quality,note=excluded.note,source=excluded.source,modified_at=excluded.modified_at", [r.uid,contact,r.occurredAt,r.recordedAt,r.channel,r.direction ?? null,r.connected,r.quality ?? null,r.note ?? null,r.source,r.modified_at]);
     if (entity === "events") await exec.runAsync("INSERT INTO events (uid,contact_id,type,occurred_at,detail,recorded_at,modified_at) VALUES (?,?,?,?,?,?,?) ON CONFLICT(uid) DO UPDATE SET contact_id=excluded.contact_id,type=excluded.type,occurred_at=excluded.occurred_at,detail=excluded.detail,recorded_at=excluded.recorded_at,modified_at=excluded.modified_at", [r.uid,contact,r.type,r.occurredAt,r.detail ?? null,r.recordedAt,r.modified_at]);
     if (entity === "fuel") await exec.runAsync("INSERT INTO fuel (uid,contact_id,kind,label,text,url,created_at,source,modified_at) VALUES (?,?,?,?,?,?,?,?,?) ON CONFLICT(uid) DO UPDATE SET contact_id=excluded.contact_id,kind=excluded.kind,label=excluded.label,text=excluded.text,url=excluded.url,created_at=excluded.created_at,source=excluded.source,modified_at=excluded.modified_at", [r.uid,contact,r.kind,r.label ?? null,r.text ?? null,r.url ?? null,r.createdAt,r.source,r.modified_at]);
     if (entity === "contact_links") await exec.runAsync("INSERT INTO contact_links (uid,contact_id,url,label,display_order,created_at,modified_at) VALUES (?,?,?,?,?,?,?) ON CONFLICT(uid) DO UPDATE SET contact_id=excluded.contact_id,url=excluded.url,label=excluded.label,display_order=excluded.display_order,created_at=excluded.created_at,modified_at=excluded.modified_at", [r.uid,contact,r.url,r.label ?? null,r.displayOrder,r.createdAt,r.modified_at]);
     if (entity === "custom_field_values") { const def = defs.get(r.fieldDefUid as string); if (!def) throw new Error("restore definition disappeared during apply"); await exec.runAsync("INSERT INTO custom_field_values (uid,contact_id,field_def_id,value,created_at,modified_at) VALUES (?,?,?,?,?,?) ON CONFLICT(uid) DO UPDATE SET contact_id=excluded.contact_id,field_def_id=excluded.field_def_id,value=excluded.value,modified_at=excluded.modified_at", [r.uid,contact,def,r.value ?? null,r.createdAt,r.modified_at]); }
   }
+  const methods = await idMap(exec, "contact_methods");
+  const externalLinks = await idMap(exec, "external_contact_links");
+  for (const a of writes(plan, "contact_method_provenance")) { const r = a.row!; const method = methods.get(r.methodUid as string); const link = typeof r.externalContactLinkUid === "string" ? externalLinks.get(r.externalContactLinkUid) ?? null : null; if (!method) throw new Error("restore method disappeared during apply"); await exec.runAsync("INSERT INTO contact_method_provenance (uid,method_id,external_contact_link_id,source_method_id,created_at,modified_at) VALUES (?,?,?,?,?,?) ON CONFLICT(uid) DO UPDATE SET method_id=excluded.method_id,external_contact_link_id=excluded.external_contact_link_id,source_method_id=excluded.source_method_id,modified_at=excluded.modified_at", [r.uid,method,link,r.sourceMethodId ?? null,r.createdAt,r.modified_at]); }
 }
 function targetFor(entity: MergeableEntityType, row: Row): PhotoTarget | null {
   if (entity === "profile") return { kind: "profile" };
@@ -146,8 +206,20 @@ async function replaceAllReset(exec: SqlExecutor, manifest: BackupManifest, dele
   await exec.runAsync("UPDATE app_settings SET sun_contact_id=NULL WHERE id=1");
   for (const r of await exec.getAllAsync<{ uid: string; photo: string | null }>("SELECT uid,photo FROM contacts")) if (r.photo) deletes.push({ target: { kind: "contact", uid: r.uid }, canonicalRelativePath: r.photo, clearReference: false });
   for (const r of await exec.getAllAsync<{ uid: string; contact_uid: string; field_def_uid: string; col_name: string; value: string | null }>("SELECT v.uid,c.uid AS contact_uid,d.uid AS field_def_uid,d.col_name,v.value FROM custom_field_values v JOIN contacts c ON c.id=v.contact_id JOIN custom_field_defs d ON d.id=v.field_def_id WHERE d.type='photo'")) if (r.value) deletes.push({ target: { kind: "customField", uid: r.contact_uid, colName: r.col_name, valueUid: r.uid, fieldDefUid: r.field_def_uid }, canonicalRelativePath: r.value, clearReference: false });
-  for (const [type, table] of [["interaction","interactions"],["event","events"],["fuel","fuel"],["custom_field_value","custom_field_values"],["contact_link","contact_links"],["contact","contacts"],["custom_field_def","custom_field_defs"]] as const) for (const r of await exec.getAllAsync<{ uid: string }>(`SELECT uid FROM ${table}`)) await exec.runAsync("INSERT INTO tombstones (entity_type,entity_uid,deleted_at) VALUES (?,?,?) ON CONFLICT(entity_type,entity_uid) DO UPDATE SET deleted_at=CASE WHEN excluded.deleted_at>tombstones.deleted_at THEN excluded.deleted_at ELSE tombstones.deleted_at END", [type,r.uid,manifest.metadata.exportedAt]);
-  for (const table of ["interactions","events","fuel","custom_field_values","contact_links","field_history","contacts","custom_field_defs"]) await exec.runAsync(`DELETE FROM ${table}`);
+  const resetSources: Record<MergeableEntityType, readonly [string, string] | null> = {
+    categories: null, profile: null,
+    contacts: ["contact", "contacts"],
+    contact_methods: ["contact_method", "contact_methods"],
+    external_contact_links: ["external_contact_link", "external_contact_links"],
+    contact_method_provenance: ["contact_method_provenance", "contact_method_provenance"],
+    interactions: ["interaction", "interactions"], events: ["event", "events"], fuel: ["fuel", "fuel"],
+    contact_links: ["contact_link", "contact_links"], custom_field_defs: ["custom_field_def", "custom_field_defs"], custom_field_values: ["custom_field_value", "custom_field_values"],
+  };
+  for (const source of Object.values(resetSources)) if (source) for (const r of await exec.getAllAsync<{ uid: string }>(`SELECT uid FROM ${source[1]}`)) await exec.runAsync("INSERT INTO tombstones (entity_type,entity_uid,deleted_at) VALUES (?,?,?) ON CONFLICT(entity_type,entity_uid) DO UPDATE SET deleted_at=CASE WHEN excluded.deleted_at>tombstones.deleted_at THEN excluded.deleted_at ELSE tombstones.deleted_at END", [source[0],r.uid,manifest.metadata.exportedAt]);
+  const ownedResidualTables: Record<MergeableEntityType, readonly string[]> = {
+    categories: [], profile: [], contacts: ["field_history"], contact_methods: [], external_contact_links: [], contact_method_provenance: [], interactions: [], events: [], fuel: [], contact_links: [], custom_field_defs: [], custom_field_values: [],
+  };
+  for (const table of ["contact_method_provenance", "interactions", "events", "fuel", "custom_field_values", "contact_links", "external_contact_links", "contact_methods", ...ownedResidualTables.contacts, "contacts", "custom_field_defs"]) await exec.runAsync(`DELETE FROM ${table}`);
 }
 async function importTombstones(exec: SqlExecutor, manifest: BackupManifest): Promise<void> { for (const r of manifest.tombstones) await exec.runAsync("INSERT INTO tombstones (entity_type,entity_uid,deleted_at) VALUES (?,?,?) ON CONFLICT(entity_type,entity_uid) DO UPDATE SET deleted_at=CASE WHEN excluded.deleted_at>tombstones.deleted_at THEN excluded.deleted_at ELSE tombstones.deleted_at END", [r.entityType,r.entityUid,r.deletedAt]); }
 async function writePhotoReference(exec: SqlExecutor, target: PhotoTarget, relative: string | null): Promise<void> {
@@ -169,6 +241,8 @@ export async function applyRestore(exec: SqlExecutor, manifest: BackupManifest, 
   if (mode === "replace-all") for (const entity of entities) { plan[entity] = incomingRows(manifest,entity).map((row) => ({ kind: "insert", uid: row.uid, row })); survivors[entity] = new Set(plan[entity].map((a) => a.uid)); }
   else for (const entity of entities) { const [,rows,deleted] = local.find(([candidate]) => candidate === entity)!; const result = reconcileEntity({ entityType: entity, localRows: rows, incomingRows: incomingRows(manifest,entity), localTombstones: deleted, incomingTombstones: incomingTombstones(manifest,entity), parentSurvivors: survivors }); plan[entity] = result.actions; survivors[entity] = result.survivors; incompatibilities += result.incompatibilities.length; }
   if (incompatibilities) return { status: "incompatible-destination", incompatibilities };
+  normalizePlan(plan);
+  for (const entity of entities) survivors[entity] = survivorSet(plan[entity]);
   const totals = entities.reduce((out, entity) => { for (const action of plan[entity]) out[action.kind] += 1; return out; }, { insert: 0, update: 0, retain: 0, delete: 0, blocked: 0 });
   const applySettings = mode === "replace-all" || (manifest.appSettings.modifiedAt as string) > settings.modifiedAt;
   if (totals.insert + totals.update + totals.delete === 0 && !applySettings) return { status: "applied", mode, inserted: 0, updated: 0, retained: totals.retain, deleted: 0, blocked: totals.blocked, photosNeedingAttention: 0, photoCleanupPending: 0, scheduleResyncPending: false, preRestoreSnapshotCreated };

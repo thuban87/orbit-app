@@ -7,6 +7,9 @@ import type { ReconciliationRow, ReconciliationTombstone } from "@/backup/types"
 /** Every UID-bearing table that a Merge caller may reconcile. */
 export type MergeableEntityType =
   | "contacts"
+  | "contact_methods"
+  | "external_contact_links"
+  | "contact_method_provenance"
   | "interactions"
   | "events"
   | "fuel"
@@ -21,6 +24,7 @@ type WriteMode = "lww" | "insert-if-missing";
 interface ParentFieldPolicy {
   field: string;
   entityType: MergeableEntityType;
+  optional?: boolean;
 }
 
 export interface EntityPolicy {
@@ -37,6 +41,21 @@ export interface EntityPolicy {
  */
 export const ENTITY_POLICIES: Readonly<Record<MergeableEntityType, EntityPolicy>> = {
   contacts: { writeMode: "lww" },
+  contact_methods: {
+    writeMode: "lww",
+    parentFields: [{ field: "contact_id", entityType: "contacts" }],
+  },
+  external_contact_links: {
+    writeMode: "lww",
+    parentFields: [{ field: "contact_id", entityType: "contacts" }],
+  },
+  contact_method_provenance: {
+    writeMode: "lww",
+    parentFields: [
+      { field: "method_id", entityType: "contact_methods" },
+      { field: "external_contact_link_id", entityType: "external_contact_links", optional: true },
+    ],
+  },
   interactions: {
     writeMode: "lww",
     parentFields: [{ field: "contact_id", entityType: "contacts" }],
@@ -193,6 +212,8 @@ function readParentUid(row: ReconciliationRow, field: string): string | undefine
   const aliases: Record<string, string> = {
     contact_id: "contactUid",
     field_def_id: "fieldDefUid",
+    method_id: "methodUid",
+    external_contact_link_id: "externalContactLinkUid",
   };
   const value = row[field] ?? row[aliases[field] ?? field];
   return typeof value === "string" ? value : undefined;
@@ -206,7 +227,7 @@ function rowHasLostParent(
   for (const parent of policy.parentFields ?? []) {
     const survivors = parentSurvivors?.[parent.entityType];
     const uid = readParentUid(row, parent.field);
-    if (survivors && (!uid || !survivors.has(uid))) return parent.field;
+    if (survivors && ((!uid && !parent.optional) || (uid && !survivors.has(uid)))) return parent.field;
   }
   return undefined;
 }

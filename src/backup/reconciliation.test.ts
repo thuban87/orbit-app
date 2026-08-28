@@ -121,9 +121,9 @@ describe("reconciliation", () => {
   it("exposes every mergeable entity policy and fixed singleton seed identities", () => {
     expect(Object.keys(ENTITY_POLICIES).sort()).toEqual([
       "categories",
+      "contact_links",
       "contact_method_provenance",
       "contact_methods",
-      "contact_links",
       "contacts",
       "custom_field_defs",
       "custom_field_values",

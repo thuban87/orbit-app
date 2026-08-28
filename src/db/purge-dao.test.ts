@@ -26,6 +26,9 @@ import { migration004 } from "@/db/migrations/004-ai-settings";
 import { migration005 } from "@/db/migrations/005-digest-settings";
 import { migration006 } from "@/db/migrations/006-normalize-custom-field-values";
 import { migration007 } from "@/db/migrations/007-tombstones";
+import { migration008 } from "@/db/migrations/008-restore-photo-journal";
+import { migration009 } from "@/db/migrations/009-contact-method-normalization";
+import { migration010 } from "@/db/migrations/010-contact-method-label";
 import { runMigrations } from "@/db/migrations/runner";
 import {
   computeImpact,
@@ -57,8 +60,11 @@ beforeEach(async () => {
       migration005,
       migration006,
       migration007,
+      migration008,
+      migration009,
+      migration010,
     ],
-    7,
+    10,
     { now: NOW, newUid: uid },
   );
 });
@@ -222,6 +228,9 @@ describe("computeImpact — per-child counts + hasCustomValues (CRUD-06)", () =>
       events: 1,
       fuel: 3,
       links: 1,
+      methods: 0,
+      externalLinks: 0,
+      methodProvenance: 0,
       hasCustomValues: true,
     });
   });
@@ -235,6 +244,9 @@ describe("computeImpact — per-child counts + hasCustomValues (CRUD-06)", () =>
       events: 0,
       fuel: 0,
       links: 0,
+      methods: 0,
+      externalLinks: 0,
+      methodProvenance: 0,
       hasCustomValues: false,
     });
   });
@@ -247,6 +259,9 @@ describe("impactSummaryLines — pure omit-zero render helper", () => {
       events: 5,
       fuel: 4,
       links: 1,
+      methods: 0,
+      externalLinks: 0,
+      methodProvenance: 0,
       hasCustomValues: true,
     });
     // events ARE now surfaced (Phase 6 writer landed); custom values still are not.
@@ -264,6 +279,9 @@ describe("impactSummaryLines — pure omit-zero render helper", () => {
       events: 0,
       fuel: 0,
       links: 2,
+      methods: 0,
+      externalLinks: 0,
+      methodProvenance: 0,
       hasCustomValues: false,
     });
     expect(lines).toEqual(["1 interaction", "2 links"]);
@@ -275,6 +293,9 @@ describe("impactSummaryLines — pure omit-zero render helper", () => {
       events: 3,
       fuel: 0,
       links: 0,
+      methods: 0,
+      externalLinks: 0,
+      methodProvenance: 0,
       hasCustomValues: true,
     });
     // events now surfaced → one line; custom values never rendered.
@@ -287,6 +308,9 @@ describe("impactSummaryLines — pure omit-zero render helper", () => {
       events: 0,
       fuel: 0,
       links: 0,
+      methods: 0,
+      externalLinks: 0,
+      methodProvenance: 0,
       hasCustomValues: true,
     });
     expect(lines).toEqual([]);

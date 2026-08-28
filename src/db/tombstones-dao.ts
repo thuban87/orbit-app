@@ -12,6 +12,8 @@ export type TombstoneEntityType =
   | "fuel"
   | "contact_link"
   | "contact_method"
+  | "external_contact_link"
+  | "contact_method_provenance"
   | "custom_field_def"
   | "custom_field_value";
 
@@ -37,6 +39,8 @@ function assertTombstoneEntityType(
     case "fuel":
     case "contact_link":
     case "contact_method":
+    case "external_contact_link":
+    case "contact_method_provenance":
     case "custom_field_def":
     case "custom_field_value":
       return;
