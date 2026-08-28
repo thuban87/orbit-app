@@ -34,6 +34,17 @@ describe("buildExportManifest", () => {
     const category = await exec.getFirstAsync<{ id: number; uid: string }>("SELECT id, uid FROM categories ORDER BY id LIMIT 1");
     await exec.runAsync(`INSERT INTO contacts (uid, name, category_id, interval_days, photo, created_at, modified_at) VALUES (?, ?, ?, ?, ?, ?, ?)`, ["contact-a", "Ada", category!.id, 7, "avatars/contact-1.jpg", NOW, NOW]);
     const contact = await exec.getFirstAsync<{ id: number }>("SELECT id FROM contacts WHERE uid = ?", ["contact-a"]);
+    await exec.runAsync(
+      `INSERT INTO contact_methods
+        (uid, contact_id, method_type, raw_value, display_value, canonical_value,
+         canonical_region, label, extension, is_actionable, is_primary,
+         display_order, created_at, modified_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        "method-a", contact!.id, "phone", "+1 555 0100", "+1 555 0100",
+        "+15550100", "US", "Mobile", "42", 1, 1, 0, NOW, NOW,
+      ],
+    );
     await exec.runAsync("UPDATE app_settings SET sun_contact_id = ?, data_revision = 9, backup_folder_uri = ? WHERE id = 1", [contact!.id, "content://local"]);
     await exec.runAsync(`INSERT INTO custom_field_defs (uid, col_name, label, type, options, show_on_new, always_show, display_order, share_with_ai, created_at, modified_at) VALUES (?, ?, ?, ?, NULL, 0, 0, 0, 0, ?, ?)`, ["def-a", "nickname", "Nickname", "text", NOW, NOW]);
     const def = await exec.getFirstAsync<{ id: number }>("SELECT id FROM custom_field_defs WHERE uid = ?", ["def-a"]);
@@ -44,6 +55,13 @@ describe("buildExportManifest", () => {
     expect(JSON.stringify(manifest)).not.toMatch(/data_revision|backup_folder_uri|avatars\//);
     expect(manifest.profile).toMatchObject({ photoBase64: "AQID" });
     expect(manifest.contacts[0]).toMatchObject({ uid: "contact-a", categoryUid: category!.uid, photoBase64: "AQID" });
+    expect(manifest).toMatchObject({
+      contactMethods: [{
+        uid: "method-a", contactUid: "contact-a", methodType: "phone",
+        canonicalValue: "+15550100", canonicalRegion: "US", label: "Mobile",
+        extension: "42", isActionable: 1, isPrimary: 1, displayOrder: 0,
+      }],
+    });
     expect(manifest.customFieldValues).toEqual([expect.objectContaining({ uid: "value-a", value: null })]);
   });
 

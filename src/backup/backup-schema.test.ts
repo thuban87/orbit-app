@@ -60,4 +60,24 @@ describe("parseBackupManifest", () => {
     broken.contacts = [{ uid: "contact", modifiedAt: "2026-08-25 12:00:00", photoBase64: "%%%" }];
     expect(() => parseBackupManifest(broken)).toThrow(/photo/i);
   });
+
+  it("forward-migrates scalar v1 contact endpoints into deterministic v2 method rows", () => {
+    const legacy = valid();
+    legacy.backupFormatVersion = 1;
+    legacy.contacts = [{
+      uid: "contact-a", name: "Ada", intervalDays: 14,
+      phone: "+1 555 0100", email: "ada@example.test", modifiedAt: "2026-08-25 12:00:00",
+    }];
+    const parsed = parseBackupManifest(legacy) as typeof legacy & {
+      contactMethods: Array<Record<string, unknown>>;
+    };
+    expect(parsed.backupFormatVersion).toBe(2);
+    expect(parsed.contacts[0]).not.toHaveProperty("phone");
+    expect(parsed.contacts[0]).not.toHaveProperty("email");
+    expect(parsed.appSettings).toHaveProperty("phoneRegionOverride", null);
+    expect(parsed.contactMethods).toEqual([
+      expect.objectContaining({ uid: "legacy-method:contact-a:phone", contactUid: "contact-a", methodType: "phone", canonicalRegion: null, label: null }),
+      expect.objectContaining({ uid: "legacy-method:contact-a:email", contactUid: "contact-a", methodType: "email", canonicalRegion: null, label: null }),
+    ]);
+  });
 });
