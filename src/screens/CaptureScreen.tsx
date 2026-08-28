@@ -486,6 +486,9 @@ export function CaptureScreen(_props: RootStackScreenProps<"Capture">) {
         uid: newUid(),
         name: trimmedName,
         intervalDays: INLINE_CREATE_INTERVAL_DAYS,
+        // Explicit normalized empty set: Capture remains name-only and Bound by
+        // the v11 DDL default without reviving retired scalar phone/email inputs.
+        methodDrafts: [],
         now: stamp,
       });
       const fuelId = await addFuel(getExecutor(), {
