@@ -14,7 +14,7 @@ vi.mock("@/db/app-settings-dao", () => ({
       quietStartHour: 21, quietEndHour: 8, sunContactId: row.sun_contact_id,
       selfSunColour: null, aiProvider: "none", aiModel: "", aiCustomEndpoint: "",
       aiCustomModel: "", aiPromptTemplate: "", backupIntervalDays: 1,
-      backupRetentionDays: 7, modifiedAt: row.modified_at,
+      backupRetentionDays: 7, phoneRegionOverride: null, modifiedAt: row.modified_at,
     };
   },
 }));

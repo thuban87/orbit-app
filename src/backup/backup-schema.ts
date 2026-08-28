@@ -16,7 +16,50 @@ type Migration = (manifest: RawManifest) => RawManifest;
  * Closed, one-step forward migration registry. Add exactly one entry whenever
  * the portable wire shape changes; SQLite's user_version is intentionally absent.
  */
-const FORWARD_MIGRATIONS: Readonly<Record<number, Migration>> = {};
+const FORWARD_MIGRATIONS: Readonly<Record<number, Migration>> = {
+  1: (manifest) => {
+    const contacts = Array.isArray(manifest.contacts) ? manifest.contacts.map((item) => record(item, "contacts[]")) : fail("contacts must be an array");
+    const contactMethods: RawManifest[] = [];
+    for (const contact of contacts) {
+      const uid = contact.uid;
+      if (typeof uid !== "string" || uid.length === 0) fail("contacts has an invalid uid");
+      const { phone, email, ...withoutScalars } = contact;
+      for (const [methodType, value] of [["phone", phone], ["email", email]] as const) {
+        if (typeof value !== "string" || value.trim() === "") continue;
+        contactMethods.push({
+          uid: `legacy-method:${uid}:${methodType}`,
+          contactUid: uid,
+          methodType,
+          rawValue: value,
+          displayValue: value,
+          canonicalValue: null,
+          canonicalRegion: null,
+          label: null,
+          extension: null,
+          isActionable: 0,
+          isPrimary: 1,
+          displayOrder: 0,
+          createdAt: withoutScalars.createdAt ?? withoutScalars.modifiedAt,
+          modifiedAt: withoutScalars.modifiedAt,
+        });
+      }
+      Object.assign(contact, withoutScalars);
+      delete contact.phone;
+      delete contact.email;
+    }
+    const settings = record(manifest.appSettings, "appSettings");
+    return {
+      ...manifest,
+      backupFormatVersion: 2,
+      appSettings: { ...settings, phoneRegionOverride: settings.phoneRegionOverride ?? null },
+      contacts,
+      contactMethods,
+      externalContactLinks: [],
+      contactMethodProvenance: [],
+      tombstones: Array.isArray(manifest.tombstones) ? manifest.tombstones : [],
+    };
+  },
+};
 
 function fail(message: string): never {
   throw new BackupSchemaError(message);
@@ -58,6 +101,9 @@ const TOMBSTONE_ENTITY_TYPES = new Set([
   "event",
   "fuel",
   "contact_link",
+  "contact_method",
+  "external_contact_link",
+  "contact_method_provenance",
   "custom_field_def",
   "custom_field_value",
 ]);
@@ -105,20 +151,38 @@ function survivorsFor(
 
 function validate(manifest: RawManifest): BackupManifest {
   const requiredArrays = [
-    "categories", "contacts", "interactions", "events", "fuel", "contactLinks", "customFieldDefs", "customFieldValues", "tombstones",
+    "categories", "contacts", "contactMethods", "externalContactLinks", "contactMethodProvenance", "interactions", "events", "fuel", "contactLinks", "customFieldDefs", "customFieldValues", "tombstones",
   ] as const;
   const arrays = Object.fromEntries(requiredArrays.map((key) => [key, array(manifest[key], key)])) as Record<(typeof requiredArrays)[number], RawManifest[]>;
   const contacts = uidSet(arrays.contacts, "contacts");
   const categories = uidSet(arrays.categories, "categories");
   const defs = uidSet(arrays.customFieldDefs, "customFieldDefs");
-  for (const key of ["categories", "interactions", "events", "fuel", "contactLinks", "customFieldValues"] as const) uidSet(arrays[key], key);
+  for (const key of ["categories", "contactMethods", "externalContactLinks", "contactMethodProvenance", "interactions", "events", "fuel", "contactLinks", "customFieldValues"] as const) uidSet(arrays[key], key);
   const settings = record(manifest.appSettings, "appSettings");
   assertPortableSettings(settings, contacts);
   const pairs = new Set<string>();
   for (const contact of arrays.contacts) {
+    if (!Number.isInteger(contact.intervalDays) || (contact.intervalDays as number) <= 0) fail("contacts has an invalid intervalDays");
     if (contact.categoryUid !== null && contact.categoryUid !== undefined && (typeof contact.categoryUid !== "string" || !categories.has(contact.categoryUid))) {
       fail("contacts has an unknown category UID");
     }
+  }
+  for (const method of arrays.contactMethods) {
+    if (typeof method.contactUid !== "string" || !contacts.has(method.contactUid)) fail("contactMethods has an unknown contact UID");
+    if (method.methodType !== "phone" && method.methodType !== "email") fail("contactMethods has an invalid method type");
+    for (const key of ["rawValue", "displayValue", "createdAt", "modifiedAt"] as const) if (typeof method[key] !== "string") fail("contactMethods has an invalid row");
+    for (const key of ["canonicalValue", "canonicalRegion", "label", "extension"] as const) if (method[key] !== undefined && method[key] !== null && typeof method[key] !== "string") fail("contactMethods has an invalid optional value");
+    if (method.isActionable !== 0 && method.isActionable !== 1) fail("contactMethods has an invalid actionability");
+    if (method.isPrimary !== 0 && method.isPrimary !== 1) fail("contactMethods has an invalid primary flag");
+    if (!Number.isInteger(method.displayOrder)) fail("contactMethods has an invalid display order");
+  }
+  for (const link of arrays.externalContactLinks) {
+    if (typeof link.contactUid !== "string" || !contacts.has(link.contactUid) || typeof link.provider !== "string" || typeof link.externalContactId !== "string" || typeof link.createdAt !== "string" || typeof link.modifiedAt !== "string" || (link.isActive !== 0 && link.isActive !== 1)) fail("externalContactLinks has an invalid row");
+  }
+  const methods = uidSet(arrays.contactMethods, "contactMethods");
+  const externalLinks = uidSet(arrays.externalContactLinks, "externalContactLinks");
+  for (const provenance of arrays.contactMethodProvenance) {
+    if (typeof provenance.methodUid !== "string" || !methods.has(provenance.methodUid) || (provenance.externalContactLinkUid !== null && provenance.externalContactLinkUid !== undefined && (typeof provenance.externalContactLinkUid !== "string" || !externalLinks.has(provenance.externalContactLinkUid))) || (provenance.sourceMethodId !== null && provenance.sourceMethodId !== undefined && typeof provenance.sourceMethodId !== "string") || typeof provenance.createdAt !== "string" || typeof provenance.modifiedAt !== "string") fail("contactMethodProvenance has an invalid row");
   }
   for (const [label, rows] of Object.entries({ interactions: arrays.interactions, events: arrays.events, fuel: arrays.fuel, contactLinks: arrays.contactLinks })) {
     for (const row of rows) {
@@ -155,6 +219,20 @@ function validate(manifest: RawManifest): BackupManifest {
   });
   const survivingContacts = survivorsFor(arrays.contacts, tombstones, "contact");
   const survivingDefs = survivorsFor(arrays.customFieldDefs, tombstones, "custom_field_def");
+  const survivingMethods = survivorsFor(arrays.contactMethods, tombstones, "contact_method");
+  const survivingExternalLinks = survivorsFor(arrays.externalContactLinks, tombstones, "external_contact_link");
+  for (const method of arrays.contactMethods) if (!survivingContacts.has(method.contactUid as string)) fail("contactMethods has no surviving contact parent");
+  for (const link of arrays.externalContactLinks) if (!survivingContacts.has(link.contactUid as string)) fail("externalContactLinks has no surviving contact parent");
+  for (const provenance of arrays.contactMethodProvenance) {
+    if (!survivingMethods.has(provenance.methodUid as string)) fail("contactMethodProvenance has no surviving method parent");
+    if (typeof provenance.externalContactLinkUid === "string" && !survivingExternalLinks.has(provenance.externalContactLinkUid)) fail("contactMethodProvenance has no surviving external link parent");
+  }
+  const primaryByContactAndType = new Set<string>();
+  for (const method of arrays.contactMethods) if (method.isPrimary === 1 && survivingMethods.has(method.uid as string)) {
+    const key = `${method.contactUid}\u0000${method.methodType}`;
+    if (primaryByContactAndType.has(key)) fail("contactMethods has duplicate surviving primary methods");
+    primaryByContactAndType.add(key);
+  }
   for (const [label, rows] of Object.entries({ interactions: arrays.interactions, events: arrays.events, fuel: arrays.fuel, contactLinks: arrays.contactLinks })) {
     for (const row of rows) {
       if (!survivingContacts.has(row.contactUid as string)) fail(`${label} has no surviving contact parent`);
@@ -180,6 +258,9 @@ function validate(manifest: RawManifest): BackupManifest {
     categories: arrays.categories,
     profile,
     contacts: arrays.contacts,
+    contactMethods: arrays.contactMethods,
+    externalContactLinks: arrays.externalContactLinks,
+    contactMethodProvenance: arrays.contactMethodProvenance,
     interactions: arrays.interactions,
     events: arrays.events,
     fuel: arrays.fuel,

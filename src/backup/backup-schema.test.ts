@@ -7,7 +7,8 @@ const valid = (): Record<string, any> => ({
   envelopeVersion: 1,
   metadata: { exportedAt: "2026-08-25 12:00:00", sqliteUserVersion: 999 },
   appSettings: { sunContactUid: null, modifiedAt: "2026-08-25 12:00:00" },
-  categories: [], profile: null, contacts: [], interactions: [], events: [], fuel: [],
+  categories: [], profile: null, contacts: [], contactMethods: [], externalContactLinks: [],
+  contactMethodProvenance: [], interactions: [], events: [], fuel: [],
   contactLinks: [], customFieldDefs: [], customFieldValues: [], tombstones: [],
 });
 
@@ -26,7 +27,7 @@ describe("parseBackupManifest", () => {
     expect(() => parseBackupManifest(duplicate)).toThrow(BackupSchemaError);
     const dangling = valid(); dangling.appSettings.sunContactUid = "missing";
     expect(() => parseBackupManifest(dangling)).toThrow(/sun/i);
-    const pairs = valid(); pairs.contacts = [{ uid: "c" }]; pairs.customFieldDefs = [{ uid: "d" }];
+    const pairs = valid(); pairs.contacts = [{ uid: "c", intervalDays: 1 }]; pairs.customFieldDefs = [{ uid: "d" }];
     pairs.customFieldValues = [{ uid: "v1", contactUid: "c", fieldDefUid: "d", value: null }, { uid: "v2", contactUid: "c", fieldDefUid: "d", value: null }];
     expect(() => parseBackupManifest(pairs)).toThrow(/duplicate custom/i);
   });
@@ -43,7 +44,7 @@ describe("parseBackupManifest", () => {
 
   it("rejects a child whose same-file parent lost to a tombstone", () => {
     const broken = valid();
-    broken.contacts = [{ uid: "contact", modifiedAt: "2026-08-25 12:00:00" }];
+    broken.contacts = [{ uid: "contact", intervalDays: 1, modifiedAt: "2026-08-25 12:00:00" }];
     broken.interactions = [{ uid: "interaction", contactUid: "contact", modifiedAt: "2026-08-25 12:00:00" }];
     broken.tombstones = [{ entityType: "contact", entityUid: "contact", deletedAt: "2026-08-25 12:00:00" }];
     expect(() => parseBackupManifest(broken)).toThrow(/surviving contact/i);
@@ -51,13 +52,13 @@ describe("parseBackupManifest", () => {
 
   it("rejects a category reference that cannot be resolved within the backup itself", () => {
     const broken = valid();
-    broken.contacts = [{ uid: "contact", modifiedAt: "2026-08-25 12:00:00", categoryUid: "missing" }];
+    broken.contacts = [{ uid: "contact", intervalDays: 1, modifiedAt: "2026-08-25 12:00:00", categoryUid: "missing" }];
     expect(() => parseBackupManifest(broken)).toThrow(/category/i);
   });
 
   it("rejects malformed photo bytes before an apply can begin", () => {
     const broken = valid();
-    broken.contacts = [{ uid: "contact", modifiedAt: "2026-08-25 12:00:00", photoBase64: "%%%" }];
+    broken.contacts = [{ uid: "contact", intervalDays: 1, modifiedAt: "2026-08-25 12:00:00", photoBase64: "%%%" }];
     expect(() => parseBackupManifest(broken)).toThrow(/photo/i);
   });
 

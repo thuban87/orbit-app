@@ -42,10 +42,13 @@ async function readManifest(ro: ReadOnlyExecutor, deps: ExportManifestDeps): Pro
     getPortableSettingsSnapshot(ro),
     ro.getFirstAsync<{ user_version: number }>("PRAGMA user_version"),
   ]);
-  const [categories, profileRows, contactRows, interactions, events, fuel, contactLinks, customFieldDefs, rawValues, tombstones] = await Promise.all([
+  const [categories, profileRows, contactRows, contactMethods, externalContactLinks, contactMethodProvenance, interactions, events, fuel, contactLinks, customFieldDefs, rawValues, tombstones] = await Promise.all([
     ro.getAllAsync<Record<string, unknown>>("SELECT uid, name, display_order AS displayOrder, created_at AS createdAt, modified_at AS modifiedAt FROM categories ORDER BY uid"),
     ro.getAllAsync<Record<string, unknown>>("SELECT uid, name, photo, created_at AS createdAt, modified_at AS modifiedAt FROM profile ORDER BY uid"),
-    ro.getAllAsync<Record<string, unknown>>(`SELECT c.id AS localContactId, c.uid, c.name, category.uid AS categoryUid, c.interval_days AS intervalDays, c.social_battery AS socialBattery, c.birthday, c.phone, c.email, c.photo, c.archived_at AS archivedAt, c.snooze_until AS snoozeUntil, c.rarely_responds AS rarelyResponds, c.reminders_off AS remindersOff, c.created_at AS createdAt, c.modified_at AS modifiedAt FROM contacts c LEFT JOIN categories category ON category.id = c.category_id ORDER BY c.uid`),
+    ro.getAllAsync<Record<string, unknown>>(`SELECT c.id AS localContactId, c.uid, c.name, category.uid AS categoryUid, c.interval_days AS intervalDays, c.social_battery AS socialBattery, c.birthday, c.photo, c.archived_at AS archivedAt, c.snooze_until AS snoozeUntil, c.rarely_responds AS rarelyResponds, c.reminders_off AS remindersOff, c.created_at AS createdAt, c.modified_at AS modifiedAt FROM contacts c LEFT JOIN categories category ON category.id = c.category_id ORDER BY c.uid`),
+    ro.getAllAsync<Record<string, unknown>>("SELECT m.uid, c.uid AS contactUid, m.method_type AS methodType, m.raw_value AS rawValue, m.display_value AS displayValue, m.canonical_value AS canonicalValue, m.canonical_region AS canonicalRegion, m.label, m.extension, m.is_actionable AS isActionable, m.is_primary AS isPrimary, m.display_order AS displayOrder, m.created_at AS createdAt, m.modified_at AS modifiedAt FROM contact_methods m JOIN contacts c ON c.id = m.contact_id ORDER BY m.uid"),
+    ro.getAllAsync<Record<string, unknown>>("SELECT l.uid, c.uid AS contactUid, l.provider, l.external_contact_id AS externalContactId, l.is_active AS isActive, l.created_at AS createdAt, l.modified_at AS modifiedAt FROM external_contact_links l JOIN contacts c ON c.id = l.contact_id ORDER BY l.uid"),
+    ro.getAllAsync<Record<string, unknown>>("SELECT p.uid, m.uid AS methodUid, l.uid AS externalContactLinkUid, p.source_method_id AS sourceMethodId, p.created_at AS createdAt, p.modified_at AS modifiedAt FROM contact_method_provenance p JOIN contact_methods m ON m.id = p.method_id LEFT JOIN external_contact_links l ON l.id = p.external_contact_link_id ORDER BY p.uid"),
     ro.getAllAsync<Record<string, unknown>>("SELECT i.uid, c.uid AS contactUid, i.occurred_at AS occurredAt, i.recorded_at AS recordedAt, i.channel, i.direction, i.connected, i.quality, i.note, i.source, i.modified_at AS modifiedAt FROM interactions i JOIN contacts c ON c.id = i.contact_id ORDER BY i.uid"),
     ro.getAllAsync<Record<string, unknown>>("SELECT e.uid, c.uid AS contactUid, e.type, e.occurred_at AS occurredAt, e.detail, e.recorded_at AS recordedAt, e.modified_at AS modifiedAt FROM events e JOIN contacts c ON c.id = e.contact_id ORDER BY e.uid"),
     ro.getAllAsync<Record<string, unknown>>("SELECT f.uid, c.uid AS contactUid, f.kind, f.label, f.text, f.url, f.created_at AS createdAt, f.source, f.modified_at AS modifiedAt FROM fuel f JOIN contacts c ON c.id = f.contact_id ORDER BY f.uid"),
@@ -72,6 +75,7 @@ async function readManifest(ro: ReadOnlyExecutor, deps: ExportManifestDeps): Pro
     categories,
     profile: profileRows[0] ? await withPhoto(profileRows[0], deps.readPhotoBase64) : null,
     contacts: await Promise.all(contactRows.map(async ({ localContactId: _localContactId, ...row }) => withPhoto(row, deps.readPhotoBase64))),
+    contactMethods, externalContactLinks, contactMethodProvenance,
     interactions, events, fuel, contactLinks, customFieldDefs, customFieldValues: values,
     tombstones: tombstones.map((row) => ({ entityType: row.entity_type, entityUid: row.entity_uid, deletedAt: row.deleted_at })),
   };

@@ -364,6 +364,7 @@ export async function getPortableSettingsSnapshot(
     | "quiet_end_hour"
     | "sun_contact_id"
     | "self_sun_colour"
+    | "phone_region_override"
     | "ai_provider"
     | "ai_model"
     | "ai_custom_endpoint"
@@ -375,7 +376,7 @@ export async function getPortableSettingsSnapshot(
   >>(
     `SELECT notifications_enabled, decay_enabled, birthday_enabled,
             digest_enabled, lockscreen_public, delivery_hour, quiet_start_hour,
-            quiet_end_hour, sun_contact_id, self_sun_colour,
+            quiet_end_hour, sun_contact_id, self_sun_colour, phone_region_override,
             ai_provider, ai_model, ai_custom_endpoint, ai_custom_model,
             ai_prompt_template, backup_interval_days, backup_retention_days,
             modified_at
@@ -396,6 +397,7 @@ export async function getPortableSettingsSnapshot(
     quietEndHour: row.quiet_end_hour,
     sunContactId: row.sun_contact_id ?? null,
     selfSunColour: row.self_sun_colour ?? null,
+    phoneRegionOverride: row.phone_region_override ?? null,
     aiProvider: row.ai_provider as AiProviderId,
     aiModel: row.ai_model,
     aiCustomEndpoint: row.ai_custom_endpoint,
