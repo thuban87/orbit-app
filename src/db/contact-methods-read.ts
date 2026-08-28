@@ -11,7 +11,7 @@ export async function listContactMethodGroups(
   const rows = await exec.getAllAsync<ContactMethodRow>(
     `SELECT id, uid, contact_id, method_type, raw_value, display_value,
             canonical_value, canonical_region, extension, is_actionable,
-            is_primary, display_order, created_at, modified_at
+            label, is_primary, display_order, created_at, modified_at
        FROM contact_methods
       WHERE contact_id = ?
       ORDER BY method_type, display_order, id`,

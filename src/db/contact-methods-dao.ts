@@ -17,6 +17,8 @@ export interface ContactMethodRow {
   canonical_value: string | null;
   canonical_region: string | null;
   extension: string | null;
+  /** User-selected standard or custom label; null for pre-label rows. */
+  label: string | null;
   is_actionable: number;
   is_primary: number;
   display_order: number;
@@ -32,6 +34,8 @@ export interface ContactMethodDraft {
   value: string;
   /** Phone-only presentation metadata. Empty drafts are stored as NULL. */
   extension?: string | null;
+  /** Optional standard or custom presentation label. Empty drafts are stored as NULL. */
+  label?: string | null;
   /** The form may explicitly choose one primary per type. */
   isPrimary?: boolean;
 }
@@ -70,7 +74,7 @@ export function listContactMethods(
   return exec.getAllAsync<ContactMethodRow>(
     `SELECT id, uid, contact_id, method_type, raw_value, display_value,
             canonical_value, canonical_region, extension, is_actionable,
-            is_primary, display_order, created_at, modified_at
+            label, is_primary, display_order, created_at, modified_at
        FROM contact_methods
       WHERE contact_id = ?
       ORDER BY method_type, display_order, id`,
@@ -81,6 +85,7 @@ export function listContactMethods(
 type PreparedDraft = Omit<ContactMethodDraft, "isPrimary"> & {
   normalized: ReturnType<typeof normalizeContactMethod>;
   extension: string | null;
+  label: string | null;
   displayOrder: number;
   selectedPrimary: boolean;
   isPrimary: number;
@@ -136,6 +141,7 @@ export async function applyContactMethodDiffCore(
         draft.type === "phone" && draft.extension?.trim()
           ? draft.extension.trim()
           : null,
+      label: draft.label?.trim() || null,
       displayOrder: orderByType[draft.type]++,
       selectedPrimary: draft.isPrimary === true,
       isPrimary: 0,
@@ -215,6 +221,7 @@ export async function applyContactMethodDiffCore(
       draft.normalized.canonicalValue,
       draft.normalized.canonicalRegion,
       draft.extension ?? draft.normalized.extension,
+      draft.label,
       draft.normalized.isActionable ? 1 : 0,
       draft.isPrimary,
       draft.displayOrder,
@@ -224,9 +231,9 @@ export async function applyContactMethodDiffCore(
       await exec.runAsync(
         `INSERT INTO contact_methods
            (uid, contact_id, method_type, raw_value, display_value, canonical_value,
-            canonical_region, extension, is_actionable, is_primary, display_order,
+            canonical_region, extension, label, is_actionable, is_primary, display_order,
             created_at, modified_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [draft.uid, params.contactId, draft.type, ...values, params.now],
       );
       changed = true;
@@ -245,14 +252,15 @@ export async function applyContactMethodDiffCore(
       seeded.canonical_value !== draft.normalized.canonicalValue ||
       seeded.canonical_region !== draft.normalized.canonicalRegion ||
       seeded.extension !== (draft.extension ?? draft.normalized.extension) ||
+      seeded.label !== draft.label ||
       seeded.is_actionable !== (draft.normalized.isActionable ? 1 : 0) ||
       seeded.is_primary !== draft.isPrimary ||
       seeded.display_order !== draft.displayOrder;
     if (differs) {
       const result = await exec.runAsync(
         `UPDATE contact_methods SET method_type = ?, raw_value = ?, display_value = ?,
-           canonical_value = ?, canonical_region = ?, extension = ?, is_actionable = ?,
-           is_primary = ?, display_order = ?, modified_at = ?
+           canonical_value = ?, canonical_region = ?, extension = ?, label = ?,
+           is_actionable = ?, is_primary = ?, display_order = ?, modified_at = ?
          WHERE id = ? AND contact_id = ?`,
         [draft.type, ...values, draft.id, params.contactId],
       );

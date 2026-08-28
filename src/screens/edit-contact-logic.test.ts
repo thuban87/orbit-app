@@ -172,6 +172,7 @@ describe("seedEditState", () => {
       canonical_value: null,
       canonical_region: null,
       extension: "12",
+      label: null,
       is_actionable: 0,
       is_primary: 1,
       display_order: 0,
@@ -234,6 +235,7 @@ describe("buildEditInput", () => {
         type: "phone",
         value: "  555-1234 ",
         extension: "12",
+        label: "Mobile",
         isPrimary: undefined,
       },
     ]);

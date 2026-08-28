@@ -39,6 +39,7 @@ import { migration005 } from "@/db/migrations/005-digest-settings";
 import { migration006 } from "@/db/migrations/006-normalize-custom-field-values";
 import { migration007 } from "@/db/migrations/007-tombstones";
 import { migration009 } from "@/db/migrations/009-contact-method-normalization";
+import { migration010 } from "@/db/migrations/010-contact-method-label";
 import { runMigrations } from "@/db/migrations/runner";
 import { recordTouchpoint } from "@/db/recency-dao";
 import type { SqlExecutor } from "@/db/types";
@@ -65,8 +66,9 @@ beforeEach(async () => {
       migration006,
       migration007,
       migration009,
+      migration010,
     ],
-    9,
+    10,
     { now: NOW, newUid: uid, defaultPhoneRegion: "US" },
   );
 });
@@ -190,6 +192,77 @@ describe("createContactFull — normalized method composition", () => {
         [contactId],
       ),
     ).toEqual([{ canonical_value: "+13125551234", canonical_region: "US" }]);
+  });
+
+  it("keeps durable labels through aggregate create, collision collapse, edit, and reload", async () => {
+    const firstPhoneUid = uid();
+    const { contactId, methodSaveResult } = await createContactFull(exec, {
+      uid: uid(),
+      name: "Labelled",
+      intervalDays: 30,
+      now: NOW,
+      methodDrafts: [
+        {
+          uid: firstPhoneUid,
+          type: "phone",
+          value: "312 555 1234",
+          label: "Mobile",
+        },
+        {
+          uid: uid(),
+          type: "phone",
+          value: "+1 312 555 1234",
+          label: "Discarded duplicate",
+        },
+        { uid: uid(), type: "email", value: "labelled@example.com", label: "Work" },
+      ],
+      methodNormalization: { effectivePhoneRegion: "US" },
+    });
+
+    expect(methodSaveResult).toMatchObject({
+      status: "canonicalDuplicate",
+      methodType: "phone",
+      survivingDraftUid: firstPhoneUid,
+    });
+    const created = methodSaveResult?.methods ?? [];
+    expect(created).toMatchObject([
+      { uid: expect.any(String), method_type: "email", label: "Work" },
+      { uid: firstPhoneUid, method_type: "phone", label: "Mobile" },
+    ]);
+
+    const edited = await updateContactFull(exec, {
+      id: contactId,
+      name: "Labelled",
+      intervalDays: 30,
+      rarelyResponds: 0,
+      remindersOff: 0,
+      now: EDIT_NOW,
+      seededMethods: created,
+      methodDrafts: created.map((row) => ({
+        id: row.id,
+        uid: row.uid,
+        type: row.method_type,
+        value: row.raw_value,
+        extension: row.extension,
+        label: row.method_type === "phone" ? "After hours" : row.label,
+        isPrimary: row.is_primary === 1,
+      })),
+      methodNormalization: { effectivePhoneRegion: "US" },
+    });
+
+    expect(edited.methods).toMatchObject([
+      { method_type: "email", label: "Work" },
+      { uid: firstPhoneUid, method_type: "phone", label: "After hours" },
+    ]);
+    expect(
+      await exec.getAllAsync(
+        "SELECT method_type, label FROM contact_methods WHERE contact_id = ? ORDER BY method_type, display_order",
+        [contactId],
+      ),
+    ).toEqual([
+      { method_type: "email", label: "Work" },
+      { method_type: "phone", label: "After hours" },
+    ]);
   });
 
   it("keeps existing callers additive-optional when no method draft/context is supplied", async () => {
@@ -436,6 +509,7 @@ describe("updateContactFull — metadata and normalized method edit", () => {
       canonical_value: string | null;
       canonical_region: string | null;
       extension: string | null;
+      label: string | null;
       is_actionable: number;
       is_primary: number;
       display_order: number;

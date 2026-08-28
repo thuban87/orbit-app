@@ -58,6 +58,7 @@ describe("contact method editor model", () => {
         type: "phone",
         value: "not a number",
         extension: undefined,
+        label: "Main",
         isPrimary: undefined,
       },
     ]);

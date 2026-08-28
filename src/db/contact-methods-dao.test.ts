@@ -13,6 +13,7 @@ import { migration005 } from "@/db/migrations/005-digest-settings";
 import { migration006 } from "@/db/migrations/006-normalize-custom-field-values";
 import { migration007 } from "@/db/migrations/007-tombstones";
 import { migration009 } from "@/db/migrations/009-contact-method-normalization";
+import { migration010 } from "@/db/migrations/010-contact-method-label";
 import { runMigrations } from "@/db/migrations/runner";
 import type { SqlExecutor } from "@/db/types";
 
@@ -35,8 +36,9 @@ beforeEach(async () => {
       migration006,
       migration007,
       migration009,
+      migration010,
     ],
-    9,
+    10,
     { now: NOW, newUid: uid, defaultPhoneRegion: "US" },
   );
 });
@@ -85,6 +87,44 @@ describe("applyContactMethodDiff", () => {
         is_primary: 1,
         display_order: 0,
       },
+    ]);
+  });
+
+  it("persists standard and custom labels through create, edit, collision collapse, and reload", async () => {
+    const contactId = await contact();
+    const first = phone("312 555 1234", { label: "Mobile" });
+    const duplicate = phone("+1 312 555 1234", { label: "After hours" });
+    await applyContactMethodDiff(exec, {
+      contactId,
+      seeded: [],
+      current: [first, duplicate, email("person@example.com", { label: "Work" })],
+      now: NOW,
+      effectivePhoneRegion: "US",
+    });
+    const created = await listContactMethods(exec, contactId);
+    expect(created).toMatchObject([
+      { method_type: "email", label: "Work" },
+      { uid: first.uid, method_type: "phone", label: "Mobile" },
+    ]);
+
+    await applyContactMethodDiff(exec, {
+      contactId,
+      seeded: created,
+      current: created.map((row) => ({
+        id: row.id,
+        uid: row.uid,
+        type: row.method_type,
+        value: row.raw_value,
+        extension: row.extension,
+        label: row.method_type === "phone" ? "After hours" : row.label,
+        isPrimary: row.is_primary === 1,
+      })),
+      now: "2026-08-28 10:01:00",
+      effectivePhoneRegion: "US",
+    });
+    expect(await listContactMethods(exec, contactId)).toMatchObject([
+      { method_type: "email", label: "Work" },
+      { uid: first.uid, method_type: "phone", label: "After hours" },
     ]);
   });
 

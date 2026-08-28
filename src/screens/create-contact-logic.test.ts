@@ -100,6 +100,7 @@ describe("buildCreateInput", () => {
         type: "phone",
         value: "  555-1234 ",
         extension: "12",
+        label: "Mobile",
         isPrimary: true,
       },
     ]);

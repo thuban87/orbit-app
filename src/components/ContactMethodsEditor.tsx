@@ -8,6 +8,7 @@ import type {
 } from "./contact-methods-editor-model";
 
 const LABELS = ["Mobile", "Home", "Work", "Main", "Other"] as const;
+const STANDARD_LABELS = ["Mobile", "Home", "Work", "Main"] as const;
 
 export interface ContactMethodsEditorProps {
   methods: MethodGroups;
@@ -87,7 +88,9 @@ export function ContactMethodsEditor({
                       : "Other"
                   }
                   onValueChange={(label) =>
-                    onUpdate(row.uid, { label: String(label) })
+                    onUpdate(row.uid, {
+                      label: label === "Other" ? "" : String(label),
+                    })
                   }
                   accessibilityLabel={`${copy.heading} label`}
                   style={{ color: colors.textPrimary }}
@@ -107,9 +110,11 @@ export function ContactMethodsEditor({
                 <Text style={{ color: colors.textSecondary }}>Remove</Text>
               </Pressable>
             </View>
-            {row.label === "Other" ? (
+            {!STANDARD_LABELS.includes(
+              row.label as (typeof STANDARD_LABELS)[number],
+            ) ? (
               <TextInput
-                value=""
+                value={row.label}
                 onChangeText={(label) => onUpdate(row.uid, { label })}
                 placeholder="Custom label"
                 placeholderTextColor={colors.textSecondary}

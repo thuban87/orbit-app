@@ -37,7 +37,7 @@ export function seedMethodDraft(
     type: row.method_type,
     value: row.raw_value,
     extension: row.extension ?? "",
-    label: "Main",
+    label: row.label ?? "Main",
     isPrimary: row.is_primary === 1,
     isActionable: row.is_actionable === 1,
   };
@@ -66,12 +66,13 @@ export function discardBlankMethodDrafts(
 export function toMethodDrafts(groups: MethodGroups): ContactMethodDraft[] {
   return ([...groups.phone, ...groups.email] as ContactMethodEditorDraft[])
     .filter((draft) => draft.value.trim().length > 0)
-    .map(({ id, uid, type, value, extension, isPrimary }) => ({
+    .map(({ id, uid, type, value, extension, label, isPrimary }) => ({
       ...(id === undefined ? {} : { id }),
       uid,
       type,
       value,
       extension: extension.trim() || undefined,
+      label: label.trim() || undefined,
       isPrimary,
     }));
 }
