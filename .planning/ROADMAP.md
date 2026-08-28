@@ -677,7 +677,7 @@ authoritative. All contacts remain Bound; the lifecycle rollout is Phase 18.2.
 Plans:
 **Wave 1**
 
-- [ ] 18.1-01-PLAN.md — v9 method migration foundation + pure phone/email normalizer
+- [x] 18.1-01-PLAN.md — v9 method migration foundation + pure phone/email normalizer
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
