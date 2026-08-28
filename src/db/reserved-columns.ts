@@ -4,17 +4,17 @@
  *
  * `col_name` remains a compatibility and filename key. `makeColName`
  * (col-name.ts) uniquifies every produced name against THIS set so a custom
- * field can never shadow a fixed column such as `phone`, `email`, or the
+ * field can never shadow a fixed column such as `tracking_enabled` or the
  * normalized value-table's own literal columns.
  *
- * SOURCE OF TRUTH: transcribed from the v6 literal schema —
- *   • every column of `contacts` (CREATE_CONTACTS)
+ * SOURCE OF TRUTH: transcribed from the v11 literal schema —
+ *   • every column of `contacts` (migration 011)
  *   • every column of `custom_field_values` (migration 006)
  *   • the SQLite rowid aliases (rowid, oid, _rowid_), which name the same hidden
  *     column and would collide silently.
  *
  * DRIFT GUARD: this list is transcribed by hand, so reserved-columns.test.ts runs
- * migrations 001 through 006 and asserts this set is a SUPERSET of the live
+ * migrations 001 through 011 and asserts this set is a SUPERSET of the live
  * `PRAGMA table_info` column names. If a future migration adds a fixed column and
  * this whitelist is not updated, that test fails loudly rather than allowing a
  * silent name collision.
@@ -23,7 +23,7 @@
  */
 
 /**
- * Every fixed column of `contacts` (CREATE_CONTACTS, migrations/001-initial.ts).
+ * Every fixed column of `contacts` (migration 011).
  * Transcribed verbatim, in DDL order.
  */
 const CONTACTS_COLUMNS: readonly string[] = [
@@ -32,10 +32,9 @@ const CONTACTS_COLUMNS: readonly string[] = [
   "name",
   "category_id",
   "interval_days",
+  "tracking_enabled",
   "social_battery",
   "birthday",
-  "phone",
-  "email",
   "photo",
   "last_contact",
   "favourite_rank",

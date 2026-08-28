@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 vi.mock("expo-sqlite", () => ({}));
+
 import { nodeSqliteExecutor, openTestDb } from "@/db/__testkit__/node-sqlite";
 import { MIGRATIONS, TARGET_VERSION } from "@/db/database";
 import {
@@ -20,9 +21,19 @@ describe("registered migration chain", () => {
       newUid: () => `uid-${++counter}`,
     });
 
-    expect(MIGRATIONS.filter((migration) => migration.version === 7)).toHaveLength(1);
-    expect(MIGRATIONS.filter((migration) => migration.version === 10)).toHaveLength(1);
-    expect(await exec.getFirstAsync<{ user_version: number }>("PRAGMA user_version")).toEqual({
+    expect(
+      MIGRATIONS.filter((migration) => migration.version === 7),
+    ).toHaveLength(1);
+    expect(
+      MIGRATIONS.filter((migration) => migration.version === 10),
+    ).toHaveLength(1);
+    expect(
+      MIGRATIONS.filter((migration) => migration.version === 11),
+    ).toHaveLength(1);
+    expect(TARGET_VERSION).toBe(11);
+    expect(
+      await exec.getFirstAsync<{ user_version: number }>("PRAGMA user_version"),
+    ).toEqual({
       user_version: TARGET_VERSION,
     });
     expect(
@@ -35,7 +46,11 @@ describe("registered migration chain", () => {
         "SELECT data_revision FROM app_settings WHERE id = 1",
       ),
     ).toEqual({ data_revision: 0 });
-    expect(await exec.getFirstAsync<{ uid: string }>("SELECT uid FROM profile WHERE id = 1")).toEqual({
+    expect(
+      await exec.getFirstAsync<{ uid: string }>(
+        "SELECT uid FROM profile WHERE id = 1",
+      ),
+    ).toEqual({
       uid: RESERVED_PROFILE_UID,
     });
     expect(

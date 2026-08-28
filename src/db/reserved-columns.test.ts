@@ -1,7 +1,7 @@
 /**
  * Drift guard for the reserved-column whitelist (FLD-02, T-03-06).
  *
- * Runs the REAL migrations 001 through 006 against a fresh node:sqlite DB, reads
+ * Runs the REAL migrations 001 through 011 against a fresh node:sqlite DB, reads
  * the live `PRAGMA table_info` for `contacts` and `custom_field_values`, and asserts
  * `RESERVED_COLUMN_NAMES` is a SUPERSET of that live column set. This is the
  * single mechanism that keeps the hand-transcribed whitelist in sync with the
@@ -16,6 +16,11 @@ import { migration003 } from "@/db/migrations/003-orrery-settings";
 import { migration004 } from "@/db/migrations/004-ai-settings";
 import { migration005 } from "@/db/migrations/005-digest-settings";
 import { migration006 } from "@/db/migrations/006-normalize-custom-field-values";
+import { migration007 } from "@/db/migrations/007-tombstones";
+import { migration008 } from "@/db/migrations/008-restore-photo-journal";
+import { migration009 } from "@/db/migrations/009-contact-method-normalization";
+import { migration010 } from "@/db/migrations/010-contact-method-label";
+import { migration011 } from "@/db/migrations/011-contact-lifecycle-schema";
 import { runMigrations } from "@/db/migrations/runner";
 import { RESERVED_COLUMN_NAMES } from "@/db/reserved-columns";
 import type { SqlExecutor } from "@/db/types";
@@ -33,7 +38,7 @@ async function liveColumns(
 }
 
 describe("RESERVED_COLUMN_NAMES", () => {
-  it("is a superset of the live contacts + custom_field_values fixed columns at v6", async () => {
+  it("is a superset of the live contacts + custom_field_values fixed columns at v11", async () => {
     let counter = 0;
     const db = openTestDb();
     const exec = nodeSqliteExecutor(db);
@@ -46,8 +51,13 @@ describe("RESERVED_COLUMN_NAMES", () => {
         migration004,
         migration005,
         migration006,
+        migration007,
+        migration008,
+        migration009,
+        migration010,
+        migration011,
       ],
-      6,
+      11,
       {
         now: NOW,
         newUid: () => `uid-${++counter}`,
