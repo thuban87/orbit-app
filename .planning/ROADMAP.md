@@ -35,7 +35,8 @@ onto the dossier domains; a `[DECIDED]`/`[REJECTED]` decision is implemented, ne
 - [ ] **Phase 15: Weekly Digest** — one WEEKLY Sunday notification → a live "your week" screen.
 - [ ] **Phase 16: Custom Field Value Normalization** — replace dynamic custom-value columns with a sync-safe normalized row model, preserving every existing behavior and value.
 - [ ] **Phase 17: Backup, Export & Restore** — manual + auto SAF backup, optional encryption, tombstone-aware Merge/Replace restore (reusable reconciliation core), forward-migrate.
-- [ ] **Phase 18: Contact Data Normalization** — normalized phone/email methods and the Bound/Unbound lifecycle, with system-contact linkage foundations.
+- [ ] **Phase 18.1: Contact Method Normalization** — normalized phone/email methods with stable identity and system-contact provenance foundations; all contacts stay Bound.
+- [ ] **Phase 18.2: Bound/Unbound Lifecycle** — the independent Bound/Unbound lifecycle across all proactive surfaces, on Phase 18.1's normalized model. (Streamlined Export deferred out of the original Phase 18.)
 - [ ] **Phase 19: System Contact Import** — deliberate single/bulk system-contact acquisition, conservative duplicate evidence, initial linking, and resumable import review.
 - [ ] **Phase 20: Contact Reconciliation & Merge** — user-triggered one-way source reconciliation, durable review, and explicit atomic Orbit-to-Orbit merge.
 - [ ] **Phase 21: Interaction Assist & Reach Out** — shared Call/Text/Email routing, durable post-handoff assist confirmation, and widget Contact integration.
@@ -643,62 +644,114 @@ Plans:
 
 - [ ] 17-11-PLAN.md — automated gates and owner-led Android release UAT
 
-### Phase 18: Contact Data Normalization
+> **Phase 18 was split (2026-08-27).** The original single "Contact Data Normalization" phase
+> bundled data-layer method normalization with a cross-cutting Bound/Unbound lifecycle rollout under
+> one name, which no reviewer scoped honestly. It is now **Phase 18.1** (method normalization) then
+> **Phase 18.2** (Bound/Unbound lifecycle). Streamlined Export (old 18-10) is deferred out entirely.
+> The two-cycle review findings are preserved and re-assigned; see
+> `.planning/phases/18-contact-data-normalization/18-SPLIT-PLAN.md` for the full provenance and
+> plan-to-bucket map. The original phase dir is retained as the historical record.
 
-**Goal:** Normalize phone/email into first-class, sync-ready contact methods and establish the Bound/Unbound lifecycle without losing existing relationship data or making system contacts authoritative.
+### Phase 18.1: Contact Method Normalization
+
+**Goal:** Normalize phone/email into first-class, sync-ready contact methods and establish local
+system-contact provenance foundations, without losing relationship data or making system contacts
+authoritative. All contacts remain Bound; the lifecycle rollout is Phase 18.2.
 **Mode:** mvp
 **Depends on:** Phase 17
-**Requirements:** CDN-01, CDN-02, CDN-03, CDN-04
+**Requirements:** CDN-01, CDN-04 (normalized-method backup half), CDN-03 (Orbit-identity-independence half only)
 
 #### Canonical refs
 
-`docs/dossier/18-contact-data-normalization.md` — **authoritative product-decision source; researcher and planner MUST read it in full before research or planning.**
-
-**Conflict preserved:** Dossier 18's scope/deferred text labels Interaction Assist as Phase 20, while the requested sequence and Dossier 21 place it in Phase 21. This roadmap makes no product reinterpretation; Phase 18 must not absorb Interaction Assist work.
+`docs/dossier/18-contact-data-normalization.md` — **authoritative product-decision source; researcher and planner MUST read it in full before research or planning.** (Clusters A–F, O, P, Q, and the method half of R govern 18.1.)
 
 **Success Criteria** (what must be TRUE):
 
   1. Phone and email are migrated from the old singular columns into ordered, first-class methods with stable identity, per-type primaries, canonical matching, extensions, and no duplicate authoritative storage; malformed methods remain storable but are not actionable.
-  2. Bound/Unbound is independent of cadence and preserves relationship history: existing contacts migrate Bound, `interval_days = NULL` means only never-assigned, and assigned cadence can never be cleared.
-  3. Bound-only proactive surfaces and the dedicated Unbound population honor the locked dashboard, Orrery, favourites, Never Contacted, notification, widget, and AI behavior; explicit person-level work and factual birthday behavior remain available as decided.
-  4. External system-contact links/provenance are structurally supported without changing Orbit identity or permitting source disappearance/refresh to delete or silently overwrite Orbit data; lossless backup includes the normalized model.
+  2. External system-contact links/provenance are structurally supported without changing Orbit identity or permitting source disappearance to delete Orbit data; lossless backup/restore round-trips the normalized method model. (Bound/Unbound state in backup is Phase 18.2.)
+
+**Migration:** ships **v9** — the data-bearing contacts rebuild that retires scalar phone/email into method rows. `interval_days` stays NOT NULL; no `tracking_enabled` yet. The nullable-cadence/lifecycle schema is Phase 18.2's v10.
+
+**Plans:** 6 plans
+
+Plans:
+**Wave 1**
+
+- [ ] 18.1-01-PLAN.md — v9 method migration foundation + pure phone/email normalizer
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [ ] 18.1-02-PLAN.md — contact-method write/read DAO
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
+- [ ] 18.1-03-PLAN.md — contact-method create/edit editor UI
+- [ ] 18.1-04-PLAN.md — normalized method backup/export/restore graph
+- [ ] 18.1-05-PLAN.md — profile primary-method display and Compose handoff
+
+**Wave 4** *(blocked on Wave 3 completion)*
+
+- [ ] 18.1-06-PLAN.md — 18.1 verification and owner-led Android migration UAT
+
+### Phase 18.2: Bound/Unbound Lifecycle
+
+**Goal:** Establish the independent Bound/Unbound contact lifecycle across every proactive surface —
+dashboard, Orrery, Never Contacted, notifications, widgets, favourites, AI — without losing
+relationship history, on top of Phase 18.1's normalized model.
+**Mode:** mvp
+**Depends on:** Phase 18.1
+**Requirements:** CDN-02, CDN-03 (lifecycle/Unbound-browsing/AI half), CDN-04 (Bound/Unbound-state backup half)
+
+#### Canonical refs
+
+`docs/dossier/18-contact-data-normalization.md` — **authoritative product-decision source.** (Clusters G–N, S, and the lifecycle half of R govern 18.2.)
+
+**Conflict preserved:** Dossier 18's scope/deferred text labels Interaction Assist as Phase 20, while the requested sequence and Dossier 21 place it in Phase 21. This roadmap makes no product reinterpretation; Phase 18.2 must not absorb Interaction Assist work.
+
+**Success Criteria** (what must be TRUE):
+
+  1. Bound/Unbound is independent of cadence and preserves relationship history: existing contacts migrate Bound, `interval_days = NULL` means only never-assigned, and assigned cadence can never be cleared.
+  2. Bound-only proactive surfaces and the dedicated Unbound population honor the locked dashboard, Orrery, favourites, Never Contacted, notification, widget, and AI behavior; explicit person-level work and factual birthday behavior remain available as decided.
+  3. Lossless backup/restore preserves Bound/Unbound state and dormant cadence alongside the normalized methods, and rejects illegal lifecycle/cadence combinations before apply.
+
+**Migration:** ships **v10** — a pure shape change (make `interval_days` nullable, add `tracking_enabled` + CHECK constraints + one-way cadence trigger + Unbound settings columns). Moves no data.
 
 **Plans:** 10 plans
 
 Plans:
 **Wave 1**
 
-- [ ] 18-01-PLAN.md — ratify and prove v9 normalized migration foundation
+- [ ] 18.2-01-PLAN.md — v10 lifecycle-schema migration (nullable cadence, tracking_enabled, constraints)
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 18-02-PLAN.md — transactional method and lifecycle writes
-- [ ] 18-03-PLAN.md — Bound-aware query owners and policy reads
+- [ ] 18.2-02-PLAN.md — lifecycle write DAO (Bind/Unbind transitions)
+- [ ] 18.2-03-PLAN.md — Bound-aware query owners and policy reads
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
-- [ ] 18-05-PLAN.md — Unbound browsing, navigation, and settings
-- [ ] 18-07-PLAN.md — normalized backup/export/restore graph
+- [ ] 18.2-04-PLAN.md — nullable-cadence impact and explicit-AI reads
+- [ ] 18.2-05-PLAN.md — Orrery Bound-only reads and shared saved-sun policy
+- [ ] 18.2-09-PLAN.md — Bound/Unbound backup extension and lifecycle-combo validation
 
 **Wave 4** *(blocked on Wave 3 completion)*
 
-- [ ] 18-04-PLAN.md — create/edit method and lifecycle forms
-- [ ] 18-09-PLAN.md — notification/widget lifecycle policy and Unbind effects
-- [ ] 18-10-PLAN.md — streamlined human export alongside lossless backup
+- [ ] 18.2-06-PLAN.md — notification/widget lifecycle policy and Unbind effects
+- [ ] 18.2-07-PLAN.md — Unbound browsing, navigation, and settings
 
 **Wave 5** *(blocked on Wave 4 completion)*
 
-- [ ] 18-06-PLAN.md — profile lifecycle and safe Compose method handoff
+- [ ] 18.2-08-PLAN.md — create/edit and profile lifecycle forms and Bind/Unbind execution
 
 **Wave 6** *(blocked on Wave 5 completion)*
 
-- [ ] 18-08-PLAN.md — complete verification and Android UAT
+- [ ] 18.2-10-PLAN.md — 18.2 verification and owner-led Android lifecycle UAT
 
 ### Phase 19: System Contact Import
 
-**Goal:** Let users deliberately select system contacts and safely import or initially link them through conservative, resumable single/bulk review on Phase 18's normalized model.
+**Goal:** Let users deliberately select system contacts and safely import or initially link them through conservative, resumable single/bulk review on Phase 18.2's normalized model.
 **Mode:** mvp
-**Depends on:** Phase 18
+**Depends on:** Phase 18.2
 **Requirements:** IMP-01, IMP-02, IMP-03, IMP-04
 
 #### Canonical refs
@@ -720,7 +773,7 @@ Plans:
 
 **Goal:** Safely maintain selected system-contact links through user-triggered, one-way reconciliation and let users explicitly, atomically consolidate duplicate Orbit identities.
 **Mode:** mvp
-**Depends on:** Phase 18, Phase 19
+**Depends on:** Phase 18.2, Phase 19
 **Requirements:** RCN-01, RCN-02, RCN-03, RCN-04
 
 #### Canonical refs
@@ -740,7 +793,7 @@ Plans:
 
 **Goal:** Provide a shared low-friction Call/Text/Email Reach Out path and optional durable Interaction Assist that asks users to confirm/log the outcome after native handoff.
 **Mode:** mvp
-**Depends on:** Phase 18, Phase 20
+**Depends on:** Phase 18.2, Phase 20
 **Requirements:** IAS-01, IAS-02, IAS-03, IAS-04
 
 #### Canonical refs

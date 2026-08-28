@@ -226,7 +226,10 @@ Tracked, not in the current roadmap. Reasons recorded in the dossier.
 | DGST-01…03 | Phase 15 | Pending |
 | CFN-01…04 | Phase 16 | Pending |
 | BKP-01…04 | Phase 17 | Pending |
-| CDN-01…04 | Phase 18 | Pending |
+| CDN-01 | Phase 18.1 | Pending |
+| CDN-02 | Phase 18.2 | Pending |
+| CDN-03 | Phase 18.1 (Orbit-identity independence) + Phase 18.2 (Bound-only surfaces, Unbound browsing, AI) | Pending |
+| CDN-04 | Phase 18.1 (normalized-method backup) + Phase 18.2 (Bound/Unbound-state backup) | Pending |
 | IMP-01…04 | Phase 19 | Pending |
 | RCN-01…04 | Phase 20 | Pending |
 | IAS-01…04 | Phase 21 | Pending |
