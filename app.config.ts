@@ -111,6 +111,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       ...new Set([
         ...(config.plugins ?? []),
         "expo-sqlite",
+        "expo-localization",
         "@react-native-community/datetimepicker",
         "expo-image",
         // Phase-11 notifications (Plan 11-01, NOTIF-01). Bare string entry —

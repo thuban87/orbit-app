@@ -32,6 +32,11 @@ async function seedLegacyContact(intervalDays: unknown = 30): Promise<number> {
     [newUid(), "Legacy", intervalDays, "312 555 1234", "Person@Example.COM", NOW, NOW],
   );
   const id = contact.lastInsertRowId;
+  const field = await exec.runAsync(
+    `INSERT INTO custom_field_defs (uid, col_name, label, type, display_order, created_at, modified_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    [newUid(), "legacy_note", "Legacy note", "text", 0, NOW, NOW],
+  );
   await exec.runAsync(
     `INSERT INTO contact_links (uid, contact_id, url, display_order, created_at, modified_at)
      VALUES (?, ?, ?, ?, ?, ?)`,
@@ -55,7 +60,7 @@ async function seedLegacyContact(intervalDays: unknown = 30): Promise<number> {
   await exec.runAsync(
     `INSERT INTO custom_field_values (uid, contact_id, field_def_id, value, created_at, modified_at)
      VALUES (?, ?, ?, ?, ?, ?)`,
-    [newUid(), id, 1, "preserved", NOW, NOW],
+    [newUid(), id, field.lastInsertRowId, "preserved", NOW, NOW],
   );
   await exec.runAsync("UPDATE app_settings SET sun_contact_id = ? WHERE id = 1", [id]);
   return id;
@@ -118,14 +123,44 @@ describe("migration 009 — contact method normalization", () => {
     const id = await seedLegacyContact();
     await runMigrations(exec, [...V8, migration009], 9, { now: NOW, newUid, defaultPhoneRegion: "US" });
     await expect((async () => exec.runAsync(
-      `INSERT INTO contact_methods (uid, contact_id, method_type, display_value, is_actionable, is_primary, display_order, created_at, modified_at)
-       VALUES (?, ?, 'phone', ?, 0, 1, 2, ?, ?)`,
-      [newUid(), id, "another", NOW, NOW],
+      `INSERT INTO contact_methods (uid, contact_id, method_type, raw_value, display_value, is_actionable, is_primary, display_order, created_at, modified_at)
+       VALUES (?, ?, 'phone', ?, ?, 0, 1, 2, ?, ?)`,
+      [newUid(), id, "another", "another", NOW, NOW],
     ))()).rejects.toThrow();
     await expect((async () => exec.runAsync(
-      `INSERT INTO contact_methods (uid, contact_id, method_type, display_value, is_actionable, is_primary, display_order, created_at, modified_at)
-       VALUES (?, ?, 'email', ?, 0, 0, 2, ?, ?)`,
-      [newUid(), id, "secondary", NOW, NOW],
+      `INSERT INTO contact_methods (uid, contact_id, method_type, raw_value, display_value, is_actionable, is_primary, display_order, created_at, modified_at)
+       VALUES (?, ?, 'email', ?, ?, 0, 0, 2, ?, ?)`,
+      [newUid(), id, "secondary", "secondary", NOW, NOW],
     ))()).resolves.toMatchObject({ changes: 1 });
+  });
+
+  it("keeps Orbit methods when external source evidence becomes stale or is removed", async () => {
+    const id = await seedLegacyContact();
+    await runMigrations(exec, [...V8, migration009], 9, {
+      now: NOW,
+      newUid,
+      defaultPhoneRegion: "US",
+    });
+    const method = await exec.getFirstAsync<{ id: number }>(
+      "SELECT id FROM contact_methods WHERE contact_id = ? AND method_type = 'phone'",
+      [id],
+    );
+    const link = await exec.runAsync(
+      `INSERT INTO external_contact_links (uid, contact_id, provider, external_contact_id, created_at, modified_at)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      [newUid(), id, "android", "source-1", NOW, NOW],
+    );
+    await exec.runAsync(
+      `INSERT INTO contact_method_provenance (uid, method_id, external_contact_link_id, source_method_id, created_at, modified_at)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      [newUid(), method?.id, link.lastInsertRowId, "phone-1", NOW, NOW],
+    );
+    await exec.runAsync("UPDATE external_contact_links SET is_active = 0 WHERE id = ?", [link.lastInsertRowId]);
+    expect(await exec.getFirstAsync("SELECT id FROM contact_methods WHERE id = ?", [method?.id])).not.toBeNull();
+    await exec.runAsync("DELETE FROM external_contact_links WHERE id = ?", [link.lastInsertRowId]);
+    expect(await exec.getFirstAsync(
+      "SELECT external_contact_link_id FROM contact_method_provenance WHERE method_id = ?",
+      [method?.id],
+    )).toEqual({ external_contact_link_id: null });
   });
 });

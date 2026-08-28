@@ -67,6 +67,8 @@ export interface AppSettings {
    * DAO cannot import theme). Only `/^#[0-9A-Fa-f]{6}$/` values are writable.
    */
   selfSunColour: string | null;
+  /** Optional user override for parsing future national-format phone entries. */
+  phoneRegionOverride: string | null;
 
   // --- Optional-AI non-secret settings (Phase 14, AI-01) --------------------
   // NO API KEY LIVES HERE — provider credentials are SecureStore-only
@@ -141,6 +143,8 @@ export interface PortableSettingsSnapshot {
   aiPromptTemplate: string;
   backupIntervalDays: number;
   backupRetentionDays: number;
+  /** Declared here; portable snapshot emission is owned by Phase 18.1-04. */
+  phoneRegionOverride?: string | null;
   modifiedAt: string;
 }
 
@@ -188,7 +192,8 @@ type WritableSettingsKey =
   | "aiCustomModel"
   | "aiPromptTemplate"
   | "backupIntervalDays"
-  | "backupRetentionDays";
+  | "backupRetentionDays"
+  | "phoneRegionOverride";
 
 /** The persisted (snake_case) column shape of the id=1 row. */
 interface AppSettingsRow {
@@ -202,6 +207,7 @@ interface AppSettingsRow {
   quiet_end_hour: number;
   sun_contact_id: number | null;
   self_sun_colour: string | null;
+  phone_region_override: string | null;
   ai_provider: string;
   ai_model: string;
   ai_custom_endpoint: string;
@@ -269,6 +275,7 @@ const COLUMN_OF: Record<WritableSettingsKey, string> = {
   aiPromptTemplate: "ai_prompt_template",
   backupIntervalDays: "backup_interval_days",
   backupRetentionDays: "backup_retention_days",
+  phoneRegionOverride: "phone_region_override",
 };
 
 /**
@@ -282,7 +289,7 @@ export async function getAppSettings(exec: SqlExecutor): Promise<AppSettings> {
     `SELECT notifications_enabled, decay_enabled, birthday_enabled,
             digest_enabled, lockscreen_public, delivery_hour, quiet_start_hour,
             quiet_end_hour,
-            sun_contact_id, self_sun_colour,
+            sun_contact_id, self_sun_colour, phone_region_override,
             ai_provider, ai_model, ai_custom_endpoint, ai_custom_model,
             ai_prompt_template, ai_ack_openai, ai_ack_anthropic,
             ai_ack_google, ai_ack_custom,
@@ -309,6 +316,7 @@ export async function getAppSettings(exec: SqlExecutor): Promise<AppSettings> {
     // palette colour (it cannot import theme); resolution happens at render.
     sunContactId: row.sun_contact_id ?? null,
     selfSunColour: row.self_sun_colour ?? null,
+    phoneRegionOverride: row.phone_region_override ?? null,
     // AI non-secret settings. The column default is `'none'`; the cast is a
     // read-shape convenience (validation on WRITE guarantees a known id).
     aiProvider: row.ai_provider as AiProviderId,
@@ -460,6 +468,16 @@ export function assertSelfSunColour(field: string, v: unknown): void {
   }
 }
 
+/** ISO 3166-1 alpha-2, or null to resume using the device region. */
+export function assertPhoneRegionOverride(field: string, v: unknown): void {
+  if (v === null) return;
+  if (typeof v !== "string" || !/^[A-Za-z]{2}$/.test(v)) {
+    throw new Error(
+      `updateAppSettings: ${field} must be null or an ISO 3166-1 alpha-2 code, got ${String(v)}`,
+    );
+  }
+}
+
 /** Throw unless `v` is a known AI provider id (`ai_provider`, AI-01). */
 export function assertAiProvider(field: string, v: unknown): void {
   if (
@@ -509,6 +527,9 @@ function validateAppSettingsPatch(patch: AppSettingsPatch): void {
     if (patch[field] !== undefined) {
       assertSelfSunColour(field, patch[field]);
     }
+  }
+  if (patch.phoneRegionOverride !== undefined) {
+    assertPhoneRegionOverride("phoneRegionOverride", patch.phoneRegionOverride);
   }
   if (patch.aiProvider !== undefined) {
     assertAiProvider("aiProvider", patch.aiProvider);

@@ -42,6 +42,7 @@ import { getExecutor, localDateTime, openAndMigrate } from "@/db/database";
 import { recordTouchpoint } from "@/db/recency-dao";
 import { snoozeContact } from "@/db/snooze-dao";
 import { notifyWidgetDataChanged } from "@/services/widget/widget-refresh";
+import { getDeviceRegion } from "@/services/device-region";
 import { Logger } from "@/utils/logger";
 import {
   ACTION_MARK,
@@ -122,7 +123,7 @@ export async function handleNotificationAction(
   // H1: open + migrate the DB BEFORE getExecutor(). Idempotent on the foreground
   // path (cached); the ONLY thing that opens the DB on a killed-app headless
   // launch, where React never mounts.
-  await openAndMigrate();
+  await openAndMigrate(getDeviceRegion());
   const exec = getExecutor();
 
   const now = localDateTime();

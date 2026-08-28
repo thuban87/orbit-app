@@ -49,6 +49,7 @@ import type { WidgetTaskHandler } from "react-native-android-widget";
 import { getExecutor, localDateTime, openAndMigrate } from "@/db/database";
 import { Logger } from "@/utils/logger";
 import { widgetMarkContacted } from "./widget-mark";
+import { getDeviceRegion } from "@/services/device-region";
 import { pushWidgetUpdate } from "./widget-refresh";
 import { renderFavourites } from "./widget-render";
 
@@ -89,7 +90,7 @@ export const widgetTaskHandler: WidgetTaskHandler = async (props) => {
         }
         // H1: open + migrate BEFORE getExecutor(). In a killed-app headless
         // launch this await is the ONLY thing that opens the DB.
-        await openAndMigrate();
+        await openAndMigrate(getDeviceRegion());
         const now = localDateTime();
         // THE DURABLE ACTION — commits here via the single-writer DAO.
         await widgetMarkContacted(getExecutor(), contactId, now);

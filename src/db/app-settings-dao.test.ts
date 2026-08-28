@@ -27,6 +27,7 @@ import {
   getPortableSettingsSnapshot,
   recordAutomaticBackupHealthCore,
   SELF_SUN_COLOUR_RE,
+  assertPhoneRegionOverride,
   updateAppSettings,
   updateAppSettingsCore,
 } from "@/db/app-settings-dao";
@@ -37,6 +38,8 @@ import { migration004 } from "@/db/migrations/004-ai-settings";
 import { migration005 } from "@/db/migrations/005-digest-settings";
 import { migration006 } from "@/db/migrations/006-normalize-custom-field-values";
 import { migration007 } from "@/db/migrations/007-tombstones";
+import { migration008 } from "@/db/migrations/008-restore-photo-journal";
+import { migration009 } from "@/db/migrations/009-contact-method-normalization";
 import { runMigrations } from "@/db/migrations/runner";
 import { inWriteTransaction } from "@/db/transaction";
 import type { SqlExecutor } from "@/db/types";
@@ -89,8 +92,10 @@ async function migrateToV5(): Promise<void> {
       migration005,
       migration006,
       migration007,
+      migration008,
+      migration009,
     ],
-    7,
+    9,
     { now: NOW, newUid },
   );
 }
@@ -255,6 +260,7 @@ describe("app-settings-dao — read", () => {
       // The two sun fields default NULL and read back as null (no resolution here).
       sunContactId: null,
       selfSunColour: null,
+      phoneRegionOverride: null,
       // AI starts disabled: provider `none`, empty config, acks 0 (AI-01).
       ...AI_DEFAULTS,
       ...BACKUP_DEFAULTS,
@@ -294,6 +300,17 @@ describe("app-settings-dao — validated write", () => {
     expect(row?.modified_at).toBe(LATER);
   });
 
+  it("roundtrips a valid phone-region override and rejects malformed restore input", async () => {
+    await updateAppSettings(exec, { phoneRegionOverride: "gb" }, LATER);
+    expect((await getAppSettings(exec)).phoneRegionOverride).toBe("gb");
+    expect(() => assertPhoneRegionOverride("phoneRegionOverride", null)).not.toThrow();
+    expect(() => assertPhoneRegionOverride("phoneRegionOverride", "US")).not.toThrow();
+    expect(() => assertPhoneRegionOverride("phoneRegionOverride", "not-a-region")).toThrow();
+    await expect(
+      (async () => updateAppSettings(exec, { phoneRegionOverride: "not-a-region" }, LATER))(),
+    ).rejects.toThrow();
+  });
+
   it("roundtrips every field", async () => {
     await updateAppSettings(
       exec,
@@ -321,6 +338,7 @@ describe("app-settings-dao — validated write", () => {
       // The sun fields are untouched by this patch — still null.
       sunContactId: null,
       selfSunColour: null,
+      phoneRegionOverride: null,
       // AI fields untouched by this patch — still the disabled defaults.
       ...AI_DEFAULTS,
       ...BACKUP_DEFAULTS,

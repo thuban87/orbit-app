@@ -53,6 +53,7 @@ import {
 } from "react-native-android-widget";
 import { getExecutor, openAndMigrate } from "@/db/database";
 import { Logger } from "@/utils/logger";
+import { getDeviceRegion } from "@/services/device-region";
 import {
   ringColor,
   ringWeight,
@@ -146,7 +147,7 @@ export async function renderFavourites(
 ): Promise<React.JSX.Element> {
   // The render can run in a headless context where App.tsx never mounted, so
   // bootstrap the DB before getExecutor() (idempotent when already open).
-  await openAndMigrate();
+  await openAndMigrate(getDeviceRegion());
   const exec = getExecutor();
 
   const palette = widgetPalette();

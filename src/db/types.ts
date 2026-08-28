@@ -36,6 +36,8 @@ export interface SqlExecutor {
 export interface MigrationDeps {
   now: string;
   newUid: () => string;
+  /** Device region supplied by the bootstrap caller for one-shot legacy phone parsing. */
+  defaultPhoneRegion?: string | null;
 }
 
 /**

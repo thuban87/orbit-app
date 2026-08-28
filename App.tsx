@@ -20,6 +20,7 @@ import { RootNavigator } from "@/navigation/RootNavigator";
 import { WidgetLinkingGate } from "@/navigation/widget-linking";
 import { BackupEncryptionBenchmarkHarness } from "@/components/BackupEncryptionBenchmarkHarness";
 import { registerFieldSweep } from "@/services/field-sweep";
+import { getDeviceRegion } from "@/services/device-region";
 import { registerBackupSweep } from "@/services/backup-sweep";
 import { installSweepTrigger } from "@/services/launch-sweep";
 // Module-scope side-effect import (Pitfall P5): importing headless-task RUNS its
@@ -117,7 +118,7 @@ function AppShell() {
   //    state instead of hanging on the spinner with an unhandled rejection.
   useEffect(() => {
     let active = true;
-    openAndMigrate()
+    openAndMigrate(getDeviceRegion())
       .then(() => {
         if (active) setReady(true);
       })

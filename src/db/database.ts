@@ -30,6 +30,7 @@ import { migration005 } from "@/db/migrations/005-digest-settings";
 import { migration006 } from "@/db/migrations/006-normalize-custom-field-values";
 import { migration007 } from "@/db/migrations/007-tombstones";
 import { migration008 } from "@/db/migrations/008-restore-photo-journal";
+import { migration009 } from "@/db/migrations/009-contact-method-normalization";
 import { runMigrations } from "@/db/migrations/runner";
 import type { Migration, SqlExecutor } from "@/db/types";
 import { newUid } from "@/db/uid";
@@ -40,7 +41,7 @@ import { formatLocalDate } from "@/utils/dates";
 /** Milliseconds a busy connection waits before erroring (concurrent headless access). */
 export const BUSY_TIMEOUT_MS = 5000;
 /** The schema version this build expects; the runner migrates up to this. */
-export const TARGET_VERSION = 8;
+export const TARGET_VERSION = 9;
 
 /** The one authoritative migration registration list, shared by bootstrap and tests. */
 export const MIGRATIONS: Migration[] = [
@@ -52,6 +53,7 @@ export const MIGRATIONS: Migration[] = [
   migration006,
   migration007,
   migration008,
+  migration009,
 ];
 
 const DATABASE_NAME = "orbit.db";
@@ -111,7 +113,9 @@ let openingDb: Promise<SQLite.SQLiteDatabase> | null = null;
  * busy_timeout) BEFORE any transaction, then run migrations up to
  * `TARGET_VERSION`. Idempotent: subsequent calls return the cached connection.
  */
-export function openAndMigrate(): Promise<SQLite.SQLiteDatabase> {
+export function openAndMigrate(
+  defaultPhoneRegion: string | null = null,
+): Promise<SQLite.SQLiteDatabase> {
   if (cachedDb) return Promise.resolve(cachedDb);
   if (openingDb) return openingDb;
 
@@ -129,6 +133,7 @@ export function openAndMigrate(): Promise<SQLite.SQLiteDatabase> {
     await runMigrations(expoExecutor(db), MIGRATIONS, TARGET_VERSION, {
       now,
       newUid,
+      defaultPhoneRegion,
     });
 
     cachedDb = db;

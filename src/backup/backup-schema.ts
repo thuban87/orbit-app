@@ -48,7 +48,7 @@ const PORTABLE_SETTINGS_KEYS = new Set([
   "lockscreenPublic", "deliveryHour", "quietStartHour", "quietEndHour",
   "selfSunColour", "aiProvider", "aiModel", "aiCustomEndpoint", "aiCustomModel",
   "aiPromptTemplate", "backupIntervalDays", "backupRetentionDays", "modifiedAt",
-  "sunContactUid",
+  "sunContactUid", "phoneRegionOverride",
 ]);
 
 const SECRET_SHAPED_KEY = /(?:api.?key|secret|passphrase|token|credential|password)/i;
