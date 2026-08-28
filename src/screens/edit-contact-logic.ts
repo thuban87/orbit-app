@@ -30,6 +30,11 @@
  * (`firstInteractionOccurredAt`) — one source of truth for the CRUD-02 rule.
  */
 import type { LastSpokeValue } from "@/components/tri-state-last-spoke-logic";
+import {
+  seedMethodGroups,
+  toMethodDrafts,
+  type MethodGroups,
+} from "@/components/contact-methods-editor-model";
 import type { ContactForEdit } from "@/db/contact-read";
 import type { UpdateContactFullInput } from "@/db/contacts-dao";
 import { firstInteractionOccurredAt } from "./create-contact-logic";
@@ -52,8 +57,8 @@ export interface EditFormState {
   birthdayInput: string | null;
   /** When on, the birthday stores as `MM-DD` (the picker's year is ignored). */
   birthdayYearUnknown: boolean;
-  phone: string;
-  email: string;
+  /** Ordered local method drafts, seeded from the normalized read boundary. */
+  methods: MethodGroups;
   /** 0/1 — the "Rarely responds" toggle. */
   rarelyResponds: number;
   /** 0/1 — the "Turn off reminders" toggle. */
@@ -80,6 +85,7 @@ export interface BuildEditInputDeps {
   editDefs: Array<{ id: number; col_name: string }>;
   /** The seeded `contact.last_contact IS NULL` flag — gates the firstInteraction path. */
   neverContacted: boolean;
+  effectivePhoneRegion: string | null;
 }
 
 /** A never-contacted contact (`last_contact IS NULL`) may set its first contact here. */
@@ -140,8 +146,7 @@ export function seedEditState(result: ContactForEdit): EditFormState {
     socialBattery: c.social_battery,
     birthdayInput,
     birthdayYearUnknown,
-    phone: c.phone ?? "",
-    email: c.email ?? "",
+    methods: seedMethodGroups(result.methods),
     rarelyResponds: c.rarely_responds,
     remindersOff: c.reminders_off,
     values: { ...result.values },
@@ -158,8 +163,8 @@ export function canSave(state: EditFormState): boolean {
 }
 
 /**
- * Build the atomic-edit input for `updateContactFull`. `phone`/`email` are
- * trimmed and empty->null; `name` is trimmed. The custom block is `editDefs`
+ * Build the atomic-edit input for `updateContactFull`. Blank controls are
+ * discarded while nonblank invalid method drafts remain durable; `name` is trimmed. The custom block is `editDefs`
  * mapped to the current values (a missing key -> null). A `firstInteraction` is
  * added ONLY when the contact is never-contacted AND the tri-state is Today/Pick
  * date (owner ruling); otherwise it is omitted and no interaction is written.
@@ -181,8 +186,10 @@ export function buildEditInput(
       state.birthdayInput,
       state.birthdayYearUnknown,
     ),
-    phone: state.phone.trim() || null,
-    email: state.email.trim() || null,
+    methodDrafts: toMethodDrafts(state.methods),
+    methodNormalization: {
+      effectivePhoneRegion: deps.effectivePhoneRegion,
+    },
     customValues: deps.editDefs.map((definition) => ({
       fieldDefId: definition.id,
       value: state.values[definition.col_name] ?? null,

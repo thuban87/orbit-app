@@ -39,6 +39,7 @@ import {
   View,
 } from "react-native";
 import { FieldValueInput } from "@/components/FieldValueInput";
+import { ContactMethodsEditor } from "@/components/ContactMethodsEditor";
 import { FrequencyPicker } from "@/components/FrequencyPicker";
 import { type LinkDraft, LinksEditor } from "@/components/LinksEditor";
 import { PhotoSourcePicker } from "@/components/PhotoSourcePicker";
@@ -56,11 +57,13 @@ import {
   listCategories,
 } from "@/db/contact-read";
 import { updateContactFull } from "@/db/contacts-dao";
+import { getAppSettings } from "@/db/app-settings-dao";
 import { getExecutor, localDateTime } from "@/db/database";
 import { listDefs } from "@/db/field-defs-dao";
 import type { CustomFieldDef } from "@/db/field-types";
 import { defsForEditForm } from "@/db/field-values-dao";
 import { newUid } from "@/db/uid";
+import { getDeviceRegion } from "@/services/device-region";
 import type { RootStackScreenProps } from "@/navigation/types";
 import { reconcileSchedule } from "@/services/notifications/notification-schedule";
 import { deletePhoto } from "@/services/photos/photo-storage";
@@ -77,6 +80,16 @@ import {
   isNeverContacted,
   seedEditState,
 } from "./edit-contact-logic";
+import {
+  addMethodDraft,
+  canonicalDuplicateCopy,
+  choosePrimary,
+  removeMethodDraft,
+  resolveEffectivePhoneRegion,
+  seedMethodGroups,
+  updateMethodDraft,
+} from "@/components/contact-methods-editor-model";
+import type { ContactMethodType } from "@/logic/contact-method-normalization";
 
 const LOG_SCOPE = "edit-contact";
 
@@ -146,6 +159,11 @@ export function EditContactScreen({
   const [neverContacted, setNeverContacted] = useState(false);
   const [showBirthdayPicker, setShowBirthdayPicker] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [effectivePhoneRegion, setEffectivePhoneRegion] = useState<string | null>(getDeviceRegion());
+  const [duplicateHelper, setDuplicateHelper] = useState<{
+    type: ContactMethodType;
+    copy: string;
+  } | null>(null);
   // Photo held as SEPARATE screen state — NOT in EditFormState. The photo is
   // written IMMEDIATELY through its own dedicated setContactPhoto/clearContactPhoto
   // DAO (RESEARCH Pitfall 6: updateContactMetadataCore deliberately omits `photo`),
@@ -166,9 +184,10 @@ export function EditContactScreen({
     try {
       const exec = getExecutor();
       const defs = await listDefs(exec, { includeQuarantined: false });
-      const [cats, result] = await Promise.all([
+      const [cats, result, settings] = await Promise.all([
         listCategories(exec),
         getContactForEdit(exec, contactId, defs),
+        getAppSettings(exec),
       ]);
       if (!result) {
         Alert.alert("Couldn't load this contact", "Please go back and retry.");
@@ -178,6 +197,12 @@ export function EditContactScreen({
       setEditDefs(defsForEditForm(defs));
       setNeverContacted(isNeverContacted(result));
       setForm(seedEditState(result));
+      setEffectivePhoneRegion(
+        resolveEffectivePhoneRegion(
+          settings.phoneRegionOverride,
+          getDeviceRegion(),
+        ),
+      );
       // The committed baseline for orphan cleanup: the pre-edit custom values.
       committedValuesRef.current = { ...result.values };
       setPhoto(result.contact.photo);
@@ -319,13 +344,15 @@ export function EditContactScreen({
         interactionUid: newUid(),
         editDefs,
         neverContacted,
+        effectivePhoneRegion,
       });
 
       // TWO-TRANSACTION BOUNDARY (by design): metadata (updateContactFull) and
       // links (applyLinkDiff) are SEPARATE transactions, so link writes never
       // bloat the metadata transaction. Metadata FIRST.
+      let saveResult: Awaited<ReturnType<typeof updateContactFull>>;
       try {
-        await updateContactFull(exec, input);
+        saveResult = await updateContactFull(exec, input);
       } catch (err) {
         // Metadata failed → NOTHING persisted. Generic save-failure copy.
         Logger.error(LOG_SCOPE, "failed to save contact metadata", err);
@@ -391,6 +418,17 @@ export function EditContactScreen({
         return;
       }
 
+      if (saveResult.methodSaveResult?.status === "canonicalDuplicate") {
+        setField("methods", seedMethodGroups({
+          phone: saveResult.methods.filter((method) => method.method_type === "phone"),
+          email: saveResult.methods.filter((method) => method.method_type === "email"),
+        }));
+        setDuplicateHelper({
+          type: saveResult.methodSaveResult.methodType,
+          copy: canonicalDuplicateCopy(saveResult.methodSaveResult.methodType),
+        });
+        return;
+      }
       navigation.navigate("Profile", { contactId });
     } catch (err) {
       Logger.error(LOG_SCOPE, "failed to save contact", err);
@@ -553,36 +591,14 @@ export function EditContactScreen({
       ) : null}
 
       <View style={styles.field}>
-        <Text style={[styles.label, { color: colors.textSecondary }]}>
-          Phone
-        </Text>
-        <TextInput
-          testID="edit-contact-phone"
-          accessibilityLabel="Phone"
-          value={form.phone}
-          onChangeText={(v) => setField("phone", v)}
-          keyboardType="phone-pad"
-          placeholder="Phone number"
-          placeholderTextColor={colors.textSecondary}
-          style={inputStyle}
-        />
-      </View>
-
-      <View style={styles.field}>
-        <Text style={[styles.label, { color: colors.textSecondary }]}>
-          Email
-        </Text>
-        <TextInput
-          testID="edit-contact-email"
-          accessibilityLabel="Email"
-          value={form.email}
-          onChangeText={(v) => setField("email", v)}
-          keyboardType="email-address"
-          autoCapitalize="none"
-          autoCorrect={false}
-          placeholder="Email address"
-          placeholderTextColor={colors.textSecondary}
-          style={inputStyle}
+        <ContactMethodsEditor
+          testID="edit-contact-methods"
+          methods={form.methods}
+          duplicateHelper={duplicateHelper}
+          onAdd={(type) => setField("methods", addMethodDraft(form.methods, type, newUid()))}
+          onUpdate={(uid, patch) => setField("methods", updateMethodDraft(form.methods, uid, patch))}
+          onRemove={(uid) => setField("methods", removeMethodDraft(form.methods, uid))}
+          onChoosePrimary={(uid) => setField("methods", choosePrimary(form.methods, uid))}
         />
       </View>
 
