@@ -56,6 +56,11 @@ import {
 import { useAiModelPrefs } from "@/stores/ai-model-prefs-store";
 import { useTheme } from "@/theme";
 import { Logger } from "@/utils/logger";
+import {
+  phoneRegionOverridePatch,
+  resolveSettingsPhoneRegion,
+} from "./settings-region-logic";
+import { getDeviceRegion } from "@/services/device-region";
 import { pinResultCopy } from "./settings-add-widget";
 import {
   buildAiSettingsPatch,
@@ -128,6 +133,7 @@ export function SettingsScreen() {
   const [settings, setSettings] = useState<AppSettings | null>(null);
   const [degraded, setDegraded] = useState(false);
   const [activePicker, setActivePicker] = useState<ActivePicker>(null);
+  const [phoneRegionInput, setPhoneRegionInput] = useState("");
 
   // The "Add Orbit widget" fallback copy — null while there is nothing to show,
   // set to the UI-SPEC fallback string when requestPinWidget can't pin (unsupported
@@ -223,6 +229,7 @@ export function SettingsScreen() {
     try {
       const next = await getAppSettings(getExecutor());
       setSettings(next);
+      setPhoneRegionInput(next.phoneRegionOverride ?? "");
       if (next.notificationsEnabled === 1) {
         const perm = await getNotificationPermission();
         setDegraded(!perm.granted);
@@ -368,6 +375,19 @@ export function SettingsScreen() {
       Logger.error(LOG_SCOPE, "failed to persist notification setting", err);
     }
   }, []);
+
+  const savePhoneRegionOverride = useCallback(async (input = phoneRegionInput) => {
+    try {
+      await updateAppSettings(
+        getExecutor(),
+        phoneRegionOverridePatch(input),
+        localDateTime(),
+      );
+      await reloadNotifications();
+    } catch (err) {
+      Logger.error(LOG_SCOPE, "failed to persist phone region override", err);
+    }
+  }, [phoneRegionInput, reloadNotifications]);
 
   const masterOn = settings?.notificationsEnabled === 1;
 
@@ -613,6 +633,44 @@ export function SettingsScreen() {
         >
           Settings
         </Text>
+      </View>
+
+      <View testID="settings-phone-region-section" style={styles.section}>
+        <Text accessibilityRole="header" style={[styles.sectionHeading, { color: colors.textSecondary }]}>
+          Phone numbers
+        </Text>
+        <View style={[styles.row, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          <Text style={[styles.rowLabel, { color: colors.textPrimary }]}>Default phone region</Text>
+          <Text style={[styles.helper, { color: colors.textSecondary }]}>
+            Use a two-letter region code for new or edited national-format phone numbers. Leave blank to use this device ({resolveSettingsPhoneRegion(null, getDeviceRegion()) ?? "unavailable"}). Existing methods are unchanged.
+          </Text>
+          <TextInput
+            testID="settings-phone-region-override"
+            accessibilityLabel="Default phone region"
+            value={phoneRegionInput}
+            onChangeText={setPhoneRegionInput}
+            placeholder="Use device region"
+            placeholderTextColor={colors.textSecondary}
+            autoCapitalize="characters"
+            autoCorrect={false}
+            maxLength={2}
+            style={[styles.aiInput, { color: colors.textPrimary, backgroundColor: colors.background, borderColor: colors.border }]}
+          />
+          <Pressable
+            testID="settings-phone-region-save"
+            accessibilityRole="button"
+            accessibilityLabel="Save default phone region"
+            onPress={() => void savePhoneRegionOverride()}
+            style={[styles.aiButton, { borderColor: colors.accent }]}
+          ><Text style={{ color: colors.accent }}>Save phone region</Text></Pressable>
+          <Pressable
+            testID="settings-phone-region-device"
+            accessibilityRole="button"
+            accessibilityLabel="Use device region"
+            onPress={() => { setPhoneRegionInput(""); void savePhoneRegionOverride(""); }}
+            style={[styles.aiButton, { borderColor: colors.border }]}
+          ><Text style={{ color: colors.textSecondary }}>Use device region</Text></Pressable>
+        </View>
       </View>
 
       <View testID="settings-notifications-section" style={styles.section}>
