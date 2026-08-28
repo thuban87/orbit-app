@@ -15,7 +15,7 @@
     {"id": 4, "name": "16 re-cut plan files created across the two new phase dirs and verified against the split spec and git", "status": "done", "commit": null}
   ],
   "remaining_tasks": [
-    {"id": 5, "name": "Reconcile the split seams flagged in-file (esp. contacts-dao.ts aggregate lifecycle-parameter ownership between 18.1-02 and 18.2-08; shared screen/backup files across 18.1/18.2)", "status": "pending"},
+    {"id": 5, "name": "Reconcile the split seams: contacts-dao.ts added to 18.2-08 files_modified for the aggregate lifecycle-parameter extension (done); shared screen/backup files across 18.1/18.2 are correct-as-is (18.1 executes first, sequential build-ons, no edit needed)", "status": "done"},
     {"id": 6, "name": "External review of Phase 18.1 full plan set (Claude read-only gate first, then flagless Codex), hard cap 2 cycles, plan-sizing excluded from findings", "status": "pending"},
     {"id": 7, "name": "Execute Phase 18.1 and verify the v9 migration on the Pixel with a real v8 backup", "status": "pending"},
     {"id": 8, "name": "Repeat review/execute/verify for Phase 18.2 after 18.1 is verified on-device", "status": "pending"}
@@ -23,9 +23,10 @@
   "blockers": [],
   "async_jobs": [],
   "human_actions_pending": [
-    {"action": "Select the normalized-phone actionability threshold: isPossible(), isValid(), or a named alternative, and provide representative-country plus extension cases.", "context": "18.1-01 Task 1 durable/behavior-policy checkpoint; needed before 18.1-01 migration code is written.", "blocking": true}
+    {"action": "Execution-time gates in 18.1-01 (not planning blockers): approve the v9 storage contract backup-first before data transform (Task 1), and verify libphonenumber-js@1.13.11 release provenance before install (Task 2).", "context": "The actionability-threshold decision is resolved (isValid); these remain as execution-time human checkpoints.", "blocking": false}
   ],
   "decisions": [
+    {"decision": "Phone actionability threshold is isValid() (strict): a parsed phone is actionable only when it matches a real numbering plan for its region; failing numbers stay stored and editable but non-actionable.", "rationale": "Owner-decided 2026-08-27. For a personal CRM the Call button should reflect real callability, and the storable-but-not-actionable design (dossier Cluster D) means nothing is discarded. Recorded in 18.1-01 Task 1.", "phase": "18.1"},
     {"decision": "Phase 18 is split into 18.1 (method normalization) then 18.2 (Bound/Unbound lifecycle); Streamlined Export deferred out entirely.", "rationale": "The original single phase bundled data-layer normalization with a cross-cutting lifecycle rollout under one name; the split cuts at the method/lifecycle seam so each plan is single-concern and the irreversible v9 migration is verifiable in isolation.", "phase": "18"},
     {"decision": "Migration Option A (split): 18.1 v9 is the data-bearing contacts rebuild; 18.2 v10 is a pure-shape change (nullable cadence, tracking_enabled, CHECKs, cadence trigger, Unbound settings) that moves no data.", "rationale": "The one data-transform rebuild happens once; the lifecycle schema ships alongside the lifecycle code that gives its constraints meaning. Straddling findings C3-H2, C3-M4, and H3 are divided across the two migrations accordingly.", "phase": "18"},
     {"decision": "Post-split review is bounded per-phase, not open-ended convergence: full-phase plan review, hard cap 2 cycles, and plan-sizing complaints are excluded from findings.", "rationale": "Cycles 2-3 spiralled on file-count sizing, not correctness; the split handles sizing deliberately. Stable scope + excluding sizing makes review terminate.", "phase": "18"},
