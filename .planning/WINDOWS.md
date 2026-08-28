@@ -2,9 +2,9 @@
 schema_version: 1
 open_count: 0
 waived_count: 0
-fixed_count: 3
-total_count: 3
-last_updated: 2026-08-25T21:43:06.513Z
+fixed_count: 4
+total_count: 4
+last_updated: 2026-08-28T07:45:03.119Z
 ---
 
 # Broken Windows Ledger
@@ -18,6 +18,7 @@ last_updated: 2026-08-25T21:43:06.513Z
 | 1 | 17 | deviation | app.config.ts |  | Registered RNQC Expo config plugin because dynamic config required manual native wiring. | fixed |  | 2026-08-25T21:10:17.988Z | 2026-08-25T21:10:23.978Z |
 | 2 | 17 | deviation | .planning/REQUIREMENTS.md |  | Kept BKP-01 and BKP-03 pending because this dependency gate does not implement the product requirements. | fixed |  | 2026-08-25T21:10:18.202Z | 2026-08-25T21:10:24.189Z |
 | 3 | 17 | deviation | src/db/migrations/007-tombstones.ts |  | Added local-only backup_folder_accessible to preserve SAF access-probe health. | fixed |  | 2026-08-25T21:42:36.632Z | 2026-08-25T21:43:06.513Z |
+| 4 | 18.1 | deviation | src/screens/ComposeScreen.tsx | 438 | Closed undefined SMS destination path with an explicit null guard. | fixed |  | 2026-08-28T07:44:01.382Z | 2026-08-28T07:45:03.119Z |
 
 ````json
 [
@@ -56,6 +57,18 @@ last_updated: 2026-08-25T21:43:06.513Z
     "reason": "",
     "recorded_at": "2026-08-25T21:42:36.632Z",
     "resolved_at": "2026-08-25T21:43:06.513Z"
+  },
+  {
+    "id": 4,
+    "kind": "deviation",
+    "phase": "18.1",
+    "file": "src/screens/ComposeScreen.tsx",
+    "line": 438,
+    "description": "Closed undefined SMS destination path with an explicit null guard.",
+    "status": "fixed",
+    "reason": "",
+    "recorded_at": "2026-08-28T07:44:01.382Z",
+    "resolved_at": "2026-08-28T07:45:03.119Z"
   }
 ]
 ````

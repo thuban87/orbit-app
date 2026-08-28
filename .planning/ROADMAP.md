@@ -687,7 +687,7 @@ Plans:
 
 - [x] 18.1-03-PLAN.md — contact-method create/edit editor UI
 - [x] 18.1-04-PLAN.md — normalized method backup/export/restore graph
-- [ ] 18.1-05-PLAN.md — profile primary-method display and Compose handoff
+- [x] 18.1-05-PLAN.md — profile primary-method display and Compose handoff
 
 **Wave 4** *(blocked on Wave 3 completion)*
 
