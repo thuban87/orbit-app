@@ -681,7 +681,7 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 18.1-02-PLAN.md — contact-method write/read DAO
+- [x] 18.1-02-PLAN.md — contact-method write/read DAO
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
