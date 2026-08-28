@@ -122,7 +122,10 @@ describe("contact lifecycle DAO", () => {
   });
 
   it("rebinds a dormant positive cadence without rewriting it", async () => {
-    const contactId = await seedContact({ intervalDays: 31, trackingEnabled: 0 });
+    const contactId = await seedContact({
+      intervalDays: 31,
+      trackingEnabled: 0,
+    });
 
     await bindContact(exec, contactId, LATER);
 
@@ -135,7 +138,10 @@ describe("contact lifecycle DAO", () => {
   });
 
   it("requires a positive supplied cadence to bind a never-assigned Unbound contact", async () => {
-    const contactId = await seedContact({ intervalDays: null, trackingEnabled: 0 });
+    const contactId = await seedContact({
+      intervalDays: null,
+      trackingEnabled: 0,
+    });
 
     await expect(bindContact(exec, contactId, LATER)).rejects.toThrow(
       "requires a positive cadence",
@@ -161,27 +167,41 @@ describe("contact lifecycle DAO", () => {
 
   it("rejects nonexistent or wrong-state transition targets without advancing revision", async () => {
     const bound = await seedContact({ intervalDays: 14, trackingEnabled: 1 });
-    await expect(bindContact(exec, bound, LATER)).rejects.toThrow("Unbound contact");
-    await expect(unbindContact(exec, 999_999, LATER)).rejects.toThrow("Bound contact");
-    expect(await row(bound)).toMatchObject({ tracking_enabled: 1, modified_at: NOW });
+    await expect(bindContact(exec, bound, LATER)).rejects.toThrow(
+      "Unbound contact",
+    );
+    await expect(unbindContact(exec, 999_999, LATER)).rejects.toThrow(
+      "Bound contact",
+    );
+    expect(await row(bound)).toMatchObject({
+      tracking_enabled: 1,
+      modified_at: NOW,
+    });
     expect(await dataRevision()).toBe(0);
   });
 
   it("proves the shipped v11 SQL constraints reject forbidden lifecycle cells and roll back", async () => {
     await expect(
-      exec.runAsync(
-        `INSERT INTO contacts
-           (uid, name, interval_days, tracking_enabled, created_at, modified_at)
-         VALUES (?, 'Invalid Bound', NULL, 1, ?, ?)`,
-        [newUid(), NOW, NOW],
+      Promise.resolve().then(() =>
+        exec.runAsync(
+          `INSERT INTO contacts
+             (uid, name, interval_days, tracking_enabled, created_at, modified_at)
+           VALUES (?, 'Invalid Bound', NULL, 1, ?, ?)`,
+          [newUid(), NOW, NOW],
+        ),
       ),
     ).rejects.toThrow();
 
-    const contactId = await seedContact({ intervalDays: 10, trackingEnabled: 1 });
+    const contactId = await seedContact({
+      intervalDays: 10,
+      trackingEnabled: 1,
+    });
     await expect(
-      exec.runAsync(
-        "UPDATE contacts SET interval_days = NULL, tracking_enabled = 0 WHERE id = ?",
-        [contactId],
+      Promise.resolve().then(() =>
+        exec.runAsync(
+          "UPDATE contacts SET interval_days = NULL, tracking_enabled = 0 WHERE id = ?",
+          [contactId],
+        ),
       ),
     ).rejects.toThrow("assigned interval_days cannot be cleared");
     expect(await row(contactId)).toMatchObject({
