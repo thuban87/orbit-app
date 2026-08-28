@@ -178,6 +178,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     // AFTER the widget plugin so the OrbitFavourites provider exists first. A
     // bare-string local-path entry — deduped by name below like the tuples.
     const bootReceiverPlugin = "./plugins/withWidgetBootReceiver";
+    const backupRestoreSharePlugin = "./plugins/withBackupRestoreShareIntent";
 
     return [
       ...stringPlugins.filter(
@@ -185,12 +186,14 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
           pluginName(p) !== "expo-image-picker" &&
           pluginName(p) !== "expo-share-intent" &&
           pluginName(p) !== "react-native-android-widget" &&
-          pluginName(p) !== bootReceiverPlugin,
+          pluginName(p) !== bootReceiverPlugin &&
+          pluginName(p) !== backupRestoreSharePlugin,
       ),
       pickerPlugin,
       shareIntentPlugin,
       widgetPlugin,
       bootReceiverPlugin,
+      backupRestoreSharePlugin,
     ];
   })(),
 });

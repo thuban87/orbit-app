@@ -1,5 +1,4 @@
 import { useFocusEffect } from "@react-navigation/native";
-import * as DocumentPicker from "expo-document-picker";
 import { File } from "expo-file-system";
 import { useCallback, useState } from "react";
 import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
@@ -37,6 +36,7 @@ import {
   restorePreviewCache,
   restorePreviewFailure,
 } from "./backup-restore-logic";
+import { consumeSharedBackup, pickBackupDocument } from "../../modules/orbit-backup-document-picker";
 
 const LOG_SCOPE = "backup-screen";
 
@@ -220,19 +220,11 @@ export function BackupScreen({ navigation }: RootStackScreenProps<"Backup">) {
     }
   }, [navigation]);
 
-  const chooseRestore = useCallback(async () => {
+  const loadRestoreDocument = useCallback(async (uri: string) => {
     if (restoreStage === "loading") return;
     setRestoreMessage(null);
     try {
-      const result = await DocumentPicker.getDocumentAsync({
-        type: ["application/json", "text/json"],
-        multiple: false,
-        copyToCacheDirectory: true,
-      });
-      if (result.canceled) return;
-      const asset = result.assets[0];
-      if (!asset) return;
-      const contents = await new File(asset.uri).text();
+      const contents = await new File(uri).text();
       if (isEncryptedBackupEnvelope(contents)) {
         setSelectedEncryptedContents(contents);
         setRestorePassphrase("");
@@ -246,6 +238,36 @@ export function BackupScreen({ navigation }: RootStackScreenProps<"Backup">) {
       setRestoreMessage("Couldn't restore this backup. Your local data hasn't changed. Please try again.");
     }
   }, [restoreStage, validateRestore]);
+
+  const chooseRestore = useCallback(async () => {
+    if (restoreStage === "loading") return;
+    setRestoreMessage(null);
+    try {
+      const { uri } = await pickBackupDocument();
+      if (!uri) return;
+      await loadRestoreDocument(uri);
+    } catch (error) {
+      Logger.error(LOG_SCOPE, "restore document picker failed", error);
+      setRestoreStage("idle");
+      setRestoreMessage("Couldn't open the file picker. You can also open Files, pick your JSON backup, tap Share, then choose Orbit.");
+    }
+  }, [restoreStage, loadRestoreDocument]);
+
+  useFocusEffect(
+    useCallback(() => {
+      let cancelled = false;
+      void consumeSharedBackup().then(({ uri }) => {
+        if (!cancelled && uri) void loadRestoreDocument(uri);
+      }).catch((error: unknown) => {
+        Logger.error(LOG_SCOPE, "shared restore document could not be read", error);
+        if (!cancelled) {
+          setRestoreStage("idle");
+          setRestoreMessage("Couldn't restore this backup. Your local data hasn't changed. Please try again.");
+        }
+      });
+      return () => { cancelled = true; };
+    }, [loadRestoreDocument]),
+  );
 
   const continueEncryptedRestore = useCallback(() => {
     if (!selectedEncryptedContents || !restorePassphrase) return;

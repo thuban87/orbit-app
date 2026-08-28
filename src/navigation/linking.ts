@@ -1,6 +1,8 @@
 import type { NavigationContainerRef } from "@react-navigation/native";
 import { useShareIntentContext } from "expo-share-intent";
 import { createRef, useEffect } from "react";
+import { hasSharedBackup } from "../../modules/orbit-backup-document-picker";
+import { isBackupShareIntent } from "./backup-share-intent";
 import type { RootStackParamList } from "./types";
 
 /**
@@ -49,13 +51,22 @@ export const navigationRef =
  * as the readiness trigger.
  */
 export function ShareIntentGate({ isReady }: { isReady: boolean }) {
-  const { hasShareIntent } = useShareIntentContext();
+  const { hasShareIntent, resetShareIntent, shareIntent } = useShareIntentContext();
 
   useEffect(() => {
-    if (hasShareIntent && isReady) {
-      navigationRef.current?.navigate("Capture");
+    // Query unconditionally: expo-share-intent's cold-start state can settle
+    // after this module has already captured the JSON stream. The native cache
+    // is the authoritative proof that Android granted one backup document.
+    const backupReady = hasSharedBackup();
+    if (isReady) {
+      if (backupReady && (isBackupShareIntent(shareIntent) || !hasShareIntent)) {
+        resetShareIntent();
+        navigationRef.current?.navigate("Backup");
+        return;
+      }
+      if (hasShareIntent) navigationRef.current?.navigate("Capture");
     }
-  }, [hasShareIntent, isReady]);
+  }, [hasShareIntent, isReady, resetShareIntent, shareIntent]);
 
   return null;
 }
