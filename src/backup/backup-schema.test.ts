@@ -81,4 +81,30 @@ describe("parseBackupManifest", () => {
       expect.objectContaining({ uid: "legacy-method:contact-a:email", contactUid: "contact-a", methodType: "email", canonicalRegion: null, label: null }),
     ]);
   });
+
+  it("rejects malformed cadence and duplicate surviving method primaries before restore", () => {
+    const cadence = valid();
+    cadence.contacts = [{ uid: "contact-a", intervalDays: 0, modifiedAt: "2026-08-25 12:00:00" }];
+    expect(() => parseBackupManifest(cadence)).toThrow(BackupSchemaError);
+
+    const primary = valid();
+    primary.contacts = [{ uid: "contact-a", intervalDays: 7, modifiedAt: "2026-08-25 12:00:00" }];
+    primary.contactMethods = [
+      { uid: "method-a", contactUid: "contact-a", methodType: "phone", rawValue: "a", displayValue: "a", isActionable: 1, isPrimary: 1, displayOrder: 0, createdAt: "2026-08-25 12:00:00", modifiedAt: "2026-08-25 12:00:00" },
+      { uid: "method-b", contactUid: "contact-a", methodType: "phone", rawValue: "b", displayValue: "b", isActionable: 1, isPrimary: 1, displayOrder: 1, createdAt: "2026-08-25 12:00:00", modifiedAt: "2026-08-25 12:00:00" },
+    ];
+    expect(() => parseBackupManifest(primary)).toThrow(/duplicate surviving primary/i);
+  });
+
+  it("rejects malformed normalized tombstone parent combinations before apply", () => {
+    const broken = valid();
+    broken.contacts = [{ uid: "contact-a", intervalDays: 7, modifiedAt: "2026-08-25 12:00:00" }];
+    broken.contactMethods = [{ uid: "method-a", contactUid: "contact-a", methodType: "phone", rawValue: "a", displayValue: "a", isActionable: 1, isPrimary: 1, displayOrder: 0, createdAt: "2026-08-25 12:00:00", modifiedAt: "2026-08-25 12:00:00" }];
+    broken.contactMethodProvenance = [{ uid: "provenance-a", methodUid: "method-a", externalContactLinkUid: null, sourceMethodId: null, createdAt: "2026-08-25 12:00:00", modifiedAt: "2026-08-25 12:00:00" }];
+    broken.tombstones = [{ entityType: "contact_method", entityUid: "method-a", deletedAt: "2026-08-25 12:00:00" }];
+    expect(() => parseBackupManifest(broken)).toThrow(/surviving method parent/i);
+
+    broken.tombstones = [{ entityType: "unsupported", entityUid: "method-a", deletedAt: "2026-08-25 12:00:00" }];
+    expect(() => parseBackupManifest(broken)).toThrow(BackupSchemaError);
+  });
 });

@@ -206,4 +206,30 @@ describe("applyRestore", () => {
       { uid: "a-promoted", is_primary: 1 }, { uid: "z-retained", is_primary: 0 },
     ]);
   });
+
+  it("removes a normalized method only when an explicit newer tombstone says so", async () => {
+    const source = await db();
+    const destination = await db();
+    for (const exec of [source, destination]) {
+      await exec.runAsync("INSERT INTO contacts (uid,name,interval_days,rarely_responds,reminders_off,created_at,modified_at) VALUES (?,?,?,?,?,?,?)", ["tombstone-contact", "Tombstone", 14, 0, 0, NOW, NOW]);
+      const contact = await exec.getFirstAsync<{ id: number }>("SELECT id FROM contacts WHERE uid=?", ["tombstone-contact"]);
+      await exec.runAsync("INSERT INTO contact_methods (uid,contact_id,method_type,raw_value,display_value,is_actionable,is_primary,display_order,created_at,modified_at) VALUES (?,?,?,?,?,?,?,?,?,?)", ["tombstone-method", contact!.id, "email", "a@example.test", "a@example.test", 1, 1, 0, NOW, NOW]);
+    }
+    const manifest = await buildExportManifest(source, { exportedAt: NOW, readPhotoBase64: async () => "" });
+    manifest.contactMethods = [];
+    manifest.tombstones = [{ entityType: "contact_method", entityUid: "tombstone-method", deletedAt: "2026-08-25 12:01:00" }];
+
+    await expect(applyRestore(destination, manifest, "merge")).resolves.toMatchObject({ status: "applied", deleted: 1 });
+    await expect(destination.getFirstAsync("SELECT uid FROM contact_methods WHERE uid=?", ["tombstone-method"])).resolves.toBeNull();
+  });
+
+  it("round-trips the portable phone region override through export and restore", async () => {
+    const source = await db();
+    await source.runAsync("UPDATE app_settings SET phone_region_override=?, modified_at=? WHERE id=1", ["GB", "2026-08-25 12:01:00"]);
+    const manifest = await buildExportManifest(source, { exportedAt: NOW, readPhotoBase64: async () => "" });
+    expect(manifest.appSettings).toMatchObject({ phoneRegionOverride: "GB" });
+    const destination = await db();
+    await expect(applyRestore(destination, manifest, "merge")).resolves.toMatchObject({ status: "applied" });
+    await expect(destination.getFirstAsync<{ phone_region_override: string }>("SELECT phone_region_override FROM app_settings WHERE id=1")).resolves.toEqual({ phone_region_override: "GB" });
+  });
 });
