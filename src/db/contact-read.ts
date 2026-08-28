@@ -9,9 +9,7 @@
  */
 
 import { type ContactLinkRow, listLinks } from "@/db/contact-links-dao";
-import {
-  type ContactMethodRow,
-} from "@/db/contact-methods-dao";
+import type { ContactMethodRow } from "@/db/contact-methods-dao";
 import { listContactMethodGroups } from "@/db/contact-methods-read";
 import type { CustomFieldDef } from "@/db/field-types";
 import { defsForEditForm, getValuesForContact } from "@/db/field-values-dao";

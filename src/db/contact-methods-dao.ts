@@ -3,8 +3,8 @@ import { insertTombstoneCore } from "@/db/tombstones-dao";
 import { inWriteTransaction } from "@/db/transaction";
 import type { SqlExecutor } from "@/db/types";
 import {
-  normalizeContactMethod,
   type ContactMethodType,
+  normalizeContactMethod,
 } from "@/logic/contact-method-normalization";
 
 export interface ContactMethodRow {
@@ -47,14 +47,24 @@ export type ContactMethodSaveResult =
       methods: ContactMethodRow[];
     };
 
-function assertOneChange(op: string, id: number, contactId: number, changes: number): void {
+function assertOneChange(
+  op: string,
+  id: number,
+  contactId: number,
+  changes: number,
+): void {
   if (changes !== 1) {
-    throw new Error(`${op}: no contact method matched id=${id} for contactId=${contactId} (changed ${changes})`);
+    throw new Error(
+      `${op}: no contact method matched id=${id} for contactId=${contactId} (changed ${changes})`,
+    );
   }
 }
 
 /** Ordered methods for a contact. This is intentionally the DAO's seed shape. */
-export function listContactMethods(exec: SqlExecutor, contactId: number): Promise<ContactMethodRow[]> {
+export function listContactMethods(
+  exec: SqlExecutor,
+  contactId: number,
+): Promise<ContactMethodRow[]> {
   return exec.getAllAsync<ContactMethodRow>(
     `SELECT id, uid, contact_id, method_type, raw_value, display_value,
             canonical_value, canonical_region, extension, is_actionable,
@@ -66,9 +76,10 @@ export function listContactMethods(exec: SqlExecutor, contactId: number): Promis
   );
 }
 
-type PreparedDraft = ContactMethodDraft & {
+type PreparedDraft = Omit<ContactMethodDraft, "isPrimary"> & {
   normalized: ReturnType<typeof normalizeContactMethod>;
   displayOrder: number;
+  selectedPrimary: boolean;
   isPrimary: number;
 };
 
@@ -89,7 +100,10 @@ export async function applyContactMethodDiffCore(
 ): Promise<ContactMethodSaveResult> {
   const prepared: PreparedDraft[] = [];
   const seenCanonical = new Map<string, ContactMethodDraft>();
-  let collision: { methodType: ContactMethodType; survivingDraftUid: string } | null = null;
+  let collision: {
+    methodType: ContactMethodType;
+    survivingDraftUid: string;
+  } | null = null;
   const orderByType: Record<ContactMethodType, number> = { phone: 0, email: 0 };
 
   for (const draft of params.current) {
@@ -104,7 +118,10 @@ export async function applyContactMethodDiffCore(
       const key = `${draft.type}\u0000${normalized.canonicalValue}`;
       const survivor = seenCanonical.get(key);
       if (survivor) {
-        collision ??= { methodType: draft.type, survivingDraftUid: survivor.uid };
+        collision ??= {
+          methodType: draft.type,
+          survivingDraftUid: survivor.uid,
+        };
         continue;
       }
       seenCanonical.set(key, draft);
@@ -113,6 +130,7 @@ export async function applyContactMethodDiffCore(
       ...draft,
       normalized,
       displayOrder: orderByType[draft.type]++,
+      selectedPrimary: draft.isPrimary === true,
       isPrimary: 0,
     });
   }
@@ -121,15 +139,19 @@ export async function applyContactMethodDiffCore(
   // singleton is therefore primary even if invalid, matching migration seeding.
   for (const type of ["phone", "email"] as const) {
     const group = prepared.filter((row) => row.type === type);
-    const primary = group.find((row) => row.isPrimary) ?? group.find((row) => row.isPrimary !== false) ?? group[0];
+    const primary = group.find((row) => row.selectedPrimary) ?? group[0];
     if (primary) primary.isPrimary = 1;
   }
 
   const seededById = new Map(params.seeded.map((row) => [row.id, row]));
-  const currentIds = new Set(prepared.flatMap((row) => row.id == null ? [] : [row.id]));
+  const currentIds = new Set(
+    prepared.flatMap((row) => (row.id == null ? [] : [row.id])),
+  );
   for (const row of prepared) {
     if (row.id != null && !seededById.has(row.id)) {
-      throw new Error(`applyContactMethodDiff: draft id=${row.id} was not seeded for contactId=${params.contactId}`);
+      throw new Error(
+        `applyContactMethodDiff: draft id=${row.id} was not seeded for contactId=${params.contactId}`,
+      );
     }
   }
 
@@ -138,8 +160,12 @@ export async function applyContactMethodDiffCore(
   // partial unique index is statement-immediate, so this ordering is required
   // for swaps, while a no-op diff remains a true no-op.
   for (const type of ["phone", "email"] as const) {
-    const desired = prepared.find((row) => row.type === type && row.isPrimary === 1);
-    const existing = params.seeded.find((row) => row.method_type === type && row.is_primary === 1);
+    const desired = prepared.find(
+      (row) => row.type === type && row.isPrimary === 1,
+    );
+    const existing = params.seeded.find(
+      (row) => row.method_type === type && row.is_primary === 1,
+    );
     if (existing && desired?.id !== existing.id) {
       const result = await exec.runAsync(
         "UPDATE contact_methods SET is_primary = 0, modified_at = ? WHERE contact_id = ? AND method_type = ? AND is_primary = 1",
@@ -152,9 +178,25 @@ export async function applyContactMethodDiffCore(
   // Explicit local removals create tombstones; stale source evidence is untouched.
   for (const seeded of params.seeded) {
     if (!currentIds.has(seeded.id)) {
-      await insertTombstoneCore(exec, { entityType: "contact_method", entityUid: seeded.uid, deletedAt: params.now }, { bumpRevision: false });
-      const result = await exec.runAsync("DELETE FROM contact_methods WHERE id = ? AND contact_id = ?", [seeded.id, params.contactId]);
-      assertOneChange("removeContactMethod", seeded.id, params.contactId, result.changes);
+      await insertTombstoneCore(
+        exec,
+        {
+          entityType: "contact_method",
+          entityUid: seeded.uid,
+          deletedAt: params.now,
+        },
+        { bumpRevision: false },
+      );
+      const result = await exec.runAsync(
+        "DELETE FROM contact_methods WHERE id = ? AND contact_id = ?",
+        [seeded.id, params.contactId],
+      );
+      assertOneChange(
+        "removeContactMethod",
+        seeded.id,
+        params.contactId,
+        result.changes,
+      );
       changed = true;
     }
   }
@@ -183,8 +225,22 @@ export async function applyContactMethodDiffCore(
       changed = true;
       continue;
     }
-    const seeded = seededById.get(draft.id)!;
-    const differs = seeded.method_type !== draft.type || seeded.raw_value !== draft.normalized.rawValue || seeded.display_value !== draft.normalized.displayValue || seeded.canonical_value !== draft.normalized.canonicalValue || seeded.canonical_region !== draft.normalized.canonicalRegion || seeded.extension !== draft.normalized.extension || seeded.is_actionable !== (draft.normalized.isActionable ? 1 : 0) || seeded.is_primary !== draft.isPrimary || seeded.display_order !== draft.displayOrder;
+    const seeded = seededById.get(draft.id);
+    if (!seeded) {
+      throw new Error(
+        `applyContactMethodDiff: draft id=${draft.id} was not seeded for contactId=${params.contactId}`,
+      );
+    }
+    const differs =
+      seeded.method_type !== draft.type ||
+      seeded.raw_value !== draft.normalized.rawValue ||
+      seeded.display_value !== draft.normalized.displayValue ||
+      seeded.canonical_value !== draft.normalized.canonicalValue ||
+      seeded.canonical_region !== draft.normalized.canonicalRegion ||
+      seeded.extension !== draft.normalized.extension ||
+      seeded.is_actionable !== (draft.normalized.isActionable ? 1 : 0) ||
+      seeded.is_primary !== draft.isPrimary ||
+      seeded.display_order !== draft.displayOrder;
     if (differs) {
       const result = await exec.runAsync(
         `UPDATE contact_methods SET method_type = ?, raw_value = ?, display_value = ?,
@@ -193,7 +249,12 @@ export async function applyContactMethodDiffCore(
          WHERE id = ? AND contact_id = ?`,
         [draft.type, ...values, draft.id, params.contactId],
       );
-      assertOneChange("updateContactMethod", draft.id, params.contactId, result.changes);
+      assertOneChange(
+        "updateContactMethod",
+        draft.id,
+        params.contactId,
+        result.changes,
+      );
       changed = true;
     }
   }
@@ -201,7 +262,12 @@ export async function applyContactMethodDiffCore(
   if (changed) await bumpDataRevisionCore(exec);
   const methods = await listContactMethods(exec, params.contactId);
   return collision
-    ? { status: "canonicalDuplicate", methodType: collision.methodType, survivingDraftUid: collision.survivingDraftUid, methods }
+    ? {
+        status: "canonicalDuplicate",
+        methodType: collision.methodType,
+        survivingDraftUid: collision.survivingDraftUid,
+        methods,
+      }
     : { status: "saved", methods };
 }
 
@@ -216,5 +282,7 @@ export function applyContactMethodDiff(
     effectivePhoneRegion?: string | null;
   },
 ): Promise<ContactMethodSaveResult> {
-  return inWriteTransaction(exec, () => applyContactMethodDiffCore(exec, params));
+  return inWriteTransaction(exec, () =>
+    applyContactMethodDiffCore(exec, params),
+  );
 }

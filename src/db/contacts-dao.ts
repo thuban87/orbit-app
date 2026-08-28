@@ -47,8 +47,16 @@
  * Node-pure: takes `exec: SqlExecutor`; imports the shared `inWriteTransaction`.
  */
 
-import { recordEventCore } from "@/db/events-dao";
+import {
+  applyContactMethodDiffCore,
+  type ContactMethodDraft,
+  type ContactMethodNormalizationContext,
+  type ContactMethodRow,
+  type ContactMethodSaveResult,
+  listContactMethods,
+} from "@/db/contact-methods-dao";
 import { bumpDataRevisionCore } from "@/db/data-revision-dao";
+import { recordEventCore } from "@/db/events-dao";
 import { listDefs } from "@/db/field-defs-dao";
 import { upsertValueCore } from "@/db/field-values-dao";
 import { assertSafeRelative } from "@/db/photo-relative-path";
@@ -70,8 +78,7 @@ export interface CustomValueInput {
 
 /**
  * A brand-new contact plus (optionally) its first touchpoint and `show_on_new`
- * custom values, created atomically. `phone` is the ONLY reach field on create
- * (CRUD-01 lean set); email/social_battery/birthday are edit-only.
+ * custom values, and optional normalized method drafts, created atomically.
  */
 export interface CreateContactFullInput {
   /** Contact-row merge-key uid (caller-minted). */
@@ -80,8 +87,6 @@ export interface CreateContactFullInput {
   intervalDays: number;
   /** Local wall-clock now — `created_at` + `modified_at` + interaction stamps. */
   now: string;
-  /** CRUD-01 lean set. Omitted → stored NULL. */
-  phone?: string | null;
   categoryId?: number | null;
   /** 0/1 — scopes recency to connected rows (default 0). */
   rarelyResponds?: number;
@@ -92,6 +97,10 @@ export interface CreateContactFullInput {
   firstInteraction?: FirstInteractionInput;
   /** Custom values to UPSERT after the complete definition-pair matrix is seeded. */
   customValues?: CustomValueInput[];
+  /** Omitted preserves the lean no-method create path. */
+  methodDrafts?: ContactMethodDraft[];
+  /** Caller-resolved device/override region; omitted values fail closed. */
+  methodNormalization?: ContactMethodNormalizationContext;
 }
 
 /**
@@ -101,7 +110,12 @@ export interface CreateContactFullInput {
 export function createContactFull(
   exec: SqlExecutor,
   input: CreateContactFullInput,
-): Promise<{ contactId: number; interactionId: number | null }> {
+): Promise<{
+  contactId: number;
+  interactionId: number | null;
+  methods: ContactMethodRow[];
+  methodSaveResult: ContactMethodSaveResult | null;
+}> {
   // GUARD 1 (WR-02): positive-integer interval. Reject BEFORE any transaction
   // opens (return, not throw — keeps the Promise contract; no BEGIN is issued).
   if (!Number.isInteger(input.intervalDays) || input.intervalDays <= 0) {
@@ -122,20 +136,18 @@ export function createContactFull(
   }
 
   return inWriteTransaction(exec, async () => {
-    // Contact row — CRUD-01 lean set INCLUDING phone. email/social_battery/
-    // birthday are deliberately absent (edit-only).
+    // Contact row — scalar phone/email were retired by migration 009.
     const contactResult = await exec.runAsync(
       `INSERT INTO contacts
-         (uid, name, category_id, interval_days, rarely_responds, phone,
+         (uid, name, category_id, interval_days, rarely_responds,
           created_at, modified_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
       [
         input.uid,
         input.name,
         input.categoryId ?? null,
         input.intervalDays,
         input.rarelyResponds ?? 0,
-        input.phone ?? null,
         input.now,
         input.now,
       ],
@@ -184,8 +196,26 @@ export function createContactFull(
       );
     }
 
-    await bumpDataRevisionCore(exec);
-    return { contactId, interactionId };
+    const methodSaveResult =
+      input.methodDrafts === undefined
+        ? null
+        : await applyContactMethodDiffCore(exec, {
+            contactId,
+            seeded: [],
+            current: input.methodDrafts,
+            now: input.now,
+            effectivePhoneRegion:
+              input.methodNormalization?.effectivePhoneRegion ?? null,
+          });
+    // The method core owns the one revision bump when it changes; aggregate-only
+    // writes retain the existing single revision bump.
+    if (methodSaveResult === null) await bumpDataRevisionCore(exec);
+    return {
+      contactId,
+      interactionId,
+      methods: methodSaveResult?.methods ?? [],
+      methodSaveResult,
+    };
   });
 }
 
@@ -226,10 +256,13 @@ export interface UpdateContactFullInput {
   categoryId?: number | null;
   socialBattery?: string | null;
   birthday?: string | null;
-  phone?: string | null;
-  email?: string | null;
   /** Custom values to UPSERT by their normalized definition pair. */
   customValues?: CustomValueInput[];
+  /** Omitted leaves durable methods untouched; [] is an explicit local clear. */
+  methodDrafts?: ContactMethodDraft[];
+  /** Optional editor snapshot; the DAO reads its own seed when omitted. */
+  seededMethods?: ContactMethodRow[];
+  methodNormalization?: ContactMethodNormalizationContext;
   /**
    * A FIRST interaction to record — honoured ONLY when the STORED `last_contact IS
    * NULL` (never-contacted). For an already-contacted contact it throws (rollback).
@@ -250,7 +283,7 @@ export async function updateContactMetadataCore(
   const result = await exec.runAsync(
     `UPDATE contacts SET
        name=?, category_id=?, interval_days=?, social_battery=?, birthday=?,
-       phone=?, email=?, rarely_responds=?, reminders_off=?, modified_at=?
+       rarely_responds=?, reminders_off=?, modified_at=?
      WHERE id=?`,
     [
       input.name,
@@ -258,8 +291,6 @@ export async function updateContactMetadataCore(
       input.intervalDays,
       input.socialBattery ?? null,
       input.birthday ?? null,
-      input.phone ?? null,
-      input.email ?? null,
       input.rarelyResponds,
       input.remindersOff,
       input.now,
@@ -281,7 +312,10 @@ export async function updateContactMetadataCore(
 export function updateContactFull(
   exec: SqlExecutor,
   input: UpdateContactFullInput,
-): Promise<void> {
+): Promise<{
+  methods: ContactMethodRow[];
+  methodSaveResult: ContactMethodSaveResult | null;
+}> {
   // GUARD 1 (WR-02): positive-integer interval (mirrors createContactFull).
   if (!Number.isInteger(input.intervalDays) || input.intervalDays <= 0) {
     return Promise.reject(
@@ -358,7 +392,20 @@ export function updateContactFull(
     ) {
       await recomputeLastContactCore(exec, input.id, input.now);
     }
-    await bumpDataRevisionCore(exec);
+    const methodSaveResult =
+      input.methodDrafts === undefined
+        ? null
+        : await applyContactMethodDiffCore(exec, {
+            contactId: input.id,
+            seeded:
+              input.seededMethods ?? (await listContactMethods(exec, input.id)),
+            current: input.methodDrafts,
+            now: input.now,
+            effectivePhoneRegion:
+              input.methodNormalization?.effectivePhoneRegion ?? null,
+          });
+    if (methodSaveResult === null) await bumpDataRevisionCore(exec);
+    return { methods: methodSaveResult?.methods ?? [], methodSaveResult };
   });
 }
 

@@ -27,7 +27,9 @@ export interface Tombstone {
   deletedAt: string;
 }
 
-function assertTombstoneEntityType(value: unknown): asserts value is TombstoneEntityType {
+function assertTombstoneEntityType(
+  value: unknown,
+): asserts value is TombstoneEntityType {
   switch (value) {
     case "contact":
     case "interaction":

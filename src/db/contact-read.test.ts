@@ -47,7 +47,16 @@ beforeEach(async () => {
   exec = nodeSqliteExecutor(db);
   await runMigrations(
     exec,
-    [migration001, migration002, migration003, migration004, migration005, migration006, migration007, migration009],
+    [
+      migration001,
+      migration002,
+      migration003,
+      migration004,
+      migration005,
+      migration006,
+      migration007,
+      migration009,
+    ],
     9,
     { now: NOW, newUid: uid, defaultPhoneRegion: "US" },
   );
