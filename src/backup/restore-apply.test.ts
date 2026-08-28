@@ -37,17 +37,19 @@ import { migration005 } from "@/db/migrations/005-digest-settings";
 import { migration006 } from "@/db/migrations/006-normalize-custom-field-values";
 import { migration007 } from "@/db/migrations/007-tombstones";
 import { migration008 } from "@/db/migrations/008-restore-photo-journal";
+import { migration009 } from "@/db/migrations/009-contact-method-normalization";
+import { migration010 } from "@/db/migrations/010-contact-method-label";
 import { runMigrations } from "@/db/migrations/runner";
 import type { SqlExecutor } from "@/db/types";
 
 const NOW = "2026-08-25 12:00:00";
 let uid = 0;
 const newUid = () => `uid-${++uid}`;
-const migrations = [migration001, migration002, migration003, migration004, migration005, migration006, migration007, migration008];
+const migrations = [migration001, migration002, migration003, migration004, migration005, migration006, migration007, migration008, migration009, migration010];
 
 async function db(): Promise<SqlExecutor> {
   const exec = nodeSqliteExecutor(openTestDb());
-  await runMigrations(exec, migrations, 8, { now: NOW, newUid });
+  await runMigrations(exec, migrations, 10, { now: NOW, newUid });
   return exec;
 }
 
@@ -165,5 +167,25 @@ describe("applyRestore", () => {
     });
     expect(result).toMatchObject({ status: "applied", scheduleResyncPending: true });
     await expect(destination.getFirstAsync<{ uid: string }>("SELECT uid FROM contacts WHERE uid=?", ["schedule-contact"])).resolves.toEqual({ uid: "schedule-contact" });
+  });
+
+  it("round-trips normalized method metadata without scalar contact columns", async () => {
+    const source = await db();
+    await source.runAsync(
+      "INSERT INTO contacts (uid,name,interval_days,rarely_responds,reminders_off,created_at,modified_at) VALUES (?,?,?,?,?,?,?)",
+      ["method-contact", "Method", 14, 0, 0, NOW, "2026-08-25 12:01:00"],
+    );
+    const contact = await source.getFirstAsync<{ id: number }>("SELECT id FROM contacts WHERE uid=?", ["method-contact"]);
+    await source.runAsync(
+      "INSERT INTO contact_methods (uid,contact_id,method_type,raw_value,display_value,canonical_value,canonical_region,label,extension,is_actionable,is_primary,display_order,created_at,modified_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+      ["method-a", contact!.id, "phone", "+15550100", "+15550100", "+15550100", "US", "Mobile", "42", 1, 1, 0, NOW, "2026-08-25 12:01:00"],
+    );
+    const manifest = await buildExportManifest(source, { exportedAt: NOW, readPhotoBase64: async () => "" });
+    const destination = await db();
+
+    await expect(applyRestore(destination, manifest, "replace-all")).resolves.toMatchObject({ status: "applied" });
+    await expect(destination.getFirstAsync<{ canonical_region: string; label: string; extension: string }>(
+      "SELECT canonical_region,label,extension FROM contact_methods WHERE uid=?", ["method-a"],
+    )).resolves.toEqual({ canonical_region: "US", label: "Mobile", extension: "42" });
   });
 });

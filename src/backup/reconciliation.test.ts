@@ -70,7 +70,7 @@ describe("reconciliation", () => {
         parentSurvivors: { contacts: new Set() },
       }).actions,
     ).toEqual([expect.objectContaining({ kind: "blocked", uid: "local-interaction" })]);
-    for (const entityType of ["interactions", "events", "fuel", "contact_links"] as const) {
+    for (const entityType of ["interactions", "events", "fuel", "contact_links", "contact_methods", "external_contact_links"] as const) {
       expect(
         reconcileEntity({
           entityType,
@@ -121,11 +121,14 @@ describe("reconciliation", () => {
   it("exposes every mergeable entity policy and fixed singleton seed identities", () => {
     expect(Object.keys(ENTITY_POLICIES).sort()).toEqual([
       "categories",
+      "contact_method_provenance",
+      "contact_methods",
       "contact_links",
       "contacts",
       "custom_field_defs",
       "custom_field_values",
       "events",
+      "external_contact_links",
       "fuel",
       "interactions",
       "profile",
