@@ -1,0 +1,40 @@
+{
+  "version": "1.0",
+  "timestamp": "2026-08-28T16:27:08.910Z",
+  "phase": "18.1",
+  "phase_name": "Contact Method Normalization",
+  "phase_dir": ".planning/phases/18.1-contact-method-normalization",
+  "plan": 6,
+  "task": 2,
+  "total_tasks": 2,
+  "status": "paused",
+  "completed_tasks": [
+    {"id": 1, "name": "18.1-06 automated regression boundary", "status": "done", "commit": "06531df"}
+  ],
+  "remaining_tasks": [
+    {"id": 2, "name": "18.1-06 Android UAT and restore-flow regression fix", "status": "in_progress", "progress": "All migration/editor/export UAT evidence is recorded and automated validation is green. The direct Restore a backup flow launches a blank/hanging DocumentsUI activity on the Pixel. An uncommitted share-receiver workaround was explored but the owner rejected it because it does not repair the Restore button flow."}
+  ],
+  "blockers": [
+    {"description": "The Pixel DocumentsUI picker hangs only when Orbit launches ACTION_OPEN_DOCUMENT for a result. Direct Restore remains broken. The current uncommitted share-receiver implementation is a rejected workaround, not a valid completion.", "type": "technical", "workaround": "Investigate and fix the direct Restore button path; do not commit or represent the Files→Share→Orbit path as the product resolution without an explicit owner decision."}
+  ],
+  "async_jobs": [],
+  "human_actions_pending": [],
+  "decisions": [
+    {"decision": "Reject the share-only inbound restore workaround.", "rationale": "The owner requires the Restore button to work directly; moving the user to Files→Share→Orbit does not meet that behavior.", "phase": "18.1"}
+  ],
+  "uncommitted_files": [
+    "app.config.ts",
+    "src/navigation/linking.ts",
+    "src/screens/BackupScreen.tsx",
+    "modules/orbit-backup-document-picker/",
+    "plugins/withBackupRestoreShareIntent.js",
+    "src/navigation/backup-share-intent.ts",
+    "src/navigation/backup-share-intent.test.ts",
+    ".planning/debug/restore-document-picker-blank.md",
+    "tsconfig.json (pre-existing/unrelated; preserve)",
+    ".planning/debug/replace-apply-failure.md and original unrelated handoff/UI artifacts (preserve)",
+    "files-*.xml, orbit-*.xml, share-chooser.xml, orbit-*.png (debug captures; inspect before retaining or deleting)"
+  ],
+  "next_action": "Read the phase checkpoint and debug session, inspect the uncommitted direct-picker experiments, preserve them without committing, then find a real direct Restore button fix or explicitly present a product decision instead of silently shipping a workaround.",
+  "context_notes": "Plans 18.1-01 through 18.1-05 are complete and committed. Plan 06 task 1 is committed; full suite passed 1,510 tests in 135 files, TypeScript/color/scalar audit passed, and debug/release builds passed. Device UAT confirmed v8→v10 migration, labels, primary/actionability, settings, export, and pre-restore preview readiness. The only remaining phase gate is direct restore/changed-primary merge UAT, blocked by Android DocumentsUI. Worktrees and parallelization are disabled; use sequential main-tree work."
+}
