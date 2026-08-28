@@ -29,6 +29,8 @@
  * Pure: same inputs → same output; no I/O; never throws.
  */
 
+import type { ContactMethodRow } from "@/db/contact-methods-dao";
+
 /** The compose Send/Copy control state this gate resolves. */
 export interface ComposeControls {
   /** Whether the Send button renders at all (only with phone + SMS capability). */
@@ -39,6 +41,20 @@ export interface ComposeControls {
   addNumber: boolean;
   /** Whether to show the "this device can't text" helper (phone present, no SMS). */
   smsUnavailableHelper: boolean;
+}
+
+/**
+ * Return the selected DAO-owned SMS destination, or suppress the handoff when
+ * the stored method is not actionable. This is intentionally a guard, not a
+ * parser: phone-region interpretation is durable method-DAO work.
+ */
+export function actionablePrimaryPhoneDestination(
+  method: ContactMethodRow | null,
+): string | null {
+  if (method === null || method.is_actionable !== 1) {
+    return null;
+  }
+  return method.canonical_value;
 }
 
 /**

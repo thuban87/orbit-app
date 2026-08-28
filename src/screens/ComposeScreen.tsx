@@ -75,6 +75,7 @@ import {
   type RequestConfig,
 } from "@/logic/ai-suggestion-logic";
 import {
+  actionablePrimaryPhoneDestination,
   type ComposeControls,
   resolveComposeControls,
 } from "@/logic/compose-logic";
@@ -117,8 +118,8 @@ type Header = {
    * like a missing one (route Home, render no Send/Copy/fuel surface).
    */
   archived_at: string | null;
-  /** The SMS-handoff source — null (or whitespace-only) means no phone (CMP-03). */
-  phone: string | null;
+  /** DAO-selected actionable primary destination, or null when SMS is unavailable. */
+  actionablePhone: string | null;
 };
 
 export function ComposeScreen({
@@ -329,7 +330,9 @@ export function ComposeScreen({
             photo: row.photo,
             modified_at: row.modified_at,
             archived_at: row.archived_at,
-            phone: actionableMethods.phone?.display_value ?? null,
+            actionablePhone: actionablePrimaryPhoneDestination(
+              actionableMethods.phone,
+            ),
           });
           setFuel(fuelRows);
           setScreenState("ready");
@@ -434,7 +437,7 @@ export function ComposeScreen({
     if (sending) {
       return;
     }
-    const phone = header?.phone?.trim() || null;
+    const phone = header?.actionablePhone ?? null;
     if (phone === null) {
       return;
     }
@@ -452,7 +455,7 @@ export function ComposeScreen({
     } finally {
       setSending(false);
     }
-  }, [sending, header, draft]);
+  }, [sending, header?.actionablePhone, draft]);
 
   // Copy — the guaranteed handoff, NEVER gated by `sending`. On success show a
   // transient "Copied" for ~2s via setState + setTimeout (not a per-frame anim).
@@ -782,7 +785,7 @@ export function ComposeScreen({
   // so no capability arithmetic is re-derived inline here (WR-02): while pending it
   // returns Send hidden / Copy sole primary / no helper; once the probe settles to a
   // concrete boolean it decides from the matrix.
-  const phone = header.phone?.trim() || null;
+  const phone = header.actionablePhone;
   const hasPhone = phone != null;
   const controls: ComposeControls = resolveComposeControls(
     hasPhone,

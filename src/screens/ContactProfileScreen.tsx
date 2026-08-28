@@ -45,6 +45,10 @@ import {
   type TouchpointRefineValue,
 } from "@/components/TouchpointRefineForm";
 import { getAppSettings } from "@/db/app-settings-dao";
+import {
+  type ContactMethodGroups,
+  listContactMethodGroups,
+} from "@/db/contact-methods-read";
 import { getContactHeader } from "@/db/contact-read";
 import {
   type ContactStatusRow,
@@ -80,6 +84,7 @@ import {
 } from "@/db/timeline-read";
 import { newUid } from "@/db/uid";
 import type { RootStackScreenProps } from "@/navigation/types";
+import { profileMethodGroups } from "@/screens/contact-profile-logic";
 import type { GravityResult } from "@/services/gravity-logic";
 import {
   computeContactGravity,
@@ -158,6 +163,10 @@ export function ContactProfileScreen({
   const [customValues, setCustomValues] = useState<
     Record<string, string | null>
   >({});
+  const [methodGroups, setMethodGroups] = useState<ContactMethodGroups>({
+    phone: [],
+    email: [],
+  });
   const [timeline, setTimeline] = useState<TimelineItem[]>([]);
   // The contact's conversational fuel (FUEL-01/02) — read through the single
   // fuel-read choke point (all kinds incl off_limits, newest-first). Editing is
@@ -213,6 +222,7 @@ export function ContactProfileScreen({
         rankedFuelRows,
         settings,
         defs,
+        methods,
       ] = await Promise.all([
         getContactHeader(exec, contactId),
         listTimeline(exec, contactId),
@@ -222,11 +232,13 @@ export function ContactProfileScreen({
         getRankedFuel(exec, contactId),
         getAppSettings(exec),
         listDefs(exec, { includeQuarantined: false }),
+        listContactMethodGroups(exec, contactId),
       ]);
       const values = await getValuesForContact(exec, contactId, defs);
       setHeader(row);
       setFieldDefs(defs);
       setCustomValues(values);
+      setMethodGroups(methods);
       setTimeline(rows);
       setStatus(statusRow);
       setFuel(fuelRows);
@@ -755,6 +767,69 @@ export function ContactProfileScreen({
         </View>
       ) : null}
 
+      {profileMethodGroups(methodGroups).map((group) => (
+        <View
+          key={group.type}
+          testID={`contact-profile-methods-${group.type}`}
+          style={styles.methods}
+        >
+          <Text
+            style={[styles.sectionHeading, { color: colors.textSecondary }]}
+          >
+            {group.title}
+          </Text>
+          {group.rows.map((method) => (
+            <View
+              key={method.id}
+              testID={`contact-profile-method-${method.id}`}
+              accessibilityLabel={method.accessibilityLabel}
+              style={[
+                styles.methodCard,
+                { backgroundColor: colors.surface, borderColor: colors.border },
+              ]}
+            >
+              <Text
+                style={[styles.methodLabel, { color: colors.textSecondary }]}
+              >
+                {method.label}
+              </Text>
+              <Text
+                numberOfLines={1}
+                ellipsizeMode="tail"
+                style={[styles.methodValue, { color: colors.textPrimary }]}
+              >
+                {method.displayValue}
+              </Text>
+              {method.isPrimary ? (
+                <Text
+                  style={[
+                    styles.methodPrimary,
+                    { color: colors.textSecondary },
+                  ]}
+                >
+                  Primary
+                </Text>
+              ) : null}
+              {method.extension ? (
+                <Text
+                  style={[
+                    styles.methodExtension,
+                    { color: colors.textSecondary },
+                  ]}
+                >
+                  Ext. {method.extension}
+                </Text>
+              ) : null}
+              {method.helper ? (
+                <Text style={[styles.methodHelper, { color: colors.danger }]}>
+                  {method.helper}
+                </Text>
+              ) : null}
+            </View>
+          ))}
+        </View>
+      ))}
+
       {/* "Message" (CMP-02): opens the entry-agnostic compose surface for this
           contact. Filled-accent primary directly ABOVE "Log contact" — per the
           UI-SPEC owner-taste note both ship as filled-accent primaries; the
@@ -1123,6 +1198,35 @@ const styles = StyleSheet.create({
   },
   customFields: {
     gap: 8,
+  },
+  methods: {
+    gap: 8,
+  },
+  methodCard: {
+    borderWidth: 1,
+    borderRadius: 10,
+    padding: 16,
+    gap: 4,
+  },
+  methodLabel: {
+    fontSize: 13,
+    fontWeight: "600",
+  },
+  methodValue: {
+    fontSize: 15,
+    fontWeight: "400",
+  },
+  methodPrimary: {
+    fontSize: 13,
+    fontWeight: "600",
+  },
+  methodExtension: {
+    fontSize: 13,
+    fontWeight: "400",
+  },
+  methodHelper: {
+    fontSize: 13,
+    fontWeight: "600",
   },
   fuel: {
     gap: 8,
