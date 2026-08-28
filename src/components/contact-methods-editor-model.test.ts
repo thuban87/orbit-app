@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   addMethodDraft,
   canonicalDuplicateCopy,
+  collapseCanonicalDuplicate,
   choosePrimary,
   discardBlankMethodDrafts,
   emptyMethodDraft,
@@ -50,5 +51,17 @@ describe("contact method editor model", () => {
   it("uses the exact same-contact collision helper copy", () => {
     expect(canonicalDuplicateCopy("phone")).toBe("This matches an existing phone number; only one will be kept.");
     expect(canonicalDuplicateCopy("email")).toBe("This matches an existing email address; only one will be kept.");
+  });
+
+  it("collapses only the DAO-reported same-contact duplicate and leaves cross-contact drafts alone", () => {
+    const withDuplicate: MethodGroups = {
+      phone: [
+        { uid: "p1", type: "phone", value: "555", extension: "", label: "Main", isPrimary: true },
+        { uid: "p2", type: "phone", value: "555", extension: "", label: "Work" },
+      ],
+      email: [],
+    };
+    expect(collapseCanonicalDuplicate(withDuplicate, "phone", "p1").phone.map((row) => row.uid)).toEqual(["p1"]);
+    expect(collapseCanonicalDuplicate(withDuplicate, "phone", "missing")).toEqual(withDuplicate);
   });
 });
