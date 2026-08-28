@@ -31,16 +31,19 @@ import {
   View,
 } from "react-native";
 import { FieldValueInput } from "@/components/FieldValueInput";
+import { ContactMethodsEditor } from "@/components/ContactMethodsEditor";
 import { FrequencyPicker } from "@/components/FrequencyPicker";
 import { TriStateLastSpoke } from "@/components/TriStateLastSpoke";
 import type { LastSpokeValue } from "@/components/tri-state-last-spoke-logic";
 import { isDuplicateName, listCategories } from "@/db/contact-read";
 import { createContactFull } from "@/db/contacts-dao";
+import { getAppSettings } from "@/db/app-settings-dao";
 import { getExecutor, localDateTime } from "@/db/database";
 import { listDefs } from "@/db/field-defs-dao";
 import type { CustomFieldDef } from "@/db/field-types";
 import { defsForCreateForm } from "@/db/field-values-dao";
 import { newUid } from "@/db/uid";
+import { getDeviceRegion } from "@/services/device-region";
 import type { RootStackScreenProps } from "@/navigation/types";
 import { useTheme } from "@/theme";
 import { FREQUENCY_DAYS } from "@/types";
@@ -50,6 +53,16 @@ import {
   type CreateFormState,
   canSave,
 } from "./create-contact-logic";
+import {
+  addMethodDraft,
+  emptyMethodDraft,
+  resolveEffectivePhoneRegion,
+  updateMethodDraft,
+  removeMethodDraft,
+  choosePrimary,
+  type MethodGroups,
+} from "@/components/contact-methods-editor-model";
+import type { ContactMethodType } from "@/logic/contact-method-normalization";
 
 const LOG_SCOPE = "create-contact";
 
@@ -84,7 +97,13 @@ export function CreateContactScreen({
   const [intervalDays, setIntervalDays] = useState(FREQUENCY_DAYS.Monthly);
   const [intervalValid, setIntervalValid] = useState(true);
   const [lastSpoke, setLastSpoke] = useState<LastSpokeValue>({ kind: "today" });
-  const [phone, setPhone] = useState("");
+  const [methods, setMethods] = useState<MethodGroups>(() => ({
+    phone: [emptyMethodDraft("phone", newUid())],
+    email: [],
+  }));
+  const [effectivePhoneRegion, setEffectivePhoneRegion] = useState<string | null>(
+    getDeviceRegion(),
+  );
   // Custom-block value map, keyed by col_name.
   const [values, setValues] = useState<Record<string, string | null>>({});
   const [saving, setSaving] = useState(false);
@@ -92,12 +111,19 @@ export function CreateContactScreen({
   const load = useCallback(async () => {
     try {
       const exec = getExecutor();
-      const [cats, defs] = await Promise.all([
+      const [cats, defs, settings] = await Promise.all([
         listCategories(exec),
         listDefs(exec, { includeQuarantined: false }),
+        getAppSettings(exec),
       ]);
       setCategories(cats);
       setCreateDefs(defsForCreateForm(defs));
+      setEffectivePhoneRegion(
+        resolveEffectivePhoneRegion(
+          settings.phoneRegionOverride,
+          getDeviceRegion(),
+        ),
+      );
     } catch (err) {
       Logger.error(LOG_SCOPE, "failed to load create-form data", err);
       Alert.alert("Couldn't load the form", "Please reopen this screen.");
@@ -115,10 +141,10 @@ export function CreateContactScreen({
       intervalDays,
       intervalValid,
       lastSpoke,
-      phone,
+      methods,
       values,
     }),
-    [name, categoryId, intervalDays, intervalValid, lastSpoke, phone, values],
+    [name, categoryId, intervalDays, intervalValid, lastSpoke, methods, values],
   );
 
   const savable = canSave(formState) && !saving;
@@ -142,6 +168,7 @@ export function CreateContactScreen({
         contactUid: newUid(),
         interactionUid: newUid(),
         createDefs,
+        effectivePhoneRegion,
       });
       const { contactId } = await createContactFull(exec, input);
       navigation.replace("Profile", { contactId });
@@ -177,7 +204,7 @@ export function CreateContactScreen({
         </Text>
       </View>
 
-      {/* -- Fixed block: Name → Category → Frequency → Last-spoke → Phone -- */}
+      {/* -- Fixed block: Name → Category → Frequency → Last-spoke → methods -- */}
       <View style={styles.field}>
         <Text style={[styles.label, { color: colors.textSecondary }]}>
           Name
@@ -250,25 +277,17 @@ export function CreateContactScreen({
       </View>
 
       <View style={styles.field}>
-        <Text style={[styles.label, { color: colors.textSecondary }]}>
-          Phone
-        </Text>
-        <TextInput
-          testID="create-contact-phone"
-          accessibilityLabel="Phone"
-          value={phone}
-          onChangeText={setPhone}
-          keyboardType="phone-pad"
-          placeholder="Phone number"
-          placeholderTextColor={colors.textSecondary}
-          style={[
-            styles.input,
-            {
-              color: colors.textPrimary,
-              backgroundColor: colors.surface,
-              borderColor: colors.border,
-            },
-          ]}
+        <ContactMethodsEditor
+          testID="create-contact-methods"
+          methods={methods}
+          onAdd={(type: ContactMethodType) =>
+            setMethods((current) => addMethodDraft(current, type, newUid()))
+          }
+          onUpdate={(uid, patch) =>
+            setMethods((current) => updateMethodDraft(current, uid, patch))
+          }
+          onRemove={(uid) => setMethods((current) => removeMethodDraft(current, uid))}
+          onChoosePrimary={(uid) => setMethods((current) => choosePrimary(current, uid))}
         />
       </View>
 

@@ -22,6 +22,7 @@
  */
 import type { LastSpokeValue } from "@/components/tri-state-last-spoke-logic";
 import type { CreateContactFullInput } from "@/db/contacts-dao";
+import { toMethodDrafts, type MethodGroups } from "@/components/contact-methods-editor-model";
 
 /** The create form's controlled state (the screen owns the React state). */
 export interface CreateFormState {
@@ -32,7 +33,7 @@ export interface CreateFormState {
   /** The FrequencyPicker's validity — false blocks Save. */
   intervalValid: boolean;
   lastSpoke: LastSpokeValue;
-  phone: string;
+  methods: MethodGroups;
   /** Custom-field values keyed by `col_name` (from FieldValueInput). */
   values: Record<string, string | null>;
 }
@@ -47,6 +48,8 @@ export interface BuildCreateInputDeps {
   interactionUid: string;
   /** `defsForCreateForm(defs)` — the show_on_new normalized definition pairs. */
   createDefs: Array<{ id: number; col_name: string }>;
+  /** Saved override first, otherwise the platform device region. */
+  effectivePhoneRegion: string | null;
 }
 
 /**
@@ -77,8 +80,8 @@ export function firstInteractionOccurredAt(
 }
 
 /**
- * Build the atomic-create input for `createContactFull`. `phone` is trimmed and
- * empty→null; `name` is trimmed. The custom block is the `createDefs` mapped
+ * Build the atomic-create input for `createContactFull`. Blank method controls
+ * are discarded but nonblank invalid drafts stay durable; `name` is trimmed. The custom block is the `createDefs` mapped
  * to the current values (a missing key → null). The `firstInteraction` follows
  * the tri-state: "not yet" omits it entirely.
  */
@@ -92,7 +95,10 @@ export function buildCreateInput(
     name: state.name.trim(),
     intervalDays: state.intervalDays,
     now: deps.now,
-    phone: state.phone.trim() || null,
+    methodDrafts: toMethodDrafts(state.methods),
+    methodNormalization: {
+      effectivePhoneRegion: deps.effectivePhoneRegion,
+    },
     categoryId: state.categoryId,
     rarelyResponds: 0,
     customValues: deps.createDefs.map((definition) => ({

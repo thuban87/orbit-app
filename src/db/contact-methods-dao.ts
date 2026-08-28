@@ -30,6 +30,8 @@ export interface ContactMethodDraft {
   uid: string;
   type: ContactMethodType;
   value: string;
+  /** Phone-only presentation metadata. Empty drafts are stored as NULL. */
+  extension?: string | null;
   /** The form may explicitly choose one primary per type. */
   isPrimary?: boolean;
 }
@@ -78,6 +80,7 @@ export function listContactMethods(
 
 type PreparedDraft = Omit<ContactMethodDraft, "isPrimary"> & {
   normalized: ReturnType<typeof normalizeContactMethod>;
+  extension: string | null;
   displayOrder: number;
   selectedPrimary: boolean;
   isPrimary: number;
@@ -129,6 +132,10 @@ export async function applyContactMethodDiffCore(
     prepared.push({
       ...draft,
       normalized,
+      extension:
+        draft.type === "phone" && draft.extension?.trim()
+          ? draft.extension.trim()
+          : null,
       displayOrder: orderByType[draft.type]++,
       selectedPrimary: draft.isPrimary === true,
       isPrimary: 0,
@@ -207,7 +214,7 @@ export async function applyContactMethodDiffCore(
       draft.normalized.displayValue,
       draft.normalized.canonicalValue,
       draft.normalized.canonicalRegion,
-      draft.normalized.extension,
+      draft.extension ?? draft.normalized.extension,
       draft.normalized.isActionable ? 1 : 0,
       draft.isPrimary,
       draft.displayOrder,
@@ -237,7 +244,7 @@ export async function applyContactMethodDiffCore(
       seeded.display_value !== draft.normalized.displayValue ||
       seeded.canonical_value !== draft.normalized.canonicalValue ||
       seeded.canonical_region !== draft.normalized.canonicalRegion ||
-      seeded.extension !== draft.normalized.extension ||
+      seeded.extension !== (draft.extension ?? draft.normalized.extension) ||
       seeded.is_actionable !== (draft.normalized.isActionable ? 1 : 0) ||
       seeded.is_primary !== draft.isPrimary ||
       seeded.display_order !== draft.displayOrder;
