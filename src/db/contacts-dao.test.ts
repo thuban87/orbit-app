@@ -38,6 +38,7 @@ import { migration004 } from "@/db/migrations/004-ai-settings";
 import { migration005 } from "@/db/migrations/005-digest-settings";
 import { migration006 } from "@/db/migrations/006-normalize-custom-field-values";
 import { migration007 } from "@/db/migrations/007-tombstones";
+import { migration009 } from "@/db/migrations/009-contact-method-normalization";
 import { runMigrations } from "@/db/migrations/runner";
 import { recordTouchpoint } from "@/db/recency-dao";
 import type { SqlExecutor } from "@/db/types";
@@ -63,9 +64,10 @@ beforeEach(async () => {
       migration005,
       migration006,
       migration007,
+      migration009,
     ],
-    7,
-    { now: NOW, newUid: uid },
+    9,
+    { now: NOW, newUid: uid, defaultPhoneRegion: "US" },
   );
 });
 
@@ -92,14 +94,6 @@ async function lastContact(contactId: number): Promise<string | null> {
   return row?.last_contact ?? null;
 }
 
-async function phone(contactId: number): Promise<string | null> {
-  const row = await exec.getFirstAsync<{ phone: string | null }>(
-    "SELECT phone FROM contacts WHERE id = ?",
-    [contactId],
-  );
-  return row?.phone ?? null;
-}
-
 async function name(contactId: number): Promise<string | null> {
   const row = await exec.getFirstAsync<{ name: string }>(
     "SELECT name FROM contacts WHERE id = ?",
@@ -115,14 +109,12 @@ async function metadata(contactId: number): Promise<{
   interval_days: number;
   social_battery: string | null;
   birthday: string | null;
-  phone: string | null;
-  email: string | null;
   rarely_responds: number;
   reminders_off: number;
 } | null> {
   return exec.getFirstAsync(
-    `SELECT name, category_id, interval_days, social_battery, birthday, phone,
-            email, rarely_responds, reminders_off
+    `SELECT name, category_id, interval_days, social_battery, birthday,
+            rarely_responds, reminders_off
        FROM contacts WHERE id = ?`,
     [contactId],
   );
@@ -182,26 +174,37 @@ describe("createContactFull — Today create composes contact + interaction", ()
   });
 });
 
-describe("createContactFull — phone round-trip (CRUD-01)", () => {
-  it("persists a supplied phone to contacts.phone", async () => {
+describe("createContactFull — normalized method composition", () => {
+  it("persists supplied typed methods in the same create transaction", async () => {
     const { contactId } = await createContactFull(exec, {
       uid: uid(),
       name: "Ravi",
       intervalDays: 30,
       now: NOW,
-      phone: "+44 7700 900123",
+      methodDrafts: [{ uid: uid(), type: "phone", value: "312 555 1234" }],
+      methodNormalization: { effectivePhoneRegion: "US" },
     });
-    expect(await phone(contactId)).toBe("+44 7700 900123");
+    expect(
+      await exec.getAllAsync(
+        "SELECT canonical_value, canonical_region FROM contact_methods WHERE contact_id = ?",
+        [contactId],
+      ),
+    ).toEqual([{ canonical_value: "+13125551234", canonical_region: "US" }]);
   });
 
-  it("stores NULL when no phone is supplied", async () => {
+  it("keeps existing callers additive-optional when no method draft/context is supplied", async () => {
     const { contactId } = await createContactFull(exec, {
       uid: uid(),
       name: "Noa",
       intervalDays: 30,
       now: NOW,
     });
-    expect(await phone(contactId)).toBeNull();
+    expect(
+      await exec.getAllAsync(
+        "SELECT * FROM contact_methods WHERE contact_id = ?",
+        [contactId],
+      ),
+    ).toEqual([]);
   });
 });
 
@@ -371,8 +374,8 @@ describe("createContactFull — mid-composition ROLLBACK (T-04-03 atomicity)", (
 
 const EDIT_NOW = "2026-08-15 10:00:00";
 
-describe("updateContactFull — metadata edit (every col except last_contact)", () => {
-  it("changes name/category/interval/phone/email/battery/birthday/reminders and leaves last_contact unchanged when rarely_responds is unchanged", async () => {
+describe("updateContactFull — metadata and normalized method edit", () => {
+  it("changes scalar metadata and method rows atomically while leaving last_contact unchanged when rarely_responds is unchanged", async () => {
     const { contactId } = await createContactFull(exec, {
       uid: uid(),
       name: "Old",
@@ -390,8 +393,8 @@ describe("updateContactFull — metadata edit (every col except last_contact)", 
       intervalDays: 30,
       socialBattery: "high",
       birthday: "03-14",
-      phone: "+44 7700 900999",
-      email: "new@example.com",
+      methodDrafts: [{ uid: uid(), type: "email", value: "new@example.com" }],
+      methodNormalization: { effectivePhoneRegion: "US" },
       rarelyResponds: 0, // unchanged (create default is 0)
       remindersOff: 1,
       now: EDIT_NOW,
@@ -403,11 +406,100 @@ describe("updateContactFull — metadata edit (every col except last_contact)", 
     expect(m?.interval_days).toBe(30);
     expect(m?.social_battery).toBe("high");
     expect(m?.birthday).toBe("03-14");
-    expect(m?.phone).toBe("+44 7700 900999");
-    expect(m?.email).toBe("new@example.com");
     expect(m?.reminders_off).toBe(1);
+    expect(
+      await exec.getAllAsync(
+        "SELECT canonical_value FROM contact_methods WHERE contact_id = ?",
+        [contactId],
+      ),
+    ).toEqual([{ canonical_value: "new@example.com" }]);
     // last_contact is NOT touched by the metadata edit (single-writer DATA-04).
     expect(await lastContact(contactId)).toBe("2026-08-10 09:00:00");
+  });
+
+  it("rolls metadata and method changes back together when the method diff rejects a stale seed", async () => {
+    const { contactId } = await createContactFull(exec, {
+      uid: uid(),
+      name: "Original",
+      intervalDays: 14,
+      now: NOW,
+      methodDrafts: [{ uid: uid(), type: "phone", value: "312 555 1234" }],
+      methodNormalization: { effectivePhoneRegion: "US" },
+    });
+    const [stored] = await exec.getAllAsync<{
+      id: number;
+      uid: string;
+      contact_id: number;
+      method_type: "phone";
+      raw_value: string;
+      display_value: string;
+      canonical_value: string | null;
+      canonical_region: string | null;
+      extension: string | null;
+      is_actionable: number;
+      is_primary: number;
+      display_order: number;
+      created_at: string;
+      modified_at: string;
+    }>("SELECT * FROM contact_methods WHERE contact_id = ?", [contactId]);
+    await expect(
+      updateContactFull(exec, {
+        id: contactId,
+        name: "Changed",
+        intervalDays: 14,
+        rarelyResponds: 0,
+        remindersOff: 0,
+        now: EDIT_NOW,
+        seededMethods: [
+          stored,
+          { ...stored, id: 99999, uid: "missing-method" },
+        ],
+        methodDrafts: [
+          { uid: uid(), type: "email", value: "changed@example.com" },
+        ],
+        methodNormalization: { effectivePhoneRegion: "US" },
+      }),
+    ).rejects.toThrow();
+    expect(await name(contactId)).toBe("Original");
+    expect(
+      await exec.getAllAsync(
+        "SELECT canonical_value FROM contact_methods WHERE contact_id = ?",
+        [contactId],
+      ),
+    ).toEqual([{ canonical_value: "+13125551234" }]);
+  });
+
+  it("uses a new region only for edited drafts and never rewrites existing canonical identity", async () => {
+    const { contactId } = await createContactFull(exec, {
+      uid: uid(),
+      name: "Regional",
+      intervalDays: 14,
+      now: NOW,
+      methodDrafts: [{ uid: uid(), type: "phone", value: "312 555 1234" }],
+      methodNormalization: { effectivePhoneRegion: "US" },
+    });
+    const before = await exec.getFirstAsync<{
+      canonical_value: string;
+      canonical_region: string;
+    }>(
+      "SELECT canonical_value, canonical_region FROM contact_methods WHERE contact_id = ?",
+      [contactId],
+    );
+    await updateContactFull(exec, {
+      id: contactId,
+      name: "Regional",
+      intervalDays: 21,
+      rarelyResponds: 0,
+      remindersOff: 0,
+      now: EDIT_NOW,
+      methodNormalization: { effectivePhoneRegion: "GB" },
+    });
+    expect(
+      await exec.getFirstAsync(
+        "SELECT canonical_value, canonical_region FROM contact_methods WHERE contact_id = ?",
+        [contactId],
+      ),
+    ).toEqual(before);
   });
 
   it("rejects a non-positive intervalDays before any write (guard mirrors create)", async () => {
