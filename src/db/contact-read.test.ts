@@ -29,6 +29,7 @@ import { migration005 } from "@/db/migrations/005-digest-settings";
 import { migration006 } from "@/db/migrations/006-normalize-custom-field-values";
 import { migration007 } from "@/db/migrations/007-tombstones";
 import { migration009 } from "@/db/migrations/009-contact-method-normalization";
+import { migration010 } from "@/db/migrations/010-contact-method-label";
 import { runMigrations } from "@/db/migrations/runner";
 import type { SqlExecutor } from "@/db/types";
 
@@ -56,8 +57,9 @@ beforeEach(async () => {
       migration006,
       migration007,
       migration009,
+      migration010,
     ],
-    9,
+    10,
     { now: NOW, newUid: uid, defaultPhoneRegion: "US" },
   );
 });

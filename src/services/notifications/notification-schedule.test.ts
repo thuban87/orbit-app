@@ -24,7 +24,11 @@ import { migration002 } from "@/db/migrations/002-app-settings";
 import { migration003 } from "@/db/migrations/003-orrery-settings";
 import { migration004 } from "@/db/migrations/004-ai-settings";
 import { migration005 } from "@/db/migrations/005-digest-settings";
+import { migration006 } from "@/db/migrations/006-normalize-custom-field-values";
 import { migration007 } from "@/db/migrations/007-tombstones";
+import { migration008 } from "@/db/migrations/008-restore-photo-journal";
+import { migration009 } from "@/db/migrations/009-contact-method-normalization";
+import { migration010 } from "@/db/migrations/010-contact-method-label";
 import { runMigrations } from "@/db/migrations/runner";
 import type { SqlExecutor } from "@/db/types";
 import { __resetSweepForTest, runLaunchSweep } from "@/services/launch-sweep";
@@ -70,9 +74,8 @@ beforeEach(async () => {
   uidCounter = 0;
   const db = openTestDb();
   exec = nodeSqliteExecutor(db);
-  // v7: getAppSettings (called by the reconcile under test) reads the Phase-17
-  // backup settings in addition to the AI and digest columns. This CURRENT-schema
-  // harness must track production's migration target.
+  // Current schema: getAppSettings reads method-region state added in v9, and
+  // method reads expect the durable label column added in v10.
   await runMigrations(
     exec,
     [
@@ -81,10 +84,14 @@ beforeEach(async () => {
       migration003,
       migration004,
       migration005,
+      migration006,
       migration007,
+      migration008,
+      migration009,
+      migration010,
     ],
-    7,
-    { now: NOW, newUid: uid },
+    10,
+    { now: NOW, newUid: uid, defaultPhoneRegion: "US" },
   );
   __resetExpo();
   __resetReconcileForTest();

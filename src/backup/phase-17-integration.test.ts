@@ -139,6 +139,8 @@ describe("Phase 17 composed backup regressions", () => {
     const covered = new Map([
       ["contacts", "contact"], ["interactions", "interaction"], ["events", "event"], ["fuel", "fuel"],
       ["contact_links", "contact_link"], ["custom_field_defs", "custom_field_def"], ["custom_field_values", "custom_field_value"],
+      ["contact_methods", "contact_method"], ["external_contact_links", "external_contact_link"],
+      ["contact_method_provenance", "contact_method_provenance"],
     ]);
     for (const table of writers) {
       if (["field_history", "restore_photo_journal"].includes(table)) continue;

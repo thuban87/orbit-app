@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { nodeSqliteExecutor, openTestDb } from "@/db/__testkit__/node-sqlite";
 import {
   applyContactMethodDiff,
@@ -16,6 +16,7 @@ import { migration009 } from "@/db/migrations/009-contact-method-normalization";
 import { migration010 } from "@/db/migrations/010-contact-method-label";
 import { runMigrations } from "@/db/migrations/runner";
 import type { SqlExecutor } from "@/db/types";
+import { Logger } from "@/utils/logger";
 
 const NOW = "2026-08-28 10:00:00";
 let counter = 0;
@@ -247,5 +248,46 @@ describe("applyContactMethodDiff", () => {
         "SELECT * FROM tombstones WHERE entity_type = 'contact_method'",
       ),
     ).toEqual([]);
+  });
+
+  it("never sends invalid, duplicate, or failed-save method values to Logger", async () => {
+    const contactId = await contact();
+    const error = vi.spyOn(Logger, "error");
+    const warn = vi.spyOn(Logger, "warn");
+    const debug = vi.spyOn(Logger, "debug");
+    const invalid = "not a valid phone";
+    const canonical = "+13125551234";
+
+    try {
+      await applyContactMethodDiff(exec, {
+        contactId,
+        seeded: [],
+        current: [phone(invalid)],
+        now: NOW,
+        effectivePhoneRegion: "US",
+      });
+      const duplicate = await applyContactMethodDiff(exec, {
+        contactId,
+        seeded: await listContactMethods(exec, contactId),
+        current: [phone("312 555 1234"), phone("+1 312 555 1234")],
+        now: NOW,
+        effectivePhoneRegion: "US",
+      });
+      expect(duplicate.status).toBe("canonicalDuplicate");
+      const [stored] = await listContactMethods(exec, contactId);
+      await expect(applyContactMethodDiff(exec, {
+        contactId,
+        seeded: [{ ...stored, id: 99999, uid: "missing-seeded-method" }],
+        current: [phone("773 555 1234")],
+        now: NOW,
+        effectivePhoneRegion: "US",
+      })).rejects.toThrow();
+
+      const logged = [error, warn, debug].flatMap((spy) => spy.mock.calls.flat());
+      expect(logged).not.toContain(invalid);
+      expect(logged).not.toContain(canonical);
+    } finally {
+      vi.restoreAllMocks();
+    }
   });
 });

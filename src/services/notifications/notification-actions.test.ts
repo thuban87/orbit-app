@@ -35,6 +35,9 @@ vi.mock("expo-notifications");
 vi.mock("@/services/widget/widget-refresh", () => ({
   notifyWidgetDataChanged: h.notifyWidget,
 }));
+vi.mock("@/services/device-region", () => ({
+  getDeviceRegion: () => "US",
+}));
 vi.mock("@/db/database", () => {
   const openAndMigrate = vi.fn(async () => null);
   h.openAndMigrate = openAndMigrate;

@@ -97,6 +97,11 @@ describe("migration 009 — contact method normalization", () => {
     expect(await exec.getFirstAsync<{ sun_contact_id: number; phone_region_override: string | null }>(
       "SELECT sun_contact_id, phone_region_override FROM app_settings WHERE id = 1",
     )).toEqual({ sun_contact_id: id, phone_region_override: null });
+    expect(await exec.getAllAsync<{ table: string; from: string }>(
+      "PRAGMA foreign_key_list(app_settings)",
+    )).toEqual(expect.arrayContaining([
+      expect.objectContaining({ table: "contacts", from: "sun_contact_id" }),
+    ]));
   });
 
   it.each([0, -1, 2.5, "broken"])("clamps malformed cadence %p and snapshots its original value", async (intervalDays) => {

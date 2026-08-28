@@ -107,3 +107,28 @@ The following are execution-completion sign-offs, deliberately pending until 18-
 - [ ] `nyquist_compliant: true` set in frontmatter.
 
 **Approval:** pending
+
+---
+
+## Phase 18.1 Re-cut Validation Ledger
+
+The original phase was split after planning. This ledger is the authoritative
+method-only closeout for Phase 18.1; lifecycle, nullable-cadence consumer, and
+Unbound checks remain explicitly owned by 18.2-10.
+
+| Task | Wave | Requirements | Automated owner | Device-only backstop | Status |
+|------|------|--------------|-----------------|----------------------|--------|
+| 18.1-01 | 1 | CDN-01, CDN-03 | `009-contact-method-normalization.test.ts`, `contact-method-normalization.test.ts` | v8 fixture upgrade parses device-region national numbers without stripping invalid Text | ✅ prior plan |
+| 18.1-02 | 2 | CDN-01 | `contact-methods-dao.test.ts`, `contact-methods-read.test.ts`, `contacts-dao.test.ts` | editor controls, invalid/error state, and touch targets | ✅ prior plan |
+| 18.1-03 | 2 | CDN-01 | `010-contact-method-label.test.ts`, aggregate DAO/form tests | labels, keyboard scroll, 320dp overflow, accessibility labels | ✅ prior plan |
+| 18.1-04 | 3 | CDN-01, CDN-04 | backup schema/export/restore/reconciliation/purge tests | backup export plus Replace-all/changed-primary restore on an upgraded device | ✅ prior plan |
+| 18.1-05 | 3 | CDN-01 | profile and Compose method-logic tests | actionable-primary SMS handoff and no-phone fallback | ✅ prior plan |
+| 18.1-06 Task 1 | 4 | CDN-01, CDN-03, CDN-04 | migration + method DAO boundary tests; `node scripts/audit-scalar-method-refs.mjs`; full suite/type/color gates | none | pending execution |
+| 18.1-06 Task 2 | 4 | CDN-01, CDN-03, CDN-04 | pre-UAT full suite/type/color gates | upgraded v8 fixture, FK write, cadence history, UI/actionability, backup Replace-all/merge, and accessibility/layout evidence | pending executor UAT |
+
+### Scope and PII boundary
+
+- The scalar-reference audit scans executable production TypeScript/JavaScript only; comments such as `src/ai/prompt-types.ts` and `src/db/ai-context-read.ts` are deliberately ignored.
+- Its only legacy transition owners are migration 001's v8 fixture schema, migration 009's v8-to-v9 migration, and the v1 backup forward migration. All other executable scalar reads/writes fail the gate.
+- `contact-methods-dao.test.ts` owns the Logger boundary for invalid input, same-contact canonical collapse, and failed persistence. It asserts that neither raw nor canonical endpoint values reach Logger.
+- Device evidence must not record raw/canonical method values in logs or screenshots. The lifecycle consumer ledger, explicit-Unbound AI/status/digest checks, import/reconciliation UI, and lifecycle migration numbering stay deferred to Phase 18.2.
