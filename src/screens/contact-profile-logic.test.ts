@@ -1,0 +1,115 @@
+import { describe, expect, it } from "vitest";
+import type { ContactMethodRow } from "@/db/contact-methods-dao";
+import { profileMethodGroups } from "@/screens/contact-profile-logic";
+
+const phone: ContactMethodRow = {
+  id: 1,
+  uid: "method-phone",
+  contact_id: 4,
+  method_type: "phone",
+  raw_value: "(312) 555-1234",
+  display_value: "+1 312 555 1234",
+  canonical_value: "+13125551234",
+  canonical_region: "US",
+  extension: "42",
+  label: "Mobile",
+  is_actionable: 1,
+  is_primary: 1,
+  display_order: 0,
+  created_at: "2026-08-28 12:00:00",
+  modified_at: "2026-08-28 12:00:00",
+};
+
+describe("profileMethodGroups", () => {
+  it("keeps phone first and renders stored labels, formatted values, primary state, extension, and full a11y", () => {
+    expect(
+      profileMethodGroups({
+        phone: [phone],
+        email: [
+          {
+            ...phone,
+            id: 2,
+            method_type: "email",
+            label: "Work",
+            extension: null,
+            display_value: "ada@example.com",
+          },
+        ],
+      }),
+    ).toEqual([
+      {
+        type: "phone",
+        title: "Phone numbers",
+        rows: [
+          {
+            id: 1,
+            label: "Mobile",
+            displayValue: "+1 312 555 1234",
+            extension: "42",
+            isPrimary: true,
+            helper: null,
+            accessibilityLabel:
+              "Mobile, +1 312 555 1234, extension 42, Primary",
+          },
+        ],
+      },
+      {
+        type: "email",
+        title: "Email addresses",
+        rows: [
+          {
+            id: 2,
+            label: "Work",
+            displayValue: "ada@example.com",
+            extension: null,
+            isPrimary: true,
+            helper: null,
+            accessibilityLabel: "Work, ada@example.com, Primary",
+          },
+        ],
+      },
+    ]);
+  });
+
+  it("falls back only for a nullable label, retains invalid rows, and never exposes canonical/raw values", () => {
+    const groups = profileMethodGroups({
+      phone: [
+        {
+          ...phone,
+          label: null,
+          raw_value: "bad number",
+          display_value: "bad number",
+          canonical_value: null,
+          canonical_region: null,
+          is_actionable: 0,
+        },
+      ],
+      email: [],
+    });
+
+    expect(groups).toEqual([
+      {
+        type: "phone",
+        title: "Phone numbers",
+        rows: [
+          {
+            id: 1,
+            label: "Phone number",
+            displayValue: "bad number",
+            extension: "42",
+            isPrimary: true,
+            helper: "This number can’t be used for calls or messages yet.",
+            accessibilityLabel:
+              "Phone number, bad number, extension 42, Primary. This number can’t be used for calls or messages yet.",
+          },
+        ],
+      },
+    ]);
+    expect(groups[0]?.rows[0]).not.toHaveProperty("canonicalValue");
+    expect(groups[0]?.rows[0]).not.toHaveProperty("rawValue");
+  });
+
+  it("omits empty type groups", () => {
+    expect(profileMethodGroups({ phone: [], email: [] })).toEqual([]);
+  });
+});
