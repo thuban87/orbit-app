@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import type { LastSpokeValue } from "@/components/tri-state-last-spoke-logic";
 import type { MethodGroups } from "@/components/contact-methods-editor-model";
+import type { LastSpokeValue } from "@/components/tri-state-last-spoke-logic";
 import {
   type BuildCreateInputDeps,
   buildCreateInput,
@@ -72,13 +72,37 @@ describe("buildCreateInput", () => {
   it("passes ordered method drafts and region context to the aggregate contract", () => {
     const methods: MethodGroups = {
       phone: [
-        { uid: "p1", type: "phone", value: "  555-1234 ", extension: "12", label: "Mobile", isPrimary: true },
-        { uid: "blank", type: "phone", value: "   ", extension: "", label: "Main" },
+        {
+          uid: "p1",
+          type: "phone",
+          value: "  555-1234 ",
+          extension: "12",
+          label: "Mobile",
+          isPrimary: true,
+        },
+        {
+          uid: "blank",
+          type: "phone",
+          value: "   ",
+          extension: "",
+          label: "Main",
+        },
       ],
       email: [],
     };
-    const out = buildCreateInput(state({ methods }), deps({ effectivePhoneRegion: "GB" }));
-    expect(out.methodDrafts).toEqual([{ uid: "p1", type: "phone", value: "  555-1234 ", extension: "12", isPrimary: true }]);
+    const out = buildCreateInput(
+      state({ methods }),
+      deps({ effectivePhoneRegion: "GB" }),
+    );
+    expect(out.methodDrafts).toEqual([
+      {
+        uid: "p1",
+        type: "phone",
+        value: "  555-1234 ",
+        extension: "12",
+        isPrimary: true,
+      },
+    ]);
     expect(out.methodNormalization).toEqual({ effectivePhoneRegion: "GB" });
     expect(out).not.toHaveProperty("phone");
   });

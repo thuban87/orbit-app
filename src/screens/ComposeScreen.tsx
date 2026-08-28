@@ -64,8 +64,8 @@ import {
   getAppSettings,
   acknowledgeProvider as persistProviderAck,
 } from "@/db/app-settings-dao";
-import { getContactHeader } from "@/db/contact-read";
 import { listActionablePrimaryMethods } from "@/db/contact-methods-read";
+import { getContactHeader } from "@/db/contact-read";
 import { getExecutor, localDateTime } from "@/db/database";
 import { type FuelItem, getRankedFuel } from "@/db/fuel-read";
 import {
@@ -283,12 +283,13 @@ export function ComposeScreen({
         try {
           // Header + fuel + AI settings (NOT the SMS probe — that runs separately
           // below so it can neither block nor fail this load).
-          const [row, fuelRows, settings, actionableMethods] = await Promise.all([
-            getContactHeader(exec, contactId),
-            getRankedFuel(exec, contactId),
-            getAppSettings(exec),
-            listActionablePrimaryMethods(exec, contactId),
-          ]);
+          const [row, fuelRows, settings, actionableMethods] =
+            await Promise.all([
+              getContactHeader(exec, contactId),
+              getRankedFuel(exec, contactId),
+              getAppSettings(exec),
+              listActionablePrimaryMethods(exec, contactId),
+            ]);
           if (cancelled) {
             return;
           }

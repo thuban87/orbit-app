@@ -20,9 +20,13 @@
  * occurred_at. Dates already arrive local-formatted from the tri-state
  * (formatLocalDate, never toISOString).
  */
+
+import {
+  type MethodGroups,
+  toMethodDrafts,
+} from "@/components/contact-methods-editor-model";
 import type { LastSpokeValue } from "@/components/tri-state-last-spoke-logic";
 import type { CreateContactFullInput } from "@/db/contacts-dao";
-import { toMethodDrafts, type MethodGroups } from "@/components/contact-methods-editor-model";
 
 /** The create form's controlled state (the screen owns the React state). */
 export interface CreateFormState {

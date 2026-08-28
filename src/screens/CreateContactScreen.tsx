@@ -30,21 +30,31 @@ import {
   TextInput,
   View,
 } from "react-native";
-import { FieldValueInput } from "@/components/FieldValueInput";
 import { ContactMethodsEditor } from "@/components/ContactMethodsEditor";
+import {
+  addMethodDraft,
+  choosePrimary,
+  emptyMethodDraft,
+  type MethodGroups,
+  removeMethodDraft,
+  resolveEffectivePhoneRegion,
+  updateMethodDraft,
+} from "@/components/contact-methods-editor-model";
+import { FieldValueInput } from "@/components/FieldValueInput";
 import { FrequencyPicker } from "@/components/FrequencyPicker";
 import { TriStateLastSpoke } from "@/components/TriStateLastSpoke";
 import type { LastSpokeValue } from "@/components/tri-state-last-spoke-logic";
+import { getAppSettings } from "@/db/app-settings-dao";
 import { isDuplicateName, listCategories } from "@/db/contact-read";
 import { createContactFull } from "@/db/contacts-dao";
-import { getAppSettings } from "@/db/app-settings-dao";
 import { getExecutor, localDateTime } from "@/db/database";
 import { listDefs } from "@/db/field-defs-dao";
 import type { CustomFieldDef } from "@/db/field-types";
 import { defsForCreateForm } from "@/db/field-values-dao";
 import { newUid } from "@/db/uid";
-import { getDeviceRegion } from "@/services/device-region";
+import type { ContactMethodType } from "@/logic/contact-method-normalization";
 import type { RootStackScreenProps } from "@/navigation/types";
+import { getDeviceRegion } from "@/services/device-region";
 import { useTheme } from "@/theme";
 import { FREQUENCY_DAYS } from "@/types";
 import { Logger } from "@/utils/logger";
@@ -53,16 +63,6 @@ import {
   type CreateFormState,
   canSave,
 } from "./create-contact-logic";
-import {
-  addMethodDraft,
-  emptyMethodDraft,
-  resolveEffectivePhoneRegion,
-  updateMethodDraft,
-  removeMethodDraft,
-  choosePrimary,
-  type MethodGroups,
-} from "@/components/contact-methods-editor-model";
-import type { ContactMethodType } from "@/logic/contact-method-normalization";
 
 const LOG_SCOPE = "create-contact";
 
@@ -101,9 +101,9 @@ export function CreateContactScreen({
     phone: [emptyMethodDraft("phone", newUid())],
     email: [],
   }));
-  const [effectivePhoneRegion, setEffectivePhoneRegion] = useState<string | null>(
-    getDeviceRegion(),
-  );
+  const [effectivePhoneRegion, setEffectivePhoneRegion] = useState<
+    string | null
+  >(getDeviceRegion());
   // Custom-block value map, keyed by col_name.
   const [values, setValues] = useState<Record<string, string | null>>({});
   const [saving, setSaving] = useState(false);
@@ -286,8 +286,12 @@ export function CreateContactScreen({
           onUpdate={(uid, patch) =>
             setMethods((current) => updateMethodDraft(current, uid, patch))
           }
-          onRemove={(uid) => setMethods((current) => removeMethodDraft(current, uid))}
-          onChoosePrimary={(uid) => setMethods((current) => choosePrimary(current, uid))}
+          onRemove={(uid) =>
+            setMethods((current) => removeMethodDraft(current, uid))
+          }
+          onChoosePrimary={(uid) =>
+            setMethods((current) => choosePrimary(current, uid))
+          }
         />
       </View>
 

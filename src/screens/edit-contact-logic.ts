@@ -29,12 +29,13 @@
  * The tri-state -> occurredAt mapping is REUSED verbatim from create-contact-logic
  * (`firstInteractionOccurredAt`) — one source of truth for the CRUD-02 rule.
  */
-import type { LastSpokeValue } from "@/components/tri-state-last-spoke-logic";
+
 import {
+  type MethodGroups,
   seedMethodGroups,
   toMethodDrafts,
-  type MethodGroups,
 } from "@/components/contact-methods-editor-model";
+import type { LastSpokeValue } from "@/components/tri-state-last-spoke-logic";
 import type { ContactForEdit } from "@/db/contact-read";
 import type { UpdateContactFullInput } from "@/db/contacts-dao";
 import { firstInteractionOccurredAt } from "./create-contact-logic";

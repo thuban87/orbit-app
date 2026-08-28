@@ -1,4 +1,7 @@
-import type { ContactMethodDraft, ContactMethodRow } from "@/db/contact-methods-dao";
+import type {
+  ContactMethodDraft,
+  ContactMethodRow,
+} from "@/db/contact-methods-dao";
 import type { ContactMethodType } from "@/logic/contact-method-normalization";
 
 export type MethodLabel = "Mobile" | "Home" | "Work" | "Main" | "Other";
@@ -11,7 +14,10 @@ export interface ContactMethodEditorDraft extends ContactMethodDraft {
   isActionable?: boolean;
 }
 
-export type MethodGroups = Record<ContactMethodType, ContactMethodEditorDraft[]>;
+export type MethodGroups = Record<
+  ContactMethodType,
+  ContactMethodEditorDraft[]
+>;
 
 export const EMPTY_METHOD_GROUPS: MethodGroups = { phone: [], email: [] };
 
@@ -22,7 +28,9 @@ export function emptyMethodDraft(
   return { uid, type, value: "", extension: "", label: "Main" };
 }
 
-export function seedMethodDraft(row: ContactMethodRow): ContactMethodEditorDraft {
+export function seedMethodDraft(
+  row: ContactMethodRow,
+): ContactMethodEditorDraft {
   return {
     id: row.id,
     uid: row.uid,
@@ -35,10 +43,16 @@ export function seedMethodDraft(row: ContactMethodRow): ContactMethodEditorDraft
   };
 }
 
-export function seedMethodGroups(rows: MethodGroups | Record<ContactMethodType, ContactMethodRow[]>): MethodGroups {
+export function seedMethodGroups(
+  rows: MethodGroups | Record<ContactMethodType, ContactMethodRow[]>,
+): MethodGroups {
   return {
-    phone: rows.phone.map((row) => "method_type" in row ? seedMethodDraft(row) : row),
-    email: rows.email.map((row) => "method_type" in row ? seedMethodDraft(row) : row),
+    phone: rows.phone.map((row) =>
+      "method_type" in row ? seedMethodDraft(row) : row,
+    ),
+    email: rows.email.map((row) =>
+      "method_type" in row ? seedMethodDraft(row) : row,
+    ),
   };
 }
 
@@ -81,7 +95,10 @@ export function updateMethodDraft(
 }
 
 /** Removing a chosen primary promotes the next displayed row of that type. */
-export function removeMethodDraft(groups: MethodGroups, uid: string): MethodGroups {
+export function removeMethodDraft(
+  groups: MethodGroups,
+  uid: string,
+): MethodGroups {
   const remove = (rows: ContactMethodEditorDraft[]) => {
     const removed = rows.find((row) => row.uid === uid);
     const next = rows.filter((row) => row.uid !== uid);
@@ -120,6 +137,10 @@ export function collapseCanonicalDuplicate(
   const rows = groups[type];
   const survivor = rows.find((row) => row.uid === survivingDraftUid);
   if (!survivor) return groups;
-  const retained = rows.filter((row) => row.uid === survivingDraftUid || row.value.trim() !== survivor.value.trim());
+  const retained = rows.filter(
+    (row) =>
+      row.uid === survivingDraftUid ||
+      row.value.trim() !== survivor.value.trim(),
+  );
   return { ...groups, [type]: retained };
 }

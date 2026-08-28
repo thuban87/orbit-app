@@ -38,13 +38,23 @@ import {
   TextInput,
   View,
 } from "react-native";
-import { FieldValueInput } from "@/components/FieldValueInput";
 import { ContactMethodsEditor } from "@/components/ContactMethodsEditor";
+import {
+  addMethodDraft,
+  canonicalDuplicateCopy,
+  choosePrimary,
+  removeMethodDraft,
+  resolveEffectivePhoneRegion,
+  seedMethodGroups,
+  updateMethodDraft,
+} from "@/components/contact-methods-editor-model";
+import { FieldValueInput } from "@/components/FieldValueInput";
 import { FrequencyPicker } from "@/components/FrequencyPicker";
 import { type LinkDraft, LinksEditor } from "@/components/LinksEditor";
 import { PhotoSourcePicker } from "@/components/PhotoSourcePicker";
 import { TriStateLastSpoke } from "@/components/TriStateLastSpoke";
 import type { LastSpokeValue } from "@/components/tri-state-last-spoke-logic";
+import { getAppSettings } from "@/db/app-settings-dao";
 import {
   applyLinkDiff,
   type ContactLinkRow,
@@ -57,14 +67,14 @@ import {
   listCategories,
 } from "@/db/contact-read";
 import { updateContactFull } from "@/db/contacts-dao";
-import { getAppSettings } from "@/db/app-settings-dao";
 import { getExecutor, localDateTime } from "@/db/database";
 import { listDefs } from "@/db/field-defs-dao";
 import type { CustomFieldDef } from "@/db/field-types";
 import { defsForEditForm } from "@/db/field-values-dao";
 import { newUid } from "@/db/uid";
-import { getDeviceRegion } from "@/services/device-region";
+import type { ContactMethodType } from "@/logic/contact-method-normalization";
 import type { RootStackScreenProps } from "@/navigation/types";
+import { getDeviceRegion } from "@/services/device-region";
 import { reconcileSchedule } from "@/services/notifications/notification-schedule";
 import { deletePhoto } from "@/services/photos/photo-storage";
 import { notifyWidgetDataChanged } from "@/services/widget/widget-refresh";
@@ -80,16 +90,6 @@ import {
   isNeverContacted,
   seedEditState,
 } from "./edit-contact-logic";
-import {
-  addMethodDraft,
-  canonicalDuplicateCopy,
-  choosePrimary,
-  removeMethodDraft,
-  resolveEffectivePhoneRegion,
-  seedMethodGroups,
-  updateMethodDraft,
-} from "@/components/contact-methods-editor-model";
-import type { ContactMethodType } from "@/logic/contact-method-normalization";
 
 const LOG_SCOPE = "edit-contact";
 
@@ -159,7 +159,9 @@ export function EditContactScreen({
   const [neverContacted, setNeverContacted] = useState(false);
   const [showBirthdayPicker, setShowBirthdayPicker] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [effectivePhoneRegion, setEffectivePhoneRegion] = useState<string | null>(getDeviceRegion());
+  const [effectivePhoneRegion, setEffectivePhoneRegion] = useState<
+    string | null
+  >(getDeviceRegion());
   const [duplicateHelper, setDuplicateHelper] = useState<{
     type: ContactMethodType;
     copy: string;
@@ -419,10 +421,17 @@ export function EditContactScreen({
       }
 
       if (saveResult.methodSaveResult?.status === "canonicalDuplicate") {
-        setField("methods", seedMethodGroups({
-          phone: saveResult.methods.filter((method) => method.method_type === "phone"),
-          email: saveResult.methods.filter((method) => method.method_type === "email"),
-        }));
+        setField(
+          "methods",
+          seedMethodGroups({
+            phone: saveResult.methods.filter(
+              (method) => method.method_type === "phone",
+            ),
+            email: saveResult.methods.filter(
+              (method) => method.method_type === "email",
+            ),
+          }),
+        );
         setDuplicateHelper({
           type: saveResult.methodSaveResult.methodType,
           copy: canonicalDuplicateCopy(saveResult.methodSaveResult.methodType),
@@ -595,10 +604,18 @@ export function EditContactScreen({
           testID="edit-contact-methods"
           methods={form.methods}
           duplicateHelper={duplicateHelper}
-          onAdd={(type) => setField("methods", addMethodDraft(form.methods, type, newUid()))}
-          onUpdate={(uid, patch) => setField("methods", updateMethodDraft(form.methods, uid, patch))}
-          onRemove={(uid) => setField("methods", removeMethodDraft(form.methods, uid))}
-          onChoosePrimary={(uid) => setField("methods", choosePrimary(form.methods, uid))}
+          onAdd={(type) =>
+            setField("methods", addMethodDraft(form.methods, type, newUid()))
+          }
+          onUpdate={(uid, patch) =>
+            setField("methods", updateMethodDraft(form.methods, uid, patch))
+          }
+          onRemove={(uid) =>
+            setField("methods", removeMethodDraft(form.methods, uid))
+          }
+          onChoosePrimary={(uid) =>
+            setField("methods", choosePrimary(form.methods, uid))
+          }
         />
       </View>
 

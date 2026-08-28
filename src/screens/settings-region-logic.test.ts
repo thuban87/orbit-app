@@ -14,7 +14,9 @@ describe("phone region settings logic", () => {
   });
 
   it("emits a normalized override patch or an explicit device-region null patch", () => {
-    expect(phoneRegionOverridePatch(" gb ")).toEqual({ phoneRegionOverride: "GB" });
+    expect(phoneRegionOverridePatch(" gb ")).toEqual({
+      phoneRegionOverride: "GB",
+    });
     expect(phoneRegionOverridePatch("")).toEqual({ phoneRegionOverride: null });
   });
 });

@@ -43,7 +43,13 @@ function forEdit(
   values: Record<string, string | null> = {},
 ): ContactForEdit {
   const contact = contactRow(overrides);
-  return { contact, categoryLabel: contact.category_label, values, links: [], methods: { phone: [], email: [] } };
+  return {
+    contact,
+    categoryLabel: contact.category_label,
+    values,
+    links: [],
+    methods: { phone: [], email: [] },
+  };
 }
 
 function deps(overrides: Partial<BuildEditInputDeps> = {}): BuildEditInputDeps {
@@ -156,9 +162,30 @@ describe("seedEditState", () => {
 
   it("seeds ordered method drafts from the normalized read boundary", () => {
     const seeded = forEdit();
-    seeded.methods.phone.push({ id: 8, uid: "p-uid", contact_id: 7, method_type: "phone", raw_value: "555", display_value: "555", canonical_value: null, canonical_region: null, extension: "12", is_actionable: 0, is_primary: 1, display_order: 0, created_at: NOW, modified_at: NOW });
+    seeded.methods.phone.push({
+      id: 8,
+      uid: "p-uid",
+      contact_id: 7,
+      method_type: "phone",
+      raw_value: "555",
+      display_value: "555",
+      canonical_value: null,
+      canonical_region: null,
+      extension: "12",
+      is_actionable: 0,
+      is_primary: 1,
+      display_order: 0,
+      created_at: NOW,
+      modified_at: NOW,
+    });
     const s = seedEditState(seeded);
-    expect(s.methods.phone[0]).toMatchObject({ id: 8, uid: "p-uid", value: "555", extension: "12", isPrimary: true });
+    expect(s.methods.phone[0]).toMatchObject({
+      id: 8,
+      uid: "p-uid",
+      value: "555",
+      extension: "12",
+      isPrimary: true,
+    });
   });
 });
 
@@ -182,7 +209,18 @@ describe("buildEditInput", () => {
     const out = buildEditInput(
       state({
         name: "  Chris ",
-        methods: { phone: [{ uid: "p1", type: "phone", value: "  555-1234 ", extension: "12", label: "Mobile" }], email: [] },
+        methods: {
+          phone: [
+            {
+              uid: "p1",
+              type: "phone",
+              value: "  555-1234 ",
+              extension: "12",
+              label: "Mobile",
+            },
+          ],
+          email: [],
+        },
         rarelyResponds: 1,
         remindersOff: 1,
       }),
@@ -190,7 +228,15 @@ describe("buildEditInput", () => {
     );
     expect(out.id).toBe(7);
     expect(out.name).toBe("Chris");
-    expect(out.methodDrafts).toEqual([{ uid: "p1", type: "phone", value: "  555-1234 ", extension: "12", isPrimary: undefined }]);
+    expect(out.methodDrafts).toEqual([
+      {
+        uid: "p1",
+        type: "phone",
+        value: "  555-1234 ",
+        extension: "12",
+        isPrimary: undefined,
+      },
+    ]);
     expect(out.methodNormalization).toEqual({ effectivePhoneRegion: "US" });
     expect(out.rarelyResponds).toBe(1);
     expect(out.remindersOff).toBe(1);
