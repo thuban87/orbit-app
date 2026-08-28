@@ -27,6 +27,8 @@ import { migration003 } from "@/db/migrations/003-orrery-settings";
 import { migration004 } from "@/db/migrations/004-ai-settings";
 import { migration005 } from "@/db/migrations/005-digest-settings";
 import { migration006 } from "@/db/migrations/006-normalize-custom-field-values";
+import { migration007 } from "@/db/migrations/007-tombstones";
+import { migration009 } from "@/db/migrations/009-contact-method-normalization";
 import { runMigrations } from "@/db/migrations/runner";
 import type { SqlExecutor } from "@/db/types";
 
@@ -45,33 +47,31 @@ beforeEach(async () => {
   exec = nodeSqliteExecutor(db);
   await runMigrations(
     exec,
-    [migration001, migration002, migration003, migration004, migration005, migration006],
-    6,
-    { now: NOW, newUid: uid },
+    [migration001, migration002, migration003, migration004, migration005, migration006, migration007, migration009],
+    9,
+    { now: NOW, newUid: uid, defaultPhoneRegion: "US" },
   );
 });
 
-/** Insert a bare contact row (optionally archived / rarely_responds / photo / phone) and return its id. */
+/** Insert a bare post-v9 contact row (no scalar phone/email columns) and return its id. */
 async function makeContact(
   name: string,
   opts: {
     archived?: boolean;
     rarelyResponds?: number;
     photo?: string | null;
-    phone?: string | null;
   } = {},
 ): Promise<number> {
   const r = await exec.runAsync(
     `INSERT INTO contacts
-       (uid, name, interval_days, rarely_responds, photo, phone, archived_at, created_at, modified_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       (uid, name, interval_days, rarely_responds, photo, archived_at, created_at, modified_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       uid(),
       name,
       30,
       opts.rarelyResponds ?? 0,
       opts.photo ?? null,
-      opts.phone ?? null,
       opts.archived ? NOW : null,
       NOW,
       NOW,
@@ -137,20 +137,9 @@ describe("getContactHeader — by-id light read (archived-reachable by design)",
     expect(header?.modified_at).toBe(NOW);
     // The additive favourite_rank field (Plan 06): a non-favourite reads null.
     expect(header?.favourite_rank).toBeNull();
-    // The additive phone field (Plan 09, CMP-03): a phone-less contact reads null.
-    expect(header?.phone).toBeNull();
-  });
-
-  it("returns the stored phone for a phone-bearing contact (CMP-03)", async () => {
-    const id = await makeContact("Dialled", { phone: "+15551234567" });
-    const header = await getContactHeader(exec, id);
-    expect(header?.phone).toBe("+15551234567");
-  });
-
-  it("returns phone === null for a phone-less contact (CMP-03)", async () => {
-    const id = await makeContact("Unlisted");
-    const header = await getContactHeader(exec, id);
-    expect(header?.phone).toBeNull();
+    // v9 retired scalar phone/email. The read exposes neither phantom property.
+    expect(header).not.toHaveProperty("phone");
+    expect(header).not.toHaveProperty("email");
   });
 
   it("returns the stored relative photo path for a photo-bearing contact (PHOTO-04)", async () => {
@@ -264,6 +253,8 @@ describe("getContactForEdit — row + category label + custom-value map", () => 
     expect(result?.contact.name).toBe("Editable");
     // last_contact is present so the UI can decide whether to show last-spoke.
     expect(result?.contact.last_contact).toBe("2026-08-10 09:00:00");
+    expect(result?.contact).not.toHaveProperty("phone");
+    expect(result?.contact).not.toHaveProperty("email");
     expect(result?.categoryLabel).toBe("Family");
     expect(result?.values.nickname).toBe("Eddie");
   });

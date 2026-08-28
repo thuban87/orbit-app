@@ -43,8 +43,8 @@ describe("applyContactMethodDiff", () => {
     const contactId = await contact();
     await applyContactMethodDiff(exec, { contactId, seeded: [], current: [phone("(312) 555-1234"), email("Person@Example.com")], now: NOW, effectivePhoneRegion: "US" });
     expect(await listContactMethods(exec, contactId)).toMatchObject([
-      { method_type: "phone", canonical_value: "+13125551234", canonical_region: "US", is_actionable: 1, is_primary: 1, display_order: 0 },
       { method_type: "email", canonical_value: "person@example.com", canonical_region: null, is_actionable: 1, is_primary: 1, display_order: 0 },
+      { method_type: "phone", canonical_value: "+13125551234", canonical_region: "US", is_actionable: 1, is_primary: 1, display_order: 0 },
     ]);
   });
 

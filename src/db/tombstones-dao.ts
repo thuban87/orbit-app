@@ -11,6 +11,7 @@ export type TombstoneEntityType =
   | "event"
   | "fuel"
   | "contact_link"
+  | "contact_method"
   | "custom_field_def"
   | "custom_field_value";
 
@@ -33,6 +34,7 @@ function assertTombstoneEntityType(value: unknown): asserts value is TombstoneEn
     case "event":
     case "fuel":
     case "contact_link":
+    case "contact_method":
     case "custom_field_def":
     case "custom_field_value":
       return;
