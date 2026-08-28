@@ -4,7 +4,7 @@ milestone: v1.0
 current_phase: 18.1
 current_phase_name: Contact Method Normalization
 status: planning
-stopped_at: Phase 18 split into 18.1 (method normalization) + 18.2 (Bound/Unbound lifecycle); re-cut complete, pending per-phase review
+stopped_at: Phase 18.1 review-converged (cycle 1 Claude+Codex incorporated, decisions H4/M1 made) and execution-ready; 18.2 re-cut but not yet reviewed
 last_updated: "2026-08-26T23:42:43.759Z"
 state_head: 2d65541adcc275d68eb83a141202129390fda13b
 progress:

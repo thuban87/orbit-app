@@ -16,8 +16,8 @@
   ],
   "remaining_tasks": [
     {"id": 5, "name": "Reconcile the split seams: contacts-dao.ts added to 18.2-08 files_modified for the aggregate lifecycle-parameter extension (done); shared screen/backup files across 18.1/18.2 are correct-as-is (18.1 executes first, sequential build-ons, no edit needed)", "status": "done"},
-    {"id": 6, "name": "External review of Phase 18.1 full plan set (Claude read-only gate first, then flagless Codex), hard cap 2 cycles, plan-sizing excluded from findings", "status": "pending"},
-    {"id": 7, "name": "Execute Phase 18.1 and verify the v9 migration on the Pixel with a real v8 backup", "status": "pending"},
+    {"id": 6, "name": "External review of Phase 18.1 full plan set — DONE (cycle 1: Claude opus-5 + Codex terra converged; both reviews incorporated; two owner decisions H4/M1 made). No cycle 2 needed (Codex a strict subset). See 18.1-REVIEWS.md.", "status": "done"},
+    {"id": 7, "name": "Execute Phase 18.1 and verify the v9 migration on the Pixel with a real v8 backup. Blocking execution-time gates in 18.1-01: backup-first v9 approval (Task 1) and libphonenumber-js provenance check (Task 2).", "status": "pending"},
     {"id": 8, "name": "Repeat review/execute/verify for Phase 18.2 after 18.1 is verified on-device", "status": "pending"}
   ],
   "blockers": [],
@@ -33,6 +33,6 @@
     {"decision": "Claude runs before Codex for every external review cycle, using only the documented direct read-only headless command.", "rationale": "Owner-required gate to protect reviewer usage; the exact path succeeded in cycles 1-3.", "phase": "18"}
   ],
   "uncommitted_files": [],
-  "next_action": "Reconcile the in-file seam notes for Phase 18.1 (contacts-dao.ts aggregate ownership first), then run the bounded external review of the full 18.1 plan set with the Claude-first gate. Do not regenerate plans from scratch; the re-cut plans carry the reviewed content. The phone-actionability threshold (18.1-01 Task 1) is a blocking owner checkpoint before migration code.",
+  "next_action": "Phase 18.1 is review-converged and execution-ready. Execute 18.1 wave-by-wave (18.1-01 first). At 18.1-01 runtime the executor must stop for the two human gates: backup-first v9 approval (Task 1) and libphonenumber-js@1.13.11 provenance verification (Task 2). Verify the v9 migration on the Pixel with a real v8 backup before proceeding to later waves. Then repeat review/execute/verify for Phase 18.2.",
   "context_notes": "Two-cycle review findings from the original Phase 18 are preserved and re-assigned; see 18-REVIEWS.md (in the retained original dir) and 18-SPLIT-PLAN.md for the plan-to-bucket map and finding divisions. Shared context/research/patterns/UI-spec/validation artifacts remain in .planning/phases/18-contact-data-normalization/ and are referenced in place by every re-cut plan's <context> block; the dossier at docs/dossier/18-contact-data-normalization.md is the authoritative product source for both phases (Clusters A-F/O/P/Q + method half of R govern 18.1; G-N/S + lifecycle half of R govern 18.2). Decimal phase ids (18.1/18.2) are non-standard for this sequential-naming repo; if a GSD tool step rejects them, hand-edit STATE.md as usual."
 }
