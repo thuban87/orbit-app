@@ -769,34 +769,37 @@ Plans:
 
 **Scope decision (resolved at planning):** Android-only for Phase 19 (owner ruling 2026-08-28). Dossier 19's iOS native-picker `[DECIDED]` is honored as design intent for a later iOS milestone and is out of scope now (consistent with the v1 iOS deferral) — sequenced, not reversed.
 
-**Plans:** 11 plans (5 waves)
+**Plans:** 11 plans (6 waves) — re-waved 2026-08-29 after the cross-AI review replan (atomic contact+session-row writes, durable document-dir photo staging, row_status/match_outcome discriminator, pre-batch consolidation).
 
 Plans:
 **Wave 1**
 
-- [ ] 19-01-PLAN.md — Migration 012 durable import-session schema + session DAO/read chokepoint (one-way gated)
-- [ ] 19-02-PLAN.md — Native Android 17 contact-picker module (ACTION_PICK_CONTACTS, SDK_INT gate, no READ_CONTACTS)
-- [ ] 19-03-PLAN.md — picked-contact-map (pure) + imported-contact-dao (composed Unbound create + external link + provenance)
+- [ ] 19-01-PLAN.md — Migration 012 durable import-session schema (incl. phone_region) + session DAO (mutexed writers + non-mutexed row cores + atomic accept) + read chokepoint (raw + four summary buckets) + state-transition table (one-way gated)
+- [ ] 19-02-PLAN.md — Native Android 17 contact-picker module (ACTION_PICK_CONTACTS, SDK_INT gate, no READ_CONTACTS; returns a cache copy only)
+- [ ] 19-05-PLAN.md — Duplicate-evidence engine (owns findActiveExternalLink; deterministic bypass + canonicalized-input advisory ladder, colourless)
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 19-04-PLAN.md — TRACER: single-contact import end-to-end (speed-dial FAB + Settings entry + review) device-verified before expansion
-- [ ] 19-05-PLAN.md — Duplicate-evidence engine (deterministic bypass + colourless advisory ladder)
+- [ ] 19-03-PLAN.md — createContactFullCore extraction + isValidStoredBirthday export + picked-contact-map (region-threaded) + imported-contact-dao (atomic create/link + session-row resolution)
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
-- [ ] 19-06-PLAN.md — Bulk import: chunked partial-failure driver + shared-defaults setup + determinate progress
+- [ ] 19-04-PLAN.md — TRACER: single-contact import end-to-end (speed-dial FAB multi-pick + length routing, document-dir photo staging, region capture, atomic commit, discard-on-back) device-verified before expansion
 
 **Wave 4** *(blocked on Wave 3 completion)*
 
-- [ ] 19-07-PLAN.md — Reusable candidate card grid + confidence chip + single/multi duplicate interrupts
-- [ ] 19-09-PLAN.md — Durable resume/discard launch sweep + cancellation guard + staged-photo cleanup
-- [ ] 19-10-PLAN.md — Photo (post-commit Orbit-owned master) + birthday import, best-effort and failure-isolated
+- [ ] 19-06-PLAN.md — Bulk import: chunked atomic partial-failure driver (already_linked match_outcome, ambiguous→needs_review, eligibleStatuses retry, region from session) + shared-defaults setup + determinate progress + verified FAB→BulkImportSetup entry
 
 **Wave 5** *(blocked on Wave 4 completion)*
 
-- [ ] 19-08-PLAN.md — Import completion summary + bridge to Unbound contacts + Retry
-- [ ] 19-11-PLAN.md — Conservative multi-source consolidation (Cluster K) — explicit combine-into-one, never silent
+- [ ] 19-07-PLAN.md — Reusable candidate card grid + confidence chip + single/multi duplicate interrupts (atomic linkExistingContactToRow; conservative Apply-recommendation)
+- [ ] 19-09-PLAN.md — Durable resume/discard launch sweep (resume state machine, one-pending policy, discard-returns-photo-paths, retryable-failed preserved) + staged-photo cleanup
+- [ ] 19-10-PLAN.md — Photo (post-commit Orbit-owned master from durable staged path) import, best-effort and failure-isolated (birthday owned by 19-03)
+- [ ] 19-11-PLAN.md — Conservative multi-source consolidation (Cluster K) — PRE-batch detection in BulkImportSetup, atomic combine, explicit combine-into-one, never silent
+
+**Wave 6** *(blocked on Wave 5 completion)*
+
+- [ ] 19-08-PLAN.md — Import completion summary (four durable summary buckets, complete-only-when-terminal) + bridge to Unbound contacts + Retry (eligibleStatuses)
 
 ### Phase 20: Contact Reconciliation & Merge
 
