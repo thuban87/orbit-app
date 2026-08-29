@@ -737,7 +737,7 @@ Plans:
 **Wave 4** *(blocked on Wave 3 completion)*
 
 - [x] 18.2-06-PLAN.md — notification/widget lifecycle policy and Unbind effects
-- [ ] 18.2-07-PLAN.md — Unbound browsing, navigation, and settings
+- [x] 18.2-07-PLAN.md — Unbound browsing, navigation, and settings
 
 **Wave 5** *(blocked on Wave 4 completion)*
 
