@@ -74,13 +74,14 @@ import { defsForEditForm } from "@/db/field-values-dao";
 import { newUid } from "@/db/uid";
 import type { ContactMethodType } from "@/logic/contact-method-normalization";
 import type { RootStackScreenProps } from "@/navigation/types";
+import { applyLifecycleTransitionEffects } from "@/services/contact-lifecycle-effects";
 import { getDeviceRegion } from "@/services/device-region";
 import { reconcileSchedule } from "@/services/notifications/notification-schedule";
 import { deletePhoto } from "@/services/photos/photo-storage";
 import { notifyWidgetDataChanged } from "@/services/widget/widget-refresh";
 import { takeStagedPhotos } from "@/stores/photo-result-store";
 import { useTheme } from "@/theme";
-import { parseDate } from "@/types";
+import { FREQUENCY_DAYS, parseDate } from "@/types";
 import { formatLocalDate } from "@/utils/dates";
 import { Logger } from "@/utils/logger";
 import {
@@ -157,6 +158,7 @@ export function EditContactScreen({
   // Captured from the seed: a never-contacted contact (last_contact IS NULL) is
   // the ONLY case that shows the last-spoke control (owner ruling — see header).
   const [neverContacted, setNeverContacted] = useState(false);
+  const [initialTrackingEnabled, setInitialTrackingEnabled] = useState(true);
   const [showBirthdayPicker, setShowBirthdayPicker] = useState(false);
   const [saving, setSaving] = useState(false);
   const [effectivePhoneRegion, setEffectivePhoneRegion] = useState<
@@ -199,6 +201,7 @@ export function EditContactScreen({
       setEditDefs(defsForEditForm(defs));
       setNeverContacted(isNeverContacted(result));
       setForm(seedEditState(result));
+      setInitialTrackingEnabled(result.contact.trackingEnabled === 1);
       setEffectivePhoneRegion(
         resolveEffectivePhoneRegion(
           settings.phoneRegionOverride,
@@ -340,6 +343,12 @@ export function EditContactScreen({
         }
       }
       const now = localDateTime();
+      const lifecycleDirection =
+        form.trackingEnabled === initialTrackingEnabled
+          ? null
+          : form.trackingEnabled
+            ? "bind"
+            : "unbind";
       const input = buildEditInput(form, {
         now,
         contactId,
@@ -378,15 +387,16 @@ export function EditContactScreen({
       // persisted). reconcileSchedule is self-coordinating (concurrent calls
       // coalesce), and the app is alive here so channels exist — a full reconcile
       // is safe, exactly as the settings-change reconcile does.
-      void reconcileSchedule(getExecutor()).catch((e) =>
-        Logger.error(LOG_SCOPE, "reconcile after edit-save failed", e),
-      );
-
-      // Metadata is committed (name / frequency / rarely_responds → the widget's
-      // tile label + derived status). Publish here so it fires on a committed
-      // metadata save even if the later links diff fails. Photo is written
-      // separately (CropPhotoScreen / PhotoSourcePicker), so it is not covered here.
-      notifyWidgetDataChanged();
+      if (lifecycleDirection) {
+        void applyLifecycleTransitionEffects(contactId, lifecycleDirection, {
+          exec,
+        });
+      } else {
+        void reconcileSchedule(exec).catch((e) =>
+          Logger.error(LOG_SCOPE, "reconcile after edit-save failed", e),
+        );
+        notifyWidgetDataChanged();
+      }
 
       // Metadata (incl. the first interaction) is now COMMITTED and last_contact
       // is set. Clear the never-contacted first-interaction intent in LOCAL STATE
@@ -512,6 +522,62 @@ export function EditContactScreen({
           via the photo-only useFocusEffect above — never through the metadata Save. */}
       <View style={styles.field}>
         <Text style={[styles.label, { color: colors.textSecondary }]}>
+          Orbit participation
+        </Text>
+        <View style={styles.lifecycleChoices}>
+          {([true, false] as const).map((enabled) => {
+            const selected = form.trackingEnabled === enabled;
+            const label = enabled ? "Bound" : "Unbound";
+            return (
+              <Pressable
+                key={label}
+                testID={`edit-contact-${label.toLowerCase()}`}
+                accessibilityRole="button"
+                accessibilityLabel={label}
+                accessibilityState={{ selected }}
+                onPress={() =>
+                  setForm((current) =>
+                    current
+                      ? {
+                          ...current,
+                          trackingEnabled: enabled,
+                          intervalDays: enabled
+                            ? (current.intervalDays ?? FREQUENCY_DAYS.Monthly)
+                            : current.intervalDays,
+                          intervalValid: true,
+                        }
+                      : current,
+                  )
+                }
+                style={[
+                  styles.lifecycleChoice,
+                  {
+                    borderColor: selected ? colors.accent : colors.border,
+                    backgroundColor: selected ? colors.accent : colors.surface,
+                  },
+                ]}
+              >
+                <Text
+                  style={{
+                    color: selected ? colors.background : colors.textPrimary,
+                    fontWeight: "600",
+                  }}
+                >
+                  {label}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+        <Text style={[styles.helper, { color: colors.textSecondary }]}>
+          {form.trackingEnabled
+            ? "Bound contacts appear in your active orbit and receive cadence reminders."
+            : "Unbound contacts keep their details and history without active cadence reminders."}
+        </Text>
+      </View>
+
+      <View style={styles.field}>
+        <Text style={[styles.label, { color: colors.textSecondary }]}>
           Photo
         </Text>
         <PhotoSourcePicker
@@ -568,18 +634,19 @@ export function EditContactScreen({
         </View>
       </View>
 
-      <View style={styles.field}>
-        <Text style={[styles.label, { color: colors.textSecondary }]}>
-          Frequency
-        </Text>
-        <FrequencyPicker
-          testID="edit-contact-frequency"
-          value={form.intervalDays}
-          onChange={(v) => setField("intervalDays", v)}
-          onValidityChange={setIntervalValid}
-        />
-      </View>
-
+      {form.trackingEnabled ? (
+        <View style={styles.field}>
+          <Text style={[styles.label, { color: colors.textSecondary }]}>
+            Frequency
+          </Text>
+          <FrequencyPicker
+            testID="edit-contact-frequency"
+            value={form.intervalDays ?? FREQUENCY_DAYS.Monthly}
+            onChange={(v) => setField("intervalDays", v)}
+            onValidityChange={setIntervalValid}
+          />
+        </View>
+      ) : null}
       {/* LAST-SPOKE (owner ruling / CONTEXT Area 3): rendered ONLY when the
           seeded contact is never-contacted (last_contact IS NULL). Its Today/Pick
           date choice routes a FIRST interaction through updateContactFull's
@@ -870,6 +937,15 @@ const styles = StyleSheet.create({
   },
   helper: {
     fontSize: 13,
+  },
+  lifecycleChoices: { flexDirection: "row", gap: 8 },
+  lifecycleChoice: {
+    minHeight: 44,
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderRadius: 8,
   },
   customBlock: {
     gap: 16,

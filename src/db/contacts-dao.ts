@@ -84,7 +84,9 @@ export interface CreateContactFullInput {
   /** Contact-row merge-key uid (caller-minted). */
   uid: string;
   name: string;
-  intervalDays: number;
+  intervalDays: number | null;
+  /** Bound contacts participate in proactive cadence treatment. */
+  trackingEnabled?: boolean;
   /** Local wall-clock now — `created_at` + `modified_at` + interaction stamps. */
   now: string;
   categoryId?: number | null;
@@ -116,9 +118,17 @@ export function createContactFull(
   methods: ContactMethodRow[];
   methodSaveResult: ContactMethodSaveResult | null;
 }> {
-  // GUARD 1 (WR-02): positive-integer interval. Reject BEFORE any transaction
-  // opens (return, not throw — keeps the Promise contract; no BEGIN is issued).
-  if (!Number.isInteger(input.intervalDays) || input.intervalDays <= 0) {
+  const trackingEnabled = input.trackingEnabled ?? true;
+  // A Bound contact requires a cadence; an Unbound contact may be never-assigned
+  // (NULL) or retain a dormant positive cadence.
+  if (
+    (trackingEnabled &&
+      (input.intervalDays === null ||
+        !Number.isInteger(input.intervalDays) ||
+        input.intervalDays <= 0)) ||
+    (input.intervalDays !== null &&
+      (!Number.isInteger(input.intervalDays) || input.intervalDays <= 0))
+  ) {
     return Promise.reject(
       new Error(
         `intervalDays must be a positive integer, got ${input.intervalDays}`,
@@ -139,14 +149,15 @@ export function createContactFull(
     // Contact row — scalar phone/email were retired by migration 009.
     const contactResult = await exec.runAsync(
       `INSERT INTO contacts
-         (uid, name, category_id, interval_days, rarely_responds,
+         (uid, name, category_id, interval_days, tracking_enabled, rarely_responds,
           created_at, modified_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         input.uid,
         input.name,
         input.categoryId ?? null,
         input.intervalDays,
+        trackingEnabled ? 1 : 0,
         input.rarelyResponds ?? 0,
         input.now,
         input.now,
@@ -246,7 +257,9 @@ export interface UpdateContactFullInput {
   /** The contact to edit. */
   id: number;
   name: string;
-  intervalDays: number;
+  intervalDays: number | null;
+  /** Omitted retains the stored Bound/Unbound state for legacy callers. */
+  trackingEnabled?: boolean;
   /** Local wall-clock now — `modified_at` + any interaction stamps. */
   now: string;
   /** 0/1 incoming flag — the DAO reads the STORED value to decide whether to recompute. */
@@ -282,13 +295,14 @@ export async function updateContactMetadataCore(
 ): Promise<void> {
   const result = await exec.runAsync(
     `UPDATE contacts SET
-       name=?, category_id=?, interval_days=?, social_battery=?, birthday=?,
+       name=?, category_id=?, interval_days=?, tracking_enabled=?, social_battery=?, birthday=?,
        rarely_responds=?, reminders_off=?, modified_at=?
      WHERE id=?`,
     [
       input.name,
       input.categoryId ?? null,
       input.intervalDays,
+      input.trackingEnabled === false ? 0 : 1,
       input.socialBattery ?? null,
       input.birthday ?? null,
       input.rarelyResponds,
@@ -316,8 +330,16 @@ export function updateContactFull(
   methods: ContactMethodRow[];
   methodSaveResult: ContactMethodSaveResult | null;
 }> {
-  // GUARD 1 (WR-02): positive-integer interval (mirrors createContactFull).
-  if (!Number.isInteger(input.intervalDays) || input.intervalDays <= 0) {
+  // A requested Bound state needs a positive cadence. Unbound accepts NULL for
+  // never-assigned contacts and positive dormant cadence otherwise.
+  if (
+    (input.trackingEnabled !== false &&
+      (input.intervalDays === null ||
+        !Number.isInteger(input.intervalDays) ||
+        input.intervalDays <= 0)) ||
+    (input.intervalDays !== null &&
+      (!Number.isInteger(input.intervalDays) || input.intervalDays <= 0))
+  ) {
     return Promise.reject(
       new Error(
         `intervalDays must be a positive integer, got ${input.intervalDays}`,
@@ -341,16 +363,33 @@ export function updateContactFull(
     const stored = await exec.getFirstAsync<{
       rarely_responds: number;
       last_contact: string | null;
-    }>("SELECT rarely_responds, last_contact FROM contacts WHERE id = ?", [
-      input.id,
-    ]);
+      interval_days: number | null;
+      tracking_enabled: number;
+    }>(
+      "SELECT rarely_responds, last_contact, interval_days, tracking_enabled FROM contacts WHERE id = ?",
+      [input.id],
+    );
     if (!stored) {
       throw new Error(`updateContactFull: no contact with id=${input.id}`);
     }
 
+    const trackingEnabled =
+      input.trackingEnabled ?? stored.tracking_enabled === 1;
+    // Once cadence has been assigned, unbinding preserves it as dormant. This
+    // also avoids the v11 one-way trigger that rejects clearing cadence.
+    const intervalDays =
+      !trackingEnabled && stored.interval_days !== null
+        ? stored.interval_days
+        : input.intervalDays;
+    const lifecycleInput: UpdateContactFullInput = {
+      ...input,
+      trackingEnabled,
+      intervalDays,
+    };
+
     // Metadata UPDATE (never writes last_contact). Runs FIRST so a later recompute
     // reads the NEW rarely_responds flag.
-    await updateContactMetadataCore(exec, input);
+    await updateContactMetadataCore(exec, lifecycleInput);
 
     // UPSERT value pairs instead of deleting/re-keying them. A fresh uid is only
     // relevant to a missing pair's INSERT branch; an existing pair retains it.

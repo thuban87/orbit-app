@@ -45,9 +45,10 @@ export interface EditFormState {
   name: string;
   categoryId: number | null;
   /** The FrequencyPicker's emitted interval_days. */
-  intervalDays: number;
+  intervalDays: number | null;
   /** The FrequencyPicker's validity — false blocks Save. */
   intervalValid: boolean;
+  trackingEnabled?: boolean;
   /** Native social-battery picker value (Charger/Neutral/Drain), or null. */
   socialBattery: string | null;
   /**
@@ -144,6 +145,7 @@ export function seedEditState(result: ContactForEdit): EditFormState {
     categoryId: c.category_id,
     intervalDays: c.interval_days,
     intervalValid: true,
+    trackingEnabled: c.trackingEnabled === 1,
     socialBattery: c.social_battery,
     birthdayInput,
     birthdayYearUnknown,
@@ -160,7 +162,10 @@ export function seedEditState(result: ContactForEdit): EditFormState {
  * interval blocks Save so a non-positive interval never reaches the DAO.
  */
 export function canSave(state: EditFormState): boolean {
-  return state.name.trim().length > 0 && state.intervalValid;
+  return (
+    state.name.trim().length > 0 &&
+    (state.trackingEnabled === false || state.intervalValid)
+  );
 }
 
 /**
@@ -178,6 +183,7 @@ export function buildEditInput(
     id: deps.contactId,
     name: state.name.trim(),
     intervalDays: state.intervalDays,
+    trackingEnabled: state.trackingEnabled !== false,
     now: deps.now,
     rarelyResponds: state.rarelyResponds,
     remindersOff: state.remindersOff,

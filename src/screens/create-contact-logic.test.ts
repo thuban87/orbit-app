@@ -52,8 +52,18 @@ describe("canSave", () => {
   });
 
   it("requires a valid cadence only while Bound", () => {
-    expect(canSave(state({ intervalDays: null as never, intervalValid: false, trackingEnabled: false }))).toBe(true);
-    expect(canSave(state({ intervalValid: false, trackingEnabled: true }))).toBe(false);
+    expect(
+      canSave(
+        state({
+          intervalDays: null as never,
+          intervalValid: false,
+          trackingEnabled: false,
+        }),
+      ),
+    ).toBe(true);
+    expect(
+      canSave(state({ intervalValid: false, trackingEnabled: true })),
+    ).toBe(false);
   });
 });
 

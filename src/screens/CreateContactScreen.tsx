@@ -94,8 +94,11 @@ export function CreateContactScreen({
   // Fixed-block state.
   const [name, setName] = useState("");
   const [categoryId, setCategoryId] = useState<number | null>(null);
-  const [intervalDays, setIntervalDays] = useState(FREQUENCY_DAYS.Monthly);
+  const [intervalDays, setIntervalDays] = useState<number | null>(
+    FREQUENCY_DAYS.Monthly,
+  );
   const [intervalValid, setIntervalValid] = useState(true);
+  const [trackingEnabled, setTrackingEnabled] = useState(true);
   const [lastSpoke, setLastSpoke] = useState<LastSpokeValue>({ kind: "today" });
   const [methods, setMethods] = useState<MethodGroups>(() => ({
     phone: [emptyMethodDraft("phone", newUid())],
@@ -140,11 +143,21 @@ export function CreateContactScreen({
       categoryId,
       intervalDays,
       intervalValid,
+      trackingEnabled,
       lastSpoke,
       methods,
       values,
     }),
-    [name, categoryId, intervalDays, intervalValid, lastSpoke, methods, values],
+    [
+      name,
+      categoryId,
+      intervalDays,
+      intervalValid,
+      trackingEnabled,
+      lastSpoke,
+      methods,
+      values,
+    ],
   );
 
   const savable = canSave(formState) && !saving;
@@ -204,7 +217,7 @@ export function CreateContactScreen({
         </Text>
       </View>
 
-      {/* -- Fixed block: Name → Category → Frequency → Last-spoke → methods -- */}
+      {/* -- Fixed block: Name → Category → lifecycle → cadence → methods -- */}
       <View style={styles.field}>
         <Text style={[styles.label, { color: colors.textSecondary }]}>
           Name
@@ -225,6 +238,55 @@ export function CreateContactScreen({
             },
           ]}
         />
+      </View>
+
+      <View style={styles.field}>
+        <Text style={[styles.label, { color: colors.textSecondary }]}>
+          Orbit participation
+        </Text>
+        <View style={styles.lifecycleChoices}>
+          {([true, false] as const).map((enabled) => {
+            const selected = trackingEnabled === enabled;
+            const label = enabled ? "Bound" : "Unbound";
+            return (
+              <Pressable
+                key={label}
+                testID={`create-contact-${label.toLowerCase()}`}
+                accessibilityRole="button"
+                accessibilityLabel={label}
+                accessibilityState={{ selected }}
+                onPress={() => {
+                  setTrackingEnabled(enabled);
+                  if (enabled && intervalDays === null)
+                    setIntervalDays(FREQUENCY_DAYS.Monthly);
+                  if (!enabled) setIntervalDays(null);
+                  setIntervalValid(true);
+                }}
+                style={[
+                  styles.lifecycleChoice,
+                  {
+                    borderColor: selected ? colors.accent : colors.border,
+                    backgroundColor: selected ? colors.accent : colors.surface,
+                  },
+                ]}
+              >
+                <Text
+                  style={{
+                    color: selected ? colors.background : colors.textPrimary,
+                    fontWeight: "600",
+                  }}
+                >
+                  {label}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+        <Text style={[styles.helper, { color: colors.textSecondary }]}>
+          {trackingEnabled
+            ? "Bound contacts appear in your active orbit and receive cadence reminders."
+            : "Unbound contacts keep their details and history without active cadence reminders."}
+        </Text>
       </View>
 
       <View style={styles.field}>
@@ -252,18 +314,19 @@ export function CreateContactScreen({
           </Picker>
         </View>
       </View>
-
-      <View style={styles.field}>
-        <Text style={[styles.label, { color: colors.textSecondary }]}>
-          Frequency
-        </Text>
-        <FrequencyPicker
-          testID="create-contact-frequency"
-          value={intervalDays}
-          onChange={setIntervalDays}
-          onValidityChange={setIntervalValid}
-        />
-      </View>
+      {trackingEnabled ? (
+        <View style={styles.field}>
+          <Text style={[styles.label, { color: colors.textSecondary }]}>
+            Frequency
+          </Text>
+          <FrequencyPicker
+            testID="create-contact-frequency"
+            value={intervalDays ?? FREQUENCY_DAYS.Monthly}
+            onChange={setIntervalDays}
+            onValidityChange={setIntervalValid}
+          />
+        </View>
+      ) : null}
 
       <View style={styles.field}>
         <Text style={[styles.label, { color: colors.textSecondary }]}>
@@ -370,6 +433,16 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 13,
     fontWeight: "600",
+  },
+  helper: { fontSize: 13, lineHeight: 18 },
+  lifecycleChoices: { flexDirection: "row", gap: 8 },
+  lifecycleChoice: {
+    minHeight: 44,
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderRadius: 8,
   },
   input: {
     borderWidth: 1,

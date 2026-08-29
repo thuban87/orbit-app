@@ -217,7 +217,12 @@ describe("createContactFull — normalized method composition", () => {
           value: "+1 312 555 1234",
           label: "Discarded duplicate",
         },
-        { uid: uid(), type: "email", value: "labelled@example.com", label: "Work" },
+        {
+          uid: uid(),
+          type: "email",
+          value: "labelled@example.com",
+          label: "Work",
+        },
       ],
       methodNormalization: { effectivePhoneRegion: "US" },
     });
@@ -301,29 +306,61 @@ describe("createContactFull — 'not yet / don't know' path", () => {
 describe("aggregate lifecycle writes", () => {
   it("persists Bound, dormant Unbound, and never-assigned Unbound cadence cells", async () => {
     const bound = await createContactFull(exec, {
-      uid: uid(), name: "Bound", intervalDays: 14, trackingEnabled: true, now: NOW,
+      uid: uid(),
+      name: "Bound",
+      intervalDays: 14,
+      trackingEnabled: true,
+      now: NOW,
     });
     const dormant = await createContactFull(exec, {
-      uid: uid(), name: "Dormant", intervalDays: 21, trackingEnabled: false, now: NOW,
+      uid: uid(),
+      name: "Dormant",
+      intervalDays: 21,
+      trackingEnabled: false,
+      now: NOW,
     });
     const neverAssigned = await createContactFull(exec, {
-      uid: uid(), name: "Never assigned", intervalDays: null as never, trackingEnabled: false, now: NOW,
+      uid: uid(),
+      name: "Never assigned",
+      intervalDays: null as never,
+      trackingEnabled: false,
+      now: NOW,
     });
 
-    expect(await metadata(bound.contactId)).toMatchObject({ interval_days: 14, tracking_enabled: 1 });
-    expect(await metadata(dormant.contactId)).toMatchObject({ interval_days: 21, tracking_enabled: 0 });
-    expect(await metadata(neverAssigned.contactId)).toMatchObject({ interval_days: null, tracking_enabled: 0 });
+    expect(await metadata(bound.contactId)).toMatchObject({
+      interval_days: 14,
+      tracking_enabled: 1,
+    });
+    expect(await metadata(dormant.contactId)).toMatchObject({
+      interval_days: 21,
+      tracking_enabled: 0,
+    });
+    expect(await metadata(neverAssigned.contactId)).toMatchObject({
+      interval_days: null,
+      tracking_enabled: 0,
+    });
   });
 
   it("retains an assigned cadence when an edit unbinds the contact", async () => {
     const { contactId } = await createContactFull(exec, {
-      uid: uid(), name: "Transition", intervalDays: 30, now: NOW,
+      uid: uid(),
+      name: "Transition",
+      intervalDays: 30,
+      now: NOW,
     });
     await updateContactFull(exec, {
-      id: contactId, name: "Transition", intervalDays: null as never,
-      trackingEnabled: false, rarelyResponds: 0, remindersOff: 0, now: EDIT_NOW,
+      id: contactId,
+      name: "Transition",
+      intervalDays: null as never,
+      trackingEnabled: false,
+      rarelyResponds: 0,
+      remindersOff: 0,
+      now: EDIT_NOW,
     });
-    expect(await metadata(contactId)).toMatchObject({ interval_days: 30, tracking_enabled: 0 });
+    expect(await metadata(contactId)).toMatchObject({
+      interval_days: 30,
+      tracking_enabled: 0,
+    });
   });
 });
 
@@ -458,7 +495,8 @@ describe("createContactFull — mid-composition ROLLBACK (T-04-03 atomicity)", (
       createContactFull(exec, {
         uid: uid(),
         name: "Doomed",
-        intervalDays: 30,
+        intervalDays: null,
+        trackingEnabled: false,
         now: NOW,
         firstInteraction: { uid: uid(), occurredAt: "2026-08-10 09:00:00" },
         customValues: [{ fieldDefId: 9999, value: "x" }],

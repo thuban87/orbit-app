@@ -33,9 +33,10 @@ export interface CreateFormState {
   name: string;
   categoryId: number | null;
   /** The FrequencyPicker's emitted interval_days (defaults to Monthly = 30). */
-  intervalDays: number;
+  intervalDays: number | null;
   /** The FrequencyPicker's validity — false blocks Save. */
   intervalValid: boolean;
+  trackingEnabled?: boolean;
   lastSpoke: LastSpokeValue;
   methods: MethodGroups;
   /** Custom-field values keyed by `col_name` (from FieldValueInput). */
@@ -61,7 +62,10 @@ export interface BuildCreateInputDeps {
  * interval blocks Save so a non-positive interval never reaches the DAO.
  */
 export function canSave(state: CreateFormState): boolean {
-  return state.name.trim().length > 0 && state.intervalValid;
+  return (
+    state.name.trim().length > 0 &&
+    (state.trackingEnabled === false || state.intervalValid)
+  );
 }
 
 /**
@@ -98,6 +102,7 @@ export function buildCreateInput(
     uid: deps.contactUid,
     name: state.name.trim(),
     intervalDays: state.intervalDays,
+    trackingEnabled: state.trackingEnabled !== false,
     now: deps.now,
     methodDrafts: toMethodDrafts(state.methods),
     methodNormalization: {

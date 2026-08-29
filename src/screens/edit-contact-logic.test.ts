@@ -205,7 +205,15 @@ describe("canSave", () => {
   });
 
   it("allows a never-assigned Unbound edit without a cadence", () => {
-    expect(canSave(state({ intervalDays: null as never, intervalValid: false, trackingEnabled: false }))).toBe(true);
+    expect(
+      canSave(
+        state({
+          intervalDays: null as never,
+          intervalValid: false,
+          trackingEnabled: false,
+        }),
+      ),
+    ).toBe(true);
   });
 });
 
