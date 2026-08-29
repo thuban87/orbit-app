@@ -655,13 +655,16 @@ describe("listNeverContacted", () => {
     expect(rows[0]?.fuelText).toBe("still has fuel");
   });
 
-  it("projects an Unbound never-contacted row as neutral while retaining its lifecycle state", async () => {
+  it("projects an opted-in Unbound never-contacted row as neutral while retaining its lifecycle state", async () => {
     const unbound = await seedContact({
       name: "Dormant Never",
       lastContact: null,
       trackingEnabled: 0,
       favouriteRank: 2,
     });
+    await exec.runAsync(
+      "UPDATE app_settings SET include_unbound_never_contacted = 1 WHERE id = 1",
+    );
     const row = (await listNeverContacted(exec, { sort: "oldest" })).find(
       (candidate) => candidate.id === unbound,
     );
@@ -671,6 +674,29 @@ describe("listNeverContacted", () => {
       progress: null,
       favourite_rank: null,
     });
+  });
+
+  it("excludes Unbound contacts by default and includes them in both list and count after persisted opt-in", async () => {
+    const bound = await seedContact({ name: "Bound Never", lastContact: null });
+    const unbound = await seedContact({
+      name: "Unbound Never",
+      lastContact: null,
+      trackingEnabled: 0,
+    });
+
+    expect(ids(await listNeverContacted(exec, { sort: "name" }))).toEqual([
+      bound,
+    ]);
+    expect(await countNeverContacted(exec)).toBe(1);
+
+    await exec.runAsync(
+      "UPDATE app_settings SET include_unbound_never_contacted = 1 WHERE id = 1",
+    );
+    expect(ids(await listNeverContacted(exec, { sort: "name" }))).toEqual([
+      bound,
+      unbound,
+    ]);
+    expect(await countNeverContacted(exec)).toBe(2);
   });
 });
 

@@ -10,3 +10,8 @@ export function unboundRowAccessibilityLabel(
 ): string {
   return [name, categoryLabel, "Unbound"].filter(Boolean).join(", ");
 }
+
+/** Only direct retrieval rows outside the active lifecycle use neutral list chrome. */
+export function usesNeutralUnboundRow(trackingEnabled: number): boolean {
+  return trackingEnabled === 0;
+}

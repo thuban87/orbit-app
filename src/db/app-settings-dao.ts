@@ -20,8 +20,8 @@
  * (Plan 11-05) clamps again as defense-in-depth.
  */
 import { validateCustomEndpoint } from "@/ai/custom-endpoint";
-import { inWriteTransaction } from "@/db/transaction";
 import { bumpDataRevisionCore } from "@/db/data-revision-dao";
+import { inWriteTransaction } from "@/db/transaction";
 import type { SqlExecutor } from "@/db/types";
 import {
   AI_PROVIDER_IDS,
@@ -69,6 +69,10 @@ export interface AppSettings {
   selfSunColour: string | null;
   /** Optional user override for parsing future national-format phone entries. */
   phoneRegionOverride: string | null;
+  /** Whether Unbound contacts with no history appear in Not yet contacted. */
+  includeUnboundNeverContacted: 0 | 1;
+  /** Whether birthday scheduling may include Unbound contacts. */
+  birthdayUnboundEnabled: 0 | 1;
 
   // --- Optional-AI non-secret settings (Phase 14, AI-01) --------------------
   // NO API KEY LIVES HERE — provider credentials are SecureStore-only
@@ -144,7 +148,9 @@ export interface PortableSettingsSnapshot {
   backupIntervalDays: number;
   backupRetentionDays: number;
   /** Declared here; portable snapshot emission is owned by Phase 18.1-04. */
-  phoneRegionOverride?: string | null;
+  phoneRegionOverride: string | null;
+  includeUnboundNeverContacted: 0 | 1;
+  birthdayUnboundEnabled: 0 | 1;
   modifiedAt: string;
 }
 
@@ -193,7 +199,9 @@ type WritableSettingsKey =
   | "aiPromptTemplate"
   | "backupIntervalDays"
   | "backupRetentionDays"
-  | "phoneRegionOverride";
+  | "phoneRegionOverride"
+  | "includeUnboundNeverContacted"
+  | "birthdayUnboundEnabled";
 
 /** The persisted (snake_case) column shape of the id=1 row. */
 interface AppSettingsRow {
@@ -208,6 +216,8 @@ interface AppSettingsRow {
   sun_contact_id: number | null;
   self_sun_colour: string | null;
   phone_region_override: string | null;
+  include_unbound_never_contacted: number;
+  birthday_unbound_enabled: number;
   ai_provider: string;
   ai_model: string;
   ai_custom_endpoint: string;
@@ -245,6 +255,8 @@ const TOGGLE_FIELDS: Array<keyof AppSettingsPatch> = [
   "birthdayEnabled",
   "digestEnabled",
   "lockscreenPublic",
+  "includeUnboundNeverContacted",
+  "birthdayUnboundEnabled",
 ];
 
 const BACKUP_DAY_FIELDS: Array<keyof AppSettingsPatch> = [
@@ -276,7 +288,17 @@ const COLUMN_OF: Record<WritableSettingsKey, string> = {
   backupIntervalDays: "backup_interval_days",
   backupRetentionDays: "backup_retention_days",
   phoneRegionOverride: "phone_region_override",
+  includeUnboundNeverContacted: "include_unbound_never_contacted",
+  birthdayUnboundEnabled: "birthday_unbound_enabled",
 };
+
+/** The saved setting is authoritative; device region is used only when it is absent. */
+export function resolveEffectivePhoneRegion(
+  savedOverride: string | null,
+  deviceRegion: string | null,
+): string | null {
+  return savedOverride ?? deviceRegion;
+}
 
 /**
  * Read the single app_settings row (id=1) as a typed `AppSettings`. Pure async
@@ -290,6 +312,7 @@ export async function getAppSettings(exec: SqlExecutor): Promise<AppSettings> {
             digest_enabled, lockscreen_public, delivery_hour, quiet_start_hour,
             quiet_end_hour,
             sun_contact_id, self_sun_colour, phone_region_override,
+            include_unbound_never_contacted, birthday_unbound_enabled,
             ai_provider, ai_model, ai_custom_endpoint, ai_custom_model,
             ai_prompt_template, ai_ack_openai, ai_ack_anthropic,
             ai_ack_google, ai_ack_custom,
@@ -317,6 +340,10 @@ export async function getAppSettings(exec: SqlExecutor): Promise<AppSettings> {
     sunContactId: row.sun_contact_id ?? null,
     selfSunColour: row.self_sun_colour ?? null,
     phoneRegionOverride: row.phone_region_override ?? null,
+    includeUnboundNeverContacted: (row.include_unbound_never_contacted
+      ? 1
+      : 0) as 0 | 1,
+    birthdayUnboundEnabled: (row.birthday_unbound_enabled ? 1 : 0) as 0 | 1,
     // AI non-secret settings. The column default is `'none'`; the cast is a
     // read-shape convenience (validation on WRITE guarantees a known id).
     aiProvider: row.ai_provider as AiProviderId,
@@ -352,31 +379,36 @@ export async function getAppSettings(exec: SqlExecutor): Promise<AppSettings> {
 export async function getPortableSettingsSnapshot(
   exec: Pick<SqlExecutor, "getFirstAsync">,
 ): Promise<PortableSettingsSnapshot> {
-  const row = await exec.getFirstAsync<Pick<
-    AppSettingsRow,
-    | "notifications_enabled"
-    | "decay_enabled"
-    | "birthday_enabled"
-    | "digest_enabled"
-    | "lockscreen_public"
-    | "delivery_hour"
-    | "quiet_start_hour"
-    | "quiet_end_hour"
-    | "sun_contact_id"
-    | "self_sun_colour"
-    | "phone_region_override"
-    | "ai_provider"
-    | "ai_model"
-    | "ai_custom_endpoint"
-    | "ai_custom_model"
-    | "ai_prompt_template"
-    | "backup_interval_days"
-    | "backup_retention_days"
-    | "modified_at"
-  >>(
+  const row = await exec.getFirstAsync<
+    Pick<
+      AppSettingsRow,
+      | "notifications_enabled"
+      | "decay_enabled"
+      | "birthday_enabled"
+      | "digest_enabled"
+      | "lockscreen_public"
+      | "delivery_hour"
+      | "quiet_start_hour"
+      | "quiet_end_hour"
+      | "sun_contact_id"
+      | "self_sun_colour"
+      | "phone_region_override"
+      | "include_unbound_never_contacted"
+      | "birthday_unbound_enabled"
+      | "ai_provider"
+      | "ai_model"
+      | "ai_custom_endpoint"
+      | "ai_custom_model"
+      | "ai_prompt_template"
+      | "backup_interval_days"
+      | "backup_retention_days"
+      | "modified_at"
+    >
+  >(
     `SELECT notifications_enabled, decay_enabled, birthday_enabled,
             digest_enabled, lockscreen_public, delivery_hour, quiet_start_hour,
             quiet_end_hour, sun_contact_id, self_sun_colour, phone_region_override,
+            include_unbound_never_contacted, birthday_unbound_enabled,
             ai_provider, ai_model, ai_custom_endpoint, ai_custom_model,
             ai_prompt_template, backup_interval_days, backup_retention_days,
             modified_at
@@ -384,7 +416,9 @@ export async function getPortableSettingsSnapshot(
       WHERE id = 1`,
   );
   if (!row) {
-    throw new Error("getPortableSettingsSnapshot: app_settings id=1 row is missing");
+    throw new Error(
+      "getPortableSettingsSnapshot: app_settings id=1 row is missing",
+    );
   }
   return {
     notificationsEnabled: (row.notifications_enabled ? 1 : 0) as 0 | 1,
@@ -398,6 +432,10 @@ export async function getPortableSettingsSnapshot(
     sunContactId: row.sun_contact_id ?? null,
     selfSunColour: row.self_sun_colour ?? null,
     phoneRegionOverride: row.phone_region_override ?? null,
+    includeUnboundNeverContacted: (row.include_unbound_never_contacted
+      ? 1
+      : 0) as 0 | 1,
+    birthdayUnboundEnabled: (row.birthday_unbound_enabled ? 1 : 0) as 0 | 1,
     aiProvider: row.ai_provider as AiProviderId,
     aiModel: row.ai_model,
     aiCustomEndpoint: row.ai_custom_endpoint,
@@ -649,9 +687,12 @@ export async function recordAutomaticBackupHealthCore(
 ): Promise<void> {
   if (
     patch.lastBackupDataRevision !== undefined &&
-    (!Number.isInteger(patch.lastBackupDataRevision) || patch.lastBackupDataRevision < 0)
+    (!Number.isInteger(patch.lastBackupDataRevision) ||
+      patch.lastBackupDataRevision < 0)
   ) {
-    throw new Error("recordAutomaticBackupHealthCore: lastBackupDataRevision must be >= 0");
+    throw new Error(
+      "recordAutomaticBackupHealthCore: lastBackupDataRevision must be >= 0",
+    );
   }
   if (patch.encryptionEnabled !== undefined) {
     assertToggle("encryptionEnabled", patch.encryptionEnabled);
@@ -664,7 +705,9 @@ export async function recordAutomaticBackupHealthCore(
   }
   const assignments: string[] = [];
   const params: unknown[] = [];
-  for (const key of Object.keys(BACKUP_BOOKKEEPING_COLUMN_OF) as BackupBookkeepingKey[]) {
+  for (const key of Object.keys(
+    BACKUP_BOOKKEEPING_COLUMN_OF,
+  ) as BackupBookkeepingKey[]) {
     const value = patch[key];
     if (value !== undefined) {
       assignments.push(`${BACKUP_BOOKKEEPING_COLUMN_OF[key]} = ?`);

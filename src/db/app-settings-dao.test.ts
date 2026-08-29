@@ -19,15 +19,16 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { nodeSqliteExecutor, openTestDb } from "@/db/__testkit__/node-sqlite";
 import {
-  acknowledgeProvider,
   type AppSettings,
   type AppSettingsPatch,
+  acknowledgeProvider,
+  assertPhoneRegionOverride,
   type BackupBookkeepingPatch,
   getAppSettings,
   getPortableSettingsSnapshot,
   recordAutomaticBackupHealthCore,
+  resolveEffectivePhoneRegion,
   SELF_SUN_COLOUR_RE,
-  assertPhoneRegionOverride,
   updateAppSettings,
   updateAppSettingsCore,
 } from "@/db/app-settings-dao";
@@ -40,6 +41,8 @@ import { migration006 } from "@/db/migrations/006-normalize-custom-field-values"
 import { migration007 } from "@/db/migrations/007-tombstones";
 import { migration008 } from "@/db/migrations/008-restore-photo-journal";
 import { migration009 } from "@/db/migrations/009-contact-method-normalization";
+import { migration010 } from "@/db/migrations/010-contact-method-label";
+import { migration011 } from "@/db/migrations/011-contact-lifecycle-schema";
 import { runMigrations } from "@/db/migrations/runner";
 import { inWriteTransaction } from "@/db/transaction";
 import type { SqlExecutor } from "@/db/types";
@@ -94,8 +97,10 @@ async function migrateToV5(): Promise<void> {
       migration007,
       migration008,
       migration009,
+      migration010,
+      migration011,
     ],
-    9,
+    11,
     { now: NOW, newUid },
   );
 }
@@ -261,6 +266,8 @@ describe("app-settings-dao — read", () => {
       sunContactId: null,
       selfSunColour: null,
       phoneRegionOverride: null,
+      includeUnboundNeverContacted: 0,
+      birthdayUnboundEnabled: 1,
       // AI starts disabled: provider `none`, empty config, acks 0 (AI-01).
       ...AI_DEFAULTS,
       ...BACKUP_DEFAULTS,
@@ -303,12 +310,82 @@ describe("app-settings-dao — validated write", () => {
   it("roundtrips a valid phone-region override and rejects malformed restore input", async () => {
     await updateAppSettings(exec, { phoneRegionOverride: "gb" }, LATER);
     expect((await getAppSettings(exec)).phoneRegionOverride).toBe("gb");
-    expect(() => assertPhoneRegionOverride("phoneRegionOverride", null)).not.toThrow();
-    expect(() => assertPhoneRegionOverride("phoneRegionOverride", "US")).not.toThrow();
-    expect(() => assertPhoneRegionOverride("phoneRegionOverride", "not-a-region")).toThrow();
+    expect(() =>
+      assertPhoneRegionOverride("phoneRegionOverride", null),
+    ).not.toThrow();
+    expect(() =>
+      assertPhoneRegionOverride("phoneRegionOverride", "US"),
+    ).not.toThrow();
+    expect(() =>
+      assertPhoneRegionOverride("phoneRegionOverride", "not-a-region"),
+    ).toThrow();
     await expect(
-      (async () => updateAppSettings(exec, { phoneRegionOverride: "not-a-region" }, LATER))(),
+      (async () =>
+        updateAppSettings(
+          exec,
+          { phoneRegionOverride: "not-a-region" },
+          LATER,
+        ))(),
     ).rejects.toThrow();
+  });
+
+  it("persists lifecycle preference defaults and emits them through the portable settings projection", async () => {
+    expect(await getAppSettings(exec)).toMatchObject({
+      includeUnboundNeverContacted: 0,
+      birthdayUnboundEnabled: 1,
+    });
+
+    await updateAppSettings(
+      exec,
+      { includeUnboundNeverContacted: 1, birthdayUnboundEnabled: 0 },
+      LATER,
+    );
+
+    expect(await getAppSettings(exec)).toMatchObject({
+      includeUnboundNeverContacted: 1,
+      birthdayUnboundEnabled: 0,
+    });
+    expect(await getPortableSettingsSnapshot(exec)).toMatchObject({
+      includeUnboundNeverContacted: 1,
+      birthdayUnboundEnabled: 0,
+    });
+  });
+
+  it("uses the saved region before the device fallback without changing saved method identity", async () => {
+    expect(resolveEffectivePhoneRegion("GB", "US")).toBe("GB");
+    expect(resolveEffectivePhoneRegion(null, "US")).toBe("US");
+
+    await exec.runAsync(
+      `INSERT INTO contacts (uid, name, interval_days, created_at, modified_at)
+       VALUES (?, ?, ?, ?, ?)`,
+      [newUid(), "Region contact", 30, NOW, NOW],
+    );
+    const contact = await exec.getFirstAsync<{ id: number }>(
+      "SELECT id FROM contacts WHERE name = 'Region contact'",
+    );
+    await exec.runAsync(
+      `INSERT INTO contact_methods
+       (uid, contact_id, method_type, raw_value, display_value, canonical_value,
+        canonical_region, is_actionable, is_primary, display_order, created_at, modified_at)
+       VALUES (?, ?, 'phone', ?, ?, ?, ?, 1, 1, 0, ?, ?)`,
+      [
+        newUid(),
+        contact?.id,
+        "020 1234 5678",
+        "020 1234 5678",
+        "+442012345678",
+        "GB",
+        NOW,
+        NOW,
+      ],
+    );
+    await updateAppSettings(exec, { phoneRegionOverride: "US" }, LATER);
+    expect(
+      await exec.getFirstAsync<{
+        canonical_value: string;
+        canonical_region: string;
+      }>("SELECT canonical_value, canonical_region FROM contact_methods"),
+    ).toEqual({ canonical_value: "+442012345678", canonical_region: "GB" });
   });
 
   it("roundtrips every field", async () => {
@@ -339,6 +416,8 @@ describe("app-settings-dao — validated write", () => {
       sunContactId: null,
       selfSunColour: null,
       phoneRegionOverride: null,
+      includeUnboundNeverContacted: 0,
+      birthdayUnboundEnabled: 1,
       // AI fields untouched by this patch — still the disabled defaults.
       ...AI_DEFAULTS,
       ...BACKUP_DEFAULTS,
@@ -764,12 +843,15 @@ describe("app-settings-dao — portable backup projection and local bookkeeping"
     "rejects malformed backup day values before writing (%s)",
     async (days) => {
       await expect(
-        (async () => updateAppSettings(exec, { backupIntervalDays: days }, LATER))(),
+        (async () =>
+          updateAppSettings(exec, { backupIntervalDays: days }, LATER))(),
       ).rejects.toThrow();
       const row = await exec.getFirstAsync<{
         backup_interval_days: number;
         modified_at: string;
-      }>("SELECT backup_interval_days, modified_at FROM app_settings WHERE id = 1");
+      }>(
+        "SELECT backup_interval_days, modified_at FROM app_settings WHERE id = 1",
+      );
       expect(row).toEqual({ backup_interval_days: 1, modified_at: NOW });
     },
   );
@@ -801,7 +883,9 @@ describe("app-settings-dao — portable backup projection and local bookkeeping"
   });
 
   it("records automatic-backup bookkeeping without advancing data revision", async () => {
-    await exec.runAsync("UPDATE app_settings SET data_revision = 12 WHERE id = 1");
+    await exec.runAsync(
+      "UPDATE app_settings SET data_revision = 12 WHERE id = 1",
+    );
     await inWriteTransaction(exec, () =>
       recordAutomaticBackupHealthCore(exec, {
         backupFolderUri: "content://provider/tree/orbit",
@@ -810,9 +894,11 @@ describe("app-settings-dao — portable backup projection and local bookkeeping"
         lastBackupDataRevision: 12,
       }),
     );
-    expect(await exec.getFirstAsync<{ data_revision: number }>(
-      "SELECT data_revision FROM app_settings WHERE id = 1",
-    )).toEqual({ data_revision: 12 });
+    expect(
+      await exec.getFirstAsync<{ data_revision: number }>(
+        "SELECT data_revision FROM app_settings WHERE id = 1",
+      ),
+    ).toEqual({ data_revision: 12 });
     expect((await getAppSettings(exec)).lastBackupDataRevision).toBe(12);
   });
 
@@ -820,7 +906,9 @@ describe("app-settings-dao — portable backup projection and local bookkeeping"
   // portable settings patch, even if a future caller attempts it.
   it("keeps bookkeeping fields out of the general settings patch type", () => {
     // @ts-expect-error backupFolderUri is device-local bookkeeping, never portable.
-    const invalidPatch: AppSettingsPatch = { backupFolderUri: "content://local" };
+    const invalidPatch: AppSettingsPatch = {
+      backupFolderUri: "content://local",
+    };
     expect(invalidPatch).toBeDefined();
   });
 });
@@ -831,7 +919,10 @@ describe("acknowledgeProvider — the SOLE ai_ack_* writer (H5 / C2-H3)", () => 
   });
 
   /** The provider→column allowlist, mirrored here to prove each maps 1:1. */
-  const CASES: Array<{ provider: Parameters<typeof acknowledgeProvider>[1]; column: string }> = [
+  const CASES: Array<{
+    provider: Parameters<typeof acknowledgeProvider>[1];
+    column: string;
+  }> = [
     { provider: "openai", column: "ai_ack_openai" },
     { provider: "anthropic", column: "ai_ack_anthropic" },
     { provider: "google", column: "ai_ack_google" },
@@ -906,7 +997,9 @@ describe("acknowledgeProvider — the SOLE ai_ack_* writer (H5 / C2-H3)", () => 
   it("is idempotent — a second acknowledge keeps the flag at 1 (changes===1)", async () => {
     await acknowledgeProvider(exec, "anthropic", LATER);
     // A re-acknowledge still updates exactly one row (modified_at bump), no throw.
-    await expect(acknowledgeProvider(exec, "anthropic", NOW)).resolves.toBeUndefined();
+    await expect(
+      acknowledgeProvider(exec, "anthropic", NOW),
+    ).resolves.toBeUndefined();
     expect((await getAppSettings(exec)).aiAckAnthropic).toBe(1);
   });
 

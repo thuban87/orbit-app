@@ -279,6 +279,25 @@ export function listNeverContacted(
   exec: SqlExecutor,
   opts: { sort: NeverContactedSort },
 ): Promise<DashboardRow[]> {
+  return listNeverContactedWithPolicy(exec, opts);
+}
+
+async function readIncludeUnboundNeverContacted(
+  exec: SqlExecutor,
+): Promise<void> {
+  const setting = await exec.getFirstAsync<{
+    include_unbound_never_contacted: number;
+  }>("SELECT include_unbound_never_contacted FROM app_settings WHERE id = 1");
+  if (!setting) {
+    throw new Error("listNeverContacted: app_settings id=1 row is missing");
+  }
+}
+
+async function listNeverContactedWithPolicy(
+  exec: SqlExecutor,
+  opts: { sort: NeverContactedSort },
+): Promise<DashboardRow[]> {
+  await readIncludeUnboundNeverContacted(exec);
   const sql = `SELECT c.id AS id,
     c.name AS name,
     c.photo AS photo,
@@ -291,7 +310,13 @@ export function listNeverContacted(
     ${FUEL_LINE} AS fuelText,
     NULL AS snippet
    ${CARD_FROM}
-   WHERE c.archived_at IS NULL AND c.last_contact IS NULL
+   WHERE c.archived_at IS NULL
+     AND c.last_contact IS NULL
+     AND (c.tracking_enabled = 1 OR (
+       c.tracking_enabled = 0 AND (
+         SELECT include_unbound_never_contacted FROM app_settings WHERE id = 1
+       ) = 1
+     ))
    ORDER BY ${NC_SORT[opts.sort]}`;
   return exec.getAllAsync<DashboardRow>(sql);
 }
@@ -318,8 +343,20 @@ async function count(exec: SqlExecutor, where: string): Promise<number> {
 }
 
 /** Count of never-contacted (live) contacts — the never-contacted screen badge. */
-export function countNeverContacted(exec: SqlExecutor): Promise<number> {
-  return count(exec, "archived_at IS NULL AND last_contact IS NULL");
+export async function countNeverContacted(exec: SqlExecutor): Promise<number> {
+  await readIncludeUnboundNeverContacted(exec);
+  const row = await exec.getFirstAsync<{ n: number }>(
+    `SELECT COUNT(*) AS n
+       FROM contacts
+      WHERE archived_at IS NULL
+        AND last_contact IS NULL
+        AND (tracking_enabled = 1 OR (
+          tracking_enabled = 0 AND (
+            SELECT include_unbound_never_contacted FROM app_settings WHERE id = 1
+          ) = 1
+        ))`,
+  );
+  return row?.n ?? 0;
 }
 
 /**

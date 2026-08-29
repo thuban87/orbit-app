@@ -3,6 +3,7 @@ import DateTimePicker, {
 } from "@react-native-community/datetimepicker";
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
+import { getCountries } from "libphonenumber-js";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   FlatList,
@@ -66,15 +67,22 @@ import {
   providerDisplayName,
   validateEndpointForSave,
 } from "./settings-ai-logic";
-import {
-  phoneRegionOverridePatch,
-  resolveSettingsPhoneRegion,
-} from "./settings-region-logic";
+import { phoneRegionValueLabel } from "./settings-lifecycle-logic";
+import { phoneRegionOverridePatch } from "./settings-region-logic";
 
 const LOG_SCOPE = "settings-screen";
 
 /** Which time control's native picker is open (null = none). */
 type ActivePicker = "delivery" | "quiet-start" | "quiet-end" | null;
+
+const regionNames =
+  typeof Intl.DisplayNames === "function"
+    ? new Intl.DisplayNames(["en"], { type: "region" })
+    : null;
+
+const PHONE_REGIONS = getCountries()
+  .map((code) => ({ code, name: regionNames?.of(code) ?? code }))
+  .sort((a, b) => a.name.localeCompare(b.name));
 
 /** Format a 0-23 hour as a "h:MM AM/PM" wall-clock label (e.g. 9 → "9:00 AM"). */
 function formatHour(hour: number): string {
@@ -133,7 +141,8 @@ export function SettingsScreen() {
   const [settings, setSettings] = useState<AppSettings | null>(null);
   const [degraded, setDegraded] = useState(false);
   const [activePicker, setActivePicker] = useState<ActivePicker>(null);
-  const [phoneRegionInput, setPhoneRegionInput] = useState("");
+  const [phoneRegionPickerOpen, setPhoneRegionPickerOpen] = useState(false);
+  const [phoneRegionSearch, setPhoneRegionSearch] = useState("");
 
   // The "Add Orbit widget" fallback copy — null while there is nothing to show,
   // set to the UI-SPEC fallback string when requestPinWidget can't pin (unsupported
@@ -229,7 +238,6 @@ export function SettingsScreen() {
     try {
       const next = await getAppSettings(getExecutor());
       setSettings(next);
-      setPhoneRegionInput(next.phoneRegionOverride ?? "");
       if (next.notificationsEnabled === 1) {
         const perm = await getNotificationPermission();
         setDegraded(!perm.granted);
@@ -261,7 +269,12 @@ export function SettingsScreen() {
           : await getContactHeader(exec, next.sunContactId);
       const isSelf = sunOccupantIsSelf({
         sunContactId: next.sunContactId,
-        occupant: header ? { archived: header.archived_at !== null } : null,
+        occupant: header
+          ? {
+              archived: header.archived_at !== null,
+              trackingEnabled: header.trackingEnabled,
+            }
+          : null,
       });
       setSunOccupantName(isSelf ? "Me" : (header?.name ?? "Me"));
     } catch (err) {
@@ -377,7 +390,7 @@ export function SettingsScreen() {
   }, []);
 
   const savePhoneRegionOverride = useCallback(
-    async (input = phoneRegionInput) => {
+    async (input: string): Promise<boolean> => {
       try {
         await updateAppSettings(
           getExecutor(),
@@ -385,12 +398,34 @@ export function SettingsScreen() {
           localDateTime(),
         );
         await reloadNotifications();
+        return true;
       } catch (err) {
         Logger.error(LOG_SCOPE, "failed to persist phone region override", err);
+        return false;
       }
     },
-    [phoneRegionInput, reloadNotifications],
+    [reloadNotifications],
   );
+
+  const onSelectPhoneRegion = useCallback(
+    async (region: string) => {
+      if (await savePhoneRegionOverride(region)) {
+        setPhoneRegionPickerOpen(false);
+        setPhoneRegionSearch("");
+      }
+    },
+    [savePhoneRegionOverride],
+  );
+
+  const filteredPhoneRegions = useMemo(() => {
+    const term = phoneRegionSearch.trim().toLocaleLowerCase();
+    if (term === "") return PHONE_REGIONS;
+    return PHONE_REGIONS.filter(
+      (region) =>
+        region.code.toLocaleLowerCase().includes(term) ||
+        region.name.toLocaleLowerCase().includes(term),
+    );
+  }, [phoneRegionSearch]);
 
   const masterOn = settings?.notificationsEnabled === 1;
 
@@ -643,7 +678,121 @@ export function SettingsScreen() {
           accessibilityRole="header"
           style={[styles.sectionHeading, { color: colors.textSecondary }]}
         >
-          Phone numbers
+          Contact methods
+        </Text>
+        <Pressable
+          testID="settings-phone-region-row"
+          accessibilityRole="button"
+          accessibilityLabel={`Phone number region, ${phoneRegionValueLabel(settings?.phoneRegionOverride ?? null, settings?.phoneRegionOverride ? (regionNames?.of(settings.phoneRegionOverride) ?? settings.phoneRegionOverride) : null)}`}
+          accessibilityState={{ disabled: settings === null }}
+          disabled={settings === null}
+          onPress={() => setPhoneRegionPickerOpen(true)}
+          style={[
+            styles.row,
+            { backgroundColor: colors.surface, borderColor: colors.border },
+          ]}
+        >
+          <View style={styles.toggleRow}>
+            <Text style={[styles.rowLabel, { color: colors.textPrimary }]}>
+              Phone number region
+            </Text>
+            <Text style={[styles.rowValue, { color: colors.accent }]}>
+              {phoneRegionValueLabel(
+                settings?.phoneRegionOverride ?? null,
+                settings?.phoneRegionOverride
+                  ? (regionNames?.of(settings.phoneRegionOverride) ??
+                      settings.phoneRegionOverride)
+                  : null,
+              )}
+            </Text>
+          </View>
+          <Text style={[styles.helper, { color: colors.textSecondary }]}>
+            Used to format phone numbers entered without a country code.
+          </Text>
+        </Pressable>
+      </View>
+
+      <Modal
+        visible={phoneRegionPickerOpen}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setPhoneRegionPickerOpen(false)}
+      >
+        <View style={styles.regionModalScrim}>
+          <View
+            testID="settings-phone-region-modal"
+            style={[
+              styles.regionModal,
+              { backgroundColor: colors.surfaceElevated },
+            ]}
+          >
+            <Text
+              accessibilityRole="header"
+              style={[styles.title, { color: colors.textPrimary }]}
+            >
+              Phone number region
+            </Text>
+            <TextInput
+              testID="settings-phone-region-search"
+              accessibilityLabel="Search phone number regions"
+              value={phoneRegionSearch}
+              onChangeText={setPhoneRegionSearch}
+              placeholder="Search regions"
+              placeholderTextColor={colors.textSecondary}
+              autoCorrect={false}
+              style={[
+                styles.aiInput,
+                {
+                  color: colors.textPrimary,
+                  backgroundColor: colors.background,
+                  borderColor: colors.border,
+                },
+              ]}
+            />
+            <Pressable
+              testID="settings-phone-region-device"
+              accessibilityRole="button"
+              accessibilityLabel="Use device region"
+              onPress={() => void onSelectPhoneRegion("")}
+              style={[styles.regionOption, { borderColor: colors.border }]}
+            >
+              <Text style={[styles.rowLabel, { color: colors.textPrimary }]}>
+                Use device region
+              </Text>
+              <Text style={[styles.helper, { color: colors.textSecondary }]}>
+                {getDeviceRegion() ?? "Unavailable"}
+              </Text>
+            </Pressable>
+            <FlatList
+              data={filteredPhoneRegions}
+              keyExtractor={(region) => region.code}
+              renderItem={({ item }) => (
+                <Pressable
+                  testID={`settings-phone-region-${item.code}`}
+                  accessibilityRole="button"
+                  accessibilityLabel={`${item.name} (${item.code})`}
+                  accessibilityState={{
+                    selected: settings?.phoneRegionOverride === item.code,
+                  }}
+                  onPress={() => void onSelectPhoneRegion(item.code)}
+                  style={[styles.regionOption, { borderColor: colors.border }]}
+                >
+                  <Text
+                    style={[styles.rowLabel, { color: colors.textPrimary }]}
+                  >{`${item.name} (${item.code})`}</Text>
+                </Pressable>
+              )}
+            />
+          </View>
+        </View>
+      </Modal>
+
+      <View testID="settings-home-screen-section" style={styles.section}>
+        <Text
+          accessibilityRole="header"
+          style={[styles.sectionHeading, { color: colors.textSecondary }]}
+        >
+          Home screen
         </Text>
         <View
           style={[
@@ -651,58 +800,28 @@ export function SettingsScreen() {
             { backgroundColor: colors.surface, borderColor: colors.border },
           ]}
         >
-          <Text style={[styles.rowLabel, { color: colors.textPrimary }]}>
-            Default phone region
-          </Text>
-          <Text style={[styles.helper, { color: colors.textSecondary }]}>
-            Use a two-letter region code for new or edited national-format phone
-            numbers. Leave blank to use this device (
-            {resolveSettingsPhoneRegion(null, getDeviceRegion()) ??
-              "unavailable"}
-            ). Existing methods are unchanged.
-          </Text>
-          <TextInput
-            testID="settings-phone-region-override"
-            accessibilityLabel="Default phone region"
-            value={phoneRegionInput}
-            onChangeText={setPhoneRegionInput}
-            placeholder="Use device region"
-            placeholderTextColor={colors.textSecondary}
-            autoCapitalize="characters"
-            autoCorrect={false}
-            maxLength={2}
-            style={[
-              styles.aiInput,
-              {
-                color: colors.textPrimary,
-                backgroundColor: colors.background,
-                borderColor: colors.border,
-              },
-            ]}
-          />
-          <Pressable
-            testID="settings-phone-region-save"
-            accessibilityRole="button"
-            accessibilityLabel="Save default phone region"
-            onPress={() => void savePhoneRegionOverride()}
-            style={[styles.aiButton, { borderColor: colors.accent }]}
-          >
-            <Text style={{ color: colors.accent }}>Save phone region</Text>
-          </Pressable>
-          <Pressable
-            testID="settings-phone-region-device"
-            accessibilityRole="button"
-            accessibilityLabel="Use device region"
-            onPress={() => {
-              setPhoneRegionInput("");
-              void savePhoneRegionOverride("");
-            }}
-            style={[styles.aiButton, { borderColor: colors.border }]}
-          >
-            <Text style={{ color: colors.textSecondary }}>
-              Use device region
+          <View style={styles.toggleRow}>
+            <Text style={[styles.rowLabel, { color: colors.textPrimary }]}>
+              Include unbound in Not yet contacted
             </Text>
-          </Pressable>
+            <Switch
+              testID="settings-include-unbound-never-contacted"
+              accessibilityRole="switch"
+              accessibilityLabel="Include unbound in Not yet contacted"
+              accessibilityState={{
+                checked: settings?.includeUnboundNeverContacted === 1,
+              }}
+              value={settings?.includeUnboundNeverContacted === 1}
+              onValueChange={(value) =>
+                void persist({ includeUnboundNeverContacted: value ? 1 : 0 })
+              }
+              trackColor={{ false: colors.border, true: colors.accent }}
+              thumbColor={colors.surfaceElevated}
+            />
+          </View>
+          <Text style={[styles.helper, { color: colors.textSecondary }]}>
+            Show unbound contacts with no history in the Not yet contacted list.
+          </Text>
         </View>
       </View>
 
@@ -835,6 +954,43 @@ export function SettingsScreen() {
           </View>
           <Text style={[styles.helper, { color: colors.textSecondary }]}>
             A morning nudge on a contact's birthday.
+          </Text>
+        </View>
+
+        <View
+          style={[
+            styles.row,
+            { backgroundColor: colors.surface, borderColor: colors.border },
+          ]}
+        >
+          <View style={styles.toggleRow}>
+            <Text
+              style={[
+                styles.rowLabel,
+                { color: masterOn ? colors.textPrimary : colors.textSecondary },
+              ]}
+            >
+              Birthday alerts for unbound contacts
+            </Text>
+            <Switch
+              testID="settings-notifications-birthday-unbound"
+              accessibilityRole="switch"
+              accessibilityLabel="Birthday alerts for unbound contacts"
+              accessibilityState={{
+                disabled: !masterOn,
+                checked: settings?.birthdayUnboundEnabled === 1,
+              }}
+              disabled={!masterOn}
+              value={settings?.birthdayUnboundEnabled === 1}
+              onValueChange={(value) =>
+                void persist({ birthdayUnboundEnabled: value ? 1 : 0 })
+              }
+              trackColor={{ false: colors.border, true: colors.accent }}
+              thumbColor={colors.surfaceElevated}
+            />
+          </View>
+          <Text style={[styles.helper, { color: colors.textSecondary }]}>
+            Keep birthday reminders on for contacts outside your active orbit.
           </Text>
         </View>
 
@@ -1882,5 +2038,22 @@ const styles = StyleSheet.create({
   },
   aiSaveRow: {
     alignItems: "center",
+  },
+  regionModalScrim: {
+    flex: 1,
+    justifyContent: "flex-end",
+  },
+  regionModal: {
+    maxHeight: "80%",
+    gap: 12,
+    borderTopLeftRadius: 12,
+    borderTopRightRadius: 12,
+    padding: 16,
+  },
+  regionOption: {
+    minHeight: 44,
+    justifyContent: "center",
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    paddingVertical: 10,
   },
 });

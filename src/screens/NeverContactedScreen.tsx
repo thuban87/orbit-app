@@ -25,20 +25,16 @@
  */
 import { useFocusEffect } from "@react-navigation/native";
 import { useCallback, useState } from "react";
-import {
-  FlatList,
-  Pressable,
-  StyleSheet,
-  Text,
-  View,
-} from "react-native";
+import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";
+import { Avatar } from "@/components/Avatar";
 import { ContactCard } from "@/components/ContactCard";
-import { getExecutor } from "@/db/database";
-import { type DashboardRow, listNeverContacted } from "@/db/dashboard-read";
 import type { NeverContactedSort } from "@/db/dashboard-read";
+import { type DashboardRow, listNeverContacted } from "@/db/dashboard-read";
+import { getExecutor } from "@/db/database";
 import type { RootStackScreenProps } from "@/navigation/types";
 import { useTheme } from "@/theme";
 import { Logger } from "@/utils/logger";
+import { usesNeutralUnboundRow } from "./unbound-list-logic";
 
 const LOG_SCOPE = "never-contacted";
 
@@ -47,11 +43,12 @@ const LOG_SCOPE = "never-contacted";
  * (08-UI-SPEC § Copywriting: "Oldest added" / "Newest added" / "Name (A–Z)").
  * The keys are the `NeverContactedSort` union `listNeverContacted` already exposes.
  */
-const SORT_OPTIONS: ReadonlyArray<{ key: NeverContactedSort; label: string }> = [
-  { key: "oldest", label: "Oldest added" },
-  { key: "newest", label: "Newest added" },
-  { key: "name", label: "Name (A–Z)" },
-];
+const SORT_OPTIONS: ReadonlyArray<{ key: NeverContactedSort; label: string }> =
+  [
+    { key: "oldest", label: "Oldest added" },
+    { key: "newest", label: "Newest added" },
+    { key: "name", label: "Name (A–Z)" },
+  ];
 
 export function NeverContactedScreen({
   navigation,
@@ -106,10 +103,7 @@ export function NeverContactedScreen({
 
       {/* The screen's OWN three-way sort control (default Oldest added). Single
           active option, mirroring the FilterChipRow filled-accent idiom. */}
-      <View
-        testID="never-contacted-sort-control"
-        style={styles.sortControl}
-      >
+      <View testID="never-contacted-sort-control" style={styles.sortControl}>
         {SORT_OPTIONS.map((opt) => {
           const isActive = opt.key === sort;
           return (
@@ -165,20 +159,64 @@ export function NeverContactedScreen({
           contentContainerStyle={styles.listContent}
           renderItem={({ item }) => (
             <View testID={`never-contacted-card-${item.id}`}>
-              <ContactCard
-                contactId={item.id}
-                name={item.name}
-                photo={item.photo}
-                modifiedAt={item.modified_at}
-                status={item.status}
-                categoryLabel={item.categoryLabel}
-                isFavourite={item.favourite_rank !== null}
-                fuelText={item.fuelText}
-                snippet={item.snippet}
-                onPress={() =>
-                  navigation.navigate("Profile", { contactId: item.id })
-                }
-              />
+              {usesNeutralUnboundRow(item.trackingEnabled) ? (
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={`${item.name}, Unbound`}
+                  onPress={() =>
+                    navigation.navigate("Profile", { contactId: item.id })
+                  }
+                  style={[
+                    styles.unboundRow,
+                    {
+                      backgroundColor: colors.surface,
+                      borderColor: colors.border,
+                    },
+                  ]}
+                >
+                  <Avatar
+                    photo={item.photo}
+                    name={item.name}
+                    contactId={item.id}
+                    cacheBust={item.modified_at}
+                    size={40}
+                  />
+                  <View style={styles.unboundText}>
+                    <Text
+                      numberOfLines={1}
+                      style={[
+                        styles.unboundName,
+                        { color: colors.textPrimary },
+                      ]}
+                    >
+                      {item.name}
+                    </Text>
+                    <Text
+                      style={[
+                        styles.unboundLabel,
+                        { color: colors.textSecondary },
+                      ]}
+                    >
+                      Unbound
+                    </Text>
+                  </View>
+                </Pressable>
+              ) : (
+                <ContactCard
+                  contactId={item.id}
+                  name={item.name}
+                  photo={item.photo}
+                  modifiedAt={item.modified_at}
+                  status={item.status}
+                  categoryLabel={item.categoryLabel}
+                  isFavourite={item.favourite_rank !== null}
+                  fuelText={item.fuelText}
+                  snippet={item.snippet}
+                  onPress={() =>
+                    navigation.navigate("Profile", { contactId: item.id })
+                  }
+                />
+              )}
             </View>
           )}
         />
@@ -239,4 +277,16 @@ const styles = StyleSheet.create({
     gap: 8,
     paddingBottom: 16,
   },
+  unboundRow: {
+    minHeight: 64,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    borderWidth: 1,
+    borderRadius: 10,
+    padding: 12,
+  },
+  unboundText: { flex: 1, gap: 4 },
+  unboundName: { fontSize: 16, fontWeight: "600" },
+  unboundLabel: { fontSize: 13, fontWeight: "600" },
 });
