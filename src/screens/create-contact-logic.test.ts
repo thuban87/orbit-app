@@ -50,6 +50,11 @@ describe("canSave", () => {
   it("allows a name-only save with a valid interval", () => {
     expect(canSave(state({ name: "Chris", intervalValid: true }))).toBe(true);
   });
+
+  it("requires a valid cadence only while Bound", () => {
+    expect(canSave(state({ intervalDays: null as never, intervalValid: false, trackingEnabled: false }))).toBe(true);
+    expect(canSave(state({ intervalValid: false, trackingEnabled: true }))).toBe(false);
+  });
 });
 
 describe("firstInteractionOccurredAt", () => {
@@ -105,6 +110,7 @@ describe("buildCreateInput", () => {
       },
     ]);
     expect(out.methodNormalization).toEqual({ effectivePhoneRegion: "GB" });
+    expect(out.trackingEnabled).toBe(true);
     expect(out).not.toHaveProperty("phone");
   });
 

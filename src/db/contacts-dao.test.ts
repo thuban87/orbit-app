@@ -40,6 +40,7 @@ import { migration006 } from "@/db/migrations/006-normalize-custom-field-values"
 import { migration007 } from "@/db/migrations/007-tombstones";
 import { migration009 } from "@/db/migrations/009-contact-method-normalization";
 import { migration010 } from "@/db/migrations/010-contact-method-label";
+import { migration011 } from "@/db/migrations/011-contact-lifecycle-schema";
 import { runMigrations } from "@/db/migrations/runner";
 import { recordTouchpoint } from "@/db/recency-dao";
 import type { SqlExecutor } from "@/db/types";
@@ -67,8 +68,9 @@ beforeEach(async () => {
       migration007,
       migration009,
       migration010,
+      migration011,
     ],
-    10,
+    11,
     { now: NOW, newUid: uid, defaultPhoneRegion: "US" },
   );
 });
@@ -108,14 +110,15 @@ async function name(contactId: number): Promise<string | null> {
 async function metadata(contactId: number): Promise<{
   name: string;
   category_id: number | null;
-  interval_days: number;
+  interval_days: number | null;
+  tracking_enabled: number;
   social_battery: string | null;
   birthday: string | null;
   rarely_responds: number;
   reminders_off: number;
 } | null> {
   return exec.getFirstAsync(
-    `SELECT name, category_id, interval_days, social_battery, birthday,
+    `SELECT name, category_id, interval_days, tracking_enabled, social_battery, birthday,
             rarely_responds, reminders_off
        FROM contacts WHERE id = ?`,
     [contactId],
@@ -292,6 +295,35 @@ describe("createContactFull — 'not yet / don't know' path", () => {
     expect(interactionId).toBeNull();
     expect(await lastContact(contactId)).toBeNull();
     expect(await interactionCount(contactId)).toBe(0);
+  });
+});
+
+describe("aggregate lifecycle writes", () => {
+  it("persists Bound, dormant Unbound, and never-assigned Unbound cadence cells", async () => {
+    const bound = await createContactFull(exec, {
+      uid: uid(), name: "Bound", intervalDays: 14, trackingEnabled: true, now: NOW,
+    });
+    const dormant = await createContactFull(exec, {
+      uid: uid(), name: "Dormant", intervalDays: 21, trackingEnabled: false, now: NOW,
+    });
+    const neverAssigned = await createContactFull(exec, {
+      uid: uid(), name: "Never assigned", intervalDays: null as never, trackingEnabled: false, now: NOW,
+    });
+
+    expect(await metadata(bound.contactId)).toMatchObject({ interval_days: 14, tracking_enabled: 1 });
+    expect(await metadata(dormant.contactId)).toMatchObject({ interval_days: 21, tracking_enabled: 0 });
+    expect(await metadata(neverAssigned.contactId)).toMatchObject({ interval_days: null, tracking_enabled: 0 });
+  });
+
+  it("retains an assigned cadence when an edit unbinds the contact", async () => {
+    const { contactId } = await createContactFull(exec, {
+      uid: uid(), name: "Transition", intervalDays: 30, now: NOW,
+    });
+    await updateContactFull(exec, {
+      id: contactId, name: "Transition", intervalDays: null as never,
+      trackingEnabled: false, rarelyResponds: 0, remindersOff: 0, now: EDIT_NOW,
+    });
+    expect(await metadata(contactId)).toMatchObject({ interval_days: 30, tracking_enabled: 0 });
   });
 });
 

@@ -203,6 +203,10 @@ describe("canSave", () => {
   it("allows a valid name + interval", () => {
     expect(canSave(state({ name: "Chris" }))).toBe(true);
   });
+
+  it("allows a never-assigned Unbound edit without a cadence", () => {
+    expect(canSave(state({ intervalDays: null as never, intervalValid: false, trackingEnabled: false }))).toBe(true);
+  });
 });
 
 describe("buildEditInput", () => {
@@ -240,6 +244,7 @@ describe("buildEditInput", () => {
       },
     ]);
     expect(out.methodNormalization).toEqual({ effectivePhoneRegion: "US" });
+    expect(out.trackingEnabled).toBe(true);
     expect(out.rarelyResponds).toBe(1);
     expect(out.remindersOff).toBe(1);
     expect(out).not.toHaveProperty("rowUid");
