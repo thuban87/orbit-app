@@ -144,6 +144,12 @@ export function BulkImportSetupScreen({
         phoneRegion: session.phoneRegion,
         now: localDateTime(),
       });
+      if (result.combined && result.sessionComplete) {
+        navigation.replace("ImportComplete", {
+          sessionId: route.params.sessionId,
+        });
+        return;
+      }
       if (!result.combined) {
         setDeclinedClusters((current) =>
           new Set(current).add(clusterKey(consolidationRows)),
