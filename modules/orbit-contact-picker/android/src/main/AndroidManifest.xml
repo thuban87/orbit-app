@@ -1,2 +1,20 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+  <!--
+    Package-visibility (Android 11+) declaration for the system contact picker.
+    Without this, targetSdk 36 filtering hides `com.android.contactspicker` from
+    the app, so `startActivityForResult` for the pick intent falls through to the
+    system resolver ("No apps can perform this action") — even though the picker
+    exists and `am start` from shell launches it. Scoped to the contact-pick
+    intent(s) only: NO READ_CONTACTS, NO QUERY_ALL_PACKAGES (the picker is
+    permissionless by design). See gap plan 19-19.
+  -->
+  <queries>
+    <intent>
+      <action android:name="android.provider.action.PICK_CONTACTS" />
+    </intent>
+    <intent>
+      <action android:name="android.intent.action.PICK" />
+      <data android:mimeType="vnd.android.cursor.dir/contact" />
+    </intent>
+  </queries>
 </manifest>
