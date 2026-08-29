@@ -905,8 +905,8 @@ describe("app-settings-dao — portable backup projection and local bookkeeping"
   // Compile-time lock: local bookkeeping can never be accepted by the generic
   // portable settings patch, even if a future caller attempts it.
   it("keeps bookkeeping fields out of the general settings patch type", () => {
-    // @ts-expect-error backupFolderUri is device-local bookkeeping, never portable.
     const invalidPatch: AppSettingsPatch = {
+      // @ts-expect-error backupFolderUri is device-local bookkeeping, never portable.
       backupFolderUri: "content://local",
     };
     expect(invalidPatch).toBeDefined();

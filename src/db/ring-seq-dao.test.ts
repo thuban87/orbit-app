@@ -105,6 +105,7 @@ async function readRow(id: number): Promise<{
     ring_seq: number | null;
     last_contact: string | null;
     modified_at: string;
+    tracking_enabled: number;
   }>(
     "SELECT ring_seq, last_contact, modified_at, tracking_enabled FROM contacts WHERE id = ?",
     [id],

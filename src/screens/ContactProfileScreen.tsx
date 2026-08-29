@@ -267,8 +267,17 @@ export function ContactProfileScreen({
       const hasHistory =
         impactInputs !== null && impactInputs.interactions.length > 0;
       setGravity(hasHistory ? computeContactGravity(impactInputs, now) : null);
+      // Intensity is unavailable for an Unbound contact (the `available: false`
+      // marker); store only a real Bound result. The impact section is already
+      // Bound-gated (showCadenceTreatment), so an unavailable marker would never
+      // render — collapse it to null rather than widen the state type.
+      const derivedIntensity = hasHistory
+        ? computeContactIntensity(impactInputs, now)
+        : null;
       setIntensity(
-        hasHistory ? computeContactIntensity(impactInputs, now) : null,
+        derivedIntensity && "available" in derivedIntensity
+          ? null
+          : derivedIntensity,
       );
       // (impactInputs is narrowed non-null by `hasHistory` above.)
     } catch (err) {

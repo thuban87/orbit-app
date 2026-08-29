@@ -29,6 +29,7 @@ import { migration007 } from "@/db/migrations/007-tombstones";
 import { migration008 } from "@/db/migrations/008-restore-photo-journal";
 import { migration009 } from "@/db/migrations/009-contact-method-normalization";
 import { migration010 } from "@/db/migrations/010-contact-method-label";
+import { migration011 } from "@/db/migrations/011-contact-lifecycle-schema";
 import { runMigrations } from "@/db/migrations/runner";
 import {
   computeImpact,
@@ -63,8 +64,9 @@ beforeEach(async () => {
       migration008,
       migration009,
       migration010,
+      migration011,
     ],
-    10,
+    11,
     { now: NOW, newUid: uid },
   );
 });

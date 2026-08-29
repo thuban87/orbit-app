@@ -29,6 +29,7 @@ import { migration007 } from "@/db/migrations/007-tombstones";
 import { migration008 } from "@/db/migrations/008-restore-photo-journal";
 import { migration009 } from "@/db/migrations/009-contact-method-normalization";
 import { migration010 } from "@/db/migrations/010-contact-method-label";
+import { migration011 } from "@/db/migrations/011-contact-lifecycle-schema";
 import { runMigrations } from "@/db/migrations/runner";
 import { purgeContact } from "@/db/purge-dao";
 import type { SqlExecutor } from "@/db/types";
@@ -387,9 +388,10 @@ describe("migration006 — lossless legacy custom-value normalization", () => {
     // The migration itself remains a v6 proof. Exercise its lifecycle callers
     // against the current production schema, where permanent deletes record
     // Phase-17 tombstones.
-    await runMigrations(exec, [...legacyMigrations, migration006, migration007, migration008, migration009, migration010], 10, {
+    await runMigrations(exec, [...legacyMigrations, migration006, migration007, migration008, migration009, migration010, migration011], 11, {
       now: MIGRATION_NOW,
       newUid: uid,
+      defaultPhoneRegion: "US",
     });
     const liveDefs = await listDefs(exec, { includeQuarantined: false });
     const initial = await getValuesForContact(exec, alex, liveDefs);
@@ -522,7 +524,7 @@ describe("migration006 — lossless legacy custom-value normalization", () => {
         [blair],
       ),
     ).toEqual({ n: 0 });
-    expect(await userVersion()).toBe(10);
+    expect(await userVersion()).toBe(11);
     // Phase 17 backup/export/restore, tombstones, reconciliation, and sync
     // conflict policy are intentionally out of scope for this migration proof.
     expect(casey).toBeGreaterThan(0);

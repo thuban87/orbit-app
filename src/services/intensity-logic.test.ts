@@ -189,6 +189,7 @@ describe("computeContactIntensity — orchestration over impact inputs", () => {
   it("delegates with periodDays = intervalDays and the rarely-responds scope", () => {
     const r = computeContactIntensity(
       {
+        trackingEnabled: 1,
         intervalDays: 30,
         rarelyResponds: 1,
         interactions: [
@@ -199,15 +200,17 @@ describe("computeContactIntensity — orchestration over impact inputs", () => {
       },
       NOW,
     );
+    if ("available" in r) throw new Error("expected a Bound intensity result");
     expect(r.periodDays).toBe(30);
     expect(r.currentCount).toBe(1);
   });
 
   it("handles a contact with no interactions (currentCount 0, cadence null)", () => {
     const r = computeContactIntensity(
-      { intervalDays: 30, rarelyResponds: 0, interactions: [] },
+      { trackingEnabled: 1, intervalDays: 30, rarelyResponds: 0, interactions: [] },
       NOW,
     );
+    if ("available" in r) throw new Error("expected a Bound intensity result");
     expect(r.currentCount).toBe(0);
     expect(r.trailingAvgGapDays).toBeNull();
   });

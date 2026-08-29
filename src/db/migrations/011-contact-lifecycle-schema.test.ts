@@ -184,7 +184,7 @@ async function seedV10Fixture(): Promise<number> {
   await exec.runAsync(
     `UPDATE app_settings SET notifications_enabled = 1, decay_enabled = 0, birthday_enabled = 0,
       lockscreen_public = 1, delivery_hour = 14, quiet_start_hour = 20, quiet_end_hour = 7,
-      sun_contact_id = ?, self_sun_colour = '#123456', ai_provider = 'custom', ai_model = 'model',
+      sun_contact_id = ?, self_sun_colour = 'sun-colour-sentinel', ai_provider = 'custom', ai_model = 'model',
       ai_custom_endpoint = 'https://example.test', ai_custom_model = 'custom-model', ai_prompt_template = 'template',
       ai_ack_openai = 1, ai_ack_anthropic = 1, ai_ack_google = 1, ai_ack_custom = 1, digest_enabled = 0,
       data_revision = 42, backup_interval_days = 3, backup_retention_days = 9, backup_folder_uri = 'content://folder',
@@ -199,11 +199,11 @@ async function seedV10Fixture(): Promise<number> {
 describe("migration 011 — contact lifecycle schema", () => {
   it("rebuilds v10 contacts as a pure shape change and preserves direct and transitive children", async () => {
     const id = await seedV10Fixture();
-    const beforeContact = await exec.getFirstAsync(
+    const beforeContact = await exec.getFirstAsync<Record<string, unknown>>(
       "SELECT * FROM contacts WHERE id = ?",
       [id],
     );
-    const beforeSettings = await exec.getFirstAsync(
+    const beforeSettings = await exec.getFirstAsync<Record<string, unknown>>(
       "SELECT * FROM app_settings WHERE id = 1",
     );
     const beforeContactInfo = await exec.getAllAsync<TableInfo>(

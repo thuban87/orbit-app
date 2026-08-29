@@ -17,6 +17,10 @@ import { migration004 } from "@/db/migrations/004-ai-settings";
 import { migration005 } from "@/db/migrations/005-digest-settings";
 import { migration006 } from "@/db/migrations/006-normalize-custom-field-values";
 import { migration007 } from "@/db/migrations/007-tombstones";
+import { migration008 } from "@/db/migrations/008-restore-photo-journal";
+import { migration009 } from "@/db/migrations/009-contact-method-normalization";
+import { migration010 } from "@/db/migrations/010-contact-method-label";
+import { migration011 } from "@/db/migrations/011-contact-lifecycle-schema";
 import { runMigrations } from "@/db/migrations/runner";
 import { insertTombstoneCore } from "@/db/tombstones-dao";
 import type { SqlExecutor } from "@/db/types";
@@ -31,9 +35,9 @@ beforeEach(async () => {
   exec = nodeSqliteExecutor(openTestDb());
   await runMigrations(
     exec,
-    [migration001, migration002, migration003, migration004, migration005, migration006, migration007],
-    7,
-    { now: NOW, newUid },
+    [migration001, migration002, migration003, migration004, migration005, migration006, migration007, migration008, migration009, migration010, migration011],
+    11,
+    { now: NOW, newUid, defaultPhoneRegion: "US" },
   );
 });
 

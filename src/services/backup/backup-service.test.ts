@@ -171,7 +171,7 @@ describe("restore preview", () => {
       status: "ready",
       preview: {
         exportedAt: manifest.metadata.exportedAt,
-        backupFormatVersion: 2,
+        backupFormatVersion: 3,
         encrypted: false,
         rowCount: 0,
         photoCount: 0,
@@ -200,7 +200,7 @@ describe("restore preview", () => {
       status: "ready",
       preview: {
         exportedAt: manifest.metadata.exportedAt,
-        backupFormatVersion: 2,
+        backupFormatVersion: 3,
         encrypted: true,
         rowCount: 0,
         photoCount: 0,

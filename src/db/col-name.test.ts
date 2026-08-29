@@ -44,9 +44,11 @@ describe("slugify", () => {
 
 describe("makeColName", () => {
   it("uniquifies a label that slugs to a reserved fixed-column name", () => {
-    // "Phone" slugs to `phone`, a reserved contacts column.
-    const col = makeColName("Phone", new Set());
-    expect(col).toBe("phone_2");
+    // "Birthday" slugs to `birthday`, a reserved contacts column. (`phone`/`email`
+    // are no longer fixed columns — retired by migration 009 — so a "Phone" custom
+    // field is now an ordinary, un-bumped slug.)
+    const col = makeColName("Birthday", new Set());
+    expect(col).toBe("birthday_2");
     expect(isSafeColName(col)).toBe(true);
   });
 
