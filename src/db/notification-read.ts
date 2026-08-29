@@ -86,13 +86,29 @@ export function listDecayEligibleCandidates(
  * computation (via `daysUntilBirthday`) is 11-10's job, so the raw rows are
  * returned here. Applies NO decay suppressor (NOTIF-04). Ordered by id (item C).
  */
-export function listBirthdayNotificationCandidates(
+export async function listBirthdayNotificationCandidates(
   exec: SqlExecutor,
 ): Promise<BirthdayNotificationCandidate[]> {
+  const settings = await exec.getFirstAsync<{
+    birthday_unbound_enabled: number;
+  }>("SELECT birthday_unbound_enabled FROM app_settings WHERE id = 1");
+  if (
+    settings === null ||
+    (settings.birthday_unbound_enabled !== 0 &&
+      settings.birthday_unbound_enabled !== 1)
+  ) {
+    throw new Error(
+      "listBirthdayNotificationCandidates: birthday_unbound_enabled is missing or corrupt",
+    );
+  }
+
   return exec.getAllAsync<BirthdayNotificationCandidate>(
     `SELECT id, name, birthday
        FROM contacts
-      WHERE archived_at IS NULL AND birthday IS NOT NULL
+      WHERE archived_at IS NULL
+        AND birthday IS NOT NULL
+        AND (tracking_enabled = 1 OR ? = 1)
       ORDER BY id`,
+    [settings.birthday_unbound_enabled],
   );
 }

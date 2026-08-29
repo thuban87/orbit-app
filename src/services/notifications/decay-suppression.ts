@@ -19,6 +19,7 @@
  *   - never-contacted  (last_contact IS NULL)
  *   - rarely_responds  (= 1)
  *   - muted            (reminders_off = 1)
+ *   - Unbound          (tracking_enabled = 0)
  *   - archived         (archived_at IS NOT NULL)
  *   - rogue            (progress >= ROGUE_K — read from status.ts, NEVER re-typed)
  *
@@ -55,7 +56,8 @@ import { PROGRESS_SQL, ROGUE_K } from "@/db/status";
  * progress below the rogue cutoff. NO lower bound (H5) and NO snooze exclusion
  * (the future-snoozed contact is surfaced, not dropped).
  */
-export const DECAY_ELIGIBLE_WHERE = `last_contact IS NOT NULL
+export const DECAY_ELIGIBLE_WHERE = `tracking_enabled = 1
+     AND last_contact IS NOT NULL
      AND rarely_responds = 0
      AND reminders_off = 0
      AND archived_at IS NULL
