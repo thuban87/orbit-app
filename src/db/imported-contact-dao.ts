@@ -122,8 +122,9 @@ export function importContactRecord(
       );
     }
 
-    const links = await Promise.all(
-      params.externalLinks.map(async (externalLink) => ({
+    const links: Array<ExternalContactLinkInput & { id: number }> = [];
+    for (const externalLink of params.externalLinks) {
+      links.push({
         ...externalLink,
         id: await insertExternalContactLinkCore(exec, {
           contactId: created.contactId,
@@ -131,8 +132,8 @@ export function importContactRecord(
           externalContactId: externalLink.externalContactId,
           now: params.now,
         }),
-      })),
-    );
+      });
+    }
     const fallbackLink = links[0];
     for (const method of created.methods) {
       const sourceLink =
