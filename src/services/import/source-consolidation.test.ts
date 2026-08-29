@@ -6,6 +6,7 @@ import { nodeSqliteExecutor, openTestDb } from "@/db/__testkit__/node-sqlite";
 import { MIGRATIONS, TARGET_VERSION } from "@/db/database";
 import { acceptImportSessionWithRows } from "@/db/import-session-dao";
 import { listSessionRows } from "@/db/import-session-read";
+import { importContactRecord } from "@/db/imported-contact-dao";
 import { runMigrations } from "@/db/migrations/runner";
 import type { SqlExecutor } from "@/db/types";
 import { findActiveExternalLink } from "@/services/import/duplicate-evidence";
@@ -91,18 +92,17 @@ describe("source consolidation", () => {
   it("creates one Unbound contact, resolves every row atomically, and preserves birthday plus source identity", async () => {
     const session = await createSession([
       { externalContactId: "one", sourcePayload: payload("Taylor", [{ type: "phone", value: "312 555 0100" }], "02-30") },
-      { externalContactId: "two", sourcePayload: payload("Taylor Jones", [{ type: "email", value: "taylor@example.com" }], "1990-05-14"), photoRelPath: "import-staging/taylor.jpg" },
+      { externalContactId: "two", sourcePayload: payload("Taylor Jones", [{ type: "phone", value: "+1 312 555 0100" }, { type: "email", value: "taylor@example.com" }], "1990-05-14"), photoRelPath: "import-staging/taylor.jpg" },
     ]);
     const { clusters } = detectSourceClusters(session.rows, { phoneRegion: "US" });
-    // These methods use different evidence values, so build an explicit user-selected cluster.
     const result = await combineCluster(exec, photoFs(), {
-      rows: session.rows,
+      rows: clusters[0],
       batchCategoryId: null,
       phoneRegion: "US",
       now: NOW,
     });
 
-    expect(clusters).toHaveLength(0);
+    expect(clusters).toHaveLength(1);
     expect(result).toEqual({ contactId: expect.any(Number), combined: true });
     if (!result.combined) throw new Error("expected a combined contact");
     expect(await exec.getFirstAsync<{ birthday: string | null }>("SELECT birthday FROM contacts WHERE id = ?", [result.contactId])).toEqual({ birthday: "1990-05-14" });
@@ -116,12 +116,18 @@ describe("source consolidation", () => {
   });
 
   it("rolls back contact and row resolutions for an in-transaction failure, while photo failure is post-commit only", async () => {
+    await importContactRecord(exec, {
+      input: { uid: uid(), name: "Existing", intervalDays: null, trackingEnabled: false, now: NOW, categoryId: null, methodDrafts: [] },
+      externalLinks: [{ provider: "android", externalContactId: "already-linked" }],
+      birthday: null,
+      now: NOW,
+    });
     const duplicate = await createSession([
-      { externalContactId: "same", sourcePayload: payload("Taylor") },
-      { externalContactId: "same", sourcePayload: payload("Taylor") },
+      { externalContactId: "already-linked", sourcePayload: payload("Taylor") },
+      { externalContactId: "other", sourcePayload: payload("Taylor") },
     ]);
     await expect(combineCluster(exec, photoFs(), { rows: duplicate.rows, batchCategoryId: null, phoneRegion: "US", now: NOW })).rejects.toThrow();
-    expect(await exec.getFirstAsync<{ count: number }>("SELECT COUNT(*) AS count FROM contacts")).toEqual({ count: 0 });
+    expect(await exec.getFirstAsync<{ count: number }>("SELECT COUNT(*) AS count FROM contacts")).toEqual({ count: 1 });
     expect(await listSessionRows(exec, duplicate.sessionId)).toEqual(expect.arrayContaining([
       expect.objectContaining({ rowStatus: "pending", contactId: null }),
       expect.objectContaining({ rowStatus: "pending", contactId: null }),

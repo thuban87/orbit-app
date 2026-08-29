@@ -53,7 +53,7 @@ export interface LinkExistingContactToRowInput {
   methodIds?: number[];
 }
 
-async function insertExternalContactLinkCore(
+export async function insertExternalContactLinkCore(
   exec: SqlExecutor,
   params: {
     contactId: number;
@@ -78,7 +78,7 @@ async function insertExternalContactLinkCore(
   return result.lastInsertRowId;
 }
 
-async function insertMethodProvenanceCore(
+export async function insertMethodProvenanceCore(
   exec: SqlExecutor,
   methodId: number,
   externalContactLinkId: number,
