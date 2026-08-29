@@ -35,9 +35,9 @@ describe("mapPickedContact", () => {
       expect.objectContaining({ type: "phone", value: "+1 (312) 555-0100" }),
       expect.objectContaining({ type: "email", value: "ada@example.test" }),
     ]);
-    expect(result.input.methodDrafts?.every((draft) => draft.uid.length > 0)).toBe(
-      true,
-    );
+    expect(
+      result.input.methodDrafts?.every((draft) => draft.uid.length > 0),
+    ).toBe(true);
   });
 
   it("flags a missing name for callers while leaving the create input blank", () => {
@@ -70,7 +70,9 @@ describe("mapPickedContact", () => {
     expect(mapPickedContact(contact("1990-05-14"), options).birthday).toBe(
       "1990-05-14",
     );
-    expect(mapPickedContact(contact("--05-14"), options).birthday).toBe("05-14");
+    expect(mapPickedContact(contact("--05-14"), options).birthday).toBe(
+      "05-14",
+    );
     expect(mapPickedContact(contact("05-14"), options).birthday).toBe("05-14");
     expect(mapPickedContact(contact("02-30"), options).birthday).toBeNull();
   });
