@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import type { ContactMethodRow } from "@/db/contact-methods-dao";
-import { profileMethodGroups } from "@/screens/contact-profile-logic";
+import {
+  profileLifecycleView,
+  profileMethodGroups,
+} from "@/screens/contact-profile-logic";
 
 const phone: ContactMethodRow = {
   id: 1,
@@ -111,5 +114,34 @@ describe("profileMethodGroups", () => {
 
   it("omits empty type groups", () => {
     expect(profileMethodGroups({ phone: [], email: [] })).toEqual([]);
+  });
+});
+
+describe("profileLifecycleView", () => {
+  it("retains Bound cadence treatment", () => {
+    expect(profileLifecycleView({ trackingEnabled: 1, intervalDays: 30 })).toEqual({
+      kind: "bound",
+      showCadenceTreatment: true,
+      showFrequencyPicker: false,
+      bindEnabled: false,
+    });
+  });
+
+  it("lets an Unbound contact with dormant cadence bind immediately", () => {
+    expect(profileLifecycleView({ trackingEnabled: 0, intervalDays: 30 })).toEqual({
+      kind: "unbound-dormant",
+      showCadenceTreatment: false,
+      showFrequencyPicker: false,
+      bindEnabled: true,
+    });
+  });
+
+  it("requires a cadence before binding a never-assigned Unbound contact", () => {
+    expect(profileLifecycleView({ trackingEnabled: 0, intervalDays: null })).toEqual({
+      kind: "unbound-never-assigned",
+      showCadenceTreatment: false,
+      showFrequencyPicker: true,
+      bindEnabled: false,
+    });
   });
 });
