@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 import type { ContactMethodRow } from "@/db/contact-methods-dao";
 import {
+  canStartLifecycleTransition,
   profileLifecycleView,
   profileMethodGroups,
+  unbindConfirmation,
 } from "@/screens/contact-profile-logic";
 
 const phone: ContactMethodRow = {
@@ -149,5 +151,21 @@ describe("profileLifecycleView", () => {
       showFrequencyPicker: true,
       bindEnabled: false,
     });
+  });
+});
+
+describe("profile lifecycle actions", () => {
+  it("uses the exact native Unbind confirmation copy", () => {
+    expect(unbindConfirmation("Ada")).toEqual({
+      title: "Unbind Ada?",
+      message:
+        "This removes them from your active orbit, reminders, favourites, and widgets. Their history, details, and saved cadence stay.",
+    });
+  });
+
+  it("allows only one lifecycle transition at a time and requires a bindable cadence", () => {
+    expect(canStartLifecycleTransition({ pending: false, bindEnabled: true })).toBe(true);
+    expect(canStartLifecycleTransition({ pending: true, bindEnabled: true })).toBe(false);
+    expect(canStartLifecycleTransition({ pending: false, bindEnabled: false })).toBe(false);
   });
 });
