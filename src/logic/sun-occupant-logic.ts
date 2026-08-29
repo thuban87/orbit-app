@@ -36,6 +36,35 @@ export interface SunOccupantLookup {
   photo: string | null;
   status: ProfileStatus | null;
   archived: boolean;
+  /** Lifecycle state from getContactHeader; 0 (Unbound) always renders self. */
+  trackingEnabled?: number;
+}
+
+/** The lifecycle-bearing subset of OrreryScreen's getContactHeader result. */
+export interface SunOccupantHeader {
+  photo: string | null;
+  archived_at: string | null;
+  trackingEnabled: number;
+}
+
+/**
+ * The only conversion from the direct lifecycle header read into the shared sun
+ * predicate input. Keeping it pure pins OrreryScreen to pass through the stored
+ * lifecycle state instead of recreating an eligibility policy in the screen.
+ */
+export function mapSunOccupantLookup(
+  header: SunOccupantHeader | null,
+  status: ProfileStatus | null,
+): SunOccupantLookup | null {
+  if (header === null) {
+    return null;
+  }
+  return {
+    photo: header.photo,
+    status,
+    archived: header.archived_at !== null,
+    trackingEnabled: header.trackingEnabled,
+  };
 }
 
 /** Everything `resolveSunOccupant` needs — all reads done by the caller. */
@@ -66,19 +95,20 @@ export type SunOccupant =
 
 /**
  * The SINGLE archived/missing→self policy (A7). The stored sun occupant resolves
- * to SELF when there is no contact id, OR its looked-up contact is missing, OR it
- * is archived. Both the canvas (`resolveSunOccupant`) and Settings' occupant-name
- * read call THIS, so the two can never silently disagree about a hidden occupant
- * if the predicate later grows a dimension (e.g. a snooze/reminders-off flag).
+ * to SELF when there is no contact id, OR its looked-up contact is missing,
+ * archived, or Unbound. Both the canvas (`resolveSunOccupant`) and Settings'
+ * occupant-name read call THIS, so the two can never silently disagree about a
+ * hidden occupant if the predicate later grows a dimension.
  */
 export function sunOccupantIsSelf(input: {
   sunContactId: number | null;
-  occupant: Pick<SunOccupantLookup, "archived"> | null;
+  occupant: Pick<SunOccupantLookup, "archived" | "trackingEnabled"> | null;
 }): boolean {
   return (
     input.sunContactId === null ||
     input.occupant === null ||
-    input.occupant.archived
+    input.occupant.archived ||
+    input.occupant.trackingEnabled === 0
   );
 }
 

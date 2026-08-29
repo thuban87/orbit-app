@@ -90,6 +90,7 @@ import {
 import { orreryRingStyle } from "@/logic/orrery-ring-logic";
 import { computeRingReorder } from "@/logic/ring-reorder-logic";
 import {
+  mapSunOccupantLookup,
   resolveSunOccupant,
   type SunOccupantLookup,
 } from "@/logic/sun-occupant-logic";
@@ -226,14 +227,11 @@ export function OrreryScreen() {
               getContactHeader(exec, settings.sunContactId),
               getContactStatus(exec, settings.sunContactId),
             ]);
-            occupant = header
-              ? {
-                  photo: header.photo,
-                  // C2-2: nullable status — never-contacted contact-sun → null.
-                  status: statusRow?.status ?? null,
-                  archived: header.archived_at !== null,
-                }
-              : null;
+            // C2-2: nullable status — never-contacted contact-sun → null. The
+            // pure mapper also threads getContactHeader's lifecycle state into
+            // the sole self-fallback predicate; this read never mutates the
+            // saved app_settings.sun_contact_id.
+            occupant = mapSunOccupantLookup(header, statusRow?.status ?? null);
             sunContactName = header?.name ?? "";
           }
 
