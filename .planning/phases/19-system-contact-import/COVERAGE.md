@@ -1,0 +1,1 @@
+No external API integration: Phase 19 integrates the Android platform Contact Picker (a local `ACTION_PICK_CONTACTS` OS intent, no network) and on-device SQLite. There is no external network service, SDK, or remote API in scope — the acquisition layer is an in-repo native module and every read/write path is local-first per CLAUDE.md.

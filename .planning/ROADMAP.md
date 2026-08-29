@@ -767,7 +767,22 @@ Plans:
   3. Exact external linkage is deterministic while all other duplicate evidence is conservative and advisory: ambiguous candidates never silently merge/link or block safe batch imports, and Phase 19 performs no generic Orbit-to-Orbit merge.
   4. Accepted picker results become durable resumable import sessions; cancellation before ownership writes nothing, safe partial commits remain committed, independent photo failures do not invalidate contacts, and completion reports bridge to Unbound contacts.
 
-**Plans:** 0 plans
+**Scope decision (resolved at planning):** Android-only for Phase 19 (owner ruling 2026-08-28). Dossier 19's iOS native-picker `[DECIDED]` is honored as design intent for a later iOS milestone and is out of scope now (consistent with the v1 iOS deferral) — sequenced, not reversed.
+
+**Plans:** 11 plans (5 waves)
+
+Plans:
+- [ ] 19-01-PLAN.md — Migration 012 durable import-session schema + session DAO/read chokepoint (one-way gated)
+- [ ] 19-02-PLAN.md — Native Android 17 contact-picker module (ACTION_PICK_CONTACTS, SDK_INT gate, no READ_CONTACTS)
+- [ ] 19-03-PLAN.md — picked-contact-map (pure) + imported-contact-dao (composed Unbound create + external link + provenance)
+- [ ] 19-04-PLAN.md — TRACER: single-contact import end-to-end (speed-dial FAB + Settings entry + review) device-verified before expansion
+- [ ] 19-05-PLAN.md — Duplicate-evidence engine (deterministic bypass + colourless advisory ladder)
+- [ ] 19-06-PLAN.md — Bulk import: chunked partial-failure driver + shared-defaults setup + determinate progress
+- [ ] 19-07-PLAN.md — Reusable candidate card grid + confidence chip + single/multi duplicate interrupts
+- [ ] 19-08-PLAN.md — Import completion summary + bridge to Unbound contacts + Retry
+- [ ] 19-09-PLAN.md — Durable resume/discard launch sweep + cancellation guard + staged-photo cleanup
+- [ ] 19-10-PLAN.md — Photo (post-commit Orbit-owned master) + birthday import, best-effort and failure-isolated
+- [ ] 19-11-PLAN.md — Conservative multi-source consolidation (Cluster K) — explicit combine-into-one, never silent
 
 ### Phase 20: Contact Reconciliation & Merge
 
