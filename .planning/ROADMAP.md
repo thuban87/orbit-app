@@ -741,7 +741,7 @@ Plans:
 
 **Wave 5** *(blocked on Wave 4 completion)*
 
-- [ ] 18.2-08-PLAN.md — create/edit and profile lifecycle forms and Bind/Unbind execution
+- [x] 18.2-08-PLAN.md — create/edit and profile lifecycle forms and Bind/Unbind execution
 
 **Wave 6** *(blocked on Wave 5 completion)*
 
