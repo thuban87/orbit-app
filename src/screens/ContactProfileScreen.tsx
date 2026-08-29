@@ -877,7 +877,7 @@ export function ContactProfileScreen({
         </Pressable>
       ) : null}
 
-      {header?.rarely_responds === 1 ? (
+      {lifecycle.showCadenceTreatment && header?.rarely_responds === 1 ? (
         <Text
           testID="contact-profile-rarely-responds"
           style={[styles.rarelyLabel, { color: colors.textSecondary }]}
