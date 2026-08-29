@@ -1,9 +1,6 @@
 import type { ContactMethodDraft } from "@/db/contact-methods-dao";
 import type { SqlExecutor } from "@/db/types";
-import {
-  normalizeContactMethod,
-  type ContactMethodType,
-} from "@/logic/contact-method-normalization";
+import { normalizeContactMethod } from "@/logic/contact-method-normalization";
 
 export type DuplicateEvidenceSignal =
   | "phoneMatch"
@@ -11,9 +8,34 @@ export type DuplicateEvidenceSignal =
   | "nameOverlap"
   | "birthdayMatch";
 
+export type DuplicateOutcome =
+  | "already_linked"
+  | "probable"
+  | "possible"
+  | "new"
+  | "needs_review";
+
+export type DuplicateRecommendation =
+  | "Recommend Link to Existing"
+  | "Review"
+  | "Import as New"
+  | "Manual Review Required";
+
+// Tunable evidence ladder. One imported source record can contain several
+// methods, so correlated phone/email evidence contributes only its strongest
+// method weight rather than adding two independent identity signals.
+export const PHONE_MATCH_WEIGHT = 80;
+export const EMAIL_MATCH_WEIGHT = 75;
+export const NAME_OVERLAP_WEIGHT = 20;
+export const BIRTHDAY_SUPPORTING_CAP = 5;
+export const NAME_ONLY_CEILING = NAME_OVERLAP_WEIGHT;
+export const PROBABLE_THRESHOLD = 70;
+export const POSSIBLE_THRESHOLD = 15;
+
 export interface DuplicateEvidenceCandidate {
   contactId: number;
   signals: DuplicateEvidenceSignal[];
+  recommendation: DuplicateRecommendation;
   /** Source draft IDs that produced canonical evidence; used to damp correlation. */
   sourceMethodIds: {
     phoneMatch: string[];
@@ -37,7 +59,7 @@ export type DuplicateEvidenceResult =
       candidates: [];
     }
   | {
-      outcome: "new" | "needs_review";
+      outcome: Exclude<DuplicateOutcome, "already_linked">;
       deterministicContactId: null;
       candidates: DuplicateEvidenceCandidate[];
     };
@@ -46,6 +68,12 @@ interface ContactNameRow {
   id: number;
   name: string;
   birthday: string | null;
+}
+
+interface ScoredCandidate {
+  candidate: DuplicateEvidenceCandidate;
+  score: number;
+  outcome: "probable" | "possible" | "new";
 }
 
 function nameTokens(value: string | null | undefined): Set<string> {
@@ -72,11 +100,57 @@ function candidateFor(
     candidate = {
       contactId,
       signals: [],
+      recommendation: "Import as New",
       sourceMethodIds: { phoneMatch: [], emailMatch: [] },
     };
     candidates.set(contactId, candidate);
   }
   return candidate;
+}
+
+function candidateScore(candidate: DuplicateEvidenceCandidate): number {
+  const phoneWeight = candidate.signals.includes("phoneMatch")
+    ? PHONE_MATCH_WEIGHT
+    : 0;
+  const emailWeight = candidate.signals.includes("emailMatch")
+    ? EMAIL_MATCH_WEIGHT
+    : 0;
+  const strongWeight = Math.max(phoneWeight, emailWeight);
+  const nameWeight = candidate.signals.includes("nameOverlap")
+    ? NAME_OVERLAP_WEIGHT
+    : 0;
+  const birthdayWeight = candidate.signals.includes("birthdayMatch")
+    ? BIRTHDAY_SUPPORTING_CAP
+    : 0;
+
+  if (strongWeight > 0) return strongWeight + nameWeight + birthdayWeight;
+  // A birthday has no independent identity power. Name-only remains advisory
+  // and below the link threshold even when supported by a matching birthday.
+  return Math.min(
+    nameWeight + birthdayWeight,
+    NAME_ONLY_CEILING + BIRTHDAY_SUPPORTING_CAP,
+  );
+}
+
+function classifyCandidate(score: number): ScoredCandidate["outcome"] {
+  if (score >= PROBABLE_THRESHOLD) return "probable";
+  if (score >= POSSIBLE_THRESHOLD) return "possible";
+  return "new";
+}
+
+function recommendationFor(
+  outcome: ScoredCandidate["outcome"] | "needs_review",
+): DuplicateRecommendation {
+  switch (outcome) {
+    case "probable":
+      return "Recommend Link to Existing";
+    case "possible":
+      return "Review";
+    case "needs_review":
+      return "Manual Review Required";
+    case "new":
+      return "Import as New";
+  }
 }
 
 function addSignal(
@@ -156,7 +230,10 @@ export async function scoreImportCandidate(
   const incomingNameTokens = nameTokens(input.name);
   for (const contact of contactRows) {
     const candidate = candidates.get(contact.id);
-    if (incomingNameTokens.size > 0 && hasTokenOverlap(incomingNameTokens, nameTokens(contact.name))) {
+    if (
+      incomingNameTokens.size > 0 &&
+      hasTokenOverlap(incomingNameTokens, nameTokens(contact.name))
+    ) {
       addSignal(candidateFor(candidates, contact.id), "nameOverlap");
     }
     if (input.birthday && contact.birthday === input.birthday) {
@@ -167,17 +244,37 @@ export async function scoreImportCandidate(
     void candidate;
   }
 
-  const evidence = [...candidates.values()].sort(
-    (left, right) => left.contactId - right.contactId,
-  );
-  if (evidence.length === 0) {
+  const scored = [...candidates.values()]
+    .map((candidate) => {
+      const score = candidateScore(candidate);
+      const outcome = classifyCandidate(score);
+      candidate.recommendation = recommendationFor(outcome);
+      return { candidate, score, outcome };
+    })
+    .sort(
+      (left, right) =>
+        right.score - left.score ||
+        left.candidate.contactId - right.candidate.contactId,
+    );
+  if (scored.length === 0) {
     return { outcome: "new", deterministicContactId: null, candidates: [] };
   }
+
+  const credible = scored.filter((item) => item.outcome !== "new");
+  if (credible.length >= 2) {
+    for (const item of scored)
+      item.candidate.recommendation = recommendationFor("needs_review");
+    return {
+      outcome: "needs_review",
+      deterministicContactId: null,
+      candidates: scored.map((item) => item.candidate),
+    };
+  }
+
+  const outcome = credible[0]?.outcome ?? "new";
   return {
-    outcome: "needs_review",
+    outcome,
     deterministicContactId: null,
-    candidates: evidence,
+    candidates: scored.map((item) => item.candidate),
   };
 }
-
-export type { ContactMethodType };

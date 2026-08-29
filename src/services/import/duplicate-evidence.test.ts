@@ -5,11 +5,11 @@ vi.mock("expo-sqlite", () => ({}));
 import { nodeSqliteExecutor, openTestDb } from "@/db/__testkit__/node-sqlite";
 import { MIGRATIONS, TARGET_VERSION } from "@/db/database";
 import { runMigrations } from "@/db/migrations/runner";
+import type { SqlExecutor } from "@/db/types";
 import {
   findActiveExternalLink,
   scoreImportCandidate,
 } from "@/services/import/duplicate-evidence";
-import type { SqlExecutor } from "@/db/types";
 
 const NOW = "2026-08-29 12:00:00";
 let exec: SqlExecutor;
@@ -97,7 +97,9 @@ describe("duplicate-evidence", () => {
     await expect(
       scoreImportCandidate(trackingExec, {
         externalContactId: "linked-source",
-        methodDrafts: [{ uid: "source-phone", type: "phone", value: "312 555 1234" }],
+        methodDrafts: [
+          { uid: "source-phone", type: "phone", value: "312 555 1234" },
+        ],
         name: "Linked",
         birthday: null,
         effectivePhoneRegion: "US",
@@ -119,7 +121,9 @@ describe("duplicate-evidence", () => {
 
     const result = await scoreImportCandidate(exec, {
       externalContactId: "new-source",
-      methodDrafts: [{ uid: "source-phone", type: "phone", value: "(312) 555-1234" }],
+      methodDrafts: [
+        { uid: "source-phone", type: "phone", value: "(312) 555-1234" },
+      ],
       name: "Different Name",
       birthday: null,
       effectivePhoneRegion: "US",
@@ -137,7 +141,9 @@ describe("duplicate-evidence", () => {
   it("returns new when canonical, name, and birthday evidence find no candidate", async () => {
     const result = await scoreImportCandidate(exec, {
       externalContactId: "unknown-source",
-      methodDrafts: [{ uid: "source-email", type: "email", value: "new@example.test" }],
+      methodDrafts: [
+        { uid: "source-email", type: "email", value: "new@example.test" },
+      ],
       name: "New Person",
       birthday: "1999-01-01",
       effectivePhoneRegion: "US",
@@ -148,5 +154,127 @@ describe("duplicate-evidence", () => {
       deterministicContactId: null,
       candidates: [],
     });
+  });
+
+  it("recommends linking a single canonical phone match", async () => {
+    const contactId = await seedContact({
+      name: "Strong Match",
+      methods: [{ type: "phone", canonicalValue: "+13125551234" }],
+    });
+
+    await expect(
+      scoreImportCandidate(exec, {
+        externalContactId: "strong-phone",
+        methodDrafts: [
+          { uid: "source-phone", type: "phone", value: "312 555 1234" },
+        ],
+        name: "Different",
+        birthday: null,
+        effectivePhoneRegion: "US",
+      }),
+    ).resolves.toMatchObject({
+      outcome: "probable",
+      candidates: [
+        {
+          contactId,
+          recommendation: "Recommend Link to Existing",
+        },
+      ],
+    });
+  });
+
+  it("never recommends a link from name overlap alone", async () => {
+    await seedContact({ name: "Alex Rivera" });
+
+    const result = await scoreImportCandidate(exec, {
+      externalContactId: "name-only",
+      methodDrafts: [],
+      name: "Alex Smith",
+      birthday: null,
+      effectivePhoneRegion: "US",
+    });
+
+    expect(["possible", "needs_review"]).toContain(result.outcome);
+    expect(result.candidates[0]).toMatchObject({ recommendation: "Review" });
+  });
+
+  it("does not count phone and email from one source record more strongly than one phone", async () => {
+    await seedContact({
+      name: "Correlated Evidence",
+      methods: [
+        { type: "phone", canonicalValue: "+13125551234" },
+        { type: "email", canonicalValue: "person@example.test" },
+      ],
+    });
+    const shared = {
+      externalContactId: "correlated-source",
+      name: "Different",
+      birthday: null,
+      effectivePhoneRegion: "US" as const,
+    };
+
+    const phoneOnly = await scoreImportCandidate(exec, {
+      ...shared,
+      methodDrafts: [{ uid: "phone", type: "phone", value: "312 555 1234" }],
+    });
+    const phoneAndEmail = await scoreImportCandidate(exec, {
+      ...shared,
+      methodDrafts: [
+        { uid: "phone", type: "phone", value: "312 555 1234" },
+        { uid: "email", type: "email", value: "person@example.test" },
+      ],
+    });
+
+    expect(phoneAndEmail.outcome).toBe(phoneOnly.outcome);
+    expect(phoneAndEmail.candidates[0]?.recommendation).toBe(
+      phoneOnly.candidates[0]?.recommendation,
+    );
+  });
+
+  it("treats a birthday-only match as supporting evidence, never probable", async () => {
+    await seedContact({ name: "Birthday Match", birthday: "1990-01-01" });
+
+    const result = await scoreImportCandidate(exec, {
+      externalContactId: "birthday-only",
+      methodDrafts: [],
+      name: "Different Person",
+      birthday: "1990-01-01",
+      effectivePhoneRegion: "US",
+    });
+
+    expect(result.outcome).not.toBe("probable");
+    expect(result.candidates[0]).toMatchObject({
+      recommendation: "Import as New",
+    });
+  });
+
+  it("requires manual review for multiple credible candidates in stable contact-ID order", async () => {
+    const firstId = await seedContact({
+      name: "First Match",
+      methods: [{ type: "phone", canonicalValue: "+13125551234" }],
+    });
+    const secondId = await seedContact({
+      name: "Second Match",
+      methods: [{ type: "phone", canonicalValue: "+13125551234" }],
+    });
+
+    const result = await scoreImportCandidate(exec, {
+      externalContactId: "multiple-credible",
+      methodDrafts: [{ uid: "phone", type: "phone", value: "312 555 1234" }],
+      name: "Different",
+      birthday: null,
+      effectivePhoneRegion: "US",
+    });
+
+    expect(result).toMatchObject({ outcome: "needs_review" });
+    expect(result.candidates.map((candidate) => candidate.contactId)).toEqual([
+      firstId,
+      secondId,
+    ]);
+    expect(result.candidates).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ recommendation: "Manual Review Required" }),
+      ]),
+    );
   });
 });
