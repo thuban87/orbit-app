@@ -33,6 +33,7 @@ import {
 import { getSessionById, listSessionRows } from "@/db/import-session-read";
 import { linkExistingContactToRow } from "@/db/imported-contact-dao";
 import { newUid } from "@/db/uid";
+import { normalizeEditedBirthday } from "@/logic/birthday-logic";
 import { mapPickedContact } from "@/logic/picked-contact-map";
 import type { RootStackScreenProps } from "@/navigation/types";
 import { getDeviceRegion } from "@/services/device-region";
@@ -79,7 +80,7 @@ export function ImportReviewScreen({
     null,
   );
   const [name, setName] = useState("");
-  const [birthday, setBirthday] = useState<string | null>(null);
+  const [birthdayInput, setBirthdayInput] = useState("");
   const [photoRelPath, setPhotoRelPath] = useState<string | null>(null);
   const [categories, setCategories] = useState<
     Array<{ id: number; name: string }>
@@ -141,7 +142,7 @@ export function ImportReviewScreen({
       setRowId(row.id);
       setExternalContactId(row.externalContactId);
       setName(mapped.input.name);
-      setBirthday(mapped.birthday);
+      setBirthdayInput(mapped.birthday ?? "");
       setPhotoRelPath(row.photoRelPath);
       setPhoneRegion(session.phoneRegion);
       const methodDrafts = mapped.input.methodDrafts ?? [];
@@ -166,12 +167,19 @@ export function ImportReviewScreen({
     void load();
   }, [load]);
 
+  const normalizedBirthday = useMemo(
+    () => normalizeEditedBirthday(birthdayInput),
+    [birthdayInput],
+  );
+  const birthdayInvalid =
+    birthdayInput.trim().length > 0 && !normalizedBirthday.valid;
   const canImport =
     !loading &&
     !saving &&
     rowId !== null &&
     externalContactId !== null &&
-    name.trim().length > 0;
+    name.trim().length > 0 &&
+    !birthdayInvalid;
   const previewUri = useMemo(
     () => (photoRelPath ? resolveImportStagingUri(photoRelPath) : null),
     [photoRelPath],
@@ -200,7 +208,7 @@ export function ImportReviewScreen({
       rowId,
       input: makeImportInput(now),
       externalLinks: [{ provider: "android", externalContactId }],
-      birthday,
+      birthday: normalizedBirthday.stored,
       now,
     });
     setDuplicateOutcome(null);
@@ -216,7 +224,7 @@ export function ImportReviewScreen({
         externalContactId,
         methodDrafts: toMethodDrafts(methods),
         name: name.trim(),
-        birthday,
+        birthday: normalizedBirthday.stored,
         effectivePhoneRegion: phoneRegion,
       });
       const now = localDateTime();
@@ -487,10 +495,10 @@ export function ImportReviewScreen({
           Birthday
         </Text>
         <TextInput
-          value={birthday ?? ""}
+          value={birthdayInput}
           onChangeText={(value) => {
             setEdited(true);
-            setBirthday(value.trim() || null);
+            setBirthdayInput(value);
           }}
           placeholder="YYYY-MM-DD"
           placeholderTextColor={colors.textSecondary}
@@ -499,10 +507,17 @@ export function ImportReviewScreen({
             {
               color: colors.textPrimary,
               backgroundColor: colors.surface,
-              borderColor: colors.border,
+              borderColor: birthdayInvalid
+                ? colors.borderStrong
+                : colors.border,
             },
           ]}
         />
+        {birthdayInvalid ? (
+          <Text style={[styles.birthdayError, { color: colors.accent }]}>
+            Enter a real date (YYYY-MM-DD or MM-DD).
+          </Text>
+        ) : null}
       </View>
       <Pressable
         disabled={!canImport}
@@ -627,6 +642,7 @@ const styles = StyleSheet.create({
   title: { fontSize: 22, fontWeight: "700" },
   photo: { width: 96, height: 96, borderRadius: 48 },
   field: { gap: 8 },
+  birthdayError: { fontSize: 13, fontWeight: "600" },
   label: { fontSize: 13, fontWeight: "600" },
   input: {
     minHeight: 44,

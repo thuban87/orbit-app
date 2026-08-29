@@ -114,6 +114,26 @@ export function isValidStoredBirthday(stored: string | null): boolean {
 }
 
 /**
+ * Convert editable birthday text to the persisted shape without silently
+ * coercing malformed dates. Android's year-unknown picker form prefixes MM-DD
+ * values with `--`; storage keeps the existing bare MM-DD convention.
+ */
+export function normalizeEditedBirthday(input: string | null): {
+  stored: string | null;
+  valid: boolean;
+} {
+  const trimmed = input?.trim() ?? "";
+  if (trimmed === "") {
+    return { stored: null, valid: true };
+  }
+
+  const stored = trimmed.replace(/^--/, "");
+  return isValidStoredBirthday(stored)
+    ? { stored, valid: true }
+    : { stored: null, valid: false };
+}
+
+/**
  * The day-of-month on which a birthday is observed in `targetYear`. Normally the
  * stored day, EXCEPT a Feb-29 birthday in a non-leap year, which is observed on
  * `FEB_29_OBSERVED_DAY` (Feb-28) — chosen explicitly so `new Date(y, 1, 29)`
