@@ -8,17 +8,17 @@
  * Canonical import row transitions — the single source of truth for plans 06,
  * 07, 08, and 11:
  *
- * | Event | row_status | match_outcome | contact_id | Writer |
- * | --- | --- | --- | --- | --- |
- * | accepted | pending | NULL | NULL | acceptImportSessionWithRows |
- * | already-linked | skipped | already_linked | NULL | resolveAlreadyLinked(Core) |
- * | import as new | imported | new | set | importer composition |
- * | link existing | linked | probable/possible | set | link composition |
- * | ambiguous deferred | needs_review | probable/possible/needs_review | NULL | deferNeedsReview(Core) |
- * | user Skip | skipped | prior or NULL, never already_linked | NULL | markRowStatus |
- * | import failure | failed | prior | NULL | markRowStatus |
- * | photo-only failure | unchanged | unchanged | unchanged | markRowPhotoFailed |
- * | staging retired (success) | unchanged | unchanged | unchanged | retireRowStagedPhoto |
+ * | Event | row_status | match_outcome | contact_id | photo_rel_path | Writer |
+ * | --- | --- | --- | --- | --- | --- |
+ * | accepted | pending | NULL | NULL | unchanged | acceptImportSessionWithRows |
+ * | already-linked | skipped | already_linked | NULL | unchanged | resolveAlreadyLinked(Core) |
+ * | import as new | imported | new | set | unchanged | importer composition |
+ * | link existing | linked | probable/possible | set | unchanged | link composition |
+ * | ambiguous deferred | needs_review | probable/possible/needs_review | NULL | unchanged | deferNeedsReview(Core) |
+ * | user Skip | skipped | prior or NULL, never already_linked | NULL | unchanged | markRowStatus |
+ * | import failure | failed | prior | NULL | unchanged | markRowStatus |
+ * | photo-only failure | unchanged | unchanged | unchanged | unchanged | markRowPhotoFailed |
+ * | staging retired (success) | unchanged | unchanged | unchanged | photo_rel_path → NULL | retireRowStagedPhoto |
  */
 import { inWriteTransaction } from "@/db/transaction";
 import type { SqlExecutor } from "@/db/types";
