@@ -7,6 +7,7 @@ import Animated, {
   useSharedValue,
   withTiming,
 } from "react-native-reanimated";
+import { speedDialScrimPointerEvents } from "@/components/add-speed-dial-fab-logic";
 import { getAppSettings } from "@/db/app-settings-dao";
 import { getExecutor, localDateTime } from "@/db/database";
 import type { RootStackParamList } from "@/navigation/types";
@@ -28,10 +29,16 @@ export function AddSpeedDialFab() {
     useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const unsupported = useImportUnsupported();
   const [busy, setBusy] = useState(false);
+  // `open` mirrors the `expanded` shared value into React state so the scrim /
+  // option `pointerEvents` can be gated on collapsed state (a shared value alone
+  // never re-renders). The two are kept in lockstep in `setExpanded` below.
+  const [open, setOpen] = useState(false);
   const expanded = useSharedValue(0);
   const setExpanded = (next: boolean) => {
     expanded.value = withTiming(next ? 1 : 0, { duration: 180 });
+    setOpen(next);
   };
+  const scrimPointerEvents = speedDialScrimPointerEvents(open);
   const importStyle = useAnimatedStyle(() => ({
     opacity: expanded.value,
     transform: [{ translateY: -68 * expanded.value }],
@@ -79,12 +86,13 @@ export function AddSpeedDialFab() {
     <View pointerEvents="box-none" style={styles.overlay}>
       <AnimatedPressable
         onPress={() => setExpanded(false)}
-        pointerEvents="auto"
+        pointerEvents={scrimPointerEvents}
         style={[styles.scrim, scrimStyle]}
       />
       <AnimatedPressable
         onPress={() => void importContacts()}
         disabled={busy}
+        pointerEvents={scrimPointerEvents}
         style={[
           styles.option,
           importStyle,
@@ -103,6 +111,7 @@ export function AddSpeedDialFab() {
           setExpanded(false);
           navigation.navigate("Create");
         }}
+        pointerEvents={scrimPointerEvents}
         style={[
           styles.option,
           createStyle,
@@ -120,7 +129,7 @@ export function AddSpeedDialFab() {
         testID="dashboard-create-fab"
         accessibilityRole="button"
         accessibilityLabel="Add contact"
-        onPress={() => setExpanded(expanded.value === 0)}
+        onPress={() => setExpanded(!open)}
         style={[styles.base, { backgroundColor: colors.accent }]}
       >
         <Animated.Text
