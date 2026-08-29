@@ -180,7 +180,9 @@ function validate(manifest: RawManifest): BackupManifest {
   assertPortableSettings(settings, contacts);
   const pairs = new Set<string>();
   for (const contact of arrays.contacts) {
-    if (!Number.isInteger(contact.intervalDays) || (contact.intervalDays as number) <= 0) fail("contacts has an invalid intervalDays");
+    if (contact.intervalDays !== null && (!Number.isInteger(contact.intervalDays) || (contact.intervalDays as number) <= 0)) fail("contacts has an invalid intervalDays");
+    if (contact.trackingEnabled !== 0 && contact.trackingEnabled !== 1) fail("contacts has an invalid trackingEnabled");
+    if (contact.trackingEnabled === 1 && contact.intervalDays === null) fail("Bound contacts require an intervalDays");
     if (contact.categoryUid !== null && contact.categoryUid !== undefined && (typeof contact.categoryUid !== "string" || !categories.has(contact.categoryUid))) {
       fail("contacts has an unknown category UID");
     }

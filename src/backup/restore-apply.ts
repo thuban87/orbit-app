@@ -58,7 +58,7 @@ async function localRows(exec: SqlExecutor, entity: MergeableEntityType): Promis
   const sql: Record<MergeableEntityType, string> = {
     categories: "SELECT uid,name,display_order AS displayOrder,created_at AS createdAt,modified_at FROM categories",
     profile: "SELECT uid,name,created_at AS createdAt,modified_at FROM profile",
-    contacts: "SELECT c.uid,c.name,cat.uid AS categoryUid,c.interval_days AS intervalDays,c.social_battery AS socialBattery,c.birthday,c.archived_at AS archivedAt,c.snooze_until AS snoozeUntil,c.rarely_responds AS rarelyResponds,c.reminders_off AS remindersOff,c.created_at AS createdAt,c.modified_at FROM contacts c LEFT JOIN categories cat ON cat.id=c.category_id",
+    contacts: "SELECT c.uid,c.name,cat.uid AS categoryUid,c.tracking_enabled AS trackingEnabled,c.interval_days AS intervalDays,c.social_battery AS socialBattery,c.birthday,c.archived_at AS archivedAt,c.snooze_until AS snoozeUntil,c.rarely_responds AS rarelyResponds,c.reminders_off AS remindersOff,c.created_at AS createdAt,c.modified_at FROM contacts c LEFT JOIN categories cat ON cat.id=c.category_id",
     contact_methods: "SELECT m.uid,c.uid AS contactUid,m.method_type AS methodType,m.raw_value AS rawValue,m.display_value AS displayValue,m.canonical_value AS canonicalValue,m.canonical_region AS canonicalRegion,m.label,m.extension,m.is_actionable AS isActionable,m.is_primary AS isPrimary,m.display_order AS displayOrder,m.created_at AS createdAt,m.modified_at FROM contact_methods m JOIN contacts c ON c.id=m.contact_id",
     external_contact_links: "SELECT l.uid,c.uid AS contactUid,l.provider,l.external_contact_id AS externalContactId,l.is_active AS isActive,l.created_at AS createdAt,l.modified_at FROM external_contact_links l JOIN contacts c ON c.id=l.contact_id",
     contact_method_provenance: "SELECT p.uid,m.uid AS methodUid,l.uid AS externalContactLinkUid,p.source_method_id AS sourceMethodId,p.created_at AS createdAt,p.modified_at FROM contact_method_provenance p JOIN contact_methods m ON m.id=p.method_id LEFT JOIN external_contact_links l ON l.id=p.external_contact_link_id",
@@ -126,6 +126,16 @@ function normalizePlan(plan: Plan): void {
   for (const actions of byActiveLink.values()) if (actions.length > 1) {
     const winner = normalizedWinner(actions);
     for (const loser of actions) if (loser !== winner) { loser.row!.isActive = 0; updateRetained(loser); }
+  }
+}
+/** Resolve the v11 one-way cadence invariant before opening the restore transaction. */
+function retainAssignedCadence(plan: Plan, localContacts: ReadonlyMap<string, Row>): void {
+  for (const action of writes(plan, "contacts")) {
+    const incoming = action.row as Row;
+    const localCadence = localContacts.get(action.uid)?.intervalDays;
+    if (incoming.trackingEnabled === 0 && incoming.intervalDays === null && Number.isInteger(localCadence) && (localCadence as number) > 0) {
+      incoming.intervalDays = localCadence;
+    }
   }
 }
 function survivorSet(actions: ReconciliationAction[]): ReadonlySet<string> {
@@ -242,6 +252,10 @@ export async function applyRestore(exec: SqlExecutor, manifest: BackupManifest, 
   else for (const entity of entities) { const [,rows,deleted] = local.find(([candidate]) => candidate === entity)!; const result = reconcileEntity({ entityType: entity, localRows: rows, incomingRows: incomingRows(manifest,entity), localTombstones: deleted, incomingTombstones: incomingTombstones(manifest,entity), parentSurvivors: survivors }); plan[entity] = result.actions; survivors[entity] = result.survivors; incompatibilities += result.incompatibilities.length; }
   if (incompatibilities) return { status: "incompatible-destination", incompatibilities };
   normalizePlan(plan);
+  if (mode === "merge") {
+    const [, contacts] = local.find(([entity]) => entity === "contacts")!;
+    retainAssignedCadence(plan, new Map(contacts.map((row) => [row.uid, row])));
+  }
   for (const entity of entities) survivors[entity] = survivorSet(plan[entity]);
   const totals = entities.reduce((out, entity) => { for (const action of plan[entity]) out[action.kind] += 1; return out; }, { insert: 0, update: 0, retain: 0, delete: 0, blocked: 0 });
   const applySettings = mode === "replace-all" || (manifest.appSettings.modifiedAt as string) > settings.modifiedAt;
