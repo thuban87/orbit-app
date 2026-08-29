@@ -28,6 +28,9 @@ private const val PICK_CONTACTS_CODE = 9472
 internal class ContactPickInProgressException :
   CodedException("A system contact picker request is already in progress.")
 
+internal class ContactPickLaunchException :
+  CodedException("Unable to start the system contact picker.")
+
 private data class MutablePickedContact(
   val lookupKey: String,
   var displayName: String? = null,
@@ -80,7 +83,12 @@ class OrbitContactPickerModule : Module() {
         }
       }
       pendingPickPromise = promise
-      appContext.throwingActivity.startActivityForResult(intent, PICK_CONTACTS_CODE)
+      try {
+        appContext.throwingActivity.startActivityForResult(intent, PICK_CONTACTS_CODE)
+      } catch (_: Exception) {
+        pendingPickPromise = null
+        promise.reject(ContactPickLaunchException())
+      }
     }
 
     OnActivityResult { _, (requestCode, resultCode, resultIntent) ->
