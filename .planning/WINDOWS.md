@@ -2,9 +2,9 @@
 schema_version: 1
 open_count: 0
 waived_count: 0
-fixed_count: 4
-total_count: 4
-last_updated: 2026-08-28T07:45:03.119Z
+fixed_count: 5
+total_count: 5
+last_updated: 2026-08-29T00:28:30.525Z
 ---
 
 # Broken Windows Ledger
@@ -19,6 +19,7 @@ last_updated: 2026-08-28T07:45:03.119Z
 | 2 | 17 | deviation | .planning/REQUIREMENTS.md |  | Kept BKP-01 and BKP-03 pending because this dependency gate does not implement the product requirements. | fixed |  | 2026-08-25T21:10:18.202Z | 2026-08-25T21:10:24.189Z |
 | 3 | 17 | deviation | src/db/migrations/007-tombstones.ts |  | Added local-only backup_folder_accessible to preserve SAF access-probe health. | fixed |  | 2026-08-25T21:42:36.632Z | 2026-08-25T21:43:06.513Z |
 | 4 | 18.1 | deviation | src/screens/ComposeScreen.tsx | 438 | Closed undefined SMS destination path with an explicit null guard. | fixed |  | 2026-08-28T07:44:01.382Z | 2026-08-28T07:45:03.119Z |
+| 5 | 18.2 | deviation | src/db/ai-context-read.test.ts |  | Corrected future-dated Unbound test touchpoint fixture before RED verification. | fixed |  | 2026-08-29T00:27:47.044Z | 2026-08-29T00:28:30.525Z |
 
 ````json
 [
@@ -69,6 +70,18 @@ last_updated: 2026-08-28T07:45:03.119Z
     "reason": "",
     "recorded_at": "2026-08-28T07:44:01.382Z",
     "resolved_at": "2026-08-28T07:45:03.119Z"
+  },
+  {
+    "id": 5,
+    "kind": "deviation",
+    "phase": "18.2",
+    "file": "src/db/ai-context-read.test.ts",
+    "line": null,
+    "description": "Corrected future-dated Unbound test touchpoint fixture before RED verification.",
+    "status": "fixed",
+    "reason": "",
+    "recorded_at": "2026-08-29T00:27:47.044Z",
+    "resolved_at": "2026-08-29T00:28:30.525Z"
   }
 ]
 ````
