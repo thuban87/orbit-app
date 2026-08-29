@@ -184,6 +184,39 @@ describe("contact-import-resume-sweep", () => {
     expect(fs.deleted).toEqual(["import-staging/import-orphan.jpg"]);
   });
 
+  it("deletes completed and skipped staging while retaining needs-review retry input", async () => {
+    const accepted = await acceptRows([
+      "imported",
+      "linked",
+      "skipped",
+      "needs-review",
+    ]);
+    await exec.runAsync(
+      `UPDATE import_session_rows
+       SET row_status = CASE id
+         WHEN ? THEN 'imported'
+         WHEN ? THEN 'linked'
+         WHEN ? THEN 'skipped'
+         WHEN ? THEN 'needs_review'
+       END`,
+      accepted.rowIds,
+    );
+    const fs = stagingFs([
+      "import-staging/import-imported.jpg",
+      "import-staging/import-linked.jpg",
+      "import-staging/import-skipped.jpg",
+      "import-staging/import-needs-review.jpg",
+    ]);
+
+    await reconcileOrphanStagedPhotos(exec, fs);
+
+    expect(fs.deleted).toEqual([
+      "import-staging/import-imported.jpg",
+      "import-staging/import-linked.jpg",
+      "import-staging/import-skipped.jpg",
+    ]);
+  });
+
   it("treats an unparseable durable snapshot as discard-only without throwing", async () => {
     const accepted = await acceptRows(["broken"], { corrupt: true });
     const onResumable = vi.fn<(value: ResumableImport | null) => void>();

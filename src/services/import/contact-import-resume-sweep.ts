@@ -82,8 +82,9 @@ export async function describeResumable(
 
 /**
  * The launch-time backstop for staging files left by an interrupted discard,
- * Replace-all, or failed accept. Every row in a non-discarded session is live:
- * in particular, pending and failed rows retain their retry input.
+ * Replace-all, or failed accept. Only unresolved or retryable rows in a
+ * non-discarded session are live: pending, needs_review, and failed rows retain
+ * their staged source for resume or Retry.
  */
 export async function reconcileOrphanStagedPhotos(
   exec: SqlExecutor,
@@ -93,7 +94,9 @@ export async function reconcileOrphanStagedPhotos(
     `SELECT r.photo_rel_path
        FROM import_session_rows r
        JOIN import_sessions s ON s.id = r.session_id
-      WHERE s.status != 'discarded' AND r.photo_rel_path IS NOT NULL`,
+      WHERE s.status != 'discarded'
+        AND r.row_status IN ('pending', 'needs_review', 'failed')
+        AND r.photo_rel_path IS NOT NULL`,
   );
   const livePaths = new Set(
     liveRows.flatMap(({ photo_rel_path }) =>
