@@ -13,7 +13,11 @@
 import { describe, expect, it } from "vitest";
 import { THEME_PRESETS } from "@/theme/theme-presets";
 import { orreryRingStyle } from "./orrery-ring-logic";
-import { resolveSunOccupant, sunOccupantIsSelf } from "./sun-occupant-logic";
+import {
+  mapSunOccupantLookup,
+  resolveSunOccupant,
+  sunOccupantIsSelf,
+} from "./sun-occupant-logic";
 
 const colors = THEME_PRESETS["space-dark"].dark;
 const starPalette = colors.starPalette;
@@ -101,6 +105,40 @@ describe("resolveSunOccupant", () => {
     expect(out.kind).toBe("self");
     expect(out.glowColor).toBe(starPalette[0]);
   });
+
+  it("a saved live Unbound sun renders self without changing its stored id, then renders the contact again after Bind", () => {
+    const savedSunContactId = 12;
+    const unbound = resolveSunOccupant({
+      ...base,
+      sunContactId: savedSunContactId,
+      selfSunColour: PICKED,
+      occupant: {
+        photo: "file:///c12.jpg",
+        status: "stable",
+        archived: false,
+        trackingEnabled: 0,
+      },
+    });
+    expect(unbound.kind).toBe("self");
+    // Rendering policy must never mutate the persisted selection.
+    expect(savedSunContactId).toBe(12);
+
+    const rebound = resolveSunOccupant({
+      ...base,
+      sunContactId: savedSunContactId,
+      selfSunColour: PICKED,
+      occupant: {
+        photo: "file:///c12.jpg",
+        status: "stable",
+        archived: false,
+        trackingEnabled: 1,
+      },
+    });
+    expect(rebound).toMatchObject({
+      kind: "contact",
+      contactId: savedSunContactId,
+    });
+  });
 });
 
 describe("sunOccupantIsSelf — the single archived/missing→self policy (WR-03)", () => {
@@ -122,8 +160,22 @@ describe("sunOccupantIsSelf — the single archived/missing→self policy (WR-03
 
   it("a live, non-archived contact → NOT self", () => {
     expect(
-      sunOccupantIsSelf({ sunContactId: 5, occupant: { archived: false } }),
+      sunOccupantIsSelf({
+        sunContactId: 5,
+        occupant: { archived: false, trackingEnabled: 1 },
+      }),
     ).toBe(false);
+  });
+
+  it("a saved live Unbound contact → self while retaining the saved reference", () => {
+    const savedSunContactId = 12;
+    expect(
+      sunOccupantIsSelf({
+        sunContactId: savedSunContactId,
+        occupant: { archived: false, trackingEnabled: 0 },
+      }),
+    ).toBe(true);
+    expect(savedSunContactId).toBe(12);
   });
 
   it("agrees with resolveSunOccupant's self/contact resolution in every case (Settings ↔ canvas)", () => {
@@ -147,5 +199,29 @@ describe("sunOccupantIsSelf — the single archived/missing→self policy (WR-03
       });
       expect(sunOccupantIsSelf(c)).toBe(resolved.kind === "self");
     }
+  });
+});
+
+describe("mapSunOccupantLookup — OrreryScreen lifecycle pass-through", () => {
+  it("maps getContactHeader lifecycle state into the sole sun predicate input", () => {
+    expect(
+      mapSunOccupantLookup(
+        {
+          photo: "avatars/contact.jpg",
+          archived_at: null,
+          trackingEnabled: 0,
+        },
+        "decay",
+      ),
+    ).toEqual({
+      photo: "avatars/contact.jpg",
+      status: "decay",
+      archived: false,
+      trackingEnabled: 0,
+    });
+  });
+
+  it("retains missing lookup as null", () => {
+    expect(mapSunOccupantLookup(null, null)).toBeNull();
   });
 });
