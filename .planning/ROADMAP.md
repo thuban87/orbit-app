@@ -732,7 +732,7 @@ Plans:
 
 - [x] 18.2-04-PLAN.md — nullable-cadence impact and explicit-AI reads
 - [x] 18.2-05-PLAN.md — Orrery Bound-only reads and shared saved-sun policy
-- [ ] 18.2-09-PLAN.md — Bound/Unbound backup extension and lifecycle-combo validation
+- [x] 18.2-09-PLAN.md — Bound/Unbound backup extension and lifecycle-combo validation
 
 **Wave 4** *(blocked on Wave 3 completion)*
 
