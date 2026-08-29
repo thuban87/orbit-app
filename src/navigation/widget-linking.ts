@@ -44,6 +44,10 @@
  * single-owner job).
  */
 import { useEffect, useState } from "react";
+import { guardWidgetIntent } from "@/services/widget/widget-quick-action-guard";
+import { Logger } from "@/utils/logger";
+
+const LOG_SOURCE = "widget-linking";
 
 /**
  * A serializable RESET intent — the gate applies it verbatim as
@@ -206,24 +210,44 @@ export function WidgetLinkingGate({ isReady }: { isReady: boolean }) {
     };
   }, []);
 
-  // Flush a queued intent once BOTH it and navigator readiness settle. Every
-  // intent is a reset, so the gate is a single reset call with no branching.
+  // Flush a queued intent once BOTH it and navigator readiness settle. The strict
+  // URI resolver stays pure; this separate live-state guard fails closed for a
+  // stale active-cadence action while preserving live Unbound Profile opens.
   useEffect(() => {
     if (!isReady || pending === null) {
       return;
     }
     let cancelled = false;
     void (async () => {
+      const guarded = await guardWidgetIntent(pending, async (contactId) => {
+        const [{ getExecutor }, { getContactHeader }] = await Promise.all([
+          import("@/db/database"),
+          import("@/db/contact-read"),
+        ]);
+        return getContactHeader(getExecutor(), contactId);
+      });
+      if (cancelled) {
+        return;
+      }
+      if (guarded === null) {
+        setPending(null);
+        return;
+      }
       const { navigationRef } = await import("./linking");
       if (cancelled) {
         return;
       }
       navigationRef.current?.reset({
-        index: pending.index,
-        routes: pending.routes,
+        index: guarded.index,
+        routes: guarded.routes,
       });
       setPending(null);
-    })();
+    })().catch((error) => {
+      Logger.error(LOG_SOURCE, "widget intent guard failed", error);
+      if (!cancelled) {
+        setPending(null);
+      }
+    });
     return () => {
       cancelled = true;
     };
