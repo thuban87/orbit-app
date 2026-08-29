@@ -18,7 +18,7 @@ import java.io.InputStream
 // API 37's constants are deliberately string literals so this local module can
 // compile on the existing Expo toolchain. The runtime SDK check below ensures
 // older Android versions never launch this Android-17-only activity.
-private const val ACTION_PICK_CONTACTS = "android.intent.action.PICK_CONTACTS"
+private const val ACTION_PICK_CONTACTS = "android.provider.action.PICK_CONTACTS"
 private const val EXTRA_USE_SYSTEM_CONTACTS_PICKER =
   "android.provider.extra.USE_SYSTEM_CONTACTS_PICKER"
 private const val EXTRA_PICK_CONTACTS_REQUESTED_DATA_FIELDS =
