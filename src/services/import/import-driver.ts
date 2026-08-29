@@ -98,6 +98,7 @@ export async function importRowAsNew(
   });
   const photo = await persistImportedPhotoPostCommit(exec, importedPhotoFs, {
     contactId,
+    rowId: params.row.id,
     stagedPhotoPath: params.row.photoRelPath,
     now: params.now,
   });

@@ -130,6 +130,7 @@ export async function commitSingleImport(
   );
   const photo = await persistImportedPhotoPostCommit(exec, importedPhotoFs, {
     contactId,
+    rowId: params.rowId,
     stagedPhotoPath: row?.photoRelPath ?? null,
     now: params.now,
   });

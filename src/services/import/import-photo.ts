@@ -7,6 +7,7 @@
  */
 import type * as ExpoImageManipulator from "expo-image-manipulator";
 import { setContactPhoto } from "@/db/contacts-dao";
+import { retireRowStagedPhoto } from "@/db/import-session-dao";
 import type { SqlExecutor } from "@/db/types";
 import { Logger } from "@/utils/logger";
 
@@ -19,6 +20,7 @@ export interface ImportedPhotoFs {
   contactPhotoRelPath: (contactId: number) => string | Promise<string>;
   resizeToMaster: (stagedPhotoPath: string) => Promise<string>;
   persistMaster: (sourceUri: string, relative: string) => Promise<string>;
+  deleteImportStaging: (relative: string) => void | Promise<void>;
   setContactPhoto: (
     exec: SqlExecutor,
     contactId: number,
@@ -63,12 +65,20 @@ async function persistPhotoMaster(
   return persistMaster(sourceUri, relative);
 }
 
+async function deleteStagedPhoto(relative: string): Promise<void> {
+  const { deleteImportStaging } = await import(
+    "@/services/photos/photo-storage"
+  );
+  deleteImportStaging(relative);
+}
+
 /** The production dependencies; callers may inject this boundary for node tests. */
 export const importedPhotoFs: ImportedPhotoFs = {
   resolveStagedPhotoPath,
   contactPhotoRelPath: photoRelativePath,
   resizeToMaster,
   persistMaster: persistPhotoMaster,
+  deleteImportStaging: deleteStagedPhoto,
   setContactPhoto,
 };
 
@@ -88,6 +98,7 @@ export async function persistImportedPhotoPostCommit(
   fs: ImportedPhotoFs,
   params: {
     contactId: number;
+    rowId: number;
     stagedPhotoPath: string | null;
     now: string;
   },
@@ -102,6 +113,16 @@ export async function persistImportedPhotoPostCommit(
     const resizedUri = await fs.resizeToMaster(stagedUri);
     await fs.persistMaster(resizedUri, relative);
     await fs.setContactPhoto(exec, params.contactId, relative, params.now);
+    await retireRowStagedPhoto(exec, params.rowId, params.now);
+    try {
+      await fs.deleteImportStaging(params.stagedPhotoPath);
+    } catch (error) {
+      Logger.error(
+        LOG_SCOPE,
+        `could not delete imported staging photo for row ${params.rowId}`,
+        error,
+      );
+    }
     return { ok: true };
   } catch (error) {
     Logger.error(

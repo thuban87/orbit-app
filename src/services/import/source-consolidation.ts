@@ -249,11 +249,14 @@ export async function combineCluster(
     return { contactId: created.contactId };
   });
 
-  const photo = await persistImportedPhotoPostCommit(exec, fs, {
-    contactId,
-    stagedPhotoPath: photoRow?.photoRelPath ?? null,
-    now: params.now,
-  });
+  const photo = photoRow
+    ? await persistImportedPhotoPostCommit(exec, fs, {
+        contactId,
+        rowId: photoRow.id,
+        stagedPhotoPath: photoRow.photoRelPath,
+        now: params.now,
+      })
+    : { ok: true, skipped: true };
   if (!photo.ok && photoRow) {
     try {
       await markRowPhotoFailed(exec, photoRow.id, params.now);

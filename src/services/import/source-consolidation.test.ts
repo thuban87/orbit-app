@@ -62,6 +62,7 @@ function photoFs(overrides: Partial<ImportedPhotoFs> = {}): ImportedPhotoFs {
     resizeToMaster: async (uri) => uri,
     persistMaster: async () => "saved",
     setContactPhoto: async () => {},
+    deleteImportStaging: () => {},
     ...overrides,
   };
 }

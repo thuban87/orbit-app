@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { SqlExecutor } from "@/db/types";
 
 vi.mock("expo-image-manipulator", () => ({
@@ -6,9 +6,13 @@ vi.mock("expo-image-manipulator", () => ({
   SaveFormat: { JPEG: "jpeg" },
 }));
 vi.mock("@/db/contacts-dao", () => ({ setContactPhoto: vi.fn() }));
+vi.mock("@/db/import-session-dao", () => ({
+  retireRowStagedPhoto: vi.fn().mockResolvedValue(undefined),
+}));
 vi.mock("@/services/photos/photo-storage", () => ({
   contactPhotoRelPath: (contactId: number) =>
     `avatars/contact-${contactId}.jpg`,
+  deleteImportStaging: vi.fn(),
   persistMaster: vi.fn(),
   resolveImportStagingUri: (relative: string) =>
     `file:///documents/${relative}`,
@@ -21,8 +25,13 @@ import {
   type ImportedPhotoFs,
   persistImportedPhotoPostCommit,
 } from "@/services/import/import-photo";
+import { retireRowStagedPhoto } from "@/db/import-session-dao";
 
 const NOW = "2026-08-29 12:00:00";
+
+beforeEach(() => {
+  vi.clearAllMocks();
+});
 
 function createFs(overrides: Partial<ImportedPhotoFs> = {}): ImportedPhotoFs {
   return {
@@ -35,6 +44,7 @@ function createFs(overrides: Partial<ImportedPhotoFs> = {}): ImportedPhotoFs {
     resizeToMaster: vi.fn().mockResolvedValue("file:///cache/master.jpg"),
     persistMaster: vi.fn().mockResolvedValue("avatars/contact-42.jpg"),
     setContactPhoto: vi.fn().mockResolvedValue(undefined),
+    deleteImportStaging: vi.fn(),
     ...overrides,
   };
 }
@@ -46,6 +56,7 @@ describe("persistImportedPhotoPostCommit", () => {
     await expect(
       persistImportedPhotoPostCommit({} as SqlExecutor, fs, {
         contactId: 42,
+        rowId: 7,
         stagedPhotoPath: "import-staging/import-session-row.jpg",
         now: NOW,
       }),
@@ -64,6 +75,14 @@ describe("persistImportedPhotoPostCommit", () => {
       "avatars/contact-42.jpg",
       NOW,
     );
+    expect(retireRowStagedPhoto).toHaveBeenCalledWith(
+      expect.anything(),
+      7,
+      NOW,
+    );
+    expect(fs.deleteImportStaging).toHaveBeenCalledWith(
+      "import-staging/import-session-row.jpg",
+    );
   });
 
   it("photo failure returns ok:false and does not throw", async () => {
@@ -74,12 +93,34 @@ describe("persistImportedPhotoPostCommit", () => {
     await expect(
       persistImportedPhotoPostCommit({} as SqlExecutor, fs, {
         contactId: 42,
+        rowId: 7,
         stagedPhotoPath: "import-staging/import-session-row.jpg",
         now: NOW,
       }),
     ).resolves.toEqual({ ok: false });
     expect(fs.persistMaster).not.toHaveBeenCalled();
     expect(fs.setContactPhoto).not.toHaveBeenCalled();
+    expect(retireRowStagedPhoto).not.toHaveBeenCalled();
+    expect(fs.deleteImportStaging).not.toHaveBeenCalled();
+  });
+
+  it("preserves staging when recording the master photo fails", async () => {
+    const fs = createFs({
+      setContactPhoto: vi.fn().mockRejectedValue(new Error("database failed")),
+    });
+
+    await expect(
+      persistImportedPhotoPostCommit({} as SqlExecutor, fs, {
+        contactId: 42,
+        rowId: 7,
+        stagedPhotoPath: "import-staging/import-session-row.jpg",
+        now: NOW,
+      }),
+    ).resolves.toEqual({ ok: false });
+
+    expect(fs.persistMaster).toHaveBeenCalled();
+    expect(retireRowStagedPhoto).not.toHaveBeenCalled();
+    expect(fs.deleteImportStaging).not.toHaveBeenCalled();
   });
 
   it("null staged photo is a skipped no-op", async () => {
@@ -88,6 +129,7 @@ describe("persistImportedPhotoPostCommit", () => {
     await expect(
       persistImportedPhotoPostCommit({} as SqlExecutor, fs, {
         contactId: 42,
+        rowId: 7,
         stagedPhotoPath: null,
         now: NOW,
       }),
@@ -95,5 +137,22 @@ describe("persistImportedPhotoPostCommit", () => {
     expect(fs.resizeToMaster).not.toHaveBeenCalled();
     expect(fs.persistMaster).not.toHaveBeenCalled();
     expect(fs.setContactPhoto).not.toHaveBeenCalled();
+    expect(retireRowStagedPhoto).not.toHaveBeenCalled();
+    expect(fs.deleteImportStaging).not.toHaveBeenCalled();
+  });
+
+  it("empty staged photo is a skipped no-op", async () => {
+    const fs = createFs();
+
+    await expect(
+      persistImportedPhotoPostCommit({} as SqlExecutor, fs, {
+        contactId: 42,
+        rowId: 7,
+        stagedPhotoPath: "",
+        now: NOW,
+      }),
+    ).resolves.toEqual({ ok: true, skipped: true });
+    expect(retireRowStagedPhoto).not.toHaveBeenCalled();
+    expect(fs.deleteImportStaging).not.toHaveBeenCalled();
   });
 });
