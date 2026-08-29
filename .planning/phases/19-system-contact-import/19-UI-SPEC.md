@@ -1,10 +1,11 @@
 ---
 phase: 19
 slug: system-contact-import
-status: draft
+status: approved
 shadcn_initialized: false
 preset: none
 created: 2026-08-28
+reviewed_at: 2026-08-28
 ---
 
 # Phase 19 — System Contact Import — UI Design Contract
@@ -59,7 +60,8 @@ The planner/executor MUST reuse these shipped primitives rather than build new o
 | Contact tile / row (avatar + name + secondary line) | `ContactCard` (dashboard card) or the Unbound row idiom | `src/components/ContactCard.tsx`, `src/screens/UnboundContactsScreen.tsx` |
 | Avatar with initials fallback + cache-bust | `Avatar` | `src/components/Avatar.tsx` |
 | Two-segment / equal-width toggle (e.g. Bound / Unbound) | `SegmentedControl` (generic, filled-accent idiom) | `src/components/SegmentedControl.tsx` |
-| Multi-option action sheet (the Add menu, bulk-action sheet) | `OverflowMenu`'s Modal-sheet-over-scrim pattern | `src/components/OverflowMenu.tsx` |
+| Bulk-action sheet (grid multi-select actions) | `OverflowMenu`'s Modal-sheet-over-scrim pattern | `src/components/OverflowMenu.tsx` |
+| Add-menu **speed-dial FAB** (owner-decided) | net-new animated FAB — Reanimated shared values only, no new library; the existing single `+` FAB is the visual base | `src/screens/HomeScreen.tsx` (FAB at 652–663) + Reanimated |
 | Bound/Unbound + cadence-if-Bound + category + methods on the single-import review | The **exact** create-form block | `src/screens/CreateContactScreen.tsx` (lines ~243–349) |
 | Cadence picker (Bound only) | `FrequencyPicker` | `src/components/FrequencyPicker.tsx` |
 | Category select | `@react-native-picker/picker` in a `pickerShell` (as create form does) | `src/screens/CreateContactScreen.tsx` |
@@ -74,7 +76,7 @@ The planner/executor MUST reuse these shipped primitives rather than build new o
 
 ## ⚠ Code-grounded corrections the planner must honor
 
-1. **There is no multi-option FAB today.** `HomeScreen.tsx` (lines 652–663) renders a **single** `+` FAB whose `onPress` is `navigation.navigate("Create")` — it goes straight to create with no menu. Dossier Cluster A's phrasing "the dashboard already uses a multi-option FAB" is **not** true against shipped code. Phase 19 therefore **adds** the multi-option behavior: tapping `+` opens a small action sheet (`Create manually` / `Import from Contacts`) rather than navigating directly. Reuse `OverflowMenu`'s Modal-sheet-over-scrim treatment; do not add a new FAB library.
+1. **There is no multi-option FAB today.** `HomeScreen.tsx` (lines 652–663) renders a **single** `+` FAB whose `onPress` is `navigation.navigate("Create")` — it goes straight to create with no menu. Dossier Cluster A's phrasing "the dashboard already uses a multi-option FAB" is **not** true against shipped code. Phase 19 therefore **adds** the multi-option behavior. **[OWNER-DECIDED 2026-08-28: speed-dial FAB.]** Tapping `+` expands into stacked mini-FABs that animate outward (`Import from Contacts` / `Create manually`) and the `+` glyph rotates to a `×`/close affordance; tapping the scrim or `×` collapses it. Animate with **Reanimated shared values only** (already an app dependency for gestures) — **never** drive the expand/collapse from React state (per CLAUDE.md's animation rule). No new FAB/animation library is added. Portrait single column; each mini-FAB is ≥44px. (This supersedes the earlier action-sheet recommendation.)
 2. **No central spacing or typography token module exists.** Spacing and font sizes are inline per-`StyleSheet`. The scales below are the **de-facto shipped** values distilled from real screens — match them; do not introduce a divergent scale.
 3. **No dedicated "caution/warning" colour token exists.** `rogue` (amber) and `statusWobble` (gold) are *orbit-status* tokens, `danger` (red) is *destructive-action only*. The confidence ladder must NOT borrow any of these to color-code match outcomes (that would conflate identity confidence with orbit status / destruction). See Color + Confidence Ladder below.
 
@@ -160,7 +162,7 @@ Locked behavior: recommendations are advisory (never an automatic identity decis
 ## Screen-by-screen interaction contract
 
 ### 1. Entry points
-- **Dashboard `+`:** tapping opens an action sheet (OverflowMenu idiom) with two rows: `Create manually` → `Create` route; `Import from Contacts` → import entry. (Replaces today's direct-to-Create navigation.)
+- **Dashboard `+` (speed-dial FAB — owner-decided 2026-08-28):** tapping `+` expands into two stacked mini-FABs animating outward — `Import from Contacts` → import entry; `Create manually` → `Create` route — with the `+` rotating to a `×` close affordance and a tap-scrim to collapse. (Replaces today's direct-to-Create navigation.) Animation via Reanimated shared values only, never React state; no new library.
 - **Settings:** add a `Contacts Integration` section (reuse `settings.section` / `sectionHeading` idiom, `13px/600 textSecondary` heading) with one row now: `Import contacts`. Phase 20 maintenance rows land in this same section later — leave room, add nothing else this phase.
 
 ### 2. Single-contact import-review screen
@@ -230,22 +232,32 @@ Voice: calm, plain, non-nagging (consistent with shipped Unbound/empty-state cop
 
 ## UI Considerations
 
-State coverage for the net-new import surfaces. Empty/error COPY lives in the Copywriting Contract above; this table references those rows.
+State coverage for the net-new import surfaces, computed by the `ui-consideration-probe` engine over
+the 11 described surfaces (E1 Add-menu FAB · E2 Settings section · E3 single-review · E4 bulk setup ·
+E5 card-grid workspace · E6 confidence chip · E7 duplicate interrupt · E8 progress · E9 completion
+summary · E10 resume/discard · E11 unsupported platform). Empty/error COPY lives in the Copywriting
+Contract above; this section covers shape-rooted STATE coverage and references those rows rather than
+restating them.
 
-Applicable state considerations resolved: 7 covered, 2 backstop, 1 unresolved.
+**Probe result:** 69 applicable considerations across 9 state categories. **Resolved:** 62 explicit
+(the spec states a concrete truth) · 6 backstop (needs a held-out UI-state test at implementation) ·
+1 unresolved (planner assumption). Resolution is per-category below; dismissals are noted with reason.
 
-| Category | Element(s) | Status | Resolution / Reason |
-|----------|------------|--------|---------------------|
-| empty | card-grid workspace | ✅ covered | Zero-review grid renders `Nothing to review` copy (Copywriting) |
-| empty | unsupported platform | ✅ covered | Renders the locked `Contact import requires Android 17 or later.` state; rest of app usable |
-| loading | progress screen | ✅ covered | Determinate `Importing… X of N` with incremental sub-status; never a bare spinner |
-| error | partial batch failure | ✅ covered | Summary shows `Failed / skipped (n)` + `Retry`; safe contacts stay committed (Cluster P) |
-| error | source record with no usable name | ✅ covered | Blocks import with the name-required copy; user supplies a name (Cluster O) |
-| populated | single-review + grid | ✅ covered | Reuses create-form field stack; grid renders candidate cards with advisory chips |
-| partial | resumable session on return | ✅ covered | Resume/Discard prompt; committed contacts independent of pending state (Cluster R) |
-| zero-one-many | duplicate resolution (0/1/many candidates) | 🧪 backstop | 1 strong → Link/Import-as-New interrupt; many → choose-one/import-new/skip; 0 → straight to review. Verify per-branch at implementation |
-| long-text | long contact names / many methods on a card | 🧪 backstop | Cards use `numberOfLines={1}` + ellipsize (ContactCard precedent); confirm grid cell width holds 2-up in portrait |
-| overflow | very large import (thousands) in the grid | ⚠ unresolved | Chunked processing is decided; grid virtualization/paging strategy for a multi-thousand review set is a planner assumption to resolve |
+| Category | Elements | Status | Resolution / Reason |
+|----------|----------|--------|---------------------|
+| **empty** | E5 grid · E9 summary · E11 platform | ✅ explicit | Grid → `Nothing to review` / `All picked contacts were imported.`; summary renders `(0)` counts; unsupported → locked `Contact import requires Android 17 or later.` (Copywriting). Menus (E1/E2) and the conditional resume prompt (E10) have no data-empty state — dismissed (static action lists / shown only when a session exists). |
+| **loading** | E8 progress · E5 grid | ✅ explicit (E8) · 🧪 backstop (E5) | E8 progress screen **is** the loading surface: determinate `Importing… X of N`, never a bare spinner. E3 fields populate synchronously from the picker result (explicit). **Backstop:** while duplicate scoring is in flight, the E5 grid must show a determinate/in-progress state, not a frozen blank. Menus (E1/E2) load nothing — dismissed. |
+| **error** | E3 name · E9 batch · E5 card action · E10 session | ✅ explicit (E3,E9) · 🧪 backstop (E5,E10) | E3 → name-required copy blocks import (Cluster O); E9 → `Failed / skipped (n)` + `Retry`, safe contacts stay committed (Cluster P). **Backstop:** a single E5 card action (e.g. link write) failing surfaces per-card without aborting the batch; an unreadable/corrupt E10 session offers `Discard` rather than crashing. |
+| **populated** | E1–E10 | ✅ explicit | Happy-path layout fully specified in the Screen-by-screen contract at typical volume. |
+| **partial** | E3 sparse source · E5 partly-resolved grid · E9 partial counts · E10 session | ✅ explicit | Sparse source imports (name required); unresolved grid cards remain while safe imports proceed (Cluster L); partial completion counts render; resumable session survives to Resume/Discard (Cluster R). |
+| **long-text** | E5/E7 card names · single-column screens | ✅ explicit · 🧪 backstop (E5) | Single-column screens wrap/ellipsize per shipped idiom (explicit). **Backstop:** confirm a long name + many methods hold the 2-up card width in portrait (`numberOfLines={1}` + ellipsize, ContactCard precedent). |
+| **overflow** | E5 grid at thousands · E7 many candidates | ✅ explicit (E7) · ⚠ unresolved (E5) | E7 candidate list scrolls; E9 fixed 4-row summary can't overflow — dismissed. ⚠ **Unresolved — planner must treat as assumption:** `FlatList` is virtualized by default, but the paging/window strategy and whether the on-screen review batch is capped for a multi-thousand review set is a **planner** decision (delegated; not an owner call). Chunked *processing* is already decided (Cluster S). |
+| **zero-one-many** | E7 candidates (0/1/many) · E4/E9 counts | 🧪 backstop | E7: 0 → straight to review; 1 strong → Link/Import-as-New interrupt; many → choose-one/import-new/skip (Cluster I). **Backstop:** verify each branch renders and that E4 `Import N contacts` / E9 count rows pluralize (`1 contact` vs `N contacts`). |
+| **unclassified** | E6 confidence chip | ✅ explicit | Classified on review: E6 is a **display badge** with 5 enumerated variants (`Already in Orbit`/`Probable match`/`Possible match`/`New person`/`Needs review`), colourless (owner-confirmed no caution hue), never a raw numeric score. Not a gap. |
+
+**Backstop inventory (6) — held-out UI-state tests the executor/verifier must wire:** (1) E5 grid shows progress, not a frozen blank, while scoring runs; (2) per-card E5 action failure isolates without aborting the batch; (3) unreadable E10 session → Discard path, no crash; (4) long name/many methods hold the 2-up grid card in portrait; (5) E7 0/1/many branches each render; (6) singular/plural count copy (E4/E9).
+
+**Unresolved (1) — planner assumption:** E5 grid virtualization/paging strategy at thousands of candidates.
 
 ---
 
@@ -259,23 +271,23 @@ No third-party UI registry, block, or component-generator is used or introduced.
 
 ---
 
-## Open dependencies for the owner (NOT resolved here)
+## Open dependencies — RESOLVED by owner (2026-08-28)
 
-These are recorded, not decided — surfacing per the orchestrator brief. They are owner-bucket calls (risk/scope/product), not researcher calls.
+All three were owner-bucket calls (risk/scope/product/taste). Decided in one batched round after both reviews:
 
-1. **iOS picker scope conflict (unresolved, do not design around it).** Dossier 19 Cluster B has a `[DECIDED]` "iOS uses the native privacy-preserving contact picker" line, but PROJECT.md / REQUIREMENTS.md line 200 / HANDOFF §11 defer iOS for v1, and the ROADMAP makes no scope choice. **This spec designs Android-first only.** No iOS-specific screen is specified. The only place iOS would materially change this contract is the entry-point/picker wrapper and the unsupported-state copy; if the owner rules iOS in-scope, the entry points (#1) and unsupported state (#10) need an iOS variant. **Owner decision required before planning finalizes the picker layer.**
-2. **Multi-option FAB introduction.** Adding the Add-menu changes a shipped interaction (the `+` FAB currently goes straight to Create). This is a small UX change but it alters existing behavior — confirm the action-sheet approach (vs. a speed-dial FAB) is acceptable. Recommended: the OverflowMenu Modal-sheet idiom (already in the app), not a new FAB animation library.
-3. **Caution hue for "Needs review".** The advisory ladder deliberately uses no semantic colour. If the owner wants "Needs review" visually distinguished by hue, that is a new theme token (owner-tunable seed like `rogue`/`statusWobble`), not an inline colour — a token addition to `theme-presets.ts`.
+1. **iOS picker scope conflict → RESOLVED: Android-only for Phase 19.** Dossier 19 Cluster B's `[DECIDED]` "iOS uses the native privacy-preserving contact picker" is **deferred**, consistent with the app-wide Android-first posture (PROJECT.md / REQUIREMENTS.md line 200 / HANDOFF §11 iOS deferral). The dossier's iOS decision is honored later, when iOS is un-deferred — it is **not reversed**, only sequenced after v1. Phase 19 designs and plans **Android-first only**: no iOS entry-point variant, no iOS unsupported-state copy, and the picker layer targets the Android 17+ Contact Picker exclusively. Planner: do not build a cross-platform picker abstraction this phase.
+2. **Add-menu introduction → RESOLVED: speed-dial FAB.** The `+` FAB (today a direct-to-Create navigation) becomes an expanding speed-dial (`Import from Contacts` / `Create manually`), Reanimated shared values only, no new library. See Code-grounded corrections #1 and Screen contract #1. (The earlier action-sheet recommendation is superseded.)
+3. **Caution hue for "Needs review" → RESOLVED: no hue.** The advisory confidence ladder stays **colourless** per the locked Color rule — neutral `surfaceElevated` chips, no borrowing of `rogue`/`statusWobble`/`danger`/`accent`, and **no new caution token** is added this phase. Advisory match-confidence remains visually distinct from orbit-status and destructive semantics.
 
 ---
 
 ## Checker Sign-Off
 
-- [ ] Dimension 1 Copywriting: PASS
-- [ ] Dimension 2 Visuals: PASS
-- [ ] Dimension 3 Color: PASS
-- [ ] Dimension 4 Typography: PASS
-- [ ] Dimension 5 Spacing: PASS
-- [ ] Dimension 6 Registry Safety: PASS
+- [x] Dimension 1 Copywriting: PASS (FLAG — single-review CTA `Import` is nounless; non-blocking, header supplies the noun)
+- [x] Dimension 2 Visuals: PASS
+- [x] Dimension 3 Color: PASS
+- [x] Dimension 4 Typography: PASS (FLAG — 5 shipped sizes exceed the 4-size guideline; pre-existing, app-wide cleanup not this phase)
+- [x] Dimension 5 Spacing: PASS (FLAG — shipped exceptions 2/10/14/28 are not multiples of 4; pre-existing, do not refactor this phase)
+- [x] Dimension 6 Registry Safety: PASS
 
-**Approval:** pending
+**Approval:** APPROVED 2026-08-28 — 6/6 dimensions pass, 3 non-blocking FLAGs (all pre-existing shipped-system conditions, owner-aware). Load-bearing code claims verified against disk by the checker (no multi-option FAB today; no caution token; all 8 referenced primitives exist). Three open dependencies resolved by owner (see above).
