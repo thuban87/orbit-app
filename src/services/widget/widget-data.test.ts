@@ -97,6 +97,7 @@ describe("loadWidgetTiles", () => {
     const sql = getAllAsync.mock.calls[0][0] as string;
     expect(sql).toContain("c.favourite_rank IS NOT NULL");
     expect(sql).toContain("c.favourite_rank ASC");
+    expect(sql).toContain("c.tracking_enabled = 1");
     expect(tiles.map((t) => t.id)).toEqual([10, 11]);
     expect(tiles[0].initials).toBe(getInitials("Fav One"));
   });
