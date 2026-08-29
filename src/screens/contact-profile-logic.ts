@@ -19,6 +19,50 @@ export interface ProfileMethodGroup {
   rows: ProfileMethodRow[];
 }
 
+export type ProfileLifecycleKind =
+  | "bound"
+  | "unbound-dormant"
+  | "unbound-never-assigned";
+
+export interface ProfileLifecycleView {
+  kind: ProfileLifecycleKind;
+  showCadenceTreatment: boolean;
+  showFrequencyPicker: boolean;
+  bindEnabled: boolean;
+}
+
+/**
+ * Lifecycle-only presentation state. Cadence stays durable data; this model
+ * decides only which participation controls may be rendered around it.
+ */
+export function profileLifecycleView(input: {
+  trackingEnabled: number;
+  intervalDays: number | null;
+}): ProfileLifecycleView {
+  if (input.trackingEnabled === 1) {
+    return {
+      kind: "bound",
+      showCadenceTreatment: true,
+      showFrequencyPicker: false,
+      bindEnabled: false,
+    };
+  }
+  if (input.intervalDays !== null) {
+    return {
+      kind: "unbound-dormant",
+      showCadenceTreatment: false,
+      showFrequencyPicker: false,
+      bindEnabled: true,
+    };
+  }
+  return {
+    kind: "unbound-never-assigned",
+    showCadenceTreatment: false,
+    showFrequencyPicker: true,
+    bindEnabled: false,
+  };
+}
+
 const typePresentation: Record<ProfileMethodType, string> = {
   phone: "Phone number",
   email: "Email address",

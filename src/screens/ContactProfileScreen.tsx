@@ -30,6 +30,7 @@ import {
 } from "react-native";
 import { Avatar } from "@/components/Avatar";
 import { CustomFieldValue } from "@/components/CustomFieldValue";
+import { FrequencyPicker } from "@/components/FrequencyPicker";
 import {
   type FuelDraft,
   FuelEditor,
@@ -57,13 +58,13 @@ import {
 } from "@/db/contact-status-read";
 import { archiveContact } from "@/db/contacts-dao";
 import { getExecutor, localDateTime } from "@/db/database";
+import { clearFavouriteRank, setFavouriteRank } from "@/db/favourites-dao";
 import { listDefs } from "@/db/field-defs-dao";
 import type { CustomFieldDef } from "@/db/field-types";
 import {
   getValuesForContact,
   visibleDefsForProfile,
 } from "@/db/field-values-dao";
-import { clearFavouriteRank, setFavouriteRank } from "@/db/favourites-dao";
 import { addFuel, confirmFuel, deleteFuel, editFuel } from "@/db/fuel-dao";
 import {
   type FuelItem,
@@ -84,7 +85,10 @@ import {
 } from "@/db/timeline-read";
 import { newUid } from "@/db/uid";
 import type { RootStackScreenProps } from "@/navigation/types";
-import { profileMethodGroups } from "@/screens/contact-profile-logic";
+import {
+  profileLifecycleView,
+  profileMethodGroups,
+} from "@/screens/contact-profile-logic";
 import type { GravityResult } from "@/services/gravity-logic";
 import {
   computeContactGravity,
@@ -141,6 +145,8 @@ type Header = {
   modified_at: string;
   /** The contact's favourite rank, or null — drives the header star's state. */
   favourite_rank: number | null;
+  trackingEnabled: number;
+  intervalDays: number | null;
   /**
    * The contact's active snooze date (`YYYY-MM-DD`) or null — drives the
    * Snooze-reminders status line. Rendered DIRECTLY as a local date string
@@ -207,6 +213,8 @@ export function ContactProfileScreen({
   );
   // In-flight latch for the refine save — blocks a double-fire.
   const [savingEdit, setSavingEdit] = useState(false);
+  const [bindIntervalDays, setBindIntervalDays] = useState(30);
+  const [bindIntervalValid, setBindIntervalValid] = useState(false);
 
   // The SINGLE unified read: the header AND the interleaved timeline, so both
   // refresh together on focus and after an in-place log (LOG-02 read half).
@@ -336,6 +344,10 @@ export function ContactProfileScreen({
   // gate). The current state is read off the freshly-loaded header, never a
   // stale snapshot. localDateTime() supplies the local wall-clock `now`.
   const isFavourite = header?.favourite_rank != null;
+  const lifecycle = profileLifecycleView({
+    trackingEnabled: header?.trackingEnabled ?? 1,
+    intervalDays: header?.intervalDays ?? 30,
+  });
   const doToggleFavourite = useCallback(async () => {
     const currentlyFavourite = header?.favourite_rank != null;
     try {
@@ -676,25 +688,27 @@ export function ContactProfileScreen({
             colors.accent (OD-2 provisional favourite token — the owner may
             substitute a dedicated favourite hue/glyph). The accessibilityLabel
             flips with the persisted state so uiautomator UAT can read it. */}
-        <Pressable
-          testID="contact-profile-favourite-star"
-          accessibilityRole="button"
-          accessibilityLabel={
-            isFavourite ? "Remove favourite" : "Mark favourite"
-          }
-          accessibilityState={{ selected: isFavourite }}
-          onPress={() => void doToggleFavourite()}
-          style={styles.favouriteStar}
-        >
-          <Text
-            style={[
-              styles.favouriteGlyph,
-              { color: isFavourite ? colors.accent : colors.textSecondary },
-            ]}
+        {lifecycle.showCadenceTreatment ? (
+          <Pressable
+            testID="contact-profile-favourite-star"
+            accessibilityRole="button"
+            accessibilityLabel={
+              isFavourite ? "Remove favourite" : "Mark favourite"
+            }
+            accessibilityState={{ selected: isFavourite }}
+            onPress={() => void doToggleFavourite()}
+            style={styles.favouriteStar}
           >
-            {isFavourite ? "★" : "☆"}
-          </Text>
-        </Pressable>
+            <Text
+              style={[
+                styles.favouriteGlyph,
+                { color: isFavourite ? colors.accent : colors.textSecondary },
+              ]}
+            >
+              {isFavourite ? "★" : "☆"}
+            </Text>
+          </Pressable>
+        ) : null}
 
         <OverflowMenu
           actions={[
@@ -711,7 +725,7 @@ export function ContactProfileScreen({
           styled through the themed `colors.rogue` token (a status hue, NOT
           danger). Nothing renders for a never-contacted contact (status null)
           or any non-rogue status. */}
-      {status?.status === "rogue" ? (
+      {lifecycle.showCadenceTreatment && status?.status === "rogue" ? (
         <Text testID="contact-profile-rogue" style={styles.rogueLabel}>
           <Text style={{ color: colors.rogue }}>
             No longer in a working orbit
@@ -722,6 +736,52 @@ export function ContactProfileScreen({
             </Text>
           ) : null}
         </Text>
+      ) : null}
+
+      {lifecycle.kind !== "bound" ? (
+        <View
+          testID="contact-profile-unbound-panel"
+          style={[
+            styles.lifecyclePanel,
+            { backgroundColor: colors.surface, borderColor: colors.border },
+          ]}
+        >
+          <Text
+            style={[styles.lifecycleHeading, { color: colors.textPrimary }]}
+          >
+            Unbound
+          </Text>
+          <Text style={[styles.sectionBody, { color: colors.textSecondary }]}>
+            This contact isn’t in your active orbit. Their details and history
+            are still here.
+          </Text>
+          {lifecycle.showFrequencyPicker ? (
+            <FrequencyPicker
+              testID="contact-profile-bind-frequency"
+              value={bindIntervalDays}
+              onChange={setBindIntervalDays}
+              onValidityChange={setBindIntervalValid}
+            />
+          ) : null}
+          <Pressable
+            testID="contact-profile-bind"
+            accessibilityRole="button"
+            accessibilityLabel="Bind contact"
+            accessibilityState={{
+              disabled: !(lifecycle.bindEnabled || bindIntervalValid),
+            }}
+            disabled={!(lifecycle.bindEnabled || bindIntervalValid)}
+            onPress={() => undefined}
+            style={[
+              styles.lifecycleAction,
+              { backgroundColor: colors.accent, borderColor: colors.accent },
+            ]}
+          >
+            <Text style={{ color: colors.background, fontWeight: "700" }}>
+              Bind contact
+            </Text>
+          </Pressable>
+        </View>
       ) : null}
 
       {header?.rarely_responds === 1 ? (
@@ -912,58 +972,67 @@ export function ContactProfileScreen({
           until {date}" status + Clear affordance appear only while a future
           snooze is active. Reversible, no confirmation, no danger token — the
           block is state-neutral (UI-SPEC §3). */}
-      <View testID="contact-profile-snooze" style={styles.snooze}>
-        <Text style={[styles.sectionHeading, { color: colors.textSecondary }]}>
-          Snooze reminders
-        </Text>
-        <View style={styles.snoozeChips}>
-          {SNOOZE_PRESETS.map(({ preset, testID, label }) => (
-            <Pressable
-              key={preset}
-              testID={testID}
-              accessibilityRole="button"
-              accessibilityLabel={label}
-              onPress={() => void doSnooze(preset)}
-              style={[
-                styles.snoozeChip,
-                { backgroundColor: colors.surface, borderColor: colors.border },
-              ]}
-            >
-              <Text
-                numberOfLines={1}
+      {lifecycle.showCadenceTreatment ? (
+        <View testID="contact-profile-snooze" style={styles.snooze}>
+          <Text
+            style={[styles.sectionHeading, { color: colors.textSecondary }]}
+          >
+            Snooze reminders
+          </Text>
+          <View style={styles.snoozeChips}>
+            {SNOOZE_PRESETS.map(({ preset, testID, label }) => (
+              <Pressable
+                key={preset}
+                testID={testID}
+                accessibilityRole="button"
+                accessibilityLabel={label}
+                onPress={() => void doSnooze(preset)}
                 style={[
-                  styles.snoozeChipLabel,
-                  { color: colors.textSecondary },
+                  styles.snoozeChip,
+                  {
+                    backgroundColor: colors.surface,
+                    borderColor: colors.border,
+                  },
                 ]}
               >
-                {label}
-              </Text>
-            </Pressable>
-          ))}
-        </View>
-        {isSnoozed ? (
-          <View style={styles.snoozeStatusRow}>
-            {/* Render the stored YYYY-MM-DD DIRECTLY (item 7) — it is already the
+                <Text
+                  numberOfLines={1}
+                  style={[
+                    styles.snoozeChipLabel,
+                    { color: colors.textSecondary },
+                  ]}
+                >
+                  {label}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+          {isSnoozed ? (
+            <View style={styles.snoozeStatusRow}>
+              {/* Render the stored YYYY-MM-DD DIRECTLY (item 7) — it is already the
                 correct local date; new Date(snooze_until) would re-add the UTC
                 off-by-one. */}
-            <Text
-              testID="contact-profile-snooze-status"
-              style={[styles.snoozeStatus, { color: colors.textSecondary }]}
-            >
-              Snoozed until {header?.snooze_until}
-            </Text>
-            <Pressable
-              testID="contact-profile-snooze-clear"
-              accessibilityRole="button"
-              accessibilityLabel="Clear snooze"
-              onPress={() => void doClearSnooze()}
-              style={[styles.snoozeClear, { borderColor: colors.border }]}
-            >
-              <Text style={{ color: colors.textSecondary }}>Clear snooze</Text>
-            </Pressable>
-          </View>
-        ) : null}
-      </View>
+              <Text
+                testID="contact-profile-snooze-status"
+                style={[styles.snoozeStatus, { color: colors.textSecondary }]}
+              >
+                Snoozed until {header?.snooze_until}
+              </Text>
+              <Pressable
+                testID="contact-profile-snooze-clear"
+                accessibilityRole="button"
+                accessibilityLabel="Clear snooze"
+                onPress={() => void doClearSnooze()}
+                style={[styles.snoozeClear, { borderColor: colors.border }]}
+              >
+                <Text style={{ color: colors.textSecondary }}>
+                  Clear snooze
+                </Text>
+              </Pressable>
+            </View>
+          ) : null}
+        </View>
+      ) : null}
 
       {/* Impact section — gravity + intensity (LOG-03), both derived-never-stored
           and PROFILE-ONLY (Cluster G: nothing log-derived on the dashboard card).
@@ -978,7 +1047,9 @@ export function ContactProfileScreen({
             tierIndex={gravity.tierIndex}
             tierCount={gravity.tierCount}
           />
-          {intensity ? <IntensityLine intensity={intensity} /> : null}
+          {lifecycle.showCadenceTreatment && intensity ? (
+            <IntensityLine intensity={intensity} />
+          ) : null}
         </View>
       ) : null}
 
@@ -1129,6 +1200,15 @@ const styles = StyleSheet.create({
   },
   favouriteGlyph: {
     fontSize: 24,
+  },
+  lifecyclePanel: { gap: 12, borderWidth: 1, borderRadius: 12, padding: 16 },
+  lifecycleHeading: { fontSize: 18, fontWeight: "700" },
+  lifecycleAction: {
+    minHeight: 44,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderRadius: 8,
   },
   rogueLabel: {
     fontSize: 14,

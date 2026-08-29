@@ -119,7 +119,9 @@ describe("profileMethodGroups", () => {
 
 describe("profileLifecycleView", () => {
   it("retains Bound cadence treatment", () => {
-    expect(profileLifecycleView({ trackingEnabled: 1, intervalDays: 30 })).toEqual({
+    expect(
+      profileLifecycleView({ trackingEnabled: 1, intervalDays: 30 }),
+    ).toEqual({
       kind: "bound",
       showCadenceTreatment: true,
       showFrequencyPicker: false,
@@ -128,7 +130,9 @@ describe("profileLifecycleView", () => {
   });
 
   it("lets an Unbound contact with dormant cadence bind immediately", () => {
-    expect(profileLifecycleView({ trackingEnabled: 0, intervalDays: 30 })).toEqual({
+    expect(
+      profileLifecycleView({ trackingEnabled: 0, intervalDays: 30 }),
+    ).toEqual({
       kind: "unbound-dormant",
       showCadenceTreatment: false,
       showFrequencyPicker: false,
@@ -137,7 +141,9 @@ describe("profileLifecycleView", () => {
   });
 
   it("requires a cadence before binding a never-assigned Unbound contact", () => {
-    expect(profileLifecycleView({ trackingEnabled: 0, intervalDays: null })).toEqual({
+    expect(
+      profileLifecycleView({ trackingEnabled: 0, intervalDays: null }),
+    ).toEqual({
       kind: "unbound-never-assigned",
       showCadenceTreatment: false,
       showFrequencyPicker: true,

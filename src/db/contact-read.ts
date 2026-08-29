@@ -91,6 +91,8 @@ export function getContactHeader(
   favourite_rank: number | null;
   /** Lifecycle state for the profile's Bound/Unbound presentation policy. */
   trackingEnabled: number;
+  /** Nullable cadence is a lifecycle input, not a status display value. */
+  intervalDays: number | null;
   /**
    * The contact's active snooze date (`YYYY-MM-DD`), or null when not snoozed —
    * the profile's Snooze-reminders status line reads it (Plan 11-09, NOTIF-03).
@@ -113,9 +115,10 @@ export function getContactHeader(
     modified_at: string;
     favourite_rank: number | null;
     trackingEnabled: number;
+    intervalDays: number | null;
     snooze_until: string | null;
   }>(
-    "SELECT id, name, rarely_responds, archived_at, photo, modified_at, favourite_rank, tracking_enabled AS trackingEnabled, snooze_until FROM contacts WHERE id = ?",
+    "SELECT id, name, rarely_responds, archived_at, photo, modified_at, favourite_rank, tracking_enabled AS trackingEnabled, interval_days AS intervalDays, snooze_until FROM contacts WHERE id = ?",
     [contactId],
   );
 }
