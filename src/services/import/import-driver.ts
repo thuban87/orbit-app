@@ -5,6 +5,7 @@
 import {
   deferNeedsReview,
   type ImportSessionRowStatus,
+  markRowPhotoFailed,
   markRowStatus,
   resolveAlreadyLinked,
 } from "@/db/import-session-dao";
@@ -19,6 +20,11 @@ import { importContactRecord } from "@/db/imported-contact-dao";
 import type { SqlExecutor } from "@/db/types";
 import { mapPickedContact } from "@/logic/picked-contact-map";
 import { scoreImportCandidate } from "@/services/import/duplicate-evidence";
+import {
+  importedPhotoFs,
+  persistImportedPhotoPostCommit,
+} from "@/services/import/import-photo";
+import { Logger } from "@/utils/logger";
 import type { PickedContact } from "../../../modules/orbit-contact-picker";
 
 /** Kept deliberately small so a picker-sized batch yields to the JS thread. */
@@ -90,6 +96,22 @@ export async function importRowAsNew(
     now: params.now,
     resolveRow: { rowId: params.row.id, matchOutcome: "new" },
   });
+  const photo = await persistImportedPhotoPostCommit(exec, importedPhotoFs, {
+    contactId,
+    stagedPhotoPath: params.row.photoRelPath,
+    now: params.now,
+  });
+  if (!photo.ok) {
+    try {
+      await markRowPhotoFailed(exec, params.row.id, params.now);
+    } catch (error) {
+      Logger.error(
+        "import-driver",
+        `could not mark photo failure for import row ${params.row.id}`,
+        error,
+      );
+    }
+  }
   return { contactId };
 }
 

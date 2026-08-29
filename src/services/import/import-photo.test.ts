@@ -7,22 +7,31 @@ vi.mock("expo-image-manipulator", () => ({
 }));
 vi.mock("@/db/contacts-dao", () => ({ setContactPhoto: vi.fn() }));
 vi.mock("@/services/photos/photo-storage", () => ({
-  contactPhotoRelPath: (contactId: number) => `avatars/contact-${contactId}.jpg`,
+  contactPhotoRelPath: (contactId: number) =>
+    `avatars/contact-${contactId}.jpg`,
   persistMaster: vi.fn(),
+  resolveImportStagingUri: (relative: string) =>
+    `file:///documents/${relative}`,
 }));
 vi.mock("@/utils/logger", () => ({
   Logger: { error: vi.fn() },
 }));
 
 import {
-  persistImportedPhotoPostCommit,
   type ImportedPhotoFs,
+  persistImportedPhotoPostCommit,
 } from "@/services/import/import-photo";
 
 const NOW = "2026-08-29 12:00:00";
 
 function createFs(overrides: Partial<ImportedPhotoFs> = {}): ImportedPhotoFs {
   return {
+    resolveStagedPhotoPath: vi.fn(
+      (relative: string) => `file:///documents/${relative}`,
+    ),
+    contactPhotoRelPath: vi.fn(
+      (contactId: number) => `avatars/contact-${contactId}.jpg`,
+    ),
     resizeToMaster: vi.fn().mockResolvedValue("file:///cache/master.jpg"),
     persistMaster: vi.fn().mockResolvedValue("avatars/contact-42.jpg"),
     setContactPhoto: vi.fn().mockResolvedValue(undefined),
@@ -37,7 +46,7 @@ describe("persistImportedPhotoPostCommit", () => {
     await expect(
       persistImportedPhotoPostCommit({} as SqlExecutor, fs, {
         contactId: 42,
-        stagedPhotoPath: "file:///documents/import-staging/import-session-row.jpg",
+        stagedPhotoPath: "import-staging/import-session-row.jpg",
         now: NOW,
       }),
     ).resolves.toEqual({ ok: true });
@@ -65,7 +74,7 @@ describe("persistImportedPhotoPostCommit", () => {
     await expect(
       persistImportedPhotoPostCommit({} as SqlExecutor, fs, {
         contactId: 42,
-        stagedPhotoPath: "file:///documents/import-staging/import-session-row.jpg",
+        stagedPhotoPath: "import-staging/import-session-row.jpg",
         now: NOW,
       }),
     ).resolves.toEqual({ ok: false });

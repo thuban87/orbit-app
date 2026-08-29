@@ -11,7 +11,9 @@ import {
   acceptImportSessionWithRows,
   completeSession,
   type ImportSessionMode,
+  markRowPhotoFailed,
 } from "@/db/import-session-dao";
+import { listSessionRows } from "@/db/import-session-read";
 import {
   type ExternalContactLinkInput,
   importContactRecord,
@@ -20,9 +22,14 @@ import type { SqlExecutor } from "@/db/types";
 import { newUid } from "@/db/uid";
 import { mapPickedContact } from "@/logic/picked-contact-map";
 import {
+  importedPhotoFs,
+  persistImportedPhotoPostCommit,
+} from "@/services/import/import-photo";
+import {
   importStagingRelPath,
   stageImportPhoto,
 } from "@/services/photos/photo-storage";
+import { Logger } from "@/utils/logger";
 import type { PickedContact } from "../../../modules/orbit-contact-picker";
 
 export interface AcceptPickedContactsOptions {
@@ -118,6 +125,25 @@ export async function commitSingleImport(
     now: params.now,
     resolveRow: { rowId: params.rowId, matchOutcome: "new" },
   });
+  const row = (await listSessionRows(exec, params.sessionId)).find(
+    (candidate) => candidate.id === params.rowId,
+  );
+  const photo = await persistImportedPhotoPostCommit(exec, importedPhotoFs, {
+    contactId,
+    stagedPhotoPath: row?.photoRelPath ?? null,
+    now: params.now,
+  });
+  if (!photo.ok) {
+    try {
+      await markRowPhotoFailed(exec, params.rowId, params.now);
+    } catch (error) {
+      Logger.error(
+        "import-acquire",
+        `could not mark photo failure for import row ${params.rowId}`,
+        error,
+      );
+    }
+  }
   await completeSession(exec, params.sessionId, params.now);
   return contactId;
 }
