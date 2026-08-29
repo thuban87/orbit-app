@@ -42,6 +42,9 @@ vi.mock("expo-file-system", () => {
     get exists(): boolean {
       return h.exists.has(this.uri);
     }
+    get name(): string {
+      return this.uri.split("/").at(-1) ?? "";
+    }
     async copy(dest: File): Promise<void> {
       h.ops.push(`copy ${this.uri} -> ${dest.uri}`);
       if (h.cfg.copyThrows) throw new Error("mock copy failed");
@@ -77,7 +80,13 @@ vi.mock("expo-file-system", () => {
       return true;
     }
     list(): File[] {
-      return [];
+      const prefix = `${this.uri}/`;
+      return [...h.exists]
+        .filter((uri) => {
+          const rest = uri.slice(prefix.length);
+          return uri.startsWith(prefix) && !rest.includes("/");
+        })
+        .map((uri) => new File(uri));
     }
   }
 
@@ -239,6 +248,9 @@ describe("import staging — flat durable picker-cache namespace", () => {
     expect(h.ops).toContain(`copy file:///cache/picker.jpg -> file:///doc/${relative}.stage-tmp`);
     expect(h.ops).toContain(`move file:///doc/${relative}.stage-tmp -> file:///doc/${relative}`);
     expect(resolveImportStagingUri(relative)).toBe(`file:///doc/${relative}`);
+    expect(listImportStagingPhotos()).toEqual([
+      { relative, isStageTmpOrphan: false },
+    ]);
     deleteImportStaging(relative);
     expect(h.ops).toContain(`delete file:///doc/${relative}`);
     expect(listImportStagingPhotos()).toEqual([]);
