@@ -9,11 +9,12 @@
  * IMPORTED and composed here, never re-typed. A parity test asserts the built
  * SELECT embeds both fragments verbatim (Pitfall 1), so status can never drift.
  *
- * ORBITING SET: `archived_at IS NULL AND last_contact IS NOT NULL` — the live
- * CONTACTED sky. `last_contact IS NOT NULL` is load-bearing (it is what makes
- * STATUS_SQL safe — a NULL last_contact would bucket 'stable', status.ts NULL
- * note); it also excludes the never-contacted, who cannot orbit until they have a
- * first interaction. Archived contacts are excluded structurally.
+ * ORBITING SET: `archived_at IS NULL AND tracking_enabled = 1 AND last_contact
+ * IS NOT NULL` — the live, Bound, CONTACTED sky. `last_contact IS NOT NULL` is
+ * load-bearing (it is what makes STATUS_SQL safe — a NULL last_contact would
+ * bucket 'stable', status.ts NULL note); it also excludes the never-contacted,
+ * who cannot orbit until they have a first interaction. Archived and Unbound
+ * contacts are excluded structurally.
  *
  * L11 — SNOOZE DIVERGENCE (deliberate, locked by a test): unlike the dashboard's
  * BASE_WHERE (dashboard-read.ts:142-144), the orrery does NOT filter
@@ -80,9 +81,10 @@ export const ORBITING_SELECT = `SELECT id,
    FROM contacts`;
 
 /**
- * Scan the orbiting set — one row per live, contacted, non-archived contact,
- * status single-sourced from status.ts, ordered densely so the row index is the
- * render rank (M3). Pass `excludeContactId` to omit the sun occupant.
+ * Scan the orbiting set — one row per live, Bound, contacted contact, status
+ * single-sourced from status.ts, ordered densely so the row index is the render
+ * rank (M3). Pass `excludeContactId` to omit the saved sun occupant; the shared
+ * rendering policy safely resolves an Unbound saved occupant to self.
  */
 export function listOrbitingContacts(
   exec: SqlExecutor,
@@ -90,7 +92,8 @@ export function listOrbitingContacts(
 ): Promise<OrbitingContact[]> {
   const exclude = opts?.excludeContactId;
   const params: unknown[] = [];
-  let where = "archived_at IS NULL AND last_contact IS NOT NULL";
+  let where =
+    "archived_at IS NULL AND tracking_enabled = 1 AND last_contact IS NOT NULL";
   if (exclude !== null && exclude !== undefined) {
     where += " AND id <> ?";
     params.push(exclude);

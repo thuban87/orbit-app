@@ -6,15 +6,16 @@
  * a `changes===1` assertion per row. Two swaps from the favourites original:
  *   (1) the column `favourite_rank → ring_seq`;
  *   (2) the scope predicate `favourite_rank IS NOT NULL → last_contact IS NOT
- *       NULL` (the ORBITING set, not the favourites set), PLUS an optional
- *       `excludeContactId` occupant exclusion.
+ *       NULL AND tracking_enabled = 1` (the Bound ORBITING set, not the
+ *       favourites set), PLUS an optional `excludeContactId` occupant exclusion.
  *
  * OCCUPANT EXCLUSION (the fixed contract seam): when a contact is the sun,
  * `excludeContactId` is passed and BOTH Guard 2's COUNT and every Guard 3 UPDATE
  * append `AND id <> ?` (`?`-bound; omitted entirely, no id bound, when the param
  * is null). So the guard's EFFECTIVE set == `orrery-read`'s RENDERED orbiting set
- * — the orbiting WHERE (`last_contact IS NOT NULL AND archived_at IS NULL`) minus
- * the sun occupant — and the sun-excluded (N−1) drag list agrees with the count.
+ * — the orbiting WHERE (`last_contact IS NOT NULL AND archived_at IS NULL AND
+ * tracking_enabled = 1`) minus the sun occupant — and the sun-excluded (N−1)
+ * drag list agrees with the count.
  * When `excludeContactId` is null the scope is the full orbiting set (the self-sun
  * path, identical to the favourites clone). A caller that wrongly passes the full
  * N-length list while a sun is set fails Guard 2 (N ≠ N−1) and writes nothing.
@@ -27,9 +28,10 @@
  *       (orbiting WHERE, minus the excluded sun), so an omitted contact can't be
  *       left at a stale seq and an over-long list can't smuggle in a non-orbiting.
  *   (3) SCOPED UPDATE — every UPDATE is `WHERE id = ? AND last_contact IS NOT NULL
- *       AND archived_at IS NULL [AND id <> ?]` with `changes===1`, so a STALE id
- *       (never-contacted, archived, non-existent, or the excluded sun) fails and
- *       rolls back — a seq can NEVER land on a non-orbiting / archived / sun row.
+ *       AND archived_at IS NULL AND tracking_enabled = 1 [AND id <> ?]` with
+ *       `changes===1`, so a STALE id (never-contacted, Unbound, archived,
+ *       non-existent, or the excluded sun) fails and rolls back — a seq can NEVER
+ *       land on a non-orbiting / Unbound / archived / sun row.
  *
  * M3 (why a stale stored seq is harmless): the render rank is derived DENSELY at
  * READ by `listOrbitingContacts` (`ORDER BY COALESCE(ring_seq, 1e9), created_at,
@@ -50,8 +52,9 @@
  * WHERE, never in a SET clause (the single-writer recency invariant is intact).
  * `now` is `localDateTime()` (never `toISOString()`); only `modified_at` is bumped.
  */
-import { inWriteTransaction } from "@/db/transaction";
+
 import { bumpDataRevisionCore } from "@/db/data-revision-dao";
+import { inWriteTransaction } from "@/db/transaction";
 import type { SqlExecutor } from "@/db/types";
 
 export function rewriteRingSeq(
@@ -63,7 +66,8 @@ export function rewriteRingSeq(
   // The occupant-exclusion term + its bound param — appended to BOTH the count
   // guard and every scoped UPDATE ONLY when a sun contact is set.
   const excludeSql = excludeContactId !== null ? " AND id <> ?" : "";
-  const excludeParams: unknown[] = excludeContactId !== null ? [excludeContactId] : [];
+  const excludeParams: unknown[] =
+    excludeContactId !== null ? [excludeContactId] : [];
 
   return inWriteTransaction(exec, async () => {
     // Guard 1: reject a non-unique list BEFORE any write.
@@ -76,7 +80,8 @@ export function rewriteRingSeq(
     // orbiting WHERE minus the excluded sun occupant).
     const countRow = await exec.getFirstAsync<{ n: number }>(
       `SELECT COUNT(*) AS n FROM contacts
-        WHERE last_contact IS NOT NULL AND archived_at IS NULL${excludeSql}`,
+        WHERE last_contact IS NOT NULL AND archived_at IS NULL
+          AND tracking_enabled = 1${excludeSql}`,
       excludeParams,
     );
     const current = countRow?.n ?? 0;
@@ -91,7 +96,8 @@ export function rewriteRingSeq(
       const result = await exec.runAsync(
         `UPDATE contacts
             SET ring_seq = ?, modified_at = ?
-          WHERE id = ? AND last_contact IS NOT NULL AND archived_at IS NULL${excludeSql}`,
+          WHERE id = ? AND last_contact IS NOT NULL AND archived_at IS NULL
+            AND tracking_enabled = 1${excludeSql}`,
         [seq, now, orderedIds[seq], ...excludeParams],
       );
       if (result.changes !== 1) {

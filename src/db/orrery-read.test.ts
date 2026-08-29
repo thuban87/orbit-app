@@ -19,11 +19,6 @@
  */
 import { beforeEach, describe, expect, it } from "vitest";
 import { nodeSqliteExecutor, openTestDb } from "@/db/__testkit__/node-sqlite";
-import {
-  listOrbitingContacts,
-  ORBITING_SELECT,
-  type OrbitingContact,
-} from "@/db/orrery-read";
 import { migration001 } from "@/db/migrations/001-initial";
 import { migration002 } from "@/db/migrations/002-app-settings";
 import { migration003 } from "@/db/migrations/003-orrery-settings";
@@ -35,6 +30,11 @@ import { migration009 } from "@/db/migrations/009-contact-method-normalization";
 import { migration010 } from "@/db/migrations/010-contact-method-label";
 import { migration011 } from "@/db/migrations/011-contact-lifecycle-schema";
 import { runMigrations } from "@/db/migrations/runner";
+import {
+  listOrbitingContacts,
+  ORBITING_SELECT,
+  type OrbitingContact,
+} from "@/db/orrery-read";
 import { PROGRESS_SQL, STATUS_SQL } from "@/db/status";
 import type { SqlExecutor } from "@/db/types";
 
@@ -158,7 +158,9 @@ describe("listOrbitingContacts — population + exclusions", () => {
     const a = await seedContact({ name: "A", lastContact: STABLE() });
     const b = await seedContact({ name: "B", lastContact: STABLE() });
     const all = await listOrbitingContacts(exec);
-    expect(ids(all).sort((x, y) => x - y)).toEqual([a, b].sort((x, y) => x - y));
+    expect(ids(all).sort((x, y) => x - y)).toEqual(
+      [a, b].sort((x, y) => x - y),
+    );
 
     const excluded = await listOrbitingContacts(exec, { excludeContactId: a });
     expect(ids(excluded)).toEqual([b]);

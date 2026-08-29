@@ -116,7 +116,10 @@ describe("listSunCandidates", () => {
   });
 
   it("excludes Unbound contacts while retaining never-contacted Bound candidates", async () => {
-    const boundNever = await seedContact({ name: "Bound never", lastContact: null });
+    const boundNever = await seedContact({
+      name: "Bound never",
+      lastContact: null,
+    });
     await seedContact({
       name: "Unbound favourite",
       favouriteRank: 0,

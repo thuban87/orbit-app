@@ -4,8 +4,9 @@
  * writer, no migration, no network — a single `getAllAsync`. On-device SQLite.
  *
  * Mirrors `listFavourites` (dashboard-read.ts:288) in shape. Differences:
- *   - it is NOT favourites-only: it returns EVERY non-archived contact, so anyone
- *     can be chosen as the sun (favourites merely sort first);
+ *   - it is NOT favourites-only: it returns EVERY non-archived Bound contact, so
+ *     anyone tracked by the proactive lifecycle can be chosen as the sun
+ *     (favourites merely sort first);
  *   - never-contacted contacts ARE included (C2-2 downstream: a never-contacted
  *     sun has `getContactStatus` status null, so 13-04/05 `resolveSunOccupant`
  *     accepts `status: ProfileStatus | null` and glows the neutral fallback —
@@ -33,14 +34,14 @@ export interface SunCandidate {
 }
 
 /**
- * The favourites-first candidate list: non-archived contacts, favourites by rank
- * then everyone else by name.
+ * The favourites-first candidate list: non-archived Bound contacts, favourites by
+ * rank then everyone else by name.
  */
 export function listSunCandidates(exec: SqlExecutor): Promise<SunCandidate[]> {
   return exec.getAllAsync<SunCandidate>(
     `SELECT id, name, photo
        FROM contacts
-      WHERE archived_at IS NULL
+      WHERE archived_at IS NULL AND tracking_enabled = 1
       ORDER BY (favourite_rank IS NULL), favourite_rank ASC, name COLLATE NOCASE, id`,
   );
 }

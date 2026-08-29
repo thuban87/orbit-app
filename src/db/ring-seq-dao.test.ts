@@ -248,7 +248,9 @@ describe("rewriteRingSeq — three guards (self-sun)", () => {
 
   it("an EMPTY list is an accepted no-op when there are no orbiting contacts", async () => {
     await seedContact({ name: "Never", lastContact: null }); // not orbiting
-    await expect(rewriteRingSeq(exec, [], LATER, null)).resolves.toBeUndefined();
+    await expect(
+      rewriteRingSeq(exec, [], LATER, null),
+    ).resolves.toBeUndefined();
   });
 
   it("an EMPTY list throws when orbiting contacts still exist (count mismatch)", async () => {
