@@ -3,6 +3,7 @@ import { Image } from "expo-image";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Alert,
+  Modal,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -22,13 +23,24 @@ import {
 } from "@/components/contact-methods-editor-model";
 import { FrequencyPicker } from "@/components/FrequencyPicker";
 import { getAppSettings } from "@/db/app-settings-dao";
-import { listCategories } from "@/db/contact-read";
+import { getContactHeader, listCategories } from "@/db/contact-read";
 import { getExecutor, localDateTime } from "@/db/database";
-import { listSessionRows } from "@/db/import-session-read";
+import {
+  finalizeSessionIfTerminal,
+  markRowStatus,
+  resolveAlreadyLinked,
+} from "@/db/import-session-dao";
+import { getSessionById, listSessionRows } from "@/db/import-session-read";
+import { linkExistingContactToRow } from "@/db/imported-contact-dao";
 import { newUid } from "@/db/uid";
 import { mapPickedContact } from "@/logic/picked-contact-map";
 import type { RootStackScreenProps } from "@/navigation/types";
 import { getDeviceRegion } from "@/services/device-region";
+import {
+  type DuplicateEvidenceCandidate,
+  type DuplicateOutcome,
+  scoreImportCandidate,
+} from "@/services/import/duplicate-evidence";
 import { commitSingleImport } from "@/services/import/import-acquire";
 import { resolveImportStagingUri } from "@/services/photos/photo-storage";
 import { useTheme } from "@/theme";
@@ -43,6 +55,8 @@ type Snapshot = {
   methods: Array<{ type: "phone" | "email"; value: string }>;
   birthday: string | null;
 };
+
+type DuplicateChoice = DuplicateEvidenceCandidate & { name: string };
 
 function parseSnapshot(value: string): Snapshot | null {
   try {
@@ -73,22 +87,32 @@ export function ImportReviewScreen({
   const [categoryId, setCategoryId] = useState<number | null>(null);
   const [trackingEnabled, setTrackingEnabled] = useState(false);
   const [intervalDays, setIntervalDays] = useState<number | null>(null);
+  const [phoneRegion, setPhoneRegion] = useState<string | null>(null);
   const [methods, setMethods] = useState<MethodGroups>({
     phone: [],
     email: [],
   });
   const [edited, setEdited] = useState(false);
+  const [duplicateChoices, setDuplicateChoices] = useState<DuplicateChoice[]>(
+    [],
+  );
+  const [duplicateOutcome, setDuplicateOutcome] = useState<Exclude<
+    DuplicateOutcome,
+    "already_linked"
+  > | null>(null);
 
   useImportLeaveGuard(navigation, route.params.sessionId, edited);
 
   const load = useCallback(async () => {
     try {
       const exec = getExecutor();
-      const [rows, settings, nextCategories] = await Promise.all([
+      const [rows, settings, session, nextCategories] = await Promise.all([
         listSessionRows(exec, route.params.sessionId),
         getAppSettings(exec),
+        getSessionById(exec, route.params.sessionId),
         listCategories(exec),
       ]);
+      if (!session) throw new Error("import session is unavailable");
       const row = rows.find((candidate) => candidate.contactId === null);
       if (!row) {
         Alert.alert(
@@ -119,6 +143,7 @@ export function ImportReviewScreen({
       setName(mapped.input.name);
       setBirthday(mapped.birthday);
       setPhotoRelPath(row.photoRelPath);
+      setPhoneRegion(session.phoneRegion);
       const methodDrafts = mapped.input.methodDrafts ?? [];
       setMethods({
         phone: methodDrafts
@@ -152,41 +177,140 @@ export function ImportReviewScreen({
     [photoRelPath],
   );
 
+  function makeImportInput(now: string) {
+    return {
+      uid: newUid(),
+      name: name.trim(),
+      intervalDays: trackingEnabled
+        ? (intervalDays ?? FREQUENCY_DAYS.Monthly)
+        : null,
+      trackingEnabled,
+      now,
+      categoryId,
+      methodDrafts: toMethodDrafts(methods),
+      methodNormalization: { effectivePhoneRegion: phoneRegion },
+    };
+  }
+
+  async function importAsNew() {
+    if (rowId === null || externalContactId === null) return;
+    const now = localDateTime();
+    const contactId = await commitSingleImport(getExecutor(), {
+      sessionId: route.params.sessionId,
+      rowId,
+      input: makeImportInput(now),
+      externalLinks: [{ provider: "android", externalContactId }],
+      birthday,
+      now,
+    });
+    setDuplicateOutcome(null);
+    navigation.replace("Profile", { contactId });
+  }
+
   async function onImport() {
     if (!canImport || rowId === null || externalContactId === null) return;
     setSaving(true);
     try {
-      const now = localDateTime();
-      const contactId = await commitSingleImport(getExecutor(), {
-        sessionId: route.params.sessionId,
-        rowId,
-        input: {
-          uid: newUid(),
-          name: name.trim(),
-          intervalDays: trackingEnabled
-            ? (intervalDays ?? FREQUENCY_DAYS.Monthly)
-            : null,
-          trackingEnabled,
-          now,
-          categoryId,
-          methodDrafts: toMethodDrafts(methods),
-          methodNormalization: {
-            effectivePhoneRegion:
-              (await getAppSettings(getExecutor())).phoneRegionOverride ??
-              getDeviceRegion(),
-          },
-        },
-        externalLinks: [{ provider: "android", externalContactId }],
+      const exec = getExecutor();
+      const result = await scoreImportCandidate(exec, {
+        externalContactId,
+        methodDrafts: toMethodDrafts(methods),
+        name: name.trim(),
         birthday,
-        now,
+        effectivePhoneRegion: phoneRegion,
       });
-      navigation.replace("Profile", { contactId });
+      const now = localDateTime();
+      if (result.outcome === "already_linked") {
+        await resolveAlreadyLinked(
+          exec,
+          rowId,
+          result.deterministicContactId,
+          now,
+        );
+        await finalizeSessionIfTerminal(exec, route.params.sessionId, now);
+        Alert.alert("Already in Orbit", "This contact is already linked.", [
+          {
+            text: "View contact",
+            onPress: () =>
+              navigation.replace("Profile", {
+                contactId: result.deterministicContactId,
+              }),
+          },
+        ]);
+        return;
+      }
+      if (result.outcome === "new" || result.candidates.length === 0) {
+        await importAsNew();
+        return;
+      }
+      const choices = await Promise.all(
+        result.candidates.map(async (candidate) => {
+          const contact = await getContactHeader(exec, candidate.contactId);
+          return contact ? { ...candidate, name: contact.name } : null;
+        }),
+      );
+      setDuplicateChoices(
+        choices.filter((choice): choice is DuplicateChoice => choice !== null),
+      );
+      setDuplicateOutcome(result.outcome);
     } catch (error) {
       Logger.error(LOG_SCOPE, "failed to commit import", error);
       Alert.alert(
         "Couldn't import contact",
         "Please check the name and try again.",
       );
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function linkToExisting(choice: DuplicateChoice) {
+    if (rowId === null || externalContactId === null || !duplicateOutcome)
+      return;
+    setSaving(true);
+    try {
+      const now = localDateTime();
+      await linkExistingContactToRow(getExecutor(), {
+        rowId,
+        contactId: choice.contactId,
+        provider: "android",
+        externalContactId,
+        matchOutcome: duplicateOutcome,
+        now,
+      });
+      await finalizeSessionIfTerminal(
+        getExecutor(),
+        route.params.sessionId,
+        now,
+      );
+      setDuplicateOutcome(null);
+      navigation.replace("Profile", { contactId: choice.contactId });
+    } catch (error) {
+      Logger.error(LOG_SCOPE, "failed to link duplicate", error);
+      Alert.alert("Couldn't link contact", "Please choose again.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function skipDuplicate() {
+    if (rowId === null) return;
+    setSaving(true);
+    try {
+      const now = localDateTime();
+      await markRowStatus(getExecutor(), rowId, "skipped", null, now);
+      await finalizeSessionIfTerminal(
+        getExecutor(),
+        route.params.sessionId,
+        now,
+      );
+      setDuplicateOutcome(null);
+      navigation.replace("ImportComplete", {
+        sessionId: route.params.sessionId,
+      });
+    } catch (error) {
+      Logger.error(LOG_SCOPE, "failed to skip duplicate", error);
+      Alert.alert("Couldn't skip contact", "Please try again.");
     } finally {
       setSaving(false);
     }
@@ -388,6 +512,66 @@ export function ImportReviewScreen({
           Import
         </Text>
       </Pressable>
+      <Modal
+        visible={duplicateOutcome !== null}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setDuplicateOutcome(null)}
+      >
+        <View style={styles.modalRoot}>
+          <View
+            style={[
+              styles.duplicateSheet,
+              {
+                backgroundColor: colors.surfaceElevated,
+                borderColor: colors.border,
+              },
+            ]}
+          >
+            <Text
+              style={[styles.duplicateTitle, { color: colors.textPrimary }]}
+            >
+              We found someone who might already be in Orbit.
+            </Text>
+            {duplicateChoices.map((choice) => (
+              <Pressable
+                key={choice.contactId}
+                disabled={saving}
+                onPress={() => void linkToExisting(choice)}
+                style={[styles.duplicateChoice, { borderColor: colors.border }]}
+              >
+                <Text style={{ color: colors.textPrimary }}>
+                  {duplicateChoices.length === 1
+                    ? "Link to Existing"
+                    : "Choose this one"}
+                </Text>
+                <Text style={{ color: colors.textSecondary }}>
+                  {choice.name}
+                </Text>
+              </Pressable>
+            ))}
+            <Pressable
+              disabled={saving}
+              onPress={() => void importAsNew()}
+              style={[
+                styles.duplicateChoice,
+                { borderColor: colors.border, backgroundColor: colors.surface },
+              ]}
+            >
+              <Text style={{ color: colors.textPrimary }}>Import as New</Text>
+            </Pressable>
+            {duplicateChoices.length > 1 ? (
+              <Pressable
+                disabled={saving}
+                onPress={() => void skipDuplicate()}
+                style={[styles.duplicateChoice, { borderColor: colors.border }]}
+              >
+                <Text style={{ color: colors.textSecondary }}>Skip</Text>
+              </Pressable>
+            ) : null}
+          </View>
+        </View>
+      </Modal>
     </ScrollView>
   );
 }
@@ -428,5 +612,16 @@ const styles = StyleSheet.create({
     alignItems: "center",
     borderWidth: 1,
     borderRadius: 10,
+  },
+  modalRoot: { flex: 1, justifyContent: "center", paddingHorizontal: 24 },
+  duplicateSheet: { borderRadius: 12, borderWidth: 1, gap: 8, padding: 16 },
+  duplicateTitle: { fontSize: 18, fontWeight: "700" },
+  duplicateChoice: {
+    borderRadius: 10,
+    borderWidth: 1,
+    gap: 4,
+    justifyContent: "center",
+    minHeight: 44,
+    padding: 12,
   },
 });
