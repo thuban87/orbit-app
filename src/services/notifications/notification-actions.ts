@@ -38,11 +38,12 @@ import {
   cancelScheduledNotificationAsync,
   setNotificationCategoryAsync,
 } from "expo-notifications";
+import { getContactHeader } from "@/db/contact-read";
 import { getExecutor, localDateTime, openAndMigrate } from "@/db/database";
 import { recordTouchpoint } from "@/db/recency-dao";
 import { snoozeContact } from "@/db/snooze-dao";
-import { notifyWidgetDataChanged } from "@/services/widget/widget-refresh";
 import { getDeviceRegion } from "@/services/device-region";
+import { notifyWidgetDataChanged } from "@/services/widget/widget-refresh";
 import { Logger } from "@/utils/logger";
 import {
   ACTION_MARK,
@@ -125,6 +126,15 @@ export async function handleNotificationAction(
   // launch, where React never mounts.
   await openAndMigrate(getDeviceRegion());
   const exec = getExecutor();
+
+  // A delivered action can outlive a lifecycle transition. Mark still records
+  // real relationship history for an Unbound contact, but Snooze is cadence work
+  // and is therefore an intentional no-op once the target is Unbound.
+  const header = await getContactHeader(exec, data.contactId);
+  if (header?.trackingEnabled === 0 && actionIdentifier === ACTION_SNOOZE) {
+    handledSet.add(key);
+    return;
+  }
 
   const now = localDateTime();
 

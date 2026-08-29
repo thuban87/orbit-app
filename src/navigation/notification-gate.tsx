@@ -79,8 +79,52 @@ function runActionTap(data: NotificationData, actionIdentifier: string): void {
  * Apply a body tap's resolved nav intent to the live navigator. A malformed
  * payload (resolver returns null) or a not-yet-attached ref routes nowhere.
  */
-function applyBodyNav(data: NotificationData): void {
+type NotificationContactLookup = (contactId: number) => Promise<{
+  archived_at: string | null;
+  trackingEnabled: number;
+} | null>;
+
+/**
+ * Resolve a body tap and reject a decay action that no longer points at a live
+ * Bound contact. Birthday and digest navigation remain factual/view-only routes.
+ */
+export async function guardNotificationBodyIntent(
+  data: unknown,
+  lookup: NotificationContactLookup,
+) {
   const intent = resolveNotificationNav(data);
+  if (!intent) {
+    return null;
+  }
+  if (intent.type !== "reset" || intent.routes[1]?.name !== "Compose") {
+    return intent;
+  }
+
+  const contactId = intent.routes[1].params.contactId;
+  const contact = await lookup(contactId);
+  if (contact === null || contact.archived_at !== null) {
+    return null;
+  }
+  if (contact.trackingEnabled !== 1) {
+    return {
+      type: "navigate" as const,
+      name: "Profile" as const,
+      params: { contactId },
+    };
+  }
+
+  return intent;
+}
+
+/** Apply the guarded body intent to the live navigator. */
+async function applyBodyNav(data: NotificationData): Promise<void> {
+  const intent = await guardNotificationBodyIntent(data, async (contactId) => {
+    const [{ getExecutor }, { getContactHeader }] = await Promise.all([
+      import("@/db/database"),
+      import("@/db/contact-read"),
+    ]);
+    return getContactHeader(getExecutor(), contactId);
+  });
   if (!intent) {
     return;
   }
@@ -141,8 +185,11 @@ export function NotificationResponseGate({ isReady }: { isReady: boolean }) {
   // (mirrors ShareIntentGate keying on reactive readiness — review A3).
   useEffect(() => {
     if (isReady && pendingBodyData !== null) {
-      applyBodyNav(pendingBodyData);
-      setPendingBodyData(null);
+      void applyBodyNav(pendingBodyData)
+        .catch((err) => {
+          Logger.error(LOG_SOURCE, "guarded body navigation failed", err);
+        })
+        .finally(() => setPendingBodyData(null));
     }
   }, [isReady, pendingBodyData]);
 
@@ -166,7 +213,7 @@ export function NotificationResponseGate({ isReady }: { isReady: boolean }) {
         ) {
           runActionTap(data, actionIdentifier);
         } else if (actionIdentifier === DEFAULT_ACTION_IDENTIFIER) {
-          applyBodyNav(data);
+          await applyBodyNav(data);
         }
       }
       // Clear regardless of classification so no relaunch replays this response.
