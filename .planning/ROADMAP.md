@@ -769,7 +769,7 @@ Plans:
 
 **Scope decision (resolved at planning):** Android-only for Phase 19 (owner ruling 2026-08-28). Dossier 19's iOS native-picker `[DECIDED]` is honored as design intent for a later iOS milestone and is out of scope now (consistent with the v1 iOS deferral) — sequenced, not reversed.
 
-**Plans:** 11 plans (6 waves) — re-waved 2026-08-29 after the cross-AI review replan (atomic contact+session-row writes, durable document-dir photo staging, row_status/match_outcome discriminator, pre-batch consolidation).
+**Plans:** 11 plans (6 waves) — re-waved 2026-08-29 after the cross-AI review replan (atomic contact+session-row writes, durable document-dir photo staging, row_status/match_outcome discriminator, pre-batch consolidation), then a cycle-2 replan (composed single-transaction classification writers, durable candidates_json, finalizeSessionIfTerminal on every review path, shared importRowAsNew photo seam, Replace-all session purge, required orphan-staging reconciliation; consolidation moved to Wave 6 to depend on the photo seam).
 
 Plans:
 **Wave 1**
@@ -794,12 +794,12 @@ Plans:
 
 - [ ] 19-07-PLAN.md — Reusable candidate card grid + confidence chip + single/multi duplicate interrupts (atomic linkExistingContactToRow; conservative Apply-recommendation)
 - [ ] 19-09-PLAN.md — Durable resume/discard launch sweep (resume state machine, one-pending policy, discard-returns-photo-paths, retryable-failed preserved) + staged-photo cleanup
-- [ ] 19-10-PLAN.md — Photo (post-commit Orbit-owned master from durable staged path) import, best-effort and failure-isolated (birthday owned by 19-03)
-- [ ] 19-11-PLAN.md — Conservative multi-source consolidation (Cluster K) — PRE-batch detection in BulkImportSetup, atomic combine, explicit combine-into-one, never silent
+- [ ] 19-10-PLAN.md — Photo (post-commit Orbit-owned master from durable staged path) import into the shared commitSingleImport + importRowAsNew seams, best-effort and failure-isolated (birthday owned by 19-03)
 
 **Wave 6** *(blocked on Wave 5 completion)*
 
-- [ ] 19-08-PLAN.md — Import completion summary (four durable summary buckets, complete-only-when-terminal) + bridge to Unbound contacts + Retry (eligibleStatuses)
+- [ ] 19-08-PLAN.md — Import completion summary (four durable summary buckets, finalizeSessionIfTerminal) + bridge to Unbound contacts + Retry (eligibleStatuses)
+- [ ] 19-11-PLAN.md — Conservative multi-source consolidation (Cluster K) — PRE-batch detection in BulkImportSetup, atomic combine (row_status='imported' + in-txn birthday + post-commit photo), explicit combine-into-one, never silent
 
 ### Phase 20: Contact Reconciliation & Merge
 
