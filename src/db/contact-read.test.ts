@@ -30,6 +30,7 @@ import { migration006 } from "@/db/migrations/006-normalize-custom-field-values"
 import { migration007 } from "@/db/migrations/007-tombstones";
 import { migration009 } from "@/db/migrations/009-contact-method-normalization";
 import { migration010 } from "@/db/migrations/010-contact-method-label";
+import { migration011 } from "@/db/migrations/011-contact-lifecycle-schema";
 import { runMigrations } from "@/db/migrations/runner";
 import type { SqlExecutor } from "@/db/types";
 
@@ -58,8 +59,9 @@ beforeEach(async () => {
       migration007,
       migration009,
       migration010,
+      migration011,
     ],
-    10,
+    11,
     { now: NOW, newUid: uid, defaultPhoneRegion: "US" },
   );
 });
@@ -71,16 +73,18 @@ async function makeContact(
     archived?: boolean;
     rarelyResponds?: number;
     photo?: string | null;
+    trackingEnabled?: number;
   } = {},
 ): Promise<number> {
   const r = await exec.runAsync(
     `INSERT INTO contacts
-       (uid, name, interval_days, rarely_responds, photo, archived_at, created_at, modified_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+       (uid, name, interval_days, tracking_enabled, rarely_responds, photo, archived_at, created_at, modified_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       uid(),
       name,
       30,
+      opts.trackingEnabled ?? 1,
       opts.rarelyResponds ?? 0,
       opts.photo ?? null,
       opts.archived ? NOW : null,
@@ -148,6 +152,7 @@ describe("getContactHeader — by-id light read (archived-reachable by design)",
     expect(header?.modified_at).toBe(NOW);
     // The additive favourite_rank field (Plan 06): a non-favourite reads null.
     expect(header?.favourite_rank).toBeNull();
+    expect(header?.trackingEnabled).toBe(1);
     // v9 retired scalar phone/email. The read exposes neither phantom property.
     expect(header).not.toHaveProperty("phone");
     expect(header).not.toHaveProperty("email");
@@ -165,6 +170,14 @@ describe("getContactHeader — by-id light read (archived-reachable by design)",
     const header = await getContactHeader(exec, id);
     expect(header?.id).toBe(id);
     expect(header?.archived_at).toBe(NOW);
+  });
+
+  it("retains an Unbound contact by id with its lifecycle state and no scalar endpoint fields", async () => {
+    const id = await makeContact("Dormant", { trackingEnabled: 0 });
+    const header = await getContactHeader(exec, id);
+    expect(header?.trackingEnabled).toBe(0);
+    expect(header).not.toHaveProperty("phone");
+    expect(header).not.toHaveProperty("email");
   });
 
   it("returns null for a missing id", async () => {
@@ -227,17 +240,22 @@ async function persistDef(definition: CustomFieldDef): Promise<void> {
 /** Insert a contact with an optional category + last_contact; return its id. */
 async function makeContactRow(
   name: string,
-  opts: { categoryId?: number | null; lastContact?: string | null } = {},
+  opts: {
+    categoryId?: number | null;
+    lastContact?: string | null;
+    trackingEnabled?: number;
+  } = {},
 ): Promise<number> {
   const r = await exec.runAsync(
     `INSERT INTO contacts
-       (uid, name, category_id, interval_days, last_contact, created_at, modified_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+       (uid, name, category_id, interval_days, tracking_enabled, last_contact, created_at, modified_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       uid(),
       name,
       opts.categoryId ?? null,
       30,
+      opts.trackingEnabled ?? 1,
       opts.lastContact ?? null,
       NOW,
       NOW,
@@ -338,6 +356,15 @@ describe("getContactForEdit — row + category label + custom-value map", () => 
     const id = await makeContactRow("NeverSpoke", { lastContact: null });
     const result = await getContactForEdit(exec, id, []);
     expect(result?.contact.last_contact).toBeNull();
+  });
+
+  it("assembles grouped methods and trackingEnabled for an Unbound profile without scalar endpoint fields", async () => {
+    const id = await makeContactRow("Unbound editor", { trackingEnabled: 0 });
+    const result = await getContactForEdit(exec, id, []);
+    expect(result?.contact.trackingEnabled).toBe(0);
+    expect(result?.methods).toEqual({ phone: [], email: [] });
+    expect(result?.contact).not.toHaveProperty("phone");
+    expect(result?.contact).not.toHaveProperty("email");
   });
 
   it("returns null for a missing id", async () => {
