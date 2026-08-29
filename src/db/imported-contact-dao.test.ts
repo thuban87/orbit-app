@@ -7,6 +7,7 @@ import type { CreateContactFullInput } from "@/db/contacts-dao";
 import { MIGRATIONS, TARGET_VERSION } from "@/db/database";
 import { acceptImportSessionWithRows } from "@/db/import-session-dao";
 import {
+  InvalidImportBirthdayError,
   importContactRecord,
   linkExistingContactToRow,
   NameRequiredError,
@@ -76,6 +77,56 @@ async function count(table: string): Promise<number> {
 }
 
 describe("importContactRecord", () => {
+  it.each(["02-30", "2021-02-29", "garbage", "1990-13-01"])(
+    "rejects invalid birthday %j before any write",
+    async (birthday) => {
+      await expect(
+        importContactRecord(exec, {
+          input: unboundInput(),
+          externalLinks: [],
+          birthday,
+          now: NOW,
+        }),
+      ).rejects.toBeInstanceOf(InvalidImportBirthdayError);
+      expect(await count("contacts")).toBe(0);
+    },
+  );
+
+  it.each(["03-14", "02-29", "1990-03-14"])(
+    "persists valid birthday %j unchanged",
+    async (birthday) => {
+      const { contactId } = await importContactRecord(exec, {
+        input: unboundInput(),
+        externalLinks: [],
+        birthday,
+        now: NOW,
+      });
+
+      expect(
+        await exec.getFirstAsync<{ birthday: string | null }>(
+          "SELECT birthday FROM contacts WHERE id = ?",
+          [contactId],
+        ),
+      ).toEqual({ birthday });
+    },
+  );
+
+  it("accepts a null birthday without forcing an update", async () => {
+    const { contactId } = await importContactRecord(exec, {
+      input: unboundInput(),
+      externalLinks: [],
+      birthday: null,
+      now: NOW,
+    });
+
+    expect(
+      await exec.getFirstAsync<{ birthday: string | null }>(
+        "SELECT birthday FROM contacts WHERE id = ?",
+        [contactId],
+      ),
+    ).toEqual({ birthday: null });
+  });
+
   it("atomically creates an Unbound contact, source link, provenance, and resolved row", async () => {
     const rowId = await acceptRow();
     const { contactId } = await importContactRecord(exec, {
