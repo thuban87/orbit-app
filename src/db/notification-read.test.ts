@@ -33,6 +33,15 @@ beforeEach(async () => {
   const db = openTestDb();
   exec = nodeSqliteExecutor(db);
   await runMigrations(exec, [migration001], 1, { now: NOW, newUid: uid });
+  await exec.execAsync(`
+    ALTER TABLE contacts
+      ADD COLUMN tracking_enabled INTEGER NOT NULL DEFAULT 1;
+    CREATE TABLE app_settings (
+      id INTEGER PRIMARY KEY CHECK (id = 1),
+      birthday_unbound_enabled INTEGER NOT NULL DEFAULT 1
+    );
+    INSERT INTO app_settings (id, birthday_unbound_enabled) VALUES (1, 1);
+  `);
 });
 
 /** A local `YYYY-MM-DD` string offset `days` from today (matches localtime). */
@@ -54,6 +63,7 @@ interface SeedOpts {
   rarelyResponds?: number;
   remindersOff?: number;
   archivedAt?: string | null;
+  trackingEnabled?: number;
 }
 
 /**
@@ -64,8 +74,8 @@ async function seedContact(o: SeedOpts = {}): Promise<number> {
   const result = await exec.runAsync(
     `INSERT INTO contacts
        (uid, name, interval_days, last_contact, snooze_until, birthday,
-        rarely_responds, reminders_off, archived_at, created_at, modified_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        rarely_responds, reminders_off, archived_at, tracking_enabled, created_at, modified_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       uid(),
       o.name ?? "Alex",
@@ -76,6 +86,7 @@ async function seedContact(o: SeedOpts = {}): Promise<number> {
       o.rarelyResponds ?? 0,
       o.remindersOff ?? 0,
       o.archivedAt ?? null,
+      o.trackingEnabled ?? 1,
       NOW,
       NOW,
     ],
@@ -146,7 +157,7 @@ describe("listDecayEligibleCandidates — snooze is a base, never an exclusion",
 });
 
 describe("listDecayEligibleCandidates — NOTIF-03 exclusions (each asserted absent)", () => {
-  it("excludes never-contacted, rarely_responds, muted, archived, and rogue; keeps the eligible one", async () => {
+  it("excludes never-contacted, rarely_responds, muted, archived, Unbound, and rogue; keeps the eligible one", async () => {
     const eligible = await seedContact({
       name: "Eligible",
       lastContact: OVERDUE(),
@@ -168,6 +179,11 @@ describe("listDecayEligibleCandidates — NOTIF-03 exclusions (each asserted abs
       archivedAt: NOW,
     });
     await seedContact({ name: "Rogue", lastContact: ROGUE() }); // progress >= ROGUE_K
+    await seedContact({
+      name: "Unbound",
+      lastContact: OVERDUE(),
+      trackingEnabled: 0,
+    });
 
     const rows = await listDecayEligibleCandidates(exec);
     expect(ids(rows)).toEqual([eligible]);
@@ -240,5 +256,44 @@ describe("listBirthdayNotificationCandidates — NOTIF-04 (all non-archived birt
     expect(ids(rows)).toEqual([first, second]);
     expect(rows[0]?.birthday).toBe("1990-03-14");
     expect(rows[1]?.birthday).toBe("01-05");
+  });
+
+  it("keeps factual birthday rows both-state only when the persisted Unbound policy permits notifications", async () => {
+    const bound = await seedContact({
+      name: "Bound birthday",
+      birthday: "01-05",
+      trackingEnabled: 1,
+    });
+    const unbound = await seedContact({
+      name: "Unbound birthday",
+      birthday: "01-06",
+      trackingEnabled: 0,
+    });
+
+    expect(ids(await listBirthdayNotificationCandidates(exec))).toEqual([
+      bound,
+      unbound,
+    ]);
+
+    await exec.runAsync(
+      "UPDATE app_settings SET birthday_unbound_enabled = 0 WHERE id = 1",
+    );
+    expect(ids(await listBirthdayNotificationCandidates(exec))).toEqual([
+      bound,
+    ]);
+  });
+
+  it("fails loud when the singleton birthday Unbound policy row is missing or corrupt", async () => {
+    await exec.runAsync("DELETE FROM app_settings WHERE id = 1");
+    await expect(listBirthdayNotificationCandidates(exec)).rejects.toThrow(
+      "birthday_unbound_enabled",
+    );
+
+    await exec.runAsync(
+      "INSERT INTO app_settings (id, birthday_unbound_enabled) VALUES (1, 2)",
+    );
+    await expect(listBirthdayNotificationCandidates(exec)).rejects.toThrow(
+      "birthday_unbound_enabled",
+    );
   });
 });

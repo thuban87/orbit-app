@@ -29,6 +29,7 @@ import { migration007 } from "@/db/migrations/007-tombstones";
 import { migration008 } from "@/db/migrations/008-restore-photo-journal";
 import { migration009 } from "@/db/migrations/009-contact-method-normalization";
 import { migration010 } from "@/db/migrations/010-contact-method-label";
+import { migration011 } from "@/db/migrations/011-contact-lifecycle-schema";
 import { runMigrations } from "@/db/migrations/runner";
 import type { SqlExecutor } from "@/db/types";
 import { __resetSweepForTest, runLaunchSweep } from "@/services/launch-sweep";
@@ -89,8 +90,9 @@ beforeEach(async () => {
       migration008,
       migration009,
       migration010,
+      migration011,
     ],
-    10,
+    11,
     { now: NOW, newUid: uid, defaultPhoneRegion: "US" },
   );
   __resetExpo();
@@ -133,6 +135,7 @@ interface SeedOpts {
   rarelyResponds?: number;
   remindersOff?: number;
   archivedAt?: string | null;
+  trackingEnabled?: number;
 }
 
 /** Insert one contact, returning its row id. */
@@ -140,8 +143,8 @@ async function seedContact(o: SeedOpts = {}): Promise<number> {
   const result = await exec.runAsync(
     `INSERT INTO contacts
        (uid, name, interval_days, last_contact, snooze_until, birthday,
-        rarely_responds, reminders_off, archived_at, created_at, modified_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        rarely_responds, reminders_off, archived_at, tracking_enabled, created_at, modified_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       uid(),
       o.name ?? "Alex",
@@ -152,6 +155,7 @@ async function seedContact(o: SeedOpts = {}): Promise<number> {
       o.rarelyResponds ?? 0,
       o.remindersOff ?? 0,
       o.archivedAt ?? null,
+      o.trackingEnabled ?? 1,
       NOW,
       NOW,
     ],
@@ -486,6 +490,26 @@ describe("reconcileSchedule — birthday must not roll off its own day (CR-01)",
 // ============================================================================
 
 describe("reconcileSchedule — stale cancel + full-request diff", () => {
+  it("cancels an already-scheduled decay request when the contact becomes Unbound", async () => {
+    await enable();
+    const id = await seedContact({
+      name: "Dormant Dee",
+      lastContact: dateOffset(-10),
+      intervalDays: 30,
+    });
+
+    await reconcileSchedule(exec);
+    expect(scheduledFor(decayIdentifier(id))).toBeDefined();
+
+    await exec.runAsync(
+      "UPDATE contacts SET tracking_enabled = 0 WHERE id = ?",
+      [id],
+    );
+    await reconcileSchedule(exec);
+
+    expect(cancelledIds()).toContain(decayIdentifier(id));
+  });
+
   it("cancels a stale decay id and schedules the newly-eligible contact", async () => {
     await enable();
     const id = await seedContact({
