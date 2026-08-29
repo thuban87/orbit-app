@@ -145,89 +145,105 @@ export function createContactFull(
     );
   }
 
-  return inWriteTransaction(exec, async () => {
-    // Contact row — scalar phone/email were retired by migration 009.
-    const contactResult = await exec.runAsync(
-      `INSERT INTO contacts
-         (uid, name, category_id, interval_days, tracking_enabled, rarely_responds,
-          created_at, modified_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-      [
-        input.uid,
-        input.name,
-        input.categoryId ?? null,
-        input.intervalDays,
-        trackingEnabled ? 1 : 0,
-        input.rarelyResponds ?? 0,
-        input.now,
-        input.now,
-      ],
-    );
-    const contactId = contactResult.lastInsertRowId;
+  return inWriteTransaction(exec, () => createContactFullCore(exec, input));
+}
 
-    // First interaction (Today / Pick-date path) → recompute last_contact via the
-    // single writer. Skipped on the "not yet" path (last_contact stays NULL).
-    let interactionId: number | null = null;
-    if (input.firstInteraction) {
-      interactionId = await insertInteractionCore(
-        exec,
-        contactId,
-        input.now,
-        input.firstInteraction,
-      );
-      await recomputeLastContactCore(exec, contactId, input.now);
-    }
+/**
+ * NON-mutexed create CORE. Call only inside an already-open
+ * `inWriteTransaction`; import composition reuses it so every contact receives
+ * the same custom-field definition-pair matrix as a normal create.
+ */
+export async function createContactFullCore(
+  exec: SqlExecutor,
+  input: CreateContactFullInput,
+): Promise<{
+  contactId: number;
+  interactionId: number | null;
+  methods: ContactMethodRow[];
+  methodSaveResult: ContactMethodSaveResult | null;
+}> {
+  const trackingEnabled = input.trackingEnabled ?? true;
+  // Contact row — scalar phone/email were retired by migration 009.
+  const contactResult = await exec.runAsync(
+    `INSERT INTO contacts
+       (uid, name, category_id, interval_days, tracking_enabled, rarely_responds,
+        created_at, modified_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
+      input.uid,
+      input.name,
+      input.categoryId ?? null,
+      input.intervalDays,
+      trackingEnabled ? 1 : 0,
+      input.rarelyResponds ?? 0,
+      input.now,
+      input.now,
+    ],
+  );
+  const contactId = contactResult.lastInsertRowId;
 
-    // Seed the durable pair matrix for EVERY definition, including quarantined
-    // definitions. Each INSERT receives an independent immutable uid; later
-    // submitted values UPSERT their matching pair and preserve that uid.
-    const definitions = await listDefs(exec, { includeQuarantined: true });
-    for (const definition of definitions) {
-      await upsertValueCore(
-        exec,
-        contactId,
-        definition.id,
-        newUid(),
-        null,
-        input.now,
-      );
-    }
-
-    // Apply submitted values only after every pair exists. The writer's UPDATE
-    // branch never rewrites uid or created_at, including when clearing to NULL.
-    const customValues = input.customValues ?? [];
-    for (const customValue of customValues) {
-      await upsertValueCore(
-        exec,
-        contactId,
-        customValue.fieldDefId,
-        newUid(),
-        customValue.value,
-        input.now,
-      );
-    }
-
-    const methodSaveResult =
-      input.methodDrafts === undefined
-        ? null
-        : await applyContactMethodDiffCore(exec, {
-            contactId,
-            seeded: [],
-            current: input.methodDrafts,
-            now: input.now,
-            effectivePhoneRegion:
-              input.methodNormalization?.effectivePhoneRegion ?? null,
-          });
-    // The method core owns the one revision bump when it changes; aggregate-only
-    // writes retain the existing single revision bump.
-    if (methodSaveResult === null) await bumpDataRevisionCore(exec);
-    return {
+  // First interaction (Today / Pick-date path) → recompute last_contact via the
+  // single writer. Skipped on the "not yet" path (last_contact stays NULL).
+  let interactionId: number | null = null;
+  if (input.firstInteraction) {
+    interactionId = await insertInteractionCore(
+      exec,
       contactId,
-      interactionId,
-      methods: methodSaveResult?.methods ?? [],
-      methodSaveResult,
-    };
-  });
+      input.now,
+      input.firstInteraction,
+    );
+    await recomputeLastContactCore(exec, contactId, input.now);
+  }
+
+  // Seed the durable pair matrix for EVERY definition, including quarantined
+  // definitions. Each INSERT receives an independent immutable uid; later
+  // submitted values UPSERT their matching pair and preserve that uid.
+  const definitions = await listDefs(exec, { includeQuarantined: true });
+  for (const definition of definitions) {
+    await upsertValueCore(
+      exec,
+      contactId,
+      definition.id,
+      newUid(),
+      null,
+      input.now,
+    );
+  }
+
+  // Apply submitted values only after every pair exists. The writer's UPDATE
+  // branch never rewrites uid or created_at, including when clearing to NULL.
+  const customValues = input.customValues ?? [];
+  for (const customValue of customValues) {
+    await upsertValueCore(
+      exec,
+      contactId,
+      customValue.fieldDefId,
+      newUid(),
+      customValue.value,
+      input.now,
+    );
+  }
+
+  const methodSaveResult =
+    input.methodDrafts === undefined
+      ? null
+      : await applyContactMethodDiffCore(exec, {
+          contactId,
+          seeded: [],
+          current: input.methodDrafts,
+          now: input.now,
+          effectivePhoneRegion:
+            input.methodNormalization?.effectivePhoneRegion ?? null,
+        });
+  // The method core owns the one revision bump when it changes; aggregate-only
+  // writes retain the existing single revision bump.
+  if (methodSaveResult === null) await bumpDataRevisionCore(exec);
+  return {
+    contactId,
+    interactionId,
+    methods: methodSaveResult?.methods ?? [],
+    methodSaveResult,
+  };
 }
 
 // =============================================================================

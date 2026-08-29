@@ -104,6 +104,15 @@ function parseStoredBirthday(stored: string): ParsedBirthday | null {
   return null;
 }
 
+/** Strict calendar-validity gate for persisted birthday shapes. */
+export function isValidStoredBirthday(stored: string | null): boolean {
+  return (
+    stored != null &&
+    stored.trim() !== "" &&
+    parseStoredBirthday(stored) !== null
+  );
+}
+
 /**
  * The day-of-month on which a birthday is observed in `targetYear`. Normally the
  * stored day, EXCEPT a Feb-29 birthday in a non-leap year, which is observed on

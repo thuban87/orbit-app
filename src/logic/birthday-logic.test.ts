@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { daysUntilBirthday, FEB_29_OBSERVED_DAY } from "./birthday-logic";
+import {
+  daysUntilBirthday,
+  FEB_29_OBSERVED_DAY,
+  isValidStoredBirthday,
+} from "./birthday-logic";
 
 /** Local-midnight-agnostic date builder (avoids UTC parsing surprises). */
 function localDate(
@@ -11,6 +15,20 @@ function localDate(
 ): Date {
   return new Date(y, m1 - 1, d, hh, mm, 0, 0);
 }
+
+describe("isValidStoredBirthday", () => {
+  it.each([
+    ["2020-02-29", true],
+    ["05-14", true],
+    ["02-29", true],
+    ["2021-02-29", false],
+    ["02-30", false],
+    [null, false],
+    ["", false],
+  ] as const)("returns %s for %s", (stored, expected) => {
+    expect(isValidStoredBirthday(stored)).toBe(expected);
+  });
+});
 
 describe("daysUntilBirthday — null / empty / malformed contract", () => {
   const today = localDate(2026, 8, 15, 14, 0);
