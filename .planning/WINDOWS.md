@@ -1,10 +1,10 @@
 ---
 schema_version: 1
-open_count: 2
+open_count: 3
 waived_count: 0
 fixed_count: 5
-total_count: 7
-last_updated: 2026-08-29T13:53:24.136Z
+total_count: 8
+last_updated: 2026-08-29T14:15:53.733Z
 ---
 
 # Broken Windows Ledger
@@ -22,6 +22,7 @@ last_updated: 2026-08-29T13:53:24.136Z
 | 5 | 18.2 | deviation | src/db/ai-context-read.test.ts |  | Corrected future-dated Unbound test touchpoint fixture before RED verification. | fixed |  | 2026-08-29T00:27:47.044Z | 2026-08-29T00:28:30.525Z |
 | 6 | 19 | stub | src/navigation/RootNavigator.tsx |  | Intentional import route placeholders await plans 06–08. | open |  | 2026-08-29T13:53:23.947Z |  |
 | 7 | 19 | unrun-verify | .planning/phases/19-system-contact-import/19-04-PLAN.md |  | Android 17 device UAT was not run; native picker and UI behavior remain to verify. | open |  | 2026-08-29T13:53:24.136Z |  |
+| 8 | 19 | unrun-verify | .planning/phases/19-system-contact-import/19-10-PLAN.md |  | Android 17 photo and birthday import UAT was not run; picker-provided photo/birthday behavior remains to verify. | open |  | 2026-08-29T14:15:53.733Z |  |
 
 ````json
 [
@@ -107,6 +108,18 @@ last_updated: 2026-08-29T13:53:24.136Z
     "status": "open",
     "reason": "",
     "recorded_at": "2026-08-29T13:53:24.136Z",
+    "resolved_at": null
+  },
+  {
+    "id": 8,
+    "kind": "unrun-verify",
+    "phase": "19",
+    "file": ".planning/phases/19-system-contact-import/19-10-PLAN.md",
+    "line": null,
+    "description": "Android 17 photo and birthday import UAT was not run; picker-provided photo/birthday behavior remains to verify.",
+    "status": "open",
+    "reason": "",
+    "recorded_at": "2026-08-29T14:15:53.733Z",
     "resolved_at": null
   }
 ]
