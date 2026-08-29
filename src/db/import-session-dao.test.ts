@@ -10,6 +10,7 @@ import {
   discardSession,
   finalizeSessionIfTerminal,
   markRowStatus,
+  retireRowStagedPhoto,
   resolveAlreadyLinkedCore,
   setRowContactCore,
   setRowMatchOutcomeCore,
@@ -221,5 +222,58 @@ describe("import-session-dao", () => {
         [accepted.sessionId],
       ),
     ).toEqual({ batch_category_id: null });
+  });
+
+  it("retires only a row's staged-photo reference and updates its timestamp", async () => {
+    const contactId = await seedContact();
+    const accepted = await acceptRows(["retire"]);
+    await inWriteTransaction(exec, async () => {
+      await setRowContactCore(
+        exec,
+        accepted.rowIds[0],
+        contactId,
+        "imported",
+        NOW,
+      );
+      await setRowMatchOutcomeCore(exec, accepted.rowIds[0], "new", null, NOW);
+      await exec.runAsync(
+        "UPDATE import_session_rows SET photo_failed = 1 WHERE id = ?",
+        [accepted.rowIds[0]],
+      );
+    });
+
+    await retireRowStagedPhoto(
+      exec,
+      accepted.rowIds[0],
+      "2026-08-29 12:01:00",
+    );
+
+    expect(
+      await exec.getFirstAsync<{
+        photo_rel_path: string | null;
+        row_status: string;
+        contact_id: number | null;
+        match_outcome: string | null;
+        photo_failed: number;
+        modified_at: string;
+      }>(
+        `SELECT photo_rel_path, row_status, contact_id, match_outcome, photo_failed, modified_at
+         FROM import_session_rows WHERE id = ?`,
+        [accepted.rowIds[0]],
+      ),
+    ).toEqual({
+      photo_rel_path: null,
+      row_status: "imported",
+      contact_id: contactId,
+      match_outcome: "new",
+      photo_failed: 1,
+      modified_at: "2026-08-29 12:01:00",
+    });
+  });
+
+  it("throws when retiring the staged photo of an unknown row", async () => {
+    await expect(retireRowStagedPhoto(exec, 9999, NOW)).rejects.toThrow(
+      "retireRowStagedPhotoCore: no row matched id=9999",
+    );
   });
 });

@@ -18,6 +18,7 @@
  * | user Skip | skipped | prior or NULL, never already_linked | NULL | markRowStatus |
  * | import failure | failed | prior | NULL | markRowStatus |
  * | photo-only failure | unchanged | unchanged | unchanged | markRowPhotoFailed |
+ * | staging retired (success) | unchanged | unchanged | unchanged | retireRowStagedPhoto |
  */
 import { inWriteTransaction } from "@/db/transaction";
 import type { SqlExecutor } from "@/db/types";
@@ -270,6 +271,30 @@ export function markRowPhotoFailed(
 ): Promise<void> {
   return inWriteTransaction(exec, () =>
     markRowPhotoFailedCore(exec, rowId, now),
+  );
+}
+
+export async function retireRowStagedPhotoCore(
+  exec: SqlExecutor,
+  rowId: number,
+  now: string,
+): Promise<void> {
+  const result = await exec.runAsync(
+    `UPDATE import_session_rows
+     SET photo_rel_path = NULL, modified_at = ?
+     WHERE id = ?`,
+    [now, rowId],
+  );
+  assertOneChange(result, "retireRowStagedPhotoCore", rowId);
+}
+
+export function retireRowStagedPhoto(
+  exec: SqlExecutor,
+  rowId: number,
+  now: string,
+): Promise<void> {
+  return inWriteTransaction(exec, () =>
+    retireRowStagedPhotoCore(exec, rowId, now),
   );
 }
 
