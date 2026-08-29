@@ -14,11 +14,19 @@ import {
 import { inWriteTransaction } from "@/db/transaction";
 import type { SqlExecutor } from "@/db/types";
 import { newUid } from "@/db/uid";
+import { isValidStoredBirthday } from "@/logic/birthday-logic";
 
 export class NameRequiredError extends Error {
   constructor() {
     super("A contact name is required before importing");
     this.name = "NameRequiredError";
+  }
+}
+
+export class InvalidImportBirthdayError extends Error {
+  constructor() {
+    super("A valid birthday is required before importing");
+    this.name = "InvalidImportBirthdayError";
   }
 }
 
@@ -103,6 +111,12 @@ export function importContactRecord(
 ): Promise<{ contactId: number }> {
   if (params.input.name.trim() === "") {
     return Promise.reject(new NameRequiredError());
+  }
+  if (
+    params.birthday !== null &&
+    !isValidStoredBirthday(params.birthday)
+  ) {
+    return Promise.reject(new InvalidImportBirthdayError());
   }
 
   return inWriteTransaction(exec, async () => {
