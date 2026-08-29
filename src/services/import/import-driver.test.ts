@@ -8,8 +8,8 @@ import {
   acceptImportSessionWithRows,
   setSessionBatchCategory,
 } from "@/db/import-session-dao";
-import { importContactRecord } from "@/db/imported-contact-dao";
 import { listSessionRows } from "@/db/import-session-read";
+import { importContactRecord } from "@/db/imported-contact-dao";
 import { runMigrations } from "@/db/migrations/runner";
 import type { SqlExecutor } from "@/db/types";
 import { runImportBatch } from "@/services/import/import-driver";
@@ -199,5 +199,64 @@ describe("runImportBatch", () => {
         "SELECT category_id FROM contacts WHERE name = 'Categorized'",
       ),
     ).toEqual({ category_id: category.id });
+  });
+
+  it("retries failed rows without double-importing a row that already has a contact", async () => {
+    const session = await createSession([
+      {
+        externalContactId: "retryable",
+        sourcePayload: payload("Retryable"),
+      },
+      {
+        externalContactId: "already-created",
+        sourcePayload: payload("Existing"),
+      },
+    ]);
+    const firstRows = await listSessionRows(exec, session.sessionId);
+    await importContactRecord(exec, {
+      input: {
+        uid: uid(),
+        name: "Existing",
+        intervalDays: null,
+        trackingEnabled: false,
+        now: NOW,
+        categoryId: null,
+        methodDrafts: [],
+        methodNormalization: { effectivePhoneRegion: "US" },
+      },
+      externalLinks: [
+        { provider: "android", externalContactId: "already-created" },
+      ],
+      birthday: null,
+      now: NOW,
+      resolveRow: { rowId: firstRows[1].id, matchOutcome: "new" },
+    });
+    await exec.runAsync(
+      "UPDATE import_session_rows SET row_status = 'failed' WHERE id IN (?, ?)",
+      [firstRows[0].id, firstRows[1].id],
+    );
+
+    await runImportBatch(exec, {
+      sessionId: session.sessionId,
+      now: NOW,
+      eligibleStatuses: ["pending", "failed"],
+    });
+    expect(await listSessionRows(exec, session.sessionId)).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          externalContactId: "retryable",
+          rowStatus: "imported",
+        }),
+        expect.objectContaining({
+          externalContactId: "already-created",
+          contactId: expect.any(Number),
+        }),
+      ]),
+    );
+    expect(
+      await exec.getFirstAsync<{ count: number }>(
+        "SELECT COUNT(*) AS count FROM contacts",
+      ),
+    ).toEqual({ count: 2 });
   });
 });

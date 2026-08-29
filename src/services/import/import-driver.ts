@@ -4,18 +4,18 @@
  */
 import {
   deferNeedsReview,
+  type ImportSessionRowStatus,
   markRowStatus,
   resolveAlreadyLinked,
-  type ImportSessionRowStatus,
 } from "@/db/import-session-dao";
-import { importContactRecord } from "@/db/imported-contact-dao";
 import {
   getSessionById,
-  listSessionRows,
-  sessionSummaryCounts,
   type ImportSessionRow,
+  listSessionRows,
   type SessionSummaryCounts,
+  sessionSummaryCounts,
 } from "@/db/import-session-read";
+import { importContactRecord } from "@/db/imported-contact-dao";
 import type { SqlExecutor } from "@/db/types";
 import { mapPickedContact } from "@/logic/picked-contact-map";
 import { scoreImportCandidate } from "@/services/import/duplicate-evidence";
