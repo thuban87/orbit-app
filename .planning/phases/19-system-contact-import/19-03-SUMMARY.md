@@ -14,9 +14,9 @@ provides:
   - Reusable non-mutexed contact create core
 affects: [import-acquire, import-driver, duplicate-review, source-consolidation]
 actuals:
-  tokens: 7042
+  tokens: 7046
   tasks: 3
-  commits: 5
+  commits: 6
 tech-stack:
   added: []
   patterns: [single transaction composed from non-mutexed DAO cores, strict stored birthday validation]
@@ -59,7 +59,7 @@ status: complete
 
 - **Duration:** 7 min
 - **Started:** 2026-08-29T13:35:00Z
-- **Completed:** 2026-08-29T13:41:36Z
+- **Completed:** 2026-08-29T13:42:59Z
 - **Tasks:** 3
 - **Files modified:** 7
 
@@ -73,7 +73,7 @@ status: complete
 
 1. **Task 1: Extract createContactFullCore + export isValidStoredBirthday** - `aa759d4` (feat)
 2. **Task 2: picked-contact-map — PickedContact → CreateContactFullInput** - `0945abb` (test RED), `ec367ba` (feat GREEN)
-3. **Task 3: imported-contact-dao — atomic composed create/link + session-row resolution** - `74d8217` (test RED), `fa701f7` (feat GREEN)
+3. **Task 3: imported-contact-dao — atomic composed create/link + session-row resolution** - `74d8217` (test RED), `fa701f7` (feat GREEN), `43a898f` (transaction safety fix)
 
 ## Files Created/Modified
 
@@ -91,7 +91,19 @@ status: complete
 
 ## Deviations from Plan
 
-None - plan executed exactly as written.
+### Auto-fixed Issues
+
+**1. [Rule 1 - Transaction safety] Serialized external-link inserts inside the import transaction**
+
+- **Found during:** Task 3 verification follow-up
+- **Issue:** Concurrently scheduled link inserts could race the enclosing transaction's rollback after an insertion failure.
+- **Fix:** Insert each external link sequentially before provenance writes.
+- **Files modified:** `src/db/imported-contact-dao.ts`
+- **Verification:** `npx vitest run src/db/imported-contact-dao.test.ts`, TypeScript, and Biome checks passed.
+- **Committed in:** `43a898f`
+
+**Total deviations:** 1 auto-fixed (Rule 1)
+**Impact on plan:** Necessary transactional hardening; no scope expansion.
 
 ## Issues Encountered
 
@@ -114,7 +126,7 @@ Plans 04, 06, 07, and 11 can use the mapper and atomic writers without nesting t
 ## Self-Check: PASSED
 
 - Verified all seven implementation and test files exist.
-- Verified all five task commits exist in local Git history.
+- Verified all six task commits exist in local Git history.
 
 ---
 *Phase: 19-system-contact-import*
