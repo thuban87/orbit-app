@@ -149,8 +149,8 @@ roadmap phases. Items marked *(infra)* are foundation guarantees rather than end
 ### Contact Data Normalization (CDN)
 
 - [x] **CDN-01**: Phone and email move from singular contact columns to ordered, first-class methods with stable identity, one primary per type, canonical equality, extensions, and no duplicate authoritative storage; incomplete methods remain storable but unavailable for unsupported actions. *(infra)*
-- [ ] **CDN-02**: Contacts support an independent Bound/Unbound lifecycle: existing contacts migrate Bound; Unbinding retains all relationship data; `interval_days = NULL` only means never assigned; a Bound contact always has positive cadence; once assigned, cadence is never cleared.
-- [ ] **CDN-03**: Bound-only cadence surfaces exclude Unbound contacts as decided while dedicated Unbound browsing, optional Never Contacted inclusion, birthday behavior, and explicit person-level AI preserve their locked behavior; Orbit identity remains independent of system-contact identity. *(infra)*
+- [x] **CDN-02**: Contacts support an independent Bound/Unbound lifecycle: existing contacts migrate Bound; Unbinding retains all relationship data; `interval_days = NULL` only means never assigned; a Bound contact always has positive cadence; once assigned, cadence is never cleared.
+- [x] **CDN-03**: Bound-only cadence surfaces exclude Unbound contacts as decided while dedicated Unbound browsing, optional Never Contacted inclusion, birthday behavior, and explicit person-level AI preserve their locked behavior; Orbit identity remains independent of system-contact identity. *(infra)*
 - [x] **CDN-04**: Lossless backup/export preserves normalized methods, Bound/Unbound state, cadence, external links, and provenance; source disappearance and source refresh never silently delete or overwrite Orbit-owned data. *(infra)*
 
 ### System Contact Import (IMP)
@@ -227,8 +227,8 @@ Tracked, not in the current roadmap. Reasons recorded in the dossier.
 | CFN-01…04 | Phase 16 | Pending |
 | BKP-01…04 | Phase 17 | Pending |
 | CDN-01 | Phase 18.1 | Complete |
-| CDN-02 | Phase 18.2 | Pending |
-| CDN-03 | Phase 18.1 (Orbit-identity independence) + Phase 18.2 (Bound-only surfaces, Unbound browsing, AI) | Pending |
+| CDN-02 | Phase 18.2 | Complete |
+| CDN-03 | Phase 18.1 (Orbit-identity independence) + Phase 18.2 (Bound-only surfaces, Unbound browsing, AI) | Complete |
 | CDN-04 | Phase 18.1 (normalized-method backup) + Phase 18.2 (Bound/Unbound-state backup) | Complete |
 | IMP-01…04 | Phase 19 | Pending |
 | RCN-01…04 | Phase 20 | Pending |

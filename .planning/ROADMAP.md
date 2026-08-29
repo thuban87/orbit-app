@@ -35,7 +35,7 @@ onto the dossier domains; a `[DECIDED]`/`[REJECTED]` decision is implemented, ne
 - [ ] **Phase 15: Weekly Digest** — one WEEKLY Sunday notification → a live "your week" screen.
 - [ ] **Phase 16: Custom Field Value Normalization** — replace dynamic custom-value columns with a sync-safe normalized row model, preserving every existing behavior and value.
 - [ ] **Phase 17: Backup, Export & Restore** — manual + auto SAF backup, optional encryption, tombstone-aware Merge/Replace restore (reusable reconciliation core), forward-migrate.
-- [ ] **Phase 18.1: Contact Method Normalization** — normalized phone/email methods with stable identity and system-contact provenance foundations; all contacts stay Bound.
+- [x] **Phase 18.1: Contact Method Normalization** — normalized phone/email methods with stable identity and system-contact provenance foundations; all contacts stay Bound. **COMPLETE 2026-08-28** (device UAT passed; restore route repaired).
 - [ ] **Phase 18.2: Bound/Unbound Lifecycle** — the independent Bound/Unbound lifecycle across all proactive surfaces, on Phase 18.1's normalized model. (Streamlined Export deferred out of the original Phase 18.)
 - [ ] **Phase 19: System Contact Import** — deliberate single/bulk system-contact acquisition, conservative duplicate evidence, initial linking, and resumable import review.
 - [ ] **Phase 20: Contact Reconciliation & Merge** — user-triggered one-way source reconciliation, durable review, and explicit atomic Orbit-to-Orbit merge.
@@ -691,7 +691,7 @@ Plans:
 
 **Wave 4** *(blocked on Wave 3 completion)*
 
-- [ ] 18.1-06-PLAN.md — 18.1 verification and owner-led Android migration UAT
+- [x] 18.1-06-PLAN.md — 18.1 verification and owner-led Android migration UAT (device UAT passed; restore route repaired)
 
 ### Phase 18.2: Bound/Unbound Lifecycle
 
@@ -721,22 +721,22 @@ relationship history, on top of Phase 18.1's normalized model.
 Plans:
 **Wave 1**
 
-- [ ] 18.2-01-PLAN.md — v10 lifecycle-schema migration (nullable cadence, tracking_enabled, constraints)
+- [x] 18.2-01-PLAN.md — v10 lifecycle-schema migration (nullable cadence, tracking_enabled, constraints)
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 18.2-02-PLAN.md — lifecycle write DAO (Bind/Unbind transitions)
-- [ ] 18.2-03-PLAN.md — Bound-aware query owners and policy reads
+- [x] 18.2-02-PLAN.md — lifecycle write DAO (Bind/Unbind transitions)
+- [x] 18.2-03-PLAN.md — Bound-aware query owners and policy reads
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
-- [ ] 18.2-04-PLAN.md — nullable-cadence impact and explicit-AI reads
-- [ ] 18.2-05-PLAN.md — Orrery Bound-only reads and shared saved-sun policy
+- [x] 18.2-04-PLAN.md — nullable-cadence impact and explicit-AI reads
+- [x] 18.2-05-PLAN.md — Orrery Bound-only reads and shared saved-sun policy
 - [ ] 18.2-09-PLAN.md — Bound/Unbound backup extension and lifecycle-combo validation
 
 **Wave 4** *(blocked on Wave 3 completion)*
 
-- [ ] 18.2-06-PLAN.md — notification/widget lifecycle policy and Unbind effects
+- [x] 18.2-06-PLAN.md — notification/widget lifecycle policy and Unbind effects
 - [ ] 18.2-07-PLAN.md — Unbound browsing, navigation, and settings
 
 **Wave 5** *(blocked on Wave 4 completion)*

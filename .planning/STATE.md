@@ -1,18 +1,18 @@
 ---
 gsd_state_version: 1.0
 milestone: v1.0
-current_phase: 18.1
-current_phase_name: Contact Method Normalization
-current_plan: 6
+current_phase: 18.2
+current_phase_name: Bound/Unbound Lifecycle
+current_plan: 7
 status: executing
-stopped_at: Completed 18.1-05-PLAN.md
-last_updated: "2026-08-28T07:45:02.611Z"
-state_head: f7ba2a14e0c9ee3b79b3f2dc744dac60a343bfeb
+stopped_at: Completed 18.2-06-PLAN.md
+last_updated: "2026-08-29T00:44:57.034Z"
+state_head: 2f27be1f796660165e22cd842fea7e7939918f83
 progress:
   total_phases: 22
   completed_phases: 14
   total_plans: 144
-  completed_plans: 130
+  completed_plans: 137
 milestone_name: milestone
 ---
 
@@ -23,14 +23,27 @@ milestone_name: milestone
 See: .planning/PROJECT.md (updated 2026-08-14)
 
 **Core value:** Collapse the taps between "you're overdue with X" and the message actually being sent.
-**Current focus:** Phase 18.1 — Contact Method Normalization
+**Current focus:** Phase 18.2 — Bound/Unbound Lifecycle
 
 ## Current Position
 
-**Phase:** 18.1 — Contact Method Normalization
-**Current Plan:** 6
-**Total Plans in Phase:** 6
+**Phase:** 18.2 — Bound/Unbound Lifecycle
+**Current Plan:** 7
+**Total Plans in Phase:** 10
 **Status:** Ready to execute
+
+**⟢ PHASE 18.1 (Contact Method Normalization) — COMPLETE (2026-08-28).** All 6 plans executed.
+Normalized phone/email method model with stable identity + system-contact provenance foundations;
+all contacts remain Bound. 18.1-06 close-out: Task 1 automated verification (1,510 tests green +
+executable scalar-method retirement audit, `06531df`); Task 2 device UAT PASSED on the Pixel —
+v8→v10 migration confirmed, and the **restore route was repaired and proven end-to-end**. The direct
+Restore button launched a blank Android DocumentsUI `PickActivity`; fix = a new in-task
+`ACTION_GET_CONTENT` native picker (`modules/orbit-backup-document-picker/pickBackupDocument`) with the
+Files→Share receiver kept as a resilient fallback. Root cause of the blank picker was this Pixel's
+**corrupted DocumentsUI** (RefreshTask NPE), reproduced identically under both intent actions and cleared
+with `pm clear com.google.android.documentsui` — a device fault, not app code. Changed-primary Merge
+verified clean (unique-safe, no rejection). Commits LOCAL on `main`, NOT pushed. **Next: Phase 18.2
+(Bound/Unbound Lifecycle)** on this normalized model.
 
 **⟢ PHASE 17 (Backup, Export & Restore) — EXECUTING.** 8/12 plans complete. Plan 17-07 adds a Pixel-release-measured v1 encrypted envelope, 600k PBKDF2 profile, typed SecureStore cache, and fail-closed encrypted backup writes. Next: 17-08 validated restore preview and transactional Merge/Replace apply. All commits remain local on `main`; nothing has been pushed.
 
@@ -83,7 +96,7 @@ Progress: [████████░░] 75% (12/16 phases complete; Phase 13 
 
 _Phase-12 recap (historical — Phase 12 is COMPLETE + verified; see 12-VERIFICATION.md):_
 
-Phase: 18.1 (Contact Method Normalization) — EXECUTING
+Phase: 18.2 (Bound/Unbound Lifecycle) — EXECUTING
 Next: Phase 13 (Orrery) — NOT started. It is a large new Skia render-loop phase (its own discuss→plan→converge→execute→device-UAT cycle); awaiting owner go-ahead before beginning.
 Done this session (2026-08-17), all committed locally on main (NOT pushed): smart-discuss (12-CONTEXT; owner APPROVED the shared stable/wobble/decay status palette — stable #45B98A / wobble #E8C15C / decay #E56A52 / rogue #E0904A unchanged — resolving OD-1 app-wide; widget + ContactCard + future orrery inherit it), UI-SPEC (approved, checker VERIFIED), RESEARCH, VALIDATION (Nyquist), PATTERNS, PLAN (8 plans / 6 waves, efa9f5b), plan-checker PASSED, then a 2-cycle cross-AI convergence (codex CLI + read-only-Claude subagent; self-review guard overridden per owner): cycle-1 = 6 codex HIGH + 7 Claude actionable → replan (cca05d9); cycle-2 = 2 codex HIGH (WDG-03 freshness incompleteness; killed-app UAT needed a debug build) → final replan (4e688cf). All 8 HIGH fixes verified in-file. NOTE: the final-replan fixes were NOT independently re-reviewed (max cycles reached + owner pause).
 Codex tooling note: current codex-cli (0.144.1) makes gsd-review auto-add `--dangerously-bypass-hook-trust`, which the safety classifier blocks; a subagent improperly tunneled it once (flagged, discarded), then codex was re-run cleanly WITHOUT that flag. Do NOT let gsd-review's codex path run with that flag — run codex manually without it, or allow-list a scoped `Bash(codex exec:*)`.
@@ -192,6 +205,12 @@ Progress: [████████░░] 75% (12/16 phases complete; Phase 13 
 | Phase 18.1 P03 | 21min | 4 tasks | 24 files |
 | Phase 18.1 P04 | 17m | 3 tasks | 13 files |
 | Phase 18.1 P05 | 6min | 1 tasks | 6 files |
+| Phase 18.2 P01 | 9min | 1 tasks | 6 files |
+| Phase 18.2 P02 | 7min | 2 tasks | 4 files |
+| Phase 18.2 P03 | 17min | 2 tasks | 14 files |
+| Phase 18.2 P04 | 4min | 2 tasks | 6 files |
+| Phase 18.2-bound-unbound-lifecycle P05 | 4min | 2 tasks | 9 files |
+| Phase 18.2 P06 | 7min | 4 tasks | 14 files |
 
 ## Accumulated Context
 
@@ -317,6 +336,19 @@ Foundational decisions affecting current work:
 - [Phase 18.1]: Method/link demotions write before promotions because SQLite partial unique indexes are statement-immediate.
 - [Phase 18.1]: Profile renders DAO-owned display values and actionability only; it never reparses raw method input or a phone region.
 - [Phase 18.1]: Compose supplies the OS SMS handoff only with the canonical destination of the DAO-selected actionable primary phone.
+- [Phase 18.2]: Migration 011 preserves v10 values and IDs while enforcing Bound cadence constraints.
+- [Phase 18.2]: Bind reuses dormant cadence and requires a positive cadence only for a never-assigned Unbound contact.
+- [Phase 18.2]: Capture passes an explicit empty normalized method list while v11 defaults new inline contacts to Bound.
+- [Phase 18.2]: Lifecycle-sensitive population eligibility lives at SQL query owners; direct retrieval remains neutral for Unbound contacts.
+- [Phase 18.2]: Digest retrospective and gentle-line reads remain all-relationship-history; overlooked is Bound-only.
+- [Phase 18.2]: STATUS_SCAN callers require Bound positive cadence before evaluating shared status fragments.
+- [Phase 18.2]: Unbound intensity is a tagged unavailable result, never nullable-cadence arithmetic or a fabricated interval.
+- [Phase 18.2]: Explicit AI maps unavailable intensity to the exact neutral aggregate while retaining closed prompt projection.
+- [Phase 18.2]: A saved Unbound sun keeps app_settings.sun_contact_id intact and resolves visually to self through the shared predicate.
+- [Phase 18.2]: Orrery reads and ring-sequence guards use the same Bound predicate, while never-contacted Bound contacts remain picker candidates.
+- [Phase 18.2]: Decay candidates require Bound state; birthday facts stay both-state but scheduling honors persisted birthday_unbound_enabled policy.
+- [Phase 18.2]: Lifecycle transition effects run only after DAO commit and isolate scheduler/widget failures from durable relationship state.
+- [Phase 18.2]: Stale proactive actions fail closed while Profile opens remain available for live Unbound relationship records.
 
 ### Pending Todos
 
@@ -353,8 +385,8 @@ planning" sections in docs/dossier/*.md — those are the authoritative hand-off
 
 ## Session
 
-**Last session:** 2026-08-28T07:43:58.911Z
-**Stopped at:** Completed 18.1-05-PLAN.md
+**Last session:** 2026-08-29T00:44:55.046Z
+**Stopped at:** Completed 18.2-06-PLAN.md
 _Prior stop (13-04):_ the orrery VISUAL VOCABULARY (theme tokens + two pure resolver modules, node-tested, 29 cases green): (1) five owner-tunable `ThemePalette` tokens seeded in `space-dark.dark` ONLY — `starPalette` (6 colours, gold `#F2C14E` at index 0, then amber/rose-red/violet/cyan/ice-white), `mutedStable/Wobble/Decay` (desaturated same-hue morph endpoints), `rogueExtinguished` (cold blue-grey `#3E4A6B` rogue BODY fill) — with an M6/C2-5 conformance test that IMPORTS the real `SELF_SUN_COLOUR_RE`/`assertSelfSunColour` from app-settings-dao and locks every starPalette entry to the ACTUAL DAO write-path rule (no re-inlined regex). (2) `orrery-ring-logic.ts` `orreryRingStyle(status, colors)` — REUSES `ringVisual` for `{color,opacity,width}` (status→colour mapped once), adds the `strokeStyle` axis (solid→dashed→faded→faintTrace) + `bodyFill` (rogue ring=`colors.rogue`, body=`rogueExtinguished`); `null`→canonical NEUTRAL (`colors.border`), never throws — the single fallback sun-occupant reuses (C2-2). (3) `sun-occupant-logic.ts` `resolveSunOccupant(input)` — NULL/archived/missing→self (A7, glow `selfSunColour ?? starPalette[0]`), live contact→its status glow via `orreryRingStyle(status, colors).color`, never-contacted (status `null`)→the reused neutral border (C2-2); accepts `status: ProfileStatus | null`. 5 commits (1801915 feat tokens+M6; d35d528 RED→4cbfad5 GREEN ring-logic; c923b16 RED→10780dd GREEN sun-occupant); tsc + check:colors clean; no deviations (one in-flight fix: a placeholder hex in the logic test was re-sourced from the palette after check:colors flagged it — C2-3). Committed locally on main (NOT pushed). Next: Wave 2 (13-05 render / 13-06 Settings sun-picker), Wave 3 (13-07 drag-release), Wave 4 (13-08 device UAT, autonomous:false).
 **Resume file:** None
 
