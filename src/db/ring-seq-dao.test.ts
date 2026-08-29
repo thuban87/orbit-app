@@ -26,6 +26,9 @@ import { migration004 } from "@/db/migrations/004-ai-settings";
 import { migration005 } from "@/db/migrations/005-digest-settings";
 import { migration006 } from "@/db/migrations/006-normalize-custom-field-values";
 import { migration007 } from "@/db/migrations/007-tombstones";
+import { migration009 } from "@/db/migrations/009-contact-method-normalization";
+import { migration010 } from "@/db/migrations/010-contact-method-label";
+import { migration011 } from "@/db/migrations/011-contact-lifecycle-schema";
 import { runMigrations } from "@/db/migrations/runner";
 import { listOrbitingContacts } from "@/db/orrery-read";
 import { rewriteRingSeq } from "@/db/ring-seq-dao";
@@ -42,7 +45,23 @@ beforeEach(async () => {
   uidCounter = 0;
   const db = openTestDb();
   exec = nodeSqliteExecutor(db);
-  await runMigrations(exec, [migration001, migration002, migration003, migration004, migration005, migration006, migration007], 7, { now: NOW, newUid: uid });
+  await runMigrations(
+    exec,
+    [
+      migration001,
+      migration002,
+      migration003,
+      migration004,
+      migration005,
+      migration006,
+      migration007,
+      migration009,
+      migration010,
+      migration011,
+    ],
+    11,
+    { now: NOW, newUid: uid, defaultPhoneRegion: "US" },
+  );
 });
 
 interface SeedOpts {
@@ -51,21 +70,23 @@ interface SeedOpts {
   ringSeq?: number | null;
   archivedAt?: string | null;
   createdAt?: string;
+  trackingEnabled?: number;
 }
 
 async function seedContact(o: SeedOpts = {}): Promise<number> {
   const created = o.createdAt ?? NOW;
   const result = await exec.runAsync(
     `INSERT INTO contacts
-       (uid, name, interval_days, last_contact, ring_seq, archived_at,
-        created_at, modified_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+       (uid, name, interval_days, last_contact, ring_seq, tracking_enabled,
+        archived_at, created_at, modified_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       uid(),
       o.name ?? "Alex",
       30,
       o.lastContact ?? null,
       o.ringSeq ?? null,
+      o.trackingEnabled ?? 1,
       o.archivedAt ?? null,
       created,
       created,
@@ -78,13 +99,14 @@ async function readRow(id: number): Promise<{
   ring_seq: number | null;
   last_contact: string | null;
   modified_at: string;
+  tracking_enabled: number;
 }> {
   const row = await exec.getFirstAsync<{
     ring_seq: number | null;
     last_contact: string | null;
     modified_at: string;
   }>(
-    "SELECT ring_seq, last_contact, modified_at FROM contacts WHERE id = ?",
+    "SELECT ring_seq, last_contact, modified_at, tracking_enabled FROM contacts WHERE id = ?",
     [id],
   );
   if (!row) throw new Error(`no contact id=${id}`);
@@ -131,6 +153,28 @@ describe("rewriteRingSeq — self-sun happy path (excludeContactId null)", () =>
       expect(row.modified_at).toBe(LATER);
       expect(row.last_contact).toBe(NOW);
     }
+  });
+
+  it("ignores a contacted Unbound contact in both guards and leaves its row untouched", async () => {
+    const [a, b, c] = await seedThreeLive();
+    const unbound = await seedContact({
+      name: "Unbound",
+      lastContact: NOW,
+      ringSeq: 9,
+      trackingEnabled: 0,
+    });
+
+    await rewriteRingSeq(exec, [c, a, b], LATER, null);
+
+    expect((await readRow(c)).ring_seq).toBe(0);
+    expect((await readRow(a)).ring_seq).toBe(1);
+    expect((await readRow(b)).ring_seq).toBe(2);
+    expect(await readRow(unbound)).toEqual({
+      ring_seq: 9,
+      last_contact: NOW,
+      modified_at: NOW,
+      tracking_enabled: 0,
+    });
   });
 });
 

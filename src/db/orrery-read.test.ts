@@ -25,6 +25,15 @@ import {
   type OrbitingContact,
 } from "@/db/orrery-read";
 import { migration001 } from "@/db/migrations/001-initial";
+import { migration002 } from "@/db/migrations/002-app-settings";
+import { migration003 } from "@/db/migrations/003-orrery-settings";
+import { migration004 } from "@/db/migrations/004-ai-settings";
+import { migration005 } from "@/db/migrations/005-digest-settings";
+import { migration006 } from "@/db/migrations/006-normalize-custom-field-values";
+import { migration007 } from "@/db/migrations/007-tombstones";
+import { migration009 } from "@/db/migrations/009-contact-method-normalization";
+import { migration010 } from "@/db/migrations/010-contact-method-label";
+import { migration011 } from "@/db/migrations/011-contact-lifecycle-schema";
 import { runMigrations } from "@/db/migrations/runner";
 import { PROGRESS_SQL, STATUS_SQL } from "@/db/status";
 import type { SqlExecutor } from "@/db/types";
@@ -39,7 +48,23 @@ beforeEach(async () => {
   uidCounter = 0;
   const db = openTestDb();
   exec = nodeSqliteExecutor(db);
-  await runMigrations(exec, [migration001], 1, { now: NOW, newUid: uid });
+  await runMigrations(
+    exec,
+    [
+      migration001,
+      migration002,
+      migration003,
+      migration004,
+      migration005,
+      migration006,
+      migration007,
+      migration009,
+      migration010,
+      migration011,
+    ],
+    11,
+    { now: NOW, newUid: uid, defaultPhoneRegion: "US" },
+  );
 });
 
 /** A local `YYYY-MM-DD` string offset `days` from today (matches localtime). */
@@ -62,6 +87,7 @@ interface SeedOpts {
   rarelyResponds?: number;
   archivedAt?: string | null;
   createdAt?: string;
+  trackingEnabled?: number;
 }
 
 async function seedContact(o: SeedOpts = {}): Promise<number> {
@@ -69,8 +95,8 @@ async function seedContact(o: SeedOpts = {}): Promise<number> {
   const result = await exec.runAsync(
     `INSERT INTO contacts
        (uid, name, interval_days, last_contact, photo, ring_seq, snooze_until,
-        rarely_responds, archived_at, created_at, modified_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        rarely_responds, tracking_enabled, archived_at, created_at, modified_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       uid(),
       o.name ?? "Alex",
@@ -80,6 +106,7 @@ async function seedContact(o: SeedOpts = {}): Promise<number> {
       o.ringSeq ?? null,
       o.snoozeUntil ?? null,
       o.rarelyResponds ?? 0,
+      o.trackingEnabled ?? 1,
       o.archivedAt ?? null,
       created,
       created,
@@ -96,9 +123,14 @@ const WOBBLE = () => localDateOffset(-26);
 const ROGUE = () => localDateOffset(-200);
 
 describe("listOrbitingContacts — population + exclusions", () => {
-  it("excludes never-contacted and archived; keeps live contacted contacts", async () => {
+  it("excludes never-contacted, archived, and Unbound contacts; keeps live contacted Bound contacts", async () => {
     const live = await seedContact({ name: "Live", lastContact: STABLE() });
     await seedContact({ name: "Never", lastContact: null });
+    await seedContact({
+      name: "Unbound",
+      lastContact: STABLE(),
+      trackingEnabled: 0,
+    });
     await seedContact({
       name: "Archie",
       lastContact: STABLE(),
