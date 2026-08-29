@@ -5,7 +5,7 @@ vi.mock("expo-sqlite", () => ({}));
 import { nodeSqliteExecutor, openTestDb } from "@/db/__testkit__/node-sqlite";
 import { MIGRATIONS, TARGET_VERSION } from "@/db/database";
 import { acceptImportSessionWithRows } from "@/db/import-session-dao";
-import { listSessionRows } from "@/db/import-session-read";
+import { getSessionById, listSessionRows } from "@/db/import-session-read";
 import { importContactRecord } from "@/db/imported-contact-dao";
 import { runMigrations } from "@/db/migrations/runner";
 import type { SqlExecutor } from "@/db/types";
@@ -139,7 +139,11 @@ describe("source consolidation", () => {
     });
 
     expect(clusters).toHaveLength(1);
-    expect(result).toEqual({ contactId: expect.any(Number), combined: true });
+    expect(result).toEqual({
+      contactId: expect.any(Number),
+      combined: true,
+      sessionComplete: true,
+    });
     if (!result.combined) throw new Error("expected a combined contact");
     expect(
       await exec.getFirstAsync<{ birthday: string | null }>(
@@ -164,6 +168,9 @@ describe("source consolidation", () => {
           contactId: result.contactId,
         }),
       ]),
+    );
+    await expect(getSessionById(exec, session.sessionId)).resolves.toEqual(
+      expect.objectContaining({ status: "complete" }),
     );
     await expect(findActiveExternalLink(exec, "android", "one")).resolves.toBe(
       result.contactId,
@@ -236,12 +243,64 @@ describe("source consolidation", () => {
         now: NOW,
       },
     );
-    expect(result).toEqual({ contactId: expect.any(Number), combined: true });
+    expect(result).toEqual({
+      contactId: expect.any(Number),
+      combined: true,
+      sessionComplete: true,
+    });
     expect(await listSessionRows(exec, photoFailure.sessionId)).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ rowStatus: "imported" }),
         expect.objectContaining({ rowStatus: "imported" }),
       ]),
+    );
+  });
+
+  it("leaves a mixed session pending after a cluster combine", async () => {
+    const session = await createSession([
+      {
+        externalContactId: "one",
+        sourcePayload: payload("Taylor", [
+          { type: "phone", value: "(312) 555-0100" },
+        ]),
+      },
+      {
+        externalContactId: "two",
+        sourcePayload: payload("Taylor Jones", [
+          { type: "phone", value: "+1 312 555 0100" },
+        ]),
+      },
+      {
+        externalContactId: "three",
+        sourcePayload: payload("Morgan", [
+          { type: "email", value: "morgan@example.com" },
+        ]),
+      },
+    ]);
+    const { clusters } = detectSourceClusters(session.rows, {
+      phoneRegion: "US",
+    });
+    const result = await combineCluster(exec, photoFs(), {
+      rows: clusters[0],
+      batchCategoryId: null,
+      phoneRegion: "US",
+      now: NOW,
+    });
+
+    expect(result).toEqual({
+      contactId: expect.any(Number),
+      combined: true,
+      sessionComplete: false,
+    });
+    expect(await listSessionRows(exec, session.sessionId)).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ externalContactId: "one", rowStatus: "imported" }),
+        expect.objectContaining({ externalContactId: "two", rowStatus: "imported" }),
+        expect.objectContaining({ externalContactId: "three", rowStatus: "pending" }),
+      ]),
+    );
+    await expect(getSessionById(exec, session.sessionId)).resolves.toEqual(
+      expect.objectContaining({ status: "pending" }),
     );
   });
 
