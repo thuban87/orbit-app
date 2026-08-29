@@ -75,6 +75,9 @@ async function seed(): Promise<void> {
     now: h.now,
     newUid: () => `seed-uid-${++seedUidN}`,
   });
+  await exec.execAsync(
+    "ALTER TABLE contacts ADD COLUMN tracking_enabled INTEGER NOT NULL DEFAULT 1",
+  );
   await exec.runAsync(
     `INSERT INTO contacts (uid, name, interval_days, created_at, modified_at)
      VALUES (?, ?, ?, ?, ?)`,
@@ -212,6 +215,34 @@ describe("handleNotificationAction — snooze", () => {
     expect(cancel).toHaveBeenCalledWith(decayIdentifier(CONTACT_ID));
 
     // Snooze is NOT widget-visible → the widget publisher must not fire (12-07).
+    expect(h.notifyWidget).not.toHaveBeenCalled();
+  });
+});
+
+describe("handleNotificationAction — now-Unbound lifecycle guard", () => {
+  it("records a real Mark touchpoint but does not re-arm cadence for an Unbound contact", async () => {
+    await h.exec?.runAsync(
+      "UPDATE contacts SET tracking_enabled = 0 WHERE id = ?",
+      [CONTACT_ID],
+    );
+    const { handleNotificationAction, cancel } = await freshHandler();
+    await handleNotificationAction(DATA, ACTION_MARK);
+
+    expect(interactionCount()).toBe(1);
+    expect(cancel).toHaveBeenCalledWith(decayIdentifier(CONTACT_ID));
+    expect(h.notifyWidget).toHaveBeenCalledTimes(1);
+  });
+
+  it("makes a Snooze tap a no-op for an Unbound contact", async () => {
+    await h.exec?.runAsync(
+      "UPDATE contacts SET tracking_enabled = 0 WHERE id = ?",
+      [CONTACT_ID],
+    );
+    const { handleNotificationAction, cancel } = await freshHandler();
+    await handleNotificationAction(DATA, ACTION_SNOOZE);
+
+    expect(snoozeEventCount()).toBe(0);
+    expect(cancel).not.toHaveBeenCalled();
     expect(h.notifyWidget).not.toHaveBeenCalled();
   });
 });
