@@ -36,7 +36,7 @@ export function ImportProgressScreen({
           },
         });
         if (mounted.current) {
-          navigation.navigate("ImportComplete", {
+          navigation.replace("ImportComplete", {
             sessionId: route.params.sessionId,
           });
         }
