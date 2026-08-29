@@ -15,7 +15,11 @@ import {
 } from "@/components/ConfidenceChip";
 import { useTheme } from "@/theme";
 
-export type BulkAction = "link" | "import-new" | "skip" | "apply-recommendation";
+export type BulkAction =
+  | "link"
+  | "import-new"
+  | "skip"
+  | "apply-recommendation";
 
 export interface CandidateChoice {
   contactId: number;
@@ -38,7 +42,10 @@ interface CandidateCardGridProps {
   items: CandidateItem[];
   bulkActions: BulkAction[];
   onInspect: (item: CandidateItem) => void;
-  onBulkAction: (action: BulkAction, items: CandidateItem[]) => Promise<void> | void;
+  onBulkAction: (
+    action: BulkAction,
+    items: CandidateItem[],
+  ) => Promise<void> | void;
   /** Generic Phase 20 safety contract: recommendation never resolves these items. */
   recommendationExcludes: "needs_review";
   scoring?: boolean;
@@ -60,9 +67,15 @@ export function CandidateCardGrid({
   scoring = false,
 }: CandidateCardGridProps) {
   const { colors } = useTheme();
-  const [selectedIds, setSelectedIds] = useState<Set<CandidateItem["id"]>>(new Set());
-  const [imageErrors, setImageErrors] = useState<Set<CandidateItem["id"]>>(new Set());
-  const [failedIds, setFailedIds] = useState<Set<CandidateItem["id"]>>(new Set());
+  const [selectedIds, setSelectedIds] = useState<Set<CandidateItem["id"]>>(
+    new Set(),
+  );
+  const [imageErrors, setImageErrors] = useState<Set<CandidateItem["id"]>>(
+    new Set(),
+  );
+  const [failedIds, setFailedIds] = useState<Set<CandidateItem["id"]>>(
+    new Set(),
+  );
   const [actionsOpen, setActionsOpen] = useState(false);
 
   const selectedItems = items.filter((item) => selectedIds.has(item.id));
@@ -83,7 +96,9 @@ export function CandidateCardGrid({
   const runBulkAction = async (action: BulkAction) => {
     const targets =
       action === "apply-recommendation"
-        ? selectedItems.filter((item) => item.outcome !== recommendationExcludes)
+        ? selectedItems.filter(
+            (item) => item.outcome !== recommendationExcludes,
+          )
         : selectedItems;
     setActionsOpen(false);
     if (targets.length === 0) return;
@@ -92,20 +107,26 @@ export function CandidateCardGrid({
       await onBulkAction(action, targets);
       setFailedIds((current) => {
         const next = new Set(current);
-        targets.forEach((item) => next.delete(item.id));
+        targets.forEach((item) => {
+          next.delete(item.id);
+        });
         return next;
       });
       setSelectedIds(new Set());
     } catch {
       // Keep the rest of the grid usable and make the affected cards retryable.
-      setFailedIds((current) => new Set([...current, ...targets.map((item) => item.id)]));
+      setFailedIds(
+        (current) => new Set([...current, ...targets.map((item) => item.id)]),
+      );
     }
   };
 
   if (scoring) {
     return (
       <View style={styles.progress}>
-        <Text style={{ color: colors.textSecondary }}>Checking for matches…</Text>
+        <Text style={{ color: colors.textSecondary }}>
+          Checking for matches…
+        </Text>
       </View>
     );
   }
@@ -125,7 +146,9 @@ export function CandidateCardGrid({
             <Pressable
               accessibilityRole="button"
               accessibilityLabel={item.name}
-              onPress={() => (multiSelect ? toggleSelection(item) : onInspect(item))}
+              onPress={() =>
+                multiSelect ? toggleSelection(item) : onInspect(item)
+              }
               onLongPress={() => toggleSelection(item)}
               style={[
                 styles.card,
@@ -147,7 +170,12 @@ export function CandidateCardGrid({
                   style={styles.photo}
                 />
               ) : (
-                <Avatar photo={null} name={item.name} size={48} contactId={item.id} />
+                <Avatar
+                  photo={null}
+                  name={item.name}
+                  size={48}
+                  contactId={item.id}
+                />
               )}
               <Text
                 numberOfLines={1}
@@ -178,7 +206,13 @@ export function CandidateCardGrid({
         <Pressable
           accessibilityRole="button"
           onPress={() => setActionsOpen(true)}
-          style={[styles.actionBar, { backgroundColor: colors.surfaceElevated, borderColor: colors.border }]}
+          style={[
+            styles.actionBar,
+            {
+              backgroundColor: colors.surfaceElevated,
+              borderColor: colors.border,
+            },
+          ]}
         >
           <Text style={[styles.actionBarText, { color: colors.textPrimary }]}>
             {selectedItems.length} selected · Choose action
@@ -196,9 +230,20 @@ export function CandidateCardGrid({
           <Pressable
             accessibilityLabel="Dismiss bulk actions"
             onPress={() => setActionsOpen(false)}
-            style={[StyleSheet.absoluteFill, { backgroundColor: colors.background, opacity: 0.85 }]}
+            style={[
+              StyleSheet.absoluteFill,
+              { backgroundColor: colors.background, opacity: 0.85 },
+            ]}
           />
-          <View style={[styles.sheet, { backgroundColor: colors.surfaceElevated, borderColor: colors.border }]}>
+          <View
+            style={[
+              styles.sheet,
+              {
+                backgroundColor: colors.surfaceElevated,
+                borderColor: colors.border,
+              },
+            ]}
+          >
             {bulkActions.map((action) => (
               <Pressable
                 key={action}
@@ -206,7 +251,9 @@ export function CandidateCardGrid({
                 onPress={() => void runBulkAction(action)}
                 style={[styles.option, { borderColor: colors.border }]}
               >
-                <Text style={{ color: colors.textPrimary }}>{actionLabels[action]}</Text>
+                <Text style={{ color: colors.textPrimary }}>
+                  {actionLabels[action]}
+                </Text>
               </Pressable>
             ))}
           </View>
@@ -242,5 +289,9 @@ const styles = StyleSheet.create({
   actionBarText: { fontSize: 16, fontWeight: "600" },
   modalRoot: { flex: 1, justifyContent: "center", paddingHorizontal: 24 },
   sheet: { borderWidth: 1, borderRadius: 12, overflow: "hidden" },
-  option: { borderBottomWidth: StyleSheet.hairlineWidth, paddingHorizontal: 16, paddingVertical: 14 },
+  option: {
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+  },
 });
