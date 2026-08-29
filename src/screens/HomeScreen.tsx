@@ -42,6 +42,7 @@ import {
   View,
 } from "react-native";
 import { Avatar } from "@/components/Avatar";
+import { AddSpeedDialFab } from "@/components/AddSpeedDialFab";
 import { BirthdayBanner } from "@/components/BirthdayBanner";
 import { ContactCard } from "@/components/ContactCard";
 import { type FilterChip, FilterChipRow } from "@/components/FilterChipRow";
@@ -649,18 +650,7 @@ export function HomeScreen() {
           />
         }
       />
-      <Pressable
-        testID="dashboard-create-fab"
-        accessibilityRole="button"
-        accessibilityLabel="Add contact"
-        onPress={() => navigation.navigate("Create")}
-        style={({ pressed }) => [
-          styles.fab,
-          { backgroundColor: colors.accent, opacity: pressed ? 0.85 : 1 },
-        ]}
-      >
-        <Text style={[styles.fabGlyph, { color: colors.background }]}>+</Text>
-      </Pressable>
+      <AddSpeedDialFab />
     </View>
   );
 }
