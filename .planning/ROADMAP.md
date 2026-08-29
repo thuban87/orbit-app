@@ -774,42 +774,42 @@ Plans:
 Plans:
 **Wave 1**
 
-- [ ] 19-01-PLAN.md — Migration 012 durable import-session schema (incl. phone_region) + session DAO (mutexed writers + non-mutexed row cores + atomic accept) + read chokepoint (raw + four summary buckets) + state-transition table (one-way gated)
-- [ ] 19-02-PLAN.md — Native Android 17 contact-picker module (ACTION_PICK_CONTACTS, SDK_INT gate, no READ_CONTACTS; returns a cache copy only)
-- [ ] 19-05-PLAN.md — Duplicate-evidence engine (owns findActiveExternalLink; deterministic bypass + canonicalized-input advisory ladder, colourless)
+- [x] 19-01-PLAN.md — Migration 012 durable import-session schema (incl. phone_region) + session DAO (mutexed writers + non-mutexed row cores + atomic accept) + read chokepoint (raw + four summary buckets) + state-transition table (one-way gated)
+- [x] 19-02-PLAN.md — Native Android 17 contact-picker module (ACTION_PICK_CONTACTS, SDK_INT gate, no READ_CONTACTS; returns a cache copy only)
+- [x] 19-05-PLAN.md — Duplicate-evidence engine (owns findActiveExternalLink; deterministic bypass + canonicalized-input advisory ladder, colourless)
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 19-03-PLAN.md — createContactFullCore extraction + isValidStoredBirthday export + picked-contact-map (region-threaded) + imported-contact-dao (atomic create/link + session-row resolution)
+- [x] 19-03-PLAN.md — createContactFullCore extraction + isValidStoredBirthday export + picked-contact-map (region-threaded) + imported-contact-dao (atomic create/link + session-row resolution)
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
-- [ ] 19-04-PLAN.md — TRACER: single-contact import end-to-end (speed-dial FAB multi-pick + length routing, document-dir photo staging, region capture, atomic commit, discard-on-back) device-verified before expansion
+- [x] 19-04-PLAN.md — TRACER: single-contact import end-to-end (speed-dial FAB multi-pick + length routing, document-dir photo staging, region capture, atomic commit, discard-on-back) device-verified before expansion
 
 **Wave 4** *(blocked on Wave 3 completion)*
 
-- [ ] 19-06-PLAN.md — Bulk import: chunked atomic partial-failure driver (already_linked match_outcome, ambiguous→needs_review, eligibleStatuses retry, region from session) + shared-defaults setup + determinate progress + verified FAB→BulkImportSetup entry
+- [x] 19-06-PLAN.md — Bulk import: chunked atomic partial-failure driver (already_linked match_outcome, ambiguous→needs_review, eligibleStatuses retry, region from session) + shared-defaults setup + determinate progress + verified FAB→BulkImportSetup entry
 
 **Wave 5** *(blocked on Wave 4 completion)*
 
-- [ ] 19-09-PLAN.md — Durable resume/discard launch sweep (resume state machine incl. never-started-vs-mid-batch bulk routing, one-pending policy, discard-returns-photo-paths, retryable-failed preserved) + staged-photo cleanup
-- [ ] 19-10-PLAN.md — Photo (post-commit Orbit-owned master from durable staged path) import into the shared commitSingleImport + importRowAsNew seams, best-effort and failure-isolated (birthday owned by 19-03)
+- [x] 19-09-PLAN.md — Durable resume/discard launch sweep (resume state machine incl. never-started-vs-mid-batch bulk routing, one-pending policy, discard-returns-photo-paths, retryable-failed preserved) + staged-photo cleanup
+- [x] 19-10-PLAN.md — Photo (post-commit Orbit-owned master from durable staged path) import into the shared commitSingleImport + importRowAsNew seams, best-effort and failure-isolated (birthday owned by 19-03)
 
 **Wave 6** *(blocked on Wave 5 completion)*
 
-- [ ] 19-07-PLAN.md — Reusable candidate card grid + confidence chip + single/multi duplicate interrupts (atomic linkExistingContactToRow; conservative Apply-recommendation; batch category read from session; already_linked → matched Profile) — depends on 19-10 for the shared importRowAsNew photo seam
-- [ ] 19-11-PLAN.md — Conservative multi-source consolidation (Cluster K) — PRE-batch detection in BulkImportSetup, atomic combine (row_status='imported' + in-txn birthday + post-commit photo), explicit combine-into-one, never silent
+- [x] 19-07-PLAN.md — Reusable candidate card grid + confidence chip + single/multi duplicate interrupts (atomic linkExistingContactToRow; conservative Apply-recommendation; batch category read from session; already_linked → matched Profile) — depends on 19-10 for the shared importRowAsNew photo seam
+- [x] 19-11-PLAN.md — Conservative multi-source consolidation (Cluster K) — PRE-batch detection in BulkImportSetup, atomic combine (row_status='imported' + in-txn birthday + post-commit photo), explicit combine-into-one, never silent
 
 **Wave 7** *(blocked on Wave 6 completion)*
 
-- [ ] 19-08-PLAN.md — Import completion summary (four durable summary buckets, finalizeSessionIfTerminal) + bridge to Unbound contacts + Retry (eligibleStatuses, batch category from session)
+- [x] 19-08-PLAN.md — Import completion summary (four durable summary buckets, finalizeSessionIfTerminal) + bridge to Unbound contacts + Retry (eligibleStatuses, batch category from session)
 
 **Gap closure (post-verification 2026-08-29 — 19-VERIFICATION.md scored 1/4 truths; 3 failed truths across IMP-01/IMP-02/IMP-04, IMP-03 VERIFIED). 6 gap plans (3 waves); 19-01..19-11 untouched.**
 
-- [ ] 19-12-PLAN.md — GAP A (IMP-01, W1): native picker targets `android.provider.action.PICK_CONTACTS` + launch guard (Event/Photo handling preserved)
-- [ ] 19-13-PLAN.md — GAP B (IMP-02, W1): birthday validated at the importContactRecord DAO boundary (shared isValidStoredBirthday) + review-screen error state + shared normalizeEditedBirthday
-- [ ] 19-14-PLAN.md — GAP C.1 (IMP-04, W1): leave-guard "unresolved" defined by row_status (pending/needs_review/failed) so resolved skips/links survive navigation
-- [ ] 19-15-PLAN.md — GAP C.3 (IMP-04, W1): combineCluster calls finalizeSessionIfTerminal + BulkImportSetup routes cluster-only batches to ImportComplete
+- [x] 19-12-PLAN.md — GAP A (IMP-01, W1): native picker targets `android.provider.action.PICK_CONTACTS` + launch guard (Event/Photo handling preserved)
+- [x] 19-13-PLAN.md — GAP B (IMP-02, W1): birthday validated at the importContactRecord DAO boundary (shared isValidStoredBirthday) + review-screen error state + shared normalizeEditedBirthday
+- [x] 19-14-PLAN.md — GAP C.1 (IMP-04, W1): leave-guard "unresolved" defined by row_status (pending/needs_review/failed) so resolved skips/links survive navigation
+- [x] 19-15-PLAN.md — GAP C.3 (IMP-04, W1): combineCluster calls finalizeSessionIfTerminal + BulkImportSetup routes cluster-only batches to ImportComplete
 - [ ] 19-16-PLAN.md — GAP C.2 (IMP-04, W2): retire session photo_rel_path + delete raw staging on success; status-aware resume-sweep liveness (PII retention closed)
 - [ ] 19-17-PLAN.md — Device UAT (IMP-01/02/04, W3): agent-driven Pixel verification of all five fixes (picker launch, resolved-flow/recovery/completion, photo lifecycle, birthday block)
 
@@ -877,6 +877,6 @@ Plans:
 | 16. Custom Field Value Normalization | 0/TBD | Not started | - |
 | 17. Backup, Export & Restore | 11/12 | In Progress|  |
 | 18. Contact Data Normalization | 0 | Not started | - |
-| 19. System Contact Import | 0 | Not started | - |
+| 19. System Contact Import | 15/17 | In Progress|  |
 | 20. Contact Reconciliation & Merge | 0 | Not started | - |
 | 21. Interaction Assist & Reach Out | 0 | Not started | - |
