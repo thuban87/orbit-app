@@ -6,11 +6,12 @@ import { discardSession } from "@/db/import-session-dao";
 import { listSessionRows } from "@/db/import-session-read";
 import { deleteImportStaging } from "@/services/photos/photo-storage";
 import { Logger } from "@/utils/logger";
+import { hasUnresolvedRows } from "./import-leave-guard-logic";
 
 async function discardUnresolvedSession(sessionId: number): Promise<void> {
   const exec = getExecutor();
   const rows = await listSessionRows(exec, sessionId);
-  if (!rows.some((row) => row.contactId === null)) return;
+  if (!hasUnresolvedRows(rows)) return;
   const stagedPaths = await discardSession(exec, sessionId, localDateTime());
   stagedPaths.forEach(deleteImportStaging);
 }
