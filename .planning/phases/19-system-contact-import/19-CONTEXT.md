@@ -32,6 +32,17 @@ The exact native API wrappers, Android unsupported-state detection, session sche
 
 </canonical_refs>
 
+<execution_directives>
+## Execution Directives (owner, 2026-08-29)
+
+These govern how `/gsd-execute-phase 19` (and its verify/UAT) run. They are owner instructions, recorded here so the executor/verifier honor them.
+
+- **Migration 012 is PRE-APPROVED.** The owner reviewed and approved the v12 durable-session schema exactly as specified in `19-01-PLAN.md`'s objective — both tables (`import_sessions` + `import_session_rows`), the `phone_region` and `candidates_json` columns, nullable `batch_category_id` (NULL = Uncategorized, no categories seed), the `row_status`/`match_outcome` enumerations and transition table, `source_payload` as a JSON snapshot, plus the CHECKs/indexes; no contacts rebuild; no edit to shipped migrations 001–011. Plan 01's migration checkpoint is therefore satisfied in advance — **do not stop execution for it.** (If the schema in the plan is changed before execution, this pre-approval lapses and the checkpoint must be re-surfaced.)
+- **The agent drives the device UAT.** Post-execution verification on the Pixel 6 Pro — the `<human-check>` gates across plans 02/04/06/07/08/09/10/11 (picker + SDK gate, staged-photo preview, FAB bulk routing, duplicate-review grid, resume/discard, photos, completion/retry) — is **driven by the agent**: build (debug, on `droid`), install, and drive the app per `docs/runbooks/desktop-build-pipeline.md` + the device-UAT run-as pattern. Do not default these UI flows to "human_needed." The owner reviews the *result*, not the mechanics.
+- **Run autonomously once execution commences.** Do NOT stop for internal checkpoints — plan-checker gates, inner revision loops, wave sequencing, doc/nit fixes, or convergence-style mechanics are the agent's to resolve. Surface something to the owner ONLY when it is a **serious, obvious owner-bucket decision**: a new one-way/irreversible door (a further migration or destructive op not already approved), a security/privacy-posture change, a product/taste/scope call, or anything that would reverse a recorded ADR/HANDOFF/`[DECIDED]` decision. When in doubt, it must be genuinely serious and obvious to warrant a stop.
+
+</execution_directives>
+
 ---
 
 *Phase: 19-system-contact-import*
