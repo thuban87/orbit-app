@@ -11,12 +11,15 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { nodeSqliteExecutor, openTestDb } from "@/db/__testkit__/node-sqlite";
 import {
   type BirthdayCandidate,
+  DASHBOARD_BOUND_WHERE,
   countArchived,
   countLiveContacts,
   countNeverContacted,
   countSnoozed,
   type DashboardRow,
   type FavouriteRow,
+  FAVOURITES_BOUND_WHERE,
+  LIVE_CONTACTS_BOUND_WHERE,
   listBirthdayCandidates,
   listDashboard,
   listFavourites,
@@ -26,6 +29,15 @@ import type { FuelKind } from "@/db/fuel-dao";
 import { addFuel } from "@/db/fuel-dao";
 import { getRankedFuel } from "@/db/fuel-read";
 import { migration001 } from "@/db/migrations/001-initial";
+import { migration002 } from "@/db/migrations/002-app-settings";
+import { migration003 } from "@/db/migrations/003-orrery-settings";
+import { migration004 } from "@/db/migrations/004-ai-settings";
+import { migration005 } from "@/db/migrations/005-digest-settings";
+import { migration006 } from "@/db/migrations/006-normalize-custom-field-values";
+import { migration007 } from "@/db/migrations/007-tombstones";
+import { migration009 } from "@/db/migrations/009-contact-method-normalization";
+import { migration010 } from "@/db/migrations/010-contact-method-label";
+import { migration011 } from "@/db/migrations/011-contact-lifecycle-schema";
 import { runMigrations } from "@/db/migrations/runner";
 import type { SqlExecutor } from "@/db/types";
 
@@ -39,7 +51,12 @@ beforeEach(async () => {
   uidCounter = 0;
   const db = openTestDb();
   exec = nodeSqliteExecutor(db);
-  await runMigrations(exec, [migration001], 1, { now: NOW, newUid: uid });
+  await runMigrations(
+    exec,
+    [migration001, migration002, migration003, migration004, migration005, migration006, migration007, migration009, migration010, migration011],
+    11,
+    { now: NOW, newUid: uid, defaultPhoneRegion: "US" },
+  );
 });
 
 /** A local `YYYY-MM-DD` string offset `days` from today (matches localtime). */
@@ -64,6 +81,7 @@ interface SeedOpts {
   rarelyResponds?: number;
   archivedAt?: string | null;
   createdAt?: string;
+  trackingEnabled?: number;
 }
 
 async function seedContact(o: SeedOpts = {}): Promise<number> {
@@ -71,9 +89,9 @@ async function seedContact(o: SeedOpts = {}): Promise<number> {
   const result = await exec.runAsync(
     `INSERT INTO contacts
        (uid, name, interval_days, last_contact, category_id, social_battery,
-        favourite_rank, snooze_until, birthday, rarely_responds, archived_at,
+        favourite_rank, snooze_until, birthday, tracking_enabled, rarely_responds, archived_at,
         created_at, modified_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       uid(),
       o.name ?? "Alex",
@@ -84,6 +102,7 @@ async function seedContact(o: SeedOpts = {}): Promise<number> {
       o.favouriteRank ?? null,
       o.snoozeUntil ?? null,
       o.birthday ?? null,
+      o.trackingEnabled ?? 1,
       o.rarelyResponds ?? 0,
       o.archivedAt ?? null,
       created,
@@ -139,6 +158,18 @@ describe("listDashboard — default population + exclusions + snooze", () => {
 
     const rows = await listDashboard(exec, { filter: "all", sort: "status" });
     expect(ids(rows).sort((a, b) => a - b)).toEqual([live, passed]);
+  });
+
+  it("excludes an Unbound contacted contact from the proactive default population", async () => {
+    const bound = await seedContact({ name: "Bound", lastContact: STABLE() });
+    await seedContact({
+      name: "Dormant",
+      lastContact: STABLE(),
+      trackingEnabled: 0,
+      favouriteRank: 1,
+    });
+
+    expect(ids(await listDashboard(exec, { filter: "all", sort: "status" }))).toEqual([bound]);
   });
 
   it("status sort orders most-overdue first with a name/id tiebreak", async () => {
@@ -435,6 +466,29 @@ describe("listDashboard — search", () => {
     });
     expect(rows).toEqual([]);
   });
+
+  it("retains an Unbound search result with neutral status and favourite metadata", async () => {
+    const unbound = await seedContact({
+      name: "Dormant Search",
+      lastContact: STABLE(),
+      trackingEnabled: 0,
+      favouriteRank: 4,
+    });
+
+    const rows = await listDashboard(exec, {
+      filter: "all",
+      sort: "name",
+      term: "dormant",
+    });
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({
+      id: unbound,
+      trackingEnabled: 0,
+      status: null,
+      progress: null,
+      favourite_rank: null,
+    });
+  });
 });
 
 describe("listDashboard — fuelText parity + A-1 null-progress ordering", () => {
@@ -587,6 +641,24 @@ describe("listNeverContacted", () => {
     const rows = await listNeverContacted(exec, { sort: "oldest" });
     expect(rows[0]?.fuelText).toBe("still has fuel");
   });
+
+  it("projects an Unbound never-contacted row as neutral while retaining its lifecycle state", async () => {
+    const unbound = await seedContact({
+      name: "Dormant Never",
+      lastContact: null,
+      trackingEnabled: 0,
+      favouriteRank: 2,
+    });
+    const row = (await listNeverContacted(exec, { sort: "oldest" })).find(
+      (candidate) => candidate.id === unbound,
+    );
+    expect(row).toMatchObject({
+      trackingEnabled: 0,
+      status: null,
+      progress: null,
+      favourite_rank: null,
+    });
+  });
 });
 
 describe("listFavourites", () => {
@@ -602,6 +674,12 @@ describe("listFavourites", () => {
     });
     const rows: FavouriteRow[] = await listFavourites(exec);
     expect(ids(rows)).toEqual([first, second, third]);
+  });
+
+  it("hides a dormant favourite rank while retaining it in storage", async () => {
+    await seedContact({ name: "Dormant", favouriteRank: 1, trackingEnabled: 0 });
+    const bound = await seedContact({ name: "Bound", favouriteRank: 2 });
+    expect(ids(await listFavourites(exec))).toEqual([bound]);
   });
 });
 
@@ -637,6 +715,36 @@ describe("counts", () => {
       snoozeUntil: localDateOffset(-3),
     });
     expect(await countSnoozed(exec)).toBe(0);
+  });
+
+  it("counts only Bound live and snoozed contacts for dashboard header parity", async () => {
+    await seedContact({ name: "Bound live", lastContact: STABLE() });
+    await seedContact({
+      name: "Dormant live",
+      lastContact: STABLE(),
+      trackingEnabled: 0,
+    });
+    await seedContact({
+      name: "Bound snoozed",
+      lastContact: STABLE(),
+      snoozeUntil: localDateOffset(3),
+    });
+    await seedContact({
+      name: "Dormant snoozed",
+      lastContact: STABLE(),
+      snoozeUntil: localDateOffset(3),
+      trackingEnabled: 0,
+    });
+    expect(await countLiveContacts(exec)).toBe(2);
+    expect(await countSnoozed(exec)).toBe(1);
+  });
+});
+
+describe("Bound SQL predicate parity", () => {
+  it("keeps dashboard population, live count, and favourites reads on the persisted lifecycle predicate", () => {
+    expect(DASHBOARD_BOUND_WHERE).toContain("tracking_enabled = 1");
+    expect(LIVE_CONTACTS_BOUND_WHERE).toContain("tracking_enabled = 1");
+    expect(FAVOURITES_BOUND_WHERE).toContain("tracking_enabled = 1");
   });
 });
 

@@ -18,6 +18,15 @@ import { fileURLToPath } from "node:url";
 import { beforeEach, describe, expect, it } from "vitest";
 import { nodeSqliteExecutor, openTestDb } from "@/db/__testkit__/node-sqlite";
 import { migration001 } from "@/db/migrations/001-initial";
+import { migration002 } from "@/db/migrations/002-app-settings";
+import { migration003 } from "@/db/migrations/003-orrery-settings";
+import { migration004 } from "@/db/migrations/004-ai-settings";
+import { migration005 } from "@/db/migrations/005-digest-settings";
+import { migration006 } from "@/db/migrations/006-normalize-custom-field-values";
+import { migration007 } from "@/db/migrations/007-tombstones";
+import { migration009 } from "@/db/migrations/009-contact-method-normalization";
+import { migration010 } from "@/db/migrations/010-contact-method-label";
+import { migration011 } from "@/db/migrations/011-contact-lifecycle-schema";
 import { runMigrations } from "@/db/migrations/runner";
 import {
   PROGRESS_SQL,
@@ -25,6 +34,7 @@ import {
   ROGUE_K,
   STABLE_MAX,
   STATUS_SQL,
+  STATUS_CADENCE_PRECONDITION,
   WOBBLE_MAX,
 } from "@/db/status";
 import type { SqlExecutor } from "@/db/types";
@@ -42,7 +52,12 @@ beforeEach(async () => {
   uidCounter = 0;
   db = openTestDb();
   exec = nodeSqliteExecutor(db);
-  await runMigrations(exec, [migration001], 1, { now: NOW, newUid: uid });
+  await runMigrations(
+    exec,
+    [migration001, migration002, migration003, migration004, migration005, migration006, migration007, migration009, migration010, migration011],
+    11,
+    { now: NOW, newUid: uid, defaultPhoneRegion: "US" },
+  );
 });
 
 /** Local wall-clock datetime `n` days before today (never re-converted by the SQL). */
@@ -102,6 +117,11 @@ describe("status thresholds", () => {
     expect(STABLE_MAX).toBe(0.8);
     expect(WOBBLE_MAX).toBe(1.0);
     expect(ROGUE_K).toBeGreaterThanOrEqual(2);
+  });
+
+  it("documents the Bound positive-cadence precondition for every fragment consumer", () => {
+    expect(STATUS_CADENCE_PRECONDITION).toContain("tracking_enabled = 1");
+    expect(STATUS_CADENCE_PRECONDITION).toContain("interval_days IS NOT NULL");
   });
 });
 

@@ -26,6 +26,15 @@ import {
   readRetrospective,
 } from "@/db/digest-read";
 import { migration001 } from "@/db/migrations/001-initial";
+import { migration002 } from "@/db/migrations/002-app-settings";
+import { migration003 } from "@/db/migrations/003-orrery-settings";
+import { migration004 } from "@/db/migrations/004-ai-settings";
+import { migration005 } from "@/db/migrations/005-digest-settings";
+import { migration006 } from "@/db/migrations/006-normalize-custom-field-values";
+import { migration007 } from "@/db/migrations/007-tombstones";
+import { migration009 } from "@/db/migrations/009-contact-method-normalization";
+import { migration010 } from "@/db/migrations/010-contact-method-label";
+import { migration011 } from "@/db/migrations/011-contact-lifecycle-schema";
 import { runMigrations } from "@/db/migrations/runner";
 import type { SqlExecutor } from "@/db/types";
 
@@ -39,7 +48,12 @@ beforeEach(async () => {
   uidCounter = 0;
   const db = openTestDb();
   exec = nodeSqliteExecutor(db);
-  await runMigrations(exec, [migration001], 1, { now: NOW, newUid: uid });
+  await runMigrations(
+    exec,
+    [migration001, migration002, migration003, migration004, migration005, migration006, migration007, migration009, migration010, migration011],
+    11,
+    { now: NOW, newUid: uid, defaultPhoneRegion: "US" },
+  );
 });
 
 /** A local `YYYY-MM-DD` string offset `days` from today (matches localtime). */
@@ -65,14 +79,15 @@ interface ContactOpts {
   rarelyResponds?: number;
   remindersOff?: number;
   archivedAt?: string | null;
+  trackingEnabled?: number;
 }
 
 async function seedContact(o: ContactOpts = {}): Promise<number> {
   const result = await exec.runAsync(
     `INSERT INTO contacts
        (uid, name, interval_days, last_contact, photo, rarely_responds,
-        reminders_off, archived_at, created_at, modified_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        reminders_off, tracking_enabled, archived_at, created_at, modified_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       uid(),
       o.name ?? "Alex",
@@ -81,6 +96,7 @@ async function seedContact(o: ContactOpts = {}): Promise<number> {
       o.photo ?? null,
       o.rarelyResponds ?? 0,
       o.remindersOff ?? 0,
+      o.trackingEnabled ?? 1,
       o.archivedAt ?? null,
       NOW,
       NOW,
@@ -178,6 +194,12 @@ describe("readRetrospective", () => {
     const rows = await readRetrospective(exec);
     expect(rows).toHaveLength(0);
   });
+
+  it("keeps Unbound relationship history in the retrospective", async () => {
+    const unbound = await seedContact({ name: "Dormant history", trackingEnabled: 0 });
+    await seedInteraction(unbound, { occurredAt: localDateTimeOffset(-1, "10:00:00") });
+    expect((await readRetrospective(exec)).map((row) => row.id)).toEqual([unbound]);
+  });
 });
 
 describe("readOverlooked", () => {
@@ -253,6 +275,16 @@ describe("readOverlooked", () => {
     expect(rows).toHaveLength(0);
   });
 
+  it("excludes an Unbound rogue from the active overlooked projection", async () => {
+    await seedContact({
+      name: "Dormant rogue",
+      intervalDays: 10,
+      lastContact: localDateOffset(-40),
+      trackingEnabled: 0,
+    });
+    expect(await readOverlooked(exec)).toEqual([]);
+  });
+
   it("orders most-slipped first (progress DESC)", async () => {
     await seedContact({
       name: "Lightly",
@@ -326,6 +358,19 @@ describe("readGentleLine", () => {
     expect(line.hard).toBe(1);
     expect(line.total).toBe(1);
     expect(line.people).toEqual([{ id: solo, name: "Solo" }]);
+  });
+
+  it("keeps Unbound relationship history in the all-relationship gentle line", async () => {
+    const unbound = await seedContact({ name: "Dormant effort", trackingEnabled: 0 });
+    await seedInteraction(unbound, {
+      occurredAt: localDateTimeOffset(-1, "10:00:00"),
+      quality: "hard",
+    });
+    expect(await readGentleLine(exec)).toEqual({
+      hard: 1,
+      total: 1,
+      people: [{ id: unbound, name: "Dormant effort" }],
+    });
   });
 
   it("is empty when there are no recent quality marks", async () => {

@@ -14,6 +14,15 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { nodeSqliteExecutor, openTestDb } from "@/db/__testkit__/node-sqlite";
 import { migration001 } from "@/db/migrations/001-initial";
+import { migration002 } from "@/db/migrations/002-app-settings";
+import { migration003 } from "@/db/migrations/003-orrery-settings";
+import { migration004 } from "@/db/migrations/004-ai-settings";
+import { migration005 } from "@/db/migrations/005-digest-settings";
+import { migration006 } from "@/db/migrations/006-normalize-custom-field-values";
+import { migration007 } from "@/db/migrations/007-tombstones";
+import { migration009 } from "@/db/migrations/009-contact-method-normalization";
+import { migration010 } from "@/db/migrations/010-contact-method-label";
+import { migration011 } from "@/db/migrations/011-contact-lifecycle-schema";
 import { runMigrations } from "@/db/migrations/runner";
 import {
   NEWEST_FOR_CONTACT,
@@ -35,7 +44,12 @@ beforeEach(async () => {
   uidCounter = 0;
   const db = openTestDb();
   exec = nodeSqliteExecutor(db);
-  await runMigrations(exec, [migration001], 1, { now: NOW, newUid: uid });
+  await runMigrations(
+    exec,
+    [migration001, migration002, migration003, migration004, migration005, migration006, migration007, migration009, migration010, migration011],
+    11,
+    { now: NOW, newUid: uid, defaultPhoneRegion: "US" },
+  );
 });
 
 /** Local wall-clock datetime `n` days before today. */
@@ -50,15 +64,17 @@ async function seedContact(opts: {
   intervalDays: number;
   lastContact: string | null;
   archivedAt?: string | null;
+  trackingEnabled?: number;
 }): Promise<number> {
   const res = await exec.runAsync(
     `INSERT INTO contacts
-       (uid, name, interval_days, last_contact, archived_at, created_at, modified_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+       (uid, name, interval_days, tracking_enabled, last_contact, archived_at, created_at, modified_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       uid(),
       opts.name,
       opts.intervalDays,
+      opts.trackingEnabled ?? 1,
       opts.lastContact,
       opts.archivedAt ?? null,
       NOW,
@@ -145,6 +161,16 @@ describe("STATUS_SCAN", () => {
       expect(rows[i - 1].progress).toBeGreaterThanOrEqual(rows[i].progress);
     }
     expect(rows.find((r) => r.id === decay)?.status).toBe("decay");
+  });
+
+  it("excludes an Unbound contacted contact before nullable-cadence status SQL can run", async () => {
+    await seedContact({
+      name: "Dormant",
+      intervalDays: 10,
+      lastContact: daysAgo(35),
+      trackingEnabled: 0,
+    });
+    expect(await exec.getAllAsync<ScanRow>(STATUS_SCAN)).toEqual([]);
   });
 });
 
