@@ -41,6 +41,7 @@ import {
   TextInput,
   View,
 } from "react-native";
+import { Avatar } from "@/components/Avatar";
 import { BirthdayBanner } from "@/components/BirthdayBanner";
 import { ContactCard } from "@/components/ContactCard";
 import { type FilterChip, FilterChipRow } from "@/components/FilterChipRow";
@@ -63,6 +64,7 @@ import { useDashboardPrefs } from "@/stores/dashboard-prefs-store";
 import { useTheme } from "@/theme";
 import type { SocialBattery } from "@/types";
 import { Logger } from "@/utils/logger";
+import { isNeutralDashboardSearchRow } from "./dashboard-search-row-logic";
 
 const LOG_SCOPE = "dashboard-home";
 
@@ -580,20 +582,60 @@ export function HomeScreen() {
       <FlatList
         data={error ? [] : rows}
         keyExtractor={(item) => String(item.id)}
-        renderItem={({ item }) => (
-          <ContactCard
-            contactId={item.id}
-            name={item.name}
-            photo={item.photo}
-            modifiedAt={item.modified_at}
-            status={item.status}
-            categoryLabel={item.categoryLabel}
-            isFavourite={item.favourite_rank !== null}
-            fuelText={item.fuelText}
-            snippet={item.snippet}
-            onPress={() => goToProfile(item.id)}
-          />
-        )}
+        renderItem={({ item }) =>
+          isNeutralDashboardSearchRow(item) ? (
+            <Pressable
+              testID={`dashboard-unbound-search-row-${item.id}`}
+              accessibilityRole="button"
+              accessibilityLabel={`${item.name}, Unbound`}
+              onPress={() => goToProfile(item.id)}
+              style={[
+                styles.unboundSearchRow,
+                { backgroundColor: colors.surface, borderColor: colors.border },
+              ]}
+            >
+              <Avatar
+                photo={item.photo}
+                name={item.name}
+                contactId={item.id}
+                cacheBust={item.modified_at}
+                size={40}
+              />
+              <View style={styles.unboundSearchText}>
+                <Text
+                  numberOfLines={1}
+                  style={[
+                    styles.unboundSearchName,
+                    { color: colors.textPrimary },
+                  ]}
+                >
+                  {item.name}
+                </Text>
+                <Text
+                  style={[
+                    styles.unboundSearchLabel,
+                    { color: colors.textSecondary },
+                  ]}
+                >
+                  Unbound
+                </Text>
+              </View>
+            </Pressable>
+          ) : (
+            <ContactCard
+              contactId={item.id}
+              name={item.name}
+              photo={item.photo}
+              modifiedAt={item.modified_at}
+              status={item.status}
+              categoryLabel={item.categoryLabel}
+              isFavourite={item.favourite_rank !== null}
+              fuelText={item.fuelText}
+              snippet={item.snippet}
+              onPress={() => goToProfile(item.id)}
+            />
+          )
+        }
         ListHeaderComponent={listHeader}
         ListFooterComponent={listFooter}
         ListEmptyComponent={listEmpty}
@@ -757,6 +799,18 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "600",
   },
+  unboundSearchRow: {
+    minHeight: 64,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    borderWidth: 1,
+    borderRadius: 10,
+    padding: 12,
+  },
+  unboundSearchText: { flex: 1, gap: 4 },
+  unboundSearchName: { fontSize: 16, fontWeight: "600" },
+  unboundSearchLabel: { fontSize: 13, fontWeight: "600" },
   emptyState: {
     gap: 8,
     marginTop: 24,
