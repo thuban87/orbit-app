@@ -1,5 +1,19 @@
 import { describe, expect, it, vi } from "vitest";
 import type { SqlExecutor } from "@/db/types";
+
+vi.mock("expo-image-manipulator", () => ({
+  ImageManipulator: {},
+  SaveFormat: { JPEG: "jpeg" },
+}));
+vi.mock("@/db/contacts-dao", () => ({ setContactPhoto: vi.fn() }));
+vi.mock("@/services/photos/photo-storage", () => ({
+  contactPhotoRelPath: (contactId: number) => `avatars/contact-${contactId}.jpg`,
+  persistMaster: vi.fn(),
+}));
+vi.mock("@/utils/logger", () => ({
+  Logger: { error: vi.fn() },
+}));
+
 import {
   persistImportedPhotoPostCommit,
   type ImportedPhotoFs,
