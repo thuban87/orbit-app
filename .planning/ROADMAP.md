@@ -804,6 +804,15 @@ Plans:
 
 - [ ] 19-08-PLAN.md — Import completion summary (four durable summary buckets, finalizeSessionIfTerminal) + bridge to Unbound contacts + Retry (eligibleStatuses, batch category from session)
 
+**Gap closure (post-verification 2026-08-29 — 19-VERIFICATION.md scored 1/4 truths; 3 failed truths across IMP-01/IMP-02/IMP-04, IMP-03 VERIFIED). 6 gap plans (3 waves); 19-01..19-11 untouched.**
+
+- [ ] 19-12-PLAN.md — GAP A (IMP-01, W1): native picker targets `android.provider.action.PICK_CONTACTS` + launch guard (Event/Photo handling preserved)
+- [ ] 19-13-PLAN.md — GAP B (IMP-02, W1): birthday validated at the importContactRecord DAO boundary (shared isValidStoredBirthday) + review-screen error state + shared normalizeEditedBirthday
+- [ ] 19-14-PLAN.md — GAP C.1 (IMP-04, W1): leave-guard "unresolved" defined by row_status (pending/needs_review/failed) so resolved skips/links survive navigation
+- [ ] 19-15-PLAN.md — GAP C.3 (IMP-04, W1): combineCluster calls finalizeSessionIfTerminal + BulkImportSetup routes cluster-only batches to ImportComplete
+- [ ] 19-16-PLAN.md — GAP C.2 (IMP-04, W2): retire session photo_rel_path + delete raw staging on success; status-aware resume-sweep liveness (PII retention closed)
+- [ ] 19-17-PLAN.md — Device UAT (IMP-01/02/04, W3): agent-driven Pixel verification of all five fixes (picker launch, resolved-flow/recovery/completion, photo lifecycle, birthday block)
+
 ### Phase 20: Contact Reconciliation & Merge
 
 **Goal:** Safely maintain selected system-contact links through user-triggered, one-way reconciliation and let users explicitly, atomically consolidate duplicate Orbit identities.
