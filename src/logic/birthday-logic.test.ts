@@ -3,6 +3,7 @@ import {
   daysUntilBirthday,
   FEB_29_OBSERVED_DAY,
   isValidStoredBirthday,
+  normalizeEditedBirthday,
 } from "./birthday-logic";
 
 /** Local-midnight-agnostic date builder (avoids UTC parsing surprises). */
@@ -27,6 +28,29 @@ describe("isValidStoredBirthday", () => {
     ["", false],
   ] as const)("returns %s for %s", (stored, expected) => {
     expect(isValidStoredBirthday(stored)).toBe(expected);
+  });
+});
+
+describe("normalizeEditedBirthday", () => {
+  it.each([
+    ["", { stored: null, valid: true }],
+    ["   ", { stored: null, valid: true }],
+    ["03-14", { stored: "03-14", valid: true }],
+    ["--03-14", { stored: "03-14", valid: true }],
+    ["--02-29", { stored: "02-29", valid: true }],
+    ["1990-03-14", { stored: "1990-03-14", valid: true }],
+    ["02-30", { stored: null, valid: false }],
+    ["2021-02-29", { stored: null, valid: false }],
+    ["garbage", { stored: null, valid: false }],
+  ] as const)("normalizes %j", (input, expected) => {
+    expect(normalizeEditedBirthday(input)).toEqual(expected);
+  });
+
+  it("treats null as no birthday", () => {
+    expect(normalizeEditedBirthday(null)).toEqual({
+      stored: null,
+      valid: true,
+    });
   });
 });
 
