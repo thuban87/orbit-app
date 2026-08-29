@@ -12,16 +12,21 @@ import {
 } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
+import { BackupEncryptionBenchmarkHarness } from "@/components/BackupEncryptionBenchmarkHarness";
+import { ResumeImportPrompt } from "@/components/ResumeImportPrompt";
 import { getExecutor, openAndMigrate } from "@/db/database";
 import { isMigration006IntegrityError } from "@/db/migrations/006-normalize-custom-field-values";
 import { navigationRef, ShareIntentGate } from "@/navigation/linking";
 import { NotificationResponseGate } from "@/navigation/notification-gate";
 import { RootNavigator } from "@/navigation/RootNavigator";
 import { WidgetLinkingGate } from "@/navigation/widget-linking";
-import { BackupEncryptionBenchmarkHarness } from "@/components/BackupEncryptionBenchmarkHarness";
-import { registerFieldSweep } from "@/services/field-sweep";
-import { getDeviceRegion } from "@/services/device-region";
 import { registerBackupSweep } from "@/services/backup-sweep";
+import { getDeviceRegion } from "@/services/device-region";
+import { registerFieldSweep } from "@/services/field-sweep";
+import {
+  type ResumableImport,
+  registerImportResumeSweep,
+} from "@/services/import/contact-import-resume-sweep";
 import { installSweepTrigger } from "@/services/launch-sweep";
 // Module-scope side-effect import (Pitfall P5): importing headless-task RUNS its
 // `TaskManager.defineTask` + `registerTaskAsync` so a killed-app action tap reaches
@@ -101,6 +106,9 @@ let digestScheduleRegistered = false;
 // on a headless tap (this is a foreground SweepHook; the headless tap path never
 // reaches the sweep runner).
 let widgetSweepRegistered = false;
+// One-shot guard for the durable import resume hook. It is ready-gated with the
+// other launch hooks so Strict Mode/remounts cannot double-prompt a session.
+let importResumeSweepRegistered = false;
 
 function AppShell() {
   const { colors } = useTheme();
@@ -112,6 +120,8 @@ function AppShell() {
   // `hasShareIntent`, so a cold-start share that lands before the container is
   // ready still navigates the moment readiness settles (no stranded intent).
   const [navReady, setNavReady] = useState(false);
+  const [resumableImport, setResumableImport] =
+    useState<ResumableImport | null>(null);
 
   // 1. Migrate before first render. Hold `ready` false until it resolves. A
   //    rejection (failed migration) is caught so the app surfaces a themed error
@@ -188,6 +198,13 @@ function AppShell() {
     if (!widgetSweepRegistered) {
       registerWidgetSweep();
       widgetSweepRegistered = true;
+    }
+    // The resume hook reads only the durable snapshot after migrations. Register
+    // it before the cold-start trigger; the module-scope guard prevents duplicate
+    // sweep hooks and duplicate modal prompts across effect re-entries.
+    if (!importResumeSweepRegistered) {
+      registerImportResumeSweep(setResumableImport, { getExecutor });
+      importResumeSweepRegistered = true;
     }
 
     // item 6 / A1: AWAIT channels + the action category into existence BEFORE the
@@ -271,6 +288,10 @@ function AppShell() {
           (pre-ready intents queue in the gate and flush on navReady). */}
       <WidgetLinkingGate isReady={navReady} />
       <RootNavigator />
+      <ResumeImportPrompt
+        resumable={resumableImport}
+        onDismiss={() => setResumableImport(null)}
+      />
     </NavigationContainer>
   );
 }
@@ -279,7 +300,8 @@ export default function App() {
   // Task 17-07 only: a purpose-built release APK can opt into the native KDF
   // timing harness. This literal is compiled in by Expo only for that one
   // measurement build; ordinary product builds never mount the harness.
-  const benchmarkMode = process.env.EXPO_PUBLIC_BACKUP_ENCRYPTION_BENCHMARK === "1";
+  const benchmarkMode =
+    process.env.EXPO_PUBLIC_BACKUP_ENCRYPTION_BENCHMARK === "1";
   // `GestureHandlerRootView` MUST wrap the OUTERMOST tree (outside
   // `SafeAreaProvider`) so react-native-gesture-handler can intercept touches
   // for the whole app — the crop-screen pan/pinch gestures (later Phase-5 plans)
@@ -299,7 +321,11 @@ export default function App() {
         <ShareIntentProvider>
           <ThemeProvider>
             <StatusBar style="light" />
-            {benchmarkMode ? <BackupEncryptionBenchmarkHarness /> : <AppShell />}
+            {benchmarkMode ? (
+              <BackupEncryptionBenchmarkHarness />
+            ) : (
+              <AppShell />
+            )}
           </ThemeProvider>
         </ShareIntentProvider>
       </SafeAreaProvider>
