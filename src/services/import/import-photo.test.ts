@@ -1,0 +1,76 @@
+import { describe, expect, it, vi } from "vitest";
+import type { SqlExecutor } from "@/db/types";
+import {
+  persistImportedPhotoPostCommit,
+  type ImportedPhotoFs,
+} from "@/services/import/import-photo";
+
+const NOW = "2026-08-29 12:00:00";
+
+function createFs(overrides: Partial<ImportedPhotoFs> = {}): ImportedPhotoFs {
+  return {
+    resizeToMaster: vi.fn().mockResolvedValue("file:///cache/master.jpg"),
+    persistMaster: vi.fn().mockResolvedValue("avatars/contact-42.jpg"),
+    setContactPhoto: vi.fn().mockResolvedValue(undefined),
+    ...overrides,
+  };
+}
+
+describe("persistImportedPhotoPostCommit", () => {
+  it("persists a stable 512px master and records the contact photo", async () => {
+    const fs = createFs();
+
+    await expect(
+      persistImportedPhotoPostCommit({} as SqlExecutor, fs, {
+        contactId: 42,
+        stagedPhotoPath: "file:///documents/import-staging/import-session-row.jpg",
+        now: NOW,
+      }),
+    ).resolves.toEqual({ ok: true });
+
+    expect(fs.resizeToMaster).toHaveBeenCalledWith(
+      "file:///documents/import-staging/import-session-row.jpg",
+    );
+    expect(fs.persistMaster).toHaveBeenCalledWith(
+      "file:///cache/master.jpg",
+      "avatars/contact-42.jpg",
+    );
+    expect(fs.setContactPhoto).toHaveBeenCalledWith(
+      expect.anything(),
+      42,
+      "avatars/contact-42.jpg",
+      NOW,
+    );
+  });
+
+  it("photo failure returns ok:false and does not throw", async () => {
+    const fs = createFs({
+      resizeToMaster: vi.fn().mockRejectedValue(new Error("decode failed")),
+    });
+
+    await expect(
+      persistImportedPhotoPostCommit({} as SqlExecutor, fs, {
+        contactId: 42,
+        stagedPhotoPath: "file:///documents/import-staging/import-session-row.jpg",
+        now: NOW,
+      }),
+    ).resolves.toEqual({ ok: false });
+    expect(fs.persistMaster).not.toHaveBeenCalled();
+    expect(fs.setContactPhoto).not.toHaveBeenCalled();
+  });
+
+  it("null staged photo is a skipped no-op", async () => {
+    const fs = createFs();
+
+    await expect(
+      persistImportedPhotoPostCommit({} as SqlExecutor, fs, {
+        contactId: 42,
+        stagedPhotoPath: null,
+        now: NOW,
+      }),
+    ).resolves.toEqual({ ok: true, skipped: true });
+    expect(fs.resizeToMaster).not.toHaveBeenCalled();
+    expect(fs.persistMaster).not.toHaveBeenCalled();
+    expect(fs.setContactPhoto).not.toHaveBeenCalled();
+  });
+});
