@@ -2,10 +2,10 @@ import { getExecutor, localDateTime } from "@/db/database";
 import type { ImportSessionMode } from "@/db/import-session-dao";
 import {
   getResumableSession,
-  listSessionRows,
-  sessionRowCounts,
   type ImportSession,
+  listSessionRows,
   type SessionRowCounts,
+  sessionRowCounts,
 } from "@/db/import-session-read";
 import type { SqlExecutor } from "@/db/types";
 import { registerSweepHook } from "@/services/launch-sweep";
@@ -101,7 +101,8 @@ export async function reconcileOrphanStagedPhotos(
     ),
   );
   for (const staged of fs.listImportStagingPhotos()) {
-    if (!livePaths.has(staged.relative)) fs.deleteImportStaging(staged.relative);
+    if (!livePaths.has(staged.relative))
+      fs.deleteImportStaging(staged.relative);
   }
 }
 

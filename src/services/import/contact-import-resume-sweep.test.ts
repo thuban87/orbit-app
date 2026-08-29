@@ -15,22 +15,24 @@ import {
 } from "@/db/import-session-dao";
 import { getSessionById } from "@/db/import-session-read";
 import { runMigrations } from "@/db/migrations/runner";
-import { __resetSweepForTest, runLaunchSweep } from "@/services/launch-sweep";
+import type { SqlExecutor } from "@/db/types";
 import {
   cleanupDiscardedStagedPhotos,
-  reconcileOrphanStagedPhotos,
-  registerImportResumeSweep,
   type ImportStagingFileSystem,
   type ResumableImport,
+  reconcileOrphanStagedPhotos,
+  registerImportResumeSweep,
 } from "@/services/import/contact-import-resume-sweep";
-import type { SqlExecutor } from "@/db/types";
+import { __resetSweepForTest, runLaunchSweep } from "@/services/launch-sweep";
 
 const NOW = "2026-08-29 12:00:00";
 let exec: SqlExecutor;
 let uidCount = 0;
 const uid = () => `uid-${++uidCount}`;
 
-function stagingFs(paths: string[] = []): ImportStagingFileSystem & { deleted: string[] } {
+function stagingFs(
+  paths: string[] = [],
+): ImportStagingFileSystem & { deleted: string[] } {
   const present = new Set(paths);
   const deleted: string[] = [];
   return {
@@ -52,12 +54,19 @@ beforeEach(async () => {
   uidCount = 0;
   __resetSweepForTest();
   exec = nodeSqliteExecutor(openTestDb());
-  await runMigrations(exec, MIGRATIONS, TARGET_VERSION, { now: NOW, newUid: uid });
+  await runMigrations(exec, MIGRATIONS, TARGET_VERSION, {
+    now: NOW,
+    newUid: uid,
+  });
 });
 
 async function acceptRows(
   names: string[],
-  options: { createdAt?: string; mode?: "single" | "bulk"; corrupt?: boolean } = {},
+  options: {
+    createdAt?: string;
+    mode?: "single" | "bulk";
+    corrupt?: boolean;
+  } = {},
 ): Promise<{ sessionId: number; rowIds: number[] }> {
   const { createdAt = NOW, mode = "bulk", corrupt = false } = options;
   return acceptImportSessionWithRows(exec, {
@@ -72,7 +81,9 @@ async function acceptRows(
     rows: names.map((name) => ({
       uid: uid(),
       externalContactId: name,
-      sourcePayload: corrupt ? "not-json" : JSON.stringify({ name, methods: [] }),
+      sourcePayload: corrupt
+        ? "not-json"
+        : JSON.stringify({ name, methods: [] }),
       photoRelPath: `import-staging/import-${name}.jpg`,
     })),
   });
@@ -91,14 +102,24 @@ describe("contact-import-resume-sweep", () => {
   it("reports a durable unresolved session through the registered launch hook", async () => {
     const accepted = await acceptRows(["resume"], { mode: "single" });
     const onResumable = vi.fn<(value: ResumableImport | null) => void>();
-    registerImportResumeSweep(onResumable, { getExecutor: () => exec, now: () => NOW });
+    registerImportResumeSweep(onResumable, {
+      getExecutor: () => exec,
+      now: () => NOW,
+    });
 
     await runLaunchSweep();
 
     expect(onResumable).toHaveBeenCalledWith({
       sessionId: accepted.sessionId,
       mode: "single",
-      counts: { pending: 1, imported: 0, linked: 0, needs_review: 0, failed: 0, skipped: 0 },
+      counts: {
+        pending: 1,
+        imported: 0,
+        linked: 0,
+        needs_review: 0,
+        failed: 0,
+        skipped: 0,
+      },
       discardOnly: false,
     });
   });
@@ -111,12 +132,18 @@ describe("contact-import-resume-sweep", () => {
       "import-staging/import-newer.jpg",
     ]);
     const onResumable = vi.fn<(value: ResumableImport | null) => void>();
-    registerImportResumeSweep(onResumable, { getExecutor: () => exec, fs, now: () => NOW });
+    registerImportResumeSweep(onResumable, {
+      getExecutor: () => exec,
+      fs,
+      now: () => NOW,
+    });
 
     await runLaunchSweep();
 
     expect(fs.deleted).toEqual(["import-staging/import-older.jpg"]);
-    expect(onResumable).toHaveBeenCalledWith(expect.objectContaining({ sessionId: newer.sessionId }));
+    expect(onResumable).toHaveBeenCalledWith(
+      expect.objectContaining({ sessionId: newer.sessionId }),
+    );
   });
 
   it("discard preserves rows with a contact_id, removes only contact_id-null rows, and the sweep deletes only returned staged photos", async () => {
@@ -160,11 +187,17 @@ describe("contact-import-resume-sweep", () => {
   it("treats an unparseable durable snapshot as discard-only without throwing", async () => {
     const accepted = await acceptRows(["broken"], { corrupt: true });
     const onResumable = vi.fn<(value: ResumableImport | null) => void>();
-    registerImportResumeSweep(onResumable, { getExecutor: () => exec, now: () => NOW });
+    registerImportResumeSweep(onResumable, {
+      getExecutor: () => exec,
+      now: () => NOW,
+    });
 
     await expect(runLaunchSweep()).resolves.toBeUndefined();
     expect(onResumable).toHaveBeenCalledWith(
-      expect.objectContaining({ sessionId: accepted.sessionId, discardOnly: true }),
+      expect.objectContaining({
+        sessionId: accepted.sessionId,
+        discardOnly: true,
+      }),
     );
   });
 
@@ -172,11 +205,16 @@ describe("contact-import-resume-sweep", () => {
     const accepted = await acceptRows(["discarded"]);
     await discardSession(exec, accepted.sessionId, NOW);
     const onResumable = vi.fn<(value: ResumableImport | null) => void>();
-    registerImportResumeSweep(onResumable, { getExecutor: () => exec, now: () => NOW });
+    registerImportResumeSweep(onResumable, {
+      getExecutor: () => exec,
+      now: () => NOW,
+    });
 
     await runLaunchSweep();
 
     expect(onResumable).toHaveBeenCalledWith(null);
-    expect(await getSessionById(exec, accepted.sessionId)).toMatchObject({ status: "discarded" });
+    expect(await getSessionById(exec, accepted.sessionId)).toMatchObject({
+      status: "discarded",
+    });
   });
 });
