@@ -127,7 +127,7 @@ describe("Phase 17 composed backup regressions", () => {
     expect(durationMs).toBeLessThan(5_000);
   });
 
-  it("keeps the tombstone vocabulary exhaustive for every production hard-delete table", async () => {
+  it("keeps every production hard-delete table covered by a tombstone or explicit non-mergeable policy", async () => {
     const dbDirectory = join(process.cwd(), "src", "db");
     const files = (await readdir(dbDirectory, { recursive: true }))
       .filter((file) => file.endsWith(".ts") && !file.endsWith(".test.ts"));
@@ -142,9 +142,19 @@ describe("Phase 17 composed backup regressions", () => {
       ["contact_methods", "contact_method"], ["external_contact_links", "external_contact_link"],
       ["contact_method_provenance", "contact_method_provenance"],
     ]);
+    const nonMergeable = new Map([
+      ["field_history", "local audit history"],
+      ["restore_photo_journal", "restore crash-recovery journal"],
+      // Import snapshots are device-local workflow state. A discard deletes only
+      // unresolved rows and their staged photos; imported contacts remain durable
+      // domain data and are exported independently of their session metadata.
+      ["import_session_rows", "device-local import workflow state"],
+    ]);
     for (const table of writers) {
-      if (["field_history", "restore_photo_journal"].includes(table)) continue;
-      expect(covered.has(table), `DELETE FROM ${table} needs a tombstone entity_type or an explicit non-mergeable exemption`).toBe(true);
+      expect(
+        covered.has(table) || nonMergeable.has(table),
+        `DELETE FROM ${table} needs a tombstone entity_type or an explicit non-mergeable exemption`,
+      ).toBe(true);
     }
   });
 });
