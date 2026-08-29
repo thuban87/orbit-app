@@ -89,6 +89,8 @@ export function getContactHeader(
    * fields individually), so adding this field breaks neither typecheck nor test.
    */
   favourite_rank: number | null;
+  /** Lifecycle state for the profile's Bound/Unbound presentation policy. */
+  trackingEnabled: number;
   /**
    * The contact's active snooze date (`YYYY-MM-DD`), or null when not snoozed —
    * the profile's Snooze-reminders status line reads it (Plan 11-09, NOTIF-03).
@@ -110,9 +112,10 @@ export function getContactHeader(
     photo: string | null;
     modified_at: string;
     favourite_rank: number | null;
+    trackingEnabled: number;
     snooze_until: string | null;
   }>(
-    "SELECT id, name, rarely_responds, archived_at, photo, modified_at, favourite_rank, snooze_until FROM contacts WHERE id = ?",
+    "SELECT id, name, rarely_responds, archived_at, photo, modified_at, favourite_rank, tracking_enabled AS trackingEnabled, snooze_until FROM contacts WHERE id = ?",
     [contactId],
   );
 }
@@ -130,6 +133,8 @@ export interface ContactEditRow {
   /** Present so the edit form can decide whether to show the last-spoke control. */
   last_contact: string | null;
   favourite_rank: number | null;
+  /** Lifecycle state retained by direct edit retrieval. */
+  trackingEnabled: number;
   ring_seq: number | null;
   archived_at: string | null;
   snooze_until: string | null;
@@ -176,7 +181,7 @@ export async function getContactForEdit(
   const contact = await exec.getFirstAsync<ContactEditRow>(
     `SELECT c.id, c.uid, c.name, c.category_id, c.interval_days,
             c.social_battery, c.birthday, c.photo, c.last_contact,
-            c.favourite_rank, c.ring_seq, c.archived_at, c.snooze_until,
+            c.favourite_rank, c.tracking_enabled AS trackingEnabled, c.ring_seq, c.archived_at, c.snooze_until,
             c.rarely_responds, c.reminders_off, c.created_at, c.modified_at,
             cat.name AS category_label
        FROM contacts c
