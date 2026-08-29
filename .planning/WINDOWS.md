@@ -1,10 +1,10 @@
 ---
 schema_version: 1
-open_count: 0
+open_count: 2
 waived_count: 0
 fixed_count: 5
-total_count: 5
-last_updated: 2026-08-29T00:28:30.525Z
+total_count: 7
+last_updated: 2026-08-29T13:53:24.136Z
 ---
 
 # Broken Windows Ledger
@@ -20,6 +20,8 @@ last_updated: 2026-08-29T00:28:30.525Z
 | 3 | 17 | deviation | src/db/migrations/007-tombstones.ts |  | Added local-only backup_folder_accessible to preserve SAF access-probe health. | fixed |  | 2026-08-25T21:42:36.632Z | 2026-08-25T21:43:06.513Z |
 | 4 | 18.1 | deviation | src/screens/ComposeScreen.tsx | 438 | Closed undefined SMS destination path with an explicit null guard. | fixed |  | 2026-08-28T07:44:01.382Z | 2026-08-28T07:45:03.119Z |
 | 5 | 18.2 | deviation | src/db/ai-context-read.test.ts |  | Corrected future-dated Unbound test touchpoint fixture before RED verification. | fixed |  | 2026-08-29T00:27:47.044Z | 2026-08-29T00:28:30.525Z |
+| 6 | 19 | stub | src/navigation/RootNavigator.tsx |  | Intentional import route placeholders await plans 06–08. | open |  | 2026-08-29T13:53:23.947Z |  |
+| 7 | 19 | unrun-verify | .planning/phases/19-system-contact-import/19-04-PLAN.md |  | Android 17 device UAT was not run; native picker and UI behavior remain to verify. | open |  | 2026-08-29T13:53:24.136Z |  |
 
 ````json
 [
@@ -82,6 +84,30 @@ last_updated: 2026-08-29T00:28:30.525Z
     "reason": "",
     "recorded_at": "2026-08-29T00:27:47.044Z",
     "resolved_at": "2026-08-29T00:28:30.525Z"
+  },
+  {
+    "id": 6,
+    "kind": "stub",
+    "phase": "19",
+    "file": "src/navigation/RootNavigator.tsx",
+    "line": null,
+    "description": "Intentional import route placeholders await plans 06–08.",
+    "status": "open",
+    "reason": "",
+    "recorded_at": "2026-08-29T13:53:23.947Z",
+    "resolved_at": null
+  },
+  {
+    "id": 7,
+    "kind": "unrun-verify",
+    "phase": "19",
+    "file": ".planning/phases/19-system-contact-import/19-04-PLAN.md",
+    "line": null,
+    "description": "Android 17 device UAT was not run; native picker and UI behavior remain to verify.",
+    "status": "open",
+    "reason": "",
+    "recorded_at": "2026-08-29T13:53:24.136Z",
+    "resolved_at": null
   }
 ]
 ````
