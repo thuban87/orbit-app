@@ -1145,3 +1145,184 @@ The 11 plans, revised across two prior review cycles plus an internal checker pa
 | No import-flow code exists on disk yet (`src/services/import/*`, `import-session-dao.ts`, etc.) | VERIFIED via `find src -iname '*import*'` (no results) | Phase not yet executed; DAO/service claims verified for internal plan consistency only, not against implementation |
 | `idx_external_contact_links_active` partial unique index | VERIFIED `src/db/migrations/011-contact-lifecycle-schema.ts:180` (Cursor's cited "line 180" matches) | |
 | `normalizeContactMethod` fallback to `canonicalValue: null` without a default region | VERIFIED `src/logic/contact-method-normalization.ts:59` (Cursor cited 59-60, line 59 is the exact branch) | |
+
+---
+
+# Cross-AI Plan Review — Phase 19: System Contact Import — CYCLE 4
+
+## Cycle 4 Consensus Summary
+
+All three reviewers (Codex, Cursor, Claude/Sonnet-5) independently re-verified the cycle-1/2/3 fixes against the current plan text AND the actual repository (still v11 on disk — `TARGET_VERSION = 11`, `src/db/database.ts:46`; migrations `001`–`011` only; no Phase 19 implementation exists yet) and found them intact: composed single-transaction cores, document-dir photo staging, the `match_outcome`/`candidates_json` contract, `finalizeSessionIfTerminal`'s `failed==0` gate, durable `batch_category_id` via `setSessionBatchCategory`/`getSessionById`, pre-batch consolidation, the cycle-3 `resolveImportStagingUri` fix for the single-import tracer, the bulk resume-routing split, the `App.tsx` (not `src/App.tsx`) fix, and plan 07's `depends_on: [19-10]`. No reviewer found a `[DECIDED]`/ADR/HANDOFF reversal or an edit to an already-shipped migration; migration 012 remains additive-only and the owner checkpoint on it (19-01) is correctly still blocking.
+
+Three NEW, source-grounded HIGH concerns surfaced this cycle — none flagged in cycles 1-3, each independently confirmed against the actual repository:
+
+1. **(Codex; Claude independently confirmed) Bulk import has no name-required gate — a nameless picked contact silently becomes a blank-named Orbit contact.** Plan 03's `mapPickedContact` produces `nameRequired: true` for a blank/whitespace name and documents that "the caller must collect a name before create" (`19-03-PLAN.md:25,113`) — but that gate is enforced only in the single-import UI (`19-04-PLAN.md:45`: "a picked row with no usable name blocks Import with the name-required copy until a name is supplied"). The bulk path has no UI per row: `importRowAsNew`/`runImportBatch` (`19-06-PLAN.md:111-115`) maps every row via `mapPickedContact` and calls `importContactRecord` unconditionally, with zero mention of `nameRequired` anywhere in `19-06-PLAN.md` (confirmed via grep — no hits). `contacts.name` is `TEXT NOT NULL` with no non-empty `CHECK` (`src/db/migrations/001-initial.ts:65`), so the INSERT succeeds with `name=''`. This is a real, common-path Cluster O violation with no acceptance criterion in plan 06 to catch it.
+2. **(Codex; Claude independently confirmed and sharpened) The import-staging namespace's own two-level nested path shape cannot be enumerated by a lister that "mirrors restore-pending EXACTLY," because restore-pending is flat, not nested.** Plan 04 defines `importStagingRelPath(sessionToken, rowToken)` and `SAFE_IMPORT_STAGING_RELATIVE` over the shape `import-staging/<sessionToken>/<rowToken>.<ext>` — a genuine two-level nested directory (one subdirectory per session) — and in the same breath instructs "add an import-staging namespace to photo-storage.ts mirroring restore-pending EXACTLY" including `listImportStagingPhotos()` (`19-04-PLAN.md:36,49,123`). But the actual restore-pending precedent is FLAT: `restorePendingRelPath` (`src/services/photos/photo-storage.ts:121-141`) bakes the session token into the FILENAME (`contact-<uid>-<sessionToken>.jpg`) inside one single directory, and `listRestorePendingPhotos()` (`photo-storage.ts:170-178`) does one non-recursive `directory.list()` over that one directory. A lister built the same way over `import-staging/` would enumerate only the per-session subdirectory names, not the files nested one level inside them — each of which would then fail `SAFE_IMPORT_STAGING_RELATIVE` (a bare `import-staging/<sessionToken>` has no `/<rowToken>.<ext>` suffix), either throwing inside `assertSafeImportStagingRelative` or silently returning nothing. Plan 09's REQUIRED `reconcileOrphanStagedPhotos` (`19-09-PLAN.md:97`) depends entirely on `listImportStagingPhotos()` actually enumerating staged files — if it cannot, orphaned staged photos are never cleaned, which is exactly the info-disclosure exposure threat T-19-02 (`19-01-PLAN.md`/`19-09-PLAN.md`) claims is mitigated.
+3. **(Claude/Sonnet-5, new this cycle) `DuplicateReviewScreen`'s reusable `CandidateCardGrid` renders a needs_review row's own incoming photo through `Avatar` — the identical avatars-only chokepoint the cycle-3 HIGH proved crashes on a staged `import-staging/...` path.** `CandidateCardGrid`'s card contract is "Avatar + name... + ConfidenceChip + evidence hint" (`19-07-PLAN.md:111`; also `19-UI-SPEC.md:178`), and `DuplicateReviewScreen` (Task 2) builds one `CandidateItem` per needs_review row with "name, avatar, outcome, evidence hint" sourced from `listSessionRows` (`19-07-PLAN.md:129`) — i.e. the top-level card's avatar is the INCOMING picked person's own photo, not an existing Orbit contact's. `deferNeedsReviewCore`'s UPDATE only sets `row_status`, `match_outcome`, `matched_contact_id`, `candidates_json` (`19-01-PLAN.md:189`) — it never touches `photo_rel_path`, so a needs_review row retains whatever staged `import-staging/<sessionToken>/<rowToken>.<ext>` path plan 04 wrote at acceptance. Feeding that path into `Avatar` hits the exact same `resolvePhotoUri` (`src/components/Avatar.tsx:73`) → `assertSafeRelative` (`src/services/photos/photo-storage.ts:209-211`, `src/db/photo-relative-path.ts:22,38-46`) chain that only accepts canonical `avatars/...` paths and throws SYNCHRONOUSLY during render (uncatchable by `onError`) — the identical mechanism the cycle-3 HIGH fixed for `ImportReviewScreen` via a preview-only `resolveImportStagingUri`. That fix was scoped to `import-acquire.ts`/`ImportReviewScreen.tsx` only and was never carried into `CandidateCardGrid`/`DuplicateReviewScreen`, which independently needs the same guard: any ambiguous bulk row whose picked contact has a photo crashes the review workspace on render. (A related, lower-confidence risk: plan 11's `ConsolidationPrompt`, which "shows the clustered source records" (`19-11-PLAN.md:128`) without specifying how, may have the same exposure if it reuses `Avatar` for cluster preview — not confirmed against explicit plan text, flagged as advisory only.)
+
+Three actionable non-HIGH gaps also surfaced:
+
+4. **(Codex) Plan 09's `App.tsx` wiring for the resume-sweep hook omits the one-shot registration guard every other sweep hook in the same file uses.** `App.tsx:77-101` documents and applies a module-scope boolean guard (`fieldSweepRegistered`, `backupSweepRegistered`, `photoReconcileRegistered`, etc.) specifically because the `ready`-gated effect "can re-run (Strict Mode, remounts), and registering the same hook twice would double-run it." Plan 09's Task 2 only says "register the resume sweep hook after migration resolves (never at module top-level)" (`19-09-PLAN.md:118`) with no mention of the guard pattern (confirmed via grep — zero hits for "one-shot"/"guard"/"Registered = false" in `19-09-PLAN.md`). Without it, a double registration could double-run the resume sweep and double-prompt the user.
+5. **(Cursor) Plan 09's resume navigation to `ImportProgress(sessionId)` omits the `batchCategoryId` field plan 04 made a required part of that route's param type.** `19-04-PLAN.md:134` declares `ImportProgress: { sessionId: number; batchCategoryId: number | null }` as a non-optional key (plan 04 is the sole writer of `navigation/types.ts`; later plans may not edit it). `19-09-PLAN.md:118` specifies "navigate ImportProgress(sessionId) to continue the batch" with no `batchCategoryId`. As literally written this fails plan 09's own `npx tsc --noEmit --pretty false` verification gate (`19-09-PLAN.md` Task 2 `<verify>`). Not a data bug — `runImportBatch` already reads the durable `batch_category_id` from the session row — but a real interface gap an executor must silently paper over (e.g. by passing `batchCategoryId: null`) since the plan doesn't say to.
+6. **(Cursor) Plan 03's `mapPickedContact` return-type omits `birthday` while its own action text requires birthday to be exposed on the returned object.** The return type is stated twice as `{ input: CreateContactFullInput, nameRequired, externalContactId, photoTempUri }` (`19-03-PLAN.md:36,119`) — no `birthday` field — yet the same task's action text says "Do NOT write birthday into contacts here... — expose it on the returned object for the caller" (`19-03-PLAN.md:119`). `CreateContactFullInput` has no birthday field (confirmed `src/db/contacts-dao.ts:83-106`), so birthday has nowhere else to live in the stated return shape. An executor following the literal destructured type in two places risks dropping birthday from every import path (single, bulk, and consolidation all consume `mapPickedContact`/its output).
+
+One carried-over LOW from cycle 3 remains unaddressed in current plan text (not newly found, still not incorporated or explicitly deferred): BulkImportSetupScreen's `N contacts selected` count source is still ambiguous — "from sessionRowCounts or the row list" (`19-06-PLAN.md:137`) — and can go stale after plan 11's pre-batch consolidation resolves rows out of `pending`. Cosmetic, not data-corrupting.
+
+## Cycle 4 — Codex Review
+
+## Summary
+
+Not execution-ready: two HIGH correctness gaps remain in the bulk/durability paths, plus one MEDIUM lifecycle omission. The prior atomic row-state, durable category, resume-routing, and staged-preview fixes are otherwise coherently retained.
+
+## Strengths
+
+- The plans correctly compose contact creation and session-row resolution in one transaction, matching the repository's explicitly non-reentrant transaction contract in [transaction.ts](/home/bwales/projects/orbit-app/src/db/transaction.ts:17).
+- The `already_linked` discriminator is now consistently designed around `match_outcome`, avoiding conflation with user skips.
+- The staged-preview fix is sound: canonical avatar paths are deliberately restricted by [photo-relative-path.ts](/home/bwales/projects/orbit-app/src/db/photo-relative-path.ts:22), while the plan adds a separate staging resolver rather than feeding staging paths to `Avatar`.
+
+## Concerns
+
+- **HIGH — bulk imports can create blank-name contacts.** Plan 03 intentionally maps a nameless source to `nameRequired: true` and says the caller must collect a name ([19-03-PLAN.md](/home/bwales/projects/orbit-app/.planning/phases/19-system-contact-import/19-03-PLAN.md:110)). But Plan 06's `importRowAsNew` maps a bulk row and immediately calls `importContactRecord`, with no `nameRequired` gate or failure transition ([19-06-PLAN.md](/home/bwales/projects/orbit-app/.planning/phases/19-system-contact-import/19-06-PLAN.md:111)). The existing contact writer validates cadence and future interactions only—not a nonblank name ([contacts-dao.ts](/home/bwales/projects/orbit-app/src/db/contacts-dao.ts:121)); SQLite's `TEXT NOT NULL` also accepts `''` ([011-contact-lifecycle-schema.ts](/home/bwales/projects/orbit-app/src/db/migrations/011-contact-lifecycle-schema.ts:20)). This violates the planned Cluster-O behavior.
+
+- **HIGH — the required orphan-photo reconciliation is underspecified for the planned nested staging layout.** Plan 04 defines paths as `import-staging/<sessionToken>/<rowToken>.<ext>` and directs implementation to mirror the restore staging helpers ([19-04-PLAN.md](/home/bwales/projects/orbit-app/.planning/phases/19-system-contact-import/19-04-PLAN.md:123)). The existing mirrored lister is flat: it lists only one directory level and constructs `avatars/_restore_pending/${entry.name}` ([photo-storage.ts](/home/bwales/projects/orbit-app/src/services/photos/photo-storage.ts:170)). That approach cannot enumerate nested session directories; it would either miss files or produce a path rejected by the planned staging regex. Yet Plan 09 makes this lister the mandatory orphan-cleanup authority ([19-09-PLAN.md](/home/bwales/projects/orbit-app/.planning/phases/19-system-contact-import/19-09-PLAN.md:97)). This leaves cache-failure, stale-session, and replace-all orphan cleanup unproven.
+
+- **MEDIUM — resume-sweep registration lacks the existing one-shot guard.** Plan 09 only says to register after migrations resolve ([19-09-PLAN.md](/home/bwales/projects/orbit-app/.planning/phases/19-system-contact-import/19-09-PLAN.md:118)). `App.tsx` uses module-level registration guards for every sweep hook specifically to prevent duplicate hook registration across effect re-entry ([App.tsx](/home/bwales/projects/orbit-app/App.tsx:77)). A duplicate import-resume hook could double-prompt and duplicate cleanup work.
+
+## Suggestions
+
+- In `importRowAsNew`, reject/mark `failed` (with a name-required reason) when `mapPickedContact(...).nameRequired` is true; add a bulk-driver test proving no contact row is created.
+- Specify and test recursive staging enumeration, or change the staging namespace to a flat, regex-safe filename shape. Ensure deletion also removes now-empty session directories.
+- Add `importResumeSweepRegistered` beside the existing App-level sweep guards and test/remount-proof registration.
+
+## Risk Assessment
+
+**HIGH** until the two HIGH issues are resolved: they can respectively create invalid user contacts and defeat the phase's explicit durable-photo cleanup guarantee.
+
+## Cycle 4 — Cursor Review
+
+# Cross-AI Plan Review — Phase 19: System Contact Import (Cycle 4)
+
+## Summary
+
+After three review cycles and the cycle-3 replan, the 11-plan set is **architecturally sound and essentially execution-ready**. I verified the current plan text on disk against the repo at v11 (`TARGET_VERSION = 11` in `src/db/database.ts:46`; migrations `001`–`011` only; no Phase 19 implementation yet). Cycle-1/2/3 fixes are present in the plans: composed single-transaction cores, document-dir photo staging, `match_outcome`/`candidates_json` contract, `finalizeSessionIfTerminal`, durable `batch_category_id`, pre-batch consolidation, `resolveImportStagingUri`, resume routing split, `App.tsx` wiring, and plan 07's `depends_on: [19-10]`. No `[DECIDED]`/ADR/HANDOFF reversal was found. Two **MEDIUM** cross-plan gaps remain (navigation typing on resume; birthday handoff signature). Plan 01's blocking owner checkpoint for migration 012 is intentional, not a plan defect. **Verdict: execution-ready after those two clarifications and owner schema approval on 19-01.**
+
+## Strengths
+
+- **Non-reentrant mutex composition matches source.** `src/db/transaction.ts:12-23` documents the permanent-hang rule; plans 01/03/04/06/11 correctly extract `*Core` writers and enter `inWriteTransaction` once — aligned with `createContactFull` at `src/db/contacts-dao.ts:148-230`.
+- **Deterministic identity is schema-backed.** Plan 05's `findActiveExternalLink` targets the partial unique index at `src/db/migrations/011-contact-lifecycle-schema.ts:180` on `(provider, external_contact_id) WHERE is_active = 1`.
+- **Cycle-1/2 atomicity fix is specified correctly.** Plan 03's `importContactRecord({ resolveRow })` composes `createContactFullCore` + row cores in one transaction (`19-03-PLAN.md:136-142`), addressing the original split-write HIGH.
+- **Cycle-1/2 staging durability is closed in plan text.** Plan 04 stages cache → document-dir before `acceptImportSessionWithRows`, mirroring `stageRestorePending` at `src/services/photos/photo-storage.ts:143-151`; plan 02 explicitly limits itself to cache copies (`19-02-PLAN.md:33`).
+- **Cycle-2 count semantics + dual-field writes are load-bearing in plan 01.** Transition table, `resolveAlreadyLinkedCore`/`deferNeedsReviewCore`, and `sessionSummaryCounts` keyed on `match_outcome='already_linked'` (`19-01-PLAN.md:75-93,186-189`).
+- **Cycle-2/3 terminal completion + Retry resumability intact.** `finalizeSessionIfTerminal` requires `failed==0` (`19-01-PLAN.md:35,182`); plans 07/08/09 wire Retry and failed-only sessions to stay `status='pending'`.
+- **Cycle-3 staged-photo preview crash fix is specified.** Plan 04 mandates `resolveImportStagingUri` (mirroring `resolveRestorePendingUri` at `photo-storage.ts:214-218`) and forbids feeding `import-staging/…` through `Avatar`/`resolvePhotoUri`/`assertSafeRelative` (`Avatar.tsx:67`, `photo-relative-path.ts:22-45`).
+- **Cycle-3 category durability is closed.** `setSessionBatchCategory` + `getSessionById` in plan 01; plan 06 persists at setup CTA; plans 07/08 read from session row, not nav params.
+- **Cycle-3 resume routing split is in plan 09.** Never-started (all pending) → `BulkImportSetup`; mid-batch interrupt (any non-pending + pending>0) → `ImportProgress` (`19-09-PLAN.md:22,118`).
+- **Cycle-3 wave dependency fix verified.** Plan 07 header: `depends_on: [19-04, 19-05, 19-06, 19-10]`, wave 6; plan 08 wave 7.
+- **Unbound import guard matches existing DAO.** `createContactFull` allows `trackingEnabled: false` + `intervalDays: null` (`contacts-dao.ts:121-136`), consistent with migration 011 CHECKs (`011-contact-lifecycle-schema.ts:36-37`).
+- **Replace-all session purge specified against real gap.** `replaceAllReset` currently deletes through `contact_methods` only (`restore-apply.ts:232`); plan 01 Task 3 adds `import_session_rows`/`import_sessions`.
+- **Local-only session policy matches export code.** `buildExportManifest` enumerates portable entities inline (`export-manifest.ts:45-58`) and omits session tables; plan 01 adds behavioral omission + Replace-all purge tests.
+
+## Concerns
+
+### MEDIUM — Resume navigation to `ImportProgress` omits a required route param
+
+- **Plan:** `19-09-PLAN.md:118` routes mid-batch resume with `navigate ImportProgress(sessionId)` only.
+- **Plan:** `19-04-PLAN.md:54,134` declares `ImportProgress: { sessionId: number; batchCategoryId: number | null }` as the sole writer of import route params; later plans may not edit `navigation/types.ts`.
+- **Source:** Current `RootStackParamList` has no import routes yet (`src/navigation/types.ts:21-120`), but plan 04's acceptance requires `npx tsc --noEmit` with all five import routes type-checked.
+- **Mechanism:** Resume navigation as written will fail TypeScript unless the caller passes `batchCategoryId` (even `null`). Plan 06 treats the nav param as redundant now that the driver reads `getSessionById`, but the type was not narrowed.
+- **Impact:** Implementation friction or a `@ts-ignore` workaround; not a data bug because `runImportBatch` reads the durable session category.
+
+### MEDIUM — `mapPickedContact` birthday handoff is internally inconsistent across plans 03/04/06
+
+- **Plan:** `19-03-PLAN.md:24,119` requires the mapper to produce a validated stored birthday and to "expose it on the returned object," but Task 2's declared return type is `{ input, nameRequired, externalContactId, photoTempUri }` with **no `birthday` field**.
+- **Plan:** `19-01-PLAN.md:70` schema requires `source_payload` JSON to include `birthday`; `19-03-PLAN.md:142` and `19-04-PLAN.md:48` pass `birthday` separately into `importContactRecord` / `commitSingleImport`.
+- **Plan:** `19-06-PLAN.md:111-115` `importRowAsNew` calls `importContactRecord({ … birthday … })` after `mapPickedContact`, but does not specify where `birthday` is sourced.
+- **Source:** `CreateContactFullInput` has no birthday field (`contacts-dao.ts:83-106`); birthday is edit-path data applied via separate UPDATE in `importContactRecord`.
+- **Impact:** An executor following the Task 2 signature literally could omit birthday from acceptance snapshots and bulk imports despite IMP-02. The fix is small (add `birthday: string | null` to the return type; assert it in `picked-contact-map.test.ts`; document `acceptPickedContacts` embedding it in `source_payload`; have `importRowAsNew` pass it through).
+
+### LOW — Merge restore leaves runtime import sessions (accepted policy)
+
+- **Plan:** `19-01-PLAN.md:41` explicitly documents Merge restore neither reads nor writes session tables; only Replace-all purges them.
+- **Source:** `restore-apply.ts` merge path never touches session tables.
+- **Impact:** A pending session can survive Merge with nulled FKs and surface a Resume prompt. Documented and owner-accepted, not an oversight.
+
+### LOW — BulkImportSetup selection count ignores pre-batch consolidation
+
+- **Plan:** `19-11-PLAN.md` resolves clustered rows before `runImportBatch`; setup screen may still show `total_rows` from acceptance.
+- **Impact:** Cosmetic "N contacts selected" mismatch after Combine. No data corruption.
+
+### LOW — Plan 01 blocks autonomous execution until owner approves migration 012
+
+- **Plan:** `19-01-PLAN.md:137-147` blocking human checkpoint; `autonomous: false`.
+- **Impact:** Expected operational gate for irreversible schema, not a design flaw.
+
+## Suggestions
+
+1. **ImportProgress resume params (primary):** In `19-09-PLAN.md` Task 2, specify `navigation.navigate('ImportProgress', { sessionId, batchCategoryId: null })` (session row is authoritative), **or** narrow plan 04's declaration to `ImportProgress: { sessionId: number }` only since plan 06 made the nav param redundant. Either closes the tsc gap without reintroducing category loss.
+
+2. **Birthday handoff (primary):** In `19-03-PLAN.md` Task 2, add `birthday: string | null` to the `mapPickedContact` return type; add an acceptance criterion that `acceptPickedContacts` embeds it in `source_payload` and that `importRowAsNew` passes it to `importContactRecord`. One test: round-trip birthday from picker → session row → bulk import.
+
+3. **Optional LOW:** After consolidation in plan 11, refresh BulkImportSetup's displayed count from `sessionRowCounts.pending` rather than `total_rows`.
+
+## Risk Assessment
+
+**MEDIUM**
+
+Structural risks from cycles 1–3 (atomicity, staging, count semantics, consolidation timing, Retry, nav inversion, category durability, preview crash, resume routing) are addressed in plan text and grounded in real source. Remaining gaps are narrow interface/clarity issues, not architectural reversals. Inherent **HIGH operational risk** remains on the unverified Android 17 Contact Picker (birthday/photo field support — plan 02/04/10 A1/A2 tracers), which the plans acknowledge and sequence correctly (tracer before bulk expansion). No edit to shipped migrations 001–011 is proposed; migration 012 is additive only. Android-only / no `READ_CONTACTS` boundaries are consistent throughout.
+
+## Cycle 4 — Claude (Sonnet 5) Reviewer
+
+## Summary
+
+The 11 plans remain architecturally sound and every cycle-1/2/3 fix I re-verified against the current plan text AND the actual repository is intact (staged-photo preview via `resolveImportStagingUri` for the single-import tracer, durable `batch_category_id` write-back + `getSessionById` reads on Retry/Import-as-New, plan 09's resume-routing split, plan 07's `depends_on: [19-10]`, plan 07's already-linked → Profile navigation, plan 09's `App.tsx` read_first pointer). However, this cycle surfaces one NEW HIGH the prior three cycles missed: the same avatars-only render-crash class fixed for the single-import tracer in cycle 3 recurs, unaddressed, in the reusable bulk duplicate-review grid. I also independently confirmed Codex's two HIGH findings and Cursor's two MEDIUM findings against source.
+
+## Strengths (re-verified intact)
+
+- `finalizeSessionIfTerminal` correctly requires `pending==0 AND needs_review==0 AND failed==0` (`19-01-PLAN.md:35,182,201`) and every row-resolving path in plans 06/07/08/11 calls it.
+- `resolveImportStagingUri` (mirroring the shipped `resolveRestorePendingUri` at `src/services/photos/photo-storage.ts:214-218`) is correctly specified as the ONLY way `ImportReviewScreen` previews a staged photo (`19-04-PLAN.md:37,123`); `Avatar` is confirmed restricted to `photo={null}` (initials) in that screen.
+- `setSessionBatchCategory`/`getSessionById` (`19-01-PLAN.md:37,180-181,215`) are correctly the durable source of truth for batch category on Retry (`19-08-PLAN.md:79`) and bulk Import-as-New (`19-07-PLAN.md:30,101,137`), never a nav param.
+- Plan 09's mechanical `<files>`/artifact-list/read_first references are all `App.tsx` (repo root); `ls App.tsx` succeeds and `ls src/App.tsx` fails, confirming the residual pointer fixed in commit `fa8032b` is fully corrected.
+- Wave graph re-verified acyclic across all 11 plans with no intra-wave `files_modified` collisions (wave 1: 01/02/05; wave 5: 09/10; wave 6: 07/11 — no file overlap in any concurrent pair), matching `ROADMAP.md`'s "11 plans (7 waves)" re-wave note.
+
+## Concerns
+
+- **HIGH (new this cycle) — `CandidateCardGrid`/`DuplicateReviewScreen` renders a needs_review row's OWN incoming photo through `Avatar`, the same avatars-only chokepoint cycle 3 proved crashes on a staged import-staging path.** `19-07-PLAN.md:111` specifies each card as "Avatar + name... + ConfidenceChip + evidence hint" (also `19-UI-SPEC.md:178`); `19-07-PLAN.md:129`'s `DuplicateReviewScreen` builds one `CandidateItem` per needs_review row with "name, avatar, outcome, evidence hint" sourced from `listSessionRows` — the top-level card is the INCOMING picked person, not an existing Orbit contact (the existing-contact candidates are nested inside, for the expand-to-choose interaction). `deferNeedsReviewCore`'s UPDATE (`19-01-PLAN.md:189`: `row_status='needs_review', match_outcome=?, matched_contact_id=?, candidates_json=?`) never touches `photo_rel_path`, so a needs_review row retains its staged `import-staging/<sessionToken>/<rowToken>.<ext>` path from acceptance. `Avatar` (`src/components/Avatar.tsx:73`) unconditionally calls `resolvePhotoUri(photo)` (`src/services/photos/photo-storage.ts:209-211`), which calls `assertSafeRelative` (`src/db/photo-relative-path.ts:38-46`) — accepting only `SAFE_RELATIVE` (`avatars/<name>.<ext>`, `photo-relative-path.ts:22`) and throwing SYNCHRONOUSLY (uncatchable by `onError`) for anything else, exactly as cycle 3 proved for `ImportReviewScreen`. That fix (`resolveImportStagingUri`) was scoped only to `import-acquire.ts`/`ImportReviewScreen.tsx` (19-04) and was never propagated to `CandidateCardGrid`/`DuplicateReviewScreen` (19-07), which is a SEPARATE screen consuming the SAME staged-photo data. I grepped all of `19-07-PLAN.md` and `19-UI-SPEC.md` for `resolveImportStagingUri`/`import-staging` — no hits. This crashes the bulk duplicate-review workspace (a reusable component the phase explicitly builds for Phase 20 reuse) for any ambiguous row whose picked contact has a photo — a common case, not an edge case.
+  - Fix: give `CandidateCardGrid`'s `CandidateItem` contract an explicit photo-source discriminator (e.g. `photoUri: string | null` pre-resolved by the caller via `resolveImportStagingUri`, rendered through a direct `expo-image` `Image` — mirroring plan 04's fix — rather than a raw `photo` prop routed through `Avatar`), or have `DuplicateReviewScreen` always pass `photo={null}` (initials-only) for phase 19's usage until a canonical-path variant is needed.
+- **HIGH (Codex, independently confirmed) — bulk import has no name-required gate; verified `contacts.name TEXT NOT NULL` accepts `''`.** Confirmed `src/db/migrations/001-initial.ts:65` (`name TEXT NOT NULL`, no CHECK on non-empty) and confirmed via grep that `19-06-PLAN.md` never mentions `nameRequired`. See Codex's finding above — I independently traced the same mechanism and reach the same HIGH severity: this ships in the common case (any picked contact identified only by an email or organization-only entry with no display name).
+- **HIGH (Codex, independently confirmed and sharpened) — the import-staging namespace's nested path shape is structurally incompatible with "mirror restore-pending EXACTLY."** I additionally traced WHY: `restorePendingRelPath` (`src/services/photos/photo-storage.ts:121-141`) bakes the session token into the FILENAME inside one flat directory (`contact-<uid>-<sessionToken>.jpg`) — it has no nested subdirectory precedent at all. Plan 04's chosen shape (`import-staging/<sessionToken>/<rowToken>.<ext>`) is a genuine two-level nesting with no flat analog to mirror. A `listImportStagingPhotos()` built the same way as `listRestorePendingPhotos()` (`photo-storage.ts:170-178`, one non-recursive `directory.list()`) would enumerate only session-token subdirectory names, each of which fails `SAFE_IMPORT_STAGING_RELATIVE` (no `/<rowToken>.<ext>` suffix) — breaking plan 09's REQUIRED `reconcileOrphanStagedPhotos` (`19-09-PLAN.md:97`) exactly as Codex describes.
+- **MEDIUM (Cursor, independently confirmed) — plan 09's `ImportProgress(sessionId)` resume navigation omits the required `batchCategoryId` field.** Confirmed `19-04-PLAN.md:134` declares `ImportProgress: { sessionId: number; batchCategoryId: number | null }` as a non-optional key, and plan 04 is the sole writer of `navigation/types.ts` (confirmed no later plan edits it). `19-09-PLAN.md:118` passes only `sessionId`. This would fail plan 09's own `npx tsc --noEmit --pretty false` verification gate as literally written — not a data bug (the driver reads the durable category from the session row) but a real gap an executor must silently paper over.
+- **MEDIUM (Cursor, independently confirmed) — plan 03's `mapPickedContact` return-type omits `birthday` while its own action text requires it to be exposed on the return object.** Confirmed the return type is stated twice, identically, without `birthday` (`19-03-PLAN.md:36,119`), immediately followed by "expose it on the returned object for the caller" in the same paragraph (`19-03-PLAN.md:119`). Confirmed `CreateContactFullInput` (`src/db/contacts-dao.ts:83-106`) has no birthday field, so there is no other place for birthday to live in the stated shape. A real, internally-contradictory interface spec that risks dropping birthday from every import path if an executor follows the literal destructured type.
+- **MEDIUM (Codex, independently confirmed) — plan 09's resume-sweep hook registration omits the module-scope one-shot guard every other App.tsx sweep hook uses.** Confirmed `App.tsx:77-101` documents this pattern explicitly ("the `ready`-gated effect below can re-run (Strict Mode, remounts), and registering the same hook twice would double-run it") and applies it to every existing hook (`fieldSweepRegistered`, `backupSweepRegistered`, `photoReconcileRegistered`, `restorePhotoFinalizeSweepRegistered`, `notificationScheduleRegistered`, `digestScheduleRegistered`). `19-09-PLAN.md` Task 2 has zero mention of this pattern (grepped for "one-shot"/"guard"/"Registered = false" — no hits).
+- **LOW (carried over from cycle 3, still unaddressed) — BulkImportSetupScreen's selection count source remains ambiguous.** `19-06-PLAN.md:137` still says "from sessionRowCounts or the row list" (unchanged since cycle 3), and plan 11's pre-batch consolidation (wave 6, after plan 06's wave 4) can make `total_rows` stale if that source is chosen. Cosmetic only.
+
+## Suggestions
+
+1. Give `CandidateCardGrid`/`DuplicateReviewScreen` the same staged-photo guard plan 04 has (`resolveImportStagingUri` into a direct `expo-image` `Image`, never `Avatar` for a staged row's own photo).
+2. Add a `nameRequired` check to `importRowAsNew`/`runImportBatch`'s per-row loop; mark such rows `failed` with a name-required reason rather than creating a blank-named contact.
+3. Reconsider the import-staging path shape (flatten to a single directory with the session token in the filename, matching restore-pending exactly) OR specify a recursive/two-pass `listImportStagingPhotos()` that lists session subdirectories then their contents.
+4. Add `batchCategoryId: null` (or a session read) to plan 09's `ImportProgress` resume navigation.
+5. Add `birthday: string | null` to `mapPickedContact`'s declared return type in both places it's stated (`19-03-PLAN.md:36,119`).
+6. Add an `importResumeSweepRegistered` module-scope guard to plan 09's Task 2, consistent with every other App.tsx sweep hook.
+
+## Risk Assessment
+
+**HIGH.** Three independently-confirmed HIGH findings remain: two (name-required gate, nested-staging orphan reconciliation) from Codex, one (CandidateCardGrid avatar crash) newly found this cycle. All three are narrow, well-scoped plan-text fixes — no architectural rework, wave reshuffle, or ADR/HANDOFF reversal is implicated — but each would ship broken/crashing/leaking behavior in a common (not edge) case if the plans execute literally as currently written.
+
+## Cycle 4 — Verification Coverage (advisory, not counted toward totals)
+
+| Symbol / claim | Status | Note |
+|---|---|---|
+| `contacts.name TEXT NOT NULL` with no non-empty CHECK | VERIFIED `src/db/migrations/001-initial.ts:65` | Confirms the bulk blank-name HIGH can actually persist |
+| `19-06-PLAN.md` never mentions `nameRequired` | VERIFIED via grep across the file | No hits |
+| `restorePendingRelPath` bakes session token into filename, single flat directory | VERIFIED `src/services/photos/photo-storage.ts:121-141` | No nested-directory precedent exists to "mirror EXACTLY" |
+| `listRestorePendingPhotos()` — single non-recursive `directory.list()` | VERIFIED `src/services/photos/photo-storage.ts:170-178` | Basis for the orphan-reconciliation HIGH |
+| `import-staging/<sessionToken>/<rowToken>.<ext>` two-level nested shape | VERIFIED `19-04-PLAN.md:36,49,123` | Confirmed distinct from the flat restore-pending shape |
+| `Avatar` → `resolvePhotoUri` → `assertSafeRelative` throw chain | VERIFIED `src/components/Avatar.tsx:73`, `src/services/photos/photo-storage.ts:209-211`, `src/db/photo-relative-path.ts:22,38-46` | Confirms the CandidateCardGrid HIGH |
+| `deferNeedsReviewCore` UPDATE never touches `photo_rel_path` | VERIFIED `19-01-PLAN.md:189` | A needs_review row keeps its staged import-staging path |
+| `19-07-PLAN.md`/`19-UI-SPEC.md` never mention `resolveImportStagingUri`/`import-staging` | VERIFIED via grep | Confirms the cycle-3 fix was not carried into plan 07 |
+| `ImportProgress` route param type is non-optional `batchCategoryId` | VERIFIED `19-04-PLAN.md:134` | Confirms the plan-09 resume-nav MEDIUM |
+| `CreateContactFullInput` has no birthday field | VERIFIED `src/db/contacts-dao.ts:83-106` | Confirms the mapPickedContact-return MEDIUM |
+| `App.tsx` one-shot sweep-registration guard idiom | VERIFIED `App.tsx:77-101` | Confirms the plan-09 registration-guard MEDIUM |
+| `19-06-PLAN.md:137` selection-count source still ambiguous | VERIFIED — unchanged since cycle 3 | Carried-over LOW, still not incorporated |
+| TARGET_VERSION / migrations on disk | VERIFIED `src/db/database.ts:46` = 11; `ls src/db/migrations/` shows 001-011 only | Phase not yet executed |
+| No import-flow code exists on disk yet | VERIFIED via `find src modules -iname '*import*'` (no results for import-session/import-driver/orbit-contact-picker) | Confirms plan-only review scope |
