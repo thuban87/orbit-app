@@ -23,6 +23,10 @@ import { migration003 } from "@/db/migrations/003-orrery-settings";
 import { migration004 } from "@/db/migrations/004-ai-settings";
 import { migration005 } from "@/db/migrations/005-digest-settings";
 import { migration006 } from "@/db/migrations/006-normalize-custom-field-values";
+import { migration007 } from "@/db/migrations/007-tombstones";
+import { migration009 } from "@/db/migrations/009-contact-method-normalization";
+import { migration010 } from "@/db/migrations/010-contact-method-label";
+import { migration011 } from "@/db/migrations/011-contact-lifecycle-schema";
 import { runMigrations } from "@/db/migrations/runner";
 import {
   createContactWithInteraction,
@@ -45,9 +49,20 @@ beforeEach(async () => {
   exec = nodeSqliteExecutor(db);
   await runMigrations(
     exec,
-    [migration001, migration002, migration003, migration004, migration005, migration006],
-    6,
-    { now: NOW, newUid: uid },
+    [
+      migration001,
+      migration002,
+      migration003,
+      migration004,
+      migration005,
+      migration006,
+      migration007,
+      migration009,
+      migration010,
+      migration011,
+    ],
+    11,
+    { now: NOW, newUid: uid, defaultPhoneRegion: "US" },
   );
 });
 
@@ -65,6 +80,49 @@ async function makeContact(
     now: NOW,
   });
   return contactId;
+}
+
+async function addMethodPiiFixture(contactId: number): Promise<void> {
+  await exec.runAsync(
+    `INSERT INTO contact_methods
+       (uid, contact_id, method_type, raw_value, display_value, canonical_value,
+        is_actionable, is_primary, display_order, created_at, modified_at)
+     VALUES (?, ?, 'phone', ?, ?, ?, 1, 1, 0, ?, ?)`,
+    [
+      uid(),
+      contactId,
+      "RAW_PHONE_MARKER",
+      "FORMATTED_PHONE_MARKER",
+      "CANONICAL_PHONE_MARKER",
+      NOW,
+      NOW,
+    ],
+  );
+  await exec.runAsync(
+    `INSERT INTO contact_methods
+       (uid, contact_id, method_type, raw_value, display_value, canonical_value,
+        is_actionable, is_primary, display_order, created_at, modified_at)
+     VALUES (?, ?, 'email', ?, ?, ?, 1, 1, 0, ?, ?)`,
+    [
+      uid(),
+      contactId,
+      "RAW_EMAIL_MARKER",
+      "FORMATTED_EMAIL_MARKER",
+      "CANONICAL_EMAIL_MARKER",
+      NOW,
+      NOW,
+    ],
+  );
+}
+
+async function makeNeverAssignedUnboundContact(): Promise<number> {
+  const result = await exec.runAsync(
+    `INSERT INTO contacts
+       (uid, name, category_id, interval_days, tracking_enabled, created_at, modified_at)
+     VALUES (?, 'Unbound Alex', 3, NULL, 0, ?, ?)`,
+    [uid(), NOW, NOW],
+  );
+  return result.lastInsertRowId;
 }
 
 function makeDef(
@@ -136,11 +194,12 @@ describe("readPromptContext — allowlist projection (H1)", () => {
   it("excludes every forbidden value — the H1 sensitive-column exclusion fixture", async () => {
     const c = await makeContact(137, 1, 1);
 
-    // Non-allowlisted contacts columns carry distinctive markers.
-    await exec.runAsync(
-      "UPDATE contacts SET phone = ?, email = ?, birthday = ? WHERE id = ?",
-      ["555-PHONEMARK", "secret@EMAILMARK.test", "1991-02-03", c],
-    );
+    // Normalized raw/display/canonical method values carry distinctive markers.
+    await addMethodPiiFixture(c);
+    await exec.runAsync("UPDATE contacts SET birthday = ? WHERE id = ?", [
+      "1991-02-03",
+      c,
+    ]);
 
     // Fuel: an off_limits item and an unconfirmed source='ai' item must NOT surface;
     // a normal item must.
@@ -227,8 +286,12 @@ describe("readPromptContext — allowlist projection (H1)", () => {
     expect(serialized).toContain("Loves trail running");
     // …and every forbidden marker is absent.
     for (const marker of [
-      "555-PHONEMARK",
-      "EMAILMARK",
+      "RAW_PHONE_MARKER",
+      "FORMATTED_PHONE_MARKER",
+      "CANONICAL_PHONE_MARKER",
+      "RAW_EMAIL_MARKER",
+      "FORMATTED_EMAIL_MARKER",
+      "CANONICAL_EMAIL_MARKER",
       "1991-02-03",
       "OFFLIMITS_MARKER",
       "AICONFIRM_MARKER",
@@ -388,5 +451,61 @@ describe("readPromptContext — allowlist projection (H1)", () => {
     const ctx = await readPromptContext(exec, c, NOW);
     expect(ctx.newestChannel).toBe("unspecified");
     expect(ctx.cadence).toEqual({ totalCount: 0, connectedCount: 0 });
+  });
+
+  it("keeps explicit AI context available but neutral for a dormant-cadence Unbound contact", async () => {
+    const c = await makeContact(30, 0, 3);
+    await exec.runAsync(
+      "UPDATE contacts SET tracking_enabled = 0 WHERE id = ?",
+      [c],
+    );
+    await recordTouchpoint(exec, {
+      contactId: c,
+      uid: uid(),
+      occurredAt: "2026-08-10 12:00:00",
+      channel: "sms",
+      direction: "outbound",
+      connected: 1,
+      now: NOW,
+    });
+    await addMethodPiiFixture(c);
+
+    const ctx = await readPromptContext(exec, c, NOW);
+
+    expect(ctx.contactName).toBe("Alex Rivera");
+    expect(ctx.category).toBe("Work");
+    expect(ctx.intensity).toEqual({
+      currentCount: 0,
+      intendedPerPeriod: 0,
+      multiple: 0,
+      trailingAvgGapDays: null,
+    });
+    expect(JSON.stringify(ctx)).not.toMatch(/RAW_|FORMATTED_|CANONICAL_/);
+  });
+
+  it("keeps explicit AI context available but neutral for a never-assigned Unbound contact", async () => {
+    const c = await makeNeverAssignedUnboundContact();
+    await recordTouchpoint(exec, {
+      contactId: c,
+      uid: uid(),
+      occurredAt: "2026-08-10 12:00:00",
+      channel: "email",
+      direction: "outbound",
+      connected: 1,
+      now: NOW,
+    });
+    await addMethodPiiFixture(c);
+
+    const ctx = await readPromptContext(exec, c, NOW);
+
+    expect(ctx.contactName).toBe("Unbound Alex");
+    expect(ctx.category).toBe("Work");
+    expect(ctx.intensity).toEqual({
+      currentCount: 0,
+      intendedPerPeriod: 0,
+      multiple: 0,
+      trailingAvgGapDays: null,
+    });
+    expect(JSON.stringify(ctx)).not.toMatch(/RAW_|FORMATTED_|CANONICAL_/);
   });
 });
