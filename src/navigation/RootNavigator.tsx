@@ -3,6 +3,7 @@ import { Text, View } from "react-native";
 import { ArchivedContactsScreen } from "@/screens/ArchivedContactsScreen";
 import { BackupScreen } from "@/screens/BackupScreen";
 import { BackupSettingsScreen } from "@/screens/BackupSettingsScreen";
+import { BulkImportSetupScreen } from "@/screens/BulkImportSetupScreen";
 import { CaptureScreen } from "@/screens/CaptureScreen";
 import { ComposeScreen } from "@/screens/ComposeScreen";
 import { ContactProfileScreen } from "@/screens/ContactProfileScreen";
@@ -106,7 +107,7 @@ export function RootNavigator() {
       <Stack.Screen name="RestorePreview" component={RestorePreviewScreen} />
       <Stack.Screen name="RestoreResult" component={RestoreResultScreen} />
       <Stack.Screen name="ImportReview" component={ImportReviewScreen} />
-      <Stack.Screen name="BulkImportSetup" component={ImportRoutePlaceholder} />
+      <Stack.Screen name="BulkImportSetup" component={BulkImportSetupScreen} />
       <Stack.Screen name="ImportProgress" component={ImportRoutePlaceholder} />
       <Stack.Screen name="DuplicateReview" component={ImportRoutePlaceholder} />
       <Stack.Screen name="ImportComplete" component={ImportRoutePlaceholder} />
