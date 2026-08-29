@@ -5,23 +5,23 @@
  */
 import { createContactFullCore } from "@/db/contacts-dao";
 import {
-  insertExternalContactLinkCore,
-  insertMethodProvenanceCore,
-} from "@/db/imported-contact-dao";
-import {
   markRowPhotoFailed,
   setRowContactCore,
   setRowMatchOutcomeCore,
 } from "@/db/import-session-dao";
 import type { ImportSessionRow } from "@/db/import-session-read";
+import {
+  insertExternalContactLinkCore,
+  insertMethodProvenanceCore,
+} from "@/db/imported-contact-dao";
 import { inWriteTransaction } from "@/db/transaction";
 import type { SqlExecutor } from "@/db/types";
 import { isValidStoredBirthday } from "@/logic/birthday-logic";
 import { normalizeContactMethod } from "@/logic/contact-method-normalization";
 import { mapPickedContact } from "@/logic/picked-contact-map";
 import {
-  persistImportedPhotoPostCommit,
   type ImportedPhotoFs,
+  persistImportedPhotoPostCommit,
 } from "@/services/import/import-photo";
 import { Logger } from "@/utils/logger";
 import type { PickedContact } from "../../../modules/orbit-contact-picker";
