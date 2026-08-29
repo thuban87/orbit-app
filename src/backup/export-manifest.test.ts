@@ -54,7 +54,10 @@ describe("buildExportManifest", () => {
     expect(manifest.appSettings).not.toHaveProperty("sunContactId");
     expect(JSON.stringify(manifest)).not.toMatch(/data_revision|backup_folder_uri|avatars\//);
     expect(manifest.profile).toMatchObject({ photoBase64: "AQID" });
-    expect(manifest.contacts[0]).toMatchObject({ uid: "contact-a", categoryUid: category!.uid, photoBase64: "AQID" });
+    expect(manifest.contacts[0]).toMatchObject({
+      uid: "contact-a", categoryUid: category!.uid, trackingEnabled: 1,
+      intervalDays: 7, photoBase64: "AQID",
+    });
     expect(manifest).toMatchObject({
       contactMethods: [{
         uid: "method-a", contactUid: "contact-a", methodType: "phone",

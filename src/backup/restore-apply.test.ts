@@ -39,17 +39,18 @@ import { migration007 } from "@/db/migrations/007-tombstones";
 import { migration008 } from "@/db/migrations/008-restore-photo-journal";
 import { migration009 } from "@/db/migrations/009-contact-method-normalization";
 import { migration010 } from "@/db/migrations/010-contact-method-label";
+import { migration011 } from "@/db/migrations/011-contact-lifecycle-schema";
 import { runMigrations } from "@/db/migrations/runner";
 import type { SqlExecutor } from "@/db/types";
 
 const NOW = "2026-08-25 12:00:00";
 let uid = 0;
 const newUid = () => `uid-${++uid}`;
-const migrations = [migration001, migration002, migration003, migration004, migration005, migration006, migration007, migration008, migration009, migration010];
+const migrations = [migration001, migration002, migration003, migration004, migration005, migration006, migration007, migration008, migration009, migration010, migration011];
 
 async function db(): Promise<SqlExecutor> {
   const exec = nodeSqliteExecutor(openTestDb());
-  await runMigrations(exec, migrations, 10, { now: NOW, newUid });
+  await runMigrations(exec, migrations, 11, { now: NOW, newUid });
   return exec;
 }
 
@@ -79,6 +80,44 @@ describe("applyRestore", () => {
     await expect(destination.getFirstAsync<{ name: string; interval_days: number }>(
       "SELECT name, interval_days FROM contacts WHERE uid = ?", ["incoming-contact"],
     )).resolves.toEqual({ name: "Incoming", interval_days: 14 });
+  });
+
+  it("round-trips an Unbound lifecycle state with its dormant cadence", async () => {
+    const source = await db();
+    await source.runAsync(
+      `INSERT INTO contacts (uid,name,tracking_enabled,interval_days,rarely_responds,reminders_off,created_at,modified_at)
+       VALUES (?,?,?,?,?,?,?,?)`,
+      ["unbound-contact", "Unbound", 0, 14, 0, 0, NOW, "2026-08-25 12:01:00"],
+    );
+    const manifest = await buildExportManifest(source, { exportedAt: NOW, readPhotoBase64: async () => "" });
+    expect(manifest.contacts).toEqual([
+      expect.objectContaining({ uid: "unbound-contact", trackingEnabled: 0, intervalDays: 14 }),
+    ]);
+
+    const destination = await db();
+    await expect(applyRestore(destination, manifest, "merge")).resolves.toMatchObject({ status: "applied" });
+    await expect(destination.getFirstAsync<{ tracking_enabled: number; interval_days: number | null }>(
+      "SELECT tracking_enabled,interval_days FROM contacts WHERE uid=?", ["unbound-contact"],
+    )).resolves.toEqual({ tracking_enabled: 0, interval_days: 14 });
+  });
+
+  it("retains assigned local cadence when a newer valid Unbound merge proposes null cadence", async () => {
+    const destination = await db();
+    await destination.runAsync(
+      `INSERT INTO contacts (uid,name,tracking_enabled,interval_days,rarely_responds,reminders_off,created_at,modified_at)
+       VALUES (?,?,?,?,?,?,?,?)`,
+      ["shared-contact", "Local", 1, 14, 0, 0, NOW, NOW],
+    );
+    const manifest = await buildExportManifest(destination, { exportedAt: NOW, readPhotoBase64: async () => "" });
+    manifest.contacts = [{
+      ...manifest.contacts[0], name: "Incoming", trackingEnabled: 0, intervalDays: null,
+      modifiedAt: "2026-08-25 12:01:00",
+    }];
+
+    await expect(applyRestore(destination, manifest, "merge")).resolves.toMatchObject({ status: "applied" });
+    await expect(destination.getFirstAsync<{ name: string; tracking_enabled: number; interval_days: number | null }>(
+      "SELECT name,tracking_enabled,interval_days FROM contacts WHERE uid=?", ["shared-contact"],
+    )).resolves.toEqual({ name: "Incoming", tracking_enabled: 0, interval_days: 14 });
   });
 
   it("uses an FK-safe reset for replace-all before inserting the incoming graph", async () => {

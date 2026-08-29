@@ -72,14 +72,56 @@ describe("parseBackupManifest", () => {
     const parsed = parseBackupManifest(legacy) as typeof legacy & {
       contactMethods: Array<Record<string, unknown>>;
     };
-    expect(parsed.backupFormatVersion).toBe(2);
+    expect(parsed.backupFormatVersion).toBe(3);
     expect(parsed.contacts[0]).not.toHaveProperty("phone");
     expect(parsed.contacts[0]).not.toHaveProperty("email");
     expect(parsed.appSettings).toHaveProperty("phoneRegionOverride", null);
+    expect(parsed.appSettings).toMatchObject({
+      includeUnboundNeverContacted: 0,
+      birthdayUnboundEnabled: 1,
+    });
+    expect(parsed.contacts).toEqual([
+      expect.objectContaining({ uid: "contact-a", trackingEnabled: 1, intervalDays: 14 }),
+    ]);
     expect(parsed.contactMethods).toEqual([
       expect.objectContaining({ uid: "legacy-method:contact-a:phone", contactUid: "contact-a", methodType: "phone", canonicalRegion: null, label: null }),
       expect.objectContaining({ uid: "legacy-method:contact-a:email", contactUid: "contact-a", methodType: "email", canonicalRegion: null, label: null }),
     ]);
+  });
+
+  it("forward-migrates v2 contacts and lifecycle settings to the v3 wire format", () => {
+    const legacy = valid();
+    legacy.backupFormatVersion = 2;
+    legacy.contacts = [{ uid: "contact-a", intervalDays: 7, modifiedAt: "2026-08-25 12:00:00" }];
+
+    const parsed = parseBackupManifest(legacy);
+
+    expect(parsed.backupFormatVersion).toBe(3);
+    expect(parsed.contacts).toEqual([
+      expect.objectContaining({ uid: "contact-a", trackingEnabled: 1, intervalDays: 7 }),
+    ]);
+    expect(parsed.appSettings).toMatchObject({
+      phoneRegionOverride: null,
+      includeUnboundNeverContacted: 0,
+      birthdayUnboundEnabled: 1,
+    });
+  });
+
+  it("rejects illegal lifecycle and cadence cells before restore planning", () => {
+    const invalidContacts = [
+      { trackingEnabled: 1, intervalDays: null },
+      { trackingEnabled: 1, intervalDays: 0 },
+      { trackingEnabled: 1, intervalDays: -1 },
+      { trackingEnabled: 1, intervalDays: 1.5 },
+      { trackingEnabled: 2, intervalDays: 7 },
+    ];
+
+    for (const contact of invalidContacts) {
+      const manifest = valid();
+      manifest.backupFormatVersion = 3;
+      manifest.contacts = [{ uid: "contact-a", modifiedAt: "2026-08-25 12:00:00", ...contact }];
+      expect(() => parseBackupManifest(manifest)).toThrow(BackupSchemaError);
+    }
   });
 
   it("rejects malformed cadence and duplicate surviving method primaries before restore", () => {
