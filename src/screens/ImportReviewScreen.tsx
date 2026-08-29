@@ -1,7 +1,15 @@
 import { Picker } from "@react-native-picker/picker";
 import { Image } from "expo-image";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import {
+  Alert,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from "react-native";
 import { Avatar } from "@/components/Avatar";
 import { ContactMethodsEditor } from "@/components/ContactMethodsEditor";
 import {
@@ -26,6 +34,7 @@ import { resolveImportStagingUri } from "@/services/photos/photo-storage";
 import { useTheme } from "@/theme";
 import { FREQUENCY_DAYS } from "@/types";
 import { Logger } from "@/utils/logger";
+import { useImportLeaveGuard } from "./use-import-leave-guard";
 
 const LOG_SCOPE = "import-review";
 
@@ -52,15 +61,25 @@ export function ImportReviewScreen({
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [rowId, setRowId] = useState<number | null>(null);
-  const [externalContactId, setExternalContactId] = useState<string | null>(null);
+  const [externalContactId, setExternalContactId] = useState<string | null>(
+    null,
+  );
   const [name, setName] = useState("");
   const [birthday, setBirthday] = useState<string | null>(null);
   const [photoRelPath, setPhotoRelPath] = useState<string | null>(null);
-  const [categories, setCategories] = useState<Array<{ id: number; name: string }>>([]);
+  const [categories, setCategories] = useState<
+    Array<{ id: number; name: string }>
+  >([]);
   const [categoryId, setCategoryId] = useState<number | null>(null);
   const [trackingEnabled, setTrackingEnabled] = useState(false);
   const [intervalDays, setIntervalDays] = useState<number | null>(null);
-  const [methods, setMethods] = useState<MethodGroups>({ phone: [], email: [] });
+  const [methods, setMethods] = useState<MethodGroups>({
+    phone: [],
+    email: [],
+  });
+  const [edited, setEdited] = useState(false);
+
+  useImportLeaveGuard(navigation, route.params.sessionId, edited);
 
   const load = useCallback(async () => {
     try {
@@ -72,7 +91,10 @@ export function ImportReviewScreen({
       ]);
       const row = rows.find((candidate) => candidate.contactId === null);
       if (!row) {
-        Alert.alert("Import unavailable", "This contact has already been handled.");
+        Alert.alert(
+          "Import unavailable",
+          "This contact has already been handled.",
+        );
         navigation.goBack();
         return;
       }
@@ -88,7 +110,8 @@ export function ImportReviewScreen({
         },
         {
           categoryId: null,
-          effectivePhoneRegion: settings.phoneRegionOverride ?? getDeviceRegion(),
+          effectivePhoneRegion:
+            settings.phoneRegionOverride ?? getDeviceRegion(),
         },
       );
       setRowId(row.id);
@@ -98,8 +121,12 @@ export function ImportReviewScreen({
       setPhotoRelPath(row.photoRelPath);
       const methodDrafts = mapped.input.methodDrafts ?? [];
       setMethods({
-        phone: methodDrafts.filter((method) => method.type === "phone").map((method) => ({ ...method, extension: "", label: "Main" })),
-        email: methodDrafts.filter((method) => method.type === "email").map((method) => ({ ...method, extension: "", label: "Main" })),
+        phone: methodDrafts
+          .filter((method) => method.type === "phone")
+          .map((method) => ({ ...method, extension: "", label: "Main" })),
+        email: methodDrafts
+          .filter((method) => method.type === "email")
+          .map((method) => ({ ...method, extension: "", label: "Main" })),
       });
       setCategories(nextCategories);
     } catch (error) {
@@ -114,7 +141,12 @@ export function ImportReviewScreen({
     void load();
   }, [load]);
 
-  const canImport = !loading && !saving && rowId !== null && externalContactId !== null && name.trim().length > 0;
+  const canImport =
+    !loading &&
+    !saving &&
+    rowId !== null &&
+    externalContactId !== null &&
+    name.trim().length > 0;
   const previewUri = useMemo(
     () => (photoRelPath ? resolveImportStagingUri(photoRelPath) : null),
     [photoRelPath],
@@ -131,13 +163,17 @@ export function ImportReviewScreen({
         input: {
           uid: newUid(),
           name: name.trim(),
-          intervalDays: trackingEnabled ? intervalDays ?? FREQUENCY_DAYS.Monthly : null,
+          intervalDays: trackingEnabled
+            ? (intervalDays ?? FREQUENCY_DAYS.Monthly)
+            : null,
           trackingEnabled,
           now,
           categoryId,
           methodDrafts: toMethodDrafts(methods),
           methodNormalization: {
-            effectivePhoneRegion: (await getAppSettings(getExecutor())).phoneRegionOverride ?? getDeviceRegion(),
+            effectivePhoneRegion:
+              (await getAppSettings(getExecutor())).phoneRegionOverride ??
+              getDeviceRegion(),
           },
         },
         externalLinks: [{ provider: "android", externalContactId }],
@@ -147,64 +183,210 @@ export function ImportReviewScreen({
       navigation.replace("Profile", { contactId });
     } catch (error) {
       Logger.error(LOG_SCOPE, "failed to commit import", error);
-      Alert.alert("Couldn't import contact", "Please check the name and try again.");
+      Alert.alert(
+        "Couldn't import contact",
+        "Please check the name and try again.",
+      );
     } finally {
       setSaving(false);
     }
   }
 
   return (
-    <ScrollView style={{ backgroundColor: colors.background }} contentContainerStyle={styles.content}>
+    <ScrollView
+      style={{ backgroundColor: colors.background }}
+      contentContainerStyle={styles.content}
+    >
       <View style={styles.header}>
-        <Pressable onPress={() => navigation.goBack()} style={[styles.back, { borderColor: colors.border }]}>
+        <Pressable
+          onPress={() => navigation.goBack()}
+          style={[styles.back, { borderColor: colors.border }]}
+        >
           <Text style={{ color: colors.textSecondary }}>Back</Text>
         </Pressable>
-        <Text accessibilityRole="header" style={[styles.title, { color: colors.textPrimary }]}>Review import</Text>
+        <Text
+          accessibilityRole="header"
+          style={[styles.title, { color: colors.textPrimary }]}
+        >
+          Review import
+        </Text>
       </View>
       {previewUri ? (
-        <Image source={{ uri: previewUri }} contentFit="cover" style={styles.photo} onError={() => setPhotoRelPath(null)} />
+        <Image
+          source={{ uri: previewUri }}
+          contentFit="cover"
+          style={styles.photo}
+          onError={() => setPhotoRelPath(null)}
+        />
       ) : (
         <Avatar photo={null} name={name} size={96} />
       )}
       <View style={styles.field}>
-        <Text style={[styles.label, { color: colors.textSecondary }]}>Name</Text>
-        <TextInput value={name} onChangeText={setName} placeholder="Their name" placeholderTextColor={colors.textSecondary} style={[styles.input, { color: colors.textPrimary, backgroundColor: colors.surface, borderColor: colors.border }]} />
+        <Text style={[styles.label, { color: colors.textSecondary }]}>
+          Name
+        </Text>
+        <TextInput
+          value={name}
+          onChangeText={(value) => {
+            setEdited(true);
+            setName(value);
+          }}
+          placeholder="Their name"
+          placeholderTextColor={colors.textSecondary}
+          style={[
+            styles.input,
+            {
+              color: colors.textPrimary,
+              backgroundColor: colors.surface,
+              borderColor: colors.border,
+            },
+          ]}
+        />
       </View>
       <View style={styles.field}>
-        <Text style={[styles.label, { color: colors.textSecondary }]}>Orbit participation</Text>
+        <Text style={[styles.label, { color: colors.textSecondary }]}>
+          Orbit participation
+        </Text>
         <View style={styles.lifecycle}>
           {([true, false] as const).map((enabled) => (
-            <Pressable key={String(enabled)} onPress={() => setTrackingEnabled(enabled)} style={[styles.choice, { backgroundColor: trackingEnabled === enabled ? colors.accent : colors.surface, borderColor: trackingEnabled === enabled ? colors.accent : colors.border }]}>
-              <Text style={{ color: trackingEnabled === enabled ? colors.background : colors.textPrimary }}>{enabled ? "Bound" : "Unbound"}</Text>
+            <Pressable
+              key={String(enabled)}
+              onPress={() => {
+                setEdited(true);
+                setTrackingEnabled(enabled);
+              }}
+              style={[
+                styles.choice,
+                {
+                  backgroundColor:
+                    trackingEnabled === enabled
+                      ? colors.accent
+                      : colors.surface,
+                  borderColor:
+                    trackingEnabled === enabled ? colors.accent : colors.border,
+                },
+              ]}
+            >
+              <Text
+                style={{
+                  color:
+                    trackingEnabled === enabled
+                      ? colors.background
+                      : colors.textPrimary,
+                }}
+              >
+                {enabled ? "Bound" : "Unbound"}
+              </Text>
             </Pressable>
           ))}
         </View>
       </View>
       <View style={styles.field}>
-        <Text style={[styles.label, { color: colors.textSecondary }]}>Category</Text>
-        <View style={[styles.picker, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-          <Picker selectedValue={categoryId ?? -1} onValueChange={(value) => setCategoryId(value === -1 ? null : Number(value))} dropdownIconColor={colors.textSecondary} style={{ color: colors.textPrimary }}>
+        <Text style={[styles.label, { color: colors.textSecondary }]}>
+          Category
+        </Text>
+        <View
+          style={[
+            styles.picker,
+            { backgroundColor: colors.surface, borderColor: colors.border },
+          ]}
+        >
+          <Picker
+            selectedValue={categoryId ?? -1}
+            onValueChange={(value) => {
+              setEdited(true);
+              setCategoryId(value === -1 ? null : Number(value));
+            }}
+            dropdownIconColor={colors.textSecondary}
+            style={{ color: colors.textPrimary }}
+          >
             <Picker.Item label="No category" value={-1} />
-            {categories.map((category) => <Picker.Item key={category.id} label={category.name} value={category.id} />)}
+            {categories.map((category) => (
+              <Picker.Item
+                key={category.id}
+                label={category.name}
+                value={category.id}
+              />
+            ))}
           </Picker>
         </View>
       </View>
-      {trackingEnabled ? <View style={styles.field}><Text style={[styles.label, { color: colors.textSecondary }]}>Frequency</Text><FrequencyPicker value={intervalDays ?? FREQUENCY_DAYS.Monthly} onChange={setIntervalDays} /></View> : null}
+      {trackingEnabled ? (
+        <View style={styles.field}>
+          <Text style={[styles.label, { color: colors.textSecondary }]}>
+            Frequency
+          </Text>
+          <FrequencyPicker
+            value={intervalDays ?? FREQUENCY_DAYS.Monthly}
+            onChange={(value) => {
+              setEdited(true);
+              setIntervalDays(value);
+            }}
+          />
+        </View>
+      ) : null}
       <View style={styles.field}>
         <ContactMethodsEditor
           methods={methods}
-          onAdd={(type) => setMethods((current) => addMethodDraft(current, type, newUid()))}
-          onUpdate={(uid, patch) => setMethods((current) => updateMethodDraft(current, uid, patch))}
-          onRemove={(uid) => setMethods((current) => removeMethodDraft(current, uid))}
-          onChoosePrimary={(uid) => setMethods((current) => choosePrimary(current, uid))}
+          onAdd={(type) => {
+            setEdited(true);
+            setMethods((current) => addMethodDraft(current, type, newUid()));
+          }}
+          onUpdate={(uid, patch) => {
+            setEdited(true);
+            setMethods((current) => updateMethodDraft(current, uid, patch));
+          }}
+          onRemove={(uid) => {
+            setEdited(true);
+            setMethods((current) => removeMethodDraft(current, uid));
+          }}
+          onChoosePrimary={(uid) => {
+            setEdited(true);
+            setMethods((current) => choosePrimary(current, uid));
+          }}
         />
       </View>
       <View style={styles.field}>
-        <Text style={[styles.label, { color: colors.textSecondary }]}>Birthday</Text>
-        <TextInput value={birthday ?? ""} onChangeText={(value) => setBirthday(value.trim() || null)} placeholder="YYYY-MM-DD" placeholderTextColor={colors.textSecondary} style={[styles.input, { color: colors.textPrimary, backgroundColor: colors.surface, borderColor: colors.border }]} />
+        <Text style={[styles.label, { color: colors.textSecondary }]}>
+          Birthday
+        </Text>
+        <TextInput
+          value={birthday ?? ""}
+          onChangeText={(value) => {
+            setEdited(true);
+            setBirthday(value.trim() || null);
+          }}
+          placeholder="YYYY-MM-DD"
+          placeholderTextColor={colors.textSecondary}
+          style={[
+            styles.input,
+            {
+              color: colors.textPrimary,
+              backgroundColor: colors.surface,
+              borderColor: colors.border,
+            },
+          ]}
+        />
       </View>
-      <Pressable disabled={!canImport} onPress={() => void onImport()} style={[styles.import, { backgroundColor: canImport ? colors.accent : colors.surface, borderColor: canImport ? colors.accent : colors.border }]}>
-        <Text style={{ color: canImport ? colors.background : colors.textSecondary, fontWeight: "600" }}>Import</Text>
+      <Pressable
+        disabled={!canImport}
+        onPress={() => void onImport()}
+        style={[
+          styles.import,
+          {
+            backgroundColor: canImport ? colors.accent : colors.surface,
+            borderColor: canImport ? colors.accent : colors.border,
+          },
+        ]}
+      >
+        <Text
+          style={{
+            color: canImport ? colors.background : colors.textSecondary,
+            fontWeight: "600",
+          }}
+        >
+          Import
+        </Text>
       </Pressable>
     </ScrollView>
   );
@@ -213,14 +395,38 @@ export function ImportReviewScreen({
 const styles = StyleSheet.create({
   content: { padding: 16, gap: 16 },
   header: { flexDirection: "row", alignItems: "center", gap: 12 },
-  back: { minHeight: 44, justifyContent: "center", paddingHorizontal: 12, borderWidth: 1, borderRadius: 10 },
+  back: {
+    minHeight: 44,
+    justifyContent: "center",
+    paddingHorizontal: 12,
+    borderWidth: 1,
+    borderRadius: 10,
+  },
   title: { fontSize: 22, fontWeight: "700" },
   photo: { width: 96, height: 96, borderRadius: 48 },
   field: { gap: 8 },
   label: { fontSize: 13, fontWeight: "600" },
-  input: { minHeight: 44, borderWidth: 1, borderRadius: 10, paddingHorizontal: 12 },
+  input: {
+    minHeight: 44,
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+  },
   lifecycle: { flexDirection: "row", gap: 8 },
-  choice: { minHeight: 44, minWidth: 96, justifyContent: "center", alignItems: "center", borderWidth: 1, borderRadius: 10 },
+  choice: {
+    minHeight: 44,
+    minWidth: 96,
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 1,
+    borderRadius: 10,
+  },
   picker: { borderWidth: 1, borderRadius: 10, overflow: "hidden" },
-  import: { minHeight: 48, justifyContent: "center", alignItems: "center", borderWidth: 1, borderRadius: 10 },
+  import: {
+    minHeight: 48,
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 1,
+    borderRadius: 10,
+  },
 });

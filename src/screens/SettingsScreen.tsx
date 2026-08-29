@@ -49,6 +49,7 @@ import {
   type AiProviderId,
 } from "@/services/ai-types";
 import { getDeviceRegion } from "@/services/device-region";
+import { routePickedImport } from "@/services/import/import-acquire";
 import { reconcileDigestSchedule } from "@/services/notifications/digest-schedule";
 import { reconcileSchedule } from "@/services/notifications/notification-schedule";
 import {
@@ -58,6 +59,7 @@ import {
 import { useAiModelPrefs } from "@/stores/ai-model-prefs-store";
 import { useTheme } from "@/theme";
 import { Logger } from "@/utils/logger";
+import { pickContacts } from "../../modules/orbit-contact-picker";
 import { pinResultCopy } from "./settings-add-widget";
 import {
   buildAiSettingsPatch,
@@ -69,6 +71,11 @@ import {
 } from "./settings-ai-logic";
 import { phoneRegionValueLabel } from "./settings-lifecycle-logic";
 import { phoneRegionOverridePatch } from "./settings-region-logic";
+import {
+  IMPORT_UNSUPPORTED_COPY,
+  IMPORT_UNSUPPORTED_TITLE,
+  useImportUnsupported,
+} from "./use-import-unsupported";
 
 const LOG_SCOPE = "settings-screen";
 
@@ -124,6 +131,7 @@ export function SettingsScreen() {
   const { colors } = useTheme();
   const navigation =
     useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const importUnsupported = useImportUnsupported();
 
   // Self-record photo seed. `name` is nullable (the id=1 seed row carries no name
   // until a self-name editor ships), so a stable "You" fallback below keeps the
@@ -143,6 +151,28 @@ export function SettingsScreen() {
   const [activePicker, setActivePicker] = useState<ActivePicker>(null);
   const [phoneRegionPickerOpen, setPhoneRegionPickerOpen] = useState(false);
   const [phoneRegionSearch, setPhoneRegionSearch] = useState("");
+
+  const onImportContacts = useCallback(async () => {
+    if (importUnsupported) return;
+    try {
+      const [picked, currentSettings] = await Promise.all([
+        pickContacts({ multiple: true }),
+        getAppSettings(getExecutor()),
+      ]);
+      await routePickedImport(
+        getExecutor(),
+        picked,
+        {
+          effectivePhoneRegion:
+            currentSettings.phoneRegionOverride ?? getDeviceRegion(),
+          now: localDateTime(),
+        },
+        { navigate: (route, params) => navigation.navigate(route, params) },
+      );
+    } catch (error) {
+      Logger.error(LOG_SCOPE, "failed to start contact import", error);
+    }
+  }, [importUnsupported, navigation]);
 
   // The "Add Orbit widget" fallback copy — null while there is nothing to show,
   // set to the UI-SPEC fallback string when requestPinWidget can't pin (unsupported
@@ -709,6 +739,49 @@ export function SettingsScreen() {
           <Text style={[styles.helper, { color: colors.textSecondary }]}>
             Used to format phone numbers entered without a country code.
           </Text>
+        </Pressable>
+      </View>
+
+      <View
+        testID="settings-contacts-integration-section"
+        style={styles.section}
+      >
+        <Text
+          accessibilityRole="header"
+          style={[styles.sectionHeading, { color: colors.textSecondary }]}
+        >
+          Contacts Integration
+        </Text>
+        <Pressable
+          testID="settings-import-contacts-row"
+          accessibilityRole="button"
+          accessibilityLabel="Import contacts"
+          disabled={importUnsupported}
+          onPress={() => void onImportContacts()}
+          style={[
+            styles.row,
+            { backgroundColor: colors.surface, borderColor: colors.border },
+          ]}
+        >
+          <Text style={[styles.rowLabel, { color: colors.textPrimary }]}>
+            Import contacts
+          </Text>
+          {importUnsupported ? (
+            <View style={styles.rowCopy}>
+              <Text
+                style={[styles.degradedHeading, { color: colors.textPrimary }]}
+              >
+                {IMPORT_UNSUPPORTED_TITLE}
+              </Text>
+              <Text style={[styles.helper, { color: colors.textSecondary }]}>
+                {IMPORT_UNSUPPORTED_COPY}
+              </Text>
+            </View>
+          ) : (
+            <Text style={[styles.helper, { color: colors.textSecondary }]}>
+              Choose people from your phone and review each import first.
+            </Text>
+          )}
         </Pressable>
       </View>
 
@@ -1932,6 +2005,9 @@ const styles = StyleSheet.create({
   rowLabel: {
     fontSize: 16,
     fontWeight: "600",
+  },
+  rowCopy: {
+    gap: 4,
   },
   addWidgetRow: {
     flexDirection: "row",
