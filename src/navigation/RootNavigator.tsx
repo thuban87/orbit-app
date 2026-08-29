@@ -13,6 +13,7 @@ import { CustomFieldsScreen } from "@/screens/CustomFieldsScreen";
 import { DigestScreen } from "@/screens/DigestScreen";
 import { EditContactScreen } from "@/screens/EditContactScreen";
 import { HomeScreen } from "@/screens/HomeScreen";
+import { ImportProgressScreen } from "@/screens/ImportProgressScreen";
 import { ImportReviewScreen } from "@/screens/ImportReviewScreen";
 import { ManageFavouritesScreen } from "@/screens/ManageFavouritesScreen";
 import { NeverContactedScreen } from "@/screens/NeverContactedScreen";
@@ -108,7 +109,7 @@ export function RootNavigator() {
       <Stack.Screen name="RestoreResult" component={RestoreResultScreen} />
       <Stack.Screen name="ImportReview" component={ImportReviewScreen} />
       <Stack.Screen name="BulkImportSetup" component={BulkImportSetupScreen} />
-      <Stack.Screen name="ImportProgress" component={ImportRoutePlaceholder} />
+      <Stack.Screen name="ImportProgress" component={ImportProgressScreen} />
       <Stack.Screen name="DuplicateReview" component={ImportRoutePlaceholder} />
       <Stack.Screen name="ImportComplete" component={ImportRoutePlaceholder} />
     </Stack.Navigator>
