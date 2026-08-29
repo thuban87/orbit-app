@@ -29,6 +29,14 @@ import {
   type IntensityResult,
 } from "@/services/intensity-logic";
 
+/** Intensity cannot be derived when a relationship is Unbound. */
+export interface IntensityUnavailable {
+  readonly available: false;
+}
+
+/** A Bound intensity result, or an explicit unavailable marker for Unbound. */
+export type ContactIntensity = IntensityResult | IntensityUnavailable;
+
 // --- Gravity tunables (top-of-file, single-number edit — CLAUDE.md) ----------
 //
 // OWNER-APPROVED 2026-08-15. These are owner-approved DEFAULTS the owner may
@@ -114,16 +122,22 @@ export function intensityPeriodDays(intervalDays: number): number {
 /**
  * Derive a contact's intensity from its impact inputs at read time.
  *
- * Delegates to the pure `computeIntensity` with the period = one interval-length
- * (the owner-approved policy above) and the contact's `rarelyResponds` flag (so
- * the pure core applies the recency-mirroring connected scope). `direction` and
- * `connected` filtering both live inside `computeIntensity`; this orchestrator
- * only supplies the period + flag. DERIVED-NEVER-STORED — no write.
+ * Returns a tagged unavailable result for an Unbound contact before touching
+ * cadence arithmetic. Bound contacts have a positive `intervalDays` by the v11
+ * database invariant, then delegate to the pure `computeIntensity` with the
+ * period = one interval-length (the owner-approved policy above) and the
+ * contact's `rarelyResponds` flag (so the pure core applies the recency-mirroring
+ * connected scope). `direction` and `connected` filtering both live inside
+ * `computeIntensity`; this orchestrator only supplies the period + flag.
+ * DERIVED-NEVER-STORED — no write.
  */
 export function computeContactIntensity(
   inputs: ImpactInputs,
   now: string,
-): IntensityResult {
+): ContactIntensity {
+  if (inputs.trackingEnabled !== 1 || inputs.intervalDays === null) {
+    return { available: false };
+  }
   return computeIntensity(
     inputs.interactions,
     intensityPeriodDays(inputs.intervalDays),

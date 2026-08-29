@@ -14,14 +14,15 @@
 import type { SqlExecutor } from "@/db/types";
 
 /**
- * The rows both derived quantities consume. `intervalDays` / `rarelyResponds`
- * come from the `contacts` row; `interactions` is the contact's touchpoint
- * history (newest-first). `occurredAt` is the stored local wall-clock
+ * The rows both derived quantities consume. `trackingEnabled` and nullable
+ * `intervalDays` / `rarelyResponds` come from the `contacts` row; `interactions`
+ * is the contact's touchpoint history (newest-first). `occurredAt` is the stored local wall-clock
  * `YYYY-MM-DD HH:MM:SS` string (DATA-05) — the pure math parses it with local
  * components, never `toISOString`.
  */
 export interface ImpactInputs {
-  intervalDays: number;
+  trackingEnabled: number;
+  intervalDays: number | null;
   rarelyResponds: number;
   interactions: {
     occurredAt: string;
@@ -31,9 +32,9 @@ export interface ImpactInputs {
 }
 
 /**
- * Load the impact inputs for one contact: the `contacts` row's `interval_days`
- * + `rarely_responds`, and every interaction row (`occurred_at` / `connected` /
- * `direction`) ordered `occurred_at DESC, id DESC` for a deterministic order
+ * Load the impact inputs for one contact: the `contacts` row's lifecycle,
+ * nullable `interval_days` + `rarely_responds`, and every interaction row
+ * (`occurred_at` / `connected` / `direction`) ordered `occurred_at DESC, id DESC` for a deterministic order
  * (the id tiebreak makes identical-timestamp rows stable). Returns null when the
  * contact row is missing; an empty interactions array when the contact exists
  * but has no touchpoints (never throws).
@@ -53,13 +54,14 @@ export async function getImpactInputs(
   contactId: number,
 ): Promise<ImpactInputs | null> {
   const rows = await exec.getAllAsync<{
-    interval_days: number;
+    tracking_enabled: number;
+    interval_days: number | null;
     rarely_responds: number;
     occurred_at: string | null;
     connected: number | null;
     direction: string | null;
   }>(
-    `SELECT c.interval_days, c.rarely_responds,
+    `SELECT c.tracking_enabled, c.interval_days, c.rarely_responds,
             i.occurred_at, i.connected, i.direction
        FROM contacts c
        LEFT JOIN interactions i ON i.contact_id = c.id
@@ -75,6 +77,7 @@ export async function getImpactInputs(
   }
 
   return {
+    trackingEnabled: rows[0].tracking_enabled,
     intervalDays: rows[0].interval_days,
     rarelyResponds: rows[0].rarely_responds,
     interactions: rows
