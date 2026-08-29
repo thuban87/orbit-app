@@ -316,6 +316,18 @@ export function ImportReviewScreen({
     }
   }
 
+  async function onImportAsNewFromInterrupt() {
+    setSaving(true);
+    try {
+      await importAsNew();
+    } catch (error) {
+      Logger.error(LOG_SCOPE, "failed to import duplicate as new", error);
+      Alert.alert("Couldn't import contact", "Please try again.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
   return (
     <ScrollView
       style={{ backgroundColor: colors.background }}
@@ -538,21 +550,47 @@ export function ImportReviewScreen({
                 key={choice.contactId}
                 disabled={saving}
                 onPress={() => void linkToExisting(choice)}
-                style={[styles.duplicateChoice, { borderColor: colors.border }]}
+                style={[
+                  styles.duplicateChoice,
+                  {
+                    backgroundColor:
+                      duplicateChoices.length === 1
+                        ? colors.accent
+                        : colors.surface,
+                    borderColor:
+                      duplicateChoices.length === 1
+                        ? colors.accent
+                        : colors.border,
+                  },
+                ]}
               >
-                <Text style={{ color: colors.textPrimary }}>
+                <Text
+                  style={{
+                    color:
+                      duplicateChoices.length === 1
+                        ? colors.background
+                        : colors.textPrimary,
+                  }}
+                >
                   {duplicateChoices.length === 1
                     ? "Link to Existing"
                     : "Choose this one"}
                 </Text>
-                <Text style={{ color: colors.textSecondary }}>
+                <Text
+                  style={{
+                    color:
+                      duplicateChoices.length === 1
+                        ? colors.background
+                        : colors.textSecondary,
+                  }}
+                >
                   {choice.name}
                 </Text>
               </Pressable>
             ))}
             <Pressable
               disabled={saving}
-              onPress={() => void importAsNew()}
+              onPress={() => void onImportAsNewFromInterrupt()}
               style={[
                 styles.duplicateChoice,
                 { borderColor: colors.border, backgroundColor: colors.surface },
