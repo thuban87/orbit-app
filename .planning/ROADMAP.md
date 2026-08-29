@@ -810,7 +810,7 @@ Plans:
 - [x] 19-13-PLAN.md — GAP B (IMP-02, W1): birthday validated at the importContactRecord DAO boundary (shared isValidStoredBirthday) + review-screen error state + shared normalizeEditedBirthday
 - [x] 19-14-PLAN.md — GAP C.1 (IMP-04, W1): leave-guard "unresolved" defined by row_status (pending/needs_review/failed) so resolved skips/links survive navigation
 - [x] 19-15-PLAN.md — GAP C.3 (IMP-04, W1): combineCluster calls finalizeSessionIfTerminal + BulkImportSetup routes cluster-only batches to ImportComplete
-- [ ] 19-16-PLAN.md — GAP C.2 (IMP-04, W2): retire session photo_rel_path + delete raw staging on success; status-aware resume-sweep liveness (PII retention closed)
+- [x] 19-16-PLAN.md — GAP C.2 (IMP-04, W2): retire session photo_rel_path + delete raw staging on success; status-aware resume-sweep liveness (PII retention closed)
 - [ ] 19-17-PLAN.md — Device UAT (IMP-01/02/04, W3): agent-driven Pixel verification of all five fixes (picker launch, resolved-flow/recovery/completion, photo lifecycle, birthday block)
 
 ### Phase 20: Contact Reconciliation & Merge
@@ -877,6 +877,6 @@ Plans:
 | 16. Custom Field Value Normalization | 0/TBD | Not started | - |
 | 17. Backup, Export & Restore | 11/12 | In Progress|  |
 | 18. Contact Data Normalization | 0 | Not started | - |
-| 19. System Contact Import | 15/17 | In Progress|  |
+| 19. System Contact Import | 16/17 | In Progress|  |
 | 20. Contact Reconciliation & Merge | 0 | Not started | - |
 | 21. Interaction Assist & Reach Out | 0 | Not started | - |
