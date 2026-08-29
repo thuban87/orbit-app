@@ -8,11 +8,22 @@ import {
   Text,
   View,
 } from "react-native";
+import { ConsolidationPrompt } from "@/components/ConsolidationPrompt";
 import { listCategories } from "@/db/contact-read";
 import { getExecutor, localDateTime } from "@/db/database";
 import { setSessionBatchCategory } from "@/db/import-session-dao";
-import { getSessionById, sessionRowCounts } from "@/db/import-session-read";
+import {
+  getSessionById,
+  type ImportSessionRow,
+  listSessionRows,
+  sessionRowCounts,
+} from "@/db/import-session-read";
 import type { RootStackScreenProps } from "@/navigation/types";
+import { importedPhotoFs } from "@/services/import/import-photo";
+import {
+  combineCluster,
+  detectSourceClusters,
+} from "@/services/import/source-consolidation";
 import { useTheme } from "@/theme";
 import { Logger } from "@/utils/logger";
 import { useImportLeaveGuard } from "./use-import-leave-guard";
@@ -36,6 +47,12 @@ export function BulkImportSetupScreen({
   const [categoryId, setCategoryId] = useState<number | null>(null);
   const [edited, setEdited] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [consolidationRows, setConsolidationRows] = useState<
+    ImportSessionRow[] | null
+  >(null);
+  const [declinedClusters, setDeclinedClusters] = useState<Set<string>>(
+    new Set(),
+  );
 
   useImportLeaveGuard(navigation, route.params.sessionId, edited);
 
@@ -61,7 +78,14 @@ export function BulkImportSetupScreen({
     void load();
   }, [load]);
 
-  async function onImport() {
+  function clusterKey(rows: ImportSessionRow[]): string {
+    return rows
+      .map((row) => row.id)
+      .sort((left, right) => left - right)
+      .join(",");
+  }
+
+  async function startBatch() {
     if (saving || count === 0) return;
     setSaving(true);
     try {
@@ -80,6 +104,71 @@ export function BulkImportSetupScreen({
       Alert.alert("Couldn't start import", "Please try again.");
       setSaving(false);
     }
+  }
+
+  async function onImport() {
+    if (saving || count === 0) return;
+    try {
+      const exec = getExecutor();
+      const [session, rows] = await Promise.all([
+        getSessionById(exec, route.params.sessionId),
+        listSessionRows(exec, route.params.sessionId),
+      ]);
+      if (!session) throw new Error("import session is unavailable");
+      const cluster = detectSourceClusters(rows, {
+        phoneRegion: session.phoneRegion,
+      }).clusters.find(
+        (candidate) => !declinedClusters.has(clusterKey(candidate)),
+      );
+      if (cluster) {
+        setConsolidationRows(cluster);
+        return;
+      }
+      await startBatch();
+    } catch (error) {
+      Logger.error(LOG_SCOPE, "failed to prepare consolidation", error);
+      Alert.alert("Couldn't prepare import", "Please try again.");
+    }
+  }
+
+  async function onCombine() {
+    if (!consolidationRows || saving) return;
+    setSaving(true);
+    try {
+      const exec = getExecutor();
+      const session = await getSessionById(exec, route.params.sessionId);
+      if (!session) throw new Error("import session is unavailable");
+      const result = await combineCluster(exec, importedPhotoFs, {
+        rows: consolidationRows,
+        batchCategoryId: categoryId,
+        phoneRegion: session.phoneRegion,
+        now: localDateTime(),
+      });
+      if (!result.combined) {
+        setDeclinedClusters((current) =>
+          new Set(current).add(clusterKey(consolidationRows)),
+        );
+      }
+      setConsolidationRows(null);
+      await load();
+      setSaving(false);
+    } catch (error) {
+      Logger.error(LOG_SCOPE, "failed to combine source records", error);
+      Alert.alert(
+        "Couldn't combine contacts",
+        "Please keep them separate and try again.",
+      );
+      setSaving(false);
+    }
+  }
+
+  function onKeepSeparate() {
+    if (consolidationRows) {
+      setDeclinedClusters((current) =>
+        new Set(current).add(clusterKey(consolidationRows)),
+      );
+    }
+    setConsolidationRows(null);
   }
 
   const importLabel = `Import ${contactLabel(count)}`;
@@ -189,6 +278,12 @@ export function BulkImportSetupScreen({
           {importLabel}
         </Text>
       </Pressable>
+      <ConsolidationPrompt
+        visible={consolidationRows !== null}
+        rows={consolidationRows ?? []}
+        onCombine={() => void onCombine()}
+        onKeepSeparate={onKeepSeparate}
+      />
     </ScrollView>
   );
 }
