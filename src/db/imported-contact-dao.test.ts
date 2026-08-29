@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("expo-sqlite", () => ({}));
 
 import { nodeSqliteExecutor, openTestDb } from "@/db/__testkit__/node-sqlite";
+import type { CreateContactFullInput } from "@/db/contacts-dao";
 import { MIGRATIONS, TARGET_VERSION } from "@/db/database";
 import { acceptImportSessionWithRows } from "@/db/import-session-dao";
 import {
@@ -28,7 +29,9 @@ beforeEach(async () => {
   });
 });
 
-async function acceptRow(externalContactId = "android-contact-1"): Promise<number> {
+async function acceptRow(
+  externalContactId = "android-contact-1",
+): Promise<number> {
   const accepted = await acceptImportSessionWithRows(exec, {
     session: {
       uid: uid(),
@@ -50,7 +53,7 @@ async function acceptRow(externalContactId = "android-contact-1"): Promise<numbe
   return accepted.rowIds[0];
 }
 
-function unboundInput(name = "Imported Person") {
+function unboundInput(name = "Imported Person"): CreateContactFullInput {
   return {
     uid: uid(),
     name,
@@ -94,7 +97,11 @@ describe("importContactRecord", () => {
         "SELECT tracking_enabled, interval_days, birthday FROM contacts WHERE id = ?",
         [contactId],
       ),
-    ).toEqual({ tracking_enabled: 0, interval_days: null, birthday: "1990-05-14" });
+    ).toEqual({
+      tracking_enabled: 0,
+      interval_days: null,
+      birthday: "1990-05-14",
+    });
     expect(
       await exec.getFirstAsync<{
         row_status: string;
@@ -104,7 +111,11 @@ describe("importContactRecord", () => {
         "SELECT row_status, match_outcome, contact_id FROM import_session_rows WHERE id = ?",
         [rowId],
       ),
-    ).toEqual({ row_status: "imported", match_outcome: "new", contact_id: contactId });
+    ).toEqual({
+      row_status: "imported",
+      match_outcome: "new",
+      contact_id: contactId,
+    });
     expect(await count("contact_methods")).toBe(2);
     expect(await count("external_contact_links")).toBe(1);
     expect(
@@ -115,8 +126,14 @@ describe("importContactRecord", () => {
         "SELECT external_contact_link_id, source_method_id FROM contact_method_provenance",
       ),
     ).toEqual([
-      expect.objectContaining({ external_contact_link_id: expect.any(Number), source_method_id: null }),
-      expect.objectContaining({ external_contact_link_id: expect.any(Number), source_method_id: null }),
+      expect.objectContaining({
+        external_contact_link_id: expect.any(Number),
+        source_method_id: null,
+      }),
+      expect.objectContaining({
+        external_contact_link_id: expect.any(Number),
+        source_method_id: null,
+      }),
     ]);
     expect(await count("custom_field_values")).toBe(
       await count("custom_field_defs"),
@@ -133,7 +150,9 @@ describe("importContactRecord", () => {
     await expect(
       importContactRecord(exec, {
         input,
-        externalLinks: [{ provider: "android", externalContactId: "bad-method" }],
+        externalLinks: [
+          { provider: "android", externalContactId: "bad-method" },
+        ],
         birthday: null,
         now: NOW,
         resolveRow: { rowId, matchOutcome: "new" },
@@ -143,35 +162,41 @@ describe("importContactRecord", () => {
     expect(await count("external_contact_links")).toBe(0);
     expect(await count("contact_method_provenance")).toBe(0);
     expect(
-      await exec.getFirstAsync<{ row_status: string; contact_id: number | null }>(
+      await exec.getFirstAsync<{
+        row_status: string;
+        contact_id: number | null;
+      }>(
         "SELECT row_status, contact_id FROM import_session_rows WHERE id = ?",
         [rowId],
       ),
     ).toEqual({ row_status: "pending", contact_id: null });
   });
 
-  it.each(["", "   "])("rejects blank name %j before any write", async (name) => {
-    const rowId = await acceptRow(`blank-${name.length}`);
-    await expect(
-      importContactRecord(exec, {
-        input: unboundInput(name),
-        externalLinks: [
-          { provider: "android", externalContactId: `blank-${name.length}` },
-        ],
-        birthday: null,
-        now: NOW,
-        resolveRow: { rowId, matchOutcome: "new" },
-      }),
-    ).rejects.toBeInstanceOf(NameRequiredError);
-    expect(await count("contacts")).toBe(0);
-    expect(await count("external_contact_links")).toBe(0);
-    expect(
-      await exec.getFirstAsync<{ row_status: string }>(
-        "SELECT row_status FROM import_session_rows WHERE id = ?",
-        [rowId],
-      ),
-    ).toEqual({ row_status: "pending" });
-  });
+  it.each(["", "   "])(
+    "rejects blank name %j before any write",
+    async (name) => {
+      const rowId = await acceptRow(`blank-${name.length}`);
+      await expect(
+        importContactRecord(exec, {
+          input: unboundInput(name),
+          externalLinks: [
+            { provider: "android", externalContactId: `blank-${name.length}` },
+          ],
+          birthday: null,
+          now: NOW,
+          resolveRow: { rowId, matchOutcome: "new" },
+        }),
+      ).rejects.toBeInstanceOf(NameRequiredError);
+      expect(await count("contacts")).toBe(0);
+      expect(await count("external_contact_links")).toBe(0);
+      expect(
+        await exec.getFirstAsync<{ row_status: string }>(
+          "SELECT row_status FROM import_session_rows WHERE id = ?",
+          [rowId],
+        ),
+      ).toEqual({ row_status: "pending" });
+    },
+  );
 });
 
 describe("linkExistingContactToRow", () => {
