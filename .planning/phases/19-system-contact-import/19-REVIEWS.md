@@ -1,7 +1,7 @@
 ---
 phase: 19
 reviewers: [codex, cursor, claude]
-reviewed_at: "2026-08-29T07:48:16Z"
+reviewed_at: "2026-08-29T09:03:18Z"
 plans_reviewed:
   - 19-01-PLAN.md
   - 19-02-PLAN.md
@@ -1326,3 +1326,241 @@ The 11 plans remain architecturally sound and every cycle-1/2/3 fix I re-verifie
 | `19-06-PLAN.md:137` selection-count source still ambiguous | VERIFIED — unchanged since cycle 3 | Carried-over LOW, still not incorporated |
 | TARGET_VERSION / migrations on disk | VERIFIED `src/db/database.ts:46` = 11; `ls src/db/migrations/` shows 001-011 only | Phase not yet executed |
 | No import-flow code exists on disk yet | VERIFIED via `find src modules -iname '*import*'` (no results for import-session/import-driver/orbit-contact-picker) | Confirms plan-only review scope |
+
+---
+
+## Cycle 5 Consensus Summary
+
+HEAD at review time: `ab8639d` (cycle-4 fixes: name-gate generalization + flat staging path + phase-wide no-staging-through-Avatar rule). All three reviewers (Codex, Cursor, Claude/Sonnet-5) independently re-verified the three cycle-4 generalizations against the current plan text AND the actual repository, and all three CONFIRM every one of them holds:
+
+1. **No create-from-picked seam persists a blank/empty contact name** — `19-03-PLAN.md:26` (DAO `NameRequiredError` backstop), `19-06-PLAN.md:24,51,119` (`importRowAsNew` name-required gate), `19-11-PLAN.md:28,48,114-117` (`combineCluster` nameless-cluster refusal). Schema still permits `''` (`contacts.name TEXT NOT NULL`, no CHECK — `001-initial.ts:65`; re-verified in this repo's actual `011-contact-lifecycle-schema.ts:20` layer too), so the layered gate is load-bearing, not redundant.
+2. **The flat staging path is enumerable by the flat lister; no plan cites the old nested shape** — `19-04-PLAN.md:36,51-52,129,137` specifies `import-staging/import-<sessionToken>-<rowToken>.<ext>` (one directory), matching the verified restore-pending precedent (`src/services/photos/photo-storage.ts:120-141` bakes the session token into the filename inside one flat directory; `listRestorePendingPhotos` at `:170-178` is a single non-recursive `directory.list()`). `19-09-PLAN.md:109` tests enumeration against the same flat shape. A grep across all 11 `*-PLAN.md` files for `import-staging/<sessionToken>/` (the old nested form) returns hits only inside historical "Review Feedback Incorporated" prose, never in actionable task/acceptance text.
+3. **No preview surface passes an import-staging path to `Avatar`** — verified against `src/components/Avatar.tsx:67-73` (unconditionally calls `resolvePhotoUri`→`assertSafeRelative` for a non-null `photo`, which throws synchronously, uncatchable by `onError`, for anything outside `avatars/<name>.<ext>` — `src/db/photo-relative-path.ts:22,38-46`). All three staged-photo preview surfaces now route through `resolveImportStagingUri` into a direct `Image`: single review (`19-04-PLAN.md:38-39,129`), the bulk duplicate grid (`19-07-PLAN.md:23,116,123,135,142`), and the consolidation prompt (`19-11-PLAN.md:29,138,146`). The general rule is stated once, in `19-04-PLAN.md:39`, and each sibling plan cites it rather than re-deriving it.
+
+No reviewer found a new HIGH concern. No reviewer found a decision reversal, an edit to a shipped migration (001-011), or any weakening of a `[DECIDED]`/ADR/HANDOFF item. Migration 012 remains additive-only and owner-gated (`autonomous: false`, blocking checkpoint in `19-01-PLAN.md`).
+
+### Agreed / Convergent Findings (non-blocking)
+
+- **Codex (LOW) + Claude (independently, MEDIUM) — "Apply recommendation" in the bulk duplicate-review grid has zero eligible targets as specified.** `19-06-PLAN.md:25,119-122` classifies every ambiguous row via `deferNeedsReview`, so the ONLY outcomes that ever reach `row_status='needs_review'` — the sole status `19-07-PLAN.md:135` (`DuplicateReviewScreen`) loads into the grid — are `probable`/`possible`/`needs_review`. `19-07-PLAN.md:25,90,147` specifies `Apply recommendation` to act ONLY on `New person` cards and to skip `Already in Orbit`, excluding `Needs review` entirely — but `new` rows are auto-imported immediately by the driver (`19-06-PLAN.md:121`) and `already_linked` rows are auto-resolved immediately (`19-06-PLAN.md:120`), so neither outcome can ever appear as a card in this grid, and `probable`/`possible` cards are explicitly excluded from bulk-apply (each requires a per-card Link tap, per the "no silent bulk link" rule, `19-07-PLAN.md:25`). The net effect: as currently specified, `Apply recommendation` in Phase 19's `DuplicateReviewScreen` can never have an eligible item and is dead on arrival — a plan-text defect (an executor building exactly to spec ships an inert button), not a data-integrity issue. This does not block execution of the safety-critical paths (Link/Import-as-New/Skip all work per-card), but it is a real, currently-unaddressed gap in `19-07-PLAN.md`.
+- **Cursor (LOW) — `19-UI-SPEC.md:178` still describes the grid card contract as `Avatar` + name, contradicting the generalized staged-photo rule.** No plan lists `19-UI-SPEC.md` in `files_modified` to sync it. Risk is mitigated by `19-07-PLAN.md`'s own explicit, repeated, grep-gated prohibition text (an executor following the PLAN.md task literally cannot reintroduce the crash), but the reference doc itself is stale.
+- **Cursor (LOW) + Claude (independently confirmed) — the tap-to-inspect detail view required by `19-UI-SPEC.md:179` and declared as a must-have in `19-07-PLAN.md:22` (`onInspect(item)` is part of `CandidateCardGrid`'s contract, `19-07-PLAN.md:116`) is never wired or specified in Task 2's `DuplicateReviewScreen` action text.** No inspector UI, no `onInspect` handler, and no acceptance criterion in Task 2 covers it — grepped `19-07-PLAN.md` for `onInspect` outside Task 1: no hits. Core Link/Import-as-New/Skip flows are unaffected; this is a scope-completeness gap against the plan's own stated must-have, not a safety issue.
+
+### Phase Risk
+
+**LOW**, unanimous. All three reviewers independently conclude the plan set is execution-ready: the durability spine (atomic accept, atomic contact+row resolution, composed classification writers, durable staging, orphan reconciliation), the count-semantics contract, Retry, resume routing, and consolidation timing are all correctly specified and grounded in real source across all 11 plans. Residual operational risk (Android 17 Contact Picker birthday/photo field support, A1/A2) is inherent, acknowledged, and correctly sequenced behind the plan-04 tracer — not a plan defect.
+
+---
+
+## Cycle 5 — Codex Review
+
+## Summary
+
+The Phase 19 plan set is execution-ready overall. Dependency waves are coherent, atomic transaction boundaries match the repository’s non-reentrant writer contract, and prior cycle findings are concretely addressed in the current plan text. I found no remaining HIGH or MEDIUM issues.
+
+## Strengths
+
+- Plans 01/03 use non-mutexed cores inside one outer transaction, matching the repository’s explicit no-nesting rule in [transaction.ts](/home/bwales/projects/orbit-app/src/db/transaction.ts:12). This correctly prevents mutex deadlocks while making contact/link/session-row state atomic.
+
+- Plans 01, 06, 07, and 08 share a durable row-state contract: already-linked and ambiguous transitions are single updates, failures remain resumable, and summary counts distinguish `already_linked` from ordinary skips. See [19-01-PLAN.md](/home/bwales/projects/orbit-app/.planning/phases/19-system-contact-import/19-01-PLAN.md:178) and [19-06-PLAN.md](/home/bwales/projects/orbit-app/.planning/phases/19-system-contact-import/19-06-PLAN.md:25).
+
+- The Android-only acquisition risk is appropriately isolated behind the native tracer/device UAT rather than assumed solved in JS.
+
+- The full durable-session lifecycle is covered: document-dir staging, atomic acceptance, resume/discard, stale-session cleanup, and required orphan reconciliation. [19-09-PLAN.md](/home/bwales/projects/orbit-app/.planning/phases/19-system-contact-import/19-09-PLAN.md:23) requires reconciliation every foreground launch and explicitly preserves staging for live failed rows needed by Retry.
+
+### Cycle-4 generalizations confirmed
+
+1. **No create-from-picked seam persists an empty name — confirmed.**
+   The schema itself permits an empty string (`name TEXT NOT NULL`) in [001-initial.ts](/home/bwales/projects/orbit-app/src/db/migrations/001-initial.ts:62), so the planned layered protection matters: Plan 03 adds the DAO `NameRequiredError` backstop, Plan 06 rejects blank bulk rows at the shared `importRowAsNew` seam, and Plan 11 refuses all-nameless consolidations. [19-03-PLAN.md](/home/bwales/projects/orbit-app/.planning/phases/19-system-contact-import/19-03-PLAN.md:26), [19-06-PLAN.md](/home/bwales/projects/orbit-app/.planning/phases/19-system-contact-import/19-06-PLAN.md:119), [19-11-PLAN.md](/home/bwales/projects/orbit-app/.planning/phases/19-system-contact-import/19-11-PLAN.md:117).
+
+2. **Flat staging is enumerable and the old nested shape is rejected — confirmed.**
+   The existing restore precedent is a flat directory with a non-recursive lister: [photo-storage.ts](/home/bwales/projects/orbit-app/src/services/photos/photo-storage.ts:121) and [photo-storage.ts](/home/bwales/projects/orbit-app/src/services/photos/photo-storage.ts:170). Plan 04 now specifies the matching flat `import-staging/import-<sessionToken>-<rowToken>.<ext>` form and an enumeration test; it explicitly says not to use the old nested shape. [19-04-PLAN.md](/home/bwales/projects/orbit-app/.planning/phases/19-system-contact-import/19-04-PLAN.md:36), [19-04-PLAN.md](/home/bwales/projects/orbit-app/.planning/phases/19-system-contact-import/19-04-PLAN.md:129). Plan 09 tests the actual lister/reconciliation path. [19-09-PLAN.md](/home/bwales/projects/orbit-app/.planning/phases/19-system-contact-import/19-09-PLAN.md:109).
+
+3. **No import-staging path reaches `Avatar` — confirmed.**
+   This is necessary because `Avatar` eagerly calls `resolvePhotoUri` [Avatar.tsx](/home/bwales/projects/orbit-app/src/components/Avatar.tsx:67), which accepts only canonical `avatars/...` paths through [photo-relative-path.ts](/home/bwales/projects/orbit-app/src/db/photo-relative-path.ts:22). Plan 04 establishes the direct-`Image`/`resolveImportStagingUri` rule for all three surfaces; Plans 07 and 11 explicitly apply it to the duplicate grid and consolidation prompt. [19-04-PLAN.md](/home/bwales/projects/orbit-app/.planning/phases/19-system-contact-import/19-04-PLAN.md:38), [19-07-PLAN.md](/home/bwales/projects/orbit-app/.planning/phases/19-system-contact-import/19-07-PLAN.md:22), [19-11-PLAN.md](/home/bwales/projects/orbit-app/.planning/phases/19-system-contact-import/19-11-PLAN.md:29).
+
+## Concerns
+
+- **LOW — “Apply recommendation” is a no-op in the bulk review grid as currently specified.** Plan 06 immediately imports `new` rows and skips deterministic `already_linked` rows; it sends only `probable`/`possible`/`needs_review` rows to `row_status='needs_review'`. [19-06-PLAN.md](/home/bwales/projects/orbit-app/.planning/phases/19-system-contact-import/19-06-PLAN.md:25). But Plan 07 says the grid loads only `needs_review` rows while Apply recommendation acts only on `New person` and `Already in Orbit`, explicitly excluding `Needs review`. [19-07-PLAN.md](/home/bwales/projects/orbit-app/.planning/phases/19-system-contact-import/19-07-PLAN.md:25). Therefore no eligible card can appear in that workspace.
+
+## Suggestions
+
+- Hide or disable “Apply recommendation” in the Phase 19 duplicate-review workspace until it has an eligible action, while retaining the generic grid capability for Phase 20. Alternatively, define an explicit safe action for an actually-present outcome—but do not make probable/possible auto-link.
+
+## Risk Assessment
+
+**LOW.** The one remaining issue is a dead/no-op bulk action, not a data-integrity, privacy, or resumability failure. The plans otherwise meet IMP-01 through IMP-04 with appropriate tests and device verification gates.
+
+---
+
+## Cycle 5 — Cursor Review
+
+# Phase 19 Plan Review — Cycle 5 (Final Convergence)
+
+## Summary
+
+After four prior review cycles, the eleven plans (v11 + migration 012) form a coherent, source-grounded architecture: tracer-first single import, atomic session acceptance, composed single-transaction classification writers, document-dir photo staging, conservative duplicate evidence, pre-batch consolidation, and honest completion accounting. I verified claims against the repository on disk (`TARGET_VERSION = 11` at `src/db/database.ts:46`; no import-flow code exists yet — this is plan-only review). Cycle 4’s three HIGH findings are **resolved in current plan text**, not merely acknowledged. Two minor gaps remain: the UI-SPEC still describes an Avatar-based grid card and a tap-to-inspect detail view that plan 07 never tasks. Neither reverses an ADR/HANDOFF decision nor requires architectural rework. **Overall: execution-ready with LOW follow-ups.**
+
+---
+
+## Cycle-4 Generalization Verification
+
+### 1. No create-from-picked seam persists a blank/empty contact name — **CONFIRMED (plan text; schema allows `''` without gates)**
+
+The schema permits empty strings: `contacts.name TEXT NOT NULL` with no non-empty CHECK (`src/db/migrations/011-contact-lifecycle-schema.ts:20`). `createContactFull` inserts `input.name` with no trim/empty guard (`src/db/contacts-dao.ts:157`).
+
+Current plans close this at every import seam:
+
+| Seam | Gate | Evidence |
+|------|------|----------|
+| Single import UI | Block Import when `nameRequired` | `19-04-PLAN.md:47` |
+| Bulk / review “Import as New” | `importRowAsNew` checks `mapPickedContact(...).nameRequired` → terminal `failed` | `19-06-PLAN.md:24, 51, 119` |
+| DAO backstop | `importContactRecord` throws `NameRequiredError` before any write | `19-03-PLAN.md:26, 50, 144, 151` |
+| Consolidation | `combineCluster` refuses all-nameless clusters | `19-11-PLAN.md:28, 48, 114–117` |
+
+The generalized rule is stated once in `19-03-PLAN.md:26`. No plan cites an alternate create path that bypasses these gates.
+
+### 2. Flat staging path is enumerable; no plan cites the old nested shape — **CONFIRMED**
+
+Restore-pending is flat: token baked into filename, single `directory.list()` (`src/services/photos/photo-storage.ts:121–141`, `170–178`).
+
+Plan 04 now specifies the matching flat shape everywhere:
+
+- `import-staging/import-<sessionToken>-<rowToken>.<ext>` (`19-04-PLAN.md:36, 51`)
+- `SAFE_IMPORT_STAGING_RELATIVE` is single-directory (`19-04-PLAN.md:37, 52`)
+- Acceptance criterion requires `listImportStagingPhotos()` enumerates staged files (`19-04-PLAN.md:137`)
+- Plan 09’s orphan reconciliation test uses the same flat shape (`19-09-PLAN.md:109`)
+
+Grep across `*-PLAN.md` shows nested `import-staging/<sessionToken>/` only in negation/historical “Review Feedback Incorporated” sections, not in actionable task text.
+
+### 3. No preview surface passes `import-staging/…` directly to `Avatar` — **CONFIRMED (plan text)**
+
+The crash mechanism is real on disk: `Avatar` calls `resolvePhotoUri(photo)` when `photo != null` (`src/components/Avatar.tsx:67–73`), which calls `assertSafeRelative` accepting only `avatars/…` (`src/db/photo-relative-path.ts:22`, `38–46`).
+
+Plans cover all three preview surfaces:
+
+| Surface | Plan | Mechanism |
+|---------|------|-----------|
+| Single review | 19-04 | `resolveImportStagingUri` → direct `Image`; `Avatar` only `photo={null}` (`19-04-PLAN.md:38–39, 129`) |
+| Bulk duplicate grid | 19-07 | Caller resolves `photoUri`; grid uses `Image`, never raw path through `Avatar` (`19-07-PLAN.md:23, 116, 135, 142`) |
+| Consolidation prompt | 19-11 | `resolveImportStagingUri` → direct `Image` (`19-11-PLAN.md:29, 138, 146`) |
+
+General rule stated once in `19-04-PLAN.md:39`.
+
+---
+
+## Strengths
+
+- **Non-reentrant mutex respected.** Plans compose `createContactFullCore` and session `*Core` writers inside one outer `inWriteTransaction`, matching the permanent-hang warning at `src/db/transaction.ts:12–17`.
+- **Durable spine is well-specified.** Migration 012 schema, canonical transition table, composed `resolveAlreadyLinkedCore` / `deferNeedsReviewCore`, `candidates_json`, `finalizeSessionIfTerminal(failed==0)`, and four-bucket `sessionSummaryCounts` (`19-01-PLAN.md:27–35`, `75–93`) address cycles 1–3 HIGH themes.
+- **Photo durability chain is closed.** Cache copy (19-02) → document-dir staging at acceptance (19-04) → post-commit master (19-10) → orphan reconciliation (19-09).
+- **Wave graph is acyclic.** Plan 07 correctly depends on 19-10 for the shared `importRowAsNew` photo seam; plan 08 cascades to wave 7.
+- **Cluster K wiring fixed.** Pre-batch detection in `BulkImportSetupScreen` (19-11) before `runImportBatch` loads only pending rows.
+- **Bulk entry wired.** `pickContacts({multiple:true})` + length routing in plan 04 Task 2 (`19-04-PLAN.md:152`); end-to-end verification delegated to plan 06.
+- **Backup policy explicit.** Import-session tables local-only; Replace-all purge in `restore-apply.ts` (`19-01-PLAN.md:38, 47`); current export manifest omits session tables (`src/backup/export-manifest.ts:45–58`).
+- **Android-only / no READ_CONTACTS** consistently honored; native module mirrors autolinked document-picker pattern (`19-02-PLAN.md:104`).
+
+---
+
+## Concerns
+
+### LOW — `19-UI-SPEC.md` Screen #4 still prescribes `Avatar + name` for grid cards
+
+`19-UI-SPEC.md:178` says each candidate card is “`Avatar` + name…”. Plans 04/07/11 override this with the staged-photo rule (`photoUri` + direct `Image`). No plan lists `19-UI-SPEC.md` in `files_modified` to sync the spec.
+
+An executor prioritizing UI-SPEC over plan prohibitions could reintroduce the cycle-4 Avatar crash. Plan acceptance criteria and grep gates in 19-07 mitigate this if followed.
+
+### LOW — Tap-to-inspect detail view is in UI-SPEC but not tasked in plan 07
+
+`19-UI-SPEC.md:179` requires “Tap a card → detail inspector.” Plan 07 defines `onInspect(item)` on `CandidateCardGrid` (`19-07-PLAN.md:116`) and lists “tap inspects” as a must-have (`19-07-PLAN.md:22`), but Task 2 (`DuplicateReviewScreen`) never wires `onInspect` or specifies inspector UI/photo handling. Core Link / Import as New / Skip flows are fully specified; the inspector is supplementary.
+
+---
+
+## Suggestions
+
+1. **Sync UI-SPEC Screen #4** to match the generalized staged-photo rule: pre-resolved `photoUri` + direct `Image` for incoming staged photos; `Avatar` only for initials or canonical `avatars/` masters.
+2. **Either task the detail inspector in 19-07 Task 2** (with the same `resolveImportStagingUri` rule) **or explicitly defer it** in UI-SPEC and plan 07 must-haves so MVP scope is unambiguous.
+3. **Optional hardening:** add a trim/empty-name guard inside `createContactFullCore` itself — not required given current seam coverage, but would protect the one direct caller (`combineCluster`) if its name gate regresses.
+
+---
+
+## Plan-by-Plan Notes
+
+| Plan | Status |
+|------|--------|
+| **19-01** | Strong. Owner-gated (`autonomous: false`) for irreversible migration 012 — appropriate. Transition table + composed writers + backup purge are the load-bearing contract. |
+| **19-02** | Sound. Correctly limits itself to cache copy; durability deferred to 04. Autolink verification replaces redundant `app.config.ts` registration. |
+| **19-03** | Sound. `createContactFullCore` extraction, `isValidStoredBirthday`, atomic `importContactRecord`/`linkExistingContactToRow`, `NameRequiredError` backstop. `birthday` now in declared return type (cycle-4 fix). |
+| **19-04** | Strong tracer plan. Flat staging, general Avatar rule, multi-pick FAB, atomic accept + commit, placeholder route registration. |
+| **19-05** | Sound pure engine. Owns `findActiveExternalLink`; canonicalizes before match; JSON-serializable `candidates[]`. |
+| **19-06** | Sound bulk driver. `eligibleStatuses`, composed writers, `importRowAsNew` name gate, durable `batch_category_id`, count from `sessionRowCounts.pending`. |
+| **19-07** | Sound. Staged-photo fix generalized; uses shared seams. Inspector gap noted above. |
+| **19-08** | Sound. `sessionSummaryCounts`, Retry with `['pending','failed']`, `finalizeSessionIfTerminal` semantics aligned with Cluster R. |
+| **19-09** | Sound. Resume decision tree, `importResumeSweepRegistered` guard (`App.tsx:77–103` precedent), `{ sessionId, batchCategoryId: null }` for mid-batch resume, required orphan reconciliation. |
+| **19-10** | Sound. Photo hook in both `commitSingleImport` and `importRowAsNew`; birthday owned by 03. |
+| **19-11** | Sound. Pre-batch consolidation, atomic combine, nameless-cluster refusal, staged-photo preview rule. |
+
+---
+
+## Risk Assessment
+
+**LOW–MEDIUM (leaning LOW).**
+
+- **LOW for plan quality:** Cycle 4 HIGHs are closed in plan text with file-level mechanisms verified against existing code (`Avatar`, `photo-storage`, `transaction`, schema).
+- **MEDIUM for execution:** Phase 19 remains inherently risky because (a) migration 012 is irreversible in production, (b) Android 17 Contact Picker birthday/photo support is device-unverified (A1/A2), and (c) implementation does not exist on disk yet — but the plans correctly sequence a device tracer before bulk expansion and document best-effort behavior.
+
+No HIGH or actionable MEDIUM plan defects remain from cycles 1–4. The two LOW items above are documentation/scope clarity, not architectural blockers.
+
+---
+
+## Verdict
+
+**Execution-ready.** Proceed with plan 01 (owner-approved migration) through the wave-1 trio, then the plan 04 tracer on Android 17 before bulk/photo/review expansion. Address the UI-SPEC / inspector drift during execution or in a lightweight doc sync — not a replan.
+
+---
+
+## Cycle 5 — Claude (Sonnet 5) Reviewer
+
+## Summary
+
+I independently read all 11 `*-PLAN.md` files in full (not diff-scoped) and cross-checked their citations against the actual source on disk: `src/db/transaction.ts`, `src/components/Avatar.tsx`, `src/db/photo-relative-path.ts`, `src/services/photos/photo-storage.ts` (the restore-pending precedent), `src/db/migrations/001-initial.ts` / `011-contact-lifecycle-schema.ts`, and `19-UI-SPEC.md`. I also re-derived the wave graph and file-collision matrix from each plan's `depends_on`/`files_modified` frontmatter rather than trusting the plans' own "wave graph acyclic" claims. All three cycle-4 generalizations hold exactly as Codex and Cursor independently found. I found no new HIGH. I independently arrived at the same "Apply recommendation is dead code" finding Codex raised (before reading Codex's output), and I confirm Cursor's two LOW UI-SPEC/inspector findings, plus one addition: the `onInspect` gap is a completeness gap against the plan's OWN stated must-have, not just a UI-SPEC sync issue.
+
+## Verification performed
+
+- **Wave graph re-derivation (independent of any plan's self-claim).** Computed wave = max(dependency wave) + 1 for all 11 plans from their `depends_on` frontmatter: 01/02/05→wave 1, 03→2, 04→3, 06→4, 09/10→5, 07/11→6, 08→7. Matches every plan's declared `wave:` field exactly. Cross-checked `files_modified` for every same-wave pair (wave 1: 01/02/05; wave 5: 09/10; wave 6: 07/11) — zero overlapping paths in any pair.
+- **`transaction.ts` non-reentrancy** — confirmed at `src/db/transaction.ts:1-23`: `withMutex` is a non-reentrant single promise chain; the module's own header comment prescribes exactly the non-mutexed-core composition pattern plans 01/03/06/11 use.
+- **`Avatar.tsx` render-crash mechanism** — confirmed at `src/components/Avatar.tsx:64-73`: `showPhoto = photo != null && !errored` unconditionally routes a non-null `photo` through `resolvePhotoUri(photo)` inside the `Image` `source.uri`, which is evaluated at render time before `onError` can fire.
+- **`photo-relative-path.ts` chokepoint** — confirmed at lines 1-56: `SAFE_RESTORE_PENDING_RELATIVE` (`^avatars\/_restore_pending\/[A-Za-z0-9_-]+\.(jpg|jpeg|png|webp)(?:\.stage-tmp)?$`) is a genuinely FLAT single-directory shape (the token lives entirely in the filename inside one subdirectory, never a further nested per-session directory) — this is the real precedent plan 04's `import-staging/import-<sessionToken>-<rowToken>.<ext>` shape mirrors, and the mirroring is faithful.
+- **`photo-storage.ts` restore-pending idiom** — confirmed at lines 119-206: `restorePendingRelPath` bakes both a target-kind prefix and the session token into one filename; `listRestorePendingPhotos` is a single non-recursive `directory.list()`; `resolveRestorePendingUri` is the exact precedent for plan 04's `resolveImportStagingUri`. All three cycle-4 fixes (04/07/11) that claim to mirror this idiom do so accurately.
+- **Migration 012 schema (plan 01) sanity-checked against the transition-table math.** The four `sessionSummaryCounts` bucket derivations in `19-01-PLAN.md`'s objective are mutually exclusive and exhaustive over the six `row_status` values crossed with `match_outcome`: `imported` = `row_status IN ('imported','linked')`; `alreadyInOrbit` = `match_outcome='already_linked'` (implies `row_status='skipped'`, disjoint from the `imported` bucket); `needReview` = `row_status='needs_review'`; `failedOrSkipped` = `row_status='failed' OR (row_status='skipped' AND match_outcome<>'already_linked')`. I traced every writer that can produce each `(row_status, match_outcome)` pair across plans 01/06/07/11 and found no combination that double-counts or falls into no bucket. A user Skip of a previously-`needs_review` row (which carries a non-null `match_outcome` of `probable`/`possible`/`needs_review` from `deferNeedsReviewCore`) is correctly captured by `failedOrSkipped`'s `match_outcome<>'already_linked'` clause, not silently dropped.
+- **`row_status='linked'` counted under `imported`, not `alreadyInOrbit` — checked for a semantic error, none found.** A user-driven Link-to-Existing (`linkExistingContactToRow`) writes `row_status='linked'`, which the `imported` bucket definition includes. This is intentional and correct, not a miscount: `alreadyInOrbit` specifically means "the deterministic bypass found this identity already present with zero user action"; a user-confirmed Link is new data (a new `external_contact_links` row, explicit user choice) and correctly reports as a successful import outcome, distinct from the zero-action deterministic case.
+
+## New findings (not previously raised, or independently re-derived before reading other lanes)
+
+- **MEDIUM (independently derived; matches Codex's LOW, sharpened) — `Apply recommendation` in `DuplicateReviewScreen` (19-07) is specified against a card population that can never contain its target outcomes.** `19-07-PLAN.md:135` (Task 2 action) loads ONLY `row_status='needs_review'` rows into the grid. Per plan 05's five-outcome enum (`19-05-PLAN.md:20`) and plan 06's classifier (`19-06-PLAN.md:120-122`), `row_status='needs_review'` is reached ONLY via `deferNeedsReview`, which is called for exactly the `probable`/`possible`/`needs_review` outcomes — `already_linked` rows are terminally resolved by `resolveAlreadyLinked` (never `needs_review`) and `new` rows are terminally resolved by `importRowAsNew` (never `needs_review`). `19-07-PLAN.md:25,90,147` specifies `Apply recommendation` to act "ONLY on `New person` cards" and to "skip `Already in Orbit`," excluding `Needs review` entirely (the "no silent bulk link" rule for probable/possible). The intersection of {cards that can appear in this grid} = {probable, possible, needs_review} and {cards Apply-recommendation acts on} = {new} (already_linked is explicitly skipped, not acted on) is the empty set. This means: as literally specified, tapping `Apply recommendation` in Phase 19's `DuplicateReviewScreen` can never import or affect a single card. This is a genuine plan-text defect — an executor building exactly to spec ships a functionally inert control into a workflow screen. It does not touch data-integrity, resumability, or any locked product decision (Link/Import-as-New/Skip per-card all work correctly), so it is not a HIGH, but it is a real, currently-unaddressed gap requiring a `19-07-PLAN.md` text change: either (a) give the button a real target within Phase 19's actual card population (e.g., bulk-apply `Import as New` is nonsensical here since no `new` cards exist, so the more coherent fix is to drop/hide `Apply recommendation` for Phase 19's grid and note the generic `recommendationExcludes` contract is reserved for a future caller with a broader outcome mix, e.g. Phase 20), or (b) explicitly document in `19-07-PLAN.md` that the control is inert for Phase 19 and defer its real behavior.
+- **LOW (confirms Cursor's finding independently) — `onInspect` is a declared-but-unwired contract gap, not just a UI-SPEC sync issue.** `19-07-PLAN.md:22` states "tap inspects" as a plan-level must-have truth (not merely a UI-SPEC line), and Task 1 (`19-07-PLAN.md:116`) bakes `onInspect(item)` into `CandidateCardGrid`'s required generic contract. Task 2's action and acceptance criteria for `DuplicateReviewScreen` (`19-07-PLAN.md:135,140-150`) never mention `onInspect`, a detail-inspector screen/modal, or what it should show. Grepped `19-07-PLAN.md` for `onInspect` outside Task 1's contract declaration: no hits. Since this plan's OWN must-have truth ("tap inspects") has no corresponding task/acceptance-criterion coverage, an executor following only the checked acceptance criteria (which is how `/gsd-execute-phase` verification gates work) could ship `DuplicateReviewScreen` without tap-to-inspect and still pass every stated acceptance check — silently under-delivering a stated must-have. Needs either a Task 2 acceptance criterion for `onInspect`/inspector UI, or an explicit downgrade of the must-have to a deferred/backstop item.
+- **LOW (confirms Cursor's finding) — `19-UI-SPEC.md:178` card-contract text is stale relative to the generalized staged-photo rule.** Confirmed by direct read (`19-UI-SPEC.md:178`: "Each candidate card: `Avatar` + name..."). No plan's `files_modified` touches `19-UI-SPEC.md`. Low risk of actual misexecution given `19-07-PLAN.md`'s own repeated, grep-gated prohibition text is unambiguous and is what `/gsd-execute-phase` actually verifies against — but the reference doc itself should be synced for future readers (e.g., a Phase 20 planner reusing `CandidateCardGrid`).
+
+## Confirmation of no regression on cycle-1/2/3 fixes
+
+Spot-checked (not exhaustively re-derived, since cycle 4 already re-verified these and no plan touched them since `ab8639d`): `finalizeSessionIfTerminal`'s `failed==0` gate (`19-01-PLAN.md:35`), `sessionSummaryCounts`' `alreadyInOrbit` keyed on `match_outcome` not `row_status` (`19-01-PLAN.md:31`), `runImportBatch`'s `eligibleStatuses` for Retry (`19-06-PLAN.md:26`), pre-batch consolidation wiring in `BulkImportSetupScreen` not `DuplicateReviewScreen` (`19-11-PLAN.md:21,41`), and durable `batch_category_id` via `getSessionById` on Retry/Import-as-New/live-pass (`19-06-PLAN.md:28`, `19-07-PLAN.md:31`, `19-08-PLAN.md:22`) — all textually unchanged from cycle 4's verified state and still internally consistent.
+
+## Risk Assessment
+
+**LOW.** No HIGH concerns. The plan set is execution-ready. Three actionable non-HIGH items remain (Apply-recommendation dead code, onInspect completeness gap, UI-SPEC doc drift), none of which are data-integrity, security, resumability, or decision-reversal issues — all are narrow plan-text/doc-sync fixes concentrated in `19-07-PLAN.md` (and optionally `19-UI-SPEC.md`).
+
+## Cycle 5 — Verification Coverage (advisory, not counted toward totals)
+
+| Symbol / claim | Status | Note |
+|---|---|---|
+| Wave graph (01/02/05→1, 03→2, 04→3, 06→4, 09/10→5, 07/11→6, 08→7) | VERIFIED — re-derived independently from `depends_on` frontmatter across all 11 plans | Matches every plan's declared `wave:` field; zero same-wave file collisions |
+| `src/db/transaction.ts` non-reentrant mutex contract | VERIFIED `src/db/transaction.ts:1-23` | Matches plans 01/03/06/11's composition pattern |
+| `Avatar.tsx` unconditional `resolvePhotoUri` on non-null `photo` | VERIFIED `src/components/Avatar.tsx:64-73` | Confirms the mechanism cycle-3/4 fixes address |
+| `SAFE_RESTORE_PENDING_RELATIVE` / restore-pending flat-directory precedent | VERIFIED `src/db/photo-relative-path.ts:1-56`, `src/services/photos/photo-storage.ts:119-206` | Confirms plan 04's flat mirroring is faithful |
+| `contacts.name TEXT NOT NULL` with no non-empty CHECK | VERIFIED `src/db/migrations/001-initial.ts` (grepped `name TEXT NOT NULL`) | Confirms the layered name-gate is load-bearing |
+| `sessionSummaryCounts` four-bucket derivation is exhaustive/non-overlapping | VERIFIED by tracing every `(row_status, match_outcome)`-producing writer across plans 01/06/07/11 | No double-count or uncounted state found |
+| `19-07-PLAN.md` grid population is `row_status='needs_review'` only | VERIFIED `19-07-PLAN.md:135` | Basis for the Apply-recommendation dead-code finding |
+| `19-07-PLAN.md` never wires `onInspect` outside Task 1's contract | VERIFIED via grep | Basis for the completeness-gap finding |
+| `19-UI-SPEC.md:178-179` card contract / tap-to-inspect text | VERIFIED via direct read | Confirms both Cursor LOW findings |
+| No plan's `files_modified` includes `19-UI-SPEC.md` | VERIFIED via grep across all 11 plans' frontmatter | Confirms the doc-sync gap |
+| `19-01-PLAN.md` migration 012 remains additive-only, owner-gated | VERIFIED `19-01-PLAN.md:18,137-148` (`autonomous: false`, blocking checkpoint) | No change since cycle 4 |
+| TARGET_VERSION / migrations on disk | VERIFIED `src/db/database.ts` = 11 (grepped `TARGET_VERSION`); `ls src/db/migrations/` shows 001-011 only | Phase not yet executed; consistent with plan-only review scope |
