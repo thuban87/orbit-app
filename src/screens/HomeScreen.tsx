@@ -56,6 +56,7 @@ import {
   listDashboard,
 } from "@/db/dashboard-read";
 import { getExecutor } from "@/db/database";
+import { countUnbound } from "@/db/unbound-read";
 import { selectDashboardEmptyState } from "@/logic/dashboard-empty-logic";
 import type { RootStackParamList } from "@/navigation/types";
 import { useDashboardPrefs } from "@/stores/dashboard-prefs-store";
@@ -82,6 +83,7 @@ interface PopulationCounts {
   neverContacted: number;
   snoozed: number;
   archived: number;
+  unbound: number;
 }
 
 const ZERO_COUNTS: PopulationCounts = {
@@ -89,6 +91,7 @@ const ZERO_COUNTS: PopulationCounts = {
   neverContacted: 0,
   snoozed: 0,
   archived: 0,
+  unbound: 0,
 };
 
 export function HomeScreen() {
@@ -139,18 +142,19 @@ export function HomeScreen() {
     (async () => {
       try {
         const exec = getExecutor();
-        const [list, live, neverContacted, snoozed, archived, cats] =
+        const [list, live, neverContacted, snoozed, archived, unbound, cats] =
           await Promise.all([
             listDashboard(exec, { filter, sort, term: debouncedTerm }),
             countLiveContacts(exec),
             countNeverContacted(exec),
             countSnoozed(exec),
             countArchived(exec),
+            countUnbound(exec),
             listCategories(exec),
           ]);
         if (cancelled) return;
         setRows(list);
-        setCounts({ live, neverContacted, snoozed, archived });
+        setCounts({ live, neverContacted, snoozed, archived, unbound });
         setCategories(cats);
         setError(false);
       } catch (err) {
@@ -252,6 +256,7 @@ export function HomeScreen() {
     neverContacted: counts.neverContacted,
     snoozed: counts.snoozed,
     archived: counts.archived,
+    unbound: counts.unbound,
     rowCount: rows.length,
     activeFilter: filter,
     hasTerm,
@@ -376,6 +381,20 @@ export function HomeScreen() {
       >
         <Text style={[styles.footerText, { color: colors.textPrimary }]}>
           {`Not yet contacted (${counts.neverContacted})`}
+        </Text>
+      </Pressable>
+      <Pressable
+        testID="dashboard-unbound-contacts-entry"
+        accessibilityRole="button"
+        accessibilityLabel={`Unbound contacts (${counts.unbound})`}
+        onPress={() => navigation.navigate("UnboundContacts")}
+        style={[
+          styles.footerEntry,
+          { backgroundColor: colors.surface, borderColor: colors.border },
+        ]}
+      >
+        <Text style={[styles.footerText, { color: colors.textPrimary }]}>
+          {`Unbound contacts (${counts.unbound})`}
         </Text>
       </Pressable>
       <Pressable

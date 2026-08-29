@@ -12,7 +12,7 @@ import { migration010 } from "@/db/migrations/010-contact-method-label";
 import { migration011 } from "@/db/migrations/011-contact-lifecycle-schema";
 import { runMigrations } from "@/db/migrations/runner";
 import type { SqlExecutor } from "@/db/types";
-import { listUnbound } from "@/db/unbound-read";
+import { countUnbound, listUnbound } from "@/db/unbound-read";
 
 const NOW = "2026-08-28 12:00:00";
 
@@ -70,5 +70,13 @@ describe("listUnbound", () => {
     expect(rows.every((row) => row.status === null)).toBe(true);
     expect(rows.every((row) => row.progress === null)).toBe(true);
     expect(rows.every((row) => row.favourite_rank === null)).toBe(true);
+  });
+
+  it("counts the same live Unbound population used by the dashboard footer", async () => {
+    await seedContact("Unbound", 0);
+    await seedContact("Bound", 1);
+    await seedContact("Archived", 0, NOW);
+
+    await expect(countUnbound(exec)).resolves.toBe(1);
   });
 });

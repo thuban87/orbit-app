@@ -37,3 +37,14 @@ export function listUnbound(exec: SqlExecutor): Promise<UnboundRow[]> {
     ORDER BY name COLLATE NOCASE, id`,
   );
 }
+
+/** Count the same live-Unbound population presented by the dashboard footer. */
+export async function countUnbound(exec: SqlExecutor): Promise<number> {
+  const row = await exec.getFirstAsync<{ n: number }>(
+    `SELECT COUNT(*) AS n
+       FROM contacts
+      WHERE archived_at IS NULL
+        AND tracking_enabled = 0`,
+  );
+  return row?.n ?? 0;
+}

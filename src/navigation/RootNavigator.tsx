@@ -17,6 +17,7 @@ import { OrreryScreen } from "@/screens/OrreryScreen";
 import { RestorePreviewScreen } from "@/screens/RestorePreviewScreen";
 import { RestoreResultScreen } from "@/screens/RestoreResultScreen";
 import { SettingsScreen } from "@/screens/SettingsScreen";
+import { UnboundContactsScreen } from "@/screens/UnboundContactsScreen";
 import type { RootStackParamList, RootStackScreenProps } from "./types";
 
 /**
@@ -69,6 +70,7 @@ export function RootNavigator() {
       <Stack.Screen name="Archived" component={ArchivedContactsScreen} />
       <Stack.Screen name="CropPhoto" component={CropPhotoScreen} />
       <Stack.Screen name="NeverContacted" component={NeverContactedScreen} />
+      <Stack.Screen name="UnboundContacts" component={UnboundContactsScreen} />
       <Stack.Screen
         name="ManageFavourites"
         component={ManageFavouritesScreen}

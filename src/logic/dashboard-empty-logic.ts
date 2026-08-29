@@ -22,7 +22,7 @@
  *                                            screen picks the copy.
  *   (4) else (the UNFILTERED default list) the population-count decision:
  *         'firstrun' ONLY when live===0 && neverContacted===0 && snoozed===0 &&
- *         archived===0 (ALL FOUR empty), otherwise 'hidden'.
+ *         archived===0 && unbound===0 (ALL FIVE empty), otherwise 'hidden'.
  *
  * Why (4) requires ALL FOUR zero (the HIGH-2 fix): the old
  * `no-live && no-archived` gate mislabelled a never-contacted-only or
@@ -57,6 +57,8 @@ export interface DashboardEmptyInput {
   snoozed: number;
   /** countArchived — archived_at IS NOT NULL. */
   archived: number;
+  /** countUnbound — live contacts excluded from the active orbit. */
+  unbound: number;
   /** The number of rows the current visible list returned. */
   rowCount: number;
   /** The persisted dashboard filter (Plan 09 threads live chips through the same input). */
@@ -72,8 +74,16 @@ export interface DashboardEmptyInput {
 export function selectDashboardEmptyState(
   input: DashboardEmptyInput,
 ): DashboardEmptyState {
-  const { live, neverContacted, snoozed, archived, rowCount, activeFilter, hasTerm } =
-    input;
+  const {
+    live,
+    neverContacted,
+    snoozed,
+    archived,
+    unbound,
+    rowCount,
+    activeFilter,
+    hasTerm,
+  } = input;
 
   // (1) A non-empty visible list is never an empty state.
   if (rowCount > 0) {
@@ -93,7 +103,13 @@ export function selectDashboardEmptyState(
 
   // (4) The unfiltered default list: first-run ONLY when ALL FOUR populations are
   // empty; otherwise the people exist in a hidden bucket → point the user there.
-  if (live === 0 && neverContacted === 0 && snoozed === 0 && archived === 0) {
+  if (
+    live === 0 &&
+    neverContacted === 0 &&
+    snoozed === 0 &&
+    archived === 0 &&
+    unbound === 0
+  ) {
     return "firstrun";
   }
   return "hidden";

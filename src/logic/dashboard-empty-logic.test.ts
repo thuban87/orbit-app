@@ -30,6 +30,7 @@ describe("selectDashboardEmptyState — precedence + population gate", () => {
         neverContacted: 2,
         snoozed: 1,
         archived: 3,
+        unbound: 2,
         rowCount: 5,
         activeFilter: "favourites",
         hasTerm: true,
@@ -44,6 +45,7 @@ describe("selectDashboardEmptyState — precedence + population gate", () => {
         neverContacted: 0,
         snoozed: 0,
         archived: 0,
+        unbound: 0,
         rowCount: 0,
         ...unfiltered,
       }),
@@ -57,6 +59,7 @@ describe("selectDashboardEmptyState — precedence + population gate", () => {
         neverContacted: 3,
         snoozed: 0,
         archived: 0,
+        unbound: 0,
         rowCount: 0,
         ...unfiltered,
       }),
@@ -70,6 +73,7 @@ describe("selectDashboardEmptyState — precedence + population gate", () => {
         neverContacted: 0,
         snoozed: 2,
         archived: 0,
+        unbound: 0,
         rowCount: 0,
         ...unfiltered,
       }),
@@ -83,6 +87,7 @@ describe("selectDashboardEmptyState — precedence + population gate", () => {
         neverContacted: 0,
         snoozed: 0,
         archived: 4,
+        unbound: 0,
         rowCount: 0,
         ...unfiltered,
       }),
@@ -96,6 +101,7 @@ describe("selectDashboardEmptyState — precedence + population gate", () => {
         neverContacted: 0,
         snoozed: 0,
         archived: 0,
+        unbound: 0,
         rowCount: 0,
         ...unfiltered,
       }),
@@ -109,6 +115,7 @@ describe("selectDashboardEmptyState — precedence + population gate", () => {
         neverContacted: 0,
         snoozed: 0,
         archived: 0,
+        unbound: 0,
         rowCount: 0,
         activeFilter: "category-3",
         hasTerm: false,
@@ -123,6 +130,7 @@ describe("selectDashboardEmptyState — precedence + population gate", () => {
         neverContacted: 0,
         snoozed: 0,
         archived: 0,
+        unbound: 0,
         rowCount: 0,
         activeFilter: "favourites",
         hasTerm: false,
@@ -137,6 +145,7 @@ describe("selectDashboardEmptyState — precedence + population gate", () => {
         neverContacted: 0,
         snoozed: 0,
         archived: 0,
+        unbound: 0,
         rowCount: 0,
         activeFilter: "all",
         hasTerm: true,
@@ -151,6 +160,7 @@ describe("selectDashboardEmptyState — precedence + population gate", () => {
         neverContacted: 1,
         snoozed: 0,
         archived: 0,
+        unbound: 0,
         rowCount: 0,
         activeFilter: "favourites",
         hasTerm: true,
@@ -164,11 +174,26 @@ describe("selectDashboardEmptyState — precedence + population gate", () => {
       neverContacted: 0,
       snoozed: 0,
       archived: 0,
+      unbound: 0,
       rowCount: 0,
       ...unfiltered,
     };
     expect(selectDashboardEmptyState(input)).toBe(
       selectDashboardEmptyState(input),
     );
+  });
+
+  it("an all-Unbound install is hidden, never first-run", () => {
+    expect(
+      selectDashboardEmptyState({
+        live: 0,
+        neverContacted: 0,
+        snoozed: 0,
+        archived: 0,
+        unbound: 1,
+        rowCount: 0,
+        ...unfiltered,
+      }),
+    ).toBe("hidden");
   });
 });

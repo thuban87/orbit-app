@@ -1,6 +1,6 @@
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
-import type { PhotoTargetDescriptor } from "@/services/photos/photo-storage";
 import type { RestorePreviewRoute } from "@/screens/backup-restore-logic";
+import type { PhotoTargetDescriptor } from "@/services/photos/photo-storage";
 
 /**
  * The single route → params contract for the app's native-stack navigator
@@ -46,6 +46,8 @@ export type RootStackParamList = {
    * nav registrations this phase adds).
    */
   NeverContacted: undefined;
+  /** Dedicated neutral browse surface for live contacts outside the active orbit. */
+  UnboundContacts: undefined;
   /**
    * The shared "Manage favourites" reorder screen (DASH-06). Carries no params
    * (the favourites order lives in the screen's local state, seeded from
