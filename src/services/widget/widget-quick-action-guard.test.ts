@@ -5,8 +5,9 @@ import { guardWidgetIntent } from "./widget-quick-action-guard";
 const bound = { archived_at: null, trackingEnabled: 1 };
 const unbound = { archived_at: null, trackingEnabled: 0 };
 const archived = { archived_at: "2026-08-29", trackingEnabled: 1 };
+type Contact = { archived_at: string | null; trackingEnabled: number };
 
-function lookup(row: typeof bound | null) {
+function lookup(row: Contact | null) {
   return vi.fn(async () => row);
 }
 

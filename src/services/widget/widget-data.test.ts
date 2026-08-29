@@ -25,6 +25,7 @@ function row(over: Partial<DashboardRow> & { id: number; name: string }): Dashbo
     photo: null,
     modified_at: "2026-08-17",
     categoryLabel: null,
+    trackingEnabled: 1,
     favourite_rank: over.id,
     status: "stable",
     progress: 0.1,

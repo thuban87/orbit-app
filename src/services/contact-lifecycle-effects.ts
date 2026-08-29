@@ -25,6 +25,10 @@ type EffectDeps = {
   reportError: (message: string, error: unknown) => void;
 };
 
+/** Overrides are injectable for tests; production callers only need `exec`. */
+type EffectDepsOverride = Pick<EffectDeps, "exec"> &
+  Partial<Omit<EffectDeps, "exec">>;
+
 type LifecycleDeps = Omit<EffectDeps, "exec"> & {
   bindContact: (
     exec: SqlExecutor,
@@ -56,21 +60,28 @@ const defaultDeps: LifecycleDeps = {
 export async function applyLifecycleTransitionEffects(
   contactId: number,
   direction: LifecycleDirection,
-  deps: EffectDeps,
+  deps: EffectDepsOverride,
 ): Promise<void> {
+  const effects: EffectDeps = {
+    exec: deps.exec,
+    reconcileSchedule: deps.reconcileSchedule ?? defaultDeps.reconcileSchedule,
+    notifyWidgetDataChanged:
+      deps.notifyWidgetDataChanged ?? defaultDeps.notifyWidgetDataChanged,
+    reportError: deps.reportError ?? defaultDeps.reportError,
+  };
   try {
-    await deps.reconcileSchedule(deps.exec);
+    await effects.reconcileSchedule(effects.exec);
   } catch (error) {
-    deps.reportError(
+    effects.reportError(
       `${direction} notification reconciliation failed for contact ${contactId}`,
       error,
     );
   }
 
   try {
-    deps.notifyWidgetDataChanged();
+    effects.notifyWidgetDataChanged();
   } catch (error) {
-    deps.reportError(
+    effects.reportError(
       `${direction} widget refresh failed for contact ${contactId}`,
       error,
     );

@@ -62,6 +62,12 @@ describe("lifecycle transition effects", () => {
     expect(d.notifyWidgetDataChanged).toHaveBeenCalledTimes(1);
   });
 
+  it("is directly callable by an already-transitioned owner with only its executor", async () => {
+    await expect(
+      applyLifecycleTransitionEffects(7, "unbind", { exec }),
+    ).resolves.toBeUndefined();
+  });
+
   it.each(["bind", "unbind"] as const)(
     "isolates %s effect failures after the durable transition",
     async (direction) => {
