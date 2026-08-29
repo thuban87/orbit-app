@@ -5,6 +5,7 @@
  */
 import { createContactFullCore } from "@/db/contacts-dao";
 import {
+  finalizeSessionIfTerminal,
   markRowPhotoFailed,
   setRowContactCore,
   setRowMatchOutcomeCore,
@@ -32,7 +33,7 @@ export interface SourceClusters {
 }
 
 export type CombineClusterResult =
-  | { combined: true; contactId: number }
+  | { combined: true; contactId: number; sessionComplete: boolean }
   | { combined: false; reason: "name-required" };
 
 interface MappedRow {
@@ -264,5 +265,10 @@ export async function combineCluster(
       );
     }
   }
-  return { combined: true, contactId };
+  const sessionComplete = await finalizeSessionIfTerminal(
+    exec,
+    params.rows[0].sessionId,
+    params.now,
+  );
+  return { combined: true, contactId, sessionComplete };
 }
