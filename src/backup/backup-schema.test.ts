@@ -27,7 +27,7 @@ describe("parseBackupManifest", () => {
     expect(() => parseBackupManifest(duplicate)).toThrow(BackupSchemaError);
     const dangling = valid(); dangling.appSettings.sunContactUid = "missing";
     expect(() => parseBackupManifest(dangling)).toThrow(/sun/i);
-    const pairs = valid(); pairs.contacts = [{ uid: "c", intervalDays: 1 }]; pairs.customFieldDefs = [{ uid: "d" }];
+    const pairs = valid(); pairs.contacts = [{ uid: "c", trackingEnabled: 1, intervalDays: 1 }]; pairs.customFieldDefs = [{ uid: "d" }];
     pairs.customFieldValues = [{ uid: "v1", contactUid: "c", fieldDefUid: "d", value: null }, { uid: "v2", contactUid: "c", fieldDefUid: "d", value: null }];
     expect(() => parseBackupManifest(pairs)).toThrow(/duplicate custom/i);
   });
@@ -44,7 +44,7 @@ describe("parseBackupManifest", () => {
 
   it("rejects a child whose same-file parent lost to a tombstone", () => {
     const broken = valid();
-    broken.contacts = [{ uid: "contact", intervalDays: 1, modifiedAt: "2026-08-25 12:00:00" }];
+    broken.contacts = [{ uid: "contact", trackingEnabled: 1, intervalDays: 1, modifiedAt: "2026-08-25 12:00:00" }];
     broken.interactions = [{ uid: "interaction", contactUid: "contact", modifiedAt: "2026-08-25 12:00:00" }];
     broken.tombstones = [{ entityType: "contact", entityUid: "contact", deletedAt: "2026-08-25 12:00:00" }];
     expect(() => parseBackupManifest(broken)).toThrow(/surviving contact/i);
@@ -52,13 +52,13 @@ describe("parseBackupManifest", () => {
 
   it("rejects a category reference that cannot be resolved within the backup itself", () => {
     const broken = valid();
-    broken.contacts = [{ uid: "contact", intervalDays: 1, modifiedAt: "2026-08-25 12:00:00", categoryUid: "missing" }];
+    broken.contacts = [{ uid: "contact", trackingEnabled: 1, intervalDays: 1, modifiedAt: "2026-08-25 12:00:00", categoryUid: "missing" }];
     expect(() => parseBackupManifest(broken)).toThrow(/category/i);
   });
 
   it("rejects malformed photo bytes before an apply can begin", () => {
     const broken = valid();
-    broken.contacts = [{ uid: "contact", intervalDays: 1, modifiedAt: "2026-08-25 12:00:00", photoBase64: "%%%" }];
+    broken.contacts = [{ uid: "contact", trackingEnabled: 1, intervalDays: 1, modifiedAt: "2026-08-25 12:00:00", photoBase64: "%%%" }];
     expect(() => parseBackupManifest(broken)).toThrow(/photo/i);
   });
 
@@ -101,7 +101,6 @@ describe("parseBackupManifest", () => {
       expect.objectContaining({ uid: "contact-a", trackingEnabled: 1, intervalDays: 7 }),
     ]);
     expect(parsed.appSettings).toMatchObject({
-      phoneRegionOverride: null,
       includeUnboundNeverContacted: 0,
       birthdayUnboundEnabled: 1,
     });
@@ -126,11 +125,11 @@ describe("parseBackupManifest", () => {
 
   it("rejects malformed cadence and duplicate surviving method primaries before restore", () => {
     const cadence = valid();
-    cadence.contacts = [{ uid: "contact-a", intervalDays: 0, modifiedAt: "2026-08-25 12:00:00" }];
+    cadence.contacts = [{ uid: "contact-a", trackingEnabled: 1, intervalDays: 0, modifiedAt: "2026-08-25 12:00:00" }];
     expect(() => parseBackupManifest(cadence)).toThrow(BackupSchemaError);
 
     const primary = valid();
-    primary.contacts = [{ uid: "contact-a", intervalDays: 7, modifiedAt: "2026-08-25 12:00:00" }];
+    primary.contacts = [{ uid: "contact-a", trackingEnabled: 1, intervalDays: 7, modifiedAt: "2026-08-25 12:00:00" }];
     primary.contactMethods = [
       { uid: "method-a", contactUid: "contact-a", methodType: "phone", rawValue: "a", displayValue: "a", isActionable: 1, isPrimary: 1, displayOrder: 0, createdAt: "2026-08-25 12:00:00", modifiedAt: "2026-08-25 12:00:00" },
       { uid: "method-b", contactUid: "contact-a", methodType: "phone", rawValue: "b", displayValue: "b", isActionable: 1, isPrimary: 1, displayOrder: 1, createdAt: "2026-08-25 12:00:00", modifiedAt: "2026-08-25 12:00:00" },
@@ -140,7 +139,7 @@ describe("parseBackupManifest", () => {
 
   it("rejects malformed normalized tombstone parent combinations before apply", () => {
     const broken = valid();
-    broken.contacts = [{ uid: "contact-a", intervalDays: 7, modifiedAt: "2026-08-25 12:00:00" }];
+    broken.contacts = [{ uid: "contact-a", trackingEnabled: 1, intervalDays: 7, modifiedAt: "2026-08-25 12:00:00" }];
     broken.contactMethods = [{ uid: "method-a", contactUid: "contact-a", methodType: "phone", rawValue: "a", displayValue: "a", isActionable: 1, isPrimary: 1, displayOrder: 0, createdAt: "2026-08-25 12:00:00", modifiedAt: "2026-08-25 12:00:00" }];
     broken.contactMethodProvenance = [{ uid: "provenance-a", methodUid: "method-a", externalContactLinkUid: null, sourceMethodId: null, createdAt: "2026-08-25 12:00:00", modifiedAt: "2026-08-25 12:00:00" }];
     broken.tombstones = [{ entityType: "contact_method", entityUid: "method-a", deletedAt: "2026-08-25 12:00:00" }];

@@ -59,6 +59,23 @@ const FORWARD_MIGRATIONS: Readonly<Record<number, Migration>> = {
       tombstones: Array.isArray(manifest.tombstones) ? manifest.tombstones : [],
     };
   },
+  2: (manifest) => {
+    const contacts = Array.isArray(manifest.contacts) ? manifest.contacts.map((item) => {
+      const contact = record(item, "contacts[]");
+      return { ...contact, trackingEnabled: 1 };
+    }) : fail("contacts must be an array");
+    const settings = record(manifest.appSettings, "appSettings");
+    return {
+      ...manifest,
+      backupFormatVersion: 3,
+      appSettings: {
+        ...settings,
+        includeUnboundNeverContacted: settings.includeUnboundNeverContacted ?? 0,
+        birthdayUnboundEnabled: settings.birthdayUnboundEnabled ?? 1,
+      },
+      contacts,
+    };
+  },
 };
 
 function fail(message: string): never {
@@ -91,7 +108,8 @@ const PORTABLE_SETTINGS_KEYS = new Set([
   "lockscreenPublic", "deliveryHour", "quietStartHour", "quietEndHour",
   "selfSunColour", "aiProvider", "aiModel", "aiCustomEndpoint", "aiCustomModel",
   "aiPromptTemplate", "backupIntervalDays", "backupRetentionDays", "modifiedAt",
-  "sunContactUid", "phoneRegionOverride",
+  "sunContactUid", "phoneRegionOverride", "includeUnboundNeverContacted",
+  "birthdayUnboundEnabled",
 ]);
 
 const SECRET_SHAPED_KEY = /(?:api.?key|secret|passphrase|token|credential|password)/i;
