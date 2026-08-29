@@ -700,3 +700,214 @@ The 11-plan structure is architecturally sound — additive migration first, tra
 | `ArchivedContactsScreen.tsx` `footerEntry` idiom (cited by 19-08) | UNCHECKABLE this session | Not opened; plan-only claim |
 
 Note: Phase-status drift verdict for phase 19 is `lag` per orchestrator instruction — this is expected (no Phase 19 code exists yet, consistent with "Plans Complete: 0" in ROADMAP.md) and is not itself a finding.
+
+---
+
+# Cross-AI Plan Review — Phase 19: System Contact Import — CYCLE 2
+
+Revision under review: commit `97f5bce` ("replan phase from cross-AI review — atomic writes, durable staging, count semantics, pre-batch consolidation"), reviewed against the six Cycle-1 HIGH themes plus a fresh look for new defects. All three lanes (Codex, Cursor, Claude/Sonnet-5) were independently source-grounded against the repository at v11 (`TARGET_VERSION = 11` in `src/db/database.ts:46`, migrations `001`–`011` shipped on disk, so migration `012` in plan 01 is correctly the next number and is additive-only).
+
+## Cycle 2 Consensus Summary
+
+All three reviewers agree the six Cycle-1 HIGH themes are **substantially fixed in plan text**: the canonical `(event → row_status, match_outcome)` transition table (19-01-PLAN.md:64-80) is now the documented single source of truth; contact-creation paths (single import, bulk "new", link-to-existing) genuinely compose `createContactFullCore`/DAO cores inside one `inWriteTransaction` (verified against `src/db/transaction.ts` and `src/db/contacts-dao.ts`); photo staging is correctly moved to document-dir before acceptance; Retry's `eligibleStatuses` mechanism concretely reaches failed rows with an idempotency guard; the FAB→BulkImportSetup entry is wired and device-verified in plan 06; and Cluster-K consolidation was moved to fire pre-batch in `BulkImportSetupScreen` (plan 11), before `runImportBatch` can consume/re-score the sibling rows.
+
+However, the revision's own new machinery introduced **four new/still-open HIGH-severity gaps**, all confirmed against actual plan task text and real source files, not just plan claims:
+
+1. **Bulk driver dual-field row transitions are not atomic** — the classification paths for `already_linked` and ambiguous/`needs_review` rows (19-06-PLAN.md:95,102-104) call two separately-mutexed writers (`markRowStatus` + `setRowMatchOutcome`) sequentially instead of composing plan 01's non-mutexed `*Core` writers in one transaction, reopening exactly the crash-window count-miscount cycle 1's HIGH-3 was meant to close — just narrowed to two of three classification branches instead of all writes.
+2. **Multi-candidate review is unrenderable after persistence** — plan 05 scores and returns an ordered `candidates[]` for ambiguous rows, but migration 012's schema (19-01-PLAN.md:61) stores only a single `matched_contact_id` column, and plan 06's driver collapses to one ID before writing (19-06-PLAN.md:104). A resumed or bulk-reviewed `needs_review` row with 2+ credible candidates cannot show the user more than one.
+3. **Several successful contact-creation paths bypass post-commit photo (and, for consolidation, birthday) persistence** — plan 10's hook is wired only into `commitSingleImport` and the bulk driver's per-row loop (19-10-PLAN.md:100), but plan 07's bulk "Import as New" calls `importContactRecord` directly (19-07-PLAN.md:108) and plan 11's `combineCluster` calls `createContactFullCore` directly (19-11-PLAN.md:99) — neither path ever reaches the photo hook, and `combineCluster` additionally never writes a birthday at all (only `importContactRecord` does that).
+4. **No plan completes a session after duplicate-review resolution** — neither bulk `DuplicateReviewScreen` (19-07-PLAN.md Task 2) nor the single-import Link-to-Existing/deterministic branches (19-07-PLAN.md Task 3) ever call `completeSession`; `completeSession` is only invoked at `ImportCompleteScreen` mount (19-08-PLAN.md:81,89), which nothing re-triggers after a review action. A session resolved entirely through duplicate review stays `status='pending'` and keeps offering Resume indefinitely — undermining IMP-04's own resumability contract for what is, for an ambiguous-heavy import, the *primary* completion path, not an edge case.
+
+### Agreed Strengths (2+ reviewers)
+
+- The shared `(row_status, match_outcome)` transition table (19-01-PLAN.md:64-80) and `sessionSummaryCounts`'s `alreadyInOrbit` discriminator keyed on `match_outcome` (not `row_status`) genuinely close cycle-1's count-semantics collision at the schema/query level.
+- Contact + row atomicity for the *creation* paths (single import, bulk "new", link-to-existing) is real: `importContactRecord`/`linkExistingContactToRow` (plan 03) compose `createContactFullCore` with plan 01's non-mutexed cores inside one `inWriteTransaction`, matching the non-reentrant mutex contract in `src/db/transaction.ts`.
+- Durable staging is end-to-end: plan 02 returns a cache-only URI, plan 04 stages to document-dir before `acceptImportSessionWithRows`, plan 10 reads only the document-dir path, plan 09 preserves a live session's failed-row staged photos for Retry.
+- Cluster-K consolidation's re-sequencing to pre-batch (`BulkImportSetupScreen`, before `runImportBatch`) is structurally sound and correctly reasoned: the driver only loads `pending` rows, so resolved cluster rows are naturally excluded from re-import.
+- Migration 012 is correctly positioned as the very next version after the on-disk v11 chain; no shipped migration is edited.
+
+### Agreed Concerns (2+ reviewers — highest priority)
+
+See the four numbered HIGH items in the Consensus Summary above — items 1, 3, and 4 were independently raised by at least two of the three lanes; item 2 (multi-candidate storage) was raised by Codex and independently corroborated by Claude's source-grounded sub-review.
+
+### Divergent Views
+
+- Cursor rated the single-import Link-to-Existing session-completion gap MEDIUM in isolation, while Codex rated the broader duplicate-review completion gap (which also covers the bulk `DuplicateReviewScreen` path) HIGH. Both are the same root cause — no plan calls `completeSession` outside the `ImportCompleteScreen`-mount check — so this cycle's consensus treats it as one HIGH concern (item 4 above), taking the more severe rating since the bulk path is the common case, not an edge case.
+- Cursor additionally flagged `combineCluster` writing `row_status='linked'` for newly-created rows (should be `'imported'` per plan 01's own table) as a MEDIUM row-semantics drift; Codex and Claude did not independently surface this exact framing but agree it is real once pointed to `19-11-PLAN.md:99`.
+
+No reviewer found a reversal of a `[DECIDED]`/ADR/HANDOFF item. The Android-only iOS-picker deferral remains correctly honored throughout the revision.
+
+---
+
+## Cycle 2 — Codex Review
+
+## Summary
+
+The six Cycle-1 HIGH themes are mostly addressed in the revised plans: contact+row writes are explicitly composed through non-mutexed cores, cache photos are staged into the document directory before acceptance, summary semantics distinguish `already_linked`, retry accepts failed rows, the FAB routes multi-picks to bulk setup, and Cluster K is now pre-batch. Migration 012 is correctly positioned after the on-disk v11 chain ([database.ts](src/db/database.ts:46)). Remaining issues are concentrated in durable duplicate review, completion, and paths that bypass the shared photo workflow.
+
+## Strengths
+
+- Atomicity is now designed around the repository's non-reentrant mutex contract: extracting `createContactFullCore` is the correct response to the existing single-transaction implementation ([contacts-dao.ts](src/db/contacts-dao.ts:148), [transaction.ts](src/db/transaction.ts:49)).
+- The revised session contract makes `already_linked` a discriminator independent of `row_status`, enabling correct four-bucket reporting ([19-01-PLAN.md:68](.planning/phases/19-system-contact-import/19-01-PLAN.md:68)).
+- Document-dir staging is correctly made acceptance-time work, not a property of the native module.
+- Bulk routing and pre-batch consolidation are now structurally in the right place.
+- Phone-region threading correctly aligns imports with the existing method normalization boundary ([contacts-dao.ts](src/db/contacts-dao.ts:210)).
+
+## Concerns
+
+- **HIGH — NEW: Durable bulk duplicate review lacks the candidate set it needs after resume.** Plan 05 produces an ordered `candidates[]` set for multi-candidate outcomes ([19-05-PLAN.md:105](.planning/phases/19-system-contact-import/19-05-PLAN.md:105)), but migration 012 persists only one `matched_contact_id` plus `match_outcome` ([19-01-PLAN.md:61](.planning/phases/19-system-contact-import/19-01-PLAN.md:61)). Plan 01 additionally says outcomes are stored rather than recomputed on read ([19-01-PLAN.md:32](.planning/phases/19-system-contact-import/19-01-PLAN.md:32)), while Plan 07 expects cards/evidence/matched contacts from those durable row fields ([19-07-PLAN.md:108](.planning/phases/19-system-contact-import/19-07-PLAN.md:108)). A resumed `needs_review` row therefore cannot render or choose among multiple candidates.
+
+- **HIGH — NEW: Several successful import paths bypass post-commit photo persistence.** Plan 10 wires the photo hook only into `commitSingleImport` and the bulk driver ([19-10-PLAN.md:97](.planning/phases/19-system-contact-import/19-10-PLAN.md:97)). But Plan 07's bulk "Import as New" calls `importContactRecord` directly ([19-07-PLAN.md:108](.planning/phases/19-system-contact-import/19-07-PLAN.md:108)), and Plan 11's `combineCluster` calls `createContactFullCore` directly ([19-11-PLAN.md:99](.planning/phases/19-system-contact-import/19-11-PLAN.md:99)). Photos from ambiguous-review imports and consolidation will remain staged and never become contact masters. Consolidation also has no stated birthday-selection/storage rule.
+
+- **HIGH — PARTIALLY RESOLVED: Resolving duplicate-review rows never completes the session.** Plan 08 correctly keeps a session pending while review remains ([19-08-PLAN.md:81](.planning/phases/19-system-contact-import/19-08-PLAN.md:81)). However, Plan 07 resolves rows via import/link/skip and contains no final "if no pending/needs-review rows, complete session" step or return to the summary ([19-07-PLAN.md:108](.planning/phases/19-system-contact-import/19-07-PLAN.md:108)). Once all review rows are handled, the session remains `pending`, causing the launch sweep to keep offering Resume.
+
+- **MEDIUM — NEW: Single-contact deterministic/link/skip outcomes also lack terminal session handling.** `commitSingleImport` completes only the Import-as-New route. Plan 07's Link-to-Existing is an atomic row/link operation but does not complete the single session; deterministic `already_linked` merely displays a state ([19-07-PLAN.md:127](.planning/phases/19-system-contact-import/19-07-PLAN.md:127)). Skip has the same gap. These choices can leave a one-row session resumable indefinitely.
+
+- **MEDIUM — NEW: The claimed export-manifest "table set" does not exist in the source.** Plan 01 asks a test to import and inspect an explicit exported-table set, but [export-manifest.ts:45](src/backup/export-manifest.ts:45) uses direct SQL queries and exports no table-set constant. The intended test needs to build a manifest and assert no session fields, or the production code needs a declared manifest-table registry.
+
+- **MEDIUM — NEW: Replace-all restore needs an explicit runtime-session policy.** The plans say import sessions are local-only and that Replace-all "neither reads nor writes" them ([19-01-PLAN.md:34](.planning/phases/19-system-contact-import/19-01-PLAN.md:34)). Existing replace-all explicitly deletes portable contact data but would not delete the new session tables ([restore-apply.ts:230](src/backup/restore-apply.ts:230)). Old pending sessions can therefore survive a replacement restore with their `contact_id` / `matched_contact_id` FKs nulled by contact deletion, then reappear as Resume prompts against restored data. Runtime sessions and their staged files should be discarded as part of Replace-all.
+
+## Suggestions
+
+- Persist a durable candidate snapshot/evidence JSON per session row, or explicitly re-score from the durable picker payload on every review read and update the plan's "not recomputed" contract.
+- Create one post-commit finalizer used by every contact-producing route: normal batch, single import, duplicate-review Import-as-New, and consolidation. Define deterministic birthday/photo selection for a combined source cluster.
+- Add a `finalizeSessionIfTerminal` DAO/service and call it after every review action; route the user back to `ImportComplete`.
+- Add terminal handling for single deterministic, Link-to-Existing, and Skip decisions.
+- Replace the nonexistent export-table-set assertion with a behavioral manifest test; explicitly purge local import sessions and staged photos during Replace-all restore.
+
+## Risk Assessment
+
+**HIGH.** The major Cycle-1 transaction, staging, retry, entry-point, count, and pre-batch-consolidation defects are fixed in plan text. However, durable review/resume is incomplete, and two legitimate contact-creation paths bypass photo handling. Those defects affect normal user flows and undermine IMP-04's resumability guarantee.
+
+---
+
+## Cycle 2 — Cursor Review
+
+# Cross-AI Plan Review — Phase 19 System Contact Import (Cycle 2)
+
+## Summary
+
+The cycle-1 replan materially closes the six HIGH themes in plan text: migration 012 is correctly sequenced after v11 (`src/db/database.ts:46`), non-mutexed session-row cores mirror the established mutexed-writer pattern (`src/db/transaction.ts:19-23`, `src/db/contacts-dao.ts:5-11`), document-dir photo staging is assigned to plan 04 (mirroring `src/services/photos/photo-storage.ts:120-188`), `sessionSummaryCounts` + the canonical transition table live in plan 01, Retry via `eligibleStatuses` is wired through plans 06/08, the FAB multi-pick → `BulkImportSetup` route is specified in plans 04/06, and Cluster-K consolidation is moved pre-batch in plan 11. Remaining gaps are narrower: the bulk driver still splits some two-field row transitions across separate mutexed writers (reintroducing a count/resume inconsistency window the transition table was meant to eliminate), the single-import Link path never completes the session, import-staging path allowlisting is underspecified relative to the restore-pending model, and auto-discard of stale pending sessions does not chain staged-photo cleanup.
+
+## Strengths
+
+- **Shared data contract is now explicit.** Plan 01 publishes the `(event → row_status, match_outcome)` transition table and derives the four completion buckets from it; plans 06/07/08/11 all reference the same vocabulary.
+- **Contact + row atomicity is solved for the import/write paths that matter most.** Plan 03 composes `createContactFullCore` + `setRowContactCore`/`setRowMatchOutcomeCore` inside one `inWriteTransaction`, matching the non-reentrant mutex contract documented in `src/db/transaction.ts:13-17` and the composition idiom in `src/db/contacts-dao.ts:148-149`.
+- **Durable staging pipeline is end-to-end.** Plan 02 returns cache-only URIs; plan 04 stages to document-dir before `acceptImportSessionWithRows`; plan 10 reads `photo_rel_path` post-commit; plan 09 preserves failed-row staging for Retry.
+- **Tracer-first wave ordering is sound.** Plan 04 device-verifies single import before bulk/photo/duplicate expansion; dependencies avoid circularity (05 parallel in wave 1; 11 correctly depends on 06 and runs pre-batch).
+- **Duplicate engine ownership is clean.** Plan 05 owns `findActiveExternalLink` against the partial-unique index defined in `src/db/migrations/011-contact-lifecycle-schema.ts:180`; plan 03 writes links only.
+- **Backup/local-only boundary is verified against real export code.** `src/backup/export-manifest.ts:45-58` enumerates exported tables explicitly and omits any import-session tables; plan 01 tasks a manifest-omission test against this file.
+- **Phone region threading is grounded.** `resolveEffectivePhoneRegion` exists in `src/db/app-settings-dao.ts:296` and is already used on create (`src/screens/CreateContactScreen.tsx:125`); plans 03/04/06 thread the same value through `import_sessions.phone_region`.
+
+## Concerns
+
+### HIGH
+
+- **PARTIALLY RESOLVED — Bulk driver dual-field writes are not atomic (theme 3 / count semantics).** Plan 06 instructs separate calls to `markRowStatus` and `setRowMatchOutcome` for `already_linked` and ambiguous rows (`19-06-PLAN.md` Task 1 action). Plan 01 defines each mutexed writer as its own `inWriteTransaction` (`19-01-PLAN.md` Task 2). A kill between the two calls leaves e.g. `row_status='skipped'` with `match_outcome IS NULL`, which `sessionSummaryCounts` counts under `failedOrSkipped` instead of `alreadyInOrbit` — exactly the collision cycle 1 flagged. Plan 01 already exports `markRowStatusCore` + `setRowMatchOutcomeCore` for composition; the driver should wrap both updates in one transaction (or add a dedicated `resolveAlreadyLinkedCore` / `deferForReviewCore` helper).
+
+### MEDIUM
+
+- **NEW — Single-import Link path never completes the session.** Plan 04's `commitSingleImport` calls `completeSession` after Import-as-New (`19-04-PLAN.md` must_haves). Plan 07's Link-to-Existing path calls only `linkExistingContactToRow` with no `completeSession` (`19-07-PLAN.md` Task 3 action). After a successful link the session stays `status='pending'`, so plan 09's `getResumableSession` will offer Resume/Discard on next launch even though the row is resolved — inconsistent with IMP-04's terminal-session expectation for single pick.
+
+- **NEW — Auto-discard of stale pending sessions may orphan staged photos.** Plan 01's `getResumableSession` discards older pending sessions via `discardSession`, which returns `photo_rel_path` values (`19-01-PLAN.md` Task 2-3). Nothing in plan 01 or 09 requires calling `cleanupDiscardedStagedPhotos` after that auto-sweep; only the explicit Discard path in plan 09 Task 2 chains cleanup. Staged files under the new `import-staging/` namespace could accumulate until orphan reconciliation runs.
+
+- **NEW — Import-staging path allowlist not placed alongside restore-pending guards.** Plan 04 mirrors restore-pending in `photo-storage.ts` and references `assertSafe*` guards, but `src/db/photo-relative-path.ts` only defines `SAFE_RELATIVE` and `SAFE_RESTORE_PENDING_RELATIVE` (`src/db/photo-relative-path.ts:22-29`) — no `import-staging/` regex. Restore-pending deliberately lives under `avatars/_restore_pending/` with a dedicated assert function (`src/db/photo-relative-path.ts:25-56`). Plan 04 puts staging at top-level `import-staging/` and does not list `photo-relative-path.ts` in `files_modified`; executors may inline ad-hoc checks and drift from the single chokepoint pattern.
+
+- **NEW — Consolidation marks new-contact rows as `linked`.** Plan 11's `combineCluster` calls `setRowContactCore(..., 'linked')` for rows attached to a newly created contact (`19-11-PLAN.md` Task 1 action). Plan 01's transition table assigns `linked` to "link to existing" and `imported` to "import as new." Summary counts still work (`imported` bucket includes both statuses), but row semantics diverge from the canonical table and may confuse Phase 20 consumers reading `row_status`.
+
+### LOW
+
+- **NEW — Plan 07 single-import `already_linked` deterministic branch leaves row resolution unspecified.** Task 3 says "do not offer as new (surface 'Already in Orbit')" but does not mandate writing `skipped` + `match_outcome='already_linked'` + `matched_contact_id`, nor `completeSession`. The row may stay `pending`, breaking summary counts and resume routing.
+
+- **NEW — Photo staging precedes DB accept without rollback coupling.** Plan 04 stages photos before `acceptImportSessionWithRows`; a DB failure after staging leaves document-dir files until plan 09's orphan sweep. Acceptable if orphan reconciliation is tested, but not explicitly acceptance-criteria'd in plan 04.
+
+- **PARTIALLY RESOLVED — Android 17 picker birthday/photo remain device-unverified.** Plans 02/04/10 correctly treat A1/A2 as tracer assumptions; this is residual product risk, not a plan-text hole.
+
+## Suggestions
+
+1. **Add composed row-transition writers in plan 01 (or plan 06):** e.g. `markAlreadyLinkedCore(exec, rowId, matchedContactId, now)` and `deferNeedsReviewCore(exec, rowId, outcome, matchedContactId, now)` that apply both column updates in one transaction; have plan 06's driver call these instead of paired mutexed writers.
+
+2. **Extract `commitSingleLink` (or extend `commitSingleImport`) in plan 04/07:** wrap `linkExistingContactToRow` + `completeSession` for single-mode sessions so Link and Import-as-New both terminate the session consistently.
+
+3. **Add `SAFE_IMPORT_STAGING_RELATIVE` + `assertSafeImportStagingRelative` to `src/db/photo-relative-path.ts`** in plan 04's `files_modified`, mirroring `SAFE_RESTORE_PENDING_RELATIVE` (`src/db/photo-relative-path.ts:29-56`).
+
+4. **Chain photo cleanup in `getResumableSession`'s auto-sweep:** when older pending sessions are discarded, pass returned paths to `cleanupDiscardedStagedPhotos` (plan 09) in the same launch pass.
+
+5. **Use `row_status='imported'` in plan 11 `combineCluster`** for newly created consolidated contacts, reserving `linked` for link-to-existing paths only.
+
+6. **Specify deterministic `already_linked` row writes in plan 07 Task 3** (mirror plan 06 driver semantics) plus session completion or explicit "leave pending for Discard" rationale.
+
+## Risk Assessment
+
+**MEDIUM**
+
+The architectural skeleton is substantially stronger than cycle 1: migration numbering, mutex composition, staging durability, retry semantics, FAB routing, and pre-batch consolidation are all specified with verifiable anchors in the repo. The remaining issues are localized transaction-boundary gaps in the bulk driver's non-import classification paths and a missing session-completion step on single-import Link — both are fixable without replanning waves, but either could produce wrong completion counts or spurious resume prompts in production if executed literally as written. Android 17 picker field support remains the largest external unknown; it is acknowledged and appropriately deferred to the tracer/device UAT path.
+
+---
+
+## Cycle 2 — Claude (Sonnet 5) Reviewer
+
+## Summary
+
+The revision genuinely closes the mechanics of the six cycle-1 HIGH themes: I independently confirmed `TARGET_VERSION = 11` and migrations `001`-`011` on disk (`src/db/database.ts:46-58`), so migration 012 (19-01-PLAN.md:8, Task 1) is correctly the next number and additive-only. Plan 03's composition of `createContactFullCore` with plan 01's non-mutexed `*Core` writers inside one `inWriteTransaction` is real and matches `src/db/transaction.ts`'s non-reentrant mutex contract. Plan 01's canonical `(row_status, match_outcome)` transition table (19-01-PLAN.md:64-80) and `sessionSummaryCounts`'s `alreadyInOrbit` discriminator are a correct fix at the schema/query level. Retry's `eligibleStatuses` (19-06-PLAN.md:26,97) and the FAB→BulkImportSetup entry (19-06-PLAN.md Task 2, human-check) are concretely wired and tested. Cluster-K consolidation is correctly re-sequenced pre-batch into `BulkImportSetupScreen` (19-11-PLAN.md, Task 2). However, reading plan 06, 07, 08, 09, 10, and 11's actual task/action text line-by-line (not just their "Review Feedback Incorporated" claims) surfaces four HIGH-severity gaps the revision's new machinery introduces or leaves open, plus several MEDIUM/LOW items. I ran three parallel source-grounded sub-reviews (each independently verifying against the actual DAO/service files) and cross-checked their findings myself against the cited plan text and source; the findings below reflect that verification, not the plans' own claims.
+
+## Strengths
+
+- The transition table (19-01-PLAN.md:64-80) is genuinely a single documented source of truth that plans 06/07/08/11 reference by the same vocabulary — a real fix, not just a restated claim.
+- `importContactRecord`/`linkExistingContactToRow` (plan 03) really do compose `createContactFullCore` + plan 01's non-mutexed cores inside one `inWriteTransaction` — I confirmed this against `src/db/transaction.ts`'s documented non-reentrancy contract and `src/db/contacts-dao.ts`'s existing `createContactFull`/`updateContactMetadataCore` idiom that plan 03 is asked to mirror.
+- `discardSession`'s contract (19-01-PLAN.md:155) — collect `photo_rel_path` for contact_id-IS-NULL rows before deleting, return them for post-commit cleanup — correctly avoids the "paths become unrecoverable after DELETE" trap, and plan 09 correctly scopes cleanup to discarded sessions only, preserving a live session's failed-row staged photos for Retry.
+- Migration 012's schema is purely additive with `ON DELETE SET NULL`/`ON DELETE CASCADE` used appropriately; no `ALTER TABLE contacts` anywhere in the plan set.
+
+## Concerns
+
+- **HIGH — PARTIALLY RESOLVED: The bulk driver's `already_linked`/`needs_review` classification writes are two separate mutexed transactions, not one.** Reading `19-06-PLAN.md:95,102-104` directly: "'already_linked' → markRowStatus(row,'skipped', null) AND setRowMatchOutcome(row,'already_linked', deterministicContactId)" and "else (probable/possible/needs_review) → setRowMatchOutcome(row, outcome, matchedContactId) AND markRowStatus(row,'needs_review', null)". Both `markRowStatus` and `setRowMatchOutcome` are declared as separately-mutexed standalone writers in plan 01 (19-01-PLAN.md:154, "each opens exactly one `inWriteTransaction`"). Plan 01 exports non-mutexed `setRowMatchOutcomeCore`/`markRowStatusCore` (19-01-PLAN.md:158) precisely so a caller can compose two column updates atomically — but plan 06's driver text never calls the `*Core` variants for these two paths (only the `new`→`importContactRecord` path is genuinely atomic). A process death between the two calls leaves `row_status='skipped'` with `match_outcome IS NULL`, which per 19-01-PLAN.md:80's own formula (`failedOrSkipped = row_status='failed' OR (row_status='skipped' AND (match_outcome IS NULL OR match_outcome <> 'already_linked'))`) miscounts the row as `failedOrSkipped` instead of `alreadyInOrbit` — reopening cycle-1's exact count-semantics collision, just narrowed from "every write" to these two specific classification branches.
+
+- **HIGH — NEW: Migration 012's schema cannot store more than one review candidate, but plan 05 produces a candidate list.** `19-01-PLAN.md:61`'s `import_session_rows` schema has exactly one `matched_contact_id` column. Plan 06's driver (19-06-PLAN.md:104) writes `setRowMatchOutcome(row, outcome, matchedContactId)` — a single ID — for ambiguous rows, and 19-01-PLAN.md:32 states outcomes are "stored on the row ... rather than recomputed on read." Yet plan 07's bulk grid (19-07-PLAN.md Task 2) and its single-import interrupt (Task 3, "multiple credible candidates → list candidate cards with Choose this one") both expect a durable multi-candidate view for the review UI. For a bulk `needs_review` row with 2+ credible candidates, only one survives to disk — a resumed session or the bulk grid can never show "choose among 3 candidates," only "choose this one candidate or import as new," silently narrowing the user's actual choice set from what plan 07's own single-import interrupt promises.
+
+- **HIGH — NEW: `combineCluster` and bulk "Import as New" from the review grid never reach plan 10's photo/birthday hook.** Plan 10 wires `persistImportedPhotoPostCommit` into exactly two call sites: `commitSingleImport` (19-10-PLAN.md:100, "enrich its BODY only") and the bulk driver's per-row loop (19-10-PLAN.md:100). But 19-07-PLAN.md:108 (DuplicateReviewScreen Task 2) has bulk "Import as New" call `importContactRecord` directly — not `commitSingleImport` — so a photo staged for an ambiguous-review row that the user chooses to import as new is never promoted from staging; it stays orphaned. Separately, 19-11-PLAN.md:99's `combineCluster` calls `createContactFullCore` directly (never `importContactRecord`, whose own transaction step writes the validated birthday — see 19-10-PLAN.md:68's note that plan 03 owns the birthday write inside `importContactRecord`). Since `createContactFullCore` is the birthday-less contact/methods/def-matrix extraction (per plan 03's stated extraction scope), a consolidated contact silently gets neither its birthday nor any of its source photos, despite the picker having returned that data for at least one of the clustered source records.
+
+- **HIGH — NEW (same root cause surfaced by two independent code paths; consensus treats as one item): No plan calls `completeSession` after a duplicate-review resolution finishes a session.** `completeSession` is invoked exactly once across all 11 plans, at `ImportCompleteScreen` mount (19-08-PLAN.md:81,89), gated on `needReview==0 && no pending rows`. Reading 19-07-PLAN.md Task 2 (bulk `DuplicateReviewScreen`) and Task 3 (single-import interrupt) in full: neither task's action text calls `completeSession`, and nothing routes the user back through `ImportCompleteScreen`'s mount check after the grid's last `needs_review` row or a single-import Link-to-Existing action resolves. `getResumableSession` (19-01-PLAN.md:179) selects purely on `status='pending'`, so a session resolved entirely through duplicate review — which is the *expected* completion path whenever ambiguous rows exist, not a rare edge case — remains resumable forever, contradicting IMP-04's own "at most one resumable session, resolved sessions are terminal" intent.
+
+- **MEDIUM — STILL UNRESOLVED: Replace-all restore does not purge import-session tables, and their FKs go stale.** I confirmed directly: `src/backup/restore-apply.ts:232`'s `replaceAllReset` table-delete list (`contact_method_provenance, interactions, events, fuel, custom_field_values, contact_links, external_contact_links, contact_methods, ...contacts, custom_field_defs`) does not include `import_sessions` or `import_session_rows`. Both `contact_id` and `matched_contact_id` in migration 012's schema are `ON DELETE SET NULL` (19-01-PLAN.md:61), so a Replace-all restore nulls out those FKs on any surviving pending session rather than removing the session, and it can resurface as an incorrect Resume prompt against a freshly-restored database. No plan (01 or 09) states an explicit "purge import sessions on Replace-all" step — 19-01-PLAN.md:34 only says Replace-all "neither reads nor writes" the tables, which is true of the *current* restore code but does not address the FK-null survival consequence.
+
+- **MEDIUM — STILL UNRESOLVED: The export-manifest "table set" test as specified cannot be written against the actual code shape.** I read `src/backup/export-manifest.ts:40-53` directly: `readManifest` builds the `BackupManifest` via 13 inline `Promise.all`-batched `SELECT` statements against named tables — there is no exported table-name array or constant. 19-01-PLAN.md:191's acceptance criterion ("an assertion that the backup export manifest's exported-table set (imported from export-manifest.ts) contains neither 'import_sessions' nor 'import_session_rows'") describes a test fixture that does not exist in the source as written; the test needs to call `readManifest`/`buildBackupManifest` and assert the resulting object has no session-shaped keys, not import a table-set constant.
+
+- **MEDIUM — STILL UNRESOLVED: `getResumableSession`'s auto-sweep of older pending sessions has no firm staged-photo cleanup guarantee.** 19-01-PLAN.md Task 3 has `getResumableSession` call `discardSession` on older pending sessions (in their own transactions) and states this "may open transactions for the sweep," but plan 01 (wave 1) cannot call plan 09's `cleanupDiscardedStagedPhotos` (wave 5) — and plan 09's own Task 1 only makes reconciliation of "truly-orphaned import-staging files" **optional** ("Optionally reconcile ... via listImportStagingPhotos"), never required. A user who accumulates several abandoned pending sessions across launches (each auto-swept by the next launch's `getResumableSession` call) can leak staged photo files under `import-staging/` indefinitely unless the optional reconciliation happens to be implemented.
+
+- **MEDIUM — STILL UNRESOLVED: `combineCluster` writes `row_status='linked'` for rows attached to a brand-new contact.** I confirmed 19-11-PLAN.md:99 directly: `setRowContactCore(exec, row.id, contactId, 'linked', now)` for every clustered row, where `contactId` came from `createContactFullCore` in the *same* action (a genuinely new contact, not a link to a pre-existing one). Plan 01's own canonical table (19-01-PLAN.md:69-70) maps "import as new" → `imported` and reserves `linked` for "link to existing." `sessionSummaryCounts`'s `imported` bucket happens to include both statuses (19-01-PLAN.md:77), so this does not break the completion count this cycle, but it is a documented drift from the single source of truth this very revision established, and plan 11's own text (line 26) explicitly flags Phase 20 as a future consumer of `row_status` — exactly the kind of consumer this drift would mislead.
+
+- **LOW — STILL UNRESOLVED: The import-staging safe-path guard was not added to the canonical chokepoint file.** `src/db/photo-relative-path.ts` is the single place `SAFE_RELATIVE`/`SAFE_RESTORE_PENDING_RELATIVE` and their `assertSafe*` functions live (confirmed via source read); 19-04-PLAN.md's `files_modified` does not list this file even though its task text asks for an `import-staging/` namespace "mirroring restore-pending... with the same token-safety guards." An executor following `files_modified` literally will not touch the actual chokepoint and may inline an ad-hoc regex in `photo-storage.ts` instead.
+
+- **LOW — STILL UNRESOLVED: Plan 07 Task 3's single-import deterministic `already_linked` branch leaves the row's terminal write unspecified.** The action text says "do not offer as new (surface 'Already in Orbit')" but does not mandate the row write (`skipped` + `match_outcome='already_linked'` + `matched_contact_id`, mirroring plan 06's driver semantics for the same outcome) nor a session-completion call. As written, this branch can leave a single-mode session's only row permanently `pending`.
+
+## Suggestions
+
+- Add `resolveAlreadyLinkedCore`/`deferNeedsReviewCore` composed writers to plan 01 (or inline the composition in plan 06 using the already-exported `*Core` functions) so the two classification paths get the same one-transaction guarantee the `new`/import path already has.
+- Either persist the full candidate list (a JSON column or a child table) or make plan 07 explicitly re-score from the durable `source_payload` + `phone_region` on every review render, and correct 19-01-PLAN.md:32's "not recomputed on read" claim to match whichever is chosen.
+- Route bulk "Import as New" (plan 07) and `combineCluster` (plan 11) through the same post-commit finalizer plan 10 defines, or extend `persistImportedPhotoPostCommit`'s call sites to cover both; give `combineCluster` an explicit birthday-selection rule (e.g., first non-null birthday among clustered source rows) before calling `createContactFullCore`.
+- Add a `finalizeSessionIfTerminal(exec, sessionId, now)` helper (checking `needReview==0 && pending==0` via `sessionSummaryCounts`) and call it after every row-resolving action in plan 07, not only at `ImportCompleteScreen` mount.
+- State an explicit Replace-all policy: delete `import_sessions`/`import_session_rows` (and sweep their staged photos) as part of `replaceAllReset`, or as a dedicated post-restore step.
+- Rewrite 19-01-PLAN.md's export-manifest acceptance criterion as a behavioral assertion against `readManifest`'s output shape rather than an "imported table-set" fixture.
+- Make plan 09's orphan-staging reconciliation a required (not optional) task, or require plan 01's auto-sweep to call it directly.
+- Change `combineCluster`'s row write to `row_status='imported'`.
+
+## Risk Assessment
+
+**HIGH.** The revision fixes the transaction/staging/retry/entry-point mechanics that made cycle-1's findings HIGH, but the new machinery it introduced to close those themes (the bulk driver's split classification writes, the pre-batch consolidation writer, and the duplicate-review resolution paths) has its own atomicity and completion gaps that would produce wrong "Already in Orbit" counts, orphaned photos/birthdays, and sessions that resume forever in real, common usage — not edge cases. None of these four HIGH items requires a wave reshuffle to fix; each is a scoped change to an existing plan's task text (mostly plan 06, 07, and 11).
+
+---
+
+## Cycle 2 — Verification Coverage (advisory, not counted toward totals)
+
+| Symbol / claim | Status | Note |
+|---|---|---|
+| `TARGET_VERSION = 11`, `MIGRATIONS` array ending at `migration011` | VERIFIED `src/db/database.ts:46-58` | Confirms migration 012 (plan 01) is the correct next version |
+| Migrations `001`-`011` shipped on disk, nothing beyond | VERIFIED via `ls src/db/migrations/` | No plan edits a shipped migration |
+| `inWriteTransaction` non-reentrant mutex contract | VERIFIED `src/db/transaction.ts` (read by two sub-reviews) | Matches plans' stated "never nest" rule |
+| `createContactFull`/`createContactFullCore` extraction source body | VERIFIED `src/db/contacts-dao.ts:112-231` (per sub-review) | Plan 03's extraction target is the real existing function |
+| `src/backup/export-manifest.ts` builds via inline SQL, no table-set constant | VERIFIED directly, lines 40-53 read in full | Contradicts plan 01's "imported from export-manifest.ts" test framing |
+| `src/backup/restore-apply.ts:232` `replaceAllReset` table list omits `import_sessions`/`import_session_rows` | VERIFIED directly via grep + read | Confirms the Replace-all gap |
+| `src/db/photo-relative-path.ts` defines only `SAFE_RELATIVE`/`SAFE_RESTORE_PENDING_RELATIVE` | VERIFIED by sub-review read of lines 22-56 | No `import-staging/` guard exists yet |
+| `createContactFullCore`, `setRowContactCore`, `markRowStatusCore`, `setRowMatchOutcomeCore`, `linkExistingContactToRow`, `combineCluster`, `detectSourceClusters`, `persistImportedPhotoPostCommit`, `sessionSummaryCounts`, `acceptImportSessionWithRows` | NOT YET ON DISK — declared under "Artifacts this phase produces" | Correctly not flagged as missing; these are this phase's own deliverables |
+| `resolveEffectivePhoneRegion` in `src/db/app-settings-dao.ts:296` | UNCHECKABLE this session | Cited by Cursor; not re-opened this cycle, but independently verified in cycle 1's review and unchanged by this revision |
+| `src/db/migrations/011-contact-lifecycle-schema.ts` partial-unique index on `external_contact_links` | VERIFIED file exists; exact line number for the index not re-confirmed this cycle (cited as ~163 vs plans' ~175/180) | Cosmetic line-number drift only, not a correctness issue |
