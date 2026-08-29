@@ -63,6 +63,24 @@ export function profileLifecycleView(input: {
   };
 }
 
+export function unbindConfirmation(name: string): {
+  title: string;
+  message: string;
+} {
+  return {
+    title: `Unbind ${name}?`,
+    message:
+      "This removes them from your active orbit, reminders, favourites, and widgets. Their history, details, and saved cadence stay.",
+  };
+}
+
+export function canStartLifecycleTransition(input: {
+  pending: boolean;
+  bindEnabled: boolean;
+}): boolean {
+  return !input.pending && input.bindEnabled;
+}
+
 const typePresentation: Record<ProfileMethodType, string> = {
   phone: "Phone number",
   email: "Email address",

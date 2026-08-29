@@ -86,9 +86,15 @@ import {
 import { newUid } from "@/db/uid";
 import type { RootStackScreenProps } from "@/navigation/types";
 import {
+  canStartLifecycleTransition,
   profileLifecycleView,
   profileMethodGroups,
+  unbindConfirmation,
 } from "@/screens/contact-profile-logic";
+import {
+  bindWithLifecycleEffects,
+  unbindWithLifecycleEffects,
+} from "@/services/contact-lifecycle-effects";
 import type { GravityResult } from "@/services/gravity-logic";
 import {
   computeContactGravity,
@@ -215,6 +221,7 @@ export function ContactProfileScreen({
   const [savingEdit, setSavingEdit] = useState(false);
   const [bindIntervalDays, setBindIntervalDays] = useState(30);
   const [bindIntervalValid, setBindIntervalValid] = useState(false);
+  const [transitioning, setTransitioning] = useState(false);
 
   // The SINGLE unified read: the header AND the interleaved timeline, so both
   // refresh together on focus and after an in-place log (LOG-02 read half).
@@ -366,6 +373,63 @@ export function ContactProfileScreen({
       Alert.alert("Couldn't update favourite", "Please try again.");
     }
   }, [contactId, header?.favourite_rank, load]);
+
+  const doLifecycleTransition = useCallback(
+    async (direction: "bind" | "unbind") => {
+      const bindEnabled =
+        lifecycle.bindEnabled ||
+        (lifecycle.showFrequencyPicker && bindIntervalValid);
+      if (
+        transitioning ||
+        (direction === "bind" &&
+          !canStartLifecycleTransition({ pending: false, bindEnabled }))
+      ) {
+        return;
+      }
+      setTransitioning(true);
+      try {
+        const exec = getExecutor();
+        const now = localDateTime();
+        if (direction === "bind") {
+          await bindWithLifecycleEffects(
+            exec,
+            contactId,
+            now,
+            lifecycle.showFrequencyPicker ? bindIntervalDays : undefined,
+          );
+        } else {
+          await unbindWithLifecycleEffects(exec, contactId, now);
+        }
+        await load();
+      } catch (err) {
+        Logger.error(LOG_SCOPE, `failed to ${direction} contact`, err);
+        Alert.alert("Couldn't update contact", "Please try again.");
+      } finally {
+        setTransitioning(false);
+      }
+    },
+    [
+      bindIntervalDays,
+      bindIntervalValid,
+      contactId,
+      lifecycle.bindEnabled,
+      lifecycle.showFrequencyPicker,
+      load,
+      transitioning,
+    ],
+  );
+
+  const confirmUnbind = useCallback(() => {
+    const confirmation = unbindConfirmation(header?.name ?? "this contact");
+    Alert.alert(confirmation.title, confirmation.message, [
+      { text: "Keep contact bound", style: "cancel" },
+      {
+        text: "Unbind contact",
+        style: "destructive",
+        onPress: () => void doLifecycleTransition("unbind"),
+      },
+    ]);
+  }, [doLifecycleTransition, header?.name]);
 
   // In-app snooze presets (NOTIF-03): write snooze_until through the mutexed
   // snooze-dao (uid minted here, local wall-clock now), then the SINGLE unified
@@ -768,10 +832,22 @@ export function ContactProfileScreen({
             accessibilityRole="button"
             accessibilityLabel="Bind contact"
             accessibilityState={{
-              disabled: !(lifecycle.bindEnabled || bindIntervalValid),
+              disabled: !canStartLifecycleTransition({
+                pending: transitioning,
+                bindEnabled:
+                  lifecycle.bindEnabled ||
+                  (lifecycle.showFrequencyPicker && bindIntervalValid),
+              }),
             }}
-            disabled={!(lifecycle.bindEnabled || bindIntervalValid)}
-            onPress={() => undefined}
+            disabled={
+              !canStartLifecycleTransition({
+                pending: transitioning,
+                bindEnabled:
+                  lifecycle.bindEnabled ||
+                  (lifecycle.showFrequencyPicker && bindIntervalValid),
+              })
+            }
+            onPress={() => void doLifecycleTransition("bind")}
             style={[
               styles.lifecycleAction,
               { backgroundColor: colors.accent, borderColor: colors.accent },
@@ -782,6 +858,23 @@ export function ContactProfileScreen({
             </Text>
           </Pressable>
         </View>
+      ) : null}
+
+      {lifecycle.kind === "bound" ? (
+        <Pressable
+          testID="contact-profile-unbind"
+          accessibilityRole="button"
+          accessibilityLabel="Unbind contact"
+          accessibilityState={{ disabled: transitioning }}
+          disabled={transitioning}
+          onPress={confirmUnbind}
+          style={[
+            styles.lifecycleOutlineAction,
+            { borderColor: colors.border },
+          ]}
+        >
+          <Text style={{ color: colors.textPrimary }}>Unbind contact</Text>
+        </Pressable>
       ) : null}
 
       {header?.rarely_responds === 1 ? (
@@ -1204,6 +1297,13 @@ const styles = StyleSheet.create({
   lifecyclePanel: { gap: 12, borderWidth: 1, borderRadius: 12, padding: 16 },
   lifecycleHeading: { fontSize: 18, fontWeight: "700" },
   lifecycleAction: {
+    minHeight: 44,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderRadius: 8,
+  },
+  lifecycleOutlineAction: {
     minHeight: 44,
     alignItems: "center",
     justifyContent: "center",

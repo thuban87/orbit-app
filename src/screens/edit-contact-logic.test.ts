@@ -26,6 +26,7 @@ function contactRow(overrides: Partial<ContactEditRow> = {}): ContactEditRow {
     photo: null,
     last_contact: null,
     favourite_rank: null,
+    trackingEnabled: 1,
     ring_seq: null,
     archived_at: null,
     snooze_until: null,

@@ -164,8 +164,14 @@ describe("profile lifecycle actions", () => {
   });
 
   it("allows only one lifecycle transition at a time and requires a bindable cadence", () => {
-    expect(canStartLifecycleTransition({ pending: false, bindEnabled: true })).toBe(true);
-    expect(canStartLifecycleTransition({ pending: true, bindEnabled: true })).toBe(false);
-    expect(canStartLifecycleTransition({ pending: false, bindEnabled: false })).toBe(false);
+    expect(
+      canStartLifecycleTransition({ pending: false, bindEnabled: true }),
+    ).toBe(true);
+    expect(
+      canStartLifecycleTransition({ pending: true, bindEnabled: true }),
+    ).toBe(false);
+    expect(
+      canStartLifecycleTransition({ pending: false, bindEnabled: false }),
+    ).toBe(false);
   });
 });

@@ -129,7 +129,7 @@ export interface ContactEditRow {
   uid: string;
   name: string;
   category_id: number | null;
-  interval_days: number;
+  interval_days: number | null;
   social_battery: string | null;
   birthday: string | null;
   photo: string | null;
