@@ -117,6 +117,12 @@ export type RootStackParamList = {
     deletionsApplied: number;
     replaceSafetySnapshot: "verified" | "not-configured" | null;
   };
+  /** Durable system-contact import flow; all params are declared up front. */
+  ImportReview: { sessionId: number };
+  BulkImportSetup: { sessionId: number };
+  ImportProgress: { sessionId: number; batchCategoryId: number | null };
+  DuplicateReview: { sessionId: number };
+  ImportComplete: { sessionId: number };
 };
 
 /**

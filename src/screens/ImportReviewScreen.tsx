@@ -1,0 +1,226 @@
+import { Picker } from "@react-native-picker/picker";
+import { Image } from "expo-image";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { Avatar } from "@/components/Avatar";
+import { ContactMethodsEditor } from "@/components/ContactMethodsEditor";
+import {
+  addMethodDraft,
+  choosePrimary,
+  type MethodGroups,
+  removeMethodDraft,
+  toMethodDrafts,
+  updateMethodDraft,
+} from "@/components/contact-methods-editor-model";
+import { FrequencyPicker } from "@/components/FrequencyPicker";
+import { getAppSettings } from "@/db/app-settings-dao";
+import { listCategories } from "@/db/contact-read";
+import { getExecutor, localDateTime } from "@/db/database";
+import { listSessionRows } from "@/db/import-session-read";
+import { newUid } from "@/db/uid";
+import { mapPickedContact } from "@/logic/picked-contact-map";
+import type { RootStackScreenProps } from "@/navigation/types";
+import { getDeviceRegion } from "@/services/device-region";
+import { commitSingleImport } from "@/services/import/import-acquire";
+import { resolveImportStagingUri } from "@/services/photos/photo-storage";
+import { useTheme } from "@/theme";
+import { FREQUENCY_DAYS } from "@/types";
+import { Logger } from "@/utils/logger";
+
+const LOG_SCOPE = "import-review";
+
+type Snapshot = {
+  displayName: string | null;
+  methods: Array<{ type: "phone" | "email"; value: string }>;
+  birthday: string | null;
+};
+
+function parseSnapshot(value: string): Snapshot | null {
+  try {
+    const parsed = JSON.parse(value) as Snapshot;
+    return Array.isArray(parsed.methods) ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+export function ImportReviewScreen({
+  navigation,
+  route,
+}: RootStackScreenProps<"ImportReview">) {
+  const { colors } = useTheme();
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [rowId, setRowId] = useState<number | null>(null);
+  const [externalContactId, setExternalContactId] = useState<string | null>(null);
+  const [name, setName] = useState("");
+  const [birthday, setBirthday] = useState<string | null>(null);
+  const [photoRelPath, setPhotoRelPath] = useState<string | null>(null);
+  const [categories, setCategories] = useState<Array<{ id: number; name: string }>>([]);
+  const [categoryId, setCategoryId] = useState<number | null>(null);
+  const [trackingEnabled, setTrackingEnabled] = useState(false);
+  const [intervalDays, setIntervalDays] = useState<number | null>(null);
+  const [methods, setMethods] = useState<MethodGroups>({ phone: [], email: [] });
+
+  const load = useCallback(async () => {
+    try {
+      const exec = getExecutor();
+      const [rows, settings, nextCategories] = await Promise.all([
+        listSessionRows(exec, route.params.sessionId),
+        getAppSettings(exec),
+        listCategories(exec),
+      ]);
+      const row = rows.find((candidate) => candidate.contactId === null);
+      if (!row) {
+        Alert.alert("Import unavailable", "This contact has already been handled.");
+        navigation.goBack();
+        return;
+      }
+      const snapshot = parseSnapshot(row.sourcePayload);
+      if (!snapshot) throw new Error("invalid import snapshot");
+      const mapped = mapPickedContact(
+        {
+          lookupKey: row.externalContactId,
+          displayName: snapshot.displayName,
+          methods: snapshot.methods,
+          birthday: snapshot.birthday,
+          photoTempUri: null,
+        },
+        {
+          categoryId: null,
+          effectivePhoneRegion: settings.phoneRegionOverride ?? getDeviceRegion(),
+        },
+      );
+      setRowId(row.id);
+      setExternalContactId(row.externalContactId);
+      setName(mapped.input.name);
+      setBirthday(mapped.birthday);
+      setPhotoRelPath(row.photoRelPath);
+      const methodDrafts = mapped.input.methodDrafts ?? [];
+      setMethods({
+        phone: methodDrafts.filter((method) => method.type === "phone").map((method) => ({ ...method, extension: "", label: "Main" })),
+        email: methodDrafts.filter((method) => method.type === "email").map((method) => ({ ...method, extension: "", label: "Main" })),
+      });
+      setCategories(nextCategories);
+    } catch (error) {
+      Logger.error(LOG_SCOPE, "failed to load import review", error);
+      Alert.alert("Couldn't load this import", "Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  }, [navigation, route.params.sessionId]);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  const canImport = !loading && !saving && rowId !== null && externalContactId !== null && name.trim().length > 0;
+  const previewUri = useMemo(
+    () => (photoRelPath ? resolveImportStagingUri(photoRelPath) : null),
+    [photoRelPath],
+  );
+
+  async function onImport() {
+    if (!canImport || rowId === null || externalContactId === null) return;
+    setSaving(true);
+    try {
+      const now = localDateTime();
+      const contactId = await commitSingleImport(getExecutor(), {
+        sessionId: route.params.sessionId,
+        rowId,
+        input: {
+          uid: newUid(),
+          name: name.trim(),
+          intervalDays: trackingEnabled ? intervalDays ?? FREQUENCY_DAYS.Monthly : null,
+          trackingEnabled,
+          now,
+          categoryId,
+          methodDrafts: toMethodDrafts(methods),
+          methodNormalization: {
+            effectivePhoneRegion: (await getAppSettings(getExecutor())).phoneRegionOverride ?? getDeviceRegion(),
+          },
+        },
+        externalLinks: [{ provider: "android", externalContactId }],
+        birthday,
+        now,
+      });
+      navigation.replace("Profile", { contactId });
+    } catch (error) {
+      Logger.error(LOG_SCOPE, "failed to commit import", error);
+      Alert.alert("Couldn't import contact", "Please check the name and try again.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <ScrollView style={{ backgroundColor: colors.background }} contentContainerStyle={styles.content}>
+      <View style={styles.header}>
+        <Pressable onPress={() => navigation.goBack()} style={[styles.back, { borderColor: colors.border }]}>
+          <Text style={{ color: colors.textSecondary }}>Back</Text>
+        </Pressable>
+        <Text accessibilityRole="header" style={[styles.title, { color: colors.textPrimary }]}>Review import</Text>
+      </View>
+      {previewUri ? (
+        <Image source={{ uri: previewUri }} contentFit="cover" style={styles.photo} onError={() => setPhotoRelPath(null)} />
+      ) : (
+        <Avatar photo={null} name={name} size={96} />
+      )}
+      <View style={styles.field}>
+        <Text style={[styles.label, { color: colors.textSecondary }]}>Name</Text>
+        <TextInput value={name} onChangeText={setName} placeholder="Their name" placeholderTextColor={colors.textSecondary} style={[styles.input, { color: colors.textPrimary, backgroundColor: colors.surface, borderColor: colors.border }]} />
+      </View>
+      <View style={styles.field}>
+        <Text style={[styles.label, { color: colors.textSecondary }]}>Orbit participation</Text>
+        <View style={styles.lifecycle}>
+          {([true, false] as const).map((enabled) => (
+            <Pressable key={String(enabled)} onPress={() => setTrackingEnabled(enabled)} style={[styles.choice, { backgroundColor: trackingEnabled === enabled ? colors.accent : colors.surface, borderColor: trackingEnabled === enabled ? colors.accent : colors.border }]}>
+              <Text style={{ color: trackingEnabled === enabled ? colors.background : colors.textPrimary }}>{enabled ? "Bound" : "Unbound"}</Text>
+            </Pressable>
+          ))}
+        </View>
+      </View>
+      <View style={styles.field}>
+        <Text style={[styles.label, { color: colors.textSecondary }]}>Category</Text>
+        <View style={[styles.picker, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          <Picker selectedValue={categoryId ?? -1} onValueChange={(value) => setCategoryId(value === -1 ? null : Number(value))} dropdownIconColor={colors.textSecondary} style={{ color: colors.textPrimary }}>
+            <Picker.Item label="No category" value={-1} />
+            {categories.map((category) => <Picker.Item key={category.id} label={category.name} value={category.id} />)}
+          </Picker>
+        </View>
+      </View>
+      {trackingEnabled ? <View style={styles.field}><Text style={[styles.label, { color: colors.textSecondary }]}>Frequency</Text><FrequencyPicker value={intervalDays ?? FREQUENCY_DAYS.Monthly} onChange={setIntervalDays} /></View> : null}
+      <View style={styles.field}>
+        <ContactMethodsEditor
+          methods={methods}
+          onAdd={(type) => setMethods((current) => addMethodDraft(current, type, newUid()))}
+          onUpdate={(uid, patch) => setMethods((current) => updateMethodDraft(current, uid, patch))}
+          onRemove={(uid) => setMethods((current) => removeMethodDraft(current, uid))}
+          onChoosePrimary={(uid) => setMethods((current) => choosePrimary(current, uid))}
+        />
+      </View>
+      <View style={styles.field}>
+        <Text style={[styles.label, { color: colors.textSecondary }]}>Birthday</Text>
+        <TextInput value={birthday ?? ""} onChangeText={(value) => setBirthday(value.trim() || null)} placeholder="YYYY-MM-DD" placeholderTextColor={colors.textSecondary} style={[styles.input, { color: colors.textPrimary, backgroundColor: colors.surface, borderColor: colors.border }]} />
+      </View>
+      <Pressable disabled={!canImport} onPress={() => void onImport()} style={[styles.import, { backgroundColor: canImport ? colors.accent : colors.surface, borderColor: canImport ? colors.accent : colors.border }]}>
+        <Text style={{ color: canImport ? colors.background : colors.textSecondary, fontWeight: "600" }}>Import</Text>
+      </Pressable>
+    </ScrollView>
+  );
+}
+
+const styles = StyleSheet.create({
+  content: { padding: 16, gap: 16 },
+  header: { flexDirection: "row", alignItems: "center", gap: 12 },
+  back: { minHeight: 44, justifyContent: "center", paddingHorizontal: 12, borderWidth: 1, borderRadius: 10 },
+  title: { fontSize: 22, fontWeight: "700" },
+  photo: { width: 96, height: 96, borderRadius: 48 },
+  field: { gap: 8 },
+  label: { fontSize: 13, fontWeight: "600" },
+  input: { minHeight: 44, borderWidth: 1, borderRadius: 10, paddingHorizontal: 12 },
+  lifecycle: { flexDirection: "row", gap: 8 },
+  choice: { minHeight: 44, minWidth: 96, justifyContent: "center", alignItems: "center", borderWidth: 1, borderRadius: 10 },
+  picker: { borderWidth: 1, borderRadius: 10, overflow: "hidden" },
+  import: { minHeight: 48, justifyContent: "center", alignItems: "center", borderWidth: 1, borderRadius: 10 },
+});

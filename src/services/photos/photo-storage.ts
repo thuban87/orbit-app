@@ -41,6 +41,7 @@
 import { Directory, File, Paths } from "expo-file-system";
 import { isSafeColName } from "@/db/col-name";
 import {
+  assertSafeImportStagingRelative,
   assertSafeRelative,
   assertSafeRestorePendingRelative,
 } from "@/db/photo-relative-path";
@@ -51,6 +52,7 @@ const LOG_SCOPE = "photo-storage";
 /** The document-dir subdirectory every master + sidecar lives under. */
 const AVATARS_DIR = "avatars";
 const RESTORE_PENDING_DIR = `${AVATARS_DIR}/_restore_pending`;
+const IMPORT_STAGING_DIR = "import-staging";
 
 /**
  * The photo write target. Each maps to a `contactId`-derivable (or fixed, for
@@ -140,6 +142,19 @@ export function restorePendingRelPath(target: RestorePendingTarget, sessionToken
   return relative;
 }
 
+/** A flat, session-scoped staging name for an evictable picker-cache photo. */
+export function importStagingRelPath(
+  sessionToken: string,
+  rowToken: string,
+): string {
+  if (!/^[A-Za-z0-9_-]+$/.test(sessionToken) || !/^[A-Za-z0-9_-]+$/.test(rowToken)) {
+    throw new Error("unsafe import staging token");
+  }
+  const relative = `${IMPORT_STAGING_DIR}/import-${sessionToken}-${rowToken}.jpg`;
+  assertSafeImportStagingRelative(relative);
+  return relative;
+}
+
 /** Stage into an unambiguous temporary name, then atomically rename it ready. */
 export async function stageRestorePending(srcUri: string, relative: string): Promise<void> {
   assertSafeRestorePendingRelative(relative);
@@ -148,6 +163,24 @@ export async function stageRestorePending(srcUri: string, relative: string): Pro
   new Directory(Paths.document, RESTORE_PENDING_DIR).create({ intermediates: true, idempotent: true });
   await new File(srcUri).copy(new File(Paths.document, tmpRelative), { overwrite: true });
   await new File(Paths.document, tmpRelative).move(new File(Paths.document, relative), { overwrite: true });
+}
+
+/** Move an accepted picker cache photo into durable document-dir staging. */
+export async function stageImportPhoto(cacheUri: string, relative: string): Promise<void> {
+  assertSafeImportStagingRelative(relative);
+  const tmpRelative = `${relative}.stage-tmp`;
+  assertSafeImportStagingRelative(tmpRelative);
+  new Directory(Paths.document, IMPORT_STAGING_DIR).create({
+    intermediates: true,
+    idempotent: true,
+  });
+  await new File(cacheUri).copy(new File(Paths.document, tmpRelative), {
+    overwrite: true,
+  });
+  await new File(Paths.document, tmpRelative).move(
+    new File(Paths.document, relative),
+    { overwrite: true },
+  );
 }
 
 /**
@@ -177,6 +210,20 @@ export function listRestorePendingPhotos(): Array<{ relative: string; isStageTmp
   });
 }
 
+/** List every flat import staging file for launch-time orphan reconciliation. */
+export function listImportStagingPhotos(): Array<{
+  relative: string;
+  isStageTmpOrphan: boolean;
+}> {
+  const directory = new Directory(Paths.document, IMPORT_STAGING_DIR);
+  if (!directory.exists) return [];
+  return directory.list().map((entry) => {
+    const relative = `${IMPORT_STAGING_DIR}/${entry.name}`;
+    assertSafeImportStagingRelative(relative);
+    return { relative, isStageTmpOrphan: relative.endsWith(".stage-tmp") };
+  });
+}
+
 /** Best-effort cleanup for recovery-only files. */
 export function deleteRestorePending(relative: string): void {
   assertSafeRestorePendingRelative(relative);
@@ -184,6 +231,16 @@ export function deleteRestorePending(relative: string): void {
     new File(Paths.document, relative).delete();
   } catch (error) {
     Logger.error(LOG_SCOPE, "restore pending cleanup failed", error);
+  }
+}
+
+/** Best-effort cleanup for an accepted-but-discarded import session. */
+export function deleteImportStaging(relative: string): void {
+  assertSafeImportStagingRelative(relative);
+  try {
+    new File(Paths.document, relative).delete();
+  } catch (error) {
+    Logger.error(LOG_SCOPE, "import staging cleanup failed", error);
   }
 }
 
@@ -213,6 +270,13 @@ export function resolvePhotoUri(relative: string): string {
 /** Resolve a recovery-only staging file without widening canonical-path rules. */
 export function resolveRestorePendingUri(relative: string): string {
   assertSafeRestorePendingRelative(relative);
+  const base = Paths.document.uri.endsWith("/") ? Paths.document.uri : `${Paths.document.uri}/`;
+  return `${base}${relative}`;
+}
+
+/** Preview-only resolver; import staging can never be passed to Avatar. */
+export function resolveImportStagingUri(relative: string): string {
+  assertSafeImportStagingRelative(relative);
   const base = Paths.document.uri.endsWith("/") ? Paths.document.uri : `${Paths.document.uri}/`;
   return `${base}${relative}`;
 }

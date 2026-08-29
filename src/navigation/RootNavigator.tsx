@@ -1,4 +1,5 @@
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
+import { Text, View } from "react-native";
 import { ArchivedContactsScreen } from "@/screens/ArchivedContactsScreen";
 import { BackupScreen } from "@/screens/BackupScreen";
 import { BackupSettingsScreen } from "@/screens/BackupSettingsScreen";
@@ -11,6 +12,7 @@ import { CustomFieldsScreen } from "@/screens/CustomFieldsScreen";
 import { DigestScreen } from "@/screens/DigestScreen";
 import { EditContactScreen } from "@/screens/EditContactScreen";
 import { HomeScreen } from "@/screens/HomeScreen";
+import { ImportReviewScreen } from "@/screens/ImportReviewScreen";
 import { ManageFavouritesScreen } from "@/screens/ManageFavouritesScreen";
 import { NeverContactedScreen } from "@/screens/NeverContactedScreen";
 import { OrreryScreen } from "@/screens/OrreryScreen";
@@ -18,6 +20,7 @@ import { RestorePreviewScreen } from "@/screens/RestorePreviewScreen";
 import { RestoreResultScreen } from "@/screens/RestoreResultScreen";
 import { SettingsScreen } from "@/screens/SettingsScreen";
 import { UnboundContactsScreen } from "@/screens/UnboundContactsScreen";
+import { useTheme } from "@/theme";
 import type { RootStackParamList, RootStackScreenProps } from "./types";
 
 /**
@@ -55,6 +58,25 @@ function CustomFieldsRoute({
   return <CustomFieldsScreen onBack={() => navigation.goBack()} />;
 }
 
+/** Temporary reachable destination until the import expansion plans land. */
+function ImportRoutePlaceholder() {
+  const { colors } = useTheme();
+  return (
+    <View
+      style={{
+        flex: 1,
+        alignItems: "center",
+        justifyContent: "center",
+        backgroundColor: colors.background,
+      }}
+    >
+      <Text style={{ color: colors.textSecondary }}>
+        This import step is coming next.
+      </Text>
+    </View>
+  );
+}
+
 export function RootNavigator() {
   return (
     <Stack.Navigator
@@ -83,6 +105,11 @@ export function RootNavigator() {
       <Stack.Screen name="BackupSettings" component={BackupSettingsScreen} />
       <Stack.Screen name="RestorePreview" component={RestorePreviewScreen} />
       <Stack.Screen name="RestoreResult" component={RestoreResultScreen} />
+      <Stack.Screen name="ImportReview" component={ImportReviewScreen} />
+      <Stack.Screen name="BulkImportSetup" component={ImportRoutePlaceholder} />
+      <Stack.Screen name="ImportProgress" component={ImportRoutePlaceholder} />
+      <Stack.Screen name="DuplicateReview" component={ImportRoutePlaceholder} />
+      <Stack.Screen name="ImportComplete" component={ImportRoutePlaceholder} />
     </Stack.Navigator>
   );
 }

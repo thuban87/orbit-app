@@ -29,6 +29,13 @@ export const SAFE_RELATIVE = /^avatars\/[A-Za-z0-9_-]+\.(jpg|jpeg|png|webp)$/;
 export const SAFE_RESTORE_PENDING_RELATIVE = /^avatars\/_restore_pending\/[A-Za-z0-9_-]+\.(jpg|jpeg|png|webp)(?:\.stage-tmp)?$/;
 
 /**
+ * Import acquisition staging is deliberately outside the canonical avatars
+ * namespace. The filename stays flat so a single directory listing can
+ * reconcile every accepted-picker photo after an interrupted import.
+ */
+export const SAFE_IMPORT_STAGING_RELATIVE = /^import-staging\/[A-Za-z0-9_-]+\.(jpg|jpeg|png|webp)(?:\.stage-tmp)?$/;
+
+/**
  * Throw unless `relative` is a safe `avatars/<name>.<ext>` relative path. Used at
  * the FS chokepoint AND at the DAO write boundary as defense-in-depth: a stored
  * absolute/`cache://` value would otherwise reach `resolvePhotoUri` and throw
@@ -53,5 +60,16 @@ export function assertSafeRestorePendingRelative(relative: string): void {
     || !SAFE_RESTORE_PENDING_RELATIVE.test(relative)
   ) {
     throw new Error(`unsafe restore pending photo path: ${JSON.stringify(relative)}`);
+  }
+}
+
+/** Throw unless a durable, recovery-only import staging path is safe. */
+export function assertSafeImportStagingRelative(relative: string): void {
+  if (
+    typeof relative !== "string"
+    || relative.includes("\0")
+    || !SAFE_IMPORT_STAGING_RELATIVE.test(relative)
+  ) {
+    throw new Error(`unsafe import staging photo path: ${JSON.stringify(relative)}`);
   }
 }

@@ -89,7 +89,10 @@ import {
   contactPhotoRelPath,
   customFieldPhotoRelPath,
   deletePhoto,
+  deleteImportStaging,
   deleteRestorePending,
+  importStagingRelPath,
+  listImportStagingPhotos,
   listRestorePendingPhotos,
   photoFileExists,
   type PhotoTargetDescriptor,
@@ -99,6 +102,8 @@ import {
   relPathForTarget,
   restorePendingRelPath,
   resolveRestorePendingUri,
+  resolveImportStagingUri,
+  stageImportPhoto,
   resolvePhotoUriFromDocumentUri,
   stageRestorePending,
   stageRestorePendingBase64,
@@ -223,6 +228,20 @@ describe("restore pending staging — separate recovery-only namespace", () => {
     expect(photoFileExists("avatars/contact-42.jpg")).toBe(true);
     expect(() => photoFileExists("avatars/_restore_pending/x.jpg")).toThrow();
     expect(listRestorePendingPhotos()).toEqual([]);
+  });
+});
+
+describe("import staging — flat durable picker-cache namespace", () => {
+  it("stages, lists, resolves, and deletes a flat import photo", async () => {
+    const relative = importStagingRelPath("session_1", "row_2");
+    expect(relative).toBe("import-staging/import-session_1-row_2.jpg");
+    await stageImportPhoto("file:///cache/picker.jpg", relative);
+    expect(h.ops).toContain(`copy file:///cache/picker.jpg -> file:///doc/${relative}.stage-tmp`);
+    expect(h.ops).toContain(`move file:///doc/${relative}.stage-tmp -> file:///doc/${relative}`);
+    expect(resolveImportStagingUri(relative)).toBe(`file:///doc/${relative}`);
+    deleteImportStaging(relative);
+    expect(h.ops).toContain(`delete file:///doc/${relative}`);
+    expect(listImportStagingPhotos()).toEqual([]);
   });
 });
 
