@@ -116,6 +116,7 @@ export function readOverlooked(exec: SqlExecutor): Promise<OverlookedRow[]> {
     (${REASON_SQL}) AS reason
    FROM contacts c
   WHERE c.archived_at IS NULL
+    AND c.tracking_enabled = 1
     AND c.last_contact IS NOT NULL
     AND (${STATUS_SQL}) = 'rogue'
   ORDER BY progress DESC, c.name COLLATE NOCASE, c.id`;

@@ -50,7 +50,18 @@ beforeEach(async () => {
   exec = nodeSqliteExecutor(db);
   await runMigrations(
     exec,
-    [migration001, migration002, migration003, migration004, migration005, migration006, migration007, migration009, migration010, migration011],
+    [
+      migration001,
+      migration002,
+      migration003,
+      migration004,
+      migration005,
+      migration006,
+      migration007,
+      migration009,
+      migration010,
+      migration011,
+    ],
     11,
     { now: NOW, newUid: uid, defaultPhoneRegion: "US" },
   );
@@ -196,9 +207,16 @@ describe("readRetrospective", () => {
   });
 
   it("keeps Unbound relationship history in the retrospective", async () => {
-    const unbound = await seedContact({ name: "Dormant history", trackingEnabled: 0 });
-    await seedInteraction(unbound, { occurredAt: localDateTimeOffset(-1, "10:00:00") });
-    expect((await readRetrospective(exec)).map((row) => row.id)).toEqual([unbound]);
+    const unbound = await seedContact({
+      name: "Dormant history",
+      trackingEnabled: 0,
+    });
+    await seedInteraction(unbound, {
+      occurredAt: localDateTimeOffset(-1, "10:00:00"),
+    });
+    expect((await readRetrospective(exec)).map((row) => row.id)).toEqual([
+      unbound,
+    ]);
   });
 });
 
@@ -361,7 +379,10 @@ describe("readGentleLine", () => {
   });
 
   it("keeps Unbound relationship history in the all-relationship gentle line", async () => {
-    const unbound = await seedContact({ name: "Dormant effort", trackingEnabled: 0 });
+    const unbound = await seedContact({
+      name: "Dormant effort",
+      trackingEnabled: 0,
+    });
     await seedInteraction(unbound, {
       occurredAt: localDateTimeOffset(-1, "10:00:00"),
       quality: "hard",

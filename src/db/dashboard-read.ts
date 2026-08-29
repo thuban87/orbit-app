@@ -84,6 +84,8 @@ export interface DashboardRow {
   modified_at: string;
   /** The category label via the LEFT JOIN, or null when uncategorised. */
   categoryLabel: string | null;
+  /** Lifecycle state retained for direct search and Never Contacted retrieval. */
+  trackingEnabled: number;
   favourite_rank: number | null;
   status: ProfileStatus | null;
   progress: number | null;
@@ -126,8 +128,19 @@ const FUEL_LINE = `(SELECT text
  * branches (HIGH-1). `cat.name` is aliased to `categoryLabel`; `c.name` is
  * qualified everywhere so the LEFT JOIN's `categories.name` can never shadow it.
  */
-const CARD_STATUS = `CASE WHEN c.last_contact IS NULL THEN NULL ELSE (${PROGRESS_SQL}) END AS progress,
-    CASE WHEN c.last_contact IS NULL THEN NULL ELSE (${STATUS_SQL}) END AS status`;
+const CARD_STATUS = `CASE WHEN c.tracking_enabled = 0 OR c.last_contact IS NULL THEN NULL ELSE (${PROGRESS_SQL}) END AS progress,
+    CASE WHEN c.tracking_enabled = 0 OR c.last_contact IS NULL THEN NULL ELSE (${STATUS_SQL}) END AS status`;
+
+/** Projection guard for retrieval rows that may intentionally retain Unbound contacts. */
+const CARD_FAVOURITE_RANK =
+  "CASE WHEN c.tracking_enabled = 1 THEN c.favourite_rank ELSE NULL END AS favourite_rank";
+
+/** Persisted Bound predicate for dashboard card populations. */
+export const DASHBOARD_BOUND_WHERE = "c.tracking_enabled = 1";
+/** Persisted Bound predicate for the standalone favourite population. */
+export const FAVOURITES_BOUND_WHERE = "tracking_enabled = 1";
+/** Persisted Bound predicate for dashboard header/population totals. */
+export const LIVE_CONTACTS_BOUND_WHERE = "tracking_enabled = 1";
 
 /** The FROM + LEFT JOIN common to the card reads. */
 const CARD_FROM = `FROM contacts c
@@ -140,6 +153,7 @@ const CARD_FROM = `FROM contacts c
  * `date('now','localtime')`.
  */
 const BASE_WHERE = `c.archived_at IS NULL
+     AND ${DASHBOARD_BOUND_WHERE}
      AND c.last_contact IS NOT NULL
      AND (c.snooze_until IS NULL OR date(c.snooze_until) <= date('now','localtime'))`;
 
@@ -203,7 +217,8 @@ export function listDashboard(
     c.photo AS photo,
     c.modified_at AS modified_at,
     cat.name AS categoryLabel,
-    c.favourite_rank AS favourite_rank,
+    c.tracking_enabled AS trackingEnabled,
+    ${CARD_FAVOURITE_RANK},
     ${CARD_STATUS},
     ${FUEL_LINE} AS fuelText,
     ${snippet} AS snippet
@@ -226,12 +241,11 @@ export function listDashboard(
   } else if (opts.filter === "favourites") {
     // Branch 2 — archived-only relaxation: a never-contacted OR currently-snoozed
     // favourite is STILL shown (its status/progress read null via the CASE wrap).
-    where = "c.archived_at IS NULL AND c.favourite_rank IS NOT NULL";
+    where = `c.archived_at IS NULL AND ${DASHBOARD_BOUND_WHERE} AND c.favourite_rank IS NOT NULL`;
     orderBy = "c.favourite_rank ASC, c.name COLLATE NOCASE, c.id";
   } else if (opts.filter === "snoozed") {
     // Branch 3 — REVEAL the future-snoozed population the default hides.
-    where =
-      "c.archived_at IS NULL AND c.snooze_until IS NOT NULL AND date(c.snooze_until) > date('now','localtime')";
+    where = `c.archived_at IS NULL AND ${DASHBOARD_BOUND_WHERE} AND c.snooze_until IS NOT NULL AND date(c.snooze_until) > date('now','localtime')`;
     orderBy = SORT[opts.sort];
   } else {
     // Branch 4 — the restrictive base, with a narrowing predicate ANDed WITHIN it.
@@ -270,7 +284,8 @@ export function listNeverContacted(
     c.photo AS photo,
     c.modified_at AS modified_at,
     cat.name AS categoryLabel,
-    c.favourite_rank AS favourite_rank,
+    c.tracking_enabled AS trackingEnabled,
+    ${CARD_FAVOURITE_RANK},
     NULL AS progress,
     NULL AS status,
     ${FUEL_LINE} AS fuelText,
@@ -289,7 +304,7 @@ export function listFavourites(exec: SqlExecutor): Promise<FavouriteRow[]> {
   return exec.getAllAsync<FavouriteRow>(
     `SELECT id, name, photo, modified_at, favourite_rank
        FROM contacts
-      WHERE archived_at IS NULL AND favourite_rank IS NOT NULL
+      WHERE archived_at IS NULL AND ${FAVOURITES_BOUND_WHERE} AND favourite_rank IS NOT NULL
       ORDER BY favourite_rank ASC`,
   );
 }
@@ -314,7 +329,7 @@ export function countNeverContacted(exec: SqlExecutor): Promise<number> {
 export function countSnoozed(exec: SqlExecutor): Promise<number> {
   return count(
     exec,
-    "archived_at IS NULL AND snooze_until IS NOT NULL AND date(snooze_until) > date('now','localtime')",
+    `archived_at IS NULL AND ${LIVE_CONTACTS_BOUND_WHERE} AND snooze_until IS NOT NULL AND date(snooze_until) > date('now','localtime')`,
   );
 }
 
@@ -329,7 +344,10 @@ export function countArchived(exec: SqlExecutor): Promise<number> {
  * last_contact IS NOT NULL` (excludes never-contacted AND archived); HIGH-2.
  */
 export function countLiveContacts(exec: SqlExecutor): Promise<number> {
-  return count(exec, "archived_at IS NULL AND last_contact IS NOT NULL");
+  return count(
+    exec,
+    `archived_at IS NULL AND ${LIVE_CONTACTS_BOUND_WHERE} AND last_contact IS NOT NULL`,
+  );
 }
 
 /** Non-archived contacts with a birthday — the birthday banner candidates. */

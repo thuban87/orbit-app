@@ -11,21 +11,23 @@
  * fragments). The ONLY runtime value is `contact_id` in NEWEST_FOR_CONTACT,
  * which is `?`-bound, never interpolated.
  */
-import { PROGRESS_SQL, STATUS_SQL } from "@/db/status";
+import {
+  PROGRESS_SQL,
+  STATUS_CADENCE_PRECONDITION,
+  STATUS_SQL,
+} from "@/db/status";
 
 /**
  * Dashboard status scan: one row per LIVE, CONTACTED contact with its computed
  * progress + status, most-overdue first.
  *
- * `last_contact IS NOT NULL` is the never-contacted predicate ([data→dashboard])
- * and is ALSO what makes STATUS_SQL safe here — STATUS_SQL alone would bucket a
- * NULL last_contact as 'stable' (every comparison false → ELSE), so this filter
- * is load-bearing, not merely cosmetic. `archived_at IS NULL` drops archived
- * rows (archived is excluded everywhere).
+ * `STATUS_CADENCE_PRECONDITION` is load-bearing: it filters Unbound nullable-
+ * cadence rows and never-contacted rows before STATUS_SQL could misclassify
+ * them. `archived_at IS NULL` drops archived rows.
  */
 export const STATUS_SCAN = `SELECT id, name, (${PROGRESS_SQL}) AS progress, (${STATUS_SQL}) AS status
     FROM contacts
-   WHERE last_contact IS NOT NULL AND archived_at IS NULL
+   WHERE archived_at IS NULL AND ${STATUS_CADENCE_PRECONDITION}
    ORDER BY progress DESC`;
 
 /**

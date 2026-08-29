@@ -11,14 +11,14 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { nodeSqliteExecutor, openTestDb } from "@/db/__testkit__/node-sqlite";
 import {
   type BirthdayCandidate,
-  DASHBOARD_BOUND_WHERE,
   countArchived,
   countLiveContacts,
   countNeverContacted,
   countSnoozed,
+  DASHBOARD_BOUND_WHERE,
   type DashboardRow,
-  type FavouriteRow,
   FAVOURITES_BOUND_WHERE,
+  type FavouriteRow,
   LIVE_CONTACTS_BOUND_WHERE,
   listBirthdayCandidates,
   listDashboard,
@@ -53,7 +53,18 @@ beforeEach(async () => {
   exec = nodeSqliteExecutor(db);
   await runMigrations(
     exec,
-    [migration001, migration002, migration003, migration004, migration005, migration006, migration007, migration009, migration010, migration011],
+    [
+      migration001,
+      migration002,
+      migration003,
+      migration004,
+      migration005,
+      migration006,
+      migration007,
+      migration009,
+      migration010,
+      migration011,
+    ],
     11,
     { now: NOW, newUid: uid, defaultPhoneRegion: "US" },
   );
@@ -169,7 +180,9 @@ describe("listDashboard — default population + exclusions + snooze", () => {
       favouriteRank: 1,
     });
 
-    expect(ids(await listDashboard(exec, { filter: "all", sort: "status" }))).toEqual([bound]);
+    expect(
+      ids(await listDashboard(exec, { filter: "all", sort: "status" })),
+    ).toEqual([bound]);
   });
 
   it("status sort orders most-overdue first with a name/id tiebreak", async () => {
@@ -677,7 +690,11 @@ describe("listFavourites", () => {
   });
 
   it("hides a dormant favourite rank while retaining it in storage", async () => {
-    await seedContact({ name: "Dormant", favouriteRank: 1, trackingEnabled: 0 });
+    await seedContact({
+      name: "Dormant",
+      favouriteRank: 1,
+      trackingEnabled: 0,
+    });
     const bound = await seedContact({ name: "Bound", favouriteRank: 2 });
     expect(ids(await listFavourites(exec))).toEqual([bound]);
   });

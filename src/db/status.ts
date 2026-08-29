@@ -50,13 +50,18 @@ export const ROGUE_K = 3;
  * yield identical progress regardless of the wall-clock time-of-day stored, and
  * avoids double-converting the stored column (the fixed review HIGH).
  *
- * NULL note: when `last_contact IS NULL` this expression is NULL, which every
- * comparison in STATUS_SQL treats as false → STATUS_SQL alone would bucket a
- * never-contacted row as 'stable'. That is only safe because the sole Phase-2
- * consumer (STATUS_SCAN in queries.ts) pre-filters `last_contact IS NULL`. Any
- * future STANDALONE caller of STATUS_SQL MUST filter NULL first.
+ * Lifecycle precondition: the status fragments are valid only for Bound rows
+ * with a positive cadence and a non-null `last_contact`. An Unbound contact may
+ * have a nullable cadence, so every population caller must use
+ * `STATUS_CADENCE_PRECONDITION` before evaluating these fragments. Direct by-id
+ * callers must instead return a neutral result for rows outside that contract.
  */
 export const PROGRESS_SQL = `CAST(julianday(date('now','localtime')) - julianday(date(last_contact)) AS REAL) / interval_days`;
+
+/** Required WHERE predicate for any population that evaluates status fragments. */
+export const STATUS_CADENCE_PRECONDITION = `tracking_enabled = 1
+     AND interval_days IS NOT NULL
+     AND last_contact IS NOT NULL`;
 
 /**
  * Query-time status bucket over PROGRESS_SQL. `rogue` is a 4th threshold

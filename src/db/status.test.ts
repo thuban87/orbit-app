@@ -33,8 +33,8 @@ import {
   REASON_SQL,
   ROGUE_K,
   STABLE_MAX,
-  STATUS_SQL,
   STATUS_CADENCE_PRECONDITION,
+  STATUS_SQL,
   WOBBLE_MAX,
 } from "@/db/status";
 import type { SqlExecutor } from "@/db/types";
@@ -54,7 +54,18 @@ beforeEach(async () => {
   exec = nodeSqliteExecutor(db);
   await runMigrations(
     exec,
-    [migration001, migration002, migration003, migration004, migration005, migration006, migration007, migration009, migration010, migration011],
+    [
+      migration001,
+      migration002,
+      migration003,
+      migration004,
+      migration005,
+      migration006,
+      migration007,
+      migration009,
+      migration010,
+      migration011,
+    ],
     11,
     { now: NOW, newUid: uid, defaultPhoneRegion: "US" },
   );

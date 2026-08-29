@@ -38,6 +38,7 @@ interface RawRow {
   progress: number | null;
   rarely_responds: number;
   last_contact: string | null;
+  trackingEnabled: number;
 }
 
 /**
@@ -57,6 +58,7 @@ export async function getContactStatus(
   const row = await exec.getFirstAsync<RawRow>(
     `SELECT rarely_responds,
             last_contact,
+            tracking_enabled AS trackingEnabled,
             (${PROGRESS_SQL}) AS progress,
             (${STATUS_SQL}) AS status,
             (${REASON_SQL}) AS reason
@@ -67,9 +69,10 @@ export async function getContactStatus(
   if (!row) {
     return null;
   }
-  // Never-contacted guard: STATUS_SQL would bucket a NULL last_contact as
-  // 'stable', so force the whole derived triple to null here.
-  if (row.last_contact === null) {
+  // Unbound and never-contacted direct retrieval stays available, but neither
+  // may evaluate cadence status: STATUS_SQL would otherwise produce chrome for
+  // an inactive or NULL-cadence row.
+  if (row.trackingEnabled === 0 || row.last_contact === null) {
     return {
       status: null,
       reason: null,
