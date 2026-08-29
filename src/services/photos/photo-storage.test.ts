@@ -97,23 +97,23 @@ vi.mock("expo-file-system", () => {
 import {
   contactPhotoRelPath,
   customFieldPhotoRelPath,
-  deletePhoto,
   deleteImportStaging,
+  deletePhoto,
   deleteRestorePending,
   importStagingRelPath,
   listImportStagingPhotos,
   listRestorePendingPhotos,
-  photoFileExists,
   type PhotoTargetDescriptor,
   persistMaster,
+  photoFileExists,
   profilePhotoRelPath,
   reconcilePhotoDir,
   relPathForTarget,
-  restorePendingRelPath,
-  resolveRestorePendingUri,
   resolveImportStagingUri,
-  stageImportPhoto,
   resolvePhotoUriFromDocumentUri,
+  resolveRestorePendingUri,
+  restorePendingRelPath,
+  stageImportPhoto,
   stageRestorePending,
   stageRestorePendingBase64,
 } from "@/services/photos/photo-storage";
@@ -210,26 +210,42 @@ describe("assertSafeRelative — generic boundary guard at the FS entry points",
 
 describe("restore pending staging — separate recovery-only namespace", () => {
   it("uses a stable uid plus per-attempt token and never broadens canonical paths", () => {
-    const relative = restorePendingRelPath({ kind: "contact", uid: "contact_a" }, "session_1");
-    expect(relative).toBe("avatars/_restore_pending/contact-contact_a-session_1.jpg");
-    expect(() => resolvePhotoUriFromDocumentUri("file:///doc", relative)).toThrow();
+    const relative = restorePendingRelPath(
+      { kind: "contact", uid: "contact_a" },
+      "session_1",
+    );
+    expect(relative).toBe(
+      "avatars/_restore_pending/contact-contact_a-session_1.jpg",
+    );
+    expect(() =>
+      resolvePhotoUriFromDocumentUri("file:///doc", relative),
+    ).toThrow();
     expect(resolveRestorePendingUri(relative)).toBe(`file:///doc/${relative}`);
   });
 
   it("stages through .stage-tmp then makes the ready file visible", async () => {
     const relative = restorePendingRelPath({ kind: "profile" }, "session_1");
     await stageRestorePending("file:///source.jpg", relative);
-    expect(h.ops).toContain(`copy file:///source.jpg -> file:///doc/${relative}.stage-tmp`);
-    expect(h.ops).toContain(`move file:///doc/${relative}.stage-tmp -> file:///doc/${relative}`);
+    expect(h.ops).toContain(
+      `copy file:///source.jpg -> file:///doc/${relative}.stage-tmp`,
+    );
+    expect(h.ops).toContain(
+      `move file:///doc/${relative}.stage-tmp -> file:///doc/${relative}`,
+    );
     deleteRestorePending(relative);
     expect(h.ops).toContain(`delete file:///doc/${relative}`);
   });
 
   it("decodes backup bytes directly into durable staging, never through cache", async () => {
-    const relative = restorePendingRelPath({ kind: "contact", uid: "stable_uid" }, "session_2");
+    const relative = restorePendingRelPath(
+      { kind: "contact", uid: "stable_uid" },
+      "session_2",
+    );
     await stageRestorePendingBase64("YQ==", relative);
     expect(h.ops).toContain(`write file:///doc/${relative}.stage-tmp`);
-    expect(h.ops).toContain(`move file:///doc/${relative}.stage-tmp -> file:///doc/${relative}`);
+    expect(h.ops).toContain(
+      `move file:///doc/${relative}.stage-tmp -> file:///doc/${relative}`,
+    );
   });
 
   it("reports canonical existence only after validating a canonical relative path", () => {
@@ -245,8 +261,12 @@ describe("import staging — flat durable picker-cache namespace", () => {
     const relative = importStagingRelPath("session_1", "row_2");
     expect(relative).toBe("import-staging/import-session_1-row_2.jpg");
     await stageImportPhoto("file:///cache/picker.jpg", relative);
-    expect(h.ops).toContain(`copy file:///cache/picker.jpg -> file:///doc/${relative}.stage-tmp`);
-    expect(h.ops).toContain(`move file:///doc/${relative}.stage-tmp -> file:///doc/${relative}`);
+    expect(h.ops).toContain(
+      `copy file:///cache/picker.jpg -> file:///doc/${relative}.stage-tmp`,
+    );
+    expect(h.ops).toContain(
+      `move file:///doc/${relative}.stage-tmp -> file:///doc/${relative}`,
+    );
     expect(resolveImportStagingUri(relative)).toBe(`file:///doc/${relative}`);
     expect(listImportStagingPhotos()).toEqual([
       { relative, isStageTmpOrphan: false },
