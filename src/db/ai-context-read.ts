@@ -16,8 +16,8 @@
  *      DIFFERENT table) are NEVER selected here. The aggregate interaction read
  *      lists ONLY channel / quality / connected / occurred_at.
  *   3. `interval_days` and `rarely_responds` are read via `getImpactInputs` for
- *      DERIVATION ONLY (they feed the gravity/intensity math). They MUST NOT be
- *      placed on `PromptContext` or reach the payload (C3-M3).
+ *      DERIVATION ONLY. They MUST NOT be placed on `PromptContext` or reach the
+ *      payload (C3-M3); Unbound intensity is explicitly neutral.
  *   4. Fuel comes ONLY through `getRankedFuel` (off_limits / unconfirmed-AI /
  *      blank already excluded in SQL). Custom values come ONLY through the
  *      validated `col_name` boundary in field-values-dao, filtered to live,
@@ -25,12 +25,6 @@
  *      widens the allowlist, and NEVER interpolate a label as SQL.
  * =============================================================================
  */
-import { getRankedFuel } from "@/db/fuel-read";
-import { listDefs } from "@/db/field-defs-dao";
-import type { CustomFieldDef } from "@/db/field-types";
-import { getValuesForContact } from "@/db/field-values-dao";
-import { getImpactInputs } from "@/db/impact-read";
-import type { SqlExecutor } from "@/db/types";
 import type {
   CadenceAggregate,
   PromptContext,
@@ -38,6 +32,12 @@ import type {
   RankedFuelEntry,
   SharedFieldValue,
 } from "@/ai/prompt-types";
+import { listDefs } from "@/db/field-defs-dao";
+import type { CustomFieldDef } from "@/db/field-types";
+import { getValuesForContact } from "@/db/field-values-dao";
+import { getRankedFuel } from "@/db/fuel-read";
+import { getImpactInputs } from "@/db/impact-read";
+import type { SqlExecutor } from "@/db/types";
 import {
   computeContactGravity,
   computeContactIntensity,
@@ -222,21 +222,30 @@ export async function readPromptContext(
   });
 
   // (3) Derived gravity tier + intensity aggregate. getImpactInputs reads
-  //     interval_days / rarely_responds INTERNALLY for the math only — those raw
-  //     values are never placed on PromptContext (C3-M3).
+  //     lifecycle plus interval_days / rarely_responds internally; none of those
+  //     raw values are placed on PromptContext (C3-M3).
   const impact = await getImpactInputs(exec, contactId);
-  const gravityTier = impact
-    ? computeContactGravity(impact, now).tierName
-    : computeContactGravity(
-        { intervalDays: 1, rarelyResponds: 0, interactions: [] },
-        now,
-      ).tierName;
-  const intensityResult = impact
-    ? computeContactIntensity(impact, now)
-    : computeContactIntensity(
-        { intervalDays: 1, rarelyResponds: 0, interactions: [] },
-        now,
-      );
+  if (!impact) {
+    throw new Error(`readPromptContext: missing impact inputs id=${contactId}`);
+  }
+  const gravityTier = computeContactGravity(impact, now).tierName;
+  const intensityResult = computeContactIntensity(impact, now);
+  const intensity =
+    "available" in intensityResult
+      ? {
+          currentCount: 0,
+          intendedPerPeriod: 0,
+          multiple: 0,
+          trailingAvgGapDays: null,
+        }
+      : {
+          // periodDays is intentionally NOT surfaced — it equals interval_days,
+          // a derivation-only input barred from egress (C3-M3).
+          currentCount: intensityResult.currentCount,
+          intendedPerPeriod: intensityResult.intendedPerPeriod,
+          multiple: intensityResult.multiple,
+          trailingAvgGapDays: intensityResult.trailingAvgGapDays,
+        };
 
   // (4) Neutral interaction aggregates + newest channel (no prose selected).
   const aggregates = await readInteractionAggregates(exec, contactId);
@@ -249,14 +258,7 @@ export async function readPromptContext(
     category: identity.categoryName ?? "",
     rankedFuel,
     gravityTier,
-    intensity: {
-      // periodDays is intentionally NOT surfaced — it equals interval_days, a
-      // derivation-only input barred from egress (C3-M3).
-      currentCount: intensityResult.currentCount,
-      intendedPerPeriod: intensityResult.intendedPerPeriod,
-      multiple: intensityResult.multiple,
-      trailingAvgGapDays: intensityResult.trailingAvgGapDays,
-    },
+    intensity,
     quality: aggregates.quality,
     cadence: aggregates.cadence,
     newestChannel: aggregates.newestChannel,
