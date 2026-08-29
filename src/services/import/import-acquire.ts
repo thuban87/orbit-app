@@ -5,13 +5,24 @@
  * copied into document-dir staging before the durable session snapshot is
  * inserted. Screens subsequently read the session and never re-query Android.
  */
-import { acceptImportSessionWithRows, completeSession, type ImportSessionMode } from "@/db/import-session-dao";
-import { importContactRecord, type ExternalContactLinkInput } from "@/db/imported-contact-dao";
+
 import type { CreateContactFullInput } from "@/db/contacts-dao";
+import {
+  acceptImportSessionWithRows,
+  completeSession,
+  type ImportSessionMode,
+} from "@/db/import-session-dao";
+import {
+  type ExternalContactLinkInput,
+  importContactRecord,
+} from "@/db/imported-contact-dao";
 import type { SqlExecutor } from "@/db/types";
 import { newUid } from "@/db/uid";
 import { mapPickedContact } from "@/logic/picked-contact-map";
-import { importStagingRelPath, stageImportPhoto } from "@/services/photos/photo-storage";
+import {
+  importStagingRelPath,
+  stageImportPhoto,
+} from "@/services/photos/photo-storage";
 import type { PickedContact } from "../../../modules/orbit-contact-picker";
 
 export interface AcceptPickedContactsOptions {

@@ -120,7 +120,10 @@ export function relPathForTarget(target: PhotoTargetDescriptor): string {
 }
 
 /** A session-scoped staging name that can never be mistaken for a canonical DB path. */
-export function restorePendingRelPath(target: RestorePendingTarget, sessionToken: string): string {
+export function restorePendingRelPath(
+  target: RestorePendingTarget,
+  sessionToken: string,
+): string {
   if (!/^[A-Za-z0-9_-]+$/.test(sessionToken)) {
     throw new Error("unsafe restore session token");
   }
@@ -133,7 +136,8 @@ export function restorePendingRelPath(target: RestorePendingTarget, sessionToken
       name = `profile-${sessionToken}`;
       break;
     case "customField":
-      if (!isSafeColName(target.colName)) throw new Error("unsafe custom-field col_name");
+      if (!isSafeColName(target.colName))
+        throw new Error("unsafe custom-field col_name");
       name = `cv-${target.uid}-${target.colName}-${sessionToken}`;
       break;
   }
@@ -147,7 +151,10 @@ export function importStagingRelPath(
   sessionToken: string,
   rowToken: string,
 ): string {
-  if (!/^[A-Za-z0-9_-]+$/.test(sessionToken) || !/^[A-Za-z0-9_-]+$/.test(rowToken)) {
+  if (
+    !/^[A-Za-z0-9_-]+$/.test(sessionToken) ||
+    !/^[A-Za-z0-9_-]+$/.test(rowToken)
+  ) {
     throw new Error("unsafe import staging token");
   }
   const relative = `${IMPORT_STAGING_DIR}/import-${sessionToken}-${rowToken}.jpg`;
@@ -156,17 +163,31 @@ export function importStagingRelPath(
 }
 
 /** Stage into an unambiguous temporary name, then atomically rename it ready. */
-export async function stageRestorePending(srcUri: string, relative: string): Promise<void> {
+export async function stageRestorePending(
+  srcUri: string,
+  relative: string,
+): Promise<void> {
   assertSafeRestorePendingRelative(relative);
   const tmpRelative = `${relative}.stage-tmp`;
   assertSafeRestorePendingRelative(tmpRelative);
-  new Directory(Paths.document, RESTORE_PENDING_DIR).create({ intermediates: true, idempotent: true });
-  await new File(srcUri).copy(new File(Paths.document, tmpRelative), { overwrite: true });
-  await new File(Paths.document, tmpRelative).move(new File(Paths.document, relative), { overwrite: true });
+  new Directory(Paths.document, RESTORE_PENDING_DIR).create({
+    intermediates: true,
+    idempotent: true,
+  });
+  await new File(srcUri).copy(new File(Paths.document, tmpRelative), {
+    overwrite: true,
+  });
+  await new File(Paths.document, tmpRelative).move(
+    new File(Paths.document, relative),
+    { overwrite: true },
+  );
 }
 
 /** Move an accepted picker cache photo into durable document-dir staging. */
-export async function stageImportPhoto(cacheUri: string, relative: string): Promise<void> {
+export async function stageImportPhoto(
+  cacheUri: string,
+  relative: string,
+): Promise<void> {
   assertSafeImportStagingRelative(relative);
   const tmpRelative = `${relative}.stage-tmp`;
   assertSafeImportStagingRelative(tmpRelative);
@@ -188,19 +209,28 @@ export async function stageImportPhoto(cacheUri: string, relative: string): Prom
  * This intentionally does not route through an OS cache URI: once this resolves,
  * the bytes survive until the committed restore-photo journal can recover them.
  */
-export async function stageRestorePendingBase64(base64: string, relative: string): Promise<void> {
+export async function stageRestorePendingBase64(
+  base64: string,
+  relative: string,
+): Promise<void> {
   assertSafeRestorePendingRelative(relative);
   const tmpRelative = `${relative}.stage-tmp`;
   assertSafeRestorePendingRelative(tmpRelative);
   const binary = atob(base64);
   const bytes = Uint8Array.from(binary, (char) => char.charCodeAt(0));
-  new Directory(Paths.document, RESTORE_PENDING_DIR).create({ intermediates: true, idempotent: true });
+  new Directory(Paths.document, RESTORE_PENDING_DIR).create({
+    intermediates: true,
+    idempotent: true,
+  });
   const tmp = new File(Paths.document, tmpRelative);
   tmp.write(bytes);
   await tmp.move(new File(Paths.document, relative), { overwrite: true });
 }
 
-export function listRestorePendingPhotos(): Array<{ relative: string; isStageTmpOrphan: boolean }> {
+export function listRestorePendingPhotos(): Array<{
+  relative: string;
+  isStageTmpOrphan: boolean;
+}> {
   const directory = new Directory(Paths.document, RESTORE_PENDING_DIR);
   if (!directory.exists) return [];
   return directory.list().map((entry) => {
@@ -270,14 +300,18 @@ export function resolvePhotoUri(relative: string): string {
 /** Resolve a recovery-only staging file without widening canonical-path rules. */
 export function resolveRestorePendingUri(relative: string): string {
   assertSafeRestorePendingRelative(relative);
-  const base = Paths.document.uri.endsWith("/") ? Paths.document.uri : `${Paths.document.uri}/`;
+  const base = Paths.document.uri.endsWith("/")
+    ? Paths.document.uri
+    : `${Paths.document.uri}/`;
   return `${base}${relative}`;
 }
 
 /** Preview-only resolver; import staging can never be passed to Avatar. */
 export function resolveImportStagingUri(relative: string): string {
   assertSafeImportStagingRelative(relative);
-  const base = Paths.document.uri.endsWith("/") ? Paths.document.uri : `${Paths.document.uri}/`;
+  const base = Paths.document.uri.endsWith("/")
+    ? Paths.document.uri
+    : `${Paths.document.uri}/`;
   return `${base}${relative}`;
 }
 

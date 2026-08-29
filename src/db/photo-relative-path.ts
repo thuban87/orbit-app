@@ -26,14 +26,16 @@ export const SAFE_RELATIVE = /^avatars\/[A-Za-z0-9_-]+\.(jpg|jpeg|png|webp)$/;
  * database paths must continue to satisfy SAFE_RELATIVE and can never point
  * into this recovery-only directory.
  */
-export const SAFE_RESTORE_PENDING_RELATIVE = /^avatars\/_restore_pending\/[A-Za-z0-9_-]+\.(jpg|jpeg|png|webp)(?:\.stage-tmp)?$/;
+export const SAFE_RESTORE_PENDING_RELATIVE =
+  /^avatars\/_restore_pending\/[A-Za-z0-9_-]+\.(jpg|jpeg|png|webp)(?:\.stage-tmp)?$/;
 
 /**
  * Import acquisition staging is deliberately outside the canonical avatars
  * namespace. The filename stays flat so a single directory listing can
  * reconcile every accepted-picker photo after an interrupted import.
  */
-export const SAFE_IMPORT_STAGING_RELATIVE = /^import-staging\/[A-Za-z0-9_-]+\.(jpg|jpeg|png|webp)(?:\.stage-tmp)?$/;
+export const SAFE_IMPORT_STAGING_RELATIVE =
+  /^import-staging\/[A-Za-z0-9_-]+\.(jpg|jpeg|png|webp)(?:\.stage-tmp)?$/;
 
 /**
  * Throw unless `relative` is a safe `avatars/<name>.<ext>` relative path. Used at
@@ -55,21 +57,25 @@ export function assertSafeRelative(relative: string): void {
 /** Throw unless a recovery-only restore staging path is safe. */
 export function assertSafeRestorePendingRelative(relative: string): void {
   if (
-    typeof relative !== "string"
-    || relative.includes("\0")
-    || !SAFE_RESTORE_PENDING_RELATIVE.test(relative)
+    typeof relative !== "string" ||
+    relative.includes("\0") ||
+    !SAFE_RESTORE_PENDING_RELATIVE.test(relative)
   ) {
-    throw new Error(`unsafe restore pending photo path: ${JSON.stringify(relative)}`);
+    throw new Error(
+      `unsafe restore pending photo path: ${JSON.stringify(relative)}`,
+    );
   }
 }
 
 /** Throw unless a durable, recovery-only import staging path is safe. */
 export function assertSafeImportStagingRelative(relative: string): void {
   if (
-    typeof relative !== "string"
-    || relative.includes("\0")
-    || !SAFE_IMPORT_STAGING_RELATIVE.test(relative)
+    typeof relative !== "string" ||
+    relative.includes("\0") ||
+    !SAFE_IMPORT_STAGING_RELATIVE.test(relative)
   ) {
-    throw new Error(`unsafe import staging photo path: ${JSON.stringify(relative)}`);
+    throw new Error(
+      `unsafe import staging photo path: ${JSON.stringify(relative)}`,
+    );
   }
 }

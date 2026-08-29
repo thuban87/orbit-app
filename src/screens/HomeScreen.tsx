@@ -41,8 +41,8 @@ import {
   TextInput,
   View,
 } from "react-native";
-import { Avatar } from "@/components/Avatar";
 import { AddSpeedDialFab } from "@/components/AddSpeedDialFab";
+import { Avatar } from "@/components/Avatar";
 import { BirthdayBanner } from "@/components/BirthdayBanner";
 import { ContactCard } from "@/components/ContactCard";
 import { type FilterChip, FilterChipRow } from "@/components/FilterChipRow";
