@@ -1,0 +1,40 @@
+{
+  "version": "1.0",
+  "timestamp": "2026-08-29T19:23:07.238Z",
+  "phase": "19",
+  "phase_name": "System Contact Import",
+  "phase_dir": ".planning/phases/19-system-contact-import",
+  "plan": 17,
+  "task": 1,
+  "total_tasks": 3,
+  "status": "paused",
+  "completed_tasks": [
+    {"id": "19-12", "name": "Android Contact Picker action and launch-failure recovery", "status": "done", "commit": "cbab166"},
+    {"id": "19-13", "name": "Import birthday validation at review and DAO boundary", "status": "done", "commit": "ed572d9"},
+    {"id": "19-14", "name": "Leave guard preserves resolved import sessions", "status": "done", "commit": "ab11300"},
+    {"id": "19-15", "name": "Cluster completion terminalization and routing", "status": "done", "commit": "0a1da6e"},
+    {"id": "19-16", "name": "Successful photo-staging retirement and retryable retention", "status": "done", "commit": "56ec9d8"},
+    {"id": "android17-startup", "name": "Fresh APK startup readiness diagnosis", "status": "done", "commit": "32f82f6"}
+  ],
+  "remaining_tasks": [
+    {"id": "19-17-task-1", "name": "Android 17 picker launch, cancellation, session, and re-invocation UAT", "status": "blocked"},
+    {"id": "19-17-task-2", "name": "Resolved-flow, consolidation, resume, and discard UAT", "status": "not_started"},
+    {"id": "19-17-task-3", "name": "Photo lifecycle and birthday validation UAT", "status": "not_started"},
+    {"id": "phase-verification", "name": "Rerun Phase 19 goal verification after 19-17 summary exists", "status": "not_started"}
+  ],
+  "blockers": [
+    {"description": "The fresh Android 17 Pixel build reaches the dashboard, but adb pointer injection (`adb shell input tap`) on visible FAB and Settings bounds produces no touch/navigation effect. ADB key injection works, so this is specific to pointer delivery in the running app.", "type": "technical", "workaround": "Establish a reliable UI-interaction path (physical touches or diagnose Android input injection) before asserting any plan 19-17 UAT behavior."}
+  ],
+  "async_jobs": [],
+  "human_actions_pending": [
+    {"action": "Provide or restore a working way to interact with the Pixel UI, or have Claude diagnose the ignored pointer injection.", "context": "The device, exact fresh APK, Metro, database, and dashboard are all healthy; only pointer injection blocks the UAT scenarios.", "blocking": true}
+  ],
+  "decisions": [
+    {"decision": "Do not create 19-17-SUMMARY.md or claim device UAT completion.", "rationale": "No picker, session, completion, photo, or birthday behavior could be genuinely driven after pointer input was ignored.", "phase": "19"},
+    {"decision": "Treat the apparent blank MainActivity as resolved operational readiness, not an app defect.", "rationale": "The hash-matched fresh APK reached the dashboard and initialized orbit.db on five bounded cold launches; use a semantic `Your week` readiness wait before inspecting UAT state.", "phase": "19"},
+    {"decision": "Classify import_session_rows as transient, local-only backup state.", "rationale": "The Phase 17 tombstone audit now explicitly exempts it; it is not portable mergeable data.", "phase": "19"}
+  ],
+  "uncommitted_files": [".gsd/", ".planning/phases/19-system-contact-import/19-VERIFICATION.md"],
+  "next_action": "From the ready dashboard on the connected Pixel, first establish a working touch/input path; then execute 19-17 Task 1 with evidence before attempting the other device scenarios.",
+  "context_notes": "Phase 19 gap closure implementation is complete through 19-16 and fully green locally. The only remaining execution plan is 19-17 device UAT. The initial full test gate exposed a pre-existing Phase 17 audit gap; it was fixed in b2af184 and all later full gates pass."
+}
