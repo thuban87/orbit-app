@@ -229,7 +229,7 @@ async function replaceAllReset(exec: SqlExecutor, manifest: BackupManifest, dele
   const ownedResidualTables: Record<MergeableEntityType, readonly string[]> = {
     categories: [], profile: [], contacts: ["field_history"], contact_methods: [], external_contact_links: [], contact_method_provenance: [], interactions: [], events: [], fuel: [], contact_links: [], custom_field_defs: [], custom_field_values: [],
   };
-  for (const table of ["contact_method_provenance", "interactions", "events", "fuel", "custom_field_values", "contact_links", "external_contact_links", "contact_methods", ...ownedResidualTables.contacts, "contacts", "custom_field_defs"]) await exec.runAsync(`DELETE FROM ${table}`);
+  for (const table of ["import_session_rows", "import_sessions", "contact_method_provenance", "interactions", "events", "fuel", "custom_field_values", "contact_links", "external_contact_links", "contact_methods", ...ownedResidualTables.contacts, "contacts", "custom_field_defs"]) await exec.runAsync(`DELETE FROM ${table}`);
 }
 async function importTombstones(exec: SqlExecutor, manifest: BackupManifest): Promise<void> { for (const r of manifest.tombstones) await exec.runAsync("INSERT INTO tombstones (entity_type,entity_uid,deleted_at) VALUES (?,?,?) ON CONFLICT(entity_type,entity_uid) DO UPDATE SET deleted_at=CASE WHEN excluded.deleted_at>tombstones.deleted_at THEN excluded.deleted_at ELSE tombstones.deleted_at END", [r.entityType,r.entityUid,r.deletedAt]); }
 async function writePhotoReference(exec: SqlExecutor, target: PhotoTarget, relative: string | null): Promise<void> {

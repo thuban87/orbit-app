@@ -40,17 +40,18 @@ import { migration008 } from "@/db/migrations/008-restore-photo-journal";
 import { migration009 } from "@/db/migrations/009-contact-method-normalization";
 import { migration010 } from "@/db/migrations/010-contact-method-label";
 import { migration011 } from "@/db/migrations/011-contact-lifecycle-schema";
+import { migration012 } from "@/db/migrations/012-import-sessions";
 import { runMigrations } from "@/db/migrations/runner";
 import type { SqlExecutor } from "@/db/types";
 
 const NOW = "2026-08-25 12:00:00";
 let uid = 0;
 const newUid = () => `uid-${++uid}`;
-const migrations = [migration001, migration002, migration003, migration004, migration005, migration006, migration007, migration008, migration009, migration010, migration011];
+const migrations = [migration001, migration002, migration003, migration004, migration005, migration006, migration007, migration008, migration009, migration010, migration011, migration012];
 
 async function db(): Promise<SqlExecutor> {
   const exec = nodeSqliteExecutor(openTestDb());
-  await runMigrations(exec, migrations, 11, { now: NOW, newUid });
+  await runMigrations(exec, migrations, 12, { now: NOW, newUid });
   return exec;
 }
 
@@ -140,6 +141,45 @@ describe("applyRestore", () => {
     await expect(destination.getFirstAsync<{ entity_uid: string }>(
       "SELECT entity_uid FROM tombstones WHERE entity_type = 'contact' AND entity_uid = 'old-local'",
     )).resolves.toEqual({ entity_uid: "old-local" });
+  });
+
+  it("purges local-only import sessions during Replace-all restore", async () => {
+    const source = await db();
+    await source.runAsync(
+      `INSERT INTO contacts (uid,name,interval_days,rarely_responds,reminders_off,created_at,modified_at)
+       VALUES (?,?,?,?,?,?,?)`,
+      ["replacement", "Replacement", 21, 0, 0, NOW, "2026-08-25 12:01:00"],
+    );
+    const manifest = await buildExportManifest(source, {
+      exportedAt: NOW,
+      readPhotoBase64: async () => "",
+    });
+    const destination = await db();
+    const session = await destination.runAsync(
+      `INSERT INTO import_sessions (uid,mode,phone_region,total_rows,created_at,modified_at)
+       VALUES (?,?,?,?,?,?)`,
+      ["local-session", "bulk", "US", 1, NOW, NOW],
+    );
+    await destination.runAsync(
+      `INSERT INTO import_session_rows
+        (uid,session_id,external_contact_id,source_payload,created_at,modified_at)
+       VALUES (?,?,?,?,?,?)`,
+      ["local-row", session.lastInsertRowId, "lookup", "{}", NOW, NOW],
+    );
+
+    await expect(applyRestore(destination, manifest, "replace-all")).resolves.toMatchObject({
+      status: "applied",
+    });
+    await expect(
+      destination.getFirstAsync<{ count: number }>(
+        "SELECT COUNT(*) AS count FROM import_sessions",
+      ),
+    ).resolves.toEqual({ count: 0 });
+    await expect(
+      destination.getFirstAsync<{ count: number }>(
+        "SELECT COUNT(*) AS count FROM import_session_rows",
+      ),
+    ).resolves.toEqual({ count: 0 });
   });
 
   it("stages only a winning incoming photo, journals it in the transaction, and reports a retryable finalize failure", async () => {
