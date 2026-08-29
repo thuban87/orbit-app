@@ -772,16 +772,30 @@ Plans:
 **Plans:** 11 plans (5 waves)
 
 Plans:
+**Wave 1**
+
 - [ ] 19-01-PLAN.md — Migration 012 durable import-session schema + session DAO/read chokepoint (one-way gated)
 - [ ] 19-02-PLAN.md — Native Android 17 contact-picker module (ACTION_PICK_CONTACTS, SDK_INT gate, no READ_CONTACTS)
 - [ ] 19-03-PLAN.md — picked-contact-map (pure) + imported-contact-dao (composed Unbound create + external link + provenance)
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
 - [ ] 19-04-PLAN.md — TRACER: single-contact import end-to-end (speed-dial FAB + Settings entry + review) device-verified before expansion
 - [ ] 19-05-PLAN.md — Duplicate-evidence engine (deterministic bypass + colourless advisory ladder)
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
 - [ ] 19-06-PLAN.md — Bulk import: chunked partial-failure driver + shared-defaults setup + determinate progress
+
+**Wave 4** *(blocked on Wave 3 completion)*
+
 - [ ] 19-07-PLAN.md — Reusable candidate card grid + confidence chip + single/multi duplicate interrupts
-- [ ] 19-08-PLAN.md — Import completion summary + bridge to Unbound contacts + Retry
 - [ ] 19-09-PLAN.md — Durable resume/discard launch sweep + cancellation guard + staged-photo cleanup
 - [ ] 19-10-PLAN.md — Photo (post-commit Orbit-owned master) + birthday import, best-effort and failure-isolated
+
+**Wave 5** *(blocked on Wave 4 completion)*
+
+- [ ] 19-08-PLAN.md — Import completion summary + bridge to Unbound contacts + Retry
 - [ ] 19-11-PLAN.md — Conservative multi-source consolidation (Cluster K) — explicit combine-into-one, never silent
 
 ### Phase 20: Contact Reconciliation & Merge
