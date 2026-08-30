@@ -1,42 +1,30 @@
 {
   "version": "1.0",
-  "timestamp": "2026-08-29T22:30:00.000Z",
+  "timestamp": "2026-08-30T00:15:00.000Z",
   "phase": "19",
   "phase_name": "System Contact Import",
-  "status": "paused-clean-handoff",
-  "summary": "Phase-19 first device UAT surfaced 3 things: 2 code defects fixed+verified (19-18 scrim, 19-19 picker visibility), and a persistent OS-level Android-17 picker failure on the Pixel 6 (not app code). Owner reversed the 'Android 17+ only / no READ_CONTACTS' decision (ADR-002) → new Phase 19.1 for a hybrid two-picker (older-Android path). This session set up the 19.1 framework; next sessions finish 19 and discuss/plan 19.1.",
-  "two_threads_next": [
-    {
-      "thread": "Finish Phase 19 (Android-17 path)",
-      "when": "new session",
-      "start_with": "Try the Android-17 picker remediation routes in 19-DEVICE-UAT-FINDINGS.md (route 1: `pm clear com.android.contactspicker` then re-test). If the picker works: run 19-17 Task 1 (17 picker launch/snapshot) + fix the 3 code-review defects (#1 Events-as-birthday, #2 silent read-fail, #3 nameless-row resume nag). Note: 19-17 Tasks 2-3 (shared downstream) will also be covered by the 19.1 3a UAT.",
-      "note": "Owner corrected: the picker failure is likely a corrupted picker-app state (à la Phase-18.1 DocumentsUI), NOT a Google OS bug to wait for."
-    },
-    {
-      "thread": "Phase 19.1 (older-Android hybrid picker)",
-      "when": "new session, after (or parallel to) finishing 19",
-      "start_with": "/gsd-discuss-phase 19.1 — read .planning/phases/19.1-.../19.1-SEED.md + ADR-002 first. Do NOT let plans get pre-created; owner wants a normal discuss → spec → plan flow.",
-      "note": "19.1 doesn't depend on the 17 picker working; it unblocks device UAT on the Pixel 3a regardless."
-    }
-  ],
+  "status": "complete",
+  "summary": "Phase 19 is COMPLETE and device-verified. The Android-17 picker dead-end (previously believed an OS defect) was root-caused on-device to orbit's own intent: the USE_SYSTEM_CONTACTS_PICKER extra was set under android.provider.extra.* while the system picker reads android.intent.extra.*. Fixed in gap plan 19-20; the native picker now renders on the Pixel 6. Full 19-17 device UAT run (all 3 tasks PASS) and a fresh verifier verdict (PASS 4/4) followed. All commits LOCAL on main, NOT pushed.",
+  "resolved_blocker": {
+    "was": "Android-17 system contact picker non-functional on the Pixel 6 (ContactsPickerActivity -> 'No PreferredActivity Found' -> empty chooser).",
+    "root_cause": "orbit set USE_SYSTEM_CONTACTS_PICKER under android.provider.extra.* (ignored) instead of android.intent.extra.* -> the trampoline read the flag as false and forwarded to a non-existent preferred picker. Device-state routes (pm clear, defaults, multi-user) proven dead; no OS update needed.",
+    "fix": "modules/orbit-contact-picker/android/.../OrbitContactPickerModule.kt — correct the extra namespace + explicit multi-select selection limit.",
+    "analysis": ".planning/phases/19-system-contact-import/19-ANDROID17-PICKER-ROOTCAUSE.md"
+  },
   "completed_this_session": [
-    {"id": "19-18", "name": "Speed-dial scrim touch fix", "commit": "33eefd7", "device_verified": true},
-    {"id": "19-19", "name": "Contact-picker package visibility", "commit": "17f41d2", "note": "verified: app now launches ContactsPickerActivity; end-to-end still OS-blocked"},
-    {"id": "ADR-002", "name": "Hybrid two-picker decision (reverses Android-17-only/no-READ_CONTACTS)", "file": "docs/decisions/ADR-002-hybrid-two-picker-contact-import.md"},
-    {"id": "19.1-framework", "name": "Phase 19.1 inserted in ROADMAP + seed context doc", "dir": ".planning/phases/19.1-older-android-contact-picker-hybrid-two-picker-adr-002", "note": "framework only — NOT planned yet, per owner"},
-    {"id": "spike", "name": "Older-Android permissions spike", "file": ".planning/phases/19-system-contact-import/19-SPIKE-older-android-permissions.md"},
-    {"id": "code-review", "name": "Import-subsystem code review (verified findings)", "file": ".planning/phases/19-system-contact-import/19-DEVICE-UAT-FINDINGS.md"}
+    {"id": "19-20", "name": "Android-17 picker intent fix", "commits": ["cfa660c", "b56956e"], "device_verified": true},
+    {"id": "19-17", "name": "Device UAT of the five gap fixes (all 3 tasks PASS)", "commit": "9620096", "artifact": ".planning/phases/19-system-contact-import/19-17-SUMMARY.md"},
+    {"id": "19-VERIFICATION", "name": "Fresh phase verdict PASS 4/4 (supersedes stale 1/4)", "commit": "97bffc2"}
   ],
-  "blockers": [
-    {"description": "Android-17 system contact picker non-functional on the Pixel 6 (ContactsPickerActivity → 'No PreferredActivity Found' → empty chooser). Likely corrupted picker-app state, not orbit code. Remediation routes listed in 19-DEVICE-UAT-FINDINGS.md. Blocks ONLY the Android-17 happy-path (19-17 Task 1 on API 37); 19.1 + the 3a cover everything else.", "type": "device", "owned_by": "finish-19 thread"}
+  "still_open": [
+    "Code-review defects #1 (Events-as-birthday), #2 (silent read-fail), #3 (nameless-row resume nag) — verified in 19-DEVICE-UAT-FINDINGS.md; NOT part of Phase 19's five gap fixes.",
+    "Minor UX: single-import 'Already in Orbit' terminal screen offered only 'VIEW CONTACT'; back did not dismiss it."
   ],
-  "uncommitted_files": [".gsd/", ".planning/phases/19-system-contact-import/19-VERIFICATION.md"],
-  "key_docs": [
-    "docs/decisions/ADR-002-hybrid-two-picker-contact-import.md",
-    ".planning/phases/19-system-contact-import/19-DEVICE-UAT-FINDINGS.md",
-    ".planning/phases/19-system-contact-import/19-SPIKE-older-android-permissions.md",
-    ".planning/phases/19.1-older-android-contact-picker-hybrid-two-picker-adr-002/19.1-SEED.md"
-  ],
-  "infra_notes": "adb input tap works on RN (tap below the status-bar inset y>=~160 for header glyphs); no on-device sqlite3 (pull files/SQLite/orbit.db via run-as + read with node:sqlite); orbit Metro on :8082 (reverse routes 8081+8082 -> 8082); no secure lock so adb reboot is safe. Nothing pushed (owner pushes).",
-  "next_action": "New session: pick a thread. Recommended first: finish-19 picker remediation (pm clear com.android.contactspicker) — quick and may unblock the 17 path. 19.1 discussion can proceed independently whenever."
+  "uat_test_data_left": "4 real contacts imported during UAT left in place per owner (ids 3-6: Andrew Wales, Joyce Milligan, Dad, Chris Wales).",
+  "next_thread": {
+    "thread": "Phase 19.1 (older-Android hybrid picker, ADR-002)",
+    "start_with": "/gsd-discuss-phase 19.1 — read .planning/phases/19.1-.../19.1-SEED.md + ADR-002 first. Normal discuss -> spec -> plan; do NOT pre-create plans.",
+    "note": "Framework inserted (commit 79a7c24), NOT planned. Independent of the now-working Android-17 path."
+  },
+  "next_action": "Owner: push the local Phase-19 commits when ready. Next planning thread: /gsd-discuss-phase 19.1. STATE.md is owner-managed — agents do not stage it."
 }
