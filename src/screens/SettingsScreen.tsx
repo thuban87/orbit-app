@@ -6,6 +6,7 @@ import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { getCountries } from "libphonenumber-js";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
+  Alert,
   FlatList,
   Modal,
   Pressable,
@@ -49,7 +50,7 @@ import {
   type AiProviderId,
 } from "@/services/ai-types";
 import { getDeviceRegion } from "@/services/device-region";
-import { routePickedImport } from "@/services/import/import-acquire";
+import { startContactImport } from "@/services/import/start-contact-import";
 import { reconcileDigestSchedule } from "@/services/notifications/digest-schedule";
 import { reconcileSchedule } from "@/services/notifications/notification-schedule";
 import {
@@ -60,6 +61,7 @@ import { useAiModelPrefs } from "@/stores/ai-model-prefs-store";
 import { useTheme } from "@/theme";
 import { Logger } from "@/utils/logger";
 import { pickContacts } from "../../modules/orbit-contact-picker";
+import { contactImportMode } from "./use-contact-import-mode";
 import { pinResultCopy } from "./settings-add-widget";
 import {
   buildAiSettingsPatch,
@@ -71,11 +73,6 @@ import {
 } from "./settings-ai-logic";
 import { phoneRegionValueLabel } from "./settings-lifecycle-logic";
 import { phoneRegionOverridePatch } from "./settings-region-logic";
-import {
-  IMPORT_UNSUPPORTED_COPY,
-  IMPORT_UNSUPPORTED_TITLE,
-  useImportUnsupported,
-} from "./use-import-unsupported";
 
 const LOG_SCOPE = "settings-screen";
 
@@ -131,8 +128,6 @@ export function SettingsScreen() {
   const { colors } = useTheme();
   const navigation =
     useNavigation<NativeStackNavigationProp<RootStackParamList>>();
-  const importUnsupported = useImportUnsupported();
-
   // Self-record photo seed. `name` is nullable (the id=1 seed row carries no name
   // until a self-name editor ships), so a stable "You" fallback below keeps the
   // initials avatar deterministic ("Y") rather than a permanently blank swatch.
@@ -153,26 +148,21 @@ export function SettingsScreen() {
   const [phoneRegionSearch, setPhoneRegionSearch] = useState("");
 
   const onImportContacts = useCallback(async () => {
-    if (importUnsupported) return;
     try {
-      const [picked, currentSettings] = await Promise.all([
-        pickContacts({ multiple: true }),
-        getAppSettings(getExecutor()),
-      ]);
-      await routePickedImport(
-        getExecutor(),
-        picked,
-        {
-          effectivePhoneRegion:
-            currentSettings.phoneRegionOverride ?? getDeviceRegion(),
-          now: localDateTime(),
-        },
-        { navigate: (route, params) => navigation.navigate(route, params) },
-      );
-    } catch (error) {
-      Logger.error(LOG_SCOPE, "failed to start contact import", error);
+      const currentSettings = await getAppSettings(getExecutor());
+      await startContactImport({
+        mode: contactImportMode(),
+        exec: getExecutor(),
+        effectivePhoneRegion:
+          currentSettings.phoneRegionOverride ?? getDeviceRegion(),
+        now: localDateTime(),
+        pick: () => pickContacts({ multiple: true }),
+        navigate: navigation.navigate,
+      });
+    } catch {
+      Alert.alert("Couldn't import contacts", "Please try again.");
     }
-  }, [importUnsupported, navigation]);
+  }, [navigation]);
 
   // The "Add Orbit widget" fallback copy — null while there is nothing to show,
   // set to the UI-SPEC fallback string when requestPinWidget can't pin (unsupported
@@ -756,7 +746,6 @@ export function SettingsScreen() {
           testID="settings-import-contacts-row"
           accessibilityRole="button"
           accessibilityLabel="Import contacts"
-          disabled={importUnsupported}
           onPress={() => void onImportContacts()}
           style={[
             styles.row,
@@ -766,22 +755,9 @@ export function SettingsScreen() {
           <Text style={[styles.rowLabel, { color: colors.textPrimary }]}>
             Import contacts
           </Text>
-          {importUnsupported ? (
-            <View style={styles.rowCopy}>
-              <Text
-                style={[styles.degradedHeading, { color: colors.textPrimary }]}
-              >
-                {IMPORT_UNSUPPORTED_TITLE}
-              </Text>
-              <Text style={[styles.helper, { color: colors.textSecondary }]}>
-                {IMPORT_UNSUPPORTED_COPY}
-              </Text>
-            </View>
-          ) : (
-            <Text style={[styles.helper, { color: colors.textSecondary }]}>
-              Choose people from your phone and review each import first.
-            </Text>
-          )}
+          <Text style={[styles.helper, { color: colors.textSecondary }]}>
+            Choose people from your phone and review each import first.
+          </Text>
         </Pressable>
       </View>
 
