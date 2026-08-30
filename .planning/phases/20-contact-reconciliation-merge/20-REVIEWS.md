@@ -1,8 +1,8 @@
 ---
 phase: 20
-convergence_cycle: 6
+convergence_cycle: 7
 reviewers: [codex, claude, cursor]
-reviewed_at: 2026-08-30T18:22:00Z
+reviewed_at: 2026-08-30T18:45:00Z
 plans_reviewed: [20-01-PLAN.md, 20-02-PLAN.md, 20-03-PLAN.md, 20-04-PLAN.md, 20-05-PLAN.md, 20-06-PLAN.md]
 models:
   codex: "gpt-5.6-terra (reasoning=low)"
@@ -13,9 +13,161 @@ model_sources:
   claude: "pinned"
   cursor: "unknown"
 cycle_summary:
-  current_high: 1
-  current_actionable: 0
+  current_high: 0
+  current_actionable: 2
 ---
+
+# Cross-AI Plan Review — Phase 20 (Convergence CYCLE 7 — FINAL)
+
+**Reviewers:** codex (gpt-5.6-terra), claude (sonnet, context-isolated), cursor. All three lanes ran
+(claude self-skip overridden by owner for this run — SELF_CLI treated as none). Lanes ran sequentially;
+none stubbed; none empty.
+
+**Lane weighting:** codex and cursor are source-grounded (both cited concrete `file:line` evidence
+verified below). The **claude** lane self-emitted the `[reviewed-without-source-citations]` marker —
+it reviewed the pasted plan text only, so its "0 remaining" verdict is folded in at REDUCED consensus
+weight, not counted at full grounded weight.
+
+## Consensus Summary
+
+The cycle-6 photo-snapshot-ordering HIGH is confirmed **fixed** by all three lanes: the PHOTO family's
+reviewed snapshot is deferred out of the apply txn and written only after post-commit
+`promoteReconcilePhoto`→`setContactPhoto` succeeds; on failure the photo is left unresolved to
+re-surface (20-03 must-haves, prohibitions, threat T-20-03-5/8, acceptance; `reconcile-apply` /
+`reconcile-photo` tests; 20-04 inherits the bulk contract). Merge atomicity, freshness revalidation,
+scalar-only `bumpDataRevisionCore` backup-visibility, additive-only bulk gating, non-reentrant
+`*Core`+wrapper composition, and `field_history` modified_at-free reparent all match real schema
+hazards verified on disk.
+
+**Divergence (the substantive output of this cycle):** cursor and (down-weighted) claude report 0/0.
+**Codex raised two source-grounded HIGHs on 20-03** that the other lanes missed, both rooted in the
+system-contact native picker contract. I re-verified every symbol Codex cited against the code on disk
+(not the plan text): all of Codex's *factual* claims are accurate. After grounding, I adjudicate both
+down from HIGH to **actionable non-HIGH** — the plan carries mitigating in-plan signals that keep each
+from being a guaranteed-wrong execution, but each is a genuine, non-cosmetic execution-contract gap the
+plan text should close explicitly. Neither is on the already-adjudicated deferral / v1-limitation list.
+Detail and evidence under **Current Actionable Non-HIGH Concerns** below.
+
+### Per-lane
+
+- **codex:** "Not execution-ready yet: two source-model gaps in 20-03 propagate to bulk/resume." Two
+  HIGH (method-label unavailability; birthday normalization boundary). 20-01/02/06 ready; 20-04/05
+  inherit. No merge-transaction concerns. (Adjudicated to 2 actionable below.)
+- **cursor:** 0 HIGH / 0 actionable / 6 advisory. Source-grounded cross-cutting verification table
+  (migration head 013, `updateContactMetadataCore` omits photo + no bump, `field_history` no
+  `modified_at`, partial unique indexes, non-reentrant mutex, backup sweep gate, photo snapshot
+  deferral) — all independently re-verified here as correct. Verdict: proceed.
+- **claude** *(down-weighted, text-only)*: 0 HIGH / 0 actionable; "execution-ready, proceed." Notes only
+  cosmetic density/duplication advisories.
+
+## Current HIGH Concerns
+
+**None.** No HIGH remains unresolved. The two items Codex rated HIGH are adjudicated to actionable
+non-HIGH after source-grounding (see below); the cycle-6 photo-ordering HIGH is fixed; the two owner
+deferrals (contact_redirects backup, UI-SPEC #5-vs-#12) and two v1 limitations (reconcile provenance,
+notification refresh lag) remain correctly flagged, not re-raised.
+
+## Current Actionable Non-HIGH Concerns
+
+Both are 20-03 execution-contract gaps stemming from the real native picker contract. Verified on disk:
+`PickedMethod` carries only `{ type, value }` (`modules/orbit-contact-picker/index.ts:9-11`); the Android
+bridge emits exactly `type`+`value` for phones/emails and a raw `Event.DATA1` string for birthday
+(`OrbitContactPickerModule.kt:422,430`); `updateContactMetadataCore` writes `birthday=?` with **no**
+canonicalization (`src/db/contacts-dao.ts:308-335`); import always canonicalizes birthday through
+`mapBirthdayForStorage` (`src/logic/picked-contact-map.ts:28-63,111`).
+
+1. **Birthday apply-path canonicalization is unspecified (codex HIGH → actionable; the more serious).**
+   The classifier is told to use the normalize/unreadable idiom "for birthday **comparison** shape"
+   (20-03:110) — which addresses false-conflict-on-compare — but the **apply** task treats birthday as a
+   "raw comparable value" (20-03:115) and builds `UpdateContactFullInput` overlaid with the "chosen
+   birthday" straight into `updateContactMetadataCore` (20-03:178) with no `mapBirthdayForStorage` step
+   and no `isBirthdayUnreadable` handling. If the diff surfaces the raw source `DATA1` value as the
+   applied option (comparison-shape ≠ applied value — the plan pins neither), accepting a source
+   birthday persists a non-canonical/unreadable string into `contacts.birthday`, unlike every other
+   write path. **Plan change:** state in 20-03 Task 3 (and the shared `applyReconcileSelections`) that the
+   applied birthday is the `mapBirthdayForStorage`-canonicalized value, and an unreadable source birthday
+   is routed to manual review, never auto-applied — mirroring import (`picked-contact-map.ts:111`). The
+   threat model already says "birthday via the shipped normalize/validate" (20-03:223); make the apply
+   body match it. (Only 20-03 needs the edit; 20-04 bulk inherits via the shared helper.)
+
+2. **Method-family `label` component is unpopulated by the source (codex HIGH → actionable).**
+   `serializeMethodFamily` sorts/serializes `(method_type, canonical_value, label)` and 20-03 asserts "a
+   LABEL change (Mobile→Personal) IS a meaningful change" (20-03:33,115), but source `PickedMethod` has
+   no label, so the label field is uniformly absent on source methods. The **narrow-memory** suppression
+   (source-vs-stored-source) is unaffected and works (label uniformly null → round-trips) — this is why
+   the cycle-4 fix that *requested* the label tuple (REVIEWS.md:614,640) still holds. The residual gap:
+   (a) the "label change is a change" behavior cannot fire from source data (an Android-picker capability
+   limit), and (b) if an executor applies the whole-family SET serialization to the **Orbit-vs-source**
+   additive/conflict determination, every user-labeled Orbit method (label present) vs source (label
+   absent) serializes byte-different → permanent false conflict. **Plan change:** state in 20-03 Task 1
+   that source `PickedMethod` carries no label, so additive/conflict/removed classification matches at
+   `canonical_value` granularity (value-level), and the `label` dimension participates only in the
+   source-vs-source narrow-memory snapshot — not in Orbit-vs-source conflict detection; note the
+   source-label-change feature as inert under the current native contract (extending the native module to
+   emit labels is out of scope / an owner call, not required for v1).
+
+**Advisory (uncounted — cosmetic / non-actionable):**
+- 20-VALIDATION.md itemizes `reconcile-photo.test.ts` for photo all-or-nothing (rows 62/82) but does not
+  separately name the cycle-6 "reviewed-snapshot deferred until post-commit success / left unresolved on
+  failure" sub-case (it is specified in 20-03 acceptance). A one-line manifest itemization would tighten
+  phase sign-off; not a correctness gap. (Cursor's related advisory that the manifest "omits
+  `013-reconciliation-and-merge.test.ts`" is itself inaccurate — that file IS listed, 20-VALIDATION.md:93,
+  and as a glob at :71.)
+- claude's density/duplication notes (dense must-haves; repeated child-table enumeration across plans) —
+  documentation-hygiene preferences, not defects.
+- cursor's 6 advisories are the two owner deferrals, the two documented v1 limitations, the harmless
+  `bumpDataRevisionCore` monotonic double-call, and the accepted post-commit `persistMaster`→
+  `setContactPhoto` window — all already adjudicated in prior cycles; not re-raised.
+
+## Verification Coverage (source-grounding pass — Cycle 7)
+
+Every pre-existing symbol cited by the six plans was resolved against the code on disk (net-new Phase-20
+symbols in the "Artifacts this phase produces" manifests are excluded). **No MISSING / AMBIGUOUS /
+UNCHECKABLE symbol found** — symbol existence is clean; the two actionable findings above are
+semantic-contract mismatches (a cited primitive cannot do what the plan's prose implies), not missing
+symbols.
+
+| Symbol / claim | Plan(s) | Status | Evidence (verified this cycle) |
+|---|---|---|---|
+| `TARGET_VERSION = 12` → next migration 013; 001–012 on disk | 20-01 | VERIFIED | `src/db/database.ts:47`; `src/db/migrations/` (…011, 012) |
+| `field_history` = (id, contact_id, field_col_name, old_value, operation, created_at) — **no `modified_at`** | 20-01,03 | VERIFIED | `src/db/migrations/001-initial.ts:155-163` |
+| Partial unique indexes + `contacts_prevent_cadence_clear` trigger | 20-01,02,05 | VERIFIED | `011-contact-lifecycle-schema.ts:178,180,181` |
+| `applyContactMethodDiffCore` whole-list seeded-vs-desired (tombstone+DELETE of unseeded) | 20-03 | VERIFIED | `src/db/contact-methods-dao.ts:99,159-215` |
+| `updateContactMetadataCore` — one `UPDATE contacts`, OMITS photo, **does NOT bump `data_revision`**, writes `birthday=?` **unvalidated** | 20-03 | VERIFIED | `src/db/contacts-dao.ts:308-335` |
+| `PickedMethod` = `{ type, value }` only (**no label**); `PickedContact.birthday` = raw string | 20-03,04 | VERIFIED | `modules/orbit-contact-picker/index.ts:9-24` |
+| Android bridge emits `type`+`value` for phone/email; raw `Event.DATA1` for birthday | 20-03 | VERIFIED | `OrbitContactPickerModule.kt:422-431` |
+| `mapBirthdayForStorage` canonicalizes (e.g. `2019/03/04`→`2019-03-04`); `isBirthdayUnreadable`; import applies it | 20-03,06 | VERIFIED | `src/logic/picked-contact-map.ts:28-63,71,111` |
+| `bumpDataRevisionCore` / `readDataRevision`; backup sweep gates on `readDataRevision`→`shouldRunAutomaticBackup` | 20-03,06 | VERIFIED | `data-revision-dao.ts:5,25`; `backup-sweep.ts:29-31` |
+| `persistImportedPhotoPostCommit` (post-commit ordering to mirror); `persistMaster`; `setContactPhoto` (self-wrapped, no `*Core` yet) | 20-03 | VERIFIED | `import-photo.ts:96`; `photo-storage.ts:325`; `contacts-dao.ts:621` |
+| `choosePrimary` (editor model); `normalizeContactMethod` | 20-02,03 | VERIFIED | `contact-methods-editor-model.ts:112`; `logic/contact-method-normalization.ts:43` |
+| `listSunCandidates` filters `tracking_enabled = 1` (why plans use net-new `listMergeCandidates` instead) | 20-01,03 | VERIFIED | `sun-picker-read.ts:40,44` |
+| `BulkAction` union + `actionLabels`; `ConfidenceOutcome` import-copy labels | 20-04 | VERIFIED | `CandidateCardGrid.tsx:18,54`; `ConfidenceChip.tsx:4` |
+| `isBirthdayUnreadable` / `sourceBirthday` reused for bulk-review flag | 20-06 | VERIFIED | `import-session-read.ts:8,79,277` |
+| Net-new (correctly ABSENT on disk): `listMergeCandidates`, `merge-dao`, `reconcile-apply`, `createReconcileSessionCore`, `markCardStatusCore`, `getNewestPendingReconcileSessionId`, `reconcile_source_snapshot`, `staged_photo_rel_path`, migration 013 | 20-01..06 | VERIFIED (net-new) | grep returns nothing in `src/` — expected, phase-produced |
+
+**UNCHECKABLE / skipped:** none. Device/UI-observable claims (Skia, Pixel UAT) are deferred to
+end-of-phase device UAT (20-06 Task 2), not counted as MISSING.
+
+## Fact-Drift Pass (ADVISORY — not counted toward HIGH/actionable)
+
+No genuine same-fact contradictions found.
+
+- **Phase status:** STATE.md (`current_phase: 20`, "Phase 20 planned (6 plans) — ready to execute") vs
+  ROADMAP (`[ ]` Phase 20, not complete). Consistent — neither claims *complete*.
+- **Requirement IDs:** ROADMAP Phase 20 = RCN-01..04; REQUIREMENTS.md RCN-01..04 → Phase 20; plans
+  reference RCN-01/02/03/04. Consistent.
+- **Success criteria vs must_haves.truths:** ROADMAP's 4 criteria map 1:1 to RCN-01..04; PLAN truths add
+  finer granularity (sanctioned, not drift).
+- **CONTEXT decisions vs plan usage:** tombstone-not-archive, one-way source→Orbit (no write-back),
+  additive-only bulk — used consistently across all six plans.
+- **VALIDATION manifest vs plan test files:** the plans' named test files are all present in
+  20-VALIDATION.md, INCLUDING `013-reconciliation-and-merge.test.ts` (`:93`). The one advisory (photo
+  deferred-snapshot sub-case not separately itemized) is recorded under Advisory above — a granularity
+  note, not a contradiction. Cursor's "manifest omits the 013 test" advisory is inaccurate.
+
+---
+
+# CYCLE 6 AND EARLIER — AUDIT HISTORY (preserved below)
 
 # Cross-AI Plan Review — Phase 20 (Convergence CYCLE 6)
 
