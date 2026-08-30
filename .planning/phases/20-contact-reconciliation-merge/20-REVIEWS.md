@@ -1,7 +1,8 @@
 ---
 phase: 20
+convergence_cycle: 2
 reviewers: [codex, claude, cursor]
-reviewed_at: 2026-08-30T20:13:09Z
+reviewed_at: 2026-08-30T20:55:52Z
 plans_reviewed: [20-01-PLAN.md, 20-02-PLAN.md, 20-03-PLAN.md, 20-04-PLAN.md, 20-05-PLAN.md, 20-06-PLAN.md]
 models:
   codex: "gpt-5.6-terra (reasoning=low)"
@@ -11,7 +12,535 @@ model_sources:
   codex: "banner"
   claude: "pinned"
   cursor: "unknown"
+cycle_summary:
+  current_high: 2
+  current_actionable: 10
 ---
+
+# Cross-AI Plan Review — Phase 20 (Convergence CYCLE 2)
+
+> Cycle 2 re-review of the six Phase-20 plans AFTER they were revised to incorporate cycle-1
+> feedback. All three explicitly-requested lanes (codex, claude, cursor) ran and returned
+> substantive reviews. The `--claude` self-skip guard ($CLAUDE_CODE_ENTRYPOINT=cli would normally
+> skip claude) was overridden for this run at owner instruction, so the Claude/Sonnet lane ran as a
+> context-isolated reviewer. **The headless claude lane declared it had no live repo-read access**
+> (plan-text-only review) — its verdict is noted but not counted at full source-grounded weight,
+> per the workflow's `[reviewed-without-repo-access]` rule. Codex and Cursor both reviewed against
+> the repo on disk. An orchestrator source-grounding pass and a cross-artifact fact-drift pass were
+> then run; results are in the two blocks after the Consensus Summary.
+>
+> **Cycle-1 findings are preserved verbatim as AUDIT HISTORY at the bottom of this file.**
+
+## Consensus Summary (Cycle 2)
+
+All three reviewers independently agree the revision is a large improvement and that **every cycle-1
+HIGH is resolved in the current plan text**: the custom-field `UNIQUE(contact_id, field_def_id)`
+collision pre-resolution, the `contact_method_provenance` capture-then-remap-before-delete ordering,
+the net-new `setContactPhotoCore` writer, full-method-list seeding on reconcile apply, the additive
+`CandidateCardGrid` extension (with a `scoringLabel` default that keeps import call sites unchanged),
+the net-new `ResumeReconcilePrompt`, and the durable `bulk_review_resolutions` table in migration
+013. Cursor and Claude found NO remaining HIGH. **Codex — the strongest source-grounded lane —
+surfaced two NEW, source-confirmable HIGH issues that the revision's own additions introduced**, both
+of which the orchestrator re-verified against `src/` and CONFIRMS.
+
+### Agreed Strengths (2+ reviewers, orchestrator-verified)
+- Cycle-1 integrity hazards concretely mitigated with test obligations: custom-field collision pre-resolution, provenance remap before delete (`011-contact-lifecycle-schema.ts:228-233` ON DELETE CASCADE), partial-unique-index pre-resolution (`011:178-180`) — codex, cursor, claude.
+- `mergeContacts` correctly inverts the shipped `purge-dao` transaction shape and routes recency only through `recomputeLastContactCore` (never a direct `last_contact` write) — cursor, codex.
+- `setContactPhotoCore` extraction correctly motivated: `updateContactMetadataCore` omits `photo` (`contacts-dao.ts:308-335`) and `setContactPhoto` self-wraps the mutex (`contacts-dao.ts:621-644`) — codex, cursor, claude.
+- The whole-list method-diff data-loss guard (`desired = current ∪ accepted`, pure node-testable helper) correctly defends `applyContactMethodDiffCore`'s tombstone-on-absence path (`contact-methods-dao.ts:191-215`) — claude, cursor.
+- `ResumeImportPrompt` correctly identified as import-coupled → net-new `ResumeReconcilePrompt` mandated and mechanically checked (grep-absence of `import-session-dao`) — all three.
+- Durable session commits atomically AFTER the full scan (no half-scanned resumable session); per-card try/catch correctly reads the grid's whole-batch failure contract (`CandidateCardGrid.tsx:106-121`) — codex, claude, cursor.
+
+### Agreed / Confirmed Concerns (highest priority — orchestrator-verified)
+- **NEW HIGH (codex, orchestrator-CONFIRMED) — 20-01 field_history reparent SQL will ABORT.** The action text (20-01 line 145) reparents every child, INCLUDING `field_history`, with the single generic template `UPDATE <child> SET contact_id = ?, modified_at = ? WHERE contact_id = ?`. But `field_history` has NO `modified_at` column — its schema is `(id, contact_id, field_col_name, old_value, operation, created_at)` (VERIFIED `src/db/migrations/001-initial.ts:156-163`). Any merge of a contact that has field_history rows hits `no such column: modified_at` and the whole transaction aborts. Fix: split `field_history` out to `UPDATE field_history SET contact_id = ? WHERE contact_id = ?` and add a merge test with a NON-empty field_history fixture (the current test asserts reparent "incl. field_history" but would only pass once the SQL is corrected).
+- **NEW HIGH (codex, orchestrator-CONFIRMED) — photo apply/durability is unimplementable as scoped across 20-03 / 20-04 / 20-05.** Picker photos arrive only as `PickedContact.photoTempUri`, an "intentionally evictable" app-private cache `file://` path that "must be moved to durable staging ... before it is persisted" (VERIFIED `modules/orbit-contact-picker/index.ts:14-24`). `setContactPhotoCore`/`setContactPhoto` call `assertSafeRelative` and accept ONLY a durable `avatars/<name>.<ext>` relative filename, rejecting any `file://`/cache URI (VERIFIED `contacts-dao.ts:610-645`). The existing import path solves this with a staging step — `stageImportPhoto(photoTempUri, relative)` then `persistPhotoMaster` (VERIFIED `src/services/import/import-acquire.ts:78-83`, `import-photo.ts:60-90`). **NO Phase-20 plan includes any photo-staging step** (grep across all six plans for `stageImportPhoto|staging|persistPhotoMaster|photoTempUri` returns nothing): 20-03 calls `setContactPhotoCore` on Apply with no staging (throws), 20-04 persists the evictable temp URI inside durable `diff_json`, and 20-05 resumes cards whose photo option points at a possibly-evicted file. Photo is one of the five required reconciled families. Fix: add an explicit reconcile photo-staging pipeline (copy/hash the selected source bytes to durable `avatars/...`, use a content hash as the reviewed/comparison value, promote post-commit, launch-sweep cleanup for abandoned staged files) — reuse the import staging service.
+
+### Divergent Views (resolved by orchestrator source read)
+- **Are there any HIGHs left?** Cursor + Claude say none; **Codex says two.** Orchestrator verdict: **codex is correct on both** — the `field_history.modified_at` column mismatch and the photo-staging gap are both verified against `src/` above. Cursor cited `field_history` reparenting as a strength without checking the generic template's `modified_at` clause against the actual column list; Claude had no repo access. Two source-confirmed HIGHs remain.
+
+---
+
+## Verification Coverage (source-grounding pass — cycle 2)
+
+Pre-existing symbols cited by the six plans were resolved against `src/` on disk. NEW artifacts this
+phase produces (`mergeContacts`, `setContactPhotoCore`, migration 013 tables incl.
+`bulk_review_resolutions`, `reconcile-*` DAOs, `ResumeReconcilePrompt`, extended CandidateCardGrid
+members, bulk-review DAOs) are EXCLUDED from missing-symbol checks — they are created by this phase.
+
+**VERIFIED (existing symbols, quoted):**
+- `field_history` schema = `(id, contact_id, field_col_name, old_value, operation, created_at)` — NO `modified_at` — `src/db/migrations/001-initial.ts:156-163`. (Drives HIGH #1.)
+- `PickedContact.photoTempUri` is evictable cache `file://`, "must be moved to durable staging ... before it is persisted" — `modules/orbit-contact-picker/index.ts:14-24`. (Drives HIGH #2.)
+- `setContactPhoto` calls `assertSafeRelative(relative)`; stores RELATIVE `avatars/<name>.<ext>` only, rejects `file://`/cache — `src/db/contacts-dao.ts:610-645`.
+- Import photo staging exists to reuse: `stageImportPhoto` — `src/services/import/import-acquire.ts:78-83`; `persistPhotoMaster` — `src/services/import/import-photo.ts:60-90`.
+- `updateContactMetadataCore` OMITS `photo` — `src/db/contacts-dao.ts:308-335`.
+- Partial unique indexes `idx_contact_methods_primary_type`, `idx_external_contact_links_active` — `src/db/migrations/011-contact-lifecycle-schema.ts:178-180`.
+- `contact_method_provenance` keyed by `method_id`, ON DELETE CASCADE — `011-contact-lifecycle-schema.ts:228-233`.
+- `custom_field_values UNIQUE(contact_id, field_def_id)` — migration 006 / `011:79-85`.
+- `applyContactMethodDiffCore` tombstones+DELETEs seeded methods absent from `current` — `src/db/contact-methods-dao.ts:191-215`.
+- `contacts` columns `favourite_rank`, `ring_seq`, `snooze_until` exist on the contact ROW — `001-initial.ts:74-77`, `011:28-31`. (Absorbed-only values dropped on the absorbed-row DELETE; drives MEDIUM.)
+- `DuplicateReviewScreen` `onInspect={() => undefined}` (no merge/inspect entry wired) — `src/screens/DuplicateReviewScreen.tsx:239`. (Drives Cluster-U MEDIUM.)
+- Migration head = 12 (`TARGET_VERSION`), `MIGRATIONS` ends at `migration012` — `src/db/database.ts`; 20-01 correctly re-verifies before bumping to 13.
+- `import_session_rows.source_payload` immutable; `bulk_review_resolutions` is the new durable store — `012-import-sessions.ts:30-49`.
+
+**UNCHECKABLE / not counted:** the headless Claude lane's internal-consistency findings (no repo
+access) are recorded but excluded from source-grounded weight. TypeScript→SQL edges are literal
+strings (graph cannot enumerate table writers) — the writer reads above were done by grep, not the
+graph. Device-UAT-only acceptance items (App.tsx modal precedence rendering) cannot be verified
+statically and are left to execution.
+
+**No hallucinated symbols:** every pre-existing symbol the plans cite resolves to real code. The two
+HIGHs are semantic/contract mismatches (a cited symbol exists but its contract does not match what
+the plan's prescribed SQL/write needs), which symbol-existence grounding alone would not catch.
+
+---
+
+## Fact-Drift Pass (ADVISORY — not counted toward HIGH/actionable)
+
+- **UI-SPEC internal contradiction (same fact, two values).** `20-UI-SPEC.md` surface #12 says merge
+  conflicts are shown with the "survivor value preselected" (`:350-351`), while the FieldChoiceGroup
+  contract in the same doc requires conflicting mode with **no** preselection (`:238-239`). The plans
+  (20-02) correctly follow the no-preselection rule; the UI-SPEC summary line should be synced. Doc
+  drift, not a plan defect.
+- **STATE.md vs ROADMAP.md** — no contradiction: STATE says phase 20 PLANNED/ready_to_execute;
+  ROADMAP progress table shows "20 | 0 | Not started" (0 plans EXECUTED). Planning-done +
+  execution-not-started are consistent, not contradictory. Authority STATE.md.
+- **ROADMAP Success Criteria vs PLAN must_haves** — no contradiction found; the five reconciled
+  families, one-way direction, additive-only bulk seam, tombstone-not-archive, and atomic merge all
+  map cleanly to plan must_haves.
+
+---
+
+## Codex Review (Cycle 2)
+
+_Model: gpt-5.6-terra (reasoning=low) — source-grounded, repo access._
+
+## Plan 20-01 — Migration and merge tracer
+
+### Summary
+
+The merge plan is substantially stronger after cycle 1: it correctly targets the real v12 head, accounts for the two partial unique indexes, and adds the missing custom-value/provenance pre-resolution. One new transaction-breaking detail remains.
+
+### Strengths
+
+- It correctly builds on the single non-reentrant transaction primitive, whose contract explicitly prohibits nested transactions. [transaction.ts](/home/bwales/projects/orbit-app/src/db/transaction.ts:50)
+- The plan’s primary-method and external-link pre-resolution matches the actual partial unique indexes. [011-contact-lifecycle-schema.ts](/home/bwales/projects/orbit-app/src/db/migrations/011-contact-lifecycle-schema.ts:178)
+- Reparenting `field_history` is necessary: it has no FK, while purge currently handles it explicitly for that reason. [001-initial.ts](/home/bwales/projects/orbit-app/src/db/migrations/001-initial.ts:156), [purge-dao.ts](/home/bwales/projects/orbit-app/src/db/purge-dao.ts:242)
+- Extracting `setContactPhotoCore` is necessary; the current public writer self-wraps a transaction. [contacts-dao.ts](/home/bwales/projects/orbit-app/src/db/contacts-dao.ts:621)
+
+### Concerns
+
+- **HIGH — the prescribed generic reparent statement will fail on `field_history`.** The action says to reparent every child using `SET contact_id=?, modified_at=?`, explicitly including `field_history`. But `field_history` has no `modified_at` column—only `contact_id`, `field_col_name`, `old_value`, `operation`, and `created_at`. [001-initial.ts](/home/bwales/projects/orbit-app/src/db/migrations/001-initial.ts:156) This would abort every merge that has history rows, despite the plan’s test intent.
+
+### Suggestions
+
+- Split reparent SQL by table. Use `UPDATE field_history SET contact_id=? WHERE contact_id=?`; retain `modified_at` only for tables that actually own it. Add a test with a nonempty `field_history` fixture, not merely an assertion after a no-history merge.
+
+### Risk Assessment
+
+**MEDIUM.** The architecture is sound, but the remaining SQL-shape error is a deterministic runtime failure on an ordinary populated profile.
+
+---
+
+## Plan 20-02 — Conflict-resolution UI
+
+### Summary
+
+The plan correctly keeps the conflict UI separate from the atomic writer and uses explicit selection for true scalar conflicts. Its dependency on the tracer’s resolution contract needs to be made concrete before implementation.
+
+### Strengths
+
+- A full metadata input is the correct safety requirement: `updateContactMetadataCore` writes all mutable metadata fields and defaults omitted `trackingEnabled` to enabled. [contacts-dao.ts](/home/bwales/projects/orbit-app/src/db/contacts-dao.ts:308)
+- The plan correctly recognizes that primary selection needs ordering because the unique primary index is immediate. The existing method writer explicitly clears the old primary before changing it. [contact-methods-dao.ts](/home/bwales/projects/orbit-app/src/db/contact-methods-dao.ts:171)
+- Real counts must not rely only on `impactSummaryLines`, which currently omits methods and external links. [purge-dao.ts](/home/bwales/projects/orbit-app/src/db/purge-dao.ts:176)
+
+### Concerns
+
+- **MEDIUM — the cross-plan `resolutions` contract is not specified as a typed artifact.** Plan 20-02 is prohibited from changing `merge-dao.ts`, but Plan 20-01 only describes resolutions narratively. This leaves custom-field choices, “keep survivor” semantics, primary choices, and photo/no-photo choices vulnerable to incompatible UI/writer shapes. The relevant existing APIs have materially different input forms: metadata is a full object, while methods are a seeded/current whole-list diff. [contacts-dao.ts](/home/bwales/projects/orbit-app/src/db/contacts-dao.ts:271), [contact-methods-dao.ts](/home/bwales/projects/orbit-app/src/db/contact-methods-dao.ts:99)
+
+### Suggestions
+
+- Make Plan 20-01 export a `MergeResolutions` type plus a unit-tested normalization/validation function. Plan 20-02 should consume that type rather than re-declaring an implied object shape.
+
+### Risk Assessment
+
+**MEDIUM.** The user flow is appropriate, but the wave boundary is too loose for an irreversible conflict-resolution operation.
+
+---
+
+## Plan 20-03 — Per-contact reconciliation
+
+### Summary
+
+The one-way and whole-method-list protections are well targeted. Photo reconciliation remains unimplementable as described because the plan neither creates a stable comparison signal nor persists the selected source photo safely.
+
+### Strengths
+
+- The plan correctly treats `applyContactMethodDiffCore` as destructive for absent seeded methods: the current implementation tombstones and deletes any seeded method not included in `current`. [contact-methods-dao.ts](/home/bwales/projects/orbit-app/src/db/contact-methods-dao.ts:191)
+- The proposed current-union-accepted desired list directly addresses that behavior.
+- Missing sources are distinguishable from provider failures/empty results: selected reads return `omittedCount`, and the provider result differentiates omitted contacts from an empty input. [orbit-contact-picker/index.ts](/home/bwales/projects/orbit-app/modules/orbit-contact-picker/index.ts:33), [orbit-contact-picker/index.ts](/home/bwales/projects/orbit-app/modules/orbit-contact-picker/index.ts:118)
+
+### Concerns
+
+- **HIGH — accepted source photos cannot be written through `setContactPhotoCore` without a photo-import/staging step.** Picker photos are explicitly evictable cache `file://` paths that must be moved to durable staging before persistence. [orbit-contact-picker/index.ts](/home/bwales/projects/orbit-app/modules/orbit-contact-picker/index.ts:19) The current contact writer accepts only a validated relative avatar filename. [contacts-dao.ts](/home/bwales/projects/orbit-app/src/db/contacts-dao.ts:610) Plan 20-03 calls `setContactPhotoCore` but adds neither a durable-copy service nor a post-commit cleanup/recovery path.
+- **HIGH — “available signal” does not support the required no-re-nag behavior for photos.** The only source-photo value is the evictable temp URI, not a stable fingerprint. [orbit-contact-picker/index.ts](/home/bwales/projects/orbit-app/modules/orbit-contact-picker/index.ts:19) Persisting/comparing that URI in `reconcile_source_snapshot` will re-surface a photo discrepancy whenever the cache path changes, or may point at a vanished file.
+
+### Suggestions
+
+- Add an explicit reconciliation-photo pipeline: copy/hash the selected source bytes to a durable staged location, use a content hash as the reviewed value, atomically promote the chosen file after the DB transaction, and add launch-sweep cleanup for abandoned staged files.
+- If hashing is intentionally deferred, explicitly exclude photo from narrow-memory suppression and state that the photo row is always manual-review; that would not fully meet the no-re-nag goal, so it needs an owner decision.
+
+### Risk Assessment
+
+**HIGH.** Photo is one of the five required reconciled families, and the current plan would either reject the write or retain invalid/evictable paths.
+
+---
+
+## Plan 20-04 — Bulk review workspace and durable sessions
+
+### Summary
+
+The plan correctly reuses the established grid and avoids creating a committed half-scan. Its durability model still does not make photo review durable, and bulk action semantics need an explicit durable apply contract.
+
+### Strengths
+
+- The additive extension is grounded in the actual grid API: `BulkAction` is a closed union and the scoring text is hardcoded today, so both changes are genuinely needed. [CandidateCardGrid.tsx](/home/bwales/projects/orbit-app/src/components/CandidateCardGrid.tsx:18), [CandidateCardGrid.tsx](/home/bwales/projects/orbit-app/src/components/CandidateCardGrid.tsx:124)
+- The plan correctly accounts for the grid’s batch-level failure behavior. A thrown callback marks all target cards failed. [CandidateCardGrid.tsx](/home/bwales/projects/orbit-app/src/components/CandidateCardGrid.tsx:106)
+- Building the session only after scan/classification is a sound way to avoid ambiguous partial pending sessions.
+
+### Concerns
+
+- **HIGH — durable session cards will persist invalid source-photo references.** `diff_json` is proposed as the durable card payload, but a source photo is only an evictable temp URI. [orbit-contact-picker/index.ts](/home/bwales/projects/orbit-app/modules/orbit-contact-picker/index.ts:19) On process death, resume cannot reliably render or apply the persisted photo option. This repeats the unresolved Plan 20-03 photo-persistence issue at the bulk boundary.
+- **MEDIUM — “Keep Orbit Values” and bulk recommendation application lack a specified snapshot/status transaction.** The grid can invoke callbacks, but it does not persist reconciliation state itself. [CandidateCardGrid.tsx](/home/bwales/projects/orbit-app/src/components/CandidateCardGrid.tsx:45) The plan must explicitly say that each bulk resolution calls the same apply/snapshot core as detail review, then updates card status/count atomically; otherwise “keep” will reappear on the next scan.
+
+### Suggestions
+
+- Make session-card construction reference staged photo records/content hashes, not raw `photoTempUri`.
+- Extract a shared `applyReconciliationCardCore` used by detail and all bulk actions. It should apply selected values, write every applicable reviewed snapshot, update card status/unresolved count, and finalize the session in one caller-owned transaction.
+
+### Risk Assessment
+
+**HIGH.** Process-death durability is a core RCN-02 promise; photo cards currently cannot honor it.
+
+---
+
+## Plan 20-05 — Resume and missing-source lifecycle
+
+### Summary
+
+The plan correctly avoids reusing the import-specific prompt component and correctly preflights the globally unique active-link identity. It inherits the unresolved durable-photo issue and needs clearer behavior for corrupt session discovery.
+
+### Strengths
+
+- A separate reconciliation prompt is justified: the existing prompt is specifically typed around import modes and import routes. [ResumeImportPrompt.tsx](/home/bwales/projects/orbit-app/src/components/ResumeImportPrompt.tsx:21)
+- The launch-sweep design is appropriate: hooks run only after registration and a real foreground launch; importing the module does not run them. [launch-sweep.ts](/home/bwales/projects/orbit-app/src/services/launch-sweep.ts:44), [launch-sweep.ts](/home/bwales/projects/orbit-app/src/services/launch-sweep.ts:102)
+- The global active-link preflight matches the real unique index on provider/external ID, not a per-contact constraint. [011-contact-lifecycle-schema.ts](/home/bwales/projects/orbit-app/src/db/migrations/011-contact-lifecycle-schema.ts:180)
+
+### Concerns
+
+- **MEDIUM — corrupt-session recovery is underspecified when parsing fails before a resumable descriptor can be built.** The import sweep only logs lookup/description errors and returns `null`; it does not synthesize a discard-only session. [contact-import-resume-sweep.ts](/home/bwales/projects/orbit-app/src/services/import/contact-import-resume-sweep.ts:124) The new plan promises a discard-only descriptor, but needs a concrete fallback query that identifies the pending session ID without parsing its card payload.
+- **MEDIUM — resuming a session that includes photo diffs remains unsafe until Plans 20-03/04 persist staged durable photo data.** The source module explicitly permits cache cleanup/eviction. [orbit-contact-picker/index.ts](/home/bwales/projects/orbit-app/modules/orbit-contact-picker/index.ts:20)
+
+### Suggestions
+
+- Define `getNewestPendingReconcileSessionId` as a corruption-tolerant read used solely to construct a discard-only prompt.
+- Block resume of photo-bearing cards until the staged-photo record exists, or ensure the resume sweep marks those individual cards retryable rather than presenting broken choices.
+
+### Risk Assessment
+
+**MEDIUM.** The lifecycle design is sound, but corrupted-state recovery and photo-session durability need implementation-level contracts.
+
+---
+
+## Plan 20-06 — Bulk flagged-item resolver and phase gate
+
+### Summary
+
+The unreadable-birthday resolution flow is appropriately conservative and uses the existing full metadata writer. The claimed generic future-flag model conflicts with the migration schema.
+
+### Strengths
+
+- The plan correctly avoids mutating immutable import payloads; current import completion only derives the unreadable-birthday count from `source_payload`. [import-session-read.ts](/home/bwales/projects/orbit-app/src/db/import-session-read.ts:269)
+- It correctly recognizes that rows may have no contact: the import schema permits `contact_id` to be null. [012-import-sessions.ts](/home/bwales/projects/orbit-app/src/db/migrations/012-import-sessions.ts:42)
+- Using a complete metadata input is necessary because the existing core updates all mutable contact metadata. [contacts-dao.ts](/home/bwales/projects/orbit-app/src/db/contacts-dao.ts:312)
+
+### Concerns
+
+- **MEDIUM — “generic over future flag types” is false with the proposed schema.** Migration 013 constrains `bulk_review_resolutions.flag_type` to `CHECK IN ('birthday')` in Plan 20-01. A future flag cannot reuse the table without another migration. This is not harmful if intentional, but the plan’s genericity claim and acceptance language should not imply otherwise.
+
+### Suggestions
+
+- Either describe the DAO/read abstraction as “generic in code, birthday-only in schema for v1,” or make the owner-approved migration choice to remove the enum check and validate supported flag types in TypeScript. Given the migration is irreversible, make this explicit before Plan 20-01 ships.
+
+### Risk Assessment
+
+**MEDIUM.** The birthday workflow is coherent; the concern is a misleading future-extension contract on an irreversible schema.
+
+---
+
+## Overall assessment
+
+The revised plans address the cycle-1 issues around custom-field collisions, provenance remapping, method-list seeding, grid extension, dedicated resume UI, and durable birthday-flag resolutions. The remaining blocker is source-photo handling: the current picker exposes only evictable temporary paths, while both per-contact and resumable bulk reconciliation require stable comparison and durable selected-photo storage. Resolve that design, plus the `field_history.modified_at` SQL error, before executing migration 013 and the tracer.
+
+---
+
+## Claude Review (Cycle 2)
+
+_Model: sonnet (reasoning=low) — context-isolated; NO live repo access (plan-text only), verdict not counted at full source-grounded weight._
+
+# Cross-AI Plan Review — Phase 20: Contact Reconciliation & Merge (Cycle 2)
+
+**Note on verification:** I do not have live file-read access to this repo's actual source in this session (only the plan/research/pattern/UI-spec/dossier text provided above). All findings below are therefore evaluated against internal consistency of the plans and the cited research/pattern documents, not fresh reads of `purge-dao.ts`, `contact-methods-dao.ts`, etc. Any claim that would normally require a `file:line` citation against live source is flagged as an **open question** rather than asserted as confirmed/refuted.
+
+---
+
+## Plan 20-01 (Migration 013 + atomic merge tracer)
+
+### Strengths
+- The custom-field collision pre-resolution (must_have #3) and provenance-remap-before-delete ordering (must_have #7, task text step 1c) are now spelled out with explicit ordering — this matches the cycle-1 asks and is internally consistent with the described `ON DELETE CASCADE` hazard.
+- `setContactPhotoCore` extraction is well-motivated (updateContactMetadataCore omits photo; setContactPhoto self-wraps the mutex) — a real gap if true, and the plan requires a regression test path (refactor `setContactPhoto` to call the new core, "existing contacts-dao tests stay green").
+- Full-input (never sparse patch) requirement for scalar resolution is a legitimate defense against the classic "PATCH overwrites unrelated columns" bug class, and is explicitly test-required.
+- Checkpoint task for the `contact_redirects` decision is properly gated as `blocking-human` before the irreversible migration — correct treatment of a one-way-door schema decision.
+
+### Concerns
+
+**MEDIUM — custom-field collision resolution is asserted "survivor-wins default" but the acceptance criteria don't verify the *absorbed's unique* fields (non-colliding field_def_ids) actually reparent.** The plan says "only field_def_ids the survivor lacks are reparented" but the must-have/acceptance-criteria list only tests the *collision* case (both hold same field_def_id) and doesn't explicitly list a test for "absorbed has a custom field the survivor doesn't → it moves to survivor." This is Cluster W/Z's core additive-merge promise and is a plausible gap in the test list, not just the code — worth requiring explicitly in acceptance criteria for 20-01, not left implicit.
+
+**MEDIUM — the `assumption_delta_decision` block declares `survivor-wins default` as the tracer's conflict policy, but 20-02's must_haves state MergeConflictsScreen conflicts get "NO preselection — explicit manual choice."** These are not contradictory (20-01 is a tracer with empty resolutions; 20-02 adds the real UI), but the phase-wide "ACCEPTED BOUNDED GAP" note only mentions a *device-build* gap window, not that any 20-01 unit test asserting "empty resolutions = survivor-wins" could mask 20-02 not actually threading resolutions correctly later. This is a soft risk, not a defect — flagging as low actionable.
+
+**LOW — `field_history` reparent vs. new-row-on-scalar-overwrite are two different write patterns to the same table inside one transaction**, and the plan doesn't distinguish which happens first (reparent absorbed's field_history rows, then separately INSERT new field_history rows for survivor overwrites) or whether a reparented field_history row referencing the absorbed's old `contact_id` needs its `contact_id` updated to the survivor (it does, since field_history has no FK and is presumably read by contact_id in the field-history UI). The must-have says "reparents... field_history" via UPDATE — acceptable, but this ordering interacts with step 3's *new* INSERT and isn't sequenced in the action text beyond bullet order. Worth an explicit note that reparent (step 2) happens before the scalar-overwrite snapshot INSERT (step 3) so the reparented history isn't confused with the new snapshot.
+
+**LOW — `bulk_review_resolutions` table lives in migration 013 but is functionally owned by 20-06 (a different plan, three waves later).** This is fine as "cheapest moment to add the table" reasoning, but it does mean 20-01's migration test (`013-reconciliation-and-merge.test.ts`) is now responsible for FK-integrity-testing a table whose write/read DAOs don't exist until wave 6. The plan does say "proving a v12→v13 forward migration creates the tables (incl. bulk_review_resolutions) and FK integrity holds" — acceptable, just a minor cross-wave coupling to note for the executor.
+
+### Suggestions
+- Add an explicit acceptance criterion/test case for "absorbed's non-colliding custom_field_values row reparents onto survivor" (distinct from the collision case) to close the additive-merge gap noted above.
+- Clarify field_history write ordering (reparent-then-append) in the action text, not just implied by list order.
+
+### Risk Assessment: **MEDIUM** (down from likely HIGH pre-revision) — the two hardest SQLite integrity hazards (partial-unique-index ABORT, provenance orphan) are now explicitly sequenced and test-required; residual risk is in test-coverage completeness (additive custom-field reparent) rather than architecture.
+
+---
+
+## Plan 20-02 (Merge conflicts UI + survivor recommendation)
+
+### Strengths
+- Explicit prohibition against modifying `merge-dao.ts` in this plan, verified via a `git diff --name-only` acceptance criterion — a good mechanical guardrail against write-path duplication (Cluster H/Z "don't fork a second writer").
+- `Continue` disabled until every conflict field has an explicit selection is correctly required to match the dossier's Cluster C "explicit manual choice" for conflicts (no defaulting).
+- Recommended-survivor badge required to be colourless (ConfidenceChip idiom) matches the UI-SPEC's locked "no caution hue" rule and is checked via grep for accent/status token misuse.
+
+### Concerns
+
+**MEDIUM — resolutions "shape" contract between 20-02 and 20-01 is described only in prose, not in a shared type.** Both plans repeatedly say "the exact shape mergeContacts already consumes" but neither plan's action text pins down a concrete TypeScript interface (e.g., `MergeResolutions { scalars: {...}, customFields: Record<fieldDefId, value>, photo?: ... }`). Since 20-01 ships the writer first and 20-02 must match it without touching merge-dao.ts, a mismatch in the resolutions shape (e.g., field naming) would only surface as a runtime/type error during 20-02's execution — acceptable given `npx tsc --noEmit` gates it, but the plans would be stronger if 20-01's artifact list defined the resolutions type explicitly as a named exported type for 20-02 to import.
+
+**LOW — primary-method contention UI reuses "ContactMethodsEditor's `choosePrimary` model,"** but it's unclear whether `choosePrimary` is a pure function/hook that can be called standalone in MergeConflictsScreen versus tightly coupled to the full ContactMethodsEditor component tree. If it's UI-coupled, "primary-method contention" might end up half-forking a new picker rather than truly reusing the model. This is flagged in RESEARCH only at the signature level ("Cluster X"), not verified as a decoupled function — worth the executor double-checking `contact-methods-editor-model.ts:112,133` actually exports a headless `choosePrimary(a, b)` rather than a hook tied to editor state.
+
+### Suggestions
+- Have 20-01 export a named `MergeResolutions` type from `merge-dao.ts` (or a sibling types file) that 20-02 imports, removing the "matches by convention" risk.
+
+### Risk Assessment: **LOW-MEDIUM** — mostly well-scoped; the main residual risk is an implicit (not type-enforced) contract between plans 1 and 2.
+
+---
+
+## Plan 20-03 (Per-contact reconciliation)
+
+### Strengths
+- The "whole-list diff data-loss" guard (must_have #7 — desired list must be current∪accepted, never just additions) is the single most important fix in this plan and is well-instrumented: both a prohibition, an acceptance criterion requiring a **pure, node-testable helper** with a dedicated test, and a grep-verifiable line in the read_first pointing at `applyContactMethodDiffCore`'s tombstone-on-absence behavior. This is exactly the kind of "trace whether the guard actually works" fix cycle 1 should have produced.
+- Multi-source snapshot writing "once per CONTRIBUTING external_contact_link_id, not just the selected source's" (must_have #9) closes a real aggregate-memory bug that a naive single-snapshot-write implementation would hit.
+- Correctly forbids photo through `updateContactMetadataCore` (which "omits photo") — consistent with 20-01's photo-writer design.
+
+### Concerns
+
+**MEDIUM — the "missing-source" detection precondition is asserted at the reconcile-diff layer, but this plan's Task 3 (ReconcileDetailScreen) is a *per-contact* entry point, and it's unclear how the screen's initial load distinguishes "zero active links" from "one active link whose source is missing" before calling `readAllContacts`.** The profile-level gating ("shown only when the contact has ≥1 active external_contact_link") only prevents the *menu item* from appearing when there are no links at all — it doesn't describe what happens if the single link's source later disappears (that's exactly the missing-source case this screen must handle per Cluster G). The action text does cover it ("On mount... `readAllContacts`... an absent contact is a MISSING source"), so this is plausibly fine, but the interplay between "OverflowMenu visibility gated on active links existing" and "detail screen handling a link whose target is gone" is worth an explicit must-have/test case in this plan (it currently reads as implied by reconcile-diff's classifier tests from Task 1, not this screen's own tests).
+
+**LOW — Task 3's acceptance criteria check for presence of four writer function names via grep, but not their *call order*** (photo via setContactPhotoCore must not be routed through updateContactMetadataCore — this is checked — but there's no check that the method-apply's desired-list construction actually runs *before* `applyContactMethodDiffCore` is invoked, i.e., that the seed-then-union helper from must_have #8 is actually wired into this screen's Apply handler rather than just existing as a standalone tested helper). A helper can exist and be unit-tested correctly while the screen still calls the DAO with a wrong list. Consider adding a grep/acceptance check that ReconcileDetailScreen's Apply path calls the specific desired-list-builder helper by name before `applyContactMethodDiffCore`.
+
+### Suggestions
+- Add an explicit test/acceptance criterion for "single active link, source becomes unresolvable mid-review" surfaced distinctly by ReconcileDetailScreen (not just reconcile-diff).
+- Verify (grep or test) that the screen calls the seed∪accepted helper, not just that the helper exists and is tested in isolation.
+
+### Risk Assessment: **LOW-MEDIUM** — the headline data-loss risk (partial method list) is well-mitigated; residual risk is wiring-level (helper exists vs. helper is actually called correctly at the one call site that matters).
+
+---
+
+## Plan 20-04 (Bulk reconciliation grid + durable session)
+
+### Strengths
+- `CandidateCardGrid` extension is now correctly additive: new `BulkAction` members plus a `scoringLabel` prop with a **default value that preserves existing import call sites** — this directly answers the cycle-1 concern about breaking Phase 19's import flow, and it's enforced via an acceptance criterion ("the import call sites still typecheck unchanged").
+- Explicit requirement that session+cards commit in ONE transaction *after* the full scan completes (must_have #5) is a good fix for the "half-scanned resumable session" ambiguity — a crash mid-scan now leaves nothing, rather than a misleading partial session.
+- Per-card try/catch requirement for `onBulkAction` (backstop item + acceptance criterion) correctly reads the grid's actual failure-isolation contract (a thrown `onBulkAction` fails the *whole* batch per `CandidateCardGrid.tsx:106-121` as cited) — this is a subtle, correctly-diagnosed integration hazard between caller and shipped component.
+
+### Concerns
+
+**MEDIUM — "additive-only eligibility" computation for `Use Contact Values` is described as "a pure helper," but its actual data source (card diff_json contents) isn't tied back to reconcile-diff's outcome types from 20-03 in a checked way.** The acceptance criteria grep only for the string `use-contact-values` being "gated on additive-only eligibility (a computed condition, not unconditional)" — this is a weak, string-shaped check; a superficial `selectedCards.length > 0 && someTrivialCondition` could pass the grep while not actually excluding conflict/removal cards. Given this is explicitly called out in the dossier (Cluster J) as a **safety invariant**, I'd expect a dedicated unit test on the eligibility helper itself (e.g., `additive-only-eligibility.test.ts`) rather than relying solely on a grep+manual device-UAT to catch a wrong implementation. This isn't listed among the plan's `files_modified` test files.
+
+**LOW — Task 3 folds three fairly distinct responsibilities (extend CandidateCardGrid, build ReconcileGridScreen's atomic scan-then-commit, build the additive-only eligibility + bulk apply wiring) into one task with only one verify block.** Given the safety-invariant weight of the additive-only gate, splitting eligibility-computation out with its own pure-function test (as suggested above) would also make Task 3 more auditable.
+
+### Suggestions
+- Extract the additive-only-eligibility computation into a named, separately unit-tested pure function (e.g., in `reconcile-diff.ts` or a sibling), with a test proving it excludes selections containing any conflict/removal/missing-source card — don't rely on grep + device-UAT alone for a dossier-locked safety invariant.
+
+### Risk Assessment: **MEDIUM** — the atomicity and grid-extension fixes are solid; the one dossier-locked safety invariant in this plan (Cluster J additive-only gate) is under-tested relative to its importance.
+
+---
+
+## Plan 20-05 (Resume sweep + missing-source/relink)
+
+### Strengths
+- Correctly identifies that `ResumeImportPrompt` is import-coupled (imports `import-session-dao`, navigates only to import routes) and mandates a **net-new** `ResumeReconcilePrompt` rather than force-fitting reuse — this is exactly the kind of "verify the mechanism, don't take the plan's claim at face value" correction cycle 1 should have produced, and it's mechanically checked (`grep` for absence of `import-session-dao` import).
+- Precedence rule for import-vs-reconcile resume prompts (import shown first, reconcile only after dismissal) closes a plausible UX/state bug (two overlapping non-dismissable modals) that wasn't explicit before.
+- The `duplicate-active-link` preflight (must_have #6) correctly identifies that the active-link uniqueness index is **global**, not per-contact — a relink that blindly inserts could ABORT or (worse, if not caught) silently attach a source that's already claimed by another Orbit contact. This is a well-reasoned, non-obvious catch.
+
+### Concerns
+
+**MEDIUM — the "precedence" mechanism between import-resume and reconcile-resume prompts is described only as an App.tsx state-ordering rule ("reconcile prompt not shown while an import resume is pending"), verified via grep, not via a test.** Given App.tsx wiring is typically hard to unit test and this plan has no App.tsx test file listed, this precedence guard's correctness rests entirely on a device-UAT pass and a grep for co-occurring identifiers — which can't actually prove the *conditional rendering logic* is correct (e.g., a grep can't distinguish `{!resumableImport && resumableReconcile && <ResumeReconcilePrompt/>}` from a broken variant that also compiles and greps the same). This is a reasonable thing to leave to human-check given App.tsx's nature, but worth flagging as a real (if low-severity) gap rather than fully resolved.
+
+**LOW — `relinkExternalSource`'s duplicate-active-link outcome says the caller should "route to merge/reconcile, or require an explicit unlink from the other contact,"** but this plan doesn't actually build that routing UI beyond "show a non-destructive explanation" — it's not clear whether landing the user on a dead-end message (with no actual path to resolve the conflict) satisfies RCN-01's "never silently overwrite" bar in a *useful* way, or just avoids the crash. This is likely acceptable for phase scope (routing to full merge flow from this specific dead-end isn't required), but worth confirming the copy genuinely explains what to do next rather than just "can't do this."
+
+### Suggestions
+- Add a lightweight App.tsx-level test (even a simple render/state test) for the import-vs-reconcile precedence rule, rather than relying solely on grep + device-UAT for a two-modal-race condition.
+
+### Risk Assessment: **LOW-MEDIUM** — the two headline fixes (net-new prompt component, duplicate-link preflight) are well-reasoned and correctly scoped; residual risk is test-depth on the App.tsx precedence wiring.
+
+---
+
+## Plan 20-06 (Bulk-review birthday resolver + phase gate)
+
+### Strengths
+- Correctly identifies that `import_session_rows.source_payload` is immutable, so a durable resolution *cannot* live by mutating import history — the `bulk_review_resolutions` table (added in 20-01's migration, consumed here) is the right fix and is now durability-tested ("durable-across-restart" cases required in both `bulk-review-read.test.ts` and `bulk-review-dao.test.ts`).
+- NULL `contact_id` handling (`ON DELETE SET NULL`) is explicitly called out as a must-have, closing a plausible crash/orphan-write path that a naive read/apply implementation would hit.
+- Consolidated device-UAT in Task 2 is a sensible phase-closing gate that harvests all five prior plans' human-check items into one pass rather than duplicating them.
+
+### Concerns
+
+**LOW — the generic-over-future-flag-types design (`flag_type CHECK IN ('birthday')` with only one value today) is fine as forward-compatible schema, but the read/write functions in this plan are typed and described specifically around birthdays** ("resolveBulkReviewFlagCore(exec, { importSessionRowId, contactId, birthday, now })" — birthday-specific parameter, not a generic `value`). This means the "generic over flag_type" claim is really only true at the schema layer; the DAO layer would need a rewrite for a second flag type. Not a defect for this phase's scope (only birthday exists), just worth not over-claiming genericity in the artifact manifest language ("generic over future flag types") when the DAO signature is birthday-specific.
+
+**LOW — Task 2 (verification gate) has no independent code changes and is essentially "run the suite and confirm," which is reasonable, but its acceptance criteria ("every 20-VALIDATION.md Wave 0 test file exists and is green") depend on a `20-VALIDATION.md` file that isn't shown in the reviewed materials** — I can't confirm that document's Wave-0 list matches the test files actually enumerated across the six plans' `files_modified`. This is a soft dependency worth double-checking at execution time (it's referenced but not included in this review bundle).
+
+### Suggestions
+- Soften "generic over future flag types" framing in the artifact manifest to acknowledge the DAO signature is birthday-specific today (schema-generic, not yet function-generic).
+
+### Risk Assessment: **LOW** — this plan is narrow, well-scoped, and correctly closes out the phase; residual risk is administrative (unverified cross-reference to `20-VALIDATION.md`).
+
+---
+
+## Cross-Plan / Phase-Wide Observations
+
+1. **Migration 013 ownership is spread across all six plans** (tables introduced in 20-01, consumed in 20-03/04/05/06). This is architecturally sound (forward-only migration authored once) but means a schema mistake discovered in wave 3+ requires either a *second* irreversible migration or reopening 20-01's already-"done" plan. Given migrations are explicitly irreversible in production, it would be worth the owner/planner double-checking that all six plans' schema needs were fully enumerated in 20-01's migration *before* execution starts, since 20-01 is the only wave that gets to write DDL.
+
+2. **The `MergeResolutions` type contract between 20-01 and 20-02** (noted above) is the one remaining "implicit interface" in the plan set that isn't mechanically enforced beyond `tsc --noEmit` at execution time — low risk given TypeScript will catch a real mismatch, but worth naming explicitly as a shared artifact.
+
+3. **The additive-only eligibility gate (Cluster J, 20-04)** is the one dossier-locked *safety* invariant in the whole phase whose verification leans most heavily on grep-pattern-matching and device-UAT rather than a dedicated unit test — given cycle 1's own theme (verify guards actually work, don't take the plan's word for it), this is the strongest candidate for a follow-up fix before execution.
+
+## Overall Risk Assessment: **LOW-MEDIUM**
+
+The cycle-1 HIGH findings (custom-field UNIQUE collision, provenance orphaning, missing photo writer, partial method-list data loss, CandidateCardGrid forking, ResumeImportPrompt reuse mismatch, missing durable bulk-review persistence) all have concrete, mechanically-checked fixes in the current plan text — this is a substantially stronger plan set than cycle 1. Remaining concerns are secondary: a few under-tested safety-critical helpers (additive-only eligibility, additive custom-field reparent), one implicit cross-plan type contract, and one App.tsx precedence rule that leans on device-UAT rather than a unit test. None of these rise to HIGH; they're the kind of gaps worth a targeted follow-up (specifically: add a unit test for the Cluster J additive-only-eligibility helper) rather than another full replan cycle.
+
+---
+
+## Cursor Review (Cycle 2)
+
+_Model: unknown — source-grounded, repo access._
+
+# Cross-AI Plan Review — Phase 20: Contact Reconciliation & Merge (Cycle 2)
+
+## Summary
+
+The six-wave plan set is substantially improved since cycle 1: the highest-risk data-layer hazards are now grounded in verified source (`purge-dao.ts`, `contact-methods-dao.ts`, `field-values-dao.ts`, `contacts-dao.ts`, migration 011 partial unique indexes) with explicit pre-resolution steps, node tests, and no new write paths for reconciliation apply. Cycle-1 blockers (custom-field `UNIQUE(contact_id, field_def_id)` collision, provenance remap ordering, `setContactPhotoCore`, full-method-list reconcile apply, additive `CandidateCardGrid` extension, `ResumeReconcilePrompt`, and `bulk_review_resolutions`) are fully addressed in the current plans. What remains is mostly product-scope alignment (dossier/UI-SPEC merge entry points), undefined merge policy for a few survivor-only contact columns (`favourite_rank`, `ring_seq`, `snooze_until`), an owner-blocking migration checkpoint, and the deliberately bounded 20-01→20-02 conflict UI gap.
+
+---
+
+## Strengths
+
+- **Merge writer design matches shipped purge/recency patterns.** `20-01-PLAN.md` correctly inverts `purge-dao.ts:204–268` (single `inWriteTransaction`, assert-one-row delete, post-commit extensions) and mandates `recomputeLastContactCore` instead of direct `last_contact` writes — consistent with `recency-dao.ts:150–176` and the project's DATA-04 invariant.
+
+- **Cycle-1 integrity hazards are concretely mitigated with test obligations.**
+  - Custom-field collision: pre-delete absorbed rows + `field_history` snapshot before reparent, using `upsertValueCore`'s `ON CONFLICT(contact_id, field_def_id)` path (`field-values-dao.ts:64–78`).
+  - Method provenance: remap `contact_method_provenance.method_id` before deleting losing methods — matches `011-contact-lifecycle-schema.ts:228–233` `ON DELETE CASCADE`.
+  - Partial unique indexes: demote competing primaries and retire duplicate active external links before reparent (`011-contact-lifecycle-schema.ts:178–180`).
+
+- **`setContactPhotoCore` extraction is correctly specified.** Plans cite the actual gap: `updateContactMetadataCore` omits `photo` (`contacts-dao.ts:308–335`) and `setContactPhoto` self-wraps `inWriteTransaction` (`contacts-dao.ts:621–644`), so an in-merge photo apply requires a non-mutexed core — exactly what 20-01 tasks describe.
+
+- **Reconcile apply reuses authoritative writers; the whole-list method trap is explicit.** `20-03-PLAN.md` requires seeding every current Orbit method and building `desired = current ∪ accepted`, with a pure helper test — directly guarding `applyContactMethodDiffCore`'s tombstone+DELETE path for seeded methods absent from `current` (`contact-methods-dao.ts:191–215`).
+
+- **Bulk reconciliation safety seam is source-accurate.** `20-04-PLAN.md` extends `CandidateCardGrid.tsx:18–22, 106–121` additively (`keep-orbit` / `use-contact-values`, caller-supplied `scoringLabel`), gates `Use Contact Values` on additive-only eligibility, and documents that per-card try/catch is the caller's job because `runBulkAction` marks the whole selection failed on throw.
+
+- **Durable bulk-review persistence is architecturally sound.** Immutable `import_session_rows.source_payload` (`012-import-sessions.ts:30–49`) plus `bulk_review_resolutions` in migration 013 gives 20-06 a correct durable Fix/Ignore store; the read path reuses `isBirthdayUnreadable` / `sourceBirthday` from `import-session-read.ts:79, 277` and `picked-contact-map.ts:67`.
+
+- **Resume/durability mirrors proven import patterns.** `20-05-PLAN.md` correctly treats `ResumeImportPrompt.tsx:4, 16–19` as import-coupled and specifies a net-new `ResumeReconcilePrompt` + `registerReconcileResumeSweep` wired into `App.tsx:123–124` with import-first precedence — matching existing sweep registration idioms.
+
+- **Wave ordering and tracer-first strategy are sound.** Migration 013 + atomic `mergeContacts` before reconciliation UI expansion de-risks the irreversible schema step and the hardest transaction before bulk/session work.
+
+---
+
+## Concerns
+
+### HIGH
+
+*None remaining from cycle 1 that are unfixed in the current plan text.* The prior HIGH items (custom-field collision, provenance ordering, photo core, method-list seeding, grid extension, reconcile resume prompt, bulk-review durability) all have explicit plan language and acceptance criteria now.
+
+### MEDIUM
+
+- **Cluster U / UI-SPEC merge entry from duplicate/reconciliation detail is missing from all six plans.** Dossier Cluster U (`docs/dossier/20-contact-reconciliation-merge.md:375–380`) and UI-SPEC surface #10 (`20-UI-SPEC.md:334–336`) require a `Merge with another contact` affordance from reconciliation/duplicate detail, not only profile overflow. Plans wire profile overflow only (`20-01-PLAN.md:174–180`; no merge affordance in `20-03`, `20-04`, or `DuplicateReviewScreen.tsx:239` which still has `onInspect={() => undefined}`). RCN-03 is satisfiable via profile alone, but this is a decided product surface gap vs the locked UI contract.
+
+- **Merge policy for `favourite_rank`, `ring_seq`, and `snooze_until` is undefined — silent survivor-wins may drop absorbed-only state.** Merge conflict UI covers name/birthday/category/photo/scalar custom fields (`20-02-PLAN.md`) and resolutions flow through `UpdateContactFullInput` (`contacts-dao.ts:272–289`), which does not include favourite/snooze/ring columns. `mergeContacts` deletes the absorbed row without a documented rule for: absorbed-only favourite (widget/dashboard ordering via `favourites-dao.ts`, `dashboard-read.ts:244–245`), absorbed-only `ring_seq` (orrery), or absorbed-only `snooze_until`. Survivor metadata is retained by default; absorbed-only values are discarded without review or `field_history` snapshot — inconsistent with the "serious consolidation" framing for user-visible lifecycle state.
+
+- **Owner checkpoint blocks Wave 1 execution.** `20-01-PLAN.md:101–118` correctly gates migration 013 on tombstone-only vs `contact_redirects`. This is appropriate (owner bucket), but it is still an unresolved execution blocker — the plan cannot proceed until the owner selects an option.
+
+### LOW
+
+- **Bounded 20-01→20-02 conflict gap is acknowledged but still a real interim UX hazard.** The plan explicitly accepts that tracer merge runs with empty resolutions = survivor-wins for scalar conflicts until `MergeConflictsScreen` lands (`20-01-PLAN.md:42–43`). Not data-loss (writer is conflict-correct), but a device build stopped after Wave 1 would expose silent scalar overwrites — acceptable only if waves are not shipped independently.
+
+- **20-01 second-candidate picker is underspecified.** Task 2 says "thin contact-list select; keep it minimal here" without naming a reuse target (e.g. existing sun-picker / contact search patterns in `sun-picker-read.ts`). Executor discretion risk for the tracer's only merge entry besides pre-seeded pairs.
+
+- **UI-SPEC surface #12 vs widget contract line 239 — plans follow the stricter rule.** Surface #12 says merge conflicts are "survivor value preselected" (`20-UI-SPEC.md:350–351`), but the FieldChoiceGroup contract requires conflicting mode with **no** preselection (`20-UI-SPEC.md:238–239`). Plans (`20-02-PLAN.md`) correctly follow line 239. The UI-SPEC summary section should be synced to avoid executor confusion — not a plan defect, but a doc inconsistency.
+
+- **Post-merge survivor notification reconcile is unspecified.** Plans specify post-commit cancel for absorbed `decay:<id>` / `birthday:<id>` via `purge-notification-cleanup` pattern (`20-01-PLAN.md:145`), but do not mention whether survivor schedules need refresh after child reparent changes recency. Likely covered by the existing launch-sweep notification reconcile (`App.tsx:174–181` registers `registerNotificationScheduleSweep`), but no explicit merge hook or test — minor verification gap.
+
+- **`bulk_review_resolutions` CASCADE on `import_session_row_id` means resolutions vanish if import rows are purged.** Schema is intentional (`ON DELETE CASCADE`), and 20-06 excludes NULL `contact_id` rows, but there is no lifecycle note for what happens to flags when import history is eventually trimmed — acceptable for v1, worth documenting in execution notes.
+
+---
+
+## Suggestions
+
+1. **Add a small plan task (20-02 or 20-03) for Cluster U detail entry points:** wire `Merge with another contact` from `ReconcileDetailScreen` (when duplicate Orbit identities are evident) and from `DuplicateReviewScreen` candidate inspect flow, routing into `SurvivorSelectScreen` with both contact ids pre-filled — as UI-SPEC #10 requires.
+
+2. **Document merge policy for lifecycle columns in `merge-dao` must_haves:** e.g. "if survivor lacks `favourite_rank` and absorbed has one, promote absorbed rank via `favourites-dao` (or survivor-wins explicitly with no promotion)"; same for `ring_seq` and `snooze_until`. Add one node test per rule so widget/orrery regressions are caught.
+
+3. **Resolve the owner checkpoint before Task 1 DDL is authored** — default recommendation in research (redirect table in 013) is flagged, but the checkpoint correctly leaves the decision to the owner; do not let an executor pick `tombstone-only` silently.
+
+4. **Add an acceptance grep/test that 20-01 SurvivorSelect can reach merge with a user-picked second contact** — even minimal — so the tracer entry is not profile-only in practice when the user discovers duplicates outside profile-initiated merge.
+
+5. **Sync UI-SPEC surface #12** to match line 239 (conflict = no preselection) so merge and reconcile share one rule.
+
+6. **Optional: note in 20-06 verification** that notification schedule for the survivor is eventually consistent via launch sweep, or add a post-commit `registerNotificationScheduleSweep`-style hook if immediate correctness matters after merge.
+
+---
+
+## Risk Assessment
+
+**Overall: MEDIUM**
+
+**Justification:** The data-layer plans are the strongest part of the phase — they trace real schema constraints, reuse proven DAO patterns, and encode cycle-1 fixes with concrete tests. Execution risk is concentrated in (a) the irreversible migration 013 owner decision, (b) the large atomic merge transaction (mitigated by extensive pre-resolution and node tests), and (c) product-scope gaps (Cluster U entry points, lifecycle-column merge policy) that will not corrupt SQLite but may ship incomplete vs decided dossier/UI-SPEC behavior. Reconciliation safety (one-way apply, additive-only bulk seam, missing-source distinctness, durable sessions) is well specified. No network exposure; SQL injection risk appropriately constrained to literal table names and `?`-binding per existing purge/DAO conventions.
+
+---
+
+### Cycle 1 Resolution Status (for traceability)
+
+| Cycle 1 concern | Status in current plans |
+|-----------------|-------------------------|
+| Custom-field UNIQUE collision on blind reparent | **Resolved** — pre-resolution + tests in 20-01 |
+| Provenance capture-then-remap ordering | **Resolved** — step 1c before delete in 20-01 |
+| Net-new `setContactPhotoCore` | **Resolved** — 20-01 with correct `contacts-dao` citations |
+| Full-method-list seeding on reconcile apply | **Resolved** — 20-03 + pure helper test requirement |
+| `CandidateCardGrid` additive bulk actions | **Resolved** — 20-04 in `files_modified` |
+| Net-new `ResumeReconcilePrompt` | **Resolved** — 20-05 |
+| `bulk_review_resolutions` in migration 013 | **Resolved** — 20-01 DDL + 20-06 consumer |
+
+---
+
+<!-- ============================================================ -->
+# CYCLE 1 — AUDIT HISTORY (preserved verbatim)
+
+> The following is the complete cycle-1 review, retained for the convergence audit trail.
+> It was addressed by the revision; do not re-action from here — see Cycle 2 above.
+
 
 # Cross-AI Plan Review — Phase 20
 
