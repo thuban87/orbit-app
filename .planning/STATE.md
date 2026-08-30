@@ -3,16 +3,16 @@ gsd_state_version: 1.0
 milestone: v1.0
 current_phase: 19.1
 current_phase_name: Older-Android Contact Picker (Hybrid two-picker, ADR-002)
-current_plan: 2
+current_plan: 3
 status: executing
-stopped_at: Completed 19.1-01-tracer-legacy-acquisition-PLAN.md
-last_updated: "2026-08-30T10:24:28.010Z"
-state_head: bbeb890d818ae6fb4a5f4d0a5685e8e0ef21006d
+stopped_at: Completed 19.1-02-carried-forward-pipeline-fixes-PLAN.md
+last_updated: "2026-08-30T10:33:18.152Z"
+state_head: 977dc7df4d05860fb7dcdfafbe50e4dc22336984
 progress:
   total_phases: 23
   completed_phases: 15
   total_plans: 169
-  completed_plans: 162
+  completed_plans: 163
 milestone_name: milestone
 ---
 
@@ -28,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-08-14)
 ## Current Position
 
 **Phase:** 19.1 — Older-Android Contact Picker (Hybrid two-picker, ADR-002) — PLANNED, ready to execute
-**Current Plan:** 2
+**Current Plan:** 3
 **Total Plans in Phase:** 5
 **Status:** Ready to execute
 
@@ -215,6 +215,7 @@ Progress: [████████░░] 75% (12/16 phases complete; Phase 13 
 | Phase 18.2 P08 | 9min | 3 tasks | 12 files |
 | Phase 18.2 P09 | 4min | 2 tasks | 7 files |
 | Phase 19.1 P01 | 6min | 2 tasks | 14 files |
+| Phase 19.1 P02 | 5m 34s | 3 tasks | 12 files |
 
 ## Accumulated Context
 
@@ -364,6 +365,9 @@ Foundational decisions affecting current work:
 - [Phase 18.2]: A newer Unbound merge cannot null an already assigned local cadence; the cadence remains dormant before SQL begins.
 - [Phase 19.1]: Use a single contactImportMode/startContactImport seam for API 37+ system and API <= 36 legacy acquisition.
 - [Phase 19.1]: Scope READ_CONTACTS to maxSdkVersion 36 and reject legacy provider read failures rather than treating them as cancels.
+- [Phase 19.1]: Nameless bulk rows use skipped while unresolved-state definitions remain unchanged.
+- [Phase 19.1]: Unreadable birthday reporting reuses the storage canonicalizer over durable source_payload.
+- [Phase 19.1]: View contact appears only for one already-linked row in a single import session.
 
 ### Pending Todos
 
@@ -400,8 +404,8 @@ planning" sections in docs/dossier/*.md — those are the authoritative hand-off
 
 ## Session
 
-**Last session:** 2026-08-30T10:24:25.577Z
-**Stopped at:** Completed 19.1-01-tracer-legacy-acquisition-PLAN.md
+**Last session:** 2026-08-30T10:33:15.760Z
+**Stopped at:** Completed 19.1-02-carried-forward-pipeline-fixes-PLAN.md
 _Prior stop (13-04):_ the orrery VISUAL VOCABULARY (theme tokens + two pure resolver modules, node-tested, 29 cases green): (1) five owner-tunable `ThemePalette` tokens seeded in `space-dark.dark` ONLY — `starPalette` (6 colours, gold `#F2C14E` at index 0, then amber/rose-red/violet/cyan/ice-white), `mutedStable/Wobble/Decay` (desaturated same-hue morph endpoints), `rogueExtinguished` (cold blue-grey `#3E4A6B` rogue BODY fill) — with an M6/C2-5 conformance test that IMPORTS the real `SELF_SUN_COLOUR_RE`/`assertSelfSunColour` from app-settings-dao and locks every starPalette entry to the ACTUAL DAO write-path rule (no re-inlined regex). (2) `orrery-ring-logic.ts` `orreryRingStyle(status, colors)` — REUSES `ringVisual` for `{color,opacity,width}` (status→colour mapped once), adds the `strokeStyle` axis (solid→dashed→faded→faintTrace) + `bodyFill` (rogue ring=`colors.rogue`, body=`rogueExtinguished`); `null`→canonical NEUTRAL (`colors.border`), never throws — the single fallback sun-occupant reuses (C2-2). (3) `sun-occupant-logic.ts` `resolveSunOccupant(input)` — NULL/archived/missing→self (A7, glow `selfSunColour ?? starPalette[0]`), live contact→its status glow via `orreryRingStyle(status, colors).color`, never-contacted (status `null`)→the reused neutral border (C2-2); accepts `status: ProfileStatus | null`. 5 commits (1801915 feat tokens+M6; d35d528 RED→4cbfad5 GREEN ring-logic; c923b16 RED→10780dd GREEN sun-occupant); tsc + check:colors clean; no deviations (one in-flight fix: a placeholder hex in the logic test was re-sourced from the palette after check:colors flagged it — C2-3). Committed locally on main (NOT pushed). Next: Wave 2 (13-05 render / 13-06 Settings sun-picker), Wave 3 (13-07 drag-release), Wave 4 (13-08 device UAT, autonomous:false).
 **Resume file:** None
 

@@ -845,12 +845,12 @@ place (a read permission ≠ breaking local-first). **Full context for discussio
 `19.1-SEED.md` (this phase dir), `ADR-002`, `../19-system-contact-import/19-SPIKE-older-android-permissions.md`,
 and `../19-system-contact-import/19-DEVICE-UAT-FINDINGS.md`.
 
-**Plans:** 1/5 plans executed / 4 waves (tracer-first; native reader + carried-forward fixes lead in parallel, then picker UI, permission UX, device UAT)
+**Plans:** 2/5 plans executed / 4 waves (tracer-first; native reader + carried-forward fixes lead in parallel, then picker UI, permission UX, device UAT)
 
 Plans:
 
 - [x] 19.1-01-tracer-legacy-acquisition-PLAN.md
-- [ ] 19.1-02-carried-forward-pipeline-fixes-PLAN.md
+- [x] 19.1-02-carried-forward-pipeline-fixes-PLAN.md
 - [ ] 19.1-03-custom-picker-ui-PLAN.md
 - [ ] 19.1-04-permission-ux-and-routing-PLAN.md
 - [ ] 19.1-05-device-uat-and-manifest-verification-PLAN.md
