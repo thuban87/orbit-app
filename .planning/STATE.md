@@ -5,14 +5,14 @@ current_phase: 19.1
 current_phase_name: Older-Android Contact Picker (Hybrid two-picker, ADR-002)
 current_plan: 1
 status: ready
-stopped_at: Phase 19 COMPLETE + device-verified (2026-08-30). The Android-17 picker dead-end was root-caused on-device to orbit's own intent (wrong USE_SYSTEM_CONTACTS_PICKER extra namespace), NOT an OS defect — fixed in gap plan 19-20 (commits cfa660c/b56956e). Full 19-17 device UAT PASS (all 3 tasks, commit 9620096); fresh verifier PASS 4/4 (97bffc2). Carried-forward open items folded into Phase 19.1. All Phase-19 commits LOCAL on main, NOT pushed. Next → /gsd-discuss-phase 19.1 (read 19.1-SEED.md + ADR-002).
-last_updated: "2026-08-30T00:20:00.000Z"
-state_head: 64b073df17dfe8742d1a6428b84f76cb919f18f1
+stopped_at: Phase 19.1 context gathered
+last_updated: "2026-08-30T05:41:35.322Z"
+state_head: c40878f258c07fa08ac173d7375005151e52ea4a
 progress:
   total_phases: 23
-  completed_phases: 14
-  total_plans: 163
-  completed_plans: 159
+  completed_phases: 15
+  total_plans: 164
+  completed_plans: 161
 milestone_name: milestone
 ---
 
@@ -397,10 +397,10 @@ planning" sections in docs/dossier/*.md — those are the authoritative hand-off
 
 ## Session
 
-**Last session:** 2026-08-29T04:26:57.076Z
-**Stopped at:** Phase 19 UI-SPEC approved
+**Last session:** 2026-08-30T05:41:33.013Z
+**Stopped at:** Phase 19.1 context gathered
 _Prior stop (13-04):_ the orrery VISUAL VOCABULARY (theme tokens + two pure resolver modules, node-tested, 29 cases green): (1) five owner-tunable `ThemePalette` tokens seeded in `space-dark.dark` ONLY — `starPalette` (6 colours, gold `#F2C14E` at index 0, then amber/rose-red/violet/cyan/ice-white), `mutedStable/Wobble/Decay` (desaturated same-hue morph endpoints), `rogueExtinguished` (cold blue-grey `#3E4A6B` rogue BODY fill) — with an M6/C2-5 conformance test that IMPORTS the real `SELF_SUN_COLOUR_RE`/`assertSelfSunColour` from app-settings-dao and locks every starPalette entry to the ACTUAL DAO write-path rule (no re-inlined regex). (2) `orrery-ring-logic.ts` `orreryRingStyle(status, colors)` — REUSES `ringVisual` for `{color,opacity,width}` (status→colour mapped once), adds the `strokeStyle` axis (solid→dashed→faded→faintTrace) + `bodyFill` (rogue ring=`colors.rogue`, body=`rogueExtinguished`); `null`→canonical NEUTRAL (`colors.border`), never throws — the single fallback sun-occupant reuses (C2-2). (3) `sun-occupant-logic.ts` `resolveSunOccupant(input)` — NULL/archived/missing→self (A7, glow `selfSunColour ?? starPalette[0]`), live contact→its status glow via `orreryRingStyle(status, colors).color`, never-contacted (status `null`)→the reused neutral border (C2-2); accepts `status: ProfileStatus | null`. 5 commits (1801915 feat tokens+M6; d35d528 RED→4cbfad5 GREEN ring-logic; c923b16 RED→10780dd GREEN sun-occupant); tsc + check:colors clean; no deviations (one in-flight fix: a placeholder hex in the logic test was re-sourced from the palette after check:colors flagged it — C2-3). Committed locally on main (NOT pushed). Next: Wave 2 (13-05 render / 13-06 Settings sun-picker), Wave 3 (13-07 drag-release), Wave 4 (13-08 device UAT, autonomous:false).
-**Resume file:** /home/bwales/projects/orbit-app/.planning/phases/19-system-contact-import/19-UI-SPEC.md
+**Resume file:** .planning/phases/19.1-older-android-contact-picker-hybrid-two-picker-adr-002/19.1-CONTEXT.md
 
 ## Phase 4 — Closeout (2026-08-15) ✅ COMPLETE
 
