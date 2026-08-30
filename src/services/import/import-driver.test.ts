@@ -8,7 +8,7 @@ import {
   acceptImportSessionWithRows,
   setSessionBatchCategory,
 } from "@/db/import-session-dao";
-import { listSessionRows } from "@/db/import-session-read";
+import { getResumableSession, listSessionRows } from "@/db/import-session-read";
 import { importContactRecord } from "@/db/imported-contact-dao";
 import { runMigrations } from "@/db/migrations/runner";
 import type { SqlExecutor } from "@/db/types";
@@ -122,6 +122,7 @@ describe("runImportBatch", () => {
       alreadyInOrbit: 1,
       needReview: 1,
       failedOrSkipped: 1,
+      nameRequiredSkipped: 0,
     });
     const rows = await listSessionRows(exec, session.sessionId);
     expect(rows).toEqual(
@@ -160,7 +161,7 @@ describe("runImportBatch", () => {
     ]);
   });
 
-  it("fails a blank name without creating a contact and honors durable batch category", async () => {
+  it("skips a blank bulk name, finalizes before a completion screen mounts, and honors durable batch category", async () => {
     const category = await exec.getFirstAsync<{ id: number }>(
       "SELECT id FROM categories ORDER BY id LIMIT 1",
     );
@@ -179,7 +180,7 @@ describe("runImportBatch", () => {
       expect.arrayContaining([
         expect.objectContaining({
           externalContactId: "blank",
-          rowStatus: "failed",
+          rowStatus: "skipped",
           failureReason: "name-required",
           contactId: null,
         }),
@@ -199,6 +200,7 @@ describe("runImportBatch", () => {
         "SELECT category_id FROM contacts WHERE name = 'Categorized'",
       ),
     ).toEqual({ category_id: category.id });
+    await expect(getResumableSession(exec, NOW)).resolves.toBeNull();
   });
 
   it("retries failed rows without double-importing a row that already has a contact", async () => {

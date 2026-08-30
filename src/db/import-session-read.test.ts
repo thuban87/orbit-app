@@ -175,6 +175,7 @@ describe("import-session-read", () => {
       alreadyInOrbit: 1,
       needReview: 1,
       failedOrSkipped: 2,
+      nameRequiredSkipped: 0,
     });
     await expect(sessionRowCounts(exec, accepted.sessionId)).resolves.toEqual({
       pending: 0,
@@ -183,6 +184,25 @@ describe("import-session-read", () => {
       needs_review: 1,
       failed: 1,
       skipped: 2,
+    });
+  });
+
+  it("reports name-required skips separately from other failed or skipped rows", async () => {
+    const accepted = await acceptRows(exec, ["name-required", "user-skipped"]);
+    await markRowStatus(
+      exec,
+      accepted.rowIds[0],
+      "skipped",
+      "name-required",
+      NOW,
+    );
+    await markRowStatus(exec, accepted.rowIds[1], "skipped", null, NOW);
+
+    await expect(
+      sessionSummaryCounts(exec, accepted.sessionId),
+    ).resolves.toMatchObject({
+      nameRequiredSkipped: 1,
+      failedOrSkipped: 1,
     });
   });
 
