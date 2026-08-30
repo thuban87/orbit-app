@@ -21,7 +21,9 @@ export function toPickerRows(
   summaries: readonly ContactSummary[],
 ): ContactPickerRow[] {
   return summaries.map((summary) => {
-    const searchMethods = summary.methods.filter((method) => method.trim() !== "");
+    const searchMethods = summary.methods.filter(
+      (method) => method.trim() !== "",
+    );
     return {
       lookupKey: summary.lookupKey,
       displayName: summary.displayName?.trim() || "Unnamed contact",

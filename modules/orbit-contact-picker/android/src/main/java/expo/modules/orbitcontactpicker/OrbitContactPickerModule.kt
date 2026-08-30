@@ -49,6 +49,13 @@ private data class MutablePickedContact(
   var photoTempUri: String? = null,
 )
 
+private data class MutableContactSummary(
+  val lookupKey: String,
+  val displayName: String?,
+  val methods: MutableList<String> = mutableListOf(),
+  val photoThumbUri: String? = null,
+)
+
 /**
  * Android 17's privacy-preserving Contact Picker wrapper. It receives only the
  * temporary session URI from Android, snapshots permitted data immediately,
@@ -109,6 +116,24 @@ class OrbitContactPickerModule : Module() {
       } catch (_: Exception) {
         // A failed provider read is distinct from a user cancelling a picker.
         // Do not expose provider details or contact data to JavaScript.
+        promise.reject(ContactReadException())
+      }
+    }
+
+    AsyncFunction("listContactsSummary") { promise: Promise ->
+      try {
+        promise.resolve(listContactsSummary())
+      } catch (_: Exception) {
+        // Keep provider details and contact contents out of JS/log output.
+        promise.reject(ContactReadException())
+      }
+    }
+
+    AsyncFunction("readContactsByLookupKeys") { lookupKeys: List<String>, promise: Promise ->
+      try {
+        promise.resolve(readContactsByLookupKeys(lookupKeys))
+      } catch (_: Exception) {
+        // A provider error is distinct from a selected contact that disappeared.
         promise.reject(ContactReadException())
       }
     }
@@ -232,6 +257,167 @@ class OrbitContactPickerModule : Module() {
         val contact = contacts.getOrPut(lookupKey) { MutablePickedContact(lookupKey) }
         contact.displayName = contact.displayName ?: cursor.stringAt(displayNameColumn)
 
+        when (cursor.stringAt(mimeTypeColumn)) {
+          ContactsContract.CommonDataKinds.Phone.CONTENT_ITEM_TYPE ->
+            cursor.stringAt(data1Column)?.takeIf { it.isNotBlank() }?.let { value ->
+              contact.methods += mapOf("type" to "phone", "value" to value)
+            }
+          ContactsContract.CommonDataKinds.Email.CONTENT_ITEM_TYPE ->
+            cursor.stringAt(data1Column)?.takeIf { it.isNotBlank() }?.let { value ->
+              contact.methods += mapOf("type" to "email", "value" to value)
+            }
+          ContactsContract.CommonDataKinds.Event.CONTENT_ITEM_TYPE ->
+            if (cursor.intAt(data2Column) == ContactsContract.CommonDataKinds.Event.TYPE_BIRTHDAY) {
+              contact.birthday = contact.birthday ?: cursor.stringAt(data1Column)
+            }
+          ContactsContract.CommonDataKinds.Photo.CONTENT_ITEM_TYPE -> {
+            if (contact.photoTempUri == null) {
+              contact.photoTempUri = cursor.blobAt(data15Column)?.let(::copyPhotoToCache)
+                ?: copyContactPhotoToCache(lookupKey)
+            }
+          }
+        }
+      }
+    }
+
+    return contacts.values.map { contact ->
+      mapOf(
+        "lookupKey" to contact.lookupKey,
+        "displayName" to contact.displayName,
+        "methods" to contact.methods,
+        "birthday" to contact.birthday,
+        "photoTempUri" to contact.photoTempUri,
+      )
+    }
+  }
+
+  /**
+   * Lightweight browse-tier read. Contacts is deliberately the first-query
+   * spine so structured-name-only contacts remain selectable; Data supplies
+   * every phone/email string, merged by lookup key. No full photo is staged.
+   */
+  private fun listContactsSummary(): List<Map<String, Any?>> {
+    val summaries = linkedMapOf<String, MutableContactSummary>()
+    context.contentResolver.query(
+      ContactsContract.Contacts.CONTENT_URI,
+      arrayOf(
+        ContactsContract.Contacts.LOOKUP_KEY,
+        ContactsContract.Contacts.DISPLAY_NAME_PRIMARY,
+        ContactsContract.Contacts.PHOTO_THUMBNAIL_URI,
+      ),
+      null,
+      null,
+      "${ContactsContract.Contacts.DISPLAY_NAME_PRIMARY} ASC",
+    )?.use { cursor ->
+      val lookupKeyColumn = cursor.getColumnIndex(ContactsContract.Contacts.LOOKUP_KEY)
+      val displayNameColumn = cursor.getColumnIndex(ContactsContract.Contacts.DISPLAY_NAME_PRIMARY)
+      val thumbnailColumn = cursor.getColumnIndex(ContactsContract.Contacts.PHOTO_THUMBNAIL_URI)
+      while (cursor.moveToNext()) {
+        val lookupKey = cursor.stringAt(lookupKeyColumn) ?: continue
+        summaries[lookupKey] = MutableContactSummary(
+          lookupKey = lookupKey,
+          displayName = cursor.stringAt(displayNameColumn),
+          photoThumbUri = cursor.stringAt(thumbnailColumn),
+        )
+      }
+    }
+
+    val methodMimeTypes = arrayOf(
+      ContactsContract.CommonDataKinds.Phone.CONTENT_ITEM_TYPE,
+      ContactsContract.CommonDataKinds.Email.CONTENT_ITEM_TYPE,
+    )
+    context.contentResolver.query(
+      ContactsContract.Data.CONTENT_URI,
+      arrayOf(
+        ContactsContract.Data.LOOKUP_KEY,
+        ContactsContract.Data.MIMETYPE,
+        ContactsContract.Data.DATA1,
+      ),
+      "${ContactsContract.Data.MIMETYPE} IN (?, ?)",
+      methodMimeTypes,
+      null,
+    )?.use { cursor ->
+      val lookupKeyColumn = cursor.getColumnIndex(ContactsContract.Data.LOOKUP_KEY)
+      val data1Column = cursor.getColumnIndex(ContactsContract.Data.DATA1)
+      while (cursor.moveToNext()) {
+        val lookupKey = cursor.stringAt(lookupKeyColumn) ?: continue
+        val summary = summaries[lookupKey] ?: continue
+        cursor.stringAt(data1Column)?.takeIf { it.isNotBlank() }?.let { value ->
+          summary.methods += value
+        }
+      }
+    }
+
+    return summaries.values.map { summary ->
+      mapOf(
+        "lookupKey" to summary.lookupKey,
+        "displayName" to summary.displayName,
+        "methods" to summary.methods,
+        "photoThumbUri" to summary.photoThumbUri,
+      )
+    }
+  }
+
+  /**
+   * Full selected-tier read for exactly one JS-formed bounded chunk. The first
+   * Contacts query keeps selected name-only contacts in the result; the Data
+   * query adds methods, birthday, and only then a staged full photo.
+   */
+  private fun readContactsByLookupKeys(lookupKeys: List<String>): List<Map<String, Any?>> {
+    if (lookupKeys.isEmpty()) return emptyList()
+
+    val contacts = linkedMapOf<String, MutablePickedContact>()
+    val placeholders = lookupKeys.joinToString(",") { "?" }
+    context.contentResolver.query(
+      ContactsContract.Contacts.CONTENT_URI,
+      arrayOf(
+        ContactsContract.Contacts.LOOKUP_KEY,
+        ContactsContract.Contacts.DISPLAY_NAME_PRIMARY,
+      ),
+      "${ContactsContract.Contacts.LOOKUP_KEY} IN ($placeholders)",
+      lookupKeys.toTypedArray(),
+      null,
+    )?.use { cursor ->
+      val lookupKeyColumn = cursor.getColumnIndex(ContactsContract.Contacts.LOOKUP_KEY)
+      val displayNameColumn = cursor.getColumnIndex(ContactsContract.Contacts.DISPLAY_NAME_PRIMARY)
+      while (cursor.moveToNext()) {
+        val lookupKey = cursor.stringAt(lookupKeyColumn) ?: continue
+        contacts[lookupKey] = MutablePickedContact(
+          lookupKey = lookupKey,
+          displayName = cursor.stringAt(displayNameColumn),
+        )
+      }
+    }
+
+    val mimeTypes = arrayOf(
+      ContactsContract.CommonDataKinds.Phone.CONTENT_ITEM_TYPE,
+      ContactsContract.CommonDataKinds.Email.CONTENT_ITEM_TYPE,
+      ContactsContract.CommonDataKinds.Event.CONTENT_ITEM_TYPE,
+      ContactsContract.CommonDataKinds.Photo.CONTENT_ITEM_TYPE,
+    )
+    val projection = arrayOf(
+      ContactsContract.Data.LOOKUP_KEY,
+      ContactsContract.Data.MIMETYPE,
+      ContactsContract.Data.DATA1,
+      ContactsContract.Data.DATA2,
+      ContactsContract.Data.DATA15,
+    )
+    context.contentResolver.query(
+      ContactsContract.Data.CONTENT_URI,
+      projection,
+      "${ContactsContract.Data.LOOKUP_KEY} IN ($placeholders) AND " +
+        "${ContactsContract.Data.MIMETYPE} IN (?, ?, ?, ?)",
+      lookupKeys.toTypedArray() + mimeTypes,
+      null,
+    )?.use { cursor ->
+      val lookupKeyColumn = cursor.getColumnIndex(ContactsContract.Data.LOOKUP_KEY)
+      val mimeTypeColumn = cursor.getColumnIndex(ContactsContract.Data.MIMETYPE)
+      val data1Column = cursor.getColumnIndex(ContactsContract.Data.DATA1)
+      val data2Column = cursor.getColumnIndex(ContactsContract.Data.DATA2)
+      val data15Column = cursor.getColumnIndex(ContactsContract.Data.DATA15)
+      while (cursor.moveToNext()) {
+        val lookupKey = cursor.stringAt(lookupKeyColumn) ?: continue
+        val contact = contacts[lookupKey] ?: continue
         when (cursor.stringAt(mimeTypeColumn)) {
           ContactsContract.CommonDataKinds.Phone.CONTENT_ITEM_TYPE ->
             cursor.stringAt(data1Column)?.takeIf { it.isNotBlank() }?.let { value ->
