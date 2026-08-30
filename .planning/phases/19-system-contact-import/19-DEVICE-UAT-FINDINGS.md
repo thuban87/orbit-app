@@ -1,3 +1,12 @@
+> **⚠ RESOLVED 2026-08-29 (evening) — the "Android 17 picker OS defect" below is DISPROVEN.**
+> On-device disassembly + a faithful repro showed the dead-end was triggered by orbit's own
+> intent (the `USE_SYSTEM_CONTACTS_PICKER` extra was set under the wrong namespace). A two-line
+> fix in `OrbitContactPickerModule.kt` makes the native Android-17 system picker render on the
+> Pixel 6 — **verified on-device**. Do not pursue the OS-update / device-state remediation routes
+> in the "⛔ BLOCKER" section; they were proven dead (incl. `pm clear`, which was tested).
+> **Full analysis + verification: `19-ANDROID17-PICKER-ROOTCAUSE.md`.** The code-review defects
+> (#1–#3) further down remain open and were not touched.
+
 # Phase 19 — First Device UAT: Consolidated Findings
 
 **Date:** 2026-08-29 · **Device:** Pixel 6 Pro `1A071FDEE002BU`, Android 17 (`raven:17/CP2A.260705.006`, API 37, patch 2026-07-05)
