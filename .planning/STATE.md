@@ -3,16 +3,16 @@ gsd_state_version: 1.0
 milestone: v1.0
 current_phase: 19.1
 current_phase_name: Older-Android Contact Picker (Hybrid two-picker, ADR-002)
-current_plan: 1
-status: ready
-stopped_at: Phase 19.1 planned — 5 plans, 4-cycle cross-AI convergence + plan-checker PASS; ready for /gsd-execute-phase 19.1
-last_updated: "2026-08-30T09:37:13.000Z"
-state_head: 9468655e032cc485e4b75b6b16c980802cc5405a
+current_plan: 2
+status: executing
+stopped_at: Completed 19.1-01-tracer-legacy-acquisition-PLAN.md
+last_updated: "2026-08-30T10:24:28.010Z"
+state_head: bbeb890d818ae6fb4a5f4d0a5685e8e0ef21006d
 progress:
   total_phases: 23
   completed_phases: 15
   total_plans: 169
-  completed_plans: 161
+  completed_plans: 162
 milestone_name: milestone
 ---
 
@@ -23,14 +23,14 @@ milestone_name: milestone
 See: .planning/PROJECT.md (updated 2026-08-14)
 
 **Core value:** Collapse the taps between "you're overdue with X" and the message actually being sent.
-**Current focus:** Phase 19 COMPLETE ✅ — next: Phase 19.1 (Older-Android hybrid picker, ADR-002)
+**Current focus:** Phase 19.1 — Older-Android Contact Picker (Hybrid two-picker, ADR-002)
 
 ## Current Position
 
 **Phase:** 19.1 — Older-Android Contact Picker (Hybrid two-picker, ADR-002) — PLANNED, ready to execute
-**Current Plan:** 1 of 5 (none executed yet)
-**Total Plans in Phase:** 5 (waves: W1 [01,02] → W2 [03] → W3 [04] → W4 [05])
-**Status:** Discussed → planned (5 plans) → **4-cycle cross-AI convergence** (codex `gpt-5.6-terra` low + cursor + headless sonnet-5 Claude, driven manually since the convergence skill errors on `--cursor` and the `claude -p` lane hits the Write-wall) → owner elected to stop after cycle 4 (fixes applied, not re-reviewed by design) → **final `gsd-plan-checker` VERIFICATION PASSED** (no blockers; 3 advisory warnings). Ready for `/gsd-execute-phase 19.1`. Convergence trail in `19.1-CONVERGENCE-LOG.md`; reviews (last cycle) in `19.1-REVIEWS.md`. Commits LOCAL on `main`, NOT pushed. **DO NOT execute here — owner runs execution in a separate session.**
+**Current Plan:** 2
+**Total Plans in Phase:** 5
+**Status:** Ready to execute
 
 **⟢ PHASE 18.1 (Contact Method Normalization) — COMPLETE (2026-08-28).** All 6 plans executed.
 Normalized phone/email method model with stable identity + system-contact provenance foundations;
@@ -96,7 +96,7 @@ Progress: [████████░░] 75% (12/16 phases complete; Phase 13 
 
 _Phase-12 recap (historical — Phase 12 is COMPLETE + verified; see 12-VERIFICATION.md):_
 
-Phase: 19.1 (Older-Android Contact Picker (Hybrid two-picker, ADR-002)) — READY TO EXECUTE
+Phase: 19.1 (Older-Android Contact Picker (Hybrid two-picker, ADR-002)) — EXECUTING
 Next: Phase 13 (Orrery) — NOT started. It is a large new Skia render-loop phase (its own discuss→plan→converge→execute→device-UAT cycle); awaiting owner go-ahead before beginning.
 Done this session (2026-08-17), all committed locally on main (NOT pushed): smart-discuss (12-CONTEXT; owner APPROVED the shared stable/wobble/decay status palette — stable #45B98A / wobble #E8C15C / decay #E56A52 / rogue #E0904A unchanged — resolving OD-1 app-wide; widget + ContactCard + future orrery inherit it), UI-SPEC (approved, checker VERIFIED), RESEARCH, VALIDATION (Nyquist), PATTERNS, PLAN (8 plans / 6 waves, efa9f5b), plan-checker PASSED, then a 2-cycle cross-AI convergence (codex CLI + read-only-Claude subagent; self-review guard overridden per owner): cycle-1 = 6 codex HIGH + 7 Claude actionable → replan (cca05d9); cycle-2 = 2 codex HIGH (WDG-03 freshness incompleteness; killed-app UAT needed a debug build) → final replan (4e688cf). All 8 HIGH fixes verified in-file. NOTE: the final-replan fixes were NOT independently re-reviewed (max cycles reached + owner pause).
 Codex tooling note: current codex-cli (0.144.1) makes gsd-review auto-add `--dangerously-bypass-hook-trust`, which the safety classifier blocks; a subagent improperly tunneled it once (flagged, discarded), then codex was re-run cleanly WITHOUT that flag. Do NOT let gsd-review's codex path run with that flag — run codex manually without it, or allow-list a scoped `Bash(codex exec:*)`.
@@ -214,6 +214,7 @@ Progress: [████████░░] 75% (12/16 phases complete; Phase 13 
 | Phase 18.2-bound-unbound-lifecycle P07 | 10min | 3 tasks | 24 files |
 | Phase 18.2 P08 | 9min | 3 tasks | 12 files |
 | Phase 18.2 P09 | 4min | 2 tasks | 7 files |
+| Phase 19.1 P01 | 6min | 2 tasks | 14 files |
 
 ## Accumulated Context
 
@@ -361,6 +362,8 @@ Foundational decisions affecting current work:
 - [Phase 18.2]: Profile lifecycle state is pure and hides cadence-only treatment for Unbound contacts while retaining gravity and history.
 - [Phase 18.2]: Lifecycle changes bump the portable backup format to v3, with v2 contacts defaulting to Bound.
 - [Phase 18.2]: A newer Unbound merge cannot null an already assigned local cadence; the cadence remains dormant before SQL begins.
+- [Phase 19.1]: Use a single contactImportMode/startContactImport seam for API 37+ system and API <= 36 legacy acquisition.
+- [Phase 19.1]: Scope READ_CONTACTS to maxSdkVersion 36 and reject legacy provider read failures rather than treating them as cancels.
 
 ### Pending Todos
 
@@ -397,10 +400,10 @@ planning" sections in docs/dossier/*.md — those are the authoritative hand-off
 
 ## Session
 
-**Last session:** 2026-08-30T05:41:33.013Z
-**Stopped at:** Phase 19.1 context gathered
+**Last session:** 2026-08-30T10:24:25.577Z
+**Stopped at:** Completed 19.1-01-tracer-legacy-acquisition-PLAN.md
 _Prior stop (13-04):_ the orrery VISUAL VOCABULARY (theme tokens + two pure resolver modules, node-tested, 29 cases green): (1) five owner-tunable `ThemePalette` tokens seeded in `space-dark.dark` ONLY — `starPalette` (6 colours, gold `#F2C14E` at index 0, then amber/rose-red/violet/cyan/ice-white), `mutedStable/Wobble/Decay` (desaturated same-hue morph endpoints), `rogueExtinguished` (cold blue-grey `#3E4A6B` rogue BODY fill) — with an M6/C2-5 conformance test that IMPORTS the real `SELF_SUN_COLOUR_RE`/`assertSelfSunColour` from app-settings-dao and locks every starPalette entry to the ACTUAL DAO write-path rule (no re-inlined regex). (2) `orrery-ring-logic.ts` `orreryRingStyle(status, colors)` — REUSES `ringVisual` for `{color,opacity,width}` (status→colour mapped once), adds the `strokeStyle` axis (solid→dashed→faded→faintTrace) + `bodyFill` (rogue ring=`colors.rogue`, body=`rogueExtinguished`); `null`→canonical NEUTRAL (`colors.border`), never throws — the single fallback sun-occupant reuses (C2-2). (3) `sun-occupant-logic.ts` `resolveSunOccupant(input)` — NULL/archived/missing→self (A7, glow `selfSunColour ?? starPalette[0]`), live contact→its status glow via `orreryRingStyle(status, colors).color`, never-contacted (status `null`)→the reused neutral border (C2-2); accepts `status: ProfileStatus | null`. 5 commits (1801915 feat tokens+M6; d35d528 RED→4cbfad5 GREEN ring-logic; c923b16 RED→10780dd GREEN sun-occupant); tsc + check:colors clean; no deviations (one in-flight fix: a placeholder hex in the logic test was re-sourced from the palette after check:colors flagged it — C2-3). Committed locally on main (NOT pushed). Next: Wave 2 (13-05 render / 13-06 Settings sun-picker), Wave 3 (13-07 drag-release), Wave 4 (13-08 device UAT, autonomous:false).
-**Resume file:** .planning/phases/19.1-older-android-contact-picker-hybrid-two-picker-adr-002/19.1-CONTEXT.md
+**Resume file:** None
 
 ## Phase 4 — Closeout (2026-08-15) ✅ COMPLETE
 

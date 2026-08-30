@@ -155,7 +155,7 @@ roadmap phases. Items marked *(infra)* are foundation guarantees rather than end
 
 ### System Contact Import (IMP)
 
-- [ ] **IMP-01**: A user can intentionally begin import from the Add flow or Settings through the privacy-preserving platform picker path; Android targets the modern Android 17+ Contact Picker without broad legacy contacts permission, while unsupported older Android versions leave Orbit usable. *(iOS picker scope remains a recorded v1 conflict; see ROADMAP Phase 19.)*
+- [x] **IMP-01**: A user can intentionally begin import from the Add flow or Settings through the privacy-preserving platform picker path; Android targets the modern Android 17+ Contact Picker without broad legacy contacts permission, while unsupported older Android versions leave Orbit usable. *(iOS picker scope remains a recorded v1 conflict; see ROADMAP Phase 19.)*
 - [ ] **IMP-02**: A single selected system contact receives review before create/link; bulk import uses shared defaults of Unbound + Uncategorized, imports only name/phones/emails/birthday/photo, and processes large selections incrementally without an arbitrary app-level cap.
 - [ ] **IMP-03**: Exact external linkage is deterministic; every other duplicate signal is conservative and advisory, so ambiguous candidates never silently merge/link or block safe batch imports, and generic Orbit-to-Orbit merge remains out of Phase 19.
 - [ ] **IMP-04**: Picker-owned import review is durable and resumable; cancellation before Orbit owns selection writes nothing, safe partial commits remain committed, photo failures do not invalidate contacts, and completion reports include a bridge to Unbound contacts.
