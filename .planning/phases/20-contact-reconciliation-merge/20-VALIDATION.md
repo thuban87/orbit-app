@@ -57,8 +57,14 @@ created: 2026-08-30
 | RCN-03 | `field_history` snapshot written on scalar overwrite inside the merge transaction | unit | `npx vitest run src/db/merge-dao.test.ts` | ❌ W0 | ⬜ pending |
 | RCN-03 | primary-method resolution honoured — chosen ABSORBED primary wins; default survivor-wins (HIGH #3) | unit | `npx vitest run src/db/merge-dao.test.ts` | ❌ W0 | ⬜ pending |
 | RCN-03 | profile merge picker includes Bound AND Unbound live contacts (finding 1) | unit | `npx vitest run src/db/merge-candidate-read.test.ts` | ❌ W0 | ⬜ pending |
-| RCN-01 | reconcile scalar-only apply ADVANCES `data_revision` (backup-visible, HIGH #1) | unit | `npx vitest run src/services/photos/reconcile-photo.test.ts` (or the reconcile-apply test) | ❌ W0 | ⬜ pending |
+| RCN-01 | reconcile scalar-only apply ADVANCES `data_revision` (backup-visible, HIGH #1) | unit | `npx vitest run src/db/reconcile-apply.test.ts` | ❌ W0 | ⬜ pending |
+| RCN-01 | freshness revalidation — a post-scan Orbit edit is NOT overwritten on a resumed apply (staleFields), HIGH #1 | unit | `npx vitest run src/db/reconcile-apply.test.ts` | ❌ W0 | ⬜ pending |
 | RCN-01 | reconcile photo apply is all-or-nothing — rollback leaves DB + master intact; persistMaster post-commit (HIGH #2) | unit | `npx vitest run src/services/photos/reconcile-photo.test.ts` | ❌ W0 | ⬜ pending |
+| RCN-02 | `Use Contact Values` unavailable/blocked on a non-additive selection (HIGH #2 grid gate) | unit | `npx vitest run src/components/candidate-card-grid-actions.test.ts` | ❌ W0 | ⬜ pending |
+| RCN-02 | additive-only eligibility excludes conflict/removed/missing selections | unit | `npx vitest run src/logic/reconcile-bulk-eligibility.test.ts` | ❌ W0 | ⬜ pending |
+| RCN-01 | relink retire-then-attach + duplicate-active-link preflight (no ABORT/clobber) | unit | `npx vitest run src/db/reconcile-relink-dao.test.ts` | ❌ W0 | ⬜ pending |
+| RCN-02 | import-vs-reconcile resume precedence (one prompt at a time) | unit | `npx vitest run src/services/resume-prompt-precedence.test.ts` | ❌ W0 | ⬜ pending |
+| RCN-02 | bulk-review read omits resolved rows; Fix advances `data_revision`, Ignore does not | unit | `npx vitest run src/db/bulk-review-read.test.ts src/db/bulk-review-dao.test.ts` | ❌ W0 | ⬜ pending |
 | RCN-02 | `createReconcileSessionCore` composes inside an outer txn without deadlock (finding 4) | unit | `npx vitest run src/db/reconcile-session-dao.test.ts` | ❌ W0 | ⬜ pending |
 | RCN-04 | absorbed contact tombstoned as `contact`, not archived; absent from `listArchived` | unit | `npx vitest run src/db/merge-dao.test.ts` | ❌ W0 | ⬜ pending |
 | RCN-04 | tombstone beats older row on reconciliation (resurrection-proof) | unit | `npx vitest run src/backup/reconciliation.test.ts` (extend) | ⚠ extend | ⬜ pending |
@@ -70,14 +76,21 @@ created: 2026-08-30
 
 ## Wave 0 Requirements
 
-- [ ] `src/db/merge-dao.test.ts` — RCN-03/04 (reparent, integrity resolution, `field_history`, recompute, rollback, tombstone-not-archive, **primary-method resolution / chosen-absorbed-primary-wins — HIGH #3**)
+- [ ] `src/db/merge-dao.test.ts` — RCN-03/04 (reparent, integrity resolution, `field_history`, recompute, rollback, tombstone-not-archive, **primary-method resolution / chosen-absorbed-primary-wins — HIGH #3**, **DUAL phone-AND-email contention — finding 1**, **selected-primary-wins-dedupe — finding 6**, **custom-field collision + custom-field resolution favouring the ABSORBED value — actionable 1**, **pending-reconcile-card discard-with-DERIVED-session-finalize — HIGH #1 / finding 2**)
 - [ ] `src/db/merge-candidate-read.test.ts` — Bound+Unbound merge picker (finding 1)
-- [ ] `src/services/photos/reconcile-photo.test.ts` — staging + content-hash, **scalar-only apply data_revision-advances (HIGH #1)**, **rollback-leaves-photo-intact / post-commit persistMaster (HIGH #2)**
-- [ ] `src/db/reconcile-session-dao.test.ts` + `reconcile-session-read.test.ts` — RCN-02 durability across process death
-- [ ] `src/db/reconcile-snapshot-dao.test.ts` — RCN-02 narrow last-reviewed-source memory
-- [ ] `src/logic/reconcile-diff.test.ts` — RCN-01 classification + Cluster D/M (multi-source → one card)
+- [ ] `src/db/reconcile-apply.test.ts` — **scalar-only apply data_revision-advances (HIGH #1 backup-visibility)** + **freshness revalidation: post-scan Orbit edit preserved / staleFields (HIGH #1)** + method desired-list (current ∪ accepted) data-loss guard
+- [ ] `src/services/photos/reconcile-photo.test.ts` — staging + content-hash, **rollback-leaves-photo-intact / post-commit persistMaster (HIGH #2)**
+- [ ] `src/logic/reconcile-bulk-eligibility.test.ts` — `isAdditiveOnlySelection` excludes conflict/removed/missing/empty (Cluster J)
+- [ ] `src/components/candidate-card-grid-actions.test.ts` — **`isBulkActionAvailable` gate: `use-contact-values` unavailable/blocked on a non-additive selection (HIGH #2)**
+- [ ] `src/db/reconcile-session-dao.test.ts` + `reconcile-session-read.test.ts` — RCN-02 durability across process death; `createReconcileSessionCore` composes in an outer txn (finding 4); `getNewestPendingReconcileSessionId` (finding 7)
+- [ ] `src/db/reconcile-snapshot-dao.test.ts` — RCN-02 narrow last-reviewed-source memory + **multi-method SET serialization round-trip (actionable 2)**
+- [ ] `src/db/reconcile-relink-dao.test.ts` — retire-then-attach ordering + duplicate-active-link preflight (no ABORT/clobber)
+- [ ] `src/services/resume-prompt-precedence.test.ts` — import-vs-reconcile precedence (all four combinations, finding 8)
+- [ ] `src/services/import/reconcile-resume-sweep.test.ts` — resumable-session resolve, corrupt→discardOnly, staging sweep, no-work-on-import
+- [ ] `src/logic/reconcile-diff.test.ts` — RCN-01 classification + Cluster D/M (multi-source → one card) + `serializeMethodFamily` order-independence
 - [ ] `src/logic/survivor-recommendation.test.ts` — survivor heuristic (if the planner adopts one; else N/A)
-- [ ] `src/db/migrations/013-*.test.ts` — v12→v13 forward migration + FK integrity
+- [ ] `src/db/bulk-review-read.test.ts` + `src/db/bulk-review-dao.test.ts` — unresolved-flag read omits resolved rows; Fix advances `data_revision` (finding 4), Ignore does not; durable across DB reopen
+- [ ] `src/db/migrations/013-*.test.ts` — v12→v13 forward migration + FK integrity (incl. `bulk_review_resolutions`, nullable `staged_photo_rel_path`)
 - [ ] Extend `src/backup/reconciliation.test.ts` — merged-contact resurrection-proofing
 
 ---
