@@ -55,6 +55,11 @@ created: 2026-08-30
 | RCN-03 | `last_contact` (and `rarely_responds`) recomputed through the single-writer path after merge | unit | `npx vitest run src/db/merge-dao.test.ts` | ❌ W0 | ⬜ pending |
 | RCN-03 | merge failure → full rollback, absorbed contact intact (atomic, no-simple-undo) | unit | `npx vitest run src/db/merge-dao.test.ts` | ❌ W0 | ⬜ pending |
 | RCN-03 | `field_history` snapshot written on scalar overwrite inside the merge transaction | unit | `npx vitest run src/db/merge-dao.test.ts` | ❌ W0 | ⬜ pending |
+| RCN-03 | primary-method resolution honoured — chosen ABSORBED primary wins; default survivor-wins (HIGH #3) | unit | `npx vitest run src/db/merge-dao.test.ts` | ❌ W0 | ⬜ pending |
+| RCN-03 | profile merge picker includes Bound AND Unbound live contacts (finding 1) | unit | `npx vitest run src/db/merge-candidate-read.test.ts` | ❌ W0 | ⬜ pending |
+| RCN-01 | reconcile scalar-only apply ADVANCES `data_revision` (backup-visible, HIGH #1) | unit | `npx vitest run src/services/photos/reconcile-photo.test.ts` (or the reconcile-apply test) | ❌ W0 | ⬜ pending |
+| RCN-01 | reconcile photo apply is all-or-nothing — rollback leaves DB + master intact; persistMaster post-commit (HIGH #2) | unit | `npx vitest run src/services/photos/reconcile-photo.test.ts` | ❌ W0 | ⬜ pending |
+| RCN-02 | `createReconcileSessionCore` composes inside an outer txn without deadlock (finding 4) | unit | `npx vitest run src/db/reconcile-session-dao.test.ts` | ❌ W0 | ⬜ pending |
 | RCN-04 | absorbed contact tombstoned as `contact`, not archived; absent from `listArchived` | unit | `npx vitest run src/db/merge-dao.test.ts` | ❌ W0 | ⬜ pending |
 | RCN-04 | tombstone beats older row on reconciliation (resurrection-proof) | unit | `npx vitest run src/backup/reconciliation.test.ts` (extend) | ⚠ extend | ⬜ pending |
 | RCN-04 | v12→v13 forward migration + FK integrity | unit | `npx vitest run src/db/migrations/013-*.test.ts` | ❌ W0 | ⬜ pending |
@@ -65,7 +70,9 @@ created: 2026-08-30
 
 ## Wave 0 Requirements
 
-- [ ] `src/db/merge-dao.test.ts` — RCN-03/04 (reparent, integrity resolution, `field_history`, recompute, rollback, tombstone-not-archive)
+- [ ] `src/db/merge-dao.test.ts` — RCN-03/04 (reparent, integrity resolution, `field_history`, recompute, rollback, tombstone-not-archive, **primary-method resolution / chosen-absorbed-primary-wins — HIGH #3**)
+- [ ] `src/db/merge-candidate-read.test.ts` — Bound+Unbound merge picker (finding 1)
+- [ ] `src/services/photos/reconcile-photo.test.ts` — staging + content-hash, **scalar-only apply data_revision-advances (HIGH #1)**, **rollback-leaves-photo-intact / post-commit persistMaster (HIGH #2)**
 - [ ] `src/db/reconcile-session-dao.test.ts` + `reconcile-session-read.test.ts` — RCN-02 durability across process death
 - [ ] `src/db/reconcile-snapshot-dao.test.ts` — RCN-02 narrow last-reviewed-source memory
 - [ ] `src/logic/reconcile-diff.test.ts` — RCN-01 classification + Cluster D/M (multi-source → one card)

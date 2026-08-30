@@ -6,8 +6,8 @@ current_phase_name: contact-reconciliation-merge
 current_plan: 1
 status: ready_to_execute
 stopped_at: Phase 20 planned (6 plans) — ready to execute
-last_updated: "2026-08-30T21:18:22.495Z"
-state_head: 40f974df75de53c9f77c56c0861e9a7474eca5a9
+last_updated: "2026-08-30T21:56:05.853Z"
+state_head: 3eb5ce996c9d1e430d27c81249fb15bb3be8476d
 progress:
   total_phases: 23
   completed_phases: 15
