@@ -1,4 +1,7 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+  <uses-permission
+    android:name="android.permission.READ_CONTACTS"
+    android:maxSdkVersion="36" />
   <!--
     Package-visibility (Android 11+) declaration for the system contact picker.
     Without this, targetSdk 36 filtering hides `com.android.contactspicker` from

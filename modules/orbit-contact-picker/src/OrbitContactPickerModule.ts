@@ -7,6 +7,7 @@ declare class OrbitContactPickerModule extends NativeModule<
 > {
   isContactPickerAvailable(): boolean;
   pickContacts(options: PickContactsOptions): Promise<PickedContact[]>;
+  readAllContacts(): Promise<PickedContact[]>;
 }
 
 export default requireNativeModule<OrbitContactPickerModule>(

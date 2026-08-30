@@ -12,6 +12,10 @@ class OrbitContactPickerModule extends NativeModule<Record<never, never>> {
   async pickContacts(_: PickContactsOptions): Promise<PickedContact[]> {
     return [];
   }
+
+  async readAllContacts(): Promise<PickedContact[]> {
+    return [];
+  }
 }
 
 export default registerWebModule(

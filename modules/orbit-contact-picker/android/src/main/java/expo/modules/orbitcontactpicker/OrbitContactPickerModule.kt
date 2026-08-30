@@ -38,6 +38,9 @@ internal class ContactPickInProgressException :
 internal class ContactPickLaunchException :
   CodedException("Unable to start the system contact picker.")
 
+internal class ContactReadException :
+  CodedException("Unable to read contacts.")
+
 private data class MutablePickedContact(
   val lookupKey: String,
   var displayName: String? = null,
@@ -97,6 +100,16 @@ class OrbitContactPickerModule : Module() {
       } catch (_: Exception) {
         pendingPickPromise = null
         promise.reject(ContactPickLaunchException())
+      }
+    }
+
+    AsyncFunction("readAllContacts") { promise: Promise ->
+      try {
+        promise.resolve(readAllContacts())
+      } catch (_: Exception) {
+        // A failed provider read is distinct from a user cancelling a picker.
+        // Do not expose provider details or contact data to JavaScript.
+        promise.reject(ContactReadException())
       }
     }
 
@@ -178,6 +191,81 @@ class OrbitContactPickerModule : Module() {
     }
   }
 
+  /**
+   * Legacy (API <= 36) full-provider reader. This is intentionally the tracer
+   * implementation: plan 03 replaces its full-book browse read with a
+   * summary-plus-selected-key read before the phase completes.
+   */
+  private fun readAllContacts(): List<Map<String, Any?>> {
+    val projection = arrayOf(
+      ContactsContract.Data.LOOKUP_KEY,
+      ContactsContract.Contacts.DISPLAY_NAME_PRIMARY,
+      ContactsContract.Data.MIMETYPE,
+      ContactsContract.Data.DATA1,
+      ContactsContract.Data.DATA2,
+      ContactsContract.Data.DATA15,
+    )
+    val contacts = linkedMapOf<String, MutablePickedContact>()
+    val mimeTypes = arrayOf(
+      ContactsContract.CommonDataKinds.Phone.CONTENT_ITEM_TYPE,
+      ContactsContract.CommonDataKinds.Email.CONTENT_ITEM_TYPE,
+      ContactsContract.CommonDataKinds.Event.CONTENT_ITEM_TYPE,
+      ContactsContract.CommonDataKinds.Photo.CONTENT_ITEM_TYPE,
+    )
+
+    context.contentResolver.query(
+      ContactsContract.Data.CONTENT_URI,
+      projection,
+      "${ContactsContract.Data.MIMETYPE} IN (?, ?, ?, ?)",
+      mimeTypes,
+      "${ContactsContract.Contacts.DISPLAY_NAME_PRIMARY} ASC",
+    )?.use { cursor ->
+      val lookupKeyColumn = cursor.getColumnIndex(ContactsContract.Data.LOOKUP_KEY)
+      val displayNameColumn = cursor.getColumnIndex(ContactsContract.Contacts.DISPLAY_NAME_PRIMARY)
+      val mimeTypeColumn = cursor.getColumnIndex(ContactsContract.Data.MIMETYPE)
+      val data1Column = cursor.getColumnIndex(ContactsContract.Data.DATA1)
+      val data2Column = cursor.getColumnIndex(ContactsContract.Data.DATA2)
+      val data15Column = cursor.getColumnIndex(ContactsContract.Data.DATA15)
+
+      while (cursor.moveToNext()) {
+        val lookupKey = cursor.stringAt(lookupKeyColumn) ?: continue
+        val contact = contacts.getOrPut(lookupKey) { MutablePickedContact(lookupKey) }
+        contact.displayName = contact.displayName ?: cursor.stringAt(displayNameColumn)
+
+        when (cursor.stringAt(mimeTypeColumn)) {
+          ContactsContract.CommonDataKinds.Phone.CONTENT_ITEM_TYPE ->
+            cursor.stringAt(data1Column)?.takeIf { it.isNotBlank() }?.let { value ->
+              contact.methods += mapOf("type" to "phone", "value" to value)
+            }
+          ContactsContract.CommonDataKinds.Email.CONTENT_ITEM_TYPE ->
+            cursor.stringAt(data1Column)?.takeIf { it.isNotBlank() }?.let { value ->
+              contact.methods += mapOf("type" to "email", "value" to value)
+            }
+          ContactsContract.CommonDataKinds.Event.CONTENT_ITEM_TYPE ->
+            if (cursor.intAt(data2Column) == ContactsContract.CommonDataKinds.Event.TYPE_BIRTHDAY) {
+              contact.birthday = contact.birthday ?: cursor.stringAt(data1Column)
+            }
+          ContactsContract.CommonDataKinds.Photo.CONTENT_ITEM_TYPE -> {
+            if (contact.photoTempUri == null) {
+              contact.photoTempUri = cursor.blobAt(data15Column)?.let(::copyPhotoToCache)
+                ?: copyContactPhotoToCache(lookupKey)
+            }
+          }
+        }
+      }
+    }
+
+    return contacts.values.map { contact ->
+      mapOf(
+        "lookupKey" to contact.lookupKey,
+        "displayName" to contact.displayName,
+        "methods" to contact.methods,
+        "birthday" to contact.birthday,
+        "photoTempUri" to contact.photoTempUri,
+      )
+    }
+  }
+
   private fun copyContactPhotoToCache(lookupKey: String): String? = try {
     val contactUri = Uri.withAppendedPath(ContactsContract.Contacts.CONTENT_LOOKUP_URI, lookupKey)
     ContactsContract.Contacts.openContactPhotoInputStream(context.contentResolver, contactUri, true)
@@ -214,4 +302,7 @@ class OrbitContactPickerModule : Module() {
 
   private fun android.database.Cursor.blobAt(columnIndex: Int): ByteArray? =
     if (columnIndex >= 0 && !isNull(columnIndex)) getBlob(columnIndex) else null
+
+  private fun android.database.Cursor.intAt(columnIndex: Int): Int? =
+    if (columnIndex >= 0 && !isNull(columnIndex)) getInt(columnIndex) else null
 }

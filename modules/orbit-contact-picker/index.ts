@@ -37,3 +37,12 @@ export function pickContacts(
 ): Promise<PickedContact[]> {
   return OrbitContactPickerModule.pickContacts(options);
 }
+
+/**
+ * Reads Contacts Provider data for Orbit's legacy (API <= 36) in-app picker.
+ * The native module rejects read failures so callers never mistake one for a
+ * cancelled picker.
+ */
+export function readAllContacts(): Promise<PickedContact[]> {
+  return OrbitContactPickerModule.readAllContacts();
+}
