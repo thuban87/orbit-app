@@ -1,5 +1,353 @@
 ---
 phase: 20
+convergence_cycle: 5
+reviewers: [codex, claude, cursor]
+reviewed_at: 2026-08-30T22:45:32Z
+plans_reviewed: [20-01-PLAN.md, 20-02-PLAN.md, 20-03-PLAN.md, 20-04-PLAN.md, 20-05-PLAN.md, 20-06-PLAN.md]
+models:
+  codex: "gpt-5.6-terra (reasoning=low)"
+  claude: "sonnet (reasoning=low)"
+  cursor: "unknown"
+model_sources:
+  codex: "banner"
+  claude: "pinned"
+  cursor: "unknown"
+cycle_summary:
+  current_high: 1
+  current_actionable: 6
+---
+
+# Cross-AI Plan Review — Phase 20 (Convergence CYCLE 5 — FINAL)
+
+> Cycle 5 (final) re-review of the six Phase-20 plans AFTER four prior revision rounds. All three
+> explicitly-requested lanes (codex, claude, cursor) ran and returned substantive reviews; none was
+> stubbed or dropped (each lane result carries `ok:true, stubbed:false`). The `--claude` self-skip
+> guard (`$CLAUDE_CODE_ENTRYPOINT=cli` would normally skip claude for same-model independence) was
+> overridden for this run at owner instruction, so the Claude/Sonnet lane ran as a context-isolated
+> reviewer (`CLAUDE_CODE_DISABLE_CLAUDE_MDS=1`, `CLAUDE_CODE_DISABLE_AUTO_MEMORY=1`).
+>
+> **Lane grounding this cycle: Codex was the deepest source-grounded lane and raised three NEW HIGHs
+> the other two lanes missed; Cursor also verified extensively on disk (mechanisms confirmed at exact
+> lines); the headless Claude lane graded largely against the plan text and its own line citations
+> ("where I have evidence"), so its verdict is treated as plan-text-weighted and NOT counted at full
+> source-grounded weight per the workflow rule.** An orchestrator source-grounding pass independently
+> verified every load-bearing finding below against the code on disk (migration DDL, `field_history`
+> schema, `CandidateCardGrid` selection internals, `bumpDataRevisionCore`, `persistMaster`,
+> `applyContactMethodDiffCore` provenance, `sun-picker-read`), and a cross-artifact fact-drift pass was
+> run. Both blocks follow the Consensus Summary.
+>
+> **Cycle-4, Cycle-3, Cycle-2 and Cycle-1 findings are preserved as AUDIT HISTORY below. Do not
+> re-action resolved items from there.** This cycle reports only what REMAINS unresolved in the
+> CURRENT plan state.
+
+## Consensus Summary (Cycle 5)
+
+The two cycle-4 HIGHs are confirmed **resolved** in the current plans and verified on disk by all
+three lanes: (1) the reconcile stale-diff / no-freshness-revalidation gap is closed by a scan-time
+per-field baseline + `modified_at` captured in `diff_json` and an apply-time re-read/skip-and-resurface
+in the shared `applyReconcileSelections` (`reconcile-apply.ts`), reused by both detail (20-03) and bulk
+(20-04) so the two paths cannot drift; and (2) the additive-only grid-selection seam is now realizable
+via an `isActionEligible` predicate prop + a pure node-testable `candidate-card-grid-actions.ts` /
+`reconcile-bulk-eligibility.ts` helper gating BOTH the action-sheet render and `runBulkAction`, which
+is necessary because `CandidateCardGrid` owns `selectedIds`/`selectedItems` internally
+(VERIFIED `CandidateCardGrid.tsx:70,81`) and takes a static `bulkActions` array (VERIFIED `:43`). The
+merge writer (purge-dao inverted), `field_history` `modified_at`-free reparent (VERIFIED
+`001-initial.ts:155-163`), photo staging, durable-session pattern, and tombstone-not-archive remain
+well grounded in shipped code. All three lanes rate the phase execution-ready modulo the items below;
+Claude and Cursor find no HIGH remaining.
+
+What cycle 5 surfaces is concentrated in the **finding-2 / finding-9 durable-session and multi-valued
+persistence seams added during cycle 4** — the two areas the earlier cycles had only just introduced.
+Codex, the deepest lane, raised three HIGHs there; orchestrator source-reads confirm ONE as a real,
+implementation-blocking defect (the merge writer decrements a session column the migration never
+creates) and downgrade the other two to actionable MEDIUM/advisory (they inherit shipped, owner-accepted
+photo-subsystem semantics or hinge on an under-specified — not wrong — multi-source persistence detail).
+None of the findings reverses a locked dossier/ADR decision or reintroduces a resolved HIGH.
+
+### Agreed Strengths (2+ lanes)
+- Both cycle-4 HIGHs incorporated as concrete, grep-/test-enforced mechanisms, not prose: shared
+  `applyReconcileSelections` freshness revalidation (codex, claude, cursor) and the
+  `isActionEligible`/`isBulkActionAvailable` grid gate wired into render AND `runBulkAction` (codex,
+  claude, cursor).
+- Merge writer inverts `purge-dao` fan-out; `field_history` reparented with a `modified_at`-free,
+  no-FK, table-specific UPDATE (columns verified `001-initial.ts:155-163`); `recomputeLastContactCore`
+  is the sole `last_contact` writer (`recency-dao.ts:427`) — codex, claude, cursor.
+- Migration-013 partial-unique-index hazards (`idx_contact_methods_primary_type`,
+  `idx_external_contact_links_active`, `contacts_prevent_cadence_clear`) carried consistently into
+  merge ordering and relink retire-before-attach — claude, cursor.
+- Photo pipeline follows the shipped `persistImportedPhotoPostCommit` post-commit ordering rather than
+  a fresh invention; evictable `photoTempUri` is staged to durable `reconcile-staging/` and never
+  handed to `setContactPhotoCore`/`assertSafeRelative` — codex, cursor.
+- The two owner-bucket deferrals (`contact_redirects` backup portability; UI-SPEC #5-vs-#12
+  preselection) are correctly flagged, not silently resolved, with the safer default kept — codex,
+  claude, cursor.
+
+### Agreed Concerns (2+ lanes)
+- **Multi-valued source data vs single-slot durable persistence.** Cursor: `reconcile_source_snapshot`
+  stores one `reviewed_value` per `(external_contact_link_id, field_family)`, but a phones/emails family
+  can hold several methods — without an explicit canonical SET serialization, narrow-memory suppression
+  can false-re-nag or false-suppress. Codex: a card stages one photo per source link
+  (20-03:172 "for every source with a photoTempUri") but the card has one `staged_photo_rel_path`
+  column that the 20-05 launch-sweep keys off — the multi-source photo case is under-specified. Same
+  root; both actionable MEDIUM.
+- The `contact_redirects` backup-portability gap and the UI-SPEC #5-vs-#12 preselection contradiction
+  are named by all lanes but are **the known, correctly-flagged owner deferrals** — not re-raised here
+  (recorded under fact-drift / owner-gate, not counted).
+
+### Divergent Views (resolved by orchestrator source read)
+- **Merge session-accounting column (Codex HIGH vs Claude/Cursor silent).** Codex traced that 20-01's
+  merge step 4c and its must_have decrement `reconciliation_sessions.unresolved_count`, a column that
+  migration 013's `reconciliation_sessions` DDL never creates (VERIFIED 20-01:154 — session columns are
+  id/uid/status/total_checked/created_at/modified_at only; `unresolved_count` exists ONLY on
+  `reconciliation_session_cards`), and that 20-04 derives session terminal state by COUNTING unresolved
+  cards via `finalizeSessionIfTerminal`, not a session-level counter. **Orchestrator adjudication: Codex
+  is correct — the merge writer as written references a non-existent column and would fail at runtime;
+  counted as the single current HIGH.**
+- **Photo post-commit "never corruption" (Codex HIGH vs Cursor advisory / Claude silent).** Codex: for
+  an EXISTING contact, `persistMaster` overwrites `avatars/contact-<id>.jpg` in place (moving the old
+  master to `.bak`) BEFORE `setContactPhoto`; if `setContactPhoto` fails post-commit, the DB reference
+  is unchanged but the file now holds the NEW bytes — contradicting the plan's "photo unchanged"
+  guarantee. Verified against `photo-storage.ts` (tmp/bak swap) and the import precedent
+  (`import-photo.ts:96-135`). BUT this window is a property of the shipped, owner-accepted
+  `persistMaster`+`setContactPhoto` sequence used by EVERY existing-photo replacement, not a Phase-20
+  invention; import escapes it only because its target path is fresh. **Orchestrator adjudication:
+  advisory/actionable-LOW (tighten the overstated "never corruption" wording or adopt a
+  unique-pending-filename swap), NOT a blocking HIGH — consistent with the cycle-4 adjudication and
+  Cursor's "not counted."**
+- **Multi-source staged photo (Codex HIGH vs others silent).** Codex: the 20-05 sweep deletes any
+  reconcile-staging file "not referenced by any live pending card's `staged_photo_rel_path` column," so
+  a card that persists multiple source photos loses live-pending staged options or leaks. Verified the
+  sweep logic (20-05:90) and the per-source staging (20-03:172). BUT the plan text mostly treats
+  `PhotoChoice` as a single Orbit-vs-one-source choice ("the durable staged reference", singular,
+  20-04:152), so the worst-case broken-resume outcome depends on an interpretation the plan does not
+  clearly assert. **Orchestrator adjudication: real under-specification — actionable MEDIUM (pin
+  one-photo-per-card collapse or a per-source staged store so the sweep cannot delete live staged
+  options), NOT a confirmed HIGH.**
+
+## Verification Coverage (source-grounding pass — Cycle 5)
+
+Every pre-existing symbol the six PLANs cite was re-checked against the code on disk. No application
+code changed since Cycle 4 (only the plan text was revised), so the Cycle-4 coverage table
+(0 MISSING / 0 AMBIGUOUS / 0 UNCHECKABLE) carries forward; the load-bearing symbols behind THIS cycle's
+HIGH and actionable findings were independently re-confirmed below. Net-new phase-20 symbols
+(merge-dao/`MergeResolutions`, `reconcile-apply`/`applyReconcileSelections`, reconcile-photo helpers,
+`listMergeCandidates`, `createReconcileSessionCore`, `markCardStatusCore`,
+`candidate-card-grid-actions`/`isBulkActionAvailable`, `staged_photo_rel_path`, per-type
+`primaryMethod`, migration-013 tables, `bulk-review-dao`, `ResumeReconcilePrompt`, the extended
+`CandidateCardGrid`) are excluded from drift-vs-disk per the phase manifest — but their INTERNAL
+consistency (a net-new column referenced vs the migration that defines it) is still in scope and is
+where this cycle's HIGH was found.
+
+| Symbol / claim | Status | Evidence |
+|---|---|---|
+| `reconciliation_sessions` DDL columns = id/uid/status/total_checked/created_at/modified_at — NO `unresolved_count` (session counter does not exist; completion is derived) | VERIFIED | `20-01-PLAN.md:154` (migration authored only here); `20-04-PLAN.md:97` describes session with `status` only, `unresolved_count` on cards; `finalizeSessionIfTerminal` = "complete when zero unresolved cards" (`20-04:102`) |
+| `field_history` columns = (id, contact_id, field_col_name, old_value, operation, created_at); NO `modified_at`, NO FK | VERIFIED | `src/db/migrations/001-initial.ts:155-163` |
+| `CandidateCardGrid` owns selection internally (`selectedIds` useState, `selectedItems` computed), static `bulkActions` array, `apply-recommendation` additive filter, NO `onSelectionChange`/`isActionEligible` yet | VERIFIED | `src/components/CandidateCardGrid.tsx:43,70,81,96-102` |
+| `updateContactMetadataCore` is a whole-row `UPDATE contacts` (sets `modified_at`, no `data_revision` bump, no concurrency predicate) | VERIFIED | `src/db/contacts-dao.ts:308-335` |
+| `bumpDataRevisionCore` = `UPDATE app_settings SET data_revision = data_revision + 1 WHERE id = 1`, monotonic, once-per-call (double-call harmless) — resolves Claude's "double-bump undefined" concern | VERIFIED | `src/db/data-revision-dao.ts:5-22` |
+| Backup sweep gates on `readDataRevision` | VERIFIED | `src/services/backup-sweep.ts:6,29` |
+| `persistMaster` does tmp→bak→final in-place swap of `avatars/contact-<id>.jpg` (old master moved to `.bak`, prior master survives a failed copy/move) | VERIFIED | `src/services/photos/photo-storage.ts:85,325-378` |
+| Import photo precedent persists file (`persistMaster`) BEFORE the DB write (`setContactPhoto`) post-commit | VERIFIED | `src/services/import/import-photo.ts:96-135` |
+| `applyContactMethodDiffCore` does NOT write `contact_method_provenance`; provenance is written only by `insertMethodProvenanceCore` (import path) — confirms Cursor's LOW (reconcile additions get weaker attribution) | VERIFIED | `src/db/contact-methods-dao.ts` (no provenance write); `src/db/imported-contact-dao.ts:89,157,205` |
+| Partial unique indexes + cadence-clear trigger; `contact_method_provenance.method_id` ON DELETE CASCADE | VERIFIED | `src/db/migrations/011-contact-lifecycle-schema.ts:178,180,181,230` |
+| `inWriteTransaction` — ONE shared non-reentrant mutex (never nest) | VERIFIED | `src/db/transaction.ts:4-17` |
+| `recomputeLastContactCore` is the sole `last_contact` writer | VERIFIED | `src/db/recency-dao.ts:427` |
+| `listSunCandidates` filters `tracking_enabled = 1` (excludes Unbound → net-new `listMergeCandidates` required) | VERIFIED | `src/db/sun-picker-read.ts:44` |
+| `listArchived` sole archived-inverse read (merge tombstones, does not archive) | VERIFIED | `src/db/contacts-dao.ts:591` |
+
+**Coverage result (Cycle 5): 0 MISSING, 0 AMBIGUOUS, 0 UNCHECKABLE among pre-existing cited symbols.**
+Every pre-existing symbol a task depends on resolves on disk, unchanged from Cycle 4. The one
+implementation-blocking defect this cycle is NOT a missing pre-existing symbol but an INTERNAL
+inconsistency in a net-new symbol: 20-01's merge writer decrements
+`reconciliation_sessions.unresolved_count`, a column its own migration 013 never creates and which the
+rest of the phase (20-04's derived `finalizeSessionIfTerminal`) does not use.
+
+## Fact-Drift Pass (ADVISORY — not counted toward HIGH/actionable)
+
+Genuine same-fact contradictions across STATE/ROADMAP/PLAN/CONTEXT/UI-SPEC/VALIDATION:
+
+- **`20-VALIDATION.md` Wave 0 test manifest is stale vs the plan test manifests (also raised by Cursor
+  as an actionable MEDIUM — counted once, there).** `20-VALIDATION.md:71-81` maps the HIGH #1
+  scalar-`data_revision` test and the HIGH #2 photo-rollback test to `reconcile-photo.test.ts`, but the
+  plans put HIGH #1 in `reconcile-apply.test.ts` (`20-03` acceptance criteria) and `reconcile-photo.test.ts`
+  is staging/hash/promote only; and the Wave 0 list omits `reconcile-apply.test.ts`,
+  `candidate-card-grid-actions.test.ts`, `reconcile-bulk-eligibility.test.ts`, `reconcile-relink-dao.test.ts`,
+  `resume-prompt-precedence.test.ts`, and `bulk-review-read/dao.test.ts` that the 20-01 "Test files"
+  manifest and 20-06 Task 2 gate on. Fix: sync `20-VALIDATION.md` Wave 0 to the plans' test manifest
+  before execution.
+- **UI-SPEC #5 vs #12 merge-conflict preselection (KNOWN, owner-gated).** `20-UI-SPEC.md` mandates
+  conflicting-mode with NO preselection in one place and preselected-but-overridable in another; the
+  plans defer to the owner and implement the safer #5 no-preselection rule. Previously-flagged owner
+  deferral — advisory only, **not counted**.
+- No other cross-artifact fact contradictions: `TARGET_VERSION 13` / migration 013 is consistent across
+  all six plan manifests; the `contact_redirects` "ONLY if the 20-01 checkpoint selects add-redirect"
+  conditional is stated identically everywhere; RCN-01/02/03/04 requirement IDs map consistently to
+  plans; ROADMAP success criteria and PLAN `must_haves.truths` do not disagree on any shared fact.
+
+## Codex Review (Cycle 5)
+
+## Summary
+
+The plans are substantially stronger after the prior convergence fixes: they correctly target the real non-reentrant transaction boundary, current normalization schema, and existing photo/import mechanisms. However, three implementation-blocking integrity gaps remain in the plan text around reconciliation-session accounting and multi-source photo durability. I would not execute migration 013 until those are resolved.
+
+## Strengths
+
+- The merge design correctly accounts for the real schema hazards: primary methods and active external links have partial unique indexes, while custom values have a `(contact_id, field_def_id)` unique constraint. The prescribed pre-resolution sequencing is appropriate. [011-contact-lifecycle-schema.ts](/home/bwales/projects/orbit-app/src/db/migrations/011-contact-lifecycle-schema.ts:79) [011-contact-lifecycle-schema.ts](/home/bwales/projects/orbit-app/src/db/migrations/011-contact-lifecycle-schema.ts:178)
+
+- The plans correctly avoid a nested write transaction. The current transaction helper serializes through a shared mutex, so wrapping a self-wrapping DAO from inside another writer would indeed hang. [transaction.ts](/home/bwales/projects/orbit-app/src/db/transaction.ts:49)
+
+- The stale-diff mitigation is directionally sound: `updateContactMetadataCore` is a whole-row update with no optimistic-concurrency predicate, so scan-time baselines plus apply-time field revalidation are necessary. [contacts-dao.ts](/home/bwales/projects/orbit-app/src/db/contacts-dao.ts:308)
+
+- The plans correctly preserve backup visibility for reconcile scalar updates. `updateContactMetadataCore` does not bump `data_revision`, while the automatic backup sweep gates on that revision. [contacts-dao.ts](/home/bwales/projects/orbit-app/src/db/contacts-dao.ts:313) [backup-sweep.ts](/home/bwales/projects/orbit-app/src/services/backup-sweep.ts:29)
+
+- Merge backup visibility is already covered by the planned `insertTombstoneCore` call: that core increments `data_revision` by default. [tombstones-dao.ts](/home/bwales/projects/orbit-app/src/db/tombstones-dao.ts:52)
+
+## Concerns
+
+- **HIGH — NEW: the planned merge session-accounting SQL targets a column that migration 013 does not create.** Plan 20-01 defines `unresolved_count` only on `reconciliation_session_cards`, but later requires decrementing `reconciliation_sessions.unresolved_count`. [20-01-PLAN.md](/home/bwales/projects/orbit-app/.planning/phases/20-contact-reconciliation-merge/20-01-PLAN.md:154) [20-01-PLAN.md](/home/bwales/projects/orbit-app/.planning/phases/20-contact-reconciliation-merge/20-01-PLAN.md:158) This will either fail at runtime or leave completion state inconsistent. Define one authoritative model: preferably derive session terminal state with `COUNT(*)` / `SUM(unresolved_count)` over cards inside the transaction, or add and consistently maintain a real session-level counter.
+
+- **HIGH — NEW: the proposed post-commit photo sequence is not all-or-nothing for an existing contact photo.** Plan 20-03 promotes to `avatars/contact-<id>.jpg`, then calls `setContactPhoto`; that path is explicitly fixed per contact. [20-03-PLAN.md](/home/bwales/projects/orbit-app/.planning/phases/20-contact-reconciliation-merge/20-03-PLAN.md:152) [photo-storage.ts](/home/bwales/projects/orbit-app/src/services/photos/photo-storage.ts:85) `persistMaster` replaces the existing file before the subsequent DB write. If `setContactPhoto` fails after promotion, the existing DB reference still points to the same filename but renders the new bytes—contradicting the plan’s “photo unchanged” guarantee. [photo-storage.ts](/home/bwales/projects/orbit-app/src/services/photos/photo-storage.ts:356) [contacts-dao.ts](/home/bwales/projects/orbit-app/src/db/contacts-dao.ts:621) A test that only forces the pre-photo transaction to roll back misses this failure window.
+
+- **HIGH — NEW: one `staged_photo_rel_path` per reconciliation card cannot safely represent the mandated multi-source photo case.** A contact may have multiple external links; the current schema allows that, and Phase 20 requires combining their sources into one card. [011-contact-lifecycle-schema.ts](/home/bwales/projects/orbit-app/src/db/migrations/011-contact-lifecycle-schema.ts:117) The plan stores potentially multiple staged photo choices in `diff_json`, but tracks only one first-class staged path for the launch sweep. [20-04-PLAN.md](/home/bwales/projects/orbit-app/.planning/phases/20-contact-reconciliation-merge/20-04-PLAN.md:40) [20-01-PLAN.md](/home/bwales/projects/orbit-app/.planning/phases/20-contact-reconciliation-merge/20-01-PLAN.md:154) The proposed sweep will either leak additional files or delete valid staged options that a resumed detail screen still references.
+
+## Suggestions
+
+- Replace all session-level `unresolved_count` updates with a single core helper that derives terminal status from card rows, and use it from merge, bulk actions, detail resolution, and discard.
+
+- Make reconcile photo promotion recoverable across both file and DB steps. For example: promote to a unique pending/avatar filename, commit the reference through a dedicated transaction, then best-effort delete the old master; retain a retryable journal if the reference write fails.
+
+- Add a normalized `reconciliation_card_staged_photos` table, keyed by card and source link, rather than a single card path. The launch sweep can then enumerate durable references without parsing JSON, including every multi-source option.
+
+## Risk Assessment
+
+**HIGH.** The core merge and freshness designs are well-grounded, but the unresolved session counter would make a specified merge path invalid, and the two photo gaps can corrupt or invalidate a resumed multi-source review. The acknowledged redirect-portability and UI preselection owner decisions were not counted as defects here.
+
+## Claude Review (Cycle 5)
+
+# Cycle 5 (Final) Convergence Review — Phase 20: Contact Reconciliation & Merge
+
+## Summary
+
+This is a mature, deeply-revised plan set. Both cycle-4 HIGH concerns (reconcile freshness revalidation, additive-only grid gating) are genuinely resolved in the current text with concrete mechanisms and tests. I traced the load-bearing claims against the actual repo state where I have evidence (research/pattern docs, and the plan text's own citations) and found the six-plan set internally consistent and free of new HIGH-severity defects. What remains is a set of MEDIUM/LOW gaps that are either newly introduced by the revisions' complexity or were always latent and didn't rise to blocking. The phase goal — safe one-way reconciliation plus atomic no-simple-undo merge — is achievable as planned.
+
+## Strengths
+
+- The freshness-revalidation design (20-01 truth block, 20-03 Task 3, 20-04 Task 3) is coherent end-to-end: scan-time baseline + `modified_at` captured in the diff → re-read-and-compare inside `applyReconcileSelections` → skip-and-resurface rather than blind overwrite. This is the correct fix for the whole-row `updateContactMetadataCore` (no optimistic-concurrency predicate) and is shared by both the detail and bulk paths, so it can't drift.
+- The `isActionEligible`/`isBulkActionAvailable` gating design correctly identifies that `CandidateCardGrid` owns `selectedIds` internally (cited at `:70`/`:81`) and therefore that a parent-supplied static `bulkActions` array cannot gate on live selection — the predicate-plus-pure-helper fix, extracted into an RN-free sibling for node-testability, is a sound response to a real toolchain gap (no RN render harness in this repo per the plan's own citation).
+- Migration-013 hazard enumeration (two partial unique indexes, the cadence-clear trigger) is carried consistently into `merge-dao` ordering (demote-then-reparent) and into `relinkExternalSource` (retire-before-attach, plus the newly-added global-uniqueness preflight for relink in 20-05).
+- The `field_history`-has-no-`modified_at` trap is caught and given a dedicated non-generic UPDATE statement plus a dedicated test — a plausible, easy-to-miss bug that a generic reparent template would have silently introduced.
+- Photo handling is now consistently "durable-stage-then-promote-post-commit" everywhere it appears (merge, per-contact reconcile, bulk reconcile), correctly modeled on the shipped `persistImportedPhotoPostCommit` ordering rather than invented fresh.
+- The two owner-bucket deferrals (`contact_redirects` backup portability, UI-SPEC #5-vs-#12 preselection contradiction) are correctly flagged rather than silently resolved, and the plans keep the safer default in each case without unilaterally overriding a locked doc.
+
+## Concerns
+
+**HIGH:** None found that are newly introduced or still unresolved from cycle 4.
+
+**MEDIUM (carried, worth a final look before execution):**
+
+- **Wave-6 `bumpDataRevisionCore` double-bump semantics undefined.** 20-06's `resolveBulkReviewFlagCore` calls `bumpDataRevisionCore` once per Fix, matching the finding-4 rationale. But if `bumpDataRevisionCore` is a monotonically-incrementing counter (as `data-revision-dao.ts` is described elsewhere as gating a sweep, not as a dirty-flag), repeated fixes across a session are presumably fine — but no plan states whether `bumpDataRevisionCore` is idempotent-per-call or must be called at most once per transaction across composed writers. In 20-03's `applyReconcileSelections`, the plan explicitly says "call bumpDataRevisionCore(exec) ONCE" to avoid ambiguity — but doesn't state what happens if a caller (e.g., a future extension) accidentally calls it twice in one txn. Low risk if it's a simple `UPDATE ... SET data_revision = data_revision + 1`, but this was never verified against `src/db/data-revision-dao.ts` in-thread — worth a one-line confirmation at execution time since three separate plans (20-01 does not bump directly, 20-03, 20-06) now independently reason about this invariant.
+- **`MergeResolutions.customFields` shape not fully pinned across 20-01/20-02.** 20-01 says "custom fields (keyed by field_def_id)" for the type but the collision-resolution logic in 20-01 Task 1 (step 1d) describes resolving collisions via a survivor-wins default *before* considering `resolutions`, while 20-02 Task 3 says the screen builds `resolutions.customFields` keyed by field_def_id for `mergeContacts` to apply via `upsertValueCore`. It's not fully explicit whether a user's explicit custom-field choice in 20-02 is honored by 20-01's collision step (1d) the same way primaryMethod is (1a is explicitly rewritten to consult the resolution; 1d's text says "keep the survivor's value (survivor-wins default this tracer) or apply the resolution via upsertValueCore" — the "or" is present but underspecified as to precedence). This is very likely fine in intent but is the one remaining spot where the per-type-consult fix applied to primaryMethod (finding 1/HIGH#3) wasn't obviously mirrored with equal rigor onto custom-field conflicts. Recommend an explicit acceptance criterion analogous to the primaryMethod one: "a custom-field resolution favoring the absorbed's value is honored, not silently defaulted to survivor-wins."
+- **Wave 4's `Check linked contacts` pending-session block is only "detection," not "interception," until wave 5.** 20-04 Task 3's acceptance criteria explicitly say the handler "at minimum blocks the new scan and surfaces that an unfinished check exists" — full Resume/Discard UX lands in 20-05. This is called out honestly in the plan text (not a silent gap), but it does mean that between shipping 20-04 and shipping 20-05, if these waves are ever partially deployed independently, the blocked state has no escape hatch UI. Given this is a single sequential phase execution (owner-declared "sequential, parallelization off"), this is low real risk — flagging only because it's a genuine (if intentional and disclosed) incomplete intermediate state.
+
+**LOW:**
+
+- The `bulk_review_resolutions.flag_type CHECK IN ('birthday')` single-valued-for-v1 constraint is called out honestly as requiring a future migration to widen — good, but worth noting this makes the "schema-generic" framing in the must_haves slightly aspirational; the acceptance criteria correctly hedge this ("do NOT over-claim function-level genericity") so this is a documentation-consistency nit, not a functional concern.
+- `resolveActiveResumePrompt` precedence (import-wins) is unit-tested per the plan, but there's no stated behavior for what happens to the reconcile-pending state while the import prompt is showing and being resolved — i.e., does the reconcile sweep's `onResumable` fire again after the import prompt resolves, or is the reconcile resumability state captured once at launch and potentially stale by the time the user finally sees it (e.g., a session discarded/expired in between)? Minor UX edge, not a data-safety issue.
+
+## Suggestions
+
+- Add one explicit merge-dao test (or acceptance-criterion line) proving a custom-field resolution that picks the **absorbed's** value is honored — mirroring the phone/email dual-contention test — to close the MEDIUM concern above with the same rigor already applied to primaryMethod.
+- Consider stating explicitly in 20-04's Task 3 (or as a one-line addendum) that the interim "block-only" state for `Check linked contacts` before 20-05 lands is an accepted intra-phase sequencing gap, not a shippable end-state — this is implied but making it explicit avoids anyone reading 20-04 in isolation and treating it as phase-complete.
+- No changes needed to the two owner-flagged deferrals; they're correctly out of scope for this cycle.
+
+## Risk Assessment
+
+**LOW.** The plan set has converged: both HIGH items from cycle 4 have concrete, tested, cross-plan-consistent fixes, migration/transaction hazards are enumerated and defended against with matching tests, and the only remaining items are a minor resolution-precedence ambiguity in merge custom-field conflicts and an intentionally-disclosed intra-phase sequencing gap. Nothing here should block execution; the customFields-precedence item is worth a quick confirmation pass during 20-01/20-02 execution but is not a redesign-triggering finding.
+
+## Cursor Review (Cycle 5)
+
+# Cross-AI Plan Review — Phase 20 (Convergence Cycle 5, Final)
+
+## Summary
+
+After four prior revision rounds, the six plans are **execution-ready**. Cycle 4’s two data-loss HIGHs are incorporated in current plan text with named tests and shared helpers: reconcile apply now captures per-field scan baselines and revalidates through `applyReconcileSelections` before writing (`20-03-PLAN.md`, `20-04-PLAN.md`, `20-05-PLAN.md`); bulk `Use Contact Values` gating is realizable via an additive `isActionEligible` prop and a pure `candidate-card-grid-actions.ts` helper wired into both render and `runBulkAction` (`20-04-PLAN.md`, verified against `CandidateCardGrid.tsx:70-81,96-121` where selection is internal); and bulk-review Fix now calls `bumpDataRevisionCore` (`20-06-PLAN.md`, closing the same gap as `updateContactMetadataCore` not self-bumping at `src/db/contacts-dao.ts:308-335` and the backup sweep gate at `src/services/backup-sweep.ts:29-31`). The merge writer, photo staging, session durability, and tombstone-not-archive design remain well grounded in shipped code (`purge-dao.ts`, `recency-dao.ts:427`, `011-contact-lifecycle-schema.ts:178-180`). What remains is documentation drift in `20-VALIDATION.md`, one underspecified narrow-memory encoding for multi-method phone/email sets, and minor operational edges—not architectural blockers.
+
+**Not re-raised (correctly flagged owner deferrals):** `contact_redirects` backup portability; UI-SPEC #5 vs #12 merge-conflict preselection.
+
+---
+
+## Strengths
+
+- **Merge transaction design matches verified schema hazards.** Plans invert `purge-dao.ts:204-268`, pre-resolve partial unique indexes at `011-contact-lifecycle-schema.ts:178-180`, reparent `field_history` with a `modified_at`-free UPDATE (schema at `001-initial.ts:156-162`), and call `recomputeLastContactCore` only (`recency-dao.ts:427`) — not a direct `last_contact` write.
+
+- **Cycle 4 freshness fix is concrete, not prose.** Shared `applyReconcileSelections` re-reads each field against its scan-time baseline before calling the whole-row `updateContactMetadataCore` (`contacts-dao.ts:312-316` has no concurrency predicate); stale fields return in `staleFields` and are re-surfaced. Bulk and resume paths inherit the same helper (`20-04`, `20-05`).
+
+- **Cycle 4 grid safety seam is now mechanically realizable.** Plans extend `CandidateCardGrid` additively and route eligibility through a pure, node-testable `isBulkActionAvailable` helper — necessary because `selectedIds`/`selectedItems` are internal state (`CandidateCardGrid.tsx:70-81`) and `bulkActions` is a static prop (`:43-44`).
+
+- **Photo pipeline follows accepted import precedent.** Evictable `photoTempUri` is staged to durable `reconcile-staging/`; `persistMaster`/`setContactPhoto` run POST-COMMIT mirroring `import-photo.ts`, avoiding pre-txn master overwrite (`photo-storage.ts:325-378` overwrite-in-place behavior cited in plans).
+
+- **Durable-session pattern is correctly non-reentrant.** Bulk scan composes `createReconcileSessionCore` inside one outer `inWriteTransaction`; self-wrapping wrappers would deadlock on the non-reentrant mutex (`transaction.ts:12-17,49`).
+
+- **Tracer-first wave ordering is sound.** Migration 013 + atomic `mergeContacts` before reconciliation UI expansion de-risks the irreversible DDL step and hardest transaction first.
+
+- **RCN-04 resurrection-proofing is wired.** Absorbed contact becomes a generic `contact` tombstone (not archive/`listArchived` at `contacts-dao.ts:591-597`), with extension to `compareRowAndTombstone` (`backup/reconciliation.ts:151`).
+
+---
+
+## Concerns
+
+### MEDIUM
+
+- **NEW — `20-VALIDATION.md` is stale vs. cycle-5 plan tests.** The validation doc’s Wave 0 list (`20-VALIDATION.md:71-81`) omits several files the plans now require and gate on in `20-06` Task 2: `src/db/reconcile-apply.test.ts` (freshness HIGH #1), `src/components/candidate-card-grid-actions.test.ts` (grid gate), `src/logic/reconcile-bulk-eligibility.test.ts`, `src/db/reconcile-relink-dao.test.ts`, `src/services/resume-prompt-precedence.test.ts`, `src/db/bulk-review-dao.test.ts` (Fix advances `data_revision`). It also misplaces the scalar `data_revision` test under `reconcile-photo.test.ts` (`20-VALIDATION.md:75`) while plans put it in `reconcile-apply.test.ts` (`20-03-PLAN.md` acceptance criteria). Risk: phase sign-off via `20-06` references a manifest that does not enumerate the safety tests the plans actually demand.
+
+- **NEW — Multi-method phones/emails narrow-memory encoding is underspecified.** `reconcile_source_snapshot` stores one `reviewed_value TEXT` per `(external_contact_link_id, field_family)` (`20-03` Task 2; migration 013 in `20-01`). Plans say store “the canonical form” for phones/emails singularly, but a contact can hold multiple methods per type (`contact-methods-dao.ts:70-82` lists many rows). Without an explicit canonical **set serialization** (sorted canonical keys + labels) for the `phones`/`emails` families, suppression after partial review can false-re-nag or false-suppress when only one method in a multi-method set changed. Tests cover label-change and canonical equality but not multi-method set round-trips.
+
+### LOW
+
+- **NEW — Post-merge survivor notification refresh is implicit, not planned.** `20-01` specifies post-commit cancel of absorbed `decay:<id>`/`birthday:<id>` via the `purge-notification-cleanup` pattern (`notification-ids.ts:27-32`), but does not schedule an immediate `reconcileSchedule` for the survivor after reparenting interactions and recomputing `last_contact`. Survivor schedules will eventually refresh via launch-sweep (`registerNotificationScheduleSweep` in `notification-schedule.ts:520`), but merge UAT should treat notification timing as eventually consistent, not immediate.
+
+- **NEW — Reconcile apply does not write `contact_method_provenance` for accepted source methods.** Import creates provenance rows via `insertMethodProvenanceCore` (`imported-contact-dao.ts:89-100`); reconcile apply routes only through `applyContactMethodDiffCore` (`contact-methods-dao.ts:99+`) with no provenance insert step in `20-03`. Live re-read via `readAllContacts` still enables diffing, but durable per-method source attribution in the DB will be weaker for reconciled additions vs. imported ones. Acceptable for v1 if intentional; worth noting in phase verification.
+
+- **DuplicateReviewScreen → merge entry explicitly deferred.** `20-03` records that `DuplicateReviewScreen.onInspect` (still a no-op) is not wired; merge reachability is via profile overflow (`20-01`) and `ReconcileDetailScreen` (`20-03`). This is a partial UI-SPEC #10 fulfillment, flagged for owner confirmation—not a plan bug if deferral is accepted.
+
+- **App.tsx dual-resume precedence lacks component-level test.** `resolveActiveResumePrompt` is unit-tested (`20-05`), but conditional rendering in `App.tsx` is grep + device-UAT only. Reasonable given no RN render harness in `package.json`; residual UX race risk is low.
+
+- **Bounded tracer gap (20-01 → 20-02) remains acknowledged.** SurvivorSelect → MergeImpactSummary without `MergeConflictsScreen` can survivor-win silently on genuine conflicts for one wave. Plans label this explicitly as a bounded, non-data-loss gap closed in `20-02`.
+
+### Advisory (not counted as actionable defects)
+
+- **Photo post-commit window is not crash-atomic across process death** — identical to the shipped import path the plans deliberately mirror; degradation to “photo unchanged” is documented.
+
+- **Cadence / Bound–Unbound merge disagreements survivor-win silently** — documented explicit product rule in `20-02` to avoid `contacts_prevent_cadence_clear` ABORT (`011:181-186`); owner change required to surface as a conflict.
+
+---
+
+## Suggestions
+
+1. **Sync `20-VALIDATION.md` Wave 0** with the exhaustive test list in `20-06` Task 2 before execution starts — especially `reconcile-apply.test.ts`, `candidate-card-grid-actions.test.ts`, `reconcile-bulk-eligibility.test.ts`, `bulk-review-dao.test.ts`, and correct the HIGH #1 test file mapping away from `reconcile-photo.test.ts`.
+
+2. **Pin phones/emails snapshot serialization in `reconcile-snapshot-dao` plan text** — e.g., stable JSON of sorted `(method_type, canonical_value, label)` tuples for set comparison — and add one round-trip test: accept one additive phone, re-run reconcile, assert only genuinely new/changed methods re-surface.
+
+3. **Name the existing notification cleanup adapter explicitly in `20-01`** — `createPurgeNotificationCleanup()` from `purge-notification-cleanup.ts:56-60` — so executors do not reimplement ad-hoc cancels.
+
+4. **Optional: note in `20-06` device UAT** that survivor notification timing may lag until the next foreground launch sweep after merge.
+
+5. **Optional: decide whether reconcile apply should call `insertMethodProvenanceCore`** when accepting source methods — if yes, add to `applyReconcileSelections`; if no, record as a v1 limitation in phase summary.
+
+---
+
+## Risk Assessment
+
+**Overall: LOW-MEDIUM**
+
+The plans are substantially stronger than earlier cycles: cycle-4 HIGHs are closed in plan text with grep- and test-enforced mechanisms verified against real source (`contacts-dao.ts`, `CandidateCardGrid.tsx`, `backup-sweep.ts`, `transaction.ts`). Remaining risk concentrates on (a) validation-manifest drift that could weaken the phase gate, and (b) an encoding detail for multi-method narrow memory—not on merge atomicity, reconciliation overwrite safety, or bulk additive-only gating, which were the prior blockers. Execution can proceed once the owner resolves the migration-013 checkpoint (`tombstone-only` vs `add-redirect`) and the two flagged UI/backup deferrals; no further full replan cycle is warranted for the issues above.
+
+---
+
+# CYCLE 4 AND EARLIER — AUDIT HISTORY (preserved below)
+
+---
+phase: 20
 convergence_cycle: 4
 reviewers: [codex, claude, cursor]
 reviewed_at: 2026-08-30T22:10:44Z
