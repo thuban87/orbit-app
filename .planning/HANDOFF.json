@@ -1,30 +1,78 @@
 {
   "version": "1.0",
-  "timestamp": "2026-08-30T00:15:00.000Z",
-  "phase": "19",
-  "phase_name": "System Contact Import",
-  "status": "complete",
-  "summary": "Phase 19 is COMPLETE and device-verified. The Android-17 picker dead-end (previously believed an OS defect) was root-caused on-device to orbit's own intent: the USE_SYSTEM_CONTACTS_PICKER extra was set under android.provider.extra.* while the system picker reads android.intent.extra.*. Fixed in gap plan 19-20; the native picker now renders on the Pixel 6. Full 19-17 device UAT run (all 3 tasks PASS) and a fresh verifier verdict (PASS 4/4) followed. All commits LOCAL on main, NOT pushed.",
-  "resolved_blocker": {
-    "was": "Android-17 system contact picker non-functional on the Pixel 6 (ContactsPickerActivity -> 'No PreferredActivity Found' -> empty chooser).",
-    "root_cause": "orbit set USE_SYSTEM_CONTACTS_PICKER under android.provider.extra.* (ignored) instead of android.intent.extra.* -> the trampoline read the flag as false and forwarded to a non-existent preferred picker. Device-state routes (pm clear, defaults, multi-user) proven dead; no OS update needed.",
-    "fix": "modules/orbit-contact-picker/android/.../OrbitContactPickerModule.kt — correct the extra namespace + explicit multi-select selection limit.",
-    "analysis": ".planning/phases/19-system-contact-import/19-ANDROID17-PICKER-ROOTCAUSE.md"
-  },
-  "completed_this_session": [
-    {"id": "19-20", "name": "Android-17 picker intent fix", "commits": ["cfa660c", "b56956e"], "device_verified": true},
-    {"id": "19-17", "name": "Device UAT of the five gap fixes (all 3 tasks PASS)", "commit": "9620096", "artifact": ".planning/phases/19-system-contact-import/19-17-SUMMARY.md"},
-    {"id": "19-VERIFICATION", "name": "Fresh phase verdict PASS 4/4 (supersedes stale 1/4)", "commit": "97bffc2"}
+  "timestamp": "2026-08-30T11:48:27.053Z",
+  "phase": "19.1",
+  "phase_name": "Older-Android Contact Picker (Hybrid two-picker, ADR-002)",
+  "phase_dir": ".planning/phases/19.1-older-android-contact-picker-hybrid-two-picker-adr-002",
+  "plan": 5,
+  "task": 2,
+  "total_tasks": 2,
+  "status": "paused",
+  "completed_tasks": [
+    {
+      "id": 1,
+      "name": "Full node gate, droid prebuild, and A3 manifest verification",
+      "status": "done",
+      "commits": ["b81e335", "0b53840"]
+    },
+    {
+      "id": 2,
+      "name": "Pixel 3a UAT matrix, ADR supersession note, and owner sign-off",
+      "status": "in_progress",
+      "progress": "No Pixel 3a UI or contact data was accessed. The UAT record contains the synthetic-fixture protocol and all matrix rows are NOT RUN."
+    }
   ],
-  "still_open": [
-    "Code-review defects #1 (Events-as-birthday), #2 (silent read-fail), #3 (nameless-row resume nag) — verified in 19-DEVICE-UAT-FINDINGS.md; NOT part of Phase 19's five gap fixes.",
-    "Minor UX: single-import 'Already in Orbit' terminal screen offered only 'VIEW CONTACT'; back did not dismiss it."
+  "remaining_tasks": [
+    {
+      "id": 2,
+      "name": "Run the synthetic-fixture-only Pixel 3a UAT, record results, perform justified documentation follow-up, then obtain owner sign-off",
+      "status": "in_progress"
+    },
+    {
+      "id": "A3b",
+      "name": "On Pixel 6 Pro/API 37, record both the READ_CONTACTS pm-grant refusal and runtime permission-state evidence",
+      "status": "blocked",
+      "reason": "Only the Pixel 3a was connected; do not infer this result from manifest packaging or the Pixel 3a."
+    }
   ],
-  "uat_test_data_left": "4 real contacts imported during UAT left in place per owner (ids 3-6: Andrew Wales, Joyce Milligan, Dad, Chris Wales).",
-  "next_thread": {
-    "thread": "Phase 19.1 (older-Android hybrid picker, ADR-002)",
-    "start_with": "/gsd-discuss-phase 19.1 — read .planning/phases/19.1-.../19.1-SEED.md + ADR-002 first. Normal discuss -> spec -> plan; do NOT pre-create plans.",
-    "note": "Framework inserted (commit 79a7c24), NOT planned. Independent of the now-working Android-17 path."
-  },
-  "next_action": "Owner: push the local Phase-19 commits when ready. Next planning thread: /gsd-discuss-phase 19.1. STATE.md is owner-managed — agents do not stage it."
+  "blockers": [
+    {
+      "description": "The owner is switching accounts before device UAT resumes.",
+      "type": "human_action",
+      "workaround": "Resume with $gsd-resume-work after the owner is ready."
+    },
+    {
+      "description": "A3b requires the Pixel 6 Pro/API 37; it was not connected.",
+      "type": "external",
+      "workaround": "Keep A3b BLOCKED until the real Pixel 6 check can run; never substitute the Pixel 3a."
+    }
+  ],
+  "async_jobs": [],
+  "human_actions_pending": [
+    {
+      "action": "Return after the account switch and authorize continuation of the synthetic-fixture-only Pixel 3a UAT.",
+      "context": "Plan 19.1-05 Task 2 is a blocking-human checkpoint.",
+      "blocking": true
+    },
+    {
+      "action": "Give final owner sign-off after reviewing recorded UAT outcomes and any blocks.",
+      "context": "The executor must not mark Plan 05 or Phase 19.1 complete without it.",
+      "blocking": true
+    }
+  ],
+  "decisions": [
+    {
+      "decision": "Use only synthetic contacts for device UAT.",
+      "rationale": "The plan requires synthetic fixtures and redacted committed evidence; this also minimizes exposure of the owner's real contacts.",
+      "phase": "19.1"
+    },
+    {
+      "decision": "Treat A3a and A3b as separate evidence.",
+      "rationale": "The generated manifest proves packaging only; API-37 runtime permission behavior requires the Pixel 6 Pro.",
+      "phase": "19.1"
+    }
+  ],
+  "uncommitted_files": [".gsd/", "docs/dossier/milestone-2/"],
+  "next_action": "Read the phase .continue-here.md, then resume Plan 19.1-05 Task 2 at the blocking-human checkpoint. Confirm the Pixel 3a is the only selected device, install the existing droid debug APK if needed, and use synthetic fixtures only.",
+  "context_notes": "Plans 01-04 are summarized and committed. Task 1 of Plan 05 passed 1,721 tests, TypeScript, colors, droid clean prebuild, debug build, and the generated-manifest A3a check. The debug APK remains on droid and is available locally. A prior ordering error ran assembleDebug while clean prebuild was trying to delete generated Android resources; the corrected runbook sequence succeeded."
 }
