@@ -123,6 +123,7 @@ describe("runImportBatch", () => {
       needReview: 1,
       failedOrSkipped: 1,
       nameRequiredSkipped: 0,
+      birthdayUnreadable: 0,
     });
     const rows = await listSessionRows(exec, session.sessionId);
     expect(rows).toEqual(

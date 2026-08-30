@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { mapPickedContact } from "./picked-contact-map";
+import {
+  isBirthdayUnreadable,
+  mapBirthdayForStorage,
+  mapPickedContact,
+} from "./picked-contact-map";
 
 describe("mapPickedContact", () => {
   it("maps the allowed fields into an Unbound create input with the phone region", () => {
@@ -75,6 +79,23 @@ describe("mapPickedContact", () => {
     );
     expect(mapPickedContact(contact("05-14"), options).birthday).toBe("05-14");
     expect(mapPickedContact(contact("02-30"), options).birthday).toBeNull();
+  });
+
+  it("canonicalizes unambiguous slash birthdays without guessing ambiguous dates", () => {
+    expect(mapBirthdayForStorage("2019/03/04")).toBe("2019-03-04");
+    expect(mapBirthdayForStorage("13/04/1990")).toBe("1990-04-13");
+    expect(mapBirthdayForStorage("04/13/1990")).toBe("1990-04-13");
+    expect(mapBirthdayForStorage("04/04/1990")).toBe("1990-04-04");
+    expect(mapBirthdayForStorage("03/04/1990")).toBeNull();
+    expect(mapBirthdayForStorage("2021/02/29")).toBeNull();
+    expect(mapBirthdayForStorage("02/30")).toBeNull();
+  });
+
+  it("identifies present but unreadable birthdays with the shared canonicalizer", () => {
+    expect(isBirthdayUnreadable("03/04/1990")).toBe(true);
+    expect(isBirthdayUnreadable("13/04/1990")).toBe(false);
+    expect(isBirthdayUnreadable(null)).toBe(false);
+    expect(isBirthdayUnreadable("  ")).toBe(false);
   });
 
   it("drops unrecognized picker method types", () => {

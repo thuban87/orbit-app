@@ -176,6 +176,7 @@ describe("import-session-read", () => {
       needReview: 1,
       failedOrSkipped: 2,
       nameRequiredSkipped: 0,
+      birthdayUnreadable: 0,
     });
     await expect(sessionRowCounts(exec, accepted.sessionId)).resolves.toEqual({
       pending: 0,
@@ -203,6 +204,35 @@ describe("import-session-read", () => {
     ).resolves.toMatchObject({
       nameRequiredSkipped: 1,
       failedOrSkipped: 1,
+    });
+  });
+
+  it("counts only imported rows with a present but unreadable source birthday", async () => {
+    const accepted = await acceptRows(exec, [
+      "unreadable-birthday",
+      "valid-birthday",
+      "no-birthday",
+      "malformed-payload",
+    ]);
+    const payloads = [
+      JSON.stringify({ birthday: "03/04/1990" }),
+      JSON.stringify({ birthday: "1990-04-03" }),
+      JSON.stringify({ birthday: null }),
+      "not-json",
+    ];
+    for (const [index, sourcePayload] of payloads.entries()) {
+      await exec.runAsync(
+        "UPDATE import_session_rows SET row_status = 'imported', source_payload = ? WHERE id = ?",
+        [sourcePayload, accepted.rowIds[index]],
+      );
+    }
+
+    await expect(
+      sessionSummaryCounts(exec, accepted.sessionId),
+    ).resolves.toMatchObject({
+      imported: 4,
+      failedOrSkipped: 0,
+      birthdayUnreadable: 1,
     });
   });
 
