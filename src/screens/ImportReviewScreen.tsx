@@ -236,15 +236,9 @@ export function ImportReviewScreen({
           now,
         );
         await finalizeSessionIfTerminal(exec, route.params.sessionId, now);
-        Alert.alert("Already in Orbit", "This contact is already linked.", [
-          {
-            text: "View contact",
-            onPress: () =>
-              navigation.replace("Profile", {
-                contactId: result.deterministicContactId,
-              }),
-          },
-        ]);
+        navigation.replace("ImportComplete", {
+          sessionId: route.params.sessionId,
+        });
         return;
       }
       if (result.outcome === "new" || result.candidates.length === 0) {

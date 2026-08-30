@@ -3,6 +3,8 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 import { getExecutor, localDateTime } from "@/db/database";
 import { finalizeSessionIfTerminal } from "@/db/import-session-dao";
 import {
+  getSessionById,
+  listSessionRows,
   type SessionSummaryCounts,
   sessionRowCounts,
   sessionSummaryCounts,
@@ -29,6 +31,9 @@ export function ImportCompleteScreen({
   const [loading, setLoading] = useState(true);
   const [retrying, setRetrying] = useState(false);
   const [error, setError] = useState(false);
+  const [alreadyLinkedContactId, setAlreadyLinkedContactId] = useState<
+    number | null
+  >(null);
 
   const load = useCallback(async () => {
     const exec = getExecutor();
@@ -37,10 +42,22 @@ export function ImportCompleteScreen({
       route.params.sessionId,
       localDateTime(),
     );
-    const [next, rawCounts] = await Promise.all([
+    const [next, rawCounts, session, rows] = await Promise.all([
       sessionSummaryCounts(exec, route.params.sessionId),
       sessionRowCounts(exec, route.params.sessionId),
+      getSessionById(exec, route.params.sessionId),
+      listSessionRows(exec, route.params.sessionId),
     ]);
+    const alreadyLinkedRows = rows.filter(
+      (row) => row.matchOutcome === "already_linked",
+    );
+    setAlreadyLinkedContactId(
+      session?.mode === "single" &&
+        alreadyLinkedRows.length === 1 &&
+        alreadyLinkedRows[0].matchedContactId !== null
+        ? alreadyLinkedRows[0].matchedContactId
+        : null,
+    );
     setCounts(next);
     setHasFailures(rawCounts.failed > 0);
     setError(false);
@@ -257,6 +274,24 @@ export function ImportCompleteScreen({
             View Unbound contacts
           </Text>
         </Pressable>
+        {alreadyLinkedContactId !== null ? (
+          <Pressable
+            testID="import-complete-view-contact"
+            accessibilityRole="button"
+            accessibilityLabel="View contact"
+            onPress={() =>
+              navigation.navigate("Profile", {
+                contactId: alreadyLinkedContactId,
+              })
+            }
+            style={[
+              styles.secondaryButton,
+              { borderColor: colors.border, backgroundColor: colors.surface },
+            ]}
+          >
+            <Text style={{ color: colors.textPrimary }}>View contact</Text>
+          </Pressable>
+        ) : null}
         <Pressable
           testID="import-complete-done"
           accessibilityRole="button"
