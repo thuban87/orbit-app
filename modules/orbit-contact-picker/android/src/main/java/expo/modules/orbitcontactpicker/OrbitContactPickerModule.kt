@@ -19,10 +19,17 @@ import java.io.InputStream
 // compile on the existing Expo toolchain. The runtime SDK check below ensures
 // older Android versions never launch this Android-17-only activity.
 private const val ACTION_PICK_CONTACTS = "android.provider.action.PICK_CONTACTS"
+// NOTE: the platform ContactsPicker trampoline reads USE_SYSTEM_CONTACTS_PICKER
+// under the `android.intent.extra.*` namespace (verified by disassembling
+// /system/priv-app/ContactsPicker on raven/17). The prior `android.provider.extra.*`
+// key was silently ignored -> the trampoline defaulted the flag to false and
+// forwarded to a non-existent preferred picker ("No PreferredActivity Found").
 private const val EXTRA_USE_SYSTEM_CONTACTS_PICKER =
-  "android.provider.extra.USE_SYSTEM_CONTACTS_PICKER"
+  "android.intent.extra.USE_SYSTEM_CONTACTS_PICKER"
 private const val EXTRA_PICK_CONTACTS_REQUESTED_DATA_FIELDS =
   "android.provider.extra.PICK_CONTACTS_REQUESTED_DATA_FIELDS"
+private const val EXTRA_PICK_CONTACTS_SELECTION_LIMIT =
+  "android.provider.extra.PICK_CONTACTS_SELECTION_LIMIT"
 private const val PICK_CONTACTS_CODE = 9472
 
 internal class ContactPickInProgressException :
@@ -80,6 +87,8 @@ class OrbitContactPickerModule : Module() {
         )
         if (multiple) {
           putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true)
+          // The trampoline validates SELECTION_LIMIT (1..100) for multi-select.
+          putExtra(EXTRA_PICK_CONTACTS_SELECTION_LIMIT, 100)
         }
       }
       pendingPickPromise = promise
