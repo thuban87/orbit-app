@@ -187,6 +187,19 @@ export function ImportCompleteScreen({
             {contactLabel(counts.nameRequiredSkipped)}
           </Text>
         </View>
+        <View
+          style={[
+            styles.footerEntry,
+            { backgroundColor: colors.surface, borderColor: colors.border },
+          ]}
+        >
+          <Text style={[styles.footerText, { color: colors.textPrimary }]}>
+            {`${counts.birthdayUnreadable} birthdays couldn't be read`}
+          </Text>
+          <Text style={[styles.countDetail, { color: colors.textSecondary }]}>
+            {contactLabel(counts.birthdayUnreadable)}
+          </Text>
+        </View>
       </View>
 
       {hasFailures ? (

@@ -5,6 +5,7 @@ import {
   type ImportSessionRowStatus,
 } from "@/db/import-session-dao";
 import type { SqlExecutor } from "@/db/types";
+import { isBirthdayUnreadable } from "@/logic/picked-contact-map";
 
 export interface ImportSession {
   id: number;
@@ -72,6 +73,17 @@ function parseCandidates(value: string | null): unknown[] {
     return Array.isArray(parsed) ? parsed : [];
   } catch {
     return [];
+  }
+}
+
+function sourceBirthday(value: string): string | null {
+  try {
+    const parsed: unknown = JSON.parse(value);
+    if (typeof parsed !== "object" || parsed === null) return null;
+    const birthday = (parsed as { birthday?: unknown }).birthday;
+    return typeof birthday === "string" ? birthday : null;
+  } catch {
+    return null;
   }
 }
 
@@ -203,6 +215,7 @@ export interface SessionSummaryCounts {
   needReview: number;
   failedOrSkipped: number;
   nameRequiredSkipped: number;
+  birthdayUnreadable: number;
 }
 
 /**
@@ -231,6 +244,7 @@ export async function sessionSummaryCounts(
     needReview: 0,
     failedOrSkipped: 0,
     nameRequiredSkipped: 0,
+    birthdayUnreadable: 0,
   };
   for (const row of rows) {
     if (row.row_status === "imported" || row.row_status === "linked")
@@ -252,5 +266,16 @@ export async function sessionSummaryCounts(
       counts.failedOrSkipped += row.count;
     }
   }
+  const importedPayloads = await exec.getAllAsync<{ source_payload: string }>(
+    `SELECT source_payload FROM import_session_rows
+     WHERE session_id = ? AND row_status = 'imported'`,
+    [sessionId],
+  );
+  counts.birthdayUnreadable = importedPayloads.reduce(
+    (count, row) =>
+      count +
+      (isBirthdayUnreadable(sourceBirthday(row.source_payload)) ? 1 : 0),
+    0,
+  );
   return counts;
 }

@@ -142,7 +142,7 @@ export function ImportReviewScreen({
       setRowId(row.id);
       setExternalContactId(row.externalContactId);
       setName(mapped.input.name);
-      setBirthdayInput(mapped.birthday ?? "");
+      setBirthdayInput(mapped.birthday ?? snapshot.birthday ?? "");
       setPhotoRelPath(row.photoRelPath);
       setPhoneRegion(session.phoneRegion);
       const methodDrafts = mapped.input.methodDrafts ?? [];
