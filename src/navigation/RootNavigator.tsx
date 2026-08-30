@@ -16,6 +16,7 @@ import { HomeScreen } from "@/screens/HomeScreen";
 import { ImportCompleteScreen } from "@/screens/ImportCompleteScreen";
 import { ImportProgressScreen } from "@/screens/ImportProgressScreen";
 import { ImportReviewScreen } from "@/screens/ImportReviewScreen";
+import { LegacyContactPickerScreen } from "@/screens/LegacyContactPickerScreen";
 import { ManageFavouritesScreen } from "@/screens/ManageFavouritesScreen";
 import { NeverContactedScreen } from "@/screens/NeverContactedScreen";
 import { OrreryScreen } from "@/screens/OrreryScreen";
@@ -88,6 +89,10 @@ export function RootNavigator() {
       <Stack.Screen name="BackupSettings" component={BackupSettingsScreen} />
       <Stack.Screen name="RestorePreview" component={RestorePreviewScreen} />
       <Stack.Screen name="RestoreResult" component={RestoreResultScreen} />
+      <Stack.Screen
+        name="LegacyContactPicker"
+        component={LegacyContactPickerScreen}
+      />
       <Stack.Screen name="ImportReview" component={ImportReviewScreen} />
       <Stack.Screen name="BulkImportSetup" component={BulkImportSetupScreen} />
       <Stack.Screen name="ImportProgress" component={ImportProgressScreen} />

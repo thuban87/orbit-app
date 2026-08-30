@@ -118,6 +118,7 @@ export type RootStackParamList = {
     replaceSafetySnapshot: "verified" | "not-configured" | null;
   };
   /** Durable system-contact import flow; all params are declared up front. */
+  LegacyContactPicker: undefined;
   ImportReview: { sessionId: number };
   BulkImportSetup: { sessionId: number };
   ImportProgress: { sessionId: number; batchCategoryId: number | null };

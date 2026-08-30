@@ -11,13 +11,9 @@ import { speedDialScrimPointerEvents } from "@/components/add-speed-dial-fab-log
 import { getAppSettings } from "@/db/app-settings-dao";
 import { getExecutor, localDateTime } from "@/db/database";
 import type { RootStackParamList } from "@/navigation/types";
-import {
-  IMPORT_UNSUPPORTED_COPY,
-  IMPORT_UNSUPPORTED_TITLE,
-  useImportUnsupported,
-} from "@/screens/use-import-unsupported";
+import { contactImportMode } from "@/screens/use-contact-import-mode";
 import { getDeviceRegion } from "@/services/device-region";
-import { routePickedImport } from "@/services/import/import-acquire";
+import { startContactImport } from "@/services/import/start-contact-import";
 import { useTheme } from "@/theme";
 import { pickContacts } from "../../modules/orbit-contact-picker";
 
@@ -27,7 +23,6 @@ export function AddSpeedDialFab() {
   const { colors } = useTheme();
   const navigation =
     useNavigation<NativeStackNavigationProp<RootStackParamList>>();
-  const unsupported = useImportUnsupported();
   const [busy, setBusy] = useState(false);
   // `open` mirrors the `expanded` shared value into React state so the scrim /
   // option `pointerEvents` can be gated on collapsed state (a shared value alone
@@ -53,27 +48,18 @@ export function AddSpeedDialFab() {
   const scrimStyle = useAnimatedStyle(() => ({ opacity: expanded.value }));
 
   async function importContacts() {
-    if (unsupported) {
-      Alert.alert(IMPORT_UNSUPPORTED_TITLE, IMPORT_UNSUPPORTED_COPY);
-      return;
-    }
     if (busy) return;
     setBusy(true);
     try {
-      const [picked, settings] = await Promise.all([
-        pickContacts({ multiple: true }),
-        getAppSettings(getExecutor()),
-      ]);
-      await routePickedImport(
-        getExecutor(),
-        picked,
-        {
-          effectivePhoneRegion:
-            settings.phoneRegionOverride ?? getDeviceRegion(),
-          now: localDateTime(),
-        },
-        { navigate: (route, params) => navigation.navigate(route, params) },
-      );
+      const settings = await getAppSettings(getExecutor());
+      await startContactImport({
+        mode: contactImportMode(),
+        exec: getExecutor(),
+        effectivePhoneRegion: settings.phoneRegionOverride ?? getDeviceRegion(),
+        now: localDateTime(),
+        pick: () => pickContacts({ multiple: true }),
+        navigate: navigation.navigate,
+      });
       setExpanded(false);
     } catch {
       Alert.alert("Couldn't import contacts", "Please try again.");
