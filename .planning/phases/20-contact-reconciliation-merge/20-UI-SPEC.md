@@ -1,10 +1,11 @@
 ---
 phase: 20
 slug: contact-reconciliation-merge
-status: draft
+status: approved
 shadcn_initialized: false
 preset: none
 created: 2026-08-30
+reviewed_at: 2026-08-30
 ---
 
 # Phase 20 — Contact Reconciliation & Merge — UI Design Contract
@@ -498,11 +499,11 @@ composed from existing `src/components`.
 
 ## Checker Sign-Off
 
-- [ ] Dimension 1 Copywriting: PASS
-- [ ] Dimension 2 Visuals: PASS
-- [ ] Dimension 3 Color: PASS
-- [ ] Dimension 4 Typography: PASS
-- [ ] Dimension 5 Spacing: PASS
-- [ ] Dimension 6 Registry Safety: PASS
+- [x] Dimension 1 Copywriting: PASS
+- [x] Dimension 2 Visuals: PASS
+- [x] Dimension 3 Color: PASS
+- [x] Dimension 4 Typography: FLAG accepted (documents the shipped 5-size/3-weight scale; introduces zero net-new values; reuse-mandated per dossier Cluster H — non-blocking)
+- [x] Dimension 5 Spacing: FLAG accepted (documents shipped non-4 exceptions 2/14/20/22; "do not refactor"; reuse-mandated — non-blocking)
+- [x] Dimension 6 Registry Safety: PASS
 
-**Approval:** pending
+**Approval:** approved 2026-08-30 (gsd-ui-checker VERIFIED; reuse claims spot-checked against src/ on disk; no dossier-locked invariant contradicted)
