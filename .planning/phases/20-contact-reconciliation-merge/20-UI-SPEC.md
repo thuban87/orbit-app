@@ -482,11 +482,11 @@ composed from existing `src/components`.
 
 ## Notes for the checker / planner
 
-- **Merge confirm colour (accent vs danger) is the one taste-adjacent call.** This spec prescribes
-  **accent confirm + danger warning line + native destructive final guard** on the reasoning that merge
-  consolidates rather than deletes, and that `danger` is reserved for destructive-action *emphasis* in
-  this app (theme-types.ts documents `danger`). If the owner prefers a fully `danger`-styled confirm
-  button, that is a one-line change and an owner call — flagged, not blocking.
+- **Merge confirm colour — OWNER-DECIDED 2026-08-30: accent confirm (LOCKED).** The owner confirmed
+  **accent confirm + danger warning line + native destructive final guard** (merge consolidates rather
+  than deletes; `danger` is reserved for destructive-action *emphasis* in this app — theme-types.ts).
+  This is no longer an open taste call; the planner must implement the accent-confirm variant and must
+  not substitute a fully `danger`-styled confirm button.
 - **`Use Contact Values` availability is a safety invariant, not styling** (Cluster J) — the planner
   must compute additive-only eligibility for the current selection and pass the action into
   `CandidateCardGrid.bulkActions` only then. Do not surface it disabled-but-present in a way that
