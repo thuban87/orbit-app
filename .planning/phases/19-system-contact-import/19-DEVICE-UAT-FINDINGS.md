@@ -36,7 +36,21 @@ ChooserListAdapter: getDisplayResolveInfoCount() == 0
 
 **Conclusion:** The brand-new Android 17 system contact picker is **non-functional on this device/build**. This is not fixable in orbit code — it is an **OS/device thread** (candidate remediations: OS/Play-system update, a different Android 17 device, or Google's fix landing in a later build). This is exactly the risk the phase RESEARCH flagged ("MEDIUM confidence — brand-new 2026 picker, verified against docs but not a device").
 
-**Reboot remediation attempted (2026-08-29) — did NOT fix it.** A full `adb reboot` (device has no secure lock, so no PIN-strand risk) reproduced the exact same failure (`No PreferredActivity Found` → empty chooser). So it is a **persistent** defect, not a transient cache. Remaining OS remediations (system OTA / Play-system update / a newer Google Contacts that implements the picker delegation) are **UI/Wi-Fi/confirmation-gated and cannot be driven headlessly via adb** — they need the owner at the device.
+**Reboot remediation attempted (2026-08-29) — did NOT fix it.** A full `adb reboot` (device has no secure lock, so no PIN-strand risk) reproduced the exact same failure (`No PreferredActivity Found` → empty chooser). So it is a **persistent** defect, not a transient cache.
+
+**Correction on the theory (owner input):** "wait for a Google OS fix" is a *weak* hypothesis — the owner updated this Pixel ~2 weeks ago and a targeted OS fix for this is unlikely. The more probable, **actionable** cause is a **corrupted/misconfigured picker-app state** — the same shape as the Phase-18.1 restore blank-picker, which was a corrupted DocumentsUI cleared by `pm clear com.google.android.documentsui` (see memory `saf-grant-reconnect-cycle` / STATE.md Phase-18.1 note). `No PreferredActivity Found` points at a missing/broken **preferred-activity / delegation** association, not necessarily an OS bug.
+
+### Android-17 picker — remediation routes to try (part of finishing Phase 19)
+Ordered cheapest/most-likely first. Most are adb-doable without the owner; a few need the device or the desktop.
+1. **`pm clear com.android.contactspicker`** (the trampoline) — then relaunch and re-test. Direct analog of the DocumentsUI blank-picker fix. Cheapest, highest-value. *(Also `pm clear com.google.android.contacts` — heavier: re-syncs the owner's contacts; low risk since synced, but do the trampoline first.)*
+2. **Inspect/reset preferred-activity + defaults:** `pm get-preferred-activities`, `dumpsys package preferred-activities`; try clearing/resetting the contacts default so the trampoline can bind a downstream picker. `No PreferredActivity Found` is literally about this.
+3. **Dig the trampoline's delegation intent:** deeper logcat on `com.android.contactspicker` to see *what* intent it fires when it can't find a preferred activity — reveals which downstream handler is missing.
+4. **Google Contacts / Play-system update (distinct from an OS OTA):** the picker delegation may be a Mainline/Play-system component or a Contacts version/feature-flag; check the Play system-update level and update Google Contacts (incl. beta) — this is more plausible than an OS OTA and partly driveable.
+5. **Third-party sample test:** run a known Android-17 contact-picker sample app on the Pixel 6 — if it *also* dead-ends, it's device-wide (confirming not-orbit); if it works, re-examine orbit's intent.
+6. **Fresh Android-17 emulator on `droid`** (the Windows desktop can run emulators; this Linux box can't): a stock Google Android-17 image isolates device-specific vs. universal-broken and gives a working picker to test the 17 path against.
+7. **Multi-user/profile check:** the trust dump showed user flags; rule out a work-profile/restriction interfering with the delegation.
+
+If none pan out, the ≤16 path (Phase 19.1) still delivers a working import + covers the shared downstream on the 3a; only the Android-17-picker-specific launch/snapshot stays open.
 
 **Cascade:** Because every 19-17 scenario is picker-fed, this blocks the **entire** 19-17 device UAT:
 - **Task 1** (picker launch / snapshot / cancel→no session / re-invoke): directly blocked.

@@ -813,6 +813,44 @@ Plans:
 - [x] 19-16-PLAN.md — GAP C.2 (IMP-04, W2): retire session photo_rel_path + delete raw staging on success; status-aware resume-sweep liveness (PII retention closed)
 - [ ] 19-17-PLAN.md — Device UAT (IMP-01/02/04, W3): agent-driven Pixel verification of all five fixes (picker launch, resolved-flow/recovery/completion, photo lifecycle, birthday block)
 
+### Phase 19.1: Older-Android Contact Picker (Hybrid two-picker, ADR-002) (INSERTED)
+
+**Goal:** Build the older-Android (≤ API 36) half of the hybrid two-picker contact acquisition
+decided in **ADR-002**, so contact import works on Android 14/15/16 (e.g. the Pixel 3a) — not only
+Android 17. On ≤16: declare `READ_CONTACTS` scoped with `android:maxSdkVersion="36"` (inert on API-37
+devices, so Google Play Contacts-policy compliant) + a **custom in-app picker** (browse / search /
+multi-select over `ContactsContract`) that reads full fields — multiple phones/emails, **birthday
+only from `Event.TYPE == TYPE_BIRTHDAY`**, and photo — and maps them to the **same `PickedContact[]`**
+the existing pipeline consumes. Route by `Build.VERSION.SDK_INT` (17+ → existing system picker; ≤16 →
+custom picker) and retire the "requires Android 17+" unsupported state.
+
+**Requirements**: IMP-01 (extends: cross-version acquisition). Full contract in ADR-002.
+**Depends on:** Phase 19 (reuses its import pipeline; reverses its Android-17-only picker decision).
+**Reverses / supersedes:** the Phase-19 "Android 17+ picker only, no `READ_CONTACTS`" locked decision
+(HANDOFF/research) — now recorded in `docs/decisions/ADR-002-hybrid-two-picker-contact-import.md`.
+
+**Scope boundary:** ONLY the older-Android picker path + routing + the ADR. The Android-17 path
+(Phase-19 plans 19-12→19-19) stays in Phase 19 and is finished separately once its device blocker is
+resolved. The **entire downstream import pipeline is SHARED and unchanged** (sessions, review, cluster
+consolidation, complete, resume/discard, photo staging, birthday validation — Phase-19 plans
+19-13→19-16).
+
+**Why now / context:** first Phase-19 device UAT found the Android-17 system picker non-functional on
+the owner's real Android 17 Pixel 6 (OS-level, not app code), and the owner wants older-device support
+(the Pixel 3a) for testing + reach. A spike confirmed rich permissionless reads are impossible below
+Android 17, so ≤16 needs `READ_CONTACTS`. Owner ruling: permissions are fine where they earn their
+place (a read permission ≠ breaking local-first). **Full context for discussion:**
+`19.1-SEED.md` (this phase dir), `ADR-002`, `../19-system-contact-import/19-SPIKE-older-android-permissions.md`,
+and `../19-system-contact-import/19-DEVICE-UAT-FINDINGS.md`.
+
+**Start with:** `/gsd-discuss-phase 19.1` (a normal discuss → spec → plan flow; not yet planned).
+
+**Plans:** 0 plans
+
+Plans:
+
+- [ ] TBD (run /gsd-discuss-phase 19.1, then /gsd-plan-phase 19.1 to break down)
+
 ### Phase 20: Contact Reconciliation & Merge
 
 **Goal:** Safely maintain selected system-contact links through user-triggered, one-way reconciliation and let users explicitly, atomically consolidate duplicate Orbit identities.
