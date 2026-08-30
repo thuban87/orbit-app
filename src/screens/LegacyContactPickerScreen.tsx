@@ -2,6 +2,7 @@ import { Image } from "expo-image";
 import { useFocusEffect } from "@react-navigation/native";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  AppState,
   FlatList,
   Pressable,
   StyleSheet,
@@ -96,13 +97,34 @@ export function LegacyContactPickerScreen({
     );
   }, [loadRows]);
 
-  // Freshly CHECK on focus, including after app-info Settings. This deliberately
-  // never requests permission: requests only happen after an explicit button tap.
+  // Freshly CHECK on focus. This deliberately never requests permission:
+  // requests only happen after an explicit button tap.
   useFocusEffect(
     useCallback(() => {
       void refreshPermission();
     }, [refreshPermission]),
   );
+
+  // A grant made in the OS Settings app returns via an AppState resume, NOT a
+  // navigation focus change (this screen never lost focus while Settings was on
+  // top), so useFocusEffect alone leaves a "denied"/"permanent" screen stale and
+  // strands the user after they follow our own "Open Settings" button. Re-check on
+  // resume, but only while parked on a permission-blocked screen so an active
+  // browse/import is never interrupted.
+  const loadStateRef = useRef(loadState);
+  useEffect(() => {
+    loadStateRef.current = loadState;
+  }, [loadState]);
+  useEffect(() => {
+    const sub = AppState.addEventListener("change", (state) => {
+      if (state !== "active") return;
+      const current = loadStateRef.current;
+      if (current === "denied" || current === "permanent") {
+        void refreshPermission();
+      }
+    });
+    return () => sub.remove();
+  }, [refreshPermission]);
 
   async function requestAccess() {
     setLoadState("loading");
