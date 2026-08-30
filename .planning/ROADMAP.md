@@ -37,7 +37,7 @@ onto the dossier domains; a `[DECIDED]`/`[REJECTED]` decision is implemented, ne
 - [ ] **Phase 17: Backup, Export & Restore** — manual + auto SAF backup, optional encryption, tombstone-aware Merge/Replace restore (reusable reconciliation core), forward-migrate.
 - [x] **Phase 18.1: Contact Method Normalization** — normalized phone/email methods with stable identity and system-contact provenance foundations; all contacts stay Bound. **COMPLETE 2026-08-28** (device UAT passed; restore route repaired).
 - [ ] **Phase 18.2: Bound/Unbound Lifecycle** — the independent Bound/Unbound lifecycle across all proactive surfaces, on Phase 18.1's normalized model. (Streamlined Export deferred out of the original Phase 18.)
-- [ ] **Phase 19: System Contact Import** — deliberate single/bulk system-contact acquisition, conservative duplicate evidence, initial linking, and resumable import review.
+- [x] **Phase 19: System Contact Import** — deliberate single/bulk system-contact acquisition, conservative duplicate evidence, initial linking, and resumable import review. **COMPLETE 2026-08-30** (device UAT passed on the Pixel 6 / API 37; verifier PASS 4/4; the Android-17 picker dead-end was root-caused to an intent bug and fixed in gap plan 19-20 — not an OS defect).
 - [ ] **Phase 20: Contact Reconciliation & Merge** — user-triggered one-way source reconciliation, durable review, and explicit atomic Orbit-to-Orbit merge.
 - [ ] **Phase 21: Interaction Assist & Reach Out** — shared Call/Text/Email routing, durable post-handoff assist confirmation, and widget Contact integration.
 
@@ -753,6 +753,8 @@ Plans:
 **Mode:** mvp
 **Depends on:** Phase 18.2
 **Requirements:** IMP-01, IMP-02, IMP-03, IMP-04
+
+**Status: COMPLETE 2026-08-30.** All four success criteria verified (`19-VERIFICATION.md` PASS 4/4). 11 plans + gap fixes 19-12→19-16 + the Android-17 picker intent fix (gap plan 19-20) shipped; device UAT (19-17) passed on the Pixel 6 (API 37). The earlier "Android-17 picker is an OS defect" belief was disproven — the dead-end was orbit's own intent (wrong `USE_SYSTEM_CONTACTS_PICKER` extra namespace). Carried-forward open items (3 import-subsystem code-review defects + a minor single-import UX note) were folded into **Phase 19.1**. Commits LOCAL on `main`, NOT pushed.
 
 #### Canonical refs
 

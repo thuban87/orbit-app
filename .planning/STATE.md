@@ -1,12 +1,12 @@
 ---
 gsd_state_version: 1.0
 milestone: v1.0
-current_phase: 19
-current_phase_name: System Contact Import
+current_phase: 19.1
+current_phase_name: Older-Android Contact Picker (Hybrid two-picker, ADR-002)
 current_plan: 1
-status: executing
-stopped_at: Phase 19 EXECUTED (11 plans); verify found gaps (1/4 truths). Gap closure PLANNED + plan-checker PASSED — 6 plans 19-12..19-17 (IMP-01/02/04; IMP-03 verified, not re-planned), commit 29988e4 LOCAL not pushed. Ready → /gsd-execute-phase 19 --gaps-only
-last_updated: "2026-08-30T02:50:54.494Z"
+status: ready
+stopped_at: Phase 19 COMPLETE + device-verified (2026-08-30). The Android-17 picker dead-end was root-caused on-device to orbit's own intent (wrong USE_SYSTEM_CONTACTS_PICKER extra namespace), NOT an OS defect — fixed in gap plan 19-20 (commits cfa660c/b56956e). Full 19-17 device UAT PASS (all 3 tasks, commit 9620096); fresh verifier PASS 4/4 (97bffc2). Carried-forward open items folded into Phase 19.1. All Phase-19 commits LOCAL on main, NOT pushed. Next → /gsd-discuss-phase 19.1 (read 19.1-SEED.md + ADR-002).
+last_updated: "2026-08-30T00:20:00.000Z"
 state_head: 64b073df17dfe8742d1a6428b84f76cb919f18f1
 progress:
   total_phases: 23
@@ -23,14 +23,14 @@ milestone_name: milestone
 See: .planning/PROJECT.md (updated 2026-08-14)
 
 **Core value:** Collapse the taps between "you're overdue with X" and the message actually being sent.
-**Current focus:** Phase 19 — System Contact Import
+**Current focus:** Phase 19 COMPLETE ✅ — next: Phase 19.1 (Older-Android hybrid picker, ADR-002)
 
 ## Current Position
 
-**Phase:** 19 — System Contact Import
-**Current Plan:** 1
-**Total Plans in Phase:** 11
-**Status:** Executing Phase 19
+**Phase:** 19.1 — Older-Android Contact Picker (Hybrid two-picker, ADR-002) — NOT yet discussed
+**Current Plan:** — (Phase 19 complete + verified PASS 4/4; 19.1 not started)
+**Total Plans in Phase:** —
+**Status:** Phase 19 done; ready for `/gsd-discuss-phase 19.1`. Phase-19 commits LOCAL on `main`, not pushed.
 
 **⟢ PHASE 18.1 (Contact Method Normalization) — COMPLETE (2026-08-28).** All 6 plans executed.
 Normalized phone/email method model with stable identity + system-contact provenance foundations;
