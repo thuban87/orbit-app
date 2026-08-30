@@ -845,18 +845,18 @@ place (a read permission ≠ breaking local-first). **Full context for discussio
 `19.1-SEED.md` (this phase dir), `ADR-002`, `../19-system-contact-import/19-SPIKE-older-android-permissions.md`,
 and `../19-system-contact-import/19-DEVICE-UAT-FINDINGS.md`.
 
-**Plans:** 2/5 plans executed / 4 waves (tracer-first; native reader + carried-forward fixes lead in parallel, then picker UI, permission UX, device UAT)
+**Plans:** 3/5 plans executed / 4 waves (tracer-first; native reader + carried-forward fixes lead in parallel, then picker UI, permission UX, device UAT)
 
 Plans:
 
 - [x] 19.1-01-tracer-legacy-acquisition-PLAN.md
 - [x] 19.1-02-carried-forward-pipeline-fixes-PLAN.md
-- [ ] 19.1-03-custom-picker-ui-PLAN.md
+- [x] 19.1-03-custom-picker-ui-PLAN.md
 - [ ] 19.1-04-permission-ux-and-routing-PLAN.md
 - [ ] 19.1-05-device-uat-and-manifest-verification-PLAN.md
 
 - [x] 19.1-01-PLAN.md — Tracer: end-to-end ≤16 acquisition (native full-provider reader + Event.TYPE gate + reject-on-error, scoped READ_CONTACTS maxSdkVersion=36, shared contactImportMode seam, minimal picker, FAB dispatch) [wave 1]
-- [ ] 19.1-02-PLAN.md — Carried-forward shared-pipeline fixes: D-12 nameless→skipped + count, D-13 broaden birthday + flag-don't-drop, D-14b already-linked clean exit (no migration) [wave 1]
+- [x] 19.1-02-PLAN.md — Carried-forward shared-pipeline fixes: D-12 nameless→skipped + count, D-13 broaden birthday + flag-don't-drop, D-14b already-linked clean exit (no migration) [wave 1]
 - [ ] 19.1-03-PLAN.md — Custom picker UI (D-09/D-10): decoupled source+selection logic, two-tier native read, searchable/avatar'd/uncapped virtualized FlatList [wave 2]
 - [ ] 19.1-04-PLAN.md — Permission UX (D-11a/b/c) + retire the "requires Android 17+" state (D-05) + route both entry points through the shared seam [wave 3]
 - [ ] 19.1-05-PLAN.md — Pixel 3a device UAT + generated-manifest scoping verification (A3) + full-suite gate + ADR supersession note [wave 4]
