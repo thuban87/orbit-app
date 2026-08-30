@@ -179,6 +179,11 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     // bare-string local-path entry — deduped by name below like the tuples.
     const bootReceiverPlugin = "./plugins/withWidgetBootReceiver";
     const backupRestoreSharePlugin = "./plugins/withBackupRestoreShareIntent";
+    // The module-library manifest is merged at Gradle build time. This plugin
+    // repeats only the scoped permission in Expo's generated app manifest, so
+    // prebuild evidence can audit the API-37 cutoff directly.
+    const contactPickerPermissionPlugin =
+      "./plugins/withContactPickerPermission";
 
     return [
       ...stringPlugins.filter(
@@ -187,13 +192,15 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
           pluginName(p) !== "expo-share-intent" &&
           pluginName(p) !== "react-native-android-widget" &&
           pluginName(p) !== bootReceiverPlugin &&
-          pluginName(p) !== backupRestoreSharePlugin,
+          pluginName(p) !== backupRestoreSharePlugin &&
+          pluginName(p) !== contactPickerPermissionPlugin,
       ),
       pickerPlugin,
       shareIntentPlugin,
       widgetPlugin,
       bootReceiverPlugin,
       backupRestoreSharePlugin,
+      contactPickerPermissionPlugin,
     ];
   })(),
 });
