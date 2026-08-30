@@ -90,7 +90,7 @@ created: 2026-08-30
 - [ ] `src/logic/reconcile-diff.test.ts` — RCN-01 classification + Cluster D/M (multi-source → one card) + `serializeMethodFamily` order-independence
 - [ ] `src/logic/survivor-recommendation.test.ts` — survivor heuristic (if the planner adopts one; else N/A)
 - [ ] `src/db/bulk-review-read.test.ts` + `src/db/bulk-review-dao.test.ts` — unresolved-flag read omits resolved rows; Fix advances `data_revision` (finding 4), Ignore does not; durable across DB reopen
-- [ ] `src/db/migrations/013-*.test.ts` — v12→v13 forward migration + FK integrity (incl. `bulk_review_resolutions`, nullable `staged_photo_rel_path`)
+- [ ] `src/db/migrations/013-reconciliation-and-merge.test.ts` — v12→v13 forward migration + FK integrity (incl. `bulk_review_resolutions`, nullable `staged_photo_rel_path`)
 - [ ] Extend `src/backup/reconciliation.test.ts` — merged-contact resurrection-proofing
 
 ---
