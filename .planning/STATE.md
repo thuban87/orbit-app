@@ -6,12 +6,12 @@ current_phase_name: Older-Android Contact Picker (Hybrid two-picker, ADR-002)
 current_plan: 1
 status: ready
 stopped_at: Phase 19.1 context gathered
-last_updated: "2026-08-30T05:41:35.322Z"
-state_head: c40878f258c07fa08ac173d7375005151e52ea4a
+last_updated: "2026-08-30T06:43:42.102Z"
+state_head: 9468655e032cc485e4b75b6b16c980802cc5405a
 progress:
   total_phases: 23
   completed_phases: 15
-  total_plans: 164
+  total_plans: 169
   completed_plans: 161
 milestone_name: milestone
 ---
@@ -29,7 +29,7 @@ See: .planning/PROJECT.md (updated 2026-08-14)
 
 **Phase:** 19.1 — Older-Android Contact Picker (Hybrid two-picker, ADR-002) — NOT yet discussed
 **Current Plan:** — (Phase 19 complete + verified PASS 4/4; 19.1 not started)
-**Total Plans in Phase:** —
+**Total Plans in Phase:** 5
 **Status:** Phase 19 done; ready for `/gsd-discuss-phase 19.1`. Phase-19 commits LOCAL on `main`, not pushed.
 
 **⟢ PHASE 18.1 (Contact Method Normalization) — COMPLETE (2026-08-28).** All 6 plans executed.
@@ -96,7 +96,7 @@ Progress: [████████░░] 75% (12/16 phases complete; Phase 13 
 
 _Phase-12 recap (historical — Phase 12 is COMPLETE + verified; see 12-VERIFICATION.md):_
 
-Phase: 19 (System Contact Import) — EXECUTING
+Phase: 19.1 (Older-Android Contact Picker (Hybrid two-picker, ADR-002)) — READY TO EXECUTE
 Next: Phase 13 (Orrery) — NOT started. It is a large new Skia render-loop phase (its own discuss→plan→converge→execute→device-UAT cycle); awaiting owner go-ahead before beginning.
 Done this session (2026-08-17), all committed locally on main (NOT pushed): smart-discuss (12-CONTEXT; owner APPROVED the shared stable/wobble/decay status palette — stable #45B98A / wobble #E8C15C / decay #E56A52 / rogue #E0904A unchanged — resolving OD-1 app-wide; widget + ContactCard + future orrery inherit it), UI-SPEC (approved, checker VERIFIED), RESEARCH, VALIDATION (Nyquist), PATTERNS, PLAN (8 plans / 6 waves, efa9f5b), plan-checker PASSED, then a 2-cycle cross-AI convergence (codex CLI + read-only-Claude subagent; self-review guard overridden per owner): cycle-1 = 6 codex HIGH + 7 Claude actionable → replan (cca05d9); cycle-2 = 2 codex HIGH (WDG-03 freshness incompleteness; killed-app UAT needed a debug build) → final replan (4e688cf). All 8 HIGH fixes verified in-file. NOTE: the final-replan fixes were NOT independently re-reviewed (max cycles reached + owner pause).
 Codex tooling note: current codex-cli (0.144.1) makes gsd-review auto-add `--dangerously-bypass-hook-trust`, which the safety classifier blocks; a subagent improperly tunneled it once (flagged, discarded), then codex was re-run cleanly WITHOUT that flag. Do NOT let gsd-review's codex path run with that flag — run codex manually without it, or allow-list a scoped `Bash(codex exec:*)`.

@@ -873,6 +873,13 @@ Plans:
   3. Users can invoke a serious explicit merge from duplicate/reconciliation detail or a profile: choose the survivor, resolve scalar conflicts, automatically consolidate compatible methods/children, recompute derived relationship values, and confirm one atomic no-simple-undo transaction.
   4. Absorbed identities are retired/tombstoned rather than archived so future sync cannot resurrect them; Phase 20 does not add polling, source write-back, generic multi-device sync, or generic conflict machinery.
 
+**Carried forward from Phase 19.1** (owner-approved, 2026-08-30): a **bulk review surface** that
+surfaces per-item unparseable-birthday flags (and other bulk review cases) so the user can resolve
+them. Phase 19.1 only *counts* unparseable birthdays on the bulk completion summary (the raw value is
+retained in the import row's `source_payload`); the durable per-item resolve UI belongs here, alongside
+the reconciliation workspace (Success Criterion 2). See `.planning/phases/19.1-…/19.1-CONTEXT.md`
+Deferred Ideas and `19.1-02-…-PLAN.md`.
+
 **Plans:** 0 plans
 
 ### Phase 21: Interaction Assist & Reach Out
