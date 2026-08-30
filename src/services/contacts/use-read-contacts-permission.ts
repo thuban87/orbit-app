@@ -30,6 +30,14 @@ async function readFlag(key: string): Promise<boolean> {
   }
 }
 
+async function writeValue(key: string, value: string): Promise<void> {
+  try {
+    await AsyncStorage.setItem(key, value);
+  } catch {
+    // Persistence only restores presentation; it must not change the OS verdict.
+  }
+}
+
 async function readDenyCount(): Promise<number> {
   try {
     const value = Number.parseInt((await AsyncStorage.getItem(DENY_COUNT_KEY)) ?? "0", 10);
@@ -96,19 +104,19 @@ export async function requestContactsPermission(): Promise<ContactsPermissionReq
       PermissionsAndroid.PERMISSIONS.READ_CONTACTS,
     );
     const verdict = classifyPermissionResult(result);
-    await AsyncStorage.setItem(REQUESTED_BEFORE_KEY, "true");
+    await writeValue(REQUESTED_BEFORE_KEY, "true");
 
     if (verdict === "granted") {
       await clearDeniedPresentation();
       return { granted: true, verdict, denialCount: 0 };
     }
     if (verdict === "permanent") {
-      await AsyncStorage.setItem(PERMANENT_DENIAL_KEY, "true");
+      await writeValue(PERMANENT_DENIAL_KEY, "true");
       return { granted: false, verdict, denialCount: await readDenyCount() };
     }
 
     const denialCount = (await readDenyCount()) + 1;
-    await AsyncStorage.setItem(DENY_COUNT_KEY, String(denialCount));
+    await writeValue(DENY_COUNT_KEY, String(denialCount));
     return { granted: false, verdict, denialCount };
   } catch {
     return {
