@@ -1,18 +1,18 @@
 ---
 gsd_state_version: 1.0
 milestone: v1.0
-current_phase: 19.1
-current_phase_name: Older-Android Contact Picker (Hybrid two-picker, ADR-002)
-current_plan: 5
-status: executing
-stopped_at: Completed 19.1-04-permission-ux-and-routing-PLAN.md
-last_updated: "2026-08-30T10:53:49.280Z"
-state_head: 7071c2b1c3ca00a6208845c5c1533e105e9246a9
+current_phase: 20
+current_phase_name: contact-reconciliation-merge
+current_plan: 1
+status: ready_to_execute
+stopped_at: Phase 20 planned (6 plans) — ready to execute
+last_updated: "2026-08-30T19:20:33.085Z"
+state_head: 9d9991089eb070d338c8c84f8facd641afce846f
 progress:
   total_phases: 23
   completed_phases: 15
-  total_plans: 169
-  completed_plans: 165
+  total_plans: 175
+  completed_plans: 166
 milestone_name: milestone
 ---
 
@@ -23,14 +23,23 @@ milestone_name: milestone
 See: .planning/PROJECT.md (updated 2026-08-14)
 
 **Core value:** Collapse the taps between "you're overdue with X" and the message actually being sent.
-**Current focus:** Phase 19.1 — Older-Android Contact Picker (Hybrid two-picker, ADR-002)
+**Current focus:** Phase 20 — Contact Reconciliation & Merge
 
 ## Current Position
 
-**Phase:** 19.1 — Older-Android Contact Picker (Hybrid two-picker, ADR-002) — PLANNED, ready to execute
-**Current Plan:** 5
-**Total Plans in Phase:** 5
+**Phase:** 20 — Contact Reconciliation & Merge — PLANNED, ready to execute
+**Current Plan:** 1
+**Total Plans in Phase:** 6
 **Status:** Ready to execute
+
+**⟢ PHASE 20 (Contact Reconciliation & Merge) — PLANNED (2026-08-30).** 6 plans / 6 waves,
+tracer-first vertical slices (20-01 tracer merge → 20-06 verification). Research (HIGH confidence,
+migration head verified 012 → new migration 013), Nyquist VALIDATION, PATTERNS (15/15 analogs), and
+plan-checker VERIFICATION PASSED (0 blockers; 1 stale-path warning fixed). Two owner decisions are
+embedded, not blocking planning: **A2** — a `checkpoint:decision` (blocking-human) before the
+migration-013 task in 20-01 chooses tombstone-only vs. adding a durable `contact_redirects` table
+(one-way door — migration is irreversible); **A3** — manual side-by-side photo choice is the primary
+path (no auto photo-diff built; flagged assumption). Not yet pushed.
 
 **⟢ PHASE 18.1 (Contact Method Normalization) — COMPLETE (2026-08-28).** All 6 plans executed.
 Normalized phone/email method model with stable identity + system-contact provenance foundations;
@@ -96,7 +105,7 @@ Progress: [████████░░] 75% (12/16 phases complete; Phase 13 
 
 _Phase-12 recap (historical — Phase 12 is COMPLETE + verified; see 12-VERIFICATION.md):_
 
-Phase: 19.1 (Older-Android Contact Picker (Hybrid two-picker, ADR-002)) — EXECUTING
+Phase: 20 (contact-reconciliation-merge) — READY TO EXECUTE
 Next: Phase 13 (Orrery) — NOT started. It is a large new Skia render-loop phase (its own discuss→plan→converge→execute→device-UAT cycle); awaiting owner go-ahead before beginning.
 Done this session (2026-08-17), all committed locally on main (NOT pushed): smart-discuss (12-CONTEXT; owner APPROVED the shared stable/wobble/decay status palette — stable #45B98A / wobble #E8C15C / decay #E56A52 / rogue #E0904A unchanged — resolving OD-1 app-wide; widget + ContactCard + future orrery inherit it), UI-SPEC (approved, checker VERIFIED), RESEARCH, VALIDATION (Nyquist), PATTERNS, PLAN (8 plans / 6 waves, efa9f5b), plan-checker PASSED, then a 2-cycle cross-AI convergence (codex CLI + read-only-Claude subagent; self-review guard overridden per owner): cycle-1 = 6 codex HIGH + 7 Claude actionable → replan (cca05d9); cycle-2 = 2 codex HIGH (WDG-03 freshness incompleteness; killed-app UAT needed a debug build) → final replan (4e688cf). All 8 HIGH fixes verified in-file. NOTE: the final-replan fixes were NOT independently re-reviewed (max cycles reached + owner pause).
 Codex tooling note: current codex-cli (0.144.1) makes gsd-review auto-add `--dangerously-bypass-hook-trust`, which the safety classifier blocks; a subagent improperly tunneled it once (flagged, discarded), then codex was re-run cleanly WITHOUT that flag. Do NOT let gsd-review's codex path run with that flag — run codex manually without it, or allow-list a scoped `Bash(codex exec:*)`.
@@ -412,10 +421,10 @@ planning" sections in docs/dossier/*.md — those are the authoritative hand-off
 
 ## Session
 
-**Last session:** 2026-08-30T10:53:46.872Z
-**Stopped at:** Completed 19.1-04-permission-ux-and-routing-PLAN.md
+**Last session:** 2026-08-30T18:00:33.354Z
+**Stopped at:** Phase 20 UI-SPEC approved
 _Prior stop (13-04):_ the orrery VISUAL VOCABULARY (theme tokens + two pure resolver modules, node-tested, 29 cases green): (1) five owner-tunable `ThemePalette` tokens seeded in `space-dark.dark` ONLY — `starPalette` (6 colours, gold `#F2C14E` at index 0, then amber/rose-red/violet/cyan/ice-white), `mutedStable/Wobble/Decay` (desaturated same-hue morph endpoints), `rogueExtinguished` (cold blue-grey `#3E4A6B` rogue BODY fill) — with an M6/C2-5 conformance test that IMPORTS the real `SELF_SUN_COLOUR_RE`/`assertSelfSunColour` from app-settings-dao and locks every starPalette entry to the ACTUAL DAO write-path rule (no re-inlined regex). (2) `orrery-ring-logic.ts` `orreryRingStyle(status, colors)` — REUSES `ringVisual` for `{color,opacity,width}` (status→colour mapped once), adds the `strokeStyle` axis (solid→dashed→faded→faintTrace) + `bodyFill` (rogue ring=`colors.rogue`, body=`rogueExtinguished`); `null`→canonical NEUTRAL (`colors.border`), never throws — the single fallback sun-occupant reuses (C2-2). (3) `sun-occupant-logic.ts` `resolveSunOccupant(input)` — NULL/archived/missing→self (A7, glow `selfSunColour ?? starPalette[0]`), live contact→its status glow via `orreryRingStyle(status, colors).color`, never-contacted (status `null`)→the reused neutral border (C2-2); accepts `status: ProfileStatus | null`. 5 commits (1801915 feat tokens+M6; d35d528 RED→4cbfad5 GREEN ring-logic; c923b16 RED→10780dd GREEN sun-occupant); tsc + check:colors clean; no deviations (one in-flight fix: a placeholder hex in the logic test was re-sourced from the palette after check:colors flagged it — C2-3). Committed locally on main (NOT pushed). Next: Wave 2 (13-05 render / 13-06 Settings sun-picker), Wave 3 (13-07 drag-release), Wave 4 (13-08 device UAT, autonomous:false).
-**Resume file:** None
+**Resume file:** /home/bwales/projects/orbit-app/.planning/phases/20-contact-reconciliation-merge/20-UI-SPEC.md
 
 ## Phase 4 — Closeout (2026-08-15) ✅ COMPLETE
 

@@ -1,0 +1,1 @@
+No external API integration: Phase 20 is on-device SQLite reconciliation of already-imported system-contact links plus local Orbit-to-Orbit merge — local-first, no network, no external API/SDK/service; the only "api" match is the in-repo `orbit-contact-picker` native module reading Android Contacts on-device.

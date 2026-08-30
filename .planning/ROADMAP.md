@@ -886,7 +886,32 @@ retained in the import row's `source_payload`); the durable per-item resolve UI 
 the reconciliation workspace (Success Criterion 2). See `.planning/phases/19.1-…/19.1-CONTEXT.md`
 Deferred Ideas and `19.1-02-…-PLAN.md`.
 
-**Plans:** 0 plans
+**Plans:** 6 plans / 6 waves (tracer-first vertical slices; migration 013 = TARGET_VERSION 13, one-way — owner redirect-table decision gates it)
+
+Plans:
+**Wave 1**
+
+- [ ] 20-01-PLAN.md — TRACER: migration 013 + atomic mergeContacts (reparent/tombstone/recompute) + minimal merge UI end-to-end (RCN-03, RCN-04) [wave 1]
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [ ] 20-02-PLAN.md — Merge with conflicts: survivor-recommendation + reusable FieldChoiceGroup/PhotoChoice + scalar/primary conflict resolution + real impact counts (RCN-03) [wave 2]
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
+- [ ] 20-03-PLAN.md — Per-contact reconciliation end-to-end: reconcile-diff + snapshot memory + ReconcileDetailScreen + apply through existing writers (RCN-01) [wave 3]
+
+**Wave 4** *(blocked on Wave 3 completion)*
+
+- [ ] 20-04-PLAN.md — Bulk Check linked contacts: durable reconcile sessions + reused CandidateCardGrid + additive-only bulk safety seam + completion summary (RCN-02) [wave 4]
+
+**Wave 5** *(blocked on Wave 4 completion)*
+
+- [ ] 20-05-PLAN.md — Durable resume (launch sweep) + missing-source/relink lifecycle (RCN-02, RCN-01) [wave 5]
+
+**Wave 6** *(blocked on Wave 5 completion)*
+
+- [ ] 20-06-PLAN.md — Carried-forward bulk-review surface (unreadable-birthday resolver) + phase verification/device-UAT (RCN-02) [wave 6]
 
 ### Phase 21: Interaction Assist & Reach Out
 
