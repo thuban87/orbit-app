@@ -159,12 +159,15 @@ export function DuplicateReviewScreen({
       try {
         const now = localDateTime();
         if (action === "import-new") {
-          await importRowAsNew(getExecutor(), {
+          const result = await importRowAsNew(getExecutor(), {
             row: entry.row,
             batchCategoryId: session.batchCategoryId,
             phoneRegion: session.phoneRegion,
             now,
           });
+          if (result.skipped === "name-required") {
+            Alert.alert("Couldn't import — no name", "Add a name before importing.");
+          }
         } else if (action === "skip") {
           await markRowStatus(
             getExecutor(),

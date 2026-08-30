@@ -174,6 +174,19 @@ export function ImportCompleteScreen({
             {contactLabel(counts.failedOrSkipped)}
           </Text>
         </View>
+        <View
+          style={[
+            styles.footerEntry,
+            { backgroundColor: colors.surface, borderColor: colors.border },
+          ]}
+        >
+          <Text style={[styles.footerText, { color: colors.textPrimary }]}>
+            {`${counts.nameRequiredSkipped} skipped — no name`}
+          </Text>
+          <Text style={[styles.countDetail, { color: colors.textSecondary }]}>
+            {contactLabel(counts.nameRequiredSkipped)}
+          </Text>
+        </View>
       </View>
 
       {hasFailures ? (

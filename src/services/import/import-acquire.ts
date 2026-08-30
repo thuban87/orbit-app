@@ -74,7 +74,10 @@ export async function acceptPickedContacts(
       });
       const rowUid = newUid();
       let photoRelPath: string | null = null;
-      if (mapped.photoTempUri !== null) {
+      if (
+        mapped.photoTempUri !== null &&
+        !(options.mode === "bulk" && mapped.nameRequired)
+      ) {
         try {
           const relative = importStagingRelPath(sessionUid, rowUid);
           await stageImportPhoto(mapped.photoTempUri, relative);

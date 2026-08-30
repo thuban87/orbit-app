@@ -4,6 +4,7 @@
  */
 import {
   deferNeedsReview,
+  finalizeSessionIfTerminal,
   type ImportSessionRowStatus,
   markRowPhotoFailed,
   markRowStatus,
@@ -77,7 +78,7 @@ export async function importRowAsNew(
     await markRowStatus(
       exec,
       params.row.id,
-      "failed",
+      "skipped",
       "name-required",
       params.now,
     );
@@ -195,5 +196,6 @@ export async function runImportBatch(
     }
   }
 
+  await finalizeSessionIfTerminal(exec, params.sessionId, params.now);
   return sessionSummaryCounts(exec, params.sessionId);
 }

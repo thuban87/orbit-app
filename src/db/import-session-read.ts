@@ -202,6 +202,7 @@ export interface SessionSummaryCounts {
   alreadyInOrbit: number;
   needReview: number;
   failedOrSkipped: number;
+  nameRequiredSkipped: number;
 }
 
 /**
@@ -216,11 +217,12 @@ export async function sessionSummaryCounts(
   const rows = await exec.getAllAsync<{
     row_status: ImportSessionRowStatus;
     match_outcome: ImportMatchOutcome | null;
+    failure_reason: string | null;
     count: number;
   }>(
-    `SELECT row_status, match_outcome, COUNT(*) AS count
+    `SELECT row_status, match_outcome, failure_reason, COUNT(*) AS count
      FROM import_session_rows WHERE session_id = ?
-     GROUP BY row_status, match_outcome`,
+     GROUP BY row_status, match_outcome, failure_reason`,
     [sessionId],
   );
   const counts: SessionSummaryCounts = {
@@ -228,6 +230,7 @@ export async function sessionSummaryCounts(
     alreadyInOrbit: 0,
     needReview: 0,
     failedOrSkipped: 0,
+    nameRequiredSkipped: 0,
   };
   for (const row of rows) {
     if (row.row_status === "imported" || row.row_status === "linked")
@@ -235,6 +238,13 @@ export async function sessionSummaryCounts(
     if (row.match_outcome === "already_linked")
       counts.alreadyInOrbit += row.count;
     if (row.row_status === "needs_review") counts.needReview += row.count;
+    if (
+      row.row_status === "skipped" &&
+      row.failure_reason === "name-required"
+    ) {
+      counts.nameRequiredSkipped += row.count;
+      continue;
+    }
     if (
       row.row_status === "failed" ||
       (row.row_status === "skipped" && row.match_outcome !== "already_linked")

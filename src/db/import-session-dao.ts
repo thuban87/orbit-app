@@ -16,6 +16,7 @@
  * | link existing | linked | probable/possible | set | unchanged | link composition |
  * | ambiguous deferred | needs_review | probable/possible/needs_review | NULL | unchanged | deferNeedsReview(Core) |
  * | user Skip | skipped | prior or NULL, never already_linked | NULL | unchanged | markRowStatus |
+ * | nameless bulk row | skipped | NULL | NULL | unchanged | importRowAsNew (failure_reason='name-required') |
  * | import failure | failed | prior | NULL | unchanged | markRowStatus |
  * | photo-only failure | unchanged | unchanged | unchanged | unchanged | markRowPhotoFailed |
  * | staging retired (success) | unchanged | unchanged | unchanged | photo_rel_path → NULL | retireRowStagedPhoto |
