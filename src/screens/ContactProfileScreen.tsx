@@ -1333,6 +1333,7 @@ export function ContactProfileScreen({
         visible={reachOutOpen}
         contactId={contactId}
         routes={reachRoutes}
+        methodGroups={methodGroups}
         assistEnabled={assistEnabled}
         onClose={() => setReachOutOpen(false)}
       />

@@ -1,4 +1,7 @@
+import { useState } from "react";
 import { Modal, Pressable, StyleSheet, Text, View } from "react-native";
+import { EndpointSelector } from "@/components/EndpointSelector";
+import type { ContactMethodGroups } from "@/db/contact-methods-read";
 import { getExecutor, localDateTime } from "@/db/database";
 import type { ReachRoutes } from "@/db/interaction-assist-read";
 import { performReachOut } from "@/services/reach-out/handoff";
@@ -8,6 +11,7 @@ type ReachOutRouterProps = {
   visible: boolean;
   contactId: number;
   routes: ReachRoutes;
+  methodGroups: ContactMethodGroups;
   assistEnabled: boolean;
   onClose: () => void;
 };
@@ -16,20 +20,23 @@ export function ReachOutRouter({
   visible,
   contactId,
   routes,
+  methodGroups,
   assistEnabled,
   onClose,
 }: ReachOutRouterProps) {
   const { colors } = useTheme();
+  const [selecting, setSelecting] = useState<"call" | "text" | "email" | null>(
+    null,
+  );
 
   if (routes.hidden) {
     return null;
   }
 
-  const launch = async (channel: "call" | "text" | "email") => {
-    const endpoint =
-      channel === "email"
-        ? routes.primaryEmail?.canonical_value
-        : routes.primaryPhone?.canonical_value;
+  const launch = async (
+    channel: "call" | "text" | "email",
+    endpoint: string | null,
+  ) => {
     if (!endpoint) return;
 
     await performReachOut(getExecutor(), {
@@ -42,6 +49,20 @@ export function ReachOutRouter({
     onClose();
   };
 
+  const chooseChannel = (channel: "call" | "text" | "email") => {
+    const type = channel === "email" ? "email" : "phone";
+    const endpoints = methodGroups[type].filter(
+      (endpoint) => endpoint.is_actionable === 1,
+    );
+    if (endpoints.length === 1) {
+      void launch(channel, endpoints[0].canonical_value);
+      return;
+    }
+    if (endpoints.length >= 2) {
+      setSelecting(channel);
+    }
+  };
+
   const primaryChannel = routes.call ? "call" : "email";
   const routeButton = (channel: "call" | "text" | "email", label: string) => {
     const primary = channel === primaryChannel;
@@ -50,7 +71,7 @@ export function ReachOutRouter({
         key={channel}
         accessibilityRole="button"
         accessibilityLabel={label}
-        onPress={() => void launch(channel)}
+        onPress={() => chooseChannel(channel)}
         style={[
           styles.route,
           {
@@ -102,9 +123,24 @@ export function ReachOutRouter({
             },
           ]}
         >
-          {routes.call ? routeButton("call", "Call") : null}
-          {routes.text ? routeButton("text", "Text") : null}
-          {routes.email ? routeButton("email", "Email") : null}
+          {selecting ? (
+            <EndpointSelector
+              type={selecting === "email" ? "email" : "phone"}
+              endpoints={
+                methodGroups[selecting === "email" ? "email" : "phone"]
+              }
+              onCancel={() => setSelecting(null)}
+              onPick={(endpoint) => {
+                void launch(selecting, endpoint.canonical_value);
+              }}
+            />
+          ) : (
+            <>
+              {routes.call ? routeButton("call", "Call") : null}
+              {routes.text ? routeButton("text", "Text") : null}
+              {routes.email ? routeButton("email", "Email") : null}
+            </>
+          )}
         </View>
       </View>
     </Modal>
