@@ -8,6 +8,7 @@ import { listContactMethods } from "@/db/contact-methods-dao";
 import { setContactPhoto } from "@/db/contacts-dao";
 import { getExecutor, localDateTime } from "@/db/database";
 import { getReviewedSnapshots, upsertReviewedSnapshotCore } from "@/db/reconcile-snapshot-dao";
+import { finalizeSessionIfTerminal, markCardStatusCore } from "@/db/reconcile-session-dao";
 import { inWriteTransaction } from "@/db/transaction";
 import { classifyReconciliation, type ReconcileDiffResult, type ReconcileFieldDiff, type ReconcileSource } from "@/logic/reconcile-diff";
 import type { RootStackScreenProps } from "@/navigation/types";
@@ -22,7 +23,7 @@ interface ScanState { diff: ReconcileDiffResult; sourcePhotoUri: string | null; 
 /** Per-contact thin reconciliation flow. Durable card-status wiring arrives with the grid. */
 export function ReconcileDetailScreen({ navigation, route }: RootStackScreenProps<"ReconcileDetail">) {
   const { colors } = useTheme();
-  const { contactId } = route.params;
+  const { contactId, sessionId, cardId } = route.params;
   const [scan, setScan] = useState<ScanState | null>(null);
   const [choices, setChoices] = useState<Partial<Record<string, Choice>>>( {} );
   const [message, setMessage] = useState<string | null>(null);
@@ -91,6 +92,21 @@ export function ReconcileDetailScreen({ navigation, route }: RootStackScreenProp
             for (const externalContactLinkId of result.pendingPhoto!.sourceLinkIds) await upsertReviewedSnapshotCore(exec, { externalContactLinkId, fieldFamily: "photo", reviewedValue: result.pendingPhoto!.photoContentHash ?? null, reviewedAt: now });
           });
         } finally { deleteReconcileStaging(result.pendingPhoto.stagedPhotoRelative); }
+      }
+      if (cardId != null && sessionId != null) {
+        const remaining = result.staleFields.length;
+        await inWriteTransaction(exec, () =>
+          markCardStatusCore(
+            exec,
+            cardId,
+            remaining === 0
+              ? (scan.diff.missingSource ? "missing_source" : "resolved")
+              : "partial",
+            remaining,
+            now,
+          ),
+        );
+        await finalizeSessionIfTerminal(exec, sessionId, now);
       }
       if (result.staleFields.length) { setMessage("Orbit changed while this was open. Review the highlighted fields again."); await load(); }
       else { setMessage("Changes applied."); }

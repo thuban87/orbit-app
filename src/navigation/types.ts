@@ -129,6 +129,9 @@ export type RootStackParamList = {
   MergeConflicts: { survivorId: number; absorbedId: number };
   MergeImpactSummary: { survivorId: number; absorbedId: number; resolutions: MergeResolutions };
   ReconcileDetail: { contactId: number; sessionId?: number; cardId?: number };
+  /** Bulk linked-contact reconciliation; an id is supplied by later resume flow. */
+  ReconcileGrid: { sessionId?: number } | undefined;
+  ReconcileComplete: { sessionId: number };
 };
 
 /**

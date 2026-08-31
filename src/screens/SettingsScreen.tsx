@@ -39,6 +39,7 @@ import {
 import { getContactHeader } from "@/db/contact-read";
 import { getExecutor, localDateTime } from "@/db/database";
 import { getProfile } from "@/db/profile-dao";
+import { getNewestPendingReconcileSessionId } from "@/db/reconcile-session-read";
 import { listSunCandidates, type SunCandidate } from "@/db/sun-picker-read";
 import { sunOccupantIsSelf } from "@/logic/sun-occupant-logic";
 import type { RootStackParamList } from "@/navigation/types";
@@ -161,6 +162,24 @@ export function SettingsScreen() {
       });
     } catch {
       Alert.alert("Couldn't import contacts", "Please try again.");
+    }
+  }, [navigation]);
+
+  const onCheckLinkedContacts = useCallback(async () => {
+    try {
+      const pendingId = await getNewestPendingReconcileSessionId(getExecutor());
+      if (pendingId !== null) {
+        // Resume/Discard owns its prompt in Plan 20-05. Until then, failing
+        // closed is safer than creating a second session that hides this work.
+        Alert.alert(
+          "Finish your existing check",
+          "You have an unfinished linked contacts check. Resume or discard it before starting another one.",
+        );
+        return;
+      }
+      navigation.navigate("ReconcileGrid");
+    } catch {
+      Alert.alert("Couldn't check linked contacts", "Please try again.");
     }
   }, [navigation]);
 
@@ -728,6 +747,23 @@ export function SettingsScreen() {
           </View>
           <Text style={[styles.helper, { color: colors.textSecondary }]}>
             Used to format phone numbers entered without a country code.
+          </Text>
+        </Pressable>
+        <Pressable
+          testID="settings-check-linked-contacts-row"
+          accessibilityRole="button"
+          accessibilityLabel="Check linked contacts"
+          onPress={() => void onCheckLinkedContacts()}
+          style={[
+            styles.row,
+            { backgroundColor: colors.surface, borderColor: colors.border },
+          ]}
+        >
+          <Text style={[styles.rowLabel, { color: colors.textPrimary }]}>
+            Check linked contacts
+          </Text>
+          <Text style={[styles.helper, { color: colors.textSecondary }]}>
+            Review changes from linked people in your phone.
           </Text>
         </Pressable>
       </View>

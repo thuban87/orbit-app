@@ -13,13 +13,16 @@ import {
   ConfidenceChip,
   type ConfidenceOutcome,
 } from "@/components/ConfidenceChip";
+import { isBulkActionAvailable } from "@/components/candidate-card-grid-actions";
 import { useTheme } from "@/theme";
 
 export type BulkAction =
   | "link"
   | "import-new"
   | "skip"
-  | "apply-recommendation";
+  | "apply-recommendation"
+  | "keep-orbit"
+  | "use-contact-values";
 
 export interface CandidateChoice {
   contactId: number;
@@ -36,6 +39,8 @@ export interface CandidateItem {
   /** A caller-resolved file URI. Raw stored photo paths must never be supplied here. */
   photoUri: string | null;
   candidates?: CandidateChoice[];
+  /** Reconciliation supplies advisory copy instead of import-match copy. */
+  chipLabel?: string;
 }
 
 interface CandidateCardGridProps {
@@ -49,6 +54,13 @@ interface CandidateCardGridProps {
   /** Generic Phase 20 safety contract: recommendation never resolves these items. */
   recommendationExcludes: "needs_review";
   scoring?: boolean;
+  /** Defaults to import copy so existing import callers stay unchanged. */
+  scoringLabel?: string;
+  /** Evaluated against this component's own live selection. */
+  isActionEligible?: (
+    action: BulkAction,
+    selectedItems: readonly CandidateItem[],
+  ) => boolean;
 }
 
 const actionLabels: Record<BulkAction, string> = {
@@ -56,6 +68,8 @@ const actionLabels: Record<BulkAction, string> = {
   "import-new": "Import as New",
   skip: "Skip",
   "apply-recommendation": "Apply recommendation",
+  "keep-orbit": "Keep Orbit Values",
+  "use-contact-values": "Use Contact Values",
 };
 
 export function CandidateCardGrid({
@@ -65,6 +79,8 @@ export function CandidateCardGrid({
   onBulkAction,
   recommendationExcludes,
   scoring = false,
+  scoringLabel = "Checking for matches…",
+  isActionEligible,
 }: CandidateCardGridProps) {
   const { colors } = useTheme();
   const [selectedIds, setSelectedIds] = useState<Set<CandidateItem["id"]>>(
@@ -94,6 +110,10 @@ export function CandidateCardGrid({
   };
 
   const runBulkAction = async (action: BulkAction) => {
+    if (!isBulkActionAvailable(action, selectedItems, isActionEligible)) {
+      setActionsOpen(false);
+      return;
+    }
     const targets =
       action === "apply-recommendation"
         ? selectedItems.filter(
@@ -125,7 +145,7 @@ export function CandidateCardGrid({
     return (
       <View style={styles.progress}>
         <Text style={{ color: colors.textSecondary }}>
-          Checking for matches…
+          {scoringLabel}
         </Text>
       </View>
     );
@@ -184,7 +204,18 @@ export function CandidateCardGrid({
               >
                 {item.name}
               </Text>
-              <ConfidenceChip outcome={item.outcome} />
+              {item.chipLabel ? (
+                <View
+                  accessibilityLabel={item.chipLabel}
+                  style={[styles.chip, { backgroundColor: colors.surfaceElevated }]}
+                >
+                  <Text style={[styles.chipLabel, { color: colors.textSecondary }]}>
+                    {item.chipLabel}
+                  </Text>
+                </View>
+              ) : (
+                <ConfidenceChip outcome={item.outcome} />
+              )}
               <Text
                 numberOfLines={1}
                 ellipsizeMode="tail"
@@ -244,7 +275,11 @@ export function CandidateCardGrid({
               },
             ]}
           >
-            {bulkActions.map((action) => (
+            {bulkActions
+              .filter((action) =>
+                isBulkActionAvailable(action, selectedItems, isActionEligible),
+              )
+              .map((action) => (
               <Pressable
                 key={action}
                 accessibilityRole="button"
@@ -255,7 +290,7 @@ export function CandidateCardGrid({
                   {actionLabels[action]}
                 </Text>
               </Pressable>
-            ))}
+              ))}
           </View>
         </View>
       </Modal>
@@ -278,6 +313,13 @@ const styles = StyleSheet.create({
   photo: { width: 48, height: 48, borderRadius: 24 },
   name: { fontSize: 15, fontWeight: "400" },
   hint: { fontSize: 13, fontWeight: "400" },
+  chip: {
+    alignSelf: "flex-start",
+    borderRadius: 10,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  chipLabel: { fontSize: 13, fontWeight: "600" },
   error: { fontSize: 13, fontWeight: "600" },
   progress: { alignItems: "center", justifyContent: "center", minHeight: 120 },
   actionBar: {

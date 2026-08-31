@@ -28,6 +28,8 @@ import { SurvivorSelectScreen } from "@/screens/SurvivorSelectScreen";
 import { MergeConflictsScreen } from "@/screens/MergeConflictsScreen";
 import { MergeImpactSummary } from "@/components/MergeImpactSummary";
 import { ReconcileDetailScreen } from "@/screens/ReconcileDetailScreen";
+import { ReconcileGridScreen } from "@/screens/ReconcileGridScreen";
+import { ReconcileCompleteScreen } from "@/screens/ReconcileCompleteScreen";
 import type { RootStackParamList, RootStackScreenProps } from "./types";
 
 /**
@@ -106,6 +108,8 @@ export function RootNavigator() {
       <Stack.Screen name="MergeConflicts" component={MergeConflictsScreen} />
       <Stack.Screen name="MergeImpactSummary" component={MergeImpactSummary} />
       <Stack.Screen name="ReconcileDetail" component={ReconcileDetailScreen} />
+      <Stack.Screen name="ReconcileGrid" component={ReconcileGridScreen} />
+      <Stack.Screen name="ReconcileComplete" component={ReconcileCompleteScreen} />
     </Stack.Navigator>
   );
 }
