@@ -14,6 +14,11 @@ import { newUid } from "@/db/uid";
 
 export type MergeChoice = "survivor" | "absorbed";
 
+/** Empty scalar values do not carry information worth preserving over an absorbed value. */
+function isEmptyMergeValue(value: string | number | null): boolean {
+  return value == null || (typeof value === "string" && value.trim() === "");
+}
+
 /** Explicit UI-to-writer contract, shared with the conflict-resolution screen. */
 export interface MergeResolutions {
   scalars?: Partial<Record<"name" | "categoryId" | "intervalDays" | "trackingEnabled" | "socialBattery" | "birthday" | "rarelyResponds" | "remindersOff", MergeChoice>>;
@@ -131,7 +136,13 @@ export async function mergeContacts(
     for (const other of absorbedValues) {
       const own = survivorValues.find((value) => value.field_def_id === other.field_def_id);
       if (!own) continue;
-      if (resolutions.customFields?.[other.field_def_id] === "absorbed") {
+      // An explicit choice always wins. In the absence of one, retain an
+      // informative absorbed value instead of replacing it with an empty survivor
+      // value during the child-row reparent below.
+      const takeAbsorbed = resolutions.customFields?.[other.field_def_id] === "absorbed" ||
+        (resolutions.customFields?.[other.field_def_id] == null &&
+          isEmptyMergeValue(own.value) && !isEmptyMergeValue(other.value));
+      if (takeAbsorbed) {
         await snapshot(exec, survivor.id, `custom_field:${other.field_def_id}`, own.value, "merge-overwritten", input.now);
         await upsertValueCore(exec, survivor.id, other.field_def_id, newUid(), other.value, input.now);
       }
@@ -147,11 +158,19 @@ export async function mergeContacts(
       ["name", "name", "name"], ["categoryId", "category_id", "categoryId"], ["intervalDays", "interval_days", "intervalDays"], ["trackingEnabled", "tracking_enabled", "trackingEnabled"], ["socialBattery", "social_battery", "socialBattery"], ["birthday", "birthday", "birthday"], ["rarelyResponds", "rarely_responds", "rarelyResponds"], ["remindersOff", "reminders_off", "remindersOff"],
     ];
     const next: UpdateContactFullInput = { id: survivor.id, name: survivor.name, categoryId: survivor.category_id, intervalDays: survivor.interval_days, trackingEnabled: survivor.tracking_enabled === 1, socialBattery: survivor.social_battery, birthday: survivor.birthday, rarelyResponds: survivor.rarely_responds, remindersOff: survivor.reminders_off, now: input.now };
-    for (const [resolutionKey, rowKey, inputKey] of fields) if (scalar[resolutionKey] === "absorbed") {
+    for (const [resolutionKey, rowKey, inputKey] of fields) {
+      // Explicit UI conflict resolutions remain authoritative. This fallback
+      // prevents conflict-free merges from discarding a populated absorbed value
+      // solely because the survivor stored a null/blank scalar.
+      const takeAbsorbed = scalar[resolutionKey] === "absorbed" ||
+        (scalar[resolutionKey] == null &&
+          isEmptyMergeValue(survivor[rowKey] as string | number | null) &&
+          !isEmptyMergeValue(absorbed[rowKey] as string | number | null));
+      if (!takeAbsorbed) continue;
       await snapshot(exec, survivor.id, String(resolutionKey), survivor[rowKey] as string | number | null, "merge-overwritten", input.now);
       (next as unknown as Record<string, unknown>)[inputKey] = absorbed[rowKey];
     }
-    if (Object.keys(scalar).length) await updateContactMetadataCore(exec, next);
+    if (Object.keys(scalar).length || fields.some(([resolutionKey, rowKey]) => scalar[resolutionKey] == null && isEmptyMergeValue(survivor[rowKey] as string | number | null) && !isEmptyMergeValue(absorbed[rowKey] as string | number | null))) await updateContactMetadataCore(exec, next);
     if (resolutions.photo && resolutions.photo !== "keep-survivor") await setContactPhotoCore(exec, survivor.id, resolutions.photo.relative, input.now);
 
     await exec.runAsync("UPDATE app_settings SET sun_contact_id = ?, modified_at = ? WHERE id = 1 AND sun_contact_id = ?", [survivor.id, input.now, absorbed.id]);

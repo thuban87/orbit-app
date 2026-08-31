@@ -57,6 +57,22 @@ describe("mergeContacts", () => {
     expect(await exec.getFirstAsync<{ value: string }>("SELECT value FROM custom_field_values WHERE contact_id = ?", [survivor])).toEqual({ value: "absorbed" });
   });
 
+  it("preserves populated absorbed scalar and custom values when the survivor is empty without a resolution", async () => {
+    const survivor = await contact("");
+    const absorbed = await contact("Absorbed name");
+    const def = await exec.runAsync("INSERT INTO custom_field_defs (uid, col_name, label, type, display_order, created_at, modified_at) VALUES (?, 'nickname', 'Nickname', 'text', 0, ?, ?)", [uid(), NOW, NOW]);
+    await exec.runAsync("INSERT INTO custom_field_values (uid, contact_id, field_def_id, value, created_at, modified_at) VALUES (?, ?, ?, '', ?, ?), (?, ?, ?, 'Absorbed nickname', ?, ?)", [uid(), survivor, def.lastInsertRowId, NOW, NOW, uid(), absorbed, def.lastInsertRowId, NOW, NOW]);
+
+    await mergeContacts(exec, { survivorId: survivor, absorbedId: absorbed, now: NOW });
+
+    expect(await exec.getFirstAsync<{ name: string }>("SELECT name FROM contacts WHERE id = ?", [survivor])).toEqual({ name: "Absorbed name" });
+    expect(await exec.getFirstAsync<{ value: string }>("SELECT value FROM custom_field_values WHERE contact_id = ? AND field_def_id = ?", [survivor, def.lastInsertRowId])).toEqual({ value: "Absorbed nickname" });
+    expect(await exec.getAllAsync<{ field_col_name: string; old_value: string | null }>("SELECT field_col_name, old_value FROM field_history WHERE contact_id = ? AND operation = 'merge-overwritten' ORDER BY field_col_name", [survivor])).toEqual([
+      { field_col_name: "custom_field:" + def.lastInsertRowId, old_value: "" },
+      { field_col_name: "name", old_value: "" },
+    ]);
+  });
+
   it("rejects self-merges without mutating a contact", async () => {
     const id = await contact("Only");
     await expect(mergeContacts(exec, { survivorId: id, absorbedId: id, now: NOW })).rejects.toThrow("cannot absorb itself");
