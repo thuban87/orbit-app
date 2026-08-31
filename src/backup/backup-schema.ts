@@ -103,8 +103,8 @@ function uidSet(rows: RawManifest[], label: string): Set<string> {
   return seen;
 }
 
-const PORTABLE_SETTINGS_KEYS = new Set([
-  "notificationsEnabled", "decayEnabled", "birthdayEnabled", "digestEnabled",
+export const PORTABLE_SETTINGS_KEYS = new Set([
+  "notificationsEnabled", "decayEnabled", "birthdayEnabled", "digestEnabled", "interactionAssistEnabled",
   "lockscreenPublic", "deliveryHour", "quietStartHour", "quietEndHour",
   "selfSunColour", "aiProvider", "aiModel", "aiCustomEndpoint", "aiCustomModel",
   "aiPromptTemplate", "backupIntervalDays", "backupRetentionDays", "modifiedAt",

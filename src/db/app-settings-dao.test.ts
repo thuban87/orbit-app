@@ -17,6 +17,7 @@
  * followed by `$`), and every reject input is a string the gate does not match.
  */
 import { beforeEach, describe, expect, it } from "vitest";
+import { PORTABLE_SETTINGS_KEYS } from "@/backup/backup-schema";
 import { nodeSqliteExecutor, openTestDb } from "@/db/__testkit__/node-sqlite";
 import {
   type AppSettings,
@@ -29,6 +30,7 @@ import {
   recordAutomaticBackupHealthCore,
   resolveEffectivePhoneRegion,
   SELF_SUN_COLOUR_RE,
+  setInteractionAssistEnabled,
   updateAppSettings,
   updateAppSettingsCore,
 } from "@/db/app-settings-dao";
@@ -43,6 +45,9 @@ import { migration008 } from "@/db/migrations/008-restore-photo-journal";
 import { migration009 } from "@/db/migrations/009-contact-method-normalization";
 import { migration010 } from "@/db/migrations/010-contact-method-label";
 import { migration011 } from "@/db/migrations/011-contact-lifecycle-schema";
+import { migration012 } from "@/db/migrations/012-import-sessions";
+import { migration013 } from "@/db/migrations/013-reconciliation-and-merge";
+import { migration014 } from "@/db/migrations/014-interaction-assists";
 import { runMigrations } from "@/db/migrations/runner";
 import { inWriteTransaction } from "@/db/transaction";
 import type { SqlExecutor } from "@/db/types";
@@ -81,7 +86,7 @@ async function migrateToV2(): Promise<void> {
 }
 
 /**
- * Bring a fresh in-memory DB to v7. The DAO selects the backup columns added by
+ * Bring a fresh in-memory DB to v14. The DAO selects the backup columns added by
  * migration 007, so every current-schema test needs the complete launch path.
  */
 async function migrateToV5(): Promise<void> {
@@ -99,8 +104,11 @@ async function migrateToV5(): Promise<void> {
       migration009,
       migration010,
       migration011,
+      migration012,
+      migration013,
+      migration014,
     ],
-    11,
+    14,
     { now: NOW, newUid },
   );
 }
@@ -258,6 +266,7 @@ describe("app-settings-dao — read", () => {
       birthdayEnabled: 1,
       // Digest defaults ON (migration 005, DGST-01).
       digestEnabled: 1,
+      interactionAssistEnabled: 1,
       lockscreenPublic: 0,
       deliveryHour: 9,
       quietStartHour: 21,
@@ -408,6 +417,7 @@ describe("app-settings-dao — validated write", () => {
       birthdayEnabled: 0,
       // Untouched by this patch — still the seeded default (ON).
       digestEnabled: 1,
+      interactionAssistEnabled: 1,
       lockscreenPublic: 1,
       deliveryHour: 6,
       quietStartHour: 22,
@@ -490,6 +500,46 @@ describe("app-settings-dao — validated write", () => {
     expect((await getAppSettings(exec)).digestEnabled).toBe(0);
     await updateAppSettings(exec, { digestEnabled: 1 }, LATER);
     expect((await getAppSettings(exec)).digestEnabled).toBe(1);
+  });
+
+  it("expires pending assists on opt-out, keeps them expired on re-enable, and bumps revision once per flip", async () => {
+    const contact = await exec.runAsync(
+      `INSERT INTO contacts (uid, name, interval_days, created_at, modified_at)
+       VALUES (?, ?, 30, ?, ?)`,
+      [newUid(), "Assist contact", NOW, NOW],
+    );
+    await exec.runAsync(
+      `INSERT INTO interaction_assists
+       (uid, contact_id, channel, endpoint_value, status, handoff_at, created_at, modified_at)
+       VALUES (?, ?, 'call', ?, 'pending', ?, ?, ?)`,
+      [newUid(), contact.lastInsertRowId, "+15551234567", NOW, NOW, NOW],
+    );
+    const before = await getAppSettings(exec);
+
+    await setInteractionAssistEnabled(exec, 0, LATER);
+    const afterOff = await getAppSettings(exec);
+    expect(afterOff.interactionAssistEnabled).toBe(0);
+    expect(afterOff.dataRevision).toBe(before.dataRevision + 1);
+    expect(await exec.getAllAsync("SELECT id FROM interactions")).toEqual([]);
+    expect(
+      await exec.getAllAsync<{ status: string }>(
+        "SELECT status FROM interaction_assists",
+      ),
+    ).toEqual([{ status: "expired" }]);
+
+    await setInteractionAssistEnabled(exec, 1, "2026-08-16 14:00:00");
+    const afterOn = await getAppSettings(exec);
+    expect(afterOn.interactionAssistEnabled).toBe(1);
+    expect(afterOn.dataRevision).toBe(afterOff.dataRevision + 1);
+    expect(
+      await exec.getAllAsync<{ status: string }>(
+        "SELECT status FROM interaction_assists",
+      ),
+    ).toEqual([{ status: "expired" }]);
+    expect(await getPortableSettingsSnapshot(exec)).toMatchObject({
+      interactionAssistEnabled: 1,
+    });
+    expect(PORTABLE_SETTINGS_KEYS).toContain("interactionAssistEnabled");
   });
 
   it("rejects a non-0/1 digestEnabled before any UPDATE (assertToggle guard, T-15-05)", async () => {
@@ -813,6 +863,7 @@ describe("app-settings-dao — portable backup projection and local bookkeeping"
     expect(snapshot).toMatchObject({
       notificationsEnabled: 0,
       digestEnabled: 1,
+      interactionAssistEnabled: 1,
       sunContactId: null,
       aiProvider: "none",
       aiModel: "",

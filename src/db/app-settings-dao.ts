@@ -47,6 +47,8 @@ export interface AppSettings {
    * backup-exportable as a settings row (migration 005, owner-ruled).
    */
   digestEnabled: 0 | 1;
+  /** User-controlled pending-confirmation queue. Defaults ON (migration 014). */
+  interactionAssistEnabled: 0 | 1;
   /** Lock-screen preview visibility — 0 (private) by default (OQ-2). */
   lockscreenPublic: 0 | 1;
   /** Hour-of-day (0-23) the daily digest fires. */
@@ -134,6 +136,7 @@ export interface PortableSettingsSnapshot {
   decayEnabled: 0 | 1;
   birthdayEnabled: 0 | 1;
   digestEnabled: 0 | 1;
+  interactionAssistEnabled: 0 | 1;
   lockscreenPublic: 0 | 1;
   deliveryHour: number;
   quietStartHour: number;
@@ -186,6 +189,7 @@ type WritableSettingsKey =
   | "decayEnabled"
   | "birthdayEnabled"
   | "digestEnabled"
+  | "interactionAssistEnabled"
   | "lockscreenPublic"
   | "deliveryHour"
   | "quietStartHour"
@@ -209,6 +213,7 @@ interface AppSettingsRow {
   decay_enabled: number;
   birthday_enabled: number;
   digest_enabled: number;
+  interaction_assist_enabled: number;
   lockscreen_public: number;
   delivery_hour: number;
   quiet_start_hour: number;
@@ -254,6 +259,7 @@ const TOGGLE_FIELDS: Array<keyof AppSettingsPatch> = [
   "decayEnabled",
   "birthdayEnabled",
   "digestEnabled",
+  "interactionAssistEnabled",
   "lockscreenPublic",
   "includeUnboundNeverContacted",
   "birthdayUnboundEnabled",
@@ -274,6 +280,7 @@ const COLUMN_OF: Record<WritableSettingsKey, string> = {
   decayEnabled: "decay_enabled",
   birthdayEnabled: "birthday_enabled",
   digestEnabled: "digest_enabled",
+  interactionAssistEnabled: "interaction_assist_enabled",
   lockscreenPublic: "lockscreen_public",
   deliveryHour: "delivery_hour",
   quietStartHour: "quiet_start_hour",
@@ -309,7 +316,7 @@ export function resolveEffectivePhoneRegion(
 export async function getAppSettings(exec: SqlExecutor): Promise<AppSettings> {
   const row = await exec.getFirstAsync<AppSettingsRow>(
     `SELECT notifications_enabled, decay_enabled, birthday_enabled,
-            digest_enabled, lockscreen_public, delivery_hour, quiet_start_hour,
+            digest_enabled, interaction_assist_enabled, lockscreen_public, delivery_hour, quiet_start_hour,
             quiet_end_hour,
             sun_contact_id, self_sun_colour, phone_region_override,
             include_unbound_never_contacted, birthday_unbound_enabled,
@@ -331,6 +338,7 @@ export async function getAppSettings(exec: SqlExecutor): Promise<AppSettings> {
     decayEnabled: (row.decay_enabled ? 1 : 0) as 0 | 1,
     birthdayEnabled: (row.birthday_enabled ? 1 : 0) as 0 | 1,
     digestEnabled: (row.digest_enabled ? 1 : 0) as 0 | 1,
+    interactionAssistEnabled: (row.interaction_assist_enabled ? 1 : 0) as 0 | 1,
     lockscreenPublic: (row.lockscreen_public ? 1 : 0) as 0 | 1,
     deliveryHour: row.delivery_hour,
     quietStartHour: row.quiet_start_hour,
@@ -386,6 +394,7 @@ export async function getPortableSettingsSnapshot(
       | "decay_enabled"
       | "birthday_enabled"
       | "digest_enabled"
+      | "interaction_assist_enabled"
       | "lockscreen_public"
       | "delivery_hour"
       | "quiet_start_hour"
@@ -406,7 +415,7 @@ export async function getPortableSettingsSnapshot(
     >
   >(
     `SELECT notifications_enabled, decay_enabled, birthday_enabled,
-            digest_enabled, lockscreen_public, delivery_hour, quiet_start_hour,
+            digest_enabled, interaction_assist_enabled, lockscreen_public, delivery_hour, quiet_start_hour,
             quiet_end_hour, sun_contact_id, self_sun_colour, phone_region_override,
             include_unbound_never_contacted, birthday_unbound_enabled,
             ai_provider, ai_model, ai_custom_endpoint, ai_custom_model,
@@ -425,6 +434,7 @@ export async function getPortableSettingsSnapshot(
     decayEnabled: (row.decay_enabled ? 1 : 0) as 0 | 1,
     birthdayEnabled: (row.birthday_enabled ? 1 : 0) as 0 | 1,
     digestEnabled: (row.digest_enabled ? 1 : 0) as 0 | 1,
+    interactionAssistEnabled: (row.interaction_assist_enabled ? 1 : 0) as 0 | 1,
     lockscreenPublic: (row.lockscreen_public ? 1 : 0) as 0 | 1,
     deliveryHour: row.delivery_hour,
     quietStartHour: row.quiet_start_hour,
@@ -603,6 +613,32 @@ export function updateAppSettings(
   validateAppSettingsPatch(patch);
   return inWriteTransaction(exec, async () => {
     await updateAppSettingsCore(exec, patch, now);
+    await bumpDataRevisionCore(exec);
+  });
+}
+
+/**
+ * Set the Interaction Assist preference and enforce the opt-out privacy
+ * boundary atomically. Disabling expires every pending confirmation; enabling
+ * deliberately never resurrects those rows. The core does not advance the
+ * revision itself, so this logical portable-settings operation owns one bump.
+ */
+export function setInteractionAssistEnabled(
+  exec: SqlExecutor,
+  enabled: 0 | 1,
+  now: string,
+): Promise<void> {
+  validateAppSettingsPatch({ interactionAssistEnabled: enabled });
+  return inWriteTransaction(exec, async () => {
+    await updateAppSettingsCore(exec, { interactionAssistEnabled: enabled }, now);
+    if (enabled === 0) {
+      await exec.runAsync(
+        `UPDATE interaction_assists
+            SET status = 'expired', resolved_at = ?, modified_at = ?
+          WHERE status = 'pending'`,
+        [now, now],
+      );
+    }
     await bumpDataRevisionCore(exec);
   });
 }
