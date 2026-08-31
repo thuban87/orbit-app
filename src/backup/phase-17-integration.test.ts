@@ -149,6 +149,10 @@ describe("Phase 17 composed backup regressions", () => {
       // unresolved rows and their staged photos; imported contacts remain durable
       // domain data and are exported independently of their session metadata.
       ["import_session_rows", "device-local import workflow state"],
+      // Reconciliation cards are device-local review workflow state. A merge
+      // explicitly discards cards for its absorbed contact, then re-finalizes the
+      // owning session by its remaining non-terminal card count.
+      ["reconciliation_session_cards", "device-local reconciliation workflow state"],
     ]);
     for (const table of writers) {
       expect(

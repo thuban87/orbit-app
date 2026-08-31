@@ -107,6 +107,10 @@ const CADENCE_OWNERS: Record<string, LedgerEntry> = {
     owner: "18.2-09",
     note: "Exports the nullable interval_days column in the portable graph.",
   },
+  "src/db/merge-dao.ts": {
+    owner: "20-01",
+    note: "The atomic merge snapshot carries nullable interval_days into the full survivor update input; it preserves either contact's stored dormant cadence rather than performing cadence arithmetic.",
+  },
   "src/db/benchmark.ts": {
     owner: "AUDITED",
     note: "Perf fixture writer; supplies a POSITIVE cadence on insert, so its STATUS_SCAN use inherits the updated fragment precondition and cannot observe a null-cadence row.",
