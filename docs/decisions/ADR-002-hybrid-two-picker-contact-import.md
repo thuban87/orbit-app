@@ -1,6 +1,6 @@
 # ADR-002: Cross-Version Contact Import — Hybrid Two-Picker
 
-- **Status:** Accepted — 2026-08
+- **Status:** Accepted — 2026-08 · **Superseded in part by [ADR-003](./ADR-003-read-contacts-on-api37-for-reconcile.md) (2026-08-31):** the "API 37+ = no `READ_CONTACTS`" clause and the `maxSdkVersion="36"` cap are lifted **for the Phase-20 reconcile re-read**. This ADR's two-picker *import* design is unchanged.
 - **Decision scope:** Phase 19.1 / contact acquisition (reverses the Phase-19 "Android 17+ picker only, no `READ_CONTACTS`" locked decision)
 
 ## Context

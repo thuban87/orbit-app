@@ -16,6 +16,7 @@ import type { RootStackScreenProps } from "@/navigation/types";
 import { deleteReconcileStaging, resolveReconcileStagingUri } from "@/services/photos/photo-storage";
 import { promoteReconcilePhoto, reconcilePhotoFs, stageReconcileSourcePhoto } from "@/services/photos/reconcile-photo";
 import { useTheme } from "@/theme";
+import { ensureReadContactsPermission, openContactsSettings } from "@/services/contacts/use-read-contacts-permission";
 import { pickContacts, readAllContacts, type PickedContact } from "../../modules/orbit-contact-picker";
 
 type Choice = "orbit" | "source";
@@ -29,10 +30,11 @@ export function ReconcileDetailScreen({ navigation, route }: RootStackScreenProp
   const [scan, setScan] = useState<ScanState | null>(null);
   const [choices, setChoices] = useState<Partial<Record<string, Choice>>>({});
   const [message, setMessage] = useState<string | null>(null);
+  const [needsContactsAccess, setNeedsContactsAccess] = useState(false);
   const [applying, setApplying] = useState(false);
 
   const load = useCallback(async () => {
-    setScan(null); setMessage(null);
+    setScan(null); setMessage(null); setNeedsContactsAccess(false);
     const exec = getExecutor();
     const [contact, links, methods] = await Promise.all([
       exec.getFirstAsync<{ name: string; birthday: string | null; photo: string | null; modified_at: string }>("SELECT name, birthday, photo, modified_at FROM contacts WHERE id = ?", [contactId]),
@@ -40,6 +42,15 @@ export function ReconcileDetailScreen({ navigation, route }: RootStackScreenProp
       listContactMethods(exec, contactId),
     ]);
     if (!contact || links.length === 0) { setMessage("No linked Contacts source is available."); return; }
+    // ADR-003: reconcile reads ContactsContract directly; ensure READ_CONTACTS first (in-context of this tap).
+    const access = await ensureReadContactsPermission();
+    if (!access.granted) {
+      setNeedsContactsAccess(true);
+      setMessage(access.verdict === "permanent"
+        ? "Orbit needs Contacts access to check for changes. Enable it in Settings."
+        : "Orbit needs Contacts access to check for changes.");
+      return;
+    }
     const read = await readAllContacts(links.map((link) => link.external_contact_id));
     const pickedByKey = new Map(read.contacts.map((picked) => [picked.lookupKey, picked]));
     const firstPhoto = links.map((link) => ({ link, picked: pickedByKey.get(link.external_contact_id) })).find((item): item is { link: ActiveLink; picked: PickedContact } => item.picked?.photoTempUri != null);
@@ -128,7 +139,7 @@ export function ReconcileDetailScreen({ navigation, route }: RootStackScreenProp
   }, [choices, contactId, load, scan, cardId, sessionId]);
 
   const unresolved = scan?.diff.fields.some((field) => field.outcome === "conflict" && !choices[field.fieldFamily]);
-  if (!scan) return <View style={[styles.root, { backgroundColor: colors.background }]}><Text style={[styles.title, { color: colors.textPrimary }]}>Update from Contacts</Text>{message ? <Text style={{ color: colors.textSecondary }}>{message}</Text> : <ActivityIndicator color={colors.accent} />}</View>;
+  if (!scan) return <View style={[styles.root, { backgroundColor: colors.background }]}><Text style={[styles.title, { color: colors.textPrimary }]}>Update from Contacts</Text>{message ? <Text style={{ color: colors.textSecondary }}>{message}</Text> : <ActivityIndicator color={colors.accent} />}{needsContactsAccess ? <Pressable onPress={() => { void openContactsSettings(); }} style={[styles.action, { borderColor: colors.border }]}><Text style={{ color: colors.textPrimary }}>Open Settings</Text></Pressable> : null}</View>;
   if (scan.diff.missingSource) return <View style={[styles.root, { backgroundColor: colors.background }]}><View style={styles.header}><Pressable onPress={() => navigation.goBack()}><Text style={{ color: colors.textSecondary }}>Back</Text></Pressable><Text style={[styles.title, { color: colors.textPrimary }]}>Update from Contacts</Text></View><View style={styles.missingSource}><View style={[styles.chip, { backgroundColor: colors.surfaceElevated }]}><Text style={[styles.chipLabel, { color: colors.textSecondary }]}>Source missing</Text></View><Text style={[styles.missingBody, { color: colors.textSecondary }]}>This linked phone contact is no longer available. Your Orbit contact and relationship history stay unchanged.</Text><Pressable disabled={applying} onPress={() => void keepMissingSource()} style={[styles.action, { borderColor: colors.border }]}><Text style={{ color: colors.textPrimary }}>Keep as is</Text></Pressable><Pressable disabled={applying} onPress={() => void relinkMissingSource()} style={[styles.action, { borderColor: colors.border }]}><Text style={{ color: colors.textPrimary }}>Relink to another contact</Text></Pressable><Pressable disabled={applying} onPress={() => void unlinkMissingSource()} style={[styles.action, { borderColor: colors.danger }]}><Text style={{ color: colors.danger }}>Unlink source</Text></Pressable>{message ? <Text style={{ color: colors.textSecondary }}>{message}</Text> : null}</View></View>;
   return <View style={[styles.root, { backgroundColor: colors.background }]}><View style={styles.header}><Pressable onPress={() => navigation.goBack()}><Text style={{ color: colors.textSecondary }}>Back</Text></Pressable><Text style={[styles.title, { color: colors.textPrimary }]}>Update from Contacts</Text><Pressable onPress={() => navigation.navigate("SurvivorSelect", { firstContactId: contactId })}><Text style={{ color: colors.textSecondary }}>Merge with another contact</Text></Pressable></View><ScrollView contentContainerStyle={styles.content}>{scan.diff.fields.map((field) => field.fieldFamily === "photo" ? <PhotoChoice key="photo" options={[{ id: "source", uri: scan.sourcePhotoUri, name: "Contacts photo", provenance: "Contacts" }]} mode={field.outcome === "conflict" ? "conflict" : "additive"} selectedId={choices.photo === "source" ? "source" : KEEP_ORBIT_PHOTO} onChange={(value) => setChoices((current) => ({ ...current, photo: value === "source" ? "source" : "orbit" }))} /> : <ChoiceRow key={field.fieldFamily} field={field} choice={choices[field.fieldFamily]} onChoice={(choice) => setChoices((current) => ({ ...current, [field.fieldFamily]: choice }))} />)}{message ? <Text style={{ color: colors.textSecondary }}>{message}</Text> : null}<Pressable disabled={unresolved || applying} onPress={() => void apply()} style={[styles.apply, { backgroundColor: colors.accent, opacity: unresolved || applying ? 0.5 : 1 }]}><Text style={{ color: colors.background }}>{applying ? "Applying…" : "Apply"}</Text></Pressable></ScrollView></View>;
 }

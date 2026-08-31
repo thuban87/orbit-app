@@ -127,6 +127,23 @@ export async function requestContactsPermission(): Promise<ContactsPermissionReq
   }
 }
 
+/**
+ * Ensure READ_CONTACTS before a reconcile re-read (ADR-003). Checks the OS-owned
+ * grant fresh; if absent, requests it once IN CONTEXT of the user's reconcile tap
+ * (Android-recommended). Returns whether the read may proceed plus the request
+ * verdict so a caller can distinguish a recoverable denial from a permanent one
+ * (to route to Settings). Reused by ReconcileDetailScreen and ReconcileGridScreen;
+ * import keeps its own permissionless-picker path.
+ */
+export async function ensureReadContactsPermission(): Promise<
+  ContactsPermissionResult & { verdict?: ContactsPermissionState["verdict"] }
+> {
+  const existing = await getContactsPermission();
+  if (existing.granted) return { granted: true, verdict: "granted" };
+  const requested = await requestContactsPermission();
+  return { granted: requested.granted, verdict: requested.verdict };
+}
+
 /** Open Orbit's app-info settings, with a calm fallback for unusual OEMs. */
 export async function openContactsSettings(): Promise<boolean> {
   try {

@@ -1,6 +1,6 @@
 import { useFocusEffect } from "@react-navigation/native";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 import { CandidateCardGrid, type CandidateItem } from "@/components/CandidateCardGrid";
 import { applyReconcileSelections, type ReconcileSelection } from "@/db/reconcile-apply";
 import { listContactMethods } from "@/db/contact-methods-dao";
@@ -28,6 +28,7 @@ import {
   type ReconcileSource,
 } from "@/logic/reconcile-diff";
 import type { RootStackScreenProps } from "@/navigation/types";
+import { ensureReadContactsPermission, openContactsSettings } from "@/services/contacts/use-read-contacts-permission";
 import { deleteReconcileStaging } from "@/services/photos/photo-storage";
 import { stageReconcileSourcePhoto } from "@/services/photos/reconcile-photo";
 import { useTheme } from "@/theme";
@@ -110,6 +111,7 @@ export function ReconcileGridScreen({ navigation, route }: RootStackScreenProps<
   const [cards, setCards] = useState<GridCard[]>([]);
   const [scoring, setScoring] = useState(route.params?.sessionId == null);
   const [message, setMessage] = useState<string | null>(null);
+  const [needsContactsAccess, setNeedsContactsAccess] = useState(false);
 
   const refreshCards = useCallback(async (id: number) => {
     const rows = await listReconcileSessionCards(getExecutor(), id);
@@ -128,7 +130,7 @@ export function ReconcileGridScreen({ navigation, route }: RootStackScreenProps<
 
   const scan = useCallback(async () => {
     const exec = getExecutor();
-    setScoring(true); setMessage(null);
+    setScoring(true); setMessage(null); setNeedsContactsAccess(false);
     const contacts = await exec.getAllAsync<LinkedContact>(
       `SELECT c.id, c.name, c.birthday, c.photo, c.modified_at
        FROM contacts c
@@ -140,6 +142,18 @@ export function ReconcileGridScreen({ navigation, route }: RootStackScreenProps<
       `SELECT id, contact_id, external_contact_id, provider
        FROM external_contact_links WHERE is_active = 1 ORDER BY contact_id, id`,
     );
+    // ADR-003: reconcile reads ContactsContract directly — ensure READ_CONTACTS first.
+    if (links.length > 0) {
+      const access = await ensureReadContactsPermission();
+      if (!access.granted) {
+        setNeedsContactsAccess(true);
+        setMessage(access.verdict === "permanent"
+          ? "Orbit needs Contacts access to check linked contacts. Enable it in Settings."
+          : "Orbit needs Contacts access to check linked contacts.");
+        setScoring(false);
+        return;
+      }
+    }
     const sourceRead = await readAllContacts(links.map((link) => link.external_contact_id));
     const pickedByKey = new Map(sourceRead.contacts.map((picked) => [picked.lookupKey, picked]));
     const linksByContact = new Map<number, Link[]>();
@@ -267,6 +281,7 @@ export function ReconcileGridScreen({ navigation, route }: RootStackScreenProps<
   return <View style={[styles.root, { backgroundColor: colors.background }]}>
     <Text style={[styles.title, { color: colors.textPrimary }]}>Check linked contacts</Text>
     {message ? <Text style={[styles.message, { color: colors.textSecondary }]}>{message}</Text> : null}
+    {needsContactsAccess ? <Pressable onPress={() => { void openContactsSettings(); }} style={[styles.settingsButton, { borderColor: colors.border }]}><Text style={{ color: colors.textPrimary }}>Open Settings</Text></Pressable> : null}
     <CandidateCardGrid
       items={items}
       bulkActions={["apply-recommendation", "keep-orbit", "use-contact-values"]}
@@ -280,4 +295,4 @@ export function ReconcileGridScreen({ navigation, route }: RootStackScreenProps<
   </View>;
 }
 
-const styles = StyleSheet.create({ root: { flex: 1 }, title: { fontSize: 24, fontWeight: "700", paddingHorizontal: 16, paddingTop: 16 }, message: { fontSize: 14, paddingHorizontal: 16, paddingTop: 8 } });
+const styles = StyleSheet.create({ root: { flex: 1 }, title: { fontSize: 24, fontWeight: "700", paddingHorizontal: 16, paddingTop: 16 }, message: { fontSize: 14, paddingHorizontal: 16, paddingTop: 8 }, settingsButton: { marginHorizontal: 16, marginTop: 12, borderWidth: 1, borderRadius: 8, paddingVertical: 10, alignItems: "center" } });

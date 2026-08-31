@@ -1,7 +1,15 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-  <uses-permission
-    android:name="android.permission.READ_CONTACTS"
-    android:maxSdkVersion="36" />
+  <!--
+    READ_CONTACTS applies on ALL supported API levels, INCLUDING API 37+.
+    ADR-003 (supersedes ADR-002's API-37 "no READ_CONTACTS" clause / the former
+    maxSdkVersion="36" cap) for the Phase-20 reconcile RE-READ: reconcile reads the
+    live state of an already-linked set via ContactsContract, which the permissionless
+    system picker cannot serve. IMPORT still uses the permissionless picker (≥37) /
+    in-app picker (≤36). Requested in-context via ensureReadContactsPermission before a
+    reconcile read. Play: file the Contacts declaration (CRM / Contact Management) at
+    release — see ADR-003.
+  -->
+  <uses-permission android:name="android.permission.READ_CONTACTS" />
   <!--
     Package-visibility (Android 11+) declaration for the system contact picker.
     Without this, targetSdk 36 filtering hides `com.android.contactspicker` from
