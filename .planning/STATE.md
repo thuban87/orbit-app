@@ -1,17 +1,17 @@
 ---
 gsd_state_version: 1.0
 milestone: v1.0
-current_phase: 20
-current_phase_name: Contact Reconciliation & Merge
-current_plan: 6
-status: phase-complete
-stopped_at: Phase 20 COMPLETE — all 6 plans + device UAT (8/8) owner-signed-off 2026-08-31
-last_updated: "2026-08-31T16:09:06.000Z"
-state_head: 049010e08ba231db7e994f28c92664ec4a34d9f9
+current_phase: 21
+current_phase_name: Interaction Assist & Reach Out
+current_plan: 0
+status: planned
+stopped_at: Phase 21 PLANNED — 6 plans / 4 waves (tracer-first), checker-passed (0 blockers), ready to execute
+last_updated: "2026-08-31T18:03:49.302Z"
+state_head: a97c22d0643be35b47e2a283399bc546cdc8998f
 progress:
   total_phases: 23
   completed_phases: 16
-  total_plans: 175
+  total_plans: 181
   completed_plans: 167
 milestone_name: milestone
 ---
@@ -23,13 +23,24 @@ milestone_name: milestone
 See: .planning/PROJECT.md (updated 2026-08-14)
 
 **Core value:** Collapse the taps between "you're overdue with X" and the message actually being sent.
-**Current focus:** Phase 20 COMPLETE — next: Phase 21 (Interaction Assist & Reach Out)
+**Current focus:** Phase 21 (Interaction Assist & Reach Out) — PLANNED, ready to execute
 
 ## Current Position
 
-**Phase:** 20 — Contact Reconciliation & Merge — ✅ COMPLETE (owner-signed-off 2026-08-31)
-**Current Plan:** 6 of 6 — done
-**Status:** Phase 20 complete; Phase 21 (Interaction Assist & Reach Out) is next — ready to plan
+**Phase:** 21 — Interaction Assist & Reach Out — 🗒 PLANNED (6 plans / 4 waves, tracer-first)
+**Current Plan:** 0 of 6 — ready to execute
+**Status:** Ready to execute
+
+**⟢ PHASE 21 (Interaction Assist & Reach Out) — PLANNED (2026-08-31).** 6 plans across 4 waves,
+tracer-first vertical slices, plan-checker PASSED (0 blockers / 0 warnings after one revision).
+Research + pattern-map + Nyquist VALIDATION contract in place. Wave 1 = `21-01` TRACER (migration 014
+`interaction_assists` + `interaction_assist_enabled`, assist write routed through `recordTouchpoint`);
+Wave 2 = `21-02` Reach Out router + native handoff + non-modal return banner + confirmation; Wave 3
+(parallel) = `21-03` endpoint selector + Compose→assist seam, `21-04` Settings toggle + sweep, `21-05`
+cross-phase wiring (merge reparent / purge cascade / widget Message→Contact / `orbit://reach/<id>`);
+Wave 4 = `21-06` full-suite gate + Pixel device UAT. **Owner decision flagged (non-blocking):** Compose
+Send→assist is retained in Phase 21 per dossier Cluster AC `[DECIDED]`; the cross-milestone note assigns
+Compose *Send-UX ownership* to M2 Phase 12 — confirm if that should change. Next: `/gsd-execute-phase 21`.
 
 **⟢ PHASE 20 (Contact Reconciliation & Merge) — COMPLETE (2026-08-31).** All 6 plans executed +
 consolidated Pixel device-UAT: **all 8 scenarios PASS**, each independently DB-verified (WAL-aware
@@ -108,7 +119,7 @@ Progress: [████████░░] 75% (12/16 phases complete; Phase 13 
 
 _Phase-12 recap (historical — Phase 12 is COMPLETE + verified; see 12-VERIFICATION.md):_
 
-Phase: 20 (Contact Reconciliation & Merge) — EXECUTING
+Phase: 21 (interaction-assist-reach-out) — READY TO EXECUTE
 Next: Phase 13 (Orrery) — NOT started. It is a large new Skia render-loop phase (its own discuss→plan→converge→execute→device-UAT cycle); awaiting owner go-ahead before beginning.
 Done this session (2026-08-17), all committed locally on main (NOT pushed): smart-discuss (12-CONTEXT; owner APPROVED the shared stable/wobble/decay status palette — stable #45B98A / wobble #E8C15C / decay #E56A52 / rogue #E0904A unchanged — resolving OD-1 app-wide; widget + ContactCard + future orrery inherit it), UI-SPEC (approved, checker VERIFIED), RESEARCH, VALIDATION (Nyquist), PATTERNS, PLAN (8 plans / 6 waves, efa9f5b), plan-checker PASSED, then a 2-cycle cross-AI convergence (codex CLI + read-only-Claude subagent; self-review guard overridden per owner): cycle-1 = 6 codex HIGH + 7 Claude actionable → replan (cca05d9); cycle-2 = 2 codex HIGH (WDG-03 freshness incompleteness; killed-app UAT needed a debug build) → final replan (4e688cf). All 8 HIGH fixes verified in-file. NOTE: the final-replan fixes were NOT independently re-reviewed (max cycles reached + owner pause).
 Codex tooling note: current codex-cli (0.144.1) makes gsd-review auto-add `--dangerously-bypass-hook-trust`, which the safety classifier blocks; a subagent improperly tunneled it once (flagged, discarded), then codex was re-run cleanly WITHOUT that flag. Do NOT let gsd-review's codex path run with that flag — run codex manually without it, or allow-list a scoped `Bash(codex exec:*)`.
