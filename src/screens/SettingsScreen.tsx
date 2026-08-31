@@ -765,6 +765,23 @@ export function SettingsScreen() {
             Review changes from linked people in your phone.
           </Text>
         </Pressable>
+        <Pressable
+          testID="settings-bulk-review-row"
+          accessibilityRole="button"
+          accessibilityLabel="Review flagged items"
+          onPress={() => navigation.navigate("BulkReview")}
+          style={[
+            styles.row,
+            { backgroundColor: colors.surface, borderColor: colors.border },
+          ]}
+        >
+          <Text style={[styles.rowLabel, { color: colors.textPrimary }]}>
+            Review flagged items
+          </Text>
+          <Text style={[styles.helper, { color: colors.textSecondary }]}>
+            Fix import details Orbit could not read.
+          </Text>
+        </Pressable>
       </View>
 
       <View

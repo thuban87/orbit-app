@@ -125,9 +125,15 @@ export type RootStackParamList = {
   ImportProgress: { sessionId: number; batchCategoryId: number | null };
   DuplicateReview: { sessionId: number };
   ImportComplete: { sessionId: number };
+  /** Durable resolver for import rows whose birthdays could not be parsed. */
+  BulkReview: undefined;
   SurvivorSelect: { firstContactId: number; secondContactId?: number };
   MergeConflicts: { survivorId: number; absorbedId: number };
-  MergeImpactSummary: { survivorId: number; absorbedId: number; resolutions: MergeResolutions };
+  MergeImpactSummary: {
+    survivorId: number;
+    absorbedId: number;
+    resolutions: MergeResolutions;
+  };
   ReconcileDetail: { contactId: number; sessionId?: number; cardId?: number };
   /** Bulk linked-contact reconciliation; an id is supplied by later resume flow. */
   ReconcileGrid: { sessionId?: number } | undefined;

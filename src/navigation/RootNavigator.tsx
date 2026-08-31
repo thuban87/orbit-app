@@ -3,6 +3,7 @@ import { ArchivedContactsScreen } from "@/screens/ArchivedContactsScreen";
 import { BackupScreen } from "@/screens/BackupScreen";
 import { BackupSettingsScreen } from "@/screens/BackupSettingsScreen";
 import { BulkImportSetupScreen } from "@/screens/BulkImportSetupScreen";
+import { BulkReviewScreen } from "@/screens/BulkReviewScreen";
 import { CaptureScreen } from "@/screens/CaptureScreen";
 import { ComposeScreen } from "@/screens/ComposeScreen";
 import { ContactProfileScreen } from "@/screens/ContactProfileScreen";
@@ -104,12 +105,16 @@ export function RootNavigator() {
       <Stack.Screen name="ImportProgress" component={ImportProgressScreen} />
       <Stack.Screen name="DuplicateReview" component={DuplicateReviewScreen} />
       <Stack.Screen name="ImportComplete" component={ImportCompleteScreen} />
+      <Stack.Screen name="BulkReview" component={BulkReviewScreen} />
       <Stack.Screen name="SurvivorSelect" component={SurvivorSelectScreen} />
       <Stack.Screen name="MergeConflicts" component={MergeConflictsScreen} />
       <Stack.Screen name="MergeImpactSummary" component={MergeImpactSummary} />
       <Stack.Screen name="ReconcileDetail" component={ReconcileDetailScreen} />
       <Stack.Screen name="ReconcileGrid" component={ReconcileGridScreen} />
-      <Stack.Screen name="ReconcileComplete" component={ReconcileCompleteScreen} />
+      <Stack.Screen
+        name="ReconcileComplete"
+        component={ReconcileCompleteScreen}
+      />
     </Stack.Navigator>
   );
 }
