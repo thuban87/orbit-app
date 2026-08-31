@@ -514,22 +514,31 @@ notification-tap path (CMP-02); only the widget stops emitting it.
 | A4 | Purge removal via `ON DELETE CASCADE` (assists excluded from tombstones as operational state). Dossier blesses "cascade-delete OR explicit deletion." | Runtime State Inventory | Low — dossier Cluster AB explicitly permits cascade. A purge-dao test must assert removal either way. |
 | A5 | The widget deep-link opens the router by resetting onto [Home, Profile/target] which auto-opens the router (vs a dedicated route). | Widget example | Low — nav-shape detail; the guard + allow-list are the load-bearing parts. Planner picks the exact route. |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
-1. **Exact nav target for `orbit://reach/<id>`**
+1. **Exact nav target for `orbit://reach/<id>`** — **RESOLVED: reset onto `[Home, Profile{contactId, openReachOut:true}]`, adopted in Plan 05 (Task 2).**
    - What we know: allow-list + `WidgetNavIntent` + guard must be extended (`widget-linking.ts`).
    - What's unclear: whether the router opens via a Profile param, a dedicated route, or a shell-level
      intent consumed by the app-global router host.
    - Recommendation: reset onto `[Home, Profile{contactId, openReachOut:true}]` and have Profile open the
      shared router on that param — minimal new routing surface; reuses the guarded Profile open.
+   - **Resolution:** Adopted the recommendation. Plan 05 Task 2 adds the `WidgetNavIntent` variant that
+     resets onto `[Home, Profile{contactId, openReachOut:true}]`, adds `openReachOut?: boolean` to the
+     Profile route params (`types.ts`), and has `ContactProfileScreen` consume the param once on focus to
+     open the shared router.
 
-2. **Should Compose "Send" create an assist now, or is that M2 Phase 12's job?**
+2. **Should Compose "Send" create an assist now, or is that M2 Phase 12's job?** — **RESOLVED: Compose Send→assist is wired now, in Plan 03 (Task 2), per Cluster AC `[DECIDED]`.**
    - What we know: Cluster AC says Compose Send hands to native + assist creation; Cross-Milestone note
      (dossier line 756) says M2 Phase 12 will own Compose Send UX and MUST map to this handoff model.
    - What's unclear: whether Phase 21 wires Compose→assist now or leaves a documented seam.
    - Recommendation: wire the shared handoff helper so Compose's existing `onSend` can create an assist
      when Assist is ON (small, additive), and record the M2 Phase 12 seam. Confirm scope with owner if it
      expands the phase.
+   - **Resolution:** Adopted the recommendation. Plan 03 Task 2 wires Compose `onSend` to create a pending
+     Text assist (when Assist is ON) BEFORE the SMS launch, writing no interaction at Send time — retained
+     in Phase 21 per Cluster AC `[DECIDED]`. The dossier ~line 756 cross-milestone note concerns Compose
+     *Send UX ownership* passing to M2 Phase 12 (which MUST map to this same handoff model); that UX
+     ownership seam is flagged for owner confirmation and is not a Phase 21 scope change.
 
 3. **Notes on Call `No answer`** — confirmed in scope (Cluster K, dossier line 290): the Notes expander is
    offered because `No answer` still writes a row (Cluster T). No open question; flagged so it is not
