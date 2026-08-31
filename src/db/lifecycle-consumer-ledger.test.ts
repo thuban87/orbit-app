@@ -115,6 +115,10 @@ const CADENCE_OWNERS: Record<string, LedgerEntry> = {
     owner: "20-03",
     note: "Shared reconciliation writer carries the stored nullable cadence into a complete metadata input without cadence arithmetic; it preserves Bound/Unbound state while applying selected source scalars.",
   },
+  "src/db/bulk-review-dao.ts": {
+    owner: "20-06",
+    note: "Birthday-fix writer carries the stored nullable cadence into a complete metadata input without cadence arithmetic; it preserves the contact's Bound/Unbound state while changing only birthday.",
+  },
   "src/db/benchmark.ts": {
     owner: "AUDITED",
     note: "Perf fixture writer; supplies a POSITIVE cadence on insert, so its STATUS_SCAN use inherits the updated fragment precondition and cannot observe a null-cadence row.",
