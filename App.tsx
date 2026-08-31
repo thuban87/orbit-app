@@ -12,6 +12,7 @@ import {
 } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
+import { AssistBanner } from "@/components/AssistBanner";
 import { BackupEncryptionBenchmarkHarness } from "@/components/BackupEncryptionBenchmarkHarness";
 import { ResumeImportPrompt } from "@/components/ResumeImportPrompt";
 import { ResumeReconcilePrompt } from "@/components/ResumeReconcilePrompt";
@@ -33,7 +34,6 @@ import {
   registerReconcileResumeSweep,
 } from "@/services/import/reconcile-resume-sweep";
 import { installSweepTrigger } from "@/services/launch-sweep";
-import { resolveActiveResumePrompt } from "@/services/resume-prompt-precedence";
 // Module-scope side-effect import (Pitfall P5): importing headless-task RUNS its
 // `TaskManager.defineTask` + `registerTaskAsync` so a killed-app action tap reaches
 // the headless write path. React never mounts in the headless context, so no
@@ -41,6 +41,7 @@ import { resolveActiveResumePrompt } from "@/services/resume-prompt-precedence";
 // runs NOTHING else (no reconcile, no sweep).
 import { ensureChannels } from "@/services/notifications/channels";
 import { ensureNotificationCategories } from "@/services/notifications/notification-actions";
+import { resolveActiveResumePrompt } from "@/services/resume-prompt-precedence";
 import "@/services/notifications/headless-task";
 import { registerDigestScheduleSweep } from "@/services/notifications/digest-schedule";
 import { FOREGROUND_NOTIFICATION_BEHAVIOR } from "@/services/notifications/notification-ids";
@@ -48,6 +49,7 @@ import { registerNotificationScheduleSweep } from "@/services/notifications/noti
 import { registerPhotoReconcileSweep } from "@/services/photos/photo-reconcile-sweep";
 import { registerRestorePhotoFinalizeSweep } from "@/services/photos/restore-photo-finalize-sweep";
 import { registerWidgetSweep } from "@/services/widget/widget-refresh";
+import { subscribeAppState, useAssistBanner } from "@/stores/assist-store";
 import { ThemeProvider, useTheme } from "@/theme";
 import { Logger } from "@/utils/logger";
 
@@ -155,6 +157,10 @@ function AppShell() {
   //    `ready`), so its immediate cold-start sweep never precedes the DB.
   useEffect(() => {
     if (!ready) return;
+    // The confirmation queue has its own per-return subscription: unlike the
+    // launch sweep, it refreshes for every real background-to-active return.
+    void useAssistBanner.getState().refresh();
+    const assistSubscription = subscribeAppState(AppState);
     // Register the launch field sweep (FLD-05) on the registry BEFORE the trigger
     // fires its cold-start sweep — once only (module guard), and only now that
     // migration has resolved so `getExecutor()` has a live connection.
@@ -247,6 +253,7 @@ function AppShell() {
     return () => {
       cancelled = true;
       subscription?.remove();
+      assistSubscription.remove();
     };
   }, [ready]);
 
@@ -301,6 +308,7 @@ function AppShell() {
           (pre-ready intents queue in the gate and flush on navReady). */}
       <WidgetLinkingGate isReady={navReady} />
       <RootNavigator />
+      <AssistBanner />
       {resolveActiveResumePrompt(resumableImport, resumableReconcile) ===
       "import" ? (
         <ResumeImportPrompt

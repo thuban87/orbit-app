@@ -40,6 +40,7 @@ import { GravityBar } from "@/components/GravityBar";
 import { IntensityLine } from "@/components/IntensityLine";
 import { OverflowMenu } from "@/components/OverflowMenu";
 import { RankedFuelLine } from "@/components/RankedFuelLine";
+import { ReachOutRouter } from "@/components/ReachOutRouter";
 import { TimelineRow } from "@/components/TimelineRow";
 import {
   TouchpointRefineForm,
@@ -49,6 +50,7 @@ import { getAppSettings } from "@/db/app-settings-dao";
 import {
   type ContactMethodGroups,
   listContactMethodGroups,
+  selectActionablePrimaryMethods,
 } from "@/db/contact-methods-read";
 import { getContactHeader } from "@/db/contact-read";
 import {
@@ -72,6 +74,7 @@ import {
   listFuelForEditor,
 } from "@/db/fuel-read";
 import { getImpactInputs } from "@/db/impact-read";
+import { deriveReachRoutes } from "@/db/interaction-assist-read";
 import {
   deleteTouchpoint,
   editTouchpointFull,
@@ -207,6 +210,8 @@ export function ContactProfileScreen({
   // In-flight latch for the one-tap log — blocks a double-fire while the write
   // is open, and dims the button.
   const [logging, setLogging] = useState(false);
+  const [reachOutOpen, setReachOutOpen] = useState(false);
+  const [assistEnabled, setAssistEnabled] = useState(true);
   // Whether an AI provider is configured (aiProvider !== 'none'). Gates the
   // additive "AI draft" entry (Plan 14-05) so a never-configured user never sees
   // a control that leads to an inert Compose flow — the exact prompt + first-send
@@ -239,6 +244,7 @@ export function ContactProfileScreen({
         settings,
         defs,
         methods,
+        assistSetting,
         externalLink,
       ] = await Promise.all([
         getContactHeader(exec, contactId),
@@ -250,6 +256,9 @@ export function ContactProfileScreen({
         getAppSettings(exec),
         listDefs(exec, { includeQuarantined: false }),
         listContactMethodGroups(exec, contactId),
+        exec.getFirstAsync<{ interaction_assist_enabled: number }>(
+          "SELECT interaction_assist_enabled FROM app_settings WHERE id = 1",
+        ),
         exec.getFirstAsync<{ id: number }>(
           "SELECT id FROM external_contact_links WHERE contact_id = ? AND is_active = 1 ORDER BY id ASC LIMIT 1",
           [contactId],
@@ -261,6 +270,9 @@ export function ContactProfileScreen({
       setFieldDefs(defs);
       setCustomValues(values);
       setMethodGroups(methods);
+      // Migration 014 defaults the setting to enabled. Keep the safe enabled
+      // default if a corrupted pre-migration row is ever unavailable.
+      setAssistEnabled(assistSetting?.interaction_assist_enabled !== 0);
       setTimeline(rows);
       setStatus(statusRow);
       setFuel(fuelRows);
@@ -292,6 +304,12 @@ export function ContactProfileScreen({
       Alert.alert("Couldn't load this contact", "Please go back and retry.");
     }
   }, [contactId]);
+
+  // Both helpers are pure projections over the method rows loaded above; this
+  // deliberately avoids a second route query or a reachable-action flash.
+  const reachRoutes = deriveReachRoutes(
+    selectActionablePrimaryMethods(methodGroups),
+  );
 
   // Reload on focus, not just on mount: the only route into Edit is this
   // profile's "Add details", so Edit always sits directly above Profile in the
@@ -795,13 +813,21 @@ export function ContactProfileScreen({
             {
               label: "Merge with another contact",
               testID: "contact-profile-merge",
-              onPress: () => navigation.navigate("SurvivorSelect", { firstContactId: contactId }),
+              onPress: () =>
+                navigation.navigate("SurvivorSelect", {
+                  firstContactId: contactId,
+                }),
             },
-            ...(hasActiveExternalLink ? [{
-              label: "Update from Contacts",
-              testID: "contact-profile-update-from-contacts",
-              onPress: () => navigation.navigate("ReconcileDetail", { contactId }),
-            }] : []),
+            ...(hasActiveExternalLink
+              ? [
+                  {
+                    label: "Update from Contacts",
+                    testID: "contact-profile-update-from-contacts",
+                    onPress: () =>
+                      navigation.navigate("ReconcileDetail", { contactId }),
+                  },
+                ]
+              : []),
             {
               label: "Archive",
               testID: "contact-profile-archive",
@@ -810,6 +836,23 @@ export function ContactProfileScreen({
           ]}
         />
       </View>
+
+      {!reachRoutes.hidden ? (
+        <Pressable
+          testID="contact-profile-reach-out"
+          accessibilityRole="button"
+          accessibilityLabel={`Reach out to ${header?.name ?? ""}`}
+          onPress={() => setReachOutOpen(true)}
+          style={[
+            styles.logContact,
+            { backgroundColor: colors.accent, borderColor: colors.accent },
+          ]}
+        >
+          <Text style={[styles.logContactText, { color: colors.background }]}>
+            Reach out
+          </Text>
+        </Pressable>
+      ) : null}
 
       {/* Rogue status label + reason — in-app only (never a notification),
           styled through the themed `colors.rogue` token (a status hue, NOT
@@ -1286,6 +1329,13 @@ export function ContactProfileScreen({
           </View>
         </View>
       ) : null}
+      <ReachOutRouter
+        visible={reachOutOpen}
+        contactId={contactId}
+        routes={reachRoutes}
+        assistEnabled={assistEnabled}
+        onClose={() => setReachOutOpen(false)}
+      />
     </ScrollView>
   );
 }
