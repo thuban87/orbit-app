@@ -618,7 +618,8 @@ export function listArchived(exec: SqlExecutor): Promise<ArchivedContactRow[]> {
  * Set a contact's photo to a RELATIVE filename + bump `modified_at`. Asserts
  * exactly one row changed (a bad id throws → rollback). `last_contact` untouched.
  */
-export async function setContactPhoto(
+/** Non-mutexed photo writer for callers that already own the write transaction. */
+export async function setContactPhotoCore(
   exec: SqlExecutor,
   id: number,
   relative: string,
@@ -630,18 +631,26 @@ export async function setContactPhoto(
   // crashing the screen. Shares the single allowlist with the FS chokepoint.
   // `async` so the fail-fast throw surfaces as a rejection (not a sync throw).
   assertSafeRelative(relative);
-  return inWriteTransaction(exec, async () => {
-    const result = await exec.runAsync(
-      "UPDATE contacts SET photo = ?, modified_at = ? WHERE id = ?",
-      [relative, now, id],
+  const result = await exec.runAsync(
+    "UPDATE contacts SET photo = ?, modified_at = ? WHERE id = ?",
+    [relative, now, id],
+  );
+  if (result.changes !== 1) {
+    throw new Error(
+      `setContactPhoto: no contact matched id=${id} (changed ${result.changes})`,
     );
-    if (result.changes !== 1) {
-      throw new Error(
-        `setContactPhoto: no contact matched id=${id} (changed ${result.changes})`,
-      );
-    }
-    await bumpDataRevisionCore(exec);
-  });
+  }
+  await bumpDataRevisionCore(exec);
+}
+
+/** Transaction-owning wrapper for the standalone contact-photo write. */
+export function setContactPhoto(
+  exec: SqlExecutor,
+  id: number,
+  relative: string,
+  now: string,
+): Promise<void> {
+  return inWriteTransaction(exec, () => setContactPhotoCore(exec, id, relative, now));
 }
 
 /**
