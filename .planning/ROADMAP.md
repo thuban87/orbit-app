@@ -931,7 +931,25 @@ Plans:
   3. Confirmations create outbound interactions at the original handoff time through the existing authoritative interaction/recency writer (including Call No answer); notes are optional, and archived/Unbound/merged/purged target handling follows the locked lifecycle rules without resurrection.
   4. Interaction Assist remains wholly local and user-initiated: no passive call/text/email observation, delivery/read verification, background monitoring, or widget-side assist writer; the larger widget's Message action is superseded by Contact while all other widget architecture stays unchanged.
 
-**Plans:** 0 plans
+**Plans:** 6 plans / 4 waves (tracer-first vertical slices; migration 014 = TARGET_VERSION 14). Additive brownfield — reuses recordTouchpoint (single-writer), merge/purge/widget wiring is the cross-phase correctness core.
+
+**Wave 1**
+
+- [ ] 21-01-PLAN.md — TRACER: migration 014 (interaction_assists + interaction_assist_enabled) + assist write DAO through recordTouchpoint + eligible-queue read + pure 15s/24h eligibility (IAS-02, IAS-03)
+
+**Wave 2** *(blocked on 21-01)*
+
+- [ ] 21-02-PLAN.md — Reach Out router + native Call/Text/Email handoff + app-global non-modal banner + confirmation + profile entry (single-endpoint) (IAS-01/02/03/04)
+
+**Wave 3** *(blocked on 21-02)*
+
+- [ ] 21-03-PLAN.md — Endpoint selector (≥2, 3rd tap) + Compose Send→assist seam (IAS-01, IAS-02)
+- [ ] 21-04-PLAN.md — Settings toggle + off-clears-queue + '{N} more pending' review sheet + 24h/30d launch-sweep prune (IAS-02)
+- [ ] 21-05-PLAN.md — Cross-phase wiring: merge reparent + purge cascade + widget Message→Contact + orbit://reach allow-list + purged fail-safe (IAS-03, IAS-04)
+
+**Wave 4** *(blocked on Wave 3)*
+
+- [ ] 21-06-PLAN.md — Full-suite gate + owner-signed Pixel device UAT (end-of-phase human-check) (IAS-01/02/03/04)
 
 ## Progress
 
