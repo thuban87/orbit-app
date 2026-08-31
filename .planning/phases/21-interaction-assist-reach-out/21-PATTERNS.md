@@ -37,7 +37,7 @@
 
 **Analogs:** `src/db/recency-dao.ts` (the authoritative writer it MUST call), `src/db/merge-dao.ts` (txn + reparent idiom).
 
-**CRITICAL — confirmation MUST route through `recordTouchpoint`, never a bespoke `interactions` INSERT or `last_contact` write.** `recency-dao.ts:1-12` declares itself the ONLY writer of `contacts.last_contact` (DATA-04). A second writer breaks `rarely_responds`, gravity, and status.
+**CRITICAL — confirmation MUST route through the recency DAO's OWN authoritative recompute, never a bespoke `interactions` INSERT or `last_contact` write.** `recency-dao.ts:1-12` declares `recomputeLastContact`/`recomputeLastContactCore` the ONLY writer of `contacts.last_contact` (DATA-04). A second writer breaks `rarely_responds`, gravity, and status. Because the confirmation must ALSO flip the assist status **atomically** with the interaction write, it does NOT call the mutexed `recordTouchpoint` wrapper (which self-transacts and cannot be composed) — it composes the SAME operations `recordTouchpoint` performs from the exported non-mutexed cores inside ONE outer `inWriteTransaction` (the established `createContactFull`/`recomputeLastContactCore` composition idiom, recency-dao.ts:414-428). See the HIGH-1/HIGH-3 resolution below.
 
 **`recordTouchpoint` verified signature** (`recency-dao.ts:59-78`, exported at `:217`):
 ```typescript
@@ -56,22 +56,35 @@ export interface RecordTouchpointInput {
 export function recordTouchpoint(exec, input): Promise<{ interactionId: number }>
 ```
 
-**Confirmation call (Pattern 1 — verified against the real signature):**
+**Confirmation call (Pattern 1 — HIGH-1 + HIGH-3 resolution — atomic, status-guarded, via cores):**
 ```typescript
-await recordTouchpoint(exec, {
-  contactId: assist.contact_id,
-  uid: newUid(),                    // uid.ts:18 — NOT crypto.randomUUID (Hermes has no globalThis.crypto)
-  occurredAt: assist.handoff_at,    // Cluster R: handoff time, NOT confirmation time
-  now: localDateTime(),             // database.ts:74 — confirmation time
-  channel: assist.channel,          // 'call' | 'text' | 'email'
-  direction: "outbound",            // Cluster S — all Phase-21 rows outbound
-  connected: answered ? 1 : 0,      // Call 'No answer' → 0 (Cluster T)
-  note: note ?? null,               // Cluster K
-  source: "assist",                 // free-text; distinct from 'manual'
+// markAssistLogged runs as ONE inWriteTransaction. It NEVER calls the mutexed
+// recordTouchpoint (nesting inWriteTransaction is a permanent hang) and NEVER
+// sniffs a UNIQUE error. It reads the assist status FIRST and writes ONLY when
+// still 'pending' — so a double-tap OR a post-crash retry is idempotent, and a
+// crash mid-write rolls the whole txn back (status stays 'pending', re-runnable).
+return inWriteTransaction(exec, async () => {
+  const assist = await exec.getFirstAsync(
+    `SELECT id, contact_id, channel, handoff_at, status
+       FROM interaction_assists WHERE uid = ?`, [assistUid]);
+  if (!assist || assist.status !== "pending") return;      // status-guarded idempotency
+  await insertInteractionCore(exec, assist.contact_id, now, {
+    uid: newUid(),                    // plain newUid() — restore-compatible; Hermes-safe (uid.ts:18)
+    occurredAt: assist.handoff_at,    // Cluster R: handoff time, NOT confirmation time
+    channel: assist.channel,          // 'call' | 'text' | 'email'
+    direction: "outbound",            // Cluster S — all Phase-21 rows outbound
+    connected,                        // Call 'No answer' → 0 (Cluster T)
+    note: note ?? null,               // Cluster K
+    source: "assist",                 // free-text; distinct from 'manual'
+  });
+  await recomputeLastContactCore(exec, assist.contact_id, now);  // THE single last_contact writer (DATA-04)
+  await bumpDataRevisionCore(exec);                              // UI refresh, same as recordTouchpoint
+  await exec.runAsync(
+    `UPDATE interaction_assists SET status='logged', resolved_at=?, modified_at=?
+      WHERE uid=? AND status='pending'`, [now, now, assistUid]);  // flip inside the SAME txn
 });
-// then, SAME transaction: UPDATE interaction_assists SET status='logged', resolved_at=?, modified_at=?
 ```
-Note: `recordTouchpoint` opens its OWN `inWriteTransaction` and calls `rejectFutureOccurredAt` synchronously before the txn. The assist-status UPDATE therefore cannot share `recordTouchpoint`'s internal transaction — either sequence them (touchpoint, then a second txn to flip status) or extract a `recomputeLastContactCore`-style non-mutexed core if a single atomic txn is required. Flag for planner: `recordTouchpoint` is mutexed/self-transacting; there is no exported "core" variant for it (unlike `recomputeLastContactCore`). Prefer sequencing over trying to nest — a nested `inWriteTransaction` is a PERMANENT hang (mutex.ts).
+**Unequivocal (HIGH-1):** `markAssistLogged` MUST NOT wrap a call to the mutexed `recordTouchpoint` in an outer `inWriteTransaction` — it does not call `recordTouchpoint` at all. `recordTouchpoint` self-transacts on the non-reentrant mutex; nesting `inWriteTransaction` is a PERMANENT hang (transaction.ts:11-29, mutex.ts). The confirmation composes the non-mutexed cores — `insertInteractionCore` + `recomputeLastContactCore` (recency-dao.ts:425-428) + `bumpDataRevisionCore` (data-revision-dao) — inside the ONE outer `inWriteTransaction` shown above: no nesting, one atomic unit, the SAME three operations `recordTouchpoint` runs. `rejectFutureOccurredAt` is unnecessary here — `handoff_at ≤ now` by construction (handoff precedes confirmation) and the value is a stored local string, not user input.
 
 **Transaction + cap-5 prune idiom** (from `merge-dao.ts:98` `inWriteTransaction` usage; `?`-bound throughout):
 ```typescript
@@ -109,7 +122,7 @@ listContactMethodGroups(exec, contactId): Promise<{ phone: ContactMethodRow[]; e
 ```
 `is_actionable` is a single per-method boolean (phone/email-granular, not channel-granular) — any actionable phone backs BOTH Call and Text (Cluster A/D). The read DAO takes `exec: SqlExecutor` and is node-testable (contract shared by every DAO).
 
-Eligibility query (pure wall-clock, no timer): `status='pending' AND (now - handoff_at) ≥ 15s AND (now - created_at) ≤ 24h`, newest-first.
+Eligibility query (pure wall-clock, no timer): `status='pending' AND (now - handoff_at) ≥ 15s AND (now - handoff_at) ≤ 24h`, newest-first. **Canonical time field (Codex LOW):** BOTH the 15s buffer and the 24h expiry (query filter AND the launch sweep) compare against `handoff_at` — the phase's single source of truth for interaction time — never `created_at`. `created_at` is retained only for the cap-5 creation-order pruning (it equals `handoff_at` at insert, so there is no observable divergence).
 
 ---
 
@@ -131,7 +144,7 @@ try {
 Phase-21 handoff generalizes this to three channels. Text reuses `SMS.sendSMSAsync`; Call/Email are greenfield core `Linking.openURL('tel:…' | 'mailto:…')`:
 ```typescript
 try {
-  if (channel === "text") await SMS.sendSMSAsync(endpoint, "");
+  if (channel === "text") await SMS.sendSMSAsync(endpoint, messageBody ?? "");  // HIGH-2: one shared helper
   else await Linking.openURL(channel === "call" ? `tel:${endpoint}` : `mailto:${endpoint}`);
 } catch (err) {
   await markAssistFailed(exec, uid, localDateTime());   // 'failed' — never a pending prompt (Cluster F)
@@ -141,6 +154,8 @@ try {
 - **Do NOT gate on `Linking.canOpenURL`** for `tel:`/`mailto:` — Android 11+ returns false without `<queries>` manifest entries (false "unavailable"). try/`openURL`/catch is the pattern (`LinksEditor.tsx:79`, `FuelEditor.tsx:129`).
 - **UI-SPEC error copy differs from Compose's shipped copy** — Compose says "Your message is ready to copy instead." (it has a Copy fallback); the Reach Out router has no copy fallback, so use the UI-SPEC strings ("No app on this device can send texts." etc.), NOT the Compose string verbatim.
 - The assist row is written BEFORE this handoff runs (Cluster E). Assist ON only.
+- **HIGH-2 — there is exactly ONE shared handoff helper, `performReachOut(exec, {…, messageBody?: string})` (Plan 02, default `messageBody=""`).** BOTH the Reach Out router (Text/Call/Email, empty body) AND Compose's `Send` (passing its `draft`) call this single helper, so create-pending-assist-before-launch + `markAssistFailed`-on-throw + the per-channel `Alert` live in ONE place — no duplicated handoff/failure logic and no lost Compose draft.
+- **Failure semantics (Cluster F/J):** NEVER interpret a RESOLVED `SMS.sendSMSAsync`/`Linking.openURL` as either a failure or a delivery/send signal — `sendSMSAsync` returns `unknown` on Android. Only a THROWN launch error (no compatible app) marks the assist `failed`.
 
 ---
 
