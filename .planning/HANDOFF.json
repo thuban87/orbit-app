@@ -1,0 +1,83 @@
+{
+  "version": "1.0",
+  "timestamp": "2026-08-31T04:50:03.488Z",
+  "phase": "20",
+  "phase_name": "Contact Reconciliation & Merge",
+  "phase_dir": ".planning/phases/20-contact-reconciliation-merge",
+  "plan": 6,
+  "task": 3,
+  "total_tasks": 3,
+  "status": "paused",
+  "completed_tasks": [
+    {
+      "id": 1,
+      "name": "Bulk birthday resolver + read + entry",
+      "status": "done",
+      "commit": "3d56911"
+    },
+    {
+      "id": 2,
+      "name": "Phase 20 verification gate + device-UAT harvest",
+      "status": "done",
+      "commit": "a376901"
+    },
+    {
+      "id": 3,
+      "name": "Consolidated Pixel device UAT",
+      "status": "in_progress",
+      "progress": "Pixel 6 Pro API 37 was identified and a debug build was installed, but none of the seven scenarios has recorded evidence. A fixture/UAT executor was interrupted without a report; device-only fixture state is unknown."
+    }
+  ],
+  "remaining_tasks": [
+    {
+      "id": 3,
+      "name": "Consolidated Pixel device UAT, fixture audit, evidence capture, and fixture cleanup",
+      "status": "blocked"
+    }
+  ],
+  "blockers": [
+    {
+      "description": "The Pixel 6 Pro baseline lacked reconciliation sessions/cards and unreadable-birthday flags; the interrupted fixture executor did not report whether it created device-only test data.",
+      "type": "external",
+      "workaround": "Audit device rows before mutation, create an explicit fixture setup/cleanup checklist, then execute and evidence each scenario one at a time."
+    },
+    {
+      "description": "Previous device-UAT execution was opaque and consumed substantial time without a usable progress report or scenario evidence.",
+      "type": "technical",
+      "workaround": "Do not dispatch another open-ended device subagent. Use a bounded, visible runbook with an explicit time box and a checkpoint after fixture audit."
+    }
+  ],
+  "async_jobs": [],
+  "human_actions_pending": [],
+  "decisions": [
+    {
+      "decision": "Merge retirement is tombstone-only; no contact_redirects table.",
+      "rationale": "Owner ruling on 2026-08-30; future sync can add redirects in its own migration.",
+      "phase": "20"
+    },
+    {
+      "decision": "A populated absorbed scalar/custom value fills a null or blank survivor value unless the user selects otherwise.",
+      "rationale": "Owner authorized the focused merge-dao correction during Plan 20-02.",
+      "phase": "20"
+    },
+    {
+      "decision": "Use only Pixel 6 Pro serial 1A071FDEE002BU for Phase 20 UAT.",
+      "rationale": "The Pixel 3a is API 32; Orbit's contact-picker availability is API 37+.",
+      "phase": "20"
+    },
+    {
+      "decision": "Dedicated Pixel 6 Pro test fixtures may be created and removed, but pre-existing personal device data must not be touched.",
+      "rationale": "Explicit owner authorization, with the scope limited to identifiable UAT fixtures.",
+      "phase": "20"
+    }
+  ],
+  "uncommitted_files": [
+    ".planning/STATE.md",
+    ".planning/config.json",
+    ".gsd/",
+    ".planning/debug/wave1-integration-regressions.md",
+    "docs/dossier/milestone-2/"
+  ],
+  "next_action": "Read .planning/phases/20-contact-reconciliation-merge/.continue-here.md, audit the Pixel 6 Pro's interrupted fixture state without touching pre-existing contacts, then write a bounded fixture/runbook checkpoint before running any UAT scenario.",
+  "context_notes": "Plans 20-01 through 20-05 are summarized. Plan 20-06 tasks 1 and 2 are committed; task 3 is the only unfinished work. Phase completion, verification, and tracking updates must not run until all seven UAT scenarios have recorded evidence and owner sign-off."
+}
