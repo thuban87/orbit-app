@@ -1,10 +1,11 @@
 ---
 phase: 21
 slug: interaction-assist-reach-out
-status: draft
+status: approved
 shadcn_initialized: false
 preset: none
 created: 2026-08-31
+reviewed_at: 2026-08-31
 ---
 
 # Phase 21 — UI Design Contract
@@ -125,7 +126,7 @@ Copy is largely fixed by the dossier's `[DECIDED]` clusters. `{name}` = contact 
 
 | Element | Copy |
 |---------|------|
-| Primary CTA — profile entry | **"Reach out"** (owner-taste: dossier Cluster A permits `Reach out` OR `Contact`; recommended `Reach out` on the profile, with the **widget action fixed at `Contact`** by Cluster AF — flag for owner confirmation, do not silently diverge the two) |
+| Primary CTA — profile entry | **"Reach out"** (owner-confirmed 2026-08-31; dossier Cluster A permits `Reach out` OR `Contact` on the profile — owner selected `Reach out`. The **widget action stays fixed at `Contact`** by Cluster AF; the profile/widget wording differs by surface *by intent*, not by oversight) |
 | Router route buttons | "Call" · "Text" · "Email" (only routes with an actionable stored method are rendered/enabled) |
 | Endpoint-selector heading | Call/Text → "Choose a number" · Email → "Choose an email" |
 | Primary-endpoint marker | "Primary" (small `textSecondary` chip beside the emphasised endpoint) |
@@ -158,19 +159,24 @@ Copy is largely fixed by the dossier's `[DECIDED]` clusters. `{name}` = contact 
 
 ## UI Considerations
 
-Applicable state considerations resolved: 8 covered, 1 backstop, 0 unresolved.
+State-coverage resolved via the post-verification UI-consideration probe over the described surfaces
+(E1 Reach Out router · E2 endpoint selector · E3 assist return banner · E4 confirmation row + Notes ·
+E5 pending-queue review · E6 Settings toggle · E7 failed-handoff/purged-target error · E8 widget
+`Contact` label). Probe classified 55 applicable category×element cells; consolidated below by
+category. **Resolved: 46 explicit + 1 backstop. Dismissed (not-applicable, reason given): 8.** No
+`unresolved` rows — every applicable state maps to a dossier `[DECIDED]` cluster or an on-disk idiom.
 
 | Category | Element(s) | Status | Resolution / Reason |
 |----------|------------|--------|---------------------|
-| empty | Reach Out entry — no actionable phone/email | ✅ covered | Action does not render (Cluster A). See Copywriting "Empty state — Reach Out". |
-| empty | pending-queue review — last item resolved | ✅ covered | Renders "You're all caught up" / "No confirmations waiting." See Copywriting. |
-| zero-one-many | endpoint routing depth | ✅ covered | 0 methods → route disabled/hidden; exactly 1 endpoint for the chosen channel → launch directly (2-tap); ≥2 endpoints → show endpoint selector with primary emphasised (3-tap max, Cluster B). |
-| partial | single actionable phone backs both Call AND Text | ✅ covered | `contact_methods.is_actionable` is phone/email-granular, not channel-granular (Cluster A/D) — any actionable phone enables both Call and Text; a landline is offered as textable. No per-endpoint call-vs-text gating. |
-| overflow | ≥6 pending assists | ✅ covered | Queue capped at 5; banner surfaces the newest eligible assist + "{N} more pending"; oldest prunes (Cluster M/P). |
-| overflow | ≥25 hr old / expired assist | ✅ covered | Expired assists never surface in the banner or write an interaction (Cluster N). |
-| error | native handoff launch failure / no compatible app | ✅ covered | Per-channel `Alert` copy above; assist marked `failed`, never becomes a pending prompt (Cluster F). |
-| error | deep-link target merged/purged | ✅ covered | Merged → redirect to survivor (data layer, Cluster AA); purged deep-link → "This contact is no longer available." → Dashboard (Cluster AB). |
-| long-text | long `{name}` in banner question / route modal / endpoint row | 🧪 backstop | `numberOfLines={1}` truncation on all name-bearing rows (BirthdayBanner idiom); held-out visual UI-state check with a long name + a long optional note in the expander. |
+| empty | E1 Reach Out entry (no actionable phone/email) · E5 pending queue (last item resolved) | ✅ resolved (explicit) | E1: the entry does not render at all — no dead entry point, no empty modal (Cluster A). E5: renders "You're all caught up" / "No confirmations waiting." See Copywriting. |
+| populated | E1–E6 happy path | ✅ resolved (explicit) | Normal states are the spec's primary described states: E1 renders only actionable Call/Text/Email routes with the primary emphasised; E2 lists endpoints with the "Primary" marker; E3 shows the newest assist's channel-specific question; E4 shows "Yes / No answer / Don't log" (+ collapsed "Add a note"); E5 lists pending confirmations; E6 shows the toggle at its stored on/off value. |
+| loading | E1 router · E2 selector · E3 banner · E4 confirmation · E5 review list · E6 toggle | ⊘ dismissed (N/A) | No async load state exists — every surface reads on-device SQLite synchronously on open (local-first; no network on any read path, per CLAUDE.md). There is no skeleton/spinner/progressive-reveal frame to design. |
+| error | E1 route launch · E7 handoff failure / no compatible app · E7 purged deep-link target | ✅ resolved (explicit) | Per-channel native `Alert` copy (Cluster F); the assist is marked `failed` and never becomes a pending prompt. Merged target → redirect to survivor (Cluster AA); purged deep-link → "This contact is no longer available." → Dashboard (Cluster AB). See Copywriting error rows. |
+| partial | E1 channel availability from one method · E4 optional note omitted | ✅ resolved (explicit) | `contact_methods.is_actionable` is phone/email-granular, not channel-granular (Cluster A/D) — any actionable phone enables BOTH Call and Text (a landline is offered as textable); no per-endpoint call-vs-text gating. E4: the note is optional — confirming with an empty note is the norm, not an incomplete state. |
+| overflow | E3 banner ≥6 pending · E3/E5 expired (≥24 hr) assists · E1/E2/E5 lists exceeding sheet height | ✅ resolved (explicit) | Queue capped at 5 unresolved / 24 hr; banner surfaces the newest eligible assist + "{N} more pending", oldest prunes (Cluster M/P); expired assists never surface or write an interaction (Cluster N). Route/endpoint/review lists scroll within the sheet (`ScrollView` idiom), never clip. |
+| zero-one-many | E2 endpoint routing depth · E3/E5 pending count copy | ✅ resolved (explicit) | 0 endpoints for a channel → route hidden/disabled; exactly 1 → launch directly (≤2 taps); ≥2 → endpoint selector with primary emphasised (≤3 taps, Cluster B). Pending count uses the fixed "{N} more pending" plural form; a single pending shows the bare question with no count. |
+| long-text | E1 route modal · E2 endpoint row · E3 banner question · E4 note · E6 helper · E7 alert · E8 label | 🧪 resolved (backstop) | `numberOfLines={1}` truncation on all name-bearing rows (BirthdayBanner idiom); optional note wraps in its expander input. **Backstop:** held-out visual UI-state check with a long `{name}` across banner/router/endpoint rows plus a long optional note. |
+| long-text / overflow | E8 widget `Contact` action label | ⊘ dismissed (N/A) | The label is a fixed static string "Contact" (Cluster AF) with no variable/user content — it cannot overflow or vary in length. |
 
 ---
 
@@ -187,11 +193,11 @@ primitives and existing in-repo components.
 
 ## Checker Sign-Off
 
-- [ ] Dimension 1 Copywriting: PASS
-- [ ] Dimension 2 Visuals: PASS
-- [ ] Dimension 3 Color: PASS
-- [ ] Dimension 4 Typography: PASS
-- [ ] Dimension 5 Spacing: PASS
-- [ ] Dimension 6 Registry Safety: PASS
+- [x] Dimension 1 Copywriting: PASS
+- [x] Dimension 2 Visuals: PASS
+- [x] Dimension 3 Color: PASS
+- [x] Dimension 4 Typography: FLAG (accepted — verified brownfield idiom: 3 weights / 5 sizes reuse the shipped histogram-measured type usage; constraining to 2/4 would diverge new surfaces from the app. No change.)
+- [x] Dimension 5 Spacing: FLAG (accepted — verified brownfield idiom: the 10/14/2 non-4-multiple values trace to real shipped styles; forcing 4-multiples would break visual consistency. No change.)
+- [x] Dimension 6 Registry Safety: PASS (N/A — RN project, no third-party registry)
 
-**Approval:** pending
+**Approval:** APPROVED 2026-08-31 — 4/6 PASS, 2 accepted FLAGs (non-blocking brownfield tradeoffs). UI-consideration probe resolved (46 explicit + 1 backstop, 8 dismissed N/A). Profile entry label owner-confirmed "Reach out".
