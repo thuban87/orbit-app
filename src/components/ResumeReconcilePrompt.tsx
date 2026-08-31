@@ -34,9 +34,10 @@ export function ResumeReconcilePrompt({ resumable, onDismiss, onDiscarded }: Res
       Logger.error("resume-reconcile-prompt", "could not discard check", error);
     }
   };
-  return <Modal visible transparent animationType="fade" onRequestClose={() => {}}>
-    <View style={styles.scrim}>
-      <View style={[styles.sheet, { backgroundColor: colors.surfaceElevated }]}>
+  return <Modal visible transparent animationType="fade" onRequestClose={() => undefined}>
+    <View style={styles.modalRoot}>
+      <View style={[StyleSheet.absoluteFill, styles.scrim, { backgroundColor: colors.background }]} />
+      <View style={[styles.sheet, { backgroundColor: colors.surfaceElevated, borderColor: colors.border }]}>
         <Text style={[styles.heading, { color: colors.textPrimary }]}>Resume your check?</Text>
         <Text style={[styles.body, { color: colors.textSecondary }]}>
           {resumable.discardOnly ? "This saved check can’t be resumed. You can discard its unresolved contacts. Changes you already applied stay applied." : "Unresolved contacts are saved. Changes you already applied stay applied."}
@@ -49,8 +50,9 @@ export function ResumeReconcilePrompt({ resumable, onDismiss, onDiscarded }: Res
 }
 
 const styles = StyleSheet.create({
-  scrim: { flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(0, 0, 0, 0.5)" },
-  sheet: { gap: 16, padding: 20, borderTopLeftRadius: 12, borderTopRightRadius: 12 },
+  modalRoot: { flex: 1, justifyContent: "center", paddingHorizontal: 24 },
+  scrim: { opacity: 0.85 },
+  sheet: { gap: 14, padding: 20, borderWidth: 1, borderRadius: 12 },
   heading: { fontSize: 18, fontWeight: "700" },
   body: { fontSize: 15, lineHeight: 22 },
   button: { minHeight: 44, borderRadius: 10, alignItems: "center", justifyContent: "center", paddingHorizontal: 16 },
