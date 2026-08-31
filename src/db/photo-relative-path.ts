@@ -37,6 +37,10 @@ export const SAFE_RESTORE_PENDING_RELATIVE =
 export const SAFE_IMPORT_STAGING_RELATIVE =
   /^import-staging\/[A-Za-z0-9_-]+\.(jpg|jpeg|png|webp)(?:\.stage-tmp)?$/;
 
+/** Reconciliation owns a distinct durable staging namespace. */
+export const SAFE_RECONCILE_STAGING_RELATIVE =
+  /^reconcile-staging\/[A-Za-z0-9_-]+\.(jpg|jpeg|png|webp)(?:\.stage-tmp)?$/;
+
 /**
  * Throw unless `relative` is a safe `avatars/<name>.<ext>` relative path. Used at
  * the FS chokepoint AND at the DAO write boundary as defense-in-depth: a stored
@@ -76,6 +80,19 @@ export function assertSafeImportStagingRelative(relative: string): void {
   ) {
     throw new Error(
       `unsafe import staging photo path: ${JSON.stringify(relative)}`,
+    );
+  }
+}
+
+/** Throw unless a reconciliation staging path is safe and non-canonical. */
+export function assertSafeReconcileStagingRelative(relative: string): void {
+  if (
+    typeof relative !== "string" ||
+    relative.includes("\0") ||
+    !SAFE_RECONCILE_STAGING_RELATIVE.test(relative)
+  ) {
+    throw new Error(
+      `unsafe reconcile staging photo path: ${JSON.stringify(relative)}`,
     );
   }
 }

@@ -168,6 +168,7 @@ export function ContactProfileScreen({
   const { colors } = useTheme();
   const { contactId } = route.params;
   const [header, setHeader] = useState<Header | null>(null);
+  const [hasActiveExternalLink, setHasActiveExternalLink] = useState(false);
   // Custom values remain raw at rest.  The profile selects its live fields from
   // definitions plus this map, then CustomFieldValue owns presentation and the
   // invalid-value recovery affordance.
@@ -238,6 +239,7 @@ export function ContactProfileScreen({
         settings,
         defs,
         methods,
+        externalLink,
       ] = await Promise.all([
         getContactHeader(exec, contactId),
         listTimeline(exec, contactId),
@@ -248,9 +250,14 @@ export function ContactProfileScreen({
         getAppSettings(exec),
         listDefs(exec, { includeQuarantined: false }),
         listContactMethodGroups(exec, contactId),
+        exec.getFirstAsync<{ id: number }>(
+          "SELECT id FROM external_contact_links WHERE contact_id = ? AND is_active = 1 ORDER BY id ASC LIMIT 1",
+          [contactId],
+        ),
       ]);
       const values = await getValuesForContact(exec, contactId, defs);
       setHeader(row);
+      setHasActiveExternalLink(externalLink != null);
       setFieldDefs(defs);
       setCustomValues(values);
       setMethodGroups(methods);
@@ -790,6 +797,11 @@ export function ContactProfileScreen({
               testID: "contact-profile-merge",
               onPress: () => navigation.navigate("SurvivorSelect", { firstContactId: contactId }),
             },
+            ...(hasActiveExternalLink ? [{
+              label: "Update from Contacts",
+              testID: "contact-profile-update-from-contacts",
+              onPress: () => navigation.navigate("ReconcileDetail", { contactId }),
+            }] : []),
             {
               label: "Archive",
               testID: "contact-profile-archive",

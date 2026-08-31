@@ -128,6 +128,7 @@ export type RootStackParamList = {
   SurvivorSelect: { firstContactId: number; secondContactId?: number };
   MergeConflicts: { survivorId: number; absorbedId: number };
   MergeImpactSummary: { survivorId: number; absorbedId: number; resolutions: MergeResolutions };
+  ReconcileDetail: { contactId: number; sessionId?: number; cardId?: number };
 };
 
 /**

@@ -42,6 +42,7 @@ import { Directory, File, Paths } from "expo-file-system";
 import { isSafeColName } from "@/db/col-name";
 import {
   assertSafeImportStagingRelative,
+  assertSafeReconcileStagingRelative,
   assertSafeRelative,
   assertSafeRestorePendingRelative,
 } from "@/db/photo-relative-path";
@@ -53,6 +54,7 @@ const LOG_SCOPE = "photo-storage";
 const AVATARS_DIR = "avatars";
 const RESTORE_PENDING_DIR = `${AVATARS_DIR}/_restore_pending`;
 const IMPORT_STAGING_DIR = "import-staging";
+const RECONCILE_STAGING_DIR = "reconcile-staging";
 
 /**
  * The photo write target. Each maps to a `contactId`-derivable (or fixed, for
@@ -162,6 +164,16 @@ export function importStagingRelPath(
   return relative;
 }
 
+/** A flat durable staging name for one evictable reconciliation source photo. */
+export function reconcileStagingRelPath(token: string): string {
+  if (!/^[A-Za-z0-9_-]+$/.test(token)) {
+    throw new Error("unsafe reconcile staging token");
+  }
+  const relative = `${RECONCILE_STAGING_DIR}/reconcile-${token}.jpg`;
+  assertSafeReconcileStagingRelative(relative);
+  return relative;
+}
+
 /** Stage into an unambiguous temporary name, then atomically rename it ready. */
 export async function stageRestorePending(
   srcUri: string,
@@ -192,6 +204,27 @@ export async function stageImportPhoto(
   const tmpRelative = `${relative}.stage-tmp`;
   assertSafeImportStagingRelative(tmpRelative);
   new Directory(Paths.document, IMPORT_STAGING_DIR).create({
+    intermediates: true,
+    idempotent: true,
+  });
+  await new File(cacheUri).copy(new File(Paths.document, tmpRelative), {
+    overwrite: true,
+  });
+  await new File(Paths.document, tmpRelative).move(
+    new File(Paths.document, relative),
+    { overwrite: true },
+  );
+}
+
+/** Move a picker cache photo into reconciliation's durable document staging. */
+export async function stageReconcilePhoto(
+  cacheUri: string,
+  relative: string,
+): Promise<void> {
+  assertSafeReconcileStagingRelative(relative);
+  const tmpRelative = `${relative}.stage-tmp`;
+  assertSafeReconcileStagingRelative(tmpRelative);
+  new Directory(Paths.document, RECONCILE_STAGING_DIR).create({
     intermediates: true,
     idempotent: true,
   });
@@ -254,6 +287,20 @@ export function listImportStagingPhotos(): Array<{
   });
 }
 
+/** List every reconciliation staging file for launch-time orphan cleanup. */
+export function listReconcileStagingPhotos(): Array<{
+  relative: string;
+  isStageTmpOrphan: boolean;
+}> {
+  const directory = new Directory(Paths.document, RECONCILE_STAGING_DIR);
+  if (!directory.exists) return [];
+  return directory.list().map((entry) => {
+    const relative = `${RECONCILE_STAGING_DIR}/${entry.name}`;
+    assertSafeReconcileStagingRelative(relative);
+    return { relative, isStageTmpOrphan: relative.endsWith(".stage-tmp") };
+  });
+}
+
 /** Best-effort cleanup for recovery-only files. */
 export function deleteRestorePending(relative: string): void {
   assertSafeRestorePendingRelative(relative);
@@ -271,6 +318,16 @@ export function deleteImportStaging(relative: string): void {
     new File(Paths.document, relative).delete();
   } catch (error) {
     Logger.error(LOG_SCOPE, "import staging cleanup failed", error);
+  }
+}
+
+/** Best-effort cleanup for completed/discarded reconciliation reviews. */
+export function deleteReconcileStaging(relative: string): void {
+  assertSafeReconcileStagingRelative(relative);
+  try {
+    new File(Paths.document, relative).delete();
+  } catch (error) {
+    Logger.error(LOG_SCOPE, "reconcile staging cleanup failed", error);
   }
 }
 
@@ -309,6 +366,15 @@ export function resolveRestorePendingUri(relative: string): string {
 /** Preview-only resolver; import staging can never be passed to Avatar. */
 export function resolveImportStagingUri(relative: string): string {
   assertSafeImportStagingRelative(relative);
+  const base = Paths.document.uri.endsWith("/")
+    ? Paths.document.uri
+    : `${Paths.document.uri}/`;
+  return `${base}${relative}`;
+}
+
+/** Preview-only resolver; reconciliation staging is never a canonical photo path. */
+export function resolveReconcileStagingUri(relative: string): string {
+  assertSafeReconcileStagingRelative(relative);
   const base = Paths.document.uri.endsWith("/")
     ? Paths.document.uri
     : `${Paths.document.uri}/`;
