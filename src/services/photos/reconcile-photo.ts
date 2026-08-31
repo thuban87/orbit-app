@@ -20,12 +20,26 @@ export interface ReconcilePhotoFs {
   contactPhotoRelPath: (contactId: number) => string;
 }
 
+/**
+ * SHA-256 of the staged bytes as lowercase hex. Hermes exposes no WebCrypto
+ * global — `globalThis.crypto` is `undefined` there (uid.ts guards the same
+ * value for exactly this reason) — so fall back to RNQC, the app's sole
+ * production cryptographic primitive. Both branches emit identical hex, so the
+ * hash flowing into `photoContentHash`/the classifier/`reconcile_source_snapshot`
+ * is unchanged. The WebCrypto branch is the one node/vitest exercises; the
+ * require is delayed so those tests never resolve the native module.
+ */
 async function digest(bytes: Uint8Array): Promise<string> {
-  const hash = await globalThis.crypto.subtle.digest(
-    "SHA-256",
-    bytes as unknown as BufferSource,
-  );
-  return Array.from(new Uint8Array(hash), (byte) => byte.toString(16).padStart(2, "0")).join("");
+  const webCrypto = globalThis.crypto;
+  if (webCrypto?.subtle) {
+    const hash = await webCrypto.subtle.digest("SHA-256", bytes as unknown as BufferSource);
+    return Array.from(new Uint8Array(hash), (byte) => byte.toString(16).padStart(2, "0")).join("");
+  }
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const quickCrypto = require("react-native-quick-crypto") as {
+    createHash(algorithm: string): { update(data: Uint8Array): { digest(encoding: string): string } };
+  };
+  return quickCrypto.createHash("sha256").update(bytes).digest("hex");
 }
 
 async function readStagedBytes(uri: string): Promise<Uint8Array> {
