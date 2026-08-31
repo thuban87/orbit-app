@@ -20,7 +20,7 @@ function questionFor(channel: "call" | "text" | "email", name: string): string {
   }
 }
 
-/** A shell overlay, intentionally not a Modal so Android Back remains untouched. */
+/** A shell overlay that leaves Android Back untouched. */
 export function AssistBanner() {
   const { colors } = useTheme();
   const newest = useAssistBanner((state) => state.newest);
