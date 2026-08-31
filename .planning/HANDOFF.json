@@ -1,0 +1,76 @@
+{
+  "version": "1.0",
+  "timestamp": "2026-08-31T23:10:08.497Z",
+  "phase": "21",
+  "phase_name": "Interaction Assist & Reach Out",
+  "phase_dir": ".planning/phases/21-interaction-assist-reach-out",
+  "plan": 6,
+  "task": 2,
+  "total_tasks": 3,
+  "status": "paused",
+  "completed_tasks": [
+    {
+      "id": "21-01..21-05",
+      "name": "Data spine, Reach Out UI, endpoint selector/Compose seam, settings/sweep, and merge/purge/widget wiring",
+      "status": "done",
+      "commits": ["dd9e556", "ccdf16f", "e4ab3ec", "40e185c", "3f63f47", "c241353", "8baad37", "16cc323", "aea3d79", "b260194", "12c16ad", "835b591", "0e11a1c", "d4ad57e", "f770be8", "9bd4090", "d896d67", "6357c15", "78c158e", "42fdd8b", "04dd4a7"]
+    },
+    {
+      "id": 1,
+      "name": "Consolidate settings reads, full node gate, and UAT scaffold",
+      "status": "done",
+      "commit": "a84a3d8"
+    }
+  ],
+  "remaining_tasks": [
+    {
+      "id": 2,
+      "name": "Owner checkpoint before the device build/UAT",
+      "status": "blocked",
+      "progress": "User requested a handoff to another session; the next session must still receive a resume signal once the Pixel is connected and authorized."
+    },
+    {
+      "id": 3,
+      "name": "Build DEBUG APK and drive the Pixel UAT matrix with WAL-aware run-as DB evidence",
+      "status": "not_started"
+    }
+  ],
+  "blockers": [
+    {
+      "description": "Plan 21-06 Task 2 is an explicit blocking-human gate before SSH build, Metro, adb, or Pixel interaction.",
+      "type": "human_action",
+      "workaround": "None. Wait for the owner to say continue and ensure exactly one authorized Pixel is visible through adb."
+    }
+  ],
+  "async_jobs": [],
+  "human_actions_pending": [
+    {
+      "action": "Connect and authorize the Pixel 6 Pro, then tell the next session to continue.",
+      "context": "Task 3 must use a DEBUG build, live Metro, and per-row device/DB verification; an unauthorized USB prompt can only be accepted by the owner.",
+      "blocking": true
+    }
+  ],
+  "decisions": [
+    {
+      "decision": "Only explicit owner/external-action gates may pause execution.",
+      "rationale": "An executor incorrectly paused at the 21-01 internal tracer-feedback check; the owner explicitly approved continuation and asked not to be stopped by internal gates.",
+      "phase": "21"
+    },
+    {
+      "decision": "Use the existing Pixel DEBUG + Metro workflow for phase close-out.",
+      "rationale": "DEBUG is required for run-as database evidence; release-only verification cannot close this phase.",
+      "phase": "21"
+    }
+  ],
+  "uncommitted_files": [
+    ".planning/STATE.md",
+    ".planning/config.json",
+    "docs/dossier/21-interaction-assist-reach-out.md",
+    ".gsd/",
+    ".planning/debug/wave1-integration-regressions.md",
+    ".planning/phases/20-contact-reconciliation-merge/uat-shots/",
+    "docs/dossier/milestone-2/"
+  ],
+  "next_action": "Run $gsd-resume-work, read the Phase 21 continuation handoff and Plan 21-06, then wait for the owner to confirm the Pixel is connected and authorized before executing Task 3.",
+  "context_notes": "All implementation work is committed. Phase 21 is paused precisely between 21-06 Task 1 and its designed device-UAT checkpoint; do not create a 21-06 summary or mark the phase complete until Task 3 produces the DB-backed UAT evidence."
+}
