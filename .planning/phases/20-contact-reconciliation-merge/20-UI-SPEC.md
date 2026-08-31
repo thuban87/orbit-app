@@ -348,8 +348,10 @@ merge fixed field, merge custom-field scalar) — do not fork per call site (Clu
 - Only conflicting scalar fields render — non-conflicting fixed + custom values combine automatically
   (Cluster W/Z); identical canonical methods dedupe; distinct methods are all preserved (Cluster X) —
   none of that is shown as a choice. Each genuine scalar conflict (name, birthday, category, photo,
-  scalar custom fields) renders a `FieldChoiceGroup` (#5) / `PhotoChoice` (#6), survivor value
-  preselected but overridable.
+  scalar custom fields) renders a `FieldChoiceGroup` (#5) / `PhotoChoice` (#6) in `conflict` mode with
+  NO preselection — the user must choose explicitly, and Continue stays disabled until every conflict
+  is resolved (owner ruling 2026-08-30, reconciling the earlier #5-vs-#12 inconsistency in favour of the
+  #5 widget contract; a future survivor-preselected default is possible but out of scope now).
 - **Primary-method contention (Cluster X):** a primary phone/email choice appears **only when both
   contacts contribute competing primary methods**; otherwise deterministic promotion applies silently.
   Reuse `ContactMethodsEditor`'s primary-choose model for that one case.
