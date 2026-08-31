@@ -17,8 +17,8 @@
  *     `contacts.last_contact` touch. Compose is NOT a touchpoint; the DATA-04
  *     single-writer invariant stays intact. Logging stays a separate, explicit
  *     profile action.
- *   - Send uses `expo-sms.sendSMSAsync` (native address+body marshalling) — no
- *     hand-rolled `sms:` URI string, and no react-native URL-scheme module.
+ *   - Send delegates native address+body marshalling to the shared Reach Out
+ *     handoff — no hand-rolled `sms:` URI string or URL-scheme module.
  *   - No AI-Suggest control is built here (Phase 14 owns it) — only a comment
  *     slot is reserved.
  *   - Every colour resolves through `useTheme().colors.*` — zero hex literals
@@ -89,6 +89,7 @@ import { AiError, AiService } from "@/services/AiService";
 import type { AiCloudProviderId } from "@/services/ai-types";
 import { formatFuelAge } from "@/services/fuel-age";
 import { fuelKindLabel } from "@/services/fuel-kind-label";
+import { performReachOut } from "@/services/reach-out/handoff";
 import { useTheme } from "@/theme";
 import { Logger } from "@/utils/logger";
 
@@ -429,8 +430,8 @@ export function ComposeScreen({
   }, []);
 
   // Send — in-flight latched (A3). Returns early while a handoff is open AND when
-  // there is no phone (C1 — narrows phone to a non-null string for sendSMSAsync and
-  // guards a stale handler), then opens the OS SMS composer pre-filled. Resets the
+  // there is no phone (C1 — narrows the canonical destination and guards a stale
+  // handler), then opens the OS SMS composer pre-filled. Resets the
   // latch in `finally` so both a resolved and a thrown handoff release it (a rapid
   // double-tap cannot launch two composers). Writes NOTHING to the DB.
   const onSend = useCallback(async () => {
@@ -443,19 +444,24 @@ export function ComposeScreen({
     }
     setSending(true);
     try {
-      await SMS.sendSMSAsync(phone, draft);
-      // Android returns { result: 'unknown' } — do NOT render a "sent"
-      // confirmation and do NOT write any interaction/log row.
-    } catch (err) {
-      Logger.error(LOG_SCOPE, "failed to open SMS composer", err);
-      Alert.alert(
-        "Couldn't open your messages app",
-        "Your message is ready to copy instead.",
-      );
+      const exec = getExecutor();
+      const assistSetting = await exec.getFirstAsync<{
+        interaction_assist_enabled: number;
+      }>("SELECT interaction_assist_enabled FROM app_settings WHERE id = 1");
+      // M2 Phase 12 owns Compose UX, but Send always shares this handoff-to-native
+      // plus assist-creation seam and never writes an interaction directly.
+      await performReachOut(exec, {
+        contactId,
+        channel: "text",
+        endpoint: phone,
+        assistEnabled: assistSetting?.interaction_assist_enabled !== 0,
+        now: localDateTime(),
+        messageBody: draft,
+      });
     } finally {
       setSending(false);
     }
-  }, [sending, header?.actionablePhone, draft]);
+  }, [sending, header?.actionablePhone, contactId, draft]);
 
   // Copy — the guaranteed handoff, NEVER gated by `sending`. On success show a
   // transient "Copied" for ~2s via setState + setTimeout (not a per-frame anim).
