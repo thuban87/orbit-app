@@ -445,16 +445,14 @@ export function ComposeScreen({
     setSending(true);
     try {
       const exec = getExecutor();
-      const assistSetting = await exec.getFirstAsync<{
-        interaction_assist_enabled: number;
-      }>("SELECT interaction_assist_enabled FROM app_settings WHERE id = 1");
+      const settings = await getAppSettings(exec);
       // M2 Phase 12 owns Compose UX, but Send always shares this handoff-to-native
       // plus assist-creation seam and never writes an interaction directly.
       await performReachOut(exec, {
         contactId,
         channel: "text",
         endpoint: phone,
-        assistEnabled: assistSetting?.interaction_assist_enabled !== 0,
+        assistEnabled: settings.interactionAssistEnabled === 1,
         now: localDateTime(),
         messageBody: draft,
       });

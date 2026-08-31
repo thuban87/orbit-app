@@ -30,6 +30,9 @@ import { migration008 } from "@/db/migrations/008-restore-photo-journal";
 import { migration009 } from "@/db/migrations/009-contact-method-normalization";
 import { migration010 } from "@/db/migrations/010-contact-method-label";
 import { migration011 } from "@/db/migrations/011-contact-lifecycle-schema";
+import { migration012 } from "@/db/migrations/012-import-sessions";
+import { migration013 } from "@/db/migrations/013-reconciliation-and-merge";
+import { migration014 } from "@/db/migrations/014-interaction-assists";
 import { runMigrations } from "@/db/migrations/runner";
 import type { SqlExecutor } from "@/db/types";
 import { __resetSweepForTest, runLaunchSweep } from "@/services/launch-sweep";
@@ -75,8 +78,7 @@ beforeEach(async () => {
   uidCounter = 0;
   const db = openTestDb();
   exec = nodeSqliteExecutor(db);
-  // Current schema: getAppSettings reads method-region state added in v9, and
-  // method reads expect the durable label column added in v10.
+  // Current schema: getAppSettings reads interaction-assist state added in v14.
   await runMigrations(
     exec,
     [
@@ -91,8 +93,11 @@ beforeEach(async () => {
       migration009,
       migration010,
       migration011,
+      migration012,
+      migration013,
+      migration014,
     ],
-    11,
+    14,
     { now: NOW, newUid: uid, defaultPhoneRegion: "US" },
   );
   __resetExpo();

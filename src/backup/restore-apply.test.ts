@@ -41,17 +41,19 @@ import { migration009 } from "@/db/migrations/009-contact-method-normalization";
 import { migration010 } from "@/db/migrations/010-contact-method-label";
 import { migration011 } from "@/db/migrations/011-contact-lifecycle-schema";
 import { migration012 } from "@/db/migrations/012-import-sessions";
+import { migration013 } from "@/db/migrations/013-reconciliation-and-merge";
+import { migration014 } from "@/db/migrations/014-interaction-assists";
 import { runMigrations } from "@/db/migrations/runner";
 import type { SqlExecutor } from "@/db/types";
 
 const NOW = "2026-08-25 12:00:00";
 let uid = 0;
 const newUid = () => `uid-${++uid}`;
-const migrations = [migration001, migration002, migration003, migration004, migration005, migration006, migration007, migration008, migration009, migration010, migration011, migration012];
+const migrations = [migration001, migration002, migration003, migration004, migration005, migration006, migration007, migration008, migration009, migration010, migration011, migration012, migration013, migration014];
 
 async function db(): Promise<SqlExecutor> {
   const exec = nodeSqliteExecutor(openTestDb());
-  await runMigrations(exec, migrations, 12, { now: NOW, newUid });
+  await runMigrations(exec, migrations, 14, { now: NOW, newUid });
   return exec;
 }
 

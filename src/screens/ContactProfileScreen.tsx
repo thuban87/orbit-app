@@ -244,7 +244,6 @@ export function ContactProfileScreen({
         settings,
         defs,
         methods,
-        assistSetting,
         externalLink,
       ] = await Promise.all([
         getContactHeader(exec, contactId),
@@ -256,9 +255,6 @@ export function ContactProfileScreen({
         getAppSettings(exec),
         listDefs(exec, { includeQuarantined: false }),
         listContactMethodGroups(exec, contactId),
-        exec.getFirstAsync<{ interaction_assist_enabled: number }>(
-          "SELECT interaction_assist_enabled FROM app_settings WHERE id = 1",
-        ),
         exec.getFirstAsync<{ id: number }>(
           "SELECT id FROM external_contact_links WHERE contact_id = ? AND is_active = 1 ORDER BY id ASC LIMIT 1",
           [contactId],
@@ -270,9 +266,7 @@ export function ContactProfileScreen({
       setFieldDefs(defs);
       setCustomValues(values);
       setMethodGroups(methods);
-      // Migration 014 defaults the setting to enabled. Keep the safe enabled
-      // default if a corrupted pre-migration row is ever unavailable.
-      setAssistEnabled(assistSetting?.interaction_assist_enabled !== 0);
+      setAssistEnabled(settings.interactionAssistEnabled === 1);
       setTimeline(rows);
       setStatus(statusRow);
       setFuel(fuelRows);
