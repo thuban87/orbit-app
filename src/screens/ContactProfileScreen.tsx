@@ -786,6 +786,11 @@ export function ContactProfileScreen({
         <OverflowMenu
           actions={[
             {
+              label: "Merge with another contact",
+              testID: "contact-profile-merge",
+              onPress: () => navigation.navigate("SurvivorSelect", { firstContactId: contactId }),
+            },
+            {
               label: "Archive",
               testID: "contact-profile-archive",
               onPress: () => void doArchive(),

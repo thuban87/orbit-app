@@ -124,6 +124,8 @@ export type RootStackParamList = {
   ImportProgress: { sessionId: number; batchCategoryId: number | null };
   DuplicateReview: { sessionId: number };
   ImportComplete: { sessionId: number };
+  SurvivorSelect: { firstContactId: number; secondContactId?: number };
+  MergeImpactSummary: { survivorId: number; absorbedId: number };
 };
 
 /**
