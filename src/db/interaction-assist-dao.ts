@@ -83,7 +83,7 @@ export function markAssistLogged(
     const assist = await exec.getFirstAsync<PendingAssistRow>(ASSIST_SELECT, [
       input.assistUid,
     ]);
-    if (!assist || assist.status !== "pending") return;
+    if (assist?.status !== "pending") return;
 
     // Match every sibling interaction writer: validate before opening a txn.
     rejectFutureOccurredAt(assist.handoff_at, input.now);
@@ -93,17 +93,22 @@ export function markAssistLogged(
         ASSIST_SELECT,
         [input.assistUid],
       );
-      if (!transactionAssist || transactionAssist.status !== "pending") return;
+      if (transactionAssist?.status !== "pending") return;
 
-      await insertInteractionCore(exec, transactionAssist.contact_id, input.now, {
-        uid: newUid(),
-        occurredAt: transactionAssist.handoff_at,
-        channel: transactionAssist.channel,
-        direction: "outbound",
-        connected: input.connected,
-        note: input.note ?? null,
-        source: "assist",
-      });
+      await insertInteractionCore(
+        exec,
+        transactionAssist.contact_id,
+        input.now,
+        {
+          uid: newUid(),
+          occurredAt: transactionAssist.handoff_at,
+          channel: transactionAssist.channel,
+          direction: "outbound",
+          connected: input.connected,
+          note: input.note ?? null,
+          source: "assist",
+        },
+      );
       await recomputeLastContactCore(
         exec,
         transactionAssist.contact_id,

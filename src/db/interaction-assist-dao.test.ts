@@ -1,5 +1,11 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { nodeSqliteExecutor, openTestDb } from "@/db/__testkit__/node-sqlite";
+import {
+  createPendingAssist,
+  markAssistDismissed,
+  markAssistFailed,
+  markAssistLogged,
+} from "@/db/interaction-assist-dao";
 import { migration001 } from "@/db/migrations/001-initial";
 import { migration002 } from "@/db/migrations/002-app-settings";
 import { migration003 } from "@/db/migrations/003-orrery-settings";
@@ -14,12 +20,6 @@ import { migration011 } from "@/db/migrations/011-contact-lifecycle-schema";
 import { migration012 } from "@/db/migrations/012-import-sessions";
 import { migration013 } from "@/db/migrations/013-reconciliation-and-merge";
 import { migration014 } from "@/db/migrations/014-interaction-assists";
-import {
-  createPendingAssist,
-  markAssistDismissed,
-  markAssistFailed,
-  markAssistLogged,
-} from "@/db/interaction-assist-dao";
 import { runMigrations } from "@/db/migrations/runner";
 import type { SqlExecutor } from "@/db/types";
 
@@ -162,8 +162,16 @@ describe("interaction assist write DAO", () => {
 
     await markAssistDismissed(exec, { assistUid: dismissedUid, now: NOW });
     await markAssistFailed(exec, { assistUid: failedUid, now: NOW });
-    await markAssistLogged(exec, { assistUid: dismissedUid, connected: 1, now: NOW });
-    await markAssistLogged(exec, { assistUid: failedUid, connected: 1, now: NOW });
+    await markAssistLogged(exec, {
+      assistUid: dismissedUid,
+      connected: 1,
+      now: NOW,
+    });
+    await markAssistLogged(exec, {
+      assistUid: failedUid,
+      connected: 1,
+      now: NOW,
+    });
 
     expect(await exec.getAllAsync("SELECT id FROM interactions")).toEqual([]);
   });
@@ -208,13 +216,18 @@ describe("interaction assist write DAO", () => {
     let assistSelects = 0;
     exec = {
       ...baseExec,
-      async getFirstAsync<T>(sql: string, params?: unknown[]): Promise<T | null> {
+      async getFirstAsync<T>(
+        sql: string,
+        params?: unknown[],
+      ): Promise<T | null> {
         if (sql.includes("FROM interaction_assists") && ++assistSelects === 2) {
           await baseExec.runAsync(
             "UPDATE interaction_assists SET contact_id = ? WHERE uid = ?",
             [survivorId, assistUid],
           );
-          await baseExec.runAsync("DELETE FROM contacts WHERE id = ?", [absorbedId]);
+          await baseExec.runAsync("DELETE FROM contacts WHERE id = ?", [
+            absorbedId,
+          ]);
         }
         return baseExec.getFirstAsync<T>(sql, params);
       },
@@ -247,11 +260,15 @@ describe("interaction assist write DAO", () => {
     let assistSelects = 0;
     exec = {
       ...baseExec,
-      async getFirstAsync<T>(sql: string, params?: unknown[]): Promise<T | null> {
+      async getFirstAsync<T>(
+        sql: string,
+        params?: unknown[],
+      ): Promise<T | null> {
         if (sql.includes("FROM interaction_assists") && ++assistSelects === 2) {
-          await baseExec.runAsync("DELETE FROM interaction_assists WHERE uid = ?", [
-            assistUid,
-          ]);
+          await baseExec.runAsync(
+            "DELETE FROM interaction_assists WHERE uid = ?",
+            [assistUid],
+          );
         }
         return baseExec.getFirstAsync<T>(sql, params);
       },
