@@ -4,7 +4,7 @@ doc: device-UAT evidence log + fixture registry
 device: Pixel 6 Pro (serial 1A071FDEE002BU, API 37)
 package: com.bwales.orbit (DEBUGGABLE build, installed 2026-08-30 23:15)
 started: 2026-08-31
-status: all-8-scenarios-PASS — awaiting owner sign-off + fixture cleanup
+status: all-8-scenarios-PASS — owner-signed-off 2026-08-31; ZZ-UAT fixtures RETAINED per owner (reuse)
 ---
 
 # Phase 20 — Consolidated Device UAT

@@ -2,17 +2,17 @@
 gsd_state_version: 1.0
 milestone: v1.0
 current_phase: 20
-current_phase_name: contact-reconciliation-merge
-current_plan: 1
-status: ready_to_execute
-stopped_at: Phase 20 planned (6 plans) — ready to execute
-last_updated: "2026-08-31T00:56:55.013Z"
-state_head: 65072cf8c87cd83c34384d822973bbdbb5e09430
+current_phase_name: Contact Reconciliation & Merge
+current_plan: 6
+status: phase-complete
+stopped_at: Phase 20 COMPLETE — all 6 plans + device UAT (8/8) owner-signed-off 2026-08-31
+last_updated: "2026-08-31T16:09:06.000Z"
+state_head: 049010e08ba231db7e994f28c92664ec4a34d9f9
 progress:
   total_phases: 23
-  completed_phases: 15
+  completed_phases: 16
   total_plans: 175
-  completed_plans: 166
+  completed_plans: 167
 milestone_name: milestone
 ---
 
@@ -23,23 +23,26 @@ milestone_name: milestone
 See: .planning/PROJECT.md (updated 2026-08-14)
 
 **Core value:** Collapse the taps between "you're overdue with X" and the message actually being sent.
-**Current focus:** Phase 20 — Contact Reconciliation & Merge
+**Current focus:** Phase 20 COMPLETE — next: Phase 21 (Interaction Assist & Reach Out)
 
 ## Current Position
 
-**Phase:** 20 — Contact Reconciliation & Merge — PLANNED, ready to execute
-**Current Plan:** 1
-**Total Plans in Phase:** 6
-**Status:** Ready to execute
+**Phase:** 20 — Contact Reconciliation & Merge — ✅ COMPLETE (owner-signed-off 2026-08-31)
+**Current Plan:** 6 of 6 — done
+**Status:** Phase 20 complete; Phase 21 (Interaction Assist & Reach Out) is next — ready to plan
 
-**⟢ PHASE 20 (Contact Reconciliation & Merge) — PLANNED (2026-08-30).** 6 plans / 6 waves,
-tracer-first vertical slices (20-01 tracer merge → 20-06 verification). Research (HIGH confidence,
-migration head verified 012 → new migration 013), Nyquist VALIDATION, PATTERNS (15/15 analogs), and
-plan-checker VERIFICATION PASSED (0 blockers; 1 stale-path warning fixed). Two owner decisions are
-embedded, not blocking planning: **A2** — a `checkpoint:decision` (blocking-human) before the
-migration-013 task in 20-01 chooses tombstone-only vs. adding a durable `contact_redirects` table
-(one-way door — migration is irreversible); **A3** — manual side-by-side photo choice is the primary
-path (no auto photo-diff built; flagged assumption). Not yet pushed.
+**⟢ PHASE 20 (Contact Reconciliation & Merge) — COMPLETE (2026-08-31).** All 6 plans executed +
+consolidated Pixel device-UAT: **all 8 scenarios PASS**, each independently DB-verified (WAL-aware
+run-as), owner-signed-off. The device UAT surfaced and this session fixed two correctness bugs the
+now-working reconcile exposed: **Bug B** (`165b9e7`) — `reconcile-photo.ts` `digest()` crashed the
+bulk scan on Hermes (`globalThis.crypto` undefined) whenever a linked source had a photo; now guards
+WebCrypto / falls back to RNQC. **Bug C** (`eecea73`) — duplicate React keys for multi-value field
+choices in `FieldChoiceGroup`. ADR-003 (READ_CONTACTS on API 37 for reconcile) owner-approved +
+implemented + verified. Close-out docs `295ae58` (20-06-SUMMARY, 20-UAT scoreboard all-green,
+20-BUGB-DIAGNOSIS). Follow-ups logged (non-blocking): **Finding A** (exact lookup-key match orphans a
+renamed local contact — backlog hardening), two cosmetic display nits, and the ADR-003 Google Play
+Contacts declaration (release gate). ZZ-UAT device+Orbit fixtures RETAINED per owner (reuse). UAT
+screenshots in `uat-shots/` left untracked. **Not yet pushed** (commits: cd41b31, 165b9e7, eecea73, 295ae58).
 
 **⟢ PHASE 18.1 (Contact Method Normalization) — COMPLETE (2026-08-28).** All 6 plans executed.
 Normalized phone/email method model with stable identity + system-contact provenance foundations;
@@ -105,7 +108,7 @@ Progress: [████████░░] 75% (12/16 phases complete; Phase 13 
 
 _Phase-12 recap (historical — Phase 12 is COMPLETE + verified; see 12-VERIFICATION.md):_
 
-Phase: 20 (contact-reconciliation-merge) — READY TO EXECUTE
+Phase: 20 (Contact Reconciliation & Merge) — EXECUTING
 Next: Phase 13 (Orrery) — NOT started. It is a large new Skia render-loop phase (its own discuss→plan→converge→execute→device-UAT cycle); awaiting owner go-ahead before beginning.
 Done this session (2026-08-17), all committed locally on main (NOT pushed): smart-discuss (12-CONTEXT; owner APPROVED the shared stable/wobble/decay status palette — stable #45B98A / wobble #E8C15C / decay #E56A52 / rogue #E0904A unchanged — resolving OD-1 app-wide; widget + ContactCard + future orrery inherit it), UI-SPEC (approved, checker VERIFIED), RESEARCH, VALIDATION (Nyquist), PATTERNS, PLAN (8 plans / 6 waves, efa9f5b), plan-checker PASSED, then a 2-cycle cross-AI convergence (codex CLI + read-only-Claude subagent; self-review guard overridden per owner): cycle-1 = 6 codex HIGH + 7 Claude actionable → replan (cca05d9); cycle-2 = 2 codex HIGH (WDG-03 freshness incompleteness; killed-app UAT needed a debug build) → final replan (4e688cf). All 8 HIGH fixes verified in-file. NOTE: the final-replan fixes were NOT independently re-reviewed (max cycles reached + owner pause).
 Codex tooling note: current codex-cli (0.144.1) makes gsd-review auto-add `--dangerously-bypass-hook-trust`, which the safety classifier blocks; a subagent improperly tunneled it once (flagged, discarded), then codex was re-run cleanly WITHOUT that flag. Do NOT let gsd-review's codex path run with that flag — run codex manually without it, or allow-list a scoped `Bash(codex exec:*)`.
