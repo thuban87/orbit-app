@@ -14,6 +14,7 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { BackupEncryptionBenchmarkHarness } from "@/components/BackupEncryptionBenchmarkHarness";
 import { ResumeImportPrompt } from "@/components/ResumeImportPrompt";
+import { ResumeReconcilePrompt } from "@/components/ResumeReconcilePrompt";
 import { getExecutor, openAndMigrate } from "@/db/database";
 import { isMigration006IntegrityError } from "@/db/migrations/006-normalize-custom-field-values";
 import { navigationRef, ShareIntentGate } from "@/navigation/linking";
@@ -27,7 +28,12 @@ import {
   type ResumableImport,
   registerImportResumeSweep,
 } from "@/services/import/contact-import-resume-sweep";
+import {
+  type ResumableReconcile,
+  registerReconcileResumeSweep,
+} from "@/services/import/reconcile-resume-sweep";
 import { installSweepTrigger } from "@/services/launch-sweep";
+import { resolveActiveResumePrompt } from "@/services/resume-prompt-precedence";
 // Module-scope side-effect import (Pitfall P5): importing headless-task RUNS its
 // `TaskManager.defineTask` + `registerTaskAsync` so a killed-app action tap reaches
 // the headless write path. React never mounts in the headless context, so no
@@ -109,6 +115,7 @@ let widgetSweepRegistered = false;
 // One-shot guard for the durable import resume hook. It is ready-gated with the
 // other launch hooks so Strict Mode/remounts cannot double-prompt a session.
 let importResumeSweepRegistered = false;
+let reconcileResumeSweepRegistered = false;
 
 function AppShell() {
   const { colors } = useTheme();
@@ -122,6 +129,8 @@ function AppShell() {
   const [navReady, setNavReady] = useState(false);
   const [resumableImport, setResumableImport] =
     useState<ResumableImport | null>(null);
+  const [resumableReconcile, setResumableReconcile] =
+    useState<ResumableReconcile | null>(null);
 
   // 1. Migrate before first render. Hold `ready` false until it resolves. A
   //    rejection (failed migration) is caught so the app surfaces a themed error
@@ -206,6 +215,10 @@ function AppShell() {
       registerImportResumeSweep(setResumableImport, { getExecutor });
       importResumeSweepRegistered = true;
     }
+    if (!reconcileResumeSweepRegistered) {
+      registerReconcileResumeSweep(setResumableReconcile, { getExecutor });
+      reconcileResumeSweepRegistered = true;
+    }
 
     // item 6 / A1: AWAIT channels + the action category into existence BEFORE the
     // trigger fires the cold-start reconcile (which begins scheduling immediately).
@@ -288,10 +301,20 @@ function AppShell() {
           (pre-ready intents queue in the gate and flush on navReady). */}
       <WidgetLinkingGate isReady={navReady} />
       <RootNavigator />
-      <ResumeImportPrompt
-        resumable={resumableImport}
-        onDismiss={() => setResumableImport(null)}
-      />
+      {resolveActiveResumePrompt(resumableImport, resumableReconcile) ===
+      "import" ? (
+        <ResumeImportPrompt
+          resumable={resumableImport}
+          onDismiss={() => setResumableImport(null)}
+        />
+      ) : null}
+      {resolveActiveResumePrompt(resumableImport, resumableReconcile) ===
+      "reconcile" ? (
+        <ResumeReconcilePrompt
+          resumable={resumableReconcile}
+          onDismiss={() => setResumableReconcile(null)}
+        />
+      ) : null}
     </NavigationContainer>
   );
 }

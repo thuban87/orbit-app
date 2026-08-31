@@ -30,6 +30,7 @@ import {
   SEED_CATALOG,
 } from "@/ai/model-registry";
 import { PhotoSourcePicker } from "@/components/PhotoSourcePicker";
+import { ResumeReconcilePrompt } from "@/components/ResumeReconcilePrompt";
 import {
   type AppSettings,
   type AppSettingsPatch,
@@ -40,6 +41,7 @@ import { getContactHeader } from "@/db/contact-read";
 import { getExecutor, localDateTime } from "@/db/database";
 import { getProfile } from "@/db/profile-dao";
 import { getNewestPendingReconcileSessionId } from "@/db/reconcile-session-read";
+import type { ResumableReconcile } from "@/services/import/reconcile-resume-sweep";
 import { listSunCandidates, type SunCandidate } from "@/db/sun-picker-read";
 import { sunOccupantIsSelf } from "@/logic/sun-occupant-logic";
 import type { RootStackParamList } from "@/navigation/types";
@@ -147,6 +149,8 @@ export function SettingsScreen() {
   const [activePicker, setActivePicker] = useState<ActivePicker>(null);
   const [phoneRegionPickerOpen, setPhoneRegionPickerOpen] = useState(false);
   const [phoneRegionSearch, setPhoneRegionSearch] = useState("");
+  const [resumableReconcile, setResumableReconcile] =
+    useState<ResumableReconcile | null>(null);
 
   const onImportContacts = useCallback(async () => {
     try {
@@ -169,12 +173,7 @@ export function SettingsScreen() {
     try {
       const pendingId = await getNewestPendingReconcileSessionId(getExecutor());
       if (pendingId !== null) {
-        // Resume/Discard owns its prompt in Plan 20-05. Until then, failing
-        // closed is safer than creating a second session that hides this work.
-        Alert.alert(
-          "Finish your existing check",
-          "You have an unfinished linked contacts check. Resume or discard it before starting another one.",
-        );
+        setResumableReconcile({ sessionId: pendingId, discardOnly: false });
         return;
       }
       navigation.navigate("ReconcileGrid");
@@ -796,6 +795,12 @@ export function SettingsScreen() {
           </Text>
         </Pressable>
       </View>
+
+      <ResumeReconcilePrompt
+        resumable={resumableReconcile}
+        onDismiss={() => setResumableReconcile(null)}
+        onDiscarded={() => navigation.navigate("ReconcileGrid")}
+      />
 
       <Modal
         visible={phoneRegionPickerOpen}
