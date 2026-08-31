@@ -3,6 +3,21 @@ import type { SqlExecutor } from "@/db/types";
 
 export type ContactMethodGroups = Record<"phone" | "email", ContactMethodRow[]>;
 
+/**
+ * Select one actionable method per type. The stored primary wins when actionable;
+ * otherwise the first actionable ordered row is the effective primary.
+ */
+export function selectActionablePrimaryMethods(groups: ContactMethodGroups): {
+  phone: ContactMethodRow | null;
+  email: ContactMethodRow | null;
+} {
+  const select = (rows: ContactMethodRow[]) =>
+    rows.find((row) => row.is_primary === 1 && row.is_actionable === 1) ??
+    rows.find((row) => row.is_actionable === 1) ??
+    null;
+  return { phone: select(groups.phone), email: select(groups.email) };
+}
+
 /** Ordered type groups for profile and edit-form reads. */
 export async function listContactMethodGroups(
   exec: SqlExecutor,
@@ -23,18 +38,11 @@ export async function listContactMethodGroups(
   };
 }
 
-/**
- * Select one actionable method per type. The stored primary wins when actionable;
- * otherwise the first actionable ordered row is the effective primary.
- */
 export async function listActionablePrimaryMethods(
   exec: SqlExecutor,
   contactId: number,
 ): Promise<{ phone: ContactMethodRow | null; email: ContactMethodRow | null }> {
-  const groups = await listContactMethodGroups(exec, contactId);
-  const select = (rows: ContactMethodRow[]) =>
-    rows.find((row) => row.is_primary === 1 && row.is_actionable === 1) ??
-    rows.find((row) => row.is_actionable === 1) ??
-    null;
-  return { phone: select(groups.phone), email: select(groups.email) };
+  return selectActionablePrimaryMethods(
+    await listContactMethodGroups(exec, contactId),
+  );
 }

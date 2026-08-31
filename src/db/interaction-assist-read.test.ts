@@ -24,7 +24,22 @@ import { runMigrations } from "@/db/migrations/runner";
 import type { SqlExecutor } from "@/db/types";
 
 const NOW = "2026-08-31 12:00:00";
-const MIGRATIONS = [migration001, migration002, migration003, migration004, migration005, migration006, migration007, migration008, migration009, migration010, migration011, migration012, migration013, migration014];
+const MIGRATIONS = [
+  migration001,
+  migration002,
+  migration003,
+  migration004,
+  migration005,
+  migration006,
+  migration007,
+  migration008,
+  migration009,
+  migration010,
+  migration011,
+  migration012,
+  migration013,
+  migration014,
+];
 let exec: SqlExecutor;
 let counter = 0;
 const uid = () => `read-${++counter}`;
@@ -108,7 +123,11 @@ describe("interaction assist queue reads", () => {
 
   it("selects actionable primaries and derives routes with no database read", () => {
     const phone = method({ id: 2, is_primary: 0 });
-    const email = method({ id: 3, method_type: "email", raw_value: "alex@example.com" });
+    const email = method({
+      id: 3,
+      method_type: "email",
+      raw_value: "alex@example.com",
+    });
     const actionable = selectActionablePrimaryMethods({
       phone: [method({ is_actionable: 0 }), phone],
       email: [email],

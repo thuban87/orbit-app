@@ -15,7 +15,10 @@ describe("assist eligibility", () => {
   });
 
   it("returns the newest eligible row and the count remaining after it", () => {
-    expect(selectBannerState([], NOW)).toEqual({ newest: null, morePendingCount: 0 });
+    expect(selectBannerState([], NOW)).toEqual({
+      newest: null,
+      morePendingCount: 0,
+    });
 
     const rows = [
       {
