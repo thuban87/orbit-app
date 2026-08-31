@@ -194,4 +194,77 @@ describe("interaction assist write DAO", () => {
       ),
     ).toEqual({ last_contact: null });
   });
+
+  it("uses the re-read survivor after an assist is reparented in the confirmation gap", async () => {
+    const survivorId = await contact("Survivor");
+    const absorbedId = await contact("Absorbed");
+    const assistUid = await createPendingAssist(exec, {
+      contactId: absorbedId,
+      channel: "email",
+      endpointValue: "absorbed@example.com",
+      now: "2026-08-31 11:00:00",
+    });
+    const baseExec = exec;
+    let assistSelects = 0;
+    exec = {
+      ...baseExec,
+      async getFirstAsync<T>(sql: string, params?: unknown[]): Promise<T | null> {
+        if (sql.includes("FROM interaction_assists") && ++assistSelects === 2) {
+          await baseExec.runAsync(
+            "UPDATE interaction_assists SET contact_id = ? WHERE uid = ?",
+            [survivorId, assistUid],
+          );
+          await baseExec.runAsync("DELETE FROM contacts WHERE id = ?", [absorbedId]);
+        }
+        return baseExec.getFirstAsync<T>(sql, params);
+      },
+    };
+
+    await markAssistLogged(exec, { assistUid, connected: 1, now: NOW });
+
+    expect(
+      await exec.getFirstAsync<{ contact_id: number }>(
+        "SELECT contact_id FROM interactions",
+      ),
+    ).toEqual({ contact_id: survivorId });
+    expect(
+      await exec.getFirstAsync<{ last_contact: string | null }>(
+        "SELECT last_contact FROM contacts WHERE id = ?",
+        [survivorId],
+      ),
+    ).toEqual({ last_contact: "2026-08-31 11:00:00" });
+  });
+
+  it("safely no-ops when the assist disappears in the confirmation gap", async () => {
+    const contactId = await contact();
+    const assistUid = await createPendingAssist(exec, {
+      contactId,
+      channel: "text",
+      endpointValue: "+15551234567",
+      now: "2026-08-31 11:00:00",
+    });
+    const baseExec = exec;
+    let assistSelects = 0;
+    exec = {
+      ...baseExec,
+      async getFirstAsync<T>(sql: string, params?: unknown[]): Promise<T | null> {
+        if (sql.includes("FROM interaction_assists") && ++assistSelects === 2) {
+          await baseExec.runAsync("DELETE FROM interaction_assists WHERE uid = ?", [
+            assistUid,
+          ]);
+        }
+        return baseExec.getFirstAsync<T>(sql, params);
+      },
+    };
+
+    await markAssistLogged(exec, { assistUid, connected: 1, now: NOW });
+
+    expect(await exec.getAllAsync("SELECT id FROM interactions")).toEqual([]);
+    expect(
+      await exec.getFirstAsync<{ last_contact: string | null }>(
+        "SELECT last_contact FROM contacts WHERE id = ?",
+        [contactId],
+      ),
+    ).toEqual({ last_contact: null });
+  });
 });

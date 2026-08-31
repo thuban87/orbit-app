@@ -36,7 +36,10 @@ describe("registered migration chain", () => {
     expect(
       MIGRATIONS.filter((migration) => migration.version === 13),
     ).toHaveLength(1);
-    expect(TARGET_VERSION).toBe(13);
+    expect(
+      MIGRATIONS.filter((migration) => migration.version === 14),
+    ).toHaveLength(1);
+    expect(TARGET_VERSION).toBe(14);
     expect(
       await exec.getFirstAsync<{ user_version: number }>("PRAGMA user_version"),
     ).toEqual({

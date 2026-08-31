@@ -35,6 +35,7 @@ import { migration010 } from "@/db/migrations/010-contact-method-label";
 import { migration011 } from "@/db/migrations/011-contact-lifecycle-schema";
 import { migration012 } from "@/db/migrations/012-import-sessions";
 import { migration013 } from "@/db/migrations/013-reconciliation-and-merge";
+import { migration014 } from "@/db/migrations/014-interaction-assists";
 import { runMigrations } from "@/db/migrations/runner";
 import type { Migration, SqlExecutor } from "@/db/types";
 import { newUid } from "@/db/uid";
@@ -45,7 +46,7 @@ import { formatLocalDate } from "@/utils/dates";
 /** Milliseconds a busy connection waits before erroring (concurrent headless access). */
 export const BUSY_TIMEOUT_MS = 5000;
 /** The schema version this build expects; the runner migrates up to this. */
-export const TARGET_VERSION = 13;
+export const TARGET_VERSION = 14;
 
 /** The one authoritative migration registration list, shared by bootstrap and tests. */
 export const MIGRATIONS: Migration[] = [
@@ -62,6 +63,7 @@ export const MIGRATIONS: Migration[] = [
   migration011,
   migration012,
   migration013,
+  migration014,
 ];
 
 const DATABASE_NAME = "orbit.db";
