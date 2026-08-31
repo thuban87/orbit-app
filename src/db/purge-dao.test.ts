@@ -30,6 +30,9 @@ import { migration008 } from "@/db/migrations/008-restore-photo-journal";
 import { migration009 } from "@/db/migrations/009-contact-method-normalization";
 import { migration010 } from "@/db/migrations/010-contact-method-label";
 import { migration011 } from "@/db/migrations/011-contact-lifecycle-schema";
+import { migration012 } from "@/db/migrations/012-import-sessions";
+import { migration013 } from "@/db/migrations/013-reconciliation-and-merge";
+import { migration014 } from "@/db/migrations/014-interaction-assists";
 import { runMigrations } from "@/db/migrations/runner";
 import {
   computeImpact,
@@ -65,8 +68,11 @@ beforeEach(async () => {
       migration009,
       migration010,
       migration011,
+      migration012,
+      migration013,
+      migration014,
     ],
-    11,
+    14,
     { now: NOW, newUid: uid },
   );
 });
@@ -329,6 +335,25 @@ describe("purgeContact — archived-guarded one-transaction fan-out (T-04-12/13)
     expect(await ownedRowCount(target)).toBe(0);
     // The second contact keeps all 11 owned rows (contact + 10 children).
     expect(await ownedRowCount(other)).toBe(11);
+  });
+
+  it("removes a pending assist through the contact foreign-key cascade", async () => {
+    const target = await seedContact("Chris");
+    await exec.runAsync(
+      `INSERT INTO interaction_assists
+         (uid, contact_id, channel, endpoint_value, status, handoff_at, created_at, modified_at)
+       VALUES (?, ?, 'call', ?, 'pending', ?, ?, ?)`,
+      [uid(), target, "+15551234567", NOW, NOW, NOW],
+    );
+
+    await purgeContact(exec, target, { now: NOW });
+
+    expect(
+      await exec.getFirstAsync<{ id: number }>(
+        "SELECT id FROM interaction_assists WHERE contact_id = ?",
+        [target],
+      ),
+    ).toBeNull();
   });
 
   it("REJECTS a live (non-archived) contact and deletes NOTHING (write-boundary guard)", async () => {

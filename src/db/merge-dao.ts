@@ -150,7 +150,7 @@ export async function mergeContacts(
       await exec.runAsync("DELETE FROM custom_field_values WHERE contact_id = ? AND field_def_id = ?", [absorbed.id, other.field_def_id]);
     }
 
-    for (const table of ["interactions", "events", "fuel", "custom_field_values", "contact_links", "contact_methods", "external_contact_links"] as const) await reparent(exec, table, survivor.id, absorbed.id, input.now);
+    for (const table of ["interactions", "events", "fuel", "custom_field_values", "contact_links", "contact_methods", "external_contact_links", "interaction_assists"] as const) await reparent(exec, table, survivor.id, absorbed.id, input.now);
     await exec.runAsync("UPDATE field_history SET contact_id = ? WHERE contact_id = ?", [survivor.id, absorbed.id]);
 
     const scalar = resolutions.scalars ?? {};

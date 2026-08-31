@@ -13,12 +13,17 @@ import { migration010 } from "@/db/migrations/010-contact-method-label";
 import { migration011 } from "@/db/migrations/011-contact-lifecycle-schema";
 import { migration012 } from "@/db/migrations/012-import-sessions";
 import { migration013 } from "@/db/migrations/013-reconciliation-and-merge";
+import { migration014 } from "@/db/migrations/014-interaction-assists";
+import {
+  createPendingAssist,
+  markAssistLogged,
+} from "@/db/interaction-assist-dao";
 import { mergeContacts, normalizeMergeResolutions } from "@/db/merge-dao";
 import { runMigrations } from "@/db/migrations/runner";
 import type { SqlExecutor } from "@/db/types";
 
 const NOW = "2026-08-30 12:00:00";
-const MIGRATIONS = [migration001, migration002, migration003, migration004, migration005, migration006, migration007, migration008, migration009, migration010, migration011, migration012, migration013];
+const MIGRATIONS = [migration001, migration002, migration003, migration004, migration005, migration006, migration007, migration008, migration009, migration010, migration011, migration012, migration013, migration014];
 let exec: SqlExecutor;
 let n = 0;
 const uid = () => `uid-${++n}`;
@@ -31,7 +36,7 @@ async function contact(name: string): Promise<number> {
 beforeEach(async () => {
   n = 0;
   exec = nodeSqliteExecutor(openTestDb());
-  await runMigrations(exec, MIGRATIONS, 13, { now: NOW, newUid: uid });
+  await runMigrations(exec, MIGRATIONS, 14, { now: NOW, newUid: uid });
 });
 
 describe("mergeContacts", () => {
@@ -46,6 +51,34 @@ describe("mergeContacts", () => {
     expect(await exec.getFirstAsync<{ contact_id: number }>("SELECT contact_id FROM interactions")).toEqual({ contact_id: survivor });
     expect(await exec.getFirstAsync<{ contact_id: number }>("SELECT contact_id FROM field_history WHERE old_value = 'old'")).toEqual({ contact_id: survivor });
     expect(await exec.getFirstAsync<{ entity_uid: string }>("SELECT entity_uid FROM tombstones WHERE entity_type = 'contact'", [])).toEqual({ entity_uid: absorbedUid });
+  });
+
+  it("reparents a pending assist to the survivor so confirmation logs against the live identity", async () => {
+    const survivor = await contact("Survivor");
+    const absorbed = await contact("Absorbed");
+    const assistUid = await createPendingAssist(exec, {
+      contactId: absorbed,
+      channel: "call",
+      endpointValue: "+15551234567",
+      now: NOW,
+    });
+
+    await mergeContacts(exec, { survivorId: survivor, absorbedId: absorbed, now: NOW });
+
+    expect(
+      await exec.getFirstAsync<{ contact_id: number }>(
+        "SELECT contact_id FROM interaction_assists WHERE uid = ?",
+        [assistUid],
+      ),
+    ).toEqual({ contact_id: survivor });
+
+    await markAssistLogged(exec, { assistUid, connected: 1, now: NOW });
+
+    expect(
+      await exec.getFirstAsync<{ contact_id: number }>(
+        "SELECT contact_id FROM interactions WHERE source = 'assist'",
+      ),
+    ).toEqual({ contact_id: survivor });
   });
 
   it("defaults custom-field collisions to survivor and honours an absorbed resolution", async () => {
