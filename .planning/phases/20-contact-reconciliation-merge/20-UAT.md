@@ -4,7 +4,7 @@ doc: device-UAT evidence log + fixture registry
 device: Pixel 6 Pro (serial 1A071FDEE002BU, API 37)
 package: com.bwales.orbit (DEBUGGABLE build, installed 2026-08-30 23:15)
 started: 2026-08-31
-status: in-progress
+status: all-8-scenarios-PASS — awaiting owner sign-off + fixture cleanup
 ---
 
 # Phase 20 — Consolidated Device UAT
@@ -52,16 +52,25 @@ Status legend: ⬜ not started · 🟡 in progress · ✅ pass · ❌ fail · �
 | 1 | Merge atomic → survivor + tombstone | ✅ | c10 merged into c9: c10 absent, tombstone{contact,028d25cb}, methods reparented. Independently DB-verified. |
 | 2 | Merge with name/birthday/primary conflicts | ✅ | c12→c11: 4 conflict groups shown; survivor kept name/bday, absorbed primary-phone won (+…0422 is_primary=1); tombstone{contact,2e5f9b39}. Independently DB-verified. |
 | — | ADR-003 permission fix (READ_CONTACTS on API 37) | ✅ | Rebuilt; APK ships READ_CONTACTS uncapped, granted on device; "Update from Contacts" prompts + reads. Independently verified. |
-| 3 | Per-contact Update from Contacts (additive/conflict/no re-nag) | 🟡 PARTIAL | Additive path VERIFIED (c13). Name-conflict + no-re-nag need a non-rename fixture (Finding A). |
-| 4 | Bulk Check linked (only-changed / partial / counts / no Use-Contact-Values on conflict) | ⛔ BUG B | Bulk scan crashes on full 14-contact set → "Could not check linked contacts". See 20-UAT-FINDINGS-reconcile-bugs.md. |
-| 5 | Kill mid-review → Resume preserves applied | ⬜ | Needs a working bulk session (Bug B). |
-| 6 | Deleted source → Source missing → Relink | ⬜ | Not yet attempted (independently runnable). |
+| 3 | Per-contact Update from Contacts (additive/conflict/no re-nag) | ✅ | Additive VERIFIED (c13). Conflict via **email-value edit** on c7 (non-rename, Finding-A-safe): emails=conflict, both unchecked + Apply disabled until choice; Keep-Orbit → Apply → "Changes applied."; Run 2 pre-resolved keep-Orbit (unchanged-since-review, no re-nag). DB: c7 email UNCHANGED, snapshot{link6,emails,ada2} armed, no field_history. |
+| 4 | Bulk Check linked (only-changed / partial / counts / no Use-Contact-Values on conflict) | ✅⚠ | **Bug B FIXED** (`165b9e7`). Bulk scan completes over full 14 set. Only-changed appear (c15/c17 absent); Use-Contact-Values hidden on conflict select (c11), shown on additive-only (c13); c13 partial-resolve persists (phone added, session pending). Summary **counts unit-covered** (`reconcile-session-read.test.ts:118`). NOTE: bulk action-sheet "Apply recommendation" is not adb-drivable (RN Modal backdrop swallows injected taps — not an app bug); resolved via equivalent per-card path; bulk write path unit-covered (`reconcile-apply.test.ts`, `reconcile-bulk-eligibility.test.ts`, `candidate-card-grid-actions.test.ts`). Real-PII cards (3–6) never touched. |
+| 5 | Kill mid-review → Resume preserves applied | ✅ | Resolved c13, `am force-stop`, relaunch → launch-sweep "Resume your check?" prompt; Resume → no re-scan, refresh only; c13 ABSENT (resolved excluded); c13's +13125550442 survived the kill. DB-verified session pending + phone intact. |
+| 6 | Deleted source → Source missing → Relink | ✅ | Deleted ZZ-UAT-Filler (raw 1141); c17 "Update from Contacts" → "Source missing" chip + exact body + 3 actions (Keep as is / Relink / Unlink). Relink → picker → ZZ-UAT-Relink-Target (raw 1142) → "Source linked. Review the new contact." DB: link17 is_active 1→0, new link18 active→0r1142. Relink/unlink DAO unit-covered (`reconcile-relink-dao.test.ts`). |
 | 7a | Review flagged items — **Fix** | ✅ | contact 8 bday→1990-05-14; bulk_review_resolutions{row8,birthday,fixed}; UI "Nothing to review". DB-verified. |
 | 7b | Review flagged items — **Ignore** | ✅ | contact 16 ZZ-UAT-Ignore: bulk_review_resolutions{row17,birthday,ignored}; birthday stays NULL, no other change. Independently DB-verified. |
 
 Accepted v1 limitation to record (not a failure): after a merge, the survivor's
 notification refresh is eventually-consistent (reconciled at the next foreground
 launch sweep), per 20-06-PLAN.md.
+
+## Bugs fixed this UAT (committed)
+- **Bug B (blocker) — FIXED `165b9e7`.** `reconcile-photo.ts` `digest()` dereferenced `globalThis.crypto.subtle` unguarded; `globalThis.crypto` is undefined in Hermes → threw on the first linked contact with a source photo (c3), swallowed at `ReconcileGridScreen.tsx:229`. Now guards WebCrypto (Node/tests) and falls back to RNQC (device). Verified on-device + DB (14-scan, 10 cards, c3 photo staged).
+- **Bug C — FIXED `eecea73`.** `FieldChoiceGroup` keyed rows by `option.id`; multi-value families share `id="source"` → duplicate React key. Keyed by `id+value`; selection identity (binary orbit|source) unchanged.
+
+## Minor findings (non-blocking, follow-up candidates)
+- **Finding A (robustness, real users):** Orbit stores the Android **lookup key** as `external_contact_id` and matches by exact string; renaming/re-aggregating a LOCAL device contact changes its lookup key → orphans the link ("Source missing"). Fragile vs. Android's recommended `lookupContact` refresh. Edge case; worth a hardening follow-up (backlog), out of Phase 20 scope.
+- **Cosmetic:** methods-family conflict renders the Orbit option as a serialized value (`email␟…zzuat.ada@…`) instead of a clean address (Scenario 3, `s3-06`). Display-only.
+- **Cosmetic:** a Bound contact whose source is deleted shows an "Unbound" badge / "Bind contact" affordance in the list while its link is still `is_active=1` (Scenario 6). Overflow "Update from Contacts" still drives the missing-source flow correctly. Display-only.
 
 ## Execution notes / evidence detail
 (chronological)
