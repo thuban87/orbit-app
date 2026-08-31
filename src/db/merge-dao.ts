@@ -50,7 +50,13 @@ export function normalizeMergeResolutions(input: unknown): MergeResolutions {
       if (value) primaryMethod[type] = value;
     }
   }
-  const photo = raw.photo === "keep-survivor" ? "keep-survivor" : undefined;
+  const photo = raw.photo === "keep-survivor"
+    ? "keep-survivor"
+    : raw.photo && typeof raw.photo === "object" &&
+        (raw.photo as Record<string, unknown>).choice === "absorbed" &&
+        typeof (raw.photo as Record<string, unknown>).relative === "string"
+      ? { choice: "absorbed" as const, relative: (raw.photo as Record<string, string>).relative }
+      : undefined;
   return {
     ...(Object.keys(scalars).length ? { scalars } : {}),
     ...(Object.keys(customFields).length ? { customFields } : {}),
