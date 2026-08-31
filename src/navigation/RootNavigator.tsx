@@ -25,6 +25,7 @@ import { RestoreResultScreen } from "@/screens/RestoreResultScreen";
 import { SettingsScreen } from "@/screens/SettingsScreen";
 import { UnboundContactsScreen } from "@/screens/UnboundContactsScreen";
 import { SurvivorSelectScreen } from "@/screens/SurvivorSelectScreen";
+import { MergeConflictsScreen } from "@/screens/MergeConflictsScreen";
 import { MergeImpactSummary } from "@/components/MergeImpactSummary";
 import type { RootStackParamList, RootStackScreenProps } from "./types";
 
@@ -101,6 +102,7 @@ export function RootNavigator() {
       <Stack.Screen name="DuplicateReview" component={DuplicateReviewScreen} />
       <Stack.Screen name="ImportComplete" component={ImportCompleteScreen} />
       <Stack.Screen name="SurvivorSelect" component={SurvivorSelectScreen} />
+      <Stack.Screen name="MergeConflicts" component={MergeConflictsScreen} />
       <Stack.Screen name="MergeImpactSummary" component={MergeImpactSummary} />
     </Stack.Navigator>
   );

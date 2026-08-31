@@ -1,4 +1,5 @@
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
+import type { MergeResolutions } from "@/db/merge-dao";
 import type { RestorePreviewRoute } from "@/screens/backup-restore-logic";
 import type { PhotoTargetDescriptor } from "@/services/photos/photo-storage";
 
@@ -125,7 +126,8 @@ export type RootStackParamList = {
   DuplicateReview: { sessionId: number };
   ImportComplete: { sessionId: number };
   SurvivorSelect: { firstContactId: number; secondContactId?: number };
-  MergeImpactSummary: { survivorId: number; absorbedId: number };
+  MergeConflicts: { survivorId: number; absorbedId: number };
+  MergeImpactSummary: { survivorId: number; absorbedId: number; resolutions: MergeResolutions };
 };
 
 /**
