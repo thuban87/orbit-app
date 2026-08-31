@@ -1,5 +1,7 @@
-import { StyleSheet, Text, View } from "react-native";
+import { useState } from "react";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 import { AssistConfirmation } from "@/components/AssistConfirmation";
+import { PendingConfirmationsSheet } from "@/components/PendingConfirmationsSheet";
 import { getExecutor, localDateTime } from "@/db/database";
 import {
   markAssistDismissed,
@@ -26,9 +28,15 @@ export function AssistBanner() {
   const newest = useAssistBanner((state) => state.newest);
   const morePendingCount = useAssistBanner((state) => state.morePendingCount);
   const refresh = useAssistBanner((state) => state.refresh);
+  const [reviewOpen, setReviewOpen] = useState(false);
 
   if (!newest) {
-    return null;
+    return reviewOpen ? (
+      <PendingConfirmationsSheet
+        visible={reviewOpen}
+        onClose={() => setReviewOpen(false)}
+      />
+    ) : null;
   }
 
   const confirm = async (connected: 0 | 1, note?: string) => {
@@ -65,9 +73,16 @@ export function AssistBanner() {
           {questionFor(newest.channel, newest.contact_name)}
         </Text>
         {morePendingCount > 0 ? (
-          <Text style={[styles.pendingCount, { color: colors.accent }]}>
-            {morePendingCount} more pending
-          </Text>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={`${morePendingCount} more pending`}
+            onPress={() => setReviewOpen(true)}
+            style={styles.pendingCount}
+          >
+            <Text style={{ color: colors.accent }}>
+              {morePendingCount} more pending
+            </Text>
+          </Pressable>
         ) : null}
         <AssistConfirmation
           key={newest.uid}
@@ -76,6 +91,10 @@ export function AssistBanner() {
           onDismiss={dismiss}
         />
       </View>
+      <PendingConfirmationsSheet
+        visible={reviewOpen}
+        onClose={() => setReviewOpen(false)}
+      />
     </View>
   );
 }
@@ -100,6 +119,8 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
   pendingCount: {
+    minHeight: 44,
+    justifyContent: "center",
     fontSize: 15,
     fontWeight: "600",
   },
