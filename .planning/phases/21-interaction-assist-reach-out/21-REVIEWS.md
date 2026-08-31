@@ -1,7 +1,8 @@
 ---
 phase: 21
 reviewers: [codex, cursor, claude]
-reviewed_at: 2026-08-31T18:28:15Z
+reviewed_at: 2026-08-31T19:20:05Z
+cycle: 2
 plans_reviewed: [21-01-PLAN.md, 21-02-PLAN.md, 21-03-PLAN.md, 21-04-PLAN.md, 21-05-PLAN.md, 21-06-PLAN.md]
 models:
   codex: "gpt-5.6-terra (reasoning=low)"
@@ -13,32 +14,94 @@ model_sources:
   claude: "pinned"
 ---
 
-# Cross-AI Plan Review — Phase 21: Interaction Assist & Reach Out
+# Cross-AI Plan Review — Phase 21 (Cycle 2)
 
-Three independent source-grounded reviewers (Codex, Cursor, headless Claude/Sonnet) reviewed all six plans against the code on disk. All three verified their citations against the repo rather than reviewing plan text in isolation; the orchestrator independently re-verified every load-bearing cited symbol (see **Verification coverage** at the end). The claude lane was run at the owner's explicit authorization this cycle (Sonnet, a distinct model from the Opus orchestrator, headless with no shared context).
+Convergence cycle 2. Plans were revised in commit `cd55776` to address cycle-1
+feedback (3 HIGH + 9 actionable). All three lanes (codex, cursor, claude) ran
+source-grounded against the repo on disk and produced genuine reviews (none
+stubbed). The orchestrator independently re-verified every load-bearing claim
+below against the actual source (see Verification Coverage).
 
 ## Consensus Summary
 
-The plan set is unusually well-grounded: TARGET_VERSION=13 / migration 013 as head (so 014 is the correct next number), the `recordTouchpoint` single-writer routing, the `mergeContacts` reparent array, the `purgeContact` explicit fan-out, the widget deep-link allow-list, and the Compose no-write-at-handoff seam all match what is actually on disk. All three reviewers independently confirmed the plans **enforce** rather than reverse the dossier's [DECIDED] clusters (Z archived-still-loggable, AA merge-reparent, AB purge-at-deletion, AC Compose-no-write, F failed-handoff=launch-failure-only). No decision reversal was found. The 6-plan / 4-wave tracer-first structure correctly sequences the data spine before UI and treats merge/purge/widget cross-phase wiring as the real risk surface.
+All three reviewers agree the **cycle-1 HIGH findings are genuinely resolved in
+the current plan text**, not merely re-asserted:
 
-The concentrated risk is a small number of **implementation-precision gaps the plans almost but do not fully nail**, all in the confirm/handoff path, plus inherently device-limited native-handoff observability.
+- **HIGH-1 (nested-mutex hang):** `markAssistLogged` (21-01-PLAN.md:96) composes
+  `insertInteractionCore` + `recomputeLastContactCore` + `bumpDataRevisionCore`
+  inside ONE `inWriteTransaction` and never calls the mutexed `recordTouchpoint`
+  — matching the documented compose-don't-nest idiom (transaction.ts) and the
+  `createContactFull` precedent. Verified on disk.
+- **HIGH-2 (Compose/Router handoff divergence, draft loss):** a single shared
+  `performReachOut(exec, {…, messageBody?})` helper (21-02-PLAN.md:100) is called
+  by both the router (empty body) and Compose (its draft, 21-03), with
+  create-before-launch + `markAssistFailed`-on-throw centralized. 21-03 grep-gates
+  that Compose does not call `createPendingAssist`/`SMS.sendSMSAsync` directly.
+- **HIGH-3 (idempotency):** status-guarded read-then-write inside one transaction
+  (`WHERE status='pending'`), explicitly NOT UNIQUE-error sniffing.
+
+Reviewers also agree the migration numbering is correct (`TARGET_VERSION = 13` on
+disk → 014 is the next slot), the merge-reparent gap is real and correctly
+targeted (`interaction_assists` genuinely absent from merge-dao.ts:153), the purge
+FK-cascade path is right, the widget allow-list extension follows the anchored
+regex pattern, and no plan introduces network egress, passive observation, or a
+widget-side assist writer (local-first preserved). No plan reverses a locked
+dossier cluster (Z/AA/AB/AC/F).
 
 ### Agreed Strengths
-- **Single-writer discipline** — all confirmed writes route through `recordTouchpoint` (`src/db/recency-dao.ts:217`); no second `interactions`/`last_contact` writer is introduced. Grep-gated in acceptance criteria across every plan that touches the writer. (all three)
-- **Migration grounding** — 014 is correctly the next number; ALTER/two-arg `apply` idioms match shipped migrations. (Codex, Cursor)
-- **Merge reparent fix is correctly scoped** — adding `interaction_assists` to the `merge-dao.ts:153` loop before the `DELETE FROM contacts` at `:185` closes a real cascade-loss hole. (all three)
-- **Widget allow-list extension mirrors the existing security boundary** — anchored regex + `parseWidgetId` safe-integer guard (`widget-linking.ts:91-106`). (all three)
-- **Nested-transaction hazard is identified** — every plan sequences `recordTouchpoint` then a separate status UPDATE rather than nesting. (all three)
+- Cores-only composition preserves DATA-04 single-writer invariant —
+  `recomputeLastContactCore` remains the sole `contacts.last_contact` writer
+  (verified: every other interaction path, incl. widget-mark and notification
+  marks, routes through `recordTouchpoint`→`recomputeLastContact`).
+- Tracer-first wave ordering; node-verifiable data spine before device-only UI.
+- Merge/purge/widget cross-phase wiring (21-05) correctly identified as the
+  highest residual correctness risk and scoped with node tests.
+- Eligibility (15s buffer / 24h expiry) is timer-free, computed off stored
+  `handoff_at`, consistent between the SQL filter and the client re-check.
 
 ### Agreed Concerns
-- **`markAssistLogged` transaction shape is ambiguous (HIGH — Codex + Cursor).** Plan 01 Task 1 says "every write uses `inWriteTransaction` for its own multi-statement unit" while also calling `recordTouchpoint`, which itself opens `inWriteTransaction` (`recency-dao.ts:232`), a non-reentrant mutex whose own docstring warns nesting is "a PERMANENT hang" (`transaction.ts:15-17`). `21-PATTERNS.md:72-74` still says "SAME transaction," compounding the ambiguity. An executor who wraps load→`recordTouchpoint`→status-UPDATE in one txn will deadlock.
-- **Compose/router handoff is not specified as one shared implementation (HIGH — Codex; MEDIUM — Cursor).** Plan 02's `performReachOut` sends an empty SMS body; Plan 03 both says "route through the shared helper" and separately instructs a direct `createPendingAssist` + `SMS.sendSMSAsync(phone, draft)`. One reading loses the Compose draft, the other duplicates handoff/failure logic.
-- **Native "failure" is only launch-failure, never delivery (MEDIUM).** `SMS.sendSMSAsync` returns `unknown` on Android (dossier Cluster F, line 165); plans must not interpret a resolved SMS result as failure. (Codex, Cursor)
-- **Widget-freshness after confirmation is missing (MEDIUM — Cursor).** Other foreground `recordTouchpoint` paths call `notifyWidgetDataChanged()` (`notification-actions.ts:161`); Plans 02/04 do not after `markAssistLogged`.
+- **Missing `rejectFutureOccurredAt` parity on the confirmation path** (codex: HIGH;
+  cursor: MEDIUM; claude: not raised). `recordTouchpoint` rejects a future
+  `occurredAt` before opening its transaction (recency-dao.ts:228), and so does
+  every other interaction writer — but the exported cores do NOT, and
+  `markAssistLogged` (21-01-PLAN.md:96) composes the cores directly with
+  `occurredAt = assist.handoff_at` and never invokes the guard. Verified on disk:
+  the guard lives only in the wrappers (recency-dao.ts:228, :268), not in
+  `insertInteractionCore`/`recomputeLastContactCore` (recency-dao.ts:426-427).
+- **Stale "recordTouchpoint" prose in 21-01** (codex: LOW; cursor: MEDIUM). The
+  Objective (:59), `<done>` (:117), threat T-21-02 (:165), and success summary
+  (:177) still say the confirmation "logs/routes through `recordTouchpoint`",
+  directly contradicting the must_haves (:33-34, :96) that forbid calling it. An
+  executor following the wrong paragraph could reintroduce the HIGH-1 nesting hang.
+- **Wave-3 shared-file coordination** (cursor: MEDIUM; claude: related double-expiry
+  note). 21-02 and 21-04 both edit `App.tsx`, `assist-store.ts`, and
+  `AssistBanner.tsx`; 21-04 extends artifacts 21-02 creates. No plan states an
+  explicit "21-04 after 21-02" ordering.
 
 ### Divergent Views
-- **Idempotency mechanism (Claude HIGH; others silent).** Only Claude escalated Plan 01's UNIQUE-constraint-catch strategy for `markAssistLogged` crash recovery as HIGH: no in-repo precedent exists for distinguishing a SQLite UNIQUE error from any other thrown error, and the error shape differs between the node testkit and on-device Hermes/expo-sqlite (the exact shape of a bug this project has hit before). Recommended a status-guarded check-then-write instead. Codex/Cursor flagged the transaction shape but not the error-detection mechanism.
-- **Overall risk rating.** Codex: MEDIUM-HIGH. Cursor: MEDIUM. Claude: LOW-MEDIUM. All agree the gaps are small plan amendments, none reversing a recorded decision, resolvable before Wave 1 lands.
+- **Severity of the future-date guard gap:** Codex rates it HIGH (a concrete
+  data-integrity gap in a shared interaction writer — a future-dated row would push
+  `last_contact` into the future, violating LOG-06). Cursor rates it MEDIUM (a
+  latent path, since `handoff_at ≤ now` normally holds at confirmation). Claude did
+  not raise it. Orchestrator assessment: the trigger requires abnormal conditions
+  (backward clock skew or corrupt `handoff_at`), but the guard is a documented
+  invariant (LOG-06) enforced by EVERY sibling writer, on the phase's central
+  tracer path, and is absent from both plan text and the test list — so it is
+  carried as the one unresolved HIGH, following the most source-grounded lane.
+- **Plan 02 interim multi-endpoint routing:** Codex flags that until 21-03 lands,
+  21-02 hands off a multi-endpoint channel via the primary endpoint directly,
+  contradicting dossier:80-82 ("if multiple endpoints exist: show a second
+  method-selection menu"). Cursor reads the same as acceptable within-phase wave
+  sequencing (21-02 builds the router, 21-03 adds the ≥2-endpoint selector). The
+  plans explicitly scope this deferral (21-02-PLAN.md:28, :136), and the phase
+  never ships between waves (21-06 gates the whole phase), so it is recorded as a
+  documented intra-phase deferral, not an unresolved actionable.
+- **Plan 06 autonomous vs owner sign-off:** Codex flags `autonomous: true` (:9) as
+  contradicting the owner sign-off / blocked checkpoints. The plan reconciles this
+  via `workflow.human_verify_mode=end-of-phase` — the sign-off is harvested as an
+  end-of-phase human-check, and device-dependent failure rows are recorded as
+  explicit BLOCKED checkpoints, never force-passed (:113-116, :124). Treated as
+  already-addressed.
 
 ---
 
@@ -46,367 +109,397 @@ The concentrated risk is a small number of **implementation-precision gaps the p
 
 ## Summary
 
-The phase is well decomposed: it establishes the schema/DAO tracer first, then the user flow, then settings/lifecycle and merge/widget wiring, ending with device UAT. It correctly reuses the existing recency writer rather than adding another `last_contact` path. However, two implementation ambiguities are serious enough to fix before execution: the Plan 01 transaction boundary around `recordTouchpoint`, and the Plan 03 Compose handoff path.
+The revised six-plan sequence is substantially stronger and is grounded in the existing architecture. It correctly adopts the non-reentrant transaction composition required by the codebase, preserves the local-only model, and covers the crucial merge/purge/widget seams. I found one correctness gap that should be fixed before execution, plus two planning-quality risks.
 
 ## Strengths
 
-- The migration plan is correctly grounded in the current schema head: `TARGET_VERSION` is 13 and migration 013 is the final registered migration in [database.ts](/home/bwales/projects/orbit-app/src/db/database.ts:48), [database.ts](/home/bwales/projects/orbit-app/src/db/database.ts:64). App startup also sets WAL, foreign keys, and busy timeout before migrations in [database.ts](/home/bwales/projects/orbit-app/src/db/database.ts:133).
+- **Cycle-1 transaction/idempotency high findings are genuinely addressed.** Plan 01 specifies one outer `inWriteTransaction`, composes `insertInteractionCore`, `recomputeLastContactCore`, and `bumpDataRevisionCore`, and status-guards the assist before writing ([21-01-PLAN.md](/home/bwales/projects/orbit-app/.planning/phases/21-interaction-assist-reach-out/21-01-PLAN.md:96)). This matches the repository’s explicit non-reentrancy rule ([transaction.ts](/home/bwales/projects/orbit-app/src/db/transaction.ts:15)) and the exported core pattern ([recency-dao.ts](/home/bwales/projects/orbit-app/src/db/recency-dao.ts:417)).
 
-- Plans 01 and 05 correctly identify the authoritative recency mechanism. `recordTouchpoint()` inserts the interaction, recomputes `last_contact`, and bumps the revision in one transaction at [recency-dao.ts](/home/bwales/projects/orbit-app/src/db/recency-dao.ts:217). The actual direct `last_contact` update is internal to that DAO at [recency-dao.ts](/home/bwales/projects/orbit-app/src/db/recency-dao.ts:195).
+- **The single-writer invariant is preserved by the intended composition.** `recomputeLastContactCore` is the only production statement updating `contacts.last_contact` ([recency-dao.ts](/home/bwales/projects/orbit-app/src/db/recency-dao.ts:145)), while `recordTouchpoint` itself composes insert → recompute → revision bump in one transaction ([recency-dao.ts](/home/bwales/projects/orbit-app/src/db/recency-dao.ts:217)). The proposed assist path mirrors that sequence rather than introducing a direct contact update.
 
-- Plan 05’s merge reparent is essential and correctly targeted. The existing merge code only reparents the listed child tables at [merge-dao.ts](/home/bwales/projects/orbit-app/src/db/merge-dao.ts:153), then deletes the absorbed contact at [merge-dao.ts](/home/bwales/projects/orbit-app/src/db/merge-dao.ts:184). Adding `interaction_assists` there is the correct way to preserve pending confirms after a merge.
+- **Migration planning is correct for the current repository state.** The checked-in database head is migration 013 and `TARGET_VERSION = 13` ([database.ts](/home/bwales/projects/orbit-app/src/db/database.ts:37), [database.ts](/home/bwales/projects/orbit-app/src/db/database.ts:48)); Plan 01 correctly makes the next migration 014.
 
-- The widget plan builds on a real strict allow-list. Current widget routes use anchored regexes and safe positive-integer parsing at [widget-linking.ts](/home/bwales/projects/orbit-app/src/navigation/widget-linking.ts:91) and [widget-linking.ts](/home/bwales/projects/orbit-app/src/navigation/widget-linking.ts:100). Extending this pattern for `orbit://reach/<id>` is sound.
+- **The merge and purge mechanism is correctly derived from existing code.** `mergeContacts` currently reparents child tables before deleting the absorbed contact ([merge-dao.ts](/home/bwales/projects/orbit-app/src/db/merge-dao.ts:153), [merge-dao.ts](/home/bwales/projects/orbit-app/src/db/merge-dao.ts:184)); adding `interaction_assists` there is necessary. Purge deletes the contact after its explicit child fan-out ([purge-dao.ts](/home/bwales/projects/orbit-app/src/db/purge-dao.ts:244), [purge-dao.ts](/home/bwales/projects/orbit-app/src/db/purge-dao.ts:261)), so the planned FK cascade is appropriate.
 
-- The endpoint design matches existing data semantics. `listActionablePrimaryMethods()` already chooses an actionable primary or first actionable ordered method at [contact-methods-read.ts](/home/bwales/projects/orbit-app/src/db/contact-methods-read.ts:30), and the method grouping query preserves display order at [contact-methods-read.ts](/home/bwales/projects/orbit-app/src/db/contact-methods-read.ts:7).
+- **The widget security approach extends an existing strict boundary.** The current resolver uses anchored digit-only URI patterns and safe-integer validation ([widget-linking.ts](/home/bwales/projects/orbit-app/src/navigation/widget-linking.ts:91), [widget-linking.ts](/home/bwales/projects/orbit-app/src/navigation/widget-linking.ts:100)). Plan 05’s `reach` form follows this rather than adding ad-hoc parsing.
 
-- Plan 02’s use of a non-modal overlay is appropriate. The existing widget gate demonstrates app-shell, asynchronous navigation handling rather than modal routing at [widget-linking.ts](/home/bwales/projects/orbit-app/src/navigation/widget-linking.ts:213). This supports the requirement that Android Back not dismiss the durable prompt.
+- **The shared handoff repair is sound.** Plan 02/03 centralize pending-write ordering, native-launch failure handling, and SMS draft propagation in `performReachOut`, avoiding two divergent Compose/router implementations. That directly resolves the earlier draft-loss/duplicated-failure-path risk.
+
+- **The settings backup coverage is correctly scoped.** The existing portable snapshot explicitly selects/maps settings ([app-settings-dao.ts](/home/bwales/projects/orbit-app/src/db/app-settings-dao.ts:379)), and the restore allow-list is explicit ([backup-schema.ts](/home/bwales/projects/orbit-app/src/backup/backup-schema.ts:106)). Plan 04 correctly updates both.
 
 ## Concerns
 
-- **HIGH — Plan 01 is internally ambiguous about transactions and can deadlock.** Its text says `markAssistLogged` should use `inWriteTransaction` for its multi-statement operation, while also calling `recordTouchpoint`. But `recordTouchpoint` itself calls `inWriteTransaction` at [recency-dao.ts](/home/bwales/projects/orbit-app/src/db/recency-dao.ts:232), and that primitive explicitly forbids nesting because it permanently hangs on the shared non-reentrant mutex at [transaction.ts](/home/bwales/projects/orbit-app/src/db/transaction.ts:49).  
-  The plan mentions the danger, but its requested implementation must be made unequivocal: no outer transaction may wrap the `recordTouchpoint` call.
+- **HIGH — Plan 01 bypasses the existing future-interaction guard.** `recordTouchpoint` rejects a future `occurredAt` before opening its transaction ([recency-dao.ts](/home/bwales/projects/orbit-app/src/db/recency-dao.ts:217)), but the proposed `markAssistLogged` calls `insertInteractionCore` directly with `handoff_at` ([21-01-PLAN.md](/home/bwales/projects/orbit-app/.planning/phases/21-interaction-assist-reach-out/21-01-PLAN.md:96)). If the device clock moves backward after handoff, or corrupted/manual data yields a future `handoff_at`, confirmation can insert a future interaction and violate LOG-06.  
+  **Fix:** export/reuse `rejectFutureOccurredAt` from `src/db/log-guards.ts` immediately before the outer transaction (or add a core-safe equivalent), with a test for `handoff_at > now` proving no interaction/status transition occurs.
 
-- **HIGH — Plan 03 does not actually specify one shared Compose handoff implementation.** Existing Compose calls `SMS.sendSMSAsync(phone, draft)` directly at [ComposeScreen.tsx](/home/bwales/projects/orbit-app/src/screens/ComposeScreen.tsx:436). Plan 02’s proposed `performReachOut` example sends `""` as the body; Plan 03 both says “route through the shared helper” and separately instructs direct `createPendingAssist` + `SMS.sendSMSAsync`. One interpretation loses the draft; the other duplicates handoff/failure logic. This is a correctness and maintenance risk.
+- **MEDIUM — Plan 02 temporarily violates the locked multi-endpoint routing behavior.** The dossier says multiple endpoints must show method selection ([21-interaction-assist-reach-out.md](/home/bwales/projects/orbit-app/docs/dossier/21-interaction-assist-reach-out.md:80)). But Plan 02 says it will use the primary endpoint directly until Plan 03. That creates an interim user-visible route that silently chooses an endpoint.  
+  **Fix:** have Plan 02 hide/disable channels with more than one actionable endpoint until Plan 03, or move the minimal selector into Plan 02. Do not silently hand off via the primary when user selection is required.
 
-- **MEDIUM — Plan 01’s deterministic interaction UID needs an explicit compatibility check with restore semantics.** Production code outside `recency-dao` also writes interactions during restore using `INSERT ... ON CONFLICT(uid) DO UPDATE` at [restore-apply.ts](/home/bwales/projects/orbit-app/src/backup/restore-apply.ts:170). A deterministic `reachout:${assist.uid}` is reasonable, but the plan should test restore/import of an assist-created interaction and document whether restored assist rows are in scope. Otherwise a restore can alter the idempotency assumptions.
+- **MEDIUM — Plan 06 is marked autonomous while requiring non-automatable acceptance.** It requires owner sign-off and potentially unavailable “no compatible app” failure cases ([21-06-PLAN.md](/home/bwales/projects/orbit-app/.planning/phases/21-interaction-assist-reach-out/21-06-PLAN.md:113)), while its acceptance criteria require every matrix row to pass or be owner-accepted ([21-06-PLAN.md](/home/bwales/projects/orbit-app/.planning/phases/21-interaction-assist-reach-out/21-06-PLAN.md:119)).  
+  **Fix:** mark Plan 06 non-autonomous / checkpointed, and distinguish “automated evidence complete” from “owner approval pending.” This avoids reporting the phase complete while a required human gate remains blocked.
 
-- **MEDIUM — “failed handoff” should distinguish only launch failure from an SMS composer result.** Current Compose deliberately treats Android’s `SMS.sendSMSAsync` result as unknown and does not claim send success at [ComposeScreen.tsx](/home/bwales/projects/orbit-app/src/screens/ComposeScreen.tsx:446). The plans mostly preserve this, but Plan 02 should explicitly prohibit interpreting any resolved SMS result as a failure or delivery outcome.
-
-- **MEDIUM — Plan 05’s purged-target UI requires a deliberate navigation/message mechanism, not merely a null guard.** The current `WidgetLinkingGate` discards every null-guarded intent silently at [widget-linking.ts](/home/bwales/projects/orbit-app/src/navigation/widget-linking.ts:232). `guardWidgetIntent` also returns null for both missing and archived contacts at [widget-quick-action-guard.ts](/home/bwales/projects/orbit-app/src/services/widget/widget-quick-action-guard.ts:33). The plan needs a typed “guard failure reason” or an explicit pre-guard lookup so it can show “no longer available” only for purged/missing Reach targets, without incorrectly treating archived contacts as purged.
-
-- **MEDIUM — Plan 02’s “no loading frame because SQLite is synchronous” is inaccurate.** The database APIs are async throughout, including `listContactMethodGroups()` at [contact-methods-read.ts](/home/bwales/projects/orbit-app/src/db/contact-methods-read.ts:7). Avoiding a spinner may be a UX decision, but the implementation still needs a defined initial state and must avoid briefly rendering a hidden/unreachable route before the method read completes.
-
-- **LOW — Eligibility and sweep timestamps should use one canonical reference field.** The plans use `handoff_at` for the 15-second eligibility buffer but `created_at` for the 24-hour bound. Creation and handoff are usually close, but the invariant is clearer and less clock-skew-sensitive if both use `handoff_at`, which is already the phase’s source of truth for interaction time.
-
-- **LOW — Plan 06 is a good gate but its UAT matrix is larger than the plan can autonomously complete.** Owner sign-off and device-dependent failed-email/call launch scenarios are legitimate human/device gates. The plan should mark these as explicit blocked checkpoints instead of implying every row can always be forced by automation.
+- **LOW — A few Plan 01 labels remain inaccurate after the correct core-composition change.** Its completion/threat text still says the DAO “logs through `recordTouchpoint`” ([21-01-PLAN.md](/home/bwales/projects/orbit-app/.planning/phases/21-interaction-assist-reach-out/21-01-PLAN.md:117), [21-01-PLAN.md](/home/bwales/projects/orbit-app/.planning/phases/21-interaction-assist-reach-out/21-01-PLAN.md:165)), while the actual intended design correctly must *not* call the mutexed wrapper.  
+  **Fix:** replace this with “through the authoritative recency cores” to prevent an executor from reintroducing the nested-transaction deadlock.
 
 ## Suggestions
 
-- Revise Plan 01’s `markAssistLogged` algorithm to:
-
-  1. Read the pending assist without an outer write transaction.
-  2. Call `recordTouchpoint()` directly.
-  3. On success or unique-UID retry, run a separate status-guarded `inWriteTransaction` update.
-  4. Add a test for the crash window between those two steps.
-
-- Make `performReachOut` accept `messageBody?: string`. Then both router Text and Compose call the same helper; router passes an empty body and Compose passes `draft`. Keep the existing in-flight latch from [ComposeScreen.tsx](/home/bwales/projects/orbit-app/src/screens/ComposeScreen.tsx:431) around the shared call.
-
-- Refactor widget guard output from `WidgetNavIntent | null` to a discriminated result such as `{ intent } | { reason: "missing" | "archived" | "ineligible" }`. This makes the required purged-target message reliable and avoids conflating lifecycle states.
-
-- Add integration tests beyond DAO unit tests for:
-  - assist creation → merge → confirmation writes against survivor;
-  - assist creation → archive → confirmation remains loggable;
-  - restore behavior for deterministic assist interaction UIDs;
-  - Compose draft preservation through the shared helper.
+1. Add the future-time validation and its node test to Plan 01.
+2. Remove the temporary “primary endpoint direct handoff” behavior from Plan 02.
+3. Convert Plan 06 into an explicit end-of-phase human checkpoint.
+4. Update stale `recordTouchpoint` wording to say “authoritative recency-core composition.”
 
 ## Risk Assessment
 
-**Overall: MEDIUM-HIGH.** The architectural direction is strong and the main cross-phase risks are identified correctly. But the transaction composition issue can cause a permanent hang, and the Compose helper ambiguity can either duplicate behavior or discard message text. Resolve those before execution; the remaining work is appropriately scoped and well testable.
-
+**MEDIUM.** The revised plans resolve the previous high-risk transaction nesting, duplicate-write, and shared-handoff issues, and their merge/purge/widget integration is well aligned with the real source. The remaining future-timestamp bypass is a concrete data-integrity gap in a shared interaction writer path; fixing it should reduce the implementation risk to low.
 
 ---
 
 ## Cursor Review
 
-# Cross-AI Plan Review — Phase 21: Interaction Assist & Reach Out
+# Phase 21: Interaction Assist & Reach Out — Cross-AI Plan Review (Cycle 2)
 
-Verified against repo head: `TARGET_VERSION = 13` (`src/db/database.ts:48`), no migration 014 on disk, `mergeContacts` reparent loop at `src/db/merge-dao.ts:153` without `interaction_assists`, widget Message action still emits `orbit://compose/` (`src/services/widget/widget-render.tsx:452-458`), Compose `onSend` writes no assist (`src/screens/ComposeScreen.tsx:436-458`).
+**Repository:** `/home/bwales/projects/orbit-app`  
+**Plans reviewed:** `21-01` through `21-06` (commit context: cycle-2 revision after cd55776)  
+**Head schema on disk:** `TARGET_VERSION = 13` (`src/db/database.ts:48`); migration 014 not yet present (expected).
 
 ---
 
-## Plan 21-01 — TRACER (migration 014 + assist DAO)
+## Executive Summary
+
+The cycle-2 plans are substantially improved and grounded in real code. The tracer-first wave ordering is sound, the dossier clusters are referenced concretely, and all three cycle-1 HIGH findings are addressed in plan text with mechanisms that match existing composition patterns in `recency-dao.ts`, `contacts-dao.ts`, and `transaction.ts`. Cross-phase wiring (merge reparent, purge cascade, widget allow-list) is correctly identified as the highest residual correctness risk and is scoped to plan 21-05 with node tests.
+
+Remaining issues are mostly execution-coordination (Wave 3 parallel edits to shared files), a few internal wording contradictions in 21-01, and one parity gap (`rejectFutureOccurredAt`) on the confirmation path. No plan contradicts a locked dossier cluster in a way that would reverse a `[DECIDED]` decision. Overall the phase is ready to execute with the caveats below.
+
+---
+
+## Cycle-1 HIGH Findings — Resolution Status
+
+| ID | Issue | Cycle-2 status | Code-grounding |
+|----|-------|----------------|----------------|
+| **HIGH-1** | Nested `inWriteTransaction` / mutex hang if confirmation calls `recordTouchpoint` | **Resolved in plan text** | `transaction.ts:11-29` documents non-reentrancy; `recency-dao.ts:425-428` exports `insertInteractionCore` + `recomputeLastContactCore`; `createContactFull` in `contacts-dao.ts:189-195` is the established compose-inside-one-txn precedent. 21-01 correctly specifies ONE outer txn composing cores + `bumpDataRevisionCore` (`data-revision-dao.ts:5`), NOT the mutexed `recordTouchpoint` (`recency-dao.ts:217-242`). |
+| **HIGH-2** | Divergent Compose vs Reach Out handoffs (draft loss / duplicated failure logic) | **Resolved in plan text** | Current `ComposeScreen.onSend` (`ComposeScreen.tsx:436-458`) calls `SMS.sendSMSAsync` directly with the draft and writes nothing. 21-02 introduces `performReachOut(..., messageBody?)`; 21-03 routes Compose through it with `messageBody: draft`. Single failure/Alert path is coherent. |
+| **HIGH-3** | Idempotency via driver-specific UNIQUE sniffing or non-atomic confirm | **Resolved in plan text** | 21-01 specifies status-guarded read-then-write + `WHERE status='pending'` flip inside ONE txn. Matches SQLite semantics; crash mid-txn rolls back to `'pending'` for safe retry. |
+
+---
+
+## Plan 21-01 — TRACER: Migration 014 + Assist DAO + Eligibility
 
 ### Summary
 
-The tracer plan correctly anchors the phase on the highest-risk invariant — routing confirmations through `recordTouchpoint` (`src/db/recency-dao.ts:217-243`) rather than opening a second `interactions` / `last_contact` writer. Schema shape, cap-5 pruning, deterministic interaction uid, and pure 15s/24h eligibility are well specified and node-testable before UI work.
+The tracer plan correctly front-loads the phase's architectural hazard: confirmation must reuse the authoritative recency cores without nesting the mutex. Migration 014 shape follows `013-reconciliation-and-merge.ts:4-6` and settings-column idiom from `005-digest-settings.ts`. Pure eligibility in `assist-eligibility.ts` with shared constants is the right split from SQL reads.
 
 ### Strengths
 
-- **Single-writer discipline is explicit and grep-enforced.** Plan prohibitions align with `recency-dao.ts:148-149` (“ONLY statement… that writes `contacts.last_contact`”) and the only production `INSERT INTO interactions` path outside tests is `insertInteraction` in `recency-dao.ts:194-212`.
-- **Mutex non-reentrancy is called out.** Plan 01 `read_first` cites `transaction.ts:11-17` and instructs sequencing the assist-status UPDATE after `recordTouchpoint` returns — matching the documented permanent-hang hazard.
-- **Migration idiom matches shipped code.** `005-digest-settings.ts:39-41` ALTER pattern and `013-reconciliation-and-merge.ts` two-arg `apply` are the right templates; `localDateTime()` at `database.ts:74-78` matches the timestamp contract.
-- **Route derivation reuses real reads.** `listActionablePrimaryMethods` (`contact-methods-read.ts:30-39`) and `listContactMethodGroups` (`:7-23`) exist and implement the phone/email-granular actionable model the dossier requires.
-- **Tracer-first wave ordering is sound.** Proving handoff-time `occurred_at` and cap-5 at the DAO layer before native handoff (device-only) de-risks Plans 02–05.
+- **Single-writer composition is code-aligned:** Plan mirrors `contacts-dao.ts:189-195` (insert + recompute inside one txn) and explicitly imports exported cores from `recency-dao.ts:425-428`.
+- **Mutex hazard is named and avoided:** References `transaction.ts:11-29` non-reentrancy rule; forbids calling mutexed `recordTouchpoint`.
+- **Schema claims verified:** `interactions.channel` / `.direction` / `.source` are free TEXT with no CHECK (`001-initial.ts:97-110`); `source='assist'` is safe.
+- **Cap-5 + tiebreak:** `(created_at DESC, id DESC)` ordering matches dossier Cluster M/O needs.
+- **Eligibility field unified:** Both 15s and 24h bounds against `handoff_at` (not `created_at`) — consistent with 21-04 sweep and fixes cycle-1 Codex LOW.
+- **Hermes / timestamp landmines addressed:** `newUid()` (`uid.ts:18`), `localDateTime()` (`database.ts:74`), no `setTimeout`.
 
 ### Concerns
 
-- **HIGH — `markAssistLogged` transaction shape is ambiguous.** Task 1 behavior says “Every write uses `inWriteTransaction` for its own multi-statement unit,” while must-haves and `read_first` forbid nesting `recordTouchpoint` inside an outer txn. `recordTouchpoint` already opens `inWriteTransaction` (`recency-dao.ts:232`). An executor who wraps load → `recordTouchpoint` → status UPDATE in one txn will deadlock per `transaction.ts:15-17`. `21-PATTERNS.md:72-74` still says “SAME transaction” before correcting itself — conflicting guidance.
-- **MEDIUM — `21-PATTERNS.md` uid example is stale.** Patterns show `uid: newUid()` (`21-PATTERNS.md:63`) but Plan 01 requires deterministic `reachout:${assist.uid}` for crash idempotency against `interactions.uid UNIQUE` (`001-initial.ts:97-100`).
-- **LOW — SQL eligibility vs pure eligibility coupling is underspecified.** Task 2 requires shared constants but does not prescribe how SQL computes 15s/24h boundaries (bound cutoff params vs `datetime()` modifiers). Lexicographic compare works for `YYYY-MM-DD HH:MM:SS` only if both sides use the same format from `localDateTime()`.
+- **MEDIUM — Stale “recordTouchpoint” wording contradicts must_haves:** Objective (`21-01-PLAN.md:59`), `<done>` (`:117`), `success_criteria` (`:177`), and threat T-21-02 (`:165`) still say confirmation goes “through recordTouchpoint” while must_haves explicitly forbid calling it. Executor following the wrong paragraph could reintroduce HIGH-1.
+- **MEDIUM — Missing `rejectFutureOccurredAt` parity:** `recordTouchpoint` rejects future `occurredAt` before opening a txn (`recency-dao.ts:227-228`, `log-guards.ts:68`). `markAssistLogged` plan does not mention this guard. Normally `handoff_at ≤ now` at confirmation, but omitting the guard breaks parity with every other interaction writer and leaves a latent path for a future-dated row if clock skew or bad data appears.
+- **LOW — Threat model drift:** T-21-02 mitigation text says “routes ONLY through recordTouchpoint” while the actual design routes through cores — undermines review/traceability.
 
 ### Suggestions
 
-- Add an explicit **anti-pattern block** to Task 1: `markAssistLogged` MUST call `recordTouchpoint` **outside** any outer `inWriteTransaction`; status flip is a second, separate txn (or single guarded UPDATE under mutex after `recordTouchpoint` resolves).
-- Fix `21-PATTERNS.md` to show deterministic uid and remove the “SAME transaction” phrasing after `recordTouchpoint`.
-- Specify eligibility SQL as bound cutoff timestamps computed in TS from `ELIGIBLE_AFTER_SECONDS` / `EXPIRE_AFTER_HOURS` so the read path and pure logic cannot drift.
+- Global find-replace in 21-01: “through recordTouchpoint” → “through `insertInteractionCore` + `recomputeLastContactCore` + `bumpDataRevisionCore` (same operations as `recordTouchpoint`, without the mutex wrapper).”
+- Add to `markAssistLogged` behavior: call `rejectFutureOccurredAt(assist.handoff_at, now)` before txn (or at txn start), matching `recency-dao.ts:227-228`.
+- Add an acceptance grep/test: confirmed interaction with `handoff_at` after `now` is rejected.
 
 ### Risk Assessment
 
-**MEDIUM** — Schema and writer routing are well designed; the main execution risk is a mutex deadlock from txn nesting, which is recoverable in development but catastrophic if shipped.
+**MEDIUM** — Data-layer design is correct and precedented; risk is executor confusion from contradictory plan prose and the missing future-date guard.
 
 ---
 
-## Plan 21-02 — Reach Out router + banner + profile entry
+## Plan 21-02 — Reach Out Router + Handoff + Banner + Profile Entry
 
 ### Summary
 
-Plan 02 delivers the first user-visible vertical slice with appropriate reuse of Compose SMS try/catch (`ComposeScreen.tsx:436-457`), LinksEditor `Linking.openURL` without `canOpenURL` (`LinksEditor.tsx:78-83`), and a separate AppState subscription model distinct from `installSweepTrigger` (`launch-sweep.ts:102-114`). Shell-global non-modal banner architecture matches dossier Cluster H.
+Delivers the first user-visible vertical slice: shared router, write-before-handoff ordering, non-modal app-global banner, and AppState-driven re-query. Correctly reuses `ComposeScreen.tsx:436-458` SMS idiom and `launch-sweep.ts:108-114` transition model (separate subscription for banner vs sweep dedupe).
 
 ### Strengths
 
-- **Handoff ordering matches Cluster E.** `createPendingAssist` before native launch is explicit; Compose already writes nothing at Send time (`ComposeScreen.tsx:435-448`), preserving Cluster AC intent for Plan 03.
-- **Banner architecture avoids Back capture.** Requirement that `AssistBanner` not use `Modal` is correct — current widget gate silently drops null intents (`widget-linking.ts:232-234`); banner must not replicate Modal back-stack behavior.
-- **Store design avoids false durability.** Explicit ban on Zustand `persist` / AsyncStorage for the queue matches “durable queue lives in SQLite.”
-- **Profile entry gating is verifiable.** `deriveReachRoutes` hidden-when-no-actionable-methods can be wired into `ContactProfileScreen`’s existing `listContactMethodGroups` read (`ContactProfileScreen.tsx:252-263`).
-- **Attestation-only copy is grep-gated.** Aligns with dossier Cluster J/AJ and platform limits documented at dossier line 165 (SMS `unknown` result).
+- **Cluster E ordering:** `createPendingAssist` before native launch; failure is a separate `markAssistFailed` — matches dossier write-before-handoff.
+- **Cluster F/J semantics:** Only thrown launch errors mark `'failed'`; resolved `sendSMSAsync` `'unknown'` is not treated as sent/failed — matches current Compose comment (`ComposeScreen.tsx:447-448`).
+- **Cluster H:** Banner as absolute overlay, not `Modal` — aligns with dossier line 217 Back-pass-through exception.
+- **HIGH-2 centralization:** `performReachOut(exec, {..., messageBody?})` with default `''` — router and Compose share one path.
+- **Widget freshness:** `notifyWidgetDataChanged()` after confirm mirrors `ContactProfileScreen.tsx:336` and `notification-actions.ts:161`.
+- **No false sync claims:** Correctly reframes “no spinner” as defined empty initial state, not synchronous SQLite.
+- **Profile entry gated:** `deriveReachRoutes` + `listActionablePrimaryMethods` (`contact-methods-read.ts:30-39`) enforce Cluster A (hide when no actionable methods).
 
 ### Concerns
 
-- **MEDIUM — No widget freshness hook after confirmation.** Every other foreground `recordTouchpoint` path calls `notifyWidgetDataChanged()` (e.g. `notification-actions.ts:145-161`, `ContactProfileScreen.tsx:321-336`). Plans 02/04 never require this after `markAssistLogged`; widget tiles can show stale overdue state until the next launch sweep (`widget-refresh.ts:10-15`).
-- **MEDIUM — Native failure detection is inherently limited.** `Linking.openURL` often resolves even when no app handles the intent; only thrown errors become `failed`. Dossier Cluster F acknowledges this; Plan 06 UAT should treat “failure” rows as best-effort, not binary pass/fail on all devices.
-- **LOW — `performReachOut` hardcodes empty SMS body** (`21-02-PLAN.md` Task 1 behavior: `SMS.sendSMSAsync(endpoint, "")`). Correct for Reach Out, but Plan 03 must not call this helper verbatim for Compose (draft required).
+- **MEDIUM — Compose error copy regression (intentional but UX-visible):** Plan replaces Compose's fallback body “Your message is ready to copy instead.” with UI-SPEC Text copy (no copy mention in Alert). 21-03 `<decisions>` documents this; acceptable if owner-approved, but it weakens the guaranteed handoff story on Send failure (CMP requirement spirit).
+- **LOW — Temporary settings read:** Defensive raw read of `interaction_assist_enabled` until 21-04 — documented, but 21-02/21-03/21-04 may ship with three slightly different read paths briefly.
+- **LOW — `tel:`/`mailto:` greenfield:** No existing `tel:` usage in repo; plan correctly avoids `canOpenURL` false negatives. Special-character phone encoding not specified (first Call handoff in app).
 
 ### Suggestions
 
-- After successful `markAssistLogged` / `markAssistDismissed` in banner and review sheet handlers, call `notifyWidgetDataChanged()` mirroring `notification-actions.ts`.
-- Extend `performReachOut` with optional `messageBody?: string` (default `""`) so Plan 03 can share failure/assist ordering without duplicating catch/Alert logic.
-- Add one integration-style test asserting `createPendingAssist` is invoked before `SMS.sendSMSAsync` / `Linking.openURL` in `handoff.ts` (mocked), not only store transition tests.
+- In `performReachOut`, document which `ContactMethodRow` field is passed to `tel:`/`sms:`/`mailto:` (`canonical_value` vs `display_value`) — match whatever `ComposeScreen` uses for `actionablePhone`.
+- Consider preserving Compose's copy-fallback sentence in the Text failure Alert when `messageBody` is non-empty (product call, not blocking).
 
 ### Risk Assessment
 
-**MEDIUM** — UI/shell design is solid; platform handoff observability and widget staleness are the main gaps.
+**LOW–MEDIUM** — Strong orchestration plan; native handoff timing remains device-only (correctly deferred to 21-06).
 
 ---
 
-## Plan 21-03 — Endpoint selector + Compose seam
+## Plan 21-03 — Endpoint Selector + Compose Send Seam
 
 ### Summary
 
-Completes the ≤3-tap routing contract and wires Compose into the assist lifecycle without writing interactions at Send time. Wave-3 parallelization with Plan 04 via raw column reads is a reasonable trade documented in the plan’s `<decisions>` block.
+Completes the ≤3-tap contract (Cluster B) and wires Compose into assist creation (Cluster AC) without writing interactions at Send time. Explicit `<decisions>` block resolves M2 Phase 12 ownership vs Phase 21 scope cleanly.
 
 ### Strengths
 
-- **Endpoint selector reuses real data model.** `listContactMethodGroups` (`contact-methods-read.ts:7-23`) provides ordered, primary-flagged rows for ≥2 endpoint UI.
-- **Compose seam preserves Cluster AC.** Acceptance grep forbids `recordTouchpoint` / `INSERT INTO interactions` in `ComposeScreen.tsx` — consistent with current `onSend` (`:435-448`).
-- **Parallel Wave 3 decision is justified.** `interaction_assist_enabled` column lands in Plan 01 migration; raw read with default `1` is safe until Plan 04 adds `COLUMN_OF` (`app-settings-dao.ts:272-293` pattern for `digestEnabled`).
-- **Coarse channel history preserved.** Endpoint is handoff context only (Cluster D), matching plan prohibitions.
+- **Cluster AC honored:** Compose Send creates pending assist then launches; interaction only on banner confirm — matches dossier lines 573-591 and current `ComposeScreen.tsx:435` “Writes NOTHING to the DB.”
+- **HIGH-2 closed:** Task 2 grep gates enforce `performReachOut` delegation and forbid direct `createPendingAssist` / `SMS.sendSMSAsync` in Compose.
+- **Cluster D:** Endpoint is operational handoff context only; interaction stores coarse channel.
+- **Wave-3 independence:** Raw column read for `assistEnabled` allows parallel execution with 21-04 — reasonable tradeoff with documented follow-up.
 
 ### Concerns
 
-- **MEDIUM — Compose/handoff sharing is underspecified.** Task 2 action calls `createPendingAssist` directly while `read_first` references `performReachOut`. Compose must pass **draft text** to SMS (`ComposeScreen.tsx:446`); Plan 02’s handoff uses empty body. Risk of duplicated failure handling or accidental draft loss.
-- **LOW — No automated test for Compose seam.** Acceptance is grep + tsc only; a small test mocking DAO + SMS would guard the ordering invariant.
+- **LOW — No automated test for Compose seam:** Acceptance is grep/tsc-only; handoff behavior is covered in `handoff.test.ts` but Compose wiring isn't node-tested.
+- **LOW — ReachOutRouter grows in two plans:** 21-02 creates modal; 21-03 adds multi-endpoint branch — fine sequentially, but executor must not ship 21-03 before 21-02's router exists.
 
 ### Suggestions
 
-- Require Compose to call extended `performReachOut(exec, { …, messageBody: draft })` so assist creation, failure marking, and Alerts stay in one module.
-- Add a note in Task 2 acceptance: preserve existing Copy path and Compose Alert copy (“ready to copy”) distinct from Reach Out router errors (per `21-PATTERNS.md:141-142`).
+- Add a minimal Compose unit test mocking `performReachOut` to assert `messageBody: draft` and `assistEnabled` threading.
+- After 21-04 lands, add a cleanup task (even a comment in 21-04 SUMMARY) to swap raw reads to `getAppSettings().interactionAssistEnabled`.
 
 ### Risk Assessment
 
-**LOW–MEDIUM** — Scope is tight; main risk is DRY drift between Compose and router handoff paths.
+**LOW** — Focused scope, clear dossier alignment.
 
 ---
 
-## Plan 21-04 — Settings toggle + review sheet + launch sweep
+## Plan 21-04 — Settings Toggle + Review Sheet + Launch Sweep
 
 ### Summary
 
-Covers the durable-queue lifecycle end: default-on toggle, “off means off” queue clear (Cluster G), multi-pending review (Cluster P), and timer-free 24h/30d prune via `registerSweepHook` (`launch-sweep.ts:45-47`, `App.tsx:156-210` registration pattern).
+Closes durable-queue lifecycle: default-on toggle with off-clears-queue (Cluster G), `{N} more pending` review surface (Cluster P), and foreground-only sweep (Cluster N/Q). Backup portability for the new setting follows the proven `digestEnabled` pattern.
 
 ### Strengths
 
-- **Settings wiring follows proven analog.** `digestEnabled` in `TOGGLE_FIELDS` / `COLUMN_OF` (`app-settings-dao.ts:252-276`) and Settings digest row (~`:895-971` cited in plan) are the correct template.
-- **`setInteractionAssistEnabled` uses the right txn pattern.** Plan specifies `updateAppSettingsCore` inside one `inWriteTransaction` (`app-settings-dao.ts:617-621` core vs `:604-607` wrapper) — avoids nesting mutexed wrappers.
-- **Sweep registration matches shipped constraints.** Lazy executor inside hook, module guard, register before `installSweepTrigger` — mirrors notification/digest/widget sweep comments in `App.tsx:183-210`.
-- **No background timers.** Aligns with `launch-sweep.ts:10-16` negative constraints and CLAUDE.md scheduler rule.
+- **Settings wiring precedent is real:** `digestEnabled` appears in `TOGGLE_FIELDS`, `COLUMN_OF`, and `PORTABLE_SETTINGS_KEYS` (`app-settings-dao.ts:256-276`, `backup-schema.ts:106-113`); plan mirrors at every site — gap is real and plan closes it.
+- **Cluster G “off means off”:** One txn: settings update + expire all pending — test-enforced.
+- **Sweep architecture matches platform constraints:** `registerSweepHook` (`launch-sweep.ts:45-47`), no module-scope side effects (`:10-16`), `handoff_at`-based 24h expiry shares `EXPIRE_AFTER_HOURS` with eligibility.
+- **AppState coexistence test:** Joint fake for sweep dedupe vs banner every-return refresh addresses a real double-subscription hazard.
+- **Widget freshness on review sheet:** Consistent with 21-02 banner handler.
 
 ### Concerns
 
-- **MEDIUM — Backup/portable settings export omitted.** `digestEnabled` is in `PortableSettingsSnapshot` (`app-settings-dao.ts:136`) and `PORTABLE_SETTINGS_KEYS` (`backup/backup-schema.ts:106-113`). Plan 04 adds a user preference column but does not extend portable snapshot / backup allowlist — restore on another device could drop Assist preference or fail manifest validation depending on restore path.
-- **LOW — Sweep expiry uses `created_at`, eligibility also uses `created_at` for 24h.** Consistent with Cluster N; cap-5 prunes at write time separately. Document that sweep and query filter must share `EXPIRE_AFTER_HOURS` import from `assist-eligibility.ts`.
+- **MEDIUM — Wave 3 file overlap with 21-02:** Both modify `App.tsx`, `assist-store.ts`, and `AssistBanner.tsx`. Parallel wave execution can cause merge conflicts or lost hunks if not serialized (21-04 extends artifacts 21-02 creates).
+- **LOW — `interaction_assists` excluded from backup:** No assist rows in backup corpus (grep confirms no assist references in `src/backup/`). Operational/ephemeral by design (Cluster X), but restore to another device won't carry pending queue — acceptable if intentional; worth one line in KB.
 
 ### Suggestions
 
-- Extend Task 1 to also update `PortableSettingsSnapshot`, `getPortableSettingsSnapshot` SELECT/mapping (`app-settings-dao.ts:379-427`), and `backup-schema.ts:106-113` — same scope as `digestEnabled`.
-- Add `notifyWidgetDataChanged()` when toggle-off expires pending assists (status changes affect widget-facing recency indirectly via future confirms — lower priority than confirmation path).
+- Add explicit wave note: **21-04 should run after 21-02 completes** (not strictly parallel on shared files), or merge 21-04 Task 2 into 21-02 follow-up commit.
+- Sweep test: assert expired pending writes zero `interactions` rows (Cluster N).
 
 ### Risk Assessment
 
-**LOW–MEDIUM** — Lifecycle logic is thorough; backup portability is the notable gap.
+**MEDIUM** (execution coordination) / **LOW** (design) — Lifecycle semantics are well specified.
 
 ---
 
-## Plan 21-05 — Merge/purge/widget cross-phase wiring
+## Plan 21-05 — Merge / Purge / Widget Cross-Phase Wiring
 
 ### Summary
 
-Correctly identifies the phase’s cross-phase correctness core: reparent assists during merge (Cluster AA), purge removal (Cluster AB), and strict `orbit://reach/<id>` allow-list (mirroring `CONTACT_URI` / `COMPOSE_URI` at `widget-linking.ts:91-92`, `parseWidgetId` at `:100-106`).
+The phase's correctness core. Correctly identifies that `mergeContacts` reparent loop (`merge-dao.ts:153`) currently omits `interaction_assists`, which would CASCADE-delete pending assists on absorbed contact deletion — defeating Cluster AA. Widget Message→Contact swap matches shipped code (`widget-render.tsx:452-459` → `orbit://compose/`). Allow-list extension follows anchored regex pattern (`widget-linking.ts:91-92`).
 
 ### Strengths
 
-- **Merge reparent target is accurate.** Current loop at `merge-dao.ts:153` lists seven tables; dossier Cluster AA (line 547) explicitly requires adding `interaction_assists` before absorbed `DELETE` (`merge-dao.ts:185`) — otherwise CASCADE would destroy pending assists and break redirect.
-- **Purge strategy matches dossier.** Cluster AB (line 563) allows CASCADE on contact delete; `purgeContact` deletes children explicitly then `DELETE FROM contacts` (`purge-dao.ts:244-262`). FK CASCADE on migration-014 `contact_id` will remove any remaining assist rows.
-- **Widget change is bounded.** Only LargeTile Message → Contact (`widget-render.tsx:452-458`); small widget untouched per Cluster AG.
-- **Allow-list security mirrors shipped pattern.** Anchored regex + `parseWidgetId` safe-integer guard is proven in `widget-linking.ts:91-106`.
-- **Purged fail-safe closes a real gap.** Today null-guarded intents are silently dropped (`widget-linking.ts:232-234`); plan adds Dashboard + copy for reach intents only.
+- **Merge reparent gap verified on disk:** Line 153 array is `["interactions", "events", "fuel", ...]` — no `interaction_assists`; plan's one-string fix is necessary and sufficient given `reparent()` sets `contact_id + modified_at` (`merge-dao.ts:88-90`).
+- **Purge cascade verified:** `purgeContact` deletes contact row (`purge-dao.ts:261-263`); FK ON DELETE CASCADE on `interaction_assists.contact_id` (migration 014 plan) removes assists without PURGE_CHILDREN fan-out — matches dossier Cluster AB (`21-interaction-assist-reach-out.md:561-563`).
+- **Widget writer-free path verified:** `widget-task-handler.tsx:78-83` — OPEN_URI writes nothing; only WIDGET_MARK writes.
+- **Security boundary preserved:** New `REACH_URI = ^orbit://reach/([0-9]+)$` mirrors `CONTACT_URI`/`COMPOSE_URI`; `parseWidgetId` safe-integer guard (`widget-linking.ts:100-105`).
+- **Discriminated guard enables AB navigation half:** Current `guardWidgetIntent` collapses missing and archived to `null` (`widget-quick-action-guard.ts:33-35`); refactor to `{ ok, reason }` is required for purged vs archived UX split — plan documents owner-flippable archived-initiation policy explicitly.
+- **Cluster Z preserved on banner path:** Archived contacts still confirmable via banner; widget reach-initiation silently dropped — consistent with CRUD-05 + plan `<decisions>`.
 
 ### Concerns
 
-- **MEDIUM — Purge relies on CASCADE while `purge-dao.ts` documents explicit fan-out.** Header at `purge-dao.ts:16-23` says “do not rely on FK CASCADE”; plan intentionally skips `PURGE_CHILDREN` for assists. Functionally OK (dossier-approved), but `computeImpact` (`purge-dao.ts:121`) will not surface pending assists in purge confirm UI.
-- **LOW — `openReachOut` consume-once via `setParams` needs careful focus handling.** Plan specifies consume-once; React Navigation param persistence across re-focus is a common footgun — worth a device UAT row (covered in Plan 06).
+- **MEDIUM — Guard refactor blast radius:** `guardWidgetIntent` has one production caller (`widget-linking.ts:222`) plus tests, but return-type change is breaking; plan says “update EVERY caller” — adequate if tests are extended per acceptance criteria.
+- **LOW — `openReachOut` param on Profile:** Requires consume-once via `setParams` to avoid reopen loops — plan mentions this; worth explicit test or UAT row (21-06 covers it).
+- **LOW — Archived widget policy is planner-owned:** Recorded in `<decisions>` but is a product call (reviewer alternative: allow archived reach-initiation). Not a dossier violation.
 
 ### Suggestions
 
-- Optionally add explicit `DELETE FROM interaction_assists WHERE contact_id = ?` to purge fan-out for consistency with `purge-dao.ts:16-23` philosophy (not required by dossier).
-- Extend `guardWidgetIntent` tests for Profile+`openReachOut:true` on live Unbound contacts (`widget-quick-action-guard.ts:33-36` allows non-archived).
+- Merge test should assert `markAssistLogged` after merge writes interaction against **survivor** `contact_id`, not absorbed id.
+- Widget-linking test matrix in plan is thorough; add case: archived contact + `orbit://reach/<id>` → silent drop, no Alert (distinct from missing).
 
 ### Risk Assessment
 
-**LOW** — Small, well-scoped diffs against shipped merge/widget code; deep-link pattern is established.
+**MEDIUM** — Highest correctness impact if skipped or mis-implemented; plan mitigations (node tests + allow-list) are appropriate.
 
 ---
 
-## Plan 21-06 — Full-suite gate + device UAT
+## Plan 21-06 — Full-Suite Gate + Pixel UAT
 
 ### Summary
 
-Appropriate release gate for an irreversible migration and device-only behaviors (native intents, AppState banner timing, RemoteViews). DB-verified UAT matrix matches dossier lines 805–825.
+Appropriate end-of-phase gate for device-only surfaces (native intents, AppState banner timing, RemoteViews, irreversible migration 014 on hardware). DB verification via `run-as` matches project “review the code, not the diff” discipline.
 
 ### Strengths
 
-- **Node gates are the right preflight.** Full `npm test`, `tsc`, `check:colors` before device work.
-- **DB verification requirement is load-bearing.** Reinforces “UI render ≠ correctness” per project rules; run-as reads for `occurred_at === handoff_at`, `source='assist'`, `direction='outbound'`.
-- **Matrix covers cross-phase cases.** Merge redirect, purge fail-safe, toggle-off clear, process death, Back-through-banner — maps to Plans 01–05 must-haves.
-- **Owner sign-off is explicit.** Appropriate for migration 014 first landing on Pixel.
+- **Node gate before device work:** `npm test`, `tsc`, `check:colors` — catches DAO/guard regressions cheaply.
+- **Time-travel strategy for 15s/24h:** DEBUG constants or run-as `handoff_at` backdate — avoids flaky waits; documented per row.
+- **Explicit BLOCKED checkpoints:** Handoff-failure rows and owner sign-off not auto-passed — honest for device-dependent cases.
+- **Matrix covers cycle-2 findings:** Widget freshness (#1), archived vs purged deep-link (#4), Compose draft via shared handoff, Back-through-banner, process death, cap-5, merge/purge/archived (Clusters Z/AA/AB).
+- **DB invariants spelled out:** `occurred_at === handoff_at`, `source='assist'`, `direction='outbound'`, connected per action.
 
 ### Concerns
 
-- **MEDIUM — Time-dependent rows (15s buffer, 24h expiry) are slow/flaky on device.** Plan does not document clock manipulation or test hooks; agent may need adb elapsed-time strategy or owner-assisted waits.
-- **LOW — Phase 20 roadmap dependency vs code reality.** Roadmap lists Phase 20 “Not started” (`ROADMAP.md:920`) while `mergeContacts` is shipped (`merge-dao.ts:92`). UAT merge row depends on Plan 05, not full Phase 20 completion — worth noting if merge UI is incomplete.
+- **LOW — adb tap false-negatives:** Plan references project MEMORY and uiautomator — good, but small banner buttons remain UAT fragility.
+- **LOW — Depends on all Wave 3 plans:** Missing transitive note that 21-01/21-02 must be complete (implicit via 21-03/04/05 dependencies).
 
 ### Suggestions
 
-- Add UAT scaffolding notes for time travel: temporarily lower `ELIGIBLE_AFTER_SECONDS` in DEBUG, or use run-as UPDATE of `handoff_at`/`created_at` before foreground return tests.
-- Include explicit widget refresh check after banner confirmation (overdue tile updates without app restart).
+- Add UAT row: toggle Assist OFF while banner visible → queue cleared, banner hides immediately (Cluster G live check).
+- Record which `canonical_value` was handed off in run-as evidence for one Text case (operational debug, not history).
 
 ### Risk Assessment
 
-**MEDIUM** — Process is strong; execution cost and time-dependent scenarios are the friction points.
+**LOW** (plan quality) — **HIGH** (phase gate importance) — migration 014 is irreversible on device; owner sign-off is the right final control.
 
 ---
 
-## Phase-Level Synthesis
+## Cross-Cutting Observations
 
-### Overall Strengths
+### Dependency / Wave Ordering
 
-1. **Tracer-first, wave-ordered plans** with clear `depends_on` and honest split of node- vs device-verifiable work.
-2. **Dossier alignment is deep** — merge reparent, purge CASCADE, attestation-only copy, cap-5/24h, off-clears-queue, widget supersession all trace to locked clusters in `docs/dossier/21-interaction-assist-reach-out.md`.
-3. **Central architectural risk (DATA-04) is treated as first-class** — grep gates, DAO tests, and UAT DB reads for single-writer and handoff-time timestamps.
-4. **Security posture preserved** — permissionless intents, no passive monitoring, strict deep-link allow-list extension, widget remains writer-free (`widget-task-handler.tsx:80`).
+```
+Wave 1: 21-01 (tracer) ✓
+Wave 2: 21-02 (depends 21-01) ✓
+Wave 3: 21-03, 21-04, 21-05 (all depend 21-02, not each other)
+Wave 4: 21-06 (depends 21-03, 21-04, 21-05)
+```
 
-### Overall Concerns
+Tracer-first ordering is correct. **Recommend serializing 21-04 after 21-02** (or merging shared-file work) to avoid `App.tsx` / `AssistBanner.tsx` / `assist-store.ts` conflicts.
 
-| Severity | Issue |
-|----------|-------|
-| **HIGH** | `markAssistLogged` txn nesting ambiguity vs `recordTouchpoint`’s self-transacting mutex (`recency-dao.ts:232`, `transaction.ts:15-17`) |
-| **MEDIUM** | Missing `notifyWidgetDataChanged()` after assist confirmation (contrast `notification-actions.ts:161`) |
-| **MEDIUM** | `interactionAssistEnabled` not added to portable backup settings (`backup-schema.ts:106-113`) |
-| **MEDIUM** | Compose/router handoff sharing needs explicit `messageBody` parameter — draft must not be lost |
-| **MEDIUM** | Native handoff “failure” detection limited on Android (dossier Cluster F) |
-| **LOW** | `21-PATTERNS.md` conflicts with Plan 01 on uid + transaction sequencing |
-| **LOW** | Purge impact summary won’t count pending assists (CASCADE vs explicit fan-out style) |
+### Dossier / Invariant Compliance
 
-### Phase-Level Suggestions
+| Invariant | Plans |
+|-----------|-------|
+| DATA-04 single `last_contact` writer | 21-01 cores-only path ✓ |
+| Local-first / no passive monitoring (Cluster AJ) | No network, no call-log reads ✓ |
+| Write before handoff (Cluster E) | 21-02 `performReachOut` ✓ |
+| Merge reparent not cascade (Cluster AA) | 21-05 ✓ |
+| Widget emits URI only (Cluster AF/AG) | 21-05 + `widget-task-handler.tsx:78-83` ✓ |
+| Compose no interaction at Send (Cluster AC) | 21-03 ✓ |
 
-1. Unify handoff through `performReachOut` with optional SMS body; Compose and router share assist-before-launch + failure marking.
-2. Add a **Plan 01 Task 1 acceptance line**: “`markAssistLogged` does not call `inWriteTransaction` around `recordTouchpoint`.”
-3. Extend Plan 04 Task 1 with portable backup/export fields for `interactionAssistEnabled`.
-4. Add widget refresh to banner/review-sheet resolve handlers in Plan 02/04.
-5. Resolve `21-PATTERNS.md` drift before execution (deterministic uid, sequencing).
+### Local-First / Security
 
-### Overall Risk Assessment
+No plan introduces network egress, Android observation permissions, or widget-side assist writers. `orbit://reach/<id>` treated as untrusted with anchored allow-list — consistent with `widget-linking.ts:9-19` threat model.
+
+---
+
+## Overall Phase Risk Assessment
 
 **MEDIUM**
 
-The plans are unusually thorough for a brownfield feature touching merge, purge, widget, compose, and the single recency writer. Wave structure and node-test coverage de-risk the core correctness path. The elevated risk is concentrated in **implementation hazards the plans almost but don’t fully nail** (mutex nesting around `recordTouchpoint`, Compose/handoff DRY, widget freshness, backup portability) plus **inherently device-limited native handoff observability**. None of these appear to reverse dossier or ADR decisions; they are execution-precision gaps addressable with small plan amendments before Wave 1 lands. Migration 014 remains irreversible once on device — Plan 06’s owner-gated UAT is the appropriate final gate.
+**Justification:** Cycle-1 architectural HIGHs are genuinely resolved in plan text and align with on-disk patterns (`recency-dao.ts`, `transaction.ts`, `contacts-dao.ts`, `merge-dao.ts`). The remaining risks are: (1) executor confusion from 21-01’s stale “recordTouchpoint” prose reintroducing mutex nesting; (2) missing `rejectFutureOccurredAt` on the assist confirmation path; (3) Wave 3 parallel edits to shared shell files; (4) device-only verification of native handoff/banner/widget (properly gated by 21-06). None of these are dossier reversals; all are addressable without replanning the phase structure.
 
+**Recommendation:** Proceed with execution after a quick 21-01 wording cleanup and adding the future-date guard to `markAssistLogged`. Serialize 21-04’s shell/UI extensions after 21-02 lands. Treat 21-05 merge reparent as non-optional — it is the silent data-loss path if omitted.
 
 ---
 
 ## Claude Review
 
-# Cross-AI Plan Review — Phase 21: Interaction Assist & Reach Out
+# Cross-AI Plan Review — Phase 21 (Cycle 2)
 
-Verified against the live repo (not just the plan text): `src/db/database.ts` (TARGET_VERSION=13, migration list), `src/db/recency-dao.ts` (`recordTouchpoint` signature/body, `inWriteTransaction` non-reentrancy), `src/db/migrations/001-initial.ts` (`interactions.uid TEXT NOT NULL UNIQUE`), `src/db/merge-dao.ts` (reparent loop, line 153), `src/db/purge-dao.ts` (`PURGE_CHILDREN` fan-out), `src/navigation/widget-linking.ts` (allow-list pattern), `src/db/app-settings-dao.ts` (`COLUMN_OF`/`digestEnabled`), `src/services/launch-sweep.ts` (`registerSweepHook`/`installSweepTrigger`), `src/screens/ComposeScreen.tsx` (`onSend`).
+## Overall Summary
 
-## Summary
-
-This is an unusually well-grounded plan set — every load-bearing file/line citation I checked was accurate, not stale or invented. The migration number (014), the `recordTouchpoint` signature, the merge reparent array, the purge fan-out mechanism, and the widget allow-list pattern all match what's actually on disk. The single-writer discipline (all confirmed writes route through `recordTouchpoint`, never a bespoke `interactions` INSERT) is enforced both structurally (Plan 01's task design) and via grep-based acceptance criteria across every plan that touches the writer. The 6-plan/4-wave structure correctly sequences the tracer (data spine) before UI, and correctly identifies cross-phase wiring (merge/purge/widget) as the actual risk surface rather than treating it as an afterthought. The main gap is in Plan 01's crash-recovery idempotency mechanism for `markAssistLogged`, which introduces a UNIQUE-constraint-catch pattern that has zero precedent anywhere in this codebase and is under-specified.
+This is a mature, unusually well-grounded plan set. Every load-bearing claim I spot-checked against the repo held up exactly as stated: `TARGET_VERSION = 13` (database.ts:48), the merge reparent array literal (merge-dao.ts:153), the non-mutexed core exports `insertInteractionCore`/`recomputeLastContactCore` (recency-dao.ts:426-427), the non-reentrant-mutex hazard documented in transaction.ts, the current `guardWidgetIntent` collapsing "missing" and "archived" into one `null` branch (widget-quick-action-guard.ts:20-43), Compose's `onSend` writing nothing (ComposeScreen.tsx:434-454), and the widget's current `Message`→`orbit://compose/<id>` button (widget-render.tsx:452-459). The cycle-1 HIGH findings (mutexed `recordTouchpoint` nested inside `inWriteTransaction`; UNIQUE-error-sniffing idempotency; the two-divergent-handoffs draft-loss bug) are genuinely resolved in the current plan text, not just re-asserted — Plan 01's `markAssistLogged` composes cores atomically with a status-guarded check-then-write, and Plan 02/03 centralize handoff+failure logic in one `performReachOut(messageBody?)` helper that Compose also calls.
 
 ## Strengths
 
-- **`recordTouchpoint` signature is verified correct.** `src/db/recency-dao.ts:217-243` matches Pattern 1 in RESEARCH/PATTERNS exactly — `occurredAt`, `now`, `channel`, `direction`, `connected`, `note`, `source` all present, `source`/`channel`/`direction` confirmed free-TEXT with no CHECK (`migrations/001-initial.ts:97-110`). The plans correctly avoid inventing a "core" variant for it (unlike `recomputeLastContact`, `recordTouchpoint` self-transacts with no exported non-mutexed core), and Plan 01's read_first section explicitly flags this ("there is NO exported non-mutexed core variant") — this is accurate and was clearly verified, not assumed.
-- **Merge reparent addition is correctly scoped.** `merge-dao.ts:153` literally reads `for (const table of ["interactions","events","fuel","custom_field_values","contact_links","contact_methods","external_contact_links"] as const)` — Plan 05's "add the string `interaction_assists`" is a one-line, low-risk, high-leverage fix that closes a real correctness hole (without it, `DELETE FROM contacts WHERE id = ?` at `merge-dao.ts:185` would cascade-delete a pending assist before redirect).
-- **Purge reliance on cascade is correct and consistent with house style.** `purge-dao.ts` does use an explicit `PURGE_CHILDREN` fan-out (verified, not `ON DELETE CASCADE`) for auditability — Plan 05 correctly does NOT add `interaction_assists` to that map (assists are operational, not tombstoned) and instead adds a guarding test for the cascade path, which is the right call given the house style deliberately avoids relying on cascade elsewhere.
-- **`interactions.uid TEXT NOT NULL UNIQUE` is real** (`001-initial.ts:99`), so Plan 01's deterministic-uid idempotency mechanism (`reachout:${assist.uid}`) is architecturally sound in principle — the DB will actually enforce it.
-- **Nested-transaction hazard is correctly identified and designed around.** `recency-dao.ts:152-156`'s own docstring warns that a nested `inWriteTransaction` is "a PERMANENT hang," and every plan that calls `recordTouchpoint` followed by a status UPDATE explicitly sequences them as separate statements/transactions rather than nesting — this is the correct mitigation and it's called out in Plan 01's task instructions, not just the must_haves.
-- **Widget allow-list extension mirrors the existing security boundary exactly.** `widget-linking.ts:91-92`'s `CONTACT_URI`/`COMPOSE_URI` regex + `parseWidgetId` idiom (Number.isSafeInteger guard) is what Plan 05 proposes to clone for `REACH_URI` — appropriate, since this is genuinely an untrusted-intent surface (another app can send arbitrary URIs to the widget's deep link handler).
-- **Compose Send→assist decision (21-03 Task 2) documents its own scope-boundary reasoning inline** ("Decisions" block distinguishing Cluster AC wiring now vs. M2 Phase 12 UX ownership later) — this is exactly the kind of traceable reasoning that prevents silent scope drift.
+- **HIGH-1/HIGH-3 resolution is structurally sound.** `markAssistLogged` (Plan 01, must_haves) composes `insertInteractionCore` + `recomputeLastContactCore` + `bumpDataRevisionCore` inside one `inWriteTransaction`, never calling the mutexed `recordTouchpoint` — this exactly matches the documented compose-don't-nest pattern in `src/db/transaction.ts:17-24`, which explicitly names "Plan 03's `deleteOrQuarantineField`" as the precedent. Not a novel risk; a proven idiom in this codebase.
+- **Migration numbering is correct and re-verified.** `database.ts:48` confirms `TARGET_VERSION = 13` with migrations 001–013 registered; migration 014 is genuinely the next slot, and the plan explicitly calls out re-verifying this on disk (a documented past-drift hazard).
+- **HIGH-2 (Compose/Router handoff divergence) is genuinely fixed by a single shared `performReachOut`.** Plan 02 Task 1 defines `performReachOut(exec, {…, messageBody?})` with create-before-launch + failure marking centralized; Plan 03 Task 2 explicitly forbids Compose from calling `createPendingAssist`/`SMS.sendSMSAsync`/`markAssistFailed` directly and grep-gates on it. This removes the double-implementation risk cycle-1 flagged.
+- **Merge/purge wiring matches the actual shipped mechanism, not a guess.** `merge-dao.ts:153`'s reparent array is exactly what Plan 05 Task 1 targets, and the plan correctly identifies that purge relies on cascade rather than the `PURGE_CHILDREN` explicit fan-out (verified: purge-dao.ts wasn't touched, only tested).
+- **Widget guard refactor is justified by real code, not invented.** The live `guardWidgetIntent` (widget-quick-action-guard.ts:31-34) really does return the same `null` for both `contact === null` and `archived_at !== null` — so Plan 05's discriminated-result refactor is solving an actual ambiguity, and the "byte-for-byte unchanged for existing intents" acceptance criterion is testable.
+- **Timer-free eligibility design is consistent across plans.** Both the 15s buffer (Plan 01/02) and 24h expiry (Plan 04's sweep) are computed off the stored `handoff_at`, matching `installSweepTrigger`'s actual background→active tracking pattern (launch-sweep.ts:102-114), and Plan 04 explicitly adds a joint AppState test rather than assuming non-interference.
 
 ## Concerns
 
-- **HIGH — Plan 01's crash-recovery idempotency mechanism has no precedent in the codebase and is under-specified.** `markAssistLogged` is supposed to catch a UNIQUE-constraint violation from `recordTouchpoint` (when a deterministic `reachout:<uid>` interaction uid collides on retry) and treat it as "already logged." I grepped the entire `src/db/` tree for any existing UNIQUE-violation-catching pattern (`grep -i "unique\|constraint"` across `*.ts`) and found **zero** examples of this codebase distinguishing a UNIQUE-constraint SQLite error from any other thrown error. `recordTouchpoint` itself has no error-shape contract for this (it just propagates whatever `exec.runAsync` throws). The plan's must-have ("If recordTouchpoint rejects with a UNIQUE violation... treat as already-logged") doesn't specify how to detect that condition from the `SqlExecutor` abstraction (error `.message` substring match on `node-sqlite.ts`'s wrapper vs. on-device `expo-sqlite`'s error shape — these can differ). This is exactly the kind of thing that passes in the node test harness (`__testkit__/node-sqlite.ts`) and silently misbehaves on-device (a recurring pattern this project has already been burned by once — see the Hermes-crypto pitfall). Recommend: either (a) make the DAO query-before-insert with a status-guarded transaction instead of relying on catching a DB-level constraint error, or (b) explicitly verify and document the exact error shape from both `node-sqlite.ts` and Hermes/expo-sqlite before relying on it.
-- **MEDIUM — Plan 01's cap-5 prune query has a race with concurrent creates that isn't addressed.** The prune SQL (`UPDATE ... WHERE status='pending' AND id NOT IN (SELECT id FROM interaction_assists WHERE status='pending' ORDER BY created_at DESC, id DESC LIMIT 5)`) runs inside the same `inWriteTransaction` as the INSERT, which is correct for atomicity given the single-writer mutex `recordTouchpoint`/`inWriteTransaction` already provide (confirmed: `transaction.ts` is a non-reentrant mutex, so this is actually fine — flagging as resolved on reflection, downgrading). No action needed; the mutex covers it.
-- **MEDIUM — the `assist-store.ts` AppState "separate subscription from the sweep" claim is asserted but not verification-testable at the unit level in the way described.** Plan 02 Task 1's acceptance criteria says the store test "proves refresh triggers on background→active and NOT on inactive→active" using "a hand-rolled AppState fake." This is testable, but the deeper interaction — that the *sweep's* `installSweepTrigger` and the *banner's* subscription don't clobber each other or double-fire when both are registered against the real `AppState` singleton in `App.tsx` — is never verified by any automated test across the whole plan set; it's implicitly deferred to Plan 06 device UAT. Given this is called out in RESEARCH as a "load-bearing negative constraint," a lightweight integration test (both hooks registered against one fake AppState, assert independent firing) would be cheap insurance and isn't currently in the Wave 0 gap list.
-- **LOW — `deriveReachRoutes`'s claim that `call === text` is not independently exercised against `listActionablePrimaryMethods`'s actual behavior.** Plan 01 Task 2 asserts this derivation as a must-have and PATTERNS.md correctly cites `contact-method-normalization.ts:15-79` for the phone/email-granular `isActionable` semantics, but I did not independently re-verify that `listActionablePrimaryMethods`'s returned shape (`{phone, email}`) has no hidden channel-specific gate downstream (e.g., a landline flag suppressing Text). This is asserted confidently in three separate documents (RESEARCH, PATTERNS, dossier) as `[VERIFIED]`, which is reasonably strong, so I'm not escalating it, but it's the one claim in the security-adjacent "route derivation" logic I couldn't independently confirm in this session.
-- **LOW — Plan 05's purged-widget-deep-link "fail-safe" UX (Task 2) reuses `guardWidgetIntent`'s Profile branch, but the plan text notes that branch currently "allows Bound OR Unbound but drops archived/missing" — it's unclear whether "archived" should actually be droppable for the REACH intent given Cluster Z ("archived target → still loggable").** If the *existing* Profile guard treats archived contacts as invalid the same way as missing/purged ones, reusing it verbatim for `orbit://reach/<id>` could incorrectly hide reachability for an archived-but-loggable contact reached via widget, contradicting Cluster Z. The plan doesn't call this distinction out explicitly — worth a one-line clarification in Plan 05 Task 2 that the reused guard must treat archived-but-existing as valid (only missing/purged/merged-without-redirect should fail).
+- **MEDIUM — Plan 01's cap-5 prune and Plan 04's sweep both touch `interaction_assists` but with different WHERE-scopes; verify no double-expire race matters.** Not a correctness bug (both are idempotent status-guarded UPDATEs), but worth noting cap-5 pruning happens synchronously inside `createPendingAssist`'s transaction while the sweep runs at launch — two independent expiry paths converging on the same rows. The plan's tests cover each in isolation; no test explicitly proves they compose correctly when both fire in the same session (e.g., cap-5 expires assist X, then the sweep's 24h check also targets X — harmless since both write `status='expired'`, but not explicitly asserted as a case).
+- **LOW — Plan 02 Task 3's defensive read of `interaction_assist_enabled` (raw column, before Plan 04 lands the DAO key) creates a temporary parallel access path to the same column.** This is explicitly a deliberate, documented same-wave independence choice (21-03's `<decisions>` block) rather than an oversight, and it's scoped to one plan-cycle — acceptable, but confirm the "later touch-up" to swap to `getAppSettings().interactionAssistEnabled` is actually tracked somewhere (it isn't in any must_haves/acceptance_criteria I can see — it's just prose in the decisions block, so it could silently never happen and leave two read paths to one column forever).
+- **LOW — `markAssistLogged`'s SELECT-then-write is two statements without `SELECT ... FOR UPDATE`-style locking, but SQLite's single-writer transaction model via the existing mutex makes this moot** — since `inWriteTransaction` composes with `withMutex`, no other write can interleave. This is correctly relied upon rather than re-solved, but it's worth flagging as a reviewer note: the correctness here depends entirely on `inWriteTransaction`'s mutex actually serializing all writers app-wide, which is true today (confirmed in transaction.ts) but is an implicit global invariant the plan doesn't re-state as a risk.
+- **LOW — Plan 05's `orbit://reach/<id>` reset target `[Home, Profile{contactId, openReachOut:true}]` depends on `ContactProfileScreen` consuming `openReachOut` exactly once (Plan 02 Task 3 "consume-once via setParams").** If the router opens on every focus rather than once, a user backgrounding/foregrounding while the router is already dismissed could reopen it. The plan does specify "consume-once on focus," which is the right mitigation, but there's no explicit test asserting the param is cleared (Plan 02's acceptance criteria for Task 3 don't grep/test for `setParams` being called).
 
 ## Suggestions
 
-- Add a Wave-0 test (or fold into Plan 01) asserting the exact error identity used to detect a UNIQUE-constraint violation in `markAssistLogged`, exercised against the same `__testkit__` executor the rest of the DAO suite uses, and flag in the SUMMARY that this specific behavior (unlike the rest of the DAO) has NOT been device-verified for its error-shape assumption — elevate it explicitly in Plan 06's device matrix rather than leaving it implicit.
-- Consider replacing the catch-a-constraint-violation idempotency strategy with a simpler status-guarded check-then-write (read `status` first inside the transaction; if already `'logged'`, no-op) — this avoids relying on driver-specific error shapes entirely and is more consistent with the "status-guarded UPDATE" pattern already used elsewhere in the same plan for `markAssistDismissed`/`markAssistFailed`.
-- Clarify in Plan 05 Task 2 that the reused `guardWidgetIntent` Profile-branch guard must NOT reject archived-but-existing contacts for the `orbit://reach/<id>` intent, only missing/purged ones — otherwise Cluster Z's "archived → still loggable" guarantee could be silently violated on the widget path specifically (profile-initiated Reach Out presumably isn't gated the same way, so this would be an inconsistency between entry points, not just a widget quirk).
-- Add one integration-level test (even a light one) that registers both `interactionAssistSweep`'s hook and `assist-store`'s AppState subscription against a single shared fake `AppState`, asserting they don't interfere — currently this is asserted as a design constraint in three docs but never jointly tested.
+- Add one integration-level test (could live in Plan 04's sweep test file) that creates 6 pending assists, lets both cap-5 pruning and the sweep run, and asserts a stable end state — closes the double-expiry gap above cheaply.
+- Add an explicit acceptance criterion to Plan 02 Task 3 (or Plan 05) asserting `openReachOut` is cleared via `setParams` after consumption, since this is the concurrency/adjacency guard for the widget deep-link reopening bug.
+- Track the Plan 03→Plan 04 raw-column-read handoff as a literal TODO/task rather than only prose in `<decisions>`, so it doesn't get silently forgotten after Wave 3 lands.
 
-## Risk Assessment: **LOW-MEDIUM**
+## Risk Assessment: **LOW**
 
-The architecture is sound, the citations are accurate (verified independently against the repo, not just trusted), and the plan correctly identifies and mitigates the phase's real risk surface (single-writer discipline, merge/purge wiring, deep-link security boundary, no-timer durability). The one genuine gap — the UNIQUE-constraint-catch idempotency mechanism in Plan 01 — is a new pattern with no in-repo precedent and an under-specified detection mechanism, which is exactly the shape of bug this project has been bitten by before (Hermes crypto passing in Node, failing on-device). It's containable (single function, single plan, easily test-hardened before Wave 2 begins) but should not ship to device UAT without tightening.
-
+The plan set resolves the cycle-1 HIGH findings with mechanisms that trace correctly to real, verified code (not just restated intent), the migration numbering and cross-phase wiring targets are accurate on disk, and the remaining concerns are minor test-coverage gaps rather than architectural or correctness flaws. This is executable as written.
 
 ---
 
-## Verification coverage
+## Verification Coverage (orchestrator, cycle 2)
 
-Effective drift-guard authority: **grep** (under this authority a MISSING symbol resolves to `needs-acknowledgement`, `hardBlock:false` — no MISSING was found regardless).
+Independent re-verification against the source on disk, per CLAUDE.md ("review the
+code, not the diff"). Authority resolved once: `EFFECTIVE_AUTHORITY = grep`.
 
-### 1. Source-grounding pass
+### 1. Source-grounding (cited pre-existing symbols; excludes each plan's own "Artifacts this phase produces")
 
-Every symbol the plans cite that already exists in the repo was grep-verified. New artifacts this phase produces (`interaction_assists` table, migration 014, `interaction_assist_enabled` column, `createPendingAssist` / `markAssistLogged` / `markAssistDismissed` / `markAssistFailed`, `performReachOut`, `deriveReachRoutes`, `AssistBanner`, `assist-store`, `assist-eligibility`, `interactionAssistSweep`, `REACH_URI` / `orbit://reach/<id>`) are **excluded** — they are declared outputs, not preconditions.
+All symbols the plans cite as existing were resolved in source. Under `grep`
+authority a MISSING would be `needs-acknowledgement` / `hardBlock:false` (no
+source-grounding HIGH is possible this cycle); none were MISSING regardless.
 
-| Symbol | Verdict | Evidence |
-|--------|---------|----------|
-| `recordTouchpoint` | VERIFIED | `src/db/recency-dao.ts:217` |
-| `insertInteraction` / `INSERT INTO interactions` | VERIFIED | `src/db/recency-dao.ts:179`, `:195` |
-| `last_contact` writer (SET last_contact) | VERIFIED | `src/db/recency-dao.ts:166` |
-| `inWriteTransaction` non-reentrant PERMANENT-hang warning | VERIFIED | `src/db/transaction.ts:15-17`, export `:49` |
-| `TARGET_VERSION = 13` / migration013 as head | VERIFIED | `src/db/database.ts:48`, `:64` (⇒ 014 is correct next) |
-| `mergeContacts` reparent loop (7 tables, no `interaction_assists`) | VERIFIED | `src/db/merge-dao.ts:153`; `DELETE FROM contacts` `:185` |
-| `listContactMethodGroups` / `listActionablePrimaryMethods` | VERIFIED | `src/db/contact-methods-read.ts:7`, `:30` |
-| widget allow-list `CONTACT_URI`/`COMPOSE_URI`/`parseWidgetId`/`isSafeInteger` | VERIFIED | `src/navigation/widget-linking.ts:91-92`, `:100-102` |
-| `guardWidgetIntent` rejects archived (`archived_at !== null → null`) | VERIFIED | `src/services/widget/widget-quick-action-guard.ts:20`, `:34-35` |
-| `purgeContact` explicit `PURGE_CHILDREN` fan-out (not FK CASCADE) | VERIFIED | `src/db/purge-dao.ts:16-22`, `:76`, `:245` |
-| `ComposeScreen` `SMS.sendSMSAsync(phone, draft)`, no `recordTouchpoint`/INSERT | VERIFIED | `src/screens/ComposeScreen.tsx:446` |
-| `digestEnabled` in `TOGGLE_FIELDS` / `COLUMN_OF` | VERIFIED | `src/db/app-settings-dao.ts:256`, `:276` |
-| `registerSweepHook` / `installSweepTrigger` | VERIFIED | `src/services/launch-sweep.ts:45`, `:102` |
-| restore writes `interactions` with `ON CONFLICT(uid) DO UPDATE` | VERIFIED | `src/backup/restore-apply.ts:170` |
-| `PORTABLE_SETTINGS_KEYS` includes `digestEnabled` | VERIFIED | `src/backup/backup-schema.ts:106-107` |
-| widget Message action → `orbit://compose/{id}` | VERIFIED | `src/services/widget/widget-render.tsx:454-458` |
+| Symbol | Status | Evidence |
+|---|---|---|
+| `recordTouchpoint` | VERIFIED | src/db/recency-dao.ts:217 (mutexed wrapper; `rejectFutureOccurredAt` at :228) |
+| `insertInteractionCore` (alias) | VERIFIED | src/db/recency-dao.ts:426 (non-mutexed core; NO future-guard) |
+| `recomputeLastContactCore` (alias) | VERIFIED | src/db/recency-dao.ts:427 (sole `last_contact` writer, body :159-176) |
+| `bumpDataRevisionCore` | VERIFIED | src/db/data-revision-dao.ts:5 |
+| `inWriteTransaction` | VERIFIED | src/db/transaction.ts:49 (non-reentrant mutex; nesting = permanent hang) |
+| `rejectFutureOccurredAt` | VERIFIED | src/db/log-guards.ts:68 (imported by recency-dao.ts:52) |
+| `newUid` | VERIFIED | src/db/uid.ts:18 |
+| `mergeContacts` | VERIFIED | src/db/merge-dao.ts:92; reparent array :153 omits `interaction_assists` (Plan 05 fix genuinely required) |
+| `purgeContact` | VERIFIED | src/db/purge-dao.ts:204 (deletes contact row → FK cascade path valid) |
+| `guardWidgetIntent` | VERIFIED | src/services/widget/widget-quick-action-guard.ts:20 (collapses missing+archived to `null` — refactor justified) |
+| `parseWidgetId` | VERIFIED | src/navigation/widget-linking.ts:100 (safe-integer guard) |
+| `listActionablePrimaryMethods` | VERIFIED | src/db/contact-methods-read.ts:30 |
+| `notifyWidgetDataChanged` | VERIFIED | src/services/widget/widget-refresh.ts:74 |
+| `registerSweepHook` | VERIFIED | src/services/launch-sweep.ts:45 |
+| `TARGET_VERSION` | VERIFIED | src/db/database.ts:48 = 13; migration013 is head (:64); 014 is next slot |
+| `TOGGLE_FIELDS` / `COLUMN_OF` | VERIFIED | src/db/app-settings-dao.ts:252 / :93 |
+| `PORTABLE_SETTINGS_KEYS` | VERIFIED | src/backup/backup-schema.ts:106 (`digestEnabled` precedent :49) |
+| `SMS.sendSMSAsync` (Compose) | VERIFIED | src/screens/ComposeScreen.tsx (expo-sms; onSend writes nothing) |
+| widget Message→compose button | VERIFIED | src/services/widget/widget-render.tsx:458 `orbit://compose/${tile.id}` (Plan 05 swaps to Contact) |
+| `CONTACT_URI`/`COMPOSE_URI` anchored patterns | VERIFIED | src/navigation/widget-linking.ts:11-12 (Plan 05 `orbit://reach/<id>` mirrors these) |
 
-MISSING: none. AMBIGUOUS: none. UNCHECKABLE / skipped: none (all cited pre-existing symbols resolved on disk). No `hardBlock` MISSING ⇒ no source-grounding HIGH.
+- MISSING: none.
+- AMBIGUOUS: none.
+- UNCHECKABLE / skipped: symbols under each plan's "Artifacts this phase produces"
+  (e.g. `markAssistLogged`, `createPendingAssist`, `performReachOut`,
+  `deriveReachRoutes`, `assist-eligibility.ts`, migration014) — excluded by
+  contract as this-phase outputs. Native `Linking.openURL`/`tel:`/`mailto:` are
+  greenfield in this repo (no existing `tel:` usage) and are device-verified in
+  21-06, not node-checkable here.
+
+Minor citation drift (advisory, not a finding): 21-01-PLAN.md cites the core
+exports at `recency-dao.ts:425-428`; on disk they are at :426-427. Same block,
+off by ~1 line.
 
 ### 2. Cross-artifact fact-drift (advisory — never counts toward HIGH/actionable)
 
-- `drift-guard phase-status --phase 21` → verdict **`lag`** (STATE.md "Ready to execute" rank 1 vs ROADMAP "Not started" rank 0; authority STATE.md). Per the convergence contract `lag` is ignored (only `drifted` is reported). No action.
-- ROADMAP Success Criteria ↔ PLAN must_haves / dossier [DECIDED] clusters: no genuine contradiction (same fact asserted opposite) found. Plans enforce Clusters Z/AA/AB/AC/F rather than contradicting them. Advisory-clean.
-- Note (advisory, not counted): `21-PATTERNS.md` carries stale guidance — `uid: newUid()` (`:63`) vs the plan's required deterministic `reachout:${uid}`, and "SAME transaction" phrasing (`:72-74`) that conflicts with Plan 01's non-nesting requirement. This is the doc-drift that makes HIGH-1 dangerous; correcting it is part of resolving HIGH-1.
+`drift-guard phase-status --phase 21` → verdict `lag` (STATE.md "Ready to execute"
+rank 1 vs ROADMAP "Not started" rank 0). Per the convergence contract, `lag` is
+ignored (only `drifted` under STATE.md authority would be reported). No genuine
+ROADMAP↔PLAN success-criteria/requirement-ID/glossary contradiction found.
+
+### Lane execution
+All three named lanes ran and returned genuine (non-stubbed) source-grounded
+reviews: codex (~100s), cursor (~110s), claude/sonnet (~55s). No lane dropped or
+timed out; no hook-trust bypass flag used.
