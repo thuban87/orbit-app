@@ -33,7 +33,11 @@ import {
   type ResumableReconcile,
   registerReconcileResumeSweep,
 } from "@/services/import/reconcile-resume-sweep";
-import { installSweepTrigger } from "@/services/launch-sweep";
+import { interactionAssistSweep } from "@/services/interaction-assist-sweep";
+import {
+  installSweepTrigger,
+  registerSweepHook,
+} from "@/services/launch-sweep";
 // Module-scope side-effect import (Pitfall P5): importing headless-task RUNS its
 // `TaskManager.defineTask` + `registerTaskAsync` so a killed-app action tap reaches
 // the headless write path. React never mounts in the headless context, so no
@@ -118,6 +122,7 @@ let widgetSweepRegistered = false;
 // other launch hooks so Strict Mode/remounts cannot double-prompt a session.
 let importResumeSweepRegistered = false;
 let reconcileResumeSweepRegistered = false;
+let interactionAssistSweepRegistered = false;
 
 function AppShell() {
   const { colors } = useTheme();
@@ -172,6 +177,13 @@ function AppShell() {
     if (!backupSweepRegistered) {
       registerBackupSweep(getExecutor);
       backupSweepRegistered = true;
+    }
+    // Durable assist rows are bounded only during a real foreground launch. The
+    // hook gets its executor lazily and is registered before the cold-start
+    // trigger, so headless widget/notification taps cannot reach it.
+    if (!interactionAssistSweepRegistered) {
+      registerSweepHook(interactionAssistSweep(getExecutor));
+      interactionAssistSweepRegistered = true;
     }
     // Register the photo-write reconciliation (PHOTO-03/05) on the same registry,
     // once only, BEFORE the trigger fires its cold-start sweep. FS-only, no
