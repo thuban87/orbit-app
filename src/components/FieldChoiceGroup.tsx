@@ -56,8 +56,11 @@ export function FieldChoiceGroup<T extends string>({
       {options.map((option) => {
         const selected = selection === option.id;
         return (
+          // `id` is the selection bucket (e.g. "source"), not unique per row: a
+          // multi-value family yields several options sharing one id, so the
+          // React key also folds in the per-row value. Selection identity stays `id`.
           <Pressable
-            key={option.id}
+            key={`${option.id}:${option.value}`}
             accessibilityRole="radio"
             accessibilityState={{ selected }}
             accessibilityLabel={`${label}: ${option.value}, ${option.provenance}`}
