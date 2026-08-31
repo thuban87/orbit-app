@@ -310,6 +310,8 @@ export function ContactProfileScreen({
   const reachRoutes = deriveReachRoutes(
     selectActionablePrimaryMethods(methodGroups),
   );
+  const hasReachRoute =
+    reachRoutes.call || reachRoutes.text || reachRoutes.email;
 
   // Reload on focus, not just on mount: the only route into Edit is this
   // profile's "Add details", so Edit always sits directly above Profile in the
@@ -320,7 +322,11 @@ export function ContactProfileScreen({
   useFocusEffect(
     useCallback(() => {
       void load();
-    }, [load]),
+      if (route.params.openReachOut && hasReachRoute) {
+        setReachOutOpen(true);
+        navigation.setParams({ openReachOut: undefined });
+      }
+    }, [hasReachRoute, load, navigation, route.params.openReachOut]),
   );
 
   // One-tap "Log contact" (LOG-01) — the primary action of this slice. Records a

@@ -12,6 +12,10 @@ export type WidgetContactLookup = (contactId: number) => Promise<{
   trackingEnabled: number;
 } | null>;
 
+export type WidgetIntentGuardResult =
+  | { ok: true; intent: WidgetNavIntent }
+  | { ok: false; reason: "missing" | "archived" | "ineligible" };
+
 /**
  * Allow live Profile opens for either lifecycle state, but require a live Bound
  * contact for the active-cadence Compose quick action. Favourites has no contact
@@ -20,24 +24,27 @@ export type WidgetContactLookup = (contactId: number) => Promise<{
 export async function guardWidgetIntent(
   intent: WidgetNavIntent | null,
   lookup: WidgetContactLookup,
-): Promise<WidgetNavIntent | null> {
+): Promise<WidgetIntentGuardResult> {
   if (intent === null) {
-    return null;
+    return { ok: false, reason: "missing" };
   }
 
   const target = intent.routes[1];
   if (target.name === "ManageFavourites") {
-    return intent;
+    return { ok: true, intent };
   }
 
   const contact = await lookup(target.params.contactId);
-  if (contact === null || contact.archived_at !== null) {
-    return null;
+  if (contact === null) {
+    return { ok: false, reason: "missing" };
+  }
+  if (contact.archived_at !== null) {
+    return { ok: false, reason: "archived" };
   }
 
   if (target.name === "Compose" && contact.trackingEnabled !== 1) {
-    return null;
+    return { ok: false, reason: "ineligible" };
   }
 
-  return intent;
+  return { ok: true, intent };
 }

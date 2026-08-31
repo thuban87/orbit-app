@@ -14,44 +14,50 @@ function lookup(row: Contact | null) {
 describe("guardWidgetIntent", () => {
   it("allows a Bound Compose target", async () => {
     const intent = resolveWidgetUri("orbit://compose/7");
-    expect(await guardWidgetIntent(intent, lookup(bound))).toEqual(intent);
+    expect(await guardWidgetIntent(intent, lookup(bound))).toEqual({
+      ok: true,
+      intent,
+    });
   });
 
   it("fails closed for an Unbound Compose target", async () => {
     const guard = lookup(unbound);
     expect(
       await guardWidgetIntent(resolveWidgetUri("orbit://compose/7"), guard),
-    ).toBeNull();
+    ).toEqual({ ok: false, reason: "ineligible" });
     expect(guard).toHaveBeenCalledWith(7);
   });
 
   it("allows a live Unbound Profile-open target", async () => {
     const intent = resolveWidgetUri("orbit://contact/7");
-    expect(await guardWidgetIntent(intent, lookup(unbound))).toEqual(intent);
+    expect(await guardWidgetIntent(intent, lookup(unbound))).toEqual({
+      ok: true,
+      intent,
+    });
   });
 
-  it.each([archived, null])(
-    "dead-ends either target kind when missing or archived",
-    async (row) => {
-      expect(
-        await guardWidgetIntent(
-          resolveWidgetUri("orbit://compose/7"),
-          lookup(row),
-        ),
-      ).toBeNull();
-      expect(
-        await guardWidgetIntent(
-          resolveWidgetUri("orbit://contact/7"),
-          lookup(row),
-        ),
-      ).toBeNull();
-    },
-  );
+  it("reports missing and archived targets distinctly", async () => {
+    expect(
+      await guardWidgetIntent(
+        resolveWidgetUri("orbit://reach/7"),
+        lookup(null),
+      ),
+    ).toEqual({ ok: false, reason: "missing" });
+    expect(
+      await guardWidgetIntent(
+        resolveWidgetUri("orbit://reach/7"),
+        lookup(archived),
+      ),
+    ).toEqual({ ok: false, reason: "archived" });
+  });
 
   it("keeps the favourites intent independent of a contact lookup", async () => {
     const intent = resolveWidgetUri("orbit://favourites");
     const guard = lookup(null);
-    expect(await guardWidgetIntent(intent, guard)).toEqual(intent);
+    expect(await guardWidgetIntent(intent, guard)).toEqual({
+      ok: true,
+      intent,
+    });
     expect(guard).not.toHaveBeenCalled();
   });
 

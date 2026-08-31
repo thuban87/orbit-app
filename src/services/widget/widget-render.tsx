@@ -366,7 +366,7 @@ function ActionButton({
  * LARGE tile row: avatar + ring on the left, a middle column of name over the
  * ranked fuel line, then the three action buttons — Mark (WIDGET_MARK), Log
  * (OPEN_URI → orbit://contact/{id}, the owner-ratified Profile target, 12-04
- * Task-1), Message (OPEN_URI → orbit://compose/{id}). The text label is the
+ * Task-1), Contact (OPEN_URI → orbit://reach/{id}). The text label is the
  * source of truth; the glyph is decorative (UI-SPEC copy contract).
  */
 function LargeTile({
@@ -450,12 +450,12 @@ function LargeTile({
           clickActionData={{ uri: `orbit://contact/${tile.id}` }}
         />
         <ActionButton
-          glyph="✉"
-          label="Message"
+          glyph="☎"
+          label="Contact"
           glyphColor={palette.accent}
           palette={palette}
           clickAction="OPEN_URI"
-          clickActionData={{ uri: `orbit://compose/${tile.id}` }}
+          clickActionData={{ uri: `orbit://reach/${tile.id}` }}
         />
       </FlexWidget>
     </FlexWidget>

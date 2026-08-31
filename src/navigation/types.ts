@@ -24,7 +24,7 @@ export type RootStackParamList = {
   Settings: undefined;
   CustomFields: undefined;
   Create: undefined;
-  Profile: { contactId: number };
+  Profile: { contactId: number; openReachOut?: boolean };
   Edit: { contactId: number };
   Archived: undefined;
   /**

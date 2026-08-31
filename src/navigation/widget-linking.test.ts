@@ -39,6 +39,17 @@ describe("resolveWidgetUri — accepted forms (all RESET onto [Home, target])", 
     });
   });
 
+  it("maps orbit://reach/<id> to a reset onto [Home, Profile{openReachOut}]", () => {
+    expect(resolveWidgetUri("orbit://reach/5")).toEqual({
+      type: "reset",
+      index: 1,
+      routes: [
+        { name: "Home" },
+        { name: "Profile", params: { contactId: 5, openReachOut: true } },
+      ],
+    });
+  });
+
   it("maps orbit://favourites to a RESET onto [Home, ManageFavourites], NOT a navigate", () => {
     const intent = resolveWidgetUri("orbit://favourites");
     expect(intent).toEqual({
@@ -81,6 +92,11 @@ describe("resolveWidgetUri — malformed / untrusted input → null", () => {
     ["encoded path", "orbit://contact/%35"],
     ["favourites with trailing slash", "orbit://favourites/"],
     ["favourites with extra segment", "orbit://favourites/5"],
+    ["reach missing id", "orbit://reach/"],
+    ["reach zero id", "orbit://reach/0"],
+    ["reach negative id", "orbit://reach/-1"],
+    ["reach alpha id", "orbit://reach/abc"],
+    ["reach oversized id", "orbit://reach/99999999999999999999"],
     ["empty string", ""],
     ["number input", 123],
     ["object input", {}],
@@ -91,5 +107,20 @@ describe("resolveWidgetUri — malformed / untrusted input → null", () => {
 
   it.each(rejected)("returns null for %s", (_label, input) => {
     expect(resolveWidgetUri(input)).toBeNull();
+  });
+
+  it("keeps reach separate from contact and compose forms", () => {
+    expect(resolveWidgetUri("orbit://reach/5")?.routes[1]).toEqual({
+      name: "Profile",
+      params: { contactId: 5, openReachOut: true },
+    });
+    expect(resolveWidgetUri("orbit://contact/5")?.routes[1]).toEqual({
+      name: "Profile",
+      params: { contactId: 5 },
+    });
+    expect(resolveWidgetUri("orbit://compose/5")?.routes[1]).toEqual({
+      name: "Compose",
+      params: { contactId: 5 },
+    });
   });
 });

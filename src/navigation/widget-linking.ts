@@ -11,6 +11,7 @@
  *        - orbit://contact/<positive-int>   → Profile
  *        - orbit://compose/<positive-int>   → Compose
  *        - orbit://favourites               → ManageFavourites
+ *        - orbit://reach/<positive-int>     → Profile with Reach Out open
  *      and returns null for EVERYTHING else — a wrong scheme, an unknown host, a
  *      non-integer / negative / zero / oversized id, a present query string /
  *      fragment / port, an encoded path, an extra segment, or a NON-STRING input.
@@ -51,7 +52,7 @@ const LOG_SOURCE = "widget-linking";
 
 /**
  * A serializable RESET intent — the gate applies it verbatim as
- * `navigationRef.current.reset({ index, routes })`. All three forms reset onto
+ * `navigationRef.current.reset({ index, routes })`. All four forms reset onto
  * [Home, target] (index 1); none is a navigate, so Back always returns to the
  * dashboard. The shapes mirror react-navigation's `reset` argument so the gate is
  * a thin adapter with no branching of its own.
@@ -63,6 +64,17 @@ export type WidgetNavIntent =
       routes: [
         { name: "Home" },
         { name: "Profile"; params: { contactId: number } },
+      ];
+    }
+  | {
+      type: "reset";
+      index: 1;
+      routes: [
+        { name: "Home" },
+        {
+          name: "Profile";
+          params: { contactId: number; openReachOut: true };
+        },
       ];
     }
   | {
@@ -90,6 +102,7 @@ const FAVOURITES_URI = "orbit://favourites";
  */
 const CONTACT_URI = /^orbit:\/\/contact\/([0-9]+)$/;
 const COMPOSE_URI = /^orbit:\/\/compose\/([0-9]+)$/;
+const REACH_URI = /^orbit:\/\/reach\/([0-9]+)$/;
 
 /**
  * Parse a digits-only capture to a positive, safe integer contact id, or null.
@@ -107,7 +120,7 @@ function parseWidgetId(digits: string): number | null {
 
 /**
  * Resolve an orbit:// widget deep link to a serializable reset intent, or null
- * when the input is not EXACTLY one of the three minted forms. Pure — no
+ * when the input is not EXACTLY one of the four minted forms. Pure — no
  * navigator, no OS, no side effect. Rejects a non-string input up front so the
  * V5 "reject non-strings" contract is real (the param is `unknown`, not `string`).
  */
@@ -150,6 +163,21 @@ export function resolveWidgetUri(url: unknown): WidgetNavIntent | null {
           routes: [
             { name: "Home" },
             { name: "Compose", params: { contactId: id } },
+          ],
+        };
+  }
+
+  const reach = REACH_URI.exec(url);
+  if (reach) {
+    const id = parseWidgetId(reach[1]);
+    return id === null
+      ? null
+      : {
+          type: "reset",
+          index: 1,
+          routes: [
+            { name: "Home" },
+            { name: "Profile", params: { contactId: id, openReachOut: true } },
           ],
         };
   }
@@ -229,7 +257,26 @@ export function WidgetLinkingGate({ isReady }: { isReady: boolean }) {
       if (cancelled) {
         return;
       }
-      if (guarded === null) {
+      const target = pending.routes[1];
+      const isReachIntent =
+        target.name === "Profile" &&
+        "openReachOut" in target.params &&
+        target.params.openReachOut === true;
+      if (!guarded.ok) {
+        if (isReachIntent && guarded.reason === "missing") {
+          const [{ Alert }, { navigationRef }] = await Promise.all([
+            import("react-native"),
+            import("./linking"),
+          ]);
+          if (cancelled) {
+            return;
+          }
+          navigationRef.current?.reset({
+            index: 0,
+            routes: [{ name: "Home" }],
+          });
+          Alert.alert("This contact is no longer available.");
+        }
         setPending(null);
         return;
       }
@@ -238,8 +285,8 @@ export function WidgetLinkingGate({ isReady }: { isReady: boolean }) {
         return;
       }
       navigationRef.current?.reset({
-        index: guarded.index,
-        routes: guarded.routes,
+        index: guarded.intent.index,
+        routes: guarded.intent.routes,
       });
       setPending(null);
     })().catch((error) => {
