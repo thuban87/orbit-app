@@ -8,7 +8,17 @@ import type { SqlExecutor } from "@/db/types";
 
 const NOW = "2026-08-30 12:00:00";
 let exec: SqlExecutor; let n = 0; const uid = () => `uid-${++n}`;
-beforeEach(async () => { n = 0; exec = nodeSqliteExecutor(openTestDb()); await runMigrations(exec, [migration001], 1, { now: NOW, newUid: uid }); await exec.execAsync("ALTER TABLE contacts ADD COLUMN tracking_enabled INTEGER NOT NULL DEFAULT 1"); });
+beforeEach(async () => {
+  n = 0;
+  exec = nodeSqliteExecutor(openTestDb());
+  await runMigrations(exec, [migration001], 1, { now: NOW, newUid: uid });
+  await exec.execAsync(`
+    ALTER TABLE contacts ADD COLUMN tracking_enabled INTEGER NOT NULL DEFAULT 1;
+    CREATE TABLE custom_field_values (contact_id INTEGER NOT NULL, value TEXT);
+    CREATE TABLE contact_methods (contact_id INTEGER NOT NULL, display_value TEXT);
+    CREATE TABLE external_contact_links (contact_id INTEGER NOT NULL, is_active INTEGER NOT NULL);
+  `);
+});
 
 describe("listMergeCandidates", () => {
   it("includes live Unbound contacts while excluding the current and archived contacts", async () => {
