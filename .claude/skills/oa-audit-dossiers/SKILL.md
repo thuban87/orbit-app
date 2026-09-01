@@ -85,9 +85,12 @@ From CLAUDE.md, non-negotiable:
   (ingesting both double-counts a decision and manufactures phantom self-conflicts). A glob
   like `phase-*-dossier.md` silently misses `-v0.2`/`-amended` files and grabs stale
   originals — never rely on it. Also pick up group-events / restructuring briefs in the dir.
-- **The roadmap file** (e.g. `orbit-ui-ux-working-roadmap-v0.8.md`) carries intended phase
-  ordering and the milestone phase map — load it; it is the source for the orphan sweep
-  (Lane B) and sequencing conflicts. Note any internal-title-vs-filename version mismatch.
+- **The roadmap file** (e.g. `orbit-ui-ux-working-roadmap-v1.0.md`) carries intended phase
+  ordering, the milestone phase map, and the **deferred-phase list** — load it; it is the
+  source for the orphan sweep (Lane B), the deferred-vs-orphan distinction, and sequencing
+  conflicts. **Also load any master-handoff doc** in the dir (e.g.
+  `orbit-ui-ux-master-handoff-v1.0.md`) — it may carry decisions not mirrored in the roadmap.
+  Note any internal-title-vs-filename version mismatch.
 - **`.docx` masters:** attempt text extraction before skipping — `unzip -p <file> word/document.xml`
   then strip tags, or `pandoc <file> -t plain` if available. If a decision lives only in the
   `.docx` and not the `.md` roadmap, it must be audited too. If extraction genuinely fails,
@@ -205,10 +208,21 @@ shared table"). A dossier decision about storage is a *claim*; the schema and DA
 - **Every** "Phase X owns/defines Y" claim (from Cross-Phase Constraints and `assumes`) is
   resolved against phase X's own ledger — all of them, recorded as checked, not spot-checked.
 - **Orphan sweep:** every dependency must resolve to a phase that actually owns and builds it
-  *within the milestone phase map* (from the roadmap). A dependency on a surface no phase owns
-  (e.g. a "Your Week" that three phases delegate to but nobody builds), or on a phase not yet
-  interrogated/planned, is a routed finding — usually REPLAN or ESCALATE — **not** a "watch"
-  item. Un-owned and uninterrogated-dependency surfaces are first-class findings.
+  *within the milestone phase map* (from the roadmap). First read the roadmap's phase map and
+  status section to learn which phases are **intentionally deferred** (e.g. the roadmap marks
+  Phases 15/17/18 deferred-until-after-execution). Then split every unresolved dependency into
+  two classes — do NOT conflate them:
+  - **Stub-contract requirement** — the dependency points at an *intentionally-deferred* phase
+    (has a roadmap slot, deliberately not yet interrogated; the plan is a GSD stub/shim). This
+    is NOT an orphan and NOT an alarm. Record it as a requirement the eventual stub must honor:
+    "Phase N's stub must expose X because Phase A/B depend on it." Collect these together — they
+    are the spec for the deferred-phase stubs. Route: a dedicated **STUB-CONTRACT** bucket in
+    the report (informational for GSD stub creation), not ESCALATE.
+  - **Genuine orphan** — the dependency points at a surface that has **no phase slot anywhere**
+    in the roadmap (e.g. a "Your Week" that three phases delegate to but no phase — deferred or
+    otherwise — owns). This is a real hole: a routed finding, REPLAN or ESCALATE, never a watch.
+  When unsure which class a target falls in, check the roadmap phase map by name/number; only a
+  target absent from the entire map is a genuine orphan.
 
 ### Then, for all lanes:
 
@@ -240,11 +254,12 @@ FINDING
 ## 5. Route every finding
 
 ```
-if reverses_locked:                       → ESCALATE   (owner's call, even if SMALL)
-elif unbuilt/unsequenced schema
-     or orphan/uninterrogated dependency: → REPLAN     (needs sequencing/planning)
-elif effort == LARGE or blast is wide:    → REPLAN     (targeted new planning session)
-elif effort in {SMALL, MEDIUM}:           → AUTO-FIX   (fixer subagent, after approval)
+if reverses_locked:                       → ESCALATE       (owner's call, even if SMALL)
+elif dependency on a deferred phase:      → STUB-CONTRACT   (spec for the GSD stub; informational)
+elif genuine orphan (no phase slot)
+     or unbuilt/unsequenced schema:       → REPLAN         (needs sequencing/planning)
+elif effort == LARGE or blast is wide:    → REPLAN         (targeted new planning session)
+elif effort in {SMALL, MEDIUM}:           → AUTO-FIX       (fixer subagent, after approval)
 ```
 
 `blast is wide` = the fix ripples into more than one phase's already-written decisions/plans.
@@ -254,8 +269,11 @@ dossier with a decision already recorded elsewhere; it never originates a decisi
 ## 6. Write AUDIT-REPORT.md and present — the gate
 
 Write `<dir>/audit/AUDIT-REPORT.md`: findings grouped by route (ESCALATE / REPLAN /
-AUTO-FIX), each with its three ratings, both-sides cites, and proposed edit. Include a
-short header: dossiers audited, ledger entry count, finding counts per kind and per route.
+AUTO-FIX / STUB-CONTRACT), each with its three ratings, both-sides cites, and proposed edit.
+The STUB-CONTRACT section is a consolidated list of what each intentionally-deferred phase's
+stub must expose to satisfy its dependents — it is informational (feeds GSD stub creation),
+not an owner decision or a fix. Include a short header: the ingested manifest (files + resolved
+versions + skipped), ledger entry count, and finding counts per kind and per route.
 
 **Leave both artifacts uncommitted.** Present the owner a compact summary — counts per
 route, and the AUTO-FIX list as candidates. Then STOP at the gate:
