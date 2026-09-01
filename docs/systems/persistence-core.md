@@ -1,8 +1,8 @@
 # Persistence Core
 
 **Last updated:** 2026-08-14
-**Updated by phase:** 02-data-foundation-status-engine
-**Owners:** `src/db/database.ts`, `src/db/migrations/runner.ts`, `src/db/migrations/001-initial.ts`, `src/db/mutex.ts`
+**Updated by phase:** 03-custom-fields
+**Owners:** `src/db/database.ts`, `src/db/migrations/runner.ts`, `src/db/migrations/001-initial.ts`, `src/db/mutex.ts`, `src/db/transaction.ts`, `src/services/launch-sweep.ts`
 
 ## Purpose
 
@@ -33,6 +33,8 @@ The schema version is SQLite's `PRAGMA user_version`. Migration 001 creates the 
 | Migration runner | `src/db/migrations/runner.ts` | Applies pending version steps in ascending order. |
 | Migration | `src/db/migrations/001-initial.ts` | Defines migration-1 schema and seeds. |
 | Concurrency utility | `src/db/mutex.ts` | Serializes database write transactions in one JS runtime. |
+| Transaction utility | `src/db/transaction.ts` | Opens a hand-rolled transaction inside the shared non-reentrant mutex. |
+| Launch-sweep registry | `src/services/launch-sweep.ts` | Runs registered local maintenance hooks after migration. |
 
 ### Key Files
 
@@ -43,6 +45,8 @@ The schema version is SQLite's `PRAGMA user_version`. Migration 001 creates the 
 | `src/db/migrations/001-initial.ts` | Initial DDL and category/profile seeds. |
 | `src/db/types.ts` | Testable database and migration interfaces. |
 | `src/db/mutex.ts` | Promise-chain serialization primitive. |
+| `src/db/transaction.ts` | Shared `inWriteTransaction()` primitive used by serialized database writers. |
+| `src/services/launch-sweep.ts` | Registry and trigger for launch-time maintenance hooks. |
 
 ## How It Works
 
@@ -52,6 +56,12 @@ The schema version is SQLite's `PRAGMA user_version`. Migration 001 creates the 
 2. The bootstrap opens `orbit.db` and sets WAL, `foreign_keys=ON`, and `busy_timeout` before a transaction begins.
 3. `runMigrations()` reads `PRAGMA user_version`, orders pending migrations, and runs each in its own `BEGIN`/`COMMIT` transaction.
 4. A successful step commits its DDL and version bump together; a failing step rolls back and leaves the version at the prior committed value.
+
+### Running launch maintenance
+
+1. After the migrated database is ready, the app registers maintenance hooks against the launch-sweep registry.
+2. The trigger runs each hook once for the foreground launch, after database access is available.
+3. A hook that writes obtains its own `inWriteTransaction()`; it must not nest that non-reentrant boundary inside another hook transaction.
 
 ## Configuration
 
@@ -66,20 +76,25 @@ The schema version is SQLite's `PRAGMA user_version`. Migration 001 creates the 
 - **ADR-009:** Crash-Safe Forward-Only SQLite Migrations — every version step commits atomically.
 - **ADR-010:** Single-Writer Interaction Recency Spine — the shared mutex serializes its write transactions.
 - **ADR-012:** Opt-Out Android Backup for Third-Party PII — persistent contact data is excluded from Android Auto Backup.
+- **ADR-013:** Runtime Two-Table Custom Fields with Whitelist-Constructed DDL — dynamic schema work and value writes use the shared transaction boundary.
+- **ADR-015:** Lossless Field Changes with Quarantine and Launch-Time Retention Sweep — launch maintenance retires stale custom fields safely.
 
 ## Gotchas
 
 1. **Set `foreign_keys` before the transaction.** SQLite treats this pragma as a no-op inside a transaction, which would make cascade declarations ineffective.
 2. **Do not use Expo transaction helpers for migration steps.** A throwing rollback can mask the original SQL error; the runner uses a hand-rolled rollback that preserves it.
 3. **A failed bootstrap needs an explicit UI error state.** At phase close, an unhandled `openAndMigrate()` rejection could leave the launch shell loading indefinitely.
+4. **The shared transaction is non-reentrant.** A helper called from inside `inWriteTransaction()` must use a non-mutexed core rather than acquiring the mutex again, or the promise chain deadlocks.
 
 ## Related Systems
 
 - **Contacts** — owns the contact data and recency writes stored in the initial schema.
 - **Status engine** — reads the migrated contact and interaction data at query time.
+- **Custom fields** — uses the shared transaction and launch-sweep registry for runtime DDL and cleanup.
 
 ## Changelog
 
 | Date | Phase | What Changed |
 |------|-------|--------------|
 | 2026-08-14 | 02 | Created the SQLite bootstrap, migration-1 contract, and shared write serialization. |
+| 2026-08-14 | 03 | Added the shared transaction entry point and launch-sweep integration for runtime custom-field maintenance. |
