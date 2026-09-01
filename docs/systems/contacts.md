@@ -1,7 +1,7 @@
 # Contacts
 
 **Last updated:** 2026-08-16
-**Updated by phase:** 10-share-sheet-capture
+**Updated by phase:** 12-home-screen-widget
 **Owners:** `src/db/contacts-dao.ts`, `src/db/contact-read.ts`, `src/db/favourites-dao.ts`, `src/db/profile-dao.ts`, `src/db/contact-links-dao.ts`, `src/db/purge-dao.ts`, `src/db/recency-dao.ts`
 
 ## Purpose
@@ -108,6 +108,7 @@ All data is on-device SQLite. Migration 001 uses a surrogate `contacts.id` and a
 1. The contact-profile star reads `favourite_rank` from the header and calls `setFavouriteRank()` or `clearFavouriteRank()`.
 2. The Manage favourites screen obtains the live non-archived set and passes its reordered ids to `rewriteFavouriteRanks()`.
 3. The DAO verifies a unique, complete current set and applies all rank updates inside one write transaction; it never writes `last_contact`.
+4. Successful favourite, metadata, archive, restore, and photo-facing mutations publish a best-effort Widget refresh after their database work commits; this publisher does not alter the contact transaction.
 
 ### Supplying a live compose header
 
@@ -153,6 +154,8 @@ All data is on-device SQLite. Migration 001 uses a surrogate `contacts.id` and a
 - **ADR-038:** Contact-Owned Share Capture Fuel — preserves name-only, never-contacted inline creation and prohibits a capture recency write.
 - **ADR-039:** Pre-Scheduled Inexact Decay Reminders — uses cadence, snooze, mute, lifecycle, and status fields to determine derived reminder eligibility.
 - **ADR-040:** Exactly-Once Notification Actions and Dashboard-Rooted Tap Routing — routes mark-contacted and snooze through the established contact write boundaries.
+- **ADR-043:** Static Globally Mirrored Favourites Widget — reuses one guarded favourite-rank list for every widget instance.
+- **ADR-045:** Event-Driven Widget Refresh and Boot Recovery — refreshes the widget after committed contact-visible changes.
 
 ## Gotchas
 
@@ -169,6 +172,7 @@ All data is on-device SQLite. Migration 001 uses a surrogate `contacts.id` and a
 11. **A capture is not contact.** Creating or selecting a contact for a share must leave `last_contact` unchanged and write no interaction row.
 12. **Keep snooze dates local.** `snooze_until` is already a local bare date; parse or render it as UTC and near-midnight users see the wrong day.
 13. **Mute does not hide a contact.** `reminders_off` suppresses decay scheduling only; Dashboard, status, and birthday behavior remain otherwise unchanged.
+14. **Publish widget refresh only after a successful mutation.** A failed favourite rewrite, archive, restore, or metadata save must not advertise a state that SQLite did not commit.
 
 ## Related Systems
 
@@ -180,6 +184,7 @@ All data is on-device SQLite. Migration 001 uses a surrogate `contacts.id` and a
 - **Contact methods** — consumes the lightweight phone and archive header for Compose gating.
 - **Capture** — selects or name-only creates a fuel owner while retaining the never-contacted state.
 - **Notifications** — derives decay eligibility from contact state and owns the OS schedule.
+- **Widget** — mirrors favourite rank and contact-visible fields without storing another configuration record.
 
 ## Changelog
 
@@ -193,3 +198,4 @@ All data is on-device SQLite. Migration 001 uses a surrogate `contacts.id` and a
 | 2026-08-16 | 09 | Exposed phone through the lightweight header read and gated archived contacts from Compose. |
 | 2026-08-16 | 10 | Added name-only capture creation that remains never-contacted and does not write recency. |
 | 2026-08-16 | 11 | Added local snooze writes, durable reminder muting, and scheduling-state reconciliation. |
+| 2026-08-16 | 12 | Published widget refreshes after committed favourite and contact-visible mutations. |
