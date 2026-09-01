@@ -1,7 +1,7 @@
 # Interaction Log
 
 **Last updated:** 2026-08-16
-**Updated by phase:** 11-actionable-notifications
+**Updated by phase:** 12-home-screen-widget
 **Owners:** `src/db/recency-dao.ts`, `src/db/events-dao.ts`, `src/db/timeline-read.ts`, `src/db/log-guards.ts`, `src/db/impact-read.ts`, `src/services/impact.ts`
 
 ## Purpose
@@ -82,6 +82,12 @@ All log data lives in local SQLite. A touchpoint is distinct from a lifecycle ev
 2. Snooze and Clear use the snooze DAO, which composes `recordEventCore()` inside its one write transaction to append `snooze` or `unsnooze` history.
 3. Deterministic action UIDs make a re-delivered notification response collide harmlessly with the existing unique event or interaction row.
 
+### Recording a widget mark
+
+1. A headless `WIDGET_MARK` validates its contact ID, opens and migrates SQLite, and calls `widgetMarkContacted()`.
+2. That seam delegates to `recordTouchpoint()` with `source='widget'`, outbound, connected, unspecified-channel defaults, and `quality=NULL`.
+3. Each genuine widget tap receives a fresh UID and produces a complete interaction row; the renderer refreshes only after this serialized write commits.
+
 ### Reading history and lifecycle events
 
 1. Archive and restore update contact lifecycle state only when their state guard matches.
@@ -114,6 +120,7 @@ All log data lives in local SQLite. A touchpoint is distinct from a lifecycle ev
 - **ADR-026:** Rogue Status for Unresponsive or Far-Overdue Contacts — shares the connection-policy filter used by impact reads.
 - **ADR-027:** Derived Profile-Only Gravity and Intensity — derives two non-stored relationship signals from this history.
 - **ADR-040:** Exactly-Once Notification Actions and Dashboard-Rooted Tap Routing — maps notification actions onto the established structured-write contracts.
+- **ADR-044:** Headless Widget Actions and Dashboard-Rooted Deep Links — maps widget marks onto the same single-writer contract.
 
 ## Gotchas
 
@@ -123,6 +130,7 @@ All log data lives in local SQLite. A touchpoint is distinct from a lifecycle ev
 4. **Keep timeline identity prefixed by kind.** Event and touchpoint IDs can collide across tables.
 5. **Sort cadence inputs ascending.** The DAO returns newest-first rows, which would otherwise produce negative gaps.
 6. **Do not turn snooze into a touchpoint.** It is a lifecycle event and must not advance `last_contact` or alter derived relationship status.
+7. **Do not bypass the recency DAO from a widget task.** A raw `last_contact` update or nested transaction breaks the serialized history/summary invariant.
 
 ## Related Systems
 
@@ -130,6 +138,7 @@ All log data lives in local SQLite. A touchpoint is distinct from a lifecycle ev
 - **Status engine** — derives rogue status and reason from qualifying recency.
 - **App shell** — supplies the theme tokens used by the rogue and gravity profile presentation.
 - **Notifications** — supplies the foreground and headless action paths that use these writers.
+- **Widget** — supplies a separate headless one-tap source with the same DAO-owned write invariant.
 
 ## Changelog
 
@@ -137,3 +146,4 @@ All log data lives in local SQLite. A touchpoint is distinct from a lifecycle ev
 |---|---|---|
 | 2026-08-15 | 06 | Created structured touchpoint logging, lifecycle history, and profile-only derived impact views. |
 | 2026-08-16 | 11 | Added notification-sourced one-tap writes and durable snooze/unsnooze event producers. |
+| 2026-08-16 | 12 | Added widget-sourced headless one-tap writes through the existing recency DAO. |
