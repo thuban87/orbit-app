@@ -1,7 +1,7 @@
 # Contacts
 
-**Last updated:** 2026-08-26
-**Updated by phase:** 20-contact-reconciliation-merge
+**Last updated:** 2026-08-31
+**Updated by phase:** 21-interaction-assist-reach-out
 **Owners:** `src/db/contacts-dao.ts`, `src/db/contact-read.ts`, `src/db/favourites-dao.ts`, `src/db/profile-dao.ts`, `src/db/contact-links-dao.ts`, `src/db/purge-dao.ts`, `src/db/recency-dao.ts`
 
 ## Purpose
@@ -106,7 +106,7 @@ All data is on-device SQLite. Migration 001 uses a surrogate `contacts.id` and a
 
 1. The link DAO applies each add, edit, or remove with both the link and contact identities scoped to the intended row; phone and email live in normalized method rows rather than fixed contact columns.
 2. Archive sets `archived_at` from the profile only when the contact is live, then composes an immutable archive event in the same transaction. Live reads exclude archived contacts; Settings owns the distinct Archived contacts home.
-3. Restore clears the marker only when the contact is archived and records a matching restore event. Purge first verifies the archived state inside its write transaction, then explicitly deletes interactions, events, fuel, normalized custom-value pairs, links, field history, and the contact.
+3. Restore clears the marker only when the contact is archived and records a matching restore event. Purge first verifies the archived state inside its write transaction, then explicitly deletes interactions, events, fuel, normalized custom-value pairs, links, field history, and the contact. Pending interaction assists are the one child removed by FK cascade rather than the explicit fan-out (a documented exception — assists are device-local and transient; see ADR-073).
 4. Photo-file and notification cleanup are idempotent best-effort post-commit extensions registered by their owning systems.
 
 ### Binding and unbinding a relationship
@@ -207,6 +207,8 @@ All data is on-device SQLite. Migration 001 uses a surrogate `contacts.id` and a
 - **ADR-056:** Tombstone-Backed UID Reconciliation for Portable Restores — governs deletion evidence, seeded identities, and UID merge behavior.
 - **ADR-057:** Full-State Versioned Backups with Verified Manual and Foreground SAF Snapshots — exports contact state through the portable manifest.
 - **ADR-069:** Atomic Tombstone-Backed Orbit Contact Merge — requires explicit conflict review, atomic child consolidation, and retirement of the absorbed identity.
+- **ADR-071:** User-Attested Handoff-Time Interaction Logging Through the Sole Recency Writer — assist confirmation recomputes `last_contact` through the same sole recomputer without a bespoke write.
+- **ADR-073:** Merge-Reparented, Purge-Cascaded Interaction Assists — purge removes pending assists via FK cascade; merge reparents them to the survivor.
 
 ## Gotchas
 
@@ -214,7 +216,7 @@ All data is on-device SQLite. Migration 001 uses a surrogate `contacts.id` and a
 2. **Do not write `last_contact` anywhere else.** Every interaction mutation must use the recency DAO so summary and history remain coherent.
 3. **Respect the lifecycle cadence invariant.** Bound requires a positive integer cadence; only a never-assigned Unbound contact may have NULL, and an assigned cadence is never cleared.
 4. **Never nest `inWriteTransaction()`.** The contact create/edit paths call non-mutexed `*Core` methods inside their one outer transaction.
-5. **Purge does not rely on cascades.** `field_history` has no contact foreign key, and every owned child table is explicitly deleted before the contact row.
+5. **Purge does not rely on cascades — with one documented exception.** `field_history` has no contact foreign key, and every owned child table is explicitly deleted before the contact row. The lone exception is `interaction_assists`, removed by its migration-014 `ON DELETE CASCADE` (transient device-local rows excluded from the portable/merge schema; ADR-073). Do not add other cascade-only children.
 6. **Do not use the metadata save to write `photo`.** Photo persistence has dedicated writers so file lifecycle and form refresh behavior remain separate.
 7. **Never record a lifecycle event for a no-op transition.** Archive and restore guard the current state before changing it; otherwise the immutable history would claim a false transition.
 8. **Deleting a touchpoint is permanent.** The profile must confirm it before calling the recency DAO; there is no undo or backup path.
@@ -246,6 +248,7 @@ All data is on-device SQLite. Migration 001 uses a surrogate `contacts.id` and a
 - **AI suggestions** — receives a profile-originated Compose intent but has no contact-write authority.
 - **Backup & Restore** — exports UID-bearing contact state and restores it through tombstone-aware reconciliation.
 - **Contact Import** — creates or explicitly links contacts through the shared transaction seam.
+- **Interaction Assist & Reach Out** — its confirmation reuses the sole recency recomputer; purge cascade-deletes and merge reparents its pending assists.
 
 ## Changelog
 
@@ -267,3 +270,4 @@ All data is on-device SQLite. Migration 001 uses a surrogate `contacts.id` and a
 | 2026-08-27 | 18.2 | Added Bound/Unbound lifecycle writes, nullable never-assigned cadence, and post-commit proactive-surface effects. |
 | 2026-08-26 | 19 | Added reviewed selected-contact create/link composition without bypassing contact invariants. |
 | 2026-08-26 | 20 | Added explicit atomic duplicate merge, tombstone retirement, and recency recomputation through existing cores. |
+| 2026-08-31 | 21 | Purge cascade-deletes pending `interaction_assists` (documented exception to explicit fan-out); assist confirmation reuses the sole recency recomputer. |
