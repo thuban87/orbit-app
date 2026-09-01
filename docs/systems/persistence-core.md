@@ -64,6 +64,7 @@ The schema version is SQLite's `PRAGMA user_version`. Migration 001 creates the 
 
 - **ADR-008:** Initial Contact Schema as a Cross-Phase Data Contract — migration 001 establishes the durable first schema.
 - **ADR-009:** Crash-Safe Forward-Only SQLite Migrations — every version step commits atomically.
+- **ADR-010:** Single-Writer Interaction Recency Spine — the shared mutex serializes its write transactions.
 - **ADR-012:** Opt-Out Android Backup for Third-Party PII — persistent contact data is excluded from Android Auto Backup.
 
 ## Gotchas
