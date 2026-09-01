@@ -1,7 +1,7 @@
 # App Shell
 
-**Last updated:** 2026-08-29
-**Updated by phase:** 19.1-older-android-contact-picker-hybrid-two-picker-adr-002
+**Last updated:** 2026-08-26
+**Updated by phase:** 20-contact-reconciliation-merge
 **Owners:** `App.tsx`, `src/navigation/RootNavigator.tsx`, `src/navigation/types.ts`, `src/navigation/linking.ts`, `src/navigation/notification-gate.tsx`, `src/navigation/widget-linking.ts`, `src/screens/SettingsScreen.tsx`, `src/theme/theme-types.ts`, `src/theme/theme-presets.ts`
 
 ## Purpose
@@ -46,6 +46,9 @@ _None._ The shell owns runtime navigation and theme contracts, not durable appli
 | `src/screens/LegacyContactPickerScreen.tsx` | Provides the typed API-36-and-below custom contact-picker route and permission-recovery views. |
 | `src/services/import/start-contact-import.ts` | Selects one SDK-routed import acquisition path for dashboard and Settings entry points. |
 | `src/screens/ImportReviewScreen.tsx` | Provides the typed selected-contact review route and explicit duplicate choices. |
+| `src/screens/ReconcileGridScreen.tsx` | Provides the Settings-launched linked-contact review workspace. |
+| `src/screens/ReconcileDetailScreen.tsx` | Provides per-contact reconciliation and missing-source actions. |
+| `src/screens/SurvivorSelectScreen.tsx` | Provides the explicit duplicate-contact merge entry. |
 | `src/theme/theme-types.ts` | Names palette tokens, including avatar swatches, rogue status, gravity tiers, and Orrery star/muted values. |
 | `src/theme/theme-presets.ts` | Holds the only allowed color literals, including avatar, relationship-status, and Orrery palette values. |
 
@@ -139,6 +142,12 @@ _None._ The shell owns runtime navigation and theme contracts, not durable appli
 3. `RootNavigator` registers legacy acquisition alongside import review, setup, progress, duplicate-review, and completion routes; every downstream screen reads durable session state rather than a source URI.
 4. A foreground prompt routes interrupted work to its local continuation or explicitly discards unresolved rows.
 
+### Reconciling and merging contacts
+
+1. Profile overflow offers `Update from Contacts` for an actively linked person and `Merge with another contact`; Settings offers `Check linked contacts` and flagged-item review.
+2. The navigator registers typed reconciliation grid, detail, completion, survivor selection, and merge-conflict routes. Screens fetch durable session or contact data instead of receiving source payloads in route state.
+3. `App.tsx` registers the foreground reconciliation resume sweep after database readiness. If import and reconciliation work are both resumable, the import prompt takes precedence so app-root sheets do not overlap.
+
 ## Configuration
 
 | Constant | Value | File | Purpose |
@@ -190,6 +199,9 @@ _None._ The shell owns runtime navigation and theme contracts, not durable appli
 - **ADR-064:** Permissionless Android 17 System-Contact Snapshot Acquisition — adds the optional selected-contact entry without broad contacts permission.
 - **ADR-066:** Deliberate Reviewed Import with Unbound Bulk Defaults — registers reviewed import routes and the completion destination.
 - **ADR-002:** Cross-Version Contact Import — Hybrid Two-Picker — adds the legacy acquisition route and one SDK-routed entry seam.
+- **ADR-003:** `READ_CONTACTS` on API 37+ for Reconcile — requests Contacts access only in the reconciliation flow that needs a current linked-source read.
+- **ADR-068:** User-Triggered, Source-Only Reconciliation with Durable Review — adds durable reconciliation routes and foreground resume handling.
+- **ADR-069:** Atomic Tombstone-Backed Orbit Contact Merge — adds explicit survivor, conflict, and impact-confirmation navigation.
 
 ## Gotchas
 
@@ -213,6 +225,7 @@ _None._ The shell owns runtime navigation and theme contracts, not durable appli
 18. **Keep Unbound navigation retrieval-oriented.** The dedicated list and neutral search rows may open Profile, but active-orbit controls stay in their Bound query owners.
 19. **Import routes carry durable identifiers, never picker grants.** A selected-contact URI is temporary provider state and must not enter navigation parameters.
 20. **Keep contact-import routing single-sourced.** Dashboard and Settings must call the shared SDK-routing seam; duplicating the Android-version branch can make their permission behavior drift.
+21. **Do not overlap root recovery prompts.** Import resume takes precedence over reconciliation resume; a pending check must be resumed or discarded before starting another.
 
 ## Related Systems
 
@@ -228,6 +241,7 @@ _None._ The shell owns runtime navigation and theme contracts, not durable appli
 - **Digest** — registers a self-fetching route, dashboard entry, ready-gated scheduler, and notification reset destination.
 - **Backup & Restore** — registers typed landing, settings, preview, and result routes plus ready-gated recovery work.
 - **Contact Import** — registers the import route family, Settings entry, and foreground recovery prompt.
+- **Contact Reconciliation** — registers linked-contact review, merge, bulk-review, and foreground-resume surfaces.
 
 ## Changelog
 
@@ -251,3 +265,4 @@ _None._ The shell owns runtime navigation and theme contracts, not durable appli
 | 2026-08-27 | 18.2 | Added the Unbound route and lifecycle settings/navigation treatment. |
 | 2026-08-26 | 19 | Added typed selected-contact import routes, Settings entry, and durable-resume navigation. |
 | 2026-08-29 | 19.1 | Added the API-36-and-below legacy picker route and shared hybrid-import dispatch. |
+| 2026-08-26 | 20 | Added typed reconciliation and merge routes, Settings entries, and foreground resume precedence. |
