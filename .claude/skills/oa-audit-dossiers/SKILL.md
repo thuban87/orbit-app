@@ -314,6 +314,15 @@ is neither re-raised nor explicitly resolved is a regression and must not happen
 header: the ingested manifest (files + resolved versions + skipped), the prior-runs reconciled
 against, ledger entry count, and finding counts per kind and per route.
 
+Also emit a **"Handoff to GSD planning"** section: findings indexed **by phase**, plus a
+one-line statement of intent — REPLAN and STUB-CONTRACT items are implementation/sequencing
+work that GSD's `plan-phase` must absorb when it plans each phase, but GSD does NOT read this
+report automatically, so these must be attached to each phase's planning inputs (its
+`CONTEXT.md` shim and/or a "Planning notes" appendix on the dossier) during milestone setup.
+Do not mutate dossiers to do this (beyond approved AUTO-FIX text syncs) — the routing is a
+deliberate setup step, and this section is its checklist. See `AUDIT-HANDOFF.md` for the
+full intended flow (audit → resolve → complete-milestone → new-milestone → plan-phase).
+
 **Leave both artifacts uncommitted.** Present the owner a compact summary — counts per
 route, and the AUTO-FIX list as candidates. Then STOP at the gate:
 
