@@ -1,7 +1,7 @@
 # Custom Fields
 
-**Last updated:** 2026-08-14
-**Updated by phase:** 04-contact-crud-lifecycle
+**Last updated:** 2026-08-15
+**Updated by phase:** 05-photos
 **Owners:** `src/db/field-defs-dao.ts`, `src/db/field-values-dao.ts`, `src/db/field-ddl.ts`, `src/db/field-type-change.ts`, `src/db/field-parsers.ts`, `src/db/field-sort.ts`, `src/services/field-sweep.ts`
 
 ## Purpose
@@ -75,6 +75,7 @@ Migration 001 provides the three base tables. A custom field is both a row in `c
 | `src/db/field-type-change.ts` | Read-only preflights plus history-backed type update. |
 | `src/services/field-sweep.ts` | Fixed-window quarantine expiry and history retention hook. |
 | `src/components/FieldValueInput.tsx` | Single field-type-to-widget dispatcher. |
+| `src/components/field-widgets/PhotoFieldWidget.tsx` | Edit-only custom-photo UI that reuses the shared photo picker and crop pipeline. |
 | `src/components/CustomFieldValue.tsx` | Display and tap-to-fix gate for invalid values. |
 | `src/components/FieldDefForm.tsx` | Definition editor and live type preview. |
 | `src/screens/CustomFieldsScreen.tsx` | Reachable custom-field management surface. |
@@ -102,6 +103,13 @@ Migration 001 provides the three base tables. A custom field is both a row in `c
 3. Before a type or dropdown-option edit, the screen runs a read-only preflight and displays the clean-versus-flagged summary.
 4. Applying a type change snapshots non-null values to `field_history` and updates the definition type in one transaction. It never rewrites `contact_custom_values` bytes.
 
+### Capturing a custom photo value
+
+1. On an existing contact, the `photo` widget derives a stable custom-field filename from the contact id and guarded `col_name`, then opens the shared photo source picker.
+2. Crop success crosses back through a serializable request id; the widget stages the resulting local file and writes its relative path into the edit form value.
+3. The existing guarded UPSERT persists that `TEXT` path on form save. A teardown reconciliation removes staged files not referenced by committed values.
+4. The create form and definition preview have no stable contact id, so custom photo input remains disabled there.
+
 ### Quarantining and permanently removing a field
 
 1. The editor checks whether a field has values: empty fields delete immediately; populated fields receive `quarantined_at` and keep their data intact.
@@ -121,6 +129,7 @@ Migration 001 provides the three base tables. A custom field is both a row in `c
 - **ADR-014:** Read-Time Custom-Field Type Semantics and a Single Sort Expression — type interpretation and ordering remain centralized without value rewrites.
 - **ADR-015:** Lossless Field Changes with Quarantine and Launch-Time Retention Sweep — destructive operations snapshot first and retire data on launch.
 - **ADR-016:** Fixed-First Contact Forms and Atomic Contact Creation — custom values join the contact create/edit transaction through a non-mutexed core.
+- **ADR-021:** Durable Relative-Path Photo Masters with Crash-Safe Lifecycle Cleanup — photo fields reuse the local master pipeline and derivable `cv-` filenames.
 
 ## Gotchas
 
@@ -129,15 +138,16 @@ Migration 001 provides the three base tables. A custom field is both a row in `c
 3. **Do not nest `inWriteTransaction()`.** The shared mutex is non-reentrant; use a non-mutexed operation core when composing an atomic destructive operation.
 4. **Type changes do not normalize stored bytes.** A value can render clean through a permissive parser while raw CAST sorting disagrees for noncanonical TEXT such as comma-formatted numbers; resolve that mismatch before a production sort consumer is wired.
 5. **The field editor applies a multi-part edit incrementally.** Label and curation writes can remain committed if the user cancels a subsequent type-change summary or a later operation fails.
-6. **The photo input is a deliberate placeholder.** The native photo picker and `share_with_ai` editor control are deferred to their owning phases.
+6. **Photo fields are edit-only.** They require a contact id to derive a stable path; create and definition-preview surfaces remain disabled.
 7. **Do not create definitions from a contact form.** The form fills values only, preserving the settings editor as the sole DDL and slugifier producer.
+8. **Do not delete a staged custom photo unless its committed references are known.** A custom crop can write the stable file before form save, so uncertain cleanup must prefer a bounded file leak over deleting a referenced image.
 
 ## Related Systems
 
 - **Persistence core** — supplies migration-1 tables, the shared transaction, and the launch-sweep registry.
 - **Contacts** — owns the contacts that receive one `contact_custom_values` row each.
 - **AI suggestions** — will later consume the stored `share_with_ai` setting.
-- **Photos** — will later provide the native picker for photo-type field values.
+- **Photos** — supplies the picker, crop, local-master, staged-file, and purge-cleanup contracts for photo-type values.
 - **App shell** — routes the definition editor through Settings.
 
 ## Changelog
@@ -146,3 +156,4 @@ Migration 001 provides the three base tables. A custom field is both a row in `c
 |---|---|---|
 | 2026-08-14 | 03 | Created runtime custom-field DDL, type semantics, editor, and launch-time quarantine cleanup. |
 | 2026-08-14 | 04 | Added the transaction-composable value writer and fixed-first contact-form integration. |
+| 2026-08-15 | 05 | Replaced the photo placeholder with the shared local photo pipeline and staged-file lifecycle handling. |
