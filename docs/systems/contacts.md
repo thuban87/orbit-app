@@ -17,7 +17,8 @@ All data is on-device SQLite. Migration 001 uses a surrogate `contacts.id` and a
 **Tables:**
 - `contacts` — person identity, category, interval, fixed contact data, lifecycle flags, timestamps, and `last_contact`.
   - `category_id` (`INTEGER`) — optional foreign key to `categories`.
-  - `interval_days` (`INTEGER`) — contact cadence in days.
+  - `tracking_enabled` (`INTEGER`) — `1` for Bound active cadence management and `0` for an Unbound relationship record.
+  - `interval_days` (`INTEGER`, nullable) — positive assigned cadence; `NULL` means cadence was never assigned and never means Unbound.
   - `last_contact` (`TEXT`) — maintained maximum qualifying interaction timestamp; `NULL` means never-contacted.
   - `rarely_responds` (`INTEGER`) — limits recency to connected interactions.
   - `archived_at` (`TEXT`) — archive lifecycle marker.
@@ -52,6 +53,7 @@ All data is on-device SQLite. Migration 001 uses a surrogate `contacts.id` and a
 |---|---|---|
 | Contact writer | `src/db/contacts-dao.ts` | Atomically creates and edits metadata, normalized method/custom-value pairs, and optional first interactions; archives and restores contacts with lifecycle-event composition. |
 | Contact reads | `src/db/contact-read.ts` | Checks duplicate names, reads categories, and assembles scalar-free edit/header data. |
+| Lifecycle DAO | `src/db/contact-lifecycle-dao.ts` | Performs guarded Bind and Unbind transitions without losing contact-owned data. |
 | Favourites DAO | `src/db/favourites-dao.ts` | Marks, clears, and atomically rewrites ordered favourite ranks. |
 | Profile DAO | `src/db/profile-dao.ts` | Reads and updates the single self record’s local photo reference. |
 | Links DAO | `src/db/contact-links-dao.ts` | Lists and applies scoped add/edit/remove changes for ordered link rows. |
@@ -65,6 +67,7 @@ All data is on-device SQLite. Migration 001 uses a surrogate `contacts.id` and a
 |---|---|
 | `src/db/contacts-dao.ts` | Composed create/edit path that seeds normalized custom-value pairs plus archive, restore, and archived-list reads. |
 | `src/db/contact-read.ts` | Duplicate-name, category, header, and edit-form data reads. |
+| `src/db/contact-lifecycle-dao.ts` | Named lifecycle transitions with exact state guards and one revision increment. |
 | `src/db/favourites-dao.ts` | Dedicated favourite-rank writes that leave recency unchanged. |
 | `src/db/profile-dao.ts` | Single-row self photo reads and writers. |
 | `src/db/contact-links-dao.ts` | Ordered child-table CRUD for contact links. |
@@ -94,6 +97,7 @@ All data is on-device SQLite. Migration 001 uses a surrogate `contacts.id` and a
 3. “Not yet” writes no interaction and leaves `last_contact` `NULL`; submitted custom values use pair-keyed non-mutexed cores in the same transaction.
 4. The edit form shows every non-quarantined custom field after fixed fields. Changing `rarely_responds` recomputes recency because it changes the qualifying interaction set.
 5. Contact aggregate saves compose method drafts through the method DAO in the same transaction; same-contact canonical duplicates collapse with typed feedback while shared methods on different contacts remain legal.
+6. Bound is the default create/edit choice and requires a positive cadence. A never-assigned Unbound contact may save with NULL cadence; a Bound-to-Unbound edit retains any assigned cadence as dormant rather than clearing it.
 
 ### Managing links and lifecycle
 
@@ -101,6 +105,12 @@ All data is on-device SQLite. Migration 001 uses a surrogate `contacts.id` and a
 2. Archive sets `archived_at` from the profile only when the contact is live, then composes an immutable archive event in the same transaction. Live reads exclude archived contacts; Settings owns the distinct Archived contacts home.
 3. Restore clears the marker only when the contact is archived and records a matching restore event. Purge first verifies the archived state inside its write transaction, then explicitly deletes interactions, events, fuel, normalized custom-value pairs, links, field history, and the contact.
 4. Photo-file and notification cleanup are idempotent best-effort post-commit extensions registered by their owning systems.
+
+### Binding and unbinding a relationship
+
+1. A profile action uses the named lifecycle DAO; an aggregate edit persists its lifecycle change in the same contact transaction.
+2. Unbind preserves cadence, favourite rank, interactions, and `last_contact`, then removes the contact from proactive projections. Bind reuses dormant cadence or requires a new positive cadence when none was assigned.
+3. After a durable change, the lifecycle-effects service reconciles notifications and refreshes the widget. An effect failure cannot roll back the committed contact state.
 
 ### Reconciling portable contact data
 
@@ -169,6 +179,7 @@ All data is on-device SQLite. Migration 001 uses a surrogate `contacts.id` and a
 - **ADR-033:** Profile Marking and Shared Drag-Reordered Favourites — owns reversible profile marking and guarded favourite-rank ordering.
 - **ADR-035:** Native SMS Handoff with Guaranteed Clipboard Copy — partially superseded; native handoff and Copy remain the interaction boundary.
 - **ADR-059:** Normalized Contact Methods, Canonical Actionability, and Local Provenance — replaces scalar endpoint fields with ordered mergeable method rows.
+- **ADR-062:** Bound/Unbound Lifecycle and One-Way Cadence Assignment — separates active cadence participation from relationship data ownership.
 - **ADR-036:** Entry-Agnostic Compose Navigation and Transmittable-Fuel Guardrails — rejects archived headers on the reusable live compose surface.
 - **ADR-038:** Contact-Owned Share Capture Fuel — preserves name-only, never-contacted inline creation and prohibits a capture recency write.
 - **ADR-039:** Pre-Scheduled Inexact Decay Reminders — uses cadence, snooze, mute, lifecycle, and status fields to determine derived reminder eligibility.
@@ -183,7 +194,7 @@ All data is on-device SQLite. Migration 001 uses a surrogate `contacts.id` and a
 
 1. **Use local wall-clock timestamps.** `occurred_at` and `last_contact` must not be supplied as UTC ISO strings or near-midnight status calculations can shift a day.
 2. **Do not write `last_contact` anywhere else.** Every interaction mutation must use the recency DAO so summary and history remain coherent.
-3. **Require a positive interval in callers.** Migration 001 does not enforce `interval_days > 0`; a zero or negative interval makes status SQL misleading.
+3. **Respect the lifecycle cadence invariant.** Bound requires a positive integer cadence; only a never-assigned Unbound contact may have NULL, and an assigned cadence is never cleared.
 4. **Never nest `inWriteTransaction()`.** The contact create/edit paths call non-mutexed `*Core` methods inside their one outer transaction.
 5. **Purge does not rely on cascades.** `field_history` has no contact foreign key, and every owned child table is explicitly deleted before the contact row.
 6. **Do not use the metadata save to write `photo`.** Photo persistence has dedicated writers so file lifecycle and form refresh behavior remain separate.
@@ -199,6 +210,7 @@ All data is on-device SQLite. Migration 001 uses a surrogate `contacts.id` and a
 16. **Use `createContactFull()` for production creation.** It is the path that seeds the complete custom-field pair matrix; the exported recency test helper writes no custom values.
 17. **A hard delete must write its tombstone first.** Purge captures every mergeable child UID in its existing transaction; transient `field_history` remains excluded.
 18. **`last_contact` is derived.** Restore recomputes it from interactions and never lets an imported summary win a reconciliation decision.
+19. **Do not clear dormant favourite rank on Unbind.** Bound-only query owners hide it; retaining it lets a rebind restore the prior preference without a second write.
 
 ## Related Systems
 
@@ -231,3 +243,4 @@ All data is on-device SQLite. Migration 001 uses a surrogate `contacts.id` and a
 | 2026-08-24 | 16 | Seeded normalized custom-field pairs on create and deleted them explicitly on purge. |
 | 2026-08-24 | 17 | Added tombstone-aware purge and UID-based portable restore behavior. |
 | 2026-08-27 | 18.1 | Replaced scalar endpoint fields with transactional normalized method drafts and scalar-free reads. |
+| 2026-08-27 | 18.2 | Added Bound/Unbound lifecycle writes, nullable never-assigned cadence, and post-commit proactive-surface effects. |
