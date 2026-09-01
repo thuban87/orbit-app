@@ -94,8 +94,13 @@ of templates + scripts + graph bridge supports them.
 
 - [ ] T1 **Claude → phase 01** (real, in-order, committed); verify
 - [ ] T2 **codex → phase 02** (real, in-order, committed) — only after T1 commits; verify
-- [ ] T3 **Subagent → phase 16 scratch dry-run** (throwaway; exercises D-XX/DISCUSSION-LOG)
-- [ ] T4 Iterate skills on findings
+- [x] T3 **Subagent → phase 16 scratch dry-run** — *done 08-31. Isolation VERIFIED (repo
+      untouched, all output in scratch). Resolver correct (no-dossier/context-dxx, D-06a/b
+      owner-resolutions captured), legacy ADR-001 reclaim worked, plan-gate surfaces CLAUDE.md
+      changes as intended, ADR/system-doc quality good.*
+- [x] T4 **Iterate skills on findings** — *done 08-31 (commit `1b5052e`): batch-order
+      prerequisite guard, INDEX.md plan-level status, cross-cutting tie-breaker rule, manifest
+      decision-source-tier field, reclaim ADRs exempt from cluster cap.*
 
 ## Deferred — not this session
 
