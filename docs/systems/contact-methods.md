@@ -1,7 +1,7 @@
 # Contact Methods
 
-**Last updated:** 2026-08-27
-**Updated by phase:** 18.1-contact-method-normalization
+**Last updated:** 2026-08-26
+**Updated by phase:** 19-system-contact-import
 **Owners:** `src/db/contact-methods-dao.ts`, `src/db/contact-methods-read.ts`, `src/logic/contact-method-normalization.ts`, `src/screens/ComposeScreen.tsx`, `src/logic/compose-logic.ts`
 
 ## Purpose
@@ -90,6 +90,12 @@ Migration 009 retires scalar contact phone/email storage. Migration 010 adds nul
 1. A link removal captures its stable UID, inserts `contact_link` deletion evidence, then removes the row in its existing transaction.
 2. Backup restoration applies a link only when its contact UID survives reconciliation.
 
+### Matching imported source methods
+
+1. Contact Import canonicalizes an accepted phone or email with the stored session region before it queries `canonical_value` evidence.
+2. An active external source link is deterministic identity; every other endpoint match remains advisory, and correlated signals from one source record contribute only their strongest signal.
+3. An explicit import create or link writes source link and method provenance in the same transaction as the resolved import row.
+
 ## Configuration
 
 | Constant | Value | File | Purpose |
@@ -106,6 +112,7 @@ Migration 009 retires scalar contact phone/email storage. Migration 010 adds nul
 - **ADR-057:** Full-State Versioned Backups with Verified Manual and Foreground SAF Snapshots — includes contact links in the complete portable manifest.
 - **ADR-059:** Normalized Contact Methods, Canonical Actionability, and Local Provenance — establishes ordered, mergeable phone/email methods as the sole endpoint authority.
 - **ADR-061:** DAO-Selected Actionable Primary SMS Handoff — gates native SMS on the stored actionable primary while retaining Copy fallback.
+- **ADR-067:** Conservative Advisory Identity Matching and Explicit Source Consolidation — makes canonical endpoint evidence advisory unless an active source link identifies the contact.
 
 ## Gotchas
 
@@ -119,6 +126,7 @@ Migration 009 retires scalar contact phone/email storage. Migration 010 adds nul
 8. **Remove links with a tombstone.** The compositional edit-form diff path must use the same caller-supplied timestamp and transaction as standalone removal.
 9. **Do not reparse at an action surface.** Profile and Compose consume stored DAO actionability; a raw value can be visible yet remain non-actionable.
 10. **Do not treat a shared canonical value as identity proof.** Same-contact duplicates collapse, but different contacts may retain the same phone or email.
+11. **Import evidence is not a primary-method selection.** Canonical matching informs an explicit import resolution but does not rewrite an existing contact's ordered methods.
 
 ## Related Systems
 
@@ -127,6 +135,7 @@ Migration 009 retires scalar contact phone/email storage. Migration 010 adds nul
 - **App shell** — owns the typed stack registration and dashboard Home destination.
 - **AI suggestions** — provides the privacy-bounded context, provider request, and exact-prompt acknowledgement that Compose owns as its draft flow.
 - **Backup & Restore** — exports link identity and applies it only beneath a surviving contact.
+- **Contact Import** — uses canonical endpoints, source links, and provenance for conservative selected-contact import.
 
 ## Changelog
 
@@ -137,3 +146,4 @@ Migration 009 retires scalar contact phone/email storage. Migration 010 adds nul
 | 2026-08-18 | 14 | Added the acknowledged, cancellable AI suggestion flow as an editable Compose draft. |
 | 2026-08-24 | 17 | Added tombstone-backed removal and portable reconciliation for contact links. |
 | 2026-08-27 | 18.1 | Added normalized phone/email methods, durable labels, provenance, and actionable-primary Compose gating. |
+| 2026-08-26 | 19 | Added canonical source-method evidence and transactional import provenance. |
