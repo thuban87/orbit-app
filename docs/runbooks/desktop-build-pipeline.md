@@ -4,7 +4,7 @@
 local emulator either). All Android builds run on the owner's Windows desktop **`droid`**
 over SSH/Tailscale, and the APK is installed on the wired **Pixel 6 Pro**. This runbook is
 the proven procedure — **do not improvise a different pipeline.** It was proven end-to-end
-for FND-01 (plan 01-05).
+for FND-01 (plan 01-05) and for the Phase 10 native share-target build.
 
 > Transport is **rsync/scp/tar-over-ssh — NEVER `git push`** (global deny; CLAUDE.md).
 > Source only; the build host runs `npm ci` + `expo prebuild` itself.
@@ -92,6 +92,8 @@ without the `rmdir` — extraction overwrites the archived files and leaves `nod
 DEST='C:\Users\bwales\projects\orbit-app'
 
 # npm ci — installs the EXACT rsync'd package-lock.json tree (NOT npm install; no drift).
+# It also runs postinstall, including patch-package. A native patch that no longer applies
+# fails here before prebuild, which is the intended loud-on-drift behavior.
 ssh -o BatchMode=yes droid "cd /d \"$DEST\" & npm ci"
 
 # Prebuild: regenerates android/ from app.config.ts.
@@ -198,9 +200,28 @@ npx expo start                                   # Metro bundler on this box (po
    `rsync`/`scp`/`ssh` only). Outside YOLO mode they prompt at the human checkpoint; the owner
    approves. Do not silence this by editing settings — owner's call.
 
+## 4. Native share-target verification (Phase 10)
+
+Use this release-APK check whenever `app.config.ts`, a native module, or a patched native
+dependency changes. `npm ci` must show the native patch applying cleanly, and prebuild must
+report the `expo-share-intent` `text/plain` filter before Gradle builds the APK.
+
+1. Run the build steps in §1b–§1e. Do not substitute a Metro reload: manifest filters, Kotlin
+   patches, and activity behavior are compiled into the APK.
+2. From Chrome on the Pixel, share a link into Orbit from a killed-app state. Confirm Capture
+   opens with the keyboard closed, the page title is shown, and archived contacts are absent.
+3. Save to one contact and confirm the short confirmation returns to Chrome, not the launcher;
+   the contact remains never-contacted if it had no interaction.
+4. Also confirm a long-press multi-select saves one row per contact and that the New contact
+   path creates a never-contacted name-only contact.
+
+**Expected:** Phase 10 proved `npm ci` applies the `EXTRA_SUBJECT` patch, prebuild emits the
+`text/plain` filter, and the release APK can capture, return to the source app, and retain
+the no-touchpoint invariant.
+
 ---
 
-## 4. Build gotchas discovered while proving FND-01 (fixed in-repo; documented so they don't recur)
+## 5. Build gotchas discovered while proving FND-01 (fixed in-repo; documented so they don't recur)
 
 These were latent since the scaffold and only surfaced at the **first real metro bundle**
 (tsc/vitest/biome never invoke metro):
