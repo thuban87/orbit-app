@@ -1,7 +1,7 @@
 # Status Engine
 
 **Last updated:** 2026-08-15
-**Updated by phase:** 06-interaction-log-status-impact
+**Updated by phase:** 12-home-screen-widget
 **Owners:** `src/db/status.ts`, `src/db/contact-status-read.ts`, `src/db/queries.ts`, `src/db/recency-dao.ts`
 
 ## Purpose
@@ -48,6 +48,12 @@ Status is a query-time projection over the contacts and interactions schema; no 
 3. The query maps continuous progress to stable, wobble, decay, or rogue. A Rarely-responds contact becomes rogue when qualifying recency reaches wobble; contacts past `ROGUE_K` become rogue because they are overdue.
 4. A separate newest-per-contact query uses `occurred_at DESC, id DESC` to deterministically choose the latest interaction row.
 
+### Rendering status outside the app
+
+1. The Dashboard favourites projection carries its query-time nullable status directly to the Widget system.
+2. The widget maps stable, wobble, decay, and rogue to shared palette rings and retains `null` for never-contacted favourites.
+3. Because a widget cannot poll or run its own clock, the displayed state is current as of its last event, launch, or boot refresh; the SQLite status remains query-time derived.
+
 ### Explaining profile rogue status
 
 1. The profile reads `getContactStatus()` for the selected contact.
@@ -70,6 +76,8 @@ Status is a query-time projection over the contacts and interactions schema; no 
 - **ADR-023:** Structured Touchpoints and One-Tap Defaults — makes qualifying recency connection-aware for Rarely-responds contacts.
 - **ADR-024:** Editable Touchpoint History and Recomputed Recency — routes corrected and deleted touchpoints through the same recency source.
 - **ADR-026:** Rogue Status for Unresponsive or Far-Overdue Contacts — adds explainable query-time rogue reasons and policy-aware recency.
+- **ADR-042:** Shared Status Palette for Dashboard and Widget Rings — gives derived status one shared visual vocabulary.
+- **ADR-045:** Event-Driven Widget Refresh and Boot Recovery — accepts bounded widget staleness without persisting status.
 
 ## Gotchas
 
@@ -77,11 +85,13 @@ Status is a query-time projection over the contacts and interactions schema; no 
 2. **Apply the never-contacted predicate.** The raw status CASE is not a substitute for `last_contact IS NOT NULL` in normal-population reads.
 3. **Keep threshold changes synchronized by convention.** The existing pure TypeScript status helper shares the stable/wobble thresholds but cannot be directly imported into SQLite SQL.
 4. **Keep status and reason branch order identical.** A `REASON_SQL` change must mirror `STATUS_SQL`, with Rarely-responds first, or the profile can explain a rogue state incorrectly.
+5. **Do not give a never-contacted widget tile a status colour.** The widget must carry the dashboard's null value rather than applying the status CASE independently.
 
 ## Related Systems
 
 - **Contacts** — provides the maintained recency and interval values.
 - **Persistence core** — provides the queryable local SQLite database.
+- **Widget** — renders the existing nullable projection as a refresh-bounded home-screen glance aid.
 
 ## Changelog
 
@@ -89,3 +99,4 @@ Status is a query-time projection over the contacts and interactions schema; no 
 |------|-------|--------------|
 | 2026-08-14 | 02 | Created query-time progress/status reads and never-contacted exclusion. |
 | 2026-08-15 | 06 | Added rogue reason reads and Rarely-responds query-time status behavior. |
+| 2026-08-16 | 12 | Added the shared dashboard/widget status-ring vocabulary and refresh-bounded widget presentation. |
