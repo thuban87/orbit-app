@@ -82,6 +82,14 @@ of templates + scripts + graph bridge supports them.
 - [ ] C1 Reclaim ADR-001 in place at phase 16; archive original → `docs/decisions/_archive/`
 - [ ] C2 Reclaim ADR-002 in place at phase 19.1; archive original
 
+## Post-build adjustments
+
+- **2026-08-31 — CLAUDE.md rule reversed (owner).** Earlier the skills *deferred* CLAUDE.md
+  edits to the owner. Owner prefers the quest-board behavior: the skills **maintain CLAUDE.md
+  themselves** (index rows for new/renamed/retired system docs + runbooks), but **every
+  add/remove/change is surfaced in the skill's plan-gate / seam-confirmation review for owner
+  approval before writing**. Applied to both skills (commit `265edb3`); codex copies re-synced.
+
 ## Test plan  *(validates the machine before mass run)*
 
 - [ ] T1 **Claude → phase 01** (real, in-order, committed); verify
