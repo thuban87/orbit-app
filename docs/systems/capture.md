@@ -1,7 +1,7 @@
 # Capture
 
-**Last updated:** 2026-08-16
-**Updated by phase:** 12-home-screen-widget
+**Last updated:** 2026-08-27
+**Updated by phase:** 18.2-bound-unbound-lifecycle
 **Owners:** `src/db/capture-read.ts`, `src/db/capture-dao.ts`, `src/logic/capture-logic.ts`, `src/screens/CaptureScreen.tsx`
 
 ## Purpose
@@ -90,6 +90,7 @@ Capture owns no table or migration. It composes existing local SQLite data: `con
 - **ADR-037:** Text-Only Android Share Intent Integration — keeps the native filter, title patch, ready gate, and return path explicit.
 - **ADR-038:** Contact-Owned Share Capture Fuel — preserves non-null ownership, canonical URLs, immediate fuel writes, and no-touchpoint semantics.
 - **ADR-045:** Event-Driven Widget Refresh and Boot Recovery — refreshes a larger widget fuel line after capture commits.
+- **ADR-062:** Bound/Unbound Lifecycle and One-Way Cadence Assignment — keeps inline name-only creation explicitly Bound with a positive cadence.
 
 ## Gotchas
 
@@ -99,6 +100,7 @@ Capture owns no table or migration. It composes existing local SQLite data: `con
 4. **Keep URLs canonical and separate.** Notes and editable display text must never overwrite `fuel.url`.
 5. **Rebuild and device-test native changes.** The manifest filter, Kotlin title patch, and finish bridge are invisible to a Metro reload; the optional-note controls can be obscured by the soft keyboard and remain a deferred polish item.
 6. **Publish widget freshness only after capture succeeds.** A cancelled or failed capture must not trigger a misleading refresh.
+7. **Keep inline capture Bound.** It passes the normalized empty-method contract and positive cadence; capture does not introduce an Unbound shortcut.
 
 ## Related Systems
 
@@ -113,3 +115,4 @@ Capture owns no table or migration. It composes existing local SQLite data: `con
 |---|---|---|
 | 2026-08-16 | 10 | Created Android share-sheet capture with local contact selection and fuel writes. |
 | 2026-08-16 | 12 | Added post-capture widget refresh publishing. |
+| 2026-08-27 | 18.2 | Made inline name-only creation explicit about its Bound lifecycle contract. |
