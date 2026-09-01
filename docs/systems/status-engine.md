@@ -1,7 +1,7 @@
 # Status Engine
 
-**Last updated:** 2026-08-15
-**Updated by phase:** 12-home-screen-widget
+**Last updated:** 2026-08-27
+**Updated by phase:** 18.2-bound-unbound-lifecycle
 **Owners:** `src/db/status.ts`, `src/db/contact-status-read.ts`, `src/db/queries.ts`, `src/db/recency-dao.ts`
 
 ## Purpose
@@ -47,6 +47,7 @@ Status is a query-time projection over the contacts and interactions schema; no 
 2. `STATUS_SCAN` computes elapsed local calendar days divided by `interval_days`.
 3. The query maps continuous progress to stable, wobble, decay, or rogue. A Rarely-responds contact becomes rogue when qualifying recency reaches wobble; contacts past `ROGUE_K` become rogue because they are overdue.
 4. A separate newest-per-contact query uses `occurred_at DESC, id DESC` to deterministically choose the latest interaction row.
+5. The shared precondition requires `tracking_enabled = 1` and a positive cadence before any status arithmetic. An Unbound contact returns null status, reason, and progress even when it retains interaction history.
 
 ### Rendering status outside the app
 
@@ -78,6 +79,7 @@ Status is a query-time projection over the contacts and interactions schema; no 
 - **ADR-026:** Rogue Status for Unresponsive or Far-Overdue Contacts — adds explainable query-time rogue reasons and policy-aware recency.
 - **ADR-042:** Shared Status Palette for Dashboard and Widget Rings — gives derived status one shared visual vocabulary.
 - **ADR-045:** Event-Driven Widget Refresh and Boot Recovery — accepts bounded widget staleness without persisting status.
+- **ADR-062:** Bound/Unbound Lifecycle and One-Way Cadence Assignment — makes lifecycle and non-null cadence prerequisites for status.
 
 ## Gotchas
 
@@ -86,6 +88,7 @@ Status is a query-time projection over the contacts and interactions schema; no 
 3. **Keep threshold changes synchronized by convention.** The existing pure TypeScript status helper shares the stable/wobble thresholds but cannot be directly imported into SQLite SQL.
 4. **Keep status and reason branch order identical.** A `REASON_SQL` change must mirror `STATUS_SQL`, with Rarely-responds first, or the profile can explain a rogue state incorrectly.
 5. **Do not give a never-contacted widget tile a status colour.** The widget must carry the dashboard's null value rather than applying the status CASE independently.
+6. **Never run status SQL for an Unbound contact.** NULL cadence must produce neutral output, never an implicit stable state.
 
 ## Related Systems
 
@@ -100,3 +103,4 @@ Status is a query-time projection over the contacts and interactions schema; no 
 | 2026-08-14 | 02 | Created query-time progress/status reads and never-contacted exclusion. |
 | 2026-08-15 | 06 | Added rogue reason reads and Rarely-responds query-time status behavior. |
 | 2026-08-16 | 12 | Added the shared dashboard/widget status-ring vocabulary and refresh-bounded widget presentation. |
+| 2026-08-27 | 18.2 | Required Bound positive-cadence state for all status and progress projections. |
