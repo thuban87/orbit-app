@@ -181,6 +181,16 @@ shared table"). A dossier decision about storage is a *claim*; the schema and DA
 1. **Enumerate claims to check.** From the ledger, collect every entry that asserts anything
    about a table, column, migration, index/constraint, a writer's behavior, or a data-layer
    invariant. Group them by the table/subsystem they touch.
+   **Check two directions, not one — this is the most common Lane A miss:**
+   - *Existence* — "does the schema this decision needs exist?" (catches required-but-unbuilt).
+   - *Invariant violation* — "does this decision violate a constraint an EXISTING table already
+     enforces?" For every existing table a decision touches, read its `UNIQUE` / `CHECK` / `FK` /
+     `ON DELETE` clauses and its single-writer rules, and ask whether the decision can hold under
+     them. A decision that needs a second row for a pair guarded by `UNIQUE(a,b)`, or that adds
+     history to a table whose model is one-current-row-per-key, is a finding even though every
+     table it names already exists. (Worked example: "history-retained custom fields" vs
+     `custom_field_values UNIQUE(contact_id, field_def_id)` — the table exists, the invariant
+     forbids the feature; `field_history` is a bounded audit snapshot, not a value-timeline store.)
 2. **One read-only subagent per table/subsystem.** Spawn `general-purpose` (or `Explore`)
    agents — parallel where the tables are disjoint. Each prompt carries: the specific ledger
    claims (id + statement + cite), the table name, and the boilerplate: *"Never use git
@@ -223,6 +233,32 @@ shared table"). A dossier decision about storage is a *claim*; the schema and DA
     otherwise — owns). This is a real hole: a routed finding, REPLAN or ESCALATE, never a watch.
   When unsure which class a target falls in, check the roadmap phase map by name/number; only a
   target absent from the entire map is a genuine orphan.
+
+### Lane C — regression reconciliation against prior runs
+
+A more thorough run must be a **superset** of prior runs, never a lateral move that silently
+drops findings. (This lane exists because an earlier run, strong on unbuilt-schema, quietly
+lost three ADR-reversal findings an earlier weaker run had caught.)
+
+1. **Find prior findings.** Read everything under `<dir>/audit/prior-runs/` — archived prior
+   `AUDIT-REPORT` files and any hand-written reconstruction notes. If the folder is empty or
+   absent, this lane is a no-op; say so and move on. (Prior-run artifacts may be gitignored
+   local files — that is expected; read them anyway.)
+2. **Reconcile every prior finding against the CURRENT corpus and code** — one of exactly three
+   outcomes, each recorded in a "Reconciled from prior runs" report section:
+   - **Still real** → re-raise it as a current finding with FRESH cites (re-verified on disk this
+     run), routed normally. Do not copy the old cites blind — re-confirm them.
+   - **Cleared** → the current corpus/code resolves it. Record "RESOLVED — because X" with the
+     evidence. This is a good outcome, not a fix to perform.
+   - **Stale/moot** → the code or dossier text the finding referenced no longer exists. Record
+     RESOLVED-STALE. **Never act on it** — a finding whose anchors are gone is closed, not chased.
+3. **No fixes here.** This lane only classifies; it writes report entries, never edits. Nothing
+   is ever "fixed because a prior run said so" — a fix happens only past the `--fix` gate, only
+   for an AUTO-FIX-routed finding, and only after re-verifying its target still exists this run.
+   This is the guard against chasing ghosts from a superseded run.
+4. **Prior-run treatment ≠ current-run truth.** A prior finding's old route/severity is a hint,
+   not a verdict; re-rate it from the current corpus (e.g. a prior over-escalation may reconcile
+   to REPLAN, or vice-versa).
 
 ### Then, for all lanes:
 
@@ -272,8 +308,11 @@ Write `<dir>/audit/AUDIT-REPORT.md`: findings grouped by route (ESCALATE / REPLA
 AUTO-FIX / STUB-CONTRACT), each with its three ratings, both-sides cites, and proposed edit.
 The STUB-CONTRACT section is a consolidated list of what each intentionally-deferred phase's
 stub must expose to satisfy its dependents — it is informational (feeds GSD stub creation),
-not an owner decision or a fix. Include a short header: the ingested manifest (files + resolved
-versions + skipped), ledger entry count, and finding counts per kind and per route.
+not an owner decision or a fix. Add a **"Reconciled from prior runs"** section (Lane C): every
+prior finding marked re-raised / RESOLVED / RESOLVED-STALE with evidence — a prior finding that
+is neither re-raised nor explicitly resolved is a regression and must not happen. Include a short
+header: the ingested manifest (files + resolved versions + skipped), the prior-runs reconciled
+against, ledger entry count, and finding counts per kind and per route.
 
 **Leave both artifacts uncommitted.** Present the owner a compact summary — counts per
 route, and the AUTO-FIX list as candidates. Then STOP at the gate:
@@ -320,9 +359,13 @@ the run stayed a dry run and the owner wants the tree clean; ask). Report to the
   verdict done here, not delegated.
 - LEDGER.md is lossless — every tagged statement, cross-phase constraint, boundary, and
   "do not" note has an atomic, cited entry; nothing summarized away.
-- **All three lanes ran.** Lane A verified every data-layer claim against the live codebase
-  via read-only subagents whose facts were re-confirmed on disk before use; required-but-
-  unbuilt schema was flagged and routed REPLAN.
+- **All lanes ran.** Lane A verified every data-layer claim against the live codebase via
+  read-only subagents whose facts were re-confirmed on disk before use, checking BOTH
+  directions — required-but-unbuilt schema (routed REPLAN) AND decisions that violate an
+  existing table's UNIQUE/CHECK/FK/single-writer invariants.
+- **Lane C reconciled every prior-run finding** under `audit/prior-runs/`: each re-raised with
+  fresh cites, RESOLVED with evidence, or RESOLVED-STALE — none silently dropped. No prior
+  finding was acted on as a fix; Lane C only classifies.
 - **Every** "Phase X owns Y" claim was resolved against phase X's ledger (Lane B), and every
   dependency on an un-owned or uninterrogated surface is a routed finding, not a watch item.
 - Findings carry effort, blast radius, and reverses_locked independently; routing follows
