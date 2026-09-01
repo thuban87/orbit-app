@@ -45,6 +45,7 @@ The repository is a **flat single Expo app** with `src/` at the repo root — no
 - `tsconfig.json` — declares the sole `@/* → ./src/*` alias; no monorepo package aliases.
 - `app.config.ts` — functional config that merges `app.json` and registers the `expo-sqlite` config plugin (deduped).
 - `babel.config.js` — `babel-preset-expo` only; no `patch-build-gradle` or monorepo transform machinery.
+- `src/db/.gitkeep` — one of the eight tracked `src/` folder markers that establish the mandated flat module layout (FND-06) the `@/* → ./src/*` alias resolves into.
 
 **Depends on:** None
 **Required by:** None
