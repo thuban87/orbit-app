@@ -53,7 +53,6 @@ The system owns no remote state and no backend. SQLite supplies live candidate d
 | `src/services/notifications/notification-actions.ts` | Registers mark/snooze buttons and performs idempotent action writes. |
 | `src/services/notifications/headless-task.ts` | Registers the killed-app TaskManager action path. |
 | `src/services/notifications/channels.ts` | Creates low-importance private/public decay and private birthday channels. |
-| `src/screens/SettingsScreen.tsx` | Persists the master, decay, birthday, and digest scheduling gates. |
 | `src/services/notifications/purge-notification-cleanup.ts` | Cancels a purged contact's decay and birthday identifiers after commit. |
 | `src/navigation/notification-gate.tsx` | Receives warm and cold body/action responses and queues body navigation until ready. |
 

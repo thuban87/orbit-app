@@ -152,6 +152,7 @@ _None._ The shell owns runtime navigation and theme contracts, not durable appli
 - **ADR-048:** Status-Default Static Orrery with a Single-Canvas Morph — adds the typed Orrery route and token-driven canvas lifecycle.
 - **ADR-049:** BYO-Key AI Configuration and Credential Boundary — hosts non-secret AI settings while retaining credentials outside navigation and SQLite settings patches.
 - **ADR-052:** Compose-Owned AI Draft Lifecycle and Acknowledged Egress — adds the serializable, consume-once Compose AI request intent.
+- **ADR-053:** Local-First LiteLLM AI Model Catalog — adds Settings model-scope and explicit-refresh controls.
 - **ADR-054:** Live Weekly Digest Retrospective and Overlooked Relationship Read — adds the self-fetching Digest route and dashboard entry.
 - **ADR-055:** Dedicated Weekly Digest Scheduling and Persisted Notification Policy — adds the dashboard-rooted Digest notification reset and ready-gated schedule hook.
 

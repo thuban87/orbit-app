@@ -93,9 +93,11 @@ The schema version is SQLite's `PRAGMA user_version`. Migration 001 creates the 
 - **ADR-012:** Opt-Out Android Backup for Third-Party PII — persistent contact data is excluded from Android Auto Backup.
 - **ADR-013:** Runtime Two-Table Custom Fields with Whitelist-Constructed DDL — dynamic schema work and value writes use the shared transaction boundary.
 - **ADR-015:** Lossless Field Changes with Quarantine and Launch-Time Retention Sweep — launch maintenance retires stale custom fields safely.
+- **ADR-028:** Per-Item Conversational Fuel with Fixed Kinds — uses the migration-001 schema contract for durable fuel rows.
 - **ADR-041:** Notification Settings, Privacy Channels, and Birthday Alerts — uses migration 002 for durable, backup-native local notification policy.
 - **ADR-047:** App-Level Assignable Sun and Themed Self Identity — uses migration 003 for validated, app-level Orrery sun preferences.
 - **ADR-049:** BYO-Key AI Configuration and Credential Boundary — uses migration 004 for exportable non-secret AI settings and excludes keys from SQLite.
+- **ADR-052:** Compose-Owned AI Draft Lifecycle and Acknowledged Egress — reads the typed application settings boundary while keeping a draft lifecycle in Compose.
 - **ADR-055:** Dedicated Weekly Digest Scheduling and Persisted Notification Policy — uses migration 005 for the durable default-on digest toggle.
 
 ## Gotchas

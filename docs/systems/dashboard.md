@@ -98,6 +98,8 @@ The dashboard owns no tables. It projects the on-device `contacts`, `categories`
 
 ## Decisions
 
+- **ADR-006:** Theme-Token Architecture — keeps Home's dashboard chrome on the shared token contract.
+- **ADR-019:** Native Stack Contact Lifecycle Navigation — establishes the typed navigation shell used by Home destination entries.
 - **ADR-032:** Flat Dashboard Discovery and In-Query Contact Search — makes the dashboard Home and owns local name-plus-fuel search.
 - **ADR-033:** Profile Marking and Shared Drag-Reordered Favourites — supplies the card marker and favourites filter/management surface.
 - **ADR-034:** Birthday Banner and Re-query Dashboard Freshness — defines birthday candidates and reliable local freshness.

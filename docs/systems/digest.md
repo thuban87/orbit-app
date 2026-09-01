@@ -40,7 +40,6 @@ The digest has no table and stores no per-contact state. It reads existing SQLit
 | `src/db/digest-read.ts` | Read-only SQLite chokepoint; imports shared status SQL rather than re-deriving it. |
 | `src/logic/digest-logic.ts` | Tunable windows, group cap, local weekday tag, and effortful-line policy. |
 | `src/screens/DigestScreen.tsx` | Typed live screen with profile and never-contacted destinations. |
-| `src/screens/HomeScreen.tsx` | Provides the non-badged “Your week” dashboard entry. |
 | `src/services/notifications/digest-schedule.ts` | Owns the `digest:weekly` request and launch-sweep registration. |
 
 ## How It Works
