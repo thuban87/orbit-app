@@ -57,7 +57,7 @@ When this skill is RUN, **commit its outputs atomically as you go**:
 | `docs/systems/<new-doc>.md` (×N) | New system doc(s) with sections moved from source. Each gets standard system-doc frontmatter (Last updated, Updated by phase, Owners, Purpose) and a fresh Changelog starting with the split row. |
 | `docs/systems/<source-doc>.md` | Trimmed source doc. Same structure, smaller. Purpose section gets a "see also" line pointing at the new docs. Changelog gets a "split off" row. |
 | `docs/decisions/ADR-NNN-*.md` (touched) | ADRs whose `Decisions`-section reference pointed at the source doc get redirected to the correct new doc. Body content otherwise unchanged. |
-| `CLAUDE.md` | Subsystem table gets new rows for new docs; source-doc row scope narrowed if appropriate. (If your environment reserves CLAUDE.md to the owner, list the edits in report-back instead — see step 8.) |
+| `CLAUDE.md` | Subsystem table gets new rows for new docs; source-doc row scope narrowed if appropriate — as shown in the approved final plan (step 5) and applied in step 8. |
 | `docs/systems/README.md` | Subsystem table updated to match CLAUDE.md. |
 
 ## Workflow
@@ -192,7 +192,7 @@ For each ADR from step 2's inventory:
 
 ### 8. Update CLAUDE.md and README
 
-1. **CLAUDE.md subsystem table.** Narrow the source-doc row's scope if applicable; add new rows for new docs in the same column shape, placed adjacent to the source row (subsystem grouping reads better than alphabetical). Edit no other section. **Orbit reserves CLAUDE.md to the owner/orchestrator** — if your environment says so, do not edit it; list the exact row changes in report-back instead.
+1. **CLAUDE.md subsystem table.** Narrow the source-doc row's scope if applicable; add new rows for new docs in the same column shape, placed adjacent to the source row (subsystem grouping reads better than alphabetical). Edit no other section. Apply exactly the row changes shown in the approved final plan (step 5) — they were surfaced for the owner at the seam-confirmation gate (step 4); make no CLAUDE.md change that was not in that plan.
 2. **`docs/systems/README.md`.** Mirror the CLAUDE.md changes — same scope edits, same new rows.
 
 Commit the cross-reference updates.
@@ -216,7 +216,7 @@ Tell the user:
 - Any ambiguities surfaced by the cross-link pass that warrant the owner's eye.
 - Total line counts: source-before vs. source-after-plus-new-docs-summed — should match within ±5 lines (allowing Purpose lines, Changelog rows, the "see also" line).
 - The commits you made (hashes + subjects), and confirmation nothing was pushed.
-- If CLAUDE.md is owner-reserved in your environment: the exact rows the orchestrator needs to add.
+- Confirmation that the `CLAUDE.md` and `docs/systems/README.md` subsystem tables end consistent with each other.
 
 ## Conventions to enforce
 
@@ -236,7 +236,7 @@ Tell the user:
 - ❌ **Improvising new content during the move.** No new gotchas, Decisions entries, or rewording.
 - ❌ **Splitting tables at the row level without user input.** Default is whole-table moves.
 - ❌ **Editing ADR bodies.** Only the Decisions-section cross-reference is fair game here.
-- ❌ **Forgetting CLAUDE.md or README** (or, where CLAUDE.md is owner-reserved, forgetting to list the needed rows in report-back). Both the subsystem tables must end consistent.
+- ❌ **Forgetting CLAUDE.md or README.** Both subsystem tables must end consistent.
 - ❌ **Losing content.** The content-preservation check (step 6) is a hard gate. If lines went missing, stop and report.
 - ❌ **Splitting cohesive docs.** If the source is under 300 lines or has no real conceptual seam, confirm first — a line-count-only split produces two docs that constantly cross-reference each other and are worse than one.
 - ❌ `git add -A`, a branch, a worktree, a push, or an AI attribution trailer.

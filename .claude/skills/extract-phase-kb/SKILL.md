@@ -57,7 +57,7 @@ The user runs `/extract-phase-kb <phase-id>` or asks "extract the KB for phase 2
 | `docs/runbooks/<name>.md` | New runbooks for newly-introduced repeatable processes. Updates for processes the phase modified. |
 | `docs/decisions/_archive/ADR-NNN-<slug>.md` | Only during a legacy-ADR reclaim (step 6) — the pre-KB original ADR body, preserved before its number is reclaimed. |
 | `.planning/phases/<phase-dir>/<phase-id>-KB-MANIFEST.md` | The audit trail tying this run to its outputs. |
-| `CLAUDE.md` | Index entries added *only* when a brand-new system doc or runbook is created. (Ask the owner / orchestrator before editing CLAUDE.md if your environment reserves it — see step 13.) |
+| `CLAUDE.md` | Index entries added / edited / removed for new, renamed, or retired system docs and runbooks — **only as approved in the step-5 plan's *Planned CLAUDE.md changes* table** (see step 13). |
 | Existing ADR files | Touched *only* to flip a `Superseded by:` or append a `Required by:` field. Body content is never edited retroactively (legacy reclaim in step 6 is the sole, documented exception). |
 
 ## Commit-as-you-go (bake this into every run)
@@ -163,6 +163,13 @@ Produce a written plan and present it before writing any files. The plan **must*
 | Reclaimed # | Original title | New title | Archive path |
 |-------------|----------------|-----------|--------------|
 
+## Planned CLAUDE.md changes  (write `_None._` if empty)
+
+| Change | Section / row | Reason |
+|--------|---------------|--------|
+| ADD | Knowledge-base index: row for `docs/systems/<new>.md` (or a new runbook) | new system doc / runbook created this run |
+| EDIT / REMOVE | the exact existing row/line | doc renamed, split, or retired this run |
+
 ## Deferred / not captured
 
 - {item} — {reason}
@@ -174,6 +181,7 @@ Produce a written plan and present it before writing any files. The plan **must*
 - The supersession table is **mandatory** even when empty (write `_None._`). It forces a conscious check.
 - If a planned ADR's source decisions overlap or contradict an existing ADR's content, that existing ADR belongs in the supersession table.
 - **Reversibility** on each planned ADR = the strictest value among its sourced decisions' `Reversibility:` tags (one-way > costly > reversible). **Migration** = the TS migration number(s) the phase ships (orbit migrations are TypeScript under `src/db/migrations/`, run via `PRAGMA user_version`; there are no `.sql` files), or "None".
+- **CLAUDE.md changes are part of this plan, never a silent side effect.** Every row this run will add, remove, or edit in `CLAUDE.md` (index entries for new/renamed/split/retired system docs and runbooks) must appear in the *Planned CLAUDE.md changes* table above, so the owner sees and approves them in this review. Step 13 applies exactly what is approved here — nothing that was not in this table.
 
 Wait for approval (or edits to the plan) before continuing.
 
@@ -275,9 +283,13 @@ npm run graph:build            # regenerates the ADR registry + knowledge graph 
 - **Supersession** in the ADR body is what the index and graph read — a supersession you fail to record is a retired decision that still looks live.
 - Commit the regenerated INDEX/registry/graph artifacts with the manifest.
 
-### 13. Update CLAUDE.md if needed
+### 13. Update CLAUDE.md (per the approved plan)
 
-If you created a *new* system doc or runbook (a row not already indexed in `CLAUDE.md`), add it to the appropriate table — existing rows and other sections untouched. **Orbit reserves CLAUDE.md edits to the owner/orchestrator.** If your environment says CLAUDE.md is owner-owned, do not edit it — instead list the exact rows to add in the report-back step so the orchestrator applies them.
+Apply exactly the CLAUDE.md changes approved in step 5's *Planned CLAUDE.md changes* table — no more, no less:
+- Add index rows for brand-new system docs / runbooks created this run.
+- Edit or remove rows for docs renamed, split, or retired this run.
+
+Touch only those index rows/entries; leave every other row and section of `CLAUDE.md` untouched. **Never make a CLAUDE.md edit that did not appear in the approved step-5 plan** — if a needed change surfaces mid-write, add it to the plan and re-confirm with the owner rather than editing silently. Then commit `CLAUDE.md` (commit-as-you-go).
 
 ### 14. Report back
 
