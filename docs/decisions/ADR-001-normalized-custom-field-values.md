@@ -1,110 +1,62 @@
-# ADR-001: Normalize Custom-Field Values
+# ADR-001: Normalized Custom-Field Values
 
-- **Status:** Accepted — 2026-08
-- **Decision scope:** Migration 006 / Phase 16
+**Status:** Accepted
+**Date:** 2026-08-24
+**Phase:** 16-custom-field-value-normalization
+**Source decisions:** D-01–D-12, D-06a, and D-06b from 16-CONTEXT.md; 16-DISCUSSION-LOG.md
+**Reversibility:** one-way
+**Migration:** 006
+**Supersedes:** ADR-013; ADR-014 (partial); ADR-015 (partial)
+**Superseded by:** None
 
 ## Context
 
-The shipped custom-field store used `custom_field_defs` for field definitions and
-`contact_custom_values` for data. Each field was a dynamic `TEXT` column in the
-latter table, with one row per contact. This made a field's visible key double as
-SQLite schema: creating, renaming, or permanently deleting a field required DDL.
-
-That model preserves raw text well on one device, but it is a poor prerequisite
-for backup, restore, or eventual multi-device sync. It has replicated-DDL risk,
-does not give each current value a portable identity, and makes a schema change
-the unit of custom-field replication. Devices cannot be remotely inspected or
-repaired, so the replacement must be a forward-only, all-or-nothing migration.
+Dynamic `TEXT` columns in the per-contact custom-value table coupled each field's visible compatibility key to SQLite schema. The model lacked a portable identity for each current value and required replicated DDL for ordinary field lifecycle work.
 
 ## Decision
 
-Migration 006 retires `contact_custom_values` and creates this normalized current
-state table:
+The system uses `custom_field_values` as the normalized current-state store: every contact-and-definition pair has a durable uid-bearing row, including blank and quarantined pairs. Migration 006 atomically validates and copies legacy values, retires the dynamic table, and thereafter uses pair-keyed UPSERTs without runtime custom-field DDL; `col_name` remains compatibility and history metadata, never SQL syntax.
 
-```text
-custom_field_values(
-  id, uid, contact_id, field_def_id, value, created_at, modified_at
-)
-```
+Loss-bearing legacy inconsistencies roll back unchanged. A non-loss-bearing orphan dynamic column is snapshotted to `field_history` in the same transaction and the upgrade proceeds; both migration-specific and generic bootstrap failures keep navigation unmounted and state only accurate recovery guidance.
 
-- `uid` is an immutable, globally unique identity for each value row.
-- `value` remains raw `TEXT` (or `NULL`); field type continues to select the UI
-  widget and parser, not a database storage type.
-- `UNIQUE(contact_id, field_def_id)` enforces **at most one** current row for a
-  contact-and-definition pair, while `uid` is separately `UNIQUE`.
-- There is one durable value row for every contact × definition pair, including
-  blank values and quarantined definitions. Clearing writes `NULL` to the same
-  row; it does not delete the row. Completeness is maintained by migration
-  seeding, seeding at every contact/field creation point, and UPSERT self-heal.
-  It is deliberately not described as a lower-bound database constraint:
-  SQLite cannot enforce that cardinality with a simple table constraint.
-- New and changed values use pair-keyed UPSERTs. The update branch preserves
-  `uid` and `created_at`, and changes only `value` and `modified_at`.
-- `col_name` remains an immutable compatibility, history, and photo-filename
-  key; it is no longer interpolated as a runtime SQL column identifier.
+## Alternatives Considered
 
-Migration 006 validates and copies every legacy value in one transaction, proves
-the copied pair matrix, then drops the retired table. A loss-bearing legacy
-inconsistency (for example, a definition whose backing column is missing) fails
-closed and leaves the database unchanged. Under D-06a, a non-loss-bearing orphan
-legacy column is instead snapshot to `field_history`, dropped in the same
-transaction, and the migration proceeds.
-
-### Timestamp provenance
-
-For a migrated contact that had a legacy value row, that row's `modified_at`
-becomes both `created_at` and `modified_at` of each derived value row. A contact
-without a legacy value row receives synthesized blank pairs stamped with the
-migration's local `now`. Later inserts use their own creation timestamp and
-updates retain `created_at` while changing `modified_at`. Phase 17 must consume
-this documented provenance rather than infer an unavailable per-value legacy
-creation time.
-
-## Rejected Alternatives
-
-### Dual-read / dual-write compatibility mode
-
-Rejected. Keeping both stores would make every future mutation synchronize a
-row-based model and dynamic DDL, increasing divergence risk on an unreachable
-device. D-05 requires one forward-only cutover to normalized-only code.
-
-### A JSON value column on `contacts`
-
-Rejected. It would make values opaque to relational pair identity and require
-rewriting a contact-wide JSON document for individual field updates, complicating
-integrity, inspection, and future reconciliation.
-
-### Keeping `ALTER TABLE` / `DROP COLUMN` field DDL
-
-Rejected. Dynamic schema changes are the replicated-DDL risk this decision
-removes. Creating, deleting, quarantining, restoring, and retyping fields now
-operate on definition and value rows; no future custom-field operation relies on
-dynamic value-table DDL.
+- **Lazy or sparse value rows** — rejected because clearing must preserve durable blank current state.
+- **Dual read/write migration** — rejected because two stores could diverge on an unreachable device.
+- **Best-effort migration** — rejected because skipped values or invented definitions would lose or falsify data.
+- **Replacing `col_name` with definition uid** — rejected because history and photo-path compatibility retain the stable key.
+- **Rewriting raw values or duplicating parsers in SQL** — rejected because type-change behavior must preserve raw TEXT.
 
 ## Consequences
 
-- `CLAUDE.md` records the normalized model; the old dynamic-column rules are
-  superseded by this ADR and migration 006.
-- The old ban on indexes or `UNIQUE` constraints on dynamic value columns does
-  not apply to the retired table. `custom_field_values.uid UNIQUE` and
-  `UNIQUE(contact_id, field_def_id)` are intentional integrity constraints.
-- D-03 is enforced honestly: the database guarantees at-most-one pair row;
-  complete coverage is maintained by migration/creation seeding and UPSERT
-  self-heal, not a lower-bound SQL constraint.
-- `createContactFull` is the only production contact-creation path that seeds
-  the complete pair matrix. The exported test helper
-  `createContactWithInteraction` writes no custom values and must not become a
-  production creation path without equivalent seeding.
-- A permanent deletion snapshots applicable values to `field_history` and
-  removes the definition plus dependent rows transactionally. A photo file for
-  a permanently deleted photo definition is a bounded local orphan: contact
-  purge enumerates surviving definitions, so it does not reclaim that deleted
-  definition's files. A future cleanup mechanism owns that concern.
-- The D-06a orphan-column snapshot is a bounded, local 30-day audit trace with
-  no read surface and no backup path. It is not a recovery mechanism.
-- `field_history.field_col_name` remains the compatibility/audit key and the
-  launch sweep, not a timer, retains the bounded history/quarantine lifecycle.
-- Phase 17 can consume normalized value rows and their timestamp provenance, but
-  backup format, restore reconciliation, tombstones, and multi-device conflict
-  policy remain explicitly open.
+### Positive
 
+- The pair constraint enforces at-most-one current row while migration and creation seeding maintain complete coverage.
+- Existing parser, visibility, photo-path, type-change, quarantine, and AI-sharing behavior retains its compatibility projection.
+
+### Negative
+
+- The forward-only representation cannot be rolled back on upgraded user databases.
+- `field_history` remains a bounded local audit trail, not backup or recovery; a permanently deleted photo definition can leave a bounded local photo orphan.
+
+### Risks
+
+- A loss-bearing malformed legacy database stays on its prior version until a compatible repair path exists.
+- Future backup, restore, and multi-device conflict policy must consume the documented timestamp provenance without being decided here.
+
+## Implementation
+
+**Key files:**
+- `src/db/migrations/006-normalize-custom-field-values.ts` — atomically converts and validates legacy dynamic values.
+- `src/db/database.ts` — registers migration 006 and serializes bootstrap opening.
+- `src/db/field-values-dao.ts` — provides normalized, defs-filtered reads and pair-keyed UPSERTs.
+- `src/db/field-ddl.ts` — seeds and removes normalized value pairs during field lifecycle operations.
+- `src/db/field-defs-dao.ts` — manages definitions and normalized emptiness checks.
+- `src/db/field-type-change.ts` — snapshots raw values while changing definition metadata.
+- `src/db/field-sort.ts` — supplies the static normalized-value expression for a future constrained join.
+- `src/db/contacts-dao.ts` — seeds the complete pair matrix within contact creation.
+- `src/db/purge-dao.ts` — deletes normalized value children in the archived-contact purge transaction.
+- `App.tsx` — gates navigation and renders accurate migration/bootstrap failure states.
+
+**Depends on:** ADR-009 (Crash-Safe Forward-Only SQLite Migrations)
+**Required by:** _None._
