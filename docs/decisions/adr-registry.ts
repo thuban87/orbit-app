@@ -69,7 +69,9 @@
 // NOTE: ADR-0057 [ACCEPTED] Full-State Versioned Backups with Verified Manual and Foreground SAF Snapshots
 // NOTE: ADR-0058 [ACCEPTED] Optional Encrypted Backups and Previewed Local Restoration
 // NOTE: ADR-0059 [ACCEPTED] Normalized Contact Methods, Canonical Actionability, and Local Provenance
-// NOTE: ADR-0060 [ACCEPTED] Versioned Portable Method Graph and Collision-Normalized Restoration
+// IMPORTANT: ADR-0060 [SUPERSEDED BY ADR-063 (partial)] Versioned Portable Method Graph and Collision-Normalized Restoration
 // NOTE: ADR-0061 [ACCEPTED] DAO-Selected Actionable Primary SMS Handoff
+// NOTE: ADR-0062 [ACCEPTED] Bound/Unbound Lifecycle and One-Way Cadence Assignment
+// NOTE: ADR-0063 [ACCEPTED] Versioned Lifecycle Backup and Dormant-Cadence Restore
 
-export const ADR_COUNT = 61;
+export const ADR_COUNT = 63;

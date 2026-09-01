@@ -21,8 +21,8 @@ not something you can pattern-match against.
 
 ## How to use this
 
-- **Is a decision still live?** Check the `Superseded by` column. 8 of
-  61 ADRs are superseded in whole or in part.
+- **Is a decision still live?** Check the `Superseded by` column. 9 of
+  63 ADRs are superseded in whole or in part.
 - **Which decisions govern a file?** Don't grep this file — ask the graph:
   `npm run graph:ask -- governs src/db/field-values-dao.ts`, or follow the
   `governed_by` edges.
@@ -90,5 +90,7 @@ not something you can pattern-match against.
 | 057 | Full-State Versioned Backups with Verified Manual and Foreground SAF Snapshots | Accepted | 17-backup-export-restore | — | — | — | 7 | `src/backup`, `src/services`, `src/services/backup` |
 | 058 | Optional Encrypted Backups and Previewed Local Restoration | Accepted | 17-backup-export-restore | — | — | — | 7 | `src/backup`, `src/db/migrations`, `src/screens` +2 |
 | 059 | Normalized Contact Methods, Canonical Actionability, and Local Provenance | Accepted | 18.1-contact-method-normalization | ADR-008 (partial) | — | — | 9 | `src/db`, `src/db/migrations`, `src/logic` +1 |
-| 060 | Versioned Portable Method Graph and Collision-Normalized Restoration | Accepted | 18.1-contact-method-normalization | ADR-056 (partial) | — | — | 7 | `src/backup`, `src/db` |
+| 060 | Versioned Portable Method Graph and Collision-Normalized Restoration | Accepted | 18.1-contact-method-normalization | ADR-056 (partial) | ADR-063 (partial) | — | 7 | `src/backup`, `src/db` |
 | 061 | DAO-Selected Actionable Primary SMS Handoff | Accepted | 18.1-contact-method-normalization | ADR-035 (partial) | — | — | 5 | `src/db`, `src/logic`, `src/screens` |
+| 062 | Bound/Unbound Lifecycle and One-Way Cadence Assignment | Accepted | 18.2-bound-unbound-lifecycle | — | — | — | 7 | `src/db`, `src/db/migrations`, `src/services` +1 |
+| 063 | Versioned Lifecycle Backup and Dormant-Cadence Restore | Accepted | 18.2-bound-unbound-lifecycle | ADR-060 (partial) | — | — | 5 | `src/backup`, `src/db/migrations` |
