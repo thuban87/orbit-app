@@ -1,7 +1,7 @@
 # Contact Reconciliation
 
-**Last updated:** 2026-08-26
-**Updated by phase:** 20-contact-reconciliation-merge
+**Last updated:** 2026-08-31
+**Updated by phase:** 21-interaction-assist-reach-out
 **Owners:** `src/db/reconcile-apply.ts`, `src/db/reconcile-session-dao.ts`, `src/db/reconcile-session-read.ts`, `src/db/reconcile-snapshot-dao.ts`, `src/db/reconcile-relink-dao.ts`, `src/db/merge-dao.ts`, `src/logic/reconcile-diff.ts`
 
 ## Purpose
@@ -77,7 +77,7 @@ Migration 013 keeps reconciliation state in local SQLite. It does not create a g
 ### Merging duplicate Orbit contacts
 
 1. A user begins from profile overflow or a reconciliation duplicate path, chooses a survivor, and resolves genuine scalar, photo, and competing-primary conflicts.
-2. `mergeContacts()` resolves method and active-link collisions before reparenting compatible children inside one write transaction.
+2. `mergeContacts()` resolves method and active-link collisions before reparenting compatible children — including any pending `interaction_assists` — to the survivor inside one write transaction, so a later assist confirmation logs against the survivor with no survivor lookup.
 3. The writer preserves field-history snapshots for overwritten or dropped meaningful values, recomputes `last_contact` through the recency core, deletes the absorbed row, and writes a generic contact tombstone.
 4. The UI lands on the survivor only after the transaction succeeds; an error leaves both contacts intact.
 
@@ -93,6 +93,7 @@ Migration 013 keeps reconciliation state in local SQLite. It does not create a g
 - **ADR-003:** `READ_CONTACTS` on API 37+ for Reconcile — gates current-source reads behind an in-context permission request.
 - **ADR-068:** User-Triggered, Source-Only Reconciliation with Durable Review — defines bounded one-way reconciliation and resumable review.
 - **ADR-069:** Atomic Tombstone-Backed Orbit Contact Merge — defines explicit atomic consolidation and absorbed-contact retirement.
+- **ADR-073:** Merge-Reparented, Purge-Cascaded Interaction Assists — extends the merge reparent loop to the pending-assist child table so redirect needs no lazy lookup.
 
 ## Gotchas
 
@@ -102,6 +103,7 @@ Migration 013 keeps reconciliation state in local SQLite. It does not create a g
 4. **Do not nest the transaction mutex.** Session and apply helpers expose non-mutexed cores for composition inside their owning transaction.
 5. **Merge has no simple undo.** Never use the normal archive lifecycle for the absorbed identity; tombstoning prevents resurrection.
 6. **Reconciled method additions have no v1 provenance row.** Imported methods retain stronger source attribution than reconciliation-added methods.
+7. **Every contact-owned child must join the reparent loop.** The merge reparents children explicitly (not by cascade); a new child table — like `interaction_assists` in phase 21 — that is not added to `mergeContacts()` would be stranded on the absorbed identity. Do not rely on `ON DELETE CASCADE` for merge.
 
 ## Related Systems
 
@@ -110,9 +112,11 @@ Migration 013 keeps reconciliation state in local SQLite. It does not create a g
 - **Photos** — supplies durable source-photo staging and post-commit mastering.
 - **Contact import** — establishes the linked source records and owns the selected-contact native bridge.
 - **Persistence core** — runs migration 013 and the shared transaction boundary.
+- **Interaction Assist & Reach Out** — its pending assists are reparented to the survivor inside the merge transaction.
 
 ## Changelog
 
 | Date | Phase | What Changed |
 |------|-------|--------------|
 | 2026-08-26 | 20 | Created user-triggered durable reconciliation, safe relinking, and atomic tombstone-backed merge documentation. |
+| 2026-08-31 | 21 | Extended the merge reparent loop to pending `interaction_assists` so a merged target's later confirmation logs against the survivor. |
