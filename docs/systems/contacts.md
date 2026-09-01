@@ -1,7 +1,7 @@
 # Contacts
 
-**Last updated:** 2026-08-18
-**Updated by phase:** 14-ai-message-suggestions
+**Last updated:** 2026-08-24
+**Updated by phase:** 16-custom-field-value-normalization
 **Owners:** `src/db/contacts-dao.ts`, `src/db/contact-read.ts`, `src/db/favourites-dao.ts`, `src/db/profile-dao.ts`, `src/db/contact-links-dao.ts`, `src/db/purge-dao.ts`, `src/db/recency-dao.ts`
 
 ## Purpose
@@ -47,20 +47,20 @@ All data is on-device SQLite. Migration 001 uses a surrogate `contacts.id` and a
 
 | Layer | File | Responsibility |
 |---|---|---|
-| Contact writer | `src/db/contacts-dao.ts` | Atomically creates and edits metadata, custom values, and optional first interactions; archives and restores contacts with lifecycle-event composition. |
+| Contact writer | `src/db/contacts-dao.ts` | Atomically creates and edits metadata, normalized custom-value pairs, and optional first interactions; archives and restores contacts with lifecycle-event composition. |
 | Contact reads | `src/db/contact-read.ts` | Checks duplicate names, reads categories, and assembles edit/header data, including the lightweight phone-capable header seek. |
 | Favourites DAO | `src/db/favourites-dao.ts` | Marks, clears, and atomically rewrites ordered favourite ranks. |
 | Profile DAO | `src/db/profile-dao.ts` | Reads and updates the single self record’s local photo reference. |
 | Links DAO | `src/db/contact-links-dao.ts` | Lists and applies scoped add/edit/remove changes for ordered link rows. |
 | Recency DAO | `src/db/recency-dao.ts` | Is the sole owner of `last_contact` recomputation. |
 | Snooze DAO | `src/db/snooze-dao.ts` | Is the sole writer of `snooze_until` and records paired lifecycle events. |
-| Purge DAO | `src/db/purge-dao.ts` | Computes the destruction summary and performs archive-guarded fan-out deletion. |
+| Purge DAO | `src/db/purge-dao.ts` | Computes the destruction summary and performs archive-guarded fan-out deletion, including normalized custom-value children. |
 
 ### Key Files
 
 | File | Role |
 |---|---|
-| `src/db/contacts-dao.ts` | Composed create/edit path plus archive, restore, and archived-list reads. |
+| `src/db/contacts-dao.ts` | Composed create/edit path that seeds normalized custom-value pairs plus archive, restore, and archived-list reads. |
 | `src/db/contact-read.ts` | Duplicate-name, category, header, and edit-form data reads. |
 | `src/db/favourites-dao.ts` | Dedicated favourite-rank writes that leave recency unchanged. |
 | `src/db/profile-dao.ts` | Single-row self photo reads and writers. |
@@ -68,7 +68,7 @@ All data is on-device SQLite. Migration 001 uses a surrogate `contacts.id` and a
 | `src/db/recency-dao.ts` | Single-writer interaction/recency cores used by composed contact writes. |
 | `src/db/snooze-dao.ts` | Local-date snooze and clear writes with immutable event composition. |
 | `src/db/events-dao.ts` | Insert-only lifecycle writer composed by archive and restore. |
-| `src/db/purge-dao.ts` | Explicit, transaction-scoped child deletion and post-commit extension hook. |
+| `src/db/purge-dao.ts` | Explicit, transaction-scoped child deletion, including normalized custom-value pairs, and post-commit extension hook. |
 | `src/screens/CreateContactScreen.tsx` | Lean fixed-first create form. |
 | `src/screens/EditContactScreen.tsx` | Always-show edit form for fixed fields, links, and custom values. |
 | `src/screens/ArchivedContactsScreen.tsx` | Restore and impact-summary purge surface. |
@@ -87,15 +87,15 @@ All data is on-device SQLite. Migration 001 uses a surrogate `contacts.id` and a
 ### Creating and editing a contact
 
 1. The create form renders name, category, frequency, last-spoke, and phone before eligible custom fields; duplicate names warn at submit but never block save.
-2. `createContactFull()` opens one shared transaction, inserts the contact, and for Today or Pick date uses recency cores to insert a manual, directionless interaction and recompute `last_contact`.
-3. “Not yet” writes no interaction and leaves `last_contact` `NULL`; custom values use their non-mutexed core in the same transaction.
+2. `createContactFull()` opens one shared transaction, inserts the contact, seeds one blank uid-bearing pair for every custom-field definition including quarantined definitions, and for Today or Pick date uses recency cores to insert a manual, directionless interaction and recompute `last_contact`.
+3. “Not yet” writes no interaction and leaves `last_contact` `NULL`; submitted custom values use pair-keyed non-mutexed cores in the same transaction.
 4. The edit form shows every non-quarantined custom field after fixed fields. Changing `rarely_responds` recomputes recency because it changes the qualifying interaction set.
 
 ### Managing links and lifecycle
 
 1. The link DAO applies each add, edit, or remove with both the link and contact identities scoped to the intended row; phone and email remain dedicated fields.
 2. Archive sets `archived_at` from the profile only when the contact is live, then composes an immutable archive event in the same transaction. Live reads exclude archived contacts; Settings owns the distinct Archived contacts home.
-3. Restore clears the marker only when the contact is archived and records a matching restore event. Purge first verifies the archived state inside its write transaction, then explicitly deletes interactions, events, fuel, custom values, links, field history, and the contact.
+3. Restore clears the marker only when the contact is archived and records a matching restore event. Purge first verifies the archived state inside its write transaction, then explicitly deletes interactions, events, fuel, normalized custom-value pairs, links, field history, and the contact.
 4. Photo-file and notification cleanup are idempotent best-effort post-commit extensions registered by their owning systems.
 
 ### Managing contact and self photos
@@ -147,6 +147,7 @@ All data is on-device SQLite. Migration 001 uses a surrogate `contacts.id` and a
 - **ADR-009:** Crash-Safe Forward-Only SQLite Migrations — commits the initial contacts schema atomically.
 - **ADR-010:** Single-Writer Interaction Recency Spine — makes recency a serialized materialization of the interaction log.
 - **ADR-011:** Query-Time Status and Never-Contacted Segregation — relies on contact cadence and the maintained never-contacted marker.
+- **ADR-001:** Normalized Custom-Field Values — seeds immutable custom-value pairs on contact creation and deletes them during purge.
 - **ADR-016:** Fixed-First Contact Forms and Atomic Contact Creation — composes the form’s multi-table write in one transaction.
 - **ADR-017:** Multi-Link Contact Reachability — stores many ordered web links while phone and email remain dedicated fields.
 - **ADR-018:** Archive-Gated Contact Purge with Explicit Fan-Out — makes permanent deletion a guarded, auditable lifecycle action.
@@ -182,6 +183,7 @@ All data is on-device SQLite. Migration 001 uses a surrogate `contacts.id` and a
 13. **Mute does not hide a contact.** `reminders_off` suppresses decay scheduling only; Dashboard, status, and birthday behavior remain otherwise unchanged.
 14. **Publish widget refresh only after a successful mutation.** A failed favourite rewrite, archive, restore, or metadata save must not advertise a state that SQLite did not commit.
 15. **The AI profile entry is not a contact action.** It routes serializable identity only; Compose may generate an editable draft but must not record recency or a touchpoint.
+16. **Use `createContactFull()` for production creation.** It is the path that seeds the complete custom-field pair matrix; the exported recency test helper writes no custom values.
 
 ## Related Systems
 
@@ -210,3 +212,4 @@ All data is on-device SQLite. Migration 001 uses a surrogate `contacts.id` and a
 | 2026-08-16 | 11 | Added local snooze writes, durable reminder muting, and scheduling-state reconciliation. |
 | 2026-08-16 | 12 | Published widget refreshes after committed favourite and contact-visible mutations. |
 | 2026-08-18 | 14 | Added the configured-provider profile entry for a Compose-owned AI draft without contact-side effects. |
+| 2026-08-24 | 16 | Seeded normalized custom-field pairs on create and deleted them explicitly on purge. |
