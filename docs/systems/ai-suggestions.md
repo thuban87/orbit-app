@@ -1,7 +1,7 @@
 # AI Suggestions
 
-**Last updated:** 2026-08-18
-**Updated by phase:** 14-ai-message-suggestions
+**Last updated:** 2026-08-27
+**Updated by phase:** 18.2-bound-unbound-lifecycle
 **Owners:** `src/services/AiService.ts`, `src/services/ai-key-store.ts`, `src/ai/`, `src/db/ai-context-read.ts`, `src/db/app-settings-dao.ts`, `src/logic/ai-suggestion-logic.ts`, `src/screens/SettingsScreen.tsx`, `src/screens/ComposeScreen.tsx`
 
 ## Purpose
@@ -66,6 +66,7 @@ AI has no per-contact table. Migration 004 extends the singleton `app_settings` 
 3. On a provider's first request, Compose displays the exact contact-specific prompt and persists acknowledgement before egress. A declined or failed acknowledgement starts no network request.
 4. `AiSuggestionLifecycle` owns the sole controller and 20-second timeout. It invalidates stale work on cancellation, unmount, configuration change, or a superseding request.
 5. A successful suggestion fills an empty draft or asks before replacing a non-empty one. Send and Copy preserve their existing handoff-only behavior and write no touchpoint, fuel, or recency value.
+6. An explicit request for an Unbound contact remains available. Its relationship context retains the closed projection, but unavailable cadence intensity becomes the fixed neutral aggregate rather than NULL arithmetic or a fabricated cadence.
 
 ### Custom egress and model catalog
 
@@ -88,6 +89,7 @@ AI has no per-contact table. Migration 004 extends the singleton `app_settings` 
 - **ADR-051:** Public-HTTPS Custom AI Egress Guard — protects user-controlled Custom destinations at URL and native transport layers.
 - **ADR-052:** Compose-Owned AI Draft Lifecycle and Acknowledged Egress — keeps generation editable, acknowledged, cancellable, and non-writing.
 - **ADR-053:** Local-First LiteLLM AI Model Catalog — provides seed/cache model selection and explicit refresh.
+- **ADR-062:** Bound/Unbound Lifecycle and One-Way Cadence Assignment — permits explicit Unbound assistance without proactive cadence evaluation.
 
 ## Gotchas
 
@@ -97,6 +99,7 @@ AI has no per-contact table. Migration 004 extends the singleton `app_settings` 
 4. **A Custom endpoint change requires a fresh acknowledgement.** The settings DAO resets the Custom acknowledgement when its endpoint changes.
 5. **Do not reconstruct a prompt after preview.** The frozen `ResolvedPrompt` object is the identity contract across preview, acknowledgement, and egress.
 6. **The owner accepted one device egress smoke test instead of the original full on-device escape matrix.** Shared JVM/vector tests cover the remaining address cases; keep that limitation visible if the guard changes.
+7. **Never invent cadence for an Unbound contact.** The neutral intensity aggregate is the only permitted representation of unavailable cadence in explicit AI context.
 
 ## Related Systems
 
@@ -111,3 +114,4 @@ AI has no per-contact table. Migration 004 extends the singleton `app_settings` 
 | Date | Phase | What Changed |
 |------|-------|--------------|
 | 2026-08-18 | 14 | Created optional BYO-key AI suggestions, the protected egress boundary, Compose draft flow, and local-first model catalog. |
+| 2026-08-27 | 18.2 | Kept explicit Unbound AI available with neutral intensity and no normalized-method egress. |
