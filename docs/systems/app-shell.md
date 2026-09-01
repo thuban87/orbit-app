@@ -1,12 +1,12 @@
 # App Shell
 
 **Last updated:** 2026-08-16
-**Updated by phase:** 09-compose-screen-sms-handoff
-**Owners:** `App.tsx`, `src/navigation/RootNavigator.tsx`, `src/navigation/types.ts`, `src/screens/SettingsScreen.tsx`, `src/theme/theme-types.ts`, `src/theme/theme-presets.ts`
+**Updated by phase:** 10-share-sheet-capture
+**Owners:** `App.tsx`, `src/navigation/RootNavigator.tsx`, `src/navigation/types.ts`, `src/navigation/linking.ts`, `src/screens/SettingsScreen.tsx`, `src/theme/theme-types.ts`, `src/theme/theme-presets.ts`
 
 ## Purpose
 
-The app shell holds Orbit’s ready-gated native navigation tree and the shared visual tokens its screens consume. It gives multi-screen flows typed stack navigation and platform Back behavior without mounting a read surface before local SQLite migration completes.
+The app shell holds Orbit’s ready-gated native navigation tree and the shared visual tokens its screens consume. It gives multi-screen flows typed stack navigation, including a pending Android share-intent route, without mounting a read surface before local SQLite migration completes.
 
 ## Architecture
 
@@ -21,6 +21,7 @@ _None._ The shell owns runtime navigation and theme contracts, not durable appli
 | Bootstrap | `App.tsx` | Opens and migrates SQLite before mounting the navigator inside theme and safe-area providers. |
 | Navigator | `src/navigation/RootNavigator.tsx` | Registers native-stack routes, including dashboard sibling lists, management, modal crop, and Compose surfaces, with custom headers. |
 | Route types | `src/navigation/types.ts` | Defines serializable parameters for profile, edit, crop, and self-fetching Compose routes. |
+| Intent gate | `src/navigation/linking.ts` | Converts provider-owned pending share state into ready-gated navigation to Capture. |
 | Settings surface | `src/screens/SettingsScreen.tsx` | Hosts low-traffic lifecycle routes, self-photo, and the Manage favourites entry. |
 | Theme contract | `src/theme/theme-types.ts`, `src/theme/theme-presets.ts` | Defines named tokens, including destructive, avatar-swatch, rogue-status, and gravity-tier tokens, and their sole palette values. |
 
@@ -31,6 +32,8 @@ _None._ The shell owns runtime navigation and theme contracts, not durable appli
 | `App.tsx` | Readiness gate, navigation mount point, gesture root, and photo reconciliation registration. |
 | `src/navigation/RootNavigator.tsx` | Native stack for the dashboard Home, Settings, contact lifecycle, Compose, NeverContacted, ManageFavourites, and CropPhoto. |
 | `src/navigation/types.ts` | Typed root-stack route contract, including serializable Compose and photo-crop targets plus dashboard sibling routes. |
+| `src/navigation/linking.ts` | Holds the navigation ref and the single ready-gated Capture navigation owner. |
+| `src/screens/CaptureScreen.tsx` | Provides the in-app target for a pending Android text share. |
 | `src/screens/HomeScreen.tsx` | Provides the dashboard Home and its destination entries. |
 | `src/screens/SettingsScreen.tsx` | Provides the distinct settings home, including self-photo and Manage favourites entries. |
 | `src/theme/theme-types.ts` | Names palette tokens, including avatar swatches, rogue status, gravity tiers, and foreground text. |
@@ -54,6 +57,12 @@ _None._ The shell owns runtime navigation and theme contracts, not durable appli
 
 1. A profile opens `Compose` with the serializable `{ contactId }` route parameter; the screen fetches its own current data rather than receiving callbacks or preloaded state.
 2. Compose resets both software and Android hardware Back to the Home dashboard, so the destination is stable for present and later entry points.
+
+### Receiving an Android share
+
+1. `ShareIntentProvider` consumes a pending native share while database migrations run.
+2. Once `NavigationContainer.onReady` sets the reactive readiness flag, `ShareIntentGate` navigates the pending share to Capture.
+3. The gate remains inside the successful migration-ready branch, so Capture cannot query a half-built local database; no deep-link consumer competes for the same native share payload.
 
 ### Applying destructive emphasis
 
@@ -97,6 +106,7 @@ _None._ The shell owns runtime navigation and theme contracts, not durable appli
 - **ADR-033:** Profile Marking and Shared Drag-Reordered Favourites — adds the shared Manage favourites route and entry points.
 - **ADR-034:** Birthday Banner and Re-query Dashboard Freshness — mounts the birthday and reliable refresh paths in Home.
 - **ADR-036:** Entry-Agnostic Compose Navigation and Transmittable-Fuel Guardrails — adds the serializable Compose route and Home-reset Back behavior.
+- **ADR-037:** Text-Only Android Share Intent Integration — adds the provider-owned, ready-gated Capture route for native text shares.
 
 ## Gotchas
 
@@ -108,6 +118,7 @@ _None._ The shell owns runtime navigation and theme contracts, not durable appli
 6. **Keep gravity tokens and tiers in lockstep.** The ordered palette ramp has one entry per gravity tier; changing one without the other can miscolor or crash profile presentation.
 7. **Keep search ownership in the dashboard.** The reusable reader and result-row pattern survive the retired FuelSearch route, but Settings must not add a duplicate search surface.
 8. **Compose Back is intentionally not a stack pop.** Both Back paths reset to Home so callers need not provide a profile or other origin route.
+9. **Keep native share navigation single-owner.** A linking redirect beside `ShareIntentGate` can race the pending native intent, especially on a cold start.
 
 ## Related Systems
 
@@ -115,6 +126,7 @@ _None._ The shell owns runtime navigation and theme contracts, not durable appli
 - **Custom fields** — is reached through Settings rather than Home-local route state.
 - **Dashboard** — is the Home route and owns daily discovery/search navigation.
 - **Contact methods** — registers the self-fetching Compose surface in the stack.
+- **Capture** — enters through the provider-owned Capture route after migrations are ready.
 
 ## Changelog
 
@@ -126,3 +138,4 @@ _None._ The shell owns runtime navigation and theme contracts, not durable appli
 | 2026-08-15 | 07 | Added the Settings-reached FuelSearch route and reusable search result surface. |
 | 2026-08-15 | 08 | Made the dashboard Home, added first-contact and favourite-management routes, and relocated search from Settings. |
 | 2026-08-16 | 09 | Added the serializable Compose route and dashboard-reset Back behavior. |
+| 2026-08-16 | 10 | Added ready-gated navigation from Android share intents to Capture. |
