@@ -1,7 +1,7 @@
 # Conversational Fuel
 
-**Last updated:** 2026-08-15
-**Updated by phase:** 08-dashboard-never-contacted-screen
+**Last updated:** 2026-08-16
+**Updated by phase:** 10-share-sheet-capture
 **Owners:** `src/db/fuel-dao.ts`, `src/db/fuel-read.ts`, `src/services/fuel-ranking.ts`, `src/services/fuel-age.ts`
 
 ## Purpose
@@ -22,7 +22,7 @@ Fuel uses the on-device SQLite table established empty in migration 1 and activa
   - `kind` (TEXT) — `recent`, `topic`, `fact`, `gift`, or `off_limits`.
   - `label`, `text`, `url` (TEXT nullable) — optional grouping, note, and independently stored link.
   - `created_at`, `modified_at` (TEXT) — local wall-clock timestamps.
-  - `source` (TEXT) — item provenance, including unconfirmed `ai` and confirmed `manual`.
+  - `source` (TEXT) — item provenance, including unconfirmed `ai`, confirmed `manual`, and captured `share`.
 
 **Types** (`src/db/fuel-dao.ts` / `src/db/fuel-read.ts`):
 - `FuelKind` — the fixed five-kind vocabulary.
@@ -33,6 +33,7 @@ Fuel uses the on-device SQLite table established empty in migration 1 and activa
 | Layer | File | Responsibility |
 |---|---|---|
 | DAO writer | `src/db/fuel-dao.ts` | Adds, patch-edits, confirms, and deletes rows through the serialized write transaction. |
+| Capture composer | `src/db/capture-dao.ts` | Composes atomic share multi-attach and multi-note operations from the non-mutexed fuel cores. |
 | DAO reader | `src/db/fuel-read.ts` | Provides the full editor list, the ranked eligible projection, and cross-contact search. |
 | Service | `src/services/fuel-ranking.ts` | Defines kind-first, recency-second ordering shared by SQL and pure comparisons. |
 | Service | `src/services/fuel-age.ts` | Formats a stored local timestamp as a display-only relative age. |
@@ -52,6 +53,7 @@ Fuel uses the on-device SQLite table established empty in migration 1 and activa
 | `src/screens/ContactProfileScreen.tsx` | Reloads fuel after every profile mutation. |
 | `src/components/FuelSearchResultRow.tsx` | Provides the reusable fuel-match presentation pattern. |
 | `src/db/dashboard-read.ts` | Reuses eligible ranked-fuel and search fragments for dashboard cards. |
+| `src/db/capture-dao.ts` | Fans out captured `topic`/`share` rows and patches a multi-contact note atomically. |
 
 ## How It Works
 
@@ -81,6 +83,13 @@ Fuel uses the on-device SQLite table established empty in migration 1 and activa
 2. The reader escapes `\\`, `%`, and `_`, binds the term to `LIKE ? ESCAPE '\\'`, and searches contact names or eligible fuel text.
 3. A dashboard card shows a matching fuel snippet when fuel text caused the match; selecting it navigates to the contact profile.
 
+### Capturing shared material
+
+1. Capture resolves shared text or a browser title into editable `fuel.text` while retaining the canonical first URL in `fuel.url`.
+2. A single contact uses `addFuel`; multi-attach composes `addFuelCore` once per contact in one transaction, always with `kind='topic'` and `source='share'`.
+3. An optional note updates text only as `note — base`; a multi-contact note uses the atomic capture composer so `url` and `created_at` remain unchanged.
+4. None of these writes advances `last_contact` or creates an interaction.
+
 ## Configuration
 
 | Constant | Value | File | Purpose |
@@ -100,6 +109,7 @@ Fuel uses the on-device SQLite table established empty in migration 1 and activa
 - **ADR-030:** Explicit Confirmation of AI-Proposed Fuel — a user must confirm an AI proposal before it becomes eligible.
 - **ADR-031:** Bound Local Fuel Search without FTS5 — search stays local and literal-safe at the Phase-7 dataset scale.
 - **ADR-032:** Flat Dashboard Discovery and In-Query Contact Search — relocates the reusable local search surface to the dashboard.
+- **ADR-038:** Contact-Owned Share Capture Fuel — makes capture immediate, contact-owned topic fuel while preserving canonical URLs and status integrity.
 
 ## Gotchas
 
@@ -109,12 +119,14 @@ Fuel uses the on-device SQLite table established empty in migration 1 and activa
 4. **Use local wall-clock dates.** UTC date conversion causes age boundary errors; the formatter compares local calendar days.
 5. **Escape LIKE metacharacters.** Parameter binding prevents SQL injection but not `%` or `_` wildcard matches.
 6. **Reuse the exported SQL fragments.** Dashboard projections must consume the shared exclusions and rank CASE rather than copy fuel eligibility logic.
+7. **Capture is not a touchpoint.** Do not route a shared item through a recency or interaction writer; it is fuel even when filed for a never-contacted person.
 
 ## Related Systems
 
 - **Contacts** — owns the profiles to which fuel rows belong and the contact lifecycle that removes them.
 - **Custom fields** — stores structured sortable values, while fuel stores sayable conversational hooks.
 - **Dashboard** — owns the live name-plus-fuel search surface and card preview.
+- **Capture** — writes contact-owned `share` fuel and uses its timestamp for capture-MRU ordering.
 
 ## Changelog
 
@@ -122,3 +134,4 @@ Fuel uses the on-device SQLite table established empty in migration 1 and activa
 |---|---|---|
 | 2026-08-15 | 07 | Created structured fuel editing, eligible ranking, AI-proposal confirmation, and local search documentation. |
 | 2026-08-15 | 08 | Reused the eligible ranked projection for dashboard cards and moved local search to the dashboard. |
+| 2026-08-16 | 10 | Added immediate share capture, canonical URL preservation, and atomic multi-contact fuel writes. |
