@@ -1,7 +1,7 @@
 # Notifications
 
 **Last updated:** 2026-08-16
-**Updated by phase:** 11-actionable-notifications
+**Updated by phase:** 12-home-screen-widget
 **Owners:** `src/db/notification-read.ts`, `src/db/snooze-dao.ts`, `src/services/notifications/`, `src/navigation/notification-gate.tsx`
 
 ## Purpose
@@ -70,6 +70,7 @@ The system owns no remote state and no backend. SQLite supplies live candidate d
 2. `handleNotificationAction()` derives an occurrence-scoped deterministic UID, opens and migrates SQLite before access, and suppresses warm or durable replay duplicates.
 3. Mark contacted calls the recency DAO with the canonical notification one-tap values. Snooze calls `snoozeContact()` and records a matching immutable event in the same transaction.
 4. Both actions cancel the active decay request. The headless snooze re-arms during the next foreground reconcile rather than trying to initialize channel state from a killed process.
+5. A successful notification-originated Mark additionally publishes a best-effort Widget refresh; Snooze does not because it does not alter the widget projection.
 
 ### Opening a notification
 
@@ -97,6 +98,7 @@ The system owns no remote state and no backend. SQLite supplies live candidate d
 - **ADR-039:** Pre-Scheduled Inexact Decay Reminders — reconciles generic, per-contact reminders without exact alarms or frozen fuel.
 - **ADR-040:** Exactly-Once Notification Actions and Dashboard-Rooted Tap Routing — keeps action writes DAO-owned and makes navigation deterministic.
 - **ADR-041:** Notification Settings, Privacy Channels, and Birthday Alerts — persists policy in SQLite and uses versioned privacy channels.
+- **ADR-045:** Event-Driven Widget Refresh and Boot Recovery — keeps the widget current after a notification mark commits.
 
 ## Gotchas
 
@@ -106,6 +108,7 @@ The system owns no remote state and no backend. SQLite supplies live candidate d
 4. **Do not bypass the action handler.** Raw writes break the recency single-writer and exactly-once guarantees.
 5. **Android channels are immutable.** A changed importance or visibility policy needs a new versioned channel ID, not a repeated update call.
 6. **Device follow-up remains important.** Killed-app actions and decay-body navigation need a naturally delivered decay reminder for final physical-device exercise.
+7. **Only Mark publishes widget freshness.** Snooze changes scheduling state, not the favourites projection, so it must not trigger unnecessary widget work.
 
 ## Related Systems
 
@@ -114,9 +117,11 @@ The system owns no remote state and no backend. SQLite supplies live candidate d
 - **Interaction log** — records notification-sourced touchpoints and snooze lifecycle events.
 - **Contact methods** — provides the Compose destination for a decay body tap.
 - **Dashboard** — remains the in-app source of truth and shares birthday semantics.
+- **Widget** — refreshes after a notification-sourced mark advances contact recency.
 
 ## Changelog
 
 | Date | Phase | What Changed |
 |---|---|---|
 | 2026-08-16 | 11 | Created local decay and birthday scheduling, action handling, privacy channels, and response routing. |
+| 2026-08-16 | 12 | Published widget freshness after notification-originated marks. |
