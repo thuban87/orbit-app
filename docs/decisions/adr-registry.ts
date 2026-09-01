@@ -44,5 +44,7 @@
 // NOTE: ADR-0032 [ACCEPTED] Flat Dashboard Discovery and In-Query Contact Search
 // NOTE: ADR-0033 [ACCEPTED] Profile Marking and Shared Drag-Reordered Favourites
 // NOTE: ADR-0034 [ACCEPTED] Birthday Banner and Re-query Dashboard Freshness
+// NOTE: ADR-0035 [ACCEPTED] Native SMS Handoff with Guaranteed Clipboard Copy
+// NOTE: ADR-0036 [ACCEPTED] Entry-Agnostic Compose Navigation and Transmittable-Fuel Guardrails
 
-export const ADR_COUNT = 34;
+export const ADR_COUNT = 36;
