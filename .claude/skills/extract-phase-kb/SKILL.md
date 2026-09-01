@@ -293,9 +293,11 @@ npm run graph:build            # regenerates the ADR registry + knowledge graph 
 
 - **Verify the graph actually rebuilt — silent-failure catch (important for restricted sandboxes, e.g. codex).** `graph:build` shells out to `graphify` and `~/.claude/gsd-core/…` (outside the workspace) and spawns worker subprocesses; a restricted sandbox can make it **fail or no-op with no error**, leaving this phase's ADRs with zero graph edges even though INDEX and registry updated fine. Guard against it by comparing the edge count before and after:
   ```bash
-  before=$(grep -c '"governed_by"' .planning/graphs/graph.json 2>/dev/null || echo 0)
+  # graph.json is minified to ONE line — count matches with grep -o | wc -l,
+  # NOT grep -c (which counts matching lines and would always return 1).
+  before=$(grep -o '"governed_by"' .planning/graphs/graph.json 2>/dev/null | wc -l)
   npm run graph:build
-  after=$(grep -c '"governed_by"' .planning/graphs/graph.json)
+  after=$(grep -o '"governed_by"' .planning/graphs/graph.json | wc -l)
   echo "governed_by edges: $before -> $after"
   ```
   If this phase produced ADRs carrying `Key files:` but `after` is **not greater than** `before` (or `graph.json` was left untouched), the build did **not** take. Do **not** report the extraction as complete: record `GRAPH REBUILD OWED — graph:build did not complete in this environment; rerun 'npm run graph:build' from a capable (non-sandboxed / full-access) environment` in the manifest **and** in report-back, so the graph is rebuilt before anyone relies on it. (Running the extraction with full filesystem access avoids this in the first place.)
