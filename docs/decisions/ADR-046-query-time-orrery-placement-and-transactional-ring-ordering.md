@@ -47,4 +47,4 @@ The system derives the visible orbiting set, dense display rank, status, progres
 - `src/logic/ring-reorder-logic.ts` — computes a clamped immutable rank permutation for radial drag.
 
 **Depends on:** ADR-010 (Single-Writer Interaction Recency Spine); ADR-011 (Query-Time Status and Never-Contacted Segregation); ADR-026 (Rogue Status for Unresponsive or Far-Overdue Contacts).
-**Required by:** _None._
+**Required by:** ADR-048 (Status-Default Static Orrery with a Single-Canvas Morph)
