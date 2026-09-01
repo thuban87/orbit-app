@@ -1,7 +1,7 @@
 # App Shell
 
-**Last updated:** 2026-08-26
-**Updated by phase:** 20-contact-reconciliation-merge
+**Last updated:** 2026-08-31
+**Updated by phase:** 21-interaction-assist-reach-out
 **Owners:** `App.tsx`, `src/navigation/RootNavigator.tsx`, `src/navigation/types.ts`, `src/navigation/linking.ts`, `src/navigation/notification-gate.tsx`, `src/navigation/widget-linking.ts`, `src/screens/SettingsScreen.tsx`, `src/theme/theme-types.ts`, `src/theme/theme-presets.ts`
 
 ## Purpose
@@ -115,6 +115,13 @@ _None._ The shell owns runtime navigation and theme contracts, not durable appli
 3. The ready-gated application effect registers the widget launch-sweep hook once. Foreground mutation publishers re-render placed widgets without blocking the user write.
 4. Settings offers the in-app Add Orbit widget request and displays fallback instructions when the launcher declines it.
 
+### Surfacing the interaction-assist banner
+
+1. `App.tsx` mounts `<AssistBanner />` after the root navigator so it is app-global while Orbit is foregrounded, refreshes the eligible-assist queue on a real background→active return, and registers the interaction-assist launch-sweep hook alongside the other ready-gated foreground hooks.
+2. The banner is a plain `position:absolute` overlay with `pointerEvents="box-none"` — not a `Modal` — so the Android Back button navigates the underlying stack normally and passes through the banner; the banner is durable state that persists until resolved, dismissed, or expired.
+3. Settings hosts the default-on **Interaction Assist** toggle; disabling it expires every pending assist and refreshes the banner in the same action.
+4. The widget `Contact` deep-link (`orbit://reach/<id>`) resolves through `WidgetLinkingGate` to Profile with a consumed-once `openReachOut` param (`src/navigation/types.ts`); the Profile opens the shared Reach Out router once and clears the param.
+
 ### Applying destructive emphasis
 
 1. Screens obtain colors through `useTheme().colors`.
@@ -202,6 +209,8 @@ _None._ The shell owns runtime navigation and theme contracts, not durable appli
 - **ADR-003:** `READ_CONTACTS` on API 37+ for Reconcile — requests Contacts access only in the reconciliation flow that needs a current linked-source read.
 - **ADR-068:** User-Triggered, Source-Only Reconciliation with Durable Review — adds durable reconciliation routes and foreground resume handling.
 - **ADR-069:** Atomic Tombstone-Backed Orbit Contact Merge — adds explicit survivor, conflict, and impact-confirmation navigation.
+- **ADR-070:** Durable Pending Interaction-Assist Lifecycle and Portable Opt-Out — mounts the app-global non-modal assist banner, the Settings toggle, and the ready-gated assist launch-sweep hook.
+- **ADR-074:** Widget Contact Supersession and Strict Reach Deep-Link Fail-Safe — adds the `orbit://reach/<id>` widget bridge and the consumed-once `openReachOut` Profile param with a stale-target Dashboard fail-safe.
 
 ## Gotchas
 
@@ -226,6 +235,8 @@ _None._ The shell owns runtime navigation and theme contracts, not durable appli
 19. **Import routes carry durable identifiers, never picker grants.** A selected-contact URI is temporary provider state and must not enter navigation parameters.
 20. **Keep contact-import routing single-sourced.** Dashboard and Settings must call the shared SDK-routing seam; duplicating the Android-version branch can make their permission behavior drift.
 21. **Do not overlap root recovery prompts.** Import resume takes precedence over reconciliation resume; a pending check must be resumed or discarded before starting another.
+22. **The assist banner must stay a non-modal overlay.** It is durable state, not a Back-dismissible transient layer, so it is a `position:absolute` `box-none` overlay and never a `Modal`; making it modal would consume Android Back and break the pass-through contract.
+23. **The `orbit://reach` bridge stays with the other widget links.** It is parsed by the strict widget URI gate (anchored digits-only), not added to React Navigation linking config, so it cannot race the share-intent singleton.
 
 ## Related Systems
 
@@ -242,6 +253,7 @@ _None._ The shell owns runtime navigation and theme contracts, not durable appli
 - **Backup & Restore** — registers typed landing, settings, preview, and result routes plus ready-gated recovery work.
 - **Contact Import** — registers the import route family, Settings entry, and foreground recovery prompt.
 - **Contact Reconciliation** — registers linked-contact review, merge, bulk-review, and foreground-resume surfaces.
+- **Interaction Assist & Reach Out** — mounts the app-global assist banner, the Settings toggle, the assist launch-sweep, and the `orbit://reach` widget bridge with its consumed-once Profile param.
 
 ## Changelog
 
@@ -266,3 +278,4 @@ _None._ The shell owns runtime navigation and theme contracts, not durable appli
 | 2026-08-26 | 19 | Added typed selected-contact import routes, Settings entry, and durable-resume navigation. |
 | 2026-08-29 | 19.1 | Added the API-36-and-below legacy picker route and shared hybrid-import dispatch. |
 | 2026-08-26 | 20 | Added typed reconciliation and merge routes, Settings entries, and foreground resume precedence. |
+| 2026-08-31 | 21 | Mounted the app-global non-modal Interaction Assist banner (Back passes through) with its launch-sweep and Settings toggle, and added the `orbit://reach` widget bridge and consumed-once `openReachOut` Profile param. |
