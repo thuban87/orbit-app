@@ -1,7 +1,7 @@
 # App Shell
 
 **Last updated:** 2026-08-27
-**Updated by phase:** 18.2-bound-unbound-lifecycle
+**Updated by phase:** 19-system-contact-import
 **Owners:** `App.tsx`, `src/navigation/RootNavigator.tsx`, `src/navigation/types.ts`, `src/navigation/linking.ts`, `src/navigation/notification-gate.tsx`, `src/navigation/widget-linking.ts`, `src/screens/SettingsScreen.tsx`, `src/theme/theme-types.ts`, `src/theme/theme-presets.ts`
 
 ## Purpose
@@ -43,6 +43,7 @@ _None._ The shell owns runtime navigation and theme contracts, not durable appli
 | `src/screens/HomeScreen.tsx` | Provides the dashboard Home and its destination entries. |
 | `src/screens/DigestScreen.tsx` | Provides the live weekly retrospective destination with its own themed Back chrome. |
 | `src/screens/SettingsScreen.tsx` | Provides the distinct settings home, including AI configuration, self-photo, self-star, sun-centre, and Manage favourites entries. |
+| `src/screens/ImportReviewScreen.tsx` | Provides the typed selected-contact review route and explicit duplicate choices. |
 | `src/theme/theme-types.ts` | Names palette tokens, including avatar swatches, rogue status, gravity tiers, and Orrery star/muted values. |
 | `src/theme/theme-presets.ts` | Holds the only allowed color literals, including avatar, relationship-status, and Orrery palette values. |
 
@@ -129,6 +130,12 @@ _None._ The shell owns runtime navigation and theme contracts, not durable appli
 2. The crop screen uses the existing custom-header convention and returns through native stack Back behavior after persistence.
 3. Settings reloads the self record on focus; the contact edit surface reloads only photo state so unsaved form values survive the round trip.
 
+### Starting contact import
+
+1. Home's speed dial and Settings' Contacts Integration row check picker availability before starting selected-contact acquisition.
+2. `RootNavigator` registers import review, setup, progress, duplicate-review, and completion routes; each screen reads durable session state rather than a source URI.
+3. A foreground prompt routes interrupted work to its local continuation or explicitly discards unresolved rows.
+
 ## Configuration
 
 | Constant | Value | File | Purpose |
@@ -176,6 +183,8 @@ _None._ The shell owns runtime navigation and theme contracts, not durable appli
 - **ADR-059:** Normalized Contact Methods, Canonical Actionability, and Local Provenance — supplies the device-region bootstrap for the one-time method migration.
 - **ADR-060:** Versioned Portable Method Graph and Collision-Normalized Restoration — adds the narrow ready-gated backup-share fallback.
 - **ADR-062:** Bound/Unbound Lifecycle and One-Way Cadence Assignment — adds the dedicated Unbound route and lifecycle-oriented settings surfaces.
+- **ADR-064:** Permissionless Android 17 System-Contact Snapshot Acquisition — adds the optional selected-contact entry without broad contacts permission.
+- **ADR-066:** Deliberate Reviewed Import with Unbound Bulk Defaults — registers reviewed import routes and the completion destination.
 
 ## Gotchas
 
@@ -197,6 +206,7 @@ _None._ The shell owns runtime navigation and theme contracts, not durable appli
 16. **Restore route parameters must be content-free.** Pass only an opaque in-memory cache token and aggregate preview; never put a file URI, manifest, callback, or passphrase in navigation state.
 17. **Every possible first opener needs the migration region.** `openAndMigrate()` can run before React mounts from headless notification or widget work; database bootstrap itself stays free of native localization imports for node-testability.
 18. **Keep Unbound navigation retrieval-oriented.** The dedicated list and neutral search rows may open Profile, but active-orbit controls stay in their Bound query owners.
+19. **Import routes carry durable identifiers, never picker grants.** A selected-contact URI is temporary provider state and must not enter navigation parameters.
 
 ## Related Systems
 
@@ -211,6 +221,7 @@ _None._ The shell owns runtime navigation and theme contracts, not durable appli
 - **AI suggestions** — uses Settings for non-secret configuration and the typed Compose intent for profile-originated drafting.
 - **Digest** — registers a self-fetching route, dashboard entry, ready-gated scheduler, and notification reset destination.
 - **Backup & Restore** — registers typed landing, settings, preview, and result routes plus ready-gated recovery work.
+- **Contact Import** — registers the import route family, Settings entry, and foreground recovery prompt.
 
 ## Changelog
 
@@ -232,3 +243,4 @@ _None._ The shell owns runtime navigation and theme contracts, not durable appli
 | 2026-08-24 | 17 | Added Backup routes, content-free restore navigation, and ready-gated backup/photo recovery hooks. |
 | 2026-08-27 | 18.1 | Added device-region migration bootstrap and the ready-gated backup-share fallback. |
 | 2026-08-27 | 18.2 | Added the Unbound route and lifecycle settings/navigation treatment. |
+| 2026-08-26 | 19 | Added typed selected-contact import routes, Settings entry, and durable-resume navigation. |
