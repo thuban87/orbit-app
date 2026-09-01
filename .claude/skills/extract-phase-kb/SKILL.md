@@ -291,6 +291,14 @@ npm run gen:adr-index          # regenerates docs/decisions/INDEX.md
 npm run graph:build            # regenerates the ADR registry + knowledge graph (via scripts/graph-build.sh)
 ```
 
+- **Verify the graph actually rebuilt — silent-failure catch (important for restricted sandboxes, e.g. codex).** `graph:build` shells out to `graphify` and `~/.claude/gsd-core/…` (outside the workspace) and spawns worker subprocesses; a restricted sandbox can make it **fail or no-op with no error**, leaving this phase's ADRs with zero graph edges even though INDEX and registry updated fine. Guard against it by comparing the edge count before and after:
+  ```bash
+  before=$(grep -c '"governed_by"' .planning/graphs/graph.json 2>/dev/null || echo 0)
+  npm run graph:build
+  after=$(grep -c '"governed_by"' .planning/graphs/graph.json)
+  echo "governed_by edges: $before -> $after"
+  ```
+  If this phase produced ADRs carrying `Key files:` but `after` is **not greater than** `before` (or `graph.json` was left untouched), the build did **not** take. Do **not** report the extraction as complete: record `GRAPH REBUILD OWED — graph:build did not complete in this environment; rerun 'npm run graph:build' from a capable (non-sandboxed / full-access) environment` in the manifest **and** in report-back, so the graph is rebuilt before anyone relies on it. (Running the extraction with full filesystem access avoids this in the first place.)
 - **`check:adr-key-files` is the gate.** It fails if a touched ADR has no `## Implementation` section naming a real file, uses an invented sub-heading instead of `**Key files:**`, uses relative shorthand, or uses a glob. Every ADR's `Key files:` block is the ONLY source of the `code → ADR` edges in the graph — a broken block is how a recorded invariant gets reversed unnoticed. If it fails, fix the ADR — do not skip the gate. (`npm run audit:adr-key-files` gives a fuller report; `npm run fix-adr-key-files` exists but review its edits.)
 - **Never build the graph any other way.** Use `npm run graph:build` — never raw `graphify`, `graphify update`, `$gsd-graphify build`, or copying `graphify-out/` into `.planning/graphs/`. The raw build silently scatters ADR nodes and destroys code→ADR edges; the wrapper builds, copies, normalizes, and synthesizes edges in the load-bearing order.
 - **Supersession** in the ADR body is what the index and graph read — a supersession you fail to record is a retired decision that still looks live.
