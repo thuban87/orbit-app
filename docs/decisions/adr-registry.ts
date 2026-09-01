@@ -38,7 +38,7 @@
 // NOTE: ADR-0026 [ACCEPTED] Rogue Status for Unresponsive or Far-Overdue Contacts
 // NOTE: ADR-0027 [ACCEPTED] Derived Profile-Only Gravity and Intensity
 // NOTE: ADR-0028 [ACCEPTED] Per-Item Conversational Fuel with Fixed Kinds
-// NOTE: ADR-0029 [ACCEPTED] In-Query Fuel Eligibility and a Shared Ranked Projection
+// IMPORTANT: ADR-0029 [SUPERSEDED BY ADR-039 (partial)] In-Query Fuel Eligibility and a Shared Ranked Projection
 // NOTE: ADR-0030 [ACCEPTED] Explicit Confirmation of AI-Proposed Fuel
 // IMPORTANT: ADR-0031 [SUPERSEDED BY ADR-032 (partial)] Bound Local Fuel Search without FTS5
 // NOTE: ADR-0032 [ACCEPTED] Flat Dashboard Discovery and In-Query Contact Search
@@ -48,5 +48,8 @@
 // NOTE: ADR-0036 [ACCEPTED] Entry-Agnostic Compose Navigation and Transmittable-Fuel Guardrails
 // NOTE: ADR-0037 [ACCEPTED] Text-Only Android Share Intent Integration
 // NOTE: ADR-0038 [ACCEPTED] Contact-Owned Share Capture Fuel
+// NOTE: ADR-0039 [ACCEPTED] Pre-Scheduled Inexact Decay Reminders
+// NOTE: ADR-0040 [ACCEPTED] Exactly-Once Notification Actions and Dashboard-Rooted Tap Routing
+// NOTE: ADR-0041 [ACCEPTED] Notification Settings, Privacy Channels, and Birthday Alerts
 
-export const ADR_COUNT = 38;
+export const ADR_COUNT = 41;
