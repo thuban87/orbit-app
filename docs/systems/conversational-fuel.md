@@ -1,7 +1,7 @@
 # Conversational Fuel
 
 **Last updated:** 2026-08-16
-**Updated by phase:** 10-share-sheet-capture
+**Updated by phase:** 12-home-screen-widget
 **Owners:** `src/db/fuel-dao.ts`, `src/db/fuel-read.ts`, `src/services/fuel-ranking.ts`, `src/services/fuel-age.ts`
 
 ## Purpose
@@ -70,6 +70,7 @@ Fuel uses the on-device SQLite table established empty in migration 1 and activa
 2. The SQL query excludes `off_limits`, `source='ai'`, and blank text before ordering by the shared kind-priority CASE, then creation time and id.
 3. `RankedFuelLine` renders the first text only; it does not rank or filter in the UI.
 4. `formatFuelAge` shows an item's local-calendar age without archiving, hiding, or deleting it.
+5. The larger Widget layout consumes the same already eligible ranked line; a fuel write publishes a best-effort rerender after its successful commit.
 
 ### Reviewing an AI proposal
 
@@ -110,6 +111,8 @@ Fuel uses the on-device SQLite table established empty in migration 1 and activa
 - **ADR-031:** Bound Local Fuel Search without FTS5 — search stays local and literal-safe at the Phase-7 dataset scale.
 - **ADR-032:** Flat Dashboard Discovery and In-Query Contact Search — relocates the reusable local search surface to the dashboard.
 - **ADR-038:** Contact-Owned Share Capture Fuel — makes capture immediate, contact-owned topic fuel while preserving canonical URLs and status integrity.
+- **ADR-043:** Static Globally Mirrored Favourites Widget — reuses the existing eligible fuel projection in its larger layout.
+- **ADR-045:** Event-Driven Widget Refresh and Boot Recovery — publishes a refresh after widget-visible fuel mutations.
 
 ## Gotchas
 
@@ -120,6 +123,7 @@ Fuel uses the on-device SQLite table established empty in migration 1 and activa
 5. **Escape LIKE metacharacters.** Parameter binding prevents SQL injection but not `%` or `_` wildcard matches.
 6. **Reuse the exported SQL fragments.** Dashboard projections must consume the shared exclusions and rank CASE rather than copy fuel eligibility logic.
 7. **Capture is not a touchpoint.** Do not route a shared item through a recency or interaction writer; it is fuel even when filed for a never-contacted person.
+8. **Do not create a widget-specific fuel reader.** The larger tile must retain the existing in-query eligibility exclusions and ranked projection.
 
 ## Related Systems
 
@@ -127,6 +131,7 @@ Fuel uses the on-device SQLite table established empty in migration 1 and activa
 - **Custom fields** — stores structured sortable values, while fuel stores sayable conversational hooks.
 - **Dashboard** — owns the live name-plus-fuel search surface and card preview.
 - **Capture** — writes contact-owned `share` fuel and uses its timestamp for capture-MRU ordering.
+- **Widget** — shows the existing eligible ranked line only on its larger layout.
 
 ## Changelog
 
@@ -135,3 +140,4 @@ Fuel uses the on-device SQLite table established empty in migration 1 and activa
 | 2026-08-15 | 07 | Created structured fuel editing, eligible ranking, AI-proposal confirmation, and local search documentation. |
 | 2026-08-15 | 08 | Reused the eligible ranked projection for dashboard cards and moved local search to the dashboard. |
 | 2026-08-16 | 10 | Added immediate share capture, canonical URL preservation, and atomic multi-contact fuel writes. |
+| 2026-08-16 | 12 | Added larger-widget fuel consumption and post-mutation refresh publishing. |
