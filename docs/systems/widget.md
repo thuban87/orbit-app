@@ -1,12 +1,12 @@
 # Widget
 
-**Last updated:** 2026-08-27
-**Updated by phase:** 18.2-bound-unbound-lifecycle
-**Owners:** `src/services/widget/`, `src/navigation/widget-linking.ts`, `plugins/withWidgetBootReceiver.js`
+**Last updated:** 2026-08-31
+**Updated by phase:** 21-interaction-assist-reach-out
+**Owners:** `src/services/widget/`, `src/navigation/widget-linking.ts`, `src/services/widget/widget-quick-action-guard.ts`, `plugins/withWidgetBootReceiver.js`
 
 ## Purpose
 
-The Widget system gives Orbit a local Android home-screen shortcut board for manually ranked favourites. It renders status-colour avatars from existing local data, lets a user mark contact without opening the app, and offers profile, logging, and message entry points without adding widget-specific SQLite state.
+The Widget system gives Orbit a local Android home-screen shortcut board for manually ranked favourites. It renders status-colour avatars from existing local data, lets a user mark contact without opening the app, and offers profile, logging, and a `Contact` reach-out entry point without adding widget-specific SQLite state.
 
 ## Architecture
 
@@ -64,7 +64,8 @@ The widget owns no table, migration, or per-instance state. It reads the existin
 1. A small tile or larger Mark control sends `WIDGET_MARK` with a contact ID; the task handler rejects non-positive or unsafe IDs before opening SQLite.
 2. The handler resolves the device region and opens/migrates the database, then `widgetMarkContacted()` delegates to `recordTouchpoint()` with `source='widget'`, outbound, connected, unspecified-channel defaults and no quality value.
 3. The existing mutexed recency DAO commits the interaction and recomputes `last_contact`; refresh follows only after that durable write.
-4. Profile and Compose controls use accepted `orbit://` links. After strict parsing, a live-state guard rejects active-cadence actions for missing, archived, or Unbound targets, while a live Unbound Profile open remains valid.
+4. Profile and the larger layout's `Contact` control use accepted `orbit://` links. The `Contact` action emits `orbit://reach/<id>` only — parsed by the anchored `^orbit://reach/([0-9]+)$` allow-list (`Number.isSafeInteger`, `>0`, non-string rejected) — and deep-links into the shared in-app Reach Out router (the former `Message → orbit://compose → Compose` action is superseded). The widget never writes an assist or interaction.
+5. After strict parsing, the discriminated live-state guard (`widget-quick-action-guard.ts`) rejects active-cadence actions for missing, archived, or Unbound targets: a purged/missing `Contact` target shows "This contact is no longer available." and resets to Dashboard, an archived target is silently dropped, and a live Unbound Profile open remains valid. The Profile consumes the `openReachOut` param exactly once (`setParams`).
 
 ### Staying fresh and recovering
 
@@ -86,10 +87,11 @@ The widget owns no table, migration, or per-instance state. It reads the existin
 
 - **ADR-042:** Shared Status Palette for Dashboard and Widget Rings — both surfaces consume one status-token vocabulary.
 - **ADR-043:** Static Globally Mirrored Favourites Widget — instances share one manually ranked, state-free list.
-- **ADR-044:** Headless Widget Actions and Dashboard-Rooted Deep Links — marks use the recency writer and links reset to Dashboard.
+- **ADR-044:** Headless Widget Actions and Dashboard-Rooted Deep Links — marks use the recency writer and links reset to Dashboard (its `Message → Compose` action is partially superseded by ADR-074).
 - **ADR-045:** Event-Driven Widget Refresh and Boot Recovery — event/launch/boot refresh replaces polling.
 - **ADR-059:** Normalized Contact Methods, Canonical Actionability, and Local Provenance — makes the widget's possible first-open pass device-region migration input.
 - **ADR-062:** Bound/Unbound Lifecycle and One-Way Cadence Assignment — excludes Unbound favourites and fails stale active actions closed.
+- **ADR-074:** Widget Contact Supersession and Strict Reach Deep-Link Fail-Safe — replaces the larger `Message` action with `Contact → orbit://reach`, deep-linking the shared router with a fail-safe lifecycle guard.
 
 ## Gotchas
 
@@ -100,6 +102,8 @@ The widget owns no table, migration, or per-instance state. It reads the existin
 5. **Android 15 force-stop can grey the widget.** A manual launch re-arms it; boot recovery is a separate native path and the widget is never the sole route to logging.
 6. **Headless first-open must supply, not guess, a migration region.** A missing region leaves national-format method data non-actionable rather than creating an irreversible false canonical value.
 7. **Guard after parsing, not by weakening the URI allowlist.** Lifecycle is mutable after render, so every active action needs live local state.
+8. **The widget is never a second assist writer.** `Contact` only emits `orbit://reach/<id>`; all assist creation and channel selection happen in the in-app router. Do not insert `interaction_assists` from any widget task.
+9. **A method-less `Contact` tap opens nothing and can strand `openReachOut`.** A favourite with no actionable phone/email resolves the deep-link but the router returns null, and the param is cleared only when `hasReachRoute` is true (review IN-02, owner-deferred). Clear it unconditionally if you touch that path.
 
 ## Related Systems
 
@@ -107,7 +111,8 @@ The widget owns no table, migration, or per-instance state. It reads the existin
 - **Interaction log** — owns the serialized touchpoint and recency invariant used by a widget mark.
 - **Photos** — supplies the bounded local master and deterministic initials fallback inputs.
 - **App shell** — mounts the URI gate, foreground refresh hook, Settings CTA, and native configuration.
-- **Contact methods** — supplies the existing Compose destination for Message.
+- **Contact methods** — supplies the actionable phone/email the reach-out router routes to.
+- **Interaction Assist & Reach Out** — the larger `Contact` action deep-links into the shared router; the widget writes no assist rows.
 
 ## Changelog
 
@@ -116,3 +121,4 @@ The widget owns no table, migration, or per-instance state. It reads the existin
 | 2026-08-16 | 12 | Created the state-free Android favourites widget with headless mark, deep links, and event-driven recovery. |
 | 2026-08-27 | 18.1 | Supplied device region to widget render and action first-open migration paths. |
 | 2026-08-27 | 18.2 | Excluded Unbound favourites and added live lifecycle guards for stale widget actions. |
+| 2026-08-31 | 21 | Replaced the larger `Message → Compose` action with `Contact → orbit://reach` into the shared Reach Out router, with a discriminated missing/archived fail-safe guard and a consumed-once `openReachOut` param. |
