@@ -40,6 +40,9 @@
 // NOTE: ADR-0028 [ACCEPTED] Per-Item Conversational Fuel with Fixed Kinds
 // NOTE: ADR-0029 [ACCEPTED] In-Query Fuel Eligibility and a Shared Ranked Projection
 // NOTE: ADR-0030 [ACCEPTED] Explicit Confirmation of AI-Proposed Fuel
-// NOTE: ADR-0031 [ACCEPTED] Bound Local Fuel Search without FTS5
+// IMPORTANT: ADR-0031 [SUPERSEDED BY ADR-032 (partial)] Bound Local Fuel Search without FTS5
+// NOTE: ADR-0032 [ACCEPTED] Flat Dashboard Discovery and In-Query Contact Search
+// NOTE: ADR-0033 [ACCEPTED] Profile Marking and Shared Drag-Reordered Favourites
+// NOTE: ADR-0034 [ACCEPTED] Birthday Banner and Re-query Dashboard Freshness
 
-export const ADR_COUNT = 31;
+export const ADR_COUNT = 34;

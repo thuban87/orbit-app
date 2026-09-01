@@ -21,8 +21,8 @@ not something you can pattern-match against.
 
 ## How to use this
 
-- **Is a decision still live?** Check the `Superseded by` column. 0 of
-  31 ADRs are superseded in whole or in part.
+- **Is a decision still live?** Check the `Superseded by` column. 1 of
+  34 ADRs are superseded in whole or in part.
 - **Which decisions govern a file?** Don't grep this file — ask the graph:
   `npm run graph:ask -- governs src/db/field-values-dao.ts`, or follow the
   `governed_by` edges.
@@ -61,4 +61,7 @@ not something you can pattern-match against.
 | 028 | Per-Item Conversational Fuel with Fixed Kinds | Accepted | 07-conversational-fuel | — | — | — | 5 | `src/components`, `src/db`, `src/db/migrations` +1 |
 | 029 | In-Query Fuel Eligibility and a Shared Ranked Projection | Accepted | 07-conversational-fuel | — | — | — | 5 | `src/components`, `src/db`, `src/screens` +1 |
 | 030 | Explicit Confirmation of AI-Proposed Fuel | Accepted | 07-conversational-fuel | — | — | — | 4 | `src/components`, `src/db`, `src/screens` |
-| 031 | Bound Local Fuel Search without FTS5 | Accepted | 07-conversational-fuel | — | — | — | 4/6 live | `src/db`, `src/navigation`, `src/screens` |
+| 031 | Bound Local Fuel Search without FTS5 | Accepted | 07-conversational-fuel | — | ADR-032 (partial) | — | 4/6 live | `src/db`, `src/navigation`, `src/screens` |
+| 032 | Flat Dashboard Discovery and In-Query Contact Search | Accepted | 08-dashboard-never-contacted-screen | ADR-031 (partial) | — | — | 6/7 live | `src/db`, `src/navigation`, `src/screens` |
+| 033 | Profile Marking and Shared Drag-Reordered Favourites | Accepted | 08-dashboard-never-contacted-screen | — | — | — | 6 | `src/components`, `src/db`, `src/logic` +1 |
+| 034 | Birthday Banner and Re-query Dashboard Freshness | Accepted | 08-dashboard-never-contacted-screen | — | — | — | 5 | `src/components`, `src/db`, `src/logic` +1 |
