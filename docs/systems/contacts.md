@@ -91,6 +91,7 @@ All data is on-device SQLite. Migration 001 uses a surrogate `contacts.id` and a
 - **ADR-008:** Initial Contact Schema as a Cross-Phase Data Contract — establishes contact identity, categories, profile, and durable fixed fields.
 - **ADR-009:** Crash-Safe Forward-Only SQLite Migrations — commits the initial contacts schema atomically.
 - **ADR-010:** Single-Writer Interaction Recency Spine — makes recency a serialized materialization of the interaction log.
+- **ADR-011:** Query-Time Status and Never-Contacted Segregation — relies on contact cadence and the maintained never-contacted marker.
 - **ADR-016:** Fixed-First Contact Forms and Atomic Contact Creation — composes the form’s multi-table write in one transaction.
 - **ADR-017:** Multi-Link Contact Reachability — stores many ordered web links while phone and email remain dedicated fields.
 - **ADR-018:** Archive-Gated Contact Purge with Explicit Fan-Out — makes permanent deletion a guarded, auditable lifecycle action.
