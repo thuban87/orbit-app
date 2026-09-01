@@ -56,4 +56,4 @@ The system uses an SDK-routed hybrid acquisition layer: Android 17+ uses the exi
 - `src/screens/SettingsScreen.tsx` — starts the shared import route from Settings.
 
 **Depends on:** None
-**Required by:** None
+**Required by:** ADR-003 (`READ_CONTACTS` on API 37+ for Reconcile)
