@@ -1,7 +1,7 @@
 # Contacts
 
 **Last updated:** 2026-08-26
-**Updated by phase:** 19-system-contact-import
+**Updated by phase:** 20-contact-reconciliation-merge
 **Owners:** `src/db/contacts-dao.ts`, `src/db/contact-read.ts`, `src/db/favourites-dao.ts`, `src/db/profile-dao.ts`, `src/db/contact-links-dao.ts`, `src/db/purge-dao.ts`, `src/db/recency-dao.ts`
 
 ## Purpose
@@ -42,6 +42,7 @@ All data is on-device SQLite. Migration 001 uses a surrogate `contacts.id` and a
   - `quality` (`TEXT`, nullable) — optional `good`, `fine`, or `hard` refinement marker.
   - `note` (`TEXT`, nullable) — local-only free-text touchpoint detail.
 - `events` — immutable archive, restore, snooze, and unsnooze history; these rows never participate in recency.
+- `tombstones` — generic permanent retirement evidence; a merged-away contact has a `contact` tombstone and is not an archived contact.
 
 **Types** (`src/db/contacts-dao.ts` and `src/db/recency-dao.ts`):
 - `CreateContactFullInput` — a new contact, method drafts, optional first interaction, and custom values.
@@ -76,6 +77,7 @@ All data is on-device SQLite. Migration 001 uses a surrogate `contacts.id` and a
 | `src/db/snooze-dao.ts` | Local-date snooze and clear writes with immutable event composition. |
 | `src/db/events-dao.ts` | Insert-only lifecycle writer composed by archive and restore. |
 | `src/db/purge-dao.ts` | Explicit, transaction-scoped child deletion, including normalized custom-value pairs, and post-commit extension hook. |
+| `src/db/merge-dao.ts` | Atomically consolidates two live contacts, reparents compatible children, and tombstones the absorbed identity. |
 | `src/screens/CreateContactScreen.tsx` | Lean fixed-first create form. |
 | `src/screens/EditContactScreen.tsx` | Always-show edit form for fixed fields, links, and custom values. |
 | `src/screens/ArchivedContactsScreen.tsx` | Restore and impact-summary purge surface. |
@@ -162,6 +164,12 @@ All data is on-device SQLite. Migration 001 uses a surrogate `contacts.id` and a
 2. `importContactRecord()` opens one outer write transaction that creates a contact or explicitly links an existing contact, writes source links and method provenance, and resolves the durable import row.
 3. The imported path uses the same normalized methods, custom-field pair setup, birthday validation, and lifecycle constraints as manual creation; it never silently overwrites an existing name.
 
+### Merging duplicate contacts
+
+1. A user selects a survivor and explicitly resolves genuine scalar, photo, or competing-primary conflicts before confirmation.
+2. `mergeContacts()` resolves method and active-link collisions, reparents compatible contact-owned children, and snapshots a meaningful overwritten or dropped value in `field_history` inside one transaction.
+3. It recomputes `last_contact` through `recency-dao`, deletes the absorbed live contact, and writes a generic contact tombstone. The absorbed identity is not archived or normally restorable.
+
 ## Configuration
 
 | Constant | Value | File | Purpose |
@@ -198,6 +206,7 @@ All data is on-device SQLite. Migration 001 uses a surrogate `contacts.id` and a
 - **ADR-052:** Compose-Owned AI Draft Lifecycle and Acknowledged Egress — adds a configured-provider profile entry while retaining the contact-write boundary.
 - **ADR-056:** Tombstone-Backed UID Reconciliation for Portable Restores — governs deletion evidence, seeded identities, and UID merge behavior.
 - **ADR-057:** Full-State Versioned Backups with Verified Manual and Foreground SAF Snapshots — exports contact state through the portable manifest.
+- **ADR-069:** Atomic Tombstone-Backed Orbit Contact Merge — requires explicit conflict review, atomic child consolidation, and retirement of the absorbed identity.
 
 ## Gotchas
 
@@ -221,6 +230,7 @@ All data is on-device SQLite. Migration 001 uses a surrogate `contacts.id` and a
 18. **`last_contact` is derived.** Restore recomputes it from interactions and never lets an imported summary win a reconciliation decision.
 19. **Do not clear dormant favourite rank on Unbind.** Bound-only query owners hide it; retaining it lets a rebind restore the prior preference without a second write.
 20. **Do not use a compatibility shortcut for imported contacts.** Import must compose the canonical creation core so contact invariants remain identical to manual creation.
+21. **Do not merge through archive or direct recency SQL.** Archive makes a normal restore possible, and a merge-local `MAX` bypasses the single recency writer.
 
 ## Related Systems
 
@@ -256,3 +266,4 @@ All data is on-device SQLite. Migration 001 uses a surrogate `contacts.id` and a
 | 2026-08-27 | 18.1 | Replaced scalar endpoint fields with transactional normalized method drafts and scalar-free reads. |
 | 2026-08-27 | 18.2 | Added Bound/Unbound lifecycle writes, nullable never-assigned cadence, and post-commit proactive-surface effects. |
 | 2026-08-26 | 19 | Added reviewed selected-contact create/link composition without bypassing contact invariants. |
+| 2026-08-26 | 20 | Added explicit atomic duplicate merge, tombstone retirement, and recency recomputation through existing cores. |
