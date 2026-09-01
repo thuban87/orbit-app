@@ -46,4 +46,4 @@ The system uses migration 001 to create the initial ten-table data contract: sta
 - `src/db/database.ts` — registers migration 001 in the application migration list.
 
 **Depends on:** None.
-**Required by:** None.
+**Required by:** ADR-010 (Single-Writer Interaction Recency Spine); ADR-012 (Opt-Out Android Backup for Third-Party PII).
