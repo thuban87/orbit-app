@@ -90,6 +90,7 @@ _None._ The shell owns runtime navigation and theme contracts, not durable appli
 - **ADR-031:** Bound Local Fuel Search without FTS5 — adds the reusable Phase-7 FuelSearch route and Settings entry.
 - **ADR-032:** Flat Dashboard Discovery and In-Query Contact Search — moves search into Home and adds the dashboard's sibling list route.
 - **ADR-033:** Profile Marking and Shared Drag-Reordered Favourites — adds the shared Manage favourites route and entry points.
+- **ADR-034:** Birthday Banner and Re-query Dashboard Freshness — mounts the birthday and reliable refresh paths in Home.
 
 ## Gotchas
 

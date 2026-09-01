@@ -49,4 +49,4 @@ The system searches contact names and eligible fuel text with a local, parameter
 - `src/screens/SettingsScreen.tsx` — exposes the low-traffic Search entry point.
 
 **Depends on:** ADR-029 (In-Query Fuel Eligibility and a Shared Ranked Projection); ADR-030 (Explicit Confirmation of AI-Proposed Fuel)
-**Required by:** _None._
+**Required by:** ADR-032 (Flat Dashboard Discovery and In-Query Contact Search)
