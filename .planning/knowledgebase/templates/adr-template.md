@@ -91,7 +91,9 @@ later "correct" it to whatever replaced it — see the immutability note below.
 
 <!--
 AGENT INSTRUCTIONS:
-- One ADR per decision or tightly-coupled decision cluster (2-3 D-XX entries max)
+- One ADR per decision or tightly-coupled decision cluster (2-3 D-XX entries max). **Exception:
+  a legacy-reclaim ADR** (e.g. ADR-001 at phase 16) legitimately spans a whole phase's decision
+  set — its `Source decisions` list may be long.
 - Number globally across the project, not per-phase
 - Reversibility mirrors the `**Reversibility:**` tag on each D-XX in phase CONTEXT.md
   (one-way | costly | reversible). Use the strictest value among the sourced decisions.

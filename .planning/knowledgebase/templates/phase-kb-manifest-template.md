@@ -2,6 +2,7 @@
 
 **Phase:** {full phase name}
 **Processed:** {YYYY-MM-DD}
+**Decision-source tier:** {dossier | context-dxx | context-prose} — {which dossier / CONTEXT drove the decisions}
 **Source docs consumed:** {count} files ({total size})
 
 ## ADRs Produced
