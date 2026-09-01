@@ -1,7 +1,7 @@
 # Custom Fields
 
 **Last updated:** 2026-08-14
-**Updated by phase:** 03-custom-fields
+**Updated by phase:** 04-contact-crud-lifecycle
 **Owners:** `src/db/field-defs-dao.ts`, `src/db/field-values-dao.ts`, `src/db/field-ddl.ts`, `src/db/field-type-change.ts`, `src/db/field-parsers.ts`, `src/db/field-sort.ts`, `src/services/field-sweep.ts`
 
 ## Purpose
@@ -51,7 +51,7 @@ Migration 001 provides the three base tables. A custom field is both a row in `c
 | Schema guard | `src/db/reserved-columns.ts` | Reserves fixed columns and SQLite row-id aliases from collision. |
 | Definition DAO | `src/db/field-defs-dao.ts` | Lists, curates, renames, reorders, quarantines, and restores definitions. |
 | DDL DAO | `src/db/field-ddl.ts` | Creates and drops dynamic `TEXT` value columns transactionally. |
-| Value DAO | `src/db/field-values-dao.ts` | Reads and UPSERTs per-contact dynamic values. |
+| Value DAO | `src/db/field-values-dao.ts` | Reads values and exposes public and transaction-composable UPSERT paths. |
 | Type layer | `src/db/field-parsers.ts` | Validates values at read time and checks dropdown membership. |
 | Type-change layer | `src/db/field-type-change.ts` | Preflights and applies lossless type changes. |
 | Query helper | `src/db/field-sort.ts` | Produces the sole safe sort/filter expression for a custom field. |
@@ -69,7 +69,7 @@ Migration 001 provides the three base tables. A custom field is both a row in `c
 | `src/db/transaction.ts` | Shared non-reentrant transaction boundary for all custom-field writes. |
 | `src/db/field-ddl.ts` | Atomic create/drop and stale-quarantine recheck. |
 | `src/db/field-defs-dao.ts` | Definition reads and serialized metadata mutations. |
-| `src/db/field-values-dao.ts` | Guarded dynamic SELECT and contact-id-keyed value UPSERT. |
+| `src/db/field-values-dao.ts` | Guarded dynamic SELECT, standalone writer, and non-mutexed `upsertValueCore()` for composed contact writes. |
 | `src/db/field-parsers.ts` | Seven permissive target parsers and option validation. |
 | `src/db/field-sort.ts` | TEXT-aware numeric, toggle, date, and text ordering expression. |
 | `src/db/field-type-change.ts` | Read-only preflights plus history-backed type update. |
@@ -90,9 +90,9 @@ Migration 001 provides the three base tables. A custom field is both a row in `c
 
 ### Reading and writing contact values
 
-1. A contact surface loads active definitions and calls `getValuesForContact()` with them.
+1. A contact surface loads active definitions and calls `getValuesForContact()` with them. Create renders `show_on_new` definitions after its fixed block; edit renders every non-quarantined definition.
 2. The value DAO validates every `col_name`, quotes only those identifiers, binds contact and value parameters, and returns an empty map when no value row exists.
-3. `upsertValue()` creates or updates the one row keyed by `contact_id`, retaining its per-contact `uid` and refreshing `modified_at`.
+3. `upsertValue()` creates or updates the one row keyed by `contact_id`, retaining its per-contact `uid` and refreshing `modified_at`. A contact create/edit that already owns the shared transaction calls `upsertValueCore()` instead.
 4. Pure selectors expose non-quarantined fields: create uses `show_on_new`, edit uses all fields, and profile uses a present value or `always_show`.
 
 ### Interpreting values and changing a type
@@ -120,6 +120,7 @@ Migration 001 provides the three base tables. A custom field is both a row in `c
 - **ADR-013:** Runtime Two-Table Custom Fields with Whitelist-Constructed DDL — definitions map to guarded, dynamic TEXT columns.
 - **ADR-014:** Read-Time Custom-Field Type Semantics and a Single Sort Expression — type interpretation and ordering remain centralized without value rewrites.
 - **ADR-015:** Lossless Field Changes with Quarantine and Launch-Time Retention Sweep — destructive operations snapshot first and retire data on launch.
+- **ADR-016:** Fixed-First Contact Forms and Atomic Contact Creation — custom values join the contact create/edit transaction through a non-mutexed core.
 
 ## Gotchas
 
@@ -129,6 +130,7 @@ Migration 001 provides the three base tables. A custom field is both a row in `c
 4. **Type changes do not normalize stored bytes.** A value can render clean through a permissive parser while raw CAST sorting disagrees for noncanonical TEXT such as comma-formatted numbers; resolve that mismatch before a production sort consumer is wired.
 5. **The field editor applies a multi-part edit incrementally.** Label and curation writes can remain committed if the user cancels a subsequent type-change summary or a later operation fails.
 6. **The photo input is a deliberate placeholder.** The native photo picker and `share_with_ai` editor control are deferred to their owning phases.
+7. **Do not create definitions from a contact form.** The form fills values only, preserving the settings editor as the sole DDL and slugifier producer.
 
 ## Related Systems
 
@@ -136,9 +138,11 @@ Migration 001 provides the three base tables. A custom field is both a row in `c
 - **Contacts** — owns the contacts that receive one `contact_custom_values` row each.
 - **AI suggestions** — will later consume the stored `share_with_ai` setting.
 - **Photos** — will later provide the native picker for photo-type field values.
+- **App shell** — routes the definition editor through Settings.
 
 ## Changelog
 
 | Date | Phase | What Changed |
 |---|---|---|
 | 2026-08-14 | 03 | Created runtime custom-field DDL, type semantics, editor, and launch-time quarantine cleanup. |
+| 2026-08-14 | 04 | Added the transaction-composable value writer and fixed-first contact-form integration. |
