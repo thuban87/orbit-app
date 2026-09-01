@@ -1,7 +1,7 @@
 # Contact Methods
 
 **Last updated:** 2026-08-16
-**Updated by phase:** 09-compose-screen-sms-handoff
+**Updated by phase:** 11-actionable-notifications
 **Owners:** `src/screens/ComposeScreen.tsx`, `src/logic/compose-logic.ts`, `src/db/contact-read.ts`, `src/db/fuel-read.ts`
 
 ## Purpose
@@ -52,6 +52,12 @@ This system owns no SQLite table. It consumes a contact's nullable `contacts.pho
 4. The user types a blank-starting local draft. With a phone and SMS capability, Send opens the OS composer with `expo-sms`; Copy uses `expo-clipboard` in every state.
 5. Software and Android hardware Back both reset the stack to dashboard Home. Send and Copy never create a touchpoint or change `last_contact`.
 
+### Entering Compose from a reminder
+
+1. A decay notification body tap resets navigation onto Dashboard and `Compose { contactId }`.
+2. Compose still performs its normal self-fetch and archive/phone gates; notification content carries no fuel snapshot.
+3. Back retains the same Dashboard destination as every other Compose entry point.
+
 ## Configuration
 
 | Constant | Value | File | Purpose |
@@ -62,6 +68,7 @@ This system owns no SQLite table. It consumes a contact's nullable `contacts.pho
 
 - **ADR-035:** Native SMS Handoff with Guaranteed Clipboard Copy — native SMS is best effort while Copy is always available.
 - **ADR-036:** Entry-Agnostic Compose Navigation and Transmittable-Fuel Guardrails — route reuse, structural fuel exclusions, archive gate, and Home-directed Back behavior.
+- **ADR-040:** Exactly-Once Notification Actions and Dashboard-Rooted Tap Routing — adds the decay reminder as a deterministic Compose entry point.
 
 ## Gotchas
 
@@ -69,6 +76,7 @@ This system owns no SQLite table. It consumes a contact's nullable `contacts.pho
 2. **Compose is not a touchpoint.** Do not write an interaction or `last_contact` after Send or Copy because Android cannot reliably confirm that the user sent the message.
 3. **Use `getRankedFuel()`, not the editor read or a UI filter.** The compose surface is transmittable, so its privacy exclusion belongs in SQL.
 4. **Native handoff needs a release rebuild.** `expo-sms` and `expo-clipboard` autolink without an app-config plugin, but a Metro reload cannot verify them.
+5. **Notification bodies are not fuel previews.** A reminder opens Compose for live fuel instead of freezing fuel text into the OS shade.
 
 ## Related Systems
 
@@ -81,3 +89,4 @@ This system owns no SQLite table. It consumes a contact's nullable `contacts.pho
 | Date | Phase | What Changed |
 |---|---|---|
 | 2026-08-16 | 09 | Created the reusable Compose/SMS handoff surface with Copy fallback and structural privacy guards. |
+| 2026-08-16 | 11 | Added decay-notification entry with Dashboard-rooted Back behavior. |
