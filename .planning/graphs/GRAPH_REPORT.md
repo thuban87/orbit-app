@@ -1,16 +1,16 @@
 # Graph Report - orbit-app  (2026-09-01)
 
 ## Corpus Check
-- 582 files · ~465,678 words
+- 582 files · ~466,178 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 3982 nodes · 11524 edges · 221 communities (178 shown, 43 thin omitted)
+- 3982 nodes · 11524 edges · 220 communities (178 shown, 42 thin omitted)
 - Extraction: 99% EXTRACTED · 1% INFERRED · 0% AMBIGUOUS · INFERRED: 101 edges (avg confidence: 0.72)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `d699005a`
+- Built from commit: `d33b8699`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -94,7 +94,6 @@
 - BackupSettingsScreen.tsx
 - bulk-review-dao.test.ts
 - fuel-read.test.ts
-- SurvivorSelectScreen.tsx
 - devDependencies
 - AiCloudProviderId
 - use-read-contacts-permission.ts
@@ -258,7 +257,7 @@
 ## Import Cycles
 - None detected.
 
-## Communities (221 total, 43 thin omitted)
+## Communities (220 total, 42 thin omitted)
 
 ### Community 0 - "database.ts"
 Cohesion: 0.07
@@ -289,8 +288,8 @@ Cohesion: 0.22
 Nodes (14): assertSelfSunColour(), ThemeStore, useThemeStore, resolveMode(), THEME_PRESETS, ThemeContext, ThemeProvider(), ThemeProviderProps (+6 more)
 
 ### Community 7 - "AiService.ts"
-Cohesion: 0.07
-Nodes (28): SecureFetchError, inputFor(), makePrompt(), secureCustomFetchMock, SecureFetchError, AiSettings, AiError, AiErrorCode (+20 more)
+Cohesion: 0.06
+Nodes (30): SecureFetchError, AiKeyStore, inputFor(), makePrompt(), secureCustomFetchMock, SecureFetchError, AiCloudProviderId, AiSettings (+22 more)
 
 ### Community 8 - "getExecutor"
 Cohesion: 0.09
@@ -361,8 +360,8 @@ Cohesion: 0.15
 Nodes (23): BirthdayNotificationCandidate, DecayEligibleCandidate, listBirthdayNotificationCandidates(), listDecayEligibleCandidates(), allowedSlotForDay(), clampHour(), clampStagger(), inQuietWindow() (+15 more)
 
 ### Community 25 - "settings-ai-logic.ts"
-Cohesion: 0.18
-Nodes (16): IPV4_MAPPED_PREFIX, ipv4InCidr(), ipv4IsNonPublic(), ipv6InCidr(), ipv6IsNonPublic(), isNonPublicIpLiteral(), NAT64_PREFIX, NON_PUBLIC_IPV4_CIDRS (+8 more)
+Cohesion: 0.10
+Nodes (29): IPV4_MAPPED_PREFIX, ipv4InCidr(), ipv4IsNonPublic(), ipv6InCidr(), ipv6IsNonPublic(), isNonPublicIpLiteral(), NAT64_PREFIX, NON_PUBLIC_IPV4_CIDRS (+21 more)
 
 ### Community 26 - "contact-status-read.ts"
 Cohesion: 0.08
@@ -373,8 +372,8 @@ Cohesion: 0.18
 Nodes (12): isBulkActionAvailable(), actionLabels, BulkAction, CandidateCardGrid(), CandidateCardGridProps, CandidateChoice, CandidateItem, styles (+4 more)
 
 ### Community 28 - "field-ddl.ts"
-Cohesion: 0.09
-Nodes (38): createContactFullCore(), ImportMatchOutcome, setRowContact(), setRowContactCore(), setRowMatchOutcome(), setRowMatchOutcomeCore(), ImportSessionRow, ImportSessionRowDbRow (+30 more)
+Cohesion: 0.13
+Nodes (26): createContactFullCore(), ImportMatchOutcome, setRowContactCore(), setRowMatchOutcomeCore(), ImportSessionRowDbRow, importContactRecord(), insertExternalContactLinkCore(), insertMethodProvenanceCore() (+18 more)
 
 ### Community 29 - "contacts-dao.ts"
 Cohesion: 0.10
@@ -389,8 +388,8 @@ Cohesion: 0.29
 Nodes (10): assertNoLocalOnlyKeys(), buildExportManifest(), ExportManifestDeps, FORBIDDEN_KEYS, readManifest(), withPhoto(), BackupPhotoUnreadableError, getPortableSettingsSnapshot() (+2 more)
 
 ### Community 32 - "app-settings-dao.ts"
-Cohesion: 0.07
-Nodes (36): AppSettings, AppSettingsPatch, AppSettingsRow, assertAiProvider(), assertBackupDays(), assertHour(), assertPhoneRegionOverride(), assertSunContactId() (+28 more)
+Cohesion: 0.08
+Nodes (33): AppSettings, AppSettingsPatch, AppSettingsRow, assertAiProvider(), assertBackupDays(), assertHour(), assertPhoneRegionOverride(), assertSunContactId() (+25 more)
 
 ### Community 33 - "backup-schema.ts"
 Cohesion: 0.23
@@ -429,12 +428,12 @@ Cohesion: 0.21
 Nodes (15): classifyPermissionResult(), ContactsPermissionRequestResult, ContactsPermissionVerdict, clearDeniedPresentation(), ContactsPermissionRequestState, ContactsPermissionResult, ContactsPermissionState, ensureReadContactsPermission() (+7 more)
 
 ### Community 42 - "newUid"
-Cohesion: 0.10
-Nodes (39): setContactPhoto(), AcceptImportSessionWithRowsInput, assertOneChange(), completeSession(), completeSessionCore(), createImportSession(), CreateImportSessionInput, deferNeedsReview() (+31 more)
+Cohesion: 0.08
+Nodes (47): setContactPhoto(), AcceptImportSessionWithRowsInput, assertOneChange(), completeSession(), completeSessionCore(), createImportSession(), CreateImportSessionInput, deferNeedsReview() (+39 more)
 
 ### Community 43 - "secure-fetch.ts"
 Cohesion: 0.11
-Nodes (17): cancel(), request(), NativeSecureFetchInput, NativeSecureFetchResult, OrbitSecureFetchModule, OrbitSecureFetchModule, validateCustomEndpoint(), generateRequestId() (+9 more)
+Nodes (16): cancel(), request(), NativeSecureFetchInput, NativeSecureFetchResult, OrbitSecureFetchModule, OrbitSecureFetchModule, generateRequestId(), mapNativeError() (+8 more)
 
 ### Community 44 - "phase-17-runtime-integration.test.ts"
 Cohesion: 0.24
@@ -513,8 +512,8 @@ Cohesion: 0.09
 Nodes (21): backgroundColor, backgroundImage, foregroundImage, monochromeImage, adaptiveIcon, predictiveBackGestureEnabled, expo, android (+13 more)
 
 ### Community 63 - "model-registry.ts"
-Cohesion: 0.08
-Nodes (36): pickContacts(), createFileCatalogStorage(), ModelScope, SEED_CATALOG, TruncationNotice, updateAppSettings(), getNewestPendingReconcileSessionId(), listSunCandidates() (+28 more)
+Cohesion: 0.09
+Nodes (27): pickContacts(), createFileCatalogStorage(), ModelScope, resolveEffectivePhoneRegion(), updateAppSettings(), getNewestPendingReconcileSessionId(), listSunCandidates(), pinResultCopy() (+19 more)
 
 ### Community 64 - "transaction.ts"
 Cohesion: 0.09
@@ -549,8 +548,8 @@ Cohesion: 0.15
 Nodes (18): adrDir, auditAdrKeyFiles(), AuditResult, byBasename, Category, CATEGORY_ORDER, classify(), everExisted() (+10 more)
 
 ### Community 72 - "types.ts"
-Cohesion: 0.10
-Nodes (29): RFC-4122, insertContact(), createPendingAssist(), InteractionAssistChannel, markAssistFailed(), markAssistLogged(), PendingAssistRow, isValidLocalDateTime() (+21 more)
+Cohesion: 0.08
+Nodes (35): RFC-4122, insertContact(), createPendingAssist(), InteractionAssistChannel, markAssistFailed(), markAssistLogged(), PendingAssistRow, isValidLocalDateTime() (+27 more)
 
 ### Community 73 - "queries.test.ts"
 Cohesion: 0.11
@@ -581,8 +580,8 @@ Cohesion: 0.12
 Nodes (17): babel-preset-expo, @biomejs/biome, devDependencies, babel-preset-expo, @biomejs/biome, patch-package, tsx, @types/node (+9 more)
 
 ### Community 81 - "AiCloudProviderId"
-Cohesion: 0.16
-Nodes (6): AiKeyStore, createAiKeyStore(), keyItemName(), nativeSecureStoreBackend, SecureKeyBackend, AiCloudProviderId
+Cohesion: 0.27
+Nodes (4): createAiKeyStore(), keyItemName(), nativeSecureStoreBackend, SecureKeyBackend
 
 ### Community 82 - "use-read-contacts-permission.ts"
 Cohesion: 0.13
@@ -722,7 +721,7 @@ Nodes (8): all, baseArg, byAdr, changedAdrs(), errors, { findings, noKeyFilesBlo
 
 ### Community 116 - "col-name.ts"
 Cohesion: 0.17
-Nodes (11): Architecture (Phases 02, 11), Code, File Locations, How to Add a SQLite Migration, Migration runner, Overview, Pitfalls, Resolution order (+3 more)
+Nodes (11): Architecture (Phases 02, 11, 16), Code, File Locations, How to Add a SQLite Migration, Migration runner, Overview, Pitfalls, Resolution order (+3 more)
 
 ### Community 117 - "seedFullContact"
 Cohesion: 0.39
@@ -955,7 +954,7 @@ Nodes (3): def(), makeContact(), uid()
 ## Knowledge Gaps
 - **1187 isolated node(s):** `styles`, `SchedulableTriggerInputTypes`, `AndroidImportance`, `AndroidNotificationVisibility`, `scheduled` (+1182 more)
   These have ≤1 connection - possible missing edges or undocumented components.
-- **43 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **42 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_

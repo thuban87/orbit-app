@@ -21,7 +21,7 @@ not something you can pattern-match against.
 
 ## How to use this
 
-- **Is a decision still live?** Check the `Superseded by` column. 2 of
+- **Is a decision still live?** Check the `Superseded by` column. 5 of
   55 ADRs are superseded in whole or in part.
 - **Which decisions govern a file?** Don't grep this file — ask the graph:
   `npm run graph:ask -- governs src/db/field-values-dao.ts`, or follow the
@@ -31,7 +31,7 @@ not something you can pattern-match against.
 
 | # | Title | Status | Phase | Supersedes | Superseded by | Subsystems | Key files | Directories |
 |---|-------|--------|-------|------------|---------------|------------|-----------|-------------|
-| 001 | Normalize Custom-Field Values | — | — | — | — | — | — | — |
+| 001 | Normalized Custom-Field Values | Accepted | 16-custom-field-value-normalization | ADR-013; ADR-014 (partial); ADR-015 (partial) | — | — | 9 | `src/db`, `src/db/migrations` |
 | 002 | Cross-Version Contact Import — Hybrid Two-Picker | — | — | — | — | — | — | — |
 | 003 | `READ_CONTACTS` on API 37+ for the Reconcile feature | — | — | — | — | — | — | — |
 | 004 | Flat Single-App Repository | Accepted | 01-project-scaffold-portable-code | — | — | — | 1 | `src/db` |
@@ -43,9 +43,9 @@ not something you can pattern-match against.
 | 010 | Single-Writer Interaction Recency Spine | Accepted | 02-data-foundation-status-engine | — | — | — | 3 | `src/db`, `src/db/migrations` |
 | 011 | Query-Time Status and Never-Contacted Segregation | Accepted | 02-data-foundation-status-engine | — | — | — | 3 | `src/db` |
 | 012 | Opt-Out Android Backup for Third-Party PII | Accepted | 02-data-foundation-status-engine | — | — | — | 1 | `src/db` |
-| 013 | Runtime Two-Table Custom Fields with Whitelist-Constructed DDL | Accepted | 03-custom-fields | — | — | — | 6 | `src/db` |
-| 014 | Read-Time Custom-Field Type Semantics and a Single Sort Expression | Accepted | 03-custom-fields | — | — | — | 5 | `src/components`, `src/db` |
-| 015 | Lossless Field Changes with Quarantine and Launch-Time Retention Sweep | Accepted | 03-custom-fields | — | — | — | 5 | `src/db`, `src/services` |
+| 013 | Runtime Two-Table Custom Fields with Whitelist-Constructed DDL | Accepted | 03-custom-fields | — | ADR-001 | — | 6 | `src/db` |
+| 014 | Read-Time Custom-Field Type Semantics and a Single Sort Expression | Accepted | 03-custom-fields | — | ADR-001 (partial) | — | 5 | `src/components`, `src/db` |
+| 015 | Lossless Field Changes with Quarantine and Launch-Time Retention Sweep | Accepted | 03-custom-fields | — | ADR-001 (partial) | — | 5 | `src/db`, `src/services` |
 | 016 | Fixed-First Contact Forms and Atomic Contact Creation | Accepted | 04-contact-crud-lifecycle | — | — | — | 5 | `src/components`, `src/db`, `src/screens` |
 | 017 | Multi-Link Contact Reachability | Accepted | 04-contact-crud-lifecycle | — | — | — | 4 | `src/components`, `src/db`, `src/screens` |
 | 018 | Archive-Gated Contact Purge with Explicit Fan-Out | Accepted | 04-contact-crud-lifecycle | — | — | — | 5 | `src/db`, `src/screens`, `src/theme` |

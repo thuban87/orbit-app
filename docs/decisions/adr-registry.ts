@@ -10,7 +10,7 @@
  * governs. See scripts/gen-adr-registry.ts for why markdown cannot do this.
  */
 
-// NOTE: ADR-0001 [NONE] Normalize Custom-Field Values
+// NOTE: ADR-0001 [ACCEPTED] Normalized Custom-Field Values
 // NOTE: ADR-0002 [NONE] Cross-Version Contact Import — Hybrid Two-Picker
 // NOTE: ADR-0003 [NONE] `READ_CONTACTS` on API 37+ for the Reconcile feature
 // NOTE: ADR-0004 [ACCEPTED] Flat Single-App Repository
@@ -22,9 +22,9 @@
 // NOTE: ADR-0010 [ACCEPTED] Single-Writer Interaction Recency Spine
 // NOTE: ADR-0011 [ACCEPTED] Query-Time Status and Never-Contacted Segregation
 // NOTE: ADR-0012 [ACCEPTED] Opt-Out Android Backup for Third-Party PII
-// NOTE: ADR-0013 [ACCEPTED] Runtime Two-Table Custom Fields with Whitelist-Constructed DDL
-// NOTE: ADR-0014 [ACCEPTED] Read-Time Custom-Field Type Semantics and a Single Sort Expression
-// NOTE: ADR-0015 [ACCEPTED] Lossless Field Changes with Quarantine and Launch-Time Retention Sweep
+// IMPORTANT: ADR-0013 [SUPERSEDED BY ADR-001] Runtime Two-Table Custom Fields with Whitelist-Constructed DDL
+// IMPORTANT: ADR-0014 [SUPERSEDED BY ADR-001 (partial)] Read-Time Custom-Field Type Semantics and a Single Sort Expression
+// IMPORTANT: ADR-0015 [SUPERSEDED BY ADR-001 (partial)] Lossless Field Changes with Quarantine and Launch-Time Retention Sweep
 // NOTE: ADR-0016 [ACCEPTED] Fixed-First Contact Forms and Atomic Contact Creation
 // NOTE: ADR-0017 [ACCEPTED] Multi-Link Contact Reachability
 // NOTE: ADR-0018 [ACCEPTED] Archive-Gated Contact Purge with Explicit Fan-Out
