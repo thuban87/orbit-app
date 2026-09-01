@@ -1,7 +1,7 @@
 # Dashboard
 
-**Last updated:** 2026-08-17
-**Updated by phase:** 13-orrery
+**Last updated:** 2026-08-23
+**Updated by phase:** 15-weekly-digest
 **Owners:** `src/db/dashboard-read.ts`, `src/screens/HomeScreen.tsx`, `src/screens/NeverContactedScreen.tsx`, `src/components/ContactCard.tsx`, `src/components/BirthdayBanner.tsx`, `src/stores/dashboard-prefs-store.ts`
 
 ## Purpose
@@ -76,6 +76,12 @@ The dashboard owns no tables. It projects the on-device `contacts`, `categories`
 2. The button navigates to the typed `Orrery` stack route without passing a contact snapshot or database state.
 3. The Orrery rereads its own local projection on focus, so the dashboard does not own a second relationship-state calculation.
 
+### Opening Your week
+
+1. The Home header exposes a discreet, non-badged “Your week” action beside the existing destination controls.
+2. The action navigates to the typed Digest route, which performs its own live retrospective and overlooked-population reads on focus.
+3. The dashboard remains the always-current work surface; the digest is a separate retrospective and does not duplicate the decay or snoozed populations.
+
 ### Showing birthdays and empty states
 
 1. `BirthdayBanner` receives every non-archived birthday candidate, including snoozed and never-contacted people.
@@ -99,6 +105,7 @@ The dashboard owns no tables. It projects the on-device `contacts`, `categories`
 - **ADR-042:** Shared Status Palette for Dashboard and Widget Rings — makes the dashboard card and widget ring vocabulary identical.
 - **ADR-043:** Static Globally Mirrored Favourites Widget — reuses the ranked favourites projection without altering it.
 - **ADR-048:** Status-Default Static Orrery with a Single-Canvas Morph — adds the dashboard-reached relationship-map entry without displacing Home.
+- **ADR-054:** Live Weekly Digest Retrospective and Overlooked Relationship Read — adds the separate, non-scoreboard weekly-retrospective entry.
 
 ## Gotchas
 
@@ -110,6 +117,7 @@ The dashboard owns no tables. It projects the on-device `contacts`, `categories`
 6. **Snooze and notification suppression differ.** The Snoozed branch follows `snooze_until`; notification decay additionally respects mute, rare-response, rogue, and lifecycle suppression, while birthdays ignore them.
 7. **Keep the widget projection rank- and null-status-preserving.** Re-sorting favourites or treating a null status as stable moves a no-undo mark target or misstates contact history.
 8. **Keep the dashboard as the primary interface.** The Orbit button opens a glanceable map; it must not become a duplicate dashboard filter or a second status query owner.
+9. **Keep the digest distinct from the due list.** “Your week” is a navigation entry to a separate live retrospective; do not add its count, overlooked groups, or a badge to Home.
 
 ## Related Systems
 
@@ -120,6 +128,7 @@ The dashboard owns no tables. It projects the on-device `contacts`, `categories`
 - **Notifications** — reuses status and birthday-candidate semantics for OS reminders; the dashboard remains the in-app truth surface.
 - **Widget** — reads the favourites projection as its state-free home-screen view.
 - **Orrery** — opens from the header and independently reads the local contacted-relationship projection.
+- **Digest** — opens from the header and independently reads a weekly retrospective plus non-nagged overlooked populations.
 
 ## Changelog
 
@@ -129,3 +138,4 @@ The dashboard owns no tables. It projects the on-device `contacts`, `categories`
 | 2026-08-16 | 11 | Activated the snoozed population through durable snooze writes and aligned reminder candidate semantics with dashboard status and birthdays. |
 | 2026-08-16 | 12 | Added shared status rings and documented the widget's rank-preserving favourites projection. |
 | 2026-08-17 | 13 | Added the dashboard header entry to the status-default Orrery. |
+| 2026-08-23 | 15 | Added the non-badged “Your week” entry to the separate live digest surface. |
