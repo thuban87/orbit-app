@@ -1,7 +1,7 @@
 # Contacts
 
 **Last updated:** 2026-08-16
-**Updated by phase:** 09-compose-screen-sms-handoff
+**Updated by phase:** 10-share-sheet-capture
 **Owners:** `src/db/contacts-dao.ts`, `src/db/contact-read.ts`, `src/db/favourites-dao.ts`, `src/db/profile-dao.ts`, `src/db/contact-links-dao.ts`, `src/db/purge-dao.ts`, `src/db/recency-dao.ts`
 
 ## Purpose
@@ -68,6 +68,7 @@ All data is on-device SQLite. Migration 001 uses a surrogate `contacts.id` and a
 | `src/screens/CreateContactScreen.tsx` | Lean fixed-first create form. |
 | `src/screens/EditContactScreen.tsx` | Always-show edit form for fixed fields, links, and custom values. |
 | `src/screens/ArchivedContactsScreen.tsx` | Restore and impact-summary purge surface. |
+| `src/screens/CaptureScreen.tsx` | Uses the existing name-only contact create path when a shared item has no owner yet. |
 
 ## How It Works
 
@@ -110,6 +111,12 @@ All data is on-device SQLite. Migration 001 uses a surrogate `contacts.id` and a
 2. Compose trims the optional phone to decide SMS availability and treats an archived header as unavailable rather than showing a live messaging surface.
 3. Send and Copy remain handoff-only actions; the contacts system receives no interaction or recency write from them.
 
+### Creating a contact during capture
+
+1. The Capture New contact tile validates a non-blank name and calls `createContactFull()` without `firstInteraction`.
+2. The name-only path uses the monthly 30-day interval and leaves `last_contact` `NULL`, so the contact remains never-contacted.
+3. Capture then writes an owned fuel row in a separate acceptable transaction; it does not turn the share into an interaction or prompt for further contact detail.
+
 ## Configuration
 
 | Constant | Value | File | Purpose |
@@ -133,6 +140,7 @@ All data is on-device SQLite. Migration 001 uses a surrogate `contacts.id` and a
 - **ADR-033:** Profile Marking and Shared Drag-Reordered Favourites — owns reversible profile marking and guarded favourite-rank ordering.
 - **ADR-035:** Native SMS Handoff with Guaranteed Clipboard Copy — uses the nullable phone field for a user-invoked, non-writing handoff.
 - **ADR-036:** Entry-Agnostic Compose Navigation and Transmittable-Fuel Guardrails — rejects archived headers on the reusable live compose surface.
+- **ADR-038:** Contact-Owned Share Capture Fuel — preserves name-only, never-contacted inline creation and prohibits a capture recency write.
 
 ## Gotchas
 
@@ -146,6 +154,7 @@ All data is on-device SQLite. Migration 001 uses a surrogate `contacts.id` and a
 8. **Deleting a touchpoint is permanent.** The profile must confirm it before calling the recency DAO; there is no undo or backup path.
 9. **Rewrite the complete favourite set in one transaction.** A partial, duplicate, stale, archived, or non-favourite id list must fail rather than leave ranks inconsistent.
 10. **A by-id header can still be archived.** Live callers such as Compose must inspect `archived_at`; the header seek intentionally does not apply a live-list filter itself.
+11. **A capture is not contact.** Creating or selecting a contact for a share must leave `last_contact` unchanged and write no interaction row.
 
 ## Related Systems
 
@@ -155,6 +164,7 @@ All data is on-device SQLite. Migration 001 uses a surrogate `contacts.id` and a
 - **App shell** — provides the create, profile, edit, and archived navigation routes.
 - **Dashboard** — reads contact projections and provides favourite-management entry points.
 - **Contact methods** — consumes the lightweight phone and archive header for Compose gating.
+- **Capture** — selects or name-only creates a fuel owner while retaining the never-contacted state.
 
 ## Changelog
 
@@ -166,3 +176,4 @@ All data is on-device SQLite. Migration 001 uses a surrogate `contacts.id` and a
 | 2026-08-15 | 06 | Added structured touchpoint refinement, connection-aware recency, and immutable archive/restore events. |
 | 2026-08-15 | 08 | Added profile favourite marking and guarded shared rank reordering. |
 | 2026-08-16 | 09 | Exposed phone through the lightweight header read and gated archived contacts from Compose. |
+| 2026-08-16 | 10 | Added name-only capture creation that remains never-contacted and does not write recency. |
