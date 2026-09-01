@@ -19,9 +19,9 @@ _None._ The shell owns runtime navigation and theme contracts, not durable appli
 | Layer | File | Responsibility |
 |-------|------|----------------|
 | Bootstrap | `App.tsx` | Opens and migrates SQLite before mounting the navigator inside theme and safe-area providers. |
-| Navigator | `src/navigation/RootNavigator.tsx` | Registers native-stack routes, including the modal crop surface, with custom headers. |
+| Navigator | `src/navigation/RootNavigator.tsx` | Registers native-stack routes, including the modal crop and FuelSearch surfaces, with custom headers. |
 | Route types | `src/navigation/types.ts` | Defines serializable parameters for profile, edit, and crop routes. |
-| Settings surface | `src/screens/SettingsScreen.tsx` | Hosts low-traffic lifecycle routes and the self-photo surface. |
+| Settings surface | `src/screens/SettingsScreen.tsx` | Hosts low-traffic lifecycle routes, self-photo, and the Phase-7 fuel-search entry. |
 | Theme contract | `src/theme/theme-types.ts`, `src/theme/theme-presets.ts` | Defines named tokens, including destructive, avatar-swatch, rogue-status, and gravity-tier tokens, and their sole palette values. |
 
 ### Key Files
@@ -29,10 +29,10 @@ _None._ The shell owns runtime navigation and theme contracts, not durable appli
 | File | Role |
 |---|---|
 | `App.tsx` | Readiness gate, navigation mount point, gesture root, and photo reconciliation registration. |
-| `src/navigation/RootNavigator.tsx` | Native stack for Home, Settings, Custom Fields, Create, Profile, Edit, Archived, and CropPhoto. |
-| `src/navigation/types.ts` | Typed root-stack route contract, including serializable photo crop targets. |
+| `src/navigation/RootNavigator.tsx` | Native stack for Home, Settings, Custom Fields, Create, Profile, Edit, Archived, CropPhoto, and FuelSearch. |
+| `src/navigation/types.ts` | Typed root-stack route contract, including serializable photo crop targets and the parameterless FuelSearch route. |
 | `src/screens/HomeScreen.tsx` | Navigates users into creation and Settings. |
-| `src/screens/SettingsScreen.tsx` | Provides the distinct settings home, including the self-photo entry. |
+| `src/screens/SettingsScreen.tsx` | Provides the distinct settings home, including self-photo and fuel-search entries. |
 | `src/theme/theme-types.ts` | Names palette tokens, including avatar swatches, rogue status, gravity tiers, and foreground text. |
 | `src/theme/theme-presets.ts` | Holds the only allowed color literals, including avatar swatches and the rogue/gravity palette values. |
 
@@ -47,7 +47,7 @@ _None._ The shell owns runtime navigation and theme contracts, not durable appli
 ### Navigating lifecycle settings
 
 1. Home navigates to Settings or the create-contact route.
-2. Settings exposes Custom Fields and Archived contacts as separate, low-traffic rows.
+2. Settings exposes Custom Fields, Archived contacts, and the fuel Search surface as separate, low-traffic rows.
 3. Every stack screen renders its own themed chrome because native-stack headers are disabled; no duplicate native header appears above screen-local Back controls.
 
 ### Applying destructive emphasis
@@ -86,6 +86,7 @@ _None._ The shell owns runtime navigation and theme contracts, not durable appli
 - **ADR-022:** Tokenized Deterministic Initials Avatars — adds avatar fallback tokens to the theme contract.
 - **ADR-026:** Rogue Status for Unresponsive or Far-Overdue Contacts — adds a dedicated in-app rogue emphasis token.
 - **ADR-027:** Derived Profile-Only Gravity and Intensity — adds the gravity-tier ramp used by the profile bar.
+- **ADR-031:** Bound Local Fuel Search without FTS5 — adds the reusable Phase-7 FuelSearch route and Settings entry.
 
 ## Gotchas
 
@@ -95,6 +96,7 @@ _None._ The shell owns runtime navigation and theme contracts, not durable appli
 4. **Use tokens, never raw color literals.** The color gate enforces this outside the theme preset boundary.
 5. **Crop navigation parameters must stay serializable.** The crop result uses a request id where a custom field needs a return signal; do not pass callbacks through navigation.
 6. **Keep gravity tokens and tiers in lockstep.** The ordered palette ramp has one entry per gravity tier; changing one without the other can miscolor or crash profile presentation.
+7. **Keep the search route thin and reusable.** Its reader and result row are designed for later dashboard use, so neither belongs in Settings-specific state.
 
 ## Related Systems
 
@@ -108,3 +110,4 @@ _None._ The shell owns runtime navigation and theme contracts, not durable appli
 | 2026-08-14 | 04 | Created ready-gated native-stack navigation, Settings routes, and the destructive theme token. |
 | 2026-08-15 | 05 | Added photo crop navigation, self-photo settings, avatar tokens, and launch-time photo reconciliation registration. |
 | 2026-08-15 | 06 | Added dedicated rogue-status and gravity-tier theme tokens for profile relationship feedback. |
+| 2026-08-15 | 07 | Added the Settings-reached FuelSearch route and reusable search result surface. |
