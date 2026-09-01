@@ -1,7 +1,7 @@
 # Dashboard
 
 **Last updated:** 2026-08-16
-**Updated by phase:** 11-actionable-notifications
+**Updated by phase:** 12-home-screen-widget
 **Owners:** `src/db/dashboard-read.ts`, `src/screens/HomeScreen.tsx`, `src/screens/NeverContactedScreen.tsx`, `src/components/ContactCard.tsx`, `src/components/BirthdayBanner.tsx`, `src/stores/dashboard-prefs-store.ts`
 
 ## Purpose
@@ -42,6 +42,7 @@ The dashboard owns no tables. It projects the on-device `contacts`, `categories`
 | `src/screens/HomeScreen.tsx` | Home dashboard, controls, and focus/foreground/pull refresh. |
 | `src/screens/NeverContactedScreen.tsx` | Separate first-contact backlog with its own sort control. |
 | `src/components/ContactCard.tsx` | Shared card with avatar cache-busting, status, fuel, category, and favourite marker. |
+| `src/components/contact-card-ring.ts` | Pure status-to-colour, opacity, and ring-weight resolver used by ContactCard. |
 | `src/components/BirthdayBanner.tsx` | Seven-day birthday surface. |
 | `src/logic/birthday-logic.ts` | Strict local-date birthday parsing and days-until computation. |
 | `src/logic/dashboard-empty-logic.ts` | Pure cause-aware empty-state precedence. |
@@ -55,6 +56,12 @@ The dashboard owns no tables. It projects the on-device `contacts`, `categories`
 2. `listDashboard()` selects exactly one population branch: term, favourites, snoozed, or the normal contacted/not-snoozed population.
 3. The query computes nullable status/progress, joins the category label, and uses the shared fuel eligibility/ranking fragments for a card line or search snippet.
 4. `ContactCard` renders the resulting row and navigates to the contact profile when pressed.
+
+### Sharing favourites with the widget
+
+1. The favourites branch of `listDashboard()` already orders by `favourite_rank`, carries nullable query-time status, and selects the eligible fuel line.
+2. The Widget system consumes that projection verbatim; it does not re-derive status or apply the dashboard's status sort.
+3. `ContactCard` and widget avatars use the same stable, wobble, decay, and rogue status colours, with a neutral ring for never-contacted people.
 
 ### Reaching hidden populations
 
@@ -83,6 +90,8 @@ The dashboard owns no tables. It projects the on-device `contacts`, `categories`
 - **ADR-033:** Profile Marking and Shared Drag-Reordered Favourites — supplies the card marker and favourites filter/management surface.
 - **ADR-034:** Birthday Banner and Re-query Dashboard Freshness — defines birthday candidates and reliable local freshness.
 - **ADR-039:** Pre-Scheduled Inexact Decay Reminders — reuses dashboard status and birthday semantics for local reminder candidates.
+- **ADR-042:** Shared Status Palette for Dashboard and Widget Rings — makes the dashboard card and widget ring vocabulary identical.
+- **ADR-043:** Static Globally Mirrored Favourites Widget — reuses the ranked favourites projection without altering it.
 
 ## Gotchas
 
@@ -92,6 +101,7 @@ The dashboard owns no tables. It projects the on-device `contacts`, `categories`
 4. **Do not use a database change listener for dashboard freshness.** It cannot observe writes from a different SQLite connection or headless context.
 5. **Pass identity and cache busting to avatars.** `ContactCard` must provide `contactId` and `modified_at` so a recycled list cell cannot flash another person's photo.
 6. **Snooze and notification suppression differ.** The Snoozed branch follows `snooze_until`; notification decay additionally respects mute, rare-response, rogue, and lifecycle suppression, while birthdays ignore them.
+7. **Keep the widget projection rank- and null-status-preserving.** Re-sorting favourites or treating a null status as stable moves a no-undo mark target or misstates contact history.
 
 ## Related Systems
 
@@ -100,6 +110,7 @@ The dashboard owns no tables. It projects the on-device `contacts`, `categories`
 - **Conversational fuel** — supplies eligible ranked lines and literal-safe search predicates.
 - **App shell** — registers the sibling list and management routes.
 - **Notifications** — reuses status and birthday-candidate semantics for OS reminders; the dashboard remains the in-app truth surface.
+- **Widget** — reads the favourites projection as its state-free home-screen view.
 
 ## Changelog
 
@@ -107,3 +118,4 @@ The dashboard owns no tables. It projects the on-device `contacts`, `categories`
 |---|---|---|
 | 2026-08-15 | 08 | Created the dashboard, first-contact sibling list, favourites controls, birthday banner, and local refresh path. |
 | 2026-08-16 | 11 | Activated the snoozed population through durable snooze writes and aligned reminder candidate semantics with dashboard status and birthdays. |
+| 2026-08-16 | 12 | Added shared status rings and documented the widget's rank-preserving favourites projection. |
