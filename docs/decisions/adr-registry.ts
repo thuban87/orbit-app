@@ -58,5 +58,10 @@
 // NOTE: ADR-0046 [ACCEPTED] Query-Time Orrery Placement and Transactional Ring Ordering
 // NOTE: ADR-0047 [ACCEPTED] App-Level Assignable Sun and Themed Self Identity
 // NOTE: ADR-0048 [ACCEPTED] Status-Default Static Orrery with a Single-Canvas Morph
+// NOTE: ADR-0049 [ACCEPTED] BYO-Key AI Configuration and Credential Boundary
+// NOTE: ADR-0050 [ACCEPTED] Closed AI Prompt Egress Allowlist and Opt-In Field Sharing
+// NOTE: ADR-0051 [ACCEPTED] Public-HTTPS Custom AI Egress Guard
+// NOTE: ADR-0052 [ACCEPTED] Compose-Owned AI Draft Lifecycle and Acknowledged Egress
+// NOTE: ADR-0053 [ACCEPTED] Local-First LiteLLM AI Model Catalog
 
-export const ADR_COUNT = 48;
+export const ADR_COUNT = 53;

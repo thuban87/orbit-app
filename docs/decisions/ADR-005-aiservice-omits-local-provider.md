@@ -45,6 +45,6 @@ The `AiService` port **omits `OllamaProvider` entirely** — the class, its `'ol
 - `src/services/AiService.test.ts` — mocked-fetch tests proving the ok-guard runs before the body parse for each of the four providers.
 
 **Depends on:** None
-**Required by:** None
+**Required by:** ADR-049 (BYO-Key AI Configuration and Credential Boundary); ADR-051 (Public-HTTPS Custom AI Egress Guard)
 
 ---

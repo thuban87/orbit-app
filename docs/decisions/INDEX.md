@@ -22,7 +22,7 @@ not something you can pattern-match against.
 ## How to use this
 
 - **Is a decision still live?** Check the `Superseded by` column. 2 of
-  48 ADRs are superseded in whole or in part.
+  53 ADRs are superseded in whole or in part.
 - **Which decisions govern a file?** Don't grep this file — ask the graph:
   `npm run graph:ask -- governs src/db/field-values-dao.ts`, or follow the
   `governed_by` edges.
@@ -79,3 +79,8 @@ not something you can pattern-match against.
 | 046 | Query-Time Orrery Placement and Transactional Ring Ordering | Accepted | 13-orrery | — | — | — | 4 | `src/db`, `src/logic` |
 | 047 | App-Level Assignable Sun and Themed Self Identity | Accepted | 13-orrery | — | — | — | 6 | `src/db`, `src/db/migrations`, `src/logic` +2 |
 | 048 | Status-Default Static Orrery with a Single-Canvas Morph | Accepted | 13-orrery | — | — | — | 7 | `src/components`, `src/components/orrery`, `src/navigation` +1 |
+| 049 | BYO-Key AI Configuration and Credential Boundary | Accepted | 14-ai-message-suggestions | — | — | — | 5 | `src/db`, `src/db/migrations`, `src/services` |
+| 050 | Closed AI Prompt Egress Allowlist and Opt-In Field Sharing | Accepted | 14-ai-message-suggestions | — | — | — | 5 | `src/ai`, `src/components`, `src/db` |
+| 051 | Public-HTTPS Custom AI Egress Guard | Accepted | 14-ai-message-suggestions | — | — | — | 5 | `modules/orbit-secure-fetch/src`, `src/ai`, `src/ai/__fixtures__` +1 |
+| 052 | Compose-Owned AI Draft Lifecycle and Acknowledged Egress | Accepted | 14-ai-message-suggestions | — | — | — | 5 | `src/db`, `src/logic`, `src/navigation` +1 |
+| 053 | Local-First LiteLLM AI Model Catalog | Accepted | 14-ai-message-suggestions | — | — | — | 5 | `scripts`, `src/ai`, `src/screens` |
