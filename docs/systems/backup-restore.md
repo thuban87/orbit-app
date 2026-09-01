@@ -1,7 +1,7 @@
 # Backup & Restore
 
-**Last updated:** 2026-08-27
-**Updated by phase:** 18.2-bound-unbound-lifecycle
+**Last updated:** 2026-08-26
+**Updated by phase:** 19-system-contact-import
 **Owners:** `src/backup/`, `src/services/backup/`, `src/services/backup-sweep.ts`, `src/db/restore-photo-journal-dao.ts`, `src/screens/BackupScreen.tsx`
 
 ## Purpose
@@ -76,6 +76,7 @@ The backup manifest is a versioned wire model separate from SQLite's schema vers
 2. `RestorePreviewScreen` shows aggregate metadata only. Merge is the default; Replace-all requires an impact confirmation and, with a configured destination, a fresh verified pre-restore snapshot.
 3. `applyRestore()` reconciles UID rows and tombstones, normalizes method/link natural-key collisions before writing, recomputes contact recency, and registers committed photo-finalization work in one transaction.
 4. Post-commit photo and schedule work is retryable. The launch sweep resumes only journal rows proven to belong to a committed restore.
+5. Import sessions are local-only transient recovery state: exports omit them, and Replace-all clears their rows so a portable snapshot cannot revive a stale system-picker selection.
 
 ## Configuration
 
@@ -94,6 +95,7 @@ The backup manifest is a versioned wire model separate from SQLite's schema vers
 - **ADR-058:** Optional Encrypted Backups and Previewed Local Restoration — defines encryption and safe restoration.
 - **ADR-060:** Versioned Portable Method Graph and Collision-Normalized Restoration — carries normalized endpoint children and resolves their safe natural-key collisions before writes.
 - **ADR-063:** Versioned Lifecycle Backup and Dormant-Cadence Restore — advances the portable graph to v3 and preserves lifecycle invariants before writes.
+- **ADR-065:** Durable Resumable Contact-Import Sessions with Failure-Isolated Photos — keeps accepted picker snapshots local-only and clears them on Replace-all restore.
 
 ## Gotchas
 
@@ -106,6 +108,7 @@ The backup manifest is a versioned wire model separate from SQLite's schema vers
 7. **Normalize method actions before publishing survivors.** A collapsed duplicate must re-parent its provenance and leave the survivor set consistent with the writes.
 8. **Demote before promoting a primary or active link.** SQLite partial unique indexes are statement-immediate, so a promotion-first write can fail mid-restore.
 9. **Plan lifecycle conflicts before the transaction.** A valid newer Unbound row with NULL cadence retains a local assigned cadence as dormant; malformed lifecycle cells fail validation before mutation.
+10. **Do not export import sessions.** Their picker-derived snapshots are local recovery state, not portable relationship authority.
 
 ## Related Systems
 
@@ -115,6 +118,7 @@ The backup manifest is a versioned wire model separate from SQLite's schema vers
 - **Photos** — owns durable master paths and restore-file finalization.
 - **Notifications** and **Digest** — rebuild derived OS schedules after a committed restore.
 - **Dashboard** — offers the temporary Backup entry and rare health nudge.
+- **Contact Import** — retains local-only recovery sessions that Replace-all intentionally clears.
 
 ## Changelog
 
@@ -123,3 +127,4 @@ The backup manifest is a versioned wire model separate from SQLite's schema vers
 | 2026-08-24 | 17 | Created full-state backup, encryption, automatic SAF snapshot, and validated restoration documentation. |
 | 2026-08-27 | 18.1 | Added the normalized method/link/provenance graph and collision-normalized restoration. |
 | 2026-08-27 | 18.2 | Bumped the portable graph to v3 for Bound/Unbound state and pre-transaction dormant-cadence resolution. |
+| 2026-08-26 | 19 | Excluded local-only contact-import sessions and cleared them on Replace-all restore. |
