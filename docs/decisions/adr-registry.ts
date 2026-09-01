@@ -22,5 +22,8 @@
 // NOTE: ADR-0010 [ACCEPTED] Single-Writer Interaction Recency Spine
 // NOTE: ADR-0011 [ACCEPTED] Query-Time Status and Never-Contacted Segregation
 // NOTE: ADR-0012 [ACCEPTED] Opt-Out Android Backup for Third-Party PII
+// NOTE: ADR-0013 [ACCEPTED] Runtime Two-Table Custom Fields with Whitelist-Constructed DDL
+// NOTE: ADR-0014 [ACCEPTED] Read-Time Custom-Field Type Semantics and a Single Sort Expression
+// NOTE: ADR-0015 [ACCEPTED] Lossless Field Changes with Quarantine and Launch-Time Retention Sweep
 
-export const ADR_COUNT = 12;
+export const ADR_COUNT = 15;
