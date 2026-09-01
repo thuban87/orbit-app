@@ -1,7 +1,7 @@
 # Dashboard
 
-**Last updated:** 2026-08-16
-**Updated by phase:** 12-home-screen-widget
+**Last updated:** 2026-08-17
+**Updated by phase:** 13-orrery
 **Owners:** `src/db/dashboard-read.ts`, `src/screens/HomeScreen.tsx`, `src/screens/NeverContactedScreen.tsx`, `src/components/ContactCard.tsx`, `src/components/BirthdayBanner.tsx`, `src/stores/dashboard-prefs-store.ts`
 
 ## Purpose
@@ -39,7 +39,7 @@ The dashboard owns no tables. It projects the on-device `contacts`, `categories`
 | File | Role |
 |---|---|
 | `src/db/dashboard-read.ts` | Parameter-bound dashboard, search, count, birthday, and first-contact SQL reads. |
-| `src/screens/HomeScreen.tsx` | Home dashboard, controls, and focus/foreground/pull refresh. |
+| `src/screens/HomeScreen.tsx` | Home dashboard, controls, focus/foreground/pull refresh, and the Orrery entry. |
 | `src/screens/NeverContactedScreen.tsx` | Separate first-contact backlog with its own sort control. |
 | `src/components/ContactCard.tsx` | Shared card with avatar cache-busting, status, fuel, category, and favourite marker. |
 | `src/components/contact-card-ring.ts` | Pure status-to-colour, opacity, and ring-weight resolver used by ContactCard. |
@@ -70,6 +70,12 @@ The dashboard owns no tables. It projects the on-device `contacts`, `categories`
 3. Not yet contacted opens `NeverContactedScreen`, whose inverse query keeps status and progress null and defaults to oldest-added-first.
 4. A profile snooze now writes the existing `snooze_until` field, so the Snoozed chip reflects real contact state rather than an empty future-facing branch.
 
+### Opening the Orrery
+
+1. The Home header keeps the dashboard as the primary working surface and exposes a compact Orbit button beside Settings.
+2. The button navigates to the typed `Orrery` stack route without passing a contact snapshot or database state.
+3. The Orrery rereads its own local projection on focus, so the dashboard does not own a second relationship-state calculation.
+
 ### Showing birthdays and empty states
 
 1. `BirthdayBanner` receives every non-archived birthday candidate, including snoozed and never-contacted people.
@@ -92,6 +98,7 @@ The dashboard owns no tables. It projects the on-device `contacts`, `categories`
 - **ADR-039:** Pre-Scheduled Inexact Decay Reminders — reuses dashboard status and birthday semantics for local reminder candidates.
 - **ADR-042:** Shared Status Palette for Dashboard and Widget Rings — makes the dashboard card and widget ring vocabulary identical.
 - **ADR-043:** Static Globally Mirrored Favourites Widget — reuses the ranked favourites projection without altering it.
+- **ADR-048:** Status-Default Static Orrery with a Single-Canvas Morph — adds the dashboard-reached relationship-map entry without displacing Home.
 
 ## Gotchas
 
@@ -102,6 +109,7 @@ The dashboard owns no tables. It projects the on-device `contacts`, `categories`
 5. **Pass identity and cache busting to avatars.** `ContactCard` must provide `contactId` and `modified_at` so a recycled list cell cannot flash another person's photo.
 6. **Snooze and notification suppression differ.** The Snoozed branch follows `snooze_until`; notification decay additionally respects mute, rare-response, rogue, and lifecycle suppression, while birthdays ignore them.
 7. **Keep the widget projection rank- and null-status-preserving.** Re-sorting favourites or treating a null status as stable moves a no-undo mark target or misstates contact history.
+8. **Keep the dashboard as the primary interface.** The Orbit button opens a glanceable map; it must not become a duplicate dashboard filter or a second status query owner.
 
 ## Related Systems
 
@@ -111,6 +119,7 @@ The dashboard owns no tables. It projects the on-device `contacts`, `categories`
 - **App shell** — registers the sibling list and management routes.
 - **Notifications** — reuses status and birthday-candidate semantics for OS reminders; the dashboard remains the in-app truth surface.
 - **Widget** — reads the favourites projection as its state-free home-screen view.
+- **Orrery** — opens from the header and independently reads the local contacted-relationship projection.
 
 ## Changelog
 
@@ -119,3 +128,4 @@ The dashboard owns no tables. It projects the on-device `contacts`, `categories`
 | 2026-08-15 | 08 | Created the dashboard, first-contact sibling list, favourites controls, birthday banner, and local refresh path. |
 | 2026-08-16 | 11 | Activated the snoozed population through durable snooze writes and aligned reminder candidate semantics with dashboard status and birthdays. |
 | 2026-08-16 | 12 | Added shared status rings and documented the widget's rank-preserving favourites projection. |
+| 2026-08-17 | 13 | Added the dashboard header entry to the status-default Orrery. |
