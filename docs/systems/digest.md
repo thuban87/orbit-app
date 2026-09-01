@@ -1,7 +1,7 @@
 # Digest
 
-**Last updated:** 2026-08-23
-**Updated by phase:** 15-weekly-digest
+**Last updated:** 2026-08-27
+**Updated by phase:** 18.2-bound-unbound-lifecycle
 **Owners:** `src/db/digest-read.ts`, `src/logic/digest-logic.ts`, `src/screens/DigestScreen.tsx`, `src/services/notifications/digest-schedule.ts`
 
 ## Purpose
@@ -51,6 +51,7 @@ The digest has no table and stores no per-contact state. It reads existing SQLit
 3. `readRetrospective()` returns one row per non-archived person touched in the inclusive trailing seven-day window, regardless of direction or connection outcome.
 4. `readOverlooked()` reads shared rogue status directly and splits `overdue` people into Drifting and `unresponsive` people into Gone quiet; it intentionally does not apply the decay-push mute.
 5. The screen reuses the dashboard never-contacted count, applies the quality gate, then renders retrospective, gentle line, overlooked groups, backlog nudge, or the unified all-quiet state.
+6. Retrospective and gentle-line reads remain all-relationship-history, including Unbound contacts; only the active-cadence overlooked projection is Bound-only.
 
 ### Delivering the weekly prompt
 
@@ -72,6 +73,7 @@ The digest has no table and stores no per-contact state. It reads existing SQLit
 
 - **ADR-054:** Live Weekly Digest Retrospective and Overlooked Relationship Read — keeps the screen live, local, non-scoreboard, and distinct from the dashboard.
 - **ADR-055:** Dedicated Weekly Digest Scheduling and Persisted Notification Policy — supplies the weekly prompt and durable scheduling gate.
+- **ADR-062:** Bound/Unbound Lifecycle and One-Way Cadence Assignment — gates only active overlooked work while preserving relationship history.
 
 ## Gotchas
 
@@ -79,6 +81,7 @@ The digest has no table and stores no per-contact state. It reads existing SQLit
 2. **Stored timestamps are local wall-clock values.** Use bare `date(stored_column)` and convert only SQLite's current time; UTC conversion can move an edge touchpoint.
 3. **Keep the quality line rare.** The threshold requires both a count and fraction so a single difficult conversation never becomes a relationship verdict.
 4. **A weekly trigger still needs device proof.** The physical-device test confirms its Sunday fire and Expo’s headless re-arm for the next occurrence.
+5. **Do not describe the whole digest as Bound-only.** The retrospective and gentle line intentionally retain Unbound relationship history.
 
 ## Related Systems
 
@@ -94,3 +97,4 @@ The digest has no table and stores no per-contact state. It reads existing SQLit
 | Date | Phase | What Changed |
 |---|---|---|
 | 2026-08-23 | 15 | Created the live weekly retrospective, overlooked relationship read, Sunday scheduling, and dashboard entry. |
+| 2026-08-27 | 18.2 | Made the active overlooked projection Bound-only while retaining inclusive retrospective history. |
