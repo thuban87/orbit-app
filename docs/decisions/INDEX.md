@@ -22,7 +22,7 @@ not something you can pattern-match against.
 ## How to use this
 
 - **Is a decision still live?** Check the `Superseded by` column. 0 of
-  19 ADRs are superseded in whole or in part.
+  22 ADRs are superseded in whole or in part.
 - **Which decisions govern a file?** Don't grep this file — ask the graph:
   `npm run graph:ask -- governs src/db/field-values-dao.ts`, or follow the
   `governed_by` edges.
@@ -50,3 +50,6 @@ not something you can pattern-match against.
 | 017 | Multi-Link Contact Reachability | Accepted | 04-contact-crud-lifecycle | — | — | — | 4 | `src/components`, `src/db`, `src/screens` |
 | 018 | Archive-Gated Contact Purge with Explicit Fan-Out | Accepted | 04-contact-crud-lifecycle | — | — | — | 5 | `src/db`, `src/screens`, `src/theme` |
 | 019 | Native Stack Contact Lifecycle Navigation | Accepted | 04-contact-crud-lifecycle | — | — | — | 4 | `src/navigation`, `src/screens` |
+| 020 | Library-Only Photo Capture with Themed In-App Cropping and One-Time URL Download | Accepted | 05-photos | — | — | — | 5 | `src/components`, `src/screens`, `src/services/photos` |
+| 021 | Durable Relative-Path Photo Masters with Crash-Safe Lifecycle Cleanup | Accepted | 05-photos | — | — | — | 7 | `src/components/field-widgets`, `src/db`, `src/services/photos` |
+| 022 | Tokenized Deterministic Initials Avatars | Accepted | 05-photos | — | — | — | 5 | `src/components`, `src/stores`, `src/theme` |

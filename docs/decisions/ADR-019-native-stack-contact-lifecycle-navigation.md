@@ -47,4 +47,4 @@ The app uses React Navigation’s native stack as its root navigation shell. The
 - `src/screens/HomeScreen.tsx` — enters contact creation and Settings through navigator actions.
 
 **Depends on:** ADR-006 (Theme-Token Architecture).
-**Required by:** None.
+**Required by:** ADR-020 (Library-Only Photo Capture with Themed In-App Cropping and One-Time URL Download)

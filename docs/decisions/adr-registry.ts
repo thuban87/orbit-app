@@ -29,5 +29,8 @@
 // NOTE: ADR-0017 [ACCEPTED] Multi-Link Contact Reachability
 // NOTE: ADR-0018 [ACCEPTED] Archive-Gated Contact Purge with Explicit Fan-Out
 // NOTE: ADR-0019 [ACCEPTED] Native Stack Contact Lifecycle Navigation
+// NOTE: ADR-0020 [ACCEPTED] Library-Only Photo Capture with Themed In-App Cropping and One-Time URL Download
+// NOTE: ADR-0021 [ACCEPTED] Durable Relative-Path Photo Masters with Crash-Safe Lifecycle Cleanup
+// NOTE: ADR-0022 [ACCEPTED] Tokenized Deterministic Initials Avatars
 
-export const ADR_COUNT = 19;
+export const ADR_COUNT = 22;
