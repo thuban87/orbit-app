@@ -1,7 +1,7 @@
 # App Shell
 
-**Last updated:** 2026-08-24
-**Updated by phase:** 17-backup-export-restore
+**Last updated:** 2026-08-27
+**Updated by phase:** 18.1-contact-method-normalization
 **Owners:** `App.tsx`, `src/navigation/RootNavigator.tsx`, `src/navigation/types.ts`, `src/navigation/linking.ts`, `src/navigation/notification-gate.tsx`, `src/navigation/widget-linking.ts`, `src/screens/SettingsScreen.tsx`, `src/theme/theme-types.ts`, `src/theme/theme-presets.ts`
 
 ## Purpose
@@ -22,6 +22,7 @@ _None._ The shell owns runtime navigation and theme contracts, not durable appli
 | Navigator | `src/navigation/RootNavigator.tsx` | Registers native-stack routes, including dashboard sibling lists, Digest, Orrery, management, modal crop, and Compose surfaces, with custom headers. |
 | Route types | `src/navigation/types.ts` | Defines serializable parameters for profile, edit, crop, and self-fetching Compose routes, including an optional AI request intent. |
 | Intent gate | `src/navigation/linking.ts` | Converts provider-owned pending share state into ready-gated navigation to Capture. |
+| Backup-share gate | `src/navigation/backup-share-intent.ts` | Holds a narrow inbound backup-file intent until the backup restore surface is ready. |
 | Notification gate | `src/navigation/notification-gate.tsx` | Converts warm and cold local-notification responses into ready-gated actions or navigation. |
 | Widget gate | `src/navigation/widget-linking.ts` | Converts narrowly accepted widget `orbit://` links into ready-gated Dashboard-rooted resets. |
 | Settings surface | `src/screens/SettingsScreen.tsx` | Hosts low-traffic lifecycle routes, self-photo, sun controls, favourites, and non-secret AI configuration. |
@@ -35,6 +36,7 @@ _None._ The shell owns runtime navigation and theme contracts, not durable appli
 | `src/navigation/RootNavigator.tsx` | Native stack for the dashboard Home, Digest, Orrery, Settings, contact lifecycle, Compose, NeverContacted, ManageFavourites, and CropPhoto. |
 | `src/navigation/types.ts` | Typed root-stack route contract, including the self-fetching Digest and Compose surfaces and photo-crop targets. |
 | `src/navigation/linking.ts` | Holds the navigation ref and the single ready-gated Capture navigation owner. |
+| `src/navigation/backup-share-intent.ts` | Handles the narrow Files-to-Orbit backup-share fallback without placing a file URI in route state. |
 | `src/navigation/notification-gate.tsx` | Owns warm/cold notification-response handling once navigation is ready. |
 | `src/navigation/widget-linking.ts` | Owns the separate, strict widget URI bridge without consuming native share state. |
 | `src/screens/CaptureScreen.tsx` | Provides the in-app target for a pending Android text share. |
@@ -93,6 +95,12 @@ _None._ The shell owns runtime navigation and theme contracts, not durable appli
 1. The ready-gated application effect registers notification reconciliation, awaits channel and action-category initialization, then installs the launch-sweep trigger.
 2. `App.tsx` imports the headless-task module at bundle scope and sets an explicit silent foreground notification behavior.
 3. `NotificationResponseGate` shares the navigator readiness flag with `ShareIntentGate`, queues an early body tap, and applies it only after the navigation ref is ready.
+
+### Bootstrapping normalized-method migration
+
+1. `App.tsx` resolves the device region before its first `openAndMigrate()` call and passes it through migration dependencies.
+2. Notification and widget headless first-open paths use the same platform-only region provider, so a killed-app action cannot consume the irreversible v9 migration with an invented region.
+3. A missing device region fails closed for national-format migration parsing; later user edits may use the validated persisted override.
 
 ### Opening and refreshing the widget
 
@@ -165,6 +173,8 @@ _None._ The shell owns runtime navigation and theme contracts, not durable appli
 - **ADR-055:** Dedicated Weekly Digest Scheduling and Persisted Notification Policy — adds the dashboard-rooted Digest notification reset and ready-gated schedule hook.
 - **ADR-057:** Full-State Versioned Backups with Verified Manual and Foreground SAF Snapshots — adds the Backup destination and ready-gated foreground automatic work.
 - **ADR-058:** Optional Encrypted Backups and Previewed Local Restoration — keeps restore content and passphrases out of navigation state.
+- **ADR-059:** Normalized Contact Methods, Canonical Actionability, and Local Provenance — supplies the device-region bootstrap for the one-time method migration.
+- **ADR-060:** Versioned Portable Method Graph and Collision-Normalized Restoration — adds the narrow ready-gated backup-share fallback.
 
 ## Gotchas
 
@@ -184,6 +194,7 @@ _None._ The shell owns runtime navigation and theme contracts, not durable appli
 14. **Reset digest notification taps instead of navigating onto a warm stack.** The Home/Digest reset is what makes the Digest screen's Back destination stable.
 15. **Do not mount navigation after a bootstrap failure.** A classified migration failure has rolled back unchanged; generic failure copy must not promise unavailable support or recovery.
 16. **Restore route parameters must be content-free.** Pass only an opaque in-memory cache token and aggregate preview; never put a file URI, manifest, callback, or passphrase in navigation state.
+17. **Every possible first opener needs the migration region.** `openAndMigrate()` can run before React mounts from headless notification or widget work; database bootstrap itself stays free of native localization imports for node-testability.
 
 ## Related Systems
 
@@ -217,3 +228,4 @@ _None._ The shell owns runtime navigation and theme contracts, not durable appli
 | 2026-08-23 | 15 | Added the typed Digest route, dashboard entry, dashboard-rooted notification reset, and ready-gated schedule registration. |
 | 2026-08-24 | 16 | Added accurate classified migration and generic bootstrap failure presentation while retaining the readiness gate. |
 | 2026-08-24 | 17 | Added Backup routes, content-free restore navigation, and ready-gated backup/photo recovery hooks. |
+| 2026-08-27 | 18.1 | Added device-region migration bootstrap and the ready-gated backup-share fallback. |
