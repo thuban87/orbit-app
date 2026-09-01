@@ -49,4 +49,4 @@ The system uses indefinite, typed tombstones and a standalone UID reconciliation
 - `src/backup/reconciliation.ts` — implements UID, tombstone, parent-survival, and incompatibility policy.
 
 **Depends on:** ADR-001 (Normalized Custom-Field Values); ADR-009 (Crash-Safe Forward-Only SQLite Migrations).
-**Required by:** ADR-057 (Full-State Versioned Backups with Verified Manual and Foreground SAF Snapshots); ADR-060 (Versioned Portable Method Graph and Collision-Normalized Restoration).
+**Required by:** ADR-057 (Full-State Versioned Backups with Verified Manual and Foreground SAF Snapshots); ADR-060 (Versioned Portable Method Graph and Collision-Normalized Restoration); ADR-069 (Atomic Tombstone-Backed Orbit Contact Merge).
