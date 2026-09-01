@@ -53,7 +53,7 @@
 // NOTE: ADR-0041 [ACCEPTED] Notification Settings, Privacy Channels, and Birthday Alerts
 // NOTE: ADR-0042 [ACCEPTED] Shared Status Palette for Dashboard and Widget Rings
 // NOTE: ADR-0043 [ACCEPTED] Static Globally Mirrored Favourites Widget
-// NOTE: ADR-0044 [ACCEPTED] Headless Widget Actions and Dashboard-Rooted Deep Links
+// IMPORTANT: ADR-0044 [SUPERSEDED BY ADR-074 (partial)] Headless Widget Actions and Dashboard-Rooted Deep Links
 // NOTE: ADR-0045 [ACCEPTED] Event-Driven Widget Refresh and Boot Recovery
 // NOTE: ADR-0046 [ACCEPTED] Query-Time Orrery Placement and Transactional Ring Ordering
 // NOTE: ADR-0047 [ACCEPTED] App-Level Assignable Sun and Themed Self Identity
@@ -79,5 +79,10 @@
 // NOTE: ADR-0067 [ACCEPTED] Conservative Advisory Identity Matching and Explicit Source Consolidation
 // NOTE: ADR-0068 [ACCEPTED] User-Triggered, Source-Only Reconciliation with Durable Review
 // NOTE: ADR-0069 [ACCEPTED] Atomic Tombstone-Backed Orbit Contact Merge
+// NOTE: ADR-0070 [ACCEPTED] Durable Pending Interaction-Assist Lifecycle and Portable Opt-Out
+// NOTE: ADR-0071 [ACCEPTED] User-Attested Handoff-Time Interaction Logging Through the Sole Recency Writer
+// NOTE: ADR-0072 [ACCEPTED] Shared Actionable Reach Out Router with Native Channel Handoff
+// NOTE: ADR-0073 [ACCEPTED] Merge-Reparented, Purge-Cascaded Interaction Assists
+// NOTE: ADR-0074 [ACCEPTED] Widget Contact Supersession and Strict Reach Deep-Link Fail-Safe
 
-export const ADR_COUNT = 69;
+export const ADR_COUNT = 74;

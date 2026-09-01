@@ -21,8 +21,8 @@ not something you can pattern-match against.
 
 ## How to use this
 
-- **Is a decision still live?** Check the `Superseded by` column. 10 of
-  69 ADRs are superseded in whole or in part.
+- **Is a decision still live?** Check the `Superseded by` column. 11 of
+  74 ADRs are superseded in whole or in part.
 - **Which decisions govern a file?** Don't grep this file — ask the graph:
   `npm run graph:ask -- governs src/db/field-values-dao.ts`, or follow the
   `governed_by` edges.
@@ -74,7 +74,7 @@ not something you can pattern-match against.
 | 041 | Notification Settings, Privacy Channels, and Birthday Alerts | Accepted | 11-actionable-notifications | — | — | — | 6 | `src/db`, `src/db/migrations`, `src/screens` +1 |
 | 042 | Shared Status Palette for Dashboard and Widget Rings | Accepted | 12-home-screen-widget | — | — | — | 5 | `src/components`, `src/services/widget`, `src/theme` |
 | 043 | Static Globally Mirrored Favourites Widget | Accepted | 12-home-screen-widget | — | — | — | 4 | `src/db`, `src/screens`, `src/services/widget` |
-| 044 | Headless Widget Actions and Dashboard-Rooted Deep Links | Accepted | 12-home-screen-widget | — | — | — | 4 | `src/navigation`, `src/services/widget` |
+| 044 | Headless Widget Actions and Dashboard-Rooted Deep Links | Accepted | 12-home-screen-widget | — | ADR-074 (partial) | — | 4 | `src/navigation`, `src/services/widget` |
 | 045 | Event-Driven Widget Refresh and Boot Recovery | Accepted | 12-home-screen-widget | — | — | — | 4 | `plugins`, `src/services/notifications`, `src/services/widget` |
 | 046 | Query-Time Orrery Placement and Transactional Ring Ordering | Accepted | 13-orrery | — | — | — | 4 | `src/db`, `src/logic` |
 | 047 | App-Level Assignable Sun and Themed Self Identity | Accepted | 13-orrery | — | — | — | 6 | `src/db`, `src/db/migrations`, `src/logic` +2 |
@@ -100,3 +100,8 @@ not something you can pattern-match against.
 | 067 | Conservative Advisory Identity Matching and Explicit Source Consolidation | Accepted | 19-system-contact-import | — | — | — | 6 | `src/components`, `src/db`, `src/screens` +1 |
 | 068 | User-Triggered, Source-Only Reconciliation with Durable Review | Accepted | 20-contact-reconciliation-merge | — | — | — | 8 | `src/db`, `src/db/migrations`, `src/logic` +2 |
 | 069 | Atomic Tombstone-Backed Orbit Contact Merge | Accepted | 20-contact-reconciliation-merge | — | — | — | 7 | `src/components`, `src/db`, `src/db/migrations` +1 |
+| 070 | Durable Pending Interaction-Assist Lifecycle and Portable Opt-Out | Accepted | 21-interaction-assist-reach-out | — | — | — | 11 | `src/backup`, `src/components`, `src/db` +5 |
+| 071 | User-Attested Handoff-Time Interaction Logging Through the Sole Recency Writer | Accepted | 21-interaction-assist-reach-out | — | — | — | 3 | `src/components`, `src/db` |
+| 072 | Shared Actionable Reach Out Router with Native Channel Handoff | Accepted | 21-interaction-assist-reach-out | — | — | — | 6 | `src/components`, `src/db`, `src/screens` +1 |
+| 073 | Merge-Reparented, Purge-Cascaded Interaction Assists | Accepted | 21-interaction-assist-reach-out | — | — | — | 3 | `src/db`, `src/db/migrations` |
+| 074 | Widget Contact Supersession and Strict Reach Deep-Link Fail-Safe | Accepted | 21-interaction-assist-reach-out | ADR-044 (partial) | — | — | 5 | `src/navigation`, `src/screens`, `src/services/widget` |
