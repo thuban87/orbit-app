@@ -4,7 +4,7 @@
 
 Orbit evolves its on-device SQLite schema with ordered TypeScript migrations rather than SQL files or a remote database. Use this process when changing durable SQLite structure: it keeps one version step atomic, testable with node-side SQLite, and safe to retry after a failure.
 
-## Architecture (Phases 02, 11)
+## Architecture (Phases 02, 11, 16)
 
 The bootstrap opens `orbit.db`, sets connection PRAGMAs before opening a transaction, then calls the migration runner. The runner reads `PRAGMA user_version`, sorts pending steps, and commits each step's DDL and version bump together.
 
@@ -32,7 +32,8 @@ try {
 2. **`src/db/migrations/runner.ts`** — discovers and applies pending numbered steps.
 3. **`src/db/migrations/001-initial.ts`** — defines the phase-2 initial schema and seeds.
 4. **`src/db/migrations/002-app-settings.ts`** — additive singleton-settings example: DDL and seed remain in the same version step.
-5. **`PRAGMA user_version`** — records the last fully committed step.
+5. **`src/db/migrations/006-normalize-custom-field-values.ts`** — representation-conversion example: validates, copies, proves, then retires a legacy table in one transaction.
+6. **`PRAGMA user_version`** — records the last fully committed step.
 
 ## File Locations
 
@@ -45,6 +46,8 @@ try {
 | `src/db/migrations/001-initial.ts` | Initial schema migration example. |
 | `src/db/migrations/001-initial.test.ts` | Node-side schema, seed, and cascade verification. |
 | `src/db/migrations/002-app-settings.ts` | Additive, defaulted singleton-table migration example. |
+| `src/db/migrations/006-normalize-custom-field-values.ts` | Atomic dynamic-column to normalized-pair conversion. |
+| `src/db/migrations/006-normalize-custom-field-values.test.ts` | v5-to-v6 preservation, rollback, and orphan-column migration proof. |
 | `src/db/app-settings-dao.test.ts` | Migration-002 defaults and validated settings-write coverage. |
 | `src/db/__testkit__/node-sqlite.ts` | In-memory SQLite adapter for migration tests. |
 
@@ -68,7 +71,7 @@ try {
 
 3. **Register the migration** in the `MIGRATIONS` list in `src/db/database.ts`, and advance `TARGET_VERSION` to the same integer. The runner performs the transaction and `user_version` bump; do not add a second transaction or manually update `user_version` in the migration.
 
-4. **Add an in-memory test** beside the migration. Open the fixture from `src/db/__testkit__/node-sqlite.ts`, run the real migration runner, and assert the schema/data result plus retry safety for a throwing step where relevant.
+4. **Add an in-memory test** beside the migration. Open the fixture from `src/db/__testkit__/node-sqlite.ts`, run the real migration runner, and assert the schema/data result plus retry safety for a throwing step where relevant. For a representation conversion, test source-byte preservation, complete destination coverage, and an unchanged source database after a classified failure.
 
 5. **Run the checks**:
 
@@ -84,6 +87,7 @@ try {
 - Do not write a `.sql` migration file; Orbit migrations are TypeScript under `src/db/migrations/`.
 - Do not use `withTransactionAsync` or `withExclusiveTransactionAsync` for a migration step.
 - Do not set `foreign_keys=ON` inside the migration; `openAndMigrate()` sets it before the runner starts.
+- Do not add a dual-read or dual-write compatibility mode after a one-way representation conversion; the migration owns the cutover.
 
 ## Pitfalls
 
@@ -93,13 +97,15 @@ try {
 
 3. **Adding an un-backfillable column later.** Migration 001 deliberately includes merge metadata and core fields from day one because unreachable devices cannot receive a truthful historical backfill.
 
+4. **Treating every malformed legacy shape alike.** Migration 006 rolls back unchanged when a loss-bearing inconsistency prevents preservation, but records a non-loss-bearing orphan dynamic column in bounded `field_history` and proceeds. The latter is an audit trace, not recovery or backup.
+
 ## Smoke Test
 
 ```bash
-npx vitest run src/db/migrations/runner.test.ts src/db/migrations/001-initial.test.ts src/db/app-settings-dao.test.ts
+npx vitest run src/db/migrations/runner.test.ts src/db/migrations/001-initial.test.ts src/db/migrations/006-normalize-custom-field-values.test.ts
 ```
 
-Expected: the runner, initial-schema, and migration-002 settings suites pass, including rollback, seed, foreign-key-cascade, and additive-default assertions.
+Expected: the runner, initial-schema, and migration-006 suites pass, including rollback, seed, foreign-key-cascade, source-value preservation, and normalized-pair assertions.
 
 ```bash
 npx tsc --noEmit && npx biome check src/db
