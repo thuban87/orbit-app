@@ -49,4 +49,4 @@ The system requires archive before purge: archive is reversible from the profile
 - `src/theme/theme-presets.ts` — defines the owner-approved `danger` value in the space-dark preset.
 
 **Depends on:** ADR-008 (Initial Contact Schema as a Cross-Phase Data Contract); ADR-013 (Runtime Two-Table Custom Fields with Whitelist-Constructed DDL); ADR-006 (Theme-Token Architecture).
-**Required by:** ADR-021 (Durable Relative-Path Photo Masters with Crash-Safe Lifecycle Cleanup)
+**Required by:** ADR-021 (Durable Relative-Path Photo Masters with Crash-Safe Lifecycle Cleanup); ADR-025 (Immutable Lifecycle Events in a Unified Timeline)

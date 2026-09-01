@@ -46,4 +46,4 @@ The system maintains `contacts.last_contact` through one serialized recency DAO.
 - `src/db/migrations/001-initial.ts` — defines the contacts and interactions tables plus recency index.
 
 **Depends on:** ADR-008 (Initial Contact Schema as a Cross-Phase Data Contract).
-**Required by:** ADR-011 (Query-Time Status and Never-Contacted Segregation); ADR-016 (Fixed-First Contact Forms and Atomic Contact Creation).
+**Required by:** ADR-011 (Query-Time Status and Never-Contacted Segregation); ADR-016 (Fixed-First Contact Forms and Atomic Contact Creation); ADR-023 (Structured Touchpoints and One-Tap Defaults).

@@ -49,4 +49,4 @@ The system uses structured interaction rows with an explicit `unspecified` chann
 - `src/components/TouchpointRefineForm.tsx` — exposes the later correction path for optional touchpoint detail.
 
 **Depends on:** ADR-010 (Single-Writer Interaction Recency Spine)
-**Required by:** _None._
+**Required by:** ADR-027 (Derived Profile-Only Gravity and Intensity)
