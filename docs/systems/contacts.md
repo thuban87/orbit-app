@@ -1,7 +1,7 @@
 # Contacts
 
-**Last updated:** 2026-08-16
-**Updated by phase:** 12-home-screen-widget
+**Last updated:** 2026-08-18
+**Updated by phase:** 14-ai-message-suggestions
 **Owners:** `src/db/contacts-dao.ts`, `src/db/contact-read.ts`, `src/db/favourites-dao.ts`, `src/db/profile-dao.ts`, `src/db/contact-links-dao.ts`, `src/db/purge-dao.ts`, `src/db/recency-dao.ts`
 
 ## Purpose
@@ -73,6 +73,7 @@ All data is on-device SQLite. Migration 001 uses a surrogate `contacts.id` and a
 | `src/screens/EditContactScreen.tsx` | Always-show edit form for fixed fields, links, and custom values. |
 | `src/screens/ArchivedContactsScreen.tsx` | Restore and impact-summary purge surface. |
 | `src/screens/CaptureScreen.tsx` | Uses the existing name-only contact create path when a shared item has no owner yet. |
+| `src/screens/ContactProfileScreen.tsx` | Provides the configured-provider AI draft entry without making a contact write. |
 
 ## How It Works
 
@@ -116,6 +117,12 @@ All data is on-device SQLite. Migration 001 uses a surrogate `contacts.id` and a
 2. Compose trims the optional phone to decide SMS availability and treats an archived header as unavailable rather than showing a live messaging surface.
 3. Send and Copy remain handoff-only actions; the contacts system receives no interaction or recency write from them.
 
+### Starting an AI draft from the profile
+
+1. Profile reads ordinary app settings alongside the contact header and shows its additive AI draft entry only when a provider is configured.
+2. The entry navigates to Compose with `{ contactId, requestAiSuggestion: true }`; it passes no contact snapshot, prompt, credential, or callback.
+3. Compose consumes the intent and owns all generation state. AI generation, acknowledgement, and draft replacement never write `contacts`, `interactions`, `fuel`, or `last_contact`.
+
 ### Snoozing reminders
 
 1. The edit form exposes the durable Mute reminders policy, while the profile exposes 3-day, 1-week, and 1-month snooze actions plus Clear.
@@ -156,6 +163,7 @@ All data is on-device SQLite. Migration 001 uses a surrogate `contacts.id` and a
 - **ADR-040:** Exactly-Once Notification Actions and Dashboard-Rooted Tap Routing — routes mark-contacted and snooze through the established contact write boundaries.
 - **ADR-043:** Static Globally Mirrored Favourites Widget — reuses one guarded favourite-rank list for every widget instance.
 - **ADR-045:** Event-Driven Widget Refresh and Boot Recovery — refreshes the widget after committed contact-visible changes.
+- **ADR-052:** Compose-Owned AI Draft Lifecycle and Acknowledged Egress — adds a configured-provider profile entry while retaining the contact-write boundary.
 
 ## Gotchas
 
@@ -173,6 +181,7 @@ All data is on-device SQLite. Migration 001 uses a surrogate `contacts.id` and a
 12. **Keep snooze dates local.** `snooze_until` is already a local bare date; parse or render it as UTC and near-midnight users see the wrong day.
 13. **Mute does not hide a contact.** `reminders_off` suppresses decay scheduling only; Dashboard, status, and birthday behavior remain otherwise unchanged.
 14. **Publish widget refresh only after a successful mutation.** A failed favourite rewrite, archive, restore, or metadata save must not advertise a state that SQLite did not commit.
+15. **The AI profile entry is not a contact action.** It routes serializable identity only; Compose may generate an editable draft but must not record recency or a touchpoint.
 
 ## Related Systems
 
@@ -185,6 +194,7 @@ All data is on-device SQLite. Migration 001 uses a surrogate `contacts.id` and a
 - **Capture** — selects or name-only creates a fuel owner while retaining the never-contacted state.
 - **Notifications** — derives decay eligibility from contact state and owns the OS schedule.
 - **Widget** — mirrors favourite rank and contact-visible fields without storing another configuration record.
+- **AI suggestions** — receives a profile-originated Compose intent but has no contact-write authority.
 
 ## Changelog
 
@@ -199,3 +209,4 @@ All data is on-device SQLite. Migration 001 uses a surrogate `contacts.id` and a
 | 2026-08-16 | 10 | Added name-only capture creation that remains never-contacted and does not write recency. |
 | 2026-08-16 | 11 | Added local snooze writes, durable reminder muting, and scheduling-state reconciliation. |
 | 2026-08-16 | 12 | Published widget refreshes after committed favourite and contact-visible mutations. |
+| 2026-08-18 | 14 | Added the configured-provider profile entry for a Compose-owned AI draft without contact-side effects. |
