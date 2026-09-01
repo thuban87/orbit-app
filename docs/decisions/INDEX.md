@@ -22,7 +22,7 @@ not something you can pattern-match against.
 ## How to use this
 
 - **Is a decision still live?** Check the `Superseded by` column. 2 of
-  45 ADRs are superseded in whole or in part.
+  48 ADRs are superseded in whole or in part.
 - **Which decisions govern a file?** Don't grep this file — ask the graph:
   `npm run graph:ask -- governs src/db/field-values-dao.ts`, or follow the
   `governed_by` edges.
@@ -76,3 +76,6 @@ not something you can pattern-match against.
 | 043 | Static Globally Mirrored Favourites Widget | Accepted | 12-home-screen-widget | — | — | — | 4 | `src/db`, `src/screens`, `src/services/widget` |
 | 044 | Headless Widget Actions and Dashboard-Rooted Deep Links | Accepted | 12-home-screen-widget | — | — | — | 4 | `src/navigation`, `src/services/widget` |
 | 045 | Event-Driven Widget Refresh and Boot Recovery | Accepted | 12-home-screen-widget | — | — | — | 4 | `plugins`, `src/services/notifications`, `src/services/widget` |
+| 046 | Query-Time Orrery Placement and Transactional Ring Ordering | Accepted | 13-orrery | — | — | — | 4 | `src/db`, `src/logic` |
+| 047 | App-Level Assignable Sun and Themed Self Identity | Accepted | 13-orrery | — | — | — | 6 | `src/db`, `src/db/migrations`, `src/logic` +2 |
+| 048 | Status-Default Static Orrery with a Single-Canvas Morph | Accepted | 13-orrery | — | — | — | 7 | `src/components`, `src/components/orrery`, `src/navigation` +1 |

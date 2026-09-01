@@ -55,5 +55,8 @@
 // NOTE: ADR-0043 [ACCEPTED] Static Globally Mirrored Favourites Widget
 // NOTE: ADR-0044 [ACCEPTED] Headless Widget Actions and Dashboard-Rooted Deep Links
 // NOTE: ADR-0045 [ACCEPTED] Event-Driven Widget Refresh and Boot Recovery
+// NOTE: ADR-0046 [ACCEPTED] Query-Time Orrery Placement and Transactional Ring Ordering
+// NOTE: ADR-0047 [ACCEPTED] App-Level Assignable Sun and Themed Self Identity
+// NOTE: ADR-0048 [ACCEPTED] Status-Default Static Orrery with a Single-Canvas Morph
 
-export const ADR_COUNT = 45;
+export const ADR_COUNT = 48;
