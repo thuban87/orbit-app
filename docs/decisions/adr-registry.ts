@@ -25,5 +25,9 @@
 // NOTE: ADR-0013 [ACCEPTED] Runtime Two-Table Custom Fields with Whitelist-Constructed DDL
 // NOTE: ADR-0014 [ACCEPTED] Read-Time Custom-Field Type Semantics and a Single Sort Expression
 // NOTE: ADR-0015 [ACCEPTED] Lossless Field Changes with Quarantine and Launch-Time Retention Sweep
+// NOTE: ADR-0016 [ACCEPTED] Fixed-First Contact Forms and Atomic Contact Creation
+// NOTE: ADR-0017 [ACCEPTED] Multi-Link Contact Reachability
+// NOTE: ADR-0018 [ACCEPTED] Archive-Gated Contact Purge with Explicit Fan-Out
+// NOTE: ADR-0019 [ACCEPTED] Native Stack Contact Lifecycle Navigation
 
-export const ADR_COUNT = 15;
+export const ADR_COUNT = 19;

@@ -22,7 +22,7 @@ not something you can pattern-match against.
 ## How to use this
 
 - **Is a decision still live?** Check the `Superseded by` column. 0 of
-  15 ADRs are superseded in whole or in part.
+  19 ADRs are superseded in whole or in part.
 - **Which decisions govern a file?** Don't grep this file — ask the graph:
   `npm run graph:ask -- governs src/db/field-values-dao.ts`, or follow the
   `governed_by` edges.
@@ -46,3 +46,7 @@ not something you can pattern-match against.
 | 013 | Runtime Two-Table Custom Fields with Whitelist-Constructed DDL | Accepted | 03-custom-fields | — | — | — | 6 | `src/db` |
 | 014 | Read-Time Custom-Field Type Semantics and a Single Sort Expression | Accepted | 03-custom-fields | — | — | — | 5 | `src/components`, `src/db` |
 | 015 | Lossless Field Changes with Quarantine and Launch-Time Retention Sweep | Accepted | 03-custom-fields | — | — | — | 5 | `src/db`, `src/services` |
+| 016 | Fixed-First Contact Forms and Atomic Contact Creation | Accepted | 04-contact-crud-lifecycle | — | — | — | 5 | `src/components`, `src/db`, `src/screens` |
+| 017 | Multi-Link Contact Reachability | Accepted | 04-contact-crud-lifecycle | — | — | — | 4 | `src/components`, `src/db`, `src/screens` |
+| 018 | Archive-Gated Contact Purge with Explicit Fan-Out | Accepted | 04-contact-crud-lifecycle | — | — | — | 5 | `src/db`, `src/screens`, `src/theme` |
+| 019 | Native Stack Contact Lifecycle Navigation | Accepted | 04-contact-crud-lifecycle | — | — | — | 4 | `src/navigation`, `src/screens` |
