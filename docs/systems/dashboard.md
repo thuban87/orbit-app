@@ -1,7 +1,7 @@
 # Dashboard
 
-**Last updated:** 2026-08-15
-**Updated by phase:** 08-dashboard-never-contacted-screen
+**Last updated:** 2026-08-16
+**Updated by phase:** 11-actionable-notifications
 **Owners:** `src/db/dashboard-read.ts`, `src/screens/HomeScreen.tsx`, `src/screens/NeverContactedScreen.tsx`, `src/components/ContactCard.tsx`, `src/components/BirthdayBanner.tsx`, `src/stores/dashboard-prefs-store.ts`
 
 ## Purpose
@@ -61,6 +61,7 @@ The dashboard owns no tables. It projects the on-device `contacts`, `categories`
 1. The normal list excludes archived, never-contacted, and currently snoozed people.
 2. The dashboard shows a counted Not yet contacted entry, a counted Snoozed chip, and a count-less Archived entry.
 3. Not yet contacted opens `NeverContactedScreen`, whose inverse query keeps status and progress null and defaults to oldest-added-first.
+4. A profile snooze now writes the existing `snooze_until` field, so the Snoozed chip reflects real contact state rather than an empty future-facing branch.
 
 ### Showing birthdays and empty states
 
@@ -81,6 +82,7 @@ The dashboard owns no tables. It projects the on-device `contacts`, `categories`
 - **ADR-032:** Flat Dashboard Discovery and In-Query Contact Search — makes the dashboard Home and owns local name-plus-fuel search.
 - **ADR-033:** Profile Marking and Shared Drag-Reordered Favourites — supplies the card marker and favourites filter/management surface.
 - **ADR-034:** Birthday Banner and Re-query Dashboard Freshness — defines birthday candidates and reliable local freshness.
+- **ADR-039:** Pre-Scheduled Inexact Decay Reminders — reuses dashboard status and birthday semantics for local reminder candidates.
 
 ## Gotchas
 
@@ -89,6 +91,7 @@ The dashboard owns no tables. It projects the on-device `contacts`, `categories`
 3. **Keep fuel exclusions in SQL.** `off_limits`, unconfirmed AI, and blank fuel must not be filtered in a component after projection.
 4. **Do not use a database change listener for dashboard freshness.** It cannot observe writes from a different SQLite connection or headless context.
 5. **Pass identity and cache busting to avatars.** `ContactCard` must provide `contactId` and `modified_at` so a recycled list cell cannot flash another person's photo.
+6. **Snooze and notification suppression differ.** The Snoozed branch follows `snooze_until`; notification decay additionally respects mute, rare-response, rogue, and lifecycle suppression, while birthdays ignore them.
 
 ## Related Systems
 
@@ -96,9 +99,11 @@ The dashboard owns no tables. It projects the on-device `contacts`, `categories`
 - **Status engine** — supplies the query-time status and progress fragments.
 - **Conversational fuel** — supplies eligible ranked lines and literal-safe search predicates.
 - **App shell** — registers the sibling list and management routes.
+- **Notifications** — reuses status and birthday-candidate semantics for OS reminders; the dashboard remains the in-app truth surface.
 
 ## Changelog
 
 | Date | Phase | What Changed |
 |---|---|---|
 | 2026-08-15 | 08 | Created the dashboard, first-contact sibling list, favourites controls, birthday banner, and local refresh path. |
+| 2026-08-16 | 11 | Activated the snoozed population through durable snooze writes and aligned reminder candidate semantics with dashboard status and birthdays. |
