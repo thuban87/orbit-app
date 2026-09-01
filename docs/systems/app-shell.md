@@ -80,6 +80,7 @@ _None._ The shell owns runtime navigation and theme contracts, not durable appli
 ## Decisions
 
 - **ADR-006:** Theme-Token Architecture — all UI colors resolve through the theme contract.
+- **ADR-015:** Lossless Field Changes with Quarantine and Launch-Time Retention Sweep — keeps launch-time cleanup inside the ready-gated application shell.
 - **ADR-018:** Archive-Gated Contact Purge with Explicit Fan-Out — destructive controls use the dedicated danger token.
 - **ADR-019:** Native Stack Contact Lifecycle Navigation — replaces temporary Home-local routing with native-stack navigation.
 - **ADR-020:** Library-Only Photo Capture with Themed In-App Cropping and One-Time URL Download — adds the modal crop route and self-photo entry.
