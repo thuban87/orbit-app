@@ -1,7 +1,7 @@
 # Persistence Core
 
-**Last updated:** 2026-08-24
-**Updated by phase:** 17-backup-export-restore
+**Last updated:** 2026-08-27
+**Updated by phase:** 18.1-contact-method-normalization
 **Owners:** `src/db/database.ts`, `src/db/migrations/runner.ts`, `src/db/migrations/001-initial.ts`, `src/db/mutex.ts`, `src/db/transaction.ts`, `src/services/launch-sweep.ts`
 
 ## Purpose
@@ -24,6 +24,8 @@ The schema version is SQLite's `PRAGMA user_version`. Migrations 001–005 estab
 - `app_settings` — a singleton SQLite row for non-secret preferences, a monotonic exportable-data revision, and device-local backup health/configuration. It never contains an API key or passphrase.
 - `tombstones` — indefinitely retained type-and-UID deletion evidence for portable reconciliation.
 - `restore_photo_journal` — committed restore-photo finalization and cleanup work.
+- `contact_methods` — ordered UID-bearing phone/email rows with canonical/actionability data, optional label, and durable display order.
+- external-link and method-provenance rows — UID-bearing local source evidence that never replaces Orbit identity.
 
 **Types** (`src/db/types.ts`):
 - `SqlExecutor` — database operations shared by Expo SQLite and the node-side test adapter.
@@ -43,6 +45,8 @@ The schema version is SQLite's `PRAGMA user_version`. Migrations 001–005 estab
 | Migration | `src/db/migrations/006-normalize-custom-field-values.ts` | Atomically validates and converts legacy custom values to normalized pairs. |
 | Migration | `src/db/migrations/007-tombstones.ts` | Adds tombstones, data revisions, stable seed identities, and backup settings. |
 | Migration | `src/db/migrations/008-restore-photo-journal.ts` | Adds durable committed restore-photo recovery evidence. |
+| Migration | `src/db/migrations/009-contact-method-normalization.ts` | Rebuilds the contact graph and migrates scalar endpoints into normalized methods. |
+| Migration | `src/db/migrations/010-contact-method-label.ts` | Adds nullable durable labels to normalized method rows. |
 | Settings DAO | `src/db/app-settings-dao.ts` | Validates and persists the singleton's notification, Orrery, and non-secret AI preference updates. |
 | Concurrency utility | `src/db/mutex.ts` | Serializes database write transactions in one JS runtime. |
 | Transaction utility | `src/db/transaction.ts` | Opens a hand-rolled transaction inside the shared non-reentrant mutex. |
@@ -62,6 +66,8 @@ The schema version is SQLite's `PRAGMA user_version`. Migrations 001–005 estab
 | `src/db/migrations/006-normalize-custom-field-values.ts` | Validates, copies, proves, and retires the legacy dynamic custom-value table in one step. |
 | `src/db/migrations/007-tombstones.ts` | Adds permanent deletion evidence and backup-specific SQLite support. |
 | `src/db/migrations/008-restore-photo-journal.ts` | Adds journal rows for committed restore-photo recovery. |
+| `src/db/migrations/009-contact-method-normalization.ts` | Performs the FK-safe contacts rebuild and scalar-to-method cutover. |
+| `src/db/migrations/010-contact-method-label.ts` | Adds optional persisted method labels in a separate forward step. |
 | `src/db/app-settings-dao.ts` | Typed, bounds-validated read and update boundary for application settings. |
 | `src/db/types.ts` | Testable database and migration interfaces. |
 | `src/db/mutex.ts` | Promise-chain serialization primitive. |
@@ -83,6 +89,8 @@ The schema version is SQLite's `PRAGMA user_version`. Migrations 001–005 estab
 9. Migration 006 validates every legacy definition/value correspondence, copies raw values into uid-bearing normalized pairs, proves the copied matrix, and only then retires the legacy table. A loss-bearing inconsistency rolls the whole step back unchanged; a non-loss-bearing orphan column is retained only as a bounded `field_history` snapshot before the step proceeds.
 10. Migration 007 adds permanent tombstones and a monotonic `data_revision` so automatic backup detects every exportable change without timestamp ties. It also fixes profile and seeded-category UIDs across installations.
 11. Migration 008 adds the restore-photo journal; its rows authorize recovery only after the associated database transaction commits.
+12. Migration 009 rebuilds `contacts`, re-points every foreign-key child before retiring the old parent, proves child preservation, and moves scalar phone/email values into normalized method rows. It uses a supplied device region only for the one-time migration parse and records the canonicalization region on successful phone rows.
+13. Migration 010 adds nullable durable method labels; it does not rewrite the committed v9 migration.
 
 ### Running launch maintenance
 
@@ -95,7 +103,7 @@ The schema version is SQLite's `PRAGMA user_version`. Migrations 001–005 estab
 | Constant | Value | File | Purpose |
 |---|---|---|---|
 | `BUSY_TIMEOUT_MS` | `5000` | `src/db/database.ts` | Wait budget for a busy shared connection. |
-| `TARGET_VERSION` | `8` | `src/db/database.ts` | Schema version after backup/restore migrations. |
+| `TARGET_VERSION` | `10` | `src/db/database.ts` | Schema version after normalized-method migrations. |
 
 ## Decisions
 
@@ -115,6 +123,7 @@ The schema version is SQLite's `PRAGMA user_version`. Migrations 001–005 estab
 - **ADR-056:** Tombstone-Backed UID Reconciliation for Portable Restores — adds durable deletion evidence and revision tracking.
 - **ADR-057:** Full-State Versioned Backups with Verified Manual and Foreground SAF Snapshots — uses consistent local read snapshots and migration-backed state.
 - **ADR-058:** Optional Encrypted Backups and Previewed Local Restoration — relies on atomic restore state and durable photo recovery evidence.
+- **ADR-059:** Normalized Contact Methods, Canonical Actionability, and Local Provenance — defines the v9/v10 normalized endpoint migrations.
 
 ## Gotchas
 
@@ -130,6 +139,7 @@ The schema version is SQLite's `PRAGMA user_version`. Migrations 001–005 estab
 10. **Treat `data_revision` as exportable-change evidence.** Backup health writes must not bump it, or every successful snapshot would immediately look stale.
 11. **A read snapshot is intentionally read-only.** Use `inReadSnapshot()` for a coherent export; writes still require the non-reentrant transaction boundary.
 12. **Journal photo work before finalization.** A restore-photo file is recoverable only when a matching committed journal row exists.
+13. **Re-point foreign-key children before dropping a rebuilt parent.** `defer_foreign_keys` delays checking, not cascade actions; row-count preservation and a surviving `sun_contact_id` are load-bearing migration proofs.
 
 ## Related Systems
 
@@ -154,3 +164,4 @@ The schema version is SQLite's `PRAGMA user_version`. Migrations 001–005 estab
 | 2026-08-23 | 15 | Added migration 005 and the durable default-on weekly-digest setting. |
 | 2026-08-24 | 16 | Added migration 006's atomic normalized custom-field value cutover. |
 | 2026-08-24 | 17 | Added migrations 007/008 for tombstones, backup revisions, and committed photo-recovery work. |
+| 2026-08-27 | 18.1 | Added migrations 009/010 for FK-safe normalized contact methods and durable labels. |
