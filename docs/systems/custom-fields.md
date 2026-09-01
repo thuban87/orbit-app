@@ -1,7 +1,7 @@
 # Custom Fields
 
 **Last updated:** 2026-08-24
-**Updated by phase:** 16-custom-field-value-normalization
+**Updated by phase:** 17-backup-export-restore
 **Owners:** `src/db/field-defs-dao.ts`, `src/db/field-values-dao.ts`, `src/db/field-ddl.ts`, `src/db/field-type-change.ts`, `src/db/field-parsers.ts`, `src/db/field-sort.ts`, `src/services/field-sweep.ts`
 
 ## Purpose
@@ -126,6 +126,12 @@ Migration 006 stores current values as normalized rows. Field type determines in
 3. For each candidate, `expireFieldIfStale()` reacquires the serialized transaction, rechecks staleness, snapshots values, and deletes dependent pairs with the definition.
 4. The same launch hook prunes old history rows in a separate serialized transaction.
 
+### Restoring normalized field state
+
+1. Backup validation retains a `NULL` value row as an explicit clear and rejects duplicate pairs, missing parents, or incompatible value-UID and definition-`col_name` collisions before any write.
+2. Reconciliation applies surviving definitions before values; a child whose contact or definition did not survive is blocked rather than inserted.
+3. Permanent definition deletion tombstones the definition and its value rows in the existing transaction. Quarantine and `field_history` stay transient and are neither tombstoned nor exported.
+
 ## Configuration
 
 | Constant | Value | File | Purpose |
@@ -141,6 +147,8 @@ Migration 006 stores current values as normalized rows. Field type determines in
 - **ADR-016:** Fixed-First Contact Forms and Atomic Contact Creation — custom values join the contact create/edit transaction through a non-mutexed core.
 - **ADR-021:** Durable Relative-Path Photo Masters with Crash-Safe Lifecycle Cleanup — photo fields reuse the local master pipeline and derivable `cv-` filenames.
 - **ADR-050:** Closed AI Prompt Egress Allowlist and Opt-In Field Sharing — limits third-party prompt context to explicitly shared live fields.
+- **ADR-056:** Tombstone-Backed UID Reconciliation for Portable Restores — treats normalized clears as portable data and rejects incompatible identities.
+- **ADR-057:** Full-State Versioned Backups with Verified Manual and Foreground SAF Snapshots — exports definitions and current normalized values, not history.
 
 ## Gotchas
 
@@ -154,6 +162,8 @@ Migration 006 stores current values as normalized rows. Field type determines in
 8. **Do not delete a staged custom photo unless its committed references are known.** A custom crop can write the stable file before form save, so uncertain cleanup must prefer a bounded file leak over deleting a referenced image.
 9. **Do not treat `share_with_ai` as a value-row property.** It belongs to `custom_field_defs`; only the AI reader may consume flagged values through its closed projection.
 10. **A loss-bearing migration inconsistency fails closed.** The old database remains unchanged and navigation does not mount; an orphan legacy column is instead retained only as a bounded history snapshot.
+11. **`NULL` is a clear, not absence.** Export and reconciliation must retain its uid and timestamp, or an older populated value can return.
+12. **Quarantine is not deletion.** Only permanent removal creates tombstones; `field_history` remains excluded from portable restore.
 
 ## Related Systems
 
@@ -162,6 +172,7 @@ Migration 006 stores current values as normalized rows. Field type determines in
 - **AI suggestions** — consumes only explicitly shared, live field values as bounded prompt context.
 - **Photos** — supplies the picker, crop, local-master, staged-file, and purge-cleanup contracts for photo-type values.
 - **App shell** — routes the definition editor through Settings.
+- **Backup & Restore** — validates and restores normalized definitions, values, and photo bytes through UID relationships.
 
 ## Changelog
 
@@ -172,3 +183,4 @@ Migration 006 stores current values as normalized rows. Field type determines in
 | 2026-08-15 | 05 | Replaced the photo placeholder with the shared local photo pipeline and staged-file lifecycle handling. |
 | 2026-08-18 | 14 | Exposed default-off per-field AI sharing and routed it to the closed AI context boundary. |
 | 2026-08-24 | 16 | Replaced dynamic columns with normalized uid-bearing value pairs through migration 006. |
+| 2026-08-24 | 17 | Added permanent-delete tombstones and whole-file restore validation for normalized field data. |
