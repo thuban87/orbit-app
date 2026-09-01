@@ -11,7 +11,7 @@
  */
 
 // NOTE: ADR-0001 [ACCEPTED] Normalized Custom-Field Values
-// NOTE: ADR-0002 [NONE] Cross-Version Contact Import — Hybrid Two-Picker
+// IMPORTANT: ADR-0002 [SUPERSEDED BY ADR-003 (partial)] Cross-Version Contact Import — Hybrid Two-Picker
 // NOTE: ADR-0003 [NONE] `READ_CONTACTS` on API 37+ for the Reconcile feature
 // NOTE: ADR-0004 [ACCEPTED] Flat Single-App Repository
 // NOTE: ADR-0005 [ACCEPTED] AiService Port Omits the Local/LAN (Ollama) Provider

@@ -21,7 +21,7 @@ not something you can pattern-match against.
 
 ## How to use this
 
-- **Is a decision still live?** Check the `Superseded by` column. 9 of
+- **Is a decision still live?** Check the `Superseded by` column. 10 of
   67 ADRs are superseded in whole or in part.
 - **Which decisions govern a file?** Don't grep this file — ask the graph:
   `npm run graph:ask -- governs src/db/field-values-dao.ts`, or follow the
@@ -32,7 +32,7 @@ not something you can pattern-match against.
 | # | Title | Status | Phase | Supersedes | Superseded by | Subsystems | Key files | Directories |
 |---|-------|--------|-------|------------|---------------|------------|-----------|-------------|
 | 001 | Normalized Custom-Field Values | Accepted | 16-custom-field-value-normalization | ADR-013; ADR-014 (partial); ADR-015 (partial) | — | — | 9 | `src/db`, `src/db/migrations` |
-| 002 | Cross-Version Contact Import — Hybrid Two-Picker | — | — | — | — | — | — | — |
+| 002 | Cross-Version Contact Import — Hybrid Two-Picker | Accepted | 19.1-older-android-contact-picker-hybrid-two-picker-adr-002 | — | ADR-003 (partial) | — | 12 | `modules/orbit-contact-picker`, `modules/orbit-contact-picker/android/src/main`, `modules/orbit-contact-picker/android/src/main/java/expo/modules/orbitcontactpicker` +6 |
 | 003 | `READ_CONTACTS` on API 37+ for the Reconcile feature | — | — | — | — | — | — | — |
 | 004 | Flat Single-App Repository | Accepted | 01-project-scaffold-portable-code | — | — | — | 1 | `src/db` |
 | 005 | AiService Port Omits the Local/LAN (Ollama) Provider | Accepted | 01-project-scaffold-portable-code | — | — | — | 3 | `src/services` |

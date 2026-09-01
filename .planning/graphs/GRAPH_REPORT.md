@@ -1,16 +1,16 @@
 # Graph Report - orbit-app  (2026-09-01)
 
 ## Corpus Check
-- 584 files · ~474,227 words
+- 584 files · ~474,695 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 4056 nodes · 11596 edges · 220 communities (181 shown, 39 thin omitted)
+- 4056 nodes · 11596 edges · 221 communities (182 shown, 39 thin omitted)
 - Extraction: 99% EXTRACTED · 1% INFERRED · 0% AMBIGUOUS · INFERRED: 101 edges (avg confidence: 0.72)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `8d500238`
+- Built from commit: `98dc3f33`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -229,6 +229,7 @@
 - notification-nav.ts
 - restore-photo-finalize-sweep.test.ts
 - migrateToV12
+- recency-dao.ts
 
 ## God Nodes (most connected - your core abstractions)
 1. `SqlExecutor` - 189 edges
@@ -257,7 +258,7 @@
 ## Import Cycles
 - None detected.
 
-## Communities (220 total, 39 thin omitted)
+## Communities (221 total, 39 thin omitted)
 
 ### Community 0 - "database.ts"
 Cohesion: 0.10
@@ -561,7 +562,7 @@ Nodes (17): ringColor(), ringWeight(), fixture, widgetPalette, WidgetTile, Actio
 
 ### Community 76 - "BackupSettingsScreen.tsx"
 Cohesion: 0.11
-Nodes (35): applyContactMethodDiff(), applyContactMethodDiffCore(), assertOneChange(), ContactMethodDraft, ContactMethodNormalizationContext, ContactMethodRow, ContactMethodSaveResult, listContactMethods() (+27 more)
+Nodes (36): applyContactMethodDiff(), applyContactMethodDiffCore(), assertOneChange(), ContactMethodDraft, ContactMethodNormalizationContext, ContactMethodRow, ContactMethodSaveResult, listContactMethods() (+28 more)
 
 ### Community 77 - "bulk-review-dao.test.ts"
 Cohesion: 0.12
@@ -600,8 +601,8 @@ Cohesion: 0.12
 Nodes (21): combineDateAndTime(), DateOrStored, isCombinedInFuture(), localTimePart(), parseLocalDateTime(), toDate(), CHANNEL_OPTIONS, DIRECTION_OPTIONS (+13 more)
 
 ### Community 86 - "notification-read.test.ts"
-Cohesion: 0.25
-Nodes (12): createField(), deleteOrQuarantineField(), dropField(), dropFieldValues(), DropTarget, expireFieldIfStale(), byDisplayOrder(), defsForCreateForm() (+4 more)
+Cohesion: 0.80
+Nodes (4): byDisplayOrder(), defsForCreateForm(), isLive(), visibleDefsForProfile()
 
 ### Community 87 - "reconcile-photo.ts"
 Cohesion: 0.25
@@ -800,8 +801,8 @@ Cohesion: 0.33
 Nodes (6): 7. Visual design, [DECIDED] Space theme throughout, [DECIDED] Theme tokens, [DECIDED] Two distinct screens — do not merge them, Rendering, The orrery — settled mechanics
 
 ### Community 136 - "linking.ts"
-Cohesion: 0.11
-Nodes (41): acknowledgeProvider(), setInteractionAssistEnabled(), assertPositiveCadence(), bindContact(), unbindContact(), clearContactPhoto(), bumpDataRevisionCore(), clearFavouriteRank() (+33 more)
+Cohesion: 0.12
+Nodes (38): acknowledgeProvider(), setInteractionAssistEnabled(), assertPositiveCadence(), bindContact(), unbindContact(), bumpDataRevisionCore(), clearFavouriteRank(), rewriteFavouriteRanks() (+30 more)
 
 ### Community 137 - "File"
 Cohesion: 0.12
@@ -963,6 +964,10 @@ Nodes (5): reconcileCompletionCounts, footerEntry(), interactionLabel(), Reconci
 Cohesion: 0.40
 Nodes (4): SegmentedControl(), SegmentedControlOption, SegmentedControlProps, styles
 
+### Community 220 - "recency-dao.ts"
+Cohesion: 0.29
+Nodes (10): CreateContactInput, createContactWithInteraction(), deleteTouchpoint(), DeleteTouchpointInput, editTouchpointFull(), EditTouchpointFullInput, insertInteraction(), recomputeLastContact() (+2 more)
+
 ## Knowledge Gaps
 - **1241 isolated node(s):** `styles`, `SchedulableTriggerInputTypes`, `AndroidImportance`, `AndroidNotificationVisibility`, `scheduled` (+1236 more)
   These have ≤1 connection - possible missing edges or undocumented components.
@@ -973,7 +978,7 @@ _Questions this graph is uniquely positioned to answer:_
 
 - **Why does `useTheme()` connect `001-initial.ts` to `field-types.ts`, `import-session-dao.ts`, `crop-geometry.ts`, `import-session-read.ts`, `linking.ts`, `HomeScreen.tsx`, `getExecutor`, `backup-service.ts`, `sun-picker-read.test.ts`, `ResumeReconcilePrompt.tsx`, `reconcile-apply.ts`, `ReconcileGridScreen.tsx`, `Logger`, `OrreryScreen.tsx`, `contacts-dao.ts`, `SettingsScreen.tsx`, `PhotoSourcePicker.tsx`, `impact.ts`, `BackupScreen.tsx`, `create-contact-logic.ts`, `ContactProfileScreen.tsx`, `contact-import-resume-sweep.ts`, `CaptureScreen.tsx`, `model-registry.ts`, `transaction.ts`, `transaction.ts`, `CreateContactScreen.tsx`, `capture-logic.ts`, `queries.test.ts`, `011-contact-lifecycle-schema.test.ts`, `notification-gate.tsx`, `fuel-read.test.ts`, `TouchpointRefineForm.tsx`, `Directory`, `ReconcileDetailScreen`, `channels.test.ts`, `reconcile-session-read.ts`, `notification-actions.test.ts`?**
   _High betweenness centrality (0.056) - this node is a cross-community bridge._
-- **Why does `SqlExecutor` connect `types.ts` to `database.ts`, `ai-service-guards.test.ts`, `import-session-dao.ts`, `linking.ts`, `HomeScreen.tsx`, `File`, `App.tsx`, `ResumeReconcilePrompt.tsx`, `backup-service.ts`, `model-catalog-filter.ts`, `restore-apply.ts`, `Directory`, `ReconcileGridScreen.tsx`, `field-type-change.test.ts`, `reconcile-session-dao.ts`, `MergeConflictsScreen.tsx`, `field-ddl.ts`, `SettingsScreen.tsx`, `app-settings-dao.ts`, `PhotoSourcePicker.tsx`, `photo-storage.ts`, `notification-schedule.test.ts`, `newUid`, `phase-17-runtime-integration.test.ts`, `FuelEditor.tsx`, `DigestScreen.tsx`, `ComposeScreen.tsx`, `RestorePreviewScreen.tsx`, `ContactProfileScreen.tsx`, `contact-import-resume-sweep.ts`, `Avatar.tsx`, `assist-store.ts`, `lifecycle-consumer-ledger.test.ts`, `computeRingReorder`, `model-registry.ts`, `File`, `transaction.ts`, `fuel-dao.test.ts`, `recency-dao.test.ts`, `ImportReviewScreen.tsx`, `CreateContactScreen.tsx`, `NativeGcmCipher`, `survivor-recommendation.ts`, `buildDecayRequest`, `contact-read.test.ts`, `011-contact-lifecycle-schema.test.ts`, `BackupSettingsScreen.tsx`, `EditContactScreen.tsx`, `field-type-change.test.ts`, `field-sort.test.ts`, `prompt-template.ts`, `contact-read.test.ts`, `fuel-read.test.ts`, `reconcile-session-read.test.ts`, `field-sweep.test.ts`, `import-acquire.ts`, `notification-read.test.ts`, `import-driver.test.ts`, `use-read-contacts-permission.ts`, `saf-storage.ts`, `PhotoFieldWidget.tsx`, `contacts-dao.test.ts`, `dashboard-read.test.ts`, `seedFullContact`, `File`, `006-normalize-custom-field-values.test.ts`?**
+- **Why does `SqlExecutor` connect `types.ts` to `database.ts`, `ai-service-guards.test.ts`, `import-session-dao.ts`, `linking.ts`, `HomeScreen.tsx`, `File`, `App.tsx`, `ResumeReconcilePrompt.tsx`, `backup-service.ts`, `model-catalog-filter.ts`, `restore-apply.ts`, `Directory`, `ReconcileGridScreen.tsx`, `field-type-change.test.ts`, `reconcile-session-dao.ts`, `MergeConflictsScreen.tsx`, `field-ddl.ts`, `SettingsScreen.tsx`, `app-settings-dao.ts`, `PhotoSourcePicker.tsx`, `photo-storage.ts`, `notification-schedule.test.ts`, `newUid`, `phase-17-runtime-integration.test.ts`, `FuelEditor.tsx`, `DigestScreen.tsx`, `ComposeScreen.tsx`, `RestorePreviewScreen.tsx`, `ContactProfileScreen.tsx`, `contact-import-resume-sweep.ts`, `Avatar.tsx`, `assist-store.ts`, `lifecycle-consumer-ledger.test.ts`, `computeRingReorder`, `model-registry.ts`, `File`, `transaction.ts`, `fuel-dao.test.ts`, `recency-dao.test.ts`, `ImportReviewScreen.tsx`, `CreateContactScreen.tsx`, `NativeGcmCipher`, `survivor-recommendation.ts`, `buildDecayRequest`, `contact-read.test.ts`, `011-contact-lifecycle-schema.test.ts`, `BackupSettingsScreen.tsx`, `EditContactScreen.tsx`, `field-type-change.test.ts`, `field-sort.test.ts`, `prompt-template.ts`, `contact-read.test.ts`, `fuel-read.test.ts`, `reconcile-session-read.test.ts`, `field-sweep.test.ts`, `import-acquire.ts`, `notification-read.test.ts`, `import-driver.test.ts`, `use-read-contacts-permission.ts`, `saf-storage.ts`, `PhotoFieldWidget.tsx`, `recency-dao.ts`, `contacts-dao.test.ts`, `dashboard-read.test.ts`, `seedFullContact`, `File`, `006-normalize-custom-field-values.test.ts`?**
   _High betweenness centrality (0.048) - this node is a cross-community bridge._
 - **Why does `BackupScreen()` connect `BackupScreen.tsx` to `backup-schema.ts`, `001-initial.ts`, `import-session-dao.ts`, `audit-adr-key-files.ts`, `linking.ts`, `sun-picker-read.test.ts`, `reconcile-apply.ts`?**
   _High betweenness centrality (0.027) - this node is a cross-community bridge._
