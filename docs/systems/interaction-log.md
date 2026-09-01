@@ -1,7 +1,7 @@
 # Interaction Log
 
-**Last updated:** 2026-08-16
-**Updated by phase:** 12-home-screen-widget
+**Last updated:** 2026-08-24
+**Updated by phase:** 17-backup-export-restore
 **Owners:** `src/db/recency-dao.ts`, `src/db/events-dao.ts`, `src/db/timeline-read.ts`, `src/db/log-guards.ts`, `src/db/impact-read.ts`, `src/services/impact.ts`
 
 ## Purpose
@@ -95,6 +95,12 @@ All log data lives in local SQLite. A touchpoint is distinct from a lifecycle ev
 3. `listTimeline()` returns touchpoints and events newest first, ordering ties by id and kind.
 4. `TimelineRow` permits touchpoint refinement/deletion but keeps events read-only.
 
+### Restoring interaction history
+
+1. Portable reconciliation treats an interaction UID and timestamp as the conflict boundary; a tombstone wins an equal timestamp.
+2. A restored interaction cannot write unless its contact survives reconciliation.
+3. After restore commits, the recency DAO recomputes `last_contact` from the resulting interaction rows.
+
 ### Deriving gravity and intensity
 
 1. `getImpactInputs()` reads a contact's interval, Rarely-responds policy, and touchpoints once.
@@ -121,6 +127,8 @@ All log data lives in local SQLite. A touchpoint is distinct from a lifecycle ev
 - **ADR-027:** Derived Profile-Only Gravity and Intensity — derives two non-stored relationship signals from this history.
 - **ADR-040:** Exactly-Once Notification Actions and Dashboard-Rooted Tap Routing — maps notification actions onto the established structured-write contracts.
 - **ADR-044:** Headless Widget Actions and Dashboard-Rooted Deep Links — maps widget marks onto the same single-writer contract.
+- **ADR-056:** Tombstone-Backed UID Reconciliation for Portable Restores — records interaction deletion evidence and blocks orphan restoration.
+- **ADR-057:** Full-State Versioned Backups with Verified Manual and Foreground SAF Snapshots — includes interaction history in full-state exports.
 
 ## Gotchas
 
@@ -131,6 +139,7 @@ All log data lives in local SQLite. A touchpoint is distinct from a lifecycle ev
 5. **Sort cadence inputs ascending.** The DAO returns newest-first rows, which would otherwise produce negative gaps.
 6. **Do not turn snooze into a touchpoint.** It is a lifecycle event and must not advance `last_contact` or alter derived relationship status.
 7. **Do not bypass the recency DAO from a widget task.** A raw `last_contact` update or nested transaction breaks the serialized history/summary invariant.
+8. **Do not import a recency summary.** Restore derives `last_contact` from the reconciled interaction set after its write transaction.
 
 ## Related Systems
 
@@ -139,6 +148,7 @@ All log data lives in local SQLite. A touchpoint is distinct from a lifecycle ev
 - **App shell** — supplies the theme tokens used by the rogue and gravity profile presentation.
 - **Notifications** — supplies the foreground and headless action paths that use these writers.
 - **Widget** — supplies a separate headless one-tap source with the same DAO-owned write invariant.
+- **Backup & Restore** — exports interactions and applies them only after their contact survives UID reconciliation.
 
 ## Changelog
 
@@ -147,3 +157,4 @@ All log data lives in local SQLite. A touchpoint is distinct from a lifecycle ev
 | 2026-08-15 | 06 | Created structured touchpoint logging, lifecycle history, and profile-only derived impact views. |
 | 2026-08-16 | 11 | Added notification-sourced one-tap writes and durable snooze/unsnooze event producers. |
 | 2026-08-16 | 12 | Added widget-sourced headless one-tap writes through the existing recency DAO. |
+| 2026-08-24 | 17 | Added interaction deletion tombstones and restored-history recency recomputation. |
