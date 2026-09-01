@@ -1,7 +1,7 @@
 # Interaction Log
 
-**Last updated:** 2026-08-15
-**Updated by phase:** 06-interaction-log-status-impact
+**Last updated:** 2026-08-16
+**Updated by phase:** 11-actionable-notifications
 **Owners:** `src/db/recency-dao.ts`, `src/db/events-dao.ts`, `src/db/timeline-read.ts`, `src/db/log-guards.ts`, `src/db/impact-read.ts`, `src/services/impact.ts`
 
 ## Purpose
@@ -76,6 +76,12 @@ All log data lives in local SQLite. A touchpoint is distinct from a lifecycle ev
 4. The user can open `TouchpointRefineForm` to correct channel, direction, connection, quality, note, and local date/time; `editTouchpointFull()` writes every editable column then recomputes recency.
 5. Deletion is explicitly confirmed, permanently removes the row, and recomputes recency.
 
+### Recording notification actions
+
+1. The shared notification action handler routes Mark contacted through `recordTouchpoint()` with `source='notification'`, `direction='outbound'`, `channel='unspecified'`, `connected=1`, and `quality=NULL`.
+2. Snooze and Clear use the snooze DAO, which composes `recordEventCore()` inside its one write transaction to append `snooze` or `unsnooze` history.
+3. Deterministic action UIDs make a re-delivered notification response collide harmlessly with the existing unique event or interaction row.
+
 ### Reading history and lifecycle events
 
 1. Archive and restore update contact lifecycle state only when their state guard matches.
@@ -107,6 +113,7 @@ All log data lives in local SQLite. A touchpoint is distinct from a lifecycle ev
 - **ADR-025:** Immutable Lifecycle Events in a Unified Timeline — separates event storage while unifying the profile read.
 - **ADR-026:** Rogue Status for Unresponsive or Far-Overdue Contacts — shares the connection-policy filter used by impact reads.
 - **ADR-027:** Derived Profile-Only Gravity and Intensity — derives two non-stored relationship signals from this history.
+- **ADR-040:** Exactly-Once Notification Actions and Dashboard-Rooted Tap Routing — maps notification actions onto the established structured-write contracts.
 
 ## Gotchas
 
@@ -115,15 +122,18 @@ All log data lives in local SQLite. A touchpoint is distinct from a lifecycle ev
 3. **Treat events as immutable.** `events-dao` has no update path; record a new event rather than altering history.
 4. **Keep timeline identity prefixed by kind.** Event and touchpoint IDs can collide across tables.
 5. **Sort cadence inputs ascending.** The DAO returns newest-first rows, which would otherwise produce negative gaps.
+6. **Do not turn snooze into a touchpoint.** It is a lifecycle event and must not advance `last_contact` or alter derived relationship status.
 
 ## Related Systems
 
 - **Contacts** — owns contact policy, lifecycle transitions, and the materialized `last_contact` value.
 - **Status engine** — derives rogue status and reason from qualifying recency.
 - **App shell** — supplies the theme tokens used by the rogue and gravity profile presentation.
+- **Notifications** — supplies the foreground and headless action paths that use these writers.
 
 ## Changelog
 
 | Date | Phase | What Changed |
 |---|---|---|
 | 2026-08-15 | 06 | Created structured touchpoint logging, lifecycle history, and profile-only derived impact views. |
+| 2026-08-16 | 11 | Added notification-sourced one-tap writes and durable snooze/unsnooze event producers. |
