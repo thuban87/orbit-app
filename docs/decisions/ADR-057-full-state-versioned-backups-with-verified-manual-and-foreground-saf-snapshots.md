@@ -51,4 +51,4 @@ The system exports a versioned, full non-secret local-state manifest containing 
 - `src/services/backup-sweep.ts` — runs eligible automatic work through the foreground launch sweep.
 
 **Depends on:** ADR-009 (Crash-Safe Forward-Only SQLite Migrations); ADR-012 (Opt-Out Android Backup for Third-Party PII); ADR-056 (Tombstone-Backed UID Reconciliation for Portable Restores).
-**Required by:** ADR-058 (Optional Encrypted Backups and Previewed Local Restoration).
+**Required by:** ADR-058 (Optional Encrypted Backups and Previewed Local Restoration); ADR-060 (Versioned Portable Method Graph and Collision-Normalized Restoration).

@@ -7,7 +7,7 @@
 **Reversibility:** one-way
 **Migration:** 001
 **Supersedes:** None
-**Superseded by:** None
+**Superseded by:** ADR-059 (partial)
 
 ## Context
 
@@ -46,4 +46,4 @@ The system uses migration 001 to create the initial ten-table data contract: sta
 - `src/db/database.ts` — registers migration 001 in the application migration list.
 
 **Depends on:** None.
-**Required by:** ADR-010 (Single-Writer Interaction Recency Spine); ADR-012 (Opt-Out Android Backup for Third-Party PII); ADR-013 (Runtime Two-Table Custom Fields with Whitelist-Constructed DDL); ADR-017 (Multi-Link Contact Reachability); ADR-018 (Archive-Gated Contact Purge with Explicit Fan-Out); ADR-028 (Per-Item Conversational Fuel with Fixed Kinds); ADR-033 (Profile Marking and Shared Drag-Reordered Favourites); ADR-034 (Birthday Banner and Re-query Dashboard Freshness).
+**Required by:** ADR-010 (Single-Writer Interaction Recency Spine); ADR-012 (Opt-Out Android Backup for Third-Party PII); ADR-013 (Runtime Two-Table Custom Fields with Whitelist-Constructed DDL); ADR-017 (Multi-Link Contact Reachability); ADR-018 (Archive-Gated Contact Purge with Explicit Fan-Out); ADR-028 (Per-Item Conversational Fuel with Fixed Kinds); ADR-033 (Profile Marking and Shared Drag-Reordered Favourites); ADR-034 (Birthday Banner and Re-query Dashboard Freshness); ADR-059 (Normalized Contact Methods, Canonical Actionability, and Local Provenance).
