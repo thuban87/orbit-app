@@ -1,7 +1,7 @@
 # Contact Methods
 
 **Last updated:** 2026-08-26
-**Updated by phase:** 19-system-contact-import
+**Updated by phase:** 20-contact-reconciliation-merge
 **Owners:** `src/db/contact-methods-dao.ts`, `src/db/contact-methods-read.ts`, `src/logic/contact-method-normalization.ts`, `src/screens/ComposeScreen.tsx`, `src/logic/compose-logic.ts`
 
 ## Purpose
@@ -96,6 +96,12 @@ Migration 009 retires scalar contact phone/email storage. Migration 010 adds nul
 2. An active external source link is deterministic identity; every other endpoint match remains advisory, and correlated signals from one source record contribute only their strongest signal.
 3. An explicit import create or link writes source link and method provenance in the same transaction as the resolved import row.
 
+### Consolidating methods during a contact merge
+
+1. `mergeContacts()` compares method type plus canonical value, collapses identical endpoints, and reparents distinct endpoints to the chosen survivor.
+2. When both contacts contribute competing primary methods of one type, the merge-conflict surface requires an explicit primary selection; otherwise the surviving ordering rules select the primary.
+3. Reconciliation uses the same canonical identity for source comparison, but a v1 reconciliation-added method does not create a provenance row.
+
 ## Configuration
 
 | Constant | Value | File | Purpose |
@@ -113,6 +119,8 @@ Migration 009 retires scalar contact phone/email storage. Migration 010 adds nul
 - **ADR-059:** Normalized Contact Methods, Canonical Actionability, and Local Provenance — establishes ordered, mergeable phone/email methods as the sole endpoint authority.
 - **ADR-061:** DAO-Selected Actionable Primary SMS Handoff — gates native SMS on the stored actionable primary while retaining Copy fallback.
 - **ADR-067:** Conservative Advisory Identity Matching and Explicit Source Consolidation — makes canonical endpoint evidence advisory unless an active source link identifies the contact.
+- **ADR-068:** User-Triggered, Source-Only Reconciliation with Durable Review — compares methods canonically without making a source authoritative.
+- **ADR-069:** Atomic Tombstone-Backed Orbit Contact Merge — deduplicates compatible methods and requires a choice for competing primaries.
 
 ## Gotchas
 
@@ -127,6 +135,7 @@ Migration 009 retires scalar contact phone/email storage. Migration 010 adds nul
 9. **Do not reparse at an action surface.** Profile and Compose consume stored DAO actionability; a raw value can be visible yet remain non-actionable.
 10. **Do not treat a shared canonical value as identity proof.** Same-contact duplicates collapse, but different contacts may retain the same phone or email.
 11. **Import evidence is not a primary-method selection.** Canonical matching informs an explicit import resolution but does not rewrite an existing contact's ordered methods.
+12. **Resolve primaries before reparenting a merge.** The partial primary-per-type index rejects a naïve child update when both contacts own a primary.
 
 ## Related Systems
 
@@ -136,6 +145,7 @@ Migration 009 retires scalar contact phone/email storage. Migration 010 adds nul
 - **AI suggestions** — provides the privacy-bounded context, provider request, and exact-prompt acknowledgement that Compose owns as its draft flow.
 - **Backup & Restore** — exports link identity and applies it only beneath a surviving contact.
 - **Contact Import** — uses canonical endpoints, source links, and provenance for conservative selected-contact import.
+- **Contact Reconciliation** — compares canonical endpoint families and consolidates compatible methods during an explicit merge.
 
 ## Changelog
 
@@ -147,3 +157,4 @@ Migration 009 retires scalar contact phone/email storage. Migration 010 adds nul
 | 2026-08-24 | 17 | Added tombstone-backed removal and portable reconciliation for contact links. |
 | 2026-08-27 | 18.1 | Added normalized phone/email methods, durable labels, provenance, and actionable-primary Compose gating. |
 | 2026-08-26 | 19 | Added canonical source-method evidence and transactional import provenance. |
+| 2026-08-26 | 20 | Added canonical reconciliation comparison and explicit primary-method merge resolution. |
