@@ -1,7 +1,7 @@
 # Custom Fields
 
-**Last updated:** 2026-08-15
-**Updated by phase:** 05-photos
+**Last updated:** 2026-08-18
+**Updated by phase:** 14-ai-message-suggestions
 **Owners:** `src/db/field-defs-dao.ts`, `src/db/field-values-dao.ts`, `src/db/field-ddl.ts`, `src/db/field-type-change.ts`, `src/db/field-parsers.ts`, `src/db/field-sort.ts`, `src/services/field-sweep.ts`
 
 ## Purpose
@@ -25,7 +25,7 @@ Migration 001 provides the three base tables. A custom field is both a row in `c
   - `show_on_new` / `always_show` (`INTEGER`) — curation flags for the create form and profile.
   - `display_order` (`INTEGER`) — ordered position in forms and the editor.
   - `quarantined_at` (`TEXT`) — local timestamp for reversible deletion.
-  - `share_with_ai` (`INTEGER`) — stored flag; its editor control is deferred to the AI phase.
+  - `share_with_ai` (`INTEGER`) — default-off definition-level consent flag for AI prompt context; it is not a value-row field.
 - `contact_custom_values` — one row per contact containing dynamically added value columns.
   - `contact_id` (`INTEGER`) — primary key and contact foreign key.
   - `uid` (`TEXT`) — row identity, created once per contact and retained by later value writes.
@@ -49,7 +49,7 @@ Migration 001 provides the three base tables. A custom field is both a row in `c
 |---|---|---|
 | Identifier boundary | `src/db/col-name.ts` | Slugifies labels and validates safe dynamic column names. |
 | Schema guard | `src/db/reserved-columns.ts` | Reserves fixed columns and SQLite row-id aliases from collision. |
-| Definition DAO | `src/db/field-defs-dao.ts` | Lists, curates, renames, reorders, quarantines, and restores definitions. |
+| Definition DAO | `src/db/field-defs-dao.ts` | Lists, curates, renames, reorders, updates AI sharing, quarantines, and restores definitions. |
 | DDL DAO | `src/db/field-ddl.ts` | Creates and drops dynamic `TEXT` value columns transactionally. |
 | Value DAO | `src/db/field-values-dao.ts` | Reads values and exposes public and transaction-composable UPSERT paths. |
 | Type layer | `src/db/field-parsers.ts` | Validates values at read time and checks dropdown membership. |
@@ -78,6 +78,7 @@ Migration 001 provides the three base tables. A custom field is both a row in `c
 | `src/components/field-widgets/PhotoFieldWidget.tsx` | Edit-only custom-photo UI that reuses the shared photo picker and crop pipeline. |
 | `src/components/CustomFieldValue.tsx` | Display and tap-to-fix gate for invalid values. |
 | `src/components/FieldDefForm.tsx` | Definition editor and live type preview. |
+| `src/components/field-def-form-logic.ts` | Hydrates and serializes the default-off AI sharing draft value. |
 | `src/screens/CustomFieldsScreen.tsx` | Reachable custom-field management surface. |
 
 ## How It Works
@@ -87,7 +88,14 @@ Migration 001 provides the three base tables. A custom field is both a row in `c
 1. The user opens Custom Fields from the temporary Home-screen route and creates or edits a definition.
 2. `FieldDefForm` derives a label slug from the full definition list, including quarantined definitions, then assigns the definition UID, display order, and local timestamps.
 3. `createField()` inserts the definition and runs `ALTER TABLE contact_custom_values ADD COLUMN` in one shared transaction. A failed DDL statement rolls back the definition insert.
-4. Rename changes only the visible label; curation, option, order, quarantine, and restore changes each serialize through the same write boundary.
+4. Rename changes only the visible label; curation, option, order, AI sharing, quarantine, and restore changes each serialize through the same write boundary.
+
+### Choosing AI-sharing consent
+
+1. The definition form initializes `share_with_ai` to off for a new field and hydrates its stored value for an edit.
+2. The explicit “Share with AI suggestions” control changes only definition metadata through `updateFieldShareWithAi()`; it does not read or rewrite any contact value.
+3. The AI context reader can use only live, non-quarantined definitions with the flag set, addressing values through validated `col_name` while showing the label.
+4. An unshared, null, blank, dropped, or quarantined field contributes no fallback data to an AI prompt.
 
 ### Reading and writing contact values
 
@@ -130,6 +138,7 @@ Migration 001 provides the three base tables. A custom field is both a row in `c
 - **ADR-015:** Lossless Field Changes with Quarantine and Launch-Time Retention Sweep — destructive operations snapshot first and retire data on launch.
 - **ADR-016:** Fixed-First Contact Forms and Atomic Contact Creation — custom values join the contact create/edit transaction through a non-mutexed core.
 - **ADR-021:** Durable Relative-Path Photo Masters with Crash-Safe Lifecycle Cleanup — photo fields reuse the local master pipeline and derivable `cv-` filenames.
+- **ADR-050:** Closed AI Prompt Egress Allowlist and Opt-In Field Sharing — limits third-party prompt context to explicitly shared live fields.
 
 ## Gotchas
 
@@ -141,12 +150,13 @@ Migration 001 provides the three base tables. A custom field is both a row in `c
 6. **Photo fields are edit-only.** They require a contact id to derive a stable path; create and definition-preview surfaces remain disabled.
 7. **Do not create definitions from a contact form.** The form fills values only, preserving the settings editor as the sole DDL and slugifier producer.
 8. **Do not delete a staged custom photo unless its committed references are known.** A custom crop can write the stable file before form save, so uncertain cleanup must prefer a bounded file leak over deleting a referenced image.
+9. **Do not treat `share_with_ai` as a value-column property.** It belongs to `custom_field_defs`; only the AI reader may consume flagged values through the existing validated identifier boundary.
 
 ## Related Systems
 
 - **Persistence core** — supplies migration-1 tables, the shared transaction, and the launch-sweep registry.
 - **Contacts** — owns the contacts that receive one `contact_custom_values` row each.
-- **AI suggestions** — will later consume the stored `share_with_ai` setting.
+- **AI suggestions** — consumes only explicitly shared, live field values as bounded prompt context.
 - **Photos** — supplies the picker, crop, local-master, staged-file, and purge-cleanup contracts for photo-type values.
 - **App shell** — routes the definition editor through Settings.
 
@@ -157,3 +167,4 @@ Migration 001 provides the three base tables. A custom field is both a row in `c
 | 2026-08-14 | 03 | Created runtime custom-field DDL, type semantics, editor, and launch-time quarantine cleanup. |
 | 2026-08-14 | 04 | Added the transaction-composable value writer and fixed-first contact-form integration. |
 | 2026-08-15 | 05 | Replaced the photo placeholder with the shared local photo pipeline and staged-file lifecycle handling. |
+| 2026-08-18 | 14 | Exposed default-off per-field AI sharing and routed it to the closed AI context boundary. |
