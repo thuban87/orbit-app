@@ -1,7 +1,7 @@
 # Photos
 
 **Last updated:** 2026-08-26
-**Updated by phase:** 19-system-contact-import
+**Updated by phase:** 20-contact-reconciliation-merge
 **Owners:** `src/services/photos/`, `src/db/contacts-dao.ts`, `src/db/profile-dao.ts`, `src/components/Avatar.tsx`, `src/components/PhotoSourcePicker.tsx`
 
 ## Purpose
@@ -49,6 +49,7 @@ SQLite stores only relative filenames; the photo bytes live in the app document 
 | `src/services/photos/purge-photo-cleanup.ts` | Implements post-commit contact photo cleanup. |
 | `src/services/photos/restore-photo-finalize-sweep.ts` | Drains committed restore-photo finalization and deletion entries. |
 | `src/services/import/import-photo.ts` | Converts durable import staging into a post-commit contact master and isolates failure. |
+| `src/services/photos/reconcile-photo.ts` | Stages current source photos, hashes staged bytes, and promotes a chosen image after reconciliation commit. |
 | `src/components/Avatar.tsx` | Renders a local master or the themed initials fallback. |
 | `src/components/PhotoSourcePicker.tsx` | Reusable source and lifecycle controls for all photo targets. |
 | `src/screens/CropPhotoScreen.tsx` | Registers the Skia crop screen. |
@@ -94,6 +95,12 @@ SQLite stores only relative filenames; the photo bytes live in the app document 
 2. After the imported contact transaction succeeds, `import-photo.ts` resolves that relative staging path, produces the ordinary Orbit master, and writes the contact photo reference.
 3. Success retires the row reference before best-effort deletion of raw staging. A mastering failure leaves the contact imported and retains the staged input for Retry.
 
+### Reconciling a linked-contact photo
+
+1. Reconciliation copies a current linked-source photo into the guarded `reconcile-staging/` namespace and hashes its bytes for source-change comparison.
+2. The detail view offers the staged source photo for a deliberate choice; it never supplies a picker-cache URI to the regular Avatar path.
+3. Once the selected data transaction commits, `promoteReconcilePhoto()` produces the usual master and writes the photo reference. A promotion failure leaves the photo snapshot unwritten so it is offered again on a later scan.
+
 ## Configuration
 
 | Constant | Value | File | Purpose |
@@ -112,6 +119,7 @@ SQLite stores only relative filenames; the photo bytes live in the app document 
 - **ADR-057:** Full-State Versioned Backups with Verified Manual and Foreground SAF Snapshots — embeds photo bytes in complete portable snapshots.
 - **ADR-058:** Optional Encrypted Backups and Previewed Local Restoration — journals committed restore-photo work for durable recovery.
 - **ADR-065:** Durable Resumable Contact-Import Sessions with Failure-Isolated Photos — keeps selected-contact photo staging retryable without making photo failure invalidate the contact.
+- **ADR-068:** User-Triggered, Source-Only Reconciliation with Durable Review — stages and promotes a selected current source photo around the reconciliation transaction.
 
 ## Gotchas
 
@@ -124,6 +132,7 @@ SQLite stores only relative filenames; the photo bytes live in the app document 
 7. **Never restore a serialized path verbatim.** It belongs to another sandbox; use the embedded bytes and a newly derived canonical master.
 8. **Only committed journal rows may finalize restore files.** A process interruption before the database commit must not create a visible master or delete an existing one.
 9. **Do not pass import staging to `Avatar`.** It is preview-only and outside Avatar's canonical master namespace; resolve it directly in import UI.
+10. **Guard WebCrypto in Hermes.** Reconciliation photo hashing must fall back to RNQC when `globalThis.crypto` is unavailable; the original unguarded digest blocked photo-bearing scans before its Phase-20 fix.
 
 ## Related Systems
 
@@ -133,6 +142,7 @@ SQLite stores only relative filenames; the photo bytes live in the app document 
 - **Widget** — derives a transient base64 thumbnail from the existing bounded master.
 - **Backup & Restore** — embeds image bytes and uses journal-backed staged restoration to recreate local masters.
 - **Contact Import** — stages selected-contact photos privately and masters them only after the contact commit.
+- **Contact Reconciliation** — uses separate private staging and post-commit promotion for source-photo review.
 
 ## Changelog
 
@@ -142,3 +152,4 @@ SQLite stores only relative filenames; the photo bytes live in the app document 
 | 2026-08-16 | 12 | Added transient base64 widget thumbnails and refresh publishing after contact photo changes. |
 | 2026-08-24 | 17 | Added embedded backup bytes and committed-only restore-photo finalization recovery. |
 | 2026-08-26 | 19 | Added selected-contact staging and post-commit failure-isolated import mastering. |
+| 2026-08-26 | 20 | Added hashed reconciliation staging and post-commit chosen-source photo promotion. |
