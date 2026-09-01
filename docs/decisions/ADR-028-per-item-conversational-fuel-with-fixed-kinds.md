@@ -49,4 +49,4 @@ The system uses one `fuel` row per item, with fixed `recent`, `topic`, `fact`, `
 - `src/screens/ContactProfileScreen.tsx` — mounts the conversational-fuel editor on a contact profile.
 
 **Depends on:** ADR-008 (Initial Contact Schema as a Cross-Phase Data Contract); ADR-013 (Runtime Two-Table Custom Fields with Whitelist-Constructed DDL)
-**Required by:** ADR-029 (In-Query Fuel Eligibility and a Shared Ranked Projection); ADR-030 (Explicit Confirmation of AI-Proposed Fuel)
+**Required by:** ADR-029 (In-Query Fuel Eligibility and a Shared Ranked Projection); ADR-030 (Explicit Confirmation of AI-Proposed Fuel); ADR-038 (Contact-Owned Share Capture Fuel)
