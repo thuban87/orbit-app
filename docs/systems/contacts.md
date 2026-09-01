@@ -1,7 +1,7 @@
 # Contacts
 
 **Last updated:** 2026-08-15
-**Updated by phase:** 05-photos
+**Updated by phase:** 06-interaction-log-status-impact
 **Owners:** `src/db/contacts-dao.ts`, `src/db/contact-read.ts`, `src/db/profile-dao.ts`, `src/db/contact-links-dao.ts`, `src/db/purge-dao.ts`, `src/db/recency-dao.ts`
 
 ## Purpose
@@ -30,6 +30,10 @@ All data is on-device SQLite. Migration 001 uses a surrogate `contacts.id` and a
   - `url` / `label` (`TEXT`) — required destination and optional display label.
   - `display_order` (`INTEGER`) — insertion order for the v1 editor.
 - `interactions` — individual touchpoints with local `occurred_at`, channel, connected state, source, and timestamps.
+  - `direction` (`TEXT`, nullable) — `outbound`, `inbound`, or `mutual`; one-tap writes explicitly use `outbound`.
+  - `quality` (`TEXT`, nullable) — optional `good`, `fine`, or `hard` refinement marker.
+  - `note` (`TEXT`, nullable) — local-only free-text touchpoint detail.
+- `events` — immutable archive, restore, snooze, and unsnooze history; these rows never participate in recency.
 
 **Types** (`src/db/contacts-dao.ts` and `src/db/recency-dao.ts`):
 - `CreateContactFullInput` — a new contact, optional first interaction, and custom values.
@@ -39,7 +43,7 @@ All data is on-device SQLite. Migration 001 uses a surrogate `contacts.id` and a
 
 | Layer | File | Responsibility |
 |---|---|---|
-| Contact writer | `src/db/contacts-dao.ts` | Atomically creates and edits metadata, custom values, and optional first interactions; archives and restores contacts. |
+| Contact writer | `src/db/contacts-dao.ts` | Atomically creates and edits metadata, custom values, and optional first interactions; archives and restores contacts with lifecycle-event composition. |
 | Contact reads | `src/db/contact-read.ts` | Checks duplicate names, reads categories, and assembles edit/header data. |
 | Profile DAO | `src/db/profile-dao.ts` | Reads and updates the single self record’s local photo reference. |
 | Links DAO | `src/db/contact-links-dao.ts` | Lists and applies scoped add/edit/remove changes for ordered link rows. |
@@ -55,6 +59,7 @@ All data is on-device SQLite. Migration 001 uses a surrogate `contacts.id` and a
 | `src/db/profile-dao.ts` | Single-row self photo reads and writers. |
 | `src/db/contact-links-dao.ts` | Ordered child-table CRUD for contact links. |
 | `src/db/recency-dao.ts` | Single-writer interaction/recency cores used by composed contact writes. |
+| `src/db/events-dao.ts` | Insert-only lifecycle writer composed by archive and restore. |
 | `src/db/purge-dao.ts` | Explicit, transaction-scoped child deletion and post-commit extension hook. |
 | `src/screens/CreateContactScreen.tsx` | Lean fixed-first create form. |
 | `src/screens/EditContactScreen.tsx` | Always-show edit form for fixed fields, links, and custom values. |
@@ -64,8 +69,8 @@ All data is on-device SQLite. Migration 001 uses a surrogate `contacts.id` and a
 
 ### Recording and maintaining recency
 
-1. A caller creates a contact with an optional first interaction, or records, edits, or deletes an interaction for an existing contact.
-2. `recency-dao` runs the mutation inside the shared mutex and a hand-rolled SQLite transaction.
+1. A caller creates a contact with an optional first interaction, or records, fully refines, or deletes an interaction for an existing contact.
+2. `recency-dao` rejects future occurrence times, then runs the mutation inside the shared mutex and a hand-rolled SQLite transaction.
 3. The DAO recomputes `last_contact` as `MAX(occurred_at)` across current interaction rows; a rarely-responds contact counts only connected rows.
 4. A missing qualifying row produces `NULL`, which keeps the person out of normal status reads until an interaction exists.
 
@@ -79,8 +84,8 @@ All data is on-device SQLite. Migration 001 uses a surrogate `contacts.id` and a
 ### Managing links and lifecycle
 
 1. The link DAO applies each add, edit, or remove with both the link and contact identities scoped to the intended row; phone and email remain dedicated fields.
-2. Archive sets `archived_at` from the profile. Live reads exclude archived contacts; Settings owns the distinct Archived contacts home.
-3. Restore clears the marker. Purge first verifies the archived state inside its write transaction, then explicitly deletes interactions, events, fuel, custom values, links, field history, and the contact.
+2. Archive sets `archived_at` from the profile only when the contact is live, then composes an immutable archive event in the same transaction. Live reads exclude archived contacts; Settings owns the distinct Archived contacts home.
+3. Restore clears the marker only when the contact is archived and records a matching restore event. Purge first verifies the archived state inside its write transaction, then explicitly deletes interactions, events, fuel, custom values, links, field history, and the contact.
 4. Photo-file and notification cleanup are idempotent best-effort post-commit extensions registered by their owning systems.
 
 ### Managing contact and self photos
@@ -105,6 +110,10 @@ All data is on-device SQLite. Migration 001 uses a surrogate `contacts.id` and a
 - **ADR-017:** Multi-Link Contact Reachability — stores many ordered web links while phone and email remain dedicated fields.
 - **ADR-018:** Archive-Gated Contact Purge with Explicit Fan-Out — makes permanent deletion a guarded, auditable lifecycle action.
 - **ADR-021:** Durable Relative-Path Photo Masters with Crash-Safe Lifecycle Cleanup — adds dedicated relative-path writers and photo cleanup to contact lifecycle work.
+- **ADR-023:** Structured Touchpoints and One-Tap Defaults — defines touchpoint axes and explicit one-tap values.
+- **ADR-024:** Editable Touchpoint History and Recomputed Recency — preserves the single writer across refinement and deletion.
+- **ADR-025:** Immutable Lifecycle Events in a Unified Timeline — adds state-guarded archive and restore events to contact lifecycle work.
+- **ADR-026:** Rogue Status for Unresponsive or Far-Overdue Contacts — uses the contact's Rarely-responds policy to filter qualifying recency.
 
 ## Gotchas
 
@@ -114,6 +123,8 @@ All data is on-device SQLite. Migration 001 uses a surrogate `contacts.id` and a
 4. **Never nest `inWriteTransaction()`.** The contact create/edit paths call non-mutexed `*Core` methods inside their one outer transaction.
 5. **Purge does not rely on cascades.** `field_history` has no contact foreign key, and every owned child table is explicitly deleted before the contact row.
 6. **Do not use the metadata save to write `photo`.** Photo persistence has dedicated writers so file lifecycle and form refresh behavior remain separate.
+7. **Never record a lifecycle event for a no-op transition.** Archive and restore guard the current state before changing it; otherwise the immutable history would claim a false transition.
+8. **Deleting a touchpoint is permanent.** The profile must confirm it before calling the recency DAO; there is no undo or backup path.
 
 ## Related Systems
 
@@ -129,3 +140,4 @@ All data is on-device SQLite. Migration 001 uses a surrogate `contacts.id` and a
 | 2026-08-14 | 02 | Created the contact foundation and single-writer recency invariant. |
 | 2026-08-14 | 04 | Added atomic create/edit, multi-link reachability, and archive/restore/purge lifecycle flows. |
 | 2026-08-15 | 05 | Added dedicated contact/self photo references, avatar reads, and photo-aware lifecycle cleanup. |
+| 2026-08-15 | 06 | Added structured touchpoint refinement, connection-aware recency, and immutable archive/restore events. |
