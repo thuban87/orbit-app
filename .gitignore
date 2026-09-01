@@ -48,3 +48,6 @@ app-debug.apk
 # Syncthing (which ignores .gitignore); kept out of git to avoid binary
 # history bloat. No screenshots have ever been committed here.
 **/uat-shots/
+
+# Dossier-audit skill output — skill test-run data, not the final artifact.
+docs/dossier/milestone-2/audit/
