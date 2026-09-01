@@ -1,7 +1,7 @@
 # Persistence Core
 
 **Last updated:** 2026-08-26
-**Updated by phase:** 19-system-contact-import
+**Updated by phase:** 20-contact-reconciliation-merge
 **Owners:** `src/db/database.ts`, `src/db/migrations/runner.ts`, `src/db/migrations/001-initial.ts`, `src/db/mutex.ts`, `src/db/transaction.ts`, `src/services/launch-sweep.ts`
 
 ## Purpose
@@ -28,6 +28,8 @@ The schema version is SQLite's `PRAGMA user_version`. Migrations 001–005 estab
 - external-link and method-provenance rows — UID-bearing local source evidence that never replaces Orbit identity.
 - `contacts.tracking_enabled` and nullable `contacts.interval_days` — an independent Bound/Unbound lifecycle; NULL cadence means never assigned, not Unbound.
 - `import_sessions` and `import_session_rows` — local-only durable contact-import snapshots, row transitions, advisory candidates, and retryable photo-staging references; they are not portable backup data.
+- `reconciliation_sessions`, `reconciliation_session_cards`, and `reconcile_source_snapshot` — local-only durable user-triggered reconciliation work and narrow per-link reviewed-source memory.
+- `bulk_review_resolutions` — durable fixed or ignored dispositions for flagged imported data; it never rewrites immutable source payloads.
 
 **Types** (`src/db/types.ts`):
 - `SqlExecutor` — database operations shared by Expo SQLite and the node-side test adapter.
@@ -51,6 +53,7 @@ The schema version is SQLite's `PRAGMA user_version`. Migrations 001–005 estab
 | Migration | `src/db/migrations/010-contact-method-label.ts` | Adds nullable durable labels to normalized method rows. |
 | Migration | `src/db/migrations/011-contact-lifecycle-schema.ts` | Rebuilds the contact graph without data changes to add lifecycle guards and lifecycle settings. |
 | Migration | `src/db/migrations/012-import-sessions.ts` | Adds local-only durable import-session and import-row state. |
+| Migration | `src/db/migrations/013-reconciliation-and-merge.ts` | Adds reconciliation-session, reviewed-source, and bulk-review resolution state. |
 | Settings DAO | `src/db/app-settings-dao.ts` | Validates and persists the singleton's notification, Orrery, and non-secret AI preference updates. |
 | Concurrency utility | `src/db/mutex.ts` | Serializes database write transactions in one JS runtime. |
 | Transaction utility | `src/db/transaction.ts` | Opens a hand-rolled transaction inside the shared non-reentrant mutex. |
@@ -74,6 +77,7 @@ The schema version is SQLite's `PRAGMA user_version`. Migrations 001–005 estab
 | `src/db/migrations/010-contact-method-label.ts` | Adds optional persisted method labels in a separate forward step. |
 | `src/db/migrations/011-contact-lifecycle-schema.ts` | Adds `tracking_enabled`, nullable never-assigned cadence, one-way cadence guards, and lifecycle settings while preserving contact children. |
 | `src/db/migrations/012-import-sessions.ts` | Adds durable selected-contact snapshots, row-state constraints, and import indexes. |
+| `src/db/migrations/013-reconciliation-and-merge.ts` | Adds durable reconciliation cards, narrow source snapshots, and generic bulk-review dispositions. |
 | `src/db/import-session-dao.ts` | Owns atomic session acceptance and transaction-composable import-row state transitions. |
 | `src/db/app-settings-dao.ts` | Typed, bounds-validated read and update boundary for application settings. |
 | `src/db/types.ts` | Testable database and migration interfaces. |
@@ -100,6 +104,7 @@ The schema version is SQLite's `PRAGMA user_version`. Migrations 001–005 estab
 13. Migration 010 adds nullable durable method labels; it does not rewrite the committed v9 migration.
 14. Migration 011 preserves all retained contact values and children while adding Bound/Unbound lifecycle state. Its checks require a positive integer cadence for Bound contacts, and its trigger prevents a previously assigned cadence from being cleared.
 15. Migration 012 adds local-only import sessions after a picker selection has been accepted. Its rows retain the durable recovery state but do not become part of portable backup contents.
+16. Migration 013 adds local-only reconciliation sessions, their changed-contact cards, narrow per-link reviewed-source snapshots, and durable bulk-review resolutions. It leaves existing contact tables intact; merge composes existing tombstone and child-table contracts inside the shared transaction boundary.
 
 ### Running launch maintenance
 
@@ -112,7 +117,7 @@ The schema version is SQLite's `PRAGMA user_version`. Migrations 001–005 estab
 | Constant | Value | File | Purpose |
 |---|---|---|---|
 | `BUSY_TIMEOUT_MS` | `5000` | `src/db/database.ts` | Wait budget for a busy shared connection. |
-| `TARGET_VERSION` | `12` | `src/db/database.ts` | Schema version after the import-session migration. |
+| `TARGET_VERSION` | `13` | `src/db/database.ts` | Schema version after the reconciliation-and-merge migration. |
 
 ## Decisions
 
@@ -135,6 +140,8 @@ The schema version is SQLite's `PRAGMA user_version`. Migrations 001–005 estab
 - **ADR-059:** Normalized Contact Methods, Canonical Actionability, and Local Provenance — defines the v9/v10 normalized endpoint migrations.
 - **ADR-062:** Bound/Unbound Lifecycle and One-Way Cadence Assignment — defines v11 lifecycle shape and its durable cadence invariant.
 - **ADR-065:** Durable Resumable Contact-Import Sessions with Failure-Isolated Photos — defines migration 012's local-only recovery state.
+- **ADR-068:** User-Triggered, Source-Only Reconciliation with Durable Review — defines migration 013's narrow durable reconciliation state.
+- **ADR-069:** Atomic Tombstone-Backed Orbit Contact Merge — composes existing transaction and tombstone mechanisms for a local merge.
 
 ## Gotchas
 
@@ -153,6 +160,7 @@ The schema version is SQLite's `PRAGMA user_version`. Migrations 001–005 estab
 13. **Re-point foreign-key children before dropping a rebuilt parent.** `defer_foreign_keys` delays checking, not cascade actions; row-count preservation and a surviving `sun_contact_id` are load-bearing migration proofs.
 14. **Do not treat NULL cadence as Unbound.** It means no cadence has ever been assigned; `tracking_enabled` alone controls lifecycle participation.
 15. **Import sessions are not portable state.** A Replace-all restore clears them, and import recovery must never try to revive a source-provider grant.
+16. **Reconciliation snapshots are not a sync journal.** They retain only the source value needed to suppress an unchanged reviewed discrepancy.
 
 ## Related Systems
 
@@ -165,6 +173,7 @@ The schema version is SQLite's `PRAGMA user_version`. Migrations 001–005 estab
 - **Digest** — reads the migration-005 scheduling preference and registers a post-migration launch-sweep reconcile.
 - **Backup & Restore** — uses migrations 007/008, revisions, snapshots, and launch recovery without a backend.
 - **Contact Import** — uses migration 012, serial write cores, and foreground recovery hooks for accepted selected-contact work.
+- **Contact Reconciliation** — uses migration 013, serial write cores, and foreground recovery for durable linked-contact review.
 
 ## Changelog
 
@@ -181,3 +190,4 @@ The schema version is SQLite's `PRAGMA user_version`. Migrations 001–005 estab
 | 2026-08-27 | 18.1 | Added migrations 009/010 for FK-safe normalized contact methods and durable labels. |
 | 2026-08-27 | 18.2 | Added migration 011 for Bound/Unbound lifecycle, one-way cadence guards, and lifecycle settings. |
 | 2026-08-26 | 19 | Added migration 012 for local-only durable contact-import sessions. |
+| 2026-08-26 | 20 | Added migration 013 for durable reconciliation sessions, narrow source memory, and bulk-review resolutions. |
