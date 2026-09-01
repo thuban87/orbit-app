@@ -1,7 +1,7 @@
 # Persistence Core
 
 **Last updated:** 2026-08-24
-**Updated by phase:** 16-custom-field-value-normalization
+**Updated by phase:** 17-backup-export-restore
 **Owners:** `src/db/database.ts`, `src/db/migrations/runner.ts`, `src/db/migrations/001-initial.ts`, `src/db/mutex.ts`, `src/db/transaction.ts`, `src/services/launch-sweep.ts`
 
 ## Purpose
@@ -21,7 +21,9 @@ The schema version is SQLite's `PRAGMA user_version`. Migrations 001–005 estab
 - `interactions` — dated contact touchpoints.
 - `contact_links`, `events`, `custom_field_defs`, `field_history`, `fuel` — durable supporting data introduced in the first schema.
 - `custom_field_values` — migration-006 normalized uid-bearing custom-field current state, unique per contact-and-definition pair.
-- `app_settings` — a singleton SQLite row for backup-native notification policy, privacy choice, local delivery/quiet hours, nullable Orrery sun preferences, and non-secret AI provider/model/template/acknowledgement settings. It never contains an API key.
+- `app_settings` — a singleton SQLite row for non-secret preferences, a monotonic exportable-data revision, and device-local backup health/configuration. It never contains an API key or passphrase.
+- `tombstones` — indefinitely retained type-and-UID deletion evidence for portable reconciliation.
+- `restore_photo_journal` — committed restore-photo finalization and cleanup work.
 
 **Types** (`src/db/types.ts`):
 - `SqlExecutor` — database operations shared by Expo SQLite and the node-side test adapter.
@@ -39,6 +41,8 @@ The schema version is SQLite's `PRAGMA user_version`. Migrations 001–005 estab
 | Migration | `src/db/migrations/004-ai-settings.ts` | Adds default-off non-secret AI configuration and acknowledgement columns. |
 | Migration | `src/db/migrations/005-digest-settings.ts` | Adds the default-on `digest_enabled` notification-policy column. |
 | Migration | `src/db/migrations/006-normalize-custom-field-values.ts` | Atomically validates and converts legacy custom values to normalized pairs. |
+| Migration | `src/db/migrations/007-tombstones.ts` | Adds tombstones, data revisions, stable seed identities, and backup settings. |
+| Migration | `src/db/migrations/008-restore-photo-journal.ts` | Adds durable committed restore-photo recovery evidence. |
 | Settings DAO | `src/db/app-settings-dao.ts` | Validates and persists the singleton's notification, Orrery, and non-secret AI preference updates. |
 | Concurrency utility | `src/db/mutex.ts` | Serializes database write transactions in one JS runtime. |
 | Transaction utility | `src/db/transaction.ts` | Opens a hand-rolled transaction inside the shared non-reentrant mutex. |
@@ -56,6 +60,8 @@ The schema version is SQLite's `PRAGMA user_version`. Migrations 001–005 estab
 | `src/db/migrations/004-ai-settings.ts` | Adds non-secret AI configuration and acknowledgement columns with constant defaults. |
 | `src/db/migrations/005-digest-settings.ts` | Adds `digest_enabled INTEGER NOT NULL DEFAULT 1` without a new table or per-contact state. |
 | `src/db/migrations/006-normalize-custom-field-values.ts` | Validates, copies, proves, and retires the legacy dynamic custom-value table in one step. |
+| `src/db/migrations/007-tombstones.ts` | Adds permanent deletion evidence and backup-specific SQLite support. |
+| `src/db/migrations/008-restore-photo-journal.ts` | Adds journal rows for committed restore-photo recovery. |
 | `src/db/app-settings-dao.ts` | Typed, bounds-validated read and update boundary for application settings. |
 | `src/db/types.ts` | Testable database and migration interfaces. |
 | `src/db/mutex.ts` | Promise-chain serialization primitive. |
@@ -75,6 +81,8 @@ The schema version is SQLite's `PRAGMA user_version`. Migrations 001–005 estab
 7. Migration 004 adds the disabled `ai_provider`, ordinary provider/model/template settings, and per-provider acknowledgement flags. It has no credential column; keys belong only to SecureStore.
 8. Migration 005 adds the default-on `digest_enabled` column so weekly-digest scheduling can preserve a durable user OFF choice across launch reconciliation.
 9. Migration 006 validates every legacy definition/value correspondence, copies raw values into uid-bearing normalized pairs, proves the copied matrix, and only then retires the legacy table. A loss-bearing inconsistency rolls the whole step back unchanged; a non-loss-bearing orphan column is retained only as a bounded `field_history` snapshot before the step proceeds.
+10. Migration 007 adds permanent tombstones and a monotonic `data_revision` so automatic backup detects every exportable change without timestamp ties. It also fixes profile and seeded-category UIDs across installations.
+11. Migration 008 adds the restore-photo journal; its rows authorize recovery only after the associated database transaction commits.
 
 ### Running launch maintenance
 
@@ -87,7 +95,7 @@ The schema version is SQLite's `PRAGMA user_version`. Migrations 001–005 estab
 | Constant | Value | File | Purpose |
 |---|---|---|---|
 | `BUSY_TIMEOUT_MS` | `5000` | `src/db/database.ts` | Wait budget for a busy shared connection. |
-| `TARGET_VERSION` | `6` | `src/db/database.ts` | Schema version after migration 006 normalized custom-field values. |
+| `TARGET_VERSION` | `8` | `src/db/database.ts` | Schema version after backup/restore migrations. |
 
 ## Decisions
 
@@ -104,6 +112,9 @@ The schema version is SQLite's `PRAGMA user_version`. Migrations 001–005 estab
 - **ADR-049:** BYO-Key AI Configuration and Credential Boundary — uses migration 004 for exportable non-secret AI settings and excludes keys from SQLite.
 - **ADR-052:** Compose-Owned AI Draft Lifecycle and Acknowledged Egress — reads the typed application settings boundary while keeping a draft lifecycle in Compose.
 - **ADR-055:** Dedicated Weekly Digest Scheduling and Persisted Notification Policy — uses migration 005 for the durable default-on digest toggle.
+- **ADR-056:** Tombstone-Backed UID Reconciliation for Portable Restores — adds durable deletion evidence and revision tracking.
+- **ADR-057:** Full-State Versioned Backups with Verified Manual and Foreground SAF Snapshots — uses consistent local read snapshots and migration-backed state.
+- **ADR-058:** Optional Encrypted Backups and Previewed Local Restoration — relies on atomic restore state and durable photo recovery evidence.
 
 ## Gotchas
 
@@ -116,6 +127,9 @@ The schema version is SQLite's `PRAGMA user_version`. Migrations 001–005 estab
 7. **Never add a credential column to `app_settings`.** Migration 004 deliberately persists only non-secret AI configuration; provider keys remain in SecureStore.
 8. **Do not infer the digest setting from OS request presence.** Migration 005's explicit `digest_enabled` column preserves a user OFF choice when launch reconciliation runs.
 9. **Migration 006 is a one-way cutover.** Do not add a dynamic-table fallback or dual-write mode; a loss-bearing proof failure must leave the prior database unchanged.
+10. **Treat `data_revision` as exportable-change evidence.** Backup health writes must not bump it, or every successful snapshot would immediately look stale.
+11. **A read snapshot is intentionally read-only.** Use `inReadSnapshot()` for a coherent export; writes still require the non-reentrant transaction boundary.
+12. **Journal photo work before finalization.** A restore-photo file is recoverable only when a matching committed journal row exists.
 
 ## Related Systems
 
@@ -126,6 +140,7 @@ The schema version is SQLite's `PRAGMA user_version`. Migrations 001–005 estab
 - **Orrery** — reads and writes the app-level sun settings added by migration 003.
 - **AI suggestions** — persists non-secret settings and acknowledgement state through migration 004 while keeping credentials outside SQLite.
 - **Digest** — reads the migration-005 scheduling preference and registers a post-migration launch-sweep reconcile.
+- **Backup & Restore** — uses migrations 007/008, revisions, snapshots, and launch recovery without a backend.
 
 ## Changelog
 
@@ -138,3 +153,4 @@ The schema version is SQLite's `PRAGMA user_version`. Migrations 001–005 estab
 | 2026-08-18 | 14 | Added migration 004 and the non-secret AI settings boundary. |
 | 2026-08-23 | 15 | Added migration 005 and the durable default-on weekly-digest setting. |
 | 2026-08-24 | 16 | Added migration 006's atomic normalized custom-field value cutover. |
+| 2026-08-24 | 17 | Added migrations 007/008 for tombstones, backup revisions, and committed photo-recovery work. |
