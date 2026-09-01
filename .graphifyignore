@@ -1,0 +1,55 @@
+# Orbit primary Graphify scope
+#
+# This is the maintained engineering/current-state graph. It keeps application
+# source, tests, living system docs/runbooks, and the root planning summaries.
+# Historical, narrative, generated, and agent-infrastructure corpora remain
+# searchable in the repo and can be graphed on demand.
+
+# Generated graph artifacts must never graph themselves.
+graphify-out/
+.planning/graphs/
+
+# Narrative / decision-prep work is a separate corpus. The dossier is orbit's
+# authoritative DECISION source, but its long prose and repeated feature
+# headings overwhelm engineering community detection when mixed into this graph.
+# Its decisions reach the graph via ADRs + the registry, exactly like ADR bodies.
+docs/dossier/
+docs/audits/
+docs/mockups/
+docs/personal-todos.md
+
+# Completed phase artifacts and ancillary planning collections are valuable
+# history but are frequently superseded. Current truth stays represented by the
+# root PROJECT/ROADMAP/REQUIREMENTS files.
+#
+# STATE.md is excluded despite being a root summary: it is a prepend-log that
+# parses into its own meaningless community and churns on every plan.
+.planning/STATE.md
+.planning/phases/
+.planning/debug/
+.planning/handoffs/
+.planning/research/
+.planning/todos/
+.planning/sync-milestone/
+.planning/knowledgebase/
+
+# Living system docs summarize operative decisions and link back to immutable
+# ADRs. Indexing every ADR heading adds thousands of historical document nodes,
+# and the graph has no concept of supersession — a retired ADR would sit in the
+# corpus with as much authority as the one that replaced it.
+#
+# INDEX.md and adr-registry.ts are the deliberate exceptions: supersession state
+# is IN them, so it stays represented rather than absent. Written as
+# `docs/decisions/*` (not `docs/decisions/`) on purpose — gitignore forbids a `!`
+# rule from re-including a file whose parent DIRECTORY is excluded, so excluding
+# the children individually is what keeps the negations below alive.
+docs/decisions/*
+!docs/decisions/INDEX.md
+!docs/decisions/adr-registry.ts
+
+# Agent/runtime infrastructure is not part of the product dependency graph.
+.claude/
+.codex/
+.gsd/
+AGENTS.md
+CLAUDE.md
