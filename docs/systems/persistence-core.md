@@ -1,7 +1,7 @@
 # Persistence Core
 
-**Last updated:** 2026-08-23
-**Updated by phase:** 15-weekly-digest
+**Last updated:** 2026-08-24
+**Updated by phase:** 16-custom-field-value-normalization
 **Owners:** `src/db/database.ts`, `src/db/migrations/runner.ts`, `src/db/migrations/001-initial.ts`, `src/db/mutex.ts`, `src/db/transaction.ts`, `src/services/launch-sweep.ts`
 
 ## Purpose
@@ -12,14 +12,15 @@ The persistence core opens Orbit's on-device SQLite database and advances its sc
 
 ### Data Model
 
-The schema version is SQLite's `PRAGMA user_version`. Migration 001 creates the initial application tables, migration 002 adds the single-row notification-policy table, migration 003 adds app-level Orrery sun preferences, migration 004 adds disabled-by-default non-secret AI configuration, and migration 005 adds the default-on weekly-digest policy toggle; each relational data model is documented by its owning system doc.
+The schema version is SQLite's `PRAGMA user_version`. Migrations 001–005 establish the initial application, settings, Orrery, AI, and digest-policy schema; migration 006 replaces dynamic custom-field columns with normalized current-value rows. Each relational data model is documented by its owning system doc.
 
 **Tables:**
 - `categories` — seeded, user-editable single-select contact groups.
 - `profile` — the single self/profile record.
 - `contacts` — the primary person record and maintained recency summary.
 - `interactions` — dated contact touchpoints.
-- `contact_links`, `events`, `custom_field_defs`, `contact_custom_values`, `field_history`, `fuel` — durable supporting data introduced in the first schema.
+- `contact_links`, `events`, `custom_field_defs`, `field_history`, `fuel` — durable supporting data introduced in the first schema.
+- `custom_field_values` — migration-006 normalized uid-bearing custom-field current state, unique per contact-and-definition pair.
 - `app_settings` — a singleton SQLite row for backup-native notification policy, privacy choice, local delivery/quiet hours, nullable Orrery sun preferences, and non-secret AI provider/model/template/acknowledgement settings. It never contains an API key.
 
 **Types** (`src/db/types.ts`):
@@ -37,6 +38,7 @@ The schema version is SQLite's `PRAGMA user_version`. Migration 001 creates the 
 | Migration | `src/db/migrations/003-orrery-settings.ts` | Adds nullable `sun_contact_id` and `self_sun_colour` settings. |
 | Migration | `src/db/migrations/004-ai-settings.ts` | Adds default-off non-secret AI configuration and acknowledgement columns. |
 | Migration | `src/db/migrations/005-digest-settings.ts` | Adds the default-on `digest_enabled` notification-policy column. |
+| Migration | `src/db/migrations/006-normalize-custom-field-values.ts` | Atomically validates and converts legacy custom values to normalized pairs. |
 | Settings DAO | `src/db/app-settings-dao.ts` | Validates and persists the singleton's notification, Orrery, and non-secret AI preference updates. |
 | Concurrency utility | `src/db/mutex.ts` | Serializes database write transactions in one JS runtime. |
 | Transaction utility | `src/db/transaction.ts` | Opens a hand-rolled transaction inside the shared non-reentrant mutex. |
@@ -53,6 +55,7 @@ The schema version is SQLite's `PRAGMA user_version`. Migration 001 creates the 
 | `src/db/migrations/003-orrery-settings.ts` | Adds the nullable app-level sun occupant and self-star colour. |
 | `src/db/migrations/004-ai-settings.ts` | Adds non-secret AI configuration and acknowledgement columns with constant defaults. |
 | `src/db/migrations/005-digest-settings.ts` | Adds `digest_enabled INTEGER NOT NULL DEFAULT 1` without a new table or per-contact state. |
+| `src/db/migrations/006-normalize-custom-field-values.ts` | Validates, copies, proves, and retires the legacy dynamic custom-value table in one step. |
 | `src/db/app-settings-dao.ts` | Typed, bounds-validated read and update boundary for application settings. |
 | `src/db/types.ts` | Testable database and migration interfaces. |
 | `src/db/mutex.ts` | Promise-chain serialization primitive. |
@@ -71,6 +74,7 @@ The schema version is SQLite's `PRAGMA user_version`. Migration 001 creates the 
 6. Migration 003 adds nullable `sun_contact_id` and `self_sun_colour`; `NULL` remains the valid self/default state, and a hard-purged chosen contact reverts to self through `ON DELETE SET NULL`.
 7. Migration 004 adds the disabled `ai_provider`, ordinary provider/model/template settings, and per-provider acknowledgement flags. It has no credential column; keys belong only to SecureStore.
 8. Migration 005 adds the default-on `digest_enabled` column so weekly-digest scheduling can preserve a durable user OFF choice across launch reconciliation.
+9. Migration 006 validates every legacy definition/value correspondence, copies raw values into uid-bearing normalized pairs, proves the copied matrix, and only then retires the legacy table. A loss-bearing inconsistency rolls the whole step back unchanged; a non-loss-bearing orphan column is retained only as a bounded `field_history` snapshot before the step proceeds.
 
 ### Running launch maintenance
 
@@ -83,7 +87,7 @@ The schema version is SQLite's `PRAGMA user_version`. Migration 001 creates the 
 | Constant | Value | File | Purpose |
 |---|---|---|---|
 | `BUSY_TIMEOUT_MS` | `5000` | `src/db/database.ts` | Wait budget for a busy shared connection. |
-| `TARGET_VERSION` | `5` | `src/db/database.ts` | Schema version after migration 005 introduced the digest policy toggle. |
+| `TARGET_VERSION` | `6` | `src/db/database.ts` | Schema version after migration 006 normalized custom-field values. |
 
 ## Decisions
 
@@ -91,8 +95,9 @@ The schema version is SQLite's `PRAGMA user_version`. Migration 001 creates the 
 - **ADR-009:** Crash-Safe Forward-Only SQLite Migrations — every version step commits atomically.
 - **ADR-010:** Single-Writer Interaction Recency Spine — the shared mutex serializes its write transactions.
 - **ADR-012:** Opt-Out Android Backup for Third-Party PII — persistent contact data is excluded from Android Auto Backup.
-- **ADR-013:** Runtime Two-Table Custom Fields with Whitelist-Constructed DDL — dynamic schema work and value writes use the shared transaction boundary.
-- **ADR-015:** Lossless Field Changes with Quarantine and Launch-Time Retention Sweep — launch maintenance retires stale custom fields safely.
+- **ADR-001:** Normalized Custom-Field Values — migration 006 atomically establishes normalized custom-field pairs.
+- **ADR-013:** Runtime Two-Table Custom Fields with Whitelist-Constructed DDL — superseded by ADR-001.
+- **ADR-015:** Lossless Field Changes with Quarantine and Launch-Time Retention Sweep — partially superseded; launch maintenance still retires stale fields safely.
 - **ADR-028:** Per-Item Conversational Fuel with Fixed Kinds — uses the migration-001 schema contract for durable fuel rows.
 - **ADR-041:** Notification Settings, Privacy Channels, and Birthday Alerts — uses migration 002 for durable, backup-native local notification policy.
 - **ADR-047:** App-Level Assignable Sun and Themed Self Identity — uses migration 003 for validated, app-level Orrery sun preferences.
@@ -110,12 +115,13 @@ The schema version is SQLite's `PRAGMA user_version`. Migration 001 creates the 
 6. **Do not write a palette default into `self_sun_colour`.** NULL deliberately means unresolved; the Orrery render resolves it through the ordered theme palette.
 7. **Never add a credential column to `app_settings`.** Migration 004 deliberately persists only non-secret AI configuration; provider keys remain in SecureStore.
 8. **Do not infer the digest setting from OS request presence.** Migration 005's explicit `digest_enabled` column preserves a user OFF choice when launch reconciliation runs.
+9. **Migration 006 is a one-way cutover.** Do not add a dynamic-table fallback or dual-write mode; a loss-bearing proof failure must leave the prior database unchanged.
 
 ## Related Systems
 
 - **Contacts** — owns the contact data and recency writes stored in the initial schema.
 - **Status engine** — reads the migrated contact and interaction data at query time.
-- **Custom fields** — uses the shared transaction and launch-sweep registry for runtime DDL and cleanup.
+- **Custom fields** — uses migration 006, the shared transaction, and the launch-sweep registry for normalized-row cleanup.
 - **Notifications** — reads the persisted policy during launch/foreground schedule reconciliation.
 - **Orrery** — reads and writes the app-level sun settings added by migration 003.
 - **AI suggestions** — persists non-secret settings and acknowledgement state through migration 004 while keeping credentials outside SQLite.
@@ -131,3 +137,4 @@ The schema version is SQLite's `PRAGMA user_version`. Migration 001 creates the 
 | 2026-08-17 | 13 | Added migration 003 and nullable app-level Orrery sun settings. |
 | 2026-08-18 | 14 | Added migration 004 and the non-secret AI settings boundary. |
 | 2026-08-23 | 15 | Added migration 005 and the durable default-on weekly-digest setting. |
+| 2026-08-24 | 16 | Added migration 006's atomic normalized custom-field value cutover. |
