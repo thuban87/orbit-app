@@ -1,8 +1,8 @@
 # App Shell
 
 **Last updated:** 2026-08-16
-**Updated by phase:** 10-share-sheet-capture
-**Owners:** `App.tsx`, `src/navigation/RootNavigator.tsx`, `src/navigation/types.ts`, `src/navigation/linking.ts`, `src/screens/SettingsScreen.tsx`, `src/theme/theme-types.ts`, `src/theme/theme-presets.ts`
+**Updated by phase:** 11-actionable-notifications
+**Owners:** `App.tsx`, `src/navigation/RootNavigator.tsx`, `src/navigation/types.ts`, `src/navigation/linking.ts`, `src/navigation/notification-gate.tsx`, `src/screens/SettingsScreen.tsx`, `src/theme/theme-types.ts`, `src/theme/theme-presets.ts`
 
 ## Purpose
 
@@ -22,6 +22,7 @@ _None._ The shell owns runtime navigation and theme contracts, not durable appli
 | Navigator | `src/navigation/RootNavigator.tsx` | Registers native-stack routes, including dashboard sibling lists, management, modal crop, and Compose surfaces, with custom headers. |
 | Route types | `src/navigation/types.ts` | Defines serializable parameters for profile, edit, crop, and self-fetching Compose routes. |
 | Intent gate | `src/navigation/linking.ts` | Converts provider-owned pending share state into ready-gated navigation to Capture. |
+| Notification gate | `src/navigation/notification-gate.tsx` | Converts warm and cold local-notification responses into ready-gated actions or navigation. |
 | Settings surface | `src/screens/SettingsScreen.tsx` | Hosts low-traffic lifecycle routes, self-photo, and the Manage favourites entry. |
 | Theme contract | `src/theme/theme-types.ts`, `src/theme/theme-presets.ts` | Defines named tokens, including destructive, avatar-swatch, rogue-status, and gravity-tier tokens, and their sole palette values. |
 
@@ -29,10 +30,11 @@ _None._ The shell owns runtime navigation and theme contracts, not durable appli
 
 | File | Role |
 |---|---|
-| `App.tsx` | Readiness gate, navigation mount point, gesture root, and photo reconciliation registration. |
+| `App.tsx` | Readiness gate, navigation mount point, gesture root, and photo/notification lifecycle registration. |
 | `src/navigation/RootNavigator.tsx` | Native stack for the dashboard Home, Settings, contact lifecycle, Compose, NeverContacted, ManageFavourites, and CropPhoto. |
 | `src/navigation/types.ts` | Typed root-stack route contract, including serializable Compose and photo-crop targets plus dashboard sibling routes. |
 | `src/navigation/linking.ts` | Holds the navigation ref and the single ready-gated Capture navigation owner. |
+| `src/navigation/notification-gate.tsx` | Owns warm/cold notification-response handling once navigation is ready. |
 | `src/screens/CaptureScreen.tsx` | Provides the in-app target for a pending Android text share. |
 | `src/screens/HomeScreen.tsx` | Provides the dashboard Home and its destination entries. |
 | `src/screens/SettingsScreen.tsx` | Provides the distinct settings home, including self-photo and Manage favourites entries. |
@@ -63,6 +65,12 @@ _None._ The shell owns runtime navigation and theme contracts, not durable appli
 1. `ShareIntentProvider` consumes a pending native share while database migrations run.
 2. Once `NavigationContainer.onReady` sets the reactive readiness flag, `ShareIntentGate` navigates the pending share to Capture.
 3. The gate remains inside the successful migration-ready branch, so Capture cannot query a half-built local database; no deep-link consumer competes for the same native share payload.
+
+### Starting and opening notifications
+
+1. The ready-gated application effect registers notification reconciliation, awaits channel and action-category initialization, then installs the launch-sweep trigger.
+2. `App.tsx` imports the headless-task module at bundle scope and sets an explicit silent foreground notification behavior.
+3. `NotificationResponseGate` shares the navigator readiness flag with `ShareIntentGate`, queues an early body tap, and applies it only after the navigation ref is ready.
 
 ### Applying destructive emphasis
 
@@ -107,6 +115,9 @@ _None._ The shell owns runtime navigation and theme contracts, not durable appli
 - **ADR-034:** Birthday Banner and Re-query Dashboard Freshness — mounts the birthday and reliable refresh paths in Home.
 - **ADR-036:** Entry-Agnostic Compose Navigation and Transmittable-Fuel Guardrails — adds the serializable Compose route and Home-reset Back behavior.
 - **ADR-037:** Text-Only Android Share Intent Integration — adds the provider-owned, ready-gated Capture route for native text shares.
+- **ADR-039:** Pre-Scheduled Inexact Decay Reminders — registers ready-gated launch/foreground notification reconciliation.
+- **ADR-040:** Exactly-Once Notification Actions and Dashboard-Rooted Tap Routing — adds the response gate and deterministic notification destinations.
+- **ADR-041:** Notification Settings, Privacy Channels, and Birthday Alerts — requires channels and categories before the first scheduler run.
 
 ## Gotchas
 
@@ -119,6 +130,7 @@ _None._ The shell owns runtime navigation and theme contracts, not durable appli
 7. **Keep search ownership in the dashboard.** The reusable reader and result-row pattern survive the retired FuelSearch route, but Settings must not add a duplicate search surface.
 8. **Compose Back is intentionally not a stack pop.** Both Back paths reset to Home so callers need not provide a profile or other origin route.
 9. **Keep native share navigation single-owner.** A linking redirect beside `ShareIntentGate` can race the pending native intent, especially on a cold start.
+10. **Initialize immutable notification channels before scheduling.** Scheduling first can post a request on a wrong/default channel and weaken the intended privacy posture.
 
 ## Related Systems
 
@@ -127,6 +139,7 @@ _None._ The shell owns runtime navigation and theme contracts, not durable appli
 - **Dashboard** — is the Home route and owns daily discovery/search navigation.
 - **Contact methods** — registers the self-fetching Compose surface in the stack.
 - **Capture** — enters through the provider-owned Capture route after migrations are ready.
+- **Notifications** — initializes at readiness and uses the response gate for body/action delivery.
 
 ## Changelog
 
@@ -139,3 +152,4 @@ _None._ The shell owns runtime navigation and theme contracts, not durable appli
 | 2026-08-15 | 08 | Made the dashboard Home, added first-contact and favourite-management routes, and relocated search from Settings. |
 | 2026-08-16 | 09 | Added the serializable Compose route and dashboard-reset Back behavior. |
 | 2026-08-16 | 10 | Added ready-gated navigation from Android share intents to Capture. |
+| 2026-08-16 | 11 | Added notification initialization, launch reconciliation, and ready-gated response routing. |
