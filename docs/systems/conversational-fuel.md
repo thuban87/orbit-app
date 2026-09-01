@@ -89,6 +89,12 @@ Fuel uses the on-device SQLite table established empty in migration 1 and activa
 
 ## Decisions
 
+- **ADR-008:** Initial Contact Schema as a Cross-Phase Data Contract — provides the migration-1 table boundary that contains fuel.
+- **ADR-009:** Crash-Safe Forward-Only SQLite Migrations — governs the already-shipped migration that creates the fuel table.
+- **ADR-010:** Single-Writer Interaction Recency Spine — shares the initial schema while fuel intentionally leaves interaction recency untouched.
+- **ADR-023:** Structured Touchpoints and One-Tap Defaults — shares the contact-profile surface where fuel is edited without writing interaction history.
+- **ADR-024:** Editable Touchpoint History and Recomputed Recency — shares profile reload behavior with fuel mutations.
+- **ADR-026:** Rogue Status for Unresponsive or Far-Overdue Contacts — shares profile relationship feedback beside the fuel section.
 - **ADR-028:** Per-Item Conversational Fuel with Fixed Kinds — fuel is structured, one-row-per-item data rather than a blob or custom field.
 - **ADR-029:** In-Query Fuel Eligibility and a Shared Ranked Projection — private, unconfirmed, and blank rows are excluded before every glanceable read.
 - **ADR-030:** Explicit Confirmation of AI-Proposed Fuel — a user must confirm an AI proposal before it becomes eligible.
