@@ -1,7 +1,7 @@
 # App Shell
 
-**Last updated:** 2026-08-23
-**Updated by phase:** 15-weekly-digest
+**Last updated:** 2026-08-24
+**Updated by phase:** 16-custom-field-value-normalization
 **Owners:** `App.tsx`, `src/navigation/RootNavigator.tsx`, `src/navigation/types.ts`, `src/navigation/linking.ts`, `src/navigation/notification-gate.tsx`, `src/navigation/widget-linking.ts`, `src/screens/SettingsScreen.tsx`, `src/theme/theme-types.ts`, `src/theme/theme-presets.ts`
 
 ## Purpose
@@ -18,7 +18,7 @@ _None._ The shell owns runtime navigation and theme contracts, not durable appli
 
 | Layer | File | Responsibility |
 |-------|------|----------------|
-| Bootstrap | `App.tsx` | Opens and migrates SQLite before mounting the navigator inside theme and safe-area providers. |
+| Bootstrap | `App.tsx` | Opens and migrates SQLite before mounting the navigator; renders accurate classified or generic startup failure copy when opening fails. |
 | Navigator | `src/navigation/RootNavigator.tsx` | Registers native-stack routes, including dashboard sibling lists, Digest, Orrery, management, modal crop, and Compose surfaces, with custom headers. |
 | Route types | `src/navigation/types.ts` | Defines serializable parameters for profile, edit, crop, and self-fetching Compose routes, including an optional AI request intent. |
 | Intent gate | `src/navigation/linking.ts` | Converts provider-owned pending share state into ready-gated navigation to Capture. |
@@ -31,7 +31,7 @@ _None._ The shell owns runtime navigation and theme contracts, not durable appli
 
 | File | Role |
 |---|---|
-| `App.tsx` | Readiness gate, navigation mount point, gesture root, and photo/notification lifecycle registration. |
+| `App.tsx` | Readiness gate, startup-failure presentation, navigation mount point, gesture root, and photo/notification lifecycle registration. |
 | `src/navigation/RootNavigator.tsx` | Native stack for the dashboard Home, Digest, Orrery, Settings, contact lifecycle, Compose, NeverContacted, ManageFavourites, and CropPhoto. |
 | `src/navigation/types.ts` | Typed root-stack route contract, including the self-fetching Digest and Compose surfaces and photo-crop targets. |
 | `src/navigation/linking.ts` | Holds the navigation ref and the single ready-gated Capture navigation owner. |
@@ -50,7 +50,8 @@ _None._ The shell owns runtime navigation and theme contracts, not durable appli
 
 1. `App.tsx` opens and migrates the local database before it renders a navigable screen.
 2. Once ready, the app mounts `NavigationContainer` inside the existing theme and safe-area providers.
-3. `RootNavigator` supplies the native stack; platform Back walks this stack rather than a Home-screen-local state toggle.
+3. A classified migration-006 integrity failure renders its specific safe-unchanged explanation; another bootstrap failure uses the generic safe-unchanged state without promising a support channel. Neither failure mounts navigation.
+4. `RootNavigator` supplies the native stack; platform Back walks this stack rather than a Home-screen-local state toggle.
 
 ### Navigating dashboard and settings
 
@@ -128,6 +129,7 @@ _None._ The shell owns runtime navigation and theme contracts, not durable appli
 ## Decisions
 
 - **ADR-006:** Theme-Token Architecture — all UI colors resolve through the theme contract.
+- **ADR-001:** Normalized Custom-Field Values — keeps the navigator behind the migration gate and distinguishes its classified integrity failure from generic startup failure.
 - **ADR-015:** Lossless Field Changes with Quarantine and Launch-Time Retention Sweep — keeps launch-time cleanup inside the ready-gated application shell.
 - **ADR-018:** Archive-Gated Contact Purge with Explicit Fan-Out — destructive controls use the dedicated danger token.
 - **ADR-019:** Native Stack Contact Lifecycle Navigation — replaces temporary Home-local routing with native-stack navigation.
@@ -172,6 +174,7 @@ _None._ The shell owns runtime navigation and theme contracts, not durable appli
 12. **Do not put Orrery sun assignment on the canvas.** Settings owns the Sun / centre picker; canvas long-press conflicts with the radial reorder gesture.
 13. **Keep the AI Compose intent serializable and minimal.** It carries only `contactId` and a boolean request marker; prompts, credentials, and callbacks must not enter route parameters.
 14. **Reset digest notification taps instead of navigating onto a warm stack.** The Home/Digest reset is what makes the Digest screen's Back destination stable.
+15. **Do not mount navigation after a bootstrap failure.** A classified migration failure has rolled back unchanged; generic failure copy must not promise unavailable support or recovery.
 
 ## Related Systems
 
@@ -202,3 +205,4 @@ _None._ The shell owns runtime navigation and theme contracts, not durable appli
 | 2026-08-17 | 13 | Added the Orrery route, Settings-owned sun controls, and themed star/muted visual tokens. |
 | 2026-08-18 | 14 | Added non-secret AI settings and a serializable, consume-once Compose AI intent. |
 | 2026-08-23 | 15 | Added the typed Digest route, dashboard entry, dashboard-rooted notification reset, and ready-gated schedule registration. |
+| 2026-08-24 | 16 | Added accurate classified migration and generic bootstrap failure presentation while retaining the readiness gate. |
