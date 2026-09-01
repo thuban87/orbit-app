@@ -1,7 +1,7 @@
 # Contacts
 
-**Last updated:** 2026-08-24
-**Updated by phase:** 17-backup-export-restore
+**Last updated:** 2026-08-27
+**Updated by phase:** 18.1-contact-method-normalization
 **Owners:** `src/db/contacts-dao.ts`, `src/db/contact-read.ts`, `src/db/favourites-dao.ts`, `src/db/profile-dao.ts`, `src/db/contact-links-dao.ts`, `src/db/purge-dao.ts`, `src/db/recency-dao.ts`
 
 ## Purpose
@@ -21,7 +21,6 @@ All data is on-device SQLite. Migration 001 uses a surrogate `contacts.id` and a
   - `last_contact` (`TEXT`) — maintained maximum qualifying interaction timestamp; `NULL` means never-contacted.
   - `rarely_responds` (`INTEGER`) — limits recency to connected interactions.
   - `archived_at` (`TEXT`) — archive lifecycle marker.
-  - `phone` (`TEXT`, nullable) — dedicated number used by user-invoked SMS handoff when present.
   - `photo` (`TEXT`, nullable) — validated relative path to the contact's local photo master.
   - `favourite_rank` (`INTEGER`, nullable) — ordered membership in the dashboard and widget favourites set.
   - `snooze_until` (`TEXT`, nullable) — bare local `YYYY-MM-DD` that delays the next decay reminder without changing the contact clock.
@@ -33,6 +32,10 @@ All data is on-device SQLite. Migration 001 uses a surrogate `contacts.id` and a
   - `contact_id` (`INTEGER`) — owning contact.
   - `url` / `label` (`TEXT`) — required destination and optional display label.
   - `display_order` (`INTEGER`) — insertion order for the v1 editor.
+- `contact_methods` — ordered phone/email endpoints owned by a contact; scalar `contacts.phone` and `contacts.email` do not exist after migration 009.
+  - `uid` (`TEXT`) — stable mergeable method identity.
+  - `type`, `label`, `display_order`, and `is_primary` — grouping, optional durable label, ordering, and per-type default selection.
+  - `canonical_value`, `canonical_region`, `extension`, and `actionable` — machine identity/provenance and safe action eligibility separate from stored presentation.
 - `interactions` — individual touchpoints with local `occurred_at`, channel, connected state, source, and timestamps.
   - `direction` (`TEXT`, nullable) — `outbound`, `inbound`, or `mutual`; one-tap writes explicitly use `outbound`.
   - `quality` (`TEXT`, nullable) — optional `good`, `fine`, or `hard` refinement marker.
@@ -40,15 +43,15 @@ All data is on-device SQLite. Migration 001 uses a surrogate `contacts.id` and a
 - `events` — immutable archive, restore, snooze, and unsnooze history; these rows never participate in recency.
 
 **Types** (`src/db/contacts-dao.ts` and `src/db/recency-dao.ts`):
-- `CreateContactFullInput` — a new contact, optional first interaction, and custom values.
-- `UpdateContactFullInput` — editable fixed metadata, values, and a never-contacted first interaction.
+- `CreateContactFullInput` — a new contact, method drafts, optional first interaction, and custom values.
+- `UpdateContactFullInput` — editable fixed metadata, method drafts, values, and a never-contacted first interaction.
 
 ### Store, Service & DAO Layer
 
 | Layer | File | Responsibility |
 |---|---|---|
-| Contact writer | `src/db/contacts-dao.ts` | Atomically creates and edits metadata, normalized custom-value pairs, and optional first interactions; archives and restores contacts with lifecycle-event composition. |
-| Contact reads | `src/db/contact-read.ts` | Checks duplicate names, reads categories, and assembles edit/header data, including the lightweight phone-capable header seek. |
+| Contact writer | `src/db/contacts-dao.ts` | Atomically creates and edits metadata, normalized method/custom-value pairs, and optional first interactions; archives and restores contacts with lifecycle-event composition. |
+| Contact reads | `src/db/contact-read.ts` | Checks duplicate names, reads categories, and assembles scalar-free edit/header data. |
 | Favourites DAO | `src/db/favourites-dao.ts` | Marks, clears, and atomically rewrites ordered favourite ranks. |
 | Profile DAO | `src/db/profile-dao.ts` | Reads and updates the single self record’s local photo reference. |
 | Links DAO | `src/db/contact-links-dao.ts` | Lists and applies scoped add/edit/remove changes for ordered link rows. |
@@ -90,10 +93,11 @@ All data is on-device SQLite. Migration 001 uses a surrogate `contacts.id` and a
 2. `createContactFull()` opens one shared transaction, inserts the contact, seeds one blank uid-bearing pair for every custom-field definition including quarantined definitions, and for Today or Pick date uses recency cores to insert a manual, directionless interaction and recompute `last_contact`.
 3. “Not yet” writes no interaction and leaves `last_contact` `NULL`; submitted custom values use pair-keyed non-mutexed cores in the same transaction.
 4. The edit form shows every non-quarantined custom field after fixed fields. Changing `rarely_responds` recomputes recency because it changes the qualifying interaction set.
+5. Contact aggregate saves compose method drafts through the method DAO in the same transaction; same-contact canonical duplicates collapse with typed feedback while shared methods on different contacts remain legal.
 
 ### Managing links and lifecycle
 
-1. The link DAO applies each add, edit, or remove with both the link and contact identities scoped to the intended row; phone and email remain dedicated fields.
+1. The link DAO applies each add, edit, or remove with both the link and contact identities scoped to the intended row; phone and email live in normalized method rows rather than fixed contact columns.
 2. Archive sets `archived_at` from the profile only when the contact is live, then composes an immutable archive event in the same transaction. Live reads exclude archived contacts; Settings owns the distinct Archived contacts home.
 3. Restore clears the marker only when the contact is archived and records a matching restore event. Purge first verifies the archived state inside its write transaction, then explicitly deletes interactions, events, fuel, normalized custom-value pairs, links, field history, and the contact.
 4. Photo-file and notification cleanup are idempotent best-effort post-commit extensions registered by their owning systems.
@@ -119,8 +123,8 @@ All data is on-device SQLite. Migration 001 uses a surrogate `contacts.id` and a
 
 ### Supplying a live compose header
 
-1. `getContactHeader()` returns the contact's identity, photo freshness, phone, and archive marker through its lightweight by-id seek.
-2. Compose trims the optional phone to decide SMS availability and treats an archived header as unavailable rather than showing a live messaging surface.
+1. `getContactHeader()` returns contact identity, photo freshness, and archive state without a scalar endpoint projection.
+2. Compose separately requests the DAO-selected actionable primary method and treats an archived header as unavailable rather than showing a live messaging surface.
 3. Send and Copy remain handoff-only actions; the contacts system receives no interaction or recency write from them.
 
 ### Starting an AI draft from the profile
@@ -155,7 +159,7 @@ All data is on-device SQLite. Migration 001 uses a surrogate `contacts.id` and a
 - **ADR-011:** Query-Time Status and Never-Contacted Segregation — relies on contact cadence and the maintained never-contacted marker.
 - **ADR-001:** Normalized Custom-Field Values — seeds immutable custom-value pairs on contact creation and deletes them during purge.
 - **ADR-016:** Fixed-First Contact Forms and Atomic Contact Creation — composes the form’s multi-table write in one transaction.
-- **ADR-017:** Multi-Link Contact Reachability — stores many ordered web links while phone and email remain dedicated fields.
+- **ADR-017:** Multi-Link Contact Reachability — stores many ordered web links alongside normalized contact methods.
 - **ADR-018:** Archive-Gated Contact Purge with Explicit Fan-Out — makes permanent deletion a guarded, auditable lifecycle action.
 - **ADR-021:** Durable Relative-Path Photo Masters with Crash-Safe Lifecycle Cleanup — adds dedicated relative-path writers and photo cleanup to contact lifecycle work.
 - **ADR-023:** Structured Touchpoints and One-Tap Defaults — defines touchpoint axes and explicit one-tap values.
@@ -163,7 +167,8 @@ All data is on-device SQLite. Migration 001 uses a surrogate `contacts.id` and a
 - **ADR-025:** Immutable Lifecycle Events in a Unified Timeline — adds state-guarded archive and restore events to contact lifecycle work.
 - **ADR-026:** Rogue Status for Unresponsive or Far-Overdue Contacts — uses the contact's Rarely-responds policy to filter qualifying recency.
 - **ADR-033:** Profile Marking and Shared Drag-Reordered Favourites — owns reversible profile marking and guarded favourite-rank ordering.
-- **ADR-035:** Native SMS Handoff with Guaranteed Clipboard Copy — uses the nullable phone field for a user-invoked, non-writing handoff.
+- **ADR-035:** Native SMS Handoff with Guaranteed Clipboard Copy — partially superseded; native handoff and Copy remain the interaction boundary.
+- **ADR-059:** Normalized Contact Methods, Canonical Actionability, and Local Provenance — replaces scalar endpoint fields with ordered mergeable method rows.
 - **ADR-036:** Entry-Agnostic Compose Navigation and Transmittable-Fuel Guardrails — rejects archived headers on the reusable live compose surface.
 - **ADR-038:** Contact-Owned Share Capture Fuel — preserves name-only, never-contacted inline creation and prohibits a capture recency write.
 - **ADR-039:** Pre-Scheduled Inexact Decay Reminders — uses cadence, snooze, mute, lifecycle, and status fields to determine derived reminder eligibility.
@@ -225,3 +230,4 @@ All data is on-device SQLite. Migration 001 uses a surrogate `contacts.id` and a
 | 2026-08-18 | 14 | Added the configured-provider profile entry for a Compose-owned AI draft without contact-side effects. |
 | 2026-08-24 | 16 | Seeded normalized custom-field pairs on create and deleted them explicitly on purge. |
 | 2026-08-24 | 17 | Added tombstone-aware purge and UID-based portable restore behavior. |
+| 2026-08-27 | 18.1 | Replaced scalar endpoint fields with transactional normalized method drafts and scalar-free reads. |
