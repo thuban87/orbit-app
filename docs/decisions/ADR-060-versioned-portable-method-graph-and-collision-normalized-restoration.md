@@ -50,4 +50,4 @@ The system uses backup format v2 to carry the normalized method graph as first-c
 - `src/db/purge-dao.ts` — removes normalized children in an exhaustive FK-safe purge.
 
 **Depends on:** ADR-056 (Tombstone-Backed UID Reconciliation for Portable Restores); ADR-057 (Full-State Versioned Backups with Verified Manual and Foreground SAF Snapshots)
-**Required by:** None.
+**Required by:** ADR-063 (Versioned Lifecycle Backup and Dormant-Cadence Restore).
