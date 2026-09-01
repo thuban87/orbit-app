@@ -32,5 +32,10 @@
 // NOTE: ADR-0020 [ACCEPTED] Library-Only Photo Capture with Themed In-App Cropping and One-Time URL Download
 // NOTE: ADR-0021 [ACCEPTED] Durable Relative-Path Photo Masters with Crash-Safe Lifecycle Cleanup
 // NOTE: ADR-0022 [ACCEPTED] Tokenized Deterministic Initials Avatars
+// NOTE: ADR-0023 [ACCEPTED] Structured Touchpoints and One-Tap Defaults
+// NOTE: ADR-0024 [ACCEPTED] Editable Touchpoint History and Recomputed Recency
+// NOTE: ADR-0025 [ACCEPTED] Immutable Lifecycle Events in a Unified Timeline
+// NOTE: ADR-0026 [ACCEPTED] Rogue Status for Unresponsive or Far-Overdue Contacts
+// NOTE: ADR-0027 [ACCEPTED] Derived Profile-Only Gravity and Intensity
 
-export const ADR_COUNT = 22;
+export const ADR_COUNT = 27;
