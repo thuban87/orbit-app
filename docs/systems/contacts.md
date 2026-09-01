@@ -1,8 +1,8 @@
 # Contacts
 
 **Last updated:** 2026-08-15
-**Updated by phase:** 06-interaction-log-status-impact
-**Owners:** `src/db/contacts-dao.ts`, `src/db/contact-read.ts`, `src/db/profile-dao.ts`, `src/db/contact-links-dao.ts`, `src/db/purge-dao.ts`, `src/db/recency-dao.ts`
+**Updated by phase:** 08-dashboard-never-contacted-screen
+**Owners:** `src/db/contacts-dao.ts`, `src/db/contact-read.ts`, `src/db/favourites-dao.ts`, `src/db/profile-dao.ts`, `src/db/contact-links-dao.ts`, `src/db/purge-dao.ts`, `src/db/recency-dao.ts`
 
 ## Purpose
 
@@ -22,6 +22,7 @@ All data is on-device SQLite. Migration 001 uses a surrogate `contacts.id` and a
   - `rarely_responds` (`INTEGER`) — limits recency to connected interactions.
   - `archived_at` (`TEXT`) — archive lifecycle marker.
   - `photo` (`TEXT`, nullable) — validated relative path to the contact's local photo master.
+  - `favourite_rank` (`INTEGER`, nullable) — ordered membership in the dashboard and widget favourites set.
 - `categories` — seeded Family, Friends, Work, and Community groups with display order.
 - `profile` — one record for the user rather than a special contact row; its nullable `photo` holds the self master’s relative path.
 - `contact_links` — ordered actionable web links belonging to a contact.
@@ -45,6 +46,7 @@ All data is on-device SQLite. Migration 001 uses a surrogate `contacts.id` and a
 |---|---|---|
 | Contact writer | `src/db/contacts-dao.ts` | Atomically creates and edits metadata, custom values, and optional first interactions; archives and restores contacts with lifecycle-event composition. |
 | Contact reads | `src/db/contact-read.ts` | Checks duplicate names, reads categories, and assembles edit/header data. |
+| Favourites DAO | `src/db/favourites-dao.ts` | Marks, clears, and atomically rewrites ordered favourite ranks. |
 | Profile DAO | `src/db/profile-dao.ts` | Reads and updates the single self record’s local photo reference. |
 | Links DAO | `src/db/contact-links-dao.ts` | Lists and applies scoped add/edit/remove changes for ordered link rows. |
 | Recency DAO | `src/db/recency-dao.ts` | Is the sole owner of `last_contact` recomputation. |
@@ -56,6 +58,7 @@ All data is on-device SQLite. Migration 001 uses a surrogate `contacts.id` and a
 |---|---|
 | `src/db/contacts-dao.ts` | Composed create/edit path plus archive, restore, and archived-list reads. |
 | `src/db/contact-read.ts` | Duplicate-name, category, header, and edit-form data reads. |
+| `src/db/favourites-dao.ts` | Dedicated favourite-rank writes that leave recency unchanged. |
 | `src/db/profile-dao.ts` | Single-row self photo reads and writers. |
 | `src/db/contact-links-dao.ts` | Ordered child-table CRUD for contact links. |
 | `src/db/recency-dao.ts` | Single-writer interaction/recency cores used by composed contact writes. |
@@ -94,6 +97,12 @@ All data is on-device SQLite. Migration 001 uses a surrogate `contacts.id` and a
 2. Dedicated contact and profile DAO writers store or clear only the validated relative photo path; the ordinary metadata update deliberately does not own photo writes.
 3. The shared photos pipeline owns file persistence and inline deletion, while contact reads supply `photo` and `modified_at` to the profile avatar.
 
+### Managing favourites
+
+1. The contact-profile star reads `favourite_rank` from the header and calls `setFavouriteRank()` or `clearFavouriteRank()`.
+2. The Manage favourites screen obtains the live non-archived set and passes its reordered ids to `rewriteFavouriteRanks()`.
+3. The DAO verifies a unique, complete current set and applies all rank updates inside one write transaction; it never writes `last_contact`.
+
 ## Configuration
 
 | Constant | Value | File | Purpose |
@@ -114,6 +123,7 @@ All data is on-device SQLite. Migration 001 uses a surrogate `contacts.id` and a
 - **ADR-024:** Editable Touchpoint History and Recomputed Recency — preserves the single writer across refinement and deletion.
 - **ADR-025:** Immutable Lifecycle Events in a Unified Timeline — adds state-guarded archive and restore events to contact lifecycle work.
 - **ADR-026:** Rogue Status for Unresponsive or Far-Overdue Contacts — uses the contact's Rarely-responds policy to filter qualifying recency.
+- **ADR-033:** Profile Marking and Shared Drag-Reordered Favourites — owns reversible profile marking and guarded favourite-rank ordering.
 
 ## Gotchas
 
@@ -125,6 +135,7 @@ All data is on-device SQLite. Migration 001 uses a surrogate `contacts.id` and a
 6. **Do not use the metadata save to write `photo`.** Photo persistence has dedicated writers so file lifecycle and form refresh behavior remain separate.
 7. **Never record a lifecycle event for a no-op transition.** Archive and restore guard the current state before changing it; otherwise the immutable history would claim a false transition.
 8. **Deleting a touchpoint is permanent.** The profile must confirm it before calling the recency DAO; there is no undo or backup path.
+9. **Rewrite the complete favourite set in one transaction.** A partial, duplicate, stale, archived, or non-favourite id list must fail rather than leave ranks inconsistent.
 
 ## Related Systems
 
@@ -132,6 +143,7 @@ All data is on-device SQLite. Migration 001 uses a surrogate `contacts.id` and a
 - **Persistence core** — supplies the SQLite schema and transaction environment.
 - **Custom fields** — contributes values to the contact create/edit transaction.
 - **App shell** — provides the create, profile, edit, and archived navigation routes.
+- **Dashboard** — reads contact projections and provides favourite-management entry points.
 
 ## Changelog
 
@@ -141,3 +153,4 @@ All data is on-device SQLite. Migration 001 uses a surrogate `contacts.id` and a
 | 2026-08-14 | 04 | Added atomic create/edit, multi-link reachability, and archive/restore/purge lifecycle flows. |
 | 2026-08-15 | 05 | Added dedicated contact/self photo references, avatar reads, and photo-aware lifecycle cleanup. |
 | 2026-08-15 | 06 | Added structured touchpoint refinement, connection-aware recency, and immutable archive/restore events. |
+| 2026-08-15 | 08 | Added profile favourite marking and guarded shared rank reordering. |
