@@ -1,7 +1,7 @@
 # App Shell
 
-**Last updated:** 2026-08-27
-**Updated by phase:** 19-system-contact-import
+**Last updated:** 2026-08-29
+**Updated by phase:** 19.1-older-android-contact-picker-hybrid-two-picker-adr-002
 **Owners:** `App.tsx`, `src/navigation/RootNavigator.tsx`, `src/navigation/types.ts`, `src/navigation/linking.ts`, `src/navigation/notification-gate.tsx`, `src/navigation/widget-linking.ts`, `src/screens/SettingsScreen.tsx`, `src/theme/theme-types.ts`, `src/theme/theme-presets.ts`
 
 ## Purpose
@@ -19,7 +19,7 @@ _None._ The shell owns runtime navigation and theme contracts, not durable appli
 | Layer | File | Responsibility |
 |-------|------|----------------|
 | Bootstrap | `App.tsx` | Opens and migrates SQLite before mounting the navigator; renders accurate classified or generic startup failure copy when opening fails. |
-| Navigator | `src/navigation/RootNavigator.tsx` | Registers native-stack routes, including dashboard sibling lists, Digest, Orrery, management, modal crop, and Compose surfaces, with custom headers. |
+| Navigator | `src/navigation/RootNavigator.tsx` | Registers native-stack routes, including dashboard sibling lists, import acquisition/review, Digest, Orrery, management, modal crop, and Compose surfaces, with custom headers. |
 | Route types | `src/navigation/types.ts` | Defines serializable parameters for profile, edit, crop, and self-fetching Compose routes, including an optional AI request intent. |
 | Intent gate | `src/navigation/linking.ts` | Converts provider-owned pending share state into ready-gated navigation to Capture. |
 | Backup-share gate | `src/navigation/backup-share-intent.ts` | Holds a narrow inbound backup-file intent until the backup restore surface is ready. |
@@ -43,6 +43,8 @@ _None._ The shell owns runtime navigation and theme contracts, not durable appli
 | `src/screens/HomeScreen.tsx` | Provides the dashboard Home and its destination entries. |
 | `src/screens/DigestScreen.tsx` | Provides the live weekly retrospective destination with its own themed Back chrome. |
 | `src/screens/SettingsScreen.tsx` | Provides the distinct settings home, including AI configuration, self-photo, self-star, sun-centre, and Manage favourites entries. |
+| `src/screens/LegacyContactPickerScreen.tsx` | Provides the typed API-36-and-below custom contact-picker route and permission-recovery views. |
+| `src/services/import/start-contact-import.ts` | Selects one SDK-routed import acquisition path for dashboard and Settings entry points. |
 | `src/screens/ImportReviewScreen.tsx` | Provides the typed selected-contact review route and explicit duplicate choices. |
 | `src/theme/theme-types.ts` | Names palette tokens, including avatar swatches, rogue status, gravity tiers, and Orrery star/muted values. |
 | `src/theme/theme-presets.ts` | Holds the only allowed color literals, including avatar, relationship-status, and Orrery palette values. |
@@ -132,9 +134,10 @@ _None._ The shell owns runtime navigation and theme contracts, not durable appli
 
 ### Starting contact import
 
-1. Home's speed dial and Settings' Contacts Integration row check picker availability before starting selected-contact acquisition.
-2. `RootNavigator` registers import review, setup, progress, duplicate-review, and completion routes; each screen reads durable session state rather than a source URI.
-3. A foreground prompt routes interrupted work to its local continuation or explicitly discards unresolved rows.
+1. Home's speed dial and Settings' Contacts Integration row call the same `startContactImport()` seam. It opens the permissionless system picker on API 37+ and the typed `LegacyContactPicker` route on API 36 and below.
+2. The legacy route primes and requests the scoped read permission at the value moment, offers a calm re-request state after denial, and opens app settings after permanent denial; it uses theme tokens but remains a standalone utility list.
+3. `RootNavigator` registers legacy acquisition alongside import review, setup, progress, duplicate-review, and completion routes; every downstream screen reads durable session state rather than a source URI.
+4. A foreground prompt routes interrupted work to its local continuation or explicitly discards unresolved rows.
 
 ## Configuration
 
@@ -185,6 +188,7 @@ _None._ The shell owns runtime navigation and theme contracts, not durable appli
 - **ADR-062:** Bound/Unbound Lifecycle and One-Way Cadence Assignment — adds the dedicated Unbound route and lifecycle-oriented settings surfaces.
 - **ADR-064:** Permissionless Android 17 System-Contact Snapshot Acquisition — adds the optional selected-contact entry without broad contacts permission.
 - **ADR-066:** Deliberate Reviewed Import with Unbound Bulk Defaults — registers reviewed import routes and the completion destination.
+- **ADR-002:** Cross-Version Contact Import — Hybrid Two-Picker — adds the legacy acquisition route and one SDK-routed entry seam.
 
 ## Gotchas
 
@@ -207,6 +211,7 @@ _None._ The shell owns runtime navigation and theme contracts, not durable appli
 17. **Every possible first opener needs the migration region.** `openAndMigrate()` can run before React mounts from headless notification or widget work; database bootstrap itself stays free of native localization imports for node-testability.
 18. **Keep Unbound navigation retrieval-oriented.** The dedicated list and neutral search rows may open Profile, but active-orbit controls stay in their Bound query owners.
 19. **Import routes carry durable identifiers, never picker grants.** A selected-contact URI is temporary provider state and must not enter navigation parameters.
+20. **Keep contact-import routing single-sourced.** Dashboard and Settings must call the shared SDK-routing seam; duplicating the Android-version branch can make their permission behavior drift.
 
 ## Related Systems
 
@@ -244,3 +249,4 @@ _None._ The shell owns runtime navigation and theme contracts, not durable appli
 | 2026-08-27 | 18.1 | Added device-region migration bootstrap and the ready-gated backup-share fallback. |
 | 2026-08-27 | 18.2 | Added the Unbound route and lifecycle settings/navigation treatment. |
 | 2026-08-26 | 19 | Added typed selected-contact import routes, Settings entry, and durable-resume navigation. |
+| 2026-08-29 | 19.1 | Added the API-36-and-below legacy picker route and shared hybrid-import dispatch. |
