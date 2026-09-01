@@ -22,7 +22,7 @@ not something you can pattern-match against.
 ## How to use this
 
 - **Is a decision still live?** Check the `Superseded by` column. 5 of
-  55 ADRs are superseded in whole or in part.
+  58 ADRs are superseded in whole or in part.
 - **Which decisions govern a file?** Don't grep this file — ask the graph:
   `npm run graph:ask -- governs src/db/field-values-dao.ts`, or follow the
   `governed_by` edges.
@@ -86,3 +86,6 @@ not something you can pattern-match against.
 | 053 | Local-First LiteLLM AI Model Catalog | Accepted | 14-ai-message-suggestions | — | — | — | 5 | `scripts`, `src/ai`, `src/screens` |
 | 054 | Live Weekly Digest Retrospective and Overlooked Relationship Read | Accepted | 15-weekly-digest | — | — | — | 4 | `src/db`, `src/logic`, `src/screens` |
 | 055 | Dedicated Weekly Digest Scheduling and Persisted Notification Policy | Accepted | 15-weekly-digest | — | — | — | 7 | `src/db`, `src/db/migrations`, `src/screens` +1 |
+| 056 | Tombstone-Backed UID Reconciliation for Portable Restores | Accepted | 17-backup-export-restore | — | — | — | 6 | `src/backup`, `src/db`, `src/db/migrations` |
+| 057 | Full-State Versioned Backups with Verified Manual and Foreground SAF Snapshots | Accepted | 17-backup-export-restore | — | — | — | 7 | `src/backup`, `src/services`, `src/services/backup` |
+| 058 | Optional Encrypted Backups and Previewed Local Restoration | Accepted | 17-backup-export-restore | — | — | — | 7 | `src/backup`, `src/db/migrations`, `src/screens` +2 |

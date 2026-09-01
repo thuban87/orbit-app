@@ -65,5 +65,8 @@
 // NOTE: ADR-0053 [ACCEPTED] Local-First LiteLLM AI Model Catalog
 // NOTE: ADR-0054 [ACCEPTED] Live Weekly Digest Retrospective and Overlooked Relationship Read
 // NOTE: ADR-0055 [ACCEPTED] Dedicated Weekly Digest Scheduling and Persisted Notification Policy
+// NOTE: ADR-0056 [ACCEPTED] Tombstone-Backed UID Reconciliation for Portable Restores
+// NOTE: ADR-0057 [ACCEPTED] Full-State Versioned Backups with Verified Manual and Foreground SAF Snapshots
+// NOTE: ADR-0058 [ACCEPTED] Optional Encrypted Backups and Previewed Local Restoration
 
-export const ADR_COUNT = 55;
+export const ADR_COUNT = 58;
