@@ -1,7 +1,7 @@
 # Contact Methods
 
-**Last updated:** 2026-08-26
-**Updated by phase:** 20-contact-reconciliation-merge
+**Last updated:** 2026-08-31
+**Updated by phase:** 21-interaction-assist-reach-out
 **Owners:** `src/db/contact-methods-dao.ts`, `src/db/contact-methods-read.ts`, `src/logic/contact-method-normalization.ts`, `src/screens/ComposeScreen.tsx`, `src/logic/compose-logic.ts`
 
 ## Purpose
@@ -62,8 +62,10 @@ Migration 009 retires scalar contact phone/email storage. Migration 010 adds nul
 1. `ContactProfileScreen` navigates to `Compose` with only the contact id.
 2. `ComposeScreen` reloads the header, the DAO-selected actionable primary phone, and all rows from `getRankedFuel()` on focus, while separately probing SMS availability.
 3. Missing or archived contacts reset to Home; the ranked read keeps off-limits, unconfirmed-AI, and blank fuel out of the reference cards in SQL.
-4. The user types a blank-starting local draft. With an actionable primary phone and SMS capability, Send opens the OS composer with `expo-sms`; Copy uses `expo-clipboard` in every state.
-5. Software and Android hardware Back both reset the stack to dashboard Home. Send and Copy never create a touchpoint or change `last_contact`.
+4. The user types a blank-starting local draft. With an actionable primary phone and SMS capability, Send routes through the shared `performReachOut` (`src/services/reach-out/handoff.ts`), which — when Interaction Assist is enabled — writes a pending assist before opening the OS composer with `expo-sms`; Copy uses `expo-clipboard` in every state.
+5. Software and Android hardware Back both reset the stack to dashboard Home. Send and Copy never create a touchpoint or change `last_contact`; the interaction, if any, is written later when the user confirms the assist banner (see `interaction-assist.md`).
+
+The actionable-primary selection (`selectActionablePrimaryMethods` in `src/db/contact-methods-read.ts`) is exported as a pure function so the Reach Out router reuses it directly from already-loaded method groups, with no second query.
 
 ### Writing and selecting methods
 
@@ -121,11 +123,12 @@ Migration 009 retires scalar contact phone/email storage. Migration 010 adds nul
 - **ADR-067:** Conservative Advisory Identity Matching and Explicit Source Consolidation — makes canonical endpoint evidence advisory unless an active source link identifies the contact.
 - **ADR-068:** User-Triggered, Source-Only Reconciliation with Durable Review — compares methods canonically without making a source authoritative.
 - **ADR-069:** Atomic Tombstone-Backed Orbit Contact Merge — deduplicates compatible methods and requires a choice for competing primaries.
+- **ADR-072:** Shared Actionable Reach Out Router with Native Channel Handoff — reuses the actionable-primary selection and routes Compose Send through the shared handoff without a send-time interaction write.
 
 ## Gotchas
 
 1. **Do not construct an `sms:` URI.** `expo-sms` performs native recipient/body marshalling; a hand-built URI can corrupt the draft and has unreliable capability detection.
-2. **Compose is not a touchpoint.** Do not write an interaction or `last_contact` after Send or Copy because Android cannot reliably confirm that the user sent the message.
+2. **Compose is not a touchpoint.** Do not write an interaction or `last_contact` after Send or Copy because Android cannot reliably confirm that the user sent the message. Send now creates a pending Interaction Assist and hands off; the interaction is written only if the user later confirms the assist banner.
 3. **Use `getRankedFuel()`, not the editor read or a UI filter.** The compose surface is transmittable, so its privacy exclusion belongs in SQL.
 4. **Native handoff needs a release rebuild.** `expo-sms` and `expo-clipboard` autolink without an app-config plugin, but a Metro reload cannot verify them.
 5. **Notification bodies are not fuel previews.** A reminder opens Compose for live fuel instead of freezing fuel text into the OS shade.
@@ -146,6 +149,7 @@ Migration 009 retires scalar contact phone/email storage. Migration 010 adds nul
 - **Backup & Restore** — exports link identity and applies it only beneath a surviving contact.
 - **Contact Import** — uses canonical endpoints, source links, and provenance for conservative selected-contact import.
 - **Contact Reconciliation** — compares canonical endpoint families and consolidates compatible methods during an explicit merge.
+- **Interaction Assist & Reach Out** — reuses the actionable-primary selection for its router and takes Compose Send through the shared native handoff.
 
 ## Changelog
 
@@ -158,3 +162,4 @@ Migration 009 retires scalar contact phone/email storage. Migration 010 adds nul
 | 2026-08-27 | 18.1 | Added normalized phone/email methods, durable labels, provenance, and actionable-primary Compose gating. |
 | 2026-08-26 | 19 | Added canonical source-method evidence and transactional import provenance. |
 | 2026-08-26 | 20 | Added canonical reconciliation comparison and explicit primary-method merge resolution. |
+| 2026-08-31 | 21 | Compose Send routes through the shared `performReachOut` (pending assist, no send-time interaction); the actionable-primary selection is reused by the Reach Out router. |
