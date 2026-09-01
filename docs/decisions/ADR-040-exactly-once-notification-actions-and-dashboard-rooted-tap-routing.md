@@ -52,4 +52,4 @@ The system offers two headless-capable action buttons: mark contacted and fixed 
 - `src/services/notifications/purge-notification-cleanup.ts` — cancels a purged contact's pending decay and birthday requests after commit.
 
 **Depends on:** ADR-010 (Single-Writer Interaction Recency Spine); ADR-023 (Structured Touchpoints and One-Tap Defaults); ADR-036 (Entry-Agnostic Compose Navigation and Transmittable-Fuel Guardrails)
-**Required by:** ADR-045 (Event-Driven Widget Refresh and Boot Recovery)
+**Required by:** ADR-045 (Event-Driven Widget Refresh and Boot Recovery); ADR-055 (Dedicated Weekly Digest Scheduling and Persisted Notification Policy)

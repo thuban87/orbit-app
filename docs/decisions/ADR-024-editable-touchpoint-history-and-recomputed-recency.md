@@ -50,4 +50,4 @@ The system logs immediately and refines from a full, editable, newest-first prof
 - `src/screens/ContactProfileScreen.tsx` — wires refinement, confirmed deletion, and in-place refresh.
 
 **Depends on:** ADR-010 (Single-Writer Interaction Recency Spine)
-**Required by:** _None._
+**Required by:** ADR-054 (Live Weekly Digest Retrospective and Overlooked Relationship Read)

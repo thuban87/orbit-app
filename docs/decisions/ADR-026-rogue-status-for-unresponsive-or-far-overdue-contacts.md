@@ -50,4 +50,4 @@ The system uses one query-time `rogue` state with an `overdue` or `unresponsive`
 - `src/theme/theme-types.ts` — defines the dedicated rogue and gravity-tier palette tokens.
 
 **Depends on:** ADR-011 (Query-Time Status and Never-Contacted Segregation)
-**Required by:** ADR-027 (Derived Profile-Only Gravity and Intensity); ADR-046 (Query-Time Orrery Placement and Transactional Ring Ordering)
+**Required by:** ADR-027 (Derived Profile-Only Gravity and Intensity); ADR-046 (Query-Time Orrery Placement and Transactional Ring Ordering); ADR-054 (Live Weekly Digest Retrospective and Overlooked Relationship Read)
