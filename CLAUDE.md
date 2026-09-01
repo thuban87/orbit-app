@@ -40,7 +40,7 @@ locally, then tell the owner what is ready to push and let him run it.
 
 This applies to **every** agent, including subagents you spawn. Workflow tooling does not necessarily read this preference, so an executor or fixer agent will happily create a branch + worktree and fast-forward it back unless you stop it. Orchestrators: state this constraint in the prompt of any agent you spawn that may write code, and never pass `isolation: "worktree"` to the Agent tool.
 
-Set up a `PreToolUse` hook (`.claude/hooks/block-git-worktree.sh`) to block `git worktree` at the harness layer, mirroring quest-board. If you hit it, that is the rule working — do not route around it. If you think isolation is genuinely required, stop and ask the owner.
+A `PreToolUse` hook (`.claude/hooks/block-git-worktree.sh`, wired in `.claude/settings.json`) blocks `git worktree` at the harness layer; the codex harness has the same guard at `.codex/hooks/block-git-worktree.sh`. If you hit it, that is the rule working — do not route around it. If you think isolation is genuinely required, stop and ask the owner.
 
 **Do not report a subagent's summary to the owner as fact.** Verify its claims against `git log` / `git show` and the working tree first — subagents have asserted file states and commit contents that turned out to be wrong.
 
@@ -167,7 +167,7 @@ Useful reference targets in that repo:
 
 - **Templates** live in `.planning/knowledgebase/templates/` — read the matching template before generating any KB doc.
 - **Phase KB manifests** live alongside their phase artifacts at `.planning/phases/{phase-id}/{phase-id}-KB-MANIFEST.md`.
-- Quest-board uses a `qb-extract-phase-kb` skill for the extraction step. **That skill is project-specific and does not exist here** — an equivalent needs creating for this repo before the first phase completes. Until it does, extraction is manual and must still happen; do not let phase decisions rot in `.planning/`.
+- Extraction runs through the `extract-phase-kb` skill (installed for both Claude and codex); structural system-doc splits use `split-system-doc`. Both are dossier-aware and adapted to this repo, and the setup is live-tracked in `.planning/knowledgebase/KB-SETUP-PLAN.md`. Run extraction as a milestone-close backfill batch in strict phase order; do not let phase decisions rot in `.planning/`.
 
 ## Graphify and feature intelligence
 
@@ -192,7 +192,7 @@ If your question is one of these, run the command before you grep. It answers in
 
 ### Build discipline (non-negotiable)
 
-- **Build with `npm run graph:build` — never `$gsd-graphify build`, and never `graphify` directly.** This is not a style preference: the stock build **silently corrupts** the graph, and the corrupted graph looks completely normal. Block both at the harness layer with `.claude/hooks/block-graphify-build.sh`, mirroring quest-board. Keep `auto_update` off; builds are explicit.
+- **Build with `npm run graph:build` — never `$gsd-graphify build`, and never `graphify` directly.** This is not a style preference: the stock build **silently corrupts** the graph, and the corrupted graph looks completely normal. Both are blocked at the harness layer by `.claude/hooks/block-graphify-build.sh` (and `.codex/hooks/block-graphify-build.sh` for codex). Keep `auto_update` off; builds are explicit.
 - Query and inspect freely: `$gsd-graphify query <term>`, `status`, `diff`. Only `build` is blocked.
 - `.graphifyignore` defines the maintained engineering corpus. Exclude historical phases, archived reference code, generated output, and agent infrastructure so they do not overwhelm community detection. Exclude ADR *bodies* too — their decisions reach the graph via the registry below.
 - `.planning/graphs/` holds `graph.json` and `GRAPH_REPORT.md` **committed**, plus `graph.html` and `.last-build-snapshot.json` which are **generated-but-ignored**. Both are rewritten wholesale every build, so git cannot delta them — on quest-board they were adding ~19 MB of new blobs per KB-extraction commit. Set the `.gitignore` up this way from the first build. On a fresh clone, run `npm run graph:build` once before using the visualization or `graphify diff`.
@@ -200,7 +200,7 @@ If your question is one of these, run the command before you grep. It answers in
 
 ### The ADR bridge — how decisions reach the graph
 
-Two pieces make it work, and both are load-bearing. **Neither exists in this repo yet** — port both from `~/projects/quest-board-app` before the first graph build, or ADR nodes will be missing or wrong:
+Two pieces make it work, and both are load-bearing (both now exist in this repo):
 
 - **`docs/decisions/adr-registry.ts`** — a *generated* file (`npm run gen:adr-registry`), sourced from the ADR bodies, never from a derived INDEX. It exists solely to be read by graphify, which mints ADR nodes **only from `ADR-NNN` tokens in JS/TS comments**. Markdown and JSON are invisible to that scan — an INDEX.md alone produces no ADR nodes at all. Regenerate whenever an ADR is added or superseded, or the graph will confidently report a retired ADR as current.
 - **`scripts/normalize-graph-docrefs.ts`** — repairs a graphify bug that scatters an ADR cited by N files into N disconnected nodes instead of one shared node, destroying every code→ADR edge. `graph:build` must normalize the copy in `.planning/graphs/` *after* copying, never graphify's own incremental baseline, which would silently re-scatter on the next build.
