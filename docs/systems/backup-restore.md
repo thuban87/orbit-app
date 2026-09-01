@@ -1,7 +1,7 @@
 # Backup & Restore
 
-**Last updated:** 2026-08-24
-**Updated by phase:** 17-backup-export-restore
+**Last updated:** 2026-08-27
+**Updated by phase:** 18.1-contact-method-normalization
 **Owners:** `src/backup/`, `src/services/backup/`, `src/services/backup-sweep.ts`, `src/db/restore-photo-journal-dao.ts`, `src/screens/BackupScreen.tsx`
 
 ## Purpose
@@ -12,12 +12,13 @@ Backup & Restore gives Orbit a user-controlled, local loss barrier while Android
 
 ### Data Model
 
-The backup manifest is a versioned wire model separate from SQLite's schema version. It contains non-secret app settings, relationship rows, tombstones, and embedded photo bytes; it excludes API keys, passphrases, `field_history`, local photo paths, and derived OS schedules.
+The backup manifest is a versioned wire model separate from SQLite's schema version. Its normalized-method representation carries non-secret app settings, relationship rows, method/link/provenance children, tombstones, and embedded photo bytes; it excludes API keys, passphrases, `field_history`, local photo paths, and derived OS schedules.
 
 **Tables:**
 - `tombstones` — indefinitely retained type-and-UID deletion evidence for mergeable rows.
 - `app_settings` — stores portable preferences plus device-local automatic-backup configuration, revision, health, and encryption-flag state.
 - `restore_photo_journal` — committed-only finalize/delete work for restored photo files.
+- `contact_methods`, external links, and method provenance — first-class UID-bearing portable children with labels and canonicalization regions where present.
 
 **Types** (`src/backup/types.ts`):
 - `BackupManifest` — complete portable snapshot with UID-shaped relationships.
@@ -60,6 +61,7 @@ The backup manifest is a versioned wire model separate from SQLite's schema vers
 1. `BackupScreen` invokes the manual export service; it does not alter automatic-backup health.
 2. `buildExportManifest()` reads tables and photo bytes under `inReadSnapshot()` so the manifest is coherent with serialized writers.
 3. The service writes the local file, reads it back, parses it again, and only then opens Android's share sheet.
+4. The normalized method graph retains nullable labels and canonical regions; v1 scalar endpoint data forward-migrates to deterministic legacy method UIDs rather than reintroducing a scalar authority.
 4. When automatic backup is configured, `registerBackupSweep()` checks cadence and `data_revision` at a foreground launch, writes and verifies a new SAF file, records success, then prunes eligible owned copies.
 
 ### Encrypting a backup
@@ -72,7 +74,7 @@ The backup manifest is a versioned wire model separate from SQLite's schema vers
 
 1. The landing screen reads a picker cache copy immediately, decrypts if necessary, parses, validates the complete graph, and stores the valid candidate in a process-local cache.
 2. `RestorePreviewScreen` shows aggregate metadata only. Merge is the default; Replace-all requires an impact confirmation and, with a configured destination, a fresh verified pre-restore snapshot.
-3. `applyRestore()` reconciles UID rows and tombstones, writes in a single transaction, recomputes contact recency, and registers committed photo-finalization work.
+3. `applyRestore()` reconciles UID rows and tombstones, normalizes method/link natural-key collisions before writing, recomputes contact recency, and registers committed photo-finalization work in one transaction.
 4. Post-commit photo and schedule work is retryable. The launch sweep resumes only journal rows proven to belong to a committed restore.
 
 ## Configuration
@@ -90,6 +92,7 @@ The backup manifest is a versioned wire model separate from SQLite's schema vers
 - **ADR-056:** Tombstone-Backed UID Reconciliation for Portable Restores — defines merge identity and deletion evidence.
 - **ADR-057:** Full-State Versioned Backups with Verified Manual and Foreground SAF Snapshots — defines the portable snapshot and automatic policy.
 - **ADR-058:** Optional Encrypted Backups and Previewed Local Restoration — defines encryption and safe restoration.
+- **ADR-060:** Versioned Portable Method Graph and Collision-Normalized Restoration — carries normalized endpoint children and resolves their safe natural-key collisions before writes.
 
 ## Gotchas
 
@@ -99,6 +102,8 @@ The backup manifest is a versioned wire model separate from SQLite's schema vers
 4. **Do not merge `last_contact`.** It is derived from interactions and is recomputed after restore.
 5. **Do not trust serialized photo paths.** Restore stages embedded bytes, then writes fresh local masters through the committed journal path.
 6. **Foreground-only means catch-up on launch.** It is not a background scheduler or a cloud-sync promise.
+7. **Normalize method actions before publishing survivors.** A collapsed duplicate must re-parent its provenance and leave the survivor set consistent with the writes.
+8. **Demote before promoting a primary or active link.** SQLite partial unique indexes are statement-immediate, so a promotion-first write can fail mid-restore.
 
 ## Related Systems
 
@@ -114,3 +119,4 @@ The backup manifest is a versioned wire model separate from SQLite's schema vers
 | Date | Phase | What Changed |
 |---|---|---|
 | 2026-08-24 | 17 | Created full-state backup, encryption, automatic SAF snapshot, and validated restoration documentation. |
+| 2026-08-27 | 18.1 | Added the normalized method/link/provenance graph and collision-normalized restoration. |
