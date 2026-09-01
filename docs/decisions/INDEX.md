@@ -22,7 +22,7 @@ not something you can pattern-match against.
 ## How to use this
 
 - **Is a decision still live?** Check the `Superseded by` column. 0 of
-  7 ADRs are superseded in whole or in part.
+  12 ADRs are superseded in whole or in part.
 - **Which decisions govern a file?** Don't grep this file — ask the graph:
   `npm run graph:ask -- governs src/db/field-values-dao.ts`, or follow the
   `governed_by` edges.
@@ -38,3 +38,8 @@ not something you can pattern-match against.
 | 005 | AiService Port Omits the Local/LAN (Ollama) Provider | Accepted | 01-project-scaffold-portable-code | — | — | — | 3 | `src/services` |
 | 006 | Theme-Token Architecture | Accepted | 01-project-scaffold-portable-code | — | — | — | 7 | `scripts`, `src/screens`, `src/stores` +1 |
 | 007 | Cross-Machine Android Build Pipeline & Physical-Pixel FND-01 Proof | Accepted | 01-project-scaffold-portable-code | — | — | — | 3 | `docs/runbooks`, `src/constants` |
+| 008 | Initial Contact Schema as a Cross-Phase Data Contract | Accepted | 02-data-foundation-status-engine | — | — | — | 3 | `src/db`, `src/db/migrations` |
+| 009 | Crash-Safe Forward-Only SQLite Migrations | Accepted | 02-data-foundation-status-engine | — | — | — | 4 | `src/db`, `src/db/migrations` |
+| 010 | Single-Writer Interaction Recency Spine | Accepted | 02-data-foundation-status-engine | — | — | — | 3 | `src/db`, `src/db/migrations` |
+| 011 | Query-Time Status and Never-Contacted Segregation | Accepted | 02-data-foundation-status-engine | — | — | — | 3 | `src/db` |
+| 012 | Opt-Out Android Backup for Third-Party PII | Accepted | 02-data-foundation-status-engine | — | — | — | 1 | `src/db` |

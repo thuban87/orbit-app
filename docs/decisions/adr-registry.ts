@@ -17,5 +17,10 @@
 // NOTE: ADR-0005 [ACCEPTED] AiService Port Omits the Local/LAN (Ollama) Provider
 // NOTE: ADR-0006 [ACCEPTED] Theme-Token Architecture
 // NOTE: ADR-0007 [ACCEPTED] Cross-Machine Android Build Pipeline & Physical-Pixel FND-01 Proof
+// NOTE: ADR-0008 [ACCEPTED] Initial Contact Schema as a Cross-Phase Data Contract
+// NOTE: ADR-0009 [ACCEPTED] Crash-Safe Forward-Only SQLite Migrations
+// NOTE: ADR-0010 [ACCEPTED] Single-Writer Interaction Recency Spine
+// NOTE: ADR-0011 [ACCEPTED] Query-Time Status and Never-Contacted Segregation
+// NOTE: ADR-0012 [ACCEPTED] Opt-Out Android Backup for Third-Party PII
 
-export const ADR_COUNT = 7;
+export const ADR_COUNT = 12;
