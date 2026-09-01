@@ -1,7 +1,7 @@
 # Interaction Log
 
-**Last updated:** 2026-08-24
-**Updated by phase:** 17-backup-export-restore
+**Last updated:** 2026-08-31
+**Updated by phase:** 21-interaction-assist-reach-out
 **Owners:** `src/db/recency-dao.ts`, `src/db/events-dao.ts`, `src/db/timeline-read.ts`, `src/db/log-guards.ts`, `src/db/impact-read.ts`, `src/services/impact.ts`
 
 ## Purpose
@@ -24,7 +24,7 @@ All log data lives in local SQLite. A touchpoint is distinct from a lifecycle ev
   - `connected` (`INTEGER`) — whether the touchpoint connected; it controls qualifying recency for Rarely-responds contacts.
   - `quality` (`TEXT`, nullable) — `good`, `fine`, or `hard` when refined.
   - `note` (`TEXT`, nullable) — local timeline detail.
-  - `source` (`TEXT`) — `manual`, `widget`, `notification`, or `ai` creation route.
+  - `source` (`TEXT`) — `manual`, `widget`, `notification`, `ai`, or `assist` creation route (free text, no CHECK constraint).
 - `events` — immutable, read-only lifecycle history.
   - `uid` (`TEXT`) — stable event identity.
   - `contact_id` (`INTEGER`) — owning contact.
@@ -88,6 +88,12 @@ All log data lives in local SQLite. A touchpoint is distinct from a lifecycle ev
 2. That seam delegates to `recordTouchpoint()` with `source='widget'`, outbound, connected, unspecified-channel defaults, and `quality=NULL`.
 3. Each genuine widget tap receives a fresh UID and produces a complete interaction row; the renderer refreshes only after this serialized write commits.
 
+### Recording an assist confirmation
+
+1. When the user confirms an Interaction Assist banner, `markAssistLogged` (`src/db/interaction-assist-dao.ts`) re-reads the assist row inside one transaction and writes a single interaction with `source='assist'`, `direction='outbound'`, the assist's original `handoff_at` as `occurred_at`, and `connected=1` (Call Yes, Text/Email Yes) or `connected=0` (Call No answer).
+2. It composes `insertInteractionCore` + `recomputeLastContactCore` (`src/db/data-revision-dao.ts`) directly rather than the `recordTouchpoint()` wrapper, so the insert, the recency recompute, and the assist status flip commit atomically — but recency still advances only through the same sole recomputer.
+3. A `Don't log` outcome writes no interaction and leaves `last_contact` untouched. See `interaction-assist.md`.
+
 ### Reading history and lifecycle events
 
 1. Archive and restore update contact lifecycle state only when their state guard matches.
@@ -127,6 +133,7 @@ All log data lives in local SQLite. A touchpoint is distinct from a lifecycle ev
 - **ADR-027:** Derived Profile-Only Gravity and Intensity — derives two non-stored relationship signals from this history.
 - **ADR-040:** Exactly-Once Notification Actions and Dashboard-Rooted Tap Routing — maps notification actions onto the established structured-write contracts.
 - **ADR-044:** Headless Widget Actions and Dashboard-Rooted Deep Links — maps widget marks onto the same single-writer contract.
+- **ADR-071:** User-Attested Handoff-Time Interaction Logging Through the Sole Recency Writer — adds assist confirmation as a new outbound touchpoint writer at handoff time, composing the shared recency cores in one transaction.
 - **ADR-056:** Tombstone-Backed UID Reconciliation for Portable Restores — records interaction deletion evidence and blocks orphan restoration.
 - **ADR-057:** Full-State Versioned Backups with Verified Manual and Foreground SAF Snapshots — includes interaction history in full-state exports.
 
@@ -140,6 +147,7 @@ All log data lives in local SQLite. A touchpoint is distinct from a lifecycle ev
 6. **Do not turn snooze into a touchpoint.** It is a lifecycle event and must not advance `last_contact` or alter derived relationship status.
 7. **Do not bypass the recency DAO from a widget task.** A raw `last_contact` update or nested transaction breaks the serialized history/summary invariant.
 8. **Do not import a recency summary.** Restore derives `last_contact` from the reconciled interaction set after its write transaction.
+9. **The assist path still recomputes through the sole recomputer.** `markAssistLogged` composes `insertInteractionCore`/`recomputeLastContactCore` directly instead of `recordTouchpoint()` (to run inside its in-transaction re-read), but it must never write `last_contact` itself — the single-writer invariant is preserved by reusing `recomputeLastContactCore`.
 
 ## Related Systems
 
@@ -149,6 +157,7 @@ All log data lives in local SQLite. A touchpoint is distinct from a lifecycle ev
 - **Notifications** — supplies the foreground and headless action paths that use these writers.
 - **Widget** — supplies a separate headless one-tap source with the same DAO-owned write invariant.
 - **Backup & Restore** — exports interactions and applies them only after their contact survives UID reconciliation.
+- **Interaction Assist & Reach Out** — confirmation writes an `source='assist'` outbound touchpoint at the original handoff time through the shared recency cores.
 
 ## Changelog
 
@@ -158,3 +167,4 @@ All log data lives in local SQLite. A touchpoint is distinct from a lifecycle ev
 | 2026-08-16 | 11 | Added notification-sourced one-tap writes and durable snooze/unsnooze event producers. |
 | 2026-08-16 | 12 | Added widget-sourced headless one-tap writes through the existing recency DAO. |
 | 2026-08-24 | 17 | Added interaction deletion tombstones and restored-history recency recomputation. |
+| 2026-08-31 | 21 | Added assist confirmation as a new touchpoint writer (`source='assist'`, outbound, handoff-time `occurred_at`, connected per Call outcome) composing the shared recency cores in one transaction. |
