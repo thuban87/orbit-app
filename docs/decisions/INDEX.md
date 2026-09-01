@@ -22,7 +22,7 @@ not something you can pattern-match against.
 ## How to use this
 
 - **Is a decision still live?** Check the `Superseded by` column. 2 of
-  53 ADRs are superseded in whole or in part.
+  55 ADRs are superseded in whole or in part.
 - **Which decisions govern a file?** Don't grep this file — ask the graph:
   `npm run graph:ask -- governs src/db/field-values-dao.ts`, or follow the
   `governed_by` edges.
@@ -84,3 +84,5 @@ not something you can pattern-match against.
 | 051 | Public-HTTPS Custom AI Egress Guard | Accepted | 14-ai-message-suggestions | — | — | — | 5 | `modules/orbit-secure-fetch/src`, `src/ai`, `src/ai/__fixtures__` +1 |
 | 052 | Compose-Owned AI Draft Lifecycle and Acknowledged Egress | Accepted | 14-ai-message-suggestions | — | — | — | 5 | `src/db`, `src/logic`, `src/navigation` +1 |
 | 053 | Local-First LiteLLM AI Model Catalog | Accepted | 14-ai-message-suggestions | — | — | — | 5 | `scripts`, `src/ai`, `src/screens` |
+| 054 | Live Weekly Digest Retrospective and Overlooked Relationship Read | Accepted | 15-weekly-digest | — | — | — | 4 | `src/db`, `src/logic`, `src/screens` |
+| 055 | Dedicated Weekly Digest Scheduling and Persisted Notification Policy | Accepted | 15-weekly-digest | — | — | — | 7 | `src/db`, `src/db/migrations`, `src/screens` +1 |

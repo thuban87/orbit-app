@@ -63,5 +63,7 @@
 // NOTE: ADR-0051 [ACCEPTED] Public-HTTPS Custom AI Egress Guard
 // NOTE: ADR-0052 [ACCEPTED] Compose-Owned AI Draft Lifecycle and Acknowledged Egress
 // NOTE: ADR-0053 [ACCEPTED] Local-First LiteLLM AI Model Catalog
+// NOTE: ADR-0054 [ACCEPTED] Live Weekly Digest Retrospective and Overlooked Relationship Read
+// NOTE: ADR-0055 [ACCEPTED] Dedicated Weekly Digest Scheduling and Persisted Notification Policy
 
-export const ADR_COUNT = 53;
+export const ADR_COUNT = 55;
