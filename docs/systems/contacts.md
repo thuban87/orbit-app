@@ -24,6 +24,8 @@ All data is on-device SQLite. Migration 001 uses a surrogate `contacts.id` and a
   - `phone` (`TEXT`, nullable) — dedicated number used by user-invoked SMS handoff when present.
   - `photo` (`TEXT`, nullable) — validated relative path to the contact's local photo master.
   - `favourite_rank` (`INTEGER`, nullable) — ordered membership in the dashboard and widget favourites set.
+  - `snooze_until` (`TEXT`, nullable) — bare local `YYYY-MM-DD` that delays the next decay reminder without changing the contact clock.
+  - `reminders_off` (`INTEGER`) — permanent decay-reminder mute; it does not archive, hide, or stop status progression for the contact.
 - `categories` — seeded Family, Friends, Work, and Community groups with display order.
 - `profile` — one record for the user rather than a special contact row; its nullable `photo` holds the self master’s relative path.
 - `contact_links` — ordered actionable web links belonging to a contact.
@@ -51,6 +53,7 @@ All data is on-device SQLite. Migration 001 uses a surrogate `contacts.id` and a
 | Profile DAO | `src/db/profile-dao.ts` | Reads and updates the single self record’s local photo reference. |
 | Links DAO | `src/db/contact-links-dao.ts` | Lists and applies scoped add/edit/remove changes for ordered link rows. |
 | Recency DAO | `src/db/recency-dao.ts` | Is the sole owner of `last_contact` recomputation. |
+| Snooze DAO | `src/db/snooze-dao.ts` | Is the sole writer of `snooze_until` and records paired lifecycle events. |
 | Purge DAO | `src/db/purge-dao.ts` | Computes the destruction summary and performs archive-guarded fan-out deletion. |
 
 ### Key Files
@@ -63,6 +66,7 @@ All data is on-device SQLite. Migration 001 uses a surrogate `contacts.id` and a
 | `src/db/profile-dao.ts` | Single-row self photo reads and writers. |
 | `src/db/contact-links-dao.ts` | Ordered child-table CRUD for contact links. |
 | `src/db/recency-dao.ts` | Single-writer interaction/recency cores used by composed contact writes. |
+| `src/db/snooze-dao.ts` | Local-date snooze and clear writes with immutable event composition. |
 | `src/db/events-dao.ts` | Insert-only lifecycle writer composed by archive and restore. |
 | `src/db/purge-dao.ts` | Explicit, transaction-scoped child deletion and post-commit extension hook. |
 | `src/screens/CreateContactScreen.tsx` | Lean fixed-first create form. |
@@ -111,6 +115,12 @@ All data is on-device SQLite. Migration 001 uses a surrogate `contacts.id` and a
 2. Compose trims the optional phone to decide SMS availability and treats an archived header as unavailable rather than showing a live messaging surface.
 3. Send and Copy remain handoff-only actions; the contacts system receives no interaction or recency write from them.
 
+### Snoozing reminders
+
+1. The edit form exposes the durable Mute reminders policy, while the profile exposes 3-day, 1-week, and 1-month snooze actions plus Clear.
+2. `snoozeContact()` writes `snooze_until` with SQLite local-date arithmetic and records an immutable `snooze` event in the same transaction; Clear writes `NULL` and an `unsnooze` event.
+3. Neither path writes `last_contact`. The notification scheduler re-reads the committed contact state and cancels or re-arms the derived OS reminder.
+
 ### Creating a contact during capture
 
 1. The Capture New contact tile validates a non-blank name and calls `createContactFull()` without `firstInteraction`.
@@ -141,6 +151,8 @@ All data is on-device SQLite. Migration 001 uses a surrogate `contacts.id` and a
 - **ADR-035:** Native SMS Handoff with Guaranteed Clipboard Copy — uses the nullable phone field for a user-invoked, non-writing handoff.
 - **ADR-036:** Entry-Agnostic Compose Navigation and Transmittable-Fuel Guardrails — rejects archived headers on the reusable live compose surface.
 - **ADR-038:** Contact-Owned Share Capture Fuel — preserves name-only, never-contacted inline creation and prohibits a capture recency write.
+- **ADR-039:** Pre-Scheduled Inexact Decay Reminders — uses cadence, snooze, mute, lifecycle, and status fields to determine derived reminder eligibility.
+- **ADR-040:** Exactly-Once Notification Actions and Dashboard-Rooted Tap Routing — routes mark-contacted and snooze through the established contact write boundaries.
 
 ## Gotchas
 
@@ -155,6 +167,8 @@ All data is on-device SQLite. Migration 001 uses a surrogate `contacts.id` and a
 9. **Rewrite the complete favourite set in one transaction.** A partial, duplicate, stale, archived, or non-favourite id list must fail rather than leave ranks inconsistent.
 10. **A by-id header can still be archived.** Live callers such as Compose must inspect `archived_at`; the header seek intentionally does not apply a live-list filter itself.
 11. **A capture is not contact.** Creating or selecting a contact for a share must leave `last_contact` unchanged and write no interaction row.
+12. **Keep snooze dates local.** `snooze_until` is already a local bare date; parse or render it as UTC and near-midnight users see the wrong day.
+13. **Mute does not hide a contact.** `reminders_off` suppresses decay scheduling only; Dashboard, status, and birthday behavior remain otherwise unchanged.
 
 ## Related Systems
 
@@ -165,6 +179,7 @@ All data is on-device SQLite. Migration 001 uses a surrogate `contacts.id` and a
 - **Dashboard** — reads contact projections and provides favourite-management entry points.
 - **Contact methods** — consumes the lightweight phone and archive header for Compose gating.
 - **Capture** — selects or name-only creates a fuel owner while retaining the never-contacted state.
+- **Notifications** — derives decay eligibility from contact state and owns the OS schedule.
 
 ## Changelog
 
@@ -177,3 +192,4 @@ All data is on-device SQLite. Migration 001 uses a surrogate `contacts.id` and a
 | 2026-08-15 | 08 | Added profile favourite marking and guarded shared rank reordering. |
 | 2026-08-16 | 09 | Exposed phone through the lightweight header read and gated archived contacts from Compose. |
 | 2026-08-16 | 10 | Added name-only capture creation that remains never-contacted and does not write recency. |
+| 2026-08-16 | 11 | Added local snooze writes, durable reminder muting, and scheduling-state reconciliation. |
