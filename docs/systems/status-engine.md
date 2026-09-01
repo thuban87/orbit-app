@@ -67,6 +67,8 @@ Status is a query-time projection over the contacts and interactions schema; no 
 
 - **ADR-011:** Query-Time Status and Never-Contacted Segregation — status/progress are derived and never-contacted people are excluded from normal reads.
 - **ADR-010:** Single-Writer Interaction Recency Spine — supplies the maintained local recency value status reads.
+- **ADR-023:** Structured Touchpoints and One-Tap Defaults — makes qualifying recency connection-aware for Rarely-responds contacts.
+- **ADR-024:** Editable Touchpoint History and Recomputed Recency — routes corrected and deleted touchpoints through the same recency source.
 - **ADR-026:** Rogue Status for Unresponsive or Far-Overdue Contacts — adds explainable query-time rogue reasons and policy-aware recency.
 
 ## Gotchas

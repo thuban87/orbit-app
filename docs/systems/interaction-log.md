@@ -101,9 +101,11 @@ All log data lives in local SQLite. A touchpoint is distinct from a lifecycle ev
 
 ## Decisions
 
+- **ADR-010:** Single-Writer Interaction Recency Spine — supplies the one maintained recency write path used by touchpoint mutations.
 - **ADR-023:** Structured Touchpoints and One-Tap Defaults — preserves independent interaction axes and explicit fast-path defaults.
 - **ADR-024:** Editable Touchpoint History and Recomputed Recency — makes the timeline the correction path and retains one writer.
 - **ADR-025:** Immutable Lifecycle Events in a Unified Timeline — separates event storage while unifying the profile read.
+- **ADR-026:** Rogue Status for Unresponsive or Far-Overdue Contacts — shares the connection-policy filter used by impact reads.
 - **ADR-027:** Derived Profile-Only Gravity and Intensity — derives two non-stored relationship signals from this history.
 
 ## Gotchas
