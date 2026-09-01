@@ -121,6 +121,16 @@ of templates + scripts + graph bridge supports them.
   (26→42, graph committed). Backstops still in place: the skill's before/after edge-count catch
   flags `GRAPH REBUILD OWED` (commit `2d724c5`) for any non-yolo run, and a final `graph:build`
   from Claude/shell at end-of-batch is cheap insurance.
+- **Phase 04** (codex, yolo) — extracted 2026-09-01. ADR-016…019, contacts.md UPDATED
+  (lifecycle/archive/purge — chronologically clean), custom-fields.md + persistence-core.md
+  cross-cutting UPDATEs. Graph 42→60. **Two boundary calls to note:** (1) codex added a NEW
+  "App shell" subsystem row to README (navigation/bootstrap/settings) — not in the original 18;
+  (2) app-shell.md **absorbed the theme contract** (theme-types/presets, no-raw-hex), which
+  overlaps ADR-006 and **pre-empts the M2 theme doc** that phase 01 deliberately deferred. At
+  M2's theme phase, decide whether to split theme out of app-shell (use `split-system-doc`).
+- **Safeguard bug fixed (`grep -c` → `grep -o | wc -l`):** graph.json is minified to one line,
+  so the edge-count catch always read 1→1 and fired a false `GRAPH REBUILD OWED` every run.
+  Fixed; phase 04's graph was actually fine.
 - **Watch at phase 16:** the reclaimed ADR-001 (normalized) must supersede ADR-013/014/015 —
   their `Superseded by:` should flip to ADR-001 when phase 16 is extracted.
 - **Skill fix:** subsystem index maintenance routes to `docs/systems/README.md`, not CLAUDE.md
