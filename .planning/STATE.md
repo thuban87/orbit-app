@@ -2,17 +2,17 @@
 gsd_state_version: 1.0
 milestone: v1.0
 current_phase: 21
-current_phase_name: interaction-assist-reach-out
-current_plan: 0
-status: planned
-stopped_at: Phase 21 PLANNED — 6 plans / 4 waves (tracer-first), checker-passed (0 blockers), ready to execute
-last_updated: "2026-08-31T21:36:53.415Z"
-state_head: ee3d04bfd7a57f67d7ab28663920d0eeaa9eb7a2
+current_phase_name: Interaction Assist & Reach Out
+current_plan: 6
+status: complete
+stopped_at: Phase 21 COMPLETE — all 6 plans executed; Pixel device UAT PASS (DB-verified) + owner sign-off (2026-08-31). Local on main, NOT pushed.
+last_updated: "2026-08-31T20:05:00.000Z"
+state_head: 13c627af1f0b1c0d348e2f0b6ba7a1931e1a9f6d
 progress:
   total_phases: 23
-  completed_phases: 16
+  completed_phases: 15
   total_plans: 181
-  completed_plans: 167
+  completed_plans: 172
 milestone_name: milestone
 ---
 
@@ -23,24 +23,39 @@ milestone_name: milestone
 See: .planning/PROJECT.md (updated 2026-08-14)
 
 **Core value:** Collapse the taps between "you're overdue with X" and the message actually being sent.
-**Current focus:** Phase 21 (Interaction Assist & Reach Out) — PLANNED, ready to execute
+**Current focus:** Phase 21 — Interaction Assist & Reach Out
 
 ## Current Position
 
-**Phase:** 21 — Interaction Assist & Reach Out — 🗒 PLANNED (6 plans / 4 waves, tracer-first)
-**Current Plan:** 0 of 6 — ready to execute
-**Status:** Ready to execute
+**Phase:** 21 — Interaction Assist & Reach Out — ✅ COMPLETE (owner-signed-off 2026-08-31)
+**Current Plan:** 6 of 6 (all executed)
+**Status:** Phase 21 complete — ready for verification / KB extraction
 
-**⟢ PHASE 21 (Interaction Assist & Reach Out) — PLANNED (2026-08-31).** 6 plans across 4 waves,
-tracer-first vertical slices, plan-checker PASSED (0 blockers / 0 warnings after one revision).
-Research + pattern-map + Nyquist VALIDATION contract in place. Wave 1 = `21-01` TRACER (migration 014
-`interaction_assists` + `interaction_assist_enabled`, assist write routed through `recordTouchpoint`);
-Wave 2 = `21-02` Reach Out router + native handoff + non-modal return banner + confirmation; Wave 3
-(parallel) = `21-03` endpoint selector + Compose→assist seam, `21-04` Settings toggle + sweep, `21-05`
-cross-phase wiring (merge reparent / purge cascade / widget Message→Contact / `orbit://reach/<id>`);
-Wave 4 = `21-06` full-suite gate + Pixel device UAT. **Owner decision flagged (non-blocking):** Compose
-Send→assist is retained in Phase 21 per dossier Cluster AC `[DECIDED]`; the cross-milestone note assigns
-Compose *Send-UX ownership* to M2 Phase 12 — confirm if that should change. Next: `/gsd-execute-phase 21`.
+**⟢ PHASE 21 (Interaction Assist & Reach Out) — COMPLETE (2026-08-31), owner-signed-off.** All 6 plans
+executed (21-01 tracer/migration 014 → 21-05 cross-phase wiring). Plan 21-06 closed the phase: Task 1
+consolidated the two raw `interaction_assist_enabled` reads onto `getAppSettings().interactionAssistEnabled`
+(`a84a3d8`) with a green node gate (**191 files / 1,812 tests**, tsc, check:colors); Task 2 owner checkpoint
+cleared; **Task 3 = Pixel device UAT PASS** — the whole matrix (R01–R10, R14–R20) driven on the physical
+Pixel 6 Pro against a DEBUG build with WAL-aware `run-as` DB evidence, migration 014 live (`user_version` 14).
+**Sign-off invariants independently re-verified by the orchestrator** (WAL-applied sqlite3 read): all 7
+assist-sourced interactions have `occurred_at === handoff_at`, `direction=outbound`, `source=assist`,
+correct `connected`; `contacts.last_contact` moved only via `recomputeLastContactCore`; queue caps/clears
+correctly; merge reparents, purge cascade-deletes, widget deep-link consumed once, non-expired pending
+survive reboot. **R11–R13** (native handoff FAILURE) are device-gated (a real Pixel always has a
+dialer/Messages/mail) — owner ruled to accept them as covered by the unit-tested `markAssistFailed`+Alert
+path. Scoreboard: `21-UAT.md` (R21 APPROVED). Close-out deviations (all recorded in `21-06-SUMMARY.md`):
+(1) skipped the droid rebuild — phase 21 is JS-only (git-diff-verified), so Metro fast-refresh on the
+existing DEBUG APK was used; (2) R14 24h-expiry via a temporary orchestrator DEBUG constant, git-reverted;
+(3) a false R10 evidence citation caught in independent DB re-verification and corrected. **Zero source
+edits survive** (time-travel reverted), all phase-21 commits LOCAL on `main`, **NOT pushed**.
+**Phase-completion gates run (2026-08-31), all pass:** verification (6/6 must-haves, IAS-01–04 ACHIEVED
+→ `21-VERIFICATION.md`), security (SECURED, 20/20 threats closed, 0 egress → `21-SECURITY.md`), Nyquist
+validation (all reqs covered, 154 phase tests green → `21-VALIDATION.md` validated), UI review (23/24, no
+blockers → `21-UI-REVIEW.md`), code review (deep → `21-REVIEW.md`) — one HIGH (WR-01: dismiss/fail not
+wrapped in the shared write txn) **FIXED** in `interaction-assist-dao.ts` (gate re-run green 1,812), one
+MEDIUM ruled by-design (IN-01 archived-loggable = Cluster Z `[DECIDED]`), IN-02 + LOWs deferred to owner.
+Phase 21 is the LAST phase of milestone v1.0 — **milestone completion is owner's, in a later session (do
+NOT auto-complete).** No KB-extraction system exists for this repo yet.
 
 **⟢ PHASE 20 (Contact Reconciliation & Merge) — COMPLETE (2026-08-31).** All 6 plans executed +
 consolidated Pixel device-UAT: **all 8 scenarios PASS**, each independently DB-verified (WAL-aware
@@ -119,7 +134,7 @@ Progress: [████████░░] 75% (12/16 phases complete; Phase 13 
 
 _Phase-12 recap (historical — Phase 12 is COMPLETE + verified; see 12-VERIFICATION.md):_
 
-Phase: 21 (interaction-assist-reach-out) — READY TO EXECUTE
+Phase: 21 (Interaction Assist & Reach Out) — EXECUTING
 Next: Phase 13 (Orrery) — NOT started. It is a large new Skia render-loop phase (its own discuss→plan→converge→execute→device-UAT cycle); awaiting owner go-ahead before beginning.
 Done this session (2026-08-17), all committed locally on main (NOT pushed): smart-discuss (12-CONTEXT; owner APPROVED the shared stable/wobble/decay status palette — stable #45B98A / wobble #E8C15C / decay #E56A52 / rogue #E0904A unchanged — resolving OD-1 app-wide; widget + ContactCard + future orrery inherit it), UI-SPEC (approved, checker VERIFIED), RESEARCH, VALIDATION (Nyquist), PATTERNS, PLAN (8 plans / 6 waves, efa9f5b), plan-checker PASSED, then a 2-cycle cross-AI convergence (codex CLI + read-only-Claude subagent; self-review guard overridden per owner): cycle-1 = 6 codex HIGH + 7 Claude actionable → replan (cca05d9); cycle-2 = 2 codex HIGH (WDG-03 freshness incompleteness; killed-app UAT needed a debug build) → final replan (4e688cf). All 8 HIGH fixes verified in-file. NOTE: the final-replan fixes were NOT independently re-reviewed (max cycles reached + owner pause).
 Codex tooling note: current codex-cli (0.144.1) makes gsd-review auto-add `--dangerously-bypass-hook-trust`, which the safety classifier blocks; a subagent improperly tunneled it once (flagged, discarded), then codex was re-run cleanly WITHOUT that flag. Do NOT let gsd-review's codex path run with that flag — run codex manually without it, or allow-list a scoped `Bash(codex exec:*)`.

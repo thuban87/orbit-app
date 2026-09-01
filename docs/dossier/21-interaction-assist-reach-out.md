@@ -1,6 +1,6 @@
 # Dossier 21 — Interaction Assist & Reach Out
 
-**Status:** draft-complete from owner interrogation · 2026-08-26  
+**Status:** draft-complete from owner interrogation · 2026-08-26 · revised 2026-08-31 (pre-planning code audit + owner rulings; see Revision Log)  
 **Purpose:** decision dossier for future GSD Phase 21 planning/discuss flow.  
 **Scope:** reusable in-app Reach Out routing, durable Interaction Assist intent lifecycle, post-handoff confirmation UX, native Call/Text/Email handoff, optional notes, app-global persistent assist banner, and larger-widget Contact integration.  
 **Out of scope:** passive call/text detection, notification-listener ingestion, background monitoring, delivery/read verification, per-endpoint interaction history, new widget grid behavior, generic communication-provider taxonomy.
@@ -54,6 +54,14 @@ Available high-level routes:
 - Email
 
 Only routes with actionable stored methods should be enabled.
+
+**[DECIDED · 2026-08-31] If a contact has NO actionable stored methods at all, the Reach Out / Contact action is hidden entirely.**
+
+No dead entry point: the action does not render (rather than opening an empty modal) when there is neither an actionable phone nor an actionable email.
+
+**[DECIDED · 2026-08-31] Route enabling is phone/email-granular, not channel-granular.**
+
+Verified against shipped code: `contact_methods.is_actionable` (`src/logic/contact-method-normalization.ts`) records only "valid phone" vs "valid email"; phone line-type (mobile vs landline) is parsed and then discarded. Therefore any actionable phone enables BOTH Call and Text (a landline will be offered as textable), and any actionable email enables Email. Orbit does not gate Text separately from Call per endpoint. Per-endpoint call-vs-text capability is net-new work, explicitly not in Phase 21.
 
 ---
 
@@ -152,6 +160,10 @@ If Orbit is backgrounded/killed immediately after handoff, the intent still exis
 
 Failed handoff does not create an interaction.
 
+**[DECIDED · 2026-08-31] "Failed handoff" means the native launch itself failed — not that the user declined to complete the action.**
+
+Detectability is limited by the platform (verified): the Text path uses `expo-sms` `sendSMSAsync`, which returns `unknown` on Android — sent vs cancelled is NOT observable; Call/Email use `tel:`/`mailto:` (both greenfield — no existing handoff code) which succeed if any app can handle them. So "failed" is detectable only as a thrown launch error / no compatible native app (see Cluster AD and the no-compatible-app planning item), never as "message not actually sent." This is consistent with the attestation model (Cluster J): whether the user actually communicated is confirmed by the user, not observed by Orbit.
+
 ---
 
 ## Cluster G — Interaction Assist Global Setting
@@ -175,6 +187,10 @@ When Off:
 - no durable assist intent is created,
 - no assist banner appears.
 
+**[DECIDED · 2026-08-31] Toggling Interaction Assist OFF clears any already-pending assists immediately.**
+
+"Off means off": turning the setting off wipes the pending-assist queue and hides the banner at once, rather than letting previously-created assists continue to prompt. Re-enabling starts fresh; cleared assists are not restored and create no interactions.
+
 The Reach Out feature is therefore not dependent on Interaction Assist being enabled.
 
 ---
@@ -197,6 +213,10 @@ The banner may appear on:
 - Compose,
 - dashboard,
 - other normal foreground screens.
+
+**[DECIDED · 2026-08-31] The Android Back button passes through the banner.**
+
+The assist banner is NOT a Back-dismissible transient layer. Back navigates normally; the banner persists until resolved, dismissed via its own control, or expired. This is an explicit exception to the M2 app-shell rule (`milestone-2` phase-01 §C: "Back dismisses the topmost transient layer before navigating") — the assist banner is durable state, not a transient overlay, so Back does not consume it.
 
 **[REJECTED] Blocking modal after every return.**
 
@@ -266,6 +286,10 @@ Reason:
 Keep the default interaction lightweight while avoiding the extra friction of later locating the contact and editing the interaction.
 
 Notes flow into the resulting interaction record.
+
+**[DECIDED · 2026-08-31] The Notes expander is offered on every confirmation that writes an interaction.**
+
+That means call `Yes`, call `No answer` (which still writes a row, Cluster T), and text/email `Yes`. `Don't log` writes no interaction and therefore offers no notes.
 
 ---
 
@@ -518,6 +542,10 @@ Do not resurrect the absorbed identity.
 
 This must honor Phase 20 merge-retirement semantics.
 
+**[DECIDED · 2026-08-31 · implementation constraint] Redirect is achieved by the assist row participating in Phase 20's existing merge reparent, NOT by a lazy survivor lookup at confirmation time.**
+
+Verified against shipped code: `mergeContacts` (`src/db/merge-dao.ts`) reparents its child tables (`interactions`, `events`, `fuel`, `custom_field_values`, `contact_links`, `contact_methods`, `external_contact_links`, `field_history`) to the survivor, writes a tombstone carrying only the *absorbed* uid, then hard-deletes the absorbed `contacts` row. There is NO survivor pointer anywhere in the schema, and merge and purge write identical `{contact, uid}` tombstones — so a stale `contact_id` cannot be resolved to a survivor after the fact, and "merged" cannot be distinguished from "purged" by tombstone alone. Therefore Phase 21 MUST add the new assist table to `mergeContacts`' reparent loop so a pending assist is moved to the survivor inside the merge transaction, and MUST NOT rely on `ON DELETE CASCADE` for merge (which would delete the assist and defeat redirect). This *extends* Phase 20's merge writer to cover a new child table — it enforces, not reverses, Phase 20's reparent-then-retire intent, so it is in scope for Phase 21 planning; but it is a cross-phase change, not the minor "lookup" detail the earlier draft implied.
+
 ---
 
 ## Cluster AB — Purged Contact
@@ -529,6 +557,14 @@ This must honor Phase 20 merge-retirement semantics.
 - expire/dismiss the assist.
 
 Exact internal status choice can be a planning detail so long as no interaction is written.
+
+**[DECIDED · 2026-08-31 · implementation constraint] On purge, the pending assist is removed with the identity so it can never resolve.**
+
+Verified: `purgeContact` (`src/db/purge-dao.ts`) is a distinct, archived-only permanent-deletion path that tombstones and deletes every child plus the `contacts` row. Because merge reparents the assist away *before* deletion (Cluster AA) while purge has no survivor, the assist table SHOULD cascade-delete (or be explicitly deleted in `purgeContact`) on purge — which cleanly satisfies AB (no interaction written) without needing to detect "purged vs merged" at confirmation time. The merge-vs-purge tombstone ambiguity is thus sidestepped by handling both at deletion time rather than at confirmation.
+
+**[DECIDED · 2026-08-31] Navigation half of AB — a widget/deep-link "Contact" action whose target was purged fails safe.**
+
+Per M2 `milestone-2` phase-01 §D ("Missing/deleted deep-link contacts fail safely"): show a friendly "contact no longer available" message and route to Dashboard — do not crash or silently retarget. This complements the data-layer rule above.
 
 ---
 
@@ -704,6 +740,20 @@ This limitation is a product choice, not a bug.
 16. **Widget Contact reuses the same Reach Out router as profiles.**
 17. **The widget never becomes a second writer of assist state.**
 18. **Phase 21 adds no passive phone/SMS/email observation capability.**
+19. **Reach Out is hidden when a contact has no actionable methods; route enabling is phone/email-granular, so any actionable phone backs both Call and Text.**
+20. **Interaction Assist toggled off clears pending assists immediately (off means off).**
+21. **The assist banner is durable state: the Back button passes through it.**
+22. **Notes are available on any confirmation that writes an interaction, including call No answer.**
+23. **Merge redirect works by reparenting the assist inside Phase 20's merge; purge removes it at deletion time — neither relies on resolving a stale id after the fact.**
+
+---
+
+## Cross-Milestone Coherence Notes (2026-08-31)
+
+- **Card View long-press "Message" (M2 `milestone-2` phase-07 §M).** The newer milestone-2 Card View dossier — interrogated *after* this dossier — specifies a single-channel `Message` long-press action, the same "Message-only" pattern Cluster AE identified as an inconsistency and converted to a `Contact` → Reach Out router on the widget. Phase 21 does not own the Card menu, so this is not a `[DECIDED]` conflict; it is a seam to reconcile when M2 Phase 9 (Profile Experience) / Phase 12 (Messaging & AI Compose) are interrogated. The Reach Out router built here is the natural target for that reconciliation. Flagged so it is not lost.
+- **M2 confirms Reach Out is not a FAB action** (phase-01 universal FAB set excludes it) — it stays profile/widget/card-scoped, consistent with Cluster A.
+- **Banner inherits M2 shell/theme transient contracts** (phase-01 §C shell layering, roadmap Phase 2 theme-aware transient surfaces) for styling, with the Back-pass-through exception recorded in Cluster H.
+- **Compose "Send" carried into M2 Phase 12.** M2 Phase 12 (Messaging & AI Compose, PLANNED) will own Compose's Copy/Send/Cancel UX; its "Send" MUST map to Phase 21's handoff-to-native + assist-creation model, never a direct interaction write at Send time (Cluster AC). Record as a constraint when Phase 12 is interrogated.
 
 ---
 
@@ -746,7 +796,7 @@ These are implementation/planning items rather than unresolved product direction
 - exact text Compose handoff wiring,
 - exact failed-handoff detection behavior per platform,
 - exact app-restart resume logic,
-- exact merge-survivor redirect lookup,
+- exact merge/purge assist-table wiring (mechanism decided in Clusters AA/AB — reparent participation on merge, cascade/delete on purge; only the wiring remains a detail),
 - exact purge detection behavior,
 - exact setting storage/default migration,
 - exact analytics/testing hooks if any,
@@ -773,3 +823,26 @@ These are implementation/planning items rather than unresolved product direction
   - purged target,
   - widget Contact deep-link,
   - Compose → Messages → banner → interaction write.
+
+---
+
+## Revision Log
+
+### 2026-08-31 — Pre-planning code audit + owner rulings
+
+Triggered by `/gsd-discuss-phase 21`. CONTEXT.md remains a shim pointing here; this dossier is the ground truth and was revised directly. Three parallel read-only audits (shipped Phases 18–20 code, milestone-2 UI/UX v0.4 docs, current Widget/Compose code) plus four owner product rulings. Load-bearing code claims were verified against files on disk.
+
+**Owner product rulings (new [DECIDED] items):**
+- IA toggled off while assists pending → **clear immediately** (Cluster G).
+- Contact with zero actionable methods → **hide the Reach Out action** (Cluster A).
+- Back button vs assist banner → **pass through**; banner is durable, not a transient layer (Cluster H).
+- Notes expander → available on **any confirmation that writes an interaction**, including call No answer (Cluster K).
+
+**Factual corrections from the code audit:**
+- Merge/purge redirect (Clusters AA/AB) promoted from "planning detail" to a named cross-phase implementation constraint: no survivor pointer exists in shipped Phase 20 code (`merge-dao.ts`/`purge-dao.ts`/`007-tombstones.ts`), so redirect must be done by reparenting the assist inside Phase 20's merge and removing it at purge time — not by a lazy lookup.
+- Cluster F: "failed handoff" is only detectable as a launch failure (`expo-sms` returns `unknown`; `tel:`/`mailto:` are greenfield) — reinforced attestation model.
+- Clusters A/B/D: no per-endpoint call-vs-text gating exists; any actionable phone backs both Call and Text.
+
+**Confirmed solid (no change needed):** `recordTouchpoint` (`recency-dao.ts:217`) already supports outbound direction, `connected=0`, caller-supplied `occurredAt`, `note`, and free-text `channel`; the `interactions` schema has every needed column; recency/`rarely_responds`/gravity reuse is automatic; Compose already writes nothing at handoff (Cluster AC is additive); the larger widget's `Message` action is real and swappable in isolation (note: the widget deep-link needs a NEW allow-list URI in `widget-linking.ts`, not just a label swap).
+
+**Cross-milestone seam surfaced (not a conflict):** M2 phase-07 §M keeps a single-channel Card View "Message" long-press — reconcile at M2 Phase 9/12 (see Cross-Milestone Coherence Notes).

@@ -125,32 +125,42 @@ export function markAssistLogged(
   })();
 }
 
-/** Dismissal records no interaction, preserving an explicit no-contact outcome. */
+/**
+ * Dismissal records no interaction, preserving an explicit no-contact outcome.
+ * Wrapped in the shared write transaction (DATA-04) so a status flip cannot be
+ * captured and lost by a concurrent launch-sweep transaction on the shared
+ * connection. Callers are top-level UI handlers, never inside inWriteTransaction.
+ */
 export function markAssistDismissed(
   exec: SqlExecutor,
   input: { assistUid: string; now: string },
 ): Promise<void> {
-  return exec
-    .runAsync(
+  return inWriteTransaction(exec, async () => {
+    await exec.runAsync(
       `UPDATE interaction_assists
           SET status = 'dismissed', resolved_at = ?, modified_at = ?
         WHERE uid = ? AND status = 'pending'`,
       [input.now, input.now, input.assistUid],
-    )
-    .then(() => {});
+    );
+  });
 }
 
-/** A failed native handoff is terminal and can never surface as a prompt. */
+/**
+ * A failed native handoff is terminal and can never surface as a prompt.
+ * Wrapped in the shared write transaction (DATA-04) for the same reason as
+ * markAssistDismissed; the caller (performReachOut's catch) runs after
+ * createPendingAssist's transaction has already committed, so there is no nesting.
+ */
 export function markAssistFailed(
   exec: SqlExecutor,
   input: { assistUid: string; now: string },
 ): Promise<void> {
-  return exec
-    .runAsync(
+  return inWriteTransaction(exec, async () => {
+    await exec.runAsync(
       `UPDATE interaction_assists
           SET status = 'failed', resolved_at = ?, modified_at = ?
         WHERE uid = ? AND status = 'pending'`,
       [input.now, input.now, input.assistUid],
-    )
-    .then(() => {});
+    );
+  });
 }

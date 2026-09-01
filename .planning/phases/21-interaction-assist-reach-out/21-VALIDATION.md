@@ -3,10 +3,11 @@ phase: 21
 slug: interaction-assist-reach-out
 # status lifecycle: draft (seeded by plan-phase) → validated (set by validate-phase §6)
 # audit-milestone §5.5 distinguishes NOT-VALIDATED (draft) from PARTIAL (validated + nyquist_compliant: false) (#2117)
-status: draft
-nyquist_compliant: false
-wave_0_complete: false
+status: validated
+nyquist_compliant: true
+wave_0_complete: true
 created: 2026-08-31
+validated: 2026-08-31
 ---
 
 # Phase 21 — Validation Strategy
@@ -54,20 +55,20 @@ Manual-Only Verifications below.
 
 | Task ID | Plan | Wave | Requirement | Threat Ref | Secure Behavior | Test Type | Automated Command | File Exists | Status |
 |---------|------|------|-------------|------------|-----------------|-----------|-------------------|-------------|--------|
-| 21-01-01 | 01 | 1 | IAS-02, IAS-03 | T-21-02 | Confirmation routes only through `recordTouchpoint` (single-writer of `contacts.last_contact`); deterministic interaction uid blocks double-insert | unit (tracer, RED-first) | `npx vitest run src/db/interaction-assist-dao.test.ts` | ❌ W0 | ⬜ pending |
-| 21-01-02 | 01 | 1 | IAS-01, IAS-02 | T-21-01 | 15s/24h thresholds shared between SQL filter + client re-check; no timer | unit | `npx vitest run src/db/interaction-assist-read.test.ts src/logic/assist-eligibility.test.ts` | ❌ W0 | ⬜ pending |
-| 21-02-01 | 02 | 2 | IAS-02 | T-21-05 | Assist row written BEFORE native launch (durability); refresh gated to background→active only | unit | `npx vitest run src/stores/assist-store.test.ts` | ❌ W0 | ⬜ pending |
-| 21-02-02 | 02 | 2 | IAS-01, IAS-03 | T-21-06 | No delivery/read-status claim; banner is a plain overlay, not a Modal (Back passes through) | type + colour | `npm run check:colors && npx tsc --noEmit` | ✅ (tooling) | ⬜ pending |
-| 21-02-03 | 02 | 2 | IAS-01 | T-21-07 | Banner mounted app-global, non-Modal; Reach Out entry only when reachable | type + colour | `npx tsc --noEmit && npm run check:colors` | ✅ (tooling) | ⬜ pending |
-| 21-03-01 | 03 | 3 | IAS-01 | T-21-09 | Chosen endpoint is transient handoff context; ≤3-tap routing depth | type + colour | `npx tsc --noEmit && npm run check:colors` | ✅ (tooling) | ⬜ pending |
-| 21-03-02 | 03 | 3 | IAS-02 | T-21-10 | Compose Send writes NO interaction at Send time (grep-enforced) | type | `npx tsc --noEmit` | ✅ (tooling) | ⬜ pending |
-| 21-04-01 | 04 | 3 | IAS-02 | T-21-11 | Toggle OFF clears pending in ONE txn ("off means off"); no interaction written | unit | `npx vitest run src/db/app-settings-dao.test.ts` | ✅ (extend) | ⬜ pending |
-| 21-04-02 | 04 | 3 | IAS-02 | T-21-11 | Review sheet is transient (no new nav route); accent reserved for disclosure | type + colour | `npx tsc --noEmit && npm run check:colors` | ✅ (tooling) | ⬜ pending |
-| 21-04-03 | 04 | 3 | IAS-02 | T-21-12, T-21-13 | 24h expiry + 30d prune as wall-clock deltas; no timer; foreground-only sweep | unit | `npx vitest run src/services/interaction-assist-sweep.test.ts` | ❌ W0 | ⬜ pending |
-| 21-05-01 | 05 | 3 | IAS-03 | T-21-15 | Merge reparents assist to survivor (no resurrection); purge cascade removes it | unit | `npx vitest run src/db/merge-dao.test.ts src/db/purge-dao.test.ts` | ✅ (extend) | ⬜ pending |
-| 21-05-02 | 05 | 3 | IAS-03, IAS-04 | T-21-14, T-21-16 | `orbit://reach/<id>` strict anchored allow-list rejects spoof/oversized; widget writes nothing | unit + type | `npx vitest run src/navigation/widget-linking.test.ts && npx tsc --noEmit` | ✅ (extend) | ⬜ pending |
-| 21-06-01 | 06 | 4 | IAS-01, IAS-02, IAS-03, IAS-04 | T-21-18 | Full node suite green before an irreversible migration reaches a real device | gate | `npm test && npx tsc --noEmit && npm run check:colors` | ✅ (tooling) | ⬜ pending |
-| 21-06-02 | 06 | 4 | IAS-01, IAS-02, IAS-03, IAS-04 | T-21-18, T-21-19 | Native handoff / banner timing / widget render DB-verified on-device (run-as, WAL-aware) | manual (device UAT) | `MISSING — device-only` + `<human-check>` owner sign-off | ❌ manual | ⬜ pending |
+| 21-01-01 | 01 | 1 | IAS-02, IAS-03 | T-21-02 | Confirmation routes only through `recordTouchpoint` (single-writer of `contacts.last_contact`); deterministic interaction uid blocks double-insert | unit (tracer, RED-first) | `npx vitest run src/db/interaction-assist-dao.test.ts` | ✅ | ✅ green |
+| 21-01-02 | 01 | 1 | IAS-01, IAS-02 | T-21-01 | 15s/24h thresholds shared between SQL filter + client re-check; no timer | unit | `npx vitest run src/db/interaction-assist-read.test.ts src/logic/assist-eligibility.test.ts` | ✅ | ✅ green |
+| 21-02-01 | 02 | 2 | IAS-02 | T-21-05 | Assist row written BEFORE native launch (durability); refresh gated to background→active only | unit | `npx vitest run src/stores/assist-store.test.ts` | ✅ | ✅ green |
+| 21-02-02 | 02 | 2 | IAS-01, IAS-03 | T-21-06 | No delivery/read-status claim; banner is a plain overlay, not a Modal (Back passes through) | type + colour | `npm run check:colors && npx tsc --noEmit` | ✅ (tooling) | ✅ green (Back-through UAT R06) |
+| 21-02-03 | 02 | 2 | IAS-01 | T-21-07 | Banner mounted app-global, non-Modal; Reach Out entry only when reachable | type + colour | `npx tsc --noEmit && npm run check:colors` | ✅ (tooling) | ✅ green |
+| 21-03-01 | 03 | 3 | IAS-01 | T-21-09 | Chosen endpoint is transient handoff context; ≤3-tap routing depth | type + colour | `npx tsc --noEmit && npm run check:colors` | ✅ (tooling) | ✅ green (≤3-tap UAT R01/R02) |
+| 21-03-02 | 03 | 3 | IAS-02 | T-21-10 | Compose Send writes NO interaction at Send time (grep-enforced) | type | `npx tsc --noEmit` | ✅ (tooling) | ✅ green |
+| 21-04-01 | 04 | 3 | IAS-02 | T-21-11 | Toggle OFF clears pending in ONE txn ("off means off"); no interaction written | unit | `npx vitest run src/db/app-settings-dao.test.ts` | ✅ | ✅ green |
+| 21-04-02 | 04 | 3 | IAS-02 | T-21-11 | Review sheet is transient (no new nav route); accent reserved for disclosure | type + colour | `npx tsc --noEmit && npm run check:colors` | ✅ (tooling) | ✅ green |
+| 21-04-03 | 04 | 3 | IAS-02 | T-21-12, T-21-13 | 24h expiry + 30d prune as wall-clock deltas; no timer; foreground-only sweep | unit | `npx vitest run src/services/interaction-assist-sweep.test.ts` | ✅ | ✅ green |
+| 21-05-01 | 05 | 3 | IAS-03 | T-21-15 | Merge reparents assist to survivor (no resurrection); purge cascade removes it | unit | `npx vitest run src/db/merge-dao.test.ts src/db/purge-dao.test.ts` | ✅ | ✅ green |
+| 21-05-02 | 05 | 3 | IAS-03, IAS-04 | T-21-14, T-21-16 | `orbit://reach/<id>` strict anchored allow-list rejects spoof/oversized; widget writes nothing | unit + type | `npx vitest run src/navigation/widget-linking.test.ts && npx tsc --noEmit` | ✅ | ✅ green |
+| 21-06-01 | 06 | 4 | IAS-01, IAS-02, IAS-03, IAS-04 | T-21-18 | Full node suite green before an irreversible migration reaches a real device | gate | `npm test && npx tsc --noEmit && npm run check:colors` | ✅ (tooling) | ✅ green |
+| 21-06-02 | 06 | 4 | IAS-01, IAS-02, IAS-03, IAS-04 | T-21-18, T-21-19 | Native handoff / banner timing / widget render DB-verified on-device (run-as, WAL-aware) | manual (device UAT) | `MISSING — device-only` + `<human-check>` owner sign-off | ✅ manual | ✅ UAT signed-off 2026-08-31 |
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
 
@@ -114,11 +115,33 @@ Device-UAT-only (not node-testable); driven and DB-verified on the Pixel in Plan
 - [x] Wave 0 covers all MISSING references (5 new suites + 4 extended suites enumerated above)
 - [x] No watch-mode flags (all commands are `vitest run`, never `vitest --watch`)
 - [x] Feedback latency < ~40s full suite / <5s per file
-- [ ] `nyquist_compliant: true` — NOT set; see note
+- [x] `nyquist_compliant: true` — set 2026-08-31; see audit below
 
-**Approval:** pending (validate-phase promotes `status` + `nyquist_compliant` after Wave 0 lands)
+**Approval:** validated 2026-08-31 (Wave 0 suites confirmed green + device-UAT evidence recorded).
 
-> **Note — nyquist_compliant left false:** every phase requirement (IAS-01…IAS-04) has node-automated
+## Validation Audit — 2026-08-31 (retroactive)
+
+Audited each IAS requirement's critical behaviors against the tests on disk (read, not diffed) and
+re-ran the Phase-21 suites with the reliable node (`/usr/local/bin/node` v24): **12 files / 154 tests, all
+green** (`npx vitest run` over the 12 files below, ~2.8s). Full suite reported green at 191 files / 1,812
+tests.
+
+| Req | Node-covered critical behaviors | Covering suite(s) | Device-only (UAT) |
+|-----|--------------------------------|-------------------|-------------------|
+| IAS-01 | route derivation, reachable-gated entry (`hidden`), actionable-primary endpoint selection | `interaction-assist-read`, `assist-eligibility` | ≤3-tap depth, native launch (UAT R01/R02) |
+| IAS-02 | write-before-launch ordering, failure→`failed` marking, assist-disabled skip, 15s–24h eligibility boundaries, banner-state selection, sweep 24h-expiry + 30d-prune, cap-5 expiry, background→active refresh gating, off-clears-pending (one txn, no resurrection) | `reach-out/handoff`, `assist-eligibility`, `interaction-assist-sweep`, `interaction-assist-dao`, `assist-store`, `app-settings-dao` | AppState banner timing, Back-through non-Modal (UAT R05/R06), Hermes crypto |
+| IAS-03 | logs exactly one outbound @handoff_at via `recomputeLastContactCore` (sole `last_contact` writer), source=assist, connected 0/1, idempotency (double-log no-op), don't-log/failed/dismissed write nothing, future-handoff rejection, merge-gap re-read | `interaction-assist-dao`, `merge-dao` | on-device DB row invariants (UAT R07–R10) |
+| IAS-04 | merge reparents assist to survivor, purge FK cascade removes it, `orbit://reach/<id>` strict allow-list (spoof/oversized/malformed→null), widget guard fail-closed (missing/archived/ineligible), widget writes nothing | `merge-dao`, `purge-dao`, `widget-linking`, `widget-quick-action-guard` | RemoteViews render + launcher deep-link, consume-once (UAT R16) |
+
+**Gaps found:** none node-testable. The one behavior without a dedicated node test — the `openReachOut`
+consume-once — lives inline in `ContactProfileScreen`'s `useFocusEffect` (`navigation.setParams({
+openReachOut: undefined })`, screen line ~319), a React-navigation runtime path with no pure extractable
+seam. Extracting it would require editing production source (forbidden here); it is verified by device-UAT
+R16. No new tests were added — coverage was already complete and correct.
+
+**Suite still green:** yes.
+
+> **Note (historical) — nyquist_compliant was left false at plan time:** every phase requirement (IAS-01…IAS-04) has node-automated
 > coverage for its core logic (DAO / read / eligibility / allow-list), but each requirement also has
 > genuinely device-only behavior — native `expo-sms`/`Linking` handoff, AppState banner timing, the
 > RemoteViews widget render, and Hermes crypto — that Vitest cannot exercise. Those are captured as the
