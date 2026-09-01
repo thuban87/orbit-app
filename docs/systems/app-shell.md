@@ -1,7 +1,7 @@
 # App Shell
 
-**Last updated:** 2026-08-16
-**Updated by phase:** 12-home-screen-widget
+**Last updated:** 2026-08-17
+**Updated by phase:** 13-orrery
 **Owners:** `App.tsx`, `src/navigation/RootNavigator.tsx`, `src/navigation/types.ts`, `src/navigation/linking.ts`, `src/navigation/notification-gate.tsx`, `src/navigation/widget-linking.ts`, `src/screens/SettingsScreen.tsx`, `src/theme/theme-types.ts`, `src/theme/theme-presets.ts`
 
 ## Purpose
@@ -19,29 +19,29 @@ _None._ The shell owns runtime navigation and theme contracts, not durable appli
 | Layer | File | Responsibility |
 |-------|------|----------------|
 | Bootstrap | `App.tsx` | Opens and migrates SQLite before mounting the navigator inside theme and safe-area providers. |
-| Navigator | `src/navigation/RootNavigator.tsx` | Registers native-stack routes, including dashboard sibling lists, management, modal crop, and Compose surfaces, with custom headers. |
+| Navigator | `src/navigation/RootNavigator.tsx` | Registers native-stack routes, including dashboard sibling lists, Orrery, management, modal crop, and Compose surfaces, with custom headers. |
 | Route types | `src/navigation/types.ts` | Defines serializable parameters for profile, edit, crop, and self-fetching Compose routes. |
 | Intent gate | `src/navigation/linking.ts` | Converts provider-owned pending share state into ready-gated navigation to Capture. |
 | Notification gate | `src/navigation/notification-gate.tsx` | Converts warm and cold local-notification responses into ready-gated actions or navigation. |
 | Widget gate | `src/navigation/widget-linking.ts` | Converts narrowly accepted widget `orbit://` links into ready-gated Dashboard-rooted resets. |
-| Settings surface | `src/screens/SettingsScreen.tsx` | Hosts low-traffic lifecycle routes, self-photo, and the Manage favourites entry. |
-| Theme contract | `src/theme/theme-types.ts`, `src/theme/theme-presets.ts` | Defines named tokens, including destructive, avatar-swatch, rogue-status, and gravity-tier tokens, and their sole palette values. |
+| Settings surface | `src/screens/SettingsScreen.tsx` | Hosts low-traffic lifecycle routes, self-photo, sun controls, and the Manage favourites entry. |
+| Theme contract | `src/theme/theme-types.ts`, `src/theme/theme-presets.ts` | Defines named tokens, including destructive, avatar-swatch, relationship-status, and Orrery star/muted tokens, and their sole palette values. |
 
 ### Key Files
 
 | File | Role |
 |---|---|
 | `App.tsx` | Readiness gate, navigation mount point, gesture root, and photo/notification lifecycle registration. |
-| `src/navigation/RootNavigator.tsx` | Native stack for the dashboard Home, Settings, contact lifecycle, Compose, NeverContacted, ManageFavourites, and CropPhoto. |
-| `src/navigation/types.ts` | Typed root-stack route contract, including serializable Compose and photo-crop targets plus dashboard sibling routes. |
+| `src/navigation/RootNavigator.tsx` | Native stack for the dashboard Home, Orrery, Settings, contact lifecycle, Compose, NeverContacted, ManageFavourites, and CropPhoto. |
+| `src/navigation/types.ts` | Typed root-stack route contract, including the additive Orrery route, serializable Compose and photo-crop targets, and dashboard sibling routes. |
 | `src/navigation/linking.ts` | Holds the navigation ref and the single ready-gated Capture navigation owner. |
 | `src/navigation/notification-gate.tsx` | Owns warm/cold notification-response handling once navigation is ready. |
 | `src/navigation/widget-linking.ts` | Owns the separate, strict widget URI bridge without consuming native share state. |
 | `src/screens/CaptureScreen.tsx` | Provides the in-app target for a pending Android text share. |
 | `src/screens/HomeScreen.tsx` | Provides the dashboard Home and its destination entries. |
-| `src/screens/SettingsScreen.tsx` | Provides the distinct settings home, including self-photo and Manage favourites entries. |
-| `src/theme/theme-types.ts` | Names palette tokens, including avatar swatches, rogue status, gravity tiers, and foreground text. |
-| `src/theme/theme-presets.ts` | Holds the only allowed color literals, including avatar swatches and the rogue/gravity palette values. |
+| `src/screens/SettingsScreen.tsx` | Provides the distinct settings home, including self-photo, self-star, sun-centre, and Manage favourites entries. |
+| `src/theme/theme-types.ts` | Names palette tokens, including avatar swatches, rogue status, gravity tiers, and Orrery star/muted values. |
+| `src/theme/theme-presets.ts` | Holds the only allowed color literals, including avatar, relationship-status, and Orrery palette values. |
 
 ## How It Works
 
@@ -53,8 +53,8 @@ _None._ The shell owns runtime navigation and theme contracts, not durable appli
 
 ### Navigating dashboard and settings
 
-1. Home is the dashboard and navigates to contact profiles, creation, Not yet contacted, Archived, Settings, and favourite management.
-2. Settings exposes Custom Fields, Archived contacts, and Manage favourites as separate, low-traffic rows.
+1. Home is the dashboard and navigates to contact profiles, creation, the Orrery, Not yet contacted, Archived, Settings, and favourite management.
+2. Settings exposes Custom Fields, Archived contacts, Manage favourites, self-star selection, and sun-centre selection as separate, low-traffic controls.
 3. Every stack screen renders its own themed chrome because native-stack headers are disabled; no duplicate native header appears above screen-local Back controls.
 
 ### Composing from a contact
@@ -93,6 +93,7 @@ _None._ The shell owns runtime navigation and theme contracts, not durable appli
 2. A rogue explanation uses the dedicated `colors.rogue` token; it is not a destructive-action danger state.
 3. Gravity uses the ordered `colors.gravityTiers` ramp, whose length matches the four named gravity tiers.
 4. Stable, wobble, and decay use dedicated shared status tokens beside `rogue`; dashboard cards and headless widget bitmaps consume the same palette vocabulary.
+5. The Orrery adds ordered `starPalette`, muted status endpoints, and a cold `rogueExtinguished` token; all Skia colours still resolve from this contract.
 
 ### Editing a photo
 
@@ -109,6 +110,7 @@ _None._ The shell owns runtime navigation and theme contracts, not durable appli
 | `rogue` | `#E0904A` | `src/theme/theme-presets.ts` | In-app relationship-status emphasis token. |
 | `statusStable` / `statusWobble` / `statusDecay` | `#45B98A` / `#E8C15C` / `#E56A52` | `src/theme/theme-presets.ts` | Shared status-ring palette for dashboard and widget surfaces. |
 | `gravityTiers` | 4 ordered tokens | `src/theme/theme-presets.ts` | Named gravity-bar ramp from thin through deep. |
+| `starPalette` | 6 ordered tokens | `src/theme/theme-presets.ts` | Self-sun choices; index 0 is the render-time default. |
 
 ## Decisions
 
@@ -133,6 +135,8 @@ _None._ The shell owns runtime navigation and theme contracts, not durable appli
 - **ADR-043:** Static Globally Mirrored Favourites Widget — registers the state-free provider and its Settings entry.
 - **ADR-044:** Headless Widget Actions and Dashboard-Rooted Deep Links — adds a single-owner, ready-gated widget URI bridge.
 - **ADR-045:** Event-Driven Widget Refresh and Boot Recovery — registers foreground refresh without polling.
+- **ADR-047:** App-Level Assignable Sun and Themed Self Identity — adds the Settings-owned sun and self-star controls.
+- **ADR-048:** Status-Default Static Orrery with a Single-Canvas Morph — adds the typed Orrery route and token-driven canvas lifecycle.
 
 ## Gotchas
 
@@ -147,6 +151,7 @@ _None._ The shell owns runtime navigation and theme contracts, not durable appli
 9. **Keep native share navigation single-owner.** A linking redirect beside `ShareIntentGate` can race the pending native intent, especially on a cold start.
 10. **Initialize immutable notification channels before scheduling.** Scheduling first can post a request on a wrong/default channel and weaken the intended privacy posture.
 11. **Keep widget links separate from React Navigation linking configuration.** A second initial-intent consumer can race `ShareIntentGate`; the explicit widget gate handles only `orbit://`.
+12. **Do not put Orrery sun assignment on the canvas.** Settings owns the Sun / centre picker; canvas long-press conflicts with the radial reorder gesture.
 
 ## Related Systems
 
@@ -157,6 +162,7 @@ _None._ The shell owns runtime navigation and theme contracts, not durable appli
 - **Capture** — enters through the provider-owned Capture route after migrations are ready.
 - **Notifications** — initializes at readiness and uses the response gate for body/action delivery.
 - **Widget** — adds its URI gate, launch refresh registration, and Settings CTA to the ready shell.
+- **Orrery** — registers its dashboard-reached route and receives its self-star and sun-centre controls from Settings.
 
 ## Changelog
 
@@ -171,3 +177,4 @@ _None._ The shell owns runtime navigation and theme contracts, not durable appli
 | 2026-08-16 | 10 | Added ready-gated navigation from Android share intents to Capture. |
 | 2026-08-16 | 11 | Added notification initialization, launch reconciliation, and ready-gated response routing. |
 | 2026-08-16 | 12 | Added shared status tokens, widget URI routing, foreground refresh registration, and the Settings pin CTA. |
+| 2026-08-17 | 13 | Added the Orrery route, Settings-owned sun controls, and themed star/muted visual tokens. |
