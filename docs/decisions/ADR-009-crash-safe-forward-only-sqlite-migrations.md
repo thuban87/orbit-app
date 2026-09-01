@@ -47,4 +47,4 @@ The system uses ordered, forward-only `PRAGMA user_version` migrations. Each ver
 - `src/db/migrations/001-initial.ts` — supplies the first migration step.
 
 **Depends on:** None.
-**Required by:** ADR-001 (Normalized Custom-Field Values); ADR-041 (Notification Settings, Privacy Channels, and Birthday Alerts); ADR-047 (App-Level Assignable Sun and Themed Self Identity); ADR-055 (Dedicated Weekly Digest Scheduling and Persisted Notification Policy)
+**Required by:** ADR-001 (Normalized Custom-Field Values); ADR-041 (Notification Settings, Privacy Channels, and Birthday Alerts); ADR-047 (App-Level Assignable Sun and Themed Self Identity); ADR-055 (Dedicated Weekly Digest Scheduling and Persisted Notification Policy); ADR-056 (Tombstone-Backed UID Reconciliation for Portable Restores); ADR-057 (Full-State Versioned Backups with Verified Manual and Foreground SAF Snapshots)

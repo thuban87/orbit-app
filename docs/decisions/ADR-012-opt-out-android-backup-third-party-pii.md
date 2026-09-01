@@ -43,4 +43,4 @@ The Android app sets `allowBackup=false`. User-directed export remains the inten
 - `src/db/benchmark.ts` — supports the device verification run that confirmed the generated manifest posture.
 
 **Depends on:** ADR-008 (Initial Contact Schema as a Cross-Phase Data Contract).
-**Required by:** None.
+**Required by:** ADR-057 (Full-State Versioned Backups with Verified Manual and Foreground SAF Snapshots)
