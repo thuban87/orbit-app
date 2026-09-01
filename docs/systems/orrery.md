@@ -1,7 +1,7 @@
 # Orrery
 
-**Last updated:** 2026-08-17
-**Updated by phase:** 13-orrery
+**Last updated:** 2026-08-27
+**Updated by phase:** 18.2-bound-unbound-lifecycle
 **Owners:** `src/db/orrery-read.ts`, `src/db/ring-seq-dao.ts`, `src/db/sun-picker-read.ts`, `src/logic/orrery-geometry-logic.ts`, `src/logic/orrery-ring-logic.ts`, `src/logic/sun-occupant-logic.ts`, `src/screens/OrreryScreen.tsx`
 
 ## Purpose
@@ -64,7 +64,7 @@ The orrery owns no per-contact table or stored status. It reads contact recency 
 
 1. The dashboard's Orbit control opens the additive `Orrery` route.
 2. On focus, `OrreryScreen` reads `app_settings`, resolves the self or contact sun, and asks `listOrbitingContacts()` for the remaining population.
-3. The read imports the shared progress and status SQL, excludes never-contacted and archived contacts, omits a contact that occupies the sun, and turns ordered rows into a dense display rank.
+3. The read imports the shared progress and status SQL, selects only Bound contacted non-archived contacts, omits a contact that occupies the sun, and turns ordered rows into a dense display rank.
 4. The screen measures the canvas once, derives one `OrreryMetrics` object, then renders rings, keyed planets, and the sun from that shared geometry.
 
 ### Status and relationship views
@@ -87,7 +87,7 @@ The orrery owns no per-contact table or stored status. It reads contact recency 
 1. Settings exposes **Your star** as themed swatches; an unset value resolves to the ordered `starPalette[0]` default at render time.
 2. **Sun / centre** prepends **Me** to a favourites-first, otherwise alphabetical list of available contacts.
 3. Selecting Me writes `sun_contact_id = NULL`; selecting a contact writes its id. A hard purge automatically clears that id through the migration-003 foreign key.
-4. A missing or soft-archived selected contact resolves to self in both Settings and the canvas. A never-contacted contact sun uses the neutral fallback glow because it has no status.
+4. A missing, soft-archived, or Unbound selected contact resolves to self in both Settings and the canvas without clearing the saved setting. A rebind restores an Unbound saved contact as sun automatically.
 
 ### Pausing the ambient layer
 
@@ -116,6 +116,7 @@ The orrery owns no per-contact table or stored status. It reads contact recency 
 - **ADR-046:** Query-Time Orrery Placement and Transactional Ring Ordering — derives the sky and constrains rank writes.
 - **ADR-047:** App-Level Assignable Sun and Themed Self Identity — stores sun state and the self-star palette policy.
 - **ADR-048:** Status-Default Static Orrery with a Single-Canvas Morph — defines the two-view, static-body, ambient-layer interaction model.
+- **ADR-062:** Bound/Unbound Lifecycle and One-Way Cadence Assignment — makes the active orbit, picker, and ring guards Bound-only.
 
 ## Gotchas
 
@@ -126,6 +127,7 @@ The orrery owns no per-contact table or stored status. It reads contact recency 
 5. **Remove drift before converting a drag release to rank.** This was a same-phase bug: raw release radius made decay and rogue bodies jump outward on a minimal drag; `driftPush` now inverts that offset for preview and commit.
 6. **High contact counts can overlap.** The current minimum ring gap can place planets on the outer rim; capacity treatment is intentionally deferred to the owner rather than silently changing the visual model.
 7. **Fast Refresh can invalidate an Expo SQLite statement in debug.** A clean relaunch restores the local connection; the phase's device UAT treated this as a development artifact, not an orrery query failure.
+8. **Keep a saved Unbound sun reference.** The self rendering is a presentation fallback, not a settings mutation; every ring guard must use the same Bound predicate as the render read.
 
 ## Related Systems
 
@@ -141,3 +143,4 @@ The orrery owns no per-contact table or stored status. It reads contact recency 
 | Date | Phase | What Changed |
 |---|---|---|
 | 2026-08-17 | 13 | Created the local two-view Skia orrery, app-level sun settings, guarded ring reordering, and dashboard entry point. |
+| 2026-08-27 | 18.2 | Made orbit/picker/reorder populations Bound-only and preserved saved Unbound sun references as self fallbacks. |
