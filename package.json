@@ -56,6 +56,13 @@
     "web": "expo start --web",
     "check:colors": "bash scripts/check-colors.sh",
     "gen:models": "tsx scripts/gen-models.ts",
+    "gen:adr-registry": "tsx scripts/gen-adr-registry.ts",
+    "gen:adr-index": "tsx scripts/gen-adr-index.ts",
+    "audit:adr-key-files": "tsx scripts/audit-adr-key-files.ts",
+    "check:adr-key-files": "tsx scripts/check-adr-key-files.ts",
+    "fix:adr-key-files": "tsx scripts/fix-adr-key-files.ts",
+    "graph:build": "bash scripts/graph-build.sh",
+    "graph:ask": "tsx scripts/graph-ask.ts",
     "test": "vitest run",
     "postinstall": "patch-package"
   },
