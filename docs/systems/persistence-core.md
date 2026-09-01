@@ -1,7 +1,7 @@
 # Persistence Core
 
-**Last updated:** 2026-08-18
-**Updated by phase:** 14-ai-message-suggestions
+**Last updated:** 2026-08-23
+**Updated by phase:** 15-weekly-digest
 **Owners:** `src/db/database.ts`, `src/db/migrations/runner.ts`, `src/db/migrations/001-initial.ts`, `src/db/mutex.ts`, `src/db/transaction.ts`, `src/services/launch-sweep.ts`
 
 ## Purpose
@@ -12,7 +12,7 @@ The persistence core opens Orbit's on-device SQLite database and advances its sc
 
 ### Data Model
 
-The schema version is SQLite's `PRAGMA user_version`. Migration 001 creates the initial application tables, migration 002 adds the single-row notification-policy table, migration 003 adds app-level Orrery sun preferences, and migration 004 adds disabled-by-default, non-secret AI configuration; each relational data model is documented by its owning system doc.
+The schema version is SQLite's `PRAGMA user_version`. Migration 001 creates the initial application tables, migration 002 adds the single-row notification-policy table, migration 003 adds app-level Orrery sun preferences, migration 004 adds disabled-by-default non-secret AI configuration, and migration 005 adds the default-on weekly-digest policy toggle; each relational data model is documented by its owning system doc.
 
 **Tables:**
 - `categories` — seeded, user-editable single-select contact groups.
@@ -36,6 +36,7 @@ The schema version is SQLite's `PRAGMA user_version`. Migration 001 creates the 
 | Migration | `src/db/migrations/002-app-settings.ts` | Adds and seeds the notification-policy singleton. |
 | Migration | `src/db/migrations/003-orrery-settings.ts` | Adds nullable `sun_contact_id` and `self_sun_colour` settings. |
 | Migration | `src/db/migrations/004-ai-settings.ts` | Adds default-off non-secret AI configuration and acknowledgement columns. |
+| Migration | `src/db/migrations/005-digest-settings.ts` | Adds the default-on `digest_enabled` notification-policy column. |
 | Settings DAO | `src/db/app-settings-dao.ts` | Validates and persists the singleton's notification, Orrery, and non-secret AI preference updates. |
 | Concurrency utility | `src/db/mutex.ts` | Serializes database write transactions in one JS runtime. |
 | Transaction utility | `src/db/transaction.ts` | Opens a hand-rolled transaction inside the shared non-reentrant mutex. |
@@ -51,6 +52,7 @@ The schema version is SQLite's `PRAGMA user_version`. Migration 001 creates the 
 | `src/db/migrations/002-app-settings.ts` | Additive app-settings DDL and default notification-policy seed. |
 | `src/db/migrations/003-orrery-settings.ts` | Adds the nullable app-level sun occupant and self-star colour. |
 | `src/db/migrations/004-ai-settings.ts` | Adds non-secret AI configuration and acknowledgement columns with constant defaults. |
+| `src/db/migrations/005-digest-settings.ts` | Adds `digest_enabled INTEGER NOT NULL DEFAULT 1` without a new table or per-contact state. |
 | `src/db/app-settings-dao.ts` | Typed, bounds-validated read and update boundary for application settings. |
 | `src/db/types.ts` | Testable database and migration interfaces. |
 | `src/db/mutex.ts` | Promise-chain serialization primitive. |
@@ -68,6 +70,7 @@ The schema version is SQLite's `PRAGMA user_version`. Migration 001 creates the 
 5. Migration 002 seeds `app_settings.id=1` with notifications off, per-type defaults on, private lock-screen posture, and 9am / 9pm–8am local timing defaults.
 6. Migration 003 adds nullable `sun_contact_id` and `self_sun_colour`; `NULL` remains the valid self/default state, and a hard-purged chosen contact reverts to self through `ON DELETE SET NULL`.
 7. Migration 004 adds the disabled `ai_provider`, ordinary provider/model/template settings, and per-provider acknowledgement flags. It has no credential column; keys belong only to SecureStore.
+8. Migration 005 adds the default-on `digest_enabled` column so weekly-digest scheduling can preserve a durable user OFF choice across launch reconciliation.
 
 ### Running launch maintenance
 
@@ -80,7 +83,7 @@ The schema version is SQLite's `PRAGMA user_version`. Migration 001 creates the 
 | Constant | Value | File | Purpose |
 |---|---|---|---|
 | `BUSY_TIMEOUT_MS` | `5000` | `src/db/database.ts` | Wait budget for a busy shared connection. |
-| `TARGET_VERSION` | `4` | `src/db/database.ts` | Schema version after migration 004 introduced the AI settings boundary. |
+| `TARGET_VERSION` | `5` | `src/db/database.ts` | Schema version after migration 005 introduced the digest policy toggle. |
 
 ## Decisions
 
@@ -93,6 +96,7 @@ The schema version is SQLite's `PRAGMA user_version`. Migration 001 creates the 
 - **ADR-041:** Notification Settings, Privacy Channels, and Birthday Alerts — uses migration 002 for durable, backup-native local notification policy.
 - **ADR-047:** App-Level Assignable Sun and Themed Self Identity — uses migration 003 for validated, app-level Orrery sun preferences.
 - **ADR-049:** BYO-Key AI Configuration and Credential Boundary — uses migration 004 for exportable non-secret AI settings and excludes keys from SQLite.
+- **ADR-055:** Dedicated Weekly Digest Scheduling and Persisted Notification Policy — uses migration 005 for the durable default-on digest toggle.
 
 ## Gotchas
 
@@ -103,6 +107,7 @@ The schema version is SQLite's `PRAGMA user_version`. Migration 001 creates the 
 5. **Treat `app_settings` as a singleton.** The migration guarantees `id=1`; a missing row is corruption, not an empty notification state.
 6. **Do not write a palette default into `self_sun_colour`.** NULL deliberately means unresolved; the Orrery render resolves it through the ordered theme palette.
 7. **Never add a credential column to `app_settings`.** Migration 004 deliberately persists only non-secret AI configuration; provider keys remain in SecureStore.
+8. **Do not infer the digest setting from OS request presence.** Migration 005's explicit `digest_enabled` column preserves a user OFF choice when launch reconciliation runs.
 
 ## Related Systems
 
@@ -112,6 +117,7 @@ The schema version is SQLite's `PRAGMA user_version`. Migration 001 creates the 
 - **Notifications** — reads the persisted policy during launch/foreground schedule reconciliation.
 - **Orrery** — reads and writes the app-level sun settings added by migration 003.
 - **AI suggestions** — persists non-secret settings and acknowledgement state through migration 004 while keeping credentials outside SQLite.
+- **Digest** — reads the migration-005 scheduling preference and registers a post-migration launch-sweep reconcile.
 
 ## Changelog
 
@@ -122,3 +128,4 @@ The schema version is SQLite's `PRAGMA user_version`. Migration 001 creates the 
 | 2026-08-16 | 11 | Added migration 002 and the validated SQLite app-settings policy boundary. |
 | 2026-08-17 | 13 | Added migration 003 and nullable app-level Orrery sun settings. |
 | 2026-08-18 | 14 | Added migration 004 and the non-secret AI settings boundary. |
+| 2026-08-23 | 15 | Added migration 005 and the durable default-on weekly-digest setting. |
