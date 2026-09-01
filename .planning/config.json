@@ -97,6 +97,11 @@
     "enabled": false
   },
   "graphify": {
-    "enabled": false
+    "enabled": true
+  },
+  "review": {
+    "models": {
+      "claude": "sonnet"
+    }
   }
 }
