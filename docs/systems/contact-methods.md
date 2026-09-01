@@ -1,21 +1,24 @@
 # Contact Methods
 
-**Last updated:** 2026-08-24
-**Updated by phase:** 17-backup-export-restore
-**Owners:** `src/screens/ComposeScreen.tsx`, `src/logic/compose-logic.ts`, `src/db/contact-read.ts`, `src/db/fuel-read.ts`, `src/db/contact-links-dao.ts`
+**Last updated:** 2026-08-27
+**Updated by phase:** 18.1-contact-method-normalization
+**Owners:** `src/db/contact-methods-dao.ts`, `src/db/contact-methods-read.ts`, `src/logic/contact-method-normalization.ts`, `src/screens/ComposeScreen.tsx`, `src/logic/compose-logic.ts`
 
 ## Purpose
 
-The contact-methods system gives a user one local compose surface for turning conversational fuel into a message. It hands a user-authored draft to the OS SMS composer when possible and always provides a clipboard fallback; it neither sends silently nor records a contact interaction.
+The contact-methods system stores ordered phone and email endpoints as local-first, mergeable contact data. It separates presentation from canonical actionability, retains incomplete values for editing, and supplies the selected actionable primary phone to the existing Compose/SMS handoff without sending or recording an interaction.
 
 ## Architecture
 
 ### Data Model
 
-This system consumes a contact's nullable `contacts.phone` through the lightweight header read and eligible fuel through the existing ranked-fuel projection. It also owns the ordered, user-managed `contact_links` reachability records.
+Migration 009 retires scalar contact phone/email storage. Migration 010 adds nullable durable labels; `contact_links` remains the separate ordered web-link collection.
 
 **Tables:**
 - `contact_links` — uid-bearing, ordered web links belonging to a contact.
+- `contact_methods` — uid-bearing phone/email rows owned by a contact.
+  - `type`, `label`, `display_order`, `is_primary` — method grouping, optional durable label, stable order, and one primary per type.
+  - `raw_value`, `canonical_value`, `canonical_region`, `extension`, and `actionable` — retained presentation, machine identity/provenance, and safe handoff eligibility.
 
 **Types** (`src/logic/compose-logic.ts` and `src/navigation/types.ts`):
 - `ComposeControls` — resolved Send, Copy, add-number, and SMS-unavailable presentation state.
@@ -26,9 +29,12 @@ This system consumes a contact's nullable `contacts.phone` through the lightweig
 | Layer | File | Responsibility |
 |---|---|---|
 | Screen | `src/screens/ComposeScreen.tsx` | Self-fetches the contact and eligible fuel, holds the in-memory draft, and invokes native handoffs. |
-| Logic | `src/logic/compose-logic.ts` | Purely resolves the phone/SMS capability matrix. |
+| Normalizer | `src/logic/contact-method-normalization.ts` | Produces conservative phone/email canonical and actionability outcomes. |
+| Method DAO | `src/db/contact-methods-dao.ts` | Applies transactional ordered drafts, primary promotion, collision handling, and tombstones. |
+| Method read | `src/db/contact-methods-read.ts` | Returns ordered groups and the selected actionable effective primary. |
+| Logic | `src/logic/compose-logic.ts` | Resolves the actionable-primary/SMS capability matrix. |
 | AI lifecycle | `src/logic/ai-suggestion-logic.ts` | Owns one cancellable, acknowledgement-gated suggestion request. |
-| Contact read | `src/db/contact-read.ts` | Supplies the lightweight header, including phone and archive state. |
+| Contact read | `src/db/contact-read.ts` | Supplies the scalar-free lightweight header and archive state. |
 | Fuel read | `src/db/fuel-read.ts` | Supplies the ranked projection whose SQL excludes off-limits, unconfirmed-AI, and blank rows. |
 | Link DAO | `src/db/contact-links-dao.ts` | Owns ordered link create, edit, and merge-safe removal. |
 
@@ -38,8 +44,11 @@ This system consumes a contact's nullable `contacts.phone` through the lightweig
 |---|---|
 | `src/screens/ComposeScreen.tsx` | Read-only fuel reference, blank draft, handoff actions, and dashboard-directed Back behavior. |
 | `src/logic/compose-logic.ts` | Node-tested Send/Copy emphasis and availability resolver. |
+| `src/logic/contact-method-normalization.ts` | Shared canonicalization, extension, and actionability boundary. |
+| `src/db/contact-methods-dao.ts` | Transactional normalized method write boundary. |
+| `src/db/contact-methods-read.ts` | Ordered method-group and actionable-primary read boundary. |
 | `src/logic/ai-suggestion-logic.ts` | Timeout, cancellation, stale-result, acknowledgement, and replacement-confirmation lifecycle. |
-| `src/db/contact-read.ts` | Lightweight contact header source for phone and archive gating. |
+| `src/db/contact-read.ts` | Lightweight scalar-free contact header and archive gate. |
 | `src/db/fuel-read.ts` | Structural eligible-fuel boundary consumed unchanged by Compose. |
 | `src/navigation/types.ts` | Serializable Compose-route parameter contract. |
 | `src/navigation/RootNavigator.tsx` | Additive native-stack Compose registration. |
@@ -51,10 +60,17 @@ This system consumes a contact's nullable `contacts.phone` through the lightweig
 ### Composing and handing off a message
 
 1. `ContactProfileScreen` navigates to `Compose` with only the contact id.
-2. `ComposeScreen` reloads the header and all rows from `getRankedFuel()` on focus, while separately probing SMS availability.
+2. `ComposeScreen` reloads the header, the DAO-selected actionable primary phone, and all rows from `getRankedFuel()` on focus, while separately probing SMS availability.
 3. Missing or archived contacts reset to Home; the ranked read keeps off-limits, unconfirmed-AI, and blank fuel out of the reference cards in SQL.
-4. The user types a blank-starting local draft. With a phone and SMS capability, Send opens the OS composer with `expo-sms`; Copy uses `expo-clipboard` in every state.
+4. The user types a blank-starting local draft. With an actionable primary phone and SMS capability, Send opens the OS composer with `expo-sms`; Copy uses `expo-clipboard` in every state.
 5. Software and Android hardware Back both reset the stack to dashboard Home. Send and Copy never create a touchpoint or change `last_contact`.
+
+### Writing and selecting methods
+
+1. Create and edit forms submit ordered method drafts to the contact aggregate writer, which composes the method DAO inside the outer contact transaction.
+2. The normalizer retains nonblank invalid values as non-actionable, canonicalizes valid phones and conservative emails, and records a phone's canonicalization region without auto-rewriting it later.
+3. The DAO clears a changing primary before promotion, promotes the next ordered row when a primary is removed, and returns same-contact canonical collisions as typed feedback; shared canonical values across contacts remain legal.
+4. Profile displays stored formatted values, labels, extensions, and invalid helpers. It does not reparse raw input; Compose receives only the read owner's actionable primary destination.
 
 ### Turning an AI suggestion into a draft
 
@@ -88,6 +104,8 @@ This system consumes a contact's nullable `contacts.phone` through the lightweig
 - **ADR-052:** Compose-Owned AI Draft Lifecycle and Acknowledged Egress — makes AI output an acknowledged, cancellable, editable draft without a contact write.
 - **ADR-056:** Tombstone-Backed UID Reconciliation for Portable Restores — protects hard-deleted contact links from older snapshots.
 - **ADR-057:** Full-State Versioned Backups with Verified Manual and Foreground SAF Snapshots — includes contact links in the complete portable manifest.
+- **ADR-059:** Normalized Contact Methods, Canonical Actionability, and Local Provenance — establishes ordered, mergeable phone/email methods as the sole endpoint authority.
+- **ADR-061:** DAO-Selected Actionable Primary SMS Handoff — gates native SMS on the stored actionable primary while retaining Copy fallback.
 
 ## Gotchas
 
@@ -99,10 +117,12 @@ This system consumes a contact's nullable `contacts.phone` through the lightweig
 6. **An AI result is not proof of contact.** Generation, acknowledgement, Cancel, replacement confirmation, Send, and Copy must not create a touchpoint or alter `last_contact`.
 7. **Do not overwrite a non-empty draft silently.** The result-time confirmation protects user text even when the request began from an empty-state expectation.
 8. **Remove links with a tombstone.** The compositional edit-form diff path must use the same caller-supplied timestamp and transaction as standalone removal.
+9. **Do not reparse at an action surface.** Profile and Compose consume stored DAO actionability; a raw value can be visible yet remain non-actionable.
+10. **Do not treat a shared canonical value as identity proof.** Same-contact duplicates collapse, but different contacts may retain the same phone or email.
 
 ## Related Systems
 
-- **Contacts** — supplies phone and archive state for the live compose gate.
+- **Contacts** — owns the aggregate create/edit transaction and scalar-free archive gate.
 - **Conversational fuel** — supplies the eligible reference rows without exposing private material.
 - **App shell** — owns the typed stack registration and dashboard Home destination.
 - **AI suggestions** — provides the privacy-bounded context, provider request, and exact-prompt acknowledgement that Compose owns as its draft flow.
@@ -116,3 +136,4 @@ This system consumes a contact's nullable `contacts.phone` through the lightweig
 | 2026-08-16 | 11 | Added decay-notification entry with Dashboard-rooted Back behavior. |
 | 2026-08-18 | 14 | Added the acknowledged, cancellable AI suggestion flow as an editable Compose draft. |
 | 2026-08-24 | 17 | Added tombstone-backed removal and portable reconciliation for contact links. |
+| 2026-08-27 | 18.1 | Added normalized phone/email methods, durable labels, provenance, and actionable-primary Compose gating. |
