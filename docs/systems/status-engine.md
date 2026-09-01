@@ -57,6 +57,7 @@ Status is a query-time projection over the contacts and interactions schema; no 
 ## Decisions
 
 - **ADR-011:** Query-Time Status and Never-Contacted Segregation — status/progress are derived and never-contacted people are excluded from normal reads.
+- **ADR-010:** Single-Writer Interaction Recency Spine — supplies the maintained local recency value status reads.
 
 ## Gotchas
 
