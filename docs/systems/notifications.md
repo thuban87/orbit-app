@@ -1,7 +1,7 @@
 # Notifications
 
-**Last updated:** 2026-08-16
-**Updated by phase:** 12-home-screen-widget
+**Last updated:** 2026-08-23
+**Updated by phase:** 15-weekly-digest
 **Owners:** `src/db/notification-read.ts`, `src/db/snooze-dao.ts`, `src/services/notifications/`, `src/navigation/notification-gate.tsx`
 
 ## Purpose
@@ -16,7 +16,7 @@ The system owns no remote state and no backend. SQLite supplies live candidate d
 
 **Tables:**
 - `app_settings` — one seeded row for notification master/type toggles, lock-screen choice, and delivery/quiet hours.
-  - `notifications_enabled`, `decay_enabled`, `birthday_enabled` (`INTEGER`) — `0`/`1` scheduling gates.
+  - `notifications_enabled`, `decay_enabled`, `birthday_enabled`, `digest_enabled` (`INTEGER`) — `0`/`1` scheduling gates.
   - `lockscreen_public` (`INTEGER`) — chooses the public decay channel only when explicitly enabled.
   - `delivery_hour`, `quiet_start_hour`, `quiet_end_hour` (`INTEGER`) — validated local-hour scheduling inputs.
 - `contacts` — supplies cadence, `last_contact`, `snooze_until`, `reminders_off`, lifecycle, and birthday values.
@@ -34,6 +34,7 @@ The system owns no remote state and no backend. SQLite supplies live candidate d
 | Candidate read | `src/db/notification-read.ts` | Returns deterministic decay and birthday candidates without writing. |
 | Snooze DAO | `src/db/snooze-dao.ts` | Is the sole writer of `snooze_until` and composes immutable snooze events. |
 | Scheduler | `src/services/notifications/notification-schedule.ts` | Reconciles the desired bounded OS request set. |
+| Digest scheduler | `src/services/notifications/digest-schedule.ts` | Reconciles the separate singleton Sunday digest request. |
 | Scheduling math | `src/services/notifications/fire-instant.ts` | Computes local delivery, quiet-window rolls, stagger, and weekly cadence. |
 | OS adapter | `src/services/notifications/channels.ts` | Creates the immutable versioned Android channels. |
 | Action handler | `src/services/notifications/notification-actions.ts` | Routes both action-delivery paths through exactly-once DAO writes. |
@@ -45,12 +46,14 @@ The system owns no remote state and no backend. SQLite supplies live candidate d
 |---|---|
 | `src/services/notifications/notification-ids.ts` | Single source for identifiers, channels, action IDs, generic copy, payloads, and deterministic action UIDs. |
 | `src/services/notifications/notification-schedule.ts` | Desired-request builder, full-request diff, bounded selection, and DEFER-ONE reconciliation coordinator. |
+| `src/services/notifications/digest-schedule.ts` | Independent idempotent reconciliation for the singleton `digest:weekly` request. |
 | `src/services/notifications/decay-suppression.ts` | Reuses the status engine's progress and rogue constants for the decay predicate. |
 | `src/db/notification-read.ts` | Reads all schedulable contacts and non-archived birthday candidates. |
 | `src/services/notifications/fire-instant.ts` | Local wall-clock fire calculations and stateless weekly re-nag date. |
 | `src/services/notifications/notification-actions.ts` | Registers mark/snooze buttons and performs idempotent action writes. |
 | `src/services/notifications/headless-task.ts` | Registers the killed-app TaskManager action path. |
 | `src/services/notifications/channels.ts` | Creates low-importance private/public decay and private birthday channels. |
+| `src/screens/SettingsScreen.tsx` | Persists the master, decay, birthday, and digest scheduling gates. |
 | `src/services/notifications/purge-notification-cleanup.ts` | Cancels a purged contact's decay and birthday identifiers after commit. |
 | `src/navigation/notification-gate.tsx` | Receives warm and cold body/action responses and queues body navigation until ready. |
 
@@ -64,6 +67,13 @@ The system owns no remote state and no backend. SQLite supplies live candidate d
 4. The scheduler keeps requests inside a 35-day, 48-request bound, reserves within-horizon birthdays first, and uses a full-request diff to cancel or replace stale `decay:<id>` and `birthday:<id>` requests.
 5. Concurrent callers coalesce through a DEFER-ONE coordinator; the final pass re-reads state so a committed mute or snooze cannot be undone by an older snapshot.
 
+### Reconciling the weekly digest
+
+1. `App.tsx` also registers the digest scheduler as a launch-sweep hook after migration and channel initialization.
+2. `reconcileDigestSchedule()` reads the master setting, `digest_enabled`, delivery hour, and pending OS requests.
+3. It keeps one `digest:weekly` Sunday request when enabled, cancels it when the master or digest toggle is off, and replaces it only when weekday or hour drift.
+4. The request uses a dedicated `digest-v1` low-importance private channel and frozen generic copy; it does not enter the decay/birthday scheduler’s ownership set.
+
 ### Acting from the shade
 
 1. A decay request exposes Mark contacted and Snooze 1 week; both may arrive through the foreground listener or the module-scope headless task.
@@ -76,7 +86,8 @@ The system owns no remote state and no backend. SQLite supplies live candidate d
 
 1. A decay body tap resets the native stack to Dashboard then Compose for the contact, guaranteeing Back returns to Dashboard.
 2. A birthday body tap navigates to that contact's Profile.
-3. The response gate reads a cold-start response once, clears it after handling, and waits for navigation readiness before applying a queued body-tap intent.
+3. A digest body tap resets the stack to Dashboard then Digest, guaranteeing Back returns to Dashboard on warm and cold starts.
+4. The response gate reads a cold-start response once, clears it after handling, and waits for navigation readiness before applying a queued body-tap intent.
 
 ### Cleaning up a purge
 
@@ -92,6 +103,7 @@ The system owns no remote state and no backend. SQLite supplies live candidate d
 | `HORIZON_DAYS` | `35` | `src/services/notifications/notification-schedule.ts` | Future pre-scheduling window. |
 | `MAX_SCHEDULED_NOTIFICATIONS` | `48` | `src/services/notifications/notification-schedule.ts` | Ceiling kept below Android's pending-notification limit. |
 | Default hours | `9`, `21`, `8` | `src/db/migrations/002-app-settings.ts` | Delivery hour, quiet-window start, and quiet-window end. |
+| `DIGEST_WEEKDAY` | `1` | `src/services/notifications/digest-schedule.ts` | Sunday weekly digest delivery. |
 
 ## Decisions
 
@@ -99,6 +111,7 @@ The system owns no remote state and no backend. SQLite supplies live candidate d
 - **ADR-040:** Exactly-Once Notification Actions and Dashboard-Rooted Tap Routing — keeps action writes DAO-owned and makes navigation deterministic.
 - **ADR-041:** Notification Settings, Privacy Channels, and Birthday Alerts — persists policy in SQLite and uses versioned privacy channels.
 - **ADR-045:** Event-Driven Widget Refresh and Boot Recovery — keeps the widget current after a notification mark commits.
+- **ADR-055:** Dedicated Weekly Digest Scheduling and Persisted Notification Policy — adds the independent Sunday digest request, private channel, durable toggle, and dashboard-rooted tap reset.
 
 ## Gotchas
 
@@ -109,6 +122,8 @@ The system owns no remote state and no backend. SQLite supplies live candidate d
 5. **Android channels are immutable.** A changed importance or visibility policy needs a new versioned channel ID, not a repeated update call.
 6. **Device follow-up remains important.** Killed-app actions and decay-body navigation need a naturally delivered decay reminder for final physical-device exercise.
 7. **Only Mark publishes widget freshness.** Snooze changes scheduling state, not the favourites projection, so it must not trigger unnecessary widget work.
+8. **Keep digest reconciliation separate.** The decay/birthday ownership check must not cancel `digest:weekly`; its own DEFER-ONE coordinator re-reads settings on a trailing pass.
+9. **Do not put digest counts in the notification body.** Scheduled content is frozen; the live Digest screen is the payload.
 
 ## Related Systems
 
@@ -118,6 +133,7 @@ The system owns no remote state and no backend. SQLite supplies live candidate d
 - **Contact methods** — provides the Compose destination for a decay body tap.
 - **Dashboard** — remains the in-app source of truth and shares birthday semantics.
 - **Widget** — refreshes after a notification-sourced mark advances contact recency.
+- **Digest** — owns the live retrospective surface that the weekly generic prompt opens.
 
 ## Changelog
 
@@ -125,3 +141,4 @@ The system owns no remote state and no backend. SQLite supplies live candidate d
 |---|---|---|
 | 2026-08-16 | 11 | Created local decay and birthday scheduling, action handling, privacy channels, and response routing. |
 | 2026-08-16 | 12 | Published widget freshness after notification-originated marks. |
+| 2026-08-23 | 15 | Added an independently reconciled weekly digest trigger, versioned private channel, policy toggle, and Digest reset route. |
