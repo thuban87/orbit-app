@@ -57,8 +57,8 @@ When this skill is RUN, **commit its outputs atomically as you go**:
 | `docs/systems/<new-doc>.md` (×N) | New system doc(s) with sections moved from source. Each gets standard system-doc frontmatter (Last updated, Updated by phase, Owners, Purpose) and a fresh Changelog starting with the split row. |
 | `docs/systems/<source-doc>.md` | Trimmed source doc. Same structure, smaller. Purpose section gets a "see also" line pointing at the new docs. Changelog gets a "split off" row. |
 | `docs/decisions/ADR-NNN-*.md` (touched) | ADRs whose `Decisions`-section reference pointed at the source doc get redirected to the correct new doc. Body content otherwise unchanged. |
-| `CLAUDE.md` | Subsystem table gets new rows for new docs; source-doc row scope narrowed if appropriate — as shown in the approved final plan (step 5) and applied in step 8. |
-| `docs/systems/README.md` | Subsystem table updated to match CLAUDE.md. |
+| `docs/systems/README.md` | The subsystem routing table gets new rows for the new docs; the source-doc row's scope/anchor narrowed if appropriate — as shown in the approved final plan (step 5) and applied in step 8. This is the subsystem index. |
+| `CLAUDE.md` | Usually **untouched** — orbit's CLAUDE.md has no subsystem table (the index is `docs/systems/README.md`). Touch only for a genuinely new top-level concept named in the approved plan. |
 
 ## Workflow
 
@@ -190,10 +190,10 @@ For each ADR from step 2's inventory:
 3. Redirect it to the correct new doc based on the section assignments. (If the ADR's subject moved, point at the new doc; if it stayed, leave it. If it spans both, reference both — add, don't replace.)
 4. Edit only that reference. **Do not edit any other field.** ADR bodies are immutable; `Supersedes:` / `Superseded by:` / `Required by:` are off-limits here — those belong to `extract-phase-kb`.
 
-### 8. Update CLAUDE.md and README
+### 8. Update the routing index (`docs/systems/README.md`)
 
-1. **CLAUDE.md subsystem table.** Narrow the source-doc row's scope if applicable; add new rows for new docs in the same column shape, placed adjacent to the source row (subsystem grouping reads better than alphabetical). Edit no other section. Apply exactly the row changes shown in the approved final plan (step 5) — they were surfaced for the owner at the seam-confirmation gate (step 4); make no CLAUDE.md change that was not in that plan.
-2. **`docs/systems/README.md`.** Mirror the CLAUDE.md changes — same scope edits, same new rows.
+1. **`docs/systems/README.md` subsystem table** (the index — orbit keeps it here, not in CLAUDE.md). Narrow the source-doc row's scope if applicable; add new rows for the new docs in the same column shape, placed adjacent to the source row (subsystem grouping reads better than alphabetical). Edit no other section. Apply exactly the row changes shown in the approved final plan (step 5), surfaced for the owner at the seam-confirmation gate (step 4).
+2. **`CLAUDE.md`.** Usually untouched — it has no subsystem table. Touch it only if the approved plan named a genuinely new top-level concept.
 
 Commit the cross-reference updates.
 

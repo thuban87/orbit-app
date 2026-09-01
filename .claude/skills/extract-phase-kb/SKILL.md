@@ -57,7 +57,8 @@ The user runs `/extract-phase-kb <phase-id>` or asks "extract the KB for phase 2
 | `docs/runbooks/<name>.md` | New runbooks for newly-introduced repeatable processes. Updates for processes the phase modified. |
 | `docs/decisions/_archive/ADR-NNN-<slug>.md` | Only during a legacy-ADR reclaim (step 6) — the pre-KB original ADR body, preserved before its number is reclaimed. |
 | `.planning/phases/<phase-dir>/<phase-id>-KB-MANIFEST.md` | The audit trail tying this run to its outputs. |
-| `CLAUDE.md` | Index entries added / edited / removed for new, renamed, or retired system docs and runbooks — **only as approved in the step-5 plan's *Planned CLAUDE.md changes* table** (see step 13). |
+| `docs/systems/README.md` | The routing-index table maintained: anchor-phase column updated when a doc is created at a phase other than its listed anchor; a row added for a genuinely new subsystem; rows narrowed/retired for renamed or retired docs — **as approved in the step-5 plan** (see step 13). This is the subsystem index. |
+| `CLAUDE.md` | Touched **only** for a genuinely new top-level concept or convention (rare) — NOT routine per-doc index rows. Orbit's CLAUDE.md has **no per-doc KB index** (the subsystem index is `docs/systems/README.md`), so this is usually `_None._` (see step 13). |
 | Existing ADR files | Touched *only* to flip a `Superseded by:` or append a `Required by:` field. Body content is never edited retroactively (legacy reclaim in step 6 is the sole, documented exception). |
 
 ## Commit-as-you-go (bake this into every run)
@@ -163,12 +164,21 @@ Produce a written plan and present it before writing any files. The plan **must*
 | Reclaimed # | Original title | New title | Archive path |
 |-------------|----------------|-----------|--------------|
 
-## Planned CLAUDE.md changes  (write `_None._` if empty)
+## Planned index changes  (write `_None._` if empty)
 
-| Change | Section / row | Reason |
-|--------|---------------|--------|
-| ADD | Knowledge-base index: row for `docs/systems/<new>.md` (or a new runbook) | new system doc / runbook created this run |
-| EDIT / REMOVE | the exact existing row/line | doc renamed, split, or retired this run |
+**`docs/systems/README.md`** — the routing index; the usual target:
+
+| Change | Row | Reason |
+|--------|-----|--------|
+| EDIT anchor | e.g. `Persistence core` anchor `01` → `02` | doc created at a phase other than its listed anchor |
+| ADD row | a genuinely new subsystem not among the pre-listed 18 | first phase to introduce it |
+| EDIT / REMOVE | the exact existing row | subsystem renamed, split, or retired |
+
+**`CLAUDE.md`** — rare; only a genuinely new top-level concept/convention, NEVER per-doc rows:
+
+| Change | Section | Reason |
+|--------|---------|--------|
+| _None._ (usual) | — | Orbit's CLAUDE.md carries no per-doc KB index; the subsystem index is `docs/systems/README.md`. Touch CLAUDE.md only for a brand-new top-level concept. |
 
 ## Deferred / not captured
 
@@ -182,7 +192,7 @@ Produce a written plan and present it before writing any files. The plan **must*
 - The supersession table is **mandatory** even when empty (write `_None._`). It forces a conscious check.
 - If a planned ADR's source decisions overlap or contradict an existing ADR's content, that existing ADR belongs in the supersession table.
 - **Reversibility** on each planned ADR = the strictest value among its sourced decisions' `Reversibility:` tags (one-way > costly > reversible). **Migration** = the TS migration number(s) the phase ships (orbit migrations are TypeScript under `src/db/migrations/`, run via `PRAGMA user_version`; there are no `.sql` files), or "None".
-- **CLAUDE.md changes are part of this plan, never a silent side effect.** Every row this run will add, remove, or edit in `CLAUDE.md` (index entries for new/renamed/split/retired system docs and runbooks) must appear in the *Planned CLAUDE.md changes* table above, so the owner sees and approves them in this review. Step 13 applies exactly what is approved here — nothing that was not in this table.
+- **Index changes are part of this plan, never a silent side effect.** Every change to `docs/systems/README.md` (anchor updates, new/renamed/retired subsystem rows) — and any rare `CLAUDE.md` touch for a genuinely new top-level concept — must appear in the *Planned index changes* section above, so the owner sees and approves them. Step 13 applies exactly what is approved — nothing more. **Orbit's CLAUDE.md has no per-doc KB index:** routine per-doc indexing goes to `docs/systems/README.md`, not CLAUDE.md.
 - **State INDEX.md status in the plan, not just report-back.** Note whether `docs/decisions/INDEX.md` exists. If it is missing (expected until the first extraction generates it), say you fell back to reading ADR bodies directly for the inventory, and that step 12 will generate it.
 - **Cross-cutting owner-resolution tie-breaker.** A decision owner-resolved *within* this phase (e.g. a `D-NNa`/`D-NNb` review resolution) but scoped *outside* the phase's core subsystem still belongs to this phase's record: fold it into the phase's primary ADR when tightly coupled to that ADR's decision, and additionally note its cross-cutting effect in the *other* subsystem's system-doc Decisions section. Do not spin a separate ADR unless it stands as its own architectural choice.
 
@@ -286,13 +296,13 @@ npm run graph:build            # regenerates the ADR registry + knowledge graph 
 - **Supersession** in the ADR body is what the index and graph read — a supersession you fail to record is a retired decision that still looks live.
 - Commit the regenerated INDEX/registry/graph artifacts with the manifest.
 
-### 13. Update CLAUDE.md (per the approved plan)
+### 13. Update the routing index (per the approved plan)
 
-Apply exactly the CLAUDE.md changes approved in step 5's *Planned CLAUDE.md changes* table — no more, no less:
-- Add index rows for brand-new system docs / runbooks created this run.
-- Edit or remove rows for docs renamed, split, or retired this run.
+The subsystem index is `docs/systems/README.md` — **not** CLAUDE.md (orbit's CLAUDE.md has no per-doc KB index). Apply exactly the *Planned index changes* approved in step 5:
+- In `docs/systems/README.md`: update the anchor-phase column when a doc was created at a phase other than its listed anchor; add a row only for a genuinely new subsystem not already listed; narrow/retire rows for renamed or retired docs. (The 18 subsystems are pre-listed, so most runs touch only the anchor column, or nothing.)
+- Touch `CLAUDE.md` **only** if the plan approved a genuinely new top-level concept/convention — never routine per-doc rows.
 
-Touch only those index rows/entries; leave every other row and section of `CLAUDE.md` untouched. **Never make a CLAUDE.md edit that did not appear in the approved step-5 plan** — if a needed change surfaces mid-write, add it to the plan and re-confirm with the owner rather than editing silently. Then commit `CLAUDE.md` (commit-as-you-go).
+Touch only what the approved plan named; leave everything else untouched. **Never make an index edit that did not appear in the approved step-5 plan** — if a needed change surfaces mid-write, add it to the plan and re-confirm with the owner rather than editing silently. Then commit (commit-as-you-go).
 
 ### 14. Report back
 
