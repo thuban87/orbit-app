@@ -1,7 +1,7 @@
 # Notifications
 
-**Last updated:** 2026-08-23
-**Updated by phase:** 15-weekly-digest
+**Last updated:** 2026-08-27
+**Updated by phase:** 18.1-contact-method-normalization
 **Owners:** `src/db/notification-read.ts`, `src/db/snooze-dao.ts`, `src/services/notifications/`, `src/navigation/notification-gate.tsx`
 
 ## Purpose
@@ -76,7 +76,7 @@ The system owns no remote state and no backend. SQLite supplies live candidate d
 ### Acting from the shade
 
 1. A decay request exposes Mark contacted and Snooze 1 week; both may arrive through the foreground listener or the module-scope headless task.
-2. `handleNotificationAction()` derives an occurrence-scoped deterministic UID, opens and migrates SQLite before access, and suppresses warm or durable replay duplicates.
+2. `handleNotificationAction()` derives an occurrence-scoped deterministic UID, resolves the device region, opens and migrates SQLite before access, and suppresses warm or durable replay duplicates. This headless path can be the first opener of a v8 database.
 3. Mark contacted calls the recency DAO with the canonical notification one-tap values. Snooze calls `snoozeContact()` and records a matching immutable event in the same transaction.
 4. Both actions cancel the active decay request. The headless snooze re-arms during the next foreground reconcile rather than trying to initialize channel state from a killed process.
 5. A successful notification-originated Mark additionally publishes a best-effort Widget refresh; Snooze does not because it does not alter the widget projection.
@@ -111,6 +111,7 @@ The system owns no remote state and no backend. SQLite supplies live candidate d
 - **ADR-041:** Notification Settings, Privacy Channels, and Birthday Alerts — persists policy in SQLite and uses versioned privacy channels.
 - **ADR-045:** Event-Driven Widget Refresh and Boot Recovery — keeps the widget current after a notification mark commits.
 - **ADR-055:** Dedicated Weekly Digest Scheduling and Persisted Notification Policy — adds the independent Sunday digest request, private channel, durable toggle, and dashboard-rooted tap reset.
+- **ADR-059:** Normalized Contact Methods, Canonical Actionability, and Local Provenance — requires headless first-open migration to supply a device region without making endpoint data part of notifications.
 
 ## Gotchas
 
@@ -123,6 +124,7 @@ The system owns no remote state and no backend. SQLite supplies live candidate d
 7. **Only Mark publishes widget freshness.** Snooze changes scheduling state, not the favourites projection, so it must not trigger unnecessary widget work.
 8. **Keep digest reconciliation separate.** The decay/birthday ownership check must not cancel `digest:weekly`; its own DEFER-ONE coordinator re-reads settings on a trailing pass.
 9. **Do not put digest counts in the notification body.** Scheduled content is frozen; the live Digest screen is the payload.
+10. **Do not migrate national endpoints with a guessed headless region.** The action path uses the shared platform region provider; an unavailable region leaves a national method non-actionable rather than inventing canonical identity.
 
 ## Related Systems
 
@@ -141,3 +143,4 @@ The system owns no remote state and no backend. SQLite supplies live candidate d
 | 2026-08-16 | 11 | Created local decay and birthday scheduling, action handling, privacy channels, and response routing. |
 | 2026-08-16 | 12 | Published widget freshness after notification-originated marks. |
 | 2026-08-23 | 15 | Added an independently reconciled weekly digest trigger, versioned private channel, policy toggle, and Digest reset route. |
+| 2026-08-27 | 18.1 | Supplied device region to the notification headless first-open migration path. |
