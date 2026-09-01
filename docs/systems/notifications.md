@@ -1,7 +1,7 @@
 # Notifications
 
 **Last updated:** 2026-08-27
-**Updated by phase:** 18.1-contact-method-normalization
+**Updated by phase:** 18.2-bound-unbound-lifecycle
 **Owners:** `src/db/notification-read.ts`, `src/db/snooze-dao.ts`, `src/services/notifications/`, `src/navigation/notification-gate.tsx`
 
 ## Purpose
@@ -16,7 +16,7 @@ The system owns no remote state and no backend. SQLite supplies live candidate d
 
 **Tables:**
 - `app_settings` — one seeded row for notification master/type toggles, lock-screen choice, and delivery/quiet hours.
-  - `notifications_enabled`, `decay_enabled`, `birthday_enabled`, `digest_enabled` (`INTEGER`) — `0`/`1` scheduling gates.
+  - `notifications_enabled`, `decay_enabled`, `birthday_enabled`, `digest_enabled`, `birthday_unbound_enabled` (`INTEGER`) — `0`/`1` scheduling gates.
   - `lockscreen_public` (`INTEGER`) — chooses the public decay channel only when explicitly enabled.
   - `delivery_hour`, `quiet_start_hour`, `quiet_end_hour` (`INTEGER`) — validated local-hour scheduling inputs.
 - `contacts` — supplies cadence, `last_contact`, `snooze_until`, `reminders_off`, lifecycle, and birthday values.
@@ -61,7 +61,7 @@ The system owns no remote state and no backend. SQLite supplies live candidate d
 ### Reconciling reminders
 
 1. After migration and channel/category initialization, `App.tsx` registers the scheduler as a launch-sweep hook.
-2. `reconcileSchedule()` reads `app_settings`, all decay-eligible contacts, birthday candidates, and the current OS request set.
+2. `reconcileSchedule()` reads `app_settings`, Bound decay-eligible contacts, birthday candidates, and the current OS request set. The persisted birthday-Unbound setting controls only birthday eligibility.
 3. It derives a local due date, applies a future snooze as the minimum base, then calculates a quiet-windowed, staggered fire instant. A birthday stays on its birthday date or is skipped.
 4. The scheduler keeps requests inside a 35-day, 48-request bound, reserves within-horizon birthdays first, and uses a full-request diff to cancel or replace stale `decay:<id>` and `birthday:<id>` requests.
 5. Concurrent callers coalesce through a DEFER-ONE coordinator; the final pass re-reads state so a committed mute or snooze cannot be undone by an older snapshot.
@@ -83,7 +83,7 @@ The system owns no remote state and no backend. SQLite supplies live candidate d
 
 ### Opening a notification
 
-1. A decay body tap resets the native stack to Dashboard then Compose for the contact, guaranteeing Back returns to Dashboard.
+1. A decay body tap checks current lifecycle before routing. A now-Unbound contact opens Profile instead of Compose; a live Bound contact retains the Dashboard-rooted Compose route.
 2. A birthday body tap navigates to that contact's Profile.
 3. A digest body tap resets the stack to Dashboard then Digest, guaranteeing Back returns to Dashboard on warm and cold starts.
 4. The response gate reads a cold-start response once, clears it after handling, and waits for navigation readiness before applying a queued body-tap intent.
@@ -112,6 +112,7 @@ The system owns no remote state and no backend. SQLite supplies live candidate d
 - **ADR-045:** Event-Driven Widget Refresh and Boot Recovery — keeps the widget current after a notification mark commits.
 - **ADR-055:** Dedicated Weekly Digest Scheduling and Persisted Notification Policy — adds the independent Sunday digest request, private channel, durable toggle, and dashboard-rooted tap reset.
 - **ADR-059:** Normalized Contact Methods, Canonical Actionability, and Local Provenance — requires headless first-open migration to supply a device region without making endpoint data part of notifications.
+- **ADR-062:** Bound/Unbound Lifecycle and One-Way Cadence Assignment — gates decay and stale active actions while retaining factual birthdays and touchpoint history.
 
 ## Gotchas
 
@@ -125,6 +126,7 @@ The system owns no remote state and no backend. SQLite supplies live candidate d
 8. **Keep digest reconciliation separate.** The decay/birthday ownership check must not cancel `digest:weekly`; its own DEFER-ONE coordinator re-reads settings on a trailing pass.
 9. **Do not put digest counts in the notification body.** Scheduled content is frozen; the live Digest screen is the payload.
 10. **Do not migrate national endpoints with a guessed headless region.** The action path uses the shared platform region provider; an unavailable region leaves a national method non-actionable rather than inventing canonical identity.
+11. **Recheck lifecycle at delivered ingress.** A notification can outlive an Unbind; Mark may record real history, but stale decay Compose and Snooze actions must not revive cadence work.
 
 ## Related Systems
 
@@ -144,3 +146,4 @@ The system owns no remote state and no backend. SQLite supplies live candidate d
 | 2026-08-16 | 12 | Published widget freshness after notification-originated marks. |
 | 2026-08-23 | 15 | Added an independently reconciled weekly digest trigger, versioned private channel, policy toggle, and Digest reset route. |
 | 2026-08-27 | 18.1 | Supplied device region to the notification headless first-open migration path. |
+| 2026-08-27 | 18.2 | Made decay Bound-only, added Unbound birthday policy, and guarded stale notification actions and body taps. |
