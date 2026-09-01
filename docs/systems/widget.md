@@ -1,7 +1,7 @@
 # Widget
 
-**Last updated:** 2026-08-16
-**Updated by phase:** 12-home-screen-widget
+**Last updated:** 2026-08-27
+**Updated by phase:** 18.1-contact-method-normalization
 **Owners:** `src/services/widget/`, `src/navigation/widget-linking.ts`, `plugins/withWidgetBootReceiver.js`
 
 ## Purpose
@@ -54,7 +54,7 @@ The widget owns no table, migration, or per-instance state. It reads the existin
 ### Rendering favourites
 
 1. A lifecycle event or `requestWidgetUpdate` invokes `renderFavourites(widgetInfo)`.
-2. The renderer opens and migrates SQLite when needed, then `loadWidgetTiles()` calls `listDashboard()` with the favourites filter.
+2. The renderer resolves the device region and opens/migrates SQLite when needed, then `loadWidgetTiles()` calls `listDashboard()` with the favourites filter. A widget render can be the first opener of an upgraded database.
 3. The tile shaper preserves `favourite_rank` order and nullable query-time status; it never recalculates either value.
 4. Each local photo master is downsized and encoded as a base64 `data:` URI. A missing or failed thumbnail falls back to deterministic themed initials rather than blanking the grid.
 5. The renderer selects the small mark grid or larger fuel-and-action layout from widget width, then rasterises the RemoteViews tree with palette tokens.
@@ -62,7 +62,7 @@ The widget owns no table, migration, or per-instance state. It reads the existin
 ### Marking and opening a contact
 
 1. A small tile or larger Mark control sends `WIDGET_MARK` with a contact ID; the task handler rejects non-positive or unsafe IDs before opening SQLite.
-2. The handler opens and migrates the database, then `widgetMarkContacted()` delegates to `recordTouchpoint()` with `source='widget'`, outbound, connected, unspecified-channel defaults and no quality value.
+2. The handler resolves the device region and opens/migrates the database, then `widgetMarkContacted()` delegates to `recordTouchpoint()` with `source='widget'`, outbound, connected, unspecified-channel defaults and no quality value.
 3. The existing mutexed recency DAO commits the interaction and recomputes `last_contact`; refresh follows only after that durable write.
 4. Profile and Compose controls use accepted `orbit://` links. `WidgetLinkingGate` strictly parses them and resets React Navigation to Dashboard plus the requested destination, so Back returns to Dashboard.
 
@@ -88,6 +88,7 @@ The widget owns no table, migration, or per-instance state. It reads the existin
 - **ADR-043:** Static Globally Mirrored Favourites Widget — instances share one manually ranked, state-free list.
 - **ADR-044:** Headless Widget Actions and Dashboard-Rooted Deep Links — marks use the recency writer and links reset to Dashboard.
 - **ADR-045:** Event-Driven Widget Refresh and Boot Recovery — event/launch/boot refresh replaces polling.
+- **ADR-059:** Normalized Contact Methods, Canonical Actionability, and Local Provenance — makes the widget's possible first-open pass device-region migration input.
 
 ## Gotchas
 
@@ -96,6 +97,7 @@ The widget owns no table, migration, or per-instance state. It reads the existin
 3. **Do not run foreground sweep work in a widget task.** Headless taps may write one interaction but must not trigger unrelated cleanup, purge, or reconciliation.
 4. **Keep refresh best-effort after a committed mark.** Rendering can consume the headless budget; it must never roll back or throw past the interaction write.
 5. **Android 15 force-stop can grey the widget.** A manual launch re-arms it; boot recovery is a separate native path and the widget is never the sole route to logging.
+6. **Headless first-open must supply, not guess, a migration region.** A missing region leaves national-format method data non-actionable rather than creating an irreversible false canonical value.
 
 ## Related Systems
 
@@ -110,3 +112,4 @@ The widget owns no table, migration, or per-instance state. It reads the existin
 | Date | Phase | What Changed |
 |------|-------|--------------|
 | 2026-08-16 | 12 | Created the state-free Android favourites widget with headless mark, deep links, and event-driven recovery. |
+| 2026-08-27 | 18.1 | Supplied device region to widget render and action first-open migration paths. |
