@@ -1,7 +1,7 @@
 # Contacts
 
 **Last updated:** 2026-08-24
-**Updated by phase:** 16-custom-field-value-normalization
+**Updated by phase:** 17-backup-export-restore
 **Owners:** `src/db/contacts-dao.ts`, `src/db/contact-read.ts`, `src/db/favourites-dao.ts`, `src/db/profile-dao.ts`, `src/db/contact-links-dao.ts`, `src/db/purge-dao.ts`, `src/db/recency-dao.ts`
 
 ## Purpose
@@ -98,6 +98,12 @@ All data is on-device SQLite. Migration 001 uses a surrogate `contacts.id` and a
 3. Restore clears the marker only when the contact is archived and records a matching restore event. Purge first verifies the archived state inside its write transaction, then explicitly deletes interactions, events, fuel, normalized custom-value pairs, links, field history, and the contact.
 4. Photo-file and notification cleanup are idempotent best-effort post-commit extensions registered by their owning systems.
 
+### Reconciling portable contact data
+
+1. Backup reconciliation identifies contacts and seeded categories by stable UID, never by a device-local integer primary key.
+2. A winning contact tombstone removes mergeable children in the same transaction; an equal timestamp favors deletion.
+3. Restore writes surviving contact rows before children, maps category UIDs back to local IDs, and recomputes `last_contact` from interactions rather than importing a cached summary.
+
 ### Managing contact and self photos
 
 1. The edit form holds a contact photo separately from unsaved fixed-field edits and refreshes it on focus without reseeding the form.
@@ -165,6 +171,8 @@ All data is on-device SQLite. Migration 001 uses a surrogate `contacts.id` and a
 - **ADR-043:** Static Globally Mirrored Favourites Widget — reuses one guarded favourite-rank list for every widget instance.
 - **ADR-045:** Event-Driven Widget Refresh and Boot Recovery — refreshes the widget after committed contact-visible changes.
 - **ADR-052:** Compose-Owned AI Draft Lifecycle and Acknowledged Egress — adds a configured-provider profile entry while retaining the contact-write boundary.
+- **ADR-056:** Tombstone-Backed UID Reconciliation for Portable Restores — governs deletion evidence, seeded identities, and UID merge behavior.
+- **ADR-057:** Full-State Versioned Backups with Verified Manual and Foreground SAF Snapshots — exports contact state through the portable manifest.
 
 ## Gotchas
 
@@ -184,6 +192,8 @@ All data is on-device SQLite. Migration 001 uses a surrogate `contacts.id` and a
 14. **Publish widget refresh only after a successful mutation.** A failed favourite rewrite, archive, restore, or metadata save must not advertise a state that SQLite did not commit.
 15. **The AI profile entry is not a contact action.** It routes serializable identity only; Compose may generate an editable draft but must not record recency or a touchpoint.
 16. **Use `createContactFull()` for production creation.** It is the path that seeds the complete custom-field pair matrix; the exported recency test helper writes no custom values.
+17. **A hard delete must write its tombstone first.** Purge captures every mergeable child UID in its existing transaction; transient `field_history` remains excluded.
+18. **`last_contact` is derived.** Restore recomputes it from interactions and never lets an imported summary win a reconciliation decision.
 
 ## Related Systems
 
@@ -197,6 +207,7 @@ All data is on-device SQLite. Migration 001 uses a surrogate `contacts.id` and a
 - **Notifications** — derives decay eligibility from contact state and owns the OS schedule.
 - **Widget** — mirrors favourite rank and contact-visible fields without storing another configuration record.
 - **AI suggestions** — receives a profile-originated Compose intent but has no contact-write authority.
+- **Backup & Restore** — exports UID-bearing contact state and restores it through tombstone-aware reconciliation.
 
 ## Changelog
 
@@ -213,3 +224,4 @@ All data is on-device SQLite. Migration 001 uses a surrogate `contacts.id` and a
 | 2026-08-16 | 12 | Published widget refreshes after committed favourite and contact-visible mutations. |
 | 2026-08-18 | 14 | Added the configured-provider profile entry for a Compose-owned AI draft without contact-side effects. |
 | 2026-08-24 | 16 | Seeded normalized custom-field pairs on create and deleted them explicitly on purge. |
+| 2026-08-24 | 17 | Added tombstone-aware purge and UID-based portable restore behavior. |
