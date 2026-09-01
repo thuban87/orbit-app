@@ -1,7 +1,7 @@
 # App Shell
 
-**Last updated:** 2026-08-14
-**Updated by phase:** 04-contact-crud-lifecycle
+**Last updated:** 2026-08-15
+**Updated by phase:** 05-photos
 **Owners:** `App.tsx`, `src/navigation/RootNavigator.tsx`, `src/navigation/types.ts`, `src/screens/SettingsScreen.tsx`, `src/theme/theme-types.ts`, `src/theme/theme-presets.ts`
 
 ## Purpose
@@ -19,22 +19,22 @@ _None._ The shell owns runtime navigation and theme contracts, not durable appli
 | Layer | File | Responsibility |
 |-------|------|----------------|
 | Bootstrap | `App.tsx` | Opens and migrates SQLite before mounting the navigator inside theme and safe-area providers. |
-| Navigator | `src/navigation/RootNavigator.tsx` | Registers the Phase-4 native-stack routes with custom headers. |
-| Route types | `src/navigation/types.ts` | Defines route parameters for profile and edit contact screens. |
-| Settings surface | `src/screens/SettingsScreen.tsx` | Hosts low-traffic Custom Fields and Archived contacts routes. |
-| Theme contract | `src/theme/theme-types.ts`, `src/theme/theme-presets.ts` | Defines named tokens, including destructive `danger`, and their sole palette values. |
+| Navigator | `src/navigation/RootNavigator.tsx` | Registers native-stack routes, including the modal crop surface, with custom headers. |
+| Route types | `src/navigation/types.ts` | Defines serializable parameters for profile, edit, and crop routes. |
+| Settings surface | `src/screens/SettingsScreen.tsx` | Hosts low-traffic lifecycle routes and the self-photo surface. |
+| Theme contract | `src/theme/theme-types.ts`, `src/theme/theme-presets.ts` | Defines named tokens, including destructive and avatar-swatch tokens, and their sole palette values. |
 
 ### Key Files
 
 | File | Role |
 |---|---|
-| `App.tsx` | Readiness gate and `NavigationContainer` mount point. |
-| `src/navigation/RootNavigator.tsx` | Native stack for Home, Settings, Custom Fields, Create, Profile, Edit, and Archived. |
-| `src/navigation/types.ts` | Typed root-stack route contract. |
+| `App.tsx` | Readiness gate, navigation mount point, gesture root, and photo reconciliation registration. |
+| `src/navigation/RootNavigator.tsx` | Native stack for Home, Settings, Custom Fields, Create, Profile, Edit, Archived, and CropPhoto. |
+| `src/navigation/types.ts` | Typed root-stack route contract, including serializable photo crop targets. |
 | `src/screens/HomeScreen.tsx` | Navigates users into creation and Settings. |
-| `src/screens/SettingsScreen.tsx` | Provides the distinct settings home for low-traffic destinations. |
-| `src/theme/theme-types.ts` | Names the palette-token interface. |
-| `src/theme/theme-presets.ts` | Holds the only allowed color literals, including `danger`. |
+| `src/screens/SettingsScreen.tsx` | Provides the distinct settings home, including the self-photo entry. |
+| `src/theme/theme-types.ts` | Names palette tokens, including avatar swatches and foreground text. |
+| `src/theme/theme-presets.ts` | Holds the only allowed color literals, including avatar swatches. |
 
 ## How It Works
 
@@ -56,6 +56,12 @@ _None._ The shell owns runtime navigation and theme contracts, not durable appli
 2. The Archived contacts purge action uses `colors.danger`; native confirmation alerts use the platform destructive style.
 3. No screen contains a raw hex color because palette literals belong only in `theme-presets.ts`.
 
+### Editing a photo
+
+1. A contact, self, or custom-field source picker navigates to `CropPhoto` with a serializable target descriptor and optional request id.
+2. The crop screen uses the existing custom-header convention and returns through native stack Back behavior after persistence.
+3. Settings reloads the self record on focus; the contact edit surface reloads only photo state so unsaved form values survive the round trip.
+
 ## Configuration
 
 | Constant | Value | File | Purpose |
@@ -68,6 +74,8 @@ _None._ The shell owns runtime navigation and theme contracts, not durable appli
 - **ADR-006:** Theme-Token Architecture — all UI colors resolve through the theme contract.
 - **ADR-018:** Archive-Gated Contact Purge with Explicit Fan-Out — destructive controls use the dedicated danger token.
 - **ADR-019:** Native Stack Contact Lifecycle Navigation — replaces temporary Home-local routing with native-stack navigation.
+- **ADR-020:** Library-Only Photo Capture with Themed In-App Cropping and One-Time URL Download — adds the modal crop route and self-photo entry.
+- **ADR-022:** Tokenized Deterministic Initials Avatars — adds avatar fallback tokens to the theme contract.
 
 ## Gotchas
 
@@ -75,6 +83,7 @@ _None._ The shell owns runtime navigation and theme contracts, not durable appli
 2. **Do not enable native stack headers without removing screen-local chrome.** The Phase-4 screens already render their own Back/title pattern.
 3. **Navigation additions require an application rebuild.** Native-stack dependencies do not arrive through a JavaScript-only reload.
 4. **Use tokens, never raw color literals.** The color gate enforces this outside the theme preset boundary.
+5. **Crop navigation parameters must stay serializable.** The crop result uses a request id where a custom field needs a return signal; do not pass callbacks through navigation.
 
 ## Related Systems
 
@@ -86,3 +95,4 @@ _None._ The shell owns runtime navigation and theme contracts, not durable appli
 | Date | Phase | What Changed |
 |------|-------|--------------|
 | 2026-08-14 | 04 | Created ready-gated native-stack navigation, Settings routes, and the destructive theme token. |
+| 2026-08-15 | 05 | Added photo crop navigation, self-photo settings, avatar tokens, and launch-time photo reconciliation registration. |
