@@ -12,7 +12,7 @@
 
 // NOTE: ADR-0001 [ACCEPTED] Normalized Custom-Field Values
 // IMPORTANT: ADR-0002 [SUPERSEDED BY ADR-003 (partial)] Cross-Version Contact Import — Hybrid Two-Picker
-// NOTE: ADR-0003 [NONE] `READ_CONTACTS` on API 37+ for the Reconcile feature
+// NOTE: ADR-0003 [ACCEPTED] `READ_CONTACTS` on API 37+ for Reconcile
 // NOTE: ADR-0004 [ACCEPTED] Flat Single-App Repository
 // NOTE: ADR-0005 [ACCEPTED] AiService Port Omits the Local/LAN (Ollama) Provider
 // NOTE: ADR-0006 [ACCEPTED] Theme-Token Architecture
@@ -77,5 +77,7 @@
 // NOTE: ADR-0065 [ACCEPTED] Durable Resumable Contact-Import Sessions with Failure-Isolated Photos
 // NOTE: ADR-0066 [ACCEPTED] Deliberate Reviewed Import with Unbound Bulk Defaults
 // NOTE: ADR-0067 [ACCEPTED] Conservative Advisory Identity Matching and Explicit Source Consolidation
+// NOTE: ADR-0068 [ACCEPTED] User-Triggered, Source-Only Reconciliation with Durable Review
+// NOTE: ADR-0069 [ACCEPTED] Atomic Tombstone-Backed Orbit Contact Merge
 
-export const ADR_COUNT = 67;
+export const ADR_COUNT = 69;

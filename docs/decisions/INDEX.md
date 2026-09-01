@@ -22,7 +22,7 @@ not something you can pattern-match against.
 ## How to use this
 
 - **Is a decision still live?** Check the `Superseded by` column. 10 of
-  67 ADRs are superseded in whole or in part.
+  69 ADRs are superseded in whole or in part.
 - **Which decisions govern a file?** Don't grep this file — ask the graph:
   `npm run graph:ask -- governs src/db/field-values-dao.ts`, or follow the
   `governed_by` edges.
@@ -33,7 +33,7 @@ not something you can pattern-match against.
 |---|-------|--------|-------|------------|---------------|------------|-----------|-------------|
 | 001 | Normalized Custom-Field Values | Accepted | 16-custom-field-value-normalization | ADR-013; ADR-014 (partial); ADR-015 (partial) | — | — | 9 | `src/db`, `src/db/migrations` |
 | 002 | Cross-Version Contact Import — Hybrid Two-Picker | Accepted | 19.1-older-android-contact-picker-hybrid-two-picker-adr-002 | — | ADR-003 (partial) | — | 12 | `modules/orbit-contact-picker`, `modules/orbit-contact-picker/android/src/main`, `modules/orbit-contact-picker/android/src/main/java/expo/modules/orbitcontactpicker` +6 |
-| 003 | `READ_CONTACTS` on API 37+ for the Reconcile feature | — | — | — | — | — | — | — |
+| 003 | `READ_CONTACTS` on API 37+ for Reconcile | Accepted | 20-contact-reconciliation-merge | ADR-002 (partial) | — | — | 5 | `modules/orbit-contact-picker/android/src/main`, `plugins`, `src/screens` +1 |
 | 004 | Flat Single-App Repository | Accepted | 01-project-scaffold-portable-code | — | — | — | 1 | `src/db` |
 | 005 | AiService Port Omits the Local/LAN (Ollama) Provider | Accepted | 01-project-scaffold-portable-code | — | — | — | 3 | `src/services` |
 | 006 | Theme-Token Architecture | Accepted | 01-project-scaffold-portable-code | — | — | — | 7 | `scripts`, `src/screens`, `src/stores` +1 |
@@ -98,3 +98,5 @@ not something you can pattern-match against.
 | 065 | Durable Resumable Contact-Import Sessions with Failure-Isolated Photos | Accepted | 19-system-contact-import | — | — | — | 6 | `src/backup`, `src/db`, `src/db/migrations` +1 |
 | 066 | Deliberate Reviewed Import with Unbound Bulk Defaults | Accepted | 19-system-contact-import | — | — | — | 7 | `src/db`, `src/screens`, `src/services/import` |
 | 067 | Conservative Advisory Identity Matching and Explicit Source Consolidation | Accepted | 19-system-contact-import | — | — | — | 6 | `src/components`, `src/db`, `src/screens` +1 |
+| 068 | User-Triggered, Source-Only Reconciliation with Durable Review | Accepted | 20-contact-reconciliation-merge | — | — | — | 8 | `src/db`, `src/db/migrations`, `src/logic` +2 |
+| 069 | Atomic Tombstone-Backed Orbit Contact Merge | Accepted | 20-contact-reconciliation-merge | — | — | — | 7 | `src/components`, `src/db`, `src/db/migrations` +1 |
