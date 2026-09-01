@@ -4,7 +4,7 @@
 
 Orbit evolves its on-device SQLite schema with ordered TypeScript migrations rather than SQL files or a remote database. Use this process when changing durable SQLite structure: it keeps one version step atomic, testable with node-side SQLite, and safe to retry after a failure.
 
-## Architecture (Phase 02)
+## Architecture (Phases 02, 11)
 
 The bootstrap opens `orbit.db`, sets connection PRAGMAs before opening a transaction, then calls the migration runner. The runner reads `PRAGMA user_version`, sorts pending steps, and commits each step's DDL and version bump together.
 
@@ -31,7 +31,8 @@ try {
 1. **`src/db/database.ts`** — opens the database and sets WAL, foreign keys, and busy timeout.
 2. **`src/db/migrations/runner.ts`** — discovers and applies pending numbered steps.
 3. **`src/db/migrations/001-initial.ts`** — defines the phase-2 initial schema and seeds.
-4. **`PRAGMA user_version`** — records the last fully committed step.
+4. **`src/db/migrations/002-app-settings.ts`** — additive singleton-settings example: DDL and seed remain in the same version step.
+5. **`PRAGMA user_version`** — records the last fully committed step.
 
 ## File Locations
 
@@ -43,6 +44,8 @@ try {
 | `src/db/migrations/runner.ts` | Forward-only atomic migration runner. |
 | `src/db/migrations/001-initial.ts` | Initial schema migration example. |
 | `src/db/migrations/001-initial.test.ts` | Node-side schema, seed, and cascade verification. |
+| `src/db/migrations/002-app-settings.ts` | Additive, defaulted singleton-table migration example. |
+| `src/db/app-settings-dao.test.ts` | Migration-002 defaults and validated settings-write coverage. |
 | `src/db/__testkit__/node-sqlite.ts` | In-memory SQLite adapter for migration tests. |
 
 ## How to Add a SQLite Migration
@@ -93,10 +96,10 @@ try {
 ## Smoke Test
 
 ```bash
-npx vitest run src/db/migrations/runner.test.ts src/db/migrations/001-initial.test.ts
+npx vitest run src/db/migrations/runner.test.ts src/db/migrations/001-initial.test.ts src/db/app-settings-dao.test.ts
 ```
 
-Expected: the runner and initial-schema suites pass, including rollback, seed, and foreign-key-cascade assertions.
+Expected: the runner, initial-schema, and migration-002 settings suites pass, including rollback, seed, foreign-key-cascade, and additive-default assertions.
 
 ```bash
 npx tsc --noEmit && npx biome check src/db
