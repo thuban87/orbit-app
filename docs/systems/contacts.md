@@ -62,6 +62,7 @@ _None._
 ## Decisions
 
 - **ADR-008:** Initial Contact Schema as a Cross-Phase Data Contract — establishes contact identity, categories, profile, and durable fixed fields.
+- **ADR-009:** Crash-Safe Forward-Only SQLite Migrations — commits the initial contacts schema atomically.
 - **ADR-010:** Single-Writer Interaction Recency Spine — makes recency a serialized materialization of the interaction log.
 
 ## Gotchas
