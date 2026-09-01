@@ -22,7 +22,7 @@ not something you can pattern-match against.
 ## How to use this
 
 - **Is a decision still live?** Check the `Superseded by` column. 2 of
-  41 ADRs are superseded in whole or in part.
+  45 ADRs are superseded in whole or in part.
 - **Which decisions govern a file?** Don't grep this file — ask the graph:
   `npm run graph:ask -- governs src/db/field-values-dao.ts`, or follow the
   `governed_by` edges.
@@ -72,3 +72,7 @@ not something you can pattern-match against.
 | 039 | Pre-Scheduled Inexact Decay Reminders | Accepted | 11-actionable-notifications | ADR-029 (partial) | — | — | 5 | `src/db`, `src/services/notifications` |
 | 040 | Exactly-Once Notification Actions and Dashboard-Rooted Tap Routing | Accepted | 11-actionable-notifications | — | — | — | 6 | `src/db`, `src/navigation`, `src/services/notifications` |
 | 041 | Notification Settings, Privacy Channels, and Birthday Alerts | Accepted | 11-actionable-notifications | — | — | — | 6 | `src/db`, `src/db/migrations`, `src/screens` +1 |
+| 042 | Shared Status Palette for Dashboard and Widget Rings | Accepted | 12-home-screen-widget | — | — | — | 5 | `src/components`, `src/services/widget`, `src/theme` |
+| 043 | Static Globally Mirrored Favourites Widget | Accepted | 12-home-screen-widget | — | — | — | 4 | `src/db`, `src/screens`, `src/services/widget` |
+| 044 | Headless Widget Actions and Dashboard-Rooted Deep Links | Accepted | 12-home-screen-widget | — | — | — | 4 | `src/navigation`, `src/services/widget` |
+| 045 | Event-Driven Widget Refresh and Boot Recovery | Accepted | 12-home-screen-widget | — | — | — | 4 | `plugins`, `src/services/notifications`, `src/services/widget` |

@@ -51,5 +51,9 @@
 // NOTE: ADR-0039 [ACCEPTED] Pre-Scheduled Inexact Decay Reminders
 // NOTE: ADR-0040 [ACCEPTED] Exactly-Once Notification Actions and Dashboard-Rooted Tap Routing
 // NOTE: ADR-0041 [ACCEPTED] Notification Settings, Privacy Channels, and Birthday Alerts
+// NOTE: ADR-0042 [ACCEPTED] Shared Status Palette for Dashboard and Widget Rings
+// NOTE: ADR-0043 [ACCEPTED] Static Globally Mirrored Favourites Widget
+// NOTE: ADR-0044 [ACCEPTED] Headless Widget Actions and Dashboard-Rooted Deep Links
+// NOTE: ADR-0045 [ACCEPTED] Event-Driven Widget Refresh and Boot Recovery
 
-export const ADR_COUNT = 41;
+export const ADR_COUNT = 45;
