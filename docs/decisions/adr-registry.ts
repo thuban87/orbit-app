@@ -73,5 +73,9 @@
 // NOTE: ADR-0061 [ACCEPTED] DAO-Selected Actionable Primary SMS Handoff
 // NOTE: ADR-0062 [ACCEPTED] Bound/Unbound Lifecycle and One-Way Cadence Assignment
 // NOTE: ADR-0063 [ACCEPTED] Versioned Lifecycle Backup and Dormant-Cadence Restore
+// NOTE: ADR-0064 [ACCEPTED] Permissionless Android 17 System-Contact Snapshot Acquisition
+// NOTE: ADR-0065 [ACCEPTED] Durable Resumable Contact-Import Sessions with Failure-Isolated Photos
+// NOTE: ADR-0066 [ACCEPTED] Deliberate Reviewed Import with Unbound Bulk Defaults
+// NOTE: ADR-0067 [ACCEPTED] Conservative Advisory Identity Matching and Explicit Source Consolidation
 
-export const ADR_COUNT = 63;
+export const ADR_COUNT = 67;

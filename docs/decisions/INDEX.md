@@ -22,7 +22,7 @@ not something you can pattern-match against.
 ## How to use this
 
 - **Is a decision still live?** Check the `Superseded by` column. 9 of
-  63 ADRs are superseded in whole or in part.
+  67 ADRs are superseded in whole or in part.
 - **Which decisions govern a file?** Don't grep this file — ask the graph:
   `npm run graph:ask -- governs src/db/field-values-dao.ts`, or follow the
   `governed_by` edges.
@@ -94,3 +94,7 @@ not something you can pattern-match against.
 | 061 | DAO-Selected Actionable Primary SMS Handoff | Accepted | 18.1-contact-method-normalization | ADR-035 (partial) | — | — | 5 | `src/db`, `src/logic`, `src/screens` |
 | 062 | Bound/Unbound Lifecycle and One-Way Cadence Assignment | Accepted | 18.2-bound-unbound-lifecycle | — | — | — | 7 | `src/db`, `src/db/migrations`, `src/services` +1 |
 | 063 | Versioned Lifecycle Backup and Dormant-Cadence Restore | Accepted | 18.2-bound-unbound-lifecycle | ADR-060 (partial) | — | — | 5 | `src/backup`, `src/db/migrations` |
+| 064 | Permissionless Android 17 System-Contact Snapshot Acquisition | Accepted | 19-system-contact-import | — | — | — | 4 | `modules/orbit-contact-picker`, `modules/orbit-contact-picker/android/src/main`, `modules/orbit-contact-picker/android/src/main/java/expo/modules/orbitcontactpicker` +1 |
+| 065 | Durable Resumable Contact-Import Sessions with Failure-Isolated Photos | Accepted | 19-system-contact-import | — | — | — | 6 | `src/backup`, `src/db`, `src/db/migrations` +1 |
+| 066 | Deliberate Reviewed Import with Unbound Bulk Defaults | Accepted | 19-system-contact-import | — | — | — | 7 | `src/db`, `src/screens`, `src/services/import` |
+| 067 | Conservative Advisory Identity Matching and Explicit Source Consolidation | Accepted | 19-system-contact-import | — | — | — | 6 | `src/components`, `src/db`, `src/screens` +1 |
