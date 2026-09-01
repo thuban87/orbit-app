@@ -1,7 +1,7 @@
 # Capture
 
 **Last updated:** 2026-08-16
-**Updated by phase:** 10-share-sheet-capture
+**Updated by phase:** 12-home-screen-widget
 **Owners:** `src/db/capture-read.ts`, `src/db/capture-dao.ts`, `src/logic/capture-logic.ts`, `src/screens/CaptureScreen.tsx`
 
 ## Purpose
@@ -76,6 +76,7 @@ Capture owns no table or migration. It composes existing local SQLite data: `con
 2. `captureMultiNote` applies the same note atomically to every selected row; the single-row path uses the scoped fuel editor.
 3. The New contact tile uses the existing name-only contact create path with no first interaction, then writes the captured fuel row to the new never-contacted contact.
 4. Confirmation uses a short timeout before the native finish bridge returns to the app that shared the content.
+5. Each successful capture fuel write publishes a best-effort Widget refresh after the transaction, without changing the no-touchpoint rule.
 
 ## Configuration
 
@@ -88,6 +89,7 @@ Capture owns no table or migration. It composes existing local SQLite data: `con
 
 - **ADR-037:** Text-Only Android Share Intent Integration — keeps the native filter, title patch, ready gate, and return path explicit.
 - **ADR-038:** Contact-Owned Share Capture Fuel — preserves non-null ownership, canonical URLs, immediate fuel writes, and no-touchpoint semantics.
+- **ADR-045:** Event-Driven Widget Refresh and Boot Recovery — refreshes a larger widget fuel line after capture commits.
 
 ## Gotchas
 
@@ -96,15 +98,18 @@ Capture owns no table or migration. It composes existing local SQLite data: `con
 3. **Do not nest the write mutex.** Multi-attach and multi-note compose non-mutexed fuel cores inside one outer transaction.
 4. **Keep URLs canonical and separate.** Notes and editable display text must never overwrite `fuel.url`.
 5. **Rebuild and device-test native changes.** The manifest filter, Kotlin title patch, and finish bridge are invisible to a Metro reload; the optional-note controls can be obscured by the soft keyboard and remain a deferred polish item.
+6. **Publish widget freshness only after capture succeeds.** A cancelled or failed capture must not trigger a misleading refresh.
 
 ## Related Systems
 
 - **Conversational fuel** — owns the durable rows and ranked projections capture composes.
 - **Contacts** — supplies picker targets and the name-only, never-contacted creation path.
 - **App shell** — preserves the migration gate and hosts the ready-gated Capture route.
+- **Widget** — can show the newly eligible captured fuel line on a larger favourite tile.
 
 ## Changelog
 
 | Date | Phase | What Changed |
 |---|---|---|
 | 2026-08-16 | 10 | Created Android share-sheet capture with local contact selection and fuel writes. |
+| 2026-08-16 | 12 | Added post-capture widget refresh publishing. |
