@@ -1,7 +1,7 @@
 # Dashboard
 
-**Last updated:** 2026-08-23
-**Updated by phase:** 15-weekly-digest
+**Last updated:** 2026-08-24
+**Updated by phase:** 17-backup-export-restore
 **Owners:** `src/db/dashboard-read.ts`, `src/screens/HomeScreen.tsx`, `src/screens/NeverContactedScreen.tsx`, `src/components/ContactCard.tsx`, `src/components/BirthdayBanner.tsx`, `src/stores/dashboard-prefs-store.ts`
 
 ## Purpose
@@ -82,6 +82,12 @@ The dashboard owns no tables. It projects the on-device `contacts`, `categories`
 2. The action navigates to the typed Digest route, which performs its own live retrospective and overlooked-population reads on focus.
 3. The dashboard remains the always-current work surface; the digest is a separate retrospective and does not duplicate the decay or snoozed populations.
 
+### Opening Backup & Restore
+
+1. Home exposes a temporary Backup & Restore entry alongside its existing destination controls; the phase does not imply or add a navigation bar.
+2. A rare dismissible nudge appears only when meaningful data has no verified automatic backup, or changed data has remained unprotected for at least fourteen days.
+3. The nudge opens Backup & Restore and clears its dismissal only after the health condition resolves; it is never a permanent dashboard card.
+
 ### Showing birthdays and empty states
 
 1. `BirthdayBanner` receives every non-archived birthday candidate, including snoozed and never-contacted people.
@@ -108,6 +114,8 @@ The dashboard owns no tables. It projects the on-device `contacts`, `categories`
 - **ADR-043:** Static Globally Mirrored Favourites Widget — reuses the ranked favourites projection without altering it.
 - **ADR-048:** Status-Default Static Orrery with a Single-Canvas Morph — adds the dashboard-reached relationship-map entry without displacing Home.
 - **ADR-054:** Live Weekly Digest Retrospective and Overlooked Relationship Read — adds the separate, non-scoreboard weekly-retrospective entry.
+- **ADR-057:** Full-State Versioned Backups with Verified Manual and Foreground SAF Snapshots — defines automatic-backup health used by the temporary entry and nudge.
+- **ADR-058:** Optional Encrypted Backups and Previewed Local Restoration — keeps the dashboard out of backup contents and restore results.
 
 ## Gotchas
 
@@ -120,6 +128,8 @@ The dashboard owns no tables. It projects the on-device `contacts`, `categories`
 7. **Keep the widget projection rank- and null-status-preserving.** Re-sorting favourites or treating a null status as stable moves a no-undo mark target or misstates contact history.
 8. **Keep the dashboard as the primary interface.** The Orbit button opens a glanceable map; it must not become a duplicate dashboard filter or a second status query owner.
 9. **Keep the digest distinct from the due list.** “Your week” is a navigation entry to a separate live retrospective; do not add its count, overlooked groups, or a badge to Home.
+10. **Do not call a manual export healthy.** Dashboard health derives only from a verified automatic SAF snapshot and matching data revision.
+11. **Keep the backup nudge rare.** It is a recovery prompt for meaningful unprotected data, not a status card or recurring dashboard obligation.
 
 ## Related Systems
 
@@ -131,6 +141,7 @@ The dashboard owns no tables. It projects the on-device `contacts`, `categories`
 - **Widget** — reads the favourites projection as its state-free home-screen view.
 - **Orrery** — opens from the header and independently reads the local contacted-relationship projection.
 - **Digest** — opens from the header and independently reads a weekly retrospective plus non-nagged overlooked populations.
+- **Backup & Restore** — owns the health state, automatic-folder configuration, export, and restore flows reached from Home.
 
 ## Changelog
 
@@ -141,3 +152,4 @@ The dashboard owns no tables. It projects the on-device `contacts`, `categories`
 | 2026-08-16 | 12 | Added shared status rings and documented the widget's rank-preserving favourites projection. |
 | 2026-08-17 | 13 | Added the dashboard header entry to the status-default Orrery. |
 | 2026-08-23 | 15 | Added the non-badged “Your week” entry to the separate live digest surface. |
+| 2026-08-24 | 17 | Added a temporary Backup & Restore entry and rare health-driven protection nudge. |
