@@ -1,7 +1,7 @@
 # Conversational Fuel
 
-**Last updated:** 2026-08-16
-**Updated by phase:** 12-home-screen-widget
+**Last updated:** 2026-08-24
+**Updated by phase:** 17-backup-export-restore
 **Owners:** `src/db/fuel-dao.ts`, `src/db/fuel-read.ts`, `src/services/fuel-ranking.ts`, `src/services/fuel-age.ts`
 
 ## Purpose
@@ -91,6 +91,11 @@ Fuel uses the on-device SQLite table established empty in migration 1 and activa
 3. An optional note updates text only as `note — base`; a multi-contact note uses the atomic capture composer so `url` and `created_at` remain unchanged.
 4. None of these writes advances `last_contact` or creates an interaction.
 
+### Reconciling portable fuel
+
+1. A hard delete reads the fuel UID, records a `fuel` tombstone, then removes the row inside the existing write transaction.
+2. Backup exports surviving fuel rows and deletion evidence; restore applies a row only when its contact survives UID reconciliation.
+
 ## Configuration
 
 | Constant | Value | File | Purpose |
@@ -113,6 +118,8 @@ Fuel uses the on-device SQLite table established empty in migration 1 and activa
 - **ADR-038:** Contact-Owned Share Capture Fuel — makes capture immediate, contact-owned topic fuel while preserving canonical URLs and status integrity.
 - **ADR-043:** Static Globally Mirrored Favourites Widget — reuses the existing eligible fuel projection in its larger layout.
 - **ADR-045:** Event-Driven Widget Refresh and Boot Recovery — publishes a refresh after widget-visible fuel mutations.
+- **ADR-056:** Tombstone-Backed UID Reconciliation for Portable Restores — prevents an older snapshot from resurrecting deleted fuel.
+- **ADR-057:** Full-State Versioned Backups with Verified Manual and Foreground SAF Snapshots — carries fuel in the complete portable manifest.
 
 ## Gotchas
 
@@ -124,6 +131,7 @@ Fuel uses the on-device SQLite table established empty in migration 1 and activa
 6. **Reuse the exported SQL fragments.** Dashboard projections must consume the shared exclusions and rank CASE rather than copy fuel eligibility logic.
 7. **Capture is not a touchpoint.** Do not route a shared item through a recency or interaction writer; it is fuel even when filed for a never-contacted person.
 8. **Do not create a widget-specific fuel reader.** The larger tile must retain the existing in-query eligibility exclusions and ranked projection.
+9. **Delete with durable evidence.** A missing or failed fuel target must not leave a false tombstone; capture, tombstone, and delete share one transaction.
 
 ## Related Systems
 
@@ -132,6 +140,7 @@ Fuel uses the on-device SQLite table established empty in migration 1 and activa
 - **Dashboard** — owns the live name-plus-fuel search surface and card preview.
 - **Capture** — writes contact-owned `share` fuel and uses its timestamp for capture-MRU ordering.
 - **Widget** — shows the existing eligible ranked line only on its larger layout.
+- **Backup & Restore** — exports fuel and reconciles it through its owning contact UID.
 
 ## Changelog
 
@@ -141,3 +150,4 @@ Fuel uses the on-device SQLite table established empty in migration 1 and activa
 | 2026-08-15 | 08 | Reused the eligible ranked projection for dashboard cards and moved local search to the dashboard. |
 | 2026-08-16 | 10 | Added immediate share capture, canonical URL preservation, and atomic multi-contact fuel writes. |
 | 2026-08-16 | 12 | Added larger-widget fuel consumption and post-mutation refresh publishing. |
+| 2026-08-24 | 17 | Added merge-safe fuel deletion evidence and portable reconciliation. |
