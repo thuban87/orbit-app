@@ -1,7 +1,7 @@
 # App Shell
 
-**Last updated:** 2026-08-15
-**Updated by phase:** 08-dashboard-never-contacted-screen
+**Last updated:** 2026-08-16
+**Updated by phase:** 09-compose-screen-sms-handoff
 **Owners:** `App.tsx`, `src/navigation/RootNavigator.tsx`, `src/navigation/types.ts`, `src/screens/SettingsScreen.tsx`, `src/theme/theme-types.ts`, `src/theme/theme-presets.ts`
 
 ## Purpose
@@ -19,8 +19,8 @@ _None._ The shell owns runtime navigation and theme contracts, not durable appli
 | Layer | File | Responsibility |
 |-------|------|----------------|
 | Bootstrap | `App.tsx` | Opens and migrates SQLite before mounting the navigator inside theme and safe-area providers. |
-| Navigator | `src/navigation/RootNavigator.tsx` | Registers native-stack routes, including dashboard sibling lists, management, and modal crop surfaces, with custom headers. |
-| Route types | `src/navigation/types.ts` | Defines serializable parameters for profile, edit, and crop routes. |
+| Navigator | `src/navigation/RootNavigator.tsx` | Registers native-stack routes, including dashboard sibling lists, management, modal crop, and Compose surfaces, with custom headers. |
+| Route types | `src/navigation/types.ts` | Defines serializable parameters for profile, edit, crop, and self-fetching Compose routes. |
 | Settings surface | `src/screens/SettingsScreen.tsx` | Hosts low-traffic lifecycle routes, self-photo, and the Manage favourites entry. |
 | Theme contract | `src/theme/theme-types.ts`, `src/theme/theme-presets.ts` | Defines named tokens, including destructive, avatar-swatch, rogue-status, and gravity-tier tokens, and their sole palette values. |
 
@@ -29,8 +29,8 @@ _None._ The shell owns runtime navigation and theme contracts, not durable appli
 | File | Role |
 |---|---|
 | `App.tsx` | Readiness gate, navigation mount point, gesture root, and photo reconciliation registration. |
-| `src/navigation/RootNavigator.tsx` | Native stack for the dashboard Home, Settings, contact lifecycle, NeverContacted, ManageFavourites, and CropPhoto. |
-| `src/navigation/types.ts` | Typed root-stack route contract, including serializable photo crop targets and dashboard sibling routes. |
+| `src/navigation/RootNavigator.tsx` | Native stack for the dashboard Home, Settings, contact lifecycle, Compose, NeverContacted, ManageFavourites, and CropPhoto. |
+| `src/navigation/types.ts` | Typed root-stack route contract, including serializable Compose and photo-crop targets plus dashboard sibling routes. |
 | `src/screens/HomeScreen.tsx` | Provides the dashboard Home and its destination entries. |
 | `src/screens/SettingsScreen.tsx` | Provides the distinct settings home, including self-photo and Manage favourites entries. |
 | `src/theme/theme-types.ts` | Names palette tokens, including avatar swatches, rogue status, gravity tiers, and foreground text. |
@@ -49,6 +49,11 @@ _None._ The shell owns runtime navigation and theme contracts, not durable appli
 1. Home is the dashboard and navigates to contact profiles, creation, Not yet contacted, Archived, Settings, and favourite management.
 2. Settings exposes Custom Fields, Archived contacts, and Manage favourites as separate, low-traffic rows.
 3. Every stack screen renders its own themed chrome because native-stack headers are disabled; no duplicate native header appears above screen-local Back controls.
+
+### Composing from a contact
+
+1. A profile opens `Compose` with the serializable `{ contactId }` route parameter; the screen fetches its own current data rather than receiving callbacks or preloaded state.
+2. Compose resets both software and Android hardware Back to the Home dashboard, so the destination is stable for present and later entry points.
 
 ### Applying destructive emphasis
 
@@ -91,6 +96,7 @@ _None._ The shell owns runtime navigation and theme contracts, not durable appli
 - **ADR-032:** Flat Dashboard Discovery and In-Query Contact Search — moves search into Home and adds the dashboard's sibling list route.
 - **ADR-033:** Profile Marking and Shared Drag-Reordered Favourites — adds the shared Manage favourites route and entry points.
 - **ADR-034:** Birthday Banner and Re-query Dashboard Freshness — mounts the birthday and reliable refresh paths in Home.
+- **ADR-036:** Entry-Agnostic Compose Navigation and Transmittable-Fuel Guardrails — adds the serializable Compose route and Home-reset Back behavior.
 
 ## Gotchas
 
@@ -101,12 +107,14 @@ _None._ The shell owns runtime navigation and theme contracts, not durable appli
 5. **Crop navigation parameters must stay serializable.** The crop result uses a request id where a custom field needs a return signal; do not pass callbacks through navigation.
 6. **Keep gravity tokens and tiers in lockstep.** The ordered palette ramp has one entry per gravity tier; changing one without the other can miscolor or crash profile presentation.
 7. **Keep search ownership in the dashboard.** The reusable reader and result-row pattern survive the retired FuelSearch route, but Settings must not add a duplicate search surface.
+8. **Compose Back is intentionally not a stack pop.** Both Back paths reset to Home so callers need not provide a profile or other origin route.
 
 ## Related Systems
 
 - **Contacts** — supplies the create, profile, edit, and archived routes.
 - **Custom fields** — is reached through Settings rather than Home-local route state.
 - **Dashboard** — is the Home route and owns daily discovery/search navigation.
+- **Contact methods** — registers the self-fetching Compose surface in the stack.
 
 ## Changelog
 
@@ -117,3 +125,4 @@ _None._ The shell owns runtime navigation and theme contracts, not durable appli
 | 2026-08-15 | 06 | Added dedicated rogue-status and gravity-tier theme tokens for profile relationship feedback. |
 | 2026-08-15 | 07 | Added the Settings-reached FuelSearch route and reusable search result surface. |
 | 2026-08-15 | 08 | Made the dashboard Home, added first-contact and favourite-management routes, and relocated search from Settings. |
+| 2026-08-16 | 09 | Added the serializable Compose route and dashboard-reset Back behavior. |
