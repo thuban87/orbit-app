@@ -130,6 +130,7 @@ _None._ The shell owns runtime navigation and theme contracts, not durable appli
 - **ADR-040:** Exactly-Once Notification Actions and Dashboard-Rooted Tap Routing — adds the response gate and deterministic notification destinations.
 - **ADR-041:** Notification Settings, Privacy Channels, and Birthday Alerts — requires channels and categories before the first scheduler run.
 - **ADR-042:** Shared Status Palette for Dashboard and Widget Rings — extends the token contract with the shared relationship-status colours.
+- **ADR-043:** Static Globally Mirrored Favourites Widget — registers the state-free provider and its Settings entry.
 - **ADR-044:** Headless Widget Actions and Dashboard-Rooted Deep Links — adds a single-owner, ready-gated widget URI bridge.
 - **ADR-045:** Event-Driven Widget Refresh and Boot Recovery — registers foreground refresh without polling.
 
