@@ -1,0 +1,40 @@
+# ADR Index
+
+**GENERATED FILE — DO NOT EDIT.** Regenerate with `npm run gen:adr-index`.
+
+Source of truth: the individual `ADR-NNN-*.md` files. This index is *derived*. If a row
+here disagrees with the underlying ADR, **the ADR wins** — do not "fix" the row, fix the
+generator.
+
+## Do not machine-read this file
+
+An earlier version of this index (on the owner's other project) carried a hand-written
+"Key file globs" column. It was a lossy summary: one ADR's four exact files were recorded
+as `src/components/**/*.tsx` — the whole component tree. Anything that consumed that
+column concluded every store was governed by the same 71 ADRs.
+
+**The ADR bodies' `**Key files:**` blocks are the contract.** They are what
+`scripts/synthesize-adr-edges.ts` turns into the graph's `code -> ADR` edges, and what
+`npm run audit:adr-key-files` validates. This file is a human navigation aid — nothing
+more. The "Key files" column below is a *count* and the real directories, deliberately
+not something you can pattern-match against.
+
+## How to use this
+
+- **Is a decision still live?** Check the `Superseded by` column. 0 of
+  7 ADRs are superseded in whole or in part.
+- **Which decisions govern a file?** Don't grep this file — ask the graph:
+  `npm run graph:ask -- governs src/db/field-values-dao.ts`, or follow the
+  `governed_by` edges.
+
+## Index
+
+| # | Title | Status | Phase | Supersedes | Superseded by | Subsystems | Key files | Directories |
+|---|-------|--------|-------|------------|---------------|------------|-----------|-------------|
+| 001 | Normalize Custom-Field Values | — | — | — | — | — | — | — |
+| 002 | Cross-Version Contact Import — Hybrid Two-Picker | — | — | — | — | — | — | — |
+| 003 | `READ_CONTACTS` on API 37+ for the Reconcile feature | — | — | — | — | — | — | — |
+| 004 | Flat Single-App Repository | Accepted | 01-project-scaffold-portable-code | — | — | — | 1 | `src/db` |
+| 005 | AiService Port Omits the Local/LAN (Ollama) Provider | Accepted | 01-project-scaffold-portable-code | — | — | — | 3 | `src/services` |
+| 006 | Theme-Token Architecture | Accepted | 01-project-scaffold-portable-code | — | — | — | 7 | `scripts`, `src/screens`, `src/stores` +1 |
+| 007 | Cross-Machine Android Build Pipeline & Physical-Pixel FND-01 Proof | Accepted | 01-project-scaffold-portable-code | — | — | — | 3 | `docs/runbooks`, `src/constants` |
