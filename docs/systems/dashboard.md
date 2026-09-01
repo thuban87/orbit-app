@@ -1,7 +1,7 @@
 # Dashboard
 
-**Last updated:** 2026-08-24
-**Updated by phase:** 17-backup-export-restore
+**Last updated:** 2026-08-27
+**Updated by phase:** 18.2-bound-unbound-lifecycle
 **Owners:** `src/db/dashboard-read.ts`, `src/screens/HomeScreen.tsx`, `src/screens/NeverContactedScreen.tsx`, `src/components/ContactCard.tsx`, `src/components/BirthdayBanner.tsx`, `src/stores/dashboard-prefs-store.ts`
 
 ## Purpose
@@ -94,6 +94,10 @@ The dashboard owns no tables. It projects the on-device `contacts`, `categories`
 2. `daysUntilBirthday()` validates the stored value, compares local midnights, and explicitly observes February 29 on February 28 in non-leap years.
 3. `selectDashboardEmptyState()` gives search and active-filter empties precedence before distinguishing a truly empty database from hidden populations.
 
+### Handling Bound and Unbound contacts
+
+The active dashboard and favourites reads select only Bound contacts. Search remains a retrieval path: an Unbound match carries lifecycle state with NULL status, progress, and favourite rank so the row renders neutrally. The counted Unbound entry opens its dedicated alphabetical list; Never Contacted includes Unbound people only when the persisted opt-in is enabled.
+
 ## Configuration
 
 | Constant | Value | File | Purpose |
@@ -116,6 +120,7 @@ The dashboard owns no tables. It projects the on-device `contacts`, `categories`
 - **ADR-054:** Live Weekly Digest Retrospective and Overlooked Relationship Read — adds the separate, non-scoreboard weekly-retrospective entry.
 - **ADR-057:** Full-State Versioned Backups with Verified Manual and Foreground SAF Snapshots — defines automatic-backup health used by the temporary entry and nudge.
 - **ADR-058:** Optional Encrypted Backups and Previewed Local Restoration — keeps the dashboard out of backup contents and restore results.
+- **ADR-062:** Bound/Unbound Lifecycle and One-Way Cadence Assignment — makes active populations Bound-only while retaining neutral relationship retrieval.
 
 ## Gotchas
 
@@ -130,6 +135,7 @@ The dashboard owns no tables. It projects the on-device `contacts`, `categories`
 9. **Keep the digest distinct from the due list.** “Your week” is a navigation entry to a separate live retrospective; do not add its count, overlooked groups, or a badge to Home.
 10. **Do not call a manual export healthy.** Dashboard health derives only from a verified automatic SAF snapshot and matching data revision.
 11. **Keep the backup nudge rare.** It is a recovery prompt for meaningful unprotected data, not a status card or recurring dashboard obligation.
+12. **Do not render active chrome for an Unbound retrieval row.** Its NULL status/progress/rank is deliberate; ContactCard remains a Bound-population component.
 
 ## Related Systems
 
@@ -153,3 +159,4 @@ The dashboard owns no tables. It projects the on-device `contacts`, `categories`
 | 2026-08-17 | 13 | Added the dashboard header entry to the status-default Orrery. |
 | 2026-08-23 | 15 | Added the non-badged “Your week” entry to the separate live digest surface. |
 | 2026-08-24 | 17 | Added a temporary Backup & Restore entry and rare health-driven protection nudge. |
+| 2026-08-27 | 18.2 | Added Bound-only active projections, neutral Unbound retrieval, dedicated browsing, and Never Contacted opt-in. |
