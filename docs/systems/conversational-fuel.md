@@ -1,7 +1,7 @@
 # Conversational Fuel
 
 **Last updated:** 2026-08-15
-**Updated by phase:** 07-conversational-fuel
+**Updated by phase:** 08-dashboard-never-contacted-screen
 **Owners:** `src/db/fuel-dao.ts`, `src/db/fuel-read.ts`, `src/services/fuel-ranking.ts`, `src/services/fuel-age.ts`
 
 ## Purpose
@@ -50,8 +50,8 @@ Fuel uses the on-device SQLite table established empty in migration 1 and activa
 | `src/components/RankedFuelLine.tsx` | Displays an already eligible top-ranked text line. |
 | `src/components/FuelEditor.tsx` | Edits all fuel, including private and unconfirmed rows. |
 | `src/screens/ContactProfileScreen.tsx` | Reloads fuel after every profile mutation. |
-| `src/components/FuelSearchResultRow.tsx` | Is the reusable Phase-7 result-row renderer. |
-| `src/screens/FuelSearch.tsx` | Provides the Phase-7 minimal Settings-reached search surface. |
+| `src/components/FuelSearchResultRow.tsx` | Provides the reusable fuel-match presentation pattern. |
+| `src/db/dashboard-read.ts` | Reuses eligible ranked-fuel and search fragments for dashboard cards. |
 
 ## How It Works
 
@@ -77,9 +77,9 @@ Fuel uses the on-device SQLite table established empty in migration 1 and activa
 
 ### Finding saved fuel
 
-1. The Phase-7 Settings Search entry opens `FuelSearch` and sends the typed term to `searchFuel`.
+1. The dashboard sends its live typed term to `listDashboard`, which reuses fuel's eligible ranked projection and literal-safe search rules.
 2. The reader escapes `\\`, `%`, and `_`, binds the term to `LIKE ? ESCAPE '\\'`, and searches contact names or eligible fuel text.
-3. `FuelSearchResultRow` displays a contact and optional matching snippet; selecting it navigates to the contact profile.
+3. A dashboard card shows a matching fuel snippet when fuel text caused the match; selecting it navigates to the contact profile.
 
 ## Configuration
 
@@ -99,6 +99,7 @@ Fuel uses the on-device SQLite table established empty in migration 1 and activa
 - **ADR-029:** In-Query Fuel Eligibility and a Shared Ranked Projection — private, unconfirmed, and blank rows are excluded before every glanceable read.
 - **ADR-030:** Explicit Confirmation of AI-Proposed Fuel — a user must confirm an AI proposal before it becomes eligible.
 - **ADR-031:** Bound Local Fuel Search without FTS5 — search stays local and literal-safe at the Phase-7 dataset scale.
+- **ADR-032:** Flat Dashboard Discovery and In-Query Contact Search — relocates the reusable local search surface to the dashboard.
 
 ## Gotchas
 
@@ -107,15 +108,17 @@ Fuel uses the on-device SQLite table established empty in migration 1 and activa
 3. **Patch-edit only supplied fields.** A full row update from a stale render closure can revert another blur-committed change.
 4. **Use local wall-clock dates.** UTC date conversion causes age boundary errors; the formatter compares local calendar days.
 5. **Escape LIKE metacharacters.** Parameter binding prevents SQL injection but not `%` or `_` wildcard matches.
+6. **Reuse the exported SQL fragments.** Dashboard projections must consume the shared exclusions and rank CASE rather than copy fuel eligibility logic.
 
 ## Related Systems
 
 - **Contacts** — owns the profiles to which fuel rows belong and the contact lifecycle that removes them.
 - **Custom fields** — stores structured sortable values, while fuel stores sayable conversational hooks.
-- **App shell** — registers the Phase-7 Settings search route.
+- **Dashboard** — owns the live name-plus-fuel search surface and card preview.
 
 ## Changelog
 
 | Date | Phase | What Changed |
 |---|---|---|
 | 2026-08-15 | 07 | Created structured fuel editing, eligible ranking, AI-proposal confirmation, and local search documentation. |
+| 2026-08-15 | 08 | Reused the eligible ranked projection for dashboard cards and moved local search to the dashboard. |
