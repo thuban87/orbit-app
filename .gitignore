@@ -40,3 +40,11 @@ app-debug.apk
 
 # GSD session locks — transient, per-process (never commit)
 .planning/*.lock
+
+# GSD runtime dispatch sentinel — transient per-process state, not source
+.gsd/
+
+# UAT screenshots — on-device evidence, synced to the Obsidian vault via
+# Syncthing (which ignores .gitignore); kept out of git to avoid binary
+# history bloat. No screenshots have ever been committed here.
+**/uat-shots/
