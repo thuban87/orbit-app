@@ -4,9 +4,9 @@
 
 Use this process to add a local notification kind to Orbit's on-device reminder system. It keeps the OS request derived from SQLite state, puts privacy and channel identity under source control, and routes actions through existing DAO boundaries rather than a direct contact update.
 
-## Architecture (Phase 11)
+## Architecture (Phase 15)
 
-The notification engine reconciles a desired request set during launch and foreground. `notification-ids.ts` is the single source of request identifiers, channel/action IDs, frozen copy, payload shape, and action idempotency; the scheduler creates requests only after the application initializes immutable channels and categories.
+The notification engine reconciles desired OS requests during launch and foreground. `notification-ids.ts` is the single source of request identifiers, channel/action IDs, frozen copy, payload shape, and action idempotency; schedulers create requests only after the application initializes immutable channels and categories. A contact-independent recurring notification may own its own reconcile service and launch-sweep hook instead of joining the contact-candidate scheduler.
 
 ### Notification identifiers
 
@@ -29,6 +29,10 @@ export function exampleIdentifier(contactId: number): string {
 3. **Full-request diff** — the scheduler compares the existing OS request's fire hour, channel, category, body, title, and payload; a mismatch cancels and replaces it.
 4. **OS cleanup** — master/type gates cancel owned identifiers, and a purge extension cancels the deleted contact's identifiers post-commit.
 
+### Singleton weekly flow
+
+The weekly digest is the model for a policy-gated singleton request. `digest-schedule.ts` owns only `digest:weekly`; its independent DEFER-ONE coordinator reads `notifications_enabled`, `digest_enabled`, and the delivery hour, then schedules, cancels, or replaces the request. The ordinary decay/birthday scheduler does not own or cancel that identifier.
+
 ## File Locations
 
 ### Code
@@ -38,6 +42,7 @@ export function exampleIdentifier(contactId: number): string {
 | `src/services/notifications/notification-ids.ts` | Stable IDs, versioned channel IDs, generic copy, payload types, and action UID. |
 | `src/services/notifications/channels.ts` | Create-only Android channel registration. |
 | `src/services/notifications/notification-schedule.ts` | Bounded desired-set reconciliation and OS request diff. |
+| `src/services/notifications/digest-schedule.ts` | Independent reconciliation for the singleton weekly digest. |
 | `src/db/notification-read.ts` | Pure SQLite candidate reads. |
 | `src/services/notifications/notification-actions.ts` | Shared foreground/headless action writer. |
 | `src/navigation/notification-gate.tsx` | Warm and cold body/action response integration. |
@@ -59,13 +64,21 @@ export function exampleIdentifier(contactId: number): string {
 
    If channel importance or visibility changes later, create `example-v2`; do not attempt to update `example-v1`.
 
-3. **Add a pure candidate read** in `src/db/notification-read.ts`. Reuse existing status or date helpers instead of restating their SQL or calendar rules. Return values in a deterministic order and keep all runtime SQL inputs `?`-bound.
+3. **Choose the request ownership model.** For contact-specific reminders, add a pure candidate read in `src/db/notification-read.ts`, reuse existing status or date helpers, and return a deterministic order with `?`-bound runtime SQL inputs. For a contact-independent singleton such as the weekly digest, persist its type setting in `app_settings` and give it a separate reconcile service; do not force it into the contact-candidate scheduler.
 
-4. **Build and reconcile the request** in `src/services/notifications/notification-schedule.ts`. Add the identifier to the engine's ownership check, preserve the full-request diff, and keep the work inside `reconcileSchedule()` so DEFER-ONE coordination prevents stale overlapping runs.
+4. **Build and reconcile the request.** A contact-specific kind belongs in `src/services/notifications/notification-schedule.ts`: add its identifier to that engine's ownership check and preserve its full-request diff. A separate singleton kind belongs in its own `*-schedule.ts`, with its own DEFER-ONE coordinator and `registerSweepHook` registration. Its identifier must remain outside the contact scheduler's ownership check so either reconciler cannot clobber the other.
+
+   ```typescript
+   export function registerExampleScheduleSweep(getExec: () => SqlExecutor): void {
+     registerSweepHook(async () => {
+       await reconcileExampleSchedule(getExec());
+     });
+   }
+   ```
 
 5. **Add an action only through a DAO.** Register its category in `notification-actions.ts`, use `actionUid()` as the durable idempotency key, and route the write through the owning DAO. Do not add a raw `UPDATE contacts` path.
 
-6. **Route body taps deliberately.** Extend the pure resolver in `src/services/notifications/notification-nav.ts`, then let `NotificationResponseGate` apply the serializable intent once navigation is ready. A new navigation destination must specify its Back behavior.
+6. **Route body taps deliberately.** Extend the pure resolver in `src/services/notifications/notification-nav.ts`, then let `NotificationResponseGate` apply the serializable intent once navigation is ready. A destination whose Back target must be stable on warm and cold stacks returns an explicit reset intent, as the digest resets to `[Home, Digest]`.
 
 7. **Cancel on lifecycle destruction.** Extend `buildNotificationPurgeCleanup()` with the new identifier if it belongs to a contact. The cancel is post-commit, idempotent, and best effort.
 
@@ -83,6 +96,7 @@ export function exampleIdentifier(contactId: number): string {
 - Do not run reconciliation at module import or from a killed-app action path.
 - Do not create an AsyncStorage mirror for notification policy; `app_settings` is the durable source of truth.
 - Do not modify a published Android channel's properties under the same ID.
+- Do not infer a durable type toggle from whether an OS request currently exists; a launch sweep cannot distinguish absence from a deliberate OFF choice.
 
 ## Pitfalls
 
@@ -94,13 +108,17 @@ export function exampleIdentifier(contactId: number): string {
 
 4. **Concurrent reconciles can re-arm a muted contact.** Keep all callers behind the scheduler's DEFER-ONE coordinator so its trailing pass re-reads committed SQLite state.
 
+5. **Do not make every request a decay-scheduler request.** A global weekly trigger has different policy inputs and an independent identifier. Give it a separate coordinator and assert the contact scheduler never cancels it.
+
+6. **A scheduled weekly body is frozen.** Use generic copy and open a live-computed screen for names or counts; physical-device testing must confirm the weekly trigger fires and re-arms after delivery.
+
 ## Smoke Test
 
 ```bash
-npx vitest run src/services/notifications/notification-schedule.test.ts src/services/notifications/notification-actions.test.ts src/services/notifications/notification-nav.test.ts
+npx vitest run src/services/notifications/notification-schedule.test.ts src/services/notifications/digest-schedule.test.ts src/services/notifications/notification-actions.test.ts src/services/notifications/notification-nav.test.ts
 ```
 
-Expected: scheduler diff, exact-once actions, and body-tap routing pass.
+Expected: contact and singleton scheduler reconciliation, exact-once actions, and body-tap routing pass.
 
 ```bash
 npx tsc --noEmit && npm run check:colors
