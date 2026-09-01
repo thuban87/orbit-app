@@ -1,7 +1,7 @@
 # Contacts
 
-**Last updated:** 2026-08-15
-**Updated by phase:** 08-dashboard-never-contacted-screen
+**Last updated:** 2026-08-16
+**Updated by phase:** 09-compose-screen-sms-handoff
 **Owners:** `src/db/contacts-dao.ts`, `src/db/contact-read.ts`, `src/db/favourites-dao.ts`, `src/db/profile-dao.ts`, `src/db/contact-links-dao.ts`, `src/db/purge-dao.ts`, `src/db/recency-dao.ts`
 
 ## Purpose
@@ -21,6 +21,7 @@ All data is on-device SQLite. Migration 001 uses a surrogate `contacts.id` and a
   - `last_contact` (`TEXT`) — maintained maximum qualifying interaction timestamp; `NULL` means never-contacted.
   - `rarely_responds` (`INTEGER`) — limits recency to connected interactions.
   - `archived_at` (`TEXT`) — archive lifecycle marker.
+  - `phone` (`TEXT`, nullable) — dedicated number used by user-invoked SMS handoff when present.
   - `photo` (`TEXT`, nullable) — validated relative path to the contact's local photo master.
   - `favourite_rank` (`INTEGER`, nullable) — ordered membership in the dashboard and widget favourites set.
 - `categories` — seeded Family, Friends, Work, and Community groups with display order.
@@ -45,7 +46,7 @@ All data is on-device SQLite. Migration 001 uses a surrogate `contacts.id` and a
 | Layer | File | Responsibility |
 |---|---|---|
 | Contact writer | `src/db/contacts-dao.ts` | Atomically creates and edits metadata, custom values, and optional first interactions; archives and restores contacts with lifecycle-event composition. |
-| Contact reads | `src/db/contact-read.ts` | Checks duplicate names, reads categories, and assembles edit/header data. |
+| Contact reads | `src/db/contact-read.ts` | Checks duplicate names, reads categories, and assembles edit/header data, including the lightweight phone-capable header seek. |
 | Favourites DAO | `src/db/favourites-dao.ts` | Marks, clears, and atomically rewrites ordered favourite ranks. |
 | Profile DAO | `src/db/profile-dao.ts` | Reads and updates the single self record’s local photo reference. |
 | Links DAO | `src/db/contact-links-dao.ts` | Lists and applies scoped add/edit/remove changes for ordered link rows. |
@@ -103,6 +104,12 @@ All data is on-device SQLite. Migration 001 uses a surrogate `contacts.id` and a
 2. The Manage favourites screen obtains the live non-archived set and passes its reordered ids to `rewriteFavouriteRanks()`.
 3. The DAO verifies a unique, complete current set and applies all rank updates inside one write transaction; it never writes `last_contact`.
 
+### Supplying a live compose header
+
+1. `getContactHeader()` returns the contact's identity, photo freshness, phone, and archive marker through its lightweight by-id seek.
+2. Compose trims the optional phone to decide SMS availability and treats an archived header as unavailable rather than showing a live messaging surface.
+3. Send and Copy remain handoff-only actions; the contacts system receives no interaction or recency write from them.
+
 ## Configuration
 
 | Constant | Value | File | Purpose |
@@ -124,6 +131,8 @@ All data is on-device SQLite. Migration 001 uses a surrogate `contacts.id` and a
 - **ADR-025:** Immutable Lifecycle Events in a Unified Timeline — adds state-guarded archive and restore events to contact lifecycle work.
 - **ADR-026:** Rogue Status for Unresponsive or Far-Overdue Contacts — uses the contact's Rarely-responds policy to filter qualifying recency.
 - **ADR-033:** Profile Marking and Shared Drag-Reordered Favourites — owns reversible profile marking and guarded favourite-rank ordering.
+- **ADR-035:** Native SMS Handoff with Guaranteed Clipboard Copy — uses the nullable phone field for a user-invoked, non-writing handoff.
+- **ADR-036:** Entry-Agnostic Compose Navigation and Transmittable-Fuel Guardrails — rejects archived headers on the reusable live compose surface.
 
 ## Gotchas
 
@@ -136,6 +145,7 @@ All data is on-device SQLite. Migration 001 uses a surrogate `contacts.id` and a
 7. **Never record a lifecycle event for a no-op transition.** Archive and restore guard the current state before changing it; otherwise the immutable history would claim a false transition.
 8. **Deleting a touchpoint is permanent.** The profile must confirm it before calling the recency DAO; there is no undo or backup path.
 9. **Rewrite the complete favourite set in one transaction.** A partial, duplicate, stale, archived, or non-favourite id list must fail rather than leave ranks inconsistent.
+10. **A by-id header can still be archived.** Live callers such as Compose must inspect `archived_at`; the header seek intentionally does not apply a live-list filter itself.
 
 ## Related Systems
 
@@ -144,6 +154,7 @@ All data is on-device SQLite. Migration 001 uses a surrogate `contacts.id` and a
 - **Custom fields** — contributes values to the contact create/edit transaction.
 - **App shell** — provides the create, profile, edit, and archived navigation routes.
 - **Dashboard** — reads contact projections and provides favourite-management entry points.
+- **Contact methods** — consumes the lightweight phone and archive header for Compose gating.
 
 ## Changelog
 
@@ -154,3 +165,4 @@ All data is on-device SQLite. Migration 001 uses a surrogate `contacts.id` and a
 | 2026-08-15 | 05 | Added dedicated contact/self photo references, avatar reads, and photo-aware lifecycle cleanup. |
 | 2026-08-15 | 06 | Added structured touchpoint refinement, connection-aware recency, and immutable archive/restore events. |
 | 2026-08-15 | 08 | Added profile favourite marking and guarded shared rank reordering. |
+| 2026-08-16 | 09 | Exposed phone through the lightweight header read and gated archived contacts from Compose. |
