@@ -22,7 +22,7 @@ not something you can pattern-match against.
 ## How to use this
 
 - **Is a decision still live?** Check the `Superseded by` column. 1 of
-  36 ADRs are superseded in whole or in part.
+  38 ADRs are superseded in whole or in part.
 - **Which decisions govern a file?** Don't grep this file — ask the graph:
   `npm run graph:ask -- governs src/db/field-values-dao.ts`, or follow the
   `governed_by` edges.
@@ -67,3 +67,5 @@ not something you can pattern-match against.
 | 034 | Birthday Banner and Re-query Dashboard Freshness | Accepted | 08-dashboard-never-contacted-screen | — | — | — | 5 | `src/components`, `src/db`, `src/logic` +1 |
 | 035 | Native SMS Handoff with Guaranteed Clipboard Copy | Accepted | 09-compose-screen-sms-handoff | — | — | — | 3 | `src/db`, `src/logic`, `src/screens` |
 | 036 | Entry-Agnostic Compose Navigation and Transmittable-Fuel Guardrails | Accepted | 09-compose-screen-sms-handoff | — | — | — | 5 | `src/db`, `src/navigation`, `src/screens` |
+| 037 | Text-Only Android Share Intent Integration | Accepted | 10-share-sheet-capture | — | — | — | 3 | `modules/orbit-share-finish/android/src/main/java/expo/modules/orbitsharefinish`, `patches`, `src/navigation` |
+| 038 | Contact-Owned Share Capture Fuel | Accepted | 10-share-sheet-capture | — | — | — | 5 | `src/db`, `src/logic`, `src/screens` |

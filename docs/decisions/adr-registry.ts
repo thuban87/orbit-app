@@ -46,5 +46,7 @@
 // NOTE: ADR-0034 [ACCEPTED] Birthday Banner and Re-query Dashboard Freshness
 // NOTE: ADR-0035 [ACCEPTED] Native SMS Handoff with Guaranteed Clipboard Copy
 // NOTE: ADR-0036 [ACCEPTED] Entry-Agnostic Compose Navigation and Transmittable-Fuel Guardrails
+// NOTE: ADR-0037 [ACCEPTED] Text-Only Android Share Intent Integration
+// NOTE: ADR-0038 [ACCEPTED] Contact-Owned Share Capture Fuel
 
-export const ADR_COUNT = 36;
+export const ADR_COUNT = 38;
