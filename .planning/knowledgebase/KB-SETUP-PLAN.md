@@ -104,3 +104,9 @@ of templates + scripts + graph bridge supports them.
   **NOT committed** — the working tree has the owner's in-flight phase-20/21 dev work and a
   `config.json` `review`-models block (owner's, uncommitted) entangled, so committing is left
   to the owner / a selective substrate-only commit. Next: Group B (author the two skills).
+- **2026-08-31** — Substrate committed as 3 atomic commits (scripts / graphify config+build /
+  templates+maps). Owner then authorized committing the rest: added `.gsd/` + `**/uat-shots/`
+  to `.gitignore` (uat screenshots ignored per owner — 11MB, still Syncthing-synced), and
+  committed the owner's in-flight phase-21 work, milestone-2 dossiers, and config. **Tree
+  clean.** Reminder for Group B: both skills must **atomically commit their own work as they
+  go** (owner request).
