@@ -1,7 +1,7 @@
 # Photos
 
-**Last updated:** 2026-08-24
-**Updated by phase:** 17-backup-export-restore
+**Last updated:** 2026-08-26
+**Updated by phase:** 19-system-contact-import
 **Owners:** `src/services/photos/`, `src/db/contacts-dao.ts`, `src/db/profile-dao.ts`, `src/components/Avatar.tsx`, `src/components/PhotoSourcePicker.tsx`
 
 ## Purpose
@@ -19,6 +19,7 @@ SQLite stores only relative filenames; the photo bytes live in the app document 
 - `profile` — its nullable `photo` (`TEXT`) holds the fixed relative `avatars/profile.jpg` path.
 - `contact_custom_values` — a `photo`-type field holds its derivable `avatars/cv-<contactId>-<colName>.jpg` path in its existing `TEXT` column.
 - `restore_photo_journal` — committed restore work that finalizes or removes a canonical master after the database transaction.
+- `import_session_rows` — a local-only retryable `photo_rel_path` reference to a selected-contact source staged under `import-staging/`.
 
 **Types** (`src/services/photos/photo-storage.ts`):
 - `PhotoTargetDescriptor` — distinguishes contact, profile, and custom-field persistence targets.
@@ -47,6 +48,7 @@ SQLite stores only relative filenames; the photo bytes live in the app document 
 | `src/services/photos/url-image.ts` | Enforces pasted-URL validation and download handling. |
 | `src/services/photos/purge-photo-cleanup.ts` | Implements post-commit contact photo cleanup. |
 | `src/services/photos/restore-photo-finalize-sweep.ts` | Drains committed restore-photo finalization and deletion entries. |
+| `src/services/import/import-photo.ts` | Converts durable import staging into a post-commit contact master and isolates failure. |
 | `src/components/Avatar.tsx` | Renders a local master or the themed initials fallback. |
 | `src/components/PhotoSourcePicker.tsx` | Reusable source and lifecycle controls for all photo targets. |
 | `src/screens/CropPhotoScreen.tsx` | Registers the Skia crop screen. |
@@ -86,6 +88,12 @@ SQLite stores only relative filenames; the photo bytes live in the app document 
 2. Restore stages validated bytes under the guarded restore-pending namespace before its database transaction.
 3. A committed journal row authorizes the finalizer to write the fresh canonical relative master or verify a stale master is absent; launch recovery ignores uncommitted work.
 
+### Importing a selected contact photo
+
+1. Contact Import moves an accepted picker-cache copy into private flat `import-staging/` before it commits the durable session snapshot.
+2. After the imported contact transaction succeeds, `import-photo.ts` resolves that relative staging path, produces the ordinary Orbit master, and writes the contact photo reference.
+3. Success retires the row reference before best-effort deletion of raw staging. A mastering failure leaves the contact imported and retains the staged input for Retry.
+
 ## Configuration
 
 | Constant | Value | File | Purpose |
@@ -103,6 +111,7 @@ SQLite stores only relative filenames; the photo bytes live in the app document 
 - **ADR-043:** Static Globally Mirrored Favourites Widget — reuses local photo masters without widget state.
 - **ADR-057:** Full-State Versioned Backups with Verified Manual and Foreground SAF Snapshots — embeds photo bytes in complete portable snapshots.
 - **ADR-058:** Optional Encrypted Backups and Previewed Local Restoration — journals committed restore-photo work for durable recovery.
+- **ADR-065:** Durable Resumable Contact-Import Sessions with Failure-Isolated Photos — keeps selected-contact photo staging retryable without making photo failure invalidate the contact.
 
 ## Gotchas
 
@@ -114,6 +123,7 @@ SQLite stores only relative filenames; the photo bytes live in the app document 
 6. **Widget images are base64 only.** RemoteViews must not receive `file://` masters or an `http(s)` source; a failed encode is an initials fallback, not a grid failure.
 7. **Never restore a serialized path verbatim.** It belongs to another sandbox; use the embedded bytes and a newly derived canonical master.
 8. **Only committed journal rows may finalize restore files.** A process interruption before the database commit must not create a visible master or delete an existing one.
+9. **Do not pass import staging to `Avatar`.** It is preview-only and outside Avatar's canonical master namespace; resolve it directly in import UI.
 
 ## Related Systems
 
@@ -122,6 +132,7 @@ SQLite stores only relative filenames; the photo bytes live in the app document 
 - **App shell** — owns the crop route, settings entry, theme tokens, and launch registration.
 - **Widget** — derives a transient base64 thumbnail from the existing bounded master.
 - **Backup & Restore** — embeds image bytes and uses journal-backed staged restoration to recreate local masters.
+- **Contact Import** — stages selected-contact photos privately and masters them only after the contact commit.
 
 ## Changelog
 
@@ -130,3 +141,4 @@ SQLite stores only relative filenames; the photo bytes live in the app document 
 | 2026-08-15 | 05 | Created the local photo pipeline, themed fallback avatar, and contact/custom-field lifecycle integration. |
 | 2026-08-16 | 12 | Added transient base64 widget thumbnails and refresh publishing after contact photo changes. |
 | 2026-08-24 | 17 | Added embedded backup bytes and committed-only restore-photo finalization recovery. |
+| 2026-08-26 | 19 | Added selected-contact staging and post-commit failure-isolated import mastering. |
