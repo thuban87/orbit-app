@@ -1,7 +1,7 @@
 # App Shell
 
 **Last updated:** 2026-08-24
-**Updated by phase:** 16-custom-field-value-normalization
+**Updated by phase:** 17-backup-export-restore
 **Owners:** `App.tsx`, `src/navigation/RootNavigator.tsx`, `src/navigation/types.ts`, `src/navigation/linking.ts`, `src/navigation/notification-gate.tsx`, `src/navigation/widget-linking.ts`, `src/screens/SettingsScreen.tsx`, `src/theme/theme-types.ts`, `src/theme/theme-presets.ts`
 
 ## Purpose
@@ -58,6 +58,12 @@ _None._ The shell owns runtime navigation and theme contracts, not durable appli
 1. Home is the dashboard and navigates to contact profiles, creation, Your week, the Orrery, Not yet contacted, Archived, Settings, and favourite management.
 2. Settings exposes Custom Fields, Archived contacts, Manage favourites, self-star selection, and sun-centre selection as separate, low-traffic controls.
 3. Every stack screen renders its own themed chrome because native-stack headers are disabled; no duplicate native header appears above screen-local Back controls.
+
+### Opening Backup & Restore
+
+1. The temporary Home entry opens the typed `Backup` route; no bottom navigation bar is introduced.
+2. `Backup` owns manual export, file selection, and health actions. Its child settings, preview, and result routes retain only serializable aggregate or opaque-token parameters.
+3. `App.tsx` registers backup and restore-photo recovery hooks after migration readiness, before the foreground launch-sweep trigger runs.
 
 ### Composing from a contact
 
@@ -157,6 +163,8 @@ _None._ The shell owns runtime navigation and theme contracts, not durable appli
 - **ADR-053:** Local-First LiteLLM AI Model Catalog — adds Settings model-scope and explicit-refresh controls.
 - **ADR-054:** Live Weekly Digest Retrospective and Overlooked Relationship Read — adds the self-fetching Digest route and dashboard entry.
 - **ADR-055:** Dedicated Weekly Digest Scheduling and Persisted Notification Policy — adds the dashboard-rooted Digest notification reset and ready-gated schedule hook.
+- **ADR-057:** Full-State Versioned Backups with Verified Manual and Foreground SAF Snapshots — adds the Backup destination and ready-gated foreground automatic work.
+- **ADR-058:** Optional Encrypted Backups and Previewed Local Restoration — keeps restore content and passphrases out of navigation state.
 
 ## Gotchas
 
@@ -175,6 +183,7 @@ _None._ The shell owns runtime navigation and theme contracts, not durable appli
 13. **Keep the AI Compose intent serializable and minimal.** It carries only `contactId` and a boolean request marker; prompts, credentials, and callbacks must not enter route parameters.
 14. **Reset digest notification taps instead of navigating onto a warm stack.** The Home/Digest reset is what makes the Digest screen's Back destination stable.
 15. **Do not mount navigation after a bootstrap failure.** A classified migration failure has rolled back unchanged; generic failure copy must not promise unavailable support or recovery.
+16. **Restore route parameters must be content-free.** Pass only an opaque in-memory cache token and aggregate preview; never put a file URI, manifest, callback, or passphrase in navigation state.
 
 ## Related Systems
 
@@ -188,6 +197,7 @@ _None._ The shell owns runtime navigation and theme contracts, not durable appli
 - **Orrery** — registers its dashboard-reached route and receives its self-star and sun-centre controls from Settings.
 - **AI suggestions** — uses Settings for non-secret configuration and the typed Compose intent for profile-originated drafting.
 - **Digest** — registers a self-fetching route, dashboard entry, ready-gated scheduler, and notification reset destination.
+- **Backup & Restore** — registers typed landing, settings, preview, and result routes plus ready-gated recovery work.
 
 ## Changelog
 
@@ -206,3 +216,4 @@ _None._ The shell owns runtime navigation and theme contracts, not durable appli
 | 2026-08-18 | 14 | Added non-secret AI settings and a serializable, consume-once Compose AI intent. |
 | 2026-08-23 | 15 | Added the typed Digest route, dashboard entry, dashboard-rooted notification reset, and ready-gated schedule registration. |
 | 2026-08-24 | 16 | Added accurate classified migration and generic bootstrap failure presentation while retaining the readiness gate. |
+| 2026-08-24 | 17 | Added Backup routes, content-free restore navigation, and ready-gated backup/photo recovery hooks. |
