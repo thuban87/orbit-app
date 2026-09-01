@@ -1,7 +1,7 @@
 # Photos
 
-**Last updated:** 2026-08-15
-**Updated by phase:** 12-home-screen-widget
+**Last updated:** 2026-08-24
+**Updated by phase:** 17-backup-export-restore
 **Owners:** `src/services/photos/`, `src/db/contacts-dao.ts`, `src/db/profile-dao.ts`, `src/components/Avatar.tsx`, `src/components/PhotoSourcePicker.tsx`
 
 ## Purpose
@@ -18,6 +18,7 @@ SQLite stores only relative filenames; the photo bytes live in the app document 
 - `contacts` — its nullable `photo` (`TEXT`) holds a relative `avatars/contact-<id>.jpg` path.
 - `profile` — its nullable `photo` (`TEXT`) holds the fixed relative `avatars/profile.jpg` path.
 - `contact_custom_values` — a `photo`-type field holds its derivable `avatars/cv-<contactId>-<colName>.jpg` path in its existing `TEXT` column.
+- `restore_photo_journal` — committed restore work that finalizes or removes a canonical master after the database transaction.
 
 **Types** (`src/services/photos/photo-storage.ts`):
 - `PhotoTargetDescriptor` — distinguishes contact, profile, and custom-field persistence targets.
@@ -33,6 +34,7 @@ SQLite stores only relative filenames; the photo bytes live in the app document 
 | URL service | `src/services/photos/url-image.ts` | Downloads a user-pasted HTTPS image once on the write path. |
 | Contact/profile DAOs | `src/db/contacts-dao.ts`, `src/db/profile-dao.ts` | Persist or clear the contact and self relative path with one-row guards. |
 | Purge extension | `src/services/photos/purge-photo-cleanup.ts` | Deletes derivable contact and custom-field files after database purge commits. |
+| Restore recovery | `src/services/photos/restore-photo-finalize-sweep.ts` | Finalizes or cleans up only committed journal-backed restore work. |
 
 ### Key Files
 
@@ -44,6 +46,7 @@ SQLite stores only relative filenames; the photo bytes live in the app document 
 | `src/services/photos/crop-geometry.ts` | Converts a crop transform into clamped source-pixel bounds. |
 | `src/services/photos/url-image.ts` | Enforces pasted-URL validation and download handling. |
 | `src/services/photos/purge-photo-cleanup.ts` | Implements post-commit contact photo cleanup. |
+| `src/services/photos/restore-photo-finalize-sweep.ts` | Drains committed restore-photo finalization and deletion entries. |
 | `src/components/Avatar.tsx` | Renders a local master or the themed initials fallback. |
 | `src/components/PhotoSourcePicker.tsx` | Reusable source and lifecycle controls for all photo targets. |
 | `src/screens/CropPhotoScreen.tsx` | Registers the Skia crop screen. |
@@ -77,6 +80,12 @@ SQLite stores only relative filenames; the photo bytes live in the app document 
 2. The launch sweep reconciles interrupted temporary or backup files from a prior replacement.
 3. An archived-contact purge invokes the post-commit cleanup extension. Because database rows are gone by then, it derives the main filename from `contactId` and custom-field filenames from the surviving photo definitions, including quarantined definitions.
 
+### Restoring backup photo bytes
+
+1. Backup serializes image bytes, never the device-local relative path as portable authority.
+2. Restore stages validated bytes under the guarded restore-pending namespace before its database transaction.
+3. A committed journal row authorizes the finalizer to write the fresh canonical relative master or verify a stale master is absent; launch recovery ignores uncommitted work.
+
 ## Configuration
 
 | Constant | Value | File | Purpose |
@@ -92,6 +101,8 @@ SQLite stores only relative filenames; the photo bytes live in the app document 
 - **ADR-021:** Durable Relative-Path Photo Masters with Crash-Safe Lifecycle Cleanup — defines the master, path, replacement, and deletion contract.
 - **ADR-022:** Tokenized Deterministic Initials Avatars — defines the themed no-photo fallback.
 - **ADR-043:** Static Globally Mirrored Favourites Widget — reuses local photo masters without widget state.
+- **ADR-057:** Full-State Versioned Backups with Verified Manual and Foreground SAF Snapshots — embeds photo bytes in complete portable snapshots.
+- **ADR-058:** Optional Encrypted Backups and Previewed Local Restoration — journals committed restore-photo work for durable recovery.
 
 ## Gotchas
 
@@ -101,6 +112,8 @@ SQLite stores only relative filenames; the photo bytes live in the app document 
 4. **Custom photo fields have a cancel-path tradeoff.** Their stable canonical file can change before the form commits its value; backing out can retain changed bytes beneath the previous reference. The documented safe posture favors a bounded leak or changed file over deleting a possibly committed file.
 5. **Treat image cache replacement carefully across restart.** A same-second replace at a stable path has a narrow stale-decode risk after the in-memory revision resets.
 6. **Widget images are base64 only.** RemoteViews must not receive `file://` masters or an `http(s)` source; a failed encode is an initials fallback, not a grid failure.
+7. **Never restore a serialized path verbatim.** It belongs to another sandbox; use the embedded bytes and a newly derived canonical master.
+8. **Only committed journal rows may finalize restore files.** A process interruption before the database commit must not create a visible master or delete an existing one.
 
 ## Related Systems
 
@@ -108,6 +121,7 @@ SQLite stores only relative filenames; the photo bytes live in the app document 
 - **Custom fields** — stores custom photo paths through its guarded values flow.
 - **App shell** — owns the crop route, settings entry, theme tokens, and launch registration.
 - **Widget** — derives a transient base64 thumbnail from the existing bounded master.
+- **Backup & Restore** — embeds image bytes and uses journal-backed staged restoration to recreate local masters.
 
 ## Changelog
 
@@ -115,3 +129,4 @@ SQLite stores only relative filenames; the photo bytes live in the app document 
 |---|---|---|
 | 2026-08-15 | 05 | Created the local photo pipeline, themed fallback avatar, and contact/custom-field lifecycle integration. |
 | 2026-08-16 | 12 | Added transient base64 widget thumbnails and refresh publishing after contact photo changes. |
+| 2026-08-24 | 17 | Added embedded backup bytes and committed-only restore-photo finalization recovery. |
