@@ -1,7 +1,7 @@
 # Contacts
 
-**Last updated:** 2026-08-27
-**Updated by phase:** 18.1-contact-method-normalization
+**Last updated:** 2026-08-26
+**Updated by phase:** 19-system-contact-import
 **Owners:** `src/db/contacts-dao.ts`, `src/db/contact-read.ts`, `src/db/favourites-dao.ts`, `src/db/profile-dao.ts`, `src/db/contact-links-dao.ts`, `src/db/purge-dao.ts`, `src/db/recency-dao.ts`
 
 ## Purpose
@@ -66,6 +66,7 @@ All data is on-device SQLite. Migration 001 uses a surrogate `contacts.id` and a
 | File | Role |
 |---|---|
 | `src/db/contacts-dao.ts` | Composed create/edit path that seeds normalized custom-value pairs plus archive, restore, and archived-list reads. |
+| `src/db/imported-contact-dao.ts` | Composes imported contact creation or explicit linking with source evidence and import-row resolution. |
 | `src/db/contact-read.ts` | Duplicate-name, category, header, and edit-form data reads. |
 | `src/db/contact-lifecycle-dao.ts` | Named lifecycle transitions with exact state guards and one revision increment. |
 | `src/db/favourites-dao.ts` | Dedicated favourite-rank writes that leave recency unchanged. |
@@ -155,6 +156,12 @@ All data is on-device SQLite. Migration 001 uses a surrogate `contacts.id` and a
 2. The name-only path uses the monthly 30-day interval and leaves `last_contact` `NULL`, so the contact remains never-contacted.
 3. Capture then writes an owned fuel row in a separate acceptable transaction; it does not turn the share into an interaction or prompt for further contact detail.
 
+### Creating or linking an imported contact
+
+1. Contact Import maps an accepted selected-contact snapshot into `createContactFullCore()`, with Unbound lifecycle defaults for bulk work.
+2. `importContactRecord()` opens one outer write transaction that creates a contact or explicitly links an existing contact, writes source links and method provenance, and resolves the durable import row.
+3. The imported path uses the same normalized methods, custom-field pair setup, birthday validation, and lifecycle constraints as manual creation; it never silently overwrites an existing name.
+
 ## Configuration
 
 | Constant | Value | File | Purpose |
@@ -180,6 +187,8 @@ All data is on-device SQLite. Migration 001 uses a surrogate `contacts.id` and a
 - **ADR-035:** Native SMS Handoff with Guaranteed Clipboard Copy — partially superseded; native handoff and Copy remain the interaction boundary.
 - **ADR-059:** Normalized Contact Methods, Canonical Actionability, and Local Provenance — replaces scalar endpoint fields with ordered mergeable method rows.
 - **ADR-062:** Bound/Unbound Lifecycle and One-Way Cadence Assignment — separates active cadence participation from relationship data ownership.
+- **ADR-066:** Deliberate Reviewed Import with Unbound Bulk Defaults — requires intentional review or safe shared defaults before a contact write.
+- **ADR-067:** Conservative Advisory Identity Matching and Explicit Source Consolidation — permits only explicit linking or approved multi-source creation.
 - **ADR-036:** Entry-Agnostic Compose Navigation and Transmittable-Fuel Guardrails — rejects archived headers on the reusable live compose surface.
 - **ADR-038:** Contact-Owned Share Capture Fuel — preserves name-only, never-contacted inline creation and prohibits a capture recency write.
 - **ADR-039:** Pre-Scheduled Inexact Decay Reminders — uses cadence, snooze, mute, lifecycle, and status fields to determine derived reminder eligibility.
@@ -211,6 +220,7 @@ All data is on-device SQLite. Migration 001 uses a surrogate `contacts.id` and a
 17. **A hard delete must write its tombstone first.** Purge captures every mergeable child UID in its existing transaction; transient `field_history` remains excluded.
 18. **`last_contact` is derived.** Restore recomputes it from interactions and never lets an imported summary win a reconciliation decision.
 19. **Do not clear dormant favourite rank on Unbind.** Bound-only query owners hide it; retaining it lets a rebind restore the prior preference without a second write.
+20. **Do not use a compatibility shortcut for imported contacts.** Import must compose the canonical creation core so contact invariants remain identical to manual creation.
 
 ## Related Systems
 
@@ -225,6 +235,7 @@ All data is on-device SQLite. Migration 001 uses a surrogate `contacts.id` and a
 - **Widget** — mirrors favourite rank and contact-visible fields without storing another configuration record.
 - **AI suggestions** — receives a profile-originated Compose intent but has no contact-write authority.
 - **Backup & Restore** — exports UID-bearing contact state and restores it through tombstone-aware reconciliation.
+- **Contact Import** — creates or explicitly links contacts through the shared transaction seam.
 
 ## Changelog
 
@@ -244,3 +255,4 @@ All data is on-device SQLite. Migration 001 uses a surrogate `contacts.id` and a
 | 2026-08-24 | 17 | Added tombstone-aware purge and UID-based portable restore behavior. |
 | 2026-08-27 | 18.1 | Replaced scalar endpoint fields with transactional normalized method drafts and scalar-free reads. |
 | 2026-08-27 | 18.2 | Added Bound/Unbound lifecycle writes, nullable never-assigned cadence, and post-commit proactive-surface effects. |
+| 2026-08-26 | 19 | Added reviewed selected-contact create/link composition without bypassing contact invariants. |
