@@ -1,7 +1,7 @@
 # App Shell
 
-**Last updated:** 2026-08-18
-**Updated by phase:** 14-ai-message-suggestions
+**Last updated:** 2026-08-23
+**Updated by phase:** 15-weekly-digest
 **Owners:** `App.tsx`, `src/navigation/RootNavigator.tsx`, `src/navigation/types.ts`, `src/navigation/linking.ts`, `src/navigation/notification-gate.tsx`, `src/navigation/widget-linking.ts`, `src/screens/SettingsScreen.tsx`, `src/theme/theme-types.ts`, `src/theme/theme-presets.ts`
 
 ## Purpose
@@ -19,7 +19,7 @@ _None._ The shell owns runtime navigation and theme contracts, not durable appli
 | Layer | File | Responsibility |
 |-------|------|----------------|
 | Bootstrap | `App.tsx` | Opens and migrates SQLite before mounting the navigator inside theme and safe-area providers. |
-| Navigator | `src/navigation/RootNavigator.tsx` | Registers native-stack routes, including dashboard sibling lists, Orrery, management, modal crop, and Compose surfaces, with custom headers. |
+| Navigator | `src/navigation/RootNavigator.tsx` | Registers native-stack routes, including dashboard sibling lists, Digest, Orrery, management, modal crop, and Compose surfaces, with custom headers. |
 | Route types | `src/navigation/types.ts` | Defines serializable parameters for profile, edit, crop, and self-fetching Compose routes, including an optional AI request intent. |
 | Intent gate | `src/navigation/linking.ts` | Converts provider-owned pending share state into ready-gated navigation to Capture. |
 | Notification gate | `src/navigation/notification-gate.tsx` | Converts warm and cold local-notification responses into ready-gated actions or navigation. |
@@ -32,13 +32,14 @@ _None._ The shell owns runtime navigation and theme contracts, not durable appli
 | File | Role |
 |---|---|
 | `App.tsx` | Readiness gate, navigation mount point, gesture root, and photo/notification lifecycle registration. |
-| `src/navigation/RootNavigator.tsx` | Native stack for the dashboard Home, Orrery, Settings, contact lifecycle, Compose, NeverContacted, ManageFavourites, and CropPhoto. |
-| `src/navigation/types.ts` | Typed root-stack route contract, including serializable Compose `requestAiSuggestion` and photo-crop targets. |
+| `src/navigation/RootNavigator.tsx` | Native stack for the dashboard Home, Digest, Orrery, Settings, contact lifecycle, Compose, NeverContacted, ManageFavourites, and CropPhoto. |
+| `src/navigation/types.ts` | Typed root-stack route contract, including the self-fetching Digest and Compose surfaces and photo-crop targets. |
 | `src/navigation/linking.ts` | Holds the navigation ref and the single ready-gated Capture navigation owner. |
 | `src/navigation/notification-gate.tsx` | Owns warm/cold notification-response handling once navigation is ready. |
 | `src/navigation/widget-linking.ts` | Owns the separate, strict widget URI bridge without consuming native share state. |
 | `src/screens/CaptureScreen.tsx` | Provides the in-app target for a pending Android text share. |
 | `src/screens/HomeScreen.tsx` | Provides the dashboard Home and its destination entries. |
+| `src/screens/DigestScreen.tsx` | Provides the live weekly retrospective destination with its own themed Back chrome. |
 | `src/screens/SettingsScreen.tsx` | Provides the distinct settings home, including AI configuration, self-photo, self-star, sun-centre, and Manage favourites entries. |
 | `src/theme/theme-types.ts` | Names palette tokens, including avatar swatches, rogue status, gravity tiers, and Orrery star/muted values. |
 | `src/theme/theme-presets.ts` | Holds the only allowed color literals, including avatar, relationship-status, and Orrery palette values. |
@@ -53,7 +54,7 @@ _None._ The shell owns runtime navigation and theme contracts, not durable appli
 
 ### Navigating dashboard and settings
 
-1. Home is the dashboard and navigates to contact profiles, creation, the Orrery, Not yet contacted, Archived, Settings, and favourite management.
+1. Home is the dashboard and navigates to contact profiles, creation, Your week, the Orrery, Not yet contacted, Archived, Settings, and favourite management.
 2. Settings exposes Custom Fields, Archived contacts, Manage favourites, self-star selection, and sun-centre selection as separate, low-traffic controls.
 3. Every stack screen renders its own themed chrome because native-stack headers are disabled; no duplicate native header appears above screen-local Back controls.
 
@@ -62,6 +63,12 @@ _None._ The shell owns runtime navigation and theme contracts, not durable appli
 1. A profile opens `Compose` with the serializable `{ contactId }` route parameter, or `{ contactId, requestAiSuggestion: true }` for an AI draft; the screen fetches its own current data rather than receiving callbacks or preloaded state.
 2. Compose resets both software and Android hardware Back to the Home dashboard, so the destination is stable for present and later entry points.
 3. The AI intent is a primitive consumed once by Compose and then cleared with `setParams`; it cannot retain a prompt, contact snapshot, key, or callback across navigation.
+
+### Opening the weekly digest
+
+1. The dashboard's “Your week” action navigates to the param-less `Digest` route; the screen rereads its local data on focus.
+2. A digest notification body tap resets the stack to Home then Digest, so Back always lands on the dashboard regardless of the warm stack.
+3. `App.tsx` registers the digest schedule hook after database readiness, alongside other ready-gated notification initialization.
 
 ### Configuring AI settings
 
@@ -145,6 +152,8 @@ _None._ The shell owns runtime navigation and theme contracts, not durable appli
 - **ADR-048:** Status-Default Static Orrery with a Single-Canvas Morph — adds the typed Orrery route and token-driven canvas lifecycle.
 - **ADR-049:** BYO-Key AI Configuration and Credential Boundary — hosts non-secret AI settings while retaining credentials outside navigation and SQLite settings patches.
 - **ADR-052:** Compose-Owned AI Draft Lifecycle and Acknowledged Egress — adds the serializable, consume-once Compose AI request intent.
+- **ADR-054:** Live Weekly Digest Retrospective and Overlooked Relationship Read — adds the self-fetching Digest route and dashboard entry.
+- **ADR-055:** Dedicated Weekly Digest Scheduling and Persisted Notification Policy — adds the dashboard-rooted Digest notification reset and ready-gated schedule hook.
 
 ## Gotchas
 
@@ -161,6 +170,7 @@ _None._ The shell owns runtime navigation and theme contracts, not durable appli
 11. **Keep widget links separate from React Navigation linking configuration.** A second initial-intent consumer can race `ShareIntentGate`; the explicit widget gate handles only `orbit://`.
 12. **Do not put Orrery sun assignment on the canvas.** Settings owns the Sun / centre picker; canvas long-press conflicts with the radial reorder gesture.
 13. **Keep the AI Compose intent serializable and minimal.** It carries only `contactId` and a boolean request marker; prompts, credentials, and callbacks must not enter route parameters.
+14. **Reset digest notification taps instead of navigating onto a warm stack.** The Home/Digest reset is what makes the Digest screen's Back destination stable.
 
 ## Related Systems
 
@@ -173,6 +183,7 @@ _None._ The shell owns runtime navigation and theme contracts, not durable appli
 - **Widget** — adds its URI gate, launch refresh registration, and Settings CTA to the ready shell.
 - **Orrery** — registers its dashboard-reached route and receives its self-star and sun-centre controls from Settings.
 - **AI suggestions** — uses Settings for non-secret configuration and the typed Compose intent for profile-originated drafting.
+- **Digest** — registers a self-fetching route, dashboard entry, ready-gated scheduler, and notification reset destination.
 
 ## Changelog
 
@@ -189,3 +200,4 @@ _None._ The shell owns runtime navigation and theme contracts, not durable appli
 | 2026-08-16 | 12 | Added shared status tokens, widget URI routing, foreground refresh registration, and the Settings pin CTA. |
 | 2026-08-17 | 13 | Added the Orrery route, Settings-owned sun controls, and themed star/muted visual tokens. |
 | 2026-08-18 | 14 | Added non-secret AI settings and a serializable, consume-once Compose AI intent. |
+| 2026-08-23 | 15 | Added the typed Digest route, dashboard entry, dashboard-rooted notification reset, and ready-gated schedule registration. |
