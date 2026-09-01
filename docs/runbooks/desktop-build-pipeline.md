@@ -219,9 +219,36 @@ report the `expo-share-intent` `text/plain` filter before Gradle builds the APK.
 `text/plain` filter, and the release APK can capture, return to the source app, and retain
 the no-touchpoint invariant.
 
+## 5. Android home-screen widget verification (Phase 12)
+
+Any change to `app.config.ts`, `plugins/withWidgetBootReceiver.js`, `package.json`, or the
+widget's native dependency requires the §1 prebuild and a physical-device check. Metro reload
+does not regenerate the provider, widget-info XML, manifest receiver, or native click path.
+
+1. Build a **release** APK for standalone widget-host proof, resize/render/pin-prompt checks,
+   cold-start `orbit://` navigation, and reboot recovery. It embeds its JS bundle and is the
+   only meaningful proof after a full reboot.
+2. Build a **debug** APK with Metro and `adb reverse` for any database inspection. The release
+   APK is not `run-as` debuggable, so killed-app widget marks must be counted with debug.
+3. After prebuild, assert the manifest preserves `allowBackup="false"`, portrait orientation,
+   and `singleTask`, and adds the `OrbitFavourites` provider, exactly one non-exported
+   `OrbitWidgetBootReceiver`, and `RECEIVE_BOOT_COMPLETED`.
+4. On the Pixel, verify the grid's status rings, base64 photo and initials fallback, the
+   empty Choose favourites state, pin request/fallback, Profile and Compose links with
+   Dashboard-rooted Back, and small/large resize layouts.
+5. On the debug build, kill the app, tap a mark region, and inspect the new interaction row:
+   it must have `source='widget'`, outbound/connected one-tap defaults, a recomputed
+   `last_contact`, and exactly one row for the tap. Measure a worst-capacity tap-to-update
+   result below the 30-second headless budget.
+6. Record reboot receiver refresh and force-stop → manual-launch re-arm separately; Android
+   treats them as different recovery paths.
+
+The detailed code and test checklist is in
+[Android home-screen widget integration](android-home-screen-widget-integration.md).
+
 ---
 
-## 5. Build gotchas discovered while proving FND-01 (fixed in-repo; documented so they don't recur)
+## 6. Build gotchas discovered while proving FND-01 (fixed in-repo; documented so they don't recur)
 
 These were latent since the scaffold and only surfaced at the **first real metro bundle**
 (tsc/vitest/biome never invoke metro):
