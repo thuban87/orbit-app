@@ -48,4 +48,4 @@ The system uses a definition row in `custom_field_defs` and a same-named, dynami
 - `src/db/transaction.ts` — provides the shared non-reentrant write transaction.
 
 **Depends on:** ADR-008 (Initial Contact Schema as a Cross-Phase Data Contract)
-**Required by:** _None._
+**Required by:** ADR-014 (Read-Time Custom-Field Type Semantics and a Single Sort Expression); ADR-015 (Lossless Field Changes with Quarantine and Launch-Time Retention Sweep)
