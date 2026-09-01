@@ -1,7 +1,7 @@
 # Backup & Restore
 
-**Last updated:** 2026-08-26
-**Updated by phase:** 19-system-contact-import
+**Last updated:** 2026-08-31
+**Updated by phase:** 21-interaction-assist-reach-out
 **Owners:** `src/backup/`, `src/services/backup/`, `src/services/backup-sweep.ts`, `src/db/restore-photo-journal-dao.ts`, `src/screens/BackupScreen.tsx`
 
 ## Purpose
@@ -16,7 +16,7 @@ The backup manifest is a versioned wire model separate from SQLite's schema vers
 
 **Tables:**
 - `tombstones` — indefinitely retained type-and-UID deletion evidence for mergeable rows.
-- `app_settings` — stores portable preferences plus device-local automatic-backup configuration, revision, health, and encryption-flag state.
+- `app_settings` — stores portable preferences (including the default-on `interactionAssistEnabled` toggle) plus device-local automatic-backup configuration, revision, health, and encryption-flag state. The transient `interaction_assists` rows themselves are device-local and excluded from the manifest.
 - `restore_photo_journal` — committed-only finalize/delete work for restored photo files.
 - `contact_methods`, external links, and method provenance — first-class UID-bearing portable children with labels and canonicalization regions where present.
 
@@ -96,6 +96,7 @@ The backup manifest is a versioned wire model separate from SQLite's schema vers
 - **ADR-060:** Versioned Portable Method Graph and Collision-Normalized Restoration — carries normalized endpoint children and resolves their safe natural-key collisions before writes.
 - **ADR-063:** Versioned Lifecycle Backup and Dormant-Cadence Restore — advances the portable graph to v3 and preserves lifecycle invariants before writes.
 - **ADR-065:** Durable Resumable Contact-Import Sessions with Failure-Isolated Photos — keeps accepted picker snapshots local-only and clears them on Replace-all restore.
+- **ADR-070:** Durable Pending Interaction-Assist Lifecycle and Portable Opt-Out — adds the `interactionAssistEnabled` setting to the portable manifest while excluding the transient assist rows.
 
 ## Gotchas
 
@@ -119,6 +120,7 @@ The backup manifest is a versioned wire model separate from SQLite's schema vers
 - **Notifications** and **Digest** — rebuild derived OS schedules after a committed restore.
 - **Dashboard** — offers the temporary Backup entry and rare health nudge.
 - **Contact Import** — retains local-only recovery sessions that Replace-all intentionally clears.
+- **Interaction Assist & Reach Out** — its `interactionAssistEnabled` preference rides in the portable manifest; its assist rows do not.
 
 ## Changelog
 
@@ -128,3 +130,4 @@ The backup manifest is a versioned wire model separate from SQLite's schema vers
 | 2026-08-27 | 18.1 | Added the normalized method/link/provenance graph and collision-normalized restoration. |
 | 2026-08-27 | 18.2 | Bumped the portable graph to v3 for Bound/Unbound state and pre-transaction dormant-cadence resolution. |
 | 2026-08-26 | 19 | Excluded local-only contact-import sessions and cleared them on Replace-all restore. |
+| 2026-08-31 | 21 | Added the `interactionAssistEnabled` preference to the portable manifest (transient assist rows excluded). |
