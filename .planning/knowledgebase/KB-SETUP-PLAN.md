@@ -109,14 +109,20 @@ of templates + scripts + graph bridge supports them.
 - **Phase 02** (codex) — extracted 2026-08-31. ADR-008…012 (dossier-sourced), 3 system docs
   (persistence-core, contacts, status-engine), sqlite-migration-pipeline runbook. Content on par
   with Claude; chronologically scoped. README anchor nudged 01→02; CLAUDE.md untouched (correct).
-- **CODEX GRAPH GAP (important for the backfill):** codex's sandbox **silently skips `graph:build`**
-  — it regenerates INDEX + registry fine but cannot run graphify (needs `~/.claude/…` outside the
-  workspace + worker subprocesses), and reports success anyway. Phase 02's graph had to be rebuilt
-  externally (12→26 edges). Mitigations now in place: (1) skill has a before/after edge-count catch
-  that flags `GRAPH REBUILD OWED` (commit `2d724c5`); (2) run codex extractions in **full-access
-  mode** (likely lets graph:build succeed — test/confirm), or (3) skip per-phase graph builds and
-  run **one `graph:build` at end-of-batch** from Claude/a normal shell. Owner leaning toward
-  full-access + end-of-batch safety build.
+- **Phase 03** (codex, **yolo/full-access**) — extracted 2026-09-01. ADR-013…015 (original
+  dynamic-column custom-field design), custom-fields.md created, persistence-core.md UPDATED
+  (cross-cutting). **Chronology nailed** — describes the phase-03 dynamic-column model
+  (`contact_custom_values`, DDL), NOT the current normalized one; supersession correctly `None`
+  (phase 16 not yet processed). Graph rebuilt fine (26→42 edges).
+- **CODEX GRAPH GAP — RESOLVED by full-access.** codex's default `workspace-write` sandbox
+  silently skips `graph:build` (graphify needs `~/.claude/…` outside the workspace + worker
+  subprocesses) and reports success anyway (phase 02 had to be rebuilt externally, 12→26).
+  **CONFIRMED FIX: run codex extractions in yolo/full-access** — phase 03 rebuilt the graph itself
+  (26→42, graph committed). Backstops still in place: the skill's before/after edge-count catch
+  flags `GRAPH REBUILD OWED` (commit `2d724c5`) for any non-yolo run, and a final `graph:build`
+  from Claude/shell at end-of-batch is cheap insurance.
+- **Watch at phase 16:** the reclaimed ADR-001 (normalized) must supersede ADR-013/014/015 —
+  their `Superseded by:` should flip to ADR-001 when phase 16 is extracted.
 - **Skill fix:** subsystem index maintenance routes to `docs/systems/README.md`, not CLAUDE.md
   (orbit has no per-doc CLAUDE.md index) — commit `afc0e85`.
 
