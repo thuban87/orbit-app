@@ -50,4 +50,4 @@ The system marks favourites with a reversible profile star and orders them by dr
 - `src/components/ContactCard.tsx` — renders the dashboard favourite marker.
 
 **Depends on:** ADR-008 (Initial Contact Schema as a Cross-Phase Data Contract); ADR-010 (Single-Writer Interaction Recency Spine)
-**Required by:** _None._
+**Required by:** ADR-043 (Static Globally Mirrored Favourites Widget)

@@ -51,4 +51,4 @@ The system uses a flat dashboard as Home, with persisted sort/filter controls an
 - `src/screens/FuelSearch.tsx` — removed after the dashboard search surface shipped.
 
 **Depends on:** ADR-011 (Query-Time Status and Never-Contacted Segregation); ADR-029 (In-Query Fuel Eligibility and a Shared Ranked Projection); ADR-031 (Bound Local Fuel Search without FTS5)
-**Required by:** _None._
+**Required by:** ADR-043 (Static Globally Mirrored Favourites Widget)
