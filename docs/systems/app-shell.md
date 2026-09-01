@@ -1,7 +1,7 @@
 # App Shell
 
 **Last updated:** 2026-08-27
-**Updated by phase:** 18.1-contact-method-normalization
+**Updated by phase:** 18.2-bound-unbound-lifecycle
 **Owners:** `App.tsx`, `src/navigation/RootNavigator.tsx`, `src/navigation/types.ts`, `src/navigation/linking.ts`, `src/navigation/notification-gate.tsx`, `src/navigation/widget-linking.ts`, `src/screens/SettingsScreen.tsx`, `src/theme/theme-types.ts`, `src/theme/theme-presets.ts`
 
 ## Purpose
@@ -33,7 +33,7 @@ _None._ The shell owns runtime navigation and theme contracts, not durable appli
 | File | Role |
 |---|---|
 | `App.tsx` | Readiness gate, startup-failure presentation, navigation mount point, gesture root, and photo/notification lifecycle registration. |
-| `src/navigation/RootNavigator.tsx` | Native stack for the dashboard Home, Digest, Orrery, Settings, contact lifecycle, Compose, NeverContacted, ManageFavourites, and CropPhoto. |
+| `src/navigation/RootNavigator.tsx` | Native stack for the dashboard Home, Digest, Orrery, Settings, contact lifecycle, Compose, NeverContacted, UnboundContacts, ManageFavourites, and CropPhoto. |
 | `src/navigation/types.ts` | Typed root-stack route contract, including the self-fetching Digest and Compose surfaces and photo-crop targets. |
 | `src/navigation/linking.ts` | Holds the navigation ref and the single ready-gated Capture navigation owner. |
 | `src/navigation/backup-share-intent.ts` | Handles the narrow Files-to-Orbit backup-share fallback without placing a file URI in route state. |
@@ -57,8 +57,8 @@ _None._ The shell owns runtime navigation and theme contracts, not durable appli
 
 ### Navigating dashboard and settings
 
-1. Home is the dashboard and navigates to contact profiles, creation, Your week, the Orrery, Not yet contacted, Archived, Settings, and favourite management.
-2. Settings exposes Custom Fields, Archived contacts, Manage favourites, self-star selection, and sun-centre selection as separate, low-traffic controls.
+1. Home is the dashboard and navigates to contact profiles, creation, Your week, the Orrery, Not yet contacted, Unbound contacts, Archived, Settings, and favourite management.
+2. Settings exposes Custom Fields, Archived contacts, Manage favourites, self-star selection, sun-centre selection, and lifecycle preferences as separate, low-traffic controls.
 3. Every stack screen renders its own themed chrome because native-stack headers are disabled; no duplicate native header appears above screen-local Back controls.
 
 ### Opening Backup & Restore
@@ -175,6 +175,7 @@ _None._ The shell owns runtime navigation and theme contracts, not durable appli
 - **ADR-058:** Optional Encrypted Backups and Previewed Local Restoration — keeps restore content and passphrases out of navigation state.
 - **ADR-059:** Normalized Contact Methods, Canonical Actionability, and Local Provenance — supplies the device-region bootstrap for the one-time method migration.
 - **ADR-060:** Versioned Portable Method Graph and Collision-Normalized Restoration — adds the narrow ready-gated backup-share fallback.
+- **ADR-062:** Bound/Unbound Lifecycle and One-Way Cadence Assignment — adds the dedicated Unbound route and lifecycle-oriented settings surfaces.
 
 ## Gotchas
 
@@ -195,6 +196,7 @@ _None._ The shell owns runtime navigation and theme contracts, not durable appli
 15. **Do not mount navigation after a bootstrap failure.** A classified migration failure has rolled back unchanged; generic failure copy must not promise unavailable support or recovery.
 16. **Restore route parameters must be content-free.** Pass only an opaque in-memory cache token and aggregate preview; never put a file URI, manifest, callback, or passphrase in navigation state.
 17. **Every possible first opener needs the migration region.** `openAndMigrate()` can run before React mounts from headless notification or widget work; database bootstrap itself stays free of native localization imports for node-testability.
+18. **Keep Unbound navigation retrieval-oriented.** The dedicated list and neutral search rows may open Profile, but active-orbit controls stay in their Bound query owners.
 
 ## Related Systems
 
@@ -229,3 +231,4 @@ _None._ The shell owns runtime navigation and theme contracts, not durable appli
 | 2026-08-24 | 16 | Added accurate classified migration and generic bootstrap failure presentation while retaining the readiness gate. |
 | 2026-08-24 | 17 | Added Backup routes, content-free restore navigation, and ready-gated backup/photo recovery hooks. |
 | 2026-08-27 | 18.1 | Added device-region migration bootstrap and the ready-gated backup-share fallback. |
+| 2026-08-27 | 18.2 | Added the Unbound route and lifecycle settings/navigation treatment. |
