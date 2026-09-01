@@ -7,7 +7,7 @@
 **Reversibility:** costly
 **Migration:** None
 **Supersedes:** None
-**Superseded by:** None
+**Superseded by:** ADR-074 (partial)
 
 ## Context
 
@@ -48,4 +48,4 @@ The small widget tile marks contacted through a headless task and exposes a dist
 - `App.tsx` — mounts the ready-gated widget linking bridge.
 
 **Depends on:** ADR-010 (Single-Writer Interaction Recency Spine); ADR-019 (Native Stack Contact Lifecycle Navigation); ADR-023 (Structured Touchpoints and One-Tap Defaults); ADR-036 (Entry-Agnostic Compose Navigation and Transmittable-Fuel Guardrails)
-**Required by:** None
+**Required by:** ADR-074 (Widget Contact Supersession and Strict Reach Deep-Link Fail-Safe)

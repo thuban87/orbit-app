@@ -47,4 +47,4 @@ The system registers a self-fetching `Compose` route with serializable `{ contac
 - `src/db/contact-read.ts` — supplies the live/archive state and phone needed by Compose.
 
 **Depends on:** ADR-018 (Archive-Gated Contact Purge with Explicit Fan-Out); ADR-019 (Native Stack Contact Lifecycle Navigation); ADR-029 (In-Query Fuel Eligibility and a Shared Ranked Projection).
-**Required by:** ADR-040 (Exactly-Once Notification Actions and Dashboard-Rooted Tap Routing); ADR-044 (Headless Widget Actions and Dashboard-Rooted Deep Links); ADR-052 (Compose-Owned AI Draft Lifecycle and Acknowledged Egress)
+**Required by:** ADR-040 (Exactly-Once Notification Actions and Dashboard-Rooted Tap Routing); ADR-044 (Headless Widget Actions and Dashboard-Rooted Deep Links); ADR-052 (Compose-Owned AI Draft Lifecycle and Acknowledged Egress); ADR-072 (Shared Actionable Reach Out Router with Native Channel Handoff)

@@ -50,4 +50,4 @@ The system uses user-triggered, one-way reconciliation of name, phones, emails, 
 - `src/screens/ReconcileGridScreen.tsx` — presents Settings-launched batch review and safe bulk actions.
 
 **Depends on:** ADR-059 (Normalized Contact Methods, Canonical Actionability, and Local Provenance); ADR-062 (Bound/Unbound Lifecycle and One-Way Cadence Assignment)
-**Required by:** None
+**Required by:** ADR-073 (Merge-Reparented, Purge-Cascaded Interaction Assists)

@@ -45,4 +45,4 @@ The system uses `expo-sms.sendSMSAsync` for best-effort, prefilled SMS-composer 
 - `src/screens/ComposeScreen.tsx` — invokes the native handoffs with a Send latch and Copy fallback.
 
 **Depends on:** _None._
-**Required by:** ADR-052 (Compose-Owned AI Draft Lifecycle and Acknowledged Egress); ADR-061 (DAO-Selected Actionable Primary SMS Handoff)
+**Required by:** ADR-052 (Compose-Owned AI Draft Lifecycle and Acknowledged Egress); ADR-061 (DAO-Selected Actionable Primary SMS Handoff); ADR-072 (Shared Actionable Reach Out Router with Native Channel Handoff)

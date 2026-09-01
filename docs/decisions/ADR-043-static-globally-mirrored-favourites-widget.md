@@ -48,4 +48,4 @@ The system renders a resizable, static manually ranked grid from the shared favo
 - `src/screens/ManageFavouritesScreen.tsx` — owns the shared drag order and empty-state destination.
 
 **Depends on:** ADR-011 (Query-Time Status and Never-Contacted Segregation); ADR-032 (Flat Dashboard Discovery and In-Query Contact Search); ADR-033 (Profile Marking and Shared Drag-Reordered Favourites)
-**Required by:** None
+**Required by:** ADR-074 (Widget Contact Supersession and Strict Reach Deep-Link Fail-Safe)

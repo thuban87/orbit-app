@@ -48,4 +48,4 @@ The system uses the method-read DAO's selected actionable primary phone as the o
 - `src/screens/ComposeScreen.tsx` — passes only the selected canonical destination to the native SMS handoff.
 
 **Depends on:** ADR-035 (Native SMS Handoff with Guaranteed Clipboard Copy); ADR-059 (Normalized Contact Methods, Canonical Actionability, and Local Provenance)
-**Required by:** None.
+**Required by:** ADR-072 (Shared Actionable Reach Out Router with Native Channel Handoff)
