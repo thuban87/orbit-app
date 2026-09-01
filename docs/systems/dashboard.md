@@ -1,7 +1,7 @@
 # Dashboard
 
 **Last updated:** 2026-08-27
-**Updated by phase:** 18.2-bound-unbound-lifecycle
+**Updated by phase:** 19-system-contact-import
 **Owners:** `src/db/dashboard-read.ts`, `src/screens/HomeScreen.tsx`, `src/screens/NeverContactedScreen.tsx`, `src/components/ContactCard.tsx`, `src/components/BirthdayBanner.tsx`, `src/stores/dashboard-prefs-store.ts`
 
 ## Purpose
@@ -47,6 +47,7 @@ The dashboard owns no tables. It projects the on-device `contacts`, `categories`
 | `src/logic/birthday-logic.ts` | Strict local-date birthday parsing and days-until computation. |
 | `src/logic/dashboard-empty-logic.ts` | Pure cause-aware empty-state precedence. |
 | `src/stores/dashboard-prefs-store.ts` | Device-local sort/filter preference persistence. |
+| `src/components/AddSpeedDialFab.tsx` | Expands the Add affordance into manual-create and selected-contact import entries. |
 
 ## How It Works
 
@@ -88,6 +89,12 @@ The dashboard owns no tables. It projects the on-device `contacts`, `categories`
 2. A rare dismissible nudge appears only when meaningful data has no verified automatic backup, or changed data has remained unprotected for at least fourteen days.
 3. The nudge opens Backup & Restore and clears its dismissal only after the health condition resolves; it is never a permanent dashboard card.
 
+### Starting contact import
+
+1. The Add affordance expands into `Import from Contacts` and `Create manually`; the manual path preserves the ordinary create route.
+2. The import entry opens selected-contact acquisition only when Android's privacy-preserving picker is available; unavailable devices retain manual creation.
+3. The invisible collapsed speed-dial scrim and option buttons have `pointerEvents="none"`; only the expanded control intercepts dashboard touches.
+
 ### Showing birthdays and empty states
 
 1. `BirthdayBanner` receives every non-archived birthday candidate, including snoozed and never-contacted people.
@@ -121,6 +128,8 @@ The active dashboard and favourites reads select only Bound contacts. Search rem
 - **ADR-057:** Full-State Versioned Backups with Verified Manual and Foreground SAF Snapshots — defines automatic-backup health used by the temporary entry and nudge.
 - **ADR-058:** Optional Encrypted Backups and Previewed Local Restoration — keeps the dashboard out of backup contents and restore results.
 - **ADR-062:** Bound/Unbound Lifecycle and One-Way Cadence Assignment — makes active populations Bound-only while retaining neutral relationship retrieval.
+- **ADR-064:** Permissionless Android 17 System-Contact Snapshot Acquisition — adds the optional dashboard selected-contact entry.
+- **ADR-066:** Deliberate Reviewed Import with Unbound Bulk Defaults — makes import a deliberate alternative to manual creation.
 
 ## Gotchas
 
@@ -136,6 +145,7 @@ The active dashboard and favourites reads select only Bound contacts. Search rem
 10. **Do not call a manual export healthy.** Dashboard health derives only from a verified automatic SAF snapshot and matching data revision.
 11. **Keep the backup nudge rare.** It is a recovery prompt for meaningful unprotected data, not a status card or recurring dashboard obligation.
 12. **Do not render active chrome for an Unbound retrieval row.** Its NULL status/progress/rank is deliberate; ContactCard remains a Bound-population component.
+13. **An invisible scrim still receives touches.** The collapsed speed dial must make its scrim and option buttons inert, not merely transparent.
 
 ## Related Systems
 
@@ -148,6 +158,7 @@ The active dashboard and favourites reads select only Bound contacts. Search rem
 - **Orrery** — opens from the header and independently reads the local contacted-relationship projection.
 - **Digest** — opens from the header and independently reads a weekly retrospective plus non-nagged overlooked populations.
 - **Backup & Restore** — owns the health state, automatic-folder configuration, export, and restore flows reached from Home.
+- **Contact Import** — begins selected-contact acquisition from the speed-dial entry.
 
 ## Changelog
 
@@ -160,3 +171,4 @@ The active dashboard and favourites reads select only Bound contacts. Search rem
 | 2026-08-23 | 15 | Added the non-badged “Your week” entry to the separate live digest surface. |
 | 2026-08-24 | 17 | Added a temporary Backup & Restore entry and rare health-driven protection nudge. |
 | 2026-08-27 | 18.2 | Added Bound-only active projections, neutral Unbound retrieval, dedicated browsing, and Never Contacted opt-in. |
+| 2026-08-26 | 19 | Replaced direct creation with safe manual/import speed-dial choices. |
