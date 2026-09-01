@@ -51,4 +51,4 @@ The system persists one 512×512 JPEG master per target under the document direc
 - `src/components/field-widgets/PhotoFieldWidget.tsx` — stores a custom photo field's derivable relative path through the existing value flow.
 
 **Depends on:** ADR-015 (Lossless Field Changes with Quarantine and Launch-Time Retention Sweep); ADR-018 (Archive-Gated Contact Purge with Explicit Fan-Out)
-**Required by:** _None._
+**Required by:** ADR-065 (Durable Resumable Contact-Import Sessions with Failure-Isolated Photos).

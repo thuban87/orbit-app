@@ -52,4 +52,4 @@ The system uses UID-bearing `contact_methods`, external-link, and provenance row
 - `src/services/device-region.ts` — supplies the device region to every possible first-open migration path.
 
 **Depends on:** ADR-008 (Initial Contact Schema as a Cross-Phase Data Contract); ADR-009 (Crash-Safe Forward-Only SQLite Migrations)
-**Required by:** ADR-061 (DAO-Selected Actionable Primary SMS Handoff)
+**Required by:** ADR-061 (DAO-Selected Actionable Primary SMS Handoff); ADR-064 (Permissionless Android 17 System-Contact Snapshot Acquisition); ADR-066 (Deliberate Reviewed Import with Unbound Bulk Defaults); ADR-067 (Conservative Advisory Identity Matching and Explicit Source Consolidation)
