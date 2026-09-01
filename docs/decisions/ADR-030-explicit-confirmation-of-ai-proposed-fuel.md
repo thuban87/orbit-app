@@ -47,4 +47,4 @@ The system stores an unconfirmed AI proposal as `source='ai'`, renders it distin
 - `src/screens/ContactProfileScreen.tsx` — reloads fuel after confirmation or dismissal.
 
 **Depends on:** ADR-028 (Per-Item Conversational Fuel with Fixed Kinds); ADR-029 (In-Query Fuel Eligibility and a Shared Ranked Projection)
-**Required by:** _None._
+**Required by:** ADR-031 (Bound Local Fuel Search without FTS5)

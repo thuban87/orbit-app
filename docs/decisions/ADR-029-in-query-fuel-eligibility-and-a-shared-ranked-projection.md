@@ -49,4 +49,4 @@ The system uses one query-time eligible ranked projection: exclude `off_limits`,
 - `src/screens/ContactProfileScreen.tsx` — reloads and displays the profile's top ranked fuel row.
 
 **Depends on:** ADR-028 (Per-Item Conversational Fuel with Fixed Kinds)
-**Required by:** _None._
+**Required by:** ADR-030 (Explicit Confirmation of AI-Proposed Fuel); ADR-031 (Bound Local Fuel Search without FTS5)
