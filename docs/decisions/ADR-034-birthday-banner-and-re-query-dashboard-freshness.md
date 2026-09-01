@@ -48,4 +48,4 @@ The dashboard displays a seven-day, soonest-first birthday banner for every non-
 - `src/screens/HomeScreen.tsx` — mounts the banner and performs focus, foreground, and pull refreshes.
 
 **Depends on:** ADR-008 (Initial Contact Schema as a Cross-Phase Data Contract); ADR-011 (Query-Time Status and Never-Contacted Segregation)
-**Required by:** _None._
+**Required by:** ADR-039 (Pre-Scheduled Inexact Decay Reminders)

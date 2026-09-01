@@ -46,4 +46,4 @@ The system computes continuous progress and its status buckets at query time fro
 - `src/db/recency-dao.ts` — maintains the local-wall-clock `last_contact` value that status reads.
 
 **Depends on:** ADR-010 (Single-Writer Interaction Recency Spine).
-**Required by:** ADR-026 (Rogue Status for Unresponsive or Far-Overdue Contacts); ADR-032 (Flat Dashboard Discovery and In-Query Contact Search); ADR-034 (Birthday Banner and Re-query Dashboard Freshness)
+**Required by:** ADR-026 (Rogue Status for Unresponsive or Far-Overdue Contacts); ADR-032 (Flat Dashboard Discovery and In-Query Contact Search); ADR-034 (Birthday Banner and Re-query Dashboard Freshness); ADR-039 (Pre-Scheduled Inexact Decay Reminders)

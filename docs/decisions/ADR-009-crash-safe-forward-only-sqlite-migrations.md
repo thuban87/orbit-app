@@ -47,4 +47,4 @@ The system uses ordered, forward-only `PRAGMA user_version` migrations. Each ver
 - `src/db/migrations/001-initial.ts` — supplies the first migration step.
 
 **Depends on:** None.
-**Required by:** None.
+**Required by:** ADR-041 (Notification Settings, Privacy Channels, and Birthday Alerts)
