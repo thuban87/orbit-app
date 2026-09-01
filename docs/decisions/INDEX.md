@@ -22,7 +22,7 @@ not something you can pattern-match against.
 ## How to use this
 
 - **Is a decision still live?** Check the `Superseded by` column. 0 of
-  27 ADRs are superseded in whole or in part.
+  31 ADRs are superseded in whole or in part.
 - **Which decisions govern a file?** Don't grep this file — ask the graph:
   `npm run graph:ask -- governs src/db/field-values-dao.ts`, or follow the
   `governed_by` edges.
@@ -58,3 +58,7 @@ not something you can pattern-match against.
 | 025 | Immutable Lifecycle Events in a Unified Timeline | Accepted | 06-interaction-log-status-impact | — | — | — | 5 | `src/components`, `src/db` |
 | 026 | Rogue Status for Unresponsive or Far-Overdue Contacts | Accepted | 06-interaction-log-status-impact | — | — | — | 5 | `src/db`, `src/screens`, `src/theme` |
 | 027 | Derived Profile-Only Gravity and Intensity | Accepted | 06-interaction-log-status-impact | — | — | — | 6 | `src/components`, `src/db`, `src/services` |
+| 028 | Per-Item Conversational Fuel with Fixed Kinds | Accepted | 07-conversational-fuel | — | — | — | 5 | `src/components`, `src/db`, `src/db/migrations` +1 |
+| 029 | In-Query Fuel Eligibility and a Shared Ranked Projection | Accepted | 07-conversational-fuel | — | — | — | 5 | `src/components`, `src/db`, `src/screens` +1 |
+| 030 | Explicit Confirmation of AI-Proposed Fuel | Accepted | 07-conversational-fuel | — | — | — | 4 | `src/components`, `src/db`, `src/screens` |
+| 031 | Bound Local Fuel Search without FTS5 | Accepted | 07-conversational-fuel | — | — | — | 4/6 live | `src/db`, `src/navigation`, `src/screens` |
