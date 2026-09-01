@@ -4,7 +4,7 @@
 
 Orbit evolves its on-device SQLite schema with ordered TypeScript migrations rather than SQL files or a remote database. Use this process when changing durable SQLite structure: it keeps one version step atomic, testable with node-side SQLite, and safe to retry after a failure.
 
-## Architecture (Phases 02, 11, 16)
+## Architecture (Phases 02, 11, 16, 17)
 
 The bootstrap opens `orbit.db`, sets connection PRAGMAs before opening a transaction, then calls the migration runner. The runner reads `PRAGMA user_version`, sorts pending steps, and commits each step's DDL and version bump together.
 
@@ -33,7 +33,9 @@ try {
 3. **`src/db/migrations/001-initial.ts`** — defines the phase-2 initial schema and seeds.
 4. **`src/db/migrations/002-app-settings.ts`** — additive singleton-settings example: DDL and seed remain in the same version step.
 5. **`src/db/migrations/006-normalize-custom-field-values.ts`** — representation-conversion example: validates, copies, proves, then retires a legacy table in one transaction.
-6. **`PRAGMA user_version`** — records the last fully committed step.
+6. **`src/db/migrations/007-tombstones.ts`** — additive backup-support example: creates durable deletion evidence and adds singleton defaults.
+7. **`src/db/migrations/008-restore-photo-journal.ts`** — additive recovery-table example for committed restore work.
+8. **`PRAGMA user_version`** — records the last fully committed step.
 
 ## File Locations
 
@@ -48,6 +50,9 @@ try {
 | `src/db/migrations/002-app-settings.ts` | Additive, defaulted singleton-table migration example. |
 | `src/db/migrations/006-normalize-custom-field-values.ts` | Atomic dynamic-column to normalized-pair conversion. |
 | `src/db/migrations/006-normalize-custom-field-values.test.ts` | v5-to-v6 preservation, rollback, and orphan-column migration proof. |
+| `src/db/migrations/007-tombstones.ts` | Tombstone, revision, reserved-identity, and backup-settings migration. |
+| `src/db/migrations/008-restore-photo-journal.ts` | Durable restore-photo journal migration. |
+| `src/db/migrations/full-chain.test.ts` | Runs the shared registered migration chain to the imported target version. |
 | `src/db/app-settings-dao.test.ts` | Migration-002 defaults and validated settings-write coverage. |
 | `src/db/__testkit__/node-sqlite.ts` | In-memory SQLite adapter for migration tests. |
 
@@ -69,7 +74,7 @@ try {
    };
    ```
 
-3. **Register the migration** in the `MIGRATIONS` list in `src/db/database.ts`, and advance `TARGET_VERSION` to the same integer. The runner performs the transaction and `user_version` bump; do not add a second transaction or manually update `user_version` in the migration.
+3. **Register the migration** in the exported `MIGRATIONS` list in `src/db/database.ts`, and advance `TARGET_VERSION` to the same integer. The runner performs the transaction and `user_version` bump; do not add a second transaction or manually update `user_version` in the migration.
 
 4. **Add an in-memory test** beside the migration. Open the fixture from `src/db/__testkit__/node-sqlite.ts`, run the real migration runner, and assert the schema/data result plus retry safety for a throwing step where relevant. For a representation conversion, test source-byte preservation, complete destination coverage, and an unchanged source database after a classified failure.
 
@@ -99,13 +104,15 @@ try {
 
 4. **Treating every malformed legacy shape alike.** Migration 006 rolls back unchanged when a loss-bearing inconsistency prevents preservation, but records a non-loss-bearing orphan dynamic column in bounded `field_history` and proceeds. The latter is an audit trace, not recovery or backup.
 
+5. **Leaving the full-chain assertion on a literal version.** Import `TARGET_VERSION` and the shared `MIGRATIONS` registry so the test follows newly registered steps such as 007 and 008.
+
 ## Smoke Test
 
 ```bash
-npx vitest run src/db/migrations/runner.test.ts src/db/migrations/001-initial.test.ts src/db/migrations/006-normalize-custom-field-values.test.ts
+npx vitest run src/db/migrations/runner.test.ts src/db/migrations/full-chain.test.ts src/db/migrations/006-normalize-custom-field-values.test.ts src/db/migrations/007-tombstones.test.ts src/db/migrations/008-restore-photo-journal.test.ts
 ```
 
-Expected: the runner, initial-schema, and migration-006 suites pass, including rollback, seed, foreign-key-cascade, source-value preservation, and normalized-pair assertions.
+Expected: the runner and full-chain suites reach the registered target, while representation conversion, tombstone defaults, and restore-journal schema checks pass.
 
 ```bash
 npx tsc --noEmit && npx biome check src/db
