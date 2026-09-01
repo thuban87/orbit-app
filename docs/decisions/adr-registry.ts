@@ -17,7 +17,7 @@
 // NOTE: ADR-0005 [ACCEPTED] AiService Port Omits the Local/LAN (Ollama) Provider
 // NOTE: ADR-0006 [ACCEPTED] Theme-Token Architecture
 // NOTE: ADR-0007 [ACCEPTED] Cross-Machine Android Build Pipeline & Physical-Pixel FND-01 Proof
-// NOTE: ADR-0008 [ACCEPTED] Initial Contact Schema as a Cross-Phase Data Contract
+// IMPORTANT: ADR-0008 [SUPERSEDED BY ADR-059 (partial)] Initial Contact Schema as a Cross-Phase Data Contract
 // NOTE: ADR-0009 [ACCEPTED] Crash-Safe Forward-Only SQLite Migrations
 // NOTE: ADR-0010 [ACCEPTED] Single-Writer Interaction Recency Spine
 // NOTE: ADR-0011 [ACCEPTED] Query-Time Status and Never-Contacted Segregation
@@ -44,7 +44,7 @@
 // NOTE: ADR-0032 [ACCEPTED] Flat Dashboard Discovery and In-Query Contact Search
 // NOTE: ADR-0033 [ACCEPTED] Profile Marking and Shared Drag-Reordered Favourites
 // NOTE: ADR-0034 [ACCEPTED] Birthday Banner and Re-query Dashboard Freshness
-// NOTE: ADR-0035 [ACCEPTED] Native SMS Handoff with Guaranteed Clipboard Copy
+// IMPORTANT: ADR-0035 [SUPERSEDED BY ADR-061 (partial)] Native SMS Handoff with Guaranteed Clipboard Copy
 // NOTE: ADR-0036 [ACCEPTED] Entry-Agnostic Compose Navigation and Transmittable-Fuel Guardrails
 // NOTE: ADR-0037 [ACCEPTED] Text-Only Android Share Intent Integration
 // NOTE: ADR-0038 [ACCEPTED] Contact-Owned Share Capture Fuel
@@ -65,8 +65,11 @@
 // NOTE: ADR-0053 [ACCEPTED] Local-First LiteLLM AI Model Catalog
 // NOTE: ADR-0054 [ACCEPTED] Live Weekly Digest Retrospective and Overlooked Relationship Read
 // NOTE: ADR-0055 [ACCEPTED] Dedicated Weekly Digest Scheduling and Persisted Notification Policy
-// NOTE: ADR-0056 [ACCEPTED] Tombstone-Backed UID Reconciliation for Portable Restores
+// IMPORTANT: ADR-0056 [SUPERSEDED BY ADR-060 (partial)] Tombstone-Backed UID Reconciliation for Portable Restores
 // NOTE: ADR-0057 [ACCEPTED] Full-State Versioned Backups with Verified Manual and Foreground SAF Snapshots
 // NOTE: ADR-0058 [ACCEPTED] Optional Encrypted Backups and Previewed Local Restoration
+// NOTE: ADR-0059 [ACCEPTED] Normalized Contact Methods, Canonical Actionability, and Local Provenance
+// NOTE: ADR-0060 [ACCEPTED] Versioned Portable Method Graph and Collision-Normalized Restoration
+// NOTE: ADR-0061 [ACCEPTED] DAO-Selected Actionable Primary SMS Handoff
 
-export const ADR_COUNT = 58;
+export const ADR_COUNT = 61;

@@ -21,8 +21,8 @@ not something you can pattern-match against.
 
 ## How to use this
 
-- **Is a decision still live?** Check the `Superseded by` column. 5 of
-  58 ADRs are superseded in whole or in part.
+- **Is a decision still live?** Check the `Superseded by` column. 8 of
+  61 ADRs are superseded in whole or in part.
 - **Which decisions govern a file?** Don't grep this file — ask the graph:
   `npm run graph:ask -- governs src/db/field-values-dao.ts`, or follow the
   `governed_by` edges.
@@ -38,7 +38,7 @@ not something you can pattern-match against.
 | 005 | AiService Port Omits the Local/LAN (Ollama) Provider | Accepted | 01-project-scaffold-portable-code | — | — | — | 3 | `src/services` |
 | 006 | Theme-Token Architecture | Accepted | 01-project-scaffold-portable-code | — | — | — | 7 | `scripts`, `src/screens`, `src/stores` +1 |
 | 007 | Cross-Machine Android Build Pipeline & Physical-Pixel FND-01 Proof | Accepted | 01-project-scaffold-portable-code | — | — | — | 3 | `docs/runbooks`, `src/constants` |
-| 008 | Initial Contact Schema as a Cross-Phase Data Contract | Accepted | 02-data-foundation-status-engine | — | — | — | 3 | `src/db`, `src/db/migrations` |
+| 008 | Initial Contact Schema as a Cross-Phase Data Contract | Accepted | 02-data-foundation-status-engine | — | ADR-059 (partial) | — | 3 | `src/db`, `src/db/migrations` |
 | 009 | Crash-Safe Forward-Only SQLite Migrations | Accepted | 02-data-foundation-status-engine | — | — | — | 4 | `src/db`, `src/db/migrations` |
 | 010 | Single-Writer Interaction Recency Spine | Accepted | 02-data-foundation-status-engine | — | — | — | 3 | `src/db`, `src/db/migrations` |
 | 011 | Query-Time Status and Never-Contacted Segregation | Accepted | 02-data-foundation-status-engine | — | — | — | 3 | `src/db` |
@@ -65,7 +65,7 @@ not something you can pattern-match against.
 | 032 | Flat Dashboard Discovery and In-Query Contact Search | Accepted | 08-dashboard-never-contacted-screen | ADR-031 (partial) | — | — | 6/7 live | `src/db`, `src/navigation`, `src/screens` |
 | 033 | Profile Marking and Shared Drag-Reordered Favourites | Accepted | 08-dashboard-never-contacted-screen | — | — | — | 6 | `src/components`, `src/db`, `src/logic` +1 |
 | 034 | Birthday Banner and Re-query Dashboard Freshness | Accepted | 08-dashboard-never-contacted-screen | — | — | — | 5 | `src/components`, `src/db`, `src/logic` +1 |
-| 035 | Native SMS Handoff with Guaranteed Clipboard Copy | Accepted | 09-compose-screen-sms-handoff | — | — | — | 3 | `src/db`, `src/logic`, `src/screens` |
+| 035 | Native SMS Handoff with Guaranteed Clipboard Copy | Accepted | 09-compose-screen-sms-handoff | — | ADR-061 (partial) | — | 3 | `src/db`, `src/logic`, `src/screens` |
 | 036 | Entry-Agnostic Compose Navigation and Transmittable-Fuel Guardrails | Accepted | 09-compose-screen-sms-handoff | — | — | — | 5 | `src/db`, `src/navigation`, `src/screens` |
 | 037 | Text-Only Android Share Intent Integration | Accepted | 10-share-sheet-capture | — | — | — | 3 | `modules/orbit-share-finish/android/src/main/java/expo/modules/orbitsharefinish`, `patches`, `src/navigation` |
 | 038 | Contact-Owned Share Capture Fuel | Accepted | 10-share-sheet-capture | — | — | — | 5 | `src/db`, `src/logic`, `src/screens` |
@@ -86,6 +86,9 @@ not something you can pattern-match against.
 | 053 | Local-First LiteLLM AI Model Catalog | Accepted | 14-ai-message-suggestions | — | — | — | 5 | `scripts`, `src/ai`, `src/screens` |
 | 054 | Live Weekly Digest Retrospective and Overlooked Relationship Read | Accepted | 15-weekly-digest | — | — | — | 4 | `src/db`, `src/logic`, `src/screens` |
 | 055 | Dedicated Weekly Digest Scheduling and Persisted Notification Policy | Accepted | 15-weekly-digest | — | — | — | 7 | `src/db`, `src/db/migrations`, `src/screens` +1 |
-| 056 | Tombstone-Backed UID Reconciliation for Portable Restores | Accepted | 17-backup-export-restore | — | — | — | 6 | `src/backup`, `src/db`, `src/db/migrations` |
+| 056 | Tombstone-Backed UID Reconciliation for Portable Restores | Accepted | 17-backup-export-restore | — | ADR-060 (partial) | — | 6 | `src/backup`, `src/db`, `src/db/migrations` |
 | 057 | Full-State Versioned Backups with Verified Manual and Foreground SAF Snapshots | Accepted | 17-backup-export-restore | — | — | — | 7 | `src/backup`, `src/services`, `src/services/backup` |
 | 058 | Optional Encrypted Backups and Previewed Local Restoration | Accepted | 17-backup-export-restore | — | — | — | 7 | `src/backup`, `src/db/migrations`, `src/screens` +2 |
+| 059 | Normalized Contact Methods, Canonical Actionability, and Local Provenance | Accepted | 18.1-contact-method-normalization | ADR-008 (partial) | — | — | 9 | `src/db`, `src/db/migrations`, `src/logic` +1 |
+| 060 | Versioned Portable Method Graph and Collision-Normalized Restoration | Accepted | 18.1-contact-method-normalization | ADR-056 (partial) | — | — | 7 | `src/backup`, `src/db` |
+| 061 | DAO-Selected Actionable Primary SMS Handoff | Accepted | 18.1-contact-method-normalization | ADR-035 (partial) | — | — | 5 | `src/db`, `src/logic`, `src/screens` |
