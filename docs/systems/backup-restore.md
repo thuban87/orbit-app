@@ -1,7 +1,7 @@
 # Backup & Restore
 
 **Last updated:** 2026-08-27
-**Updated by phase:** 18.1-contact-method-normalization
+**Updated by phase:** 18.2-bound-unbound-lifecycle
 **Owners:** `src/backup/`, `src/services/backup/`, `src/services/backup-sweep.ts`, `src/db/restore-photo-journal-dao.ts`, `src/screens/BackupScreen.tsx`
 
 ## Purpose
@@ -93,6 +93,7 @@ The backup manifest is a versioned wire model separate from SQLite's schema vers
 - **ADR-057:** Full-State Versioned Backups with Verified Manual and Foreground SAF Snapshots — defines the portable snapshot and automatic policy.
 - **ADR-058:** Optional Encrypted Backups and Previewed Local Restoration — defines encryption and safe restoration.
 - **ADR-060:** Versioned Portable Method Graph and Collision-Normalized Restoration — carries normalized endpoint children and resolves their safe natural-key collisions before writes.
+- **ADR-063:** Versioned Lifecycle Backup and Dormant-Cadence Restore — advances the portable graph to v3 and preserves lifecycle invariants before writes.
 
 ## Gotchas
 
@@ -104,6 +105,7 @@ The backup manifest is a versioned wire model separate from SQLite's schema vers
 6. **Foreground-only means catch-up on launch.** It is not a background scheduler or a cloud-sync promise.
 7. **Normalize method actions before publishing survivors.** A collapsed duplicate must re-parent its provenance and leave the survivor set consistent with the writes.
 8. **Demote before promoting a primary or active link.** SQLite partial unique indexes are statement-immediate, so a promotion-first write can fail mid-restore.
+9. **Plan lifecycle conflicts before the transaction.** A valid newer Unbound row with NULL cadence retains a local assigned cadence as dormant; malformed lifecycle cells fail validation before mutation.
 
 ## Related Systems
 
@@ -120,3 +122,4 @@ The backup manifest is a versioned wire model separate from SQLite's schema vers
 |---|---|---|
 | 2026-08-24 | 17 | Created full-state backup, encryption, automatic SAF snapshot, and validated restoration documentation. |
 | 2026-08-27 | 18.1 | Added the normalized method/link/provenance graph and collision-normalized restoration. |
+| 2026-08-27 | 18.2 | Bumped the portable graph to v3 for Bound/Unbound state and pre-transaction dormant-cadence resolution. |
