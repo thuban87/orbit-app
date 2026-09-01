@@ -34,10 +34,14 @@ Read the relevant system doc *before* making changes to that subsystem.
 | Backup & restore | `backup-restore.md` | `services/backup/`, `services/backup-sweep.ts`, `db/restore-photo-journal-dao.ts`, `db/app-settings-dao.ts`, `db/data-revision-dao.ts` | 17 |
 | Contact import | `contact-import.md` | `db/imported-contact-dao.ts`, `db/import-session-dao.ts`, `db/import-session-read.ts`, `db/unbound-read.ts`, `services/import/` | 19 |
 | Contact reconciliation | `contact-reconciliation.md` | merge/dedupe logic + `screens/DuplicateReviewScreen.tsx` (exact DAOs to confirm when authored) | 20 |
+| Interaction assist / Reach Out | `interaction-assist.md` | `db/interaction-assist-dao.ts`, `db/interaction-assist-read.ts`, `logic/assist-eligibility.ts`, `services/reach-out/handoff.ts`, `services/interaction-assist-sweep.ts`, `stores/assist-store.ts`; assist/reach components (`components/ReachOutRouter.tsx`, `EndpointSelector.tsx`, `AssistBanner.tsx`, `AssistConfirmation.tsx`, `PendingConfirmationsSheet.tsx`) | 21 |
 
-**Open routing note — assist / "reach out" (phase 21):** in-flight at the time this map was
-drawn. Its home is decided when phase 21 is extracted (likely folds into `contact-methods`
-as the reach-out surface; may also touch `status-engine` / `ai-suggestions`). Not pre-boxed.
+**Assist / "reach out" (phase 21) — resolved to its own doc `interaction-assist.md`.** It is a
+standalone subsystem (own `interaction_assists` table, DAOs, and handoff/sweep services), not a
+fold into `contact-methods`. It cross-cuts several docs: `contact-methods` (actionable-primary
+selection, Compose Send seam), `interaction-log` + `contacts` (handoff-time logging through the
+sole recency writer; purge cascade), `contact-reconciliation` (merge reparent), and
+`widget` + `app-shell` (widget `Contact` deep-link, app-global banner, Settings toggle).
 
 **Owning-code lists are the initial routing guide**, derived from the DAO/service layout.
 Refine a row when its subsystem doc is first authored during extraction and the real file
