@@ -68,11 +68,14 @@ of templates + scripts + graph bridge supports them.
 
 ## Group B — The two skills  *(after A)*
 
-- [ ] **B1 `extract-phase-kb`** — dossier-first resolver, 18 subsystems, chronology
-      discipline, ADR-001/002 reclaim rule, batched-per-milestone framing
-- [ ] **B2 `split-system-doc`** — orbit subsystems + template paths
-- [ ] **B3 Install both** to `.claude/skills/` + `~/.codex/skills/`; resolve CLAUDE.md's
-      "port before first build" notes to reflect reality
+- [x] **B1 `extract-phase-kb`** — *done 08-31 (subagent, verified). 323 lines; dossier-first
+      resolver, 18 subsystems, chronology discipline, legacy ADR-001/002/003 reclaim rule,
+      batched-per-milestone, commit-as-you-go baked in, harness-neutral. Commit `3760c65`.*
+- [x] **B2 `split-system-doc`** — *done 08-31 (subagent, verified). Commit `7e92c91`.*
+- [x] **B3 Install both** to `.claude/skills/` (committed) + `~/.codex/skills/` (global, incl.
+      `agents/openai.yaml` wrapper). CLAUDE.md's 4 stale "port before build" notes synced to
+      reality. Codex block hooks (worktree + graphify) ported repo-scoped to `.codex/hooks/`
+      (git-publication already covered by `.codex/rules/`; production-db N/A). — *done 08-31*
 
 ## Group C — Existing ADRs  *(deferred to backfill)*
 
