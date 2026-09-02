@@ -7,7 +7,7 @@
 **Reversibility:** reversible
 **Migration:** 004
 **Supersedes:** None
-**Superseded by:** None
+**Superseded by:** ADR-079 (partial — acknowledgement and Profile entry)
 
 ## Context
 
