@@ -20,7 +20,7 @@ It intentionally does **not** define custom System authoring/management, polishe
 
 Targeted resolutions from the milestone-2 cross-dossier audit. Each item names the finding it resolves; all other Phase 8 decisions remain authoritative.
 
-- **E-03 — single Orrery view.** The Status / Relationship mode split is gone; ADR-048 is superseded 2026-09-01 by a single unnamed status view. §A is annotated accordingly.
+- **E-03 — single Orrery view.** The Status / Relationship mode split is gone; ADR-048 is superseded 2026-09-01 by ADR-077, a single unnamed status view. §A is annotated accordingly.
 - **E-02 — never-contacted bodies in Systems.** The All Contacts and Not Contacted Systems include never-contacted contacts, which carry no interval progress. §S records the required neutral placement rule.
 
 ---
@@ -33,7 +33,7 @@ Targeted resolutions from the milestone-2 cross-dossier audit. Each item names t
 
 **[DECIDED]** Orrery has one canonical spatial visualization centered on relationship-health/status semantics.
 
-**[DECIDED]** The existing Status / Relationship mode split is removed. The current Relationship mode is not sufficiently intuitive to justify preserving as a first-class product mode. (ADR-048 superseded 2026-09-01: single unnamed status view.)
+**[DECIDED]** The existing Status / Relationship mode split is removed. The current Relationship mode is not sufficiently intuitive to justify preserving as a first-class product mode. (ADR-048 superseded 2026-09-01 by ADR-077: single unnamed status view.)
 
 **[DERIVED]** Phase 8 should simplify/remove mode-toggle and relationship-mode-specific morph/resting-layout behavior rather than preserving it merely because current code exists.
 

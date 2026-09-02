@@ -37,7 +37,7 @@ It intentionally does **not** redefine Dashboard populations, filters, sort, sea
 Targeted resolutions from the milestone-2 cross-dossier audit. Each item names the finding it resolves; all other Phase 7 decisions remain authoritative.
 
 - **E-08 — bulk Delete becomes Archive.** Bulk Delete is removed from Sensitive Operations; bulk Archive is the recoverable removal and permanent deletion stays a manual per-contact action on the Archived Contacts list (ADR-018, unchanged). The dossier's earlier "30-day quarantine" description of contact deletion was factually wrong — that quarantine applies to custom-field definitions. No contact quarantine or auto-purge exists or will be built.
-- **E-01 — binary favourites ratified.** The owner ratified binary favourite membership; the drag-reorder "Manage favourites" screen and its rank are retired (ADR-033 superseded 2026-09-01). §H is annotated accordingly.
+- **E-01 — binary favourites ratified.** The owner ratified binary favourite membership; the drag-reorder "Manage favourites" screen and its rank are retired (ADR-033 superseded 2026-09-01 by ADR-075). §H is annotated accordingly.
 
 ---
 
@@ -117,7 +117,7 @@ While snoozed:
 
 **[DERIVED]** Favorite mutation should reuse/extract existing favorite-domain plumbing rather than create a new Card-specific mutation path.
 
-**[DERIVED]** Product semantics remain binary favorite membership; legacy/internal rank storage must not leak into Card View UX (ADR-033 superseded 2026-09-01).
+**[DERIVED]** Product semantics remain binary favorite membership; legacy/internal rank storage must not leak into Card View UX (ADR-033 superseded 2026-09-01 by ADR-075).
 
 ## I. Adaptive Context
 **[DECIDED]** Card View shows **one** adaptive context item.

@@ -11,7 +11,7 @@
 
 Targeted resolutions from the milestone-2 cross-dossier audit. Each item names the finding it resolves; all other Phase 6 decisions remain authoritative.
 
-- **E-01 — binary favourites ratified.** The owner ratified binary favourite membership; the drag-reorder "Manage favourites" screen and its rank are retired (ADR-033 superseded 2026-09-01). §H is annotated accordingly.
+- **E-01 — binary favourites ratified.** The owner ratified binary favourite membership; the drag-reorder "Manage favourites" screen and its rank are retired (ADR-033 superseded 2026-09-01 by ADR-075). §H is annotated accordingly.
 
 ---
 
@@ -138,7 +138,7 @@ Direction/examples:
 
 **[DERIVED]** Reuse/extract the existing favorite mutation plumbing rather than creating a List-only favorite concept.
 
-**[DERIVED]** Legacy/internal favorite ranking must not surface as ranked-Favorites UX; product semantics remain binary membership (ADR-033 superseded 2026-09-01).
+**[DERIVED]** Legacy/internal favorite ranking must not surface as ranked-Favorites UX; product semantics remain binary membership (ADR-033 superseded 2026-09-01 by ADR-075).
 
 ## I. Relationship Status Presentation
 

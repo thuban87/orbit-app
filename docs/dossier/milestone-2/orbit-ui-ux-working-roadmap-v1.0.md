@@ -137,7 +137,7 @@ Phase 12 owns Group Event persistence, event-first capture, shared/default inher
 
 ### Phase 1 — App Shell & Navigation
 - Permanent bottom nav: Dashboard, Orrery, Backup/Restore, Settings.
-- Root shell is a four-tab bottom navigator with per-tab stacks (ADR-019 superseded 2026-09-01); Archived Contacts is reachable from Dashboard overflow and the Settings row may remain.
+- Root shell is a four-tab bottom navigator with per-tab stacks (ADR-019 superseded 2026-09-01 by ADR-080); Archived Contacts is reachable from Dashboard overflow and the Settings row may remain.
 - Each top-level tab preserves its stack; retapping the active tab dismisses transient UI first, then returns to root.
 - Browse/read screens retain bottom nav and universal FAB; focused workflows hide both.
 - Android/system Back and visible app Back have the same logical result; in-app navigation is origin-aware.
@@ -161,7 +161,7 @@ Phase 12 owns Group Event persistence, event-first capture, shared/default inher
 
 ### Phase 4 — Dashboard Data & State Foundation
 - Dashboard remains the contact browser/relationship command center; Orrery remains the more explicit relationship-health visualization.
-- Active Contacts is the implicit default universe and excludes never-contacted contacts (ADR-011 preserved); special populations are Favorites, Birthdays, Not Contacted, Snoozed, and All Contacts (Active ∪ Not Contacted); Favorites are binary — the Manage-favourites reorder screen is retired (ADR-033 superseded 2026-09-01).
+- Active Contacts is the implicit default universe and excludes never-contacted contacts (ADR-011 preserved); special populations are Favorites, Birthdays, Not Contacted, Snoozed, and All Contacts (Active ∪ Not Contacted); Favorites are binary — the Manage-favourites reorder screen is retired (ADR-033 superseded 2026-09-01 by ADR-075).
 - Filters remain Category, Social Battery, Relationship Status/Needs Attention, Gravity, and Contact Frequency with OR-within / AND-across semantics.
 - Search is scoped to current Population + Filters and never leaks Archived/Unbound.
 - Gravity is derived, never ordinary editable contact state.
@@ -187,7 +187,7 @@ Phase 12 owns Group Event persistence, event-first capture, shared/default inher
 - Bulk Archive is the recoverable removal (permanent deletion stays a manual per-contact action on the Archived list, ADR-018; no contact auto-purge); Gravity remains derived and noneditable.
 
 ### Phase 8 — Orrery Camera, Scale & Exploration
-- Orrery is a constrained 2.5D navigable world over one canonical relationship-health/status visualization (ADR-048 superseded 2026-09-01: single unnamed status view).
+- Orrery is a constrained 2.5D navigable world over one canonical relationship-health/status visualization (ADR-048 superseded 2026-09-01 by ADR-077: single unnamed status view).
 - Camera supports pan, pinch zoom, bounded tilt, yaw, focus/cluster focus, and canonical recenter/north orientation.
 - High-count geometry grows physically rather than crushing contacts indefinitely into the initial viewport.
 - Semantic zoom progressively reveals identity/context; ambiguous touch clusters use Focus Zoom plus a bottom contact panel.
@@ -305,10 +305,10 @@ Phase 12 owns Group Event persistence, event-first capture, shared/default inher
 - Each saved connection remembers its own selected model. Missing/unavailable models create an explicit **Needs attention** state and require deliberate reselection. Model/catalog freshness may be daily/manual; pricing used for estimates should be materially fresher than the broader catalog.
 - Orbit owns the immutable system/output prompt contract. Users personalize through structured Writing Style controls plus arbitrary global **Personalization Context** sections with title/body/enabled/order state. Pasting is preferred; `.txt` and `.md` import is supported by copying content into Orbit-owned local records.
 - Orbit does **not** impose an artificial context ceiling or silently truncate enabled context. It exposes token/context estimates and, for OpenRouter, estimated **input cost** using current/cached pricing; true model-capacity overflow is shown explicitly.
-- Contact Knowledge AI permissions remain authoritative: permission means eligible contact information is included in AI context; **Message Focus** increases emphasis without granting permission; AI-enabled **Off Limits** are sent as negative/avoidance constraints. The three most recent Interactions may be included, with an interaction's note only where that interaction's Allow AI toggle (default OFF) is on; Group Notes are never sent (ADR-050/036 superseded 2026-09-01).
+- Contact Knowledge AI permissions remain authoritative: permission means eligible contact information is included in AI context; **Message Focus** increases emphasis without granting permission; AI-enabled **Off Limits** are sent as negative/avoidance constraints. The three most recent Interactions may be included, with an interaction's note only where that interaction's Allow AI toggle (default OFF) is on; Group Notes are never sent (ADR-050/036 superseded 2026-09-01 by ADR-078).
 - **Adjust** is ephemeral to the current generation/review session and can combine quick actions with freeform guidance; it returns three revised alternatives without changing persistent Writing Style.
 - Central AI permission management supports defaults for new information, searchable existing-access review, bulk disable, and confirmed bulk enable. Type-default changes remain new-items-only.
-- Transparency is intentionally split: **Settings** can inspect the whole resolved AI system/prompt and optionally preview it with a chosen contact; **Compose** exposes only the contact-specific disclosure for that generation (for example, the exact items being shared about Mom). First-use disclosure is lightweight; the exact-prompt first-send acknowledgement is retired (ADR-052 superseded 2026-09-01). Profile has no direct AI-draft action; AI is reached via Message → Draft with AI.
+- Transparency is intentionally split: **Settings** can inspect the whole resolved AI system/prompt and optionally preview it with a chosen contact; **Compose** exposes only the contact-specific disclosure for that generation (for example, the exact items being shared about Mom). First-use disclosure is lightweight; the exact-prompt first-send acknowledgement is retired (ADR-052 superseded 2026-09-01 by ADR-079). Profile has no direct AI-draft action; AI is reached via Message → Draft with AI.
 - AI Off removes AI generation UI. AI On + broken connection/model preserves configuration and surfaces a clear **AI needs attention** repair path in Compose instead of silently hiding AI.
 - User-facing provider/model errors are human-readable and preserve Compose state. A sanitized structured telemetry seam is defined for later Sentry integration, but prompts, contact data, personalization text, credentials, and generated drafts must never enter production diagnostics by default.
 - Backup/Restore preserves nonsecret personalization/configuration and AI permissions while excluding direct-provider keys, OpenRouter credential state, and Custom Endpoint secrets.
@@ -347,7 +347,7 @@ Phase 12 owns Group Event persistence, event-first capture, shared/default inher
 - **Message Focus privacy boundary:** `Add to AI` only emphasizes already-authorized knowledge for the current Compose session; it never grants AI permission. Off Limits can constrain AI if authorized but can never become Message Focus.
 - **Widget membership:** the favourites widget shows the Favorites population in its Default ordering for now; a customizable `include in widget` membership concept is deferred to a future milestone (owner, 2026-09-01).
 - **Never-contacted reachability:** never-contacted contacts reach the Dashboard only via the Not Contacted or All Contacts populations; the standalone Never Contacted screen and the include-Unbound toggle retire.
-- **Birthday presentation relocated:** the birthday banner is removed from the Dashboard (ADR-034 superseded 2026-09-01); the deferred Your Week phase owns upcoming-birthday presentation.
+- **Birthday presentation relocated:** the birthday banner is removed from the Dashboard (ADR-034 superseded 2026-09-01 by ADR-076); the deferred Your Week phase owns upcoming-birthday presentation.
 
 ## 8. Updated Dependency Order
 

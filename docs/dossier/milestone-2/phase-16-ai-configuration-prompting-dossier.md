@@ -44,9 +44,9 @@ It intentionally does **not** redefine Compose layout, Text/Email delivery behav
 
 # Amendment — audit resolutions 2026-09-01
 
-**E-05 — ratified AI egress plus the per-interaction gate.** The owner ratified the widened AI egress in §Y (AI-enabled Off Limits sent as avoidance constraints); **ADR-050 and ADR-036 are superseded 2026-09-01** by a new ADR issued in this batch. The same decision closes the gate that was missing on interaction notes: a note is transmitted only when that interaction's **Allow AI** toggle is ON (§Z), the toggle is authored in Phase 13 §N and defaults OFF, and this dossier's permission manager covers interaction notes as an information type with a default-OFF, new-items-only type default plus review/withdrawal (§AB). **Group Notes are never transmitted to AI** (Phase 12 §H).
+**E-05 — ratified AI egress plus the per-interaction gate.** The owner ratified the widened AI egress in §Y (AI-enabled Off Limits sent as avoidance constraints); **ADR-050 and ADR-036 are superseded 2026-09-01** by ADR-078. The same decision closes the gate that was missing on interaction notes: a note is transmitted only when that interaction's **Allow AI** toggle is ON (§Z), the toggle is authored in Phase 13 §N and defaults OFF, and this dossier's permission manager covers interaction notes as an information type with a default-OFF, new-items-only type default plus review/withdrawal (§AB). **Group Notes are never transmitted to AI** (Phase 12 §H).
 
-**E-06 — first-use AI disclosure.** The owner ratified §AG's lightweight disclosure with full prompt/context review available **on demand**, together with Phase 10 §C's removal of the Profile AI-draft entry (AI is reached via Message → Draft with AI, two taps). **ADR-052's exact-prompt first-send acknowledgement is superseded 2026-09-01.** No other §AG behavior changes: the disclosure still names the active connection's real data path.
+**E-06 — first-use AI disclosure.** The owner ratified §AG's lightweight disclosure with full prompt/context review available **on demand**, together with Phase 10 §C's removal of the Profile AI-draft entry (AI is reached via Message → Draft with AI, two taps). **ADR-052's exact-prompt first-send acknowledgement is superseded 2026-09-01 by ADR-079.** No other §AG behavior changes: the disclosure still names the active connection's real data path.
 
 ---
 
@@ -622,7 +622,7 @@ Prompt meaning should effectively communicate:
 
 **[DECIDED]** If an Off Limits item is AI-disabled, Orbit respects that privacy choice and does not secretly transmit it merely so the model can enforce the avoidance constraint.
 
-**[DECIDED]** The owner ratified this widened AI egress on 2026-09-01 (ADR-050 and ADR-036 superseded 2026-09-01).
+**[DECIDED]** The owner ratified this widened AI egress on 2026-09-01 (ADR-050 and ADR-036 superseded 2026-09-01 by ADR-078).
 
 ---
 
@@ -817,7 +817,7 @@ Direction:
 - Direct Provider → the selected provider,
 - Custom → the configured endpoint.
 
-**[DECIDED]** Full detailed prompt/context review remains available on demand rather than being forced during every first-send/setup flow (ADR-052's exact-prompt first-send acknowledgement superseded 2026-09-01).
+**[DECIDED]** Full detailed prompt/context review remains available on demand rather than being forced during every first-send/setup flow (ADR-052's exact-prompt first-send acknowledgement superseded 2026-09-01 by ADR-079).
 
 ---
 

@@ -11,9 +11,9 @@
 
 Targeted resolutions from the milestone-2 cross-dossier audit. Each item names the finding it resolves; all other Phase 4 decisions remain authoritative.
 
-- **E-04 — birthday presentation relocation.** ADR-034 is superseded 2026-09-01; a deferred-planning **Your Week** phase after Phase 16 will own the relocated birthday presentation. Dashboard still owns only the Birthday population and the entry point.
+- **E-04 — birthday presentation relocation.** ADR-034 is superseded 2026-09-01 by ADR-076; a deferred-planning **Your Week** phase after Phase 16 will own the relocated birthday presentation. Dashboard still owns only the Birthday population and the entry point.
 - **E-02 — "All Contacts" population, ADR-011 preserved.** Never-contacted contacts were *not* merged into Active Contacts. Active Contacts stays status-bearing only (ADR-011 intact); a fifth special population **All Contacts** (= Active Contacts ∪ Not Contacted) provides the union. The legacy Never Contacted screen and `include_unbound_never_contacted` setting retire in favour of the populations.
-- **E-01 — binary favourites ratified.** The "Manage favourites" drag-reorder screen and the favourite rank behind it are retired (ADR-033 superseded 2026-09-01). Favourites are binary membership only; the favourites widget (ADR-043) renders the Favorites population in its Default ordering.
+- **E-01 — binary favourites ratified.** The "Manage favourites" drag-reorder screen and the favourite rank behind it are retired (ADR-033 superseded 2026-09-01 by ADR-075). Favourites are binary membership only; the favourites widget (ADR-043) renders the Favorites population in its Default ordering.
 - **AF-08 — no deferred compact renderer.** The `[DEFERRED]` compact Card/Grid presentation mode is superseded: Card View *is* the compact 3-column avatar-first grid (Phase 7 v0.2, roadmap v1.0). Nothing separate remains deferred here.
 
 ---
@@ -87,12 +87,12 @@ It intentionally does **not** define exact List/Card row/card composition, card 
 
 **[DERIVED]** Any legacy/internal `favourite_rank` implementation detail must not be treated as evidence for ranked-Favorites UX.
 
-**[DECIDED]** The former "Manage favourites" drag-reorder screen and its rank are retired (ADR-033 superseded 2026-09-01). The favourites home-screen widget (ADR-043) shows favourites in the Favorites population's Default ordering; customizable widget membership is a future-milestone item.
+**[DECIDED]** The former "Manage favourites" drag-reorder screen and its rank are retired (ADR-033 superseded 2026-09-01 by ADR-075). The favourites home-screen widget (ADR-043) shows favourites in the Favorites population's Default ordering; customizable widget membership is a future-milestone item.
 
 ### Birthdays
 **[DECIDED]** Dashboard Birthday population covers the next **30 days**.
 
-**[DECIDED]** Richer imminent/upcoming birthday presentation belongs to **Your Week**, not to a permanent Dashboard banner/module. (ADR-034 superseded 2026-09-01; a deferred-planning “Your Week” phase after Phase 16 will own the relocated birthday presentation.)
+**[DECIDED]** Richer imminent/upcoming birthday presentation belongs to **Your Week**, not to a permanent Dashboard banner/module. (ADR-034 superseded 2026-09-01 by ADR-076; a deferred-planning “Your Week” phase after Phase 16 will own the relocated birthday presentation.)
 
 **[DERIVED]** Under Sort = Default, Birthday population naturally orders soonest birthday first.
 

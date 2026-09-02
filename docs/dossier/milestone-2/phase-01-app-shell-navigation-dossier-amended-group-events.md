@@ -102,6 +102,8 @@ All other Phase 1 decisions remain intact.
 
 **AF-03 (text sync, no new decision).** The three passages the Supersession Map above already directed to be read as six-action have now been rewritten in place, so no stale five-action text remains: **Section F — Universal FAB Action Set** (now lists six actions, Group Log at position 4), the **Cross-Phase Constraints — action workflows** line, and **Phase Success Criterion 4** (“six-action labeled speed dial”). The six-action contract itself is unchanged; only the wording elsewhere in this dossier was brought into line with it.
 
+- **E-07** — the four-tab bottom-nav root shell in §A supersedes ADR-019's stack-root shell (ADR-080, owner ratified 2026-09-01); Archived Contacts is reachable from Dashboard overflow and the Settings row may remain.
+
 ---
 
 ## Decisions

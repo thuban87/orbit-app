@@ -39,7 +39,7 @@ It intentionally does **not** redefine Group Event persistence, Group Log field 
 
 # Amendment — audit resolutions 2026-09-01
 
-**E-05 — per-interaction Allow AI gate.** The owner ratified the widened AI egress for AI-enabled Off Limits (Phase 16 §Y; ADR-050 and ADR-036 superseded 2026-09-01) and, in the same decision, closed the missing gate on interaction notes: §N now carries an **Allow AI** toggle on the Log Interaction form, placed with the Note field, defaulting **OFF**, with its initial value taken from Phase 16's new-items-only type defaults. Group Notes are never transmitted to AI (Phase 12 §H). Consuming contracts: Phase 11 §V/§W (display and editing of the toggle), Phase 12 §H (Group Note egress ban), Phase 16 §Z and §AB (transmission rule and permission-manager coverage).
+**E-05 — per-interaction Allow AI gate.** The owner ratified the widened AI egress for AI-enabled Off Limits (Phase 16 §Y; ADR-050 and ADR-036 superseded 2026-09-01 by ADR-078) and, in the same decision, closed the missing gate on interaction notes: §N now carries an **Allow AI** toggle on the Log Interaction form, placed with the Note field, defaulting **OFF**, with its initial value taken from Phase 16's new-items-only type defaults. Group Notes are never transmitted to AI (Phase 12 §H). Consuming contracts: Phase 11 §V/§W (display and editing of the toggle), Phase 12 §H (Group Note egress ban), Phase 16 §Z and §AB (transmission rule and permission-manager coverage).
 
 ---
 
