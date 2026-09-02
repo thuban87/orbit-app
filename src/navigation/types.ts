@@ -1,3 +1,5 @@
+import type { CompositeScreenProps, NavigatorScreenParams } from "@react-navigation/native";
+import type { BottomTabScreenProps } from "@react-navigation/bottom-tabs";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import type { MergeResolutions } from "@/db/merge-dao";
 import type { RestorePreviewRoute } from "@/screens/backup-restore-logic";
@@ -19,7 +21,7 @@ import type { PhotoTargetDescriptor } from "@/services/photos/photo-storage";
  * index signature that satisfies `createNativeStackNavigator`'s `ParamListBase`
  * constraint — an `interface` would fail to assign (TS2344).
  */
-export type RootStackParamList = {
+export type DashboardStackParamList = {
   Home: undefined;
   Settings: undefined;
   CustomFields: undefined;
@@ -104,13 +106,39 @@ export type RootStackParamList = {
    * every existing route is untouched.
    */
   Digest: undefined;
-  /** Permanent local backup health/action surface (BKP-01..03). */
+  SurvivorSelect: { firstContactId: number; secondContactId?: number };
+  MergeConflicts: { survivorId: number; absorbedId: number };
+  MergeImpactSummary: {
+    survivorId: number;
+    absorbedId: number;
+    resolutions: MergeResolutions;
+  };
+};
+
+/** The Orrery owns its visual root and duplicates contact detail for origin-aware Back. */
+export type OrreryStackParamList = {
+  Orrery: undefined;
+  Profile: { contactId: number; openReachOut?: boolean };
+  Edit: { contactId: number };
+  Compose: { contactId: number; requestAiSuggestion?: boolean };
+  CropPhoto: {
+    rawUri: string;
+    target: PhotoTargetDescriptor;
+    requestId?: string;
+  };
+  SurvivorSelect: { firstContactId: number; secondContactId?: number };
+  MergeConflicts: { survivorId: number; absorbedId: number };
+  MergeImpactSummary: {
+    survivorId: number;
+    absorbedId: number;
+    resolutions: MergeResolutions;
+  };
+};
+
+export type BackupStackParamList = {
   Backup: undefined;
-  /** Dedicated automatic-backup and encryption configuration screen. */
   BackupSettings: { section?: "automatic" | "encryption" } | undefined;
-  /** Serializable aggregate hand-off; the validated backup stays process-local. */
   RestorePreview: RestorePreviewRoute;
-  /** Aggregate-only committed restore outcome; never carries backup contents. */
   RestoreResult: {
     added: number;
     updated: number;
@@ -118,14 +146,23 @@ export type RootStackParamList = {
     deletionsApplied: number;
     replaceSafetySnapshot: "verified" | "not-configured" | null;
   };
-  /** Durable system-contact import flow; all params are declared up front. */
+};
+
+export type SettingsStackParamList = {
+  Settings: undefined;
+  CustomFields: undefined;
+  Archived: undefined;
+  CropPhoto: {
+    rawUri: string;
+    target: PhotoTargetDescriptor;
+    requestId?: string;
+  };
   LegacyContactPicker: undefined;
   ImportReview: { sessionId: number };
   BulkImportSetup: { sessionId: number };
   ImportProgress: { sessionId: number; batchCategoryId: number | null };
   DuplicateReview: { sessionId: number };
   ImportComplete: { sessionId: number };
-  /** Durable resolver for import rows whose birthdays could not be parsed. */
   BulkReview: undefined;
   SurvivorSelect: { firstContactId: number; secondContactId?: number };
   MergeConflicts: { survivorId: number; absorbedId: number };
@@ -135,10 +172,50 @@ export type RootStackParamList = {
     resolutions: MergeResolutions;
   };
   ReconcileDetail: { contactId: number; sessionId?: number; cardId?: number };
-  /** Bulk linked-contact reconciliation; an id is supplied by later resume flow. */
   ReconcileGrid: { sessionId?: number } | undefined;
   ReconcileComplete: { sessionId: number };
 };
+
+/** The root container exposes only the four persistent tab destinations. */
+export type TabParamList = {
+  DashboardTab: NavigatorScreenParams<DashboardStackParamList>;
+  OrreryTab: NavigatorScreenParams<OrreryStackParamList>;
+  BackupTab: NavigatorScreenParams<BackupStackParamList>;
+  SettingsTab: NavigatorScreenParams<SettingsStackParamList>;
+};
+
+/**
+ * Compatibility contract for existing screen-local navigation typing. New
+ * container navigation is deliberately typed against TabParamList instead.
+ */
+export type RootStackParamList = DashboardStackParamList &
+  OrreryStackParamList &
+  BackupStackParamList &
+  SettingsStackParamList;
+
+export type DashboardScreenProps<T extends keyof DashboardStackParamList> =
+  CompositeScreenProps<
+    NativeStackScreenProps<DashboardStackParamList, T>,
+    BottomTabScreenProps<TabParamList>
+  >;
+
+export type OrreryScreenProps<T extends keyof OrreryStackParamList> =
+  CompositeScreenProps<
+    NativeStackScreenProps<OrreryStackParamList, T>,
+    BottomTabScreenProps<TabParamList>
+  >;
+
+export type BackupScreenProps<T extends keyof BackupStackParamList> =
+  CompositeScreenProps<
+    NativeStackScreenProps<BackupStackParamList, T>,
+    BottomTabScreenProps<TabParamList>
+  >;
+
+export type SettingsScreenProps<T extends keyof SettingsStackParamList> =
+  CompositeScreenProps<
+    NativeStackScreenProps<SettingsStackParamList, T>,
+    BottomTabScreenProps<TabParamList>
+  >;
 
 /**
  * Per-screen props helper: `RootStackScreenProps<"Profile">` gives a screen its

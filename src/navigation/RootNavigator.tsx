@@ -1,120 +1,55 @@
-import { createNativeStackNavigator } from "@react-navigation/native-stack";
-import { ArchivedContactsScreen } from "@/screens/ArchivedContactsScreen";
-import { BackupScreen } from "@/screens/BackupScreen";
-import { BackupSettingsScreen } from "@/screens/BackupSettingsScreen";
-import { BulkImportSetupScreen } from "@/screens/BulkImportSetupScreen";
-import { BulkReviewScreen } from "@/screens/BulkReviewScreen";
-import { CaptureScreen } from "@/screens/CaptureScreen";
-import { ComposeScreen } from "@/screens/ComposeScreen";
-import { ContactProfileScreen } from "@/screens/ContactProfileScreen";
-import { CreateContactScreen } from "@/screens/CreateContactScreen";
-import { CropPhotoScreen } from "@/screens/CropPhotoScreen";
-import { CustomFieldsScreen } from "@/screens/CustomFieldsScreen";
-import { DigestScreen } from "@/screens/DigestScreen";
-import { DuplicateReviewScreen } from "@/screens/DuplicateReviewScreen";
-import { EditContactScreen } from "@/screens/EditContactScreen";
-import { HomeScreen } from "@/screens/HomeScreen";
-import { ImportCompleteScreen } from "@/screens/ImportCompleteScreen";
-import { ImportProgressScreen } from "@/screens/ImportProgressScreen";
-import { ImportReviewScreen } from "@/screens/ImportReviewScreen";
-import { LegacyContactPickerScreen } from "@/screens/LegacyContactPickerScreen";
-import { ManageFavouritesScreen } from "@/screens/ManageFavouritesScreen";
-import { NeverContactedScreen } from "@/screens/NeverContactedScreen";
-import { OrreryScreen } from "@/screens/OrreryScreen";
-import { RestorePreviewScreen } from "@/screens/RestorePreviewScreen";
-import { RestoreResultScreen } from "@/screens/RestoreResultScreen";
-import { SettingsScreen } from "@/screens/SettingsScreen";
-import { UnboundContactsScreen } from "@/screens/UnboundContactsScreen";
-import { SurvivorSelectScreen } from "@/screens/SurvivorSelectScreen";
-import { MergeConflictsScreen } from "@/screens/MergeConflictsScreen";
-import { MergeImpactSummary } from "@/components/MergeImpactSummary";
-import { ReconcileDetailScreen } from "@/screens/ReconcileDetailScreen";
-import { ReconcileGridScreen } from "@/screens/ReconcileGridScreen";
-import { ReconcileCompleteScreen } from "@/screens/ReconcileCompleteScreen";
-import type { RootStackParamList, RootStackScreenProps } from "./types";
+import { createBottomTabNavigator as createBottomTabs } from "@react-navigation/bottom-tabs";
+import { Text } from "react-native";
+import { DashboardStack } from "@/navigation/tabs/DashboardStack";
+import { OrreryStack } from "@/navigation/tabs/OrreryStack";
+import { BackupStack } from "@/navigation/tabs/BackupStack";
+import { SettingsStack } from "@/navigation/tabs/SettingsStack";
+import { useTheme } from "@/theme";
+import type { TabParamList } from "./types";
 
 /**
- * The app's real navigation shell (Phase 4) — a native-stack navigator that
- * every Phase-4 screen (Home, Settings, Custom Fields, Create, Profile, Edit,
- * Archived) hangs off. It replaces the Phase-1→3 dependency-free `HomeScreen`
- * `useState<Route>` toggle, which was an explicitly temporary state.
+ * The app's permanent four-tab shell. Each tab owns a native stack, preserving
+ * in-tab history when the user switches sections.
  *
  * `headerShown: false` (screenOptions): every screen renders its OWN back
  * chrome (the `CustomFieldsScreen` header/back/title pattern the whole phase
  * reuses), so a native-stack header on top would double up. With no header
  * there is also no colour literal needed on `screenOptions` — each screen's
  * themed root supplies its background via `useTheme().colors.*` (check:colors).
- * Predictive-back is disabled in app.config.ts:26, so back navigation is the
- * Android system Back button walking the stack, not a swipe gesture.
- *
- * `enableScreens` is NOT called manually — native-stack enables it.
- *
- * Every Phase-4 route now points at its real screen: `Settings`/`CustomFields`
- * (Plan 04-01), `Create`/`Profile` (Plans 04-04/04-05), `Edit` (Plan 04-06),
- * and `Archived` — the real ArchivedContactsScreen replacing the Plan 04-01
- * placeholder (Plan 08).
+ * Predictive back remains disabled in app.config.ts. Android system Back walks
+ * the current tab stack rather than a swipe gesture.
  */
-const Stack = createNativeStackNavigator<RootStackParamList>();
+const Tab = createBottomTabs<TabParamList>();
 
-/**
- * Thin route wrapper: `CustomFieldsScreen` stays prop-driven (its `onBack`
- * contract is unchanged and testable) — the navigator supplies the back action
- * via `navigation.goBack()`. We deliberately do NOT refactor `onBack` to call
- * `useNavigation` inside the screen; the wrapper keeps that concern here.
- */
-function CustomFieldsRoute({
-  navigation,
-}: RootStackScreenProps<"CustomFields">) {
-  return <CustomFieldsScreen onBack={() => navigation.goBack()} />;
-}
+const TAB_GLYPHS: Record<keyof TabParamList, string> = {
+  DashboardTab: "⌂",
+  OrreryTab: "◎",
+  BackupTab: "↥",
+  SettingsTab: "⚙",
+};
 
 export function RootNavigator() {
+  const { colors } = useTheme();
+
   return (
-    <Stack.Navigator
-      initialRouteName="Home"
-      screenOptions={{ headerShown: false }}
+    <Tab.Navigator
+      initialRouteName="DashboardTab"
+      screenOptions={({ route }) => ({
+        headerShown: false,
+        tabBarHideOnKeyboard: true,
+        animation: "fade",
+        tabBarActiveTintColor: colors.accent,
+        tabBarInactiveTintColor: colors.textSecondary,
+        tabBarStyle: { backgroundColor: colors.surface },
+        tabBarIcon: ({ color }) => (
+          <Text style={{ color }}>{TAB_GLYPHS[route.name]}</Text>
+        ),
+      })}
     >
-      <Stack.Screen name="Home" component={HomeScreen} />
-      <Stack.Screen name="Settings" component={SettingsScreen} />
-      <Stack.Screen name="CustomFields" component={CustomFieldsRoute} />
-      <Stack.Screen name="Create" component={CreateContactScreen} />
-      <Stack.Screen name="Profile" component={ContactProfileScreen} />
-      <Stack.Screen name="Edit" component={EditContactScreen} />
-      <Stack.Screen name="Archived" component={ArchivedContactsScreen} />
-      <Stack.Screen name="CropPhoto" component={CropPhotoScreen} />
-      <Stack.Screen name="NeverContacted" component={NeverContactedScreen} />
-      <Stack.Screen name="UnboundContacts" component={UnboundContactsScreen} />
-      <Stack.Screen
-        name="ManageFavourites"
-        component={ManageFavouritesScreen}
-      />
-      <Stack.Screen name="Compose" component={ComposeScreen} />
-      <Stack.Screen name="Capture" component={CaptureScreen} />
-      <Stack.Screen name="Orrery" component={OrreryScreen} />
-      <Stack.Screen name="Digest" component={DigestScreen} />
-      <Stack.Screen name="Backup" component={BackupScreen} />
-      <Stack.Screen name="BackupSettings" component={BackupSettingsScreen} />
-      <Stack.Screen name="RestorePreview" component={RestorePreviewScreen} />
-      <Stack.Screen name="RestoreResult" component={RestoreResultScreen} />
-      <Stack.Screen
-        name="LegacyContactPicker"
-        component={LegacyContactPickerScreen}
-      />
-      <Stack.Screen name="ImportReview" component={ImportReviewScreen} />
-      <Stack.Screen name="BulkImportSetup" component={BulkImportSetupScreen} />
-      <Stack.Screen name="ImportProgress" component={ImportProgressScreen} />
-      <Stack.Screen name="DuplicateReview" component={DuplicateReviewScreen} />
-      <Stack.Screen name="ImportComplete" component={ImportCompleteScreen} />
-      <Stack.Screen name="BulkReview" component={BulkReviewScreen} />
-      <Stack.Screen name="SurvivorSelect" component={SurvivorSelectScreen} />
-      <Stack.Screen name="MergeConflicts" component={MergeConflictsScreen} />
-      <Stack.Screen name="MergeImpactSummary" component={MergeImpactSummary} />
-      <Stack.Screen name="ReconcileDetail" component={ReconcileDetailScreen} />
-      <Stack.Screen name="ReconcileGrid" component={ReconcileGridScreen} />
-      <Stack.Screen
-        name="ReconcileComplete"
-        component={ReconcileCompleteScreen}
-      />
-    </Stack.Navigator>
+      <Tab.Screen name="DashboardTab" component={DashboardStack} options={{ title: "Dashboard" }} />
+      <Tab.Screen name="OrreryTab" component={OrreryStack} options={{ title: "Orrery" }} />
+      <Tab.Screen name="BackupTab" component={BackupStack} options={{ title: "Backup" }} />
+      <Tab.Screen name="SettingsTab" component={SettingsStack} options={{ title: "Settings" }} />
+    </Tab.Navigator>
   );
 }
