@@ -61,6 +61,7 @@ import { getExecutor } from "@/db/database";
 import { countUnbound } from "@/db/unbound-read";
 import { selectDashboardEmptyState } from "@/logic/dashboard-empty-logic";
 import type { RootStackParamList } from "@/navigation/types";
+import { navigationRef } from "@/navigation/linking";
 import { useDashboardPrefs } from "@/stores/dashboard-prefs-store";
 import { useTheme } from "@/theme";
 import type { SocialBattery } from "@/types";
@@ -533,7 +534,11 @@ export function HomeScreen() {
             testID="dashboard-backup-entry"
             accessibilityRole="button"
             accessibilityLabel="Backup and Restore"
-            onPress={() => navigation.navigate("Backup")}
+            onPress={() =>
+              navigationRef.current?.navigate("BackupTab", {
+                screen: "Backup",
+              })
+            }
             style={styles.backupEntry}
           >
             {({ pressed }) => (
@@ -551,7 +556,11 @@ export function HomeScreen() {
             testID="dashboard-orbit-entry"
             accessibilityRole="button"
             accessibilityLabel="Orbit view"
-            onPress={() => navigation.navigate("Orrery")}
+            onPress={() =>
+              navigationRef.current?.navigate("OrreryTab", {
+                screen: "Orrery",
+              })
+            }
             style={styles.settingsEntry}
           >
             {({ pressed }) => (
@@ -569,7 +578,11 @@ export function HomeScreen() {
             testID="dashboard-settings-entry"
             accessibilityRole="button"
             accessibilityLabel="Settings"
-            onPress={() => navigation.navigate("Settings")}
+            onPress={() =>
+              navigationRef.current?.navigate("SettingsTab", {
+                screen: "Settings",
+              })
+            }
             style={styles.settingsEntry}
           >
             <Text

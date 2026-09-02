@@ -46,6 +46,7 @@ import type { ResumableReconcile } from "@/services/import/reconcile-resume-swee
 import { listSunCandidates, type SunCandidate } from "@/db/sun-picker-read";
 import { sunOccupantIsSelf } from "@/logic/sun-occupant-logic";
 import type { RootStackParamList } from "@/navigation/types";
+import { navigationRef } from "@/navigation/linking";
 import { AiService } from "@/services/AiService";
 import { aiKeyStore } from "@/services/ai-key-store";
 import {
@@ -2005,7 +2006,11 @@ export function SettingsScreen() {
         testID="settings-manage-favourites-row"
         accessibilityRole="button"
         accessibilityLabel="Manage favourites"
-        onPress={() => navigation.navigate("ManageFavourites")}
+        onPress={() =>
+          navigationRef.current?.navigate("DashboardTab", {
+            screen: "ManageFavourites",
+          })
+        }
         style={[
           styles.row,
           { backgroundColor: colors.surface, borderColor: colors.border },
