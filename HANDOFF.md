@@ -172,6 +172,7 @@ The metaphor already matches the data model — orbital decay *is* the status sy
 
 - Round profile photos with rings around them, styled as planets.
 - Starfield background, but **dashboard/orbit screens only**, not behind text-heavy screens where contrast suffers.
+  - **Supersession note — 2026-09-01:** superseded by the milestone-2 Phase 2 (Theme & Visual System) and Phase 10 (Profile Experience) dossiers — bundled preset backgrounds are app-wide and Profiles may carry their own background; readability is guaranteed by Phase 2's opacity-by-density surface rule rather than by restricting where backgrounds appear. Owner-approved.
 - If the starfield animates, it must be a static image or a very cheap shader. A particle field redrawing behind every screen is a battery complaint.
 
 ### [DECIDED] Two distinct screens — do not merge them
