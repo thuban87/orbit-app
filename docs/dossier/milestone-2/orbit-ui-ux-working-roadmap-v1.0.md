@@ -182,7 +182,7 @@ Phase 12 owns Group Event persistence, event-first capture, shared/default inher
 - Name, recency, one compact adaptive context line; status via avatar ring + badge; snooze overrides status presentation.
 - Tap opens Profile; long press exposes per-contact power menu; no List swipe duplication.
 - Grid multi-select is Dashboard bulk management and freezes the current result universe.
-- Bulk delete uses the existing 30-day quarantine; Gravity remains derived and noneditable.
+- Bulk Archive is the recoverable removal (permanent deletion stays a manual per-contact action on the Archived list, ADR-018; no contact auto-purge); Gravity remains derived and noneditable.
 
 ### Phase 8 — Orrery Camera, Scale & Exploration
 - Orrery is a constrained 2.5D navigable world over one canonical relationship-health/status visualization.
