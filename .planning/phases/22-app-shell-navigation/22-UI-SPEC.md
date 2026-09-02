@@ -1,10 +1,11 @@
 ---
 phase: 22
 slug: app-shell-navigation
-status: draft
+status: approved
 shadcn_initialized: false
 preset: none
 created: 2026-09-02
+reviewed_at: 2026-09-02
 ---
 
 # Phase 22 — UI Design Contract
@@ -113,20 +114,53 @@ Tone: terse, sentence-case, verb-first for actions. No exclamation marks. Snackb
 
 ## UI Considerations
 
-> Shape-rooted UI *state* coverage for the shell surfaces (tab shell, FAB speed dial, contact picker, Quick Log snackbar, app bars). Empty/error COPY lives in the Copywriting Contract above; this section covers state coverage and references those rows.
+> Shape-rooted UI *state* coverage for the shell surfaces, computed by the UI-consideration probe (ADR-550 Decision 7) over six classified surfaces: `tab-shell` (nav), `fab-speed-dial` (interactive-control + nav), `contact-picker` (form + list-collection), `quick-log-snackbar` (interactive-control), `app-bar` (nav + static-content), `placeholder-route` (static-content). Empty/error COPY lives in the Copywriting Contract above; this section covers *state* coverage and references those rows rather than restating copy.
 
-Applicable state considerations resolved: 6 covered, 2 backstop, 0 unresolved.
+**Probe result: 25 applicable considerations — 12 resolved (explicit), 4 resolved (backstop), 9 dismissed (reason), 0 unresolved.**
 
-| Category | Element(s) | Status | Resolution / Reason |
-|----------|------------|--------|---------------------|
-| empty | contact-picker (list-collection) | ✅ covered | Zero-match search renders "No matching contacts"; zero-contacts renders "No contacts yet" + Add-Contact pointer (Copywriting rows). Archived excluded from default list, reachable via search only. |
-| loading | contact-picker (async reads: favourites/recency/alpha) | ✅ covered | Picker opens immediately with a calm loading state; reads are on-device SQLite (fast) — no blocking network on any shell read path (CLAUDE.md local-first). No spinner-over-blank-tab: the migration gate keeps the navigator unmounted until the DB is ready (Pitfall 2). |
-| error | Quick Log write (snackbar) | ✅ covered | Commit-truthful: success snackbar only on resolved transaction; failure → "Couldn't log" + Retry (SHELL-11). Never a success claim without commit. |
-| populated | tab shell / speed dial (static-content) | ✅ covered | Four tabs always present; FAB always shows the six fixed actions regardless of data or current tab. |
-| overflow | speed-dial actions / picker rows (list-collection) | ✅ covered | Six actions is a fixed, non-scrolling set (fits one column above the FAB). Picker rows virtualize via `FlatList`; long contact lists scroll, not clip. |
-| zero-one-many | FAB context (from Profile vs global) | ✅ covered | From a Profile the picker is pre-selected/skipped (SHELL-09); global entry opens the shared picker; Group Log routes directly with no shell pre-picker (D-05). |
-| long-text | tab labels, FAB action labels, picker names (static-content) | 🧪 backstop | Under large OS font scale labels must reflow/wrap or hide-label rather than shrink or ellipsize the icon away (SHELL-14). Verify on-device with max font scale (held-out visual UI-state check on the Pixel). |
-| partial | partially-swiped/transient layer on tab retap & Back (list-collection) | 🧪 backstop | Active-tab retap and Back both dismiss the topmost transient layer (speed dial / picker / open modal) FIRST, then act (SHELL-02/03). System Back == visible Back via one resolver. Verify on-device: Back with speed dial open dismisses the dial, does not exit the app. |
+Backstop rows lift into `must_haves.truths` and are confirmed only by explicit on-device visual evidence at verify time (never a silent pass); they cannot be covered by the render-free vitest env.
+
+### Resolved — explicit
+
+| Element | Category | Truth |
+|---------|----------|-------|
+| tab-shell | loading | The tab navigator does not mount until the SQLite migration gate resolves; the launch/splash gate holds until DB-ready — no blank-tab spinner (Pitfall 2). |
+| fab-speed-dial | overflow | Exactly six fixed-order actions render in a single non-scrolling column above the FAB (CONTEXT D-05); the set never grows, so the dial never scrolls or clips. |
+| contact-picker | empty | Zero-match search → "No matching contacts"; zero contacts → "No contacts yet" + Add-Contact pointer (Copywriting rows). Archived excluded from the default list, reachable via search only. |
+| contact-picker | loading | Picker opens immediately with a calm loading state; ordering reads (favourites/recency/alpha) are on-device SQLite — no blocking network on the read path (CLAUDE.md local-first). |
+| contact-picker | error | Picker reads are local SQLite with no network failure mode; on an unexpected query exception the picker renders the empty state rather than a broken sheet. |
+| contact-picker | populated | Normal list: contacts ordered favourites → recency → alpha, rows virtualized via `FlatList`; snoozed rows show a snooze marker but stay selectable. |
+| contact-picker | partial | Row name is always present; the secondary line (recency / snooze marker / "+N more") is optional and simply omitted when absent — no blank-row artifact. |
+| contact-picker | overflow | Long contact lists virtualize and scroll via `FlatList`; rows are never clipped. |
+| contact-picker | zero-one-many | Zero → empty copy (above); one and many read naturally with consistent row spacing (no singular/plural copy branch in the picker body). |
+| quick-log-snackbar | loading | No in-flight/loading snackbar — commit-truthful: the snackbar appears only after `recordTouchpoint()`'s transaction resolves (SHELL-11), never optimistically. |
+| quick-log-snackbar | error | Write failure → "Couldn't log" + Retry on `.catch()` (Copywriting row); the app never claims success without a commit. Haptic: warning. |
+| app-bar | overflow | Secondary actions collapse into the `⋯` overflow menu; the title is single-line and truncates with ellipsis when the header row is full. |
+
+### Resolved — backstop (on-device visual verification on the Pixel)
+
+| Element | Category | Statement | verification |
+|---------|----------|-----------|-------------|
+| tab-shell | long-text | Under large OS font scale, tab captions reflow/wrap or hide-label rather than shrink or ellipsize the icon away (SHELL-14). | backstop |
+| fab-speed-dial | long-text | Under large OS font scale, FAB action labels reflow rather than clip within the speed-dial rows. | backstop |
+| contact-picker | long-text | Long contact display names wrap or truncate gracefully within the row without breaking layout. | backstop |
+| app-bar | long-text | Long screen/child titles reflow/truncate under large font scale without clipping the Back or overflow affordances. | backstop |
+
+Additional interaction backstop (SHELL-02/03, outside the 8 shape categories but on-device-only): active-tab retap and system/visible Back both dismiss the topmost transient layer (speed dial / picker / open modal) FIRST via one resolver, then act — verify on the Pixel that Back with the speed dial open dismisses the dial and does not exit the app.
+
+### Dismissed (reason)
+
+| Element | Category | Reason |
+|---------|----------|--------|
+| tab-shell | error | Nav chrome has no data or submit of its own to fail; the only pre-mount failure (DB migration) is owned by the bootstrap gate upstream of the navigator, not shell chrome. |
+| tab-shell | overflow | Exactly four fixed tabs (D-04); the tab bar never overflows or scrolls. |
+| fab-speed-dial | loading | The FAB and its six fixed actions are static chrome; nothing async gates their appearance. |
+| fab-speed-dial | error | Speed-dial actions are pure navigation triggers; the only failable action (Quick Log write) surfaces via the commit-truthful snackbar, not the FAB. |
+| quick-log-snackbar | long-text | Snackbar copy is fixed short strings ("Logged" / "Couldn't log", ≤2-word action label); no variable-length text renders in the snackbar. |
+| app-bar | loading | The app-bar title is a synchronous route/screen title; no async gates the bar itself. |
+| app-bar | error | The app bar has no data of its own to fail; screen-level errors render in the screen body, not the bar. |
+| placeholder-route | overflow | Placeholder content is two short static lines centered on screen; nothing to overflow. |
+| placeholder-route | long-text | Placeholder copy is fixed, authored short text ("Coming soon" + one feature line); no variable-length input. |
 
 ---
 
@@ -143,11 +177,11 @@ Not applicable — React Native project, no shadcn, no third-party component reg
 
 ## Checker Sign-Off
 
-- [ ] Dimension 1 Copywriting: PASS
-- [ ] Dimension 2 Visuals: PASS
-- [ ] Dimension 3 Color: PASS
-- [ ] Dimension 4 Typography: PASS
-- [ ] Dimension 5 Spacing: PASS
-- [ ] Dimension 6 Registry Safety: PASS
+- [x] Dimension 1 Copywriting: PASS
+- [x] Dimension 2 Visuals: PASS
+- [x] Dimension 3 Color: PASS
+- [x] Dimension 4 Typography: PASS (FLAG — >4 sizes / 3 weights, accepted: documents the established codebase system, verified on disk)
+- [x] Dimension 5 Spacing: PASS (FLAG — non-4 multiples 10/14, accepted: established de-facto tokens, verified on disk)
+- [x] Dimension 6 Registry Safety: PASS
 
-**Approval:** pending
+**Approval:** approved 2026-09-02 (gsd-ui-checker — 4 PASS, 2 FLAG non-blocking; platform override applied for RN typography/spacing deviations)
