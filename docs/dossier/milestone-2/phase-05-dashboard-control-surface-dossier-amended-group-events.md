@@ -112,6 +112,7 @@ All Population / Filters / Sort, anchored-panel, Search, List/Card-toggle, reset
 
 Targeted resolutions from the milestone-2 cross-dossier audit. Each item names the finding it resolves; all other Phase 5 decisions remain authoritative.
 
+- **E-04 — birthday presentation relocation.** ADR-034 is superseded 2026-09-01; a deferred-planning **Your Week** phase after Phase 16 will own the relocated birthday presentation. Dashboard still hosts no permanent birthday module.
 - **E-02 — "All Contacts" population row.** The Population panel gains an **All Contacts** selectable row (Active Contacts stays implicit and unlisted). Semantics are owned by Phase 4 §D.
 - **E-01 — binary favourites ratified.** **Manage Favorites** is removed from Dashboard overflow with nothing put in its place: the drag-reorder screen and its rank are retired (ADR-033 superseded 2026-09-01) and favourites are binary membership only.
 - **AF-08 — no deferred compact renderer.** The deferred `compact Card/Grid renderer` is superseded: Card View *is* the compact 3-column avatar-first grid (Phase 7 v0.2, roadmap v1.0). Nothing separate remains deferred here.
@@ -131,7 +132,7 @@ It intentionally does **not** define Population/filter/sort/search query semanti
 
 **[DECIDED]** Dashboard does not contain a permanent birthday/upcoming module between controls and contacts.
 
-Birthdays are available through the Birthday population. Richer upcoming birthday content belongs to Your Week.
+Birthdays are available through the Birthday population. Richer upcoming birthday content belongs to Your Week. (ADR-034 superseded 2026-09-01; a deferred-planning “Your Week” phase after Phase 16 will own the relocated birthday presentation.)
 
 **[DECIDED] Working top hierarchy:**
 1. Dashboard header / branded root
