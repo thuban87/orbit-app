@@ -701,7 +701,7 @@ Initial fields may include:
 
 **[DERIVED]** Reuse the existing authoritative interaction-update domain function/writer rather than duplicating mutation logic in History.
 
-**[DERIVED]** Phase 12 Rapid Capture may reuse this canonical route/component rather than inventing another interaction-correction workflow.
+**[DERIVED]** Phase 13 Rapid Capture & Update Flows may reuse this canonical route/component rather than inventing another interaction-correction workflow.
 
 ---
 
@@ -782,7 +782,7 @@ Examples:
 
 **[DECIDED]** Quick Log is not used for historical backfill because Quick Log semantically means `now`.
 
-**[DERIVED]** Phase 12 owns the final detailed logging form/business UX; Phase 11 only establishes History's route/context contract.
+**[DERIVED]** Phase 13 owns the final ordinary detailed logging form/business UX; Phase 11 only establishes History's route/context contract.
 
 ---
 
@@ -907,7 +907,7 @@ Examples:
 - Keep Profile Heatmap interaction-only. Lifecycle/history events belong to History Browser/detail sheets, not Heatmap saturation or Heatmap context counts.
 - Preserve the three record families: editable Interactions, immutable lifecycle events, and independently history-aware knowledge changes.
 - Do not mutate the immutable lifecycle-event model merely to make location/job history editable.
-- Add a canonical Edit Interaction route here; Phase 12 can reuse it.
+- Add a canonical Edit Interaction route here; Phase 13 can reuse it.
 - Optional duration is a small domain expansion owned here because History/Interaction Detail is already being upgraded.
 - Keep Heatmap/Intensity timeframe shared unless device testing demonstrates a genuine usability problem.
 - Build temporal aggregation/rendering for reuse, but do not roadmap the future analytics products themselves.
