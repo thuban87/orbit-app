@@ -176,6 +176,10 @@ This amendment specifically extends or supersedes older generic Phase 11 wording
 
 All unrelated Phase 11 decisions remain authoritative.
 
+## Amendment — audit resolutions 2026-09-01
+
+**AF-06 (terminology sync, no new decision).** The interaction quality field is named **Tone** everywhere in this dossier. The three remaining `quality/impact` references — the shared period/date detail sheet's compact interaction row (§T), the Interaction Detail field list (§V), and the Edit Interaction field list (§W) — now read **Tone**, matching the participant-editable scope above and the canonical term in Phase 13 §T, roadmap §7, and the master handoff §7. No field semantics change.
+
 
 ---
 
@@ -577,7 +581,7 @@ For an empty date:
 - interaction type/channel,
 - time,
 - direction where relevant,
-- quality/impact where present,
+- Tone where present,
 - duration where present,
 - one-line note/context preview.
 
@@ -667,7 +671,7 @@ Initial fields may include:
 - date/time,
 - direction,
 - connected state where relevant,
-- quality/impact,
+- Tone,
 - optional duration,
 - note/context,
 - other structured metadata already present in the canonical interaction model.
@@ -691,7 +695,7 @@ Initial fields may include:
 - channel/type,
 - direction,
 - connected state where relevant,
-- quality/impact,
+- Tone,
 - note/context,
 - optional duration.
 
