@@ -1,7 +1,7 @@
 # Phase 17 — Sync-Readiness Decisions (v1.0)
 
 **Status:** locked owner decisions, folded into `ROADMAP.md` and `REQUIREMENTS.md` on 2026-08-24.
-**Companion:** `SYNC-MILESTONE-INVESTIGATION.md` scopes the later v2.0 milestone.
+**Companion:** `SYNC-MILESTONE-INVESTIGATION.md` scopes the later v3.0 milestone.
 **Required reading:** planners must first read the parked
 `../phases/17-backup-export-restore/17-CONTEXT.md`, then run a fresh Phase 17 discussion after
 Phase 16 has completed. This note is a concise index, not substitute implementation context.

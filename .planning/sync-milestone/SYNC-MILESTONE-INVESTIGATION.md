@@ -1,4 +1,7 @@
-# Sync Milestone (v2.0) — Investigation & Decision Register
+# Sync Milestone (v3.0) — Investigation & Decision Register
+
+> **Relabeled v2.0 → v3.0 (2026-09-02):** the v2.0 moniker now belongs to the Release Readiness
+> UI/UX milestone. This Sync milestone is unchanged in scope and remains not started.
 
 **Status:** pre-milestone scoping. Nothing here is built or committed to the roadmap yet.
 **Author:** planning session 2026-08-22.
