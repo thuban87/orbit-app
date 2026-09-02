@@ -25,6 +25,11 @@ export type DashboardStackParamList = {
   Home: undefined;
   /** Placeholder until Phase 33 supplies the Group Events workflow. */
   GroupEvents: undefined;
+  /** Placeholder routes the universal FAB exposes before their owning phases land. */
+  LogContact: { contactId?: number } | undefined;
+  GroupLog: undefined;
+  UpdateContact: { contactId?: number } | undefined;
+  Memory: { contactId?: number } | undefined;
   Settings: undefined;
   CustomFields: undefined;
   Create: undefined;

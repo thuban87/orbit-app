@@ -40,7 +40,6 @@ import {
   TextInput,
   View,
 } from "react-native";
-import { AddSpeedDialFab } from "@/components/AddSpeedDialFab";
 import { Avatar } from "@/components/Avatar";
 import { BirthdayBanner } from "@/components/BirthdayBanner";
 import { ContactCard } from "@/components/ContactCard";
@@ -616,7 +615,6 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
           />
         }
       />
-      <AddSpeedDialFab />
     </View>
   );
 }

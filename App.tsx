@@ -16,6 +16,7 @@ import { AssistBanner } from "@/components/AssistBanner";
 import { BackupEncryptionBenchmarkHarness } from "@/components/BackupEncryptionBenchmarkHarness";
 import { ResumeImportPrompt } from "@/components/ResumeImportPrompt";
 import { ResumeReconcilePrompt } from "@/components/ResumeReconcilePrompt";
+import { UniversalFab } from "@/components/UniversalFab";
 import { getExecutor, openAndMigrate } from "@/db/database";
 import { isMigration006IntegrityError } from "@/db/migrations/006-normalize-custom-field-values";
 import { navigationRef, ShareIntentGate } from "@/navigation/linking";
@@ -320,6 +321,7 @@ function AppShell() {
           (pre-ready intents queue in the gate and flush on navReady). */}
       <WidgetLinkingGate isReady={navReady} />
       <RootNavigator />
+      <UniversalFab />
       <AssistBanner />
       {resolveActiveResumePrompt(resumableImport, resumableReconcile) ===
       "import" ? (

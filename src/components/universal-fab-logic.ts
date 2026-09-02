@@ -80,10 +80,10 @@ export function resolveFabTarget(
 
 export interface NavigationStateNode {
   index?: number;
-  routes?: Array<{
+  routes?: ReadonlyArray<{
     name: string;
-    params?: Record<string, unknown>;
-    state?: NavigationStateNode;
+    params?: object;
+    state?: unknown;
   }>;
 }
 
@@ -91,10 +91,18 @@ export interface FocusedContactContext {
   originContactId: number | null;
 }
 
-function focusedRoute(state: NavigationStateNode | undefined) {
-  const index = state?.index;
-  if (!state?.routes || !Number.isInteger(index) || index === undefined) return null;
-  return state.routes[index] ?? null;
+function focusedRoute(state: unknown) {
+  if (!state || typeof state !== "object") return null;
+  const navigationState = state as NavigationStateNode;
+  const index = navigationState.index;
+  if (
+    !navigationState.routes ||
+    !Number.isInteger(index) ||
+    index === undefined
+  ) {
+    return null;
+  }
+  return navigationState.routes[index] ?? null;
 }
 
 /**
@@ -114,7 +122,11 @@ export function getFocusedContactContext(
   }
 
   const profileRoute = focusedRoute(tabRoute.state);
-  const contactId = profileRoute?.params?.contactId;
+  const params = profileRoute?.params;
+  const contactId =
+    params && "contactId" in params
+      ? (params as { contactId?: unknown }).contactId
+      : undefined;
 
   return profileRoute?.name === "Profile" && typeof contactId === "number"
     ? { originContactId: contactId }
