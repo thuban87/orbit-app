@@ -316,7 +316,7 @@ Interaction Detail
 
 **[DECIDED]** Group Log is a distinct visible user intent rather than being hidden behind individual Log Contact.
 
-**[DERIVED]** Phase 1's five-action FAB contract requires targeted amendment.
+**[DERIVED]** Phase 1's FAB contract was amended to six actions (2026-09-01 amendment, AF-03).
 
 ## V. Dashboard Grid / Multi-Select
 **[DECIDED]** Phase 7's prior prohibition on detailed multi-contact logging is superseded.
