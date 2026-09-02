@@ -120,16 +120,28 @@ export async function guardNotificationBodyIntent(
   return intent;
 }
 
-/** Apply the guarded body intent to the live navigator. */
-async function applyBodyNav(data: NotificationData): Promise<void> {
-  const intent = await guardNotificationBodyIntent(data, async (contactId) => {
+/**
+ * Apply the guarded body intent to the live navigator.
+ *
+ * `isCurrent` keeps an older asynchronous lookup from replacing the destination
+ * selected by a newer notification body tap.
+ */
+export async function applyBodyNav(
+  data: NotificationData,
+  isCurrent: () => boolean = () => true,
+  lookup: NotificationContactLookup = async (contactId) => {
     const [{ getExecutor }, { getContactHeader }] = await Promise.all([
       import("@/db/database"),
       import("@/db/contact-read"),
     ]);
     return getContactHeader(getExecutor(), contactId);
-  });
+  },
+): Promise<void> {
+  const intent = await guardNotificationBodyIntent(data, lookup);
   if (!intent) {
+    return;
+  }
+  if (!isCurrent()) {
     return;
   }
   const nav = navigationRef.current;
@@ -159,6 +171,9 @@ export function NotificationResponseGate({ isReady }: { isReady: boolean }) {
   // flush effect below re-fires the moment EITHER this or `isReady` settles last.
   const [pendingBodyData, setPendingBodyData] =
     useState<NotificationData | null>(null);
+  // Every flush gets a new id. An older DB lookup may finish after a newer tap,
+  // but it cannot navigate or clear the newer pending body data.
+  const bodyNavigationRequestId = useRef(0);
   // The cold-start response is read exactly once, no matter how `isReady` churns.
   const coldStartHandled = useRef(false);
 
@@ -185,11 +200,18 @@ export function NotificationResponseGate({ isReady }: { isReady: boolean }) {
   // (mirrors ShareIntentGate keying on reactive readiness — review A3).
   useEffect(() => {
     if (isReady && pendingBodyData !== null) {
-      void applyBodyNav(pendingBodyData)
+      const requestId = bodyNavigationRequestId.current + 1;
+      bodyNavigationRequestId.current = requestId;
+      const isCurrent = () => bodyNavigationRequestId.current === requestId;
+      void applyBodyNav(pendingBodyData, isCurrent)
         .catch((err) => {
           Logger.error(LOG_SOURCE, "guarded body navigation failed", err);
         })
-        .finally(() => setPendingBodyData(null));
+        .finally(() => {
+          if (isCurrent()) {
+            setPendingBodyData(null);
+          }
+        });
     }
   }, [isReady, pendingBodyData]);
 

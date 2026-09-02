@@ -11,7 +11,8 @@ vi.mock("@/services/notifications/notification-actions", () => ({
 }));
 vi.mock("./linking", () => ({ navigationRef: { current: null } }));
 
-import { guardNotificationBodyIntent } from "./notification-gate";
+import { navigationRef } from "./linking";
+import { applyBodyNav, guardNotificationBodyIntent } from "./notification-gate";
 
 const decay = {
   kind: "decay" as const,
@@ -69,5 +70,63 @@ describe("guardNotificationBodyIntent", () => {
         async () => null,
       ),
     ).resolves.toBeNull();
+  });
+});
+
+describe("applyBodyNav", () => {
+  it("does not let an older lookup overwrite a newer notification destination", async () => {
+    let resolveFirst:
+      | ((value: { archived_at: null; trackingEnabled: 1 }) => void)
+      | undefined;
+    let resolveSecond:
+      | ((value: { archived_at: null; trackingEnabled: 1 }) => void)
+      | undefined;
+    const firstLookup = new Promise<{
+      archived_at: null;
+      trackingEnabled: 1;
+    }>((resolve) => {
+      resolveFirst = resolve;
+    });
+    const secondLookup = new Promise<{
+      archived_at: null;
+      trackingEnabled: 1;
+    }>((resolve) => {
+      resolveSecond = resolve;
+    });
+    const reset = vi.fn();
+    navigationRef.current = { reset } as never;
+
+    let latestRequestId = 1;
+    const first = applyBodyNav(
+      decay,
+      () => latestRequestId === 1,
+      async () => firstLookup,
+    );
+    latestRequestId = 2;
+    const second = applyBodyNav(
+      { ...decay, contactId: 8 },
+      () => latestRequestId === 2,
+      async () => secondLookup,
+    );
+
+    resolveSecond?.({ archived_at: null, trackingEnabled: 1 });
+    await second;
+    resolveFirst?.({ archived_at: null, trackingEnabled: 1 });
+    await first;
+
+    expect(reset).toHaveBeenCalledTimes(1);
+    expect(reset.mock.calls[0][0]).toMatchObject({
+      routes: [
+        {
+          name: "DashboardTab",
+          state: {
+            routes: [
+              { name: "Home" },
+              { name: "Compose", params: { contactId: 8 } },
+            ],
+          },
+        },
+      ],
+    });
   });
 });
