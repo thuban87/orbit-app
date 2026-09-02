@@ -112,6 +112,7 @@ All Population / Filters / Sort, anchored-panel, Search, List/Card-toggle, reset
 
 Targeted resolutions from the milestone-2 cross-dossier audit. Each item names the finding it resolves; all other Phase 5 decisions remain authoritative.
 
+- **E-07 — Archived/Unbound entry points.** Archived Contacts keeps both its Dashboard-overflow entry and its existing Settings row, routing to one screen; ADR-019's stack-root shell is superseded by Phase 1's tab shell (new ADR, 2026-09-01).
 - **E-04 — birthday presentation relocation.** ADR-034 is superseded 2026-09-01; a deferred-planning **Your Week** phase after Phase 16 will own the relocated birthday presentation. Dashboard still hosts no permanent birthday module.
 - **E-02 — "All Contacts" population row.** The Population panel gains an **All Contacts** selectable row (Active Contacts stays implicit and unlisted). Semantics are owned by Phase 4 §D.
 - **E-01 — binary favourites ratified.** **Manage Favorites** is removed from Dashboard overflow with nothing put in its place: the drag-reorder screen and its rank are retired (ADR-033 superseded 2026-09-01) and favourites are binary membership only.
@@ -300,6 +301,10 @@ The exact width split is responsive/derived rather than fixed to a literal perce
 Existing screens/routes should be **refactored/re-presented** inside the new navigation model.
 
 **[DECIDED]** They open as Dashboard child/browse routes rather than becoming Dashboard populations.
+
+**[DECIDED — amended 2026-09-01]** **Archived Contacts** is reachable from the Dashboard overflow entry **and** the existing Settings row. Both route to the same screen; the redundant entry point is intentional and the Settings row is not removed. **Unbound Contacts** likewise remains in Dashboard overflow as written above.
+
+**[DERIVED]** ADR-019's stack-root shell assumption for these management routes is superseded by Phase 1's tab shell (new ADR, 2026-09-01). Origin-aware return behavior is expressed inside the tab shell rather than through a stack root.
 
 **[DERIVED]** Preserve origin-aware behavior such as:
 
