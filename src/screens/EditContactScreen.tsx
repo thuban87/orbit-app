@@ -74,6 +74,7 @@ import { defsForEditForm } from "@/db/field-values-dao";
 import { newUid } from "@/db/uid";
 import type { ContactMethodType } from "@/logic/contact-method-normalization";
 import type { RootStackScreenProps } from "@/navigation/types";
+import { useDiscardKeepGuard } from "@/navigation/discard-keep-guard";
 import { applyLifecycleTransitionEffects } from "@/services/contact-lifecycle-effects";
 import { getDeviceRegion } from "@/services/device-region";
 import { reconcileSchedule } from "@/services/notifications/notification-schedule";
@@ -139,6 +140,38 @@ function buildLinksForDiff(draft: LinkDraft[]): DraftLink[] {
     .filter((l) => l.url.length > 0);
 }
 
+const DIRTY_CHECK_NOW = "2000-01-01 00:00:00";
+const DIRTY_CHECK_UID = "dirty-check";
+
+function editInputSignature(
+  state: EditFormState,
+  options: {
+    contactId: number;
+    editDefs: Array<{ id: number; col_name: string }>;
+    neverContacted: boolean;
+    effectivePhoneRegion: string | null;
+  },
+): string {
+  return JSON.stringify(
+    buildEditInput(state, {
+      contactId: options.contactId,
+      editDefs: options.editDefs,
+      neverContacted: options.neverContacted,
+      effectivePhoneRegion: options.effectivePhoneRegion,
+      now: DIRTY_CHECK_NOW,
+      interactionUid: DIRTY_CHECK_UID,
+    }),
+  );
+}
+
+function valuesSignature(values: Record<string, string | null>): string {
+  return JSON.stringify(
+    Object.entries(values).sort(([first], [second]) =>
+      first.localeCompare(second),
+    ),
+  );
+}
+
 export function EditContactScreen({
   navigation,
   route,
@@ -183,6 +216,10 @@ export function EditContactScreen({
   // committed value → referenced → kept). A ref so the unmount cleanup reads the
   // latest committed set, not a stale render closure.
   const committedValuesRef = useRef<Record<string, string | null>>({});
+  // The metadata baseline is intentionally a built DAO input rather than raw
+  // form state, so presentation-only state cannot trigger a discard prompt.
+  const seedInputRef = useRef<string | null>(null);
+  const bypassRef = useRef(false);
 
   const load = useCallback(async () => {
     try {
@@ -198,16 +235,24 @@ export function EditContactScreen({
         return;
       }
       setCategories(cats);
-      setEditDefs(defsForEditForm(defs));
-      setNeverContacted(isNeverContacted(result));
-      setForm(seedEditState(result));
-      setInitialTrackingEnabled(result.contact.trackingEnabled === 1);
-      setEffectivePhoneRegion(
-        resolveEffectivePhoneRegion(
-          settings.phoneRegionOverride,
-          getDeviceRegion(),
-        ),
+      const nextEditDefs = defsForEditForm(defs);
+      const nextForm = seedEditState(result);
+      const nextNeverContacted = isNeverContacted(result);
+      const nextPhoneRegion = resolveEffectivePhoneRegion(
+        settings.phoneRegionOverride,
+        getDeviceRegion(),
       );
+      setEditDefs(nextEditDefs);
+      setNeverContacted(nextNeverContacted);
+      setForm(nextForm);
+      setInitialTrackingEnabled(result.contact.trackingEnabled === 1);
+      setEffectivePhoneRegion(nextPhoneRegion);
+      seedInputRef.current = editInputSignature(nextForm, {
+        contactId,
+        editDefs: nextEditDefs,
+        neverContacted: nextNeverContacted,
+        effectivePhoneRegion: nextPhoneRegion,
+      });
       // The committed baseline for orphan cleanup: the pre-edit custom values.
       committedValuesRef.current = { ...result.values };
       setPhoto(result.contact.photo);
@@ -316,10 +361,19 @@ export function EditContactScreen({
       const defs = await listDefs(exec, { includeQuarantined: false });
       const result = await getContactForEdit(exec, contactId, defs);
       if (result) {
-        setEditDefs(defsForEditForm(defs));
-        setNeverContacted(isNeverContacted(result));
-        setForm(seedEditState(result));
+        const nextEditDefs = defsForEditForm(defs);
+        const nextForm = seedEditState(result);
+        const nextNeverContacted = isNeverContacted(result);
+        setEditDefs(nextEditDefs);
+        setNeverContacted(nextNeverContacted);
+        setForm(nextForm);
         committedValuesRef.current = { ...result.values };
+        seedInputRef.current = editInputSignature(nextForm, {
+          contactId,
+          editDefs: nextEditDefs,
+          neverContacted: nextNeverContacted,
+          effectivePhoneRegion,
+        });
         // seededLinks is unchanged: applyLinkDiff rolled back, so the DB links
         // still equal the original baseline — keep it as the retry diff baseline.
       }
@@ -448,6 +502,7 @@ export function EditContactScreen({
         });
         return;
       }
+      bypassRef.current = true;
       navigation.navigate("Profile", { contactId });
     } catch (err) {
       Logger.error(LOG_SCOPE, "failed to save contact", err);
@@ -464,6 +519,21 @@ export function EditContactScreen({
     }
     setField("birthdayInput", formatLocalDate(date));
   }
+
+  const hasUnsavedChanges =
+    form !== null &&
+    (seedInputRef.current !==
+      editInputSignature(form, {
+        contactId,
+        editDefs,
+        neverContacted,
+        effectivePhoneRegion,
+      }) ||
+      valuesSignature(form.values) !== valuesSignature(committedValuesRef.current) ||
+      JSON.stringify(buildLinksForDiff(linksDraft)) !==
+        JSON.stringify(buildLinksForDiff(toLinkDrafts(seededLinks))));
+
+  useDiscardKeepGuard({ hasUnsavedChanges, bypassRef });
 
   const inputStyle = [
     styles.input,
