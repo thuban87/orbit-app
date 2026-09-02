@@ -22,7 +22,7 @@ category's phase (see Traceability).
 - [x] **SHELL-04**: Back from a Contact Profile returns to the surface the user actually came from (origin-aware), not always Dashboard
 - [x] **SHELL-05**: Externally launched/deep-linked flows with no in-app origin fall back to Dashboard on cancel or Back; a deep link to a missing contact shows a friendly message and routes to Dashboard rather than crashing
 - [x] **SHELL-06**: Bottom nav and FAB are visible on browse/read surfaces and hidden during focused workflows and while the keyboard is open
-- [ ] **SHELL-07**: Leaving a focused workflow with meaningful unsaved changes prompts Discard changes / Keep editing
+- [x] **SHELL-07**: Leaving a focused workflow with meaningful unsaved changes prompts Discard changes / Keep editing
 - [ ] **SHELL-08**: User can expand a consistently positioned FAB into a labeled speed dial with translucent scrim offering exactly six actions in fixed order: Add Contact, Quick Log, Log Contact, Group Log, Update Contact, Memory
 - [ ] **SHELL-09**: From a contact's Profile, contact-specific FAB actions preselect that contact; from global contexts they open the shared picker; Group Log opens its canonical workflow directly with no shell-level pre-picker
 - [ ] **SHELL-10**: User can pick a contact through one reusable modal picker with live search ordered Favorites → recently relevant → alphabetical; archived contacts surface only via explicit search with an Archived badge; snoozed contacts stay selectable with a Snoozed marker
