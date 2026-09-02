@@ -159,7 +159,7 @@ Phase 12 owns Group Event persistence, event-first capture, shared/default inher
 
 ### Phase 4 — Dashboard Data & State Foundation
 - Dashboard remains the contact browser/relationship command center; Orrery remains the more explicit relationship-health visualization.
-- Active Contacts is the implicit default universe; Favorites, Birthdays, Not Contacted, and Snoozed are special populations; Favorites are binary — the Manage-favourites reorder screen is retired (ADR-033 superseded 2026-09-01).
+- Active Contacts is the implicit default universe and excludes never-contacted contacts (ADR-011 preserved); special populations are Favorites, Birthdays, Not Contacted, Snoozed, and All Contacts (Active ∪ Not Contacted); Favorites are binary — the Manage-favourites reorder screen is retired (ADR-033 superseded 2026-09-01).
 - Filters remain Category, Social Battery, Relationship Status/Needs Attention, Gravity, and Contact Frequency with OR-within / AND-across semantics.
 - Search is scoped to current Population + Filters and never leaks Archived/Unbound.
 - Gravity is derived, never ordinary editable contact state.
@@ -344,6 +344,7 @@ Phase 12 owns Group Event persistence, event-first capture, shared/default inher
 - **AI availability contract:** Phase 16 supersedes the earlier simplistic provider=None/unusable wording with three states: AI Off removes AI generation UI; AI On + Ready exposes AI actions; AI On + Needs Attention shows a repair notice rather than silently disappearing. Phase 16 owns connection/model setup, prompt personalization/context, Adjust, permissions, transparency, and readiness.
 - **Message Focus privacy boundary:** `Add to AI` only emphasizes already-authorized knowledge for the current Compose session; it never grants AI permission. Off Limits can constrain AI if authorized but can never become Message Focus.
 - **Widget membership:** the favourites widget shows the Favorites population in its Default ordering for now; a customizable `include in widget` membership concept is deferred to a future milestone (owner, 2026-09-01).
+- **Never-contacted reachability:** never-contacted contacts reach the Dashboard only via the Not Contacted or All Contacts populations; the standalone Never Contacted screen and the include-Unbound toggle retire.
 
 ## 8. Updated Dependency Order
 
