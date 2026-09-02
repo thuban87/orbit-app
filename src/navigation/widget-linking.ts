@@ -92,6 +92,17 @@ export type WidgetNavIntent =
       routes: [{ name: "Home" }, { name: "ManageFavourites" }];
     };
 
+type WidgetUrlEvent = { url: string };
+
+/** The subset of React Native's Linking API used by the widget intent gate. */
+export type WidgetUrlLinking = {
+  addEventListener(
+    event: "url",
+    listener: (event: WidgetUrlEvent) => void,
+  ): { remove: () => void };
+  getInitialURL(): Promise<string | null>;
+};
+
 /** The one accepted zero-id form. */
 const FAVOURITES_URI = "orbit://favourites";
 
@@ -187,6 +198,46 @@ export function resolveWidgetUri(url: unknown): WidgetNavIntent | null {
 }
 
 /**
+ * Subscribe to widget URLs without allowing a delayed launch URL to replace a
+ * newer warm intent. Kept separate from the React effect so the arrival ordering
+ * remains directly regression-testable.
+ */
+export function subscribeToWidgetUrls(
+  linking: WidgetUrlLinking,
+  enqueue: (intent: WidgetNavIntent) => void,
+): () => void {
+  let cancelled = false;
+  let receivedWarmIntent = false;
+  const sub = linking.addEventListener("url", ({ url }) => {
+    const intent = resolveWidgetUri(url);
+    if (intent) {
+      receivedWarmIntent = true;
+      enqueue(intent);
+    }
+  });
+
+  void linking
+    .getInitialURL()
+    .then((initial) => {
+      if (cancelled || receivedWarmIntent) {
+        return;
+      }
+      const intent = resolveWidgetUri(initial);
+      if (intent) {
+        enqueue(intent);
+      }
+    })
+    .catch((error) => {
+      Logger.error(LOG_SOURCE, "widget launch URL lookup failed", error);
+    });
+
+  return () => {
+    cancelled = true;
+    sub.remove();
+  };
+}
+
+/**
  * Ready-gated single-owner orbit:// deep-link navigation. Renders null (config/
  * logic only — no colour literals, check:colors).
  *
@@ -212,30 +263,19 @@ export function WidgetLinkingGate({ isReady }: { isReady: boolean }) {
   // so this never consumes the share text/plain path.
   useEffect(() => {
     let cancelled = false;
-    let sub: { remove: () => void } | undefined;
-    void (async () => {
-      const { Linking } = await import("react-native");
-      if (cancelled) {
-        return;
-      }
-      sub = Linking.addEventListener("url", ({ url }: { url: string }) => {
-        const intent = resolveWidgetUri(url);
-        if (intent) {
-          setPending(intent);
+    let unsubscribe: (() => void) | undefined;
+    void import("react-native")
+      .then(({ Linking }) => {
+        if (!cancelled) {
+          unsubscribe = subscribeToWidgetUrls(Linking, setPending);
         }
+      })
+      .catch((error) => {
+        Logger.error(LOG_SOURCE, "widget Linking setup failed", error);
       });
-      const initial = await Linking.getInitialURL();
-      if (cancelled) {
-        return;
-      }
-      const intent = resolveWidgetUri(initial);
-      if (intent) {
-        setPending(intent);
-      }
-    })();
     return () => {
       cancelled = true;
-      sub?.remove();
+      unsubscribe?.();
     };
   }, []);
 

@@ -13,8 +13,12 @@
  * is device-only and is NOT exercised here — only the pure resolver is imported,
  * so this stays node-loadable.
  */
-import { describe, expect, it } from "vitest";
-import { resolveWidgetUri } from "./widget-linking";
+import { describe, expect, it, vi } from "vitest";
+import {
+  resolveWidgetUri,
+  subscribeToWidgetUrls,
+  type WidgetUrlLinking,
+} from "./widget-linking";
 
 describe("resolveWidgetUri — accepted forms (all RESET onto [Home, target])", () => {
   it("maps orbit://contact/<id> to a reset onto [Home, Profile{contactId}]", () => {
@@ -122,5 +126,42 @@ describe("resolveWidgetUri — malformed / untrusted input → null", () => {
       name: "Compose",
       params: { contactId: 5 },
     });
+  });
+});
+
+describe("subscribeToWidgetUrls", () => {
+  it("keeps a warm widget intent when the launch URL resolves later", async () => {
+    let resolveInitial: ((url: string | null) => void) | undefined;
+    const initialUrl = new Promise<string | null>((resolve) => {
+      resolveInitial = resolve;
+    });
+    let urlListener: ((event: { url: string }) => void) | undefined;
+    const remove = vi.fn();
+    const linking: WidgetUrlLinking = {
+      addEventListener: vi.fn((_event, listener) => {
+        urlListener = listener;
+        return { remove };
+      }),
+      getInitialURL: vi.fn(() => initialUrl),
+    };
+    const enqueue = vi.fn();
+    const unsubscribe = subscribeToWidgetUrls(linking, enqueue);
+
+    urlListener?.({ url: "orbit://contact/8" });
+    resolveInitial?.("orbit://compose/7");
+    await initialUrl;
+    await Promise.resolve();
+
+    expect(enqueue).toHaveBeenCalledTimes(1);
+    expect(enqueue).toHaveBeenCalledWith({
+      type: "reset",
+      index: 1,
+      routes: [
+        { name: "Home" },
+        { name: "Profile", params: { contactId: 8 } },
+      ],
+    });
+    unsubscribe();
+    expect(remove).toHaveBeenCalledOnce();
   });
 });
