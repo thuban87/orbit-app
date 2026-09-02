@@ -46,7 +46,7 @@ The amended initial overflow set is therefore:
 - Unbound Contacts
 - Archived Contacts
 - Manage Favorites
-- Bulk / Contact Management
+- Select Contacts
 - Reset Dashboard View
 
 This redundant path is intentional even though Group Events also has a prominent header affordance.
@@ -106,6 +106,14 @@ This amendment extends or supersedes the following older Phase 5 text without ot
 - **Phase Success Criterion 8:** read as Dashboard overflow additionally exposes **Group Events**.
 
 All Population / Filters / Sort, anchored-panel, Search, List/Card-toggle, reset, and unrelated Dashboard control decisions remain authoritative and are not reopened by this amendment.
+
+---
+
+## Amendment — audit resolutions 2026-09-01
+
+Targeted resolutions from the milestone-2 cross-dossier audit. Each item names the finding it resolves; all other Phase 5 decisions remain authoritative.
+
+- **AF-02 — Dashboard-overflow bulk entry.** The overflow entry is named **Select Contacts** and enters Phase 7's Card/Grid multi-select bulk-management mode. The earlier `Bulk / Contact Management` naming, and its claim that the entry "supports the existing/current import" capabilities, are superseded: contact import belongs to Backup/Restore (Phase 7 §O, roadmap §7), not to this entry.
 
 ---
 
@@ -271,14 +279,16 @@ The exact width split is responsive/derived rather than fixed to a literal perce
 - Unbound Contacts
 - Archived Contacts
 - Manage Favorites
-- Bulk / Contact Management
+- Select Contacts
 - Reset Dashboard View
 
 **[DECIDED]** Your Week is not buried in overflow because it has a first-class header affordance.
 
 **[DECIDED]** Bulk/contact-management receives a Dashboard-overflow home now rather than being deferred.
 
-This supports the existing/current import and bulk-management capabilities.
+**[DECIDED]** The overflow entry is named **Select Contacts**. It enters the Phase 7 Card/Grid multi-select bulk-management mode (switching to Card View if needed) rather than routing to a standalone bulk-management screen.
+
+**[DECIDED]** Contact import is **not** reachable from this entry. Import belongs to Backup/Restore / contact data-management flows (Phase 7 §O, roadmap §7).
 
 ## N. Existing Management Screens
 **[DECIDED]** Archived and Unbound destinations are not greenfield reimplementations.
@@ -359,7 +369,8 @@ Dashboard State
 - **Theme & Visual System:** owns visual token resolution, glass/opacity/scrim/contrast behavior.
 - **App Shell:** owns Back, active-tab transient dismissal, header architecture, safe areas, nav/FAB behavior.
 - **Your Week:** richer birthday/upcoming content lives there, not as a permanent Dashboard block.
-- **Import/Bulk Management:** existing/current bulk workflows receive a discoverable Dashboard-overflow entry point.
+- **Bulk Management (Dashboard Card View):** the Dashboard-overflow **Select Contacts** entry enters the Phase 7 Grid multi-select bulk-management mode; contact import is not part of it.
+- **Backup/Restore / contact data management:** owns contact import; Dashboard overflow does not expose an import entry point.
 - **Archived/Unbound:** dedicated child routes, not Dashboard populations.
 
 ## Explicitly Deferred
@@ -384,7 +395,7 @@ Dashboard State
 5. Panels dismiss/switch consistently through control taps, outside tap, Back, and direct control-to-control switching.
 6. Search appears beneath the query-control row and shares its row with an accessible List/Card toggle.
 7. Your Week is discoverable from the Dashboard header without becoming a permanent content module.
-8. Dashboard overflow exposes Unbound, Archived, Manage Favorites, Bulk/Contact Management, and Reset Dashboard View.
+8. Dashboard overflow exposes Unbound, Archived, Manage Favorites, Select Contacts, and Reset Dashboard View.
 9. Existing Archived/Unbound management surfaces are integrated/refactored into the new Dashboard navigation model rather than recreated unnecessarily.
 10. The control architecture allows a future HUD container to replace anchored-panel presentation without rewriting Dashboard state/query behavior.
 
