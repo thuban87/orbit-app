@@ -139,7 +139,7 @@ Phase 12 owns Group Event persistence, event-first capture, shared/default inher
 - Each top-level tab preserves its stack; retapping the active tab dismisses transient UI first, then returns to root.
 - Browse/read screens retain bottom nav and universal FAB; focused workflows hide both.
 - Android/system Back and visible app Back have the same logical result; in-app navigation is origin-aware.
-- Universal labeled speed-dial FAB exposes Add Contact, Quick Log, Log Contact, Update Contact, and Memory.
+- Universal labeled speed-dial FAB exposes six actions: Add Contact, Quick Log, Log Contact, Group Log, Update Contact, and Memory.
 - Quick Log writes immediately once the target is known; detailed Log Contact remains a separate routable form.
 
 ### Phase 2 — Theme & Visual System
