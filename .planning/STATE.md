@@ -5,10 +5,10 @@ milestone_name: Release Readiness
 current_phase: 22
 current_phase_name: app-shell-navigation
 status: planned
-stopped_at: Phase 22 planned — 6 plans, 4 waves, ready to execute
-last_updated: "2026-09-02T10:23:34.511Z"
+stopped_at: Phase 22 plans converged — 6 plans, 5 waves, ready to execute (5-cycle cross-AI review: 0 HIGH, all actionables incorporated)
+last_updated: "2026-09-02T21:11:05.000Z"
 last_activity: 2026-09-02
-last_activity_desc: Phase 22 planned (6 plans across 4 waves; plan-checker 0 blockers)
+last_activity_desc: Phase 22 plans converged via 5-cycle cross-AI review (6 plans across 5 waves; 0 HIGH, all actionables incorporated/deferred)
 state_head: c74cb305c8af345689782038df28842dffa14716
 progress:
   total_phases: 19
@@ -30,8 +30,8 @@ mapped across 22–36). Next: `/gsd-execute-phase 22` (App Shell & Navigation).
 ## Current Position
 
 Phase: 22 (app-shell-navigation) — READY TO EXECUTE
-Plan: 6 plans across 4 waves (22-01 … 22-06); run `/gsd-execute-phase 22`
-Status: Phase 22 planned — 6 plans, 4 waves; plan-checker 0 blockers, 2 non-blocking warnings
+Plan: 6 plans across 5 waves (22-01 … 22-06); run `/gsd-execute-phase 22`
+Status: Phase 22 plans converged (5-cycle cross-AI review — codex/cursor/claude: 0 HIGH, all actionables incorporated or owner-flagged); 6 plans, 5 waves; ready to execute
 Last activity: 2026-09-02 — Phase 22 planned (App Shell & Navigation)
 Progress: 0/19 phases complete (v2.0)
 
@@ -389,7 +389,7 @@ _Also disposed at this close: 05/deferred-items.md (check:colors doc-comment) ma
 ## Session
 
 **Last session:** 2026-09-02T09:35:20.434Z
-**Stopped at:** Phase 22 planned — 6 plans across 4 waves (tracer-first: Wave 1 = four-tab shell + nested external-reset owner; Waves 2–4 = transient/back-intent, app bars/insets/Group Events, universal FAB, contact picker + commit-truthful Quick Log). plan-checker: 0 blockers, 2 non-blocking warnings (RESEARCH Open-Questions marker fixed; VALIDATION sign-off deferred to validate-phase). Next: `/gsd-execute-phase 22`.
+**Stopped at:** Phase 22 plans converged (5-cycle cross-AI review) — 6 plans across 5 waves (tracer-first: Wave 1 = four-tab shell + nested external-reset owner; Waves 2–5 = transient/back-intent, app bars/insets/Group Events, universal FAB, contact picker + commit-truthful Quick Log). plan-checker: 0 blockers, 2 non-blocking warnings (RESEARCH Open-Questions marker fixed; VALIDATION sign-off deferred to validate-phase). Next: `/gsd-execute-phase 22`.
 _Prior stop (v1.0):_ Phase 21 UI-SPEC approved; milestone v1.0 closed 2026-09-01.
 _Prior stop (13-04):_ the orrery VISUAL VOCABULARY (theme tokens + two pure resolver modules, node-tested, 29 cases green): (1) five owner-tunable `ThemePalette` tokens seeded in `space-dark.dark` ONLY — `starPalette` (6 colours, gold `#F2C14E` at index 0, then amber/rose-red/violet/cyan/ice-white), `mutedStable/Wobble/Decay` (desaturated same-hue morph endpoints), `rogueExtinguished` (cold blue-grey `#3E4A6B` rogue BODY fill) — with an M6/C2-5 conformance test that IMPORTS the real `SELF_SUN_COLOUR_RE`/`assertSelfSunColour` from app-settings-dao and locks every starPalette entry to the ACTUAL DAO write-path rule (no re-inlined regex). (2) `orrery-ring-logic.ts` `orreryRingStyle(status, colors)` — REUSES `ringVisual` for `{color,opacity,width}` (status→colour mapped once), adds the `strokeStyle` axis (solid→dashed→faded→faintTrace) + `bodyFill` (rogue ring=`colors.rogue`, body=`rogueExtinguished`); `null`→canonical NEUTRAL (`colors.border`), never throws — the single fallback sun-occupant reuses (C2-2). (3) `sun-occupant-logic.ts` `resolveSunOccupant(input)` — NULL/archived/missing→self (A7, glow `selfSunColour ?? starPalette[0]`), live contact→its status glow via `orreryRingStyle(status, colors).color`, never-contacted (status `null`)→the reused neutral border (C2-2); accepts `status: ProfileStatus | null`. 5 commits (1801915 feat tokens+M6; d35d528 RED→4cbfad5 GREEN ring-logic; c923b16 RED→10780dd GREEN sun-occupant); tsc + check:colors clean; no deviations (one in-flight fix: a placeholder hex in the logic test was re-sourced from the palette after check:colors flagged it — C2-3). Committed locally on main (NOT pushed). Next: Wave 2 (13-05 render / 13-06 Settings sun-picker), Wave 3 (13-07 drag-release), Wave 4 (13-08 device UAT, autonomous:false).
 **Resume file:** .planning/phases/22-app-shell-navigation/22-01-PLAN.md (Wave 1 tracer)
