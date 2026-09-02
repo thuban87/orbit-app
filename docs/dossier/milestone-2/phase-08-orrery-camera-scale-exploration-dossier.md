@@ -16,6 +16,14 @@ It intentionally does **not** define custom System authoring/management, polishe
 
 ---
 
+## Amendment — audit resolutions 2026-09-01
+
+Targeted resolutions from the milestone-2 cross-dossier audit. Each item names the finding it resolves; all other Phase 8 decisions remain authoritative.
+
+- **E-02 — never-contacted bodies in Systems.** The All Contacts and Not Contacted Systems include never-contacted contacts, which carry no interval progress. §S records the required neutral placement rule.
+
+---
+
 ## A. Orrery Product Role
 
 **[DECIDED]** Orrery remains Orbit's primary relationship-health / attention-centric visualization rather than another Dashboard renderer.
@@ -361,6 +369,10 @@ The hold must be meaningfully longer/more deliberate than a casual short long-pr
 - one automatically derived System per user-visible Category
 
 **[DECIDED]** All Contacts is the default/canonical Orrery System.
+
+**[DECIDED — amended 2026-09-01]** The **All Contacts** and **Not Contacted** Systems include never-contacted contacts. Those contacts have no last interaction and therefore no interval progress.
+
+**[DERIVED]** Phase 8 must define a placement for bodies with no last interaction (no progress angle) — for example a fixed neutral resting angle on their ring with neutral styling — and must **never** fabricate a progress value. ADR-011 still applies: never misrepresent a never-contacted contact as decaying.
 
 **[DECIDED]** Systems resolve against current/live contact data rather than storing a frozen snapshot of member IDs.
 

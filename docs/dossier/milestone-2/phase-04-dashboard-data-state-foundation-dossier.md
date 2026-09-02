@@ -11,6 +11,7 @@
 
 Targeted resolutions from the milestone-2 cross-dossier audit. Each item names the finding it resolves; all other Phase 4 decisions remain authoritative.
 
+- **E-02 — "All Contacts" population, ADR-011 preserved.** Never-contacted contacts were *not* merged into Active Contacts. Active Contacts stays status-bearing only (ADR-011 intact); a fifth special population **All Contacts** (= Active Contacts ∪ Not Contacted) provides the union. The legacy Never Contacted screen and `include_unbound_never_contacted` setting retire in favour of the populations.
 - **E-01 — binary favourites ratified.** The "Manage favourites" drag-reorder screen and the favourite rank behind it are retired (ADR-033 superseded 2026-09-01). Favourites are binary membership only; the favourites widget (ADR-043) renders the Favorites population in its Default ordering.
 - **AF-08 — no deferred compact renderer.** The `[DEFERRED]` compact Card/Grid presentation mode is superseded: Card View *is* the compact 3-column avatar-first grid (Phase 7 v0.2, roadmap v1.0). Nothing separate remains deferred here.
 
@@ -50,6 +51,8 @@ It intentionally does **not** define exact List/Card row/card composition, card 
 
 **[DECIDED]** Unbound contacts are outside the Dashboard result universe.
 
+**[DECIDED — amended 2026-09-01]** Active Contacts **excludes never-contacted contacts** (no last interaction, no relationship status). This preserves ADR-011's rule that never-contacted contacts are excluded from normal dashboard reads. They are reached through the **Not Contacted** population (ADR-011's dedicated surface) and through **All Contacts**.
+
 **[DERIVED]** The shared query model should represent the eligible universe explicitly rather than treating `all contacts` as a catch-all branch with later exclusions.
 
 ## D. Special Populations
@@ -58,6 +61,11 @@ It intentionally does **not** define exact List/Card row/card composition, card 
 - Birthdays
 - Not Contacted
 - Snoozed
+- All Contacts
+
+**[DECIDED — amended 2026-09-01]** **All Contacts** = Active Contacts ∪ Not Contacted. Archived and Unbound contacts remain outside the Dashboard universe and are *not* included.
+
+**[DERIVED]** Because populations combine as an OR-union, selecting All Contacts alongside other populations is redundant but harmless; no special-case suppression is required.
 
 **[DECIDED]** Special populations are multi-select.
 
@@ -88,9 +96,9 @@ It intentionally does **not** define exact List/Card row/card composition, card 
 **[DERIVED]** Under Sort = Default, Birthday population naturally orders soonest birthday first.
 
 ### Not Contacted
-**[DECIDED]** Never-contacted contacts remain eligible for Active Contacts with a neutral/no-status state.
+**[DECIDED — amended 2026-09-01]** Never-contacted contacts are **not** part of Active Contacts. They are surfaced by the dedicated **Not Contacted** population (ADR-011's dedicated surface) and by **All Contacts**.
 
-**[DECIDED]** They also have a dedicated Not Contacted population.
+**[DECIDED]** Renderers show them with the neutral/no-status treatment.
 
 ### Snoozed
 **[DECIDED]** Snoozed contacts remain in Active Contacts.
@@ -148,6 +156,7 @@ Examples:
 - Favorites → normal Dashboard ordering; no favorite-rank sort.
 - Not Contacted → natural not-contacted ordering.
 - Snoozed → natural snooze ordering.
+- All Contacts → normal Dashboard ordering with never-contacted contacts grouped after status-bearing contacts.
 
 **[DECIDED]** An explicit sort overrides population-natural ordering until the user returns Sort to `Default`.
 
@@ -300,8 +309,8 @@ It should own:
 
 ## Phase Success Criteria
 1. Dashboard has one shared query/state contract independent of List/Card rendering.
-2. No explicit population means Active Contacts; special populations OR-union and dedupe.
-3. Favorites, Birthdays, Not Contacted, and Snoozed follow the settled population rules.
+2. No explicit population means Active Contacts — status-bearing contacts only, excluding never-contacted contacts (ADR-011); special populations OR-union and dedupe.
+3. Favorites, Birthdays, Not Contacted, Snoozed, and All Contacts follow the settled population rules, with All Contacts resolving to Active Contacts ∪ Not Contacted.
 4. Filters support OR-within-category and AND-across-category semantics using the initial five families.
 5. Needs Attention behaves as a filter and excludes snoozed contacts.
 6. Sort supports population-aware Default plus explicit overrides.
@@ -315,6 +324,7 @@ It should own:
 - Treat this as a distinct integer execution phase before Dashboard Control Surface and the two renderers.
 - Do not recreate query/search logic separately in List and Card phases.
 - Do not interpret legacy `favourite_rank` as a requirement for ranked Favorites UX.
+- The existing **Never Contacted** screen and the `include_unbound_never_contacted` setting retire in favour of the Not Contacted / All Contacts populations. Unbound contacts remain outside the Dashboard universe either way.
 - Do not make Dashboard search global.
 - Do not dynamically rewrite the Sort option list per population; keep `Default` semantic and population-resolved.
 - Preserve existing proven database/domain helpers where compatible, but old Dashboard UI/query precedence is not automatically authoritative.

@@ -112,6 +112,7 @@ All Population / Filters / Sort, anchored-panel, Search, List/Card-toggle, reset
 
 Targeted resolutions from the milestone-2 cross-dossier audit. Each item names the finding it resolves; all other Phase 5 decisions remain authoritative.
 
+- **E-02 — "All Contacts" population row.** The Population panel gains an **All Contacts** selectable row (Active Contacts stays implicit and unlisted). Semantics are owned by Phase 4 §D.
 - **E-01 — binary favourites ratified.** **Manage Favorites** is removed from Dashboard overflow with nothing put in its place: the drag-reorder screen and its rank are retired (ADR-033 superseded 2026-09-01) and favourites are binary membership only.
 - **AF-08 — no deferred compact renderer.** The deferred `compact Card/Grid renderer` is superseded: Card View *is* the compact 3-column avatar-first grid (Phase 7 v0.2, roadmap v1.0). Nothing separate remains deferred here.
 - **AF-02 — Dashboard-overflow bulk entry.** The overflow entry is named **Select Contacts** and enters Phase 7's Card/Grid multi-select bulk-management mode. The earlier `Bulk / Contact Management` naming, and its claim that the entry "supports the existing/current import" capabilities, are superseded: contact import belongs to Backup/Restore (Phase 7 §O, roadmap §7), not to this entry.
@@ -230,6 +231,8 @@ Standard may use a quieter light scrim and flatter surface treatment.
 **[DERIVED]** Selection state still requires a clear accessible visual/semantic treatment.
 
 **[DECIDED]** Active Contacts is not shown as an explicit selectable population inside the panel.
+
+**[DECIDED — amended 2026-09-01]** **All Contacts** *is* shown as an ordinary selectable population row in the panel. Active Contacts remains the implicit, unlisted default universe.
 
 **[DECIDED]** Deselecting the final explicit special population immediately returns to Active Contacts.
 
