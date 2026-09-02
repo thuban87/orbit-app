@@ -186,7 +186,7 @@ Phase 12 owns Group Event persistence, event-first capture, shared/default inher
 - Bulk Archive is the recoverable removal (permanent deletion stays a manual per-contact action on the Archived list, ADR-018; no contact auto-purge); Gravity remains derived and noneditable.
 
 ### Phase 8 — Orrery Camera, Scale & Exploration
-- Orrery is a constrained 2.5D navigable world over one canonical relationship-health/status visualization.
+- Orrery is a constrained 2.5D navigable world over one canonical relationship-health/status visualization (ADR-048 superseded 2026-09-01: single unnamed status view).
 - Camera supports pan, pinch zoom, bounded tilt, yaw, focus/cluster focus, and canonical recenter/north orientation.
 - High-count geometry grows physically rather than crushing contacts indefinitely into the initial viewport.
 - Semantic zoom progressively reveals identity/context; ambiguous touch clusters use Focus Zoom plus a bottom contact panel.
