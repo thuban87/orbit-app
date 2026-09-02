@@ -11,6 +11,7 @@ import {
 } from "@/db/import-session-read";
 import type { RootStackScreenProps } from "@/navigation/types";
 import { navigationRef } from "@/navigation/linking";
+import { resetToDashboardRoot } from "@/navigation/reset-intents";
 import { runImportBatch } from "@/services/import/import-driver";
 import { useTheme } from "@/theme";
 import { Logger } from "@/utils/logger";
@@ -302,9 +303,7 @@ export function ImportCompleteScreen({
           testID="import-complete-done"
           accessibilityRole="button"
           accessibilityLabel="Done"
-          onPress={() =>
-            navigation.reset({ index: 0, routes: [{ name: "Home" }] })
-          }
+          onPress={() => navigationRef.current?.reset(resetToDashboardRoot())}
           style={[styles.doneButton, { backgroundColor: colors.accent }]}
         >
           <Text style={{ color: colors.background }}>Done</Text>

@@ -6,6 +6,8 @@ import {
   type ReconcileCompletionCounts,
 } from "@/db/reconcile-session-read";
 import type { RootStackScreenProps } from "@/navigation/types";
+import { navigationRef } from "@/navigation/linking";
+import { resetToDashboardRoot } from "@/navigation/reset-intents";
 import { useTheme } from "@/theme";
 
 function interactionLabel(count: number): string {
@@ -44,7 +46,7 @@ export function ReconcileCompleteScreen({ navigation, route }: RootStackScreenPr
     </View>
     <View style={styles.actions}>
       {counts.unresolved > 0 ? <Pressable accessibilityRole="button" accessibilityLabel="View unresolved" onPress={() => navigation.navigate("ReconcileGrid", { sessionId: route.params.sessionId })} style={[styles.secondaryButton, { borderColor: colors.border, backgroundColor: colors.surface }]}><Text style={{ color: colors.textPrimary }}>View unresolved</Text></Pressable> : null}
-      <Pressable accessibilityRole="button" accessibilityLabel="Done" onPress={() => navigation.reset({ index: 0, routes: [{ name: "Home" }] })} style={[styles.doneButton, { backgroundColor: colors.accent }]}><Text style={{ color: colors.background }}>Done</Text></Pressable>
+      <Pressable accessibilityRole="button" accessibilityLabel="Done" onPress={() => navigationRef.current?.reset(resetToDashboardRoot())} style={[styles.doneButton, { backgroundColor: colors.accent }]}><Text style={{ color: colors.background }}>Done</Text></Pressable>
     </View>
   </View>;
 }
