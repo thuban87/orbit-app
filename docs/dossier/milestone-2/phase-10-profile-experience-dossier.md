@@ -860,8 +860,8 @@ Conceptually, registry metadata may describe:
 - Treat this as the Profile composition/presentation phase after Orrery Systems.
 - Do not delay the entire Profile phase until Interaction History, Rapid Capture, or Messaging are implemented. Build stable section/route seams and let later phases replace section internals.
 - Do not pull Phase 11's full heatmap/timeline/detail editing into Profile.
-- Do not pull Phase 12's forms/business workflows into Profile merely because Profile links to Edit/Log/Update.
-- Do not pull Phase 13's Message/AI Compose implementation into the Profile Hero action itself.
+- Do not pull Phase 13's (Rapid Capture & Update Flows) forms/business workflows into Profile merely because Profile links to Edit/Log/Update.
+- Do not pull Phase 14's Message/AI Compose implementation into the Profile Hero action itself.
 - Do not pull general Category CRUD into Profile. Profile consumes Category definitions for presentation assignment.
 - Keep layout templates and background templates independent.
 - Initial presentation-assignment scopes are global/default, Category, and contact only.
