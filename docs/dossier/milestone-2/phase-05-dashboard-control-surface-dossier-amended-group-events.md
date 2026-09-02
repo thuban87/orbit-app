@@ -45,7 +45,6 @@ The amended initial overflow set is therefore:
 - Group Events
 - Unbound Contacts
 - Archived Contacts
-- Manage Favorites
 - Select Contacts
 - Reset Dashboard View
 
@@ -113,6 +112,7 @@ All Population / Filters / Sort, anchored-panel, Search, List/Card-toggle, reset
 
 Targeted resolutions from the milestone-2 cross-dossier audit. Each item names the finding it resolves; all other Phase 5 decisions remain authoritative.
 
+- **E-01 — binary favourites ratified.** **Manage Favorites** is removed from Dashboard overflow with nothing put in its place: the drag-reorder screen and its rank are retired (ADR-033 superseded 2026-09-01) and favourites are binary membership only.
 - **AF-08 — no deferred compact renderer.** The deferred `compact Card/Grid renderer` is superseded: Card View *is* the compact 3-column avatar-first grid (Phase 7 v0.2, roadmap v1.0). Nothing separate remains deferred here.
 - **AF-02 — Dashboard-overflow bulk entry.** The overflow entry is named **Select Contacts** and enters Phase 7's Card/Grid multi-select bulk-management mode. The earlier `Bulk / Contact Management` naming, and its claim that the entry "supports the existing/current import" capabilities, are superseded: contact import belongs to Backup/Restore (Phase 7 §O, roadmap §7), not to this entry.
 
@@ -279,7 +279,6 @@ The exact width split is responsive/derived rather than fixed to a literal perce
 **[DECIDED] Dashboard overflow initially contains:**
 - Unbound Contacts
 - Archived Contacts
-- Manage Favorites
 - Select Contacts
 - Reset Dashboard View
 
@@ -396,7 +395,7 @@ Dashboard State
 5. Panels dismiss/switch consistently through control taps, outside tap, Back, and direct control-to-control switching.
 6. Search appears beneath the query-control row and shares its row with an accessible List/Card toggle.
 7. Your Week is discoverable from the Dashboard header without becoming a permanent content module.
-8. Dashboard overflow exposes Unbound, Archived, Manage Favorites, Select Contacts, and Reset Dashboard View.
+8. Dashboard overflow exposes Unbound, Archived, Select Contacts, and Reset Dashboard View.
 9. Existing Archived/Unbound management surfaces are integrated/refactored into the new Dashboard navigation model rather than recreated unnecessarily.
 10. The control architecture allows a future HUD container to replace anchored-panel presentation without rewriting Dashboard state/query behavior.
 

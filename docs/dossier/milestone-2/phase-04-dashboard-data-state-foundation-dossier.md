@@ -11,6 +11,7 @@
 
 Targeted resolutions from the milestone-2 cross-dossier audit. Each item names the finding it resolves; all other Phase 4 decisions remain authoritative.
 
+- **E-01 — binary favourites ratified.** The "Manage favourites" drag-reorder screen and the favourite rank behind it are retired (ADR-033 superseded 2026-09-01). Favourites are binary membership only; the favourites widget (ADR-043) renders the Favorites population in its Default ordering.
 - **AF-08 — no deferred compact renderer.** The `[DEFERRED]` compact Card/Grid presentation mode is superseded: Card View *is* the compact 3-column avatar-first grid (Phase 7 v0.2, roadmap v1.0). Nothing separate remains deferred here.
 
 ---
@@ -76,6 +77,8 @@ It intentionally does **not** define exact List/Card row/card composition, card 
 **[DECIDED]** Favorites are binary membership, not a user-visible ranking system.
 
 **[DERIVED]** Any legacy/internal `favourite_rank` implementation detail must not be treated as evidence for ranked-Favorites UX.
+
+**[DECIDED]** The former "Manage favourites" drag-reorder screen and its rank are retired (ADR-033 superseded 2026-09-01). The favourites home-screen widget (ADR-043) shows favourites in the Favorites population's Default ordering; customizable widget membership is a future-milestone item.
 
 ### Birthdays
 **[DECIDED]** Dashboard Birthday population covers the next **30 days**.

@@ -32,6 +32,14 @@ It intentionally does **not** redefine Dashboard populations, filters, sort, sea
 
 **[DERIVED]** Existing Phase 7 references to `Bulk Log Interaction with a detailed form is not offered` are superseded by this amendment wherever they conflict. All unrelated Phase 7 decisions remain authoritative.
 
+## Amendment — audit resolutions 2026-09-01
+
+Targeted resolutions from the milestone-2 cross-dossier audit. Each item names the finding it resolves; all other Phase 7 decisions remain authoritative.
+
+- **E-01 — binary favourites ratified.** The owner ratified binary favourite membership; the drag-reorder "Manage favourites" screen and its rank are retired (ADR-033 superseded 2026-09-01). §H is annotated accordingly.
+
+---
+
 ## A. Product Role
 **[DECIDED]** Card View is primarily a **browse-and-recognize** presentation of the same Dashboard contacts shown in List View.
 
@@ -108,7 +116,7 @@ While snoozed:
 
 **[DERIVED]** Favorite mutation should reuse/extract existing favorite-domain plumbing rather than create a new Card-specific mutation path.
 
-**[DERIVED]** Product semantics remain binary favorite membership; legacy/internal rank storage must not leak into Card View UX.
+**[DERIVED]** Product semantics remain binary favorite membership; legacy/internal rank storage must not leak into Card View UX (ADR-033 superseded 2026-09-01).
 
 ## I. Adaptive Context
 **[DECIDED]** Card View shows **one** adaptive context item.
