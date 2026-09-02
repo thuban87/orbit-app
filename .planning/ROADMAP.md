@@ -162,14 +162,14 @@ All v1.0 commits are local on `main` and have NOT been pushed.
 
 **Canonical refs**: docs/dossier/milestone-2/phase-01-app-shell-navigation-dossier-amended-group-events.md; docs/dossier/milestone-2/planning-notes/phase-01-planning-notes.md
 **Schema**: none
-**Plans:** 1/6 plans executed
+**Plans:** 2/6 plans executed
 **Wave 1**
 
 - [x] 22-01-PLAN.md — TRACER: four-tab bottom-nav shell + nested external-reset reconciliation (SHELL-01/04/05/15)
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 22-02-PLAN.md — Navigator behavior: transient store, back-intent, active-tab retap, nav visibility (SHELL-02/03/04/06)
+- [x] 22-02-PLAN.md — Navigator behavior: transient store, back-intent, active-tab retap, nav visibility (SHELL-02/03/04/06)
 - [ ] 22-03-PLAN.md — In-app/container navigate reconciliation (incl. ImportReview crash), completion resets, no-replay, Discard/Keep (SHELL-03/04/05/07)
 
 **Wave 3** *(blocked on Wave 2 completion — 04 depends on 02's back-intent)*
@@ -488,7 +488,7 @@ All v1.0 commits are local on `main` and have NOT been pushed.
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 22. App Shell & Navigation | 1/6 | In Progress|  |
+| 22. App Shell & Navigation | 2/6 | In Progress|  |
 | 23. Theme & Visual System | 0/TBD | Not started | - |
 | 24. Contact Knowledge Foundation | 0/TBD | Not started | - |
 | 25. Dashboard Data & State Foundation | 0/TBD | Not started | - |

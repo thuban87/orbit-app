@@ -17,11 +17,11 @@ category's phase (see Traceability).
 ### SHELL — App Shell & Navigation (Phase 22)
 
 - [x] **SHELL-01**: User can reach Dashboard, Orrery, Backup/Restore, and Settings from a persistent four-tab bottom navigation bar with correct safe-area insets; each tab preserves its own navigation stack (ADR-080)
-- [ ] **SHELL-02**: Tapping the already-active tab first dismisses open transient UI; a second tap returns that tab to its root
-- [ ] **SHELL-03**: Android system Back and the visible app Back control produce identical results on every screen; Back dismisses the topmost transient layer before navigating; Back after a completed edit never replays the finished edit screen
+- [x] **SHELL-02**: Tapping the already-active tab first dismisses open transient UI; a second tap returns that tab to its root
+- [x] **SHELL-03**: Android system Back and the visible app Back control produce identical results on every screen; Back dismisses the topmost transient layer before navigating; Back after a completed edit never replays the finished edit screen
 - [x] **SHELL-04**: Back from a Contact Profile returns to the surface the user actually came from (origin-aware), not always Dashboard
 - [x] **SHELL-05**: Externally launched/deep-linked flows with no in-app origin fall back to Dashboard on cancel or Back; a deep link to a missing contact shows a friendly message and routes to Dashboard rather than crashing
-- [ ] **SHELL-06**: Bottom nav and FAB are visible on browse/read surfaces and hidden during focused workflows and while the keyboard is open
+- [x] **SHELL-06**: Bottom nav and FAB are visible on browse/read surfaces and hidden during focused workflows and while the keyboard is open
 - [ ] **SHELL-07**: Leaving a focused workflow with meaningful unsaved changes prompts Discard changes / Keep editing
 - [ ] **SHELL-08**: User can expand a consistently positioned FAB into a labeled speed dial with translucent scrim offering exactly six actions in fixed order: Add Contact, Quick Log, Log Contact, Group Log, Update Contact, Memory
 - [ ] **SHELL-09**: From a contact's Profile, contact-specific FAB actions preselect that contact; from global contexts they open the shared picker; Group Log opens its canonical workflow directly with no shell-level pre-picker
