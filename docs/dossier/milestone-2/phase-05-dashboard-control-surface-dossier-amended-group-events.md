@@ -113,6 +113,7 @@ All Population / Filters / Sort, anchored-panel, Search, List/Card-toggle, reset
 
 Targeted resolutions from the milestone-2 cross-dossier audit. Each item names the finding it resolves; all other Phase 5 decisions remain authoritative.
 
+- **AF-08 — no deferred compact renderer.** The deferred `compact Card/Grid renderer` is superseded: Card View *is* the compact 3-column avatar-first grid (Phase 7 v0.2, roadmap v1.0). Nothing separate remains deferred here.
 - **AF-02 — Dashboard-overflow bulk entry.** The overflow entry is named **Select Contacts** and enters Phase 7's Card/Grid multi-select bulk-management mode. The earlier `Bulk / Contact Management` naming, and its claim that the entry "supports the existing/current import" capabilities, are superseded: contact import belongs to Backup/Restore (Phase 7 §O, roadmap §7), not to this entry.
 
 ---
@@ -380,7 +381,7 @@ Dashboard State
 - checkbox-style population selection chrome
 - fourth top-row presentation-mode button
 - permanent birthday/upcoming Dashboard module
-- compact Card/Grid renderer
+- ~~compact Card/Grid renderer~~ — superseded 2026-09-01: Card View IS the compact 3-column avatar-first grid per Phase 7 v0.2 and roadmap v1.0; no separate compact renderer is deferred
 - final List View presentation
 - final Card View presentation
 - exact anchored-panel pixel dimensions/offset algorithms

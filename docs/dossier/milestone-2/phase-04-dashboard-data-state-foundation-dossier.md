@@ -7,6 +7,14 @@
 - **[DERIVED]** implementation/architecture consequence.
 - **[DEFERRED]** intentionally postponed.
 
+## Amendment — audit resolutions 2026-09-01
+
+Targeted resolutions from the milestone-2 cross-dossier audit. Each item names the finding it resolves; all other Phase 4 decisions remain authoritative.
+
+- **AF-08 — no deferred compact renderer.** The `[DEFERRED]` compact Card/Grid presentation mode is superseded: Card View *is* the compact 3-column avatar-first grid (Phase 7 v0.2, roadmap v1.0). Nothing separate remains deferred here.
+
+---
+
 ## Scope
 This dossier defines the nonvisual Dashboard foundation consumed by the Dashboard Control Surface, Dashboard List View, and Dashboard Card View.
 
@@ -28,7 +36,7 @@ It intentionally does **not** define exact List/Card row/card composition, card 
 
 **[DECIDED]** Both modes consume the same Population / Filters / Sort / Search state.
 
-**[DEFERRED]** Compact Card/Grid presentation mode.
+**[DEFERRED]** Compact Card/Grid presentation mode — *superseded 2026-09-01: Card View IS the compact 3-column avatar-first grid per Phase 7 v0.2 and roadmap v1.0; no separate compact renderer is deferred.*
 
 ## C. Default Dashboard Universe
 **[DECIDED]** With no explicit special population selected, Dashboard shows **Active Contacts**.
@@ -275,7 +283,7 @@ It should own:
 - **Future compact renderer:** query architecture should not be coupled to exactly two renderers.
 
 ## Explicitly Deferred
-- Compact Card/Grid Dashboard renderer
+- ~~Compact Card/Grid Dashboard renderer~~ — superseded 2026-09-01: Card View IS the compact 3-column avatar-first grid per Phase 7 v0.2 and roadmap v1.0; no separate compact renderer is deferred
 - ranked Favorites product concept
 - advanced filter categories beyond the initial five
 - arbitrary custom-field filtering
