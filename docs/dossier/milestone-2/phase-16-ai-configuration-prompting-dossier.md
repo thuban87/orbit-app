@@ -42,6 +42,12 @@ It intentionally does **not** redefine Compose layout, Text/Email delivery behav
 
 ---
 
+# Amendment — audit resolutions 2026-09-01
+
+**E-05 — ratified AI egress plus the per-interaction gate.** The owner ratified the widened AI egress in §Y (AI-enabled Off Limits sent as avoidance constraints); **ADR-050 and ADR-036 are superseded 2026-09-01** by a new ADR issued in this batch. The same decision closes the gate that was missing on interaction notes: a note is transmitted only when that interaction's **Allow AI** toggle is ON (§Z), the toggle is authored in Phase 13 §N and defaults OFF, and this dossier's permission manager covers interaction notes as an information type with a default-OFF, new-items-only type default plus review/withdrawal (§AB). **Group Notes are never transmitted to AI** (Phase 12 §H).
+
+---
+
 # A. Product Role
 
 **[DECIDED]** AI is an optional capability layer within Orbit rather than a mandatory product dependency.
@@ -614,6 +620,8 @@ Prompt meaning should effectively communicate:
 
 **[DECIDED]** If an Off Limits item is AI-disabled, Orbit respects that privacy choice and does not secretly transmit it merely so the model can enforce the avoidance constraint.
 
+**[DECIDED]** The owner ratified this widened AI egress on 2026-09-01 (ADR-050 and ADR-036 superseded 2026-09-01).
+
 ---
 
 # Z. Recent Interaction Context
@@ -629,7 +637,11 @@ Useful recent context may include:
 
 **[DECIDED]** Recent history is bounded to the latest three Interaction entries rather than transmitting the complete History Browser.
 
-**[DECIDED]** Interaction-note content is sent only where its AI/privacy permission semantics permit it.
+**[DECIDED]** An Interaction note is sent **only when that interaction's `Allow AI` toggle is ON**.
+
+The toggle is authored on the Log Interaction form (Phase 13 §N), defaults **OFF**, and remains editable afterward through Phase 11's canonical Edit Interaction. A note whose toggle is OFF is withheld from the projection entirely; the rest of that interaction's compact structured context may still be sent.
+
+**[DECIDED]** **Group Notes are never transmitted to AI** (owner decision 2026-09-01), whatever any participant's Allow AI state. Only a participant's own interaction note may be sent, subject to that interaction's Allow AI toggle. Group affiliation may still be referenced as ordinary structured context.
 
 **[DERIVED]** Recent context exists to prevent obviously tone-deaf/repetitive drafting and provide near-term conversational continuity, not to turn the AI prompt into full historical analytics.
 
@@ -678,6 +690,8 @@ Type/field defaults controlling whether newly created eligible information begin
 
 The UI should say this plainly and may offer a path such as `Review existing ...`.
 
+**[DECIDED]** **Interaction notes are one of the information types covered by these defaults.** Their `Allow AI` default is **OFF**, and changing that default affects **new interactions only** — existing interactions keep the Allow AI state they were saved with.
+
 ## Review existing AI-enabled information
 
 The manager provides:
@@ -687,6 +701,8 @@ The manager provides:
 - contact drill-in,
 - clear semantic labels/values rather than storage identifiers,
 - summary counts.
+
+**[DECIDED]** Review coverage includes **AI-enabled interaction notes** as a reviewable information type alongside Contact Knowledge items, so a user can find and withdraw notes they previously allowed. Group Notes never appear here because they are never AI-eligible.
 
 Example summary direction:
 

@@ -14,6 +14,12 @@ It covers Group Event domain identity and persistence, parent ↔ child Interact
 
 It intentionally does **not** redesign ordinary single-contact logging, Add Contact, Update Contact, Messaging/AI Compose, Dashboard renderers, Profile layout, general Settings IA, category administration, future social analytics, future event planning, or calendar synchronization.
 
+
+## Amendment — audit resolutions 2026-09-01
+
+**E-05 — Group Note AI egress ban.** The owner's 2026-09-01 AI-egress decision adds one Phase 12 rule, recorded in §H: a Group Note is shared social context authored about several people at once and is **never** sent to AI. A participant's own interaction note may be, and only when that child Interaction's **Allow AI** toggle is on. Related contracts: Phase 13 §N (the toggle), Phase 11 §V/§W (display and editing), Phase 16 §Z/§AB (transmission and permission management). Nothing about Group Note storage, display, inheritance, or detachment semantics changes.
+
+
 ## A. Product Role
 **[DECIDED]** Group Interaction Logging is a first-class Orbit subsystem for recording one real-world social encounter involving multiple Orbit contacts without forcing the user to separately author the same details for each contact.
 
@@ -150,6 +156,8 @@ If the event later changes to `Tone = Neutral` and `Duration = 3h`:
 **[DECIDED]** Participant notes remain untouched by Group Note edits.
 
 **[DECIDED]** Shared text should be explicitly labeled **Group Note** when shown with a participant Interaction; the participant note needs no special label.
+
+**[DECIDED]** **Group Note is never transmitted to AI** (owner decision 2026-09-01). Only a participant's own interaction note may be, subject to that interaction's **Allow AI** toggle (Phase 13 §N; default OFF, participant-editable per child Interaction).
 
 **[DERIVED]** Contact-level consumers can show both notes together without concatenating them into one storage field.
 

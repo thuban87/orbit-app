@@ -37,6 +37,12 @@ It intentionally does **not** redefine Group Event persistence, Group Log field 
 
 ---
 
+# Amendment — audit resolutions 2026-09-01
+
+**E-05 — per-interaction Allow AI gate.** The owner ratified the widened AI egress for AI-enabled Off Limits (Phase 16 §Y; ADR-050 and ADR-036 superseded 2026-09-01) and, in the same decision, closed the missing gate on interaction notes: §N now carries an **Allow AI** toggle on the Log Interaction form, placed with the Note field, defaulting **OFF**, with its initial value taken from Phase 16's new-items-only type defaults. Group Notes are never transmitted to AI (Phase 12 §H). Consuming contracts: Phase 11 §V/§W (display and editing of the toggle), Phase 12 §H (Group Note egress ban), Phase 16 §Z and §AB (transmission rule and permission-manager coverage).
+
+---
+
 # A. Product Role
 
 **[DECIDED]** Rapid Capture should optimize for the smallest reasonable amount of work needed to record or update relationship information while preserving separate full editing surfaces for exhaustive changes.
@@ -281,9 +287,22 @@ Flow:
 - Direction,
 - Connected where meaningful,
 - Tone,
-- Note.
+- Note,
+- **Allow AI**.
 
 **[DECIDED]** Date/time defaults to **now** for ordinary invocation and remains editable.
+
+**[DECIDED]** The form exposes an **Allow AI** toggle for the interaction, placed **with the Note field** because the note is the content it governs.
+
+**Allow AI** controls whether that interaction's note may be included in AI context. It is a per-interaction privacy gate, not a global AI setting.
+
+**[DECIDED]** **Allow AI defaults OFF.** An interaction note is never sent to AI unless the user deliberately allows it for that interaction.
+
+**[DECIDED]** The toggle's initial value for a newly created interaction is governed by Phase 16's central AI permission manager **type defaults**, which retain the default-OFF privacy posture and affect **new items only**. Changing that type default never retroactively opens existing interaction notes to AI.
+
+**[DERIVED]** Allow AI is per-interaction state that must survive save, remain editable afterward through Phase 11's canonical Edit Interaction, and be carried by backup/restore alongside the interaction it belongs to.
+
+**[DERIVED]** For a group-linked child Interaction, Allow AI is participant-scoped state on that child; the Phase 12 Group Note is never transmitted to AI under any Allow AI value.
 
 **[DECIDED]** Optional Duration is available through **More Options** rather than being a required/default primary field.
 

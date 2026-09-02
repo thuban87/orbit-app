@@ -100,7 +100,12 @@ Initial participant-editable scope includes:
 - Duration,
 - Direction where relevant,
 - Connected state where relevant,
-- participant-specific note.
+- participant-specific note,
+- **Allow AI**.
+
+**[DECIDED]** **Allow AI is per child Interaction and participant-editable.** Each participant's own note carries its own Allow AI state; there is no event-level Allow AI value and no inheritance of one.
+
+**[DECIDED]** The Phase 12 **Group Note is never transmitted to AI** regardless of any participant's Allow AI state.
 
 **[DECIDED]** Group Event title and shared event date/time do not appear as individual participant-editable fields.
 
@@ -179,6 +184,8 @@ All unrelated Phase 11 decisions remain authoritative.
 ## Amendment — audit resolutions 2026-09-01
 
 **AF-06 (terminology sync, no new decision).** The interaction quality field is named **Tone** everywhere in this dossier. The three remaining `quality/impact` references — the shared period/date detail sheet's compact interaction row (§T), the Interaction Detail field list (§V), and the Edit Interaction field list (§W) — now read **Tone**, matching the participant-editable scope above and the canonical term in Phase 13 §T, roadmap §7, and the master handoff §7. No field semantics change.
+
+**E-05 (owner decision 2026-09-01) — per-interaction Allow AI gate.** Interaction notes reach AI only through an explicit per-interaction **Allow AI** toggle, defined by Phase 13 §N and defaulting **OFF**. Phase 11 consumes it in two places: Interaction Detail (§V) shows the AI-enabled state with a restrained sparkle when the toggle is on, and Edit Interaction (§W) can change it. For group-linked child Interactions the toggle is per child and participant-editable (see the participant-editable scope above), and the Phase 12 Group Note is never transmitted to AI. Transmission itself is owned by Phase 16 §Z; permission-manager defaults and review by Phase 16 §AB.
 
 
 ---
@@ -676,6 +683,8 @@ Initial fields may include:
 - note/context,
 - other structured metadata already present in the canonical interaction model.
 
+**[DECIDED]** When the interaction's **Allow AI** toggle is ON, Interaction Detail shows the interaction's AI-enabled state through a restrained sparkle indicator. Nothing is shown when the toggle is OFF.
+
 **[DECIDED]** Interaction Detail exposes:
 - Edit,
 - Delete.
@@ -697,7 +706,10 @@ Initial fields may include:
 - connected state where relevant,
 - Tone,
 - note/context,
-- optional duration.
+- optional duration,
+- **Allow AI**.
+
+**[DECIDED]** Edit Interaction can change the interaction's **Allow AI** toggle, so a note allowed to AI in error can be withdrawn and a withheld note can later be permitted. The toggle is defined by Phase 13 §N and defaults OFF.
 
 **[DECIDED]** Future dates remain invalid.
 
