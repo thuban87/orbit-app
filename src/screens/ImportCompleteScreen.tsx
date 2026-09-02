@@ -10,6 +10,7 @@ import {
   sessionSummaryCounts,
 } from "@/db/import-session-read";
 import type { RootStackScreenProps } from "@/navigation/types";
+import { navigationRef } from "@/navigation/linking";
 import { runImportBatch } from "@/services/import/import-driver";
 import { useTheme } from "@/theme";
 import { Logger } from "@/utils/logger";
@@ -264,7 +265,11 @@ export function ImportCompleteScreen({
           testID="import-complete-unbound"
           accessibilityRole="button"
           accessibilityLabel="View Unbound contacts"
-          onPress={() => navigation.navigate("UnboundContacts")}
+          onPress={() =>
+            navigationRef.current?.navigate("DashboardTab", {
+              screen: "UnboundContacts",
+            })
+          }
           style={[
             styles.secondaryButton,
             { borderColor: colors.border, backgroundColor: colors.surface },
@@ -280,8 +285,9 @@ export function ImportCompleteScreen({
             accessibilityRole="button"
             accessibilityLabel="View contact"
             onPress={() =>
-              navigation.navigate("Profile", {
-                contactId: alreadyLinkedContactId,
+              navigationRef.current?.navigate("DashboardTab", {
+                screen: "Profile",
+                params: { contactId: alreadyLinkedContactId },
               })
             }
             style={[

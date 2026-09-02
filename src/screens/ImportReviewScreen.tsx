@@ -36,6 +36,8 @@ import { newUid } from "@/db/uid";
 import { normalizeEditedBirthday } from "@/logic/birthday-logic";
 import { mapPickedContact } from "@/logic/picked-contact-map";
 import type { RootStackScreenProps } from "@/navigation/types";
+import { navigationRef } from "@/navigation/linking";
+import { resetToDashboardWith } from "@/navigation/reset-intents";
 import { getDeviceRegion } from "@/services/device-region";
 import {
   type DuplicateEvidenceCandidate,
@@ -212,7 +214,9 @@ export function ImportReviewScreen({
       now,
     });
     setDuplicateOutcome(null);
-    navigation.replace("Profile", { contactId });
+    navigationRef.current?.reset(
+      resetToDashboardWith({ name: "Profile", params: { contactId } }),
+    );
   }
 
   async function onImport() {
@@ -286,7 +290,12 @@ export function ImportReviewScreen({
         now,
       );
       setDuplicateOutcome(null);
-      navigation.replace("Profile", { contactId: choice.contactId });
+      navigationRef.current?.reset(
+        resetToDashboardWith({
+          name: "Profile",
+          params: { contactId: choice.contactId },
+        }),
+      );
     } catch (error) {
       Logger.error(LOG_SCOPE, "failed to link duplicate", error);
       Alert.alert("Couldn't link contact", "Please choose again.");

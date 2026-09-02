@@ -2,7 +2,7 @@ import { type NavigationProp, useNavigation } from "@react-navigation/native";
 import { Modal, Pressable, StyleSheet, Text, View } from "react-native";
 import { getExecutor, localDateTime } from "@/db/database";
 import { discardSession } from "@/db/import-session-dao";
-import type { RootStackParamList } from "@/navigation/types";
+import type { TabParamList } from "@/navigation/types";
 import {
   cleanupDiscardedStagedPhotos,
   type ResumableImport,
@@ -11,7 +11,7 @@ import { deleteImportStaging } from "@/services/photos/photo-storage";
 import { useTheme } from "@/theme";
 import { Logger } from "@/utils/logger";
 
-type RootNavigation = NavigationProp<RootStackParamList>;
+type RootNavigation = NavigationProp<TabParamList>;
 
 export interface ResumeImportPromptProps {
   resumable: ResumableImport | null;
@@ -24,7 +24,10 @@ function resumeImport(
 ): void {
   const { counts, mode, sessionId } = resumable;
   if (mode === "single" && counts.pending > 0) {
-    navigation.navigate("ImportReview", { sessionId });
+    navigation.navigate("SettingsTab", {
+      screen: "ImportReview",
+      params: { sessionId },
+    });
     return;
   }
 
@@ -36,18 +39,30 @@ function resumeImport(
       counts.failed +
       counts.needs_review;
     if (nonPending === 0) {
-      navigation.navigate("BulkImportSetup", { sessionId });
+      navigation.navigate("SettingsTab", {
+        screen: "BulkImportSetup",
+        params: { sessionId },
+      });
       return;
     }
-    navigation.navigate("ImportProgress", { sessionId, batchCategoryId: null });
+    navigation.navigate("SettingsTab", {
+      screen: "ImportProgress",
+      params: { sessionId, batchCategoryId: null },
+    });
     return;
   }
 
   if (counts.needs_review > 0) {
-    navigation.navigate("DuplicateReview", { sessionId });
+    navigation.navigate("SettingsTab", {
+      screen: "DuplicateReview",
+      params: { sessionId },
+    });
     return;
   }
-  navigation.navigate("ImportComplete", { sessionId });
+  navigation.navigate("SettingsTab", {
+    screen: "ImportComplete",
+    params: { sessionId },
+  });
 }
 
 /** App-root, explicit-action-only recovery sheet for a durable import snapshot. */

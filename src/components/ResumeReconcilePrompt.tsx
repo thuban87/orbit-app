@@ -2,7 +2,7 @@ import { type NavigationProp, useNavigation } from "@react-navigation/native";
 import { Modal, Pressable, StyleSheet, Text, View } from "react-native";
 import { getExecutor, localDateTime } from "@/db/database";
 import { discardSession } from "@/db/reconcile-session-dao";
-import type { RootStackParamList } from "@/navigation/types";
+import type { TabParamList } from "@/navigation/types";
 import {
   cleanupDiscardedReconcileStagedPhotos,
   type ResumableReconcile,
@@ -11,7 +11,7 @@ import { deleteReconcileStaging } from "@/services/photos/photo-storage";
 import { useTheme } from "@/theme";
 import { Logger } from "@/utils/logger";
 
-type RootNavigation = NavigationProp<RootStackParamList>;
+type RootNavigation = NavigationProp<TabParamList>;
 
 export interface ResumeReconcilePromptProps {
   resumable: ResumableReconcile | null;
@@ -42,7 +42,7 @@ export function ResumeReconcilePrompt({ resumable, onDismiss, onDiscarded }: Res
         <Text style={[styles.body, { color: colors.textSecondary }]}>
           {resumable.discardOnly ? "This saved check can’t be resumed. You can discard its unresolved contacts. Changes you already applied stay applied." : "Unresolved contacts are saved. Changes you already applied stay applied."}
         </Text>
-        {!resumable.discardOnly ? <Pressable accessibilityRole="button" accessibilityLabel="Resume check" onPress={() => { navigation.navigate("ReconcileGrid", { sessionId: resumable.sessionId }); onDismiss(); }} style={[styles.button, { backgroundColor: colors.accent }]}><Text style={[styles.buttonLabel, { color: colors.background }]}>Resume</Text></Pressable> : null}
+        {!resumable.discardOnly ? <Pressable accessibilityRole="button" accessibilityLabel="Resume check" onPress={() => { navigation.navigate("SettingsTab", { screen: "ReconcileGrid", params: { sessionId: resumable.sessionId } }); onDismiss(); }} style={[styles.button, { backgroundColor: colors.accent }]}><Text style={[styles.buttonLabel, { color: colors.background }]}>Resume</Text></Pressable> : null}
         <Pressable accessibilityRole="button" accessibilityLabel="Discard check" onPress={() => void discard()} style={[styles.button, styles.discardButton, { borderColor: colors.danger }]}><Text style={[styles.buttonLabel, { color: colors.danger }]}>Discard</Text></Pressable>
       </View>
     </View>

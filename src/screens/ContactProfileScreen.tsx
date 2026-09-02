@@ -88,6 +88,7 @@ import {
 } from "@/db/timeline-read";
 import { newUid } from "@/db/uid";
 import type { RootStackScreenProps } from "@/navigation/types";
+import { navigationRef } from "@/navigation/linking";
 import {
   canStartLifecycleTransition,
   profileLifecycleView,
@@ -824,7 +825,10 @@ export function ContactProfileScreen({
                     label: "Update from Contacts",
                     testID: "contact-profile-update-from-contacts",
                     onPress: () =>
-                      navigation.navigate("ReconcileDetail", { contactId }),
+                      navigationRef.current?.navigate("SettingsTab", {
+                        screen: "ReconcileDetail",
+                        params: { contactId },
+                      }),
                   },
                 ]
               : []),
