@@ -15,8 +15,8 @@ This phase was fully interrogated outside GSD (milestone-2 dossier process, amen
 ## Implementation Decisions
 
 ### Ground truth and process
-- **D-01:** Read the phase dossier (canonical_refs) IN FULL before planning. Where present, its dated "Amendment — audit resolutions 2026-09-01" section overrides older text. [DECIDED] and [REJECTED] items are settled: reopening one, or reversing any Accepted ADR or HANDOFF.md entry, is an owner decision — stop and ask, never "fix" it.
-- **D-02:** Read the phase planning-notes file (canonical_refs) as a binding appendix: every REPLAN finding must be reflected in the plan, and every trip-wire is a stop-and-ask.
+- **D-01 [informational]:** Read the phase dossier (canonical_refs) IN FULL before planning. Where present, its dated "Amendment — audit resolutions 2026-09-01" section overrides older text. [DECIDED] and [REJECTED] items are settled: reopening one, or reversing any Accepted ADR or HANDOFF.md entry, is an owner decision — stop and ask, never "fix" it. *(Planner-process directive — shaped how this phase was planned; not a shippable deliverable verifiable in code, so [informational] rather than plan-tracked.)*
+- **D-02 [informational]:** Read the phase planning-notes file (canonical_refs) as a binding appendix: every REPLAN finding must be reflected in the plan, and every trip-wire is a stop-and-ask. *(Planner-process directive — the REPLAN findings/trip-wires it points at are themselves tracked via D-06/D-07/D-08 in the plans; the "read the notes" instruction is [informational].)*
 - **D-03:** This phase ships NO SQLite migration; do not add schema. It is a pure navigation refactor and can be planned independently of the milestone's migration chain.
 
 ### Phase-specific constraints

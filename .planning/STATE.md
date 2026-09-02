@@ -2,15 +2,19 @@
 gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Release Readiness
-status: planning
-last_updated: "2026-09-02T05:35:00.000Z"
+current_phase: 22
+current_phase_name: app-shell-navigation
+status: planned
+stopped_at: Phase 22 planned — 6 plans, 4 waves, ready to execute
+last_updated: "2026-09-02T10:23:34.511Z"
 last_activity: 2026-09-02
+last_activity_desc: Phase 22 planned (6 plans across 4 waves; plan-checker 0 blockers)
+state_head: c74cb305c8af345689782038df28842dffa14716
 progress:
   total_phases: 19
   completed_phases: 0
-  total_plans: 0
+  total_plans: 6
   completed_plans: 0
-  percent: 0
 ---
 
 # Project State
@@ -21,14 +25,14 @@ See: .planning/PROJECT.md (updated 2026-09-01 after v1.0 milestone)
 
 **Core value:** Collapse the taps between "you're overdue with X" and the message actually being sent.
 **Current focus:** Milestone v2.0 Release Readiness — ROADMAP.md written (Phases 22–40, 217 requirements
-mapped across 22–36). Next: `/gsd-plan-phase 22` (App Shell & Navigation).
+mapped across 22–36). Next: `/gsd-execute-phase 22` (App Shell & Navigation).
 
 ## Current Position
 
-Phase: 22 — App Shell & Navigation (next; not started)
-Plan: — (no plans yet; run `/gsd-plan-phase 22`)
-Status: Roadmap complete — awaiting owner approval, then phase planning
-Last activity: 2026-09-02 — v2.0 roadmap created (Phases 22–40)
+Phase: 22 (app-shell-navigation) — READY TO EXECUTE
+Plan: 6 plans across 4 waves (22-01 … 22-06); run `/gsd-execute-phase 22`
+Status: Phase 22 planned — 6 plans, 4 waves; plan-checker 0 blockers, 2 non-blocking warnings
+Last activity: 2026-09-02 — Phase 22 planned (App Shell & Navigation)
 Progress: 0/19 phases complete (v2.0)
 
 **Milestone v2.0 structure (pre-decided by the owner from the fifteen milestone-2 dossiers + the
@@ -164,6 +168,7 @@ at plan time. All new durable preferences are `app_settings` columns, never Asyn
   from v1.0's Phase 21. Structure is owner-decided from `docs/dossier/milestone-2/` (fifteen dossiers)
   and the audit bridge `AUDIT-HANDOFF.md`; ADR-075–080 record the ratified reversals. Phases 37–40 are
   deferred-planning slots — do not plan or discuss them until the product they consolidate exists.
+
 - Phases 18–21 added after Phase 17: Contact Data Normalization → System Contact Import → Contact Reconciliation & Merge → Interaction Assist & Reach Out. Their externally completed product discussion is captured in the corresponding phase CONTEXT.md files and canonical dossiers.
 - Phase 19.1 inserted after Phase 19: Older-Android hybrid two-picker (ADR-002) (URGENT)
 
@@ -383,11 +388,11 @@ _Also disposed at this close: 05/deferred-items.md (check:colors doc-comment) ma
 
 ## Session
 
-**Last session:** 2026-08-31T17:07:16.424Z
-**Stopped at:** v2.0 roadmap created (Phases 22–40) — awaiting owner approval, then `/gsd-plan-phase 22`
+**Last session:** 2026-09-02T09:35:20.434Z
+**Stopped at:** Phase 22 planned — 6 plans across 4 waves (tracer-first: Wave 1 = four-tab shell + nested external-reset owner; Waves 2–4 = transient/back-intent, app bars/insets/Group Events, universal FAB, contact picker + commit-truthful Quick Log). plan-checker: 0 blockers, 2 non-blocking warnings (RESEARCH Open-Questions marker fixed; VALIDATION sign-off deferred to validate-phase). Next: `/gsd-execute-phase 22`.
 _Prior stop (v1.0):_ Phase 21 UI-SPEC approved; milestone v1.0 closed 2026-09-01.
 _Prior stop (13-04):_ the orrery VISUAL VOCABULARY (theme tokens + two pure resolver modules, node-tested, 29 cases green): (1) five owner-tunable `ThemePalette` tokens seeded in `space-dark.dark` ONLY — `starPalette` (6 colours, gold `#F2C14E` at index 0, then amber/rose-red/violet/cyan/ice-white), `mutedStable/Wobble/Decay` (desaturated same-hue morph endpoints), `rogueExtinguished` (cold blue-grey `#3E4A6B` rogue BODY fill) — with an M6/C2-5 conformance test that IMPORTS the real `SELF_SUN_COLOUR_RE`/`assertSelfSunColour` from app-settings-dao and locks every starPalette entry to the ACTUAL DAO write-path rule (no re-inlined regex). (2) `orrery-ring-logic.ts` `orreryRingStyle(status, colors)` — REUSES `ringVisual` for `{color,opacity,width}` (status→colour mapped once), adds the `strokeStyle` axis (solid→dashed→faded→faintTrace) + `bodyFill` (rogue ring=`colors.rogue`, body=`rogueExtinguished`); `null`→canonical NEUTRAL (`colors.border`), never throws — the single fallback sun-occupant reuses (C2-2). (3) `sun-occupant-logic.ts` `resolveSunOccupant(input)` — NULL/archived/missing→self (A7, glow `selfSunColour ?? starPalette[0]`), live contact→its status glow via `orreryRingStyle(status, colors).color`, never-contacted (status `null`)→the reused neutral border (C2-2); accepts `status: ProfileStatus | null`. 5 commits (1801915 feat tokens+M6; d35d528 RED→4cbfad5 GREEN ring-logic; c923b16 RED→10780dd GREEN sun-occupant); tsc + check:colors clean; no deviations (one in-flight fix: a placeholder hex in the logic test was re-sourced from the palette after check:colors flagged it — C2-3). Committed locally on main (NOT pushed). Next: Wave 2 (13-05 render / 13-06 Settings sun-picker), Wave 3 (13-07 drag-release), Wave 4 (13-08 device UAT, autonomous:false).
-**Resume file:** — (no active phase. v2.0 phase artifacts will live in `.planning/phases/`; v1.0 artifacts
+**Resume file:** .planning/phases/22-app-shell-navigation/22-01-PLAN.md (Wave 1 tracer)
 are archived under `.planning/milestones/v1.0-phases/`.)
 
 ## Phase 4 — Closeout (2026-08-15) ✅ COMPLETE
@@ -412,7 +417,9 @@ was built via the desktop pipeline and driven through create→edit→archive→
 
 ## Operator Next Steps
 
-- Review `.planning/ROADMAP.md` (Phases 22–40) and approve, or send revision feedback.
-- On approval, the orchestrator commits ROADMAP.md + STATE.md + REQUIREMENTS.md (commits stay local —
-  agents never push).
-- Then start the milestone with `/gsd-plan-phase 22` (App Shell & Navigation).
+- Phase 22 is planned (6 plans, 4 waves; plan-checker 0 blockers). Review the plans if desired:
+  `cat .planning/phases/22-app-shell-navigation/22-0{1..6}-PLAN.md`.
+- Execute the phase: `/gsd-execute-phase 22` (Wave 1 is the four-tab-shell tracer, verified before chrome).
+- Optional before executing: `/gsd-validate-phase 22` to finalize the Nyquist VALIDATION.md sign-off
+  (non-blocking), and `/gsd-review --phase 22 --all` for cross-AI plan review.
+- Commits stay local — agents never push; push when you're ready.

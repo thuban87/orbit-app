@@ -419,23 +419,26 @@ Note: current `RootStackParamList` (`types.ts:22-141`) is one flat list; splitti
 | A5 | Undo requires a NEW delete-interaction DAO export (none found) | Code Examples | If a delete path exists elsewhere, reuse it; if not, it's a required new guarded task |
 | A6 | The four not-yet-built FAB actions route to themed placeholder screens (established `types.ts:14-16` pattern) rather than "coming soon" affordances | Summary / Open Q1 | If the owner wants a different UX for unbuilt actions, the FAB wiring changes — implementation detail, but user-visible |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **How should the FAB expose actions whose forms are built in later phases?**
    - What we know: Add Contact → existing `Create`; Quick Log → shell-owned immediate write (buildable now). Log Contact/Update Contact (Phase 34), Group Log (Phase 33), Memory (Phase 24) target unbuilt workflows. Dossier: Phase 22 owns "exposure/routing only."
    - What's unclear: whether unbuilt actions route to themed placeholder screens (registered semantic routes, deep-link-ready) or show a "coming soon" state.
    - Recommendation: **register semantic placeholder routes** (the codebase's own documented pattern, `types.ts:14-16`) so SHELL-08's six-in-fixed-order and the routing-contract's deep-link readiness are satisfied now, and Phases 24/33/34 swap the placeholder for the real screen with zero shell change. This is settled enough to plan (not a blocker) — but it is user-visible, so surfaced here for confirmation.
+   - — RESOLVED: register themed semantic placeholder routes (deep-link-ready); adopted by Plans 04 (Group Events header/overflow) and 05 (unbuilt FAB actions).
 
 2. **Which tab owns the contact-import / reconcile flow (Class C resets)?**
    - What we know: Import is launched from the FAB (Add Contact) and historically resets to Home; it can also start from Settings.
    - What's unclear: post-refactor owning tab for its completion reset.
    - Recommendation: reset to Dashboard root via `resetToDashboardRoot()` (matches current Home reset and the external-entry fallback); revisit only if the owner wants import to return to Settings.
+   - — RESOLVED: import/reconcile completion resets to Dashboard root via `resetToDashboardRoot()`; adopted by Plan 03.
 
 3. **Group Events destination screen (SHELL-12) — placeholder or existing?**
    - What we know: Dashboard header + overflow expose Group Events; Phase 33 owns the Group Event screens/persistence.
    - Recommendation: header/overflow entries route to a themed placeholder route (same pattern as Q1); Phase 33 fills it.
+   - — RESOLVED: Group Events routes to a themed placeholder route (Phase 33 fills it); adopted by Plan 04.
 
-No item here reverses a [DECIDED]/ADR/HANDOFF entry, so none is a stop-and-ask. They are discretion calls with clear recommendations.
+No item here reverses a [DECIDED]/ADR/HANDOFF entry, so none is a stop-and-ask. They are discretion calls with clear recommendations, each now resolved and adopted by the plan named above.
 
 ## Environment Availability
 
