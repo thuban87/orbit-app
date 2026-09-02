@@ -1990,25 +1990,6 @@ export function SettingsScreen() {
       </View>
 
       <Pressable
-        testID="settings-manage-favourites-row"
-        accessibilityRole="button"
-        accessibilityLabel="Manage favourites"
-        onPress={() =>
-          navigationRef.current?.navigate("DashboardTab", {
-            screen: "ManageFavourites",
-          })
-        }
-        style={[
-          styles.row,
-          { backgroundColor: colors.surface, borderColor: colors.border },
-        ]}
-      >
-        <Text style={[styles.rowLabel, { color: colors.textPrimary }]}>
-          Manage favourites
-        </Text>
-      </Pressable>
-
-      <Pressable
         testID="settings-custom-fields-row"
         accessibilityRole="button"
         accessibilityLabel="Custom Fields"

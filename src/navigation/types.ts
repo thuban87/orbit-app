@@ -23,6 +23,8 @@ import type { PhotoTargetDescriptor } from "@/services/photos/photo-storage";
  */
 export type DashboardStackParamList = {
   Home: undefined;
+  /** Placeholder until Phase 33 supplies the Group Events workflow. */
+  GroupEvents: undefined;
   Settings: undefined;
   CustomFields: undefined;
   Create: undefined;

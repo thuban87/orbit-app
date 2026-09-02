@@ -28,8 +28,7 @@
  *
  * Every colour resolves through `useTheme().colors.*` (CLAUDE.md / check:colors).
  */
-import { useFocusEffect, useNavigation } from "@react-navigation/native";
-import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
+import { useFocusEffect } from "@react-navigation/native";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   AppState,
@@ -47,6 +46,7 @@ import { BirthdayBanner } from "@/components/BirthdayBanner";
 import { ContactCard } from "@/components/ContactCard";
 import { type FilterChip, FilterChipRow } from "@/components/FilterChipRow";
 import { ShellAppBar } from "@/components/ShellAppBar";
+import type { OverflowAction } from "@/components/OverflowMenu";
 import { listCategories } from "@/db/contact-read";
 import {
   countArchived,
@@ -61,9 +61,8 @@ import {
 import { getExecutor } from "@/db/database";
 import { countUnbound } from "@/db/unbound-read";
 import { selectDashboardEmptyState } from "@/logic/dashboard-empty-logic";
-import type { RootStackParamList } from "@/navigation/types";
+import type { DashboardScreenProps } from "@/navigation/types";
 import { useBottomClearance } from "@/navigation/use-bottom-clearance";
-import { navigationRef } from "@/navigation/linking";
 import { useDashboardPrefs } from "@/stores/dashboard-prefs-store";
 import { useTheme } from "@/theme";
 import type { SocialBattery } from "@/types";
@@ -100,15 +99,58 @@ const ZERO_COUNTS: PopulationCounts = {
   unbound: 0,
 };
 
-export function HomeScreen() {
+export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
   const { colors } = useTheme();
-  const navigation =
-    useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const sort = useDashboardPrefs((s) => s.sort);
   const filter = useDashboardPrefs((s) => s.filter);
   const setSort = useDashboardPrefs((s) => s.setSort);
   const setFilter = useDashboardPrefs((s) => s.setFilter);
   const bottomClearance = useBottomClearance();
+
+  const overflowActions: OverflowAction[] = [
+    {
+      label: "Your week",
+      onPress: () => navigation.navigate("Digest"),
+      testID: "dashboard-your-week-entry",
+    },
+    {
+      label: "Backup and Restore",
+      onPress: () =>
+        navigation.navigate({
+          name: "BackupTab",
+          params: { screen: "Backup" },
+        }),
+      testID: "dashboard-backup-entry",
+    },
+    {
+      label: "Orrery",
+      onPress: () =>
+        navigation.navigate({
+          name: "OrreryTab",
+          params: { screen: "Orrery" },
+        }),
+      testID: "dashboard-orbit-entry",
+    },
+    {
+      label: "Settings",
+      onPress: () =>
+        navigation.navigate({
+          name: "SettingsTab",
+          params: { screen: "Settings" },
+        }),
+      testID: "dashboard-settings-entry",
+    },
+    {
+      label: "Group Events",
+      onPress: () => navigation.navigate("GroupEvents"),
+      testID: "dashboard-group-events-overflow-entry",
+    },
+    {
+      label: "Archived Contacts",
+      onPress: () => navigation.navigate("Archived"),
+      testID: "dashboard-archived-overflow-entry",
+    },
+  ];
 
   const [rows, setRows] = useState<DashboardRow[]>([]);
   const [counts, setCounts] = useState<PopulationCounts>(ZERO_COUNTS);
@@ -315,19 +357,6 @@ export function HomeScreen() {
         ) : null}
       </View>
       <FilterChipRow chips={chips} active={filter} onSelect={setFilter} />
-      {filter === "favourites" ? (
-        <Pressable
-          testID="dashboard-favourites-manage"
-          accessibilityRole="button"
-          accessibilityLabel="Manage favourites"
-          onPress={() => navigation.navigate("ManageFavourites")}
-          style={styles.manageEntry}
-        >
-          <Text style={[styles.manageText, { color: colors.accent }]}>
-            Manage
-          </Text>
-        </Pressable>
-      ) : null}
       <View
         testID="dashboard-sort-control"
         accessibilityRole="tablist"
@@ -402,20 +431,6 @@ export function HomeScreen() {
       >
         <Text style={[styles.footerText, { color: colors.textPrimary }]}>
           {`Unbound contacts (${counts.unbound})`}
-        </Text>
-      </Pressable>
-      <Pressable
-        testID="dashboard-archived-entry"
-        accessibilityRole="button"
-        accessibilityLabel="Archived"
-        onPress={() => navigation.navigate("Archived")}
-        style={[
-          styles.footerEntry,
-          { backgroundColor: colors.surface, borderColor: colors.border },
-        ]}
-      >
-        <Text style={[styles.footerText, { color: colors.textPrimary }]}>
-          Archived
         </Text>
       </Pressable>
     </View>
@@ -513,92 +528,22 @@ export function HomeScreen() {
       <ShellAppBar
         variant="root"
         title="Orbit"
+        overflow={overflowActions}
         trailing={
-          <>
-            {/* Discreet retrospective entry (15-04). Text (not a glyph) reads as
-                a retrospective link; no badge/count (locked). */}
-        <Pressable
-          testID="dashboard-your-week-entry"
+          <Pressable
+          testID="dashboard-group-events-entry"
           accessibilityRole="button"
-          accessibilityLabel="Your week"
-          onPress={() => navigation.navigate("Digest")}
-          style={styles.yourWeekEntry}
+          accessibilityLabel="Group Events"
+          onPress={() => navigation.navigate("GroupEvents")}
+          style={styles.groupEventsEntry}
         >
           {({ pressed }) => (
-            <Text
-              style={[
-                styles.yourWeekText,
-                { color: pressed ? colors.accent : colors.textSecondary },
-              ]}
-            >
-              Your week
-            </Text>
+            <>
+              <Text style={[styles.groupEventsGlyph, { color: pressed ? colors.accent : colors.textSecondary }]}>◉</Text>
+              <Text numberOfLines={1} ellipsizeMode="tail" style={[styles.groupEventsLabel, { color: pressed ? colors.accent : colors.textSecondary }]}>Group Events</Text>
+            </>
           )}
         </Pressable>
-            <View style={styles.topBarRight}>
-          <Pressable
-            testID="dashboard-backup-entry"
-            accessibilityRole="button"
-            accessibilityLabel="Backup and Restore"
-            onPress={() =>
-              navigationRef.current?.navigate("BackupTab", {
-                screen: "Backup",
-              })
-            }
-            style={styles.backupEntry}
-          >
-            {({ pressed }) => (
-              <Text
-                style={[
-                  styles.backupText,
-                  { color: pressed ? colors.accent : colors.textSecondary },
-                ]}
-              >
-                Backup
-              </Text>
-            )}
-          </Pressable>
-          <Pressable
-            testID="dashboard-orbit-entry"
-            accessibilityRole="button"
-            accessibilityLabel="Orbit view"
-            onPress={() =>
-              navigationRef.current?.navigate("OrreryTab", {
-                screen: "Orrery",
-              })
-            }
-            style={styles.settingsEntry}
-          >
-            {({ pressed }) => (
-              <Text
-                style={[
-                  styles.settingsGlyph,
-                  { color: pressed ? colors.accent : colors.textSecondary },
-                ]}
-              >
-                ◎
-              </Text>
-            )}
-          </Pressable>
-          <Pressable
-            testID="dashboard-settings-entry"
-            accessibilityRole="button"
-            accessibilityLabel="Settings"
-            onPress={() =>
-              navigationRef.current?.navigate("SettingsTab", {
-                screen: "Settings",
-              })
-            }
-            style={styles.settingsEntry}
-          >
-            <Text
-              style={[styles.settingsGlyph, { color: colors.textSecondary }]}
-            >
-              ⚙
-            </Text>
-          </Pressable>
-            </View>
-          </>
         }
       />
       <FlatList
@@ -696,13 +641,6 @@ const styles = StyleSheet.create({
     lineHeight: 34,
     fontWeight: "600",
   },
-  topBar: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingHorizontal: 16,
-    paddingTop: 8,
-  },
   topBarRight: {
     flexDirection: "row",
     alignItems: "center",
@@ -733,6 +671,23 @@ const styles = StyleSheet.create({
   },
   settingsGlyph: {
     fontSize: 22,
+    fontWeight: "600",
+  },
+  groupEventsEntry: {
+    maxWidth: 132,
+    minHeight: 44,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 4,
+  },
+  groupEventsGlyph: {
+    fontSize: 18,
+    fontWeight: "600",
+  },
+  groupEventsLabel: {
+    flexShrink: 1,
+    fontSize: 14,
     fontWeight: "600",
   },
   content: {

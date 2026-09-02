@@ -8,6 +8,7 @@ import { CreateContactScreen } from "@/screens/CreateContactScreen";
 import { CropPhotoScreen } from "@/screens/CropPhotoScreen";
 import { DigestScreen } from "@/screens/DigestScreen";
 import { EditContactScreen } from "@/screens/EditContactScreen";
+import { GroupEventsScreen } from "@/screens/GroupEventsScreen";
 import { HomeScreen } from "@/screens/HomeScreen";
 import { ManageFavouritesScreen } from "@/screens/ManageFavouritesScreen";
 import { NeverContactedScreen } from "@/screens/NeverContactedScreen";
@@ -22,6 +23,7 @@ export function DashboardStack() {
   return (
     <Stack.Navigator initialRouteName="Home" screenOptions={{ headerShown: false }}>
       <Stack.Screen name="Home" component={HomeScreen} />
+      <Stack.Screen name="GroupEvents" component={GroupEventsScreen} />
       <Stack.Screen name="Profile" component={ContactProfileScreen} />
       <Stack.Screen name="Edit" component={EditContactScreen} />
       <Stack.Screen name="Create" component={CreateContactScreen} />
