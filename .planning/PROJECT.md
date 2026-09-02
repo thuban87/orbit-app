@@ -34,6 +34,45 @@ work — that is the one thing the plugin got wrong and the reason this project 
 - **Competitive note**: UpHabit shut down ~April 2026 (took users' data with it); Dex is
   $12/mo with no free tier. A local-only DB structurally cannot lock in or shut down a user.
 
+## Current Milestone: v2.0 Release Readiness
+
+**Goal:** Transform Orbit's functional v1.0 foundation into a release-quality, low-friction mobile
+experience — intentional navigation, presentation, capture workflows, personalization, and
+accessibility — ending in a state suitable for outside beta testers.
+
+**Target features:**
+- App shell rework: four-tab bottom nav with per-tab stacks, universal six-action speed-dial FAB,
+  origin-aware Back, deep-link/widget-ready fast-entry routes (ADR-080)
+- Theme & visual system: Galaxy + Standard theme packages × Light/Dark/Follow System, semantic
+  icon registry, status glyphs, reduced-motion hook
+- Contact Knowledge foundation: "Things to Remember" over first-class fields, custom fields,
+  structured Relationships, typed Memories; per-item AI opt-in (default OFF)
+- Dashboard rebuild: shared query/state foundation, populations (incl. All Contacts), control
+  surface, List view + 3-column Card grid, grid multi-select bulk management (ADR-075/076)
+- Orrery rebuild: 2.5D camera/scale/exploration with semantic zoom + relationship satellites, and
+  named dynamic Systems with HUD builder (ADR-077)
+- Profile experience: fixed Hero, modular sections, layout/background templates, Relationship
+  Overview tile grid
+- Interaction History & Insights: activity heatmap (Cycles lens), intensity, Rolodex History
+  Browser, canonical Interaction Detail/Edit, optional duration
+- Group Interaction Logging: Group Event parent + canonical child interactions, event-first
+  capture, inheritance/overrides
+- Rapid capture & update flows: streamlined Add Contact, Quick Log + post-log note/Memory,
+  Tone vocabulary, Update Contact chooser loop
+- Messaging & AI Compose: Compose-first drafting workspace, Text/Email Transmit handoff,
+  "Did you send it?" logging, three-suggestion AI review
+- AI Configuration & Prompting: three-lane connection architecture (OpenRouter-first),
+  prompt personalization, permissions, transparency (ADR-078/079); backup format v4 bump
+- Deferred-planning slots: Settings & Personalization, Your Week, Onboarding,
+  Responsive & Release Hardening
+
+**Key context:** All product decisions are pre-made in the fifteen phase dossiers under
+`docs/dossier/milestone-2/` (amended 2026-09-01 per the cross-dossier audit; ADR-075–080 record
+the ratified reversals). Dossiers are ground truth; per-phase `CONTEXT.md` files are shims that
+point at them. Migration order is milestone-wide: schema → consumers → backup wire-shape bump
+(format 4, Phase 16's final plan). The previously drafted **Sync milestone keeps its scope but
+is relabeled v3.0** (`.planning/sync-milestone/`) — this milestone takes the v2.0 moniker.
+
 ## Requirements
 
 All Active requirements are hypotheses until shipped and validated. The scoped, testable v1 set
@@ -78,10 +117,11 @@ are local on `main`, NOT pushed.
 
 ### Active
 
-- **v1.1 — not yet scoped.** Run `/gsd-new-milestone` to question → research → define requirements →
-  roadmap the next milestone. The milestone-2 dossier audit and `docs/dossier/milestone-2/AUDIT-HANDOFF.md`
-  already exist to seed it. Deferred/v2 candidates remain in `docs/dossier/*.md` "Deferred to phase
-  discussion" sections and the archived `v1.0-REQUIREMENTS.md` "v2 / Deferred" list.
+- **v2.0 Release Readiness — in planning/execution.** The release-quality UI/UX pass defined by the
+  fifteen phase dossiers in `docs/dossier/milestone-2/` (see "Current Milestone" above). Scoped
+  requirements live in `.planning/REQUIREMENTS.md`; the phase structure in `.planning/ROADMAP.md`.
+  Four late phases (Settings & Personalization, Your Week, Onboarding, Responsive & Release
+  Hardening) are deferred-planning slots interrogated later against the implemented product.
 
 ### Out of Scope
 
@@ -226,4 +266,4 @@ This document evolves at phase transitions and milestone boundaries.
 5. Update Context with current state
 
 ---
-*Last updated: 2026-09-01 after v1.0 MVP milestone*
+*Last updated: 2026-09-02 after starting milestone v2.0 Release Readiness*
