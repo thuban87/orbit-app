@@ -9,12 +9,14 @@ import {
   type EventArg,
   type RouteProp,
 } from "@react-navigation/native";
-import { Text } from "react-native";
+import { useEffect } from "react";
+import { BackHandler, Text } from "react-native";
 import { DashboardStack } from "@/navigation/tabs/DashboardStack";
 import { OrreryStack } from "@/navigation/tabs/OrreryStack";
 import { BackupStack } from "@/navigation/tabs/BackupStack";
 import { SettingsStack } from "@/navigation/tabs/SettingsStack";
 import { useTheme } from "@/theme";
+import { resolveBackIntent } from "./back-intent";
 import { isFocusedWorkflow } from "./focused-route-classification";
 import { shellTransientStore } from "@/stores/shell-transient-store";
 import type { TabParamList } from "./types";
@@ -74,6 +76,51 @@ function handleActiveTabPress(
 
 export function RootNavigator() {
   const { colors } = useTheme();
+
+  useEffect(() => {
+    let subscription: { remove: () => void } | undefined;
+    // BackHandler invokes the most recently registered listener first. Register
+    // after NavigationContainer's default nested-back listener so an open shell
+    // overlay gets first refusal; the default remains untouched otherwise.
+    const registrationTimer = setTimeout(() => {
+      subscription = BackHandler.addEventListener("hardwareBackPress", () => {
+        const intent = resolveBackIntent({
+          anyTransientOpen: shellTransientStore.getState().isAnyOpen(),
+        });
+
+        if (intent === "dismiss-transient") {
+          shellTransientStore.getState().dismissTop();
+          return true;
+        }
+
+        return false;
+      });
+    }, 0);
+
+    return () => {
+      clearTimeout(registrationTimer);
+      subscription?.remove();
+    };
+  }, []);
+
+  /**
+   * This is intentionally limited to shell-owned transients (the speed dial and
+   * picker). Plan 04's app-bar Back must call the same resolveBackIntent /
+   * dismissTop path, so system and shell-visible Back make the same decision.
+   *
+   * Existing child visible Back controls in DigestScreen, ArchivedContactsScreen,
+   * NeverContactedScreen, UnboundContactsScreen, and BackupScreen still call
+   * navigation.goBack() directly. ComposeScreen and CaptureScreen also own
+   * native-system Back listeners. They are a deferred child-chrome pass, not a
+   * claim that the FAB is hidden on child screens (it is visible on browse
+   * children including Archived, NeverContacted, UnboundContacts, and Profile).
+   *
+   * This is safe while every shell transient keeps its StyleSheet.absoluteFill
+   * scrim with pointer events set to auto while open: the scrim physically
+   * intercepts a child Back tap, and without a transient goBack() is the same
+   * default branch. If a later change shrinks that full-screen scrim, re-route
+   * those child controls through back-intent immediately to prevent divergence.
+   */
   const tabOptions = (
     title: string,
     route: TabRoute,
