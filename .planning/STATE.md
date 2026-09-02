@@ -417,7 +417,7 @@ was built via the desktop pipeline and driven through create→edit→archive→
 
 ## Operator Next Steps
 
-- Phase 22 is planned (6 plans, 4 waves; plan-checker 0 blockers). Review the plans if desired:
+- Phase 22 plans converged (6 plans, 5 waves; 5-cycle cross-AI review, 0 HIGH). Review the plans if desired:
   `cat .planning/phases/22-app-shell-navigation/22-0{1..6}-PLAN.md`.
 - Execute the phase: `/gsd-execute-phase 22` (Wave 1 is the four-tab-shell tracer, verified before chrome).
 - Optional before executing: `/gsd-validate-phase 22` to finalize the Nyquist VALIDATION.md sign-off
