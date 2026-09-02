@@ -2,9 +2,9 @@
 schema_version: 1
 open_count: 11
 waived_count: 0
-fixed_count: 5
-total_count: 16
-last_updated: 2026-09-02T22:19:37.725Z
+fixed_count: 6
+total_count: 17
+last_updated: 2026-09-02T22:33:27.282Z
 ---
 
 # Broken Windows Ledger
@@ -26,11 +26,12 @@ last_updated: 2026-09-02T22:19:37.725Z
 | 9 | 21 | deviation | src/screens/ContactProfileScreen.tsx | 1336 | Router receives already-loaded complete method groups so the required multi-endpoint selector can function. | open |  | 2026-08-31T22:23:05.470Z |  |
 | 10 | 22 | stub | src/screens/GroupEventsScreen.tsx | 14 | Intentional Coming soon placeholder; Phase 33 replaces it with Group Events data and workflow UI. | open |  | 2026-09-02T22:06:32.115Z |  |
 | 11 | 22 | unrun-verify | src/components/ShellAppBar.tsx |  | Pixel visual, TalkBack focus, and gesture/three-button clearance UAT require the desktop-build-to-Pixel workflow. | open |  | 2026-09-02T22:06:32.315Z |  |
-| 12 | 22 | stub | src/components/UniversalFab.tsx | 186 | Quick Log and global contact-specific actions retain their explicit Plan-06 picker/transaction seam. | open |  | 2026-09-02T22:19:36.941Z |  |
+| 12 | 22 | stub | src/components/UniversalFab.tsx | 186 | Quick Log and global contact-specific actions retain their explicit Plan-06 picker/transaction seam. | fixed |  | 2026-09-02T22:19:36.941Z | 2026-09-02T22:33:22.858Z |
 | 13 | 22 | stub | src/screens/placeholders/FabActionPlaceholders.tsx | 22 | Log Contact remains a themed placeholder until Phase 34 Rapid Capture. | open |  | 2026-09-02T22:19:37.126Z |  |
 | 14 | 22 | stub | src/screens/placeholders/FabActionPlaceholders.tsx | 22 | Group Log remains a themed placeholder until Phase 33 Group Events. | open |  | 2026-09-02T22:19:37.319Z |  |
 | 15 | 22 | stub | src/screens/placeholders/FabActionPlaceholders.tsx | 22 | Update Contact remains a themed placeholder until Phase 34 Rapid Capture. | open |  | 2026-09-02T22:19:37.507Z |  |
 | 16 | 22 | stub | src/screens/placeholders/FabActionPlaceholders.tsx | 22 | Memory remains a themed placeholder until Phase 24 Contact Knowledge. | open |  | 2026-09-02T22:19:37.725Z |  |
+| 17 | 22 | unrun-verify | src/components/ContactPicker.tsx |  | Pixel UAT remains: picker search/archived/snoozed markers, TalkBack modal focus, Quick Log commit truth, Undo/Retry, haptics, widget refresh, and shell refresh without refocus. | open |  | 2026-09-02T22:33:27.282Z |  |
 
 ````json
 [
@@ -173,10 +174,10 @@ last_updated: 2026-09-02T22:19:37.725Z
     "file": "src/components/UniversalFab.tsx",
     "line": 186,
     "description": "Quick Log and global contact-specific actions retain their explicit Plan-06 picker/transaction seam.",
-    "status": "open",
+    "status": "fixed",
     "reason": "",
     "recorded_at": "2026-09-02T22:19:36.941Z",
-    "resolved_at": null
+    "resolved_at": "2026-09-02T22:33:22.858Z"
   },
   {
     "id": 13,
@@ -224,6 +225,18 @@ last_updated: 2026-09-02T22:19:37.725Z
     "status": "open",
     "reason": "",
     "recorded_at": "2026-09-02T22:19:37.725Z",
+    "resolved_at": null
+  },
+  {
+    "id": 17,
+    "kind": "unrun-verify",
+    "phase": "22",
+    "file": "src/components/ContactPicker.tsx",
+    "line": null,
+    "description": "Pixel UAT remains: picker search/archived/snoozed markers, TalkBack modal focus, Quick Log commit truth, Undo/Retry, haptics, widget refresh, and shell refresh without refocus.",
+    "status": "open",
+    "reason": "",
+    "recorded_at": "2026-09-02T22:33:27.282Z",
     "resolved_at": null
   }
 ]
