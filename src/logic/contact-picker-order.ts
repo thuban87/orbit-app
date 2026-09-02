@@ -29,12 +29,19 @@ export function matchPickerRow(row: PickerOrderRow, term: string): boolean {
  */
 export function pickerRowMarkers(
   row: PickerOrderRow,
-  localToday = new Intl.DateTimeFormat("en-CA").format(new Date()),
+  localToday = localDate(),
 ): PickerRowMarkers {
   return {
     snoozed: row.snooze_until !== null && row.snooze_until > localToday,
     archived: row.archived_at !== null,
   };
+}
+
+function localDate(): string {
+  const now = new Date();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
+  return `${now.getFullYear()}-${month}-${day}`;
 }
 
 /**
