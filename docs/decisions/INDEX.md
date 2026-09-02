@@ -21,8 +21,8 @@ not something you can pattern-match against.
 
 ## How to use this
 
-- **Is a decision still live?** Check the `Superseded by` column. 11 of
-  74 ADRs are superseded in whole or in part.
+- **Is a decision still live?** Check the `Superseded by` column. 20 of
+  80 ADRs are superseded in whole or in part.
 - **Which decisions govern a file?** Don't grep this file — ask the graph:
   `npm run graph:ask -- governs src/db/field-values-dao.ts`, or follow the
   `governed_by` edges.
@@ -48,8 +48,8 @@ not something you can pattern-match against.
 | 015 | Lossless Field Changes with Quarantine and Launch-Time Retention Sweep | Accepted | 03-custom-fields | — | ADR-001 (partial) | — | 5 | `src/db`, `src/services` |
 | 016 | Fixed-First Contact Forms and Atomic Contact Creation | Accepted | 04-contact-crud-lifecycle | — | — | — | 5 | `src/components`, `src/db`, `src/screens` |
 | 017 | Multi-Link Contact Reachability | Accepted | 04-contact-crud-lifecycle | — | — | — | 4 | `src/components`, `src/db`, `src/screens` |
-| 018 | Archive-Gated Contact Purge with Explicit Fan-Out | Accepted | 04-contact-crud-lifecycle | — | — | — | 5 | `src/db`, `src/screens`, `src/theme` |
-| 019 | Native Stack Contact Lifecycle Navigation | Accepted | 04-contact-crud-lifecycle | — | — | — | 4 | `src/navigation`, `src/screens` |
+| 018 | Archive-Gated Contact Purge with Explicit Fan-Out | Accepted | 04-contact-crud-lifecycle | — | ADR-080 (note — Archived list entry points only; gate unchanged) | — | 5 | `src/db`, `src/screens`, `src/theme` |
+| 019 | Native Stack Contact Lifecycle Navigation | Accepted | 04-contact-crud-lifecycle | — | ADR-080 (partial — root shell) | — | 4 | `src/navigation`, `src/screens` |
 | 020 | Library-Only Photo Capture with Themed In-App Cropping and One-Time URL Download | Accepted | 05-photos | — | — | — | 5 | `src/components`, `src/screens`, `src/services/photos` |
 | 021 | Durable Relative-Path Photo Masters with Crash-Safe Lifecycle Cleanup | Accepted | 05-photos | — | — | — | 7 | `src/components/field-widgets`, `src/db`, `src/services/photos` |
 | 022 | Tokenized Deterministic Initials Avatars | Accepted | 05-photos | — | — | — | 5 | `src/components`, `src/stores`, `src/theme` |
@@ -63,26 +63,26 @@ not something you can pattern-match against.
 | 030 | Explicit Confirmation of AI-Proposed Fuel | Accepted | 07-conversational-fuel | — | — | — | 4 | `src/components`, `src/db`, `src/screens` |
 | 031 | Bound Local Fuel Search without FTS5 | Accepted | 07-conversational-fuel | — | ADR-032 (partial) | — | 4/6 live | `src/db`, `src/navigation`, `src/screens` |
 | 032 | Flat Dashboard Discovery and In-Query Contact Search | Accepted | 08-dashboard-never-contacted-screen | ADR-031 (partial) | — | — | 6/7 live | `src/db`, `src/navigation`, `src/screens` |
-| 033 | Profile Marking and Shared Drag-Reordered Favourites | Accepted | 08-dashboard-never-contacted-screen | — | — | — | 6 | `src/components`, `src/db`, `src/logic` +1 |
-| 034 | Birthday Banner and Re-query Dashboard Freshness | Accepted | 08-dashboard-never-contacted-screen | — | — | — | 5 | `src/components`, `src/db`, `src/logic` +1 |
+| 033 | Profile Marking and Shared Drag-Reordered Favourites | Accepted | 08-dashboard-never-contacted-screen | — | ADR-075 | — | 6 | `src/components`, `src/db`, `src/logic` +1 |
+| 034 | Birthday Banner and Re-query Dashboard Freshness | Accepted | 08-dashboard-never-contacted-screen | — | ADR-076 (partial — banner) | — | 5 | `src/components`, `src/db`, `src/logic` +1 |
 | 035 | Native SMS Handoff with Guaranteed Clipboard Copy | Accepted | 09-compose-screen-sms-handoff | — | ADR-061 (partial) | — | 3 | `src/db`, `src/logic`, `src/screens` |
-| 036 | Entry-Agnostic Compose Navigation and Transmittable-Fuel Guardrails | Accepted | 09-compose-screen-sms-handoff | — | — | — | 5 | `src/db`, `src/navigation`, `src/screens` |
+| 036 | Entry-Agnostic Compose Navigation and Transmittable-Fuel Guardrails | Accepted | 09-compose-screen-sms-handoff | — | ADR-078 (partial — Off Limits visible on the Research side) | — | 5 | `src/db`, `src/navigation`, `src/screens` |
 | 037 | Text-Only Android Share Intent Integration | Accepted | 10-share-sheet-capture | — | — | — | 3 | `modules/orbit-share-finish/android/src/main/java/expo/modules/orbitsharefinish`, `patches`, `src/navigation` |
 | 038 | Contact-Owned Share Capture Fuel | Accepted | 10-share-sheet-capture | — | — | — | 5 | `src/db`, `src/logic`, `src/screens` |
 | 039 | Pre-Scheduled Inexact Decay Reminders | Accepted | 11-actionable-notifications | ADR-029 (partial) | — | — | 5 | `src/db`, `src/services/notifications` |
 | 040 | Exactly-Once Notification Actions and Dashboard-Rooted Tap Routing | Accepted | 11-actionable-notifications | — | — | — | 6 | `src/db`, `src/navigation`, `src/services/notifications` |
 | 041 | Notification Settings, Privacy Channels, and Birthday Alerts | Accepted | 11-actionable-notifications | — | — | — | 6 | `src/db`, `src/db/migrations`, `src/screens` +1 |
 | 042 | Shared Status Palette for Dashboard and Widget Rings | Accepted | 12-home-screen-widget | — | — | — | 5 | `src/components`, `src/services/widget`, `src/theme` |
-| 043 | Static Globally Mirrored Favourites Widget | Accepted | 12-home-screen-widget | — | — | — | 4 | `src/db`, `src/screens`, `src/services/widget` |
+| 043 | Static Globally Mirrored Favourites Widget | Accepted | 12-home-screen-widget | — | ADR-075 (partial — ordering source only) | — | 4 | `src/db`, `src/screens`, `src/services/widget` |
 | 044 | Headless Widget Actions and Dashboard-Rooted Deep Links | Accepted | 12-home-screen-widget | — | ADR-074 (partial) | — | 4 | `src/navigation`, `src/services/widget` |
 | 045 | Event-Driven Widget Refresh and Boot Recovery | Accepted | 12-home-screen-widget | — | — | — | 4 | `plugins`, `src/services/notifications`, `src/services/widget` |
 | 046 | Query-Time Orrery Placement and Transactional Ring Ordering | Accepted | 13-orrery | — | — | — | 4 | `src/db`, `src/logic` |
 | 047 | App-Level Assignable Sun and Themed Self Identity | Accepted | 13-orrery | — | — | — | 6 | `src/db`, `src/db/migrations`, `src/logic` +2 |
-| 048 | Status-Default Static Orrery with a Single-Canvas Morph | Accepted | 13-orrery | — | — | — | 7 | `src/components`, `src/components/orrery`, `src/navigation` +1 |
+| 048 | Status-Default Static Orrery with a Single-Canvas Morph | Accepted | 13-orrery | — | ADR-077 (partial — dual view/morph) | — | 7 | `src/components`, `src/components/orrery`, `src/navigation` +1 |
 | 049 | BYO-Key AI Configuration and Credential Boundary | Accepted | 14-ai-message-suggestions | — | — | — | 5 | `src/db`, `src/db/migrations`, `src/services` |
-| 050 | Closed AI Prompt Egress Allowlist and Opt-In Field Sharing | Accepted | 14-ai-message-suggestions | — | — | — | 5 | `src/ai`, `src/components`, `src/db` |
+| 050 | Closed AI Prompt Egress Allowlist and Opt-In Field Sharing | Accepted | 14-ai-message-suggestions | — | ADR-078 (partial — Off Limits and permitted interaction notes) | — | 5 | `src/ai`, `src/components`, `src/db` |
 | 051 | Public-HTTPS Custom AI Egress Guard | Accepted | 14-ai-message-suggestions | — | — | — | 5 | `modules/orbit-secure-fetch/src`, `src/ai`, `src/ai/__fixtures__` +1 |
-| 052 | Compose-Owned AI Draft Lifecycle and Acknowledged Egress | Accepted | 14-ai-message-suggestions | — | — | — | 5 | `src/db`, `src/logic`, `src/navigation` +1 |
+| 052 | Compose-Owned AI Draft Lifecycle and Acknowledged Egress | Accepted | 14-ai-message-suggestions | — | ADR-079 (partial — acknowledgement and Profile entry) | — | 5 | `src/db`, `src/logic`, `src/navigation` +1 |
 | 053 | Local-First LiteLLM AI Model Catalog | Accepted | 14-ai-message-suggestions | — | — | — | 5 | `scripts`, `src/ai`, `src/screens` |
 | 054 | Live Weekly Digest Retrospective and Overlooked Relationship Read | Accepted | 15-weekly-digest | — | — | — | 4 | `src/db`, `src/logic`, `src/screens` |
 | 055 | Dedicated Weekly Digest Scheduling and Persisted Notification Policy | Accepted | 15-weekly-digest | — | — | — | 7 | `src/db`, `src/db/migrations`, `src/screens` +1 |
@@ -105,3 +105,9 @@ not something you can pattern-match against.
 | 072 | Shared Actionable Reach Out Router with Native Channel Handoff | Accepted | 21-interaction-assist-reach-out | — | — | — | 6 | `src/components`, `src/db`, `src/screens` +1 |
 | 073 | Merge-Reparented, Purge-Cascaded Interaction Assists | Accepted | 21-interaction-assist-reach-out | — | — | — | 3 | `src/db`, `src/db/migrations` |
 | 074 | Widget Contact Supersession and Strict Reach Deep-Link Fail-Safe | Accepted | 21-interaction-assist-reach-out | ADR-044 (partial) | — | — | 5 | `src/navigation`, `src/screens`, `src/services/widget` |
+| 075 | Binary Favourite Membership Without a User-Facing Order | Accepted | milestone-2 | ADR-033 (full); ADR-043 (partial — ordering source only) | — | — | 6 | `src/db`, `src/logic`, `src/screens` +1 |
+| 076 | Population-Reached Birthdays Without a Dashboard Banner | Accepted | milestone-2 | ADR-034 (partial — banner) | — | — | 4 | `src/components`, `src/db`, `src/logic` +1 |
+| 077 | Single Canonical Orrery with a Constrained Inspection Camera | Accepted | milestone-2 | ADR-048 (partial — dual view/morph) | — | — | 4 | `src/components`, `src/components/orrery`, `src/screens` |
+| 078 | Negative-Constraint Off Limits and Gated Recent-Interaction AI Context | Accepted | milestone-2 | ADR-050 (partial — Off Limits and permitted interaction notes); ADR-036 (partial — Off Limits visible on the Research side) | — | — | 5 | `src/ai`, `src/db`, `src/screens` |
+| 079 | On-Demand AI Transparency and Compose-Only Three-Suggestion Invocation | Accepted | milestone-2 | ADR-052 (partial — acknowledgement and Profile entry) | — | — | 5 | `src/db`, `src/logic`, `src/navigation` +1 |
+| 080 | Four-Tab Bottom Navigation Shell with Per-Tab Stacks | Accepted | milestone-2 | ADR-019 (partial — root shell); ADR-018 (note — Archived list entry points only; gate unchanged) | — | — | 4 | `src/navigation`, `src/screens` |

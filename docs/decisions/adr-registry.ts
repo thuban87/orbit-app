@@ -27,8 +27,8 @@
 // IMPORTANT: ADR-0015 [SUPERSEDED BY ADR-001 (partial)] Lossless Field Changes with Quarantine and Launch-Time Retention Sweep
 // NOTE: ADR-0016 [ACCEPTED] Fixed-First Contact Forms and Atomic Contact Creation
 // NOTE: ADR-0017 [ACCEPTED] Multi-Link Contact Reachability
-// NOTE: ADR-0018 [ACCEPTED] Archive-Gated Contact Purge with Explicit Fan-Out
-// NOTE: ADR-0019 [ACCEPTED] Native Stack Contact Lifecycle Navigation
+// IMPORTANT: ADR-0018 [SUPERSEDED BY ADR-080 (note — Archived list entry points only; gate unchanged)] Archive-Gated Contact Purge with Explicit Fan-Out
+// IMPORTANT: ADR-0019 [SUPERSEDED BY ADR-080 (partial — root shell)] Native Stack Contact Lifecycle Navigation
 // NOTE: ADR-0020 [ACCEPTED] Library-Only Photo Capture with Themed In-App Cropping and One-Time URL Download
 // NOTE: ADR-0021 [ACCEPTED] Durable Relative-Path Photo Masters with Crash-Safe Lifecycle Cleanup
 // NOTE: ADR-0022 [ACCEPTED] Tokenized Deterministic Initials Avatars
@@ -42,26 +42,26 @@
 // NOTE: ADR-0030 [ACCEPTED] Explicit Confirmation of AI-Proposed Fuel
 // IMPORTANT: ADR-0031 [SUPERSEDED BY ADR-032 (partial)] Bound Local Fuel Search without FTS5
 // NOTE: ADR-0032 [ACCEPTED] Flat Dashboard Discovery and In-Query Contact Search
-// NOTE: ADR-0033 [ACCEPTED] Profile Marking and Shared Drag-Reordered Favourites
-// NOTE: ADR-0034 [ACCEPTED] Birthday Banner and Re-query Dashboard Freshness
+// IMPORTANT: ADR-0033 [SUPERSEDED BY ADR-075] Profile Marking and Shared Drag-Reordered Favourites
+// IMPORTANT: ADR-0034 [SUPERSEDED BY ADR-076 (partial — banner)] Birthday Banner and Re-query Dashboard Freshness
 // IMPORTANT: ADR-0035 [SUPERSEDED BY ADR-061 (partial)] Native SMS Handoff with Guaranteed Clipboard Copy
-// NOTE: ADR-0036 [ACCEPTED] Entry-Agnostic Compose Navigation and Transmittable-Fuel Guardrails
+// IMPORTANT: ADR-0036 [SUPERSEDED BY ADR-078 (partial — Off Limits visible on the Research side)] Entry-Agnostic Compose Navigation and Transmittable-Fuel Guardrails
 // NOTE: ADR-0037 [ACCEPTED] Text-Only Android Share Intent Integration
 // NOTE: ADR-0038 [ACCEPTED] Contact-Owned Share Capture Fuel
 // NOTE: ADR-0039 [ACCEPTED] Pre-Scheduled Inexact Decay Reminders
 // NOTE: ADR-0040 [ACCEPTED] Exactly-Once Notification Actions and Dashboard-Rooted Tap Routing
 // NOTE: ADR-0041 [ACCEPTED] Notification Settings, Privacy Channels, and Birthday Alerts
 // NOTE: ADR-0042 [ACCEPTED] Shared Status Palette for Dashboard and Widget Rings
-// NOTE: ADR-0043 [ACCEPTED] Static Globally Mirrored Favourites Widget
+// IMPORTANT: ADR-0043 [SUPERSEDED BY ADR-075 (partial — ordering source only)] Static Globally Mirrored Favourites Widget
 // IMPORTANT: ADR-0044 [SUPERSEDED BY ADR-074 (partial)] Headless Widget Actions and Dashboard-Rooted Deep Links
 // NOTE: ADR-0045 [ACCEPTED] Event-Driven Widget Refresh and Boot Recovery
 // NOTE: ADR-0046 [ACCEPTED] Query-Time Orrery Placement and Transactional Ring Ordering
 // NOTE: ADR-0047 [ACCEPTED] App-Level Assignable Sun and Themed Self Identity
-// NOTE: ADR-0048 [ACCEPTED] Status-Default Static Orrery with a Single-Canvas Morph
+// IMPORTANT: ADR-0048 [SUPERSEDED BY ADR-077 (partial — dual view/morph)] Status-Default Static Orrery with a Single-Canvas Morph
 // NOTE: ADR-0049 [ACCEPTED] BYO-Key AI Configuration and Credential Boundary
-// NOTE: ADR-0050 [ACCEPTED] Closed AI Prompt Egress Allowlist and Opt-In Field Sharing
+// IMPORTANT: ADR-0050 [SUPERSEDED BY ADR-078 (partial — Off Limits and permitted interaction notes)] Closed AI Prompt Egress Allowlist and Opt-In Field Sharing
 // NOTE: ADR-0051 [ACCEPTED] Public-HTTPS Custom AI Egress Guard
-// NOTE: ADR-0052 [ACCEPTED] Compose-Owned AI Draft Lifecycle and Acknowledged Egress
+// IMPORTANT: ADR-0052 [SUPERSEDED BY ADR-079 (partial — acknowledgement and Profile entry)] Compose-Owned AI Draft Lifecycle and Acknowledged Egress
 // NOTE: ADR-0053 [ACCEPTED] Local-First LiteLLM AI Model Catalog
 // NOTE: ADR-0054 [ACCEPTED] Live Weekly Digest Retrospective and Overlooked Relationship Read
 // NOTE: ADR-0055 [ACCEPTED] Dedicated Weekly Digest Scheduling and Persisted Notification Policy
@@ -84,5 +84,11 @@
 // NOTE: ADR-0072 [ACCEPTED] Shared Actionable Reach Out Router with Native Channel Handoff
 // NOTE: ADR-0073 [ACCEPTED] Merge-Reparented, Purge-Cascaded Interaction Assists
 // NOTE: ADR-0074 [ACCEPTED] Widget Contact Supersession and Strict Reach Deep-Link Fail-Safe
+// NOTE: ADR-0075 [ACCEPTED] Binary Favourite Membership Without a User-Facing Order
+// NOTE: ADR-0076 [ACCEPTED] Population-Reached Birthdays Without a Dashboard Banner
+// NOTE: ADR-0077 [ACCEPTED] Single Canonical Orrery with a Constrained Inspection Camera
+// NOTE: ADR-0078 [ACCEPTED] Negative-Constraint Off Limits and Gated Recent-Interaction AI Context
+// NOTE: ADR-0079 [ACCEPTED] On-Demand AI Transparency and Compose-Only Three-Suggestion Invocation
+// NOTE: ADR-0080 [ACCEPTED] Four-Tab Bottom Navigation Shell with Per-Tab Stacks
 
-export const ADR_COUNT = 74;
+export const ADR_COUNT = 80;
