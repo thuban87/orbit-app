@@ -34,6 +34,16 @@ It intentionally does **not** define AI provider/model/key administration, full 
 
 ---
 
+# Amendment — audit resolutions 2026-09-01
+
+**AF-01 — AI availability is three-state, not binary.** Section L and Phase Success Criterion 9 previously described a pre-Phase-16 binary model in which AI affordances vanished whenever the provider was `None` **or** the selected provider lacked usable credentials/configuration. That second case is now **AI On + Needs Attention** and is owned by **Phase 16 §F — AI Readiness / Needs Attention**: Compose replaces its AI actions with a restrained `AI needs attention` repair notice rather than hiding AI, so a deliberately disabled AI and an enabled-but-broken AI are not confused. Only the **AI Off** state still removes all AI affordances, and that state's exclusion list is unchanged.
+
+The `AI needs attention` notice is a repair route for an enabled connection, not an AI setup/configure prompt; it does not reopen the Explicitly Deferred item “AI setup/configure prompts inside Compose,” and Compose still does not become a provider-troubleshooting surface (§T).
+
+Unchanged by this amendment: Things to Remember Research remains fully useful without AI, and Phase 14 continues to consume a reliable AI-availability state from Phase 16 rather than computing it.
+
+---
+
 # A. Product Role
 
 **[DECIDED]** Compose is an **AI-assisted drafting workspace with lightweight external delivery handoff**, not an in-app messaging client.
@@ -296,11 +306,13 @@ Examples generally excluded from the research projection:
 
 **[DECIDED]** AI is not a mandatory or constantly advertised part of Compose.
 
-**[DECIDED]** If AI provider is set to **None**, Compose shows **no AI affordances**.
+**[DECIDED]** Compose consumes the **three AI states** owned by **Phase 16 §F — AI Readiness / Needs Attention**, not a binary available/unavailable flag:
 
-**[DECIDED]** If the selected provider lacks required credentials/configuration and therefore is not actually usable, Compose likewise shows **no AI affordances**.
+1. **AI Off** — the global AI master state is off. Compose shows **no AI affordances**.
+2. **AI On + Ready** — a valid active connection plus a valid selected model/configuration exist. Compose exposes its normal AI actions.
+3. **AI On + Needs Attention** — AI is enabled but the active connection/model is not currently usable (not yet configured, expired/invalid credential, unavailable model, or equivalent). Compose **replaces its normal AI actions with a restrained `AI needs attention` notice** that routes toward the relevant Phase 16 repair experience. AI must not silently disappear in this state.
 
-When AI is unavailable/unconfigured, Compose/Research must not show:
+**[DECIDED]** In the **AI Off** state, Compose/Research must not show:
 - Draft with AI,
 - Rewrite with AI,
 - sparkle/setup nags,
@@ -310,9 +322,11 @@ When AI is unavailable/unconfigured, Compose/Research must not show:
 - Message Focus,
 - other AI-specific empty-state language.
 
+**[DECIDED]** In the **AI On + Needs Attention** state, the restrained repair notice is the only AI-specific element Compose shows. It does not restore Draft with AI, Rewrite with AI, `Add to AI`, or Message Focus, and it is a repair route rather than a setup/marketing nag.
+
 **[DECIDED]** Things to Remember Research remains fully useful as a **human memory aid** even when AI is absent.
 
-**[DERIVED]** Phase 16 owns AI setup/discovery/configuration. Phase 14 merely consumes a reliable `AI available` capability/state.
+**[DERIVED]** Phase 16 owns AI setup/discovery/configuration and the definition of these three states. Phase 14 merely consumes a reliable AI-availability state from Phase 16.
 
 ---
 
@@ -611,7 +625,7 @@ Phase 14 is successful when:
 6. Returning from Transmit can ask `Did you send it?`; only explicit confirmation creates the canonical Message interaction, while `Not yet` preserves the Compose session.
 7. Compose session state is preserved appropriately in-session but does not become a durable draft/backup data model.
 8. Things to Remember opens as a separate compact Research side of the Compose workflow and shows useful populated conversation-relevant knowledge without becoming Profile/Edit Contact.
-9. AI is completely absent from Compose/Research when no provider is selected or required configuration/credentials are unavailable; manual Compose/Research remains fully useful.
+9. Compose honors the three Phase 16 AI states: **AI Off** removes every AI affordance from Compose/Research; **AI On + Ready** exposes the normal AI actions; **AI On + Needs Attention** shows a restrained `AI needs attention` repair notice in place of the AI actions rather than letting AI silently vanish. Manual Compose and Things to Remember Research remain fully useful in every state.
 10. AI consumes only preauthorized Contact Knowledge; Phase 14 does not require repetitive payload authorization screens.
 11. Off Limits remains visible as human avoidance context and is passed to AI as an avoidance constraint when authorized, never as Message Focus.
 12. Up to three AI-authorized research items can be selected with `Add to AI` / `Added ✓` and carried as session-only Message Focus.
