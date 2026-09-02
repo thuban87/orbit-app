@@ -98,6 +98,10 @@ This amendment specifically supersedes or extends the following older Phase 1 te
 
 All other Phase 1 decisions remain intact.
 
+### Amendment — audit resolutions 2026-09-01
+
+**AF-03 (text sync, no new decision).** The three passages the Supersession Map above already directed to be read as six-action have now been rewritten in place, so no stale five-action text remains: **Section F — Universal FAB Action Set** (now lists six actions, Group Log at position 4), the **Cross-Phase Constraints — action workflows** line, and **Phase Success Criterion 4** (“six-action labeled speed dial”). The six-action contract itself is unchanged; only the wording elsewhere in this dossier was brought into line with it.
+
 ---
 
 ## Decisions
@@ -212,12 +216,13 @@ Each child action uses **icon + text**.
 
 ### F. Universal FAB Action Set
 
-**[DECIDED] Canonical action set contains five actions:**
+**[DECIDED] Canonical action set contains six actions:**
 1. Add Contact
 2. Quick Log
 3. Log Contact
-4. Update Contact
-5. **Memory** — working title only
+4. **Group Log**
+5. Update Contact
+6. **Memory** — working title only
 
 `Memory` is the current working label for “add something to remember.” Final product terminology is deferred to the Contact Knowledge phase.
 
@@ -398,7 +403,7 @@ Externally, a dispatcher should be able to translate widget/notification/deep-li
 - **[shell → browse/read surfaces]** Preserve bottom nav and universal FAB unless a screen is intentionally classified as focused.
 - **[shell → focused workflows]** Hide bottom nav/FAB and protect meaningful unsaved changes with Discard / Keep editing.
 - **[shell → profile/dashboard/orrery/your-week]** Profiles return to actual in-app origin; do not restore “Profile always backs to Dashboard.”
-- **[shell → action workflows]** Universal actions are Add Contact, Quick Log, Log Contact, Update Contact, and Memory.
+- **[shell → action workflows]** Universal actions are Add Contact, Quick Log, Log Contact, Group Log, Update Contact, and Memory.
 - **[shell → contact knowledge]** `Memory` is only a working label. Final terminology and data semantics belong to the Contact Knowledge phase.
 - **[shell → rapid capture]** Quick Log is current-time, immediate, reversible via Undo, and explicitly reports failures.
 - **[shell → future widgets]** Fast-entry workflows must remain independently routable/deep-linkable. Actual widget design remains deferred.
@@ -434,7 +439,7 @@ Phase 1 is successful when:
 1. Dashboard, Orrery, Backup / Restore, and Settings are reachable through persistent bottom navigation with correct safe-area handling.
 2. Each tab preserves its stack; active-tab retap dismisses transient UI first and then returns that section to root.
 3. Android Back and visible Back agree, origin-aware navigation works, and completed edit routes no longer replay.
-4. The universal FAB is consistently positioned, expands into the five-action labeled speed dial, and preselects contact context where available.
+4. The universal FAB is consistently positioned, expands into the six-action labeled speed dial, and preselects contact context where available.
 5. Global contact-specific actions use the shared picker with the decided favorite/recent/alphabetical ordering and archived/snoozed behavior.
 6. Quick Log executes with minimal friction and truthful Undo/error/Retry feedback.
 7. Top bars, system insets, keyboard behavior, content clearance, and bottom-nav spacing are handled by reusable shell primitives.
