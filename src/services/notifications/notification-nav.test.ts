@@ -73,6 +73,16 @@ describe("resolveNotificationNav", () => {
     ).toBeNull();
   });
 
+  it.each([
+    ["NaN", Number.NaN],
+    ["infinity", Number.POSITIVE_INFINITY],
+    ["zero", 0],
+    ["negative", -1],
+    ["decimal", 1.5],
+  ])("returns null for an invalid %s contactId", (_label, contactId) => {
+    expect(resolveNotificationNav({ kind: "decay", contactId })).toBeNull();
+  });
+
   it("returns null for a null / undefined / non-object payload", () => {
     expect(resolveNotificationNav(null)).toBeNull();
     expect(resolveNotificationNav(undefined)).toBeNull();

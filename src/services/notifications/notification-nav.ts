@@ -63,7 +63,9 @@ function isNotificationData(d: unknown): d is NotificationData {
   const rec = d as Record<string, unknown>;
   return (
     (rec.kind === "decay" || rec.kind === "birthday") &&
-    typeof rec.contactId === "number"
+    typeof rec.contactId === "number" &&
+    Number.isSafeInteger(rec.contactId) &&
+    rec.contactId > 0
   );
 }
 
