@@ -71,6 +71,7 @@ The milestone should end in a state suitable for outside beta testers.
 | 16 | AI Configuration & Prompting | COMPLETE | Three-lane AI connection architecture, OpenRouter-first setup, direct BYOK/custom endpoint advanced paths, model catalogs/pricing, prompt personalization/context, Adjust, permissions, transparency, lifecycle and diagnostics. |
 | 17 | Onboarding | DEFERRED PLANNING | Final first-run setup/teaching is intentionally deferred until the substantive product exists in implementation. |
 | 18 | Responsive & Release Hardening | DEFERRED PLANNING | Detailed device/accessibility/performance/readiness planning is intentionally deferred until implementation exposes real cross-screen issues. |
+| 19 (provisional) | Your Week | DEFERRED PLANNING | Designs the Your Week page (relocated birthday presentation per ADR-034 supersession, Group Events, heatmap aggregation reuse) once those inputs exist; planned after Phase 16. |
 
 ## 5. Major Phase Decompositions
 
@@ -345,6 +346,7 @@ Phase 12 owns Group Event persistence, event-first capture, shared/default inher
 - **Message Focus privacy boundary:** `Add to AI` only emphasizes already-authorized knowledge for the current Compose session; it never grants AI permission. Off Limits can constrain AI if authorized but can never become Message Focus.
 - **Widget membership:** the favourites widget shows the Favorites population in its Default ordering for now; a customizable `include in widget` membership concept is deferred to a future milestone (owner, 2026-09-01).
 - **Never-contacted reachability:** never-contacted contacts reach the Dashboard only via the Not Contacted or All Contacts populations; the standalone Never Contacted screen and the include-Unbound toggle retire.
+- **Birthday presentation relocated:** the birthday banner is removed from the Dashboard (ADR-034 superseded 2026-09-01); the deferred Your Week phase owns upcoming-birthday presentation.
 
 ## 8. Updated Dependency Order
 
@@ -366,6 +368,7 @@ Phase 12 owns Group Event persistence, event-first capture, shared/default inher
 16. AI Configuration & Prompting — **planning complete; dossier written**
 17. Onboarding — **planning deferred until substantive implementation exists**
 18. Responsive & Release Hardening — **planning deferred until substantive implementation exists**
+19. Your Week (provisional) — **planning deferred; planned after Phase 16 once birthday presentation, Group Events, and heatmap aggregation exist**
 
 Some later phases may be reordered by GSD based on final requirements/dependencies. Preparatory numbering represents current planning seams, not canonical execution numbering.
 
@@ -430,5 +433,6 @@ Detailed hardening/readiness planning waits until implementation exposes real de
 - **16. AI Configuration & Prompting — COMPLETE PLANNING.** Detailed dossier exists; keep as a substantive AI subsystem even if GSD changes canonical numbering/order.
 - **17. Onboarding — DEFERRED PLANNING.** Revisit after substantive implementation.
 - **18. Responsive & Release Hardening — DEFERRED PLANNING.** Revisit after substantive implementation and device/testing evidence.
+- **19. Your Week (provisional) — DEFERRED PLANNING.** Designs the Your Week page (relocated birthday presentation per ADR-034 supersession, Group Events, heatmap aggregation reuse) once those inputs exist; planned after Phase 16.
 
 The preparatory numbering above remains a traceability aid only. GSD should assign canonical milestone phase numbering/order according to requirements, dependencies, and its own roadmapping rules.
