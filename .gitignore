@@ -49,5 +49,5 @@ app-debug.apk
 # history bloat. No screenshots have ever been committed here.
 **/uat-shots/
 
-# Dossier-audit skill output — skill test-run data, not the final artifact.
-docs/dossier/milestone-2/audit/
+# Dossier-audit prior test runs only; the current LEDGER.md / AUDIT-REPORT.md are tracked.
+docs/dossier/milestone-2/audit/prior-runs/
