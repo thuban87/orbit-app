@@ -67,7 +67,7 @@ The fixed Hero includes:
 
 **[DECIDED]** If an action is unavailable because the contact lacks a usable contact method, the control remains present but disabled with an accessible explanation rather than disappearing and shifting Hero layout.
 
-**[DERIVED]** AI Draft is not restored as a separate Profile action; later Messaging / AI Compose owns AI-assisted composition behavior behind Message.
+**[DERIVED]** AI Draft is not restored as a separate Profile action; later Messaging / AI Compose owns AI-assisted composition behavior behind Message (ADR-052 superseded 2026-09-01: AI is reached via Message → Draft with AI, two taps).
 
 ---
 
