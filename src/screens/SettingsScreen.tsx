@@ -31,6 +31,7 @@ import {
 } from "@/ai/model-registry";
 import { PhotoSourcePicker } from "@/components/PhotoSourcePicker";
 import { ResumeReconcilePrompt } from "@/components/ResumeReconcilePrompt";
+import { ShellAppBar } from "@/components/ShellAppBar";
 import {
   type AppSettings,
   type AppSettingsPatch,
@@ -708,23 +709,7 @@ export function SettingsScreen() {
       style={{ backgroundColor: colors.background }}
       contentContainerStyle={styles.content}
     >
-      <View style={styles.header}>
-        <Pressable
-          testID="settings-back"
-          accessibilityRole="button"
-          accessibilityLabel="Back"
-          onPress={() => navigation.goBack()}
-          style={[styles.backBtn, { borderColor: colors.border }]}
-        >
-          <Text style={{ color: colors.textSecondary }}>Back</Text>
-        </Pressable>
-        <Text
-          accessibilityRole="header"
-          style={[styles.title, { color: colors.textPrimary }]}
-        >
-          Settings
-        </Text>
-      </View>
+      <ShellAppBar variant="root" title="Settings" />
 
       <View testID="settings-phone-region-section" style={styles.section}>
         <Text

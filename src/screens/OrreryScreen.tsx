@@ -65,6 +65,7 @@ import {
 import { getInitials, swatchIndex } from "@/components/avatar-initials";
 import { OrbitBody } from "@/components/orrery/OrbitBody";
 import { OrreryCanvas } from "@/components/orrery/OrreryCanvas";
+import { ShellAppBar } from "@/components/ShellAppBar";
 import { SunBody } from "@/components/orrery/SunBody";
 import { SegmentedControl } from "@/components/SegmentedControl";
 import { getAppSettings } from "@/db/app-settings-dao";
@@ -662,23 +663,7 @@ export function OrreryScreen() {
       testID="orrery-root"
       style={[styles.root, { backgroundColor: colors.background }]}
     >
-      <View style={styles.header}>
-        <Pressable
-          testID="orrery-back"
-          accessibilityRole="button"
-          accessibilityLabel="Back"
-          onPress={() => navigation.goBack()}
-          style={[styles.backBtn, { borderColor: colors.border }]}
-        >
-          <Text style={{ color: colors.textSecondary }}>Back</Text>
-        </Pressable>
-        <Text
-          accessibilityRole="header"
-          style={[styles.title, { color: colors.textPrimary }]}
-        >
-          Orbit
-        </Text>
-      </View>
+      <ShellAppBar variant="root" title="Orrery" />
 
       <View style={styles.toggleRow}>
         <SegmentedControl<OrreryView>

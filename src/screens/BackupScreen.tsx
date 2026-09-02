@@ -2,6 +2,7 @@ import { useFocusEffect } from "@react-navigation/native";
 import { File } from "expo-file-system";
 import { useCallback, useState } from "react";
 import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { ShellAppBar } from "@/components/ShellAppBar";
 import {
   getAppSettings,
   recordAutomaticBackupHealthCore,
@@ -284,12 +285,7 @@ export function BackupScreen({ navigation }: RootStackScreenProps<"Backup">) {
 
   return (
     <ScrollView testID="backup-screen" style={{ backgroundColor: colors.background }} contentContainerStyle={styles.content}>
-      <View style={styles.header}>
-        <Pressable testID="backup-back" accessibilityRole="button" accessibilityLabel="Back" onPress={() => navigation.goBack()} style={[styles.back, { borderColor: colors.border }]}>
-          <Text style={{ color: colors.textSecondary }}>Back</Text>
-        </Pressable>
-        <Text accessibilityRole="header" style={[styles.title, { color: colors.textPrimary }]}>Backup & Restore</Text>
-      </View>
+      <ShellAppBar variant="root" title="Backup & Restore" />
 
       {health ? (
         <View testID={`backup-health-${health.kind}`} accessibilityLabel={`${health.headline}. ${"body" in health ? health.body : ""}`} style={[styles.hero, { backgroundColor: colors.surface, borderColor: colors.border }]}>

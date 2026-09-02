@@ -46,6 +46,7 @@ import { Avatar } from "@/components/Avatar";
 import { BirthdayBanner } from "@/components/BirthdayBanner";
 import { ContactCard } from "@/components/ContactCard";
 import { type FilterChip, FilterChipRow } from "@/components/FilterChipRow";
+import { ShellAppBar } from "@/components/ShellAppBar";
 import { listCategories } from "@/db/contact-read";
 import {
   countArchived,
@@ -507,10 +508,13 @@ export function HomeScreen() {
           08-07 dashboard rewrite dropped the placeholder's Settings row, leaving
           the (existing) Settings route UI-unreachable. A minimal top-right gear
           restores reach; exact styling is the owner's later design pass. */}
-      <View style={styles.topBar}>
-        {/* Discreet retrospective entry (15-04) — LEFT, so the ◎/⚙ glyph cluster
-            stays grouped RIGHT (topBar splits via justifyContent:"space-between").
-            Text (not a glyph) reads as a retrospective link; no badge/count (locked). */}
+      <ShellAppBar
+        variant="root"
+        title="Orbit"
+        trailing={
+          <>
+            {/* Discreet retrospective entry (15-04). Text (not a glyph) reads as
+                a retrospective link; no badge/count (locked). */}
         <Pressable
           testID="dashboard-your-week-entry"
           accessibilityRole="button"
@@ -529,7 +533,7 @@ export function HomeScreen() {
             </Text>
           )}
         </Pressable>
-        <View style={styles.topBarRight}>
+            <View style={styles.topBarRight}>
           <Pressable
             testID="dashboard-backup-entry"
             accessibilityRole="button"
@@ -591,8 +595,10 @@ export function HomeScreen() {
               ⚙
             </Text>
           </Pressable>
-        </View>
-      </View>
+            </View>
+          </>
+        }
+      />
       <FlatList
         data={error ? [] : rows}
         keyExtractor={(item) => String(item.id)}

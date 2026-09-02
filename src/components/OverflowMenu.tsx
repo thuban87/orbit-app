@@ -12,8 +12,16 @@
  * destructive; purge lands on the Archived list in Plan 09, never here — the
  * two-stage guarantee keeps the irreversible action off the profile).
  */
-import { useState } from "react";
-import { Modal, Pressable, StyleSheet, Text, View } from "react-native";
+import { useRef, useState } from "react";
+import {
+  AccessibilityInfo,
+  findNodeHandle,
+  Modal,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
 import { useTheme } from "@/theme";
 
 /** One row in the overflow sheet. */
@@ -29,10 +37,22 @@ export interface OverflowAction {
 export function OverflowMenu({ actions }: { actions: OverflowAction[] }) {
   const { colors } = useTheme();
   const [open, setOpen] = useState(false);
+  const triggerRef = useRef<View>(null);
+
+  const close = () => {
+    setOpen(false);
+    requestAnimationFrame(() => {
+      const triggerNode = findNodeHandle(triggerRef.current);
+      if (triggerNode !== null) {
+        AccessibilityInfo.setAccessibilityFocus(triggerNode);
+      }
+    });
+  };
 
   return (
     <>
       <Pressable
+        ref={triggerRef}
         testID="overflow-menu-trigger"
         accessibilityRole="button"
         accessibilityLabel="More actions"
@@ -47,13 +67,13 @@ export function OverflowMenu({ actions }: { actions: OverflowAction[] }) {
         visible={open}
         transparent
         animationType="fade"
-        onRequestClose={() => setOpen(false)}
+        onRequestClose={close}
       >
-        <View style={styles.modalRoot}>
+        <View accessibilityViewIsModal style={styles.modalRoot}>
           <Pressable
             accessibilityLabel="Dismiss actions"
             style={StyleSheet.absoluteFill}
-            onPress={() => setOpen(false)}
+            onPress={close}
           >
             <View
               style={[
@@ -80,7 +100,7 @@ export function OverflowMenu({ actions }: { actions: OverflowAction[] }) {
                 accessibilityRole="button"
                 accessibilityLabel={action.accessibilityLabel ?? action.label}
                 onPress={() => {
-                  setOpen(false);
+                  close();
                   action.onPress();
                 }}
                 style={[styles.option, { borderColor: colors.border }]}
