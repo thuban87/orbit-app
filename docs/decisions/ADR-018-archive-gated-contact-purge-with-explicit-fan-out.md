@@ -7,7 +7,7 @@
 **Reversibility:** one-way
 **Migration:** None
 **Supersedes:** None
-**Superseded by:** None
+**Superseded by:** ADR-080 (note — Archived list entry points only; gate unchanged)
 
 ## Context
 
