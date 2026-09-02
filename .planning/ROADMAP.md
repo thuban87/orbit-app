@@ -162,7 +162,7 @@ All v1.0 commits are local on `main` and have NOT been pushed.
 
 **Canonical refs**: docs/dossier/milestone-2/phase-01-app-shell-navigation-dossier-amended-group-events.md; docs/dossier/milestone-2/planning-notes/phase-01-planning-notes.md
 **Schema**: none
-**Plans:** 3/6 plans executed
+**Plans:** 4/6 plans executed
 **Wave 1**
 
 - [x] 22-01-PLAN.md — TRACER: four-tab bottom-nav shell + nested external-reset reconciliation (SHELL-01/04/05/15)
@@ -174,7 +174,7 @@ All v1.0 commits are local on `main` and have NOT been pushed.
 
 **Wave 3** *(blocked on Wave 2 completion — 04 depends on 02's back-intent)*
 
-- [ ] 22-04-PLAN.md — Shell chrome: app bars, insets, content-clearance, Group Events header/overflow + Archived (SHELL-12/13/14)
+- [x] 22-04-PLAN.md — Shell chrome: app bars, insets, content-clearance, Group Events header/overflow + Archived (SHELL-12/13/14)
 
 **Wave 4** *(blocked on Wave 3 completion)*
 
@@ -488,7 +488,7 @@ All v1.0 commits are local on `main` and have NOT been pushed.
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 22. App Shell & Navigation | 3/6 | In Progress|  |
+| 22. App Shell & Navigation | 4/6 | In Progress|  |
 | 23. Theme & Visual System | 0/TBD | Not started | - |
 | 24. Contact Knowledge Foundation | 0/TBD | Not started | - |
 | 25. Dashboard Data & State Foundation | 0/TBD | Not started | - |

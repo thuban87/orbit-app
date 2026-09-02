@@ -1,10 +1,10 @@
 ---
 schema_version: 1
-open_count: 4
+open_count: 6
 waived_count: 0
 fixed_count: 5
-total_count: 9
-last_updated: 2026-08-31T22:23:05.470Z
+total_count: 11
+last_updated: 2026-09-02T22:06:32.315Z
 ---
 
 # Broken Windows Ledger
@@ -24,6 +24,8 @@ last_updated: 2026-08-31T22:23:05.470Z
 | 7 | 19 | unrun-verify | .planning/milestones/v1.0-phases/19-system-contact-import/19-04-PLAN.md |  | Android 17 device UAT was not run; native picker and UI behavior remain to verify. | open |  | 2026-08-29T13:53:24.136Z |  |
 | 8 | 19 | unrun-verify | .planning/milestones/v1.0-phases/19-system-contact-import/19-10-PLAN.md |  | Android 17 photo and birthday import UAT was not run; picker-provided photo/birthday behavior remains to verify. | open |  | 2026-08-29T14:15:53.733Z |  |
 | 9 | 21 | deviation | src/screens/ContactProfileScreen.tsx | 1336 | Router receives already-loaded complete method groups so the required multi-endpoint selector can function. | open |  | 2026-08-31T22:23:05.470Z |  |
+| 10 | 22 | stub | src/screens/GroupEventsScreen.tsx | 14 | Intentional Coming soon placeholder; Phase 33 replaces it with Group Events data and workflow UI. | open |  | 2026-09-02T22:06:32.115Z |  |
+| 11 | 22 | unrun-verify | src/components/ShellAppBar.tsx |  | Pixel visual, TalkBack focus, and gesture/three-button clearance UAT require the desktop-build-to-Pixel workflow. | open |  | 2026-09-02T22:06:32.315Z |  |
 
 ````json
 [
@@ -133,6 +135,30 @@ last_updated: 2026-08-31T22:23:05.470Z
     "status": "open",
     "reason": "",
     "recorded_at": "2026-08-31T22:23:05.470Z",
+    "resolved_at": null
+  },
+  {
+    "id": 10,
+    "kind": "stub",
+    "phase": "22",
+    "file": "src/screens/GroupEventsScreen.tsx",
+    "line": 14,
+    "description": "Intentional Coming soon placeholder; Phase 33 replaces it with Group Events data and workflow UI.",
+    "status": "open",
+    "reason": "",
+    "recorded_at": "2026-09-02T22:06:32.115Z",
+    "resolved_at": null
+  },
+  {
+    "id": 11,
+    "kind": "unrun-verify",
+    "phase": "22",
+    "file": "src/components/ShellAppBar.tsx",
+    "line": null,
+    "description": "Pixel visual, TalkBack focus, and gesture/three-button clearance UAT require the desktop-build-to-Pixel workflow.",
+    "status": "open",
+    "reason": "",
+    "recorded_at": "2026-09-02T22:06:32.315Z",
     "resolved_at": null
   }
 ]

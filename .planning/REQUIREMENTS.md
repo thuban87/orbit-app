@@ -27,9 +27,9 @@ category's phase (see Traceability).
 - [ ] **SHELL-09**: From a contact's Profile, contact-specific FAB actions preselect that contact; from global contexts they open the shared picker; Group Log opens its canonical workflow directly with no shell-level pre-picker
 - [ ] **SHELL-10**: User can pick a contact through one reusable modal picker with live search ordered Favorites → recently relevant → alphabetical; archived contacts surface only via explicit search with an Archived badge; snoozed contacts stay selectable with a Snoozed marker
 - [ ] **SHELL-11**: Quick Log writes immediately at the current time once the target is known, with a success snackbar + Undo + success haptic, or an error snackbar with Retry — never success unless the write committed
-- [ ] **SHELL-12**: Dashboard exposes Group Events as a prominent header icon+label destination with a redundant overflow entry; Archived Contacts is reachable from Dashboard overflow (the Settings row may remain)
-- [ ] **SHELL-13**: Root tabs show a branded title with no Back; child and focused screens show Back plus a clear title; the status bar integrates with the active theme and scrollable content clears the nav bar and FAB
-- [ ] **SHELL-14**: Interactive shell controls carry semantic accessibility labels, adequate touch targets, logical focus order, and correct modal/speed-dial focus management; haptics are semantic only
+- [x] **SHELL-12**: Dashboard exposes Group Events as a prominent header icon+label destination with a redundant overflow entry; Archived Contacts is reachable from Dashboard overflow (the Settings row may remain)
+- [x] **SHELL-13**: Root tabs show a branded title with no Back; child and focused screens show Back plus a clear title; the status bar integrates with the active theme and scrollable content clears the nav bar and FAB
+- [x] **SHELL-14**: Interactive shell controls carry semantic accessibility labels, adequate touch targets, logical focus order, and correct modal/speed-dial focus management; haptics are semantic only
 - [x] **SHELL-15**: Tab switching uses a very short crossfade with no horizontal slide and no swipe-between-tabs gesture
 
 ### THEME — Theme & Visual System (Phase 23)
