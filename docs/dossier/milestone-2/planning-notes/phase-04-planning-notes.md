@@ -30,7 +30,7 @@
   Default order (ADR-043's consequence). `ManageFavouritesScreen.tsx` and the rank-ordered picker
   reads need a decided fate — either they fall back to Default order too, or the column becomes
   vestigial. **Do not drop the `favourite_rank` column** without a plan for the pickers that read
-  it. This ratification supersedes ADR-033; confirm the superseding ADR exists before planning.
+  it. This ratification supersedes ADR-033 (ADR-075, owner ratified 2026-09-01).
 - **Deferred (owner, 2026-09-01):** customizable widget membership is deferred to a future
   milestone. The widget's membership is the Favorites population; it is not user-configurable in
   this milestone.
