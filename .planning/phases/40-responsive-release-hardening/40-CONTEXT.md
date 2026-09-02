@@ -28,7 +28,9 @@ available. Interrogate with the owner first; this shim then gets replaced by a r
 - **D-02:** Orrery/Skia performance claims are physical-Pixel-only — the desktop emulator cannot
   assess them — and every perf claim must say which thread the evidence covers.
 - **D-03:** This phase owns no schema by default; a migration need discovered here signals an
-  upstream phase missed something — check before adding one.
+  upstream phase missed something — check before adding one. The backup wire format is frozen at
+  v4 after Phase 36's final plan: any new durable entity or portable preference this phase
+  introduces owes a format-5 bump — an owner decision, not a side effect.
 </decisions>
 
 <canonical_refs>

@@ -26,7 +26,9 @@ gsd-discuss-phase); this shim then gets replaced by a real CONTEXT.md.
 - **D-02:** Settings controls write to `app_settings` columns created by the owning feature phases
   (owner resolution R-16); this phase builds UI over existing columns and owns no schema by
   default. A migration need discovered here signals an upstream phase missed something — check
-  before adding one.
+  before adding one. The backup wire format is frozen at v4 after Phase 36's final plan: any new
+  durable entity or portable preference this phase introduces owes a format-5 bump — an owner
+  decision, not a side effect.
 - **D-03:** Already-settled row fates (do not reopen): Manage favourites — retired (ADR-075);
   Include-unbound toggle — retired (E-02); Archived contacts — dual entry allowed (ADR-080/E-07);
   Custom Fields — stays; Memory Recently Deleted/Trash — owned by Phase 24, not here.

@@ -24,7 +24,9 @@ with the owner first; this shim then gets replaced by a real CONTEXT.md.
   OpenRouter and explain the data flow without redefining the AI architecture or its optional
   posture; may introduce Profile customization without redefining it.
 - **D-02:** This phase owns no schema by default; a migration need discovered here signals an
-  upstream phase missed something — check before adding one.
+  upstream phase missed something — check before adding one. The backup wire format is frozen at
+  v4 after Phase 36's final plan: any new durable entity or portable preference this phase
+  introduces owes a format-5 bump — an owner decision, not a side effect.
 </decisions>
 
 <canonical_refs>
