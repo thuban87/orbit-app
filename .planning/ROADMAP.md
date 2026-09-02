@@ -170,16 +170,19 @@ All v1.0 commits are local on `main` and have NOT been pushed.
 **Wave 2** *(blocked on Wave 1 completion)*
 
 - [ ] 22-02-PLAN.md — Navigator behavior: transient store, back-intent, active-tab retap, nav visibility (SHELL-02/03/04/06)
-- [ ] 22-03-PLAN.md — In-app/container navigate reconciliation, completion resets, no-replay, Discard/Keep (SHELL-03/04/05/07)
+- [ ] 22-03-PLAN.md — In-app/container navigate reconciliation (incl. ImportReview crash), completion resets, no-replay, Discard/Keep (SHELL-03/04/05/07)
+
+**Wave 3** *(blocked on Wave 2 completion — 04 depends on 02's back-intent)*
+
 - [ ] 22-04-PLAN.md — Shell chrome: app bars, insets, content-clearance, Group Events header/overflow + Archived (SHELL-12/13/14)
-
-**Wave 3** *(blocked on Wave 2 completion)*
-
-- [ ] 22-05-PLAN.md — Universal six-action FAB + placeholder routes + haptics (SHELL-06/08/09/14)
 
 **Wave 4** *(blocked on Wave 3 completion)*
 
-- [ ] 22-06-PLAN.md — Shared contact picker + commit-truthful Quick Log snackbar (SHELL-09/10/11/14)
+- [ ] 22-05-PLAN.md — Universal six-action FAB + placeholder routes + haptics (SHELL-06/08/09/14)
+
+**Wave 5** *(blocked on Wave 4 completion)*
+
+- [ ] 22-06-PLAN.md — Shared contact picker + commit-truthful Quick Log snackbar + shell-refresh freshness (SHELL-09/10/11/14)
 
 **UI hint**: yes
 
