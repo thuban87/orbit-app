@@ -43,9 +43,9 @@ describe("guardNotificationBodyIntent", () => {
         trackingEnabled: 0,
       })),
     ).resolves.toEqual({
-      name: "Profile",
-      params: { contactId: 7 },
-      type: "navigate",
+      type: "reset",
+      index: 1,
+      routes: [{ name: "Home" }, { name: "Profile", params: { contactId: 7 } }],
     });
   });
 
@@ -56,9 +56,9 @@ describe("guardNotificationBodyIntent", () => {
         trackingEnabled: 0,
       })),
     ).resolves.toEqual({
-      name: "Profile",
-      params: { contactId: 7 },
-      type: "navigate",
+      type: "reset",
+      index: 1,
+      routes: [{ name: "Home" }, { name: "Profile", params: { contactId: 7 } }],
     });
   });
 

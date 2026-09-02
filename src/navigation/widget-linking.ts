@@ -47,6 +47,7 @@
 import { useEffect, useState } from "react";
 import { guardWidgetIntent } from "@/services/widget/widget-quick-action-guard";
 import { Logger } from "@/utils/logger";
+import { resetToDashboardRoot, resetToDashboardWith } from "./reset-intents";
 
 const LOG_SOURCE = "widget-linking";
 
@@ -271,10 +272,7 @@ export function WidgetLinkingGate({ isReady }: { isReady: boolean }) {
           if (cancelled) {
             return;
           }
-          navigationRef.current?.reset({
-            index: 0,
-            routes: [{ name: "Home" }],
-          });
+          navigationRef.current?.reset(resetToDashboardRoot());
           Alert.alert("This contact is no longer available.");
         }
         setPending(null);
@@ -284,10 +282,9 @@ export function WidgetLinkingGate({ isReady }: { isReady: boolean }) {
       if (cancelled) {
         return;
       }
-      navigationRef.current?.reset({
-        index: guarded.intent.index,
-        routes: guarded.intent.routes,
-      });
+      navigationRef.current?.reset(
+        resetToDashboardWith(guarded.intent.routes[1]),
+      );
       setPending(null);
     })().catch((error) => {
       Logger.error(LOG_SOURCE, "widget intent guard failed", error);

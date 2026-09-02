@@ -12,7 +12,8 @@
  *     OS handed us under singleTask/onNewIntent — TaskStackBuilder does not
  *     compose with singleTask, so the back-stack is a JS concern (Pitfall 7 /
  *     T-11-BACKSTACK). `index: 1` selects Compose as the focused route.
- *   - birthday body tap → a NAVIGATE to Profile{contactId} (NOTIF-04).
+ *   - birthday body tap → a RESET onto [Home, Profile{contactId}], preserving
+ *     the Dashboard fallback used by every external entry.
  *   - digest body tap → a RESET onto [Home, Digest] (index 1), mirroring the
  *     decay reset so Back ALWAYS lands on the dashboard on warm AND cold stacks
  *     (review H3 / T-11-BACKSTACK). A digest payload carries NO contactId — there
@@ -24,9 +25,8 @@ import type { NotificationData } from "./notification-ids";
 
 /**
  * A serializable navigation intent the gate applies to `navigationRef.current`
- * (`reset(...)` for a reset intent, `navigate(...)` for a navigate intent). The
- * shapes mirror react-navigation's `reset`/`navigate` arguments so the gate is a
- * thin adapter with no branching logic of its own.
+ * (`reset(...)` after it nests the flat routes in the Dashboard tab). The flat
+ * shapes keep this resolver node-loadable and the gate a thin adapter.
  */
 export type NavIntent =
   | {
@@ -42,7 +42,14 @@ export type NavIntent =
       index: 1;
       routes: [{ name: "Home" }, { name: "Digest" }];
     }
-  | { type: "navigate"; name: "Profile"; params: { contactId: number } };
+  | {
+      type: "reset";
+      index: 1;
+      routes: [
+        { name: "Home" },
+        { name: "Profile"; params: { contactId: number } },
+      ];
+    };
 
 /**
  * Narrow an arbitrary tap payload (cold-start data is loosely typed) to a valid
@@ -100,8 +107,11 @@ export function resolveNotificationNav(data: unknown): NavIntent | null {
 
   // kind === "birthday" (the only other narrowed value).
   return {
-    type: "navigate",
-    name: "Profile",
-    params: { contactId: data.contactId },
+    type: "reset",
+    index: 1,
+    routes: [
+      { name: "Home" },
+      { name: "Profile", params: { contactId: data.contactId } },
+    ],
   };
 }

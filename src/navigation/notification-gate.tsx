@@ -56,6 +56,7 @@ import {
 import { resolveNotificationNav } from "@/services/notifications/notification-nav";
 import { Logger } from "@/utils/logger";
 import { navigationRef } from "./linking";
+import { resetToDashboardWith } from "./reset-intents";
 
 const LOG_SOURCE = "notif-gate";
 
@@ -107,9 +108,12 @@ export async function guardNotificationBodyIntent(
   }
   if (contact.trackingEnabled !== 1) {
     return {
-      type: "navigate" as const,
-      name: "Profile" as const,
-      params: { contactId },
+      type: "reset" as const,
+      index: 1 as const,
+      routes: [
+        { name: "Home" as const },
+        { name: "Profile" as const, params: { contactId } },
+      ],
     };
   }
 
@@ -132,11 +136,7 @@ async function applyBodyNav(data: NotificationData): Promise<void> {
   if (!nav) {
     return;
   }
-  if (intent.type === "reset") {
-    nav.reset({ index: intent.index, routes: intent.routes });
-  } else {
-    nav.navigate(intent.name, intent.params);
-  }
+  nav.reset(resetToDashboardWith(intent.routes[1]));
 }
 
 /** Read the app-minted payload off a tapped notification. */

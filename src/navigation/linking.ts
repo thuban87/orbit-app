@@ -3,7 +3,7 @@ import { useShareIntentContext } from "expo-share-intent";
 import { createRef, useEffect } from "react";
 import { hasSharedBackup } from "../../modules/orbit-backup-document-picker";
 import { isBackupShareIntent } from "./backup-share-intent";
-import type { RootStackParamList } from "./types";
+import type { TabParamList } from "./types";
 
 /**
  * Share-intent → navigation wiring: the SINGLE deterministic owner of pending-
@@ -33,8 +33,7 @@ import type { RootStackParamList } from "./types";
  * not required for the share flow, and were one ever added for the app it MUST
  * NOT handle the share intent (that stays the provider's job, single-owner).
  */
-export const navigationRef =
-  createRef<NavigationContainerRef<RootStackParamList>>();
+export const navigationRef = createRef<NavigationContainerRef<TabParamList>>();
 
 /**
  * Ready-gated single-owner share navigation.
@@ -51,7 +50,8 @@ export const navigationRef =
  * as the readiness trigger.
  */
 export function ShareIntentGate({ isReady }: { isReady: boolean }) {
-  const { hasShareIntent, resetShareIntent, shareIntent } = useShareIntentContext();
+  const { hasShareIntent, resetShareIntent, shareIntent } =
+    useShareIntentContext();
 
   useEffect(() => {
     // Query unconditionally: expo-share-intent's cold-start state can settle
@@ -59,12 +59,17 @@ export function ShareIntentGate({ isReady }: { isReady: boolean }) {
     // is the authoritative proof that Android granted one backup document.
     const backupReady = hasSharedBackup();
     if (isReady) {
-      if (backupReady && (isBackupShareIntent(shareIntent) || !hasShareIntent)) {
+      if (
+        backupReady &&
+        (isBackupShareIntent(shareIntent) || !hasShareIntent)
+      ) {
         resetShareIntent();
-        navigationRef.current?.navigate("Backup");
+        navigationRef.current?.navigate("BackupTab", { screen: "Backup" });
         return;
       }
-      if (hasShareIntent) navigationRef.current?.navigate("Capture");
+      if (hasShareIntent) {
+        navigationRef.current?.navigate("DashboardTab", { screen: "Capture" });
+      }
     }
   }, [hasShareIntent, isReady, resetShareIntent, shareIntent]);
 

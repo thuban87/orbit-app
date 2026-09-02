@@ -36,7 +36,7 @@
  * render a stale SMS result against a fresh pending probe, nor let a superseded
  * focus's load/probe overwrite the latest focused state.
  */
-import { useFocusEffect } from "@react-navigation/native";
+import { type NavigationProp, useFocusEffect } from "@react-navigation/native";
 import * as Clipboard from "expo-clipboard";
 import * as SMS from "expo-sms";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -80,7 +80,8 @@ import {
   resolveComposeControls,
 } from "@/logic/compose-logic";
 import { consumeAiSuggestionIntent } from "@/navigation/ai-suggestion-navigation";
-import type { RootStackScreenProps } from "@/navigation/types";
+import { resetToDashboardRoot } from "@/navigation/reset-intents";
+import type { RootStackScreenProps, TabParamList } from "@/navigation/types";
 import {
   buildInspectorViewState,
   buildProviderAckViewState,
@@ -258,13 +259,13 @@ export function ComposeScreen({
     });
   }
 
-  // Back → dashboard (the one genuinely new nav behaviour, B2). `reset` is called
-  // INSIDE the callback body (never at render — `navigation.reset(...)` returns
-  // void, so a bare assignment would fire it during render and bind undefined to
-  // onPress). Entry-agnostic: robust when a future notification/widget caller has
-  // no Home in the back stack.
+  // Back → Dashboard root. Reset the parent tab tree so this remains correct when
+  // Compose was opened from the Orrery stack as well as Dashboard.
   const goHome = useCallback(
-    () => navigation.reset({ index: 0, routes: [{ name: "Home" }] }),
+    () =>
+      navigation
+        .getParent<NavigationProp<TabParamList>>()
+        ?.reset(resetToDashboardRoot()),
     [navigation],
   );
 

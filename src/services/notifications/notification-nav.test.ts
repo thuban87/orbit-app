@@ -5,7 +5,7 @@
  * The three cases the gate depends on:
  *   - decay body tap → a RESET to [Home, Compose{contactId}] so Back always lands
  *     on the dashboard regardless of the prior stack (Pitfall 7 / T-11-BACKSTACK),
- *   - birthday body tap → a NAVIGATE to Profile{contactId} (NOTIF-04),
+ *   - birthday body tap → a RESET to [Home, Profile{contactId}],
  *   - a malformed / unknown payload → null (no navigation).
  * No react-navigation or expo import is exercised — this is node-loadable.
  */
@@ -46,7 +46,7 @@ describe("resolveNotificationNav", () => {
     });
   });
 
-  it("routes a birthday body tap to a navigate to Profile{contactId}", () => {
+  it("routes a birthday body tap to a reset onto [Home, Profile{contactId}]", () => {
     expect(
       resolveNotificationNav({
         kind: "birthday",
@@ -54,9 +54,9 @@ describe("resolveNotificationNav", () => {
         occurrenceKey: "2026-08-16",
       }),
     ).toEqual({
-      type: "navigate",
-      name: "Profile",
-      params: { contactId: 7 },
+      type: "reset",
+      index: 1,
+      routes: [{ name: "Home" }, { name: "Profile", params: { contactId: 7 } }],
     });
   });
 
