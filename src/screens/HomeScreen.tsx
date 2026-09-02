@@ -44,8 +44,8 @@ import { Avatar } from "@/components/Avatar";
 import { BirthdayBanner } from "@/components/BirthdayBanner";
 import { ContactCard } from "@/components/ContactCard";
 import { type FilterChip, FilterChipRow } from "@/components/FilterChipRow";
-import { ShellAppBar } from "@/components/ShellAppBar";
 import type { OverflowAction } from "@/components/OverflowMenu";
+import { ShellAppBar } from "@/components/ShellAppBar";
 import { listCategories } from "@/db/contact-read";
 import {
   countArchived,
@@ -63,6 +63,7 @@ import { selectDashboardEmptyState } from "@/logic/dashboard-empty-logic";
 import type { DashboardScreenProps } from "@/navigation/types";
 import { useBottomClearance } from "@/navigation/use-bottom-clearance";
 import { useDashboardPrefs } from "@/stores/dashboard-prefs-store";
+import { useShellRefresh } from "@/stores/shell-refresh-store";
 import { useTheme } from "@/theme";
 import type { SocialBattery } from "@/types";
 import { Logger } from "@/utils/logger";
@@ -219,6 +220,11 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
       cancelled = true;
     };
   }, [filter, sort, debouncedTerm]);
+
+  // Shell Quick Log/Undo originates outside this screen's focus lifecycle. This
+  // in-process tick is intentionally distinct from the connection-scoped SQLite
+  // subscription that this dashboard deliberately does not use (DASH-07).
+  useShellRefresh(reload);
 
   // Freshness path 1 — re-query every time the dashboard regains focus.
   useFocusEffect(

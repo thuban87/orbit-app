@@ -87,8 +87,8 @@ import {
   type TimelineTouchpoint,
 } from "@/db/timeline-read";
 import { newUid } from "@/db/uid";
-import type { RootStackScreenProps } from "@/navigation/types";
 import { navigationRef } from "@/navigation/linking";
+import type { RootStackScreenProps } from "@/navigation/types";
 import {
   canStartLifecycleTransition,
   profileLifecycleView,
@@ -107,6 +107,7 @@ import {
 import type { IntensityResult } from "@/services/intensity-logic";
 import { reconcileSchedule } from "@/services/notifications/notification-schedule";
 import { notifyWidgetDataChanged } from "@/services/widget/widget-refresh";
+import { useShellRefresh } from "@/stores/shell-refresh-store";
 import { useTheme } from "@/theme";
 import { formatLocalDate } from "@/utils/dates";
 import { Logger } from "@/utils/logger";
@@ -299,6 +300,10 @@ export function ContactProfileScreen({
       Alert.alert("Couldn't load this contact", "Please go back and retry.");
     }
   }, [contactId]);
+
+  // The shell FAB can log this profile's contact without changing focus, so its
+  // app-level refresh event must re-run this unified read.
+  useShellRefresh(load);
 
   // Both helpers are pure projections over the method rows loaded above; this
   // deliberately avoids a second route query or a reachable-action flash.

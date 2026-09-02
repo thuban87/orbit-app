@@ -16,16 +16,23 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated";
 import { speedDialScrimPointerEvents } from "@/components/add-speed-dial-fab-logic";
+import { ContactPicker } from "@/components/ContactPicker";
 import {
   getFocusedContactContext,
   resolveFabTarget,
   UNIVERSAL_FAB_ACTIONS,
   type UniversalFabAction,
 } from "@/components/universal-fab-logic";
+import { getExecutor, localDateTime } from "@/db/database";
+import { deleteTouchpoint, recordTouchpoint } from "@/db/recency-dao";
+import { newUid } from "@/db/uid";
 import { isFocusedWorkflow } from "@/navigation/focused-route-classification";
 import { navigationRef } from "@/navigation/linking";
 import { FAB_EDGE_GAP, FAB_SIZE } from "@/navigation/use-bottom-clearance";
+import { notifyWidgetDataChanged } from "@/services/widget/widget-refresh";
+import { bumpShellRefresh } from "@/stores/shell-refresh-store";
 import { shellTransientStore } from "@/stores/shell-transient-store";
+import { showSnackbar } from "@/stores/snackbar-store";
 import { useMeasuredTabBarHeight } from "@/stores/tab-bar-layout-store";
 import { useTheme } from "@/theme";
 
@@ -45,6 +52,10 @@ const ACTION_ACCESSIBILITY_LABELS: Record<
   UpdateContact: { accessibilityLabel: "Update Contact" },
   Memory: { accessibilityLabel: "Memory" },
 };
+
+type PickerFlow =
+  | { kind: "quick-log" }
+  | { kind: "navigate"; screen: "LogContact" | "UpdateContact" | "Memory" };
 
 function UniversalFabActionRow({
   action,
@@ -109,7 +120,10 @@ export function UniversalFab() {
   const [open, setOpen] = useState(false);
   const [keyboardOpen, setKeyboardOpen] = useState(false);
   const [currentRouteName, setCurrentRouteName] = useState("Home");
+  const [pickerFlow, setPickerFlow] = useState<PickerFlow | null>(null);
   const expanded = useSharedValue(0);
+  const quickLogPending = useRef(false);
+  const undoPending = useRef(false);
   const bottomOffset = tabBarHeight + FAB_EDGE_GAP;
 
   const restoreFabFocus = useCallback(() => {
@@ -119,15 +133,18 @@ export function UniversalFab() {
     });
   }, []);
 
-  const closeDial = useCallback(() => {
-    if (!isOpenRef.current) return;
-    isOpenRef.current = false;
-    expanded.value = withTiming(0, { duration: DIAL_ANIMATION_DURATION });
-    setOpen(false);
-    shellTransientStore.getState().closeTransient(DIAL_ID);
-    AccessibilityInfo.announceForAccessibility("Capture actions closed");
-    restoreFabFocus();
-  }, [expanded, restoreFabFocus]);
+  const closeDial = useCallback(
+    (restoreFocusAfterClose = true) => {
+      if (!isOpenRef.current) return;
+      isOpenRef.current = false;
+      expanded.value = withTiming(0, { duration: DIAL_ANIMATION_DURATION });
+      setOpen(false);
+      shellTransientStore.getState().closeTransient(DIAL_ID);
+      AccessibilityInfo.announceForAccessibility("Capture actions closed");
+      if (restoreFocusAfterClose) restoreFabFocus();
+    },
+    [expanded, restoreFabFocus],
+  );
 
   const openDial = useCallback(() => {
     if (isOpenRef.current) return;
@@ -169,25 +186,139 @@ export function UniversalFab() {
     if (hidden) closeDial();
   }, [closeDial, hidden]);
 
+  const undoQuickLog = useCallback(
+    (contactId: number, interactionId: number) => {
+      if (undoPending.current) return;
+      undoPending.current = true;
+
+      void deleteTouchpoint(getExecutor(), {
+        contactId,
+        interactionId,
+        now: localDateTime(),
+      })
+        .then(() => {
+          // deleteTouchpoint recomputes recency but does not publish a data
+          // revision, so shell consumers and the widget need this explicit tick.
+          notifyWidgetDataChanged();
+          bumpShellRefresh();
+        })
+        .catch(() => {
+          showSnackbar({
+            kind: "error",
+            label: "Couldn't undo",
+            action: {
+              label: "Retry",
+              accessibilityLabel: "Retry undoing logged interaction",
+              onPress: () => undoQuickLog(contactId, interactionId),
+            },
+          });
+        })
+        .finally(() => {
+          undoPending.current = false;
+        });
+    },
+    [],
+  );
+
+  const logContact = useCallback(
+    (contactId: number) => {
+      if (quickLogPending.current) return;
+      quickLogPending.current = true;
+      const stamp = localDateTime();
+
+      void recordTouchpoint(getExecutor(), {
+        contactId,
+        uid: newUid(),
+        occurredAt: stamp,
+        now: stamp,
+        channel: "unspecified",
+        direction: "outbound",
+        connected: 1,
+        quality: null,
+        source: "manual",
+      })
+        .then(({ interactionId }) => {
+          showSnackbar({
+            kind: "success",
+            label: "Logged",
+            action: {
+              label: "Undo",
+              accessibilityLabel: "Undo logged interaction",
+              onPress: () => undoQuickLog(contactId, interactionId),
+            },
+          });
+          void Haptics.notificationAsync(
+            Haptics.NotificationFeedbackType.Success,
+          );
+          notifyWidgetDataChanged();
+          bumpShellRefresh();
+        })
+        .catch(() => {
+          // A failed write is ordinary error feedback, not a destructive action:
+          // the shell haptic taxonomy deliberately reserves warning haptics.
+          showSnackbar({
+            kind: "error",
+            label: "Couldn't log",
+            action: {
+              label: "Retry",
+              accessibilityLabel: "Retry logging contact",
+              onPress: () => logContact(contactId),
+            },
+          });
+        })
+        .finally(() => {
+          quickLogPending.current = false;
+        });
+    },
+    [undoQuickLog],
+  );
+
+  const selectPickerContact = useCallback(
+    (contactId: number) => {
+      const flow = pickerFlow;
+      setPickerFlow(null);
+      if (!flow) return;
+      if (flow.kind === "quick-log") {
+        logContact(contactId);
+        return;
+      }
+      navigationRef.current?.navigate("DashboardTab", {
+        screen: flow.screen,
+        params: { contactId },
+      } as never);
+    },
+    [logContact, pickerFlow],
+  );
+
   const dispatchAction = useCallback(
     (action: UniversalFabAction) => {
       const intent = resolveFabTarget(
         action.id,
         getFocusedContactContext(navigationRef.current?.getRootState()),
       );
-      closeDial();
+      const opensPicker =
+        intent.kind === "pick-then" ||
+        (intent.kind === "quick-log" && intent.contactId === null);
+      // Modal accessibility owns focus for picker flows; restoring focus to the
+      // now-covered FAB would pull assistive tech out of the modal surface.
+      closeDial(!opensPicker);
 
       if (intent.kind === "navigate") {
         navigationRef.current?.navigate(intent.tab, {
           screen: intent.screen,
           params: intent.params,
         } as never);
+      } else if (intent.kind === "quick-log") {
+        if (intent.contactId === null) {
+          setPickerFlow({ kind: "quick-log" });
+        } else {
+          logContact(intent.contactId);
+        }
+      } else {
+        setPickerFlow({ kind: "navigate", screen: intent.screen });
       }
-      // Plan 06 attaches the shared ContactPicker and the transactional Quick
-      // Log flow to these explicit intents. Keeping the seam here avoids a
-      // shell-level route walk or a second ad-hoc picker.
     },
-    [closeDial],
+    [closeDial, logContact],
   );
 
   const glyphStyle = useAnimatedStyle(() => ({
@@ -200,9 +331,14 @@ export function UniversalFab() {
 
   return (
     <View pointerEvents="box-none" style={styles.overlay}>
+      <ContactPicker
+        visible={pickerFlow !== null}
+        onDismiss={() => setPickerFlow(null)}
+        onSelect={selectPickerContact}
+      />
       <AnimatedPressable
         accessibilityLabel="Dismiss capture actions"
-        onPress={closeDial}
+        onPress={() => closeDial()}
         pointerEvents={scrimPointerEvents}
         style={[
           styles.scrim,

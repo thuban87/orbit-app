@@ -49,7 +49,6 @@ import {
   Alert,
   AppState,
   type LayoutChangeEvent,
-  Pressable,
   StyleSheet,
   Text,
   View,
@@ -65,9 +64,9 @@ import {
 import { getInitials, swatchIndex } from "@/components/avatar-initials";
 import { OrbitBody } from "@/components/orrery/OrbitBody";
 import { OrreryCanvas } from "@/components/orrery/OrreryCanvas";
-import { ShellAppBar } from "@/components/ShellAppBar";
 import { SunBody } from "@/components/orrery/SunBody";
 import { SegmentedControl } from "@/components/SegmentedControl";
+import { ShellAppBar } from "@/components/ShellAppBar";
 import { getAppSettings } from "@/db/app-settings-dao";
 import { getContactHeader } from "@/db/contact-read";
 import { getContactStatus, type ProfileStatus } from "@/db/contact-status-read";
@@ -96,6 +95,7 @@ import {
   type SunOccupantLookup,
 } from "@/logic/sun-occupant-logic";
 import type { RootStackParamList } from "@/navigation/types";
+import { useShellRefresh } from "@/stores/shell-refresh-store";
 import { useTheme } from "@/theme";
 import type { ThemePalette } from "@/theme/theme-types";
 import { Logger } from "@/utils/logger";
@@ -213,63 +213,64 @@ export function OrreryScreen() {
 
   // Focus read (FuelSearch cancelled-flag pattern): settings → sun occupant
   // (Promise.all, M4) → orbiting set. Offline, async only.
-  useFocusEffect(
-    useCallback(() => {
-      let cancelled = false;
-      (async () => {
-        try {
-          const exec = getExecutor();
-          const settings = await getAppSettings(exec);
+  const reloadOrrery = useCallback(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const exec = getExecutor();
+        const settings = await getAppSettings(exec);
 
-          let occupant: SunOccupantLookup | null = null;
-          let sunContactName = "";
-          if (settings.sunContactId !== null) {
-            const [header, statusRow] = await Promise.all([
-              getContactHeader(exec, settings.sunContactId),
-              getContactStatus(exec, settings.sunContactId),
-            ]);
-            // C2-2: nullable status — never-contacted contact-sun → null. The
-            // pure mapper also threads getContactHeader's lifecycle state into
-            // the sole self-fallback predicate; this read never mutates the
-            // saved app_settings.sun_contact_id.
-            occupant = mapSunOccupantLookup(header, statusRow?.status ?? null);
-            sunContactName = header?.name ?? "";
-          }
-
-          const [selfPhoto, selfProfile, bodies] = await Promise.all([
-            getProfilePhoto(exec),
-            getProfile(exec),
-            listOrbitingContacts(exec, {
-              excludeContactId: settings.sunContactId,
-            }),
+        let occupant: SunOccupantLookup | null = null;
+        let sunContactName = "";
+        if (settings.sunContactId !== null) {
+          const [header, statusRow] = await Promise.all([
+            getContactHeader(exec, settings.sunContactId),
+            getContactStatus(exec, settings.sunContactId),
           ]);
-
-          if (cancelled) {
-            return;
-          }
-          setSun({
-            sunContactId: settings.sunContactId,
-            selfSunColour: settings.selfSunColour,
-            selfPhoto,
-            selfName: selfProfile?.name ?? "",
-            occupant,
-            sunContactName,
-          });
-          setOrbiting(bodies);
-        } catch (err) {
-          // Offline read-path rule: render with defaults, no error UI.
-          Logger.error(LOG_SCOPE, "failed to load orrery", err);
-          if (!cancelled) {
-            setSun(DEFAULT_SUN);
-            setOrbiting([]);
-          }
+          // C2-2: nullable status — never-contacted contact-sun → null. The
+          // pure mapper also threads getContactHeader's lifecycle state into
+          // the sole self-fallback predicate; this read never mutates the
+          // saved app_settings.sun_contact_id.
+          occupant = mapSunOccupantLookup(header, statusRow?.status ?? null);
+          sunContactName = header?.name ?? "";
         }
-      })();
-      return () => {
-        cancelled = true;
-      };
-    }, []),
-  );
+
+        const [selfPhoto, selfProfile, bodies] = await Promise.all([
+          getProfilePhoto(exec),
+          getProfile(exec),
+          listOrbitingContacts(exec, {
+            excludeContactId: settings.sunContactId,
+          }),
+        ]);
+
+        if (cancelled) return;
+        setSun({
+          sunContactId: settings.sunContactId,
+          selfSunColour: settings.selfSunColour,
+          selfPhoto,
+          selfName: selfProfile?.name ?? "",
+          occupant,
+          sunContactName,
+        });
+        setOrbiting(bodies);
+      } catch (err) {
+        // Offline read-path rule: render with defaults, no error UI.
+        Logger.error(LOG_SCOPE, "failed to load orrery", err);
+        if (!cancelled) {
+          setSun(DEFAULT_SUN);
+          setOrbiting([]);
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useFocusEffect(reloadOrrery);
+  // This causes a data read only; the Skia animation remains driven by shared
+  // values and is never advanced through React state.
+  useShellRefresh(reloadOrrery);
 
   const onCanvasLayout = useCallback((e: LayoutChangeEvent) => {
     const { width, height } = e.nativeEvent.layout;

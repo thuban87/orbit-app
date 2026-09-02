@@ -16,6 +16,7 @@ import { AssistBanner } from "@/components/AssistBanner";
 import { BackupEncryptionBenchmarkHarness } from "@/components/BackupEncryptionBenchmarkHarness";
 import { ResumeImportPrompt } from "@/components/ResumeImportPrompt";
 import { ResumeReconcilePrompt } from "@/components/ResumeReconcilePrompt";
+import { Snackbar } from "@/components/Snackbar";
 import { UniversalFab } from "@/components/UniversalFab";
 import { getExecutor, openAndMigrate } from "@/db/database";
 import { isMigration006IntegrityError } from "@/db/migrations/006-normalize-custom-field-values";
@@ -322,6 +323,7 @@ function AppShell() {
       <WidgetLinkingGate isReady={navReady} />
       <RootNavigator />
       <UniversalFab />
+      <Snackbar />
       <AssistBanner />
       {resolveActiveResumePrompt(resumableImport, resumableReconcile) ===
       "import" ? (
