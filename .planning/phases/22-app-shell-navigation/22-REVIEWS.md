@@ -1,598 +1,657 @@
 ---
 phase: 22
 reviewers: [codex, cursor, claude]
-reviewed_at: 2026-09-02T16:44:43Z
+reviewed_at: 2026-09-02T17:46:00Z
+cycle: 2
 plans_reviewed: [22-01-PLAN.md, 22-02-PLAN.md, 22-03-PLAN.md, 22-04-PLAN.md, 22-05-PLAN.md, 22-06-PLAN.md]
 models:
-  codex: "gpt-5.6-terra (reasoning=high)"
+  codex: "gpt-5.6-terra (reasoning=low)"
   cursor: "unknown"
-  claude: "claude-opus-4-8 (read-only subagent)"
+  claude: "claude-opus-4-8 (read-only subagent lane)"
 model_sources:
   codex: "banner"
   cursor: "unknown"
-  claude: "subagent"
+  claude: "orchestrator"
+gates:
+  source_grounding: true          # authority=grep
+  cross_artifact_fact_drift: advisory
 ---
 
-# Cross-AI Plan Review — Phase 22 (App Shell & Navigation)
+# Cross-AI Plan Review — Phase 22 (App Shell & Navigation) — Convergence Cycle 2
 
-Reviewed by three independent AI systems (Codex `gpt-5.6-terra`, Cursor, and a read-only Claude subagent), each source-grounded against the actual code on disk. Every reviewer file:line claim below was re-verified by the orchestrator against the repo (per the repo's "review the code, not the diff" rule) before being folded into the consensus — including the reviewers' decision-reversal claims, which are the highest-authority findings here.
+Three independent reviewers (Codex, Cursor, and a read-only Claude subagent lane) re-reviewed the
+6 revised plans on disk after commit `5ed789e`. Every file:line claim carried by a reviewer was
+re-verified by the orchestrator against the actual code on disk (CLAUDE.md "review the code, not the
+diff"); the disposition column below reflects that verification, which in two cases changed a
+reviewer's severity.
 
 ## Consensus Summary
 
-The four-tab architecture is **correct in direction and unusually faithful to the recorded decisions** — ADR-080 (four-tab shell), ADR-044 (external→Dashboard fallback), ADR-018 (single Archived surface), D-03 (no migration; `TARGET_VERSION` stays 14, verified on disk), D-10 (predictive-back stays disabled), and the migration-gate-ahead-of-navigator invariant all survive. The plans' own file:line citations are exceptionally accurate: every existing cited symbol (reset sites, `deleteTouchpoint`/`recordTouchpoint`, the orbit:// guards, the flat `createNativeStackNavigator`) resolved as written.
+Cycle 2 is a **material improvement** over cycle 1 — all three reviewers independently rate overall
+phase risk **MEDIUM**, down from cycle 1's HIGH. Four of cycle 1's five HIGHs are fully or
+correctly resolved: the merge-completion `replace("Profile")` crash is now owned (Plan 03), the
+`navigationRef` retype closes the container-level tsc-blindness, the transient store now holds real
+dismiss callbacks, and the ADR-075 posture (enforce the planner half, remove the two named
+user-facing entries, flag the full `ManageFavourites`/`orbit://favourites` retirement for the owner)
+is the correct escalation — **not** a defect.
 
-The risk is concentrated in **two clusters**, both of which the plans' primary automated gate (`npx tsc --noEmit`) is structurally blind to:
+**The single most important finding is new this cycle:** the Claude lane's repo-wide sweep found an
+**unowned cross-tab crash the "COMPLETE" D-08 inventory still misses** —
+`ImportReviewScreen.tsx:215/:289 replace("Profile")`. The orchestrator verified it: `ImportReview`
+is a SettingsStack screen typed `RootStackScreenProps<"ImportReview">`, `Profile` lives only in
+DashboardStack/OrreryStack, so both sites are route-not-found post-split — the exact N9/N10 crash
+class the plans already caught, on two real import paths, in no plan's `files_modified`.
 
-1. **A decision reversal against ADR-075 (owner escalation).** Codex found — and the orchestrator verified against `docs/decisions/ADR-075-...md` (Accepted, owner-ratified 2026-09-01) — that Plan 06's `picker-read.ts` ORDER BY carries `favourite_rank ASC`, which reintroduces the retired user-facing favourite order into a *new* read path (the exact risk ADR-075's own "Risks" section names). Separately, Plans 01/04 retain the `ManageFavourites` route, the `HomeScreen:319` Dashboard entry, and the `SettingsScreen:2008` Manage-favourites entry — three surfaces ADR-075 explicitly retires "with nothing put in their place." A reviewer flagging removal of a named control (Manage favourites) is a standing escalation trigger in this repo.
+Two reviewer HIGHs were **downgraded after orchestrator verification against source**: (a) Codex's
+"system Back ≠ visible Back on browse child screens" — the FAB scrim is `StyleSheet.absoluteFill`
+with `pointerEvents:"auto"` when open (`AddSpeedDialFab.tsx:75,133`), so the visible Back is
+physically un-tappable while a transient is open; the deferral is genuinely safe (the Claude lane
+reached the same conclusion), but Plan 02's *stated* rationale ("FAB hidden on child screens") is
+factually wrong and should be corrected to the scrim-interception argument. (b) The picker
+`openTransient` callback omission (Codex/Cursor HIGH) is real but tsc-bounded per the Claude lane —
+kept as an actionable plan-text fix.
 
-2. **Incomplete cross-tab navigation coverage.** The D-08 "reset & navigate call-site inventory" claims completeness ("cross-tab navigate audit this session") but misses a cluster of in-app `navigate`/`replace` calls that break once routes are partitioned across tabs. All three reviewers independently converged here. Because Plan 01 retains a merged `RootStackParamList` back-compat alias, all of these type-check and fail only at runtime — so the plans' `tsc` verify blocks cannot catch them, and only a path-specific Pixel UAT would.
+### Agreed Strengths (2+ reviewers, verified on disk)
 
-Overall consensus risk: **HIGH** (Cursor: HIGH; Codex: HIGH; Claude: MEDIUM-HIGH). Direction is sound; the phase should not execute as written until the ADR-075 reversal is resolved with the owner and the cross-tab inventory is completed.
+- **D-06 fidelity + external-entry preservation** — plans are written against the real flat stack
+  (`RootNavigator.tsx`, Profile Back `goBack()` at `ContactProfileScreen.tsx:762`), and every
+  ADR-044/D-07 external reset (Compose `:267`, notification `:136`, widget `:274/:287`, ShareIntent
+  `linking.ts:64/:67`) is reshaped, never removed. (codex, cursor, claude)
+- **ADR-075 handling is exemplary** — enforces the new picker path (membership band, no
+  `favourite_rank ASC`), removes `HomeScreen.tsx:319` + `SettingsScreen.tsx:2008`, and flags the
+  route/widget retirement for the owner; `capture-read.ts:65-66` still carries the `favourite_rank
+  ASC` idiom Plan 06 must not copy. (codex, cursor, claude)
+- **Quick Log data-layer correctness** — mirrors canonical `doLogContact`
+  (`ContactProfileScreen.tsx:339-349`) exactly, `uid` required (`recency-dao.ts:59-61`), Undo reuses
+  `deleteTouchpoint` (`:313`), and the freshness reasoning (deleteTouchpoint does NOT call
+  `bumpDataRevisionCore` at `:240`) is correct. (codex, cursor, claude)
+- **Merge-completion + birthday-notification crashes owned**; widget reshape correctly scoped to the
+  gate dispatch only (resolver/tests stay flat). (codex, cursor, claude)
+- **Transient store dismiss-callback design** fixes the cycle-1 "id-in-a-set can't close local React
+  state" defect. (codex, cursor, claude)
 
-### Agreed Strengths
+### Agreed Concerns (2+ reviewers)
 
-- **Decision fidelity to ADR-080/044/018 and D-03/D-10** — verified on disk by all three (migration gate at App.tsx:290/297-310; deep-link guards at widget-linking.ts:103-119 untouched; `TARGET_VERSION=14`; predictive-back false at app.config.ts:76).
-- **On-disk re-verification (D-06) is genuine**, not inherited from artifacts — the flat `createNativeStackNavigator` (RootNavigator.tsx:57), the nine reset sites, and `deleteTouchpoint` at recency-dao.ts:313 all match. (Codex, Cursor, Claude)
-- **`deleteTouchpoint` reuse for Quick Log Undo is the correct data-layer choice** — delete-by-both-keys + tombstone + `recomputeLastContact` in one txn; no new delete DAO; single-writer invariant intact. (Codex ran the full table-writer audit: contacts-dao.ts:185/442, merge-dao.ts:153/187.) (all three)
-- **Commit-truthful Quick Log** — success keyed strictly to the resolved `{interactionId}`, no optimistic snackbar — is real (`recordTouchpoint` rejects a future `occurred_at` before opening the txn). (all three)
-- **Reanimated compliance** — the FAB is shared-value-driven with React state only for `pointerEvents`; no per-frame setState. (Codex, Claude)
-- **Local-first + theme-token discipline** — no network on any read path; `check:colors` gates + status-hue-on-chrome prohibition. (all three)
+- **Picker `openTransient` inconsistency** — Plan 06 Task 2 says `openTransient("contact-picker")`
+  with no dismiss callback, contradicting Plan 02's contract/must_have. (codex HIGH, cursor HIGH,
+  claude LOW — tsc-bounded)
+- **Post-Quick-Log browse-surface refresh has no named mechanism** — "refresh the currently focused
+  data surface" is asserted; `HomeScreen` reloads only on focus/AppState/pull, does not subscribe to
+  the data revision. Widget path is covered; on-Home/Orrery staleness is a real gap. (codex MEDIUM,
+  cursor MEDIUM)
+- **SHELL-03 scope vs literal success criterion** — identical system/visible Back is delivered for
+  shell-owned transients + default nested back, not for existing child Back controls; UAT must not
+  claim full SHELL-03. (codex, cursor, claude — see downgrade note above)
 
-### Agreed Concerns
+### Divergent Views (resolved by orchestrator verification)
 
-- **HIGH — cross-tab navigate inventory is incomplete** (all three reviewers). Confirmed stranded/broken sites the D-08 inventory omits: `HomeScreen.tsx:536/554/572` (Backup/Orrery/Settings quick-links), `OrreryScreen.tsx:433/441 → Profile` (breaks dossier-`[DECIDED]` Orrery→Profile→Back=Orrery — Profile is only in DashboardStack), `ImportCompleteScreen.tsx:267/283 → UnboundContacts/Profile`, `ContactProfileScreen.tsx:827 → ReconcileDetail`, and the birthday-notification container `navigate("Profile")` (notification-nav.ts:101-105 → notification-gate.tsx:137).
-- **HIGH — merge-completion `replace("Profile")` crashes from the reconcile origin** (Claude; verified). `src/components/MergeImpactSummary.tsx:17` calls `navigation.replace("Profile", {contactId})` on merge success; the merge cluster is reachable from reconcile (ReconcileDetailScreen.tsx:104/:144 → SurvivorSelect) inside SettingsStack, where Profile is not registered. Plan 01 defers to Plan 03 "at execution time"; Plan 03's `files_modified` excludes the merge component — unowned.
-- **HIGH (meta) — `tsc --noEmit` is blind to all of the above** because the retained merged `RootStackParamList` alias lets any route name type-check regardless of its owning stack (Codex, Cursor, Claude).
-- **MEDIUM — Quick Log wiring omits the required `uid`** (all three). `RecordTouchpointInput.uid` is mandatory with no default (recency-dao.ts:59-61); Plan 06 Task 3 never mints one. The canonical analog (`doLogContact`, ContactProfileScreen.tsx:339-349) passes `uid: newUid()` + `direction:"outbound"`, `connected:1`, etc.
-- **MEDIUM — no freshness propagation after Quick Log / Undo** (Codex, Cursor). The profile logger calls `notifyWidgetDataChanged()` + reloads the focused view (ContactProfileScreen.tsx:350); a shell-mounted Quick Log doesn't, so status/recency/widget stay stale until a later focus. `deleteTouchpoint` also skips `bumpDataRevisionCore` (asymmetry with `recordTouchpoint` at :240), so Undo compounds the staleness.
-- **MEDIUM-HIGH — shell-level FAB routing / geometry** (Codex, Cursor, Claude). A shell-mounted FAB dispatching bare `navigate("Create")` won't resolve cross-tab (must be nested `navigate("DashboardTab",{screen,params})`), and the retained `bottom:28` offset (sized for a full-screen Dashboard) will collide with the new tab bar — derive from `useBottomTabBarHeight()`.
-
-### Divergent Views
-
-- **ADR-075 reversal:** only **Codex** surfaced it (it read ADR-075; Cursor and the Claude subagent checked only ADR-080/044/018 and reported "no reversals"). The orchestrator independently verified Codex is correct against `docs/decisions/ADR-075-...md` and `capture-read.ts:65-67`, so it stands as the top finding despite being single-source.
-- **Transient-dismiss mechanism (Plan 02):** **Codex** rates HIGH that `dismissTop()` removing a store id cannot close a component whose visibility is local React state (AddSpeedDialFab.tsx:30 `setExpanded`); Cursor/Claude treat the store design as sound in principle. Verified: the concern is real *as written* — the plans don't specify whether overlays derive visibility from the store or hold dismiss callbacks.
-- **system Back == visible Back (Plan 02/04):** **Codex** rates HIGH (Compose/Capture own `hardwareBackPress` handlers at ComposeScreen.tsx:404 / CaptureScreen.tsx:216 consume Back first; existing child Back controls call `goBack()` directly; Plan 04 defers child-chrome migration). Claude rates the Plan-02 logic itself LOW. Both are compatible: the *pure logic* is clean, but the *end-to-end guarantee* isn't delivered for existing focused/child screens this phase — partly explicitly-deferred scope the owner may accept.
-- **Overall risk:** Cursor & Codex HIGH; Claude MEDIUM-HIGH.
+- **"system Back == visible Back" on browse child screens** — Codex rated HIGH (FAB visible on
+  Archived/NeverContacted/UnboundContacts/Digest; their own Back controls call `goBack()` directly).
+  Cursor MEDIUM; Claude LOW. **Resolution: LOW.** Verified the shell transient's scrim is
+  full-screen absoluteFill and intercepts the tap while open, so the visible Back cannot fire during
+  an open transient — no real divergence. Fix is to correct Plan 02's stated rationale, not the
+  behavior.
+- **Picker callback severity** — Codex/Cursor HIGH vs Claude LOW. **Resolution: actionable
+  non-HIGH** — a real cross-plan contradiction to fix in Plan 06 text, but tsc catches the runtime
+  defect when `dismiss` is a required parameter.
 
 ---
 
 ## Codex Review
 
-# Phase 22 plan review
+_Model: gpt-5.6-terra (reasoning=low)_
 
-Overall: **HIGH risk; do not execute as written.** The tab-shell direction, readiness gate preservation, and recency-DAO reuse are sound. However, the route partition is incomplete and will strand existing navigation paths; the transient-store design cannot actually dismiss UI; and the plans retain rank-ordered favourites/Manage Favourites despite ADR-075 explicitly retiring both.
+# Phase 22 plan review — convergence cycle 2
 
-## Decision-reversal escalation
+## Overall summary
 
-- **HIGH — ADR-075 is directly reversed.** Plan 01 retains `ManageFavourites`; Plan 06 orders picker results by `favourite_rank ASC`. ADR-075 requires binary favourites, retires the reorder screen and Settings/Dashboard entries, and prohibits rank deciding user-visible order. The live app still contains exactly the legacy surface and rank wiring the ADR says to retire: [ManageFavouritesScreen.tsx:98](/home/bwales/projects/orbit-app/src/screens/ManageFavouritesScreen.tsx:98), [SettingsScreen.tsx:2008](/home/bwales/projects/orbit-app/src/screens/SettingsScreen.tsx:2008), and [HomeScreen.tsx:319](/home/bwales/projects/orbit-app/src/screens/HomeScreen.tsx:319). See [ADR-075:18](/home/bwales/projects/orbit-app/docs/decisions/ADR-075-binary-favourite-membership-without-a-user-facing-order.md:18) and [ADR-075:40](/home/bwales/projects/orbit-app/docs/decisions/ADR-075-binary-favourite-membership-without-a-user-facing-order.md:40).
+The plans are substantially improved: they correctly trace the flat-stack split, retain the external Dashboard fallback, cover the widget resolver boundary, fix the merge-completion crash, and explicitly avoid introducing new `favourite_rank ASC` ordering. However, three implementation gaps still prevent the phase from fully meeting its decided Back/Discard contracts.
 
-  Remove the route/screen/entries and sort favourite membership as a boolean band followed by the current Default ordering—not rank.
+## 22-01 — Four-tab shell
 
-## Plan 01 — four-tab shell
-
-**Summary:** Good architectural target, but the proposed route-to-tab map does not cover the existing graph. The `RootStackParamList` compatibility alias would allow TypeScript to conceal several runtime-unhandled navigation actions.
+**Summary:** Strong architectural tracer. The route-to-tab partition and external nested-reset approach correctly reflect the current flat root stack.
 
 **Strengths**
 
-- It correctly starts from the actual flat stack: [RootNavigator.tsx:57](/home/bwales/projects/orbit-app/src/navigation/RootNavigator.tsx:57).
-- Preserving the migration gate is essential and feasible: the `NavigationContainer` and navigator are currently mounted only after `ready` succeeds at [App.tsx:290](/home/bwales/projects/orbit-app/App.tsx:290) and [App.tsx:310](/home/bwales/projects/orbit-app/App.tsx:310).
-- It correctly preserves the strict widget URI boundary: anchored digit-only URI forms and safe-positive-integer checks are present at [widget-linking.ts:98](/home/bwales/projects/orbit-app/src/navigation/widget-linking.ts:98) and [widget-linking.ts:113](/home/bwales/projects/orbit-app/src/navigation/widget-linking.ts:113).
+- Correctly starts from the actual single-stack navigator at [RootNavigator.tsx](/home/bwales/projects/orbit-app/src/navigation/RootNavigator.tsx:57), rather than assuming tabs already exist.
+- Correctly preserves the migration gate: the `NavigationContainer` remains inside the ready branch at [App.tsx](/home/bwales/projects/orbit-app/App.tsx:298).
+- Correctly identifies the Orrery Profile requirement: planet/sun taps use `navigate("Profile")` at [OrreryScreen.tsx](/home/bwales/projects/orbit-app/src/screens/OrreryScreen.tsx:433), so dual registration is necessary.
+- Correctly preserves strict widget URI validation at [widget-linking.ts](/home/bwales/projects/orbit-app/src/navigation/widget-linking.ts:103).
 
 **Concerns**
 
-- **HIGH — the proposed Orrery stack cannot deliver Orrery → Profile → Back = Orrery.** The plan assigns only `Orrery` to `OrreryStack`, yet the real Orrery opens `Profile` at [OrreryScreen.tsx:433](/home/bwales/projects/orbit-app/src/screens/OrreryScreen.tsx:433) and [OrreryScreen.tsx:441](/home/bwales/projects/orbit-app/src/screens/OrreryScreen.tsx:441). With `Profile` registered solely in DashboardStack, this is an unhandled action, not origin-aware back.
-
-- **HIGH — the reset/navigation inventory misses many cross-tab calls.** Current Dashboard navigation directly targets future tab roots: Backup, Orrery, and Settings at [HomeScreen.tsx:536](/home/bwales/projects/orbit-app/src/screens/HomeScreen.tsx:536), [HomeScreen.tsx:554](/home/bwales/projects/orbit-app/src/screens/HomeScreen.tsx:554), and [HomeScreen.tsx:572](/home/bwales/projects/orbit-app/src/screens/HomeScreen.tsx:572). Import completion also directly targets Dashboard-only routes from the proposed Settings stack at [ImportCompleteScreen.tsx:267](/home/bwales/projects/orbit-app/src/screens/ImportCompleteScreen.tsx:267) and [ImportCompleteScreen.tsx:283](/home/bwales/projects/orbit-app/src/screens/ImportCompleteScreen.tsx:283). Profile also launches `ReconcileDetail`, which the plan assigns only to Settings, at [ContactProfileScreen.tsx:827](/home/bwales/projects/orbit-app/src/screens/ContactProfileScreen.tsx:827).
-
-- **MEDIUM — keeping a merged `RootStackParamList` masks these runtime faults.** The current type is a flat route list at [types.ts:22](/home/bwales/projects/orbit-app/src/navigation/types.ts:22), and the global ref uses it at [linking.ts:36](/home/bwales/projects/orbit-app/src/navigation/linking.ts:36). A merged alias lets a Dashboard child compile while navigating `"Backup"` even when its navigator no longer owns that route.
+- **MEDIUM — the retained merged `RootStackScreenProps` is not enough to prove per-tab screen registration will type-check.** Existing screens are explicitly typed against the full root list, e.g. [EditContactScreen.tsx](/home/bwales/projects/orbit-app/src/screens/EditContactScreen.tsx:142) and [MergeImpactSummary.tsx](/home/bwales/projects/orbit-app/src/components/MergeImpactSummary.tsx:12). Registering those components in narrower `DashboardStackParamList`/`OrreryStackParamList` navigators may be structurally incompatible under React Navigation’s screen-prop variance. The plan says consumers “keep compiling,” but has no compile-spike or fallback wrapper strategy.
 
 **Suggestions**
 
-- Build a complete caller → destination → owning-stack matrix from every `navigate`, `reset`, `replace`, and injected `navigate` callback before partitioning.
-- Either register the necessary profile workflow family in OrreryStack, or define and test an explicit cross-tab/profile-origin mechanism. A plain Dashboard switch does not satisfy the ADR-080 back contract.
-- Type `navigationRef` as `NavigationContainerRef<TabParamList>` and force cross-tab calls into `{ screen, params }`; reserve stack-only screen props for routes actually registered in that stack.
+- Add an explicit first-task compile checkpoint after registering one existing `RootStackScreenProps` component in a tab stack. If it fails, migrate screen props to the per-tab composite helper or add typed route wrappers; do not defer discovery until the whole navigator rewrite is complete.
 
-**Risk:** **HIGH.**
+**Risk:** **MEDIUM.** The architectural direction is right, but typing compatibility is an early blocker risk.
 
-## Plan 02 — transient state, retap, Back
+## 22-02 — Back, retap, transient overlays
 
-**Summary:** Centralizing intent is sensible, but the proposed store records IDs without a mechanism to close the actual component that owns the UI state.
+**Summary:** The ordered callback-based transient store is a real improvement, but the stated deferral for visible Back controls contradicts the intended FAB visibility.
 
 **Strengths**
 
-- The existing speed dial correctly uses a Reanimated shared value, with React state only mirroring pointer-event state: [AddSpeedDialFab.tsx:27](/home/bwales/projects/orbit-app/src/components/AddSpeedDialFab.tsx:27).
-- Existing focused workflow handlers demonstrate why Back needs deliberate treatment: Compose and Capture already consume hardware Back at [ComposeScreen.tsx:400](/home/bwales/projects/orbit-app/src/screens/ComposeScreen.tsx:400) and [CaptureScreen.tsx:209](/home/bwales/projects/orbit-app/src/screens/CaptureScreen.tsx:209).
+- The callback-based store fixes the real local-state problem: the current dial’s visibility is local state in [AddSpeedDialFab.tsx](/home/bwales/projects/orbit-app/src/components/AddSpeedDialFab.tsx:27), so removing only an ID would not close it.
+- The plan correctly keeps ordinary Back delegated to React Navigation instead of inventing a global stack walker.
+- Its visible/browse classification matches the dossier: Profile, Archived, and ordinary child pages are supposed to keep shell chrome visible. The decision record explicitly lists these at [phase dossier](/home/bwales/projects/orbit-app/docs/dossier/milestone-2/phase-01-app-shell-navigation-dossier-amended-group-events.md:137).
 
 **Concerns**
 
-- **HIGH — `dismissTop(): boolean` cannot dismiss a FAB, picker, or modal.** The current FAB is visually controlled by its local `open` state and `setExpanded` function at [AddSpeedDialFab.tsx:30](/home/bwales/projects/orbit-app/src/components/AddSpeedDialFab.tsx:30). Removing `"fab-speed-dial"` from a Zustand array does not call `setExpanded(false)`. The same problem applies to `OverflowMenu`, whose visibility is private local state at [OverflowMenu.tsx:30](/home/bwales/projects/orbit-app/src/components/OverflowMenu.tsx:30).
-
-- **HIGH — one root BackHandler will not make system Back and visible Back equivalent.** Compose and Capture have focused handlers that consume the event before the root handler can apply the resolver. Separately, many visible Back controls still call `navigation.goBack()` directly, e.g. [DigestScreen.tsx:128](/home/bwales/projects/orbit-app/src/screens/DigestScreen.tsx:128) and [ArchivedContactsScreen.tsx:181](/home/bwales/projects/orbit-app/src/screens/ArchivedContactsScreen.tsx:181).
+- **HIGH — “system Back == visible Back” remains unachieved on browse child screens.** Plan 02 says existing child Back controls are safe to defer because the FAB/picker are hidden on “focused + child screens,” but the same plan classifies `Archived`, `NeverContacted`, `UnboundContacts`, and `Digest` as visible browse routes. These controls directly call `navigation.goBack()` at [ArchivedContactsScreen.tsx](/home/bwales/projects/orbit-app/src/screens/ArchivedContactsScreen.tsx:181), [NeverContactedScreen.tsx](/home/bwales/projects/orbit-app/src/screens/NeverContactedScreen.tsx:87), [UnboundContactsScreen.tsx](/home/bwales/projects/orbit-app/src/screens/UnboundContactsScreen.tsx:55), and [DigestScreen.tsx](/home/bwales/projects/orbit-app/src/screens/DigestScreen.tsx:128). Plan 05 makes the universal FAB visible on browse/read surfaces. Therefore an open dial/picker plus visible Back pops the screen, while system Back dismisses the transient—violating the decided identical-results rule at [phase dossier](/home/bwales/projects/orbit-app/docs/dossier/milestone-2/phase-01-app-shell-navigation-dossier-amended-group-events.md:153).
+- **MEDIUM — the plan’s acceptance test only validates a future app-bar Back, not the existing Back controls that remain in use.** It does not prove the actual user-visible Back behavior across visible child surfaces.
 
 **Suggestions**
 
-- Store registered close callbacks or a `dismiss` command observable by each overlay—not just IDs. Ensure every shell-owned transient registers it.
-- Refactor existing focused Back handlers and visible Back controls through one shared `handleBackIntent` API, retaining workflow-specific behavior after transient dismissal.
+- Either route every visible Back control through one shared `handleBackIntent(navigation)` primitive in this phase, or hide/unmount FAB and picker on every screen whose Back control is not migrated. The former better matches the dossier’s “visible Back equals system Back” decision.
+- Add a render/device test for `Archived → open FAB → Back`: it must close the FAB and remain on Archived.
 
-**Risk:** **HIGH.**
+**Risk:** **HIGH.** This is a direct failure of a decided phase behavior.
 
-## Plan 03 — nested callers, completion, Discard/Keep
+## 22-03 — Reconciliation, no-replay, Discard/Keep
 
-**Summary:** Correctly recognizes import/reconcile completion and Backup-local resets as different cases, but still depends on the incomplete route inventory.
+**Summary:** Navigation reconciliation is careful and correctly addresses real stranded route sites, but the proposed discard guard is unsafe for the current Edit screen’s persistence model.
 
 **Strengths**
 
-- Backup-local resets currently target `Backup` at [RestorePreviewScreen.tsx:99](/home/bwales/projects/orbit-app/src/screens/RestorePreviewScreen.tsx:99) and [RestoreResultScreen.tsx:18](/home/bwales/projects/orbit-app/src/screens/RestoreResultScreen.tsx:18), so retaining their stack-local shape is appropriate if `Backup` remains that stack’s root.
-- The completed-edit replay is real: successful save currently pushes/navigates to Profile at [EditContactScreen.tsx:451](/home/bwales/projects/orbit-app/src/screens/EditContactScreen.tsx:451).
+- Correctly addresses the current merge crash: merge completion uses `navigation.replace("Profile")` at [MergeImpactSummary.tsx](/home/bwales/projects/orbit-app/src/components/MergeImpactSummary.tsx:17), which cannot resolve from Settings after the split.
+- Correctly identifies import completion’s root reset at [ImportCompleteScreen.tsx](/home/bwales/projects/orbit-app/src/screens/ImportCompleteScreen.tsx:295) and reconcile completion reset at [ReconcileCompleteScreen.tsx](/home/bwales/projects/orbit-app/src/screens/ReconcileCompleteScreen.tsx:45).
+- Correctly catches the edit replay source: save currently pushes/navigates to Profile at [EditContactScreen.tsx](/home/bwales/projects/orbit-app/src/screens/EditContactScreen.tsx:451).
 
 **Concerns**
 
-- **HIGH — N1–N4 are not the full set of broken cross-stack calls.** The plan fixes only a subset while the calls listed under Plan 01 remain unresolved. This makes the plan’s “all container-level and completion navigation resolves correctly” success criterion false.
-
-- **MEDIUM — the proposed `beforeRemove` guard can block successful Save.** Save currently calls navigation immediately after the write at [EditContactScreen.tsx:451](/home/bwales/projects/orbit-app/src/screens/EditContactScreen.tsx:451). If dirty state is still true, `beforeRemove` intercepts that action and presents “Discard changes?” after a successful save. The plan needs an explicit confirmed-save bypass ref or a synchronously cleared baseline before dispatch.
+- **HIGH — the proposed “Discard changes” behavior cannot discard photos in the current Edit implementation.** Edit explicitly persists photo updates immediately through a dedicated DAO, outside the form save transaction: [EditContactScreen.tsx](/home/bwales/projects/orbit-app/src/screens/EditContactScreen.tsx:171). A `beforeRemove` dialog can prevent navigation, but choosing Discard cannot undo an already-written photo. The plan’s acceptance criterion promises photo edits are protected by Discard, which would be materially false and conflicts with the dossier’s explicit abandonment confirmation requirement at [phase dossier](/home/bwales/projects/orbit-app/docs/dossier/milestone-2/phase-01-app-shell-navigation-dossier-amended-group-events.md:143).
+- **MEDIUM — the planned dirty comparison is underspecified for the current separate state model.** Links are maintained separately at [EditContactScreen.tsx](/home/bwales/projects/orbit-app/src/screens/EditContactScreen.tsx:154), and custom-field committed values are independently tracked at [EditContactScreen.tsx](/home/bwales/projects/orbit-app/src/screens/EditContactScreen.tsx:179). “Track a coarse dirty boolean if impractical” risks never resetting it after a partial failure/reseed path.
 
 **Suggestions**
 
-- Add navigation tests for every cross-stack caller, not only `tsc`; the merged compatibility alias cannot prove dispatch is handled.
-- Specify the save-success bypass behavior in the reusable guard API.
+- Do not claim photo changes are discardable unless this plan also stages them until Save or records the pre-change photo and reliably restores it on Discard.
+- Define explicit baselines and reset points for form, links, custom fields, and photo; add tests for successful save, partial link-save failure, and discard after a photo update.
 
-**Risk:** **HIGH.**
+**Risk:** **HIGH.** “Discard” must not leave a user-visible edit committed.
 
-## Plan 04 — app bars, clearance, Dashboard entries
+## 22-04 — Shell chrome and dashboard entries
 
-**Summary:** The reusable primitive and Group Events placeholder are appropriately scoped, but the plan does not actually migrate child visible Back controls to the shared behavior it promises.
+**Summary:** Good coverage of Group Events, Archived, ADR-075 entry removal, and the existing cross-tab header shortcuts.
 
 **Strengths**
 
-- Group Events as a Dashboard-owned destination is aligned with the dossier; it avoids a fifth tab.
-- The current `OverflowMenu` already provides a themed, 44px trigger and action-row pattern at [OverflowMenu.tsx:32](/home/bwales/projects/orbit-app/src/components/OverflowMenu.tsx:32).
+- Correctly removes the two visible Manage Favourites entries currently present in [HomeScreen.tsx](/home/bwales/projects/orbit-app/src/screens/HomeScreen.tsx:314) and [SettingsScreen.tsx](/home/bwales/projects/orbit-app/src/screens/SettingsScreen.tsx:2004), while retaining the route for the existing widget deep link.
+- Correctly converts currently bare cross-tab dashboard routes at [HomeScreen.tsx](/home/bwales/projects/orbit-app/src/screens/HomeScreen.tsx:532).
+- Correctly preserves one Archived screen/DAO surface while adding Dashboard reachability; current Archived Back is conventional at [ArchivedContactsScreen.tsx](/home/bwales/projects/orbit-app/src/screens/ArchivedContactsScreen.tsx:181).
 
 **Concerns**
 
-- **HIGH — “leave existing child-screen chrome as-is” fails SHELL-03 and SHELL-13.** Existing child headers directly perform `goBack`, including [NeverContactedScreen.tsx:87](/home/bwales/projects/orbit-app/src/screens/NeverContactedScreen.tsx:87), [UnboundContactsScreen.tsx:55](/home/bwales/projects/orbit-app/src/screens/UnboundContactsScreen.tsx:55), and [BackupScreen.tsx:288](/home/bwales/projects/orbit-app/src/screens/BackupScreen.tsx:288). They will not dismiss a transient first or share system-Back semantics.
-
-- **MEDIUM — the existing overflow component does not provide the claimed modal focus management.** Its `Modal` has no `accessibilityViewIsModal`, focus capture, or focus restoration at [OverflowMenu.tsx:47](/home/bwales/projects/orbit-app/src/components/OverflowMenu.tsx:47).
+- **MEDIUM — the “shared clearance geometry constant” seam is not actually specified.** Plan 04’s hook describes locally adding FAB dimensions and a gap; Plan 05 says its FAB must consume “the shared geometry constant.” Neither plan defines the exported constant/module contract, so the two measurements can drift despite the stated invariant.
+- **LOW — the plan promises child Back/title chrome while explicitly leaving existing child chrome unchanged.** This is especially problematic given the Back inconsistency noted under Plan 02.
 
 **Suggestions**
 
-- Make ShellAppBar the required child-header path for screens in this phase, or add a small shared Back control and migrate every existing visible Back.
-- Upgrade `OverflowMenu` itself before relying on it for a shell a11y requirement.
+- Export named geometry constants from `use-bottom-clearance.ts` (or a dedicated shell geometry module) and make both the hook and FAB import them.
+- Make the child app-bar migration decision explicit: migrate all visible child Back controls now, or scope the success criterion to root app bars only.
 
-**Risk:** **MEDIUM-HIGH.**
+**Risk:** **MEDIUM.** Core routes are sound; consistency and safe-area reuse need a firmer implementation contract.
 
-## Plan 05 — universal FAB
+## 22-05 — Universal FAB
 
-**Summary:** The six-action contract and Reanimated posture are good, but placement and dismissal are underspecified for a shell-level FAB.
+**Summary:** Strong fixed-action mapping, nested navigation, and Reanimated approach. It appropriately retains the current pointer-events helper, whose need is demonstrated by [AddSpeedDialFab.tsx](/home/bwales/projects/orbit-app/src/components/AddSpeedDialFab.tsx:72).
 
 **Strengths**
 
-- Reusing the existing shared-value/scrim pointer-events pattern is correct: [AddSpeedDialFab.tsx:31](/home/bwales/projects/orbit-app/src/components/AddSpeedDialFab.tsx:31) and [AddSpeedDialFab.tsx:72](/home/bwales/projects/orbit-app/src/components/AddSpeedDialFab.tsx:72).
-- The action set correctly includes Group Log directly rather than through a contact picker.
+- Correctly replaces the legacy two-action dial and preserves `speedDialScrimPointerEvents`, which returns `"none"` while collapsed at [add-speed-dial-fab-logic.ts](/home/bwales/projects/orbit-app/src/components/add-speed-dial-fab-logic.ts:23).
+- Correctly requires shell-level nested tab targets rather than calling a bare `navigate("Create")`.
+- Correctly makes Group Log direct and keeps action order explicit.
 
 **Concerns**
 
-- **HIGH — fixed `bottom: 28` is no longer safe once the FAB is outside the tab screen.** The existing value is for a full-screen Dashboard without bottom navigation at [AddSpeedDialFab.tsx:135](/home/bwales/projects/orbit-app/src/components/AddSpeedDialFab.tsx:135). A shell-level FAB with the same offset will overlap or sit beneath the new tab bar, contrary to the dossier’s “above bottom navigation and safe areas” requirement.
-
-- **HIGH — Plan 05 inherits the nonfunctional transient-dismiss design.** Registering `"fab-speed-dial"` in the proposed store does not close the component’s local open state unless the plan adds an actual dismiss subscription/callback.
+- **MEDIUM — current-route/contact-context extraction is not defined robustly enough for nested state.** The shell FAB must distinguish Dashboard/Profile and Orrery/Profile routes, including the nested params; the plan says to use `getFocusedRouteNameFromRoute` plus nested params but does not specify a pure walker or tests for Dashboard Profile, Orrery Profile, root tabs, and stale/unavailable nested state.
+- **LOW — warning haptics for Quick Log failure do not match the dossier’s stated haptic vocabulary.** The dossier specifies warning feedback for destructive confirmation at [phase dossier](/home/bwales/projects/orbit-app/docs/dossier/milestone-2/phase-01-app-shell-navigation-dossier-amended-group-events.md:353), while Plan 06 assigns warning feedback to an ordinary write error.
 
 **Suggestions**
 
-- Derive FAB bottom position from `useBottomTabBarHeight()` and safe-area insets; have `useBottomClearance` consume the same geometry constant.
-- Include a component-level test that dispatches the shared dismiss command and proves the scrim becomes inert.
+- Add a pure `getFocusedContactContext(navigationState)` helper with tests for both Profile-owning stacks and non-Profile routes.
+- Use no haptic or a separately ratified error haptic for Quick Log failures.
 
-**Risk:** **HIGH.**
+**Risk:** **MEDIUM.** The routing design is good; context extraction needs concrete, testable mechanics.
 
-## Plan 06 — picker and Quick Log
+## 22-06 — Picker and Quick Log
 
-**Summary:** Local SQLite reads and canonical recency DAO reuse are the right foundations, but the plan has a compile blocker, an ADR-075 reversal, and lacks in-place refresh/widget propagation.
+**Summary:** The local-only query posture, ADR-075 ordering correction, and commit-only success path are all well designed. One direct store-API mismatch and the refresh strategy remain unresolved.
 
 **Strengths**
 
-- `recordTouchpoint` is the correct writer: it validates future timestamps before opening a transaction, inserts, recomputes `last_contact`, and bumps revision at [recency-dao.ts:217](/home/bwales/projects/orbit-app/src/db/recency-dao.ts:217).
-- `deleteTouchpoint` correctly scopes deletion by both interaction and contact IDs, tombstones it, and recomputes recency in one transaction at [recency-dao.ts:313](/home/bwales/projects/orbit-app/src/db/recency-dao.ts:313).
-- The full writer audit supports the single-recency-writer claim: composed create/update use `recomputeLastContactCore` at [contacts-dao.ts:185](/home/bwales/projects/orbit-app/src/db/contacts-dao.ts:185) and [contacts-dao.ts:442](/home/bwales/projects/orbit-app/src/db/contacts-dao.ts:442); merge reparents interactions then recomputes at [merge-dao.ts:153](/home/bwales/projects/orbit-app/src/db/merge-dao.ts:153) and [merge-dao.ts:187](/home/bwales/projects/orbit-app/src/db/merge-dao.ts:187).
+- Correctly uses interaction recency rather than capture recency; existing capture ordering is rank-based at [capture-read.ts](/home/bwales/projects/orbit-app/src/db/capture-read.ts:64), so copying it would violate ADR-075.
+- Correctly mirrors the canonical one-tap write at [ContactProfileScreen.tsx](/home/bwales/projects/orbit-app/src/screens/ContactProfileScreen.tsx:338), including local timestamps and required UID.
+- Correctly reuses `deleteTouchpoint`, which scopes deletion by both interaction and contact at [recency-dao.ts](/home/bwales/projects/orbit-app/src/db/recency-dao.ts:313).
 
 **Concerns**
 
-- **HIGH — picker SQL using `favourite_rank ASC` repeats the ADR-075 reversal.** Current legacy capture SQL does exactly this at [capture-read.ts:65](/home/bwales/projects/orbit-app/src/db/capture-read.ts:65); copying it would preserve a retired user-visible ranking.
-
-- **HIGH — the proposed Quick Log call omits required `uid`.** `RecordTouchpointInput.uid` is mandatory at [recency-dao.ts:58](/home/bwales/projects/orbit-app/src/db/recency-dao.ts:58). Existing genuine manual/widget logs mint it with `newUid()` at [ContactProfileScreen.tsx:339](/home/bwales/projects/orbit-app/src/screens/ContactProfileScreen.tsx:339) and [widget-mark.ts:51](/home/bwales/projects/orbit-app/src/services/widget/widget-mark.ts:51). The plan must also explicitly use the canonical one-tap values, especially `direction: "outbound"`; DAO defaults make direction `null`.
-
-- **MEDIUM — Quick Log and Undo have no specified freshness propagation.** The existing profile logger reloads the focused view and calls `notifyWidgetDataChanged()` after a commit at [ContactProfileScreen.tsx:350](/home/bwales/projects/orbit-app/src/screens/ContactProfileScreen.tsx:350). Plan 06 mounts outside those screens and does not modify Home/Profile or specify an invalidation mechanism, so contact status/recency and widget data may remain stale until a later focus event.
+- **HIGH — ContactPicker’s planned transient registration does not supply the required dismiss callback.** Plan 02 defines `openTransient(id, dismiss)` and explicitly requires the picker to register `onDismiss`; Plan 06 Task 2 instead says only `openTransient("contact-picker")`. This either fails TypeScript or registers no actual close behavior, so Back/retap cannot reliably dismiss the picker.
+- **MEDIUM — “refresh the currently focused data surface” has no implementation mechanism.** `notifyWidgetDataChanged()` only updates the Android widget at [widget-refresh.ts](/home/bwales/projects/orbit-app/src/services/widget/widget-refresh.ts:74). Home deliberately refreshes only on focus, foregrounding, or pull-to-refresh at [HomeScreen.tsx](/home/bwales/projects/orbit-app/src/screens/HomeScreen.tsx:9); it has no shell refresh subscription. The plan must introduce a concrete refresh event/store or invoke a registered focused-screen callback.
+- **LOW — the pure ordering helper’s responsibility is ambiguous.** The SQL orders rows, but the proposed `filterPicker` description does not say it sorts; its tests nevertheless claim to prove ordering. Either test the SQL with a SQLite fixture or have the pure helper own sorting.
 
 **Suggestions**
 
-- Replace rank ordering with favourite membership grouping plus Default ordering.
-- Add `uid: newUid()`, an explicit one-tap interaction shape, and a single captured `stamp` for both `occurredAt` and `now`.
-- After commit and undo, publish the existing freshness/widget signal and refresh the currently focused data surface.
+- Change the picker contract to `openTransient("contact-picker", onDismiss)` and ensure every dismissal path calls `closeTransient`.
+- Define a small shell refresh registry/event with lifecycle cleanup, or explicitly refresh the known focused screen through a stable callback. Test Quick Log and Undo freshness separately.
+- Make ordering ownership explicit and test it at the layer that implements it.
 
-**Risk:** **HIGH.**
+**Risk:** **HIGH.** The picker dismissal bug is a direct blocker for SHELL-02/03, and freshness is currently aspirational.
+
+## Final assessment
+
+The plans now cover most of the difficult navigation refactor correctly, especially external entries and cross-tab crash paths. Before execution, I would resolve these blockers:
+
+1. Make all visible Back controls use the same transient-first back path.
+2. Make Discard truthful for immediately persisted photo edits.
+3. Pass a real picker dismissal callback to the transient store.
+4. Specify the post-Quick-Log focused-surface refresh mechanism.
 
 ---
 
 ## Cursor Review
 
-# Cross-AI Plan Review: Phase 22 — App Shell & Navigation
+_Model: unknown_
+
+# Cross-AI Plan Review — Phase 22: App Shell & Navigation (Convergence Cycle 2)
+
+**Reviewed against:** `/home/bwales/projects/orbit-app` on disk (2026-09-02)  
+**Plans:** 22-01 through 22-06  
+**Prior cycle:** Cycle 1 flagged ADR-075 reversal, incomplete D-08 inventory, `tsc` blindness, merge crash, FAB geometry/routing, transient dismiss, Quick Log contract gaps. Cycle 2 plans substantially address those. Remaining issues are narrower and mostly cross-plan seams.
+
+---
 
 ## Executive Summary
 
-These six plans are unusually strong on decision fidelity, dossier traceability, and code-grounded inventory work. The tracer-first Plan 01, `reset-intents.ts` single-owner pattern, migration-gate preservation, and threat-model entries for deep links all match what is actually on disk. Verified: nine `.reset(` call sites, `deleteTouchpoint` at `recency-dao.ts:313`, digit-anchored widget guards at `widget-linking.ts:103–119`, and `App.tsx`'s `ready && !error` gate at lines 298–322.
+Cycle 2 is a **material improvement** over cycle 1. The phase anchor (Plan 01) now carries a complete, source-verified D-08 inventory, the correct ADR-075 posture (enforce new paths + remove named entries + flag route/widget retirement for the owner), Orrery→Profile origin-aware dual registration, and `navigationRef` retyping to close container-level `tsc` blindness. Plans 03, 05, and 06 close the merge-completion crash, shell-level FAB nested routing, Quick Log write contract, and widget freshness gaps that cycle 1 identified.
 
-The main weakness is not decision reversal — ADR-044, ADR-018, D-03, and D-10 are respected — but **incomplete cross-tab navigation coverage**. The D-08 inventory captures container-level resets and four ShareIntent/Resume sites, yet several in-app `navigate()` calls that work today in the flat stack will break or violate origin-aware Back once routes are partitioned. The plan treats SHELL-04 as automatic for Orrery→Profile (`OrreryScreen.tsx:433`), but Profile is assigned only to `DashboardStack`; that contradicts the dossier's explicit `[DECIDED]` rule at dossier lines 160–161. Until those gaps are closed, overall risk is **HIGH** despite excellent planning hygiene.
+The plans are **executable with two HIGH fixes** (Plan 04→02 dependency; Plan 06 picker dismiss callback) and a few MEDIUM implementation clarifications. Overall phase risk drops from cycle 1’s **HIGH** to **MEDIUM** — direction and decision fidelity are sound; remaining risk is execution-order and a handful of underspecified cross-surface refresh behaviors.
 
 ---
 
-## Plan 01 — Four-Tab Shell + Nested Resets
+## Plan 01 — Four-tab shell + nested external resets
 
 ### Summary
-Solid architectural tracer: installs bottom-tabs, splits stacks, centralizes external-entry resets. Decision fidelity and security posture for widget deep links are well handled. The route→tab map follows real launch sites (Settings-owned import/reconcile vs stale PATTERNS guidance).
+Strong tracer plan. Correctly reads the actual flat stack (`RootNavigator.tsx:57`, 32 `Stack.Screen` routes), preserves the migration gate (`App.tsx:298-322`), and reshapes external-entry resets without touching deep-link acceptance (`widget-linking.ts:132-137`, `:274-279`, digit guards at `:103-119`). The D-08 table matches on-disk call sites verified via grep.
 
 ### Strengths
-- **Flat stack confirmed on disk.** `RootNavigator.tsx:71–118` is a single `createNativeStackNavigator` with 32 routes — matches D-06.
-- **Reset inventory is accurate.** All nine `.reset(` sites match the plan's A1–C2 table (`ComposeScreen.tsx:267`, `widget-linking.ts:274/287`, `notification-gate.tsx:136`, restore screens, import/reconcile completion).
-- **Deep-link guards are real and must stay byte-for-byte.** `widget-linking.ts:103–119` uses anchored digit-only regexes plus `Number.isSafeInteger` / `id > 0`.
-- **Migration gate correctly preserved.** `App.tsx:298–322` mounts `NavigationContainer` + `RootNavigator` only after `ready && !error`; plan explicitly forbids moving it.
-- **No schema drift.** `database.ts:49` confirms `TARGET_VERSION = 14`; D-03 honored.
-- **deleteTouchpoint correction.** Plan correctly cites `recency-dao.ts:313–345` (tombstone + scoped delete + `recomputeLastContact`) — RESEARCH A5 was wrong.
-- **Profile Back is already plain `goBack()`.** `ContactProfileScreen.tsx:762` supports per-stack origin-aware back *if* Profile is registered in the launching stack.
+- **D-06 fidelity:** Flat `createNativeStackNavigator`, no `@react-navigation/bottom-tabs` in `package.json:9-10`, Profile Back is plain `goBack()` (`ContactProfileScreen.tsx:762`).
+- **ADR-044/D-07 preserved:** Compose reset (`ComposeScreen.tsx:267`), notification reset (`notification-gate.tsx:136`), widget resets (`widget-linking.ts:274/:287`), ShareIntent navigates (`linking.ts:64/:67`) all owned with nested shape via `reset-intents.ts`.
+- **ADR-075 escalation done correctly:** Enforces no rank ordering in new picker path; removes `HomeScreen.tsx:319` / `SettingsScreen.tsx:2008` entries; flags `ManageFavourites` route retention for `orbit://favourites` (`widget-linking.ts:132-137`) — not a silent reversal.
+- **Orrery→Profile fix:** Dual-register Profile family in `OrreryStack` addresses real tap sites (`OrreryScreen.tsx:433/:441`) without editing OrreryScreen.
+- **Birthday notification fix (A2b):** Container `navigate("Profile")` (`notification-nav.ts:101-105` → `notification-gate.tsx:138`) would fail post-split; reset intent is correct.
 
 ### Concerns
-
-| Severity | Concern | Evidence |
-|----------|---------|----------|
-| **HIGH** | **Orrery→Profile→Back=Orrery will not work as planned.** Plan asserts SHELL-04 holds "by construction" with Profile only in `DashboardStack`, but `OrreryScreen.tsx:433–441` calls `navigation.navigate("Profile", …)` from the Orrery tab. Without dual-registering Profile (and likely Edit/Compose/CropPhoto for Profile's downstream pushes) in `OrreryStack`, this either throws route-not-found or cross-tabs and breaks origin-aware Back — reversing dossier `[DECIDED]` Orrery→Profile→Back=Orrery. | `OrreryScreen.tsx:433`, dossier lines 160–161, plan route map (OrreryStack = Orrery only) |
-| **HIGH** | **D-08 inventory omits HomeScreen cross-tab shortcuts.** After the split, `Backup`, `Orrery`, and `Settings` won't live in `DashboardStack`, but `HomeScreen.tsx:536/554/572` still `navigate()` to them. No plan task rewrites these to tab switches. | `HomeScreen.tsx:536–572`, `RootNavigator.tsx:93–96` (current flat registration) |
-| **MEDIUM** | **Settings→ManageFavourites is cross-tab and unplanned.** `ManageFavourites` is assigned to `DashboardStack` only, but `SettingsScreen.tsx:2008` navigates there from Settings. Back should return to Settings (origin-aware); nested `DashboardTab` navigate would land Back on Dashboard Home instead. | `SettingsScreen.tsx:2008`, plan route map |
-| **MEDIUM** | **Birthday notification `navigate` path not in reset inventory.** Plan 01 Task 2 updates reset shapes in `notification-nav.ts` but not the birthday branch (`notification-nav.ts:102–106`) consumed by `notification-gate.tsx:138` via `nav.navigate(intent.name, intent.params)`. | `notification-nav.ts:102–106`, `notification-gate.tsx:135–138` |
-| **MEDIUM** | **`RootStackParamList` back-compat alias may hide breakage at compile time.** Merged alias lets `navigate("Backup")` from `HomeScreen` still type-check while failing at runtime once `Backup` moves to `BackupStack`. | `types.ts:22+`, `HomeScreen.tsx:536` |
-| **LOW** | **22-PATTERNS.md Archived guidance contradicts Plan 01.** PATTERNS says single-stack registration + cross-navigate; Plan 01 dual-registers Archived (correct per ADR-080/dossier). Executor should follow the plan, not PATTERNS. | `.planning/.../22-PATTERNS.md` vs plan phase-anchor |
+- **MEDIUM — Inter-wave runtime window:** Plan 01 retypes `navigationRef` but component-level cross-tab sites (`ImportCompleteScreen.tsx:267/:283`, `ContactProfileScreen.tsx:827`, `MergeImpactSummary.tsx:17`) remain until Plan 03. `RootStackParamList` back-compat alias still lets bare route names compile on component `navigation` props. Mitigation: execute Plan 03 immediately after Plan 01 within Wave 2; do not UAT between 01 and 03 alone.
+- **LOW — `Capture` in OrreryStack:** “Confirm at execution” is fine; grep shows no Profile→Capture path (`navigate("Capture")` only in `linking.ts:67` ShareIntent → DashboardTab). Likely omit from OrreryStack.
 
 ### Suggestions
-1. Extend Plan 01 Task 1 with an explicit **Profile dual-registration matrix**: at minimum `OrreryStack` (+ child routes Profile pushes: Edit, Compose, CropPhoto); consider `SettingsStack` for `ImportCompleteScreen.tsx:283`.
-2. Add a **Plan 03 Task 0 or expanded Task 1**: grep all `navigate("` call sites and classify intra-stack vs cross-tab; include `HomeScreen.tsx:536/554/572`, `SettingsScreen.tsx:2008`, `ImportCompleteScreen.tsx:267/283`.
-3. Update `notification-nav.ts` NavIntent types and `notification-gate.tsx:138` for nested birthday Profile navigate.
-4. For tab shortcuts on Home, either remove redundant header entries when ShellAppBar + bottom tabs ship (Plan 04) or convert to `navigation.navigate('OrreryTab')` etc.
+- Add explicit Wave-2 ordering note: **01 → 03 before device UAT**; 02 and 04 can parallelize only after 03 lands (or 04 waits for 02 — see Plan 04).
+- In D-08 table, add explicit “no change (intra-SettingsStack)” rows for `SettingsScreen.tsx:181` `navigate("ReconcileGrid")` and `import-acquire.ts:172-174` to prevent future re-audit churn.
 
-### Risk Assessment: **HIGH** (architectural tracer is sound; cross-tab gaps threaten SHELL-04 and boot-time UAT)
+### Risk Assessment
+**MEDIUM** — Architecture and external-entry paths are well specified; interim state between 01 and 03 is the main hazard.
 
 ---
 
-## Plan 02 — Back Intent, Tab Retap, Nav Hide
+## Plan 02 — Transient store, back-intent, tab behavior
 
 ### Summary
-Clean separation of pure modules (`back-intent`, `focused-route-classification`) from wiring. Correctly limits BackHandler interception to transient dismissal only — aligns with React Navigation nested-back guidance and dossier §C.
+Solid behavior contract. The dismiss-callback store design (`openTransient(id, dismiss)`) correctly fixes cycle 1’s “id-only store can’t close local React state” finding (`AddSpeedDialFab.tsx` uses local `setExpanded`).
 
 ### Strengths
-- **Transient-first Back matches dossier.** Dismiss overlay before stack pop is the right layering model.
-- **Focused-workflow allow-list is explicit** rather than heuristic — good for SHELL-06 maintainability.
-- **`tabBarHideOnKeyboard: true`** in Plan 01 + route-based hide covers keyboard case without hand-rolled inset math.
-- **No origin-aware Back override** — prohibitions correctly forbid forced Dashboard on ordinary Back.
+- **Transient dismiss mechanism:** `dismissTop()` invokes registered close callbacks — required for FAB (`Plan 05`) and picker (`Plan 06`).
+- **Focused-workflow hide:** Explicit allow-list in `focused-route-classification.ts` aligns with dossier §B routes.
+- **Documented SHELL-03 deferral:** Child screens with own Back (`DigestScreen`, `ArchivedContactsScreen`, etc.) and focused handlers (`ComposeScreen.tsx:404`, `CaptureScreen.tsx:216`) explicitly deferred — reasoning is sound because FAB/picker are hidden on those routes.
 
 ### Concerns
-
-| Severity | Concern | Evidence |
-|----------|---------|----------|
-| **MEDIUM** | **Depends on Plan 01 cross-tab fixes Plan 02 doesn't know about.** UAT criteria ("Back pops focused tab's stack to true origin") fails for Orrery→Profile until Plan 01 dual-registers Profile. | `OrreryScreen.tsx:433`, Plan 02 depends on `[22-01]` |
-| **LOW** | **`back-intent.ts` is minimal** — only branches on `anyTransientOpen`. Acceptable because `shell-transient-store.dismissTop()` owns ordering; document that contract in tests. | Plan 02 Task 1 |
-| **LOW** | **Visible Back wiring deferred to Plan 04** (`ShellAppBar` → `back-intent`). Plan 02 Task 3 documents the seam but Plan 04 must not ship without it or SHELL-03 is only half-delivered until Plan 04. | Plan 02 Task 3 action, Plan 04 Task 1 |
+- **MEDIUM — Success criterion vs deferral:** Roadmap SHELL-03 says system Back and visible Back behave identically on **every screen**. Plans deliver that for shell-owned transients + default nested back, but **not** for existing child Back controls until a later chrome pass. Documented deferral is honest; UAT checklist should not claim full SHELL-03 until child chrome migrates or success criteria are scoped.
+- **LOW — `popToTop` retap:** Must use nested stack navigator reference correctly; RESEARCH Pattern 2 dependency is appropriate.
 
 ### Suggestions
-1. Add acceptance criterion: **with picker + FAB both registered, two Back presses dismiss picker then FAB** (ordering edge in must_haves).
-2. Gate Plan 02 on-device UAT on Plan 01 completing Profile-in-OrreryStack registration.
+- Add acceptance assertion that `shell-transient-store.test.ts` covers **double-registration replacement** (mentioned in action text but not in acceptance criteria).
+- Cross-link Plan 06: picker **must** register `openTransient("contact-picker", () => closePicker())` — see Plan 06 concern below.
 
-### Risk Assessment: **MEDIUM** (logic is sound; blocked by Plan 01 navigation gaps)
+### Risk Assessment
+**LOW–MEDIUM** — Core logic is clean; gap is scope vs literal success criteria wording.
 
 ---
 
-## Plan 03 — Container Navigates, Completion Resets, Discard/Keep
+## Plan 03 — Cross-tab navigates, completion resets, Discard/Keep
 
 ### Summary
-Correctly identifies the highest-risk stranded navigations (ShareIntent, Resume prompts, import/reconcile Done resets). Backup-local resets correctly stay flat within `BackupStack`. Discard/Keep primitive follows existing `beforeRemove` idiom from `RestorePreviewScreen.tsx:94–96`.
+Closes the cycle-1 HIGH merge crash and stranded navigate cluster. `MergeImpactSummary.tsx:17` `replace("Profile")` is a confirmed crash from SettingsStack reconcile origin (Profile not registered there).
 
 ### Strengths
-- **N1–N4 sites verified on disk.** `linking.ts:64/67`, `ResumeImportPrompt.tsx:27–50`, `ResumeReconcilePrompt.tsx:45`.
-- **C1/C2 completion resets confirmed.** `ImportCompleteScreen.tsx:300`, `ReconcileCompleteScreen.tsx:47` reset to `{ name: "Home" }` — correctly mapped to `resetToDashboardRoot()`.
-- **B1–B3 Backup-local resets verified.** `RestorePreviewScreen.tsx:99/123`, `RestoreResultScreen.tsx:18` use `{ name: "Backup" }` — valid if `Backup` is `BackupStack` root.
-- **Edit no-replay may already work.** `EditContactScreen.tsx:451` uses `navigate("Profile")`; `ContactProfileScreen.tsx:310–313` documents this pops to the existing Profile instance. Plan's verify-first approach is correct — change may be unnecessary.
-- **Merge completion uses `replace`.** `MergeImpactSummary.tsx:17` — `navigation.replace("Profile", …)` already avoids replay within stack.
+- **N10 crash fix owned:** Plan includes `MergeImpactSummary.tsx` in `files_modified`; routes through `navigationRef.reset(resetToDashboardWith(...))`.
+- **Completion resets:** C1/C2 (`ImportCompleteScreen.tsx:300`, `ReconcileCompleteScreen.tsx:47`) → `resetToDashboardRoot()` preserves historical Dashboard landing.
+- **Backup-local resets verified:** B1–B3 keep flat `{name:"Backup"}` shape (`RestorePreviewScreen.tsx:99/:123`, `RestoreResultScreen.tsx:18`) — correct if Backup is BackupStack root.
+- **Discard/Keep:** `beforeRemove` idiom exists (`RestorePreviewScreen.tsx:94-96`); bypass ref before save navigate addresses real dirty-state at `EditContactScreen.tsx:451`.
 
 ### Concerns
-
-| Severity | Concern | Evidence |
-|----------|---------|----------|
-| **HIGH** | **Incomplete navigate inventory (same root cause as Plan 01).** Missing: `HomeScreen` tab shortcuts, `SettingsScreen→ManageFavourites`, `ImportComplete→UnboundContacts/Profile`, birthday notification navigate. | See Plan 01 concerns |
-| **MEDIUM** | **Discard/Keep has no existing dirty helper.** `EditContactScreen` has `form`/`seedEditState`/`buildEditInput` but no `hasUnsavedChanges` (grep finds no dirty/unsaved helpers). Photo (`photo` state), links draft, and custom-field values are outside `EditFormState` (`EditContactScreen.tsx:171–185`). Deriving a meaningful delta is non-trivial and under-specified. | `EditContactScreen.tsx:171–185, 352` |
-| **LOW** | **Import/reconcile Done → Dashboard is intentional** even though flows launch from Settings — matches historical `Home` reset behavior. | `ImportCompleteScreen.tsx:300`, dossier external-fallback vs completion semantics |
+- **LOW — Edit no-replay:** `EditContactScreen.tsx:451` uses `navigation.navigate("Profile", { contactId })`. `ContactProfileScreen.tsx:310-313` documents this pops to the existing Profile instance (does not push a duplicate). Plan’s “read and verify” approach is correct; likely no change needed.
+- **LOW — Merge completion lands Dashboard, not origin:** Intentional completion reset (like import Done). Orrery-origin merge → Dashboard Profile is a product tradeoff, explicitly chosen.
 
 ### Suggestions
-1. Expand Task 1 scope with a **complete navigate audit** (not just N1–N4).
-2. For Discard/Keep Task 3, specify mechanism: e.g. snapshot `seedEditState(result)` in a ref on load, compare via serialized `buildEditInput` output + photo/links deltas — or accept Phase 22 ships guard on metadata fields only and defer photo/links to Rapid Capture.
-3. Add test or grep assertion that no bare `navigate("Home")` / `navigate("Profile")` remains at container level post-refactor.
+- Task 2 acceptance: if Edit already pops correctly, require SUMMARY to cite `ContactProfileScreen.tsx:310-313` as evidence (avoid unnecessary navigation change).
+- Task 3: specify whether custom-field dirty tracking uses coarse `onChange` flags or diff — plan allows either but executor should pick one and test photo + custom field paths in UAT.
 
-### Risk Assessment: **MEDIUM–HIGH** (critical paths covered; audit holes remain)
+### Risk Assessment
+**LOW** — Well-scoped call-site reshaping with strong file:line grounding.
 
 ---
 
-## Plan 04 — ShellAppBar, Clearance, Group Events
+## Plan 04 — Shell chrome, Group Events, clearance
 
 ### Summary
-Good chrome-layer plan with reusable primitives, theme-token discipline, and correct rejection of fifth-tab / radial-launcher patterns. Group Events placeholder pattern matches existing `types.ts` placeholder docs.
+Good SHELL-12/13 delivery. OverflowMenu gap is real: Modal at `OverflowMenu.tsx:46-51` lacks `accessibilityViewIsModal` and focus restore. ADR-075 entry removals and header cross-tab fixes match on-disk sites.
 
 ### Strengths
-- **D-09 Group Events placement correct** — Dashboard header + redundant overflow, not a tab.
-- **Dual-registered Archived assumption matches Plan 01** — overflow Back returns to Dashboard.
-- **Status-hue prohibition on chrome** aligns with dossier and theme rules.
-- **`useBottomTabBarHeight()` for clearance** — correct vs hardcoded padding (`HomeScreen.tsx:643` currently uses static `styles.content`).
+- **Group Events placement:** Header + redundant overflow, not fifth tab — matches D-09.
+- **Archived dual entry:** Dashboard overflow + Settings row (`SettingsScreen.tsx:2038`) → one `ArchivedContactsScreen`, ADR-018 untouched.
+- **`useBottomClearance`:** Correctly forbids hardcoded padding; derives from `useBottomTabBarHeight()`.
+- **Header reconciliation:** `HomeScreen.tsx:536/:554/:572` bare cross-tab navigates confirmed; conversion to `*Tab` switches is necessary.
 
 ### Concerns
-
-| Severity | Concern | Evidence |
-|----------|---------|----------|
-| **MEDIUM** | **HomeScreen header conflicts with new shell chrome.** Existing `topBar` (`HomeScreen.tsx:509–581`) has Backup/Orrery/Settings shortcuts that duplicate bottom tabs; Plan 04 adds `ShellAppBar` + Group Events header without addressing removal/conversion of legacy shortcuts. | `HomeScreen.tsx:509–581` |
-| **LOW** | **Archived triple entry.** Footer at `HomeScreen.tsx:403–416` plus new overflow (`Plan 04 Task 3`) plus Settings row — dossier requires overflow + Settings; footer predates D-09 and may be stale redundancy. | `HomeScreen.tsx:403–416`, D-09 |
-| **LOW** | **Child-screen ShellAppBar migration deferred** — acceptable boundary note, but UAT for SHELL-13 covers only tab roots + "child screens show Back+title" partially. | Plan 04 Task 1 |
+- **HIGH — Missing dependency on Plan 02:** `depends_on: [22-01]` only, but Task 1 requires wiring ShellAppBar Back to `back-intent.ts` (Plan 02). Wave 2 allows 02 and 04 in parallel — **04 Task 1 will fail if 02 hasn’t landed**. Add `depends_on: [22-01, 22-02]` or defer ShellAppBar Back wiring to a 04 Task 1 follow-up after 02.
+- **MEDIUM — Partial ShellAppBar rollout:** Only four tab roots get ShellAppBar; most child screens keep legacy Back through end of phase. Consistent with Plan 02 deferral but limits SHELL-13 “child = Back + title” coverage in this phase.
 
 ### Suggestions
-1. Explicit task: **reconcile HomeScreen topBar** with four-tab shell (remove Backup/Orrery/Settings shortcuts or convert Your Week-only header under `ShellAppBar`).
-2. Decide footer Archived vs overflow-only — if D-09 mandates overflow, note whether footer entry should be removed to avoid three paths.
+- Split Task 1: OverflowMenu upgrade can run on `[22-01]`; ShellAppBar **child Back → back-intent** subtask gates on `[22-02]`.
+- Flag header Backup/Orrery/Settings shortcuts as owner visual decision (plan already flags — good).
 
-### Risk Assessment: **MEDIUM** (presentation layer; dependency on Plan 01 route correctness)
+### Risk Assessment
+**MEDIUM** (would be **HIGH** if 04 executes parallel to 02 without ordering guard).
 
 ---
 
-## Plan 05 — Universal FAB
+## Plan 05 — Universal six-action FAB
 
 ### Summary
-Strong alignment with D-05 six-action fixed order, Reanimated/shared-value animation rules, scrim pointer-events reuse, and transient-store integration. Supersedes dashboard-only `AddSpeedDialFab` (`HomeScreen.tsx:653`) with shell-level mount — correct for cross-tab consistency.
+Addresses cycle-1 FAB geometry and cross-tab routing gaps. Correctly supersedes `AddSpeedDialFab.tsx:98` bare `navigate("Create")` with nested tab targets from shell level.
 
 ### Strengths
-- **Existing FAB patterns to reuse.** `AddSpeedDialFab.tsx:27–36` uses `useSharedValue` + React `open` state only for `pointerEvents` — CLAUDE.md compliant.
-- **`speedDialScrimPointerEvents` retained** from `add-speed-dial-fab-logic.ts` — Pitfall 3 addressed.
-- **Group Log direct (no pre-picker)** — matches D-05.
-- **Placeholder routes** follow GroupEvents pattern — good seam for Phases 24/33/34.
+- **D-05 six actions, fixed order:** Enforced in pure logic + tests.
+- **Group Log direct:** No pre-picker — matches dossier.
+- **Reanimated compliance:** Shared value for animation; React `open` state only for `pointerEvents` — matches CLAUDE.md.
+- **Geometry:** Derives bottom offset from `useBottomTabBarHeight()` + insets, shares constant with `useBottomClearance` — fixes collision with new tab bar (legacy `bottom:28` in AddSpeedDialFab).
+- **Transient registration:** `openTransient("fab-speed-dial", () => setExpanded(false))` — aligns with Plan 02.
 
 ### Concerns
-
-| Severity | Concern | Evidence |
-|----------|---------|----------|
-| **MEDIUM** | **Profile-origin detection assumes Profile route in current tab's stack.** `originContactId` from Profile params works only if Profile is registered in the active stack (Orrery issue from Plan 01). | Plan 05 Task 2, `OrreryScreen.tsx:433` |
-| **LOW** | **Wave 3 depends on 22-02 + 22-04** — reasonable, but FAB UAT for retap/Back dismissal can't complete until Plan 02 transient store exists. | Plan dependency graph |
-| **LOW** | **AddSpeedDialFab import flow removed from FAB** — old FAB had import (`AddSpeedDialFab.tsx:50–68`); universal six-action set correctly omits import (not in D-05). Verify no regression intent. | `AddSpeedDialFab.tsx:78–79` vs D-05 action list |
+- **LOW — Shell-level navigation typing:** Plan correctly requires tab-typed navigation / `navigationRef` for nested dispatch; executor must not use a screen-scoped hook from App-level mount.
+- **LOW — Placeholder routes:** Four themed placeholders are appropriate seam for Phases 24/33/34.
 
 ### Suggestions
-1. Wire `UniversalFab` Profile-origin detection to **deepest focused route in navigation state** (handles nested stacks after dual-registration).
-2. Confirm testID migration (`dashboard-create-fab`) is sufficient for any E2E relying on old two-action FAB.
+- Task 2: when walking navigation state for `originContactId`, document handling when focused route is nested (e.g. DashboardTab → Profile params) — acceptance UAT covers Profile preselect.
 
-### Risk Assessment: **MEDIUM**
+### Risk Assessment
+**LOW** — Thorough, cycle-1 findings addressed.
 
 ---
 
-## Plan 06 — Contact Picker + Quick Log
+## Plan 06 — Contact picker + commit-truthful Quick Log
 
 ### Summary
-Commit-truthful Quick Log design is excellent and matches SHELL-11. Picker ordering via static SQL mirrors `capture-read.ts` idiom. Local-first read path is correct. Undo via existing `deleteTouchpoint` preserves single-writer invariants.
+Strong data-layer plan. Correctly reuses `recordTouchpoint` / `deleteTouchpoint` (`recency-dao.ts:217-242`, `:313-345`), mirrors canonical `doLogContact` (`ContactProfileScreen.tsx:339-349`), and enforces ADR-075-compliant picker ordering (membership band, not `favourite_rank ASC` — contrast `capture-read.ts:65-66`, `dashboard-read.ts:245`).
 
 ### Strengths
-- **`recordTouchpoint` / `deleteTouchpoint` behavior verified.** `recency-dao.ts:217–242` (txn + `{interactionId}` return + future-date guard); `recency-dao.ts:313–345` (scoped delete + tombstone + recompute).
-- **Picker ordering source correctly chosen.** Plan uses `last_contact` (interaction recency), not `capture-read.ts`'s `fuel.created_at` MRU — appropriate for contact picker per dossier §G.
-- **No network on read path** — matches `capture-read.ts:1–8` posture.
-- **No optimistic success** — aligns with `ContactProfileScreen.tsx:332–357` error handling pattern (Alert, not fake success).
+- **SHELL-11 commit truth:** Success only in `.then(({ interactionId }))`; no optimistic snackbar.
+- **Undo path:** Reuses existing guarded delete — no new SQL writer.
+- **ADR-075 in new read:** `(favourite_rank IS NULL)` band + `last_contact DESC` + alpha; explicit test that rank does not decide order among favourites.
+- **Widget freshness:** `notifyWidgetDataChanged()` after commit and Undo — addresses `deleteTouchpoint` not calling `bumpDataRevisionCore` (unlike `recordTouchpoint` at `:240`).
+- **Local-first:** Static SQL `getAllAsync`, no network on read path.
 
 ### Concerns
-
-| Severity | Concern | Evidence |
-|----------|---------|----------|
-| **MEDIUM** | **`recordTouchpoint` call spec incomplete in plan text.** Required fields include `uid: string` (`recency-dao.ts:59–62`); canonical one-tap write at `ContactProfileScreen.tsx:339–348` also passes `direction: "outbound"`, `connected: 1`, etc. Plan 06 Task 3 omits `uid` and `newUid()`. | `recency-dao.ts:59–62`, `ContactProfileScreen.tsx:339–348` |
-| **MEDIUM** | **Dashboard refresh after Quick Log not specified.** `HomeScreen.tsx:9–15` refreshes on focus/foreground/pull only — not on same-screen writes. Quick Log from FAB on Dashboard won't update list until tab switch unless plan calls `notifyWidgetDataChanged()` / focus refresh like Profile does (`ContactProfileScreen.tsx:352–354`). | `HomeScreen.tsx:9–15`, `ContactProfileScreen.tsx:352–354` |
-| **LOW** | **`deleteTouchpoint` skips `bumpDataRevisionCore`.** `recordTouchpoint` calls it (`recency-dao.ts:240`); delete path does not (`recency-dao.ts:313–345`). Undo may leave widget/orrery stale until next foreground — pre-existing asymmetry; plan should note whether Quick Log Undo needs widget notify. | `recency-dao.ts:240 vs 344` |
-| **LOW** | **Snooze marker needs explicit time comparison.** `snooze_until` column exists (`contact-read.ts:107`); plan says "in the future" but doesn't name `localDateTime()` comparator — easy to get wrong across timezone boundaries. | `contact-read.ts:107`, plan Task 1 |
+- **HIGH — Picker transient registration inconsistent with Plan 02:** Task 2 says `openTransient("contact-picker")` without a dismiss callback (`22-06-PLAN.md` action text). Plan 02 requires `{id, dismiss}` and `dismissTop()` **invokes** `dismiss()`. Without `() => setVisible(false)`, system Back / active-tab retap will pop the store entry but leave the Modal open — breaks SHELL-02/03. Plan 02 must_haves explicitly say picker registers a real close callback.
+- **MEDIUM — Dashboard/Orrery refresh mechanism underspecified:** UAT requires status/recency update “without a manual refocus” (`22-06-PLAN.md` acceptance). `HomeScreen.tsx:178-184` reloads on focus/AppState/pull only — not on data revision. `recordTouchpoint` bumps revision (`recency-dao.ts:240`) but Dashboard doesn’t subscribe. Plan says “refresh the currently focused data surface” without naming a mechanism (event bus, shared reload hook, navigation focus trick, etc.). Widget path is covered; **browse-surface staleness after Quick Log while staying on Home/Orrery is a real gap**.
+- **LOW — `deleteTouchpoint` Undo staleness:** Plan correctly adds `notifyWidgetDataChanged` for Undo; dashboard still needs explicit reload for full SHELL-11 UAT.
 
 ### Suggestions
-1. Copy the **`ContactProfileScreen.tsx:338–348` write contract verbatim** into Plan 06 Task 3 (including `uid: newUid()`, `direction: "outbound"`, `source: "manual"` or a FAB-specific source).
-2. After successful Quick Log + Undo, call **`notifyWidgetDataChanged()`** and/or trigger dashboard re-query if Home is focused (mirror Profile post-log refresh).
-3. Add unit test for snooze marker using wall-clock strings consistent with `localDateTime()`.
+- Fix Task 2 action to: `openTransient("contact-picker", () => setOpen(false))` (or equivalent) and add acceptance grep for dismiss callback arity.
+- Task 3: specify refresh mechanism — e.g. extract a small `useShellDataRefresh()` subscribed from Home/Orrery focus hooks, invoked from UniversalFab after commit/Undo; or call existing screen reload via a lightweight Zustand “tick” store. Without this, on-device UAT will fail.
+- Consider calling `bumpDataRevisionCore` inside Undo wrapper (or document why `notifyWidgetDataChanged` + explicit reload suffices).
 
-### Risk Assessment: **MEDIUM** (data-layer path is correct; write spec and UI freshness gaps)
-
----
-
-## Cross-Cutting: Decision Reversal Check
-
-| Decision | Status |
-|----------|--------|
-| ADR-044 external-entry → Dashboard fallback | **Preserved** — Plans 01/03 reshape, never remove |
-| Widget deep-link acceptance guards | **Preserved** — byte-for-byte constraint explicit |
-| Migration gate ahead of navigator | **Preserved** — `App.tsx:298–322` |
-| No SQLite migration (D-03) | **Preserved** — `TARGET_VERSION = 14` |
-| Group Events not fifth tab; Dashboard not radial launcher | **Preserved** — Plan 04 prohibitions |
-| ADR-018 single destructive Archived surface | **Preserved** — dual-register same component |
-| Predictive back stays disabled (D-10) | **Preserved** — `app.config.ts:76` |
-| Origin-aware Back (dossier `[DECIDED]`) | **At risk of effective reversal** for Orrery→Profile if Plan 01 ships without OrreryStack Profile registration — implementation gap, not intentional reversal |
-
-**No HIGH decision-reversal flags** — but the Orrery→Profile gap would fail a `[DECIDED]` requirement if shipped as written.
+### Risk Assessment
+**MEDIUM** — Data write path is excellent; transient dismiss + browse refresh are the blockers.
 
 ---
 
-## Wave Dependency Assessment
+## Phase-Level Assessment
 
+### Decision fidelity (verified on disk)
+| Decision | Status in plans |
+|----------|-----------------|
+| ADR-080 four-tab shell | ✅ Plan 01 |
+| ADR-044 external → Dashboard | ✅ Plans 01, 03 |
+| ADR-018 single Archived surface | ✅ Dual-register, one component |
+| ADR-075 | ✅ Enforce + flag (correct posture) |
+| D-03 no migration (`TARGET_VERSION = 14`, `database.ts:49`) | ✅ |
+| D-10 predictive back disabled (`app.config.ts`) | ✅ noted, not flipped |
+| Migration gate before navigator (`App.tsx:298-322`) | ✅ |
+
+No **new** decision reversals identified beyond the owner-flagged ADR-075 residual (ManageFavourites route + rank reads in legacy paths).
+
+### Dependency / wave ordering
 ```
-Wave 1: Plan 01 (tracer) ──┬── Wave 2: Plans 02, 03, 04
-                           │
-Wave 3: Plan 05 (needs 02+04)
-Wave 4: Plan 06 (needs 05)
+Wave 1: 01
+Wave 2: 02, 03, 04 — recommend 01→03 first; 04 Task 1 (Back wiring) after 02
+Wave 3: 05 (needs 02+04)
+Wave 4: 06 (needs 05; implicitly needs 02 store)
 ```
 
-Ordering is logical, but **Plan 01 UAT cannot pass SHELL-04** until cross-tab/dual-registration gaps are fixed — those fixes should not wait for Wave 2. Recommend treating an expanded navigate audit as part of Plan 01 Task 1 completion, not Plan 03 alone.
+### Security / local-first
+Deep-link guards unchanged; no network on picker read; reset targets are compile-time route names. Threat models in plans are proportionate.
+
+### Performance
+FAB uses Reanimated shared values (not per-frame `setState`). Orrery Skia loop untouched this phase — appropriate.
 
 ---
 
-## Overall Risk Assessment: **HIGH**
+## Overall Risk Assessment
 
-**Justification:** Planning quality, ADR fidelity, security mitigations, and pure-module test strategy are well above average. The phase fails on navigation completeness: the flat→nested transition has more `navigate()` coupling than the D-08 inventory captures, and the dossier's clearest origin-aware case (Orrery→Profile→Back=Orrery) is asserted but not actually enabled by the route assignment. That is a fixable planning gap, not a wrong direction — but it would produce a broken shell if executed verbatim.
+**MEDIUM**
 
-**Highest-priority fixes before execution:**
-1. Dual-register **Profile** (and downstream routes) in **OrreryStack**.
-2. Full **navigate audit** beyond N1–N5 (Home tab shortcuts, Settings→ManageFavourites, ImportComplete cross-tab, birthday notification).
-3. Complete **Quick Log write contract** (`uid`, `direction`, post-write refresh).
-4. Reconcile **HomeScreen header** with bottom tabs + ShellAppBar in Plan 04.
+**Justification:** Cycle 2 resolves cycle 1’s architectural and inventory failures with unusually accurate file:line grounding (verified: flat stack, reset sites, merge crash, widget guards, `deleteTouchpoint`/`recordTouchpoint`, favourites rank reads, OverflowMenu a11y gap). Remaining HIGH items are **fixable plan edits**, not direction reversals: Plan 04→02 dependency and Plan 06 picker dismiss callback. MEDIUM items (browse-surface refresh after Quick Log, SHELL-03 scope vs deferral) need specification before UAT can certify SHELL-11/03 literally.
+
+**Recommendation:** Patch the two HIGH seams, add explicit Wave-2 execution order (01→03→02→04), then execute. Schedule owner decision on full ADR-075 retirement (`orbit://favourites` target) as a separate tracked task — plans already flag it correctly.
 
 ---
 
 ## Claude Review
 
-*(Claude reviewer ran as a read-only subagent — the `claude -p` reviewer lane has a Write-permission gap on this host, so the Claude identity is backed by a read-only general-purpose subagent that read the actual code on disk. Same source-grounding contract as the other lanes.)*
+_Model: claude-opus-4-8 (read-only subagent lane — the built-in `claude -p` lane self-skips inside Claude Code and has a Write-permission gap in this repo)_
 
-## Verification summary (claims checked against disk)
+# Cross-AI Plan Review — Phase 22 (App Shell & Navigation), Convergence Cycle 2 — Claude lane
 
-Confirmed accurate: `RootNavigator.tsx` is a single flat `createNativeStackNavigator` with exactly 32 `<Stack.Screen>` routes (RootNavigator.tsx:57, 77-117). `@react-navigation/bottom-tabs` is NOT installed; native@^7.3.16 / native-stack@^7.18.8 / screens@~4.26.0 / safe-area@~5.7.0 are (package.json:9-10, 38-39). `expo-haptics` not installed. `TARGET_VERSION = 14` (database.ts:49); migrations run 001-014, no 015 — D-03 holds on disk. Columns `favourite_rank`/`last_contact`/`snooze_until`/`archived_at` all exist (001-initial.ts:73-77). `predictiveBackGestureEnabled: false` (app.config.ts:76). Migration gate: navigator mounts only in the `ready && !error` branch (App.tsx:290, 297-310). Profile Back is a plain `goBack()` (ContactProfileScreen.tsx:762). `deleteTouchpoint` exists at recency-dao.ts:313 with delete-by-both-keys + tombstone + `recomputeLastContact` in one `inWriteTransaction`; `recordTouchpoint` at :217 returns `{interactionId}` and rejects future `occurred_at` before opening the txn (:227-231). orbit:// guards (`Number.isSafeInteger`/`>0`, digit-anchored regexes) at widget-linking.ts:103-119. **No ADR-080/044/018 reversals found** — external→Dashboard fallback, deep-link guards, migration gate, single Archived surface, predictive-back, and the four-tab (not five) contract are all preserved. (Note: this reviewer did not open ADR-075; see Codex, whose ADR-075 finding the orchestrator verified independently.)
+**Verdict: MEDIUM risk (down from cycle-1 HIGH).** The revisions are strong and largely faithful. Four of the five cycle-1 HIGHs are fully resolved. **One HIGH remains: the D-08 cross-tab inventory still claims completeness but still misses a runtime crash site** — `ImportReviewScreen.tsx:215` and `:289` `replace("Profile")` — the exact same crash class the plans caught for merge-completion (N10) and ImportComplete (N9), but from the import-review completion paths, and it is unowned by any plan and invisible to `tsc`.
 
-## Plan 01 — Four-tab shell + nested-reset owner
+All file:line claims below were verified against the code on disk.
 
-**Summary.** Converts the flat 32-route stack into a four-tab bottom navigator with a native stack per tab and reshapes external-entry resets to the nested tab-tree. The architecture matches ADR-080 exactly, the on-disk re-verification (D-06) is genuine, and the route→tab partition accounts for all 32 routes.
+## Cycle-1 HIGH findings — resolution status
 
-**Strengths.**
-- Migration-gate-preservation claim is real and load-bearing (App.tsx:290, 297-310).
-- Deep-link acceptance untouched: guards at widget-linking.ts:103-119 are exactly the "byte-for-byte" surface the plan promises to leave alone.
-- Dual-registration reasoning (same component + same DAO = one destructive/merge surface, origin-aware Back) is sound and Pitfall-6-compliant.
-- Reset owner (`resetToDashboardRoot`/`resetToDashboardWith`) as a single pure module is the right shape; A1 (ComposeScreen.tsx:267), A4 (widget-linking.ts:274), A3 (:287), A2 (notification-gate.tsx:136) all verified.
+| # | Cycle-1 HIGH | Status | Evidence |
+|---|---|---|---|
+| 1 | Cross-tab navigate inventory incomplete | **PARTIALLY RESOLVED** | The D-08 table now enumerates N1–N17, F1, A2b, B1–B3, C1–C2 and captures every site the cycle-1 reviewers named (Home 536/554/572, Orrery 433/441, ImportComplete 267/283, Profile 827, birthday, merge). **But my own repo-wide `navigate(`/`replace(`/`reset(` sweep found `ImportReviewScreen.tsx:215` and `:289` `replace("Profile", {contactId})` — a SettingsStack screen (`RootStackScreenProps<"ImportReview">`, registered in the import cluster) targeting `Profile`, which lives only in DashboardStack/OrreryStack. Post-split this is route-not-found. Not in the inventory, not in any plan's `files_modified`.** See below. |
+| 2 | merge-completion `replace("Profile")` crashes from reconcile origin, unowned | **FULLY RESOLVED** | `MergeImpactSummary.tsx` is now in Plan 03 `files_modified` (line 12); Task 1 (N10) replaces `replace("Profile")` with `navigationRef.current?.reset(resetToDashboardWith({name:"Profile",...}))`. Verified the current crash site exists at `MergeImpactSummary.tsx:17`. Ownership seam closed. |
+| 3 | `tsc` blind via merged `RootStackParamList` alias | **PARTIALLY RESOLVED (by design)** | Plan 01 retypes `navigationRef` (currently `NavigationContainerRef<RootStackParamList>`, linking.ts:37) to `NavigationContainerRef<TabParamList>`, and migrates the specific stranded component consumers (Plan 03) to composite/tab typing. **The merged alias is deliberately retained for ~38 intra-stack consumers**, so component-level `navigation` props typed `RootStackScreenProps<T>` remain `tsc`-blind to cross-tab route names — which is exactly why the ImportReview miss type-checks cleanly. Reasonable churn-minimizing tradeoff, but the residual blindness is real and the miss proves it still bites. |
+| 4 | ADR-075 reversal | **RESOLVED — correct escalation posture** | Plan 01's `## ADR-075 compliance` block enforces the planner-bucket parts (Plan 06 membership band, no `favourite_rank ASC`; Plan 04 removes HomeScreen:319 + SettingsScreen:2008) and flags the full `ManageFavourites` route retirement for the owner because it would break the shipped `orbit://favourites` widget deep-link. Per this repo's rules, this documented owner-flagged deferral is the correct posture, not a defect. Verified `capture-read.ts:65-66` still carries `favourite_rank ASC`. |
+| 5 | Plan 02 `dismissTop()` can't close local-state overlays | **FULLY RESOLVED** | shell-transient-store now holds `{id, dismiss}` entries; `dismissTop()` invokes the topmost `dismiss()` callback. Plan 05 FAB registers `openTransient("fab-speed-dial", () => setExpanded(false))`. A dedicated store test asserts the callback is invoked. |
 
-**Concerns.**
-- **HIGH — the D-08 inventory omits the birthday-notification container-level `navigate`.** notification-nav.ts:101-105 returns `{ type: "navigate", name: "Profile", params }` for a birthday tap, and notification-gate.tsx:137 applies it as `nav.navigate(intent.name, intent.params)` on `navigationRef`. Post-split, `Profile` is nested in `DashboardTab`, so a container-level `navigate("Profile")` resolves to no route and the birthday tap silently does nothing. The inventory lists notification only as the A2 *reset*; the *navigate* branch is not enumerated.
-- **MEDIUM — widget/notification reset reshaping is under-specified and can break missing-contact detection.** The widget gate reads `pending.routes[1]` and `target.params.openReachOut` (widget-linking.ts:260-264) assuming the flat `[Home, target]` shape. If the executor changes `resolveWidgetUri`'s return to nested (as Task 2's "update the test to nested" implies), the gate's `routes[1]` reads break. Safer: reshape only at the final `navigationRef.reset` call, leaving the pure resolver + tests flat — but that contradicts the plan's instruction. Pick and pin one.
+Two cycle-1 divergent HIGHs (Codex): **"system Back == visible Back" deferral** is now explicitly documented and argued as SAFE (Plan 02 Task 3) — see LOW finding below on the reasoning's accuracy. **FAB `bottom:28` geometry + shell-level nested navigate** are fully resolved (Plan 05 derives the offset from `useBottomTabBarHeight()` and returns nested `{tab,screen,params}` targets; verified the legacy `bottom:28` at `AddSpeedDialFab.tsx:135`).
 
-**Risk:** MEDIUM.
+## Concerns
 
-## Plan 02 — Transient store + back-intent + nav visibility
+### HIGH — the "complete" D-08 inventory still misses `ImportReviewScreen.tsx:215/:289 replace("Profile")` (unowned cross-tab crash)
 
-**Summary.** One ephemeral Zustand transient registry, one pure back-intent resolver, one focused-route allow-list, wired into tabPress retap, `tabBarStyle` visibility, and a single shell `BackHandler`. Clean, pure-module, node-testable.
+Plan 01 asserts (line 164) that *"the cross-tab navigate/reset call-site inventory is COMPLETE."* My repo-wide sweep shows it is not:
 
-**Strengths.**
-- Centralizing transient state so tabPress, the shell `BackHandler`, and the visible Back consult one source is the correct approach.
-- Correctly declines to hand-roll a global stack walker.
-- `isFocusedWorkflow` as an explicit allow-list is faithful to dossier §B.
+- `src/screens/ImportReviewScreen.tsx:215` — `navigation.replace("Profile", { contactId })` (single-import completion, `onImport` path).
+- `src/screens/ImportReviewScreen.tsx:289` — `navigation.replace("Profile", { contactId: choice.contactId })` (duplicate-link completion path).
 
-**Concerns.**
-- **LOW — focused-route allow-list must stay in lockstep with the route inventory across plans** (it enumerates routes owned by Plans 04/05). A rename drifts the classification silently. Use a shared constant.
-- **LOW — retap `popToTop()` on the focused tab's nested stack** requires resolving the nested stack navigator in the `tabPress` listener; the exact nested-nav resolution is left to the executor.
+`ImportReviewScreen` is typed `RootStackScreenProps<"ImportReview">` (line 74) and `ImportReview` is assigned to **SettingsStack** (Plan 01 route map). `Profile` is registered only in DashboardStack and OrreryStack. **Mechanism:** post-split, `navigation.replace("Profile", …)` from within SettingsStack resolves to no route → route-not-found crash on two real user paths (import a single Android contact → commit; link a duplicate during import). Byte-for-byte the same crash class as N9 and N10 that the plans *did* catch — but these two sites appear in no plan's `files_modified` and in no inventory row. Because `ImportReviewScreen` keeps `RootStackParamList` typing, `tsc --noEmit` passes.
 
-**Risk:** LOW.
+**Fix:** add `ImportReviewScreen.tsx` to Plan 03 Task 1 with the N9/N10 treatment. And the executor instruction to grep every `navigate(`/`replace(`/`reset(` against the post-split route→tab map should be a literal Plan 01/03 step, not a claim — the claim was made in cycle 1 too and still missed this.
 
-## Plan 03 — Container/completion navigate reconciliation + no-replay + Discard/Keep
+### MEDIUM — Plan 04 header cross-tab conversion under-specifies the navigation retyping it requires
 
-**Summary.** Reshapes N1-N4, verifies Backup-local resets stay in-stack, fixes completed-Edit no-replay, and adds a reusable `beforeRemove` Discard/Keep guard. Catches most of the stranded container-level navigates.
+Plan 04 Task 3 converts `HomeScreen.tsx:536/:554/:572` to `navigate("BackupTab"|"OrreryTab"|"SettingsTab")` but does not say how those tab names type-check. HomeScreen's navigation is typed against the per-tab/`RootStackParamList` surface, which does not contain the `*Tab` names (those live in `TabParamList`). The executor must retype HomeScreen's `useNavigation`/props to the composite helper or route via `navigationRef` — unstated. `tsc` will force a resolution (so this won't ship broken), but mirror Plans 03/05's specificity here.
 
-**Strengths.**
-- N1/N2 verified (linking.ts:64/:67); C1/C2 verified (ImportCompleteScreen.tsx:300, ReconcileCompleteScreen.tsx:47); B1/B2/B3 correctly flagged tab-local with the right verify-first guard.
-- No-replay premise is real (EditContactScreen.tsx:451 navigates to Profile after save at :331); the conditional "if it pushes, pop/replace; else assert" is exactly right.
+### LOW — Plan 06 picker `openTransient` omits the dismiss callback in Task 2's action text
 
-**Concerns.**
-- **HIGH — merge-completion `navigation.replace("Profile")` crashes from the reconcile (SettingsStack) origin, and no plan owns it.** MergeImpactSummary.tsx:17 does, on merge success, `navigation.replace("Profile", { contactId: survivorId })`. The merge cluster is reachable from BOTH Profile→SurvivorSelect (ContactProfileScreen.tsx:816) and reconcile→SurvivorSelect (ReconcileDetailScreen.tsx:104, :144). Plan 01 dual-registers the merge cluster in both stacks — but **`Profile` is only in DashboardStack.** So a merge completed from reconcile calls `replace("Profile")` inside SettingsStack → route-not-found. Plan 01 defers ("Plan 03 owns this; verify at execution time"), but Plan 03's `files_modified` does NOT include MergeImpactSummary.tsx. The bug falls through the ownership seam.
-- **MEDIUM — the completion/no-replay changes are guarded only by `npx tsc --noEmit`, which is blind to cross-tab routing** (see cross-cutting). The merge crash type-checks cleanly.
+Plan 02's contract and the cycle-1 HIGH #5 fix require `openTransient(id, dismiss)`. Plan 06 Task 2 action (line 129) and acceptance (line 136) say only `openTransient("contact-picker")` — the dismiss argument is dropped, reintroducing the "id-in-a-set can't close the component" defect for the picker. If Plan 02 makes `dismiss` a required parameter, `tsc` catches the omission (hence LOW), but the plan text should match Plan 02's truth (line 30/92).
 
-**Suggestions.** Add MergeImpactSummary.tsx (and a scan of every `replace(`/`navigate(` in the dual-registered cluster) to Plan 03's file list with an explicit "route to DashboardTab/Profile" instruction.
+### LOW — Plan 02 Task 3's deferral safety *reasoning* is inaccurate (conclusion still holds)
 
-**Risk:** HIGH (solely due to the unowned merge-completion crash).
+Plan 02 justifies not migrating existing child/browse Back controls by asserting *"the FAB and picker are hidden/unmounted on focused + child screens."* That premise is false for `Archived`, `NeverContacted`, `UnboundContacts`, and `Profile` — Plan 02's own `isFocusedWorkflow` classifies these as browse surfaces where the FAB is **visible**. The deferral is nonetheless genuinely safe, but for a *different* reason I verified: every shell transient's scrim/Modal is `StyleSheet.absoluteFill` and, when open, `pointerEvents:"auto"` (confirmed `AddSpeedDialFab.tsx` scrim absoluteFill; `speedDialScrimPointerEvents` returns `"auto"` when open; `OverflowMenu`/`ContactPicker` use full-screen `Modal`s) — so the header's visible Back is physically un-tappable while a transient is open, and when nothing is open `goBack()` equals the back-intent "default" branch. Recommend correcting the stated rationale to the scrim-interception argument, so a future maintainer who changes scrim coverage doesn't unknowingly open a real system-Back≠visible-Back divergence.
 
-## Plan 04 — Shell chrome
+## Strengths (verified on disk)
 
-**Summary.** Reusable `ShellAppBar`, a `useBottomClearance()` hook over `useBottomTabBarHeight()`, and the Dashboard Group Events header+overflow + Archived overflow with a themed placeholder. Faithful to dossier §I/§J/§N.
+- **Data-layer correctness for Quick Log is right.** `recordTouchpoint` requires `uid` (recency-dao.ts:59-61), returns `{interactionId}`, rejects a future `occurred_at`, calls `bumpDataRevisionCore` (:240). `deleteTouchpoint` (:313) is delete-by-both-keys + tombstone + `recomputeLastContact` in one txn and does not call `bumpDataRevisionCore` — confirming Plan 06's freshness claim. Plan 06 mirrors canonical `doLogContact` (ContactProfileScreen.tsx:339-349) exactly.
+- **ADR-075 handling is exemplary** — enforces the planner half, escalates the owner half by name, avoids the `favourite_rank ASC` pattern still at `capture-read.ts:65-66`.
+- **Merge-completion and birthday-notification crashes are now owned** (Plan 03 for N10; Plan 01 Task 2 converts the birthday intent from `navigate("Profile")` to a reset).
+- **Widget reshape correctly scoped to the gate dispatch only** — verified the gate reads `pending.routes[1]` and `target.params.openReachOut` (widget-linking.ts:260-264) and dispatches at :274/:287; keeping resolver + tests flat avoids breaking those reads.
+- Migration gate, D-03 (no migration), D-10 (predictive-back), ADR-018/044/080 all preserved.
 
-**Strengths.**
-- `useBottomTabBarHeight()`-based clearance (not hardcoded) matches dossier §J.
-- Group Events kept a Dashboard-owned destination, NOT a fifth tab; Dashboard NOT a launcher — both `[REJECTED]` items honored.
-- Status-hue-prohibition grep gate is a good checkable guard.
+## Risk Assessment
 
-**Concerns.**
-- **LOW — FAB clearance constants (56 + 28 + gap) are duplicated** across `useBottomClearance` and AddSpeedDialFab.tsx:136-138 (and again in Plan 05's UniversalFab). Two sources of truth. Single-source the geometry.
-- **LOW — `useBottomClearance` (Wave 2) reserves space for a FAB Plan 05 (Wave 3) creates**; consistent only because both share 56/28. Cross-reference the constant.
-
-**Risk:** LOW.
-
-## Plan 05 — Universal six-action FAB + placeholders + haptics
-
-**Summary.** Replaces the two-action FAB with a shell-mounted six-action speed dial (fixed order, contact-preselect vs picker, Group Log direct), hidden on focused/keyboard, a11y-modal with a light haptic; four placeholder routes. Six-action set matches the dossier amendment exactly.
-
-**Strengths.**
-- Reanimated-compliance premise verified: AddSpeedDialFab.tsx:31-36 drives `expanded` via `useSharedValue`/`withTiming`, React `open` state ONLY for `pointerEvents` (:28-30). `speedDialScrimPointerEvents` (add-speed-dial-fab-logic.ts:23) is a genuine reusable helper.
-- Group Log routed directly, no shell pre-picker (D-05) — correctly enforced.
-- Pure `universal-fab-logic` with a frozen six-element array + length-6 test is a solid anti-drift guard.
-
-**Concerns.**
-- **MEDIUM-HIGH — a shell-mounted FAB navigating into DashboardStack routes must use the nested form, and the plan doesn't say so.** AddSpeedDialFab today does `navigation.navigate("Create")` (AddSpeedDialFab.tsx:98) from inside the Dashboard stack. Plan 05 mounts UniversalFab "ONCE at shell level" and dispatches to `Create`/`GroupLog`/placeholders — all registered only in DashboardStack. From a shell-level ref (or any non-Dashboard tab), `navigate("Create")` won't resolve; it must be `navigate("DashboardTab", { screen: "Create", params })`. Same stranded-navigate class Plan 03 exists to prevent, reintroduced by a new shell-level consumer — and tsc won't catch it.
-- **MEDIUM — `originContactId` derivation from a shell-level mount is non-trivial and under-specified.** Drilling tab→stack→Profile params from outside the stacks is feasible via navigation state, but the plan hand-waves it; get it wrong and every Profile FAB action silently falls into the global pick-then branch.
-
-**Suggestions.** Specify `resolveFabTarget` returns a nested `{ tab, screen, params }` target; origin resolution via `getFocusedRouteNameFromRoute` + nested params. Test that the intent target names a tab, not a bare screen.
-
-**Risk:** MEDIUM-HIGH.
-
-## Plan 06 — Shared contact picker + commit-truthful Quick Log
-
-**Summary.** A pure ordering/filter/marker module + thin static-SQL `picker-read`, a reusable modal `ContactPicker`, and a commit-truthful Quick Log snackbar whose Undo reuses `deleteTouchpoint`. Data-layer posture is careful and mostly correct.
-
-**Strengths.**
-- `picker-read` ORDER BY faithfully mirrors the proven `capture-read.ts:65-69` idiom; single `getAllAsync`, no txn, no interpolation — local-first, injection-safe.
-- The on-disk correction is right: `deleteTouchpoint` (recency-dao.ts:313) exists; RESEARCH A5 was wrong. Undo reuses it exactly (matches ContactProfileScreen.tsx:602-605). No new delete DAO; single-writer invariant intact.
-- Commit-truth wiring — success only inside `.then(({interactionId}))`, error inside `.catch()`, no optimistic snackbar — is exactly SHELL-11; `recordTouchpoint` genuinely returns `{interactionId}` and rejects future `occurred_at` before the txn.
-- Correct deliberate divergence: recency source is `last_contact` (interaction recency), NOT `fuel.created_at` (capture MRU).
-
-**Concerns.**
-- **MEDIUM — the Quick Log wiring omits the required `uid`.** `RecordTouchpointInput.uid` is REQUIRED with no DAO default (recency-dao.ts:59-61); the canonical analog passes `uid: newUid()` + `direction: "outbound"`, `channel`, `connected: 1`, `quality: null`, `source: "manual"` (ContactProfileScreen.tsx:339-349). Plan 06 Task 3's action text never mints a `uid` and its `read_first` omits the existing Quick-Log button (`doLogContact`). tsc will force it, but the plan should point at the exact analog.
-- **LOW — naming proximity** to existing `src/logic/contact-picker-*` import-flow modules; distinct enough but the shared prefix invites confusion.
-- **LOW — global Quick Log/picker post-pick routing to placeholder routes inherits Plan 05's nested-navigate gap.**
-
-**Suggestions.** Add `doLogContact` (ContactProfileScreen.tsx:339) to `read_first` and mirror its field set verbatim, including `uid: newUid()`.
-
-**Risk:** MEDIUM.
-
-## Cross-cutting
-
-**Wave/dependency ordering is sound.** W1 (01) → W2 (02/03/04, all `[22-01]`) → W3 (05, `[22-02,22-04]`) → W4 (06, `[22-05]`). Shared-file serialization respected (`types.ts`/`DashboardStack.tsx`: 01→04→05, never concurrent; `HomeScreen.tsx`: 04→05; `UniversalFab.tsx`/`App.tsx`: 05→06). Within W2, 02 touches only RootNavigator while 03/04 touch disjoint files — clean parallelism.
-
-**HIGH (meta) — the plans lean on `npx tsc --noEmit` as the primary correctness gate, but the retained `RootStackParamList` back-compat alias makes tsc blind to exactly the cross-tab routing errors the split introduces.** Plan 01 keeps `RootStackParamList` as "the four per-tab lists merged." Consequence: any `navigate`/`replace` typed against it type-checks for *any* route regardless of which stack it lives in. The merge-completion `replace("Profile")` from SettingsStack, the birthday container `navigate("Profile")`, and the shell-level FAB `navigate("Create")` will ALL pass `tsc` and fail only at runtime. Recommend an explicit executor instruction to grep every `navigate(`/`reset(`/`replace(` in the repo against the post-split route→tab map.
-
-**Local-first:** no network on any read path; `picker-read` and all reads are on-device SQLite. Clean. **Theme tokens:** every plan mandates `useTheme().colors.*` + `check:colors`; no literals; status-hue-on-chrome grep-gated. **RN animation:** Plan 05 FAB is shared-value-driven, not per-frame setState.
-
-## Overall risk: MEDIUM-HIGH
-
-Architecture is correct and (on ADR-080/044/018) decision-faithful; data-layer handling is careful and verified. Risk is concentrated in cross-tab navigation completeness: one confirmed HIGH runtime crash (merge-completion `replace("Profile")` from reconcile, unowned), one HIGH unowned container navigate (birthday notification), one MEDIUM-HIGH under-specified shell-level FAB routing — all masked from the plans' `tsc` gate by the back-compat alias. Resolving the routing gaps (assign owners, specify nested targets, repo-wide navigate/replace sweep) would bring this to LOW-MEDIUM.
+**Overall: MEDIUM.** Direction is sound and the revisions closed four of five cycle-1 HIGHs cleanly. The one remaining HIGH (`ImportReviewScreen:215/:289`) is a definite runtime crash on real import paths, but a small, well-understood fix identical to the N9/N10 pattern the plans already apply — a localized completeness gap, not an architectural problem. It must be assigned an owner (Plan 03) before execution, and the "grep every navigate/replace/reset against the route→tab map" step should be executed as a literal task. With that site owned and the two LOW/MEDIUM spec tightenings applied, this phase drops to LOW-MEDIUM.
 
 ---
 
-## Verification coverage
+## Orchestrator adjudication (verified against source on disk)
 
-This section records the orchestrator's own source-grounding and cross-artifact fact-drift passes (advisory — they never set a hard block and do not count toward the HIGH or actionable totals). A clean review must never silently mean "nothing was checked."
+### Unresolved HIGH (3)
 
-### Source-grounding (authority = grep)
+1. **Unowned cross-tab crash: `ImportReviewScreen.tsx:215/:289 replace("Profile")`** (Claude lane;
+   orchestrator-verified). `ImportReview` is typed `RootStackScreenProps<"ImportReview">`
+   (`:74`) and is assigned to SettingsStack; `Profile` is DashboardStack/OrreryStack only →
+   route-not-found on the single-import-commit and duplicate-link import paths. Not in the D-08
+   inventory, not in any plan's `files_modified`, and tsc-blind because the screen keeps
+   `RootStackParamList` typing. **Fix:** add `ImportReviewScreen.tsx` to Plan 03 Task 1 with the
+   N9/N10 treatment (`navigationRef.current?.reset(resetToDashboardWith({name:"Profile",params:{contactId}}))`),
+   and make "grep every navigate/replace/reset against the post-split route→tab map" a literal
+   executor step (the COMPLETE claim missed a site in both cycles). Orchestrator also verified the
+   remaining `navigate("Profile")` sites (CreateContactScreen:187, Digest:120, UnboundContacts:113,
+   NeverContacted:167/216, Home:221, ContactProfile:312) all resolve intra-DashboardStack — not
+   misses.
 
-Every symbol the 6 plans cite against *existing* code was resolved against the source. Symbols the plans declare under "Artifacts this phase produces" (reset-intents.ts, back-intent.ts, focused-route-classification.ts, shell-transient-store.ts, UniversalFab.tsx, universal-fab-logic.ts, ContactPicker.tsx, Snackbar.tsx, snackbar-store.ts, picker-read.ts, contact-picker-order.ts, ShellAppBar.tsx, use-bottom-clearance.ts, GroupEventsScreen.tsx, FabActionPlaceholders.tsx, the four per-tab stacks, `@react-navigation/bottom-tabs`, `expo-haptics`, and the placeholder routes) are **excluded** — they are created by this phase.
+2. **Discard/Keep guard makes a materially-false promise for immediately-persisted photos** (Codex;
+   orchestrator-verified). `EditContactScreen.tsx:170-176` documents that the photo "is written
+   IMMEDIATELY through its own dedicated setContactPhoto/clearContactPhoto DAO ... never through the
+   metadata Save path." Plan 03 truth (line 35) and Task 3 acceptance (line 169) fold the photo into
+   the dirty delta and claim "changing the photo ... then Back shows 'Discard changes?' ... Discard
+   leaves" — but Discard cannot revert an already-committed photo, so the user is told they discarded
+   a change that persists. **Fix (owner/planner decision):** either exclude the already-persisted
+   photo from the Discard delta and correct the acceptance criterion, or stage the photo until Save.
 
-**VERIFIED** (file:line confirmed on disk):
-- `@react-navigation/native@^7.3.16`, `native-stack@^7.18.8` present; `bottom-tabs`/`expo-haptics` absent (package.json:9-10) — new deps, correct.
-- `TARGET_VERSION = 14` (database.ts:49); migrations 001-014, no 015 (src/db/migrations/) — D-03 holds.
-- `RootNavigator.tsx:57` single flat `createNativeStackNavigator` — D-06 holds.
-- `recordTouchpoint` recency-dao.ts:217; `deleteTouchpoint` recency-dao.ts:313; `RecordTouchpointInput.uid` required (recency-dao.ts:59-61); `bumpDataRevisionCore` present in record (:240) but not in the delete block.
-- `ContactProfileScreen.tsx:762` `goBack()`; `:817` navigate("SurvivorSelect"); `:827` navigate("ReconcileDetail"); `:339-349` `doLogContact` canonical write.
-- `ComposeScreen.tsx:267` reset; notification-gate.tsx:136 reset, :137 navigate; notification-nav.ts:101-105 birthday navigate("Profile").
-- widget-linking.ts:115 `Number.isSafeInteger`/`>0` guard; :274 reset + :278 Alert; :287 reset.
-- RestorePreviewScreen.tsx:99/:123; RestoreResultScreen.tsx:18; ImportCompleteScreen.tsx:267/:283/:300; ReconcileCompleteScreen.tsx:47.
-- linking.ts:64/:67 navigate; ResumeImportPrompt.tsx:27-50; ResumeReconcilePrompt.tsx:45; SettingsScreen.tsx:181/:830/:2008/:2023.
-- HomeScreen.tsx:44/:319/:407/:517/:536/:554/:572/:653; OrreryScreen.tsx:433/:441; MergeImpactSummary.tsx:17 `replace("Profile")`.
-- add-speed-dial-fab-logic.ts:23 `speedDialScrimPointerEvents`; AddSpeedDialFab.tsx:30/:115/:135-138 (local `open` state, `dashboard-create-fab` testID, geometry).
-- capture-read.ts:64-69 ordering idiom incl. `favourite_rank ASC`; 001-initial.ts:73-77 columns (`last_contact`/`favourite_rank`/`archived_at`/`snooze_until`); dashboard-prefs-store.ts uses `persist`; OverflowMenu.tsx (hitSlop 16, "Dismiss actions"); types.ts placeholder-route doc pattern; ADR-075 (Accepted, retires ManageFavourites + rank ordering); ManageFavouritesScreen.tsx still present.
+3. **Plan 04 missing `depends_on: 22-02`** (Cursor; orchestrator-verified). Plan 04 frontmatter is
+   `depends_on: [22-01]`, but ShellAppBar's child Back wires to `back-intent.ts` (Plan 02) and the
+   component imports Plan 02's back-intent/transient-store — both plans are wave 2 and parallelizable,
+   so Plan 04 fails if Plan 02 has not landed. **Fix:** add `22-02` to Plan 04 `depends_on` (or gate
+   the ShellAppBar-Back subtask on 22-02) and record the Wave-2 order 01 → 03 → 02 → 04.
 
-**MISSING** (grep can check; symbol absent): none — no existing cited symbol failed to resolve. (Plan hygiene here is unusually high.)
+### Unresolved actionable non-HIGH (7)
 
-**AMBIGUOUS:** none material.
+- **A. Picker dismiss callback** — Plan 06 Task 2 action/acceptance must call
+  `openTransient("contact-picker", onDismiss)` (matching Plan 02's contract) and assert the callback
+  arity, so Back/retap actually close the Modal. (codex/cursor HIGH, claude LOW; tsc-bounded)
+- **B. Quick Log browse-surface refresh mechanism** — name a concrete mechanism (a small shell
+  refresh registry/event, or a Zustand "tick" the focused screen subscribes to) invoked after commit
+  AND Undo; without it on-device SHELL-11 UAT ("update without a manual refocus") fails on Home/Orrery.
+  (codex/cursor MEDIUM)
+- **C. Shared FAB/clearance geometry constant** — export a named constant/module consumed by both
+  Plan 04 `use-bottom-clearance.ts` and Plan 05 `UniversalFab`; the plans reference a "shared
+  constant" that neither defines, so tab-bar clearance and FAB offset can drift. (codex MEDIUM)
+- **D. FAB `originContactId` nested-state extraction** — add a pure `getFocusedContactContext`
+  helper with tests for Dashboard-Profile, Orrery-Profile, root tabs, and stale/unavailable nested
+  state; the plan describes `getFocusedRouteNameFromRoute` + nested params but ships no tested walker.
+  (codex MEDIUM, cursor LOW)
+- **E. Correct Plan 02 Task 3's deferral rationale** — replace the false "FAB/picker hidden on child
+  screens" reasoning with the verified scrim-interception argument (full-screen absoluteFill scrim,
+  `pointerEvents:"auto"` when open) so a future scrim-coverage change cannot silently open a real
+  system-Back ≠ visible-Back divergence. (claude LOW; resolves codex's downgraded Back HIGH)
+- **F. Edit dirty-delta reset points** — define explicit baselines/reset for form/links/custom-field
+  values (and, per HIGH #2, the photo decision) and cover the partial-save-failure / reseed path so a
+  coarse `dirty` flag cannot get stuck. (codex MEDIUM; Plan 03 already offers a coarse fallback but
+  not the reset behavior)
+- **G. Quick Log failure haptic** — the dossier reserves the warning haptic for destructive
+  confirmation; use a ratified error haptic or none for an ordinary write error. (codex LOW)
 
-**UNCHECKABLE** (grep cannot analyze — recorded, never treated as verified):
-- The exact `@react-navigation/bottom-tabs` v7 fade `animation` token (Plan 01 Assumption A1) — the dep is not yet installed; must be confirmed against node_modules types at execution.
-- Library-API *signatures* and correct usage of `CompositeScreenProps`, `NavigatorScreenParams`, `getFocusedRouteNameFromRoute`, `useBottomTabBarHeight`, `BottomTabScreenProps` (react-navigation v7) — signature correctness is UNCHECKABLE under grep.
-- `recordTouchpoint`/`deleteTouchpoint` call-*signature* match for Plan 06's new invocation — signature mismatch is UNCHECKABLE under grep (the missing `uid` is a plan-text omission, folded in as a MEDIUM, not a grep verdict).
-- Reanimated shared-value / no-per-frame-setState behavior of the new UniversalFab (component not yet written).
+Non-counted spec-clarity notes (tsc-bounded, so surfaced by the existing gate rather than invisible):
+Plan 04 header `*Tab` conversion (`HomeScreen.tsx:536/554/572`) should spell out the composite/`navigationRef`
+retyping the way Plans 03/05 do (claude MEDIUM); and Plan 01 should add an early compile checkpoint /
+fallback-wrapper strategy for registering `RootStackScreenProps`-typed components in the narrower
+per-tab navigators (codex MEDIUM). Both are forced to resolve by `npx tsc --noEmit` and will not ship
+broken.
 
-### Cross-artifact fact-drift (advisory)
+---
 
-- **Phase status:** `drift-guard phase-status --phase 22` → verdict **`uncheckable`** (STATE.md "Phase 22 planned — 6 plans, 4 waves" vs ROADMAP "Planned"; the tool could not rank either status string, so `stateRank`/`roadmapRank` are null). Not a `drifted` finding; recorded here as uncheckable per protocol. STATE.md and ROADMAP.md do not narratively contradict.
-- **Judgment pairs** (ROADMAP Success Criteria ↔ PLAN must_haves.truths; ROADMAP Requirements ↔ PLAN requirement refs): no contradictions found. The FAB six-action set/order, the crossfade-no-swipe criterion, and the commit-truthful Quick Log criterion match verbatim between ROADMAP and the plan truths. Plans add truths beyond ROADMAP (sanctioned), none of which invert a ROADMAP fact.
+## Verification coverage (source-grounding pass, authority=grep)
 
-No fact-drift findings contribute to the HIGH or actionable counts.
+All symbols cited by the 6 plans were resolved against source (symbols under each plan's "Artifacts
+this phase produces" were excluded as this-phase creations). Verdicts:
+
+**VERIFIED (quoted file:line):** OrreryScreen.tsx:433/:441 `navigate("Profile")`;
+ContactProfileScreen.tsx:762 `goBack()`, :817 `SurvivorSelect`, :827 `ReconcileDetail`,
+:312 `navigate("Profile")`, :339 `recordTouchpoint`/doLogContact; ComposeScreen.tsx:267 reset,
+:404 hardwareBackPress; notification-nav.ts:101-106 birthday `{type:"navigate",name:"Profile"}`;
+widget-linking.ts:132-136 `orbit://favourites`→ManageFavourites, :274 (A4), :287 (A3), :95
+FAVOURITES_URI; linking.ts:36 navigationRef, :64 `navigate("Backup")`, :67 `navigate("Capture")`;
+recency-dao.ts:313 deleteTouchpoint, :240 bumpDataRevisionCore, :59 RecordTouchpointInput;
+dashboard-read.ts:245/:333 `favourite_rank ASC`; sun-picker-read.ts:45 `favourite_rank ASC`;
+capture-read.ts:65-66 `favourite_rank ASC`; ImportCompleteScreen.tsx:267/:283/:300;
+ReconcileCompleteScreen.tsx:47 reset; MergeImpactSummary.tsx:17 `replace("Profile")`;
+RestorePreviewScreen.tsx:99/:123; RestoreResultScreen.tsx:18; HomeScreen.tsx:319/:407/:517/:536/:554/:572;
+SettingsScreen.tsx:2008 ManageFavourites; EditContactScreen.tsx:451 `navigate("Profile")`,
+:170-176 immediate photo write; OverflowMenu.tsx:47 Modal (no accessibilityViewIsModal);
+recency-dao TARGET_VERSION context / database.ts:49 `TARGET_VERSION = 14` (D-03 no-migration);
+DigestScreen:128/:132 goBack, ArchivedContactsScreen:181, NeverContactedScreen:87,
+UnboundContactsScreen:55, BackupScreen:288, CaptureScreen:216 hardwareBackPress;
+AddSpeedDialFab.tsx:98 `navigate("Create")`, :75/:133 absoluteFill scrim + pointerEvents;
+widget-render.tsx:549 `orbit://favourites`, widget-quick-action-guard.ts:33 ManageFavourites;
+package.json `@react-navigation/native@^7.3.16` + native-stack@^7.18.8 (bottom-tabs not yet present,
+consistent with Plan 01 adding it).
+
+**MISSING (grep can check this kind; absent from any plan / inventory) → needs-acknowledgement (not
+a hard block):** `ImportReviewScreen.tsx:215/:289 replace("Profile")` — a cross-tab crash site
+absent from the D-08 inventory and all `files_modified`. Escalated to HIGH #1 above (a real runtime
+crash, not merely a grounding gap).
+
+**Off-by-one / imprecise citation (INFO, mechanism accurate):** notification-gate.tsx birthday
+navigate is at `:138` (plan cites `:137`, which is `} else {`); child-screen goBack citations point
+at the Back `<Pressable>` opening tag with `goBack()` a few lines inside (e.g. Digest `:128`→`:132`);
+notification-nav birthday return spans `:101-106` (plan cites `:101-105`). None affect the claim.
+
+**UNCHECKABLE (grep cannot analyze — behavior/type/runtime):** all `.test.ts` assertion behavior
+claims; React Navigation screen-prop variance ("consumers keep compiling" via the RootStackParamList
+alias — only `tsc` at execution can confirm); the v7 bottom-tabs `animation` fade token value
+(Assumption A1, deferred to execution per the plan); whether `openTransient`'s `dismiss` parameter is
+required vs optional (determines the picker-callback runtime severity); on-device UAT items
+(crossfade, haptics, TalkBack focus, content clearance).
+
+**Skipped:** symbols under each plan's "Artifacts this phase produces" (reset-intents, back-intent,
+focused-route-classification, shell-transient-store, universal-fab-logic, contact-picker-order,
+picker-read, UniversalFab, ContactPicker, Snackbar, ShellAppBar, use-bottom-clearance,
+discard-keep-guard, GroupEventsScreen, FabActionPlaceholders, the placeholder routes) — created by
+this phase, correctly excluded.
+
+## Cross-artifact fact-drift pass (advisory — never counts)
+
+`node gsd-tools drift-guard phase-status --phase 22` → verdict **`uncheckable`** (STATE.md authority;
+ranks null). Per the advisory rules only `drifted` is a finding — none reported. Judgment pairs
+(ROADMAP Success Criteria ↔ PLAN must_haves.truths; ROADMAP Requirements ↔ PLAN requirement refs;
+CONTEXT Decisions ↔ PLAN term usage) surfaced **no contradiction** — only plan-added detail and
+single-source truths, which are excluded. No drift.
+
+---
+
+## How to use this feedback
+
+    /gsd-plan-phase 22 --reviews
+
+Priority order: assign HIGH #1 (ImportReview crash) to Plan 03, resolve HIGH #2 (photo Discard —
+owner/planner decision) and HIGH #3 (Plan 04 dependency), then the 7 actionables. Schedule the full
+ADR-075 retirement (`orbit://favourites` widget-tap target) as its own owner-owned task — the plans
+already flag it correctly and it is NOT counted here.
