@@ -36,6 +36,7 @@ It intentionally does **not** redefine Dashboard populations, filters, sort, sea
 
 Targeted resolutions from the milestone-2 cross-dossier audit. Each item names the finding it resolves; all other Phase 7 decisions remain authoritative.
 
+- **E-08 — bulk Delete becomes Archive.** Bulk Delete is removed from Sensitive Operations; bulk Archive is the recoverable removal and permanent deletion stays a manual per-contact action on the Archived Contacts list (ADR-018, unchanged). The dossier's earlier "30-day quarantine" description of contact deletion was factually wrong — that quarantine applies to custom-field definitions. No contact quarantine or auto-purge exists or will be built.
 - **E-01 — binary favourites ratified.** The owner ratified binary favourite membership; the drag-reorder "Manage favourites" screen and its rank are retired (ADR-033 superseded 2026-09-01). §H is annotated accordingly.
 
 ---
@@ -306,9 +307,10 @@ For mixed selections, provide clear operations such as:
 ## Y. Sensitive Operations
 **[DECIDED]** Multi-select includes a distinct **Sensitive Operations** menu/subsurface for higher-impact batch changes.
 
-**[DECIDED] Initial Sensitive Operations:**
+**[DECIDED — amended 2026-09-01] Initial Sensitive Operations:**
 - Change Contact Frequency
-- Delete Contacts
+
+Bulk **Delete Contacts** is removed from this menu; see §AA.
 
 **[DECIDED]** Gravity is **not** an action because Gravity is a derived-never-stored statistic computed from interaction history/impact inputs.
 
@@ -319,14 +321,12 @@ For mixed selections, provide clear operations such as:
 
 **[DECIDED]** Frequency change requires confirmation summarizing the affected contact count/value because it changes downstream relationship-state calculations.
 
-## AA. Bulk Delete / Quarantine
-**[DECIDED]** Delete does not immediately hard-delete contacts.
+## AA. Bulk Delete — Removed
+**[SUPERSEDED — 2026-09-01]** Bulk Delete is removed. Bulk **Archive** (§X) is the recoverable removal; permanent deletion remains the existing manual per-contact action on the Archived Contacts list (ADR-018); Orbit does not auto-purge archived contacts.
 
-**[DECIDED]** Current delete behavior sends contacts into a **30-day quarantine** where users can restore them, purge them manually, or allow automatic pruning after the quarantine expires.
+**[DECIDED]** There is no contact quarantine, and none will be built. The earlier statement that "current delete behavior sends contacts into a 30-day quarantine" was factually wrong: contacts have indefinite archive retention with manual purge only. The 30-day quarantine belongs to custom-field **definitions**, not to contacts.
 
-**[DECIDED]** Bulk-delete confirmation must accurately explain this recoverable quarantine behavior rather than falsely describing immediate permanent deletion.
-
-**[DERIVED]** Exact quarantine-management UI belongs to the existing contact lifecycle/data-management surfaces rather than Phase 7.
+**[DERIVED]** Restore and manual permanent deletion remain owned by the existing Archived Contacts surface rather than Phase 7.
 
 ## AB. After Bulk Operations
 **[DECIDED]** Successful ordinary bulk operations generally preserve selection mode and selected contacts so users may perform multiple cleanup actions without reselecting.
@@ -335,7 +335,6 @@ Expected behavior:
 - Quick Log → stay selected; show Undo/error feedback.
 - Favorite/Snooze/Category/Frequency → stay selected.
 - Archive → archived cards disappear; any remaining eligible selections stay selected.
-- Delete/quarantine → removed cards disappear; any remaining eligible selections stay selected.
 
 **[DECIDED]** User explicitly exits selection mode when finished.
 
@@ -390,7 +389,7 @@ Examples include:
 - **App Shell / Rapid Capture:** Quick Log, detailed Log Interaction, Message, Edit, and Profile use canonical routable flows rather than Card-specific forms.
 - **Theme & Visual System:** avatar rings, status/snooze glyphs, scrims, favorite state, selection state, transitions, and accessibility resolve through semantic tokens/components.
 - **Backup/Restore / data management:** contact import belongs there conceptually, not in Dashboard bulk-management mode.
-- **Contact lifecycle:** bulk delete respects the existing 30-day quarantine/restore/purge lifecycle.
+- **Contact lifecycle:** bulk archive respects the existing archive-then-manual-purge lifecycle (ADR-018).
 - **Gravity:** derived-never-stored; never expose bulk gravity mutation.
 
 ## Explicitly Deferred
@@ -415,9 +414,9 @@ Examples include:
 6. Grid multi-select serves as Orbit's Dashboard bulk-management surface and can be entered from long-press or Dashboard overflow.
 7. Multi-select replaces/locks normal Dashboard query controls, exposes clear top-left selection circles, supports Select All over the frozen current result universe, and keeps card taps selection-only.
 8. Ordinary bulk actions keep Quick Log distinct while also exposing count-aware detailed Log Interaction routing: one selected contact opens the canonical individual flow and two or more open Phase 12 Group Log; favorite/snooze, category assignment, and archive remain available, while bulk Edit remains excluded.
-9. Sensitive Operations cleanly separates bulk frequency change and recoverable delete/quarantine behavior from routine bulk actions.
+9. Sensitive Operations cleanly separates bulk contact-frequency change from routine bulk actions; bulk Delete is not offered, and Archive is the bulk removal path.
 10. Gravity is never presented as mutable bulk state because it remains derived-never-stored.
-11. Bulk operations generally preserve selection mode for repeated cleanup and accurately remove archived/quarantined contacts from the visible result set.
+11. Bulk operations generally preserve selection mode for repeated cleanup and accurately remove archived contacts from the visible result set.
 12. Empty/error/loading/transition behavior remains consistent with shared Dashboard semantics, renderer-appropriate layout, reduced motion, and accessibility.
 13. Responsive behavior gracefully moves away from three columns when device width or accessibility text makes three columns unusable.
 
@@ -434,6 +433,6 @@ Examples include:
 - Contact import is not owned by this phase; route that concern toward Backup/Restore/data-management planning.
 - Multi-select temporarily replaces/locks Population/Filters/Sort/Search controls rather than allowing result-universe mutations underneath active selections.
 - Keep normal bulk actions and Sensitive Operations separate.
-- Delete copy must reflect the current 30-day quarantine/restore/purge lifecycle, not permanent immediate destruction.
+- Bulk Delete is not offered. Archive is the bulk removal; permanent deletion stays a manual per-contact action on the Archived Contacts list (ADR-018), and Orbit does not auto-purge archived contacts. There is no contact quarantine.
 - Gravity is derived-never-stored and must not become an editable field merely because bulk operations exist.
 - Exact gesture/menu mechanics, layout pixels, breakpoints, transition timings, and confirmation thresholds are implementation/tuning work unless device testing exposes a genuine product contradiction.
