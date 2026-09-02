@@ -3,10 +3,10 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Release Readiness
 status: planning
-last_updated: "2026-09-02T05:10:48.060Z"
+last_updated: "2026-09-02T05:35:00.000Z"
 last_activity: 2026-09-02
 progress:
-  total_phases: 0
+  total_phases: 19
   completed_phases: 0
   total_plans: 0
   completed_plans: 0
@@ -20,14 +20,26 @@ progress:
 See: .planning/PROJECT.md (updated 2026-09-01 after v1.0 milestone)
 
 **Core value:** Collapse the taps between "you're overdue with X" and the message actually being sent.
-**Current focus:** Milestone v1.0 (MVP) shipped 2026-09-01 — planning the next milestone. Run `/gsd-new-milestone`.
+**Current focus:** Milestone v2.0 Release Readiness — ROADMAP.md written (Phases 22–40, 217 requirements
+mapped across 22–36). Next: `/gsd-plan-phase 22` (App Shell & Navigation).
 
 ## Current Position
 
-Phase: Not started (defining requirements)
-Plan: —
-Status: Defining requirements
-Last activity: 2026-09-02 — Milestone v2.0 started
+Phase: 22 — App Shell & Navigation (next; not started)
+Plan: — (no plans yet; run `/gsd-plan-phase 22`)
+Status: Roadmap complete — awaiting owner approval, then phase planning
+Last activity: 2026-09-02 — v2.0 roadmap created (Phases 22–40)
+Progress: 0/19 phases complete (v2.0)
+
+**Milestone v2.0 structure (pre-decided by the owner from the fifteen milestone-2 dossiers + the
+2026-09-01 cross-dossier audit; not re-derived):** 22 App Shell · 23 Theme · 24 Contact Knowledge ·
+25 Dashboard Data/State · 26 Dashboard Controls · 27 List View · 28 Card View · 29 Orrery Camera ·
+30 Orrery Systems · 31 Profile · 32 History & Insights · 33 Group Logging · 34 Rapid Capture ·
+35 Compose · 36 AI Config (ends the milestone schema chain with the backup v4 bump) ·
+37–40 deferred planning (Settings, Your Week, Onboarding, Release Hardening).
+Migration order is milestone-wide (schema → consumers → backup v4 last); **never** write a literal
+migration number — each phase verifies head+1 against `src/db/migrations/` + `TARGET_VERSION` on disk
+at plan time. All new durable preferences are `app_settings` columns, never AsyncStorage.
 
 ## Performance Metrics
 
@@ -148,6 +160,10 @@ Last activity: 2026-09-02 — Milestone v2.0 started
 
 ### Roadmap Evolution
 
+- **v2.0 Release Readiness (2026-09-02):** Phases 22–40 added, continuing the project-wide numbering
+  from v1.0's Phase 21. Structure is owner-decided from `docs/dossier/milestone-2/` (fifteen dossiers)
+  and the audit bridge `AUDIT-HANDOFF.md`; ADR-075–080 record the ratified reversals. Phases 37–40 are
+  deferred-planning slots — do not plan or discuss them until the product they consolidate exists.
 - Phases 18–21 added after Phase 17: Contact Data Normalization → System Contact Import → Contact Reconciliation & Merge → Interaction Assist & Reach Out. Their externally completed product discussion is captured in the corresponding phase CONTEXT.md files and canonical dossiers.
 - Phase 19.1 inserted after Phase 19: Older-Android hybrid two-picker (ADR-002) (URGENT)
 
@@ -325,15 +341,17 @@ Foundational decisions affecting current work:
   overrode the Claude-self-review guard). Resume the remaining phases with:
   `/gsd-autonomous --from 5 --to 8 --converge --claude --codex --claude --max-cycles 3`.
 
-- **Graphify is disabled** in config until its ADR-bridge scripts (`adr-registry.ts`,
-  `normalize-graph-docrefs.ts`) and build-blocking hooks are ported from quest-board (a Phase 1/2
-  foundation task). Do not run `graphify build` before then — the stock build silently corrupts.
+- **Graphify — RESOLVED (v1.0 close).** `.planning/config.json` now sets `graphify.enabled: true`; the
+  ADR-bridge scripts (`docs/decisions/adr-registry.ts`, `scripts/normalize-graph-docrefs.ts`) and the
+  build-blocking hooks are in place. Build **only** via `npm run graph:build` — the stock
+  `graphify build` silently corrupts the graph and is blocked at the harness layer.
 
 ## Deferred Items
 
-See REQUIREMENTS.md "v2 / Deferred Requirements" and the per-domain "Deferred to phase discussion /
-planning" sections in docs/dossier/*.md — those are the authoritative hand-off lists for each phase's
-`/gsd-discuss-phase` and `/gsd-plan-phase` steps.
+For v2.0, the hand-off lists are REQUIREMENTS.md "Out of Scope" + "Deferred-planning phases" and each
+milestone-2 dossier's own `[DEFERRED]`/`[REJECTED]` items (binding there). The v1.0 equivalents live in
+`milestones/v1.0-REQUIREMENTS.md` and the per-domain "Deferred to phase discussion / planning" sections
+of `docs/dossier/*.md`.
 
 Items acknowledged and deferred at milestone close, most recent first:
 
@@ -366,9 +384,11 @@ _Also disposed at this close: 05/deferred-items.md (check:colors doc-comment) ma
 ## Session
 
 **Last session:** 2026-08-31T17:07:16.424Z
-**Stopped at:** Phase 21 UI-SPEC approved
+**Stopped at:** v2.0 roadmap created (Phases 22–40) — awaiting owner approval, then `/gsd-plan-phase 22`
+_Prior stop (v1.0):_ Phase 21 UI-SPEC approved; milestone v1.0 closed 2026-09-01.
 _Prior stop (13-04):_ the orrery VISUAL VOCABULARY (theme tokens + two pure resolver modules, node-tested, 29 cases green): (1) five owner-tunable `ThemePalette` tokens seeded in `space-dark.dark` ONLY — `starPalette` (6 colours, gold `#F2C14E` at index 0, then amber/rose-red/violet/cyan/ice-white), `mutedStable/Wobble/Decay` (desaturated same-hue morph endpoints), `rogueExtinguished` (cold blue-grey `#3E4A6B` rogue BODY fill) — with an M6/C2-5 conformance test that IMPORTS the real `SELF_SUN_COLOUR_RE`/`assertSelfSunColour` from app-settings-dao and locks every starPalette entry to the ACTUAL DAO write-path rule (no re-inlined regex). (2) `orrery-ring-logic.ts` `orreryRingStyle(status, colors)` — REUSES `ringVisual` for `{color,opacity,width}` (status→colour mapped once), adds the `strokeStyle` axis (solid→dashed→faded→faintTrace) + `bodyFill` (rogue ring=`colors.rogue`, body=`rogueExtinguished`); `null`→canonical NEUTRAL (`colors.border`), never throws — the single fallback sun-occupant reuses (C2-2). (3) `sun-occupant-logic.ts` `resolveSunOccupant(input)` — NULL/archived/missing→self (A7, glow `selfSunColour ?? starPalette[0]`), live contact→its status glow via `orreryRingStyle(status, colors).color`, never-contacted (status `null`)→the reused neutral border (C2-2); accepts `status: ProfileStatus | null`. 5 commits (1801915 feat tokens+M6; d35d528 RED→4cbfad5 GREEN ring-logic; c923b16 RED→10780dd GREEN sun-occupant); tsc + check:colors clean; no deviations (one in-flight fix: a placeholder hex in the logic test was re-sourced from the palette after check:colors flagged it — C2-3). Committed locally on main (NOT pushed). Next: Wave 2 (13-05 render / 13-06 Settings sun-picker), Wave 3 (13-07 drag-release), Wave 4 (13-08 device UAT, autonomous:false).
-**Resume file:** — (milestone v1.0 complete; no active phase. v1.0 phase artifacts archived under `.planning/milestones/v1.0-phases/`.)
+**Resume file:** — (no active phase. v2.0 phase artifacts will live in `.planning/phases/`; v1.0 artifacts
+are archived under `.planning/milestones/v1.0-phases/`.)
 
 ## Phase 4 — Closeout (2026-08-15) ✅ COMPLETE
 
@@ -392,4 +412,7 @@ was built via the desktop pipeline and driven through create→edit→archive→
 
 ## Operator Next Steps
 
-- Start the next milestone with /gsd-new-milestone
+- Review `.planning/ROADMAP.md` (Phases 22–40) and approve, or send revision feedback.
+- On approval, the orchestrator commits ROADMAP.md + STATE.md + REQUIREMENTS.md (commits stay local —
+  agents never push).
+- Then start the milestone with `/gsd-plan-phase 22` (App Shell & Navigation).

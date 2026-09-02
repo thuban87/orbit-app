@@ -313,7 +313,9 @@ dossier and is binding there.
 
 ## Traceability
 
-Requirement categories map one-to-one to phases; the roadmap lists the same mapping per phase.
+Requirement categories map one-to-one to phases; `.planning/ROADMAP.md` lists the same mapping per phase
+(with each phase's derived success criteria and its canonical dossier + planning-notes refs).
+Status values: **Pending** = roadmapped, not yet planned.
 
 | Category | Phase | Status |
 |----------|-------|--------|
@@ -341,4 +343,4 @@ Requirement categories map one-to-one to phases; the roadmap lists the same mapp
 
 ---
 *Requirements defined: 2026-09-02*
-*Last updated: 2026-09-02 after initial definition (derived from the milestone-2 dossiers)*
+*Last updated: 2026-09-02 after roadmapping — all 217 requirements mapped to Phases 22–36 in ROADMAP.md*
