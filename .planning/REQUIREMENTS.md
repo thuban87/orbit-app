@@ -16,11 +16,11 @@ category's phase (see Traceability).
 
 ### SHELL — App Shell & Navigation (Phase 22)
 
-- [ ] **SHELL-01**: User can reach Dashboard, Orrery, Backup/Restore, and Settings from a persistent four-tab bottom navigation bar with correct safe-area insets; each tab preserves its own navigation stack (ADR-080)
+- [x] **SHELL-01**: User can reach Dashboard, Orrery, Backup/Restore, and Settings from a persistent four-tab bottom navigation bar with correct safe-area insets; each tab preserves its own navigation stack (ADR-080)
 - [ ] **SHELL-02**: Tapping the already-active tab first dismisses open transient UI; a second tap returns that tab to its root
 - [ ] **SHELL-03**: Android system Back and the visible app Back control produce identical results on every screen; Back dismisses the topmost transient layer before navigating; Back after a completed edit never replays the finished edit screen
-- [ ] **SHELL-04**: Back from a Contact Profile returns to the surface the user actually came from (origin-aware), not always Dashboard
-- [ ] **SHELL-05**: Externally launched/deep-linked flows with no in-app origin fall back to Dashboard on cancel or Back; a deep link to a missing contact shows a friendly message and routes to Dashboard rather than crashing
+- [x] **SHELL-04**: Back from a Contact Profile returns to the surface the user actually came from (origin-aware), not always Dashboard
+- [x] **SHELL-05**: Externally launched/deep-linked flows with no in-app origin fall back to Dashboard on cancel or Back; a deep link to a missing contact shows a friendly message and routes to Dashboard rather than crashing
 - [ ] **SHELL-06**: Bottom nav and FAB are visible on browse/read surfaces and hidden during focused workflows and while the keyboard is open
 - [ ] **SHELL-07**: Leaving a focused workflow with meaningful unsaved changes prompts Discard changes / Keep editing
 - [ ] **SHELL-08**: User can expand a consistently positioned FAB into a labeled speed dial with translucent scrim offering exactly six actions in fixed order: Add Contact, Quick Log, Log Contact, Group Log, Update Contact, Memory
@@ -30,7 +30,7 @@ category's phase (see Traceability).
 - [ ] **SHELL-12**: Dashboard exposes Group Events as a prominent header icon+label destination with a redundant overflow entry; Archived Contacts is reachable from Dashboard overflow (the Settings row may remain)
 - [ ] **SHELL-13**: Root tabs show a branded title with no Back; child and focused screens show Back plus a clear title; the status bar integrates with the active theme and scrollable content clears the nav bar and FAB
 - [ ] **SHELL-14**: Interactive shell controls carry semantic accessibility labels, adequate touch targets, logical focus order, and correct modal/speed-dial focus management; haptics are semantic only
-- [ ] **SHELL-15**: Tab switching uses a very short crossfade with no horizontal slide and no swipe-between-tabs gesture
+- [x] **SHELL-15**: Tab switching uses a very short crossfade with no horizontal slide and no swipe-between-tabs gesture
 
 ### THEME — Theme & Visual System (Phase 23)
 
@@ -284,8 +284,10 @@ them now.
 
 - **Phase 37 — Settings & Personalization** — consolidates the preference/admin seams exported by
   Phases 22–36 (see `docs/dossier/milestone-2/planning-notes/phase-15-17-18-stub-contracts.md`)
+
 - **Phase 38 — Your Week** — owns relocated birthday presentation (ADR-076), Group Event rollups,
   heatmap-aggregation reuse (see `planning-notes/phase-19-your-week-placeholder.md`)
+
 - **Phase 39 — Onboarding** — first-run setup/teaching against the real product (stub contracts file)
 - **Phase 40 — Responsive & Release Hardening** — device/accessibility/performance audit pass
   (stub contracts file)
@@ -337,6 +339,7 @@ Status values: **Pending** = roadmapped, not yet planned.
 | (deferred) | Phases 37–40 — Settings / Your Week / Onboarding / Release Hardening | Deferred planning |
 
 **Coverage:**
+
 - v2.0 requirements: 217 total
 - Mapped to phases: 217
 - Unmapped: 0 ✓
