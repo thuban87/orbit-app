@@ -20,3 +20,5 @@ scope (per the executor scope-boundary rule). NOT fixed by the discovering plan.
   - **RESOLVED (orchestrator, during Wave 3):** reworded the comment to drop the
     literal `hsl(` token; `npm run check:colors` is green tree-wide (exit 0).
     Committed separately as `fix(05-03): reword hsl() doc comment …`.
+
+- **Status:** resolved

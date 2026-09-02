@@ -1,3 +1,10 @@
+---
+audit_acknowledged:
+  milestone: v1.0
+  at: 2026-09-02
+  gap_snapshot: "unknown::scenarios=0"
+---
+
 > **⚠ RESOLVED 2026-08-29 (evening) — the "Android 17 picker OS defect" below is DISPROVEN.**
 > On-device disassembly + a faithful repro showed the dead-end was triggered by orbit's own
 > intent (the `USE_SYSTEM_CONTACTS_PICKER` extra was set under the wrong namespace). A two-line
@@ -30,6 +37,7 @@
 **Symptom:** With 19-19 applied, the app successfully launches the OS `ContactsPickerActivity`, which then logs **`No PreferredActivity Found`** and bounces to an **empty system Chooser** (`ChooserActions: android.provider.action.PICK_CONTACTS is not supported`, `getDisplayResolveInfoCount() == 0`) → "No apps can perform this action."
 
 **Evidence (logcat):**
+
 ```
 START ... act=android.provider.action.PICK_CONTACTS cmp=com.android.contactspicker/.ContactsPickerActivity ... from uid ...(com.bwales.orbit)
 ContactsPickerActivity: No PreferredActivity Found
@@ -39,6 +47,7 @@ ChooserListAdapter: getDisplayResolveInfoCount() == 0
 ```
 
 **Established facts:**
+
 - The app's picker usage **matches the official Android 17 docs** (action `ACTION_PICK_CONTACTS`, `EXTRA_USE_SYSTEM_CONTACTS_PICKER`, `EXTRA_PICK_CONTACTS_REQUESTED_DATA_FIELDS`, multi-select via `Intent.EXTRA_ALLOW_MULTIPLE`). Verified against live `developer.android.com/about/versions/17/features/contact-picker`.
 - `com.android.contactspicker` is a **privileged system app** (`/system/priv-app`, v17/API37); Google Contacts is **installed, enabled, and the default** (`SYSTEM_CONTACTS` role), updated 2026-08-19, targetSdk 37 — **not** stale.
 - **Both** the new `PICK_CONTACTS` **and** the classic `ACTION_PICK` (contacts) route through the same trampoline and dead-end identically — for **any** app, not just orbit.
@@ -50,7 +59,9 @@ ChooserListAdapter: getDisplayResolveInfoCount() == 0
 **Correction on the theory (owner input):** "wait for a Google OS fix" is a *weak* hypothesis — the owner updated this Pixel ~2 weeks ago and a targeted OS fix for this is unlikely. The more probable, **actionable** cause is a **corrupted/misconfigured picker-app state** — the same shape as the Phase-18.1 restore blank-picker, which was a corrupted DocumentsUI cleared by `pm clear com.google.android.documentsui` (see memory `saf-grant-reconnect-cycle` / STATE.md Phase-18.1 note). `No PreferredActivity Found` points at a missing/broken **preferred-activity / delegation** association, not necessarily an OS bug.
 
 ### Android-17 picker — remediation routes to try (part of finishing Phase 19)
+
 Ordered cheapest/most-likely first. Most are adb-doable without the owner; a few need the device or the desktop.
+
 1. **`pm clear com.android.contactspicker`** (the trampoline) — then relaunch and re-test. Direct analog of the DocumentsUI blank-picker fix. Cheapest, highest-value. *(Also `pm clear com.google.android.contacts` — heavier: re-syncs the owner's contacts; low risk since synced, but do the trampoline first.)*
 2. **Inspect/reset preferred-activity + defaults:** `pm get-preferred-activities`, `dumpsys package preferred-activities`; try clearing/resetting the contacts default so the trampoline can bind a downstream picker. `No PreferredActivity Found` is literally about this.
 3. **Dig the trampoline's delegation intent:** deeper logcat on `com.android.contactspicker` to see *what* intent it fires when it can't find a preferred activity — reveals which downstream handler is missing.
@@ -62,6 +73,7 @@ Ordered cheapest/most-likely first. Most are adb-doable without the owner; a few
 If none pan out, the ≤16 path (Phase 19.1) still delivers a working import + covers the shared downstream on the 3a; only the Android-17-picker-specific launch/snapshot stays open.
 
 **Cascade:** Because every 19-17 scenario is picker-fed, this blocks the **entire** 19-17 device UAT:
+
 - **Task 1** (picker launch / snapshot / cancel→no session / re-invoke): directly blocked.
 - **Tasks 2-3** (review counts, cluster Combine, resume/discard, photo lifecycle, birthday validation): transitively blocked — no real session can be created. Faithful DB-seeding as a workaround is also impractical here: **there is no `sqlite3` binary on the device**, so seeding would require pull→edit→push DB surgery (WAL) producing only synthetic-input findings. Not pursued (low confidence, high effort, phase can't sign off regardless).
 
@@ -103,6 +115,7 @@ A subsystem-level review (full files, all shared-table writers) of 19-12→19-16
 ---
 
 ## Infrastructure notes (for the eventual real UAT)
+
 - **adb `input tap` DOES drive React Native** on this device (prior "pointer injection dead" was the scrim). Caveat: high header targets (e.g. Settings ⚙ at y≈105) hit the **status-bar inset** — tap lower in the a11y bounds (y≈160).
 - **No on-device `sqlite3`.** For DB inspection, pull via `adb exec-out run-as com.bwales.orbit cat files/SQLite/orbit.db` (+ `-wal`, `-shm`) and read on the Linux box with `node:sqlite`. DB path: **`files/SQLite/orbit.db`** (122 KB + WAL), user data present.
 - **Metro:** orbit runs on **:8082** (quest-board owns :8081); device reverse routes both 8081→8082 and 8082→8082 to orbit's Metro. Force-stop + relaunch pulls a fresh bundle; the dev-menu "Reload" (native, tappable) forces it.

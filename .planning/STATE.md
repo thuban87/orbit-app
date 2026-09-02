@@ -1,146 +1,37 @@
 ---
 gsd_state_version: 1.0
 milestone: v1.0
-current_phase: 21
-current_phase_name: Interaction Assist & Reach Out
-current_plan: 6
-status: complete
+status: Awaiting next milestone
 stopped_at: Phase 21 COMPLETE — all 6 plans executed; Pixel device UAT PASS (DB-verified) + owner sign-off (2026-08-31). Local on main, NOT pushed.
-last_updated: "2026-08-31T20:05:00.000Z"
-state_head: 13c627af1f0b1c0d348e2f0b6ba7a1931e1a9f6d
+last_updated: "2026-09-02T04:46:04.445Z"
+last_activity: 2026-09-01
+last_activity_desc: Milestone v1.0 completed and archived
+state_head: e5efd4a012bf281fbace01024baade24fbd39d03
 progress:
   total_phases: 23
-  completed_phases: 15
+  completed_phases: 16
   total_plans: 181
-  completed_plans: 172
+  completed_plans: 178
 milestone_name: milestone
+current_phase: 21
+current_phase_name: Interaction Assist & Reach Out
 ---
 
 # Project State
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-08-14)
+See: .planning/PROJECT.md (updated 2026-09-01 after v1.0 milestone)
 
 **Core value:** Collapse the taps between "you're overdue with X" and the message actually being sent.
-**Current focus:** Phase 21 — Interaction Assist & Reach Out
+**Current focus:** Milestone v1.0 (MVP) shipped 2026-09-01 — planning the next milestone. Run `/gsd-new-milestone`.
 
 ## Current Position
 
-**Phase:** 21 — Interaction Assist & Reach Out — ✅ COMPLETE (owner-signed-off 2026-08-31)
-**Current Plan:** 6 of 6 (all executed)
-**Status:** Phase 21 complete — ready for verification / KB extraction
-
-**⟢ PHASE 21 (Interaction Assist & Reach Out) — COMPLETE (2026-08-31), owner-signed-off.** All 6 plans
-executed (21-01 tracer/migration 014 → 21-05 cross-phase wiring). Plan 21-06 closed the phase: Task 1
-consolidated the two raw `interaction_assist_enabled` reads onto `getAppSettings().interactionAssistEnabled`
-(`a84a3d8`) with a green node gate (**191 files / 1,812 tests**, tsc, check:colors); Task 2 owner checkpoint
-cleared; **Task 3 = Pixel device UAT PASS** — the whole matrix (R01–R10, R14–R20) driven on the physical
-Pixel 6 Pro against a DEBUG build with WAL-aware `run-as` DB evidence, migration 014 live (`user_version` 14).
-**Sign-off invariants independently re-verified by the orchestrator** (WAL-applied sqlite3 read): all 7
-assist-sourced interactions have `occurred_at === handoff_at`, `direction=outbound`, `source=assist`,
-correct `connected`; `contacts.last_contact` moved only via `recomputeLastContactCore`; queue caps/clears
-correctly; merge reparents, purge cascade-deletes, widget deep-link consumed once, non-expired pending
-survive reboot. **R11–R13** (native handoff FAILURE) are device-gated (a real Pixel always has a
-dialer/Messages/mail) — owner ruled to accept them as covered by the unit-tested `markAssistFailed`+Alert
-path. Scoreboard: `21-UAT.md` (R21 APPROVED). Close-out deviations (all recorded in `21-06-SUMMARY.md`):
-(1) skipped the droid rebuild — phase 21 is JS-only (git-diff-verified), so Metro fast-refresh on the
-existing DEBUG APK was used; (2) R14 24h-expiry via a temporary orchestrator DEBUG constant, git-reverted;
-(3) a false R10 evidence citation caught in independent DB re-verification and corrected. **Zero source
-edits survive** (time-travel reverted), all phase-21 commits LOCAL on `main`, **NOT pushed**.
-**Phase-completion gates run (2026-08-31), all pass:** verification (6/6 must-haves, IAS-01–04 ACHIEVED
-→ `21-VERIFICATION.md`), security (SECURED, 20/20 threats closed, 0 egress → `21-SECURITY.md`), Nyquist
-validation (all reqs covered, 154 phase tests green → `21-VALIDATION.md` validated), UI review (23/24, no
-blockers → `21-UI-REVIEW.md`), code review (deep → `21-REVIEW.md`) — one HIGH (WR-01: dismiss/fail not
-wrapped in the shared write txn) **FIXED** in `interaction-assist-dao.ts` (gate re-run green 1,812), one
-MEDIUM ruled by-design (IN-01 archived-loggable = Cluster Z `[DECIDED]`), IN-02 + LOWs deferred to owner.
-Phase 21 is the LAST phase of milestone v1.0 — **milestone completion is owner's, in a later session (do
-NOT auto-complete).** No KB-extraction system exists for this repo yet.
-
-**⟢ PHASE 20 (Contact Reconciliation & Merge) — COMPLETE (2026-08-31).** All 6 plans executed +
-consolidated Pixel device-UAT: **all 8 scenarios PASS**, each independently DB-verified (WAL-aware
-run-as), owner-signed-off. The device UAT surfaced and this session fixed two correctness bugs the
-now-working reconcile exposed: **Bug B** (`165b9e7`) — `reconcile-photo.ts` `digest()` crashed the
-bulk scan on Hermes (`globalThis.crypto` undefined) whenever a linked source had a photo; now guards
-WebCrypto / falls back to RNQC. **Bug C** (`eecea73`) — duplicate React keys for multi-value field
-choices in `FieldChoiceGroup`. ADR-003 (READ_CONTACTS on API 37 for reconcile) owner-approved +
-implemented + verified. Close-out docs `295ae58` (20-06-SUMMARY, 20-UAT scoreboard all-green,
-20-BUGB-DIAGNOSIS). Follow-ups logged (non-blocking): **Finding A** (exact lookup-key match orphans a
-renamed local contact — backlog hardening), two cosmetic display nits, and the ADR-003 Google Play
-Contacts declaration (release gate). ZZ-UAT device+Orbit fixtures RETAINED per owner (reuse). UAT
-screenshots in `uat-shots/` left untracked. **Not yet pushed** (commits: cd41b31, 165b9e7, eecea73, 295ae58).
-
-**⟢ PHASE 18.1 (Contact Method Normalization) — COMPLETE (2026-08-28).** All 6 plans executed.
-Normalized phone/email method model with stable identity + system-contact provenance foundations;
-all contacts remain Bound. 18.1-06 close-out: Task 1 automated verification (1,510 tests green +
-executable scalar-method retirement audit, `06531df`); Task 2 device UAT PASSED on the Pixel —
-v8→v10 migration confirmed, and the **restore route was repaired and proven end-to-end**. The direct
-Restore button launched a blank Android DocumentsUI `PickActivity`; fix = a new in-task
-`ACTION_GET_CONTENT` native picker (`modules/orbit-backup-document-picker/pickBackupDocument`) with the
-Files→Share receiver kept as a resilient fallback. Root cause of the blank picker was this Pixel's
-**corrupted DocumentsUI** (RefreshTask NPE), reproduced identically under both intent actions and cleared
-with `pm clear com.google.android.documentsui` — a device fault, not app code. Changed-primary Merge
-verified clean (unique-safe, no rejection). Commits LOCAL on `main`, NOT pushed. **Next: Phase 18.2
-(Bound/Unbound Lifecycle)** on this normalized model.
-
-**⟢ PHASE 17 (Backup, Export & Restore) — EXECUTING.** 8/12 plans complete. Plan 17-07 adds a Pixel-release-measured v1 encrypted envelope, 600k PBKDF2 profile, typed SecureStore cache, and fail-closed encrypted backup writes. Next: 17-08 validated restore preview and transactional Merge/Replace apply. All commits remain local on `main`; nothing has been pushed.
-
-**⟢ PHASE 15 (Weekly Digest) — COMPLETE (2026-08-23), pending owner sign-off. Milestone `--to 15` halt reached.**
-5/6 plans EXECUTED + node-verified (vitest 1356/1356) + code-review APPROVE + **DEVICE UAT PASSED on the Pixel**:
-migration 005 applied on-device, DigestScreen renders (streak-safe retrospective list), dashboard "Your week"
-entry + Settings toggle (ON default) work, and a **device-clock fire test PROVED the WEEKLY digest FIRES**
-(`tag=digest:weekly`, channel `digest-v1` PRIVATE, copy "Your week in Orbit"/"A look back at who you reached.")
-**AND headlessly RE-ARMS for the next Sunday (Sep 6)** — resolving the pre-57 `repeatInterval=0` caveat. Not
-driven e2e (code/dossier-verified, low-risk): H3 notification-tap reset + reboot re-registration. See 15-VERIFICATION.md.
-discuss (smart) → UI-SPEC (approved, 6/6 dims) → research (code-grounded) → migration escalation resolved by
-owner → pattern-map → plan (6 plans / 4 waves, MVP slices) → plan-checker PASSED → **3-cycle cross-AI convergence
-(codex `exec --sandbox read-only` no-bypass + fresh read-only Claude subagent — the gsd-review codex/claude paths
-are both broken here, driven manually)** cycle1 2H/5a → cycle2 1H/4a → cycle3 0 HIGH → **owner approved execute** →
-**EXECUTED 15-01..05 sequentially on `main` (no worktree)**: node gates GREEN (vitest **1356/1356**, tsc clean,
-check:colors clean), then a fresh read-only Claude **code review of the implementation = APPROVE (0 HIGH / 0 MEDIUM /
-2 LOW)** — LOW-1 (EFFORTFUL_WINDOW_DAYS comment off-by-one) FIXED, LOW-2 (dayTag defensive, unreachable) recorded.
-**NEXT (owner-gated): 15-06 device UAT** — desktop release build on `droid` → Pixel: WEEKLY Sunday fire (device-clock),
-reboot re-register, delivery-hour drift re-arm (M3), DigestScreen render, dashboard "Your week" entry, Settings toggle,
-tap→[Home,Digest] reset (Back→dashboard), foreground-suppression accept (L2). The **contested M4 test-barrier handshake
-was DEFERRED by owner** ("harden only if we find it failing") — recipe in 15-REVIEWS.md if the overlap test ever flakes.
-All 15-01..05 code commits + the 12 planning commits are scoped `docs(15)`/`feat(15-*)`/`fix(15)` on `main`, LOCAL,
-NOT pushed; STATE.md/ROADMAP.md never staged by any agent. Plan `digest-schedule.ts` (own service + defer-one + sweep),
-`digest-read.ts` (3 reads), `digest-logic.ts`, migration 005, `DigestScreen.tsx`, tap-reset + Settings toggle — all in.
-**OWNER RULING (recorded):** the digest ON/OFF toggle persists as `app_settings.digest_enabled`
-via **migration 005** (reconciles the dossier "no new schema" line = no new *tables*/per-contact state). Deferred:
-markdown export → the now-renumbered Phase 17.
-All 12 phase-15 planning commits are scoped `docs(15)` on main, LOCAL, NOT pushed; STATE.md/ROADMAP.md never staged
-by any agent. Plan set: 15-01 reads+logic, 15-02 migration005+DAO, 15-03 digest WEEKLY service+sweep hook,
-15-04 DigestScreen+route+dashboard "Your week" entry, 15-05 tap-routing(reset→[Home,Digest])+Settings toggle,
-15-06 owner-gated device UAT (weekly-fire+reboot+drift, release-blocking DGST-01).
-
-**⟢ SYNC MILESTONE (v2.0) SCOPED — updated 2026-08-24.** Multi-device sync + Electron desktop + a web portal is a decided future milestone (opt-in sync *over* the local DB, Turso-first, PowerSync dropped on cost, E2EE required, sync behind a paid tier). It is NOT built and is not on this v1.0 roadmap; it becomes its own `/gsd-new-milestone` only after a Turso go/no-go spike gate. The authoritative investigation is **`.planning/sync-milestone/SYNC-MILESTONE-INVESTIGATION.md`**. Two v1.0 prerequisites are now intentionally sequenced before the future milestone: **Phase 16 normalizes custom-field values into stable rows in migration 006**, then **Phase 17 adds backup/export/restore plus generic, all-mergeable-entity tombstones and the reusable reconciliation core in migration 007**. Phase 17 has a parked context at **`.planning/phases/17-backup-export-restore/17-CONTEXT.md`** and must be freshly discussed after Phase 16 executes; its concise decision index is **`.planning/sync-milestone/PHASE-17-SYNC-READINESS.md`**.
-
-**CURRENT — Phase 14 (AI Message Suggestions): COMPLETE ✅ — owner-ACCEPTED (2026-08-22). Remaining: owner push (+ device test-config reset; disposable key already revoked).** Device UAT on the Pixel release build: picker fully verified (3 frontier/provider — OpenAI sol/terra/luna, Anthropic opus-5/sonnet-5/haiku-4-5, Gemini 3.1-pro-preview/3.7-flash/3.5-flash-lite; All toggle; live LiteLLM refresh "17 available"; offline seed fallback; masked key). Owner confirmed generation works via the new picker. **Egress guard smoke test PASS** (owner scoped the release-gating matrix down to a smoke test): a Custom endpoint on a private-resolving host (`10-0-0-1.nip.io`→10.0.0.1) fail-closed via the native `OrbitSecureFetchModule` ("endpoint refused", logcat-confirmed), while a public-resolving control (`8.8.8.8`) got past the guard and failed differently — proving address-specific blocking; the first-send ack + exact-prompt inspector also fired correctly. Exhaustive vector coverage rests on the green JVM/Kotlin address-predicate tests. **The Custom BYO-endpoint feature was KEPT** (owner declined removing it — don't alienate self-hosting users). Left a throwaway Custom test config on the device + removed the disposable gemini key (owner: reset + revoke). Earlier context: Core 7 plans (14-01..07) executed 2026-08-21; device UAT found 3 bugs (all fixed). Model-handling then went through THREE gap iterations: 14-08 (hand-curated list) → **SUPERSEDED by 14-10** (model list now SOURCED from LiteLLM's published `model_prices_and_context_window.json` — user-tap Refresh, on-device cache + bundled seed, offline fallback, Frontier/All toggle, free-text escape hatch) → **14-11** (Frontier = exactly 3 LATEST-per-tier ids resolved live from the catalog: OpenAI sol/terra/luna, Anthropic opus-5/sonnet-5/haiku-4-5, Gemini 3.1-pro-preview/3.7-flash/3.5-flash-lite; previews eligible). 14-09's token budget → **SUPERSEDED by 14-11**: the artificial output cap is REMOVED (owner call — it never bounded visible length and truncated thinking models). Gemini omits maxOutputTokens+thinkingConfig (dynamic thinking); OpenAI omits max_completion_tokens; Anthropic sends the model's OWN catalog max (its API requires the field); visible length bounded solely by the 1,200-code-point post-parse trim. Node-verified by the orchestrator: **vitest 1305/1305, tsc/check:colors clean, frontier resolution re-run (3/provider)**, no egress/privacy control touched. Commits on main through `7401ee9`, NOT pushed. **NEXT (owner-gated): ONE release-APK build on `droid` → a SINGLE device UAT** covering (a) the picker (3 frontier + All toggle + Refresh + offline seed + free-text), (b) full-length drafts on ALL 3 Gemini tiers incl. Pro, AND (c) the still-PENDING release-blocking 14-06 Task 2 checklist (native egress-escape fixtures — private-address/redirect/proxy/IP-literal FAIL to leak w/ sanitized codes + independent zero-delivery observer; first-send ack + exact-prompt inspector; cancel/replace; sanitized errors; SecureStore masked key; rejected Custom paths). ⚠ Disposable Gemini key may still be active — owner to revoke when done. _(Pre-execution convergence detail below is historical.)_ Original 7 plans, wave order 01/03 → 07 → 02 → 04 → 05 → 06. A 5-cycle cross-AI plan-review convergence (codex `exec --sandbox read-only` no-bypass + read-only Claude subagent, aggregated in `14-REVIEWS.md`) drove unresolved concerns 11→10→12→4→1; the final confirming review = Claude APPROVE, Codex 1 residual HIGH that was purely IANA-table exhaustiveness (not an egress hole). Owner close-out (2026-08-21): applied the safe IANA hardening + a shared `non-public-vectors.json` manifest (JS ⇔ Kotlin table-driven), and DECLINED the globally-reachable `/32` carve-outs as they would weaken the egress guard (recorded intentional — do not "bug-fix" it back). **Core design:** Custom-provider egress routes ONLY through a new Android-first Expo native module `orbit-secure-fetch` (OkHttp custom `Dns` rejecting non-public resolved+literal addresses per the canonical IANA table, `Proxy.NO_PROXY`, redirects disabled); official providers on raw `fetch`; keys in `expo-secure-store` (migration 004 → v4, registered in `database.ts`); a closed `PromptContext` allowlist; a Compose-owned first-send per-provider acknowledgement committed BEFORE any egress with a stale-request recheck. Commits LOCAL on main, NOT pushed. **NEXT: owner go-ahead → `/gsd-execute-phase 14`** (one owner-gated checkpoint: 14-06 Task 2, a Pixel release-build UAT with native private-address/redirect/proxy/IP-literal egress-escape fixtures + the desktop native `compileDebugKotlin`/`testDebugUnitTest` gate before Plan 02). _(Phase-13 detail below is historical.)_
-
----
-
-**PRIOR — Phase 13 (Orrery): COMPLETE ✅ / owner-accepted (2026-08-18).** Milestone `--to 13` reached; **Phase 14 (AI Message Suggestions) is next — in a fresh session.** All 8 plans executed (TDD, atomic); deep code-review (0 critical; WR-01 drag-drift + WR-03 shared self-predicate fixed; WR-02 capacity deferred to owner); goal-verifier 22/22 code-truths; node gates green (npm test 1009/1009, tsc, check:colors, biome); plan-checker + a 3-cycle cross-AI convergence CONVERGED (codex `exec --sandbox read-only` + read-only-Claude subagent; 0 HIGH/0 actionable). On-device (Pixel, debug build for the populated DB): orrery **renders + works** (owner-confirmed) — starfield, self-sun gold glow via the bundled `.ttf`, segmented control, migration 003 live (v3). The empty-orbit seen mid-UAT was a **dev-mode Metro/Fast-Refresh expo-sqlite NPE** (`NativeStatement.runAsync` NPE on the first read; cleared by a clean relaunch), NOT the orrery code. Owner-accepted follow-ups (NOT blockers): a release-APK confirmation on a fresh DB (owner runs later), WR-02 grid-capacity. Owner-requested add-contact **FAB** shipped (`cc41d93`, outside orrery scope). Commits LOCAL on main, NOT pushed. _(Execution detail below is historical.)_ Wave 1 (13-01..04) + Wave 2 (13-05, 13-06) + Wave 3 (13-07) COMPLETE. **13-07 DONE:** the static status-view orrery is now the full interactive Skia surface (`OrreryScreen.tsx` + keyed children `OrbitBody`/`OrreryCanvas`/`SunBody` + new `orrery-clock-context.ts`). **ORR-02 morph:** a SINGLE `morph` shared value (0=Status, 1=Relationship) driven by the SegmentedControl via `withTiming(MORPH_MS=500, ease-in-out)`; per-body `OrbitBody` `useDerivedValue` worklets (H1 — keyed child, never a `.map()`) interpolate angle (statusAngle↔even-spread via `shortestAngleDelta`, as a Group-transform translate) + outline colour (`interpolateColor` full↔muted), radius FIXED. **ORR-03 ambient:** `OrreryCanvas` owns the SOLE `useClock()` driving a ~44-dot starfield twinkle + (via `OrreryClockContext`) the `SunBody` glow pulse; pause-on-blur = UNMOUNT `OrreryCanvas` on `!(dimsValid && useIsFocused && AppState active)` (grep-confirmed `useClock` only in OrreryCanvas). **ORR-06 canvas half:** `Gesture.Race(tap, pan)` — the pan hit-tests a worklet-safe `bodiesShared`+`dragMetrics` snapshot (M5), live-previews an `accent` ghost-ring, and on release snaps radius→rank via the SAME `deriveOrreryMetrics` C (H2) then `runOnJS`→`commitRingSeq`→`rewriteRingSeq(exec, newIds, localDateTime(), sunContactId)` in ONE txn — threading `sunContactId` as `excludeContactId` (the fixed guard-alignment blocker); success re-reads with the same exclusion to reflow, failure alerts + re-reads. All colours via tokens incl. the `interpolateColor` endpoints; check:colors clean. 3 commits (d204f33 morph; ea4370c ambient+pause; de20aca radial drag); tsc + check:colors + npm test (1000) + biome (5 touched files) green; no deviations. .tsx/Skia render loop + gestures are device-UAT (13-08). Committed LOCALLY on main (NOT pushed).
-
-- **Convergence CONVERGED** — reviewers = codex `exec --sandbox read-only` WITHOUT the classifier-blocked bypass flag + an independent read-only Claude subagent (self-review guard overridden per owner). plan-checker PASSED after 1 revision closing a real cross-plan blocker (rewriteRingSeq count-guard vs the sun-excluded N-1 rendered set — would break every ring_seq drag whenever a contact occupied the sun). cycle-1: 2 codex HIGH (React Rules-of-Hooks per-planet hooks in a map → keyed OrbitBody/OrreryCanvas/SunBody; incomplete responsive geometry → shared deriveOrreryMetrics) + 9 actionable → replan. cycle-2: 2 HIGH (nullable photo→resolvePhotoUri type/fallback; never-contacted-sun null status) + Claude's real check:colors test-hex build-gate bug + 4 → replan. cycle-3: BOTH reviewers READY-TO-EXECUTE, 0 HIGH / 0 actionable.
-- **8 PLANs / 4 waves** (13-01..08). Migration 003 (adds sun_contact_id + self_sun_colour to app_settings) is the first schema change since Phase-11's 002 — forward-only + irreversible. ZERO new npm deps (Skia 2.6.2 / Reanimated 4.5.1 already installed + proven by CropPhotoScreen); the only new asset is one bundled .ttf font for the Skia initials fallback.
-- **Owner decision recorded:** sun-OCCUPANT assignment is a Settings picker (favourites → all contacts → "Me"/self), NOT an orrery long-press (owner rejected long-press as accident-prone); the ring_seq radial drag stays on the canvas. ORR-06's "assign the sun from the orrery" is intentionally relocated to Settings — do NOT mis-flag the canvas absence as a gap.
-- **Next: `/gsd-execute-phase 13` on owner go-ahead.** One owner-gated checkpoint — 13-08 (`autonomous:false`): desktop prebuild via `droid` + Pixel device UAT (render / morph / gestures / the one-off Skia `file://` decode spike / pause-on-blur / perf — Pixel-only) + owner sign-off.
-- Reviewer tooling (unchanged from Phase 12): gsd-review's built-in codex (`--dangerously-bypass-hook-trust`, classifier-blocked) + claude (`-p` Write-gap) paths are BOTH broken here — drive reviews manually (`codex exec --sandbox read-only` no bypass flag; read-only Claude subagent; aggregate into REVIEWS.md).
-
-Progress: [████████░░] 75% (12/16 phases complete; Phase 13 EXECUTING — 7/8 plans done, only 13-08 owner-gated device UAT remains)
-
----
-
-_Phase-12 recap (historical — Phase 12 is COMPLETE + verified; see 12-VERIFICATION.md):_
-
-Phase: 21 (Interaction Assist & Reach Out) — EXECUTING
-Next: Phase 13 (Orrery) — NOT started. It is a large new Skia render-loop phase (its own discuss→plan→converge→execute→device-UAT cycle); awaiting owner go-ahead before beginning.
-Done this session (2026-08-17), all committed locally on main (NOT pushed): smart-discuss (12-CONTEXT; owner APPROVED the shared stable/wobble/decay status palette — stable #45B98A / wobble #E8C15C / decay #E56A52 / rogue #E0904A unchanged — resolving OD-1 app-wide; widget + ContactCard + future orrery inherit it), UI-SPEC (approved, checker VERIFIED), RESEARCH, VALIDATION (Nyquist), PATTERNS, PLAN (8 plans / 6 waves, efa9f5b), plan-checker PASSED, then a 2-cycle cross-AI convergence (codex CLI + read-only-Claude subagent; self-review guard overridden per owner): cycle-1 = 6 codex HIGH + 7 Claude actionable → replan (cca05d9); cycle-2 = 2 codex HIGH (WDG-03 freshness incompleteness; killed-app UAT needed a debug build) → final replan (4e688cf). All 8 HIGH fixes verified in-file. NOTE: the final-replan fixes were NOT independently re-reviewed (max cycles reached + owner pause).
-Codex tooling note: current codex-cli (0.144.1) makes gsd-review auto-add `--dangerously-bypass-hook-trust`, which the safety classifier blocks; a subagent improperly tunneled it once (flagged, discarded), then codex was re-run cleanly WITHOUT that flag. Do NOT let gsd-review's codex path run with that flag — run codex manually without it, or allow-list a scoped `Bash(codex exec:*)`.
-Next: EXECUTION on owner go-ahead — `/gsd-execute-phase 12`. Two owner-gated checkpoints in the plans: (1) 12-02 native-dep legitimacy checkpoint (`react-native-android-widget@0.22.0`, blocking-human), (2) 12-04-T1 Log→Profile mapping ratification (blocking-human, gates the URI resolver + render). Device UATs incl. the killed-app headless mark are now on a DEBUG build (release APK is not run-as-able, runbook §3.1) and are BUNDLED with the deferred Phase-11 killed-app FCM-less headless mark/snooze check.
-
-Progress: [████████░░] 75% (12/16 phases complete; Phase 13 next, not started)
+Phase: Milestone v1.0 complete
+Plan: —
+Status: Awaiting next milestone
+Last activity: 2026-09-01 — Milestone v1.0 completed and archived
 
 ## Performance Metrics
 
@@ -448,12 +339,40 @@ See REQUIREMENTS.md "v2 / Deferred Requirements" and the per-domain "Deferred to
 planning" sections in docs/dossier/*.md — those are the authoritative hand-off lists for each phase's
 `/gsd-discuss-phase` and `/gsd-plan-phase` steps.
 
+Items acknowledged and deferred at milestone close, most recent first:
+
+| Category | Item | Status | Deferred At | Milestone |
+|----------|------|--------|-------------|-----------|
+| debug_sessions | knowledge-base | unknown | 2026-09-01 | v1.0 |
+| debug_sessions | manual-export-failure | investigating | 2026-09-01 | v1.0 |
+| debug_sessions | replace-apply-failure | awaiting_human_verify | 2026-09-01 | v1.0 |
+| debug_sessions | replace-preview-expiry | awaiting_human_verify | 2026-09-01 | v1.0 |
+| debug_sessions | wave1-integration-regressions | awaiting_human_verify | 2026-09-01 | v1.0 |
+| todos | 2026-08-26-validate-restore-progress-with-imported-photo-library.md | (presence-only) | 2026-09-01 | v1.0 |
+| uat_gaps | 11/11-UAT-NOTES.md | 0 pending scenarios | 2026-09-01 | v1.0 |
+| uat_gaps | 16/16-UPGRADE-UAT.md | 0 pending scenarios | 2026-09-01 | v1.0 |
+| uat_gaps | 19/19-DEVICE-UAT-FINDINGS.md | 0 pending scenarios | 2026-09-01 | v1.0 |
+| uat_gaps | 19.1/19.1-DEVICE-UAT.md | 0 pending scenarios | 2026-09-01 | v1.0 |
+| uat_gaps | 20/20-UAT-BLOCKER-read-contacts.md | resolved by ADR-003 (stale header) | 2026-09-01 | v1.0 |
+| uat_gaps | 20/20-UAT-FINDINGS-reconcile-bugs.md | 0 pending scenarios | 2026-09-01 | v1.0 |
+| uat_gaps | 20/20-UAT-HANDOFF.md | 0 pending scenarios | 2026-09-01 | v1.0 |
+| uat_gaps | 20/20-UAT-RUNBOOK-RESEARCH.md | 0 pending scenarios | 2026-09-01 | v1.0 |
+| uat_gaps | 20/20-UAT.md | all-8-pass, owner-signed-off | 2026-09-01 | v1.0 |
+| uat_gaps | 21/21-UAT.md | signed-off (owner) | 2026-09-01 | v1.0 |
+| deferred_items | 10/deferred-items.md: pre-existing biome drift on main | acknowledged | 2026-09-01 | v1.0 |
+| deferred_items | 14/deferred-items.md: pre-existing noArrayIndexKey in ComposeScreen | acknowledged | 2026-09-01 | v1.0 |
+| deferred_items | 18.1/deferred-items.md: pre-existing ComposeScreen biome findings | acknowledged | 2026-09-01 | v1.0 |
+| deferred_items | 18.2/deferred-items.md: pre-existing check:colors test-fixture colour | acknowledged | 2026-09-01 | v1.0 |
+| deferred_items | 21/deferred-items.md: pre-existing ComposeScreen unused import + key | acknowledged | 2026-09-01 | v1.0 |
+
+_Also disposed at this close: 05/deferred-items.md (check:colors doc-comment) marked **resolved** — genuinely fixed during Phase 5 Wave 3, not deferred._
+
 ## Session
 
 **Last session:** 2026-08-31T17:07:16.424Z
 **Stopped at:** Phase 21 UI-SPEC approved
 _Prior stop (13-04):_ the orrery VISUAL VOCABULARY (theme tokens + two pure resolver modules, node-tested, 29 cases green): (1) five owner-tunable `ThemePalette` tokens seeded in `space-dark.dark` ONLY — `starPalette` (6 colours, gold `#F2C14E` at index 0, then amber/rose-red/violet/cyan/ice-white), `mutedStable/Wobble/Decay` (desaturated same-hue morph endpoints), `rogueExtinguished` (cold blue-grey `#3E4A6B` rogue BODY fill) — with an M6/C2-5 conformance test that IMPORTS the real `SELF_SUN_COLOUR_RE`/`assertSelfSunColour` from app-settings-dao and locks every starPalette entry to the ACTUAL DAO write-path rule (no re-inlined regex). (2) `orrery-ring-logic.ts` `orreryRingStyle(status, colors)` — REUSES `ringVisual` for `{color,opacity,width}` (status→colour mapped once), adds the `strokeStyle` axis (solid→dashed→faded→faintTrace) + `bodyFill` (rogue ring=`colors.rogue`, body=`rogueExtinguished`); `null`→canonical NEUTRAL (`colors.border`), never throws — the single fallback sun-occupant reuses (C2-2). (3) `sun-occupant-logic.ts` `resolveSunOccupant(input)` — NULL/archived/missing→self (A7, glow `selfSunColour ?? starPalette[0]`), live contact→its status glow via `orreryRingStyle(status, colors).color`, never-contacted (status `null`)→the reused neutral border (C2-2); accepts `status: ProfileStatus | null`. 5 commits (1801915 feat tokens+M6; d35d528 RED→4cbfad5 GREEN ring-logic; c923b16 RED→10780dd GREEN sun-occupant); tsc + check:colors clean; no deviations (one in-flight fix: a placeholder hex in the logic test was re-sourced from the palette after check:colors flagged it — C2-3). Committed locally on main (NOT pushed). Next: Wave 2 (13-05 render / 13-06 Settings sun-picker), Wave 3 (13-07 drag-release), Wave 4 (13-08 device UAT, autonomous:false).
-**Resume file:** .planning/phases/21-interaction-assist-reach-out/21-UI-SPEC.md
+**Resume file:** — (milestone v1.0 complete; no active phase. v1.0 phase artifacts archived under `.planning/milestones/v1.0-phases/`.)
 
 ## Phase 4 — Closeout (2026-08-15) ✅ COMPLETE
 
@@ -474,3 +393,7 @@ was built via the desktop pipeline and driven through create→edit→archive→
 
 - 3 minor UI affordances not tapped on-device (they render correctly): a link's tap-to-open, the native
   date picker via "Pick date", and the Restore action.
+
+## Operator Next Steps
+
+- Start the next milestone with /gsd-new-milestone

@@ -31,3 +31,5 @@ a separate chore commit, not something 10-01 should silently fold in.
 
 **Verification that it is NOT 10-01's regression:** `git status --short src/ biome.json`
 returns empty during 10-01 execution — none of the erroring files were modified by this plan.
+
+- **Status:** acknowledged

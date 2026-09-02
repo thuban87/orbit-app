@@ -5,6 +5,10 @@ blocked_at: 20-06 Task 3 — Consolidated Pixel device UAT
 created: 2026-08-30
 target_device: Pixel 6 Pro (serial 1A071FDEE002BU, API 37)
 do_not_use: Pixel 3a (serial 943AY0JR4P, API 32; unsupported for the contact picker)
+audit_acknowledged:
+  milestone: v1.0
+  at: 2026-09-02
+  gap_snapshot: "blocked::scenarios=0"
 ---
 
 # Phase 20 Device-UAT Handoff

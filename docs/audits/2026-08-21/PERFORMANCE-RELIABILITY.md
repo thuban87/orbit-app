@@ -304,7 +304,7 @@ Artifact inspection found approximately 133.4 MB of stored native libraries: 35.
 | Existing Android local-time probe | `date('now','localtime')` matched the device's 2026-08-14 local date |
 | Release artifact | 151,424,230-byte APK; 3,782,224-byte Hermes bundle; four ABIs; `extractNativeLibs=false` |
 
-The prior Pixel data is from `.planning/phases/02-data-foundation-status-engine/02-06-SUMMARY.md`, not a rerun. It covers the Phase 2 status/newest queries—not the current dashboard fuel subqueries, profile, widget, photo, or orrery.
+The prior Pixel data is from `.planning/milestones/v1.0-phases/02-data-foundation-status-engine/02-06-SUMMARY.md`, not a rerun. It covers the Phase 2 status/newest queries—not the current dashboard fuel subqueries, profile, widget, photo, or orrery.
 
 ### Query-plan evidence
 

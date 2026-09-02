@@ -21,8 +21,8 @@ last_updated: 2026-08-31T22:23:05.470Z
 | 4 | 18.1 | deviation | src/screens/ComposeScreen.tsx | 438 | Closed undefined SMS destination path with an explicit null guard. | fixed |  | 2026-08-28T07:44:01.382Z | 2026-08-28T07:45:03.119Z |
 | 5 | 18.2 | deviation | src/db/ai-context-read.test.ts |  | Corrected future-dated Unbound test touchpoint fixture before RED verification. | fixed |  | 2026-08-29T00:27:47.044Z | 2026-08-29T00:28:30.525Z |
 | 6 | 19 | stub | src/navigation/RootNavigator.tsx |  | Intentional import route placeholders await plans 06–08. | open |  | 2026-08-29T13:53:23.947Z |  |
-| 7 | 19 | unrun-verify | .planning/phases/19-system-contact-import/19-04-PLAN.md |  | Android 17 device UAT was not run; native picker and UI behavior remain to verify. | open |  | 2026-08-29T13:53:24.136Z |  |
-| 8 | 19 | unrun-verify | .planning/phases/19-system-contact-import/19-10-PLAN.md |  | Android 17 photo and birthday import UAT was not run; picker-provided photo/birthday behavior remains to verify. | open |  | 2026-08-29T14:15:53.733Z |  |
+| 7 | 19 | unrun-verify | .planning/milestones/v1.0-phases/19-system-contact-import/19-04-PLAN.md |  | Android 17 device UAT was not run; native picker and UI behavior remain to verify. | open |  | 2026-08-29T13:53:24.136Z |  |
+| 8 | 19 | unrun-verify | .planning/milestones/v1.0-phases/19-system-contact-import/19-10-PLAN.md |  | Android 17 photo and birthday import UAT was not run; picker-provided photo/birthday behavior remains to verify. | open |  | 2026-08-29T14:15:53.733Z |  |
 | 9 | 21 | deviation | src/screens/ContactProfileScreen.tsx | 1336 | Router receives already-loaded complete method groups so the required multi-endpoint selector can function. | open |  | 2026-08-31T22:23:05.470Z |  |
 
 ````json
@@ -103,7 +103,7 @@ last_updated: 2026-08-31T22:23:05.470Z
     "id": 7,
     "kind": "unrun-verify",
     "phase": "19",
-    "file": ".planning/phases/19-system-contact-import/19-04-PLAN.md",
+    "file": ".planning/milestones/v1.0-phases/19-system-contact-import/19-04-PLAN.md",
     "line": null,
     "description": "Android 17 device UAT was not run; native picker and UI behavior remain to verify.",
     "status": "open",
@@ -115,7 +115,7 @@ last_updated: 2026-08-31T22:23:05.470Z
     "id": 8,
     "kind": "unrun-verify",
     "phase": "19",
-    "file": ".planning/phases/19-system-contact-import/19-10-PLAN.md",
+    "file": ".planning/milestones/v1.0-phases/19-system-contact-import/19-10-PLAN.md",
     "line": null,
     "description": "Android 17 photo and birthday import UAT was not run; picker-provided photo/birthday behavior remains to verify.",
     "status": "open",

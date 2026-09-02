@@ -9,7 +9,7 @@ ADR-002 established a hybrid two-picker **import** layer: API 37+ uses the permi
 
 Phase 20 then built **reconciliation** (`Update from Contacts`, `Check linked contacts`) on top of `orbit-contact-picker`'s `readAllContacts(lookupKeys)` → `readContactsByLookupKeys` → a **direct `ContactsContract` provider query** (`OrbitContactPickerModule.kt`). That query requires runtime `READ_CONTACTS`. Because the permission is capped at `maxSdkVersion=36`, it is **absent on API 37+**, so on the owner's Pixel 6 Pro (API 37) both reconcile entry points fail: *"Could not read Contacts right now."* / *"Could not check linked contacts right now."* (logcat: `Permission Denial … requires android.permission.READ_CONTACTS`).
 
-This was invisible until the **first Phase-20 device UAT** (2026-08-31): automated tests mock the native module, and import/merge/birthday-review don't hit the reconcile re-read. See `.planning/phases/20-contact-reconciliation-merge/20-UAT-BLOCKER-read-contacts.md`.
+This was invisible until the **first Phase-20 device UAT** (2026-08-31): automated tests mock the native module, and import/merge/birthday-review don't hit the reconcile re-read. See `.planning/milestones/v1.0-phases/20-contact-reconciliation-merge/20-UAT-BLOCKER-read-contacts.md`.
 
 The reconcile feature fundamentally needs to re-read the **current state of an already-linked set** of contacts to detect drift (additive / conflict / removed / missing) and sync it into Orbit. The system Contact Picker cannot serve this: it returns a fresh user *selection*, not a diff of previously-linked contacts, and forcing the user to re-pick their entire linked set on every `Check linked contacts` sweep is not a technical equivalent of ongoing change-detection.
 

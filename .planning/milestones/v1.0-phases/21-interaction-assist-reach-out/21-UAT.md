@@ -6,6 +6,10 @@ device: Pixel 6 Pro (serial 1A071FDEE002BU)
 build: DEBUG (run-as verified); repo HEAD 5b6e05e; DB user_version=14, migration 014 applied
 executed_at: 2026-08-31
 evidence_dir: scratchpad/uat (screenshots R01..R20 + final-db-snapshot.txt)
+audit_acknowledged:
+  milestone: v1.0
+  at: 2026-09-02
+  gap_snapshot: "signed-off (owner, 2026-08-31)::scenarios=0"
 ---
 
 # Phase 21 Device UAT Scoreboard
@@ -19,10 +23,13 @@ the Evidence column. Do not infer database correctness from visible UI.
 - Use a DEBUG APK; release builds cannot use `run-as`.
 - For confirmed rows, verify `occurred_at === handoff_at`, `direction='outbound'`,
   `source='assist'`, and the action-specific `connected` value.
+
 - Verify `contacts.last_contact` changes only through the authoritative recency
   recompute path, not a bespoke write.
+
 - Record the actual device serial, build commit, screenshot path, SQL/read output,
   and time-travel technique for each row below.
+
 - `BLOCKED` rows are explicit owner/device checkpoints and must never be
   auto-passed. A failure or deviation stops sign-off and is surfaced to the owner.
 
@@ -55,14 +62,17 @@ the Evidence column. Do not infer database correctness from visible UI.
 - **R05 (return <15s) and R06 (return >15s):** exercised with REAL wall-clock time
   (background + immediate foreground for R05; background + ~16s wait + foreground
   for R06). No constant lowering or backdate needed.
+
 - **R14 sixth-pending prune:** NO time travel — created 6 real pending handoffs and
   DB-verified the LIMIT-5 prune (oldest → `expired`).
+
 - **R14 24-hour-expiry-not-prompted:** DONE via DEBUG time-travel — the orchestrator
   temporarily compressed `EXPIRE_AFTER_HOURS` to 30s (source edit owned/reverted by the
   orchestrator; the agent made no source edits). Created pending id=20 (contact 17),
   backgrounded, waited a real 35s past the 30s window, foregrounded → no banner AND the
   launch sweep expired the row. (The agent's own device DB writes remain blocked;
   this technique used a bundle constant, not a DB backdate.)
+
 - **R15 reboot:** real `adb reboot` (durable-SQLite survival, not simulated).
 
 ## Final Recommendation (agent, DB-verified; owner sign-off NOT taken)
@@ -74,14 +84,18 @@ no time-travel; 24h-expiry via the orchestrator's DEBUG-lowered EXPIRE_AFTER_HOU
 real 35s wait). R11–R13 remain explicit device-gated BLOCKED; R21 left BLOCKED.
 
 Plain-language DB state (for the owner, who cannot inspect on-device SQLite):
+
 - **Handoff-time integrity:** every one of the 7 assist-sourced interactions written
   during UAT has `occurred_at` EXACTLY equal to its assist's `handoff_at` — the
   confirmation logged the moment of reach-out, never the moment of confirmation.
+
 - **Single recency writer:** `contacts.last_contact` advanced only through
   `recomputeLastContactCore` (the sole writer); no bespoke last_contact write fired.
+
 - **Connected values honest to the action:** Call Yes=1, Call No answer=0, Text Yes=1,
   Email Yes=1; Don't log wrote NO interaction; every written row is
   direction=outbound, source=assist.
+
 - **Fail-safes hold:** Assist OFF writes nothing and clears the pending queue
   immediately (no resurrection on re-enable); return <15s shows no prompt; the queue
   caps at 5 pending (6th prunes the oldest); non-expired pending survive a reboot and

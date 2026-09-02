@@ -8,3 +8,5 @@
   14-11 and unrelated to the model-layer changes — left untouched per the
   scope boundary. Fix later by keying on a stable field of the truncation entry
   rather than the array index.
+
+- **Status:** acknowledged

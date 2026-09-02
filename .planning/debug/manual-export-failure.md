@@ -3,6 +3,10 @@ status: investigating
 trigger: "Release-device readable manual export fails before Android sharing, independently blocking Replace-all safety snapshots."
 created: "2026-08-26"
 updated: "2026-08-26"
+audit_acknowledged:
+  milestone: v1.0
+  at: 2026-09-02
+  status: investigating
 ---
 
 # Debug Session: Manual export failure
@@ -28,10 +32,12 @@ updated: "2026-08-26"
 - timestamp: "2026-08-26"
   source: Pixel 6 Pro diagnostic release UAT
   observation: Explicit readable manual export failed before native sharing; no output file was selected or restored.
+
 - timestamp: "2026-08-26"
   source: complete manual export and manifest trace
   observation: "Readable export bypasses encryption and passphrase resolution, then calls buildExportManifest before cache-file creation or expo-sharing. The manifest builder turns a rejected/empty profile, contact, or custom-photo read into BackupPhotoUnreadableError; the manual service's outer catch maps it to export-failed and never invokes the share adapter."
   implication: "Encryption/passphrase and Android sharing are eliminated for the direct readable failure. A bad current photo reference is the leading data cause; cache-file creation/read remains an uninstrumented alternative."
+
 - timestamp: "2026-08-26"
   source: focused local Vitest
   observation: "src/backup/export-manifest.test.ts and src/services/backup/backup-service.test.ts passed (19 tests). The export-manifest test asserts that one unreadable referenced photo rejects the whole export; the manual-service tests assert a failed export does not open sharing."
@@ -41,8 +47,10 @@ updated: "2026-08-26"
 
 - hypothesis: Automatic backup daily cadence alone explains the Replace safety snapshot failure.
   reason: Manual export, which does not use automatic cadence, fails at the same current-data export boundary.
+
 - hypothesis: Encryption passphrase or envelope encryption causes the direct readable-JSON failure.
   reason: "readableOverride makes resolveWriteEncryptionMode plaintext and skips encryption before buildExportManifest."
+
 - hypothesis: Android share availability/open is the direct readable-JSON failure.
   reason: "buildExportManifest, cache write, and read-back occur before share.isAvailable/open; the observed failure is reported before sharing."
 

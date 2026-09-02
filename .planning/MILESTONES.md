@@ -1,0 +1,21 @@
+# Milestones
+
+## v1.0 MVP (Shipped: 2026-09-01)
+
+**Scope:** Phases 1–21 (23 phase dirs incl. sub-phases 18.1/18.2/19.1) · 181 plans · 368 tasks · ~90,800 LOC TypeScript · SQLite `user_version` 14 · built 2026-08-11 → 2026-08-31.
+
+**Key accomplishments:**
+
+- **Foundation & data model (Phases 1–2)** — Expo SDK 57 scaffold with ~900 lines of portable plugin logic extracted into `src/`, theme-token system; a `PRAGMA user_version` migration-1 schema carrying every un-backfillable column from day one, the single-writer `last_contact` DAO (killing the plugin's four-writer recency drift), continuous derived-never-stored status, and the once-per-launch sweep.
+- **Custom fields (Phase 3 → normalized Phase 16)** — two-table TEXT-forever design with 7 read-time parsers, `field_history`, and quarantine/expiry; later migrated (migration 006 / ADR-001) to a sync-safe normalized value-row model with a stable `uid` per value, preserving every value and behavior.
+- **Contacts, photos & interaction model (Phases 4–7)** — contact CRUD with archive/restore/purge and `contact_links`; library/URL photos with in-app Skia crop to a 512px master; the editable touchpoint log with gravity/intensity, the `rogue` state and "Rarely responds"; and Conversational Fuel with a ranked projection and never-transmitted `off_limits`.
+- **Daily surfaces (Phases 8, 9, 13)** — the dashboard + never-contacted screen (sort/filter/search, birthday banner, favourites, offline render); the in-app compose screen (fuel visible, Send→SMS, Copy) that every reminder surface opens; and the two-view Skia orrery with rogue rendering and an assignable/self-colour sun.
+- **Friction loop (Phases 10–12)** — Android share-sheet capture with a grid-of-faces picker and inline create; actionable notifications (pre-scheduled + launch-reconcile, permissionless fuzzy delivery, mark/snooze actions, birthday alerts, per-contact mute); and a home-screen widget with headless mark-contacted.
+- **AI, digest & backup (Phases 14, 15, 17)** — BYO-key AI suggestions (OpenAI/Anthropic/Gemini/custom HTTPS, keys in secure-store, `share_with_ai` field flag, editable draft); the weekly Sunday digest → a live "your week" screen; and the load-bearing backup/export/restore (manual + auto rotating SAF backup, optional AES-256-GCM, tombstone-aware Merge/Replace, forward-migrate).
+- **Contact normalization & system integration (Phases 18.1, 18.2, 19, 19.1)** — normalized phone/email method rows with stable identity and system-contact provenance, the independent Bound/Unbound lifecycle, and deliberate single/bulk system-contact import via the hybrid two-picker (ADR-002: permissionless picker on API ≥37, scoped `READ_CONTACTS maxSdkVersion=36` + in-app picker on ≤16), with conservative duplicate evidence and resumable review.
+- **Reconciliation, merge & reach-out (Phases 20–21)** — user-triggered one-way source reconciliation and an explicit atomic Orbit-to-Orbit merge with tombstoning (ADR-003 enables `READ_CONTACTS` on API 37+ for the reconcile re-read only); and Interaction Assist — a durable pending assist written before native Call/Text/Email handoff, logged at handoff time through the single recency writer, plus widget Contact integration.
+- **Verified on real hardware** — foundation-to-assist flows were device-UAT'd end-to-end on the physical Pixel 6 Pro (API 37) with WAL-aware `run-as` DB verification, built through the desktop (`droid`) SSH pipeline; device UAT surfaced correctness bugs (Hermes `crypto` undefined, the API-37 reconcile permission gap) that mocked unit suites could not.
+
+**Closeout:** override_closeout. All 21 phases (1–21) are substantively complete and owner-signed-off (Phase 21, the declared last phase of v1.0, device-UAT PASS + sign-off 2026-08-31); the override reflects that the legacy STATE.md-format desync prevents the tooling from auto-confirming per-phase verification, not any missing work. **Known verification overrides:** 22 open artifacts dispositioned at close (21 acknowledged as deferred + 1 resolved), 0 carried forward from a prior close (see STATE.md "Deferred Items"). Verification for the later phases (14, 17, 18.1, 18.2, 20) is via device-UAT + owner sign-off rather than a VERIFICATION.md. All commits are local on `main`, NOT pushed.
+
+---

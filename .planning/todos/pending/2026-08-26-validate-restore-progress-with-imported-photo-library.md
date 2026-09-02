@@ -4,8 +4,13 @@ title: Validate restore progress with imported photo library
 area: testing
 severity: minor
 files:
+
   - src/screens/RestorePreviewScreen.tsx
   - src/screens/RestoreResultScreen.tsx
+
+audit_acknowledged:
+  milestone: v1.0
+  at: 2026-09-02
 ---
 
 ## Problem

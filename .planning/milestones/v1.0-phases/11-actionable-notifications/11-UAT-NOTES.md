@@ -1,8 +1,16 @@
+---
+audit_acknowledged:
+  milestone: v1.0
+  at: 2026-09-02
+  gap_snapshot: "unknown::scenarios=0"
+---
+
 # Phase 11 — On-Device Pixel UAT Notes (2026-08-16, live driving)
 
 Release APK built via desktop pipeline (droid), installed on the Pixel (`1A071FDEE002BU`) as a reinstall (`-r`, exercised migration v1→v2 on real data).
 
 ## Verified live on-device
+
 - **Launch + migration:** the release build cold-starts with no crash; migration 002 (v1→v2 `app_settings`) ran on existing data; dashboard + birthday banner ("Dad's birthday today") render.
 - **Settings → Notifications section** renders with all controls + correct copy: master "Allow notifications", "Decay reminders", "Birthday alerts", "Show names on lock screen", and the **user-tunable "Reminder time 9:00 AM" + "Quiet hours 9:00 PM – 8:00 AM"** (the owner's reversal). All expected testIDs present.
 - **NOTIF-05 value moment:** tapping the master toggle fires the OS `POST_NOTIFICATIONS` dialog ("Allow Orbit to send you notifications?"). Granting → `POST_NOTIFICATIONS granted=true`.
@@ -10,12 +18,14 @@ Release APK built via desktop pipeline (droid), installed on the Pixel (`1A071FD
 - **NOTIF-01 pre-scheduling:** after grant, the launch/foreground reconcile scheduled an `RTC_WAKEUP` AlarmManager alarm (inexact — no exact-alarm permission) for a **future** due morning (`2026-08-21 09:10`, = 9am + per-contact stagger) — i.e. a decay notification is parked and will fire without the app open.
 
 ## FINDING — lock-screen private/public visibility not enforced on-device (needs follow-up fix + rebuild)
+
 - **Symptom:** on-device, BOTH `decay-private-v1` and `decay-public-v1` report `mLockscreenVisibility=-1000` (`VISIBILITY_NO_OVERRIDE`) — identical. The private/public split is not applied at the channel level.
 - **Code is correct:** `src/services/notifications/channels.ts:47/52/57` sets `lockscreenVisibility: AndroidNotificationVisibility.PRIVATE`/`PUBLIC` per channel. So `expo-notifications`' `setNotificationChannelAsync({lockscreenVisibility})` is apparently NOT propagating to the native channel's visibility (stays at the NO_OVERRIDE default).
 - **Impact:** NOTIF-05's "private-by-default lock-screen visibility" (hide the contact name on the lock screen) is likely NOT effective on-device — a privacy-control gap (T-11-LOCK).
 - **Fix (owner-logged, deferred):** investigate the expo channel-visibility mapping (SDK 57); likely needs a code change (a new channel-id version since channels are immutable, and/or a native/config path) + another desktop build. NOT a blocker for the engine; a privacy hardening follow-up.
 
 ## Remaining on-device UAT (in progress this session — forced-delivery route)
+
 - Actual delivery: silent, generic body ("{Name} — time to reach out"), no heads-up.
 - Killed-app FCM-less headless mark/snooze DB write (H1/H2) — verified via the profile timeline after a killed-app action tap (release APK is not debuggable → no run-as; verify via app UI).
 - Body-tap → Compose → Back → dashboard.
@@ -28,6 +38,7 @@ Release APK built via desktop pipeline (droid), installed on the Pixel (`1A071FD
 Test data: Dad (birthday today; frequency set to daily by owner); quiet hours moved to 10pm; delivery 9pm — to force fires within the session.
 
 ### PASSED live on-device
+
 - **NOTIF-05 permission:** master toggle → OS `POST_NOTIFICATIONS` dialog → grant (granted=true). Value-moment, not cold-start. ✓
 - **Channels:** decay-private-v1 / decay-public-v1 / birthday-v1 created at IMPORTANCE_LOW (mImportance=2, FLAG_MUTE_HAPTIC, vibration off) — silent (H4). ✓
 - **NOTIF-01 pre-schedule + reschedule-on-change:** after the owner's frequency + delivery-hour + quiet-hours edits, the reconcile **rescheduled** Dad's decay from the earlier Aug-21 09:10 slot to the new cadence, and pre-scheduled the weekly re-nag for **Aug 22 21:10** — RTC_WAKEUP, inexact window (Doze-batched), no exact-alarm permission. Confirms item B / H3 live. ✓
@@ -38,11 +49,14 @@ Test data: Dad (birthday today; frequency set to daily by owner); quiet hours mo
 - **Migration + launch:** release build cold-starts; migration 002 (v1→v2) ran on real data; no crash. ✓
 
 ### FINDING (softened from the earlier alarm) — lock-screen visibility
+
 - The posted birthday notification carries **`vis=PRIVATE`** (private applied at the NOTIFICATION level), even though the channel dumped as `mLockscreenVisibility=-1000` (NO_OVERRIDE). So the private-by-default posture appears to BE applied via the notification. The earlier "not enforced" concern is largely walked back — recommend a quick lock-screen visual confirm (does the contact name hide on the lock screen when private) to fully close it, but this is NOT the privacy gap it first looked like.
 
 ### NOT exercised on-device (deferred — code-verified)
+
 - **Killed-app FCM-less headless mark/snooze write (H1/H2):** no decay notification is deliverable tonight (Dad's decay is Aug 22 per the weekly cadence; quiet hours now block further fires today), so the shade action buttons couldn't be tapped. The H1 (`await openAndMigrate()` before `getExecutor()`) + H2 (deterministic actionUid, UNIQUE-collision benign) fixes are verified in code review + the exactly-once unit test that drives the real DAOs against in-memory sqlite. On-device exercise needs a non-rogue overdue contact whose weekly tick lands on a near-future deliverable slot (e.g., tomorrow morning) — a short follow-up.
 - **Decay body-tap → Compose → Back → dashboard:** same dependency (no decay notification tonight). resolveNotificationNav decay→reset[Home,Compose] is pure-unit-tested; birthday→Profile confirmed live above.
 
 ### Net
+
 The engine works on the real device: it schedules (inexact, no exact-alarm), reschedules on change, delivers silently with the correct generic copy, routes taps, and honors the weekly cadence. Remaining device-exercise (headless action + decay body-tap) is a short follow-up gated on a deliverable decay notification, and is already code-de-risked.

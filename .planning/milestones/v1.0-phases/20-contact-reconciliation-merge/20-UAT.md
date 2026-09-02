@@ -5,6 +5,10 @@ device: Pixel 6 Pro (serial 1A071FDEE002BU, API 37)
 package: com.bwales.orbit (DEBUGGABLE build, installed 2026-08-30 23:15)
 started: 2026-08-31
 status: all-8-scenarios-PASS — owner-signed-off 2026-08-31; ZZ-UAT fixtures RETAINED per owner (reuse)
+audit_acknowledged:
+  milestone: v1.0
+  at: 2026-09-02
+  gap_snapshot: "all-8-scenarios-pass — owner-signed-off 2026-08-31; zz-uat fixtures retained per owner (reuse)::scenarios=0"
 ---
 
 # Phase 20 — Consolidated Device UAT
@@ -13,19 +17,23 @@ Runbook/navigation source: `20-UAT-RUNBOOK-RESEARCH.md` (code-verified).
 Baseline snapshot + integrity manifest: scratchpad `baseline/PRE-UAT-BASELINE.md`.
 
 ## Isolation guarantee
+
 - All fixtures use device-contact + Orbit name prefix **`ZZ-UAT-`**.
 - Pre-existing rows that must remain UNTOUCHED: contacts id 1–6 (id 3–6 are the owner's
   real family PII), external_contact_links id 1–5, import_sessions id 1–4,
   import_session_rows id 1–6, contact_methods id 1–22, interactions id 1–2.
+
 - Every destructive step resolves IDs from the DB by the `ZZ-UAT-` prefix before acting.
 
 ## Verified device-driving procedure (learned this session)
+
 - **Create device-local contacts:** on-device shell script via ContactsProvider `content insert` (null account = device-only, never synced). Host-side `--where` quoting mangles; push `.sh` to `/data/local/tmp`. Real contacts are `account_type=com.google` — never touched.
 - **adb input by control type:** plain `input tap` for RN chips/rows; **`input touchscreen tap`** for gesture-handler buttons (gear/FAB/import buttons/action bars); **`input touchscreen swipe X Y X Y 800`** (long-press) to SELECT CandidateCardGrid cards (a plain tap = onInspect). Settings gear must be tapped at its LOWER strip (y≈172) to clear the status bar.
 - **Import path:** FAB → "Import from Contacts" → picker (search `ZZ-UAT`, tap rows, Done) → "Resume import" → BulkImportSetup "Import N contacts" → ImportComplete → "Review possible matches" → long-press cards → "Choose action" → "Import as New" → Done.
 - **DB read:** `run-as com.bwales.orbit cat files/SQLite/orbit.db{,-wal,-shm}` then open WAL-aware with node:sqlite.
 
 ## Fixture registry
+
 device raw_contact id ↔ Orbit contact id ↔ external_contact_link id
 
 | Fixture (name) | Device raw_id | Orbit contact id | ext_link id | Role |
@@ -44,6 +52,7 @@ device raw_contact id ↔ Orbit contact id ↔ external_contact_link id
 | ZZ-UAT-Filler | 1141 | 17 | link17 | 7b bulk-path filler |
 
 ## Scenario evidence
+
 Status legend: ⬜ not started · 🟡 in progress · ✅ pass · ❌ fail · ⚠ pass-with-note
 
 | # | Scenario | Status | Evidence |
@@ -64,13 +73,16 @@ notification refresh is eventually-consistent (reconciled at the next foreground
 launch sweep), per 20-06-PLAN.md.
 
 ## Bugs fixed this UAT (committed)
+
 - **Bug B (blocker) — FIXED `165b9e7`.** `reconcile-photo.ts` `digest()` dereferenced `globalThis.crypto.subtle` unguarded; `globalThis.crypto` is undefined in Hermes → threw on the first linked contact with a source photo (c3), swallowed at `ReconcileGridScreen.tsx:229`. Now guards WebCrypto (Node/tests) and falls back to RNQC (device). Verified on-device + DB (14-scan, 10 cards, c3 photo staged).
 - **Bug C — FIXED `eecea73`.** `FieldChoiceGroup` keyed rows by `option.id`; multi-value families share `id="source"` → duplicate React key. Keyed by `id+value`; selection identity (binary orbit|source) unchanged.
 
 ## Minor findings (non-blocking, follow-up candidates)
+
 - **Finding A (robustness, real users):** Orbit stores the Android **lookup key** as `external_contact_id` and matches by exact string; renaming/re-aggregating a LOCAL device contact changes its lookup key → orphans the link ("Source missing"). Fragile vs. Android's recommended `lookupContact` refresh. Edge case; worth a hardening follow-up (backlog), out of Phase 20 scope.
 - **Cosmetic:** methods-family conflict renders the Orbit option as a serialized value (`email␟…zzuat.ada@…`) instead of a clean address (Scenario 3, `s3-06`). Display-only.
 - **Cosmetic:** a Bound contact whose source is deleted shows an "Unbound" badge / "Bind contact" affordance in the list while its link is still `is_active=1` (Scenario 6). Overflow "Update from Contacts" still drives the missing-source flow correctly. Display-only.
 
 ## Execution notes / evidence detail
+
 (chronological)
