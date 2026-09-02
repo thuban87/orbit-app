@@ -62,6 +62,7 @@ import { getExecutor } from "@/db/database";
 import { countUnbound } from "@/db/unbound-read";
 import { selectDashboardEmptyState } from "@/logic/dashboard-empty-logic";
 import type { RootStackParamList } from "@/navigation/types";
+import { useBottomClearance } from "@/navigation/use-bottom-clearance";
 import { navigationRef } from "@/navigation/linking";
 import { useDashboardPrefs } from "@/stores/dashboard-prefs-store";
 import { useTheme } from "@/theme";
@@ -107,6 +108,7 @@ export function HomeScreen() {
   const filter = useDashboardPrefs((s) => s.filter);
   const setSort = useDashboardPrefs((s) => s.setSort);
   const setFilter = useDashboardPrefs((s) => s.setFilter);
+  const bottomClearance = useBottomClearance();
 
   const [rows, setRows] = useState<DashboardRow[]>([]);
   const [counts, setCounts] = useState<PopulationCounts>(ZERO_COUNTS);
@@ -659,7 +661,7 @@ export function HomeScreen() {
         ListHeaderComponent={listHeader}
         ListFooterComponent={listFooter}
         ListEmptyComponent={listEmpty}
-        contentContainerStyle={styles.content}
+        contentContainerStyle={[styles.content, { paddingBottom: bottomClearance }]}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}

@@ -1,5 +1,7 @@
 import {
+  BottomTabBar,
   createBottomTabNavigator as createBottomTabs,
+  type BottomTabBarProps,
   type BottomTabNavigationOptions,
   type BottomTabNavigationProp,
 } from "@react-navigation/bottom-tabs";
@@ -10,7 +12,7 @@ import {
   type RouteProp,
 } from "@react-navigation/native";
 import { useEffect } from "react";
-import { BackHandler, Text } from "react-native";
+import { BackHandler, Text, View } from "react-native";
 import { DashboardStack } from "@/navigation/tabs/DashboardStack";
 import { OrreryStack } from "@/navigation/tabs/OrreryStack";
 import { BackupStack } from "@/navigation/tabs/BackupStack";
@@ -19,6 +21,7 @@ import { useTheme } from "@/theme";
 import { resolveBackIntent } from "./back-intent";
 import { isFocusedWorkflow } from "./focused-route-classification";
 import { shellTransientStore } from "@/stores/shell-transient-store";
+import { setTabBarHeight } from "@/stores/tab-bar-layout-store";
 import type { TabParamList } from "./types";
 
 /**
@@ -44,6 +47,16 @@ const TAB_GLYPHS: Record<keyof TabParamList, string> = {
 
 type TabNavigation = BottomTabNavigationProp<TabParamList>;
 type TabRoute = RouteProp<TabParamList, keyof TabParamList>;
+
+function MeasuredTabBar(props: BottomTabBarProps) {
+  return (
+    <View
+      onLayout={(event) => setTabBarHeight(event.nativeEvent.layout.height)}
+    >
+      <BottomTabBar {...props} />
+    </View>
+  );
+}
 
 function handleActiveTabPress(
   event: EventArg<string, true, undefined>,
@@ -140,6 +153,7 @@ export function RootNavigator() {
   return (
     <Tab.Navigator
       initialRouteName="DashboardTab"
+      tabBar={(props) => <MeasuredTabBar {...props} />}
       screenOptions={({ route }) => ({
         headerShown: false,
         tabBarHideOnKeyboard: true,

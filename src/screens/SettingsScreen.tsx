@@ -47,6 +47,7 @@ import type { ResumableReconcile } from "@/services/import/reconcile-resume-swee
 import { listSunCandidates, type SunCandidate } from "@/db/sun-picker-read";
 import { sunOccupantIsSelf } from "@/logic/sun-occupant-logic";
 import type { RootStackParamList } from "@/navigation/types";
+import { useBottomClearance } from "@/navigation/use-bottom-clearance";
 import { navigationRef } from "@/navigation/linking";
 import { AiService } from "@/services/AiService";
 import { aiKeyStore } from "@/services/ai-key-store";
@@ -133,6 +134,7 @@ function seedForHour(hour: number): Date {
  */
 export function SettingsScreen() {
   const { colors } = useTheme();
+  const bottomClearance = useBottomClearance();
   const navigation =
     useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   // Self-record photo seed. `name` is nullable (the id=1 seed row carries no name
@@ -707,7 +709,7 @@ export function SettingsScreen() {
     <ScrollView
       testID="settings-screen"
       style={{ backgroundColor: colors.background }}
-      contentContainerStyle={styles.content}
+      contentContainerStyle={[styles.content, { paddingBottom: bottomClearance }]}
     >
       <ShellAppBar variant="root" title="Settings" />
 

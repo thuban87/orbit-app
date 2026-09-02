@@ -10,6 +10,7 @@ import {
 import { getExecutor, localDateTime } from "@/db/database";
 import { inWriteTransaction } from "@/db/transaction";
 import type { RootStackScreenProps } from "@/navigation/types";
+import { useBottomClearance } from "@/navigation/use-bottom-clearance";
 import {
   createManualExportService,
   loadBackupForRestore,
@@ -61,6 +62,7 @@ function exportFailureCopy(result: ManualExportResult): string | null {
 
 export function BackupScreen({ navigation }: RootStackScreenProps<"Backup">) {
   const { colors } = useTheme();
+  const bottomClearance = useBottomClearance();
   const [health, setHealth] = useState<BackupHealth | null>(null);
   const [encryptionEnabled, setEncryptionEnabled] = useState(false);
   const [showNudge, setShowNudge] = useState(false);
@@ -284,7 +286,7 @@ export function BackupScreen({ navigation }: RootStackScreenProps<"Backup">) {
   const healthColor = health?.kind === "healthy" ? colors.statusStable : colors.statusWobble;
 
   return (
-    <ScrollView testID="backup-screen" style={{ backgroundColor: colors.background }} contentContainerStyle={styles.content}>
+    <ScrollView testID="backup-screen" style={{ backgroundColor: colors.background }} contentContainerStyle={[styles.content, { paddingBottom: bottomClearance }]}>
       <ShellAppBar variant="root" title="Backup & Restore" />
 
       {health ? (
