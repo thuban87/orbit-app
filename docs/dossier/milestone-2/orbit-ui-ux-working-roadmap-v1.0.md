@@ -137,6 +137,7 @@ Phase 12 owns Group Event persistence, event-first capture, shared/default inher
 
 ### Phase 1 — App Shell & Navigation
 - Permanent bottom nav: Dashboard, Orrery, Backup/Restore, Settings.
+- Root shell is a four-tab bottom navigator with per-tab stacks (ADR-019 superseded 2026-09-01); Archived Contacts is reachable from Dashboard overflow and the Settings row may remain.
 - Each top-level tab preserves its stack; retapping the active tab dismisses transient UI first, then returns to root.
 - Browse/read screens retain bottom nav and universal FAB; focused workflows hide both.
 - Android/system Back and visible app Back have the same logical result; in-app navigation is origin-aware.
