@@ -63,6 +63,7 @@ Transform Orbit's functional foundation into a release-quality, low-friction mob
 | 16 — AI Configuration & Prompting      | Complete   | phase-16-ai-configuration-prompting-dossier(1).md      |
 | 17 — Onboarding                        | Deferred planning | Revisit after substantive implementation exists.       |
 | 18 — Responsive & Release Hardening    | Deferred planning | Revisit after substantive implementation/device testing. |
+| 19 — Your Week (provisional) | Deferred planning | Placed after Phase 16; owns upcoming-birthday presentation (ADR-076), Group Events and heatmap-aggregation reuse. |
 
 # 6. Critical Decisions Already Settled
 
@@ -94,7 +95,7 @@ Transform Orbit's functional foundation into a release-quality, low-friction mob
 
 - Dashboard is primarily a contact browser/relationship command center; Orrery is the more explicit relationship-health/attention visualization.
 
-- Default universe is Active Contacts. Special populations: Favorites, Birthdays, Not Contacted, Snoozed; filters use OR within a family and AND across families.
+- Default universe is Active Contacts (excludes never-contacted; ADR-011 preserved). Special populations: Favorites, Birthdays, Not Contacted, Snoozed, All Contacts (Active ∪ Not Contacted); filters use OR within a family and AND across families.
 
 - Search is scoped to current Population + Filters and never leaks Archived/Unbound.
 
@@ -102,7 +103,7 @@ Transform Orbit's functional foundation into a release-quality, low-friction mob
 
 - Card View is a 3-column avatar-first grid with status rings, compact adaptive context, long-press power actions, and Grid multi-select as Dashboard bulk management.
 
-- Gravity is derived-never-stored; contact import remains outside Dashboard bulk management.
+- Gravity is derived-never-stored; contact import remains outside Dashboard bulk management. Favorites are binary; the Manage-favourites reorder screen is retired (ADR-075).
 
 ## Orrery — Phases 8–9
 
@@ -256,6 +257,8 @@ Add/Edit use one form-level Save, preserve state on failure, reveal validation e
 
 - Dashboard bulk/contact management remains Select Contacts → Phase 7 Grid multi-select; do not create a separate bulk-management screen.
 
+- Bulk Delete is removed; bulk Archive is the recoverable removal, permanent deletion stays manual on the Archived list (ADR-018 unchanged; no contact auto-purge).
+
 - Contact import belongs with Backup/Restore/contact data management.
 
 - Gravity remains derived-never-stored and is never directly editable.
@@ -357,5 +360,6 @@ Use the completed dossiers plus the current repository as authoritative mileston
 - **16. AI Configuration & Prompting — COMPLETE PLANNING.** Detailed dossier exists.
 - **17. Onboarding — DEFERRED PLANNING.** Resume after substantive implementation exists.
 - **18. Responsive & Release Hardening — DEFERRED PLANNING.** Resume after substantive implementation and device/testing evidence.
+- **19. Your Week — DEFERRED PLANNING (provisional).** Resume after Phase 16 once its inputs exist.
 
 This handoff intentionally remains Markdown. Do not convert it to DOCX unless a later workflow explicitly requires a document artifact format.
