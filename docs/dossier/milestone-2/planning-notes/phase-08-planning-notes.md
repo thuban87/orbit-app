@@ -32,11 +32,10 @@ D-08-153 :699; SC1 :673) reverses ADR-048.**
   relationship view**"; its rejected alternative was "Relationship view as the default or only view…
   would otherwise remove the owner's relationship map" (`docs/decisions/ADR-048…md:18,22`).
 - **Code facts (verified 2026-09-01):** the split is live — `src/screens/OrreryScreen.tsx:121,178,683-692`;
-  `src/components/OrbitBody.tsx:112-120` (angle-only morph; relationship mode = even angular spread
+  `src/components/orrery/OrbitBody.tsx:112-120` (angle-only morph; relationship mode = even angular spread
   plus muted colour, **not** category/gravity rings).
-- **The outcome is recorded in the dossier and `docs/decisions/`, not here.** Confirm a superseding
-  ADR exists before planning the removal. If none does and the dossier still removes the split,
-  stop and ask.
+- **Ratified (owner, 2026-09-01):** the Status / Relationship mode split is removed in favour of a
+  single unnamed status view. **ADR-077** supersedes ADR-048 on this point. Plan the removal.
 
 ## REPLAN items for plan-phase
 

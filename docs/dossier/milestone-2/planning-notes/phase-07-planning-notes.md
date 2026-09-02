@@ -64,7 +64,7 @@ Contacted, not a change to the Active predicate.
 
 - **Unbuilt / needed:** D-07-027/028 consume Phase 2's silhouettes and registry.
 - **Code facts (verified 2026-09-01):** colour + border weight only
-  (`src/utils/contact-card-ring.ts:44-61`); no registry; no reduced-motion hook.
+  (`src/components/contact-card-ring.ts:44-61`); no registry; no reduced-motion hook.
 - **Resolved / recommended path:** consume Phase 2's deliverables; do not fork a second icon source.
 
 ## Migration / sequencing

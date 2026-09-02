@@ -85,7 +85,7 @@ un-owned interaction-note permission gate.**
 - **Unbuilt / needed:** D-03-054…058 (`phase-03…md:132-140`).
 - **Code facts (verified 2026-09-01):**
   - `FieldType` has **7** members — no URL / Email / Phone (`src/schemas/types.ts:20-27`;
-    `src/utils/field-parsers.ts:44-91`). ADR-014 requires "exactly seven parsers"; going to ten is
+    `src/db/field-parsers.ts:44-91`). ADR-014 requires "exactly seven parsers"; going to ten is
     **additive** and still one parser per type.
   - `custom_field_values UNIQUE(contact_id, field_def_id)` (`006-normalize-custom-field-values.ts:41-51`)
     — **one current row per pair**.

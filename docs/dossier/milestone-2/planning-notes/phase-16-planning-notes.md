@@ -36,7 +36,7 @@ format 4, as its final plan, sequenced after all other schema has landed (owner 
 **E-06 — the exact-prompt first-send acknowledgement.** D-16-135/137 (:805-816) replace ADR-052's
 "durable first-send acknowledgement of the exact prompt" with a lightweight disclosure, review
 available on demand. Code: the exact-prompt gate is live at
-`src/services/ai-suggestion-logic.ts:223-235`, with per-provider `ai_ack_*` columns (migration 004).
+`src/logic/ai-suggestion-logic.ts:223-235`, with per-provider `ai_ack_*` columns (migration 004).
 Phase 10's removal of the Profile AI-draft entry (D-10-016) is the other half.
 **The outcome is recorded in the dossier and `docs/decisions/`, not here.**
 
@@ -55,9 +55,9 @@ Phase 10's removal of the Profile AI-draft entry (D-10-016) is the other half.
   - Single `ai_provider` / `ai_model` / `ai_custom_*` columns (migration 004) — no multi-connection
     storage.
   - **Zero** hits for `openrouter`, `WebBrowser`, or `AuthSession` in `src/` or `package.json`.
-  - The model catalog reads **no pricing fields** (`src/services/model-catalog-filter.ts:19,70-78`).
+  - The model catalog reads **no pricing fields** (`src/ai/model-catalog-filter.ts:19,70-78`).
   - The prompt template is a user "style note" inside a fixed prompt
-    (`src/services/prompt-template.ts:36-42`), and truncation is disclosed only on the first ack —
+    (`src/ai/prompt-template.ts:36-42`), and truncation is disclosed only on the first ack —
     D-16-083 assumes more.
 - **Edit points adding OpenRouter as a fixed provider touches (enumerate in the plan):** the closed
   `AiProviderId` union, a new `ai_ack_<id>` column, the **exhaustive `never` switch** in

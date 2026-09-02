@@ -22,10 +22,9 @@ Settings touch ADR-019 and ADR-018.**
   Settings screen" (`docs/decisions/ADR-019…md:18,31`).
 - ADR-018's substance — the archive-before-purge gate — is **untouched**; only the *home* of the
   Archived list moves (Phase 5's half).
-- **The outcome is recorded in the dossier and in `docs/decisions/`, not here.** Before planning,
-  read the phase-01 dossier and check for a superseding ADR against ADR-019. If none exists and the
-  dossier still specifies a tab root, that is an unresolved reversal — stop and ask, do not plan
-  around it.
+- **Ratified (owner, 2026-09-01):** the four-tab bottom-nav root shell stands. **ADR-080** supersedes
+  ADR-019's stack-root shell. Archived Contacts is reachable from the Dashboard overflow, and the
+  Settings row may remain as a second entry point. Plan the tab root.
 
 **AUTO-FIX applied to this dossier:** AF-03 — §F, the §Cross-Phase "action workflows" line, and SC4
 were stale at "five actions"; the universal FAB exposes **six** (Add Contact, Quick Log, Log
@@ -44,8 +43,8 @@ Plan against six.
     pops to whatever pushed it, so "origin-aware" is partly free.
   - Forced Dashboard-rooting **does** exist in three places and matches D-01-019/022 (external entry
     → Dashboard fallback): Compose Back (`src/screens/ComposeScreen.tsx:266-268`), notification taps
-    (`src/navigation/notification-nav.ts`), widget deep links
-    (`src/widget/widget-linking.ts:55-57`, ADR-044).
+    (`src/services/notifications/notification-nav.ts`), widget deep links
+    (`src/navigation/widget-linking.ts:55-57`, ADR-044).
   - Predictive back is disabled (`app.config.ts:76`).
 - **Resolved / recommended path:** treat the three reset-to-Home flows as **requirements that must
   survive** the tab refactor, not as legacy to delete. Enumerate every `navigation.reset` call site

@@ -20,8 +20,9 @@
   needs a drafting entry point" (`docs/decisions/ADR-052…md:18,22`).
 - **Code facts (verified 2026-09-01):** the Profile "AI draft" entry exists at
   `src/screens/ContactProfileScreen.tsx:1075`.
-- **The outcome is recorded in the dossier and `docs/decisions/`, not here.** Confirm a superseding
-  ADR before removing the entry; the same ADR covers Phase 16's disclosure half of E-06.
+- **Ratified (owner, 2026-09-01):** lightweight disclosure, and the Profile "AI draft" entry is
+  removed — drafting stays reachable in two taps. **ADR-079** supersedes ADR-052 on this point and
+  also covers Phase 16's disclosure half of E-06.
 
 **E-09 — Profile / Hero backgrounds (D-10-017, `phase-10…md:77`)** are the Phase 10 half of the
 `HANDOFF.md` §7 starfield-placement supersession ("not behind text-heavy screens"). See
@@ -54,7 +55,7 @@ Compose (D-10-209/210 vs D-RM-014).
 - **Unbuilt / needed:** a defined fallback. D-10-100 derives the Intensity interval from Contact
   Frequency (`phase-10…md:391`).
 - **Code facts (verified 2026-09-01):** `computeContactIntensity` returns `{available:false}` for
-  Unbound (`src/utils/impact.ts:139`); `interval_days` is **nullable**
+  Unbound (`src/services/impact.ts:139`); `interval_days` is **nullable**
   (`011-contact-lifecycle-schema.ts:22-23`); ADR-062 requires that **every cadence consumer guard
   nullable cadence**. Profiles of Unbound / never-assigned-cadence contacts **are reachable**
   (D-04-085, D-05-059).

@@ -39,7 +39,7 @@
   Contact Methods and **never mention** the last-spoke / first-interaction choice.
 - **Code facts (verified 2026-09-01):** the form default is `{ kind: "today" }`
   (`src/screens/CreateContactScreen.tsx:102`); `firstInteractionOccurredAt` supports
-  today / date / not-yet (`src/utils/create-contact-logic.ts:76-88`); the DAO writes the first
+  today / date / not-yet (`src/screens/create-contact-logic.ts:76-88`); the DAO writes the first
   interaction **via the recency cores** (`src/db/contacts-dao.ts:188-196`).
 - **Resolved path (owner, 2026-09-01):** **keep the tri-state last-spoke control (today / on date /
   not yet) in Add Contact's Relationship Basics, default "today". ADR-016 is unchanged.**

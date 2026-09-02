@@ -20,9 +20,8 @@
   density (`phase-02…md:102-122`); Phase 10's D-10-017 is the Profile half.
 - `HANDOFF.md:172-174`: "Starfield background, but **dashboard/orbit screens only, not behind
   text-heavy screens** where contrast suffers."
-- **The outcome is recorded in the dossier and in `HANDOFF.md` §7 (dated supersession note), not
-  here.** Before planning, confirm which way it went. If §7 still reads as above and the dossier
-  still specifies app-wide backgrounds, that is an unresolved reversal — stop and ask.
+- **Ratified (owner, 2026-09-01):** the dossier's placement stands; the `HANDOFF.md` §7 supersession
+  note was added 2026-09-01. Plan against the dossier, not §7's original text.
 - Note: HANDOFF's "tap-to-freeze" and live creeping motion were already superseded by ADR-048; no
   new finding there.
 
@@ -34,7 +33,7 @@
   hook (D-02-049/050/053, D-02-033).
 - **Code facts (verified 2026-09-01):**
   - Status is expressed as **colour + border weight only**, no glyphs
-    (`src/utils/contact-card-ring.ts:44-61`).
+    (`src/components/contact-card-ring.ts:44-61`).
   - There is **no icon registry** anywhere in `src/`.
   - **Zero** usages of `isReduceMotionEnabled` / `useReducedMotion` — reduced-motion infrastructure
     does not exist at all, yet Phases 2, 8, 9 and 11 all assume it

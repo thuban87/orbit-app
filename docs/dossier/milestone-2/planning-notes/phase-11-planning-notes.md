@@ -92,7 +92,7 @@
 - **Unbuilt / needed:** D-11-053/054 — each block is one *current* Contact Frequency cycle
   (`phase-11…md:275-281`).
 - **Code facts (verified 2026-09-01):** `interval_days` is nullable; `computeContactIntensity`
-  returns `{available:false}` for Unbound (`src/utils/impact.ts:139`); ADR-062 requires every cadence
+  returns `{available:false}` for Unbound (`src/services/impact.ts:139`); ADR-062 requires every cadence
   consumer to guard nullable cadence. Unbound profiles are reachable (D-04-085, D-05-059).
 - **Resolved / recommended path:** define the fallback — hide the lens, or fall back to a fixed
   7 Days / Month window. Decide it **once**, with Phase 10's identical note.

@@ -30,7 +30,7 @@
 **E-06 — the exact-prompt first-send acknowledgement and the Profile AI-draft entry.** Phase 16
 replaces ADR-052's exact-prompt ack with a lightweight disclosure (D-16-135/137); Phase 10 removes
 the Profile AI-draft entry (D-10-016). Code: the exact-prompt gate is live at
-`src/services/ai-suggestion-logic.ts:223-235` with per-provider `ai_ack_*` columns (migration 004).
+`src/logic/ai-suggestion-logic.ts:223-235` with per-provider `ai_ack_*` columns (migration 004).
 **The outcome is recorded in the dossier and `docs/decisions/`, not here.**
 
 **AUTO-FIX applied to this dossier:** **AF-01** — §L and SC9 no longer use binary AI-availability
@@ -49,7 +49,7 @@ AI On + Needs Attention → a restrained "AI needs attention" repair notice** (c
   - It is **already an in-app banner, not a notification** (`src/components/AssistBanner.tsx:14-22`),
     mounted app-wide at `App.tsx:323`.
   - "Don't log" → `markAssistDismissed`; email handoff via `mailto:` exists
-    (`src/services/handoff.ts:50-66`); the Compose Send path already creates the assist
+    (`src/services/reach-out/handoff.ts:50-66`); the Compose Send path already creates the assist
     (`src/screens/ComposeScreen.tsx:451-458`).
   - ADR-070: a durable `interaction_assists` row is written **before** launch;
     `pending → logged | dismissed | expired | failed`; cap 5; 15 s eligibility; 24 h expiry; launch

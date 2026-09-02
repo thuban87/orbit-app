@@ -64,7 +64,7 @@ The slot now exists so the delegation has a destination.
   reads.
 - **Constraint carried forward (R-15):** cadence-relative aggregation is **undefined for contacts
   with no cadence**. `interval_days` is nullable (`011-contact-lifecycle-schema.ts:22-23`) and
-  `computeContactIntensity` returns `{available:false}` for Unbound (`src/utils/impact.ts:139`);
+  `computeContactIntensity` returns `{available:false}` for Unbound (`src/services/impact.ts:139`);
   ADR-062 requires every cadence consumer to guard nullable cadence. Whatever fallback Phases 10 and
   11 settle on applies here too — do not invent a third answer.
 

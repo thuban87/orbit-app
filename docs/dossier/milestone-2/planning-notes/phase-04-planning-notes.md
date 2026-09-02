@@ -23,7 +23,7 @@
 - **Code facts (verified 2026-09-01):** `favourite_rank` is the only favourite column
   (`001-initial.ts:74`); the favourites branch orders `favourite_rank ASC`
   (`src/db/dashboard-read.ts:244-245`); widget data is `listDashboard({filter:"favourites"})`
-  truncated to 6 by rank (`src/widget/widget-data.ts:83-86`); capture / sun / merge pickers order by
+  truncated to 6 by rank (`src/services/widget/widget-data.ts:83-86`); capture / sun / merge pickers order by
   rank (`src/db/capture-read.ts:65-66`, `src/db/sun-picker-read.ts:45`,
   `src/db/merge-candidate-read.ts:29`).
 - **Plan implication:** the widget's ordering source changes from rank to the Favorites population's
@@ -31,6 +31,9 @@
   reads need a decided fate — either they fall back to Default order too, or the column becomes
   vestigial. **Do not drop the `favourite_rank` column** without a plan for the pickers that read
   it. This ratification supersedes ADR-033; confirm the superseding ADR exists before planning.
+- **Deferred (owner, 2026-09-01):** customizable widget membership is deferred to a future
+  milestone. The widget's membership is the Favorites population; it is not user-configurable in
+  this milestone.
 
 **E-02 — never-contacted contacts in Active Contacts vs ADR-011's segregation.**
 
@@ -87,7 +90,7 @@ D-RM-015). No separate compact renderer is deferred.
   surfaces Unbound contacts", `phase-04…md:154`) can ship.
 - **Code facts (verified 2026-09-01):** the search branch is archived-only and **does** return
   Unbound as neutral rows today (`src/db/dashboard-read.ts:230-240`;
-  `src/utils/dashboard-search-row-logic.ts:20-24`) — this is ADR-062's "retrieval row" consequence.
+  `src/screens/dashboard-search-row-logic.ts:20-24`) — this is ADR-062's "retrieval row" consequence.
   `UnboundContactsScreen.tsx` has **no search**. Phase 1's picker mentions Archived and Snoozed
   markers but not Unbound (D-01-037/039).
 - **Resolved / recommended path:** give the Unbound child route its own search, **or** add Unbound

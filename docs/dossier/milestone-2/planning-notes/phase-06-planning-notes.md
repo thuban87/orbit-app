@@ -36,7 +36,7 @@
 - **Unbuilt / needed:** D-06-043 consumes Phase 2's status silhouettes and icon registry
   (D-02-049/050/053).
 - **Code facts (verified 2026-09-01):** status today is **colour + border weight only**, no glyphs
-  (`src/utils/contact-card-ring.ts:44-61`); there is no icon registry in `src/`; zero
+  (`src/components/contact-card-ring.ts:44-61`); there is no icon registry in `src/`; zero
   `useReducedMotion` / `isReduceMotionEnabled` usage anywhere.
 - **Resolved / recommended path:** **Phase 2 must deliver the registry, the glyph set, and the
   reduced-motion hook before Phase 6 plans against them.** If Phase 6 is planned first, it must

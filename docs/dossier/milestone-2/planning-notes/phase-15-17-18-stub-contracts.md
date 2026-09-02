@@ -43,8 +43,8 @@
     population = Active ∪ Not Contacted; Active excludes never-contacted; the Never Contacted screen
     and the include-Unbound toggle retire). It is in `PORTABLE_SETTINGS_KEYS` — coordinate removal
     with Phase 16's format-4 bump.
-  - **Archived contacts** — its home depends on E-07's outcome (Dashboard child route vs Settings);
-    read the Phase 5 dossier and `docs/decisions/`.
+  - **Archived contacts** — resolved per **ADR-080** (E-07, owner ratified 2026-09-01): reachable
+    from the Dashboard overflow, and the Settings row may remain — both entry points are allowed.
   - **Custom Fields** — unaffected by any resolution; still a Settings destination.
 - **No longer a Phase 15 candidate:** the Memory **Recently Deleted / Trash** surface (D-03-029) was
   listed as a possible Phase 15 owner. **The owner assigned it to Phase 3** (2026-09-01). Do not

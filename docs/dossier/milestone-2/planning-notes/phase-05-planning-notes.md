@@ -61,7 +61,7 @@
 - **Unbuilt / needed:** a name-lookup path for Unbound contacts that is not Dashboard search.
 - **Code facts (verified 2026-09-01):** `UnboundContactsScreen.tsx` has **no search**; today's
   Dashboard search returns Unbound as neutral rows (`src/db/dashboard-read.ts:230-240`,
-  `src/utils/dashboard-search-row-logic.ts:20-24`) — the ADR-062 "retrieval row" consequence.
+  `src/screens/dashboard-search-row-logic.ts:20-24`) — the ADR-062 "retrieval row" consequence.
 - **Resolved / recommended path:** since Phase 5 owns the Unbound child route, give that route its
   own search (or ensure Phase 1's picker covers Unbound). Coordinate with Phase 4's R-11 note so the
   work is owned once, not twice.
