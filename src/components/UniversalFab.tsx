@@ -18,6 +18,7 @@ import Animated, {
 import { speedDialScrimPointerEvents } from "@/components/add-speed-dial-fab-logic";
 import { ContactPicker } from "@/components/ContactPicker";
 import {
+  createQuickLogUndoController,
   getFocusedContactContext,
   resolveFabTarget,
   UNIVERSAL_FAB_ACTIONS,
@@ -123,7 +124,15 @@ export function UniversalFab() {
   const [pickerFlow, setPickerFlow] = useState<PickerFlow | null>(null);
   const expanded = useSharedValue(0);
   const quickLogPending = useRef(false);
-  const undoPending = useRef(false);
+  const quickLogUndoController = useRef(
+    createQuickLogUndoController(({ contactId, interactionId }) =>
+      deleteTouchpoint(getExecutor(), {
+        contactId,
+        interactionId,
+        now: localDateTime(),
+      }),
+    ),
+  );
   const bottomOffset = tabBarHeight + FAB_EDGE_GAP;
 
   const restoreFabFocus = useCallback(() => {
@@ -188,14 +197,13 @@ export function UniversalFab() {
 
   const undoQuickLog = useCallback(
     (contactId: number, interactionId: number) => {
-      if (undoPending.current) return;
-      undoPending.current = true;
-
-      void deleteTouchpoint(getExecutor(), {
+      const deletion = quickLogUndoController.current.undo({
         contactId,
         interactionId,
-        now: localDateTime(),
-      })
+      });
+      if (!deletion) return;
+
+      void deletion
         .then(() => {
           // deleteTouchpoint recomputes recency but does not publish a data
           // revision, so shell consumers and the widget need this explicit tick.
@@ -212,9 +220,6 @@ export function UniversalFab() {
               onPress: () => undoQuickLog(contactId, interactionId),
             },
           });
-        })
-        .finally(() => {
-          undoPending.current = false;
         });
     },
     [],

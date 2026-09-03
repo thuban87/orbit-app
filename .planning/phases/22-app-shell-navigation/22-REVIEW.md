@@ -1,47 +1,46 @@
 ---
 phase: 22-app-shell-navigation
-reviewed: 2026-09-03T04:43:59Z
+reviewed: 2026-09-03T05:02:00Z
 depth: deep
 files_reviewed: 3
 files_reviewed_list:
-  - src/components/ContactPicker.tsx
   - src/components/UniversalFab.tsx
-  - src/navigation/RootNavigator.tsx
+  - src/components/universal-fab-logic.ts
+  - src/components/universal-fab-logic.test.ts
 findings:
   critical: 0
-  warning: 1
+  warning: 0
   info: 0
-  total: 1
-status: issues_found
+  total: 0
+status: clean
 ---
 
-# Phase 22: Post-UAT Fix Code Review Report
+# Phase 22: Quick Log Undo Follow-up Review
 
-**Reviewed:** 2026-09-03T04:43:59Z
+**Reviewed:** 2026-09-03T05:02:00Z
 **Depth:** deep
 **Files Reviewed:** 3
-**Status:** issues_found
+**Status:** clean
 
 ## Summary
 
-Reviewed the post-UAT picker stacking, keyboard-preservation, and top-safe-area changes, tracing their callers through the shell transient registry, snackbar host, canonical recency writers, navigation host, and relevant tests. The picker remains mounted through keyboard visibility changes, and the safe-area wrapper does not alter the tab route or Back-handler contracts. One existing but reachable Quick Log/Undo race remains in the changed `UniversalFab` transaction path.
+Reviewed the WR-01 repair through the Universal FAB's Quick Log completion and
+snackbar callbacks, the controller's per-interaction pending state, and the
+canonical `deleteTouchpoint` writer. Pending deletion state is now keyed by
+`interactionId`, so an Undo for a newly logged interaction is accepted while a
+different deletion is still in flight. The duplicate press for the same
+interaction remains safely single-flight.
 
-## Narrative Findings (AI reviewer)
+The render-free regression test deliberately holds the first delete promise,
+starts the second Undo, and asserts that both canonical calls retain their
+respective `(contactId, interactionId)` pairs. This is the appropriate test
+seam because the repository intentionally has no React Native renderer.
 
-## Warnings
+## Findings
 
-### WR-01: A second Undo is silently discarded while an earlier undo is in flight
-
-**Classification:** WARNING
-
-**File:** `src/components/UniversalFab.tsx:189-218`
-
-**Issue:** `undoPending` is one component-wide boolean rather than state for the interaction being undone. After the user starts Undo for interaction A, they can log interaction B before A's `deleteTouchpoint()` resolves. B's successful commit replaces the snackbar with its own Undo action. Pressing that action first dismisses the snackbar in `Snackbar.tsx:28-30`, then reaches line 191 and returns because A still holds `undoPending`. Interaction B remains persisted, and its only Undo affordance has been removed without feedback. This violates the per-interaction Undo contract under a valid overlapping transaction sequence.
-
-**Fix:** Track pending deletes by `interactionId` (for example, `useRef(new Set<number>())`) so Undo for B is independent of A, and only consume/dismiss an action when its own operation is accepted. Add a component/integration regression test that holds A's delete promise, commits B, presses B's Undo, then verifies both canonical `deleteTouchpoint` calls receive their matching `(contactId, interactionId)` pairs.
+No critical, warning, or informational findings.
 
 ---
 
-_Reviewed: 2026-09-03T04:43:59Z_
-_Reviewer: the agent (gsd-code-reviewer)_
-_Depth: deep_
+_Reviewed: 2026-09-03T05:02:00Z_
+_Reviewer: Codex (inline follow-up review; no subagent dispatched)_

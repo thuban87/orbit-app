@@ -1,9 +1,18 @@
 import { describe, expect, it } from "vitest";
 import {
+  createQuickLogUndoController,
   getFocusedContactContext,
   resolveFabTarget,
   UNIVERSAL_FAB_ACTIONS,
 } from "./universal-fab-logic";
+
+function deferred<T>() {
+  let resolve!: (value: T | PromiseLike<T>) => void;
+  const promise = new Promise<T>((resolvePromise) => {
+    resolve = resolvePromise;
+  });
+  return { promise, resolve };
+}
 
 describe("UNIVERSAL_FAB_ACTIONS", () => {
   it("locks the six shell actions to their prescribed order and labels", () => {
@@ -21,7 +30,9 @@ describe("UNIVERSAL_FAB_ACTIONS", () => {
 
 describe("resolveFabTarget", () => {
   it("uses nested Dashboard tab targets instead of bare screen navigation", () => {
-    expect(resolveFabTarget("AddContact", { originContactId: null })).toMatchObject({
+    expect(
+      resolveFabTarget("AddContact", { originContactId: null }),
+    ).toMatchObject({
       kind: "navigate",
       tab: "DashboardTab",
       screen: "Create",
@@ -68,6 +79,35 @@ describe("resolveFabTarget", () => {
   });
 });
 
+describe("createQuickLogUndoController", () => {
+  it("accepts a replacement snackbar Undo while an earlier delete is pending", async () => {
+    const firstDelete = deferred<void>();
+    const secondDelete = deferred<void>();
+    const received: Array<{ contactId: number; interactionId: number }> = [];
+    const controller = createQuickLogUndoController((request) => {
+      received.push(request);
+      return request.interactionId === 101
+        ? firstDelete.promise
+        : secondDelete.promise;
+    });
+
+    const firstUndo = controller.undo({ contactId: 11, interactionId: 101 });
+    const secondUndo = controller.undo({ contactId: 22, interactionId: 202 });
+
+    expect(firstUndo).not.toBeNull();
+    expect(secondUndo).not.toBeNull();
+    expect(received).toEqual([
+      { contactId: 11, interactionId: 101 },
+      { contactId: 22, interactionId: 202 },
+    ]);
+    expect(controller.undo({ contactId: 22, interactionId: 202 })).toBeNull();
+
+    firstDelete.resolve();
+    secondDelete.resolve();
+    await Promise.all([firstUndo, secondUndo]);
+  });
+});
+
 describe("getFocusedContactContext", () => {
   it("finds a Dashboard Profile contact", () => {
     expect(
@@ -78,7 +118,10 @@ describe("getFocusedContactContext", () => {
             name: "DashboardTab",
             state: {
               index: 1,
-              routes: [{ name: "Home" }, { name: "Profile", params: { contactId: 4 } }],
+              routes: [
+                { name: "Home" },
+                { name: "Profile", params: { contactId: 4 } },
+              ],
             },
           },
         ],
@@ -93,7 +136,13 @@ describe("getFocusedContactContext", () => {
         routes: [
           {
             name: "OrreryTab",
-            state: { index: 1, routes: [{ name: "Orrery" }, { name: "Profile", params: { contactId: 8 } }] },
+            state: {
+              index: 1,
+              routes: [
+                { name: "Orrery" },
+                { name: "Profile", params: { contactId: 8 } },
+              ],
+            },
           },
         ],
       }),
@@ -101,7 +150,12 @@ describe("getFocusedContactContext", () => {
   });
 
   it("returns no contact from root-tab browse surfaces", () => {
-    for (const name of ["DashboardTab", "OrreryTab", "BackupTab", "SettingsTab"]) {
+    for (const name of [
+      "DashboardTab",
+      "OrreryTab",
+      "BackupTab",
+      "SettingsTab",
+    ]) {
       expect(
         getFocusedContactContext({ index: 0, routes: [{ name }] }),
       ).toEqual({ originContactId: null });
@@ -109,12 +163,21 @@ describe("getFocusedContactContext", () => {
   });
 
   it("is defensive around stale or malformed state", () => {
-    expect(getFocusedContactContext(undefined)).toEqual({ originContactId: null });
-    expect(getFocusedContactContext({ routes: [] })).toEqual({ originContactId: null });
+    expect(getFocusedContactContext(undefined)).toEqual({
+      originContactId: null,
+    });
+    expect(getFocusedContactContext({ routes: [] })).toEqual({
+      originContactId: null,
+    });
     expect(
       getFocusedContactContext({
         index: 0,
-        routes: [{ name: "DashboardTab", state: { index: 0, routes: [{ name: "Profile" }] } }],
+        routes: [
+          {
+            name: "DashboardTab",
+            state: { index: 0, routes: [{ name: "Profile" }] },
+          },
+        ],
       }),
     ).toEqual({ originContactId: null });
   });

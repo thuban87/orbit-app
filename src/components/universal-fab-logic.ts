@@ -51,6 +51,33 @@ export interface FabContext {
   originContactId: number | null;
 }
 
+export interface QuickLogUndoRequest {
+  contactId: number;
+  interactionId: number;
+}
+
+/**
+ * Keeps an Undo single-flight per interaction instead of across the whole
+ * shell. A new Quick Log can replace the snackbar while an earlier deletion
+ * is pending, and its Undo must remain actionable.
+ */
+export function createQuickLogUndoController(
+  deleteInteraction: (request: QuickLogUndoRequest) => Promise<void>,
+) {
+  const pendingInteractionIds = new Set<number>();
+
+  return {
+    undo(request: QuickLogUndoRequest): Promise<void> | null {
+      if (pendingInteractionIds.has(request.interactionId)) return null;
+      pendingInteractionIds.add(request.interactionId);
+
+      return deleteInteraction(request).finally(() => {
+        pendingInteractionIds.delete(request.interactionId);
+      });
+    },
+  };
+}
+
 /** Maps a fixed FAB action to an internal, serializable shell intent. */
 export function resolveFabTarget(
   actionId: UniversalFabActionId,
