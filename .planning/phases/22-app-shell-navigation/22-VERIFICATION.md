@@ -1,128 +1,126 @@
 ---
 phase: 22-app-shell-navigation
-verified: 2026-09-03T05:29:53Z
-status: human_needed
-score: 4/5 must-haves verified
-behavior_unverified: 1
-behavior_unverified_items:
-  - truth: "Shell controls have correct modal/focus behavior and semantic haptics in the live Android accessibility environment."
-    test: "Run the remaining haptic and widget-refresh checks on the Pixel."
-    expected: "Haptics match the documented actions and the widget visibly refreshes after Quick Log and Undo."
-    why_human: "The render-free test environment cannot mount React Native UI, run TalkBack, feel haptics, or observe an Android widget."
+verified: 2026-09-03T06:37:24Z
+status: passed
+score: 5/5 must-haves verified
+behavior_unverified: 0
+overrides_applied: 0
+re_verification:
+  previous_status: human_needed
+  previous_score: 4/5
+  gaps_closed:
+    - "TalkBack modal traversal, semantic haptics, and launcher-widget refresh were confirmed on-device."
+  gaps_remaining: []
+  regressions: []
 ---
 
 # Phase 22: App Shell & Navigation Verification Report
 
 **Phase Goal:** Every surface in the app is reachable through one intentional shell — a persistent four-tab bottom navigation with per-tab stacks, a universal six-action speed-dial FAB, and Back that always returns the user where they actually came from.
 
-**Verified:** 2026-09-03T05:29:53Z
-**Status:** human_needed
+**Verified:** 2026-09-03T06:37:24Z
+**Status:** passed
+**Re-verification:** Yes — the prior report was held only for device UAT.
 
 ## Goal Achievement
 
 ### Observable Truths
 
 | # | Truth | Status | Evidence |
-|---|-------|--------|----------|
-| 1 | Four persistent tabs retain their own stacks; active-tab retap dismisses transients then returns to root, with a fade transition and no swipe gesture. | ✓ VERIFIED | `RootNavigator` owns four tab listeners, `animation: "fade"`, the measured tab bar, and the tested transient/back intent helpers. Physical Pixel UAT recorded four tabs, shell/FAB placement, and gesture/three-button clearance. |
-| 2 | System and visible Back are transient-first and preserve nested/origin-aware routes and safe external fallbacks. | ✓ VERIFIED | `RootNavigator` registers the shell Back handler; `ShellAppBar` and `back-intent` share the resolver; nested reset, notification, and widget suites pass. Device UAT confirmed the app bundle and shell navigation paths. |
-| 3 | The six-action FAB has fixed labels/order, preselects Profile context, and otherwise uses the shared picker. | ✓ VERIFIED | `UNIVERSAL_FAB_ACTIONS` is an immutable six-item list; `UniversalFab` maps all items through the typed resolver; the picker is a reusable modal with local search/order logic. Targeted FAB/picker tests pass. |
-| 4 | Quick Log is commit-truthful and supports canonical Undo/Retry without a global overlapping-Undo race. | ✓ VERIFIED | `recordTouchpoint` success is handled only in its resolve path; `deleteTouchpoint` is the canonical Undo writer. The per-interaction controller accepts B while A is pending, proven by the held-promise regression test. Full suite passes (197 files, 1,877 tests). |
-| 5 | Shell chrome, accessibility semantics, focus management, and haptics work correctly in the live Android environment. | ⚠️ PRESENT_BEHAVIOR_UNVERIFIED | Code contains semantic labels, ≥44px action targets, `accessibilityViewIsModal`, explicit focus restoration, and documented semantic haptic calls. TalkBack traversal was owner-confirmed on 2026-09-03; perceived haptics and visible widget refresh remain sensory-only. |
+| --- | --- | --- | --- |
+| 1 | Users can switch among four persistent tabs, retain per-tab history, dismiss a transient then pop an active tab to root, and get a fade-only tab transition. | ✓ VERIFIED | `RootNavigator.tsx` mounts exactly Dashboard, Orrery, Backup, Settings with one native stack per tab; active-tab listeners call the transient registry before `popToTop`; `animation: "fade"` and `tabBarHideOnKeyboard` are set. Targeted navigation tests passed. |
+| 2 | Back is transient-first, origin-aware, completion-safe, and preserves the Dashboard fallback for external entry. | ✓ VERIFIED | `resolveBackIntent` is used by the hardware handler and `ShellAppBar`; Profile is registered in Dashboard and Orrery stacks; nested reset builders retain Dashboard below targets; widget missing-contact handling resets then alerts; Edit's confirmed-save navigate focuses the existing Profile and removes the Edit route above it. Navigation/linking suites passed. |
+| 3 | The FAB provides exactly the six specified, fixed-order actions and uses Profile context or one shared picker correctly. | ✓ VERIFIED | `UNIVERSAL_FAB_ACTIONS` is immutable and has the prescribed six entries; `resolveFabTarget` preselects Profile context, chooses the reusable picker otherwise, and opens Group Log directly. The 9-test FAB contract suite passed. |
+| 4 | Quick Log writes truthfully, offers canonical Undo/Retry behavior, and does not reintroduce the overlapping-Undo race. | ✓ VERIFIED | `UniversalFab.tsx` invokes `recordTouchpoint` before success feedback and success haptic; failure exposes Retry; Undo uses `deleteTouchpoint`; the per-interaction controller is exercised by the held-promise regression test. `recency-dao` and FAB suites passed. |
+| 5 | Contextual chrome, discard protection, destinations, accessibility, and semantic device behavior are complete. | ✓ VERIFIED | Focused-route classification controls nav/FAB hiding; `useDiscardKeepGuard` wires `beforeRemove` with a save bypass; Dashboard exposes Group Events and Archived entries; controls have labels/modal semantics and >=44px action targets. Committed `22-UAT.md` records passed TalkBack traversal, semantic haptics, and visible launcher-widget refresh on the standalone release APK. |
 
-**Score:** 4/5 truths verified (1 present, behavior-unverified)
+**Score:** 5/5 truths verified (0 present, behavior-unverified)
 
 ### Required Artifacts
 
 | Artifact | Expected | Status | Details |
-|---|---|---|---|
-| `src/navigation/RootNavigator.tsx` | Four-tab shell, retap and Back integration | ✓ EXISTS + SUBSTANTIVE | Bottom tabs, per-tab listeners, fade animation, transient-first Back handling. |
-| `src/navigation/reset-intents.ts` | Typed external Dashboard reset owner | ✓ EXISTS + SUBSTANTIVE | Covered by `reset-intents.test.ts`; notification/widget callers use nested tab targets. |
-| `src/components/UniversalFab.tsx` | Six-action dial and Quick Log wiring | ✓ EXISTS + SUBSTANTIVE | Typed action map, picker integration, canonical writers, widget and shell-refresh publication. |
-| `src/components/ContactPicker.tsx` | Local searchable modal picker | ✓ EXISTS + SUBSTANTIVE | `Modal`, `FlatList`, modal semantics, transient registration, and local read/filter flow. |
-| `src/components/Snackbar.tsx` | Shell-level committed-write feedback | ✓ EXISTS + SUBSTANTIVE | Mounted once in `App.tsx`; Undo/Retry actions have semantic button labels and 44px targets. |
-| `src/navigation/discard-keep-guard.ts` | Unsaved-edit guard | ✓ EXISTS + SUBSTANTIVE | `beforeRemove` guard presents explicit Keep editing / Discard choices. |
-
-**Artifacts:** 6/6 verified
+| --- | --- | --- | --- |
+| `src/navigation/RootNavigator.tsx` | Four-tab shell, active-tab behavior, system Back, fade | ✓ VERIFIED | Substantive 206-line tab navigator; mounts all four per-tab stacks and is rendered only after App's migration-ready/error gates. |
+| `src/navigation/tabs/*.tsx` and `src/navigation/types.ts` | Per-tab stacks and typed tab tree | ✓ VERIFIED | Four native stack instances; Dashboard/Orrery dual-register the Profile family; container ref is `NavigationContainerRef<TabParamList>`. |
+| `src/navigation/reset-intents.ts` | Sole nested Dashboard reset shape | ✓ VERIFIED | Real nested states for Dashboard root/target, value-tested by `reset-intents.test.ts` and used by widget, notification, compose, import, reconcile, and merge completion paths. |
+| `src/stores/shell-transient-store.ts` and `src/navigation/back-intent.ts` | Topmost transient dismissal before navigation | ✓ VERIFIED | Store retains executable dismiss callbacks, not just identifiers; behavior tests prove last-opened-first dismissal and fall-through. |
+| `src/components/UniversalFab.tsx` and `universal-fab-logic.ts` | Six-action dial, context routing, Quick Log | ✓ VERIFIED | 426-line live shell component, mounted once in `App.tsx`; typed logic and concurrent-Undo regression coverage are substantive. |
+| `src/components/ContactPicker.tsx` and `src/db/picker-read.ts` | Shared search picker with real local data | ✓ VERIFIED | Modal reads `contacts` with a real SQLite `getAllAsync` query, filters results locally, and registers its close callback with the transient store. |
+| `src/components/Snackbar.tsx` and `src/navigation/discard-keep-guard.ts` | Truthful write feedback and unsaved-edit guard | ✓ VERIFIED | App mounts the single snackbar host; the guard attaches a `beforeRemove` listener and dispatches only an explicit Discard action. |
 
 ### Key Link Verification
 
-| From | To | Via | Status |
-|---|---|---|---|
-| `RootNavigator` | shell transient store | active-tab and hardware-Back callbacks | ✓ WIRED |
-| `UniversalFab` | `ContactPicker` | global pick-then callback | ✓ WIRED |
-| `UniversalFab` | recency DAO | `recordTouchpoint` and `deleteTouchpoint` promise paths | ✓ WIRED |
-| `UniversalFab` | widget + shell refresh | resolve-only publication after commit/Undo | ✓ WIRED |
-| `App.tsx` | `UniversalFab` + `Snackbar` | one shared shell-level host of each | ✓ WIRED |
-| notification/widget links | `reset-intents` | typed Dashboard-rooted fallback | ✓ WIRED |
+| From | To | Via | Status | Details |
+| --- | --- | --- | --- | --- |
+| `App.tsx` ready/error gates | `RootNavigator` | `NavigationContainer` only in the ready, non-error branch | ✓ WIRED | Migration readiness remains ahead of every tab screen. |
+| `RootNavigator` / `ShellAppBar` | transient store | shared `resolveBackIntent` then `dismissTop()` | ✓ WIRED | System and shell Back use the same transient decision; full-screen transient scrims protect legacy child Back controls while open. |
+| external entry gates | `reset-intents` | typed Dashboard-rooted reset | ✓ WIRED | Widget, notification, Compose, import/reconcile, and merge paths use nested tab states rather than flat root targets. |
+| `UniversalFab` | picker / DAO / snackbar | typed action intent then picker or `recordTouchpoint` | ✓ WIRED | Success occurs only after the write resolves; Undo calls the canonical delete writer. |
+| `UniversalFab` | widget and browse refresh | successful write/Undo publication | ✓ WIRED | The on-device standalone-release UAT observed the launcher widget refresh. |
 
-**Wiring:** 6/6 connections verified
+### Data-Flow Trace (Level 4)
 
-## Requirements Coverage
+| Artifact | Data variable | Source | Produces real data | Status |
+| --- | --- | --- | --- | --- |
+| `ContactPicker.tsx` | `rows` | `listPickerContacts(getExecutor(), …)` | SQL `SELECT … FROM contacts` via `getAllAsync`, then local search/filter | ✓ FLOWING |
+| `UniversalFab.tsx` | Quick Log result / Undo action | `recordTouchpoint` / `deleteTouchpoint` | Canonical DAO promises supply interaction IDs and commit/failure branches | ✓ FLOWING |
+| `Snackbar.tsx` | `snackbar` | shared Zustand snackbar store | Receives success/error objects from the resolved write paths | ✓ FLOWING |
+
+### Behavioral Spot-Checks
+
+| Behavior | Command | Result | Status |
+| --- | --- | --- | --- |
+| Shell navigation, resets, transient ordering, picker ordering, Quick Log undo | `npx vitest run` over 9 named Phase-22 suites | 9 files / 140 tests passed | ✓ PASS |
+| Whole workspace regression | `npm test` | 197 files / 1,877 tests passed | ✓ PASS |
+| Static typing | `npx tsc --noEmit` | exit 0 | ✓ PASS |
+| Theme-token guard | `npm run check:colors` | exit 0 | ✓ PASS |
+| Sensory Android behavior | committed `22-UAT.md`, `9ad6a5a` | TalkBack, semantic haptics, and standalone-release widget refresh all passed | ✓ PASS |
+
+### Requirements Coverage
 
 | Requirement | Status | Evidence |
-|-------------|--------|----------|
-| SHELL-01 | ✓ SATISFIED | Four-tab navigator, per-tab stacks, safe-area tab shell; Pixel tab UAT recorded. |
-| SHELL-02 | ✓ SATISFIED | Tested active-tab/transient resolver and tab listeners. |
-| SHELL-03 | ✓ SATISFIED | Tested Back resolver and shell Back handler; nested stacks retain ordinary fallback. |
-| SHELL-04 | ✓ SATISFIED | Per-stack Profile routes preserve origin-aware `goBack()` paths. |
-| SHELL-05 | ✓ SATISFIED | Typed nested external resets and notification/widget resolver tests pass. |
-| SHELL-06 | ✓ SATISFIED | Focused-route and keyboard visibility wiring is present and tested where render-free. |
-| SHELL-07 | ✓ SATISFIED | `beforeRemove` Discard/Keep guard is substantive and wired into edit flow. |
-| SHELL-08 | ✓ SATISFIED | Fixed six-action FAB contract and semantic dial implementation. |
-| SHELL-09 | ✓ SATISFIED | Profile context preselect and global shared-picker routing pass logic tests. |
-| SHELL-10 | ✓ SATISFIED | Local ordering/filter/marker tests and picker implementation pass. |
-| SHELL-11 | ✓ SATISFIED | Commit-only success, canonical Undo, Retry, and overlapping-Undo regression coverage pass. |
-| SHELL-12 | ✓ SATISFIED | Dashboard header and overflow expose Group Events and Archived Contacts. |
-| SHELL-13 | ✓ SATISFIED | Shell app bars and measured content/bottom clearance are wired. |
-| SHELL-14 | ? NEEDS HUMAN | Source/a11y-tree evidence is sound and TalkBack traversal passed; haptic and visible widget behavior remain sensory-only. |
-| SHELL-15 | ✓ SATISFIED | Fade transition is configured; Pixel UAT observed the four-tab shell. |
+| --- | --- | --- |
+| SHELL-01 | ✓ SATISFIED | Four typed tab stacks, fixed order, ready gate, and measured tab bar. |
+| SHELL-02 | ✓ SATISFIED | Active-tab listener dismisses first then pops root; transient-store tests pass. |
+| SHELL-03 | ✓ SATISFIED | Transient-first back resolver, stack fall-through, and completed-edit path. |
+| SHELL-04 | ✓ SATISFIED | Per-tab registrations preserve Profile origin; cross-tab completions explicitly reset to Dashboard. |
+| SHELL-05 | ✓ SATISFIED | Validated deep links and notification/Compose/import/reconcile reset flows retain Dashboard fallback. |
+| SHELL-06 | ✓ SATISFIED | Focused-workflow predicate and keyboard tab/FAB hiding are wired. |
+| SHELL-07 | ✓ SATISFIED | Reusable `beforeRemove` Discard/Keep guard with confirmed-save bypass. |
+| SHELL-08 | ✓ SATISFIED | Exact six-action labeled dial with scrim. |
+| SHELL-09 | ✓ SATISFIED | Profile preselection, shared-picker routing, and direct Group Log intent. |
+| SHELL-10 | ✓ SATISFIED | SQLite data flow plus tested membership/recency/name ordering and archived/snoozed handling. |
+| SHELL-11 | ✓ SATISFIED | Commit-only success, canonical Undo, Retry, and concurrent-Undo regression test. |
+| SHELL-12 | ✓ SATISFIED | Dashboard header/overflow routes reach Group Events and Archived Contacts. |
+| SHELL-13 | ✓ SATISFIED | Shell app bars, safe-area tab bar, and shared bottom-clearance wiring. |
+| SHELL-14 | ✓ SATISFIED | Semantic labels, action target sizes, modal isolation/focus paths, and passed TalkBack/haptic UAT. |
+| SHELL-15 | ✓ SATISFIED | Bottom-tabs fade configuration; no swipe tab gesture; device UAT passed. |
 
-**Coverage:** 14/15 requirements satisfied; 1 requires final human confirmation.
+**Coverage:** 15/15 requirements satisfied.
 
-## Test Quality Audit
+### Test Quality Audit
 
-| Test File(s) | Linked Requirements | Active | Skipped | Assertion Level | Verdict |
-|--------------|---------------------|--------|---------|-----------------|---------|
-| navigation reset/linking/back/focused/transient suites | SHELL-01–06, 15 | 88 | 0 | Behavioral | ✓ PASS |
-| FAB logic and Quick Log Undo regression | SHELL-08/09/11 | 10 | 0 | Behavioral | ✓ PASS |
-| picker ordering and recency DAO suites | SHELL-10/11 | 42 | 0 | Value / behavioral | ✓ PASS |
+| Test file(s) | Linked requirements | Active | Skipped | Circular | Assertion level | Verdict |
+| --- | --- | ---: | ---: | --- | --- | --- |
+| reset/back/focused/transient/linking/notification suites | SHELL-01–06, 15 | 88 | 0 | No | Value / behavioral | ✓ PASS |
+| FAB logic and Quick Log Undo regression | SHELL-08, 09, 11 | 10 | 0 | No | Behavioral | ✓ PASS |
+| picker ordering and recency DAO suites | SHELL-10, 11 | 42 | 0 | No | Value / behavioral | ✓ PASS |
 
-Targeted verification: 9 files, 140 tests passed. Full verification: `npm test` passed (197 files, 1,877 tests); TypeScript, color-token, Biome, and diff-integrity checks passed. No disabled linked tests, circular expected-value fixtures, or incomplete-source markers were found in the reviewed shell scope.
+No disabled requirement-linked tests or circular expected-value writers were found. The only phase-scope placeholder hits are intentionally reachable future workflow destinations (`LogContact`, `GroupLog`, `UpdateContact`, `Memory`), explicitly owned by later phases 24, 33, and 34; they are not dead-end shell controls and do not block this phase's navigation goal.
 
-## Human Verification Required
+### Decision Coverage
 
-TalkBack modal traversal was confirmed by the owner on 2026-09-03: spoken traversal worked well. The remaining checks are:
+All 8 trackable `22-CONTEXT.md` decisions are honored by shipped artifacts (`check.decision-coverage-verify`: 8/8). This is advisory and produced no warnings.
 
-### 1. Semantic haptics
+### Human Verification
 
-**Test:** Feel the FAB opening, a successful Quick Log, and a failed/retried Quick Log path.
-
-**Expected:** FAB open has a light impact; committed Quick Log has a success haptic; ordinary write failure has no haptic.
-
-**Why human:** Perceived Android haptics cannot be observed in the render-free test environment.
-
-### 2. Visible widget refresh
-
-**Test:** With the Orbit widget on the launcher, Quick Log then Undo a contact.
-
-**Expected:** The widget visibly refreshes after each successful write without manually reopening the app.
-
-**Why human:** The device test confirmed refresh publication, not the launcher widget's rendered update.
+None remaining. The three previously required Android sensory checks are recorded as passed in `22-UAT.md` at commit `9ad6a5a`.
 
 ## Gaps Summary
 
-No source or automated-test gaps found. The phase is held only for the two remaining human-sensory Android checks above.
-
-## Verification Metadata
-
-**Verification approach:** Goal-backward against the five Phase 22 roadmap success criteria.
-
-**Automated checks:** 9 targeted files / 140 tests, full suite 197 files / 1,877 tests, TypeScript, color-token, Biome, and diff checks passed.
-
-**Human checks required:** 2
+No gaps found. The phase goal is achieved and all required automated and on-device checks have passed.
 
 ---
 
-_Verified: 2026-09-03T05:29:53Z_
-_Verifier: Codex (inline verifier; no subagent dispatched)_
+_Verified: 2026-09-03T06:37:24Z_
+_Verifier: Codex (gsd-verifier)_
