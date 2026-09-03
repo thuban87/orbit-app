@@ -43,12 +43,11 @@ import { getContactHeader } from "@/db/contact-read";
 import { getExecutor, localDateTime } from "@/db/database";
 import { getProfile } from "@/db/profile-dao";
 import { getNewestPendingReconcileSessionId } from "@/db/reconcile-session-read";
-import type { ResumableReconcile } from "@/services/import/reconcile-resume-sweep";
 import { listSunCandidates, type SunCandidate } from "@/db/sun-picker-read";
 import { sunOccupantIsSelf } from "@/logic/sun-occupant-logic";
+import { navigationRef } from "@/navigation/linking";
 import type { RootStackParamList } from "@/navigation/types";
 import { useBottomClearance } from "@/navigation/use-bottom-clearance";
-import { navigationRef } from "@/navigation/linking";
 import { AiService } from "@/services/AiService";
 import { aiKeyStore } from "@/services/ai-key-store";
 import {
@@ -57,6 +56,7 @@ import {
   type AiProviderId,
 } from "@/services/ai-types";
 import { getDeviceRegion } from "@/services/device-region";
+import type { ResumableReconcile } from "@/services/import/reconcile-resume-sweep";
 import { startContactImport } from "@/services/import/start-contact-import";
 import { reconcileDigestSchedule } from "@/services/notifications/digest-schedule";
 import { reconcileSchedule } from "@/services/notifications/notification-schedule";
@@ -66,10 +66,13 @@ import {
 } from "@/services/notifications/permission";
 import { useAiModelPrefs } from "@/stores/ai-model-prefs-store";
 import { useAssistBanner } from "@/stores/assist-store";
+import { useThemeStore } from "@/stores/theme-store";
 import { useTheme } from "@/theme";
+import { ACCENTS } from "@/theme/accents";
+import { ACCENT_IDS, type AccentId } from "@/theme/theme-option-ids";
+import type { ThemeMode, ThemePackage } from "@/theme/theme-types";
 import { Logger } from "@/utils/logger";
 import { pickContacts } from "../../modules/orbit-contact-picker";
-import { contactImportMode } from "./use-contact-import-mode";
 import { pinResultCopy } from "./settings-add-widget";
 import {
   buildAiSettingsPatch,
@@ -81,6 +84,7 @@ import {
 } from "./settings-ai-logic";
 import { phoneRegionValueLabel } from "./settings-lifecycle-logic";
 import { phoneRegionOverridePatch } from "./settings-region-logic";
+import { contactImportMode } from "./use-contact-import-mode";
 
 const LOG_SCOPE = "settings-screen";
 
@@ -133,7 +137,22 @@ function seedForHour(hour: number): Date {
  * `useTheme().colors.*` (CLAUDE.md / check:colors).
  */
 export function SettingsScreen() {
-  const { colors } = useTheme();
+  const { colors, mode } = useTheme();
+  // Appearance (23-08): live theme selection from the store — the ThemeProvider
+  // re-renders from these, so a change restyles the whole app instantly; the
+  // persist() helper below writes the durable app_settings columns.
+  const themePackage = useThemeStore((s) => s.package);
+  const galaxyMode = useThemeStore((s) => s.galaxyMode);
+  const standardMode = useThemeStore((s) => s.standardMode);
+  const galaxyAccent = useThemeStore((s) => s.galaxyAccent);
+  const standardAccent = useThemeStore((s) => s.standardAccent);
+  const setThemePackage = useThemeStore((s) => s.setPackage);
+  const setModeForActivePackage = useThemeStore(
+    (s) => s.setModeForActivePackage,
+  );
+  const setAccentForActivePackage = useThemeStore(
+    (s) => s.setAccentForActivePackage,
+  );
   const bottomClearance = useBottomClearance();
   const navigation =
     useNavigation<NativeStackNavigationProp<RootStackParamList>>();
@@ -709,9 +728,239 @@ export function SettingsScreen() {
     <ScrollView
       testID="settings-screen"
       style={{ backgroundColor: colors.background }}
-      contentContainerStyle={[styles.content, { paddingBottom: bottomClearance }]}
+      contentContainerStyle={[
+        styles.content,
+        { paddingBottom: bottomClearance },
+      ]}
     >
       <ShellAppBar variant="root" title="Settings" />
+
+      {/* Appearance (23-08) — the in-app entry point for the theme axes that
+          resolve through ThemeProvider app-wide today: package, mode, accent.
+          Each control drives a live store setter (instant restyle) AND persists
+          the durable app_settings column via persist(). Background/glass/status
+          adoption has no production consumer yet, so it is intentionally absent. */}
+      <View testID="settings-appearance-section" style={styles.section}>
+        <Text
+          accessibilityRole="header"
+          style={[styles.sectionHeading, { color: colors.textSecondary }]}
+        >
+          Appearance
+        </Text>
+
+        {/* Theme package */}
+        <View
+          testID="settings-theme-package-row"
+          style={[
+            styles.row,
+            { backgroundColor: colors.surface, borderColor: colors.border },
+          ]}
+        >
+          <Text style={[styles.rowLabel, { color: colors.textPrimary }]}>
+            Theme
+          </Text>
+          <View style={styles.themeChipRow}>
+            {(
+              [
+                ["galaxy", "Galaxy"],
+                ["standard", "Standard"],
+              ] as [ThemePackage, string][]
+            ).map(([value, label]) => {
+              const selected = themePackage === value;
+              return (
+                <Pressable
+                  key={value}
+                  testID={`settings-theme-package-${value}`}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Theme ${label}`}
+                  accessibilityState={{ selected }}
+                  onPress={() => {
+                    setThemePackage(value);
+                    void persist({ themePackage: value });
+                  }}
+                  style={[
+                    styles.themeChip,
+                    {
+                      borderColor: selected ? colors.accent : colors.border,
+                      backgroundColor: selected
+                        ? colors.accent
+                        : colors.surface,
+                    },
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.themeChipLabel,
+                      {
+                        color: selected ? colors.onAccent : colors.textPrimary,
+                      },
+                    ]}
+                  >
+                    {label}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+          <Text style={[styles.helper, { color: colors.textSecondary }]}>
+            Galaxy is glass-forward and deep-space; Standard is flatter and
+            calmer. Each package remembers its own mode and accent.
+          </Text>
+        </View>
+
+        {/* Appearance mode (per active package) */}
+        <View
+          testID="settings-theme-mode-row"
+          style={[
+            styles.row,
+            { backgroundColor: colors.surface, borderColor: colors.border },
+          ]}
+        >
+          <Text style={[styles.rowLabel, { color: colors.textPrimary }]}>
+            Mode
+          </Text>
+          <View style={styles.themeChipRow}>
+            {(
+              [
+                ["light", "Light"],
+                ["dark", "Dark"],
+                ["system", "Follow System"],
+              ] as [ThemeMode, string][]
+            ).map(([value, label]) => {
+              const activeMode =
+                themePackage === "galaxy" ? galaxyMode : standardMode;
+              const selected = activeMode === value;
+              return (
+                <Pressable
+                  key={value}
+                  testID={`settings-theme-mode-${value}`}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Mode ${label}`}
+                  accessibilityState={{ selected }}
+                  onPress={() => {
+                    setModeForActivePackage(value);
+                    void persist(
+                      themePackage === "galaxy"
+                        ? { galaxyMode: value }
+                        : { standardMode: value },
+                    );
+                  }}
+                  style={[
+                    styles.themeChip,
+                    {
+                      borderColor: selected ? colors.accent : colors.border,
+                      backgroundColor: selected
+                        ? colors.accent
+                        : colors.surface,
+                    },
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.themeChipLabel,
+                      {
+                        color: selected ? colors.onAccent : colors.textPrimary,
+                      },
+                    ]}
+                  >
+                    {label}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        </View>
+
+        {/* Accent (per active package) */}
+        <View
+          testID="settings-theme-accent-row"
+          style={[
+            styles.row,
+            { backgroundColor: colors.surface, borderColor: colors.border },
+          ]}
+        >
+          <Text style={[styles.rowLabel, { color: colors.textPrimary }]}>
+            Accent
+          </Text>
+          <View style={styles.swatchRow}>
+            {(() => {
+              const activeAccent =
+                themePackage === "galaxy" ? galaxyAccent : standardAccent;
+              const defaultSelected = activeAccent === null;
+              return (
+                <>
+                  {/* Package default (NULL accent) */}
+                  <Pressable
+                    testID="settings-theme-accent-default"
+                    accessibilityRole="button"
+                    accessibilityLabel="Accent package default"
+                    accessibilityState={{ selected: defaultSelected }}
+                    onPress={() => {
+                      setAccentForActivePackage(null);
+                      void persist(
+                        themePackage === "galaxy"
+                          ? { galaxyAccent: null }
+                          : { standardAccent: null },
+                      );
+                    }}
+                    style={[
+                      styles.themeChip,
+                      {
+                        borderColor: defaultSelected
+                          ? colors.accent
+                          : colors.border,
+                        backgroundColor: colors.surface,
+                      },
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.themeChipLabel,
+                        { color: colors.textPrimary },
+                      ]}
+                    >
+                      Default
+                    </Text>
+                  </Pressable>
+                  {ACCENT_IDS.map((id: AccentId, index) => {
+                    const selected = activeAccent === id;
+                    const fill = ACCENTS[id][mode].fill;
+                    return (
+                      <Pressable
+                        key={id}
+                        testID={`settings-theme-accent-${index}`}
+                        accessibilityRole="button"
+                        accessibilityLabel={`Accent ${id.replace(/-/g, " ")}`}
+                        accessibilityState={{ selected }}
+                        onPress={() => {
+                          setAccentForActivePackage(id);
+                          void persist(
+                            themePackage === "galaxy"
+                              ? { galaxyAccent: id }
+                              : { standardAccent: id },
+                          );
+                        }}
+                        style={[
+                          styles.swatch,
+                          {
+                            backgroundColor: fill,
+                            borderColor: selected
+                              ? colors.accent
+                              : colors.border,
+                          },
+                        ]}
+                      />
+                    );
+                  })}
+                </>
+              );
+            })()}
+          </View>
+          <Text style={[styles.helper, { color: colors.textSecondary }]}>
+            The accent tints buttons, links, and active states across the app.
+          </Text>
+        </View>
+      </View>
 
       <View testID="settings-phone-region-section" style={styles.section}>
         <Text
@@ -1313,7 +1562,9 @@ export function SettingsScreen() {
               testID="settings-interaction-assist"
               accessibilityRole="switch"
               accessibilityLabel="Interaction Assist"
-              accessibilityState={{ checked: settings?.interactionAssistEnabled === 1 }}
+              accessibilityState={{
+                checked: settings?.interactionAssistEnabled === 1,
+              }}
               value={settings?.interactionAssistEnabled === 1}
               onValueChange={(value) => void onToggleInteractionAssist(value)}
               trackColor={{ false: colors.border, true: colors.accent }}
@@ -2092,6 +2343,23 @@ const styles = StyleSheet.create({
     height: 44,
     borderRadius: 22,
     borderWidth: 3,
+  },
+  themeChipRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  themeChip: {
+    minHeight: 44,
+    justifyContent: "center",
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+  },
+  themeChipLabel: {
+    fontSize: 15,
+    fontWeight: "600",
   },
   modalRoot: {
     flex: 1,

@@ -30,6 +30,8 @@ interface ThemeStore extends ThemeSelection {
   setPackage: (themePackage: ThemePackage) => void;
   /** Set the appearance mode for the CURRENTLY-ACTIVE package. */
   setModeForActivePackage: (mode: ThemeMode) => void;
+  /** Set the accent for the CURRENTLY-ACTIVE package (null = package default). */
+  setAccentForActivePackage: (accent: AccentId | null) => void;
 }
 
 export const useThemeStore = create<ThemeStore>()((set) => ({
@@ -49,6 +51,12 @@ export const useThemeStore = create<ThemeStore>()((set) => ({
       state.package === "galaxy"
         ? { galaxyMode: mode }
         : { standardMode: mode },
+    ),
+  setAccentForActivePackage: (accent) =>
+    set((state) =>
+      state.package === "galaxy"
+        ? { galaxyAccent: accent }
+        : { standardAccent: accent },
     ),
 }));
 
