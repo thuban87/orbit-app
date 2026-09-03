@@ -79,7 +79,9 @@ created: 2026-09-03
 |----------|-------------|------------|-------------------|
 | Reduced-motion live toggle halts ambient/Orrery motion without jank | THEME-06 / D-07 | Skia render-loop behavior + OS a11y setting; JS-thread perf not observable in unit tests | On the Pixel, toggle OS "Remove animations" while a Galaxy background + Orrery are on-screen; confirm ambient drift/twinkle stops and manual camera control remains |
 | No wrong-theme flash on cold start | THEME-03 / D-10 | First-paint timing; not observable without a real cold boot | Force-stop the app, relaunch; confirm the correct package×mode paints on first frame (no flash of the default/other theme) |
-| All-four-combo visual pass | THEME-01 / THEME-11 | Human visual confirmation of contrast/legibility across palettes | On the Pixel, cycle Galaxy/Standard × Light/Dark and confirm surfaces, accents, and status glyphs are legible and AA-comfortable |
+| All-four-combo visual pass | THEME-01 / THEME-11 | Human visual confirmation of contrast/legibility across palettes | On the Pixel, drive each package×mode via a DAO write (see scope note) and cold-start; confirm surfaces, accents, and status glyphs are legible and AA-comfortable in all four combos |
+
+> **Scope note (REVIEWS 23 consensus — no in-app switcher this phase).** There is NO Appearance settings UI in Phase 23 — the settings screen that lets a user *cycle* package×mode and see *live preview / restore-on-switch* is Phase 15/37. Therefore for Phase 23 the multi-combo and preview UATs above (THEME-01/02/03/04) are exercised by **writing the theme columns directly via the DAO (`updateAppSettings` / `adb run-as` DB write) and cold-starting** to observe first-paint — NOT by in-app cycling. The **live in-app cycle + immediate-preview + restore-on-switch** flows are DEFERRED to the Phase-15/37 settings-UI verification gate. `/gsd-verify-work` for Phase 23 must NOT fail THEME-01/02/03/04 for the absence of an in-app switcher; it verifies the DAO-write + cold-start path only.
 
 ---
 
