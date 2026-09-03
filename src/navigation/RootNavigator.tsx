@@ -12,8 +12,10 @@ import {
   type RouteProp,
 } from "@react-navigation/native";
 import { useEffect } from "react";
-import { BackHandler, Text, View } from "react-native";
+import { BackHandler, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { Icon } from "@/components/icons/Icon";
+import { TAB_ICON } from "@/components/icons/icon-registry";
 import { DashboardStack } from "@/navigation/tabs/DashboardStack";
 import { OrreryStack } from "@/navigation/tabs/OrreryStack";
 import { BackupStack } from "@/navigation/tabs/BackupStack";
@@ -38,13 +40,6 @@ import type { TabParamList } from "./types";
  * the current tab stack rather than a swipe gesture.
  */
 const Tab = createBottomTabs<TabParamList>();
-
-const TAB_GLYPHS: Record<keyof TabParamList, string> = {
-  DashboardTab: "⌂",
-  OrreryTab: "◎",
-  BackupTab: "↥",
-  SettingsTab: "⚙",
-};
 
 type TabNavigation = BottomTabNavigationProp<TabParamList>;
 type TabRoute = RouteProp<TabParamList, keyof TabParamList>;
@@ -163,8 +158,18 @@ export function RootNavigator() {
           tabBarActiveTintColor: colors.accent,
           tabBarInactiveTintColor: colors.textSecondary,
           tabBarStyle: { backgroundColor: colors.surface },
-          tabBarIcon: ({ color }) => (
-            <Text style={{ color }}>{TAB_GLYPHS[route.name]}</Text>
+          // Route each tab through the semantic icon registry (the ad-hoc
+          // per-route glyph map is retired). Icon resolves colour via its own
+          // theme tone — accent when
+          // focused, textSecondary otherwise — mirroring the tab bar's former
+          // active/inactive tint, and size via the ICON_SIZE `lg` token.
+          tabBarIcon: ({ focused }) => (
+            <Icon
+              name={TAB_ICON[route.name]}
+              state={focused ? "active" : "default"}
+              tone={focused ? "accent" : "textSecondary"}
+              size="lg"
+            />
           ),
         })}
       >
