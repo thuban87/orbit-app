@@ -1,10 +1,10 @@
 ---
 schema_version: 1
-open_count: 13
+open_count: 15
 waived_count: 0
 fixed_count: 6
-total_count: 19
-last_updated: 2026-09-03T16:10:52.253Z
+total_count: 21
+last_updated: 2026-09-03T17:10:03.761Z
 ---
 
 # Broken Windows Ledger
@@ -34,6 +34,8 @@ last_updated: 2026-09-03T16:10:52.253Z
 | 17 | 22 | unrun-verify | src/components/ContactPicker.tsx |  | Pixel UAT remains: picker search/archived/snoozed markers, TalkBack modal focus, Quick Log commit truth, Undo/Retry, haptics, widget refresh, and shell refresh without refocus. | open |  | 2026-09-02T22:33:27.282Z |  |
 | 18 | 23 | stub | src/theme/theme-presets.ts |  | standard package palette is a placeholder; finished four-palette authoring is Plan 03 (accents.ts) | open |  | 2026-09-03T16:10:52.068Z |  |
 | 19 | 23 | stub | src/stores/theme-store.ts |  | setPackage/setModeForActivePackage have no runtime caller yet; Settings UI (later plan) wires them | open |  | 2026-09-03T16:10:52.253Z |  |
+| 20 | 23 | unmet-truth | src/theme/theme-presets.ts |  | galaxy-dark onDanger(#FFFFFF)/danger(#E5484D) = 3.91:1 (<AA 4.5) — owner decision (23-03-SUMMARY Owner Escalations); do not auto-retune owner hue | open |  | 2026-09-03T17:10:03.552Z |  |
+| 21 | 23 | unmet-truth | src/theme/theme-presets.ts |  | galaxy-dark danger-as-text(#E5484D)/surfaceElevated(#1D2235) = 4.03:1 (<AA 4.5) — owner decision (23-03-SUMMARY); still >= AA-large 3.0 | open |  | 2026-09-03T17:10:03.761Z |  |
 
 ````json
 [
@@ -263,6 +265,30 @@ last_updated: 2026-09-03T16:10:52.253Z
     "status": "open",
     "reason": "",
     "recorded_at": "2026-09-03T16:10:52.253Z",
+    "resolved_at": null
+  },
+  {
+    "id": 20,
+    "kind": "unmet-truth",
+    "phase": "23",
+    "file": "src/theme/theme-presets.ts",
+    "line": null,
+    "description": "galaxy-dark onDanger(#FFFFFF)/danger(#E5484D) = 3.91:1 (<AA 4.5) — owner decision (23-03-SUMMARY Owner Escalations); do not auto-retune owner hue",
+    "status": "open",
+    "reason": "",
+    "recorded_at": "2026-09-03T17:10:03.552Z",
+    "resolved_at": null
+  },
+  {
+    "id": 21,
+    "kind": "unmet-truth",
+    "phase": "23",
+    "file": "src/theme/theme-presets.ts",
+    "line": null,
+    "description": "galaxy-dark danger-as-text(#E5484D)/surfaceElevated(#1D2235) = 4.03:1 (<AA 4.5) — owner decision (23-03-SUMMARY); still >= AA-large 3.0",
+    "status": "open",
+    "reason": "",
+    "recorded_at": "2026-09-03T17:10:03.761Z",
     "resolved_at": null
   }
 ]

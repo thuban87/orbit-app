@@ -209,7 +209,7 @@ All v1.0 commits are local on `main` and have NOT been pushed.
 **Wave 2** *(blocked on Wave 1 completion)*
 
 - [x] 23-02-PLAN.md — Runtime deps, bundled fonts, typography/spacing/radii tokens, text-scaling reflow [THEME-07]
-- [ ] 23-03-PLAN.md — Four palettes, curated accent system, AA contrast gate [THEME-01/02/11]
+- [x] 23-03-PLAN.md — Four palettes, curated accent system, AA contrast gate [THEME-01/02/11]
 - [ ] 23-04-PLAN.md — Reduced-motion hook (SharedValue bridge + boolean twin) + motion tokens [THEME-06]
 
 **Wave 3** *(blocked on Wave 2 completion)*
