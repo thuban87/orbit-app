@@ -10,4 +10,14 @@ export {
   buttonVisual,
   MIN_TOUCH_TARGET,
 } from "./Button";
+export {
+  ConfirmDialog,
+  type ConfirmDialogProps,
+} from "./ConfirmDialog";
 export { GlassSurface, type GlassSurfaceProps } from "./GlassSurface";
+export { Modal, type ModalProps } from "./Modal";
+export {
+  type OverlayLifecycle,
+  SCRIM_OPACITY,
+} from "./overlay-base";
+export { Sheet, type SheetProps, type SheetVariant } from "./Sheet";

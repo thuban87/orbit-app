@@ -89,12 +89,19 @@ describe("assertButtonAccessibility — the icon-only a11y contract", () => {
 
   it("accepts an IconOnly button that carries an accessibilityLabel", () => {
     expect(() =>
-      assertButtonAccessibility("iconOnly", { accessibilityLabel: "Add contact" }),
+      assertButtonAccessibility("iconOnly", {
+        accessibilityLabel: "Add contact",
+      }),
     ).not.toThrow();
   });
 
   it("never blocks a text-label role (it has its own accessible name)", () => {
-    for (const role of ["primary", "secondary", "tertiary", "destructive"] as const) {
+    for (const role of [
+      "primary",
+      "secondary",
+      "tertiary",
+      "destructive",
+    ] as const) {
       expect(() => assertButtonAccessibility(role, {})).not.toThrow();
     }
   });

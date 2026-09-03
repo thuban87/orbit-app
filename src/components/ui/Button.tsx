@@ -19,6 +19,9 @@
  * sibling `button-roles.ts`; this module only RESOLVES those token keys to real
  * colours via `useTheme()` and renders. No colour literal here (check:colors).
  */
+// biome-ignore-all lint/a11y/useValidAriaRole: `role` on AppText (semantic
+// typography role) is a domain prop, NOT an ARIA role — the a11y lint
+// false-fires on the prop name (same precedent as ThemePreviewScreen.tsx).
 import { Pressable, type PressableProps, StyleSheet, View } from "react-native";
 import { Icon } from "@/components/icons/Icon";
 import type { IconName, IconTone } from "@/components/icons/icon-registry";
@@ -26,11 +29,7 @@ import { useTheme } from "@/theme";
 import { RADII } from "@/theme/tokens/radii";
 import { SPACING } from "@/theme/tokens/spacing";
 import { AppText } from "./AppText";
-import {
-  assertButtonAccessibility,
-  type ButtonRole,
-  buttonVisual,
-} from "./button-roles";
+import { assertButtonAccessibility, buttonVisual } from "./button-roles";
 
 // Re-exported so `button-roles` stays "exported from Button" for app consumers.
 export {
@@ -91,7 +90,8 @@ export function Button(props: ButtonProps) {
       accessibilityRole="button"
       accessibilityState={{ disabled: !!disabled }}
       accessibilityLabel={
-        accessibilityLabel ?? (props.role !== "iconOnly" ? props.label : undefined)
+        accessibilityLabel ??
+        (props.role !== "iconOnly" ? props.label : undefined)
       }
       style={[styles.base, containerStyle]}
     >

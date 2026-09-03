@@ -27,7 +27,7 @@
  * from `react-native`.
  */
 import type { IconName, IconTone } from "@/components/icons/icon-registry";
-import { type RadiusToken } from "@/theme/tokens/radii";
+import type { RadiusToken } from "@/theme/tokens/radii";
 
 /** The five formal button roles (dossier §P). */
 export type ButtonRole =
