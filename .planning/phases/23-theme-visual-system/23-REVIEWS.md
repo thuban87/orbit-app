@@ -1,434 +1,159 @@
 ---
 phase: 23
 reviewers: [codex, claude]
-reviewed_at: 2026-09-03T08:24:37Z
+reviewed_at: 2026-09-03T09:11:22Z
+convergence_cycle: 2
 plans_reviewed: [23-01-PLAN.md, 23-02-PLAN.md, 23-03-PLAN.md, 23-04-PLAN.md, 23-05-PLAN.md, 23-06-PLAN.md, 23-07-PLAN.md]
 models:
   codex: "gpt-5.6-terra (reasoning=low)"
-  claude: "claude-opus (read-only subagent)"
+  claude: "claude-opus-4-8"
 model_sources:
   codex: "banner"
-  claude: "subagent"
+  claude: "self-identified"
 ---
 
 # Cross-AI Plan Review — Phase 23 (Theme & Visual System)
 
-Two independent source-grounded reviewers ran: **Codex** (via the review-lane machinery,
-model `gpt-5.6-terra`) and **Claude** (run as a read-only subagent rather than the `claude -p`
-lane, per the known Write-permission gap in that lane). Both verified claims against the actual
-code on disk — migrations, DAOs, the theme layer, the backup layer, boot, the dossier, HANDOFF,
-and ADRs — and both read beyond the changed-files lists (shared-table/shared-surface consumers)
-per the "review the code, not the diff" rule. The orchestrator independently re-verified every
-load-bearing claim below against source before recording it (migration number, backup
-export/spread, SunBody clock consumer, `ProfileStatus` union, `postinstall`, test harness).
+Convergence cycle 2. The seven plans were revised to incorporate cycle-1 review feedback; both cycle-1 HIGH findings ([23-01] backup wire-shape, [23-03] accent AA) were re-reviewed against the live codebase this cycle.
 
 ## Consensus Summary
 
-The phase's **architecture is sound and both reviewers agree on it**: Plan 01 correctly
-front-loads the one-way-door migration-015 schema, the whole `app_settings` writer contract, the
-theme re-key, the `orbit-theme` one-time import, and the restore-before-paint boot gate into a
-single gated tracer; later waves fan out as additive pure data, primitives, and renderer edits.
-The migration number (015 = head+1, `database.ts:49` `TARGET_VERSION=14`, latest migration 014)
-is correct on disk. **No decision reversals, no local-first/network violations, and no
-hardcoded-colour or animation-from-React-state violations were found in the plans** — the plans
-in fact *enforce* the recorded decisions (D-04's supersession of HANDOFF §7, ADR-048's rejection
-of tap-to-freeze, D-06/D-07 trip-wires).
+Both reviewers (codex `gpt-5.6-terra`, claude `claude-opus-4-8`) ran source-grounded against the repository and agree the phase is well-architected: every irreversible/shared-file edit is front-loaded into Plan 01's gated tracer, and waves 2–4 fan out additive, non-overlapping work with a clean dependency graph. **Both reviewers independently verified the two cycle-1 HIGHs against the actual backup pipeline, DAO validators, restore path, palette types, and Orrery clock consumers, and both find them FULLY RESOLVED with no decision reversed.**
 
-Two substantive issues rise to the top (both reviewers, both verified), and one important
-**divergence** on how much "adoption" this phase owes.
+- **[23-01] backup wire-shape HIGH — FULLY RESOLVED (both).** Allowlist-now / emit-later is byte-safe: the 7 theme keys are added to `PORTABLE_SETTINGS_KEYS`, declared OPTIONAL in `PortableSettingsSnapshot`, and deliberately NOT emitted from `getPortableSettingsSnapshot`; `BACKUP_FORMAT_VERSION` stays 3 and no `FORWARD_MIGRATIONS` entry is added. Verified: `export-manifest.ts:63,74` spreads `...portable` unconditionally (so non-emission is the only wire-safe route), `types.ts:14` = 3, `FORWARD_MIGRATIONS` holds only entries 1/2, and the restore patch path (`restore-apply.ts:272` → `updateAppSettingsCore` → `validateAppSettingsPatch`, keyed by `COLUMN_OF`) is already able to write the keys the moment Phase 36 emits them. D-03/D-09 preserved.
+- **[23-03] accent AA HIGH — FULLY RESOLVED (both).** `palette.accent` is a single `string` today (`theme-types.ts:33-34`), which genuinely cannot be AA-4.5:1 as a text-link on both galaxy-dark and a near-white light surface; the per-mode `{fill, onAccent, text}` triple is a real fix, not scope creep. The split gate (hard-fail for curated accents + newly-authored palettes; flag-for-owner/stop-and-ask for legacy owner-approved galaxy-dark hues) keeps `AA_NORMAL=4.5`/`AA_LARGE=3.0` intact and never auto-edits an owner hue. AA was NOT weakened.
+
+One NEW HIGH was raised (codex) and stands after verification: **Plan 01's idempotency guarantee for a failed AsyncStorage clear is unsatisfiable with the cited API.** Remaining findings are MEDIUM/LOW polish items concentrated in Plans 01, 04, and 06.
 
 ### Agreed Strengths
 
-- **Migration 015 = correct head+1, verified on disk** by both reviewers (`database.ts:49`
-  `TARGET_VERSION=14`; latest registered migration `014-interaction-assists.ts`). The additive
-  `ALTER TABLE app_settings ADD COLUMN … NOT NULL DEFAULT` idiom is copied faithfully from 014.
-- **The tracer correctly front-loads the irreversible schema + all shared-file edits** and folds
-  restore-before-paint into the *existing* `openAndMigrate` ready gate (`App.tsx:147-161`), so the
-  first non-splash frame carries the saved palette (both reviewers).
-- **Accent/background stored as id / slot-id (never a hex), resolved at render** — a good durable-
-  data boundary matching the verified `self_sun_colour` precedent (nullable TEXT, validated on
-  write, NULL passed through, resolved to a palette hex at render) (both reviewers).
-- **Reduced-motion hook uses the `AccessibilityInfo` subscription bridge** as a Reanimated
-  `SharedValue<boolean>` (live), explicitly *not* Reanimated's boot-only `useReducedMotion()`, and
-  writes `.value` with no per-frame setState — satisfies D-07 (both reviewers).
-- **Status glyphs extend the single `ringVisual` source rather than forking** (`contact-card-ring.ts:44-61`),
-  and the ad-hoc `TAB_GLYPHS` fork (`RootNavigator.tsx:42-47`) is retired through the registry
-  (both reviewers).
-- **Backgrounds/fonts are local `require()` / bundled assets — no network on any read path**
-  (both reviewers); `resolveMode`'s live Follow-System path is correct (both reviewers).
+- Backup deferral is mechanically sound and byte-safe against the format-3 wire, not hand-waved (both reviewers traced the actual `export-manifest.ts` spread and `backup-schema.ts` allowlist/reject).
+- Migration 015 is correctly head+1 (`TARGET_VERSION = 14`, latest on-disk migration `014-interaction-assists.ts`) — verified on disk, not assumed.
+- The per-mode accent triple is a substantive, necessary correction to the single-`accent`-string limitation, and the AA thresholds are preserved.
+- `check:colors` exemption reasoning is accurate (`^[^:]*/theme/` only; migrations are scanned, `accents.ts`/`backgrounds.ts` are exempt).
 
 ### Agreed Concerns
 
-1. **[HIGH — 23-01] Backup wire-shape change ships silently under format-3.** Both reviewers,
-   verified. `export-manifest.ts:26,37` spreads `...portable` from `getPortableSettingsSnapshot`
-   unconditionally into `manifest.appSettings`, so the moment Plan 01 adds the 7 theme fields to
-   that snapshot, every export emits them while `BACKUP_FORMAT_VERSION` stays `3`
-   (`src/backup/types.ts:14`). Consequences: a wire-shape change with no format bump and no
-   `FORWARD_MIGRATIONS` entry (contrary to the backup-schema's own contract,
-   `backup-schema.ts:14-19`); and a format-3 backup made by this build, restored on a pre-Phase-23
-   build (also format 3, allowlist lacking the keys), is **hard-rejected** by `assertPortableSettings`
-   ("appSettings contains a local-only or secret member", `backup-schema.ts:129-135`) rather than
-   getting the friendly update-first message. Neither `export-manifest.ts` nor `restore-apply.ts`
-   is in Plan 01's `files_modified`/`read_first`, and no existing test catches it. **This
-   intersects a DECIDED sequencing item** — planning-notes:73-74 ("the new settings keys must
-   exist before the format-4 plan serializes them") and CONTEXT D-03/D-09 place the format-4 bump
-   in a later phase while requiring the allowlist entry now — so the *resolution* is an owner/planner
-   escalation, not an autonomous fix. Codex rated this HIGH; Claude rated it MEDIUM (noting the
-   broken direction is new-backup→old-app, i.e. an app downgrade) but agrees it must be settled
-   before execution. (Severity divergence noted; carried as HIGH given the one-way-door phase.)
-
-2. **[HIGH — 23-03] The per-combo AA gate is under-defined at the accent data model and can be
-   forced to silently retune owner-approved colours.** Two complementary angles, both verified:
-   - *Codex:* a single `{id, hex, onAccent}` accent tested as text/link on **every** dark **and**
-     light background cannot pass 4.5:1 in all four combos — a foreground light enough on Galaxy
-     Dark cannot also be dark enough on a near-white light surface (`theme-provider.tsx:33-39`
-     exposes one `palette.accent` string). As written, the plan's own acceptance gate may be
-     mathematically unsatisfiable → blocks execution or pressures weakening AA (a prohibited
-     reversal). Fix direction: palette-specific accent tones (`AccentDefinition[package][mode]`) or
-     distinct `accentFill`/`accentText`/`onAccent`.
-   - *Claude:* the gate also runs over **existing owner-approved** galaxy-dark status/text hues
-     (`theme-types.ts:78-108`, "owner-approved 2026-08-16"), but the only stated remedy ("drop the
-     accent") cannot apply to required tokens — retuning an owner-approved hue is an owner visual
-     decision. If the gate hard-fails on a legacy token, the "fix" is a silent visual reversal. Fix
-     direction: hard-fail for curated accents; **flag-for-owner (stop-and-ask)** for any required
-     status/text/surface token that misses AA in the legacy palette.
+- Plan 06's AA guarantee for glass surfaces is only validated against the semi-opaque fallback tint token; the live translucent composite over bright imagery is not bounded by the gate (Claude MEDIUM; codex touches adjacent Plan 06 asset/test gaps). Highest-value non-HIGH item.
+- Plan 06 under-specifies concrete execution artifacts (codex: bundled asset paths + provenance README missing from `files_modified`; image-render-failure runtime test seam unspecified).
 
 ### Divergent Views
 
-- **How much screen "adoption" Phase 23 owes (the central divergence).** **Codex** rated four
-  plans HIGH on the same theme — a primitive is created but not wired into existing consumers, so
-  the user-observable requirement is "only scaffolding": `AppText` (THEME-07) with raw `<Text>`
-  still on screens (`UnboundContactsScreen.tsx:128`), `StatusGlyph` (THEME-08) unconsumed by
-  ContactCard/profile/Orrery, `BackgroundHost` (THEME-04) not mounted at any root, and the button/
-  ConfirmDialog primitives (THEME-10) not adopted by existing destructive flows. **Claude**, having
-  read the dossier and planning-notes, treats this as **by-design deferral, not a defect**: the
-  phase CONTEXT domain says it "establishes reusable visual primitives rather than redesigning
-  individual screens," and planning-notes:78-81 assigns the Appearance/settings UI (and thus
-  adoption of these primitives) to **Phase 15** ("Phase 2 builds the engine and the persisted
-  state; Phase 15 builds the settings UI"). **Orchestrator resolution:** the deferral is a recorded
-  scope boundary, so this is **not a HIGH blocker** — but the plans should make the deferral and
-  the success-criteria *verification scope* explicit (see Actionable MEDIUM below), because several
-  ROADMAP success criteria are worded as user-observable outcomes that cannot be demonstrated this
-  phase without either adoption or a debug harness. Recorded as an actionable scoping item rather
-  than adopted as codex's four HIGHs.
-- **Backup severity:** HIGH (Codex) vs MEDIUM (Claude) — same finding, see Agreed Concern 1.
+- **Codex raised a HIGH that Claude did not:** Plan 01's "repeat import after a failed clear is a no-op that does NOT re-bump `modified_at`/`data_revision`." Codex is correct on the code: `updateAppSettings` (`app-settings-dao.ts:606-617`) always bumps `modified_at` and `data_revision`, and its own docstring (`:598-604`) states an empty patch still bumps. The mapped legacy blob is always a non-empty patch, so the plan's only stated guard ("if the patch is non-empty, `updateAppSettings`") does not prevent the re-bump. The guarantee needs an explicit compare-before-write (diff) step the plan does not currently specify. **Verified on disk; this HIGH stands.**
+- **Claude raised the glass-over-imagery AA MEDIUM that codex did not**, and both surfaced non-overlapping Plan 06 gaps — complementary, not contradictory.
+- Overall risk rating: codex MEDIUM, claude LOW–MEDIUM. The delta is entirely the Plan 01 idempotency HIGH; both agree the architecture and decision-integrity are strong.
 
 ---
 
 ## Codex Review
 
-# Phase 23 Plan Review
+## Summary
 
-Overall, the plan decomposition is strong: Plan 01 correctly front-loads the irreversible schema/boot seam, and later plans generally isolate pure data, primitives, and renderer changes. However, several plans currently create primitives without integrating them into existing consumers, and two requirements are not achievable as written without changing their data model or sequencing.
+The phase is well-sequenced around the right irreversible seams: Plan 01 establishes durable settings and boot hydration before later visual primitives build on them; Plans 03–06 correctly isolate palette/accessibility, motion, icon/status, and surface work. The cycle-1 backup and accent-AA resolutions are coherent with the current codebase. Two implementation details still need tightening before execution: legacy-theme import idempotency/error handling, and the reduced-motion controller API/lifecycle.
 
-## 23-01 — Persistence, package axis, restore-before-paint
+## Strengths
 
-**Summary:** Good tracer and correct migration target: the repository is currently at schema version 14 with migration 014 last, so 015 is valid (`src/db/database.ts:38-67`, `src/db/migrations/014-interaction-assists.ts:4-27`). The DAO and boot gate are the right seams.
+- Plan 01 correctly addresses the backup wire-shape hazard. `readManifest()` spreads the portable snapshot directly into `appSettings` at [src/backup/export-manifest.ts:63-74](/home/bwales/projects/orbit-app/src/backup/export-manifest.ts:63), so deferring the seven keys from `getPortableSettingsSnapshot()` while allowlisting them is the right compatibility boundary. The current allowlist rejection confirms why this matters: [src/backup/backup-schema.ts:106-135](/home/bwales/projects/orbit-app/src/backup/backup-schema.ts:106).
 
-**Strengths**
-- The planned migration follows the repository's atomic per-version migration runner, which wraps DDL and `PRAGMA user_version` in a single transaction (`src/db/migrations/runner.ts:47-67`).
-- It correctly recognizes that durable settings require changes in both the DAO projection and the backup allowlist. The existing portable snapshot is an explicit select/projection, not a generic serialization (`src/db/app-settings-dao.ts:387-457`).
-- Folding hydration into `AppShell`'s existing `ready` gate is the appropriate way to prevent the current asynchronous Zustand/AsyncStorage rehydration flash (`src/stores/theme-store.ts:25-48`, `App.tsx:144-161`).
+- Making the new snapshot fields optional is a sound TypeScript mechanism. `AppSettingsPatch` is derived from `PortableSettingsSnapshot` at [src/db/app-settings-dao.ts:160-163](/home/bwales/projects/orbit-app/src/db/app-settings-dao.ts:160), while export takes the snapshot return value verbatim. Optional, non-emitted fields therefore remain writable/restorable without silently changing format 3.
 
-**Concerns**
-- **HIGH — backup wire-shape sequencing is unsafe.** Adding the seven fields to `PORTABLE_SETTINGS_KEYS` now means the v3 exporter will emit them, but `BACKUP_FORMAT_VERSION` remains 3 (`src/backup/types.ts:13-15`). A prior v3 build will accept the format version and then reject the new keys because its allowlist is closed (`src/backup/backup-schema.ts:106-135`). This conflicts with the milestone decision that the backup format-4 bump belongs to Phase 36.
-- **HIGH — the legacy import order is underspecified and can hydrate stale values.** The plan says to read settings, import `orbit-theme`, hydrate, and clear. If hydration uses the first read rather than a post-import read or the exact validated patch, the provider will render old defaults until another state update. The current `ready` effect only calls `openAndMigrate()` then `setReady(true)` (`App.tsx:147-157`).
-- **MEDIUM — one-time import is not transactionally specified.** The DB update must complete before `AsyncStorage.removeItem`; otherwise clearing first loses the legacy selection. If removal fails after a successful update, a repeated import should be harmless and must not repeatedly bump `modified_at`/`data_revision`.
-- **LOW — the plan says "all colour literals" stay in `theme-presets.ts`, but Plan 03 intentionally puts accent literals in `accents.ts`; this should be corrected to "under `src/theme/`."**
+- Plan 01’s migration sequencing matches the repository’s real migration model: `TARGET_VERSION` is currently 14 and registration is centralized in [src/db/database.ts:49-66](/home/bwales/projects/orbit-app/src/db/database.ts:49); each migration is atomic with its `user_version` bump in [src/db/migrations/runner.ts:46-67](/home/bwales/projects/orbit-app/src/db/migrations/runner.ts:46).
 
-**Suggestions**
-- Keep the columns and DAO fields in Plan 01, but do not add them to the exported portable wire projection/allowlist until Phase 36's atomic format-4 migration. Alternatively, move the backup format bump into this plan; do not ship a changed v3 wire shape.
-- Specify the boot transaction precisely: migrate → read legacy blob → validate/map → `updateAppSettings` → clear blob only after successful DB commit → read settings again (or hydrate from the committed patch) → hydrate store → set ready.
-- Add tests for clear failure, write failure, and repeated legacy blobs.
+- Plan 03’s per-mode accent triple is a substantive correction. The provider currently exposes only one `palette.accent` value at [src/theme/theme-provider.tsx:33-39](/home/bwales/projects/orbit-app/src/theme/theme-provider.tsx:33); separate fill/on-fill/link tones are necessary to make text contrast feasible across dark and light surfaces.
 
-**Risk Assessment:** **HIGH** until backup-version sequencing and import ordering are fixed.
+- Plan 04 properly avoids relying on Reanimated’s boot-time reduced-motion hook, and its planned Skia bridge fits existing architecture. The Orrery already drives animated values with `useClock()` and `useDerivedValue()` at [src/components/orrery/OrreryCanvas.tsx:93-101](/home/bwales/projects/orbit-app/src/components/orrery/OrreryCanvas.tsx:93).
 
-## 23-02 — Fonts, tokens, AppText
+- Plan 05 correctly identifies snooze as independent of `ProfileStatus`: the actual union contains only four states at [src/db/contact-status-read.ts:19-20](/home/bwales/projects/orbit-app/src/db/contact-status-read.ts:19), while the current ring helper accepts that status-or-null shape at [src/components/contact-card-ring.ts:44-60](/home/bwales/projects/orbit-app/src/components/contact-card-ring.ts:44).
 
-**Summary:** The token definitions are appropriately scoped and pure, but a new `AppText` component alone does not satisfy app-wide text scaling because existing screens continue to render raw `<Text>` with truncation.
+- Plan 06 correctly expands reduced-motion coverage to `SunBody`; it currently derives a separate pulse directly from the shared clock at [src/components/orrery/SunBody.tsx:86-100](/home/bwales/projects/orbit-app/src/components/orrery/SunBody.tsx:86), so gating only canvas twinkle would be incomplete.
 
-**Strengths**
-- The planned token values and semantic role split are sensible, and pure `src/theme/tokens/*` modules match the project's node-testable pattern.
-- Separating React Native font loading from Skia font loading is correct. Skia currently loads only Inter through its own provider (`src/screens/OrreryScreen.tsx:176`).
+## Concerns
 
-**Concerns**
-- **HIGH — THEME-07 is not achieved without adoption.** No existing screens/components are modified, yet many current text surfaces use raw `<Text>` and clamps, such as `src/screens/UnboundContactsScreen.tsx:128-134`. `AppText` cannot change their accessibility behavior unless they are migrated or a targeted adoption plan is explicitly deferred.
-- **MEDIUM — the failure behavior conflicts with the plan's threat model.** Awaiting a font load in the same boot promise means a rejected load reaches AppShell's catch and blocks the app in its startup error state (`App.tsx:147-157`). The stated "degrade to system font rather than crashing boot" requires catching font-load failures separately.
-- **MEDIUM — "confirm no postinstall scripts ran" is false for this repository.** `package.json` declares `"postinstall": "patch-package"` (`package.json:54-70`); package installation may run it.
-- **LOW — provenance/license recording has no declared output file.** Binary assets alone do not provide an in-project license record.
+- **HIGH — Plan 01’s “clear failed, repeat import is a no-op” guarantee is not implementable from the stated action without an explicit equality guard.** `updateAppSettings()` always enters a transaction and bumps `data_revision` after the update at [src/db/app-settings-dao.ts:606-617](/home/bwales/projects/orbit-app/src/db/app-settings-dao.ts:606); its own contract even says an empty patch advances `modified_at` at [src/db/app-settings-dao.ts:598-604](/home/bwales/projects/orbit-app/src/db/app-settings-dao.ts:598). If AsyncStorage removal fails, merely remapping the same legacy blob and calling `updateAppSettings(patch)` on next boot will repeatedly mutate timestamps/revisions. The plan requires no re-bump, but its action needs a compare-before-write step.
 
-**Suggestions**
-- Add a defined adoption boundary: migrate all shared primitives and high-traffic screens this phase, or create a tracked follow-up plan that enumerates each raw/clamped text surface.
-- Treat font failures as nonfatal: log, continue with system fonts, and still hydrate theme/database.
-- Add an `assets/fonts/README` or equivalent license/provenance file, and revise the postinstall assertion to verify the known root script rather than claiming none ran.
+- **MEDIUM — Plan 01 does not define failure isolation for AsyncStorage I/O.** The existing boot chain catches any rejection and enters startup error state at [App.tsx:147-156](/home/bwales/projects/orbit-app/App.tsx:147). The new `getItem`, JSON decode, and `removeItem` calls must be individually nonfatal (except perhaps an actual DB write failure), otherwise a corrupt/unavailable legacy cache can block startup even though migration 015 and the seeded database settings are valid.
 
-**Risk Assessment:** **MEDIUM-HIGH** because the central accessibility requirement is otherwise only scaffolding.
+- **MEDIUM — Plan 04’s controller interface is underspecified.** It calls for `createReducedMotionController(accessibilityInfo)` while saying it forwards values through an `emit` callback, but does not establish whether `emit` is an argument, a `start(emit)` method, or a subscription API. This matters because both hooks need a clean effect lifecycle. Define one concrete interface before implementation, e.g. `createReducedMotionController(accessibilityInfo, emit): { dispose(): void }`.
 
-## 23-03 — Four palettes, accents, contrast
+- **MEDIUM — Plan 06 declares new bundled background assets and provenance but does not own their paths in `files_modified`.** The repository currently has only general assets and a font asset ([assets listing](/home/bwales/projects/orbit-app/assets/Inter-SemiBold.ttf)); Plan 06 should explicitly list the exact image files plus a provenance README/manifest. Otherwise the required local-asset and licensing deliverables can disappear from execution scope.
 
-**Summary:** The pure contrast module and making light palettes required are good. The planned contrast gate, however, is mathematically incompatible with a single accent hex being AA-normal text on both light and dark backgrounds.
+- **LOW — Plan 02 should include `package-lock.json` in its modified-files contract.** The repository uses npm and has a lockfile, while the plan installs three runtime dependencies. Omitting it risks an unreviewed lockfile change or a non-reproducible dependency update.
 
-**Strengths**
-- `resolveMode` already supports live Follow System correctly through `useColorScheme`, including its intentional non-light → dark fallback (`src/theme/theme-presets.ts:114-123`).
-- The existing palette shape already carries status, star, and surface tokens, so extending all four complete palettes is the right approach (`src/theme/theme-types.ts:28-157`).
-- Accent IDs in SQLite rather than hex values are a good durable-data boundary.
+- **LOW — Plan 06’s “image render failure” test needs a concrete test seam.** Existing image error handling is component-state based, e.g. [src/components/PhotoChoice.tsx:61](/home/bwales/projects/orbit-app/src/components/PhotoChoice.tsx:61). The plan should specify an injected/resolvable image renderer or a component test strategy; a pure manifest test cannot prove the `onError → None/Solid` runtime behavior.
 
-**Concerns**
-- **HIGH — a single `{ id, hex, onAccent }` accent cannot meet the proposed AA test.** The plan requires every accent to pass as text/link on every dark and light background. A foreground light enough for 4.5:1 on Galaxy dark cannot also be dark enough for 4.5:1 on a near-white light surface. The provider currently exposes one `palette.accent` string (`src/theme/theme-provider.tsx:33-39`). This will either make the required gate impossible or pressure the team to weaken AA.
-- **MEDIUM — the test must validate actual compositing pairs.** "Status/text on surface" is insufficient if components draw status over `background`, `surfaceElevated`, translucent glass, or image-backed surfaces. Current theme tokens include only opaque strings, while Plan 06 introduces translucent surfaces.
-- **LOW — "theme-presets.ts is the sole hex-literal file" contradicts the intended `accents.ts`; the repository's actual enforcement allows any `/theme/` path (`scripts/check-colors.sh:37-47`).**
+## Suggestions
 
-**Suggestions**
-- Store an accent ID but resolve it to a palette-specific tone, e.g. `AccentDefinition[package][resolvedMode]`, or distinguish `accentFill`, `accentText`, and `onAccent`.
-- Define the exact tested foreground/background pairs from actual component usage, including translucent surface composition; do not call a palette-only check a complete accessibility gate.
-- Add an explicit test proving unknown stored IDs fall back safely.
+- In Plan 01, after migration and legacy-blob mapping, read `getAppSettings()`, calculate only differing fields, and call `updateAppSettings()` only if that diff is non-empty. Attempt legacy-key removal afterward; if removal fails, log a nonfatal warning. Test unchanged-column retry behavior explicitly.
 
-**Risk Assessment:** **HIGH** until the accent representation and AA contract are reconciled.
+- Wrap legacy `AsyncStorage.getItem`, parse, and removal in localized `try/catch` blocks. Treat read/parse/removal failure as “no import this launch,” retain the seeded/database settings, and continue to hydrate the store.
 
-## 23-04 — Reduced motion
+- Specify the Plan 04 controller API and test it as a single-start/single-dispose resource. Also state whether simultaneous use of both hooks is allowed to create separate native listeners or whether a shared subscription is required.
 
-**Summary:** The intended `AccessibilityInfo` subscription plus `SharedValue` bridge is the correct architecture, but the plan's hook test and export coverage need tightening.
+- Add explicit background asset filenames and an `assets/backgrounds/README.md` (or equivalent manifest) to Plan 06’s `files_modified`.
 
-**Strengths**
-- It correctly avoids Reanimated's boot-time-only hook and avoids React-state-driven Skia animation.
-- The current Orrery already has the appropriate worklet seam: `useClock()` and `useDerivedValue()` in the canvas (`src/components/orrery/OrreryCanvas.tsx:93-101`).
+- Add `package-lock.json` to Plan 02 and verify dependency additions with `npm ci` or the project’s normal lockfile validation.
 
-**Concerns**
-- **MEDIUM — the proposed hook tests have no stated React hook test harness.** The repository's dev dependencies include Vitest but no React test renderer/testing-library package (`package.json:44-52`). A normal node Vitest test cannot mount/unmount these hooks and assert subscription cleanup.
-- **LOW — the plan says the hooks are exported from `src/theme/index.ts`, but omits that file from `files_modified`; the current barrel only exports presets, provider, and types (`src/theme/index.ts:7-10`).**
+- Add a component-level test or an extracted `resolveRenderableBackground` state reducer for Plan 06’s image-error fallback.
 
-**Suggestions**
-- Either add a supported hook-rendering test dependency or extract/test a non-React subscription controller and keep one device-level hook assertion.
-- Include the theme barrel in the plan or have consumers import the direct module deliberately.
+## Risk Assessment
 
-**Risk Assessment:** **MEDIUM**.
-
-## 23-05 — Icon registry and status glyphs
-
-**Summary:** Centralizing the tab icons is good, but the plan currently builds an unused status-glyph primitive and has type/registry gaps.
-
-**Strengths**
-- Replacing `TAB_GLYPHS` is a real high-visibility consolidation: the current tab bar directly renders raw Unicode glyphs (`src/navigation/RootNavigator.tsx:42-47`, `src/navigation/RootNavigator.tsx:159-169`).
-- Extending `ringVisual` is the correct source-of-truth location: it already maps status to theme token, opacity, and weight without hardcoded colors (`src/components/contact-card-ring.ts:44-60`).
-
-**Concerns**
-- **HIGH — THEME-08 is not delivered if `StatusGlyph` is never consumed.** Plan files do not include ContactCard, profile, Orrery, or widget consumers. Current rendering remains color plus ring weight; adding an unused mapping does not make relationship state readable without color.
-- **HIGH — `snoozed` is not part of the planned function's declared input type.** `ringVisual` takes `ProfileStatus | null`, and `ProfileStatus` is only stable/wobble/decay/rogue (`src/db/contact-status-read.ts:19-20`). Snooze is currently a separate UI/filter condition, not a query-time status (`src/db/dashboard-read.ts:63-90`). The plan needs a separate display-state union or explicit `snoozed` input.
-- **MEDIUM — registry completeness is not specified.** StatusGlyph needs six semantic glyph names, while Plan 07 also needs a warning glyph. Plan 05's registry action does not explicitly add either set, so typed lookup can fail or invite bypasses.
-
-**Suggestions**
-- Modify at least the current ContactCard and profile status presentation in this plan. Define exactly how Orrery and the headless widget consume equivalent glyph semantics; do not claim widget integration while prohibiting widget changes.
-- Introduce a `StatusDisplayState` union that combines computed relationship status with independent snooze/never-contacted state.
-- Explicitly reserve and test all registry names required by `StatusGlyph` and `Button`.
-
-**Risk Assessment:** **HIGH** due to missing adoption and the snoozed type mismatch.
-
-## 23-06 — Backgrounds, surfaces, Orrery
-
-**Summary:** The fixed-background and fallback designs are directionally sound, but the app-wide requirement and reduced-motion coverage are incomplete in the listed file set.
-
-**Strengths**
-- The plan properly keeps backgrounds local and uses static bundled assets rather than a network path.
-- It preserves the existing token boundary in Orrery: current canvas colors are supplied as props from theme values rather than literals (`src/components/orrery/OrreryCanvas.tsx:85-101`, `src/screens/OrreryScreen.tsx:650-690`).
-
-**Concerns**
-- **HIGH — `BackgroundHost` is not integrated anywhere.** No root navigator, AppShell, or screen file is modified. The current navigator mounts tab stacks directly (`src/navigation/RootNavigator.tsx:154-205`), so merely creating the host cannot provide app-wide fixed backgrounds behind text-heavy screens.
-- **HIGH — changing only `OrreryCanvas` cannot stop all Orrery ambient motion.** `SunBody` independently derives a glow pulse directly from the shared clock (`src/components/orrery/SunBody.tsx:82-100`). It is not in the plan's files, so reduced motion would stop star twinkle while the sun continues pulsing.
-- **MEDIUM — "Galaxy animated background" is asserted but no animation implementation or consumer contract is defined.** BackgroundHost's listed work does not establish a Reanimated/Skia animation path to consume the shared value.
-- **MEDIUM — asset-failure fallback requires a real observable failure path.** Static Metro `require()` failures usually fail during bundle resolution, not as a recoverable component error. The plan needs to define what runtime failure can be caught and tested.
-
-**Suggestions**
-- Wire `BackgroundHost` at a defined app-shell/root-screen boundary and state how per-screen density is passed.
-- Include `SunBody` and any other clock consumers in the reduced-motion audit; preferably provide reduced-motion through an Orrery context so every worklet uses the same value.
-- Make background assets static and bundle-time validated; use runtime fallback only for image rendering failure, not unavailable modules.
-
-**Risk Assessment:** **HIGH**.
-
-## 23-07 — Buttons and overlay primitives
-
-**Summary:** The primitive API is useful and aligns with the central icon/theme seams, but it needs concrete lifecycle/API definitions and adoption expectations.
-
-**Strengths**
-- The existing theme has `accent`, `danger`, background/surface, and text tokens available for semantic variants (`src/theme/theme-types.ts:28-46`).
-- Requiring an accessible label and 44px target for icon-only controls is a solid contract.
-
-**Concerns**
-- **MEDIUM — the primitives are not adopted by existing destructive actions or modals.** No existing screen is modified, so destructive flows continue to use their current presentation. A new `ConfirmDialog` does not retroactively make actions distinct beyond color.
-- **MEDIUM — Android modal lifecycle is underspecified.** The shared modal API needs `visible`, `onRequestClose`, focus handling, and a clear back/scrim-dismiss policy. Without these, a reusable modal can trap Android Back or accidentally dismiss destructive confirmation.
-- **LOW — the plan depends on a registry warning glyph not explicitly guaranteed by Plan 05.**
-
-**Suggestions**
-- Add at least one existing destructive flow as a vertical-slice consumer and enumerate the later migrations for remaining flows.
-- Define modal/sheet props and dismissal semantics, especially whether destructive confirmation permits scrim/back dismissal.
-- Add component-level accessibility tests or a device test that verifies focus and Back behavior.
-
-**Risk Assessment:** **MEDIUM**.
-
-## Cross-plan recommendation
-
-Do not begin execution unchanged. Resolve these four items first:
-1. Keep backup format changes atomic with the format-4 bump.
-2. Make palette-specific accent tones compatible with the AA requirement.
-3. Add real consumer adoption for `AppText`, `StatusGlyph`, `BackgroundHost`, and destructive primitives.
-4. Audit every Orrery clock consumer, not just `OrreryCanvas`, for reduced-motion gating.
+**MEDIUM.** The architecture and dependency ordering are strong, and the two cycle-1 HIGH findings are genuinely resolved rather than papered over. The remaining high-risk item is narrowly scoped to boot migration retry behavior; without a compare-before-write guard, a failed AsyncStorage clear causes persistent unnecessary settings revisions. Once that and the stated medium implementation seams are clarified, the plans are suitable for execution.
 
 ---
 
 ## Claude Review
 
-# Phase 23 (Theme & Visual System) — Cross-AI Peer Review (Claude)
+**Reviewer:** Claude (claude-opus-4-8), independent cross-AI peer reviewer (run as a read-only source-grounded subagent; the in-CLI `claude -p` lane is skipped for independence and has a known Write-permission gap in this environment).
 
-**Method:** Every claim below was checked against the actual source on disk (migrations, DAOs, theme layer, backup layer, boot, dossier, HANDOFF, ADRs), not against plan text in isolation. Shared-table/shared-surface consumers were read beyond the changed-files list per the "review the code, not the diff" rule.
+## Summary
 
-**Headline:** No decision reversals. No local-first / network violations. No hardcoded-colour or animation-from-React-state violations in the plans. The migration number, storage model, and restore-before-paint integration are all correct against disk. The one finding that a diff-scoped review would miss is a **backup wire-shape change** (Plan 01 → `export-manifest.ts`) that is not called out in any plan and that the plans' own tests will not catch — rated MEDIUM. Overall phase risk: **MEDIUM**.
+The seven plans are coherent, well-sequenced, and — unusually — their load-bearing claims hold up against the actual code on disk. The architecture front-loads every irreversible/shared-file edit (migration 015, the `app_settings` writer contract, the backup allowlist, the boot gate, the package re-key) into Plan 01's gated tracer, then fans out additive, non-overlapping work across waves 2–4. I verified the two cycle-1 HIGHs against the real backup pipeline, DAO validators, restore path, palette types, and Orrery clock consumers: **both are FULLY RESOLVED and neither reverses a recorded decision.** The backup deferral is genuinely byte-safe against the format-3 wire (`export-manifest.ts` spread + `validateAppSettingsPatch` reuse in `updateAppSettingsCore` both confirmed), and the AA split gate preserves 4.5:1 while correctly firewalling owner-approved hues. Remaining issues are minor: a mis-citation of which galaxy-dark tokens are owner-dated, one real accessibility edge in the glass-over-imagery AA guarantee, and the honest fact that this phase ships primitives, not visible app-wide theming (an intentional, recorded scope boundary).
 
-### Cross-Cutting Verification (facts established once)
+## Strengths
 
-- **Migration number is correct.** `src/db/database.ts:49` `TARGET_VERSION = 14`; latest registered migration is `migration014`. head+1 = **015**. ✔
-- **Additive ALTER idiom is real.** `014-interaction-assists.ts:25-26` is an `ALTER TABLE app_settings ADD COLUMN ... NOT NULL DEFAULT`. ✔
-- **`self_sun_colour` precedent is real and matches the accent/background design.** Nullable TEXT, validated on write (`app-settings-dao.ts:494`, `:512`), NULL passed straight through in `getAppSettings` (`:348-349`), resolved at render. ✔
-- **check:colors scans migrations and exempts only `/theme/`.** `scripts/check-colors.sh` recurses `src`, filters `grep -vE '^[^:]*/theme/'`. A hex default in migration 015 would trip the gate; the WR-01 substring hazard (ADR-006) is already hardened (path-anchored). ✔
-- **D-04 is ENFORCED, not reversed.** HANDOFF §7 carries the 2026-09-01 supersession note (`HANDOFF.md:175`); ADR-048 lists tap-to-freeze as a rejected alternative. Plan 06 correctly enforces both. No HIGH escalation. ✔
-- **No network on any read path.** Fonts and backgrounds are local `require()`/bundled assets. ✔
-- **Theme-store blast radius is small.** The only non-test consumer of `useThemeStore` is `theme-provider.tsx` (both in Plan 01's file list). ✔
+- **Backup HIGH deferral is mechanically sound, not hand-waved.** `export-manifest.ts:63,74` does spread `...portable` unconditionally into `manifest.appSettings`, so not-emitting from `getPortableSettingsSnapshot` (`app-settings-dao.ts:387-458`) is indeed the only way to keep the 7 keys off the wire. `BACKUP_FORMAT_VERSION = 3` (`types.ts:14`) and `FORWARD_MIGRATIONS` has only entries `1` and `2` (`backup-schema.ts:19-79`) — the plan correctly touches neither. The regression test (format-3 export omits the 7 keys) is the right and only guard, since `assertNoLocalOnlyKeys` uses a blocklist (`export-manifest.ts:12-14`) that wouldn't otherwise catch accidental emission.
+- **The forward-restore path is real.** `restore-apply.ts:272` builds the settings patch from `manifest.appSettings` and writes via `updateAppSettingsCore`, which repeats `validateAppSettingsPatch` (`app-settings-dao.ts:658`) and only writes keys present in `COLUMN_OF`. So the plan's claim that Phase 36 can begin emitting with "the allowlist + patch path already in place" is accurate, and tampered theme values in a hand-crafted backup would be validated by the new `assertTheme*` validators before write (T-23-03 grounded).
+- **`phoneRegionOverride` precedent caution is correct.** It is now REQUIRED (`app-settings-dao.ts:154`) and EMITTED (`:444`) — Plan 01 correctly warns *not* to copy that shape and instead use optional-field + no-SELECT/return, which keeps `tsc` green while omitting the keys.
+- **Migration head+1 verified.** `TARGET_VERSION = 14` (`database.ts:49`), latest migration on disk is `014-interaction-assists.ts` — so `015` is correct, not assumed.
+- **AA split gate does not weaken 4.5:1.** `palette.accent` is a single `string` today (`theme-types.ts:34`); one hex genuinely cannot be AA as a text-link on both galaxy-dark and a light surface, so the `{fill, onAccent, text}` per-mode triple is a real fix, not scope creep. The hard-fail/flag-for-owner partition keeps `AA_NORMAL`/`AA_LARGE` intact.
+- **Orrery HIGH (23-06) correctly identifies the second clock consumer.** `SunBody.tsx:86` reads `useOrreryClock()` and drives `pulseGlowRadius`/`pulseGlowOpacity` (`:87-100`), independent of `OrreryCanvas.tsx:94`'s `useClock()` twinkle (`:98-101`). There are exactly two clock consumers (grep confirms), so gating only `OrreryCanvas` would leave the sun pulsing — the plan's scoping of SunBody is exactly right.
+- **`check:colors` exemption claim is accurate.** `scripts/check-colors.sh` filters `^[^:]*/theme/` only, so migrations under `src/db/migrations/` are scanned (hex-default prohibition grounded) and `accents.ts`/`backgrounds.ts` under `src/theme/` are exempt.
+- **`ProfileStatus`/snooze distinction verified.** `contact-status-read.ts:19` is `stable|wobble|decay|rogue` with no `snoozed`; the new `StatusDisplayState = ProfileStatus | 'snoozed' | null` correctly leaves `ringVisual`'s `ProfileStatus | null` (`contact-card-ring.ts:44-45`) untouched.
+- **Tooling claims check out:** `postinstall: patch-package` only (`package.json:69`); the three new deps are absent (so `expo install` is real); `react-test-renderer`/`@testing-library` absent with `vitest` present, justifying Plan 04's node-testable controller extraction.
 
-### 23-01 — Migration 015 + DAO/backup plumbing + package-axis tracer
+## Concerns
 
-**Summary.** The most consequential plan and correctly treated as such. The technical spine is sound and every load-bearing file:line it cites is accurate. Its one real gap is a shared consumer it doesn't name (`export-manifest.ts`), which turns an intended "allowlist now, serialize later" edit into an immediate wire-shape change.
+- **[LOW] 23-03 mis-cites which galaxy-dark tokens are "owner-approved 2026-08-16."** Plan 03 lists `textPrimary/textSecondary` (and `rogue`) as owner-approved-dated at `theme-types.ts:78-108`. In fact only `statusStable/statusWobble/statusDecay` carry the `2026-08-16` annotation (`:77-108`); `rogue` is dated `2026-08-15` (`:67-73`); and `textPrimary/textSecondary` (`:34-35`) carry **no** owner-approval date at all. The flag-for-owner partition is defined by this citation. Mechanism: an executor mapping "legacy owner-approved" strictly to the dated tokens might wrongly treat `textPrimary/textSecondary` as new/tunable and auto-retune them. They *are* legacy space-dark tokens, so flagging them is still the safe call — but the citation should be corrected so the partition boundary is unambiguous.
+- **[MEDIUM] Glass-over-imagery AA is only guaranteed against the fallback tint token, not the live translucent composite.** Plan 06 checks text/status foregrounds against the *semi-opaque tinted fallback surface token* (the blur-unavailable path), and Plan 03 hands the translucent pairs to Plan 06. But when `expo-blur` IS available, `GlassSurface` renders a translucent tint over the selected background image, and the exact tint opacity/blur radius are explicitly "discretion defaults" (Plan 06 flagged edge). Nothing in the plans requires the *live* glass tint opacity to be ≥ the fallback token's opacity used in the AA gate. Mechanism: over a bright bundled background, a more-translucent-than-fallback glass tint can drop text below 4.5:1 even though the gate (checking the more-opaque fallback) passes. Suggest an explicit invariant: the live glass tint must be at least as opaque as the AA-checked fallback token, or the AA check must run against the actual minimum-opacity composite.
+- **[LOW] `theme-provider.tsx` and the palette files are edited by both Plan 01 (wave 1, package re-key) and Plan 03 (wave 2, accent overlay).** Also `theme-presets.ts`/`theme-types.ts`/`theme-presets.test.ts`. This is correctly serialized by wave ordering (no in-wave overlap), so it is not a merge hazard — but Plan 03's provider overlay assumes Plan 01 has already repointed `resolvePalette(presetId,…)` (`theme-provider.tsx:36`) to the package axis. If Plan 01 slips, Plan 03 breaks. Worth an explicit dependency note in 03 beyond `depends_on: ["23-01"]` (which is present, so this is a soft note).
+- **[LOW] Plan 02 font asset paths are inconsistent.** The two new fonts land at `assets/Inter-Regular.ttf` / `assets/SpaceGrotesk-SemiBold.ttf` (assets root, matching existing `assets/Inter-SemiBold.ttf`), but the provenance README is `assets/fonts/README.md` (a subdirectory that otherwise holds no fonts). Harmless, but the README documenting fonts that live one directory up is mildly confusing.
+- **[LOW/informational] The phase delivers infrastructure, not a visibly themed app.** Every plan defers screen adoption to Phase 15 (and the Appearance settings UI to Phase 36/37), per `planning-notes:78-81`. This is a recorded, defensible boundary — but a reader expecting "the app now has themes" should note that after Phase 23 no existing screen renders through `BackgroundHost`/`AppText`/`Button`, no settings UI drives the columns, and THEME-04/05/07/08/09/10 are verified at the primitive level only. The phase goal ("the theme system exists and is proven") is met; the milestone goal ("the app is themed") is not, by design.
 
-**Strengths**
-- Restore-before-paint folded into the *existing* gate correctly (`App.tsx:147-161`); `AppShell` already calls `useTheme()` (`App.tsx:130`) for the pre-ready splash.
-- DAO contract citations are exact: `COLUMN_OF` (`:278-300`), validators + `*_FIELDS` + patch loop (`:479-596`), `getAppSettings` NULL passthrough (`:316-349`), `PortableSettingsSnapshot` (`:134-158`).
-- `orbit-theme` treated as untrusted (validate against enums, unknown → seeded defaults, `space-dark`→`galaxy`, absent → no-op) — correct given `theme-store.ts:34` persists exactly `{mode, presetId}` under key `orbit-theme`.
-- Additive/forward-only/re-runnable framing correct; migrations 001-014 untouched; v0→v15 lands fully seeded.
+## Suggestions
 
-**Concerns**
-- **[MEDIUM] Adding theme keys to `getPortableSettingsSnapshot` silently serializes them into a format-3 backup — before the deferred format bump — and the plan never names the export/restore consumers.** `src/backup/export-manifest.ts:63,74` destructures the snapshot and spreads `...portable` **unconditionally** into `manifest.appSettings`; `restore-apply.ts:249` also consumes the snapshot. So the moment Plan 01 adds the 7 theme fields, every export emits them while `BACKUP_FORMAT_VERSION` is still `3` (`src/backup/types.ts:14`). Consequences: (a) a wire-shape change with no format bump and no forward-migration entry — contrary to the backup-schema's own contract (`backup-schema.ts:15-19`); (b) a format-3 backup made by this build, restored on a pre-Phase-23 build, is hard-rejected by `assertPortableSettings` (`backup-schema.ts:129-135`) — the older app never reaches the friendly update-first message because that gate only trips on a *higher* format number; (c) it contradicts planning-notes:73-74. Neither `export-manifest.ts` nor `restore-apply.ts` is in Plan 01's file lists, and no existing test catches this.
-  - *Mechanism of the fix:* land columns + DAO validators + `COLUMN_OF` + the `PORTABLE_SETTINGS_KEYS` allowlist entry **now** (so a future backup that carries the keys is accepted and restore-reconciled), but **defer adding the theme fields to the emitted `getPortableSettingsSnapshot` object (and thus to the export)** until the format-4 bump owns them. Bumping the format early instead is a milestone-sequencing decision — **stop-and-ask**.
-- **[MEDIUM] Unlisted ADR-042 consumer: `src/services/widget/widget-colors.ts`.** It imports `DEFAULT_PRESET_ID` + `resolvePalette` and calls `resolvePalette(DEFAULT_PRESET_ID, "dark")` (`widget-colors.ts:18,32`); its test asserts "resolves the space-dark dark palette" (`widget-colors.test.ts:47`). Re-keying `space-dark`→`galaxy` is value-safe by design and backstopped by tsc + that test — but the plan never names the file. The widget is a headless renderer tied to ADR-042's shared-palette contract and cannot be device-verified, so Plan 01 should explicitly confirm `widget-colors.ts` still compiles and its test passes after the re-key.
+- Correct the 23-03 token citation: split "owner-approved status hues (`:77-108`, 2026-08-16)" from "pre-existing space-dark `textPrimary`/`textSecondary` (`:34-35`, undated)" and state that *all* pre-existing galaxy(=space-dark) required tokens are flag-for-owner regardless of an inline date.
+- Add an explicit AA invariant to Plan 06: the live `GlassSurface` tint opacity must be ≥ the fallback tint token's opacity that the AA gate validates, so the gate's guarantee actually bounds the rendered composite (closes the glass-over-imagery gap).
+- In Plan 06, consider asserting (test or device-UAT) that at least the densest surface step keeps AA over the *brightest* bundled background, not only over the fallback token.
+- Move the font provenance README to `assets/README.md` (or move the `.ttf`s under `assets/fonts/`) so the record sits with the files it documents.
+- Optional: add a `tsc`/grep guard in Plan 01's acceptance that `getPortableSettingsSnapshot`'s return object literal contains none of the 7 theme keys, complementing the runtime export regression test (belt-and-suspenders against re-emission).
 
-**Suggestions**
-- Add `src/backup/export-manifest.ts` and `src/backup/restore-apply.ts` to `read_first`; state explicitly whether theme keys are emitted now or deferred, and add a test asserting a format-3 export does **not** contain theme keys (if deferring).
-- Add `widget-colors.ts` + its test to the tracer's acceptance.
+## Risk Assessment
 
-**Risk:** MEDIUM.
+**Overall: LOW–MEDIUM.**
 
-### 23-02 — Fonts, typography/spacing/radii tokens, AppText
+Justification: The irreversible surface (migration 015) is isolated to one gated decision in Plan 01, the backup wire-shape is provably unchanged (verified against the real spread and validators), and no plan reverses a `[DECIDED]`/`[REJECTED]` item — the two most dangerous decision-reversals (format-4 bump; weakening AA / editing owner hues) are explicitly firewalled to owner escalation. The dependency graph is clean (no in-wave file collisions). Residual risk is concentrated in two places: (a) the boot-gate rewrite in Plan 01, which replaces a one-line `.then(setReady)` with a multi-step import/hydrate sequence — well-specified with import-order tests but genuinely the highest-execution-risk edit (the plan's own "confidence: low" is appropriate); and (b) the glass-over-imagery AA guarantee (MEDIUM), which is bounded only against the fallback token and could under-protect the live translucent path. Neither threatens data integrity or the local-first/no-network commitment (backgrounds/fonts are all bundled `require()`, verified no CDN path in the plans).
 
-**Summary.** Clean, low-risk foundation plan. Deps are first-party Expo via `npx expo install`; fonts bundled locally; tokens are pure node-testable data with colour *token names* only; AppText preserves OS text reflow.
+**Cycle-1 HIGH status:**
+- **[23-01] backup wire-shape — FULLY RESOLVED.** Allowlist-now/emit-later is coherent and byte-safe: keys optional in `PortableSettingsSnapshot`, added to `PORTABLE_SETTINGS_KEYS`, not emitted, no version bump, no `FORWARD_MIGRATIONS` entry, restore path already able to write them via `COLUMN_OF`+validators. D-03/D-09 preserved.
+- **[23-03] accessibility AA — FULLY RESOLVED.** Per-mode `{fill,onAccent,text}` triple is a real necessity (single `accent: string` confirmed), the split gate does not lower `AA_NORMAL`/`AA_LARGE`, and legacy owner-approved galaxy-dark hues are flag-for-owner, not auto-edited. (Fix the token citation per Concerns, but the resolution logic is sound.)
 
-**Strengths**
-- No `allowFontScaling={false}` / no fixed heights on reflowable text (THEME-07) stated as a prohibition and an acceptance grep.
-- Token files RN-free and colour-literal-free under `src/theme/tokens/**`.
-- Correctly keeps these RN fonts out of the Skia `useFonts` map (Pitfall 5).
+---
 
-**Concerns**
-- **[LOW] Font-load failure path is asserted only by device UAT.** The threat register (T-23-05) says a failed font degrades to system font, but there is no automated check that a missing/failed font in the ready gate is non-fatal. Given it's inside the boot gate, a small unit assertion (or an explicit try/degrade in `fonts.ts`) would be cheap insurance.
+## Planner Notes (aggregation)
 
-**Suggestions**
-- Have `fonts.ts`'s load helper swallow/log a load failure and resolve, so the ready gate can never hang on a font error; assert it.
+- **Cycle-1 HIGHs [23-01] and [23-03]: FULLY RESOLVED** — both reviewers verified against live code; neither reverses a recorded decision (D-03/D-09 and the AA 4.5:1 invariant both preserved). Excluded from the unresolved count.
+- **NEW HIGH (unresolved this cycle) — Plan 01 idempotent-re-import guarantee.** `updateAppSettings` (`app-settings-dao.ts:606-617`, docstring `:598-604`) always bumps `modified_at`/`data_revision`; the plan's "repeat import is a no-op that does NOT re-bump" (must_have + acceptance line ~199) needs an explicit compare-before-write (diff) step that the plan does not specify. Verified on disk. → owner/planner action required (this is an internal plan/code inconsistency, not a decision reversal).
+- Actionable MEDIUM/LOW not yet incorporated into a PLAN.md task/acceptance/`files_modified`: (1) Plan 06 live-glass AA invariant vs fallback token [MED]; (2) Plan 01 read-side AsyncStorage I/O failure isolation [MED]; (3) Plan 06 bundled asset paths + provenance README in `files_modified` [MED]; (4) Plan 04 controller `emit` interface signature [MED]; (5) Plan 02 `package-lock.json` in `files_modified` [LOW]; (6) Plan 06 image-render-failure runtime test seam [LOW]; (7) Plan 03 owner-approved token citation fix [LOW]; (8) Plan 02 font provenance README path [LOW].
 
-**Risk:** LOW.
-
-### 23-03 — Four palettes, curated accents, WCAG contrast gate
-
-**Summary.** Sound structure: a pure WCAG module, `ThemePreset.light` made required, a curated accent set separate from `starPalette`, and a per-combo AA gate. The one substantive issue is that the AA gate is described as also covering **existing owner-approved status/text tokens**, whose only stated remedy on failure ("drop the accent") does not apply to required tokens.
-
-**Strengths**
-- Accent stored as id, resolved to hex at render in the provider overlay — never a hex in the DAO/migration. Keeps accent distinct from `starPalette` (dossier §C).
-- `contrast.ts` is pure/RN-free with symmetry, identity=1.0-fails, malformed-input rejection.
-- Correctly makes `light` required so `resolvePalette(package,'light')` stops falling back to dark (`theme-presets.ts:137`).
-
-**Concerns**
-- **[MEDIUM] The AA gate runs over owner-approved status/text hues, but the plan's only failure remedy fits accents.** Galaxy Dark == the former `space-dark` palette, whose `statusStable/statusWobble/statusDecay/rogue` and `textPrimary/textSecondary` are owner-approved seeds (`theme-types.ts:78-108`, "owner-approved 2026-08-16"; `theme-presets.ts:62-64`). If an owner-approved status/text token fails AA in a combo, you cannot "drop" it — it's required — and retuning an owner-approved hue is a visual/taste decision (owner bucket). The plan does not say whether the status/text portion of the gate is hard-fail or advisory.
-  - *Mechanism:* if the gate is hard-fail and a legacy status token misses AA, the build fails and the "fix" silently edits an owner-approved colour — a quiet visual reversal.
-
-**Suggestions**
-- Split the gate: **hard-fail for curated accents** (drop on miss) and **flag-for-owner** for any *required* status/text/surface token that misses AA in the legacy galaxy-dark palette. Do not auto-retune an owner-approved hue.
-- State explicitly that new palettes may be tuned to pass AA (agent discretion) while galaxy-dark legacy tokens may not without owner sign-off.
-
-**Risk:** MEDIUM.
-
-### 23-04 — Reduced-motion hook + motion tokens
-
-**Summary.** The highest-risk *integration* per the dossier (D-05/D-07), and the plan gets the hard part right: `AccessibilityInfo` subscription bridge (live) as a Reanimated `SharedValue<boolean>` readable from worklets, plus a React boolean twin — explicitly **not** Reanimated's boot-only `useReducedMotion()`.
-
-**Strengths**
-- Correct API choice and the correct rejection of `react-native-reanimated`'s `useReducedMotion` (names Pitfall 1).
-- The SharedValue path writes `.value` (no setState) → satisfies D-07; the boolean twin's setState is confined to React-tree consumers.
-- Subscription lifecycle (seed once, subscribe once, unmount cleanup, guarded post-unmount seed) is an explicit tested invariant.
-
-**Concerns**
-- **[LOW] Motion tokens' "ambient" value is under-specified for its consumer.** Plan 06 gates ambient Orrery/background motion on the SharedValue; ensure the token shape `motion.ts` exports is what Plan 06 multiplies into the `useDerivedValue` worklet (e.g. a speed constant, not a duration) so the two plans don't mismatch at the seam.
-
-**Suggestions**
-- Name the exact `ambient` token shape the Orrery worklet consumes and reference it from Plan 06's read_first.
-
-**Risk:** LOW.
-
-### 23-05 — Icon registry + status glyphs
-
-**Summary.** Delivers the two D-05 seams as first-class, extending single sources rather than forking.
-
-**Strengths**
-- Extends the single status source: `ringVisual` at `contact-card-ring.ts:44-61` is real and the plan adds `statusGlyph()` beside it (not a second source), matching ADR-042's one-source contract. `null → neutral` mirrors `ringVisual`'s default branch.
-- `TAB_GLYPHS` fork is real (`RootNavigator.tsx:42-47`) and correctly retired through the registry.
-- Respects the widget boundary: explicitly does **not** wire icons/glyphs into `widget-colors.ts` (headless, no theme provider).
-- `IconName` as a `keyof` union so an unregistered name fails `tsc`; colour via `useTheme()`, size via `ICON_SIZE`, no literals.
-
-**Concerns**
-- **[LOW] Registry must cover the four tab identities, not just the enumerated generic set.** The tab bar needs semantic names for Dashboard/Orrery/Backup/Settings (`TabParamList`). Ensure `ICON_REGISTRY` includes those four; the acceptance test "every registry name resolves outline+filled" won't catch a *missing* tab name. Add an assertion that every `TabParamList` key maps to a registered icon.
-
-**Suggestions**
-- Add a test that each of the four tab routes resolves a registered `<Icon>` name, so retiring `TAB_GLYPHS` can't leave a tab glyph-less.
-
-**Risk:** LOW.
-
-*(Orchestrator note: Codex additionally rated 23-05 HIGH on two points — `StatusGlyph` not consumed by any renderer, and `snoozed` not being part of `ProfileStatus`. The orchestrator verified `ProfileStatus = "stable"|"wobble"|"decay"|"rogue"` (`contact-status-read.ts:19`) has no `snoozed` member — codex's type finding is valid and is carried as an actionable MEDIUM. The "not consumed" point is the adoption divergence — see Divergent Views.)*
-
-### 23-06 — Backgrounds, surface/glass, Orrery reduced-motion gating
-
-**Summary.** Implements D-04 (app-wide fixed backgrounds + None/Solid + opacity-by-density), THEME-05 (per-package glass/flat with graceful blur fallback), and THEME-12 (Orrery follows the package, tokenized, honors live reduced motion). The decision framing *enforces* D-04/ADR-048 rather than reversing them.
-
-**Strengths**
-- Correctly identifies the real gating site: `OrreryCanvas.tsx:93-101` is the `useClock` + `useDerivedValue` twinkle/drift loop; gating it by reading the SharedValue *inside* the worklet satisfies D-06/D-07. Pause-on-blur unmount behavior left intact.
-- Backgrounds local `require()` only, asset-fail → None/Solid, blur → semi-opaque tinted token — all no-network, all token-resolved.
-- `resolveBackground(package, slotId|null)` mirrors the NULL-resolve-at-render idiom, consistent with `assertBackgroundId` from Plan 01.
-
-**Concerns**
-- **[LOW] "Glass-forward vs flatter" blur/opacity/glow values are agent-discretion but visually load-bearing.** The plan flags this "for verify," within Claude's discretion per CONTEXT. Ensure the device-UAT compares Galaxy(glass) vs Standard(flat) on the Pixel (the emulator can't assess Skia/blur cost).
-- **[LOW] Task 3 runs the full `npm test` inside a single task's verify.** Harmless but heavy; the wave-merge verification already runs `npm test`.
-
-**Suggestions**
-- Confirm `motion.ts`'s ambient token is consumed by the worklet as intended.
-- Record background-asset provenance/license in-project as the plan states.
-
-**Risk:** LOW-MEDIUM (Skia perf claims are device-only; the logic is sound).
-
-*(Orchestrator note: Codex rated 23-06 HIGH on two points Claude did not raise — `BackgroundHost` not mounted at any root (the adoption divergence), and `SunBody.tsx:82-100` independently deriving a glow pulse from the ambient clock via `useOrreryClock()`, which Plan 06 does not touch. The orchestrator verified SunBody is a genuine second clock consumer, so gating only `OrreryCanvas` leaves the sun pulsing under reduced motion — codex's finding is valid and is carried as an actionable MEDIUM: Plan 06 must include `SunBody.tsx` and audit all clock consumers.)*
-
-### 23-07 — Button hierarchy + Modal/Sheet/ConfirmDialog
-
-**Summary.** Reusable action/overlay primitives: five-role Button with destructive-beyond-colour, and compact/detail/full/confirm overlays sharing radius/scrim/safe-area. Token-driven, a11y-aware (44×44, required labels).
-
-**Strengths**
-- Destructive-beyond-colour is enforced by construction (danger token + warning glyph via registry + explicit ConfirmDialog naming the action).
-- Scrim resolved from `colors.background` at opacity, never a hex; icon-only requires `accessibilityLabel` and 44×44.
-- Correctly uses the icon registry for the warning glyph rather than a third-party icon name (D-05).
-
-**Concerns**
-- **[LOW] "Exactly one Primary per surface" is a convention, not enforced.** The plan flags this (backstop) and expresses it via the `role` prop — noting it only so it isn't later mistaken for a runtime guarantee.
-- **[LOW] Modal/Sheet a11y (focus trap / back-button dismissal / scrim tap) isn't in the acceptance.** For release quality, add that Android system Back dismisses the overlay and the scrim is tappable-to-dismiss where appropriate.
-
-**Suggestions**
-- Add an acceptance line for back-button/scrim dismissal on the overlay variants.
-
-**Risk:** LOW.
-
-### Phase-Level Assessment (Claude)
-
-**Overall risk: MEDIUM.** The architecture is well-sequenced, the decision citations are accurate and *enforce* rather than reverse recorded decisions (D-04/ADR-048/HANDOFF §7 verified), and the guardrails are respected throughout. What keeps it at MEDIUM: (1) the silent backup wire-shape change on a one-way-door phase; and (2) an AA gate that can be forced to silently retune owner-approved colours.
-
-**Scope note (not a defect):** No appearance-picker UI ships in Phase 23 — correctly deferred to Phase 15 per planning-notes:78-81. Consequence: the 23-VALIDATION device-UATs that say "cycle Galaxy/Standard × Light/Dark" and "preview immediately / restore on switch" (THEME-01/02/03/04) can only be exercised this phase via DAO writes + cold-start, not through the real UI. Recommend either a throwaway debug toggle for the device pass or explicitly marking those combo/preview UATs as Phase-15 gates.
-
-**HIGH-severity concerns (Claude):** None — no plan deletes, weakens, or inverts a `[DECIDED]`/`[REJECTED]` HANDOFF item or an Accepted ADR.
+To incorporate feedback into planning:
+  /gsd-plan-phase 23 --reviews
