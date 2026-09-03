@@ -225,6 +225,7 @@ const styles = StyleSheet.create({
     opacity: 0.85,
   },
   sheet: {
+    elevation: 1,
     maxHeight: "82%",
     minHeight: 260,
     borderTopWidth: 1,
@@ -232,6 +233,7 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 20,
     paddingHorizontal: 16,
     paddingTop: 16,
+    zIndex: 1,
     paddingBottom: 24,
   },
   title: {

@@ -13,6 +13,7 @@ import {
 } from "@react-navigation/native";
 import { useEffect } from "react";
 import { BackHandler, Text, View } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { DashboardStack } from "@/navigation/tabs/DashboardStack";
 import { OrreryStack } from "@/navigation/tabs/OrreryStack";
 import { BackupStack } from "@/navigation/tabs/BackupStack";
@@ -151,53 +152,55 @@ export function RootNavigator() {
   });
 
   return (
-    <Tab.Navigator
-      initialRouteName="DashboardTab"
-      tabBar={(props) => <MeasuredTabBar {...props} />}
-      screenOptions={({ route }) => ({
-        headerShown: false,
-        tabBarHideOnKeyboard: true,
-        animation: "fade",
-        tabBarActiveTintColor: colors.accent,
-        tabBarInactiveTintColor: colors.textSecondary,
-        tabBarStyle: { backgroundColor: colors.surface },
-        tabBarIcon: ({ color }) => (
-          <Text style={{ color }}>{TAB_GLYPHS[route.name]}</Text>
-        ),
-      })}
-    >
-      <Tab.Screen
-        name="DashboardTab"
-        component={DashboardStack}
-        options={({ route }) => tabOptions("Dashboard", route, "Home")}
-        listeners={({ navigation, route }) => ({
-          tabPress: (event) => handleActiveTabPress(event, navigation, route),
+    <SafeAreaView edges={["top"]} style={{ flex: 1 }}>
+      <Tab.Navigator
+        initialRouteName="DashboardTab"
+        tabBar={(props) => <MeasuredTabBar {...props} />}
+        screenOptions={({ route }) => ({
+          headerShown: false,
+          tabBarHideOnKeyboard: true,
+          animation: "fade",
+          tabBarActiveTintColor: colors.accent,
+          tabBarInactiveTintColor: colors.textSecondary,
+          tabBarStyle: { backgroundColor: colors.surface },
+          tabBarIcon: ({ color }) => (
+            <Text style={{ color }}>{TAB_GLYPHS[route.name]}</Text>
+          ),
         })}
-      />
-      <Tab.Screen
-        name="OrreryTab"
-        component={OrreryStack}
-        options={({ route }) => tabOptions("Orrery", route, "Orrery")}
-        listeners={({ navigation, route }) => ({
-          tabPress: (event) => handleActiveTabPress(event, navigation, route),
-        })}
-      />
-      <Tab.Screen
-        name="BackupTab"
-        component={BackupStack}
-        options={({ route }) => tabOptions("Backup", route, "Backup")}
-        listeners={({ navigation, route }) => ({
-          tabPress: (event) => handleActiveTabPress(event, navigation, route),
-        })}
-      />
-      <Tab.Screen
-        name="SettingsTab"
-        component={SettingsStack}
-        options={({ route }) => tabOptions("Settings", route, "Settings")}
-        listeners={({ navigation, route }) => ({
-          tabPress: (event) => handleActiveTabPress(event, navigation, route),
-        })}
-      />
-    </Tab.Navigator>
+      >
+        <Tab.Screen
+          name="DashboardTab"
+          component={DashboardStack}
+          options={({ route }) => tabOptions("Dashboard", route, "Home")}
+          listeners={({ navigation, route }) => ({
+            tabPress: (event) => handleActiveTabPress(event, navigation, route),
+          })}
+        />
+        <Tab.Screen
+          name="OrreryTab"
+          component={OrreryStack}
+          options={({ route }) => tabOptions("Orrery", route, "Orrery")}
+          listeners={({ navigation, route }) => ({
+            tabPress: (event) => handleActiveTabPress(event, navigation, route),
+          })}
+        />
+        <Tab.Screen
+          name="BackupTab"
+          component={BackupStack}
+          options={({ route }) => tabOptions("Backup", route, "Backup")}
+          listeners={({ navigation, route }) => ({
+            tabPress: (event) => handleActiveTabPress(event, navigation, route),
+          })}
+        />
+        <Tab.Screen
+          name="SettingsTab"
+          component={SettingsStack}
+          options={({ route }) => tabOptions("Settings", route, "Settings")}
+          listeners={({ navigation, route }) => ({
+            tabPress: (event) => handleActiveTabPress(event, navigation, route),
+          })}
+        />
+      </Tab.Navigator>
+    </SafeAreaView>
   );
 }

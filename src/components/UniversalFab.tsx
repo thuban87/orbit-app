@@ -327,60 +327,68 @@ export function UniversalFab() {
   const scrimStyle = useAnimatedStyle(() => ({ opacity: expanded.value }));
   const scrimPointerEvents = speedDialScrimPointerEvents(open);
 
-  if (hidden) return null;
+  const picker = (
+    <ContactPicker
+      visible={pickerFlow !== null}
+      onDismiss={() => setPickerFlow(null)}
+      onSelect={selectPickerContact}
+    />
+  );
+
+  // The picker owns a TextInput. It must stay mounted while that input opens
+  // the keyboard; hiding the FAB overlay must not also unmount the modal.
+  if (hidden) return picker;
 
   return (
-    <View pointerEvents="box-none" style={styles.overlay}>
-      <ContactPicker
-        visible={pickerFlow !== null}
-        onDismiss={() => setPickerFlow(null)}
-        onSelect={selectPickerContact}
-      />
-      <AnimatedPressable
-        accessibilityLabel="Dismiss capture actions"
-        onPress={() => closeDial()}
-        pointerEvents={scrimPointerEvents}
-        style={[
-          styles.scrim,
-          scrimStyle,
-          { backgroundColor: colors.background },
-        ]}
-      />
-      <View
-        accessibilityViewIsModal
-        pointerEvents="box-none"
-        style={styles.dial}
-      >
-        {UNIVERSAL_FAB_ACTIONS.map((action, index) => (
-          <UniversalFabActionRow
-            action={action}
-            bottomOffset={bottomOffset}
-            expanded={expanded}
-            index={index}
-            key={action.id}
-            onPress={() => dispatchAction(action)}
-            pointerEvents={scrimPointerEvents}
-          />
-        ))}
-      </View>
-      <Pressable
-        ref={fabRef}
-        testID="dashboard-create-fab"
-        accessibilityRole="button"
-        accessibilityLabel="Add / capture"
-        onPress={() => (isOpenRef.current ? closeDial() : openDial())}
-        style={[
-          styles.base,
-          { bottom: bottomOffset, backgroundColor: colors.accent },
-        ]}
-      >
-        <Animated.Text
-          style={[styles.glyph, glyphStyle, { color: colors.background }]}
+    <>
+      {picker}
+      <View pointerEvents="box-none" style={styles.overlay}>
+        <AnimatedPressable
+          accessibilityLabel="Dismiss capture actions"
+          onPress={() => closeDial()}
+          pointerEvents={scrimPointerEvents}
+          style={[
+            styles.scrim,
+            scrimStyle,
+            { backgroundColor: colors.background },
+          ]}
+        />
+        <View
+          accessibilityViewIsModal
+          pointerEvents="box-none"
+          style={styles.dial}
         >
-          +
-        </Animated.Text>
-      </Pressable>
-    </View>
+          {UNIVERSAL_FAB_ACTIONS.map((action, index) => (
+            <UniversalFabActionRow
+              action={action}
+              bottomOffset={bottomOffset}
+              expanded={expanded}
+              index={index}
+              key={action.id}
+              onPress={() => dispatchAction(action)}
+              pointerEvents={scrimPointerEvents}
+            />
+          ))}
+        </View>
+        <Pressable
+          ref={fabRef}
+          testID="dashboard-create-fab"
+          accessibilityRole="button"
+          accessibilityLabel="Add / capture"
+          onPress={() => (isOpenRef.current ? closeDial() : openDial())}
+          style={[
+            styles.base,
+            { bottom: bottomOffset, backgroundColor: colors.accent },
+          ]}
+        >
+          <Animated.Text
+            style={[styles.glyph, glyphStyle, { color: colors.background }]}
+          >
+            +
+          </Animated.Text>
+        </Pressable>
+      </View>
+    </>
   );
 }
 
