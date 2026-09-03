@@ -37,15 +37,15 @@ category's phase (see Traceability).
 - [ ] **THEME-01**: User can choose a theme package (Galaxy or Standard) independently of appearance mode (Light / Dark / Follow System), yielding all four combinations; Follow System tracks the OS live; first launch defaults to Galaxy + Follow System
 - [ ] **THEME-02**: User can pick a UI accent color from a curated palette (~8–10 choices), separate from the owner/star color setting
 - [ ] **THEME-03**: Each theme package remembers its own accent, background, and appearance choices; all appearance changes preview live; theme-critical preferences restore before first render (no wrong-theme flash)
-- [ ] **THEME-04**: User can choose from curated bundled backgrounds per theme (~4–5) plus None/Solid, all shipped locally; backgrounds stay fixed while content scrolls, and surface opacity increases with content density so dense screens stay readable
-- [ ] **THEME-05**: Galaxy renders glass-forward (translucency, glow) with optionally very subtle ambient motion; Standard renders cleaner, flatter, quieter
+- [x] **THEME-04**: User can choose from curated bundled backgrounds per theme (~4–5) plus None/Solid, all shipped locally; backgrounds stay fixed while content scrolls, and surface opacity increases with content density so dense screens stay readable
+- [x] **THEME-05**: Galaxy renders glass-forward (translucency, glow) with optionally very subtle ambient motion; Standard renders cleaner, flatter, quieter
 - [ ] **THEME-06**: The app respects the OS reduced-motion preference, stopping or simplifying nonessential motion app-wide (a reusable hook consumable from the Skia render loop)
 - [x] **THEME-07**: Text respects system text scaling by reflowing rather than truncating or shrinking
 - [ ] **THEME-08**: Relationship statuses keep stable semantic hue families across themes, each with its own distinct silhouette glyph — state is never conveyed by color alone
 - [ ] **THEME-09**: All screens draw icons through a centralized semantic icon registry supporting state variants, so custom icon art can be swapped later without broad rewrites
 - [ ] **THEME-10**: Modals/sheets come from shared variants and buttons follow a formal hierarchy (Primary/Secondary/Tertiary/Destructive/Icon-only), with destructive actions visually distinct beyond color
 - [ ] **THEME-11**: Functional content meets strong AA-equivalent contrast in every supported theme/mode combination
-- [ ] **THEME-12**: The Orrery follows the active theme package with a more immersive treatment while still resolving through shared tokens and honoring accessibility
+- [x] **THEME-12**: The Orrery follows the active theme package with a more immersive treatment while still resolving through shared tokens and honoring accessibility
 - [ ] **THEME-13**: Theme preferences persist durably on-device and survive backup and restore (portable settings, replacing the old device-local storage)
 
 ### KNOW — Contact Knowledge Foundation (Phase 24)

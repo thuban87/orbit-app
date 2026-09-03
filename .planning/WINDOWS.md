@@ -1,10 +1,10 @@
 ---
 schema_version: 1
-open_count: 15
+open_count: 18
 waived_count: 0
 fixed_count: 6
-total_count: 21
-last_updated: 2026-09-03T17:10:03.761Z
+total_count: 24
+last_updated: 2026-09-03T17:58:56.315Z
 ---
 
 # Broken Windows Ledger
@@ -36,6 +36,9 @@ last_updated: 2026-09-03T17:10:03.761Z
 | 19 | 23 | stub | src/stores/theme-store.ts |  | setPackage/setModeForActivePackage have no runtime caller yet; Settings UI (later plan) wires them | open |  | 2026-09-03T16:10:52.253Z |  |
 | 20 | 23 | unmet-truth | src/theme/theme-presets.ts |  | galaxy-dark onDanger(#FFFFFF)/danger(#E5484D) = 3.91:1 (<AA 4.5) — owner decision (23-03-SUMMARY Owner Escalations); do not auto-retune owner hue | open |  | 2026-09-03T17:10:03.552Z |  |
 | 21 | 23 | unmet-truth | src/theme/theme-presets.ts |  | galaxy-dark danger-as-text(#E5484D)/surfaceElevated(#1D2235) = 4.03:1 (<AA 4.5) — owner decision (23-03-SUMMARY); still >= AA-large 3.0 | open |  | 2026-09-03T17:10:03.761Z |  |
+| 22 | 23 | stub | assets/backgrounds/README.md |  | Background assets are placeholder uniform-fill webps (8 slots); final curated art deferred, must stay <= declared brightest pixel (23-06) | open |  | 2026-09-03T17:58:48.467Z |  |
+| 23 | 23 | unrun-verify | src/components/ui/__dev__/ThemePreviewScreen.tsx |  | Per-asset brightest-region text-over-glass AA on each Galaxy asset (shipped .webp bytes) — device-UAT deferred to end-of-phase Pixel pass (23-06 Task 2) | open |  | 2026-09-03T17:58:56.134Z |  |
+| 24 | 23 | unrun-verify | src/components/orrery/SunBody.tsx |  | Reduced-motion live toggle halts OrreryCanvas twinkle + SunBody glow pulse + bg motion — device-UAT deferred to end-of-phase Pixel pass (23-06 Task 3) | open |  | 2026-09-03T17:58:56.315Z |  |
 
 ````json
 [
@@ -289,6 +292,42 @@ last_updated: 2026-09-03T17:10:03.761Z
     "status": "open",
     "reason": "",
     "recorded_at": "2026-09-03T17:10:03.761Z",
+    "resolved_at": null
+  },
+  {
+    "id": 22,
+    "kind": "stub",
+    "phase": "23",
+    "file": "assets/backgrounds/README.md",
+    "line": null,
+    "description": "Background assets are placeholder uniform-fill webps (8 slots); final curated art deferred, must stay <= declared brightest pixel (23-06)",
+    "status": "open",
+    "reason": "",
+    "recorded_at": "2026-09-03T17:58:48.467Z",
+    "resolved_at": null
+  },
+  {
+    "id": 23,
+    "kind": "unrun-verify",
+    "phase": "23",
+    "file": "src/components/ui/__dev__/ThemePreviewScreen.tsx",
+    "line": null,
+    "description": "Per-asset brightest-region text-over-glass AA on each Galaxy asset (shipped .webp bytes) — device-UAT deferred to end-of-phase Pixel pass (23-06 Task 2)",
+    "status": "open",
+    "reason": "",
+    "recorded_at": "2026-09-03T17:58:56.134Z",
+    "resolved_at": null
+  },
+  {
+    "id": 24,
+    "kind": "unrun-verify",
+    "phase": "23",
+    "file": "src/components/orrery/SunBody.tsx",
+    "line": null,
+    "description": "Reduced-motion live toggle halts OrreryCanvas twinkle + SunBody glow pulse + bg motion — device-UAT deferred to end-of-phase Pixel pass (23-06 Task 3)",
+    "status": "open",
+    "reason": "",
+    "recorded_at": "2026-09-03T17:58:56.315Z",
     "resolved_at": null
   }
 ]

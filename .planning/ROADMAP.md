@@ -215,7 +215,7 @@ All v1.0 commits are local on `main` and have NOT been pushed.
 **Wave 3** *(blocked on Wave 2 completion)*
 
 - [x] 23-05-PLAN.md — Semantic icon registry + status glyphs [THEME-08/09]
-- [ ] 23-06-PLAN.md — Backgrounds, surface/glass treatment, Orrery immersive + reduced-motion consumption [THEME-04/05/12]
+- [x] 23-06-PLAN.md — Backgrounds, surface/glass treatment, Orrery immersive + reduced-motion consumption [THEME-04/05/12]
 
 **Wave 4** *(blocked on Wave 3 completion)*
 

@@ -5,11 +5,11 @@ milestone_name: Release Readiness
 current_phase: 23
 current_phase_name: Theme & Visual System
 status: executing
-stopped_at: Completed 23-05-PLAN.md
-last_updated: "2026-09-03T19:30:00.000Z"
+stopped_at: Completed 23-06-PLAN.md
+last_updated: "2026-09-03T17:55:00.000Z"
 last_activity: 2026-09-03
-last_activity_desc: Executed 23-05 (semantic icon registry + Icon primitive + ICON_SIZE tokens, tab bar routed through registry/TAB_GLYPHS retired; statusGlyph + StatusGlyph extending ringVisual — one glyph+hue source; THEME-08/09)
-state_head: 071eb37
+last_activity_desc: Executed 23-06 (background slot manifest + per-package glass/flat surface tokens + BackgroundHost/GlassSurface primitives with graceful blur/asset-fail fallbacks + composited per-asset AA; every Orrery clock consumer — canvas twinkle/drift + sun glow pulse — gated on the reduced-motion SharedValue; THEME-04/05/12)
+state_head: 180e8eb
 progress:
   total_phases: 19
   completed_phases: 1
@@ -30,9 +30,9 @@ final source verification and standalone-release Android UAT.
 ## Current Position
 
 Phase: 23 (Theme & Visual System) — EXECUTING
-Plan: 6 of 7
-Status: Executing Phase 23 — 23-05 complete (semantic icon registry + Icon/StatusGlyph primitives + ICON_SIZE tokens; tab bar routed through the registry, TAB_GLYPHS retired; statusGlyph extends ringVisual as the single glyph+hue source; THEME-08/09 delivered as first-class seams, screen adoption deferred to renderer/Phase-15)
-Last activity: 2026-09-03 — Executed 23-05 (icon registry + status glyphs)
+Plan: 7 of 7
+Status: Executing Phase 23 — 23-06 complete (background slot manifest keyed by the imported BACKGROUND_SLOT_IDS single source; per-package glass/flat SURFACE tokens with composited per-asset AA + token-only resolveSurfaceStyle; BackgroundHost fixed-behind-scroll + density scrim + onError->None/Solid; GlassSurface glass/flat with graceful expo-blur fallback; OrreryCanvas twinkle + SunBody glow pulse both gated on the reduced-motion SharedValue; THEME-04/05/12 delivered as primitives+behaviors, app-wide mount deferred to renderer/Phase-15, Appearance UI Phase 37)
+Last activity: 2026-09-03 — Executed 23-06 (backgrounds + glass/flat surfaces + Orrery reduced-motion gating)
 Progress: 0/19 phases complete (v2.0)
 
 **Milestone v2.0 structure (pre-decided by the owner from the fifteen milestone-2 dossiers + the
@@ -171,6 +171,7 @@ at plan time. All new durable preferences are `app_settings` columns, never Asyn
 | Phase 23 P03 | 16m | 3 tasks | 9 files |
 | Phase 23 P04 | 8m | 2 tasks | 4 files |
 | Phase 23 P05 | 8m | 2 tasks | 8 files |
+| Phase 23 P06 | 14m | 3 tasks | 15 files |
 
 ## Accumulated Context
 
@@ -317,6 +318,7 @@ Foundational decisions affecting current work:
 - [Phase 18.2]: Decay candidates require Bound state; birthday facts stay both-state but scheduling honors persisted birthday_unbound_enabled policy.
 - [Phase 23]: 23-01: migration 015 (TARGET_VERSION 15, head+1 verified on disk) adds seven durable app_settings theme columns — theme_package + per-package galaxy_*/standard_* mode/accent/background. Package + mode are NOT NULL DEFAULT + CHECK (v0->v15 lands Galaxy + Follow-System, no code branch); accent/background are nullable option-id TEXT (NULL = package default resolved at RENDER, the self_sun_colour idiom) so NO colour hex enters the schema. Owner-resolved Task-1 checkpoint = the recommended shape (one-time orbit-theme import then clear).
 - [Phase 23]: 23-01: theme-option-ids.ts is the single canonical ACCENT_IDS/BACKGROUND_SLOT_IDS source (pure, RN/db-free); DAO validators assertAccentId/assertBackgroundId consume it via .includes() (AI_PROVIDER_IDS idiom); Plans 03 (accents.ts) / 06 (backgrounds.ts) IMPORT these arrays, never re-declare. Theme layer re-keyed onto ThemePackage (galaxy = former space-dark verbatim, standard placeholder); resolvePalette(package, mode); DEFAULT_PRESET_ID kept exported (value 'galaxy') so widget-colors.ts compiles unchanged.
+- [Phase 23]: 23-06: backgrounds.ts BACKGROUND slot manifest keyed by the IMPORTED BACKGROUND_SLOT_IDS single source (drift test asserts equality, no re-declared list); asset require() lives in a lazy `source: () => require(*.webp)` thunk (fonts.ts idiom) so the module is node-testable and resolvers return the thunk uncalled. resolveBackground (NULL->package default, none->solid, unknown/tampered->default) + resolveRenderableBackground(pkg,slot,renderFailed) pure onError->None/Solid reducer (unit-tested; no react-test-renderer to mount BackgroundHost). tokens/surface.ts per-package SURFACE tokens: galaxy glass (translucent surface tint 0.88->0.97 by density + luminous borderStrong + accent glow), standard flat (near-opaque 0.97->1.0, plain border, no glow); resolveSurfaceStyle returns ONLY palette-token KEYS + declared opacities (token-only escape-hatch guard, unit-tested) and GlassSurface resolves colour via useTheme()[key] carrying NO component-local colour/opacity literal. liveGlassTintOpacity pinned == least-dense density opacity == fallbackTintOpacity per package (opacity-ordering invariant by construction); COMPOSITED per-asset AA = alphaComposite(live tint, each asset's DECLARED brightest pixel) checked vs every text(AA-normal)/status(AA-large) foreground in all 4 palettes. 8 placeholder uniform-fill webp assets (colour == declared brightest pixel, honest bound) + provenance README; final art deferred, must stay <= declared pixel (device-UAT enforces shipped bytes — 23-VALIDATION Manual-Only + WINDOWS.md). BackgroundHost density scrim reuses surfaceOpacityForDensity (readability-dominant band for D-04 text-heavy backgrounds; vivid full-bleed is the Orrery exception); static assets ship NO animation worklet. OrreryCanvas twinkle AND SunBody glow pulse BOTH gated on useReducedMotionShared() read DIRECTLY inside useDerivedValue (REVIEWS 23-06 HIGH — every clock consumer audited; sun stops pulsing under reduced motion; no prop/context threading, no setState). ThemePreviewScreen dev-only harness NOT wired into RootNavigator (files_modified scope + no-new-nav). THEME-04/05/12 delivered as primitives+behaviors; app-wide mount deferred renderer/Phase-15, Appearance UI Phase 37. 2088 tests pass; tsc + check:colors + biome clean; no deviations.
 - [Phase 23]: 23-01: the 7 theme keys are allowlisted in PORTABLE_SETTINGS_KEYS + DAO-writable NOW, but EMISSION in getPortableSettingsSnapshot is DEFERRED to Phase 36's format-4 plan (OPTIONAL PortableSettingsSnapshot fields, no SELECT/return, phoneRegionOverride 69bb048 precedent). BACKUP_FORMAT_VERSION stays 3, no FORWARD_MIGRATIONS entry — format-3 wire byte-identical (REVIEWS 23-01 HIGH). Legacy orbit-theme imported once at boot via hydrate-theme-at-boot (DI coordinator, compare-before-write idempotency, per-step error isolation) folded into the App.tsx ready gate = restore-before-paint; theme-store reworked to boot-hydrated app_settings selection (no AsyncStorage). Device UAT (no-flash + carry-across) deferred to end-of-phase Pixel pass.
 - [Phase 18.2]: Lifecycle transition effects run only after DAO commit and isolate scheduler/widget failures from durable relationship state.
 - [Phase 18.2]: Stale proactive actions fail closed while Profile opens remain available for live Unbound relationship records.
