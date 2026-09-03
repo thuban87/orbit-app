@@ -19,7 +19,7 @@ import {
   sunOccupantIsSelf,
 } from "./sun-occupant-logic";
 
-const colors = THEME_PRESETS["space-dark"].dark;
+const colors = THEME_PRESETS.galaxy.dark;
 const starPalette = colors.starPalette;
 // A "picked" self-sun colour, sourced from the palette (not index 0, so it is
 // distinct from the gold default) — keeps the test hex-literal-free (C2-3).

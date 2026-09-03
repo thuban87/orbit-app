@@ -7,8 +7,18 @@
  * `theme-presets.ts` (which reference these types) stay node-unit-testable.
  */
 
+import type { AccentId, BackgroundSlotId } from "./theme-option-ids";
+
 /** User-selectable theme mode. `system` defers to the OS colour scheme. */
 export type ThemeMode = "light" | "dark" | "system";
+
+/**
+ * Theme PACKAGE — the top visual axis (THEME-01 / D-10), independent of
+ * appearance mode. `galaxy` is the former `space-dark` palette (dark-first,
+ * shipped); `standard` is the second package proving the axis. Package × mode
+ * yields the four palette slots `resolvePalette(package, mode)` selects among.
+ */
+export type ThemePackage = "galaxy" | "standard";
 
 /** A mode after `system` has been resolved against the OS scheme. */
 export type ResolvedMode = "light" | "dark";
@@ -157,23 +167,43 @@ export interface ThemePalette {
   rogueExtinguished: string;
 }
 
-/** Identifier union for the shipped presets. Only one preset ships this phase. */
-export type ThemePresetId = "space-dark";
-
 /**
- * A theme preset. `dark` is required — the app is dark-first this phase — while
- * `light` is optional so `resolvePalette` can fall back to `dark` until a light
- * palette is authored (the owner's visual design, HANDOFF §7 + Q4).
+ * A theme preset, now keyed by `ThemePackage`. `dark` is required — the app is
+ * dark-first this phase — while `light` is optional so `resolvePalette` can fall
+ * back to `dark` until each package's light palette is authored (Plan 03 makes
+ * `light` required once the four palettes are authored).
  */
 export interface ThemePreset {
-  id: ThemePresetId;
+  id: ThemePackage;
   name: string;
   dark: ThemePalette;
   light?: ThemePalette;
 }
 
-/** What `useTheme()` returns: the active palette plus the resolved mode. */
+/**
+ * What `useTheme()` returns: the active palette, the resolved mode, and the
+ * active package (so consumers — and Plans 03/06's accent/background overlays —
+ * know which package's tones are in force).
+ */
 export interface ResolvedTheme {
   colors: ThemePalette;
   mode: ResolvedMode;
+  package: ThemePackage;
+}
+
+/**
+ * The durable theme selection hydrated from `app_settings` at boot (THEME-03 /
+ * D-11). Package + per-package appearance mode + per-package accent/background
+ * memory: switching package restores THAT package's own stored mode/accent/
+ * background. Accent/background DATA resolution lands in Plans 03/06; this phase
+ * lands the storage + the package × mode render path.
+ */
+export interface ThemeSelection {
+  package: ThemePackage;
+  galaxyMode: ThemeMode;
+  standardMode: ThemeMode;
+  galaxyAccent: AccentId | null;
+  standardAccent: AccentId | null;
+  galaxyBackground: BackgroundSlotId | null;
+  standardBackground: BackgroundSlotId | null;
 }

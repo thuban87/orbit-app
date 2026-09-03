@@ -23,7 +23,11 @@ import {
   type AppSettings,
   type AppSettingsPatch,
   acknowledgeProvider,
+  assertAccentId,
+  assertBackgroundId,
   assertPhoneRegionOverride,
+  assertThemeMode,
+  assertThemePackage,
   type BackupBookkeepingPatch,
   getAppSettings,
   getPortableSettingsSnapshot,
@@ -48,10 +52,12 @@ import { migration011 } from "@/db/migrations/011-contact-lifecycle-schema";
 import { migration012 } from "@/db/migrations/012-import-sessions";
 import { migration013 } from "@/db/migrations/013-reconciliation-and-merge";
 import { migration014 } from "@/db/migrations/014-interaction-assists";
+import { migration015 } from "@/db/migrations/015-theme-settings";
 import { runMigrations } from "@/db/migrations/runner";
 import { inWriteTransaction } from "@/db/transaction";
 import type { SqlExecutor } from "@/db/types";
 import { newUid } from "@/db/uid";
+import { ACCENT_IDS, BACKGROUND_SLOT_IDS } from "@/theme/theme-option-ids";
 
 const NOW = "2026-08-16 12:00:00";
 const LATER = "2026-08-16 13:30:00";
@@ -107,8 +113,9 @@ async function migrateToV5(): Promise<void> {
       migration012,
       migration013,
       migration014,
+      migration015,
     ],
-    14,
+    15,
     { now: NOW, newUid },
   );
 }
@@ -124,6 +131,17 @@ const AI_DEFAULTS = {
   aiAckAnthropic: 0 as const,
   aiAckGoogle: 0 as const,
   aiAckCustom: 0 as const,
+};
+
+/** Migration-015 theme defaults, for splicing into full-object expectations. */
+const THEME_DEFAULTS = {
+  themePackage: "galaxy" as const,
+  galaxyMode: "system" as const,
+  standardMode: "system" as const,
+  galaxyAccent: null,
+  standardAccent: null,
+  galaxyBackground: null,
+  standardBackground: null,
 };
 
 const BACKUP_DEFAULTS = {
@@ -277,6 +295,8 @@ describe("app-settings-dao — read", () => {
       phoneRegionOverride: null,
       includeUnboundNeverContacted: 0,
       birthdayUnboundEnabled: 1,
+      // Theme starts on the seeded package + follow-system, accent/background NULL.
+      ...THEME_DEFAULTS,
       // AI starts disabled: provider `none`, empty config, acks 0 (AI-01).
       ...AI_DEFAULTS,
       ...BACKUP_DEFAULTS,
@@ -428,6 +448,8 @@ describe("app-settings-dao — validated write", () => {
       phoneRegionOverride: null,
       includeUnboundNeverContacted: 0,
       birthdayUnboundEnabled: 1,
+      // Theme fields untouched by this patch — still the seeded defaults.
+      ...THEME_DEFAULTS,
       // AI fields untouched by this patch — still the disabled defaults.
       ...AI_DEFAULTS,
       ...BACKUP_DEFAULTS,
@@ -1059,5 +1081,125 @@ describe("acknowledgeProvider — the SOLE ai_ack_* writer (H5 / C2-H3)", () => 
     await expect(acknowledgeProvider(exec, "google", LATER)).rejects.toThrow(
       /changed 0/,
     );
+  });
+});
+
+describe("app-settings-dao — theme settings (migration 015, Phase 23)", () => {
+  beforeEach(async () => {
+    await migrateToV5();
+  });
+
+  it("round-trips each package's OWN remembered mode/accent/background (assumption-delta invariant)", async () => {
+    await updateAppSettings(
+      exec,
+      {
+        themePackage: "standard",
+        galaxyMode: "dark",
+        standardMode: "light",
+        galaxyAccent: "nebula-blue",
+        standardAccent: "slate-indigo",
+        galaxyBackground: "galaxy-aurora",
+        standardBackground: "standard-dawn",
+      },
+      LATER,
+    );
+    const settings = await getAppSettings(exec);
+    expect(settings).toMatchObject({
+      themePackage: "standard",
+      galaxyMode: "dark",
+      standardMode: "light",
+      galaxyAccent: "nebula-blue",
+      standardAccent: "slate-indigo",
+      galaxyBackground: "galaxy-aurora",
+      standardBackground: "standard-dawn",
+    });
+  });
+
+  it("passes NULL accent/background straight through (package default resolved at render)", async () => {
+    await updateAppSettings(
+      exec,
+      { galaxyAccent: "solar-amber", galaxyBackground: "galaxy-nebula" },
+      LATER,
+    );
+    await updateAppSettings(
+      exec,
+      { galaxyAccent: null, galaxyBackground: null },
+      NOW,
+    );
+    const settings = await getAppSettings(exec);
+    expect(settings.galaxyAccent).toBeNull();
+    expect(settings.galaxyBackground).toBeNull();
+  });
+
+  it.each([
+    { patch: { themePackage: "nebula" }, label: "unknown package" },
+    { patch: { galaxyMode: "sunset" }, label: "unknown mode" },
+    { patch: { galaxyAccent: "not-an-accent" }, label: "unknown accent id" },
+    {
+      patch: { galaxyBackground: "not-a-slot" },
+      label: "unknown background id",
+    },
+  ])("rejects an invalid $label BEFORE the UPDATE opens", async ({ patch }) => {
+    await expect(
+      (async () => updateAppSettings(exec, patch as AppSettingsPatch, LATER))(),
+    ).rejects.toThrow();
+    // The write never opened — settings stay at their seeded defaults.
+    const settings = await getAppSettings(exec);
+    expect(settings.themePackage).toBe("galaxy");
+    expect(settings.galaxyMode).toBe("system");
+  });
+
+  it("binds assertThemePackage/assertThemeMode to their enums", () => {
+    expect(() => assertThemePackage("themePackage", "galaxy")).not.toThrow();
+    expect(() => assertThemePackage("themePackage", "standard")).not.toThrow();
+    expect(() => assertThemePackage("themePackage", "nebula")).toThrow();
+    for (const mode of ["light", "dark", "system"]) {
+      expect(() => assertThemeMode("galaxyMode", mode)).not.toThrow();
+    }
+    expect(() => assertThemeMode("galaxyMode", "sunset")).toThrow();
+  });
+
+  it("binds assertAccentId/assertBackgroundId to the exported single-source arrays", () => {
+    // null is always accepted (package default).
+    expect(() => assertAccentId("galaxyAccent", null)).not.toThrow();
+    expect(() => assertBackgroundId("galaxyBackground", null)).not.toThrow();
+    // Every listed id is accepted — proving the validator is bound to the source.
+    for (const id of ACCENT_IDS) {
+      expect(() => assertAccentId("galaxyAccent", id)).not.toThrow();
+    }
+    for (const id of BACKGROUND_SLOT_IDS) {
+      expect(() => assertBackgroundId("galaxyBackground", id)).not.toThrow();
+    }
+    // An unknown id is rejected.
+    expect(() => assertAccentId("galaxyAccent", "made-up")).toThrow();
+    expect(() => assertBackgroundId("galaxyBackground", "made-up")).toThrow();
+  });
+
+  it("allowlists all seven theme keys in PORTABLE_SETTINGS_KEYS but does NOT emit them (deferral guard)", async () => {
+    for (const key of [
+      "themePackage",
+      "galaxyMode",
+      "standardMode",
+      "galaxyAccent",
+      "standardAccent",
+      "galaxyBackground",
+      "standardBackground",
+    ]) {
+      expect(PORTABLE_SETTINGS_KEYS.has(key)).toBe(true);
+    }
+    // Emission is DEFERRED to Phase 36: the real portable snapshot omits them, so
+    // this build's format-3 wire stays byte-identical (REVIEWS 23-01 HIGH).
+    const snapshot = await getPortableSettingsSnapshot(exec);
+    for (const key of [
+      "themePackage",
+      "galaxyMode",
+      "standardMode",
+      "galaxyAccent",
+      "standardAccent",
+      "galaxyBackground",
+      "standardBackground",
+    ]) {
+      expect(snapshot).not.toHaveProperty(key);
+    }
   });
 });

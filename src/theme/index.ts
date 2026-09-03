@@ -5,6 +5,7 @@
  * this barrel, so it never pulls `react-native` in through the provider.
  */
 
+export * from "./theme-option-ids";
 export * from "./theme-presets";
 export { ThemeContext, ThemeProvider, useTheme } from "./theme-provider";
 export * from "./theme-types";

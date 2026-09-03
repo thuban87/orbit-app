@@ -33,6 +33,7 @@ import { migration011 } from "@/db/migrations/011-contact-lifecycle-schema";
 import { migration012 } from "@/db/migrations/012-import-sessions";
 import { migration013 } from "@/db/migrations/013-reconciliation-and-merge";
 import { migration014 } from "@/db/migrations/014-interaction-assists";
+import { migration015 } from "@/db/migrations/015-theme-settings";
 import { runMigrations } from "@/db/migrations/runner";
 import type { SqlExecutor } from "@/db/types";
 import { __resetSweepForTest, runLaunchSweep } from "@/services/launch-sweep";
@@ -96,8 +97,9 @@ beforeEach(async () => {
       migration012,
       migration013,
       migration014,
+      migration015,
     ],
-    14,
+    15,
     { now: NOW, newUid: uid, defaultPhoneRegion: "US" },
   );
   __resetExpo();

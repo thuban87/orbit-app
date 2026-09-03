@@ -17,8 +17,11 @@ interface ThemeProviderProps {
 
 /**
  * Provides the resolved theme to the tree. It takes NO palette props — the
- * persisted `useThemeStore` is the source of truth, so a rehydrated
- * `mode`/`presetId` re-renders the provider and restyles the app.
+ * boot-hydrated `useThemeStore` selection is the source of truth, so a hydrated
+ * (or later live-changed) package/mode re-renders the provider and restyles the
+ * app. The package × mode axes are independent (THEME-01 / D-10): the active
+ * package selects a preset and its OWN remembered mode selects the light/dark
+ * slot. Accent/background overlays land in Plans 03/06.
  *
  * `system` is resolved HERE at the app boundary via `useColorScheme()`; its
  * `ColorSchemeName | null | undefined` result is passed straight into the pure
@@ -26,17 +29,21 @@ interface ThemeProviderProps {
  * that could drop the `"unspecified"` path or invert the dark default.
  */
 export function ThemeProvider({ children }: ThemeProviderProps) {
-  const mode = useThemeStore((s) => s.mode);
-  const presetId = useThemeStore((s) => s.presetId);
+  const themePackage = useThemeStore((s) => s.package);
+  const galaxyMode = useThemeStore((s) => s.galaxyMode);
+  const standardMode = useThemeStore((s) => s.standardMode);
   const scheme = useColorScheme();
 
   const theme = useMemo<ResolvedTheme>(() => {
+    // Per-package memory: the active package's OWN remembered mode drives render.
+    const mode = themePackage === "galaxy" ? galaxyMode : standardMode;
     const resolved = resolveMode(mode, scheme);
     return {
-      colors: resolvePalette(presetId, resolved),
+      colors: resolvePalette(themePackage, resolved),
       mode: resolved,
+      package: themePackage,
     };
-  }, [mode, presetId, scheme]);
+  }, [themePackage, galaxyMode, standardMode, scheme]);
 
   return (
     <ThemeContext.Provider value={theme}>{children}</ThemeContext.Provider>
@@ -45,7 +52,7 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
 
 /**
  * Access the active theme. Outside a provider (stray callers, tests) it falls
- * back to the default preset's dark palette — never null, never a bare hex.
+ * back to the default package's dark palette — never null, never a bare hex.
  */
 export function useTheme(): ResolvedTheme {
   const theme = useContext(ThemeContext);
@@ -53,6 +60,7 @@ export function useTheme(): ResolvedTheme {
     return {
       colors: resolvePalette(DEFAULT_PRESET_ID, "dark"),
       mode: "dark",
+      package: DEFAULT_PRESET_ID,
     };
   }
   return theme;

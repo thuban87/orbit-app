@@ -6,8 +6,10 @@
  * table lookups — no native import, no mock needed.
  *
  * Coverage: the full colour + weight table for stable/wobble/decay/rogue/null
- * against a palette fixture, plus that `widgetPalette()` resolves the space-dark
- * dark palette (the tokens 12-01 introduced).
+ * against a palette fixture, plus that `widgetPalette()` resolves the galaxy
+ * (= former space-dark) dark palette (the tokens 12-01 introduced). The Phase-23
+ * package re-key keeps DEFAULT_PRESET_ID exported and value-safe, so this headless
+ * consumer compiles unchanged and still resolves the identical dark palette.
  */
 import { describe, expect, it } from "vitest";
 import type { ThemePalette } from "@/theme/theme-types";
@@ -44,7 +46,7 @@ describe("ringWeight", () => {
 });
 
 describe("widgetPalette", () => {
-  it("resolves the space-dark dark palette (status tokens present, no theme hook)", () => {
+  it("resolves the galaxy (= former space-dark) dark palette (status tokens present, no theme hook)", () => {
     const p = widgetPalette();
     // The four shared status tokens (12-01) the headless render consumes.
     expect(typeof p.statusStable).toBe("string");

@@ -2,10 +2,7 @@ import { describe, expect, it } from "vitest";
 // C2-5: import the ACTUAL DAO validator, not a re-inlined regex, so the palette
 // lock and the write path can never desync (loosening the DAO rule would fail
 // this suite too).
-import {
-  assertSelfSunColour,
-  SELF_SUN_COLOUR_RE,
-} from "@/db/app-settings-dao";
+import { assertSelfSunColour, SELF_SUN_COLOUR_RE } from "@/db/app-settings-dao";
 import {
   DEFAULT_PRESET_ID,
   resolveMode,
@@ -35,18 +32,40 @@ describe("resolveMode", () => {
 });
 
 describe("resolvePalette", () => {
-  it("returns the requested mode's palette", () => {
+  it("returns the requested package + mode's palette", () => {
     expect(resolvePalette(DEFAULT_PRESET_ID, "dark")).toBe(
       THEME_PRESETS[DEFAULT_PRESET_ID].dark,
+    );
+    expect(resolvePalette("galaxy", "dark")).toBe(THEME_PRESETS.galaxy.dark);
+    expect(resolvePalette("standard", "dark")).toBe(
+      THEME_PRESETS.standard.dark,
+    );
+  });
+
+  it("resolves galaxy and standard to DISTINCT package palettes (the package axis)", () => {
+    const galaxy = resolvePalette("galaxy", "dark");
+    const standard = resolvePalette("standard", "dark");
+    expect(galaxy).not.toBe(standard);
+    // At minimum the base background differs so the axis is observable at render.
+    expect(galaxy.background).not.toBe(standard.background);
+  });
+
+  it("DEFAULT_PRESET_ID is the galaxy package (= the former space-dark palette)", () => {
+    expect(DEFAULT_PRESET_ID).toBe("galaxy");
+    expect(resolvePalette(DEFAULT_PRESET_ID, "dark")).toBe(
+      THEME_PRESETS.galaxy.dark,
     );
   });
 
   it("falls back to the dark palette when the requested mode is absent", () => {
-    // Only a dark palette ships this phase, so "light" deterministically
-    // returns the SAME dark palette — proving "light"/"system" are DEFINED,
-    // never undefined.
+    // Only dark palettes ship this phase, so "light" deterministically returns
+    // the SAME dark palette — proving "light"/"system" are DEFINED, never
+    // undefined (Plan 03 authors the light palettes and makes `light` required).
     expect(resolvePalette(DEFAULT_PRESET_ID, "light")).toBe(
       THEME_PRESETS[DEFAULT_PRESET_ID].dark,
+    );
+    expect(resolvePalette("standard", "light")).toBe(
+      THEME_PRESETS.standard.dark,
     );
   });
 
@@ -88,8 +107,8 @@ describe("avatar swatch tokens (PHOTO-04)", () => {
     }
   });
 
-  it("resolvePalette surfaces both avatar tokens for space-dark/dark", () => {
-    const palette = resolvePalette("space-dark", "dark");
+  it("resolvePalette surfaces both avatar tokens for galaxy/dark", () => {
+    const palette = resolvePalette("galaxy", "dark");
     expect(palette.avatarSwatches.length).toBeGreaterThan(0);
     expect(palette.avatarSwatchText.length).toBeGreaterThan(0);
   });
@@ -122,8 +141,8 @@ describe("status/gravity colour tokens (LOG-05, owner-approved 2026-08-15)", () 
     }
   });
 
-  it("resolvePalette surfaces both status/gravity tokens for space-dark/dark", () => {
-    const palette = resolvePalette("space-dark", "dark");
+  it("resolvePalette surfaces both status/gravity tokens for galaxy/dark", () => {
+    const palette = resolvePalette("galaxy", "dark");
     expect(palette.rogue.length).toBeGreaterThan(0);
     expect(palette.gravityTiers).toHaveLength(GRAVITY_TIER_COUNT);
   });

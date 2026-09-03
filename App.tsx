@@ -1,3 +1,4 @@
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { NavigationContainer } from "@react-navigation/native";
 import * as Notifications from "expo-notifications";
 import { ShareIntentProvider } from "expo-share-intent";
@@ -18,7 +19,8 @@ import { ResumeImportPrompt } from "@/components/ResumeImportPrompt";
 import { ResumeReconcilePrompt } from "@/components/ResumeReconcilePrompt";
 import { Snackbar } from "@/components/Snackbar";
 import { UniversalFab } from "@/components/UniversalFab";
-import { getExecutor, openAndMigrate } from "@/db/database";
+import { getAppSettings, updateAppSettings } from "@/db/app-settings-dao";
+import { getExecutor, localDateTime, openAndMigrate } from "@/db/database";
 import { isMigration006IntegrityError } from "@/db/migrations/006-normalize-custom-field-values";
 import { navigationRef, ShareIntentGate } from "@/navigation/linking";
 import { NotificationResponseGate } from "@/navigation/notification-gate";
@@ -56,13 +58,19 @@ import { registerPhotoReconcileSweep } from "@/services/photos/photo-reconcile-s
 import { registerRestorePhotoFinalizeSweep } from "@/services/photos/restore-photo-finalize-sweep";
 import { registerWidgetSweep } from "@/services/widget/widget-refresh";
 import { subscribeAppState, useAssistBanner } from "@/stores/assist-store";
+import {
+  themeSelectionFromSettings,
+  useThemeStore,
+} from "@/stores/theme-store";
 import { ThemeProvider, useTheme } from "@/theme";
+import { hydrateThemeAtBoot } from "@/theme/hydrate-theme-at-boot";
 import { Logger } from "@/utils/logger";
 
 /**
- * App entry: the thin shell. `ThemeProvider` reads the persisted `orbit-theme`
- * store internally (so a rehydrated selection restyles the tree). This shell
- * owns the two launch-path lifecycle jobs and gates first render on them:
+ * App entry: the thin shell. `ThemeProvider` reads the `useThemeStore` selection
+ * (hydrated from `app_settings` at boot — the durable theme columns of migration
+ * 015, no longer AsyncStorage) so the hydrated selection restyles the tree. This
+ * shell owns the launch-path lifecycle jobs and gates first render on them:
  *
  *   1. `openAndMigrate()` (DATA-01) runs in an on-mount effect; the home shell
  *      renders only once migration RESOLVES — a themed loading view shows while
@@ -147,8 +155,23 @@ function AppShell() {
   useEffect(() => {
     let active = true;
     openAndMigrate(getDeviceRegion())
-      .then(() => {
-        if (active) setReady(true);
+      .then(async () => {
+        // After migration 015 is committed, run the one-time legacy orbit-theme
+        // import + read the durable theme selection, THEN hydrate the store, THEN
+        // flip `ready` — so the first painted MAIN frame carries the saved palette
+        // (restore-before-paint, no wrong-theme flash). The coordinator is
+        // internally error-isolated (getItem/parse/clear/write failures are
+        // non-fatal), so a legacy-import hiccup never blocks boot.
+        const settings = await hydrateThemeAtBoot({
+          getItem: (key) => AsyncStorage.getItem(key),
+          removeItem: (key) => AsyncStorage.removeItem(key),
+          getAppSettings: () => getAppSettings(getExecutor()),
+          updateAppSettings: (patch) =>
+            updateAppSettings(getExecutor(), patch, localDateTime()),
+        });
+        if (!active) return;
+        useThemeStore.getState().hydrate(themeSelectionFromSettings(settings));
+        setReady(true);
       })
       .catch((err: unknown) => {
         if (!active) return;

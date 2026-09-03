@@ -28,6 +28,13 @@ import {
   type AiCloudProviderId,
   type AiProviderId,
 } from "@/services/ai-types";
+import {
+  ACCENT_IDS,
+  type AccentId,
+  BACKGROUND_SLOT_IDS,
+  type BackgroundSlotId,
+} from "@/theme/theme-option-ids";
+import type { ThemeMode, ThemePackage } from "@/theme/theme-types";
 
 /**
  * The app-level notification settings, one row (id=1). Toggles are 0/1
@@ -75,6 +82,26 @@ export interface AppSettings {
   includeUnboundNeverContacted: 0 | 1;
   /** Whether birthday scheduling may include Unbound contacts. */
   birthdayUnboundEnabled: 0 | 1;
+
+  // --- Theme settings (Phase 23, THEME-01/03/13, migration 015) -------------
+  // Package + appearance mode are independent axes; each package remembers its
+  // OWN mode/accent/background. Accent/background hold an option-ID (or NULL =
+  // package default resolved at RENDER, the self_sun_colour idiom) — NEVER a hex.
+
+  /** Active theme package (galaxy | standard). NOT NULL, defaults 'galaxy'. */
+  themePackage: ThemePackage;
+  /** Galaxy's remembered appearance mode. NOT NULL, defaults 'system'. */
+  galaxyMode: ThemeMode;
+  /** Standard's remembered appearance mode. NOT NULL, defaults 'system'. */
+  standardMode: ThemeMode;
+  /** Galaxy's remembered accent-id, or NULL = package default at render. */
+  galaxyAccent: AccentId | null;
+  /** Standard's remembered accent-id, or NULL = package default at render. */
+  standardAccent: AccentId | null;
+  /** Galaxy's remembered background slot-id, or NULL = package default. */
+  galaxyBackground: BackgroundSlotId | null;
+  /** Standard's remembered background slot-id, or NULL = package default. */
+  standardBackground: BackgroundSlotId | null;
 
   // --- Optional-AI non-secret settings (Phase 14, AI-01) --------------------
   // NO API KEY LIVES HERE — provider credentials are SecureStore-only
@@ -154,6 +181,23 @@ export interface PortableSettingsSnapshot {
   phoneRegionOverride: string | null;
   includeUnboundNeverContacted: 0 | 1;
   birthdayUnboundEnabled: 0 | 1;
+  // --- Theme keys (Phase 23) — allowlisted + writable NOW, EMISSION DEFERRED --
+  // Declared OPTIONAL (`?:`) so they enter `AppSettingsPatch` (writable via
+  // updateAppSettings, restorable via restore-apply) AND so a
+  // getPortableSettingsSnapshot return that OMITS them still typechecks. Their
+  // emission in the snapshot SELECT/return is DEFERRED to Phase 36's format-4
+  // plan (D-03, REVIEWS 23-01 HIGH) — copying the OPTIONAL-then-emit shape
+  // phoneRegionOverride had at deferred-emission commit 69bb048, NOT its current
+  // required-and-emitted form. Emitting them now would silently change the
+  // format-3 wire shape and hard-reject this build's backups on a pre-Phase-23
+  // build. Do NOT add these to the getPortableSettingsSnapshot SELECT this phase.
+  themePackage?: ThemePackage;
+  galaxyMode?: ThemeMode;
+  standardMode?: ThemeMode;
+  galaxyAccent?: AccentId | null;
+  standardAccent?: AccentId | null;
+  galaxyBackground?: BackgroundSlotId | null;
+  standardBackground?: BackgroundSlotId | null;
   modifiedAt: string;
 }
 
@@ -205,7 +249,14 @@ type WritableSettingsKey =
   | "backupRetentionDays"
   | "phoneRegionOverride"
   | "includeUnboundNeverContacted"
-  | "birthdayUnboundEnabled";
+  | "birthdayUnboundEnabled"
+  | "themePackage"
+  | "galaxyMode"
+  | "standardMode"
+  | "galaxyAccent"
+  | "standardAccent"
+  | "galaxyBackground"
+  | "standardBackground";
 
 /** The persisted (snake_case) column shape of the id=1 row. */
 interface AppSettingsRow {
@@ -223,6 +274,13 @@ interface AppSettingsRow {
   phone_region_override: string | null;
   include_unbound_never_contacted: number;
   birthday_unbound_enabled: number;
+  theme_package: string;
+  galaxy_mode: string;
+  standard_mode: string;
+  galaxy_accent: string | null;
+  standard_accent: string | null;
+  galaxy_background: string | null;
+  standard_background: string | null;
   ai_provider: string;
   ai_model: string;
   ai_custom_endpoint: string;
@@ -297,6 +355,13 @@ const COLUMN_OF: Record<WritableSettingsKey, string> = {
   phoneRegionOverride: "phone_region_override",
   includeUnboundNeverContacted: "include_unbound_never_contacted",
   birthdayUnboundEnabled: "birthday_unbound_enabled",
+  themePackage: "theme_package",
+  galaxyMode: "galaxy_mode",
+  standardMode: "standard_mode",
+  galaxyAccent: "galaxy_accent",
+  standardAccent: "standard_accent",
+  galaxyBackground: "galaxy_background",
+  standardBackground: "standard_background",
 };
 
 /** The saved setting is authoritative; device region is used only when it is absent. */
@@ -320,6 +385,8 @@ export async function getAppSettings(exec: SqlExecutor): Promise<AppSettings> {
             quiet_end_hour,
             sun_contact_id, self_sun_colour, phone_region_override,
             include_unbound_never_contacted, birthday_unbound_enabled,
+            theme_package, galaxy_mode, standard_mode,
+            galaxy_accent, standard_accent, galaxy_background, standard_background,
             ai_provider, ai_model, ai_custom_endpoint, ai_custom_model,
             ai_prompt_template, ai_ack_openai, ai_ack_anthropic,
             ai_ack_google, ai_ack_custom,
@@ -352,6 +419,20 @@ export async function getAppSettings(exec: SqlExecutor): Promise<AppSettings> {
       ? 1
       : 0) as 0 | 1,
     birthdayUnboundEnabled: (row.birthday_unbound_enabled ? 1 : 0) as 0 | 1,
+    // Theme settings (migration 015). package/mode are NOT NULL enums (the cast
+    // is a read-shape convenience; the CHECK + write validators guarantee a known
+    // value). accent/background raw NULL passes straight through as null — the
+    // package default is resolved at RENDER, never in this DAO (self_sun_colour
+    // idiom; the DAO cannot import theme colour values).
+    themePackage: row.theme_package as ThemePackage,
+    galaxyMode: row.galaxy_mode as ThemeMode,
+    standardMode: row.standard_mode as ThemeMode,
+    galaxyAccent: (row.galaxy_accent ?? null) as AccentId | null,
+    standardAccent: (row.standard_accent ?? null) as AccentId | null,
+    galaxyBackground: (row.galaxy_background ??
+      null) as BackgroundSlotId | null,
+    standardBackground: (row.standard_background ??
+      null) as BackgroundSlotId | null,
     // AI non-secret settings. The column default is `'none'`; the cast is a
     // read-shape convenience (validation on WRITE guarantees a known id).
     aiProvider: row.ai_provider as AiProviderId,
@@ -540,6 +621,77 @@ export function assertAiProvider(field: string, v: unknown): void {
   }
 }
 
+/** The theme-package field, validated to 'galaxy' | 'standard' on write. */
+const THEME_PACKAGE_FIELDS: Array<keyof AppSettingsPatch> = ["themePackage"];
+
+/** The per-package mode fields, validated to a ThemeMode enum on write. */
+const THEME_MODE_FIELDS: Array<keyof AppSettingsPatch> = [
+  "galaxyMode",
+  "standardMode",
+];
+
+/** The per-package accent fields, validated to null-or-known accent-id. */
+const ACCENT_FIELDS: Array<keyof AppSettingsPatch> = [
+  "galaxyAccent",
+  "standardAccent",
+];
+
+/** The per-package background fields, validated to null-or-known slot-id. */
+const BACKGROUND_FIELDS: Array<keyof AppSettingsPatch> = [
+  "galaxyBackground",
+  "standardBackground",
+];
+
+/** Throw unless `v` is 'galaxy' or 'standard' (`theme_package`, THEME-01). */
+export function assertThemePackage(field: string, v: unknown): void {
+  if (v !== "galaxy" && v !== "standard") {
+    throw new Error(
+      `updateAppSettings: ${field} must be 'galaxy' or 'standard', got ${String(v)}`,
+    );
+  }
+}
+
+/** Throw unless `v` is a known appearance mode (`galaxy_mode`/`standard_mode`). */
+export function assertThemeMode(field: string, v: unknown): void {
+  if (v !== "light" && v !== "dark" && v !== "system") {
+    throw new Error(
+      `updateAppSettings: ${field} must be 'light', 'dark', or 'system', got ${String(v)}`,
+    );
+  }
+}
+
+/**
+ * Throw unless `v` is null or a KNOWN accent-id. Consumes the exported
+ * `ACCENT_IDS` single source (theme-option-ids.ts) via `.includes()` — exactly
+ * the `assertAiProvider` / `AI_PROVIDER_IDS` idiom — so the DAO's accepted-id set
+ * and Plan 03's `accents.ts` resolver cannot drift (REVIEWS 23-01 cycle-4).
+ */
+export function assertAccentId(field: string, v: unknown): void {
+  if (v === null) return;
+  if (typeof v !== "string" || !(ACCENT_IDS as readonly string[]).includes(v)) {
+    throw new Error(
+      `updateAppSettings: ${field} must be null or a known accent id, got ${String(v)}`,
+    );
+  }
+}
+
+/**
+ * Throw unless `v` is null or a KNOWN background slot-id. Consumes the exported
+ * `BACKGROUND_SLOT_IDS` single source (theme-option-ids.ts) via `.includes()`, so
+ * the DAO's accepted-id set and Plan 06's `backgrounds.ts` manifest cannot drift.
+ */
+export function assertBackgroundId(field: string, v: unknown): void {
+  if (v === null) return;
+  if (
+    typeof v !== "string" ||
+    !(BACKGROUND_SLOT_IDS as readonly string[]).includes(v)
+  ) {
+    throw new Error(
+      `updateAppSettings: ${field} must be null or a known background slot id, got ${String(v)}`,
+    );
+  }
+}
+
 /**
  * Throw unless `v` is a whole automatic-backup day count in [1,3650]. Exported
  * so every backup settings UI validates exactly the DAO's durable boundary.
@@ -576,6 +728,26 @@ function validateAppSettingsPatch(patch: AppSettingsPatch): void {
   for (const field of SELF_SUN_COLOUR_FIELDS) {
     if (patch[field] !== undefined) {
       assertSelfSunColour(field, patch[field]);
+    }
+  }
+  for (const field of THEME_PACKAGE_FIELDS) {
+    if (patch[field] !== undefined) {
+      assertThemePackage(field, patch[field]);
+    }
+  }
+  for (const field of THEME_MODE_FIELDS) {
+    if (patch[field] !== undefined) {
+      assertThemeMode(field, patch[field]);
+    }
+  }
+  for (const field of ACCENT_FIELDS) {
+    if (patch[field] !== undefined) {
+      assertAccentId(field, patch[field]);
+    }
+  }
+  for (const field of BACKGROUND_FIELDS) {
+    if (patch[field] !== undefined) {
+      assertBackgroundId(field, patch[field]);
     }
   }
   if (patch.phoneRegionOverride !== undefined) {
@@ -630,7 +802,11 @@ export function setInteractionAssistEnabled(
 ): Promise<void> {
   validateAppSettingsPatch({ interactionAssistEnabled: enabled });
   return inWriteTransaction(exec, async () => {
-    await updateAppSettingsCore(exec, { interactionAssistEnabled: enabled }, now);
+    await updateAppSettingsCore(
+      exec,
+      { interactionAssistEnabled: enabled },
+      now,
+    );
     if (enabled === 0) {
       await exec.runAsync(
         `UPDATE interaction_assists

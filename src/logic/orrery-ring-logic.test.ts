@@ -10,12 +10,13 @@
  * C2-3 gate-safety: the palette input is sourced from THEME_PRESETS (this test is
  * under /logic/, NOT check:colors-exempt) — never an inline hex fake palette.
  */
+
+import { describe, expect, it } from "vitest";
 import { ringVisual } from "@/components/contact-card-ring";
 import { THEME_PRESETS } from "@/theme/theme-presets";
-import { describe, expect, it } from "vitest";
 import { orreryRingStyle } from "./orrery-ring-logic";
 
-const colors = THEME_PRESETS["space-dark"].dark;
+const colors = THEME_PRESETS.galaxy.dark;
 
 describe("orreryRingStyle", () => {
   it("stable → solid stroke, body = full statusStable, colour reused from ringVisual", () => {

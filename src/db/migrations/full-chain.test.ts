@@ -39,12 +39,34 @@ describe("registered migration chain", () => {
     expect(
       MIGRATIONS.filter((migration) => migration.version === 14),
     ).toHaveLength(1);
-    expect(TARGET_VERSION).toBe(14);
+    expect(
+      MIGRATIONS.filter((migration) => migration.version === 15),
+    ).toHaveLength(1);
+    expect(TARGET_VERSION).toBe(15);
     expect(
       await exec.getFirstAsync<{ user_version: number }>("PRAGMA user_version"),
     ).toEqual({
       user_version: TARGET_VERSION,
     });
+    // Migration 015's seven theme columns are present after the full chain.
+    const appSettingsCols = new Set(
+      (
+        await exec.getAllAsync<{ name: string }>(
+          "PRAGMA table_info(app_settings)",
+        )
+      ).map((r) => r.name),
+    );
+    for (const col of [
+      "theme_package",
+      "galaxy_mode",
+      "standard_mode",
+      "galaxy_accent",
+      "standard_accent",
+      "galaxy_background",
+      "standard_background",
+    ]) {
+      expect(appSettingsCols.has(col)).toBe(true);
+    }
     expect(
       await exec.getFirstAsync<{ name: string }>(
         "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'tombstones'",

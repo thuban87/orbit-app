@@ -2,9 +2,9 @@ import type {
   ResolvedMode,
   SystemScheme,
   ThemeMode,
+  ThemePackage,
   ThemePalette,
   ThemePreset,
-  ThemePresetId,
 } from "./theme-types";
 
 /**
@@ -12,13 +12,17 @@ import type {
  * literal may appear (CLAUDE.md: all colours resolve through theme tokens).
  * Every other module reads colours via `useTheme().colors.*`.
  *
- * One space-dark preset ships this phase as INFRASTRUCTURE, not a finished
- * palette; the visual design is the owner's call (HANDOFF §7 + Q4).
+ * Re-keyed onto the PACKAGE axis (THEME-01). `galaxy` is the former `space-dark`
+ * palette verbatim (dark-first, owner-approved seeds intact); `standard` is a
+ * second package with a DISTINCT placeholder dark palette so the package axis
+ * resolves to two different palettes — the full four-palette authoring (galaxy
+ * light + standard dark/light) is Plan 03. These are INFRASTRUCTURE seeds, not a
+ * finished visual design (the owner's call, HANDOFF §7 + Q4).
  */
-export const THEME_PRESETS: Record<ThemePresetId, ThemePreset> = {
-  "space-dark": {
-    id: "space-dark",
-    name: "Deep Space",
+export const THEME_PRESETS: Record<ThemePackage, ThemePreset> = {
+  galaxy: {
+    id: "galaxy",
+    name: "Galaxy",
     dark: {
       background: "#0B0E1A",
       surface: "#141828",
@@ -95,10 +99,65 @@ export const THEME_PRESETS: Record<ThemePresetId, ThemePreset> = {
       rogueExtinguished: "#3E4A6B",
     },
   },
+  // The SECOND package — a DISTINCT placeholder dark palette proving the package
+  // axis resolves to two different palettes (resolvePalette('standard','dark') is
+  // observably different from 'galaxy'). A neutral slate treatment, deliberately
+  // cooler-flat vs galaxy's deep-space blues. Plan 03 authors the finished
+  // standard palettes (dark + light) and galaxy-light; these are placeholders.
+  standard: {
+    id: "standard",
+    name: "Standard",
+    dark: {
+      background: "#101216",
+      surface: "#191C22",
+      surfaceElevated: "#242830",
+      accent: "#7C8DA6",
+      textPrimary: "#E9ECF1",
+      textSecondary: "#9AA1AD",
+      border: "#2E333C",
+      borderStrong: "#424956",
+      danger: "#E5484D",
+      avatarSwatches: [
+        "#6472A0",
+        "#4F8785",
+        "#8570A6",
+        "#A5795F",
+        "#5F9668",
+        "#A55F76",
+        "#96965F",
+        "#5F84A5",
+      ],
+      avatarSwatchText: "#F1F3F7",
+      rogue: "#DA9350",
+      statusStable: "#4BB08A",
+      statusWobble: "#DDBB63",
+      statusDecay: "#DE6E57",
+      gravityTiers: ["#535D74", "#5F84A5", "#5F9686", "#BE9E56"],
+      starPalette: [
+        "#F2C14E",
+        "#E8944A",
+        "#D96B7C",
+        "#A98BE0",
+        "#5CC6F0",
+        "#DCE6FF",
+      ],
+      mutedStable: "#7E9A90",
+      mutedWobble: "#BFB488",
+      mutedDecay: "#C08E82",
+      rogueExtinguished: "#414957",
+    },
+  },
 };
 
-/** The default preset used before any user selection (and outside a provider). */
-export const DEFAULT_PRESET_ID: ThemePresetId = "space-dark";
+/**
+ * The default package used before any user selection (and outside a provider).
+ * NAME kept as `DEFAULT_PRESET_ID` so the headless widget consumer
+ * (widget-colors.ts, ADR-042) and other by-name importers compile unchanged
+ * across the package re-key; its value is now the `galaxy` package (= the former
+ * space-dark palette), so `resolvePalette(DEFAULT_PRESET_ID, 'dark')` still
+ * returns the identical dark palette the widget already rendered.
+ */
+export const DEFAULT_PRESET_ID: ThemePackage = "galaxy";
 
 /**
  * Resolve a user-selected `ThemeMode` against the OS colour scheme. PURE — no
@@ -123,16 +182,18 @@ export function resolveMode(
 }
 
 /**
- * Resolve a concrete palette for a preset + resolved mode. PURE. Falls back to
- * the preset's `dark` palette when the requested mode's palette is absent — so
- * with only a dark palette shipped this phase, `resolvePalette(id, "light")`
+ * Resolve a concrete palette for a package + resolved mode. PURE. Falls back to
+ * the package's `dark` palette when the requested mode's palette is absent — so
+ * with only dark palettes shipped this phase, `resolvePalette(pkg, "light")`
  * deterministically returns the dark palette (`"light"`/`"system"` are DEFINED,
- * never undefined).
+ * never undefined). Plan 03 authors the light palettes and makes `light`
+ * required.
  */
 export function resolvePalette(
-  presetId: ThemePresetId,
+  themePackage: ThemePackage,
   mode: ResolvedMode,
 ): ThemePalette {
-  const preset = THEME_PRESETS[presetId] ?? THEME_PRESETS[DEFAULT_PRESET_ID];
+  const preset =
+    THEME_PRESETS[themePackage] ?? THEME_PRESETS[DEFAULT_PRESET_ID];
   return preset[mode] ?? preset.dark;
 }
