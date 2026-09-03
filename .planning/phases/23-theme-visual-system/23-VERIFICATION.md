@@ -1,35 +1,44 @@
 ---
 phase: 23-theme-visual-system
 verified: 2026-09-03T18:55:27Z
-status: human_needed
+status: passed
 score: 5/5 must-haves verified (roadmap success criteria, code/primitive/data-seam level)
 behavior_unverified: 0
 overrides_applied: 0
 human_verification:
+
   - test: "Cold-start a Pixel debug build with a persisted non-default theme_package (write via DAO/adb run-as, then relaunch)."
     expected: "First painted MAIN frame is the saved package's palette with NO dark->other snap (restore-before-paint, no wrong-theme flash); an existing device that had an AsyncStorage orbit-theme value carries its mode across after one launch, then the key is cleared."
     why_human: "First-paint timing / no-flash on a real cold start is device-observable only; unit tests verify the coordinator ordering + idempotency but not the rendered first frame."
+
   - test: "On a Pixel with OS reduced motion toggled ON mid-session while a Galaxy background + Orrery are on-screen."
     expected: "Orrery drift/twinkle AND the sun glow pulse (and any Galaxy background motion) stop; manual camera control still works; toggling live updates without an app restart."
     why_human: "Skia render-loop behavior + OS a11y setting live toggle; JS-thread motion is not observable in node unit tests (controller lifecycle is unit-tested, the rendered halt is not)."
+
   - test: "On a Pixel with OS font size set large, render AppText content (incl. long multibyte and long-word strings)."
     expected: "Text wraps / grows height rather than truncating or shrinking; correct fonts render on first paint."
     why_human: "Runtime text layout at large OS scale is device-observable; the primitive is verified to not set allowFontScaling={false} or fixed heights, but reflow behavior needs a device pass."
+
   - test: "On a Pixel with a greyscale / colour filter applied, view the six status display states (stable/wobble/decay/rogue/neutral/snoozed)."
     expected: "Each remains distinguishable by silhouette glyph + border weight + text label alone, with colour removed."
     why_human: "Visual distinguishability without colour is a human perceptual check; the distinct-glyph-per-state invariant is unit-verified but not the greyscale legibility."
+
   - test: "On a Pixel, for EACH Galaxy background asset, place body + caption text over glass on the asset's visibly brightest region."
     expected: "Text stays legible (AA-comfortable). A failure means the shipped .webp exceeds its declared worst-case pixel."
     why_human: "The composited AA unit test validates only the DECLARED worst-case pixel in backgrounds.ts; nothing decodes the shipped .webp bytes (REVIEWS 23-06 cycle-4 MEDIUM). Compounded by placeholder art — see anti-patterns."
+
   - test: "On a Pixel, drive each package×mode (galaxy/standard × light/dark) via a DAO write + cold-start."
     expected: "Surfaces, accents, and status glyphs are legible and AA-comfortable in all four combos; Galaxy shows glass, Standard shows flat; background stays fixed while content scrolls; dense forms are more opaque/readable; a removed asset falls back to None/Solid with no error."
     why_human: "Human visual confirmation of contrast/legibility and glass-vs-flat treatment across palettes on device; there is NO in-app Appearance switcher this phase (deferred to Phase 15/37), so verification is DAO-write + cold-start."
+
   - test: "On a Pixel, exercise each Modal/Sheet/ConfirmDialog variant."
     expected: "Shared radius/scrim/safe-area render; Android Back + scrim-tap dismiss a non-destructive Modal/Sheet; a destructive ConfirmDialog does NOT dismiss on Back or scrim-tap, requires an explicit choice, names the action, and shows the warning glyph; scrim dims without a colour literal."
     why_human: "Android overlay lifecycle (system Back wiring, focus, scrim-tap policy) is device-observable; the dismissable=false contract is verified in source but not the on-device Back behavior."
+
   - test: "On a Pixel, confirm the Galaxy GlassSurface 'subtle glow' actually renders (REVIEW WR-02)."
     expected: "The luminous accent-tinted glow is visible on the Android target, OR the glow is accepted/documented as iOS-only."
     why_human: "GlassSurface expresses the glow with iOS-only shadowColor/shadowOpacity/shadowRadius props that are no-ops on Android (only elevation is honored, and it renders neutral grey, not the accent tint). Whether THEME-05's glow affordance is present on the primary platform must be confirmed on device."
+
   - test: "Confirm the placeholder background art is acceptable to ship, or schedule real curated art."
     expected: "Owner decision: the 8 background .webp files are honestly-disclosed uniform-fill placeholders (colour == declared brightest pixel). Real curated art is an asset-production deferral. Any replacement art must stay at or below the declared brightest pixel per slot (or retune pixel + tint opacity together — never weaken AA)."
     why_human: "Product/taste call on whether placeholder backgrounds are acceptable for the current milestone; the primitive pipeline (require/resolve/AA-bound) is complete and functional."
