@@ -125,7 +125,7 @@ All v1.0 commits are local on `main` and have NOT been pushed.
 
 ### v2.0 Release Readiness (Phases 22–40)
 
-- [ ] **Phase 22: App Shell & Navigation** - Four-tab shell with per-tab stacks, universal six-action speed-dial FAB, and origin-aware Back
+- [x] **Phase 22: App Shell & Navigation** - Four-tab shell with per-tab stacks, universal six-action speed-dial FAB, and origin-aware Back (completed 2026-09-03)
 - [ ] **Phase 23: Theme & Visual System** - Galaxy + Standard packages × Light/Dark/Follow System, semantic icon registry, reduced-motion and contrast guarantees
 - [ ] **Phase 24: Contact Knowledge Foundation** - One "Things to Remember" model over fields, custom fields, relationships, and typed Memories with per-item AI opt-in
 - [ ] **Phase 25: Dashboard Data & State Foundation** - Shared population/filter/sort/search query state, durable and restored on return

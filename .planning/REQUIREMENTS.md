@@ -321,7 +321,7 @@ Status values: **Pending** = roadmapped, not yet planned.
 
 | Category | Phase | Status |
 |----------|-------|--------|
-| SHELL-01…15 | Phase 22 — App Shell & Navigation | Pending |
+| SHELL-01…15 | Phase 22 — App Shell & Navigation | Complete (2026-09-03) |
 | THEME-01…13 | Phase 23 — Theme & Visual System | Pending |
 | KNOW-01…16 | Phase 24 — Contact Knowledge Foundation | Pending |
 | DASHQ-01…14 | Phase 25 — Dashboard Data & State Foundation | Pending |
