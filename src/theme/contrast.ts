@@ -73,6 +73,10 @@ export function contrastRatio(a: string, b: string): number {
 }
 
 /** True when `fg`/`bg` meet or exceed the given AA threshold (default normal). */
-export function meetsAA(fg: string, bg: string, threshold = AA_NORMAL): boolean {
+export function meetsAA(
+  fg: string,
+  bg: string,
+  threshold = AA_NORMAL,
+): boolean {
   return contrastRatio(fg, bg) >= threshold;
 }
