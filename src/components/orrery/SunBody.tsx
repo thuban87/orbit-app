@@ -30,6 +30,7 @@ import {
 import { useMemo } from "react";
 import { useDerivedValue } from "react-native-reanimated";
 import { resolvePhotoUri } from "@/services/photos/photo-storage";
+import { useReducedMotionShared } from "@/theme/use-reduced-motion";
 import { useOrreryClock } from "./orrery-clock-context";
 
 export interface SunBodyProps {
@@ -84,15 +85,25 @@ export function SunBody({
   // harness), fall back to the static mid-point (no pulse). Bodies do NOT animate;
   // only the sun's glow halo breathes (~3s) — radius ±10%, opacity ±40%.
   const clock = useOrreryClock();
+
+  // THEME-06 / REVIEWS 23-06 HIGH: SunBody is the SECOND ambient clock consumer, so
+  // it MUST gate too — gating only OrreryCanvas would leave the sun pulsing under
+  // reduced motion. Read the live signal DIRECTLY as a SharedValue (NOT via prop or
+  // OrreryClockContext — SunBody is built before it is handed to OrreryCanvas, and
+  // the context carries only the clock; the direct hook keeps the fix inside this
+  // file, its files_modified scope). The worklet reads `.value` — never a React
+  // boolean, no per-frame setState (D-07). Reduced motion ON -> the glow holds at
+  // its static mid-point (radius + opacity), matching the no-clock fallback.
+  const reducedMotion = useReducedMotionShared();
   const pulseGlowRadius = useDerivedValue(() => {
-    if (!clock) {
+    if (!clock || reducedMotion.value) {
       return glowRadius;
     }
     const t = Math.sin(clock.value * PULSE_SPEED); // −1..1
     return glowRadius * (1 + PULSE_RADIUS_FRAC * t);
   });
   const pulseGlowOpacity = useDerivedValue(() => {
-    if (!clock) {
+    if (!clock || reducedMotion.value) {
       return GLOW_OPACITY;
     }
     const t = Math.sin(clock.value * PULSE_SPEED); // −1..1

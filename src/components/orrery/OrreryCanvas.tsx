@@ -34,6 +34,7 @@ import {
   type GestureType,
 } from "react-native-gesture-handler";
 import { useDerivedValue } from "react-native-reanimated";
+import { useReducedMotionShared } from "@/theme/use-reduced-motion";
 import { OrreryClockContext } from "./orrery-clock-context";
 
 export interface OrreryCanvasProps {
@@ -61,6 +62,12 @@ const TWINKLE_MIN = 0.18;
 const TWINKLE_MAX = 0.55;
 /** Twinkle angular speed (rad/ms) → ~2.6s period. */
 const TWINKLE_SPEED = 0.0024;
+/**
+ * The static opacity the twinkle collapses to under reduced motion — the band
+ * mid-point, so the starfield holds steady (visible, not flickering) rather than
+ * animating (THEME-06). Field variation still comes from each star's `base`.
+ */
+const TWINKLE_STATIC = (TWINKLE_MIN + TWINKLE_MAX) / 2;
 
 /** One placed star dot. */
 interface Star {
@@ -93,9 +100,18 @@ export function OrreryCanvas({
   // M5: the ONE ambient clock (inside this unmountable subtree).
   const clock = useClock();
 
+  // THEME-06: the live OS reduced-motion signal, read DIRECTLY as a SharedValue so
+  // the Skia loop gates on it inside `useDerivedValue` — never a React boolean, no
+  // per-frame setState (D-07). A live toggle updates without an app restart.
+  const reducedMotion = useReducedMotionShared();
+
   // The subtle starfield twinkle — a SINGLE Group-opacity oscillation (cheap; one
   // worklet for the whole field). Per-star `base` opacity keeps the field varied.
+  // Under reduced motion it collapses to a constant (holds, no oscillation).
   const twinkle = useDerivedValue(() => {
+    if (reducedMotion.value) {
+      return TWINKLE_STATIC;
+    }
     const t = (Math.sin(clock.value * TWINKLE_SPEED) + 1) / 2; // 0..1
     return TWINKLE_MIN + (TWINKLE_MAX - TWINKLE_MIN) * t;
   });
