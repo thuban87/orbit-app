@@ -21,6 +21,7 @@
  */
 import type { ProfileStatus } from "@/db/contact-status-read";
 import type { ThemePalette } from "@/theme/theme-types";
+import type { IconName } from "./icons/icon-registry";
 
 /** The resolved ring style for a status: colour + opacity + border weight. */
 export interface RingVisual {
@@ -57,5 +58,46 @@ export function ringVisual(
     default:
       // null / never-contacted → faint neutral ring, thin weight.
       return { color: colors.border, opacity: 0.5, width: 2 };
+  }
+}
+
+/**
+ * The DISPLAY status domain for the status glyph (THEME-08). It is NOT
+ * `ProfileStatus | null`: the query-time `ProfileStatus` union
+ * (stable|wobble|decay|rogue) has no `snoozed` member — snooze is an
+ * INDEPENDENT condition (`contacts.snooze_until`, a filter/UI state, not a
+ * query-time status), which the CONSUMER composes onto the computed status
+ * (REVIEWS 23-05 MEDIUM). `null` is the never-contacted "no status yet" state.
+ * `ringVisual`'s `ProfileStatus | null` contract stays unchanged.
+ */
+export type StatusDisplayState = ProfileStatus | "snoozed" | null;
+
+/**
+ * Map a display state to its DISTINCT semantic glyph id (THEME-08 / D-05).
+ * PURE, TOTAL, deterministic — beside `ringVisual` so card/profile/orrery read
+ * ONE glyph+hue source (never a forked second status source).
+ *
+ * Each of the six display states gets its OWN silhouette (no two share one), so
+ * status stays readable WITHOUT colour — the glyph is a redundant CVD channel
+ * alongside `ringVisual`'s border weight and the label `StatusGlyph` renders.
+ * The returned ids are registered `IconName`s (Task 1), so a missing registry
+ * entry fails `tsc`; `null` -> the neutral glyph (matching `ringVisual`'s null
+ * neutral ring).
+ */
+export function statusGlyph(state: StatusDisplayState): IconName {
+  switch (state) {
+    case "stable":
+      return "status-stable";
+    case "wobble":
+      return "status-wobble";
+    case "decay":
+      return "status-decay";
+    case "rogue":
+      return "status-rogue";
+    case "snoozed":
+      return "status-snoozed";
+    default:
+      // null / never-contacted → neutral "no status yet" silhouette.
+      return "status-neutral";
   }
 }
