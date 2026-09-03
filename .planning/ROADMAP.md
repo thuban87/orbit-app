@@ -200,8 +200,15 @@ All v1.0 commits are local on `main` and have NOT been pushed.
   5. Icons draw through a centralized semantic registry with state variants, modals/sheets and buttons come from shared variants with a formal hierarchy including visually distinct destructive actions, and theme preferences persist durably and survive backup and restore (THEME-09/10/13)
 
 **Canonical refs**: docs/dossier/milestone-2/phase-02-theme-visual-system-dossier.md; docs/dossier/milestone-2/planning-notes/phase-02-planning-notes.md
-**Schema**: theme preferences (portable `app_settings` columns; verify head+1 at plan time)
-**Plans**: TBD
+**Schema**: theme preferences (portable `app_settings` columns; migration 015 verified head+1 at plan time)
+**Plans**: 7 plans
+- [ ] 23-01-PLAN.md — TRACER: persisted theme resolves package × mode with restore-before-paint (migration 015, DAO/backup plumbing, orbit-theme import) [THEME-01/03/13]
+- [ ] 23-02-PLAN.md — Runtime deps, bundled fonts, typography/spacing/radii tokens, text-scaling reflow [THEME-07]
+- [ ] 23-03-PLAN.md — Four palettes, curated accent system, AA contrast gate [THEME-01/02/11]
+- [ ] 23-04-PLAN.md — Reduced-motion hook (SharedValue bridge + boolean twin) + motion tokens [THEME-06]
+- [ ] 23-05-PLAN.md — Semantic icon registry + status glyphs [THEME-08/09]
+- [ ] 23-06-PLAN.md — Backgrounds, surface/glass treatment, Orrery immersive + reduced-motion consumption [THEME-04/05/12]
+- [ ] 23-07-PLAN.md — Modal/sheet variants + button hierarchy (destructive beyond colour) [THEME-10]
 **UI hint**: yes
 
 ### Phase 24: Contact Knowledge Foundation
