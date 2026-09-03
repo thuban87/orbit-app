@@ -3,18 +3,18 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Release Readiness
 current_phase: 23
-current_phase_name: theme-visual-system
+current_phase_name: Theme & Visual System
 status: executing
-stopped_at: Phase 23 UI-SPEC approved
-last_updated: "2026-09-03T12:03:47.161Z"
+stopped_at: Completed 23-01-PLAN.md
+last_updated: "2026-09-03T16:10:00.000Z"
 last_activity: 2026-09-03
-last_activity_desc: Phase 22 complete, transitioned to Phase 23
-state_head: f71ec062ec466e65cf86a348c14ad1334d07de23
+last_activity_desc: Executed 23-01 (durable theme + package axis tracer)
+state_head: f36a08aecfbedee607a221ea769df2e8029fc353
 progress:
   total_phases: 19
   completed_phases: 1
   total_plans: 13
-  completed_plans: 6
+  completed_plans: 7
 ---
 
 # Project State
@@ -24,15 +24,15 @@ progress:
 See: .planning/PROJECT.md (updated 2026-09-01 after v1.0 milestone)
 
 **Core value:** Collapse the taps between "you're overdue with X" and the message actually being sent.
-**Current focus:** Phase 23 — Theme & Visual System. Phase 22 is complete after
+**Current focus:** Phase 23 — Theme & Visual System
 final source verification and standalone-release Android UAT.
 
 ## Current Position
 
-Phase: 23 (theme-visual-system) — READY TO EXECUTE
-Plan: Not started
-Status: Ready to execute
-Last activity: 2026-09-03 — Phase 22 complete, transitioned to Phase 23
+Phase: 23 (Theme & Visual System) — EXECUTING
+Plan: 2 of 7
+Status: Executing Phase 23 — 23-01 complete
+Last activity: 2026-09-03 — Executed 23-01 (durable theme + package axis tracer)
 Progress: 0/19 phases complete (v2.0)
 
 **Milestone v2.0 structure (pre-decided by the owner from the fifteen milestone-2 dossiers + the
@@ -166,6 +166,7 @@ at plan time. All new durable preferences are `app_settings` columns, never Asyn
 | Phase 22-app-shell-navigation P04 | 13m | 3 tasks | 12 files |
 | Phase 22 P05 | 10m | 3 tasks | 11 files |
 | Phase 22 P06 | 13m | 3 tasks | 12 files |
+| Phase 23 P01 | 45m | 1 task | 25 files |
 
 ## Accumulated Context
 
@@ -308,6 +309,9 @@ Foundational decisions affecting current work:
 - [Phase 18.2]: A saved Unbound sun keeps app_settings.sun_contact_id intact and resolves visually to self through the shared predicate.
 - [Phase 18.2]: Orrery reads and ring-sequence guards use the same Bound predicate, while never-contacted Bound contacts remain picker candidates.
 - [Phase 18.2]: Decay candidates require Bound state; birthday facts stay both-state but scheduling honors persisted birthday_unbound_enabled policy.
+- [Phase 23]: 23-01: migration 015 (TARGET_VERSION 15, head+1 verified on disk) adds seven durable app_settings theme columns — theme_package + per-package galaxy_*/standard_* mode/accent/background. Package + mode are NOT NULL DEFAULT + CHECK (v0->v15 lands Galaxy + Follow-System, no code branch); accent/background are nullable option-id TEXT (NULL = package default resolved at RENDER, the self_sun_colour idiom) so NO colour hex enters the schema. Owner-resolved Task-1 checkpoint = the recommended shape (one-time orbit-theme import then clear).
+- [Phase 23]: 23-01: theme-option-ids.ts is the single canonical ACCENT_IDS/BACKGROUND_SLOT_IDS source (pure, RN/db-free); DAO validators assertAccentId/assertBackgroundId consume it via .includes() (AI_PROVIDER_IDS idiom); Plans 03 (accents.ts) / 06 (backgrounds.ts) IMPORT these arrays, never re-declare. Theme layer re-keyed onto ThemePackage (galaxy = former space-dark verbatim, standard placeholder); resolvePalette(package, mode); DEFAULT_PRESET_ID kept exported (value 'galaxy') so widget-colors.ts compiles unchanged.
+- [Phase 23]: 23-01: the 7 theme keys are allowlisted in PORTABLE_SETTINGS_KEYS + DAO-writable NOW, but EMISSION in getPortableSettingsSnapshot is DEFERRED to Phase 36's format-4 plan (OPTIONAL PortableSettingsSnapshot fields, no SELECT/return, phoneRegionOverride 69bb048 precedent). BACKUP_FORMAT_VERSION stays 3, no FORWARD_MIGRATIONS entry — format-3 wire byte-identical (REVIEWS 23-01 HIGH). Legacy orbit-theme imported once at boot via hydrate-theme-at-boot (DI coordinator, compare-before-write idempotency, per-step error isolation) folded into the App.tsx ready gate = restore-before-paint; theme-store reworked to boot-hydrated app_settings selection (no AsyncStorage). Device UAT (no-flash + carry-across) deferred to end-of-phase Pixel pass.
 - [Phase 18.2]: Lifecycle transition effects run only after DAO commit and isolate scheduler/widget failures from durable relationship state.
 - [Phase 18.2]: Stale proactive actions fail closed while Profile opens remain available for live Unbound relationship records.
 - [Phase 18.2]: Never Contacted eligibility is a persisted policy evaluated at its SQL read owners, never a screen-side filter.

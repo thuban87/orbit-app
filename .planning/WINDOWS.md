@@ -1,10 +1,10 @@
 ---
 schema_version: 1
-open_count: 11
+open_count: 13
 waived_count: 0
 fixed_count: 6
-total_count: 17
-last_updated: 2026-09-02T22:33:27.282Z
+total_count: 19
+last_updated: 2026-09-03T16:10:52.253Z
 ---
 
 # Broken Windows Ledger
@@ -32,6 +32,8 @@ last_updated: 2026-09-02T22:33:27.282Z
 | 15 | 22 | stub | src/screens/placeholders/FabActionPlaceholders.tsx | 22 | Update Contact remains a themed placeholder until Phase 34 Rapid Capture. | open |  | 2026-09-02T22:19:37.507Z |  |
 | 16 | 22 | stub | src/screens/placeholders/FabActionPlaceholders.tsx | 22 | Memory remains a themed placeholder until Phase 24 Contact Knowledge. | open |  | 2026-09-02T22:19:37.725Z |  |
 | 17 | 22 | unrun-verify | src/components/ContactPicker.tsx |  | Pixel UAT remains: picker search/archived/snoozed markers, TalkBack modal focus, Quick Log commit truth, Undo/Retry, haptics, widget refresh, and shell refresh without refocus. | open |  | 2026-09-02T22:33:27.282Z |  |
+| 18 | 23 | stub | src/theme/theme-presets.ts |  | standard package palette is a placeholder; finished four-palette authoring is Plan 03 (accents.ts) | open |  | 2026-09-03T16:10:52.068Z |  |
+| 19 | 23 | stub | src/stores/theme-store.ts |  | setPackage/setModeForActivePackage have no runtime caller yet; Settings UI (later plan) wires them | open |  | 2026-09-03T16:10:52.253Z |  |
 
 ````json
 [
@@ -237,6 +239,30 @@ last_updated: 2026-09-02T22:33:27.282Z
     "status": "open",
     "reason": "",
     "recorded_at": "2026-09-02T22:33:27.282Z",
+    "resolved_at": null
+  },
+  {
+    "id": 18,
+    "kind": "stub",
+    "phase": "23",
+    "file": "src/theme/theme-presets.ts",
+    "line": null,
+    "description": "standard package palette is a placeholder; finished four-palette authoring is Plan 03 (accents.ts)",
+    "status": "open",
+    "reason": "",
+    "recorded_at": "2026-09-03T16:10:52.068Z",
+    "resolved_at": null
+  },
+  {
+    "id": 19,
+    "kind": "stub",
+    "phase": "23",
+    "file": "src/stores/theme-store.ts",
+    "line": null,
+    "description": "setPackage/setModeForActivePackage have no runtime caller yet; Settings UI (later plan) wires them",
+    "status": "open",
+    "reason": "",
+    "recorded_at": "2026-09-03T16:10:52.253Z",
     "resolved_at": null
   }
 ]
