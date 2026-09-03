@@ -1,10 +1,11 @@
 ---
 phase: 24
 slug: contact-knowledge-foundation
-status: draft
+status: approved
 shadcn_initialized: false
 preset: none
 created: 2026-09-03
+reviewed_at: 2026-09-03
 ---
 
 # Phase 24 — UI Design Contract
@@ -118,20 +119,25 @@ RN token system — the 60/30/10 discipline maps onto the existing `ThemePalette
 
 ## UI Considerations
 
-Applicable state considerations resolved: 6 covered, 3 backstop, 1 unresolved.
+State-coverage probe over 8 described surfaces (E1 Things-to-Remember · E2 Recently Deleted · E3 history drill-in backlist · E4 Memory card · E5 custom-field value widget · E6 per-item AI toggle · E7 kind/type/relation picker · E8 repeatable-group summary). 54 raw candidate considerations; resolved below as **7 covered (explicit) · 3 backstop · 1 unresolved**, with two documented blanket dismissals.
+
+**Blanket dismissals (grounded in project rules — apply to every surface above):**
+- **`loading`** — N/A for all read surfaces. Reads are on-device SQLite and render synchronously; CLAUDE.md forbids any blocking network call on a read path, so there is no async/skeleton/spinner state to design. (The one *label*-resolution wrinkle that looks loading-shaped — the unresolved default-type name — is captured as its own backstop row below, not a data-loading state.)
+- **`populated`** — the nominal populated state **is** the primary design contract above (Design System / Typography / Color / Copywriting). Not re-specified here.
 
 | Category | Element(s) | Status | Resolution / Reason |
 |----------|------------|--------|---------------------|
-| empty | Things-to-Remember surface (list-collection) | ✅ covered | Empty surface renders the documented "Nothing to remember yet" heading + body from Copywriting Contract, calm styling, no error treatment |
-| empty | Recently Deleted (list-collection) | ✅ covered | Empty trash renders the documented "Recently Deleted is empty" copy; the surface still exists (owned by this phase) even with zero rows |
-| empty | history drill-in backlist (list-collection) | ✅ covered | A current-only field with no prior values renders "No earlier entries"; the current value still shows above it |
-| error | custom-field value failing its type parser (form-input / static-content) | ✅ covered | Flagged value is preserved and rendered with the `accent + borderStrong` tap-to-fix emphasis + the documented inline error copy; never coerced or cleared (D-06) |
-| partial | Memory card with blank optional metadata (note/date/link/label absent) (static-content) | ✅ covered | Blank metadata consumes **no space** (master-handoff §140 "omits blank metadata"); the card renders only present fields — no empty rows, no form-like skeleton |
-| zero-one-many | repeatable group summary vs "View all" drill-in (list-collection) | ✅ covered | 0 → group omitted/summarized; 1–3 → inline; >3 → first ~3 + "View all" → full backlist. Cap is a declared constant, not per-screen |
-| long-text | long Memory value / note / relationship name (static-content) | 🧪 backstop | Long content **truncates** in the compact card (master-handoff §140) and shows in full on drill-in/detail; verify no overflow past card bounds at max OS text scale (reflow, never clip-shrink — THEME-07). Held-out visual UI-state check |
-| overflow | Off-Limits + AI sparkle + pin + outdated markers co-occurring on one card (static-content) | 🧪 backstop | All four indicators can be true at once; verify the marker row wraps/reflows and every marker keeps its ≥44px target and accessible label without colour-only encoding. Held-out visual check |
-| loading | default type name / "Memory" label resolution (static-content) | 🧪 backstop | User-facing type/label strings depend on the **unresolved** default built-in Memory type name (D-11); until the owner reconciles it, any copy naming the *default* type is insufficient-spec → surfaces as human_needed rather than a silent guess |
-| partial | reduced-motion + backup/restore round-trip of soft-deleted + history rows | ⚠ unresolved | Reduced-motion must simplify any Things-to-Remember/trash transitions (THEME-06); and backup/restore must preserve soft-deleted + history + pin + visibility + AI-permission fidelity (dossier §Q) — the planner treats these as assumptions to verify against the Phase-23 reduced-motion hook and the Phase-36 backup format, out of scope for pixel layout here |
+| empty | E1 Things-to-Remember | ✅ covered (explicit) | Renders the documented **"Nothing to remember yet"** heading + body (Copywriting Contract), calm styling, no error treatment |
+| empty | E2 Recently Deleted | ✅ covered (explicit) | Renders **"Recently Deleted is empty"**; the surface still exists (owned by this phase) with zero rows |
+| empty | E3 history drill-in backlist | ✅ covered (explicit) | A current-only field with no prior values renders **"No earlier entries"**; the current value still shows above it |
+| error | E5 custom-field value failing its type parser | ✅ covered (explicit) | Flagged value is **preserved and shown** with the `accent + borderStrong` tap-to-fix emphasis + inline error copy; never coerced or cleared (D-06). This is the phase's only genuine error state — E1/E2/E3/E7/E8 have no surface-level error path (local read cannot fail meaningfully; item-level errors surface here and render on the E4 card) |
+| error | E6 per-item AI toggle — global gate OFF | ✅ covered (explicit) | The two-gate "can't-act" state renders as a disabled/greyed toggle with helper **"Turn on AI in Settings first"** (D-08), not an error dialog |
+| partial | E4 Memory card with blank optional metadata (note/date/link/label absent) | ✅ covered (explicit) | Blank metadata consumes **no space** (master-handoff §140 "omits blank metadata"); the card renders only present fields — no empty rows, no form-like skeleton. Same rule governs partial cards on E1 |
+| zero-one-many | E8 repeatable-group summary vs "View all" drill-in | ✅ covered (explicit) | 0 → group omitted/summarized · 1–3 → inline · >3 → first ~3 + **"View all"** → full backlist. Cap is a declared constant, not per-screen. Governs the same many-vs-few decision on E1/E3 |
+| long-text | E4 long Memory value / note / relationship name | 🧪 backstop | Long content **truncates** on the compact card (master-handoff §140) and shows in full on drill-in/detail; verify no overflow past card bounds at **max OS text scale** (reflow, never clip-shrink — THEME-07). Also governs long values in E5 widgets and long option labels in E7 (ellipsis in-row). Held-out visual UI-state check |
+| overflow | E4 Off-Limits + AI sparkle + pin + outdated markers co-occurring on one card | 🧪 backstop | All four indicators can be true at once; verify the marker row **wraps/reflows**, every marker keeps its ≥44px target and accessible label, and no state is colour-only encoded. Held-out visual check |
+| loading | default/general built-in Memory **type name** resolution (label, not data) | 🧪 backstop → human_needed | User-facing copy naming the *default* type depends on the **unresolved** default built-in Memory type name (D-11); until the owner reconciles it (needed before the Rapid Capture phase, not here), such copy is insufficient-spec and must surface as `human_needed` at verify time — never a silent guess |
+| partial | reduced-motion behavior + backup/restore round-trip fidelity of soft-deleted / history / pin / visibility / AI-permission rows | ⚠ unresolved — planner must treat as assumption | Reduced-motion must simplify any Things-to-Remember / trash transitions (THEME-06); backup/restore must preserve soft-deleted + history + pin + visibility + per-item AI-permission fidelity (dossier §Q). Both are cross-phase seams — verify against the Phase-23 reduced-motion hook and the Phase-36 backup format; out of scope for pixel layout here |
 
 ---
 
@@ -147,11 +153,11 @@ Not applicable — no shadcn, no third-party UI registry. Icons come from the in
 
 ## Checker Sign-Off
 
-- [ ] Dimension 1 Copywriting: PASS
-- [ ] Dimension 2 Visuals: PASS
-- [ ] Dimension 3 Color: PASS
-- [ ] Dimension 4 Typography: PASS
-- [ ] Dimension 5 Spacing: PASS
-- [ ] Dimension 6 Registry Safety: PASS
+- [x] Dimension 1 Copywriting: PASS
+- [x] Dimension 2 Visuals: PASS
+- [x] Dimension 3 Color: PASS
+- [x] Dimension 4 Typography: PASS
+- [x] Dimension 5 Spacing: PASS
+- [x] Dimension 6 Registry Safety: PASS
 
-**Approval:** pending
+**Approval:** APPROVED (gsd-ui-checker, 2026-09-03) — 6/6 dimensions PASS, all token/registry claims verified against disk. No blocking issues.
