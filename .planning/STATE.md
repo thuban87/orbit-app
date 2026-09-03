@@ -5,11 +5,11 @@ milestone_name: Release Readiness
 current_phase: 23
 current_phase_name: Theme & Visual System
 status: executing
-stopped_at: Completed 23-03-PLAN.md
-last_updated: "2026-09-03T17:09:16.000Z"
+stopped_at: Completed 23-04-PLAN.md
+last_updated: "2026-09-03T18:20:00.000Z"
 last_activity: 2026-09-03
-last_activity_desc: Executed 23-03 (four palettes + curated per-mode accent system + WCAG AA split gate; 2 galaxy-dark danger/onDanger AA misses flagged for owner)
-state_head: 1c4c38e
+last_activity_desc: Executed 23-04 (live reduced-motion signal — AccessibilityInfo→SharedValue controller + boolean twin, no per-frame setState; semantic motion/easing tokens)
+state_head: 552cb36
 progress:
   total_phases: 19
   completed_phases: 1
@@ -30,9 +30,9 @@ final source verification and standalone-release Android UAT.
 ## Current Position
 
 Phase: 23 (Theme & Visual System) — EXECUTING
-Plan: 4 of 7
-Status: Executing Phase 23 — 23-03 complete (2 galaxy-dark danger/onDanger AA misses flagged for owner — see 23-03-SUMMARY Owner Escalations)
-Last activity: 2026-09-03 — Executed 23-03 (four palettes + curated per-mode accent system + WCAG AA split gate)
+Plan: 5 of 7
+Status: Executing Phase 23 — 23-04 complete (live reduced-motion SharedValue controller + boolean twin + motion tokens; THEME-06/D-07 satisfied, unblocks Plan 06 Skia consumers)
+Last activity: 2026-09-03 — Executed 23-04 (reduced-motion signal + motion/easing tokens)
 Progress: 0/19 phases complete (v2.0)
 
 **Milestone v2.0 structure (pre-decided by the owner from the fifteen milestone-2 dossiers + the
@@ -169,6 +169,7 @@ at plan time. All new durable preferences are `app_settings` columns, never Asyn
 | Phase 23 P01 | 45m | 1 task | 25 files |
 | Phase 23 P02 | 20m | 3 tasks | 13 files |
 | Phase 23 P03 | 16m | 3 tasks | 9 files |
+| Phase 23 P04 | 8m | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -351,6 +352,7 @@ Foundational decisions affecting current work:
 - [Phase 22]: Picker favourites are a boolean membership band; recency and name, never favourite rank, determine visible order.
 - [Phase 22]: Quick Log feedback is keyed solely to the resolved canonical recordTouchpoint transaction; Undo reuses deleteTouchpoint.
 - [Phase 22]: Shell-originated interaction changes use a non-persisted app-level revision rather than Dashboard's connection-scoped SQLite notification.
+- [Phase 23]: 23-04: the live OS reduced-motion signal (THEME-06/D-05/D-07). The subscribe/seed/cleanup logic is EXTRACTED into `createReducedMotionController(accessibilityInfo, emit): { dispose() }` — a plain, non-React controller with `emit` as the SECOND ARGUMENT (called once with the seeded value, again on every `reduceMotionChanged`) and `dispose()` as the only returned member, so it is node-testable with a mock accessibilityInfo + spy emit (repo has Vitest, no react-test-renderer). Signal source = `AccessibilityInfo.isReduceMotionEnabled()` (seed) + `addEventListener('reduceMotionChanged')` (live), NOT reanimated's boot-time `useReducedMotion()` (RESEARCH Pitfall 1). `useReducedMotionShared()` writes a `useSharedValue<boolean>` `.value` (never setState) so the Skia loop reads it via `useDerivedValue` with no per-frame re-render; `useReducedMotion()` is a separate state-backed boolean twin for React-tree crossfade-vs-instant decisions — Skia never driven from the boolean. Each hook owns ONE controller instance (own listener, no shared subscription); a post-dispose seed resolve is disposed-flag-guarded (T-23-07). Motion tokens (motion.ts) = MOTION fast(120)/base(200)/slow(320) ms durations + `ambient` per-second SPEED constant (a rate, NOT a duration — the exact shape Plan 06's Orrery worklet multiplies into useDerivedValue; tunable via top-of-file AMBIENT_SPEED) + EASING standard/decelerate pure-data descriptors (no reanimated Easing import — node-importable/RN-free). Consumers import `@/theme/use-reduced-motion` + `@/theme/tokens/motion` directly (no barrel edit). 11 node tests; tsc + check:colors + full suite (2035) green; no deviations. Device UAT (toggle OS reduced motion mid-session → Plan 06 ambient halts live) deferred to end-of-phase Pixel pass (no Plan 06 consumer exists yet). 2 commits (ea314b3 hook; 552cb36 tokens).
 
 ### Pending Todos
 
