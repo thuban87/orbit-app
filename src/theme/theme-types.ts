@@ -35,25 +35,67 @@ export type ResolvedMode = "light" | "dark";
  */
 export type SystemScheme = "light" | "dark" | "unspecified" | null | undefined;
 
-/** The 11 base dynamic tokens every theme preset defines. */
+/**
+ * The base dynamic tokens every theme preset defines.
+ *
+ * Base scalar tokens (14): background, surface, surfaceElevated, the accent
+ * OVERLAY trio (accent = fill / onAccent / accentText), textPrimary,
+ * textSecondary, border, borderStrong, and the destructive PAIR (danger fill /
+ * onDanger foreground). The accent trio is SEEDED per preset with the package
+ * default accent's mode-resolved tone and OVERLAID at render by the provider
+ * with the active accent (Plan 03); `onDanger` is authored per palette and is
+ * NOT overlay-provided. The remaining members are the array/status/orrery seed
+ * tokens below.
+ */
 export interface ThemePalette {
   background: string;
   surface: string;
   surfaceElevated: string;
+  /**
+   * The filled-accent background (Primary button / active state). SEEDED per
+   * preset with the package default accent's mode-resolved `fill` and OVERLAID
+   * at render by the provider with the active package's accent (Plan 03 /
+   * THEME-02). Consumers reading `useTheme().colors.accent` get `fill`.
+   */
   accent: string;
+  /**
+   * The foreground drawn ON the `accent` fill (Primary button label/glyph).
+   * SEEDED with the default accent's mode `onAccent`, OVERLAID at render. Tuned
+   * to meet AA (>=4.5) against `accent`; distinct from `onDanger` (whose values
+   * are tuned for the destructive `danger` fill, never reused here).
+   */
+  onAccent: string;
+  /**
+   * The accent-as-text/link tone for THIS palette's background (Tertiary/text
+   * role). SEEDED with the default accent's mode `text`, OVERLAID at render.
+   * Tuned to meet AA (>=4.5) against `background`/`surface`; one hex cannot be
+   * AA on both a dark and a light background, hence a per-mode tone (THEME-02).
+   */
+  accentText: string;
   textPrimary: string;
   textSecondary: string;
   border: string;
   borderStrong: string;
   /**
-   * Destructive/danger emphasis (owner-approved #E5484D, 2026-08-14). Used by
-   * in-app rendered destructive controls (the Archived "Delete permanently"
-   * button) and validation/warning emphasis (invalid interval, future date,
-   * duplicate-name). The native `Alert.alert` `style: "destructive"` needs no
-   * token (OS-rendered). Added in Phase-4 wave 1 so Plans 03/04/06/09 consume
-   * it via `useTheme().colors.danger`; none re-adds it.
+   * Destructive/danger emphasis (galaxy-dark = owner-approved #E5484D,
+   * 2026-08-14; the other three palettes author their own AA-passing hue). Used
+   * as the destructive-control FILL (with `onDanger` as its label/glyph
+   * foreground) AND as validation/warning-emphasis TEXT (invalid interval,
+   * future date, duplicate-name). The native `Alert.alert` `style:
+   * "destructive"` needs no token (OS-rendered). Consumed via
+   * `useTheme().colors.danger`.
    */
   danger: string;
+  /**
+   * The named destructive FOREGROUND drawn on the `danger` fill (Plan 07's
+   * Destructive Button / ConfirmDialog label + warning glyph). AUTHORED per
+   * palette (NOT overlay-provided), distinct from the accent `onAccent` — reusing
+   * onAccent would draw the configurable-accent foreground on the fixed
+   * destructive fill. Tuned to meet AA (>=4.5) against `danger` in the three
+   * newly-authored palettes; the galaxy-dark pair (near-white on #E5484D ≈3.9:1)
+   * is an owner-decision flag, never auto-retuned (REVIEWS 23-03/23-07 cycle-4).
+   */
+  onDanger: string;
   /**
    * Deterministic initials-avatar swatch set (PHOTO-04). The predecessor plugin
    * coloured avatars with a free `hsl(hash(name) % 360, 65%, 45%)`, which the
@@ -168,16 +210,17 @@ export interface ThemePalette {
 }
 
 /**
- * A theme preset, now keyed by `ThemePackage`. `dark` is required — the app is
- * dark-first this phase — while `light` is optional so `resolvePalette` can fall
- * back to `dark` until each package's light palette is authored (Plan 03 makes
- * `light` required once the four palettes are authored).
+ * A theme preset, keyed by `ThemePackage`. Both `dark` and `light` are REQUIRED
+ * (Plan 03 authored all four palettes — galaxy dark+light, standard dark+light),
+ * so `resolvePalette`'s former dark-fallback for a missing `light` is no longer
+ * load-bearing: every (package, mode) pair resolves to a distinct authored
+ * palette.
  */
 export interface ThemePreset {
   id: ThemePackage;
   name: string;
   dark: ThemePalette;
-  light?: ThemePalette;
+  light: ThemePalette;
 }
 
 /**

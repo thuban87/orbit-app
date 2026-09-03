@@ -57,14 +57,19 @@ describe("resolvePalette", () => {
     );
   });
 
-  it("falls back to the dark palette when the requested mode is absent", () => {
-    // Only dark palettes ship this phase, so "light" deterministically returns
-    // the SAME dark palette — proving "light"/"system" are DEFINED, never
-    // undefined (Plan 03 authors the light palettes and makes `light` required).
+  it("resolves 'light' to the AUTHORED light palette (dark-fallback retired, Plan 03)", () => {
+    // Plan 03 authored all four palettes and made `light` required, so "light"
+    // now returns the package's OWN light palette — never the dark fallback.
     expect(resolvePalette(DEFAULT_PRESET_ID, "light")).toBe(
+      THEME_PRESETS[DEFAULT_PRESET_ID].light,
+    );
+    expect(resolvePalette(DEFAULT_PRESET_ID, "light")).not.toBe(
       THEME_PRESETS[DEFAULT_PRESET_ID].dark,
     );
     expect(resolvePalette("standard", "light")).toBe(
+      THEME_PRESETS.standard.light,
+    );
+    expect(resolvePalette("standard", "light")).not.toBe(
       THEME_PRESETS.standard.dark,
     );
   });
@@ -210,5 +215,104 @@ describe("orrery theme tokens (ORR-04/ORR-05, UI-SPEC seeds)", () => {
         expect(preset.dark[token].length).toBeGreaterThan(0);
       }
     }
+  });
+});
+
+describe("four authored palettes — light required, all distinct + complete (Plan 03)", () => {
+  // Every SCALAR string token a complete ThemePalette must carry (arrays are
+  // asserted separately below). Includes the accent overlay trio
+  // (accent/onAccent/accentText, seeded per palette) and the destructive pair
+  // (danger/onDanger) added in Plan 03.
+  const SCALAR_TOKENS = [
+    "background",
+    "surface",
+    "surfaceElevated",
+    "accent",
+    "onAccent",
+    "accentText",
+    "textPrimary",
+    "textSecondary",
+    "border",
+    "borderStrong",
+    "danger",
+    "onDanger",
+    "avatarSwatchText",
+    "rogue",
+    "statusStable",
+    "statusWobble",
+    "statusDecay",
+    "mutedStable",
+    "mutedWobble",
+    "mutedDecay",
+    "rogueExtinguished",
+  ] as const;
+  const ARRAY_TOKENS = [
+    "avatarSwatches",
+    "gravityTiers",
+    "starPalette",
+  ] as const;
+
+  const combos = [
+    ["galaxy", "dark"],
+    ["galaxy", "light"],
+    ["standard", "dark"],
+    ["standard", "light"],
+  ] as const;
+
+  it("resolves all four (package, mode) combos to DISTINCT palette objects", () => {
+    const resolved = combos.map(([pkg, mode]) => resolvePalette(pkg, mode));
+    // Every pair is a distinct object reference (no two combos share a palette).
+    for (let i = 0; i < resolved.length; i++) {
+      for (let j = i + 1; j < resolved.length; j++) {
+        expect(resolved[i]).not.toBe(resolved[j]);
+      }
+    }
+    // And galaxy vs standard at the SAME mode never collapse to one palette.
+    expect(resolvePalette("galaxy", "dark")).not.toBe(
+      resolvePalette("standard", "dark"),
+    );
+    expect(resolvePalette("galaxy", "light")).not.toBe(
+      resolvePalette("standard", "light"),
+    );
+  });
+
+  it("light is REQUIRED and returns the authored light palette, NOT the dark fallback", () => {
+    for (const preset of Object.values(THEME_PRESETS)) {
+      expect(preset.light).toBeDefined();
+      // The retired dark-fallback: light must be its OWN palette, not dark.
+      expect(preset.light).not.toBe(preset.dark);
+      expect(preset.light.background).not.toBe(preset.dark.background);
+    }
+    // resolvePalette(pkg, "light") now returns the light palette, never dark.
+    expect(resolvePalette("galaxy", "light")).toBe(THEME_PRESETS.galaxy.light);
+    expect(resolvePalette("standard", "light")).toBe(
+      THEME_PRESETS.standard.light,
+    );
+  });
+
+  it("every one of the four palettes carries the COMPLETE token set (incl. onDanger)", () => {
+    for (const [pkg, mode] of combos) {
+      const palette = resolvePalette(pkg, mode);
+      for (const token of SCALAR_TOKENS) {
+        expect(typeof palette[token]).toBe("string");
+        expect((palette[token] as string).length).toBeGreaterThan(0);
+      }
+      for (const token of ARRAY_TOKENS) {
+        expect(Array.isArray(palette[token])).toBe(true);
+        expect((palette[token] as readonly string[]).length).toBeGreaterThan(0);
+      }
+      // onDanger is the net-new destructive foreground — assert it explicitly so
+      // a palette omitting it fails loudly (not just via the loop above).
+      expect(typeof palette.onDanger).toBe("string");
+      expect(palette.onDanger.length).toBeGreaterThan(0);
+    }
+  });
+
+  it("galaxy-dark keeps its owner-approved danger fill and the former accent fill", () => {
+    const gd = resolvePalette("galaxy", "dark");
+    // Owner-approved destructive hue (2026-08-14) is untouched by Plan 03.
+    expect(gd.danger).toBe("#E5484D");
+    // accent(=fill) stays the former single accent so consumers see no regression.
+    expect(gd.accent).toBe("#6C8CFF");
   });
 });

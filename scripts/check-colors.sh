@@ -40,7 +40,14 @@ pattern="#[0-9a-fA-F]{3,8}\b|rgba?\(|hsla?\(|${quote}${named}${quote}"
 # anchored to the path field (everything before grep's first `:` = path:lineno:content)
 # so a forbidden literal on a non-theme line that merely mentions "/theme/" in its
 # content (e.g. a comment or import) is NOT evaded (WR-01).
-matches=$(grep -rEniI \
+#
+# `-H` FORCES the filename prefix on EVERY match. Without it, grep omits the
+# filename when handed a SINGLE file argument (`check:colors src/theme/foo.ts`),
+# which strips the `path:` field the `/theme/` exemption anchors to — so a lone
+# theme file would be reported as a violation even though it is the sanctioned
+# colour-literal location. `-H` makes the exemption behave identically for a
+# single file, a multi-file list, and a directory recursion.
+matches=$(grep -rEniIH \
   --include='*.ts' --include='*.tsx' \
   "$pattern" \
   "${existing[@]}" 2>/dev/null \
