@@ -1,19 +1,19 @@
 ---
-status: testing
+status: passed
 phase: 22-app-shell-navigation
 source: [22-VERIFICATION.md]
 started: 2026-09-03T05:29:53Z
-updated: 2026-09-03T05:29:53Z
+updated: 2026-09-03T06:33:54Z
 ---
 
 ## Current Test
 
-number: 2
-name: Semantic haptics
+number: none
+name: All tests passed
 expected: |
-  FAB open feels light; committed Quick Log feels successful; an ordinary write
-  failure has no haptic.
-awaiting: user response
+  TalkBack traversal, semantic haptics, and the release-build widget refresh
+  have each been confirmed on-device.
+awaiting: none
 
 ## Tests
 
@@ -27,26 +27,24 @@ result: passed (owner-confirmed 2026-09-03; spoken traversal worked well)
 
 expected: FAB open feels light; committed Quick Log feels successful; an ordinary
 write failure has no haptic.
-result: pending
+result: passed (owner-confirmed 2026-09-03)
 
 ### 3. Visible widget refresh
 
 expected: The launcher widget visibly refreshes after successful Quick Log and
 after Undo, without manually reopening Orbit.
-result: pending
+result: passed (owner-confirmed 2026-09-03 on the standalone release APK)
 
 ## Summary
 
 total: 3
-passed: 1
+passed: 3
 issues: 0
-pending: 2
+pending: 0
 skipped: 0
 blocked: 0
 
 ## Gaps
 
-TalkBack modal traversal passed on 2026-09-03. The widget observation attempted
-against a debug app served by Questboard's Metro port and was invalid for Orbit;
-it remains pending against the new standalone release APK. Code and automated
-tests are green.
+All three sensory checks passed on 2026-09-03. The final widget check used the
+standalone release APK, avoiding the earlier invalid Questboard Metro result.
