@@ -75,6 +75,8 @@ Declared values (multiples of 4). Principle (dossier §J): **compact within comp
 | xl | 32px | Major layout gaps |
 | 2xl | 48px | Major section breaks / presentation screens |
 
+**`md = 12px` justification:** kept intentionally, though outside the strict 4/8/16/24/32/48 standard set. It is fully grid-aligned (a multiple of 4) and serves a real, recurring need — row inner padding and inline control gaps — where `sm` (8px) is too tight and `base` (16px) too loose for dense list/row layouts (dossier §J: compact within components). `64` (a value in the recommended standard set) is intentionally not adopted — no layout in this primitives phase needs a gap that large; acceptable.
+
 Exceptions:
 - **Minimum touch target 44×44px** (Android a11y / dossier §Q) — a target-size floor, not a spacing token. Icon-only buttons pad up to 44 even when the glyph is 24.
 - User-controlled density is **out of scope** — density is fixed "moderate" (dossier §J, deferred list).
@@ -100,15 +102,17 @@ Orbit intentionally embraces a **very rounded** visual language (dossier §I —
 
 ## Typography
 
-Five semantic roles (dossier §H mandates display / heading / body / label / caption). Roles are font-family-remappable per theme without screen rewrites. Sizes respect system text scaling and **reflow before truncation or shrinking** (THEME-07). *(All values discretion.)*
+Five semantic roles (dossier §H mandates display / heading / body / label / caption) over **exactly four distinct sizes** (28 / 20 / 16 / 14). Roles are font-family-remappable per theme without screen rewrites. Sizes respect system text scaling and **reflow before truncation or shrinking** (THEME-07). *(All values discretion.)*
 
-| Role | Family | Size | Weight | Line Height |
-|------|--------|------|--------|-------------|
-| Display | Space Grotesk | 28px | SemiBold (600) | 1.2 |
-| Heading | Space Grotesk | 20px | SemiBold (600) | 1.25 |
-| Body | Inter | 16px | Regular (400) | 1.5 |
-| Label | Inter | 14px | SemiBold (600) | 1.4 |
-| Caption | Inter | 13px | Regular (400) | 1.4 |
+| Role | Family | Size | Weight | Color | Line Height |
+|------|--------|------|--------|-------|-------------|
+| Display | Space Grotesk | 28px | SemiBold (600) | `textPrimary` | 1.2 |
+| Heading | Space Grotesk | 20px | SemiBold (600) | `textPrimary` | 1.25 |
+| Body | Inter | 16px | Regular (400) | `textPrimary` | 1.5 |
+| Label | Inter | 14px | SemiBold (600) | `textPrimary` | 1.4 |
+| Caption | Inter | 14px | Regular (400) | `textSecondary` | 1.4 |
+
+**Four distinct sizes across five roles (dossier §H requires five semantic ROLES, not five sizes).** Label and Caption share the 14px step and are differentiated by **weight and color** instead of size: Label is SemiBold (600) on `textPrimary`; Caption is Regular (400) on `textSecondary`. This keeps a clear hierarchical step at every size (no 1px near-collision) while preserving all five roles.
 
 **Weights: exactly two — Regular (400) and SemiBold (600).** No other weights ship this phase.
 
