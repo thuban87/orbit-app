@@ -63,6 +63,7 @@ import {
   useThemeStore,
 } from "@/stores/theme-store";
 import { ThemeProvider, useTheme } from "@/theme";
+import { loadAppFonts } from "@/theme/fonts";
 import { hydrateThemeAtBoot } from "@/theme/hydrate-theme-at-boot";
 import { Logger } from "@/utils/logger";
 
@@ -162,13 +163,22 @@ function AppShell() {
         // (restore-before-paint, no wrong-theme flash). The coordinator is
         // internally error-isolated (getItem/parse/clear/write failures are
         // non-fatal), so a legacy-import hiccup never blocks boot.
-        const settings = await hydrateThemeAtBoot({
-          getItem: (key) => AsyncStorage.getItem(key),
-          removeItem: (key) => AsyncStorage.removeItem(key),
-          getAppSettings: () => getAppSettings(getExecutor()),
-          updateAppSettings: (patch) =>
-            updateAppSettings(getExecutor(), patch, localDateTime()),
-        });
+        //
+        // The expo-font load (THEME-07) is folded into the SAME ready gate — run
+        // in parallel with the theme read so first paint carries the real fonts.
+        // `loadAppFonts()` RESOLVES even on a font-load failure (degrade to the
+        // system font), so it can never reach this effect's `.catch` or block
+        // boot in the startup-error state (REVIEWS 23-02 MEDIUM).
+        const [settings] = await Promise.all([
+          hydrateThemeAtBoot({
+            getItem: (key) => AsyncStorage.getItem(key),
+            removeItem: (key) => AsyncStorage.removeItem(key),
+            getAppSettings: () => getAppSettings(getExecutor()),
+            updateAppSettings: (patch) =>
+              updateAppSettings(getExecutor(), patch, localDateTime()),
+          }),
+          loadAppFonts(),
+        ]);
         if (!active) return;
         useThemeStore.getState().hydrate(themeSelectionFromSettings(settings));
         setReady(true);

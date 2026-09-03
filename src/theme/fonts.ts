@@ -59,14 +59,12 @@ async function defaultLoad(): Promise<void> {
  * Load the app fonts, degrading to the system font on any failure. ALWAYS
  * resolves (never rejects) so the boot ready gate can await it unconditionally.
  */
-export async function loadAppFonts(load: FontLoader = defaultLoad): Promise<void> {
+export async function loadAppFonts(
+  load: FontLoader = defaultLoad,
+): Promise<void> {
   try {
     await load();
   } catch (err) {
-    Logger.error(
-      LOG_SCOPE,
-      "font load failed; degrading to system font",
-      err,
-    );
+    Logger.error(LOG_SCOPE, "font load failed; degrading to system font", err);
   }
 }
