@@ -43,7 +43,7 @@ category's phase (see Traceability).
 - [x] **THEME-07**: Text respects system text scaling by reflowing rather than truncating or shrinking
 - [ ] **THEME-08**: Relationship statuses keep stable semantic hue families across themes, each with its own distinct silhouette glyph — state is never conveyed by color alone
 - [ ] **THEME-09**: All screens draw icons through a centralized semantic icon registry supporting state variants, so custom icon art can be swapped later without broad rewrites
-- [ ] **THEME-10**: Modals/sheets come from shared variants and buttons follow a formal hierarchy (Primary/Secondary/Tertiary/Destructive/Icon-only), with destructive actions visually distinct beyond color
+- [x] **THEME-10**: Modals/sheets come from shared variants and buttons follow a formal hierarchy (Primary/Secondary/Tertiary/Destructive/Icon-only), with destructive actions visually distinct beyond color
 - [ ] **THEME-11**: Functional content meets strong AA-equivalent contrast in every supported theme/mode combination
 - [x] **THEME-12**: The Orrery follows the active theme package with a more immersive treatment while still resolving through shared tokens and honoring accessibility
 - [ ] **THEME-13**: Theme preferences persist durably on-device and survive backup and restore (portable settings, replacing the old device-local storage)

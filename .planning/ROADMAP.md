@@ -219,7 +219,7 @@ All v1.0 commits are local on `main` and have NOT been pushed.
 
 **Wave 4** *(blocked on Wave 3 completion)*
 
-- [ ] 23-07-PLAN.md — Modal/sheet variants + button hierarchy (destructive beyond colour) [THEME-10]
+- [x] 23-07-PLAN.md — Modal/sheet variants + button hierarchy (destructive beyond colour) [THEME-10]
 
 **UI hint**: yes
 
@@ -508,7 +508,7 @@ All v1.0 commits are local on `main` and have NOT been pushed.
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 22. App Shell & Navigation | 6/6 | In Progress|  |
-| 23. Theme & Visual System | 5/7 | In Progress | - |
+| 23. Theme & Visual System | 7/7 | In Progress | - |
 | 24. Contact Knowledge Foundation | 0/TBD | Not started | - |
 | 25. Dashboard Data & State Foundation | 0/TBD | Not started | - |
 | 26. Dashboard Control Surface | 0/TBD | Not started | - |

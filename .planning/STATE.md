@@ -5,16 +5,16 @@ milestone_name: Release Readiness
 current_phase: 23
 current_phase_name: Theme & Visual System
 status: executing
-stopped_at: Completed 23-06-PLAN.md
-last_updated: "2026-09-03T17:55:00.000Z"
+stopped_at: Completed 23-07-PLAN.md
+last_updated: "2026-09-03T18:30:00.000Z"
 last_activity: 2026-09-03
-last_activity_desc: Executed 23-06 (background slot manifest + per-package glass/flat surface tokens + BackgroundHost/GlassSurface primitives with graceful blur/asset-fail fallbacks + composited per-asset AA; every Orrery clock consumer — canvas twinkle/drift + sun glow pulse — gated on the reduced-motion SharedValue; THEME-04/05/12)
+last_activity_desc: Executed 23-07 (formal five-role Button hierarchy — Primary/Secondary/Tertiary/Destructive/IconOnly — with token colour, 44px touch floor, and destructive-beyond-colour via danger fill + reserved `warning` glyph + NAMED onDanger foreground; shared Modal/Sheet/ConfirmDialog overlay variants sharing scrim=colors.background-at-opacity + an explicit Android Back/scrim dismissal contract, destructive ConfirmDialog explicit-choice-only; THEME-10 at primitive level, adoption deferred to Phase-15)
 state_head: 180e8eb
 progress:
   total_phases: 19
   completed_phases: 1
   total_plans: 13
-  completed_plans: 10
+  completed_plans: 11
 ---
 
 # Project State
@@ -29,10 +29,10 @@ final source verification and standalone-release Android UAT.
 
 ## Current Position
 
-Phase: 23 (Theme & Visual System) — EXECUTING
-Plan: 7 of 7
-Status: Executing Phase 23 — 23-06 complete (background slot manifest keyed by the imported BACKGROUND_SLOT_IDS single source; per-package glass/flat SURFACE tokens with composited per-asset AA + token-only resolveSurfaceStyle; BackgroundHost fixed-behind-scroll + density scrim + onError->None/Solid; GlassSurface glass/flat with graceful expo-blur fallback; OrreryCanvas twinkle + SunBody glow pulse both gated on the reduced-motion SharedValue; THEME-04/05/12 delivered as primitives+behaviors, app-wide mount deferred to renderer/Phase-15, Appearance UI Phase 37)
-Last activity: 2026-09-03 — Executed 23-06 (backgrounds + glass/flat surfaces + Orrery reduced-motion gating)
+Phase: 23 (Theme & Visual System) — all 7 plans executed (end-of-phase verify/UI-review/device-UAT pending)
+Plan: 7 of 7 — 23-07 complete
+Status: 23-07 complete (Button five-role hierarchy in one API — Primary/Secondary/Tertiary/Destructive/IconOnly — resolving colour from useTheme() tokens, 44px min touch target, destructive distinct beyond colour = danger fill + reserved `warning` registry glyph + the NAMED onDanger foreground, never onAccent/a literal; pure RN-free button-roles.ts sibling node-tested for the role->token wiring + icon-only a11y contract; shared overlay-base owns scrim=colors.background-at-opacity + the Android lifecycle contract, composed by full-screen Modal / compact+detail Sheet / ConfirmDialog; destructive ConfirmDialog is explicit-choice-only — no scrim/Back dismissal — while non-destructive overlays dismiss on both; THEME-10 delivered at primitive level, adoption into existing destructive flows/screens deferred to renderer/Phase-15)
+Last activity: 2026-09-03 — Executed 23-07 (Button hierarchy + Modal/Sheet/ConfirmDialog variants + destructive-beyond-colour)
 Progress: 0/19 phases complete (v2.0)
 
 **Milestone v2.0 structure (pre-decided by the owner from the fifteen milestone-2 dossiers + the
@@ -172,6 +172,7 @@ at plan time. All new durable preferences are `app_settings` columns, never Asyn
 | Phase 23 P04 | 8m | 2 tasks | 4 files |
 | Phase 23 P05 | 8m | 2 tasks | 8 files |
 | Phase 23 P06 | 14m | 3 tasks | 15 files |
+| Phase 23 P07 | 12m | 2 tasks | 8 files |
 
 ## Accumulated Context
 
