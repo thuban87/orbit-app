@@ -6,8 +6,8 @@ score: 4/5 must-haves verified
 behavior_unverified: 1
 behavior_unverified_items:
   - truth: "Shell controls have correct modal/focus behavior and semantic haptics in the live Android accessibility environment."
-    test: "Run the remaining TalkBack, haptic, and widget-refresh checks on the Pixel."
-    expected: "Focus remains inside each open modal, haptics match the documented actions, and the widget visibly refreshes after Quick Log and Undo."
+    test: "Run the remaining haptic and widget-refresh checks on the Pixel."
+    expected: "Haptics match the documented actions and the widget visibly refreshes after Quick Log and Undo."
     why_human: "The render-free test environment cannot mount React Native UI, run TalkBack, feel haptics, or observe an Android widget."
 ---
 
@@ -28,7 +28,7 @@ behavior_unverified_items:
 | 2 | System and visible Back are transient-first and preserve nested/origin-aware routes and safe external fallbacks. | ✓ VERIFIED | `RootNavigator` registers the shell Back handler; `ShellAppBar` and `back-intent` share the resolver; nested reset, notification, and widget suites pass. Device UAT confirmed the app bundle and shell navigation paths. |
 | 3 | The six-action FAB has fixed labels/order, preselects Profile context, and otherwise uses the shared picker. | ✓ VERIFIED | `UNIVERSAL_FAB_ACTIONS` is an immutable six-item list; `UniversalFab` maps all items through the typed resolver; the picker is a reusable modal with local search/order logic. Targeted FAB/picker tests pass. |
 | 4 | Quick Log is commit-truthful and supports canonical Undo/Retry without a global overlapping-Undo race. | ✓ VERIFIED | `recordTouchpoint` success is handled only in its resolve path; `deleteTouchpoint` is the canonical Undo writer. The per-interaction controller accepts B while A is pending, proven by the held-promise regression test. Full suite passes (197 files, 1,877 tests). |
-| 5 | Shell chrome, accessibility semantics, focus management, and haptics work correctly in the live Android environment. | ⚠️ PRESENT_BEHAVIOR_UNVERIFIED | Code contains semantic labels, ≥44px action targets, `accessibilityViewIsModal`, explicit focus restoration, and documented semantic haptic calls. Prior Pixel UAT and accessibility-tree inspection cover much of the surface, but live TalkBack audio/focus traversal, perceived haptics, and visible widget refresh have not been human-confirmed. |
+| 5 | Shell chrome, accessibility semantics, focus management, and haptics work correctly in the live Android environment. | ⚠️ PRESENT_BEHAVIOR_UNVERIFIED | Code contains semantic labels, ≥44px action targets, `accessibilityViewIsModal`, explicit focus restoration, and documented semantic haptic calls. TalkBack traversal was owner-confirmed on 2026-09-03; perceived haptics and visible widget refresh remain sensory-only. |
 
 **Score:** 4/5 truths verified (1 present, behavior-unverified)
 
@@ -75,7 +75,7 @@ behavior_unverified_items:
 | SHELL-11 | ✓ SATISFIED | Commit-only success, canonical Undo, Retry, and overlapping-Undo regression coverage pass. |
 | SHELL-12 | ✓ SATISFIED | Dashboard header and overflow expose Group Events and Archived Contacts. |
 | SHELL-13 | ✓ SATISFIED | Shell app bars and measured content/bottom clearance are wired. |
-| SHELL-14 | ? NEEDS HUMAN | Source/a11y-tree evidence is sound; live TalkBack, haptic, and visible widget behavior remain sensory-only. |
+| SHELL-14 | ? NEEDS HUMAN | Source/a11y-tree evidence is sound and TalkBack traversal passed; haptic and visible widget behavior remain sensory-only. |
 | SHELL-15 | ✓ SATISFIED | Fade transition is configured; Pixel UAT observed the four-tab shell. |
 
 **Coverage:** 14/15 requirements satisfied; 1 requires final human confirmation.
@@ -92,15 +92,9 @@ Targeted verification: 9 files, 140 tests passed. Full verification: `npm test` 
 
 ## Human Verification Required
 
-### 1. TalkBack modal traversal
+TalkBack modal traversal was confirmed by the owner on 2026-09-03: spoken traversal worked well. The remaining checks are:
 
-**Test:** Enable TalkBack, open the speed dial and contact picker, traverse controls, then close each.
-
-**Expected:** Focus is contained in the open transient; each action and picker row has a useful label; closing restores focus to the FAB.
-
-**Why human:** Accessibility-tree attributes do not prove spoken order or audible announcements.
-
-### 2. Semantic haptics
+### 1. Semantic haptics
 
 **Test:** Feel the FAB opening, a successful Quick Log, and a failed/retried Quick Log path.
 
@@ -108,7 +102,7 @@ Targeted verification: 9 files, 140 tests passed. Full verification: `npm test` 
 
 **Why human:** Perceived Android haptics cannot be observed in the render-free test environment.
 
-### 3. Visible widget refresh
+### 2. Visible widget refresh
 
 **Test:** With the Orbit widget on the launcher, Quick Log then Undo a contact.
 
@@ -118,7 +112,7 @@ Targeted verification: 9 files, 140 tests passed. Full verification: `npm test` 
 
 ## Gaps Summary
 
-No source or automated-test gaps found. The phase is held only for the three human-sensory Android checks above.
+No source or automated-test gaps found. The phase is held only for the two remaining human-sensory Android checks above.
 
 ## Verification Metadata
 
@@ -126,7 +120,7 @@ No source or automated-test gaps found. The phase is held only for the three hum
 
 **Automated checks:** 9 targeted files / 140 tests, full suite 197 files / 1,877 tests, TypeScript, color-token, Biome, and diff checks passed.
 
-**Human checks required:** 3
+**Human checks required:** 2
 
 ---
 

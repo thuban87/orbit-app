@@ -8,11 +8,11 @@ updated: 2026-09-03T05:29:53Z
 
 ## Current Test
 
-number: 1
-name: TalkBack modal traversal
+number: 2
+name: Semantic haptics
 expected: |
-  Focus remains within the open speed dial or picker, controls are spoken with
-  useful labels, and closing returns focus to the FAB.
+  FAB open feels light; committed Quick Log feels successful; an ordinary write
+  failure has no haptic.
 awaiting: user response
 
 ## Tests
@@ -21,7 +21,7 @@ awaiting: user response
 
 expected: Open the speed dial and picker with TalkBack enabled. Focus is modal,
 labels are meaningful, and closing each transient returns focus to the FAB.
-result: pending
+result: passed (owner-confirmed 2026-09-03; spoken traversal worked well)
 
 ### 2. Semantic haptics
 
@@ -38,12 +38,15 @@ result: pending
 ## Summary
 
 total: 3
-passed: 0
+passed: 1
 issues: 0
-pending: 3
+pending: 2
 skipped: 0
 blocked: 0
 
 ## Gaps
 
-None. These are sensory confirmation checks only; code and automated tests are green.
+TalkBack modal traversal passed on 2026-09-03. The widget observation attempted
+against a debug app served by Questboard's Metro port and was invalid for Orbit;
+it remains pending against the new standalone release APK. Code and automated
+tests are green.
