@@ -47,14 +47,14 @@ created: 2026-09-03
 | Requirement | Behavior | Test Type | Automated Command | File Exists |
 |-------------|----------|-----------|-------------------|-------------|
 | THEME-01 | `resolveMode`/`resolvePalette` across 4 combos + package axis | unit | `npx vitest run src/theme/theme-presets.test.ts` | ⚠️ extend (add package axis + 4 palettes) |
-| THEME-11 | Every accent/text/status passes AA in all 4 combos | unit | `npx vitest run src/theme/contrast.test.ts` | ❌ W0 (new `contrast.ts` + test) |
+| THEME-11 | Every accent/text/status/danger passes AA in all 4 combos (split gate: hard-fail new palettes incl. danger, flag-for-owner legacy galaxy-dark) | unit | `npx vitest run src/theme/contrast.test.ts src/theme/accents.test.ts` | ❌ W0 (new `contrast.ts` + test; `accents.test.ts` in 23-03) |
 | THEME-08 | `statusGlyph(status)` distinct per status; ring visual unchanged | unit | `npx vitest run src/components/contact-card-ring.test.ts` | ⚠️ add glyph-map test (W0) |
 | THEME-06 | reduced-motion hook seeds + subscribes; no setState in worklet path | unit (mock `AccessibilityInfo`) + device UAT | `npx vitest run src/theme/use-reduced-motion.test.ts` | ❌ W0 |
 | THEME-13 | migration 015 additive; DAO read/write; `PORTABLE_SETTINGS_KEYS` carries new keys | unit + migration test | `npx vitest run src/db/migrations/015-*.test.ts src/db/app-settings-dao.test.ts` | ⚠️ add migration 015 test + portable-keys assertion (W0) |
-| THEME-03 | restore-before-paint gating; `orbit-theme` → columns mapper (pure fn) | unit | `npx vitest run src/theme/orbit-theme-migration.test.ts` | ❌ W0 |
-| THEME-09 | registry maps every semantic name; screens use names only | unit | `npx vitest run src/components/icons/icon-registry.test.ts` | ❌ W0 |
+| THEME-03 | restore-before-paint gating; `orbit-theme` → columns mapper (pure fn, unwraps the zustand persist envelope `{state:{mode,presetId},version}`) | unit | `npx vitest run src/theme/orbit-theme-migration.test.ts` | ❌ W0 |
+| THEME-09 | registry maps every semantic name (incl. all four TabParamList route keys DashboardTab/OrreryTab/BackupTab/SettingsTab via the explicit mapping, six status names, warning); screens use names only | unit | `npx vitest run src/components/icons/icon-registry.test.ts` | ❌ W0 |
 | THEME-04 | `resolveBackground`/`resolveRenderableBackground` (NULL→default, 'none'→solid, render-fail→None/Solid) | unit | `npx vitest run src/theme/backgrounds.test.ts` | ❌ new (23-06) |
-| THEME-05 | surface tokens: density→opacity, glass-composite AA over fallback token, live glass tint opacity ≥ fallback token opacity | unit | `npx vitest run src/theme/tokens/surface.test.ts` | ❌ new (23-06) |
+| THEME-05 | surface tokens: density→opacity, glass-composite AA over fallback token, live glass tint opacity ≥ fallback token opacity, composited per-asset AA over each bundled asset's worst-case brightest pixel, `resolveSurfaceStyle` returns only declared surface-token fields | unit | `npx vitest run src/theme/tokens/surface.test.ts` | ❌ new (23-06) |
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
 
