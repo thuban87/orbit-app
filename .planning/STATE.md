@@ -5,16 +5,16 @@ milestone_name: Release Readiness
 current_phase: 23
 current_phase_name: Theme & Visual System
 status: executing
-stopped_at: Completed 23-04-PLAN.md
-last_updated: "2026-09-03T18:20:00.000Z"
+stopped_at: Completed 23-05-PLAN.md
+last_updated: "2026-09-03T19:30:00.000Z"
 last_activity: 2026-09-03
-last_activity_desc: Executed 23-04 (live reduced-motion signal — AccessibilityInfo→SharedValue controller + boolean twin, no per-frame setState; semantic motion/easing tokens)
-state_head: 552cb36
+last_activity_desc: Executed 23-05 (semantic icon registry + Icon primitive + ICON_SIZE tokens, tab bar routed through registry/TAB_GLYPHS retired; statusGlyph + StatusGlyph extending ringVisual — one glyph+hue source; THEME-08/09)
+state_head: 071eb37
 progress:
   total_phases: 19
   completed_phases: 1
   total_plans: 13
-  completed_plans: 9
+  completed_plans: 10
 ---
 
 # Project State
@@ -30,9 +30,9 @@ final source verification and standalone-release Android UAT.
 ## Current Position
 
 Phase: 23 (Theme & Visual System) — EXECUTING
-Plan: 5 of 7
-Status: Executing Phase 23 — 23-04 complete (live reduced-motion SharedValue controller + boolean twin + motion tokens; THEME-06/D-07 satisfied, unblocks Plan 06 Skia consumers)
-Last activity: 2026-09-03 — Executed 23-04 (reduced-motion signal + motion/easing tokens)
+Plan: 6 of 7
+Status: Executing Phase 23 — 23-05 complete (semantic icon registry + Icon/StatusGlyph primitives + ICON_SIZE tokens; tab bar routed through the registry, TAB_GLYPHS retired; statusGlyph extends ringVisual as the single glyph+hue source; THEME-08/09 delivered as first-class seams, screen adoption deferred to renderer/Phase-15)
+Last activity: 2026-09-03 — Executed 23-05 (icon registry + status glyphs)
 Progress: 0/19 phases complete (v2.0)
 
 **Milestone v2.0 structure (pre-decided by the owner from the fifteen milestone-2 dossiers + the
@@ -170,6 +170,7 @@ at plan time. All new durable preferences are `app_settings` columns, never Asyn
 | Phase 23 P02 | 20m | 3 tasks | 13 files |
 | Phase 23 P03 | 16m | 3 tasks | 9 files |
 | Phase 23 P04 | 8m | 2 tasks | 4 files |
+| Phase 23 P05 | 8m | 2 tasks | 8 files |
 
 ## Accumulated Context
 
@@ -291,6 +292,7 @@ Foundational decisions affecting current work:
 - [Phase 17]: Normal passphrase change re-encrypts accessible automatic backups by default; future-only remains explicit.
 - [Phase 17]: SecureStore retains a pending old/new passphrase and replacement URI journal until verified automatic-backup re-encryption completes.
 - [Phase 17]: Restore navigation carries only opaque validated-cache tokens and aggregate preview data.
+- [Phase 23]: 23-05: ONE semantic icon registry (ICON_REGISTRY, src/components/icons/icon-registry.ts) maps semantic names → {outline,filled} Ionicons pairs (IconName union); screens import semantic names only, never a third-party glyph (D-05, no second icon source). The registry stores plain glyph STRINGS so the module stays react-native-free/node-testable; Ionicons-name TYPE validation lives in Icon.tsx where the real Ionicons is imported (glyph flows straight into `<Ionicons name={glyph}>` → invalid glyph fails tsc, no cast). Icon resolves colour via useTheme().colors[tone] + size via ICON_SIZE (16/20/24/28); IconTone is a mapped type over ThemePalette keeping only string-valued keys (array tokens avatarSwatches/gravityTiers/starPalette excluded; a @ts-expect-error asserts the rejection), StatusTone narrows to statusStable/statusWobble/statusDecay/rogue/border. TAB_ICON maps real *Tab route keys → semantic names (typed Record<keyof TabParamList,IconName> for completeness); tab bar renders through <Icon>, ad-hoc TAB_GLYPHS map retired. statusGlyph(state) + StatusDisplayState (ProfileStatus | 'snoozed' | null) added BESIDE ringVisual in contact-card-ring.ts (one glyph+hue source, ringVisual's ProfileStatus|null contract unchanged; snooze is an independent condition composed by the consumer) → six DISTINCT silhouettes (checkmark-circle/time/warning/remove-circle/ellipse/moon), null→status-neutral. StatusGlyph.tsx renders via the registry with a StatusTone token (never hex) + accessibilityLabel. THEME-08/09 delivered as seams; screen adoption deferred to renderer/Phase-15. Full suite 2049 pass; tsc + check:colors clean; no deviations.
 - [Phase 17]: Restore applying state is React-local and never resumes after a cold launch.
 - [Phase 18.1]: V9 contact methods use isValid actionability, retain non-actionable raw input, and preserve the device canonicalization region.
 - [Phase 18.1]: Aggregate contact saves compose contact-method cores inside one outer transaction; method drafts are optional and return typed same-contact canonical collisions.
