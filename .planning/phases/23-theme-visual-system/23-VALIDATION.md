@@ -53,6 +53,8 @@ created: 2026-09-03
 | THEME-13 | migration 015 additive; DAO read/write; `PORTABLE_SETTINGS_KEYS` carries new keys | unit + migration test | `npx vitest run src/db/migrations/015-*.test.ts src/db/app-settings-dao.test.ts` | ⚠️ add migration 015 test + portable-keys assertion (W0) |
 | THEME-03 | restore-before-paint gating; `orbit-theme` → columns mapper (pure fn) | unit | `npx vitest run src/theme/orbit-theme-migration.test.ts` | ❌ W0 |
 | THEME-09 | registry maps every semantic name; screens use names only | unit | `npx vitest run src/components/icons/icon-registry.test.ts` | ❌ W0 |
+| THEME-04 | `resolveBackground`/`resolveRenderableBackground` (NULL→default, 'none'→solid, render-fail→None/Solid) | unit | `npx vitest run src/theme/backgrounds.test.ts` | ❌ new (23-06) |
+| THEME-05 | surface tokens: density→opacity, glass-composite AA over fallback token, live glass tint opacity ≥ fallback token opacity | unit | `npx vitest run src/theme/tokens/surface.test.ts` | ❌ new (23-06) |
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
 
