@@ -408,22 +408,24 @@ Run as a vitest check over all four palettes × (text-on-surface, accent-as-link
 | A6 | expo-blur is genuinely optional (dossier fallback is a tinted token) | Surface/Glass | Low — can ship glass-*like* surfaces with zero blur dep |
 | A7 | Package-legitimacy seam unavailable; verdicts from `npm view` + Expo first-party provenance | Package Audit | Low — all first-party Expo; `npx expo install` is the authoritative pin |
 
-## Open Questions
+## Open Questions (RESOLVED)
+
+*All four were by-design "planner's call" items; each is now answered in an executable plan (recorded 2026-09-03 during plan verification).*
 
 1. **Accent storage: hex string vs enum id vs NULL-resolved-at-render?**
    - What we know: `check:colors` scans `src` and migrations live under `src/db/` (not a `/theme/` path); `self_sun_colour` already uses the NULL→render-resolve idiom.
-   - Recommendation: store an **accent id** (or NULL) and resolve to a hex in `src/theme/accents.ts` at render. Keeps the palette swappable and the gate green. **Planner decides.**
+   - **RESOLVED:** store an **accent id** (or NULL) and resolve to a hex in `src/theme/accents.ts` at render — keeps the palette swappable and the colour gate green. Confirmed via Plan 01's `checkpoint:decision` (one-way migration-015 shape) and Plan 03's `accents.ts`.
 
 2. **`orbit-theme` migration: read-once-then-clear vs one-time import?** (D-08, explicitly the plan's call.)
    - What we know: only `mode` + `presetId` exist there; one preset today.
-   - Recommendation: one-time import at boot (map `presetId → galaxy`, carry `mode`), then clear the AsyncStorage key to avoid a second import. **Planner decides.**
+   - **RESOLVED:** one-time import at boot (map `presetId → galaxy`, carry `mode`), then clear the AsyncStorage key so it cannot re-import. Owned by Plan 01.
 
 3. **Scope of routing existing raw glyphs (`✕`/`◎`/`⚙`) through the registry now vs later.** (Explicitly planner's scope call per UI-SPEC.)
-   - Recommendation: build the registry + convert the tab-bar glyphs (`RootNavigator`) this phase (highest visibility); leave in-form `✕` conversions to consuming phases if scope is tight.
+   - **RESOLVED:** Plan 05 builds the registry + converts the tab-bar glyphs (`RootNavigator`) this phase (highest visibility); in-form `✕` conversions deferred to consuming phases.
 
 4. **Does any canvas (Skia) text need Space Grotesk, or only RN `<Text>`?**
    - What we know: Orrery loads only Inter into Skia today.
-   - Recommendation: load Space Grotesk via `expo-font` for `<Text>`; add to the Skia `useFonts` map only if a canvas surface renders display text. **Planner/executor confirms during build.**
+   - **RESOLVED:** Plan 02 loads Space Grotesk via `expo-font` for `<Text>` only; the Skia `useFonts` map is left untouched (no canvas surface renders display text this phase).
 
 ## Environment Availability
 
