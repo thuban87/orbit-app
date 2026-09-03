@@ -204,11 +204,11 @@ All v1.0 commits are local on `main` and have NOT been pushed.
 **Plans**: 7 plans
 **Wave 1**
 
-- [ ] 23-01-PLAN.md — TRACER: persisted theme resolves package × mode with restore-before-paint (migration 015, DAO/backup plumbing, orbit-theme import) [THEME-01/03/13]
+- [x] 23-01-PLAN.md — TRACER: persisted theme resolves package × mode with restore-before-paint (migration 015, DAO/backup plumbing, orbit-theme import) [THEME-01/03/13]
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 23-02-PLAN.md — Runtime deps, bundled fonts, typography/spacing/radii tokens, text-scaling reflow [THEME-07]
+- [x] 23-02-PLAN.md — Runtime deps, bundled fonts, typography/spacing/radii tokens, text-scaling reflow [THEME-07]
 - [ ] 23-03-PLAN.md — Four palettes, curated accent system, AA contrast gate [THEME-01/02/11]
 - [ ] 23-04-PLAN.md — Reduced-motion hook (SharedValue bridge + boolean twin) + motion tokens [THEME-06]
 
@@ -508,7 +508,7 @@ All v1.0 commits are local on `main` and have NOT been pushed.
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 22. App Shell & Navigation | 6/6 | In Progress|  |
-| 23. Theme & Visual System | 1/7 | In Progress | - |
+| 23. Theme & Visual System | 2/7 | In Progress | - |
 | 24. Contact Knowledge Foundation | 0/TBD | Not started | - |
 | 25. Dashboard Data & State Foundation | 0/TBD | Not started | - |
 | 26. Dashboard Control Surface | 0/TBD | Not started | - |

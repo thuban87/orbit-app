@@ -5,16 +5,16 @@ milestone_name: Release Readiness
 current_phase: 23
 current_phase_name: Theme & Visual System
 status: executing
-stopped_at: Completed 23-01-PLAN.md
-last_updated: "2026-09-03T16:10:00.000Z"
+stopped_at: Completed 23-02-PLAN.md
+last_updated: "2026-09-03T16:37:00.000Z"
 last_activity: 2026-09-03
-last_activity_desc: Executed 23-01 (durable theme + package axis tracer)
-state_head: f36a08aecfbedee607a221ea769df2e8029fc353
+last_activity_desc: Executed 23-02 (typography/spacing/radii tokens + fonts + AppText reflow primitive)
+state_head: 6bc01a5
 progress:
   total_phases: 19
   completed_phases: 1
   total_plans: 13
-  completed_plans: 7
+  completed_plans: 8
 ---
 
 # Project State
@@ -30,9 +30,9 @@ final source verification and standalone-release Android UAT.
 ## Current Position
 
 Phase: 23 (Theme & Visual System) — EXECUTING
-Plan: 2 of 7
-Status: Executing Phase 23 — 23-01 complete
-Last activity: 2026-09-03 — Executed 23-01 (durable theme + package axis tracer)
+Plan: 3 of 7
+Status: Executing Phase 23 — 23-02 complete
+Last activity: 2026-09-03 — Executed 23-02 (typography/spacing/radii tokens + fonts + AppText reflow primitive)
 Progress: 0/19 phases complete (v2.0)
 
 **Milestone v2.0 structure (pre-decided by the owner from the fifteen milestone-2 dossiers + the
@@ -167,6 +167,7 @@ at plan time. All new durable preferences are `app_settings` columns, never Asyn
 | Phase 22 P05 | 10m | 3 tasks | 11 files |
 | Phase 22 P06 | 13m | 3 tasks | 12 files |
 | Phase 23 P01 | 45m | 1 task | 25 files |
+| Phase 23 P02 | 20m | 3 tasks | 13 files |
 
 ## Accumulated Context
 
@@ -302,6 +303,7 @@ Foundational decisions affecting current work:
 - [Phase 18.2]: Bind reuses dormant cadence and requires a positive cadence only for a never-assigned Unbound contact.
 - [Phase 18.2]: Capture passes an explicit empty normalized method list while v11 defaults new inline contacts to Bound.
 - [Phase 18.2]: Lifecycle-sensitive population eligibility lives at SQL query owners; direct retrieval remains neutral for Unbound contacts.
+- [Phase 23]: 23-02: typography/spacing/radii tokens are pure node-tested RN-free data — TYPOGRAPHY = 5 roles (display/heading/body/label/caption) over 4 sizes (28/20/16/14) + 2 weights (400/600), label vs caption share 14 diverging by weight + colour TOKEN (never a hex); SPACING xs4..2xl48 (all %4); RADII sm8..pill999/full9999. Consumers import concrete @/theme/tokens/* (no barrel edit). AppText resolves role→family/size/weight from TYPOGRAPHY + colour from useTheme(), sets NO allowFontScaling={false} and NO fixed height/numberOfLines so OS scaling reflows (THEME-07). Fonts (Inter Regular/SemiBold + Space Grotesk SemiBold) bundle locally from assets/ via expo-font; loadAppFonts() catches/logs and RESOLVES on failure (degrade to system font) and is awaited in the App.tsx ready gate (Promise.all with theme hydrate) so a font error never blocks boot. expo-font's OPTIONAL config plugin deliberately NOT added (runtime load, matching 13-05 Skia useFonts precedent); @expo/vector-icons + expo-blur ship none. Font-map keys are weight-specific (Android won't synth a weight). Screen adoption of AppText = Phase 15; device-UAT reflow = end-of-phase backstop. deps @expo/vector-icons/expo-font/expo-blur SDK-57-pinned, no install scripts (only root patch-package).
 - [Phase 18.2]: Digest retrospective and gentle-line reads remain all-relationship-history; overlooked is Bound-only.
 - [Phase 18.2]: STATUS_SCAN callers require Bound positive cadence before evaluating shared status fragments.
 - [Phase 18.2]: Unbound intensity is a tagged unavailable result, never nullable-cadence arithmetic or a fabricated interval.

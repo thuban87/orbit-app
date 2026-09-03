@@ -40,7 +40,7 @@ category's phase (see Traceability).
 - [ ] **THEME-04**: User can choose from curated bundled backgrounds per theme (~4–5) plus None/Solid, all shipped locally; backgrounds stay fixed while content scrolls, and surface opacity increases with content density so dense screens stay readable
 - [ ] **THEME-05**: Galaxy renders glass-forward (translucency, glow) with optionally very subtle ambient motion; Standard renders cleaner, flatter, quieter
 - [ ] **THEME-06**: The app respects the OS reduced-motion preference, stopping or simplifying nonessential motion app-wide (a reusable hook consumable from the Skia render loop)
-- [ ] **THEME-07**: Text respects system text scaling by reflowing rather than truncating or shrinking
+- [x] **THEME-07**: Text respects system text scaling by reflowing rather than truncating or shrinking
 - [ ] **THEME-08**: Relationship statuses keep stable semantic hue families across themes, each with its own distinct silhouette glyph — state is never conveyed by color alone
 - [ ] **THEME-09**: All screens draw icons through a centralized semantic icon registry supporting state variants, so custom icon art can be swapped later without broad rewrites
 - [ ] **THEME-10**: Modals/sheets come from shared variants and buttons follow a formal hierarchy (Primary/Secondary/Tertiary/Destructive/Icon-only), with destructive actions visually distinct beyond color
