@@ -19,6 +19,10 @@ import {
   MemoryPlaceholderScreen,
   UpdateContactPlaceholderScreen,
 } from "@/screens/placeholders/FabActionPlaceholders";
+import {
+  MemoryHistoryPlaceholderScreen,
+  RecentlyDeletedPlaceholderScreen,
+} from "@/screens/placeholders/KnowledgePlaceholders";
 import { SurvivorSelectScreen } from "@/screens/SurvivorSelectScreen";
 import { ThingsToRememberScreen } from "@/screens/ThingsToRememberScreen";
 import { UnboundContactsScreen } from "@/screens/UnboundContactsScreen";
@@ -42,7 +46,18 @@ export function DashboardStack() {
       />
       <Stack.Screen name="Memory" component={MemoryPlaceholderScreen} />
       <Stack.Screen name="Profile" component={ContactProfileScreen} />
-      <Stack.Screen name="ThingsToRemember" component={ThingsToRememberScreen} />
+      <Stack.Screen
+        name="ThingsToRemember"
+        component={ThingsToRememberScreen}
+      />
+      <Stack.Screen
+        name="RecentlyDeleted"
+        component={RecentlyDeletedPlaceholderScreen}
+      />
+      <Stack.Screen
+        name="MemoryHistory"
+        component={MemoryHistoryPlaceholderScreen}
+      />
       <Stack.Screen name="Edit" component={EditContactScreen} />
       <Stack.Screen name="Create" component={CreateContactScreen} />
       <Stack.Screen name="Compose" component={ComposeScreen} />

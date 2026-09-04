@@ -8,16 +8,34 @@ import { MergeConflictsScreen } from "@/screens/MergeConflictsScreen";
 import { OrreryScreen } from "@/screens/OrreryScreen";
 import { SurvivorSelectScreen } from "@/screens/SurvivorSelectScreen";
 import { ThingsToRememberScreen } from "@/screens/ThingsToRememberScreen";
+import {
+  MemoryHistoryPlaceholderScreen,
+  RecentlyDeletedPlaceholderScreen,
+} from "@/screens/placeholders/KnowledgePlaceholders";
 import type { OrreryStackParamList } from "../types";
 
 const Stack = createNativeStackNavigator<OrreryStackParamList>();
 
 export function OrreryStack() {
   return (
-    <Stack.Navigator initialRouteName="Orrery" screenOptions={{ headerShown: false }}>
+    <Stack.Navigator
+      initialRouteName="Orrery"
+      screenOptions={{ headerShown: false }}
+    >
       <Stack.Screen name="Orrery" component={OrreryScreen} />
       <Stack.Screen name="Profile" component={ContactProfileScreen} />
-      <Stack.Screen name="ThingsToRemember" component={ThingsToRememberScreen} />
+      <Stack.Screen
+        name="ThingsToRemember"
+        component={ThingsToRememberScreen}
+      />
+      <Stack.Screen
+        name="RecentlyDeleted"
+        component={RecentlyDeletedPlaceholderScreen}
+      />
+      <Stack.Screen
+        name="MemoryHistory"
+        component={MemoryHistoryPlaceholderScreen}
+      />
       <Stack.Screen name="Edit" component={EditContactScreen} />
       <Stack.Screen name="Compose" component={ComposeScreen} />
       <Stack.Screen name="CropPhoto" component={CropPhotoScreen} />
