@@ -2,13 +2,13 @@
 gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Release Readiness
-current_phase: 24.1
-current_phase_name: Contact Knowledge Foundation — Model, Storage & UI
-status: complete
-stopped_at: Phase 24.1 COMPLETE — goal ACHIEVED; all gates pass. Next phase 24.2 is planned (7 plans staged), not started.
-last_updated: "2026-09-04T10:05:00.000Z"
+current_phase: 24.2
+current_phase_name: Contact Knowledge — Egress, Search, Types & Data-moves
+status: planned
+stopped_at: Phase 24.2 plans cross-AI converged (7 plans / 3 waves) — 0 HIGH, 0 actionable; ready to execute, not started. Phase 24.1 remains COMPLETE.
+last_updated: "2026-09-04T18:20:00.000Z"
 last_activity: 2026-09-04
-last_activity_desc: Phase 24.1 completed — device UAT 7/7, UI review 18/24 (no blockers), Nyquist signed off, phase-goal ACHIEVED
+last_activity_desc: Phase 24.2 plans cross-AI converged (codex+claude, 7 review cycles) — 30→0 HIGH; owner decisions on createField scope + import-note wiring incorporated
 carried_forward:
   - "D-11: default Memory-type display name is provisional (memory-registry.ts:10-12) — owner naming decision, must be reconciled before Phase 34"
   - "UI-REVIEW warnings (non-blocking): accent→accentText token misrole (8 sites); Add-memory CTA uses hand-rolled link vs Button primitive; ContactPicker/Snackbar off type/spacing scale — triage fix-now vs fold into 24.2"
@@ -16,7 +16,7 @@ state_head: e0c7b6b11caed0f6f518f5cade678d556b63d3c7
 progress:
   total_phases: 20
   completed_phases: 3
-  total_plans: 22
+  total_plans: 29
   completed_plans: 21
 ---
 
@@ -27,17 +27,18 @@ progress:
 See: .planning/PROJECT.md (updated 2026-09-01 after v1.0 milestone)
 
 **Core value:** Collapse the taps between "you're overdue with X" and the message actually being sent.
-**Current focus:** Phase 24.1 COMPLETE — next is Phase 24.2 (Contact Knowledge — Egress, Search, Types & Data-moves), already planned (7 plans staged), not started.
+**Current focus:** Phase 24.2 (Contact Knowledge — Egress, Search, Types & Data-moves) — plans cross-AI converged (7 plans / 3 waves, 0 HIGH), ready to execute. Phase 24.1 COMPLETE.
 
 ## Current Position
 
-Phase: 24.1 (Contact Knowledge Foundation — Model, Storage & UI) — ✓ COMPLETE (2026-09-04)
-Plan: 7 of 7
-Status: COMPLETE — goal ACHIEVED. Gates: device UAT 7/7 PASS · UI review 18/24 (no blockers) · Nyquist signed off (2,177 tests green) · phase-goal verification ACHIEVED (status human_needed only for the deferred D-11 naming decision).
+Phase: 24.2 (Contact Knowledge — Egress, Search, Types & Data-moves) — ◆ PLANNED, cross-AI converged (2026-09-04)
+Plan: 0 of 7 executed (7 plans / 3 waves staged)
+Status: PLANNED — plans cross-AI converged via codex+claude over 7 review cycles (30→0 HIGH, 0 actionable). Owner decisions recorded: createField global-only in 24.2 (contact-scoped def creation → Phase 31); imported note wired through all import entry paths. Phase 24.1 remains COMPLETE (device UAT 7/7, Nyquist signed off).
 Carried forward (owner's bucket, NOT resolved here): D-11 default Memory-type display name — reconcile before Phase 34.
-Last activity: 2026-09-04 — Phase 24.1 completed
+Deferred to Phase 31 (recorded in Plan 05): durable contact-scoped-def ownership + owner-purge semantics. Deferred to Phase 36 (ROADMAP breadcrumb): legacy AI-fuel confirm-path code removal.
+Last activity: 2026-09-04 — Phase 24.2 plan convergence complete
 Progress: 3/19 phases complete (v2.0) — 22, 23, 24.1
-Next: Phase 24.2 (planned, 7 plans / 3 waves staged) — `/gsd-execute-phase 24.2` when ready.
+Next: `/gsd-execute-phase 24.2` when ready.
 
 **Milestone v2.0 structure (pre-decided by the owner from the fifteen milestone-2 dossiers + the
 2026-09-01 cross-dossier audit; not re-derived):** 22 App Shell · 23 Theme · 24 Contact Knowledge ·
