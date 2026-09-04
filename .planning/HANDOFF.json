@@ -1,39 +1,39 @@
 {
   "version": "1.0",
-  "timestamp": "2026-09-04T08:23:01.915Z",
+  "timestamp": "2026-09-04T14:15:29.172Z",
   "phase": "24.1",
   "phase_name": "Contact Knowledge Foundation — Model, Storage & UI",
   "phase_dir": ".planning/phases/24.1-contact-knowledge-foundation",
   "plan": 7,
-  "task": 7,
-  "total_tasks": 7,
+  "task": 4,
+  "total_tasks": 6,
   "status": "paused",
   "completed_tasks": [
     {"id": 1, "name": "Execute plans 24.1-01 through 24.1-07", "status": "done", "commit": "499a7eb"},
-    {"id": 2, "name": "Fix review and full-suite regression failures", "status": "done", "commit": "931450b"},
-    {"id": 3, "name": "Run final review gate", "status": "done", "commit": "uncommitted review artifact"}
+    {"id": 2, "name": "Resolve the three advisory code-review warnings", "status": "done", "commit": "aef0a90"},
+    {"id": 3, "name": "Verify the Phase 24.1 security threat model", "status": "done", "commit": "b4762eb"},
+    {"id": 4, "name": "Run regression, type, color, and whitespace gates", "status": "done", "verification": "npm test: 224 files / 2,177 tests; npx tsc --noEmit; npm run check:colors; git diff --check"}
   ],
   "remaining_tasks": [
-    {"id": 4, "name": "Evaluate and resolve three advisory code-review warnings", "status": "not_started"},
-    {"id": 5, "name": "Run security, Nyquist, UI, and phase-goal verification gates", "status": "not_started"},
-    {"id": 6, "name": "Complete phase tracking only if verification passes", "status": "not_started"}
+    {"id": 5, "name": "Finish physical-device UAT on the connected Pixel 6 Pro and record only observed results", "status": "in_progress"},
+    {"id": 6, "name": "Run truthful Nyquist/UI/phase-goal verification and complete tracking only if all gates pass", "status": "not_started"}
   ],
   "blockers": [
-    {"description": "No blocking findings remain; the latest deep review has three warnings.", "type": "technical", "workaround": "Review 24.1-REVIEW.md before starting further work."}
+    {"description": "Phase completion is blocked on unfinished physical-device UAT and its remaining verification gates.", "type": "verification", "workaround": "Continue the exact UAT checklist in .continue-here.md; do not mark Phase 24.1 complete until it passes."},
+    {"description": "The owner explicitly requires real ADB-driven UAT, not newly introduced React Native renderer/component-test dependencies.", "type": "scope", "workaround": "Use the connected device and report observed behavior. Do not add react-test-renderer or a renderer test stack for this phase."}
   ],
   "async_jobs": [],
-  "human_actions_pending": [
-    {"action": "Decide whether the three remaining review warnings should be fixed before final phase verification.", "context": "The user explicitly requested a pause after this review gate to evaluate usage.", "blocking": false}
-  ],
+  "human_actions_pending": [],
   "decisions": [
-    {"decision": "Run Phase 24.1 sequentially with temporary auto-advance.", "rationale": "The project has worktrees disabled and the user asked not to pause at ordinary tracer gates.", "phase": "24.1"},
-    {"decision": "Keep the migration additive and the Memory-type registry application-owned.", "rationale": "The owner approved this irreversible migration boundary before implementation.", "phase": "24.1"}
+    {"decision": "Use physical-device ADB UAT for the remaining rendered behaviors.", "rationale": "The owner clarified that automated testing here means driving the device through ADB; no new testing-environment dependency is authorized.", "phase": "24.1"},
+    {"decision": "Preserve the installed app data during UAT.", "rationale": "It contains deliberately created test records whose lifecycle and visibility must be verified.", "phase": "24.1"},
+    {"decision": "Use the existing release APK unless a source change requires a rebuild.", "rationale": "The release build is already installed and smoke-tested on the Pixel 6 Pro.", "phase": "24.1"}
   ],
   "uncommitted_files": [
     ".planning/config.json",
     ".planning/phases/24.1-contact-knowledge-foundation/24.1-REVIEW.md",
     ".planning/phases/24.1-contact-knowledge-foundation/24.1-REVIEW-FIX.md"
   ],
-  "next_action": "Read the Phase 24.1 handoff and current REVIEW.md, then decide whether to fix the three warnings before running the remaining verification gates.",
-  "context_notes": "All seven planned implementation units are committed. Full regression passed after integration fixes: 224 test files, 2,174 tests. The phase has not yet run security, Nyquist, UI, or goal verification, and must not be marked complete."
+  "next_action": "Resume physical-device UAT from .planning/phases/24.1-contact-knowledge-foundation/.continue-here.md. Verify the relationship Undo result first, then finish visibility, permanent-delete, history, linked-contact, and Orrery-origin paths without clearing device data.",
+  "context_notes": "The active device is an authorized Pixel 6 Pro (adb serial 1A071FDEE002BU when paused). The release APK was built on droid, pulled to /tmp/orbit-phase24.1-release.apk, installed with adb install -r, and launched successfully. UAT data on contact UAT Ada: PixelUATMemory is live after a confirmed trash/restore cycle; PixelUATHistory is current for Last talked about; PixelUATRelationship was deleted then Undo tapped but restoration still needs confirmation. Do not treat planned/manual checks as passed; record only direct observations. The branch also contains later Phase 24.2 commits not created by this UAT session; preserve them and do not reset or revert unrelated work."
 }
