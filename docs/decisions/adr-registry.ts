@@ -39,7 +39,7 @@
 // NOTE: ADR-0027 [ACCEPTED] Derived Profile-Only Gravity and Intensity
 // NOTE: ADR-0028 [ACCEPTED] Per-Item Conversational Fuel with Fixed Kinds
 // IMPORTANT: ADR-0029 [SUPERSEDED BY ADR-039 (partial)] In-Query Fuel Eligibility and a Shared Ranked Projection
-// NOTE: ADR-0030 [ACCEPTED] Explicit Confirmation of AI-Proposed Fuel
+// IMPORTANT: ADR-0030 [SUPERSEDED BY ADR-081] Explicit Confirmation of AI-Proposed Fuel
 // IMPORTANT: ADR-0031 [SUPERSEDED BY ADR-032 (partial)] Bound Local Fuel Search without FTS5
 // NOTE: ADR-0032 [ACCEPTED] Flat Dashboard Discovery and In-Query Contact Search
 // IMPORTANT: ADR-0033 [SUPERSEDED BY ADR-075] Profile Marking and Shared Drag-Reordered Favourites
