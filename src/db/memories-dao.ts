@@ -44,6 +44,12 @@ export interface EditMemoryInput {
   now: string;
 }
 
+/** The identifying slice a trash-sweep candidate needs to expire one Memory. */
+export interface MemoryCandidate {
+  id: number;
+  contactId: number;
+}
+
 function normalizeOptional(value: string | null | undefined): string | null {
   return value === undefined || value === null || value.trim().length === 0
     ? null
@@ -231,6 +237,22 @@ export async function restoreMemoryCore(
   assertOneChange("restoreMemory", input.id, input.contactId, result.changes);
 }
 
+/**
+ * Physically remove an already soft-deleted Memory while the caller owns the
+ * shared transaction. The deleted_at guard preserves the two-stage lifecycle.
+ */
+export async function purgeMemoryPermanentlyCore(
+  exec: SqlExecutor,
+  id: number,
+  contactId: number,
+): Promise<void> {
+  const result = await exec.runAsync(
+    "DELETE FROM memories WHERE id = ? AND contact_id = ? AND deleted_at IS NOT NULL",
+    [id, contactId],
+  );
+  assertOneChange("purgeMemoryPermanently", id, contactId, result.changes);
+}
+
 /** Insert one Memory and mark the database dirty for backup inside one mutex. */
 export function addMemory(
   exec: SqlExecutor,
@@ -273,5 +295,41 @@ export function restoreMemory(
   return inWriteTransaction(exec, async () => {
     await restoreMemoryCore(exec, input);
     await bumpDataRevisionCore(exec);
+  });
+}
+
+/** User-confirmed immediate purge for an already soft-deleted Memory. */
+export function purgeMemoryPermanently(
+  exec: SqlExecutor,
+  candidate: MemoryCandidate,
+): Promise<void> {
+  return inWriteTransaction(exec, () =>
+    purgeMemoryPermanentlyCore(exec, candidate.id, candidate.contactId),
+  );
+}
+
+/**
+ * Sweep writer: re-check the complete stale predicate under the write lock
+ * before invoking the non-mutexed core, so restored or freshly re-deleted rows
+ * survive the advisory candidate scan.
+ */
+export function expireMemoryIfStale(
+  exec: SqlExecutor,
+  candidate: MemoryCandidate,
+  windowModifier: string,
+  _now: string,
+): Promise<boolean> {
+  return inWriteTransaction(exec, async () => {
+    const stale = await exec.getFirstAsync<{ one: number }>(
+      `SELECT 1 AS one FROM memories
+        WHERE id = ?
+          AND contact_id = ?
+          AND deleted_at IS NOT NULL
+          AND deleted_at < datetime('now', 'localtime', ?)`,
+      [candidate.id, candidate.contactId, windowModifier],
+    );
+    if (stale === null) return false;
+    await purgeMemoryPermanentlyCore(exec, candidate.id, candidate.contactId);
+    return true;
   });
 }

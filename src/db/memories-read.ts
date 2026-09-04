@@ -36,12 +36,28 @@ SELECT id, uid, contact_id, type, custom_label, value, note, url,
           created_at DESC,
           id DESC`;
 
+const LIST_RECENTLY_DELETED = `
+SELECT id, uid, contact_id, type, custom_label, value, note, url,
+       meaningful_date, pinned, outdated, hidden, provenance, created_at, modified_at,
+       deleted_at
+  FROM memories
+ WHERE contact_id = ? AND deleted_at IS NOT NULL
+ ORDER BY deleted_at DESC, id DESC`;
+
 /** Return a contact's live Memories with deterministic glanceable ordering. */
 export function listMemoriesForContact(
   exec: SqlExecutor,
   contactId: number,
 ): Promise<MemoryRow[]> {
   return exec.getAllAsync<MemoryRow>(LIST_MEMORIES_FOR_CONTACT, [contactId]);
+}
+
+/** Return a contact's restorable Memories, newest deletion first. */
+export function listRecentlyDeleted(
+  exec: SqlExecutor,
+  contactId: number,
+): Promise<MemoryRow[]> {
+  return exec.getAllAsync<MemoryRow>(LIST_RECENTLY_DELETED, [contactId]);
 }
 
 /**
