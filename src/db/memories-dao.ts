@@ -142,8 +142,9 @@ export async function editMemoryCore(
   const existing = await exec.getFirstAsync<{
     type: string;
     custom_label: string | null;
+    value: string | null;
   }>(
-    "SELECT type, custom_label FROM memories WHERE id = ? AND contact_id = ?",
+    "SELECT type, custom_label, value FROM memories WHERE id = ? AND contact_id = ?",
     [input.id, input.contactId],
   );
   if (!existing) {
@@ -156,8 +157,13 @@ export async function editMemoryCore(
     input.customLabel === undefined
       ? existing.custom_label
       : normalizeOptional(input.customLabel);
+  const effectiveValue =
+    input.value === undefined ? existing.value : normalizeOptional(input.value);
   if (effectiveType === "custom") {
     assertCustomLabel("custom", effectiveCustomLabel);
+  }
+  if (effectiveValue === null && effectiveCustomLabel === null) {
+    throw new Error("memories-dao: memory value or custom label is required");
   }
 
   const sets: string[] = [];

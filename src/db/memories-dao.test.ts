@@ -189,6 +189,33 @@ describe("memories DAO", () => {
     ]);
   });
 
+  it("rejects an edit that would make a general memory wholly blank", async () => {
+    const contactId = await seedContact();
+    const id = await addMemory(exec, {
+      contactId,
+      type: "general",
+      value: "Original value",
+      createdAt: NOW,
+      now: NOW,
+    });
+
+    await expect(
+      editMemory(exec, {
+        id,
+        contactId,
+        value: " \t",
+        now: "2026-09-04 13:00:00",
+      }),
+    ).rejects.toThrow("memories-dao: memory value or custom label is required");
+
+    await expect(
+      exec.getFirstAsync<{ value: string | null; custom_label: string | null }>(
+        "SELECT value,custom_label FROM memories WHERE id=?",
+        [id],
+      ),
+    ).resolves.toEqual({ value: "Original value", custom_label: null });
+  });
+
   it("rejects wrong-pair and invalid effective custom patches without changing the row", async () => {
     const contactId = await seedContact();
     const otherContactId = await seedContact("Blair");
