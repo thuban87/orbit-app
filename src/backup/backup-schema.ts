@@ -4,6 +4,10 @@ import {
   type BackupManifest,
   BackupSchemaError,
 } from "@/backup/types";
+import {
+  isCurrentStateFieldKey,
+  isMemoryTypeKey,
+} from "@/db/memory-registry";
 
 /** Displayed before any preview or restore work for a file from a newer app. */
 export const UPDATE_FIRST_MESSAGE =
@@ -212,6 +216,18 @@ function validBase64(value: unknown): value is string {
   return value.length > 0;
 }
 
+function isBinaryFlag(value: unknown): value is 0 | 1 {
+  return value === 0 || value === 1;
+}
+
+function isNullableBinaryFlag(value: unknown): value is 0 | 1 | null | undefined {
+  return value === null || value === undefined || isBinaryFlag(value);
+}
+
+function isMemoryProvenance(value: unknown): value is "user" | "import" | "share" {
+  return value === "user" || value === "import" || value === "share";
+}
+
 function reconciliationRows(
   rows: RawManifest[],
 ): Array<{ uid: string; modified_at: string }> {
@@ -399,21 +415,46 @@ function validate(manifest: RawManifest): BackupManifest {
     for (const key of ["customLabel", "value", "note", "url", "meaningfulDate", "deletedAt"] as const)
       if (memory[key] !== null && memory[key] !== undefined && typeof memory[key] !== "string")
         fail("memories has an invalid optional value");
-    if ((memory.pinned !== 0 && memory.pinned !== 1) || (memory.outdated !== 0 && memory.outdated !== 1))
+    const type = memory.type;
+    if (typeof type !== "string" || !isMemoryTypeKey(type))
+      fail("memories has an unregistered type");
+    const customLabel = memory.customLabel;
+    const value = memory.value;
+    if (
+      type === "custom" &&
+      (typeof customLabel !== "string" || customLabel.trim().length === 0)
+    ) {
+      fail("memories custom type requires a label");
+    }
+    if (
+      (typeof customLabel !== "string" || customLabel.trim().length === 0) &&
+      (typeof value !== "string" || value.trim().length === 0)
+    ) {
+      fail("memories requires a value or custom label");
+    }
+    if (!isBinaryFlag(memory.pinned) || !isBinaryFlag(memory.outdated) || !isNullableBinaryFlag(memory.hidden))
       fail("memories has an invalid flag");
+    if (!isMemoryProvenance(memory.provenance))
+      fail("memories has an invalid provenance");
   }
   for (const relationship of arrays.relationships) {
     if (typeof relationship.contactUid !== "string" || !contacts.has(relationship.contactUid) || typeof relationship.personName !== "string" || typeof relationship.createdAt !== "string" || typeof relationship.modifiedAt !== "string")
       fail("relationships has an invalid row");
+    if (relationship.personName.trim().length === 0)
+      fail("relationships requires a person name");
     if (relationship.linkedContactUid !== null && relationship.linkedContactUid !== undefined && (typeof relationship.linkedContactUid !== "string" || !contacts.has(relationship.linkedContactUid)))
       fail("relationships has an unknown linked contact UID");
     if (relationship.linkedContactUid === relationship.contactUid)
       fail("relationships cannot link a contact to itself");
+    if (!isBinaryFlag(relationship.pinned) || !isNullableBinaryFlag(relationship.hidden))
+      fail("relationships has an invalid flag");
   }
   const currentPairs = new Set<string>();
   for (const entry of arrays.currentStateEntries) {
     if (typeof entry.contactUid !== "string" || !contacts.has(entry.contactUid) || typeof entry.fieldKey !== "string" || typeof entry.value !== "string" || typeof entry.createdAt !== "string" || typeof entry.modifiedAt !== "string" || (entry.isCurrent !== 0 && entry.isCurrent !== 1))
       fail("currentStateEntries has an invalid row");
+    if (!isCurrentStateFieldKey(entry.fieldKey))
+      fail("currentStateEntries has an unregistered field key");
     if (entry.isCurrent === 1) {
       const pair = `${entry.contactUid}\u0000${entry.fieldKey}`;
       if (currentPairs.has(pair)) fail("currentStateEntries has duplicate current value");

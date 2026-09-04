@@ -62,6 +62,69 @@ describe("parseBackupManifest", () => {
     expect(parseBackupManifest(manifest).tombstones).toEqual(manifest.tombstones);
   });
 
+  it("rejects knowledge rows outside the application-owned registry contracts", () => {
+    const knowledgeManifest = () => {
+      const manifest = valid();
+      manifest.contacts = [
+        {
+          uid: "contact-a",
+          trackingEnabled: 1,
+          intervalDays: 7,
+          modifiedAt: "2026-08-25 12:00:00",
+        },
+      ];
+      manifest.memories = [
+        {
+          uid: "memory-a",
+          contactUid: "contact-a",
+          type: "general",
+          customLabel: null,
+          value: "Remember this",
+          note: null,
+          url: null,
+          meaningfulDate: null,
+          pinned: 0,
+          outdated: 0,
+          hidden: null,
+          provenance: "user",
+          createdAt: "2026-08-25 12:00:00",
+          modifiedAt: "2026-08-25 12:00:00",
+          deletedAt: null,
+        },
+      ];
+      manifest.currentStateEntries = [
+        {
+          uid: "state-a",
+          contactUid: "contact-a",
+          fieldKey: "current_location",
+          value: "Chicago",
+          isCurrent: 1,
+          createdAt: "2026-08-25 12:00:00",
+          modifiedAt: "2026-08-25 12:00:00",
+        },
+      ];
+      return manifest;
+    };
+
+    for (const patch of [
+      { type: "future_memory" },
+      { type: "custom", customLabel: "  " },
+      { value: " \t" },
+      { pinned: 2 },
+      { outdated: -1 },
+      { hidden: 2 },
+      { provenance: "remote" },
+    ]) {
+      const manifest = knowledgeManifest();
+      Object.assign(manifest.memories[0], patch);
+      expect(() => parseBackupManifest(manifest)).toThrow(BackupSchemaError);
+    }
+
+    const unknownField = knowledgeManifest();
+    unknownField.currentStateEntries[0].fieldKey = "future_state";
+    expect(() => parseBackupManifest(unknownField)).toThrow(BackupSchemaError);
+  });
+
   it("rejects a category reference that cannot be resolved within the backup itself", () => {
     const broken = valid();
     broken.contacts = [{ uid: "contact", trackingEnabled: 1, intervalDays: 1, modifiedAt: "2026-08-25 12:00:00", categoryUid: "missing" }];
