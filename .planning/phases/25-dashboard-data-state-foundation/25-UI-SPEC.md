@@ -1,10 +1,11 @@
 ---
 phase: 25
 slug: dashboard-data-state-foundation
-status: draft
+status: approved
 shadcn_initialized: false
 preset: none
 created: 2026-09-04
+reviewed_at: 2026-09-04
 ---
 
 # Phase 25 — UI Design Contract
@@ -226,23 +227,55 @@ addition to colour (see Color section).
 
 ## UI Considerations
 
-Applicable state considerations resolved: **8 covered, 3 backstop, 0 unresolved.** Shape-rooted state
-coverage for the foundation's contracts. Copy for empty/error states lives in the Copywriting Contract
-above; rows here reference those states rather than restating copy.
+State-coverage probe (`ui-consideration-probe`) run post-verification over **6 described surfaces** →
+**36 applicable considerations**: **27 resolved** (19 explicit / 8 backstop), **9 n/a** (duplicate of a
+canonical surface, or a state this nonvisual foundation does not own), **0 unresolved**. Shape-rooted
+state coverage for the foundation's contracts. Copy for empty/error states lives in the Copywriting
+Contract above; rows here reference those states rather than restating copy. `🧪 backstop` items carry a
+held-out / on-device visual check deferred to the render-phase (26–28) UAT.
 
-| Category | Element(s) | Status | Resolution / Reason |
-|----------|------------|--------|---------------------|
-| empty | population result set (per population) | ✅ covered | Each population resolves a cause-aware empty via the single `dashboard-empty-logic` gate; copy per Copywriting Contract (firstrun / hidden / per-population). |
-| empty | search results within scope | ✅ covered | `hasTerm` + zero rows → `search-empty` ("No matches for …"); precedence fires before filter/population copy. |
-| empty | filtered result set | ✅ covered | Non-default filter + zero rows → `filter-empty` (Favourites pointer copy vs generic). |
-| error | read-path load failure | ✅ covered | `dashboard-error-state` heading+body; recovery = focus / foreground / pull-to-refresh re-query, never network. |
-| loading | initial + refresh | ✅ covered | Offline SQLite read; no blocking spinner. Freshness re-query on focus, `AppState`→active, and pull-to-refresh (`RefreshControl` accent tint). No network on read path (non-negotiable). |
-| populated | deduped multi-population union | ✅ covered | OR-union across selected populations dedupes to one contact result; result retains all population-match reasons (dossier §D). |
-| zero-one-many | search snippets per contact | ✅ covered | 0 snippets (name-only match shows no secondary) · 1–3 shown · >3 → `+{N} more`. |
-| partial | never-contacted rows in All Contacts / Not Contacted | ✅ covered | Rendered with neutral/no-status treatment; `status: null` drives the neutral state, never re-derived as "Stable" (ADR-011). |
-| long-text | snippet / long contact name / long fieldLabel | 🧪 backstop | Snippet + label truncation is a render-phase concern; foundation carries full text + highlight offsets. Held-out visual check at render-phase UAT. |
-| overflow | many selected populations / filter chips | 🧪 backstop | Multi-select union is unbounded and harmless (All Contacts + others is redundant, not special-cased); control-surface overflow layout is Phase 26. Backstop verify at Phase 26. |
-| overflow | very large eligible set + active TS search scoring | 🧪 backstop | TS scoring over the already-filtered eligible set (no FTS5, no index — ADR-031); perf assessable only on the physical Pixel, not the emulator. Backstop: profile on-device at render-phase UAT. |
+**Surfaces probed:** E1 shared result collection · E2 scoped search + results · E3 population/filter/sort
+control chips · E4 cause-aware empty-state panel · E5 read-path error panel · E6 never-contacted rows.
+
+| Element | Category | Status | Resolution / Reason |
+|---------|----------|--------|---------------------|
+| E1 result collection | empty | ✅ explicit | Cause-aware gate (`dashboard-empty-logic`) resolves exactly one cause (firstrun / hidden / search-empty / filter-empty / per-population); copy per Copywriting Contract. |
+| E1 result collection | loading | ✅ explicit | Offline SQLite read — no blocking spinner; freshness re-query on focus, `AppState`→active, pull-to-refresh (`RefreshControl` accent tint). No network on read path (non-negotiable). |
+| E1 result collection | error | ✅ explicit | Cause-aware read-path failure state (`Couldn't load your contacts` / `Pull down to try again`); recovery = re-query, never a network retry. |
+| E1 result collection | populated | ✅ explicit | OR-union across selected populations deduped to one row per contact, retaining all population-match reasons (dossier §D). |
+| E1 result collection | partial | ✅ explicit | Never-contacted rows render neutral/statusless; `status: null` drives neutral, never re-derived as "Stable" (ADR-011). |
+| E1 result collection | zero-one-many | ✅ explicit | 0 rows → cause-aware empty; 1..many → populated collection; singular/plural copy per Copywriting Contract. |
+| E1 result collection | overflow | 🧪 backstop | List scroll / clip / virtualization is render-phase (27/28); foundation returns the full ordered set. Verify at render UAT. |
+| E2 scoped search | empty | ✅ explicit | `hasTerm` + zero rows → `search-empty` (`No matches for "{term}"`); precedence fires before filter/population copy. |
+| E2 scoped search | loading | ✅ explicit | Local SQLite + TS scoring is synchronous-fast — no spinner, no "searching…" label (contract). |
+| E2 scoped search | populated | ✅ explicit | Per-contact match descriptors, up-to-3 prioritized snippets, relevance-primary ordering with current sort as tie-breaker. |
+| E2 scoped search | partial | ✅ explicit | A name/identity-only match shows no secondary snippet yet still ranks; a name match never suppresses useful secondary knowledge matches. |
+| E2 scoped search | overflow | ✅ explicit | Beyond three match descriptors collapse to `+{N} more` (N = `totalMatchCount` − shown) — a locked data contract. |
+| E2 scoped search | zero-one-many | ✅ explicit | 0 snippets (name-only) · 1–3 shown · >3 → `+{N} more`. |
+| E2 scoped search | long-text | 🧪 backstop | Snippet / long name / long `fieldLabel` truncation is render-phase; foundation carries full text + highlight offsets. Verify at render UAT. |
+| E2 scoped search | error | ➖ n/a | Search runs over the same read path as E1 — no separate failure mode (covered by E1 error). |
+| E2 scoped search + scale | overflow (perf) | 🧪 backstop | TS scoring over the already-filtered eligible set (no FTS5, no index — ADR-031); perf assessable only on the physical Pixel, not the emulator. Profile on-device at render UAT. |
+| E3 control chips | empty | ✅ explicit | Nothing selected → `Active` implicit default, no chip rendered. |
+| E3 control chips | populated | ✅ explicit | Active selection = filled-accent chip + redundant non-colour channel (glyph/label); restrained active treatment on non-default. |
+| E3 control chips | zero-one-many | ✅ explicit | One vs many selected = OR-union within a family, AND across families; `All Contacts` + others is redundant, not special-cased. |
+| E3 control chips | overflow | 🧪 backstop | Many active chips collapse to `+N` summary — control-surface layout is Phase 26. Verify there. |
+| E3 control chips | long-text | 🧪 backstop | Long chip-label truncation is Phase 26 render; labels are fixed short strings here. Verify there. |
+| E3 control chips | loading | ➖ n/a | Chips hydrate synchronously from local `app_settings` prefs; no async load state. |
+| E3 control chips | error | ➖ n/a | Prefs are local; a write failure is a settings concern, not a chip state. |
+| E3 control chips | partial | ➖ n/a | Chips are atomic on/off; no partial-selection state exists. |
+| E4 empty-state panel | long-text | ✅ explicit | Text reflows under OS scaling (Typography: absolute-px line heights, no clamps); headings = Heading, bodies = Caption/Body. |
+| E4 empty-state panel | overflow | 🧪 backstop | Body/next-step layout under long hidden-bucket counts is render; verify at render UAT. |
+| E4 empty-state panel | loading | ➖ n/a | The panel is a resolved terminal state; its data-load is E1 loading. |
+| E4 empty-state panel | error | ➖ n/a | The empty panel has no failure mode; load failure is the separate cause (E5). |
+| E5 error panel | long-text | ✅ explicit | Reflows under OS scaling (same Typography contract). |
+| E5 error panel | overflow | ➖ n/a | Fixed short heading + body; no overflow surface (covered by Typography reflow). |
+| E6 never-contacted rows | populated | ✅ explicit | Neutral/statusless treatment; `status: null` drives neutral, never re-derived as "Stable" (ADR-011). |
+| E6 never-contacted rows | partial | ✅ explicit | The canonical partial-data case: no interaction history → neutral, no fabricated status/recency ("No interactions yet"). |
+| E6 never-contacted rows | overflow | 🧪 backstop | Row/card composition is render-phase (27/28); verify there. |
+| E6 never-contacted rows | empty | ➖ n/a | A row is not empty-stateful; the empty case is E1. |
+| E6 never-contacted rows | loading | ➖ n/a | Covered by E1 loading. |
+| E6 never-contacted rows | error | ➖ n/a | Covered by E1 error. |
+| E6 never-contacted rows | zero-one-many | ➖ n/a | Covered by E1 zero-one-many. |
 
 ---
 
@@ -284,11 +317,11 @@ if they must change — flag as BLOCKER, do not "fix"):
 
 ## Checker Sign-Off
 
-- [ ] Dimension 1 Copywriting: PASS
-- [ ] Dimension 2 Visuals: PASS
-- [ ] Dimension 3 Color: PASS
-- [ ] Dimension 4 Typography: PASS
-- [ ] Dimension 5 Spacing: PASS
-- [ ] Dimension 6 Registry Safety: PASS
+- [x] Dimension 1 Copywriting: PASS
+- [x] Dimension 2 Visuals: PASS
+- [x] Dimension 3 Color: PASS
+- [x] Dimension 4 Typography: PASS
+- [x] Dimension 5 Spacing: PASS
+- [x] Dimension 6 Registry Safety: PASS
 
-**Approval:** pending
+**Approval:** APPROVED (gsd-ui-checker, 2026-09-04) — 6/6 dimensions PASS; all four ADR trip-wires verified intact against disk. State-coverage probe: 27/36 resolved, 0 unresolved. Owner-confirm copy items outstanding (see Copywriting Contract).
