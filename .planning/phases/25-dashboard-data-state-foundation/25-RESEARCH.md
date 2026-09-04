@@ -371,18 +371,20 @@ ALTER TABLE app_settings ADD COLUMN theme_package TEXT NOT NULL DEFAULT 'galaxy'
 
 **If this table looks large:** these are genuine forks a planner/owner must confirm; none is a silent assumption presented as fact.
 
-## Open Questions
+## Open Questions (RESOLVED)
 
-1. **Gravity/Closeness filter mechanism (DASHQ-06).**
+> All four resolved during Phase 25 planning (2026-09-04). The guarded risk — an unresolved decision leaking into execution — does not exist: each is answered in a plan, as noted inline below.
+
+1. **Gravity/Closeness filter mechanism (DASHQ-06).** — **RESOLVED → Plan 25-03:** reversible post-query TS filter over candidate ids (reusing `computeContactGravity`/`GRAVITY_TIERS`), no cached column. Recorded as an explicit `<assumption>` with a Manual-Only Pixel perf gate; a cached column stays an owner one-way-door decision only if it profiles badly.
    - What we know: Gravity is derived in TS over the full interaction log via `computeContactGravity` (`impact.ts:88-101`) into tiers `thin/building/solid/deep` (`impact.ts:63-68`). There is **no gravity column** in `contacts` (verified: schema `001-initial.ts:61-82` has none; grep for gravity/closeness columns returned nothing).
    - What's unclear: whether to (a) resolve the Gravity filter as a **post-query TS pass** over candidate ids (batch-read each candidate's interactions, compute tier, filter) — simple but O(interactions) per filtered query, assessable for perf only on the physical Pixel; or (b) introduce a **cached gravity column with a single writer** — the explicit fallback `impact.ts:11-13` names, but that is new derived-state storage and a **risk/architecture decision in the owner's bucket**.
    - Recommendation: default to (a) for this phase (no new stored derived state, honors derived-never-stored), and **flag the perf/complexity fork to the owner** at discuss/plan. Do not add a gravity column without owner sign-off.
 
-2. **Filter durability serialization (A1).** Confirm at plan time whether filters persist as one TEXT blob, per-family columns, or JSON — and confirm all four axes (view/populations/filters/sort) are the complete durable set (search text + scroll explicitly excluded).
+2. **Filter durability serialization (A1).** — **RESOLVED → Plan 25-01:** locked via a `checkpoint:decision` to the four-column JSON-TEXT shape; the durable set is exactly view/populations/filters/sort (search text + scroll explicitly excluded).
 
-3. **Fate of the rank-ordered picker/sun/merge/capture reads (D-04).** The Dashboard stops sorting by rank, but `capture-read`, `sun-picker-read`, `merge-candidate-read`, `picker-read` still ORDER BY `favourite_rank`. Decide per-consumer: keep internal rank ordering (harmless, column stays) vs. switch to Default/recency order. This is an owner-visible fate decision to name, not silently pick.
+3. **Fate of the rank-ordered picker/sun/merge/capture reads (D-04).** — **RESOLVED → Plan 25-06:** keep internal rank ordering in `capture-read`/`sun-picker-read`/`merge-candidate-read`/`picker-read` (harmless, column stays per the D-04 trip-wire); only the Dashboard/widget stop ordering by rank.
 
-4. **Digest coupling (D-05/D-06).** `DigestScreen` consumes `countNeverContacted` and has no birthday read. Confirm the Digest surface's expectations before retiring the Never-Contacted screen and the birthday banner.
+4. **Digest coupling (D-05/D-06).** — **RESOLVED → Plan 25-07:** `countNeverContacted` is kept so Digest's count still reads; the Your-Week birthday coverage gap is recorded as a `flagged-unverified` prohibition, not silently dropped.
 
 ## Environment Availability
 

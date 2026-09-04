@@ -322,8 +322,27 @@ All v1.0 commits are local on `main` and have NOT been pushed.
   5. List and Card views share one query state where each axis is independently clearable, a global Reset Dashboard View restores all four while preserving the List/Card preference, and the Dashboard birthday banner is gone in favor of the Birthdays population (DASHQ-13/14)
 
 **Canonical refs**: docs/dossier/milestone-2/phase-04-dashboard-data-state-foundation-dossier.md; docs/dossier/milestone-2/planning-notes/phase-04-planning-notes.md
-**Schema**: dashboard preferences + retirement path for superseded keys (verify head+1 at plan time)
-**Plans**: TBD
+**Schema**: migration 019 — durable dashboard-preference columns on `app_settings` (view/populations/filters/sort); portable-key removal for superseded keys deferred to Phase 36 (verified head+1 = 019 on disk)
+**Plans**: 7 plans (4 waves)
+**Wave 1**
+
+- [ ] 25-01-PLAN.md — Schema (migration 019) + durable-pref DAO + shared query-state tracer (Active universe end-to-end) [W1]
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [ ] 25-02-PLAN.md — Populations OR-union engine (Favourites/Birthdays/Not-Contacted/Snoozed/All-Contacts, dedupe) [W2]
+- [ ] 25-04-PLAN.md — Scoped semantic search: eligible-id corpus scope + match descriptors (≤3 + "+N more") [W2]
+- [ ] 25-05-PLAN.md — Ephemeral session store (search/scroll) + empty-state population model [W2]
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
+- [ ] 25-03-PLAN.md — Five filter families + reversible Gravity post-query TS filter + sort model [W3]
+- [ ] 25-06-PLAN.md — Favourites retirement (ADR-075): widget Default order, retire Manage-favourites, keep column [W3]
+
+**Wave 4** *(blocked on Wave 3 completion)*
+
+- [ ] 25-07-PLAN.md — Retire birthday banner + Never-Contacted screen + include-Unbound toggle; Unbound replacement search [W4]
+
 **UI hint**: yes
 
 ### Phase 26: Dashboard Control Surface
