@@ -7,6 +7,7 @@ import { EditContactScreen } from "@/screens/EditContactScreen";
 import { MergeConflictsScreen } from "@/screens/MergeConflictsScreen";
 import { OrreryScreen } from "@/screens/OrreryScreen";
 import { SurvivorSelectScreen } from "@/screens/SurvivorSelectScreen";
+import { ThingsToRememberScreen } from "@/screens/ThingsToRememberScreen";
 import type { OrreryStackParamList } from "../types";
 
 const Stack = createNativeStackNavigator<OrreryStackParamList>();
@@ -16,6 +17,7 @@ export function OrreryStack() {
     <Stack.Navigator initialRouteName="Orrery" screenOptions={{ headerShown: false }}>
       <Stack.Screen name="Orrery" component={OrreryScreen} />
       <Stack.Screen name="Profile" component={ContactProfileScreen} />
+      <Stack.Screen name="ThingsToRemember" component={ThingsToRememberScreen} />
       <Stack.Screen name="Edit" component={EditContactScreen} />
       <Stack.Screen name="Compose" component={ComposeScreen} />
       <Stack.Screen name="CropPhoto" component={CropPhotoScreen} />

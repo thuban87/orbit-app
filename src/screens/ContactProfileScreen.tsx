@@ -976,6 +976,18 @@ export function ContactProfileScreen({
         </Text>
       </Pressable>
 
+      <Pressable
+        testID="contact-profile-things-to-remember"
+        accessibilityRole="button"
+        accessibilityLabel="Things to Remember"
+        onPress={() => navigation.navigate("ThingsToRemember", { contactId })}
+        style={styles.thingsToRememberEntry}
+      >
+        <Text style={[styles.addDetailsText, { color: colors.accentText }]}>
+          Things to Remember
+        </Text>
+      </Pressable>
+
       {visibleDefsForProfile(fieldDefs, customValues).length > 0 ? (
         <View
           testID="contact-profile-custom-fields"
@@ -1411,6 +1423,10 @@ const styles = StyleSheet.create({
   addDetailsText: {
     fontSize: 16,
     fontWeight: "600",
+  },
+  thingsToRememberEntry: {
+    minHeight: 44,
+    justifyContent: "center",
   },
   logContact: {
     minHeight: 44,

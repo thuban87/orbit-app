@@ -34,6 +34,7 @@ export type DashboardStackParamList = {
   CustomFields: undefined;
   Create: undefined;
   Profile: { contactId: number; openReachOut?: boolean };
+  ThingsToRemember: { contactId: number };
   Edit: { contactId: number };
   Archived: undefined;
   /**
@@ -126,6 +127,7 @@ export type DashboardStackParamList = {
 export type OrreryStackParamList = {
   Orrery: undefined;
   Profile: { contactId: number; openReachOut?: boolean };
+  ThingsToRemember: { contactId: number };
   Edit: { contactId: number };
   Compose: { contactId: number; requestAiSuggestion?: boolean };
   CropPhoto: {
