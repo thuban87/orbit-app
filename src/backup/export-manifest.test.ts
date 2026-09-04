@@ -66,6 +66,10 @@ describe("buildExportManifest", () => {
       "SELECT id FROM contacts WHERE uid = ?",
       ["contact-a"],
     );
+    const linked = await exec.runAsync(
+      `INSERT INTO contacts (uid, name, interval_days, created_at, modified_at) VALUES (?, ?, ?, ?, ?)`,
+      ["contact-b", "Bea", 7, NOW, NOW],
+    );
     await exec.runAsync(
       `INSERT INTO contact_methods
         (uid, contact_id, method_type, raw_value, display_value, canonical_value,
@@ -104,6 +108,26 @@ describe("buildExportManifest", () => {
     await exec.runAsync(
       `INSERT INTO custom_field_values (uid, contact_id, field_def_id, value, created_at, modified_at) VALUES (?, ?, ?, NULL, ?, ?)`,
       ["value-a", contact!.id, def!.id, NOW, NOW],
+    );
+    await exec.runAsync(
+      `INSERT INTO memories (uid, contact_id, type, value, pinned, outdated, provenance, created_at, modified_at, deleted_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ["memory-deleted", contact!.id, "custom", "Remember this", 1, 0, "user", NOW, NOW, "2026-08-26 12:00:00"],
+    );
+    await exec.runAsync(
+      `INSERT INTO relationships (uid, contact_id, person_name, linked_contact_id, pinned, created_at, modified_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      ["relationship-a", contact!.id, "Bea", linked.lastInsertRowId, 0, NOW, NOW],
+    );
+    await exec.runAsync(
+      `INSERT INTO current_state_entries (uid, contact_id, field_key, value, is_current, created_at, modified_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      ["state-history", contact!.id, "current_location", "Chicago", 0, NOW, NOW],
+    );
+    await exec.runAsync(
+      `INSERT INTO current_state_entries (uid, contact_id, field_key, value, is_current, created_at, modified_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      ["state-current", contact!.id, "current_location", "Madison", 1, NOW, "2026-08-26 12:00:00"],
     );
     const manifest = await buildExportManifest(exec, {
       exportedAt: NOW,
@@ -144,6 +168,16 @@ describe("buildExportManifest", () => {
     expect(manifest.customFieldValues).toEqual([
       expect.objectContaining({ uid: "value-a", value: null }),
     ]);
+    expect(manifest.memories).toEqual([
+      expect.objectContaining({ uid: "memory-deleted", contactUid: "contact-a", deletedAt: "2026-08-26 12:00:00" }),
+    ]);
+    expect(manifest.currentStateEntries).toEqual([
+      expect.objectContaining({ uid: "state-current", isCurrent: 1 }),
+      expect.objectContaining({ uid: "state-history", isCurrent: 0 }),
+    ]);
+    expect(manifest.relationships).toEqual([
+      expect.objectContaining({ uid: "relationship-a", contactUid: "contact-a", linkedContactUid: "contact-b" }),
+    ]);
   });
 
   it("omits all seven Phase-23 theme keys from a format-3 export's appSettings (deferral guard, REVIEWS 23-01 HIGH)", async () => {
@@ -162,7 +196,7 @@ describe("buildExportManifest", () => {
       exportedAt: NOW,
       readPhotoBase64: async () => "AQID",
     });
-    expect(manifest.backupFormatVersion).toBe(3);
+    expect(manifest.backupFormatVersion).toBe(4);
     for (const key of [
       "themePackage",
       "galaxyMode",

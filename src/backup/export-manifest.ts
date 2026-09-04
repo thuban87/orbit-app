@@ -42,7 +42,7 @@ async function readManifest(ro: ReadOnlyExecutor, deps: ExportManifestDeps): Pro
     getPortableSettingsSnapshot(ro),
     ro.getFirstAsync<{ user_version: number }>("PRAGMA user_version"),
   ]);
-  const [categories, profileRows, contactRows, contactMethods, externalContactLinks, contactMethodProvenance, interactions, events, fuel, contactLinks, customFieldDefs, rawValues, tombstones] = await Promise.all([
+  const [categories, profileRows, contactRows, contactMethods, externalContactLinks, contactMethodProvenance, interactions, events, fuel, contactLinks, customFieldDefs, rawValues, memories, relationships, currentStateEntries, tombstones] = await Promise.all([
     ro.getAllAsync<Record<string, unknown>>("SELECT uid, name, display_order AS displayOrder, created_at AS createdAt, modified_at AS modifiedAt FROM categories ORDER BY uid"),
     ro.getAllAsync<Record<string, unknown>>("SELECT uid, name, photo, created_at AS createdAt, modified_at AS modifiedAt FROM profile ORDER BY uid"),
     ro.getAllAsync<Record<string, unknown>>(`SELECT c.id AS localContactId, c.uid, c.name, category.uid AS categoryUid, c.tracking_enabled AS trackingEnabled, c.interval_days AS intervalDays, c.social_battery AS socialBattery, c.birthday, c.photo, c.archived_at AS archivedAt, c.snooze_until AS snoozeUntil, c.rarely_responds AS rarelyResponds, c.reminders_off AS remindersOff, c.created_at AS createdAt, c.modified_at AS modifiedAt FROM contacts c LEFT JOIN categories category ON category.id = c.category_id ORDER BY c.uid`),
@@ -55,6 +55,9 @@ async function readManifest(ro: ReadOnlyExecutor, deps: ExportManifestDeps): Pro
     ro.getAllAsync<Record<string, unknown>>("SELECT l.uid, c.uid AS contactUid, l.url, l.label, l.display_order AS displayOrder, l.created_at AS createdAt, l.modified_at AS modifiedAt FROM contact_links l JOIN contacts c ON c.id = l.contact_id ORDER BY l.uid"),
     ro.getAllAsync<Record<string, unknown>>("SELECT uid, col_name AS colName, label, type, options, show_on_new AS showOnNew, always_show AS alwaysShow, display_order AS displayOrder, quarantined_at AS quarantinedAt, share_with_ai AS shareWithAi, created_at AS createdAt, modified_at AS modifiedAt FROM custom_field_defs ORDER BY uid"),
     ro.getAllAsync<Record<string, unknown>>("SELECT v.uid, c.uid AS contactUid, d.uid AS fieldDefUid, d.type AS fieldType, d.col_name AS colName, c.id AS contactId, v.value, v.created_at AS createdAt, v.modified_at AS modifiedAt FROM custom_field_values v JOIN contacts c ON c.id = v.contact_id JOIN custom_field_defs d ON d.id = v.field_def_id ORDER BY v.uid"),
+    ro.getAllAsync<Record<string, unknown>>("SELECT m.uid,c.uid AS contactUid,m.type,m.custom_label AS customLabel,m.value,m.note,m.url,m.meaningful_date AS meaningfulDate,m.pinned,m.outdated,m.hidden,m.provenance,m.created_at AS createdAt,m.modified_at AS modifiedAt,m.deleted_at AS deletedAt FROM memories m JOIN contacts c ON c.id=m.contact_id ORDER BY m.uid"),
+    ro.getAllAsync<Record<string, unknown>>("SELECT r.uid,c.uid AS contactUid,r.person_name AS personName,r.relation_type AS relationType,linked.uid AS linkedContactUid,r.note,r.pinned,r.hidden,r.created_at AS createdAt,r.modified_at AS modifiedAt,r.deleted_at AS deletedAt FROM relationships r JOIN contacts c ON c.id=r.contact_id LEFT JOIN contacts linked ON linked.id=r.linked_contact_id ORDER BY r.uid"),
+    ro.getAllAsync<Record<string, unknown>>("SELECT s.uid,c.uid AS contactUid,s.field_key AS fieldKey,s.value,s.is_current AS isCurrent,s.created_at AS createdAt,s.modified_at AS modifiedAt FROM current_state_entries s JOIN contacts c ON c.id=s.contact_id ORDER BY s.uid"),
     ro.getAllAsync<{ entity_type: string; entity_uid: string; deleted_at: string }>("SELECT entity_type, entity_uid, deleted_at FROM tombstones ORDER BY entity_type, entity_uid"),
   ]);
   const contactUid = new Map(contactRows.map((row) => [row.localContactId as number, row.uid as string]));
@@ -77,6 +80,7 @@ async function readManifest(ro: ReadOnlyExecutor, deps: ExportManifestDeps): Pro
     contacts: await Promise.all(contactRows.map(async ({ localContactId: _localContactId, ...row }) => withPhoto(row, deps.readPhotoBase64))),
     contactMethods, externalContactLinks, contactMethodProvenance,
     interactions, events, fuel, contactLinks, customFieldDefs, customFieldValues: values,
+    memories, relationships, currentStateEntries,
     tombstones: tombstones.map((row) => ({ entityType: row.entity_type, entityUid: row.entity_uid, deletedAt: row.deleted_at })),
   };
   assertNoLocalOnlyKeys(manifest);

@@ -46,12 +46,12 @@ type PhotoTarget = RestorePendingTarget & { valueUid?: string; fieldDefUid?: str
 type FinalizeCandidate = { target: PhotoTarget; relativePath: string };
 type DeleteCandidate = { target: PhotoTarget; canonicalRelativePath: string; clearReference: boolean };
 
-const entities: readonly MergeableEntityType[] = ["categories", "profile", "contacts", "custom_field_defs", "contact_methods", "external_contact_links", "contact_method_provenance", "interactions", "events", "fuel", "contact_links", "custom_field_values"];
-const tableOf: Record<MergeableEntityType, string> = { categories: "categories", profile: "profile", contacts: "contacts", contact_methods: "contact_methods", external_contact_links: "external_contact_links", contact_method_provenance: "contact_method_provenance", interactions: "interactions", events: "events", fuel: "fuel", contact_links: "contact_links", custom_field_defs: "custom_field_defs", custom_field_values: "custom_field_values" };
-const tombstoneEntity: Record<MergeableEntityType, string | null> = { contacts: "contact", contact_methods: "contact_method", external_contact_links: "external_contact_link", contact_method_provenance: "contact_method_provenance", interactions: "interaction", events: "event", fuel: "fuel", contact_links: "contact_link", custom_field_defs: "custom_field_def", custom_field_values: "custom_field_value", categories: null, profile: null };
+const entities: readonly MergeableEntityType[] = ["categories", "profile", "contacts", "custom_field_defs", "contact_methods", "external_contact_links", "contact_method_provenance", "interactions", "events", "fuel", "contact_links", "custom_field_values", "memories", "relationships", "current_state_entries"];
+const tableOf: Record<MergeableEntityType, string> = { categories: "categories", profile: "profile", contacts: "contacts", contact_methods: "contact_methods", external_contact_links: "external_contact_links", contact_method_provenance: "contact_method_provenance", interactions: "interactions", events: "events", fuel: "fuel", contact_links: "contact_links", custom_field_defs: "custom_field_defs", custom_field_values: "custom_field_values", memories: "memories", relationships: "relationships", current_state_entries: "current_state_entries" };
+const tombstoneEntity: Record<MergeableEntityType, string | null> = { contacts: "contact", contact_methods: "contact_method", external_contact_links: "external_contact_link", contact_method_provenance: "contact_method_provenance", interactions: "interaction", events: "event", fuel: "fuel", contact_links: "contact_link", custom_field_defs: "custom_field_def", custom_field_values: "custom_field_value", categories: null, profile: null, memories: null, relationships: null, current_state_entries: null };
 
 function incomingRows(manifest: BackupManifest, entity: MergeableEntityType): Row[] {
-  const raw: Record<string, unknown>[] = entity === "profile" ? (manifest.profile ? [manifest.profile] : []) : entity === "contact_links" ? manifest.contactLinks : entity === "contact_methods" ? manifest.contactMethods : entity === "external_contact_links" ? manifest.externalContactLinks : entity === "contact_method_provenance" ? manifest.contactMethodProvenance : entity === "custom_field_defs" ? manifest.customFieldDefs : entity === "custom_field_values" ? manifest.customFieldValues : manifest[entity] as Record<string, unknown>[];
+  const raw: Record<string, unknown>[] = entity === "profile" ? (manifest.profile ? [manifest.profile] : []) : entity === "contact_links" ? manifest.contactLinks : entity === "contact_methods" ? manifest.contactMethods : entity === "external_contact_links" ? manifest.externalContactLinks : entity === "contact_method_provenance" ? manifest.contactMethodProvenance : entity === "custom_field_defs" ? manifest.customFieldDefs : entity === "custom_field_values" ? manifest.customFieldValues : entity === "current_state_entries" ? manifest.currentStateEntries : manifest[entity] as Record<string, unknown>[];
   return raw.map((row) => ({ ...row, modified_at: row.modifiedAt as string } as Row));
 }
 async function localRows(exec: SqlExecutor, entity: MergeableEntityType): Promise<Row[]> {
@@ -68,6 +68,9 @@ async function localRows(exec: SqlExecutor, entity: MergeableEntityType): Promis
     contact_links: "SELECT l.uid,c.uid AS contactUid,l.url,l.label,l.display_order AS displayOrder,l.created_at AS createdAt,l.modified_at FROM contact_links l JOIN contacts c ON c.id=l.contact_id",
     custom_field_defs: "SELECT uid,col_name AS colName,label,type,options,show_on_new AS showOnNew,always_show AS alwaysShow,display_order AS displayOrder,quarantined_at AS quarantinedAt,share_with_ai AS shareWithAi,created_at AS createdAt,modified_at FROM custom_field_defs",
     custom_field_values: "SELECT v.uid,c.uid AS contactUid,d.uid AS fieldDefUid,d.type AS fieldType,d.col_name AS colName,v.value,v.created_at AS createdAt,v.modified_at FROM custom_field_values v JOIN contacts c ON c.id=v.contact_id JOIN custom_field_defs d ON d.id=v.field_def_id",
+    memories: "SELECT m.uid,c.uid AS contactUid,m.type,m.custom_label AS customLabel,m.value,m.note,m.url,m.meaningful_date AS meaningfulDate,m.pinned,m.outdated,m.hidden,m.provenance,m.created_at AS createdAt,m.modified_at,m.deleted_at AS deletedAt FROM memories m JOIN contacts c ON c.id=m.contact_id",
+    relationships: "SELECT r.uid,c.uid AS contactUid,r.person_name AS personName,r.relation_type AS relationType,linked.uid AS linkedContactUid,r.note,r.pinned,r.hidden,r.created_at AS createdAt,r.modified_at,r.deleted_at AS deletedAt FROM relationships r JOIN contacts c ON c.id=r.contact_id LEFT JOIN contacts linked ON linked.id=r.linked_contact_id",
+    current_state_entries: "SELECT s.uid,c.uid AS contactUid,s.field_key AS fieldKey,s.value,s.is_current AS isCurrent,s.created_at AS createdAt,s.modified_at FROM current_state_entries s JOIN contacts c ON c.id=s.contact_id",
   };
   return exec.getAllAsync<Row>(sql[entity]);
 }
@@ -127,6 +130,13 @@ function normalizePlan(plan: Plan): void {
     const winner = normalizedWinner(actions);
     for (const loser of actions) if (loser !== winner) { loser.row!.isActive = 0; updateRetained(loser); }
   }
+  const liveCurrent = plan.current_state_entries.filter((action) => action.row && action.kind !== "delete" && action.kind !== "blocked" && action.row.isCurrent === 1);
+  const byCurrent = new Map<string, ReconciliationAction[]>();
+  for (const action of liveCurrent) { const row = action.row!; const key = `${row.contactUid}\0${row.fieldKey}`; byCurrent.set(key, [...(byCurrent.get(key) ?? []), action]); }
+  for (const actions of byCurrent.values()) if (actions.length > 1) {
+    const winner = normalizedWinner(actions);
+    for (const loser of actions) if (loser !== winner) { loser.row!.isCurrent = 0; updateRetained(loser); }
+  }
 }
 /** Resolve the v11 one-way cadence invariant before opening the restore transaction. */
 function retainAssignedCadence(plan: Plan, localContacts: ReadonlyMap<string, Row>): void {
@@ -159,7 +169,7 @@ async function upsertContacts(exec: SqlExecutor, plan: Plan): Promise<void> {
 }
 async function upsertChildren(exec: SqlExecutor, plan: Plan): Promise<void> {
   const contacts = await idMap(exec, "contacts"); const defs = await idMap(exec, "custom_field_defs");
-  for (const entity of ["contact_methods", "external_contact_links", "interactions","events","fuel","contact_links","custom_field_values"] as const) for (const a of writes(plan, entity).sort((left, right) => {
+  for (const entity of ["contact_methods", "external_contact_links", "interactions","events","fuel","contact_links","custom_field_values", "memories", "relationships", "current_state_entries"] as const) for (const a of writes(plan, entity).sort((left, right) => {
     const leftActive = entity === "contact_methods" ? left.row?.isPrimary : entity === "external_contact_links" ? left.row?.isActive : 0;
     const rightActive = entity === "contact_methods" ? right.row?.isPrimary : entity === "external_contact_links" ? right.row?.isActive : 0;
     return Number(leftActive) - Number(rightActive) || left.uid.localeCompare(right.uid);
@@ -172,6 +182,9 @@ async function upsertChildren(exec: SqlExecutor, plan: Plan): Promise<void> {
     if (entity === "fuel") await exec.runAsync("INSERT INTO fuel (uid,contact_id,kind,label,text,url,created_at,source,modified_at) VALUES (?,?,?,?,?,?,?,?,?) ON CONFLICT(uid) DO UPDATE SET contact_id=excluded.contact_id,kind=excluded.kind,label=excluded.label,text=excluded.text,url=excluded.url,created_at=excluded.created_at,source=excluded.source,modified_at=excluded.modified_at", [r.uid,contact,r.kind,r.label ?? null,r.text ?? null,r.url ?? null,r.createdAt,r.source,r.modified_at]);
     if (entity === "contact_links") await exec.runAsync("INSERT INTO contact_links (uid,contact_id,url,label,display_order,created_at,modified_at) VALUES (?,?,?,?,?,?,?) ON CONFLICT(uid) DO UPDATE SET contact_id=excluded.contact_id,url=excluded.url,label=excluded.label,display_order=excluded.display_order,created_at=excluded.created_at,modified_at=excluded.modified_at", [r.uid,contact,r.url,r.label ?? null,r.displayOrder,r.createdAt,r.modified_at]);
     if (entity === "custom_field_values") { const def = defs.get(r.fieldDefUid as string); if (!def) throw new Error("restore definition disappeared during apply"); await exec.runAsync("INSERT INTO custom_field_values (uid,contact_id,field_def_id,value,created_at,modified_at) VALUES (?,?,?,?,?,?) ON CONFLICT(uid) DO UPDATE SET contact_id=excluded.contact_id,field_def_id=excluded.field_def_id,value=excluded.value,modified_at=excluded.modified_at", [r.uid,contact,def,r.value ?? null,r.createdAt,r.modified_at]); }
+    if (entity === "memories") await exec.runAsync("INSERT INTO memories (uid,contact_id,type,custom_label,value,note,url,meaningful_date,pinned,outdated,hidden,provenance,created_at,modified_at,deleted_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(uid) DO UPDATE SET contact_id=excluded.contact_id,type=excluded.type,custom_label=excluded.custom_label,value=excluded.value,note=excluded.note,url=excluded.url,meaningful_date=excluded.meaningful_date,pinned=excluded.pinned,outdated=excluded.outdated,hidden=excluded.hidden,provenance=excluded.provenance,modified_at=excluded.modified_at,deleted_at=excluded.deleted_at", [r.uid,contact,r.type,r.customLabel ?? null,r.value ?? null,r.note ?? null,r.url ?? null,r.meaningfulDate ?? null,r.pinned,r.outdated,r.hidden ?? null,r.provenance,r.createdAt,r.modified_at,r.deletedAt ?? null]);
+    if (entity === "relationships") { const linked = typeof r.linkedContactUid === "string" ? contacts.get(r.linkedContactUid) ?? null : null; await exec.runAsync("INSERT INTO relationships (uid,contact_id,person_name,relation_type,linked_contact_id,note,pinned,hidden,created_at,modified_at,deleted_at) VALUES (?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(uid) DO UPDATE SET contact_id=excluded.contact_id,person_name=excluded.person_name,relation_type=excluded.relation_type,linked_contact_id=excluded.linked_contact_id,note=excluded.note,pinned=excluded.pinned,hidden=excluded.hidden,modified_at=excluded.modified_at,deleted_at=excluded.deleted_at", [r.uid,contact,r.personName,r.relationType ?? null,linked,r.note ?? null,r.pinned,r.hidden ?? null,r.createdAt,r.modified_at,r.deletedAt ?? null]); }
+    if (entity === "current_state_entries") await exec.runAsync("INSERT INTO current_state_entries (uid,contact_id,field_key,value,is_current,created_at,modified_at) VALUES (?,?,?,?,?,?,?) ON CONFLICT(uid) DO UPDATE SET contact_id=excluded.contact_id,field_key=excluded.field_key,value=excluded.value,is_current=excluded.is_current,modified_at=excluded.modified_at", [r.uid,contact,r.fieldKey,r.value,r.isCurrent,r.createdAt,r.modified_at]);
   }
   const methods = await idMap(exec, "contact_methods");
   const externalLinks = await idMap(exec, "external_contact_links");
@@ -222,14 +235,14 @@ async function replaceAllReset(exec: SqlExecutor, manifest: BackupManifest, dele
     contact_methods: ["contact_method", "contact_methods"],
     external_contact_links: ["external_contact_link", "external_contact_links"],
     contact_method_provenance: ["contact_method_provenance", "contact_method_provenance"],
-    interactions: ["interaction", "interactions"], events: ["event", "events"], fuel: ["fuel", "fuel"],
+    interactions: ["interaction", "interactions"], events: ["event", "events"], fuel: ["fuel", "fuel"], memories: null, relationships: null, current_state_entries: null,
     contact_links: ["contact_link", "contact_links"], custom_field_defs: ["custom_field_def", "custom_field_defs"], custom_field_values: ["custom_field_value", "custom_field_values"],
   };
   for (const source of Object.values(resetSources)) if (source) for (const r of await exec.getAllAsync<{ uid: string }>(`SELECT uid FROM ${source[1]}`)) await exec.runAsync("INSERT INTO tombstones (entity_type,entity_uid,deleted_at) VALUES (?,?,?) ON CONFLICT(entity_type,entity_uid) DO UPDATE SET deleted_at=CASE WHEN excluded.deleted_at>tombstones.deleted_at THEN excluded.deleted_at ELSE tombstones.deleted_at END", [source[0],r.uid,manifest.metadata.exportedAt]);
   const ownedResidualTables: Record<MergeableEntityType, readonly string[]> = {
-    categories: [], profile: [], contacts: ["field_history"], contact_methods: [], external_contact_links: [], contact_method_provenance: [], interactions: [], events: [], fuel: [], contact_links: [], custom_field_defs: [], custom_field_values: [],
+    categories: [], profile: [], contacts: ["field_history"], contact_methods: [], external_contact_links: [], contact_method_provenance: [], interactions: [], events: [], fuel: [], contact_links: [], custom_field_defs: [], custom_field_values: [], memories: [], relationships: [], current_state_entries: [],
   };
-  for (const table of ["import_session_rows", "import_sessions", "contact_method_provenance", "interactions", "events", "fuel", "custom_field_values", "contact_links", "external_contact_links", "contact_methods", ...ownedResidualTables.contacts, "contacts", "custom_field_defs"]) await exec.runAsync(`DELETE FROM ${table}`);
+  for (const table of ["import_session_rows", "import_sessions", "contact_method_provenance", "interactions", "events", "fuel", "current_state_entries", "relationships", "memories", "custom_field_values", "contact_links", "external_contact_links", "contact_methods", ...ownedResidualTables.contacts, "contacts", "custom_field_defs"]) await exec.runAsync(`DELETE FROM ${table}`);
 }
 async function importTombstones(exec: SqlExecutor, manifest: BackupManifest): Promise<void> { for (const r of manifest.tombstones) await exec.runAsync("INSERT INTO tombstones (entity_type,entity_uid,deleted_at) VALUES (?,?,?) ON CONFLICT(entity_type,entity_uid) DO UPDATE SET deleted_at=CASE WHEN excluded.deleted_at>tombstones.deleted_at THEN excluded.deleted_at ELSE tombstones.deleted_at END", [r.entityType,r.entityUid,r.deletedAt]); }
 async function writePhotoReference(exec: SqlExecutor, target: PhotoTarget, relative: string | null): Promise<void> {

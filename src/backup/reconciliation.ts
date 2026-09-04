@@ -16,6 +16,9 @@ export type MergeableEntityType =
   | "contact_links"
   | "custom_field_defs"
   | "custom_field_values"
+  | "memories"
+  | "relationships"
+  | "current_state_entries"
   | "categories"
   | "profile";
 
@@ -80,6 +83,9 @@ export const ENTITY_POLICIES: Readonly<Record<MergeableEntityType, EntityPolicy>
       { field: "field_def_id", entityType: "custom_field_defs" },
     ],
   },
+  memories: { writeMode: "lww", parentFields: [{ field: "contact_id", entityType: "contacts" }] },
+  relationships: { writeMode: "lww", parentFields: [{ field: "contact_id", entityType: "contacts" }] },
+  current_state_entries: { writeMode: "lww", parentFields: [{ field: "contact_id", entityType: "contacts" }] },
   categories: {
     writeMode: "lww",
     reservedUids: Object.values(RESERVED_CATEGORY_UIDS),

@@ -89,6 +89,13 @@ const FORWARD_MIGRATIONS: Readonly<Record<number, Migration>> = {
       contacts,
     };
   },
+  3: (manifest) => ({
+    ...manifest,
+    backupFormatVersion: 4,
+    memories: [],
+    relationships: [],
+    currentStateEntries: [],
+  }),
 };
 
 function fail(message: string): never {
@@ -243,6 +250,9 @@ function validate(manifest: RawManifest): BackupManifest {
     "contactLinks",
     "customFieldDefs",
     "customFieldValues",
+    "memories",
+    "relationships",
+    "currentStateEntries",
     "tombstones",
   ] as const;
   const arrays = Object.fromEntries(
@@ -261,6 +271,9 @@ function validate(manifest: RawManifest): BackupManifest {
     "fuel",
     "contactLinks",
     "customFieldValues",
+    "memories",
+    "relationships",
+    "currentStateEntries",
   ] as const)
     uidSet(arrays[key], key);
   const settings = record(manifest.appSettings, "appSettings");
@@ -375,6 +388,35 @@ function validate(manifest: RawManifest): BackupManifest {
       fail("customFieldValues has a duplicate custom value pair");
     pairs.add(pair);
   }
+  for (const memory of arrays.memories) {
+    if (typeof memory.contactUid !== "string" || !contacts.has(memory.contactUid))
+      fail("memories has an unknown contact UID");
+    for (const key of ["type", "createdAt", "modifiedAt"] as const)
+      if (typeof memory[key] !== "string") fail("memories has an invalid row");
+    for (const key of ["customLabel", "value", "note", "url", "meaningfulDate", "deletedAt"] as const)
+      if (memory[key] !== null && memory[key] !== undefined && typeof memory[key] !== "string")
+        fail("memories has an invalid optional value");
+    if ((memory.pinned !== 0 && memory.pinned !== 1) || (memory.outdated !== 0 && memory.outdated !== 1))
+      fail("memories has an invalid flag");
+  }
+  for (const relationship of arrays.relationships) {
+    if (typeof relationship.contactUid !== "string" || !contacts.has(relationship.contactUid) || typeof relationship.personName !== "string" || typeof relationship.createdAt !== "string" || typeof relationship.modifiedAt !== "string")
+      fail("relationships has an invalid row");
+    if (relationship.linkedContactUid !== null && relationship.linkedContactUid !== undefined && (typeof relationship.linkedContactUid !== "string" || !contacts.has(relationship.linkedContactUid)))
+      fail("relationships has an unknown linked contact UID");
+    if (relationship.linkedContactUid === relationship.contactUid)
+      fail("relationships cannot link a contact to itself");
+  }
+  const currentPairs = new Set<string>();
+  for (const entry of arrays.currentStateEntries) {
+    if (typeof entry.contactUid !== "string" || !contacts.has(entry.contactUid) || typeof entry.fieldKey !== "string" || typeof entry.value !== "string" || typeof entry.createdAt !== "string" || typeof entry.modifiedAt !== "string" || (entry.isCurrent !== 0 && entry.isCurrent !== 1))
+      fail("currentStateEntries has an invalid row");
+    if (entry.isCurrent === 1) {
+      const pair = `${entry.contactUid}\u0000${entry.fieldKey}`;
+      if (currentPairs.has(pair)) fail("currentStateEntries has duplicate current value");
+      currentPairs.add(pair);
+    }
+  }
   const profile =
     manifest.profile === null ? null : record(manifest.profile, "profile");
   const metadata = record(manifest.metadata, "metadata");
@@ -467,6 +509,18 @@ function validate(manifest: RawManifest): BackupManifest {
     if (!survivingDefs.has(value.fieldDefUid as string))
       fail("customFieldValues has no surviving field definition parent");
   }
+  for (const memory of arrays.memories)
+    if (!survivingContacts.has(memory.contactUid as string))
+      fail("memories has no surviving contact parent");
+  for (const relationship of arrays.relationships) {
+    if (!survivingContacts.has(relationship.contactUid as string))
+      fail("relationships has no surviving contact parent");
+    if (typeof relationship.linkedContactUid === "string" && !survivingContacts.has(relationship.linkedContactUid))
+      fail("relationships has no surviving linked contact parent");
+  }
+  for (const entry of arrays.currentStateEntries)
+    if (!survivingContacts.has(entry.contactUid as string))
+      fail("currentStateEntries has no surviving contact parent");
   for (const row of [...arrays.contacts, ...arrays.customFieldValues]) {
     if (
       row.photoBase64 !== null &&
@@ -504,6 +558,9 @@ function validate(manifest: RawManifest): BackupManifest {
     contactLinks: arrays.contactLinks,
     customFieldDefs: arrays.customFieldDefs,
     customFieldValues: arrays.customFieldValues,
+    memories: arrays.memories,
+    relationships: arrays.relationships,
+    currentStateEntries: arrays.currentStateEntries,
     tombstones,
   };
 }

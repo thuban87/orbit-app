@@ -43,17 +43,19 @@ import { migration011 } from "@/db/migrations/011-contact-lifecycle-schema";
 import { migration012 } from "@/db/migrations/012-import-sessions";
 import { migration013 } from "@/db/migrations/013-reconciliation-and-merge";
 import { migration014 } from "@/db/migrations/014-interaction-assists";
+import { migration015 } from "@/db/migrations/015-theme-settings";
+import { migration016 } from "@/db/migrations/016-contact-knowledge";
 import { runMigrations } from "@/db/migrations/runner";
 import type { SqlExecutor } from "@/db/types";
 
 const NOW = "2026-08-25 12:00:00";
 let uid = 0;
 const newUid = () => `uid-${++uid}`;
-const migrations = [migration001, migration002, migration003, migration004, migration005, migration006, migration007, migration008, migration009, migration010, migration011, migration012, migration013, migration014];
+const migrations = [migration001, migration002, migration003, migration004, migration005, migration006, migration007, migration008, migration009, migration010, migration011, migration012, migration013, migration014, migration015, migration016];
 
 async function db(): Promise<SqlExecutor> {
   const exec = nodeSqliteExecutor(openTestDb());
-  await runMigrations(exec, migrations, 14, { now: NOW, newUid });
+  await runMigrations(exec, migrations, 16, { now: NOW, newUid });
   return exec;
 }
 
@@ -67,6 +69,22 @@ beforeEach(() => {
 });
 
 describe("applyRestore", () => {
+  it("round-trips live and deleted knowledge, linked people, and current/history state", async () => {
+    const source = await db();
+    const owner = await source.runAsync("INSERT INTO contacts (uid,name,interval_days,rarely_responds,reminders_off,created_at,modified_at) VALUES (?,?,?,?,?,?,?)", ["knowledge-owner", "Owner", 14, 0, 0, NOW, NOW]);
+    const linked = await source.runAsync("INSERT INTO contacts (uid,name,interval_days,rarely_responds,reminders_off,created_at,modified_at) VALUES (?,?,?,?,?,?,?)", ["knowledge-linked", "Linked", 14, 0, 0, NOW, NOW]);
+    await source.runAsync("INSERT INTO memories (uid,contact_id,type,value,pinned,outdated,provenance,created_at,modified_at,deleted_at) VALUES (?,?,?,?,?,?,?,?,?,?)", ["memory-live", owner.lastInsertRowId, "custom", "Live", 1, 0, "user", NOW, NOW, null]);
+    await source.runAsync("INSERT INTO memories (uid,contact_id,type,value,pinned,outdated,provenance,created_at,modified_at,deleted_at) VALUES (?,?,?,?,?,?,?,?,?,?)", ["memory-deleted", owner.lastInsertRowId, "custom", "Deleted", 0, 0, "user", NOW, NOW, "2026-08-26 12:00:00"]);
+    await source.runAsync("INSERT INTO relationships (uid,contact_id,person_name,linked_contact_id,pinned,created_at,modified_at,deleted_at) VALUES (?,?,?,?,?,?,?,?)", ["relationship-linked", owner.lastInsertRowId, "Linked", linked.lastInsertRowId, 1, NOW, NOW, null]);
+    await source.runAsync("INSERT INTO current_state_entries (uid,contact_id,field_key,value,is_current,created_at,modified_at) VALUES (?,?,?,?,?,?,?)", ["state-history", owner.lastInsertRowId, "current_location", "Chicago", 0, NOW, NOW]);
+    await source.runAsync("INSERT INTO current_state_entries (uid,contact_id,field_key,value,is_current,created_at,modified_at) VALUES (?,?,?,?,?,?,?)", ["state-current", owner.lastInsertRowId, "current_location", "Madison", 1, NOW, "2026-08-26 12:00:00"]);
+    const manifest = await buildExportManifest(source, { exportedAt: NOW, readPhotoBase64: async () => "" });
+    const destination = await db();
+    await expect(applyRestore(destination, manifest, "replace-all")).resolves.toMatchObject({ status: "applied" });
+    await expect(destination.getAllAsync("SELECT uid,deleted_at FROM memories ORDER BY uid")).resolves.toEqual([{ uid: "memory-deleted", deleted_at: "2026-08-26 12:00:00" }, { uid: "memory-live", deleted_at: null }]);
+    await expect(destination.getFirstAsync<{ linked_uid: string }>("SELECT linked.uid AS linked_uid FROM relationships r JOIN contacts linked ON linked.id=r.linked_contact_id WHERE r.uid=?", ["relationship-linked"])).resolves.toEqual({ linked_uid: "knowledge-linked" });
+    await expect(destination.getAllAsync("SELECT uid,is_current FROM current_state_entries ORDER BY uid")).resolves.toEqual([{ uid: "state-current", is_current: 1 }, { uid: "state-history", is_current: 0 }]);
+  });
   it("reconciles all decisions before one transaction and UID-maps an incoming contact", async () => {
     const source = await db();
     await source.runAsync(

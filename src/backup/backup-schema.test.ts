@@ -9,7 +9,8 @@ const valid = (): Record<string, any> => ({
   appSettings: { sunContactUid: null, modifiedAt: "2026-08-25 12:00:00" },
   categories: [], profile: null, contacts: [], contactMethods: [], externalContactLinks: [],
   contactMethodProvenance: [], interactions: [], events: [], fuel: [],
-  contactLinks: [], customFieldDefs: [], customFieldValues: [], tombstones: [],
+  contactLinks: [], customFieldDefs: [], customFieldValues: [], memories: [],
+  relationships: [], currentStateEntries: [], tombstones: [],
 });
 
 describe("parseBackupManifest", () => {
@@ -72,7 +73,7 @@ describe("parseBackupManifest", () => {
     const parsed = parseBackupManifest(legacy) as typeof legacy & {
       contactMethods: Array<Record<string, unknown>>;
     };
-    expect(parsed.backupFormatVersion).toBe(3);
+    expect(parsed.backupFormatVersion).toBe(4);
     expect(parsed.contacts[0]).not.toHaveProperty("phone");
     expect(parsed.contacts[0]).not.toHaveProperty("email");
     expect(parsed.appSettings).toHaveProperty("phoneRegionOverride", null);
@@ -96,7 +97,7 @@ describe("parseBackupManifest", () => {
 
     const parsed = parseBackupManifest(legacy);
 
-    expect(parsed.backupFormatVersion).toBe(3);
+    expect(parsed.backupFormatVersion).toBe(4);
     expect(parsed.contacts).toEqual([
       expect.objectContaining({ uid: "contact-a", trackingEnabled: 1, intervalDays: 7 }),
     ]);
