@@ -128,6 +128,41 @@ describe("relationships DAO", () => {
     ).toEqual({ count: 0 });
   });
 
+  it("rejects invalid visibility flags without changing relationship rows", async () => {
+    const contactId = await seedContact();
+    await expect(
+      addRelationship(exec, {
+        contactId,
+        personName: "Invalid new flag",
+        hidden: 2 as never,
+        createdAt: NOW,
+        now: NOW,
+      }),
+    ).rejects.toThrow("relationships-dao: hidden must be 0, 1, or null");
+
+    const id = await addRelationship(exec, {
+      contactId,
+      personName: "Existing flag",
+      hidden: null,
+      createdAt: NOW,
+      now: NOW,
+    });
+    await expect(
+      editRelationship(exec, {
+        id,
+        contactId,
+        hidden: 2 as never,
+        now: "2026-09-04 13:00:00",
+      }),
+    ).rejects.toThrow("relationships-dao: hidden must be 0, 1, or null");
+    await expect(
+      exec.getFirstAsync<{ hidden: number | null }>(
+        "SELECT hidden FROM relationships WHERE id = ?",
+        [id],
+      ),
+    ).resolves.toEqual({ hidden: null });
+  });
+
   it("patches only supplied fields, scopes by both keys, and rejects edit self-links", async () => {
     const contactId = await seedContact();
     const otherContactId = await seedContact("Blair");

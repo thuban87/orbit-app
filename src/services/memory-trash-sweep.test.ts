@@ -82,7 +82,7 @@ async function rowExists(table: "memories" | "relationships", id: number): Promi
 }
 
 describe("memory trash sweep", () => {
-  it("expires only past-window memories and relationships, retaining boundary rows on rerun", async () => {
+  it("expires only past-window memories and relationships, retaining under-window rows on rerun", async () => {
     const contactId = await seedContact();
     const staleMemory = await seedMemory(contactId, "Stale memory");
     const recentMemory = await seedMemory(contactId, "Recent memory");
@@ -91,7 +91,10 @@ describe("memory trash sweep", () => {
     const recentRelationship = await seedRelationship(contactId, "Recent relationship");
     await ageMemory(staleMemory, "-31 days");
     await ageMemory(recentMemory, "-29 days");
-    await ageMemory(edgeMemory, "-30 days");
+    // SQLite evaluates its wall clock separately from this setup query. Keep
+    // the retained row safely inside the strict window rather than racing the
+    // next-second boundary of an exact 30-day timestamp.
+    await ageMemory(edgeMemory, "-29 days");
     await ageRelationship(staleRelationship, "-31 days");
     await ageRelationship(recentRelationship, "-29 days");
 

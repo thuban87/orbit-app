@@ -12,7 +12,7 @@ export interface RelationshipDraft {
   linkedContactId: number | null;
   note: string | null;
   pinned: boolean;
-  hidden: number | null;
+  hidden: 0 | 1 | null;
 }
 
 export interface RelationshipEditorProps {
@@ -36,7 +36,7 @@ function initialDraft(item?: RelationshipRow): RelationshipDraft {
     linkedContactId: item?.linked_contact_id ?? null,
     note: item?.note ?? null,
     pinned: item?.pinned === 1,
-    hidden: item?.hidden ?? null,
+    hidden: item?.hidden === 1 ? 1 : item?.hidden === 0 ? 0 : null,
   };
 }
 

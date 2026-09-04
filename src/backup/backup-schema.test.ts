@@ -131,6 +131,45 @@ describe("parseBackupManifest", () => {
     );
   });
 
+  it("rejects non-text relationship optional fields before restore", () => {
+    const relationshipManifest = () => {
+      const manifest = valid();
+      manifest.contacts = [
+        {
+          uid: "contact-a",
+          trackingEnabled: 1,
+          intervalDays: 7,
+          modifiedAt: "2026-08-25 12:00:00",
+        },
+      ];
+      manifest.relationships = [
+        {
+          uid: "relationship-a",
+          contactUid: "contact-a",
+          personName: "Alex",
+          relationType: null,
+          note: null,
+          pinned: 0,
+          hidden: null,
+          createdAt: "2026-08-25 12:00:00",
+          modifiedAt: "2026-08-25 12:00:00",
+          deletedAt: null,
+        },
+      ];
+      return manifest;
+    };
+
+    for (const patch of [
+      { relationType: 12 },
+      { note: {} },
+      { deletedAt: false },
+    ]) {
+      const manifest = relationshipManifest();
+      Object.assign(manifest.relationships[0], patch);
+      expect(() => parseBackupManifest(manifest)).toThrow(BackupSchemaError);
+    }
+  });
+
   it("rejects a category reference that cannot be resolved within the backup itself", () => {
     const broken = valid();
     broken.contacts = [{ uid: "contact", trackingEnabled: 1, intervalDays: 1, modifiedAt: "2026-08-25 12:00:00", categoryUid: "missing" }];

@@ -12,7 +12,7 @@ export interface NewRelationshipInput {
   linkedContactId?: number | null;
   note?: string | null;
   pinned?: boolean | number;
-  hidden?: number | null;
+  hidden?: 0 | 1 | null;
   createdAt: string;
   now: string;
 }
@@ -25,7 +25,7 @@ export interface EditRelationshipInput {
   linkedContactId?: number | null;
   note?: string | null;
   pinned?: boolean | number;
-  hidden?: number | null;
+  hidden?: 0 | 1 | null;
   now: string;
 }
 
@@ -48,6 +48,12 @@ function assertPersonName(personName: string): void {
   }
 }
 
+function assertNullableBinaryVisibility(hidden: unknown): void {
+  if (hidden !== null && hidden !== 0 && hidden !== 1) {
+    throw new Error("relationships-dao: hidden must be 0, 1, or null");
+  }
+}
+
 /** Reject a relationship whose optional contact link points to its owner. */
 export function assertNotSelfLink(
   contactId: number,
@@ -65,6 +71,7 @@ export async function addRelationshipCore(
 ): Promise<number> {
   assertPersonName(input.personName);
   assertNotSelfLink(input.contactId, input.linkedContactId);
+  if (input.hidden !== undefined) assertNullableBinaryVisibility(input.hidden);
   const result = await exec.runAsync(
     `INSERT INTO relationships
        (uid, contact_id, person_name, relation_type, linked_contact_id, note,
@@ -95,6 +102,7 @@ export async function editRelationshipCore(
   if (input.linkedContactId !== undefined) {
     assertNotSelfLink(input.contactId, input.linkedContactId);
   }
+  if (input.hidden !== undefined) assertNullableBinaryVisibility(input.hidden);
 
   const sets: string[] = [];
   const params: (string | number | null)[] = [];

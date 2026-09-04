@@ -442,6 +442,9 @@ function validate(manifest: RawManifest): BackupManifest {
       fail("relationships has an invalid row");
     if (relationship.personName.trim().length === 0)
       fail("relationships requires a person name");
+    for (const key of ["relationType", "note", "deletedAt"] as const)
+      if (relationship[key] !== null && relationship[key] !== undefined && typeof relationship[key] !== "string")
+        fail("relationships has an invalid optional value");
     if (relationship.linkedContactUid !== null && relationship.linkedContactUid !== undefined && (typeof relationship.linkedContactUid !== "string" || !contacts.has(relationship.linkedContactUid)))
       fail("relationships has an unknown linked contact UID");
     if (relationship.linkedContactUid === relationship.contactUid)

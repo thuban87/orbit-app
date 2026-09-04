@@ -167,7 +167,9 @@ export function initialDraft(item?: MemoryRow): MemoryDraft {
     meaningfulDate: item?.meaningful_date ?? null,
     pinned: item?.pinned === 1,
     outdated: item?.outdated === 1,
-    hidden: item?.hidden === null ? null : item?.hidden === 1,
+    // A new Memory (and a legacy row with a malformed flag) must inherit the
+    // registry default; only explicit database 0/1 values are overrides.
+    hidden: item?.hidden === 1 ? true : item?.hidden === 0 ? false : null,
   };
 }
 

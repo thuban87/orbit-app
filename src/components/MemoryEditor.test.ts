@@ -21,6 +21,10 @@ import { initialDraft } from "./MemoryEditor";
 import type { MemoryRow } from "@/db/memories-read";
 
 describe("initialDraft", () => {
+  it("keeps a new Memory's visibility inherited", () => {
+    expect(initialDraft().hidden).toBeNull();
+  });
+
   it("retains inherited visibility for an existing Memory", () => {
     const memory = { hidden: null } as MemoryRow;
 
