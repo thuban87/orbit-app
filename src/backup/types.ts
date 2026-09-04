@@ -65,6 +65,7 @@ export interface BackupManifest {
   memories: Record<string, unknown>[];
   relationships: Record<string, unknown>[];
   currentStateEntries: Record<string, unknown>[];
+  customFieldValueHistory: Record<string, unknown>[];
   tombstones: Array<{ entityType: string; entityUid: string; deletedAt: string }>;
 }
 

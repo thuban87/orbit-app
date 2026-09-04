@@ -110,9 +110,13 @@ describe("buildExportManifest", () => {
       ["value-a", contact!.id, def!.id, NOW, NOW],
     );
     await exec.runAsync(
-      `INSERT INTO memories (uid, contact_id, type, custom_label, value, pinned, outdated, provenance, created_at, modified_at, deleted_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      ["memory-deleted", contact!.id, "custom", "Note", "Remember this", 1, 0, "user", NOW, NOW, "2026-08-26 12:00:00"],
+      `INSERT INTO custom_field_value_history (uid, contact_id, field_def_id, value, created_at) VALUES (?, ?, ?, ?, ?)`,
+      ["history-a", contact!.id, def!.id, "Old nickname", NOW],
+    );
+    await exec.runAsync(
+      `INSERT INTO memories (uid, contact_id, type, custom_label, value, pinned, outdated, provenance, allow_ai, created_at, modified_at, deleted_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ["memory-deleted", contact!.id, "custom", "Note", "Remember this", 1, 0, "user", 1, NOW, NOW, "2026-08-26 12:00:00"],
     );
     await exec.runAsync(
       `INSERT INTO relationships (uid, contact_id, person_name, linked_contact_id, pinned, created_at, modified_at)
@@ -168,8 +172,14 @@ describe("buildExportManifest", () => {
     expect(manifest.customFieldValues).toEqual([
       expect.objectContaining({ uid: "value-a", value: null }),
     ]);
+    expect(manifest.customFieldDefs).toEqual([
+      expect.objectContaining({ uid: "def-a", scope: "global", historyRetained: 0, fieldGroup: null }),
+    ]);
+    expect(manifest.customFieldValueHistory).toEqual([
+      expect.objectContaining({ uid: "history-a", contactUid: "contact-a", fieldDefUid: "def-a", value: "Old nickname" }),
+    ]);
     expect(manifest.memories).toEqual([
-      expect.objectContaining({ uid: "memory-deleted", contactUid: "contact-a", deletedAt: "2026-08-26 12:00:00" }),
+      expect.objectContaining({ uid: "memory-deleted", contactUid: "contact-a", allowAi: 1, deletedAt: "2026-08-26 12:00:00" }),
     ]);
     expect(manifest.currentStateEntries).toEqual([
       expect.objectContaining({ uid: "state-current", isCurrent: 1 }),

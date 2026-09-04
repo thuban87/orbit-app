@@ -277,6 +277,14 @@ function validate(manifest: RawManifest): BackupManifest {
   const arrays = Object.fromEntries(
     requiredArrays.map((key) => [key, array(manifest[key], key)]),
   ) as Record<(typeof requiredArrays)[number], RawManifest[]>;
+  // P07-MED: value-history is an OPTIONAL top-level array. A live format-4 backup
+  // that predates this phase lacks the key entirely, and there is no 4->4 forward
+  // migration, so normalize a missing array to [] at parse rather than adding it
+  // to requiredArrays (which would hard-fail every pre-existing format-4 backup).
+  const customFieldValueHistory = array(
+    manifest.customFieldValueHistory ?? [],
+    "customFieldValueHistory",
+  );
   const contacts = uidSet(arrays.contacts, "contacts");
   const categories = uidSet(arrays.categories, "categories");
   const defs = uidSet(arrays.customFieldDefs, "customFieldDefs");
@@ -610,6 +618,7 @@ function validate(manifest: RawManifest): BackupManifest {
     memories: arrays.memories,
     relationships: arrays.relationships,
     currentStateEntries: arrays.currentStateEntries,
+    customFieldValueHistory,
     tombstones,
   };
 }
