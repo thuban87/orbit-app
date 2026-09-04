@@ -108,11 +108,11 @@ describe("migration 016 — contact knowledge schema", () => {
       ["memory-1", alex, "general", NOW, NOW],
     );
     await expect(
-      exec.runAsync(
+      Promise.resolve().then(() => exec.runAsync(
         `INSERT INTO memories (uid, contact_id, type, created_at, modified_at)
          VALUES (?, ?, ?, ?, ?)`,
         ["memory-1", alex, "general", NOW, NOW],
-      ),
+      )),
     ).rejects.toThrow();
 
     await exec.runAsync(
@@ -121,24 +121,24 @@ describe("migration 016 — contact knowledge schema", () => {
       ["relationship-1", alex, "Blair", blair, NOW, NOW],
     );
     await expect(
-      exec.runAsync(
+      Promise.resolve().then(() => exec.runAsync(
         `INSERT INTO relationships (uid, contact_id, person_name, created_at, modified_at)
          VALUES (?, ?, ?, ?, ?)`,
         ["relationship-1", alex, "Duplicate", NOW, NOW],
-      ),
+      )),
     ).rejects.toThrow();
     await expect(
-      exec.runAsync(
+      Promise.resolve().then(() => exec.runAsync(
         `INSERT INTO relationships (uid, contact_id, person_name, linked_contact_id, created_at, modified_at)
          VALUES (?, ?, ?, ?, ?, ?)`,
         ["relationship-self", alex, "Self", alex, NOW, NOW],
-      ),
+      )),
     ).rejects.toThrow();
     await expect(
-      exec.runAsync(
+      Promise.resolve().then(() => exec.runAsync(
         "UPDATE relationships SET linked_contact_id = contact_id WHERE uid = ?",
         ["relationship-1"],
-      ),
+      )),
     ).rejects.toThrow();
     await exec.runAsync(
       `INSERT INTO relationships (uid, contact_id, person_name, linked_contact_id, created_at, modified_at)
@@ -152,11 +152,11 @@ describe("migration 016 — contact knowledge schema", () => {
       ["state-1", alex, "current_location", "Austin", 1, NOW, NOW],
     );
     await expect(
-      exec.runAsync(
+      Promise.resolve().then(() => exec.runAsync(
         `INSERT INTO current_state_entries (uid, contact_id, field_key, value, is_current, created_at, modified_at)
          VALUES (?, ?, ?, ?, ?, ?, ?)`,
         ["state-2", alex, "current_location", "Chicago", 1, NOW, NOW],
-      ),
+      )),
     ).rejects.toThrow();
     await exec.runAsync(
       `INSERT INTO current_state_entries (uid, contact_id, field_key, value, is_current, created_at, modified_at)
