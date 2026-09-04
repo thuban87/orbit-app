@@ -14,6 +14,8 @@ import { migration011 } from "@/db/migrations/011-contact-lifecycle-schema";
 import { migration012 } from "@/db/migrations/012-import-sessions";
 import { migration013 } from "@/db/migrations/013-reconciliation-and-merge";
 import { migration014 } from "@/db/migrations/014-interaction-assists";
+import { migration015 } from "@/db/migrations/015-theme-settings";
+import { migration016 } from "@/db/migrations/016-contact-knowledge";
 import {
   createPendingAssist,
   markAssistLogged,
@@ -23,7 +25,7 @@ import { runMigrations } from "@/db/migrations/runner";
 import type { SqlExecutor } from "@/db/types";
 
 const NOW = "2026-08-30 12:00:00";
-const MIGRATIONS = [migration001, migration002, migration003, migration004, migration005, migration006, migration007, migration008, migration009, migration010, migration011, migration012, migration013, migration014];
+const MIGRATIONS = [migration001, migration002, migration003, migration004, migration005, migration006, migration007, migration008, migration009, migration010, migration011, migration012, migration013, migration014, migration015, migration016];
 let exec: SqlExecutor;
 let n = 0;
 const uid = () => `uid-${++n}`;
@@ -36,8 +38,16 @@ async function contact(name: string): Promise<number> {
 beforeEach(async () => {
   n = 0;
   exec = nodeSqliteExecutor(openTestDb());
-  await runMigrations(exec, MIGRATIONS, 14, { now: NOW, newUid: uid });
+  await runMigrations(exec, MIGRATIONS, 16, { now: NOW, newUid: uid });
 });
+
+async function assertNoRelationshipSelfLinks(): Promise<void> {
+  expect(
+    await exec.getFirstAsync<{ n: number }>(
+      "SELECT COUNT(*) AS n FROM relationships WHERE contact_id = linked_contact_id",
+    ),
+  ).toEqual({ n: 0 });
+}
 
 describe("mergeContacts", () => {
   it("reparents children and field history, then retires the absorbed identity as a tombstone", async () => {
@@ -47,6 +57,7 @@ describe("mergeContacts", () => {
     await exec.runAsync("INSERT INTO field_history (contact_id, field_col_name, old_value, operation, created_at) VALUES (?, 'name', 'old', 'edit', ?)", [absorbed, NOW]);
     const absorbedUid = (await exec.getFirstAsync<{ uid: string }>("SELECT uid FROM contacts WHERE id = ?", [absorbed]))!.uid;
     await mergeContacts(exec, { survivorId: survivor, absorbedId: absorbed, now: NOW });
+    await assertNoRelationshipSelfLinks();
     expect(await exec.getFirstAsync("SELECT id FROM contacts WHERE id = ?", [absorbed])).toBeNull();
     expect(await exec.getFirstAsync<{ contact_id: number }>("SELECT contact_id FROM interactions")).toEqual({ contact_id: survivor });
     expect(await exec.getFirstAsync<{ contact_id: number }>("SELECT contact_id FROM field_history WHERE old_value = 'old'")).toEqual({ contact_id: survivor });
@@ -64,6 +75,7 @@ describe("mergeContacts", () => {
     });
 
     await mergeContacts(exec, { survivorId: survivor, absorbedId: absorbed, now: NOW });
+    await assertNoRelationshipSelfLinks();
 
     expect(
       await exec.getFirstAsync<{ contact_id: number }>(
@@ -87,6 +99,7 @@ describe("mergeContacts", () => {
     const def = await exec.runAsync("INSERT INTO custom_field_defs (uid, col_name, label, type, display_order, created_at, modified_at) VALUES (?, 'nickname', 'Nickname', 'text', 0, ?, ?)", [uid(), NOW, NOW]);
     await exec.runAsync("INSERT INTO custom_field_values (uid, contact_id, field_def_id, value, created_at, modified_at) VALUES (?, ?, ?, 'survivor', ?, ?), (?, ?, ?, 'absorbed', ?, ?)", [uid(), survivor, def.lastInsertRowId, NOW, NOW, uid(), absorbed, def.lastInsertRowId, NOW, NOW]);
     await mergeContacts(exec, { survivorId: survivor, absorbedId: absorbed, now: NOW, resolutions: { customFields: { [def.lastInsertRowId]: 'absorbed' } } });
+    await assertNoRelationshipSelfLinks();
     expect(await exec.getFirstAsync<{ value: string }>("SELECT value FROM custom_field_values WHERE contact_id = ?", [survivor])).toEqual({ value: "absorbed" });
   });
 
@@ -97,6 +110,7 @@ describe("mergeContacts", () => {
     await exec.runAsync("INSERT INTO custom_field_values (uid, contact_id, field_def_id, value, created_at, modified_at) VALUES (?, ?, ?, '', ?, ?), (?, ?, ?, 'Absorbed nickname', ?, ?)", [uid(), survivor, def.lastInsertRowId, NOW, NOW, uid(), absorbed, def.lastInsertRowId, NOW, NOW]);
 
     await mergeContacts(exec, { survivorId: survivor, absorbedId: absorbed, now: NOW });
+    await assertNoRelationshipSelfLinks();
 
     expect(await exec.getFirstAsync<{ name: string }>("SELECT name FROM contacts WHERE id = ?", [survivor])).toEqual({ name: "Absorbed name" });
     expect(await exec.getFirstAsync<{ value: string }>("SELECT value FROM custom_field_values WHERE contact_id = ? AND field_def_id = ?", [survivor, def.lastInsertRowId])).toEqual({ value: "Absorbed nickname" });
@@ -110,6 +124,72 @@ describe("mergeContacts", () => {
     const id = await contact("Only");
     await expect(mergeContacts(exec, { survivorId: id, absorbedId: id, now: NOW })).rejects.toThrow("cannot absorb itself");
     expect(await exec.getFirstAsync<{ name: string }>("SELECT name FROM contacts WHERE id = ?", [id])).toEqual({ name: "Only" });
+  });
+
+  it("preserves knowledge, repoints third-party links, and prevents merge-created self-links", async () => {
+    const survivor = await contact("Survivor");
+    const absorbed = await contact("Absorbed");
+    const third = await contact("Third");
+    await exec.runAsync(
+      `INSERT INTO memories (uid, contact_id, type, created_at, modified_at)
+       VALUES (?, ?, 'general', ?, ?)`,
+      [uid(), absorbed, NOW, NOW],
+    );
+    await exec.runAsync(
+      `INSERT INTO relationships
+         (uid, contact_id, person_name, linked_contact_id, created_at, modified_at)
+       VALUES (?, ?, 'Survivor-owned', ?, ?, ?),
+              (?, ?, 'Absorbed-owned', ?, ?, ?),
+              (?, ?, 'Third-party', ?, ?, ?),
+              (?, ?, 'Ordinary', NULL, ?, ?)`,
+      [
+        uid(), survivor, absorbed, NOW, NOW,
+        uid(), absorbed, survivor, NOW, NOW,
+        uid(), third, absorbed, NOW, NOW,
+        uid(), absorbed, NOW, NOW,
+      ],
+    );
+    await exec.runAsync(
+      `INSERT INTO current_state_entries
+         (uid, contact_id, field_key, value, is_current, created_at, modified_at)
+       VALUES (?, ?, 'city', 'Survivor city', 1, ?, ?),
+              (?, ?, 'city', 'Absorbed city', 1, ?, ?),
+              (?, ?, 'hobby', 'Climbing', 1, ?, ?)`,
+      [
+        uid(), survivor, NOW, NOW,
+        uid(), absorbed, NOW, NOW,
+        uid(), absorbed, NOW, NOW,
+      ],
+    );
+
+    await mergeContacts(exec, { survivorId: survivor, absorbedId: absorbed, now: NOW });
+    await assertNoRelationshipSelfLinks();
+
+    expect(
+      await exec.getFirstAsync<{ contact_id: number }>(
+        "SELECT contact_id FROM memories WHERE contact_id = ?",
+        [survivor],
+      ),
+    ).toEqual({ contact_id: survivor });
+    expect(
+      await exec.getAllAsync<{ person_name: string; contact_id: number; linked_contact_id: number | null }>(
+        "SELECT person_name, contact_id, linked_contact_id FROM relationships ORDER BY person_name",
+      ),
+    ).toEqual([
+      { person_name: "Absorbed-owned", contact_id: survivor, linked_contact_id: null },
+      { person_name: "Ordinary", contact_id: survivor, linked_contact_id: null },
+      { person_name: "Survivor-owned", contact_id: survivor, linked_contact_id: null },
+      { person_name: "Third-party", contact_id: third, linked_contact_id: survivor },
+    ]);
+    expect(
+      await exec.getAllAsync<{ field_key: string; value: string; is_current: number; contact_id: number }>(
+        "SELECT field_key, value, is_current, contact_id FROM current_state_entries ORDER BY field_key, is_current DESC",
+      ),
+    ).toEqual([
+      { field_key: "city", value: "Survivor city", is_current: 1, contact_id: survivor },
+      { field_key: "city", value: "Absorbed city", is_current: 0, contact_id: survivor },
+      { field_key: "hobby", value: "Climbing", is_current: 1, contact_id: survivor },
+    ]);
   });
 
   it("normalizes only known per-type primary choices", () => {

@@ -33,6 +33,8 @@ import { migration011 } from "@/db/migrations/011-contact-lifecycle-schema";
 import { migration012 } from "@/db/migrations/012-import-sessions";
 import { migration013 } from "@/db/migrations/013-reconciliation-and-merge";
 import { migration014 } from "@/db/migrations/014-interaction-assists";
+import { migration015 } from "@/db/migrations/015-theme-settings";
+import { migration016 } from "@/db/migrations/016-contact-knowledge";
 import { runMigrations } from "@/db/migrations/runner";
 import {
   computeImpact,
@@ -71,8 +73,10 @@ beforeEach(async () => {
       migration012,
       migration013,
       migration014,
+      migration015,
+      migration016,
     ],
-    14,
+    16,
     { now: NOW, newUid: uid },
   );
 });
@@ -186,6 +190,25 @@ async function seedHistory(contactId: number): Promise<void> {
   );
 }
 
+async function seedKnowledge(contactId: number): Promise<void> {
+  await exec.runAsync(
+    `INSERT INTO memories (uid, contact_id, type, created_at, modified_at)
+     VALUES (?, ?, 'general', ?, ?)`,
+    [uid(), contactId, NOW, NOW],
+  );
+  await exec.runAsync(
+    `INSERT INTO relationships (uid, contact_id, person_name, created_at, modified_at)
+     VALUES (?, ?, 'Key person', ?, ?)`,
+    [uid(), contactId, NOW, NOW],
+  );
+  await exec.runAsync(
+    `INSERT INTO current_state_entries
+       (uid, contact_id, field_key, value, is_current, created_at, modified_at)
+     VALUES (?, ?, 'city', 'Austin', 1, ?, ?)`,
+    [uid(), contactId, NOW, NOW],
+  );
+}
+
 /** Total rows owned by a contact across every child table + contacts. */
 async function ownedRowCount(contactId: number): Promise<number> {
   const tables: Array<[string, string]> = [
@@ -239,6 +262,9 @@ describe("computeImpact — per-child counts + hasCustomValues (CRUD-06)", () =>
       methods: 0,
       externalLinks: 0,
       methodProvenance: 0,
+      memories: 0,
+      relationships: 0,
+      currentStateEntries: 0,
       hasCustomValues: true,
     });
   });
@@ -255,6 +281,9 @@ describe("computeImpact — per-child counts + hasCustomValues (CRUD-06)", () =>
       methods: 0,
       externalLinks: 0,
       methodProvenance: 0,
+      memories: 0,
+      relationships: 0,
+      currentStateEntries: 0,
       hasCustomValues: false,
     });
   });
@@ -270,6 +299,9 @@ describe("impactSummaryLines — pure omit-zero render helper", () => {
       methods: 0,
       externalLinks: 0,
       methodProvenance: 0,
+      memories: 2,
+      relationships: 1,
+      currentStateEntries: 4,
       hasCustomValues: true,
     });
     // events ARE now surfaced (Phase 6 writer landed); custom values still are not.
@@ -278,6 +310,8 @@ describe("impactSummaryLines — pure omit-zero render helper", () => {
       "5 events",
       "4 fuel items",
       "1 link",
+      "2 memories",
+      "1 relationship",
     ]);
   });
 
@@ -290,6 +324,9 @@ describe("impactSummaryLines — pure omit-zero render helper", () => {
       methods: 0,
       externalLinks: 0,
       methodProvenance: 0,
+      memories: 0,
+      relationships: 0,
+      currentStateEntries: 0,
       hasCustomValues: false,
     });
     expect(lines).toEqual(["1 interaction", "2 links"]);
@@ -304,6 +341,9 @@ describe("impactSummaryLines — pure omit-zero render helper", () => {
       methods: 0,
       externalLinks: 0,
       methodProvenance: 0,
+      memories: 0,
+      relationships: 0,
+      currentStateEntries: 0,
       hasCustomValues: true,
     });
     // events now surfaced → one line; custom values never rendered.
@@ -319,6 +359,9 @@ describe("impactSummaryLines — pure omit-zero render helper", () => {
       methods: 0,
       externalLinks: 0,
       methodProvenance: 0,
+      memories: 0,
+      relationships: 0,
+      currentStateEntries: 0,
       hasCustomValues: true,
     });
     expect(lines).toEqual([]);
@@ -335,6 +378,38 @@ describe("purgeContact — archived-guarded one-transaction fan-out (T-04-12/13)
     expect(await ownedRowCount(target)).toBe(0);
     // The second contact keeps all 11 owned rows (contact + 10 children).
     expect(await ownedRowCount(other)).toBe(11);
+  });
+
+  it("explicitly fans out knowledge rows and preserves another contact's nullified link", async () => {
+    const target = await seedContact("Chris");
+    const other = await seedContact("Bo");
+    await seedKnowledge(target);
+    await seedKnowledge(other);
+    await exec.runAsync(
+      `UPDATE relationships SET linked_contact_id = ?
+        WHERE contact_id = ? AND person_name = 'Key person'`,
+      [target, other],
+    );
+
+    expect(await computeImpact(exec, target)).toEqual(
+      expect.objectContaining({ memories: 1, relationships: 1, currentStateEntries: 1 }),
+    );
+    await purgeContact(exec, target, { now: NOW });
+
+    for (const table of ["memories", "relationships", "current_state_entries"] as const) {
+      expect(
+        await exec.getFirstAsync<{ n: number }>(
+          `SELECT COUNT(*) AS n FROM ${table} WHERE contact_id = ?`,
+          [target],
+        ),
+      ).toEqual({ n: 0 });
+    }
+    expect(
+      await exec.getFirstAsync<{ linked_contact_id: number | null }>(
+        "SELECT linked_contact_id FROM relationships WHERE contact_id = ?",
+        [other],
+      ),
+    ).toEqual({ linked_contact_id: null });
   });
 
   it("removes a pending assist through the contact foreign-key cascade", async () => {
