@@ -23,6 +23,8 @@ export interface ContactPickerProps {
   visible: boolean;
   onDismiss: () => void;
   onSelect: (contactId: number) => void;
+  /** Optional owner exclusion for relationship links; existing callers see all rows. */
+  excludeContactId?: number;
 }
 
 /** A shell-owned, local-first picker shared by all contact-targeting actions. */
@@ -30,6 +32,7 @@ export function ContactPicker({
   visible,
   onDismiss,
   onSelect,
+  excludeContactId,
 }: ContactPickerProps) {
   const { colors } = useTheme();
   const [term, setTerm] = useState("");
@@ -77,7 +80,16 @@ export function ContactPicker({
       });
   }, [hasSearch, visible]);
 
-  const filteredRows = useMemo(() => filterPicker(rows, term), [rows, term]);
+  const filteredRows = useMemo(
+    () =>
+      filterPicker(
+        excludeContactId === undefined
+          ? rows
+          : rows.filter((row) => row.id !== excludeContactId),
+        term,
+      ),
+    [excludeContactId, rows, term],
+  );
   const isZeroContacts = !loading && !failed && rows.length === 0;
 
   const select = useCallback(

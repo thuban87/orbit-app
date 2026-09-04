@@ -10,6 +10,10 @@ import {
   View,
 } from "react-native";
 import { MemoryEditor, type MemoryDraft } from "@/components/MemoryEditor";
+import {
+  RelationshipEditor,
+  type RelationshipDraft,
+} from "@/components/RelationshipEditor";
 import { AppText } from "@/components/ui";
 import { setCurrentStateValue } from "@/db/current-state-history-dao";
 import {
@@ -48,7 +52,12 @@ import {
   resolveVisibility,
   type MemoryRow,
 } from "@/db/memories-read";
-import { editRelationship } from "@/db/relationships-dao";
+import {
+  addRelationship,
+  deleteRelationship,
+  editRelationship,
+  restoreRelationship,
+} from "@/db/relationships-dao";
 import {
   listRelationshipsForContact,
   resolveRelationshipVisibility,
@@ -333,20 +342,72 @@ export function ThingsToRememberScreen({
       .catch((error) =>
         Logger.error(LOG_SCOPE, "failed to show memory on Profile", error),
       );
-  const unhideRelationship = (relationship: RelationshipRow) =>
-    void editRelationship(getExecutor(), {
-      id: relationship.id,
+  const addKeyPerson = async (
+    draft: RelationshipDraft,
+  ): Promise<boolean> => {
+    try {
+      const now = localDateTime();
+      await addRelationship(getExecutor(), {
+        contactId,
+        ...draft,
+        createdAt: now,
+        now,
+      });
+      refresh();
+      return true;
+    } catch (error) {
+      Logger.error(LOG_SCOPE, "failed to add relationship", error);
+      return false;
+    }
+  };
+  const editKeyPerson = async (
+    id: number,
+    draft: RelationshipDraft,
+  ): Promise<boolean> => {
+    try {
+      await editRelationship(getExecutor(), {
+        id,
+        contactId,
+        ...draft,
+        now: localDateTime(),
+      });
+      refresh();
+      return true;
+    } catch (error) {
+      Logger.error(LOG_SCOPE, "failed to edit relationship", error);
+      return false;
+    }
+  };
+  const restoreKeyPerson = (id: number) =>
+    void restoreRelationship(getExecutor(), {
+      id,
       contactId,
-      hidden: 0,
       now: localDateTime(),
     })
       .then(refresh)
       .catch((error) =>
-        Logger.error(
-          LOG_SCOPE,
-          "failed to show relationship on Profile",
-          error,
-        ),
+        Logger.error(LOG_SCOPE, "failed to restore relationship", error),
+      );
+  const removeKeyPerson = (id: number) =>
+    void deleteRelationship(getExecutor(), {
+      id,
+      contactId,
+      now: localDateTime(),
+    })
+      .then(() => {
+        refresh();
+        snackbarStore.getState().show({
+          kind: "success",
+          label: "Relationship removed",
+          action: {
+            label: "Undo",
+            accessibilityLabel: "Undo removing relationship",
+            onPress: () => restoreKeyPerson(id),
+          },
+        });
+      })
+      .catch((error) =>
+        Logger.error(LOG_SCOPE, "failed to delete relationship", error),
       );
 
   return (
@@ -506,83 +567,17 @@ export function ThingsToRememberScreen({
           ))}
         </View>
       ) : null}
-      {relationships.length > 0 ? (
-        <View style={[styles.group, { borderColor: colors.border }]}>
-          <AppText role="heading">{RELATIONSHIPS_GROUP.displayName}</AppText>
-          {(expanded.relationships
-            ? relationships
-            : relationships.slice(0, GROUP_PREVIEW_LIMIT)
-          ).map((relationship) => {
-            const hidden =
-              resolveRelationshipVisibility(relationship.hidden) === "hide";
-            return (
-              <View
-                key={relationship.id}
-                style={[
-                  styles.relationship,
-                  {
-                    backgroundColor: colors.surface,
-                    borderColor: colors.border,
-                    opacity: hidden ? 0.68 : 1,
-                  },
-                ]}
-              >
-                <AppText
-                  numberOfLines={1}
-                  role="body"
-                  style={hidden ? { color: colors.textSecondary } : undefined}
-                >
-                  {relationship.person_name}
-                </AppText>
-                {relationship.relation_type ? (
-                  <AppText
-                    role="caption"
-                    style={{ color: colors.textSecondary }}
-                  >
-                    {relationship.relation_type}
-                  </AppText>
-                ) : null}
-                {relationship.note ? (
-                  <AppText
-                    numberOfLines={2}
-                    role="caption"
-                    style={{ color: colors.textSecondary }}
-                  >
-                    {relationship.note}
-                  </AppText>
-                ) : null}
-                {hidden ? (
-                  <Pressable
-                    accessibilityRole="button"
-                    accessibilityLabel={`Show ${relationship.person_name} on Profile`}
-                    onPress={() => unhideRelationship(relationship)}
-                    style={[styles.action, { borderColor: colors.border }]}
-                  >
-                    <AppText role="caption" style={{ color: colors.accent }}>
-                      Show on Profile
-                    </AppText>
-                  </Pressable>
-                ) : null}
-              </View>
-            );
-          })}
-          {relationships.length > GROUP_PREVIEW_LIMIT &&
-          !expanded.relationships ? (
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="View all key people"
-              onPress={() =>
-                setExpanded((current) => ({ ...current, relationships: true }))
-              }
-              style={styles.tertiary}
-            >
-              <AppText role="body" style={{ color: colors.accent }}>
-                View all
-              </AppText>
-            </Pressable>
-          ) : null}
-        </View>
-      ) : null}
+      <View style={[styles.group, { borderColor: colors.border }]}>
+        <AppText role="heading">{RELATIONSHIPS_GROUP.displayName}</AppText>
+        <RelationshipEditor
+          contactId={contactId}
+          items={relationships}
+          onAdd={addKeyPerson}
+          onEdit={editKeyPerson}
+          onDelete={removeKeyPerson}
+          onRestore={restoreKeyPerson}
+        />
+      </View>
       {groupedMemories.map((group, index) => {
         const shown = expanded[group.key]
           ? group.items
