@@ -11,6 +11,7 @@ import {
   expireMemoryIfStale,
   purgeMemoryPermanently,
   restoreMemory,
+  setMemoryAllowAi,
 } from "@/db/memories-dao";
 import { listMemoriesForContact } from "@/db/memories-read";
 import { runMigrations } from "@/db/migrations/runner";
@@ -39,6 +40,63 @@ async function seedContact(name = "Alex"): Promise<number> {
 }
 
 describe("memories DAO", () => {
+  it("seeds AI permission off and toggles it only for the matching contact", async () => {
+    const contactId = await seedContact();
+    const otherContactId = await seedContact("Blair");
+    const id = await addMemory(exec, {
+      contactId,
+      type: "general",
+      value: "A private memory",
+      createdAt: NOW,
+      now: NOW,
+    });
+
+    await expect(
+      exec.getFirstAsync<{ allow_ai: number }>(
+        "SELECT allow_ai FROM memories WHERE id = ?",
+        [id],
+      ),
+    ).resolves.toEqual({ allow_ai: 0 });
+
+    const before = (
+      await exec.getFirstAsync<{ data_revision: number }>(
+        "SELECT data_revision FROM app_settings WHERE id = 1",
+      )
+    )!.data_revision;
+    await setMemoryAllowAi(exec, {
+      id,
+      contactId,
+      allow: true,
+      now: "2026-09-04 13:00:00",
+    });
+    await expect(
+      exec.getFirstAsync<{ allow_ai: number; modified_at: string }>(
+        "SELECT allow_ai, modified_at FROM memories WHERE id = ? AND contact_id = ?",
+        [id, contactId],
+      ),
+    ).resolves.toEqual({ allow_ai: 1, modified_at: "2026-09-04 13:00:00" });
+    await expect(
+      exec.getFirstAsync<{ data_revision: number }>(
+        "SELECT data_revision FROM app_settings WHERE id = 1",
+      ),
+    ).resolves.toEqual({ data_revision: before + 1 });
+
+    await expect(
+      setMemoryAllowAi(exec, {
+        id,
+        contactId: otherContactId,
+        allow: false,
+        now: "2026-09-04 14:00:00",
+      }),
+    ).rejects.toThrow("setMemoryAllowAi: no memory matched");
+    await expect(
+      exec.getFirstAsync<{ allow_ai: number; modified_at: string }>(
+        "SELECT allow_ai, modified_at FROM memories WHERE id = ? AND contact_id = ?",
+        [id, contactId],
+      ),
+    ).resolves.toEqual({ allow_ai: 1, modified_at: "2026-09-04 13:00:00" });
+  });
+
   it("marks manual permanent purges and successful stale expiry dirty for backup", async () => {
     const contactId = await seedContact();
     const id = await addMemory(exec, { contactId, type: "custom", customLabel: "Note", value: "Delete", createdAt: NOW, now: NOW });

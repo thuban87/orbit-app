@@ -106,8 +106,8 @@ export async function addMemoryCore(
   const result = await exec.runAsync(
     `INSERT INTO memories
        (uid, contact_id, type, custom_label, value, note, url, meaningful_date,
-        pinned, outdated, hidden, provenance, created_at, modified_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        pinned, outdated, hidden, provenance, created_at, modified_at, allow_ai)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       newUid(),
       input.contactId,
@@ -123,9 +123,24 @@ export async function addMemoryCore(
       input.provenance ?? "user",
       input.createdAt,
       input.now,
+      MEMORY_TYPE_REGISTRY[input.type].aiDefault ? 1 : 0,
     ],
   );
   return result.lastInsertRowId;
+}
+
+/** Toggle explicit AI permission for one Memory while the caller owns the transaction. */
+export async function setMemoryAllowAiCore(
+  exec: SqlExecutor,
+  input: { id: number; contactId: number; allow: boolean; now: string },
+): Promise<void> {
+  const result = await exec.runAsync(
+    `UPDATE memories
+        SET allow_ai = ?, modified_at = ?
+      WHERE id = ? AND contact_id = ?`,
+    [input.allow ? 1 : 0, input.now, input.id, input.contactId],
+  );
+  assertOneChange("setMemoryAllowAi", input.id, input.contactId, result.changes);
 }
 
 /**
@@ -296,6 +311,17 @@ export function editMemory(
 ): Promise<void> {
   return inWriteTransaction(exec, async () => {
     await editMemoryCore(exec, input);
+    await bumpDataRevisionCore(exec);
+  });
+}
+
+/** Toggle explicit AI permission and mark the database dirty inside one mutex. */
+export function setMemoryAllowAi(
+  exec: SqlExecutor,
+  input: { id: number; contactId: number; allow: boolean; now: string },
+): Promise<void> {
+  return inWriteTransaction(exec, async () => {
+    await setMemoryAllowAiCore(exec, input);
     await bumpDataRevisionCore(exec);
   });
 }
