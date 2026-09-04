@@ -11,6 +11,7 @@ import {
   setRowContactCore,
   setRowMatchOutcomeCore,
 } from "@/db/import-session-dao";
+import { addMemoryCore } from "@/db/memories-dao";
 import { inWriteTransaction } from "@/db/transaction";
 import type { SqlExecutor } from "@/db/types";
 import { newUid } from "@/db/uid";
@@ -46,6 +47,8 @@ export interface ImportContactRecordInput {
   input: CreateContactFullInput;
   externalLinks: ExternalContactLinkInput[];
   birthday: string | null;
+  /** Raw picker note; blank values intentionally produce no Memory. */
+  note?: string | null;
   now: string;
   resolveRow?: ResolveImportRowInput;
 }
@@ -134,6 +137,17 @@ export function importContactRecord(
         "UPDATE contacts SET birthday = ?, modified_at = ? WHERE id = ?",
         [params.birthday, params.now, created.contactId],
       );
+    }
+
+    if (params.note?.trim()) {
+      await addMemoryCore(exec, {
+        contactId: created.contactId,
+        type: "imported",
+        provenance: "import",
+        value: params.note,
+        createdAt: params.now,
+        now: params.now,
+      });
     }
 
     const links: Array<ExternalContactLinkInput & { id: number }> = [];

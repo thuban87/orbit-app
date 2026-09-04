@@ -152,7 +152,7 @@ describe("importContactRecord", () => {
         contact_id: noted.contactId,
         type: "imported",
         provenance: "import",
-        value: "Raw imported note",
+        value: " Raw imported note ",
         allow_ai: 0,
       },
     ]);

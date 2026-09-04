@@ -94,6 +94,7 @@ export async function importRowAsNew(
       },
     ],
     birthday: mapped.birthday,
+    note: mapped.note,
     now: params.now,
     resolveRow: { rowId: params.row.id, matchOutcome: "new" },
   });

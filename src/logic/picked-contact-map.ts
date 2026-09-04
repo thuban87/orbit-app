@@ -16,6 +16,8 @@ export interface PickedContactMapResult {
   photoTempUri: string | null;
   /** Validated stored birthday; CreateContactFullInput has no birthday field. */
   birthday: string | null;
+  /** Raw freeform provider note; blank values are not imported. */
+  note: string | null;
 }
 
 /** Local wall-clock timestamp without importing the Expo-backed DB bootstrap. */
@@ -74,7 +76,8 @@ export function isBirthdayUnreadable(birthday: string | null): boolean {
 
 /**
  * Convert the picker snapshot to the only fields Orbit imports. Deliberately
- * excludes arbitrary Android contact metadata such as addresses and notes.
+ * excludes arbitrary Android contact metadata such as addresses. The provider
+ * note is deliberately retained for the imported Memory path.
  */
 export function mapPickedContact(
   picked: PickedContact,
@@ -109,5 +112,6 @@ export function mapPickedContact(
     externalContactId: picked.lookupKey,
     photoTempUri: picked.photoTempUri,
     birthday: mapBirthdayForStorage(picked.birthday),
+    note: picked.note?.trim() ? picked.note : null,
   };
 }

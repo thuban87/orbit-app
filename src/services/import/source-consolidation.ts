@@ -15,6 +15,7 @@ import {
   insertExternalContactLinkCore,
   insertMethodProvenanceCore,
 } from "@/db/imported-contact-dao";
+import { addMemoryCore } from "@/db/memories-dao";
 import { inWriteTransaction } from "@/db/transaction";
 import type { SqlExecutor } from "@/db/types";
 import { isValidStoredBirthday } from "@/logic/birthday-logic";
@@ -190,6 +191,12 @@ export async function combineCluster(
   const birthday = mappedRows
     .map(({ mapped }) => mapped.birthday)
     .find((candidate): candidate is string => isValidStoredBirthday(candidate));
+  const note = mappedRows
+    .map(({ mapped }) => mapped.note)
+    .find(
+      (candidate): candidate is string =>
+        candidate !== null && candidate.trim() !== "",
+    );
   const photoRow = mappedRows.find(({ row }) => row.photoRelPath !== null)?.row;
 
   const { contactId } = await inWriteTransaction(exec, async () => {
@@ -208,6 +215,16 @@ export async function combineCluster(
         "UPDATE contacts SET birthday = ?, modified_at = ? WHERE id = ?",
         [birthday, params.now, created.contactId],
       );
+    }
+    if (note) {
+      await addMemoryCore(exec, {
+        contactId: created.contactId,
+        type: "imported",
+        provenance: "import",
+        value: note,
+        createdAt: params.now,
+        now: params.now,
+      });
     }
 
     const linksByRowId = new Map<number, number>();

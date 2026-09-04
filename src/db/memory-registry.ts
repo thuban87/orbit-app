@@ -11,7 +11,7 @@ export const PROVISIONAL_MEMORY_LABEL = "Memory";
 /** Human-needed: the final general-type name is intentionally still provisional. */
 export const PROVISIONAL_DEFAULT_MEMORY_TYPE_NAME = "General";
 
-export type MemoryTypeKey = "general" | "custom";
+export type MemoryTypeKey = "general" | "imported" | "custom";
 export const DEFAULT_MEMORY_TYPE_KEY: MemoryTypeKey = "general";
 
 export interface MemoryTypeMeta {
@@ -35,6 +35,16 @@ export const MEMORY_TYPE_REGISTRY: Record<MemoryTypeKey, MemoryTypeMeta> = {
     aiDefault: false,
     visibilityDefault: "show",
     presentationOrder: 20,
+  },
+  imported: {
+    displayName: "Imported from Contacts App",
+    iconSemantic: "memory",
+    cardinality: "many",
+    historyAware: false,
+    searchable: true,
+    aiDefault: false,
+    visibilityDefault: "show",
+    presentationOrder: 25,
   },
   custom: {
     displayName: PROVISIONAL_MEMORY_LABEL,

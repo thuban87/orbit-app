@@ -93,6 +93,7 @@ export async function acceptPickedContacts(
           displayName: contact.displayName,
           methods: contact.methods,
           birthday: contact.birthday,
+          note: contact.note,
         }),
         photoRelPath,
       };
@@ -121,16 +122,26 @@ export async function commitSingleImport(
   exec: SqlExecutor,
   params: CommitSingleImportInput,
 ): Promise<number> {
+  const row = (await listSessionRows(exec, params.sessionId)).find(
+    (candidate) => candidate.id === params.rowId,
+  );
+  let note: string | null = null;
+  if (row) {
+    try {
+      const picked = JSON.parse(row.sourcePayload) as PickedContact;
+      note = picked.note?.trim() ? picked.note : null;
+    } catch {
+      // A corrupt snapshot has no safe note to import; retain the prior create behavior.
+    }
+  }
   const { contactId } = await importContactRecord(exec, {
     input: params.input,
     externalLinks: params.externalLinks,
     birthday: params.birthday,
+    note,
     now: params.now,
     resolveRow: { rowId: params.rowId, matchOutcome: "new" },
   });
-  const row = (await listSessionRows(exec, params.sessionId)).find(
-    (candidate) => candidate.id === params.rowId,
-  );
   const photo = await persistImportedPhotoPostCommit(exec, importedPhotoFs, {
     contactId,
     rowId: params.rowId,
