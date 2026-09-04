@@ -59,13 +59,13 @@ category's phase (see Traceability).
 - [x] **KNOW-07**: Deleting a Memory is a soft delete restorable from a Recently Deleted / Trash surface (owned by this phase; expiry runs via launch sweep, never a timer)
 - [x] **KNOW-08**: Types/groups have Profile-visibility defaults that individual items can override; hidden-from-Profile is presentation-only, never privacy
 - [x] **KNOW-09**: Memory items carry lightweight optional provenance shown mainly in detail/edit views
-- [ ] **KNOW-10**: Dashboard search can find contact names, Memory labels/values/notes, relationship names, and appropriate custom-field content regardless of storage table, with typo tolerance — implemented as TypeScript scoring over the eligible set, no FTS5 (ADR-031 preserved); internal metadata is never searched
-- [ ] **KNOW-11**: AI use is opt-in per information item/field behind two gates (global AI enabled, then per-item permission defaulting OFF); AI-enabled items show the sparkle icon; type-level defaults affect newly created items only
+- [x] **KNOW-10**: Dashboard search can find contact names, Memory labels/values/notes, relationship names, and appropriate custom-field content regardless of storage table, with typo tolerance — implemented as TypeScript scoring over the eligible set, no FTS5 (ADR-031 preserved); internal metadata is never searched
+- [x] **KNOW-11**: AI use is opt-in per information item/field behind two gates (global AI enabled, then per-item permission defaulting OFF); AI-enabled items show the sparkle icon; type-level defaults affect newly created items only
 - [ ] **KNOW-12**: Off Limits marks topics to avoid — visible where relevant, separate from AI permission, and carrying "avoid this topic" semantics when transmitted
 - [ ] **KNOW-13**: Custom fields support Text, Long Text, Number, Date, Yes/No, URL, Email, Phone, and Choice types; definitions may be global or one-off per contact (promotable to reusable), optionally grouped; values may be current-only or history-retained via a new additive value-history table (ADR-001 uniqueness constraints untouched)
 - [ ] **KNOW-14**: Freeform notes from the phone Contacts app import as a dedicated "Imported from Contacts App" Memory type, AI-off by default
 - [ ] **KNOW-15**: Backup/restore preserves the full knowledge model: current values, history, Memories, custom fields, relationships, visibility, pinning, AI permissions, provenance, and soft-deleted records
-- [ ] **KNOW-16**: Existing share-sheet captures migrate onto the new model as default-type Memories with no data loss
+- [x] **KNOW-16**: Existing share-sheet captures migrate onto the new model as default-type Memories with no data loss
 
 ### DASHQ — Dashboard Data & State Foundation (Phase 25)
 
