@@ -183,6 +183,7 @@ describe("memories DAO", () => {
         meaningful_date: null,
         pinned: 1,
         outdated: 1,
+        hidden: null,
         created_at: NOW,
         modified_at: "2026-09-04 14:00:00",
       }),

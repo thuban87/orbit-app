@@ -51,7 +51,8 @@ export interface MemoryDraft {
   meaningfulDate: string | null;
   pinned: boolean;
   outdated: boolean;
-  hidden: boolean;
+  /** Null inherits the selected Memory type's visibility default. */
+  hidden: boolean | null;
 }
 
 export interface MemoryEditPatch extends MemoryDraft {}
@@ -156,7 +157,7 @@ function TypePicker({
   );
 }
 
-function initialDraft(item?: MemoryRow): MemoryDraft {
+export function initialDraft(item?: MemoryRow): MemoryDraft {
   return {
     type: item?.type === "custom" ? "custom" : DEFAULT_MEMORY_TYPE_KEY,
     customLabel: item?.custom_label ?? null,
@@ -166,7 +167,7 @@ function initialDraft(item?: MemoryRow): MemoryDraft {
     meaningfulDate: item?.meaningful_date ?? null,
     pinned: item?.pinned === 1,
     outdated: item?.outdated === 1,
-    hidden: item?.hidden === 1,
+    hidden: item?.hidden === null ? null : item?.hidden === 1,
   };
 }
 
@@ -370,7 +371,7 @@ export function MemoryEditor({
               </AppText>
             </View>
             <Switch
-              value={draft.hidden}
+              value={draft.hidden === true}
               onValueChange={(value) => update("hidden", value)}
             />
           </View>
