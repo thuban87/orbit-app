@@ -93,6 +93,42 @@ const PURGE_CHILDREN: Record<TombstoneEntityType, PurgeChildSpec | null> = {
   current_state_entry: { countSql: "SELECT COUNT(*) AS n FROM current_state_entries WHERE contact_id = ?", tombstoneSql: "SELECT uid FROM current_state_entries WHERE contact_id = ?", deleteSql: "DELETE FROM current_state_entries WHERE contact_id = ?" },
 };
 
+const KNOWLEDGE_CHILD_TABLES = {
+  memory: "memories",
+  relationship: "relationships",
+  current_state_entry: "current_state_entries",
+} as const;
+
+type KnowledgeChildEntityType = keyof typeof KNOWLEDGE_CHILD_TABLES;
+
+async function availableKnowledgeChildren(
+  exec: SqlExecutor,
+): Promise<ReadonlySet<KnowledgeChildEntityType>> {
+  const rows = await exec.getAllAsync<{ name: string }>(
+    `SELECT name
+       FROM sqlite_master
+      WHERE type = 'table'
+        AND name IN ('memories', 'relationships', 'current_state_entries')`,
+  );
+  const names = new Set(rows.map((row) => row.name));
+  return new Set(
+    (Object.entries(KNOWLEDGE_CHILD_TABLES) as Array<
+      [KnowledgeChildEntityType, string]
+    >)
+      .filter(([, table]) => names.has(table))
+      .map(([entityType]) => entityType),
+  );
+}
+
+function isAvailablePurgeChild(
+  entityType: TombstoneEntityType,
+  knowledgeChildren: ReadonlySet<KnowledgeChildEntityType>,
+): boolean {
+  return !(entityType in KNOWLEDGE_CHILD_TABLES) || knowledgeChildren.has(
+    entityType as KnowledgeChildEntityType,
+  );
+}
+
 /** Required purge timing plus optional post-commit cleanup registered by Phases 5/11. */
 export interface PurgeOptions {
   /** Caller-supplied local wall-clock timestamp for the merge-visible sun update. */
@@ -129,6 +165,7 @@ export async function computeImpact(
   exec: SqlExecutor,
   contactId: number,
 ): Promise<PurgeImpact> {
+  const knowledgeChildren = await availableKnowledgeChildren(exec);
   const interactions = await countRows(
     exec,
     "SELECT COUNT(*) AS n FROM interactions WHERE contact_id = ?",
@@ -152,21 +189,19 @@ export async function computeImpact(
   const methods = await countRows(exec, PURGE_CHILDREN.contact_method!.countSql, contactId);
   const externalLinks = await countRows(exec, PURGE_CHILDREN.external_contact_link!.countSql, contactId);
   const methodProvenance = await countRows(exec, PURGE_CHILDREN.contact_method_provenance!.countSql, contactId);
-  const memories = await countRows(
-    exec,
-    PURGE_CHILDREN.memory!.countSql,
-    contactId,
-  );
-  const relationships = await countRows(
-    exec,
-    PURGE_CHILDREN.relationship!.countSql,
-    contactId,
-  );
-  const currentStateEntries = await countRows(
-    exec,
-    PURGE_CHILDREN.current_state_entry!.countSql,
-    contactId,
-  );
+  const memories = knowledgeChildren.has("memory")
+    ? await countRows(exec, PURGE_CHILDREN.memory!.countSql, contactId)
+    : 0;
+  const relationships = knowledgeChildren.has("relationship")
+    ? await countRows(exec, PURGE_CHILDREN.relationship!.countSql, contactId)
+    : 0;
+  const currentStateEntries = knowledgeChildren.has("current_state_entry")
+    ? await countRows(
+        exec,
+        PURGE_CHILDREN.current_state_entry!.countSql,
+        contactId,
+      )
+    : 0;
   const cv = await exec.getFirstAsync<{ present: number }>(
     "SELECT EXISTS(SELECT 1 FROM custom_field_values WHERE contact_id = ?) AS present",
     [contactId],
@@ -249,11 +284,18 @@ export function purgeContact(
         `purgeContact: contact id=${contactId} is not archived — refusing to purge (no rows deleted)`,
       );
     }
+    const knowledgeChildren = await availableKnowledgeChildren(exec);
 
     // (2) Capture every mergeable UID before deleting it. field_history has no
     //     merge identity and remains deliberately excluded from evidence.
     for (const [entityType, source] of Object.entries(PURGE_CHILDREN) as Array<[TombstoneEntityType, PurgeChildSpec | null]>) {
-      if (!source || entityType === "contact") continue;
+      if (
+        !source ||
+        entityType === "contact" ||
+        !isAvailablePurgeChild(entityType, knowledgeChildren)
+      ) {
+        continue;
+      }
       const rows = await exec.getAllAsync<{ uid: string }>(source.tombstoneSql, [
         contactId,
       ]);
@@ -274,6 +316,7 @@ export function purgeContact(
     // (3) Explicit fan-out of every owned child (incl. field_history, which has
     //     no FK and never cascades). Not relying on FK CASCADE — auditable.
     for (const entityType of ["contact_method_provenance", "interaction", "event", "fuel", "custom_field_value", "contact_link", "external_contact_link", "contact_method", "memory", "relationship", "current_state_entry"] as const) {
+      if (!isAvailablePurgeChild(entityType, knowledgeChildren)) continue;
       await exec.runAsync(PURGE_CHILDREN[entityType]!.deleteSql, [contactId]);
     }
     await exec.runAsync("DELETE FROM field_history WHERE contact_id = ?", [

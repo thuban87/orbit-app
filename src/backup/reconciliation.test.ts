@@ -125,13 +125,16 @@ describe("reconciliation", () => {
       "contact_method_provenance",
       "contact_methods",
       "contacts",
+      "current_state_entries",
       "custom_field_defs",
       "custom_field_values",
       "events",
       "external_contact_links",
       "fuel",
       "interactions",
+      "memories",
       "profile",
+      "relationships",
     ]);
     expect(ENTITY_POLICIES.profile.reservedUids).toEqual([RESERVED_PROFILE_UID]);
     expect(ENTITY_POLICIES.categories.reservedUids).toEqual(Object.values(RESERVED_CATEGORY_UIDS));
