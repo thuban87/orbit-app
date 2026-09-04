@@ -303,9 +303,10 @@ export function purgeMemoryPermanently(
   exec: SqlExecutor,
   candidate: MemoryCandidate,
 ): Promise<void> {
-  return inWriteTransaction(exec, () =>
-    purgeMemoryPermanentlyCore(exec, candidate.id, candidate.contactId),
-  );
+  return inWriteTransaction(exec, async () => {
+    await purgeMemoryPermanentlyCore(exec, candidate.id, candidate.contactId);
+    await bumpDataRevisionCore(exec);
+  });
 }
 
 /**
@@ -330,6 +331,7 @@ export function expireMemoryIfStale(
     );
     if (stale === null) return false;
     await purgeMemoryPermanentlyCore(exec, candidate.id, candidate.contactId);
+    await bumpDataRevisionCore(exec);
     return true;
   });
 }

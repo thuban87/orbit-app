@@ -214,9 +214,10 @@ export function purgeRelationshipPermanently(
   exec: SqlExecutor,
   candidate: RelationshipCandidate,
 ): Promise<void> {
-  return inWriteTransaction(exec, () =>
-    purgeRelationshipPermanentlyCore(exec, candidate.id, candidate.contactId),
-  );
+  return inWriteTransaction(exec, async () => {
+    await purgeRelationshipPermanentlyCore(exec, candidate.id, candidate.contactId);
+    await bumpDataRevisionCore(exec);
+  });
 }
 
 /**
@@ -240,6 +241,7 @@ export function expireRelationshipIfStale(
     );
     if (stale === null) return false;
     await purgeRelationshipPermanentlyCore(exec, candidate.id, candidate.contactId);
+    await bumpDataRevisionCore(exec);
     return true;
   });
 }

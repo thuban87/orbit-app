@@ -38,6 +38,20 @@ async function seedContact(name = "Alex"): Promise<number> {
 }
 
 describe("relationships DAO", () => {
+  it("marks manual permanent purges and successful stale expiry dirty for backup", async () => {
+    const contactId = await seedContact();
+    const id = await addRelationship(exec, { contactId, personName: "Delete", createdAt: NOW, now: NOW });
+    await deleteRelationship(exec, { id, contactId, now: NOW });
+    const beforePurge = (await exec.getFirstAsync<{ data_revision: number }>("SELECT data_revision FROM app_settings WHERE id=1"))!.data_revision;
+    await purgeRelationshipPermanently(exec, { id, contactId });
+    await expect(exec.getFirstAsync<{ data_revision: number }>("SELECT data_revision FROM app_settings WHERE id=1")).resolves.toEqual({ data_revision: beforePurge + 1 });
+
+    const staleId = await addRelationship(exec, { contactId, personName: "Stale", createdAt: NOW, now: NOW });
+    await exec.runAsync("UPDATE relationships SET deleted_at=datetime('now','localtime', ?) WHERE id=?", ["-31 days", staleId]);
+    const beforeExpiry = (await exec.getFirstAsync<{ data_revision: number }>("SELECT data_revision FROM app_settings WHERE id=1"))!.data_revision;
+    await expect(expireRelationshipIfStale(exec, { id: staleId, contactId }, "-30 days", NOW)).resolves.toBe(true);
+    await expect(exec.getFirstAsync<{ data_revision: number }>("SELECT data_revision FROM app_settings WHERE id=1")).resolves.toEqual({ data_revision: beforeExpiry + 1 });
+  });
   it("adds a relationship with optional link fields and preserves multi-byte text", async () => {
     const contactId = await seedContact();
     const linkedContactId = await seedContact("Blair");
