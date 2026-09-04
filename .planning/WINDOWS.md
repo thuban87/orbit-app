@@ -1,10 +1,10 @@
 ---
 schema_version: 1
-open_count: 18
+open_count: 19
 waived_count: 0
 fixed_count: 6
-total_count: 24
-last_updated: 2026-09-03T17:58:56.315Z
+total_count: 25
+last_updated: 2026-09-04T06:26:08.728Z
 ---
 
 # Broken Windows Ledger
@@ -39,6 +39,7 @@ last_updated: 2026-09-03T17:58:56.315Z
 | 22 | 23 | stub | assets/backgrounds/README.md |  | Background assets are placeholder uniform-fill webps (8 slots); final curated art deferred, must stay <= declared brightest pixel (23-06) | open |  | 2026-09-03T17:58:48.467Z |  |
 | 23 | 23 | unrun-verify | src/components/ui/__dev__/ThemePreviewScreen.tsx |  | Per-asset brightest-region text-over-glass AA on each Galaxy asset (shipped .webp bytes) — device-UAT deferred to end-of-phase Pixel pass (23-06 Task 2) | open |  | 2026-09-03T17:58:56.134Z |  |
 | 24 | 23 | unrun-verify | src/components/orrery/SunBody.tsx |  | Reduced-motion live toggle halts OrreryCanvas twinkle + SunBody glow pulse + bg motion — device-UAT deferred to end-of-phase Pixel pass (23-06 Task 3) | open |  | 2026-09-03T17:58:56.315Z |  |
+| 25 | 24.1 | stub | src/navigation/tabs/DashboardStack.tsx | 43 | The universal-FAB MemoryPlaceholderScreen intentionally remains until Phase 34; this plan adds the separate profile-owned Things-to-Remember route. | open |  | 2026-09-04T06:26:08.728Z |  |
 
 ````json
 [
@@ -328,6 +329,18 @@ last_updated: 2026-09-03T17:58:56.315Z
     "status": "open",
     "reason": "",
     "recorded_at": "2026-09-03T17:58:56.315Z",
+    "resolved_at": null
+  },
+  {
+    "id": 25,
+    "kind": "stub",
+    "phase": "24.1",
+    "file": "src/navigation/tabs/DashboardStack.tsx",
+    "line": 43,
+    "description": "The universal-FAB MemoryPlaceholderScreen intentionally remains until Phase 34; this plan adds the separate profile-owned Things-to-Remember route.",
+    "status": "open",
+    "reason": "",
+    "recorded_at": "2026-09-04T06:26:08.728Z",
     "resolved_at": null
   }
 ]

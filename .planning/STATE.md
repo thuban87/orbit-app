@@ -5,16 +5,16 @@ milestone_name: Release Readiness
 current_phase: 24.1
 current_phase_name: Contact Knowledge Foundation — Model, Storage & UI
 status: executing
-stopped_at: Phase 24 UI-SPEC approved
-last_updated: "2026-09-04T02:00:40.101Z"
-last_activity: 2026-09-03
-last_activity_desc: Phase 24.1 cross-AI plan convergence — plans converged (0 HIGH), owner decisions pending
-state_head: 9acdeb84ff25f0b6e07327924cfd7c02d4915cc0
+stopped_at: Completed 24.1-01-PLAN.md
+last_updated: "2026-09-04T06:26:30.245Z"
+last_activity: 2026-09-04
+last_activity_desc: Phase 24.1 execution started
+state_head: 357865cefaff635b766a0a0b5642b49a1a1aa6c9
 progress:
   total_phases: 20
-  completed_phases: 2
-  total_plans: 21
-  completed_plans: 13
+  completed_phases: 1
+  total_plans: 22
+  completed_plans: 15
 ---
 
 # Project State
@@ -24,14 +24,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-09-01 after v1.0 milestone)
 
 **Core value:** Collapse the taps between "you're overdue with X" and the message actually being sent.
-**Current focus:** Phase 24.1 — Contact Knowledge Foundation (cross-AI plan convergence)
+**Current focus:** Phase 24.1 — Contact Knowledge Foundation — Model, Storage & UI
 
 ## Current Position
 
-Phase: 24.1 (Contact Knowledge Foundation — Model, Storage & UI) — READY TO EXECUTE
-Plan: Not started
+Phase: 24.1 (Contact Knowledge Foundation — Model, Storage & UI) — EXECUTING
+Plan: 2 of 7
 Status: Ready to execute
-Last activity: 2026-09-03 — Phase 24.1 cross-AI plan convergence (5 review cycles); plans converged on HIGH, 3 non-HIGH + owner decisions pending
+Last activity: 2026-09-04 — Phase 24.1 execution started
 Progress: 2/19 phases complete (v2.0)
 
 **Milestone v2.0 structure (pre-decided by the owner from the fifteen milestone-2 dossiers + the
@@ -173,6 +173,7 @@ at plan time. All new durable preferences are `app_settings` columns, never Asyn
 | Phase 23 P05 | 8m | 2 tasks | 8 files |
 | Phase 23 P06 | 14m | 3 tasks | 15 files |
 | Phase 23 P07 | 12m | 2 tasks | 8 files |
+| Phase 24.1 P01 | 14min | 3 tasks | 14 files |
 
 ## Accumulated Context
 
@@ -358,6 +359,8 @@ Foundational decisions affecting current work:
 - [Phase 22]: Quick Log feedback is keyed solely to the resolved canonical recordTouchpoint transaction; Undo reuses deleteTouchpoint.
 - [Phase 22]: Shell-originated interaction changes use a non-persisted app-level revision rather than Dashboard's connection-scoped SQLite notification.
 - [Phase 23]: 23-04: the live OS reduced-motion signal (THEME-06/D-05/D-07). The subscribe/seed/cleanup logic is EXTRACTED into `createReducedMotionController(accessibilityInfo, emit): { dispose() }` — a plain, non-React controller with `emit` as the SECOND ARGUMENT (called once with the seeded value, again on every `reduceMotionChanged`) and `dispose()` as the only returned member, so it is node-testable with a mock accessibilityInfo + spy emit (repo has Vitest, no react-test-renderer). Signal source = `AccessibilityInfo.isReduceMotionEnabled()` (seed) + `addEventListener('reduceMotionChanged')` (live), NOT reanimated's boot-time `useReducedMotion()` (RESEARCH Pitfall 1). `useReducedMotionShared()` writes a `useSharedValue<boolean>` `.value` (never setState) so the Skia loop reads it via `useDerivedValue` with no per-frame re-render; `useReducedMotion()` is a separate state-backed boolean twin for React-tree crossfade-vs-instant decisions — Skia never driven from the boolean. Each hook owns ONE controller instance (own listener, no shared subscription); a post-dispose seed resolve is disposed-flag-guarded (T-23-07). Motion tokens (motion.ts) = MOTION fast(120)/base(200)/slow(320) ms durations + `ambient` per-second SPEED constant (a rate, NOT a duration — the exact shape Plan 06's Orrery worklet multiplies into useDerivedValue; tunable via top-of-file AMBIENT_SPEED) + EASING standard/decelerate pure-data descriptors (no reanimated Easing import — node-importable/RN-free). Consumers import `@/theme/use-reduced-motion` + `@/theme/tokens/motion` directly (no barrel edit). 11 node tests; tsc + check:colors + full suite (2035) green; no deviations. Device UAT (toggle OS reduced motion mid-session → Plan 06 ambient halts live) deferred to end-of-phase Pixel pass (no Plan 06 consumer exists yet). 2 commits (ea314b3 hook; 552cb36 tokens).
+- [Phase 24.1]: Migration 016 is additive-only; Memory types remain application-owned with a provisional general label.
+- [Phase 24.1]: Memory writes validate the registry and use the shared non-reentrant transaction; Things-to-Remember is registered in both profile stacks.
 
 ### Pending Todos
 
@@ -424,11 +427,11 @@ _Also disposed at this close: 05/deferred-items.md (check:colors doc-comment) ma
 
 ## Session
 
-**Last session:** 2026-09-03T21:26:25.137Z
-**Stopped at:** Phase 24 UI-SPEC approved
+**Last session:** 2026-09-04T06:26:29.779Z
+**Stopped at:** Completed 24.1-01-PLAN.md
 _Prior stop (v1.0):_ Phase 21 UI-SPEC approved; milestone v1.0 closed 2026-09-01.
 _Prior stop (13-04):_ the orrery VISUAL VOCABULARY (theme tokens + two pure resolver modules, node-tested, 29 cases green): (1) five owner-tunable `ThemePalette` tokens seeded in `space-dark.dark` ONLY — `starPalette` (6 colours, gold `#F2C14E` at index 0, then amber/rose-red/violet/cyan/ice-white), `mutedStable/Wobble/Decay` (desaturated same-hue morph endpoints), `rogueExtinguished` (cold blue-grey `#3E4A6B` rogue BODY fill) — with an M6/C2-5 conformance test that IMPORTS the real `SELF_SUN_COLOUR_RE`/`assertSelfSunColour` from app-settings-dao and locks every starPalette entry to the ACTUAL DAO write-path rule (no re-inlined regex). (2) `orrery-ring-logic.ts` `orreryRingStyle(status, colors)` — REUSES `ringVisual` for `{color,opacity,width}` (status→colour mapped once), adds the `strokeStyle` axis (solid→dashed→faded→faintTrace) + `bodyFill` (rogue ring=`colors.rogue`, body=`rogueExtinguished`); `null`→canonical NEUTRAL (`colors.border`), never throws — the single fallback sun-occupant reuses (C2-2). (3) `sun-occupant-logic.ts` `resolveSunOccupant(input)` — NULL/archived/missing→self (A7, glow `selfSunColour ?? starPalette[0]`), live contact→its status glow via `orreryRingStyle(status, colors).color`, never-contacted (status `null`)→the reused neutral border (C2-2); accepts `status: ProfileStatus | null`. 5 commits (1801915 feat tokens+M6; d35d528 RED→4cbfad5 GREEN ring-logic; c923b16 RED→10780dd GREEN sun-occupant); tsc + check:colors clean; no deviations (one in-flight fix: a placeholder hex in the logic test was re-sourced from the palette after check:colors flagged it — C2-3). Committed locally on main (NOT pushed). Next: Wave 2 (13-05 render / 13-06 Settings sun-picker), Wave 3 (13-07 drag-release), Wave 4 (13-08 device UAT, autonomous:false).
-**Resume file:** .planning/phases/24-contact-knowledge-foundation/24-UI-SPEC.md
+**Resume file:** None
 are archived under `.planning/milestones/v1.0-phases/`.)
 
 ## Phase 4 — Closeout (2026-08-15) ✅ COMPLETE

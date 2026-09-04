@@ -238,10 +238,13 @@ All v1.0 commits are local on `main` and have NOT been pushed.
 
 **Canonical refs**: docs/dossier/milestone-2/phase-03-contact-knowledge-foundation-dossier.md; docs/dossier/milestone-2/planning-notes/phase-03-planning-notes.md
 **Schema**: additive model migration (016 — verified head+1 on disk at plan time: TARGET_VERSION=15, migrations 001–015 → first new is 016); no backup-format bump
-**Plans**: 7 plans (4 waves)
+**Plans**: 1/8 plans executed (4 waves)
+
+- [ ] 24.1-PLAN-CHECK-cycle1.md
+
 **Wave 1**
 
-- [ ] 24.1-01-PLAN.md — Tracer: migration 016 (full additive schema) + in-code Memory-type registry + memories DAO/read + reachable Things-to-Remember render (KNOW-01/02/09)
+- [x] 24.1-01-PLAN.md — Tracer: migration 016 (full additive schema) + in-code Memory-type registry + memories DAO/read + reachable Things-to-Remember render (KNOW-01/02/09)
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
@@ -546,7 +549,7 @@ All v1.0 commits are local on `main` and have NOT been pushed.
 |-------|----------------|--------|-----------|
 | 22. App Shell & Navigation | 6/6 | In Progress|  |
 | 23. Theme & Visual System | 7/7 | In Progress | - |
-| 24.1 Contact Knowledge Foundation (Model, Storage & UI) | 0/TBD | Not started | - |
+| 24.1 Contact Knowledge Foundation (Model, Storage & UI) | 1/8 | In Progress|  |
 | 24.2 Contact Knowledge (Egress, Search, Types & Data-moves) | 0/TBD | Not started | - |
 | 25. Dashboard Data & State Foundation | 0/TBD | Not started | - |
 | 26. Dashboard Control Surface | 0/TBD | Not started | - |
