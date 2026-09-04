@@ -13,6 +13,7 @@ export function TextFieldWidget({
   onChange,
   label,
   testID,
+  keyboardType,
 }: FieldWidgetProps) {
   const { colors } = useTheme();
   return (
@@ -21,6 +22,7 @@ export function TextFieldWidget({
       accessibilityLabel={label}
       value={value ?? ""}
       onChangeText={onChange}
+      keyboardType={keyboardType}
       placeholderTextColor={colors.textSecondary}
       style={[
         styles.input,

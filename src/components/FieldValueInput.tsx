@@ -81,6 +81,12 @@ export function FieldValueInput({
       return <ToggleFieldWidget {...shared} />;
     case "number":
       return <NumberFieldWidget {...shared} />;
+    case "url":
+      return <TextFieldWidget {...shared} keyboardType="url" />;
+    case "email":
+      return <TextFieldWidget {...shared} keyboardType="email-address" />;
+    case "phone":
+      return <TextFieldWidget {...shared} keyboardType="phone-pad" />;
     case "photo":
       // Photo ONLY: thread contactId + col_name so the widget is edit-gated and
       // can derive its stable `cv-` filename. Every other case ignores them.

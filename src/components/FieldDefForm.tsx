@@ -50,7 +50,7 @@ import { useTheme } from "@/theme";
 // type from the component; the canonical definition now lives in the pure logic.
 export type { FieldDefDraft } from "@/components/field-def-form-logic";
 
-/** Human labels for the 7 FieldType values (picker order mirrors the union). */
+/** Human labels for the 10 FieldType values (picker order mirrors the union). */
 const FIELD_TYPES: ReadonlyArray<{ value: FieldType; label: string }> = [
   { value: "text", label: "Text" },
   { value: "textarea", label: "Text area" },
@@ -59,6 +59,9 @@ const FIELD_TYPES: ReadonlyArray<{ value: FieldType; label: string }> = [
   { value: "toggle", label: "Toggle" },
   { value: "number", label: "Number" },
   { value: "photo", label: "Photo" },
+  { value: "url", label: "URL" },
+  { value: "email", label: "Email" },
+  { value: "phone", label: "Phone" },
 ];
 
 interface CreateProps {

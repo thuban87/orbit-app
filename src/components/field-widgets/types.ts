@@ -1,5 +1,5 @@
 /**
- * Shared prop contract for the 7 custom-field VALUE widgets (FLD-04).
+ * Shared prop contract for the 10 custom-field VALUE widgets (FLD-04, KNOW-13).
  *
  * Each widget is a CONTROLLED input over the field's TEXT storage: it reads a
  * `string | null` and emits a raw `string` via `onChange`. Widgets NEVER coerce
@@ -32,4 +32,6 @@ export interface FieldWidgetProps {
   colName?: string;
   /** Stable testID mirroring the `HomeScreen` verification pattern. */
   testID?: string;
+  /** Optional native keyboard hint for single-line typed text inputs. */
+  keyboardType?: import("react-native").TextInputProps["keyboardType"];
 }
