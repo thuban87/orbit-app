@@ -27,6 +27,7 @@ vi.mock("@/services/photos/photo-storage", () => ({
 vi.mock("@/services/notifications/notification-schedule", () => ({ reconcileSchedule: async () => {} }));
 vi.mock("@/services/notifications/digest-schedule", () => ({ reconcileDigestSchedule: async () => {} }));
 import { buildExportManifest } from "@/backup/export-manifest";
+import { parseBackupManifest } from "@/backup/backup-schema";
 import { applyRestore } from "@/backup/restore-apply";
 import { nodeSqliteExecutor, openTestDb } from "@/db/__testkit__/node-sqlite";
 import { deleteMemory, purgeMemoryPermanently } from "@/db/memories-dao";
@@ -484,7 +485,7 @@ describe("applyRestore", () => {
     const s1 = await scopedSource.getFirstAsync<{ id: number }>("SELECT id FROM contacts WHERE uid=?", ["scoped-c1"]);
     await scopedSource.runAsync("INSERT INTO custom_field_defs (uid,col_name,label,type,show_on_new,always_show,display_order,share_with_ai,scope,created_at,modified_at) VALUES (?,?,?,?,?,?,?,?,?,?,?)", ["scoped-def", "fav_colour", "Favourite colour", "text", 0, 0, 0, 0, "contact", NOW, NOW]);
     const sdef = await scopedSource.getFirstAsync<{ id: number }>("SELECT id FROM custom_field_defs WHERE uid=?", ["scoped-def"]);
-    await scopedSource.runAsync("INSERT INTO custom_field_values (uid,contact_id,field_def_id,value,created_at,modified_at) VALUES (?,?,?,?,?,?)", ["sval-1", s1!.id, sdef!.id, "Blue", NOW, NOW]);
+    await scopedSource.runAsync("INSERT INTO custom_field_values (uid,contact_id,field_def_id,value,created_at,modified_at) VALUES (?,?,?,?,?,?)", ["sval-1", s1!.id, sdef!.id, "Choice", NOW, NOW]);
     const scopedManifest = await buildExportManifest(scopedSource, { exportedAt: NOW, readPhotoBase64: async () => "" });
     // A contact-scoped def legitimately owns only its owner's pair and is exempt.
     const scopedDest = await db();
@@ -500,5 +501,92 @@ describe("applyRestore", () => {
     const destination = await db();
     await expect(applyRestore(destination, manifest, "merge")).resolves.toMatchObject({ status: "applied" });
     await expect(destination.getFirstAsync<{ phone_region_override: string }>("SELECT phone_region_override FROM app_settings WHERE id=1")).resolves.toEqual({ phone_region_override: "GB" });
+  });
+
+  it("round-trips allow_ai, scoped/history/group defs, value history, soft-deletes, and a history tombstone in merge", async () => {
+    const source = await db();
+    const owner = await source.runAsync("INSERT INTO contacts (uid,name,interval_days,rarely_responds,reminders_off,created_at,modified_at) VALUES (?,?,?,?,?,?,?)", ["know-owner", "Owner", 14, 0, 0, NOW, NOW]);
+    const ownerId = owner.lastInsertRowId;
+    // (a) memories: allow_ai ON; imported-type (allow_ai OFF, KNOW-14 provenance); soft-deleted.
+    await source.runAsync("INSERT INTO memories (uid,contact_id,type,value,pinned,outdated,provenance,allow_ai,created_at,modified_at) VALUES (?,?,?,?,?,?,?,?,?,?)", ["mem-allow", ownerId, "general", "Shared fact", 0, 0, "user", 1, NOW, NOW]);
+    await source.runAsync("INSERT INTO memories (uid,contact_id,type,value,pinned,outdated,provenance,allow_ai,created_at,modified_at) VALUES (?,?,?,?,?,?,?,?,?,?)", ["mem-imported", ownerId, "imported", "From contacts app", 0, 0, "import", 0, NOW, NOW]);
+    await source.runAsync("INSERT INTO memories (uid,contact_id,type,custom_label,value,pinned,outdated,provenance,allow_ai,created_at,modified_at,deleted_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)", ["mem-deleted", ownerId, "custom", "Note", "Deleted", 0, 0, "user", 0, NOW, NOW, "2026-08-26 12:00:00"]);
+    // (b) a GLOBAL def and a per-contact scoped def with history + group.
+    await source.runAsync("INSERT INTO custom_field_defs (uid,col_name,label,type,show_on_new,always_show,display_order,share_with_ai,scope,history_retained,field_group,created_at,modified_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)", ["g-def", "nickname", "Nickname", "text", 0, 0, 0, 0, "global", 0, null, NOW, NOW]);
+    await source.runAsync("INSERT INTO custom_field_defs (uid,col_name,label,type,show_on_new,always_show,display_order,share_with_ai,scope,history_retained,field_group,created_at,modified_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)", ["s-def", "fav_colour", "Favourite colour", "text", 0, 0, 0, 0, "contact", 1, "Personal", NOW, NOW]);
+    const gDef = await source.getFirstAsync<{ id: number }>("SELECT id FROM custom_field_defs WHERE uid=?", ["g-def"]);
+    const sDef = await source.getFirstAsync<{ id: number }>("SELECT id FROM custom_field_defs WHERE uid=?", ["s-def"]);
+    await source.runAsync("INSERT INTO custom_field_values (uid,contact_id,field_def_id,value,created_at,modified_at) VALUES (?,?,?,?,?,?)", ["g-val", ownerId, gDef!.id, "Ace", NOW, NOW]);
+    await source.runAsync("INSERT INTO custom_field_values (uid,contact_id,field_def_id,value,created_at,modified_at) VALUES (?,?,?,?,?,?)", ["s-val", ownerId, sDef!.id, "Current", NOW, NOW]);
+    // (c) two value-history rows on the history-retained scoped def.
+    await source.runAsync("INSERT INTO custom_field_value_history (uid,contact_id,field_def_id,value,created_at) VALUES (?,?,?,?,?)", ["hist-1", ownerId, sDef!.id, "Older", NOW]);
+    await source.runAsync("INSERT INTO custom_field_value_history (uid,contact_id,field_def_id,value,created_at) VALUES (?,?,?,?,?)", ["hist-2", ownerId, sDef!.id, "Oldest", "2026-08-24 12:00:00"]);
+    // (d) a value-history tombstone that must survive export→restore.
+    await source.runAsync("INSERT INTO tombstones (entity_type,entity_uid,deleted_at) VALUES (?,?,?)", ["custom_field_value_history", "hist-ghost", NOW]);
+
+    const manifest = await buildExportManifest(source, { exportedAt: NOW, readPhotoBase64: async () => "" });
+    const destination = await db();
+    await expect(applyRestore(destination, manifest, "merge")).resolves.toMatchObject({ status: "applied" });
+
+    await expect(destination.getAllAsync<{ uid: string; allow_ai: number; deleted_at: string | null }>("SELECT uid,allow_ai,deleted_at FROM memories ORDER BY uid")).resolves.toEqual([
+      { uid: "mem-allow", allow_ai: 1, deleted_at: null },
+      { uid: "mem-deleted", allow_ai: 0, deleted_at: "2026-08-26 12:00:00" },
+      { uid: "mem-imported", allow_ai: 0, deleted_at: null },
+    ]);
+    await expect(destination.getFirstAsync<{ type: string }>("SELECT type FROM memories WHERE uid=?", ["mem-imported"])).resolves.toEqual({ type: "imported" });
+    await expect(destination.getAllAsync<{ uid: string; scope: string; history_retained: number; field_group: string | null }>("SELECT uid,scope,history_retained,field_group FROM custom_field_defs ORDER BY uid")).resolves.toEqual([
+      { uid: "g-def", scope: "global", history_retained: 0, field_group: null },
+      { uid: "s-def", scope: "contact", history_retained: 1, field_group: "Personal" },
+    ]);
+    await expect(destination.getAllAsync<{ uid: string; value: string }>("SELECT uid,value FROM custom_field_value_history ORDER BY uid")).resolves.toEqual([
+      { uid: "hist-1", value: "Older" },
+      { uid: "hist-2", value: "Oldest" },
+    ]);
+    await expect(destination.getFirstAsync<{ entity_uid: string }>("SELECT entity_uid FROM tombstones WHERE entity_type='custom_field_value_history' AND entity_uid='hist-ghost'")).resolves.toEqual({ entity_uid: "hist-ghost" });
+  });
+
+  it("clears destination-only value history on replace-all before writing the manifest's rows", async () => {
+    const source = await db();
+    const owner = await source.runAsync("INSERT INTO contacts (uid,name,interval_days,rarely_responds,reminders_off,created_at,modified_at) VALUES (?,?,?,?,?,?,?)", ["ra-owner", "Owner", 14, 0, 0, NOW, NOW]);
+    await source.runAsync("INSERT INTO custom_field_defs (uid,col_name,label,type,show_on_new,always_show,display_order,share_with_ai,scope,history_retained,field_group,created_at,modified_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)", ["ra-def", "nickname", "Nickname", "text", 0, 0, 0, 0, "contact", 1, "Grp", NOW, NOW]);
+    const raDef = await source.getFirstAsync<{ id: number }>("SELECT id FROM custom_field_defs WHERE uid=?", ["ra-def"]);
+    await source.runAsync("INSERT INTO custom_field_values (uid,contact_id,field_def_id,value,created_at,modified_at) VALUES (?,?,?,?,?,?)", ["ra-val", owner.lastInsertRowId, raDef!.id, "Now", NOW, NOW]);
+    await source.runAsync("INSERT INTO custom_field_value_history (uid,contact_id,field_def_id,value,created_at) VALUES (?,?,?,?,?)", ["ra-hist", owner.lastInsertRowId, raDef!.id, "Then", NOW]);
+    const manifest = await buildExportManifest(source, { exportedAt: NOW, readPhotoBase64: async () => "" });
+
+    const destination = await db();
+    const destContact = await destination.runAsync("INSERT INTO contacts (uid,name,interval_days,rarely_responds,reminders_off,created_at,modified_at) VALUES (?,?,?,?,?,?,?)", ["dest-owner", "Dest", 14, 0, 0, NOW, NOW]);
+    await destination.runAsync("INSERT INTO custom_field_defs (uid,col_name,label,type,show_on_new,always_show,display_order,share_with_ai,scope,history_retained,field_group,created_at,modified_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)", ["dest-def", "x", "X", "text", 0, 0, 0, 0, "contact", 1, null, NOW, NOW]);
+    const destDef = await destination.getFirstAsync<{ id: number }>("SELECT id FROM custom_field_defs WHERE uid=?", ["dest-def"]);
+    await destination.runAsync("INSERT INTO custom_field_value_history (uid,contact_id,field_def_id,value,created_at) VALUES (?,?,?,?,?)", ["dest-hist", destContact.lastInsertRowId, destDef!.id, "Stale", NOW]);
+
+    await expect(applyRestore(destination, manifest, "replace-all")).resolves.toMatchObject({ status: "applied", mode: "replace-all" });
+    await expect(destination.getAllAsync<{ uid: string }>("SELECT uid FROM custom_field_value_history ORDER BY uid")).resolves.toEqual([{ uid: "ra-hist" }]);
+  });
+
+  it("parses a pre-phase format-4 backup end-to-end and restores defaulted knowledge columns (P07-MED)", async () => {
+    const source = await db();
+    const owner = await source.runAsync("INSERT INTO contacts (uid,name,interval_days,rarely_responds,reminders_off,created_at,modified_at) VALUES (?,?,?,?,?,?,?)", ["old-owner", "Owner", 14, 0, 0, NOW, NOW]);
+    await source.runAsync("INSERT INTO memories (uid,contact_id,type,value,pinned,outdated,provenance,allow_ai,created_at,modified_at) VALUES (?,?,?,?,?,?,?,?,?,?)", ["old-mem", owner.lastInsertRowId, "general", "Fact", 0, 0, "user", 1, NOW, NOW]);
+    await source.runAsync("INSERT INTO custom_field_defs (uid,col_name,label,type,show_on_new,always_show,display_order,share_with_ai,scope,history_retained,field_group,created_at,modified_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)", ["old-def", "nickname", "Nickname", "text", 0, 0, 0, 0, "global", 1, "Grp", NOW, NOW]);
+    const oldDef = await source.getFirstAsync<{ id: number }>("SELECT id FROM custom_field_defs WHERE uid=?", ["old-def"]);
+    await source.runAsync("INSERT INTO custom_field_values (uid,contact_id,field_def_id,value,created_at,modified_at) VALUES (?,?,?,?,?,?)", ["old-val", owner.lastInsertRowId, oldDef!.id, "Ace", NOW, NOW]);
+    const manifest = await buildExportManifest(source, { exportedAt: NOW, readPhotoBase64: async () => "" });
+
+    // Simulate a LIVE format-4 backup object written BEFORE this phase: no
+    // customFieldValueHistory top-level array, and no new per-row columns.
+    const older = JSON.parse(JSON.stringify(manifest)) as Record<string, any>;
+    delete older.customFieldValueHistory;
+    for (const def of older.customFieldDefs) { delete def.scope; delete def.historyRetained; delete def.fieldGroup; }
+    for (const mem of older.memories) delete mem.allowAi;
+
+    const parsed = parseBackupManifest(older);
+    expect(parsed.customFieldValueHistory).toEqual([]);
+
+    const destination = await db();
+    await expect(applyRestore(destination, parsed, "replace-all")).resolves.toMatchObject({ status: "applied" });
+    await expect(destination.getFirstAsync<{ allow_ai: number }>("SELECT allow_ai FROM memories WHERE uid=?", ["old-mem"])).resolves.toEqual({ allow_ai: 0 });
+    await expect(destination.getFirstAsync<{ scope: string; history_retained: number; field_group: string | null }>("SELECT scope,history_retained,field_group FROM custom_field_defs WHERE uid=?", ["old-def"])).resolves.toEqual({ scope: "global", history_retained: 0, field_group: null });
+    await expect(destination.getFirstAsync<{ n: number }>("SELECT COUNT(*) AS n FROM custom_field_value_history")).resolves.toEqual({ n: 0 });
   });
 });
