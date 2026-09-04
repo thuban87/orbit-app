@@ -1,6 +1,10 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { nodeSqliteExecutor, openTestDb } from "@/db/__testkit__/node-sqlite";
-import { setCurrentStateValue } from "@/db/current-state-history-dao";
+import {
+  editHistoryEntry,
+  promoteToCurrentValue,
+  setCurrentStateValue,
+} from "@/db/current-state-history-dao";
 import { migration001 } from "@/db/migrations/001-initial";
 import { migration002 } from "@/db/migrations/002-app-settings";
 import { migration003 } from "@/db/migrations/003-orrery-settings";
@@ -133,5 +137,139 @@ describe("setCurrentStateValue — new current + retained history", () => {
       [contactId],
     );
     expect(count?.count).toBe(0);
+  });
+});
+
+describe("promoteToCurrentValue and editHistoryEntry", () => {
+  async function seedHistory(contactId: number): Promise<{
+    historicId: number;
+    currentId: number;
+  }> {
+    const historicId = await setCurrentStateValue(exec, {
+      contactId,
+      fieldKey: "current_location",
+      value: "Chicago",
+      now: NOW,
+    });
+    const currentId = await setCurrentStateValue(exec, {
+      contactId,
+      fieldKey: "current_location",
+      value: "Madison",
+      now: "2026-09-05 12:00:00",
+    });
+    return { historicId, currentId };
+  }
+
+  it("promotes history while preserving the formerly-current value", async () => {
+    const contactId = await makeContact();
+    const { historicId, currentId } = await seedHistory(contactId);
+
+    await promoteToCurrentValue(exec, {
+      contactId,
+      fieldKey: "current_location",
+      targetId: historicId,
+      now: "2026-09-06 12:00:00",
+    });
+
+    const rows = await entries(contactId);
+    expect(rows).toEqual([
+      expect.objectContaining({ id: historicId, value: "Chicago", is_current: 1 }),
+      expect.objectContaining({ id: currentId, value: "Madison", is_current: 0 }),
+    ]);
+    expect(rows.filter((row) => row.is_current === 1)).toHaveLength(1);
+  });
+
+  it("is no-op-safe when promoting the already-current entry", async () => {
+    const contactId = await makeContact();
+    const { currentId } = await seedHistory(contactId);
+    const before = await entries(contactId);
+
+    await promoteToCurrentValue(exec, {
+      contactId,
+      fieldKey: "current_location",
+      targetId: currentId,
+      now: "2026-09-06 12:00:00",
+    });
+
+    const after = await entries(contactId);
+    expect(after.map(({ id, value, is_current }) => ({ id, value, is_current }))).toEqual(
+      before.map(({ id, value, is_current }) => ({ id, value, is_current })),
+    );
+    expect(after.filter((row) => row.is_current === 1)).toHaveLength(1);
+  });
+
+  it("edits a history value in place without changing its current state", async () => {
+    const contactId = await makeContact();
+    const { historicId } = await seedHistory(contactId);
+
+    await editHistoryEntry(exec, {
+      contactId,
+      fieldKey: "current_location",
+      entryId: historicId,
+      value: "Milwaukee",
+      now: "2026-09-06 12:00:00",
+    });
+
+    expect(await entries(contactId)).toEqual([
+      expect.objectContaining({ id: historicId, value: "Milwaukee", is_current: 0 }),
+      expect.objectContaining({ value: "Madison", is_current: 1 }),
+    ]);
+  });
+
+  it("rolls back a promote whose target does not belong to the field", async () => {
+    const contactId = await makeContact();
+    const { currentId } = await seedHistory(contactId);
+    const otherId = await setCurrentStateValue(exec, {
+      contactId,
+      fieldKey: "last_talked_about",
+      value: "Coffee",
+      now: NOW,
+    });
+
+    await expect(
+      promoteToCurrentValue(exec, {
+        contactId,
+        fieldKey: "current_location",
+        targetId: otherId,
+        now: "2026-09-06 12:00:00",
+      }),
+    ).rejects.toThrow("promoteToCurrentValue");
+
+    expect((await entries(contactId)).find((row) => row.id === currentId)).toEqual(
+      expect.objectContaining({ is_current: 1, value: "Madison" }),
+    );
+  });
+
+  it("rolls back an edit misrouted to another current-state field", async () => {
+    const contactId = await makeContact();
+    const locationId = await setCurrentStateValue(exec, {
+      contactId,
+      fieldKey: "current_location",
+      value: "Chicago",
+      now: NOW,
+    });
+    const topicId = await setCurrentStateValue(exec, {
+      contactId,
+      fieldKey: "last_talked_about",
+      value: "Gardening",
+      now: NOW,
+    });
+
+    await expect(
+      editHistoryEntry(exec, {
+        contactId,
+        fieldKey: "last_talked_about",
+        entryId: locationId,
+        value: "Misrouted",
+        now: "2026-09-06 12:00:00",
+      }),
+    ).rejects.toThrow("editHistoryEntry");
+
+    expect((await entries(contactId)).find((row) => row.id === locationId)).toEqual(
+      expect.objectContaining({ value: "Chicago", is_current: 1 }),
+    );
+    expect((await entries(contactId, "last_talked_about")).find((row) => row.id === topicId)).toEqual(
+      expect.objectContaining({ value: "Gardening", is_current: 1 }),
+    );
   });
 });
