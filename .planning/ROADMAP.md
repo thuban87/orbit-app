@@ -138,7 +138,7 @@ All v1.0 commits are local on `main` and have NOT been pushed.
 
 - [x] **Phase 22: App Shell & Navigation** - Four-tab shell with per-tab stacks, universal six-action speed-dial FAB, and origin-aware Back (completed 2026-09-03)
 - [x] **Phase 23: Theme & Visual System** - Galaxy + Standard packages × Light/Dark/Follow System, semantic icon registry, reduced-motion and contrast guarantees (completed 2026-09-03)
-- [ ] **Phase 24.1: Contact Knowledge Foundation — Model, Storage & UI** - The "Things to Remember" model + UI over fields, custom fields, relationships, typed Memories, current-state history, and soft-delete (additive migration; KNOW-01..09)
+- [x] **Phase 24.1: Contact Knowledge Foundation — Model, Storage & UI** - The "Things to Remember" model + UI over fields, custom fields, relationships, typed Memories, current-state history, and soft-delete (additive migration; KNOW-01..09) (completed 2026-09-04; goal ACHIEVED — device UAT 7/7, UI 18/24 no blockers, Nyquist signed off. Carried forward: D-11 default Memory-type display name — owner naming decision due before Phase 34)
 - [ ] **Phase 24.2: Contact Knowledge — Egress, Search, Types & Data-moves** - Bounded local search, per-item AI opt-in + Off Limits, expanded custom-field types + value history, imported notes, share-capture migration, backup coverage (destructive migration + ADR-030 retirement; KNOW-10..16)
 - [ ] **Phase 25: Dashboard Data & State Foundation** - Shared population/filter/sort/search query state, durable and restored on return
 - [ ] **Phase 26: Dashboard Control Surface** - Lean header plus three equal live-applying anchored control panels
