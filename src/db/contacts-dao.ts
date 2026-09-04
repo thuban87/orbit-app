@@ -58,7 +58,11 @@ import {
 import { bumpDataRevisionCore } from "@/db/data-revision-dao";
 import { recordEventCore } from "@/db/events-dao";
 import { listDefs } from "@/db/field-defs-dao";
-import { upsertValueCore } from "@/db/field-values-dao";
+import {
+  assertContactScopedWriteAllowedCore,
+  upsertValueCore,
+} from "@/db/field-values-dao";
+import { maybeAppendPriorValueHistoryCore } from "@/db/value-history-dao";
 import { assertSafeRelative } from "@/db/photo-relative-path";
 import {
   type FirstInteractionInput,
@@ -411,6 +415,17 @@ export function updateContactFull(
     // relevant to a missing pair's INSERT branch; an existing pair retains it.
     const customValues = input.customValues ?? [];
     for (const customValue of customValues) {
+      await assertContactScopedWriteAllowedCore(
+        exec,
+        input.id,
+        customValue.fieldDefId,
+      );
+      await maybeAppendPriorValueHistoryCore(exec, {
+        contactId: input.id,
+        fieldDefId: customValue.fieldDefId,
+        incomingValue: customValue.value,
+        now: input.now,
+      });
       await upsertValueCore(
         exec,
         input.id,

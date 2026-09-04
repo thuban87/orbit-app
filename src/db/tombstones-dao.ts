@@ -16,6 +16,7 @@ export type TombstoneEntityType =
   | "contact_method_provenance"
   | "custom_field_def"
   | "custom_field_value"
+  | "custom_field_value_history"
   | "memory"
   | "relationship"
   | "current_state_entry";
@@ -46,6 +47,7 @@ function assertTombstoneEntityType(
     case "contact_method_provenance":
     case "custom_field_def":
     case "custom_field_value":
+    case "custom_field_value_history":
     case "memory":
     case "relationship":
     case "current_state_entry":

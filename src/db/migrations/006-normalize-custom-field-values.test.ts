@@ -32,6 +32,7 @@ import { migration010 } from "@/db/migrations/010-contact-method-label";
 import { migration011 } from "@/db/migrations/011-contact-lifecycle-schema";
 import { migration016 } from "@/db/migrations/016-contact-knowledge";
 import { migration017 } from "@/db/migrations/017-knowledge-egress-datamove";
+import { migration018 } from "@/db/migrations/018-custom-field-scope-history";
 import { runMigrations } from "@/db/migrations/runner";
 import { purgeContact } from "@/db/purge-dao";
 import type { SqlExecutor } from "@/db/types";
@@ -395,7 +396,7 @@ describe("migration006 — lossless legacy custom-value normalization", () => {
       newUid: uid,
       defaultPhoneRegion: "US",
     });
-    await runMigrations(exec, [migration016, migration017], 17, {
+    await runMigrations(exec, [migration016, migration017, migration018], 18, {
       now: MIGRATION_NOW,
       newUid: uid,
       defaultPhoneRegion: "US",
@@ -531,8 +532,8 @@ describe("migration006 — lossless legacy custom-value normalization", () => {
         [blair],
       ),
     ).toEqual({ n: 0 });
-    expect(await userVersion()).toBe(17);
-    // Phase 17 backup/export/restore, tombstones, reconciliation, and sync
+    expect(await userVersion()).toBe(18);
+    // Later-phase backup/export/restore, tombstones, reconciliation, and sync
     // conflict policy are intentionally out of scope for this migration proof.
     expect(casey).toBeGreaterThan(0);
   });

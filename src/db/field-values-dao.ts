@@ -51,9 +51,45 @@ export function upsertValue(
   now: string,
 ): Promise<void> {
   return inWriteTransaction(exec, async () => {
+    // Production edit history is composed in updateContactFull before this pure
+    // primitive overwrites a pair. Keeping this wrapper history-free preserves
+    // create-time null seeding and first-set semantics.
     await upsertValueCore(exec, contactId, fieldDefId, uid, value, now);
     await bumpDataRevisionCore(exec);
   });
+}
+
+/**
+ * Reject a second contact from claiming a directly-present contact-scoped def.
+ * This defense-in-depth marker is unreachable through the public 24.2 creator;
+ * Phase 31 will pair scoped creation with durable ownership and edit filtering.
+ */
+export async function assertContactScopedWriteAllowedCore(
+  exec: SqlExecutor,
+  contactId: number,
+  fieldDefId: number,
+): Promise<void> {
+  const def = await exec.getFirstAsync<{ scope: string }>(
+    "SELECT scope FROM custom_field_defs WHERE id = ?",
+    [fieldDefId],
+  );
+  if (def?.scope !== "contact") return;
+  const own = await exec.getFirstAsync<{ one: number }>(
+    `SELECT 1 AS one FROM custom_field_values
+      WHERE contact_id = ? AND field_def_id = ? LIMIT 1`,
+    [contactId, fieldDefId],
+  );
+  if (own) return;
+  const another = await exec.getFirstAsync<{ one: number }>(
+    `SELECT 1 AS one FROM custom_field_values
+      WHERE contact_id != ? AND field_def_id = ? LIMIT 1`,
+    [contactId, fieldDefId],
+  );
+  if (another) {
+    throw new Error(
+      `contact-scoped custom field ${fieldDefId} belongs to a different contact`,
+    );
+  }
 }
 
 /**

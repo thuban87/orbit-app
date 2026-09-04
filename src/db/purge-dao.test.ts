@@ -17,24 +17,10 @@
  *     already gone when it runs), and a THROWING adapter does NOT undo the commit.
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
+vi.mock("expo-sqlite", () => ({}));
 import { nodeSqliteExecutor, openTestDb } from "@/db/__testkit__/node-sqlite";
 import { archiveContact, createContactFull } from "@/db/contacts-dao";
-import { migration001 } from "@/db/migrations/001-initial";
-import { migration002 } from "@/db/migrations/002-app-settings";
-import { migration003 } from "@/db/migrations/003-orrery-settings";
-import { migration004 } from "@/db/migrations/004-ai-settings";
-import { migration005 } from "@/db/migrations/005-digest-settings";
-import { migration006 } from "@/db/migrations/006-normalize-custom-field-values";
-import { migration007 } from "@/db/migrations/007-tombstones";
-import { migration008 } from "@/db/migrations/008-restore-photo-journal";
-import { migration009 } from "@/db/migrations/009-contact-method-normalization";
-import { migration010 } from "@/db/migrations/010-contact-method-label";
-import { migration011 } from "@/db/migrations/011-contact-lifecycle-schema";
-import { migration012 } from "@/db/migrations/012-import-sessions";
-import { migration013 } from "@/db/migrations/013-reconciliation-and-merge";
-import { migration014 } from "@/db/migrations/014-interaction-assists";
-import { migration015 } from "@/db/migrations/015-theme-settings";
-import { migration016 } from "@/db/migrations/016-contact-knowledge";
+import { MIGRATIONS, TARGET_VERSION } from "@/db/database";
 import { runMigrations } from "@/db/migrations/runner";
 import {
   computeImpact,
@@ -56,29 +42,7 @@ beforeEach(async () => {
   customValueDefIds = undefined;
   const db = openTestDb();
   exec = nodeSqliteExecutor(db);
-  await runMigrations(
-    exec,
-    [
-      migration001,
-      migration002,
-      migration003,
-      migration004,
-      migration005,
-      migration006,
-      migration007,
-      migration008,
-      migration009,
-      migration010,
-      migration011,
-      migration012,
-      migration013,
-      migration014,
-      migration015,
-      migration016,
-    ],
-    16,
-    { now: NOW, newUid: uid },
-  );
+  await runMigrations(exec, MIGRATIONS, TARGET_VERSION, { now: NOW, newUid: uid });
 });
 
 /** Insert a contact (archived by default) and return its id. */
@@ -286,6 +250,43 @@ describe("computeImpact — per-child counts + hasCustomValues (CRUD-06)", () =>
       currentStateEntries: 0,
       hasCustomValues: false,
     });
+  });
+});
+
+describe("purgeContact — retained custom-field history", () => {
+  it("tombstones and explicitly deletes retained value history", async () => {
+    const target = await seedContact("History");
+    const def = await seedDef("history_note", 2);
+    const historyUid = uid();
+    await exec.runAsync(
+      `INSERT INTO custom_field_value_history (uid, contact_id, field_def_id, value, created_at)
+       VALUES (?, ?, ?, ?, ?)`,
+      [historyUid, target, def, "prior", NOW],
+    );
+    await purgeContact(exec, target, { now: NOW });
+    expect(await exec.getFirstAsync(
+      "SELECT id FROM custom_field_value_history WHERE uid = ?", [historyUid],
+    )).toBeNull();
+    expect(await exec.getFirstAsync(
+      "SELECT entity_uid FROM tombstones WHERE entity_type = 'custom_field_value_history' AND entity_uid = ?",
+      [historyUid],
+    )).toEqual({ entity_uid: historyUid });
+  });
+
+  it("skips the late-added history table cleanly on a pre-018 fixture", async () => {
+    const legacy = nodeSqliteExecutor(openTestDb());
+    await runMigrations(
+      legacy,
+      MIGRATIONS.filter((migration) => migration.version <= 17),
+      17,
+      { now: NOW, newUid: uid },
+    );
+    const contact = await legacy.runAsync(
+      `INSERT INTO contacts (uid, name, interval_days, archived_at, created_at, modified_at)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      [uid(), "Legacy", 30, NOW, NOW, NOW],
+    );
+    await expect(purgeContact(legacy, contact.lastInsertRowId, { now: NOW })).resolves.toBeUndefined();
   });
 });
 

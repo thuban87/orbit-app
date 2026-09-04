@@ -179,6 +179,7 @@ export async function mergeContacts(
 
     for (const table of ["interactions", "events", "fuel", "custom_field_values", "contact_links", "contact_methods", "external_contact_links", "interaction_assists", "memories", "relationships", "current_state_entries"] as const) await reparent(exec, table, survivor.id, absorbed.id, input.now);
     await exec.runAsync("UPDATE field_history SET contact_id = ? WHERE contact_id = ?", [survivor.id, absorbed.id]);
+    await exec.runAsync("UPDATE custom_field_value_history SET contact_id = ? WHERE contact_id = ?", [survivor.id, absorbed.id]);
 
     const scalar = resolutions.scalars ?? {};
     const fields: Array<[keyof typeof scalar, keyof ContactRow, keyof UpdateContactFullInput]> = [

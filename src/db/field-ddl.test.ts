@@ -122,6 +122,26 @@ describe("normalized field lifecycle", () => {
     ]);
   });
 
+  it("tombstones and explicitly deletes retained history before deleting a definition", async () => {
+    const contactId = await seedContact("Alex");
+    await createField(exec, newDef({ history_retained: 1 }));
+    const fieldDefId = await defId("nickname");
+    const historyUid = uid();
+    await exec.runAsync(
+      `INSERT INTO custom_field_value_history (uid, contact_id, field_def_id, value, created_at)
+       VALUES (?, ?, ?, ?, ?)`,
+      [historyUid, contactId, fieldDefId, "prior", NOW],
+    );
+    await dropField(exec, { id: fieldDefId, col_name: "nickname" }, "delete", NOW);
+    expect(await exec.getFirstAsync(
+      "SELECT id FROM custom_field_value_history WHERE uid = ?", [historyUid],
+    )).toBeNull();
+    expect(await exec.getFirstAsync(
+      "SELECT entity_uid FROM tombstones WHERE entity_type = 'custom_field_value_history' AND entity_uid = ?",
+      [historyUid],
+    )).toEqual({ entity_uid: historyUid });
+  });
+
   it("snapshots non-null normalized values before deleting pairs and the definition", async () => {
     const alex = await seedContact("Alex");
     const bo = await seedContact("Bo");

@@ -129,6 +129,10 @@ async function dropFieldValues(
     "SELECT uid FROM custom_field_values WHERE field_def_id = ? ORDER BY id",
     [def.id],
   );
+  const valueHistory = await exec.getAllAsync<{ uid: string }>(
+    "SELECT uid FROM custom_field_value_history WHERE field_def_id = ? ORDER BY id",
+    [def.id],
+  );
 
   // (a) Snapshot every non-null value to field_history BEFORE deleting the
   //     current pairs. col_name is the immutable, bound history key.
@@ -146,10 +150,21 @@ async function dropFieldValues(
     "DELETE FROM custom_field_values WHERE field_def_id = ?",
     [def.id],
   );
+  await exec.runAsync(
+    "DELETE FROM custom_field_value_history WHERE field_def_id = ?",
+    [def.id],
+  );
   for (const value of values) {
     await insertTombstoneCore(exec, {
       entityType: "custom_field_value",
       entityUid: value.uid,
+      deletedAt: now,
+    });
+  }
+  for (const history of valueHistory) {
+    await insertTombstoneCore(exec, {
+      entityType: "custom_field_value_history",
+      entityUid: history.uid,
       deletedAt: now,
     });
   }

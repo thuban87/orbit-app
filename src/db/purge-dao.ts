@@ -83,6 +83,7 @@ const PURGE_CHILDREN: Record<TombstoneEntityType, PurgeChildSpec | null> = {
   event: { countSql: "SELECT COUNT(*) AS n FROM events WHERE contact_id = ?", tombstoneSql: "SELECT uid FROM events WHERE contact_id = ?", deleteSql: "DELETE FROM events WHERE contact_id = ?" },
   fuel: { countSql: "SELECT COUNT(*) AS n FROM fuel WHERE contact_id = ?", tombstoneSql: "SELECT uid FROM fuel WHERE contact_id = ?", deleteSql: "DELETE FROM fuel WHERE contact_id = ?" },
   custom_field_value: { countSql: "SELECT COUNT(*) AS n FROM custom_field_values WHERE contact_id = ?", tombstoneSql: "SELECT uid FROM custom_field_values WHERE contact_id = ?", deleteSql: "DELETE FROM custom_field_values WHERE contact_id = ?" },
+  custom_field_value_history: { countSql: "SELECT COUNT(*) AS n FROM custom_field_value_history WHERE contact_id = ?", tombstoneSql: "SELECT uid FROM custom_field_value_history WHERE contact_id = ?", deleteSql: "DELETE FROM custom_field_value_history WHERE contact_id = ?" },
   contact_link: { countSql: "SELECT COUNT(*) AS n FROM contact_links WHERE contact_id = ?", tombstoneSql: "SELECT uid FROM contact_links WHERE contact_id = ?", deleteSql: "DELETE FROM contact_links WHERE contact_id = ?" },
   contact_method: { countSql: "SELECT COUNT(*) AS n FROM contact_methods WHERE contact_id = ?", tombstoneSql: "SELECT uid FROM contact_methods WHERE contact_id = ?", deleteSql: "DELETE FROM contact_methods WHERE contact_id = ?" },
   external_contact_link: { countSql: "SELECT COUNT(*) AS n FROM external_contact_links WHERE contact_id = ?", tombstoneSql: "SELECT uid FROM external_contact_links WHERE contact_id = ?", deleteSql: "DELETE FROM external_contact_links WHERE contact_id = ?" },
@@ -97,6 +98,7 @@ const KNOWLEDGE_CHILD_TABLES = {
   memory: "memories",
   relationship: "relationships",
   current_state_entry: "current_state_entries",
+  custom_field_value_history: "custom_field_value_history",
 } as const;
 
 type KnowledgeChildEntityType = keyof typeof KNOWLEDGE_CHILD_TABLES;
@@ -108,7 +110,7 @@ async function availableKnowledgeChildren(
     `SELECT name
        FROM sqlite_master
       WHERE type = 'table'
-        AND name IN ('memories', 'relationships', 'current_state_entries')`,
+        AND name IN ('memories', 'relationships', 'current_state_entries', 'custom_field_value_history')`,
   );
   const names = new Set(rows.map((row) => row.name));
   return new Set(
@@ -315,7 +317,7 @@ export function purgeContact(
 
     // (3) Explicit fan-out of every owned child (incl. field_history, which has
     //     no FK and never cascades). Not relying on FK CASCADE — auditable.
-    for (const entityType of ["contact_method_provenance", "interaction", "event", "fuel", "custom_field_value", "contact_link", "external_contact_link", "contact_method", "memory", "relationship", "current_state_entry"] as const) {
+    for (const entityType of ["contact_method_provenance", "interaction", "event", "fuel", "custom_field_value", "custom_field_value_history", "contact_link", "external_contact_link", "contact_method", "memory", "relationship", "current_state_entry"] as const) {
       if (!isAvailablePurgeChild(entityType, knowledgeChildren)) continue;
       await exec.runAsync(PURGE_CHILDREN[entityType]!.deleteSql, [contactId]);
     }
