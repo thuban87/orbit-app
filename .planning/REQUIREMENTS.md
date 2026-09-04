@@ -324,7 +324,7 @@ Status values: **Pending** = roadmapped, not yet planned.
 | SHELL-01…15 | Phase 22 — App Shell & Navigation | Complete (2026-09-03) |
 | THEME-01…13 | Phase 23 — Theme & Visual System | Pending |
 | KNOW-01…09 | Phase 24.1 — Contact Knowledge Foundation (Model, Storage & UI) | Pending |
-| KNOW-10…16 | Phase 24.2 — Contact Knowledge (Egress, Search, Types & Data-moves) | Pending |
+| KNOW-10…16 | Phase 24.2 — Contact Knowledge (Egress, Search, Types & Data-moves) | Complete |
 | DASHQ-01…14 | Phase 25 — Dashboard Data & State Foundation | Pending |
 | DASHC-01…10 | Phase 26 — Dashboard Control Surface | Pending |
 | LISTV-01…10 | Phase 27 — Dashboard List View | Pending |
