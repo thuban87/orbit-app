@@ -16,6 +16,7 @@ export type MergeableEntityType =
   | "contact_links"
   | "custom_field_defs"
   | "custom_field_values"
+  | "custom_field_value_history"
   | "memories"
   | "relationships"
   | "current_state_entries"
@@ -78,6 +79,15 @@ export const ENTITY_POLICIES: Readonly<Record<MergeableEntityType, EntityPolicy>
   custom_field_defs: { writeMode: "lww" },
   custom_field_values: {
     writeMode: "lww",
+    parentFields: [
+      { field: "contact_id", entityType: "contacts" },
+      { field: "field_def_id", entityType: "custom_field_defs" },
+    ],
+  },
+  // Append-only, immutable value timeline — mirrors `events`: insert-if-missing,
+  // scoped to BOTH its contact and its field definition parent.
+  custom_field_value_history: {
+    writeMode: "insert-if-missing",
     parentFields: [
       { field: "contact_id", entityType: "contacts" },
       { field: "field_def_id", entityType: "custom_field_defs" },

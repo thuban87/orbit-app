@@ -127,6 +127,7 @@ describe("reconciliation", () => {
       "contacts",
       "current_state_entries",
       "custom_field_defs",
+      "custom_field_value_history",
       "custom_field_values",
       "events",
       "external_contact_links",

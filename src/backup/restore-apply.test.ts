@@ -50,17 +50,19 @@ import { migration013 } from "@/db/migrations/013-reconciliation-and-merge";
 import { migration014 } from "@/db/migrations/014-interaction-assists";
 import { migration015 } from "@/db/migrations/015-theme-settings";
 import { migration016 } from "@/db/migrations/016-contact-knowledge";
+import { migration017 } from "@/db/migrations/017-knowledge-egress-datamove";
+import { migration018 } from "@/db/migrations/018-custom-field-scope-history";
 import { runMigrations } from "@/db/migrations/runner";
 import type { SqlExecutor } from "@/db/types";
 
 const NOW = "2026-08-25 12:00:00";
 let uid = 0;
 const newUid = () => `uid-${++uid}`;
-const migrations = [migration001, migration002, migration003, migration004, migration005, migration006, migration007, migration008, migration009, migration010, migration011, migration012, migration013, migration014, migration015, migration016];
+const migrations = [migration001, migration002, migration003, migration004, migration005, migration006, migration007, migration008, migration009, migration010, migration011, migration012, migration013, migration014, migration015, migration016, migration017, migration018];
 
 async function db(): Promise<SqlExecutor> {
   const exec = nodeSqliteExecutor(openTestDb());
-  await runMigrations(exec, migrations, 16, { now: NOW, newUid });
+  await runMigrations(exec, migrations, 18, { now: NOW, newUid });
   return exec;
 }
 
@@ -460,6 +462,34 @@ describe("applyRestore", () => {
     await expect(applyRestore(destination, manifest, "merge")).resolves.toMatchObject({ status: "applied", deleted: 2 });
     await expect(destination.getAllAsync("SELECT uid FROM memories WHERE uid='tombstone-memory'")).resolves.toEqual([]);
     await expect(destination.getAllAsync("SELECT uid FROM relationships WHERE uid='tombstone-relationship'")).resolves.toEqual([]);
+  });
+
+  it("requires full contact×def pairs only for global-scope defs, exempting contact-scoped defs", async () => {
+    const globalSource = await db();
+    for (const name of ["pair-c1", "pair-c2"]) {
+      await globalSource.runAsync("INSERT INTO contacts (uid,name,interval_days,rarely_responds,reminders_off,created_at,modified_at) VALUES (?,?,?,?,?,?,?)", [name, name, 14, 0, 0, NOW, NOW]);
+    }
+    const c1 = await globalSource.getFirstAsync<{ id: number }>("SELECT id FROM contacts WHERE uid=?", ["pair-c1"]);
+    await globalSource.runAsync("INSERT INTO custom_field_defs (uid,col_name,label,type,show_on_new,always_show,display_order,share_with_ai,scope,created_at,modified_at) VALUES (?,?,?,?,?,?,?,?,?,?,?)", ["global-def", "nickname", "Nickname", "text", 0, 0, 0, 0, "global", NOW, NOW]);
+    const gdef = await globalSource.getFirstAsync<{ id: number }>("SELECT id FROM custom_field_defs WHERE uid=?", ["global-def"]);
+    await globalSource.runAsync("INSERT INTO custom_field_values (uid,contact_id,field_def_id,value,created_at,modified_at) VALUES (?,?,?,?,?,?)", ["gval-1", c1!.id, gdef!.id, "Ada", NOW, NOW]);
+    const globalManifest = await buildExportManifest(globalSource, { exportedAt: NOW, readPhotoBase64: async () => "" });
+    // A global def with only one of two contacts' pairs is still rejected.
+    await expect(applyRestore(await db(), globalManifest, "merge")).rejects.toThrow(/missing a normalized custom-field value pair/);
+
+    const scopedSource = await db();
+    for (const name of ["scoped-c1", "scoped-c2"]) {
+      await scopedSource.runAsync("INSERT INTO contacts (uid,name,interval_days,rarely_responds,reminders_off,created_at,modified_at) VALUES (?,?,?,?,?,?,?)", [name, name, 14, 0, 0, NOW, NOW]);
+    }
+    const s1 = await scopedSource.getFirstAsync<{ id: number }>("SELECT id FROM contacts WHERE uid=?", ["scoped-c1"]);
+    await scopedSource.runAsync("INSERT INTO custom_field_defs (uid,col_name,label,type,show_on_new,always_show,display_order,share_with_ai,scope,created_at,modified_at) VALUES (?,?,?,?,?,?,?,?,?,?,?)", ["scoped-def", "fav_colour", "Favourite colour", "text", 0, 0, 0, 0, "contact", NOW, NOW]);
+    const sdef = await scopedSource.getFirstAsync<{ id: number }>("SELECT id FROM custom_field_defs WHERE uid=?", ["scoped-def"]);
+    await scopedSource.runAsync("INSERT INTO custom_field_values (uid,contact_id,field_def_id,value,created_at,modified_at) VALUES (?,?,?,?,?,?)", ["sval-1", s1!.id, sdef!.id, "Blue", NOW, NOW]);
+    const scopedManifest = await buildExportManifest(scopedSource, { exportedAt: NOW, readPhotoBase64: async () => "" });
+    // A contact-scoped def legitimately owns only its owner's pair and is exempt.
+    const scopedDest = await db();
+    await expect(applyRestore(scopedDest, scopedManifest, "merge")).resolves.toMatchObject({ status: "applied" });
+    await expect(scopedDest.getFirstAsync<{ uid: string; scope: string }>("SELECT uid,scope FROM custom_field_defs WHERE uid=?", ["scoped-def"])).resolves.toEqual({ uid: "scoped-def", scope: "contact" });
   });
 
   it("round-trips the portable phone region override through export and restore", async () => {

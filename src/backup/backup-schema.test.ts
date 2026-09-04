@@ -257,6 +257,51 @@ describe("parseBackupManifest", () => {
     expect(() => parseBackupManifest(primary)).toThrow(/duplicate surviving primary/i);
   });
 
+  it("normalizes a missing customFieldValueHistory array to [] for pre-existing format-4 backups (P07-MED)", () => {
+    // A live format-4 backup that predates this phase carries no
+    // customFieldValueHistory key. There is no 4->4 forward migration, so the
+    // ONLY thing that keeps validate() from hard-failing is the ?? [] default.
+    const older = valid();
+    expect(older).not.toHaveProperty("customFieldValueHistory");
+    const parsed = parseBackupManifest(older);
+    expect(parsed.customFieldValueHistory).toEqual([]);
+  });
+
+  it("round-trips and validates custom_field_value_history rows and their tombstone", () => {
+    const manifest = valid();
+    manifest.contacts = [{ uid: "contact-a", trackingEnabled: 1, intervalDays: 7, modifiedAt: "2026-08-25 12:00:00" }];
+    manifest.customFieldDefs = [{ uid: "def-a", modifiedAt: "2026-08-25 12:00:00" }];
+    manifest.customFieldValues = [{ uid: "value-a", contactUid: "contact-a", fieldDefUid: "def-a", value: null }];
+    manifest.customFieldValueHistory = [
+      { uid: "history-a", contactUid: "contact-a", fieldDefUid: "def-a", value: "Old", createdAt: "2026-08-25 12:00:00", modifiedAt: "2026-08-25 12:00:00" },
+    ];
+    manifest.tombstones = [{ entityType: "custom_field_value_history", entityUid: "history-b", deletedAt: "2026-08-25 12:00:00" }];
+    const parsed = parseBackupManifest(manifest);
+    expect(parsed.customFieldValueHistory).toEqual([
+      expect.objectContaining({ uid: "history-a", contactUid: "contact-a", fieldDefUid: "def-a", value: "Old" }),
+    ]);
+    expect(parsed.tombstones).toEqual([
+      { entityType: "custom_field_value_history", entityUid: "history-b", deletedAt: "2026-08-25 12:00:00" },
+    ]);
+  });
+
+  it("rejects a value-history row whose fieldDefUid or contactUid is unknown to the manifest", () => {
+    const base = () => {
+      const manifest = valid();
+      manifest.contacts = [{ uid: "contact-a", trackingEnabled: 1, intervalDays: 7, modifiedAt: "2026-08-25 12:00:00" }];
+      manifest.customFieldDefs = [{ uid: "def-a" }];
+      manifest.customFieldValues = [{ uid: "value-a", contactUid: "contact-a", fieldDefUid: "def-a", value: null }];
+      return manifest;
+    };
+    const badDef = base();
+    badDef.customFieldValueHistory = [{ uid: "history-a", contactUid: "contact-a", fieldDefUid: "ghost-def", value: "Old", createdAt: "2026-08-25 12:00:00", modifiedAt: "2026-08-25 12:00:00" }];
+    expect(() => parseBackupManifest(badDef)).toThrow(/customFieldValueHistory has an unknown field definition UID/);
+
+    const badContact = base();
+    badContact.customFieldValueHistory = [{ uid: "history-a", contactUid: "ghost-contact", fieldDefUid: "def-a", value: "Old", createdAt: "2026-08-25 12:00:00", modifiedAt: "2026-08-25 12:00:00" }];
+    expect(() => parseBackupManifest(badContact)).toThrow(/customFieldValueHistory has an unknown contact UID/);
+  });
+
   it("rejects malformed normalized tombstone parent combinations before apply", () => {
     const broken = valid();
     broken.contacts = [{ uid: "contact-a", trackingEnabled: 1, intervalDays: 7, modifiedAt: "2026-08-25 12:00:00" }];

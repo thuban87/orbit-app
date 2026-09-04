@@ -178,6 +178,7 @@ const TOMBSTONE_ENTITY_TYPES = new Set([
   "contact_method_provenance",
   "custom_field_def",
   "custom_field_value",
+  "custom_field_value_history",
   "memory",
   "relationship",
   "current_state_entry",
@@ -415,6 +416,13 @@ function validate(manifest: RawManifest): BackupManifest {
       fail("customFieldValues has a duplicate custom value pair");
     pairs.add(pair);
   }
+  uidSet(customFieldValueHistory, "customFieldValueHistory");
+  for (const history of customFieldValueHistory) {
+    if (typeof history.contactUid !== "string" || !contacts.has(history.contactUid))
+      fail("customFieldValueHistory has an unknown contact UID");
+    if (typeof history.fieldDefUid !== "string" || !defs.has(history.fieldDefUid))
+      fail("customFieldValueHistory has an unknown field definition UID");
+  }
   for (const memory of arrays.memories) {
     if (typeof memory.contactUid !== "string" || !contacts.has(memory.contactUid))
       fail("memories has an unknown contact UID");
@@ -565,6 +573,12 @@ function validate(manifest: RawManifest): BackupManifest {
       fail("customFieldValues has no surviving contact parent");
     if (!survivingDefs.has(value.fieldDefUid as string))
       fail("customFieldValues has no surviving field definition parent");
+  }
+  for (const history of customFieldValueHistory) {
+    if (!survivingContacts.has(history.contactUid as string))
+      fail("customFieldValueHistory has no surviving contact parent");
+    if (!survivingDefs.has(history.fieldDefUid as string))
+      fail("customFieldValueHistory has no surviving field definition parent");
   }
   for (const memory of arrays.memories)
     if (!survivingContacts.has(memory.contactUid as string))
