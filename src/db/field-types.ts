@@ -45,6 +45,12 @@ export interface CustomFieldDef {
   quarantined_at: string | null;
   /** Include this field's value in AI suggestion payloads. */
   share_with_ai: SqliteBool;
+  /** Global definitions seed every contact; contact scope is reserved for Phase 31. */
+  scope: "global" | "contact";
+  /** Preserve prior non-null values in the additive value-history table. */
+  history_retained: SqliteBool;
+  /** Optional display grouping, consumed by a later Profile UI phase. */
+  field_group: string | null;
   /** Local wall-clock creation stamp. */
   created_at: string;
   /** Local wall-clock last-modified stamp. */
@@ -66,6 +72,10 @@ export interface NewFieldDef {
   always_show: SqliteBool;
   display_order: number;
   share_with_ai: SqliteBool;
+  /** Omitted scope remains global; contact-scoped creation is rejected until Phase 31. */
+  scope?: "global" | "contact";
+  history_retained?: SqliteBool;
+  field_group?: string | null;
   /** Local wall-clock now — used for both created_at and modified_at. */
   now: string;
 }
