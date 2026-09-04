@@ -46,6 +46,7 @@ private data class MutablePickedContact(
   var displayName: String? = null,
   val methods: MutableList<Map<String, String>> = mutableListOf(),
   var birthday: String? = null,
+  var note: String? = null,
   var photoTempUri: String? = null,
 )
 
@@ -92,6 +93,7 @@ class OrbitContactPickerModule : Module() {
             ContactsContract.CommonDataKinds.Phone.CONTENT_ITEM_TYPE,
             ContactsContract.CommonDataKinds.Email.CONTENT_ITEM_TYPE,
             ContactsContract.CommonDataKinds.Event.CONTENT_ITEM_TYPE,
+            ContactsContract.CommonDataKinds.Note.CONTENT_ITEM_TYPE,
             ContactsContract.CommonDataKinds.Photo.CONTENT_ITEM_TYPE,
           ),
         )
@@ -195,6 +197,9 @@ class OrbitContactPickerModule : Module() {
             }
           ContactsContract.CommonDataKinds.Event.CONTENT_ITEM_TYPE ->
             contact.birthday = contact.birthday ?: cursor.stringAt(data1Column)
+          ContactsContract.CommonDataKinds.Note.CONTENT_ITEM_TYPE ->
+            // A provider can expose several Note rows; preserve the first non-blank value.
+            contact.note = contact.note ?: cursor.stringAt(data1Column)?.takeIf { it.isNotBlank() }
           ContactsContract.CommonDataKinds.Photo.CONTENT_ITEM_TYPE -> {
             if (contact.photoTempUri == null) {
               contact.photoTempUri = cursor.blobAt(data15Column)?.let(::copyPhotoToCache)
@@ -211,6 +216,7 @@ class OrbitContactPickerModule : Module() {
         "displayName" to contact.displayName,
         "methods" to contact.methods,
         "birthday" to contact.birthday,
+        "note" to contact.note,
         "photoTempUri" to contact.photoTempUri,
       )
     }
@@ -235,13 +241,14 @@ class OrbitContactPickerModule : Module() {
       ContactsContract.CommonDataKinds.Phone.CONTENT_ITEM_TYPE,
       ContactsContract.CommonDataKinds.Email.CONTENT_ITEM_TYPE,
       ContactsContract.CommonDataKinds.Event.CONTENT_ITEM_TYPE,
+      ContactsContract.CommonDataKinds.Note.CONTENT_ITEM_TYPE,
       ContactsContract.CommonDataKinds.Photo.CONTENT_ITEM_TYPE,
     )
 
     context.contentResolver.query(
       ContactsContract.Data.CONTENT_URI,
       projection,
-      "${ContactsContract.Data.MIMETYPE} IN (?, ?, ?, ?)",
+      "${ContactsContract.Data.MIMETYPE} IN (?, ?, ?, ?, ?)",
       mimeTypes,
       "${ContactsContract.Contacts.DISPLAY_NAME_PRIMARY} ASC",
     )?.use { cursor ->
@@ -270,6 +277,9 @@ class OrbitContactPickerModule : Module() {
             if (cursor.intAt(data2Column) == ContactsContract.CommonDataKinds.Event.TYPE_BIRTHDAY) {
               contact.birthday = contact.birthday ?: cursor.stringAt(data1Column)
             }
+          ContactsContract.CommonDataKinds.Note.CONTENT_ITEM_TYPE ->
+            // A provider can expose several Note rows; preserve the first non-blank value.
+            contact.note = contact.note ?: cursor.stringAt(data1Column)?.takeIf { it.isNotBlank() }
           ContactsContract.CommonDataKinds.Photo.CONTENT_ITEM_TYPE -> {
             if (contact.photoTempUri == null) {
               contact.photoTempUri = cursor.blobAt(data15Column)?.let(::copyPhotoToCache)
@@ -286,6 +296,7 @@ class OrbitContactPickerModule : Module() {
         "displayName" to contact.displayName,
         "methods" to contact.methods,
         "birthday" to contact.birthday,
+        "note" to contact.note,
         "photoTempUri" to contact.photoTempUri,
       )
     }
@@ -393,6 +404,7 @@ class OrbitContactPickerModule : Module() {
       ContactsContract.CommonDataKinds.Phone.CONTENT_ITEM_TYPE,
       ContactsContract.CommonDataKinds.Email.CONTENT_ITEM_TYPE,
       ContactsContract.CommonDataKinds.Event.CONTENT_ITEM_TYPE,
+      ContactsContract.CommonDataKinds.Note.CONTENT_ITEM_TYPE,
       ContactsContract.CommonDataKinds.Photo.CONTENT_ITEM_TYPE,
     )
     val projection = arrayOf(
@@ -406,7 +418,7 @@ class OrbitContactPickerModule : Module() {
       ContactsContract.Data.CONTENT_URI,
       projection,
       "${ContactsContract.Data.LOOKUP_KEY} IN ($placeholders) AND " +
-        "${ContactsContract.Data.MIMETYPE} IN (?, ?, ?, ?)",
+        "${ContactsContract.Data.MIMETYPE} IN (?, ?, ?, ?, ?)",
       lookupKeys.toTypedArray() + mimeTypes,
       null,
     )?.use { cursor ->
@@ -431,6 +443,9 @@ class OrbitContactPickerModule : Module() {
             if (cursor.intAt(data2Column) == ContactsContract.CommonDataKinds.Event.TYPE_BIRTHDAY) {
               contact.birthday = contact.birthday ?: cursor.stringAt(data1Column)
             }
+          ContactsContract.CommonDataKinds.Note.CONTENT_ITEM_TYPE ->
+            // A provider can expose several Note rows; preserve the first non-blank value.
+            contact.note = contact.note ?: cursor.stringAt(data1Column)?.takeIf { it.isNotBlank() }
           ContactsContract.CommonDataKinds.Photo.CONTENT_ITEM_TYPE -> {
             if (contact.photoTempUri == null) {
               contact.photoTempUri = cursor.blobAt(data15Column)?.let(::copyPhotoToCache)
@@ -447,6 +462,7 @@ class OrbitContactPickerModule : Module() {
         "displayName" to contact.displayName,
         "methods" to contact.methods,
         "birthday" to contact.birthday,
+        "note" to contact.note,
         "photoTempUri" to contact.photoTempUri,
       )
     }

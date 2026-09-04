@@ -16,6 +16,8 @@ export interface PickedContact {
   readonly displayName: string | null;
   readonly methods: PickedMethod[];
   readonly birthday: string | null;
+  /** Freeform Android Contacts note, when the provider grants it. */
+  readonly note?: string | null;
   /**
    * App-private cache copy of a picker-granted photo. This `file://` value is
    * intentionally evictable and must be moved to durable staging by the
