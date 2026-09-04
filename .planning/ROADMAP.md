@@ -276,10 +276,27 @@ All v1.0 commits are local on `main` and have NOT been pushed.
   3. The nine custom-field types support global or per-contact definitions with optional value history (ADR-001 uniqueness untouched); imported Contacts-app notes land as their own AI-off Memory type; existing share-sheet captures migrate with no data loss; and backup/restore preserves the entire knowledge model including soft-deleted records (KNOW-13/14/15/16)
 
 **Canonical refs**: docs/dossier/milestone-2/phase-03-contact-knowledge-foundation-dossier.md; docs/dossier/milestone-2/planning-notes/phase-03-planning-notes.md
-**Schema**: destructive data-move migration (017 — share-capture carry-over + ADR-030 retirement via a new superseding ADR; verify head+1 at plan time); adds a backup entity/tombstone but no format-version bump (Phase 36 owns the v4 bump)
-**Plans**: TBD
+**Schema**: destructive data-move migration **017** (memories.allow_ai + share-capture carry-over + ADR-030 retirement via **ADR-081**; verified head+1 on disk 2026-09-04: migrations 001–016, TARGET_VERSION=16) + additive migration **018** (custom-field scope/history_retained/field_group + custom_field_value_history table). Backup: `BACKUP_FORMAT_VERSION` is ALREADY 4 on disk (24.1 pre-bumped it, commit d677e2c) — 24.2 emits its additions within format 4, no further bump. ⚠ The milestone "Phase 36 owns the v4 bump" note is now stale (owner flag).
+**Plans**: 7 plans (3 waves)
+
+**Wave 1**
+
+- [ ] 24.2-01-PLAN.md — Tracer: migration 017 (allow_ai + destructive share/ai data-move) + AI-egress gate (default OFF) + one memory proven searchable + ADR-081 (KNOW-10/11/16)
+
+**Wave 2** *(blocked on Wave 1)*
+
+- [ ] 24.2-02-PLAN.md — Knowledge search corpus + TS typo scorer, no FTS5 (KNOW-10)
+- [ ] 24.2-03-PLAN.md — Per-item AI permission UI/toggle/sparkle + Off Limits avoid-topic control (KNOW-11/12)
+- [ ] 24.2-04-PLAN.md — Custom-field types url/email/phone + parsers + widgets (KNOW-13)
+- [ ] 24.2-05-PLAN.md — Migration 018: custom-field scope/history/group + seeding writers + value-history DAO (KNOW-13)
+- [ ] 24.2-06-PLAN.md — Imported Contacts-app notes as an AI-off Memory type (native Note MIME read) (KNOW-14)
+
+**Wave 3** *(blocked on Wave 2)*
+
+- [ ] 24.2-07-PLAN.md — Backup/restore coverage of allow_ai + scope/history/group + value-history + soft-deleted (KNOW-15)
+
 **UI hint**: yes
-**Note**: split from the original single Phase 24 (owner-approved 2026-09-03).
+**Note**: split from the original single Phase 24 (owner-approved 2026-09-03). Migration/ADR numbers verified on disk at plan time (2026-09-04): destructive migration 017 + additive 018; new superseding ADR-081 (head was ADR-080).
 
 ### Phase 25: Dashboard Data & State Foundation
 
