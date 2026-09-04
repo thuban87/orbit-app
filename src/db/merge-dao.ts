@@ -150,7 +150,34 @@ export async function mergeContacts(
       await exec.runAsync("DELETE FROM custom_field_values WHERE contact_id = ? AND field_def_id = ?", [absorbed.id, other.field_def_id]);
     }
 
-    for (const table of ["interactions", "events", "fuel", "custom_field_values", "contact_links", "contact_methods", "external_contact_links", "interaction_assists"] as const) await reparent(exec, table, survivor.id, absorbed.id, input.now);
+    // Demote absorbed current values that would collide with the survivor's
+    // current value before reparenting into the partial unique index.
+    await exec.runAsync(
+      `UPDATE current_state_entries
+          SET is_current = 0, modified_at = ?
+        WHERE contact_id = ?
+          AND is_current = 1
+          AND field_key IN (
+            SELECT field_key FROM current_state_entries
+             WHERE contact_id = ? AND is_current = 1
+          )`,
+      [input.now, absorbed.id, survivor.id],
+    );
+    // This must precede reparenting: links in either direction between the two
+    // merging contacts would otherwise become persisted self-links.
+    await exec.runAsync(
+      `UPDATE relationships SET linked_contact_id = NULL, modified_at = ?
+        WHERE contact_id IN (?, ?) AND linked_contact_id IN (?, ?)`,
+      [input.now, survivor.id, absorbed.id, survivor.id, absorbed.id],
+    );
+    // Preserve third-party links to the absorbed contact by pointing them at its
+    // survivor after the two would-be self-links have been cleared.
+    await exec.runAsync(
+      "UPDATE relationships SET linked_contact_id = ?, modified_at = ? WHERE linked_contact_id = ?",
+      [survivor.id, input.now, absorbed.id],
+    );
+
+    for (const table of ["interactions", "events", "fuel", "custom_field_values", "contact_links", "contact_methods", "external_contact_links", "interaction_assists", "memories", "relationships", "current_state_entries"] as const) await reparent(exec, table, survivor.id, absorbed.id, input.now);
     await exec.runAsync("UPDATE field_history SET contact_id = ? WHERE contact_id = ?", [survivor.id, absorbed.id]);
 
     const scalar = resolutions.scalars ?? {};

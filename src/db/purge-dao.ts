@@ -15,8 +15,9 @@
  *
  * EXPLICIT FAN-OUT, NOT FK CASCADE (review T-04-13):
  *   Every owned child is deleted EXPLICITLY in ONE `inWriteTransaction`:
- *   interactions, events, fuel, custom_field_values, contact_links,
- *   `field_history`, then the contacts row. `field_history` has NO FK to
+ *   interactions, events, fuel, custom_field_values, contact_links, memories,
+ *   relationships, current_state_entries, `field_history`, then the contacts row.
+ *   `field_history` has NO FK to
  *   `contacts` and never cascades — it MUST be deleted here or its rows would
  *   outlive the contact. The FK CASCADEs on the other children are live but we
  *   do not rely on them: explicit deletes keep the blast radius auditable and
@@ -63,6 +64,9 @@ export interface PurgeImpact {
   methods: number;
   externalLinks: number;
   methodProvenance: number;
+  memories: number;
+  relationships: number;
+  currentStateEntries: number;
   hasCustomValues: boolean;
 }
 
@@ -85,6 +89,23 @@ const PURGE_CHILDREN: Record<TombstoneEntityType, PurgeChildSpec | null> = {
   contact_method_provenance: { countSql: "SELECT COUNT(*) AS n FROM contact_method_provenance p JOIN contact_methods m ON m.id = p.method_id WHERE m.contact_id = ?", tombstoneSql: "SELECT p.uid FROM contact_method_provenance p JOIN contact_methods m ON m.id = p.method_id WHERE m.contact_id = ?", deleteSql: "DELETE FROM contact_method_provenance WHERE method_id IN (SELECT id FROM contact_methods WHERE contact_id = ?)" },
   custom_field_def: null,
 };
+
+// Phase 24.2 KNOW-15 owns their backup manifest/tombstone entity types, so this
+// separate explicit fan-out intentionally has no tombstone SQL.
+const KNOWLEDGE_PURGE_CHILDREN = [
+  {
+    countSql: "SELECT COUNT(*) AS n FROM memories WHERE contact_id = ?",
+    deleteSql: "DELETE FROM memories WHERE contact_id = ?",
+  },
+  {
+    countSql: "SELECT COUNT(*) AS n FROM relationships WHERE contact_id = ?",
+    deleteSql: "DELETE FROM relationships WHERE contact_id = ?",
+  },
+  {
+    countSql: "SELECT COUNT(*) AS n FROM current_state_entries WHERE contact_id = ?",
+    deleteSql: "DELETE FROM current_state_entries WHERE contact_id = ?",
+  },
+] as const;
 
 /** Required purge timing plus optional post-commit cleanup registered by Phases 5/11. */
 export interface PurgeOptions {
@@ -145,6 +166,21 @@ export async function computeImpact(
   const methods = await countRows(exec, PURGE_CHILDREN.contact_method!.countSql, contactId);
   const externalLinks = await countRows(exec, PURGE_CHILDREN.external_contact_link!.countSql, contactId);
   const methodProvenance = await countRows(exec, PURGE_CHILDREN.contact_method_provenance!.countSql, contactId);
+  const memories = await countRows(
+    exec,
+    KNOWLEDGE_PURGE_CHILDREN[0].countSql,
+    contactId,
+  );
+  const relationships = await countRows(
+    exec,
+    KNOWLEDGE_PURGE_CHILDREN[1].countSql,
+    contactId,
+  );
+  const currentStateEntries = await countRows(
+    exec,
+    KNOWLEDGE_PURGE_CHILDREN[2].countSql,
+    contactId,
+  );
   const cv = await exec.getFirstAsync<{ present: number }>(
     "SELECT EXISTS(SELECT 1 FROM custom_field_values WHERE contact_id = ?) AS present",
     [contactId],
@@ -157,6 +193,9 @@ export async function computeImpact(
     methods,
     externalLinks,
     methodProvenance,
+    memories,
+    relationships,
+    currentStateEntries,
     hasCustomValues: (cv?.present ?? 0) === 1,
   };
 }
@@ -191,6 +230,13 @@ export function impactSummaryLines(
   if (impact.links > 0) {
     lines.push(plural(impact.links, "link", "links"));
   }
+  if (impact.memories > 0) {
+    lines.push(plural(impact.memories, "memory", "memories"));
+  }
+  if (impact.relationships > 0) {
+    lines.push(plural(impact.relationships, "relationship", "relationships"));
+  }
+  // Current-state history is durable but not a user-meaningful blast-radius count.
   return lines;
 }
 
@@ -243,6 +289,9 @@ export function purgeContact(
     //     no FK and never cascades). Not relying on FK CASCADE — auditable.
     for (const entityType of ["contact_method_provenance", "interaction", "event", "fuel", "custom_field_value", "contact_link", "external_contact_link", "contact_method"] as const) {
       await exec.runAsync(PURGE_CHILDREN[entityType]!.deleteSql, [contactId]);
+    }
+    for (const child of KNOWLEDGE_PURGE_CHILDREN) {
+      await exec.runAsync(child.deleteSql, [contactId]);
     }
     await exec.runAsync("DELETE FROM field_history WHERE contact_id = ?", [
       contactId,
