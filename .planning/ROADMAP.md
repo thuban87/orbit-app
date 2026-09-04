@@ -238,7 +238,7 @@ All v1.0 commits are local on `main` and have NOT been pushed.
 
 **Canonical refs**: docs/dossier/milestone-2/phase-03-contact-knowledge-foundation-dossier.md; docs/dossier/milestone-2/planning-notes/phase-03-planning-notes.md
 **Schema**: additive model migration (016 — verified head+1 on disk at plan time: TARGET_VERSION=15, migrations 001–015 → first new is 016); no backup-format bump
-**Plans**: 5/8 plans executed (4 waves)
+**Plans**: 6/8 plans executed (4 waves)
 
 - [ ] 24.1-PLAN-CHECK-cycle1.md
 
@@ -255,7 +255,7 @@ All v1.0 commits are local on `main` and have NOT been pushed.
 **Wave 3** *(blocked on Wave 2 completion)*
 
 - [x] 24.1-05-PLAN.md — Recently Deleted / Trash: guarded permanent delete + TOCTOU-safe idempotent launch sweep (KNOW-07)
-- [ ] 24.1-06-PLAN.md — Unified "Things to Remember" grouped surface + Memory editor + routes (KNOW-01/03/05/06/08/09)
+- [x] 24.1-06-PLAN.md — Unified "Things to Remember" grouped surface + Memory editor + routes (KNOW-01/03/05/06/08/09)
 
 **Wave 4** *(blocked on Wave 3 completion)*
 
@@ -549,7 +549,7 @@ All v1.0 commits are local on `main` and have NOT been pushed.
 |-------|----------------|--------|-----------|
 | 22. App Shell & Navigation | 6/6 | In Progress|  |
 | 23. Theme & Visual System | 7/7 | In Progress | - |
-| 24.1 Contact Knowledge Foundation (Model, Storage & UI) | 5/8 | In Progress|  |
+| 24.1 Contact Knowledge Foundation (Model, Storage & UI) | 6/8 | In Progress|  |
 | 24.2 Contact Knowledge (Egress, Search, Types & Data-moves) | 0/TBD | Not started | - |
 | 25. Dashboard Data & State Foundation | 0/TBD | Not started | - |
 | 26. Dashboard Control Surface | 0/TBD | Not started | - |

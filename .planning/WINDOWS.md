@@ -1,10 +1,10 @@
 ---
 schema_version: 1
-open_count: 20
+open_count: 22
 waived_count: 0
 fixed_count: 6
-total_count: 26
-last_updated: 2026-09-04T06:52:03.142Z
+total_count: 28
+last_updated: 2026-09-04T07:11:24.422Z
 ---
 
 # Broken Windows Ledger
@@ -41,6 +41,8 @@ last_updated: 2026-09-04T06:52:03.142Z
 | 24 | 23 | unrun-verify | src/components/orrery/SunBody.tsx |  | Reduced-motion live toggle halts OrreryCanvas twinkle + SunBody glow pulse + bg motion — device-UAT deferred to end-of-phase Pixel pass (23-06 Task 3) | open |  | 2026-09-03T17:58:56.315Z |  |
 | 25 | 24.1 | stub | src/navigation/tabs/DashboardStack.tsx | 43 | The universal-FAB MemoryPlaceholderScreen intentionally remains until Phase 34; this plan adds the separate profile-owned Things-to-Remember route. | open |  | 2026-09-04T06:26:08.728Z |  |
 | 26 | 24.1 | deviation | src/db/current-state-history-dao.test.ts |  | Kept current-state DAO test fixtures node-pure by avoiding the Expo database bootstrap. | open |  | 2026-09-04T06:52:03.142Z |  |
+| 27 | 24.1 | stub | src/screens/placeholders/KnowledgePlaceholders.tsx | 31 | Recently Deleted placeholder is intentionally replaced by Plan 24.1-07. | open |  | 2026-09-04T07:11:24.241Z |  |
+| 28 | 24.1 | stub | src/screens/placeholders/KnowledgePlaceholders.tsx | 41 | Memory History placeholder is intentionally replaced by Plan 24.1-07. | open |  | 2026-09-04T07:11:24.422Z |  |
 
 ````json
 [
@@ -354,6 +356,30 @@ last_updated: 2026-09-04T06:52:03.142Z
     "status": "open",
     "reason": "",
     "recorded_at": "2026-09-04T06:52:03.142Z",
+    "resolved_at": null
+  },
+  {
+    "id": 27,
+    "kind": "stub",
+    "phase": "24.1",
+    "file": "src/screens/placeholders/KnowledgePlaceholders.tsx",
+    "line": 31,
+    "description": "Recently Deleted placeholder is intentionally replaced by Plan 24.1-07.",
+    "status": "open",
+    "reason": "",
+    "recorded_at": "2026-09-04T07:11:24.241Z",
+    "resolved_at": null
+  },
+  {
+    "id": 28,
+    "kind": "stub",
+    "phase": "24.1",
+    "file": "src/screens/placeholders/KnowledgePlaceholders.tsx",
+    "line": 41,
+    "description": "Memory History placeholder is intentionally replaced by Plan 24.1-07.",
+    "status": "open",
+    "reason": "",
+    "recorded_at": "2026-09-04T07:11:24.422Z",
     "resolved_at": null
   }
 ]
