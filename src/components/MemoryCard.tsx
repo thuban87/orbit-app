@@ -6,6 +6,7 @@ import {
 import type { MemoryRow } from "@/db/memories-read";
 import { useTheme } from "@/theme";
 import { SPACING } from "@/theme/tokens/spacing";
+import { Icon } from "./icons/Icon";
 import { normaliseLinkUrl } from "./LinksEditor";
 import { AppText } from "./ui";
 
@@ -75,6 +76,15 @@ export function MemoryCard({
               <AppText role="caption" style={{ color: colors.textSecondary }}>
                 Outdated
               </AppText>
+            </View>
+          ) : null}
+          {memory.allow_ai === 1 ? (
+            <View
+              accessibilityLabel="Shared with AI"
+              accessible
+              style={styles.marker}
+            >
+              <Icon name="sparkle" tone="accentText" />
             </View>
           ) : null}
         </View>

@@ -21,6 +21,7 @@ import {
   type CurrentStateEntryRow,
 } from "@/db/current-state-history-read";
 import { getExecutor, localDateTime } from "@/db/database";
+import { getAppSettings } from "@/db/app-settings-dao";
 import { listDefs } from "@/db/field-defs-dao";
 import {
   getValuesForContact,
@@ -46,6 +47,7 @@ import {
   deleteMemory,
   editMemory,
   restoreMemory,
+  setMemoryAllowAi,
 } from "@/db/memories-dao";
 import {
   listMemoriesForContact,
@@ -164,10 +166,20 @@ export function ThingsToRememberScreen({
     null,
   );
   const [currentDraft, setCurrentDraft] = useState("");
+  // Interim durable availability gate; Phase 36 will replace/compose this with
+  // the global AI master setting without changing the per-item wiring.
+  const [globalAiEnabled, setGlobalAiEnabled] = useState(false);
 
   const load = useCallback(
     async (cancelled: () => boolean = () => false) => {
       const exec = getExecutor();
+      try {
+        const aiEnabled = (await getAppSettings(exec)).aiProvider !== "none";
+        if (!cancelled()) setGlobalAiEnabled(aiEnabled);
+      } catch (error) {
+        Logger.error(LOG_SCOPE, "failed to load AI availability", error);
+        if (!cancelled()) setGlobalAiEnabled(false);
+      }
       const [
         memories,
         relationships,
@@ -299,6 +311,19 @@ export function ThingsToRememberScreen({
     } catch (error) {
       Logger.error(LOG_SCOPE, "failed to edit memory", error);
       return false;
+    }
+  };
+  const setAllowAi = async (id: number, allow: boolean): Promise<void> => {
+    try {
+      await setMemoryAllowAi(getExecutor(), {
+        id,
+        contactId,
+        allow,
+        now: localDateTime(),
+      });
+      await load();
+    } catch (error) {
+      Logger.error(LOG_SCOPE, "failed to set memory AI permission", error);
     }
   };
   const restore = (id: number) =>
@@ -589,6 +614,8 @@ export function ThingsToRememberScreen({
               onEdit={edit}
               onDelete={remove}
               onRestore={restore}
+              onSetAllowAi={setAllowAi}
+              globalAiEnabled={globalAiEnabled}
             />
             {shown
               .filter(
@@ -633,6 +660,8 @@ export function ThingsToRememberScreen({
           onEdit={edit}
           onDelete={remove}
           onRestore={restore}
+          onSetAllowAi={setAllowAi}
+          globalAiEnabled={globalAiEnabled}
         />
       ) : null}
     </ScrollView>

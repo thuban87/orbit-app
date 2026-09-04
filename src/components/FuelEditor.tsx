@@ -309,7 +309,7 @@ function FuelRow({
             </Text>
           </View>
           <Text style={[styles.helper, { color: colors.textSecondary }]}>
-            Never shared with AI, never shown at a glance.
+            A topic to avoid bringing up.
           </Text>
         </View>
       ) : null}
@@ -475,7 +475,7 @@ function DraftRow({
             </Text>
           </View>
           <Text style={[styles.helper, { color: colors.textSecondary }]}>
-            Never shared with AI, never shown at a glance.
+            A topic to avoid bringing up.
           </Text>
         </View>
       ) : null}

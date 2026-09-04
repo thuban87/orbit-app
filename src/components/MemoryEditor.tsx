@@ -65,6 +65,8 @@ export interface MemoryEditorProps {
   onEdit: (id: number, patch: MemoryEditPatch) => Promise<boolean>;
   onDelete: (id: number) => void;
   onRestore: (id: number) => void;
+  onSetAllowAi: (id: number, allow: boolean) => void;
+  globalAiEnabled: boolean;
   testID?: string;
 }
 
@@ -181,6 +183,8 @@ export function MemoryEditor({
   onEdit,
   onDelete,
   onRestore,
+  onSetAllowAi,
+  globalAiEnabled,
   testID,
 }: MemoryEditorProps) {
   const { colors } = useTheme();
@@ -377,6 +381,33 @@ export function MemoryEditor({
               onValueChange={(value) => update("hidden", value)}
             />
           </View>
+          {editing ? (
+            <View style={styles.toggleRow}>
+              <View style={styles.visibilityCopy}>
+                <AppText role="body">Allow AI to use this</AppText>
+                {!globalAiEnabled ? (
+                  <AppText
+                    role="caption"
+                    style={{ color: colors.textSecondary }}
+                  >
+                    Turn on AI in Settings first
+                  </AppText>
+                ) : null}
+              </View>
+              <Switch
+                accessibilityLabel="Allow AI to use this"
+                accessibilityState={{ disabled: !globalAiEnabled }}
+                disabled={!globalAiEnabled}
+                value={editing.allow_ai === 1}
+                onValueChange={(allow) => {
+                  setEditing((current) =>
+                    current ? { ...current, allow_ai: allow ? 1 : 0 } : current,
+                  );
+                  onSetAllowAi(editing.id, allow);
+                }}
+              />
+            </View>
+          ) : null}
           {editing ? (
             <AppText role="caption" style={{ color: colors.textSecondary }}>
               {provenanceLabel(editing.provenance)}
