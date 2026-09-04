@@ -287,7 +287,7 @@ All v1.0 commits are local on `main` and have NOT been pushed.
 
 **Canonical refs**: docs/dossier/milestone-2/phase-03-contact-knowledge-foundation-dossier.md; docs/dossier/milestone-2/planning-notes/phase-03-planning-notes.md
 **Schema**: destructive data-move migration **017** (memories.allow_ai + share-capture carry-over + ADR-030 retirement via **ADR-081**; verified head+1 on disk 2026-09-04: migrations 001–016, TARGET_VERSION=16) + additive migration **018** (custom-field scope/history_retained/field_group + custom_field_value_history table). Backup: `BACKUP_FORMAT_VERSION` is ALREADY 4 on disk (24.1 pre-bumped it, commit d677e2c) — 24.2 emits its additions within format 4, no further bump. The milestone migration-ordering rule was amended 2026-09-04 (owner-approved) to record this: v4 is spent, Phase 36's closing bump is now v5. **Deferred to a later Profile/custom-fields UI phase (see Phase 31):** the custom-field value-history backlist UI and grouped-field rendering — 24.2 lands only the `custom_field_value_history` table + DAO read and the `field_group` column (data-layer), with no in-phase viewer.
-**Plans**: 6/7 plans executed (3 waves)
+**Plans**: 7/7 plans executed (3 waves)
 
 **Wave 1**
 
@@ -303,7 +303,7 @@ All v1.0 commits are local on `main` and have NOT been pushed.
 
 **Wave 3** *(blocked on Wave 2)*
 
-- [ ] 24.2-07-PLAN.md — Backup/restore coverage of allow_ai + scope/history/group + value-history + soft-deleted (KNOW-15)
+- [x] 24.2-07-PLAN.md — Backup/restore coverage of allow_ai + scope/history/group + value-history + soft-deleted (KNOW-15)
 
 **UI hint**: yes
 **Note**: split from the original single Phase 24 (owner-approved 2026-09-03). Migration/ADR numbers verified on disk at plan time (2026-09-04): destructive migration 017 + additive 018; new superseding ADR-081 (head was ADR-080).
@@ -579,7 +579,7 @@ All v1.0 commits are local on `main` and have NOT been pushed.
 | 22. App Shell & Navigation | 6/6 | In Progress|  |
 | 23. Theme & Visual System | 7/7 | In Progress | - |
 | 24.1 Contact Knowledge Foundation (Model, Storage & UI) | 7/8 | In Progress|  |
-| 24.2 Contact Knowledge (Egress, Search, Types & Data-moves) | 6/7 | In Progress|  |
+| 24.2 Contact Knowledge (Egress, Search, Types & Data-moves) | 7/7 | In Progress|  |
 | 25. Dashboard Data & State Foundation | 0/TBD | Not started | - |
 | 26. Dashboard Control Surface | 0/TBD | Not started | - |
 | 27. Dashboard List View | 0/TBD | Not started | - |

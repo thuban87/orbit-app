@@ -64,7 +64,7 @@ category's phase (see Traceability).
 - [x] **KNOW-12**: Off Limits marks topics to avoid — visible where relevant, separate from AI permission, and carrying "avoid this topic" semantics when transmitted
 - [x] **KNOW-13**: Custom fields support Text, Long Text, Number, Date, Yes/No, URL, Email, Phone, and Choice types; definitions may be global or one-off per contact (promotable to reusable), optionally grouped; values may be current-only or history-retained via a new additive value-history table (ADR-001 uniqueness constraints untouched)
 - [x] **KNOW-14**: Freeform notes from the phone Contacts app import as a dedicated "Imported from Contacts App" Memory type, AI-off by default
-- [ ] **KNOW-15**: Backup/restore preserves the full knowledge model: current values, history, Memories, custom fields, relationships, visibility, pinning, AI permissions, provenance, and soft-deleted records
+- [x] **KNOW-15**: Backup/restore preserves the full knowledge model: current values, history, Memories, custom fields, relationships, visibility, pinning, AI permissions, provenance, and soft-deleted records
 - [x] **KNOW-16**: Existing share-sheet captures migrate onto the new model as default-type Memories with no data loss
 
 ### DASHQ — Dashboard Data & State Foundation (Phase 25)

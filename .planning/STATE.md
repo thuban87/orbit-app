@@ -5,16 +5,16 @@ milestone_name: Release Readiness
 current_phase: 24.2
 current_phase_name: Contact Knowledge — Egress, Search, Types & Data-moves
 status: executing
-stopped_at: Completed 24.2-06-PLAN.md
-last_updated: "2026-09-04T19:42:06.052Z"
+stopped_at: Completed 24.2-07-PLAN.md
+last_updated: "2026-09-04T20:13:00.000Z"
 last_activity: 2026-09-04
 last_activity_desc: Phase 24.2 execution started
-state_head: 29b9bd783ff344ff6568fc2dc3d72d27aef71350
+state_head: 88f82b7404c10b7d9d6e11a37dcfc6ab09bad4cc
 progress:
   total_phases: 20
   completed_phases: 1
   total_plans: 29
-  completed_plans: 27
+  completed_plans: 28
 carried_forward:
 
   - "D-11: default Memory-type display name is provisional (memory-registry.ts:10-12) — owner naming decision, must be reconciled before Phase 34"
@@ -34,9 +34,10 @@ See: .planning/PROJECT.md (updated 2026-09-01 after v1.0 milestone)
 ## Current Position
 
 Phase: 24.2 (Contact Knowledge — Egress, Search, Types & Data-moves) — EXECUTING
-Plan: 7 of 7
-Status: Ready to execute
+Plan: 7 of 7 (all plans complete)
+Status: Phase 24.2 execution complete — ready for verification
 Carried forward (owner's bucket, NOT resolved here): D-11 default Memory-type display name — reconcile before Phase 34.
+Surface to owner (24.2-07, KNOW-15): milestone plan said Phase 36 owns the backup format-4 bump, but 24.1 already bumped to 4 (d677e2c); Plan 07 emits into the live format 4 with NO bump — that milestone instruction is stale.
 Deferred to Phase 31 (recorded in Plan 05): durable contact-scoped-def ownership + owner-purge semantics. Deferred to Phase 36 (ROADMAP breadcrumb): legacy AI-fuel confirm-path code removal.
 Last activity: 2026-09-04 — Phase 24.2 execution started
 Progress: 3/19 phases complete (v2.0) — 22, 23, 24.1
@@ -194,6 +195,7 @@ at plan time. All new durable preferences are `app_settings` columns, never Asyn
 | Phase 24.2 P04 | 5min | 2 tasks | 7 files |
 | Phase 24.2 P05 | 12min | 3 tasks | 28 files |
 | Phase 24.2 P06 | 15min | 2 tasks | 14 files |
+| Phase 24.2 P07 | 13min | 3 tasks | 9 files |
 
 ## Accumulated Context
 
