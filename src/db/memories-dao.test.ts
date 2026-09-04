@@ -4,7 +4,12 @@ vi.mock("expo-sqlite", () => ({}));
 
 import { nodeSqliteExecutor, openTestDb } from "@/db/__testkit__/node-sqlite";
 import { MIGRATIONS, TARGET_VERSION } from "@/db/database";
-import { addMemory, editMemory } from "@/db/memories-dao";
+import {
+  addMemory,
+  deleteMemory,
+  editMemory,
+  restoreMemory,
+} from "@/db/memories-dao";
 import { listMemoriesForContact } from "@/db/memories-read";
 import { runMigrations } from "@/db/migrations/runner";
 import type { SqlExecutor } from "@/db/types";
@@ -217,6 +222,41 @@ describe("memories DAO", () => {
         custom_label: "Nickname",
         value: "Ace",
       }),
+    ]);
+  });
+
+  it("soft-deletes and restores a memory without physically removing its row", async () => {
+    const contactId = await seedContact();
+    const id = await addMemory(exec, {
+      contactId,
+      type: "general",
+      value: "Keep me",
+      createdAt: NOW,
+      now: NOW,
+    });
+
+    await deleteMemory(exec, {
+      id,
+      contactId,
+      now: "2026-09-04 13:00:00",
+    });
+
+    expect(await listMemoriesForContact(exec, contactId)).toEqual([]);
+    expect(
+      await exec.getFirstAsync<{ deleted_at: string | null }>(
+        "SELECT deleted_at FROM memories WHERE id = ? AND contact_id = ?",
+        [id, contactId],
+      ),
+    ).toEqual({ deleted_at: "2026-09-04 13:00:00" });
+
+    await restoreMemory(exec, {
+      id,
+      contactId,
+      now: "2026-09-04 14:00:00",
+    });
+
+    expect(await listMemoriesForContact(exec, contactId)).toEqual([
+      expect.objectContaining({ id, value: "Keep me", deleted_at: null }),
     ]);
   });
 });
