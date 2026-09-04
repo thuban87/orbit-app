@@ -1,5 +1,6 @@
 /** Writers for structured contact relationships (KNOW-05). */
 import { bumpDataRevisionCore } from "@/db/data-revision-dao";
+import { insertTombstoneCore } from "@/db/tombstones-dao";
 import { inWriteTransaction } from "@/db/transaction";
 import type { SqlExecutor } from "@/db/types";
 import { newUid } from "@/db/uid";
@@ -167,6 +168,19 @@ export async function purgeRelationshipPermanentlyCore(
   id: number,
   contactId: number,
 ): Promise<void> {
+  const target = await exec.getFirstAsync<{ uid: string; deleted_at: string }>(
+    "SELECT uid, deleted_at FROM relationships WHERE id = ? AND contact_id = ? AND deleted_at IS NOT NULL",
+    [id, contactId],
+  );
+  if (!target) {
+    assertOneChange("purgeRelationshipPermanently", id, contactId, 0);
+    return;
+  }
+  await insertTombstoneCore(
+    exec,
+    { entityType: "relationship", entityUid: target.uid, deletedAt: target.deleted_at },
+    { bumpRevision: false },
+  );
   const result = await exec.runAsync(
     "DELETE FROM relationships WHERE id = ? AND contact_id = ? AND deleted_at IS NOT NULL",
     [id, contactId],

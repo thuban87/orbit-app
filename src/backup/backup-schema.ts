@@ -174,6 +174,9 @@ const TOMBSTONE_ENTITY_TYPES = new Set([
   "contact_method_provenance",
   "custom_field_def",
   "custom_field_value",
+  "memory",
+  "relationship",
+  "current_state_entry",
 ]);
 
 function assertPortableSettings(

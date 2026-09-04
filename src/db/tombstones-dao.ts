@@ -15,7 +15,10 @@ export type TombstoneEntityType =
   | "external_contact_link"
   | "contact_method_provenance"
   | "custom_field_def"
-  | "custom_field_value";
+  | "custom_field_value"
+  | "memory"
+  | "relationship"
+  | "current_state_entry";
 
 export interface TombstoneInput {
   entityType: TombstoneEntityType;
@@ -43,6 +46,9 @@ function assertTombstoneEntityType(
     case "contact_method_provenance":
     case "custom_field_def":
     case "custom_field_value":
+    case "memory":
+    case "relationship":
+    case "current_state_entry":
       return;
     default:
       throw new Error(`unsupported tombstone entity type: ${String(value)}`);

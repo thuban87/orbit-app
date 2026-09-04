@@ -51,6 +51,17 @@ describe("parseBackupManifest", () => {
     expect(() => parseBackupManifest(broken)).toThrow(/surviving contact/i);
   });
 
+  it("accepts Memory and relationship tombstones", () => {
+    const manifest = valid();
+    manifest.tombstones = [
+      { entityType: "memory", entityUid: "memory-a", deletedAt: "2026-08-25 12:00:00" },
+      { entityType: "relationship", entityUid: "relationship-a", deletedAt: "2026-08-25 12:00:00" },
+      { entityType: "current_state_entry", entityUid: "current-state-a", deletedAt: "2026-08-25 12:00:00" },
+    ];
+
+    expect(parseBackupManifest(manifest).tombstones).toEqual(manifest.tombstones);
+  });
+
   it("rejects a category reference that cannot be resolved within the backup itself", () => {
     const broken = valid();
     broken.contacts = [{ uid: "contact", trackingEnabled: 1, intervalDays: 1, modifiedAt: "2026-08-25 12:00:00", categoryUid: "missing" }];

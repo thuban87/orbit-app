@@ -4,6 +4,7 @@ import {
   type MemoryTypeKey,
 } from "@/db/memory-registry";
 import { bumpDataRevisionCore } from "@/db/data-revision-dao";
+import { insertTombstoneCore } from "@/db/tombstones-dao";
 import { inWriteTransaction } from "@/db/transaction";
 import type { SqlExecutor } from "@/db/types";
 import { newUid } from "@/db/uid";
@@ -250,6 +251,19 @@ export async function purgeMemoryPermanentlyCore(
   id: number,
   contactId: number,
 ): Promise<void> {
+  const target = await exec.getFirstAsync<{ uid: string; deleted_at: string }>(
+    "SELECT uid, deleted_at FROM memories WHERE id = ? AND contact_id = ? AND deleted_at IS NOT NULL",
+    [id, contactId],
+  );
+  if (!target) {
+    assertOneChange("purgeMemoryPermanently", id, contactId, 0);
+    return;
+  }
+  await insertTombstoneCore(
+    exec,
+    { entityType: "memory", entityUid: target.uid, deletedAt: target.deleted_at },
+    { bumpRevision: false },
+  );
   const result = await exec.runAsync(
     "DELETE FROM memories WHERE id = ? AND contact_id = ? AND deleted_at IS NOT NULL",
     [id, contactId],

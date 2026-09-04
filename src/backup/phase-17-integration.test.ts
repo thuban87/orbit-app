@@ -141,6 +141,7 @@ describe("Phase 17 composed backup regressions", () => {
       ["contact_links", "contact_link"], ["custom_field_defs", "custom_field_def"], ["custom_field_values", "custom_field_value"],
       ["contact_methods", "contact_method"], ["external_contact_links", "external_contact_link"],
       ["contact_method_provenance", "contact_method_provenance"],
+      ["memories", "memory"], ["relationships", "relationship"], ["current_state_entries", "current_state_entry"],
     ]);
     const nonMergeable = new Map([
       ["field_history", "local audit history"],

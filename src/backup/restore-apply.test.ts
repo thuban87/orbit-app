@@ -150,10 +150,22 @@ describe("applyRestore", () => {
     );
     const manifest = await buildExportManifest(source, { exportedAt: NOW, readPhotoBase64: async () => "" });
     const destination = await db();
-    await destination.runAsync(
+    const oldContact = await destination.runAsync(
       `INSERT INTO contacts (uid,name,interval_days,rarely_responds,reminders_off,created_at,modified_at)
        VALUES (?,?,?,?,?,?,?)`,
       ["old-local", "Old", 30, 0, 0, NOW, NOW],
+    );
+    await destination.runAsync(
+      "INSERT INTO memories (uid,contact_id,type,value,pinned,outdated,provenance,created_at,modified_at) VALUES (?,?,?,?,?,?,?,?,?)",
+      ["old-memory", oldContact.lastInsertRowId, "general", "Old memory", 0, 0, "user", NOW, NOW],
+    );
+    await destination.runAsync(
+      "INSERT INTO relationships (uid,contact_id,person_name,pinned,created_at,modified_at) VALUES (?,?,?,?,?,?)",
+      ["old-relationship", oldContact.lastInsertRowId, "Old relationship", 0, NOW, NOW],
+    );
+    await destination.runAsync(
+      "INSERT INTO current_state_entries (uid,contact_id,field_key,value,is_current,created_at,modified_at) VALUES (?,?,?,?,?,?,?)",
+      ["old-current-state", oldContact.lastInsertRowId, "current_location", "Old location", 1, NOW, NOW],
     );
 
     await expect(applyRestore(destination, manifest, "replace-all")).resolves.toMatchObject({ status: "applied", mode: "replace-all" });
@@ -161,6 +173,13 @@ describe("applyRestore", () => {
     await expect(destination.getFirstAsync<{ entity_uid: string }>(
       "SELECT entity_uid FROM tombstones WHERE entity_type = 'contact' AND entity_uid = 'old-local'",
     )).resolves.toEqual({ entity_uid: "old-local" });
+    await expect(destination.getAllAsync<{ entity_type: string; entity_uid: string }>(
+      "SELECT entity_type,entity_uid FROM tombstones WHERE entity_type IN ('memory','relationship','current_state_entry') ORDER BY entity_type",
+    )).resolves.toEqual([
+      { entity_type: "current_state_entry", entity_uid: "old-current-state" },
+      { entity_type: "memory", entity_uid: "old-memory" },
+      { entity_type: "relationship", entity_uid: "old-relationship" },
+    ]);
   });
 
   it("purges local-only import sessions during Replace-all restore", async () => {
@@ -320,6 +339,36 @@ describe("applyRestore", () => {
 
     await expect(applyRestore(destination, manifest, "merge")).resolves.toMatchObject({ status: "applied", deleted: 1 });
     await expect(destination.getFirstAsync("SELECT uid FROM contact_methods WHERE uid=?", ["tombstone-method"])).resolves.toBeNull();
+  });
+
+  it("removes Memory and relationship rows when a newer tombstone says so", async () => {
+    const source = await db();
+    const destination = await db();
+    for (const exec of [source, destination]) {
+      const contact = await exec.runAsync(
+        "INSERT INTO contacts (uid,name,interval_days,rarely_responds,reminders_off,created_at,modified_at) VALUES (?,?,?,?,?,?,?)",
+        ["knowledge-tombstone-contact", "Knowledge", 14, 0, 0, NOW, NOW],
+      );
+      if (exec === destination) {
+        await exec.runAsync(
+          "INSERT INTO memories (uid,contact_id,type,value,pinned,outdated,provenance,created_at,modified_at) VALUES (?,?,?,?,?,?,?,?,?)",
+          ["tombstone-memory", contact.lastInsertRowId, "general", "Delete me", 0, 0, "user", NOW, NOW],
+        );
+        await exec.runAsync(
+          "INSERT INTO relationships (uid,contact_id,person_name,pinned,created_at,modified_at) VALUES (?,?,?,?,?,?)",
+          ["tombstone-relationship", contact.lastInsertRowId, "Delete me", 0, NOW, NOW],
+        );
+      }
+    }
+    const manifest = await buildExportManifest(source, { exportedAt: NOW, readPhotoBase64: async () => "" });
+    manifest.tombstones = [
+      { entityType: "memory", entityUid: "tombstone-memory", deletedAt: "2026-08-25 12:01:00" },
+      { entityType: "relationship", entityUid: "tombstone-relationship", deletedAt: "2026-08-25 12:01:00" },
+    ];
+
+    await expect(applyRestore(destination, manifest, "merge")).resolves.toMatchObject({ status: "applied", deleted: 2 });
+    await expect(destination.getAllAsync("SELECT uid FROM memories WHERE uid='tombstone-memory'")).resolves.toEqual([]);
+    await expect(destination.getAllAsync("SELECT uid FROM relationships WHERE uid='tombstone-relationship'")).resolves.toEqual([]);
   });
 
   it("round-trips the portable phone region override through export and restore", async () => {

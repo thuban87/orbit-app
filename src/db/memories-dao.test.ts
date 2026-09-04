@@ -42,16 +42,20 @@ describe("memories DAO", () => {
   it("marks manual permanent purges and successful stale expiry dirty for backup", async () => {
     const contactId = await seedContact();
     const id = await addMemory(exec, { contactId, type: "custom", customLabel: "Note", value: "Delete", createdAt: NOW, now: NOW });
+    const uid = (await exec.getFirstAsync<{ uid: string }>("SELECT uid FROM memories WHERE id=?", [id]))!.uid;
     await deleteMemory(exec, { id, contactId, now: NOW });
     const beforePurge = (await exec.getFirstAsync<{ data_revision: number }>("SELECT data_revision FROM app_settings WHERE id=1"))!.data_revision;
     await purgeMemoryPermanently(exec, { id, contactId });
     await expect(exec.getFirstAsync<{ data_revision: number }>("SELECT data_revision FROM app_settings WHERE id=1")).resolves.toEqual({ data_revision: beforePurge + 1 });
+    await expect(exec.getFirstAsync("SELECT entity_type,entity_uid,deleted_at FROM tombstones WHERE entity_type='memory' AND entity_uid=?", [uid])).resolves.toEqual({ entity_type: "memory", entity_uid: uid, deleted_at: NOW });
 
     const staleId = await addMemory(exec, { contactId, type: "custom", customLabel: "Note", value: "Stale", createdAt: NOW, now: NOW });
+    const staleUid = (await exec.getFirstAsync<{ uid: string }>("SELECT uid FROM memories WHERE id=?", [staleId]))!.uid;
     await exec.runAsync("UPDATE memories SET deleted_at=datetime('now','localtime', ?) WHERE id=?", ["-31 days", staleId]);
     const beforeExpiry = (await exec.getFirstAsync<{ data_revision: number }>("SELECT data_revision FROM app_settings WHERE id=1"))!.data_revision;
     await expect(expireMemoryIfStale(exec, { id: staleId, contactId }, "-30 days", NOW)).resolves.toBe(true);
     await expect(exec.getFirstAsync<{ data_revision: number }>("SELECT data_revision FROM app_settings WHERE id=1")).resolves.toEqual({ data_revision: beforeExpiry + 1 });
+    await expect(exec.getFirstAsync("SELECT entity_uid FROM tombstones WHERE entity_type='memory' AND entity_uid=?", [staleUid])).resolves.toEqual({ entity_uid: staleUid });
   });
   it("adds and reads distinct typed memories in deterministic order", async () => {
     const contactId = await seedContact();
