@@ -17,6 +17,7 @@ import { listDefs } from "@/db/field-defs-dao";
 import type { CustomFieldDef } from "@/db/field-types";
 import { getValuesForContact, upsertValue } from "@/db/field-values-dao";
 import { addFuel } from "@/db/fuel-dao";
+import { addMemory } from "@/db/memories-dao";
 import { migration001 } from "@/db/migrations/001-initial";
 import { migration002 } from "@/db/migrations/002-app-settings";
 import { migration003 } from "@/db/migrations/003-orrery-settings";
@@ -27,6 +28,8 @@ import { migration007 } from "@/db/migrations/007-tombstones";
 import { migration009 } from "@/db/migrations/009-contact-method-normalization";
 import { migration010 } from "@/db/migrations/010-contact-method-label";
 import { migration011 } from "@/db/migrations/011-contact-lifecycle-schema";
+import { migration016 } from "@/db/migrations/016-contact-knowledge";
+import { migration017 } from "@/db/migrations/017-knowledge-egress-datamove";
 import { runMigrations } from "@/db/migrations/runner";
 import {
   createContactWithInteraction,
@@ -64,6 +67,11 @@ beforeEach(async () => {
     11,
     { now: NOW, newUid: uid, defaultPhoneRegion: "US" },
   );
+  await runMigrations(exec, [migration016, migration017], 17, {
+    now: NOW,
+    newUid: uid,
+    defaultPhoneRegion: "US",
+  });
 });
 
 async function makeContact(
@@ -173,6 +181,23 @@ async function persistDef(definition: CustomFieldDef): Promise<void> {
 }
 
 describe("readPromptContext — allowlist projection (H1)", () => {
+  it("egresses a Memory only after its explicit per-item opt-in", async () => {
+    const c = await makeContact();
+    const memoryId = await addMemory(exec, {
+      contactId: c,
+      type: "general",
+      value: "MEMORY_EGRESS_MARKER",
+      createdAt: NOW,
+      now: NOW,
+    });
+
+    expect((await readPromptContext(exec, c, NOW)).sharedMemories).toEqual([]);
+    await exec.runAsync("UPDATE memories SET allow_ai = 1 WHERE id = ?", [memoryId]);
+    expect((await readPromptContext(exec, c, NOW)).sharedMemories).toEqual([
+      { label: "General", value: "MEMORY_EGRESS_MARKER" },
+    ]);
+  });
+
   it("returns the two direct identifiers: name + category NAME from the join (C2-H1)", async () => {
     const c = await makeContact(30, 0, 3); // category_id 3 = 'Work'
     const ctx = await readPromptContext(exec, c, NOW);

@@ -37,6 +37,8 @@ import type { CustomFieldDef } from "@/db/field-types";
 import { getValuesForContact } from "@/db/field-values-dao";
 import { getRankedFuel } from "@/db/fuel-read";
 import { getImpactInputs } from "@/db/impact-read";
+import { listAiEligibleMemories } from "@/db/memories-read";
+import { isMemoryTypeKey, MEMORY_TYPE_REGISTRY } from "@/db/memory-registry";
 import type { SqlExecutor } from "@/db/types";
 import {
   computeContactGravity,
@@ -179,6 +181,30 @@ async function readSharedFields(
 }
 
 /**
+ * The Memory branch of the closed egress projection. Permission is enforced by
+ * listAiEligibleMemories in SQL; blanks are minimized away before serialization.
+ */
+async function readSharedMemories(
+  exec: SqlExecutor,
+  contactId: number,
+): Promise<SharedFieldValue[]> {
+  const rows = await listAiEligibleMemories(exec, contactId);
+  const out: SharedFieldValue[] = [];
+  for (const row of rows) {
+    if (row.value === null || row.value.trim() === "") {
+      continue;
+    }
+    const label =
+      row.custom_label?.trim() ||
+      (isMemoryTypeKey(row.type)
+        ? MEMORY_TYPE_REGISTRY[row.type].displayName
+        : "Memory");
+    out.push({ label, value: row.value });
+  }
+  return out;
+}
+
+/**
  * Build the closed `PromptContext` for one contact — the sole projection that
  * decides what may cross the device boundary into an AI prompt. `now` defaults
  * to the local wall-clock (tests pass an explicit value for determinism).
@@ -252,6 +278,9 @@ export async function readPromptContext(
 
   // (5) Live opted-in custom values, by label, through the validated boundary.
   const sharedFields = await readSharedFields(exec, contactId);
+  // The existing fuel projection is intentionally unaffected: its SQL still
+  // excludes source='ai', while migration 017 leaves no such fuel rows to read.
+  const sharedMemories = await readSharedMemories(exec, contactId);
 
   return {
     contactName: identity.name,
@@ -263,5 +292,6 @@ export async function readPromptContext(
     cadence: aggregates.cadence,
     newestChannel: aggregates.newestChannel,
     sharedFields,
+    sharedMemories,
   };
 }

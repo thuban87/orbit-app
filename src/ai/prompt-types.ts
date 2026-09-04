@@ -118,6 +118,12 @@ export interface PromptContext {
   readonly newestChannel: string;
   /** Live, opted-in custom field values keyed by display label. */
   readonly sharedFields: ReadonlyArray<SharedFieldValue>;
+  /**
+   * Live Memories explicitly opted into AI egress. Optional while Phase 36
+   * owns their final prompt-string serialization; the read boundary always
+   * supplies an array.
+   */
+  readonly sharedMemories?: ReadonlyArray<SharedFieldValue>;
 }
 
 /**

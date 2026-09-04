@@ -7,6 +7,7 @@ import { MIGRATIONS, TARGET_VERSION } from "@/db/database";
 import { addMemory } from "@/db/memories-dao";
 import {
   listMemoriesForContact,
+  listAiEligibleMemories,
   listProfileVisibleMemoriesForContact,
   listRecentlyDeleted,
   resolveVisibility,
@@ -38,6 +39,25 @@ async function seedContact(): Promise<number> {
 }
 
 describe("memories read", () => {
+  it("keeps default-off Memories out of the explicit AI egress projection", async () => {
+    const contactId = await seedContact();
+    const memoryId = await addMemory(exec, {
+      contactId,
+      type: "general",
+      value: "Only after opt-in",
+      createdAt: NOW,
+      now: NOW,
+    });
+
+    expect(await listAiEligibleMemories(exec, contactId)).toEqual([]);
+    await exec.runAsync("UPDATE memories SET allow_ai = 1 WHERE id = ?", [memoryId]);
+    expect((await listAiEligibleMemories(exec, contactId)).map((row) => row.id)).toEqual([
+      memoryId,
+    ]);
+    await exec.runAsync("UPDATE memories SET deleted_at = ? WHERE id = ?", [NOW, memoryId]);
+    expect(await listAiEligibleMemories(exec, contactId)).toEqual([]);
+  });
+
   it("resolves per-item overrides, registry defaults, and corrupt values defensively", () => {
     expect(resolveVisibility("general", 1)).toBe("hide");
     expect(resolveVisibility("general", 0)).toBe("show");
