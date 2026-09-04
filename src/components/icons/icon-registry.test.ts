@@ -38,6 +38,7 @@ const BASE_NAMES = [
   "message",
   "call",
   "edit",
+  "sparkle",
 ] as const satisfies readonly IconName[];
 
 describe("ICON_REGISTRY", () => {

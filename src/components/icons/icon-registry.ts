@@ -41,6 +41,7 @@ export const ICON_REGISTRY = {
   message: { outline: "chatbubble-outline", filled: "chatbubble" },
   call: { outline: "call-outline", filled: "call" },
   edit: { outline: "create-outline", filled: "create" },
+  sparkle: { outline: "sparkles-outline", filled: "sparkles" },
 
   // ---- Tab identities (the four persistent destinations) ----------------
   // `settings` above doubles as the Settings tab identity (TAB_ICON maps it).
