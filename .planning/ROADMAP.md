@@ -28,12 +28,22 @@ a state suitable for outside beta testers.
 
 ## Milestone-wide migration ordering (binding on every v2.0 phase)
 
-This milestone implies **at least nine forward-only SQLite migrations plus one backup wire-format bump
-to v4**. They are sequenced milestone-wide, not per phase:
+This milestone implies **at least nine forward-only SQLite migrations plus one closing backup wire-format
+bump**. They are sequenced milestone-wide, not per phase:
+
+> **Amendment (2026-09-04, owner-approved): the v4 bump already landed early, out of order.** Phase 24.1
+> bumped `BACKUP_FORMAT_VERSION` from 3 to **4** during a review-fix commit (`d677e2c`, "CR-01 preserve
+> contact knowledge backups") to close a backup-coverage finding — ahead of the intended "Phase 36 owns
+> v4" sequencing below. This is a recorded-decision deviation surfaced during Phase 24.2 planning; it is
+> **not** re-litigated here (see the Phase 24.1 close-out for whether the bump itself should have been an
+> escalation). Consequences now binding: **v4 is spent.** Phases that add entities between 24.1 and 36
+> (24.2 included) **emit within the live format 4 without bumping.** Phase 36's *closing* bump therefore
+> targets **v5** (or a decided extend-v4-in-place), decided at Phase 36 plan time — it is no longer "introduce v4".
 
 1. **Strict order is schema → consumers → backup bump.** A phase lands its own schema before the code
-   that reads it, and the **backup v4 bump is Phase 36's FINAL plan**, executed after every other
-   milestone schema change has landed.
+   that reads it, and the **milestone's closing backup-format bump is Phase 36's FINAL plan** (now to
+   **v5** — v4 landed early in 24.1, see the amendment above), executed after every other milestone
+   schema change has landed.
 
 2. **Never write a literal migration number in this roadmap or in any plan.** This repo's migration
    numbers drift every time a schema phase lands (see the v1.0 renumbering history). Each schema-bearing
@@ -55,7 +65,7 @@ to v4**. They are sequenced milestone-wide, not per phase:
 
    - Phase 33 — group events
    - Phase 35 — compose preferences
-   - Phase 36 — AI configuration, **plus the final backup wire-format v4 bump**
+   - Phase 36 — AI configuration, **plus the final backup wire-format bump (now v5 — v4 landed early in 24.1; see amendment)**
    - Phases 22, 26, and 28 ship **no** schema.
 4. **All new durable preferences live in `app_settings` columns** — portable via the backup manifest —
    **never in AsyncStorage.** A preference that must survive backup/restore is a column, not device-local
@@ -141,7 +151,7 @@ All v1.0 commits are local on `main` and have NOT been pushed.
 - [ ] **Phase 33: Group Interaction Logging** - Group Event parent with canonical child interactions, inheritance/overrides, and atomic fan-out
 - [ ] **Phase 34: Rapid Capture & Update Flows** - Streamlined Add Contact, Quick Log with post-log capture, Tone vocabulary, Update Contact chooser loop
 - [ ] **Phase 35: Messaging & AI Compose** - Compose-first drafting workspace, Text/Email transmit handoff, Research side, three-suggestion AI review
-- [ ] **Phase 36: AI Configuration & Prompting** - Three connection lanes, prompt personalization, permission manager, and the final backup format v4 bump
+- [ ] **Phase 36: AI Configuration & Prompting** - Three connection lanes, prompt personalization, permission manager, and the final backup format bump (v5 — v4 landed early in 24.1)
 - [ ] **Phase 37: Settings & Personalization** - DEFERRED PLANNING — consolidates the preference/admin seams exported by Phases 22–36
 - [ ] **Phase 38: Your Week** - DEFERRED PLANNING — relocated birthday presentation, Group Event rollups, heatmap-aggregation reuse
 - [ ] **Phase 39: Onboarding** - DEFERRED PLANNING — first-run setup and teaching against the implemented product
@@ -276,7 +286,7 @@ All v1.0 commits are local on `main` and have NOT been pushed.
   3. The nine custom-field types support global or per-contact definitions with optional value history (ADR-001 uniqueness untouched); imported Contacts-app notes land as their own AI-off Memory type; existing share-sheet captures migrate with no data loss; and backup/restore preserves the entire knowledge model including soft-deleted records (KNOW-13/14/15/16)
 
 **Canonical refs**: docs/dossier/milestone-2/phase-03-contact-knowledge-foundation-dossier.md; docs/dossier/milestone-2/planning-notes/phase-03-planning-notes.md
-**Schema**: destructive data-move migration **017** (memories.allow_ai + share-capture carry-over + ADR-030 retirement via **ADR-081**; verified head+1 on disk 2026-09-04: migrations 001–016, TARGET_VERSION=16) + additive migration **018** (custom-field scope/history_retained/field_group + custom_field_value_history table). Backup: `BACKUP_FORMAT_VERSION` is ALREADY 4 on disk (24.1 pre-bumped it, commit d677e2c) — 24.2 emits its additions within format 4, no further bump. ⚠ The milestone "Phase 36 owns the v4 bump" note is now stale (owner flag).
+**Schema**: destructive data-move migration **017** (memories.allow_ai + share-capture carry-over + ADR-030 retirement via **ADR-081**; verified head+1 on disk 2026-09-04: migrations 001–016, TARGET_VERSION=16) + additive migration **018** (custom-field scope/history_retained/field_group + custom_field_value_history table). Backup: `BACKUP_FORMAT_VERSION` is ALREADY 4 on disk (24.1 pre-bumped it, commit d677e2c) — 24.2 emits its additions within format 4, no further bump. The milestone migration-ordering rule was amended 2026-09-04 (owner-approved) to record this: v4 is spent, Phase 36's closing bump is now v5. **Deferred to a later Profile/custom-fields UI phase (see Phase 31):** the custom-field value-history backlist UI and grouped-field rendering — 24.2 lands only the `custom_field_value_history` table + DAO read and the `field_group` column (data-layer), with no in-phase viewer.
 **Plans**: 7 plans (3 waves)
 
 **Wave 1**
@@ -420,6 +430,7 @@ All v1.0 commits are local on `main` and have NOT been pushed.
   5. Things to Remember renders as a one-column configurable section in factory child order with compact cards — blank metadata consuming no space, long content truncating, ~3 items then View All, tap to detail and long-press to Edit/Pin/Hide with no permanent inline edit/delete controls — where hidden items stay recoverable via administration and a Show hidden toggle, Off Limits reads as distinct caution without changing sparkle meaning, Profile overflow lists contact actions before presentation actions with no AI-draft entry, and every state is operable without precise drag and exposed textually (PROF-14/15/16/17/19/20)
 
 **Canonical refs**: docs/dossier/milestone-2/phase-10-profile-experience-dossier.md; docs/dossier/milestone-2/planning-notes/phase-10-planning-notes.md
+**Consumes from Phase 24.2** (deferred UI, owner-approved 2026-09-04): the custom-field **value-history backlist** viewer (reads `value-history-dao.ts` / `custom_field_value_history`) and **grouped custom-field rendering** (`custom_field_defs.field_group`). 24.2 shipped these as data-layer only. Confirm at Phase 31 planning whether the Profile is the right surface or a dedicated custom-fields UI phase is needed; if the latter, re-home this note.
 **Schema**: profile layout/background templates (verify head+1 at plan time)
 **Plans**: TBD
 **UI hint**: yes
@@ -498,7 +509,7 @@ All v1.0 commits are local on `main` and have NOT been pushed.
 
 ### Phase 36: AI Configuration & Prompting
 
-**Goal**: AI becomes an explicit, user-owned capability — three connection lanes, a real global switch, personalization the user controls, a permission model that decides exactly what leaves the device, and the milestone's closing backup wire-format v4 bump.
+**Goal**: AI becomes an explicit, user-owned capability — three connection lanes, a real global switch, personalization the user controls, a permission model that decides exactly what leaves the device, and the milestone's closing backup wire-format bump (**now v5** — v4 landed early in 24.1, see the migration-ordering amendment; the exact target/mechanics are a Phase 36 plan-time decision).
 **Depends on**: Phases 24.2, 32, 33, 34, 35 — and every schema-bearing phase of the milestone, because this phase ends the milestone's schema chain with the backup format bump
 **Requirements**: AICFG-01, AICFG-02, AICFG-03, AICFG-04, AICFG-05, AICFG-06, AICFG-07, AICFG-08, AICFG-09, AICFG-10, AICFG-11, AICFG-12, AICFG-13, AICFG-14, AICFG-15, AICFG-16, AICFG-17
 **Success Criteria** (what must be TRUE):
@@ -507,10 +518,10 @@ All v1.0 commits are local on `main` and have NOT been pushed.
   2. User can configure three connection lanes — OpenRouter (recommended, browser-authorized, with an Orbit-owned curated-first model picker showing real current/cached pricing and daily/manual catalog refresh), direct BYOK, and an OpenAI-compatible HTTPS custom endpoint — with exactly one active connection, stored inactive configurations, a new lane activating only on success, and Orbit never silently substituting a model or connection (an unavailable selection becomes an explicit Needs Attention state with repair actions) (AICFG-02/03/04/05)
   3. Orbit owns an immutable system/output prompt contract that user personalization layers onto through structured Writing Style controls and ordered enableable Personalization Context sections, with no artificial context ceiling or silent truncation, exposed token/context and OpenRouter cost estimates, explicit surfacing of true model-capacity overflow, and an Adjust flow that is ephemeral per session and never changes persistent Writing Style (AICFG-06/07/09)
   4. What is transmitted is exactly what the permission model authorizes — AI-permitted knowledge included automatically per contact, Message Focus adding emphasis without changing permission, AI-enabled Off Limits transmitted only as avoidance constraints, the three most recent Interactions included only where that interaction's Allow AI is ON, and Group Notes never — governed by a central permission manager (new-item type defaults OFF and new-items-only, searchable review, contact drill-in, bulk disable, bulk enable only behind explicit impact confirmation, Group Notes never surfaced), inspectable and previewable in Settings without ever showing credentials, and disclosed once on first successful setup with the exact-prompt first-send acknowledgement retired (AICFG-08/10/11/12)
-  5. Failures translate to human-readable categories that preserve Compose state and never fail over silently, emitting sanitized structured diagnostics carrying only safe metadata; credentials stay in secure storage and out of app settings and backups while nonsecret personalization, configuration, and permissions are preserved so a restored install never falsely appears Ready; and the backup wire format bumps to v4 as this phase's FINAL plan — after all other milestone schema — serializing every entity and portable preference the milestone added, with restore validation, orphan repair including Phase 33's Group Event rules, and a decided restore-compat behavior for every retired key (AICFG-13/14/15/16/17)
+  5. Failures translate to human-readable categories that preserve Compose state and never fail over silently, emitting sanitized structured diagnostics carrying only safe metadata; credentials stay in secure storage and out of app settings and backups while nonsecret personalization, configuration, and permissions are preserved so a restored install never falsely appears Ready; and the backup wire format bumps to its closing version (v5 — v4 landed early in 24.1; see migration-ordering amendment) as this phase's FINAL plan — after all other milestone schema — serializing every entity and portable preference the milestone added, with restore validation, orphan repair including Phase 33's Group Event rules, and a decided restore-compat behavior for every retired key (AICFG-13/14/15/16/17)
 
 **Canonical refs**: docs/dossier/milestone-2/phase-16-ai-configuration-prompting-dossier.md; docs/dossier/milestone-2/planning-notes/phase-16-planning-notes.md
-**Schema**: AI configuration tables/columns, then the **final backup wire-format v4 bump as the phase's last plan** (verify head+1 at plan time)
+**Schema**: AI configuration tables/columns, then the **final backup wire-format bump as the phase's last plan** (now v5 — v4 landed early in 24.1; see migration-ordering amendment; verify head+1 and the current `BACKUP_FORMAT_VERSION` on disk at plan time)
 **Plans**: TBD
 **UI hint**: yes
 
