@@ -5,13 +5,11 @@ import { ContactProfileScreen } from "@/screens/ContactProfileScreen";
 import { CropPhotoScreen } from "@/screens/CropPhotoScreen";
 import { EditContactScreen } from "@/screens/EditContactScreen";
 import { MergeConflictsScreen } from "@/screens/MergeConflictsScreen";
+import { MemoryHistoryScreen } from "@/screens/MemoryHistoryScreen";
 import { OrreryScreen } from "@/screens/OrreryScreen";
 import { RecentlyDeletedScreen } from "@/screens/RecentlyDeletedScreen";
 import { SurvivorSelectScreen } from "@/screens/SurvivorSelectScreen";
 import { ThingsToRememberScreen } from "@/screens/ThingsToRememberScreen";
-import {
-  MemoryHistoryPlaceholderScreen,
-} from "@/screens/placeholders/KnowledgePlaceholders";
 import type { OrreryStackParamList } from "../types";
 
 const Stack = createNativeStackNavigator<OrreryStackParamList>();
@@ -34,7 +32,7 @@ export function OrreryStack() {
       />
       <Stack.Screen
         name="MemoryHistory"
-        component={MemoryHistoryPlaceholderScreen}
+        component={MemoryHistoryScreen}
       />
       <Stack.Screen name="Edit" component={EditContactScreen} />
       <Stack.Screen name="Compose" component={ComposeScreen} />

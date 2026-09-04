@@ -11,6 +11,7 @@ import { EditContactScreen } from "@/screens/EditContactScreen";
 import { GroupEventsScreen } from "@/screens/GroupEventsScreen";
 import { HomeScreen } from "@/screens/HomeScreen";
 import { ManageFavouritesScreen } from "@/screens/ManageFavouritesScreen";
+import { MemoryHistoryScreen } from "@/screens/MemoryHistoryScreen";
 import { MergeConflictsScreen } from "@/screens/MergeConflictsScreen";
 import { NeverContactedScreen } from "@/screens/NeverContactedScreen";
 import { RecentlyDeletedScreen } from "@/screens/RecentlyDeletedScreen";
@@ -20,9 +21,6 @@ import {
   MemoryPlaceholderScreen,
   UpdateContactPlaceholderScreen,
 } from "@/screens/placeholders/FabActionPlaceholders";
-import {
-  MemoryHistoryPlaceholderScreen,
-} from "@/screens/placeholders/KnowledgePlaceholders";
 import { SurvivorSelectScreen } from "@/screens/SurvivorSelectScreen";
 import { ThingsToRememberScreen } from "@/screens/ThingsToRememberScreen";
 import { UnboundContactsScreen } from "@/screens/UnboundContactsScreen";
@@ -56,7 +54,7 @@ export function DashboardStack() {
       />
       <Stack.Screen
         name="MemoryHistory"
-        component={MemoryHistoryPlaceholderScreen}
+        component={MemoryHistoryScreen}
       />
       <Stack.Screen name="Edit" component={EditContactScreen} />
       <Stack.Screen name="Create" component={CreateContactScreen} />
