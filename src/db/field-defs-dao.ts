@@ -37,8 +37,10 @@
  */
 import type { CustomFieldDef, SqliteBool } from "@/db/field-types";
 import { bumpDataRevisionCore } from "@/db/data-revision-dao";
+import { upsertValueCore } from "@/db/field-values-dao";
 import { inWriteTransaction } from "@/db/transaction";
 import type { SqlExecutor } from "@/db/types";
+import { newUid } from "@/db/uid";
 
 /** Throw (→ rollback) unless exactly one row matched. */
 function assertOneChange(op: string, id: number, changes: number): void {
@@ -195,6 +197,53 @@ export function restoreField(
     assertOneChange("restoreField", id, result.changes);
     await bumpDataRevisionCore(exec);
   });
+}
+
+/**
+ * Promote a directly-present Phase-31 contact-scoped definition to global and
+ * seed only the contacts still missing its normalized current-value pair.
+ *
+ * This is a non-mutexed core so the update and fan-out stay one transaction;
+ * it deliberately never calls the mutex-owning `createField` writer.
+ */
+export async function promoteFieldToGlobalCore(
+  exec: SqlExecutor,
+  input: { fieldDefId: number; now: string },
+): Promise<void> {
+  const updated = await exec.runAsync(
+    "UPDATE custom_field_defs SET scope = 'global', modified_at = ? WHERE id = ?",
+    [input.now, input.fieldDefId],
+  );
+  assertOneChange("promoteFieldToGlobal", input.fieldDefId, updated.changes);
+  const contacts = await exec.getAllAsync<{ id: number }>(
+    `SELECT contacts.id
+       FROM contacts
+      WHERE NOT EXISTS (
+        SELECT 1 FROM custom_field_values
+         WHERE contact_id = contacts.id AND field_def_id = ?
+      )
+      ORDER BY contacts.id`,
+    [input.fieldDefId],
+  );
+  for (const contact of contacts) {
+    await upsertValueCore(
+      exec,
+      contact.id,
+      input.fieldDefId,
+      newUid(),
+      null,
+      input.now,
+    );
+  }
+  await bumpDataRevisionCore(exec);
+}
+
+/** Public one-transaction wrapper for global promotion. */
+export function promoteFieldToGlobal(
+  exec: SqlExecutor,
+  input: { fieldDefId: number; now: string },
+): Promise<void> {
+  return inWriteTransaction(exec, () => promoteFieldToGlobalCore(exec, input));
 }
 
 /**

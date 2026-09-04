@@ -22,7 +22,8 @@
  *     two-transaction impl would leave the contact + interaction committed and
  *     FAIL this assertion.
  */
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+vi.mock("expo-sqlite", () => ({}));
 import { nodeSqliteExecutor, openTestDb } from "@/db/__testkit__/node-sqlite";
 import {
   archiveContact,
@@ -31,16 +32,7 @@ import {
   restoreContact,
   updateContactFull,
 } from "@/db/contacts-dao";
-import { migration001 } from "@/db/migrations/001-initial";
-import { migration002 } from "@/db/migrations/002-app-settings";
-import { migration003 } from "@/db/migrations/003-orrery-settings";
-import { migration004 } from "@/db/migrations/004-ai-settings";
-import { migration005 } from "@/db/migrations/005-digest-settings";
-import { migration006 } from "@/db/migrations/006-normalize-custom-field-values";
-import { migration007 } from "@/db/migrations/007-tombstones";
-import { migration009 } from "@/db/migrations/009-contact-method-normalization";
-import { migration010 } from "@/db/migrations/010-contact-method-label";
-import { migration011 } from "@/db/migrations/011-contact-lifecycle-schema";
+import { MIGRATIONS, TARGET_VERSION } from "@/db/database";
 import { runMigrations } from "@/db/migrations/runner";
 import { recordTouchpoint } from "@/db/recency-dao";
 import type { SqlExecutor } from "@/db/types";
@@ -56,36 +48,25 @@ beforeEach(async () => {
   uidCounter = 0;
   const db = openTestDb();
   exec = nodeSqliteExecutor(db);
-  await runMigrations(
-    exec,
-    [
-      migration001,
-      migration002,
-      migration003,
-      migration004,
-      migration005,
-      migration006,
-      migration007,
-      migration009,
-      migration010,
-      migration011,
-    ],
-    11,
-    { now: NOW, newUid: uid, defaultPhoneRegion: "US" },
-  );
+  await runMigrations(exec, MIGRATIONS, TARGET_VERSION, {
+    now: NOW,
+    newUid: uid,
+    defaultPhoneRegion: "US",
+  });
 });
 
 /** Add a normalized definition directly, independent of Plan 03's DDL work. */
 async function addDefinition(
   colName: string,
   quarantinedAt: string | null = null,
+  scope: "global" | "contact" = "global",
 ): Promise<number> {
   const result = await exec.runAsync(
     `INSERT INTO custom_field_defs (
        uid, col_name, label, type, options, display_order, quarantined_at,
-       created_at, modified_at
-     ) VALUES (?, ?, ?, 'text', NULL, ?, ?, ?, ?)`,
-    [uid(), colName, colName, uidCounter, quarantinedAt, NOW, NOW],
+       scope, created_at, modified_at
+     ) VALUES (?, ?, ?, 'text', NULL, ?, ?, ?, ?, ?)`,
+    [uid(), colName, colName, uidCounter, quarantinedAt, scope, NOW, NOW],
   );
   return result.lastInsertRowId;
 }
@@ -392,6 +373,19 @@ describe("createContactFull — custom values compose without deadlock (Pitfall 
     ]);
     expect(new Set(rows.map((row) => row.uid)).size).toBe(2);
     expect(await totalValueRows()).toBe(2);
+  });
+
+  it("does not fan out a directly-present contact-scoped definition", async () => {
+    const globalDefId = await addDefinition("nickname");
+    const contactDefId = await addDefinition("private_note", null, "contact");
+    const { contactId } = await createContactFull(exec, {
+      uid: uid(), name: "Mara", intervalDays: 21, now: NOW,
+    });
+    expect(await exec.getAllAsync<{ field_def_id: number }>(
+      "SELECT field_def_id FROM custom_field_values WHERE contact_id = ? ORDER BY field_def_id",
+      [contactId],
+    )).toEqual([{ field_def_id: globalDefId }]);
+    expect(contactDefId).toBeGreaterThan(globalDefId);
   });
 });
 

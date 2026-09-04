@@ -195,11 +195,11 @@ export async function createContactFullCore(
     await recomputeLastContactCore(exec, contactId, input.now);
   }
 
-  // Seed the durable pair matrix for EVERY definition, including quarantined
-  // definitions. Each INSERT receives an independent immutable uid; later
-  // submitted values UPSERT their matching pair and preserve that uid.
+  // Seed the durable pair matrix only for GLOBAL definitions, including
+  // quarantined globals. Directly-present Phase-31 contact defs must never
+  // fan out to a newly-created contact.
   const definitions = await listDefs(exec, { includeQuarantined: true });
-  for (const definition of definitions) {
+  for (const definition of definitions.filter((definition) => definition.scope === "global")) {
     await upsertValueCore(
       exec,
       contactId,

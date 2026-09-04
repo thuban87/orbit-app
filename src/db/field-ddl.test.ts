@@ -1,4 +1,5 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+vi.mock("expo-sqlite", () => ({}));
 import { nodeSqliteExecutor, openTestDb } from "@/db/__testkit__/node-sqlite";
 import {
   createField,
@@ -6,14 +7,9 @@ import {
   dropField,
   expireFieldIfStale,
 } from "@/db/field-ddl";
+import { promoteFieldToGlobal } from "@/db/field-defs-dao";
 import type { NewFieldDef } from "@/db/field-types";
-import { migration001 } from "@/db/migrations/001-initial";
-import { migration002 } from "@/db/migrations/002-app-settings";
-import { migration003 } from "@/db/migrations/003-orrery-settings";
-import { migration004 } from "@/db/migrations/004-ai-settings";
-import { migration005 } from "@/db/migrations/005-digest-settings";
-import { migration006 } from "@/db/migrations/006-normalize-custom-field-values";
-import { migration007 } from "@/db/migrations/007-tombstones";
+import { MIGRATIONS, TARGET_VERSION } from "@/db/database";
 import { runMigrations } from "@/db/migrations/runner";
 import type { SqlExecutor } from "@/db/types";
 
@@ -25,20 +21,7 @@ let exec: SqlExecutor;
 beforeEach(async () => {
   uidCounter = 0;
   exec = nodeSqliteExecutor(openTestDb());
-  await runMigrations(
-    exec,
-    [
-      migration001,
-      migration002,
-      migration003,
-      migration004,
-      migration005,
-      migration006,
-      migration007,
-    ],
-    7,
-    { now: NOW, newUid: uid },
-  );
+  await runMigrations(exec, MIGRATIONS, TARGET_VERSION, { now: NOW, newUid: uid });
 });
 
 function newDef(overrides: Partial<NewFieldDef> = {}): NewFieldDef {
@@ -98,6 +81,45 @@ describe("normalized field lifecycle", () => {
       [fieldDefId],
     );
     expect(count?.n).toBe(2);
+  });
+
+  it("rejects contact-scoped creation before inserting a definition or values", async () => {
+    const contactId = await seedContact("Alex");
+    const beforeDefs = await exec.getFirstAsync<{ n: number }>("SELECT COUNT(*) AS n FROM custom_field_defs");
+    const beforeValues = await exec.getFirstAsync<{ n: number }>("SELECT COUNT(*) AS n FROM custom_field_values");
+    await expect(createField(exec, newDef({ scope: "contact" }))).rejects.toThrow(/Phase 31/);
+    expect(await exec.getFirstAsync("SELECT COUNT(*) AS n FROM custom_field_defs")).toEqual(beforeDefs);
+    expect(await exec.getFirstAsync("SELECT COUNT(*) AS n FROM custom_field_values")).toEqual(beforeValues);
+    expect(contactId).toBeGreaterThan(0);
+  });
+
+  it("promotes a directly-present contact def and seeds only missing contacts", async () => {
+    const owner = await seedContact("Owner");
+    const other = await seedContact("Other");
+    const def = await exec.runAsync(
+      `INSERT INTO custom_field_defs (
+         uid, col_name, label, type, options, show_on_new, always_show,
+         display_order, share_with_ai, scope, history_retained, field_group, created_at, modified_at
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [uid(), "private_note", "Private note", "text", null, 0, 0, 0, 0, "contact", 0, null, NOW, NOW],
+    );
+    await exec.runAsync(
+      `INSERT INTO custom_field_values (uid, contact_id, field_def_id, value, created_at, modified_at)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      [uid(), owner, def.lastInsertRowId, "owner value", NOW, NOW],
+    );
+
+    await promoteFieldToGlobal(exec, { fieldDefId: def.lastInsertRowId, now: NOW });
+
+    expect(await exec.getFirstAsync("SELECT scope FROM custom_field_defs WHERE id = ?", [def.lastInsertRowId]))
+      .toEqual({ scope: "global" });
+    expect(await exec.getAllAsync(
+      "SELECT contact_id, value FROM custom_field_values WHERE field_def_id = ? ORDER BY contact_id",
+      [def.lastInsertRowId],
+    )).toEqual([
+      { contact_id: owner, value: "owner value" },
+      { contact_id: other, value: null },
+    ]);
   });
 
   it("snapshots non-null normalized values before deleting pairs and the definition", async () => {

@@ -56,12 +56,17 @@ export function createField(
   exec: SqlExecutor,
   def: NewFieldDef,
 ): Promise<void> {
+  if (def.scope === "contact") {
+    return Promise.reject(new Error(
+      "Contact-scoped custom-field creation, durable ownership, and owner-purge semantics are deferred to Phase 31.",
+    ));
+  }
   return inWriteTransaction(exec, async () => {
     const result = await exec.runAsync(
       `INSERT INTO custom_field_defs
          (uid, col_name, label, type, options, show_on_new, always_show,
-          display_order, share_with_ai, created_at, modified_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          display_order, share_with_ai, scope, history_retained, field_group, created_at, modified_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         def.uid,
         def.col_name,
@@ -72,6 +77,9 @@ export function createField(
         def.always_show,
         def.display_order,
         def.share_with_ai,
+        def.scope ?? "global",
+        def.history_retained ?? 0,
+        def.field_group ?? null,
         def.now,
         def.now,
       ],
