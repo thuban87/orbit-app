@@ -246,7 +246,7 @@ All v1.0 commits are local on `main` and have NOT been pushed.
 **Wave 2** *(blocked on Wave 1 completion)*
 
 - [ ] 24.1-02-PLAN.md — Memories DAO full CRUD + metadata (notes/links/dates/pin/outdated) + soft-delete/restore + registry-driven visibility (KNOW-02/06/07/08/09)
-- [ ] 24.1-03-PLAN.md — Structured relationships DAO + read (optional Orbit-contact link) (KNOW-05)
+- [ ] 24.1-03-PLAN.md — Structured relationships DAO + read (optional Orbit-contact link) + merge/purge coverage for the three knowledge tables (KNOW-05; review H2/M5)
 - [ ] 24.1-04-PLAN.md — Current-state history (Last Talked About + Current Location): set/edit/promote-to-current + backlist (KNOW-03/04)
 
 **Wave 3** *(blocked on Wave 2 completion)*
