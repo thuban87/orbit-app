@@ -1,10 +1,10 @@
 ---
 schema_version: 1
-open_count: 22
+open_count: 23
 waived_count: 0
 fixed_count: 6
-total_count: 28
-last_updated: 2026-09-04T07:11:24.422Z
+total_count: 29
+last_updated: 2026-09-04T19:42:12.035Z
 ---
 
 # Broken Windows Ledger
@@ -43,6 +43,7 @@ last_updated: 2026-09-04T07:11:24.422Z
 | 26 | 24.1 | deviation | src/db/current-state-history-dao.test.ts |  | Kept current-state DAO test fixtures node-pure by avoiding the Expo database bootstrap. | open |  | 2026-09-04T06:52:03.142Z |  |
 | 27 | 24.1 | stub | src/screens/placeholders/KnowledgePlaceholders.tsx | 31 | Recently Deleted placeholder is intentionally replaced by Plan 24.1-07. | open |  | 2026-09-04T07:11:24.241Z |  |
 | 28 | 24.1 | stub | src/screens/placeholders/KnowledgePlaceholders.tsx | 41 | Memory History placeholder is intentionally replaced by Plan 24.1-07. | open |  | 2026-09-04T07:11:24.422Z |  |
+| 29 | 24.2 | unrun-verify | modules/orbit-contact-picker/android/src/main/java/expo/modules/orbitcontactpicker/OrbitContactPickerModule.kt |  | On-device Pixel Note-MIME UAT remains required after the successful desktop assembleDebug build. | open |  | 2026-09-04T19:42:12.035Z |  |
 
 ````json
 [
@@ -380,6 +381,18 @@ last_updated: 2026-09-04T07:11:24.422Z
     "status": "open",
     "reason": "",
     "recorded_at": "2026-09-04T07:11:24.422Z",
+    "resolved_at": null
+  },
+  {
+    "id": 29,
+    "kind": "unrun-verify",
+    "phase": "24.2",
+    "file": "modules/orbit-contact-picker/android/src/main/java/expo/modules/orbitcontactpicker/OrbitContactPickerModule.kt",
+    "line": null,
+    "description": "On-device Pixel Note-MIME UAT remains required after the successful desktop assembleDebug build.",
+    "status": "open",
+    "reason": "",
+    "recorded_at": "2026-09-04T19:42:12.035Z",
     "resolved_at": null
   }
 ]
