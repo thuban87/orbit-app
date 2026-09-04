@@ -1,5 +1,5 @@
 /**
- * Pure Vitest coverage for the 7 target-type parsers + isValueInOptions
+ * Pure Vitest coverage for the 10 target-type parsers + isValueInOptions
  * (FLD-04). No DB, no expo — these are pure string functions.
  *
  * The two load-bearing invariants under test: (1) every FieldType has a parser
@@ -30,11 +30,14 @@ describe("parsers — exhaustiveness", () => {
       "toggle",
       "number",
       "photo",
+      "url",
+      "email",
+      "phone",
     ];
     for (const t of allTypes) {
       expect(typeof parsers[t]).toBe("function");
     }
-    // No stray keys beyond the 7 target types.
+    // No stray keys beyond the 10 target types.
     expect(Object.keys(parsers).sort()).toEqual([...allTypes].sort());
   });
 });
@@ -57,6 +60,41 @@ describe("parsers.dropdown — identity (membership is the caller's concern)", (
   it("passes any value through unchanged and never flags", () => {
     expectOk(parsers.dropdown("anything"), "anything");
     expectOk(parsers.dropdown(null), null);
+  });
+});
+
+describe("parsers.url / email / phone — permissive raw-TEXT validation", () => {
+  it("accepts plausible URLs unchanged and flags a space-separated non-URL", () => {
+    const localDev = "http://localhost:3000/path?q=hello";
+    expectOk(parsers.url("https://example.com"), "https://example.com");
+    expectOk(parsers.url("example.com"), "example.com");
+    expectOk(parsers.url(localDev), localDev);
+    expectOk(parsers.url("mailto:person@example.com"), "mailto:person@example.com");
+    expect(parsers.url("not a url with spaces only")).toEqual({ ok: false });
+  });
+
+  it("accepts plausible emails unchanged and requires one @ plus a domain dot", () => {
+    const plusAddress = "a+tag@b.co";
+    expectOk(parsers.email("a@b.co"), "a@b.co");
+    expectOk(parsers.email(plusAddress), plusAddress);
+    expect(parsers.email("a@b")).toEqual({ ok: false });
+    expect(parsers.email("plainstring")).toEqual({ ok: false });
+  });
+
+  it("accepts plausible phones unchanged and flags non-phone prose", () => {
+    const internationalExtension = "+44 (0)20 7946 0018 ext. 42";
+    expectOk(parsers.phone("+1 (555) 123-4567"), "+1 (555) 123-4567");
+    expectOk(parsers.phone("555.123.4567"), "555.123.4567");
+    expectOk(parsers.phone(internationalExtension), internationalExtension);
+    expect(parsers.phone("call me maybe")).toEqual({ ok: false });
+  });
+
+  it("treats null and blank values as absent without rewriting them", () => {
+    for (const type of ["url", "email", "phone"] as const) {
+      expectOk(parsers[type](null), null);
+      expectOk(parsers[type](""), null);
+      expectOk(parsers[type]("   "), null);
+    }
   });
 });
 
