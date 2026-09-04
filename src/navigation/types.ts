@@ -1,7 +1,11 @@
-import type { CompositeScreenProps, NavigatorScreenParams } from "@react-navigation/native";
+import type {
+  CompositeScreenProps,
+  NavigatorScreenParams,
+} from "@react-navigation/native";
 import type { BottomTabScreenProps } from "@react-navigation/bottom-tabs";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import type { MergeResolutions } from "@/db/merge-dao";
+import type { CurrentStateFieldKey } from "@/db/memory-registry";
 import type { RestorePreviewRoute } from "@/screens/backup-restore-logic";
 import type { PhotoTargetDescriptor } from "@/services/photos/photo-storage";
 
@@ -35,6 +39,8 @@ export type DashboardStackParamList = {
   Create: undefined;
   Profile: { contactId: number; openReachOut?: boolean };
   ThingsToRemember: { contactId: number };
+  RecentlyDeleted: { contactId: number };
+  MemoryHistory: { contactId: number; fieldKey: CurrentStateFieldKey };
   Edit: { contactId: number };
   Archived: undefined;
   /**
@@ -128,6 +134,8 @@ export type OrreryStackParamList = {
   Orrery: undefined;
   Profile: { contactId: number; openReachOut?: boolean };
   ThingsToRemember: { contactId: number };
+  RecentlyDeleted: { contactId: number };
+  MemoryHistory: { contactId: number; fieldKey: CurrentStateFieldKey };
   Edit: { contactId: number };
   Compose: { contactId: number; requestAiSuggestion?: boolean };
   CropPhoto: {

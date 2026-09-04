@@ -26,9 +26,9 @@ const PROVENANCE_LABELS = {
   share: "From a shared capture",
 } as const;
 
-const MEMORY_TYPE_OPTIONS = (Object.keys(MEMORY_TYPE_REGISTRY) as MemoryTypeKey[]).map(
-  (type) => ({ type, label: MEMORY_TYPE_REGISTRY[type].displayName }),
-);
+const MEMORY_TYPE_OPTIONS = (
+  Object.keys(MEMORY_TYPE_REGISTRY) as MemoryTypeKey[]
+).map((type) => ({ type, label: MEMORY_TYPE_REGISTRY[type].displayName }));
 
 function blankToNull(value: string): string | null {
   const trimmed = value.trim();
@@ -58,6 +58,8 @@ export interface MemoryEditPatch extends MemoryDraft {}
 
 export interface MemoryEditorProps {
   items: MemoryRow[];
+  /** Grouped callers render one editor per type; only the final group offers creation. */
+  showAdd?: boolean;
   onAdd: (draft: MemoryDraft) => Promise<boolean>;
   onEdit: (id: number, patch: MemoryEditPatch) => Promise<boolean>;
   onDelete: (id: number) => void;
@@ -84,20 +86,42 @@ function TypePicker({
         accessibilityRole="button"
         accessibilityLabel={`Memory type: ${selected}`}
         onPress={() => setOpen(true)}
-        style={[styles.typeTrigger, { backgroundColor: colors.surface, borderColor: colors.border }]}
+        style={[
+          styles.typeTrigger,
+          { backgroundColor: colors.surface, borderColor: colors.border },
+        ]}
       >
         <AppText role="body">{selected}</AppText>
       </Pressable>
-      <Modal transparent visible={open} animationType="fade" onRequestClose={() => setOpen(false)}>
+      <Modal
+        transparent
+        visible={open}
+        animationType="fade"
+        onRequestClose={() => setOpen(false)}
+      >
         <View style={styles.modalRoot}>
           <Pressable
             accessibilityLabel="Dismiss memory type options"
             onPress={() => setOpen(false)}
             style={StyleSheet.absoluteFill}
           >
-            <View style={[StyleSheet.absoluteFill, styles.scrim, { backgroundColor: colors.background }]} />
+            <View
+              style={[
+                StyleSheet.absoluteFill,
+                styles.scrim,
+                { backgroundColor: colors.background },
+              ]}
+            />
           </Pressable>
-          <View style={[styles.sheet, { backgroundColor: colors.surfaceElevated, borderColor: colors.border }]}>
+          <View
+            style={[
+              styles.sheet,
+              {
+                backgroundColor: colors.surfaceElevated,
+                borderColor: colors.border,
+              },
+            ]}
+          >
             <FlatList
               data={MEMORY_TYPE_OPTIONS}
               keyExtractor={(item) => item.type}
@@ -111,7 +135,15 @@ function TypePicker({
                   }}
                   style={[styles.option, { borderColor: colors.border }]}
                 >
-                  <AppText role="body" style={{ color: item.type === value ? colors.accent : colors.textPrimary }}>
+                  <AppText
+                    role="body"
+                    style={{
+                      color:
+                        item.type === value
+                          ? colors.accent
+                          : colors.textPrimary,
+                    }}
+                  >
                     {item.label}
                   </AppText>
                 </Pressable>
@@ -141,6 +173,7 @@ function initialDraft(item?: MemoryRow): MemoryDraft {
 /** Memory form with parent-owned persistence; it deliberately imports no writer DAO. */
 export function MemoryEditor({
   items,
+  showAdd = true,
   onAdd,
   onEdit,
   onDelete,
@@ -163,11 +196,18 @@ export function MemoryEditor({
     setEditing(null);
     setDraft(null);
   };
-  const update = <K extends keyof MemoryDraft>(key: K, value: MemoryDraft[K]) => {
+  const update = <K extends keyof MemoryDraft>(
+    key: K,
+    value: MemoryDraft[K],
+  ) => {
     setDraft((current) => (current ? { ...current, [key]: value } : current));
   };
   const commit = async () => {
-    if (!draft || (draft.type === "custom" && !blankToNull(draft.customLabel ?? ""))) return;
+    if (
+      !draft ||
+      (draft.type === "custom" && !blankToNull(draft.customLabel ?? ""))
+    )
+      return;
     const normalized: MemoryDraft = {
       ...draft,
       customLabel: blankToNull(draft.customLabel ?? ""),
@@ -182,26 +222,48 @@ export function MemoryEditor({
     if (saved) close();
   };
   const isCustom = draft?.type === "custom";
-  const canSave = Boolean(draft && (!isCustom || blankToNull(draft.customLabel ?? "")));
+  const canSave = Boolean(
+    draft &&
+      blankToNull(draft.value ?? "") &&
+      (!isCustom || blankToNull(draft.customLabel ?? "")),
+  );
 
   return (
     <View testID={testID} style={styles.container}>
       {items.map((item) => (
-        <MemoryCard key={item.id} memory={item} onPress={() => openExisting(item)} />
+        <MemoryCard
+          key={item.id}
+          memory={item}
+          onPress={() => openExisting(item)}
+        />
       ))}
       {!draft ? (
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Add memory"
-          onPress={openNew}
-          style={[styles.action, { borderColor: colors.border }]}
-        >
-          <AppText role="body" style={{ color: colors.accent }}>Add memory</AppText>
-        </Pressable>
+        showAdd ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Add memory"
+            onPress={openNew}
+            style={[styles.action, { borderColor: colors.border }]}
+          >
+            <AppText role="body" style={{ color: colors.accent }}>
+              Add memory
+            </AppText>
+          </Pressable>
+        ) : null
       ) : (
-        <View style={[styles.form, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-          <AppText role="heading">{editing ? "Edit memory" : "Add memory"}</AppText>
-          <TypePicker value={draft.type} onSelect={(type) => update("type", type)} />
+        <View
+          style={[
+            styles.form,
+            { backgroundColor: colors.surface, borderColor: colors.border },
+          ]}
+        >
+          <AppText role="heading">
+            {editing ? "Edit memory" : "Add memory"}
+          </AppText>
+          <TypePicker
+            value={draft.type}
+            onSelect={(type) => update("type", type)}
+          />
           {isCustom ? (
             <TextInput
               accessibilityLabel="Custom memory label"
@@ -209,7 +271,14 @@ export function MemoryEditor({
               onChangeText={(value) => update("customLabel", value)}
               placeholder="Memory label"
               placeholderTextColor={colors.textSecondary}
-              style={[styles.input, { color: colors.textPrimary, backgroundColor: colors.background, borderColor: colors.border }]}
+              style={[
+                styles.input,
+                {
+                  color: colors.textPrimary,
+                  backgroundColor: colors.background,
+                  borderColor: colors.border,
+                },
+              ]}
             />
           ) : null}
           <TextInput
@@ -219,7 +288,15 @@ export function MemoryEditor({
             placeholder="What should you remember?"
             placeholderTextColor={colors.textSecondary}
             multiline
-            style={[styles.input, styles.multiline, { color: colors.textPrimary, backgroundColor: colors.background, borderColor: colors.border }]}
+            style={[
+              styles.input,
+              styles.multiline,
+              {
+                color: colors.textPrimary,
+                backgroundColor: colors.background,
+                borderColor: colors.border,
+              },
+            ]}
           />
           <TextInput
             accessibilityLabel="Memory note optional"
@@ -228,7 +305,15 @@ export function MemoryEditor({
             placeholder="Note (optional)"
             placeholderTextColor={colors.textSecondary}
             multiline
-            style={[styles.input, styles.multiline, { color: colors.textPrimary, backgroundColor: colors.background, borderColor: colors.border }]}
+            style={[
+              styles.input,
+              styles.multiline,
+              {
+                color: colors.textPrimary,
+                backgroundColor: colors.background,
+                borderColor: colors.border,
+              },
+            ]}
           />
           <TextInput
             accessibilityLabel="Memory link optional"
@@ -239,7 +324,14 @@ export function MemoryEditor({
             autoCapitalize="none"
             autoCorrect={false}
             keyboardType="url"
-            style={[styles.input, { color: colors.textPrimary, backgroundColor: colors.background, borderColor: colors.border }]}
+            style={[
+              styles.input,
+              {
+                color: colors.textPrimary,
+                backgroundColor: colors.background,
+                borderColor: colors.border,
+              },
+            ]}
           />
           <TextInput
             accessibilityLabel="Meaningful date optional"
@@ -247,15 +339,28 @@ export function MemoryEditor({
             onChangeText={(value) => update("meaningfulDate", value)}
             placeholder="Meaningful date (optional)"
             placeholderTextColor={colors.textSecondary}
-            style={[styles.input, { color: colors.textPrimary, backgroundColor: colors.background, borderColor: colors.border }]}
+            style={[
+              styles.input,
+              {
+                color: colors.textPrimary,
+                backgroundColor: colors.background,
+                borderColor: colors.border,
+              },
+            ]}
           />
           <View style={styles.toggleRow}>
             <AppText role="body">Pin memory</AppText>
-            <Switch value={draft.pinned} onValueChange={(value) => update("pinned", value)} />
+            <Switch
+              value={draft.pinned}
+              onValueChange={(value) => update("pinned", value)}
+            />
           </View>
           <View style={styles.toggleRow}>
             <AppText role="body">Mark outdated</AppText>
-            <Switch value={draft.outdated} onValueChange={(value) => update("outdated", value)} />
+            <Switch
+              value={draft.outdated}
+              onValueChange={(value) => update("outdated", value)}
+            />
           </View>
           <View style={styles.toggleRow}>
             <View style={styles.visibilityCopy}>
@@ -264,7 +369,10 @@ export function MemoryEditor({
                 This is presentation only.
               </AppText>
             </View>
-            <Switch value={draft.hidden} onValueChange={(value) => update("hidden", value)} />
+            <Switch
+              value={draft.hidden}
+              onValueChange={(value) => update("hidden", value)}
+            />
           </View>
           {editing ? (
             <AppText role="caption" style={{ color: colors.textSecondary }}>
@@ -282,7 +390,9 @@ export function MemoryEditor({
                 }}
                 style={[styles.action, { borderColor: colors.border }]}
               >
-                <AppText role="body" style={{ color: colors.textSecondary }}>Move to Recently Deleted</AppText>
+                <AppText role="body" style={{ color: colors.textSecondary }}>
+                  Move to Recently Deleted
+                </AppText>
               </Pressable>
             ) : null}
             {editing?.deleted_at ? (
@@ -292,11 +402,20 @@ export function MemoryEditor({
                 onPress={() => onRestore(editing.id)}
                 style={[styles.action, { borderColor: colors.border }]}
               >
-                <AppText role="body" style={{ color: colors.accent }}>Restore</AppText>
+                <AppText role="body" style={{ color: colors.accent }}>
+                  Restore
+                </AppText>
               </Pressable>
             ) : null}
-            <Pressable accessibilityRole="button" accessibilityLabel="Cancel" onPress={close} style={[styles.action, { borderColor: colors.border }]}>
-              <AppText role="body" style={{ color: colors.textSecondary }}>Cancel</AppText>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Cancel"
+              onPress={close}
+              style={[styles.action, { borderColor: colors.border }]}
+            >
+              <AppText role="body" style={{ color: colors.textSecondary }}>
+                Cancel
+              </AppText>
             </Pressable>
             <Pressable
               accessibilityRole="button"
@@ -304,9 +423,20 @@ export function MemoryEditor({
               accessibilityState={{ disabled: !canSave }}
               disabled={!canSave}
               onPress={() => void commit()}
-              style={[styles.action, { backgroundColor: canSave ? colors.accent : colors.surface, borderColor: canSave ? colors.accent : colors.border }]}
+              style={[
+                styles.action,
+                {
+                  backgroundColor: canSave ? colors.accent : colors.surface,
+                  borderColor: canSave ? colors.accent : colors.border,
+                },
+              ]}
             >
-              <AppText role="body" style={{ color: canSave ? colors.background : colors.textSecondary }}>
+              <AppText
+                role="body"
+                style={{
+                  color: canSave ? colors.background : colors.textSecondary,
+                }}
+              >
                 {editing ? "Save" : "Add memory"}
               </AppText>
             </Pressable>
@@ -318,17 +448,62 @@ export function MemoryEditor({
 }
 
 const styles = StyleSheet.create({
-  action: { alignItems: "center", borderRadius: SPACING.sm, borderWidth: 1, justifyContent: "center", minHeight: 44, paddingHorizontal: SPACING.md },
+  action: {
+    alignItems: "center",
+    borderRadius: SPACING.sm,
+    borderWidth: 1,
+    justifyContent: "center",
+    minHeight: 44,
+    paddingHorizontal: SPACING.md,
+  },
   actions: { flexDirection: "row", flexWrap: "wrap", gap: SPACING.sm },
   container: { gap: SPACING.sm },
-  form: { borderRadius: SPACING.md, borderWidth: 1, gap: SPACING.sm, padding: SPACING.base },
-  input: { borderRadius: SPACING.sm, borderWidth: 1, minHeight: 44, paddingHorizontal: SPACING.sm, paddingVertical: SPACING.xs },
-  modalRoot: { alignItems: "center", flex: 1, justifyContent: "center", padding: SPACING.lg },
+  form: {
+    borderRadius: SPACING.md,
+    borderWidth: 1,
+    gap: SPACING.sm,
+    padding: SPACING.base,
+  },
+  input: {
+    borderRadius: SPACING.sm,
+    borderWidth: 1,
+    minHeight: 44,
+    paddingHorizontal: SPACING.sm,
+    paddingVertical: SPACING.xs,
+  },
+  modalRoot: {
+    alignItems: "center",
+    flex: 1,
+    justifyContent: "center",
+    padding: SPACING.lg,
+  },
   multiline: { minHeight: 84, textAlignVertical: "top" },
-  option: { borderBottomWidth: 1, minHeight: 44, justifyContent: "center", paddingHorizontal: SPACING.base },
+  option: {
+    borderBottomWidth: 1,
+    minHeight: 44,
+    justifyContent: "center",
+    paddingHorizontal: SPACING.base,
+  },
   scrim: { opacity: 0.82 },
-  sheet: { borderRadius: SPACING.md, borderWidth: 1, maxWidth: 360, width: "100%" },
-  toggleRow: { alignItems: "center", flexDirection: "row", gap: SPACING.md, justifyContent: "space-between", minHeight: 44 },
-  typeTrigger: { borderRadius: SPACING.sm, borderWidth: 1, justifyContent: "center", minHeight: 44, paddingHorizontal: SPACING.sm },
+  sheet: {
+    borderRadius: SPACING.md,
+    borderWidth: 1,
+    maxWidth: 360,
+    width: "100%",
+  },
+  toggleRow: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: SPACING.md,
+    justifyContent: "space-between",
+    minHeight: 44,
+  },
+  typeTrigger: {
+    borderRadius: SPACING.sm,
+    borderWidth: 1,
+    justifyContent: "center",
+    minHeight: 44,
+    paddingHorizontal: SPACING.sm,
+  },
   visibilityCopy: { flex: 1, gap: SPACING.xs },
 });

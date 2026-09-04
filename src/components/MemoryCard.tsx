@@ -108,7 +108,11 @@ export function MemoryCard({
           }}
           style={styles.link}
         >
-          <AppText numberOfLines={1} role="caption" style={{ color: colors.accent }}>
+          <AppText
+            numberOfLines={1}
+            role="caption"
+            style={{ color: colors.accent }}
+          >
             Open link
           </AppText>
         </Pressable>
