@@ -127,6 +127,38 @@ describe("importContactRecord", () => {
     ).toEqual({ birthday: null });
   });
 
+  it("writes a raw imported note AI-off and omits blank notes", async () => {
+    const noted = await importContactRecord(exec, {
+      input: unboundInput("Noted Person"),
+      externalLinks: [],
+      birthday: null,
+      note: " Raw imported note ",
+      now: NOW,
+    } as Parameters<typeof importContactRecord>[1]);
+    const blank = await importContactRecord(exec, {
+      input: unboundInput("Blank Note Person"),
+      externalLinks: [],
+      birthday: null,
+      note: "   ",
+      now: NOW,
+    } as Parameters<typeof importContactRecord>[1]);
+
+    expect(
+      await exec.getAllAsync<{ contact_id: number; type: string; provenance: string; value: string; allow_ai: number }>(
+        "SELECT contact_id, type, provenance, value, allow_ai FROM memories ORDER BY contact_id",
+      ),
+    ).toEqual([
+      {
+        contact_id: noted.contactId,
+        type: "imported",
+        provenance: "import",
+        value: "Raw imported note",
+        allow_ai: 0,
+      },
+    ]);
+    expect(blank.contactId).toBeGreaterThan(0);
+  });
+
   it("atomically creates an Unbound contact, source link, provenance, and resolved row", async () => {
     const rowId = await acceptRow();
     const { contactId } = await importContactRecord(exec, {

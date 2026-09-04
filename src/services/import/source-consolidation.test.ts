@@ -1,6 +1,15 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("expo-sqlite", () => ({}));
+vi.mock("expo-file-system", () => ({
+  Paths: { document: { uri: "file:///doc" } },
+  Directory: class {},
+  File: class {},
+}));
+vi.mock("@/services/photos/photo-storage", () => ({
+  importStagingRelPath: () => "import-staging/test.jpg",
+  stageImportPhoto: async () => {},
+}));
 
 import { nodeSqliteExecutor, openTestDb } from "@/db/__testkit__/node-sqlite";
 import { MIGRATIONS, TARGET_VERSION } from "@/db/database";
@@ -9,6 +18,7 @@ import { getSessionById, listSessionRows } from "@/db/import-session-read";
 import { importContactRecord } from "@/db/imported-contact-dao";
 import { runMigrations } from "@/db/migrations/runner";
 import type { SqlExecutor } from "@/db/types";
+import { acceptPickedContacts } from "@/services/import/import-acquire";
 import { findActiveExternalLink } from "@/services/import/duplicate-evidence";
 import type { ImportedPhotoFs } from "@/services/import/import-photo";
 import {
@@ -78,6 +88,57 @@ beforeEach(async () => {
 });
 
 describe("source consolidation", () => {
+  it("uses the first non-blank note from real accepted picker rows", async () => {
+    const sessionId = await acceptPickedContacts(
+      exec,
+      [
+        {
+          lookupKey: "cluster-note-one",
+          displayName: "Taylor",
+          methods: [{ type: "phone", value: "312 555 0100" }],
+          birthday: null,
+          note: "First imported cluster note",
+          photoTempUri: null,
+        },
+        {
+          lookupKey: "cluster-note-two",
+          displayName: "Taylor Jones",
+          methods: [{ type: "phone", value: "+1 312 555 0100" }],
+          birthday: null,
+          note: "Later note must not win",
+          photoTempUri: null,
+        },
+      ],
+      {
+        mode: "bulk",
+        batchCategoryId: null,
+        effectivePhoneRegion: "US",
+        now: NOW,
+      },
+    );
+    const rows = await listSessionRows(exec, sessionId);
+    const result = await combineCluster(exec, photoFs(), {
+      rows,
+      batchCategoryId: null,
+      phoneRegion: "US",
+      now: NOW,
+    });
+
+    if (!result.combined) throw new Error("expected a combined contact");
+    expect(
+      await exec.getAllAsync<{ type: string; value: string; allow_ai: number }>(
+        "SELECT type, value, allow_ai FROM memories WHERE contact_id = ?",
+        [result.contactId],
+      ),
+    ).toEqual([
+      {
+        type: "imported",
+        value: "First imported cluster note",
+        allow_ai: 0,
+      },
+    ]);
+  });
+
   it("clusters selected rows by a shared canonical method, never name alone", async () => {
     const session = await createSession([
       {

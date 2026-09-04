@@ -10,12 +10,18 @@ import {
 } from "@/db/memory-registry";
 
 describe("Memory type registry", () => {
-  it("is application-owned and includes the default and custom types", () => {
+  it("is application-owned and includes the default, imported, and custom types", () => {
     expect(MEMORY_TYPE_REGISTRY[DEFAULT_MEMORY_TYPE_KEY]).toMatchObject({
       cardinality: expect.stringMatching(/^(single|many)$/),
       visibilityDefault: expect.stringMatching(/^(show|hide)$/),
     });
     expect(MEMORY_TYPE_REGISTRY.custom).toBeDefined();
+    expect(MEMORY_TYPE_REGISTRY.imported).toMatchObject({
+      displayName: "Imported from Contacts App",
+      searchable: true,
+      aiDefault: false,
+    });
+    expect(isMemoryTypeKey("imported")).toBe(true);
     expect(isMemoryTypeKey(DEFAULT_MEMORY_TYPE_KEY)).toBe(true);
     expect(isMemoryTypeKey("made_up_type")).toBe(false);
   });

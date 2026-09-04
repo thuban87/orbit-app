@@ -16,6 +16,7 @@ describe("mapPickedContact", () => {
           { type: "email", value: "ada@example.test" },
         ],
         birthday: "1990-05-14",
+        note: "Raw provider note",
         photoTempUri: "file:///cache/ada.jpg",
       },
       { categoryId: 12, effectivePhoneRegion: "US" },
@@ -26,6 +27,7 @@ describe("mapPickedContact", () => {
       externalContactId: "android:opaque/contact",
       photoTempUri: "file:///cache/ada.jpg",
       birthday: "1990-05-14",
+      note: "Raw provider note",
       input: {
         name: "Ada Lovelace",
         intervalDays: null,
@@ -42,6 +44,24 @@ describe("mapPickedContact", () => {
     expect(
       result.input.methodDrafts?.every((draft) => draft.uid.length > 0),
     ).toBe(true);
+  });
+
+  it("preserves a non-blank note but treats absent or blank notes as empty", () => {
+    const options = { categoryId: null, effectivePhoneRegion: null };
+    const contact = (note?: string | null) => ({
+      lookupKey: "notes",
+      displayName: "Note Person",
+      methods: [],
+      birthday: null,
+      note,
+      photoTempUri: null,
+    });
+
+    expect(mapPickedContact(contact(" raw provider note "), options).note).toBe(
+      " raw provider note ",
+    );
+    expect(mapPickedContact(contact("  "), options).note).toBeNull();
+    expect(mapPickedContact(contact(), options).note).toBeNull();
   });
 
   it("flags a missing name for callers while leaving the create input blank", () => {

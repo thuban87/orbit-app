@@ -22,8 +22,9 @@ const uid = () => `import-driver-${++counter}`;
 function payload(
   displayName: string | null,
   methods: Array<{ type: "phone" | "email"; value: string }> = [],
+  note: string | null = null,
 ): string {
-  return JSON.stringify({ displayName, methods, birthday: null });
+  return JSON.stringify({ displayName, methods, birthday: null, note });
 }
 
 beforeEach(async () => {
@@ -99,7 +100,7 @@ describe("runImportBatch", () => {
       },
       {
         externalContactId: "already-linked",
-        sourcePayload: payload("Linked Person"),
+        sourcePayload: payload("Linked Person", [], "Do not import this"),
       },
       {
         externalContactId: "ambiguous",
@@ -160,6 +161,12 @@ describe("runImportBatch", () => {
       [3, 4],
       [4, 4],
     ]);
+    expect(
+      await exec.getFirstAsync<{ count: number }>(
+        "SELECT COUNT(*) AS count FROM memories WHERE contact_id = ? AND type = 'imported'",
+        [linkedContactId],
+      ),
+    ).toEqual({ count: 0 });
   });
 
   it("skips a blank bulk name, finalizes before a completion screen mounts, and honors durable batch category", async () => {

@@ -34,6 +34,7 @@ import {
   acceptPickedContacts,
   commitSingleImport,
 } from "@/services/import/import-acquire";
+import { importRowAsNew } from "@/services/import/import-driver";
 
 const NOW = "2026-08-29 12:00:00";
 let exec: SqlExecutor;
@@ -82,6 +83,7 @@ describe("import acquisition", () => {
           displayName: "Ada Import",
           methods: [{ type: "phone", value: "312 555 0100" }],
           birthday: null,
+          note: "Single review note",
           photoTempUri: null,
         },
       ],
@@ -126,5 +128,56 @@ describe("import acquisition", () => {
     expect(await getSessionById(exec, sessionId)).toEqual(
       expect.objectContaining({ status: "complete" }),
     );
+    expect(
+      await exec.getAllAsync<{ type: string; value: string; allow_ai: number }>(
+        "SELECT type, value, allow_ai FROM memories WHERE contact_id = ?",
+        [contactId],
+      ),
+    ).toEqual([
+      { type: "imported", value: "Single review note", allow_ai: 0 },
+    ]);
+  });
+
+  it("preserves a bulk note through the real session serialization and driver replay", async () => {
+    const sessionId = await acceptPickedContacts(
+      exec,
+      [
+        {
+          lookupKey: "android-bulk-note",
+          displayName: "Bulk Note",
+          methods: [],
+          birthday: null,
+          note: "Raw bulk provider note",
+          photoTempUri: null,
+        },
+      ],
+      {
+        mode: "bulk",
+        batchCategoryId: null,
+        effectivePhoneRegion: "US",
+        now: NOW,
+      },
+    );
+    const [row] = await listSessionRows(exec, sessionId);
+
+    const result = await importRowAsNew(exec, {
+      row,
+      batchCategoryId: null,
+      phoneRegion: "US",
+      now: NOW,
+    });
+
+    if (result.contactId === null) throw new Error("expected a contact");
+    expect(JSON.parse(row.sourcePayload)).toMatchObject({
+      note: "Raw bulk provider note",
+    });
+    expect(
+      await exec.getAllAsync<{ type: string; value: string; allow_ai: number }>(
+        "SELECT type, value, allow_ai FROM memories WHERE contact_id = ?",
+        [result.contactId],
+      ),
+    ).toEqual([
+      { type: "imported", value: "Raw bulk provider note", allow_ai: 0 },
+    ]);
   });
 });
