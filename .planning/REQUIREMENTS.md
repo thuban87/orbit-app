@@ -53,7 +53,7 @@ category's phase (see Traceability).
 - [x] **KNOW-01**: User sees first-class fields, custom fields, structured relationships, and typed Memory items together in one visually grouped "Things to Remember" surface, featured/current information first
 - [x] **KNOW-02**: Memory items are typed, with built-in types governed by one central registry (display, cardinality, history behavior, searchability, AI defaults, presentation); user can create a generic Custom-type Memory with their own label (the type *set* stays application-owned per ADR-028)
 - [x] **KNOW-03**: Last Talked About and Current Location are history-aware: the Profile shows the most recent value with the full backlist on drill-in; history behavior is defined centrally per field/type
-- [ ] **KNOW-04**: User can edit historical entries and promote a historical value back to current where appropriate
+- [x] **KNOW-04**: User can edit historical entries and promote a historical value back to current where appropriate
 - [x] **KNOW-05**: User can record structured relationships with person/name, relation type, and an optional link to another Orbit contact
 - [x] **KNOW-06**: Memory items support optional notes, links, and an optional meaningful date; user can pin items and mark items outdated/inactive without deleting
 - [x] **KNOW-07**: Deleting a Memory is a soft delete restorable from a Recently Deleted / Trash surface (owned by this phase; expiry runs via launch sweep, never a timer)

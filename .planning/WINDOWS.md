@@ -1,10 +1,10 @@
 ---
 schema_version: 1
-open_count: 19
+open_count: 20
 waived_count: 0
 fixed_count: 6
-total_count: 25
-last_updated: 2026-09-04T06:26:08.728Z
+total_count: 26
+last_updated: 2026-09-04T06:52:03.142Z
 ---
 
 # Broken Windows Ledger
@@ -40,6 +40,7 @@ last_updated: 2026-09-04T06:26:08.728Z
 | 23 | 23 | unrun-verify | src/components/ui/__dev__/ThemePreviewScreen.tsx |  | Per-asset brightest-region text-over-glass AA on each Galaxy asset (shipped .webp bytes) — device-UAT deferred to end-of-phase Pixel pass (23-06 Task 2) | open |  | 2026-09-03T17:58:56.134Z |  |
 | 24 | 23 | unrun-verify | src/components/orrery/SunBody.tsx |  | Reduced-motion live toggle halts OrreryCanvas twinkle + SunBody glow pulse + bg motion — device-UAT deferred to end-of-phase Pixel pass (23-06 Task 3) | open |  | 2026-09-03T17:58:56.315Z |  |
 | 25 | 24.1 | stub | src/navigation/tabs/DashboardStack.tsx | 43 | The universal-FAB MemoryPlaceholderScreen intentionally remains until Phase 34; this plan adds the separate profile-owned Things-to-Remember route. | open |  | 2026-09-04T06:26:08.728Z |  |
+| 26 | 24.1 | deviation | src/db/current-state-history-dao.test.ts |  | Kept current-state DAO test fixtures node-pure by avoiding the Expo database bootstrap. | open |  | 2026-09-04T06:52:03.142Z |  |
 
 ````json
 [
@@ -341,6 +342,18 @@ last_updated: 2026-09-04T06:26:08.728Z
     "status": "open",
     "reason": "",
     "recorded_at": "2026-09-04T06:26:08.728Z",
+    "resolved_at": null
+  },
+  {
+    "id": 26,
+    "kind": "deviation",
+    "phase": "24.1",
+    "file": "src/db/current-state-history-dao.test.ts",
+    "line": null,
+    "description": "Kept current-state DAO test fixtures node-pure by avoiding the Expo database bootstrap.",
+    "status": "open",
+    "reason": "",
+    "recorded_at": "2026-09-04T06:52:03.142Z",
     "resolved_at": null
   }
 ]
