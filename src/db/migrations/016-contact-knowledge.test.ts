@@ -66,7 +66,7 @@ describe("migration 016 — contact knowledge schema", () => {
       memories: [
         "id", "uid", "contact_id", "type", "custom_label", "value", "note", "url",
         "meaningful_date", "pinned", "outdated", "hidden", "provenance", "created_at",
-        "modified_at", "deleted_at",
+        "modified_at", "deleted_at", "allow_ai",
       ],
       relationships: [
         "id", "uid", "contact_id", "person_name", "relation_type", "linked_contact_id",
