@@ -1,4 +1,8 @@
 /** Read choke point for live typed Memories. */
+import {
+  isMemoryTypeKey,
+  MEMORY_TYPE_REGISTRY,
+} from "@/db/memory-registry";
 import type { SqlExecutor } from "@/db/types";
 
 export interface MemoryRow {
@@ -17,11 +21,13 @@ export interface MemoryRow {
   provenance: string;
   created_at: string;
   modified_at: string;
+  deleted_at: string | null;
 }
 
 const LIST_MEMORIES_FOR_CONTACT = `
 SELECT id, uid, contact_id, type, custom_label, value, note, url,
-       meaningful_date, pinned, outdated, hidden, provenance, created_at, modified_at
+       meaningful_date, pinned, outdated, hidden, provenance, created_at, modified_at,
+       deleted_at
   FROM memories
  WHERE contact_id = ? AND deleted_at IS NULL
  ORDER BY pinned DESC,
@@ -36,4 +42,33 @@ export function listMemoriesForContact(
   contactId: number,
 ): Promise<MemoryRow[]> {
   return exec.getAllAsync<MemoryRow>(LIST_MEMORIES_FOR_CONTACT, [contactId]);
+}
+
+/**
+ * Resolve a Memory's Profile presentation visibility. This is strictly a render
+ * preference, not a privacy or AI-egress control. Unknown persisted types fail
+ * visible so corrupt data can never disappear silently; invalid hidden values
+ * instead inherit the registered type's default.
+ */
+export function resolveVisibility(
+  type: string,
+  hidden: number | null,
+): "show" | "hide" {
+  if (!isMemoryTypeKey(type)) return "show";
+  if (hidden === 1) return "hide";
+  if (hidden === 0) return "show";
+  return MEMORY_TYPE_REGISTRY[type].visibilityDefault;
+}
+
+/**
+ * Return the live, Profile-visible subset in the same deterministic order as
+ * `listMemoriesForContact`. Hidden items remain durable and available to their
+ * owner through non-Profile surfaces; this filter is presentation-only.
+ */
+export async function listProfileVisibleMemoriesForContact(
+  exec: SqlExecutor,
+  contactId: number,
+): Promise<MemoryRow[]> {
+  const rows = await listMemoriesForContact(exec, contactId);
+  return rows.filter((row) => resolveVisibility(row.type, row.hidden) === "show");
 }
