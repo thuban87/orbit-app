@@ -94,6 +94,22 @@ describe("migration 016 — contact knowledge schema", () => {
     expect(currentStateIndexes.map((index) => index.name)).toEqual(
       expect.arrayContaining(["idx_current_state_current", "idx_current_state_history"]),
     );
+    for (const table of [
+      "contacts",
+      "fuel",
+      "custom_field_defs",
+      "custom_field_values",
+      "field_history",
+      "tombstones",
+      "app_settings",
+    ]) {
+      expect(
+        await exec.getFirstAsync<{ name: string }>(
+          "SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?",
+          [table],
+        ),
+      ).toEqual({ name: table });
+    }
   });
 
   it("enforces knowledge-row identity, history cardinality, links, and self-link safety", async () => {
@@ -163,6 +179,13 @@ describe("migration 016 — contact knowledge schema", () => {
        VALUES (?, ?, ?, ?, ?, ?, ?)`,
       ["state-2", alex, "current_location", "Chicago", 0, NOW, NOW],
     );
+    await expect(
+      Promise.resolve().then(() => exec.runAsync(
+        `INSERT INTO current_state_entries (uid, contact_id, field_key, value, is_current, created_at, modified_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        ["state-2", alex, "last_talked_about", "Travel", 0, NOW, NOW],
+      )),
+    ).rejects.toThrow();
 
     await exec.runAsync("DELETE FROM contacts WHERE id = ?", [blair]);
     expect(
@@ -188,6 +211,13 @@ describe("migration 016 — contact knowledge schema", () => {
       [contactId],
     );
     expect(plan.map((row) => row.detail).join(" ")).toContain("idx_memories_contact_deleted");
+    const relationshipPlan = await exec.getAllAsync<{ detail: string }>(
+      "EXPLAIN QUERY PLAN SELECT * FROM relationships WHERE contact_id = ? AND deleted_at IS NULL ORDER BY id",
+      [contactId],
+    );
+    expect(relationshipPlan.map((row) => row.detail).join(" ")).toContain(
+      "idx_relationships_contact_deleted",
+    );
     const historyPlan = await exec.getAllAsync<{ detail: string }>(
       "EXPLAIN QUERY PLAN SELECT * FROM current_state_entries WHERE contact_id = ? AND field_key = ? ORDER BY id",
       [contactId, "current_location"],
