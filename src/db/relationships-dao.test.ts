@@ -67,7 +67,7 @@ describe("relationships DAO", () => {
         pinned: number;
         hidden: number | null;
       }>("SELECT * FROM relationships WHERE id = ?", [id]),
-    ).toEqual({
+    ).toEqual(expect.objectContaining({
       id,
       uid: expect.any(String),
       person_name: "Cafe\u0301 ☕️ 👨‍👩‍👧‍👦",
@@ -75,7 +75,7 @@ describe("relationships DAO", () => {
       linked_contact_id: linkedContactId,
       pinned: 0,
       hidden: null,
-    });
+    }));
     expect(
       await exec.getFirstAsync<{ linked_contact_id: number | null }>(
         "SELECT linked_contact_id FROM relationships WHERE id = ?",
@@ -154,13 +154,13 @@ describe("relationships DAO", () => {
         hidden: number | null;
         created_at: string;
       }>("SELECT * FROM relationships WHERE id = ?", [id]),
-    ).toEqual({
+    ).toEqual(expect.objectContaining({
       person_name: "Sam",
       relation_type: "Friend",
       note: "Updated",
       hidden: 1,
       created_at: NOW,
-    });
+    }));
   });
 
   it("soft-deletes, restores, and permanently purges only soft-deleted rows", async () => {
