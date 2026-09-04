@@ -238,7 +238,7 @@ All v1.0 commits are local on `main` and have NOT been pushed.
 
 **Canonical refs**: docs/dossier/milestone-2/phase-03-contact-knowledge-foundation-dossier.md; docs/dossier/milestone-2/planning-notes/phase-03-planning-notes.md
 **Schema**: additive model migration (016 — verified head+1 on disk at plan time: TARGET_VERSION=15, migrations 001–015 → first new is 016); no backup-format bump
-**Plans**: 1/8 plans executed (4 waves)
+**Plans**: 2/8 plans executed (4 waves)
 
 - [ ] 24.1-PLAN-CHECK-cycle1.md
 
@@ -248,7 +248,7 @@ All v1.0 commits are local on `main` and have NOT been pushed.
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 24.1-02-PLAN.md — Memories DAO full CRUD + metadata (notes/links/dates/pin/outdated) + soft-delete/restore + registry-driven visibility (KNOW-02/06/07/08/09)
+- [x] 24.1-02-PLAN.md — Memories DAO full CRUD + metadata (notes/links/dates/pin/outdated) + soft-delete/restore + registry-driven visibility (KNOW-02/06/07/08/09)
 - [ ] 24.1-03-PLAN.md — Structured relationships DAO + read (optional Orbit-contact link) + merge/purge coverage for the three knowledge tables (KNOW-05; review H2/M5)
 - [ ] 24.1-04-PLAN.md — Current-state history (Last Talked About + Current Location): set/edit/promote-to-current + backlist (KNOW-03/04)
 
@@ -549,7 +549,7 @@ All v1.0 commits are local on `main` and have NOT been pushed.
 |-------|----------------|--------|-----------|
 | 22. App Shell & Navigation | 6/6 | In Progress|  |
 | 23. Theme & Visual System | 7/7 | In Progress | - |
-| 24.1 Contact Knowledge Foundation (Model, Storage & UI) | 1/8 | In Progress|  |
+| 24.1 Contact Knowledge Foundation (Model, Storage & UI) | 2/8 | In Progress|  |
 | 24.2 Contact Knowledge (Egress, Search, Types & Data-moves) | 0/TBD | Not started | - |
 | 25. Dashboard Data & State Foundation | 0/TBD | Not started | - |
 | 26. Dashboard Control Surface | 0/TBD | Not started | - |
