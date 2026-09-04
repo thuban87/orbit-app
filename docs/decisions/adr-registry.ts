@@ -90,5 +90,6 @@
 // NOTE: ADR-0078 [ACCEPTED] Negative-Constraint Off Limits and Gated Recent-Interaction AI Context
 // NOTE: ADR-0079 [ACCEPTED] On-Demand AI Transparency and Compose-Only Three-Suggestion Invocation
 // NOTE: ADR-0080 [ACCEPTED] Four-Tab Bottom Navigation Shell with Per-Tab Stacks
+// NOTE: ADR-0081 [ACCEPTED] Retire AI-Proposed Fuel for Explicit Per-Item Permission
 
-export const ADR_COUNT = 80;
+export const ADR_COUNT = 81;
