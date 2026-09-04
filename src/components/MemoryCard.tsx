@@ -6,6 +6,7 @@ import {
 import type { MemoryRow } from "@/db/memories-read";
 import { useTheme } from "@/theme";
 import { SPACING } from "@/theme/tokens/spacing";
+import { normaliseLinkUrl } from "./LinksEditor";
 import { AppText } from "./ui";
 
 function memoryTypeLabel(memory: MemoryRow): string {
@@ -18,8 +19,8 @@ function memoryTypeLabel(memory: MemoryRow): string {
   );
 }
 
-function openLink(url: string): void {
-  void Linking.openURL(url).catch(() => {});
+export function openMemoryLink(url: string): void {
+  void Linking.openURL(normaliseLinkUrl(url)).catch(() => {});
 }
 
 export interface MemoryCardProps {
@@ -104,7 +105,7 @@ export function MemoryCard({
           hitSlop={8}
           onPress={(event) => {
             event.stopPropagation();
-            openLink(memory.url ?? "");
+            openMemoryLink(memory.url ?? "");
           }}
           style={styles.link}
         >
