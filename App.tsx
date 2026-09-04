@@ -29,6 +29,7 @@ import { WidgetLinkingGate } from "@/navigation/widget-linking";
 import { registerBackupSweep } from "@/services/backup-sweep";
 import { getDeviceRegion } from "@/services/device-region";
 import { registerFieldSweep } from "@/services/field-sweep";
+import { registerMemoryTrashSweep } from "@/services/memory-trash-sweep";
 import {
   type ResumableImport,
   registerImportResumeSweep,
@@ -107,6 +108,7 @@ Notifications.setNotificationHandler({
 // remounts), and registering the same hook twice would double-run it — so this
 // module-scope flag makes registration idempotent across effect re-entries.
 let fieldSweepRegistered = false;
+let memoryTrashSweepRegistered = false;
 let backupSweepRegistered = false;
 // One-shot guard for the photo-write reconciliation hook (PHOTO-03/05), on the
 // SAME registry and under the SAME re-entrancy reasoning as the field sweep.
@@ -207,6 +209,13 @@ function AppShell() {
     if (!fieldSweepRegistered) {
       registerFieldSweep(getExecutor);
       fieldSweepRegistered = true;
+    }
+    // Memory and Undo-only relationship trash expire only on a real foreground
+    // launch, after migration makes their tables available and before the
+    // trigger fires its cold-start sweep.
+    if (!memoryTrashSweepRegistered) {
+      registerMemoryTrashSweep(getExecutor);
+      memoryTrashSweepRegistered = true;
     }
     // Backup must register before the trigger's cold-start foreground sweep.
     if (!backupSweepRegistered) {
