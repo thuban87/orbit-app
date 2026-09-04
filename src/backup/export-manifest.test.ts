@@ -110,9 +110,9 @@ describe("buildExportManifest", () => {
       ["value-a", contact!.id, def!.id, NOW, NOW],
     );
     await exec.runAsync(
-      `INSERT INTO memories (uid, contact_id, type, value, pinned, outdated, provenance, created_at, modified_at, deleted_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      ["memory-deleted", contact!.id, "custom", "Remember this", 1, 0, "user", NOW, NOW, "2026-08-26 12:00:00"],
+      `INSERT INTO memories (uid, contact_id, type, custom_label, value, pinned, outdated, provenance, created_at, modified_at, deleted_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ["memory-deleted", contact!.id, "custom", "Note", "Remember this", 1, 0, "user", NOW, NOW, "2026-08-26 12:00:00"],
     );
     await exec.runAsync(
       `INSERT INTO relationships (uid, contact_id, person_name, linked_contact_id, pinned, created_at, modified_at)
