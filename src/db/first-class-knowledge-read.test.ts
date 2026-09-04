@@ -81,7 +81,7 @@ describe("getFirstClassFields", () => {
     });
   });
 
-  it("returns a null category for a contact without one and null when absent", async () => {
+  it("returns a null category for a contact without one", async () => {
     const contactId = await makeContact();
     await expect(getFirstClassFields(exec, contactId)).resolves.toEqual({
       birthday: null,
@@ -89,6 +89,9 @@ describe("getFirstClassFields", () => {
       intervalDays: 30,
       categoryName: null,
     });
+  });
+
+  it("returns null for a missing contact", async () => {
     await expect(getFirstClassFields(exec, 999_999)).resolves.toBeNull();
   });
 });
