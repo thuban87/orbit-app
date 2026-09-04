@@ -455,6 +455,8 @@ function validate(manifest: RawManifest): BackupManifest {
       fail("currentStateEntries has an invalid row");
     if (!isCurrentStateFieldKey(entry.fieldKey))
       fail("currentStateEntries has an unregistered field key");
+    if (entry.value.trim().length === 0)
+      fail("currentStateEntries has a blank value");
     if (entry.isCurrent === 1) {
       const pair = `${entry.contactUid}\u0000${entry.fieldKey}`;
       if (currentPairs.has(pair)) fail("currentStateEntries has duplicate current value");

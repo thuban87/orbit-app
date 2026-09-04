@@ -123,6 +123,12 @@ describe("parseBackupManifest", () => {
     const unknownField = knowledgeManifest();
     unknownField.currentStateEntries[0].fieldKey = "future_state";
     expect(() => parseBackupManifest(unknownField)).toThrow(BackupSchemaError);
+
+    const blankValue = knowledgeManifest();
+    blankValue.currentStateEntries[0].value = " \t\n ";
+    expect(() => parseBackupManifest(blankValue)).toThrow(
+      "currentStateEntries has a blank value",
+    );
   });
 
   it("rejects a category reference that cannot be resolved within the backup itself", () => {
