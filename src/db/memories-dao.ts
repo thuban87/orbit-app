@@ -67,10 +67,15 @@ function assertCustomLabel(
   }
 }
 
-function assertOneChange(id: number, contactId: number, changes: number): void {
+function assertOneChange(
+  op: string,
+  id: number,
+  contactId: number,
+  changes: number,
+): void {
   if (changes !== 1) {
     throw new Error(
-      `editMemory: no memory matched id=${id} for contactId=${contactId} (changed ${changes})`,
+      `${op}: no memory matched id=${id} for contactId=${contactId} (changed ${changes})`,
     );
   }
 }
@@ -131,7 +136,7 @@ export async function editMemoryCore(
     [input.id, input.contactId],
   );
   if (!existing) {
-    assertOneChange(input.id, input.contactId, 0);
+    assertOneChange("editMemory", input.id, input.contactId, 0);
     return;
   }
 
@@ -195,7 +200,35 @@ export async function editMemoryCore(
       WHERE id = ? AND contact_id = ?`,
     [...params, input.id, input.contactId],
   );
-  assertOneChange(input.id, input.contactId, result.changes);
+  assertOneChange("editMemory", input.id, input.contactId, result.changes);
+}
+
+/** Soft-delete one Memory while the caller owns the shared transaction. */
+export async function deleteMemoryCore(
+  exec: SqlExecutor,
+  input: { id: number; contactId: number; now: string },
+): Promise<void> {
+  const result = await exec.runAsync(
+    `UPDATE memories
+        SET deleted_at = ?, modified_at = ?
+      WHERE id = ? AND contact_id = ?`,
+    [input.now, input.now, input.id, input.contactId],
+  );
+  assertOneChange("deleteMemory", input.id, input.contactId, result.changes);
+}
+
+/** Restore one soft-deleted Memory while the caller owns the transaction. */
+export async function restoreMemoryCore(
+  exec: SqlExecutor,
+  input: { id: number; contactId: number; now: string },
+): Promise<void> {
+  const result = await exec.runAsync(
+    `UPDATE memories
+        SET deleted_at = NULL, modified_at = ?
+      WHERE id = ? AND contact_id = ?`,
+    [input.now, input.id, input.contactId],
+  );
+  assertOneChange("restoreMemory", input.id, input.contactId, result.changes);
 }
 
 /** Insert one Memory and mark the database dirty for backup inside one mutex. */
@@ -217,6 +250,28 @@ export function editMemory(
 ): Promise<void> {
   return inWriteTransaction(exec, async () => {
     await editMemoryCore(exec, input);
+    await bumpDataRevisionCore(exec);
+  });
+}
+
+/** Soft-delete one Memory and mark the database dirty inside one mutex. */
+export function deleteMemory(
+  exec: SqlExecutor,
+  input: { id: number; contactId: number; now: string },
+): Promise<void> {
+  return inWriteTransaction(exec, async () => {
+    await deleteMemoryCore(exec, input);
+    await bumpDataRevisionCore(exec);
+  });
+}
+
+/** Restore one Memory and mark the database dirty for backup inside one mutex. */
+export function restoreMemory(
+  exec: SqlExecutor,
+  input: { id: number; contactId: number; now: string },
+): Promise<void> {
+  return inWriteTransaction(exec, async () => {
+    await restoreMemoryCore(exec, input);
     await bumpDataRevisionCore(exec);
   });
 }

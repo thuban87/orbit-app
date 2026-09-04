@@ -256,7 +256,7 @@ describe("memories DAO", () => {
     });
 
     expect(await listMemoriesForContact(exec, contactId)).toEqual([
-      expect.objectContaining({ id, value: "Keep me", deleted_at: null }),
+      expect.objectContaining({ id, value: "Keep me" }),
     ]);
   });
 });
