@@ -52,7 +52,9 @@ describe("knowledge search scorer", () => {
   });
 
   it("shares one folded, punctuation-aware tokenizer for queries and corpus text", () => {
-    expect(tokenize("O'Connor a@b.co https://example.com:8080/path café")).toEqual([
+    expect(
+      tokenize("O'Connor a@b.co https://example.com:8080/path café"),
+    ).toEqual([
       "o",
       "connor",
       "a",

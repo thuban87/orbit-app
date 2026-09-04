@@ -52,9 +52,8 @@ export function boundedEditDistance(
   if (Math.abs(left.length - right.length) > limit) return limit + 1;
 
   const exceeded = limit + 1;
-  let previous = Array.from(
-    { length: right.length + 1 },
-    (_, index) => (index <= limit ? index : exceeded),
+  let previous = Array.from({ length: right.length + 1 }, (_, index) =>
+    index <= limit ? index : exceeded,
   );
 
   for (let i = 1; i <= left.length; i += 1) {
@@ -92,7 +91,10 @@ function tokenScore(term: string, token: string): number | null {
  * matches outrank substrings, which outrank permitted typo matches. `null`
  * means the term matches no corpus token.
  */
-export function scoreCandidate(term: string, corpusText: string): number | null {
+export function scoreCandidate(
+  term: string,
+  corpusText: string,
+): number | null {
   const terms = tokenize(term);
   if (terms.length !== 1) return null;
 

@@ -4,13 +4,13 @@ vi.mock("expo-sqlite", () => ({}));
 
 import { nodeSqliteExecutor, openTestDb } from "@/db/__testkit__/node-sqlite";
 import { MIGRATIONS, TARGET_VERSION } from "@/db/database";
-import { MEMORY_TYPE_REGISTRY } from "@/db/memory-registry";
-import { addMemory } from "@/db/memories-dao";
 import { listKnowledgeSearchCandidates } from "@/db/knowledge-search-read";
-import { addRelationship } from "@/db/relationships-dao";
+import { addMemory } from "@/db/memories-dao";
+import { MEMORY_TYPE_REGISTRY } from "@/db/memory-registry";
 import { runMigrations } from "@/db/migrations/runner";
-import { rankCandidates } from "@/services/knowledge-search";
+import { addRelationship } from "@/db/relationships-dao";
 import type { SqlExecutor } from "@/db/types";
+import { rankCandidates } from "@/services/knowledge-search";
 
 const NOW = "2026-09-04 12:00:00";
 let exec: SqlExecutor;
@@ -110,12 +110,27 @@ describe("knowledge search corpus read", () => {
         `INSERT INTO custom_field_values
            (uid, contact_id, field_def_id, value, created_at, modified_at)
          VALUES (?, ?, ?, ?, ?, ?)`,
-        ["secret-value", contactId, secretDefId, "Quarantined marker", NOW, NOW],
+        [
+          "secret-value",
+          contactId,
+          secretDefId,
+          "Quarantined marker",
+          NOW,
+          NOW,
+        ],
       );
       await exec.runAsync(
         `INSERT INTO fuel (uid, contact_id, kind, text, created_at, source, modified_at)
          VALUES (?, ?, ?, ?, ?, ?, ?)`,
-        ["off-limits-fuel", contactId, "off_limits", "Off-limits fuel marker", NOW, "manual", NOW],
+        [
+          "off-limits-fuel",
+          contactId,
+          "off_limits",
+          "Off-limits fuel marker",
+          NOW,
+          "manual",
+          NOW,
+        ],
       );
       await exec.runAsync(
         `INSERT INTO fuel (uid, contact_id, kind, text, created_at, source, modified_at)
@@ -167,7 +182,10 @@ describe("knowledge search corpus read", () => {
 
     const corpus = await listKnowledgeSearchCandidates(exec);
     expect(corpus[0].entries).not.toContainEqual(
-      expect.objectContaining({ source: "customField", fieldKey: "blank_value" }),
+      expect.objectContaining({
+        source: "customField",
+        fieldKey: "blank_value",
+      }),
     );
   });
 });

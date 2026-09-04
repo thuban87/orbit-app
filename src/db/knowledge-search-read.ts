@@ -91,10 +91,17 @@ export function isSearchableCustomFieldValue(
   definition: CustomFieldDef,
   value: string | null | undefined,
 ): value is string {
-  return definition.quarantined_at === null && typeof value === "string" && value.trim().length > 0;
+  return (
+    definition.quarantined_at === null &&
+    typeof value === "string" &&
+    value.trim().length > 0
+  );
 }
 
-function appendMemoryEntries(entries: KnowledgeSearchEntry[], memory: MemoryRow): void {
+function appendMemoryEntries(
+  entries: KnowledgeSearchEntry[],
+  memory: MemoryRow,
+): void {
   for (const text of [memory.customLabel, memory.value, memory.note]) {
     if (text !== null) entries.push({ source: "memory", text });
   }
@@ -134,12 +141,16 @@ export async function listKnowledgeSearchCandidates(
 
   return Promise.all(
     contacts.map(async (contact): Promise<KnowledgeSearchCandidate> => {
-      const entries: KnowledgeSearchEntry[] = [{ source: "name", text: contact.name }];
+      const entries: KnowledgeSearchEntry[] = [
+        { source: "name", text: contact.name },
+      ];
 
       for (const memory of memoriesByContact.get(contact.contactId) ?? []) {
         appendMemoryEntries(entries, memory);
       }
-      for (const relationship of relationshipsByContact.get(contact.contactId) ?? []) {
+      for (const relationship of relationshipsByContact.get(
+        contact.contactId,
+      ) ?? []) {
         entries.push({ source: "relationship", text: relationship.personName });
       }
 
