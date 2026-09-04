@@ -8,6 +8,7 @@ import { addMemory } from "@/db/memories-dao";
 import {
   listMemoriesForContact,
   listProfileVisibleMemoriesForContact,
+  listRecentlyDeleted,
   resolveVisibility,
 } from "@/db/memories-read";
 import { MEMORY_TYPE_REGISTRY } from "@/db/memory-registry";
@@ -113,5 +114,62 @@ describe("memories read", () => {
         (row) => row.id,
       ),
     ).toEqual([firstId, olderId]);
+  });
+
+  it("lists only soft-deleted memories newest-first for one contact", async () => {
+    const contactId = await seedContact();
+    const otherContactId = await seedContact();
+    const olderId = await addMemory(exec, {
+      contactId,
+      type: "general",
+      value: "Older deleted",
+      createdAt: NOW,
+      now: NOW,
+    });
+    const newerId = await addMemory(exec, {
+      contactId,
+      type: "general",
+      value: "Newer deleted",
+      createdAt: NOW,
+      now: NOW,
+    });
+    const liveId = await addMemory(exec, {
+      contactId,
+      type: "general",
+      value: "Live",
+      createdAt: NOW,
+      now: NOW,
+    });
+    const otherId = await addMemory(exec, {
+      contactId: otherContactId,
+      type: "general",
+      value: "Other contact",
+      createdAt: NOW,
+      now: NOW,
+    });
+
+    await exec.runAsync("UPDATE memories SET deleted_at = ? WHERE id = ?", [
+      "2026-09-03 12:00:00",
+      olderId,
+    ]);
+    await exec.runAsync("UPDATE memories SET deleted_at = ? WHERE id = ?", [
+      "2026-09-04 12:00:00",
+      newerId,
+    ]);
+    await exec.runAsync("UPDATE memories SET deleted_at = ? WHERE id = ?", [
+      "2026-09-04 13:00:00",
+      otherId,
+    ]);
+
+    expect((await listRecentlyDeleted(exec, contactId)).map((row) => row.id)).toEqual([
+      newerId,
+      olderId,
+    ]);
+    expect((await listRecentlyDeleted(exec, otherContactId)).map((row) => row.id)).toEqual([
+      otherId,
+    ]);
+    expect((await listMemoriesForContact(exec, contactId)).map((row) => row.id)).toEqual([
+      liveId,
+    ]);
   });
 });

@@ -8,6 +8,8 @@ import {
   addMemory,
   deleteMemory,
   editMemory,
+  expireMemoryIfStale,
+  purgeMemoryPermanently,
   restoreMemory,
 } from "@/db/memories-dao";
 import { listMemoriesForContact } from "@/db/memories-read";
@@ -258,5 +260,95 @@ describe("memories DAO", () => {
     expect(await listMemoriesForContact(exec, contactId)).toEqual([
       expect.objectContaining({ id, value: "Keep me" }),
     ]);
+  });
+
+  it("permanently purges only an already soft-deleted memory", async () => {
+    const contactId = await seedContact();
+    const liveId = await addMemory(exec, {
+      contactId,
+      type: "general",
+      value: "Live",
+      createdAt: NOW,
+      now: NOW,
+    });
+    const deletedId = await addMemory(exec, {
+      contactId,
+      type: "general",
+      value: "Deleted",
+      createdAt: NOW,
+      now: NOW,
+    });
+    await deleteMemory(exec, {
+      id: deletedId,
+      contactId,
+      now: "2026-09-04 13:00:00",
+    });
+
+    await expect(
+      purgeMemoryPermanently(exec, { id: liveId, contactId }),
+    ).rejects.toThrow("purgeMemoryPermanently: no memory matched");
+    await purgeMemoryPermanently(exec, { id: deletedId, contactId });
+
+    expect(
+      await exec.getFirstAsync("SELECT id FROM memories WHERE id = ?", [liveId]),
+    ).toEqual({ id: liveId });
+    expect(
+      await exec.getFirstAsync("SELECT id FROM memories WHERE id = ?", [deletedId]),
+    ).toBeNull();
+  });
+
+  it("expires only a still-stale soft-deleted memory under the write lock", async () => {
+    const contactId = await seedContact();
+    const staleId = await addMemory(exec, {
+      contactId,
+      type: "general",
+      value: "Stale",
+      createdAt: NOW,
+      now: NOW,
+    });
+    const recentId = await addMemory(exec, {
+      contactId,
+      type: "general",
+      value: "Recent",
+      createdAt: NOW,
+      now: NOW,
+    });
+    const reDeletedId = await addMemory(exec, {
+      contactId,
+      type: "general",
+      value: "Freshly re-deleted",
+      createdAt: NOW,
+      now: NOW,
+    });
+    for (const [id, offset] of [
+      [staleId, "-31 days"],
+      [recentId, "-29 days"],
+      [reDeletedId, "-1 days"],
+    ] as const) {
+      await exec.runAsync(
+        "UPDATE memories SET deleted_at = datetime('now', 'localtime', ?) WHERE id = ?",
+        [offset, id],
+      );
+    }
+
+    await expect(
+      expireMemoryIfStale(exec, { id: staleId, contactId }, "-30 days", NOW),
+    ).resolves.toBe(true);
+    await expect(
+      expireMemoryIfStale(exec, { id: recentId, contactId }, "-30 days", NOW),
+    ).resolves.toBe(false);
+    await expect(
+      expireMemoryIfStale(exec, { id: reDeletedId, contactId }, "-30 days", NOW),
+    ).resolves.toBe(false);
+
+    expect(
+      await exec.getFirstAsync("SELECT id FROM memories WHERE id = ?", [staleId]),
+    ).toBeNull();
+    expect(
+      await exec.getFirstAsync("SELECT id FROM memories WHERE id = ?", [recentId]),
+    ).toEqual({ id: recentId });
+    expect(
+      await exec.getFirstAsync("SELECT id FROM memories WHERE id = ?", [reDeletedId]),
+    ).toEqual({ id: reDeletedId });
   });
 });
