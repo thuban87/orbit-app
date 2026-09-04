@@ -4,7 +4,7 @@ vi.mock("expo-sqlite", () => ({}));
 
 import { nodeSqliteExecutor, openTestDb } from "@/db/__testkit__/node-sqlite";
 import { MIGRATIONS, TARGET_VERSION } from "@/db/database";
-import { addMemory } from "@/db/memories-dao";
+import { addMemory, editMemory } from "@/db/memories-dao";
 import { listMemoriesForContact } from "@/db/memories-read";
 import { runMigrations } from "@/db/migrations/runner";
 import type { SqlExecutor } from "@/db/types";
@@ -126,5 +126,97 @@ describe("memories DAO", () => {
       }),
     ).rejects.toThrow("memories-dao: custom memory requires a label");
     expect(await listMemoriesForContact(exec, contactId)).toEqual([]);
+  });
+
+  it("patches only present metadata fields and normalizes blank optionals to NULL", async () => {
+    const contactId = await seedContact();
+    const id = await addMemory(exec, {
+      contactId,
+      type: "general",
+      value: "Original value",
+      note: "Original note",
+      url: "https://example.test/original",
+      meaningfulDate: "2026-01-01",
+      createdAt: NOW,
+      now: NOW,
+    });
+
+    await editMemory(exec, {
+      id,
+      contactId,
+      note: "Updated note",
+      pinned: true,
+      outdated: true,
+      now: "2026-09-04 13:00:00",
+    });
+    await editMemory(exec, {
+      id,
+      contactId,
+      note: " \t",
+      url: "",
+      meaningfulDate: "\n",
+      now: "2026-09-04 14:00:00",
+    });
+
+    expect(await listMemoriesForContact(exec, contactId)).toEqual([
+      expect.objectContaining({
+        id,
+        value: "Original value",
+        note: null,
+        url: null,
+        meaningful_date: null,
+        pinned: 1,
+        outdated: 1,
+        created_at: NOW,
+        modified_at: "2026-09-04 14:00:00",
+      }),
+    ]);
+  });
+
+  it("rejects wrong-pair and invalid effective custom patches without changing the row", async () => {
+    const contactId = await seedContact();
+    const otherContactId = await seedContact("Blair");
+    const id = await addMemory(exec, {
+      contactId,
+      type: "custom",
+      customLabel: "Nickname",
+      value: "Ace",
+      createdAt: NOW,
+      now: NOW,
+    });
+
+    await expect(
+      editMemory(exec, {
+        id,
+        contactId: otherContactId,
+        value: "Wrong contact",
+        now: "2026-09-04 13:00:00",
+      }),
+    ).rejects.toThrow("editMemory: no memory matched");
+    await expect(
+      editMemory(exec, {
+        id,
+        contactId,
+        type: "not_registered",
+        now: "2026-09-04 13:00:00",
+      }),
+    ).rejects.toThrow("memories-dao: unregistered memory type");
+    await expect(
+      editMemory(exec, {
+        id,
+        contactId,
+        customLabel: "  ",
+        now: "2026-09-04 13:00:00",
+      }),
+    ).rejects.toThrow("memories-dao: custom memory requires a label");
+
+    expect(await listMemoriesForContact(exec, contactId)).toEqual([
+      expect.objectContaining({
+        id,
+        type: "custom",
+        custom_label: "Nickname",
+        value: "Ace",
+      }),
+    ]);
   });
 });
