@@ -522,6 +522,7 @@ All v1.0 commits are local on `main` and have NOT been pushed.
 
 **Canonical refs**: docs/dossier/milestone-2/phase-16-ai-configuration-prompting-dossier.md; docs/dossier/milestone-2/planning-notes/phase-16-planning-notes.md
 **Schema**: AI configuration tables/columns, then the **final backup wire-format bump as the phase's last plan** (now v5 — v4 landed early in 24.1; see migration-ordering amendment; verify head+1 and the current `BACKUP_FORMAT_VERSION` on disk at plan time)
+**Consumes from Phase 24.2** (deferred code cleanup, planner-noted 2026-09-04): remove the now-inert legacy AI-proposed-fuel confirm path retired by ADR-081 — `confirmFuel`/`confirmFuelCore` (fuel-dao.ts:214/282), its Profile handler + import (ContactProfileScreen.tsx:70/705), and the FuelEditor AI-unconfirmed render + Confirm/Dismiss control. 24.2 landed the data + ADR half (migration 017 removed all `source='ai'` rows; ADR-081 supersedes ADR-030) but deliberately left the shipped UI code in place; it is inert (no producer writes `source='ai'`) but a latent revival surface this permission-manager phase should delete.
 **Plans**: TBD
 **UI hint**: yes
 
