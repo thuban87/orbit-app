@@ -68,6 +68,7 @@ import { snackbarStore } from "@/stores/snackbar-store";
 import { useTheme } from "@/theme";
 import { SPACING } from "@/theme/tokens/spacing";
 import { Logger } from "@/utils/logger";
+import { rowsForKnowledgeDisplay } from "./things-to-remember-ordering";
 
 const LOG_SCOPE = "things-to-remember";
 const GROUP_PREVIEW_LIMIT = 3;
@@ -88,20 +89,16 @@ interface CustomValue {
   value: string | null;
 }
 interface KnowledgeState {
-  visibleMemories: MemoryRow[];
-  hiddenMemories: MemoryRow[];
-  visibleRelationships: RelationshipRow[];
-  hiddenRelationships: RelationshipRow[];
+  memories: MemoryRow[];
+  relationships: RelationshipRow[];
   currentValues: Partial<Record<CurrentStateFieldKey, CurrentStateEntryRow>>;
   firstClass: FirstClassFields | null;
   derived: FirstClassDerived | null;
   customValues: CustomValue[];
 }
 const EMPTY_KNOWLEDGE: KnowledgeState = {
-  visibleMemories: [],
-  hiddenMemories: [],
-  visibleRelationships: [],
-  hiddenRelationships: [],
+  memories: [],
+  relationships: [],
   currentValues: {},
   firstClass: null,
   derived: null,
@@ -190,20 +187,8 @@ export function ThingsToRememberScreen({
       const visibleDefs = visibleDefsForProfile(defs, values);
       if (cancelled()) return;
       setKnowledge({
-        visibleMemories: memories.filter(
-          (memory) => resolveVisibility(memory.type, memory.hidden) === "show",
-        ),
-        hiddenMemories: memories.filter(
-          (memory) => resolveVisibility(memory.type, memory.hidden) === "hide",
-        ),
-        visibleRelationships: relationships.filter(
-          (relationship) =>
-            resolveRelationshipVisibility(relationship.hidden) === "show",
-        ),
-        hiddenRelationships: relationships.filter(
-          (relationship) =>
-            resolveRelationshipVisibility(relationship.hidden) === "hide",
-        ),
+        memories,
+        relationships,
         currentValues,
         firstClass,
         derived,
@@ -229,12 +214,16 @@ export function ThingsToRememberScreen({
     }, [load]),
   );
 
-  const memories = includeHidden
-    ? [...knowledge.visibleMemories, ...knowledge.hiddenMemories]
-    : knowledge.visibleMemories;
-  const relationships = includeHidden
-    ? [...knowledge.visibleRelationships, ...knowledge.hiddenRelationships]
-    : knowledge.visibleRelationships;
+  const memories = rowsForKnowledgeDisplay(
+    knowledge.memories,
+    includeHidden,
+    (memory) => resolveVisibility(memory.type, memory.hidden) === "hide",
+  );
+  const relationships = rowsForKnowledgeDisplay(
+    knowledge.relationships,
+    includeHidden,
+    (relationship) => resolveRelationshipVisibility(relationship.hidden) === "hide",
+  );
   const groupedMemories = useMemo(() => {
     const groups = new Map<string, MemoryRow[]>();
     for (const memory of memories) {
@@ -253,8 +242,12 @@ export function ThingsToRememberScreen({
     !knowledge.firstClass?.socialBattery &&
     Object.keys(knowledge.currentValues).length === 0 &&
     knowledge.customValues.length === 0 &&
-    knowledge.visibleRelationships.length === 0 &&
-    knowledge.visibleMemories.length === 0;
+    knowledge.relationships.every((relationship) =>
+      resolveRelationshipVisibility(relationship.hidden) === "hide",
+    ) &&
+    knowledge.memories.every(
+      (memory) => resolveVisibility(memory.type, memory.hidden) === "hide",
+    );
   const refresh = () =>
     void load().catch((error) =>
       Logger.error(LOG_SCOPE, "failed to refresh contact knowledge", error),
