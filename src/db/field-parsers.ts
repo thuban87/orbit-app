@@ -1,5 +1,5 @@
 /**
- * The 7 permissive target-type parsers (FLD-04) — READ-TIME validators, never
+ * The 10 permissive target-type parsers (FLD-04, KNOW-13) — READ-TIME validators, never
  * value rewriters.
  *
  * STORAGE IS TEXT FOREVER (HANDOFF §14.3, CLAUDE.md invariant). A custom field's
@@ -10,7 +10,7 @@
  * `sortExpr`'s CASTs expect); an unconvertible value is FLAGGED as the
  * tap-to-fix error state on the profile.
  *
- * There are exactly 7 parsers — ONE per TARGET type, NOT 42 pairwise converters
+ * There are exactly 10 parsers — ONE per TARGET type, NOT pairwise converters
  * (HANDOFF §14.4). A parser MUST NOT throw and MUST NOT clear or coerce a failing
  * value: `{ ok: false }` is a SIGNAL to flag, never a licence to rewrite bytes
  * (T-03-04 — data loss on a "cleared" value is forbidden). This is why a type
@@ -21,6 +21,12 @@
  *   - toggle → "1" / "0"   (so CAST(col AS INTEGER) groups false before true)
  *   - date   → YYYY-MM-DD  (ISO text sorts chronologically)
  *   - number → String(n)   (so CAST(col AS REAL) sorts numerically)
+ *
+ * New typed-text validation rules intentionally err permissive: URL accepts a
+ * scheme URL (including `mailto:`) or a dot-host / localhost-with-port without
+ * whitespace; email requires exactly one `@` and a dot in its domain; phone
+ * requires at least three digits and phone-plausible punctuation / `ext` text.
+ * Passing url/email/phone strings always return byte-for-byte unchanged.
  *
  * Node-pure: imports only the `FieldType` union and the DEFS row type; nothing
  * from expo/react-native. Source: HANDOFF §14.4 (boolean example verbatim).
@@ -38,7 +44,7 @@ export type ParseResult = { ok: true; value: string | null } | { ok: false };
 
 /**
  * One permissive parser per TARGET `FieldType`. The `Record<FieldType, …>` type
- * makes exhaustiveness a compile-time guarantee — adding an 8th field type
+ * makes exhaustiveness a compile-time guarantee — adding an 11th field type
  * without a parser fails `tsc`.
  */
 export const parsers: Record<FieldType, (raw: string | null) => ParseResult> = {
@@ -55,6 +61,36 @@ export const parsers: Record<FieldType, (raw: string | null) => ParseResult> = {
   // out-of-list value with the SAME tap-to-fix state without this staying
   // identity being compromised.
   dropdown: (r) => ({ ok: true, value: r ?? null }),
+
+  // url: blank/null → absent; otherwise accept no-whitespace scheme URLs
+  // (including mailto:) or conventional dot-host / localhost-with-port forms.
+  // Preserve raw TEXT byte-for-byte on success; anything else is flagged.
+  url: (r) => {
+    if (r == null || r.trim() === "") return { ok: true, value: null };
+    const hasScheme = /^[a-z][a-z0-9+.-]*:[^\s]+$/i.test(r);
+    const hasHost = /^(?:localhost(?::\d+)?|(?:[a-z0-9-]+\.)+[a-z0-9-]+)(?::\d+)?(?:[/?#][^\s]*)?$/i.test(r);
+    return hasScheme || hasHost ? { ok: true, value: r } : { ok: false };
+  },
+
+  // email: blank/null → absent; otherwise exactly one @ and a dot in the
+  // domain, with no whitespace. Preserve raw TEXT byte-for-byte on success.
+  email: (r) => {
+    if (r == null || r.trim() === "") return { ok: true, value: null };
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(r)
+      ? { ok: true, value: r }
+      : { ok: false };
+  },
+
+  // phone: blank/null → absent; otherwise at least three digits plus only
+  // phone-plausible punctuation or the conventional `ext` extension marker.
+  // Preserve raw TEXT byte-for-byte on success.
+  phone: (r) => {
+    if (r == null || r.trim() === "") return { ok: true, value: null };
+    const digitCount = (r.match(/\d/g) ?? []).length;
+    return digitCount >= 3 && /^[0-9+().\-\s/#*xXextEXT]+$/.test(r)
+      ? { ok: true, value: r }
+      : { ok: false };
+  },
 
   // number: empty/null → absent; else strip thousands commas + trim and parse.
   // Finite → canonical `String(n)` (so CAST AS REAL sorts numerically);

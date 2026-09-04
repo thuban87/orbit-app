@@ -16,6 +16,9 @@
  * - toggle:   Boolean checkbox
  * - number:   Numeric input
  * - photo:    URL input (preview added in Phase 2)
+ * - url:      Web or local-development URL
+ * - email:    Email address
+ * - phone:    Phone number
  */
 export type FieldType =
   | "text"
@@ -24,7 +27,10 @@ export type FieldType =
   | "date"
   | "toggle"
   | "number"
-  | "photo";
+  | "photo"
+  | "url"
+  | "email"
+  | "phone";
 
 /**
  * Defines a single field in a schema-driven form.
@@ -92,6 +98,9 @@ export function isFieldDef(value: unknown): value is FieldDef {
     "toggle",
     "number",
     "photo",
+    "url",
+    "email",
+    "phone",
   ];
   if (!validTypes.includes(obj.type as FieldType)) return false;
   if (typeof obj.label !== "string" || obj.label.length === 0) return false;
