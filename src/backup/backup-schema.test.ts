@@ -267,6 +267,23 @@ describe("parseBackupManifest", () => {
     expect(parsed.customFieldValueHistory).toEqual([]);
   });
 
+  it("validates the scope-branching custom_field_defs fields at the parse boundary (WR-01)", () => {
+    const withDef = (def: Record<string, unknown>): Record<string, any> => {
+      const m = valid();
+      m.customFieldDefs = [{ uid: "def-a", modifiedAt: "2026-08-25 12:00:00", ...def }];
+      return m;
+    };
+    // A malformed scope must fail before it can silently bypass the completeness guard.
+    expect(() => parseBackupManifest(withDef({ scope: "Global" }))).toThrow(/scope/i);
+    expect(() => parseBackupManifest(withDef({ scope: 1 }))).toThrow(/scope/i);
+    // Wrong-typed history_retained / field_group fail as a clean parse error, not a bind rollback.
+    expect(() => parseBackupManifest(withDef({ historyRetained: 2 }))).toThrow(/history_retained/i);
+    expect(() => parseBackupManifest(withDef({ fieldGroup: 5 }))).toThrow(/field_group/i);
+    // The legitimate contact scope, and absent/null values from older backups, still pass.
+    expect(() => parseBackupManifest(withDef({ scope: "contact", historyRetained: 1, fieldGroup: "Work" }))).not.toThrow();
+    expect(() => parseBackupManifest(withDef({}))).not.toThrow();
+  });
+
   it("round-trips and validates custom_field_value_history rows and their tombstone", () => {
     const manifest = valid();
     manifest.contacts = [{ uid: "contact-a", trackingEnabled: 1, intervalDays: 7, modifiedAt: "2026-08-25 12:00:00" }];

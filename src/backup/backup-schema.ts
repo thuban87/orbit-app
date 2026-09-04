@@ -289,6 +289,28 @@ function validate(manifest: RawManifest): BackupManifest {
   const contacts = uidSet(arrays.contacts, "contacts");
   const categories = uidSet(arrays.categories, "categories");
   const defs = uidSet(arrays.customFieldDefs, "customFieldDefs");
+  // Validate the fields the scope-aware restore now branches on (WR-01): a
+  // malformed `scope` in a hand-edited backup must not silently bypass
+  // assertCompleteIncomingPairs, and a non-string/non-flag value must fail as a
+  // clean parse error rather than an opaque bind-time rollback. Absent/null is
+  // tolerated for pre-scope format-4 backups (restore defaults global/0/null).
+  for (const def of arrays.customFieldDefs) {
+    if (
+      def.scope !== undefined &&
+      def.scope !== null &&
+      def.scope !== "global" &&
+      def.scope !== "contact"
+    )
+      fail("customFieldDefs has an invalid scope");
+    if (!isNullableBinaryFlag(def.historyRetained))
+      fail("customFieldDefs has an invalid history_retained flag");
+    if (
+      def.fieldGroup !== undefined &&
+      def.fieldGroup !== null &&
+      typeof def.fieldGroup !== "string"
+    )
+      fail("customFieldDefs has an invalid field_group");
+  }
   for (const key of [
     "categories",
     "contactMethods",
