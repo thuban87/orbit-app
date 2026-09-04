@@ -6,11 +6,11 @@ import { CropPhotoScreen } from "@/screens/CropPhotoScreen";
 import { EditContactScreen } from "@/screens/EditContactScreen";
 import { MergeConflictsScreen } from "@/screens/MergeConflictsScreen";
 import { OrreryScreen } from "@/screens/OrreryScreen";
+import { RecentlyDeletedScreen } from "@/screens/RecentlyDeletedScreen";
 import { SurvivorSelectScreen } from "@/screens/SurvivorSelectScreen";
 import { ThingsToRememberScreen } from "@/screens/ThingsToRememberScreen";
 import {
   MemoryHistoryPlaceholderScreen,
-  RecentlyDeletedPlaceholderScreen,
 } from "@/screens/placeholders/KnowledgePlaceholders";
 import type { OrreryStackParamList } from "../types";
 
@@ -30,7 +30,7 @@ export function OrreryStack() {
       />
       <Stack.Screen
         name="RecentlyDeleted"
-        component={RecentlyDeletedPlaceholderScreen}
+        component={RecentlyDeletedScreen}
       />
       <Stack.Screen
         name="MemoryHistory"

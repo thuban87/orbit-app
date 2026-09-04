@@ -13,6 +13,7 @@ import { HomeScreen } from "@/screens/HomeScreen";
 import { ManageFavouritesScreen } from "@/screens/ManageFavouritesScreen";
 import { MergeConflictsScreen } from "@/screens/MergeConflictsScreen";
 import { NeverContactedScreen } from "@/screens/NeverContactedScreen";
+import { RecentlyDeletedScreen } from "@/screens/RecentlyDeletedScreen";
 import {
   GroupLogPlaceholderScreen,
   LogContactPlaceholderScreen,
@@ -21,7 +22,6 @@ import {
 } from "@/screens/placeholders/FabActionPlaceholders";
 import {
   MemoryHistoryPlaceholderScreen,
-  RecentlyDeletedPlaceholderScreen,
 } from "@/screens/placeholders/KnowledgePlaceholders";
 import { SurvivorSelectScreen } from "@/screens/SurvivorSelectScreen";
 import { ThingsToRememberScreen } from "@/screens/ThingsToRememberScreen";
@@ -52,7 +52,7 @@ export function DashboardStack() {
       />
       <Stack.Screen
         name="RecentlyDeleted"
-        component={RecentlyDeletedPlaceholderScreen}
+        component={RecentlyDeletedScreen}
       />
       <Stack.Screen
         name="MemoryHistory"
