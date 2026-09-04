@@ -237,8 +237,15 @@ All v1.0 commits are local on `main` and have NOT been pushed.
   3. User can attach optional notes, links, and a meaningful date, pin items, mark items outdated without deleting, override type-level Profile visibility per item, see lightweight provenance in detail views, and restore a deleted Memory from Recently Deleted (expiry running via the launch sweep, never a timer) (KNOW-06/07/08/09)
 
 **Canonical refs**: docs/dossier/milestone-2/phase-03-contact-knowledge-foundation-dossier.md; docs/dossier/milestone-2/planning-notes/phase-03-planning-notes.md
-**Schema**: additive model migration (016 — verify head+1 at plan time); no backup-format bump
-**Plans**: TBD
+**Schema**: additive model migration (016 — verified head+1 on disk at plan time: TARGET_VERSION=15, migrations 001–015 → first new is 016); no backup-format bump
+**Plans**: 7 plans (4 waves)
+- [ ] 24.1-01-PLAN.md — Tracer: migration 016 (full additive schema) + in-code Memory-type registry + memories DAO/read + reachable Things-to-Remember render (KNOW-01/02/09)
+- [ ] 24.1-02-PLAN.md — Memories DAO full CRUD + metadata (notes/links/dates/pin/outdated) + soft-delete/restore + registry-driven visibility (KNOW-02/06/07/08/09)
+- [ ] 24.1-03-PLAN.md — Structured relationships DAO + read (optional Orbit-contact link) (KNOW-05)
+- [ ] 24.1-04-PLAN.md — Current-state history (Last Talked About + Current Location): set/edit/promote-to-current + backlist (KNOW-03/04)
+- [ ] 24.1-05-PLAN.md — Recently Deleted / Trash: guarded permanent delete + TOCTOU-safe idempotent launch sweep (KNOW-07)
+- [ ] 24.1-06-PLAN.md — Unified "Things to Remember" grouped surface + Memory editor + routes (KNOW-01/03/05/06/08/09)
+- [ ] 24.1-07-PLAN.md — Recently Deleted screen + history backlist drill-in + relationship editor (KNOW-03/04/05/07)
 **UI hint**: yes
 **Note**: split from the original single Phase 24 (owner-approved 2026-09-03) at the migration seam — 24.1 is additive schema + model + "Things to Remember" UI; 24.2 is the destructive data-move + egress/search/types.
 
