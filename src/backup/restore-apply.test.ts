@@ -29,6 +29,11 @@ vi.mock("@/services/notifications/digest-schedule", () => ({ reconcileDigestSche
 import { buildExportManifest } from "@/backup/export-manifest";
 import { applyRestore } from "@/backup/restore-apply";
 import { nodeSqliteExecutor, openTestDb } from "@/db/__testkit__/node-sqlite";
+import { deleteMemory, purgeMemoryPermanently } from "@/db/memories-dao";
+import {
+  deleteRelationship,
+  purgeRelationshipPermanently,
+} from "@/db/relationships-dao";
 import { migration001 } from "@/db/migrations/001-initial";
 import { migration002 } from "@/db/migrations/002-app-settings";
 import { migration003 } from "@/db/migrations/003-orrery-settings";
@@ -69,6 +74,92 @@ beforeEach(() => {
 });
 
 describe("applyRestore", () => {
+  it("allows a newer merged knowledge row to be permanently deleted after its older tombstone survives", async () => {
+    const source = await db();
+    const destination = await db();
+    for (const exec of [source, destination]) {
+      await exec.runAsync(
+        "INSERT INTO contacts (uid,name,interval_days,rarely_responds,reminders_off,created_at,modified_at) VALUES (?,?,?,?,?,?,?)",
+        ["revived-knowledge-contact", "Knowledge", 14, 0, 0, NOW, NOW],
+      );
+    }
+    const sourceContact = await source.getFirstAsync<{ id: number }>(
+      "SELECT id FROM contacts WHERE uid=?",
+      ["revived-knowledge-contact"],
+    );
+    const destinationContact = await destination.getFirstAsync<{ id: number }>(
+      "SELECT id FROM contacts WHERE uid=?",
+      ["revived-knowledge-contact"],
+    );
+    await source.runAsync(
+      "INSERT INTO memories (uid,contact_id,type,value,pinned,outdated,provenance,created_at,modified_at) VALUES (?,?,?,?,?,?,?,?,?)",
+      ["revived-memory", sourceContact!.id, "general", "Revived", 0, 0, "user", NOW, "2026-08-26 12:00:00"],
+    );
+    await source.runAsync(
+      "INSERT INTO relationships (uid,contact_id,person_name,pinned,created_at,modified_at) VALUES (?,?,?,?,?,?)",
+      ["revived-relationship", sourceContact!.id, "Revived", 0, NOW, "2026-08-26 12:00:00"],
+    );
+    for (const [entityType, entityUid] of [
+      ["memory", "revived-memory"],
+      ["relationship", "revived-relationship"],
+    ]) {
+      await destination.runAsync(
+        "INSERT INTO tombstones (entity_type,entity_uid,deleted_at) VALUES (?,?,?)",
+        [entityType, entityUid, NOW],
+      );
+    }
+
+    const manifest = await buildExportManifest(source, {
+      exportedAt: NOW,
+      readPhotoBase64: async () => "",
+    });
+    await expect(applyRestore(destination, manifest, "merge")).resolves.toMatchObject({
+      status: "applied",
+    });
+
+    const memory = await destination.getFirstAsync<{ id: number }>(
+      "SELECT id FROM memories WHERE uid=?",
+      ["revived-memory"],
+    );
+    const relationship = await destination.getFirstAsync<{ id: number }>(
+      "SELECT id FROM relationships WHERE uid=?",
+      ["revived-relationship"],
+    );
+    const deletedAt = "2026-08-27 12:00:00";
+    await deleteMemory(destination, {
+      id: memory!.id,
+      contactId: destinationContact!.id,
+      now: deletedAt,
+    });
+    await purgeMemoryPermanently(destination, {
+      id: memory!.id,
+      contactId: destinationContact!.id,
+    });
+    await deleteRelationship(destination, {
+      id: relationship!.id,
+      contactId: destinationContact!.id,
+      now: deletedAt,
+    });
+    await purgeRelationshipPermanently(destination, {
+      id: relationship!.id,
+      contactId: destinationContact!.id,
+    });
+
+    await expect(
+      destination.getAllAsync<{ entity_type: string; entity_uid: string; deleted_at: string }>(
+        "SELECT entity_type,entity_uid,deleted_at FROM tombstones WHERE entity_uid IN (?,?) ORDER BY entity_type",
+        ["revived-memory", "revived-relationship"],
+      ),
+    ).resolves.toEqual([
+      { entity_type: "memory", entity_uid: "revived-memory", deleted_at: deletedAt },
+      {
+        entity_type: "relationship",
+        entity_uid: "revived-relationship",
+        deleted_at: deletedAt,
+      },
+    ]);
+  });
+
   it("round-trips live and deleted knowledge, linked people, and current/history state", async () => {
     const source = await db();
     const owner = await source.runAsync("INSERT INTO contacts (uid,name,interval_days,rarely_responds,reminders_off,created_at,modified_at) VALUES (?,?,?,?,?,?,?)", ["knowledge-owner", "Owner", 14, 0, 0, NOW, NOW]);

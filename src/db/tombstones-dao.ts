@@ -64,7 +64,12 @@ export async function insertTombstoneCore(
   assertTombstoneEntityType(input.entityType);
   await exec.runAsync(
     `INSERT INTO tombstones (entity_type, entity_uid, deleted_at)
-     VALUES (?, ?, ?)`,
+     VALUES (?, ?, ?)
+     ON CONFLICT(entity_type, entity_uid) DO UPDATE SET
+       deleted_at = CASE
+         WHEN excluded.deleted_at > tombstones.deleted_at THEN excluded.deleted_at
+         ELSE tombstones.deleted_at
+       END`,
     [input.entityType, input.entityUid, input.deletedAt],
   );
   if (bumpRevision) {

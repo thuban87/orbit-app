@@ -390,6 +390,21 @@ describe("purgeContact — archived-guarded one-transaction fan-out (T-04-12/13)
         WHERE contact_id = ? AND person_name = 'Key person'`,
       [target, other],
     );
+    const revivedKnowledge = await exec.getAllAsync<{
+      entity_type: string;
+      entity_uid: string;
+    }>(
+      `SELECT 'memory' AS entity_type, uid AS entity_uid FROM memories WHERE contact_id = ?
+       UNION ALL
+       SELECT 'relationship', uid FROM relationships WHERE contact_id = ?`,
+      [target, target],
+    );
+    for (const row of revivedKnowledge) {
+      await exec.runAsync(
+        "INSERT INTO tombstones (entity_type,entity_uid,deleted_at) VALUES (?,?,?)",
+        [row.entity_type, row.entity_uid, "2026-08-01 12:00:00"],
+      );
+    }
 
     expect(await computeImpact(exec, target)).toEqual(
       expect.objectContaining({ memories: 1, relationships: 1, currentStateEntries: 1 }),
@@ -410,6 +425,16 @@ describe("purgeContact — archived-guarded one-transaction fan-out (T-04-12/13)
         [other],
       ),
     ).toEqual({ linked_contact_id: null });
+    await expect(
+      exec.getAllAsync<{ entity_type: string; entity_uid: string; deleted_at: string }>(
+        "SELECT entity_type,entity_uid,deleted_at FROM tombstones WHERE entity_uid IN (?,?) ORDER BY entity_type",
+        revivedKnowledge.map((row) => row.entity_uid),
+      ),
+    ).resolves.toEqual(
+      revivedKnowledge
+        .sort((left, right) => left.entity_type.localeCompare(right.entity_type))
+        .map((row) => ({ ...row, deleted_at: NOW })),
+    );
   });
 
   it("removes a pending assist through the contact foreign-key cascade", async () => {
