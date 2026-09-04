@@ -43,7 +43,8 @@ to v4**. They are sequenced milestone-wide, not per phase:
 
 3. **Schema-bearing phases:**
    - Phase 23 — theme preferences
-   - Phase 24 — the knowledge model (the largest cluster in the milestone)
+   - Phase 24.1 — the knowledge model, additive schema (largest cluster in the milestone; split from Phase 24)
+   - Phase 24.2 — the destructive data-move (share-capture carry-over + ADR-030 retirement) + value-history/scope columns
    - Phase 25 — dashboard preferences + the retirement path for superseded keys
    - Phase 27 — swipe-action preference (may fold into Phase 25's migration)
    - Phase 29 — orrery preferences (may fold with Phase 30's)
@@ -70,7 +71,7 @@ to v4**. They are sequenced milestone-wide, not per phase:
 - 🚧 **v2.0 Release Readiness** — Phases 22–40 (in planning, started 2026-09-02). 217 requirements
   across Phases 22–36; Phases 37–40 are deferred-planning slots.
 
-  - **Foundations** — 22 App Shell & Navigation · 23 Theme & Visual System · 24 Contact Knowledge Foundation
+  - **Foundations** — 22 App Shell & Navigation · 23 Theme & Visual System · 24.1 Contact Knowledge Foundation (Model, Storage & UI) · 24.2 Contact Knowledge (Egress, Search, Types & Data-moves)
   - **Dashboard** — 25 Dashboard Data & State Foundation · 26 Dashboard Control Surface · 27 Dashboard List View · 28 Dashboard Card View
   - **Orrery** — 29 Orrery Camera, Scale & Exploration · 30 Orrery Systems
   - **Profile & history** — 31 Profile Experience · 32 Interaction History & Insights
@@ -127,7 +128,8 @@ All v1.0 commits are local on `main` and have NOT been pushed.
 
 - [x] **Phase 22: App Shell & Navigation** - Four-tab shell with per-tab stacks, universal six-action speed-dial FAB, and origin-aware Back (completed 2026-09-03)
 - [x] **Phase 23: Theme & Visual System** - Galaxy + Standard packages × Light/Dark/Follow System, semantic icon registry, reduced-motion and contrast guarantees (completed 2026-09-03)
-- [ ] **Phase 24: Contact Knowledge Foundation** - One "Things to Remember" model over fields, custom fields, relationships, and typed Memories with per-item AI opt-in
+- [ ] **Phase 24.1: Contact Knowledge Foundation — Model, Storage & UI** - The "Things to Remember" model + UI over fields, custom fields, relationships, typed Memories, current-state history, and soft-delete (additive migration; KNOW-01..09)
+- [ ] **Phase 24.2: Contact Knowledge — Egress, Search, Types & Data-moves** - Bounded local search, per-item AI opt-in + Off Limits, expanded custom-field types + value history, imported notes, share-capture migration, backup coverage (destructive migration + ADR-030 retirement; KNOW-10..16)
 - [ ] **Phase 25: Dashboard Data & State Foundation** - Shared population/filter/sort/search query state, durable and restored on return
 - [ ] **Phase 26: Dashboard Control Surface** - Lean header plus three equal live-applying anchored control panels
 - [ ] **Phase 27: Dashboard List View** - Full-width three-line rows with status border + glyph, swipe logging, and search explanations
@@ -223,28 +225,44 @@ All v1.0 commits are local on `main` and have NOT been pushed.
 
 **UI hint**: yes
 
-### Phase 24: Contact Knowledge Foundation
+### Phase 24.1: Contact Knowledge Foundation — Model, Storage & UI
 
-**Goal**: Everything Orbit remembers about a person lives in one coherent model — first-class fields, custom fields, structured relationships, and typed Memories — presented as a single "Things to Remember" surface with history, visibility, and per-item AI permission.
+**Goal**: The durable contact-knowledge model exists and is usable — typed Memories from one central application-owned registry (plus a user-labelled Custom type), structured relationships, current-state history (Last Talked About, Current Location), and per-item notes/links/dates/pinning/outdated/visibility/provenance — with soft-delete + Recently Deleted (launch-sweep expiry), all surfaced in the unified "Things to Remember" UI. Additive schema only (migration 016).
 **Depends on**: Phases 22, 23
-**Requirements**: KNOW-01, KNOW-02, KNOW-03, KNOW-04, KNOW-05, KNOW-06, KNOW-07, KNOW-08, KNOW-09, KNOW-10, KNOW-11, KNOW-12, KNOW-13, KNOW-14, KNOW-15, KNOW-16
+**Requirements**: KNOW-01, KNOW-02, KNOW-03, KNOW-04, KNOW-05, KNOW-06, KNOW-07, KNOW-08, KNOW-09
 **Success Criteria** (what must be TRUE):
 
   1. User sees first-class fields, custom fields, structured relationships, and typed Memory items together in one visually grouped "Things to Remember" surface with featured/current information first, where Memory types come from one central application-owned registry and a generic Custom-type Memory can carry the user's own label (KNOW-01/02/05)
   2. History-aware information (Last Talked About, Current Location) shows the most recent value on the Profile with the full backlist on drill-in, and the user can edit a historical entry or promote it back to current (KNOW-03/04)
   3. User can attach optional notes, links, and a meaningful date, pin items, mark items outdated without deleting, override type-level Profile visibility per item, see lightweight provenance in detail views, and restore a deleted Memory from Recently Deleted (expiry running via the launch sweep, never a timer) (KNOW-06/07/08/09)
-  4. Dashboard search finds contact names, Memory labels/values/notes, relationship names, and eligible custom-field content regardless of storage table with typo tolerance — as TypeScript scoring with no FTS5 — and never searches internal metadata (KNOW-10)
-  5. AI use is opt-in per item behind two gates (global AI, then per-item permission defaulting OFF) with a sparkle on enabled items and Off Limits kept separate carrying avoid-this-topic semantics; the nine custom-field types support global or per-contact definitions with optional value history; imported Contacts-app notes land as their own AI-off Memory type; existing share-sheet captures migrate with no data loss; and backup/restore preserves the entire knowledge model including soft-deleted records (KNOW-11/12/13/14/15/16)
 
 **Canonical refs**: docs/dossier/milestone-2/phase-03-contact-knowledge-foundation-dossier.md; docs/dossier/milestone-2/planning-notes/phase-03-planning-notes.md
-**Schema**: the knowledge model — the milestone's largest schema cluster (verify head+1 at plan time)
+**Schema**: additive model migration (016 — verify head+1 at plan time); no backup-format bump
 **Plans**: TBD
 **UI hint**: yes
+**Note**: split from the original single Phase 24 (owner-approved 2026-09-03) at the migration seam — 24.1 is additive schema + model + "Things to Remember" UI; 24.2 is the destructive data-move + egress/search/types.
+
+### Phase 24.2: Contact Knowledge — Egress, Search, Types & Data-moves
+
+**Goal**: The knowledge model becomes searchable, AI-permissioned, richly typed, and portable — bounded local typo search (no FTS5), opt-in-per-item AI permission with Off Limits kept separate, the expanded custom-field type set with optional value history, imported phone-Contacts notes, migration of existing share-sheet captures, and full backup/restore coverage. Includes the milestone's destructive data-move (migration 017 + the new ADR retiring ADR-030).
+**Depends on**: Phase 24.1
+**Requirements**: KNOW-10, KNOW-11, KNOW-12, KNOW-13, KNOW-14, KNOW-15, KNOW-16
+**Success Criteria** (what must be TRUE):
+
+  1. Dashboard search finds contact names, Memory labels/values/notes, relationship names, and eligible custom-field content regardless of storage table with typo tolerance — as TypeScript scoring with no FTS5 — and never searches internal metadata (KNOW-10)
+  2. AI use is opt-in per item behind two gates (global AI, then per-item permission defaulting OFF) with a sparkle on enabled items and Off Limits kept separate carrying avoid-this-topic semantics (KNOW-11/12)
+  3. The nine custom-field types support global or per-contact definitions with optional value history (ADR-001 uniqueness untouched); imported Contacts-app notes land as their own AI-off Memory type; existing share-sheet captures migrate with no data loss; and backup/restore preserves the entire knowledge model including soft-deleted records (KNOW-13/14/15/16)
+
+**Canonical refs**: docs/dossier/milestone-2/phase-03-contact-knowledge-foundation-dossier.md; docs/dossier/milestone-2/planning-notes/phase-03-planning-notes.md
+**Schema**: destructive data-move migration (017 — share-capture carry-over + ADR-030 retirement via a new superseding ADR; verify head+1 at plan time); adds a backup entity/tombstone but no format-version bump (Phase 36 owns the v4 bump)
+**Plans**: TBD
+**UI hint**: yes
+**Note**: split from the original single Phase 24 (owner-approved 2026-09-03).
 
 ### Phase 25: Dashboard Data & State Foundation
 
 **Goal**: One shared Dashboard query and state engine — populations, filters, sort, and search — that both views read, that persists across relaunch, and that comes back intact when the user returns from a Profile.
-**Depends on**: Phase 24
+**Depends on**: Phase 24.2
 **Requirements**: DASHQ-01, DASHQ-02, DASHQ-03, DASHQ-04, DASHQ-05, DASHQ-06, DASHQ-07, DASHQ-08, DASHQ-09, DASHQ-10, DASHQ-11, DASHQ-12, DASHQ-13, DASHQ-14
 **Success Criteria** (what must be TRUE):
 
@@ -316,7 +334,7 @@ All v1.0 commits are local on `main` and have NOT been pushed.
 ### Phase 29: Orrery Camera, Scale & Exploration
 
 **Goal**: The Orrery becomes one canonical, explorable 2.5D relationship-health world — a bounded camera, semantic zoom, density presets, built-in Systems, and an accessible companion list — instead of two competing modes.
-**Depends on**: Phases 23, 24
+**Depends on**: Phases 23, 24.2
 **Requirements**: ORRC-01, ORRC-02, ORRC-03, ORRC-04, ORRC-05, ORRC-06, ORRC-07, ORRC-08, ORRC-09, ORRC-10, ORRC-11, ORRC-12, ORRC-13, ORRC-14, ORRC-15, ORRC-16
 **Success Criteria** (what must be TRUE):
 
@@ -352,7 +370,7 @@ All v1.0 commits are local on `main` and have NOT been pushed.
 ### Phase 31: Profile Experience
 
 **Goal**: The Profile becomes a fixed Hero over modular, user-arrangeable sections — with reusable layout and background templates and a Relationship Overview tile grid that explains and adjusts the relationship at a glance.
-**Depends on**: Phases 23, 24
+**Depends on**: Phases 23, 24.2
 **Requirements**: PROF-01, PROF-02, PROF-03, PROF-04, PROF-05, PROF-06, PROF-07, PROF-08, PROF-09, PROF-10, PROF-11, PROF-12, PROF-13, PROF-14, PROF-15, PROF-16, PROF-17, PROF-18, PROF-19, PROF-20
 **Success Criteria** (what must be TRUE):
 
@@ -406,7 +424,7 @@ All v1.0 commits are local on `main` and have NOT been pushed.
 ### Phase 34: Rapid Capture & Update Flows
 
 **Goal**: Creating a contact, logging an interaction, and updating what Orbit remembers all collapse to the fewest honest taps — with a streamlined Add Contact, a truthful Quick Log that can grow a note or Memory, and an Update Contact chooser loop.
-**Depends on**: Phases 24, 32, 33
+**Depends on**: Phases 24.2, 32, 33
 **Requirements**: CAPT-01, CAPT-02, CAPT-03, CAPT-04, CAPT-05, CAPT-06, CAPT-07, CAPT-08, CAPT-09, CAPT-10, CAPT-11, CAPT-12, CAPT-13, CAPT-14, CAPT-15
 **Success Criteria** (what must be TRUE):
 
@@ -424,7 +442,7 @@ All v1.0 commits are local on `main` and have NOT been pushed.
 ### Phase 35: Messaging & AI Compose
 
 **Goal**: Reaching out is a drafting workspace the user owns — a blank composition editor in Text or Email mode, a read-only knowledge Research side, honest external handoff, and an optional three-suggestion AI review that never writes without consent.
-**Depends on**: Phases 24, 31, 34
+**Depends on**: Phases 24.2, 31, 34
 **Requirements**: COMP-01, COMP-02, COMP-03, COMP-04, COMP-05, COMP-06, COMP-07, COMP-08, COMP-09, COMP-10, COMP-11, COMP-12, COMP-13, COMP-14
 **Success Criteria** (what must be TRUE):
 
@@ -442,7 +460,7 @@ All v1.0 commits are local on `main` and have NOT been pushed.
 ### Phase 36: AI Configuration & Prompting
 
 **Goal**: AI becomes an explicit, user-owned capability — three connection lanes, a real global switch, personalization the user controls, a permission model that decides exactly what leaves the device, and the milestone's closing backup wire-format v4 bump.
-**Depends on**: Phases 24, 32, 33, 34, 35 — and every schema-bearing phase of the milestone, because this phase ends the milestone's schema chain with the backup format bump
+**Depends on**: Phases 24.2, 32, 33, 34, 35 — and every schema-bearing phase of the milestone, because this phase ends the milestone's schema chain with the backup format bump
 **Requirements**: AICFG-01, AICFG-02, AICFG-03, AICFG-04, AICFG-05, AICFG-06, AICFG-07, AICFG-08, AICFG-09, AICFG-10, AICFG-11, AICFG-12, AICFG-13, AICFG-14, AICFG-15, AICFG-16, AICFG-17
 **Success Criteria** (what must be TRUE):
 
@@ -509,7 +527,8 @@ All v1.0 commits are local on `main` and have NOT been pushed.
 |-------|----------------|--------|-----------|
 | 22. App Shell & Navigation | 6/6 | In Progress|  |
 | 23. Theme & Visual System | 7/7 | In Progress | - |
-| 24. Contact Knowledge Foundation | 0/TBD | Not started | - |
+| 24.1 Contact Knowledge Foundation (Model, Storage & UI) | 0/TBD | Not started | - |
+| 24.2 Contact Knowledge (Egress, Search, Types & Data-moves) | 0/TBD | Not started | - |
 | 25. Dashboard Data & State Foundation | 0/TBD | Not started | - |
 | 26. Dashboard Control Surface | 0/TBD | Not started | - |
 | 27. Dashboard List View | 0/TBD | Not started | - |
