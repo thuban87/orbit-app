@@ -79,9 +79,9 @@ describe("memories DAO", () => {
     expect(rows[0]?.uid).toBeTruthy();
   });
 
-  it("normalizes blank optionals to NULL and defaults provenance to user", async () => {
+  it("rejects a wholly blank draft before any row is written", async () => {
     const contactId = await seedContact();
-    await addMemory(exec, {
+    await expect(addMemory(exec, {
       contactId,
       type: "general",
       value: "   ",
@@ -90,17 +90,8 @@ describe("memories DAO", () => {
       customLabel: "\n",
       createdAt: NOW,
       now: NOW,
-    });
-
-    expect(await listMemoriesForContact(exec, contactId)).toEqual([
-      expect.objectContaining({
-        value: null,
-        note: null,
-        url: null,
-        custom_label: null,
-        provenance: "user",
-      }),
-    ]);
+    })).rejects.toThrow("memory value or custom label is required");
+    expect(await listMemoriesForContact(exec, contactId)).toEqual([]);
   });
 
   it("preserves multi-byte text and excludes memories belonging to other contacts", async () => {

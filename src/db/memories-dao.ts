@@ -96,7 +96,11 @@ export async function addMemoryCore(
 ): Promise<number> {
   assertRegisteredMemoryType(input.type);
   const customLabel = normalizeOptional(input.customLabel);
+  const value = normalizeOptional(input.value);
   assertCustomLabel(input.type, customLabel);
+  if (value === null && customLabel === null) {
+    throw new Error("memories-dao: memory value or custom label is required");
+  }
 
   const result = await exec.runAsync(
     `INSERT INTO memories
@@ -108,7 +112,7 @@ export async function addMemoryCore(
       input.contactId,
       input.type,
       customLabel,
-      normalizeOptional(input.value),
+      value,
       normalizeOptional(input.note),
       normalizeOptional(input.url),
       normalizeOptional(input.meaningfulDate),
