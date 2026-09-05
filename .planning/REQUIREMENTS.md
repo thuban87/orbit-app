@@ -94,7 +94,7 @@ category's phase (see Traceability).
 - [x] **DASHC-06**: The Population panel offers All Contacts as an ordinary row; Active Contacts remains the implicit unlisted default; Filters can be cleared in-panel and Sort offers an explicit Default
 - [x] **DASHC-07**: Search sits below the control row, collapsible, sharing its row with an accessible right-aligned List/Card toggle
 - [x] **DASHC-08**: Dashboard overflow offers Group Events, Unbound Contacts, Archived Contacts, Select Contacts, and Reset Dashboard View; Select Contacts enters the Card/Grid multi-select mode (switching view if needed) — no standalone bulk screen; no Manage Favorites entry (retired, ADR-075)
-- [ ] **DASHC-09**: Unbound and Archived open as Dashboard child routes with origin-aware return, and both Archived entry points (overflow + Settings row) route to one screen
+- [x] **DASHC-09**: Unbound and Archived open as Dashboard child routes with origin-aware return, and both Archived entry points (overflow + Settings row) route to one screen
 - [x] **DASHC-10**: Reset Dashboard View returns to Active Contacts, no filters, Default sort, cleared search, preserving the List/Card preference
 
 ### LISTV — Dashboard List View (Phase 27)

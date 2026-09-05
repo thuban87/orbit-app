@@ -1,10 +1,10 @@
 ---
 schema_version: 1
-open_count: 26
+open_count: 27
 waived_count: 0
 fixed_count: 6
-total_count: 32
-last_updated: 2026-09-05T12:46:17.277Z
+total_count: 33
+last_updated: 2026-09-05T12:51:17.723Z
 ---
 
 # Broken Windows Ledger
@@ -47,6 +47,7 @@ last_updated: 2026-09-05T12:46:17.277Z
 | 30 | 25 | unrun-verify | .planning/phases/25-dashboard-data-state-foundation/25-04-PLAN.md |  | Physical Pixel large-eligible-set search performance validation remains required; desktop fixtures cannot assess the N+1 corpus read. | open |  | 2026-09-05T04:07:55.132Z |  |
 | 31 | 26 | unrun-verify | .planning/phases/26-dashboard-control-surface/26-02-SUMMARY.md |  | Pixel Filter and Sort anchored-panel interaction verification remains pending. | open |  | 2026-09-05T12:27:40.703Z |  |
 | 32 | 26 | unrun-verify | src/screens/HomeScreen.tsx |  | Pixel verification pending for 200% header fallback, disabled overflow press, and Reset view-mode retention | open |  | 2026-09-05T12:46:17.277Z |  |
+| 33 | 26 | unrun-verify | src/screens/ArchivedContactsScreen.tsx |  | Pixel Archived route, origin-aware Back, Restore, and purge-confirmation UAT pending | open |  | 2026-09-05T12:51:17.723Z |  |
 
 ````json
 [
@@ -432,6 +433,18 @@ last_updated: 2026-09-05T12:46:17.277Z
     "status": "open",
     "reason": "",
     "recorded_at": "2026-09-05T12:46:17.277Z",
+    "resolved_at": null
+  },
+  {
+    "id": 33,
+    "kind": "unrun-verify",
+    "phase": "26",
+    "file": "src/screens/ArchivedContactsScreen.tsx",
+    "line": null,
+    "description": "Pixel Archived route, origin-aware Back, Restore, and purge-confirmation UAT pending",
+    "status": "open",
+    "reason": "",
+    "recorded_at": "2026-09-05T12:51:17.723Z",
     "resolved_at": null
   }
 ]
