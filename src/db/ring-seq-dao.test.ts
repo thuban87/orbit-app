@@ -3,7 +3,7 @@
  *
  * Drives a fresh in-memory `node:sqlite` DB through the REAL migration-1 fixture
  * and the REAL ring-seq-dao (+ orrery-read for the M3 re-read). rewriteRingSeq is
- * a near-verbatim clone of rewriteFavouriteRanks; this suite mirrors the
+ * a near-verbatim clone of the retired favourites rank-rewrite writer; this suite mirrors the
  * favourites guard-test shape AND adds the sun-occupant seam:
  *   - happy self-sun path writes ring_seq 0..n-1, bumps modified_at, leaves
  *     last_contact untouched;

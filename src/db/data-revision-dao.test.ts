@@ -10,7 +10,7 @@ import {
 import { addLink, applyLinkDiff, listLinks } from "@/db/contact-links-dao";
 import { readDataRevision } from "@/db/data-revision-dao";
 import { createField } from "@/db/field-ddl";
-import { setFavouriteRank, rewriteFavouriteRanks } from "@/db/favourites-dao";
+import { clearFavouriteRank, setFavouriteRank } from "@/db/favourites-dao";
 import { MIGRATIONS, TARGET_VERSION } from "@/db/database";
 import { runMigrations } from "@/db/migrations/runner";
 import { insertTombstoneCore } from "@/db/tombstones-dao";
@@ -114,16 +114,15 @@ describe("data revision outer-writer coalescing", () => {
     expect(second.contactId).toBeGreaterThan(0);
   });
 
-  it("keeps accepted empty reorder a no-op while a real reorder advances once", async () => {
-    const beforeEmpty = await readDataRevision(exec);
-    await rewriteFavouriteRanks(exec, [], NOW);
-    expect(await readDataRevision(exec)).toBe(beforeEmpty);
-
+  it("advances once for each binary favourite membership write", async () => {
     const contact = await createContactFull(exec, { uid: newUid(), name: "Favourite", intervalDays: 30, now: NOW });
+    const beforeMark = await readDataRevision(exec);
     await setFavouriteRank(exec, contact.contactId, NOW);
-    const beforeReorder = await readDataRevision(exec);
-    await rewriteFavouriteRanks(exec, [contact.contactId], NOW);
-    expect(await readDataRevision(exec)).toBe(beforeReorder + 1);
+    expect(await readDataRevision(exec)).toBe(beforeMark + 1);
+
+    const beforeClear = await readDataRevision(exec);
+    await clearFavouriteRank(exec, contact.contactId, NOW);
+    expect(await readDataRevision(exec)).toBe(beforeClear + 1);
   });
 
   it("does not advance when a writer rolls back", async () => {

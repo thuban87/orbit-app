@@ -1,7 +1,7 @@
 /**
  * Ring-seq write layer (ORR-06) — the FIRST writer of `contacts.ring_seq`.
  *
- * A near-VERBATIM clone of `rewriteFavouriteRanks` (favourites-dao.ts:105-143):
+ * A near-verbatim clone of the retired favourites rank-rewrite writer:
  * the same THREE guards, N raw `?`-bound UPDATEs inside ONE `inWriteTransaction`,
  * a `changes===1` assertion per row. Two swaps from the favourites original:
  *   (1) the column `favourite_rank → ring_seq`;

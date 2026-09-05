@@ -10,7 +10,8 @@
  * references the recency column at all).
  *
  * `favourite_rank` already exists (migration 001) — no migration ships here.
- * Ordering is `favourite_rank ASC`; ranks need not be gap-free.
+ * ADR-075 retires rank as a user-facing order: this vestigial storage is retained
+ * only for membership and internal picker reads, so no rank-rewrite writer exists.
  */
 import { inWriteTransaction } from "@/db/transaction";
 import { bumpDataRevisionCore } from "@/db/data-revision-dao";
@@ -71,79 +72,5 @@ export function clearFavouriteRank(
       );
     }
     await bumpDataRevisionCore(exec);
-  });
-}
-
-/**
- * Rewrite the favourite ranks of the CURRENT live-favourite set to match
- * `orderedIds` (rank = array index 0..n-1) inside ONE transaction — the drag-end
- * (Manage-favourites, Plan 08) write half. `orderedIds` is the FULL reordered
- * favourites list, computed off-DB by `computeReorder` (favourites-reorder-logic).
- *
- * THREE guards (review MEDIUM-2), each a loud failure that rolls back the WHOLE
- * batch so a partial / duplicate / stale list can never leave stale ranks or
- * assign a rank to a non-favourite / archived row:
- *   (1) UNIQUE ids — a duplicate id → throw (Set size !== length).
- *   (2) COUNT MATCH — `orderedIds.length` must equal the CURRENT count of
- *       non-archived favourites, so an omitted favourite can't be left at a stale
- *       rank and an over-long list can't smuggle in a non-favourite.
- *   (3) SCOPED UPDATE — every UPDATE is `WHERE id = ? AND favourite_rank IS NOT
- *       NULL AND archived_at IS NULL` with a `changes===1` assertion, so a STALE
- *       id (since-unfavourited, archived, or never a favourite) fails loudly and
- *       rolls back — a rank can NEVER land on a non-favourite / archived contact.
- *
- * NON-REENTRANCY (transaction.ts): the mutex is non-reentrant — calling a wrapped
- * single-write DAO (e.g. `setFavouriteRank`) inside this loop would PERMANENTLY
- * hang. This issues N RAW UPDATEs directly inside the ONE outer transaction; it
- * MUST NOT call `setFavouriteRank`. Keep this exactly as-is.
- *
- * An empty `orderedIds` (`[]`) is an ACCEPTED no-op, NOT a missing guard (review
- * A-2): the uniqueness check passes (size 0 === length 0) and the count check
- * passes when the current non-archived favourite count is also 0 (0 === 0), so
- * zero UPDATEs commit and nothing changes — harmless, and unreachable from the
- * drag UI, which only reorders an existing non-empty favourites list.
- *
- * The recency column is untouched.
- */
-export function rewriteFavouriteRanks(
-  exec: SqlExecutor,
-  orderedIds: number[],
-  now: string,
-): Promise<void> {
-  return inWriteTransaction(exec, async () => {
-    // Guard 1: reject a non-unique list BEFORE any write.
-    if (new Set(orderedIds).size !== orderedIds.length) {
-      throw new Error(
-        `rewriteFavouriteRanks: orderedIds contains duplicate ids (${orderedIds.length} ids, ${new Set(orderedIds).size} unique)`,
-      );
-    }
-    // Guard 2: the supplied list must be the COMPLETE current live-favourite set.
-    const countRow = await exec.getFirstAsync<{ n: number }>(
-      "SELECT COUNT(*) AS n FROM contacts WHERE favourite_rank IS NOT NULL AND archived_at IS NULL",
-    );
-    const current = countRow?.n ?? 0;
-    if (current !== orderedIds.length) {
-      throw new Error(
-        `rewriteFavouriteRanks: orderedIds length ${orderedIds.length} != current live-favourite count ${current}`,
-      );
-    }
-    // Guard 3: each UPDATE is scoped to a LIVE favourite (changes===1 per row) —
-    // a stale id fails here and rolls back the batch.
-    for (let rank = 0; rank < orderedIds.length; rank++) {
-      const result = await exec.runAsync(
-        `UPDATE contacts
-            SET favourite_rank = ?, modified_at = ?
-          WHERE id = ? AND favourite_rank IS NOT NULL AND archived_at IS NULL`,
-        [rank, now, orderedIds[rank]],
-      );
-      if (result.changes !== 1) {
-        throw new Error(
-          `rewriteFavouriteRanks: id=${orderedIds[rank]} is not a live favourite (changed ${result.changes})`,
-        );
-      }
-    }
-    if (orderedIds.length > 0) {
-      await bumpDataRevisionCore(exec);
-    }
   });
 }
