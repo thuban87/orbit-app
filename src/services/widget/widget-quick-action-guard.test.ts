@@ -51,7 +51,7 @@ describe("guardWidgetIntent", () => {
     ).toEqual({ ok: false, reason: "archived" });
   });
 
-  it("keeps the favourites intent independent of a contact lookup", async () => {
+  it("keeps the Home-only favourites intent independent of a contact lookup", async () => {
     const intent = resolveWidgetUri("orbit://favourites");
     const guard = lookup(null);
     expect(await guardWidgetIntent(intent, guard)).toEqual({

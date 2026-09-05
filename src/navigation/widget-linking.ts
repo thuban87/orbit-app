@@ -10,7 +10,7 @@
  *      T-12-01): it accepts ONLY the three minted forms
  *        - orbit://contact/<positive-int>   → Profile
  *        - orbit://compose/<positive-int>   → Compose
- *        - orbit://favourites               → ManageFavourites
+ *        - orbit://favourites               → Home
  *        - orbit://reach/<positive-int>     → Profile with Reach Out open
  *      and returns null for EVERYTHING else — a wrong scheme, an unknown host, a
  *      non-integer / negative / zero / oversized id, a present query string /
@@ -19,8 +19,9 @@
  *      app); the resolver never eval/interpolates it, and the anchored digit-only
  *      regexes make the id impossible to smuggle anything through.
  *
- *      EVERY accepted form resolves to a RESET onto [Home, target] (index 1) —
- *      none is a bare navigate. Under app-wide singleTask the OS may hand us an
+ *      Contact-target forms resolve to a RESET onto [Home, target] (index 1);
+ *      favourites resolves to a Home-only reset (index 0). None is a bare
+ *      navigate. Under app-wide singleTask the OS may hand us an
  *      arbitrary back-stack, so Back must be a JS concern: resetting onto
  *      [Home, target] guarantees Back always lands on the dashboard, exactly as
  *      notification-nav.ts:63-72 resets the decay tap.
@@ -53,12 +54,16 @@ const LOG_SOURCE = "widget-linking";
 
 /**
  * A serializable RESET intent — the gate applies it verbatim as
- * `navigationRef.current.reset({ index, routes })`. All four forms reset onto
- * [Home, target] (index 1); none is a navigate, so Back always returns to the
- * dashboard. The shapes mirror react-navigation's `reset` argument so the gate is
- * a thin adapter with no branching of its own.
+ * `navigationRef.current.reset({ index, routes })`. Contact-target forms reset
+ * onto [Home, target] (index 1); the Favorites route resets to Home alone
+ * (index 0). The shapes mirror react-navigation's `reset` argument.
  */
 export type WidgetNavIntent =
+  | {
+      type: "reset";
+      index: 0;
+      routes: [{ name: "Home" }];
+    }
   | {
       type: "reset";
       index: 1;
@@ -86,11 +91,7 @@ export type WidgetNavIntent =
         { name: "Compose"; params: { contactId: number } },
       ];
     }
-  | {
-      type: "reset";
-      index: 1;
-      routes: [{ name: "Home" }, { name: "ManageFavourites" }];
-    };
+  ;
 
 type WidgetUrlEvent = { url: string };
 
@@ -144,8 +145,8 @@ export function resolveWidgetUri(url: unknown): WidgetNavIntent | null {
   if (url === FAVOURITES_URI) {
     return {
       type: "reset",
-      index: 1,
-      routes: [{ name: "Home" }, { name: "ManageFavourites" }],
+      index: 0,
+      routes: [{ name: "Home" }],
     };
   }
 
@@ -298,12 +299,12 @@ export function WidgetLinkingGate({ isReady }: { isReady: boolean }) {
       if (cancelled) {
         return;
       }
-      const target = pending.routes[1];
-      const isReachIntent =
-        target.name === "Profile" &&
-        "openReachOut" in target.params &&
-        target.params.openReachOut === true;
       if (!guarded.ok) {
+        const target = pending.index === 1 ? pending.routes[1] : null;
+        const isReachIntent =
+          target?.name === "Profile" &&
+          "openReachOut" in target.params &&
+          target.params.openReachOut === true;
         if (isReachIntent && guarded.reason === "missing") {
           const [{ Alert }, { navigationRef }] = await Promise.all([
             import("react-native"),
@@ -315,6 +316,15 @@ export function WidgetLinkingGate({ isReady }: { isReady: boolean }) {
           navigationRef.current?.reset(resetToDashboardRoot());
           Alert.alert("This contact is no longer available.");
         }
+        setPending(null);
+        return;
+      }
+      if (guarded.intent.index === 0) {
+        const { navigationRef } = await import("./linking");
+        if (cancelled) {
+          return;
+        }
+        navigationRef.current?.reset(resetToDashboardRoot());
         setPending(null);
         return;
       }

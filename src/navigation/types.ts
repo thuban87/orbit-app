@@ -66,18 +66,9 @@ export type DashboardStackParamList = {
   /** Dedicated neutral browse surface for live contacts outside the active orbit. */
   UnboundContacts: undefined;
   /**
-   * The shared "Manage favourites" reorder screen (DASH-06). Carries no params
-   * (the favourites order lives in the screen's local state, seeded from
-   * `listFavourites`). Reached from the Settings row (Plan 10) and the
-   * favourites-chip Manage affordance (Plan 09) — the second of the two nav
-   * registrations this phase adds.
-   */
-  ManageFavourites: undefined;
-  /**
    * The entry-agnostic compose surface (CMP-01/02/03). Params are SERIALIZABLE
    * ONLY — a bare `contactId` plus the optional Phase-14 AI intent flag, NO
-   * callback params (native-stack serialization + deep-link safety), the same
-   * additive posture as `NeverContacted` / `ManageFavourites`. The screen
+   * callback params (native-stack serialization + deep-link safety). The screen
    * self-fetches header + fuel + SMS capability from the id alone, so Phase 11
    * (notification), Phase 12 (widget), and Phase 14 (AI) can open it with just a
    * contact id and no wiring. Registered additively; `initialRouteName` stays

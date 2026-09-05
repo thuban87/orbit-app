@@ -10,7 +10,6 @@ import { DigestScreen } from "@/screens/DigestScreen";
 import { EditContactScreen } from "@/screens/EditContactScreen";
 import { GroupEventsScreen } from "@/screens/GroupEventsScreen";
 import { HomeScreen } from "@/screens/HomeScreen";
-import { ManageFavouritesScreen } from "@/screens/ManageFavouritesScreen";
 import { MemoryHistoryScreen } from "@/screens/MemoryHistoryScreen";
 import { MergeConflictsScreen } from "@/screens/MergeConflictsScreen";
 import { NeverContactedScreen } from "@/screens/NeverContactedScreen";
@@ -64,10 +63,6 @@ export function DashboardStack() {
       <Stack.Screen name="Archived" component={ArchivedContactsScreen} />
       <Stack.Screen name="NeverContacted" component={NeverContactedScreen} />
       <Stack.Screen name="UnboundContacts" component={UnboundContactsScreen} />
-      <Stack.Screen
-        name="ManageFavourites"
-        component={ManageFavouritesScreen}
-      />
       <Stack.Screen name="Digest" component={DigestScreen} />
       <Stack.Screen name="SurvivorSelect" component={SurvivorSelectScreen} />
       <Stack.Screen name="MergeConflicts" component={MergeConflictsScreen} />

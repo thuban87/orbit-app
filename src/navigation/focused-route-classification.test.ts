@@ -37,7 +37,6 @@ const browseRoutes = [
   "Archived",
   "NeverContacted",
   "UnboundContacts",
-  "ManageFavourites",
   "Digest",
   "GroupEvents",
   "RestorePreview",

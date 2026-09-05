@@ -18,8 +18,8 @@ export type WidgetIntentGuardResult =
 
 /**
  * Allow live Profile opens for either lifecycle state, but require a live Bound
- * contact for the active-cadence Compose quick action. Favourites has no contact
- * target and remains a valid projection-level route.
+ * contact for the active-cadence Compose quick action. The Home-only Favorites
+ * route has no contact target and remains a valid projection-level route.
  */
 export async function guardWidgetIntent(
   intent: WidgetNavIntent | null,
@@ -29,11 +29,11 @@ export async function guardWidgetIntent(
     return { ok: false, reason: "missing" };
   }
 
-  const target = intent.routes[1];
-  if (target.name === "ManageFavourites") {
+  if (intent.index === 0) {
     return { ok: true, intent };
   }
 
+  const target = intent.routes[1];
   const contact = await lookup(target.params.contactId);
   if (contact === null) {
     return { ok: false, reason: "missing" };

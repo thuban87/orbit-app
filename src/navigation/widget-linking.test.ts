@@ -54,14 +54,14 @@ describe("resolveWidgetUri — accepted forms (all RESET onto [Home, target])", 
     });
   });
 
-  it("maps orbit://favourites to a RESET onto [Home, ManageFavourites], NOT a navigate", () => {
+  it("maps orbit://favourites to a Home-only reset", () => {
     const intent = resolveWidgetUri("orbit://favourites");
     expect(intent).toEqual({
       type: "reset",
-      index: 1,
-      routes: [{ name: "Home" }, { name: "ManageFavourites" }],
+      index: 0,
+      routes: [{ name: "Home" }],
     });
-    // Explicitly assert it is a reset (Back → dashboard), never a bare navigate.
+    // Explicitly assert it is a reset, never a bare navigate.
     expect(intent?.type).toBe("reset");
   });
 
