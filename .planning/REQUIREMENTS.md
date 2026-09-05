@@ -80,7 +80,7 @@ category's phase (see Traceability).
 - [x] **DASHQ-09**: Search matches forgivingly (prefix/substring plus typo tolerance) across the semantic knowledge corpus, ranks by term coverage with identity matches strongly prioritized, and treats the Dashboard sort as tie-breaker only
 - [x] **DASHQ-10**: A search result shows up to three prioritized highlighted snippets plus "+N more"; a direct name match does not suppress secondary knowledge matches
 - [x] **DASHQ-11**: List/Card preference, population, filters, and sort persist across relaunch (durable, backup-portable); search text and scroll position do not
-- [ ] **DASHQ-12**: Dashboard → Profile → Back restores the full working Dashboard state including search, filters, population, sort, and scroll position
+- [x] **DASHQ-12**: Dashboard → Profile → Back restores the full working Dashboard state including search, filters, population, sort, and scroll position
 - [x] **DASHQ-13**: List and Card views share one query state; each query axis is independently clearable and a global Reset Dashboard View restores all four while preserving the List/Card preference
 - [x] **DASHQ-14**: The birthday banner is removed from the Dashboard (ADR-076); the Dashboard keeps only the Birthdays population — richer presentation belongs to the deferred Your Week phase
 
