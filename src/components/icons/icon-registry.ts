@@ -42,6 +42,13 @@ export const ICON_REGISTRY = {
   call: { outline: "call-outline", filled: "call" },
   edit: { outline: "create-outline", filled: "create" },
   sparkle: { outline: "sparkles-outline", filled: "sparkles" },
+  filter: { outline: "filter-outline", filled: "filter" },
+  sort: { outline: "swap-vertical-outline", filled: "swap-vertical" },
+  list: { outline: "list-outline", filled: "list" },
+  grid: { outline: "grid-outline", filled: "grid" },
+  "your-week": { outline: "calendar-outline", filled: "calendar" },
+  "group-events": { outline: "people-outline", filled: "people" },
+  "chevron-down": { outline: "chevron-down", filled: "chevron-down" },
 
   // ---- Tab identities (the four persistent destinations) ----------------
   // `settings` above doubles as the Settings tab identity (TAB_ICON maps it).
