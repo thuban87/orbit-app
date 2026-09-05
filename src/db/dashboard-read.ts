@@ -56,9 +56,15 @@ import { PROGRESS_SQL, STABLE_MAX, STATUS_SQL } from "@/db/status";
 import type { SqlExecutor } from "@/db/types";
 import {
   ACTIVE_SEGREGATION_WHERE,
+  buildPopulationWhere,
+  DASHBOARD_POPULATIONS,
   type DashboardQueryState,
+  FAVOURITES_WHERE,
+  NOT_CONTACTED_WHERE,
   resolveDefaultSort,
+  SNOOZED_WHERE,
 } from "@/logic/dashboard-query-logic";
+import { daysUntilBirthday } from "@/logic/birthday-logic";
 
 /** The dashboard filter chips — a closed set of code-constant identifiers. */
 export type DashboardFilter =
@@ -98,6 +104,12 @@ export interface DashboardRow {
   fuelText: string | null;
   /** A matching fuel snippet — non-null only when a term matched fuel text. */
   snippet: string | null;
+  /** Population-match flags only included for explicitly selected populations. */
+  isFavourite?: number;
+  isBirthday?: number;
+  isNotContacted?: number;
+  isSnoozed?: number;
+  isAllContacts?: number;
 }
 
 /** A favourite row for the Manage-favourites reorder screen. */
@@ -191,17 +203,95 @@ const POPULATION_SORT: Record<
 };
 
 /**
- * Additive Phase-25 population read. The tracer implements the implicit Active
- * universe only; legacy listDashboard and its snooze-bearing BASE_WHERE remain
- * byte-for-byte untouched for existing Home consumers until later render plans.
+ * Additive Phase-25 population read. It stays node-pure: the render layer owns
+ * the local wall-clock read and injects it for the birthday window. Legacy
+ * listDashboard and its snooze-bearing BASE_WHERE remain byte-for-byte untouched
+ * for existing Home consumers until later render plans.
  */
-export function listDashboardPopulation(
+function birthdayPredicate(birthdayIds: readonly number[]): string {
+  return birthdayIds.length === 0
+    ? "0"
+    : `c.id IN (${birthdayIds.map(() => "?").join(", ")})`;
+}
+
+function populationMatchColumns(
+  populations: readonly string[],
+  birthdayIds: readonly number[],
+): { sql: string; params: unknown[] } {
+  const selected = [...new Set(populations)].filter((population) =>
+    (DASHBOARD_POPULATIONS as readonly string[]).includes(population),
+  );
+  const columns: string[] = [];
+  const params: unknown[] = [];
+  for (const population of selected) {
+    switch (population) {
+      case "favourites":
+        columns.push(`CASE WHEN ${FAVOURITES_WHERE} THEN 1 ELSE 0 END AS isFavourite`);
+        break;
+      case "birthdays":
+        columns.push(
+          `CASE WHEN ${birthdayPredicate(birthdayIds)} THEN 1 ELSE 0 END AS isBirthday`,
+        );
+        params.push(...birthdayIds);
+        break;
+      case "not-contacted":
+        columns.push(`CASE WHEN ${NOT_CONTACTED_WHERE} THEN 1 ELSE 0 END AS isNotContacted`);
+        break;
+      case "snoozed":
+        columns.push(`CASE WHEN ${SNOOZED_WHERE} THEN 1 ELSE 0 END AS isSnoozed`);
+        break;
+      case "all-contacts":
+        columns.push(
+          `CASE WHEN ((${ACTIVE_SEGREGATION_WHERE}) OR (${NOT_CONTACTED_WHERE})) THEN 1 ELSE 0 END AS isAllContacts`,
+        );
+        break;
+    }
+  }
+  return { sql: columns.length === 0 ? "" : `,\n      ${columns.join(",\n      ")}`, params };
+}
+
+function localMidnightFromReadNow(now: string): Date {
+  const [year, month, day] = now.slice(0, 10).split("-").map(Number);
+  if (
+    !Number.isInteger(year) ||
+    !Number.isInteger(month) ||
+    !Number.isInteger(day) ||
+    month < 1 ||
+    month > 12 ||
+    day < 1 ||
+    day > 31
+  ) {
+    throw new Error("listDashboardPopulation: now must start with YYYY-MM-DD");
+  }
+  // Intentionally construct local parts: never parse the local-wall-clock string
+  // as UTC, which would reintroduce an evening off-by-one in birthday selection.
+  return new Date(year, month - 1, day);
+}
+
+export async function listDashboardPopulation(
   exec: SqlExecutor,
   query: DashboardQueryState,
+  now: string,
 ): Promise<DashboardRow[]> {
-  const orderBy =
-    POPULATION_SORT[resolveDefaultSort(query.sort, query.populations)];
-  return exec.getAllAsync<DashboardRow>(
+  const birthdayDays = new Map<number, number>();
+  let birthdayIds: number[] = [];
+  if (query.populations.includes("birthdays")) {
+    const todayLocal = localMidnightFromReadNow(now);
+    const candidates = await listBirthdayCandidates(exec);
+    for (const candidate of candidates) {
+      const days = daysUntilBirthday(candidate.birthday, todayLocal);
+      if (days !== null && days >= 0 && days <= 30) {
+        birthdayIds.push(candidate.id);
+        birthdayDays.set(candidate.id, days);
+      }
+    }
+  }
+
+  const where = buildPopulationWhere(query.populations, { birthdayIds });
+  const matches = populationMatchColumns(query.populations, birthdayIds);
+  const resolvedSort = resolveDefaultSort(query.sort, query.populations);
+  const orderBy = POPULATION_SORT[resolvedSort];
+  const rows = await exec.getAllAsync<DashboardRow>(
     `SELECT c.id AS id,
       c.name AS name,
       c.photo AS photo,
@@ -211,11 +301,22 @@ export function listDashboardPopulation(
       ${CARD_FAVOURITE_RANK},
       ${CARD_STATUS},
       ${FUEL_LINE} AS fuelText,
-      NULL AS snippet
+      NULL AS snippet${matches.sql}
      ${CARD_FROM}
-     WHERE ${ACTIVE_SEGREGATION_WHERE}
+     WHERE ${where.sql}
      ORDER BY ${orderBy}`,
+    [...matches.params, ...where.params],
   );
+
+  if (resolvedSort === "soonest-birthday") {
+    rows.sort((left, right) => {
+      const daysDelta =
+        (birthdayDays.get(left.id) ?? Number.POSITIVE_INFINITY) -
+        (birthdayDays.get(right.id) ?? Number.POSITIVE_INFINITY);
+      return daysDelta || left.name.localeCompare(right.name) || left.id - right.id;
+    });
+  }
+  return rows;
 }
 
 /** Never-contacted sort clause per NeverContactedSort. */

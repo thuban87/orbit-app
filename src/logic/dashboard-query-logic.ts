@@ -55,9 +55,9 @@ export const ACTIVE_SEGREGATION_WHERE = `c.archived_at IS NULL
 export const DASHBOARD_POPULATION_SCOPE_WHERE = `c.archived_at IS NULL
      AND c.tracking_enabled = 1`;
 
-const NOT_CONTACTED_WHERE = "c.last_contact IS NULL";
-const FAVOURITES_WHERE = "c.favourite_rank IS NOT NULL";
-const SNOOZED_WHERE = `c.snooze_until IS NOT NULL
+export const NOT_CONTACTED_WHERE = "c.last_contact IS NULL";
+export const FAVOURITES_WHERE = "c.favourite_rank IS NOT NULL";
+export const SNOOZED_WHERE = `c.snooze_until IS NOT NULL
      AND date(c.snooze_until) > date('now','localtime')`;
 
 export interface PopulationWhereOptions {

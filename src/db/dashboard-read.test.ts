@@ -369,10 +369,169 @@ describe("listDashboardPopulation — Phase 25 Active universe", () => {
     });
 
     expect(
-      (await listDashboardPopulation(exec, active))
+      (await listDashboardPopulation(exec, active, NOW))
         .map((row) => row.id)
         .sort(),
     ).toEqual([live, snoozed].sort());
+  });
+
+  it("returns a deduped Favourites and Not Contacted OR-union with match reasons", async () => {
+    const both = await seedContact({
+      name: "Both",
+      lastContact: null,
+      favouriteRank: 3,
+    });
+    const favourite = await seedContact({
+      name: "Favourite",
+      lastContact: STABLE(),
+      favouriteRank: 1,
+    });
+    const never = await seedContact({ name: "Never", lastContact: null });
+
+    const rows = await listDashboardPopulation(
+      exec,
+      { ...active, populations: ["favourites", "not-contacted"] },
+      NOW,
+    );
+
+    expect(ids(rows).sort((a, b) => a - b)).toEqual(
+      [both, favourite, never].sort((a, b) => a - b),
+    );
+    expect(rows.filter((row) => row.id === both)).toHaveLength(1);
+    expect(rows.find((row) => row.id === both)).toMatchObject({
+      isFavourite: 1,
+      isNotContacted: 1,
+      status: null,
+      progress: null,
+    });
+  });
+
+  it("keeps snoozed status-bearing contacts in Active and All Contacts", async () => {
+    const snoozed = await seedContact({
+      name: "Snoozed",
+      lastContact: STABLE(),
+      snoozeUntil: localDateOffset(6),
+    });
+    const never = await seedContact({ name: "Never", lastContact: null });
+    await seedContact({
+      name: "Archived",
+      lastContact: STABLE(),
+      archivedAt: NOW,
+    });
+    await seedContact({
+      name: "Unbound",
+      lastContact: null,
+      trackingEnabled: 0,
+    });
+
+    const activeRows = await listDashboardPopulation(exec, active, NOW);
+    const allRows = await listDashboardPopulation(
+      exec,
+      { ...active, populations: ["all-contacts"] },
+      NOW,
+    );
+    const snoozedRows = await listDashboardPopulation(
+      exec,
+      { ...active, populations: ["snoozed", "all-contacts"] },
+      NOW,
+    );
+
+    expect(activeRows.find((row) => row.id === snoozed)).toMatchObject({
+      status: "stable",
+    });
+    expect(ids(allRows).sort((a, b) => a - b)).toEqual(
+      [snoozed, never].sort((a, b) => a - b),
+    );
+    expect(allRows.find((row) => row.id === never)).toMatchObject({
+      status: null,
+      progress: null,
+    });
+    expect(snoozedRows.filter((row) => row.id === snoozed)).toHaveLength(1);
+    expect(snoozedRows.find((row) => row.id === snoozed)?.status).not.toBeNull();
+  });
+
+  it("uses Default order rather than favourite rank and natural snooze/not-contacted orders", async () => {
+    const alphaFavourite = await seedContact({
+      name: "Alpha",
+      lastContact: STABLE(),
+      favouriteRank: 99,
+    });
+    const zetaFavourite = await seedContact({
+      name: "Zeta",
+      lastContact: STABLE(),
+      favouriteRank: 1,
+    });
+    const olderNever = await seedContact({
+      name: "Older",
+      lastContact: null,
+      createdAt: "2026-01-01 00:00:00",
+    });
+    const newerNever = await seedContact({
+      name: "Newer",
+      lastContact: null,
+      createdAt: "2026-02-01 00:00:00",
+    });
+    const earlierSnooze = await seedContact({
+      name: "Earlier",
+      lastContact: STABLE(),
+      snoozeUntil: localDateOffset(3),
+    });
+    const laterSnooze = await seedContact({
+      name: "Later",
+      lastContact: STABLE(),
+      snoozeUntil: localDateOffset(7),
+    });
+
+    expect(
+      (await listDashboardPopulation(
+        exec,
+        { ...active, populations: ["favourites"] },
+        NOW,
+      )).map((row) => row.id),
+    ).toEqual([alphaFavourite, zetaFavourite]);
+    expect(
+      (await listDashboardPopulation(
+        exec,
+        { ...active, populations: ["not-contacted"] },
+        NOW,
+      )).map((row) => row.id),
+    ).toEqual([olderNever, newerNever]);
+    expect(
+      (await listDashboardPopulation(
+        exec,
+        { ...active, populations: ["snoozed"] },
+        NOW,
+      )).map((row) => row.id),
+    ).toEqual([earlierSnooze, laterSnooze]);
+  });
+
+  it("computes the birthday window from injected local time and sorts soonest first", async () => {
+    const tenDays = await seedContact({ name: "Ten", birthday: "08-25" });
+    const twentyFiveDays = await seedContact({
+      name: "Twenty Five",
+      birthday: "09-09",
+    });
+    await seedContact({ name: "Forty", birthday: "09-24" });
+
+    expect(
+      (await listDashboardPopulation(
+        exec,
+        { ...active, populations: ["birthdays"] },
+        "2026-08-15 10:00:00",
+      )).map((row) => row.id),
+    ).toEqual([tenDays, twentyFiveDays]);
+  });
+
+  it("returns no rows for an empty birthday id set without an invalid IN clause", async () => {
+    await seedContact({ name: "Forty", birthday: "09-24" });
+
+    await expect(
+      listDashboardPopulation(
+        exec,
+        { ...active, populations: ["birthdays"] },
+        "2026-08-15 10:00:00",
+      ),
+    ).resolves.toEqual([]);
   });
 });
 

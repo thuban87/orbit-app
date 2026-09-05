@@ -41,7 +41,7 @@ describe("dashboard query store", () => {
     expect(useDashboardQueryStore.getState().sort).toBe("name-asc");
     expect(
       (
-        await listDashboardPopulation(exec, useDashboardQueryStore.getState())
+        await listDashboardPopulation(exec, useDashboardQueryStore.getState(), NOW)
       ).map((row) => row.name),
     ).toEqual(["Alpha", "Zeta"]);
   });
