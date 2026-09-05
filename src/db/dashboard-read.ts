@@ -172,7 +172,7 @@ const CARD_FROM = `FROM contacts c
  * see HIGH-1). The snooze clause uses a BARE `date(c.snooze_until)` vs
  * `date('now','localtime')`.
  */
-const BASE_WHERE = `c.archived_at IS NULL
+export const BASE_WHERE = `c.archived_at IS NULL
      AND ${DASHBOARD_BOUND_WHERE}
      AND c.last_contact IS NOT NULL
      AND (c.snooze_until IS NULL OR date(c.snooze_until) <= date('now','localtime'))`;
@@ -394,10 +394,17 @@ export function listDashboard(
   let orderBy: string;
 
   if (hasTerm) {
-    // Branch 1 — term wins over everything. Relax to archived-only (A3).
+    // Branch 1 — term wins over everything. Relax the never-contacted + snooze
+    // exclusions to archived-only (A3), but stay BOUND-ONLY: `${DASHBOARD_BOUND_WHERE}`
+    // (`c.tracking_enabled = 1`) keeps an Unbound contact out of legacy Home search
+    // (D-13 — closes the DASHQ-08 leak where Unbound rows surfaced as unlabelled
+    // cards). The Unbound name-lookup replacement is coordinated with Phase 26; the
+    // one-phase gap is owner-accepted. Only this branch's inline `where` changes —
+    // BASE_WHERE and every other branch stay byte-unchanged.
     const like = `%${escapeLike(term)}%`;
     params.push(like); // snippet subquery (SELECT clause — appears first)
     where = `c.archived_at IS NULL
+     AND ${DASHBOARD_BOUND_WHERE}
      AND (
        c.name LIKE ? ESCAPE '\\'
        OR EXISTS (SELECT 1 FROM fuel WHERE contact_id = c.id AND ${RANKED_FUEL_EXCLUSIONS} AND text LIKE ? ESCAPE '\\')

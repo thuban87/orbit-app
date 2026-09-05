@@ -10,6 +10,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { nodeSqliteExecutor, openTestDb } from "@/db/__testkit__/node-sqlite";
 import {
+  BASE_WHERE,
   type BirthdayCandidate,
   countArchived,
   countLiveContacts,
@@ -803,7 +804,16 @@ describe("listDashboard — search", () => {
     expect(rows).toEqual([]);
   });
 
-  it("retains an Unbound search result with neutral status and favourite metadata", async () => {
+  it("D-13: the legacy term branch is BOUND-ONLY — an Unbound name match is absent while a Bound match is present", async () => {
+    // Same matching token on a Bound and an Unbound contact. Pre-D-13 the legacy
+    // Home term branch filtered only `archived_at IS NULL`, so the Unbound row
+    // surfaced (as an unlabelled card — the DASHQ-08 leak). With Branch 1 now
+    // bound-only (`${DASHBOARD_BOUND_WHERE}`) the Unbound contact must not appear.
+    const bound = await seedContact({
+      name: "Dormant Bound",
+      lastContact: STABLE(),
+      trackingEnabled: 1,
+    });
     const unbound = await seedContact({
       name: "Dormant Search",
       lastContact: STABLE(),
@@ -816,14 +826,21 @@ describe("listDashboard — search", () => {
       sort: "name",
       term: "dormant",
     });
-    expect(rows).toHaveLength(1);
-    expect(rows[0]).toMatchObject({
-      id: unbound,
-      trackingEnabled: 0,
-      status: null,
-      progress: null,
-      favourite_rank: null,
-    });
+    const rowIds = ids(rows);
+    expect(rowIds).toContain(bound);
+    expect(rowIds).not.toContain(unbound); // D-13: Unbound excluded from legacy Home search
+  });
+
+  it("D-13: only Branch 1's inline WHERE changed — BASE_WHERE stays byte-unchanged", () => {
+    // The legacy default-population predicate must remain byte-identical: the
+    // D-13 change is scoped to the term branch alone (BASE_WHERE + every other
+    // branch are frozen; render phases 26-28 retire the legacy path).
+    expect(BASE_WHERE).toBe(
+      `c.archived_at IS NULL
+     AND c.tracking_enabled = 1
+     AND c.last_contact IS NOT NULL
+     AND (c.snooze_until IS NULL OR date(c.snooze_until) <= date('now','localtime'))`,
+    );
   });
 });
 
