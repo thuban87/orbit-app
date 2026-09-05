@@ -238,8 +238,14 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
   }));
 
   const onToggleSearch = useCallback(() => {
-    setSearchExpanded((expanded) => !expanded);
-  }, []);
+    setSearchExpanded((expanded) => {
+      // Collapsing drops the active query so the list returns to the full
+      // population — a collapsed search must never leave the list silently
+      // filtered with no visible input or indicator (WR-02).
+      if (expanded) setSearchText("");
+      return !expanded;
+    });
+  }, [setSearchText]);
 
   const onClearSearch = useCallback(() => {
     setSearchText("");
@@ -480,7 +486,11 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
     </View>
   ) : emptyState === "filter-empty" ? (
     <View testID="dashboard-empty-filter" style={styles.emptyState}>
-      {query.populations.includes("favourites") ? (
+      {query.populations.includes("favourites") &&
+      populationCounts.favourites === 0 ? (
+        // Only the genuine "no favourites exist" case gets the onboarding copy.
+        // A favourites-population list zeroed by an active filter still HAS
+        // favourites, so it falls through to the neutral filtered-empty copy (WR-03).
         <>
           <Text style={[styles.emptyHeading, { color: colors.textPrimary }]}>
             No favourites yet
