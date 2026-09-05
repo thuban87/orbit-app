@@ -196,4 +196,93 @@ describe("selectDashboardEmptyState — precedence + population gate", () => {
       }),
     ).toBe("hidden");
   });
+
+  it("accepts the legacy filter-enum shape unchanged", () => {
+    expect(
+      selectDashboardEmptyState({
+        live: 1,
+        neverContacted: 0,
+        snoozed: 0,
+        archived: 0,
+        unbound: 0,
+        rowCount: 0,
+        activeFilter: "all",
+        hasTerm: false,
+      }),
+    ).toBe("hidden");
+  });
+
+  it("uses active population filters before the population fallback", () => {
+    expect(
+      selectDashboardEmptyState({
+        live: 4,
+        neverContacted: 0,
+        snoozed: 0,
+        archived: 0,
+        unbound: 0,
+        rowCount: 0,
+        activeFilter: "all",
+        hasTerm: false,
+        activeFilters: { category: ["family"] },
+      }),
+    ).toBe("filter-empty");
+  });
+
+  it("resolves a Birthday population empty cause through the one gate", () => {
+    expect(
+      selectDashboardEmptyState({
+        live: 4,
+        neverContacted: 0,
+        snoozed: 0,
+        archived: 0,
+        unbound: 0,
+        rowCount: 0,
+        activeFilter: "all",
+        hasTerm: false,
+        activePopulations: ["birthdays"],
+        activeFilters: {},
+        populationCounts: {
+          favourites: 0,
+          birthdays: 0,
+          "not-contacted": 0,
+          snoozed: 0,
+          "all-contacts": 4,
+        },
+      }),
+    ).toBe("birthdays-empty");
+  });
+
+  it("resolves Not Contacted and Snoozed population empty causes", () => {
+    const baseInput = {
+      live: 4,
+      neverContacted: 0,
+      snoozed: 0,
+      archived: 0,
+      unbound: 0,
+      rowCount: 0,
+      activeFilter: "all" as const,
+      hasTerm: false,
+      activeFilters: {},
+      populationCounts: {
+        favourites: 0,
+        birthdays: 0,
+        "not-contacted": 0,
+        snoozed: 0,
+        "all-contacts": 4,
+      },
+    };
+
+    expect(
+      selectDashboardEmptyState({
+        ...baseInput,
+        activePopulations: ["not-contacted"],
+      }),
+    ).toBe("not-contacted-empty");
+    expect(
+      selectDashboardEmptyState({
+        ...baseInput,
+        activePopulations: ["snoozed"],
+      }),
+    ).toBe("snoozed-empty");
+  });
 });
