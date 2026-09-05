@@ -167,6 +167,13 @@ const BACKUP_DEFAULTS = {
   modifiedAt: NOW,
 };
 
+const DASHBOARD_DEFAULTS = {
+  dashboardViewMode: "list" as const,
+  dashboardPopulations: "[]",
+  dashboardFilters: "{}",
+  dashboardSort: "default" as const,
+};
+
 type KeysOverlap<A, B> = Extract<keyof A, keyof B>;
 type IsNever<T> = [T] extends [never] ? true : false;
 const portableAndBookkeepingAreDisjoint: IsNever<
@@ -305,6 +312,7 @@ describe("app-settings-dao — read", () => {
       birthdayUnboundEnabled: 1,
       // Theme starts on the seeded package + follow-system, accent/background NULL.
       ...THEME_DEFAULTS,
+      ...DASHBOARD_DEFAULTS,
       // AI starts disabled: provider `none`, empty config, acks 0 (AI-01).
       ...AI_DEFAULTS,
       ...BACKUP_DEFAULTS,
@@ -458,6 +466,7 @@ describe("app-settings-dao — validated write", () => {
       birthdayUnboundEnabled: 1,
       // Theme fields untouched by this patch — still the seeded defaults.
       ...THEME_DEFAULTS,
+      ...DASHBOARD_DEFAULTS,
       // AI fields untouched by this patch — still the disabled defaults.
       ...AI_DEFAULTS,
       ...BACKUP_DEFAULTS,
@@ -1237,9 +1246,9 @@ describe("app-settings-dao — dashboard preference settings (migration 019, Pha
   });
 
   it("rejects invalid dashboard preference JSON and enum values before writes", async () => {
-    await expect(updateAppSettings(exec, { dashboardSort: "rank" as never }, LATER)).rejects.toThrow();
-    await expect(updateAppSettings(exec, { dashboardPopulations: '["unknown"]' }, LATER)).rejects.toThrow();
-    await expect(updateAppSettings(exec, { dashboardFilters: '{"unknown":["x"]}' }, LATER)).rejects.toThrow();
+    await expect((async () => updateAppSettings(exec, { dashboardSort: "rank" as never }, LATER))()).rejects.toThrow();
+    await expect((async () => updateAppSettings(exec, { dashboardPopulations: '["unknown"]' }, LATER))()).rejects.toThrow();
+    await expect((async () => updateAppSettings(exec, { dashboardFilters: '{"unknown":["x"]}' }, LATER))()).rejects.toThrow();
     expect((await getAppSettings(exec)).dashboardSort).toBe("default");
   });
 });

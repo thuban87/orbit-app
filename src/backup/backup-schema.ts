@@ -163,6 +163,13 @@ export const PORTABLE_SETTINGS_KEYS = new Set([
   "standardAccent",
   "galaxyBackground",
   "standardBackground",
+  // Phase 25 dashboard keys: allowlisted NOW so a future format-5 backup can
+  // carry them, but getPortableSettingsSnapshot does not emit them yet. Emission,
+  // a format bump, and a forward migration remain Phase 36 scope.
+  "dashboardViewMode",
+  "dashboardPopulations",
+  "dashboardFilters",
+  "dashboardSort",
 ]);
 
 const SECRET_SHAPED_KEY =

@@ -24,6 +24,13 @@ import { bumpDataRevisionCore } from "@/db/data-revision-dao";
 import { inWriteTransaction } from "@/db/transaction";
 import type { SqlExecutor } from "@/db/types";
 import {
+  DASHBOARD_SORT_MODES,
+  type DashboardSortMode,
+  type DashboardViewMode,
+  parseDashboardFilters,
+  parseDashboardPopulations,
+} from "@/logic/dashboard-query-logic";
+import {
   AI_PROVIDER_IDS,
   type AiCloudProviderId,
   type AiProviderId,
@@ -102,6 +109,16 @@ export interface AppSettings {
   galaxyBackground: BackgroundSlotId | null;
   /** Standard's remembered background slot-id, or NULL = package default. */
   standardBackground: BackgroundSlotId | null;
+
+  // --- Dashboard query preferences (Phase 25, migration 019) --------------
+  /** Shared List/Card presentation preference. */
+  dashboardViewMode: DashboardViewMode;
+  /** Raw validated JSON array of explicit population tokens. */
+  dashboardPopulations: string;
+  /** Raw validated JSON object of filter family selections. */
+  dashboardFilters: string;
+  /** Literal default sentinel or an explicit sort override. */
+  dashboardSort: DashboardSortMode;
 
   // --- Optional-AI non-secret settings (Phase 14, AI-01) --------------------
   // NO API KEY LIVES HERE — provider credentials are SecureStore-only
@@ -198,6 +215,13 @@ export interface PortableSettingsSnapshot {
   standardAccent?: AccentId | null;
   galaxyBackground?: BackgroundSlotId | null;
   standardBackground?: BackgroundSlotId | null;
+  // --- Dashboard keys (Phase 25) — allowlisted + writable NOW, emission ----
+  // deferred to Phase 36's format-5 backup plan. They remain optional so the
+  // current snapshot projection intentionally omits them without changing wire.
+  dashboardViewMode?: DashboardViewMode;
+  dashboardPopulations?: string;
+  dashboardFilters?: string;
+  dashboardSort?: DashboardSortMode;
   modifiedAt: string;
 }
 
@@ -256,7 +280,11 @@ type WritableSettingsKey =
   | "galaxyAccent"
   | "standardAccent"
   | "galaxyBackground"
-  | "standardBackground";
+  | "standardBackground"
+  | "dashboardViewMode"
+  | "dashboardPopulations"
+  | "dashboardFilters"
+  | "dashboardSort";
 
 /** The persisted (snake_case) column shape of the id=1 row. */
 interface AppSettingsRow {
@@ -281,6 +309,10 @@ interface AppSettingsRow {
   standard_accent: string | null;
   galaxy_background: string | null;
   standard_background: string | null;
+  dashboard_view_mode: string;
+  dashboard_populations: string;
+  dashboard_filters: string;
+  dashboard_sort: string;
   ai_provider: string;
   ai_model: string;
   ai_custom_endpoint: string;
@@ -362,6 +394,10 @@ const COLUMN_OF: Record<WritableSettingsKey, string> = {
   standardAccent: "standard_accent",
   galaxyBackground: "galaxy_background",
   standardBackground: "standard_background",
+  dashboardViewMode: "dashboard_view_mode",
+  dashboardPopulations: "dashboard_populations",
+  dashboardFilters: "dashboard_filters",
+  dashboardSort: "dashboard_sort",
 };
 
 /** The saved setting is authoritative; device region is used only when it is absent. */
@@ -387,6 +423,7 @@ export async function getAppSettings(exec: SqlExecutor): Promise<AppSettings> {
             include_unbound_never_contacted, birthday_unbound_enabled,
             theme_package, galaxy_mode, standard_mode,
             galaxy_accent, standard_accent, galaxy_background, standard_background,
+            dashboard_view_mode, dashboard_populations, dashboard_filters, dashboard_sort,
             ai_provider, ai_model, ai_custom_endpoint, ai_custom_model,
             ai_prompt_template, ai_ack_openai, ai_ack_anthropic,
             ai_ack_google, ai_ack_custom,
@@ -433,6 +470,10 @@ export async function getAppSettings(exec: SqlExecutor): Promise<AppSettings> {
       null) as BackgroundSlotId | null,
     standardBackground: (row.standard_background ??
       null) as BackgroundSlotId | null,
+    dashboardViewMode: row.dashboard_view_mode as DashboardViewMode,
+    dashboardPopulations: row.dashboard_populations,
+    dashboardFilters: row.dashboard_filters,
+    dashboardSort: row.dashboard_sort as DashboardSortMode,
     // AI non-secret settings. The column default is `'none'`; the cast is a
     // read-shape convenience (validation on WRITE guarantees a known id).
     aiProvider: row.ai_provider as AiProviderId,
@@ -692,6 +733,52 @@ export function assertBackgroundId(field: string, v: unknown): void {
   }
 }
 
+export function assertDashboardViewMode(field: string, v: unknown): void {
+  if (v !== "list" && v !== "card") {
+    throw new Error(
+      `updateAppSettings: ${field} must be 'list' or 'card', got ${String(v)}`,
+    );
+  }
+}
+
+export function assertDashboardSort(field: string, v: unknown): void {
+  if (
+    typeof v !== "string" ||
+    !(DASHBOARD_SORT_MODES as readonly string[]).includes(v)
+  ) {
+    throw new Error(
+      `updateAppSettings: ${field} must be a known dashboard sort, got ${String(v)}`,
+    );
+  }
+}
+
+function parseDashboardJson(field: string, v: unknown): unknown {
+  if (typeof v !== "string") {
+    throw new Error(`updateAppSettings: ${field} must be JSON text`);
+  }
+  try {
+    return JSON.parse(v);
+  } catch {
+    throw new Error(`updateAppSettings: ${field} must be valid JSON text`);
+  }
+}
+
+export function assertDashboardPopulations(field: string, v: unknown): void {
+  if (parseDashboardPopulations(parseDashboardJson(field, v)) === null) {
+    throw new Error(
+      `updateAppSettings: ${field} must be a JSON array of known dashboard populations`,
+    );
+  }
+}
+
+export function assertDashboardFilters(field: string, v: unknown): void {
+  if (parseDashboardFilters(parseDashboardJson(field, v)) === null) {
+    throw new Error(
+      `updateAppSettings: ${field} must be a JSON object of known dashboard filters`,
+    );
+  }
+}
+
 /**
  * Throw unless `v` is a whole automatic-backup day count in [1,3650]. Exported
  * so every backup settings UI validates exactly the DAO's durable boundary.
@@ -749,6 +836,21 @@ function validateAppSettingsPatch(patch: AppSettingsPatch): void {
     if (patch[field] !== undefined) {
       assertBackgroundId(field, patch[field]);
     }
+  }
+  if (patch.dashboardViewMode !== undefined) {
+    assertDashboardViewMode("dashboardViewMode", patch.dashboardViewMode);
+  }
+  if (patch.dashboardSort !== undefined) {
+    assertDashboardSort("dashboardSort", patch.dashboardSort);
+  }
+  if (patch.dashboardPopulations !== undefined) {
+    assertDashboardPopulations(
+      "dashboardPopulations",
+      patch.dashboardPopulations,
+    );
+  }
+  if (patch.dashboardFilters !== undefined) {
+    assertDashboardFilters("dashboardFilters", patch.dashboardFilters);
   }
   if (patch.phoneRegionOverride !== undefined) {
     assertPhoneRegionOverride("phoneRegionOverride", patch.phoneRegionOverride);

@@ -54,6 +54,11 @@ import type { ProfileStatus } from "@/db/contact-status-read";
 import { escapeLike, RANK_CASE, RANKED_FUEL_EXCLUSIONS } from "@/db/fuel-read";
 import { PROGRESS_SQL, STABLE_MAX, STATUS_SQL } from "@/db/status";
 import type { SqlExecutor } from "@/db/types";
+import {
+  ACTIVE_SEGREGATION_WHERE,
+  type DashboardQueryState,
+  resolveDefaultSort,
+} from "@/logic/dashboard-query-logic";
 
 /** The dashboard filter chips — a closed set of code-constant identifiers. */
 export type DashboardFilter =
@@ -168,6 +173,45 @@ const SORT: Record<DashboardSort, string> = {
   "least-recent": "c.last_contact ASC, c.name COLLATE NOCASE, c.id",
   "most-recent": "c.last_contact DESC, c.name COLLATE NOCASE, c.id",
 };
+
+const POPULATION_SORT: Record<
+  Exclude<ReturnType<typeof resolveDefaultSort>, "default">,
+  string
+> = {
+  status: SORT.status,
+  "name-asc": SORT.name,
+  "name-desc": "c.name COLLATE NOCASE DESC, c.id DESC",
+  "least-recent": SORT["least-recent"],
+  "most-recent": SORT["most-recent"],
+};
+
+/**
+ * Additive Phase-25 population read. The tracer implements the implicit Active
+ * universe only; legacy listDashboard and its snooze-bearing BASE_WHERE remain
+ * byte-for-byte untouched for existing Home consumers until later render plans.
+ */
+export function listDashboardPopulation(
+  exec: SqlExecutor,
+  query: DashboardQueryState,
+): Promise<DashboardRow[]> {
+  const orderBy =
+    POPULATION_SORT[resolveDefaultSort(query.sort, query.populations)];
+  return exec.getAllAsync<DashboardRow>(
+    `SELECT c.id AS id,
+      c.name AS name,
+      c.photo AS photo,
+      c.modified_at AS modified_at,
+      cat.name AS categoryLabel,
+      c.tracking_enabled AS trackingEnabled,
+      ${CARD_FAVOURITE_RANK},
+      ${CARD_STATUS},
+      ${FUEL_LINE} AS fuelText,
+      NULL AS snippet
+     ${CARD_FROM}
+     WHERE ${ACTIVE_SEGREGATION_WHERE}
+     ORDER BY ${orderBy}`,
+  );
+}
 
 /** Never-contacted sort clause per NeverContactedSort. */
 const NC_SORT: Record<NeverContactedSort, string> = {
