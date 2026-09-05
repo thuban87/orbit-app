@@ -131,6 +131,10 @@ const CADENCE_OWNERS: Record<string, LedgerEntry> = {
     owner: "24.1-04",
     note: "Read-only Things-to-Remember projection carries nullable interval_days for display; derived intensity delegates to the null-safe impact reader.",
   },
+  "src/logic/dashboard-query-logic.ts": {
+    owner: "25-03",
+    note: "Closed Contact Frequency bucket predicates read interval_days only inside the Dashboard population scope, which structurally requires tracking_enabled = 1.",
+  },
 };
 
 /**
