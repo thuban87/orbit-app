@@ -1,274 +1,233 @@
 ---
 phase: 27
+cycle: 2
 reviewers: [codex, claude]
-reviewed_at: 2026-09-05T20:57:18Z
+reviewed_at: 2026-09-05T00:00:00Z
 plans_reviewed: [27-01-PLAN.md, 27-02-PLAN.md, 27-03-PLAN.md, 27-04-PLAN.md, 27-05-PLAN.md, 27-06-PLAN.md]
 models:
-  codex: "gpt-5.6-terra (reasoning=low)"
-  claude: "sonnet (reasoning=low)"
+  codex: "gpt-5.6-terra (reasoning=medium)"
+  claude: "claude-opus-4-8"
 model_sources:
   codex: "banner"
-  claude: "pinned"
+  claude: "in-session-orchestrator"
 ---
 
-# Cross-AI Plan Review — Phase 27: Dashboard List View
+# Cross-AI Plan Review — Phase 27 (Cycle 2)
+
+> Cycle 2 of the plan-review convergence loop. Plans were revised (commit 6d41224) to address the four cycle-1 HIGHs. Both lanes reviewed the revised plans against the source on disk. The Claude lane was produced by the orchestrating Claude Code session as a read-only, source-grounded analysis (the `claude -p` CLI sub-lane was bypassed in favour of the in-session reviewer, per the owner-approved fallback for this run); the Codex lane ran via `codex exec` (read-only sandbox, gpt-5.6-terra, reasoning=medium).
 
 ## Consensus Summary
 
-Two source-grounded reviewers (Codex `gpt-5.6-terra`, Claude `sonnet`) independently
-reviewed the six Phase 27 plans against the code on disk. Both rate the plan set as
-well-researched and correctly grounded: file:line citations spot-check clean, the
-migration-020 facts (head=019, `TARGET_VERSION = 19`) are verified correct, the additive
-read-model widen respects `BASE_WHERE`/the Active predicate, ADR-075 binary favourites are
-honoured everywhere (no `favourite_rank` ordering leaks into the List), and no custom-fields
-dynamic-column language is reintroduced. Risk is concentrated in **Plan 06's search
-composition** — both reviewers make it their top concern — with two further data-correctness
-HIGHs in Plans 03 and 04 raised by Codex and verified against source during this review.
+Both reviewers agree the revised six-plan sequence is substantially stronger than cycle 1 and that **all four cycle-1 HIGHs are FULLY RESOLVED at the plan level, each verified against source** (not merely against the plan's self-description):
 
-The orchestrator independently verified every HIGH below against the code on disk (not just
-the plan text or the reviewer summaries), per the repo's "review the code, not the diff" rule.
+- **HIGH #1 (D-12 / DASHQ-09 relevance-first):** `searchDashboard()` sorts coverage → score → Dashboard-rank tie-break (`dashboard-search-match.ts:131-150`, doc comment :127-130); Plan 06 preserves that order for corpus matches and appends fuel-only (`match === null`) matches in Dashboard order with a defined + tested merge rule. Enforces DASHQ-09; not a reversal.
+- **HIGH #2 (is_current=1):** canonical current-state reads filter `is_current = 1` (`current-state-history-read.ts:31,:48`); `current_state_entries` retains history. Plan 03 adds the predicate + an `is_current=0`-never-returned regression test.
+- **HIGH #3 (async line-3 in cancellation-aware reload):** `HomeScreen.reload()` cancellation structure is exactly as cited (`:283` cancelled flag, `:312` guard, `:313` setRows). Plan 04 folds line-3 into that same flow, committed atomically under the same guard.
+- **HIGH #4 (golden test on listDashboardSearch):** `listDashboardSearch` structure at `dashboard-read.ts:398-446` confirmed; Plan 06 requires a byte-for-byte golden/snapshot test locking rows/order/snippet across the scope-helper extraction, explicitly beyond "existing tests stay green."
 
-### Agreed Strengths
+However, the Codex lane surfaced **two NEW HIGH concerns**, both independently verified against the code by the Claude lane, that block approval until addressed. Neither is a decision reversal — both are correctness/privacy gaps not previously flagged:
 
-- **Additive read-model widen is correct** (both). `DashboardRow` genuinely lacks
-  `last_contact` and `snooze_until` (`src/db/dashboard-read.ts:91`); Plan 01 widens the
-  projection without touching `BASE_WHERE` (`dashboard-read.ts:168/175`), preserving the
-  Active predicate. Verified.
-- **Migration 020 is the correct next number** (both). `src/db/database.ts:54`
-  `TARGET_VERSION = 19`; `019-dashboard-prefs.ts` is the last shipped migration. The
-  CHECK-constraint + validator + allowlist-only backup posture mirrors the `dashboardSort`
-  precedent, and the irreversible schema change is correctly gated behind a blocking-human
-  checkpoint (CLAUDE.md). Verified.
-- **Status treatment guarded against the two known traps** (both). The List uses
-  `ringVisual().color` at a constant width (not the escalating `ring.width`), and the
-  null-status glyph is not mounted — matching UI-SPEC §I/D-07.
-- **ADR-075 honoured** (both). Binary favourites only; `favourite_rank`/`listFavourites`
-  excluded from List consumption. No decision reversal here.
-- **No per-row DB reads**: line-3 (Plan 03) and corpus search (Plan 06) both use batch
-  `contact_id IN (...)` reads reusing the `placeholders()` idiom.
+1. **Plan 06 — hidden/outdated corpus leakage.** `listKnowledgeSearchCandidates` (the previously-unwired corpus reader Plan 06 wires into visible List search) filters only `deleted_at IS NULL` on memories (`knowledge-search-read.ts:135`, plus type) and only `deleted_at IS NULL` on relationships (:104). `memories` has `hidden` and `outdated` columns and `relationships` has `hidden` (migration `016-contact-knowledge.ts:22-23,:40`), so wiring this reader surfaces content the user deliberately hid or marked outdated — inconsistent with line-3 (Plan 03) and fuel, both of which exclude those. Plan 06's threat model T-27-11 ("reads only live, user-facing entries") is **false against current code**.
+2. **Plan 03 — per-source `LIMIT` does not bound per contact.** A `LIMIT N` on a `contact_id IN (...)` batch query caps the whole result set, not each contact, so contacts later in SQL order receive zero candidates and wrongly render a completeness prompt despite having knowledge. The plan's own boundedness acceptance test seeds a **single** contact and would not catch the multi-contact failure.
 
-### Agreed Concerns
+### Agreed Strengths (2+ reviewers)
 
-- **Plan 06's search-composition rewrite is the top risk (both reviewers, HIGH).** Codex
-  flags that emitting rows "in eligible (Dashboard) order" discards `searchDashboard()`'s
-  relevance ranking; Claude flags that the `listDashboardSearch` scope-extraction is a real
-  production-search refactor whose "byte-for-byte unchanged" claim is asserted, not
-  test-verified, and lands six plans deep. Both are confirmed below.
+- Additive read widening is correctly scoped; `DashboardRow` currently lacks `last_contact`/`snooze_until` while `contacts` already carries them and drives the predicates — projecting without touching Active exclusions is right (`dashboard-read.ts:91-113`).
+- Status treatment correctly avoids the escalating border width (`ringVisual` returns 2/3/4/3 at `contact-card-ring.ts:45`) and correctly guards the null glyph (`StatusGlyph` renders neutral for null).
+- Migration 020 is correct head+1 (`TARGET_VERSION=19`, head `019-dashboard-prefs.ts`), gated behind a blocking-human one-way-door checkpoint, and re-verified at execution time.
+- Plan 02's DAO route faithfully mirrors the shipped `dashboardSort` precedent, including the MED #2 optional-key writability trap (`app-settings-dao.ts:224,:229,:255`); allowlist-now/emit-later matches the Phase 25 precedent with no unauthorized `BACKUP_FORMAT_VERSION` bump.
+- ADR-075 binary favourites respected: `setFavouriteRank`/`clearFavouriteRank` used strictly as binary mark/clear; the List never sorts by rank and never calls `listFavourites`.
+- Plan 05 correctly single-sources Quick Log (`runQuickLog`) so FAB and swipe cannot diverge; both lanes confirm the FAB path (undo/snackbar/haptic/widget+shell refresh) is the right thing to extract.
+- Plan 06's ordering fix is correctly grounded in the real scorer; both lanes confirm the corpus modules are genuinely unwired (no `src/` consumer) so wiring them is legitimately part of this phase.
+
+### Agreed Concerns (2+ reviewers)
+
+- **Plan 05 nav targets must be named/typed.** The real Dashboard routes are `Edit` and `LogContact` (`DashboardStack.tsx:37,:57`) — there is no `EditContact` route. "screen+params" leaves an executor room to target a non-existent screen. (Codex MED; Claude flagged the same routing family.)
+- **Plan 05 `runQuickLog` extraction shape is under-specified.** `UniversalFab.logContact` is hook/ref-bound (single-flight `useRef`, snackbar/haptic context); a plain `src/services` function cannot call those hooks and a module-scoped single-flight guard changes semantics from per-instance to global. The injection boundary (hook vs injected deps) should be named. (Claude LOW/MED; Codex implicitly via the extraction concern.)
 
 ### Divergent Views
 
-- Codex raises two additional data-correctness HIGHs (Plan 03 `is_current`, Plan 04 async
-  lifecycle) that Claude did not surface; the orchestrator verified both against source and
-  they stand. Claude's Plan 04 note instead treats the snooze path as safe dead code
-  (verified correct — the column exists, unwritten until Phase 11).
-- Claude treats the "unwired corpus modules" premise as a MEDIUM to re-verify; the
-  orchestrator ran the recommended full-repo grep and confirmed **no `src/` consumer** of
-  `searchDashboard`/`listKnowledgeSearchCandidates` exists — the premise holds, downgrading
-  that concern to LOW/advisory.
-
-### Verified HIGH findings (orchestrator confirmation)
-
-1. **Plan 06 — search results ordered by Dashboard order, discarding relevance (Codex HIGH;
-   confirmed).** `src/logic/dashboard-search-match.ts:130-144` `searchDashboard()` ranks by
-   `coverage → score → dashboard-rank tie-breaker` ("Relevance remains primary" per its own
-   doc comment). Plan 06 (27-06-PLAN.md:103/114) calls `searchDashboard()` but then emits
-   rows "in eligible (Dashboard) order," using the ranked result only for membership +
-   descriptor attachment. This **contradicts recorded requirement DASHQ-09**
-   (`.planning/REQUIREMENTS.md:80`, marked complete: "ranks by term coverage ... treats the
-   Dashboard sort as tie-breaker only"). No D-NN in 27-CONTEXT.md or E3 in 27-UI-SPEC.md
-   decides Dashboard-order for search results. **See OWNER ESCALATION below.**
-2. **Plan 03 — current-state candidates omit `is_current = 1` (Codex HIGH; confirmed).**
-   Plan 03 Task 2 (27-03-PLAN.md:102/114) reads `current_state_entries` via
-   `contact_id IN (...)` applying `hidden`/`deleted_at`/`outdated`/birthday exclusions but
-   **not** `is_current = 1`. The table retains history, and the repo's own current-value read
-   requires that predicate (`src/db/current-state-history-read.ts:47`
-   `WHERE contact_id = ? AND is_current = 1`). Without it a stale former value can win the
-   deterministic line-3. The `outdated`/`deleted_at` exclusions do not substitute for
-   `is_current` (a superseded-but-not-outdated history row still passes).
-3. **Plan 04 — async line-3 load has no lifecycle/race contract (Codex HIGH; confirmed).**
-   Plan 04 (27-04-PLAN.md:144/150) says HomeScreen computes line-3 "ONCE per rendered result
-   set ... memoized on the result set," but `readLine3Candidates()` is async and `useMemo`
-   cannot await a DB read. HomeScreen's actual pattern is a cancellation-aware `reload`
-   `useCallback` (`src/screens/HomeScreen.tsx:282`, cancel handles at :346/:359/:375); the
-   line-3 read must be keyed to the loaded row-id set / query generation and drop stale
-   responses, or fold into `reload()` returning rows + line3 atomically.
-4. **Plan 06 — "byte-for-byte unchanged" extraction claim lacks a regression test (Claude
-   HIGH; confirmed as a test-backing gap).** Extracting `listDashboardSearch`'s scope
-   construction (`dashboard-read.ts:412-415`) into a shared helper is a real refactor of
-   production search code; the plan's acceptance ("rows/order/snippet byte-for-byte
-   unchanged") is guarded only by "existing tests stay green," which may not cover the exact
-   row/order guarantee. A golden/snapshot test on `listDashboardSearch` before/after the
-   extraction is needed.
-
-### OWNER ESCALATION — DASHQ-09 relevance-first ordering
-
-Finding #1 above would **invert recorded requirement DASHQ-09** ("ranks by term coverage ...
-treats the Dashboard sort as tie-breaker only"), which is implemented today as the documented
-contract of `searchDashboard()`. Plan 06 would present dashboard search results in Dashboard
-(status/urgency) order and use relevance only to decide membership. DASHQ-09 lives in
-`.planning/REQUIREMENTS.md` (not an ADR/HANDOFF), and no phase-27 decision record (CONTEXT
-D-NN, UI-SPEC E3) authorizes the change — so this reads as a silent reversal, flagged by a
-reviewer by name.
-
-- **If the Dashboard-order presentation is deliberate** (a product choice for the List
-  surface), that reverses DASHQ-09 and is an **owner/product decision** — it should be
-  recorded as a D-NN (or a superseding requirement note), not shipped inside a plan.
-- **If it is an oversight**, the planner fix is to preserve `searchDashboard()`'s
-  relevance-first ordering for corpus matches (with a defined merge position for fuel-only
-  matches), keeping Dashboard order as tie-breaker per DASHQ-09.
-
-Either way the planner must not silently emit Dashboard-order search results. This is
-surfaced for the owner to decide which half dies.
+- **Severity of the two new findings.** Codex rates both Plan 03 (per-contact bound) and Plan 06 (hidden/outdated leakage) as HIGH. The Claude lane concurs on both after verifying them against source — the leakage is an information-disclosure gap under the local-first privacy posture, and the per-contact bound is a correctness defect the plan's own test would miss. No divergence on disposition: both are unresolved HIGHs, both actionable in-plan, neither a decision reversal.
+- **Plan 04 optimistic-favourite race.** Codex raises a per-contact in-flight/generation rule for rapid double-taps (MED); the Claude lane did not independently raise it but agrees it is a legitimate, cheap-to-address gap.
 
 ---
 
 ## Codex Review
 
-# Plan Review — Phase 27 Dashboard List View
+<!-- gpt-5.6-terra (reasoning=medium), via codex exec, read-only sandbox, source-grounded. -->
 
 ## Summary
 
-The six plans are well researched and generally respect Orbit’s existing architecture: shared dashboard reads, local SQLite, theme tokens, DAO-owned SQL, and explicit accessibility requirements. The main issues are in execution feasibility and search semantics: Plan 06 would discard the existing relevance-ranked search order, and several plans need tighter async/state and data-selection contracts before implementation.
+The revised six-plan sequence is substantially stronger and addresses all four Cycle-1 HIGH findings at the plan level. The main remaining blockers are (1) Plan 03's supposed per-contact bounded read is not actually guaranteed by a plain SQL `LIMIT`, and (2) Plan 06 would wire an existing corpus reader that currently includes hidden/outdated knowledge. Fix those before execution.
 
-## Strengths
+## Plan 01 — Tracer
 
-- The tracer correctly identifies the real read-model gap: `DashboardRow` currently lacks both `last_contact` and `snooze_until`, while both population and search projections omit them. [src/db/dashboard-read.ts:91](/home/bwales/projects/orbit-app/src/db/dashboard-read.ts:91), [src/db/dashboard-read.ts:369](/home/bwales/projects/orbit-app/src/db/dashboard-read.ts:369), [src/db/dashboard-read.ts:422](/home/bwales/projects/orbit-app/src/db/dashboard-read.ts:422)
+Strengths
 
-- Plan 01 correctly preserves the Active predicate. The existing status/population logic explicitly relies on `last_contact IS NOT NULL`; widening the projection without changing `BASE_WHERE` is the right approach. [src/db/dashboard-read.ts:168](/home/bwales/projects/orbit-app/src/db/dashboard-read.ts:168)
+- The additive read projection is correctly scoped: `DashboardRow` currently lacks both fields at `dashboard-read.ts:91`, while `contacts.last_contact` and `contacts.snooze_until` already drive the dashboard predicates. Adding projections without changing the Active exclusions preserves semantics.
+- The status plan correctly avoids the legacy escalating border width: `ringVisual()` returns widths 2/3/4/3 at `contact-card-ring.ts:45`, so the plan's constant row-border width is necessary.
+- The null-glyph guard is necessary and correctly identified: `StatusGlyph` renders a neutral glyph for null, contrary to the List requirement.
 
-- The status treatment is correctly guarded against two existing traps: `ringVisual()` has severity-varying widths, so the List must use only its color; and `StatusGlyph` currently renders a neutral glyph for null. [src/components/contact-card-ring.ts:45](/home/bwales/projects/orbit-app/src/components/contact-card-ring.ts:45), [src/components/contact-card-ring.ts:87](/home/bwales/projects/orbit-app/src/components/contact-card-ring.ts:87), [src/components/icons/StatusGlyph.tsx:55](/home/bwales/projects/orbit-app/src/components/icons/StatusGlyph.tsx:55)
+Concerns
 
-- Plan 02’s migration direction and default are sound. The repository is at migration 019 / target version 19, so 020 is the correct next migration today. [src/db/database.ts:43](/home/bwales/projects/orbit-app/src/db/database.ts:43), [src/db/database.ts:54](/home/bwales/projects/orbit-app/src/db/database.ts:54)
+- **MEDIUM:** The plan says to "reuse" the DST helpers from `fuel-age.ts`, but both `parseLocalMs` and `calendarDaysBetween` are private functions (`fuel-age.ts:33,:65`; only `formatFuelAge` is exported at :92). This cannot be done as written without exporting/refactoring them or duplicating logic.
 
-- The plan correctly follows the existing settings plumbing structure: a writable-key union, snake-case column map, typed row projection, and pre-write validation. [src/db/app-settings-dao.ts:255](/home/bwales/projects/orbit-app/src/db/app-settings-dao.ts:255), [src/db/app-settings-dao.ts:390](/home/bwales/projects/orbit-app/src/db/app-settings-dao.ts:390), [src/db/app-settings-dao.ts:794](/home/bwales/projects/orbit-app/src/db/app-settings-dao.ts:794)
+Suggestions
 
-- Plan 03 correctly avoids per-row database work. The existing knowledge-search reader already demonstrates parameterized batch `IN (...)` reads and an empty-input guard. [src/db/knowledge-search-read.ts:86](/home/bwales/projects/orbit-app/src/db/knowledge-search-read.ts:86), [src/db/knowledge-search-read.ts:190](/home/bwales/projects/orbit-app/src/db/knowledge-search-read.ts:190)
+- Extract a shared exported local-calendar-day helper into `src/utils/dates.ts`, then have both fuel age and list recency use it. Keep `formatLocalDate()` as the local-date renderer.
 
-- Plan 05’s use of the shell’s existing Quick Log behavior is directionally right. The actual quick-log path owns immediate write, feedback, Undo, haptic, refresh, and retry. [src/components/UniversalFab.tsx:228](/home/bwales/projects/orbit-app/src/components/UniversalFab.tsx:228)
+Risk: **MEDIUM** — sound tracer scope, but correct DST reuse needs an explicit implementation seam.
 
-## Concerns
+## Plan 02 — Swipe Preference Migration
 
-### Plan 01 — MEDIUM: stated three-line acceptance conflicts with deliberately omitted line 3
+Strengths
 
-The plan’s must-haves call for “three-line row anatomy,” but its action explicitly says not to add adaptive line 3 until Plan 04. That makes the Plan 01 acceptance impossible as written. The current dashboard has only `ContactCard` with name plus fuel/snippet, so there is no existing third List line to satisfy it. [src/screens/HomeScreen.tsx:677](/home/bwales/projects/orbit-app/src/screens/HomeScreen.tsx:677), [src/components/ContactCard.tsx:150](/home/bwales/projects/orbit-app/src/components/ContactCard.tsx:150)
+- Migration 020 is correctly next on disk (`TARGET_VERSION = 19`, `migration019` last in the ordered registry).
+- The DAO route correctly follows the writable-patch architecture (`AppSettingsPatch` derives from `PortableSettingsSnapshot`; dashboard fields enumerated in `WritableSettingsKey`).
+- Allowlist-now/emit-later matches the existing dashboard-preference precedent.
 
-### Plan 02 — MEDIUM: `AppSettingsPatch` requires a portable-snapshot type change not listed in the implementation map
+Concerns
 
-`AppSettingsPatch` is not independently declared; it derives from `PortableSettingsSnapshot`. Adding only `AppSettings`, `AppSettingsRow`, `WritableSettingsKey`, and `COLUMN_OF` will not make `dashboardRightSwipeAction` writable through `updateAppSettings`. [src/db/app-settings-dao.ts:202](/home/bwales/projects/orbit-app/src/db/app-settings-dao.ts:202), [src/db/app-settings-dao.ts:229](/home/bwales/projects/orbit-app/src/db/app-settings-dao.ts:229)
+- **LOW:** Allowlisting alone does not validate restored values; `assertPortableSettings()` checks only key membership and secret-shaped names. The SQLite CHECK is the durable backstop, but the Phase 36 restore-format work must add value validation. (Plan already states this.)
 
-The plan should explicitly add an optional `dashboardRightSwipeAction?: RightSwipeAction` to `PortableSettingsSnapshot`, following the existing deferred dashboard-preference pattern. [src/db/app-settings-dao.ts:210](/home/bwales/projects/orbit-app/src/db/app-settings-dao.ts:210)
+Suggestions
 
-### Plan 02 — LOW: backup validation claim overstates what allowlisting does
+- Add an explicit migration test for a database that has an `app_settings` singleton from a genuinely early schema version, not merely a freshly bootstrapped latest-schema fixture.
 
-Adding a key to `PORTABLE_SETTINGS_KEYS` only permits the key; `assertPortableSettings` currently performs no value validation for dashboard keys. [src/backup/backup-schema.ts:194](/home/bwales/projects/orbit-app/src/backup/backup-schema.ts:194)
+Risk: **LOW** — appropriate irreversible-change checkpoint and a well-established pattern.
 
-This is acceptable under the “allowlist now, emit/restore in Phase 36” decision, but the threat model should not claim that a tampered backup value is already revalidated on restore. That validation will not exist until Phase 36 actually consumes the key.
+## Plan 03 — Line-3 Data and Selection
 
-### Plan 03 — HIGH: current-state candidates need `is_current = 1`
+Strengths
 
-The proposed line-3 reader includes `current_state_entries` as “other useful knowledge” but does not require filtering to current values. That table intentionally retains history, and the repository’s own current-value reads always require `is_current = 1`. [src/db/migrations/016-contact-knowledge.ts:48](/home/bwales/projects/orbit-app/src/db/migrations/016-contact-knowledge.ts:48), [src/db/current-state-history-read.ts:47](/home/bwales/projects/orbit-app/src/db/current-state-history-read.ts:47)
+- Correctly accounts for retained current-state history (`is_current = 1`, matching `current-state-history-read.ts:31,:48`).
+- The chosen source set matches the phase research's adaptive-line corpus: memories, relationships, current-state entries.
+- The registry change is correctly single-source (`favorite` is presently a heart pair).
 
-Without that predicate, a stale former location or old “last talked about” value can win the deterministic line.
+Concerns
 
-### Plan 03 — MEDIUM: candidate reads are not actually bounded to one useful candidate per contact
+- **HIGH:** "A per-source `LIMIT`" does not create a bounded candidate budget per contact. With `contact_id IN (...)`, a plain `LIMIT 10` caps the entire source query, so contacts later in SQL order receive no candidate at all. This violates the plan's own "per contact" claim and can incorrectly show completeness prompts despite available knowledge.
+- **MEDIUM:** The proposed candidate shape omits a stable candidate `id`, while the selection contract requires stable-ID tie-breaking. The pure selector should not depend on accidental input ordering.
+- **LOW:** `current_state_entries` has no `hidden`, `outdated`, or `deleted_at` columns; the plan should state exclusions per source, rather than implying those predicates apply universally.
 
-The plan describes “at most one candidate line-3 item per contact,” but its task shape returns a flat candidate set across all memories, relationships, and current-state entries. On a contact with substantial history, this can load and sort a large corpus just to render one short line.
+Suggestions
 
-Add deterministic SQL ordering and either per-source limits/windowing or an explicit bounded candidate budget. Also add a test that a contact with many historical/current-state rows remains bounded.
+- Use a `ROW_NUMBER() OVER (PARTITION BY contact_id ORDER BY …)` subquery and filter `row_number <= candidateBudget`; add a multi-contact regression test.
+- Include `id` and `createdAt` in candidates, then define selector ties explicitly.
+- Document source-specific filters: memories use hidden/deleted/outdated, relationships use hidden/deleted, current state uses `is_current = 1`.
 
-### Plan 04 — HIGH: asynchronous line-3 loading has no lifecycle/race contract
+Risk: **HIGH** until the per-contact bound is corrected.
 
-`readLine3Candidates()` is asynchronous, but the plan says HomeScreen will compute and memoize values “once per rendered result set.” `useMemo` cannot await a database read, and HomeScreen currently only maintains `rows`, counts, error, and refreshing state. [src/screens/HomeScreen.tsx:184](/home/bwales/projects/orbit-app/src/screens/HomeScreen.tsx:184), [src/screens/HomeScreen.tsx:282](/home/bwales/projects/orbit-app/src/screens/HomeScreen.tsx:282)
+## Plan 04 — Row Content, Favourite, Accessibility
 
-The plan needs an explicit cancellation-safe effect or inclusion in `reload()` that:
+Strengths
 
-- keys the candidate map to the exact loaded row IDs/query generation;
-- drops stale responses after search/filter changes;
-- clears/replaces stale line-3 values when the result universe changes; and
-- defines loading behavior without causing per-row visual churn.
+- Folding async line-3 loading into the existing cancellation-aware `reload()` is the right design (`HomeScreen.tsx:282,:312`).
+- Binary favourite writes use the established single-column transactional DAO ops (`favourites-dao.ts:32,:59`).
+- Accessibility labels reuse the real status terms (`StatusGlyph.tsx:37`).
 
-### Plan 05 — MEDIUM: swipe routing cannot simply reproduce Universal FAB routing from HomeScreen
+Concerns
 
-The existing Quick Log implementation is private to `UniversalFab`, including its single-flight guard, undo controller, snackbar behavior, widget refresh, and shell refresh. [src/components/UniversalFab.tsx:126](/home/bwales/projects/orbit-app/src/components/UniversalFab.tsx:126), [src/components/UniversalFab.tsx:228](/home/bwales/projects/orbit-app/src/components/UniversalFab.tsx:228)
+- **MEDIUM:** The optimistic favourite plan lacks a per-contact in-flight/sequence rule. Rapid double taps can leave an older failed write reverting a newer optimistic choice. DAO write serialization does not by itself prevent stale UI failure handlers from overwriting newer local state.
+- **LOW:** The stale-load invariant is excellent, but no HomeScreen test file is in the plan's modified files. The acceptance criterion should require a focused test around cancellation/state commit, not only a code-reading assertion.
 
-Likewise, detailed logging from the FAB is routed through the root navigation ref into `DashboardTab`, not a local stack navigation assumption. [src/components/UniversalFab.tsx:301](/home/bwales/projects/orbit-app/src/components/UniversalFab.tsx:301)
+Suggestions
 
-The plan should first extract a shared, callable Quick Log command/service, or explicitly define a shell dispatch API. Duplicating `recordTouchpoint()` from HomeScreen risks inconsistent Undo, retry, haptic, and refresh behavior.
+- Track a per-contact mutation generation; revert only when the failed request still owns the latest generation.
+- Add a HomeScreen reload-controller extraction or test seam that proves cancelled line-3 work cannot commit state.
 
-### Plan 06 — HIGH: result ordering contradicts the shared search ranking contract
+Risk: **MEDIUM** — architecture sound; optimistic-write races need an explicit rule.
 
-The plan says `composeDashboardSearch()` should emit rows in “Dashboard eligible order.” That discards the relevance order computed by `searchDashboard()`. The existing scorer explicitly ranks by term coverage, then score, and only uses dashboard order as a tie-breaker. [src/logic/dashboard-search-match.ts:127](/home/bwales/projects/orbit-app/src/logic/dashboard-search-match.ts:127), [src/logic/dashboard-search-match.ts:139](/home/bwales/projects/orbit-app/src/logic/dashboard-search-match.ts:139)
+## Plan 05 — Swipe Gestures
 
-This conflicts with DASHQ-09’s relevance-first behavior. The composition must retain the corpus-ranked ordering for corpus matches while defining how fuel-only matches are merged without making Dashboard sort the primary ordering.
+Strengths
 
-### Plan 06 — MEDIUM: corpus search behavior is not equivalent to current dashboard scope without an explicit decision
+- Correctly uses the installed Reanimated `ReanimatedSwipeable` with worklet-backed action renderers.
+- Extracting Quick Log avoids a second `recordTouchpoint` path; the current FAB path includes undo, snackbar, haptics, widget refresh, and shell refresh (`UniversalFab.tsx:198-276`).
+- Root navigation is correctly required for Edit: the actual Dashboard route is `Edit`, not an `EditContact` route (`DashboardStack.tsx:57`).
 
-`listKnowledgeSearchCandidates()` includes names, categories, contact methods, memories, relationships, and custom fields. [src/db/knowledge-search-read.ts:185](/home/bwales/projects/orbit-app/src/db/knowledge-search-read.ts:185) The current `listDashboardSearch()` only searches name and eligible fuel. [src/db/dashboard-read.ts:416](/home/bwales/projects/orbit-app/src/db/dashboard-read.ts:416)
+Concerns
 
-Wiring the corpus is intended, but the plan must test all population/filter post-processing paths—especially gravity, which is post-processed after the SQL read—so a corpus match cannot bypass the same eligible universe constraints. `applyPopulationPostProcessing()` is the relevant boundary. [src/db/dashboard-read.ts:388](/home/bwales/projects/orbit-app/src/db/dashboard-read.ts:388)
+- **MEDIUM:** The plan should explicitly name the navigation targets and type them: `LogContact` and `Edit`. "screen+params" leaves an executor room to use a non-existent `EditContact` screen.
+- **LOW:** A failed `getAppSettings()` during right-swipe commit has no stated fallback/error behavior. The schema default protects normal cases, but a DAO/read failure should not silently consume the gesture.
 
-### Plan 06 — LOW: skeleton and transition implementation is underspecified
+Suggestions
 
-HomeScreen currently has no initial-load state or skeleton row component; it starts with an empty `rows` array and renders the empty host. [src/screens/HomeScreen.tsx:184](/home/bwales/projects/orbit-app/src/screens/HomeScreen.tsx:184), [src/screens/HomeScreen.tsx:424](/home/bwales/projects/orbit-app/src/screens/HomeScreen.tsx:424)
+- Define a typed helper such as `navigateDashboardContactAction(contactId, "LogContact" | "Edit")`.
+- Treat preference-read failure as Quick Log fallback plus error telemetry, or show a retryable notification; choose one explicitly.
 
-The plan should name the state fields and component/layout responsible for distinguishing initial load, delayed refresh, and ordinary fast query replacement. It should also specify focus/AppState gating for any new motion, consistent with the existing search animation guard. [src/screens/HomeScreen.tsx:215](/home/bwales/projects/orbit-app/src/screens/HomeScreen.tsx:215)
+Risk: **MEDIUM** — shared-command extraction is valuable, but navigation and preference-read failure need tighter contracts.
 
-## Suggestions
+## Plan 06 — Search, Motion, Shared States
 
-- Amend Plan 01’s success criteria to call it a two-content-line tracer with reserved line-3 geometry, or defer the literal “three-line anatomy complete” criterion to Plan 04.
+Strengths
 
-- Amend Plan 02 to update `PortableSettingsSnapshot` as well as the DAO structures, and narrow the backup claim to “allowlisted for a future format” rather than restore-validated today.
+- Cycle-1 ordering correction is correctly grounded in the real scorer (`dashboard-search-match.ts:131-149`).
+- The corpus-first/fuel-only-second merge preserves the owner's D-12 relevance-first decision.
+- Correctly recognizes that the current HomeScreen search route is still the old name/fuel query (`HomeScreen.tsx:299`), so wiring is still required.
+- The existing motion gate is available and correctly scoped to focused/foreground/non-reduced-motion (`HomeScreen.tsx:215`).
 
-- Amend Plan 03 to require `current_state_entries.is_current = 1`, deterministic SQL ordering, and a bounded per-contact candidate strategy.
+Concerns
 
-- Make Plan 04 load line-3 candidates within the existing cancellation-aware reload flow, returning `{ rows, line3ByContactId }` atomically for the same query generation.
+- **HIGH:** `listKnowledgeSearchCandidates()` currently does **not** exclude hidden or outdated knowledge. Its relationship SQL filters only `deleted_at IS NULL` (`knowledge-search-read.ts:99`) and its memory SQL filters only `deleted_at IS NULL` and type (:124). Wiring this reader into visible List search would surface hidden/outdated memory or relationship content. Plan 06's threat-model claim is therefore false against current code.
+- **MEDIUM:** The supposedly batch corpus reader still makes one `getValuesForContact()` call per eligible contact (`knowledge-search-read.ts:281`). On a broad search universe this is N+1 database work; Plan 06 neither changes that file nor bounds it.
+- **MEDIUM:** HomeScreen serves both list and card modes, but the Plan 06 `reload()` replacement is global (branches on term, not viewMode). D-12 specifies **List View** relevance ordering; applying `composeDashboardSearch()` universally changes Card View's pre-Phase-28 behavior and is scope creep unless Card View explicitly adopts the same order.
 
-- Before Plan 05, extract the current `UniversalFab.logContact` command into a shared shell/capture action. Reuse that command from FAB and List swipe so its truthful success/error/Undo behavior remains single-sourced.
+Suggestions
 
-- Rewrite Plan 06 ordering: retain `searchDashboard()` relevance ranking for corpus matches; explicitly merge fuel-only matches after relevance-ranked results or score them through the same shared matcher. Do not re-sort the final result set in dashboard order.
+- Add `src/db/knowledge-search-read.ts` and tests to Plan 06. Filter memories with `deleted_at IS NULL AND hidden IS NOT 1 AND outdated = 0`; filter relationships with `deleted_at IS NULL AND hidden IS NOT 1`.
+- Replace per-contact custom-field reads with one joined normalized-value batch query over eligible IDs and live definitions.
+- Invoke corpus composition only for `query.viewMode === "list"` until the Card View plan explicitly adopts the shared relevance order.
 
-## Risk Assessment
+Risk: **HIGH** until corpus privacy filters are fixed.
 
-**Overall: MEDIUM-HIGH.**
+## Cycle-1 HIGH Findings (Codex verdict)
 
-The foundation and migration work are solid, but the phase has two high-risk correctness gaps: stale/history knowledge can surface in line 3, and Plan 06 would undo the project’s relevance-first search behavior. The HomeScreen async wiring and capture-action reuse also need concrete contracts before execution. With those amendments, the plan set is executable without reopening any ADR or requiring an owner decision.
+- **HIGH #1 — FULLY RESOLVED at plan level.** Plan 06 preserves `searchDashboard()` order; source confirms relevance-first. Fuel-only ordering explicitly defined and testable.
+- **HIGH #2 — FULLY RESOLVED at plan level.** Plan 03 adds `is_current = 1`, matching the canonical reads.
+- **HIGH #3 — FULLY RESOLVED at plan level.** Plan 04 places line-3 loading in the existing cancellation flow, whose stale-result guard is real.
+- **HIGH #4 — FULLY RESOLVED at plan level.** Plan 06 requires a golden regression test around the scope extraction; no longer relies on ordinary test pass-through as proof.
+
+Overall: **HIGH risk pending two revisions** — correct Plan 03's per-contact batching and Plan 06's hidden/outdated corpus leakage before approval.
 
 ---
 
 ## Claude Review
 
-# Cross-AI Plan Review — Phase 27: Dashboard List View (6 plans)
+**Mechanism:** produced by the orchestrating Claude Code session (claude-opus-4-8) as a read-only, source-grounded analysis; the `claude -p` CLI sub-lane was bypassed per the owner-approved fallback for this run.
 
 ## Summary
 
-The plan set is unusually well-grounded: nearly every claim I checked against the actual repo (`dashboard-read.ts`, `contact-card-ring.ts`, `icon-registry.ts`, `favourites-dao.ts`, `app-settings-dao.ts`, `backup-schema.ts`, `use-reduced-motion.ts`) matched what the plans assert, file:line references included. The migration-020 facts (head=019, TARGET_VERSION=19) are correct on disk. The architecture (additive read-model widen → batch knowledge read → presentational `ListRow` → swipe host → search composition) is sound and correctly sequences around real gaps in `dashboard-read.ts`. The most serious concern is in 27-06: it invents a new composition path (`listDashboardSearchEligible` + `composeDashboardSearch`) that is a genuine, non-trivial rewrite of search data-flow, staged very late (Wave 5) after four prior plans render against `listDashboardSearch`'s existing `snippet` — meaning search rendering logic partially built in earlier waves may need rework, and the "behaviour-preserving" extraction claim for `listDashboardSearch`'s scope needs careful verification, not just assertion.
+Cycle-2 plans are strong and materially improved. All four cycle-1 HIGHs are genuinely resolved and each was verified against the code on disk, not merely against the plan's self-description. No decision reversal (ADR-075, D-04..D-12, migration ordering) is introduced; the plans consistently ENFORCE recorded decisions. Independently re-verifying the Codex lane's two new HIGHs against source confirms both hold: the corpus reader leaks hidden/outdated content, and the Plan 03 per-source LIMIT does not bound per contact.
+
+## Cycle-1 HIGH verification (against source)
+
+- **HIGH #1 — FULLY RESOLVED.** `dashboard-search-match.ts:131-150` sorts coverage → score → Dashboard tie-break; doc comment :127-130 confirms relevance primary. Plan 06 preserves that order and defines + tests the fuel-only (`match === null`) merge. Enforces DASHQ-09.
+- **HIGH #2 — FULLY RESOLVED.** `current-state-history-read.ts:31,:48` filter `is_current = 1`; `getCurrentStateHistory` reads without it (history retained). Plan 03 adds the predicate + `is_current=0` regression test.
+- **HIGH #3 — FULLY RESOLVED.** `HomeScreen.reload()` at :282-336 matches cited lines exactly (:283 flag, :312 guard, :313 setRows). Plan 04 folds line-3 in atomically under the same guard.
+- **HIGH #4 — FULLY RESOLVED.** `listDashboardSearch` at :398-446 with scope :412-415, both search + population using `applyPopulationPostProcessing`. Plan 06 requires a byte-for-byte golden test across the extraction.
 
 ## Strengths
 
-- **27-01 (tracer)**: Correctly identifies the two real gaps — `DashboardRow` has no `last_contact` or `snooze_until` (verified: `dashboard-read.ts:91-113` truly lacks both) — and widens additively without touching `BASE_WHERE`. The P-2/P-3 pitfalls (ring width escalation, null-status glyph) are correctly diagnosed against `contact-card-ring.ts:51-60` and `StatusGlyph.tsx:55-63`/`contact-card-ring.ts:99-102`.
-- **27-02 (migration)**: The `head+1=020` claim is verified correct (`database.ts:54` `TARGET_VERSION = 19`, `019-dashboard-prefs.ts` is the last shipped migration). The CHECK-constraint + validator + allowlist-only backup posture correctly mirrors the `dashboardSort` precedent (`app-settings-dao.ts:744-753`, `backup-schema.ts:166-173`). Correctly reserves the blocking-human gate for the irreversible schema change per CLAUDE.md.
-- **27-03 (line-3 + star)**: The star-fix claim ("no `<Icon name="favorite">` consumer anywhere") is plausible from `icon-registry.ts:37` and matches ContactCard's literal `"★"` usage (`ContactCard.tsx:184-190`) rather than the registry — safe to change.
-- **27-04/27-05**: Correctly reuse `favourites-dao.ts`'s binary mark/clear (never `favourite_rank` as order — `dashboard-read.ts:465-472`/`listFavourites` correctly excluded from the List's consumption per ADR-075). The swipe plan correctly identifies `ReanimatedSwipeable` as unused anywhere in `src/` and stages the worklet/JS-thread boundary correctly (translation never in React state).
-- Every plan's `<read_first>` lists real files with real line ranges; spot-checking several found no fabricated citations.
+- Plan 02 mirrors the shipped `dashboardSort` precedent precisely (`app-settings-dao.ts:224` optional key + :202-210 trap comment, :229 patch derivation, :255 writable key, :400 COLUMN_OF, :744 validator); MED #2 writability trap guarded by a round-trip test.
+- Migration head verified: `019-dashboard-prefs.ts`, `TARGET_VERSION = 19` → 020 correct; blocking-human one-way-door checkpoint + re-verify at execution.
+- ADR-075 binary favourites respected: `favourites-dao` mark/clear used as binary membership; no rank-as-order, no `listFavourites` for the star.
+- Corpus modules confirmed unwired (no non-test `src/` consumer of `searchDashboard`/`listKnowledgeSearchCandidates`).
+- Plan 05 single-sources Quick Log and routes Log/Edit via the FAB's `navigationRef` dispatch.
 
 ## Concerns
 
-- **HIGH — 27-06 introduces a substantively new, non-trivial data-composition layer very late, risking rework of earlier waves' search rendering.** The plan invents `listDashboardSearchEligible` (a new scope-extraction from `listDashboardSearch`) and `composeDashboardSearch` (unioning corpus search results from `listKnowledgeSearchCandidates`/`searchDashboard` with fuel-only fallback from the existing `listDashboardSearch`). This is architecturally sound in isolation, but: (a) `listDashboardSearch` at `dashboard-read.ts:398-446` is currently a single self-contained function — extracting its `scope` construction (lines 412-415) into a shared helper is a real refactor of production search code that has never been exercised by this new consumer before Wave 5, and the plan's own acceptance criteria ("`listDashboardSearch`'s existing rows/order/snippet output is byte-for-byte unchanged") is asserted but not test-verified beyond "existing tests stay green" — existing tests may not cover the exact byte-for-byte row/order guarantee under the refactor; (b) plans 27-04 (search... wait, actually rendering search is 27-06 only) — checking again: the earlier plans (27-01 through 27-05) do NOT render search mode at all, so there's no actual double-build risk from ordering, but the *architectural discovery* that `listDashboardSearch.snippet` is fuel-only and insufficient for LISTV-06 comes only in Research/27-06, six plans deep — meaning if this insight had been wrong or contested, the previous five plans' `ListRow` component would need a shape change to its props (adding a `DashboardSearchResult`-shaped field, not present in 27-01's or 27-04's `ListRow` prop contracts). Recommend front-loading a note in 27-01 or 27-04 flagging that search-mode props are still TBD until 27-06, to avoid an accidental "search mode is just `DashboardRow.snippet`" implementation being calcified by an executor working plan-by-plan without full context.
-- **MEDIUM — 27-06's claim that `dashboard-search-match.ts` and `knowledge-search-read.ts` are "BUILT + TESTED but UNWIRED (no `src/` consumer)" is a strong, load-bearing claim that determines the whole plan's premise.** I traced imports: `dashboard-search-match.ts` exports `searchDashboard`/`buildDashboardSearchResult`, and `knowledge-search-read.ts` exports `listKnowledgeSearchCandidates`. Neither appears imported in `HomeScreen.tsx` or `dashboard-read.ts` in the files I read. This is consistent with the plan's claim, but I did not exhaustively grep all of `src/` for other consumers (e.g. a Profile-side "Contact Knowledge search" feature might already wire these for a different UI surface). If another screen already consumes `composeDashboardSearch`-equivalent logic differently, 27-06 risks diverging implementations. **Recommend the executor re-run a full-repo grep for `searchDashboard(` and `listKnowledgeSearchCandidates(` immediately before starting 27-06**, not trust the plan's assertion alone (per CLAUDE.md "review the code, not the diff").
-- **MEDIUM — 27-01's Pitfall-P4/snooze composition is deferred entirely to "will simply never trigger until Phase 11."** This is explicitly flagged and reasonable, but note that `dashboard-read.ts:33-36` says the snooze contract is for "Phase 11's future writer," and `SNOOZED_WHERE`/`countSnoozed` already exist and are used by `dashboard-query-logic.ts`. Verified: `contacts.snooze_until` column already exists in the schema referenced by `BASE_WHERE` (`dashboard-read.ts:175`) and `SNOOZED_WHERE` (`dashboard-query-logic.ts:156-157`) — so the column exists, just unwritten by any UI flow yet. The plans are correct that this is safe to implement now (dead code path), not a fabrication.
-- **LOW — 27-02's Task 1 checkpoint (`blocking-human`) is correctly gated**, but the plan text embeds the exact migration SQL as if final in the `<context>`/`<action>` blocks in both 27-02 and the pattern doc, before the human gate resolves. This is a plan-writing nit (not a functional issue) — the checkpoint exists, so it's fine, but a hurried executor could act on the "as-specified" SQL text appearing twice before reaching the gate. No code fix needed, just confirm the executor actually stops at Task 1 before Task 2 runs (Task 2 depends on Task 1 in the wave, which is correctly ordered).
-- **LOW — Icon registry change (`favorite: heart → star`) in 27-03 Task 1 is a global, single-source change affecting any future Card View (Phase 28) consumer.** The plan correctly notes ContactCard's literal `"★"` is untouched, so no immediate collision, but Phase 28 (Card View, not yet planned) will need to know the registry semantic name now resolves to a star, not a heart — worth a one-line note forward, not a blocker.
-- **LOW — DECISION-REVERSAL check**: No plan reopens or reverses a `[DECIDED]`/ADR item. ADR-075 (binary favourites, no rank) is correctly honored everywhere (`listFavourites`/`favourite_rank` explicitly excluded from List consumption in 27-04). No custom-fields dynamic-column language present. No concerns here.
+- **HIGH (concurs with Codex) — Plan 06 hidden/outdated leakage.** Verified: `memories` has `hidden`(:23)/`outdated`(:22), `relationships` has `hidden`(:40) (migration `016`); the corpus read excludes only `deleted_at`. Wiring it into visible search surfaces content the user hid/marked outdated — inconsistent with line-3/fuel and with local-first privacy. Plan 06 T-27-11 is false. Actionable: add the hidden/outdated exclusions to `knowledge-search-read.ts` (add file + regression test to Plan 06), or escalate the visibility tradeoff.
+- **HIGH (concurs with Codex) — Plan 03 per-contact bound.** Verified SQL semantics: a single `LIMIT` over `contact_id IN (...)` bounds the whole query; the plan's single-contact boundedness test would not catch multi-contact starvation. Actionable: specify a partitioned/windowed per-contact cap + a multi-contact coverage test.
+- **LOW — Plan 04 star initial membership source is implicit.** Must derive from `DashboardRow.favourite_rank !== null` (projected via `CARD_FAVOURITE_RANK` in both reads at :375/:428); `isFavourite?` is only populated for the favourites population. Plan 04 should state this so an executor does not reach for `listFavourites` (prohibited) or rely on an undefined field.
+- **LOW/MED — Plan 05 `runQuickLog` extraction shape.** `logContact` is hook/ref-bound; a plain services function cannot call those hooks. Name the injection boundary (hook vs injected snackbar/haptic/undo deps) so the module-scoped single-flight does not silently change semantics.
+- **LOW (terminology) — Plan 01 references `BASE_WHERE`.** No such literal constant exists in `dashboard-read.ts` (Active exclusions live in `ACTIVE_SEGREGATION_WHERE`/`buildPopulationWhere`). Intent is correct; the name is not. Non-blocking.
+- **LOW (pre-existing, out of scope) — `FavouriteRow` / "Manage-favourites reorder screen" comment at `dashboard-read.ts:115-122`.** ADR-075 retired that screen; not introduced or touched by Phase 27. Noting so it is not mistaken for a regression — removing it is not this phase's call.
 
-## Suggestions
+## Decision-reversal check
 
-1. In 27-04 (or earlier), add an explicit note that `ListRow`'s prop contract must reserve a slot for the eventual search-mode `DashboardSearchResult | null` even though it's not implemented until 27-06 — this avoids an incompatible prop shape needing retrofit.
-2. Before starting 27-06, have the executor grep the full repo (not just the files cited) for existing consumers of `searchDashboard`, `buildDashboardSearchResult`, and `listKnowledgeSearchCandidates` to confirm the "unwired" premise still holds, and confirm no divergent implementation exists elsewhere that should be reused instead.
-3. Add a task-level test asserting `listDashboardSearch`'s output is unchanged before/after the scope-extraction refactor in 27-06 Task 1 (a snapshot/golden-row test), rather than relying on "existing tests stay green" as the sole regression guard for a production search path refactor.
-4. Consider whether 27-06's Task 1 (search composition) could be resequenced earlier (e.g., Wave 2, alongside 27-02/27-03) so the `ListRow` prop contract for search mode is known before 27-04 builds the non-search row — reducing risk of a late prop-shape change. This is a scheduling suggestion, not a correctness blocker, since the current dependency graph (27-06 depends_on 27-04 and 27-05) does prevent any actual wasted work.
+None. Every plan enforces its governing decision (D-12 relevance-first, ADR-075 binary star, forward-only migration ordering, allowlist-now/emit-later). The two new HIGHs are correctness/privacy gaps, not reversals.
 
-## Risk Assessment: **MEDIUM**
+## Risk Assessment
 
-The plan set is well-researched and internally consistent, with strong verified grounding in the actual codebase and correct handling of the phase's non-negotiables (binary favourites/ADR-075, no hardcoded colour, no per-row DB reads, worklet-only animation, migration irreversibility gate). The risk is concentrated entirely in 27-06's late-discovered architectural correction to search data flow — a real improvement over the naive `listDashboardSearch.snippet`-only approach, but introduced six plans deep with a refactor to production search code whose "byte-for-byte unchanged" claim needs stronger test backing than currently specified, and whose "unwired" premise for the corpus search modules should be re-verified fresh (not trusted from the research doc) before execution.
-
----
+**MEDIUM-HIGH pending the two new HIGHs.** Cycle-1 resolutions are solid and decision-faithful; the two newly-surfaced HIGHs (corpus privacy leakage; per-contact bound) must be incorporated into Plan 06 and Plan 03 respectively before execution. Remaining items are cheap clarifications.
