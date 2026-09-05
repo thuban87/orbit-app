@@ -9,20 +9,40 @@
 import { listDefs } from "@/db/field-defs-dao";
 import type { CustomFieldDef } from "@/db/field-types";
 import { getValuesForContact } from "@/db/field-values-dao";
-import { MEMORY_TYPE_REGISTRY } from "@/db/memory-registry";
+import {
+  MEMORY_TYPE_REGISTRY,
+  type MemoryTypeKey,
+} from "@/db/memory-registry";
 import type { SqlExecutor } from "@/db/types";
 
 export type KnowledgeSearchSource =
   | "name"
+  | "phone"
+  | "email"
+  | "category"
   | "memory"
   | "relationship"
   | "customField";
 
+export type KnowledgeSearchPart =
+  | "identity"
+  | "relationship"
+  | "memory-or-custom-field"
+  | "note-or-body";
+
 export interface KnowledgeSearchEntry {
   readonly source: KnowledgeSearchSource;
   readonly text: string;
+  /** User-facing semantic label, never an internal storage identifier. */
+  readonly label: string;
+  /** Closed presentation provenance used to construct Dashboard descriptors. */
+  readonly part: KnowledgeSearchPart;
   /** Stable custom-field key, present only for `source: "customField"`. */
   readonly fieldKey?: string;
+  /** Memory registry key, present only for `source: "memory"`. */
+  readonly memoryType?: MemoryTypeKey;
+  /** User-facing relationship type, when the relationship has one. */
+  readonly relationType?: string | null;
 }
 
 /**
@@ -39,10 +59,12 @@ export interface KnowledgeSearchCandidate {
 interface ContactRow {
   contactId: number;
   name: string;
+  categoryLabel: string | null;
 }
 
 interface MemoryRow {
   contactId: number;
+  type: MemoryTypeKey;
   customLabel: string | null;
   value: string | null;
   note: string | null;
@@ -51,18 +73,47 @@ interface MemoryRow {
 interface RelationshipRow {
   contactId: number;
   personName: string;
+  relationType: string | null;
+  note: string | null;
 }
 
-const LIST_CONTACTS = `
-SELECT id AS contactId, name
-  FROM contacts
- ORDER BY id`;
+interface ContactMethodRow {
+  contactId: number;
+  methodType: "phone" | "email";
+  displayValue: string;
+}
 
-const LIST_LIVE_RELATIONSHIPS = `
+function placeholders(values: readonly unknown[]): string {
+  return values.map(() => "?").join(", ");
+}
+
+function contactsSql(eligibleIds: readonly number[]): string {
+  return `
+SELECT c.id AS contactId, c.name, cat.name AS categoryLabel
+  FROM contacts c
+  LEFT JOIN categories cat ON cat.id = c.category_id
+ WHERE c.id IN (${placeholders(eligibleIds)})
+ ORDER BY c.id`;
+}
+
+function relationshipsSql(eligibleIds: readonly number[]): string {
+  return `
 SELECT contact_id AS contactId, person_name AS personName
+       , relation_type AS relationType, note
   FROM relationships
  WHERE deleted_at IS NULL
+   AND contact_id IN (${placeholders(eligibleIds)})
  ORDER BY contact_id, id`;
+}
+
+function contactMethodsSql(eligibleIds: readonly number[]): string {
+  return `
+SELECT contact_id AS contactId, method_type AS methodType, display_value AS displayValue
+  FROM contact_methods
+ WHERE contact_id IN (${placeholders(eligibleIds)})
+   AND method_type IN (?, ?)
+ ORDER BY contact_id, method_type, display_order, id`;
+}
 
 function searchableMemoryTypes(): string[] {
   return Object.entries(MEMORY_TYPE_REGISTRY)
@@ -70,15 +121,20 @@ function searchableMemoryTypes(): string[] {
     .map(([type]) => type);
 }
 
-function memorySql(types: readonly string[]): string {
+function memorySql(
+  types: readonly string[],
+  eligibleIds: readonly number[],
+): string {
   return `
 SELECT contact_id AS contactId,
+       type,
        custom_label AS customLabel,
        value,
        note
   FROM memories
  WHERE deleted_at IS NULL
    AND type IN (${types.map(() => "?").join(", ")})
+   AND contact_id IN (${placeholders(eligibleIds)})
  ORDER BY contact_id, id`;
 }
 
@@ -102,8 +158,26 @@ function appendMemoryEntries(
   entries: KnowledgeSearchEntry[],
   memory: MemoryRow,
 ): void {
-  for (const text of [memory.customLabel, memory.value, memory.note]) {
-    if (text !== null) entries.push({ source: "memory", text });
+  const label = MEMORY_TYPE_REGISTRY[memory.type].displayName;
+  for (const text of [memory.customLabel, memory.value]) {
+    if (text !== null && text.trim().length > 0) {
+      entries.push({
+        source: "memory",
+        part: "memory-or-custom-field",
+        memoryType: memory.type,
+        label,
+        text,
+      });
+    }
+  }
+  if (memory.note !== null && memory.note.trim().length > 0) {
+    entries.push({
+      source: "memory",
+      part: "note-or-body",
+      memoryType: memory.type,
+      label,
+      text: memory.note,
+    });
   }
 }
 
@@ -115,15 +189,27 @@ function appendMemoryEntries(
  */
 export async function listKnowledgeSearchCandidates(
   exec: SqlExecutor,
+  options: { readonly eligibleIds: readonly number[] },
 ): Promise<KnowledgeSearchCandidate[]> {
+  const eligibleIds = [...new Set(options.eligibleIds)];
+  if (eligibleIds.length === 0) return [];
+
   const memoryTypes = searchableMemoryTypes();
-  const [contacts, relationships, defs, memories] = await Promise.all([
-    exec.getAllAsync<ContactRow>(LIST_CONTACTS),
-    exec.getAllAsync<RelationshipRow>(LIST_LIVE_RELATIONSHIPS),
+  const [contacts, relationships, methods, defs, memories] = await Promise.all([
+    exec.getAllAsync<ContactRow>(contactsSql(eligibleIds), eligibleIds),
+    exec.getAllAsync<RelationshipRow>(relationshipsSql(eligibleIds), eligibleIds),
+    exec.getAllAsync<ContactMethodRow>(contactMethodsSql(eligibleIds), [
+      ...eligibleIds,
+      "phone",
+      "email",
+    ]),
     listDefs(exec, { includeQuarantined: false }),
     memoryTypes.length === 0
       ? Promise.resolve<MemoryRow[]>([])
-      : exec.getAllAsync<MemoryRow>(memorySql(memoryTypes), memoryTypes),
+      : exec.getAllAsync<MemoryRow>(memorySql(memoryTypes, eligibleIds), [
+          ...memoryTypes,
+          ...eligibleIds,
+        ]),
   ]);
 
   const memoriesByContact = new Map<number, MemoryRow[]>();
@@ -138,12 +224,34 @@ export async function listKnowledgeSearchCandidates(
     rows.push(relationship);
     relationshipsByContact.set(relationship.contactId, rows);
   }
+  const methodsByContact = new Map<number, ContactMethodRow[]>();
+  for (const method of methods) {
+    const rows = methodsByContact.get(method.contactId) ?? [];
+    rows.push(method);
+    methodsByContact.set(method.contactId, rows);
+  }
 
   return Promise.all(
     contacts.map(async (contact): Promise<KnowledgeSearchCandidate> => {
       const entries: KnowledgeSearchEntry[] = [
-        { source: "name", text: contact.name },
+        { source: "name", part: "identity", label: "Name", text: contact.name },
       ];
+      if (contact.categoryLabel?.trim()) {
+        entries.push({
+          source: "category",
+          part: "identity",
+          label: "Category",
+          text: contact.categoryLabel,
+        });
+      }
+      for (const method of methodsByContact.get(contact.contactId) ?? []) {
+        entries.push({
+          source: method.methodType,
+          part: "identity",
+          label: method.methodType === "phone" ? "Phone" : "Email",
+          text: method.displayValue,
+        });
+      }
 
       for (const memory of memoriesByContact.get(contact.contactId) ?? []) {
         appendMemoryEntries(entries, memory);
@@ -151,7 +259,23 @@ export async function listKnowledgeSearchCandidates(
       for (const relationship of relationshipsByContact.get(
         contact.contactId,
       ) ?? []) {
-        entries.push({ source: "relationship", text: relationship.personName });
+        const label = relationship.relationType?.trim() || "Relationship";
+        entries.push({
+          source: "relationship",
+          part: "relationship",
+          relationType: relationship.relationType,
+          label,
+          text: relationship.personName,
+        });
+        if (relationship.note?.trim()) {
+          entries.push({
+            source: "relationship",
+            part: "note-or-body",
+            relationType: relationship.relationType,
+            label,
+            text: relationship.note,
+          });
+        }
       }
 
       const values = await getValuesForContact(exec, contact.contactId, defs);
@@ -161,6 +285,8 @@ export async function listKnowledgeSearchCandidates(
           entries.push({
             source: "customField",
             fieldKey: definition.col_name,
+            part: "memory-or-custom-field",
+            label: definition.label,
             text: value,
           });
         }
