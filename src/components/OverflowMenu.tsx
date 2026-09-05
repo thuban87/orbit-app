@@ -28,6 +28,8 @@ import { useTheme } from "@/theme";
 export interface OverflowAction {
   label: string;
   onPress: () => void;
+  /** Disabled actions remain visible but cannot dismiss or invoke the menu. */
+  disabled?: boolean;
   /** Overrides the accessibility label (defaults to `label`). */
   accessibilityLabel?: string;
   /** testID for the action row. */
@@ -99,13 +101,22 @@ export function OverflowMenu({ actions }: { actions: OverflowAction[] }) {
                 testID={action.testID ?? `overflow-action-${action.label}`}
                 accessibilityRole="button"
                 accessibilityLabel={action.accessibilityLabel ?? action.label}
+                accessibilityState={{ disabled: action.disabled === true }}
+                disabled={action.disabled}
                 onPress={() => {
+                  if (action.disabled) return;
                   close();
                   action.onPress();
                 }}
                 style={[styles.option, { borderColor: colors.border }]}
               >
-                <Text style={{ color: colors.textPrimary }}>
+                <Text
+                  style={{
+                    color: action.disabled
+                      ? colors.textSecondary
+                      : colors.textPrimary,
+                  }}
+                >
                   {action.label}
                 </Text>
               </Pressable>
