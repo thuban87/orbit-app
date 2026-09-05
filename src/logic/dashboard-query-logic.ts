@@ -1,5 +1,7 @@
 /** Shared, renderer-independent Dashboard query state and closed SQL fragments. */
 
+import { PROGRESS_SQL, STABLE_MAX } from "@/db/status";
+
 export const DASHBOARD_POPULATIONS = [
   "favourites",
   "birthdays",
@@ -18,6 +20,100 @@ export const DASHBOARD_FILTER_FAMILIES = [
 ] as const;
 export type DashboardFilterFamily = (typeof DASHBOARD_FILTER_FAMILIES)[number];
 export type DashboardFilters = Partial<Record<DashboardFilterFamily, string[]>>;
+
+/**
+ * Inclusive upper bounds for the product cadence buckets. Keep the tuning
+ * surface here: changing a bucket boundary is a single-number edit. Each
+ * following bucket starts on the prior upper bound plus one day.
+ */
+export const CONTACT_FREQUENCY_BANDS = {
+  weekly: 7,
+  monthly: 31,
+  quarterly: 91,
+  yearly: null,
+} as const;
+
+type ContactFrequencyBucket = keyof typeof CONTACT_FREQUENCY_BANDS;
+
+const SOCIAL_BATTERY_VALUES = ["Charger", "Neutral", "Drain"] as const;
+const NEEDS_ATTENTION_VALUE = "on";
+
+function isContactFrequencyBucket(value: string): value is ContactFrequencyBucket {
+  return Object.prototype.hasOwnProperty.call(CONTACT_FREQUENCY_BANDS, value);
+}
+
+function frequencyPredicate(bucket: ContactFrequencyBucket): {
+  sql: string;
+  params: number[];
+} {
+  const entries = Object.entries(CONTACT_FREQUENCY_BANDS) as [
+    ContactFrequencyBucket,
+    number | null,
+  ][];
+  const index = entries.findIndex(([name]) => name === bucket);
+  const previousUpper = index === 0 ? 0 : entries[index - 1][1];
+  const upper = entries[index][1];
+
+  if (upper === null) {
+    return { sql: "c.interval_days > ?", params: [previousUpper as number] };
+  }
+  if (previousUpper === 0) {
+    return { sql: "c.interval_days <= ?", params: [upper] };
+  }
+  return {
+    sql: "c.interval_days > ? AND c.interval_days <= ?",
+    params: [previousUpper as number, upper],
+  };
+}
+
+/**
+ * Build the SQL-expressible Dashboard filters. Values within a family OR
+ * together; populated families AND together. Runtime tokens only choose from
+ * closed constants and every runtime value stays ?-bound. Gravity deliberately
+ * contributes no SQL because it is a reversible post-query TypeScript pass.
+ */
+export function buildFilterWhere(filters: DashboardFilters | Record<string, unknown>): PopulationWhere {
+  const groups: string[] = [];
+  const params: unknown[] = [];
+  const selections = (family: DashboardFilterFamily): string[] => {
+    const value = filters[family];
+    return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
+  };
+
+  const categoryIds = [...new Set(selections("category")
+    .filter((value) => /^\d+$/.test(value))
+    .map(Number)
+    .filter((value) => Number.isSafeInteger(value) && value > 0))];
+  if (categoryIds.length > 0) {
+    groups.push(`c.category_id IN (${categoryIds.map(() => "?").join(", ")})`);
+    params.push(...categoryIds);
+  }
+
+  const batteries = [...new Set(selections("social-battery").filter(
+    (value): value is (typeof SOCIAL_BATTERY_VALUES)[number] =>
+      (SOCIAL_BATTERY_VALUES as readonly string[]).includes(value),
+  ))];
+  if (batteries.length > 0) {
+    groups.push(`c.social_battery IN (${batteries.map(() => "?").join(", ")})`);
+    params.push(...batteries);
+  }
+
+  const frequencyGroups = [...new Set(selections("contact-frequency").filter(isContactFrequencyBucket))]
+    .map(frequencyPredicate);
+  if (frequencyGroups.length > 0) {
+    groups.push(`(${frequencyGroups.map((group) => `(${group.sql})`).join(" OR ")})`);
+    params.push(...frequencyGroups.flatMap((group) => group.params));
+  }
+
+  if (selections("needs-attention").includes(NEEDS_ATTENTION_VALUE)) {
+    groups.push(`(${PROGRESS_SQL}) >= ${STABLE_MAX}
+     AND (c.snooze_until IS NULL OR date(c.snooze_until) <= date('now','localtime'))`);
+  }
+
+  // The gravity family is intentionally recognized but handled after the SQL
+  // candidate read; do not turn this derived value into a WHERE clause.
+  return { sql: groups.map((group) => `(${group})`).join(" AND "), params };
+}
 
 export const DASHBOARD_SORT_MODES = [
   "default",
