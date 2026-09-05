@@ -1,8 +1,8 @@
 ---
 phase: 26
 reviewers: [codex, claude]
-reviewed_at: 2026-09-05T08:25:31Z
-cycles: 4
+reviewed_at: 2026-09-05T09:01:42Z
+cycles: 5
 plans_reviewed: [26-01-PLAN.md, 26-02-PLAN.md, 26-03-PLAN.md, 26-04-PLAN.md, 26-05-PLAN.md, 26-06-PLAN.md, 26-07-PLAN.md]
 models:
   codex: "gpt-5.6-terra (reasoning=low)"
@@ -27,12 +27,16 @@ cycle_history:
     reviewed_at: 2026-09-05T08:25:31Z
     current_high: 0
     current_actionable: 4
+  - cycle: 5
+    reviewed_at: 2026-09-05T09:01:42Z
+    current_high: 0
+    current_actionable: 3
 ---
 
-> **This file accumulates across convergence cycles as an audit trail.** The Cycle 1, Cycle 2,
-> and Cycle 3 content below is retained verbatim as history; the authoritative CURRENT state is
-> the **Cycle 4** section at the end of this file. Cycle-4 CYCLE_SUMMARY counts reflect only
-> findings UNRESOLVED in the plans on disk at commit `a73f5aa` — resolved prior-cycle
+> **This file accumulates across convergence cycles as an audit trail.** The Cycle 1–4
+> content below is retained verbatim as history; the authoritative CURRENT state is
+> the **Cycle 5** section at the end of this file. Cycle-5 CYCLE_SUMMARY counts reflect only
+> findings UNRESOLVED in the plans on disk at commit `b5c1ab1` — resolved prior-cycle
 > findings are not re-counted.
 
 ═══════════════════════════════════════════════════════════════════════════════
@@ -1455,7 +1459,7 @@ The architecture is sound and the cycle-2→cycle-3 revisions correctly resolved
   escalation required.
 
 ═══════════════════════════════════════════════════════════════════════════════
-# CYCLE 4 (CURRENT — 2026-09-05T08:25:31Z) — re-review of the revised plans (commit a73f5aa)
+# CYCLE 4 (history — 2026-09-05T08:25:31Z) — 0 HIGH + 4 actionable, all since addressed in commit b5c1ab1
 ═══════════════════════════════════════════════════════════════════════════════
 
 Both reviewer lanes ran again as independent headless sessions with full repo access and
@@ -2026,3 +2030,291 @@ CYCLE_SUMMARY: current_high=0 current_actionable=4
      (which always writes); add an equality guard before persistence.
   4. [LOW] Plan 04 — Reset persistence-failure path unhandled (`onReset` awaits `resetDashboardView`
      with no rejection handling); wrap in a handled async with a themed non-blocking error.
+
+═══════════════════════════════════════════════════════════════════════════════
+# CYCLE 5 (CURRENT — 2026-09-05T09:01:42Z) — re-review of the revised plans (commit b5c1ab1)
+═══════════════════════════════════════════════════════════════════════════════
+
+Both reviewer lanes ran again as independent headless sessions with full repo access and
+produced source-grounded reviews (Codex `gpt-5.6-terra` reasoning=low, 9,725 bytes, **59**
+`file:line` citations; Claude `sonnet` reasoning=low, 11,995 bytes, 8 explicit `file:line`
+citations plus numerous inline line references, tracing each strength to a real mechanism).
+Neither stubbed (`ok=true, stubbed=false` on both lane results); neither carried a
+`[reviewed-without-repo-access]` or `[reviewed-without-source-citations]` marker. `SELF_CLI`
+was forced to `none` for this run per the owner's explicit authorization, overriding the
+`CLAUDE_CODE_ENTRYPOINT` independence-skip (which would otherwise skip the claude lane), so
+BOTH lanes ran — the claude lane as a separate `claude -p --model sonnet` headless session
+with no inherited context, output captured from stdout. The orchestrator then ran a
+source-grounding + cross-artifact fact-drift pass (a dedicated read-only subagent read the
+actual code on disk and independently verified each new finding against the current plans and
+the source they cite) before recording the counts below.
+
+## Cycle-4 resolution (verified against the revised plans + code)
+
+**Cycle 4 had 0 HIGH + 4 actionable. All four are FULLY RESOLVED in commit `b5c1ab1`:**
+
+- **[RESOLVED] Cycle-4 #1 — layer-2 `onChange(completeObject)` vs `getState()` serialization.**
+  The panels now emit an *intent* (a toggle key / axis value), and `DashboardControlRow`
+  resolves the complete next object via `useDashboardQueryStore.getState()` at press time,
+  composing with Plan 01's generation guard. Claude Cycle 5 independently confirms this as
+  "a genuine, well-reasoned fix" verifiable against the store (`dashboard-query-store.ts:73-92`
+  has no write serialization), so the intent-based contract removes the lost-update race.
+- **[RESOLVED] Cycle-4 #2 — Plan 04 header fit-measurement method underspecified.** Plan 04
+  now specifies a concrete API (`trailing?: ReactNode | ((opts:{ compact:boolean }) => ReactNode)`,
+  `26-04-PLAN.md:138`) and a named measurement contract — the generic bar measures its own root
+  width (`onLayout`) + title width (`onTextLayout`) and compares available trailing space against
+  a **measured-intrinsic** expanded-trailing width via a hidden off-screen probe OR a reserved
+  trailing-width budget (`26-04-PLAN.md:25`, acceptance `:148-149`). The subagent confirmed this
+  is the reviewer's own suggested shape — no residual gap.
+- **[RESOLVED] Cycle-4 #3 — `setViewMode` "already-active view is a no-op" not enforced.** Plan 07
+  now adds an equality guard so a same-value `setViewMode` performs no write and no generation
+  bump (`26-07-PLAN.md:59,109,120,131`), node-tested.
+- **[RESOLVED] Cycle-4 #4 — Reset persistence-failure path unhandled.** Plan 04's `onReset` now
+  wraps `resetDashboardView` with handled rejection + a themed non-blocking error path.
+
+## Consensus Summary (Cycle 5)
+
+The plan set is mature and both lanes rate it MEDIUM overall risk, converging on the same
+verdict: the architecture, dependency ordering, D-12 search seam, data-scope protections, and
+test/backstop design are sound; the remaining risk is concentrated in **cross-plan contract
+completeness**, not product decisions. No new HIGH survives the source-grounding pass.
+
+### Agreed Strengths
+- The D-12 search read (Plan 03) correctly preserves the recorded A3 term-relaxation semantics
+  verbatim and keeps `listDashboardPopulation`'s no-term contract un-forked (both lanes, verified
+  `dashboard-read.ts:274,396-413`).
+- `countBirthdayPopulation`'s bound-only design correctly avoids the over-count bug that a raw
+  `listBirthdayCandidates` count would cause (both lanes; `listBirthdayCandidates` at
+  `dashboard-read.ts:572` is not bound-only).
+- Plan 07's retirement precautions (lifting the policy test before deleting `listNeverContacted`;
+  preserving the `include_unbound_never_contacted` DAO/backup contract for the Phase-36 bump) are
+  correct (codex; `dashboard-read.ts:527`, `app-settings-dao.ts:275`, `backup-schema.ts:153`).
+- Plan 06's local pure-name Unbound filter is a bounded, appropriate replacement after Dashboard
+  search becomes bound-only (both lanes; `unbound-read.ts:24`).
+
+### Agreed Concerns
+- **Plan 02 sources filter option values from constants that are not exported** —
+  `SOCIAL_BATTERY_VALUES` / `NEEDS_ATTENTION_VALUE` are module-private
+  (`dashboard-query-logic.ts:38-39`) and `dashboard-query-logic.ts` is not in Plan 02's
+  `files_modified` (codex; orchestrator-confirmed). **Actionable #1 below.**
+- **Plan 07's `populationCounts` record is incomplete** — only 3 of the 5
+  `Record<DashboardPopulation, number>` keys are defined; `favourites` is actually consumed by the
+  resolver (`dashboard-empty-logic.ts:100-106`) and `all-contacts` is required by the type
+  (codex; orchestrator-confirmed, more severe than the reviewer stated). **Actionable #2 below.**
+
+### Divergent Views
+- **Claude raised two HIGHs about `HomeScreen.tsx` line-citation drift; the source-grounding pass
+  neutralized both.** Claude flagged them explicitly as open questions BECAUSE `HomeScreen.tsx`
+  was not in its prompt context. The subagent read the file on disk and confirmed the plans cite
+  the CORRECT current lines (`ShellAppBar` sibling of `FlatList` at `HomeScreen.tsx:533/554`,
+  header `Pressable` at `537-551`, `ListHeaderComponent` at `571`), and that `26-PATTERNS.md`'s
+  drift flag (537-551, not the stale 640-656 `StyleSheet` block) is itself correct and already
+  absorbed by the plans. The residual — Plan 01 lacks the explicit "re-read in full / treat line
+  numbers as approximate" mandate that Plan 07 Task 3 carries — is a real asymmetry but a
+  robustness nit, not a correctness-material gap, because the citations are verified accurate.
+  Not counted (see below).
+
+### Decision-collision gate (ran explicitly)
+No Cycle-5 finding reverses, weakens, or deletes a D-01..D-12 item, a `HANDOFF.md` entry, or an
+ADR. All three actionables are purely additive (export two constants + add the file to scope;
+complete the `populationCounts` record; add an empty-list guard + test). No owner escalation is
+required. In particular: exporting `SOCIAL_BATTERY_VALUES`/`NEEDS_ATTENTION_VALUE` and adding
+`favourites`/`all-contacts` counts do not touch D-06 (binary favourites — the count is membership,
+not rank), D-07 (All Contacts is a selectable population — a count aligns with it), D-03 (no
+migration — all fixes are TypeScript/SQL-composition only), or the D-12 search seam.
+
+---
+
+## Codex Review (Cycle 5)
+
+## Summary
+
+The plan set is unusually thorough and correctly targets the real migration points: `HomeScreen` still uses the legacy prefs/read path, while the Phase 25 store and population read are presently unwired ([HomeScreen.tsx:63](</home/bwales/projects/orbit-app/src/screens/HomeScreen.tsx:63), [HomeScreen.tsx:193](</home/bwales/projects/orbit-app/src/screens/HomeScreen.tsx:193), [dashboard-query-store.ts:64](</home/bwales/projects/orbit-app/src/stores/dashboard-query-store.ts:64)). The wave ordering is sensible, particularly the tracer before broader control work and the dedicated D-12 search read before final wiring. There are two material plan gaps to correct before execution: Plan 02 references non-exported query constants, and Plan 07 does not define a complete, valid `populationCounts` record.
+
+## Strengths
+
+- **Plan 01 correctly identifies the actual UI composition hazard.** `ShellAppBar` and `FlatList` are siblings, while the existing control UI is inside `ListHeaderComponent` ([HomeScreen.tsx:533](</home/bwales/projects/orbit-app/src/screens/HomeScreen.tsx:533), [HomeScreen.tsx:554](</home/bwales/projects/orbit-app/src/screens/HomeScreen.tsx:554), [HomeScreen.tsx:571](</home/bwales/projects/orbit-app/src/screens/HomeScreen.tsx:571)). A root-level in-tree overlay host is the right architecture for a scrim that must cover the app bar as well as list content.
+
+- **The plan correctly avoids `Modal` for anchored controls.** The existing `OverflowMenu` demonstrates that this project’s modal implementation is a separate modal layer ([OverflowMenu.tsx:66](</home/bwales/projects/orbit-app/src/components/OverflowMenu.tsx:66)). That would indeed prevent one-tap control switching from a Dashboard control row underneath it.
+
+- **The proposed hydration-race guard is justified.** The current `hydrate` directly applies an async settings snapshot ([dashboard-query-store.ts:64](</home/bwales/projects/orbit-app/src/stores/dashboard-query-store.ts:64)), while setters persist and only then update Zustand state ([dashboard-query-store.ts:65](</home/bwales/projects/orbit-app/src/stores/dashboard-query-store.ts:65)). A late hydrate can overwrite a just-written UI choice. Plan 01’s generation guard plus a slow-hydrate test directly addresses that mechanism.
+
+- **Plans 03 and 07 preserve the intended separation between no-term and search reads.** `listDashboardPopulation` has no term argument ([dashboard-read.ts:274](</home/bwales/projects/orbit-app/src/db/dashboard-read.ts:274)); legacy `listDashboard` contains the recorded A3 branch that widens term searches while retaining the bound predicate ([dashboard-read.ts:365](</home/bwales/projects/orbit-app/src/db/dashboard-read.ts:365), [dashboard-read.ts:398](</home/bwales/projects/orbit-app/src/db/dashboard-read.ts:398)). The additive `listDashboardSearch` design is appropriate.
+
+- **Plan 03 explicitly accounts for the non-SQL parts of the population read.** This is essential because birthdays require ID resolution before `buildPopulationWhere` ([dashboard-read.ts:279](</home/bwales/projects/orbit-app/src/db/dashboard-read.ts:279)), default birthday sort is post-query ([dashboard-read.ts:315](</home/bwales/projects/orbit-app/src/db/dashboard-read.ts:315)), and Gravity is a post-query filter ([dashboard-read.ts:324](</home/bwales/projects/orbit-app/src/db/dashboard-read.ts:324)). The planned parity tests are well chosen.
+
+- **Plan 06 closes a real retrieval gap.** `listUnbound` is intentionally a fixed, alphabetical SQL query with no term support ([unbound-read.ts:24](</home/bwales/projects/orbit-app/src/db/unbound-read.ts:24)). Adding a local, pure name filter is a bounded and appropriate replacement after Dashboard search becomes bound-only.
+
+- **Plan 07’s retirement precautions are good.** `countNeverContacted` still depends on `include_unbound_never_contacted` ([dashboard-read.ts:527](</home/bwales/projects/orbit-app/src/db/dashboard-read.ts:527)), and that setting remains part of the DAO/backup contracts ([app-settings-dao.ts:275](</home/bwales/projects/orbit-app/src/db/app-settings-dao.ts:275), [backup-schema.ts:153](</home/bwales/projects/orbit-app/src/backup/backup-schema.ts:153)). Lifting the policy test before deleting `listNeverContacted` is the correct approach.
+
+## Concerns
+
+- **MEDIUM — Plan 02 cannot source all declared filter values from the stated authoritative constants without modifying another file.** `SOCIAL_BATTERY_VALUES` and `NEEDS_ATTENTION_VALUE` are module-private constants in `dashboard-query-logic.ts` ([dashboard-query-logic.ts:32](</home/bwales/projects/orbit-app/src/logic/dashboard-query-logic.ts:32), [dashboard-query-logic.ts:33](</home/bwales/projects/orbit-app/src/logic/dashboard-query-logic.ts:33)). Yet Plan 02 requires FilterPanelContent to source its option values from them, while its `files_modified` excludes that module. The executor must either export these constants and add `dashboard-query-logic.ts` to the plan scope, or establish an exported closed-options API. Duplicating literals in the component would weaken the anti-drift goal.
+
+- **MEDIUM — Plan 07 does not specify a complete `DashboardPopulationCounts` construction.** The type is `Record<DashboardPopulation, number>` ([dashboard-empty-logic.ts:47](</home/bwales/projects/orbit-app/src/logic/dashboard-empty-logic.ts:47)), covering `favourites`, `birthdays`, `not-contacted`, `snoozed`, and `all-contacts`. Plan 07 only defines count sources for birthdays, not-contacted, and snoozed. The empty-state logic iterates selected populations including `favourites` ([dashboard-empty-logic.ts:98](</home/bwales/projects/orbit-app/src/logic/dashboard-empty-logic.ts:98)); an omitted favourite count either fails typechecking or causes an incorrect fallback. Define cheap counts for Favorites and All Contacts, or deliberately narrow/refactor the empty-state input contract with tests.
+
+- **MEDIUM — Plan 04’s generic ShellAppBar fit mechanism needs a concrete API contract.** `ShellAppBar` currently accepts only `trailing?: ReactNode` and has no layout measurement interface ([ShellAppBar.tsx:9](</home/bwales/projects/orbit-app/src/components/ShellAppBar.tsx:9), [ShellAppBar.tsx:63](</home/bwales/projects/orbit-app/src/components/ShellAppBar.tsx:63)). The plan rightly says the generic bar must own fit, but does not state how it receives the intrinsic expanded width of Dashboard-specific trailing labels. Add a defined prop such as `trailing?: ReactNode | (({ compact }) => ReactNode)` plus `expandedTrailingMinWidth`, or a named measurement contract. Otherwise the generic bar cannot safely create or measure a probe for labels it does not own.
+
+- **LOW — Plan 01’s dashboard-panel channel is an untracked artifact.** The plan allows either lifted state or a “tiny dashboard-panel store,” but neither is named in `files_modified`. Since `DashboardControlRow` must publish content to a root sibling host without reintroducing HomeScreen coupling, the channel’s interface and file ownership should be explicit. This prevents an executor from improvising a global store with unclear cleanup semantics.
+
+- **LOW — Plan 07’s stated file scope conflicts with its stale-comment sweep.** Task 3 requires edits in `src/services/widget/widget-data.ts`, `src/db/fuel-read.ts`, and `HomeScreen.tsx`, but lists only `dashboard-read.ts` and its test under `files_modified`. The stale references are real ([widget-data.ts:18](</home/bwales/projects/orbit-app/src/services/widget/widget-data.ts:18), [fuel-read.ts:12](</home/bwales/projects/orbit-app/src/db/fuel-read.ts:12), [HomeScreen.tsx:3](</home/bwales/projects/orbit-app/src/screens/HomeScreen.tsx:3)). Add them to the formal scope or make that sweep a separate cleanup plan.
+
+- **LOW — `countBirthdayPopulation` needs an explicit empty-candidate SQL path.** `buildPopulationWhere` deliberately returns `0` when no birthday IDs exist ([dashboard-query-logic.ts:194](</home/bwales/projects/orbit-app/src/logic/dashboard-query-logic.ts:194)). Plan 03 should state that the count helper returns `0` before constructing an `IN (...)` clause, avoiding invalid empty-list SQL.
+
+## Suggestions
+
+- Amend Plan 02 to export `SOCIAL_BATTERY_VALUES` and `NEEDS_ATTENTION_VALUE` from [dashboard-query-logic.ts](</home/bwales/projects/orbit-app/src/logic/dashboard-query-logic.ts:32), add that file to scope, and test that panel option values equal the exported sets.
+
+- Amend Plan 07 with a full `DashboardPopulationCounts` table. At minimum define:
+  - `favourites`: bound, non-archived favorite membership count.
+  - `all-contacts`: bound Active ∪ Not Contacted count, matching `buildPopulationWhere`.
+  - Existing birthdays/not-contacted/snoozed sources as planned.
+
+- Make the Plan 04 ShellAppBar interface explicit before execution, including how an intrinsic expanded trailing width is supplied/measured and when `compact` becomes stable.
+
+- Name and test the panel channel as a first-class artifact, including cleanup on Dashboard unmount and replacement behavior when opening another control.
+
+- Add an explicit `birthdayIds.length === 0 → 0` branch to Plan 03’s count helper and test it.
+
+## Risk Assessment
+
+**Overall: MEDIUM.** The plans have strong source grounding, dependency ordering, data-scope protections, and unusually good test/backstop design. The remaining risk is concentrated in cross-plan contracts rather than product decisions: Plan 02 has an immediate non-exported-constant implementation gap, and Plan 07’s incomplete population-count model can either block typechecking or produce incorrect empty states. Addressing those before execution should reduce the phase to manageable UI-integration risk.
+
+---
+
+## Claude Review (Cycle 5)
+
+# Cross-AI Plan Review: Phase 26 Dashboard Control Surface
+
+## Summary
+
+This is an unusually mature set of plans — four review cycles deep with real, traceable fixes (root-level overlay host, intent-based layer-2 callbacks, hydration generation guard, measured header fit). Verifying against the actual source confirms most cited mechanisms exist as described (`shell-transient-store.ts`, `dashboard-query-store.ts`, `dashboard-query-logic.ts`, `dashboard-read.ts`, `SegmentedControl.tsx`, `OverflowMenu.tsx` all match the plans' characterizations). The plans correctly identify that `HomeScreen.tsx` was never actually read in this session (it's referenced extensively but not in the provided context), which is the single largest residual risk — several must_haves (exact line numbers, existing structure like `ShellAppBar` sibling-vs-header placement) are asserted against a file none of the reviewers in this chain could have re-verified this session. The plans are strong on architecture but leave a few concrete gaps: `Sheet.tsx` was never read despite being cited in RESEARCH as a design-system component, `unbound-read.ts`'s `countUnbound` is oddly unused in the new `countBirthdayPopulation` design pattern discussion, and Task-level dependencies between Plan 04 (ShellAppBar changes) and Plan 05/06 (which also touch `ShellAppBar`-consuming screens) aren't cross-checked for merge conflicts within Wave 2.
+
+## Strengths
+
+- **AnchoredPanel architecture is correctly justified against real code.** `overlay-base.tsx:35,57,95` confirms `SCRIM_OPACITY = 0.85` and `justify: center|flex-end` only — the plan's rejection of `BaseOverlay` reuse for a top-anchored, lighter-scrim panel is accurate, not hand-waved.
+- **shell-transient-store integration is real and correctly wired.** `shell-transient-store.ts:46-54`'s `dismissTop()` pop-then-callback order and `ShellAppBar.tsx:29-40`'s `resolveBackIntent` call are exactly as described; registering the panel via `openTransient`/`closeTransient` genuinely gets Back-dismissal for free.
+- **The D-12 search read plan (26-03) correctly identifies the A3 semantics to preserve.** `dashboard-read.ts:396-413`'s term-relaxation branch is real and the plan's instruction to copy it "verbatim" rather than re-derive is the right call — this is exactly the kind of subtle owner-decision logic that's easy to accidentally narrow.
+- **The intent-based (not `onChange(completeObject)`) layer-2 contract is a genuine, well-reasoned fix.** Given `dashboard-query-store.ts:73-92` has no write serialization, a panel emitting a toggle key (not a resolved array) that the owner (`DashboardControlRow`) resolves via `getState()` at press time is a correct pattern to avoid lost-update races — this is verifiable against the actual store code, which indeed has no debounce/mutex.
+- **`SegmentedControl.tsx` extension is scoped correctly.** The file at `:22-26` really is `{label, value}`-only with a bare `<Text>` render at `:75-83`, so the plan's mandate to add an optional `icon?: IconName` (typed, not stringly) is both necessary and minimal — it won't break the Orrery consumer since no `icon` prop is passed there.
+- **`countBirthdayPopulation`'s bound-only design correctly avoids the over-count bug.** `listBirthdayCandidates` (`dashboard-read.ts:572-580`) indeed has no `tracking_enabled` filter, so a naive reuse would over-count by including Unbound — Plan 03's fix is real and necessary, not overcautious.
+- **ArchivedContactsScreen preservation constraints are concrete and testable.** The plan's git-diff guard against touching `confirmPurge`/`purgeBody`/`doPurge` is a good mechanical check given the file (`ArchivedContactsScreen.tsx`) genuinely holds the ADR-018 gate.
+
+## Concerns
+
+**HIGH**
+- **`HomeScreen.tsx` itself was never read in this review or, apparently, freshly by RESEARCH/PATTERNS this cycle.** Every plan cites exact line numbers into it (`:63`, `:107-150`, `:224-266`, `:537-551`, `:640-656`) but PATTERNS.md explicitly flags drift ("the HomeScreen header Pressable is at 537-551, not 640-656"). Given four review cycles of citation-based must_haves against this file, and no fresh read available to this reviewer either, there's real risk that further drift exists beyond what's already been caught — Plan 01's Task 2 acceptance criteria hinge on precise structural facts (ShellAppBar/FlatList siblinghood, `ListHeaderComponent` boundaries) that cannot be verified here. **This is a real open question, not a confirmed defect** — recommend the executor re-read the file fully immediately before Task 2, as Plan 01 half-heartedly does for `dashboard-read.test.ts` in Plan 07 Task 3 but not consistently elsewhere.
+- **Plan 07 Task 3's line-citation risk is explicitly self-flagged but the same risk exists uncaught in Plan 01/02/04's `HomeScreen.tsx` citations.** Plan 07 Task 3 has an elaborate "MANDATORY re-read before deletion" guard for `dashboard-read.test.ts`, correctly recognizing line-number drift risk. But Plan 01 Task 2 (the tracer, the highest-risk plan in the phase per its own framing) has no equivalent mandate for `HomeScreen.tsx`, despite citing precise structural claims (sibling-vs-header nesting) that if wrong would silently produce the exact HIGH bug Cycle-2 review already found once (overlay inside FlatList header). The fix pattern that worked for Plan 07 wasn't propagated to the plan that needs it most.
+
+**MEDIUM**
+- **The `dashboard-query-store.ts` generation-guard (Plan 01) interacts with the newly-added `setViewMode` equality guard (Plan 07) in an unreviewed order.** Plan 01 adds a `generation` counter bumped by every setter including `setViewMode`; Plan 07 then adds an early-return in `setViewMode` for an unchanged value, explicitly placed "above" the generation bump so a no-op skips it too. Reading the actual current `dashboard-query-store.ts` (provided in context), the setter shape is `async (exec, viewMode) => { await updateAppSettings(...); set({viewMode}); }` — inserting an equality check requires reading `get().viewMode` before the `await`, which is fine, but the plan text never states the generation counter itself must not tick on a same-value call in a way that could race with a genuinely concurrent hydrate resolving mid-flight. Low probability of an actual bug, but the plan never node-tests the *interaction* of both guards together (only "setViewMode no-op" and "stale hydrate" separately) — a same-value setViewMode arriving exactly during a stale hydrate window is untested.
+- **Plan 04's ShellAppBar `compact` trailing-fit signal changes a shared component consumed elsewhere, but only Plan 04 owns `ShellAppBar.tsx` in `files_modified`.** Plans 05 and 06 both use `ShellAppBar variant="child"` and are Wave 2 (parallel with Plan 04, also Wave 2). If Plan 04's `trailing` prop signature change (`ReactNode | ((opts:{compact}) => ReactNode)`) lands concurrently with Plan 05/06 wiring `ShellAppBar` for Archived/Unbound, there's a possible file-level merge collision or a race where Plan 05/06's PRs are drafted against a stale `ShellAppBar.tsx` signature. The dependency graph declares `depends_on: ["26-01"]` for 04/05/06 but not on each other — since all three are Wave 2, this is presumably intentional (they touch different files: 04→ShellAppBar+HomeScreen, 05→ArchivedContactsScreen, 06→UnboundContactsScreen), so the actual collision risk is low, but it's worth an explicit note that 05/06 must use `ShellAppBar variant="child"` in its OLD (ReactNode-only, ungapped) form since they pass no `trailing` at all — confirmed fine on inspection, just undocumented as deliberately safe.
+- **The bound-only `countBirthdayPopulation` parity claim ("equals listDashboardPopulation's row count for populations=['birthdays']") is asserted but the underlying gravity-filter interaction is not addressed.** If a `filters.gravity` selection is simultaneously active, `listDashboardPopulation` post-filters by gravity (dashboard-read.ts:324-335) but `countBirthdayPopulation` (per Plan 03's spec) does NOT apply gravity filtering — it's described as bound-only + 0-30-day window only. This means the parity guarantee "equals listDashboardPopulation... for populations=['birthdays']" implicitly assumes empty filters; Plan 07's empty-state usage passes `query.filters` to the list read but the count derivation for birthdays doesn't take filters into account at all. This could produce an incorrect birthdays-empty-state determination when a gravity filter is also active (count says "3 birthday contacts exist" while the actual filtered+gravity-passed list is empty) — Plan 07 does note "a gravity-filtered zero result is treated as the filter-empty case, not a population-empty" which appears to correctly route around this, but it relies on precedence ordering in `dashboard-empty-logic.ts` being exactly right (checked: `selectDashboardEmptyState`'s step (3) checks `activeFilter !== 'all' || hasActiveDashboardFilters` BEFORE step population-empty, so gravity-filter-active does take the filter-empty branch first — this actually resolves correctly, downgrading this to a documentation gap rather than a functional bug).
+
+**LOW**
+- **`OverflowMenu.tsx`'s existing per-row `close()` fires `requestAnimationFrame` refocus onto the trigger** (`OverflowMenu.tsx:42-50`); Plan 04's disabled-row short-circuit correctly skips `close()` for disabled rows, but doesn't address what a11y focus does when a disabled row is "pressed" via TalkBack — the row should probably still receive/retain focus feedback so it doesn't feel silently broken. Not called out as a must_have; likely fine given `accessibilityState.disabled` communicates it, but worth a UAT note.
+- **Plan 06's `filterUnboundByName` scale note (T-26-17) is honest about the pre-existing unpaginated-read ceiling but the plan doesn't verify `listUnbound`'s actual row-count ceiling in this codebase** — reasonable to defer, correctly flagged as out of scope.
+
+## Suggestions
+
+- Add an explicit "re-read `HomeScreen.tsx` in full before Task 2" instruction to Plan 01 (mirroring Plan 07 Task 3's mandate), given it's the tracer and the highest-risk file-structure assumptions in the whole phase live there.
+- In Plan 03/07, add one line to the `countBirthdayPopulation` must_have clarifying it is filters-naive by design and that the empty-state precedence ordering (filter-empty before population-empty) is what prevents a gravity+birthdays mismatch — this is currently true by construction but undocumented, so a future editor touching `dashboard-empty-logic.ts` precedence could silently reintroduce the bug.
+- Consider a node test in Plan 07 that seeds a birthdays population + an active gravity filter with zero gravity-matching birthday rows, asserting the empty state resolves to `filter-empty` (not `birthdays-empty`) — this exercises the precedence interaction the MEDIUM finding above depends on, and currently isn't explicitly tested anywhere in the plan set.
+
+## Risk Assessment
+
+**MEDIUM.** The architecture is sound and heavily cross-verified against real source in this review (store, overlay, icon registry, ShellAppBar, OverflowMenu, dashboard-read.ts, dashboard-query-logic.ts, unbound-read.ts, ArchivedContactsScreen.tsx, UnboundContactsScreen.tsx all check out as described). The residual risk is concentrated entirely in `HomeScreen.tsx`, which no one in this review chain (including me) has read this session, and which is the single most heavily-modified, highest-citation-density file across five of the seven plans. Given the file's own PATTERNS.md entry already documents one line-drift instance, I'd treat any HomeScreen-specific structural must_have (sibling ordering, exact removal targets) as provisional until the executor re-verifies on disk immediately before editing — which the plans already instruct in spirit (D-01/D-02 "read before implementing") but don't always enforce with the same rigor Plan 07 Task 3 uses for its own file.
+
+---
+
+## Verification coverage (Cycle 5)
+
+- **Both lanes ran as independent headless sessions with repo access; neither stubbed.** Codex
+  (`gpt-5.6-terra`, reasoning=low, source=banner) produced 9,725 bytes with 59 `file:line`
+  citations; Claude (`sonnet`, reasoning=low, source=pinned, separate `claude -p --model sonnet`
+  session, stdout-captured) produced 11,995 bytes with 8 explicit `file:line` citations plus
+  inline line references. Both lane results carry `ok=true, stubbed=false`. `SELF_CLI` forced to
+  `none` (owner-authorized) so the `CLAUDE_CODE_ENTRYPOINT` independence-skip did not drop the
+  claude lane.
+- **Source-grounding pass (orchestrator + dedicated read-only subagent).** Read the actual code on
+  disk — not the diff or plan text — and adjudicated each Cycle-5 finding against the source it
+  cites. Confirmed: (1) `SOCIAL_BATTERY_VALUES`/`NEEDS_ATTENTION_VALUE` are module-private
+  (`dashboard-query-logic.ts:38-39`, no `export`, contrast the exported `CONTACT_FREQUENCY_BANDS`
+  at `:29`), Plan 02 requires sourcing from them (`26-02-PLAN.md:97`) but `dashboard-query-logic.ts`
+  is absent from its `files_modified` (`:7-14`) with no export task → **Actionable #1**; (2)
+  `DashboardPopulationCounts` is an exact 5-key `Record` (`dashboard-empty-logic.ts:58`), the
+  resolver actually indexes `populationCounts['favourites']` (`:100-106`), and Plan 07 defines only
+  3 count sources (`26-07-PLAN.md:36,160`) → **Actionable #2**; (3) `countBirthdayPopulation`'s
+  suggested `id IN (<candidateIds>)` construction (`26-03-PLAN.md:100`) has no empty-list guard and
+  no zero-upcoming-birthday test, while `buildPopulationWhere` itself guards the empty case
+  (`dashboard-query-logic.ts:196` `if (birthdayIds.length === 0) return "0"`) → **Actionable #3**.
+- **Claude's two HIGHs adjudicated against disk and downgraded.** The subagent confirmed the plans
+  cite the CORRECT current `HomeScreen.tsx` lines (`ShellAppBar` sibling of `FlatList` at `:533/554`,
+  header `Pressable` at `537-551`, `ListHeaderComponent` at `571`) and that `26-PATTERNS.md`'s drift
+  flag is correct and already reflected in Plan 01/04 citations — no stale `640-656` citation
+  survives. The drift HIGH is therefore INACCURATE; the "Plan 01 lacks Plan 07's re-read mandate"
+  HIGH is a real but non-material asymmetry (citations verified accurate). Neither is a HIGH; neither
+  is counted actionable.
+- **Shared-table writer sweep (contacts / interactions / custom_field_values / field_history).**
+  Verified by reading the read/DAO files directly rather than trusting the graph (which cannot
+  enumerate SQL writers): Phase 26 ships no migration (D-03), writes no shared domain table, and
+  introduces no dynamic custom-field columns or pairwise type converters (ADR-001 / migration 006
+  not implicated). It composes existing reads plus the additive `listDashboardSearch` /
+  `countBirthdayPopulation`; the query store persists only Dashboard view prefs to `app_settings`
+  (?-bound); the only mutating path touched is the pre-existing Archived purge (Plan 05,
+  git-diff-guarded).
+- **Local-first invariant.** No finding introduces a network dependency on any read path; all three
+  proposed fixes are on-device (export constants, complete a typed count record, add an empty-list
+  SQL guard + test).
+- **Cross-artifact fact-drift pass.** No untraceable decision labels; plan citations match code on
+  disk. The only line drift found is the previously-recorded non-load-bearing
+  `dashboard-query-logic.ts:194`→`:196` (buildPopulationWhere birthday guard), already mitigated by
+  the plans' by-name / approximate-line discipline.
+
+## CYCLE_SUMMARY (Cycle 5 — unresolved in the current plans, commit b5c1ab1)
+
+CYCLE_SUMMARY: current_high=0 current_actionable=3
+
+- **current_high = 0.** No unresolved HIGH. The two Claude-raised HIGHs were reviewer open
+  questions (raised because `HomeScreen.tsx` was outside the prompt context); the source-grounding
+  pass read the file on disk and found the plans' citations accurate, downgrading both. No new HIGH
+  from codex; the two Cycle-2 structural HIGHs remain fully resolved.
+- **current_actionable = 3** (all MEDIUM/LOW, none colliding with a recorded decision):
+  1. **[MEDIUM] Plan 02 — filter option values sourced from un-exported, out-of-scope constants.**
+     `26-02-PLAN.md:97` requires `FilterPanelContent` option keys to come from `SOCIAL_BATTERY_VALUES`
+     / `NEEDS_ATTENTION_VALUE`, but these are module-private (`dashboard-query-logic.ts:38-39`) and
+     that file is not in `files_modified` (`:7-14`). PLAN change needed: add a task to `export` both
+     constants (or an equivalent exported closed-options API) and add `src/logic/dashboard-query-logic.ts`
+     to Plan 02's `files_modified`, plus an assertion that panel option values equal the exported sets.
+  2. **[MEDIUM] Plan 07 — incomplete `populationCounts` record.** `DashboardPopulationCounts` is an
+     exact 5-key `Record` (`dashboard-empty-logic.ts:58`) and the resolver consumes `favourites`
+     (`:100-106`), but Plan 07 defines only `not-contacted` / `snoozed` / `birthdays` count sources
+     (`26-07-PLAN.md:36,160`). PLAN change needed: define cheap bound-only counts for `favourites`
+     and `all-contacts` (or deliberately narrow/refactor the empty-state input contract with tests) —
+     otherwise `tsc` fails on the incomplete Record and a favourites-empty mis-resolves as filter-empty.
+  3. **[LOW] Plan 03 — `countBirthdayPopulation` empty-candidate SQL path unguarded + untested.**
+     The suggested `SELECT COUNT(*) … id IN (<candidateIds>)` (`26-03-PLAN.md:100`) produces an
+     invalid empty `IN ()` when there are zero upcoming birthdays (a common state), and the parity
+     test seeds candidates only. PLAN change needed: mandate an explicit `candidateIds.length === 0
+     → return 0` branch (mirroring `buildPopulationWhere`'s `:196` guard) and add a zero-upcoming-
+     birthday test case.
+
+**Considered but NOT counted actionable (represented in plan content, delegated, or non-material):**
+- Claude's "Plan 01 lacks a re-read-before-edit mandate for `HomeScreen.tsx`" (real asymmetry vs
+  Plan 07 Task 3, but the cited lines are verified accurate on disk, so it does not materially affect
+  correctness — a robustness suggestion only; Plan 01 Task 2 `read_first` already points the executor
+  at `HomeScreen.tsx` with the correct lines).
+- Codex LOW "dashboard-panel channel not in `files_modified`" — explicitly delegated to Claude's
+  discretion (`26-01-PLAN.md:33` "a tiny dashboard-panel store OR lifted HomeScreen state"); a
+  discretionary new file omitted from `files_modified` is normal.
+- Codex LOW "stale-comment sweep touches `widget-data.ts`/`fuel-read.ts` not in `files_modified`" —
+  comment-only cleanup, and the sweep task itself names the files (`26-07-PLAN.md:174-180`), so it is
+  represented in plan content and is the kind of cleanup the executor handles correctly anyway.
+- Claude MEDIUM "generation-guard × setViewMode interaction not tested together" — the load-bearing
+  seam (a no-op `setViewMode` does not bump `generation`, so it cannot clobber an in-flight hydrate)
+  IS asserted in Plan 07's test (`26-07-PLAN.md:109`); a combined end-to-end scenario is additional
+  coverage, not a correctness gap.
+- Claude MEDIUM "`countBirthdayPopulation` gravity parity" and Claude MEDIUM "Plan 04/05/06 Wave-2
+  merge collision" — both self-resolved by the reviewer against source (empty-state precedence in
+  `dashboard-empty-logic.ts` routes gravity-active to filter-empty first; 05/06 pass no `trailing`
+  so the widened signature is backward-compatible).
