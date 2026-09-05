@@ -1,17 +1,33 @@
 import { useNavigation } from "@react-navigation/native";
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { resolveBackIntent } from "@/navigation/back-intent";
 import { shellTransientStore } from "@/stores/shell-transient-store";
 import { useTheme } from "@/theme";
 import { OverflowMenu, type OverflowAction } from "./OverflowMenu";
 
+interface TrailingFitOptions {
+  /** True until the complete app bar has measured enough room for labels. */
+  compact: boolean;
+}
+
+type TrailingContent = ReactNode | ((options: TrailingFitOptions) => ReactNode);
+
 interface ShellAppBarProps {
   variant: "root" | "child";
   title: string;
   overflow?: OverflowAction[];
-  trailing?: ReactNode;
+  /** Existing ReactNode callers remain supported; root chrome can consume fit state. */
+  trailing?: TrailingContent;
+  /** Expanded labels that this bar measures invisibly at the active OS text scale. */
+  trailingLabelProbe?: readonly string[];
 }
+
+const ROOT_HORIZONTAL_PADDING = 16;
+const OVERFLOW_WIDTH = 44;
+const ROOT_GAP_COUNT = 2;
+const ROOT_GAP = 8;
+const TWO_DESTINATION_CHROME_WIDTH = 64;
 
 /**
  * Shared screen-owned chrome for shell roots and future child surfaces. Root
@@ -22,9 +38,39 @@ export function ShellAppBar({
   title,
   overflow,
   trailing,
+  trailingLabelProbe,
 }: ShellAppBarProps) {
   const { colors } = useTheme();
   const navigation = useNavigation();
+  const [rootWidth, setRootWidth] = useState(0);
+  const [titleWidth, setTitleWidth] = useState(0);
+  const [labelWidths, setLabelWidths] = useState<Record<string, number>>({});
+
+  const labelsMeasured = trailingLabelProbe?.every(
+    (label) => labelWidths[label] !== undefined,
+  ) ?? false;
+  const expandedTrailingWidth = trailingLabelProbe
+    ? trailingLabelProbe.reduce(
+        (total, label) => total + (labelWidths[label] ?? 0),
+        TWO_DESTINATION_CHROME_WIDTH,
+      )
+    : 0;
+  const availableTrailingWidth =
+    rootWidth -
+    ROOT_HORIZONTAL_PADDING * 2 -
+    titleWidth -
+    (overflow ? OVERFLOW_WIDTH : 0) -
+    ROOT_GAP_COUNT * ROOT_GAP;
+  // Fail closed before every measurement is available: labels only expand if
+  // this bar proves they fit beside the rendered title and overflow affordance.
+  const compact = !(
+    rootWidth > 0 &&
+    titleWidth > 0 &&
+    labelsMeasured &&
+    availableTrailingWidth >= expandedTrailingWidth
+  );
+  const trailingContent =
+    typeof trailing === "function" ? trailing({ compact }) : trailing;
 
   const onBack = () => {
     const intent = resolveBackIntent({
@@ -40,7 +86,13 @@ export function ShellAppBar({
   };
 
   return (
-    <View style={[styles.root, { borderColor: colors.border }]}>
+    <View
+      onLayout={(event) => {
+        const width = event.nativeEvent.layout.width;
+        setRootWidth((current) => (current === width ? current : width));
+      }}
+      style={[styles.root, { borderColor: colors.border }]}
+    >
       {variant === "child" ? (
         <Pressable
           accessibilityRole="button"
@@ -56,12 +108,47 @@ export function ShellAppBar({
         accessibilityRole="header"
         numberOfLines={1}
         ellipsizeMode="tail"
+        onTextLayout={(event) => {
+          const width = Math.max(
+            0,
+            ...event.nativeEvent.lines.map((line) => line.width),
+          );
+          setTitleWidth((current) => (current === width ? current : width));
+        }}
         style={[styles.title, { color: colors.textPrimary }]}
       >
         {title}
       </Text>
-      {trailing ? <View style={styles.trailing}>{trailing}</View> : null}
+      {trailingContent ? <View style={styles.trailing}>{trailingContent}</View> : null}
       {overflow && overflow.length > 0 ? <OverflowMenu actions={overflow} /> : null}
+      {trailingLabelProbe ? (
+        <View
+          accessible={false}
+          importantForAccessibility="no-hide-descendants"
+          pointerEvents="none"
+          style={styles.labelProbe}
+        >
+          {trailingLabelProbe.map((label) => (
+            <Text
+              key={label}
+              onTextLayout={(event) => {
+                const width = Math.max(
+                  0,
+                  ...event.nativeEvent.lines.map((line) => line.width),
+                );
+                setLabelWidths((current) =>
+                  current[label] === width
+                    ? current
+                    : { ...current, [label]: width },
+                );
+              }}
+              style={styles.labelProbeText}
+            >
+              {label}
+            </Text>
+          ))}
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -92,5 +179,15 @@ const styles = StyleSheet.create({
   trailing: {
     flexDirection: "row",
     alignItems: "center",
+  },
+  labelProbe: {
+    position: "absolute",
+    left: -10000,
+    opacity: 0,
+    flexDirection: "row",
+  },
+  labelProbeText: {
+    fontSize: 14,
+    fontWeight: "600",
   },
 });

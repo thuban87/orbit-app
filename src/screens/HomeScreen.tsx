@@ -44,6 +44,7 @@ import { DashboardControlRow } from "@/components/control-surface/DashboardContr
 import { DashboardOverlayHost } from "@/components/control-surface/DashboardOverlayHost";
 import type { OverflowAction } from "@/components/OverflowMenu";
 import { ShellAppBar } from "@/components/ShellAppBar";
+import { Icon } from "@/components/icons/Icon";
 import {
   countArchived,
   countLiveContacts,
@@ -387,22 +388,69 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
           variant="root"
           title="Orbit"
           overflow={overflowActions}
-          trailing={
-            <Pressable
-              testID="dashboard-group-events-entry"
-              accessibilityRole="button"
-              accessibilityLabel="Group Events"
-              onPress={() => navigation.navigate("GroupEvents")}
-              style={styles.groupEventsEntry}
-            >
-              {({ pressed }) => (
-                <>
-                  <Text style={[styles.groupEventsGlyph, { color: pressed ? colors.accent : colors.textSecondary }]}>◉</Text>
-                  <Text numberOfLines={1} ellipsizeMode="tail" style={[styles.groupEventsLabel, { color: pressed ? colors.accent : colors.textSecondary }]}>Group Events</Text>
-                </>
-              )}
-            </Pressable>
-          }
+          trailingLabelProbe={["Your Week", "Group Events"]}
+          trailing={({ compact }) => (
+            <View style={styles.headerDestinations}>
+              <Pressable
+                testID="dashboard-your-week-entry"
+                accessibilityRole="button"
+                accessibilityLabel="Your Week"
+                hitSlop={4}
+                onPress={() => navigation.navigate("Digest")}
+                style={styles.headerDestination}
+              >
+                {({ pressed }) => (
+                  <>
+                    <Icon
+                      name="your-week"
+                      size="md"
+                      tone={pressed ? "accent" : "textSecondary"}
+                    />
+                    {!compact ? (
+                      <Text
+                        numberOfLines={1}
+                        style={[
+                          styles.headerDestinationLabel,
+                          { color: pressed ? colors.accent : colors.textSecondary },
+                        ]}
+                      >
+                        Your Week
+                      </Text>
+                    ) : null}
+                  </>
+                )}
+              </Pressable>
+              <Pressable
+                testID="dashboard-group-events-entry"
+                accessibilityRole="button"
+                accessibilityLabel="Group Events"
+                hitSlop={4}
+                onPress={() => navigation.navigate("GroupEvents")}
+                style={styles.headerDestination}
+              >
+                {({ pressed }) => (
+                  <>
+                    <Icon
+                      name="group-events"
+                      size="md"
+                      tone={pressed ? "accent" : "textSecondary"}
+                    />
+                    {!compact ? (
+                      <Text
+                        numberOfLines={1}
+                        style={[
+                          styles.headerDestinationLabel,
+                          { color: pressed ? colors.accent : colors.textSecondary },
+                        ]}
+                      >
+                        Group Events
+                      </Text>
+                    ) : null}
+                  </>
+                )}
+              </Pressable>
+            </View>
+          )}
         />
       </View>
       <DashboardControlRow onPanelOpenChange={setPanelOpen} />
@@ -455,68 +503,20 @@ const styles = StyleSheet.create({
   listRegion: {
     flex: 1,
   },
-  fab: {
-    position: "absolute",
-    right: 20,
-    bottom: 28,
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    alignItems: "center",
-    justifyContent: "center",
-    elevation: 6,
-  },
-  fabGlyph: {
-    fontSize: 32,
-    lineHeight: 34,
-    fontWeight: "600",
-  },
-  topBarRight: {
+  headerDestinations: {
     flexDirection: "row",
     alignItems: "center",
+    gap: 4,
   },
-  yourWeekEntry: {
-    minHeight: 44,
-    justifyContent: "center",
-    paddingHorizontal: 4,
-  },
-  yourWeekText: {
-    fontSize: 15,
-    fontWeight: "600",
-  },
-  settingsEntry: {
+  headerDestination: {
     minHeight: 44,
     minWidth: 44,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  backupEntry: {
-    minHeight: 44,
-    justifyContent: "center",
-    paddingHorizontal: 8,
-  },
-  backupText: {
-    fontSize: 14,
-    fontWeight: "600",
-  },
-  settingsGlyph: {
-    fontSize: 22,
-    fontWeight: "600",
-  },
-  groupEventsEntry: {
-    maxWidth: 132,
-    minHeight: 44,
     flexDirection: "row",
     alignItems: "center",
     gap: 4,
     paddingHorizontal: 4,
   },
-  groupEventsGlyph: {
-    fontSize: 18,
-    fontWeight: "600",
-  },
-  groupEventsLabel: {
-    flexShrink: 1,
+  headerDestinationLabel: {
     fontSize: 14,
     fontWeight: "600",
   },
