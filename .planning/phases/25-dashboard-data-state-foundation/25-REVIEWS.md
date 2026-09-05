@@ -1,198 +1,162 @@
 ---
 phase: 25
-cycle: 2
+cycle: 3
 reviewers: [codex, claude]
-reviewed_at: 2026-09-05T01:15:16Z
+reviewed_at: 2026-09-05T02:00:42Z
 plans_reviewed: [25-01-PLAN.md, 25-02-PLAN.md, 25-03-PLAN.md, 25-04-PLAN.md, 25-05-PLAN.md, 25-06-PLAN.md, 25-07-PLAN.md]
 models:
-  codex: "gpt-5.6-terra (reasoning=low)"
+  codex: "gpt-5.6-terra (reasoning=high)"
   claude: "opus (read-only subagent)"
 model_sources:
   codex: "banner"
   claude: "subagent-invocation"
 note: >
-  Cycle 2 of the convergence loop. Plans revised after cycle-1 (commits 10a485e, d83c685) and
-  owner decision D-12 (25-CONTEXT.md). D-12 (snooze-clause relocation out of Active/Default into
-  the Needs-Attention filter) is OWNER-AUTHORIZED and was NOT re-escalated — its implementation was
-  verified for correctness instead. The Claude lane ran as an owner-authorized read-only subagent
-  (the `claude -p` lane has a known Write-permission gap in this repo). Every load-bearing claim in
-  both reviews was independently re-verified against the code on disk by the orchestrator.
+  Cycle 3 of the convergence loop. Plans revised after cycle-2 (commit 3eb66b8) and owner decisions
+  D-13 (Unbound search — legacy Home term branch made bound-only NOW; searchUnbound dropped; one-phase
+  Unbound name-lookup gap ACCEPTED, replacement coordinated with Phase 26) and D-14 (Not-Contacted —
+  NeverContactedScreen retired NOW; one-phase control gap ACCEPTED). D-13 and D-14 are OWNER-AUTHORIZED
+  and were NOT re-escalated — their implementations were verified for correctness instead. The Claude
+  lane ran as an owner-authorized read-only subagent (the `claude -p` lane has a known Write-permission
+  gap in this repo). Every load-bearing claim in both reviews was independently re-verified against the
+  code on disk by the orchestrator.
 ---
 
-# Cross-AI Plan Review — Phase 25 (Dashboard Data & State Foundation) — CYCLE 2
+# Cross-AI Plan Review — Phase 25 (Dashboard Data & State Foundation) — CYCLE 3
 
 ## Consensus Summary
 
-Both reviewers agree the revisions **closed the entire cycle-1 cluster**: D-12 is implemented
-cleanly and consistently (a new `ACTIVE_SEGREGATION_WHERE` = the three ADR-011 clauses with no
-snooze drives Active/Default and the All-Contacts union; the snooze clause relocates verbatim into
-the Needs-Attention filter in Plan 03; the legacy `BASE_WHERE` at `dashboard-read.ts:155-158` is
-byte-unchanged). Migration numbering (019, head+1 of 018 / `TARGET_VERSION 18`) is correct and
-re-verified on disk, with a `checkpoint:decision` HALT if head ≠ 018 at execution. The §H
-population-aware Default-sort model, the birthday JS→SQL seam, the multi-population precedence, the
-scorer partial-coverage redesign (a new additive coverage-aware aggregator; the existing all-terms
-gate untouched), the additive Plan-05 empty-state signature (no Wave-2 `tsc` break), the
-backup-format-5/Phase-36 wording, and the Plan-06/07 consumer sweeps are all now specified correctly
-and match the code.
+Both reviewers independently agree: **all 5 cycle-2 HIGHs and all 4 cycle-2 actionables are FULLY
+RESOLVED on disk** against the revised plans (commit 3eb66b8) plus owner decisions D-13/D-14, and
+**no finding this cycle is an owner escalation** — nothing deletes, weakens, or inverts an
+ADR/HANDOFF/CONTEXT decision beyond what D-13/D-14 explicitly authorize. Migration numbering is
+re-verified head+1 = 019 (head 018, `TARGET_VERSION = 18` at `database.ts:53`). The orchestrator
+independently re-verified every load-bearing claim below against the code on disk (not the reviewers'
+summaries).
 
-**But cycle 2 surfaced NEW, verified execution-blocking issues the revisions introduced or missed —
-the two reviewers found DIFFERENT, complementary problems on Plans 04, 06, and 07.** The engineering
-architecture is sound; the residual risk is a cluster of concrete, on-disk-verified plan bugs plus
-one owner sequencing decision. Overall risk: **MEDIUM–HIGH**, gated on amending Plans 04, 06, 07
-(and a Plan 01 test-scope gap) before execution.
+The two reviewers found **non-overlapping** residual issues, and **the residuals are all plan-text /
+spec-precision imprecisions, not execution-blocking defects** — the engineering architecture is sound
+and each cycle-2 fix lands against real symbols/columns:
+
+- **HIGH-1 (Plan 04 phone/email):** now sourced via a `contact_methods` LEFT JOIN
+  (`method_type IN ('phone','email')`, `display_value`). Verified `contacts` has no phone/email
+  (migration 009 `CREATE_CONTACTS_V9` at `009-…:16-34`; no later migration re-adds them) and that
+  `contact_methods` carries those columns (`009-…:226-234`). **RESOLVED.**
+- **HIGH-2 (Plan 04 descriptor contract):** `KnowledgeSearchEntry` widened (memory `type` + part
+  split, relationship `relation_type` + `note`, direct-field/category labels) + an offset-preserving
+  match surface added inside `knowledge-search.ts`. Verified the disk gaps the plan claims
+  (`knowledge-search-read.ts:56-59,73-83,101-108`; `knowledge-search.ts` `tokenize`→strings at 32-40,
+  `tokenScore`→number at 81-87) and that all widened target columns exist in migration 016
+  (`memories.type` `:15`, `relationships.relation_type` `:36` / `note` `:38`). **RESOLVED.**
+- **HIGH-3 (Plan 06 widget intent):** adds a Home-only `WidgetNavIntent` variant (`index:0`, one
+  route), re-points `resolveWidgetUri('orbit://favourites')`, and handles it in **all three**
+  unconditional `routes[1]` consumers — the guard (`widget-quick-action-guard.ts:32`) and both gate
+  reads (`widget-linking.ts:301` and `:326`). **RESOLVED.**
+- **HIGH-4 (Plan 07 Unbound leak → D-13):** Plan 07 Task 3(1) adds `AND ${DASHBOARD_BOUND_WHERE}` to
+  Branch 1's inline `where` only; `BASE_WHERE` (`dashboard-read.ts:155-158`) is byte-unchanged; no
+  `searchUnbound` is added; `unbound-read.ts` / `UnboundContactsScreen.tsx` untouched. Exactly D-13.
+  **RESOLVED (owner-authorized) — not re-escalated.**
+- **HIGH-5 (Plan 07 Not-Contacted gap → D-14):** `NeverContactedScreen` retirement is clean — every
+  consumer re-pointed (`types.ts:65`, `DashboardStack.tsx:16,65`, `DigestScreen.tsx:163`,
+  `HomeScreen.tsx:417`, `focused-route-classification.test.ts:38`), `countNeverContacted` kept (still
+  read by `DigestScreen.tsx:100`, `HomeScreen.tsx:198`, `digest-read.test.ts:414`).
+  **RESOLVED (owner-authorized) — not re-escalated.**
+- **A1** (Plan 01 `restore-apply.test.ts` + mig 019 in local chain), **A2** (Plan 06
+  `rewriteFavouriteRanks` grep-gate swept incl. `ring-seq-dao`), **A3** (Plan 03 single read-scoped
+  `now` for Gravity), **A4** (Plans 06/07 stale-comment cleanup): all incorporated. **RESOLVED.**
+
+**Overall risk: LOW.** Residual = 0 HIGH, 0 owner escalation, and a cluster of MEDIUM/LOW plan-text
+corrections (below), most of them caught by the plans' own `tsc`/`vitest` gates but worth fixing so
+the executor is not misdirected.
 
 ### Agreed Strengths (both reviewers, verified)
 
-- **D-12 implemented correctly and consistently** across every population and filter; legacy
-  `BASE_WHERE` byte-unchanged; the ADR-011 segregation trip-wire honored. A currently-snoozed
-  status-bearing contact appears in Active, All Contacts, and Snoozed (deduped) and is suppressed
-  only from Needs Attention — matching the dossier §Snoozed [DECIDED] pair.
-- **Migration numbering verified head+1 = 019** (`database.ts:53` `TARGET_VERSION = 18`, migrations
-  top out at `018`); additive `ADD COLUMN` only, no edit to shipped migrations, one-way gate.
-- **`CARD_STATUS` CASE-wrap preserved** (`dashboard-read.ts:127-132`): never-contacted rows read
-  NULL status/progress, never bucketed 'stable' (the HIGH-1 guard); snooze doesn't null
-  `last_contact`, so snoozed contacts keep real status.
-- **Injection posture uniformly strong**: static SQL, closed code-constants, `?`-bound runtime
-  values, `escapeLike` for LIKE; JSON-TEXT columns defended by DAO validators + store parse-guards +
-  known-token-only mapping.
-- **Gravity kept out of SQL** as a reversible post-query TS pass reusing `computeContactGravity` /
-  `GRAVITY_TIERS`; the cached-column alternative is reserved as an owner decision.
-- **ADR-031 (no FTS/no index) grep-gated; ADR-075 favourite-rank retirement keeps the column** and
-  its picker/sun/merge/capture internal reads intact.
+- Every cycle-2 fix lands against **real symbols and columns** — the widened corpus targets exist in
+  migrations 009/016; the Home-only widget variant handles all three `routes[1]` sites; the D-13
+  bound predicate is the exact one-line inline-`where` change with `BASE_WHERE` frozen.
+- D-13 and D-14 are implemented **exactly as authorized** — the legacy term branch is bound-only, no
+  `searchUnbound` is re-added, the Never-Contacted retirement re-points (not strands) consumers, and
+  `countNeverContacted` survives for Digest. No unauthorized ADR/CONTEXT reversal.
+- Migration 019 = head+1 (018 / `TARGET_VERSION 18`), additive `ADD COLUMN` only, one-way
+  `checkpoint:decision` gate, `restore-apply.test.ts` chain registered.
 
 ### Agreed Concerns (raised or corroborated by both — highest priority)
 
-1. **Plan 04 corpus completion (Task 1) is not implementable as written** — both reviewers flagged
-   the search corpus, from different angles, and both are verified on disk:
-   - *(Claude, HIGH — NEW)* The instruction sources `phone`/`email` from `contacts`
-     (`25-04-PLAN.md:100`), but **migration 009 rebuilt `contacts` WITHOUT those columns**
-     (`CREATE_CONTACTS_V9`, `009-contact-method-normalization.ts:16-34`; values migrated into the new
-     `contact_methods` table, `:183-196`). `SELECT ... phone, email FROM contacts` throws
-     `no such column` at `TARGET_VERSION 18`; Plan 04's own AC ("a phone/email term matches its
-     in-scope contact", `:107`) cannot pass. Re-point to a `contact_methods` LEFT JOIN
-     (`method_type IN ('phone','email')`). The category-label half (`categories` join) is fine.
-   - *(Codex, HIGH — NEW)* Even for entries that DO exist, the corpus carries insufficient provenance
-     to build the DASHQ-10 / UI-SPEC descriptor. A memory entry is `{ source: "memory", text }`
-     collapsing custom-label/value/note (`knowledge-search-read.ts:101-108`); the SQL never selects
-     `memories.type` (`:73-82`), and relationships select only `person_name` (`:61-65`) despite
-     `relation_type`/`note` existing (`016-contact-knowledge.ts:31-44`). So the descriptor builder
-     cannot assign `sourceKind` `note-or-body` vs `memory-or-custom-field`, derive `fieldLabel` from
-     `MEMORY_TYPE_REGISTRY[type].displayName`, or (MEDIUM) reconstruct highlight offsets, because
-     `tokenize()` discards offsets (`knowledge-search.ts:32-40`). UI-SPEC:199-207/255 require the
-     4-way `sourceKind`, `fieldLabel`, and highlight offsets **in the foundation** ("foundation
-     carries full text + highlight offsets"), so this is in-scope for Phase 25, not deferrable.
-
-2. **Plan 07 Not-Contacted retrieval gap persists (owner sequencing decision).** Deleting
-   `NeverContactedScreen` and re-pointing `navigate("NeverContacted")` (`HomeScreen.tsx:417`,
-   `DigestScreen.tsx:163`) to Home leaves no user-facing way to select the Not-Contacted population
-   until its chip lands in Phase 26 (Home still renders legacy `listDashboard`). Plan 07 now surfaces
-   this as an explicit owner-visible `flagged-unverified` assumption (`25-07-PLAN.md:53`: "If the
-   owner wants the screen kept until Phase 26, that is an owner sequencing call") — correct handling
-   per the decision-authority guardrail (the E-02 retirement is the dossier's decision; the sequencing
-   risk is surfaced, not papered over). It remains an **open owner sequencing decision**; the gap is
-   real and unchanged in substance.
+- **Plan 07 NeverContacted grep-gate yields benign false positives** (raised by Claude AND the
+  orchestrator's independent pass). The gate `grep -rn 'name="NeverContacted"\|navigate("NeverContacted")\|"NeverContacted",' src`
+  cannot return empty after the retirement: the `"NeverContacted",` alternative matches the seed-name
+  fixtures `name: "NeverContacted",` in **`queries.test.ts:135`** AND **`contact-status-read.test.ts:160`**.
+  Plan 07 flags only `queries.test.ts` as benign and omits `contact-status-read.test.ts:160` entirely.
+  Same class as the cycle-2 A2 gate bug that was fixed for `rewriteFavouriteRanks`. **MEDIUM actionable.**
 
 ### Divergent Views
 
-- **Plan 04 severity framing.** Claude rates overall risk MEDIUM (residual is the one
-  schema-impossible instruction + the owner call); Codex rates HIGH until Plans 04/06/07 are amended.
-  Both agree on the underlying facts; the difference is aggregation weight. Given the widget
-  compile/runtime break (below) and the unbound-search leak are both deterministic, MEDIUM–HIGH is
-  the reconciled rating.
-- **Plan 06 / Plan 07 each carry a HIGH that only ONE reviewer surfaced** (widget-intent break;
-  unbound-search leak). These are not disagreements — they are non-overlapping coverage. Both were
-  independently re-verified against disk by the orchestrator and are treated as live.
+- **Severity framing of the three cross-plan spec gaps (Codex).** Codex rates its three findings
+  (reset-clears-search coordination; `contact_methods` join fan-out; Plan 06 widget call signature)
+  as HIGH; Claude did not surface them and rated the set LOW. Reconciled by the orchestrator against
+  disk: none is execution-blocking or a decided-contract reversal — the widget-call and reset items
+  are `tsc`/scope-precision fixes, and the reset "cleared search" clause is a **Phase-26** requirement
+  (DASHC-10) whose two primitives already exist in P25. The fan-out item is the only one not caught by
+  a gate, but the corpus is inherently per-`contactId`-keyed. All three are treated as **MEDIUM
+  actionable**, not HIGH.
+- **Non-overlapping coverage (not disagreement).** Codex found the three cross-plan contract seams;
+  Claude found three plan-text precision errors (Plan 07 symbol misname; Plan 06 `widget-linking.ts`
+  header comments; Plan 04 "existing categories join" wording). Both sets were re-verified on disk and
+  are treated as live.
 
 ---
 
 ## Codex Review
 
-<!-- model: gpt-5.6-terra (reasoning=low); source-grounded, file:line evidence; independently re-verified on disk -->
+<!-- model: gpt-5.6-terra (reasoning=high); source-grounded, file:line evidence; independently re-verified on disk -->
 
-The revised plan set correctly incorporates D-12’s authorized move of snooze suppression out of Active/All Contacts: the existing legacy predicate still contains snooze at `dashboard-read.ts:155`, while the planned additive path explicitly avoids reusing it. Migration head is genuinely 018 / target 18 today (`database.ts:53`, `:74`).
+Summary: the five prior HIGH findings and four actionables are now planned correctly. Three new
+unresolved cross-plan seams remain (Codex rated them HIGH; the orchestrator reconciled them to MEDIUM
+actionable — see Divergent Views).
 
-Three implementation seams remain unresolved: migration-test consumers omitted from Plan 01, insufficient corpus provenance for Plan 04 descriptors, and retirement paths in Plans 06–07 that would either crash or still expose Unbound contacts through legacy Dashboard search. **Risk assessment: HIGH** until Plans 04, 06, and 07 are amended.
+**FULLY RESOLVED (Codex):** HIGH-1 direct `contact_methods` sourcing; HIGH-2 provenance + offset
+surface; HIGH-3 Home-only widget intent/guard; HIGH-4 D-13 bound-only legacy term branch; HIGH-5 D-14
+clean Never-Contacted retirement; A1 restore-chain mig 019 registration; A2 comment-aware
+`rewriteFavouriteRanks` sweep; A3 injected read-scoped Gravity `now`; A4 stale retirement-comment
+cleanup. No owner escalation — none weakens D-13, D-14, or any ADR.
 
-### Plan 01 — Schema, DAO, store, Active tracer — Risk: MEDIUM
-- **MEDIUM — Plan 01 omits an existing hard-coded v18 migration consumer.** `restore-apply.test.ts:45-66` imports only through `migration018`, builds a local array, and runs it at target `18`. Once `getAppSettings()` is widened to select the new (non-null) dashboard columns, this v18 test DB can fail when a restore path reads settings. It is not in Plan 01's `files_modified`. Fix: add `restore-apply.test.ts` to Plan 01, register migration 019 in its local chain at target 19 — but audit the *intentional* partial-chain tests separately; do not blindly bump tests that specifically validate migration 018.
-- Strengths: repo is genuinely at 018/target 18 so 019 is head+1 (`database.ts:42-53,74`); legacy `BASE_WHERE` preserved with its three ADR-011 clauses (`dashboard-read.ts:155-158`); portable-settings precedent exists (`app-settings-dao.ts:184-200`, `backup-schema.ts:132-166`).
+- **[reconciled MEDIUM; Codex HIGH] Plan 01 / Plan 05 — global Reset Dashboard View does not clear
+  search.** The dossier's Reset contract restores Active / no filters / Default sort / **cleared
+  search** while preserving List/Card (`dossier:250-263` [DECIDED]). Plan 01's `resetDashboardView()`
+  is explicitly "search-not-owned-here" (`25-01-PLAN.md:38`) and Plan 05 provides a separate
+  `clearSession()` (`25-05-PLAN.md` Task 1) — nothing coordinates them. **Orchestrator note:** the
+  full Reset control + its "cleared search" behavior is **DASHC-10, a Phase-26 (Control Surface)
+  requirement** (`REQUIREMENTS.md:98`); P25's DASHQ-13 owns the shared query-state + durable-axis
+  reset, and the two clearing primitives (durable `resetDashboardView()` + ephemeral `clearSession()`)
+  both exist in P25. So this is a recorded-ownership gap, not an execution-blocking defect. Required
+  change: in Plan 01 (or Plan 05) explicitly record that "Reset Dashboard View = `resetDashboardView()`
+  (durable axes) + `clearSession()` (search), coordinated by the Phase-26 Control Surface (DASHC-10)"
+  — so the decided "cleared search" clause is not silently orphaned. (Or add a foundation-level reset
+  coordinator if the owner wants it in P25.)
 
-### Plan 02 — Population union engine — Risk: LOW
-- No new concerns. `CARD_STATUS` already nulls status/progress for `last_contact IS NULL`
-  (`dashboard-read.ts:127-132`); the new path safely leaves legacy queries untouched
-  (`:179-199`, still consumed by `HomeScreen.tsx:194-202`); `listBirthdayCandidates` is deliberately
-  broader with another live consumer (`:391-399`), so filtering final ids is correct. Keep the
-  explicit test that a snoozed status-bearing contact has non-null status in Active/All Contacts/Snoozed.
+- **[reconciled MEDIUM; Codex HIGH] Plan 04 — the `contact_methods` LEFT JOIN can fan one contact into
+  multiple corpus candidates.** Only the *primary* method per `(contact_id, method_type)` is unique
+  (`009-…:235`, `WHERE is_primary = 1`); the DAO models ordered method arrays
+  (`contact-methods-dao.ts:69`), so a contact may have multiple phones/emails. A literal join onto the
+  `id,name` contact read would duplicate contact rows (and name entries), violating the
+  per-deduplicated-contact result shape (`25-UI-SPEC.md:195`). **Orchestrator note:** the existing
+  corpus is per-`contactId`-keyed (`contacts.map(...)`, one `KnowledgeSearchCandidate` per contact,
+  1-to-many sources grouped via a `Map` exactly like `memories`/`relationships`), so an executor
+  mirroring that pattern would not fan out — but the plan's repeated literal "LEFT JOIN" wording plus
+  the absence of a multi-method test is a genuine trap (a logic-level fan-out is NOT `tsc`-caught).
+  Required change (Plan 04 Task 1): specify the phone/email read as a **separate scoped
+  `contact_methods` query grouped by `contact_id`** (mirroring the memory/relationship reads), NOT a
+  join onto `LIST_CONTACTS`, and add a test that one contact with two phones/emails yields exactly one
+  candidate carrying both method entries.
 
-### Plan 03 — Filters, sort, Gravity — Risk: LOW
-- **LOW — the Gravity read contract does not specify a consistent `now` source.**
-  `computeContactGravity(inputs, now)` needs a local wall-clock string (`impact.ts:88-100`), but the
-  proposed `listDashboardPopulation` contract states no `now` parameter — per-row computation and
-  tests can become nondeterministic. Fix: amend the signature to accept one read-scoped `now: string`
-  (or derive it once before the SQL/Gravity pass) and reuse it in fixtures and the Gravity loader.
-- Strengths: Gravity is derived at read time, not stored (`impact.ts:63-100`); `getImpactInputs`
-  gives a one-statement per-contact snapshot (`impact-read.ts:52-90`); legacy needs-attention uses
-  `PROGRESS_SQL` only inside `BASE_WHERE` (`dashboard-read.ts:250-264`), so relocating snooze is clean.
-
-### Plan 04 — Scoped semantic search — Risk: HIGH
-- **HIGH — corpus lacks provenance for the required descriptor labels/source kinds.** (See Agreed
-  Concern 1.) Memory entries are `{source:"memory", text}` with no `type` selected
-  (`knowledge-search-read.ts:73-82,101-108`); relationships carry only `person_name` (`:61-65`)
-  despite `relation_type`/`note` (`016-contact-knowledge.ts:31-44`). Descriptor cannot derive
-  `MEMORY_TYPE_REGISTRY[type].displayName`, distinguish value/label from note, or assign note-or-body
-  priority.
-- **MEDIUM — the tokenizer cannot produce raw-text highlight ranges.** `tokenize()` diacritic-folds
-  and returns strings only (`knowledge-search.ts:32-40`); `tokenScore()` returns a number
-  (`:81-87`). Offsets into raw text (e.g. `café`) cannot be reconstructed downstream. Fix: add an
-  offset-preserving match-info surface inside `knowledge-search.ts` that maps normalized matches back
-  to original-string offsets (do not ask `dashboard-search-match.ts` to infer them). Widen
-  `KnowledgeSearchEntry` with a closed user-facing subtype + semantic metadata (memory `type` + part;
-  relationship `relationType` + part; direct-field/category labels). Add fixtures for a
-  registry-labelled memory note, a relationship note/type, and a diacritic-folded match with asserted
-  highlight offsets.
-- Strengths: corpus is term-free/TS-matched (`knowledge-search-read.ts:1-7`); the additive
-  coverage-aware scorer correctly does NOT alter the existing all-terms `scoreQuery` gate
-  (`knowledge-search.ts:111-121`); no production caller invokes `listKnowledgeSearchCandidates` yet
-  (`:116-118`), so the scoped signature is safe to introduce with tests updated.
-
-### Plan 05 — Ephemeral session state + empty-state gate — Risk: LOW
-- No new concerns. Empty gate is a pure single-decision fn (`dashboard-empty-logic.ts:74-115`);
-  `HomeScreen.tsx:308-317` is the sole legacy caller so additive optional fields avoid a Wave-2 screen
-  change; in-memory Zustand precedent is plain `create` (`shell-transient-store.ts:1-22`). Suggestion:
-  add a test reset helper for the singleton session store so tests don't depend on execution order.
-
-### Plan 06 — Favourites retirement — Risk: HIGH
-- **HIGH — repointing `orbit://favourites` to `[{ name: "Home" }]` breaks the intent + guard
-  contracts.** `WidgetNavIntent` only permits two-route tuples with `index: 1` (incl. the
-  ManageFavourites variant) (`widget-linking.ts:61-93`), and the guard unconditionally reads
-  `intent.routes[1]` (`widget-quick-action-guard.ts:32-37`). A Home-only intent as prescribed by
-  Plan 06 Task 3 (`25-06-PLAN.md` action) is both **non-typeable** (fails the plan's own
-  `tsc --noEmit` gate) and a **runtime `undefined` dereference** once the ManageFavourites branch is
-  removed. Fix: introduce an explicit Home-only `WidgetNavIntent` variant (`index: 0`,
-  `routes: [{ name: "Home" }]`), update `guardWidgetIntent()` to accept it before reading
-  `routes[1]`, and update resolver tests to assert `index: 0` + the one-route payload.
-- Strengths: keeping the `favourite_rank` column is correct — genuinely read by capture
-  (`capture-read.ts:58-66`), sun-picker (`sun-picker-read.ts:45`), merge (`merge-candidate-read.ts:29`),
-  picker (`picker-read.ts:31-42`); the widget is rank-ordered through legacy Dashboard
-  (`widget-data.ts:74-87`); the guard's `ManageFavourites` special-case is a real functional consumer
-  (`widget-quick-action-guard.ts:32`).
-
-### Plan 07 — Retire banner / Never Contacted, replace Unbound retrieval — Risk: HIGH
-- **HIGH — deleting only the neutral-row helper does not stop Unbound contacts appearing in Dashboard
-  search.** The legacy term branch filters only `archived_at IS NULL` — NOT `tracking_enabled = 1`
-  (`dashboard-read.ts:230-239`) — so it returns `tracking_enabled = 0` (Unbound) rows; HomeScreen
-  renders them directly (`HomeScreen.tsx:557-609`), and `dashboard-search-row-logic.ts:7-23` only
-  changes their *presentation* to "Unbound". After the helper's removal (Plan 07), those rows render
-  as normal `ContactCard`s, so DASHQ-08 ("Dashboard search never surfaces unbound") is **still**
-  violated — arguably worse. Fix: in the same change, make the legacy Home term branch structurally
-  bound-only (`AND tracking_enabled = 1`, aligned with D-07 now that `searchUnbound()` is the
-  replacement), with an integration test asserting a matching Unbound contact is absent from Home's
-  legacy search; OR wire Home's search to Plan 04's scoped search before removing the old presentation.
-  Do not leave the data-layer leak to a later render phase while claiming DASHQ-08 complete.
-- Strengths: old term branch is demonstrably broader (`dashboard-read.ts:230-239`); a dedicated
-  Unbound route + `searchUnbound()` replacement already exists (`unbound-read.ts:23-38`) so it is not
-  an ADR-062 reversal; banner freshness paths (focus/foreground/pull) are real and separable
-  (`HomeScreen.tsx:229-262`).
+- **[reconciled MEDIUM; Codex HIGH] Plan 06 — widget repoint uses a call that cannot type-check.** Plan
+  06 Task 4 instructs `listDashboardPopulation(['favourites'])` (`25-06-PLAN.md:102`), but Plan 02
+  defines `listDashboardPopulation(exec, query)` (`25-02-PLAN.md:121`) and Plan 03 adds a required
+  injected `now: string` (`25-03-PLAN.md:167`) → the real signature is
+  `listDashboardPopulation(exec, query, now)`. The literal array-arg call fails `tsc` (the widget
+  loader already holds an executor, `widget-data.ts:79`). Caught by Plan 06's own `tsc` gate, but the
+  action misdirects the executor. Required change (Plan 06 Task 4): specify the complete call —
+  `listDashboardPopulation(exec, { populations: ['favourites'], filters: {}, sort: 'default' }, now)` —
+  and thread one local wall-clock `now` (with a fixed `now` in `widget-data.test.ts`).
 
 ---
 
@@ -200,151 +164,91 @@ Three implementation seams remain unresolved: migration-test consumers omitted f
 
 <!-- model: opus (read-only subagent, owner-authorized for this run); source-grounded; independently re-verified on disk -->
 
-The revisions closed most of cycle-1's cluster. **D-12 is implemented consistently and correctly**
-across all seven plans (a new `ACTIVE_SEGREGATION_WHERE` = the three ADR-011 clauses with no snooze
-drives Active/Default and the All-Contacts union; the snooze clause relocates verbatim into the
-Needs-Attention filter, Plan 03; the legacy `BASE_WHERE` at `dashboard-read.ts:155-158` is
-byte-unchanged). The §H Default-sort model, the birthday JS→SQL seam, the scorer partial-coverage
-redesign, the Plan-05 additive empty-state signature, the backup-format-5 wording, and the
-Plan-06/07 consumer sweeps are now specified correctly and match disk. Overall risk: **MEDIUM**.
+**Overall risk: LOW.** All 5 cycle-2 HIGHs and all 4 actionables are resolved on disk against the
+revised plans plus D-13/D-14. Every claimed source condition verified holds (Branch 1 omits the bound
+predicate; the `WidgetNavIntent` union permits only `index:1` two-route tuples with unconditional
+`routes[1]` reads at three sites; `knowledge-search-read.ts` sources only `id,name` and collapses
+memory parts; all widened target columns exist in migrations 009/016; mig 019 = head+1). D-13 and D-14
+implemented exactly as authorized — no unauthorized reversal. Remaining items are LOW/MEDIUM
+plan-text/grep-gate imprecisions, none blocking (caught by the `tsc`/`vitest` gates).
 
-### HIGH
+**Cycle-2 disposition (Claude):** HIGH-1..HIGH-5 and A1/A2/A3 — **FULLY RESOLVED**; A4 — **mostly
+resolved**, one `widget-linking.ts` header-comment gap (LOW).
 
-**C1 — [NEW] Plan 04 corpus completion targets non-existent `contacts.phone` / `contacts.email`
-columns.** (See Agreed Concern 1.) Plan 04 Task 1 (`25-04-PLAN.md:100`) sources `phone`/`email` from
-`contacts`, asserting "only fields that exist are added" and "verified on disk" — but it verified
-`location`'s absence, not phone/email. migration 009 rebuilds the table
-(`009-contact-method-normalization.ts:209` RENAME; `CREATE_CONTACTS_V9` `:16-34` has no phone/email;
-copy INSERT `:171-178` omits them; values move to `contact_methods` `:183-196`). No later migration
-re-adds them. `SELECT id, name, phone, email FROM contacts` throws `no such column: phone` at
-`TARGET_VERSION 18`; Plan 04's own AC (`:107`) cannot pass. Fix: LEFT JOIN `contact_methods`
-(`display_value`/`raw_value`, `method_type IN ('phone','email')`) — a normalized shared table with
-its own writers (`contact-methods-dao.ts`) the plan does not mention. Not an owner decision (dossier
-§J requirement intact); a wrong implementation target.
+- **[LOW-MEDIUM] Plan 07 misnames the HomeScreen consumer.** Task 3(2) says remove "the
+  `dashboardSearchRowPresentation` rendering + its import from `HomeScreen.tsx`" — but `HomeScreen.tsx`
+  imports **`isNeutralDashboardSearchRow`** (`:70`) and renders it in a ternary at **`:558`**;
+  `dashboardSearchRowPresentation` is used **only** by `HomeScreen.test.tsx` (`:2`). Both are exports of
+  `dashboard-search-row-logic.ts` (`:8`, `:20`) — verified on disk. Correctness still holds (the module
+  is deleted wholesale; `tsc` + the module-path grep catch a leftover import), but Plan 07 should name
+  the real symbol + the `:558` render ternary so the executor removes the right code. Required change:
+  correct the symbol name and cite `HomeScreen.tsx:70,558`.
 
-**C2 — [Cycle-1 HIGH, PARTIALLY RESOLVED / owner-flagged] Plan 07 re-point-to-Home strands
-Not-Contacted retrieval for one phase.** (See Agreed Concern 2.) Now surfaced as a
-`flagged-unverified` owner-visible assumption (`25-07-PLAN.md:53`). Correct handling per the
-decision-authority guardrail; remains an open owner sequencing decision, gap persists.
+- **[LOW] Plan 07 NeverContacted grep-gate false positives** (also raised in the orchestrator's pass —
+  see Agreed Concerns). Add `contact-status-read.test.ts:160` to the benign-seed note (the plan notes
+  only `queries.test.ts:135`), or scope the pattern to the browseRoutes/route context so the gate
+  returns empty.
 
-### MEDIUM
+- **[LOW] Plan 06 A4 gap — `widget-linking.ts` own header comments go stale.** Plan 06 cleans
+  `navigation/types.ts:80` but not `widget-linking.ts`'s header doc: line 13
+  ("`orbit://favourites → ManageFavourites`"), line 56 ("All four forms reset onto [Home, target]
+  (index 1)"), and the `WidgetNavIntent` type doc — all contradict the Home-only variant once it lands.
+  Required change: add these to Task 3's doc-comment sweep.
 
-**C3 — [NEW] Plan 06 `rewriteFavouriteRanks` grep acceptance gate cannot pass — `ring-seq-dao`
-references it in comments and is unswept.** Plan 06's AC (`25-06-PLAN.md:47,129,186`) requires
-`grep -rn 'rewriteFavouriteRanks' src` to return empty after the sweep, but `ring-seq-dao.ts:4`
-("A near-VERBATIM clone of `rewriteFavouriteRanks` (favourites-dao.ts:105-143)") and
-`ring-seq-dao.test.ts:6` reference the name in doc comments and are not in `files_modified`. Comments
-only (no compile/test break), but (a) the gate fails as written and will block/confuse the executor,
-and (b) the `ring-seq-dao.ts:4` comment cites `favourites-dao.ts:105-143`, a dangling line reference
-once `rewriteFavouriteRanks` is deleted. Fix: scope the grep or add/update those two files. (The
-`ManageFavourites` gate is clean by contrast — all references are in listed files.)
-
-**C4 — [Cycle-1 MEDIUM, PARTIALLY RESOLVED — conscious deferral] Search-scope = post-Gravity id
-set: contract recorded, but no Phase-25 test runs search over a Gravity-narrowed set.** Plan 03
-Task 3 tests the fully-filtered id set excludes a Gravity-dropped contact (`25-03-PLAN.md:175,183`)
-and the contract is recorded (`:89-92`; Plan 04 `:50`), but the end-to-end join (Plan 03's ids →
-Plan 04's `searchDashboard`) is deferred to render phases 26-28. Given D-11 (nonvisual foundation)
-and both halves independently tested, this deferral is acceptable; residual risk low but non-zero.
-No further Phase-25 action strictly required — flagged as a conscious deferral.
-
-### LOW
-
-**C5 — [NEW] Stale doc-comment references survive the retirements (not load-bearing).** After the
-Plan-06/07 deletions, prose comments still name removed routes/screens: `navigation/types.ts:80`,
-`RootNavigator.tsx:121,125`, `DigestScreen.tsx:17`, plus the `ring-seq-dao` comments (C3). None break
-compile/tests, and Plan 07's grep gates use specific patterns that avoid them. Cleanup pass, not
-blocking.
-
-**C6 — [Cycle-1 LOW, RESOLVED] `getValuesForContact` N+1 in the corpus read**
-(`knowledge-search-read.ts:157`, per-contact) is now named as the Pixel-only search-perf gate
-(Plan 04 verification, `25-04-PLAN.md:203`). Acknowledged and deferred to on-device UAT —
-appropriate.
-
-### Cycle-1 disposition (5 HIGH + 13 actionables)
-
-| Cycle-1 finding | Disposition |
-|-----------------|-------------|
-| HIGH-1 Snooze vs Active (ESCALATION) | **RESOLVED by owner D-12** — not re-escalated; implemented consistently; legacy `BASE_WHERE` byte-unchanged. |
-| HIGH-2 Default-sort fails §H; Birthdays seam; multi-pop undefined | **RESOLVED** — §H mapping correct, JS→SQL birthday seam + empty→constant-false + soonest post-query sort, multi-pop precedence defined. |
-| HIGH-3 Plans 06/07 miss consumers; grep gates can't pass | **RESOLVED for ManageFavourites/NeverContacted** (real consumers now in `files_modified`); **NEW residual C3** (`ring-seq-dao` comments break the `rewriteFavouriteRanks` gate). |
-| HIGH-4 Scorer term-coverage contradiction | **RESOLVED** — additive coverage-aware aggregator via `scoreCandidate`; existing gate untouched. |
-| HIGH-5 Search has no integration owner | **RESOLVED as scope clarification** + PARTIAL on proof (C4); wiring deferred to render phases (D-11). |
-| HIGH (Codex) Plan 05 storage not restoration | **RESOLVED as scope clarification** — state-shape foundation delivered; wiring deferred to 26-28. |
-| HIGH (Codex) Plan 07 re-point strands Not-Contacted | **PARTIALLY RESOLVED / owner-flagged** (C2). |
-| MED/HIGH Plan 05 breaks Wave-2 tsc | **RESOLVED** — additive optional signature; HomeScreen not edited. |
-| MED Search corpus incomplete (category/phone/email) | **PARTIALLY RESOLVED** — category sound; **phone/email target non-existent columns (C1, NEW HIGH)**. |
-| MED (both) Search scope must be post-Gravity | **PARTIALLY RESOLVED** (C4) — contract + id-set test; e2e deferred. |
-| MED Gravity vs rowCount empty-state | **RESOLVED** — callers take post-Gravity `rows.length`. |
-| MED Plan 06 phantom Settings/HomeScreen targets | **RESOLVED** — grep=0 stated, dropped; real consumers enumerated. |
-| MED Plan 07 file/test inventory (HomeScreen.test.tsx) | **RESOLVED** — retirement + HomeScreen listed. |
-| LOW JSON columns no CHECK → drop-unknown-token explicit | **RESOLVED** across Plans 01/02/03. |
-| LOW Backup-format wording (v5/Phase 36) | **RESOLVED** — Plan 01 mandates format-5 wording. |
-| LOW read_first names private scorer fns | **RESOLVED** — identified private; threads through `scoreCandidate`. |
-| LOW `listNeverContacted` dead code | **RESOLVED (deliberate)** — `@deprecated`, retired with legacy `listDashboard`. |
-| LOW Contact-Frequency bands → single tunable + test | **RESOLVED** — `CONTACT_FREQUENCY_BANDS` + boundary test. |
-| LOW `getValuesForContact` N+1 | **ACKNOWLEDGED/deferred** to Pixel gate (C6). |
-
-Net: all 5 cycle-1 HIGHs resolved or owner-decided **except** the Plan-07 sequencing gap (now
-owner-flagged). The 13 actionables are incorporated except the phone/email corpus source (now a NEW
-HIGH, C1) and the new `ring-seq-dao` grep-gate gap (C3).
+- **[LOW] Plan 04 "existing categories join" wording.** must_haves truth #2 and Task 1 say the category
+  label comes "from the existing `categories` join," but the file being edited
+  (`knowledge-search-read.ts`) has **no** categories join today — `LIST_CONTACTS` is
+  `SELECT id, name FROM contacts` (`:56-59`); the join lives in `dashboard-read.ts`. Non-blocking (the
+  executor adds the needed join), but reword to "add a `categories` join / select via
+  `contacts.category_id`" so "existing" doesn't misdirect.
 
 ---
 
-## Cycle-2 Verdict (orchestrator synthesis)
+## Cycle-3 Verdict (orchestrator synthesis)
 
 All findings below were re-verified against the code on disk by the orchestrator (not taken from the
-reviewers' summaries). The two reviewers found **non-overlapping** issues on Plans 04/06/07 — the
-union is what must be addressed.
+reviewers' summaries). **All 5 cycle-2 HIGHs and all 4 cycle-2 actionables are FULLY RESOLVED**; D-13
+and D-14 are implemented exactly as owner-authorized and were not re-escalated. **No HIGH remains and
+no owner escalation is required.** The residual is a cluster of MEDIUM/LOW plan-text and spec-precision
+corrections (union of the two reviewers' non-overlapping findings), none execution-blocking.
 
-CYCLE_SUMMARY: current_high=5 current_actionable=4
+CYCLE_SUMMARY: current_high=0 current_actionable=7
 
-### Current HIGH Concerns (unresolved — 5)
+### Current HIGH Concerns (unresolved — 0)
 
-1. **[NEW] Plan 04 — search corpus sources `phone`/`email` from `contacts`, which have no such
-   columns** (migration 009 moved them to `contact_methods`). Plan instruction throws
-   `no such column` and fails its own AC. Fix in `25-04-PLAN.md` Task 1: source phone/email via a
-   `contact_methods` LEFT JOIN (`method_type IN ('phone','email')`), not `contacts`.
-2. **[NEW] Plan 04 — the descriptor contract (DASHQ-10 / UI-SPEC:199-207,255) is not deliverable
-   from the current corpus/tokenizer.** The corpus collapses memory custom-label/value/note into one
-   `{source:"memory"}` and never selects `memories.type`; relationships carry only `person_name` (no
-   `relation_type`/`note`); `tokenize()` discards offsets. So `sourceKind` (`note-or-body` vs
-   `memory-or-custom-field`), `fieldLabel` (from `MEMORY_TYPE_REGISTRY[type].displayName`), and
-   `highlights` offsets — all required in the foundation — cannot be built. Fix in `25-04-PLAN.md`
-   Tasks 1–2: widen `KnowledgeSearchEntry` provenance (memory type + part, relationship type + part,
-   field labels) and add an offset-preserving match-info surface in `knowledge-search.ts`.
-3. **[NEW] Plan 06 — repointing `orbit://favourites` to `routes: [{ name: "Home" }]` is a
-   compile + runtime break.** `WidgetNavIntent` permits only `index:1` two-route tuples
-   (`widget-linking.ts:61-93`); the guard reads `intent.routes[1]` unconditionally
-   (`widget-quick-action-guard.ts:32-37`). As prescribed, Task 3 fails its own `tsc --noEmit` gate
-   and dereferences `undefined` at runtime. Fix: add a Home-only `WidgetNavIntent` variant
-   (`index:0`, one route) and update `guardWidgetIntent()` + resolver tests to handle it.
-4. **[NEW] Plan 07 — legacy Home Dashboard search still surfaces Unbound contacts.** The term branch
-   filters only `archived_at IS NULL`, not `tracking_enabled = 1` (`dashboard-read.ts:230-239`);
-   removing `dashboard-search-row-logic.ts` (Plan 07) only strips their "Unbound" presentation, so
-   they render as normal cards — DASHQ-08 still violated. Fix in `25-07-PLAN.md` Task 3: make the
-   legacy term branch bound-only in the same change (with an integration test asserting an Unbound
-   contact is absent from Home search), or wire Plan 04's scoped search before removing the helper.
-5. **[Cycle-1 carryover — OWNER ESCALATION] Plan 07 Not-Contacted retrieval gap.** Retiring
-   `NeverContactedScreen` in Phase 25 while the Not-Contacted chip lands in Phase 26 leaves one phase
-   with no user-facing Not-Contacted retrieval (Home is on legacy `listDashboard`). Plan 07 correctly
-   surfaces this as an owner sequencing call (`25-07-PLAN.md:53`) rather than reversing the E-02
-   retirement. **This is the owner's decision to make** (keep the screen until Phase 26, or accept
-   the transient gap) — not a plan fix an executor should silently apply.
+None. (All 5 cycle-2 HIGHs resolved: HIGH-1/2/3 fixed and verified against real symbols/columns;
+HIGH-4/5 owner-authorized by D-13/D-14 and implemented cleanly. No new HIGH; no owner escalation.)
 
-### Current Actionable Non-HIGH Concerns (unresolved — 4)
+### Current Actionable Non-HIGH Concerns (unresolved — 7)
 
-1. **[MEDIUM] Plan 01 — add `src/backup/restore-apply.test.ts` to scope.** It hard-codes the 001–018
-   chain at target 18 (`:45-66`) and is not in `files_modified`; widening `getAppSettings()` to
-   select the new dashboard columns can break this v18 test DB. Register migration 019 in its local
-   chain at target 19; do not blindly bump tests that intentionally validate a partial chain.
-2. **[MEDIUM] Plan 06 — the `grep -rn 'rewriteFavouriteRanks' src` acceptance gate cannot pass.**
-   `ring-seq-dao.ts:4` and `ring-seq-dao.test.ts:6` reference the name in doc comments and are
-   unswept. Add those two files to Plan 06's sweep (update the comments / dangling line ref) or scope
-   the grep pattern in the AC.
-3. **[LOW] Plan 03 — specify a single read-scoped `now` source for the Gravity pass.** Amend
-   `listDashboardPopulation`'s contract to take one `now: string` (or derive once) and reuse it in
-   the Gravity loader and fixtures, so per-row Gravity computation and its tests are deterministic.
-4. **[LOW] Plans 06/07 — clean up stale doc-comment references** to the retired routes/screens
-   (`navigation/types.ts:80`, `RootNavigator.tsx:121,125`, `DigestScreen.tsx:17`, the `ring-seq-dao`
-   comments). Non-blocking, but add a note/cleanup to the retirement tasks so the executor removes
-   them.
+1. **[MEDIUM] Plan 04 Task 1 — specify the `contact_methods` read as a separate scoped query grouped
+   by `contact_id`** (mirroring the memory/relationship reads), NOT a literal LEFT JOIN onto
+   `LIST_CONTACTS` (which fans a multi-method contact — allowed by `009-…:235`, modeled by
+   `contact-methods-dao.ts:69` — into duplicate candidates, violating `25-UI-SPEC.md:195`). Add a test:
+   one contact with two phones/emails → exactly one candidate carrying both method entries. (Not
+   `tsc`-caught.)
+2. **[MEDIUM] Plan 06 Task 4 — give the complete widget population call.** Replace
+   `listDashboardPopulation(['favourites'])` (`25-06-PLAN.md:102`) with
+   `listDashboardPopulation(exec, { populations: ['favourites'], filters: {}, sort: 'default' }, now)`
+   per the Plan 02/03 signature `(exec, query, now)`; thread one wall-clock `now` and pin a fixed `now`
+   in `widget-data.test.ts`.
+3. **[MEDIUM] Plan 07 — fix the NeverContacted grep-gate so it can return empty.** The
+   `"NeverContacted",` alternative matches seed-name fixtures in `queries.test.ts:135` AND
+   `contact-status-read.test.ts:160`; the plan notes only the former. Add
+   `contact-status-read.test.ts:160` to the benign-seed note or scope the pattern to route context
+   (acceptance line 155 + verification line 220).
+4. **[MEDIUM] Plan 01 / Plan 05 — record the Reset↔search-clear ownership.** The decided Reset
+   contract clears search (`dossier:250-263`; DASHC-10, a Phase-26 requirement), but Plan 01's
+   `resetDashboardView()` is "search-not-owned-here" and Plan 05's `clearSession()` is separate.
+   Explicitly record that "Reset Dashboard View = `resetDashboardView()` + `clearSession()`, coordinated
+   by the Phase-26 Control Surface (DASHC-10)" so the "cleared search" clause is not orphaned (or add a
+   P25 reset coordinator if the owner wants it in-phase).
+5. **[LOW-MEDIUM] Plan 07 Task 3(2) — name the real HomeScreen symbol.** It is
+   `isNeutralDashboardSearchRow` (`HomeScreen.tsx:70` import, `:558` render ternary), not
+   `dashboardSearchRowPresentation` (which lives only in `HomeScreen.test.tsx`). Correct the symbol +
+   cite the `:558` render site.
+6. **[LOW] Plan 06 Task 3 — extend the A4 doc sweep to `widget-linking.ts`'s own header comments**
+   (lines 13, 56, and the `WidgetNavIntent` type doc), which go stale once the Home-only variant lands.
+7. **[LOW] Plan 04 — reword "existing `categories` join."** `knowledge-search-read.ts` has no categories
+   join today (`LIST_CONTACTS` = `SELECT id, name FROM contacts`, `:56-59`); reword to "add a
+   `categories` join / select via `contacts.category_id`" so the executor is not misdirected.
