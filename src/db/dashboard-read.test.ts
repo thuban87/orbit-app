@@ -795,6 +795,143 @@ describe("listDashboardSearch — population-aware search + A3 scope", () => {
     await seedContact({ name: "Live", lastContact: STABLE() });
     await expect(listDashboardSearch(exec, active, "  \n\t", NOW)).resolves.toEqual([]);
   });
+
+  it("keeps fuelText parity with the ranked fuel projection", async () => {
+    const contact = await seedContact({ name: "Fuel Search", lastContact: STABLE() });
+    await addFuelRow(contact, { kind: "fact", text: "an older fact" });
+    await addFuelRow(contact, { kind: "recent", text: "a current fuel line" });
+
+    const ranked = await getRankedFuel(exec, contact);
+    const rows = await listDashboardSearch(exec, active, "fuel search", NOW);
+
+    expect(rows[0]?.fuelText).toBe(ranked[0]?.text ?? null);
+  });
+
+  it("uses the shared deterministic name/id tiebreak for equal progress rows", async () => {
+    const alpha = await seedContact({ name: "Tie Alpha", lastContact: STABLE() });
+    const zetaFirst = await seedContact({ name: "Tie Zeta", lastContact: STABLE() });
+    const zetaSecond = await seedContact({ name: "Tie Zeta", lastContact: STABLE() });
+
+    expect(ids(await listDashboardSearch(exec, active, "tie", NOW))).toEqual([
+      alpha,
+      zetaFirst,
+      zetaSecond,
+    ]);
+  });
+
+  it("treats %, _, backslash, and quotes as literal search text", async () => {
+    const literal = await seedContact({
+      name: "Literal 50%_\\' marker",
+      lastContact: STABLE(),
+    });
+    await seedContact({ name: "Literal 50xx marker", lastContact: STABLE() });
+
+    await expect(
+      listDashboardSearch(exec, active, "50%_\\'", NOW).then(ids),
+    ).resolves.toEqual([literal]);
+  });
+
+  it("AND-composes category and battery filters with the term", async () => {
+    const match = await seedContact({
+      name: "Filter Term Match",
+      lastContact: STABLE(),
+      categoryId: 1,
+      socialBattery: "Charger",
+    });
+    await seedContact({
+      name: "Filter Term Wrong Battery",
+      lastContact: STABLE(),
+      categoryId: 1,
+      socialBattery: "Drain",
+    });
+
+    await expect(
+      listDashboardSearch(
+        exec,
+        { ...active, filters: { category: ["1"], "social-battery": ["Charger"] } },
+        "filter term",
+        NOW,
+      ).then(ids),
+    ).resolves.toEqual([match]);
+  });
+
+  it("matches the population read's birthday post-sort", async () => {
+    await seedContact({ name: "Parity Birthday Eight", birthday: "08-23" });
+    await seedContact({ name: "Parity Birthday One", birthday: "08-16" });
+    const query: DashboardQueryState = { ...active, populations: ["birthdays"] };
+
+    const populationRows = await listDashboardPopulation(exec, query, NOW);
+    const searchRows = await listDashboardSearch(exec, query, "parity birthday", NOW);
+
+    expect(ids(searchRows)).toEqual(ids(populationRows));
+  });
+
+  it("matches the population read's gravity survivors", async () => {
+    const deep = await seedContact({ name: "Parity Gravity Deep", lastContact: STABLE() });
+    await seedContact({ name: "Parity Gravity Thin", lastContact: STABLE() });
+    await addInteractionRows(deep, 20);
+    const query = { ...active, filters: { gravity: ["deep"] } };
+
+    const populationRows = await listDashboardPopulation(exec, query, "2026-09-04 10:00:00");
+    const searchRows = await listDashboardSearch(
+      exec,
+      query,
+      "parity gravity",
+      "2026-09-04 10:00:00",
+    );
+
+    expect(new Set(ids(searchRows))).toEqual(new Set(ids(populationRows)));
+  });
+
+  it("counts only bound non-archived birthday population rows", async () => {
+    await seedContact({ name: "Bound Birthday", birthday: "08-16" });
+    await seedContact({
+      name: "Unbound Birthday",
+      birthday: "08-16",
+      trackingEnabled: 0,
+    });
+    await seedContact({
+      name: "Archived Birthday",
+      birthday: "08-16",
+      archivedAt: NOW,
+    });
+    const query: DashboardQueryState = { ...active, populations: ["birthdays"] };
+
+    expect(await countBirthdayPopulation(exec, NOW)).toBe(1);
+    expect(await countBirthdayPopulation(exec, NOW)).toBe(
+      (await listDashboardPopulation(exec, query, NOW)).length,
+    );
+  });
+
+  it("returns zero for an empty upcoming-birthday window without throwing", async () => {
+    await seedContact({ name: "Outside Window", birthday: "10-31" });
+    await expect(countBirthdayPopulation(exec, NOW)).resolves.toBe(0);
+  });
+
+  it("counts favourite membership with bound-only population parity", async () => {
+    await seedContact({ name: "Bound Favourite", favouriteRank: 1 });
+    await seedContact({ name: "Unbound Favourite", favouriteRank: 1, trackingEnabled: 0 });
+    await seedContact({ name: "Archived Favourite", favouriteRank: 1, archivedAt: NOW });
+    const query: DashboardQueryState = { ...active, populations: ["favourites"] };
+
+    expect(await countFavourites(exec)).toBe(1);
+    expect(await countFavourites(exec)).toBe(
+      (await listDashboardPopulation(exec, query, NOW)).length,
+    );
+  });
+
+  it("counts all bound non-archived contacts with population parity", async () => {
+    await seedContact({ name: "Bound Contacted", lastContact: STABLE() });
+    await seedContact({ name: "Bound Never", lastContact: null });
+    await seedContact({ name: "Unbound", lastContact: STABLE(), trackingEnabled: 0 });
+    await seedContact({ name: "Archived", lastContact: STABLE(), archivedAt: NOW });
+    const query: DashboardQueryState = { ...active, populations: ["all-contacts"] };
+
+    expect(await countAllContacts(exec)).toBe(2);
+    expect(await countAllContacts(exec)).toBe(
+      (await listDashboardPopulation(exec, query, NOW)).length,
+    );
+  });
 });
 
 describe("listDashboard — search", () => {
