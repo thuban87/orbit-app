@@ -344,7 +344,9 @@ grid:          { outline: "grid-outline",          filled: "grid" },
 | A3 | The orphaned `orbit-dashboard-prefs` AsyncStorage key is harmless if left unread | Runtime State Inventory | If some other reader depends on it, retiring the store breaks it — grep confirms only HomeScreen reads it `[VERIFIED: grep useDashboardPrefs]`, so risk is low. |
 | A4 | `importantForAccessibility="no-hide-descendants"` correctly removes the background from Android a11y focus for an in-tree overlay | Pattern 2 | If insufficient, may need to also toggle `accessible`/focus management; verify with TalkBack on the Pixel (backstop). |
 
-## Open Questions
+## Open Questions (RESOLVED 2026-09-05)
+
+> Disposition: O-1 → owner decision, CONTEXT D-12 (below). O-2 → RESOLVED: use `localDateTime()` (grep-banned against `toISOString()` in plans 26-01/26-07 per CLAUDE.md). O-3 → RESOLVED: ship Select Contacts with no helper copy (the `accessibilityState.disabled` is the load-bearing part); owner may add copy at UAT. O-4 → RESOLVED: default Unbound search placeholder "Search unbound contacts"; owner may adjust at UAT. All non-blocking.
 
 1. **O-1 (HIGH) — RESOLVED 2026-09-05 (owner decision → CONTEXT D-12).** Dashboard search reads via a **new, additive population-aware search read authored in Phase 26** that composes population + filters + term and preserves the recorded A3 search-scope semantics (`dashboard-read.ts:38`). It must **not** fork Phase 25's `listDashboardPopulation` (no `term` param on it — D-11 layer-1). Legacy `listDashboard` retires once the new read is wired; **no dual-read**. See CONTEXT.md D-12.
    - Original context (retained): `dashboard-session-store.searchText` exists `[VERIFIED]`, `dashboard-empty-logic` models `search-empty` `[VERIFIED]`, `listDashboardPopulation(query, now)` takes **no term** `[VERIFIED: dashboard-read.ts:274-296]`; the old `listDashboard` (with `term`) is what HomeScreen calls today `[VERIFIED: dashboard-read.ts:365-369]`.
