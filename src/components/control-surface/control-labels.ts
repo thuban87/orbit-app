@@ -19,6 +19,12 @@ export const AXIS_DEFAULT_LABELS = {
   sort: "Default",
 } as const;
 
+export const CONTROL_AXIS_LABELS = {
+  population: "Population",
+  filters: "Filters",
+  sort: "Sort",
+} as const;
+
 export const FILTER_FAMILY_LABELS: Record<DashboardFilterFamily, string> = {
   category: "Category",
   "social-battery": "Social Battery",
