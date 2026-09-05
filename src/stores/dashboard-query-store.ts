@@ -14,6 +14,8 @@ import {
 } from "@/logic/dashboard-query-logic";
 
 interface DashboardQueryStore extends DashboardQueryState {
+  /** Hydration is complete, including a deliberately discarded stale snapshot. */
+  hydrated: boolean;
   hydrate: (exec: SqlExecutor) => Promise<void>;
   setViewMode: (
     exec: SqlExecutor,
@@ -26,6 +28,8 @@ interface DashboardQueryStore extends DashboardQueryState {
   setFilters: (exec: SqlExecutor, filters: DashboardFilters) => Promise<void>;
   setSort: (exec: SqlExecutor, sort: DashboardSortMode) => Promise<void>;
   resetDashboardView: (exec: SqlExecutor) => Promise<void>;
+  /** Internal write/hydration ordering guard; not a presentation setting. */
+  generation: number;
 }
 
 function parseStoredState(settings: {
@@ -61,14 +65,24 @@ export const useDashboardQueryStore = create<DashboardQueryStore>()(
     populations: [],
     filters: {},
     sort: "default",
-    hydrate: async (exec) => set(parseStoredState(await getAppSettings(exec))),
+    hydrated: false,
+    generation: 0,
+    hydrate: async (exec) => {
+      const generation = get().generation;
+      const stored = parseStoredState(await getAppSettings(exec));
+      set((state) =>
+        state.generation === generation
+          ? { ...stored, hydrated: true }
+          : { hydrated: true },
+      );
+    },
     setViewMode: async (exec, viewMode) => {
       await updateAppSettings(
         exec,
         { dashboardViewMode: viewMode },
         localDateTime(),
       );
-      set({ viewMode });
+      set((state) => ({ viewMode, generation: state.generation + 1 }));
     },
     setPopulations: async (exec, populations) => {
       await updateAppSettings(
@@ -76,7 +90,7 @@ export const useDashboardQueryStore = create<DashboardQueryStore>()(
         { dashboardPopulations: JSON.stringify(populations) },
         localDateTime(),
       );
-      set({ populations });
+      set((state) => ({ populations, generation: state.generation + 1 }));
     },
     setFilters: async (exec, filters) => {
       await updateAppSettings(
@@ -84,11 +98,11 @@ export const useDashboardQueryStore = create<DashboardQueryStore>()(
         { dashboardFilters: JSON.stringify(filters) },
         localDateTime(),
       );
-      set({ filters });
+      set((state) => ({ filters, generation: state.generation + 1 }));
     },
     setSort: async (exec, sort) => {
       await updateAppSettings(exec, { dashboardSort: sort }, localDateTime());
-      set({ sort });
+      set((state) => ({ sort, generation: state.generation + 1 }));
     },
     resetDashboardView: async (exec) => {
       const next = resetDashboardView(get());
@@ -101,7 +115,7 @@ export const useDashboardQueryStore = create<DashboardQueryStore>()(
         },
         localDateTime(),
       );
-      set(next);
+      set((state) => ({ ...next, generation: state.generation + 1 }));
     },
   }),
 );

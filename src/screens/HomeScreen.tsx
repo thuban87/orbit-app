@@ -29,7 +29,7 @@
  * Every colour resolves through `useTheme().colors.*` (CLAUDE.md / check:colors).
  */
 import { useFocusEffect } from "@react-navigation/native";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   AppState,
   FlatList,
@@ -37,47 +37,32 @@ import {
   RefreshControl,
   StyleSheet,
   Text,
-  TextInput,
   View,
 } from "react-native";
 import { ContactCard } from "@/components/ContactCard";
-import { type FilterChip, FilterChipRow } from "@/components/FilterChipRow";
+import { DashboardControlRow } from "@/components/control-surface/DashboardControlRow";
+import { DashboardOverlayHost } from "@/components/control-surface/DashboardOverlayHost";
 import type { OverflowAction } from "@/components/OverflowMenu";
 import { ShellAppBar } from "@/components/ShellAppBar";
-import { listCategories } from "@/db/contact-read";
 import {
   countArchived,
   countLiveContacts,
   countNeverContacted,
   countSnoozed,
-  type DashboardFilter,
   type DashboardRow,
-  type DashboardSort,
-  listDashboard,
+  listDashboardPopulation,
 } from "@/db/dashboard-read";
-import { getExecutor } from "@/db/database";
+import { getExecutor, localDateTime } from "@/db/database";
 import { countUnbound } from "@/db/unbound-read";
 import { selectDashboardEmptyState } from "@/logic/dashboard-empty-logic";
 import type { DashboardScreenProps } from "@/navigation/types";
 import { useBottomClearance } from "@/navigation/use-bottom-clearance";
-import { useDashboardPrefs } from "@/stores/dashboard-prefs-store";
+import { useDashboardQueryStore } from "@/stores/dashboard-query-store";
 import { useShellRefresh } from "@/stores/shell-refresh-store";
 import { useTheme } from "@/theme";
-import type { SocialBattery } from "@/types";
 import { Logger } from "@/utils/logger";
 
 const LOG_SCOPE = "dashboard-home";
-
-/** The dashboard sort control's four options, in display order (08-UI-SPEC). */
-const SORT_OPTIONS: { key: DashboardSort; label: string }[] = [
-  { key: "status", label: "Status" },
-  { key: "name", label: "Name (A–Z)" },
-  { key: "least-recent", label: "Least recent" },
-  { key: "most-recent", label: "Most recent" },
-];
-
-/** The social-battery chip values (src/types.ts SocialBattery), in fixed order. */
-const BATTERY_VALUES: SocialBattery[] = ["Charger", "Neutral", "Drain"];
 
 /** The four population counts feeding the header + the empty-state gate. */
 interface PopulationCounts {
@@ -98,10 +83,13 @@ const ZERO_COUNTS: PopulationCounts = {
 
 export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
   const { colors } = useTheme();
-  const sort = useDashboardPrefs((s) => s.sort);
-  const filter = useDashboardPrefs((s) => s.filter);
-  const setSort = useDashboardPrefs((s) => s.setSort);
-  const setFilter = useDashboardPrefs((s) => s.setFilter);
+  const query = useDashboardQueryStore((state) => ({
+    viewMode: state.viewMode,
+    populations: state.populations,
+    filters: state.filters,
+    sort: state.sort,
+  }));
+  const hydrate = useDashboardQueryStore((state) => state.hydrate);
   const bottomClearance = useBottomClearance();
 
   const overflowActions: OverflowAction[] = [
@@ -151,31 +139,13 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
 
   const [rows, setRows] = useState<DashboardRow[]>([]);
   const [counts, setCounts] = useState<PopulationCounts>(ZERO_COUNTS);
-  const [categories, setCategories] = useState<{ id: number; name: string }[]>(
-    [],
-  );
-  // The live search term — LOCAL state (not persisted, unlike sort/filter): a
-  // present term switches the list to the search result set via the DAO. `term`
-  // is the immediate controlled-input value; `debouncedTerm` lags it and is what
-  // the read + the empty-state gate key on, so a burst of keystrokes fires ONE
-  // read after the burst settles rather than a full reload (list + counts +
-  // categories) per keystroke (LOW-4).
-  const [term, setTerm] = useState("");
-  const [debouncedTerm, setDebouncedTerm] = useState("");
   const [error, setError] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [panelOpen, setPanelOpen] = useState(false);
 
-  // Debounce the term: settle ~220ms after the last keystroke. The empty-state
-  // gate reads `debouncedTerm` (via `hasTerm` below) so it stays consistent with
-  // the rows the read actually produced; the clear button uses the immediate
-  // `term` so it appears/hides without lag.
   useEffect(() => {
-    const id = setTimeout(() => setDebouncedTerm(term), 220);
-    return () => clearTimeout(id);
-  }, [term]);
-
-  const hasTerm = debouncedTerm.trim() !== "";
-  const showClear = term.trim() !== "";
+    void hydrate(getExecutor());
+  }, [hydrate]);
 
   /**
    * The single load: `listDashboard` + the four counts, guarded by a `cancelled`
@@ -188,20 +158,18 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
     (async () => {
       try {
         const exec = getExecutor();
-        const [list, live, neverContacted, snoozed, archived, unbound, cats] =
+        const [list, live, neverContacted, snoozed, archived, unbound] =
           await Promise.all([
-            listDashboard(exec, { filter, sort, term: debouncedTerm }),
+            listDashboardPopulation(exec, query, localDateTime()),
             countLiveContacts(exec),
             countNeverContacted(exec),
             countSnoozed(exec),
             countArchived(exec),
             countUnbound(exec),
-            listCategories(exec),
           ]);
         if (cancelled) return;
         setRows(list);
         setCounts({ live, neverContacted, snoozed, archived, unbound });
-        setCategories(cats);
         setError(false);
       } catch (err) {
         Logger.error(LOG_SCOPE, "failed to load dashboard", err);
@@ -216,7 +184,7 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
     return () => {
       cancelled = true;
     };
-  }, [filter, sort, debouncedTerm]);
+  }, [query]);
 
   // Shell Quick Log/Undo originates outside this screen's focus lifecycle. This
   // in-process tick is intentionally distinct from the connection-scoped SQLite
@@ -270,32 +238,6 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
     [navigation],
   );
 
-  // The single-active chip list: all · needs-attention · one per category ·
-  // one per social-battery value · favourites · snoozed (with its live count).
-  // Selecting a chip persists it via `setFilter`; the store change re-runs
-  // `reload` through the focus effect (Plan 07's persisted-default mechanism).
-  const chips: FilterChip[] = useMemo(
-    () => [
-      { key: "all", label: "All" },
-      { key: "needs-attention", label: "Needs attention" },
-      ...categories.map(
-        (c): FilterChip => ({
-          key: `category-${c.id}` as DashboardFilter,
-          label: c.name,
-        }),
-      ),
-      ...BATTERY_VALUES.map(
-        (v): FilterChip => ({
-          key: `battery-${v}` as DashboardFilter,
-          label: v,
-        }),
-      ),
-      { key: "favourites", label: "Favourites" },
-      { key: "snoozed", label: "Snoozed", count: counts.snoozed },
-    ],
-    [categories, counts.snoozed],
-  );
-
   // The cause-aware empty state — delegated to the pure gate (no inline count
   // arithmetic; HIGH-2). The live `activeFilter` (chip) + `hasTerm` (search box)
   // are threaded in: the gate's precedence resolves a zero-result search →
@@ -309,8 +251,10 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
     archived: counts.archived,
     unbound: counts.unbound,
     rowCount: rows.length,
-    activeFilter: filter,
-    hasTerm,
+    activeFilter: "all",
+    activeFilters: query.filters,
+    activePopulations: query.populations,
+    hasTerm: false,
   });
 
   const listHeader = (
@@ -323,84 +267,6 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
           {`${counts.live} contact${counts.live === 1 ? "" : "s"}`}
         </Text>
       ) : null}
-      <View style={styles.searchRow}>
-        <TextInput
-          testID="dashboard-search-input"
-          value={term}
-          onChangeText={setTerm}
-          placeholder="Search people and notes"
-          placeholderTextColor={colors.textSecondary}
-          autoCorrect={false}
-          autoCapitalize="none"
-          style={[
-            styles.searchInput,
-            {
-              backgroundColor: colors.surface,
-              borderColor: colors.border,
-              color: colors.textPrimary,
-            },
-          ]}
-        />
-        {showClear ? (
-          <Pressable
-            testID="dashboard-search-clear"
-            accessibilityRole="button"
-            accessibilityLabel="Clear search"
-            onPress={() => setTerm("")}
-            style={[styles.searchClear, { borderColor: colors.border }]}
-          >
-            <Text
-              style={[styles.searchClearText, { color: colors.textSecondary }]}
-            >
-              Clear
-            </Text>
-          </Pressable>
-        ) : null}
-      </View>
-      <FilterChipRow chips={chips} active={filter} onSelect={setFilter} />
-      <View
-        testID="dashboard-sort-control"
-        accessibilityRole="tablist"
-        style={styles.sortControl}
-      >
-        {SORT_OPTIONS.map((option) => {
-          const isActive = option.key === sort;
-          return (
-            <Pressable
-              key={option.key}
-              testID={`dashboard-sort-option-${option.key}`}
-              accessibilityRole="button"
-              accessibilityState={{ selected: isActive }}
-              accessibilityLabel={`Sort by ${option.label}`}
-              onPress={() => setSort(option.key)}
-              style={[
-                styles.sortOption,
-                isActive
-                  ? {
-                      backgroundColor: colors.accent,
-                      borderColor: colors.borderStrong,
-                    }
-                  : {
-                      backgroundColor: colors.surface,
-                      borderColor: colors.border,
-                    },
-              ]}
-            >
-              <Text
-                numberOfLines={1}
-                style={[
-                  styles.sortLabel,
-                  {
-                    color: isActive ? colors.background : colors.textSecondary,
-                  },
-                ]}
-              >
-                {option.label}
-              </Text>
-            </Pressable>
-          );
-        })}
-      </View>
     </View>
   );
 
@@ -488,23 +354,9 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
         </Text>
       ) : null}
     </View>
-  ) : emptyState === "search-empty" ? (
-    // A search that matched nothing. The gate resolves 'search-empty' BEFORE any
-    // filter/population branch (MEDIUM-4), so this shows even when a filter is
-    // also active — never the hidden-population or filter copy.
-    <View testID="dashboard-search-empty" style={styles.emptyState}>
-      <Text style={[styles.emptyBody, { color: colors.textSecondary }]}>
-        {`No matches for "${debouncedTerm.trim()}"`}
-      </Text>
-    </View>
   ) : emptyState === "filter-empty" ? (
-    // A non-'all' filter that yields nothing — the gate resolved 'filter-empty'
-    // (MEDIUM-4: this fires BEFORE the hidden-population branch, so a zero-result
-    // filter over a non-empty population never shows the hidden copy). The
-    // favourites filter gets its own pointer-to-the-star copy; every other
-    // filter (category / battery / needs-attention / snoozed) gets a calm generic.
     <View testID="dashboard-empty-filter" style={styles.emptyState}>
-      {filter === "favourites" ? (
+      {query.populations.includes("favourites") ? (
         <>
           <Text style={[styles.emptyHeading, { color: colors.textPrimary }]}>
             No favourites yet
@@ -526,67 +378,81 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
       testID="dashboard-root"
       style={[styles.root, { backgroundColor: colors.background }]}
     >
-      {/* Owner-approved addition (beyond the plan text): a Settings entry — the
-          08-07 dashboard rewrite dropped the placeholder's Settings row, leaving
-          the (existing) Settings route UI-unreachable. A minimal top-right gear
-          restores reach; exact styling is the owner's later design pass. */}
-      <ShellAppBar
-        variant="root"
-        title="Orbit"
-        overflow={overflowActions}
-        trailing={
-          <Pressable
-          testID="dashboard-group-events-entry"
-          accessibilityRole="button"
-          accessibilityLabel="Group Events"
-          onPress={() => navigation.navigate("GroupEvents")}
-          style={styles.groupEventsEntry}
-        >
-          {({ pressed }) => (
-            <>
-              <Text style={[styles.groupEventsGlyph, { color: pressed ? colors.accent : colors.textSecondary }]}>◉</Text>
-              <Text numberOfLines={1} ellipsizeMode="tail" style={[styles.groupEventsLabel, { color: pressed ? colors.accent : colors.textSecondary }]}>Group Events</Text>
-            </>
+      <View
+        accessible={!panelOpen}
+        importantForAccessibility={panelOpen ? "no-hide-descendants" : "auto"}
+        pointerEvents={panelOpen ? "none" : "auto"}
+      >
+        <ShellAppBar
+          variant="root"
+          title="Orbit"
+          overflow={overflowActions}
+          trailing={
+            <Pressable
+              testID="dashboard-group-events-entry"
+              accessibilityRole="button"
+              accessibilityLabel="Group Events"
+              onPress={() => navigation.navigate("GroupEvents")}
+              style={styles.groupEventsEntry}
+            >
+              {({ pressed }) => (
+                <>
+                  <Text style={[styles.groupEventsGlyph, { color: pressed ? colors.accent : colors.textSecondary }]}>◉</Text>
+                  <Text numberOfLines={1} ellipsizeMode="tail" style={[styles.groupEventsLabel, { color: pressed ? colors.accent : colors.textSecondary }]}>Group Events</Text>
+                </>
+              )}
+            </Pressable>
+          }
+        />
+      </View>
+      <DashboardControlRow onPanelOpenChange={setPanelOpen} />
+      <View
+        accessible={!panelOpen}
+        importantForAccessibility={panelOpen ? "no-hide-descendants" : "auto"}
+        pointerEvents={panelOpen ? "none" : "auto"}
+        style={styles.listRegion}
+      >
+        <FlatList
+          data={error ? [] : rows}
+          keyExtractor={(item) => String(item.id)}
+          renderItem={({ item }) => (
+            <ContactCard
+              contactId={item.id}
+              name={item.name}
+              photo={item.photo}
+              modifiedAt={item.modified_at}
+              status={item.status}
+              categoryLabel={item.categoryLabel}
+              isFavourite={item.favourite_rank !== null}
+              fuelText={item.fuelText}
+              snippet={item.snippet}
+              onPress={() => goToProfile(item.id)}
+            />
           )}
-        </Pressable>
-        }
-      />
-      <FlatList
-        data={error ? [] : rows}
-        keyExtractor={(item) => String(item.id)}
-        renderItem={({ item }) => (
-          <ContactCard
-            contactId={item.id}
-            name={item.name}
-            photo={item.photo}
-            modifiedAt={item.modified_at}
-            status={item.status}
-            categoryLabel={item.categoryLabel}
-            isFavourite={item.favourite_rank !== null}
-            fuelText={item.fuelText}
-            snippet={item.snippet}
-            onPress={() => goToProfile(item.id)}
-          />
-        )}
-        ListHeaderComponent={listHeader}
-        ListFooterComponent={listFooter}
-        ListEmptyComponent={listEmpty}
-        contentContainerStyle={[styles.content, { paddingBottom: bottomClearance }]}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={onRefresh}
-            tintColor={colors.accent}
-            colors={[colors.accent]}
-          />
-        }
-      />
+          ListHeaderComponent={listHeader}
+          ListFooterComponent={listFooter}
+          ListEmptyComponent={listEmpty}
+          contentContainerStyle={[styles.content, { paddingBottom: bottomClearance }]}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              tintColor={colors.accent}
+              colors={[colors.accent]}
+            />
+          }
+        />
+      </View>
+      <DashboardOverlayHost />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   root: {
+    flex: 1,
+  },
+  listRegion: {
     flex: 1,
   },
   fab: {

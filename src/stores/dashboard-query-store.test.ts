@@ -22,6 +22,8 @@ beforeEach(async () => {
     populations: [],
     filters: {},
     sort: "default",
+    hydrated: false,
+    generation: 0,
   });
 });
 
@@ -96,5 +98,29 @@ describe("dashboard query store", () => {
     expect(
       (await listDashboardPopulation(exec, activeQuery, NOW)).map((row) => row.id),
     ).toEqual([favourite.lastInsertRowId]);
+  });
+
+  it("does not let a late hydration overwrite a persisted population selection", async () => {
+    let releaseRead: (() => void) | undefined;
+    const readStarted = new Promise<void>((resolve) => {
+      releaseRead = resolve;
+    });
+    const delayedExec: SqlExecutor = {
+      ...exec,
+      getFirstAsync: async <T>(sql: string, params?: unknown[]) => {
+        await readStarted;
+        return exec.getFirstAsync<T>(sql, params);
+      },
+    };
+
+    const hydration = useDashboardQueryStore.getState().hydrate(delayedExec);
+    await useDashboardQueryStore.getState().setPopulations(exec, ["favourites"]);
+    releaseRead?.();
+    await hydration;
+
+    expect(useDashboardQueryStore.getState()).toMatchObject({
+      populations: ["favourites"],
+      hydrated: true,
+    });
   });
 });
