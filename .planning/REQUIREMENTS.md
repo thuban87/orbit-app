@@ -76,9 +76,9 @@ category's phase (see Traceability).
 - [x] **DASHQ-05**: Snoozed contacts remain in Active Contacts but are suppressed from Needs Attention while staying reachable via population selection, search, and deliberate action
 - [ ] **DASHQ-06**: User can filter across five families — Category, Social Battery, Relationship Status/Needs Attention, Gravity, Contact Frequency — OR within a family, AND across families; filters survive population changes
 - [x] **DASHQ-07**: User can sort by Default, Name A–Z/Z–A, Least/Most Recently Contacted, or Relationship Status; Default is population-aware, and an explicit sort survives until reset to Default
-- [ ] **DASHQ-08**: Dashboard search is scoped to the current Population + Filters universe and never surfaces archived or unbound contacts; unbound contacts get a replacement retrieval path so ADR-062's "retrieval stays available" holds
-- [ ] **DASHQ-09**: Search matches forgivingly (prefix/substring plus typo tolerance) across the semantic knowledge corpus, ranks by term coverage with identity matches strongly prioritized, and treats the Dashboard sort as tie-breaker only
-- [ ] **DASHQ-10**: A search result shows up to three prioritized highlighted snippets plus "+N more"; a direct name match does not suppress secondary knowledge matches
+- [x] **DASHQ-08**: Dashboard search is scoped to the current Population + Filters universe and never surfaces archived or unbound contacts; unbound contacts get a replacement retrieval path so ADR-062's "retrieval stays available" holds
+- [x] **DASHQ-09**: Search matches forgivingly (prefix/substring plus typo tolerance) across the semantic knowledge corpus, ranks by term coverage with identity matches strongly prioritized, and treats the Dashboard sort as tie-breaker only
+- [x] **DASHQ-10**: A search result shows up to three prioritized highlighted snippets plus "+N more"; a direct name match does not suppress secondary knowledge matches
 - [x] **DASHQ-11**: List/Card preference, population, filters, and sort persist across relaunch (durable, backup-portable); search text and scroll position do not
 - [ ] **DASHQ-12**: Dashboard → Profile → Back restores the full working Dashboard state including search, filters, population, sort, and scroll position
 - [x] **DASHQ-13**: List and Card views share one query state; each query axis is independently clearable and a global Reset Dashboard View restores all four while preserving the List/Card preference

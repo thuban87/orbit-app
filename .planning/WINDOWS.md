@@ -1,10 +1,10 @@
 ---
 schema_version: 1
-open_count: 23
+open_count: 24
 waived_count: 0
 fixed_count: 6
-total_count: 29
-last_updated: 2026-09-04T19:42:12.035Z
+total_count: 30
+last_updated: 2026-09-05T04:07:55.132Z
 ---
 
 # Broken Windows Ledger
@@ -44,6 +44,7 @@ last_updated: 2026-09-04T19:42:12.035Z
 | 27 | 24.1 | stub | src/screens/placeholders/KnowledgePlaceholders.tsx | 31 | Recently Deleted placeholder is intentionally replaced by Plan 24.1-07. | open |  | 2026-09-04T07:11:24.241Z |  |
 | 28 | 24.1 | stub | src/screens/placeholders/KnowledgePlaceholders.tsx | 41 | Memory History placeholder is intentionally replaced by Plan 24.1-07. | open |  | 2026-09-04T07:11:24.422Z |  |
 | 29 | 24.2 | unrun-verify | modules/orbit-contact-picker/android/src/main/java/expo/modules/orbitcontactpicker/OrbitContactPickerModule.kt |  | On-device Pixel Note-MIME UAT remains required after the successful desktop assembleDebug build. | open |  | 2026-09-04T19:42:12.035Z |  |
+| 30 | 25 | unrun-verify | .planning/phases/25-dashboard-data-state-foundation/25-04-PLAN.md |  | Physical Pixel large-eligible-set search performance validation remains required; desktop fixtures cannot assess the N+1 corpus read. | open |  | 2026-09-05T04:07:55.132Z |  |
 
 ````json
 [
@@ -393,6 +394,18 @@ last_updated: 2026-09-04T19:42:12.035Z
     "status": "open",
     "reason": "",
     "recorded_at": "2026-09-04T19:42:12.035Z",
+    "resolved_at": null
+  },
+  {
+    "id": 30,
+    "kind": "unrun-verify",
+    "phase": "25",
+    "file": ".planning/phases/25-dashboard-data-state-foundation/25-04-PLAN.md",
+    "line": null,
+    "description": "Physical Pixel large-eligible-set search performance validation remains required; desktop fixtures cannot assess the N+1 corpus read.",
+    "status": "open",
+    "reason": "",
+    "recorded_at": "2026-09-05T04:07:55.132Z",
     "resolved_at": null
   }
 ]
