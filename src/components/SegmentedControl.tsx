@@ -17,12 +17,24 @@
  * through `useTheme().colors.*` — no hex/named literal (CLAUDE.md / check:colors).
  */
 import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Icon } from "@/components/icons/Icon";
+import type { IconName } from "@/components/icons/icon-registry";
 import { useTheme } from "@/theme";
 
-/** One selectable segment — a display label paired with its value. */
+/**
+ * One selectable segment — a display label paired with its value, and an
+ * OPTIONAL semantic icon. When `icon` is present the segment renders the
+ * semantic `Icon` (filled when active, outline when inactive) instead of the
+ * visible text, keeping `label` as the accessibilityLabel; label-only options
+ * (the Orrery view toggle) render the `<Text>` exactly as before. The field is
+ * typed `IconName` — NOT a bare string — so `tsc --noEmit` rejects an
+ * unregistered icon name at the SegmentedControl CALL SITE, not only inside
+ * Icon.tsx.
+ */
 export interface SegmentedControlOption<V extends string> {
   label: string;
   value: V;
+  icon?: IconName;
 }
 
 export interface SegmentedControlProps<V extends string> {
@@ -72,15 +84,26 @@ export function SegmentedControl<V extends string>({
                   },
             ]}
           >
-            <Text
-              numberOfLines={1}
-              style={[
-                styles.label,
-                { color: isActive ? colors.background : colors.textSecondary },
-              ]}
-            >
-              {option.label}
-            </Text>
+            {option.icon ? (
+              <Icon
+                name={option.icon}
+                state={isActive ? "active" : "default"}
+                tone={isActive ? "background" : "textSecondary"}
+                size="md"
+              />
+            ) : (
+              <Text
+                numberOfLines={1}
+                style={[
+                  styles.label,
+                  {
+                    color: isActive ? colors.background : colors.textSecondary,
+                  },
+                ]}
+              >
+                {option.label}
+              </Text>
+            )}
           </Pressable>
         );
       })}

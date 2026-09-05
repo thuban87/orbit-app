@@ -77,6 +77,10 @@ export const useDashboardQueryStore = create<DashboardQueryStore>()(
       );
     },
     setViewMode: async (exec, viewMode) => {
+      // Idempotency guard (cross-AI review CYCLE-4 #3): re-selecting the already
+      // active view must not persist, set(), or bump the generation — so a no-op
+      // toggle never thrashes SQLite or triggers a Dashboard reload.
+      if (viewMode === get().viewMode) return;
       await updateAppSettings(
         exec,
         { dashboardViewMode: viewMode },

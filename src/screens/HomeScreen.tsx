@@ -28,7 +28,7 @@
  *
  * Every colour resolves through `useTheme().colors.*` (CLAUDE.md / check:colors).
  */
-import { useFocusEffect } from "@react-navigation/native";
+import { useFocusEffect, useIsFocused } from "@react-navigation/native";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   AppState,
@@ -37,13 +37,21 @@ import {
   RefreshControl,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from "react-native";
+import Animated, {
+  Easing,
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+} from "react-native-reanimated";
 import { ContactCard } from "@/components/ContactCard";
 import { DashboardControlRow } from "@/components/control-surface/DashboardControlRow";
 import { DashboardOverlayHost } from "@/components/control-surface/DashboardOverlayHost";
-import { ShellAppBar } from "@/components/ShellAppBar";
 import { Icon } from "@/components/icons/Icon";
+import { SegmentedControl } from "@/components/SegmentedControl";
+import { ShellAppBar } from "@/components/ShellAppBar";
 import {
   countArchived,
   countLiveContacts,
@@ -55,6 +63,7 @@ import {
 import { getExecutor, localDateTime } from "@/db/database";
 import { countUnbound } from "@/db/unbound-read";
 import { selectDashboardEmptyState } from "@/logic/dashboard-empty-logic";
+import type { DashboardViewMode } from "@/logic/dashboard-query-logic";
 import type { DashboardScreenProps } from "@/navigation/types";
 import { useBottomClearance } from "@/navigation/use-bottom-clearance";
 import { buildDashboardOverflowActions } from "@/screens/dashboard-overflow-actions";
@@ -63,7 +72,23 @@ import { useDashboardSessionStore } from "@/stores/dashboard-session-store";
 import { useShellRefresh } from "@/stores/shell-refresh-store";
 import { showSnackbar } from "@/stores/snackbar-store";
 import { useTheme } from "@/theme";
+import { MOTION } from "@/theme/tokens/motion";
+import { SPACING } from "@/theme/tokens/spacing";
+import { useReducedMotion } from "@/theme/use-reduced-motion";
 import { Logger } from "@/utils/logger";
+
+/** The debounce interval (ms) that collapses a keystroke burst to one read. */
+const SEARCH_DEBOUNCE_MS = 220;
+
+/** The two view-toggle segments — List then Card, each with its semantic icon. */
+const VIEW_TOGGLE_OPTIONS: {
+  label: string;
+  value: DashboardViewMode;
+  icon: "list" | "grid";
+}[] = [
+  { label: "List view", value: "list", icon: "list" },
+  { label: "Card view", value: "card", icon: "grid" },
+];
 
 const LOG_SCOPE = "dashboard-home";
 
@@ -120,7 +145,10 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
   const onReset = useCallback(() => {
     void resetDashboard();
   }, [resetDashboard]);
-  const overflowActions = buildDashboardOverflowActions({ navigation, onReset });
+  const overflowActions = buildDashboardOverflowActions({
+    navigation,
+    onReset,
+  });
 
   const [rows, setRows] = useState<DashboardRow[]>([]);
   const [counts, setCounts] = useState<PopulationCounts>(ZERO_COUNTS);
@@ -131,6 +159,75 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
   useEffect(() => {
     void hydrate(getExecutor());
   }, [hydrate]);
+
+  // Row 3 search — EPHEMERAL session state (dossier §K): the term lives in the
+  // session store so Dashboard→Profile→Back restores it while a fresh launch
+  // starts empty. The input value stays immediately responsive; a debounced
+  // twin (below) is what drives the read so a keystroke burst fires ONE query.
+  const searchText = useDashboardSessionStore((state) => state.searchText);
+  const setSearchText = useDashboardSessionStore(
+    (state) => state.setSearchText,
+  );
+  const [searchExpanded, setSearchExpanded] = useState(false);
+  const [debouncedSearchText, setDebouncedSearchText] = useState(searchText);
+
+  useEffect(() => {
+    const handle = setTimeout(
+      () => setDebouncedSearchText(searchText),
+      SEARCH_DEBOUNCE_MS,
+    );
+    return () => clearTimeout(handle);
+  }, [searchText]);
+
+  // Search collapse/expand animation gating (CLAUDE.md non-negotiable, mirrors
+  // AnchoredPanel / OrreryScreen): the Reanimated timing runs only when focused,
+  // foregrounded, and reduced-motion is off; otherwise it settles INSTANTLY to
+  // its final value so a backgrounded screen never leaves a half-run animation.
+  const reducedMotion = useReducedMotion();
+  const isFocused = useIsFocused();
+  const [appActive, setAppActive] = useState(
+    AppState.currentState === "active",
+  );
+  useEffect(() => {
+    const sub = AppState.addEventListener("change", (state) => {
+      setAppActive(state === "active");
+    });
+    return () => sub.remove();
+  }, []);
+
+  const searchProgress = useSharedValue(searchExpanded ? 1 : 0);
+  useEffect(() => {
+    const canAnimate = isFocused && appActive && !reducedMotion;
+    const target = searchExpanded ? 1 : 0;
+    searchProgress.value = canAnimate
+      ? withTiming(target, {
+          duration: MOTION.base,
+          easing: Easing.out(Easing.ease),
+        })
+      : target;
+  }, [appActive, isFocused, reducedMotion, searchExpanded, searchProgress]);
+
+  const searchInputStyle = useAnimatedStyle(() => ({
+    opacity: searchProgress.value,
+    transform: [{ translateY: (1 - searchProgress.value) * SPACING.sm }],
+  }));
+
+  const onToggleSearch = useCallback(() => {
+    setSearchExpanded((expanded) => !expanded);
+  }, []);
+
+  const onClearSearch = useCallback(() => {
+    setSearchText("");
+  }, [setSearchText]);
+
+  // View-toggle idempotency (cross-AI review CYCLE-4 #3): short-circuit when the
+  // tapped segment is already active BEFORE calling setViewMode, so re-selecting
+  // the current view neither persists nor reloads. The store setter is ALSO
+  // hardened to no-op on an unchanged value (belt-and-braces).
+  const onChangeView = useCallback((mode: DashboardViewMode) => {
+    if (mode === useDashboardQueryStore.getState().viewMode) return;
+    void useDashboardQueryStore.getState().setViewMode(getExecutor(), mode);
+  }, []);
 
   /**
    * The single load: `listDashboard` + the four counts, guarded by a `cancelled`
@@ -229,6 +326,7 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
   // 'search-empty' BEFORE any filter/population branch, so a no-match search over
   // a non-empty population (or with a filter also active) never shows the
   // hidden-population or filter copy (MEDIUM-4).
+  const term = debouncedSearchText.trim();
   const emptyState = selectDashboardEmptyState({
     live: counts.live,
     neverContacted: counts.neverContacted,
@@ -239,7 +337,7 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
     activeFilter: "all",
     activeFilters: query.filters,
     activePopulations: query.populations,
-    hasTerm: false,
+    hasTerm: term !== "",
   });
 
   const listHeader = (
@@ -262,6 +360,12 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
       </Text>
       <Text style={[styles.emptyBody, { color: colors.textSecondary }]}>
         Pull down to try again.
+      </Text>
+    </View>
+  ) : emptyState === "search-empty" ? (
+    <View testID="dashboard-empty-search" style={styles.emptyState}>
+      <Text style={[styles.emptyBody, { color: colors.textSecondary }]}>
+        {`No matches for "${term}"`}
       </Text>
     </View>
   ) : emptyState === "firstrun" ? (
@@ -358,7 +462,11 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
                         numberOfLines={1}
                         style={[
                           styles.headerDestinationLabel,
-                          { color: pressed ? colors.accent : colors.textSecondary },
+                          {
+                            color: pressed
+                              ? colors.accent
+                              : colors.textSecondary,
+                          },
                         ]}
                       >
                         Your Week
@@ -387,7 +495,11 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
                         numberOfLines={1}
                         style={[
                           styles.headerDestinationLabel,
-                          { color: pressed ? colors.accent : colors.textSecondary },
+                          {
+                            color: pressed
+                              ? colors.accent
+                              : colors.textSecondary,
+                          },
                         ]}
                       >
                         Group Events
@@ -407,6 +519,71 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
         pointerEvents={panelOpen ? "none" : "auto"}
         style={styles.listRegion}
       >
+        <View testID="dashboard-search-row" style={styles.searchRow}>
+          <Pressable
+            testID="dashboard-search-toggle"
+            accessibilityRole="button"
+            accessibilityLabel={searchExpanded ? "Close search" : "Search"}
+            accessibilityState={{ expanded: searchExpanded }}
+            onPress={onToggleSearch}
+            hitSlop={8}
+            style={styles.searchToggle}
+          >
+            <Icon
+              name="search"
+              state={searchExpanded ? "active" : "default"}
+              size="md"
+              tone="textSecondary"
+            />
+          </Pressable>
+          {searchExpanded ? (
+            <Animated.View style={[styles.searchInputWrap, searchInputStyle]}>
+              <TextInput
+                testID="dashboard-search-input"
+                value={searchText}
+                onChangeText={setSearchText}
+                placeholder="Search people and notes"
+                placeholderTextColor={colors.textSecondary}
+                style={[
+                  styles.searchInput,
+                  {
+                    color: colors.textPrimary,
+                    borderColor: colors.border,
+                    backgroundColor: colors.surface,
+                  },
+                ]}
+              />
+              {searchText !== "" ? (
+                <Pressable
+                  testID="dashboard-search-clear"
+                  accessibilityRole="button"
+                  accessibilityLabel="Clear"
+                  onPress={onClearSearch}
+                  style={[styles.searchClear, { borderColor: colors.border }]}
+                >
+                  <Text
+                    style={[
+                      styles.searchClearText,
+                      { color: colors.textSecondary },
+                    ]}
+                  >
+                    Clear
+                  </Text>
+                </Pressable>
+              ) : null}
+            </Animated.View>
+          ) : (
+            <View style={styles.searchSpacer} />
+          )}
+          <View style={styles.viewToggleWrap}>
+            <SegmentedControl<DashboardViewMode>
+              testID="dashboard-view-toggle"
+              options={VIEW_TOGGLE_OPTIONS}
+              value={query.viewMode}
+              onChange={onChangeView}
+            />
+          </View>
+        </View>
         <FlatList
           data={error ? [] : rows}
           keyExtractor={(item) => String(item.id)}
@@ -426,7 +603,10 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
           )}
           ListHeaderComponent={listHeader}
           ListEmptyComponent={listEmpty}
-          contentContainerStyle={[styles.content, { paddingBottom: bottomClearance }]}
+          contentContainerStyle={[
+            styles.content,
+            { paddingBottom: bottomClearance },
+          ]}
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
@@ -482,6 +662,23 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+  },
+  searchToggle: {
+    minHeight: 44,
+    minWidth: 44,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  searchInputWrap: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  searchSpacer: {
+    flex: 1,
   },
   searchInput: {
     flex: 1,
@@ -500,6 +697,9 @@ const styles = StyleSheet.create({
   searchClearText: {
     fontSize: 14,
     fontWeight: "600",
+  },
+  viewToggleWrap: {
+    width: 96,
   },
   sortControl: {
     flexDirection: "row",

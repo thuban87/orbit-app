@@ -44,7 +44,11 @@ describe("dashboard query store", () => {
     expect(useDashboardQueryStore.getState().sort).toBe("name-asc");
     expect(
       (
-        await listDashboardPopulation(exec, useDashboardQueryStore.getState(), NOW)
+        await listDashboardPopulation(
+          exec,
+          useDashboardQueryStore.getState(),
+          NOW,
+        )
       ).map((row) => row.name),
     ).toEqual(["Alpha", "Zeta"]);
   });
@@ -85,7 +89,9 @@ describe("dashboard query store", () => {
     expect(unionQuery.populations).toEqual(["favourites", "not-contacted"]);
     expect(buildPopulationWhere(unionQuery.populations).sql).toContain(" OR ");
     expect(
-      (await listDashboardPopulation(exec, unionQuery, NOW)).map((row) => row.id).sort(),
+      (await listDashboardPopulation(exec, unionQuery, NOW))
+        .map((row) => row.id)
+        .sort(),
     ).toEqual([favourite.lastInsertRowId, never.lastInsertRowId].sort());
 
     await useDashboardQueryStore.getState().setPopulations(exec, []);
@@ -96,8 +102,40 @@ describe("dashboard query store", () => {
       "c.last_contact IS NOT NULL",
     );
     expect(
-      (await listDashboardPopulation(exec, activeQuery, NOW)).map((row) => row.id),
+      (await listDashboardPopulation(exec, activeQuery, NOW)).map(
+        (row) => row.id,
+      ),
     ).toEqual([favourite.lastInsertRowId]);
+  });
+
+  it("no-ops a same-value setViewMode: no app_settings write and no store change", async () => {
+    // Track every write so a same-value toggle can be proven to persist nothing.
+    const runCalls: string[] = [];
+    const spyExec: SqlExecutor = {
+      ...exec,
+      runAsync: async (sql: string, params?: unknown[]) => {
+        runCalls.push(sql);
+        return exec.runAsync(sql, params);
+      },
+    };
+
+    const before = useDashboardQueryStore.getState();
+    expect(before.viewMode).toBe("list");
+
+    // Re-selecting the already-active view writes nothing and changes nothing —
+    // no updateAppSettings, no set(), no generation bump (CYCLE-4 #3).
+    await useDashboardQueryStore.getState().setViewMode(spyExec, "list");
+    const afterNoop = useDashboardQueryStore.getState();
+    expect(afterNoop.viewMode).toBe("list");
+    expect(afterNoop.generation).toBe(before.generation);
+    expect(runCalls.some((sql) => sql.includes("app_settings"))).toBe(false);
+
+    // Sanity: a genuine change DOES persist and bump the generation.
+    await useDashboardQueryStore.getState().setViewMode(spyExec, "card");
+    const afterChange = useDashboardQueryStore.getState();
+    expect(afterChange.viewMode).toBe("card");
+    expect(afterChange.generation).toBe(before.generation + 1);
+    expect(runCalls.some((sql) => sql.includes("app_settings"))).toBe(true);
   });
 
   it("does not let a late hydration overwrite a persisted population selection", async () => {
@@ -114,7 +152,9 @@ describe("dashboard query store", () => {
     };
 
     const hydration = useDashboardQueryStore.getState().hydrate(delayedExec);
-    await useDashboardQueryStore.getState().setPopulations(exec, ["favourites"]);
+    await useDashboardQueryStore
+      .getState()
+      .setPopulations(exec, ["favourites"]);
     releaseRead?.();
     await hydration;
 
