@@ -53,17 +53,18 @@ import { migration015 } from "@/db/migrations/015-theme-settings";
 import { migration016 } from "@/db/migrations/016-contact-knowledge";
 import { migration017 } from "@/db/migrations/017-knowledge-egress-datamove";
 import { migration018 } from "@/db/migrations/018-custom-field-scope-history";
+import { migration019 } from "@/db/migrations/019-dashboard-prefs";
 import { runMigrations } from "@/db/migrations/runner";
 import type { SqlExecutor } from "@/db/types";
 
 const NOW = "2026-08-25 12:00:00";
 let uid = 0;
 const newUid = () => `uid-${++uid}`;
-const migrations = [migration001, migration002, migration003, migration004, migration005, migration006, migration007, migration008, migration009, migration010, migration011, migration012, migration013, migration014, migration015, migration016, migration017, migration018];
+const migrations = [migration001, migration002, migration003, migration004, migration005, migration006, migration007, migration008, migration009, migration010, migration011, migration012, migration013, migration014, migration015, migration016, migration017, migration018, migration019];
 
 async function db(): Promise<SqlExecutor> {
   const exec = nodeSqliteExecutor(openTestDb());
-  await runMigrations(exec, migrations, 18, { now: NOW, newUid });
+  await runMigrations(exec, migrations, 19, { now: NOW, newUid });
   return exec;
 }
 

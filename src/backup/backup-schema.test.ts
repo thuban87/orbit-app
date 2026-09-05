@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { parseBackupManifest } from "@/backup/backup-schema";
+import {
+  parseBackupManifest,
+  PORTABLE_SETTINGS_KEYS,
+} from "@/backup/backup-schema";
 import { BACKUP_FORMAT_VERSION, BackupSchemaError } from "@/backup/types";
 
 const valid = (): Record<string, any> => ({
@@ -11,6 +14,14 @@ const valid = (): Record<string, any> => ({
   contactMethodProvenance: [], interactions: [], events: [], fuel: [],
   contactLinks: [], customFieldDefs: [], customFieldValues: [], memories: [],
   relationships: [], currentStateEntries: [], tombstones: [],
+});
+
+describe("dashboard preference portable allowlist", () => {
+  it("allowlists the future format-5 dashboard keys", () => {
+    for (const key of ["dashboardViewMode", "dashboardPopulations", "dashboardFilters", "dashboardSort"]) {
+      expect(PORTABLE_SETTINGS_KEYS.has(key)).toBe(true);
+    }
+  });
 });
 
 describe("parseBackupManifest", () => {

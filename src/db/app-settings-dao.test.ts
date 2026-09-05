@@ -53,6 +53,10 @@ import { migration012 } from "@/db/migrations/012-import-sessions";
 import { migration013 } from "@/db/migrations/013-reconciliation-and-merge";
 import { migration014 } from "@/db/migrations/014-interaction-assists";
 import { migration015 } from "@/db/migrations/015-theme-settings";
+import { migration016 } from "@/db/migrations/016-contact-knowledge";
+import { migration017 } from "@/db/migrations/017-knowledge-egress-datamove";
+import { migration018 } from "@/db/migrations/018-custom-field-scope-history";
+import { migration019 } from "@/db/migrations/019-dashboard-prefs";
 import { runMigrations } from "@/db/migrations/runner";
 import { inWriteTransaction } from "@/db/transaction";
 import type { SqlExecutor } from "@/db/types";
@@ -114,8 +118,12 @@ async function migrateToV5(): Promise<void> {
       migration013,
       migration014,
       migration015,
+      migration016,
+      migration017,
+      migration018,
+      migration019,
     ],
-    15,
+    19,
     { now: NOW, newUid },
   );
 }
@@ -1201,5 +1209,37 @@ describe("app-settings-dao — theme settings (migration 015, Phase 23)", () => 
     ]) {
       expect(snapshot).not.toHaveProperty(key);
     }
+  });
+});
+
+describe("app-settings-dao — dashboard preference settings (migration 019, Phase 25)", () => {
+  beforeEach(async () => {
+    await migrateToV5();
+  });
+
+  it("round-trips the four durable dashboard preference axes but does not emit them", async () => {
+    await updateAppSettings(exec, {
+      dashboardViewMode: "card",
+      dashboardPopulations: '["favourites"]',
+      dashboardFilters: '{"category":["family"]}',
+      dashboardSort: "name-asc",
+    }, LATER);
+    expect(await getAppSettings(exec)).toMatchObject({
+      dashboardViewMode: "card",
+      dashboardPopulations: '["favourites"]',
+      dashboardFilters: '{"category":["family"]}',
+      dashboardSort: "name-asc",
+    });
+    const snapshot = await getPortableSettingsSnapshot(exec);
+    for (const key of ["dashboardViewMode", "dashboardPopulations", "dashboardFilters", "dashboardSort"]) {
+      expect(snapshot).not.toHaveProperty(key);
+    }
+  });
+
+  it("rejects invalid dashboard preference JSON and enum values before writes", async () => {
+    await expect(updateAppSettings(exec, { dashboardSort: "rank" as never }, LATER)).rejects.toThrow();
+    await expect(updateAppSettings(exec, { dashboardPopulations: '["unknown"]' }, LATER)).rejects.toThrow();
+    await expect(updateAppSettings(exec, { dashboardFilters: '{"unknown":["x"]}' }, LATER)).rejects.toThrow();
+    expect((await getAppSettings(exec)).dashboardSort).toBe("default");
   });
 });

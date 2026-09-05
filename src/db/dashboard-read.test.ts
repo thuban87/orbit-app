@@ -20,11 +20,13 @@ import {
   FAVOURITES_BOUND_WHERE,
   type FavouriteRow,
   LIVE_CONTACTS_BOUND_WHERE,
+  listDashboardPopulation,
   listBirthdayCandidates,
   listDashboard,
   listFavourites,
   listNeverContacted,
 } from "@/db/dashboard-read";
+import type { DashboardQueryState } from "@/logic/dashboard-query-logic";
 import type { FuelKind } from "@/db/fuel-dao";
 import { addFuel } from "@/db/fuel-dao";
 import { getRankedFuel } from "@/db/fuel-read";
@@ -336,6 +338,41 @@ describe("listDashboard — filters (four mutually-exclusive branches)", () => {
       const rows = await listDashboard(exec, { filter, sort: "status" });
       expect(ids(rows)).toEqual([live]);
     }
+  });
+});
+
+describe("listDashboardPopulation — Phase 25 Active universe", () => {
+  const active: DashboardQueryState = {
+    viewMode: "list",
+    populations: [],
+    filters: {},
+    sort: "default",
+  };
+
+  it("excludes archived, never-contacted, and Unbound but includes a currently-snoozed status-bearing contact", async () => {
+    const live = await seedContact({ name: "Live", lastContact: STABLE() });
+    const snoozed = await seedContact({
+      name: "Snoozed",
+      lastContact: STABLE(),
+      snoozeUntil: localDateOffset(5),
+    });
+    await seedContact({ name: "Never", lastContact: null });
+    await seedContact({
+      name: "Archived",
+      lastContact: STABLE(),
+      archivedAt: NOW,
+    });
+    await seedContact({
+      name: "Unbound",
+      lastContact: STABLE(),
+      trackingEnabled: 0,
+    });
+
+    expect(
+      (await listDashboardPopulation(exec, active))
+        .map((row) => row.id)
+        .sort(),
+    ).toEqual([live, snoozed].sort());
   });
 });
 
