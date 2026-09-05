@@ -140,6 +140,27 @@ async function addFuelRow(
   });
 }
 
+async function addInteractionRows(contactId: number, count: number): Promise<void> {
+  for (let index = 0; index < count; index++) {
+    await exec.runAsync(
+      `INSERT INTO interactions
+         (uid, contact_id, occurred_at, recorded_at, channel, direction, connected, source, modified_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        uid(),
+        contactId,
+        NOW,
+        NOW,
+        "unspecified",
+        "outgoing",
+        1,
+        "user",
+        NOW,
+      ],
+    );
+  }
+}
+
 const ids = (rows: { id: number }[]) => rows.map((r) => r.id);
 
 // interval_days = 30 throughout, so: stable < 24d elapsed (< 0.8), wobble at
@@ -532,6 +553,90 @@ describe("listDashboardPopulation — Phase 25 Active universe", () => {
         "2026-08-15 10:00:00",
       ),
     ).resolves.toEqual([]);
+  });
+
+  it("ANDs the worked category, battery, and Needs Attention filters while suppressing snoozes", async () => {
+    const family = await seedContact({
+      name: "Family Charger",
+      categoryId: 1,
+      socialBattery: "Charger",
+      lastContact: ROGUE(),
+    });
+    const friends = await seedContact({
+      name: "Friends Neutral",
+      categoryId: 2,
+      socialBattery: "Neutral",
+      lastContact: WOBBLE(),
+    });
+    const snoozed = await seedContact({
+      name: "Snoozed Match",
+      categoryId: 1,
+      socialBattery: "Charger",
+      lastContact: ROGUE(),
+      snoozeUntil: localDateOffset(5),
+    });
+    await seedContact({
+      name: "Wrong Battery",
+      categoryId: 1,
+      socialBattery: "Drain",
+      lastContact: ROGUE(),
+    });
+
+    const filters = {
+      category: ["1", "2"],
+      "social-battery": ["Charger", "Neutral"],
+      "needs-attention": ["on"],
+    };
+    expect(
+      ids(await listDashboardPopulation(exec, { ...active, filters }, NOW)).sort(
+        (a, b) => a - b,
+      ),
+    ).toEqual([family, friends].sort((a, b) => a - b));
+    expect(ids(await listDashboardPopulation(exec, active, NOW))).toContain(snoozed);
+  });
+
+  it("keeps the same filters when the selected population changes", async () => {
+    const favourite = await seedContact({
+      name: "Favourite Match",
+      categoryId: 1,
+      socialBattery: "Charger",
+      favouriteRank: 1,
+      lastContact: ROGUE(),
+    });
+    await seedContact({
+      name: "Non-favourite Match",
+      categoryId: 1,
+      socialBattery: "Charger",
+      lastContact: ROGUE(),
+    });
+    const filters = {
+      category: ["1"],
+      "social-battery": ["Charger"],
+      "needs-attention": ["on"],
+    };
+
+    await expect(
+      listDashboardPopulation(
+        exec,
+        { ...active, populations: ["favourites"], filters },
+        NOW,
+      ),
+    ).resolves.toMatchObject([{ id: favourite }]);
+  });
+
+  it("uses the post-query Gravity survivors as the fully-filtered id scope", async () => {
+    const deep = await seedContact({ name: "Deep", lastContact: STABLE() });
+    const thin = await seedContact({ name: "Thin", lastContact: STABLE() });
+    await addInteractionRows(deep, 20);
+
+    const rows = await listDashboardPopulation(
+      exec,
+      { ...active, filters: { gravity: ["deep"] } },
+      "2026-09-04 10:00:00",
+    );
+
+    expect(ids(rows)).toEqual([deep]);
+    expect(ids(rows)).not.toContain(thin);
   });
 });
 
