@@ -140,7 +140,7 @@ All v1.0 commits are local on `main` and have NOT been pushed.
 - [x] **Phase 23: Theme & Visual System** - Galaxy + Standard packages × Light/Dark/Follow System, semantic icon registry, reduced-motion and contrast guarantees (completed 2026-09-03)
 - [x] **Phase 24.1: Contact Knowledge Foundation — Model, Storage & UI** - The "Things to Remember" model + UI over fields, custom fields, relationships, typed Memories, current-state history, and soft-delete (additive migration; KNOW-01..09) (completed 2026-09-04; goal ACHIEVED — device UAT 7/7, UI 18/24 no blockers, Nyquist signed off. Carried forward: D-11 default Memory-type display name — owner naming decision due before Phase 34)
 - [x] **Phase 24.2: Contact Knowledge — Egress, Search, Types & Data-moves** - Bounded local search, per-item AI opt-in + Off Limits, expanded custom-field types + value history, imported notes, share-capture migration, backup coverage (destructive migration + ADR-030 retirement; KNOW-10..16) (completed 2026-09-04; goal ACHIEVED — verifier 7/7 must-haves, code review 0 blockers, on-device UAT 3/3 passed: memory AI toggle/sparkle, url/email/phone field types + tap-to-fix, imported Contacts notes; migrations 017+018 verified on-device user_version=18)
-- [ ] **Phase 25: Dashboard Data & State Foundation** - Shared population/filter/sort/search query state, durable and restored on return
+- [x] **Phase 25: Dashboard Data & State Foundation** - Shared population/filter/sort/search query state, durable and restored on return (completed 2026-09-05; goal ACHIEVED — verifier 14/14 must-haves, code review 0 blockers/2 warnings/3 info with WR-01 fixed inline; migration 019 verified irreversibility-safe. Owner-accepted deferrals: D-13 Unbound name-lookup search + D-14 Not-Contacted chip → Phase 26, D-06 birthday at-a-glance → deferred Your Week — all with a live path preserved)
 - [ ] **Phase 26: Dashboard Control Surface** - Lean header plus three equal live-applying anchored control panels
 - [ ] **Phase 27: Dashboard List View** - Full-width three-line rows with status border + glyph, swipe logging, and search explanations
 - [ ] **Phase 28: Dashboard Card View** - Avatar-first 3-column grid with long-press menu and multi-select bulk management
@@ -323,7 +323,7 @@ All v1.0 commits are local on `main` and have NOT been pushed.
 
 **Canonical refs**: docs/dossier/milestone-2/phase-04-dashboard-data-state-foundation-dossier.md; docs/dossier/milestone-2/planning-notes/phase-04-planning-notes.md
 **Schema**: migration 019 — durable dashboard-preference columns on `app_settings` (view/populations/filters/sort); portable-key removal for superseded keys deferred to Phase 36 (verified head+1 = 019 on disk)
-**Plans**: 6/7 plans executed (4 waves)
+**Plans**: 7/7 plans executed (4 waves)
 **Wave 1**
 
 - [x] 25-01-PLAN.md — Schema (migration 019) + durable-pref DAO + shared query-state tracer (Active universe end-to-end) [W1]
@@ -341,7 +341,7 @@ All v1.0 commits are local on `main` and have NOT been pushed.
 
 **Wave 4** *(blocked on Wave 3 completion)*
 
-- [ ] 25-07-PLAN.md — Retire birthday banner + Never-Contacted screen + include-Unbound toggle; Unbound replacement search [W4]
+- [x] 25-07-PLAN.md — Retire birthday banner + Never-Contacted screen + include-Unbound toggle; legacy Home search made bound-only (D-13, Unbound name-lookup replacement deferred to Phase 26) [W4]
 
 **UI hint**: yes
 
