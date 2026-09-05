@@ -13,6 +13,9 @@ import {
   BASE_WHERE,
   type BirthdayCandidate,
   countArchived,
+  countAllContacts,
+  countBirthdayPopulation,
+  countFavourites,
   countLiveContacts,
   countNeverContacted,
   countSnoozed,
@@ -22,6 +25,7 @@ import {
   type FavouriteRow,
   LIVE_CONTACTS_BOUND_WHERE,
   listDashboardPopulation,
+  listDashboardSearch,
   listBirthdayCandidates,
   listDashboard,
   listFavourites,
@@ -690,6 +694,106 @@ describe("listDashboard — favourites metadata + LOW-2 precedence", () => {
     // The matched favourite still carries its rank so its star renders.
     expect(rows.find((r) => r.id === fav)?.favourite_rank).toBe(1);
     expect(nonFav).toBeGreaterThan(0);
+  });
+});
+
+describe("listDashboardSearch — population-aware search + A3 scope", () => {
+  const active: DashboardQueryState = {
+    viewMode: "list",
+    populations: [],
+    filters: {},
+    sort: "default",
+  };
+
+  it("relaxes the implicit Active default to archived-only while staying Bound-only", async () => {
+    const never = await seedContact({ name: "A3 Never", lastContact: null });
+    const snoozed = await seedContact({
+      name: "A3 Snoozed",
+      lastContact: STABLE(),
+      snoozeUntil: localDateOffset(5),
+    });
+    await seedContact({ name: "A3 Archived", lastContact: STABLE(), archivedAt: NOW });
+    await seedContact({
+      name: "A3 Unbound",
+      lastContact: STABLE(),
+      trackingEnabled: 0,
+    });
+
+    const rows = await listDashboardSearch(exec, active, "a3", NOW);
+
+    expect(ids(rows).sort((a, b) => a - b)).toEqual([never, snoozed].sort((a, b) => a - b));
+    expect(rows.find((row) => row.id === never)).toMatchObject({ status: null, progress: null });
+  });
+
+  it("AND-composes explicit populations and filters with name/fuel matching and preserves snippets", async () => {
+    const favourite = await seedContact({
+      name: "Sushi Favourite",
+      lastContact: STABLE(),
+      favouriteRank: 1,
+      categoryId: 1,
+    });
+    const fuelMatch = await seedContact({
+      name: "Different Name",
+      lastContact: STABLE(),
+      favouriteRank: 2,
+      categoryId: 1,
+    });
+    await addFuelRow(fuelMatch, { text: "sushi rolls" });
+    await seedContact({
+      name: "Sushi Wrong Category",
+      lastContact: STABLE(),
+      favouriteRank: 3,
+      categoryId: 2,
+    });
+    await seedContact({ name: "Sushi Not Favourite", lastContact: STABLE(), categoryId: 1 });
+
+    const rows = await listDashboardSearch(
+      exec,
+      { ...active, populations: ["favourites"], filters: { category: ["1"] } },
+      "sushi",
+      NOW,
+    );
+    const byId = new Map(rows.map((row) => [row.id, row]));
+
+    expect(ids(rows).sort((a, b) => a - b)).toEqual([favourite, fuelMatch].sort((a, b) => a - b));
+    expect(byId.get(favourite)?.snippet).toBeNull();
+    expect(byId.get(fuelMatch)?.snippet).toBe("sushi rolls");
+  });
+
+  it("resolves birthday ids for a term and uses the soonest-birthday sort", async () => {
+    const tomorrow = await seedContact({ name: "Birthday Match Tomorrow", birthday: "08-16" });
+    const nextWeek = await seedContact({ name: "Birthday Match Next Week", birthday: "08-22" });
+    await seedContact({ name: "Birthday Match Outside", birthday: "09-24" });
+
+    const rows = await listDashboardSearch(
+      exec,
+      { ...active, populations: ["birthdays"] },
+      "birthday match",
+      NOW,
+    );
+
+    expect(ids(rows)).toEqual([tomorrow, nextWeek]);
+  });
+
+  it("applies the post-query gravity pass to term results", async () => {
+    const deep = await seedContact({ name: "Gravity Match Deep", lastContact: STABLE() });
+    const thin = await seedContact({ name: "Gravity Match Thin", lastContact: STABLE() });
+    await addInteractionRows(deep, 20);
+
+    const rows = await listDashboardSearch(
+      exec,
+      { ...active, filters: { gravity: ["deep"] } },
+      "gravity match",
+      "2026-09-04 10:00:00",
+    );
+
+    expect(ids(rows)).toEqual([deep]);
+    expect(ids(rows)).not.toContain(thin);
+  });
+
+  it("returns [] for empty terms", async () => {
+    await seedContact({ name: "Live", lastContact: STABLE() });
+    await expect(listDashboardSearch(exec, active, "  \n\t", NOW)).resolves.toEqual([]);
   });
 });
 
