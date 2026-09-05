@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Release Readiness
 current_phase: 27
-current_phase_name: Dashboard List View
+current_phase_name: dashboard-list-view
 status: ready
 stopped_at: Phase 27 planned (6 plans, 5 waves)
-last_updated: "2026-09-05T20:40:37.951Z"
+last_updated: "2026-09-05T21:24:23.075Z"
 last_activity: 2026-09-05
 last_activity_desc: Phase 27 planned — 6 plans / 5 waves, research + pattern-map + checker-verified (1 blocker fixed on revision); ready to execute
-state_head: 42d31b1ab39a65547b09d7759e88b5a27983a62d
+state_head: dc60323442a5961f4e91dbf09d0b61dce819e21e
 progress:
   total_phases: 20
   completed_phases: 4
