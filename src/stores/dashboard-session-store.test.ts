@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { beforeEach, describe, expect, it } from "vitest";
 import { useDashboardSessionStore } from "@/stores/dashboard-session-store";
 
@@ -35,5 +36,16 @@ describe("useDashboardSessionStore", () => {
       searchText: "",
       scrollOffset: 0,
     });
+  });
+
+  it("has no durable-storage adapter", () => {
+    const source = readFileSync(
+      new URL("./dashboard-session-store.ts", import.meta.url),
+      "utf8",
+    );
+
+    expect(source).not.toMatch(
+      /@react-native-async-storage\/async-storage|zustand\/middleware/,
+    );
   });
 });
