@@ -47,6 +47,7 @@ import Animated, {
   useSharedValue,
   withTiming,
 } from "react-native-reanimated";
+import { useShallow } from "zustand/react/shallow";
 import { ContactCard } from "@/components/ContactCard";
 import { POPULATION_LABELS } from "@/components/control-surface/control-labels";
 import { DashboardControlRow } from "@/components/control-surface/DashboardControlRow";
@@ -134,12 +135,19 @@ const ZERO_POPULATION_COUNTS: DashboardPopulationCounts = {
 
 export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
   const { colors } = useTheme();
-  const query = useDashboardQueryStore((state) => ({
-    viewMode: state.viewMode,
-    populations: state.populations,
-    filters: state.filters,
-    sort: state.sort,
-  }));
+  // useShallow is required: this selector returns a fresh object, and Zustand v5
+  // compares snapshots with Object.is — without a shallow comparator the new
+  // reference every render drives an infinite useSyncExternalStore update loop
+  // ("Maximum update depth exceeded"). It also keeps `query` referentially stable
+  // for the effect below (`[query, debouncedSearchText]`) so reads don't re-fire.
+  const query = useDashboardQueryStore(
+    useShallow((state) => ({
+      viewMode: state.viewMode,
+      populations: state.populations,
+      filters: state.filters,
+      sort: state.sort,
+    })),
+  );
   const hydrate = useDashboardQueryStore((state) => state.hydrate);
   const bottomClearance = useBottomClearance();
 
