@@ -271,52 +271,72 @@ function localMidnightFromReadNow(now: string): Date {
   return new Date(year, month - 1, day);
 }
 
-export async function listDashboardPopulation(
+interface PopulationReadComposition {
+  birthdayDays: Map<number, number>;
+  birthdayIds: number[];
+  where: ReturnType<typeof buildPopulationWhere>;
+  filters: ReturnType<typeof buildFilterWhere>;
+  matches: ReturnType<typeof populationMatchColumns>;
+  resolvedSort: ReturnType<typeof resolveDefaultSort>;
+  orderBy: string;
+}
+
+async function resolveBirthdayWindow(
+  exec: SqlExecutor,
+  now: string,
+): Promise<{ birthdayDays: Map<number, number>; birthdayIds: number[] }> {
+  const birthdayDays = new Map<number, number>();
+  const birthdayIds: number[] = [];
+  const todayLocal = localMidnightFromReadNow(now);
+  const candidates = await listBirthdayCandidates(exec);
+  for (const candidate of candidates) {
+    const days = daysUntilBirthday(candidate.birthday, todayLocal);
+    if (days !== null && days >= 0 && days <= 30) {
+      birthdayIds.push(candidate.id);
+      birthdayDays.set(candidate.id, days);
+    }
+  }
+  return { birthdayDays, birthdayIds };
+}
+
+async function composePopulationRead(
   exec: SqlExecutor,
   query: DashboardQueryState,
   now: string,
-): Promise<DashboardRow[]> {
-  const birthdayDays = new Map<number, number>();
+): Promise<PopulationReadComposition> {
+  let birthdayDays = new Map<number, number>();
   let birthdayIds: number[] = [];
   if (query.populations.includes("birthdays")) {
-    const todayLocal = localMidnightFromReadNow(now);
-    const candidates = await listBirthdayCandidates(exec);
-    for (const candidate of candidates) {
-      const days = daysUntilBirthday(candidate.birthday, todayLocal);
-      if (days !== null && days >= 0 && days <= 30) {
-        birthdayIds.push(candidate.id);
-        birthdayDays.set(candidate.id, days);
-      }
-    }
+    ({ birthdayDays, birthdayIds } = await resolveBirthdayWindow(exec, now));
   }
 
   const where = buildPopulationWhere(query.populations, { birthdayIds });
   const filters = buildFilterWhere(query.filters);
   const matches = populationMatchColumns(query.populations, birthdayIds);
   const resolvedSort = resolveDefaultSort(query.sort, query.populations);
-  const orderBy = POPULATION_SORT[resolvedSort];
-  const rows = await exec.getAllAsync<DashboardRow>(
-    `SELECT c.id AS id,
-      c.name AS name,
-      c.photo AS photo,
-      c.modified_at AS modified_at,
-      cat.name AS categoryLabel,
-      c.tracking_enabled AS trackingEnabled,
-      ${CARD_FAVOURITE_RANK},
-      ${CARD_STATUS},
-      ${FUEL_LINE} AS fuelText,
-      NULL AS snippet${matches.sql}
-     ${CARD_FROM}
-     WHERE ${where.sql}${filters.sql ? `\n       AND ${filters.sql}` : ""}
-     ORDER BY ${orderBy}`,
-    [...matches.params, ...where.params, ...filters.params],
-  );
+  return {
+    birthdayDays,
+    birthdayIds,
+    where,
+    filters,
+    matches,
+    resolvedSort,
+    orderBy: POPULATION_SORT[resolvedSort],
+  };
+}
 
-  if (resolvedSort === "soonest-birthday") {
+async function applyPopulationPostProcessing(
+  exec: SqlExecutor,
+  rows: DashboardRow[],
+  query: DashboardQueryState,
+  now: string,
+  composition: PopulationReadComposition,
+): Promise<DashboardRow[]> {
+  if (composition.resolvedSort === "soonest-birthday") {
     rows.sort((left, right) => {
       const daysDelta =
-        (birthdayDays.get(left.id) ?? Number.POSITIVE_INFINITY) -
-        (birthdayDays.get(right.id) ?? Number.POSITIVE_INFINITY);
+        (composition.birthdayDays.get(left.id) ?? Number.POSITIVE_INFINITY) -
+        (composition.birthdayDays.get(right.id) ?? Number.POSITIVE_INFINITY);
       return daysDelta || left.name.localeCompare(right.name) || left.id - right.id;
     });
   }
@@ -330,9 +350,93 @@ export async function listDashboardPopulation(
     now,
   );
   const survivingIds = new Set(gravityIds);
+  return rows.filter((row) => survivingIds.has(row.id));
+}
+
+export async function listDashboardPopulation(
+  exec: SqlExecutor,
+  query: DashboardQueryState,
+  now: string,
+): Promise<DashboardRow[]> {
+  const composition = await composePopulationRead(exec, query, now);
+  const rows = await exec.getAllAsync<DashboardRow>(
+    `SELECT c.id AS id,
+      c.name AS name,
+      c.photo AS photo,
+      c.modified_at AS modified_at,
+      cat.name AS categoryLabel,
+      c.tracking_enabled AS trackingEnabled,
+      ${CARD_FAVOURITE_RANK},
+      ${CARD_STATUS},
+      ${FUEL_LINE} AS fuelText,
+      NULL AS snippet${composition.matches.sql}
+     ${CARD_FROM}
+     WHERE ${composition.where.sql}${composition.filters.sql ? `\n       AND ${composition.filters.sql}` : ""}
+     ORDER BY ${composition.orderBy}`,
+    [
+      ...composition.matches.params,
+      ...composition.where.params,
+      ...composition.filters.params,
+    ],
+  );
   // These are the fully-filtered rows. Search and empty-state consumers must
   // derive their id scope/count from this returned set, never the SQL candidates.
-  return rows.filter((row) => survivingIds.has(row.id));
+  return applyPopulationPostProcessing(exec, rows, query, now, composition);
+}
+
+/**
+ * Population-aware Dashboard search. The A3 owner decision applies only to the
+ * implicit Active default: a present term relaxes its never-contacted/snooze
+ * exclusions to archived-only, while an explicit population keeps its own scope.
+ */
+export async function listDashboardSearch(
+  exec: SqlExecutor,
+  query: DashboardQueryState,
+  term: string,
+  now: string,
+): Promise<DashboardRow[]> {
+  // Search callers always supply a local wall-clock value, even without the
+  // Birthdays population, so reject accidental UTC/invalid inputs consistently.
+  localMidnightFromReadNow(now);
+  const trimmedTerm = term.trim();
+  if (trimmedTerm === "") return [];
+
+  const composition = await composePopulationRead(exec, query, now);
+  const like = `%${escapeLike(trimmedTerm)}%`;
+  const implicitActive = query.populations.length === 0;
+  const scope = implicitActive
+    ? `c.archived_at IS NULL\n       AND ${DASHBOARD_BOUND_WHERE}`
+    : composition.where.sql;
+  const termPredicate = `(
+       c.name LIKE ? ESCAPE '\\'
+       OR EXISTS (SELECT 1 FROM fuel WHERE contact_id = c.id AND ${RANKED_FUEL_EXCLUSIONS} AND text LIKE ? ESCAPE '\\')
+     )`;
+  const snippet = `(SELECT text FROM fuel WHERE contact_id = c.id AND ${RANKED_FUEL_EXCLUSIONS} AND text LIKE ? ESCAPE '\\' LIMIT 1)`;
+  const rows = await exec.getAllAsync<DashboardRow>(
+    `SELECT c.id AS id,
+      c.name AS name,
+      c.photo AS photo,
+      c.modified_at AS modified_at,
+      cat.name AS categoryLabel,
+      c.tracking_enabled AS trackingEnabled,
+      ${CARD_FAVOURITE_RANK},
+      ${CARD_STATUS},
+      ${FUEL_LINE} AS fuelText,
+      ${snippet} AS snippet${composition.matches.sql}
+     ${CARD_FROM}
+     WHERE ${scope}${composition.filters.sql ? `\n       AND ${composition.filters.sql}` : ""}
+       AND ${termPredicate}
+     ORDER BY ${composition.orderBy}`,
+    [
+      like,
+      ...composition.matches.params,
+      ...composition.where.params,
+      ...composition.filters.params,
+      like,
+      like,
+    ],
+  );
+  return applyPopulationPostProcessing(exec, rows, query, now, composition);
 }
 
 /** Never-contacted sort clause per NeverContactedSort. */
@@ -549,6 +653,41 @@ export function countSnoozed(exec: SqlExecutor): Promise<number> {
     exec,
     `archived_at IS NULL AND ${LIVE_CONTACTS_BOUND_WHERE} AND snooze_until IS NOT NULL AND date(snooze_until) > date('now','localtime')`,
   );
+}
+
+/** Bound, non-archived favourite membership count for Dashboard empty states. */
+export function countFavourites(exec: SqlExecutor): Promise<number> {
+  return count(
+    exec,
+    `archived_at IS NULL AND ${FAVOURITES_BOUND_WHERE} AND favourite_rank IS NOT NULL`,
+  );
+}
+
+/** Bound, non-archived Dashboard universe count for Dashboard empty states. */
+export function countAllContacts(exec: SqlExecutor): Promise<number> {
+  return count(exec, `archived_at IS NULL AND ${LIVE_CONTACTS_BOUND_WHERE}`);
+}
+
+/**
+ * Bound, non-archived count of contacts whose birthday falls in the same 0–30
+ * day window used by the Birthdays population. The explicit empty guard avoids
+ * constructing an invalid empty SQLite IN clause on the common no-birthday path.
+ */
+export async function countBirthdayPopulation(
+  exec: SqlExecutor,
+  now: string,
+): Promise<number> {
+  const { birthdayIds: candidateIds } = await resolveBirthdayWindow(exec, now);
+  if (candidateIds.length === 0) return 0;
+  const row = await exec.getFirstAsync<{ n: number }>(
+    `SELECT COUNT(*) AS n
+       FROM contacts
+      WHERE archived_at IS NULL
+        AND ${LIVE_CONTACTS_BOUND_WHERE}
+        AND id IN (${candidateIds.map(() => "?").join(", ")})`,
+    candidateIds,
+  );
+  return row?.n ?? 0;
 }
 
 /** Count of archived contacts. */
