@@ -47,22 +47,30 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated";
 import { ContactCard } from "@/components/ContactCard";
+import { POPULATION_LABELS } from "@/components/control-surface/control-labels";
 import { DashboardControlRow } from "@/components/control-surface/DashboardControlRow";
 import { DashboardOverlayHost } from "@/components/control-surface/DashboardOverlayHost";
 import { Icon } from "@/components/icons/Icon";
 import { SegmentedControl } from "@/components/SegmentedControl";
 import { ShellAppBar } from "@/components/ShellAppBar";
 import {
+  countAllContacts,
   countArchived,
+  countBirthdayPopulation,
+  countFavourites,
   countLiveContacts,
   countNeverContacted,
   countSnoozed,
   type DashboardRow,
   listDashboardPopulation,
+  listDashboardSearch,
 } from "@/db/dashboard-read";
 import { getExecutor, localDateTime } from "@/db/database";
 import { countUnbound } from "@/db/unbound-read";
-import { selectDashboardEmptyState } from "@/logic/dashboard-empty-logic";
+import {
+  type DashboardPopulationCounts,
+  selectDashboardEmptyState,
+} from "@/logic/dashboard-empty-logic";
 import type { DashboardViewMode } from "@/logic/dashboard-query-logic";
 import type { DashboardScreenProps } from "@/navigation/types";
 import { useBottomClearance } from "@/navigation/use-bottom-clearance";
@@ -109,6 +117,20 @@ const ZERO_COUNTS: PopulationCounts = {
   unbound: 0,
 };
 
+/**
+ * The COMPLETE 5-key population-count record feeding the empty-state gate (each
+ * key from a cheap dedicated count, never an extra full population scan). A
+ * partial literal would fail the exact `Record<DashboardPopulation, number>`
+ * typecheck AND mis-resolve a favourites-empty state as filter-empty.
+ */
+const ZERO_POPULATION_COUNTS: DashboardPopulationCounts = {
+  "all-contacts": 0,
+  favourites: 0,
+  birthdays: 0,
+  "not-contacted": 0,
+  snoozed: 0,
+};
+
 export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
   const { colors } = useTheme();
   const query = useDashboardQueryStore((state) => ({
@@ -152,6 +174,8 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
 
   const [rows, setRows] = useState<DashboardRow[]>([]);
   const [counts, setCounts] = useState<PopulationCounts>(ZERO_COUNTS);
+  const [populationCounts, setPopulationCounts] =
+    useState<DashboardPopulationCounts>(ZERO_POPULATION_COUNTS);
   const [error, setError] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [panelOpen, setPanelOpen] = useState(false);
@@ -230,28 +254,56 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
   }, []);
 
   /**
-   * The single load: `listDashboard` + the four counts, guarded by a `cancelled`
-   * flag it returns as its canceller. Every caller (focus, foreground, pull)
-   * runs this same function; the guard drops a stale async result if a newer
-   * query started before this one resolved.
+   * The single load: the D-12 read (`listDashboardSearch` when a term is present,
+   * else `listDashboardPopulation`) + the header counts + the COMPLETE 5-key
+   * populationCounts, guarded by a `cancelled` flag it returns as its canceller.
+   * The DEBOUNCE (not this flag) collapses a keystroke burst to ONE read — the
+   * cancelled flag only drops a stale async result so a newer query is never
+   * clobbered. ONE `now` is captured per reload and threaded to every
+   * birthday-resolving read/count (the list read AND countBirthdayPopulation) so
+   * the birthday list and its empty-state count can't disagree across local
+   * midnight (D-12; cross-AI review CYCLE-3).
    */
   const reload = useCallback(() => {
     let cancelled = false;
+    const now = localDateTime();
+    const term = debouncedSearchText.trim();
     (async () => {
       try {
         const exec = getExecutor();
-        const [list, live, neverContacted, snoozed, archived, unbound] =
-          await Promise.all([
-            listDashboardPopulation(exec, query, localDateTime()),
-            countLiveContacts(exec),
-            countNeverContacted(exec),
-            countSnoozed(exec),
-            countArchived(exec),
-            countUnbound(exec),
-          ]);
+        const [
+          list,
+          live,
+          neverContacted,
+          snoozed,
+          archived,
+          unbound,
+          birthdays,
+          favourites,
+          allContacts,
+        ] = await Promise.all([
+          term !== ""
+            ? listDashboardSearch(exec, query, term, now)
+            : listDashboardPopulation(exec, query, now),
+          countLiveContacts(exec),
+          countNeverContacted(exec),
+          countSnoozed(exec),
+          countArchived(exec),
+          countUnbound(exec),
+          countBirthdayPopulation(exec, now),
+          countFavourites(exec),
+          countAllContacts(exec),
+        ]);
         if (cancelled) return;
         setRows(list);
         setCounts({ live, neverContacted, snoozed, archived, unbound });
+        setPopulationCounts({
+          "all-contacts": allContacts,
+          favourites,
+          birthdays,
+          "not-contacted": neverContacted,
+          snoozed,
+        });
         setError(false);
       } catch (err) {
         Logger.error(LOG_SCOPE, "failed to load dashboard", err);
@@ -266,7 +318,7 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
     return () => {
       cancelled = true;
     };
-  }, [query]);
+  }, [query, debouncedSearchText]);
 
   // Shell Quick Log/Undo originates outside this screen's focus lifecycle. This
   // in-process tick is intentionally distinct from the connection-scoped SQLite
@@ -337,6 +389,7 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
     activeFilter: "all",
     activeFilters: query.filters,
     activePopulations: query.populations,
+    populationCounts,
     hasTerm: term !== "",
   });
 
@@ -366,6 +419,24 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
     <View testID="dashboard-empty-search" style={styles.emptyState}>
       <Text style={[styles.emptyBody, { color: colors.textSecondary }]}>
         {`No matches for "${term}"`}
+      </Text>
+    </View>
+  ) : emptyState === "birthdays-empty" ? (
+    <View testID="dashboard-empty-birthdays" style={styles.emptyState}>
+      <Text style={[styles.emptyBody, { color: colors.textSecondary }]}>
+        {`Nothing in ${POPULATION_LABELS.birthdays}.`}
+      </Text>
+    </View>
+  ) : emptyState === "not-contacted-empty" ? (
+    <View testID="dashboard-empty-not-contacted" style={styles.emptyState}>
+      <Text style={[styles.emptyBody, { color: colors.textSecondary }]}>
+        {`Nothing in ${POPULATION_LABELS["not-contacted"]}.`}
+      </Text>
+    </View>
+  ) : emptyState === "snoozed-empty" ? (
+    <View testID="dashboard-empty-snoozed" style={styles.emptyState}>
+      <Text style={[styles.emptyBody, { color: colors.textSecondary }]}>
+        {`Nothing in ${POPULATION_LABELS.snoozed}.`}
       </Text>
     </View>
   ) : emptyState === "firstrun" ? (
