@@ -42,7 +42,6 @@ import {
 import { ContactCard } from "@/components/ContactCard";
 import { DashboardControlRow } from "@/components/control-surface/DashboardControlRow";
 import { DashboardOverlayHost } from "@/components/control-surface/DashboardOverlayHost";
-import type { OverflowAction } from "@/components/OverflowMenu";
 import { ShellAppBar } from "@/components/ShellAppBar";
 import { Icon } from "@/components/icons/Icon";
 import {
@@ -58,8 +57,11 @@ import { countUnbound } from "@/db/unbound-read";
 import { selectDashboardEmptyState } from "@/logic/dashboard-empty-logic";
 import type { DashboardScreenProps } from "@/navigation/types";
 import { useBottomClearance } from "@/navigation/use-bottom-clearance";
+import { buildDashboardOverflowActions } from "@/screens/dashboard-overflow-actions";
 import { useDashboardQueryStore } from "@/stores/dashboard-query-store";
+import { useDashboardSessionStore } from "@/stores/dashboard-session-store";
 import { useShellRefresh } from "@/stores/shell-refresh-store";
+import { showSnackbar } from "@/stores/snackbar-store";
 import { useTheme } from "@/theme";
 import { Logger } from "@/utils/logger";
 
@@ -93,50 +95,32 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
   const hydrate = useDashboardQueryStore((state) => state.hydrate);
   const bottomClearance = useBottomClearance();
 
-  const overflowActions: OverflowAction[] = [
-    {
-      label: "Your week",
-      onPress: () => navigation.navigate("Digest"),
-      testID: "dashboard-your-week-entry",
-    },
-    {
-      label: "Backup and Restore",
-      onPress: () =>
-        navigation.navigate({
-          name: "BackupTab",
-          params: { screen: "Backup" },
-        }),
-      testID: "dashboard-backup-entry",
-    },
-    {
-      label: "Orrery",
-      onPress: () =>
-        navigation.navigate({
-          name: "OrreryTab",
-          params: { screen: "Orrery" },
-        }),
-      testID: "dashboard-orbit-entry",
-    },
-    {
-      label: "Settings",
-      onPress: () =>
-        navigation.navigate({
-          name: "SettingsTab",
-          params: { screen: "Settings" },
-        }),
-      testID: "dashboard-settings-entry",
-    },
-    {
-      label: "Group Events",
-      onPress: () => navigation.navigate("GroupEvents"),
-      testID: "dashboard-group-events-overflow-entry",
-    },
-    {
-      label: "Archived Contacts",
-      onPress: () => navigation.navigate("Archived"),
-      testID: "dashboard-archived-overflow-entry",
-    },
-  ];
+  const resetDashboard = useCallback(async () => {
+    try {
+      await useDashboardQueryStore.getState().resetDashboardView(getExecutor());
+      useDashboardSessionStore.getState().clearSession();
+    } catch (error) {
+      Logger.error(LOG_SCOPE, "failed to reset dashboard view", error);
+      showSnackbar({
+        kind: "error",
+        label: "Couldn't reset dashboard",
+        action: {
+          label: "Retry",
+          accessibilityLabel: "Retry resetting the dashboard view",
+          onPress: () => {
+            void resetDashboard();
+          },
+        },
+      });
+    }
+  }, []);
+
+  // OverflowAction is synchronous; this wrapper contains the awaited reset and
+  // its failure path so a rejected persistence write cannot become unhandled.
+  const onReset = useCallback(() => {
+    void resetDashboard();
+  }, [resetDashboard]);
+  const overflowActions = buildDashboardOverflowActions({ navigation, onReset });
 
   const [rows, setRows] = useState<DashboardRow[]>([]);
   const [counts, setCounts] = useState<PopulationCounts>(ZERO_COUNTS);
@@ -268,43 +252,6 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
           {`${counts.live} contact${counts.live === 1 ? "" : "s"}`}
         </Text>
       ) : null}
-    </View>
-  );
-
-  const listFooter = error ? null : (
-    <View style={styles.footer}>
-      <Pressable
-        testID="dashboard-not-yet-contacted-entry"
-        accessibilityRole="button"
-        accessibilityLabel={`Not yet contacted (${counts.neverContacted})`}
-        // The standalone Never Contacted screen is retired (DASHQ-03 / dossier
-        // E-02). Its replacement control — the Not-Contacted population chip —
-        // lands in Phase 26; until then this re-points to the live Dashboard
-        // (owner-accepted one-phase gap, D-14). Never a deleted route.
-        onPress={() => navigation.navigate("Home")}
-        style={[
-          styles.footerEntry,
-          { backgroundColor: colors.surface, borderColor: colors.border },
-        ]}
-      >
-        <Text style={[styles.footerText, { color: colors.textPrimary }]}>
-          {`Not yet contacted (${counts.neverContacted})`}
-        </Text>
-      </Pressable>
-      <Pressable
-        testID="dashboard-unbound-contacts-entry"
-        accessibilityRole="button"
-        accessibilityLabel={`Unbound contacts (${counts.unbound})`}
-        onPress={() => navigation.navigate("UnboundContacts")}
-        style={[
-          styles.footerEntry,
-          { backgroundColor: colors.surface, borderColor: colors.border },
-        ]}
-      >
-        <Text style={[styles.footerText, { color: colors.textPrimary }]}>
-          {`Unbound contacts (${counts.unbound})`}
-        </Text>
-      </Pressable>
     </View>
   );
 
@@ -478,7 +425,6 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
             />
           )}
           ListHeaderComponent={listHeader}
-          ListFooterComponent={listFooter}
           ListEmptyComponent={listEmpty}
           contentContainerStyle={[styles.content, { paddingBottom: bottomClearance }]}
           refreshControl={
@@ -580,20 +526,6 @@ const styles = StyleSheet.create({
   manageText: {
     fontSize: 15,
     fontWeight: "700",
-  },
-  footer: {
-    gap: 10,
-    marginTop: 12,
-  },
-  footerEntry: {
-    borderWidth: 1,
-    borderRadius: 10,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-  },
-  footerText: {
-    fontSize: 16,
-    fontWeight: "600",
   },
   emptyState: {
     gap: 8,
