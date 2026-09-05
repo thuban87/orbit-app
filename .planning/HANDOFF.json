@@ -1,0 +1,37 @@
+{
+  "version": "1.0",
+  "timestamp": "2026-09-05T04:35:28.566Z",
+  "phase": "25",
+  "phase_name": "Dashboard Data & State Foundation",
+  "phase_dir": ".planning/phases/25-dashboard-data-state-foundation",
+  "plan": "25-07",
+  "task": 1,
+  "total_tasks": 3,
+  "status": "paused",
+  "completed_tasks": [
+    {"id": "25-01", "name": "Durable dashboard-query tracer", "status": "done", "commit": "ad3634d"},
+    {"id": "25-02", "name": "Dashboard population OR-union engine", "status": "done", "commit": "e8a5765"},
+    {"id": "25-04", "name": "Scoped dashboard knowledge search", "status": "done", "commit": "85315cf"},
+    {"id": "25-05", "name": "Ephemeral session state and empty-state gate", "status": "done", "commit": "73305b4"},
+    {"id": "25-03", "name": "Filters, sorts, and gravity pass", "status": "done", "commit": "4e2be23"},
+    {"id": "25-06", "name": "Retire ranked favourites", "status": "done", "commit": "75a697e"}
+  ],
+  "remaining_tasks": [
+    {"id": "25-07/1", "name": "Remove Dashboard birthday banner while retaining freshness", "status": "not_started"},
+    {"id": "25-07/2", "name": "Retire Never Contacted screen and include-Unbound toggle", "status": "not_started"},
+    {"id": "25-07/3", "name": "Make Home and Dashboard search bound-only", "status": "not_started"}
+  ],
+  "blockers": [],
+  "async_jobs": [],
+  "human_actions_pending": [],
+  "decisions": [
+    {"decision": "Migration 019 uses four durable app_settings columns with JSON TEXT for populations and filters.", "rationale": "User approved the irreversible shape after confirming migration head 018 and TARGET_VERSION 18.", "phase": "25"},
+    {"decision": "Pause before Wave 4 / Plan 25-07.", "rationale": "User requested a clean session handoff after Plan 25-06 and Wave 3 integration verification.", "phase": "25"}
+  ],
+  "uncommitted_files": [
+    ".planning/phases/24.1-contact-knowledge-foundation/24.1-REVIEW-FIX.md",
+    ".planning/phases/24.1-contact-knowledge-foundation/24.1-REVIEW.md"
+  ],
+  "next_action": "Run $gsd-resume-work, then execute the sole remaining Wave 4 plan, 25-07.",
+  "context_notes": "Plans 25-01 through 25-06 are summarized and committed. Wave 3 integration passed: npm test (234 files / 2242 tests), npx tsc --noEmit, and npm run check:colors. Do not touch the two unrelated Phase 24.1 review-file edits."
+}
