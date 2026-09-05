@@ -35,6 +35,10 @@ import { migration012 } from "@/db/migrations/012-import-sessions";
 import { migration013 } from "@/db/migrations/013-reconciliation-and-merge";
 import { migration014 } from "@/db/migrations/014-interaction-assists";
 import { migration015 } from "@/db/migrations/015-theme-settings";
+import { migration016 } from "@/db/migrations/016-contact-knowledge";
+import { migration017 } from "@/db/migrations/017-knowledge-egress-datamove";
+import { migration018 } from "@/db/migrations/018-custom-field-scope-history";
+import { migration019 } from "@/db/migrations/019-dashboard-prefs";
 import { runMigrations } from "@/db/migrations/runner";
 import type { SqlExecutor } from "@/db/types";
 import { __resetSweepForTest, runLaunchSweep } from "@/services/launch-sweep";
@@ -71,7 +75,7 @@ beforeEach(async () => {
   uidCounter = 0;
   const db = openTestDb();
   exec = nodeSqliteExecutor(db);
-  // Current schema: getAppSettings reads interaction-assist state added in v14.
+  // Current schema: getAppSettings reads durable dashboard preferences added in v19.
   await runMigrations(
     exec,
     [
@@ -90,8 +94,12 @@ beforeEach(async () => {
       migration013,
       migration014,
       migration015,
+      migration016,
+      migration017,
+      migration018,
+      migration019,
     ],
-    15,
+    19,
     { now: NOW, newUid: uid, defaultPhoneRegion: "US" },
   );
   __resetExpo();

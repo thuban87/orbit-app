@@ -104,7 +104,14 @@ status: complete
 
 ## Deviations from Plan
 
-None - plan executed exactly as written.
+### Auto-fixed Issues
+
+**1. [Rule 3 - Blocking issue] Advanced current-schema notification fixtures through migration 019**
+
+- **Found during:** Post-merge full-suite verification
+- **Issue:** Notification and digest scheduling fixtures stopped at v15 while their production paths call `getAppSettings()`, which now selects migration-019 dashboard columns.
+- **Fix:** Registered migrations 016–019 and target version 19 in both current-schema fixture chains; mapped the new shared Active predicate in the lifecycle consumer ledger and its validation companion.
+- **Files modified:** `src/services/notifications/notification-schedule.test.ts`, `src/services/notifications/digest-schedule.test.ts`, `src/db/lifecycle-consumer-ledger.test.ts`, `.planning/milestones/v1.0-phases/18.2-bound-unbound-lifecycle/18.2-VALIDATION.md`
 
 ## Issues Encountered
 

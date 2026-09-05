@@ -51,7 +51,7 @@ const LIFECYCLE_PREDICATE = /tracking_enabled\s*=\s*[01]\b/;
 type ConsumerClass = "cadence" | "predicate";
 
 interface LedgerEntry {
-  /** The 18.2 (or earlier) plan/task that owns the reference. */
+  /** The phase plan/task that owns the reference. */
   owner: string;
   /** The exact predicate/fragment or reason this file is a legitimate owner. */
   note: string;
@@ -139,6 +139,10 @@ const CADENCE_OWNERS: Record<string, LedgerEntry> = {
  * mapped to its owning task and exact predicate.
  */
 const PREDICATE_OWNERS: Record<string, LedgerEntry> = {
+  "src/logic/dashboard-query-logic.ts": {
+    owner: "25-01",
+    note: "ACTIVE_SEGREGATION_WHERE is the shared Active-universe predicate: archived-at-null, `tracking_enabled = 1`, and contacted; snooze suppression is intentionally absent.",
+  },
   "src/db/dashboard-read.ts": {
     owner: "18.2-04 / 18.2-07",
     note: "DASHBOARD_BOUND_WHERE / FAVOURITES_BOUND_WHERE / LIVE_CONTACTS_BOUND_WHERE = `tracking_enabled = 1`; CARD_STATUS nulls progress/status for Unbound; favourite_rank projected only when Bound; the Never Contacted branch reads `tracking_enabled = 0`.",
