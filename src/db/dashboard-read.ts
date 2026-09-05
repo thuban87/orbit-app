@@ -183,6 +183,11 @@ const POPULATION_SORT: Record<
   "name-desc": "c.name COLLATE NOCASE DESC, c.id DESC",
   "least-recent": SORT["least-recent"],
   "most-recent": SORT["most-recent"],
+  "natural-not-contacted": "c.created_at ASC, c.id",
+  "natural-snooze": "c.snooze_until ASC, c.name COLLATE NOCASE, c.id",
+  // Birthdays are post-query sorted by the population read once its candidate
+  // ids have been computed; keep SQL deterministic until that pass runs.
+  "soonest-birthday": SORT.status,
 };
 
 /**

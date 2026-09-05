@@ -28,6 +28,12 @@ export const DASHBOARD_SORT_MODES = [
   "status",
 ] as const;
 export type DashboardSortMode = (typeof DASHBOARD_SORT_MODES)[number];
+/** Internal sort outcomes selected when the persisted sort is Default. */
+export type ResolvedDashboardSort =
+  | Exclude<DashboardSortMode, "default">
+  | "natural-not-contacted"
+  | "natural-snooze"
+  | "soonest-birthday";
 export type DashboardViewMode = "list" | "card";
 
 export interface DashboardQueryState {
@@ -45,6 +51,71 @@ export const ACTIVE_SEGREGATION_WHERE = `c.archived_at IS NULL
      AND c.tracking_enabled = 1
      AND c.last_contact IS NOT NULL`;
 
+/** Scope that every explicit population must retain at the SQL boundary. */
+export const DASHBOARD_POPULATION_SCOPE_WHERE = `c.archived_at IS NULL
+     AND c.tracking_enabled = 1`;
+
+const NOT_CONTACTED_WHERE = "c.last_contact IS NULL";
+const FAVOURITES_WHERE = "c.favourite_rank IS NOT NULL";
+const SNOOZED_WHERE = `c.snooze_until IS NOT NULL
+     AND date(c.snooze_until) > date('now','localtime')`;
+
+export interface PopulationWhereOptions {
+  /** IDs computed by the read layer via the shared birthday parser. */
+  birthdayIds?: readonly number[];
+}
+
+export interface PopulationWhere {
+  sql: string;
+  params: unknown[];
+}
+
+function isDashboardPopulation(value: unknown): value is DashboardPopulation {
+  return (
+    typeof value === "string" &&
+    (DASHBOARD_POPULATIONS as readonly string[]).includes(value)
+  );
+}
+
+/**
+ * Build one safe, dedupe-friendly population WHERE. Runtime tokens select only
+ * closed SQL constants; identifiers and values are never interpolated.
+ */
+export function buildPopulationWhere(
+  populations: readonly DashboardPopulation[] | readonly unknown[],
+  opts: PopulationWhereOptions = {},
+): PopulationWhere {
+  const selected = [...new Set(populations.filter(isDashboardPopulation))];
+  if (selected.length === 0) {
+    return { sql: ACTIVE_SEGREGATION_WHERE, params: [] };
+  }
+
+  const params: unknown[] = [];
+  const predicates = selected.map((population) => {
+    switch (population) {
+      case "favourites":
+        return FAVOURITES_WHERE;
+      case "birthdays": {
+        const birthdayIds = opts.birthdayIds ?? [];
+        if (birthdayIds.length === 0) return "0";
+        params.push(...birthdayIds);
+        return `c.id IN (${birthdayIds.map(() => "?").join(", ")})`;
+      }
+      case "not-contacted":
+        return NOT_CONTACTED_WHERE;
+      case "snoozed":
+        return SNOOZED_WHERE;
+      case "all-contacts":
+        return `(${ACTIVE_SEGREGATION_WHERE}) OR (${NOT_CONTACTED_WHERE})`;
+    }
+  });
+
+  return {
+    sql: `${DASHBOARD_POPULATION_SCOPE_WHERE}\n     AND (${predicates.map((predicate) => `(${predicate})`).join(" OR ")})`,
+    params,
+  };
+}
+
 export function resetDashboardView(
   state: DashboardQueryState,
 ): DashboardQueryState {
@@ -60,11 +131,21 @@ export function resetDashboardView(
 export function resolveDefaultSort(
   sort: DashboardSortMode,
   populations: readonly DashboardPopulation[],
-): Exclude<DashboardSortMode, "default"> {
+): ResolvedDashboardSort {
   if (sort !== "default") return sort;
-  // The tracer owns only Active (empty populations); later populations extend
-  // their natural default ordering without changing the stored sentinel.
-  void populations;
+  const selected = [...new Set(populations.filter(isDashboardPopulation))];
+  if (selected.length !== 1) return "status";
+  switch (selected[0]) {
+    case "not-contacted":
+      return "natural-not-contacted";
+    case "snoozed":
+      return "natural-snooze";
+    case "birthdays":
+      return "soonest-birthday";
+    case "favourites":
+    case "all-contacts":
+      return "status";
+  }
   return "status";
 }
 
