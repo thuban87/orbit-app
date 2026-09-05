@@ -360,7 +360,7 @@ All v1.0 commits are local on `main` and have NOT been pushed.
 
 **Canonical refs**: docs/dossier/milestone-2/phase-05-dashboard-control-surface-dossier-amended-group-events.md; docs/dossier/milestone-2/planning-notes/phase-05-planning-notes.md
 **Schema**: none (D-03 — verified TARGET_VERSION=19 / migration head 019 on disk 2026-09-05; retirement of `include_unbound_never_contacted` / prefs keys deferred to the Phase 36 backup bump)
-**Plans**: 6/7 plans executed (3 waves)
+**Plans**: 7/7 plans executed (3 waves)
 **Wave 1**
 
 - [x] 26-01-PLAN.md — TRACER: Population control end-to-end (AnchoredPanel + presentation seam + HomeScreen old→new store migration) [DASHC-01/03/04/05/06]
@@ -375,7 +375,7 @@ All v1.0 commits are local on `main` and have NOT been pushed.
 
 **Wave 3** *(blocked on Wave 2 completion — edits HomeScreen after 04 + wires the 03 read)*
 
-- [ ] 26-07-PLAN.md — Collapsible search + List/Card toggle row; wire listDashboardSearch + retire legacy listDashboard/listNeverContacted (no dual-read); preserve D-03 count/policy machinery [DASHC-01/07]
+- [x] 26-07-PLAN.md — Collapsible search + List/Card toggle row; wire listDashboardSearch + retire legacy listDashboard/listNeverContacted (no dual-read); preserve D-03 count/policy machinery [DASHC-01/07]
 
 **UI hint**: yes
 
@@ -616,7 +616,7 @@ All v1.0 commits are local on `main` and have NOT been pushed.
 | 24.1 Contact Knowledge Foundation (Model, Storage & UI) | 7/8 | In Progress|  |
 | 24.2 Contact Knowledge (Egress, Search, Types & Data-moves) | 7/7 | In Progress|  |
 | 25. Dashboard Data & State Foundation | 6/7 | In Progress|  |
-| 26. Dashboard Control Surface | 6/7 | In Progress|  |
+| 26. Dashboard Control Surface | 7/7 | In Progress|  |
 | 27. Dashboard List View | 0/TBD | Not started | - |
 | 28. Dashboard Card View | 0/TBD | Not started | - |
 | 29. Orrery Camera, Scale & Exploration | 0/TBD | Not started | - |
