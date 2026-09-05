@@ -1145,43 +1145,12 @@ export function SettingsScreen() {
         </View>
       </Modal>
 
-      <View testID="settings-home-screen-section" style={styles.section}>
-        <Text
-          accessibilityRole="header"
-          style={[styles.sectionHeading, { color: colors.textSecondary }]}
-        >
-          Home screen
-        </Text>
-        <View
-          style={[
-            styles.row,
-            { backgroundColor: colors.surface, borderColor: colors.border },
-          ]}
-        >
-          <View style={styles.toggleRow}>
-            <Text style={[styles.rowLabel, { color: colors.textPrimary }]}>
-              Include unbound in Not yet contacted
-            </Text>
-            <Switch
-              testID="settings-include-unbound-never-contacted"
-              accessibilityRole="switch"
-              accessibilityLabel="Include unbound in Not yet contacted"
-              accessibilityState={{
-                checked: settings?.includeUnboundNeverContacted === 1,
-              }}
-              value={settings?.includeUnboundNeverContacted === 1}
-              onValueChange={(value) =>
-                void persist({ includeUnboundNeverContacted: value ? 1 : 0 })
-              }
-              trackColor={{ false: colors.border, true: colors.accent }}
-              thumbColor={colors.surfaceElevated}
-            />
-          </View>
-          <Text style={[styles.helper, { color: colors.textSecondary }]}>
-            Show unbound contacts with no history in the Not yet contacted list.
-          </Text>
-        </View>
-      </View>
+      {/* The "Include unbound in Not yet contacted" toggle is retired with the
+          standalone Never Contacted screen (DASHQ-03). Only the UI row is removed
+          here: the `include_unbound_never_contacted` app_settings column and its
+          `PORTABLE_SETTINGS_KEYS` entry are intentionally KEPT — their removal is
+          coordinated with the Phase 36 backup format bump (D-05), never dropped
+          unilaterally. */}
 
       <View testID="settings-notifications-section" style={styles.section}>
         <Text

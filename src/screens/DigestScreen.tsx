@@ -14,7 +14,7 @@
  * screen only through the shared `ContactCard` status ring — the digest adds no
  * status colour of its own.
  *
- * Load discipline mirrors NeverContactedScreen: a `cancelled`-flag guard drops a
+ * Load discipline mirrors the dashboard's focus-effect reads: a `cancelled`-flag guard drops a
  * stale async result if focus moved on, and a null-vs-loaded SENTINEL (`phase`)
  * keeps the "all quiet this week" state from flashing before the reads resolve —
  * the header renders instantly, the section bodies stay blank until "loaded".
@@ -160,7 +160,11 @@ export function DigestScreen({ navigation }: RootStackScreenProps<"Digest">) {
           onExpandDrifting={() => setExpandDrifting(true)}
           onExpandGoneQuiet={() => setExpandGoneQuiet(true)}
           onPressName={goToProfile}
-          onPressBacklog={() => navigation.navigate("NeverContacted")}
+          // Never Contacted screen retired (DASHQ-03 / D-14); the Not-Contacted
+          // population chip lands in Phase 26. Re-pointed to the live Dashboard
+          // so the backlog tap never targets a deleted route. countNeverContacted
+          // (the badge number) is unaffected.
+          onPressBacklog={() => navigation.navigate("Home")}
         />
       ) : null}
     </View>

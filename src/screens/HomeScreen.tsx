@@ -412,7 +412,11 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
         testID="dashboard-not-yet-contacted-entry"
         accessibilityRole="button"
         accessibilityLabel={`Not yet contacted (${counts.neverContacted})`}
-        onPress={() => navigation.navigate("NeverContacted")}
+        // The standalone Never Contacted screen is retired (DASHQ-03 / dossier
+        // E-02). Its replacement control — the Not-Contacted population chip —
+        // lands in Phase 26; until then this re-points to the live Dashboard
+        // (owner-accepted one-phase gap, D-14). Never a deleted route.
+        onPress={() => navigation.navigate("Home")}
         style={[
           styles.footerEntry,
           { backgroundColor: colors.surface, borderColor: colors.border },

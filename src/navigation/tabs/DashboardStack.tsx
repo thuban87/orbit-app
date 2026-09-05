@@ -12,7 +12,6 @@ import { GroupEventsScreen } from "@/screens/GroupEventsScreen";
 import { HomeScreen } from "@/screens/HomeScreen";
 import { MemoryHistoryScreen } from "@/screens/MemoryHistoryScreen";
 import { MergeConflictsScreen } from "@/screens/MergeConflictsScreen";
-import { NeverContactedScreen } from "@/screens/NeverContactedScreen";
 import { RecentlyDeletedScreen } from "@/screens/RecentlyDeletedScreen";
 import {
   GroupLogPlaceholderScreen,
@@ -61,7 +60,6 @@ export function DashboardStack() {
       <Stack.Screen name="Capture" component={CaptureScreen} />
       <Stack.Screen name="CropPhoto" component={CropPhotoScreen} />
       <Stack.Screen name="Archived" component={ArchivedContactsScreen} />
-      <Stack.Screen name="NeverContacted" component={NeverContactedScreen} />
       <Stack.Screen name="UnboundContacts" component={UnboundContactsScreen} />
       <Stack.Screen name="Digest" component={DigestScreen} />
       <Stack.Screen name="SurvivorSelect" component={SurvivorSelectScreen} />

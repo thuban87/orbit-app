@@ -118,11 +118,11 @@ export function RootNavigator() {
    * dismissTop path, so system and shell-visible Back make the same decision.
    *
    * Existing child visible Back controls in DigestScreen, ArchivedContactsScreen,
-   * NeverContactedScreen, UnboundContactsScreen, and BackupScreen still call
+   * UnboundContactsScreen, and BackupScreen still call
    * navigation.goBack() directly. ComposeScreen and CaptureScreen also own
    * native-system Back listeners. They are a deferred child-chrome pass, not a
    * claim that the FAB is hidden on child screens (it is visible on browse
-   * children including Archived, NeverContacted, UnboundContacts, and Profile).
+   * children including Archived, UnboundContacts, and Profile).
    *
    * This is safe while every shell transient keeps its StyleSheet.absoluteFill
    * scrim with pointer events set to auto while open: the scrim physically

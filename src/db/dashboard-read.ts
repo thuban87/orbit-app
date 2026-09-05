@@ -435,6 +435,14 @@ export function listDashboard(
 }
 
 /**
+ * @deprecated The standalone Never Contacted screen was retired in Phase 25
+ * (DASHQ-03 / dossier E-02); this read has no runtime consumer as of Phase 25.
+ * It is retained deliberately, NOT surgically pulled here: it is retired together
+ * with the legacy `listDashboard` / legacy Home in the render phases (26–28), and
+ * removing it now would touch this file which Plans 02/03 heavily edit. The
+ * Not-Contacted DATA path lives on via `listDashboardPopulation`'s not-contacted
+ * population; `countNeverContacted` (below) is still consumed by DigestScreen.
+ *
  * The never-contacted inverse population (`archived_at IS NULL AND last_contact
  * IS NULL`). Selects LITERAL `NULL AS status, NULL AS progress` — NOT STATUS_SQL
  * over these rows, which would label every row 'stable' (HIGH-1). Same card

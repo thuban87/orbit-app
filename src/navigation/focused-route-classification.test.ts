@@ -35,7 +35,6 @@ const browseRoutes = [
   "CustomFields",
   "Profile",
   "Archived",
-  "NeverContacted",
   "UnboundContacts",
   "Digest",
   "GroupEvents",
