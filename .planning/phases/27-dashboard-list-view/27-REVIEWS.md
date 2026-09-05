@@ -1,210 +1,216 @@
 ---
 phase: 27
 reviewers: [codex, claude]
-reviewed_at: 2026-09-05T18:05:00Z
-cycle: 4
+reviewed_at: 2026-09-05T23:26:37Z
+cycle: 5
 plans_reviewed: [27-01-PLAN.md, 27-02-PLAN.md, 27-03-PLAN.md, 27-04-PLAN.md, 27-05-PLAN.md, 27-06-PLAN.md]
 models:
   codex: "gpt-5.6-terra (reasoning=low)"
-  claude: "claude-opus-4-8"
+  claude: "claude-opus-4-8 (in-harness read-only source-grounded lane)"
 model_sources:
   codex: "banner"
   claude: "self"
-mechanism_note: "The --claude lane was NOT run via the `claude -p` CLI (this review executes inside Claude Code — the self-CLI is skipped for independence, and the headless lane has the known Write-permission/trust gap). Per the owner's explicit approval, the Claude lane was performed by the orchestrator as a read-only, source-grounded analysis (every cited file:line opened and verified on disk) and aggregated here as the Claude lane."
+cycle_summary:
+  current_high: 1
+  current_actionable: 1
 ---
 
-# Cross-AI Plan Review — Phase 27 (Dashboard List View) — Cycle 4
-
-This is CYCLE 4 of a plan-review convergence loop. As of cycle 3 there were 0 HIGH and 9
-MEDIUM/LOW actionables, all addressed in commit ace15cf. This cycle re-verifies that the
-cycle-1/2/3 resolutions hold against the code on disk and looks for anything newly exposed.
+# Cross-AI Plan Review — Phase 27 (Dashboard List View), Cycle 5 (final)
 
 ## Consensus Summary
 
-The six plans are **exceptionally well-grounded in the current codebase**. Both lanes
-independently confirmed that the load-bearing file:line anchors are accurate on disk and that
-every cycle-1/2/3 resolution is present and correctly cited (see "Resolved-items re-verification"
-below). The plans correctly identify the real gaps — the missing List read-model fields, the
-standalone migration-020 boundary, the existing Quick Log behaviour, the real Dashboard route
-names, the search-corpus privacy/N+1 defects, and the D-12 relevance ordering — and back them with
-tests.
+Both reviewers independently read the six plans against the code on disk and reached
+the same conclusion: the plans are unusually thorough and, apart from a single
+execution-affecting defect, execution-ready. Every load-bearing `file:line` claim the
+plans cite was verified true on disk (migration head 019 / `TARGET_VERSION = 19`;
+`DashboardRow` lacks `last_contact`/`snooze_until`; `fuel-age.ts` parser/day-math
+private at :33/:65; `resolveVisibility` memories-read.ts:101; `resolveRelationshipVisibility`
+relationships-read.ts:39; `is_current` current-state-history-read.ts:31/:48; corpus read's
+`deleted_at`-only filter + per-contact `getValuesForContact` N+1 at :281; `LogContact`/`Edit`
+routes DashboardStack.tsx:37/:57 with no `EditContact`; Quick Log Success haptic
+UniversalFab.tsx:255 vs dial-open Light impact :165; `STATUS_LABEL` private StatusGlyph.tsx:37;
+`favorite` registry still heart at icon-registry.ts:37; `renderItem` reads
+`item.favourite_rank !== null` at HomeScreen.tsx:688). All cycle-1→cycle-4 resolutions
+(C1–C4) were re-verified and still hold. The known false positive (BASE_WHERE "does not
+exist") did not recur; BASE_WHERE is present at dashboard-read.ts:172.
 
-**One new execution-affecting gap emerged this cycle, raised by Codex and independently confirmed
-by the Claude lane against source:** Plan 04 specifies the optimistic-favourite overlay/generation
-controller purely as logic but never names the **React-state binding** that makes `overlayFor()`
-reactive. As written, a `useRef`-held pure controller mutated by `begin`/`resolve` triggers no
-re-render, so the "immediate fill/unfill" and revert-on-failure requirements (LISTV-04 E5) can
-silently fail on device while **all automated tests pass** (the pure `favourite-optimistic.test.ts`
-is green regardless). This is the single blocker; the fix is a small, surgical PLAN.md addition.
-
-Two smaller actionable clarifications remain (Plan 03 budget/visibility ordering — latent today;
-Plan 05 Quick Log testability shape). Everything else is a nit or cosmetic line-drift the executor
-self-corrects via the on-disk verify anchors.
+One NEW execution-affecting concern surfaced this cycle, found by Codex and confirmed by
+Claude against source: **Plan 04's optimistic-favourite SUCCESS path clears the overlay
+while nothing refreshes the base `rows` state, so the star visibly reverts after every
+successful toggle.** This is not a re-raise of any prior finding — cycle-3 MED #5 fixed the
+overlay surviving a *reload race*, and cycle-4 HIGH fixed the *React-state binding*; neither
+addressed what happens on a clean success when no reload is triggered at all.
 
 ### Agreed Strengths
-- The tracer (Plan 01) targets real gaps: `DashboardRow` has neither recency nor snooze today
-  (dashboard-read.ts:91-113) and both projections omit them (:369/:421); the additive widen is the
-  correct seam and `BASE_WHERE` (:172) is correctly left untouched. Both lanes verified.
-- The `row()` fixture trap (widget-data.test.ts:23-38) is real and correctly pre-empted — an
-  explicitly-typed `DashboardRow` literal that fails `tsc` once the fields become required.
-- Migration 02 accurately reflects the irreversible boundary: DB at version 19, migrations 001-019
-  registered (database.ts:54/:57); head+1 = 020 confirmed; the full writable-key analysis
-  (PortableSettingsSnapshot → AppSettingsPatch, WritableSettingsKey, COLUMN_OF) is sound.
-- Plans 03/06 correctly route corpus visibility through the existing choke points
-  (`resolveVisibility` memories-read.ts:101, `resolveRelationshipVisibility` relationships-read.ts:39),
-  fix the `deleted_at`-only leak (knowledge-search-read.ts:104/:135), replace the per-contact
-  `getValuesForContact` N+1 (:281), and preserve the quarantine JOIN + live-def-id restriction
-  (field-values-dao.ts JOIN; listDefs includeQuarantined:false at :206).
-- Plan 05's route/haptic tracing is precise: `LogContact` (DashboardStack.tsx:37) and `Edit` (:57)
-  are the real routes (no `EditContact`); the FAB's Success haptic fires after the write resolves
-  (UniversalFab.tsx:255) while the Light impact (:165) is dial-open only.
-- Plan 06 preserves the product's D-12 relevance decision: `searchDashboard()` already sorts
-  coverage → score → Dashboard-tie-break (dashboard-search-match.ts:131-146), and the composition
-  preserves that order rather than restoring SQL order.
+- Plan 01 widens the real shared read chokepoint (not per-row queries); the DST-safe
+  calendar-day extraction from the private `fuel-age.ts` helpers into `dates.ts` is
+  necessary and correctly scoped (both reviewers).
+- Plan 02 correctly identifies migration head 019 → standalone 020; the one-way schema
+  change is human-gated (blocking-human checkpoint).
+- Plan 03's batched `contact_id IN (...)` read with per-contact `ROW_NUMBER` bound +
+  visibility over-fetch/re-cap is a sound starvation guard; current-state `is_current = 1`
+  predicate correctly required.
+- Plan 05 targets the real navigation routes and preserves the FAB's Success-on-write
+  haptic semantics (single-sourced `runQuickLog`).
+- Plan 06 fixes real privacy (hidden/outdated leak) and performance (custom-value N+1)
+  defects in the corpus reader *before* wiring it into visible search, via the existing
+  visibility choke points and a quarantine-preserving JOIN.
 
 ### Agreed Concerns
-- **HIGH (both lanes) — Plan 04 optimistic overlay has no render-invalidation mechanism.** The
-  pure controller (`begin`/`overlayFor`/`resolve`) is never bound to React state; a ref-held
-  object mutated by those methods re-renders nothing. renderItem currently reads
-  `item.favourite_rank !== null` directly (HomeScreen.tsx:688). Immediate optimistic flip and
-  revert-on-failure fail silently; automated tests still pass. Blocker.
+- **HIGH (Claude) / MEDIUM (Codex) — Plan 04 favourite SUCCESS path reverts the star.**
+  On a successful toggle, `resolve(...)` drops the overlay ("so reload truth shows"), but
+  `setFavouriteRank`/`clearFavouriteRank` bump only `bumpDataRevisionCore` (favourites-dao.ts:49/:76),
+  NOT `bumpShellRefresh`, and HomeScreen's `reload()` fires only on focus / AppState-active /
+  pull / shell-refresh (HomeScreen.tsx:341-376) — never on a data-revision bump (the
+  shell-refresh store comment at shell-refresh-store.ts:14-16 explicitly notes data-revision
+  is the change channel dashboard reads *avoid*). So after the write resolves, the star reads
+  `overlayFor(id) ?? (item.favourite_rank !== null)` = `undefined ?? staleBase` and flips back
+  to the pre-toggle value, staying wrong until an unrelated reload. This defeats LISTV-04's
+  "immediate fill/unfill" on the common happy path for both favourite and unfavourite.
 
 ### Divergent Views
-- **Plan 06 test-fixture completeness (Codex LOW).** Codex flags that `dashboard-read.test.ts`
-  bootstraps only migrations 001-011 (verified, :57-72), while the new corpus/composition tests
-  need the 016+ knowledge tables. The Claude lane concurs the fact is true but rates it **below
-  actionable**: a missing table surfaces as a loud test failure (not silent), and
-  `knowledge-search-read.test.ts` already exists as a full-chain fixture model, so the new
-  `dashboard-search-read.test.ts` author will naturally bootstrap the needed chain. Noted, not
-  counted as a blocker.
+- **Severity of the Plan 04 finding.** Codex rates it MEDIUM ("reduced to LOW after the
+  correction") on the grounds that it is localized and the DB value is correct — only the
+  in-memory display is stale. Claude rates it HIGH: it fires on *every* successful toggle
+  (not an edge case), it is user-visible, the star does not merely fail to update but
+  visibly *reverts*, and it stays reverted until an unrelated reload event — a core-requirement
+  (LISTV-04) behavior appearing broken in normal use. The disagreement is only about the
+  label; both agree it is real, execution-affecting, source-confirmed, and must be fixed in
+  Plan 04 before execution. It is NOT a decision reversal (the fix preserves the intended
+  immediate-durable-star behavior; it touches no ADR / HANDOFF / D-NN).
 
-## Resolved-items re-verification (do NOT re-raise — confirmed still holding)
-
-All cycle-1/2/3 resolutions listed in the convergence context were verified present and
-source-accurate this cycle:
-- BASE_WHERE exists at dashboard-read.ts:172 (known false positive — confirmed exists).
-- D-12/DASHQ-09 relevance-first ordering preserved (dashboard-search-match.ts:131-146).
-- is_current = 1 current-state predicate (current-state-history-read.ts:31/:48).
-- resolveVisibility / resolveRelationshipVisibility choke points reused (not raw hidden=1).
-- Per-contact ROW_NUMBER() bound; batched custom-value read (no N+1); quarantine JOIN + live-def
-  restriction (listDefs includeQuarantined:false at :206).
-- Typed nav to real routes LogContact/Edit (no EditContact).
-- widget-data.test.ts row() fixture defaults; exported statusDisplayLabel (STATUS_LABEL single
-  source); snippet==null guard; line-3 skip in list-search; favourite mutation-generation +
-  overlay logic (logic correct — only its React binding is unspecified, see the HIGH above).
+---
 
 ## Codex Review
 
-**Model:** gpt-5.6-terra (reasoning=low). Source-grounded (workspace-write; opened cited files).
+*Model: gpt-5.6-terra (reasoning=low), banner-resolved. Source-grounded lane (prompt-fed, repo-accessible).*
 
-### Summary
-Six plans unusually well-grounded in the current codebase — correct read-model gaps, migration
-boundary, Quick Log behaviour, route names, and search corpus privacy/perf defects; sensible wave
-ordering; meaningful tests for prior findings. **One remaining execution-blocking gap:** Plan 04's
-optimistic-favourite controller is a mutable pure overlay with no specified React
-state/subscription to make its mutations re-render HomeScreen — so the star cannot reliably become
-immediate or revert on settlement.
+## Summary
 
-### Concerns
-- **HIGH — Plan 04's optimistic overlay has no render invalidation.** The plan defines
-  `begin`/`overlayFor`/`resolve` and renders `overlayFor(contactId) ?? (favourite_rank !== null)`,
-  but specifies no state update / external-store subscription / reducer dispatch when the controller
-  mutates. HomeScreen renders from React state (`rows` at :184, `setRows` at :312/:313) and
-  renderItem reads `item.favourite_rank` directly (:680/:688); a `useRef`-held controller changes no
-  rendered props. Immediate fill/unfill fails; a latest-gen failure notifies without visually
-  reverting. **Required correction:** specify per-contact overlay React state (e.g.
-  `useState<Map<number, boolean>>` + a version, or a subscribed store) updated synchronously after
-  `begin` and after an `applied` `resolve`; keep the generation logic pure/tested but make the
-  controller→React adapter explicit.
-- **MEDIUM — Plan 03 bounded SQL must rank visibility-compatible rows before the per-contact
-  budget.** The `ROW_NUMBER()` budget is applied in SQL but `resolveVisibility` runs in TS after
-  the window. A `hidden = null` row of a future `visibilityDefault: "hide"` type could occupy the
-  budget and starve a later visible row → false completeness prompt. Latent today (all memory types
-  default `show`, memory-registry.ts). Define (a) a safe SQL predicate covering known default-hidden
-  types + the TS choke point, or (b) over-fetch per contact before TS filtering then re-cap; add a
-  regression test.
-- **MEDIUM — Quick Log extraction needs an explicit dependency/testability contract.** Plan 05
-  permits a hook or an injected command but requires vitest coverage; the repo is node/vitest-only
-  (no hook renderer). Choose the injected per-instance `runQuickLog(deps)` shape, define its
-  dependency interface (writer, clock/UID, notifier, refresh fns, snackbar, undo controller, pending
-  ref), and make `useQuickLog` a thin adapter if kept.
-- **LOW — Plan 06 snapshot fixture migration-completeness.** `dashboard-read.test.ts` bootstraps
-  only through migration 011 (:57-72); corpus/composition tests need memories/relationships/
-  current-state/custom-field tables from later migrations. State which setup runs 016-019 (and 020
-  when required). Test-fixture clarification, not a design blocker.
+The six plans are unusually thorough and largely execution-ready. They trace real repository seams correctly: the shared dashboard read lacks the proposed recency/snooze fields, HomeScreen owns the single cancellation-aware reload path, migration head is 019, and the current knowledge-search reader has the visibility/N+1 gaps Plan 06 addresses. One execution-affecting issue remains in Plan 04's optimistic-favourite success reconciliation.
 
-### Risk assessment
-After the HIGH is fixed, implementation risk is **moderate** — shared Dashboard reads, a one-way
-migration, gesture/nav plumbing, search composition — but strong local tests, explicit cancellation
-rules, and device UAT mitigate. Highest residual runtime risks: on-device gesture behaviour and
-large-dataset search perf, both covered by planned Pixel validation + batched reads. No unresolved
-security/data-migration design issue beyond the already-gated migration.
+## Strengths
+
+- Plan 01 correctly widens the real shared read chokepoint rather than querying per row. `DashboardRow` currently lacks both `last_contact` and `snooze_until` at `dashboard-read.ts:91`, while both population and search projections are the appropriate shared insertion points at `dashboard-read.ts:368` and `dashboard-read.ts:421`.
+- The local-calendar refactor is necessary and correctly scoped. The existing DST-safe parser/day calculation is private in `fuel-age.ts:33` and `fuel-age.ts:65`; extraction to `dates.ts` avoids a duplicate implementation.
+- The planned ListRow status behavior respects the source primitive. `ringVisual()` currently varies width by status at `contact-card-ring.ts:45`, so deliberately consuming only its color with a constant row border width correctly implements the Phase 27 decision.
+- Plan 02 accurately identifies a standalone migration. The repo currently ends at migration 019 and has `TARGET_VERSION = 19` in `database.ts:54`, with 019 already owning dashboard preferences at `019-dashboard-prefs.ts:10`.
+- Plan 03's batch-read direction is sound. The existing corpus reader already uses `IN (...)` placeholder construction at `knowledge-search-read.ts:86`, while current-state history demonstrably requires a current-row predicate. The plan's per-contact `ROW_NUMBER` plus visibility over-fetch/re-cap is an appropriate guard against starvation.
+- Plan 05 correctly targets real navigation names: `LogContact` and `Edit` exist in `DashboardStack.tsx:37` and `DashboardStack.tsx:57`. It also correctly preserves the existing Quick Log success haptic semantics: the FAB emits notification success only after `recordTouchpoint` resolves at `UniversalFab.tsx:247`.
+- Plan 06 addresses real privacy and performance defects before wiring corpus search into visible UI. The existing corpus reader returns relationships with only `deleted_at IS NULL` at `knowledge-search-read.ts:99`, memory rows with the same incomplete filtering at `knowledge-search-read.ts:124`, and performs one `getValuesForContact` call per contact at `knowledge-search-read.ts:281`. The planned visibility choke points, batched custom-value query, and quarantine-preserving join are warranted.
+
+## Concerns
+
+- **MEDIUM — Plan 04 clears the optimistic overlay on success before the row's base state is updated.** The proposed rule is to clear the overlay on the latest success and rely on subsequent reload truth. But HomeScreen renders favourite state directly from `item.favourite_rank !== null` today at `HomeScreen.tsx:688`, and `reload()` replaces the entire rows array only when its independently triggered read completes at `HomeScreen.tsx:282` and `HomeScreen.tsx:313`. `setFavouriteRank`/`clearFavouriteRank` update SQLite and data revision but do not publish HomeScreen's shell refresh at `favourites-dao.ts:32` and `favourites-dao.ts:59`.
+
+  Mechanism: after a successful mark, clearing `overlayFor(id)` immediately makes the star read the stale in-memory `favourite_rank` value again, so it visibly flips back until a future focus/refresh reload. The same issue occurs for un-favouriting.
+
+## Suggestions
+
+- Fix Plan 04's success path explicitly. Either:
+  - atomically patch the matching `rows` entry's `favourite_rank` membership before clearing the overlay; or
+  - retain a settled overlay until a post-write refresh has returned and confirmed the database value, with generation-aware reconciliation.
+
+  The first is simpler: on latest success, update the local base row to a non-null sentinel for favourite or `null` for unfavourite, then clear the reactive overlay. Keep the existing generation guard for stale settlements and reload races.
+- Add a unit test for this exact sequence: base membership `false` → `begin(true)` → latest successful resolve → rendered membership remains `true` without requiring `reload()`.
+- Plan 01's `isSnoozed()` should fail closed (`false`) for malformed non-null stored date text, matching SQLite's `date(...) > date(...)` behavior rather than allowing a renderer exception. The schema stores `snooze_until` as unconstrained `TEXT` in `001-initial.ts:77`, even though normal writers use valid local dates.
+
+## Risk Assessment
+
+**Overall: MEDIUM, reduced to LOW after the Plan 04 reconciliation correction.**
+
+The migration is correctly human-gated, privacy-sensitive search work is explicitly protected, and dependency ordering is coherent. The remaining favourite-success issue is user-visible and directly violates the intended immediate, durable star state, but it is localized to Plan 04 and has a straightforward, testable fix.
 
 ---
 
 ## Claude Review
 
-**Model:** claude-opus-4-8. Mechanism: read-only source-grounded analysis by the orchestrator
-(the `claude -p` CLI lane is skipped inside Claude Code and has the known Write-permission gap;
-owner explicitly approved performing this lane directly). Every cited anchor below was opened and
-verified on disk.
+*Model: claude-opus-4-8, in-harness read-only source-grounded lane. The `claude -p` CLI lane
+was not spawned (this review is itself running inside Claude Code — the workflow skips the
+self-CLI for independence, and the owner pre-authorized performing the Claude lane in-session
+as a read-only, source-grounded analysis aggregated here). Every finding below was checked
+against the actual files on disk, not the plan text.*
 
 ### Summary
-The plans are the most source-accurate I have reviewed in this loop. I independently opened and
-verified **every** load-bearing anchor the plans cite — dashboard-read.ts (BASE_WHERE:172,
-snooze:175, favourite_rank:100, isFavourite:108, CARD_FAVOURITE_RANK:152-153 used at :375/:428,
-listFavourites:465-470, termPredicate:416), database.ts TARGET_VERSION=19 + migration head 019,
-widget-data.test.ts row() factory:23-38, current-state-history-read.ts is_current:31/:48,
-memories-read.ts resolveVisibility:101, relationships-read.ts resolveRelationshipVisibility:39,
-DashboardStack.tsx LogContact:37/Edit:57 (no EditContact), knowledge-search-read.ts deleted_at-only
-:104/:135 + getValuesForContact N+1:281 + listDefs includeQuarantined:false:206, field-values-dao.ts
-custom_field_defs JOIN, UniversalFab.tsx Light:165/Success:255, dashboard-search-match.ts relevance
-sort:131-150 — **all correct**. No anchor error found. The KNOWN FALSE POSITIVE (BASE_WHERE) is
-confirmed to exist. All cycle-1/2/3 resolutions are present and correctly reflected.
+
+I read all six PLAN.md files in full and verified every load-bearing `file:line` claim plus
+each of the C1–C4 resolutions against the code on disk. The plans are execution-ready with a
+single exception. The cycle-4 HIGH (overlay held in React state via `useSyncExternalStore`/
+`useState`, `renderItem` deriving the star from `overlayFor(id) ?? (favourite_rank !== null)`)
+is correctly incorporated into Plan 04, verified against HomeScreen.tsx:688. The one remaining
+defect is a NEW angle on the same optimistic-favourite machinery, independently found by Codex
+and confirmed below.
+
+### Verification of prior-cycle resolutions (all HOLD)
+- C1: relevance-first search (D-12/DASHQ-09) preserved in Plan 06 (`composeDashboardSearch`
+  preserves `searchDashboard()` order; fuel-only appended after) — dashboard-search-match.ts:128
+  ("Relevance remains primary") + sort at :140-142 confirm the engine ranks coverage→score→
+  Dashboard-tiebreak. Plan 03 `is_current = 1` confirmed (current-state-history-read.ts:31/:48).
+  Plan 04 line-3 folded into cancellation-aware `reload()` confirmed (HomeScreen.tsx:282/:312/:313).
+- C2: Plan 06 corpus hidden/outdated exclusion via `resolveVisibility`/`resolveRelationshipVisibility`
+  + `outdated` drop, batched custom-value read (replacing the :281 N+1), and `viewMode === "list"`
+  gating all match source facts (`reload()` currently branches on TERM not viewMode at
+  HomeScreen.tsx:301-302 — the gate Plan 06 adds is correct and necessary). Plan 03 per-contact
+  ROW_NUMBER bound confirmed. Plan 05 typed nav (`LogContact`/`Edit`, no `EditContact`) confirmed.
+- C3: Plan 01 `widget-data.test.ts` `row()` fixture (:22-40) is a typed `DashboardRow` literal
+  that WILL break `tsc` on the additive widen — the fix is real and necessary. Plan 05 haptic
+  prose (Success-on-write only) matches UniversalFab.tsx:255 vs :165. Plan 04 `statusDisplayLabel`
+  export matches the private `STATUS_LABEL` at StatusGlyph.tsx:37. Plan 06 quarantine JOIN +
+  live-def-id restriction matches field-values-dao.ts:31 + knowledge-search-read.ts:206.
+- C4: Plan 04 overlay-in-React-state (not `useRef`) + `renderItem` derivation verified against
+  HomeScreen.tsx:688. Plan 03 over-fetch+re-cap around the TS visibility filter present.
+  Plan 05 `runQuickLog(deps)` testable core present.
+- Known false positive did NOT recur: BASE_WHERE exists (dashboard-read.ts:172-175).
 
 ### Concerns
-- **HIGH — I concur with the Codex overlay render-invalidation finding after independent source
-  verification.** I confirmed on disk that (1) HomeScreen renderItem reads `item.favourite_rank !==
-  null` directly from `rows` state (HomeScreen.tsx:688), and (2) Plan 04 contains **no** `useState`,
-  `setState`, `useReducer`, `useSyncExternalStore`, subscription, or force-update mechanism for the
-  overlay — a grep of 27-04-PLAN.md returns none. The plan's repeated framing — "PURE controller
-  owning a per-contact map", `begin` "bumps"/"records", `resolve` "clears", "no render harness
-  needed", "node-tested" — actively steers toward a mutable ref-held object that would not
-  re-render. The overlay/generation *logic* is correct and complete; only the imperative
-  controller→React binding is missing. Because the pure `favourite-optimistic.test.ts` passes
-  regardless of that binding, a wrong (ref-based) implementation would ship green and only the
-  device human-check would catch it. This is substantive and execution-affecting. **Fix:** add one
-  acceptance criterion / action sentence requiring the overlay to be held in React state (pure
-  reducer helpers over a `useState<Map<number, boolean>>`, or a small store consumed via
-  `useSyncExternalStore`) so `begin` and a latest-`resolve` re-render synchronously; keep the pure
-  reconciliation logic + its node test.
-- **MEDIUM (actionable, latent) — I concur with Codex on Plan 03's TS-visibility-after-SQL-budget
-  ordering.** Verified memory-registry.ts: all four `visibilityDefault` values are `"show"`, so the
-  starvation cannot manifest with any shipping type — but the plan explicitly tests a stubbed
-  `visibilityDefault:"hide"` type, and against such a type a null-hidden row could consume the
-  per-contact `ROW_NUMBER()` budget before the TS choke point drops it, yielding a false
-  completeness prompt. Invisible + silent (no test failure), so actionable, but zero impact today.
-  **Fix:** one plan sentence — over-fetch beyond `candidateBudget` per contact before the TS
-  visibility filter and re-cap, OR document the all-types-default-`show` assumption + a forward
-  note.
-- **MEDIUM (actionable) — I concur with Codex on Plan 05's Quick Log testability shape.** The plan
-  states the `useQuickLog()` hook as **preferred**, yet the repo is node/vitest-only (no
-  hook/RN-render harness — consistent with Plan 04's own admission) and Plan 05 *requires* vitest
-  coverage of the capture path (success/single-flight/failure-retry/undo). The preferred shape is
-  the untestable one. **Fix:** mandate the injected `runQuickLog(deps)` command as the testable
-  core (hook, if retained, a thin per-instance adapter over it), so the required tests are
-  satisfiable without adding a hook-test framework.
 
-### Nits / cosmetic (NOT actionable — executor self-corrects via on-disk verify anchors)
-- Minor line-drift in a few citations (e.g. field-values-dao.ts JOIN cited near ":29-33", actual
-  JOIN ~:31; UniversalFab ":158/:165" — only :165 is the impactAsync). All carry accurate on-disk
-  verify anchors; no execution impact.
-- The Plan 06 test-fixture note (Codex LOW) is real but self-surfaces as a loud test failure and
-  has an existing full-chain model (knowledge-search-read.test.ts); below the actionable bar.
+- **HIGH — Plan 04 optimistic-favourite SUCCESS path reverts the star (no reload is triggered
+  by a favourite write).** Verified mechanism against source:
+  1. `setFavouriteRank`/`clearFavouriteRank` (favourites-dao.ts:32-51 / :59-76) perform the
+     UPDATE + `bumpDataRevisionCore(exec)` ONLY. They do **not** call `bumpShellRefresh`.
+  2. HomeScreen's `reload()` is re-invoked only by `useShellRefresh(reload)` (HomeScreen.tsx:341),
+     `useFocusEffect` (:344), AppState→active (:356), and pull-to-refresh (:372). `useShellRefresh`
+     fires on the shell-refresh-store `revision` bump (shell-refresh-store.ts:18-27), which is
+     bumped only by `bumpShellRefresh()` (:29-30) — e.g. the Quick Log path (UniversalFab.tsx:211).
+     A `bumpDataRevisionCore` write is deliberately NOT a shell-refresh (store doc comment :14-16).
+  3. Therefore a successful favourite write triggers **no** HomeScreen reload, so `rows` keeps the
+     pre-toggle `favourite_rank`.
+  4. Plan 04's rule clears the overlay on latest success ("drop overlay so reload truth shows";
+     acceptance test asserts `overlayFor(id) === undefined` after a success resolve). With the
+     overlay gone and the base stale, `renderItem`'s `overlayFor(id) ?? (item.favourite_rank !== null)`
+     (HomeScreen.tsx:688, per Plan 04) reads the STALE base and the star flips back — on every
+     successful toggle, both favourite and unfavourite, until an unrelated reload.
 
-### Risk assessment
-**MEDIUM**, reducing to **LOW-MEDIUM** once the Plan 04 overlay render binding is specified. The
-data-layer discipline (parameterized reads, choke-point visibility, per-contact bounds, quarantine
-boundary, forward-only migration 020) is sound and privacy-preserving; no decision-reversal, no
-local-first violation, no worktree/push risk. No owner-escalation trigger found (no recorded
-ADR/HANDOFF/DASHQ/LISTV/D-NN control is deleted, weakened, or inverted by any plan).
+  This is distinct from cycle-3 MED #5 (reload *race* — overlay must survive an overlapping reload)
+  and cycle-4 HIGH (React-state *binding*). It is the clean-success case with no reload at all.
+  It defeats LISTV-04's "immediate fill/unfill" durability on the happy path.
+
+  Required PLAN.md change (planner's implementation choice; not a decision reversal): on a latest
+  success, make the base truth reflect the committed write before/instead of clearing the overlay —
+  e.g. (a) patch the matching `rows` entry's `favourite_rank` membership atomically on success, then
+  clear the overlay; or (b) treat the settled overlay as authoritative until a confirming reload; or
+  (c) `bumpShellRefresh()` after the favourite write so `reload()` re-reads the DB truth. Keep the
+  existing generation guard. Add a test: base `false` → `begin(true)` → latest success resolve →
+  rendered membership stays `true` without a `reload()`.
+
+- **LOW (actionable) — Plan 01 `isSnoozed()` should fail closed on unparseable `snooze_until`.**
+  Plan 01 mandates `isSnoozed` reuse "the SAME local-ms parsing as the calendar-day helper." That
+  parser (`parseLocalMs`, fuel-age.ts:37-39) **throws** on unparseable input. `snooze_until` is
+  unconstrained `TEXT` (migration 001), so a malformed non-null value would throw inside a FlatList
+  `renderItem` cell rather than failing closed like the SQL predicate it claims to mirror
+  (`date(snooze_until) > date('now','localtime')`, which yields false/NULL on garbage). Writers are
+  controlled and a storage contract exists (dashboard-read.ts:33), so the probability is low — but
+  the divergence from the mirrored SQL semantics is invisible to the executor unless the plan adds
+  it. Add one line to `isSnoozed`'s spec/test: return `false` on unparseable input (parity with the
+  SQL predicate), rather than propagating a parser exception.
+
+### Risk Assessment
+
+**Overall: MEDIUM before the Plan 04 fix, LOW after.** Dependency ordering (5 waves) is coherent,
+the one-way migration is human-gated, local-first/privacy invariants are actively strengthened
+(Plan 06 corpus exclusions, quarantine boundary), theme-token and no-animation-from-state rules
+are honored (the discrete favourite toggle in React state is the correct sanctioned exception,
+not a violation), and `formatLocalDate`/local-calendar discipline is enforced. The single HIGH is
+localized to Plan 04's success reconciliation and has a straightforward, testable fix; the LOW is a
+one-line robustness/parity addition. No decision-reversal escalation triggers were found — no
+finding deletes, weakens, or inverts any ADR / HANDOFF / DASHQ / LISTV / D-NN decision.
