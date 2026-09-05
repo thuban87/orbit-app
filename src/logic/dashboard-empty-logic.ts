@@ -39,6 +39,10 @@
  * short-circuits ahead of this helper.
  */
 import type { DashboardFilter } from "@/db/dashboard-read";
+import type {
+  DashboardFilters,
+  DashboardPopulation,
+} from "@/logic/dashboard-query-logic";
 
 /** The empty-state outcomes this gate resolves (error is handled by the screen). */
 export type DashboardEmptyState =
@@ -46,7 +50,12 @@ export type DashboardEmptyState =
   | "firstrun"
   | "hidden"
   | "search-empty"
-  | "filter-empty";
+  | "filter-empty"
+  | "birthdays-empty"
+  | "not-contacted-empty"
+  | "snoozed-empty";
+
+export type DashboardPopulationCounts = Record<DashboardPopulation, number>;
 
 export interface DashboardEmptyInput {
   /** countLiveContacts — archived_at IS NULL AND last_contact IS NOT NULL. */
@@ -65,6 +74,51 @@ export interface DashboardEmptyInput {
   activeFilter: DashboardFilter;
   /** Whether a non-empty search term is active (Plan 09 threads the live search box). */
   hasTerm: boolean;
+  /**
+   * Additive population-model inputs for the Phase 26–28 renderers. They remain
+   * optional while HomeScreen continues to use the legacy filter-enum shape.
+   */
+  activePopulations?: readonly DashboardPopulation[];
+  activeFilters?: DashboardFilters;
+  populationCounts?: DashboardPopulationCounts;
+}
+
+function hasActiveDashboardFilters(filters: DashboardFilters | undefined): boolean {
+  return Object.values(filters ?? {}).some(
+    (selections) => (selections?.length ?? 0) > 0,
+  );
+}
+
+function selectPopulationEmptyState(
+  activePopulations: readonly DashboardPopulation[] | undefined,
+  populationCounts: DashboardPopulationCounts | undefined,
+): DashboardEmptyState | null {
+  if (!activePopulations || !populationCounts) return null;
+
+  // A multi-selected population still needs one render cause. Keep that cause
+  // deterministic and use the UI-SPEC's dedicated-copy populations first.
+  for (const population of [
+    "birthdays",
+    "not-contacted",
+    "snoozed",
+    "favourites",
+  ] as const) {
+    if (!activePopulations.includes(population) || populationCounts[population] > 0)
+      continue;
+
+    switch (population) {
+      case "birthdays":
+        return "birthdays-empty";
+      case "not-contacted":
+        return "not-contacted-empty";
+      case "snoozed":
+        return "snoozed-empty";
+      case "favourites":
+        return "filter-empty";
+    }
+  }
+
+  return null;
 }
 
 /**
@@ -83,6 +137,9 @@ export function selectDashboardEmptyState(
     rowCount,
     activeFilter,
     hasTerm,
+    activePopulations,
+    activeFilters,
+    populationCounts,
   } = input;
 
   // (1) A non-empty visible list is never an empty state.
@@ -97,9 +154,15 @@ export function selectDashboardEmptyState(
 
   // (3) A non-'all' filter that yields nothing shows that filter's empty state —
   // resolved BEFORE the population fallback so it never shows the hidden copy.
-  if (activeFilter !== "all") {
+  if (activeFilter !== "all" || hasActiveDashboardFilters(activeFilters)) {
     return "filter-empty";
   }
+
+  const populationEmptyState = selectPopulationEmptyState(
+    activePopulations,
+    populationCounts,
+  );
+  if (populationEmptyState) return populationEmptyState;
 
   // (4) The unfiltered default list: first-run ONLY when ALL FOUR populations are
   // empty; otherwise the people exist in a hidden bucket → point the user there.
