@@ -452,7 +452,9 @@ async function readIncludeUnboundNeverContacted(
     include_unbound_never_contacted: number;
   }>("SELECT include_unbound_never_contacted FROM app_settings WHERE id = 1");
   if (!setting) {
-    throw new Error("listNeverContacted: app_settings id=1 row is missing");
+    throw new Error(
+      "readIncludeUnboundNeverContacted: app_settings id=1 row is missing",
+    );
   }
 }
 
