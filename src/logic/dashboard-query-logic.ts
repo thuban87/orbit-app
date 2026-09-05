@@ -35,8 +35,8 @@ export const CONTACT_FREQUENCY_BANDS = {
 
 type ContactFrequencyBucket = keyof typeof CONTACT_FREQUENCY_BANDS;
 
-const SOCIAL_BATTERY_VALUES = ["Charger", "Neutral", "Drain"] as const;
-const NEEDS_ATTENTION_VALUE = "on";
+export const SOCIAL_BATTERY_VALUES = ["Charger", "Neutral", "Drain"] as const;
+export const NEEDS_ATTENTION_VALUE = "on";
 
 function isContactFrequencyBucket(value: string): value is ContactFrequencyBucket {
   return Object.prototype.hasOwnProperty.call(CONTACT_FREQUENCY_BANDS, value);
