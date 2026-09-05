@@ -8,7 +8,7 @@ updated: 2026-09-05
 
 ## Current Test
 
-[testing paused — 2 items need owner confirmation; 1 sub-item fixture-blocked]
+[testing paused — owner reviewed the release APK; feedback resolved this session (see ## Post-UAT owner feedback). Remaining: owner to confirm archived→profile on the rebuilt APK.]
 
 <!--
 Driven on the physical Pixel 6 Pro over USB (Metro :8082, adb reverse tcp:8081→8082).
@@ -169,3 +169,35 @@ a gap-closure plan)
 - WR-03 (fixed d380ce1): a favourites list zeroed by an active filter shows neutral "Nothing here
   right now." not "No favourites yet" — **confirmed** (Favourites + "Needs attention" → 0 rows →
   "Nothing here right now.").
+
+## Post-UAT owner feedback (release-APK review, resolved this session)
+
+The owner installed the release APK and reported four items. Resolution:
+
+1. **TalkBack (WR-01)** — "worked great." ✅ Confirmed by owner.
+2. **Motion (Test 5 feel)** — "seemed fine." ✅ Confirmed by owner.
+3. **Archived profiles not clickable** — **BUG, fixed (commit 53bb4af).** Violated the locked
+   origin-aware return (D-05 / UI-SPEC §Origin-aware return): `ArchivedContactsScreen` rows wired
+   only Restore + Delete, never a row→Profile tap. Fixed: row name is now a Pressable →
+   `navigate("Profile", {contactId})`; Profile registered in SettingsStack too so it works from
+   both Archived entry points. Verified by tsc + 2246 tests; owner to confirm on-device (adb can't
+   reliably tap the RN row Pressable; no archived fixture on the test Pixel).
+4. **Control panels off** — **fixed (commit c414e51).**
+   - *Centering* — owner decided **centered-on-screen, both axes** (was anchored below each control).
+     This is a placement change within UI-SPEC's "(discretion)" latitude; the D-11 lock (floating
+     panel, **not** modal/bottom-sheet) is preserved — the panel still floats over the dimmed
+     backdrop. `anchorRect` stays on the request for a future anchored/HUD variant. Verified centered
+     on-device (Population/Filters/Sort).
+   - *Filters not scrollable* — **BUG** against UI-SPEC's "scroll beyond the cap" requirement
+     (:196–198, :418 backstop). `FilterPanelContent` was a plain View with no ScrollView, clipped at
+     the panel cap, so families past the cutoff (Gravity, Contact Frequency, Clear filters) were
+     unreachable. Fixed: panel content wrapped in a ScrollView capped at 66% viewport. Verified
+     on-device (scrolled to Clear filters).
+
+**Decision recorded:** control-panel placement is now **centered-on-screen (both axes)**, owner's
+call this session, superseding the "top-anchored below the control row" placement description in
+26-UI-SPEC §Anchored Floating Panel Pattern. Core D-11 (floating, not modal/bottom-sheet, one-at-a-
+time, live-apply, inert-behind) is unchanged.
+
+**Still open for the owner:** confirm archived→profile on the rebuilt release APK, and the header-
+count product observation above (total-live vs filtered count) — a taste call, currently total-live.
