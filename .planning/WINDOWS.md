@@ -1,10 +1,10 @@
 ---
 schema_version: 1
-open_count: 25
+open_count: 26
 waived_count: 0
 fixed_count: 6
-total_count: 31
-last_updated: 2026-09-05T12:27:40.703Z
+total_count: 32
+last_updated: 2026-09-05T12:46:17.277Z
 ---
 
 # Broken Windows Ledger
@@ -46,6 +46,7 @@ last_updated: 2026-09-05T12:27:40.703Z
 | 29 | 24.2 | unrun-verify | modules/orbit-contact-picker/android/src/main/java/expo/modules/orbitcontactpicker/OrbitContactPickerModule.kt |  | On-device Pixel Note-MIME UAT remains required after the successful desktop assembleDebug build. | open |  | 2026-09-04T19:42:12.035Z |  |
 | 30 | 25 | unrun-verify | .planning/phases/25-dashboard-data-state-foundation/25-04-PLAN.md |  | Physical Pixel large-eligible-set search performance validation remains required; desktop fixtures cannot assess the N+1 corpus read. | open |  | 2026-09-05T04:07:55.132Z |  |
 | 31 | 26 | unrun-verify | .planning/phases/26-dashboard-control-surface/26-02-SUMMARY.md |  | Pixel Filter and Sort anchored-panel interaction verification remains pending. | open |  | 2026-09-05T12:27:40.703Z |  |
+| 32 | 26 | unrun-verify | src/screens/HomeScreen.tsx |  | Pixel verification pending for 200% header fallback, disabled overflow press, and Reset view-mode retention | open |  | 2026-09-05T12:46:17.277Z |  |
 
 ````json
 [
@@ -419,6 +420,18 @@ last_updated: 2026-09-05T12:27:40.703Z
     "status": "open",
     "reason": "",
     "recorded_at": "2026-09-05T12:27:40.703Z",
+    "resolved_at": null
+  },
+  {
+    "id": 32,
+    "kind": "unrun-verify",
+    "phase": "26",
+    "file": "src/screens/HomeScreen.tsx",
+    "line": null,
+    "description": "Pixel verification pending for 200% header fallback, disabled overflow press, and Reset view-mode retention",
+    "status": "open",
+    "reason": "",
+    "recorded_at": "2026-09-05T12:46:17.277Z",
     "resolved_at": null
   }
 ]

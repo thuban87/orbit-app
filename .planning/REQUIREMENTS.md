@@ -87,15 +87,15 @@ category's phase (see Traceability).
 ### DASHC — Dashboard Control Surface (Phase 26)
 
 - [x] **DASHC-01**: The Dashboard is lean, ordered header → Population/Filters/Sort control row → Search + List/Card row → contact collection
-- [ ] **DASHC-02**: User can reach Your Week and Group Events from the Dashboard header as first-class destinations (icon + short label, icon-only fallback)
+- [x] **DASHC-02**: User can reach Your Week and Group Events from the Dashboard header as first-class destinations (icon + short label, icon-only fallback)
 - [x] **DASHC-03**: Population, Filters, and Sort are three separate equal controls whose summaries show current state (overflow collapses to "+N") with a restrained active treatment on non-default state
 - [x] **DASHC-04**: Tapping a control opens an anchored floating panel (not a modal/bottom sheet); changes apply live with no Apply step and results visibly update behind the panel
 - [x] **DASHC-05**: While a panel is open the content behind it is interaction-inert and out of accessibility focus; panels dismiss via re-tap, outside tap, or Back, and tapping another control switches panels directly; only one panel opens at a time
 - [x] **DASHC-06**: The Population panel offers All Contacts as an ordinary row; Active Contacts remains the implicit unlisted default; Filters can be cleared in-panel and Sort offers an explicit Default
 - [x] **DASHC-07**: Search sits below the control row, collapsible, sharing its row with an accessible right-aligned List/Card toggle
-- [ ] **DASHC-08**: Dashboard overflow offers Group Events, Unbound Contacts, Archived Contacts, Select Contacts, and Reset Dashboard View; Select Contacts enters the Card/Grid multi-select mode (switching view if needed) — no standalone bulk screen; no Manage Favorites entry (retired, ADR-075)
+- [x] **DASHC-08**: Dashboard overflow offers Group Events, Unbound Contacts, Archived Contacts, Select Contacts, and Reset Dashboard View; Select Contacts enters the Card/Grid multi-select mode (switching view if needed) — no standalone bulk screen; no Manage Favorites entry (retired, ADR-075)
 - [ ] **DASHC-09**: Unbound and Archived open as Dashboard child routes with origin-aware return, and both Archived entry points (overflow + Settings row) route to one screen
-- [ ] **DASHC-10**: Reset Dashboard View returns to Active Contacts, no filters, Default sort, cleared search, preserving the List/Card preference
+- [x] **DASHC-10**: Reset Dashboard View returns to Active Contacts, no filters, Default sort, cleared search, preserving the List/Card preference
 
 ### LISTV — Dashboard List View (Phase 27)
 
