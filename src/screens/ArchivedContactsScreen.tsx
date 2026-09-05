@@ -35,7 +35,7 @@ import {
   impactSummaryLines,
   purgeContact,
 } from "@/db/purge-dao";
-import type { RootStackScreenProps } from "@/navigation/types";
+import { ShellAppBar } from "@/components/ShellAppBar";
 import { buildNotificationPurgeCleanup } from "@/services/notifications/purge-notification-cleanup";
 import { buildPhotoPurgeCleanup } from "@/services/photos/purge-photo-cleanup";
 import { notifyWidgetDataChanged } from "@/services/widget/widget-refresh";
@@ -86,9 +86,7 @@ function purgeBody(name: string, parts: string[]): string {
   return `Permanently delete ${name}${blast}? This cannot be undone.`;
 }
 
-export function ArchivedContactsScreen({
-  navigation,
-}: RootStackScreenProps<"Archived">) {
+export function ArchivedContactsScreen() {
   const { colors } = useTheme();
   const [rows, setRows] = useState<ArchivedContactRow[]>([]);
 
@@ -172,90 +170,80 @@ export function ArchivedContactsScreen({
   );
 
   return (
-    <ScrollView
+    <View
       testID="archived-contacts-screen"
-      style={{ backgroundColor: colors.background }}
-      contentContainerStyle={styles.content}
+      style={{ flex: 1, backgroundColor: colors.background }}
     >
-      <View style={styles.header}>
-        <Pressable
-          testID="archived-back"
-          accessibilityRole="button"
-          accessibilityLabel="Back"
-          onPress={() => navigation.goBack()}
-          style={[styles.backBtn, { borderColor: colors.border }]}
-        >
-          <Text style={{ color: colors.textSecondary }}>Back</Text>
-        </Pressable>
-        <Text
-          accessibilityRole="header"
-          style={[styles.title, { color: colors.textPrimary }]}
-        >
-          Archived
-        </Text>
-      </View>
-
-      {rows.length === 0 ? (
-        <View testID="archived-empty" style={styles.emptyState}>
-          <Text style={[styles.emptyHeading, { color: colors.textPrimary }]}>
-            No archived contacts
-          </Text>
-          <Text style={[styles.emptyBody, { color: colors.textSecondary }]}>
-            Contacts you archive are kept here until you delete them
-            permanently.
-          </Text>
-        </View>
-      ) : (
-        <>
-          <Text
-            testID="archived-count"
-            style={[styles.count, { color: colors.textSecondary }]}
-          >
-            {countLabel(rows.length)}
-          </Text>
-
-          {rows.map((contact) => (
-            <View
-              key={contact.id}
-              testID={`archived-row-${contact.id}`}
-              style={[
-                styles.row,
-                { backgroundColor: colors.surface, borderColor: colors.border },
-              ]}
+      <ShellAppBar variant="child" title="Archived" />
+      <ScrollView
+        style={{ backgroundColor: colors.background }}
+        contentContainerStyle={styles.content}
+      >
+        {rows.length === 0 ? (
+          <View testID="archived-empty" style={styles.emptyState}>
+            <Text style={[styles.emptyHeading, { color: colors.textPrimary }]}>
+              No archived contacts
+            </Text>
+            <Text style={[styles.emptyBody, { color: colors.textSecondary }]}>
+              Contacts you archive are kept here until you delete them
+              permanently.
+            </Text>
+          </View>
+        ) : (
+          <>
+            <Text
+              testID="archived-count"
+              style={[styles.count, { color: colors.textSecondary }]}
             >
-              <Text
-                numberOfLines={1}
-                style={[styles.rowName, { color: colors.textPrimary }]}
+              {countLabel(rows.length)}
+            </Text>
+
+            {rows.map((contact) => (
+              <View
+                key={contact.id}
+                testID={`archived-row-${contact.id}`}
+                style={[
+                  styles.row,
+                  {
+                    backgroundColor: colors.surface,
+                    borderColor: colors.border,
+                  },
+                ]}
               >
-                {contact.name}
-              </Text>
-              <View style={styles.rowActions}>
-                <Pressable
-                  testID={`archived-restore-${contact.id}`}
-                  accessibilityRole="button"
-                  accessibilityLabel={`Restore ${contact.name}`}
-                  onPress={() => void doRestore(contact.id)}
-                  style={[styles.actionBtn, { borderColor: colors.accent }]}
+                <Text
+                  numberOfLines={1}
+                  style={[styles.rowName, { color: colors.textPrimary }]}
                 >
-                  <Text style={{ color: colors.accent }}>Restore</Text>
-                </Pressable>
-                <Pressable
-                  testID={`archived-delete-${contact.id}`}
-                  accessibilityRole="button"
-                  accessibilityLabel={`Delete ${contact.name} permanently`}
-                  onPress={() => void doPurge(contact.id, contact.name)}
-                  style={[styles.actionBtn, { borderColor: colors.danger }]}
-                >
-                  <Text style={{ color: colors.danger }}>
-                    Delete permanently
-                  </Text>
-                </Pressable>
+                  {contact.name}
+                </Text>
+                <View style={styles.rowActions}>
+                  <Pressable
+                    testID={`archived-restore-${contact.id}`}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Restore ${contact.name}`}
+                    onPress={() => void doRestore(contact.id)}
+                    style={[styles.actionBtn, { borderColor: colors.accent }]}
+                  >
+                    <Text style={{ color: colors.accent }}>Restore</Text>
+                  </Pressable>
+                  <Pressable
+                    testID={`archived-delete-${contact.id}`}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Delete ${contact.name} permanently`}
+                    onPress={() => void doPurge(contact.id, contact.name)}
+                    style={[styles.actionBtn, { borderColor: colors.danger }]}
+                  >
+                    <Text style={{ color: colors.danger }}>
+                      Delete permanently
+                    </Text>
+                  </Pressable>
+                </View>
               </View>
-            </View>
-          ))}
-        </>
-      )}
-    </ScrollView>
+            ))}
+          </>
+        )}
+      </ScrollView>
+    </View>
   );
 }
 
@@ -263,21 +251,6 @@ const styles = StyleSheet.create({
   content: {
     padding: 16,
     gap: 12,
-  },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-  },
-  backBtn: {
-    borderWidth: 1,
-    borderRadius: 8,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: "700",
   },
   count: {
     fontSize: 13,
