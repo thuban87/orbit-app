@@ -1,8 +1,8 @@
 ---
 phase: 26
 reviewers: [codex, claude]
-reviewed_at: 2026-09-05T07:56:23Z
-cycles: 3
+reviewed_at: 2026-09-05T08:25:31Z
+cycles: 4
 plans_reviewed: [26-01-PLAN.md, 26-02-PLAN.md, 26-03-PLAN.md, 26-04-PLAN.md, 26-05-PLAN.md, 26-06-PLAN.md, 26-07-PLAN.md]
 models:
   codex: "gpt-5.6-terra (reasoning=low)"
@@ -23,12 +23,16 @@ cycle_history:
     reviewed_at: 2026-09-05T07:56:23Z
     current_high: 0
     current_actionable: 10
+  - cycle: 4
+    reviewed_at: 2026-09-05T08:25:31Z
+    current_high: 0
+    current_actionable: 4
 ---
 
-> **This file accumulates across convergence cycles as an audit trail.** The Cycle 1 and
-> Cycle 2 content below is retained verbatim as history; the authoritative CURRENT state is the
-> **Cycle 3** section at the end of this file. Cycle-3 CYCLE_SUMMARY counts reflect only
-> findings UNRESOLVED in the plans on disk at commit `957aa8c` — resolved prior-cycle
+> **This file accumulates across convergence cycles as an audit trail.** The Cycle 1, Cycle 2,
+> and Cycle 3 content below is retained verbatim as history; the authoritative CURRENT state is
+> the **Cycle 4** section at the end of this file. Cycle-4 CYCLE_SUMMARY counts reflect only
+> findings UNRESOLVED in the plans on disk at commit `a73f5aa` — resolved prior-cycle
 > findings are not re-counted.
 
 ═══════════════════════════════════════════════════════════════════════════════
@@ -927,7 +931,7 @@ re-fires after `hydrate()` resolves (claude — behavior is already correct).
 
 
 ═══════════════════════════════════════════════════════════════════════════════
-# CYCLE 3 (CURRENT — 2026-09-05T07:56:23Z) — re-review of the revised plans (commit 957aa8c)
+# CYCLE 3 (history — 2026-09-05T07:56:23Z) — 0 HIGH + 10 actionable, all since addressed in commit a73f5aa
 ═══════════════════════════════════════════════════════════════════════════════
 
 Both reviewer lanes ran again as independent headless sessions with full repo access and
@@ -1449,3 +1453,576 @@ The architecture is sound and the cycle-2→cycle-3 revisions correctly resolved
 - **Decision-collision gate.** Ran explicitly (see the Cycle-3 Consensus Summary): no finding
   reverses, weakens, or deletes a D-01..D-12 item, a HANDOFF.md entry, or an ADR — no owner
   escalation required.
+
+═══════════════════════════════════════════════════════════════════════════════
+# CYCLE 4 (CURRENT — 2026-09-05T08:25:31Z) — re-review of the revised plans (commit a73f5aa)
+═══════════════════════════════════════════════════════════════════════════════
+
+Both reviewer lanes ran again as independent headless sessions with full repo access and
+produced source-grounded reviews (Codex `gpt-5.6-terra` reasoning=low, 14,991 bytes, **72**
+`file:line` citations; Claude `sonnet` reasoning=low, 20,429 bytes, 25 `file:line`
+citations). Neither stubbed (`ok=true, stubbed=false` on both lane results); neither carried a
+`[reviewed-without-repo-access]` or `[reviewed-without-source-citations]` marker. `SELF_CLI`
+was forced to `none` for this run per the owner's explicit authorization, overriding the
+`CLAUDE_CODE_ENTRYPOINT` independence-skip (which would otherwise skip the claude lane), so
+BOTH lanes ran — the claude lane as a separate `claude -p --model sonnet` headless session with
+no inherited context, output captured from stdout. The orchestrator then ran a source-grounding
++ cross-artifact fact-drift pass (a dedicated read-only subagent read the actual code on disk —
+every writer/reader of the dashboard read path, the query store, the migrations dir, and the
+management routes — and independently verified each carried-forward and new finding, plus the
+seven project-specific invariants: no migration, D-12 seam, shared-table writers, custom-field
+storage, store migration, routes, theme/animation) before recording it.
+
+## Cycle-3 resolution (verified against the revised plans + code)
+
+**Cycle 3 had 0 HIGH + 10 actionable. Eight of the ten are FULLY RESOLVED in commit `a73f5aa`;
+two are PARTIALLY RESOLVED** (the plan absorbed part of the concern but a sharper residual
+remains — carried forward below). Each plan carries a `review_feedback_incorporated` section
+mapping the cycle-3 finding to a specific must_have / task / acceptance edit; the orchestrator
+cross-checked each against code:
+
+- **[RESOLVED] Plan 01 hydration-race guard.** Plan 01 now adds a `generation` counter + a
+  `hydrated` flag to `dashboard-query-store.ts`: `hydrate()` captures the generation before its
+  await and applies the parsed snapshot only if unchanged; every setter bumps it. A stale-hydrate
+  test case is added. Verified the race was real (`dashboard-query-store.ts:64` applied
+  unconditionally after the await).
+- **[RESOLVED] Plan 02 listCategories refetch trigger.** The category fetch now lives in
+  `DashboardControlRow` inside a `useFocusEffect` (cancelled-flag guarded) — refetch-on-focus,
+  not mount-only.
+- **[RESOLVED] Plan 07 capture `now` once per reload.** `reload()` computes a single
+  `const now = localDateTime()` and threads it to `listDashboardPopulation`/`listDashboardSearch`
+  AND `countBirthdayPopulation`, so the birthday list and its empty-state count cannot straddle
+  local midnight.
+- **[RESOLVED] Plan 07 type the SegmentedControl icon as `IconName`.** The field is now
+  `icon?: IconName` (imported from `icon-registry.ts`), so `tsc` catches an unregistered icon at
+  the call site, not only inside `Icon.tsx`.
+- **[RESOLVED] Plan 01 clampAnchorPosition idempotency type-validity.** Redefined as a fixed
+  point over the horizontal `left` axis (an anchorRect whose `x` already equals a returned `left`
+  yields the same `left`) + a constrained-width assertion, not a type-invalid re-feed.
+- **[RESOLVED] Plan 06 render search before the empty/non-empty branch.** Branch order is now
+  `rows.length===0` (true-empty) → `filtered.length===0` (no-match) → filtered list; a no-match is
+  never conflated with true-empty.
+- **[RESOLVED] Plan 05 fixed-chrome structure explicit.** Root `View` → `ShellAppBar` → scroll
+  content stated explicitly, with a git-diff guard on the ADR-018 purge functions.
+- **[RESOLVED] Plan 07 Task 3 mandate a full re-read of `dashboard-read.test.ts` before deleting.**
+  A mandatory full-re-read directive now opens Task 3, treating every cited line number as
+  approximate and block NAMES as authoritative, with an acceptance note recording the drift-tolerant
+  approach.
+- **[PARTIALLY RESOLVED] Plans 01/02 async setter serialization.** The plans now specify "derive
+  each mutation's `next` from `useDashboardQueryStore.getState()` at press time + disable presses
+  while a write is in flight," composing with Plan 01's generation guard. **Residual (Codex,
+  carried):** this serialization is *incompatible with the stated layer-2 component contract* —
+  `PopulationPanelContent`/`FilterPanelContent`/`SortPanelContent` take `{state, onChange}` and
+  compute a COMPLETE next object from the `state` render snapshot, so `DashboardControlRow` cannot
+  re-derive from `getState()`. See Cycle-4 actionable #1.
+- **[PARTIALLY RESOLVED] Plan 04 measured header fallback.** Plan 04 added `ShellAppBar.tsx` to
+  `files_modified` (fit decision now owned at the app-bar level) and mandated icon-only-until-measured
+  as the fail-safe default (flash eliminated) — both cycle-3 halves resolved. **Residual (Codex,
+  carried):** with icon-only as the mandated pre-measurement default, the expanded labels are never
+  rendered, so the "measure-and-compare" approach the plan lists as discretion has nothing to compare
+  against; the plan does not mandate an intrinsic-width method (hidden probe / reserved budget). See
+  Cycle-4 actionable #2.
+
+Neither lane, nor the orchestrator's source-grounding subagent, found any decision reversal, ADR
+conflict, [REJECTED]-item resurfacing, new migration, network-read path, custom-field storage
+change, or theme-token violation in the revised plans.
+
+## Consensus Summary (Cycle 4)
+
+**Cycle 4 surfaces NO HIGH.** Codex records "No HIGH findings" explicitly; Claude raises no new
+HIGH (its risk ratings are MEDIUM, driven by disclosed-and-mitigated Plan 07 test-file surgery).
+Both lanes + the source-grounding subagent independently confirm **zero decision reversals**. The
+residual set is four MEDIUM/LOW implementation-contract gaps, concentrated in the async
+query-mutation path (Plans 01/02), the header fit-measurement method (Plan 04), and the List/Card
+toggle write path (Plan 07). **None require a decision reversal, migration, network access, or
+scope expansion — every proposed fix upholds the recorded decisions (D-03 no-migration, D-04
+locked icon-only fallback, D-11 in-tree non-Modal panel / no layer-1 fork, D-12 additive bound-only
+read).**
+
+### Agreed Strengths (2+ lanes / orchestrator-verified)
+- All eight fully-resolved cycle-3 items are fixed in code terms, not reworded — the generation
+  guard, the single-`now` reload, the `IconName` typing, and the by-block-name deletion are the
+  correct corrections and are grounded in real source (both lanes + subagent).
+- Plan 03 remains the strongest-verified plan: A3 relaxation copied verbatim from the real legacy
+  branch (`dashboard-read.ts:396-413`), all three post-processing paths (birthday-id resolution,
+  soonest-birthday sort, `filterByGravity`) correctly identified and ported, bound-only scope
+  preserved, and `countBirthdayPopulation` correctly diagnosed as necessary because
+  `listBirthdayCandidates` (`:572`) is not bound-only (both lanes + subagent).
+- Chrome-only refactors (Plans 05/06) are narrowly scoped, grep-verified against real testIDs and
+  functions, protect the ADR-018 purge flow via a git-diff guard, and preserve ADR-062/D-08
+  Unbound retrieval via the own-route search (both lanes + subagent).
+- No decision reversal / ADR conflict / [REJECTED] resurfacing / migration / network path /
+  custom-field change anywhere in the seven plans (both lanes + subagent).
+
+### Agreed Concerns (actionable, UNRESOLVED in the current plans)
+
+- **[MEDIUM] Plans 01 + 02 — the layer-2 `onChange(completeObject)` contract contradicts the
+  plans' own "derive next from `getState()` at press time" serialization must_have.** Codex (both
+  plans); orchestrator verified against the plan text. The panels take `{state, onChange}` and the
+  action text has each option "toggle that value … and call `onChange` with the next
+  DashboardFilters/populations" — i.e. the layer-2 component computes the complete `next` from its
+  `state` render snapshot. `DashboardControlRow` then only *receives* that object; it cannot
+  re-derive from `useDashboardQueryStore.getState()`, so two fast presses computed from the same
+  stale snapshot still race (the exact defect the must_have claims to fix). The store setters
+  genuinely do not serialize (`dashboard-query-store.ts:81-92`). **Fix (decision-safe): make the
+  layer-2 callbacks intent-based (`onTogglePopulation(key)` / `onToggleFilter(family,value)` /
+  `onClearFilters` / `onSelectSort(mode)`) and compute `next` from `getState()` in the serialized
+  owner, OR move the axis state up so the panel emits the intent, not the resolved object.** No
+  decision collision — this is an implementation-contract reconciliation.
+- **[MEDIUM] Plan 04 — the expanded-label header fit-measurement METHOD is still underspecified.**
+  Codex; orchestrator verified against Plan 04 line 137. The plan correctly moved ownership to
+  `ShellAppBar` (measures root width via `onLayout` + rendered title width via `onTextLayout`) and
+  mandated icon-only as the pre-measurement default — but *with icon-only as the default the two
+  destination labels are never in the tree to measure*, so the "measure-and-compare vs
+  reserve-a-budget (Claude's discretion)" wording leaves a viable-looking path (measure-and-compare)
+  that cannot work: there is no rendered expanded width to compare against the available space. An
+  executor picking it would build a header that never expands (stuck compact) or reflows. **Fix:
+  mandate an intrinsic-width method — a hidden/invisible off-screen label probe measured once, or a
+  reserved trailing budget — rather than leaving "measure-and-compare" as an option; state that the
+  fit test compares available space against a MEASURED-INTRINSIC (not currently-rendered) label
+  width.** Upholds D-04 (locked icon-only fallback).
+- **[MEDIUM] Plan 07 — the "already-active view is a no-op" must_have is not enforced by the
+  proposed write path.** Codex; orchestrator verified. The must_have edge-probe row states
+  "Toggling to the already-active view / setting viewMode to its current value is a no-op that does
+  not thrash the read (idempotency)," but the action only says `onChange` calls
+  `setViewMode(getExecutor(), mode)`, and `setViewMode` (`dashboard-query-store.ts:65`) always
+  writes SQLite and calls `set(...)` even for the current value — so re-selecting the active segment
+  triggers a persist + a reload, violating the must_have. **Fix: add an equality guard before
+  persistence — `if (mode === useDashboardQueryStore.getState().viewMode) return;` at the call site
+  (and preferably harden the store setter to no-op on an unchanged value).**
+- **[LOW] Plan 04 — the Reset persistence-failure path is unhandled.** Codex; orchestrator
+  verified. `OverflowAction.onPress` returns `void` (`OverflowMenu.tsx:28`) and the plan's `onReset`
+  `await`s `resetDashboardView(getExecutor())` then `clearSession()` with no rejection handling —
+  yet `resetDashboardView`/the store setters can reject before state changes
+  (`dashboard-query-store.ts:93`), leaving an unhandled promise rejection and no user feedback, unlike
+  the themed-error-on-rejection path Plans 01/02 adopted for the population/filter/sort writes.
+  **Fix: wrap `onReset` in a handled async function that surfaces a themed non-blocking error on
+  rejection (mirror the Plan 01/02 persistence-failure pattern).**
+
+### Divergent Views (resolved by orchestrator verification)
+- **HIGH count.** Codex: "No HIGH findings." Claude: no new HIGH (risk ratings MEDIUM, driven by
+  disclosed-and-mitigated Plan 07 test-file surgery, not a new blocker). Orchestrator + subagent
+  concur: **0 unresolved HIGH this cycle.**
+- **Serialization finding.** Codex raises the onChange-contract contradiction (Plans 01/02) as its
+  lead MEDIUM; Claude does not surface it this pass (it read the setters as async-rejectable but did
+  not connect the layer-2 API to the getState() requirement). Orchestrator verified Codex's reading
+  against the plan text — the contradiction is real and actionable; recorded as Cycle-4 #1.
+- **Plan 03 shared-helper drift (Claude MEDIUM).** Claude flags that the "duplicate if a shared
+  helper is impractical" escape hatch could let the two reads diverge organically after ship.
+  Orchestrator: this is already mitigated in-plan by the mandatory parity tests (Task 2) and the
+  plan's stated *preference* for the shared helper — it is represented in PLAN content, so it is NOT
+  counted as a new actionable (it is an accepted, test-guarded design tradeoff).
+
+### Cross-artifact fact-drift (orchestrator pass, Cycle 4)
+- No untraceable decision labels; 26-CONTEXT.md defines D-01..D-12 and every plan citation resolves
+  within that set (the former "D-13"/"D-14" mis-citations were already re-pointed in prior cycles and
+  remain correct).
+- All spot-checked citations hold on disk. Minor non-load-bearing drift found by the subagent: Plan
+  03 cites `buildPopulationWhere` birthdays→`"0"` at `dashboard-query-logic.ts:194`; on disk it is
+  `:196`. `buildFilterWhere` "no gravity SQL" cited `:113` (approximate). These are guidance-level and
+  the plans already mandate re-locating blocks by name and treating line numbers as approximate — no
+  functional drift between plan text and code.
+- **Dead file (cleanup nit, not counted):** `src/stores/dashboard-prefs-store.ts` becomes orphaned
+  after Plan 01 migrates its sole consumer (`HomeScreen.tsx`); no plan deletes it. Cleanup nit, not a
+  correctness gap — the executor may sweep it or a later cleanup pass can.
+
+### Decision-collision check (escalation gate)
+**No finding collides with a recorded decision.** Every proposed Cycle-4 fix is an implementation
+detail or an enforcement of an existing decision: the serialization fix (Plans 01/02) is an internal
+component-API reconciliation; the header fit-measurement fix (Plan 04) UPHOLDS D-04's locked
+icon-only rule; the viewMode no-op guard (Plan 07) and the Reset error path (Plan 04) are robustness
+additions. Nothing deletes, weakens, or inverts a D-01..D-12 item, a HANDOFF.md entry, or an ADR.
+The source-grounding subagent independently confirmed no migration (TARGET_VERSION=19 / head 019),
+no shared-domain-table writer beyond the existing `app_settings` DAO, no custom-field storage change
+(ADR-001 / migration 006 not implicated; `sortExpr()` untouched, no dynamic columns, no pairwise
+converters), and no network dependency on any read path (local-first intact). **No owner escalation
+is required for this cycle.**
+
+---
+
+## Codex Review (Cycle 4)
+
+# Cycle 4 Plan Review — Phase 26
+
+Overall: the plans are substantially stronger after prior cycles. I found no decision reversal, migration, network-read path, or theme-token violation. The remaining issues are chiefly implementation-contract gaps around async query mutations and header measurement.
+
+## Plan 01 — Population tracer
+
+Summary: Good architectural tracer: it migrates the Dashboard away from the legacy AsyncStorage state/read and validates the hardest overlay/a11y seam first.
+
+Strengths:
+
+- Correctly targets the real migration seam: `HomeScreen` still uses `useDashboardPrefs` and legacy `listDashboard` at [HomeScreen.tsx:101](/home/bwales/projects/orbit-app/src/screens/HomeScreen.tsx:101) and [HomeScreen.tsx:193](/home/bwales/projects/orbit-app/src/screens/HomeScreen.tsx:193), while the Phase-25 store is presently unconsumed.
+- The root-level overlay correction is necessary: `ShellAppBar` and `FlatList` are siblings in the current composition, so a header-mounted scrim could not cover the app bar.
+- The hydration-race concern is real: `hydrate()` currently applies after its await unconditionally at [dashboard-query-store.ts:64](/home/bwales/projects/orbit-app/src/stores/dashboard-query-store.ts:64), whereas setters persist and set later at [dashboard-query-store.ts:73](/home/bwales/projects/orbit-app/src/stores/dashboard-query-store.ts:73).
+- The selected population order explicitly avoids the query constant’s different order ([dashboard-query-logic.ts:5](/home/bwales/projects/orbit-app/src/logic/dashboard-query-logic.ts:5)).
+
+Concerns:
+
+- **MEDIUM — Population mutation serialization remains underspecified.** `PopulationPanelContent` is planned with `{ state, onChange(next) }`, meaning it computes `next` from a render snapshot. Two fast presses can produce competing full-array writes. The current store likewise has no serializer; each mutation awaits before updating Zustand ([dashboard-query-store.ts:73](/home/bwales/projects/orbit-app/src/stores/dashboard-query-store.ts:73)). “Guard rapid presses” needs a concrete pending lock plus a fresh-state operation contract, not just an error handler.
+- **LOW — The overlay channel has no settled file/API.** The plan permits either lifted state or a new store, but neither a panel-store artifact nor a required `DashboardControlRow` callback contract is specified. This makes the Plan-02 “no HomeScreen changes” promise fragile.
+
+Suggestions:
+
+- Define a single mutation API such as `onTogglePopulation(key)`; derive the array in `DashboardControlRow` from `useDashboardQueryStore.getState()` under an axis-level pending lock.
+- Settle the overlay channel as either an explicit `dashboard-panel-store.ts` artifact or required callback props.
+
+Risk: **MEDIUM.** The source migration and overlay behavior are high-impact, but the plan’s tests/UAT backstops are otherwise strong.
+
+Prior-cycle status: root-host scope, a11y full-surface scope, animation pause, label centralization, and hydration-race coverage are addressed. Population concurrent-write handling remains only partially resolved.
+
+## Plan 02 — Filters and Sort
+
+Summary: Well-scoped expansion of the tracer, with correct gravity sourcing and category-refresh ownership, but its stated fresh-state serialization is incompatible with its proposed component contracts.
+
+Strengths:
+
+- Correctly uses `GRAVITY_TIERS`; filter SQL intentionally does not implement Gravity ([dashboard-query-logic.ts:113](/home/bwales/projects/orbit-app/src/logic/dashboard-query-logic.ts:113)), so the service tiers at [impact.ts:63](/home/bwales/projects/orbit-app/src/services/impact.ts:63) are the right source.
+- Category refresh on focus is sensible because the current HomeScreen only fetches categories as part of reload ([HomeScreen.tsx:191](/home/bwales/projects/orbit-app/src/screens/HomeScreen.tsx:191)).
+- A pure filter-summary helper is an appropriate node-testable seam.
+- Explicit Default sort aligns with the actual sort union ([dashboard-query-logic.ts:118](/home/bwales/projects/orbit-app/src/logic/dashboard-query-logic.ts:118)).
+
+Concerns:
+
+- **MEDIUM — “Derive next from getState at press time” cannot be achieved with the prescribed `onChange(nextFilters)` contract.** `FilterPanelContent` computes and emits an already-complete filter object from its passed `state`; the parent cannot reconstruct which toggle occurred. The same contradiction exists for the population tracer. This needs operation callbacks (`toggleFilter(family, value)`, `clearFilters`, `selectSort`) or state ownership moved upward.
+- **LOW — Category names can still be stale while the Dashboard remains focused.** `useFocusEffect` refreshes on regaining focus, not after an in-place category mutation that returns without focus loss. This is probably acceptable for this phase, but should be stated as the chosen freshness boundary.
+
+Suggestions:
+
+- Replace full-state layer-2 callbacks with typed intent callbacks and calculate next state in the serialized owner.
+- Disable the whole relevant panel axis while persisting, including Clear.
+
+Risk: **MEDIUM.**
+
+Prior-cycle status: gravity values, summary labels, persistence-failure path, and focus refresh are addressed. Concurrent setter handling is not yet mechanically coherent.
+
+## Plan 03 — Population-aware search read
+
+Summary: This is the strongest plan. It appropriately treats search as an additive read and preserves the population read’s birthday/gravity/sort behavior.
+
+Strengths:
+
+- Correctly recognizes that Birthday needs resolved IDs: `buildPopulationWhere()` deliberately returns `0` without birthday IDs ([dashboard-query-logic.ts:194](/home/bwales/projects/orbit-app/src/logic/dashboard-query-logic.ts:194)).
+- Correctly ports the required post-query Gravity pass; it is not SQL-expressible by design ([dashboard-query-logic.ts:113](/home/bwales/projects/orbit-app/src/logic/dashboard-query-logic.ts:113), [dashboard-read.ts:324](/home/bwales/projects/orbit-app/src/db/dashboard-read.ts:324)).
+- Correctly requires the birthday sort parity; the population read currently does it after SQL ([dashboard-read.ts:315](/home/bwales/projects/orbit-app/src/db/dashboard-read.ts:315)).
+- Bound-only search is consistent with the existing A3 branch, which explicitly retains `c.tracking_enabled = 1` ([dashboard-read.ts:396](/home/bwales/projects/orbit-app/src/db/dashboard-read.ts:396)).
+- `countBirthdayPopulation` is the right correction for the empty-state count: `listBirthdayCandidates()` is non-archived but not bound-only ([dashboard-read.ts:572](/home/bwales/projects/orbit-app/src/db/dashboard-read.ts:572)).
+
+Concerns:
+
+- **LOW — Error text for `localMidnightFromReadNow()` is population-read-specific.** The shared validator currently throws `"listDashboardPopulation: now must start with YYYY-MM-DD"` ([dashboard-read.ts:256](/home/bwales/projects/orbit-app/src/db/dashboard-read.ts:256)). Reusing it for search/count is safe but misleading in diagnostics.
+
+Suggestions:
+
+- Rename the error to a neutral dashboard-read message while preserving validation behavior.
+
+Risk: **LOW.**
+
+Prior-cycle status: birthday IDs, gravity, soonest-birthday ordering, injection binding, and bound-only birthday counting are all directly addressed.
+
+## Plan 04 — Header and overflow
+
+Summary: The overflow plan is solid. The measured header-fit design is directionally right but still lacks enough mechanical detail to prove it can distinguish “labels fit” from “labels do not fit.”
+
+Strengths:
+
+- The five-row overflow matches the phase decision and removes obsolete tab destinations.
+- Disabled Select Contacts addresses a real flaw in current `OverflowMenu`: every row currently calls `close()` then `action.onPress()` ([OverflowMenu.tsx:96](/home/bwales/projects/orbit-app/src/components/OverflowMenu.tsx:96)).
+- Reset correctly composes durable query reset with session reset; the query reset preserves `viewMode` ([dashboard-query-logic.ts:215](/home/bwales/projects/orbit-app/src/logic/dashboard-query-logic.ts:215)).
+- The need to modify `ShellAppBar` is legitimate: it owns the title/trailing/overflow layout ([ShellAppBar.tsx:42](/home/bwales/projects/orbit-app/src/components/ShellAppBar.tsx:42)).
+
+Concerns:
+
+- **MEDIUM — The header fit measurement is not fully implementable as specified.** Measuring only bar width and the currently rendered title does not reveal the natural width of both destination labels plus icons and overflow. Since icon-only is the initial state, those labels are not even rendered to measure. `ShellAppBar` needs a defined measurement method: hidden/invisible intrinsic label probes, or an explicit measured trailing-content callback reporting both compact and expanded widths.
+- **LOW — Reset persistence failure is unhandled.** `OverflowAction.onPress` returns void ([OverflowMenu.tsx:28](/home/bwales/projects/orbit-app/src/components/OverflowMenu.tsx:28)); an async reset supplied through it can reject without user feedback. Existing store mutations can reject before state changes ([dashboard-query-store.ts:93](/home/bwales/projects/orbit-app/src/stores/dashboard-query-store.ts:93)).
+
+Suggestions:
+
+- Specify the expanded-width measurement contract before implementation.
+- Wrap `onReset` in a handled async function and show a non-blocking failure message if persistence fails.
+
+Risk: **MEDIUM.**
+
+Prior-cycle status: true disabled no-op behavior, pure builder signature, header ownership, and icon-only-first behavior are addressed. The actual expanded-label measurement remains open.
+
+## Plan 05 — Archived child route
+
+Summary: Safe chrome-only refactor with unusually good protection against accidental destructive-flow changes.
+
+Strengths:
+
+- The fixed-chrome correction is appropriate: the current `ScrollView` is the root ([ArchivedContactsScreen.tsx:175](/home/bwales/projects/orbit-app/src/screens/ArchivedContactsScreen.tsx:175)); moving `ShellAppBar` outside prevents it scrolling away.
+- Both stack registrations already point to the same component ([DashboardStack.tsx:62](/home/bwales/projects/orbit-app/src/navigation/tabs/DashboardStack.tsx:62), [SettingsStack.tsx:32](/home/bwales/projects/orbit-app/src/navigation/tabs/SettingsStack.tsx:32)).
+- The no-touch purge diff guard is well warranted: confirmation and post-commit cleanup live at [ArchivedContactsScreen.tsx:128](/home/bwales/projects/orbit-app/src/screens/ArchivedContactsScreen.tsx:128).
+
+Concerns:
+
+- None material.
+
+Suggestions:
+
+- Keep the root `View`’s `flex: 1` and preserve the former scroll background/content styles exactly, as the plan implies.
+
+Risk: **LOW.**
+
+Prior-cycle status: fixed child chrome, unused navigation cleanup, and purge regression protection are resolved.
+
+## Plan 06 — Unbound route and retrieval search
+
+Summary: Correctly closes the retrieval-path trip-wire without broadening Dashboard search.
+
+Strengths:
+
+- The current dedicated read is correctly neutral and bound to `tracking_enabled = 0` ([unbound-read.ts:23](/home/bwales/projects/orbit-app/src/db/unbound-read.ts:23)).
+- Rendering search after loading/error but before the empty/no-match branch addresses the current structure, which chooses true empty before any search UI ([UnboundContactsScreen.tsx:72](/home/bwales/projects/orbit-app/src/screens/UnboundContactsScreen.tsx:72)).
+- Client-side filtering preserves the DAO’s `name COLLATE NOCASE, id` ordering ([unbound-read.ts:35](/home/bwales/projects/orbit-app/src/db/unbound-read.ts:35)).
+- The explicit matching-count extension fixes the current helper’s total-only semantics ([unbound-list-logic.ts:2](/home/bwales/projects/orbit-app/src/screens/unbound-list-logic.ts:2)).
+
+Concerns:
+
+- **LOW — The search local state survives Profile-back because the route remains mounted, but it resets if navigation reconstructs the route.** That is fine because no persistence requirement is stated; note it explicitly to avoid accidental future interpretation as a Dashboard-session contract.
+
+Suggestions:
+
+- Add one test that a whitespace-only term uses total-count wording, not matching wording.
+
+Risk: **LOW.**
+
+Prior-cycle status: true-empty/no-match ordering and filtered-count wording are resolved.
+
+## Plan 07 — Search/toggle completion and retirement
+
+Summary: Thorough retirement plan, but the view-toggle no-op requirement is not actually enforced by the proposed write path.
+
+Strengths:
+
+- Correctly uses a single `now` through the reload; the population read resolves birthdays from supplied `now` ([dashboard-read.ts:274](/home/bwales/projects/orbit-app/src/db/dashboard-read.ts:274)), so this prevents midnight disagreement with the birthday count.
+- Correctly restores the required debounce rather than relying on the cancelled flag; current HomeScreen demonstrates the intended 220ms mechanism ([HomeScreen.tsx:168](/home/bwales/projects/orbit-app/src/screens/HomeScreen.tsx:168)).
+- The delete-by-describe-name requirement is prudent because the legacy and must-keep test blocks are interleaved.
+- Preserving `countNeverContacted` is necessary: it still reads the deferred `include_unbound_never_contacted` setting ([dashboard-read.ts:527](/home/bwales/projects/orbit-app/src/db/dashboard-read.ts:527)).
+- `IconName` is the correct type for the SegmentedControl extension; current options have no icon field ([SegmentedControl.tsx:23](/home/bwales/projects/orbit-app/src/components/SegmentedControl.tsx:23)).
+
+Concerns:
+
+- **MEDIUM — The “already-active view is a no-op” must-have is not satisfied by “onChange calls setViewMode.”** The existing setter always writes SQLite and sets state, even for the current value ([dashboard-query-store.ts:65](/home/bwales/projects/orbit-app/src/stores/dashboard-query-store.ts:65)). The plan needs an equality guard either in `SegmentedControl`’s caller or in `setViewMode`.
+- **LOW — SegmentedControl’s active icon color needs an explicit contrast check.** Existing active labels use `colors.background` ([SegmentedControl.tsx:75](/home/bwales/projects/orbit-app/src/components/SegmentedControl.tsx:75)); the new icon path should use the same semantic color and be covered by the existing contrast gate.
+
+Suggestions:
+
+- Add `if (mode === useDashboardQueryStore.getState().viewMode) return;` before persistence, preferably also harden the store setter.
+- Add an icon-active/inactive visual token test or verify it through the existing contrast tooling.
+
+Risk: **MEDIUM.**
+
+Prior-cycle status: debounce, one-now-per-reload, `IconName`, birthday counting, and safe by-name test deletion are resolved. Toggle idempotency remains unaddressed.
+
+## Final assessment
+
+No **HIGH** findings. The plan set is ready to execute after tightening three MEDIUM items:
+
+1. Make population/filter/sort mutations intent-based and serialized from fresh store state.
+2. Specify a real intrinsic-width measurement contract for the header’s expand-if-room labels.
+3. Make List/Card writes idempotent before calling `setViewMode`.
+
+
+---
+
+## Claude Review (Cycle 4)
+
+# Cross-AI Plan Review — Phase 26: Dashboard Control Surface (Cycle 4)
+
+## Cross-Cutting Assessment
+
+This is a mature convergence cycle (4th pass); the plans show real engineering rigor and have already absorbed substantial prior feedback. Verified against source: `dashboard-query-store.ts`, `dashboard-query-logic.ts`, `dashboard-read.ts`, `shell-transient-store.ts`, `overlay-base.tsx`, `GlassSurface.tsx`, `SegmentedControl.tsx`, `ShellAppBar.tsx`, `OverflowMenu.tsx`, `icon-registry.ts`, `unbound-list-logic.ts`, `unbound-read.ts`, `ArchivedContactsScreen.tsx`, `UnboundContactsScreen.tsx`, `dashboard-empty-logic.ts`, `motion.ts`, `use-reduced-motion.ts`. No dossier/ADR files were opened this pass (not in context), so D-01..D-12 compliance is checked against `26-CONTEXT.md`'s own text, not the underlying dossier — flagged as a limitation below.
+
+---
+
+## Plan 01 (Population tracer + AnchoredPanel + DashboardOverlayHost)
+
+**Summary:** The riskiest architectural bet in the phase — resolving the tracer to a root-level overlay host rather than an in-header one is correct and well-justified by `ShellAppBar.tsx:43` (title/trailing/overflow all siblings in one flex row) and `HomeScreen.tsx` composition. The plan's account of `AnchoredPanel`'s relationship to `overlay-base.tsx` is accurate.
+
+**Strengths:**
+- `shellTransientStore` reuse for Back/dismiss is exactly the right mechanism — verified `dismissTop()` semantics at `shell-transient-store.ts:46-54` (removes first, then invokes `dismiss`), which composes correctly with a panel's `onDismiss`.
+- The a11y-focus-on-open pattern lifted from `overlay-base.tsx:76-84` is a legitimate, verified reuse target.
+- The store hydration-race guard (generation counter) is a real, previously-absent gap: `dashboard-query-store.ts:64` (`hydrate: async (exec) => set(parseStoredState(...))`) indeed has no guard against a stale resolve clobbering a newer `set()` from a setter — the described race is real and the fix (generation captured before await, compare after) is the standard fix.
+
+**Concerns:**
+- **[MEDIUM] `SegmentedControlOption.icon` typing claim is not yet true anywhere referenced.** Plan 01 doesn't touch `SegmentedControl.tsx` (that's Plan 07's job), but Task 1's icon-registry additions are consumed nowhere in Plan 01 itself except via `DashboardControlRow`'s Population trigger, which per the plan's own action description doesn't render list/grid icons (only Plan 07 does). This is fine as sequencing, but the plan's "Artifacts index" implies these are Plan-01-owned deliverables when some (list/grid on SegmentedControl) are actually inert until Plan 07. Low material risk, just a documentation-precision nit.
+- **[LOW] `GlassSurface` corner/opacity claims.** The plan cites `RADII.lg` and asks for scrim opacity "lower than 0.85" — verified `GlassSurface.tsx:114` already hardcodes `borderRadius: RADII.lg`, so this is consistent, not a new invention. Fine.
+- **[LOW, evidence-limited] D-11/D-12 compliance can't be independently verified** since the dossier text itself wasn't opened this session — only `26-CONTEXT.md`'s summary of D-11/D-12 was available. The plan's claims about D-11 ("no layer-1 fork") are consistent with what `dashboard-query-logic.ts` shows (no `term` param anywhere in `buildPopulationWhere`), so this checks out empirically even without the dossier.
+
+**Prior-cycle concern resolution:** The cycle-2 HIGH (in-header overlay can't scrim the app bar) is now resolved via the root-level `DashboardOverlayHost` — verified this is architecturally sound given `ShellAppBar` and `FlatList` are declared as siblings. The cycle-3 MEDIUM (hydration race) is resolved with a concrete, correct mechanism (generation counter). Both hold up.
+
+**Risk:** MEDIUM — the single largest, least-tested-in-review surface (in-tree a11y-hide of a non-Modal overlay) remains fundamentally an on-device UAT bet, which the plan appropriately flags as FA-DASHC-05 rather than hiding it.
+
+---
+
+## Plan 02 (Filters + Sort panels)
+
+**Summary:** Solid horizontal extension of Plan 01's pattern. The Gravity-tier sourcing fix (from `GRAVITY_TIERS` rather than a hand-list or `DASHBOARD_FILTER_FAMILIES`) is verified correct: `dashboard-query-logic.ts:14-20` confirms `DASHBOARD_FILTER_FAMILIES` carries only family names (`"gravity"`), never tier values — so a plan that had derived tier options from that constant would have been broken. Good catch, correctly fixed.
+
+**Strengths:**
+- `buildFilterWhere`'s deliberate gravity omission is correctly identified: `dashboard-query-logic.ts:113-115` — "gravity family is intentionally recognized but handled after the SQL candidate read." The plan's insistence that Filters panel gravity options be pulled from `GRAVITY_TIERS` (not from SQL-facing constants) is the right fix for a real bug class.
+- Setter serialization design (derive `next` from `getState()` at press time + disable while in-flight) is a reasonable, minimal fix for the identified race in `dashboard-query-store.ts:81-92` (no serialization exists there today — confirmed, the setters are independent async functions with no queue/lock).
+
+**Concerns:**
+- **[LOW] `listCategories` fetch — `useFocusEffect` refetch cost not bounded.** The plan mandates the category fetch live inside `DashboardControlRow` on every Dashboard focus. This is reasonable given the review history, but there's no debounce/memoization guard against a focus event firing on every panel-close in rapid succession (e.g., closing the Population panel returns focus to Dashboard, which itself doesn't refocus the screen — but Profile→Back does). Minor perf nit, not correctness.
+- **[LOW] `selectedFilterLabels` category-id resolution** depends on `categories` being passed in synchronously-fresh at summary-render time; if the `useFocusEffect` fetch is still in flight when a stale filter selection references a category id not yet in `categories`, the "unknown/missing category id" fallback (called out in must_haves) needs to degrade gracefully — the plan does specify this test case, which is good, but only as a "skip or fallback" without pinning the exact behavior. Minor spec looseness, unlikely to cause a real defect given the explicit test requirement.
+
+**Risk:** LOW-MEDIUM. Mechanically sound; the main residual risk is on-device UI polish (summary correctness with rapid toggling), not architecture.
+
+---
+
+## Plan 03 (listDashboardSearch + countBirthdayPopulation)
+
+**Summary:** This is the most SQL-rigor-heavy plan and holds up well against `dashboard-read.ts`. The birthday-id / gravity / soonest-birthday replication requirement is the single most important correctness fix in the whole cycle, and it's now correctly specified.
+
+**Strengths:**
+- Verified `dashboard-read.ts:274-336` (`listDashboardPopulation`) does three things a naive `listDashboardSearch` clone could easily omit: (1) resolves `birthdayIds`/`birthdayDays` from `listBirthdayCandidates` + `daysUntilBirthday` and threads them into `buildPopulationWhere`/`populationMatchColumns`; (2) applies a JS post-sort for `soonest-birthday`; (3) applies `filterByGravity` as a post-query pass since `buildFilterWhere` deliberately emits no gravity SQL (`dashboard-query-logic.ts:113`). The plan's must_haves correctly enumerate all three and forbid a "simplify birthdays+term to status sort" shortcut — this is the correct level of rigor given the real risk of silent omission.
+- `countBirthdayPopulation`'s bound-only design is correctly justified: `listBirthdayCandidates` (`dashboard-read.ts:572-580`) scans `archived_at IS NULL AND birthday IS NOT NULL` with **no** `tracking_enabled` filter — so a raw count would indeed include Unbound contacts and over-count relative to the Birthdays *population* (which is bound-only via `DASHBOARD_POPULATION_SCOPE_WHERE`, `dashboard-query-logic.ts:151-152`). This over-count risk is real and the fix (bound-only intersection) is correct.
+- A3 semantics preservation is well-grounded: verified `dashboard-read.ts:396-413` is exactly the branch the plan instructs to copy verbatim, and the header comment at `dashboard-read.ts:38-41` documents the semantics the plan must preserve.
+
+**Concerns:**
+- **[MEDIUM] The "shared private helper" contract is Claude's-discretion-with-a-fallback, not enforced by an automated gate beyond the parity test.** The plan permits full duplication as an acceptable fallback if a clean shared helper "is impractical" — reasonable pragmatism, but it means the review can't verify (from the plan text alone) that a future maintenance edit to `listDashboardPopulation`'s birthday/gravity logic won't silently diverge from `listDashboardSearch`'s copy, if the executor chooses the duplication path. The parity tests mitigate this at test-time but not for organic drift after this phase ships. Acceptable given the constraints, but worth flagging.
+- **[LOW] `snippet` bind ordering note is correctly carried forward** (`dashboard-read.ts:404-405` comment: "SELECT clause — appears first") — verified accurate.
+
+**Risk:** LOW. This plan is data-layer-only, fully unit-testable, and the must_haves are unusually precise about the exact failure mode being guarded against (over-counting, missing post-processing). This is the strongest plan of the seven from a correctness-rigor standpoint.
+
+---
+
+## Plan 04 (Header destinations + overflow)
+
+**Summary:** Reasonable UI refit; the "icon-only is the mandated pre-measurement default" fix directly addresses a real first-paint flash risk, and moving the fit decision into `ShellAppBar` is architecturally correct given `ShellAppBar.tsx:42-66`'s actual flex layout (title `flex:1`, trailing, overflow all in one row — confirmed by reading the file).
+
+**Strengths:**
+- The `OverflowMenu` disabled-row fix is precise and necessary: verified `OverflowMenu.tsx:102-105` (`onPress={() => { close(); action.onPress(); }}`) unconditionally calls `close()` today — a naive `disabled` prop addition without also guarding the row's own `onPress` handler would still dismiss the whole sheet on a disabled tap. The plan correctly identifies and fixes this exact line.
+- `buildDashboardOverflowActions({ navigation, onReset })` object-param signature is a sensible, testable design; the current `HomeScreen.tsx:107-150` overflowActions array (not shown here but referenced accurately per RESEARCH/PATTERNS) is being replaced with a pure function — good testability improvement.
+
+**Concerns:**
+- **[LOW] ShellAppBar `compact` trailing-fit signal is a nontrivial widening of a shared, heavily-reused component** (`ShellAppBar` is used by every screen in the app per the "Modified files" pattern map). The plan asserts backward compatibility is "proven by tsc" for the ReactNode-only consumers, which is true for typing but not for runtime behavior — a bug in the new `compact` measurement logic (e.g., an infinite re-measure loop, or a measurement that never resolves and defaults to compact forever) could regress `ArchivedContactsScreen`/`UnboundContactsScreen`'s trailing content if those pass a function-form `trailing` in the future, though today they don't (Plan 05/06 don't add trailing content to those screens per their tasks). Contained risk, correctly scoped by test coverage requirements (tsc + on-device).
+
+**Risk:** LOW-MEDIUM, mostly concentrated in the on-device text-scaling backstop, which is correctly flagged as such rather than claimed as unit-tested.
+
+---
+
+## Plan 05 (ArchivedContactsScreen chrome refactor)
+
+**Summary:** Narrow, well-scoped, and the ADR-018 purge-flow preservation requirement is taken seriously with an explicit diff-guard acceptance criterion.
+
+**Strengths:**
+- Verified against `ArchivedContactsScreen.tsx` in full: the purge flow (`confirmPurge` 58-74, `purgeBody` 84-87, `doPurge` 128-172 with its POST-COMMIT photo/notification cleanup fan-out) is exactly as described, and the plan's instruction to leave it byte-unchanged while only restructuring chrome (root View → ShellAppBar → ScrollView, moving `testID="archived-contacts-screen"` off the ScrollView onto the new root View) is precise and matches the actual current structure (`ScrollView` is root at line 175 today, confirmed).
+- The cycle-3 fix (explicit fixed-chrome structure, not swap-header-inside-ScrollView) is a real, previously-missed distinction — a header rendered inside the ScrollView would scroll away, which is not what "first-class child-route chrome" should mean. Good catch.
+
+**Concerns:**
+- **[LOW] No new concerns beyond what's already flagged in-plan.** This is the lowest-risk plan of the seven — small diff surface, single file, strong preservation guardrails (git-diff-based acceptance check on the purge functions is a good mechanical enforcement, better than "don't touch it" prose alone).
+
+**Risk:** LOW.
+
+---
+
+## Plan 06 (UnboundContactsScreen chrome + own-route search)
+
+**Summary:** Correctly treats the ADR-062 retrieval-path requirement as load-bearing (STOP-AND-ASK trip-wire framing, not "nice to have"), and the no-match vs true-empty state disambiguation fix (branch order: `rows.length===0` before `filtered.length===0`) is a legitimate UX bug the plan catches before it ships.
+
+**Strengths:**
+- Verified `UnboundContactsScreen.tsx:72-94` today does branch as `rows===null` (loading) → `rows.length===0` (true empty) → else FlatList; adding a client-side filter without reordering these branches would indeed have made a filtered-to-zero list render as "No unbound contacts" (the true-empty copy), which is misleading. The plan's explicit branch-order requirement is correct and necessary.
+- `unboundCountLabel`'s extension (`{ matching?: boolean }`) rather than reusing the existing total-only helper for a filtered count is correctly identified as necessary — verified `unbound-list-logic.ts:2-4` today only produces "N unbound contact(s)," which has no way to express "N matching."
+- `filterUnboundByName` as a pure, node-testable helper mirrors the existing file's idiom (`unbound-list-logic.ts` is already RN-free) — good consistency.
+
+**Concerns:**
+- **[LOW] Scale ceiling on the client-side filter is honestly disclosed** (`filterUnboundByName` runs over the full unpaginated `listUnbound` result) but not actually mitigated — acceptable given personal-scale usage per PROJECT.md's "owner is user #1" framing, and the plan explicitly notes this as a pre-existing condition it doesn't worsen.
+
+**Risk:** LOW.
+
+---
+
+## Plan 07 (Search + toggle row, D-12 read wiring, legacy retirement)
+
+**Summary:** The most operationally hazardous plan — it retires `listDashboard`/`listNeverContacted` from a file (`dashboard-read.ts`) that Plans 01-06 don't touch but that has a large, interconnected test file. The plan's response to this (mandatory full re-read of the test file before deletion, block-name-not-line-range deletion) is the correct mitigation for a real risk class.
+
+**Strengths:**
+- Verified `dashboard-read.ts:274-336` (`listDashboardPopulation`) validates `now` via `localMidnightFromReadNow` (`dashboard-read.ts:256-272`), which throws unless `now` starts `YYYY-MM-DD` — the plan's insistence on `localDateTime()` never `toISOString()` is correctly grounded and enforceable via the stated grep gate.
+- The "capture ONE `now` per reload" fix is a genuinely subtle correctness issue: if `reload()` called `localDateTime()` independently for the list read and for `countBirthdayPopulation`, a call straddling local midnight could make the Birthdays empty-state count disagree with the actual rendered list. This is a real, non-obvious race the plan correctly identifies and fixes with a single-capture pattern.
+- `countNeverContacted`/`readIncludeUnboundNeverContacted` preservation is correctly cross-checked against `dashboard-read.ts:466-541` — these functions do exist as described and are legitimately D-03-protected (the `include_unbound_never_contacted` app_settings column is read there, and PROJECT.md's migration-forward-only constraint plus D-03's "coordinate with Phase 36" instruction make ad-hoc removal correctly forbidden).
+- The D-03 coverage "lift" (moving the Unbound×countNeverContacted test assertion into the surviving `counts` block before deleting `listNeverContacted`'s test block) is a thoughtful, concrete fix for what would otherwise be a silent coverage loss — verified the two settings interact exactly as described at `dashboard-read.ts:466-475` (`readIncludeUnboundNeverContacted`) and `:527-541` (`countNeverContacted`).
+
+**Concerns:**
+- **[MEDIUM] The plan's test-file line-number citations (943-1041, etc.) are self-admittedly unverifiable this session** — `dashboard-read.test.ts` was not opened in this review pass. The plan's own mitigation (treat block names as authoritative, re-read in full before deleting) is the correct engineering response to this uncertainty, but it means this review cannot independently confirm the block-boundary claims are accurate; that verification is deferred to the executor, as the plan itself acknowledges. This is a legitimate, disclosed limitation, not a plan defect — but it is the single highest blast-radius step in the whole phase (deleting exported functions + their tests in a heavily-shared file) and deserves an explicit post-execution `npm test` gate, which the plan does include.
+- **[LOW] `SegmentedControlOption.icon?: IconName` typing requirement is correctly specified** — verified `icon-registry.ts:69` exports `IconName` as `keyof typeof ICON_REGISTRY`, confirming the type exists and is importable RN-free (the registry module has no `react-native` import, confirmed). The plan's insistence on this exact type (not `string`) to get a compile-time gate at the SegmentedControl call site is correct and matches the actual type surface available.
+- **[LOW] Debounce vs. cancelled-flag distinction is correctly reasoned** — a debounce is necessary to collapse a keystroke burst to one query; a cancelled-flag alone only discards stale *results*, not stale *requests*. This is accurate.
+
+**Risk:** MEDIUM-HIGH — not because the design is wrong, but because this plan performs the highest-blast-radius mechanical operation in the phase (deleting shipped, tested, exported functions from a file with a large existing test suite) under genuine "block names, not verified line numbers" uncertainty. The mitigations (full re-read mandate, `npm test` gate, D-03 coverage lift) are appropriate and about as strong as achievable without this review having opened the target test file directly.
+
+---
+
+## Dependency Ordering / Wave Structure
+
+Waves are internally consistent: Wave 1 (Plan 01) is a true single-point dependency for Waves 2 (Plans 02-06, correctly `depends_on: ["26-01"]`) and Wave 3 (Plan 07, correctly depends on 01/02/03/04). One nit: Plan 07's `depends_on` omits `26-05`/`26-06` even though it doesn't touch those files, which is fine — but it also doesn't explicitly depend on `26-02` in a prior cycle finding that was already addressed (confirmed `depends_on: ["26-01", "26-02", "26-03", "26-04"]` is present in Plan 07's frontmatter — correct, this was fixed).
+
+## Decision-Reversal Check
+
+No plan deletes, weakens, or inverts a D-01..D-12 decision as stated in `26-CONTEXT.md`. Specifically checked: Manage Favourites stays removed (D-06, Plan 04 confirms no reintroduction and greps for absence); no permanent birthday banner is added (D-07, Plan 07's empty-state design keeps Birthdays as population-only); Select Contacts stays disabled (D-09, Plan 04); no migration is introduced (D-03, confirmed no plan touches `src/db/migrations/`); Unbound retrieval is replaced, not dropped (D-08, Plan 06). No escalation-worthy reversal found.
+
+## Overall Risk Assessment
+
+**MEDIUM**, driven almost entirely by Plan 07's legacy-read-retirement mechanics (real but disclosed-and-mitigated risk) and the phase-wide dependency on the in-tree, non-Modal a11y-hide mechanism from Plan 01 (an architecturally sound design that is nonetheless is fundamentally an on-device-only verification, appropriately flagged as such rather than falsely claimed as unit-tested). All seven plans show evidence of genuine engineering correction across the review cycles — the Gravity-tier sourcing fix, the birthday/gravity post-processing replication requirement, the hydration-race guard, and the D-03 coverage lift are all real bugs the plans now correctly avoid, not cosmetic churn.
+
+---
+
+## Verification coverage (Cycle 4)
+
+- **Both lanes ran as independent headless sessions with repo access; neither stubbed.** Codex
+  (`gpt-5.6-terra`, reasoning=low, source=banner) produced 14,991 bytes with 72 `file:line`
+  citations; Claude (`sonnet`, reasoning=low, source=pinned, separate `claude -p` session,
+  stdout-captured) produced 20,429 bytes with 25 `file:line` citations. Both lane results carry
+  `ok=true, stubbed=false`. `SELF_CLI` forced to `none` (owner-authorized) so the
+  `CLAUDE_CODE_ENTRYPOINT` independence-skip did not drop the claude lane.
+- **Source-grounding pass (orchestrator + dedicated read-only subagent).** Read the actual code on
+  disk — not the diff or the plan text — and verified seven project-specific invariants plus the
+  carried/new findings: (1) no migration — `database.ts:54` `TARGET_VERSION=19`, migrations head
+  `019-dashboard-prefs.ts`, no plan touches `src/db/migrations/`; (2) D-12 seam — A3 anchor real at
+  `dashboard-read.ts:38`, legacy mechanics at `:396-413`, `listDashboardPopulation(exec,query,now)`
+  has no `term` param (`:274`), Plan 07 retires `listDashboard`/`listNeverContacted` with no
+  dual-read; (3) shared-table writers — `dashboard-read.ts` has zero writers, the only Phase-26
+  write path is `app_settings` via `app-settings-dao.updateAppSettings` (?-bound), no
+  `INSERT INTO interactions` / bulk archive (D-09 held, Select Contacts ships DISABLED); (4) custom
+  fields — no plan touches `custom_field`/`sortExpr`/dynamic columns (ADR-001 / migration 006 not
+  implicated); (5) store migration — `HomeScreen.tsx` old-store usage at `:63/:101-104/:193`
+  matches Plan 01, `useDashboardPrefs` has no other consumer (no stranded consumer); (6) routes —
+  ADR-080 four-tab shell real (`RootNavigator.tsx:176-200`), both Archived registrations exist
+  (`DashboardStack.tsx:62`, `SettingsStack.tsx:32`), `ShellAppBar variant='child'` + resolveBackIntent
+  present; (7) theme/animation — every plan mandates `useTheme().colors.*` + `check:colors` and
+  forbids setState-per-frame/Skia, pausing animation on `useIsFocused===false`/AppState background.
+- **Shared-table writer sweep (custom-fields / contacts / interactions).** Verified by reading the
+  read/DAO files directly rather than trusting the graph (which cannot enumerate SQL writers): this
+  phase ships no migration (D-03) and writes no shared domain table; it composes existing reads plus
+  the new additive `listDashboardSearch`/`countBirthdayPopulation`; the query-store persists only
+  Dashboard view prefs to `app_settings`; the only mutating path touched is the pre-existing Archived
+  purge (Plan 05, git-diff-guarded).
+- **Cross-artifact fact-drift pass.** No untraceable decision labels; plan citations match code on
+  disk except minor non-load-bearing line drift (`dashboard-query-logic.ts:194`→`:196`), already
+  mitigated by the plans' by-name / approximate-line-number discipline.
+- **Local-first invariant.** No finding introduces a network dependency on any read path; all
+  proposed fixes are on-device (component-API reconciliation, intrinsic-width measurement, an
+  equality guard, a themed error path).
+- **Decision-collision gate.** Ran explicitly (see the Cycle-4 Consensus Summary): no finding
+  reverses, weakens, or deletes a D-01..D-12 item, a HANDOFF.md entry, or an ADR — no owner
+  escalation required.
+
+## CYCLE_SUMMARY (Cycle 4 — unresolved in the current plans, commit a73f5aa)
+
+CYCLE_SUMMARY: current_high=0 current_actionable=4
+
+- **current_high = 0.** No unresolved HIGH. Both lanes + the source-grounding subagent agree; the
+  two Cycle-2 structural HIGHs remain fully resolved and no new HIGH was raised.
+- **current_actionable = 4** (all MEDIUM/LOW, none colliding with a recorded decision):
+  1. [MEDIUM] Plans 01+02 — layer-2 `onChange(completeObject)` contract contradicts the plans' own
+     "derive `next` from `getState()` at press time" serialization must_have; needs intent-based
+     callbacks (or axis state moved up).
+  2. [MEDIUM] Plan 04 — expanded-label header fit-measurement METHOD underspecified: with icon-only
+     as the mandated default the labels are never rendered, so "measure-and-compare" cannot work;
+     mandate an intrinsic-width probe / reserved budget.
+  3. [MEDIUM] Plan 07 — "already-active view is a no-op" must_have not enforced by `setViewMode`
+     (which always writes); add an equality guard before persistence.
+  4. [LOW] Plan 04 — Reset persistence-failure path unhandled (`onReset` awaits `resetDashboardView`
+     with no rejection handling); wrap in a handled async with a themed non-blocking error.
