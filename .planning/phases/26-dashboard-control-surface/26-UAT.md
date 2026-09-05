@@ -1,5 +1,5 @@
 ---
-status: partial
+status: complete
 phase: 26-dashboard-control-surface
 source: [26-VERIFICATION.md]
 started: 2026-09-05
@@ -8,7 +8,7 @@ updated: 2026-09-05
 
 ## Current Test
 
-[testing paused — owner reviewed the release APK; feedback resolved this session (see ## Post-UAT owner feedback). Remaining: owner to confirm archived→profile on the rebuilt APK.]
+[testing complete — 7/7 passed on the Pixel; launch-blocker + all post-UAT owner feedback fixed and owner-approved 2026-09-05. See ## Post-UAT owner feedback.]
 
 <!--
 Driven on the physical Pixel 6 Pro over USB (Metro :8082, adb reverse tcp:8081→8082).

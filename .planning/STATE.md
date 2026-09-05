@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Release Readiness
-current_phase: 26
-current_phase_name: Dashboard Control Surface
-status: executing
-stopped_at: Phase 26 executed + gates passed (regression 2246 green; review 0-crit/3-warn all fixed WR-01/02/03); awaiting Pixel UAT /gsd-verify-work 26
-last_updated: "2026-09-05T14:44:58Z"
+current_phase: 27
+current_phase_name: Dashboard List View
+status: ready
+stopped_at: Phase 26 COMPLETE — owner-approved after Pixel UAT (7/7) + post-UAT fixes (panels centered/scrollable, archived→profile); launch-blocker fixed inline (fc62a7b); release APK delivered. Ready to plan Phase 27.
+last_updated: "2026-09-05T19:05:42Z"
 last_activity: 2026-09-05
-last_activity_desc: Phase 26 gates complete — code review + fixes + verification (human_needed → UAT)
-state_head: 362e594
+last_activity_desc: Phase 26 closed — UAT 7/7 + owner-approved post-UAT fixes (centered/scrollable panels, archived→profile); release APK delivered
+state_head: 3068a34
 progress:
   total_phases: 20
   completed_phases: 3
@@ -29,19 +29,19 @@ carried_forward:
 See: .planning/PROJECT.md (updated 2026-09-01 after v1.0 milestone)
 
 **Core value:** Collapse the taps between "you're overdue with X" and the message actually being sent.
-**Current focus:** Phase 26 — Dashboard Control Surface
+**Current focus:** Phase 27 — Dashboard List View
 
 ## Current Position
 
-Phase: 26 (Dashboard Control Surface) — ALL PLANS EXECUTED
-Plan: 7 of 7 (complete)
-Status: Phase 26 all 7 plans done — awaiting `/gsd-verify-work 26`
+Phase: 27 (Dashboard List View) — NOT YET PLANNED
+Plan: — (Phase 27 not yet planned)
+Status: Phase 26 COMPLETE (owner-approved 2026-09-05). Next: `/gsd-plan-phase 27`
 Carried forward (owner's bucket, NOT resolved here): D-11 default Memory-type display name — reconcile before Phase 34.
 Surface to owner (24.2-07, KNOW-15): milestone plan said Phase 36 owns the backup format-4 bump, but 24.1 already bumped to 4 (d677e2c); Plan 07 emits into the live format 4 with NO bump — that milestone instruction is stale.
 Deferred to Phase 31 (recorded in Plan 05): durable contact-scoped-def ownership + owner-purge semantics. Deferred to Phase 36 (ROADMAP breadcrumb): legacy AI-fuel confirm-path code removal.
-Last activity: 2026-09-05 — Completed 26-07 (final plan of Phase 26)
-Progress: 5/19 phases complete (v2.0) — 22, 23, 24.1, 24.2, 25 (26 executed, pending verify)
-Next: `/gsd-verify-work 26` then `/gsd-plan-phase 27`.
+Last activity: 2026-09-05 — Phase 26 closed (Pixel UAT 7/7 + owner-approved post-UAT fixes; release APK delivered)
+Progress: 6/19 phases complete (v2.0) — 22, 23, 24.1, 24.2, 25, 26
+Next: `/gsd-plan-phase 27`.
 
 **Milestone v2.0 structure (pre-decided by the owner from the fifteen milestone-2 dossiers + the
 2026-09-01 cross-dossier audit; not re-derived):** 22 App Shell · 23 Theme · 24 Contact Knowledge ·

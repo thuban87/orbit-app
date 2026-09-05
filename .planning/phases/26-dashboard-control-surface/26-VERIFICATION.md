@@ -1,8 +1,8 @@
 ---
 phase: 26-dashboard-control-surface
 verified: 2026-09-05T10:05:00Z
-status: human_needed
-score: 10/10 requirements code-satisfied; rendered/on-device behaviour routed to UAT
+status: passed
+score: 10/10 requirements code-satisfied; on-device UAT 7/7 passed + owner-approved (2026-09-05). A launch-blocking render loop (HomeScreen useShallow, fc62a7b) was found and fixed during UAT; post-UAT owner feedback (archived→profile 53bb4af; panels centered + scrollable c414e51) fixed and owner-approved.
 behavior_unverified: 0
 overrides_applied: 0
 next_action: "Run the batched 26-UAT.md pass on the Pixel to confirm the device-observable control-surface behaviours (anchored panels, live-apply with no Apply button, inert/a11y-hide while open, Back-dismiss, header icon-only fallback, reduced-motion, 44px targets, 200% text scale, origin-aware return). All code-level truths, artifacts, wiring, prohibitions, and pure-logic tests are green."
