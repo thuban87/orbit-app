@@ -24,10 +24,10 @@
  *         'firstrun' ONLY when live===0 && neverContacted===0 && snoozed===0 &&
  *         archived===0 && unbound===0 (ALL FIVE empty), otherwise 'hidden'.
  *
- * Why (4) requires ALL FOUR zero (the HIGH-2 fix): the old
+ * Why (4) requires ALL FIVE zero (the HIGH-2 fix): the old
  * `no-live && no-archived` gate mislabelled a never-contacted-only or
  * snoozed-only user as first-run and showed "Add your first contact" — wrong,
- * they DO have people, just in a hidden bucket. Requiring all four populations
+ * they DO have people, just in a hidden bucket. Requiring all five populations
  * empty is robust regardless of how the "{N} contacts" header semantic is read.
  *
  * Why the precedence matters (the MEDIUM-4 fix): steps (2)/(3) fire BEFORE the
@@ -164,7 +164,7 @@ export function selectDashboardEmptyState(
   );
   if (populationEmptyState) return populationEmptyState;
 
-  // (4) The unfiltered default list: first-run ONLY when ALL FOUR populations are
+  // (4) The unfiltered default list: first-run ONLY when ALL FIVE populations are
   // empty; otherwise the people exist in a hidden bucket → point the user there.
   if (
     live === 0 &&
