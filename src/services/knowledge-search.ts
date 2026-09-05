@@ -21,7 +21,38 @@ export interface KnowledgeSearchItem {
 
 /** The minimal structured corpus shape consumed by the reusable ranker. */
 export interface SearchableKnowledgeCandidate {
-  readonly entries: ReadonlyArray<{ readonly text: string }>;
+  readonly entries: ReadonlyArray<SearchableKnowledgeEntry>;
+}
+
+/** The minimal entry shape used by the additive descriptor-ready scorer. */
+export interface SearchableKnowledgeEntry {
+  readonly text: string;
+  /** Optional provenance lets identity/name matches receive their bounded boost. */
+  readonly source?: string;
+}
+
+export interface KnowledgeSearchHighlight {
+  readonly start: number;
+  readonly length: number;
+}
+
+export interface KnowledgeSearchTermMatch {
+  readonly term: string;
+  readonly score: number;
+  readonly highlights: ReadonlyArray<KnowledgeSearchHighlight>;
+}
+
+export interface KnowledgeSearchEntryMatch<T extends SearchableKnowledgeEntry> {
+  readonly entry: T;
+  readonly termMatches: ReadonlyArray<KnowledgeSearchTermMatch>;
+  readonly score: number;
+}
+
+export interface CoverageRankedCandidate<T extends SearchableKnowledgeCandidate> {
+  readonly candidate: T;
+  readonly coverage: number;
+  readonly score: number;
+  readonly matches: ReadonlyArray<KnowledgeSearchEntryMatch<T["entries"][number]>>;
 }
 
 /**
@@ -37,6 +68,36 @@ export function tokenize(text: string): string[] {
     .toLocaleLowerCase()
     .split(/[^\p{L}\p{N}]+/u)
     .filter(Boolean);
+}
+
+interface OffsetToken extends KnowledgeSearchHighlight {
+  readonly normalizedToken: string;
+}
+
+/**
+ * The offset-preserving half of the sole tokenizer boundary. It recognizes the
+ * same word spans as `tokenize`, folds every span with its normalization rules,
+ * and retains offsets into the original raw string for descriptor rendering.
+ */
+function tokenizeWithOffsets(text: string): OffsetToken[] {
+  const bounded = text.slice(0, MAX_TOKENIZE_LEN);
+  const tokens: OffsetToken[] = [];
+  const words = /[\p{L}\p{N}\p{M}]+/gu;
+  for (const match of bounded.matchAll(words)) {
+    const raw = match[0];
+    const normalizedToken = raw
+      .normalize("NFD")
+      .replace(/\p{M}+/gu, "")
+      .toLocaleLowerCase();
+    if (normalizedToken) {
+      tokens.push({
+        normalizedToken,
+        start: match.index,
+        length: raw.length,
+      });
+    }
+  }
+  return tokens;
 }
 
 /**
@@ -106,6 +167,97 @@ export function scoreCandidate(
     }
   }
   return best;
+}
+
+/**
+ * Return every corpus entry that matched at least one query term, including
+ * raw-text highlight ranges and each term's best shared-matcher score.
+ */
+export function matchCandidateEntries<T extends SearchableKnowledgeEntry>(
+  query: string,
+  entries: readonly T[],
+): KnowledgeSearchEntryMatch<T>[] {
+  const terms = [...new Set(tokenize(query))];
+  if (terms.length === 0) return [];
+
+  return entries.flatMap((entry) => {
+    const tokens = tokenizeWithOffsets(entry.text);
+    const termMatches = terms.flatMap((term): KnowledgeSearchTermMatch[] => {
+      let bestScore: number | null = null;
+      let highlights: KnowledgeSearchHighlight[] = [];
+      for (const token of tokens) {
+        const score = tokenScore(term, token.normalizedToken);
+        if (score === null) continue;
+        const highlight = { start: token.start, length: token.length };
+        if (bestScore === null || score > bestScore) {
+          bestScore = score;
+          highlights = [highlight];
+        } else if (score === bestScore) {
+          highlights.push(highlight);
+        }
+      }
+      return bestScore === null ? [] : [{ term, score: bestScore, highlights }];
+    });
+    if (termMatches.length === 0) return [];
+    return [{
+      entry,
+      termMatches,
+      score: termMatches.reduce((total, match) => total + match.score, 0),
+    }];
+  });
+}
+
+/**
+ * Additive Dashboard ranker: term coverage is the primary key, strength is
+ * secondary, and partial matches intentionally remain in the result set.
+ * Legacy `rankCandidates` retains its all-terms-required behavior unchanged.
+ */
+export function rankCandidatesWithCoverage<T extends SearchableKnowledgeCandidate>(
+  query: string,
+  candidates: readonly T[],
+): CoverageRankedCandidate<T>[] {
+  return candidates
+    .map((candidate, index) => {
+      const matches = matchCandidateEntries(query, candidate.entries);
+      const bestByTerm = new Map<string, number>();
+      let exactNameBoost = 0;
+      for (const match of matches) {
+        for (const termMatch of match.termMatches) {
+          bestByTerm.set(
+            termMatch.term,
+            Math.max(bestByTerm.get(termMatch.term) ?? 0, termMatch.score),
+          );
+          if (match.entry.source === "name" && termMatch.score === 4) {
+            exactNameBoost = 10;
+          }
+        }
+      }
+      const coverage = bestByTerm.size;
+      const strength = [...bestByTerm.values()].reduce(
+        (total, score) => total + score,
+        0,
+      );
+      return {
+        candidate,
+        coverage,
+        matches,
+        index,
+        score: coverage * 100 + strength + exactNameBoost,
+      };
+    })
+    .filter((result) => result.coverage > 0)
+    .sort(
+      (left, right) =>
+        right.coverage - left.coverage ||
+        right.score - left.score ||
+        left.index - right.index,
+    )
+    .map(({ candidate, coverage, matches, score }) => ({
+      candidate,
+      coverage,
+      matches,
+      score,
+    }));
 }
 
 function scoreQuery(query: string, corpusText: string): number | null {
