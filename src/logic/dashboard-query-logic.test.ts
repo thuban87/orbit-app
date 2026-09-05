@@ -1,12 +1,57 @@
 import { describe, expect, it } from "vitest";
 import {
   ACTIVE_SEGREGATION_WHERE,
+  buildFilterWhere,
   buildPopulationWhere,
+  CONTACT_FREQUENCY_BANDS,
   resetDashboardView,
   resolveDefaultSort,
 } from "@/logic/dashboard-query-logic";
 
 describe("dashboard query logic", () => {
+  it("composes filter values OR-within and filter families AND-across", () => {
+    const where = buildFilterWhere({
+      category: ["1", "2"],
+      "social-battery": ["Charger", "Neutral"],
+      "needs-attention": ["on"],
+    });
+
+    expect(where.sql).toContain("c.category_id IN (?, ?)");
+    expect(where.sql).toContain("c.social_battery IN (?, ?)");
+    expect(where.sql).toContain("AND");
+    expect(where.sql).toContain("snooze_until IS NULL");
+    expect(where.params).toEqual([1, 2, "Charger", "Neutral"]);
+  });
+
+  it("keeps gravity out of SQL and drops unknown restored filter tokens", () => {
+    expect(buildFilterWhere({ gravity: ["deep"] })).toEqual({
+      sql: "",
+      params: [],
+    });
+    expect(
+      buildFilterWhere({
+        category: ["not-an-id"],
+        "social-battery": ["unknown"],
+        "contact-frequency": ["never"],
+        unknown: ["untrusted"] as never[],
+      } as never),
+    ).toEqual({ sql: "", params: [] });
+  });
+
+  it("uses the single frequency-band boundary source with bound values", () => {
+    const where = buildFilterWhere({ "contact-frequency": ["weekly", "monthly"] });
+
+    expect(CONTACT_FREQUENCY_BANDS).toEqual({
+      weekly: 7,
+      monthly: 31,
+      quarterly: 91,
+      yearly: null,
+    });
+    expect(where.sql).toContain("c.interval_days <= ?");
+    expect(where.sql).toContain("c.interval_days > ? AND c.interval_days <= ?");
+    expect(where.params).toEqual([7, 7, 31]);
+  });
+
   it("resets the shared query axes while preserving view mode", () => {
     expect(
       resetDashboardView({
