@@ -53,9 +53,11 @@
 import type { ProfileStatus } from "@/db/contact-status-read";
 import { escapeLike, RANK_CASE, RANKED_FUEL_EXCLUSIONS } from "@/db/fuel-read";
 import { PROGRESS_SQL, STABLE_MAX, STATUS_SQL } from "@/db/status";
+import { getImpactInputs } from "@/db/impact-read";
 import type { SqlExecutor } from "@/db/types";
 import {
   ACTIVE_SEGREGATION_WHERE,
+  buildFilterWhere,
   buildPopulationWhere,
   DASHBOARD_POPULATIONS,
   type DashboardQueryState,
@@ -65,6 +67,7 @@ import {
   SNOOZED_WHERE,
 } from "@/logic/dashboard-query-logic";
 import { daysUntilBirthday } from "@/logic/birthday-logic";
+import { filterByGravity } from "@/logic/dashboard-gravity-filter";
 
 /** The dashboard filter chips — a closed set of code-constant identifiers. */
 export type DashboardFilter =
@@ -288,6 +291,7 @@ export async function listDashboardPopulation(
   }
 
   const where = buildPopulationWhere(query.populations, { birthdayIds });
+  const filters = buildFilterWhere(query.filters);
   const matches = populationMatchColumns(query.populations, birthdayIds);
   const resolvedSort = resolveDefaultSort(query.sort, query.populations);
   const orderBy = POPULATION_SORT[resolvedSort];
@@ -303,9 +307,9 @@ export async function listDashboardPopulation(
       ${FUEL_LINE} AS fuelText,
       NULL AS snippet${matches.sql}
      ${CARD_FROM}
-     WHERE ${where.sql}
+     WHERE ${where.sql}${filters.sql ? `\n       AND ${filters.sql}` : ""}
      ORDER BY ${orderBy}`,
-    [...matches.params, ...where.params],
+    [...matches.params, ...where.params, ...filters.params],
   );
 
   if (resolvedSort === "soonest-birthday") {
@@ -316,7 +320,19 @@ export async function listDashboardPopulation(
       return daysDelta || left.name.localeCompare(right.name) || left.id - right.id;
     });
   }
-  return rows;
+
+  const gravityTiers = query.filters.gravity ?? [];
+  if (gravityTiers.length === 0) return rows;
+  const gravityIds = await filterByGravity(
+    rows.map((row) => row.id),
+    gravityTiers,
+    (id) => getImpactInputs(exec, id),
+    now,
+  );
+  const survivingIds = new Set(gravityIds);
+  // These are the fully-filtered rows. Search and empty-state consumers must
+  // derive their id scope/count from this returned set, never the SQL candidates.
+  return rows.filter((row) => survivingIds.has(row.id));
 }
 
 /** Never-contacted sort clause per NeverContactedSort. */

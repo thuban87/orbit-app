@@ -622,6 +622,13 @@ describe("listDashboardPopulation — Phase 25 Active universe", () => {
         NOW,
       ),
     ).resolves.toMatchObject([{ id: favourite }]);
+    await expect(
+      listDashboardPopulation(
+        exec,
+        { ...active, populations: ["favourites"], filters },
+        NOW,
+      ),
+    ).resolves.toHaveLength(1);
   });
 
   it("uses the post-query Gravity survivors as the fully-filtered id scope", async () => {
@@ -637,6 +644,21 @@ describe("listDashboardPopulation — Phase 25 Active universe", () => {
 
     expect(ids(rows)).toEqual([deep]);
     expect(ids(rows)).not.toContain(thin);
+  });
+
+  it("orders every explicit sort while Default remains population-aware", async () => {
+    const alpha = await seedContact({ name: "Alpha", lastContact: localDateOffset(-1) });
+    const bravo = await seedContact({ name: "Bravo", lastContact: localDateOffset(-30) });
+    const charlie = await seedContact({ name: "Charlie", lastContact: localDateOffset(-200) });
+    const read = (sort: DashboardQueryState["sort"]) =>
+      listDashboardPopulation(exec, { ...active, sort }, NOW).then(ids);
+
+    await expect(read("default")).resolves.toEqual([charlie, bravo, alpha]);
+    await expect(read("status")).resolves.toEqual([charlie, bravo, alpha]);
+    await expect(read("name-asc")).resolves.toEqual([alpha, bravo, charlie]);
+    await expect(read("name-desc")).resolves.toEqual([charlie, bravo, alpha]);
+    await expect(read("least-recent")).resolves.toEqual([charlie, bravo, alpha]);
+    await expect(read("most-recent")).resolves.toEqual([alpha, bravo, charlie]);
   });
 });
 
