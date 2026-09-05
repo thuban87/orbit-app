@@ -1,7 +1,8 @@
 ---
 phase: 26
 slug: dashboard-control-surface
-status: draft
+status: approved
+reviewed_at: 2026-09-05
 shadcn_initialized: false
 preset: none
 created: 2026-09-05
@@ -386,6 +387,25 @@ probed surfaces: S1 control row + summaries · S2 anchored panel (Population/Fil
 destinations · S4 overflow menu · S5 search + List/Card row · S6 Archived child route · S7 Unbound child
 route + search.
 
+**Probe reconciliation (post-verification, 2026-09-05).** The `ui-consideration-probe` engine, run with
+broad element-kind unions per surface, proposed **44** applicable considerations; the 27 rows above cover
+every one a user can reach. The remaining 17 are **dismissed with reason** (no silent drop) — all trace to
+the same two architectural facts, not to a missing state:
+
+- **`loading` / `error` on S1 control row, S2/S4 menus, S3 header, S5 search** — dismissed: these surfaces
+  hydrate **synchronously from local `app_settings` / SQLite with no network on any read path** (CLAUDE.md
+  local-first; Phase 25 contract). There is no in-flight or failure state to render; a preference write
+  failure is a settings concern, not a control-shell state (mirrors Phase 25 E3).
+- **`empty` / `populated` / `zero-one-many` on S4 overflow** — dismissed: the overflow is a **fixed 5-row
+  set** (§M amendment) that never varies in count, so data-volume states do not apply.
+- **`overflow` on S1 summaries / S3 header** — dismissed: covered by the `+N` collapse and the D-04
+  icon-only fallback already rowed above (not a separate scroll/clip state).
+- **`partial` / `overflow` / `zero-one-many` on S6/S7 lists beyond the rows above** — dismissed: rows are
+  complete contact records (no partial-field state) and list scroll is native `FlatList` behavior; the
+  meaningful volume states (empty / populated / long-name) are already rowed.
+
+Every proposed consideration is therefore **resolved or dismissed-with-reason** — 0 silently dropped.
+
 | Category | Element(s) | Status | Resolution / Reason |
 |----------|------------|--------|---------------------|
 | populated | S1 control summaries | ✅ covered | Each control shows current-axis names; `+N` collapse per dossier §C. |
@@ -466,11 +486,11 @@ BLOCKER, do not "fix"):
 
 ## Checker Sign-Off
 
-- [ ] Dimension 1 Copywriting: PASS
-- [ ] Dimension 2 Visuals: PASS
-- [ ] Dimension 3 Color: PASS
-- [ ] Dimension 4 Typography: PASS
-- [ ] Dimension 5 Spacing: PASS
-- [ ] Dimension 6 Registry Safety: PASS
+- [x] Dimension 1 Copywriting: PASS
+- [x] Dimension 2 Visuals: PASS
+- [x] Dimension 3 Color: PASS
+- [x] Dimension 4 Typography: PASS
+- [x] Dimension 5 Spacing: PASS
+- [x] Dimension 6 Registry Safety: PASS
 
-**Approval:** pending
+**Approval:** APPROVED by gsd-ui-checker 2026-09-05 (6/6 dimensions PASS, no recommendations; claims verified against `ArchivedContactsScreen.tsx` / `UnboundContactsScreen.tsx`). UI-Consideration Probe reconciled: 27 resolved + 17 dismissed-with-reason, 0 unresolved.
