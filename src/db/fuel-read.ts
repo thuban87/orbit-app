@@ -9,8 +9,8 @@
  *   1. This file is the ONLY user-facing / projection fuel read path. Every
  *      projection added later (getRankedFuel, Plan 02) lands HERE. (The standalone
  *      cross-contact `searchFuel` projection was retired in Phase 8 — dashboard
- *      search now lives in `dashboard-read.ts`'s `listDashboard`, which reuses the
- *      shared `RANKED_FUEL_EXCLUSIONS` / `escapeLike` exports below.) purge-dao's
+ *      search now lives in `dashboard-read.ts`'s `listDashboardSearch`, which reuses
+ *      the shared `RANKED_FUEL_EXCLUSIONS` / `escapeLike` exports below.) purge-dao's
  *      MAINTENANCE reads — the impact count at `purge-dao.ts:105`
  *      (`SELECT COUNT(*) … FROM fuel`) and the delete fan-out at `:188`
  *      (`DELETE FROM fuel …`) — are a SEPARATE maintenance path and are EXPLICITLY

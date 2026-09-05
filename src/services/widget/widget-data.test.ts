@@ -1,6 +1,6 @@
 /**
  * widget-data — proof that the favourites tile shaper is a pure, node-testable
- * projection of the EXISTING `listDashboard({filter:'favourites'})` rows into
+ * projection of the EXISTING `listDashboardPopulation({populations:['favourites']})` rows into
  * widget tiles: it carries the derived status VERBATIM (never re-deriving it, so
  * the never-contacted='stable' HIGH-1 trap can never resurface), computes only
  * the presentational initials + swatch index, and truncates by the incoming
@@ -8,9 +8,9 @@
  * fixture and a stub SqlExecutor exercise every branch.
  */
 import { describe, expect, it, vi } from "vitest";
+import { getInitials, swatchIndex } from "@/components/avatar-initials";
 import type { DashboardRow } from "@/db/dashboard-read";
 import type { SqlExecutor } from "@/db/types";
-import { getInitials, swatchIndex } from "@/components/avatar-initials";
 import {
   loadWidgetTiles,
   shapeWidgetTiles,
@@ -20,7 +20,9 @@ import {
 const SWATCH_COUNT = 8;
 
 /** A DashboardRow fixture builder. favourite_rank signals membership only. */
-function row(over: Partial<DashboardRow> & { id: number; name: string }): DashboardRow {
+function row(
+  over: Partial<DashboardRow> & { id: number; name: string },
+): DashboardRow {
   return {
     photo: null,
     modified_at: "2026-08-17",
@@ -51,7 +53,14 @@ describe("shapeWidgetTiles", () => {
 
   it("computes initials + swatchIndex via the shared avatar helpers", () => {
     const tiles = shapeWidgetTiles(
-      [row({ id: 1, name: "Ada Lovelace", photo: "avatars/1.jpg", fuelText: "Ask about Analytical Engine" })],
+      [
+        row({
+          id: 1,
+          name: "Ada Lovelace",
+          photo: "avatars/1.jpg",
+          fuelText: "Ask about Analytical Engine",
+        }),
+      ],
       { capacity: WIDGET_GRID_CAPACITY, swatchCount: SWATCH_COUNT },
     );
     expect(tiles[0]).toEqual({
@@ -72,13 +81,19 @@ describe("shapeWidgetTiles", () => {
       row({ id: 3, name: "Three" }),
       row({ id: 4, name: "Four" }),
     ];
-    const tiles = shapeWidgetTiles(rows, { capacity: 2, swatchCount: SWATCH_COUNT });
+    const tiles = shapeWidgetTiles(rows, {
+      capacity: 2,
+      swatchCount: SWATCH_COUNT,
+    });
     expect(tiles.map((t) => t.name)).toEqual(["One", "Two"]);
   });
 
   it("maps an empty list to []", () => {
     expect(
-      shapeWidgetTiles([], { capacity: WIDGET_GRID_CAPACITY, swatchCount: SWATCH_COUNT }),
+      shapeWidgetTiles([], {
+        capacity: WIDGET_GRID_CAPACITY,
+        swatchCount: SWATCH_COUNT,
+      }),
     ).toEqual([]);
   });
 });
@@ -110,8 +125,9 @@ describe("loadWidgetTiles", () => {
   });
 
   it("truncates the loaded favourites to the default grid capacity", async () => {
-    const rows: DashboardRow[] = Array.from({ length: WIDGET_GRID_CAPACITY + 3 }, (_, i) =>
-      row({ id: i + 1, name: `Fav ${i + 1}`, favourite_rank: i }),
+    const rows: DashboardRow[] = Array.from(
+      { length: WIDGET_GRID_CAPACITY + 3 },
+      (_, i) => row({ id: i + 1, name: `Fav ${i + 1}`, favourite_rank: i }),
     );
     const exec = {
       getAllAsync: vi.fn().mockResolvedValue(rows),

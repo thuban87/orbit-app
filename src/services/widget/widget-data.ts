@@ -15,13 +15,17 @@
  *     only truncates that already-ordered projection (ADR-075).
  *
  * It is node-loadable and file-I/O-free: NO react-native, NO expo, NO DB import
- * beyond the pure `listDashboard` read. The relative photo path is carried as-is;
+ * beyond the pure `listDashboardPopulation` read. The relative photo path is carried as-is;
  * base64 thumbnail encoding happens later in the render (12-03's encoder), keeping
  * this shaper pure so the never-re-derive contract is unit-tested without a device.
  */
-import type { ProfileStatus } from "@/db/contact-status-read";
+
 import { getInitials, swatchIndex } from "@/components/avatar-initials";
-import { type DashboardRow, listDashboardPopulation } from "@/db/dashboard-read";
+import type { ProfileStatus } from "@/db/contact-status-read";
+import {
+  type DashboardRow,
+  listDashboardPopulation,
+} from "@/db/dashboard-read";
 import type { SqlExecutor } from "@/db/types";
 import { formatLocalDate } from "@/utils/dates";
 
@@ -80,10 +84,17 @@ export async function loadWidgetTiles(
   opts: { swatchCount: number; capacity?: number; now?: string },
 ): Promise<WidgetTile[]> {
   const date = new Date();
-  const now = opts.now ?? `${formatLocalDate(date)} ${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}:${String(date.getSeconds()).padStart(2, "0")}`;
+  const now =
+    opts.now ??
+    `${formatLocalDate(date)} ${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}:${String(date.getSeconds()).padStart(2, "0")}`;
   const rows = await listDashboardPopulation(
     exec,
-    { viewMode: "list", populations: ["favourites"], filters: {}, sort: "default" },
+    {
+      viewMode: "list",
+      populations: ["favourites"],
+      filters: {},
+      sort: "default",
+    },
     now,
   );
   return shapeWidgetTiles(rows, {

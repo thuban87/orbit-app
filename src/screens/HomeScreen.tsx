@@ -1,10 +1,10 @@
 /**
  * HomeScreen — the dashboard CORE (DASH-01/03/04/05/07). This IS the app's home
- * surface: a flat, status-sorted `listDashboard` population rendered as
- * `ContactCard`s, with the birthday banner, the contact-count header, the
- * hidden-population footer entries, a reliable freshness path, and cause-aware
- * empty/error states. The interactive controls (filter chips, sort control,
- * search box) land in Plan 09; this ships the default persisted sort/filter.
+ * surface: the Phase 25 query-state population (`listDashboardPopulation`, or
+ * `listDashboardSearch` when a term is present) rendered as `ContactCard`s, with
+ * the contact-count header, the Population/Filters/Sort control row, the Row 3
+ * collapsible session-backed search + List/Card toggle, a reliable freshness
+ * path, and cause-aware empty/error states.
  *
  * FRESHNESS (DASH-07 / threat T-08-18): the list re-queries on `useFocusEffect`,
  * on an `AppState`→"active" listener, and via pull-to-refresh. It deliberately
@@ -14,8 +14,9 @@
  * different connection, so it would silently miss cross-context updates. Focus +
  * foreground + pull is the only path that reflects those writes.
  *
- * READS (threat T-08-16/17): every read is async on-device SQLite (`listDashboard`
- * + the four counts via `getExecutor()`) guarded by a `cancelled` flag so a stale
+ * READS (threat T-08-16/17): every read is async on-device SQLite (the D-12
+ * `listDashboardPopulation` / `listDashboardSearch` read + the counts via
+ * `getExecutor()`) guarded by a `cancelled` flag so a stale
  * async result can never clobber a newer one; no network sits on the read path,
  * and the DAO already scopes off_limits / unconfirmed-ai / archived rows in-query
  * (this screen performs no `.filter()` on private data).

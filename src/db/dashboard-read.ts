@@ -1,6 +1,6 @@
 /**
  * Dashboard read chokepoint (DASH-01/02/04/07) — the SINGLE parametrized card
- * read behind the home screen list, the never-contacted screen, the search box,
+ * read behind the home screen list, the not-contacted population, the search box,
  * the birthday banner, and every population count. Pure READ-ONLY: no
  * transaction, no writer, no migration, no network — async `getAllAsync` /
  * `getFirstAsync` only (NEVER the sync variants). On-device SQLite; local-first.
@@ -19,11 +19,11 @@
  * HIGH-1 (never-contacted status): STATUS_SQL has NO NULL branch — over a NULL
  * `last_contact` every comparison is false → its ELSE buckets the row as the
  * literal 'stable' (status.ts:67-73). Every card projection here therefore wraps
- * status/progress in `CASE WHEN c.last_contact IS NULL THEN NULL ELSE (…) END`
- * (or selects literal `NULL` in listNeverContacted), so a never-contacted row —
- * surfaced by listNeverContacted, the favourites archived-only relaxation, or the
- * term-widened search — always reads status=null / progress=null, never 'stable'.
- * This mirrors the getContactStatus guard (contact-status-read.ts:70-80).
+ * status/progress in `CASE WHEN c.last_contact IS NULL THEN NULL ELSE (…) END`,
+ * so a never-contacted row — surfaced by listDashboardPopulation's not-contacted
+ * population, the favourites archived-only relaxation, or the term-widened search
+ * — always reads status=null / progress=null, never 'stable'. This mirrors the
+ * getContactStatus guard (contact-status-read.ts:70-80).
  *
  * TIMEZONE (matches status.ts): only `now` is converted to local
  * (`date('now','localtime')`); a STORED column (`last_contact`, `snooze_until`)
@@ -52,9 +52,11 @@
  */
 import type { ProfileStatus } from "@/db/contact-status-read";
 import { escapeLike, RANK_CASE, RANKED_FUEL_EXCLUSIONS } from "@/db/fuel-read";
-import { PROGRESS_SQL, STABLE_MAX, STATUS_SQL } from "@/db/status";
 import { getImpactInputs } from "@/db/impact-read";
+import { PROGRESS_SQL, STATUS_SQL } from "@/db/status";
 import type { SqlExecutor } from "@/db/types";
+import { daysUntilBirthday } from "@/logic/birthday-logic";
+import { filterByGravity } from "@/logic/dashboard-gravity-filter";
 import {
   ACTIVE_SEGREGATION_WHERE,
   buildFilterWhere,
@@ -66,8 +68,6 @@ import {
   resolveDefaultSort,
   SNOOZED_WHERE,
 } from "@/logic/dashboard-query-logic";
-import { daysUntilBirthday } from "@/logic/birthday-logic";
-import { filterByGravity } from "@/logic/dashboard-gravity-filter";
 
 /** The dashboard filter chips — a closed set of code-constant identifiers. */
 export type DashboardFilter =
@@ -80,9 +80,6 @@ export type DashboardFilter =
 
 /** The dashboard sort modes. */
 export type DashboardSort = "status" | "name" | "least-recent" | "most-recent";
-
-/** The never-contacted screen's own sort modes. */
-export type NeverContactedSort = "oldest" | "newest" | "name";
 
 /**
  * One dashboard card row. `status` and `progress` are NULLABLE (per HIGH-1 they
@@ -144,9 +141,9 @@ const FUEL_LINE = `(SELECT text
     LIMIT 1)`;
 
 /**
- * The CASE-wrapped status/progress projection shared by ALL listDashboard
- * branches (HIGH-1). `cat.name` is aliased to `categoryLabel`; `c.name` is
- * qualified everywhere so the LEFT JOIN's `categories.name` can never shadow it.
+ * The CASE-wrapped status/progress projection shared by the population and
+ * search card reads (HIGH-1). `cat.name` is aliased to `categoryLabel`; `c.name`
+ * is qualified everywhere so the LEFT JOIN's `categories.name` can never shadow it.
  */
 const CARD_STATUS = `CASE WHEN c.tracking_enabled = 0 OR c.last_contact IS NULL THEN NULL ELSE (${PROGRESS_SQL}) END AS progress,
     CASE WHEN c.tracking_enabled = 0 OR c.last_contact IS NULL THEN NULL ELSE (${STATUS_SQL}) END AS status`;
@@ -206,10 +203,8 @@ const POPULATION_SORT: Record<
 };
 
 /**
- * Additive Phase-25 population read. It stays node-pure: the render layer owns
- * the local wall-clock read and injects it for the birthday window. Legacy
- * listDashboard and its snooze-bearing BASE_WHERE remain byte-for-byte untouched
- * for existing Home consumers until later render plans.
+ * Additive Phase-25 population read helper. It stays node-pure: the render layer
+ * owns the local wall-clock read and injects it for the birthday window.
  */
 function birthdayPredicate(birthdayIds: readonly number[]): string {
   return birthdayIds.length === 0
@@ -229,7 +224,9 @@ function populationMatchColumns(
   for (const population of selected) {
     switch (population) {
       case "favourites":
-        columns.push(`CASE WHEN ${FAVOURITES_WHERE} THEN 1 ELSE 0 END AS isFavourite`);
+        columns.push(
+          `CASE WHEN ${FAVOURITES_WHERE} THEN 1 ELSE 0 END AS isFavourite`,
+        );
         break;
       case "birthdays":
         columns.push(
@@ -238,10 +235,14 @@ function populationMatchColumns(
         params.push(...birthdayIds);
         break;
       case "not-contacted":
-        columns.push(`CASE WHEN ${NOT_CONTACTED_WHERE} THEN 1 ELSE 0 END AS isNotContacted`);
+        columns.push(
+          `CASE WHEN ${NOT_CONTACTED_WHERE} THEN 1 ELSE 0 END AS isNotContacted`,
+        );
         break;
       case "snoozed":
-        columns.push(`CASE WHEN ${SNOOZED_WHERE} THEN 1 ELSE 0 END AS isSnoozed`);
+        columns.push(
+          `CASE WHEN ${SNOOZED_WHERE} THEN 1 ELSE 0 END AS isSnoozed`,
+        );
         break;
       case "all-contacts":
         columns.push(
@@ -250,7 +251,10 @@ function populationMatchColumns(
         break;
     }
   }
-  return { sql: columns.length === 0 ? "" : `,\n      ${columns.join(",\n      ")}`, params };
+  return {
+    sql: columns.length === 0 ? "" : `,\n      ${columns.join(",\n      ")}`,
+    params,
+  };
 }
 
 function localMidnightFromReadNow(now: string): Date {
@@ -337,7 +341,9 @@ async function applyPopulationPostProcessing(
       const daysDelta =
         (composition.birthdayDays.get(left.id) ?? Number.POSITIVE_INFINITY) -
         (composition.birthdayDays.get(right.id) ?? Number.POSITIVE_INFINITY);
-      return daysDelta || left.name.localeCompare(right.name) || left.id - right.id;
+      return (
+        daysDelta || left.name.localeCompare(right.name) || left.id - right.id
+      );
     });
   }
 
@@ -439,134 +445,6 @@ export async function listDashboardSearch(
   return applyPopulationPostProcessing(exec, rows, query, now, composition);
 }
 
-/** Never-contacted sort clause per NeverContactedSort. */
-const NC_SORT: Record<NeverContactedSort, string> = {
-  oldest: "c.created_at ASC, c.id ASC",
-  newest: "c.created_at DESC, c.id DESC",
-  name: "c.name COLLATE NOCASE, c.id",
-};
-
-/**
- * The dashboard card list. Chooses its WHERE among FOUR MUTUALLY-EXCLUSIVE
- * population branches (NOT a fixed restrictive base + APPENDED filter predicate —
- * that construction is internally contradictory: appending `snooze_until > now`
- * onto a base requiring `snooze_until <= now` is always-empty, and appending
- * `favourite_rank IS NOT NULL` onto a base excluding never-contacted hides a
- * never-contacted favourite). All branches share the IDENTICAL card projection
- * (CASE-wrapped status/progress, the ranked fuel line, the term-only snippet) and
- * the `c.name COLLATE NOCASE, c.id` tiebreak; they differ only in WHERE and — for
- * favourites — the ORDER BY. Precedence:
- *
- *   1. term present  — HIGHEST (review LOW-2; wins even over filter='favourites').
- *                      Archived-only + name-OR-fuel EXISTS (A3 widening).
- *   2. favourites    — archived-only + favourite_rank IS NOT NULL, ordered
- *                      favourite_rank ASC (REVEALS never-contacted / snoozed favs).
- *   3. snoozed       — archived-only + FUTURE snooze_until (REVEALS the hidden
- *                      population; empty until Phase 11 writes snooze_until).
- *   4. default       — the restrictive BASE_WHERE, with needs-attention / category
- *                      / battery narrowing WITHIN it (never relaxing it).
- */
-export function listDashboard(
-  exec: SqlExecutor,
-  opts: { filter: DashboardFilter; sort: DashboardSort; term?: string },
-): Promise<DashboardRow[]> {
-  const term = opts.term?.trim() ?? "";
-  const hasTerm = term !== "";
-  const params: unknown[] = [];
-
-  // The snippet subquery renders WHENEVER an eligible fuel row matches the term,
-  // INDEPENDENT of a concurrent name match (MEDIUM-6) — mirrors searchFuel. Its
-  // `?` sits in the SELECT list, so its bind is pushed FIRST. On a name-only match
-  // (no matching fuel) the subquery yields null.
-  const snippet = hasTerm
-    ? `(SELECT text FROM fuel WHERE contact_id = c.id AND ${RANKED_FUEL_EXCLUSIONS} AND text LIKE ? ESCAPE '\\' LIMIT 1)`
-    : "NULL";
-
-  const head = `SELECT c.id AS id,
-    c.name AS name,
-    c.photo AS photo,
-    c.modified_at AS modified_at,
-    cat.name AS categoryLabel,
-    c.tracking_enabled AS trackingEnabled,
-    ${CARD_FAVOURITE_RANK},
-    ${CARD_STATUS},
-    ${FUEL_LINE} AS fuelText,
-    ${snippet} AS snippet
-   ${CARD_FROM}`;
-
-  let where: string;
-  let orderBy: string;
-
-  if (hasTerm) {
-    // Branch 1 — term wins over everything. Relax the never-contacted + snooze
-    // exclusions to archived-only (A3), but stay BOUND-ONLY: `${DASHBOARD_BOUND_WHERE}`
-    // (`c.tracking_enabled = 1`) keeps an Unbound contact out of legacy Home search
-    // (D-13 — closes the DASHQ-08 leak where Unbound rows surfaced as unlabelled
-    // cards). The Unbound name-lookup replacement is coordinated with Phase 26; the
-    // one-phase gap is owner-accepted. Only this branch's inline `where` changes —
-    // BASE_WHERE and every other branch stay byte-unchanged.
-    const like = `%${escapeLike(term)}%`;
-    params.push(like); // snippet subquery (SELECT clause — appears first)
-    where = `c.archived_at IS NULL
-     AND ${DASHBOARD_BOUND_WHERE}
-     AND (
-       c.name LIKE ? ESCAPE '\\'
-       OR EXISTS (SELECT 1 FROM fuel WHERE contact_id = c.id AND ${RANKED_FUEL_EXCLUSIONS} AND text LIKE ? ESCAPE '\\')
-     )`;
-    params.push(like, like); // name LIKE, then EXISTS text LIKE
-    orderBy = SORT[opts.sort];
-  } else if (opts.filter === "favourites") {
-    // Branch 2 — archived-only relaxation: a never-contacted OR currently-snoozed
-    // favourite is STILL shown (its status/progress read null via the CASE wrap).
-    where = `c.archived_at IS NULL AND ${DASHBOARD_BOUND_WHERE} AND c.favourite_rank IS NOT NULL`;
-    orderBy = "c.favourite_rank ASC, c.name COLLATE NOCASE, c.id";
-  } else if (opts.filter === "snoozed") {
-    // Branch 3 — REVEAL the future-snoozed population the default hides.
-    where = `c.archived_at IS NULL AND ${DASHBOARD_BOUND_WHERE} AND c.snooze_until IS NOT NULL AND date(c.snooze_until) > date('now','localtime')`;
-    orderBy = SORT[opts.sort];
-  } else {
-    // Branch 4 — the restrictive base, with a narrowing predicate ANDed WITHIN it.
-    where = BASE_WHERE;
-    if (opts.filter === "needs-attention") {
-      // wobble/decay/rogue: progress past the stable ceiling.
-      where += ` AND (${PROGRESS_SQL}) >= ${STABLE_MAX}`;
-    } else if (opts.filter.startsWith("category-")) {
-      where += " AND c.category_id = ?";
-      params.push(Number(opts.filter.slice("category-".length)));
-    } else if (opts.filter.startsWith("battery-")) {
-      where += " AND c.social_battery = ?";
-      params.push(opts.filter.slice("battery-".length));
-    }
-    // filter === 'all' adds no extra predicate.
-    orderBy = SORT[opts.sort];
-  }
-
-  const sql = `${head}\n  WHERE ${where}\n  ORDER BY ${orderBy}`;
-  return exec.getAllAsync<DashboardRow>(sql, params);
-}
-
-/**
- * @deprecated The standalone Never Contacted screen was retired in Phase 25
- * (DASHQ-03 / dossier E-02); this read has no runtime consumer as of Phase 25.
- * It is retained deliberately, NOT surgically pulled here: it is retired together
- * with the legacy `listDashboard` / legacy Home in the render phases (26–28), and
- * removing it now would touch this file which Plans 02/03 heavily edit. The
- * Not-Contacted DATA path lives on via `listDashboardPopulation`'s not-contacted
- * population; `countNeverContacted` (below) is still consumed by DigestScreen.
- *
- * The never-contacted inverse population (`archived_at IS NULL AND last_contact
- * IS NULL`). Selects LITERAL `NULL AS status, NULL AS progress` — NOT STATUS_SQL
- * over these rows, which would label every row 'stable' (HIGH-1). Same card
- * projection otherwise (category label + ranked fuel line); snippet is always
- * null (no search here).
- */
-export function listNeverContacted(
-  exec: SqlExecutor,
-  opts: { sort: NeverContactedSort },
-): Promise<DashboardRow[]> {
-  return listNeverContactedWithPolicy(exec, opts);
-}
-
 async function readIncludeUnboundNeverContacted(
   exec: SqlExecutor,
 ): Promise<void> {
@@ -576,34 +454,6 @@ async function readIncludeUnboundNeverContacted(
   if (!setting) {
     throw new Error("listNeverContacted: app_settings id=1 row is missing");
   }
-}
-
-async function listNeverContactedWithPolicy(
-  exec: SqlExecutor,
-  opts: { sort: NeverContactedSort },
-): Promise<DashboardRow[]> {
-  await readIncludeUnboundNeverContacted(exec);
-  const sql = `SELECT c.id AS id,
-    c.name AS name,
-    c.photo AS photo,
-    c.modified_at AS modified_at,
-    cat.name AS categoryLabel,
-    c.tracking_enabled AS trackingEnabled,
-    ${CARD_FAVOURITE_RANK},
-    NULL AS progress,
-    NULL AS status,
-    ${FUEL_LINE} AS fuelText,
-    NULL AS snippet
-   ${CARD_FROM}
-   WHERE c.archived_at IS NULL
-     AND c.last_contact IS NULL
-     AND (c.tracking_enabled = 1 OR (
-       c.tracking_enabled = 0 AND (
-         SELECT include_unbound_never_contacted FROM app_settings WHERE id = 1
-       ) = 1
-     ))
-   ORDER BY ${NC_SORT[opts.sort]}`;
-  return exec.getAllAsync<DashboardRow>(sql);
 }
 
 /**
