@@ -15,6 +15,8 @@
  * with a `goBack` Back control, title 24/700, surface rows). Every colour
  * resolves through `useTheme().colors.*` (CLAUDE.md / check:colors).
  */
+import { useNavigation } from "@react-navigation/native";
+import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useCallback, useEffect, useState } from "react";
 import {
   Alert,
@@ -24,6 +26,7 @@ import {
   Text,
   View,
 } from "react-native";
+import { ShellAppBar } from "@/components/ShellAppBar";
 import {
   type ArchivedContactRow,
   listArchived,
@@ -35,7 +38,7 @@ import {
   impactSummaryLines,
   purgeContact,
 } from "@/db/purge-dao";
-import { ShellAppBar } from "@/components/ShellAppBar";
+import type { RootStackParamList } from "@/navigation/types";
 import { buildNotificationPurgeCleanup } from "@/services/notifications/purge-notification-cleanup";
 import { buildPhotoPurgeCleanup } from "@/services/photos/purge-photo-cleanup";
 import { notifyWidgetDataChanged } from "@/services/widget/widget-refresh";
@@ -88,6 +91,12 @@ function purgeBody(name: string, parts: string[]): string {
 
 export function ArchivedContactsScreen() {
   const { colors } = useTheme();
+  // Archived is hosted in both DashboardStack and SettingsStack; both register
+  // "Profile", so tapping a row opens the contact and Back returns here — the
+  // locked origin-aware return (Dashboard → Archived → Profile → Back → Archived,
+  // UI-SPEC §Origin-aware return / D-05).
+  const navigation =
+    useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const [rows, setRows] = useState<ArchivedContactRow[]>([]);
 
   const load = useCallback(async () => {
@@ -210,12 +219,22 @@ export function ArchivedContactsScreen() {
                   },
                 ]}
               >
-                <Text
-                  numberOfLines={1}
-                  style={[styles.rowName, { color: colors.textPrimary }]}
+                <Pressable
+                  testID={`archived-open-${contact.id}`}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Open ${contact.name}`}
+                  onPress={() =>
+                    navigation.navigate("Profile", { contactId: contact.id })
+                  }
+                  style={styles.rowNameButton}
                 >
-                  {contact.name}
-                </Text>
+                  <Text
+                    numberOfLines={1}
+                    style={[styles.rowName, { color: colors.textPrimary }]}
+                  >
+                    {contact.name}
+                  </Text>
+                </Pressable>
                 <View style={styles.rowActions}>
                   <Pressable
                     testID={`archived-restore-${contact.id}`}
@@ -277,8 +296,12 @@ const styles = StyleSheet.create({
     padding: 12,
     gap: 10,
   },
-  rowName: {
+  rowNameButton: {
     flex: 1,
+    justifyContent: "center",
+    minHeight: 44,
+  },
+  rowName: {
     fontSize: 16,
     fontWeight: "600",
   },

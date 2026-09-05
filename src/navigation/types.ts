@@ -1,11 +1,11 @@
+import type { BottomTabScreenProps } from "@react-navigation/bottom-tabs";
 import type {
   CompositeScreenProps,
   NavigatorScreenParams,
 } from "@react-navigation/native";
-import type { BottomTabScreenProps } from "@react-navigation/bottom-tabs";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
-import type { MergeResolutions } from "@/db/merge-dao";
 import type { CurrentStateFieldKey } from "@/db/memory-registry";
+import type { MergeResolutions } from "@/db/merge-dao";
 import type { RestorePreviewRoute } from "@/screens/backup-restore-logic";
 import type { PhotoTargetDescriptor } from "@/services/photos/photo-storage";
 
@@ -152,6 +152,7 @@ export type SettingsStackParamList = {
   Settings: undefined;
   CustomFields: undefined;
   Archived: undefined;
+  Profile: { contactId: number; openReachOut?: boolean };
   CropPhoto: {
     rawUri: string;
     target: PhotoTargetDescriptor;
