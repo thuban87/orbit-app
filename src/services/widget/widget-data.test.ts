@@ -4,7 +4,7 @@
  * widget tiles: it carries the derived status VERBATIM (never re-deriving it, so
  * the never-contacted='stable' HIGH-1 trap can never resurface), computes only
  * the presentational initials + swatch index, and truncates by the incoming
- * favourite_rank order. No DB, no react-native, no expo — a fake DashboardRow[]
+ * Dashboard Default order. No DB, no react-native, no expo — a fake DashboardRow[]
  * fixture and a stub SqlExecutor exercise every branch.
  */
 import { describe, expect, it, vi } from "vitest";
@@ -19,7 +19,7 @@ import {
 
 const SWATCH_COUNT = 8;
 
-/** A DashboardRow fixture builder — favourites arrive favourite_rank ASC. */
+/** A DashboardRow fixture builder. favourite_rank signals membership only. */
 function row(over: Partial<DashboardRow> & { id: number; name: string }): DashboardRow {
   return {
     photo: null,
@@ -65,7 +65,7 @@ describe("shapeWidgetTiles", () => {
     });
   });
 
-  it("truncates to capacity, preserving the incoming favourite_rank order", () => {
+  it("truncates to capacity, preserving the incoming Default order", () => {
     const rows: DashboardRow[] = [
       row({ id: 1, name: "One" }),
       row({ id: 2, name: "Two" }),
@@ -84,23 +84,29 @@ describe("shapeWidgetTiles", () => {
 });
 
 describe("loadWidgetTiles", () => {
-  it("reads the listDashboard favourites projection and shapes it", async () => {
+  it("reads the Favorites population in Dashboard Default order and shapes it", async () => {
     const rows: DashboardRow[] = [
-      row({ id: 10, name: "Fav One", favourite_rank: 0 }),
-      row({ id: 11, name: "Fav Two", favourite_rank: 1 }),
+      // Default relationship-health order is supplied by the dashboard read;
+      // deliberately reverse legacy ranks so the fixture cannot imply rank order.
+      row({ id: 11, name: "Fav Two", favourite_rank: 0 }),
+      row({ id: 10, name: "Fav One", favourite_rank: 1 }),
     ];
     const getAllAsync = vi.fn().mockResolvedValue(rows);
     const exec = { getAllAsync } as unknown as SqlExecutor;
 
-    const tiles = await loadWidgetTiles(exec, { swatchCount: SWATCH_COUNT });
+    const tiles = await loadWidgetTiles(exec, {
+      swatchCount: SWATCH_COUNT,
+      now: "2026-09-05 12:00:00",
+    });
 
-    // The SQL that ran must be the favourites branch (archived-only + rank).
+    // The SQL must select the Favorites membership set and Default ordering.
     const sql = getAllAsync.mock.calls[0][0] as string;
     expect(sql).toContain("c.favourite_rank IS NOT NULL");
-    expect(sql).toContain("c.favourite_rank ASC");
     expect(sql).toContain("c.tracking_enabled = 1");
-    expect(tiles.map((t) => t.id)).toEqual([10, 11]);
-    expect(tiles[0].initials).toBe(getInitials("Fav One"));
+    expect(sql).toContain("ORDER BY progress DESC");
+    expect(sql).not.toContain("favourite_rank ASC");
+    expect(tiles.map((t) => t.id)).toEqual([11, 10]);
+    expect(tiles[0].initials).toBe(getInitials("Fav Two"));
   });
 
   it("truncates the loaded favourites to the default grid capacity", async () => {
@@ -111,7 +117,10 @@ describe("loadWidgetTiles", () => {
       getAllAsync: vi.fn().mockResolvedValue(rows),
     } as unknown as SqlExecutor;
 
-    const tiles = await loadWidgetTiles(exec, { swatchCount: SWATCH_COUNT });
+    const tiles = await loadWidgetTiles(exec, {
+      swatchCount: SWATCH_COUNT,
+      now: "2026-09-05 12:00:00",
+    });
     expect(tiles).toHaveLength(WIDGET_GRID_CAPACITY);
   });
 });
