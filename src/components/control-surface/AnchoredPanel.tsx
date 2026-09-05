@@ -47,6 +47,11 @@ export function AnchoredPanel({
   const isFocused = useIsFocused();
   const [appActive, setAppActive] = useState(AppState.currentState === "active");
   const contentRef = useRef<View>(null);
+  // Hold the latest onDismiss in a ref so the focus/transient effect below can
+  // depend on `visible` ALONE — a fresh onDismiss identity must never re-arm the
+  // effect and re-steal accessibility focus on an in-panel toggle (WR-01).
+  const onDismissRef = useRef(onDismiss);
+  onDismissRef.current = onDismiss;
   const progress = useSharedValue(visible ? 1 : 0);
   const { width, height } = useWindowDimensions();
   const position = clampAnchorPosition(anchorRect, PANEL_DIMENSIONS[size], { width, height }, SPACING.base);
@@ -61,11 +66,13 @@ export function AnchoredPanel({
       shellTransientStore.getState().closeTransient("dashboard-panel");
       return;
     }
-    shellTransientStore.getState().openTransient("dashboard-panel", onDismiss);
+    shellTransientStore
+      .getState()
+      .openTransient("dashboard-panel", () => onDismissRef.current());
     const handle = findNodeHandle(contentRef.current);
     if (handle != null) AccessibilityInfo.setAccessibilityFocus(handle);
     return () => shellTransientStore.getState().closeTransient("dashboard-panel");
-  }, [visible, onDismiss]);
+  }, [visible]);
 
   useEffect(() => {
     const canAnimate = isFocused && appActive && !reducedMotion;

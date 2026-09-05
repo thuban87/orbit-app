@@ -1,7 +1,7 @@
-import type { ReactNode } from "react";
+import { type ReactNode, useCallback } from "react";
 import { create } from "zustand";
-import { type AnchorRect } from "./anchor-position";
 import { AnchoredPanel, type PanelSize } from "./AnchoredPanel";
+import type { AnchorRect } from "./anchor-position";
 
 export interface DashboardPanelRequest {
   id: string;
@@ -26,12 +26,15 @@ export const dashboardPanelStore = create<DashboardPanelStore>()((set) => ({
 /** Root-level host so the in-tree scrim covers both the app bar and the list. */
 export function DashboardOverlayHost() {
   const request = dashboardPanelStore((state) => state.request);
-  if (!request) return null;
-
-  const dismiss = () => {
+  // Stable identity so AnchoredPanel's focus/transient effect does not re-arm
+  // (and re-steal accessibility focus) on every content-refresh re-render (WR-01).
+  // Reads the latest request via getState() rather than closing over `request`.
+  const dismiss = useCallback(() => {
     dashboardPanelStore.getState().close();
-    request.onDismiss();
-  };
+    dashboardPanelStore.getState().request?.onDismiss();
+  }, []);
+
+  if (!request) return null;
 
   return (
     <AnchoredPanel
