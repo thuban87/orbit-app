@@ -5,18 +5,24 @@ import {
   AppState,
   findNodeHandle,
   Pressable,
+  ScrollView,
   StyleSheet,
   useWindowDimensions,
   View,
 } from "react-native";
-import Animated, { Easing, useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
+import Animated, {
+  Easing,
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+} from "react-native-reanimated";
 import { GlassSurface } from "@/components/ui/GlassSurface";
-import { SPACING } from "@/theme/tokens/spacing";
-import { MOTION } from "@/theme/tokens/motion";
-import { useReducedMotion } from "@/theme/use-reduced-motion";
-import { useTheme } from "@/theme";
 import { shellTransientStore } from "@/stores/shell-transient-store";
-import { clampAnchorPosition, type AnchorRect } from "./anchor-position";
+import { useTheme } from "@/theme";
+import { MOTION } from "@/theme/tokens/motion";
+import { SPACING } from "@/theme/tokens/spacing";
+import { useReducedMotion } from "@/theme/use-reduced-motion";
+import type { AnchorRect } from "./anchor-position";
 
 export type PanelSize = "compact" | "medium" | "large";
 
@@ -36,7 +42,6 @@ export interface AnchoredPanelProps {
 
 /** The in-tree, swappable presentation container for dashboard control content. */
 export function AnchoredPanel({
-  anchorRect,
   size,
   visible,
   onDismiss,
@@ -45,7 +50,9 @@ export function AnchoredPanel({
   const { colors } = useTheme();
   const reducedMotion = useReducedMotion();
   const isFocused = useIsFocused();
-  const [appActive, setAppActive] = useState(AppState.currentState === "active");
+  const [appActive, setAppActive] = useState(
+    AppState.currentState === "active",
+  );
   const contentRef = useRef<View>(null);
   // Hold the latest onDismiss in a ref so the focus/transient effect below can
   // depend on `visible` ALONE — a fresh onDismiss identity must never re-arm the
@@ -54,10 +61,23 @@ export function AnchoredPanel({
   onDismissRef.current = onDismiss;
   const progress = useSharedValue(visible ? 1 : 0);
   const { width, height } = useWindowDimensions();
-  const position = clampAnchorPosition(anchorRect, PANEL_DIMENSIONS[size], { width, height }, SPACING.base);
+  // Centered-on-screen presentation (owner decision, this session): the panel
+  // floats in the middle of the viewport over the dimmed backdrop rather than
+  // anchoring under its control. It is still a floating panel — not a modal or
+  // bottom sheet — so D-11 holds; `anchorRect` stays on the request for a future
+  // anchored / branded-HUD variant (the swappable-presentation seam).
+  const panelWidth = Math.min(
+    PANEL_DIMENSIONS[size].width,
+    width - 2 * SPACING.base,
+  );
+  // Cap the scrollable content so a long panel (Filters) stays on screen and
+  // scrolls instead of clipping unreachable rows (UI-SPEC §Anchored panel sizes).
+  const maxContentHeight = Math.round(height * 0.66);
 
   useEffect(() => {
-    const sub = AppState.addEventListener("change", (state) => setAppActive(state === "active"));
+    const sub = AppState.addEventListener("change", (state) =>
+      setAppActive(state === "active"),
+    );
     return () => sub.remove();
   }, []);
 
@@ -71,13 +91,17 @@ export function AnchoredPanel({
       .openTransient("dashboard-panel", () => onDismissRef.current());
     const handle = findNodeHandle(contentRef.current);
     if (handle != null) AccessibilityInfo.setAccessibilityFocus(handle);
-    return () => shellTransientStore.getState().closeTransient("dashboard-panel");
+    return () =>
+      shellTransientStore.getState().closeTransient("dashboard-panel");
   }, [visible]);
 
   useEffect(() => {
     const canAnimate = isFocused && appActive && !reducedMotion;
     progress.value = canAnimate
-      ? withTiming(visible ? 1 : 0, { duration: MOTION.base, easing: Easing.out(Easing.ease) })
+      ? withTiming(visible ? 1 : 0, {
+          duration: MOTION.base,
+          easing: Easing.out(Easing.ease),
+        })
       : visible
         ? 1
         : 0;
@@ -98,15 +122,23 @@ export function AnchoredPanel({
         onPress={onDismiss}
         style={styles.scrim}
       >
-        <View style={[styles.scrimTint, { backgroundColor: colors.background }]} />
+        <View
+          style={[styles.scrimTint, { backgroundColor: colors.background }]}
+        />
       </Pressable>
       <Animated.View
         ref={contentRef}
         collapsable={false}
-        style={[styles.panel, { left: position.left, top: position.top, width: position.width }, panelStyle]}
+        style={[{ width: panelWidth }, panelStyle]}
       >
-        <GlassSurface density="dense" style={styles.surface}>
-          {children}
+        <GlassSurface density="dense">
+          <ScrollView
+            style={{ maxHeight: maxContentHeight }}
+            contentContainerStyle={styles.scrollContent}
+            showsVerticalScrollIndicator
+          >
+            {children}
+          </ScrollView>
         </GlassSurface>
       </Animated.View>
     </View>
@@ -114,9 +146,25 @@ export function AnchoredPanel({
 }
 
 const styles = StyleSheet.create({
-  root: { position: "absolute", top: 0, right: 0, bottom: 0, left: 0, zIndex: 10, elevation: 10 },
+  root: {
+    position: "absolute",
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
+    zIndex: 10,
+    elevation: 10,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   scrim: { position: "absolute", top: 0, right: 0, bottom: 0, left: 0 },
-  scrimTint: { position: "absolute", top: 0, right: 0, bottom: 0, left: 0, opacity: 0.45 },
-  panel: { position: "absolute", maxHeight: "60%" },
-  surface: { padding: SPACING.base },
+  scrimTint: {
+    position: "absolute",
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
+    opacity: 0.45,
+  },
+  scrollContent: { padding: SPACING.base },
 });
