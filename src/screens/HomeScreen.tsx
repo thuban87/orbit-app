@@ -41,7 +41,6 @@ import {
   View,
 } from "react-native";
 import { Avatar } from "@/components/Avatar";
-import { BirthdayBanner } from "@/components/BirthdayBanner";
 import { ContactCard } from "@/components/ContactCard";
 import { type FilterChip, FilterChipRow } from "@/components/FilterChipRow";
 import type { OverflowAction } from "@/components/OverflowMenu";
@@ -318,7 +317,6 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
 
   const listHeader = (
     <View style={styles.header}>
-      <BirthdayBanner onPressContact={goToProfile} />
       {!error && counts.live > 0 ? (
         <Text
           testID="dashboard-header-count"
