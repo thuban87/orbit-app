@@ -59,8 +59,10 @@ blocked: 0
 
 (none recorded by verification — 10/10 requirements code-satisfied; these are device-observable confirmations only)
 
-## Review notes (advisory, from 26-REVIEW.md — not gaps)
+## Review notes (from 26-REVIEW.md — all fixed this session, confirm on device)
 
-- WR-01: AnchoredPanel re-steals TalkBack focus on every in-panel toggle (a11y focus churn). Overlaps UAT tests 1–3.
-- WR-02: Collapsing Row-3 search leaves the term applied with no visible input/indicator — list stays silently filtered. Overlaps UAT test 5.
-- WR-03: "No favourites yet" empty copy shows even when favourites exist but a filter zeroed the list.
+The 3 code-review Warnings were fixed before this UAT (owner-approved "fix now"). Confirm the fixed behaviour while testing:
+
+- WR-01 (fixed 8418857): opening a panel and toggling options should NOT yank TalkBack focus back to the panel each time. Confirm during tests 1–3.
+- WR-02 (fixed d380ce1): collapsing Row-3 search now clears the term — "Close search" restores the full list, never a silently filtered one. Confirm during test 5.
+- WR-03 (fixed d380ce1): a favourites list zeroed by an active filter shows neutral "Nothing here right now." copy, not "No favourites yet".

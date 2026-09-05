@@ -210,6 +210,16 @@ inline the existence check, so the setting is read once.
 
 ---
 
+## Resolution (2026-09-05, owner-approved fix-now)
+
+All three Warnings were fixed this session before the Pixel UAT (owner chose "fix now, then UAT the fixed build"; WR-02 resolved via "clear the term on collapse"). The Info items (IN-01/02/03) are left as tracked low-risk debt.
+
+- **WR-01** — fixed in `8418857`: `DashboardOverlayHost.dismiss` is now `useCallback`-stable and `AnchoredPanel`'s focus/transient effect depends on `visible` alone (latest `onDismiss` held in a ref), so an in-panel toggle no longer re-steals accessibility focus.
+- **WR-02** — fixed in `d380ce1`: `onToggleSearch` clears the search term on collapse, so "Close search" restores the full population (no silent filtered list).
+- **WR-03** — fixed in `d380ce1`: the "No favourites yet" copy is gated on `populationCounts.favourites === 0`; a favourites list zeroed by a filter now shows the neutral filtered-empty copy.
+
+Verified: `tsc` clean, `check:colors` clean, full suite 238 files / 2246 tests pass. On-device confirmation folded into 26-UAT.md (WR-01 → tests 1–3, WR-02 → test 5).
+
 _Reviewed: 2026-09-05_
 _Reviewer: Claude (gsd-code-reviewer)_
 _Depth: deep_
