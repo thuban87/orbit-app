@@ -69,7 +69,7 @@ category's phase (see Traceability).
 
 ### DASHQ — Dashboard Data & State Foundation (Phase 25)
 
-- [ ] **DASHQ-01**: With no explicit population selected, the Dashboard shows Active Contacts — status-bearing contacts only, excluding never-contacted, archived, and unbound (ADR-011 preserved)
+- [x] **DASHQ-01**: With no explicit population selected, the Dashboard shows Active Contacts — status-bearing contacts only, excluding never-contacted, archived, and unbound (ADR-011 preserved)
 - [ ] **DASHQ-02**: User can multi-select special populations — Favorites, Birthdays, Not Contacted, Snoozed, All Contacts — combined as an OR-union with each contact appearing once; deselecting the last returns to Active Contacts
 - [ ] **DASHQ-03**: All Contacts resolves to Active ∪ Not Contacted; archived and unbound stay outside it; the standalone Never Contacted screen and the include-Unbound toggle retire
 - [ ] **DASHQ-04**: Favorites is binary membership with no user-visible ranking; the Dashboard never sorts by favourite rank (ADR-075); the Birthdays population covers the next 30 days
@@ -79,9 +79,9 @@ category's phase (see Traceability).
 - [ ] **DASHQ-08**: Dashboard search is scoped to the current Population + Filters universe and never surfaces archived or unbound contacts; unbound contacts get a replacement retrieval path so ADR-062's "retrieval stays available" holds
 - [ ] **DASHQ-09**: Search matches forgivingly (prefix/substring plus typo tolerance) across the semantic knowledge corpus, ranks by term coverage with identity matches strongly prioritized, and treats the Dashboard sort as tie-breaker only
 - [ ] **DASHQ-10**: A search result shows up to three prioritized highlighted snippets plus "+N more"; a direct name match does not suppress secondary knowledge matches
-- [ ] **DASHQ-11**: List/Card preference, population, filters, and sort persist across relaunch (durable, backup-portable); search text and scroll position do not
+- [x] **DASHQ-11**: List/Card preference, population, filters, and sort persist across relaunch (durable, backup-portable); search text and scroll position do not
 - [ ] **DASHQ-12**: Dashboard → Profile → Back restores the full working Dashboard state including search, filters, population, sort, and scroll position
-- [ ] **DASHQ-13**: List and Card views share one query state; each query axis is independently clearable and a global Reset Dashboard View restores all four while preserving the List/Card preference
+- [x] **DASHQ-13**: List and Card views share one query state; each query axis is independently clearable and a global Reset Dashboard View restores all four while preserving the List/Card preference
 - [ ] **DASHQ-14**: The birthday banner is removed from the Dashboard (ADR-076); the Dashboard keeps only the Birthdays population — richer presentation belongs to the deferred Your Week phase
 
 ### DASHC — Dashboard Control Surface (Phase 26)

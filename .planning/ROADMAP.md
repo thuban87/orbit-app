@@ -323,10 +323,10 @@ All v1.0 commits are local on `main` and have NOT been pushed.
 
 **Canonical refs**: docs/dossier/milestone-2/phase-04-dashboard-data-state-foundation-dossier.md; docs/dossier/milestone-2/planning-notes/phase-04-planning-notes.md
 **Schema**: migration 019 — durable dashboard-preference columns on `app_settings` (view/populations/filters/sort); portable-key removal for superseded keys deferred to Phase 36 (verified head+1 = 019 on disk)
-**Plans**: 7 plans (4 waves)
+**Plans**: 1/7 plans executed (4 waves)
 **Wave 1**
 
-- [ ] 25-01-PLAN.md — Schema (migration 019) + durable-pref DAO + shared query-state tracer (Active universe end-to-end) [W1]
+- [x] 25-01-PLAN.md — Schema (migration 019) + durable-pref DAO + shared query-state tracer (Active universe end-to-end) [W1]
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
@@ -599,7 +599,7 @@ All v1.0 commits are local on `main` and have NOT been pushed.
 | 23. Theme & Visual System | 7/7 | In Progress | - |
 | 24.1 Contact Knowledge Foundation (Model, Storage & UI) | 7/8 | In Progress|  |
 | 24.2 Contact Knowledge (Egress, Search, Types & Data-moves) | 7/7 | In Progress|  |
-| 25. Dashboard Data & State Foundation | 0/TBD | Not started | - |
+| 25. Dashboard Data & State Foundation | 1/7 | In Progress|  |
 | 26. Dashboard Control Surface | 0/TBD | Not started | - |
 | 27. Dashboard List View | 0/TBD | Not started | - |
 | 28. Dashboard Card View | 0/TBD | Not started | - |
