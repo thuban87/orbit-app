@@ -74,7 +74,7 @@ category's phase (see Traceability).
 - [x] **DASHQ-03**: All Contacts resolves to Active ∪ Not Contacted; archived and unbound stay outside it; the standalone Never Contacted screen and the include-Unbound toggle retire
 - [x] **DASHQ-04**: Favorites is binary membership with no user-visible ranking; the Dashboard never sorts by favourite rank (ADR-075); the Birthdays population covers the next 30 days
 - [x] **DASHQ-05**: Snoozed contacts remain in Active Contacts but are suppressed from Needs Attention while staying reachable via population selection, search, and deliberate action
-- [ ] **DASHQ-06**: User can filter across five families — Category, Social Battery, Relationship Status/Needs Attention, Gravity, Contact Frequency — OR within a family, AND across families; filters survive population changes
+- [x] **DASHQ-06**: User can filter across five families — Category, Social Battery, Relationship Status/Needs Attention, Gravity, Contact Frequency — OR within a family, AND across families; filters survive population changes
 - [x] **DASHQ-07**: User can sort by Default, Name A–Z/Z–A, Least/Most Recently Contacted, or Relationship Status; Default is population-aware, and an explicit sort survives until reset to Default
 - [x] **DASHQ-08**: Dashboard search is scoped to the current Population + Filters universe and never surfaces archived or unbound contacts; unbound contacts get a replacement retrieval path so ADR-062's "retrieval stays available" holds
 - [x] **DASHQ-09**: Search matches forgivingly (prefix/substring plus typo tolerance) across the semantic knowledge corpus, ranks by term coverage with identity matches strongly prioritized, and treats the Dashboard sort as tie-breaker only
