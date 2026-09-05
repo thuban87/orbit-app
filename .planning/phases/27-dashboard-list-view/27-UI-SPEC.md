@@ -1,10 +1,11 @@
 ---
 phase: 27
 slug: dashboard-list-view
-status: draft
+status: approved
 shadcn_initialized: false
 preset: none
 created: 2026-09-05
+reviewed_at: 2026-09-05
 ---
 
 # Phase 27 — Dashboard List View — UI Design Contract
@@ -224,20 +225,50 @@ Two **redundant** channels for unsnoozed relationship state, never colour alone:
 
 ## UI Considerations
 
-State coverage for the List renderer. Empty/error COPY lives in the Copywriting Contract above; this section covers **state coverage** and references those rows.
+State coverage for the List renderer, produced by the UI-consideration probe (post-verification) over five surfaces: **E1** the list renderer/collection, **E2** the contact row, **E3** search-result rendering, **E4** swipe/gesture surfaces, **E5** the favourite star toggle. Empty/error **COPY** lives in the Copywriting Contract above; this section covers **state coverage** and references those rows (de-dup, not restated).
 
-Applicable state considerations resolved: 7 covered, 1 backstop, 0 unresolved.
+Probe result: **38 applicable considerations — 24 resolved (explicit), 1 resolved (backstop), 13 dismissed (n/a for that surface), 0 unresolved.** Dismissed rows are surfaces where the category has no distinct state (e.g. a binary control has no "partial"; a row has no independent "empty" — that is the list's E1 empty).
 
-| Category | Element(s) | Status | Resolution / Reason |
-|----------|------------|--------|---------------------|
-| empty | list-collection (no contacts / no search / zero-filter) | ✅ covered | Cause-aware shared empty states render the documented copy (first-run CTA, `No matches for "{term}"`, filtered-empty, hidden-population pointer) — see Copywriting Contract |
-| error | list-collection (load/db failure) | ✅ covered | Renders `Couldn't load your contacts` + `Pull down to try again.` (shared with Card View) |
-| loading | list-collection | ✅ covered | Skeleton only on initial/delayed load; fast query changes keep content visible (Motion Contract) |
-| populated | list-collection | ✅ covered | Three-line row anatomy with status border + glyph + favourite star |
-| partial | static-content (never-contacted row; missing adaptive context) | ✅ covered | `No interactions yet` + neutral border, no glyph; missing line-3 context → deterministic completeness prompt |
-| zero-one-many | static-content (search match count; favourite/population counts) | ✅ covered | Match explanation pluralises (`1 match` / `3 matches · …`); counts render from the shared result model |
-| overflow | static-content (long name / long category / long snippet) | ✅ covered | Line 1 + lines 2/3 single-line ellipsize tail; category chip `maxWidth` ellipsize |
-| long-text | list-collection (OS/accessibility text scaling) | 🧪 backstop | Large text must reflow row height (not clamp) — device-UAT'd on the Pixel; lifts as `{ statement, verification: backstop }` |
+| Surface | Category | Status | Resolution / Reason |
+|---------|----------|--------|---------------------|
+| E1 list | empty | ✅ resolved (explicit) | Cause-aware shared empty states: first-run CTA `Add your first contact`, `No matches for "{term}"`, filtered-empty (population-labelled), everyone-hidden pointer lines — see Copywriting Contract |
+| E1 list | loading | ✅ resolved (explicit) | Skeleton rows on **initial/delayed** load only; fast Population/Filter/Sort/Search changes keep current content visible and update in place (Motion Contract) |
+| E1 list | error | ✅ resolved (explicit) | `Couldn't load your contacts` + `Pull down to try again.` (shared with Card View) — Copywriting Contract |
+| E1 list | populated | ✅ resolved (explicit) | Three-line row anatomy, ~5–6 rows visible at default text size, status border + glyph + favourite star (Row Anatomy) |
+| E1 list | partial | ✅ resolved (explicit) | Mixed populations render per-row: never-contacted rows show `No interactions yet` + neutral border + no glyph within All/Not-Contacted populations (D-08) |
+| E1 list | overflow | ✅ resolved (explicit) | Virtualized vertical scroll (FlatList/FlashList); list is the scroll surface over `background` |
+| E1 list | zero-one-many | ✅ resolved (explicit) | 0 → empty state; 1..many → rows; counts render from the shared result model (Phase 25 read) |
+| E2 row | populated | ✅ resolved (explicit) | Line 1 name / line 2 recency·category / line 3 adaptive-or-completeness; avatar, status border, lower-right glyph, upper-right star (Row Anatomy) |
+| E2 row | partial | ✅ resolved (explicit) | Never-contacted → `No interactions yet` + neutral border + **no** glyph; missing line-3 context → deterministic per-contact completeness prompt (D-11) |
+| E2 row | loading | ✅ resolved (explicit) | Skeleton placeholder matches row geometry (initial load only); no per-row spinner during in-place updates |
+| E2 row | overflow | ✅ resolved (explicit) | Line 1 `numberOfLines={1}` ellipsize tail; lines 2/3 single-line ellipsize; category chip `maxWidth` ellipsize (Typography) |
+| E2 row | long-text | 🧪 resolved (backstop) | `{ statement: "OS/accessibility text scaling reflows row height (increase), never clamps below readable size (§C/§Q, LISTV-09)", verification: backstop }` — device-UAT'd on the Pixel |
+| E2 row | empty | ⊘ dismissed | A row exists only when a contact exists; the "no rows" case is E1 empty |
+| E2 row | error | ⊘ dismissed | No independent row-level load error; failures surface at list level (E1) or favourite write (E5) |
+| E2 row | zero-one-many | ⊘ dismissed | A single row is inherently "one"; count semantics live at list/search level (E1/E3) |
+| E3 search | empty | ✅ resolved (explicit) | Zero matches routes to the `No matches for "{term}"` empty state (E1) |
+| E3 search | populated | ✅ resolved (explicit) | Line-2 match explanation `3 matches · Memory, Relationship`; matched run highlighted at label weight (600) in the line-3 snippet |
+| E3 search | partial | ✅ resolved (explicit) | `+N more` categories shown (no inline action); strongest match categories named |
+| E3 search | overflow | ✅ resolved (explicit) | Match explanation is a caption line (ellipsize tail); snippet single-line ellipsize |
+| E3 search | zero-one-many | ✅ resolved (explicit) | Pluralised count copy: `1 match` / `3 matches · …` |
+| E3 search | long-text | ✅ resolved (explicit) | Highlighted run + snippet ellipsize within the caption line; no wrap |
+| E3 search | loading | ⊘ dismissed | Search updates in place (keep-content-visible); no separate search-loading state (Motion Contract) |
+| E3 search | error | ⊘ dismissed | Search runs over the local shared read model — no network/error path (local-first, no network on a read path) |
+| E4 swipe | populated | ✅ resolved (explicit) | Progressive reveal: row translates → action surface behind → semantic action icon → threshold/resistance communicates commit; executes on commit (§P) |
+| E4 swipe | partial | ✅ resolved (explicit) | Partially-swiped row is a real state: exactly one row revealed at a time; tapping a partially-swiped row **closes** the swipe rather than navigating (D-09) |
+| E4 swipe | error | ✅ resolved (explicit) | No destructive actions; sub-threshold release returns the row; the logging action's own failure handling is owned by the routed Rapid Capture / Compose flow, not this renderer |
+| E4 swipe | empty | ⊘ dismissed | Swipe surfaces exist only on a populated row |
+| E4 swipe | loading | ⊘ dismissed | Gestures are static affordances; no loading state |
+| E4 swipe | overflow | ⊘ dismissed | Action surface holds a fixed semantic icon + optional short label; no overflow content |
+| E4 swipe | zero-one-many | ⊘ dismissed | Exactly two fixed non-destructive gestures (one per direction); no variable count |
+| E5 star | populated | ✅ resolved (explicit) | Binary membership: filled = `accent`, unfilled = `textSecondary`; ≥44px hit area (Row Anatomy, ADR-075) |
+| E5 star | loading | ✅ resolved (explicit) | Optimistic — immediate fill/unfill + light haptic, **no** spinner, no pending state, no success snackbar (D-04) |
+| E5 star | error | ✅ resolved (explicit) | Persistence failure reverts the optimistic state + error notification `Couldn't update favourite. Try again.` (Copywriting Contract) |
+| E5 star | empty | ⊘ dismissed | The star is present on every row; no empty state |
+| E5 star | partial | ⊘ dismissed | Binary — marked or unmarked; no partial state |
+| E5 star | overflow | ⊘ dismissed | Fixed-size glyph; no content overflow |
+| E5 star | zero-one-many | ⊘ dismissed | Single binary control per row; no count |
+| E5 star | long-text | ⊘ dismissed | Icon-only control; no text |
 
 ---
 
@@ -278,11 +309,11 @@ Applicable state considerations resolved: 7 covered, 1 backstop, 0 unresolved.
 
 ## Checker Sign-Off
 
-- [ ] Dimension 1 Copywriting: PASS
-- [ ] Dimension 2 Visuals: PASS
-- [ ] Dimension 3 Color: PASS
-- [ ] Dimension 4 Typography: PASS
-- [ ] Dimension 5 Spacing: PASS
-- [ ] Dimension 6 Registry Safety: PASS
+- [x] Dimension 1 Copywriting: PASS
+- [x] Dimension 2 Visuals: PASS
+- [x] Dimension 3 Color: PASS
+- [x] Dimension 4 Typography: PASS
+- [x] Dimension 5 Spacing: PASS
+- [x] Dimension 6 Registry Safety: PASS
 
-**Approval:** pending
+**Approval:** VERIFIED (gsd-ui-checker, 2026-09-05) — all spec claims audited against on-disk code and confirmed accurate. Non-blocking flags F-1..F-5 routed to planner/owner (F-4 star-vs-heart is an owner taste call).
