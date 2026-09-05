@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Release Readiness
 current_phase: 25
-current_phase_name: Dashboard Data & State Foundation
+current_phase_name: dashboard-data-state-foundation
 status: executing
 stopped_at: Phase 25 UI-SPEC approved
-last_updated: "2026-09-04T23:59:40.200Z"
+last_updated: "2026-09-05T01:03:16.317Z"
 last_activity: 2026-09-04
 last_activity_desc: Phase 24.2 execution started
-state_head: 6c2e111242900edfda2d86f1114046e9fd102016
+state_head: 10a485ebbd4ce7cfa2e2dd907c7f202385ee514e
 progress:
   total_phases: 20
   completed_phases: 1
@@ -33,7 +33,7 @@ See: .planning/PROJECT.md (updated 2026-09-01 after v1.0 milestone)
 
 ## Current Position
 
-Phase: 25 (Dashboard Data & State Foundation) — READY TO EXECUTE
+Phase: 25 (dashboard-data-state-foundation) — READY TO EXECUTE
 Plan: 7 of 7 (all plans complete)
 Status: Phase 24.2 execution complete — ready for verification
 Carried forward (owner's bucket, NOT resolved here): D-11 default Memory-type display name — reconcile before Phase 34.
