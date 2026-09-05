@@ -360,14 +360,14 @@ All v1.0 commits are local on `main` and have NOT been pushed.
 
 **Canonical refs**: docs/dossier/milestone-2/phase-05-dashboard-control-surface-dossier-amended-group-events.md; docs/dossier/milestone-2/planning-notes/phase-05-planning-notes.md
 **Schema**: none (D-03 — verified TARGET_VERSION=19 / migration head 019 on disk 2026-09-05; retirement of `include_unbound_never_contacted` / prefs keys deferred to the Phase 36 backup bump)
-**Plans**: 1/7 plans executed (3 waves)
+**Plans**: 2/7 plans executed (3 waves)
 **Wave 1**
 
 - [x] 26-01-PLAN.md — TRACER: Population control end-to-end (AnchoredPanel + presentation seam + HomeScreen old→new store migration) [DASHC-01/03/04/05/06]
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 26-02-PLAN.md — Filters + Sort anchored panels (control-row completion, layer-2 seam) [DASHC-03/06]
+- [x] 26-02-PLAN.md — Filters + Sort anchored panels (control-row completion, layer-2 seam) [DASHC-03/06]
 - [ ] 26-03-PLAN.md — D-12 population-aware search read (listDashboardSearch, A3 semantics preserved, no fork) [DASHC-07]
 - [ ] 26-04-PLAN.md — Header destinations (Your Week + Group Events, icon-only fallback) + amended 5-row overflow + confirmation-free Reset + OverflowMenu disabled [DASHC-02/08/10]
 - [ ] 26-05-PLAN.md — Archived child-route chrome refactor (ShellAppBar child, ADR-018 preserved) [DASHC-09]
@@ -616,7 +616,7 @@ All v1.0 commits are local on `main` and have NOT been pushed.
 | 24.1 Contact Knowledge Foundation (Model, Storage & UI) | 7/8 | In Progress|  |
 | 24.2 Contact Knowledge (Egress, Search, Types & Data-moves) | 7/7 | In Progress|  |
 | 25. Dashboard Data & State Foundation | 6/7 | In Progress|  |
-| 26. Dashboard Control Surface | 1/7 | In Progress|  |
+| 26. Dashboard Control Surface | 2/7 | In Progress|  |
 | 27. Dashboard List View | 0/TBD | Not started | - |
 | 28. Dashboard Card View | 0/TBD | Not started | - |
 | 29. Orrery Camera, Scale & Exploration | 0/TBD | Not started | - |
