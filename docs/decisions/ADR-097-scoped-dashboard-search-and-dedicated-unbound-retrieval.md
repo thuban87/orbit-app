@@ -53,4 +53,4 @@ The system uses a dedicated population-aware Dashboard search read rather than a
 - `src/screens/unbound-list-logic.ts` — applies stable, case-insensitive local name filtering to already-loaded Unbound rows.
 
 **Depends on:** ADR-062 (Bound/Unbound Lifecycle and One-Way Cadence Assignment); ADR-093 (Scoped Composable Dashboard Population and Filter Model); ADR-094 (Eligibility-Scoped Semantic Dashboard Search)
-**Required by:** None
+**Required by:** ADR-100 (Relevance-First, Visibility-Safe Dashboard List Search)

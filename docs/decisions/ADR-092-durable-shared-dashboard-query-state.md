@@ -49,4 +49,4 @@ The system uses one `DashboardQueryState` for view mode, selected populations, f
 - `src/stores/dashboard-session-store.ts` — owns memory-only search and scroll session state.
 
 **Depends on:** ADR-009 (Crash-Safe Forward-Only SQLite Migrations); ADR-083 (Durable Multi-Package Theme Configuration and Restore-Before-Paint)
-**Required by:** ADR-095 (Live-Applying Dashboard Floating Control Surface)
+**Required by:** ADR-095 (Live-Applying Dashboard Floating Control Surface); ADR-099 (Durable Global Dashboard Right-Swipe Action)
