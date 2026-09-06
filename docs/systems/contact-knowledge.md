@@ -20,6 +20,7 @@ Migration 016 adds three tables without moving conversational fuel or changing c
   - `contact_id` (`INTEGER`) — owning contact, cascaded on permanent contact deletion.
   - `type`, `custom_label`, `value`, `note`, `url`, `meaningful_date` (`TEXT`) — typed content and optional metadata.
   - `pinned`, `outdated` (`INTEGER`) — presentation and lifecycle state.
+  - `allow_ai` (`INTEGER`) — explicit per-item egress permission, defaulting to off; it is independent of visibility and provenance.
   - `hidden` (`INTEGER NULL`) — three-state Profile visibility override: inherit, show, or hide.
   - `provenance` (`TEXT`) — lightweight `user`, `import`, or `share` origin shown in edit/detail views.
   - `created_at`, `modified_at`, `deleted_at` (`TEXT`) — local timestamps; a non-NULL `deleted_at` is Recently Deleted state.
@@ -35,8 +36,8 @@ Migration 016 adds three tables without moving conversational fuel or changing c
   - `created_at`, `modified_at` (`TEXT`) — local timestamps for deterministic history ordering.
 
 **Types** (`src/db/memory-registry.ts`):
-- `MemoryTypeKey` — application-owned `general` and `custom` Memory keys; a Custom item carries its own required label.
-- `MemoryTypeMeta` — display, cardinality, history, search, future AI-default, visibility, and presentation metadata.
+- `MemoryTypeKey` — application-owned `general`, `custom`, and `imported` Memory keys; a Custom item carries its own required label.
+- `MemoryTypeMeta` — display, cardinality, history, search, new-item AI default, visibility, and presentation metadata.
 - `CurrentStateFieldKey` — `last_talked_about` and `current_location`.
 
 ### Store, Service & DAO Layer
@@ -46,6 +47,7 @@ Migration 016 adds three tables without moving conversational fuel or changing c
 | Registry | `src/db/memory-registry.ts` | Defines application-owned Memory types, current-state fields, and group order. |
 | Memory writer | `src/db/memories-dao.ts` | Validates, adds, patches, soft-deletes, restores, and guarded-purges Memory rows. |
 | Memory reader | `src/db/memories-read.ts` | Produces live and Recently Deleted projections with deterministic ordering and visibility resolution. |
+| AI eligibility reader | `src/db/memories-read.ts` | Exposes only live Memories with explicit `allow_ai = 1` for the AI context boundary. |
 | Relationship writer | `src/db/relationships-dao.ts` | Writes structured relationships, rejects self-links, and owns their Undo lifecycle. |
 | Relationship reader | `src/db/relationships-read.ts` | Reads live rows and optional linked-contact display names. |
 | State-history writer | `src/db/current-state-history-dao.ts` | Atomically sets, promotes, and edits retained current-state values. |
@@ -62,6 +64,7 @@ Migration 016 adds three tables without moving conversational fuel or changing c
 | `src/db/memory-registry.ts` | Single source for type and history-field semantics. |
 | `src/db/memories-dao.ts` | Transactional Memory lifecycle boundary. |
 | `src/db/memories-read.ts` | Memory read and visibility choke point. |
+| `src/db/knowledge-search-read.ts` | Produces the local, metadata-free knowledge-search corpus. |
 | `src/db/relationships-dao.ts` | Structured relationship writer and stale-expiry core. |
 | `src/db/relationships-read.ts` | Relationship projection with optional linked name. |
 | `src/db/current-state-history-dao.ts` | Non-destructive current/history transitions. |
@@ -87,6 +90,12 @@ Migration 016 adds three tables without moving conversational fuel or changing c
 2. `addMemory` or `editMemory` validates the registry key and requires a label for `custom`; optional blank metadata normalizes to NULL.
 3. The writer runs inside the shared write transaction, scopes edits to both row and owning contact, and bumps the portable data revision.
 4. Live reads return only rows with `deleted_at IS NULL`, ordered pinned first, then meaningful date, creation time, and ID.
+
+### Controlling AI eligibility and local search
+
+1. A new Memory seeds `allow_ai` from its registry type default; the imported type defaults off and existing rows are never retroactively changed.
+2. `setMemoryAllowAi()` scopes a toggle by Memory and contact identity, while `listAiEligibleMemories()` enforces `allow_ai = 1 AND deleted_at IS NULL` in SQL.
+3. The knowledge-search read exposes only names, searchable Memory content, relationship names, and eligible custom-field values. Its pure TypeScript scorer supplies bounded typo tolerance; identifiers, provenance, timestamps, and other internal metadata never enter the corpus.
 
 ### Current-state history
 
@@ -120,12 +129,14 @@ Migration 016 adds three tables without moving conversational fuel or changing c
 
 - **ADR-088:** Additive Contact-Knowledge Schema and Application-Owned Memory Registry — defines the new tables and fixed in-code type boundary.
 - **ADR-089:** Recoverable Memory Lifecycle and Contact-Operation Integrity — defines recovery, expiry, merge, and purge behavior.
+- **ADR-081:** Retire AI-Proposed Fuel for Explicit Per-Item Permission — moves retired fuel into default-off Memories and establishes explicit Memory consent.
+- **ADR-091:** Imported Contact Notes as AI-Off Typed Memories — adds the searchable imported type and durable import boundary.
 
 ## Gotchas
 
 1. **Memory types are not user-created records.** A user-labelled Custom item is allowed; a user-writable type set would reverse ADR-028.
-2. **Memories coexist with conversational fuel in this phase.** Do not reshape fuel or migrate share capture here; that destructive move is phase 24.2 work.
-3. **Visibility is not an AI or privacy control.** It affects Profile presentation only; this phase sends no Memory data to AI.
+2. **Memory AI permission is explicit.** Visibility, provenance, and type are not egress permission; only the SQL eligibility predicate may admit an opted-in live row.
+3. **Search is local but not SQL fuzzy search.** Do not add FTS5 or an index; the SQL read establishes eligibility and the TypeScript scorer ranks its bounded result set.
 4. **Nothing watches timestamps.** Retention is a foreground launch sweep, never a timer or trigger.
 5. **Do not nest transaction wrappers.** Sweep expiry calls a non-mutexed core after obtaining its own write transaction.
 6. **Current-state promotion preserves history.** The partial unique index enforces one current row; it does not authorize deleting the displaced value.
@@ -138,10 +149,13 @@ Migration 016 adds three tables without moving conversational fuel or changing c
 - **Contact reconciliation** — reparents knowledge rows inside a contact merge.
 - **App shell** — registers the typed routes in both contact-navigation stacks.
 - **Custom fields** — remain structured and render as a read-only grouped portion of Things to Remember.
-- **Conversational fuel** — remains a separate fixed-kind model during this additive phase.
+- **Conversational fuel** — legacy share and AI-proposal rows migrate into Memories through the verified phase-24.2 data move.
+- **AI suggestions** — consumes only the explicit, SQL-gated Memory projection.
+- **Contact import** — supplies imported Notes as AI-off typed Memories.
 
 ## Changelog
 
 | Date | Phase | What Changed |
 |------|-------|--------------|
 | 2026-09-03 | 24.1 | Created the typed local contact-knowledge model, recovery lifecycle, and unified Things to Remember surface. |
+| 2026-09-03 | 24.2 | Added explicit default-off Memory egress permission, local knowledge-search corpus, and imported Notes type. |
