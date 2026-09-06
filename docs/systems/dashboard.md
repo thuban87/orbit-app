@@ -113,6 +113,7 @@ The Dashboard owns no table. It reads `contacts` and related local data, while i
 - **ADR-032:** Flat Dashboard Discovery and In-Query Contact Search — establishes Dashboard local discovery; its legacy surface is superseded where ADR-093 documents the shared model.
 - **ADR-033:** Profile Marking and Shared Drag-Reordered Favourites — superseded by ADR-075 for user-facing favourite order.
 - **ADR-034:** Birthday Banner and Re-query Dashboard Freshness — superseded by ADR-076 for the banner; local refresh discipline remains.
+- **ADR-043:** Static Globally Mirrored Favourites Widget — partially superseded by ADR-075 for ordering, while the Dashboard remains the widget's local favourites projection source.
 - **ADR-062:** Bound/Unbound Lifecycle and One-Way Cadence Assignment — keeps Unbound contacts outside the Dashboard universe.
 - **ADR-075:** Binary Favourite Membership Without a User-Facing Order — makes rank ineligible as Dashboard or widget ordering.
 - **ADR-076:** Population-Reached Birthdays Without a Dashboard Banner — routes birthdays through the population and defers richer presentation.
