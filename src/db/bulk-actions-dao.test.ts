@@ -1,4 +1,5 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+vi.mock("expo-sqlite", () => ({}));
 import { bulkQuickLog } from "@/db/bulk-actions-dao";
 import { nodeSqliteExecutor, openTestDb } from "@/db/__testkit__/node-sqlite";
 import { createContactFull } from "@/db/contacts-dao";
