@@ -113,7 +113,10 @@ import {
   selectDashboardEmptyState,
 } from "@/logic/dashboard-empty-logic";
 import type { DashboardViewMode } from "@/logic/dashboard-query-logic";
-import { createBulkActionGate } from "@/logic/dashboard-bulk-action-session";
+import {
+  createBulkActionGate,
+  getCurrentSelectionIds,
+} from "@/logic/dashboard-bulk-action-session";
 import {
   applyCommittedMembership,
   createFavouriteOptimisticStore,
@@ -446,7 +449,7 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
   const [bulkConfirm, setBulkConfirm] = useState<BulkConfirmAction | null>(null);
   const [snoozePickerIds, setSnoozePickerIds] = useState<number[] | null>(null);
   const [categoryPicker, setCategoryPicker] = useState<{
-    ids: number[];
+    sessionId: number;
     categories: { id: number; name: string }[];
   } | null>(null);
   const [frequencyPickerIds, setFrequencyPickerIds] = useState<number[] | null>(
@@ -1052,18 +1055,29 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
 
   const onBulkOpenCategoryPicker = useCallback(() => {
     if (!tryAcquireBulkAction()) return;
-    const ids = [...selectedIds];
-    if (ids.length === 0) {
+    const selection = useDashboardSelectionStore.getState();
+    const sessionId = selection.sessionId;
+    if (!getCurrentSelectionIds(selection, sessionId)?.length) {
       releaseBulkAction();
       return;
     }
     void listCategories(getExecutor())
-      .then((categories) => setCategoryPicker({ ids, categories }))
+      .then((categories) => {
+        const currentIds = getCurrentSelectionIds(
+          useDashboardSelectionStore.getState(),
+          sessionId,
+        );
+        if (!currentIds?.length) {
+          releaseBulkAction();
+          return;
+        }
+        setCategoryPicker({ sessionId, categories });
+      })
       .catch((readError: unknown) => {
         releaseBulkAction();
         reportBulkFailure("load categories", readError, onBulkOpenCategoryPicker);
       });
-  }, [releaseBulkAction, reportBulkFailure, selectedIds, tryAcquireBulkAction]);
+  }, [releaseBulkAction, reportBulkFailure, tryAcquireBulkAction]);
 
   const onBulkArchive = useCallback(() => {
     if (!tryAcquireBulkAction()) return;
@@ -1871,20 +1885,28 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
             key={category.id}
             testID={`bulk-category-${category.id}`}
             accessibilityRole="button"
-            accessibilityLabel={`Set category to ${category.name} for ${categoryPicker.ids.length} contacts`}
+            accessibilityLabel={`Set category to ${category.name} for ${selectionCount} contacts`}
             onPress={() => {
               const picker = categoryPicker;
               if (!picker) return;
               setCategoryPicker(null);
+              const ids = getCurrentSelectionIds(
+                useDashboardSelectionStore.getState(),
+                picker.sessionId,
+              );
+              if (!ids?.length) {
+                releaseBulkAction();
+                return;
+              }
               void bulkSetCategory(
                 getExecutor(),
-                picker.ids,
+                ids,
                 category.id,
                 localDateTime(),
               )
                 .then(() =>
                   commitBulkOutcome(
-                    `Set category to ${category.name} for ${picker.ids.length} contacts`,
+                    `Set category to ${category.name} for ${ids.length} contacts`,
                   ),
                 )
                 .catch((writeError: unknown) => {

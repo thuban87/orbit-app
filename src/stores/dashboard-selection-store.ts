@@ -2,6 +2,7 @@ import { create } from "zustand";
 
 export interface DashboardSelectionStore {
   mode: boolean;
+  sessionId: number;
   selectedIds: Set<number>;
   frozenUniverse: number[];
   enterSelection: (universe: number[], seedId?: number) => void;
@@ -26,16 +27,22 @@ export function selectDashboardSelectionCount(
 export const useDashboardSelectionStore = create<DashboardSelectionStore>()(
   (set) => ({
     mode: false,
+    sessionId: 0,
     selectedIds: new Set(),
     frozenUniverse: [],
     enterSelection: (universe, seedId) => {
       set((state) => {
         if (state.mode) return state;
 
+        const frozenUniverse = [...new Set(universe)];
         return {
           mode: true,
-          frozenUniverse: [...universe],
-          selectedIds: seedId == null ? new Set() : new Set([seedId]),
+          sessionId: state.sessionId + 1,
+          frozenUniverse,
+          selectedIds:
+            seedId != null && frozenUniverse.includes(seedId)
+              ? new Set([seedId])
+              : new Set(),
         };
       });
     },

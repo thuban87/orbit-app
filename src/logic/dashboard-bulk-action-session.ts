@@ -8,6 +8,22 @@ export interface BulkActionGate {
   release: () => void;
 }
 
+/** The narrow selection snapshot needed after HomeScreen crosses an async boundary. */
+export interface DashboardSelectionSessionSnapshot {
+  mode: boolean;
+  sessionId: number;
+  selectedIds: ReadonlySet<number>;
+}
+
+/** Returns live IDs only while the captured selection session remains active. */
+export function getCurrentSelectionIds(
+  selection: DashboardSelectionSessionSnapshot,
+  sessionId: number,
+): number[] | null {
+  if (!selection.mode || selection.sessionId !== sessionId) return null;
+  return [...selection.selectedIds];
+}
+
 export function createBulkActionGate(
   onPendingChange?: (pending: boolean) => void,
 ): BulkActionGate {
