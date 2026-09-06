@@ -63,7 +63,7 @@ The orrery owns no per-contact table or stored status. It reads contact recency 
 ### Loading the sky
 
 1. The dashboard's Orbit control opens the additive `Orrery` route.
-2. On focus, `OrreryScreen` reads `app_settings`, resolves the self or contact sun, and asks `listOrbitingContacts()` for the remaining population.
+2. On focus, and after a committed shell Quick Log or Undo refresh signal, `OrreryScreen` reads `app_settings`, resolves the self or contact sun, and asks `listOrbitingContacts()` for the remaining population.
 3. The read imports the shared progress and status SQL, selects only Bound contacted non-archived contacts, omits a contact that occupies the sun, and turns ordered rows into a dense display rank.
 4. The screen measures the canvas once, derives one `OrreryMetrics` object, then renders rings, keyed planets, and the sun from that shared geometry.
 
@@ -117,6 +117,7 @@ The orrery owns no per-contact table or stored status. It reads contact recency 
 - **ADR-047:** App-Level Assignable Sun and Themed Self Identity — stores sun state and the self-star palette policy.
 - **ADR-048:** Status-Default Static Orrery with a Single-Canvas Morph — defines the two-view, static-body, ambient-layer interaction model.
 - **ADR-062:** Bound/Unbound Lifecycle and One-Way Cadence Assignment — makes the active orbit, picker, and ring guards Bound-only.
+- **ADR-082:** Universal Capture FAB, Canonical Picker, and Truthful Quick Log — publishes a post-commit refresh signal that causes this local read to rerun.
 
 ## Gotchas
 
@@ -128,6 +129,7 @@ The orrery owns no per-contact table or stored status. It reads contact recency 
 6. **High contact counts can overlap.** The current minimum ring gap can place planets on the outer rim; capacity treatment is intentionally deferred to the owner rather than silently changing the visual model.
 7. **Fast Refresh can invalidate an Expo SQLite statement in debug.** A clean relaunch restores the local connection; the phase's device UAT treated this as a development artifact, not an orrery query failure.
 8. **Keep a saved Unbound sun reference.** The self rendering is a presentation fallback, not a settings mutation; every ring guard must use the same Bound predicate as the render read.
+9. **Shell freshness must re-query data, not drive animation.** `useShellRefresh` refreshes the SQLite projection; Skia's ambient loop remains outside React state.
 
 ## Related Systems
 
@@ -144,3 +146,4 @@ The orrery owns no per-contact table or stored status. It reads contact recency 
 |---|---|---|
 | 2026-08-17 | 13 | Created the local two-view Skia orrery, app-level sun settings, guarded ring reordering, and dashboard entry point. |
 | 2026-08-27 | 18.2 | Made orbit/picker/reorder populations Bound-only and preserved saved Unbound sun references as self fallbacks. |
+| 2026-09-02 | 22 | Added post-Quick-Log local projection refresh without altering the Skia animation boundary. |
