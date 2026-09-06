@@ -56,19 +56,19 @@ describe("composeDashboardSearch", () => {
     const lessRelevant = await contact("Alpha low relevance");
     const moreRelevant = await contact("Zulu high relevance");
     const fuelOnly = await contact("Beta fuel only");
-    await memory(lessRelevant, "red");
-    await memory(moreRelevant, "red blue");
+    await memory(lessRelevant, "lambda");
+    await memory(moreRelevant, "lambda sigma");
     await addFuel(exec, {
       uid: `fuel-${++counter}`,
       contactId: fuelOnly,
       kind: "topic",
-      text: "red blue",
+      text: "lambda sigma",
       source: "user",
       createdAt: NOW,
       now: NOW,
     });
 
-    const rows = await composeDashboardSearch(exec, active, "red blue", NOW);
+    const rows = await composeDashboardSearch(exec, active, "lambda sigma", NOW);
 
     expect(rows.map((entry) => entry.row.id)).toEqual([
       moreRelevant,
@@ -76,7 +76,7 @@ describe("composeDashboardSearch", () => {
       fuelOnly,
     ]);
     expect(rows.slice(0, 2).every((entry) => entry.match !== null)).toBe(true);
-    expect(rows[2]).toMatchObject({ match: null, row: { snippet: "red blue" } });
+    expect(rows[2]).toMatchObject({ match: null, row: { snippet: "lambda sigma" } });
   });
 
   it("surfaces memory-only matches but never lets them bypass the eligible universe", async () => {

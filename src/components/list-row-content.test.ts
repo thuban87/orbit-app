@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   buildRowAccessibilityDescription,
+  formatMatchCategories,
+  formatMatchExplanation,
   formatLine2,
   formatListRecency,
 } from "@/components/list-row-content";
@@ -18,6 +20,25 @@ describe("ListRow content", () => {
   it("composes recency and the one displayed category", () => {
     expect(formatLine2("18d ago", "Friend")).toBe("18d ago · Friend");
     expect(formatLine2("No interactions yet", null)).toBe("No interactions yet");
+  });
+
+  it("formats pluralised corpus match explanations with the strongest categories", () => {
+    expect(
+      formatMatchExplanation(
+        3,
+        formatMatchCategories([
+          "memory-or-custom-field",
+          "relationship",
+          "memory-or-custom-field",
+        ]),
+        "+2 more",
+      ),
+    ).toBe("3 matches · Memory, Relationship · +2 more");
+  });
+
+  it("formats singular and fuel-only match explanations without categories", () => {
+    expect(formatMatchExplanation(1, [])).toBe("1 match");
+    expect(formatMatchExplanation(1, [], "+1 more")).toBe("1 match · +1 more");
   });
 
   it.each([
