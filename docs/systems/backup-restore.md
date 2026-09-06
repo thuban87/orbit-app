@@ -1,7 +1,7 @@
 # Backup & Restore
 
 **Last updated:** 2026-09-02
-**Updated by phase:** 25-dashboard-data-state-foundation
+**Updated by phase:** 27-dashboard-list-view
 **Owners:** `src/backup/`, `src/services/backup/`, `src/services/backup-sweep.ts`, `src/db/restore-photo-journal-dao.ts`, `src/screens/BackupScreen.tsx`
 
 ## Purpose
@@ -16,7 +16,7 @@ The backup manifest is a versioned wire model separate from SQLite's schema vers
 
 **Tables:**
 - `tombstones` — indefinitely retained type-and-UID deletion evidence for mergeable rows.
-- `app_settings` — stores portable preferences (including the default-on `interactionAssistEnabled` toggle) plus device-local automatic-backup configuration, revision, health, and encryption-flag state. Theme and Dashboard query keys are allowlisted so a later format can accept them, but the current wire intentionally omits both sets. The transient `interaction_assists` rows themselves are device-local and excluded from the manifest.
+- `app_settings` — stores portable preferences (including the default-on `interactionAssistEnabled` toggle) plus device-local automatic-backup configuration, revision, health, and encryption-flag state. Theme, Dashboard query, and Dashboard right-swipe-action keys are allowlisted so a later format can accept them, but the current wire intentionally omits all three sets. The transient `interaction_assists` rows themselves are device-local and excluded from the manifest.
 - `restore_photo_journal` — committed-only finalize/delete work for restored photo files.
 - `contact_methods`, external links, and method provenance — first-class UID-bearing portable children with labels and canonicalization regions where present.
 - `memories`, `relationships`, `current_state_entries`, and `custom_field_value_history` — portable typed knowledge rows, including soft deletion, explicit AI permission, and retained prior field values.
@@ -102,6 +102,7 @@ The backup manifest is a versioned wire model separate from SQLite's schema vers
 - **ADR-083:** Durable Multi-Package Theme Configuration and Restore-Before-Paint — allowlists seven future-portable theme keys without changing the current format-3 wire shape.
 - **ADR-090:** Additive Custom-Field Value History and Deferred Contact Scope — makes retained prior values a mergeable, tombstoned portable entity.
 - **ADR-092:** Durable Shared Dashboard Query State — allowlists future-portable Dashboard preferences without changing the current wire format.
+- **ADR-099:** Durable Global Dashboard Right-Swipe Action — allowlists the future-portable action key without an in-phase format change.
 
 ## Gotchas
 
@@ -118,6 +119,7 @@ The backup manifest is a versioned wire model separate from SQLite's schema vers
 11. **Allowlisting is not emission.** Theme keys may be accepted when a future format carries them, but adding them to a format-3 projection would silently break cross-version restore compatibility.
 12. **Do not require a new array from an older format-4 file.** There is no 4→4 forward migration, so optional additive arrays normalize during parse before validation and restore.
 13. **Allowlisting is not emission for Dashboard preferences.** Migration 019 makes the keys durable and restorable; the current manifest projection stays unchanged until its coordinated format bump.
+14. **The right-swipe action follows the same deferred-wire rule.** Accepting its key in validation does not authorize format-4 export or restore emission before the coordinated backup change.
 
 ## Related Systems
 
@@ -143,3 +145,4 @@ The backup manifest is a versioned wire model separate from SQLite's schema vers
 | 2026-09-02 | 23 | Allowlisted durable theme preferences while preserving the format-3 export projection. |
 | 2026-09-03 | 24.2 | Added Memory permission, retained custom-field history, scope metadata, and compatible format-4 restoration. |
 | 2026-09-02 | 25 | Allowlisted durable Dashboard preferences for a future wire without changing the current backup format. |
+| 2026-09-02 | 27 | Allowlisted the durable Dashboard right-swipe action for a future wire without changing the current backup format. |
