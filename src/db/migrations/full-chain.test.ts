@@ -54,7 +54,10 @@ describe("registered migration chain", () => {
     expect(
       MIGRATIONS.filter((migration) => migration.version === 19),
     ).toHaveLength(1);
-    expect(TARGET_VERSION).toBe(19);
+    expect(
+      MIGRATIONS.filter((migration) => migration.version === 20),
+    ).toHaveLength(1);
+    expect(TARGET_VERSION).toBe(20);
     expect(
       await exec.getFirstAsync<{ user_version: number }>("PRAGMA user_version"),
     ).toEqual({
@@ -76,6 +79,7 @@ describe("registered migration chain", () => {
       "standard_accent",
       "galaxy_background",
       "standard_background",
+      "dashboard_right_swipe_action",
     ]) {
       expect(appSettingsCols.has(col)).toBe(true);
     }

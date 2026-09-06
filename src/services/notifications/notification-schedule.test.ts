@@ -38,6 +38,7 @@ import { migration016 } from "@/db/migrations/016-contact-knowledge";
 import { migration017 } from "@/db/migrations/017-knowledge-egress-datamove";
 import { migration018 } from "@/db/migrations/018-custom-field-scope-history";
 import { migration019 } from "@/db/migrations/019-dashboard-prefs";
+import { migration020 } from "@/db/migrations/020-dashboard-swipe-pref";
 import { runMigrations } from "@/db/migrations/runner";
 import type { SqlExecutor } from "@/db/types";
 import { __resetSweepForTest, runLaunchSweep } from "@/services/launch-sweep";
@@ -83,7 +84,7 @@ beforeEach(async () => {
   uidCounter = 0;
   const db = openTestDb();
   exec = nodeSqliteExecutor(db);
-  // Current schema: getAppSettings reads durable dashboard preferences added in v19.
+  // Current schema: getAppSettings reads the v20 durable right-swipe preference.
   await runMigrations(
     exec,
     [
@@ -106,8 +107,9 @@ beforeEach(async () => {
       migration017,
       migration018,
       migration019,
+      migration020,
     ],
-    19,
+    20,
     { now: NOW, newUid: uid, defaultPhoneRegion: "US" },
   );
   __resetExpo();
