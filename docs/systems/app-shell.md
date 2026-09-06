@@ -1,7 +1,7 @@
 # App Shell
 
 **Last updated:** 2026-09-02
-**Updated by phase:** 26-dashboard-control-surface
+**Updated by phase:** 27-dashboard-list-view
 **Owners:** `App.tsx`, `src/navigation/RootNavigator.tsx`, `src/navigation/tabs/`, `src/navigation/types.ts`, `src/navigation/reset-intents.ts`, `src/navigation/linking.ts`, `src/navigation/notification-gate.tsx`, `src/navigation/widget-linking.ts`, `src/components/UniversalFab.tsx`, `src/components/ShellAppBar.tsx`
 
 ## Purpose
@@ -24,7 +24,7 @@ The shell owns runtime navigation and consumes the durable theme contract; `app_
 | Reset intents | `src/navigation/reset-intents.ts` | Sole owner of typed nested Dashboard-root reset states for external and completion paths. |
 | Transient/back state | `src/stores/shell-transient-store.ts`, `src/navigation/back-intent.ts` | Registers executable overlay dismissal callbacks and resolves transient-first Back behavior. |
 | Shell chrome | `src/components/ShellAppBar.tsx`, `src/navigation/use-bottom-clearance.ts` | Provides themed root/child app bars, measured compact trailing content, and shared tab/FAB clearance. |
-| Capture | `src/components/UniversalFab.tsx`, `src/components/ContactPicker.tsx`, `src/components/Snackbar.tsx` | Provides the universal action dial, local contact selection, and commit-truthful feedback. |
+| Capture | `src/components/UniversalFab.tsx`, `src/services/quick-log-command.ts`, `src/components/ContactPicker.tsx`, `src/components/Snackbar.tsx` | Provides the universal action dial, shared Quick Log command, local contact selection, and commit-truthful feedback. |
 | Intent gate | `src/navigation/linking.ts` | Converts provider-owned pending share state into ready-gated navigation to Capture. |
 | Backup-share gate | `src/navigation/backup-share-intent.ts` | Holds a narrow inbound backup-file intent until the backup restore surface is ready. |
 | Notification gate | `src/navigation/notification-gate.tsx` | Converts warm and cold local-notification responses into ready-gated actions or navigation. |
@@ -46,6 +46,7 @@ The shell owns runtime navigation and consumes the durable theme contract; `app_
 | `src/screens/MemoryHistoryScreen.tsx` | Typed retained-current-state history destination. |
 | `src/navigation/reset-intents.ts` | Builds the only root-level Dashboard reset states. |
 | `src/components/UniversalFab.tsx` | Mounts the six-action shell capture dial once above browse/read surfaces. |
+| `src/services/quick-log-command.ts` | Shares commit-truthful Quick Log behavior between the universal FAB and Dashboard List gestures. |
 | `src/components/ShellAppBar.tsx` | Supplies accessible themed root and child app bars, including measured icon-only fallback for constrained root destinations. |
 | `src/navigation/linking.ts` | Holds the navigation ref and the single ready-gated Capture navigation owner. |
 | `src/navigation/backup-share-intent.ts` | Handles the narrow Files-to-Orbit backup-share fallback without placing a file URI in route state. |
@@ -87,8 +88,8 @@ The shell owns runtime navigation and consumes the durable theme contract; `app_
 ### Capturing from any browse surface
 
 1. `App.tsx` mounts one `UniversalFab` and snackbar host outside the tab tree. The FAB is visible only on browse/read routes and uses measured tab-bar geometry for its bottom offset.
-2. The fixed labeled speed dial is Add Contact, Quick Log, Log Contact, Group Log, Update Contact, and Memory. Profile context preselects a contact; global contact-specific actions open the reusable local picker, while Group Log routes directly.
-3. Quick Log waits for the canonical SQLite write to resolve before it shows success and an Undo action. Its picker, dial, and snackbar register real dismissal callbacks with the transient store.
+2. The fixed labeled speed dial is Add Contact, Quick Log, Log Contact, Group Log, Update Contact, and Memory. Profile context preselects a contact; global contact-specific actions open the reusable local picker, while Group Log routes directly. Dashboard List can reuse the same Quick Log command after its configured gesture commits.
+3. Quick Log waits for the canonical SQLite write to resolve before it shows success and an Undo action. Its picker, dial, List host, and snackbar register real dismissal callbacks with the transient store.
 
 ### Navigating dashboard and settings
 
@@ -271,6 +272,8 @@ The shell owns runtime navigation and consumes the durable theme contract; `app_
 - **ADR-093:** Scoped Composable Dashboard Population and Filter Model — retires the Never Contacted route and leaves its next visible control to Dashboard work.
 - **ADR-095:** Live-Applying Dashboard Floating Control Surface — registers Dashboard controls as a transient-first in-tree surface rather than a native modal.
 - **ADR-096:** Dashboard Header and Overflow Discovery Paths — defines measured header fallback, fixed overflow entries, and shared management-route chrome.
+- **ADR-098:** Scan-First, Accessible Dashboard List Rows — reuses typed Dashboard Profile/Edit destinations and accessible action primitives.
+- **ADR-099:** Durable Global Dashboard Right-Swipe Action — reuses the shell's commit-truthful Quick Log and typed Log Contact route from the global Dashboard preference.
 
 ## Gotchas
 
@@ -306,6 +309,7 @@ The shell owns runtime navigation and consumes the durable theme contract; `app_
 27. **Root header labels must fail closed to icon-only.** Do not wrap, shrink, or independently hide a co-equal Dashboard destination when measured text no longer fits.
 28. **A disabled overflow entry must not close its menu.** Select Contacts is a visible future capability, not a no-op route or a hidden item.
 29. **Keep Archived registered in both owning stacks.** It is one screen with two deliberate entry paths; replacing either route with a duplicate breaks origin-aware Back behavior.
+30. **Keep Quick Log command-owned.** The Dashboard List may invoke it, but must not duplicate FAB feedback, Undo, Retry, haptic, or refresh behavior in a second shell path.
 
 ## Related Systems
 
@@ -356,3 +360,4 @@ The shell owns runtime navigation and consumes the durable theme contract; `app_
 | 2026-09-03 | 24.1 | Added typed contact-knowledge, Recently Deleted, and retained-history routes to both profile stacks. |
 | 2026-09-02 | 25 | Retired Manage favourites and Never Contacted navigation surfaces plus the Settings include-Unbound control. |
 | 2026-09-02 | 26 | Added measured Dashboard header fallback, fixed overflow behavior, transient-aware controls, and shared child chrome for Archived and Unbound routes. |
+| 2026-09-02 | 27 | Shared the Quick Log command and existing Dashboard Profile/Edit routing with accessible List gesture actions. |
