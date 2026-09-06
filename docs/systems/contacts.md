@@ -1,8 +1,8 @@
 # Contacts
 
 **Last updated:** 2026-09-02
-**Updated by phase:** 25-dashboard-data-state-foundation
-**Owners:** `src/db/contacts-dao.ts`, `src/db/contact-read.ts`, `src/db/favourites-dao.ts`, `src/db/profile-dao.ts`, `src/db/contact-links-dao.ts`, `src/db/purge-dao.ts`, `src/db/recency-dao.ts`
+**Updated by phase:** 28-dashboard-card-view
+**Owners:** `src/db/contacts-dao.ts`, `src/db/contact-read.ts`, `src/db/favourites-dao.ts`, `src/db/profile-dao.ts`, `src/db/contact-links-dao.ts`, `src/db/purge-dao.ts`, `src/db/recency-dao.ts`, `src/db/snooze-dao.ts`, `src/db/bulk-actions-dao.ts`
 
 ## Purpose
 
@@ -78,6 +78,7 @@ All data is on-device SQLite. Migration 001 uses a surrogate `contacts.id` and a
 | `src/db/recency-dao.ts` | Single-writer interaction/recency cores used by composed contact writes. |
 | `src/db/snooze-dao.ts` | Local-date snooze and clear writes with immutable event composition. |
 | `src/db/events-dao.ts` | Insert-only lifecycle writer composed by archive and restore. |
+| `src/db/bulk-actions-dao.ts` | Composes atomic Dashboard batch writes from existing transaction-owned cores. |
 | `src/db/purge-dao.ts` | Explicit, transaction-scoped child deletion, including normalized custom-value pairs, and post-commit extension hook. |
 | `src/db/merge-dao.ts` | Atomically consolidates two live contacts, reparents compatible children, and tombstones the absorbed identity. |
 | `src/screens/CreateContactScreen.tsx` | Lean fixed-first create form. |
@@ -135,6 +136,13 @@ All data is on-device SQLite. Migration 001 uses a surrogate `contacts.id` and a
 2. The star is the only user-facing favourite-order control: no Manage favourites screen or rank-rewrite writer exists.
 3. Dashboard and Widget reads treat a non-NULL stored rank as binary membership and apply their own documented Default ordering; the DAO never writes `last_contact`.
 4. Successful favourite, metadata, archive, restore, and photo-facing mutations publish a best-effort Widget refresh after their database work commits; this publisher does not alter the contact transaction.
+
+### Applying Dashboard bulk contact changes
+
+1. A Dashboard selection passes selected IDs to `bulk-actions-dao`; each non-empty operation opens one outer transaction, invokes the relevant non-mutexed contact core per ID, and bumps data revision once.
+2. Category and frequency writes update only their named contact column and `modified_at`; frequency rejects non-positive or fractional values before the transaction. Favourite operations remain explicit add or remove membership, never rank ordering.
+3. Archive composes the same guarded archive core and immutable event as the single-contact lifecycle path. It is recoverable; permanent deletion remains archive-gated in the Archived Contacts surface.
+4. Snooze resolves one SQLite-local target date for a whole batch. All selected IDs are passed to each action, including Unbound or never-contacted contacts, matching the single-contact command boundary.
 
 ### Selecting a contact for a shell action
 
@@ -224,6 +232,7 @@ All data is on-device SQLite. Migration 001 uses a surrogate `contacts.id` and a
 - **ADR-069:** Atomic Tombstone-Backed Orbit Contact Merge — requires explicit conflict review, atomic child consolidation, and retirement of the absorbed identity.
 - **ADR-071:** User-Attested Handoff-Time Interaction Logging Through the Sole Recency Writer — assist confirmation recomputes `last_contact` through the same sole recomputer without a bespoke write.
 - **ADR-073:** Merge-Reparented, Purge-Cascaded Interaction Assists — purge removes pending assists via FK cascade; merge reparents them to the survivor.
+- **ADR-103:** Atomic Composed Dashboard Bulk Mutations — requires Dashboard batches to compose contact cores in one transaction without rank or lifecycle shortcuts.
 
 ## Gotchas
 
@@ -251,6 +260,8 @@ All data is on-device SQLite. Migration 001 uses a surrogate `contacts.id` and a
 22. **Picker ordering is not favourite-rank ordering.** A favourite is a membership band only; use recency and then name inside that band.
 23. **Do not rely on cascade for a merge.** Contact deletion would discard knowledge rows; merge must reparent them and resolve relationship/current-state collisions first.
 24. **Retained custom-field history is a child with evidence.** Edit appends its prior raw value in the contact transaction; merge reparents it and purge tombstones it before deletion.
+25. **A bulk action is not a set-based update.** Calling a public writer inside the batch deadlocks the non-reentrant transaction mutex; compose its core inside `bulk-actions-dao` instead.
+26. **Archive batch state must include its event.** Updating `archived_at` without the immutable archive event breaks the lifecycle timeline.
 
 ## Related Systems
 
@@ -294,3 +305,4 @@ All data is on-device SQLite. Migration 001 uses a surrogate `contacts.id` and a
 | 2026-09-03 | 24.1 | Extended merge and archive-gated purge with explicit contact-knowledge preservation and fan-out. |
 | 2026-09-03 | 24.2 | Added atomic retained custom-field history capture plus explicit merge and purge lifecycle handling. |
 | 2026-09-02 | 25 | Retired rank rewrites and made favourite membership feed shared Dashboard Default ordering. |
+| 2026-09-02 | 28 | Added transaction-composed Dashboard bulk category, frequency, favourite, snooze, and archive actions. |
