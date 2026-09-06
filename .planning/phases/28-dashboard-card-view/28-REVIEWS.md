@@ -1,8 +1,8 @@
 ---
 phase: 28
-cycle: 3
+cycle: 4
 reviewers: [codex, claude]
-reviewed_at: 2026-09-06T07:38:52Z
+reviewed_at: 2026-09-06T08:05:00Z
 plans_reviewed: [28-01-PLAN.md, 28-02-PLAN.md, 28-03-PLAN.md, 28-04-PLAN.md, 28-05-PLAN.md, 28-06-PLAN.md, 28-07-PLAN.md]
 models:
   codex: "gpt-5.6-terra (reasoning=low)"
@@ -12,64 +12,98 @@ model_sources:
   claude: "orchestrator (read-only subagent — CLAUDE_CODE_ENTRYPOINT self-skip workaround)"
 summary:
   current_high: 0
-  current_actionable: 3
+  current_actionable: 1
 ---
 
-# Cross-AI Plan Review — Phase 28 (Dashboard Card View) — CYCLE 3
+# Cross-AI Plan Review — Phase 28 (Dashboard Card View) — CYCLE 4
 
-Both reviewers reviewed the CURRENT 7 plans on disk (post commit `4680296`, cycle-2
+Both reviewers reviewed the CURRENT 7 plans on disk (post commit `fa06779`, the cycle-3
 replan) under the project mandate: **review the code on disk, not the diff/plan text;**
 verify every `file:line`; treat any decision reversal (HANDOFF / ADR / D-01..D-12) as an
 owner-escalation HIGH. The orchestrator independently re-verified every finding below
-against source before counting it (both reviewers' `file:line` citations resolved
-accurately on spot-check).
+against source before counting it.
 
-Reviewer split this cycle: **Claude** drove the data-layer / decision-reversal /
-frozen-universe surface and cleared it (0 actionable, "converged"); **Codex** traced the
-UI-wiring surface (search descriptors, Log-Interaction routing, view-mode switch) and
-found three MEDIUM execution gaps. This is the intended cross-AI blind-spot split — the
-two reviewers covered different surfaces, and both sets of claims are code-verified.
+The cycle-4 replan (`fa06779`) touched only Plans 04/05/06 — the three cycle-3 MEDIUM
+UI-wiring findings — and STATE.md; Plans 01/02/03/07 are byte-identical to cycle 3, where
+both reviewers cleared them. `git show --stat fa06779` confirms this scope.
 
 ## Consensus Summary
 
 - **No HIGH findings. No decision reversals.** Both reviewers independently confirmed no
   recorded decision (HANDOFF, ADR-010/018/024/025/033/071/075, D-01..D-12) is deleted,
-  weakened, or inverted, and no data-layer red line is crossed. The bulk data layer
-  (Plan 02) is correct-by-construction: N composed non-mutexed `*Core` primitives in ONE
-  `inWriteTransaction`, the single recency writer preserved (ADR-010/024/071), the
-  immutable lifecycle-event trail preserved (ADR-025), a single `bumpDataRevisionCore`
-  per op (D-04), no set-based mutation, no schema change (D-03), no mutex nesting (D-05).
-- **All cycle-1/2 fixes remain SOUND** — both reviewers confirmed independently (see each
-  section). Nothing regressed.
-- **Three MEDIUM UI-wiring gaps remain (Codex; orchestrator-verified) — actionable.**
-  They are UI-routing/wiring specifications that would produce wrong or unverifiable
-  Card-view behavior (search-match rendering, Log-Interaction routing, selection entry)
-  under `/gsd-execute-phase` as the plans currently read. None touches the data layer or
-  any recorded decision.
+  weakened, or inverted, and no data-layer / local-first / migration red line is crossed
+  (no schema change — D-03). The bulk data layer (Plan 02) remains correct-by-construction:
+  N composed non-mutexed `*Core` primitives in ONE `inWriteTransaction`, the single recency
+  writer preserved (ADR-010/024/071), the immutable lifecycle-event trail preserved
+  (ADR-025), a single `bumpDataRevisionCore` per op (D-04), no set-based mutation, no mutex
+  nesting (D-05).
+- **All three cycle-3 MEDIUM UI-wiring fixes are now correctly incorporated** into Plans
+  04/05/06 (must_haves, read_first, action, acceptance_criteria), with every new `file:line`
+  citation verified accurate against source by both reviewers and the orchestrator:
+  - **Finding 1 (28-04 view-independent search descriptors):** `isListSearch` at
+    `HomeScreen.tsx:558`, `composeDashboardSearch` producer branch at `:573`, empty
+    `resultsByContactId` else branch at `:583/588`, candidate gate at `:601`,
+    `isListSearchMode` at `:772` — all confirmed list-only on disk; the plan widens both the
+    descriptor gate and the candidate gate view-independently and keeps search/adaptive
+    line-3 mutually exclusive.
+  - **Finding 2 (28-05 direct LogContact route):** `onLogInteraction` at
+    `HomeScreen.tsx:412-425` is genuinely preference-gated (opens `LogContact` only when
+    `dashboardRightSwipeAction === "log-contact"`, else `logQuickly`); the direct helper
+    `navigateDashboardContactAction` exists at `:133-141`. Plan 05 routes the card menu (and
+    the a11y action) to the direct `navigateDashboardContactAction(id, "LogContact")` and
+    explicitly bars reuse of the gated handler.
+  - **Finding 3 (28-06 awaited 2-arg setViewMode + failure path):** `setViewMode` at
+    `dashboard-query-store.ts:79-89` is `async (exec, viewMode)` and carries an idempotency
+    guard on disk; the existing idiom `setViewMode(getExecutor(), mode)` is at
+    `HomeScreen.tsx:540`. Plan 06's `await setViewMode(getExecutor(), "card")`-before-
+    `enterSelection`, the persist-failure path (report + do not enter selection), and the
+    already-card fast-path all match.
+- **All cycle-1/2 fixes remain SOUND** — both reviewers confirmed independently; nothing
+  regressed.
 
 ### Agreed Strengths (2+ reviewers)
-- Data layer honors the non-reentrant mutex and canonical recency/event writers; every
-  drift-prone citation (`setContactPhotoCore` bump at contacts-dao.ts:658, `insertInteraction`
-  direction-defaults-null at recency-dao.ts:205, `deleteTouchpoint` bump-free 313-346,
-  `GroupLog: undefined` at navigation/types.ts:34) is accurate.
-- Frozen-universe invariant is fenced at both the store boundary (Plan 03 `toggle`) and the
-  renderer boundary (Plan 06 filter); the re-query paths that make the fence necessary are
-  confirmed (HomeScreen `useFocusEffect`/AppState/`onRefresh`).
-- The per-action-eligibility question is correctly routed to the owner as a properly
-  recorded `flagged_assumption` with a safe reversible default (Plan 07) — resolved, not
-  actionable.
+- The three cycle-3 UI-wiring corrections are necessary and correctly targeted; the widened
+  search/candidate gates, the direct detailed-log route, and the awaited persisted view
+  switch all match repository constraints on disk (`HomeScreen.tsx:558/601/412`,
+  `dashboard-query-store.ts:79`).
+- Bulk writers correctly require extracted non-mutexed cores: `contacts-dao.ts:536/541`,
+  `favourites-dao.ts:32`, `snooze-dao.ts:79`, `transaction.ts:49` — each existing API opens
+  its own txn and bumps revision, so nesting under the shared non-reentrant mutex would
+  deadlock; Plan 02's composed-`*Core` approach is the only correct one.
+- Quick Log pins `direction: "outbound"` where the reusable insert core defaults it to
+  `null` (`recency-dao.ts:178/205`); archive preserves its immutable event trail via
+  `recordEventCore` (`contacts-dao.ts:541`) rather than a set-based update.
+- GroupLog route-param handoff is additive/serializable over the parameterless placeholder
+  (`navigation/types.ts:34`); frozen-universe double fence intact (store guard Plan 03 +
+  render filter Plan 06; re-query paths at HomeScreen ~678/690/706).
 
 ### Agreed Concerns (2+ reviewers)
-- None. (The three actionable items were raised by Codex; Claude did not trace the UI-wiring
-  surface in that depth. The orchestrator verified all three against code.)
+- None. The two items below were raised by Codex only; Claude (deep on the data-layer /
+  frozen-universe surface) reached zero actionable findings and recommended closing the loop.
 
 ### Divergent Views
-- **Codex vs Claude on convergence.** Claude concluded the set is converged (0 actionable);
-  Codex found 3 MEDIUM UI-wiring gaps. The divergence is coverage, not contradiction — Claude
-  concentrated on the data layer and decision-reversal surface (and cleared it), Codex on the
-  card-view UI wiring. The orchestrator adjudicated in favor of Codex on all three after
-  confirming each against `src/screens/HomeScreen.tsx` and `src/stores/dashboard-query-store.ts`;
-  they are genuine execution-relevance gaps, not style. Counted: **0 HIGH, 3 actionable MEDIUM.**
+- **Codex raised two items Claude did not; the orchestrator verified both against source and
+  counted one.**
+  - Codex **LOW (Plan 01 hit-target)** — COUNTED as the one actionable finding. Verified: the
+    `md` icon is 20px (`icon-size.ts:16`) and `hitSlop={SPACING.sm}` is 8px
+    (`spacing.ts:12`), so the plan's stated mechanism yields a 36px target — below the plan's
+    own must_have E4 (">=44px hit area") and CARDV a11y floor. The repo's established pattern
+    (`ListRow.styles.favouriteButton { minWidth/minHeight: SPACING["2xl"] = 48px }`,
+    `ListRow.tsx:342-347`) achieves the floor via a min touch-box, NOT hitSlop; `spacing.ts:8`
+    explicitly warns "44×44 minimum touch target is a floor, not a spacing token." Plan 01's
+    automated gate (tsc + check:colors) would not catch this, so it is a real, verifiable
+    execution gap, not style. **Actionable.**
+  - Codex **MEDIUM (Plan 03 seed-membership guard)** — NOT counted. Codex is correct that
+    `enterSelection(universe, seedId?)` inserts `seedId` without a `universe.includes(seedId)`
+    check while only `toggle()` is fenced (`28-03-PLAN.md:86`). But both wired callers pass an
+    in-universe seed: Plan 05 seeds the long-pressed card's id, which is by construction a
+    member of `currentEligibleIds = rows.map(r => r.id)`; Plan 06 passes no seed. No wired
+    path admits an out-of-universe seed, so `/gsd-execute-phase` produces correct behavior; the
+    finding is defensive hardening against a hypothetical caller error, not a defect in the
+    plans as written. Claude, who manually traced the frozen-universe surface, independently
+    did not flag it. Under this cycle's convergence calibration it is a reasonable optional
+    consistency improvement, not an actionable blocker. Recorded here so the owner/executor
+    may add the guard if desired.
 
 ---
 
@@ -78,72 +112,49 @@ two reviewers covered different surfaces, and both sets of claims are code-verif
 *Model: gpt-5.6-terra (reasoning=low). Source-grounded (repo read access).*
 
 ### Summary
-Two-to-three execution-relevant UI-wiring gaps remain. Card search is list-only at the
-query/match-descriptor layer, so Plan 04's card search UI would lack match metadata; the
-existing `onLogInteraction` handler is preference-dependent, not reliably the individual
-detailed-log route the card menu requires; and Plan 06's `setViewMode` call shape does not
-match the persisted async view-mode API.
+The plans are largely execution-ready. Prior high-risk fixes remain sound against the
+current code: the recency/event composition strategy, the view-independent search
+correction, the direct detailed-log routing, and the awaited persisted Card-view switch all
+match repository constraints.
+
+### Strengths
+- Bulk writers correctly need extracted non-mutexed cores: current archive, favourite, and
+  snooze APIs each open their own transaction and bump revision, so nesting them would
+  deadlock under the shared non-reentrant mutex (`contacts-dao.ts:536`, `favourites-dao.ts:32`,
+  `snooze-dao.ts:79`, `transaction.ts:49`).
+- Quick Log pins `direction: "outbound"`; the reusable insert core otherwise defaults it to
+  `null` (`recency-dao.ts:178`).
+- Archive's immutable event trail is preserved: the existing writer updates `archived_at`
+  then writes `recordEventCore`; a set-based update would violate this (`contacts-dao.ts:541`).
+- The view-independent search and card candidate-read changes are necessary and correctly
+  targeted: both are currently list-only (`HomeScreen.tsx:558`, `:601`).
+- The direct detailed-log routing correction is valid: the existing `onLogInteraction` is
+  governed by the right-swipe preference and defaults to Quick Log (`HomeScreen.tsx:412`).
+- The persisted two-argument `setViewMode(exec, viewMode)` plan is correct
+  (`dashboard-query-store.ts:79`).
+- The GroupLog route-param handoff is additive and appropriate: the route is currently
+  parameterless and still a placeholder (`navigation/types.ts:34`).
 
 ### Concerns
-
-- **[MEDIUM] Plans 28-04, 28-01 — Card search wiring does not enable the shared descriptor
-  read in Card view.** `HomeScreen` defines search mode as list-only at
-  `src/screens/HomeScreen.tsx:558` (`isListSearch = query.viewMode === "list" && term !== ""`),
-  and only calls `composeDashboardSearch` — the producer of `DashboardSearchResult` match
-  descriptors — when that condition is true (`:573`). Card view instead falls to the else
-  branch, which builds an EMPTY `resultsByContactId` map (`:583/:588`); `isListSearchMode`
-  (`:772`) that gates descriptor props onto the row is likewise list-only. Plan 04 widens
-  only the non-search line-3 candidate gate at `:601`; it does not widen this search-query
-  gate. Consequently its proposed matched-field label / highlighted snippet cannot render
-  from the shared descriptor model in card mode — failing the plan's own device human-check
-  (28-04:143) and CARDV-02/03.
-  **PLAN.md change needed:** In 28-04 Task 3, make the Dashboard descriptor search
-  view-independent for a non-empty term — run `composeDashboardSearch` (and a
-  card-inclusive search-mode flag replacing/augmenting `isListSearchMode`) for BOTH list and
-  card modes — and pass descriptor results to `CardGrid` only when that shared search mode is
-  active. Add a source assertion covering the widened `:558/:573` descriptor gate (not just
-  the `:601` candidate gate). Preserve the normal-mode line-3 read exclusion during search.
-
-- **[MEDIUM] Plan 28-05 — Reuse of HomeScreen's existing `onLogInteraction` does not
-  guarantee the individual detailed-log flow.** The existing handler reads
-  `dashboardRightSwipeAction` and opens `LogContact` only when the swipe preference is
-  `"log-contact"`; otherwise it fires Quick Log (`src/screens/HomeScreen.tsx:412-425`; the
-  schema default is Quick Log per the handler's own comment). The card long-press menu item
-  is locked to "Log Interaction," and D-10 requires its one-contact route to the canonical
-  individual detailed-log flow, independent of list-swipe configuration. 28-05 read_first
-  cites the existing `onLogInteraction` and names the menu callback `onLogInteraction`,
-  creating a reuse trap; the plan's verification ("routes to the individual flow (not Group
-  Log)") would not catch a Quick-Log misroute.
-  **PLAN.md change needed:** In 28-05 Task 3, specify a dedicated callback that routes
-  directly to the individual detailed-log flow (e.g. `navigateDashboardContactAction(id,
-  "LogContact")`), NOT the preference-sensitive `onLogInteraction`; thread that same direct
-  callback to the GridCard accessibility action; and add a verify that it opens the
-  individual flow regardless of `dashboardRightSwipeAction`.
-
-- **[MEDIUM] Plan 28-06 — Overflow `Select Contacts` call shape does not match the persisted
-  async view-mode API.** `setViewMode` is `async (exec, viewMode)` and updates Zustand only
-  after `updateAppSettings` resolves (`src/stores/dashboard-query-store.ts:79-89`). Plan 06
-  writes `if viewMode !== "card" setViewMode("card"); enterSelection(currentEligibleIds);` —
-  wrong signature (missing `exec`; tsc-caught) and unawaited, so `enterSelection` can run
-  before the view switches/persists, and a failed preference write has no defined behavior.
-  **PLAN.md change needed:** In 28-06 Task 3, require an async `onSelectContacts`: `await
-  setViewMode(getExecutor(), "card")` before `enterSelection(rows.map(r => r.id))`; define
-  the failure path (report the persistence error, do not enter selection); if already in
-  Card view, enter directly. (`setViewMode`'s own idempotency guard already no-ops the
-  already-card case.)
-
-### Confirmation of prior fixes
-All cycle-1/2 fixes remain sound in the current set: GroupLog receives only an additive,
-serializable `participantIds` handoff; bulk Quick Log uses a per-row receipt and atomic
-core-based undo; Plan 03 store guard + Plan 06 render filter provide the two frozen-universe
-fences; bulk pickers are concretely specified; the photo-core citation correctly recognizes
-the core itself bumps revision at `contacts-dao.ts:637-659`; the shared `formatLocalDate`
-use avoids reproducing the private formatter at `list-row-selection.ts:30`.
+- **[MEDIUM] Selection store seed can violate the frozen-universe invariant.** Plan 03
+  `enterSelection(universe, seedId?)` inserts any supplied seed ID, while only `toggle()` is
+  constrained to `frozenUniverse`. A caller error could bulk-act on an ID outside the frozen
+  eligible result set. Suggest admitting `seedId` only when `universe.includes(seedId)`; add a
+  test for `enterSelection([1,2], 99)` producing an empty selection (`HomeScreen.tsx:1055`).
+  *(Orchestrator: NOT counted — both wired callers pass an in-universe seed; see Divergent
+  Views. Defensive hardening, not a defect in the plans as written.)*
+- **[LOW] Plan 01's stated 44px favourite hit-target is not guaranteed by
+  `hitSlop={SPACING.sm}`.** `SPACING.sm` is 8px and the token file says 44×44 is a separate
+  floor. Unless the visual star is >=28px square, 8px hit slop per side misses the requirement.
+  Specify a 44×44 wrapper/minimum layout box, with hit slop only as supplemental forgiveness
+  (`spacing.ts:8`). *(Orchestrator: COUNTED — verified 20px icon + 8px slop = 36px; see
+  Divergent Views.)*
 
 ### Risk Assessment
-**MEDIUM.** The data layer respects the on-disk non-reentrant transaction model and the
-canonical recency/event writers; the three UI-routing gaps would produce incorrect
-Card-view search, logging, or selection behavior unless resolved.
+Data-integrity risk is well controlled by the one-transaction/N-core architecture, batch
+receipt-based undo, canonical recency recomputation, and lifecycle-event composition. No
+decision reversal, migration violation, network path, or bulk-delete/quarantine regression
+was found. The two concerns above are localized and straightforward to resolve.
 
 ---
 
@@ -154,84 +165,107 @@ self-skipped for independence per the workflow; run as a read-only Agent instead
 Source-grounded (repo read access).*
 
 ### Summary
-Verified the 7 current plans against actual source — not plan text — focusing on the data
-layer (Plan 02), the frozen-universe fence (Plans 03/06/07), and every cited `file:line`.
-All load-bearing claims check out. The data-layer design is correct-by-construction:
-manually grepped every writer of `contacts.archived_at`, `contacts.last_contact`,
-`interactions`, `contacts.category_id`, and `contacts.interval_days` and confirmed the
-single-writer / immutable-event invariants hold, no set-based mutation is introduced, and
-the extracted `*Core` composition honors the non-reentrant mutex (D-04/D-05/D-06,
-ADR-010/024/025/071). Found no decision reversals, no data-layer red-line violations, no
-HIGH findings. ~40 spot-checked `file:line` references all accurate. This plan set is
-converged (from the data-layer / decision-reversal vantage).
+The Phase 28 plan set is execution-ready and converged. Independently re-verified ~20
+distinct on-disk citation clusters spanning the cycle-3 fix surface (search-descriptor gates,
+Log-Interaction routing, async view-mode switch) and the highest-risk data layer (bulk
+composers, recency spine, event trail, extraction targets). Every `file:line` the plans
+assert resolved correctly. All three cycle-3 MEDIUM fixes are now concretely reflected in
+Plans 04/05/06 with accurate citations, and all cycle-1/2 fixes remain sound. No recorded
+decision (HANDOFF, ADR-010/018/024/025/033/071/075, D-01..D-12) is deleted, weakened, or
+inverted; no local-first/network red line is crossed; no migration is introduced (D-03).
+**Zero actionable findings.**
+
+### Strengths
+- **Cycle-3 finding-1 fix verified.** `isListSearch` at `HomeScreen.tsx:558`, the
+  `composeDashboardSearch` producer branch at `:573`, the empty-`resultsByContactId` else
+  branch at `:583/588`, the candidate-read gate at `:601`, and `isListSearchMode` at `:772`
+  are all list-only exactly as Plan 04 Task 3 describes; the plan widens both gates
+  view-independently and keeps search/adaptive mutually exclusive.
+- **Cycle-3 finding-2 fix verified.** `onLogInteraction` at `HomeScreen.tsx:412-425` is
+  genuinely preference-gated; the direct helper `navigateDashboardContactAction` exists at
+  `:133-141`. Plan 05 correctly routes the card menu to the direct route and bars reuse of the
+  gated handler.
+- **Cycle-3 finding-3 fix verified — and strengthened by disk state.** `setViewMode` at
+  `dashboard-query-store.ts:79-89` is `async (exec, viewMode)` and now carries an explicit
+  idempotency guard (`if (viewMode === get().viewMode) return;`). Plan 06 Task 3's
+  `await setViewMode(getExecutor(), "card")`-before-`enterSelection`, failure path, and
+  already-card fast-path all match.
+- **Data layer correct-by-construction.** `setContactPhotoCore` bumps at `contacts-dao.ts:658`
+  inside the core (wrapper adds none); `deleteTouchpoint` (`recency-dao.ts:313-346`) is
+  bump-free with dual-key DELETE scoping; `insertInteraction` defaults `direction ?? null` at
+  `:205` (so Plan 02's pinned `direction:"outbound"` is required and specified); `runQuickLog`'s
+  canonical column shape matches Plan 02's bulkQuickLog.
+- **Frozen-universe double fence intact.** Re-query paths confirmed at `useFocusEffect` (~678),
+  AppState (~690), `onRefresh` (~706); Plan 03 store-boundary `toggle` guard + Plan 06
+  renderer-boundary `rows.filter` fence both present.
+- **Additive handoffs correct.** `GroupLog: undefined` at `navigation/types.ts:34`; overflow
+  `Select Contacts` is `disabled:true`/no-op (Plan 06 enables). Pickers grounded:
+  `SNOOZE_PRESETS` at `ContactProfileScreen.tsx:122-129`, `SnoozePreset`/`PRESET_MODIFIERS` at
+  `snooze-dao.ts:39/46`, `listCategories` at `contact-read.ts:49`, mutexed favourite twins at
+  `favourites-dao.ts:32/59`, `updateContactMetadataCore` (the writer to avoid) at
+  `contacts-dao.ts:312`.
 
 ### Concerns
-No HIGH or MEDIUM findings from the data-layer/decision surface. LOW / observational, all
-**NOT-ACTIONABLE** per cycle-3 calibration:
-- **LOW — `assertOneChange` is file-local, not exported** (`bulk-review-dao.ts:34`). Every
-  extracted core already carries its own inline `changes !== 1` throw, and the two new cores
-  copy that inline shape, so there is no hard dependency on exporting it; Plan 02 permits
-  "copy or import." NOT-ACTIONABLE.
-- **LOW — `snoozeContactCore` computes the date via an in-loop `SELECT date('now','localtime',?)`**
-  (from `snooze-dao.ts:87-90`). Preserved behavior, correctness-neutral (all N get the same
-  local date), trivial perf note only. NOT-ACTIONABLE.
-- **LOW — `bulkSnooze` uid minting phrasing.** `SnoozeContactInput.uid` is caller-minted
-  (`snooze-dao.ts:55`); Plan 02 Task 2 already states "Use `newUid()` for each event uid," so
-  execution is unambiguous. NOT-ACTIONABLE.
-- **RESOLVED (not a finding) — Plan 07 per-action-eligibility `flagged_assumption`.** Verified
-  its basis: migration `011:37` `CHECK (tracking_enabled = 0 OR interval_days IS NOT NULL)` is
-  satisfied by any positive value, so `bulkSetFrequency` on an Unbound contact is schema-legal,
-  and the `contacts_prevent_cadence_clear` trigger (`011:181-186`) fires only on NULL.
-  Properly `owner_bucket`, ships a safe reversible default, reverses nothing. RESOLVED.
+None actionable.
+- **(observational, NOT-ACTIONABLE) Frozen-universe seeding under an active search term.**
+  Entering selection via overflow `Select Contacts` while a search term is present would freeze
+  the current search-result set as the eligible universe (search then ceases to function per
+  D-12). Defensible product behavior ("freeze the eligible universe as it stood"), not a
+  defect; the control-area lock (Plan 06) makes it consistent. No plan change needed.
+- **(observational, NOT-ACTIONABLE) Plan 07 per-action-eligibility `flagged_assumption`.**
+  Properly `owner_bucket`, ships a safe reversible default (apply to all selected), reverses
+  nothing (verified schema-legal: migration-011 `CHECK (tracking_enabled = 0 OR interval_days
+  IS NOT NULL)` and the `contacts_prevent_cadence_clear` trigger fire only on NULL). RESOLVED.
 
-### Confirmation of prior fixes — all SOUND
-- **Cycle-1 HIGH-1 (28-07 GroupLog additive param): SOUND.** `navigation/types.ts:34` is
-  `GroupLog: undefined`; the extension to `{ participantIds?: number[] } | undefined` is
-  additive/serializable; D-10 explicitly authorizes preloading participants for the 2+ path;
-  the FAB "never preselects" comment (`universal-fab-logic.ts:92`) is genuinely FAB-scoped.
-  No decision reversal.
-- **Cycle-1 HIGH-2 (28-02 receipt + atomic undo): SOUND.** `insertInteractionCore`
-  (`recency-dao.ts:426`) returns `lastInsertRowId` for the `{contactId, interactionId}[]`
-  receipt; `undoBulkQuickLog` composes `deleteInteractionCore` (the bump-free body of
-  `deleteTouchpoint:313-346`) per entry + one `bumpDataRevisionCore`, in ONE
-  `inWriteTransaction`; Plan 07 wires Undo to `undoBulkQuickLog`, not the single-keyed
-  controller.
-- **Cycle-2 A1 (frozen-universe fence): SOUND.** Store guard (Plan 03 `toggle` no-ops when
-  `!frozenUniverse.includes(id)`) + renderer filter (Plan 06) + Plan 07 "must not re-seed."
-  Necessity proven — HomeScreen re-queries at `useFocusEffect:678`, AppState `:690`,
-  `onRefresh:706`.
-- **Cycle-2 A2 (net-new pickers): SOUND.** Snooze picker uses the three `SNOOZE_PRESETS`
-  (`ContactProfileScreen:127-129`); category picker from `listCategories`
-  (`contact-read.ts:49`); both composed from Sheet/overlay-base with testIDs + a11y.
-- **Cycle-2 A3 (setContactPhotoCore:658 citation): SOUND.** `bumpDataRevisionCore` is at
-  `contacts-dao.ts:658` inside the core; wrapper `setContactPhoto:661-669` adds no bump; Plan
-  02 copies only the single-column UPDATE + `changes===1` guard.
-- **Cycle-2 A4 (shared formatLocalDate): SOUND.** Shared helper at `dates.ts:17`; private
-  duplicate at `list-row-selection.ts:30`; Plan 04 mandates importing `@/utils/dates` and
-  forbids mirroring the private copy or `toISOString().split()`.
-- **Cycle-2 A5–A8: SOUND.** A5 `deleteTouchpoint` bump-free (single bump "more correct");
-  A6 snooze-preset affordance grounded (`ContactProfileScreen:486`); A7 frozen universe
-  seeded from full `rows.map(r => r.id)` (FlatList virtualizes rendering only). Plus
-  independent confirmations: OverflowMenu text-only (Sheet composition required), events-dao
-  stale comment genuinely wrong (snooze-dao IS the producer), no icon-registry key collisions.
+### Prior-Fix Verification
+- **Cycle-1 HIGH-1 (GroupLog additive param / Phase 33 defer): SOUND.** `navigation/types.ts:34`
+  is `GroupLog: undefined`; Plan 07's `{ participantIds?: number[] } | undefined` is
+  additive/serializable; D-10 authorizes preloading.
+- **Cycle-1 HIGH-2 (bulk receipt + atomic undoBulkQuickLog): SOUND.** Plan 02 returns
+  `{contactId, interactionId}[]`; `undoBulkQuickLog` composes `deleteInteractionCore`
+  (bump-free `deleteTouchpoint:313-346`) per entry + one `bumpDataRevisionCore`, one txn;
+  Plan 07 wires Undo to `undoBulkQuickLog`, not `createQuickLogUndoController`.
+- **Cycle-2 A1 (frozen-universe double fence): SOUND.** Store guard (Plan 03) + render filter
+  (Plan 06) present; re-query necessity confirmed at HomeScreen 678/690/706.
+- **Cycle-2 A2 (net-new bulk pickers): SOUND.** Snooze picker from `SNOOZE_PRESETS`, category
+  from `listCategories:49`, both composed from Sheet/overlay-base with testIDs + a11y.
+- **Cycle-2 A3 (setContactPhotoCore:658 citation): SOUND.** Bump is inside the core at `:658`;
+  wrapper adds none; Plan 02 copies only the single-column UPDATE + `changes===1` guard.
+- **Cycle-2 A4 (shared formatLocalDate): SOUND.** Plan 04 mandates `@/utils/dates` and forbids
+  mirroring `list-row-selection.ts`'s private formatter / `toISOString().split()`.
+- **Cycle-3 finding-1 (view-independent search descriptors): SOUND.** Verified above.
+- **Cycle-3 finding-2 (direct LogContact route): SOUND.** Verified above.
+- **Cycle-3 finding-3 (awaited 2-arg setViewMode + failure path): SOUND.** Verified above;
+  store idempotency guard on disk reinforces it.
 
 ### Risk Assessment
-**LOW** (from the data-layer / decision-reversal vantage). Every decision-critical claim is
-grounded in verified code; the highest-risk surface (bulk data layer) is architecturally
-correct; the frozen-universe invariant is double-fenced; no recorded decision is weakened;
-the one product-posture question is owner-routed with a safe default. Residual risk is
-ordinary execution/UAT (device layout, TalkBack, breakpoints), already routed to Pixel UAT.
+**LOW.** Every decision-critical claim is grounded in verified on-disk code; the highest-risk
+surface (bulk data layer) is architecturally correct; the frozen-universe invariant is
+double-fenced; the three cycle-3 UI-wiring gaps are closed with accurate citations; no
+recorded decision is weakened; the one product-posture question is owner-routed with a safe
+default. Residual risk is ordinary device UAT (Pixel layout, breakpoints, TalkBack), already
+routed to the plans' human-checks. Recommend closing the convergence loop.
 
 ---
 
 ## Orchestrator adjudication (counted result)
 
-- **HIGH: 0.** No decision reversals; no data-layer red lines crossed; all cycle-1/2 fixes
-  verified sound against source.
-- **Actionable MEDIUM: 3** — Codex's three UI-wiring gaps, each independently confirmed
-  against `src/screens/HomeScreen.tsx` (`:558/:573/:583/:588/:601/:772`, `:412-425`) and
-  `src/stores/dashboard-query-store.ts` (`:79-89`). Each would produce wrong or
-  unverifiable Card-view behavior under `/gsd-execute-phase` and each fails or evades the
-  plan's own acceptance/human-check. None touches the data layer or a recorded decision.
+- **HIGH: 0.** No decision reversals; no data-layer / local-first / migration red lines
+  crossed; all cycle-1/2/3 fixes verified sound against source. The cycle-4 replan (`fa06779`)
+  correctly incorporated all three cycle-3 MEDIUM findings into Plans 04/05/06, with every new
+  citation confirmed accurate on disk.
+- **Actionable: 1** — Codex's LOW (Plan 01 favourite hit-target). Verified independently:
+  `md` icon = 20px (`icon-size.ts:16`) + `hitSlop={SPACING.sm}` = 8px (`spacing.ts:12`) yields
+  a 36px target, below the plan's own must_have E4 (">=44px") and the a11y floor
+  (`spacing.ts:8`). The repo's own control (`ListRow.styles.favouriteButton`,
+  `ListRow.tsx:342-347`) reaches the floor via `minWidth/minHeight: SPACING["2xl"]` (48px), not
+  hitSlop. **PLAN.md change needed (28-01):** specify a 44/48px minimum touch-box for the
+  favourite star (mirror `ListRow.styles.favouriteButton`'s `minWidth/minHeight: SPACING["2xl"]`
+  with center alignment), with `hitSlop` as supplemental forgiveness only; update the Task-2
+  acceptance criterion (28-01-PLAN.md:125) so the 44px floor is attributed to the min-box, not
+  to `hitSlop` alone.
+- **Not counted:** Codex's MEDIUM (Plan 03 seed-membership guard) — defensive hardening; no
+  wired caller passes an out-of-universe seed, so execution is correct as written. Recorded for
+  the owner's optional consideration.
 
 To incorporate: `/gsd-plan-phase 28 --reviews`
