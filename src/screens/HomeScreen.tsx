@@ -91,6 +91,7 @@ import {
   createFavouriteOptimisticStore,
 } from "@/logic/favourite-optimistic";
 import { selectLine3 } from "@/logic/list-row-selection";
+import { selectCardLine3 } from "@/logic/card-line3-selection";
 import type { DashboardSearchResult } from "@/logic/dashboard-search-match";
 import type { DashboardScreenProps } from "@/navigation/types";
 import { navigationRef } from "@/navigation/linking";
@@ -555,7 +556,7 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
     let cancelled = false;
     const now = localDateTime();
     const term = debouncedSearchText.trim();
-    const isListSearch = query.viewMode === "list" && term !== "";
+    const isSearch = term !== "";
     (async () => {
       try {
         const exec = getExecutor();
@@ -570,16 +571,18 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
           favourites,
           allContacts,
         ] = await Promise.all([
-          isListSearch
-            ? composeDashboardSearch(exec, query, term, now).then((searchRows) => ({
-                rows: searchRows.map((searchRow) => searchRow.row),
-                resultsByContactId: new Map(
-                  searchRows.map((searchRow) => [
-                    searchRow.row.id,
-                    searchRow.match,
-                  ]),
-                ),
-              }))
+          isSearch
+            ? composeDashboardSearch(exec, query, term, now).then(
+                (searchRows) => ({
+                  rows: searchRows.map((searchRow) => searchRow.row),
+                  resultsByContactId: new Map(
+                    searchRows.map((searchRow) => [
+                      searchRow.row.id,
+                      searchRow.match,
+                    ]),
+                  ),
+                }),
+              )
             : (term !== ""
                 ? listDashboardSearch(exec, query, term, now)
                 : listDashboardPopulation(exec, query, now)
@@ -598,7 +601,10 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
         ]);
         const list = searchRead.rows;
         const nextLine3ByContactId = new Map<number, ListRowLine3>();
-        if (query.viewMode === "list" && !isListSearch) {
+        if (
+          (query.viewMode === "list" || query.viewMode === "card") &&
+          !isSearch
+        ) {
           const candidates = await readLine3Candidates(
             exec,
             list.map((row) => row.id),
@@ -611,7 +617,9 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
           }
           const selectionNow = new Date(parseLocalMs(now));
           for (const row of list) {
-            const selection = selectLine3(
+            const selection = (
+              query.viewMode === "card" ? selectCardLine3 : selectLine3
+            )(
               candidatesByContactId.get(row.id) ?? [],
               row.id,
               row.name,
@@ -769,7 +777,7 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
   // a non-empty population (or with a filter also active) never shows the
   // hidden-population or filter copy (MEDIUM-4).
   const term = debouncedSearchText.trim();
-  const isListSearchMode = query.viewMode === "list" && term !== "";
+  const isSearchMode = term !== "";
   const emptyState = selectDashboardEmptyState({
     live: counts.live,
     neverContacted: counts.neverContacted,
@@ -1079,11 +1087,11 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
                   }}
                   line3={line3ByContactId.get(item.id) ?? null}
                   searchResult={
-                    isListSearchMode
+                    isSearchMode
                       ? (searchResultsByContactId.get(item.id) ?? null)
                       : undefined
                   }
-                  searchSnippet={isListSearchMode ? item.snippet : null}
+                  searchSnippet={isSearchMode ? item.snippet : null}
                   onLogInteraction={onLogInteraction}
                   onEditContact={onEditContact}
                   openRowRef={openRowRef}
@@ -1111,6 +1119,9 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
               onPressContact={goToProfile}
               favouriteOverlay={favouriteOverlay}
               onToggleFavourite={toggleFavourite}
+              line3ByContactId={line3ByContactId}
+              searchResultsByContactId={searchResultsByContactId}
+              isSearchMode={isSearchMode}
               error={error}
               showInitialSkeleton={showInitialSkeleton}
               loadingSkeleton={<ListLoadingSkeleton />}

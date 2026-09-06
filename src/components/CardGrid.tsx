@@ -2,6 +2,8 @@
 import type { ReactElement } from "react";
 import { FlatList, RefreshControl, StyleSheet, useWindowDimensions } from "react-native";
 import type { DashboardRow } from "@/db/dashboard-read";
+import type { IconName } from "@/components/icons/icon-registry";
+import type { DashboardSearchResult } from "@/logic/dashboard-search-match";
 import { useTheme } from "@/theme";
 import { SPACING } from "@/theme/tokens/spacing";
 import { GridCard } from "./GridCard";
@@ -12,6 +14,9 @@ export interface CardGridProps {
   onPressContact: (contactId: number) => void;
   favouriteOverlay: ReadonlyMap<number, boolean>;
   onToggleFavourite: (contactId: number, nextMembership: boolean) => void;
+  line3ByContactId: ReadonlyMap<number, { text: string; iconName?: IconName }>;
+  searchResultsByContactId: ReadonlyMap<number, DashboardSearchResult | null>;
+  isSearchMode: boolean;
   /** Mirrors the list renderer's empty-data error/loading gate. */
   error: boolean;
   showInitialSkeleton: boolean;
@@ -37,6 +42,9 @@ export function CardGrid({
   onPressContact,
   favouriteOverlay,
   onToggleFavourite,
+  line3ByContactId,
+  searchResultsByContactId,
+  isSearchMode,
   error,
   showInitialSkeleton,
   loadingSkeleton,
@@ -54,7 +62,12 @@ export function CardGrid({
     <FlatList
       key={`grid-${numColumns}`}
       data={error || showInitialSkeleton ? [] : rows}
-      extraData={favouriteOverlay}
+      extraData={{
+        favouriteOverlay,
+        line3ByContactId,
+        searchResultsByContactId,
+        isSearchMode,
+      }}
       numColumns={numColumns}
       keyExtractor={(item) => String(item.id)}
       columnWrapperStyle={styles.row}
@@ -88,6 +101,13 @@ export function CardGrid({
             onToggleFavourite={() =>
               onToggleFavourite(item.id, !renderedMembership)
             }
+            line3={line3ByContactId.get(item.id) ?? null}
+            searchResult={
+              isSearchMode
+                ? (searchResultsByContactId.get(item.id) ?? null)
+                : undefined
+            }
+            searchSnippet={isSearchMode ? item.snippet : null}
           />
         );
       }}

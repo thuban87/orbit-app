@@ -22,8 +22,49 @@ import { TYPOGRAPHY } from "@/theme/tokens/typography";
 import { isSnoozed } from "@/utils/dates";
 import {
   buildRowAccessibilityDescription,
+  formatMatchCategories,
+  formatMatchExplanation,
   formatListRecency,
 } from "./list-row-content";
+
+function HighlightedSnippet({
+  text,
+  highlights,
+  color,
+}: {
+  text: string;
+  highlights: ReadonlyArray<{
+    readonly start: number;
+    readonly length: number;
+  }>;
+  color: string;
+}) {
+  const sorted = [...highlights].sort(
+    (left, right) => left.start - right.start,
+  );
+  let cursor = 0;
+  return (
+    <>
+      {sorted.map((highlight, index) => {
+        const start = Math.max(cursor, Math.min(highlight.start, text.length));
+        const end = Math.max(
+          start,
+          Math.min(start + highlight.length, text.length),
+        );
+        const before = text.slice(cursor, start);
+        const matched = text.slice(start, end);
+        cursor = end;
+        return (
+          <Text key={`${highlight.start}-${highlight.length}-${index}`}>
+            {before}
+            <Text style={[styles.highlight, { color }]}>{matched}</Text>
+          </Text>
+        );
+      })}
+      {text.slice(cursor)}
+    </>
+  );
+}
 
 export interface GridCardProps {
   contactId: number;
@@ -61,6 +102,9 @@ export function GridCard({
   onPress,
   isFavourite = false,
   onToggleFavourite,
+  line3 = null,
+  searchResult,
+  searchSnippet = null,
 }: GridCardProps) {
   const { colors } = useTheme();
   const displayState: StatusDisplayState = isSnoozed(snoozeUntil, now)
@@ -78,6 +122,21 @@ export function GridCard({
     isFavourite,
     displayState,
   });
+  const isSearchMode = searchResult !== undefined;
+  const strongestMatch = searchResult?.matches[0];
+  const searchExplanation = isSearchMode
+    ? formatMatchExplanation(
+        searchResult?.totalMatchCount ?? 1,
+        searchResult
+          ? formatMatchCategories(
+              searchResult.matches.map((match) => match.sourceKind),
+            )
+          : [],
+        searchResult?.moreMatchesLabel,
+      )
+    : null;
+  const displayedSearchSnippet =
+    strongestMatch?.snippet ?? (searchResult === null ? searchSnippet : null);
 
   return (
     <Pressable
@@ -146,16 +205,61 @@ export function GridCard({
           >
             {name}
           </Text>
-          <Text
-            testID={`dashboard-grid-card-recency-${contactId}`}
-            numberOfLines={1}
-            ellipsizeMode="tail"
-            style={[styles.recency, { color: colors.textSecondary }]}
-          >
-            {recency}
-          </Text>
-          {/* Plan 04 replaces this reserved third row with adaptive/search context. */}
-          <View accessible={false} style={styles.line3Placeholder} />
+          {isSearchMode ? (
+            <Text
+              testID={`dashboard-grid-card-match-explanation-${contactId}`}
+              numberOfLines={1}
+              ellipsizeMode="tail"
+              style={[styles.recency, { color: colors.textSecondary }]}
+            >
+              {searchExplanation}
+            </Text>
+          ) : (
+            <Text
+              testID={`dashboard-grid-card-recency-${contactId}`}
+              numberOfLines={1}
+              ellipsizeMode="tail"
+              style={[styles.recency, { color: colors.textSecondary }]}
+            >
+              {recency}
+            </Text>
+          )}
+          {isSearchMode ? (
+            <Text
+              testID={`dashboard-grid-card-search-snippet-${contactId}`}
+              numberOfLines={1}
+              ellipsizeMode="tail"
+              style={[
+                styles.recency,
+                styles.line3Text,
+                { color: colors.textSecondary },
+              ]}
+            >
+              <HighlightedSnippet
+                text={displayedSearchSnippet ?? ""}
+                highlights={strongestMatch?.highlights ?? []}
+                color={colors.textPrimary}
+              />
+            </Text>
+          ) : (
+            <View style={styles.line3}>
+              {line3?.iconName ? (
+                <Icon name={line3.iconName} size="sm" tone="textSecondary" />
+              ) : null}
+              <Text
+                testID={`dashboard-grid-card-line3-${contactId}`}
+                numberOfLines={1}
+                ellipsizeMode="tail"
+                style={[
+                  styles.recency,
+                  styles.line3Text,
+                  { color: colors.textSecondary },
+                ]}
+              >
+                {line3?.text ?? ""}
+              </Text>
+            </View>
+          )}
         </View>
       </GlassSurface>
     </Pressable>
@@ -225,7 +329,19 @@ const styles = StyleSheet.create({
     lineHeight: TYPOGRAPHY.caption.lineHeight,
     textAlign: "center",
   },
-  line3Placeholder: {
-    minHeight: TYPOGRAPHY.caption.lineHeight,
+  line3: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: SPACING.xs,
+    minWidth: 0,
+  },
+  line3Text: {
+    flex: 1,
+  },
+  highlight: {
+    fontFamily: TYPOGRAPHY.label.family,
+    fontSize: TYPOGRAPHY.label.size,
+    fontWeight: TYPOGRAPHY.label.weight,
+    lineHeight: TYPOGRAPHY.label.lineHeight,
   },
 });
