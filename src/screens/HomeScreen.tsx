@@ -104,7 +104,8 @@ import { runQuickLog } from "@/services/quick-log-command";
 import { notifyWidgetDataChanged } from "@/services/widget/widget-refresh";
 import { createQuickLogUndoController } from "@/components/universal-fab-logic";
 import { useTheme } from "@/theme";
-import { MOTION } from "@/theme/tokens/motion";
+import { EASING, MOTION } from "@/theme/tokens/motion";
+import { RADII } from "@/theme/tokens/radii";
 import { SPACING } from "@/theme/tokens/spacing";
 import { useReducedMotion } from "@/theme/use-reduced-motion";
 import { Logger } from "@/utils/logger";
@@ -163,6 +164,33 @@ function SwipeActionSurface({
       <Text style={[styles.swipeActionLabel, { color: colors.textPrimary }]}>
         {label}
       </Text>
+    </View>
+  );
+}
+
+/** Initial-only row geometry placeholder; query changes retain current content. */
+function ListLoadingSkeleton() {
+  const { colors } = useTheme();
+  return (
+    <View testID="dashboard-list-loading" style={styles.skeletonList}>
+      {[0, 1, 2, 3].map((index) => (
+        <View
+          key={index}
+          style={[
+            styles.skeletonRow,
+            { backgroundColor: colors.surface, borderColor: colors.border },
+          ]}
+        >
+          <View
+            style={[styles.skeletonAvatar, { backgroundColor: colors.surfaceElevated }]}
+          />
+          <View style={styles.skeletonTextBlock}>
+            <View style={[styles.skeletonName, { backgroundColor: colors.surfaceElevated }]} />
+            <View style={[styles.skeletonLine, { backgroundColor: colors.surfaceElevated }]} />
+            <View style={[styles.skeletonLineShort, { backgroundColor: colors.surfaceElevated }]} />
+          </View>
+        </View>
+      ))}
     </View>
   );
 }
@@ -348,6 +376,8 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
     useState<DashboardPopulationCounts>(ZERO_POPULATION_COUNTS);
   const [error, setError] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [initialLoad, setInitialLoad] = useState(true);
+  const [resultGeneration, setResultGeneration] = useState(0);
   const [panelOpen, setPanelOpen] = useState(false);
   const openRowRef = useRef<SwipeableMethods | null>(null);
   const quickLogPending = useRef(false);
@@ -467,6 +497,24 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
   const searchInputStyle = useAnimatedStyle(() => ({
     opacity: searchProgress.value,
     transform: [{ translateY: (1 - searchProgress.value) * SPACING.sm }],
+  }));
+  const resultProgress = useSharedValue(1);
+  useEffect(() => {
+    if (resultGeneration === 0) return;
+    const canAnimate = isFocused && appActive && !reducedMotion;
+    resultProgress.value = canAnimate
+      ? withTiming(1, {
+          duration: MOTION.fast,
+          easing:
+            EASING.decelerate === "out"
+              ? Easing.out(Easing.ease)
+              : Easing.inOut(Easing.ease),
+        })
+      : 1;
+  }, [appActive, isFocused, reducedMotion, resultGeneration, resultProgress]);
+  const resultTransitionStyle = useAnimatedStyle(() => ({
+    opacity: resultProgress.value,
+    transform: [{ translateY: (1 - resultProgress.value) * SPACING.xs }],
   }));
 
   const onToggleSearch = useCallback(() => {
@@ -591,6 +639,9 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
           snoozed,
         });
         setError(false);
+        resultProgress.value =
+          isFocused && appActive && !reducedMotion ? 0 : 1;
+        setResultGeneration((generation) => generation + 1);
       } catch (err) {
         Logger.error(LOG_SCOPE, "failed to load dashboard", err);
         if (!cancelled) {
@@ -600,13 +651,23 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
           setError(true);
         }
       } finally {
-        if (!cancelled) setRefreshing(false);
+        if (!cancelled) {
+          setRefreshing(false);
+          setInitialLoad(false);
+        }
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, [query, debouncedSearchText]);
+  }, [
+    appActive,
+    debouncedSearchText,
+    isFocused,
+    query,
+    reducedMotion,
+    resultProgress,
+  ]);
 
   // Shell Quick Log/Undo originates outside this screen's focus lifecycle. This
   // in-process tick is intentionally distinct from the connection-scoped SQLite
@@ -717,6 +778,7 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
     populationCounts,
     hasTerm: term !== "",
   });
+  const showInitialSkeleton = initialLoad && !error;
 
   const listHeader = (
     <View style={styles.header}>
@@ -984,8 +1046,9 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
             />
           </View>
         </View>
+        <Animated.View style={[styles.listRegion, resultTransitionStyle]}>
         <FlatList
-          data={error ? [] : rows}
+          data={error || showInitialSkeleton ? [] : rows}
           keyExtractor={(item) => String(item.id)}
           renderItem={({ item }) =>
             query.viewMode === "list" ? (
@@ -1035,7 +1098,7 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
               />
             )}
           ListHeaderComponent={listHeader}
-          ListEmptyComponent={listEmpty}
+          ListEmptyComponent={showInitialSkeleton ? <ListLoadingSkeleton /> : listEmpty}
           contentContainerStyle={[
             styles.content,
             { paddingBottom: bottomClearance },
@@ -1049,6 +1112,7 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
             />
           }
         />
+        </Animated.View>
       </View>
       <DashboardOverlayHost />
     </View>
@@ -1201,5 +1265,41 @@ const styles = StyleSheet.create({
   swipeActionLabel: {
     fontSize: 13,
     fontWeight: "600",
+  },
+  skeletonList: {
+    gap: SPACING.md,
+  },
+  skeletonRow: {
+    alignItems: "center",
+    borderRadius: RADII.lg,
+    borderWidth: SPACING.xs / 2,
+    flexDirection: "row",
+    gap: SPACING.md,
+    minHeight: SPACING["2xl"] + SPACING.lg,
+    padding: SPACING.md,
+  },
+  skeletonAvatar: {
+    borderRadius: SPACING["2xl"],
+    height: SPACING["2xl"],
+    width: SPACING["2xl"],
+  },
+  skeletonTextBlock: {
+    flex: 1,
+    gap: SPACING.xs,
+  },
+  skeletonName: {
+    borderRadius: SPACING.xs,
+    height: SPACING.md,
+    width: "52%",
+  },
+  skeletonLine: {
+    borderRadius: SPACING.xs,
+    height: SPACING.sm,
+    width: "68%",
+  },
+  skeletonLineShort: {
+    borderRadius: SPACING.xs,
+    height: SPACING.sm,
+    width: "38%",
   },
 });
