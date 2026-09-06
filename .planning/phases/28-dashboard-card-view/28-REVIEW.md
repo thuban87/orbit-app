@@ -1,8 +1,8 @@
 ---
 phase: 28-dashboard-card-view
-reviewed: 2026-09-06T09:35:00Z
+reviewed: 2026-09-06T11:27:55Z
 depth: deep
-files_reviewed: 21
+files_reviewed: 22
 files_reviewed_list:
   - src/components/BulkActionSurface.tsx
   - src/components/CardContextMenu.tsx
@@ -19,91 +19,73 @@ files_reviewed_list:
   - src/db/snooze-dao.ts
   - src/logic/card-line3-selection.test.ts
   - src/logic/card-line3-selection.ts
+  - src/logic/dashboard-bulk-action-session.test.ts
+  - src/logic/dashboard-bulk-action-session.ts
   - src/navigation/types.ts
-  - src/screens/HomeScreen.tsx
   - src/screens/dashboard-overflow-actions.test.ts
   - src/screens/dashboard-overflow-actions.ts
+  - src/screens/HomeScreen.tsx
   - src/stores/dashboard-selection-store.test.ts
   - src/stores/dashboard-selection-store.ts
 findings:
-  blocker: 2
-  warning: 2
+  critical: 2
+  warning: 1
   info: 0
-  total: 4
+  total: 3
 status: issues_found
 ---
 
-# Phase 28: Dashboard Card View — Code Review
+# Phase 28: Code Review Report
 
-**Reviewed:** 2026-09-06  
-**Depth:** deep  
-**Files reviewed:** 21  
+**Reviewed:** 2026-09-06T11:27:55Z
+**Depth:** deep
+**Files Reviewed:** 22
 **Status:** issues_found
 
 ## Summary
 
-The card grid, selection state, atomic bulk DAO composers, and bulk-action UI were
-reviewed across their relevant call chains. Type checking, token validation, and
-the full Vitest suite passed, but the final bulk-action surface has two release
-blockers: it permits duplicate submissions whose first undo receipt is lost, and
-it can apply a category update to a stale selection.
+The Card grid, selection session fencing, batch Snooze date resolution, and category session validation are substantively wired. The Phase 28-08 single-flight fix is incomplete at its host boundary: post-claim UI callbacks can repeat a claimed operation, and exiting selection releases an in-flight write's lock. Both paths allow duplicate durable bulk writes and can again overwrite a Quick Log Undo receipt.
+
+Focused Phase 28 tests, TypeScript, and the colour-token check pass, but the focused gate test models only two direct starts and does not execute these host paths.
+
+## Narrative Findings (AI reviewer)
 
 ## Critical Issues
 
-### CR-01: Overlapping bulk submissions can create unundoable duplicate Quick Logs
+### CR-01: A claimed bulk operation can be submitted repeatedly from confirmation and picker controls
 
-**Classification:** BLOCKER  
-**Files:** `src/components/BulkActionSurface.tsx:51,92-100`; `src/screens/HomeScreen.tsx:847-872`
+**Classification:** BLOCKER
 
-**Issue:** The action surface disables only when `selectedCount === 0`, and the
-HomeScreen action handler has no synchronous pending-operation fence. A double tap
-on small-batch Quick Log can commit two atomic batches. The singleton snackbar
-holds only the latest Undo receipt, so the first committed batch becomes
-unreversible through the advertised Undo action.
+**File:** `src/screens/HomeScreen.tsx:1103-1113`, `src/screens/HomeScreen.tsx:1842-1861`, `src/screens/HomeScreen.tsx:1889-1920`
 
-**Fix:** Gate every bulk action while a bulk operation is in flight, using a
-synchronous ref/single-flight guard as well as render state. Add a deferred-write
-test proving a double press performs one batch and retains its receipt for Undo.
+**Issue:** The initial action acquires `bulkActionGate`, but the controls shown after that claim do not have a one-shot guard. `onBulkConfirm` passes `alreadyClaimed=true` to the writers, bypassing `tryAcquireBulkAction`; a rapid second Confirm press before React commits `setBulkConfirm(null)` launches the same write again. Snooze and category choices have the same shape: they keep the existing claim but issue their writer directly on every press before their state-clearing render commits. This creates duplicate interactions/events (or duplicate category/snooze writes) and can overwrite the singleton Quick Log Undo snackbar, precisely the failure the Phase 28-08 gate was meant to prevent.
 
-### CR-02: Set Category can write to contacts that are no longer selected
+**Fix:** Make every confirmation/picker choice consume the pending claim exactly once before starting a writer. For example, track an operation token/ref when opening the dialog or picker, atomically mark it consumed in the choice handler, and reject later callbacks; also disable the choice controls immediately. Keep the gate held until the one writer settles and add deferred double-press regressions for Confirm, Snooze, and Category.
 
-**Classification:** BLOCKER  
-**File:** `src/screens/HomeScreen.tsx:973-978,1750-1769`
+### CR-02: Exiting selection unlocks an in-flight write and lets a later operation overlap it
 
-**Issue:** Set Category captures selected IDs before awaiting `listCategories`,
-then opens and commits the picker using that stale snapshot. The user can exit or
-change selection while categories load, causing a later choice to mutate contacts
-that are no longer selected.
+**Classification:** BLOCKER
 
-**Fix:** Bind the picker to a selection-session token and revalidate it before
-opening and committing, or block selection changes for the pending picker. Add a
-test for exiting/changing selection while the category read is deferred.
+**File:** `src/screens/HomeScreen.tsx:1121-1128`, `src/screens/HomeScreen.tsx:866-900`, `src/screens/HomeScreen.tsx:911-926`
+
+**Issue:** `exitBulkSelection` unconditionally calls `releaseBulkAction()` while the Done control remains available during `bulkActionPending`. If a user exits while a DAO promise is unresolved, they can re-enter selection and start operation B even though operation A is still writing. When A's unconditional `.finally(releaseBulkAction)` later runs, it releases B's claim as well, allowing further overlap. The screen-level single-flight invariant is therefore broken across exit/re-entry, risking duplicate writes and overwritten feedback/Undo state.
+
+**Fix:** Associate each acquire/release with an ownership token. Exiting selection should invalidate and close only dialogs/pickers; it must not release a claim that already owns a DAO write. Release the writer's token only from that writer's settled path, and ensure a stale settled path cannot release a newer claim. Add a deferred-write regression for Done → re-enter → new action before the first write settles.
 
 ## Warnings
 
-### WR-01: The selection store accepts an out-of-universe seed ID
+### WR-01: The new gate tests do not exercise the HomeScreen paths that bypass it
 
-**File:** `src/stores/dashboard-selection-store.ts:31-39`
+**Classification:** WARNING
 
-**Issue:** `toggle` fences IDs against the frozen universe, but `enterSelection`
-directly seeds any supplied ID. A non-card caller can therefore begin a selection
-with an ineligible contact, defeating the store-level invariant.
+**File:** `src/logic/dashboard-bulk-action-session.test.ts:15-42`
 
-**Fix:** Deduplicate the eligible universe first and add `seedId` only when it is
-contained in that universe. Cover an ineligible seed in the unit tests.
+**Issue:** The test proves only that two direct calls which each invoke `tryAcquire()` result in one DAO call. It does not cover `alreadyClaimed=true` confirmation writes, picker choices, or `exitBulkSelection` releasing an unresolved claim, so all blocker paths pass the suite unchanged.
 
-### WR-02: A single bulk Snooze can assign different dates across midnight
-
-**Files:** `src/db/bulk-actions-dao.ts:131-140`; `src/db/snooze-dao.ts:84-88`
-
-**Issue:** The bulk composer invokes the snooze core once per contact, and each
-core independently resolves SQLite `date('now')`. A batch crossing local midnight
-can produce different `snooze_until` values for one selected preset.
-
-**Fix:** Resolve the preset target once for the outer batch and bind that same
-value for every contact core invocation.
+**Fix:** Add host-level tests with deferred DAO promises that invoke each rendered confirmation/picker callback twice and test exit/re-entry while pending. Assert one writer invocation, one Quick Log Undo receipt, and that a second action remains rejected until the owner settles.
 
 ---
 
-_Reviewer: gsd-code-reviewer_  
-_Report materialized by the execution orchestrator from the reviewer's returned findings._
+_Reviewed: 2026-09-06T11:27:55Z_
+_Reviewer: the agent (gsd-code-reviewer)_
+_Depth: deep_
