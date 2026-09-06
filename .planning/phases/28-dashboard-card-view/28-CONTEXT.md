@@ -15,8 +15,8 @@ This phase was fully interrogated outside GSD (milestone-2 dossier process, amen
 ## Implementation Decisions
 
 ### Ground truth and process
-- **D-01:** Read the phase dossier (canonical_refs) IN FULL before planning. Where present, its dated "Amendment — audit resolutions 2026-09-01" section overrides older text. [DECIDED] and [REJECTED] items are settled: reopening one, or reversing any Accepted ADR or HANDOFF.md entry, is an owner decision — stop and ask, never "fix" it.
-- **D-02:** Read the phase planning-notes file (canonical_refs) as a binding appendix: every REPLAN finding must be reflected in the plan, and every trip-wire is a stop-and-ask.
+- **D-01 [informational]:** Read the phase dossier (canonical_refs) IN FULL before planning. Where present, its dated "Amendment — audit resolutions 2026-09-01" section overrides older text. [DECIDED] and [REJECTED] items are settled: reopening one, or reversing any Accepted ADR or HANDOFF.md entry, is an owner decision — stop and ask, never "fix" it. *(Process directive to planning agents, not a buildable decision — honored during planning; not tracked in plan must_haves.)*
+- **D-02 [informational]:** Read the phase planning-notes file (canonical_refs) as a binding appendix: every REPLAN finding must be reflected in the plan, and every trip-wire is a stop-and-ask. *(Process directive to planning agents, not a buildable decision — honored during planning; not tracked in plan must_haves.)*
 - **D-03:** This phase ships **no migration of its own** — every bulk operation composes existing writers against the existing schema. Explicitly **not** implied: no quarantine column, no purge-deadline column, no launch-time auto-purge sweep (E-08). If any migration proves unavoidable, number it head+1 verified against `src/db/migrations/` and `TARGET_VERSION` in `src/db/database.ts` on disk at plan time — never assume a number; coordinate any portable-key change with the backup format bump (Phase 36's final plan).
 
 ### Phase-specific constraints
