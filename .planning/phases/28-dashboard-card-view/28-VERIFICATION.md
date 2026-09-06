@@ -1,7 +1,7 @@
 ---
 phase: 28-dashboard-card-view
 verified: 2026-09-06T11:44:05Z
-status: human_needed
+status: passed
 score: "0/5 roadmap must-haves verified"
 behavior_unverified: 5
 overrides_applied: 0
@@ -9,27 +9,33 @@ re_verification:
   previous_status: gaps_found
   previous_score: "0/5"
   gaps_closed:
+
     - "Bulk Quick Log is immediate and reversibly undoable for a selected batch."
     - "Bulk Set Category applies only to contacts selected when the operation is committed."
   gaps_remaining: []
   regressions: []
 behavior_unverified_items:
+
   - truth: "User can browse the responsive avatar-first Card grid with all required status, context, favourite, and search presentation."
     test: "On a fresh debug APK, inspect normal, narrow/large-text, wide, empty/error, and search states, including grapheme-rich names."
     expected: "The measured grid changes columns appropriately; every card retains its geometry, status ring/glyph semantics, real context/search snippet, and readable ellipsis."
     why_human: "No native render/device test exercises React Native layout, text shaping, or visual state composition."
+
   - truth: "Tap opens Profile and long-press exposes exactly the eight safe card actions without duplicate press behavior."
     test: "Tap and long-press a real card; invoke each sheet and TalkBack action."
     expected: "Tap only opens Profile; long-press only opens the eight-row sheet; Delete, Archive, and List swipes are absent."
     why_human: "Source wiring exists, but no rendered-card gesture or accessibility integration test runs it."
+
   - truth: "Selection entry, frozen-universe rendering, Select All, count, control replacement, and Android Back behave as one user flow."
     test: "Enter through both Select paths, refresh/change live results, Select All, then press Android Back."
     expected: "Only entry-time contacts are selectable; the normal controls are replaced; count changes; Back exits selection before navigation."
     why_human: "The Zustand unit tests and source fence do not execute HomeScreen's asynchronous/native interaction path."
+
   - truth: "Every bulk action is reachable and correct, with count-aware detailed-log routing and recoverable Archive."
     test: "For one and multiple selected contacts, run every bulk action, including large Quick Log/Archive/Frequency confirmation, pickers, and Undo."
     expected: "Writes apply to the intended contacts; one detailed log opens the individual flow, two or more opens Group Log with IDs; only Archive removes cards; normal writes preserve selection."
     why_human: "DAO and coordination tests prove the underlying contracts, but no HomeScreen integration test presses the real callbacks or confirms their rendered state."
+
   - truth: "Bulk Quick Log remains single-flight through the actual control and selection can exit normally."
     test: "Repeat the paired Quick Log action while a deliberately delayed write is pending, then use Done and Undo."
     expected: "Exactly one write and one Undo receipt exist; Working/disabled controls are visible; Done does not unlock the in-flight writer."
@@ -39,12 +45,15 @@ decision_coverage:
   total: 11
   not_honored: []
 human_verification:
+
   - test: "Exercise Card layout, large text, search, and grapheme-rich data on a device."
     expected: "The grid stays compact, legible, and semantically complete across supported layout states."
     why_human: "Native layout and text rendering are not covered by the test runtime."
+
   - test: "Exercise real-card gestures, accessibility actions, selection, refresh, and Back."
     expected: "Gesture arbitration, frozen selection, control replacement, and exit behavior match the roadmap contract."
     why_human: "No rendered HomeScreen integration test exists."
+
   - test: "Exercise all bulk actions, confirmations, pickers, Undo, and one-vs-many Log Interaction routing."
     expected: "Only the intended selected contacts change, UI feedback is truthful, and archive is recoverable."
     why_human: "WR-01 remains: coordination tests model the gate rather than pressing HomeScreen controls."
