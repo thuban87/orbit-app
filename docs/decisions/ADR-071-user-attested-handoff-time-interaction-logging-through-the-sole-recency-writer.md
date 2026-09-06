@@ -46,4 +46,4 @@ Confirmation writes exactly **one outbound interaction** through the authoritati
 - `src/db/data-revision-dao.ts` — supplies the composable `insertInteractionCore`, `recomputeLastContactCore`, and `bumpDataRevisionCore` cores the assist writer runs in one transaction.
 
 **Depends on:** ADR-010 (Single-Writer Interaction Recency Spine); ADR-024 (Editable Touchpoint History and Recomputed Recency)
-**Required by:** None
+**Required by:** ADR-103 (Atomic Composed Dashboard Bulk Mutations)

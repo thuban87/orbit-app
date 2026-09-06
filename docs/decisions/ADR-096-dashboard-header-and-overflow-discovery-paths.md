@@ -55,4 +55,4 @@ The Dashboard header exposes Your Week and Group Events as co-equal semantic-ico
 - `src/navigation/tabs/SettingsStack.tsx` — preserves the Settings entry to the same Archived and Profile screens.
 
 **Depends on:** ADR-018 (Archive-Gated Contact Purge with Explicit Fan-Out); ADR-075 (Binary Favourite Membership Without a User-Facing Order); ADR-076 (Population-Reached Birthdays Without a Dashboard Banner); ADR-080 (Four-Tab Bottom Navigation Shell with Per-Tab Stacks)
-**Required by:** None
+**Required by:** ADR-102 (Frozen-Universe Dashboard Multi-Select)

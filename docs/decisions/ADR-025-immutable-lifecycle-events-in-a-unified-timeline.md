@@ -49,4 +49,4 @@ The system stores lifecycle events in a separate, immutable table and renders th
 - `src/components/TimelineRow.tsx` — renders events read-only and visually distinct from touchpoints.
 
 **Depends on:** ADR-018 (Archive-Gated Contact Purge with Explicit Fan-Out)
-**Required by:** _None._
+**Required by:** ADR-103 (Atomic Composed Dashboard Bulk Mutations)

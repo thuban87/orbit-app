@@ -50,4 +50,4 @@ The system logs immediately and refines from a full, editable, newest-first prof
 - `src/screens/ContactProfileScreen.tsx` — wires refinement, confirmed deletion, and in-place refresh.
 
 **Depends on:** ADR-010 (Single-Writer Interaction Recency Spine)
-**Required by:** ADR-054 (Live Weekly Digest Retrospective and Overlooked Relationship Read); ADR-071 (User-Attested Handoff-Time Interaction Logging Through the Sole Recency Writer)
+**Required by:** ADR-054 (Live Weekly Digest Retrospective and Overlooked Relationship Read); ADR-071 (User-Attested Handoff-Time Interaction Logging Through the Sole Recency Writer); ADR-103 (Atomic Composed Dashboard Bulk Mutations)

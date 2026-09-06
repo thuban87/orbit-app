@@ -50,4 +50,4 @@ The Dashboard builds one archived-and-Bound scoped result universe. Empty popula
 - `src/screens/HomeScreen.tsx` — retires the banner and legacy Dashboard-only population surfaces.
 
 **Depends on:** ADR-011 (Query-Time Status and Never-Contacted Segregation); ADR-062 (Bound/Unbound Lifecycle and One-Way Cadence Assignment); ADR-075 (Binary Favourite Membership Without a User-Facing Order); ADR-076 (Population-Reached Birthdays Without a Dashboard Banner)
-**Required by:** ADR-095 (Live-Applying Dashboard Floating Control Surface); ADR-097 (Scoped Dashboard Search and Dedicated Unbound Retrieval); ADR-098 (Scan-First, Accessible Dashboard List Rows)
+**Required by:** ADR-095 (Live-Applying Dashboard Floating Control Surface); ADR-097 (Scoped Dashboard Search and Dedicated Unbound Retrieval); ADR-098 (Scan-First, Accessible Dashboard List Rows); ADR-101 (Avatar-First Accessible Dashboard Card Renderer); ADR-102 (Frozen-Universe Dashboard Multi-Select)
