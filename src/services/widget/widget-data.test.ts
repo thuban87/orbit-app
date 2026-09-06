@@ -29,6 +29,8 @@ function row(
     categoryLabel: null,
     trackingEnabled: 1,
     favourite_rank: over.id,
+    last_contact: null,
+    snooze_until: null,
     status: "stable",
     progress: 0.1,
     fuelText: null,

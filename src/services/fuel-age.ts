@@ -24,53 +24,7 @@
  * =============================================================================
  */
 
-/**
- * Parse a stored `YYYY-MM-DD HH:MM:SS` (or bare `YYYY-MM-DD`) as a LOCAL Date —
- * local components so there is no UTC evening off-by-one (dates.ts convention;
- * copied from `gravity-logic.parseLocalMs`). A missing time defaults to
- * `00:00:00`.
- */
-function parseLocalMs(stored: string): number {
-  const m = stored
-    .trim()
-    .match(/^(\d{4})-(\d{2})-(\d{2})(?:[ T](\d{2}):(\d{2})(?::(\d{2}))?)?/);
-  if (!m) {
-    throw new Error(`fuel-age: unparseable timestamp "${stored}"`);
-  }
-  const [, y, mo, d, hh, mm, ss] = m;
-  return new Date(
-    Number(y),
-    Number(mo) - 1,
-    Number(d),
-    Number(hh ?? 0),
-    Number(mm ?? 0),
-    Number(ss ?? 0),
-  ).getTime();
-}
-
-const MS_PER_DAY = 86_400_000;
-
-/**
- * Whole calendar days between two local timestamps, DST-safe. Anchors each stamp's
- * LOCAL Y/M/D to UTC midnight and diffs — UTC has no DST, so every day is exactly
- * 24h and the quotient is an exact integer count of calendar days regardless of
- * any DST transition in the span.
- *
- * Why not `(startOfLocalDay(now) - startOfLocalDay(created)) / MS_PER_DAY`
- * (review MEDIUM-1): on a spring-forward day two consecutive LOCAL midnights are
- * only 23h apart, so `floor(23h / 24h) === 0` — a row created the day before the
- * transition reads "today" a day later. The UTC anchoring removes the DST-skewed
- * elapsed ms entirely. `Math.round` guards float noise (values are exact anyway).
- */
-function calendarDaysBetween(createdMs: number, nowMs: number): number {
-  const created = new Date(createdMs);
-  const now = new Date(nowMs);
-  return Math.round(
-    (Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()) -
-      Date.UTC(created.getFullYear(), created.getMonth(), created.getDate())) /
-      MS_PER_DAY,
-  );
-}
+import { calendarDaysBetween, parseLocalMs } from "@/utils/dates";
 
 /** `n unit ago`, pluralised (`1 day ago`, `3 days ago`). */
 function ago(n: number, unit: "day" | "month" | "year"): string {

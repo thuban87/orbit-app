@@ -49,6 +49,7 @@ import Animated, {
 } from "react-native-reanimated";
 import { useShallow } from "zustand/react/shallow";
 import { ContactCard } from "@/components/ContactCard";
+import { ListRow } from "@/components/ListRow";
 import { POPULATION_LABELS } from "@/components/control-surface/control-labels";
 import { DashboardControlRow } from "@/components/control-surface/DashboardControlRow";
 import { DashboardOverlayHost } from "@/components/control-surface/DashboardOverlayHost";
@@ -182,6 +183,7 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
   });
 
   const [rows, setRows] = useState<DashboardRow[]>([]);
+  const [listNow, setListNow] = useState(() => localDateTime());
   const [counts, setCounts] = useState<PopulationCounts>(ZERO_COUNTS);
   const [populationCounts, setPopulationCounts] =
     useState<DashboardPopulationCounts>(ZERO_POPULATION_COUNTS);
@@ -311,6 +313,7 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
         ]);
         if (cancelled) return;
         setRows(list);
+        setListNow(now);
         setCounts({ live, neverContacted, snoozed, archived, unbound });
         setPopulationCounts({
           "all-contacts": allContacts,
@@ -677,20 +680,34 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
         <FlatList
           data={error ? [] : rows}
           keyExtractor={(item) => String(item.id)}
-          renderItem={({ item }) => (
-            <ContactCard
-              contactId={item.id}
-              name={item.name}
-              photo={item.photo}
-              modifiedAt={item.modified_at}
-              status={item.status}
-              categoryLabel={item.categoryLabel}
-              isFavourite={item.favourite_rank !== null}
-              fuelText={item.fuelText}
-              snippet={item.snippet}
-              onPress={() => goToProfile(item.id)}
-            />
-          )}
+          renderItem={({ item }) =>
+            query.viewMode === "list" ? (
+              <ListRow
+                contactId={item.id}
+                name={item.name}
+                photo={item.photo}
+                modifiedAt={item.modified_at}
+                categoryLabel={item.categoryLabel}
+                lastContact={item.last_contact}
+                snoozeUntil={item.snooze_until}
+                status={item.status}
+                now={listNow}
+                onPress={() => goToProfile(item.id)}
+              />
+            ) : (
+              <ContactCard
+                contactId={item.id}
+                name={item.name}
+                photo={item.photo}
+                modifiedAt={item.modified_at}
+                status={item.status}
+                categoryLabel={item.categoryLabel}
+                isFavourite={item.favourite_rank !== null}
+                fuelText={item.fuelText}
+                snippet={item.snippet}
+                onPress={() => goToProfile(item.id)}
+              />
+            )}
           ListHeaderComponent={listHeader}
           ListEmptyComponent={listEmpty}
           contentContainerStyle={[

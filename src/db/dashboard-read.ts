@@ -98,6 +98,10 @@ export interface DashboardRow {
   /** Lifecycle state retained for direct search and Never Contacted retrieval. */
   trackingEnabled: number;
   favourite_rank: number | null;
+  /** Local wall-clock interaction date used by the List row recency copy. */
+  last_contact: string | null;
+  /** Local wall-clock snooze date used by the List row presentation override. */
+  snooze_until: string | null;
   status: ProfileStatus | null;
   progress: number | null;
   /** The ranked top fuel line (== getRankedFuel[0].text), or null when none. */
@@ -372,6 +376,8 @@ export async function listDashboardPopulation(
       c.modified_at AS modified_at,
       cat.name AS categoryLabel,
       c.tracking_enabled AS trackingEnabled,
+      c.last_contact AS last_contact,
+      c.snooze_until AS snooze_until,
       ${CARD_FAVOURITE_RANK},
       ${CARD_STATUS},
       ${FUEL_LINE} AS fuelText,
@@ -425,6 +431,8 @@ export async function listDashboardSearch(
       c.modified_at AS modified_at,
       cat.name AS categoryLabel,
       c.tracking_enabled AS trackingEnabled,
+      c.last_contact AS last_contact,
+      c.snooze_until AS snooze_until,
       ${CARD_FAVOURITE_RANK},
       ${CARD_STATUS},
       ${FUEL_LINE} AS fuelText,

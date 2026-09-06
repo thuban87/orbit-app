@@ -243,6 +243,8 @@ describe("listDashboardPopulation — Phase 25 Active universe", () => {
     expect(rows.find((row) => row.id === both)).toMatchObject({
       isFavourite: 1,
       isNotContacted: 1,
+      last_contact: null,
+      snooze_until: null,
       status: null,
       progress: null,
     });
