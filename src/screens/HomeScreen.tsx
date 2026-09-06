@@ -48,9 +48,12 @@ import Animated, {
   useSharedValue,
   withTiming,
 } from "react-native-reanimated";
+import ReanimatedSwipeable, {
+  type SwipeableMethods,
+} from "react-native-gesture-handler/ReanimatedSwipeable";
 import { useShallow } from "zustand/react/shallow";
 import { ContactCard } from "@/components/ContactCard";
-import { ListRow } from "@/components/ListRow";
+import { ListRow, type ListRowProps } from "@/components/ListRow";
 import { POPULATION_LABELS } from "@/components/control-surface/control-labels";
 import { DashboardControlRow } from "@/components/control-surface/DashboardControlRow";
 import { DashboardOverlayHost } from "@/components/control-surface/DashboardOverlayHost";
@@ -70,9 +73,12 @@ import {
   listDashboardPopulation,
   listDashboardSearch,
 } from "@/db/dashboard-read";
+import { getAppSettings } from "@/db/app-settings-dao";
 import { getExecutor, localDateTime } from "@/db/database";
 import { readLine3Candidates } from "@/db/dashboard-knowledge-read";
 import { clearFavouriteRank, setFavouriteRank } from "@/db/favourites-dao";
+import { deleteTouchpoint, recordTouchpoint } from "@/db/recency-dao";
+import { newUid } from "@/db/uid";
 import { countUnbound } from "@/db/unbound-read";
 import {
   type DashboardPopulationCounts,
@@ -85,12 +91,16 @@ import {
 } from "@/logic/favourite-optimistic";
 import { selectLine3 } from "@/logic/list-row-selection";
 import type { DashboardScreenProps } from "@/navigation/types";
+import { navigationRef } from "@/navigation/linking";
 import { useBottomClearance } from "@/navigation/use-bottom-clearance";
 import { buildDashboardOverflowActions } from "@/screens/dashboard-overflow-actions";
 import { useDashboardQueryStore } from "@/stores/dashboard-query-store";
 import { useDashboardSessionStore } from "@/stores/dashboard-session-store";
-import { useShellRefresh } from "@/stores/shell-refresh-store";
+import { bumpShellRefresh, useShellRefresh } from "@/stores/shell-refresh-store";
 import { showSnackbar } from "@/stores/snackbar-store";
+import { runQuickLog } from "@/services/quick-log-command";
+import { notifyWidgetDataChanged } from "@/services/widget/widget-refresh";
+import { createQuickLogUndoController } from "@/components/universal-fab-logic";
 import { useTheme } from "@/theme";
 import { MOTION } from "@/theme/tokens/motion";
 import { SPACING } from "@/theme/tokens/spacing";
@@ -112,6 +122,116 @@ const VIEW_TOGGLE_OPTIONS: {
 ];
 
 const LOG_SCOPE = "dashboard-home";
+const SWIPE_ACTION_WIDTH = 96;
+
+type DashboardContactActionTarget = "LogContact" | "Edit";
+
+/** Dashboard detail routes must dispatch through the root tab navigator. */
+function navigateDashboardContactAction(
+  contactId: number,
+  target: DashboardContactActionTarget,
+): void {
+  navigationRef.current?.navigate("DashboardTab", {
+    screen: target,
+    params: { contactId },
+  } as never);
+}
+
+function SwipeActionSurface({
+  label,
+  icon,
+  side,
+}: {
+  label: string;
+  icon: "message" | "edit";
+  side: "left" | "right";
+}) {
+  const { colors } = useTheme();
+  return (
+    <View
+      accessible={false}
+      pointerEvents="none"
+      style={[
+        styles.swipeAction,
+        side === "left" ? styles.swipeActionLeft : styles.swipeActionRight,
+        { backgroundColor: colors.surfaceElevated, borderColor: colors.border },
+      ]}
+    >
+      <Icon name={icon} size="md" tone="textSecondary" />
+      <Text style={[styles.swipeActionLabel, { color: colors.textPrimary }]}>
+        {label}
+      </Text>
+    </View>
+  );
+}
+
+function SwipeableListRow({
+  onLogInteraction,
+  onEditContact,
+  openRowRef,
+  ...rowProps
+}: ListRowProps & {
+  onLogInteraction: (contactId: number) => Promise<void>;
+  onEditContact: (contactId: number) => void;
+  openRowRef: { current: SwipeableMethods | null };
+}) {
+  const swipeableRef = useRef<SwipeableMethods | null>(null);
+  const isThisRowOpen = () => openRowRef.current === swipeableRef.current;
+
+  const onWillOpen = useCallback(() => {
+    const previousRow = openRowRef.current;
+    if (previousRow && previousRow !== swipeableRef.current) {
+      previousRow.close();
+    }
+    openRowRef.current = swipeableRef.current;
+  }, [openRowRef]);
+
+  const onClose = useCallback(() => {
+    if (isThisRowOpen()) openRowRef.current = null;
+  }, [openRowRef]);
+
+  const onPress = useCallback(() => {
+    if (isThisRowOpen()) {
+      swipeableRef.current?.close();
+      openRowRef.current = null;
+      return;
+    }
+    rowProps.onPress();
+  }, [openRowRef, rowProps]);
+
+  const onSwipeableOpen = useCallback(
+    (direction: "left" | "right") => {
+      if (direction === "right") {
+        void onLogInteraction(rowProps.contactId);
+        return;
+      }
+      onEditContact(rowProps.contactId);
+    },
+    [onEditContact, onLogInteraction, rowProps.contactId],
+  );
+
+  return (
+    <ReanimatedSwipeable
+      ref={swipeableRef}
+      friction={1.8}
+      leftThreshold={SWIPE_ACTION_WIDTH / 2}
+      rightThreshold={SWIPE_ACTION_WIDTH / 2}
+      overshootLeft={false}
+      overshootRight={false}
+      renderLeftActions={() => (
+        <SwipeActionSurface label="Log" icon="message" side="left" />
+      )}
+      renderRightActions={() => (
+        <SwipeActionSurface label="Edit" icon="edit" side="right" />
+      )}
+      onSwipeableWillOpen={onWillOpen}
+      onSwipeableOpen={onSwipeableOpen}
+      onSwipeableClose={onClose}
+    >
+      <ListRow {...rowProps} onPress={onPress} />
+    </ReanimatedSwipeable>
+  );
+}
 
 interface ListRowLine3 {
   text: string;
@@ -217,6 +337,69 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
   const [error, setError] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [panelOpen, setPanelOpen] = useState(false);
+  const openRowRef = useRef<SwipeableMethods | null>(null);
+  const quickLogPending = useRef(false);
+  const quickLogUndoController = useRef(
+    createQuickLogUndoController(({ contactId, interactionId }) =>
+      deleteTouchpoint(getExecutor(), {
+        contactId,
+        interactionId,
+        now: localDateTime(),
+      }),
+    ),
+  );
+
+  const logQuickly = useCallback((contactId: number) => {
+    runQuickLog(
+      {
+        pendingRef: quickLogPending,
+        undoController: quickLogUndoController.current,
+        recordTouchpoint: (input) => recordTouchpoint(getExecutor(), input),
+        localDateTime,
+        newUid,
+        showSnackbar,
+        notifySuccessHaptic: () =>
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success),
+        notifyWidgetDataChanged,
+        bumpShellRefresh,
+      },
+      contactId,
+    );
+  }, []);
+
+  const onLogInteraction = useCallback(
+    async (contactId: number) => {
+      try {
+        const { dashboardRightSwipeAction } = await getAppSettings(getExecutor());
+        if (dashboardRightSwipeAction === "log-contact") {
+          navigateDashboardContactAction(contactId, "LogContact");
+          return;
+        }
+        logQuickly(contactId);
+      } catch (error) {
+        Logger.error(LOG_SCOPE, "failed to read dashboard swipe action", error);
+        // The durable schema default is Quick Log. A read failure must still
+        // execute it and leave the user an explicit retry path for the setting.
+        logQuickly(contactId);
+        showSnackbar({
+          kind: "error",
+          label: "Couldn't read swipe action",
+          action: {
+            label: "Retry",
+            accessibilityLabel: "Retry reading swipe action",
+            onPress: () => {
+              void onLogInteraction(contactId);
+            },
+          },
+        });
+      }
+    },
+    [logQuickly],
+  );
+
+  const onEditContact = useCallback((contactId: number) => {
+    navigateDashboardContactAction(contactId, "Edit");
+  }, []);
 
   useEffect(() => {
     void hydrate(getExecutor());
@@ -773,7 +956,7 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
           keyExtractor={(item) => String(item.id)}
           renderItem={({ item }) =>
             query.viewMode === "list" ? (
-              <ListRow
+              <SwipeableListRow
                 contactId={item.id}
                 name={item.name}
                 photo={item.photo}
@@ -794,6 +977,9 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
                   toggleFavourite(item.id, !renderedMembership);
                 }}
                 line3={line3ByContactId.get(item.id) ?? null}
+                onLogInteraction={onLogInteraction}
+                onEditContact={onEditContact}
+                openRowRef={openRowRef}
               />
             ) : (
               <ContactCard
@@ -956,6 +1142,25 @@ const styles = StyleSheet.create({
   },
   primaryCtaText: {
     fontSize: 16,
+    fontWeight: "600",
+  },
+  swipeAction: {
+    width: SWIPE_ACTION_WIDTH,
+    borderWidth: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    gap: 4,
+  },
+  swipeActionLeft: {
+    borderTopLeftRadius: 16,
+    borderBottomLeftRadius: 16,
+  },
+  swipeActionRight: {
+    borderTopRightRadius: 16,
+    borderBottomRightRadius: 16,
+  },
+  swipeActionLabel: {
+    fontSize: 13,
     fontWeight: "600",
   },
 });
