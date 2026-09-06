@@ -1,8 +1,8 @@
 # Dashboard
 
 **Last updated:** 2026-09-02
-**Updated by phase:** 27-dashboard-list-view
-**Owners:** `src/db/dashboard-read.ts`, `src/logic/dashboard-query-logic.ts`, `src/logic/dashboard-gravity-filter.ts`, `src/db/knowledge-search-read.ts`, `src/services/knowledge-search.ts`, `src/logic/dashboard-search-match.ts`, `src/stores/dashboard-query-store.ts`, `src/stores/dashboard-session-store.ts`, `src/components/control-surface/`, `src/screens/HomeScreen.tsx`
+**Updated by phase:** 28-dashboard-card-view
+**Owners:** `src/db/dashboard-read.ts`, `src/logic/dashboard-query-logic.ts`, `src/logic/dashboard-gravity-filter.ts`, `src/db/knowledge-search-read.ts`, `src/services/knowledge-search.ts`, `src/logic/dashboard-search-match.ts`, `src/stores/dashboard-query-store.ts`, `src/stores/dashboard-session-store.ts`, `src/stores/dashboard-selection-store.ts`, `src/components/control-surface/`, `src/screens/HomeScreen.tsx`
 
 ## Purpose
 
@@ -61,7 +61,14 @@ The Dashboard owns no table. It reads `contacts` and related local data, while i
 | `src/db/dashboard-knowledge-read.ts` | Reads visibility-safe, bounded candidates for List's adaptive third line. |
 | `src/logic/list-row-selection.ts` | Selects deterministic third-line context or a stable gentle prompt. |
 | `src/components/ListRow.tsx` | Renders the scan-first, tokenized, accessible List row. |
+| `src/components/GridCard.tsx` | Renders the avatar-first Card View row with status, context/search, favourite, and selection semantics. |
+| `src/components/CardGrid.tsx` | Owns the keyed responsive virtualized Card View renderer. |
+| `src/components/CardContextMenu.tsx` | Renders the fixed safe per-contact Card View action sheet. |
+| `src/components/BulkActionSurface.tsx` | Renders explicit selection-mode bulk actions and the frequency-only sensitive subsurface. |
 | `src/components/list-row-content.ts` | Formats local-calendar recency, row narration, and search explanations. |
+| `src/logic/card-line3-selection.ts` | Applies a compactness-only within-tier context choice for cards. |
+| `src/logic/dashboard-bulk-action-session.ts` | Owns the synchronous host-side bulk-action claim and selection-session validation contracts. |
+| `src/stores/dashboard-selection-store.ts` | Holds ephemeral frozen-universe multi-select state. |
 | `src/services/widget/widget-data.ts` | Consumes the Favorites population in Dashboard Default order. |
 | `src/logic/birthday-logic.ts` | Parses local birthdays for the 30-day Birthdays population. |
 | `src/components/control-surface/AnchoredPanel.tsx` | Renders the centered, in-tree floating control surface with a scroll cap, scrim, focus handoff, and reduced-motion-aware animation. |
@@ -108,6 +115,20 @@ The Dashboard owns no table. It reads `contacts` and related local data, while i
 4. A closed row opens Profile. A partially open row closes first. Right swipe and its accessibility action read the global action only at commitment, then run shared Quick Log or navigate to Log Contact; left swipe and its accessibility action route to Edit Contact. Only one row remains open.
 5. Search keeps identity on line one and replaces normal secondary content with a compact match explanation and strongest highlighted descriptor. Relevance-ranked corpus matches stay in scorer order; name-only and fuel-only fallbacks append in Dashboard order.
 
+### Rendering and acting from a Card
+
+1. `HomeScreen` passes the same shared rows, local read time, candidates, and search descriptors to `CardGrid`; Card View does not issue a renderer-specific query.
+2. `CardGrid` remounts its keyed `FlatList` when width or font scale changes the responsive column count. `GridCard` presents name, recency, and one compact context item; it uses a status ring plus glyph, neutralizes the ring with a snooze glyph when snoozed, and suppresses the glyph for a never-contacted row.
+3. The Card star uses the host-owned optimistic binary favourite path. Card context and search retain the shared semantic priorities and descriptors; compactness only breaks ties within a context tier.
+4. A normal tap opens Profile. Long-press and equivalent accessibility actions expose the fixed per-contact action menu; Card View does not copy List swipe gestures.
+
+### Selecting and applying bulk actions
+
+1. Select Contacts enters an in-memory session with an entry-time frozen eligible-ID universe. While active, the renderer filters refreshed rows to that universe, the normal query controls are replaced, and Select All uses only the snapshot.
+2. Card taps toggle selection, stars remain visible but non-interactive, and Back exits selection before route navigation. Ordinary committed operations retain the session; Archive removes only its committed IDs from both selection and frozen universe.
+3. The replacement control area exposes Quick Log, count-aware detailed logging, explicit favourite and snooze actions, category, Archive, and Frequency as the sole Sensitive Operation. Two or more detailed-log targets navigate with serializable `GroupLog.participantIds`; Group Event behavior remains outside Dashboard.
+4. Every writer is claimed synchronously before asynchronous work. Committed batches refresh Dashboard state and notify widget and shell consumers once; failures report without claiming a completed outcome.
+
 ### Retired legacy Dashboard surfaces
 
 1. Favourites are binary membership; the widget reads Favorites in shared Default order instead of user-visible rank order.
@@ -144,6 +165,9 @@ The Dashboard owns no table. It reads `contacts` and related local data, while i
 - **ADR-098:** Scan-First, Accessible Dashboard List Rows — establishes the dense List renderer, deterministic third line, binary star, and redundant status treatment.
 - **ADR-099:** Durable Global Dashboard Right-Swipe Action — adds the constrained persisted logging choice used by List gestures.
 - **ADR-100:** Relevance-First, Visibility-Safe Dashboard List Search — preserves scorer order and confines List search to visible local knowledge.
+- **ADR-101:** Avatar-First Accessible Dashboard Card Renderer — establishes the shared-model Card renderer and compact presentation rules.
+- **ADR-102:** Frozen-Universe Dashboard Multi-Select — makes selection the Dashboard bulk-management surface and records its routing boundary.
+- **ADR-103:** Atomic Composed Dashboard Bulk Mutations — requires host orchestration to call the invariant-preserving batch composers.
 
 ## Gotchas
 
@@ -161,6 +185,8 @@ The Dashboard owns no table. It reads `contacts` and related local data, while i
 12. **Timestamp text is untrusted at the renderer boundary.** Local-date parsing rejects rollover values; malformed recency renders neutral copy and malformed snoozes are inactive.
 13. **Do not re-sort scored List corpus results.** Dashboard order is a tie-breaker for corpus matches and the append order only for name/fuel fallbacks.
 14. **A stale Favourite write can still be durable.** Every successful settlement updates the base membership, even if a newer optimistic intent remains over it.
+15. **Do not re-seed selection after entry.** The store membership guard and render-side frozen-universe filter both matter; only a committed archive removes IDs.
+16. **Do not use public single-contact writers inside a batch.** They own their own transaction; Dashboard bulk actions call the composed DAO instead.
 
 ## Related Systems
 
@@ -188,3 +214,4 @@ The Dashboard owns no table. It reads `contacts` and related local data, while i
 | 2026-09-02 | 25 | Added shared durable query state, scoped populations/filters/search, and retired rank, banner, and Never Contacted Dashboard surfaces. |
 | 2026-09-02 | 26 | Added the live Population/Filters/Sort floating control surface, session search and view toggle, fixed Dashboard discovery entries, and dedicated Unbound name retrieval. |
 | 2026-09-02 | 27 | Added the scan-first List renderer, deterministic knowledge context, binary Favourite reconciliation, constrained swipe actions, and relevance-first List search. |
+| 2026-09-02 | 28 | Added the responsive Card renderer, frozen-universe multi-select, explicit bulk controls, and count-aware detailed-log handoff. |
