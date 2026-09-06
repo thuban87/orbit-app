@@ -3,17 +3,17 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Release Readiness
 current_phase: 27
-current_phase_name: Dashboard List View
-status: verifying
+current_phase_name: dashboard-list-view
+status: executing
 stopped_at: Completed 27-06-PLAN.md
-last_updated: "2026-09-06T03:53:30.508Z"
+last_updated: "2026-09-06T04:16:36.628Z"
 last_activity: 2026-09-05
 last_activity_desc: Phase 27 execution started
-state_head: 06861257a8681476e2012e77c8498b67c9386ca2
+state_head: 0f37f86906627dd3d8da133e94af6975c12f8a1a
 progress:
   total_phases: 20
   completed_phases: 4
-  total_plans: 49
+  total_plans: 51
   completed_plans: 48
 carried_forward:
 
@@ -33,9 +33,9 @@ See: .planning/PROJECT.md (updated 2026-09-01 after v1.0 milestone)
 
 ## Current Position
 
-Phase: 27 (Dashboard List View) — EXECUTING
+Phase: 27 (dashboard-list-view) — READY TO EXECUTE
 Plan: 6 of 6
-Status: Phase complete — ready for verification
+Status: Ready to execute
 Carried forward (owner's bucket, NOT resolved here): D-11 default Memory-type display name — reconcile before Phase 34.
 Surface to owner (24.2-07, KNOW-15): milestone plan said Phase 36 owns the backup format-4 bump, but 24.1 already bumped to 4 (d677e2c); Plan 07 emits into the live format 4 with NO bump — that milestone instruction is stale.
 Deferred to Phase 31 (recorded in Plan 05): durable contact-scoped-def ownership + owner-purge semantics. Deferred to Phase 36 (ROADMAP breadcrumb): legacy AI-fuel confirm-path code removal.
