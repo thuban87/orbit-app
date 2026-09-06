@@ -232,6 +232,7 @@ The shell owns runtime navigation and consumes the durable theme contract; `app_
 - **ADR-084:** Four Semantic Theme Palettes, Curated Accents, and Contrast Validation — supplies the four-palette and live-accent contract.
 - **ADR-086:** Semantic Icons and Accessible Interaction Primitives — supplies registry, typography, status, action, and overlay seams.
 - **ADR-087:** Bundled Background Presets and Package-Specific Surface Treatment — supplies tokenized local background and surface primitives for later screen adoption.
+- **ADR-101:** Avatar-First Accessible Dashboard Card Renderer — consumes the semantic icon and accessible interaction primitives in Card View.
 - **ADR-102:** Frozen-Universe Dashboard Multi-Select — adds the Select Contacts entry and serializable Group Log participant handoff.
 - **ADR-020:** Library-Only Photo Capture with Themed In-App Cropping and One-Time URL Download — adds the modal crop route and self-photo entry.
 - **ADR-022:** Tokenized Deterministic Initials Avatars — adds avatar fallback tokens to the theme contract.
