@@ -120,7 +120,7 @@ category's phase (see Traceability).
 - [x] **CARDV-06**: Multi-select locks and replaces the Dashboard control area with selection actions; Select All operates over the result universe frozen when selection began
 - [x] **CARDV-07**: Bulk actions cover Quick Log, Log Interaction, Add to/Remove from Favorites, Snooze/Unsnooze, Set Category, Archive, and Sensitive Operations; Bulk Edit and multi-recipient Message are not offered
 - [x] **CARDV-08**: Bulk Quick Log writes one generic current-time interaction per selected contact (immediate + Undo for small selections, confirmation for large), composed through the canonical recency writers
-- [ ] **CARDV-09**: Detailed Log Interaction routes by count: 1 selected → individual flow; 2+ → Group Log with participants preloaded
+- [x] **CARDV-09**: Detailed Log Interaction routes by count: 1 selected → individual flow; 2+ → Group Log with participants preloaded
 - [x] **CARDV-10**: Bulk Archive is the recoverable removal with confirmation; permanent deletion stays a manual per-contact action on the Archived list (ADR-018; no bulk delete, no contact quarantine/auto-purge)
 - [x] **CARDV-11**: Sensitive Operations contains Change Contact Frequency only, with a confirmation summarizing count and value; Gravity is never a bulk action
 - [x] **CARDV-12**: After a successful ordinary bulk operation, selection mode persists (archived cards disappear); the user exits explicitly, and Back exits multi-select before navigating

@@ -438,7 +438,7 @@ All v1.0 commits are local on `main` and have NOT been pushed.
 
 **Canonical refs**: docs/dossier/milestone-2/phase-07-dashboard-card-view-dossier-v0.2.md; docs/dossier/milestone-2/planning-notes/phase-07-planning-notes.md
 **Schema**: none (D-03 — no migration; every bulk op composes existing writers; TARGET_VERSION=20 / migration head 020 verified on disk at plan time)
-**Plans**: 6/7 plans executed (5 waves)
+**Plans**: 7/7 plans executed (5 waves)
 **Wave 1** *(01/02/03 parallel — disjoint files)*
 
 - [x] 28-01-PLAN.md — TRACER: avatar-first grid renders real contacts end-to-end (status ring+glyph, favourite star) + 7 new icon-registry entries [CARDV-01/02/03]
@@ -459,7 +459,7 @@ All v1.0 commits are local on `main` and have NOT been pushed.
 
 **Wave 5** *(blocked on Wave 4 completion)*
 
-- [ ] 28-07-PLAN.md — Bulk-action surface + count-aware Log routing (1 individual / 2+ Group Log) + confirm/Undo + Archive-vanish + reduced-motion/a11y [CARDV-07/08/09/10/11/12]
+- [x] 28-07-PLAN.md — Bulk-action surface + count-aware Log routing (1 individual / 2+ Group Log) + confirm/Undo + Archive-vanish + reduced-motion/a11y [CARDV-07/08/09/10/11/12]
 
 **UI hint**: yes
 
@@ -666,7 +666,7 @@ All v1.0 commits are local on `main` and have NOT been pushed.
 | 25. Dashboard Data & State Foundation | 6/7 | In Progress|  |
 | 26. Dashboard Control Surface | 7/7 | In Progress|  |
 | 27. Dashboard List View | 8/8 | Complete | 2026-09-06 (owner-approved; UAT partial) |
-| 28. Dashboard Card View | 6/7 | In Progress|  |
+| 28. Dashboard Card View | 7/7 | In Progress|  |
 | 29. Orrery Camera, Scale & Exploration | 0/TBD | Not started | - |
 | 30. Orrery Systems | 0/TBD | Not started | - |
 | 31. Profile Experience | 0/TBD | Not started | - |
