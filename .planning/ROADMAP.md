@@ -394,7 +394,7 @@ All v1.0 commits are local on `main` and have NOT been pushed.
 
 **Canonical refs**: docs/dossier/milestone-2/phase-06-dashboard-list-view-dossier.md; docs/dossier/milestone-2/planning-notes/phase-06-planning-notes.md
 **Schema**: standalone migration **020** — additive `app_settings.dashboard_right_swipe_action` column (verified head+1 on disk 2026-09-05: migrations 001–019, `TARGET_VERSION=19` → first new is 020; the fold-into-Phase-25 option is foreclosed since 019 already shipped). Portable key `dashboardRightSwipeAction` allowlisted now in `PORTABLE_SETTINGS_KEYS`; no backup-format bump (Phase 36 owns that). Re-verify head+1 at execution time.
-**Plans**: 6/6 plans executed (5 waves)
+**Plans**: 6/8 plans executed (6 waves; 2 gap-closure plans pending)
 **Wave 1**
 
 - [x] 27-01-PLAN.md — TRACER: additively widen shared read (last_contact + snooze_until) + one real ListRow end-to-end (identity + recency·category + status border/glyph, null-safe) wired into HomeScreen [LISTV-01/02/05]
@@ -415,6 +415,11 @@ All v1.0 commits are local on `main` and have NOT been pushed.
 **Wave 5** *(blocked on Wave 4 completion)*
 
 - [x] 27-06-PLAN.md — Search-mode rendering + reduced-motion in-place transitions + shared empty/error/loading [LISTV-06/10]
+
+**Wave 6** *(gap closure; blocked on completed Wave 5)*
+
+- [ ] 27-07-PLAN.md — Reconcile rapid favourite writes so an older durable success survives a latest failure [LISTV-04]
+- [ ] 27-08-PLAN.md — Strictly validate timestamps and make malformed List recency fail safe [LISTV-05]
 
 **UI hint**: yes
 
