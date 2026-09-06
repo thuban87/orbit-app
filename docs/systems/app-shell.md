@@ -1,7 +1,7 @@
 # App Shell
 
 **Last updated:** 2026-09-02
-**Updated by phase:** 22-app-shell-navigation
+**Updated by phase:** 23-theme-visual-system
 **Owners:** `App.tsx`, `src/navigation/RootNavigator.tsx`, `src/navigation/tabs/`, `src/navigation/types.ts`, `src/navigation/reset-intents.ts`, `src/navigation/linking.ts`, `src/navigation/notification-gate.tsx`, `src/navigation/widget-linking.ts`, `src/components/UniversalFab.tsx`, `src/components/ShellAppBar.tsx`
 
 ## Purpose
@@ -12,13 +12,13 @@ The app shell holds Orbit’s ready-gated four-tab navigation tree and reusable 
 
 ### Data Model
 
-_None._ The shell owns runtime navigation and theme contracts, not durable application data.
+The shell owns runtime navigation and consumes the durable theme contract; `app_settings` owns the non-secret theme values themselves.
 
 ### Store, Service & DAO Layer
 
 | Layer | File | Responsibility |
 |-------|------|----------------|
-| Bootstrap | `App.tsx` | Opens and migrates SQLite before mounting the navigator; renders accurate classified or generic startup failure copy when opening fails. |
+| Bootstrap | `App.tsx`, `src/theme/hydrate-theme-at-boot.ts` | Opens and migrates SQLite, imports legacy theme state once, hydrates the theme store, then mounts the navigator; renders accurate classified or generic startup failure copy when opening fails. |
 | Navigator | `src/navigation/RootNavigator.tsx` | Mounts the fixed Dashboard, Orrery, Backup, and Settings tabs with a native stack for each. |
 | Route types | `src/navigation/types.ts` | Defines serializable tab and per-stack route parameters. |
 | Reset intents | `src/navigation/reset-intents.ts` | Sole owner of typed nested Dashboard-root reset states for external and completion paths. |
@@ -29,15 +29,16 @@ _None._ The shell owns runtime navigation and theme contracts, not durable appli
 | Backup-share gate | `src/navigation/backup-share-intent.ts` | Holds a narrow inbound backup-file intent until the backup restore surface is ready. |
 | Notification gate | `src/navigation/notification-gate.tsx` | Converts warm and cold local-notification responses into ready-gated actions or navigation. |
 | Widget gate | `src/navigation/widget-linking.ts` | Converts narrowly accepted widget `orbit://` links into ready-gated Dashboard-rooted resets. |
-| Settings surface | `src/screens/SettingsScreen.tsx` | Hosts low-traffic lifecycle routes, self-photo, sun controls, favourites, and non-secret AI configuration. |
-| Theme contract | `src/theme/theme-types.ts`, `src/theme/theme-presets.ts` | Defines named tokens, including destructive, avatar-swatch, relationship-status, and Orrery star/muted tokens, and their sole palette values. |
+| Settings surface | `src/screens/SettingsScreen.tsx` | Hosts low-traffic lifecycle routes, live Appearance controls, self-photo, sun controls, favourites, and non-secret AI configuration. |
+| Theme contract | `src/theme/` | Defines four semantic palettes, curated accents, typography and motion tokens, local background/surface primitives, and their sole palette values. |
+| Interaction primitives | `src/components/icons/`, `src/components/ui/` | Provides semantic icons, non-colour status glyphs, scalable text, and shared action/overlay contracts. |
 
 ### Key Files
 
 | File | Role |
 |---|---|
-| `App.tsx` | Readiness gate, startup-failure presentation, navigation mount point, gesture root, and photo/notification lifecycle registration. |
-| `src/navigation/RootNavigator.tsx` | Four-tab root, fade transition, focused-route and keyboard visibility, transient-first retap, and system-Back boundary. |
+| `App.tsx` | Readiness gate, theme hydration before first main paint, startup-failure presentation, navigation mount point, gesture root, and photo/notification lifecycle registration. |
+| `src/navigation/RootNavigator.tsx` | Four-tab root, semantic registry tab icons, fade transition, focused-route and keyboard visibility, transient-first retap, and system-Back boundary. |
 | `src/navigation/tabs/` | Owns the native-stack registrations for each persistent tab. |
 | `src/navigation/types.ts` | Typed tab and stack contracts, including semantic placeholder routes. |
 | `src/navigation/reset-intents.ts` | Builds the only root-level Dashboard reset states. |
@@ -50,7 +51,7 @@ _None._ The shell owns runtime navigation and theme contracts, not durable appli
 | `src/screens/CaptureScreen.tsx` | Provides the in-app target for a pending Android text share. |
 | `src/screens/HomeScreen.tsx` | Provides the dashboard Home and its destination entries. |
 | `src/screens/DigestScreen.tsx` | Provides the live weekly retrospective destination with its own themed Back chrome. |
-| `src/screens/SettingsScreen.tsx` | Provides the distinct settings home, including AI configuration, self-photo, self-star, sun-centre, and Manage favourites entries. |
+| `src/screens/SettingsScreen.tsx` | Provides the distinct settings home, including live Theme/Mode/Accent controls, AI configuration, self-photo, self-star, sun-centre, and Manage favourites entries. |
 | `src/screens/LegacyContactPickerScreen.tsx` | Provides the typed API-36-and-below custom contact-picker route and permission-recovery views. |
 | `src/services/import/start-contact-import.ts` | Selects one SDK-routed import acquisition path for dashboard and Settings entry points. |
 | `src/screens/ImportReviewScreen.tsx` | Provides the typed selected-contact review route and explicit duplicate choices. |
@@ -59,15 +60,19 @@ _None._ The shell owns runtime navigation and theme contracts, not durable appli
 | `src/screens/SurvivorSelectScreen.tsx` | Provides the explicit duplicate-contact merge entry. |
 | `src/theme/theme-types.ts` | Names palette tokens, including avatar swatches, rogue status, gravity tiers, and Orrery star/muted values. |
 | `src/theme/theme-presets.ts` | Holds the only allowed color literals, including avatar, relationship-status, and Orrery palette values. |
+| `src/theme/hydrate-theme-at-boot.ts` | Safely imports legacy theme state and returns the SQLite-backed boot selection. |
+| `src/components/icons/icon-registry.ts` | Maps semantic icon names and variants to the replaceable base icon family. |
+| `src/components/ui/` | Hosts AppText, Button, and standardized overlay primitives for consuming screens. |
 
 ## How It Works
 
 ### Starting the application
 
-1. `App.tsx` opens and migrates the local database before it renders a navigable screen.
-2. Once ready, the app mounts `NavigationContainer` inside the existing theme and safe-area providers.
-3. A classified migration-006 integrity failure renders its specific safe-unchanged explanation; another bootstrap failure uses the generic safe-unchanged state without promising a support channel. Neither failure mounts navigation.
-4. `RootNavigator` supplies the tab navigator only after that gate resolves; platform Back falls through to the focused tab stack unless a shell transient is open.
+1. `App.tsx` opens and migrates the local database, then hydrates the theme store from `app_settings` before it renders a navigable screen.
+2. The one-time legacy `orbit-theme` import compares values before writing and clears its AsyncStorage key only after a successful write; a failed import remains non-fatal.
+3. Once ready, the app mounts `NavigationContainer` inside the existing theme and safe-area providers with the saved Galaxy/Standard package and resolved appearance already selected.
+4. A classified migration-006 integrity failure renders its specific safe-unchanged explanation; another bootstrap failure uses the generic safe-unchanged state without promising a support channel. Neither failure mounts navigation.
+5. `RootNavigator` supplies the tab navigator only after that gate resolves; platform Back falls through to the focused tab stack unless a shell transient is open.
 
 ### Moving through the shell
 
@@ -85,7 +90,7 @@ _None._ The shell owns runtime navigation and theme contracts, not durable appli
 ### Navigating dashboard and settings
 
 1. Dashboard owns the prominent Group Events destination and overflow entries for Group Events and Archived Contacts; Archived remains the same destructive surface reached from Settings as well.
-2. Settings exposes low-traffic lifecycle and configuration controls in its own remembered tab stack.
+2. Settings exposes low-traffic lifecycle and configuration controls in its own remembered tab stack. Its Appearance section changes package, mode, and curated accent live, then persists the active package's values through the validated settings DAO.
 3. Root tabs use branded/destination app bars without Back; child routes use a title and Back control. Native stack headers remain disabled so no duplicate chrome appears.
 
 ### Opening Backup & Restore
@@ -149,6 +154,12 @@ _None._ The shell owns runtime navigation and theme contracts, not durable appli
 2. The Archived contacts purge action uses `colors.danger`; native confirmation alerts use the platform destructive style.
 3. No screen contains a raw hex color because palette literals belong only in `theme-presets.ts`.
 
+### Applying the visual system
+
+1. `ThemeProvider` resolves the active package and system/light/dark appearance to one of four palettes, then overlays its curated accent tone triple.
+2. Screens use semantic registry names and shared UI primitives rather than base-family icon names or ad-hoc action/overlay implementations.
+3. `AppText` preserves OS text scaling. Destructive controls combine the danger treatment, warning glyph, and an explicit confirmation rather than relying on colour alone.
+
 ### Applying relationship-state emphasis
 
 1. The profile reads every presentation colour through `useTheme().colors`.
@@ -188,6 +199,8 @@ _None._ The shell owns runtime navigation and theme contracts, not durable appli
 | `statusStable` / `statusWobble` / `statusDecay` | `#45B98A` / `#E8C15C` / `#E56A52` | `src/theme/theme-presets.ts` | Shared status-ring palette for dashboard and widget surfaces. |
 | `gravityTiers` | 4 ordered tokens | `src/theme/theme-presets.ts` | Named gravity-bar ramp from thin through deep. |
 | `starPalette` | 6 ordered tokens | `src/theme/theme-presets.ts` | Self-sun choices; index 0 is the render-time default. |
+| Theme packages | Galaxy / Standard | `src/theme/theme-types.ts` | Independent of light/dark/follow-system appearance mode. |
+| `AA_NORMAL` / `AA_LARGE` | `4.5` / `3.0` | `src/theme/contrast.ts` | Contrast thresholds for text and large/status elements. |
 
 ## Decisions
 
@@ -198,6 +211,10 @@ _None._ The shell owns runtime navigation and theme contracts, not durable appli
 - **ADR-019:** Native Stack Contact Lifecycle Navigation — replaces temporary Home-local routing with native-stack navigation.
 - **ADR-080:** Four-Tab Bottom Navigation Shell with Per-Tab Stacks — supersedes the flat root shell while retaining the migration gate and Dashboard fallback.
 - **ADR-082:** Universal Capture FAB, Canonical Picker, and Truthful Quick Log — fixes shell capture actions, local target selection, and commit-only feedback.
+- **ADR-083:** Durable Multi-Package Theme Configuration and Restore-Before-Paint — moves theme selection to SQLite and gates first main paint on its hydration.
+- **ADR-084:** Four Semantic Theme Palettes, Curated Accents, and Contrast Validation — supplies the four-palette and live-accent contract.
+- **ADR-086:** Semantic Icons and Accessible Interaction Primitives — supplies registry, typography, status, action, and overlay seams.
+- **ADR-087:** Bundled Background Presets and Package-Specific Surface Treatment — supplies tokenized local background and surface primitives for later screen adoption.
 - **ADR-020:** Library-Only Photo Capture with Themed In-App Cropping and One-Time URL Download — adds the modal crop route and self-photo entry.
 - **ADR-022:** Tokenized Deterministic Initials Avatars — adds avatar fallback tokens to the theme contract.
 - **ADR-026:** Rogue Status for Unresponsive or Far-Overdue Contacts — adds a dedicated in-app rogue emphasis token.
@@ -265,6 +282,8 @@ _None._ The shell owns runtime navigation and theme contracts, not durable appli
 21. **Do not overlap root recovery prompts.** Import resume takes precedence over reconciliation resume; a pending check must be resumed or discarded before starting another.
 22. **The assist banner must stay a non-modal overlay.** It is durable state, not a Back-dismissible transient layer, so it is a `position:absolute` `box-none` overlay and never a `Modal`; making it modal would consume Android Back and break the pass-through contract.
 23. **The `orbit://reach` bridge stays with the other widget links.** It is parsed by the strict widget URI gate (anchored digits-only), not added to React Navigation linking config, so it cannot race the share-intent singleton.
+24. **Do not hydrate theme after navigation mounts.** A first main frame in the wrong saved palette is a visual regression; only the neutral pre-ready splash may precede theme hydration.
+25. **Do not bypass semantic visual seams.** New screens use token roles, semantic icon names, scalable text, and shared action/overlay primitives; they do not add raw colour or base-family icon imports.
 
 ## Related Systems
 
@@ -282,6 +301,8 @@ _None._ The shell owns runtime navigation and theme contracts, not durable appli
 - **Contact Import** — registers the import route family, Settings entry, and foreground recovery prompt.
 - **Contact Reconciliation** — registers linked-contact review, merge, bulk-review, and foreground-resume surfaces.
 - **Interaction Assist & Reach Out** — mounts the app-global assist banner, the Settings toggle, the assist launch-sweep, and the `orbit://reach` widget bridge with its consumed-once Profile param.
+- **Persistence core** — owns migration 015 and the validated durable settings selection consumed before navigation mounts.
+- **Orrery** — consumes the theme tokens and shared motion/accessibility contract while retaining its specialized canvas treatment.
 
 ## Changelog
 
@@ -308,3 +329,4 @@ _None._ The shell owns runtime navigation and theme contracts, not durable appli
 | 2026-08-26 | 20 | Added typed reconciliation and merge routes, Settings entries, and foreground resume precedence. |
 | 2026-08-31 | 21 | Mounted the app-global non-modal Interaction Assist banner (Back passes through) with its launch-sweep and Settings toggle, and added the `orbit://reach` widget bridge and consumed-once `openReachOut` Profile param. |
 | 2026-09-02 | 22 | Replaced the flat root stack with four tab-owned stacks, nested external resets, shared chrome, and universal capture primitives. |
+| 2026-09-02 | 23 | Added restore-before-paint durable theming, live Appearance controls, semantic tab icons, and shared visual primitives. |
