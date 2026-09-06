@@ -1,10 +1,10 @@
 ---
 schema_version: 1
-open_count: 27
+open_count: 28
 waived_count: 0
 fixed_count: 6
-total_count: 33
-last_updated: 2026-09-05T12:51:17.723Z
+total_count: 34
+last_updated: 2026-09-06T01:58:00.188Z
 ---
 
 # Broken Windows Ledger
@@ -48,6 +48,7 @@ last_updated: 2026-09-05T12:51:17.723Z
 | 31 | 26 | unrun-verify | .planning/phases/26-dashboard-control-surface/26-02-SUMMARY.md |  | Pixel Filter and Sort anchored-panel interaction verification remains pending. | open |  | 2026-09-05T12:27:40.703Z |  |
 | 32 | 26 | unrun-verify | src/screens/HomeScreen.tsx |  | Pixel verification pending for 200% header fallback, disabled overflow press, and Reset view-mode retention | open |  | 2026-09-05T12:46:17.277Z |  |
 | 33 | 26 | unrun-verify | src/screens/ArchivedContactsScreen.tsx |  | Pixel Archived route, origin-aware Back, Restore, and purge-confirmation UAT pending | open |  | 2026-09-05T12:51:17.723Z |  |
+| 34 | 27 | unrun-verify | src/components/ListRow.tsx |  | Pixel null-status/never-contacted visual UAT remains unrun because prepared data had no fixture and Add Contact dismissed its sheet. | open |  | 2026-09-06T01:58:00.188Z |  |
 
 ````json
 [
@@ -445,6 +446,18 @@ last_updated: 2026-09-05T12:51:17.723Z
     "status": "open",
     "reason": "",
     "recorded_at": "2026-09-05T12:51:17.723Z",
+    "resolved_at": null
+  },
+  {
+    "id": 34,
+    "kind": "unrun-verify",
+    "phase": "27",
+    "file": "src/components/ListRow.tsx",
+    "line": null,
+    "description": "Pixel null-status/never-contacted visual UAT remains unrun because prepared data had no fixture and Add Contact dismissed its sheet.",
+    "status": "open",
+    "reason": "",
+    "recorded_at": "2026-09-06T01:58:00.188Z",
     "resolved_at": null
   }
 ]

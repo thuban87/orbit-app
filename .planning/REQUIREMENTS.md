@@ -99,11 +99,11 @@ category's phase (see Traceability).
 
 ### LISTV — Dashboard List View (Phase 27)
 
-- [ ] **LISTV-01**: Each contact renders as a full-width medium-compact row — large circular avatar plus a stable three-line stack: name; recency + category; one deterministic adaptive context line (roughly 5–6 rows visible at default text size)
-- [ ] **LISTV-02**: Line 2 shows recency plus the contact's category ("18d ago · Friend"), or "No interactions yet" for never-contacted rows
+- [x] **LISTV-01**: Each contact renders as a full-width medium-compact row — large circular avatar plus a stable three-line stack: name; recency + category; one deterministic adaptive context line (roughly 5–6 rows visible at default text size)
+- [x] **LISTV-02**: Line 2 shows recency plus the contact's category ("18d ago · Friend"), or "No interactions yet" for never-contacted rows
 - [ ] **LISTV-03**: Line 3 shows a deterministic adaptive context item from existing contact knowledge (imminent → pinned/high-value → other), or a stable per-contact completeness prompt when no useful context exists
 - [ ] **LISTV-04**: An always-visible Favorite star toggles binary membership with immediate fill/unfill + light haptic, no success snackbar, and revert + notification on persistence failure
-- [ ] **LISTV-05**: Unsnoozed relationship state shows through two redundant channels — a same-weight status-colored border and a distinct status glyph; unevaluated contacts get a neutral border and no glyph; snoozed contacts get a neutral border and a snooze glyph
+- [x] **LISTV-05**: Unsnoozed relationship state shows through two redundant channels — a same-weight status-colored border and a distinct status glyph; unevaluated contacts get a neutral border and no glyph; snoozed contacts get a neutral border and a snooze glyph
 - [ ] **LISTV-06**: During search, rows keep the name on line 1 and replace lines 2–3 with a compact match explanation plus the strongest highlighted snippet
 - [ ] **LISTV-07**: Tap opens Profile (a partially swiped row closes first); right swipe executes the configured logging action, left swipe routes to Edit Contact; one row swipe-revealed at a time; no destructive swipe actions
 - [ ] **LISTV-08**: User can choose globally between Quick Log and Log Contact for right-swipe (default Quick Log), stored durably and backup-portable; the action executes on gesture commitment
