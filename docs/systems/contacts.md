@@ -69,6 +69,7 @@ All data is on-device SQLite. Migration 001 uses a surrogate `contacts.id` and a
 | `src/db/contacts-dao.ts` | Composed create/edit path that seeds normalized custom-value pairs plus archive, restore, and archived-list reads. |
 | `src/db/imported-contact-dao.ts` | Composes imported contact creation or explicit linking with source evidence and import-row resolution. |
 | `src/db/contact-read.ts` | Duplicate-name, category, header, and edit-form data reads. |
+| `src/db/picker-read.ts` | Local action-picker projection with favourite membership, recency, name, snooze, and archive state. |
 | `src/db/contact-lifecycle-dao.ts` | Named lifecycle transitions with exact state guards and one revision increment. |
 | `src/db/favourites-dao.ts` | Dedicated favourite-rank writes that leave recency unchanged. |
 | `src/db/profile-dao.ts` | Single-row self photo reads and writers. |
@@ -134,6 +135,12 @@ All data is on-device SQLite. Migration 001 uses a surrogate `contacts.id` and a
 3. The DAO verifies a unique, complete current set and applies all rank updates inside one write transaction; it never writes `last_contact`.
 4. Successful favourite, metadata, archive, restore, and photo-facing mutations publish a best-effort Widget refresh after their database work commits; this publisher does not alter the contact transaction.
 
+### Selecting a contact for a shell action
+
+1. A global contact-specific shell action opens the reusable picker rather than changing Dashboard state.
+2. `listPickerContacts()` groups favourite membership first, then sorts by `last_contact` descending and name; `favourite_rank` never determines picker order.
+3. Archived contacts are absent from the default list and appear only when an explicit matching search term is supplied. Snoozed contacts remain selectable and are marked.
+
 ### Supplying a live compose header
 
 1. `getContactHeader()` returns contact identity, photo freshness, and archive state without a scalar endpoint projection.
@@ -192,6 +199,8 @@ All data is on-device SQLite. Migration 001 uses a surrogate `contacts.id` and a
 - **ADR-025:** Immutable Lifecycle Events in a Unified Timeline — adds state-guarded archive and restore events to contact lifecycle work.
 - **ADR-026:** Rogue Status for Unresponsive or Far-Overdue Contacts — uses the contact's Rarely-responds policy to filter qualifying recency.
 - **ADR-033:** Profile Marking and Shared Drag-Reordered Favourites — owns reversible profile marking and guarded favourite-rank ordering.
+- **ADR-075:** Binary Favourite Membership Without a User-Facing Order — makes favourite rank ineligible as a contact-picker sort key.
+- **ADR-082:** Universal Capture FAB, Canonical Picker, and Truthful Quick Log — adds the shared local target picker.
 - **ADR-035:** Native SMS Handoff with Guaranteed Clipboard Copy — partially superseded; native handoff and Copy remain the interaction boundary.
 - **ADR-059:** Normalized Contact Methods, Canonical Actionability, and Local Provenance — replaces scalar endpoint fields with ordered mergeable method rows.
 - **ADR-062:** Bound/Unbound Lifecycle and One-Way Cadence Assignment — separates active cadence participation from relationship data ownership.
@@ -233,6 +242,7 @@ All data is on-device SQLite. Migration 001 uses a surrogate `contacts.id` and a
 19. **Do not clear dormant favourite rank on Unbind.** Bound-only query owners hide it; retaining it lets a rebind restore the prior preference without a second write.
 20. **Do not use a compatibility shortcut for imported contacts.** Import must compose the canonical creation core so contact invariants remain identical to manual creation.
 21. **Do not merge through archive or direct recency SQL.** Archive makes a normal restore possible, and a merge-local `MAX` bypasses the single recency writer.
+22. **Picker ordering is not favourite-rank ordering.** A favourite is a membership band only; use recency and then name inside that band.
 
 ## Related Systems
 
@@ -271,3 +281,4 @@ All data is on-device SQLite. Migration 001 uses a surrogate `contacts.id` and a
 | 2026-08-26 | 19 | Added reviewed selected-contact create/link composition without bypassing contact invariants. |
 | 2026-08-26 | 20 | Added explicit atomic duplicate merge, tombstone retirement, and recency recomputation through existing cores. |
 | 2026-08-31 | 21 | Purge cascade-deletes pending `interaction_assists` (documented exception to explicit fan-out); assist confirmation reuses the sole recency recomputer. |
+| 2026-09-02 | 22 | Added the local shell action-picker projection with membership-only favourites ordering and explicit archive search. |
