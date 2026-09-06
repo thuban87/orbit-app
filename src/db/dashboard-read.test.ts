@@ -25,6 +25,7 @@ import {
   listBirthdayCandidates,
   listDashboardPopulation,
   listDashboardSearch,
+  listDashboardSearchEligible,
   listFavourites,
 } from "@/db/dashboard-read";
 import type { FuelKind } from "@/db/fuel-dao";
@@ -545,6 +546,45 @@ describe("listDashboardSearch — population-aware search + A3 scope", () => {
       status: null,
       progress: null,
     });
+  });
+
+  it("shares the A3-aware, post-processed eligible universe without a term", async () => {
+    const never = await seedContact({ name: "Eligible Never", lastContact: null });
+    const snoozed = await seedContact({
+      name: "Eligible Snoozed",
+      lastContact: STABLE(),
+      snoozeUntil: localDateOffset(5),
+    });
+    await seedContact({
+      name: "Eligible Unbound",
+      lastContact: STABLE(),
+      trackingEnabled: 0,
+    });
+    await seedContact({
+      name: "Eligible Archived",
+      lastContact: STABLE(),
+      archivedAt: NOW,
+    });
+
+    const rows = await listDashboardSearchEligible(exec, active, NOW);
+
+    expect(ids(rows).sort((a, b) => a - b)).toEqual(
+      [never, snoozed].sort((a, b) => a - b),
+    );
+    expect(rows.every((row) => row.snippet === null)).toBe(true);
+  });
+
+  it("keeps the name-and-fuel search projection golden after sharing its scope", async () => {
+    const nameMatch = await seedContact({ name: "Golden Name", lastContact: STABLE() });
+    const fuelMatch = await seedContact({ name: "Other", lastContact: STABLE() });
+    await addFuelRow(fuelMatch, { text: "Golden fuel" });
+
+    const rows = await listDashboardSearch(exec, active, "golden", NOW);
+
+    expect(rows.map(({ id, name, snippet, fuelText }) => ({ id, name, snippet, fuelText }))).toEqual([
+      { id: nameMatch, name: "Golden Name", snippet: null, fuelText: null },
+      { id: fuelMatch, name: "Other", snippet: "Golden fuel", fuelText: "Golden fuel" },
+    ]);
   });
 
   it("AND-composes explicit populations and filters with name/fuel matching and preserves snippets", async () => {

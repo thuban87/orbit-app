@@ -230,4 +230,91 @@ describe("knowledge search corpus read", () => {
       listKnowledgeSearchCandidates(exec, { eligibleIds: [] }),
     ).resolves.toEqual([]);
   });
+
+  it("excludes hidden or outdated knowledge while retaining visible entries", async () => {
+    const contactId = await seedContact();
+    const visibleMemory = await addMemory(exec, {
+      contactId,
+      type: "general",
+      value: "Visible memory marker",
+      createdAt: NOW,
+      now: NOW,
+    });
+    const hiddenMemory = await addMemory(exec, {
+      contactId,
+      type: "general",
+      value: "Hidden memory marker",
+      createdAt: NOW,
+      now: NOW,
+    });
+    const outdatedMemory = await addMemory(exec, {
+      contactId,
+      type: "general",
+      value: "Outdated memory marker",
+      createdAt: NOW,
+      now: NOW,
+    });
+    await exec.runAsync("UPDATE memories SET hidden = 1 WHERE id = ?", [hiddenMemory]);
+    await exec.runAsync("UPDATE memories SET outdated = 1 WHERE id = ?", [outdatedMemory]);
+    const visibleRelationship = await addRelationship(exec, {
+      contactId,
+      personName: "Visible relationship marker",
+      createdAt: NOW,
+      now: NOW,
+    });
+    const hiddenRelationship = await addRelationship(exec, {
+      contactId,
+      personName: "Hidden relationship marker",
+      createdAt: NOW,
+      now: NOW,
+    });
+    await exec.runAsync("UPDATE relationships SET hidden = 1 WHERE id = ?", [hiddenRelationship]);
+
+    const corpus = await listKnowledgeSearchCandidates(exec, {
+      eligibleIds: [contactId],
+    });
+    const text = corpus[0].entries.map((entry) => entry.text).join(" ");
+    expect(text).toContain("Visible memory marker");
+    expect(text).toContain("Visible relationship marker");
+    expect(text).not.toContain("Hidden memory marker");
+    expect(text).not.toContain("Outdated memory marker");
+    expect(text).not.toContain("Hidden relationship marker");
+    expect(visibleMemory).toBeGreaterThan(0);
+    expect(visibleRelationship).toBeGreaterThan(0);
+  });
+
+  it("reads custom values once for a multi-contact batch and ignores quarantined definitions", async () => {
+    const firstContact = await seedContact("First");
+    const secondContact = await seedContact("Second");
+    const liveDef = await insertField("live_marker");
+    const quarantinedDef = await insertField("quarantined_marker", NOW);
+    await exec.runAsync(
+      `INSERT INTO custom_field_values
+         (uid, contact_id, field_def_id, value, created_at, modified_at)
+       VALUES (?, ?, ?, ?, ?, ?), (?, ?, ?, ?, ?, ?), (?, ?, ?, ?, ?, ?)`,
+      [
+        "first-live", firstContact, liveDef, "First visible value", NOW, NOW,
+        "second-live", secondContact, liveDef, "Second visible value", NOW, NOW,
+        "first-quarantined", firstContact, quarantinedDef, "Quarantined value", NOW, NOW,
+      ],
+    );
+    const getAllAsync = vi.spyOn(exec, "getAllAsync");
+
+    const corpus = await listKnowledgeSearchCandidates(exec, {
+      eligibleIds: [firstContact, secondContact],
+    });
+
+    expect(
+      getAllAsync.mock.calls.filter(([sql]) =>
+        String(sql).includes("FROM custom_field_values AS values_table"),
+      ),
+    ).toHaveLength(1);
+    expect(corpus.find((candidate) => candidate.contactId === firstContact)?.entries)
+      .toContainEqual(expect.objectContaining({ text: "First visible value" }));
+    expect(corpus.find((candidate) => candidate.contactId === secondContact)?.entries)
+      .toContainEqual(expect.objectContaining({ text: "Second visible value" }));
+    expect(corpus.flatMap((candidate) => candidate.entries)).not.toContainEqual(
+      expect.objectContaining({ text: "Quarantined value" }),
+    );
+  });
 });
