@@ -60,6 +60,11 @@ export interface SnoozeContactInput {
   now: string;
 }
 
+/** Resolved input for a caller that already owns the write transaction. */
+export interface SnoozeContactCoreInput extends Omit<SnoozeContactInput, "preset"> {
+  until: string;
+}
+
 /** Clear a contact's snooze. `uid` is REQUIRED (review item 10). */
 export interface ClearSnoozeInput {
   contactId: number;
@@ -76,20 +81,27 @@ export interface ClearSnoozeInput {
  * the bare-`date()` dashboard contract. Asserts `changes===1` on the contacts
  * UPDATE (a bad id throws → rollback). `last_contact` is never touched.
  */
+/** Resolve the SQLite-local target date for one Snooze operation. */
+export async function resolveSnoozeUntil(
+  exec: SqlExecutor,
+  preset: SnoozePreset,
+): Promise<string> {
+  const dateRow = await exec.getFirstAsync<{ until: string }>(
+    "SELECT date('now','localtime', ?) AS until",
+    [PRESET_MODIFIERS[preset]],
+  );
+  if (!dateRow?.until) throw new Error("snoozeContact: could not resolve local target date");
+  return dateRow.until;
+}
+
 /** Non-mutexed snooze primitive for callers that already own a transaction. */
 export async function snoozeContactCore(
   exec: SqlExecutor,
-  input: SnoozeContactInput,
+  input: SnoozeContactCoreInput,
 ): Promise<void> {
-  const modifier = PRESET_MODIFIERS[input.preset];
-  const dateRow = await exec.getFirstAsync<{ until: string }>(
-    "SELECT date('now','localtime', ?) AS until",
-    [modifier],
-  );
-  const until = dateRow?.until ?? null;
   const result = await exec.runAsync(
     "UPDATE contacts SET snooze_until = ?, modified_at = ? WHERE id = ?",
-    [until, input.now, input.contactId],
+    [input.until, input.now, input.contactId],
   );
   if (result.changes !== 1) {
     throw new Error(
@@ -111,7 +123,12 @@ export function snoozeContact(
   input: SnoozeContactInput,
 ): Promise<void> {
   return inWriteTransaction(exec, async () => {
-    await snoozeContactCore(exec, input);
+    await snoozeContactCore(exec, {
+      contactId: input.contactId,
+      uid: input.uid,
+      until: await resolveSnoozeUntil(exec, input.preset),
+      now: input.now,
+    });
     await bumpDataRevisionCore(exec);
   });
 }

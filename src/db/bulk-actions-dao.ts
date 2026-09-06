@@ -21,6 +21,7 @@ import {
 } from "@/db/recency-dao";
 import {
   clearSnoozeCore,
+  resolveSnoozeUntil,
   snoozeContactCore,
   type SnoozePreset,
 } from "@/db/snooze-dao";
@@ -128,17 +129,19 @@ export function bulkSnooze(
   now: string,
 ): Promise<void> {
   if (ids.length === 0) return Promise.resolve();
-  return inWriteTransaction(exec, async () => {
-    for (const contactId of ids) {
-      await snoozeContactCore(exec, {
-        contactId,
-        uid: newUid(),
-        preset,
-        now,
-      });
-    }
-    await bumpDataRevisionCore(exec);
-  });
+  return resolveSnoozeUntil(exec, preset).then((until) =>
+    inWriteTransaction(exec, async () => {
+      for (const contactId of ids) {
+        await snoozeContactCore(exec, {
+          contactId,
+          uid: newUid(),
+          until,
+          now,
+        });
+      }
+      await bumpDataRevisionCore(exec);
+    }),
+  );
 }
 
 export function bulkUnsnooze(
