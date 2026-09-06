@@ -22,7 +22,7 @@ not something you can pattern-match against.
 ## How to use this
 
 - **Is a decision still live?** Check the `Superseded by` column. 22 of
-  87 ADRs are superseded in whole or in part.
+  89 ADRs are superseded in whole or in part.
 - **Which decisions govern a file?** Don't grep this file — ask the graph:
   `npm run graph:ask -- governs src/db/field-values-dao.ts`, or follow the
   `governed_by` edges.
@@ -118,3 +118,5 @@ not something you can pattern-match against.
 | 085 | Live Reduced-Motion Signal for Skia Ambient Animation | Accepted | 23-theme-visual-system | — | — | — | 4 | `src/components/orrery`, `src/theme`, `src/theme/tokens` |
 | 086 | Semantic Icons and Accessible Interaction Primitives | Accepted | 23-theme-visual-system | — | — | — | 8 | `src/components`, `src/components/icons`, `src/components/ui` +1 |
 | 087 | Bundled Background Presets and Package-Specific Surface Treatment | Accepted | 23-theme-visual-system | — | — | — | 6 | `assets/backgrounds`, `src/components/ui`, `src/components/ui/__dev__` +2 |
+| 088 | Additive Contact-Knowledge Schema and Application-Owned Memory Registry | Accepted | 24.1-contact-knowledge-foundation | — | — | — | 10 | `src/db`, `src/db/migrations` |
+| 089 | Recoverable Memory Lifecycle and Contact-Operation Integrity | Accepted | 24.1-contact-knowledge-foundation | — | — | — | 7 | `src/db`, `src/screens`, `src/services` |

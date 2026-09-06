@@ -97,5 +97,7 @@
 // NOTE: ADR-0085 [ACCEPTED] Live Reduced-Motion Signal for Skia Ambient Animation
 // NOTE: ADR-0086 [ACCEPTED] Semantic Icons and Accessible Interaction Primitives
 // NOTE: ADR-0087 [ACCEPTED] Bundled Background Presets and Package-Specific Surface Treatment
+// NOTE: ADR-0088 [ACCEPTED] Additive Contact-Knowledge Schema and Application-Owned Memory Registry
+// NOTE: ADR-0089 [ACCEPTED] Recoverable Memory Lifecycle and Contact-Operation Integrity
 
-export const ADR_COUNT = 87;
+export const ADR_COUNT = 89;
