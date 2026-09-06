@@ -110,5 +110,8 @@
 // NOTE: ADR-0098 [ACCEPTED] Scan-First, Accessible Dashboard List Rows
 // NOTE: ADR-0099 [ACCEPTED] Durable Global Dashboard Right-Swipe Action
 // NOTE: ADR-0100 [ACCEPTED] Relevance-First, Visibility-Safe Dashboard List Search
+// NOTE: ADR-0101 [ACCEPTED] Avatar-First Accessible Dashboard Card Renderer
+// NOTE: ADR-0102 [ACCEPTED] Frozen-Universe Dashboard Multi-Select
+// NOTE: ADR-0103 [ACCEPTED] Atomic Composed Dashboard Bulk Mutations
 
-export const ADR_COUNT = 100;
+export const ADR_COUNT = 103;

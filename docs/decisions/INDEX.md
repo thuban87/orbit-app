@@ -22,7 +22,7 @@ not something you can pattern-match against.
 ## How to use this
 
 - **Is a decision still live?** Check the `Superseded by` column. 22 of
-  100 ADRs are superseded in whole or in part.
+  103 ADRs are superseded in whole or in part.
 - **Which decisions govern a file?** Don't grep this file — ask the graph:
   `npm run graph:ask -- governs src/db/field-values-dao.ts`, or follow the
   `governed_by` edges.
@@ -131,3 +131,6 @@ not something you can pattern-match against.
 | 098 | Scan-First, Accessible Dashboard List Rows | Accepted | 27-dashboard-list-view | — | — | — | 7 | `src/components`, `src/components/icons`, `src/db` +2 |
 | 099 | Durable Global Dashboard Right-Swipe Action | Accepted | 27-dashboard-list-view | — | — | — | 6 | `src/backup`, `src/db`, `src/db/migrations` +2 |
 | 100 | Relevance-First, Visibility-Safe Dashboard List Search | Accepted | 27-dashboard-list-view | — | — | — | 6 | `src/components`, `src/db`, `src/logic` +1 |
+| 101 | Avatar-First Accessible Dashboard Card Renderer | Accepted | 28-dashboard-card-view | — | — | — | 5 | `src/components`, `src/components/icons`, `src/logic` +1 |
+| 102 | Frozen-Universe Dashboard Multi-Select | Accepted | 28-dashboard-card-view | — | — | — | 5 | `src/components`, `src/navigation`, `src/screens` +1 |
+| 103 | Atomic Composed Dashboard Bulk Mutations | Accepted | 28-dashboard-card-view | — | — | — | 6 | `src/db` |
