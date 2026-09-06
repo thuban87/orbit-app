@@ -169,6 +169,34 @@ describe("other bulk action composers", () => {
     ]);
   });
 
+  it("resolves one local snooze target for an entire bulk batch", async () => {
+    const ids = await Promise.all([seedContact("A"), seedContact("B")]);
+    const originalGetFirst = exec.getFirstAsync.bind(exec);
+    let resolverCalls = 0;
+    const resolvingExec: SqlExecutor = {
+      ...exec,
+      getFirstAsync: async <T>(sql: string, params?: unknown[]) => {
+        if (sql === "SELECT date('now','localtime', ?) AS until") {
+          resolverCalls += 1;
+          return { until: resolverCalls === 1 ? "2026-09-13" : "2026-09-14" } as T;
+        }
+        return originalGetFirst<T>(sql, params);
+      },
+    };
+
+    await bulkSnooze(resolvingExec, ids, "1w", NOW);
+
+    expect(resolverCalls).toBe(1);
+    expect(await exec.getAllAsync("SELECT snooze_until FROM contacts ORDER BY id")).toEqual([
+      { snooze_until: "2026-09-13" },
+      { snooze_until: "2026-09-13" },
+    ]);
+    expect(await exec.getAllAsync("SELECT type FROM events ORDER BY id")).toEqual([
+      { type: "snooze" },
+      { type: "snooze" },
+    ]);
+  });
+
   it("updates only category and validates positive integer frequencies", async () => {
     const contactId = await seedContact("Unchanged");
     await exec.runAsync("UPDATE contacts SET social_battery = ? WHERE id = ?", ["high", contactId]);
