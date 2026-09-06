@@ -75,4 +75,26 @@ describe("calendar day helpers", () => {
     expect(() => isSnoozed("not a date", now)).not.toThrow();
     expect(isSnoozed("not a date", now)).toBe(false);
   });
+
+  it.each([
+    "2026-00-15",
+    "2026-13-15",
+    "2026-02-29",
+    "2026-08-15 99:00:00",
+    "2026-08-15 12:60:00",
+    "2026-08-15 12:00:60",
+  ])("rejects numeric-invalid local timestamp %s", (stored) => {
+    expect(() => parseLocalMs(stored)).toThrow("dates: unparseable timestamp");
+  });
+
+  it("accepts a real leap day while failing closed for invalid numeric snoozes", () => {
+    expect(() => parseLocalMs("2028-02-29 12:00:00")).not.toThrow();
+
+    const now = "2026-08-15 12:00:00";
+    expect(isSnoozed("2026-08-16", now)).toBe(true);
+    expect(isSnoozed("2026-08-15 99:00:00", now)).toBe(false);
+    expect(isSnoozed("2026-13-01", now)).toBe(false);
+    expect(isSnoozed("2026-08-16 12:60:00", now)).toBe(false);
+    expect(isSnoozed("2026-08-16 12:00:60", now)).toBe(false);
+  });
 });
