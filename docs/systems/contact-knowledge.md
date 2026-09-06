@@ -1,7 +1,7 @@
 # Contact Knowledge
 
 **Last updated:** 2026-09-02
-**Updated by phase:** 27-dashboard-list-view
+**Updated by phase:** 28-dashboard-card-view
 **Owners:** `src/db/memory-registry.ts`, `src/db/memories-dao.ts`, `src/db/memories-read.ts`, `src/db/relationships-dao.ts`, `src/db/relationships-read.ts`, `src/db/current-state-history-dao.ts`, `src/db/current-state-history-read.ts`, `src/db/first-class-knowledge-read.ts`, `src/db/knowledge-search-read.ts`, `src/db/dashboard-knowledge-read.ts`, `src/services/knowledge-search.ts`, `src/services/memory-trash-sweep.ts`
 
 ## Purpose
@@ -53,7 +53,7 @@ Migration 016 adds three tables without moving conversational fuel or changing c
 | State-history writer | `src/db/current-state-history-dao.ts` | Atomically sets, promotes, and edits retained current-state values. |
 | State-history reader | `src/db/current-state-history-read.ts` | Reads the current value, full backlist, and batched recognized fields. |
 | First-class reader | `src/db/first-class-knowledge-read.ts` | Projects core contact fields plus local gravity/intensity display values. |
-| Dashboard candidate reader | `src/db/dashboard-knowledge-read.ts` | Batches bounded, visibility-safe candidates for a loaded List result set. |
+| Dashboard candidate reader | `src/db/dashboard-knowledge-read.ts` | Batches bounded, visibility-safe candidates for loaded List and Card result sets. |
 | Maintenance service | `src/services/memory-trash-sweep.ts` | Expires stale Memory and relationship trash at foreground launch. |
 | Screen owner | `src/screens/ThingsToRememberScreen.tsx` | Composes local reads, owns persistence calls, and reloads after a mutation. |
 
@@ -66,7 +66,7 @@ Migration 016 adds three tables without moving conversational fuel or changing c
 | `src/db/memories-dao.ts` | Transactional Memory lifecycle boundary. |
 | `src/db/memories-read.ts` | Memory read and visibility choke point. |
 | `src/db/knowledge-search-read.ts` | Produces the local, metadata-free knowledge-search corpus. |
-| `src/db/dashboard-knowledge-read.ts` | Batches visible candidates for deterministic Dashboard List context. |
+| `src/db/dashboard-knowledge-read.ts` | Batches visible candidates for deterministic Dashboard List and Card context. |
 | `src/services/knowledge-search.ts` | Performs bounded matching and preserves raw-text offsets for descriptors. |
 | `src/db/relationships-dao.ts` | Structured relationship writer and stale-expiry core. |
 | `src/db/relationships-read.ts` | Relationship projection with optional linked name. |
@@ -100,7 +100,7 @@ Migration 016 adds three tables without moving conversational fuel or changing c
 2. `setMemoryAllowAi()` scopes a toggle by Memory and contact identity, while `listAiEligibleMemories()` enforces `allow_ai = 1 AND deleted_at IS NULL` in SQL.
 3. The knowledge-search read accepts only eligible Dashboard IDs and exposes names, phone/email, category, searchable Memory content, relationship content, and eligible custom-field values. Its pure TypeScript scorer supplies bounded typo tolerance and raw-text offsets; identifiers, provenance, timestamps, and other internal metadata never enter searchable text.
 
-### Supplying Dashboard List context
+### Supplying Dashboard renderer context
 
 1. After Dashboard has determined its eligible result IDs, it calls `readLine3Candidates()` once for the loaded set rather than issuing a read from each List row.
 2. The reader applies registry-owned visibility semantics, live lifecycle conditions, and per-contact bounds before returning candidates. Its headroom prevents a future hidden-by-default type from starving visible content.
@@ -143,6 +143,7 @@ Migration 016 adds three tables without moving conversational fuel or changing c
 - **ADR-094:** Eligibility-Scoped Semantic Dashboard Search — preserves typed provenance in an eligible-ID-scoped Dashboard corpus.
 - **ADR-098:** Scan-First, Accessible Dashboard List Rows — uses bounded visible knowledge for deterministic List context without adding a row-local read path.
 - **ADR-100:** Relevance-First, Visibility-Safe Dashboard List Search — preserves only safe knowledge in List search explanations and snippets.
+- **ADR-101:** Avatar-First Accessible Dashboard Card Renderer — reuses the same bounded candidates and semantic search descriptors for compact Card context.
 
 ## Gotchas
 
@@ -155,6 +156,7 @@ Migration 016 adds three tables without moving conversational fuel or changing c
 7. **Relationships are Undo-only after removal.** Recently Deleted is a Memory recovery surface, not a general relationship trash browser.
 8. **Search scope is supplied by Dashboard.** The corpus must never broaden that eligible-ID set or add an unscoped global reader.
 9. **Dashboard List context is also visibility-scoped.** Do not select hidden, deleted, outdated, or quarantined data merely because it would fill a sparse row.
+10. **Card compactness is presentation, not a new relevance tier.** Card View may choose a concise candidate only within the same imminent, pinned, and other priority tier ordering.
 
 ## Related Systems
 
@@ -166,7 +168,7 @@ Migration 016 adds three tables without moving conversational fuel or changing c
 - **Conversational fuel** — legacy share and AI-proposal rows migrate into Memories through the verified phase-24.2 data move.
 - **AI suggestions** — consumes only the explicit, SQL-gated Memory projection.
 - **Contact import** — supplies imported Notes as AI-off typed Memories.
-- **Dashboard** — consumes bounded visible candidates for List context and the visible corpus for semantic search.
+- **Dashboard** — consumes bounded visible candidates for List and Card context and the visible corpus for semantic search.
 
 ## Changelog
 
@@ -176,3 +178,4 @@ Migration 016 adds three tables without moving conversational fuel or changing c
 | 2026-09-03 | 24.2 | Added explicit default-off Memory egress permission, local knowledge-search corpus, and imported Notes type. |
 | 2026-09-02 | 25 | Added eligible-ID-scoped semantic search provenance, matching, and highlight offsets for Dashboard consumption. |
 | 2026-09-02 | 27 | Added bounded visibility-safe candidates for deterministic List context and tightened List search presentation boundaries. |
+| 2026-09-02 | 28 | Reused bounded candidates and shared descriptors for compact Card View context and search presentation. |
