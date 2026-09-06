@@ -1,8 +1,8 @@
 # Orrery
 
-**Last updated:** 2026-08-27
-**Updated by phase:** 18.2-bound-unbound-lifecycle
-**Owners:** `src/db/orrery-read.ts`, `src/db/ring-seq-dao.ts`, `src/db/sun-picker-read.ts`, `src/logic/orrery-geometry-logic.ts`, `src/logic/orrery-ring-logic.ts`, `src/logic/sun-occupant-logic.ts`, `src/screens/OrreryScreen.tsx`
+**Last updated:** 2026-09-02
+**Updated by phase:** 23-theme-visual-system
+**Owners:** `src/db/orrery-read.ts`, `src/db/ring-seq-dao.ts`, `src/db/sun-picker-read.ts`, `src/logic/orrery-geometry-logic.ts`, `src/logic/orrery-ring-logic.ts`, `src/logic/sun-occupant-logic.ts`, `src/screens/OrreryScreen.tsx`, `src/components/orrery/OrreryCanvas.tsx`, `src/components/orrery/SunBody.tsx`
 
 ## Purpose
 
@@ -55,6 +55,8 @@ The orrery owns no per-contact table or stored status. It reads contact recency 
 | `src/components/orrery/OrreryCanvas.tsx` | Owns the sole ambient Skia clock inside the unmountable canvas subtree. |
 | `src/components/orrery/OrbitBody.tsx` | Renders one keyed planet, photo/fallback, and per-body morph worklets. |
 | `src/components/orrery/SunBody.tsx` | Renders the central occupant and consumes the shared pulse clock. |
+| `src/theme/use-reduced-motion.ts` | Supplies the live OS accessibility signal as a Skia-readable shared value. |
+| `src/theme/tokens/motion.ts` | Defines the ambient-motion speed used by the visual layer. |
 | `src/components/SegmentedControl.tsx` | Controlled Status / Relationship selector. |
 | `assets/Inter-SemiBold.ttf` | Bundled Paragraph-API font for Skia initials fallback. |
 
@@ -94,6 +96,7 @@ The orrery owns no per-contact table or stored status. It reads contact recency 
 1. `OrreryScreen` leaves screen chrome mounted but mounts `OrreryCanvas` only after dimensions are valid and the route is focused and foregrounded.
 2. `OrreryCanvas` is the only `useClock()` owner and supplies that clock to `SunBody` through context.
 3. Blurring or backgrounding unmounts the complete canvas subtree, which stops the ambient clock rather than merely hiding its derived values.
+4. While mounted, both canvas twinkle/drift and the sun glow pulse read the live reduced-motion shared value inside their derived worklets. A reduced-motion change holds those decorative values constant without using React state per frame.
 
 ## Configuration
 
@@ -104,6 +107,7 @@ The orrery owns no per-contact table or stored status. It reads contact recency 
 | `SUN_RADIUS` | `30` px | `src/logic/orrery-geometry-logic.ts` | Central sun disc radius. |
 | `PLANET_RADIUS` | `16` px | `src/logic/orrery-geometry-logic.ts` | Rendered planet radius. |
 | `starPalette` | 6 ordered tokens | `src/theme/theme-presets.ts` | Validated self-sun choices; index 0 is the default. |
+| `MOTION.ambient` | Tunable per-second rate | `src/theme/tokens/motion.ts` | Shared decorative ambient-motion speed. |
 
 ## Decisions
 
@@ -118,6 +122,7 @@ The orrery owns no per-contact table or stored status. It reads contact recency 
 - **ADR-048:** Status-Default Static Orrery with a Single-Canvas Morph — defines the two-view, static-body, ambient-layer interaction model.
 - **ADR-062:** Bound/Unbound Lifecycle and One-Way Cadence Assignment — makes the active orbit, picker, and ring guards Bound-only.
 - **ADR-082:** Universal Capture FAB, Canonical Picker, and Truthful Quick Log — publishes a post-commit refresh signal that causes this local read to rerun.
+- **ADR-085:** Live Reduced-Motion Signal for Skia Ambient Animation — gates every ambient-clock consumer with the live OS preference.
 
 ## Gotchas
 
@@ -130,6 +135,7 @@ The orrery owns no per-contact table or stored status. It reads contact recency 
 7. **Fast Refresh can invalidate an Expo SQLite statement in debug.** A clean relaunch restores the local connection; the phase's device UAT treated this as a development artifact, not an orrery query failure.
 8. **Keep a saved Unbound sun reference.** The self rendering is a presentation fallback, not a settings mutation; every ring guard must use the same Bound predicate as the render read.
 9. **Shell freshness must re-query data, not drive animation.** `useShellRefresh` refreshes the SQLite projection; Skia's ambient loop remains outside React state.
+10. **Gate every ambient-clock consumer.** Stopping only canvas twinkle leaves the independently derived sun pulse running under reduced motion.
 
 ## Related Systems
 
@@ -147,3 +153,4 @@ The orrery owns no per-contact table or stored status. It reads contact recency 
 | 2026-08-17 | 13 | Created the local two-view Skia orrery, app-level sun settings, guarded ring reordering, and dashboard entry point. |
 | 2026-08-27 | 18.2 | Made orbit/picker/reorder populations Bound-only and preserved saved Unbound sun references as self fallbacks. |
 | 2026-09-02 | 22 | Added post-Quick-Log local projection refresh without altering the Skia animation boundary. |
+| 2026-09-02 | 23 | Added live reduced-motion gating for canvas twinkle/drift and the sun glow pulse. |
