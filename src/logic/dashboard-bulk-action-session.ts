@@ -4,8 +4,19 @@
  */
 export interface BulkActionGate {
   readonly pending: boolean;
-  tryAcquire: () => boolean;
-  release: () => void;
+  tryAcquire: () => BulkActionClaim | null;
+  /** Marks a claimed dialog or picker choice as having started its one writer. */
+  consume: (claim: BulkActionClaim) => boolean;
+  /** Releases only the gate's current owner; stale completions are inert. */
+  release: (claim: BulkActionClaim) => void;
+}
+
+/**
+ * Opaque ownership token for one bulk operation. A claim may launch exactly one
+ * writer, but can be released without consumption when its dialog is dismissed.
+ */
+export interface BulkActionClaim {
+  readonly id: number;
 }
 
 /** The narrow selection snapshot needed after HomeScreen crosses an async boundary. */
@@ -27,21 +38,28 @@ export function getCurrentSelectionIds(
 export function createBulkActionGate(
   onPendingChange?: (pending: boolean) => void,
 ): BulkActionGate {
-  let pending = false;
+  let nextId = 0;
+  let current: { claim: BulkActionClaim; consumed: boolean } | null = null;
 
   return {
     get pending() {
-      return pending;
+      return current !== null;
     },
     tryAcquire: () => {
-      if (pending) return false;
-      pending = true;
+      if (current) return null;
+      const claim = { id: ++nextId };
+      current = { claim, consumed: false };
       onPendingChange?.(true);
+      return claim;
+    },
+    consume: (claim) => {
+      if (!current || current.claim !== claim || current.consumed) return false;
+      current.consumed = true;
       return true;
     },
-    release: () => {
-      if (!pending) return;
-      pending = false;
+    release: (claim) => {
+      if (!current || current.claim !== claim) return;
+      current = null;
       onPendingChange?.(false);
     },
   };

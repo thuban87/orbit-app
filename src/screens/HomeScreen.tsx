@@ -116,6 +116,7 @@ import type { DashboardViewMode } from "@/logic/dashboard-query-logic";
 import {
   createBulkActionGate,
   getCurrentSelectionIds,
+  type BulkActionClaim,
 } from "@/logic/dashboard-bulk-action-session";
 import {
   applyCommittedMembership,
@@ -171,10 +172,11 @@ const CARD_SNOOZE_PRESETS: { preset: SnoozePreset; label: string }[] = [
 ];
 
 type DashboardContactActionTarget = "LogContact" | "Edit";
-type BulkConfirmAction =
+type BulkConfirmAction = { claim: BulkActionClaim } & (
   | { kind: "quick-log"; ids: number[] }
   | { kind: "archive"; ids: number[] }
-  | { kind: "frequency"; ids: number[]; intervalDays: number };
+  | { kind: "frequency"; ids: number[]; intervalDays: number }
+);
 
 /** Dashboard detail routes must dispatch through the root tab navigator. */
 function navigateDashboardContactAction(
@@ -446,15 +448,23 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
   if (!bulkActionGateRef.current) {
     bulkActionGateRef.current = createBulkActionGate(setBulkActionPending);
   }
+  // Holds a claim while it is awaiting a dialog or picker choice. Once a
+  // choice consumes it, the writer owns that claim until its settled path.
+  const bulkActionInputClaimRef = useRef<BulkActionClaim | null>(null);
   const [bulkConfirm, setBulkConfirm] = useState<BulkConfirmAction | null>(null);
-  const [snoozePickerIds, setSnoozePickerIds] = useState<number[] | null>(null);
+  const [snoozePicker, setSnoozePicker] = useState<{
+    claim: BulkActionClaim;
+    ids: number[];
+  } | null>(null);
   const [categoryPicker, setCategoryPicker] = useState<{
+    claim: BulkActionClaim;
     sessionId: number;
     categories: { id: number; name: string }[];
   } | null>(null);
-  const [frequencyPickerIds, setFrequencyPickerIds] = useState<number[] | null>(
-    null,
-  );
+  const [frequencyPicker, setFrequencyPicker] = useState<{
+    claim: BulkActionClaim;
+    ids: number[];
+  } | null>(null);
   const [frequencyDraft, setFrequencyDraft] = useState("");
 
   useEffect(() => {
@@ -834,13 +844,28 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
     [],
   );
 
-  const tryAcquireBulkAction = useCallback(
-    () => bulkActionGateRef.current?.tryAcquire() === true,
-    [],
-  );
-  const releaseBulkAction = useCallback(() => {
-    bulkActionGateRef.current?.release();
+  const tryAcquireBulkAction = useCallback(() => {
+    const claim = bulkActionGateRef.current?.tryAcquire() ?? null;
+    if (claim) bulkActionInputClaimRef.current = claim;
+    return claim;
   }, []);
+  const consumeBulkAction = useCallback((claim: BulkActionClaim) => {
+    const consumed = bulkActionGateRef.current?.consume(claim) === true;
+    if (consumed && bulkActionInputClaimRef.current === claim) {
+      bulkActionInputClaimRef.current = null;
+    }
+    return consumed;
+  }, []);
+  const releaseBulkAction = useCallback((claim: BulkActionClaim) => {
+    if (bulkActionInputClaimRef.current === claim) {
+      bulkActionInputClaimRef.current = null;
+    }
+    bulkActionGateRef.current?.release(claim);
+  }, []);
+  const releaseBulkInputClaim = useCallback(() => {
+    const claim = bulkActionInputClaimRef.current;
+    if (claim) releaseBulkAction(claim);
+  }, [releaseBulkAction]);
 
   const commitBulkOutcome = useCallback(
     (label: string) => {
@@ -864,8 +889,9 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
   );
 
   const performBulkQuickLog = useCallback(
-    (ids: number[], alreadyClaimed = false) => {
-      if (!alreadyClaimed && !tryAcquireBulkAction()) return;
+    (ids: number[], claimed?: BulkActionClaim) => {
+      const claim = claimed ?? tryAcquireBulkAction();
+      if (!claim || (!claimed && !consumeBulkAction(claim))) return;
       void bulkQuickLog(getExecutor(), ids, localDateTime())
         .then((receipt) => {
           const label = `Logged ${ids.length} interactions`;
@@ -892,15 +918,16 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
           reload();
         })
         .catch((writeError: unknown) => {
-          releaseBulkAction();
+          releaseBulkAction(claim);
           reportBulkFailure("log interactions", writeError, () => {
             performBulkQuickLog(ids);
           });
         })
-        .finally(releaseBulkAction);
+        .finally(() => releaseBulkAction(claim));
     },
     [
       commitBulkOutcome,
+      consumeBulkAction,
       reload,
       releaseBulkAction,
       reportBulkFailure,
@@ -909,8 +936,9 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
   );
 
   const performBulkArchive = useCallback(
-    (ids: number[], alreadyClaimed = false) => {
-      if (!alreadyClaimed && !tryAcquireBulkAction()) return;
+    (ids: number[], claimed?: BulkActionClaim) => {
+      const claim = claimed ?? tryAcquireBulkAction();
+      if (!claim || (!claimed && !consumeBulkAction(claim))) return;
       void bulkArchive(getExecutor(), ids, localDateTime())
         .then(() => {
           // Archive is reversible, but it must disappear from this frozen universe.
@@ -918,15 +946,16 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
           commitBulkOutcome(`Archived ${ids.length} contacts`);
         })
         .catch((writeError: unknown) => {
-          releaseBulkAction();
+          releaseBulkAction(claim);
           reportBulkFailure("archive contacts", writeError, () => {
             performBulkArchive(ids);
           });
         })
-        .finally(releaseBulkAction);
+        .finally(() => releaseBulkAction(claim));
     },
     [
       commitBulkOutcome,
+      consumeBulkAction,
       releaseBulkAction,
       removeFromUniverse,
       reportBulkFailure,
@@ -935,8 +964,9 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
   );
 
   const performBulkFrequency = useCallback(
-    (ids: number[], intervalDays: number, alreadyClaimed = false) => {
-      if (!alreadyClaimed && !tryAcquireBulkAction()) return;
+    (ids: number[], intervalDays: number, claimed?: BulkActionClaim) => {
+      const claim = claimed ?? tryAcquireBulkAction();
+      if (!claim || (!claimed && !consumeBulkAction(claim))) return;
       void bulkSetFrequency(getExecutor(), ids, intervalDays, localDateTime())
         .then(() => {
           commitBulkOutcome(
@@ -944,15 +974,16 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
           );
         })
         .catch((writeError: unknown) => {
-          releaseBulkAction();
+          releaseBulkAction(claim);
           reportBulkFailure("change contact frequency", writeError, () => {
             performBulkFrequency(ids, intervalDays);
           });
         })
-        .finally(releaseBulkAction);
+        .finally(() => releaseBulkAction(claim));
     },
     [
       commitBulkOutcome,
+      consumeBulkAction,
       releaseBulkAction,
       reportBulkFailure,
       tryAcquireBulkAction,
@@ -960,85 +991,115 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
   );
 
   const onBulkQuickLog = useCallback(() => {
-    if (!tryAcquireBulkAction()) return;
+    const claim = tryAcquireBulkAction();
+    if (!claim) return;
     const ids = [...selectedIds];
     if (ids.length === 0) {
-      releaseBulkAction();
+      releaseBulkAction(claim);
       return;
     }
     if (ids.length > BULK_QUICK_LOG_CONFIRM_THRESHOLD) {
-      setBulkConfirm({ kind: "quick-log", ids });
+      setBulkConfirm({ kind: "quick-log", ids, claim });
       return;
     }
-    performBulkQuickLog(ids, true);
-  }, [performBulkQuickLog, releaseBulkAction, selectedIds, tryAcquireBulkAction]);
+    if (!consumeBulkAction(claim)) return;
+    performBulkQuickLog(ids, claim);
+  }, [
+    consumeBulkAction,
+    performBulkQuickLog,
+    releaseBulkAction,
+    selectedIds,
+    tryAcquireBulkAction,
+  ]);
 
   const onBulkLogInteraction = useCallback(() => {
-    if (!tryAcquireBulkAction()) return;
+    const claim = tryAcquireBulkAction();
+    if (!claim) return;
     const ids = [...selectedIds];
     if (ids.length === 1) {
       navigateDashboardContactAction(ids[0], "LogContact");
     } else if (ids.length >= 2) {
       navigation.navigate("GroupLog", { participantIds: ids });
     }
-    releaseBulkAction();
+    releaseBulkAction(claim);
   }, [navigation, releaseBulkAction, selectedIds, tryAcquireBulkAction]);
 
   const onBulkAddFavourites = useCallback(() => {
-    if (!tryAcquireBulkAction()) return;
+    const claim = tryAcquireBulkAction();
+    if (!claim) return;
     const ids = [...selectedIds];
     if (ids.length === 0) {
-      releaseBulkAction();
+      releaseBulkAction(claim);
       return;
     }
+    if (!consumeBulkAction(claim)) return;
     void bulkAddFavourites(getExecutor(), ids, localDateTime())
       .then(() => commitBulkOutcome(`Added ${ids.length} contacts to Favorites`))
       .catch((writeError: unknown) => {
-        releaseBulkAction();
+        releaseBulkAction(claim);
         reportBulkFailure("add contacts to Favorites", writeError, onBulkAddFavourites);
       })
-      .finally(releaseBulkAction);
-  }, [commitBulkOutcome, releaseBulkAction, reportBulkFailure, selectedIds, tryAcquireBulkAction]);
+      .finally(() => releaseBulkAction(claim));
+  }, [
+    commitBulkOutcome,
+    consumeBulkAction,
+    releaseBulkAction,
+    reportBulkFailure,
+    selectedIds,
+    tryAcquireBulkAction,
+  ]);
 
   const onBulkRemoveFavourites = useCallback(() => {
-    if (!tryAcquireBulkAction()) return;
+    const claim = tryAcquireBulkAction();
+    if (!claim) return;
     const ids = [...selectedIds];
     if (ids.length === 0) {
-      releaseBulkAction();
+      releaseBulkAction(claim);
       return;
     }
+    if (!consumeBulkAction(claim)) return;
     void bulkRemoveFavourites(getExecutor(), ids, localDateTime())
       .then(() =>
         commitBulkOutcome(`Removed ${ids.length} contacts from Favorites`),
       )
       .catch((writeError: unknown) => {
-        releaseBulkAction();
+        releaseBulkAction(claim);
         reportBulkFailure(
           "remove contacts from Favorites",
           writeError,
           onBulkRemoveFavourites,
         );
       })
-      .finally(releaseBulkAction);
-  }, [commitBulkOutcome, releaseBulkAction, reportBulkFailure, selectedIds, tryAcquireBulkAction]);
+      .finally(() => releaseBulkAction(claim));
+  }, [
+    commitBulkOutcome,
+    consumeBulkAction,
+    releaseBulkAction,
+    reportBulkFailure,
+    selectedIds,
+    tryAcquireBulkAction,
+  ]);
 
   const onBulkOpenSnoozePicker = useCallback(() => {
-    if (!tryAcquireBulkAction()) return;
+    const claim = tryAcquireBulkAction();
+    if (!claim) return;
     const ids = [...selectedIds];
     if (ids.length === 0) {
-      releaseBulkAction();
+      releaseBulkAction(claim);
       return;
     }
-    setSnoozePickerIds(ids);
+    setSnoozePicker({ claim, ids });
   }, [releaseBulkAction, selectedIds, tryAcquireBulkAction]);
 
   const onBulkUnsnooze = useCallback(() => {
-    if (!tryAcquireBulkAction()) return;
+    const claim = tryAcquireBulkAction();
+    if (!claim) return;
     const ids = [...selectedIds];
     if (ids.length === 0) {
-      releaseBulkAction();
+      releaseBulkAction(claim);
       return;
     }
+    if (!consumeBulkAction(claim)) return;
     void bulkUnsnooze(getExecutor(), ids, localDateTime())
       .then(async () => {
         commitBulkOutcome(`Unsnoozed ${ids.length} contacts`);
@@ -1047,18 +1108,26 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
         );
       })
       .catch((writeError: unknown) => {
-        releaseBulkAction();
+        releaseBulkAction(claim);
         reportBulkFailure("unsnooze contacts", writeError, onBulkUnsnooze);
       })
-      .finally(releaseBulkAction);
-  }, [commitBulkOutcome, releaseBulkAction, reportBulkFailure, selectedIds, tryAcquireBulkAction]);
+      .finally(() => releaseBulkAction(claim));
+  }, [
+    commitBulkOutcome,
+    consumeBulkAction,
+    releaseBulkAction,
+    reportBulkFailure,
+    selectedIds,
+    tryAcquireBulkAction,
+  ]);
 
   const onBulkOpenCategoryPicker = useCallback(() => {
-    if (!tryAcquireBulkAction()) return;
+    const claim = tryAcquireBulkAction();
+    if (!claim) return;
     const selection = useDashboardSelectionStore.getState();
     const sessionId = selection.sessionId;
     if (!getCurrentSelectionIds(selection, sessionId)?.length) {
-      releaseBulkAction();
+      releaseBulkAction(claim);
       return;
     }
     void listCategories(getExecutor())
@@ -1068,64 +1137,73 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
           sessionId,
         );
         if (!currentIds?.length) {
-          releaseBulkAction();
+          releaseBulkAction(claim);
           return;
         }
-        setCategoryPicker({ sessionId, categories });
+        setCategoryPicker({ claim, sessionId, categories });
       })
       .catch((readError: unknown) => {
-        releaseBulkAction();
+        releaseBulkAction(claim);
         reportBulkFailure("load categories", readError, onBulkOpenCategoryPicker);
       });
   }, [releaseBulkAction, reportBulkFailure, tryAcquireBulkAction]);
 
   const onBulkArchive = useCallback(() => {
-    if (!tryAcquireBulkAction()) return;
+    const claim = tryAcquireBulkAction();
+    if (!claim) return;
     const ids = [...selectedIds];
     if (ids.length === 0) {
-      releaseBulkAction();
+      releaseBulkAction(claim);
       return;
     }
-    setBulkConfirm({ kind: "archive", ids });
+    setBulkConfirm({ kind: "archive", ids, claim });
   }, [releaseBulkAction, selectedIds, tryAcquireBulkAction]);
 
   const onBulkOpenFrequencyPicker = useCallback(() => {
-    if (!tryAcquireBulkAction()) return;
+    const claim = tryAcquireBulkAction();
+    if (!claim) return;
     const ids = [...selectedIds];
     if (ids.length === 0) {
-      releaseBulkAction();
+      releaseBulkAction(claim);
       return;
     }
     setFrequencyDraft("");
-    setFrequencyPickerIds(ids);
+    setFrequencyPicker({ claim, ids });
   }, [releaseBulkAction, selectedIds, tryAcquireBulkAction]);
 
   const onBulkConfirm = useCallback(() => {
     const confirm = bulkConfirm;
-    if (!confirm) return;
+    if (!confirm || !consumeBulkAction(confirm.claim)) return;
     setBulkConfirm(null);
     if (confirm.kind === "quick-log") {
-      performBulkQuickLog(confirm.ids, true);
+      performBulkQuickLog(confirm.ids, confirm.claim);
     } else if (confirm.kind === "archive") {
-      performBulkArchive(confirm.ids, true);
+      performBulkArchive(confirm.ids, confirm.claim);
     } else {
-      performBulkFrequency(confirm.ids, confirm.intervalDays, true);
+      performBulkFrequency(confirm.ids, confirm.intervalDays, confirm.claim);
     }
-  }, [bulkConfirm, performBulkArchive, performBulkFrequency, performBulkQuickLog]);
+  }, [
+    bulkConfirm,
+    consumeBulkAction,
+    performBulkArchive,
+    performBulkFrequency,
+    performBulkQuickLog,
+  ]);
 
   const dismissBulkConfirm = useCallback(() => {
     setBulkConfirm(null);
-    releaseBulkAction();
-  }, [releaseBulkAction]);
+    releaseBulkInputClaim();
+  }, [releaseBulkInputClaim]);
 
   const exitBulkSelection = useCallback(() => {
     setBulkConfirm(null);
-    setSnoozePickerIds(null);
+    setSnoozePicker(null);
     setCategoryPicker(null);
-    setFrequencyPickerIds(null);
-    releaseBulkAction();
+    setFrequencyPicker(null);
+    // Done must not release a writer that has already consumed its claim.
+    releaseBulkInputClaim();
     exitSelection();
-  }, [exitSelection, releaseBulkAction]);
+  }, [exitSelection, releaseBulkInputClaim]);
 
   const goToProfile = useCallback(
     (contactId: number) => navigation.navigate("Profile", { contactId }),
@@ -1823,10 +1901,10 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
         onRequestClose={() => setContextMenuContactId(null)}
       />
       <Sheet
-        visible={snoozePickerIds !== null}
+        visible={snoozePicker !== null}
         onRequestClose={() => {
-          setSnoozePickerIds(null);
-          releaseBulkAction();
+          setSnoozePicker(null);
+          releaseBulkInputClaim();
         }}
         variant="compact"
       >
@@ -1838,11 +1916,12 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
             key={preset}
             testID={`bulk-snooze-preset-${preset}`}
             accessibilityRole="button"
-            accessibilityLabel={`Snooze ${snoozePickerIds?.length ?? 0} contacts for ${label}`}
+            accessibilityLabel={`Snooze ${snoozePicker?.ids.length ?? 0} contacts for ${label}`}
             onPress={() => {
-              const ids = snoozePickerIds;
-              if (!ids) return;
-              setSnoozePickerIds(null);
+              const picker = snoozePicker;
+              if (!picker || !consumeBulkAction(picker.claim)) return;
+              const ids = picker.ids;
+              setSnoozePicker(null);
               void bulkSnooze(getExecutor(), ids, preset, localDateTime())
                 .then(async () => {
                   commitBulkOutcome(`Snoozed ${ids.length} contacts`);
@@ -1855,10 +1934,10 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
                   );
                 })
                 .catch((writeError: unknown) => {
-                  releaseBulkAction();
+                  releaseBulkAction(picker.claim);
                   reportBulkFailure("snooze contacts", writeError, onBulkOpenSnoozePicker);
                 })
-                .finally(releaseBulkAction);
+                .finally(() => releaseBulkAction(picker.claim));
             }}
             style={[styles.bulkPickerRow, { borderColor: colors.border }]}
           >
@@ -1873,7 +1952,7 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
         visible={categoryPicker !== null}
         onRequestClose={() => {
           setCategoryPicker(null);
-          releaseBulkAction();
+          releaseBulkInputClaim();
         }}
         variant="detail"
       >
@@ -1888,14 +1967,14 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
             accessibilityLabel={`Set category to ${category.name} for ${selectionCount} contacts`}
             onPress={() => {
               const picker = categoryPicker;
-              if (!picker) return;
+              if (!picker || !consumeBulkAction(picker.claim)) return;
               setCategoryPicker(null);
               const ids = getCurrentSelectionIds(
                 useDashboardSelectionStore.getState(),
                 picker.sessionId,
               );
               if (!ids?.length) {
-                releaseBulkAction();
+                releaseBulkAction(picker.claim);
                 return;
               }
               void bulkSetCategory(
@@ -1910,14 +1989,14 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
                   ),
                 )
                 .catch((writeError: unknown) => {
-                  releaseBulkAction();
+                  releaseBulkAction(picker.claim);
                   reportBulkFailure(
                     "set contact category",
                     writeError,
                     onBulkOpenCategoryPicker,
                   );
                 })
-                .finally(releaseBulkAction);
+                .finally(() => releaseBulkAction(picker.claim));
             }}
             style={[styles.bulkPickerRow, { borderColor: colors.border }]}
           >
@@ -1929,10 +2008,10 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
         ))}
       </Sheet>
       <Sheet
-        visible={frequencyPickerIds !== null}
+        visible={frequencyPicker !== null}
         onRequestClose={() => {
-          setFrequencyPickerIds(null);
-          releaseBulkAction();
+          setFrequencyPicker(null);
+          releaseBulkInputClaim();
         }}
         variant="compact"
       >
@@ -1962,8 +2041,8 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
           accessibilityLabel="Confirm frequency"
           onPress={() => {
             const intervalDays = Number(frequencyDraft);
-            const ids = frequencyPickerIds;
-            if (!ids || !Number.isInteger(intervalDays) || intervalDays <= 0) {
+            const picker = frequencyPicker;
+            if (!picker || !Number.isInteger(intervalDays) || intervalDays <= 0) {
               AccessibilityInfo.announceForAccessibility(
                 "Frequency must be a positive whole number",
               );
@@ -1978,8 +2057,13 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
               });
               return;
             }
-            setFrequencyPickerIds(null);
-            setBulkConfirm({ kind: "frequency", ids, intervalDays });
+            setFrequencyPicker(null);
+            setBulkConfirm({
+              kind: "frequency",
+              ids: picker.ids,
+              intervalDays,
+              claim: picker.claim,
+            });
           }}
           style={[
             styles.bulkFrequencyContinue,

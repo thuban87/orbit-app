@@ -18,14 +18,16 @@ describe("createBulkActionGate", () => {
     const bulkQuickLog = vi.fn(() => write.promise);
     const snackbars: { undo: () => { batchId: "first-and-only" } }[] = [];
     const gate = createBulkActionGate();
+    const claim = gate.tryAcquire();
+    expect(claim).not.toBeNull();
 
     const startQuickLog = () => {
-      if (!gate.tryAcquire()) return;
+      if (!claim || !gate.consume(claim)) return;
       void bulkQuickLog()
         .then((receipt) => {
           snackbars.push({ undo: () => receipt });
         })
-        .finally(() => gate.release());
+        .finally(() => gate.release(claim));
     };
 
     startQuickLog();
@@ -39,6 +41,66 @@ describe("createBulkActionGate", () => {
 
     expect(snackbars[0].undo()).toEqual({ batchId: "first-and-only" });
     await vi.waitFor(() => expect(gate.pending).toBe(false));
+  });
+
+  it.each(["confirmation", "Snooze picker", "Category picker"])(
+    "consumes a pending claim only once from repeated %s callbacks",
+    async (control) => {
+      const write = deferred<void>();
+      const writer = vi.fn(() => write.promise);
+      const gate = createBulkActionGate();
+      const claim = gate.tryAcquire();
+      expect(claim).not.toBeNull();
+
+      const onChoice = () => {
+        if (!claim || !gate.consume(claim)) return;
+        void writer().finally(() => gate.release(claim));
+      };
+
+      onChoice();
+      onChoice();
+
+      expect(
+        writer,
+        `${control} should start one writer`,
+      ).toHaveBeenCalledOnce();
+      expect(gate.pending).toBe(true);
+
+      write.resolve();
+      await vi.waitFor(() => expect(gate.pending).toBe(false));
+    },
+  );
+
+  it("keeps a pending writer claimed across Done and ignores its stale release after re-entry", async () => {
+    const firstWrite = deferred<void>();
+    const gate = createBulkActionGate();
+    const first = gate.tryAcquire();
+    expect(first).not.toBeNull();
+    expect(first && gate.consume(first)).toBe(true);
+
+    void firstWrite.promise.finally(() => {
+      if (first) gate.release(first);
+    });
+
+    // Done closes selection UI only; its writer claim remains held.
+    const exitSelection = () => undefined;
+    exitSelection();
+    expect(gate.tryAcquire()).toBeNull();
+
+    firstWrite.resolve();
+    await vi.waitFor(() => expect(gate.pending).toBe(false));
+
+    const second = gate.tryAcquire();
+    expect(second).not.toBeNull();
+    expect(second && gate.consume(second)).toBe(true);
+
+    // A late duplicate completion from the first owner cannot unlock the second.
+    if (first) gate.release(first);
+    expect(gate.pending).toBe(true);
+    expect(gate.tryAcquire()).toBeNull();
+
+    if (second) gate.release(second);
+    expect(gate.pending).toBe(false);
   });
 });
 
