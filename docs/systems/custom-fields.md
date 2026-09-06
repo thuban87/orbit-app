@@ -26,6 +26,8 @@ Migration 006 stores current values as normalized rows. Field type determines in
   - `display_order` (`INTEGER`) — ordered position in forms and the editor.
   - `quarantined_at` (`TEXT`) — local timestamp for reversible deletion.
   - `share_with_ai` (`INTEGER`) — default-off definition-level consent flag for AI prompt context; it is not a value-row field.
+  - `scope` (`TEXT`) — global by default; contact-scoped creation remains unavailable until its owner/lifecycle UI ships.
+  - `history_retained` (`INTEGER`) and `field_group` (`TEXT nullable`) — opt a definition into prior-value retention and optional grouping.
 - `custom_field_values` — one current-state row for each contact-and-definition pair.
   - `id` (`INTEGER`) — local primary key.
   - `uid` (`TEXT`) — immutable globally unique value identity.
@@ -38,11 +40,13 @@ Migration 006 stores current values as normalized rows. Field type determines in
   - `old_value` (`TEXT`) — stored value before a drop or type change.
   - `operation` (`TEXT`) — operation and type transition where applicable.
   - `created_at` (`TEXT`) — local snapshot timestamp.
+- `custom_field_value_history` — append-only prior values for history-retained definitions.
+  - `uid` (`TEXT UNIQUE`), `contact_id`, `field_def_id`, `value` (`TEXT`), and `created_at` — durable history identity, parents, raw prior bytes, and local ordering.
 
 **Types** (`src/db/field-types.ts`):
 - `CustomFieldDef` — durable definition row consumed by data and UI layers.
 - `NewFieldDef` — complete create payload, including generated identity and timestamps.
-- `FieldType` — exhaustive seven-type union used by parsers and widgets.
+- `FieldType` — exhaustive ten-type union: the existing seven plus URL, Email, and Phone.
 
 ### Store, Service & DAO Layer
 
@@ -53,6 +57,7 @@ Migration 006 stores current values as normalized rows. Field type determines in
 | Definition DAO | `src/db/field-defs-dao.ts` | Lists, curates, renames, reorders, updates AI sharing, quarantines, and restores definitions. |
 | Lifecycle DAO | `src/db/field-ddl.ts` | Seeds, snapshots, and removes normalized value rows transactionally. |
 | Value DAO | `src/db/field-values-dao.ts` | Reads values and exposes public and transaction-composable UPSERT paths. |
+| Value-history DAO | `src/db/value-history-dao.ts` | Appends and reads prior values without changing the current pair. |
 | Type layer | `src/db/field-parsers.ts` | Validates values at read time and checks dropdown membership. |
 | Type-change layer | `src/db/field-type-change.ts` | Preflights and applies lossless type changes. |
 | Query helper | `src/db/field-sort.ts` | Produces the sole safe sort/filter expression for a custom field. |
@@ -71,7 +76,8 @@ Migration 006 stores current values as normalized rows. Field type determines in
 | `src/db/field-ddl.ts` | Atomic normalized-pair lifecycle and stale-quarantine recheck. |
 | `src/db/field-defs-dao.ts` | Definition reads and serialized metadata mutations. |
 | `src/db/field-values-dao.ts` | Defs-filtered normalized reads plus standalone and composable pair UPSERTs. |
-| `src/db/field-parsers.ts` | Seven permissive target parsers and option validation. |
+| `src/db/field-parsers.ts` | Ten target parsers and option validation; URL, email, and phone are permissive and byte-preserving. |
+| `src/db/value-history-dao.ts` | Prior-value append/read boundary for history-retained definitions. |
 | `src/db/field-sort.ts` | TEXT-aware numeric, toggle, date, and text ordering expression. |
 | `src/db/field-type-change.ts` | Read-only preflights plus history-backed type update. |
 | `src/services/field-sweep.ts` | Fixed-window quarantine expiry and history retention hook. |
@@ -88,7 +94,7 @@ Migration 006 stores current values as normalized rows. Field type determines in
 
 1. The user opens Custom Fields from Settings and creates or edits a definition.
 2. `FieldDefForm` derives a label slug from the full definition list, including quarantined definitions, then assigns the definition UID, display order, and local timestamps.
-3. `createField()` inserts the definition and seeds a blank pair row for every contact in one shared transaction.
+3. `createField()` accepts global definitions only and seeds a blank pair row for every contact in one shared transaction. Contact-scoped creation is deliberately deferred until durable ownership and owner-purge behavior arrive together.
 4. Rename changes only the visible label; curation, option, order, AI sharing, quarantine, and restore changes each serialize through the same write boundary.
 
 ### Choosing AI-sharing consent
@@ -103,7 +109,8 @@ Migration 006 stores current values as normalized rows. Field type determines in
 1. A contact surface loads active definitions and calls `getValuesForContact()` with them. Create renders `show_on_new` definitions after its fixed block; edit renders every non-quarantined definition.
 2. The value DAO joins literal normalized tables, binds runtime values, and returns a `col_name`-keyed map only for definitions supplied by the caller.
 3. `upsertValue()` writes by `(contact_id, field_def_id)`, retaining a pair row's `uid` and `created_at` on update. A clear writes `NULL` to the same row; a contact create/edit that owns the shared transaction calls `upsertValueCore()` instead.
-4. Pure selectors expose non-quarantined fields: create uses `show_on_new`, edit uses all fields, and profile uses a present value or `always_show`.
+4. `updateContactFull()` appends the prior raw value before changing a history-retained current pair. First sets and no-op writes append nothing; merge, purge, and permanent definition deletion explicitly preserve lifecycle evidence instead of relying on cascade.
+5. Pure selectors expose non-quarantined fields: create uses `show_on_new`, edit uses all fields, and profile uses a present value or `always_show`.
 
 ### Interpreting values and changing a type
 
@@ -149,6 +156,7 @@ Migration 006 stores current values as normalized rows. Field type determines in
 - **ADR-050:** Closed AI Prompt Egress Allowlist and Opt-In Field Sharing — limits third-party prompt context to explicitly shared live fields.
 - **ADR-056:** Tombstone-Backed UID Reconciliation for Portable Restores — treats normalized clears as portable data and rejects incompatible identities.
 - **ADR-057:** Full-State Versioned Backups with Verified Manual and Foreground SAF Snapshots — exports definitions and current normalized values, not history.
+- **ADR-090:** Additive Custom-Field Value History and Deferred Contact Scope — retains prior values separately while preserving current-pair integrity.
 
 ## Gotchas
 
@@ -164,6 +172,8 @@ Migration 006 stores current values as normalized rows. Field type determines in
 10. **A loss-bearing migration inconsistency fails closed.** The old database remains unchanged and navigation does not mount; an orphan legacy column is instead retained only as a bounded history snapshot.
 11. **`NULL` is a clear, not absence.** Export and reconciliation must retain its uid and timestamp, or an older populated value can return.
 12. **Quarantine is not deletion.** Only permanent removal creates tombstones; `field_history` remains excluded from portable restore.
+13. **Do not reuse `field_history` as value history.** It is a 30-day destructive-operation trace; `custom_field_value_history` is portable prior-value state.
+14. **Contact scope is not ready for UI creation.** Directly-present contact definitions are guarded on write, but Phase 31 owns durable ownership and owner-purge semantics.
 
 ## Related Systems
 
@@ -173,6 +183,7 @@ Migration 006 stores current values as normalized rows. Field type determines in
 - **Photos** — supplies the picker, crop, local-master, staged-file, and purge-cleanup contracts for photo-type values.
 - **App shell** — routes the definition editor through Settings.
 - **Backup & Restore** — validates and restores normalized definitions, values, and photo bytes through UID relationships.
+- **Contact Knowledge** — presents custom fields in Things to Remember and consumes only the eligible local search projection.
 
 ## Changelog
 
@@ -184,3 +195,4 @@ Migration 006 stores current values as normalized rows. Field type determines in
 | 2026-08-18 | 14 | Exposed default-off per-field AI sharing and routed it to the closed AI context boundary. |
 | 2026-08-24 | 16 | Replaced dynamic columns with normalized uid-bearing value pairs through migration 006. |
 | 2026-08-24 | 17 | Added permanent-delete tombstones and whole-file restore validation for normalized field data. |
+| 2026-09-03 | 24.2 | Added ten typed inputs, additive scope/history/group metadata, and portable retained-value history. |
