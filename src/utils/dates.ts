@@ -30,14 +30,45 @@ export function parseLocalMs(stored: string): number {
     throw new Error(`dates: unparseable timestamp "${stored}"`);
   }
   const [, year, month, day, hour, minute, second] = match;
-  return new Date(
-    Number(year),
-    Number(month) - 1,
-    Number(day),
-    Number(hour ?? 0),
-    Number(minute ?? 0),
-    Number(second ?? 0),
-  ).getTime();
+  const components = {
+    year: Number(year),
+    month: Number(month),
+    day: Number(day),
+    hour: Number(hour ?? 0),
+    minute: Number(minute ?? 0),
+    second: Number(second ?? 0),
+  };
+  if (
+    components.month < 1 ||
+    components.month > 12 ||
+    components.day < 1 ||
+    components.day > 31 ||
+    components.hour > 23 ||
+    components.minute > 59 ||
+    components.second > 59
+  ) {
+    throw new Error(`dates: unparseable timestamp "${stored}"`);
+  }
+
+  const local = new Date(
+    components.year,
+    components.month - 1,
+    components.day,
+    components.hour,
+    components.minute,
+    components.second,
+  );
+  if (
+    local.getFullYear() !== components.year ||
+    local.getMonth() !== components.month - 1 ||
+    local.getDate() !== components.day ||
+    local.getHours() !== components.hour ||
+    local.getMinutes() !== components.minute ||
+    local.getSeconds() !== components.second
+  ) {
+    throw new Error(`dates: unparseable timestamp "${stored}"`);
+  }
+  return local.getTime();
 }
 
 const MS_PER_DAY = 86_400_000;
