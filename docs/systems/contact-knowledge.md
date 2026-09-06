@@ -1,8 +1,8 @@
 # Contact Knowledge
 
-**Last updated:** 2026-09-03
-**Updated by phase:** 24.1-contact-knowledge-foundation
-**Owners:** `src/db/memory-registry.ts`, `src/db/memories-dao.ts`, `src/db/memories-read.ts`, `src/db/relationships-dao.ts`, `src/db/relationships-read.ts`, `src/db/current-state-history-dao.ts`, `src/db/current-state-history-read.ts`, `src/db/first-class-knowledge-read.ts`, `src/services/memory-trash-sweep.ts`
+**Last updated:** 2026-09-02
+**Updated by phase:** 25-dashboard-data-state-foundation
+**Owners:** `src/db/memory-registry.ts`, `src/db/memories-dao.ts`, `src/db/memories-read.ts`, `src/db/relationships-dao.ts`, `src/db/relationships-read.ts`, `src/db/current-state-history-dao.ts`, `src/db/current-state-history-read.ts`, `src/db/first-class-knowledge-read.ts`, `src/db/knowledge-search-read.ts`, `src/services/knowledge-search.ts`, `src/services/memory-trash-sweep.ts`
 
 ## Purpose
 
@@ -65,6 +65,7 @@ Migration 016 adds three tables without moving conversational fuel or changing c
 | `src/db/memories-dao.ts` | Transactional Memory lifecycle boundary. |
 | `src/db/memories-read.ts` | Memory read and visibility choke point. |
 | `src/db/knowledge-search-read.ts` | Produces the local, metadata-free knowledge-search corpus. |
+| `src/services/knowledge-search.ts` | Performs bounded matching and preserves raw-text offsets for descriptors. |
 | `src/db/relationships-dao.ts` | Structured relationship writer and stale-expiry core. |
 | `src/db/relationships-read.ts` | Relationship projection with optional linked name. |
 | `src/db/current-state-history-dao.ts` | Non-destructive current/history transitions. |
@@ -95,7 +96,7 @@ Migration 016 adds three tables without moving conversational fuel or changing c
 
 1. A new Memory seeds `allow_ai` from its registry type default; the imported type defaults off and existing rows are never retroactively changed.
 2. `setMemoryAllowAi()` scopes a toggle by Memory and contact identity, while `listAiEligibleMemories()` enforces `allow_ai = 1 AND deleted_at IS NULL` in SQL.
-3. The knowledge-search read exposes only names, searchable Memory content, relationship names, and eligible custom-field values. Its pure TypeScript scorer supplies bounded typo tolerance; identifiers, provenance, timestamps, and other internal metadata never enter the corpus.
+3. The knowledge-search read accepts only eligible Dashboard IDs and exposes names, phone/email, category, searchable Memory content, relationship content, and eligible custom-field values. Its pure TypeScript scorer supplies bounded typo tolerance and raw-text offsets; identifiers, provenance, timestamps, and other internal metadata never enter searchable text.
 
 ### Current-state history
 
@@ -131,6 +132,7 @@ Migration 016 adds three tables without moving conversational fuel or changing c
 - **ADR-089:** Recoverable Memory Lifecycle and Contact-Operation Integrity — defines recovery, expiry, merge, and purge behavior.
 - **ADR-081:** Retire AI-Proposed Fuel for Explicit Per-Item Permission — moves retired fuel into default-off Memories and establishes explicit Memory consent.
 - **ADR-091:** Imported Contact Notes as AI-Off Typed Memories — adds the searchable imported type and durable import boundary.
+- **ADR-094:** Eligibility-Scoped Semantic Dashboard Search — preserves typed provenance in an eligible-ID-scoped Dashboard corpus.
 
 ## Gotchas
 
@@ -141,6 +143,7 @@ Migration 016 adds three tables without moving conversational fuel or changing c
 5. **Do not nest transaction wrappers.** Sweep expiry calls a non-mutexed core after obtaining its own write transaction.
 6. **Current-state promotion preserves history.** The partial unique index enforces one current row; it does not authorize deleting the displaced value.
 7. **Relationships are Undo-only after removal.** Recently Deleted is a Memory recovery surface, not a general relationship trash browser.
+8. **Search scope is supplied by Dashboard.** The corpus must never broaden that eligible-ID set or add an unscoped global reader.
 
 ## Related Systems
 
@@ -159,3 +162,4 @@ Migration 016 adds three tables without moving conversational fuel or changing c
 |------|-------|--------------|
 | 2026-09-03 | 24.1 | Created the typed local contact-knowledge model, recovery lifecycle, and unified Things to Remember surface. |
 | 2026-09-03 | 24.2 | Added explicit default-off Memory egress permission, local knowledge-search corpus, and imported Notes type. |
+| 2026-09-02 | 25 | Added eligible-ID-scoped semantic search provenance, matching, and highlight offsets for Dashboard consumption. |
