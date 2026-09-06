@@ -1,7 +1,7 @@
 # Backup & Restore
 
-**Last updated:** 2026-08-31
-**Updated by phase:** 21-interaction-assist-reach-out
+**Last updated:** 2026-09-02
+**Updated by phase:** 23-theme-visual-system
 **Owners:** `src/backup/`, `src/services/backup/`, `src/services/backup-sweep.ts`, `src/db/restore-photo-journal-dao.ts`, `src/screens/BackupScreen.tsx`
 
 ## Purpose
@@ -16,7 +16,7 @@ The backup manifest is a versioned wire model separate from SQLite's schema vers
 
 **Tables:**
 - `tombstones` — indefinitely retained type-and-UID deletion evidence for mergeable rows.
-- `app_settings` — stores portable preferences (including the default-on `interactionAssistEnabled` toggle) plus device-local automatic-backup configuration, revision, health, and encryption-flag state. The transient `interaction_assists` rows themselves are device-local and excluded from the manifest.
+- `app_settings` — stores portable preferences (including the default-on `interactionAssistEnabled` toggle) plus device-local automatic-backup configuration, revision, health, and encryption-flag state. The seven durable theme keys are allowlisted so a later format can accept them, but format-3 exports intentionally omit them. The transient `interaction_assists` rows themselves are device-local and excluded from the manifest.
 - `restore_photo_journal` — committed-only finalize/delete work for restored photo files.
 - `contact_methods`, external links, and method provenance — first-class UID-bearing portable children with labels and canonicalization regions where present.
 
@@ -29,7 +29,7 @@ The backup manifest is a versioned wire model separate from SQLite's schema vers
 
 | Layer | File | Responsibility |
 |---|---|---|
-| Wire validation | `src/backup/backup-schema.ts` | Parses and forward-migrates the manifest before preview or apply. |
+| Wire validation | `src/backup/backup-schema.ts` | Parses and forward-migrates the manifest before preview or apply, including allowlisted future theme keys. |
 | Export | `src/backup/export-manifest.ts` | Builds one full non-secret manifest inside a read snapshot. |
 | Reconciliation | `src/backup/reconciliation.ts` | Resolves UID, tombstone, parent, and natural-key outcomes. |
 | Restore | `src/backup/restore-apply.ts` | Applies a validated Merge or Replace-all under one write transaction. |
@@ -59,7 +59,7 @@ The backup manifest is a versioned wire model separate from SQLite's schema vers
 ### Exporting a snapshot
 
 1. `BackupScreen` invokes the manual export service; it does not alter automatic-backup health.
-2. `buildExportManifest()` reads tables and photo bytes under `inReadSnapshot()` so the manifest is coherent with serialized writers.
+2. `buildExportManifest()` reads tables and photo bytes under `inReadSnapshot()` so the manifest is coherent with serialized writers. The format-3 settings projection deliberately omits newly allowlisted theme keys until the owner-sequenced format-4 change.
 3. The service writes the local file, reads it back, parses it again, and only then opens Android's share sheet.
 4. The normalized method graph retains nullable labels and canonical regions; v1 scalar endpoint data forward-migrates to deterministic legacy method UIDs rather than reintroducing a scalar authority.
 4. When automatic backup is configured, `registerBackupSweep()` checks cadence and `data_revision` at a foreground launch, writes and verifies a new SAF file, records success, then prunes eligible owned copies.
@@ -97,6 +97,7 @@ The backup manifest is a versioned wire model separate from SQLite's schema vers
 - **ADR-063:** Versioned Lifecycle Backup and Dormant-Cadence Restore — advances the portable graph to v3 and preserves lifecycle invariants before writes.
 - **ADR-065:** Durable Resumable Contact-Import Sessions with Failure-Isolated Photos — keeps accepted picker snapshots local-only and clears them on Replace-all restore.
 - **ADR-070:** Durable Pending Interaction-Assist Lifecycle and Portable Opt-Out — adds the `interactionAssistEnabled` setting to the portable manifest while excluding the transient assist rows.
+- **ADR-083:** Durable Multi-Package Theme Configuration and Restore-Before-Paint — allowlists seven future-portable theme keys without changing the current format-3 wire shape.
 
 ## Gotchas
 
@@ -110,6 +111,7 @@ The backup manifest is a versioned wire model separate from SQLite's schema vers
 8. **Demote before promoting a primary or active link.** SQLite partial unique indexes are statement-immediate, so a promotion-first write can fail mid-restore.
 9. **Plan lifecycle conflicts before the transaction.** A valid newer Unbound row with NULL cadence retains a local assigned cadence as dormant; malformed lifecycle cells fail validation before mutation.
 10. **Do not export import sessions.** Their picker-derived snapshots are local recovery state, not portable relationship authority.
+11. **Allowlisting is not emission.** Theme keys may be accepted when a future format carries them, but adding them to a format-3 projection would silently break cross-version restore compatibility.
 
 ## Related Systems
 
@@ -131,3 +133,4 @@ The backup manifest is a versioned wire model separate from SQLite's schema vers
 | 2026-08-27 | 18.2 | Bumped the portable graph to v3 for Bound/Unbound state and pre-transaction dormant-cadence resolution. |
 | 2026-08-26 | 19 | Excluded local-only contact-import sessions and cleared them on Replace-all restore. |
 | 2026-08-31 | 21 | Added the `interactionAssistEnabled` preference to the portable manifest (transient assist rows excluded). |
+| 2026-09-02 | 23 | Allowlisted durable theme preferences while preserving the format-3 export projection. |
