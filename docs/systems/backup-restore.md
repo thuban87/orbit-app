@@ -12,13 +12,14 @@ Backup & Restore gives Orbit a user-controlled, local loss barrier while Android
 
 ### Data Model
 
-The backup manifest is a versioned wire model separate from SQLite's schema version. Its normalized-method representation carries non-secret app settings, relationship rows, method/link/provenance children, tombstones, and embedded photo bytes; it excludes API keys, passphrases, `field_history`, local photo paths, and derived OS schedules.
+The backup manifest is a versioned wire model separate from SQLite's schema version. Format 4 carries non-secret app settings, typed knowledge, relationship rows, method/link/provenance children, tombstones, and embedded photo bytes; it excludes API keys, passphrases, destructive-operation `field_history`, local photo paths, and derived OS schedules.
 
 **Tables:**
 - `tombstones` — indefinitely retained type-and-UID deletion evidence for mergeable rows.
 - `app_settings` — stores portable preferences (including the default-on `interactionAssistEnabled` toggle) plus device-local automatic-backup configuration, revision, health, and encryption-flag state. The seven durable theme keys are allowlisted so a later format can accept them, but format-3 exports intentionally omit them. The transient `interaction_assists` rows themselves are device-local and excluded from the manifest.
 - `restore_photo_journal` — committed-only finalize/delete work for restored photo files.
 - `contact_methods`, external links, and method provenance — first-class UID-bearing portable children with labels and canonicalization regions where present.
+- `memories`, `relationships`, `current_state_entries`, and `custom_field_value_history` — portable typed knowledge rows, including soft deletion, explicit AI permission, and retained prior field values.
 
 **Types** (`src/backup/types.ts`):
 - `BackupManifest` — complete portable snapshot with UID-shaped relationships.
@@ -59,7 +60,7 @@ The backup manifest is a versioned wire model separate from SQLite's schema vers
 ### Exporting a snapshot
 
 1. `BackupScreen` invokes the manual export service; it does not alter automatic-backup health.
-2. `buildExportManifest()` reads tables and photo bytes under `inReadSnapshot()` so the manifest is coherent with serialized writers. The format-3 settings projection deliberately omits newly allowlisted theme keys until the owner-sequenced format-4 change.
+2. `buildExportManifest()` reads tables and photo bytes under `inReadSnapshot()` so the manifest is coherent with serialized writers. Format 4 includes Memory permission, custom-field scope/history/group metadata, and retained value-history rows.
 3. The service writes the local file, reads it back, parses it again, and only then opens Android's share sheet.
 4. The normalized method graph retains nullable labels and canonical regions; v1 scalar endpoint data forward-migrates to deterministic legacy method UIDs rather than reintroducing a scalar authority.
 4. When automatic backup is configured, `registerBackupSweep()` checks cadence and `data_revision` at a foreground launch, writes and verifies a new SAF file, records success, then prunes eligible owned copies.
@@ -77,12 +78,13 @@ The backup manifest is a versioned wire model separate from SQLite's schema vers
 3. `applyRestore()` reconciles UID rows and tombstones, normalizes method/link natural-key collisions before writing, recomputes contact recency, and registers committed photo-finalization work in one transaction.
 4. Post-commit photo and schedule work is retryable. The launch sweep resumes only journal rows proven to belong to a committed restore.
 5. Import sessions are local-only transient recovery state: exports omit them, and Replace-all clears their rows so a portable snapshot cannot revive a stale system-picker selection.
+6. A format-4 backup that predates retained custom-field value history normalizes its missing array to `[]`; restored older rows default to AI off and global, non-history field definitions.
 
 ## Configuration
 
 | Constant | Value | File | Purpose |
 |---|---|---|---|
-| `BACKUP_FORMAT_VERSION` | `3` | `src/backup/types.ts` | Portable manifest compatibility version. |
+| `BACKUP_FORMAT_VERSION` | `4` | `src/backup/types.ts` | Portable manifest compatibility version. |
 | `BACKUP_ENVELOPE_VERSION` | `1` | `src/backup/types.ts` | Encrypted-container compatibility version. |
 | PBKDF2 iterations | `600000` | `src/services/backup/encryption.ts` | Approved passphrase derivation cost. |
 | Backup days | `1..3650`, defaults `1` / `7` | `src/db/app-settings-dao.ts` | Automatic cadence and retention bounds. |
@@ -98,6 +100,7 @@ The backup manifest is a versioned wire model separate from SQLite's schema vers
 - **ADR-065:** Durable Resumable Contact-Import Sessions with Failure-Isolated Photos — keeps accepted picker snapshots local-only and clears them on Replace-all restore.
 - **ADR-070:** Durable Pending Interaction-Assist Lifecycle and Portable Opt-Out — adds the `interactionAssistEnabled` setting to the portable manifest while excluding the transient assist rows.
 - **ADR-083:** Durable Multi-Package Theme Configuration and Restore-Before-Paint — allowlists seven future-portable theme keys without changing the current format-3 wire shape.
+- **ADR-090:** Additive Custom-Field Value History and Deferred Contact Scope — makes retained prior values a mergeable, tombstoned portable entity.
 
 ## Gotchas
 
@@ -112,12 +115,14 @@ The backup manifest is a versioned wire model separate from SQLite's schema vers
 9. **Plan lifecycle conflicts before the transaction.** A valid newer Unbound row with NULL cadence retains a local assigned cadence as dormant; malformed lifecycle cells fail validation before mutation.
 10. **Do not export import sessions.** Their picker-derived snapshots are local recovery state, not portable relationship authority.
 11. **Allowlisting is not emission.** Theme keys may be accepted when a future format carries them, but adding them to a format-3 projection would silently break cross-version restore compatibility.
+12. **Do not require a new array from an older format-4 file.** There is no 4→4 forward migration, so optional additive arrays normalize during parse before validation and restore.
 
 ## Related Systems
 
 - **Persistence core** — supplies schema migration, serialized transactions, revisions, and launch hooks.
 - **Contacts** — supplies UID-bearing relationship rows and derived recency.
 - **Custom fields** — supplies normalized nullable values and photo-field references.
+- **Contact Knowledge** — supplies typed Memories and explicit per-item permission; **Custom fields** supplies retained value history and scope metadata.
 - **Photos** — owns durable master paths and restore-file finalization.
 - **Notifications** and **Digest** — rebuild derived OS schedules after a committed restore.
 - **Dashboard** — offers the temporary Backup entry and rare health nudge.
@@ -134,3 +139,4 @@ The backup manifest is a versioned wire model separate from SQLite's schema vers
 | 2026-08-26 | 19 | Excluded local-only contact-import sessions and cleared them on Replace-all restore. |
 | 2026-08-31 | 21 | Added the `interactionAssistEnabled` preference to the portable manifest (transient assist rows excluded). |
 | 2026-09-02 | 23 | Allowlisted durable theme preferences while preserving the format-3 export projection. |
+| 2026-09-03 | 24.2 | Added Memory permission, retained custom-field history, scope metadata, and compatible format-4 restoration. |
