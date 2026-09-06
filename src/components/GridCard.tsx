@@ -78,6 +78,15 @@ export interface GridCardProps {
   /** Captured once by HomeScreen for a deterministic render pass. */
   now: string;
   onPress: () => void;
+  /** Opens the host-owned per-contact action menu. */
+  onLongPress?: () => void;
+  /** Assistive-tech equivalents for the normal-mode card menu actions. */
+  onViewProfile?: () => void;
+  onQuickLog?: () => void;
+  onLogInteraction?: () => void;
+  onMessage?: () => void;
+  onEditContact?: () => void;
+  onSelect?: () => void;
   /** The current binary favourite membership, owned by HomeScreen. */
   isFavourite?: boolean;
   onToggleFavourite?: () => void;
@@ -100,6 +109,13 @@ export function GridCard({
   status,
   now,
   onPress,
+  onLongPress,
+  onViewProfile,
+  onQuickLog,
+  onLogInteraction,
+  onMessage,
+  onEditContact,
+  onSelect,
   isFavourite = false,
   onToggleFavourite,
   line3 = null,
@@ -137,13 +153,47 @@ export function GridCard({
     : null;
   const displayedSearchSnippet =
     strongestMatch?.snippet ?? (searchResult === null ? searchSnippet : null);
+  const accessibilityActions = [
+    onViewProfile && { name: "view-profile", label: "View Profile" },
+    onQuickLog && { name: "quick-log", label: "Quick Log" },
+    onLogInteraction && { name: "log-interaction", label: "Log Interaction" },
+    onMessage && { name: "message", label: "Message" },
+    onEditContact && { name: "edit-contact", label: "Edit Contact" },
+    onSelect && { name: "select", label: "Select" },
+  ].filter(Boolean) as { name: string; label: string }[];
 
   return (
     <Pressable
       testID={`dashboard-grid-card-${contactId}`}
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel}
+      accessibilityActions={
+        accessibilityActions.length > 0 ? accessibilityActions : undefined
+      }
+      onAccessibilityAction={(event) => {
+        switch (event.nativeEvent.actionName) {
+          case "view-profile":
+            onViewProfile?.();
+            break;
+          case "quick-log":
+            onQuickLog?.();
+            break;
+          case "log-interaction":
+            onLogInteraction?.();
+            break;
+          case "message":
+            onMessage?.();
+            break;
+          case "edit-contact":
+            onEditContact?.();
+            break;
+          case "select":
+            onSelect?.();
+            break;
+        }
+      }}
       onPress={onPress}
+      onLongPress={onLongPress}
       style={styles.card}
     >
       <GlassSurface blurAvailable={false} density="dense" style={styles.surface}>

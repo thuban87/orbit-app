@@ -12,6 +12,13 @@ export interface CardGridProps {
   rows: DashboardRow[];
   now: string;
   onPressContact: (contactId: number) => void;
+  onLongPressContact?: (contactId: number) => void;
+  onViewProfile?: (contactId: number) => void;
+  onQuickLog?: (contactId: number) => void;
+  onLogInteraction?: (contactId: number) => void;
+  onMessage?: (contactId: number) => void;
+  onEditContact?: (contactId: number) => void;
+  onSelect?: (contactId: number) => void;
   favouriteOverlay: ReadonlyMap<number, boolean>;
   onToggleFavourite: (contactId: number, nextMembership: boolean) => void;
   line3ByContactId: ReadonlyMap<number, { text: string; iconName?: IconName }>;
@@ -40,6 +47,13 @@ export function CardGrid({
   rows,
   now,
   onPressContact,
+  onLongPressContact,
+  onViewProfile,
+  onQuickLog,
+  onLogInteraction,
+  onMessage,
+  onEditContact,
+  onSelect,
   favouriteOverlay,
   onToggleFavourite,
   line3ByContactId,
@@ -97,6 +111,23 @@ export function CardGrid({
             status={item.status}
             now={now}
             onPress={() => onPressContact(item.id)}
+            onLongPress={
+              onLongPressContact
+                ? () => onLongPressContact(item.id)
+                : undefined
+            }
+            onViewProfile={
+              onViewProfile ? () => onViewProfile(item.id) : undefined
+            }
+            onQuickLog={onQuickLog ? () => onQuickLog(item.id) : undefined}
+            onLogInteraction={
+              onLogInteraction ? () => onLogInteraction(item.id) : undefined
+            }
+            onMessage={onMessage ? () => onMessage(item.id) : undefined}
+            onEditContact={
+              onEditContact ? () => onEditContact(item.id) : undefined
+            }
+            onSelect={onSelect ? () => onSelect(item.id) : undefined}
             isFavourite={renderedMembership}
             onToggleFavourite={() =>
               onToggleFavourite(item.id, !renderedMembership)
