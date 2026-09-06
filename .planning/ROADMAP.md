@@ -438,11 +438,11 @@ All v1.0 commits are local on `main` and have NOT been pushed.
 
 **Canonical refs**: docs/dossier/milestone-2/phase-07-dashboard-card-view-dossier-v0.2.md; docs/dossier/milestone-2/planning-notes/phase-07-planning-notes.md
 **Schema**: none (D-03 — no migration; every bulk op composes existing writers; TARGET_VERSION=20 / migration head 020 verified on disk at plan time)
-**Plans**: 1/7 plans executed (5 waves)
+**Plans**: 2/7 plans executed (5 waves)
 **Wave 1** *(01/02/03 parallel — disjoint files)*
 
 - [x] 28-01-PLAN.md — TRACER: avatar-first grid renders real contacts end-to-end (status ring+glyph, favourite star) + 7 new icon-registry entries [CARDV-01/02/03]
-- [ ] 28-02-PLAN.md — bulk-actions-dao: extract non-mutexed *Cores + 8 atomic bulk composers (recency spine, immutable event trail, single-column category/frequency) [CARDV-07/08/10/11]
+- [x] 28-02-PLAN.md — bulk-actions-dao: extract non-mutexed *Cores + 8 atomic bulk composers (recency spine, immutable event trail, single-column category/frequency) [CARDV-07/08/10/11]
 - [ ] 28-03-PLAN.md — dashboard-selection-store: mode / selectedIds / frozen universe (pure in-memory) [CARDV-05/06/12]
 
 **Wave 2** *(blocked on Wave 1 completion)*
@@ -666,7 +666,7 @@ All v1.0 commits are local on `main` and have NOT been pushed.
 | 25. Dashboard Data & State Foundation | 6/7 | In Progress|  |
 | 26. Dashboard Control Surface | 7/7 | In Progress|  |
 | 27. Dashboard List View | 8/8 | Complete | 2026-09-06 (owner-approved; UAT partial) |
-| 28. Dashboard Card View | 1/7 | In Progress|  |
+| 28. Dashboard Card View | 2/7 | In Progress|  |
 | 29. Orrery Camera, Scale & Exploration | 0/TBD | Not started | - |
 | 30. Orrery Systems | 0/TBD | Not started | - |
 | 31. Profile Experience | 0/TBD | Not started | - |
