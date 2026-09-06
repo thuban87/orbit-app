@@ -1,7 +1,7 @@
 # Contacts
 
-**Last updated:** 2026-09-03
-**Updated by phase:** 24.1-contact-knowledge-foundation
+**Last updated:** 2026-09-02
+**Updated by phase:** 25-dashboard-data-state-foundation
 **Owners:** `src/db/contacts-dao.ts`, `src/db/contact-read.ts`, `src/db/favourites-dao.ts`, `src/db/profile-dao.ts`, `src/db/contact-links-dao.ts`, `src/db/purge-dao.ts`, `src/db/recency-dao.ts`
 
 ## Purpose
@@ -23,7 +23,7 @@ All data is on-device SQLite. Migration 001 uses a surrogate `contacts.id` and a
   - `rarely_responds` (`INTEGER`) — limits recency to connected interactions.
   - `archived_at` (`TEXT`) — archive lifecycle marker.
   - `photo` (`TEXT`, nullable) — validated relative path to the contact's local photo master.
-  - `favourite_rank` (`INTEGER`, nullable) — ordered membership in the dashboard and widget favourites set.
+  - `favourite_rank` (`INTEGER`, nullable) — legacy storage that marks membership; it is not user-facing Dashboard or widget order.
   - `snooze_until` (`TEXT`, nullable) — bare local `YYYY-MM-DD` that delays the next decay reminder without changing the contact clock.
   - `reminders_off` (`INTEGER`) — permanent decay-reminder mute; it does not archive, hide, or stop status progression for the contact.
 - `categories` — seeded Family, Friends, Work, and Community groups with display order.
@@ -56,7 +56,7 @@ All data is on-device SQLite. Migration 001 uses a surrogate `contacts.id` and a
 | Contact writer | `src/db/contacts-dao.ts` | Atomically creates and edits metadata, normalized method/custom-value pairs, and optional first interactions; archives and restores contacts with lifecycle-event composition. |
 | Contact reads | `src/db/contact-read.ts` | Checks duplicate names, reads categories, and assembles scalar-free edit/header data. |
 | Lifecycle DAO | `src/db/contact-lifecycle-dao.ts` | Performs guarded Bind and Unbind transitions without losing contact-owned data. |
-| Favourites DAO | `src/db/favourites-dao.ts` | Marks, clears, and atomically rewrites ordered favourite ranks. |
+| Favourites DAO | `src/db/favourites-dao.ts` | Marks and clears binary favourite membership without a rank-rewrite operation. |
 | Profile DAO | `src/db/profile-dao.ts` | Reads and updates the single self record’s local photo reference. |
 | Links DAO | `src/db/contact-links-dao.ts` | Lists and applies scoped add/edit/remove changes for ordered link rows. |
 | Recency DAO | `src/db/recency-dao.ts` | Is the sole owner of `last_contact` recomputation. |
@@ -72,7 +72,7 @@ All data is on-device SQLite. Migration 001 uses a surrogate `contacts.id` and a
 | `src/db/contact-read.ts` | Duplicate-name, category, header, and edit-form data reads. |
 | `src/db/picker-read.ts` | Local action-picker projection with favourite membership, recency, name, snooze, and archive state. |
 | `src/db/contact-lifecycle-dao.ts` | Named lifecycle transitions with exact state guards and one revision increment. |
-| `src/db/favourites-dao.ts` | Dedicated favourite-rank writes that leave recency unchanged. |
+| `src/db/favourites-dao.ts` | Dedicated binary-membership writes that leave recency unchanged. |
 | `src/db/profile-dao.ts` | Single-row self photo reads and writers. |
 | `src/db/contact-links-dao.ts` | Ordered child-table CRUD for contact links. |
 | `src/db/recency-dao.ts` | Single-writer interaction/recency cores used by composed contact writes. |
@@ -132,8 +132,8 @@ All data is on-device SQLite. Migration 001 uses a surrogate `contacts.id` and a
 ### Managing favourites
 
 1. The contact-profile star reads `favourite_rank` from the header and calls `setFavouriteRank()` or `clearFavouriteRank()`.
-2. The Manage favourites screen obtains the live non-archived set and passes its reordered ids to `rewriteFavouriteRanks()`.
-3. The DAO verifies a unique, complete current set and applies all rank updates inside one write transaction; it never writes `last_contact`.
+2. The star is the only user-facing favourite-order control: no Manage favourites screen or rank-rewrite writer exists.
+3. Dashboard and Widget reads treat a non-NULL stored rank as binary membership and apply their own documented Default ordering; the DAO never writes `last_contact`.
 4. Successful favourite, metadata, archive, restore, and photo-facing mutations publish a best-effort Widget refresh after their database work commits; this publisher does not alter the contact transaction.
 
 ### Selecting a contact for a shell action
@@ -203,6 +203,7 @@ All data is on-device SQLite. Migration 001 uses a surrogate `contacts.id` and a
 - **ADR-026:** Rogue Status for Unresponsive or Far-Overdue Contacts — uses the contact's Rarely-responds policy to filter qualifying recency.
 - **ADR-033:** Profile Marking and Shared Drag-Reordered Favourites — owns reversible profile marking and guarded favourite-rank ordering.
 - **ADR-075:** Binary Favourite Membership Without a User-Facing Order — makes favourite rank ineligible as a contact-picker sort key.
+- **ADR-093:** Scoped Composable Dashboard Population and Filter Model — keeps favourite storage as membership while Dashboard/Widget use shared Default ordering.
 - **ADR-082:** Universal Capture FAB, Canonical Picker, and Truthful Quick Log — adds the shared local target picker.
 - **ADR-089:** Recoverable Memory Lifecycle and Contact-Operation Integrity — extends merge and purge with explicit contact-knowledge integrity work.
 - **ADR-090:** Additive Custom-Field Value History and Deferred Contact Scope — requires retained field history to follow explicit contact lifecycle handling.
@@ -234,12 +235,12 @@ All data is on-device SQLite. Migration 001 uses a surrogate `contacts.id` and a
 6. **Do not use the metadata save to write `photo`.** Photo persistence has dedicated writers so file lifecycle and form refresh behavior remain separate.
 7. **Never record a lifecycle event for a no-op transition.** Archive and restore guard the current state before changing it; otherwise the immutable history would claim a false transition.
 8. **Deleting a touchpoint is permanent.** The profile must confirm it before calling the recency DAO; there is no undo or backup path.
-9. **Rewrite the complete favourite set in one transaction.** A partial, duplicate, stale, archived, or non-favourite id list must fail rather than leave ranks inconsistent.
+9. **Do not restore a rank-rewrite writer.** `favourite_rank` persists for internal readers, but favourites are binary membership and no user-facing reorder surface exists.
 10. **A by-id header can still be archived.** Live callers such as Compose must inspect `archived_at`; the header seek intentionally does not apply a live-list filter itself.
 11. **A capture is not contact.** Creating or selecting a contact for a share must leave `last_contact` unchanged and write no interaction row.
 12. **Keep snooze dates local.** `snooze_until` is already a local bare date; parse or render it as UTC and near-midnight users see the wrong day.
 13. **Mute does not hide a contact.** `reminders_off` suppresses decay scheduling only; Dashboard, status, and birthday behavior remain otherwise unchanged.
-14. **Publish widget refresh only after a successful mutation.** A failed favourite rewrite, archive, restore, or metadata save must not advertise a state that SQLite did not commit.
+14. **Publish widget refresh only after a successful mutation.** A failed favourite mark/clear, archive, restore, or metadata save must not advertise a state that SQLite did not commit.
 15. **The AI profile entry is not a contact action.** It routes serializable identity only; Compose may generate an editable draft but must not record recency or a touchpoint.
 16. **Use `createContactFull()` for production creation.** It is the path that seeds the complete custom-field pair matrix; the exported recency test helper writes no custom values.
 17. **A hard delete must write its tombstone first.** Purge captures every mergeable child UID in its existing transaction; transient `field_history` remains excluded.
@@ -257,11 +258,11 @@ All data is on-device SQLite. Migration 001 uses a surrogate `contacts.id` and a
 - **Persistence core** — supplies the SQLite schema and transaction environment.
 - **Custom fields** — contributes values to the contact create/edit transaction.
 - **App shell** — provides the create, profile, edit, and archived navigation routes.
-- **Dashboard** — reads contact projections and provides favourite-management entry points.
+- **Dashboard** — reads contact projections and owns shared population ordering; it has no favourite-management screen.
 - **Contact methods** — consumes the lightweight phone and archive header for Compose gating.
 - **Capture** — selects or name-only creates a fuel owner while retaining the never-contacted state.
 - **Notifications** — derives decay eligibility from contact state and owns the OS schedule.
-- **Widget** — mirrors favourite rank and contact-visible fields without storing another configuration record.
+- **Widget** — mirrors binary favourite membership and contact-visible fields without storing another configuration record.
 - **AI suggestions** — receives a profile-originated Compose intent but has no contact-write authority.
 - **Backup & Restore** — exports UID-bearing contact state and restores it through tombstone-aware reconciliation.
 - **Contact Import** — creates or explicitly links contacts through the shared transaction seam.
@@ -292,3 +293,4 @@ All data is on-device SQLite. Migration 001 uses a surrogate `contacts.id` and a
 | 2026-09-02 | 22 | Added the local shell action-picker projection with membership-only favourites ordering and explicit archive search. |
 | 2026-09-03 | 24.1 | Extended merge and archive-gated purge with explicit contact-knowledge preservation and fan-out. |
 | 2026-09-03 | 24.2 | Added atomic retained custom-field history capture plus explicit merge and purge lifecycle handling. |
+| 2026-09-02 | 25 | Retired rank rewrites and made favourite membership feed shared Dashboard Default ordering. |
