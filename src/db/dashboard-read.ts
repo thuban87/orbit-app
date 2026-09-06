@@ -363,6 +363,20 @@ async function applyPopulationPostProcessing(
   return rows.filter((row) => survivingIds.has(row.id));
 }
 
+/**
+ * Search intentionally widens only the implicit Active scope (A3). Keeping the
+ * construction here makes the term-bearing name/fuel read and the term-free
+ * corpus eligibility read provably share the exact same population boundary.
+ */
+function searchScope(
+  query: DashboardQueryState,
+  composition: PopulationReadComposition,
+): string {
+  return query.populations.length === 0
+    ? `c.archived_at IS NULL\n       AND ${DASHBOARD_BOUND_WHERE}`
+    : composition.where.sql;
+}
+
 export async function listDashboardPopulation(
   exec: SqlExecutor,
   query: DashboardQueryState,
@@ -415,10 +429,7 @@ export async function listDashboardSearch(
 
   const composition = await composePopulationRead(exec, query, now);
   const like = `%${escapeLike(trimmedTerm)}%`;
-  const implicitActive = query.populations.length === 0;
-  const scope = implicitActive
-    ? `c.archived_at IS NULL\n       AND ${DASHBOARD_BOUND_WHERE}`
-    : composition.where.sql;
+  const scope = searchScope(query, composition);
   const termPredicate = `(
        c.name LIKE ? ESCAPE '\\'
        OR EXISTS (SELECT 1 FROM fuel WHERE contact_id = c.id AND ${RANKED_FUEL_EXCLUSIONS} AND text LIKE ? ESCAPE '\\')
@@ -448,6 +459,44 @@ export async function listDashboardSearch(
       ...composition.filters.params,
       like,
       like,
+    ],
+  );
+  return applyPopulationPostProcessing(exec, rows, query, now, composition);
+}
+
+/**
+ * Term-free, A3-aware search eligibility. This is deliberately a sibling of
+ * `listDashboardSearch`: corpus search needs every structurally eligible row,
+ * including memory-only matches, while retaining population/filter/gravity
+ * post-processing and Dashboard order as its tie-break universe.
+ */
+export async function listDashboardSearchEligible(
+  exec: SqlExecutor,
+  query: DashboardQueryState,
+  now: string,
+): Promise<DashboardRow[]> {
+  localMidnightFromReadNow(now);
+  const composition = await composePopulationRead(exec, query, now);
+  const rows = await exec.getAllAsync<DashboardRow>(
+    `SELECT c.id AS id,
+      c.name AS name,
+      c.photo AS photo,
+      c.modified_at AS modified_at,
+      cat.name AS categoryLabel,
+      c.tracking_enabled AS trackingEnabled,
+      c.last_contact AS last_contact,
+      c.snooze_until AS snooze_until,
+      ${CARD_FAVOURITE_RANK},
+      ${CARD_STATUS},
+      ${FUEL_LINE} AS fuelText,
+      NULL AS snippet${composition.matches.sql}
+     ${CARD_FROM}
+     WHERE ${searchScope(query, composition)}${composition.filters.sql ? `\n       AND ${composition.filters.sql}` : ""}
+     ORDER BY ${composition.orderBy}`,
+    [
+      ...composition.matches.params,
+      ...composition.where.params,
+      ...composition.filters.params,
     ],
   );
   return applyPopulationPostProcessing(exec, rows, query, now, composition);

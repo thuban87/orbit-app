@@ -8,11 +8,12 @@
  */
 import { listDefs } from "@/db/field-defs-dao";
 import type { CustomFieldDef } from "@/db/field-types";
-import { getValuesForContact } from "@/db/field-values-dao";
 import {
   MEMORY_TYPE_REGISTRY,
   type MemoryTypeKey,
 } from "@/db/memory-registry";
+import { resolveVisibility } from "@/db/memories-read";
+import { resolveRelationshipVisibility } from "@/db/relationships-read";
 import type { SqlExecutor } from "@/db/types";
 
 export type KnowledgeSearchSource =
@@ -68,6 +69,8 @@ interface MemoryRow {
   customLabel: string | null;
   value: string | null;
   note: string | null;
+  hidden: number | null;
+  outdated: number;
 }
 
 interface RelationshipRow {
@@ -75,6 +78,13 @@ interface RelationshipRow {
   personName: string;
   relationType: string | null;
   note: string | null;
+  hidden: number | null;
+}
+
+interface CustomValueRow {
+  contactId: number;
+  colName: string;
+  value: string | null;
 }
 
 interface ContactMethodRow {
@@ -99,7 +109,7 @@ SELECT c.id AS contactId, c.name, cat.name AS categoryLabel
 function relationshipsSql(eligibleIds: readonly number[]): string {
   return `
 SELECT contact_id AS contactId, person_name AS personName
-       , relation_type AS relationType, note
+       , relation_type AS relationType, note, hidden
   FROM relationships
  WHERE deleted_at IS NULL
    AND contact_id IN (${placeholders(eligibleIds)})
@@ -130,12 +140,32 @@ SELECT contact_id AS contactId,
        type,
        custom_label AS customLabel,
        value,
-       note
+       note,
+       hidden,
+       outdated
   FROM memories
  WHERE deleted_at IS NULL
    AND type IN (${types.map(() => "?").join(", ")})
    AND contact_id IN (${placeholders(eligibleIds)})
  ORDER BY contact_id, id`;
+}
+
+/**
+ * Batch counterpart to `getValuesForContact`. The literal definitions join is
+ * deliberate: it preserves that DAO's quarantine/non-shared-definition
+ * boundary in this shared visible-search corpus.
+ */
+function customValuesSql(
+  eligibleIds: readonly number[],
+  definitionIds: readonly number[],
+): string {
+  return `
+SELECT values_table.contact_id AS contactId, defs.col_name AS colName, values_table.value
+  FROM custom_field_values AS values_table
+  JOIN custom_field_defs AS defs ON defs.id = values_table.field_def_id
+ WHERE values_table.contact_id IN (${placeholders(eligibleIds)})
+   AND values_table.field_def_id IN (${placeholders(definitionIds)})
+ ORDER BY values_table.contact_id, values_table.field_def_id`;
 }
 
 /**
@@ -183,9 +213,11 @@ function appendMemoryEntries(
 
 /**
  * Read every contact's KNOW-10 corpus. Eligibility is structural and term-free:
- * names, live registry-searchable Memories, live relationship names, and live
- * non-blank custom values. There is no transaction, no identifier interpolation,
- * and every runtime SQL value (the closed registry type list) is `?`-bound.
+ * names, visible non-outdated registry-searchable Memories, visible relationship
+ * names, and live non-blank custom values. The visibility contract is shared:
+ * hidden/outdated snippets never reach any visible corpus consumer. There is no
+ * transaction, no identifier interpolation, and every runtime SQL value (the
+ * closed registry type list and every id) is `?`-bound.
  */
 export async function listKnowledgeSearchCandidates(
   exec: SqlExecutor,
@@ -211,6 +243,14 @@ export async function listKnowledgeSearchCandidates(
           ...eligibleIds,
         ]),
   ]);
+  const definitionIds = defs.map((definition) => definition.id);
+  const customValues =
+    definitionIds.length === 0
+      ? []
+      : await exec.getAllAsync<CustomValueRow>(
+          customValuesSql(eligibleIds, definitionIds),
+          [...eligibleIds, ...definitionIds],
+        );
 
   const memoriesByContact = new Map<number, MemoryRow[]>();
   for (const memory of memories) {
@@ -230,9 +270,14 @@ export async function listKnowledgeSearchCandidates(
     rows.push(method);
     methodsByContact.set(method.contactId, rows);
   }
+  const valuesByContact = new Map<number, Record<string, string | null>>();
+  for (const value of customValues) {
+    const values = valuesByContact.get(value.contactId) ?? {};
+    values[value.colName] = value.value;
+    valuesByContact.set(value.contactId, values);
+  }
 
-  return Promise.all(
-    contacts.map(async (contact): Promise<KnowledgeSearchCandidate> => {
+  return contacts.map((contact): KnowledgeSearchCandidate => {
       const entries: KnowledgeSearchEntry[] = [
         { source: "name", part: "identity", label: "Name", text: contact.name },
       ];
@@ -254,11 +299,19 @@ export async function listKnowledgeSearchCandidates(
       }
 
       for (const memory of memoriesByContact.get(contact.contactId) ?? []) {
-        appendMemoryEntries(entries, memory);
+        if (
+          memory.outdated !== 1 &&
+          resolveVisibility(memory.type, memory.hidden) === "show"
+        ) {
+          appendMemoryEntries(entries, memory);
+        }
       }
       for (const relationship of relationshipsByContact.get(
         contact.contactId,
       ) ?? []) {
+        if (resolveRelationshipVisibility(relationship.hidden) !== "show") {
+          continue;
+        }
         const label = relationship.relationType?.trim() || "Relationship";
         entries.push({
           source: "relationship",
@@ -278,7 +331,7 @@ export async function listKnowledgeSearchCandidates(
         }
       }
 
-      const values = await getValuesForContact(exec, contact.contactId, defs);
+      const values = valuesByContact.get(contact.contactId) ?? {};
       for (const definition of defs) {
         const value = values[definition.col_name];
         if (isSearchableCustomFieldValue(definition, value)) {
@@ -293,6 +346,5 @@ export async function listKnowledgeSearchCandidates(
       }
 
       return { contactId: contact.contactId, entries };
-    }),
-  );
+    });
 }
