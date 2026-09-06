@@ -18,6 +18,7 @@ Read the relevant system doc *before* making changes to that subsystem.
 | Persistence core | `persistence-core.md` | `db/database.ts`, `db/migrations/`, `db/transaction.ts`, `db/mutex.ts`, `db/uid.ts`, `db/queries.ts` | 02 |
 | App shell | `app-shell.md` | `navigation/RootNavigator.tsx`, `navigation/types.ts`, `screens/SettingsScreen.tsx`, `theme/` | 04 |
 | Contacts | `contacts.md` | `db/contacts-dao.ts`, `db/contact-read.ts`, `db/contact-lifecycle-dao.ts`, `db/profile-dao.ts`, `db/favourites-dao.ts`, `db/recency-dao.ts`, `db/purge-dao.ts`, `db/tombstones-dao.ts` | 02, 04 |
+| Contact knowledge | `contact-knowledge.md` | `db/memory-registry.ts`, `db/memories-dao.ts`, `db/memories-read.ts`, `db/relationships-dao.ts`, `db/relationships-read.ts`, `db/current-state-history-dao.ts`, `db/current-state-history-read.ts`, `services/memory-trash-sweep.ts` | 24.1 |
 | Status engine | `status-engine.md` | `db/status.ts`, `services/gravity-logic.ts`, `services/intensity-logic.ts`, `db/contact-status-read.ts` | 02 |
 | Contact methods | `contact-methods.md` | `db/contact-methods-dao.ts`, `db/contact-methods-read.ts`, `db/contact-links-dao.ts`; compose/SMS handoff (`screens/ComposeScreen.tsx`) | 18, 18.1, 18.2, 09 |
 | Custom fields | `custom-fields.md` | `db/field-defs-dao.ts`, `db/field-values-dao.ts`, `db/field-ddl.ts`, `db/field-parsers.ts`, `db/field-sort.ts`, `db/field-type-change.ts`, `db/col-name.ts` | 03, 16 |
