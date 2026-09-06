@@ -30,11 +30,14 @@ import {
   createContactFull,
   listArchived,
   restoreContact,
+  setContactCategoryCore,
+  setContactFrequencyCore,
   updateContactFull,
 } from "@/db/contacts-dao";
 import { MIGRATIONS, TARGET_VERSION } from "@/db/database";
 import { runMigrations } from "@/db/migrations/runner";
 import { recordTouchpoint } from "@/db/recency-dao";
+import { inWriteTransaction } from "@/db/transaction";
 import type { SqlExecutor } from "@/db/types";
 
 const NOW = "2026-08-14 12:00:00";
@@ -898,6 +901,57 @@ describe("updateContactFull — custom values compose without deadlock (Pitfall 
     );
     expect(cleared).toEqual({ uid: row?.uid, value: null });
     expect(await totalValueRows()).toBe(1);
+  });
+});
+
+// =============================================================================
+// Plan 28 — dedicated category/frequency cores. Bulk composition must update
+// exactly one scalar field without routing through the full metadata writer.
+// =============================================================================
+
+describe("bulk composition contact cores", () => {
+  it("sets category without clobbering unrelated metadata", async () => {
+    const { contactId } = await createContactFull(exec, {
+      uid: uid(),
+      name: "Original",
+      intervalDays: 14,
+      socialBattery: "high",
+      now: NOW,
+    });
+
+    await inWriteTransaction(exec, () =>
+      setContactCategoryCore(exec, contactId, 2, EDIT_NOW),
+    );
+
+    expect(await metadata(contactId)).toMatchObject({
+      name: "Original",
+      category_id: 2,
+      interval_days: 14,
+      social_battery: "high",
+    });
+  });
+
+  it("accepts only positive integer frequency values before the UPDATE", async () => {
+    const { contactId } = await createContactFull(exec, {
+      uid: uid(),
+      name: "Cadence",
+      intervalDays: 14,
+      now: NOW,
+    });
+
+    for (const intervalDays of [0, -1, 1.5]) {
+      await expect(
+        inWriteTransaction(exec, () =>
+          setContactFrequencyCore(exec, contactId, intervalDays, EDIT_NOW),
+        ),
+      ).rejects.toThrow(/positive integer/);
+    }
+    expect((await metadata(contactId))?.interval_days).toBe(14);
+
+    await inWriteTransaction(exec, () =>
+      setContactFrequencyCore(exec, contactId, 1, EDIT_NOW),
+    );
+    expect((await metadata(contactId))?.interval_days).toBe(1);
   });
 });
 
