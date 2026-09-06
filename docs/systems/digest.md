@@ -1,7 +1,7 @@
 # Digest
 
-**Last updated:** 2026-08-27
-**Updated by phase:** 18.2-bound-unbound-lifecycle
+**Last updated:** 2026-09-02
+**Updated by phase:** 25-dashboard-data-state-foundation
 **Owners:** `src/db/digest-read.ts`, `src/logic/digest-logic.ts`, `src/screens/DigestScreen.tsx`, `src/services/notifications/digest-schedule.ts`
 
 ## Purpose
@@ -39,7 +39,7 @@ The digest has no table and stores no per-contact state. It reads existing SQLit
 |---|---|
 | `src/db/digest-read.ts` | Read-only SQLite chokepoint; imports shared status SQL rather than re-deriving it. |
 | `src/logic/digest-logic.ts` | Tunable windows, group cap, local weekday tag, and effortful-line policy. |
-| `src/screens/DigestScreen.tsx` | Typed live screen with profile and never-contacted destinations. |
+| `src/screens/DigestScreen.tsx` | Typed live screen with profile destinations and the retained never-contacted backlog count. |
 | `src/services/notifications/digest-schedule.ts` | Owns the `digest:weekly` request and launch-sweep registration. |
 
 ## How It Works
@@ -50,7 +50,7 @@ The digest has no table and stores no per-contact state. It reads existing SQLit
 2. `DigestScreen` reloads its inputs in parallel on focus with a cancelled-result guard.
 3. `readRetrospective()` returns one row per non-archived person touched in the inclusive trailing seven-day window, regardless of direction or connection outcome.
 4. `readOverlooked()` reads shared rogue status directly and splits `overdue` people into Drifting and `unresponsive` people into Gone quiet; it intentionally does not apply the decay-push mute.
-5. The screen reuses the dashboard never-contacted count, applies the quality gate, then renders retrospective, gentle line, overlooked groups, backlog nudge, or the unified all-quiet state.
+5. The screen reuses the dashboard never-contacted count, applies the quality gate, then renders retrospective, gentle line, overlooked groups, backlog nudge, or the unified all-quiet state. Its interim backlog tap targets live Home while the Dashboard's Not Contacted control is built later.
 6. Retrospective and gentle-line reads remain all-relationship-history, including Unbound contacts; only the active-cadence overlooked projection is Bound-only.
 
 ### Delivering the weekly prompt
@@ -74,6 +74,7 @@ The digest has no table and stores no per-contact state. It reads existing SQLit
 - **ADR-054:** Live Weekly Digest Retrospective and Overlooked Relationship Read — keeps the screen live, local, non-scoreboard, and distinct from the dashboard.
 - **ADR-055:** Dedicated Weekly Digest Scheduling and Persisted Notification Policy — supplies the weekly prompt and durable scheduling gate.
 - **ADR-062:** Bound/Unbound Lifecycle and One-Way Cadence Assignment — gates only active overlooked work while preserving relationship history.
+- **ADR-093:** Scoped Composable Dashboard Population and Filter Model — retains the backlog count while retiring its standalone Dashboard route.
 
 ## Gotchas
 
@@ -82,11 +83,12 @@ The digest has no table and stores no per-contact state. It reads existing SQLit
 3. **Keep the quality line rare.** The threshold requires both a count and fraction so a single difficult conversation never becomes a relationship verdict.
 4. **A weekly trigger still needs device proof.** The physical-device test confirms its Sunday fire and Expo’s headless re-arm for the next occurrence.
 5. **Do not describe the whole digest as Bound-only.** The retrospective and gentle line intentionally retain Unbound relationship history.
+6. **The backlog count is not a route contract.** `countNeverContacted()` stays available to Digest even though the standalone Never Contacted screen is retired.
 
 ## Related Systems
 
 - **Notifications** — owns the versioned channel, OS request plumbing, response gate, and global policy conventions.
-- **Dashboard** — provides the in-app entry and the never-contacted backlog destination.
+- **Dashboard** — provides the in-app entry and retains the never-contacted count; its Not Contacted control replaces the retired route in later Dashboard work.
 - **Status engine** — supplies the sole rogue/status expressions used by the overlooked read.
 - **Interaction log** — supplies the touchpoints and quality marks the digest reflects.
 - **Persistence core** — migrates the durable digest toggle and runs launch-sweep hooks after readiness.
@@ -98,3 +100,4 @@ The digest has no table and stores no per-contact state. It reads existing SQLit
 |---|---|---|
 | 2026-08-23 | 15 | Created the live weekly retrospective, overlooked relationship read, Sunday scheduling, and dashboard entry. |
 | 2026-08-27 | 18.2 | Made the active overlooked projection Bound-only while retaining inclusive retrospective history. |
+| 2026-09-02 | 25 | Repointed the backlog action to live Home while retaining the never-contacted count. |
