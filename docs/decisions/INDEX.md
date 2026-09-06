@@ -21,8 +21,8 @@ not something you can pattern-match against.
 
 ## How to use this
 
-- **Is a decision still live?** Check the `Superseded by` column. 21 of
-  82 ADRs are superseded in whole or in part.
+- **Is a decision still live?** Check the `Superseded by` column. 22 of
+  87 ADRs are superseded in whole or in part.
 - **Which decisions govern a file?** Don't grep this file — ask the graph:
   `npm run graph:ask -- governs src/db/field-values-dao.ts`, or follow the
   `governed_by` edges.
@@ -36,7 +36,7 @@ not something you can pattern-match against.
 | 003 | `READ_CONTACTS` on API 37+ for Reconcile | Accepted | 20-contact-reconciliation-merge | ADR-002 (partial) | — | — | 5 | `modules/orbit-contact-picker/android/src/main`, `plugins`, `src/screens` +1 |
 | 004 | Flat Single-App Repository | Accepted | 01-project-scaffold-portable-code | — | — | — | 1 | `src/db` |
 | 005 | AiService Port Omits the Local/LAN (Ollama) Provider | Accepted | 01-project-scaffold-portable-code | — | — | — | 3 | `src/services` |
-| 006 | Theme-Token Architecture | Accepted | 01-project-scaffold-portable-code | — | — | — | 7 | `scripts`, `src/screens`, `src/stores` +1 |
+| 006 | Theme-Token Architecture | Accepted | 01-project-scaffold-portable-code | — | ADR-083 (partial) | — | 7 | `scripts`, `src/screens`, `src/stores` +1 |
 | 007 | Cross-Machine Android Build Pipeline & Physical-Pixel FND-01 Proof | Accepted | 01-project-scaffold-portable-code | — | — | — | 3 | `docs/runbooks`, `src/constants` |
 | 008 | Initial Contact Schema as a Cross-Phase Data Contract | Accepted | 02-data-foundation-status-engine | — | ADR-059 (partial) | — | 3 | `src/db`, `src/db/migrations` |
 | 009 | Crash-Safe Forward-Only SQLite Migrations | Accepted | 02-data-foundation-status-engine | — | — | — | 4 | `src/db`, `src/db/migrations` |
@@ -113,3 +113,8 @@ not something you can pattern-match against.
 | 080 | Four-Tab Bottom Navigation Shell with Per-Tab Stacks | Accepted | milestone-2 | ADR-019 (partial — root shell); ADR-018 (note — Archived list entry points only; gate unchanged) | — | — | 4 | `src/navigation`, `src/screens` |
 | 081 | Retire AI-Proposed Fuel for Explicit Per-Item Permission | Accepted | 24.2-contact-knowledge-egress-search-types | ADR-030 | — | — | 2 | `src/db`, `src/db/migrations` |
 | 082 | Universal Capture FAB, Canonical Picker, and Truthful Quick Log | Accepted | 22-app-shell-navigation | — | — | — | 6 | `src/components`, `src/db` |
+| 083 | Durable Multi-Package Theme Configuration and Restore-Before-Paint | Accepted | 23-theme-visual-system | ADR-006 (partial) | — | — | 7 | `src/backup`, `src/db`, `src/db/migrations` +2 |
+| 084 | Four Semantic Theme Palettes, Curated Accents, and Contrast Validation | Accepted | 23-theme-visual-system | — | — | — | 6 | `src/screens`, `src/theme` |
+| 085 | Live Reduced-Motion Signal for Skia Ambient Animation | Accepted | 23-theme-visual-system | — | — | — | 4 | `src/components/orrery`, `src/theme`, `src/theme/tokens` |
+| 086 | Semantic Icons and Accessible Interaction Primitives | Accepted | 23-theme-visual-system | — | — | — | 8 | `src/components`, `src/components/icons`, `src/components/ui` +1 |
+| 087 | Bundled Background Presets and Package-Specific Surface Treatment | Accepted | 23-theme-visual-system | — | — | — | 6 | `assets/backgrounds`, `src/components/ui`, `src/components/ui/__dev__` +2 |

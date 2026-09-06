@@ -15,7 +15,7 @@
 // NOTE: ADR-0003 [ACCEPTED] `READ_CONTACTS` on API 37+ for Reconcile
 // NOTE: ADR-0004 [ACCEPTED] Flat Single-App Repository
 // NOTE: ADR-0005 [ACCEPTED] AiService Port Omits the Local/LAN (Ollama) Provider
-// NOTE: ADR-0006 [ACCEPTED] Theme-Token Architecture
+// IMPORTANT: ADR-0006 [SUPERSEDED BY ADR-083 (partial)] Theme-Token Architecture
 // NOTE: ADR-0007 [ACCEPTED] Cross-Machine Android Build Pipeline & Physical-Pixel FND-01 Proof
 // IMPORTANT: ADR-0008 [SUPERSEDED BY ADR-059 (partial)] Initial Contact Schema as a Cross-Phase Data Contract
 // NOTE: ADR-0009 [ACCEPTED] Crash-Safe Forward-Only SQLite Migrations
@@ -92,5 +92,10 @@
 // NOTE: ADR-0080 [ACCEPTED] Four-Tab Bottom Navigation Shell with Per-Tab Stacks
 // NOTE: ADR-0081 [ACCEPTED] Retire AI-Proposed Fuel for Explicit Per-Item Permission
 // NOTE: ADR-0082 [ACCEPTED] Universal Capture FAB, Canonical Picker, and Truthful Quick Log
+// NOTE: ADR-0083 [ACCEPTED] Durable Multi-Package Theme Configuration and Restore-Before-Paint
+// NOTE: ADR-0084 [ACCEPTED] Four Semantic Theme Palettes, Curated Accents, and Contrast Validation
+// NOTE: ADR-0085 [ACCEPTED] Live Reduced-Motion Signal for Skia Ambient Animation
+// NOTE: ADR-0086 [ACCEPTED] Semantic Icons and Accessible Interaction Primitives
+// NOTE: ADR-0087 [ACCEPTED] Bundled Background Presets and Package-Specific Surface Treatment
 
-export const ADR_COUNT = 82;
+export const ADR_COUNT = 87;
