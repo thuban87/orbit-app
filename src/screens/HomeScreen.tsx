@@ -33,6 +33,7 @@ import { useFocusEffect, useIsFocused } from "@react-navigation/native";
 import * as Haptics from "expo-haptics";
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import {
+  Alert,
   AppState,
   FlatList,
   Pressable,
@@ -52,6 +53,7 @@ import ReanimatedSwipeable, {
   type SwipeableMethods,
 } from "react-native-gesture-handler/ReanimatedSwipeable";
 import { useShallow } from "zustand/react/shallow";
+import { CardContextMenu } from "@/components/CardContextMenu";
 import { CardGrid } from "@/components/CardGrid";
 import { ListRow, type ListRowProps } from "@/components/ListRow";
 import { POPULATION_LABELS } from "@/components/control-surface/control-labels";
@@ -79,6 +81,7 @@ import { getExecutor, localDateTime } from "@/db/database";
 import { readLine3Candidates } from "@/db/dashboard-knowledge-read";
 import { clearFavouriteRank, setFavouriteRank } from "@/db/favourites-dao";
 import { deleteTouchpoint, recordTouchpoint } from "@/db/recency-dao";
+import { clearSnooze, snoozeContact, type SnoozePreset } from "@/db/snooze-dao";
 import { newUid } from "@/db/uid";
 import { countUnbound } from "@/db/unbound-read";
 import {
@@ -98,10 +101,12 @@ import { navigationRef } from "@/navigation/linking";
 import { useBottomClearance } from "@/navigation/use-bottom-clearance";
 import { buildDashboardOverflowActions } from "@/screens/dashboard-overflow-actions";
 import { useDashboardQueryStore } from "@/stores/dashboard-query-store";
+import { useDashboardSelectionStore } from "@/stores/dashboard-selection-store";
 import { useDashboardSessionStore } from "@/stores/dashboard-session-store";
 import { bumpShellRefresh, useShellRefresh } from "@/stores/shell-refresh-store";
 import { showSnackbar } from "@/stores/snackbar-store";
 import { runQuickLog } from "@/services/quick-log-command";
+import { reconcileSchedule } from "@/services/notifications/notification-schedule";
 import { notifyWidgetDataChanged } from "@/services/widget/widget-refresh";
 import { createQuickLogUndoController } from "@/components/universal-fab-logic";
 import { useTheme } from "@/theme";
@@ -110,7 +115,7 @@ import { RADII } from "@/theme/tokens/radii";
 import { SPACING } from "@/theme/tokens/spacing";
 import { useReducedMotion } from "@/theme/use-reduced-motion";
 import { Logger } from "@/utils/logger";
-import { parseLocalMs } from "@/utils/dates";
+import { isSnoozed, parseLocalMs } from "@/utils/dates";
 
 /** The debounce interval (ms) that collapses a keystroke burst to one read. */
 const SEARCH_DEBOUNCE_MS = 220;
@@ -127,6 +132,11 @@ const VIEW_TOGGLE_OPTIONS: {
 
 const LOG_SCOPE = "dashboard-home";
 const SWIPE_ACTION_WIDTH = 96;
+const CARD_SNOOZE_PRESETS: { preset: SnoozePreset; label: string }[] = [
+  { preset: "3d", label: "3 days" },
+  { preset: "1w", label: "1 week" },
+  { preset: "1m", label: "1 month" },
+];
 
 type DashboardContactActionTarget = "LogContact" | "Edit";
 
@@ -380,6 +390,9 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
   const [initialLoad, setInitialLoad] = useState(true);
   const [resultGeneration, setResultGeneration] = useState(0);
   const [panelOpen, setPanelOpen] = useState(false);
+  const [contextMenuContactId, setContextMenuContactId] = useState<number | null>(
+    null,
+  );
   const openRowRef = useRef<SwipeableMethods | null>(null);
   const quickLogPending = useRef(false);
   const quickLogUndoController = useRef(
@@ -770,6 +783,117 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
     [favouriteStore],
   );
 
+  const openCardContextMenu = useCallback((contactId: number) => {
+    setContextMenuContactId(contactId);
+  }, []);
+
+  const logCardInteraction = useCallback((contactId: number) => {
+    navigateDashboardContactAction(contactId, "LogContact");
+  }, []);
+
+  const messageContact = useCallback(
+    (contactId: number) => navigation.navigate("Compose", { contactId }),
+    [navigation],
+  );
+
+  const refreshAfterSnooze = useCallback(() => {
+    reload();
+  }, [reload]);
+
+  const snoozeContactWithPreset = useCallback(
+    async (contactId: number, preset: SnoozePreset) => {
+      try {
+        await snoozeContact(getExecutor(), {
+          contactId,
+          uid: newUid(),
+          preset,
+          now: localDateTime(),
+        });
+        refreshAfterSnooze();
+        void reconcileSchedule(getExecutor()).catch((scheduleError) =>
+          Logger.error(
+            LOG_SCOPE,
+            "failed to reconcile after card snooze",
+            scheduleError,
+          ),
+        );
+      } catch (snoozeError) {
+        Logger.error(LOG_SCOPE, "failed to snooze card contact", snoozeError);
+        showSnackbar({
+          kind: "error",
+          label: "Couldn't snooze contact. Try again.",
+          action: {
+            label: "Retry",
+            accessibilityLabel: "Retry snoozing contact",
+            onPress: () => {
+              void snoozeContactWithPreset(contactId, preset);
+            },
+          },
+        });
+      }
+    },
+    [refreshAfterSnooze],
+  );
+
+  const toggleCardSnooze = useCallback(
+    (contactId: number, currentlySnoozed: boolean) => {
+      if (currentlySnoozed) {
+        void clearSnooze(getExecutor(), {
+          contactId,
+          uid: newUid(),
+          now: localDateTime(),
+        })
+          .then(() => {
+            refreshAfterSnooze();
+            return reconcileSchedule(getExecutor()).catch((scheduleError) =>
+              Logger.error(
+                LOG_SCOPE,
+                "failed to reconcile after card unsnooze",
+                scheduleError,
+              ),
+            );
+          })
+          .catch((snoozeError: unknown) => {
+            Logger.error(LOG_SCOPE, "failed to unsnooze card contact", snoozeError);
+            showSnackbar({
+              kind: "error",
+              label: "Couldn't unsnooze contact. Try again.",
+              action: {
+                label: "Retry",
+                accessibilityLabel: "Retry unsnoozing contact",
+                onPress: () => toggleCardSnooze(contactId, true),
+              },
+            });
+          });
+        return;
+      }
+
+      Alert.alert(
+        "Snooze contact",
+        "Choose how long to pause reminders.",
+        [
+          ...CARD_SNOOZE_PRESETS.map(({ label, preset }) => ({
+            text: label,
+            onPress: () => {
+              void snoozeContactWithPreset(contactId, preset);
+            },
+          })),
+          { text: "Cancel", style: "cancel" as const },
+        ],
+      );
+    },
+    [snoozeContactWithPreset, refreshAfterSnooze],
+  );
+
+  const enterCardSelection = useCallback(
+    (contactId: number) => {
+      useDashboardSelectionStore
+        .getState()
+        .enterSelection(rows.map((row) => row.id), contactId);
+    },
+    [rows],
+  );
+
   // The cause-aware empty state — delegated to the pure gate (no inline count
   // arithmetic; HIGH-2). The live `activeFilter` (chip) + `hasTerm` (search box)
   // are threaded in: the gate's precedence resolves a zero-result search →
@@ -778,6 +902,17 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
   // hidden-population or filter copy (MEDIUM-4).
   const term = debouncedSearchText.trim();
   const isSearchMode = term !== "";
+  const contextMenuContact =
+    contextMenuContactId === null
+      ? null
+      : (rows.find((row) => row.id === contextMenuContactId) ?? null);
+  const contextMenuIsFavourite =
+    contextMenuContact !== null &&
+    (favouriteOverlay.get(contextMenuContact.id) ??
+      (contextMenuContact.favourite_rank !== null));
+  const contextMenuIsSnoozed =
+    contextMenuContact !== null &&
+    isSnoozed(contextMenuContact.snooze_until, listNow);
   const emptyState = selectDashboardEmptyState({
     live: counts.live,
     neverContacted: counts.neverContacted,
@@ -1117,6 +1252,13 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
               rows={rows}
               now={listNow}
               onPressContact={goToProfile}
+              onLongPressContact={openCardContextMenu}
+              onViewProfile={goToProfile}
+              onQuickLog={logQuickly}
+              onLogInteraction={logCardInteraction}
+              onMessage={messageContact}
+              onEditContact={onEditContact}
+              onSelect={enterCardSelection}
               favouriteOverlay={favouriteOverlay}
               onToggleFavourite={toggleFavourite}
               line3ByContactId={line3ByContactId}
@@ -1135,6 +1277,42 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
         </Animated.View>
       </View>
       <DashboardOverlayHost />
+      <CardContextMenu
+        visible={contextMenuContact !== null}
+        contactId={contextMenuContact?.id ?? null}
+        name={contextMenuContact?.name ?? ""}
+        isFavourite={contextMenuIsFavourite}
+        isSnoozed={contextMenuIsSnoozed}
+        onViewProfile={() => {
+          if (contextMenuContact) goToProfile(contextMenuContact.id);
+        }}
+        onQuickLog={() => {
+          if (contextMenuContact) logQuickly(contextMenuContact.id);
+        }}
+        onLogInteraction={() => {
+          if (contextMenuContact) logCardInteraction(contextMenuContact.id);
+        }}
+        onMessage={() => {
+          if (contextMenuContact) messageContact(contextMenuContact.id);
+        }}
+        onEditContact={() => {
+          if (contextMenuContact) onEditContact(contextMenuContact.id);
+        }}
+        onToggleFavourite={() => {
+          if (contextMenuContact) {
+            toggleFavourite(contextMenuContact.id, !contextMenuIsFavourite);
+          }
+        }}
+        onToggleSnooze={() => {
+          if (contextMenuContact) {
+            toggleCardSnooze(contextMenuContact.id, contextMenuIsSnoozed);
+          }
+        }}
+        onSelect={() => {
+          if (contextMenuContact) enterCardSelection(contextMenuContact.id);
+        }}
+        onRequestClose={() => setContextMenuContactId(null)}
+      />
     </View>
   );
 }
