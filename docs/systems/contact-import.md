@@ -21,7 +21,7 @@ Migration 012 stores import work outside Orbit's portable backup model. Picker p
   - `batch_category_id` (`INTEGER`, nullable) — explicit bulk override; `NULL` means Uncategorized.
   - `status` (`TEXT`) — durable pending, complete, or discarded session state.
 - `import_session_rows` — one picker snapshot and review state per selected source contact.
-  - `source_payload` (`TEXT`) — accepted name, methods, birthday, and source metadata snapshot.
+  - `source_payload` (`TEXT`) — accepted name, methods, birthday, and Note snapshot; the allowlist remains the durable source after a provider grant expires.
   - `row_status` (`TEXT`) — pending, imported, linked, skipped, needs_review, or failed state.
   - `match_outcome` (`TEXT`) — deterministic or advisory outcome retained for truthful completion counts.
   - `candidates_json` (`TEXT`) — JSON-safe advisory candidate list; malformed persisted data reads as an empty list.
@@ -41,7 +41,7 @@ Migration 012 stores import work outside Orbit's portable backup model. Picker p
 | Legacy picker | `src/screens/LegacyContactPickerScreen.tsx` | Provides token-driven browse, search, multi-select, and permission recovery for the scoped legacy path. |
 | Session DAO | `src/db/import-session-dao.ts` | Accepts snapshots atomically and owns transaction-composable row transitions. |
 | Session read | `src/db/import-session-read.ts` | Finds resumable work and groups durable completion counts. |
-| Import writer | `src/db/imported-contact-dao.ts` | Composes contact creation/linking, external links, method provenance, and row resolution in one transaction. |
+| Import writer | `src/db/imported-contact-dao.ts` | Composes contact creation/linking, external links, method provenance, AI-off imported Notes, and row resolution in one transaction. |
 | Duplicate service | `src/services/import/duplicate-evidence.ts` | Performs deterministic active-link lookup and advisory candidate scoring. |
 | Batch service | `src/services/import/import-driver.ts` | Incrementally classifies and imports each row without a batch-wide transaction. |
 | Recovery service | `src/services/import/contact-import-resume-sweep.ts` | Reconciles resumable sessions and private staging on foreground launch. |
@@ -53,6 +53,7 @@ Migration 012 stores import work outside Orbit's portable backup model. Picker p
 |---|---|
 | `src/db/migrations/012-import-sessions.ts` | Adds local-only durable import-session tables and state constraints. |
 | `src/services/import/import-acquire.ts` | Accepts picker snapshots, stages accepted photos, and routes single versus bulk flow. |
+| `src/services/import/source-consolidation.ts` | Combines explicit source clusters and retains the first non-blank Note for the new contact. |
 | `modules/orbit-contact-picker/android/src/main/AndroidManifest.xml` | Declares the permission used by legacy acquisition and reconciliation re-reads. |
 | `plugins/withContactPickerPermission.js` | Writes the decisive app-manifest permission declaration during Expo prebuild. |
 | `src/services/import/start-contact-import.ts` | Selects the system or legacy acquisition path once for both entry points. |
@@ -69,7 +70,7 @@ Migration 012 stores import work outside Orbit's portable backup model. Picker p
 ### Acquiring and accepting a selection
 
 1. `AddSpeedDialFab` and Settings call `startContactImport()`, which routes API 37+ to the permissionless system picker and API 36 and below to `LegacyContactPicker`.
-2. The system picker snapshots selected fields from its temporary grant; the legacy picker requests scoped `READ_CONTACTS`, lists on-device summaries, then reads full fields only for selected lookup keys. Both map to `PickedContact[]`; no provider URI enters route state or durable payload.
+2. The system picker snapshots selected fields from its temporary grant; the legacy picker requests scoped `READ_CONTACTS`, lists on-device summaries, then reads full fields only for selected lookup keys. Both map to `PickedContact[]`, including the first non-blank Android Note; no provider URI enters route state or durable payload.
 3. The legacy reader accepts birthdays only from `Event.TYPE_BIRTHDAY`, preserves multiple methods, stages selected photos privately, and rejects a read failure so the screen can show an error rather than a false cancellation.
 4. `acceptPickedContacts()` moves accepted photos into flat private `import-staging/` paths, then commits the import session and every row together. Cancelling before acceptance writes neither a session nor an Orbit contact.
 
@@ -78,7 +79,7 @@ Migration 012 stores import work outside Orbit's portable backup model. Picker p
 1. One accepted row opens `ImportReviewScreen`, where the user can choose Bound or Unbound, category, selected/primary methods, birthday, and photo before writing.
 2. The DAO rejects an invalid non-null birthday before opening its transaction; the screen keeps invalid raw input visible and disables Import. The mapper accepts supported year-less and unambiguous slash formats, while still-unreadable values remain flagged rather than coerced.
 3. A deterministic active external link resolves as already in Orbit. Advisory matches require an explicit Link to Existing, Import as New, or Skip choice and never overwrite an existing name.
-4. A successful create or link resolves the import row in the same write transaction as contact data, links, and method provenance.
+4. A successful new-contact create preserves a raw Note as an `imported`, import-provenance, default-AI-off Memory in the same transaction as contact data, links, and method provenance. An already-linked outcome deliberately writes no Note.
 
 ### Processing bulk work and recovery
 
@@ -98,6 +99,7 @@ Migration 012 stores import work outside Orbit's portable backup model. Picker p
 1. After an imported contact commits, `import-photo.ts` converts the staged source into Orbit's usual master photo and sets the contact photo path.
 2. On success, the row's staging reference is retired before best-effort raw-file deletion. A failed photo leaves the contact imported and retains the staged input for Retry.
 3. Before a bulk driver starts, source rows sharing a canonical phone or email may be shown in `ConsolidationPrompt`; only an explicit Combine into one creates one contact with multiple external links.
+4. Consolidation chooses the first non-blank imported Note and writes it atomically with the combined new contact; it never uses provider metadata to enable AI.
 
 ## Configuration
 
@@ -117,6 +119,7 @@ Migration 012 stores import work outside Orbit's portable backup model. Picker p
 - **ADR-002:** Cross-Version Contact Import — Hybrid Two-Picker — routes acquisition by Android SDK while retaining one local picker-agnostic pipeline.
 - **ADR-003:** `READ_CONTACTS` on API 37+ for Reconcile — enables a permission-gated linked-contact re-read without changing the API-37+ import picker.
 - **ADR-068:** User-Triggered, Source-Only Reconciliation with Durable Review — shares the local source records and durable import flag-review boundary.
+- **ADR-091:** Imported Contact Notes as AI-Off Typed Memories — preserves accepted provider Notes through all new-contact import paths.
 
 ## Gotchas
 
@@ -128,6 +131,8 @@ Migration 012 stores import work outside Orbit's portable backup model. Picker p
 6. **A read error is not a cancellation.** The legacy screen must surface rejected selected-key reads; collapsing them to an empty selection silently loses the user's work.
 7. **Keep name-required behavior mode-specific.** A nameless bulk row skips terminally, while a nameless single row remains in review so the user can supply a name.
 8. **Fix and Ignore have different write scopes.** Fix must advance data revision with its birthday write; Ignore must only record the durable disposition.
+9. **Keep the Note in the session payload allowlist.** Adding it only to the native bridge loses it when bulk or review code reparses durable session JSON.
+10. **Already-linked imports do not append Notes.** This deliberate boundary prevents a re-import from duplicating unreviewed provider text on an existing contact.
 
 ## Related Systems
 
@@ -138,6 +143,7 @@ Migration 012 stores import work outside Orbit's portable backup model. Picker p
 - **App shell** — registers import routes and the Settings entry.
 - **Dashboard** — exposes the speed-dial import entry.
 - **Backup & Restore** — excludes local-only import sessions from portable snapshots and clears them on Replace-all restore.
+- **Contact Knowledge** — owns imported Notes after the new-contact transaction commits.
 - **Contact Reconciliation** — re-reads already-linked source records through a permission-gated, user-initiated path.
 
 ## Changelog
@@ -147,3 +153,4 @@ Migration 012 stores import work outside Orbit's portable backup model. Picker p
 | 2026-08-26 | 19 | Created Android-17 selected-contact acquisition, durable review sessions, conservative resolution, and resumable import documentation. |
 | 2026-08-29 | 19.1 | Added SDK-routed legacy acquisition, scoped permission recovery, and explicit shared-pipeline terminal outcomes. |
 | 2026-08-26 | 20 | Added reconcile-only API-37+ permission handling and durable unreadable-birthday Fix/Ignore review. |
+| 2026-09-03 | 24.2 | Added Note MIME acquisition and durable AI-off imported-Memory writes for new-contact imports. |
