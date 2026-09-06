@@ -1,7 +1,7 @@
 /**
  * HomeScreen — the dashboard CORE (DASH-01/03/04/05/07). This IS the app's home
  * surface: the Phase 25 query-state population (`listDashboardPopulation`, or
- * `listDashboardSearch` when a term is present) rendered as `ContactCard`s, with
+ * `listDashboardSearch` when a term is present) rendered as ListRows or a CardGrid,
  * the contact-count header, the Population/Filters/Sort control row, the Row 3
  * collapsible session-backed search + List/Card toggle, a reliable freshness
  * path, and cause-aware empty/error states.
