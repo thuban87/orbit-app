@@ -30,7 +30,8 @@
  * Every colour resolves through `useTheme().colors.*` (CLAUDE.md / check:colors).
  */
 import { useFocusEffect, useIsFocused } from "@react-navigation/native";
-import { useCallback, useEffect, useRef, useState } from "react";
+import * as Haptics from "expo-haptics";
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import {
   AppState,
   FlatList,
@@ -54,6 +55,7 @@ import { POPULATION_LABELS } from "@/components/control-surface/control-labels";
 import { DashboardControlRow } from "@/components/control-surface/DashboardControlRow";
 import { DashboardOverlayHost } from "@/components/control-surface/DashboardOverlayHost";
 import { Icon } from "@/components/icons/Icon";
+import { ICON_REGISTRY, type IconName } from "@/components/icons/icon-registry";
 import { SegmentedControl } from "@/components/SegmentedControl";
 import { ShellAppBar } from "@/components/ShellAppBar";
 import {
@@ -69,12 +71,19 @@ import {
   listDashboardSearch,
 } from "@/db/dashboard-read";
 import { getExecutor, localDateTime } from "@/db/database";
+import { readLine3Candidates } from "@/db/dashboard-knowledge-read";
+import { clearFavouriteRank, setFavouriteRank } from "@/db/favourites-dao";
 import { countUnbound } from "@/db/unbound-read";
 import {
   type DashboardPopulationCounts,
   selectDashboardEmptyState,
 } from "@/logic/dashboard-empty-logic";
 import type { DashboardViewMode } from "@/logic/dashboard-query-logic";
+import {
+  applyCommittedMembership,
+  createFavouriteOptimisticStore,
+} from "@/logic/favourite-optimistic";
+import { selectLine3 } from "@/logic/list-row-selection";
 import type { DashboardScreenProps } from "@/navigation/types";
 import { useBottomClearance } from "@/navigation/use-bottom-clearance";
 import { buildDashboardOverflowActions } from "@/screens/dashboard-overflow-actions";
@@ -87,6 +96,7 @@ import { MOTION } from "@/theme/tokens/motion";
 import { SPACING } from "@/theme/tokens/spacing";
 import { useReducedMotion } from "@/theme/use-reduced-motion";
 import { Logger } from "@/utils/logger";
+import { parseLocalMs } from "@/utils/dates";
 
 /** The debounce interval (ms) that collapses a keystroke burst to one read. */
 const SEARCH_DEBOUNCE_MS = 220;
@@ -102,6 +112,15 @@ const VIEW_TOGGLE_OPTIONS: {
 ];
 
 const LOG_SCOPE = "dashboard-home";
+
+interface ListRowLine3 {
+  text: string;
+  iconName?: IconName;
+}
+
+function isIconName(value: string): value is IconName {
+  return value in ICON_REGISTRY;
+}
 
 /** The four population counts feeding the header + the empty-state gate. */
 interface PopulationCounts {
@@ -183,6 +202,14 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
   });
 
   const [rows, setRows] = useState<DashboardRow[]>([]);
+  const [line3ByContactId, setLine3ByContactId] = useState<
+    ReadonlyMap<number, ListRowLine3>
+  >(() => new Map());
+  const [favouriteStore] = useState(createFavouriteOptimisticStore);
+  const favouriteOverlay = useSyncExternalStore(
+    favouriteStore.subscribe,
+    favouriteStore.getSnapshot,
+  );
   const [listNow, setListNow] = useState(() => localDateTime());
   const [counts, setCounts] = useState<PopulationCounts>(ZERO_COUNTS);
   const [populationCounts, setPopulationCounts] =
@@ -311,8 +338,35 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
           countFavourites(exec),
           countAllContacts(exec),
         ]);
+        const candidates = await readLine3Candidates(
+          exec,
+          list.map((row) => row.id),
+        );
+        const candidatesByContactId = new Map<number, typeof candidates>();
+        for (const candidate of candidates) {
+          const forContact = candidatesByContactId.get(candidate.contactId) ?? [];
+          forContact.push(candidate);
+          candidatesByContactId.set(candidate.contactId, forContact);
+        }
+        const nextLine3ByContactId = new Map<number, ListRowLine3>();
+        const selectionNow = new Date(parseLocalMs(now));
+        for (const row of list) {
+          const selection = selectLine3(
+            candidatesByContactId.get(row.id) ?? [],
+            row.id,
+            row.name,
+            selectionNow,
+          );
+          nextLine3ByContactId.set(row.id, {
+            text: selection.text,
+            ...(selection.kind === "candidate" && isIconName(selection.type)
+              ? { iconName: selection.type }
+              : {}),
+          });
+        }
         if (cancelled) return;
         setRows(list);
+        setLine3ByContactId(nextLine3ByContactId);
         setListNow(now);
         setCounts({ live, neverContacted, snoozed, archived, unbound });
         setPopulationCounts({
@@ -327,6 +381,7 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
         Logger.error(LOG_SCOPE, "failed to load dashboard", err);
         if (!cancelled) {
           setRows([]);
+          setLine3ByContactId(new Map());
           setError(true);
         }
       } finally {
@@ -388,6 +443,42 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
   const goToProfile = useCallback(
     (contactId: number) => navigation.navigate("Profile", { contactId }),
     [navigation],
+  );
+
+  const toggleFavourite = useCallback(
+    (contactId: number, nextMembership: boolean) => {
+      const generation = favouriteStore.begin(contactId, nextMembership);
+      void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      const write = nextMembership ? setFavouriteRank : clearFavouriteRank;
+
+      void write(getExecutor(), contactId, localDateTime())
+        .then(() => {
+          if (
+            favouriteStore.resolve(contactId, generation, "success") === "applied"
+          ) {
+            setRows((previousRows) =>
+              applyCommittedMembership(previousRows, contactId, nextMembership),
+            );
+          }
+        })
+        .catch((writeError: unknown) => {
+          Logger.error(LOG_SCOPE, "failed to update favourite", writeError);
+          if (
+            favouriteStore.resolve(contactId, generation, "failure") === "applied"
+          ) {
+            showSnackbar({
+              kind: "error",
+              label: "Couldn't update favourite. Try again.",
+              action: {
+                label: "Retry",
+                accessibilityLabel: "Retry updating favourite",
+                onPress: () => toggleFavourite(contactId, nextMembership),
+              },
+            });
+          }
+        });
+    },
+    [favouriteStore],
   );
 
   // The cause-aware empty state — delegated to the pure gate (no inline count
@@ -693,6 +784,16 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
                 status={item.status}
                 now={listNow}
                 onPress={() => goToProfile(item.id)}
+                isFavourite={
+                  favouriteOverlay.get(item.id) ?? (item.favourite_rank !== null)
+                }
+                onToggleFavourite={() => {
+                  const renderedMembership =
+                    favouriteOverlay.get(item.id) ??
+                    (item.favourite_rank !== null);
+                  toggleFavourite(item.id, !renderedMembership);
+                }}
+                line3={line3ByContactId.get(item.id) ?? null}
               />
             ) : (
               <ContactCard
