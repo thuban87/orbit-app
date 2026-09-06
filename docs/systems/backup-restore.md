@@ -1,7 +1,7 @@
 # Backup & Restore
 
 **Last updated:** 2026-09-02
-**Updated by phase:** 23-theme-visual-system
+**Updated by phase:** 25-dashboard-data-state-foundation
 **Owners:** `src/backup/`, `src/services/backup/`, `src/services/backup-sweep.ts`, `src/db/restore-photo-journal-dao.ts`, `src/screens/BackupScreen.tsx`
 
 ## Purpose
@@ -16,7 +16,7 @@ The backup manifest is a versioned wire model separate from SQLite's schema vers
 
 **Tables:**
 - `tombstones` — indefinitely retained type-and-UID deletion evidence for mergeable rows.
-- `app_settings` — stores portable preferences (including the default-on `interactionAssistEnabled` toggle) plus device-local automatic-backup configuration, revision, health, and encryption-flag state. The seven durable theme keys are allowlisted so a later format can accept them, but format-3 exports intentionally omit them. The transient `interaction_assists` rows themselves are device-local and excluded from the manifest.
+- `app_settings` — stores portable preferences (including the default-on `interactionAssistEnabled` toggle) plus device-local automatic-backup configuration, revision, health, and encryption-flag state. Theme and Dashboard query keys are allowlisted so a later format can accept them, but the current wire intentionally omits both sets. The transient `interaction_assists` rows themselves are device-local and excluded from the manifest.
 - `restore_photo_journal` — committed-only finalize/delete work for restored photo files.
 - `contact_methods`, external links, and method provenance — first-class UID-bearing portable children with labels and canonicalization regions where present.
 - `memories`, `relationships`, `current_state_entries`, and `custom_field_value_history` — portable typed knowledge rows, including soft deletion, explicit AI permission, and retained prior field values.
@@ -30,7 +30,7 @@ The backup manifest is a versioned wire model separate from SQLite's schema vers
 
 | Layer | File | Responsibility |
 |---|---|---|
-| Wire validation | `src/backup/backup-schema.ts` | Parses and forward-migrates the manifest before preview or apply, including allowlisted future theme keys. |
+| Wire validation | `src/backup/backup-schema.ts` | Parses and forward-migrates the manifest before preview or apply, including allowlisted future theme and Dashboard keys. |
 | Export | `src/backup/export-manifest.ts` | Builds one full non-secret manifest inside a read snapshot. |
 | Reconciliation | `src/backup/reconciliation.ts` | Resolves UID, tombstone, parent, and natural-key outcomes. |
 | Restore | `src/backup/restore-apply.ts` | Applies a validated Merge or Replace-all under one write transaction. |
@@ -101,6 +101,7 @@ The backup manifest is a versioned wire model separate from SQLite's schema vers
 - **ADR-070:** Durable Pending Interaction-Assist Lifecycle and Portable Opt-Out — adds the `interactionAssistEnabled` setting to the portable manifest while excluding the transient assist rows.
 - **ADR-083:** Durable Multi-Package Theme Configuration and Restore-Before-Paint — allowlists seven future-portable theme keys without changing the current format-3 wire shape.
 - **ADR-090:** Additive Custom-Field Value History and Deferred Contact Scope — makes retained prior values a mergeable, tombstoned portable entity.
+- **ADR-092:** Durable Shared Dashboard Query State — allowlists future-portable Dashboard preferences without changing the current wire format.
 
 ## Gotchas
 
@@ -116,6 +117,7 @@ The backup manifest is a versioned wire model separate from SQLite's schema vers
 10. **Do not export import sessions.** Their picker-derived snapshots are local recovery state, not portable relationship authority.
 11. **Allowlisting is not emission.** Theme keys may be accepted when a future format carries them, but adding them to a format-3 projection would silently break cross-version restore compatibility.
 12. **Do not require a new array from an older format-4 file.** There is no 4→4 forward migration, so optional additive arrays normalize during parse before validation and restore.
+13. **Allowlisting is not emission for Dashboard preferences.** Migration 019 makes the keys durable and restorable; the current manifest projection stays unchanged until its coordinated format bump.
 
 ## Related Systems
 
@@ -140,3 +142,4 @@ The backup manifest is a versioned wire model separate from SQLite's schema vers
 | 2026-08-31 | 21 | Added the `interactionAssistEnabled` preference to the portable manifest (transient assist rows excluded). |
 | 2026-09-02 | 23 | Allowlisted durable theme preferences while preserving the format-3 export projection. |
 | 2026-09-03 | 24.2 | Added Memory permission, retained custom-field history, scope metadata, and compatible format-4 restoration. |
+| 2026-09-02 | 25 | Allowlisted durable Dashboard preferences for a future wire without changing the current backup format. |
