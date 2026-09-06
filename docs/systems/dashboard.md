@@ -1,12 +1,12 @@
 # Dashboard
 
 **Last updated:** 2026-09-02
-**Updated by phase:** 26-dashboard-control-surface
+**Updated by phase:** 27-dashboard-list-view
 **Owners:** `src/db/dashboard-read.ts`, `src/logic/dashboard-query-logic.ts`, `src/logic/dashboard-gravity-filter.ts`, `src/db/knowledge-search-read.ts`, `src/services/knowledge-search.ts`, `src/logic/dashboard-search-match.ts`, `src/stores/dashboard-query-store.ts`, `src/stores/dashboard-session-store.ts`, `src/components/control-surface/`, `src/screens/HomeScreen.tsx`
 
 ## Purpose
 
-The Dashboard is Orbit's everyday local contact browser and detail-entry surface. It projects one shared eligible universe for all future List and Card renderers, then lets a person narrow it with populations, filters, sorting, and semantic search without exposing archived or Unbound contacts.
+The Dashboard is Orbit's everyday local contact browser and detail-entry surface. It projects one shared eligible universe for List and Card renderers, then lets a person narrow it with populations, filters, sorting, and semantic search without exposing archived or Unbound contacts. Its List renderer is a scan-first three-line local contact browser with accessible status and gesture equivalents.
 
 ## Architecture
 
@@ -16,7 +16,7 @@ The Dashboard owns no table. It reads `contacts` and related local data, while i
 
 **Tables:**
 - `contacts` — supplies lifecycle, cadence, recency, category, birthday, snooze, favourite, and status inputs.
-- `app_settings` — holds the List/Card preference, explicit population set, filter object, and literal sort sentinel.
+- `app_settings` — holds the List/Card preference, explicit population set, filter object, literal sort sentinel, and the global right-swipe action.
 - `categories`, `contact_methods`, `memories`, `relationships`, `custom_field_defs`, `custom_field_values` — supply user-facing semantic search entries.
 - `fuel` — continues to supply the legacy dashboard projection's eligible card line while the new query foundation is wired by later render phases.
 
@@ -24,6 +24,7 @@ The Dashboard owns no table. It reads `contacts` and related local data, while i
 - `DashboardQueryState` — the one renderer-independent durable state object.
 - `DashboardPopulation` / `DashboardFilters` / `DashboardSortMode` — closed query-axis tokens validated before query construction.
 - `DashboardRow` (`src/db/dashboard-read.ts`) — a scoped contact projection with population match reasons and nullable status for Not Contacted rows.
+- `RightSwipeAction` — the closed `quick-log` / `log-contact` preference vocabulary.
 
 ### Store, Service & DAO Layer
 
@@ -36,14 +37,17 @@ The Dashboard owns no table. It reads `contacts` and related local data, while i
 | Search read | `src/db/knowledge-search-read.ts` | Reads only the eligible IDs' user-facing semantic corpus. |
 | Search logic | `src/services/knowledge-search.ts` | Performs bounded typo-tolerant matching, coverage ranking, and raw-text offset mapping. |
 | Descriptor logic | `src/logic/dashboard-search-match.ts` | Produces prioritized highlighted match descriptors for renderers. |
+| List knowledge read | `src/db/dashboard-knowledge-read.ts` | Batches visible, bounded line-three candidates for the loaded List contacts. |
+| List selection | `src/logic/list-row-selection.ts` | Prioritizes imminent and pinned knowledge, then returns a stable completeness prompt when no candidate qualifies. |
 | Control surface | `src/components/control-surface/` | Separates option content from the floating panel presentation and durable query writes. |
-| Dashboard screen | `src/screens/HomeScreen.tsx` | Hosts controls, session search, refresh, destinations, and the List/Card renderer seam. |
+| Dashboard screen | `src/screens/HomeScreen.tsx` | Hosts controls, session search, refresh, List loading, Favourite reconciliation, destinations, and the List/Card renderer seam. |
 
 ### Key Files
 
 | File | Role |
 |---|---|
 | `src/db/migrations/019-dashboard-prefs.ts` | Adds the durable Dashboard preference columns. |
+| `src/db/migrations/020-dashboard-swipe-pref.ts` | Adds the constrained global right-swipe action with the Quick Log default. |
 | `src/db/app-settings-dao.ts` | Validates and persists Dashboard preference values. |
 | `src/logic/dashboard-query-logic.ts` | Defines populations, filters, sorting, and reset transitions. |
 | `src/db/dashboard-read.ts` | Owns the shared scoped population and term-bearing reads plus bound-only empty-state counts. |
@@ -53,6 +57,11 @@ The Dashboard owns no table. It reads `contacts` and related local data, while i
 | `src/db/knowledge-search-read.ts` | Builds the eligible-ID-scoped semantic corpus. |
 | `src/services/knowledge-search.ts` | Provides bounded matcher and coverage-aware ranking. |
 | `src/logic/dashboard-search-match.ts` | Builds semantic labels, highlights, snippets, and overflow copy. |
+| `src/db/dashboard-search-read.ts` | Composes relevance-ranked semantic matches with deterministic name/fuel fallbacks for List search. |
+| `src/db/dashboard-knowledge-read.ts` | Reads visibility-safe, bounded candidates for List's adaptive third line. |
+| `src/logic/list-row-selection.ts` | Selects deterministic third-line context or a stable gentle prompt. |
+| `src/components/ListRow.tsx` | Renders the scan-first, tokenized, accessible List row. |
+| `src/components/list-row-content.ts` | Formats local-calendar recency, row narration, and search explanations. |
 | `src/services/widget/widget-data.ts` | Consumes the Favorites population in Dashboard Default order. |
 | `src/logic/birthday-logic.ts` | Parses local birthdays for the 30-day Birthdays population. |
 | `src/components/control-surface/AnchoredPanel.tsx` | Renders the centered, in-tree floating control surface with a scroll cap, scrim, focus handoff, and reduced-motion-aware animation. |
@@ -91,6 +100,14 @@ The Dashboard owns no table. It reads `contacts` and related local data, while i
 3. A term relaxes only the implicit Active search scope to non-archived Bound contacts. Explicit populations and filters retain their selected boundaries, and all term matching remains LIKE-escaped and bound.
 4. The semantic reader still receives only fully filtered eligible IDs. It returns user-facing names, fields, semantic memories, relationships, searchable custom values, and notes; bounded TypeScript matching provides descriptors and highlights without FTS5.
 
+### Rendering and acting from a List row
+
+1. `HomeScreen` loads the shared Dashboard rows, batches line-three candidates for their IDs, and passes the selected deterministic context into `ListRow`; the row does not issue its own database reads.
+2. A normal row shows name, local-calendar recency plus category, and the selected context or a stable completeness prompt. Its same-weight tokenized border and decorative glyph communicate a real status; null status is neutral and glyph-less, while a current snooze uses the neutral snooze presentation without mutating domain status.
+3. The Favourite star is binary membership. The screen keeps an optimistic per-contact overlay while a write is pending, records every successful durable settlement into the base row, and reveals that committed membership if a newer write fails.
+4. A closed row opens Profile. A partially open row closes first. Right swipe and its accessibility action read the global action only at commitment, then run shared Quick Log or navigate to Log Contact; left swipe and its accessibility action route to Edit Contact. Only one row remains open.
+5. Search keeps identity on line one and replaces normal secondary content with a compact match explanation and strongest highlighted descriptor. Relevance-ranked corpus matches stay in scorer order; name-only and fuel-only fallbacks append in Dashboard order.
+
 ### Retired legacy Dashboard surfaces
 
 1. Favourites are binary membership; the widget reads Favorites in shared Default order instead of user-visible rank order.
@@ -105,6 +122,7 @@ The Dashboard owns no table. It reads `contacts` and related local data, while i
 | `DASHBOARD_SORT_MODES` | `default`, name, recency, status modes | `src/logic/dashboard-query-logic.ts` | Closed persisted sort vocabulary. |
 | `CONTACT_FREQUENCY_BANDS` | weekly ≤7, monthly ≤31, quarterly ≤91, yearly thereafter | `src/logic/dashboard-query-logic.ts` | Dashboard contact-frequency filter boundaries. |
 | Birthday window | 30 days | `src/db/dashboard-read.ts` | Limits the Birthdays population. |
+| `RIGHT_SWIPE_ACTIONS` | `quick-log`, `log-contact` | `src/logic/dashboard-query-logic.ts` | Closes the durable List right-swipe preference vocabulary. |
 
 ## Decisions
 
@@ -123,6 +141,9 @@ The Dashboard owns no table. It reads `contacts` and related local data, while i
 - **ADR-095:** Live-Applying Dashboard Floating Control Surface — keeps separate query controls live-applying in one swappable in-tree presentation surface.
 - **ADR-096:** Dashboard Header and Overflow Discovery Paths — establishes the header destinations, fixed overflow, and management-route entry behavior.
 - **ADR-097:** Scoped Dashboard Search and Dedicated Unbound Retrieval — separates term-bearing Dashboard search from the population read and preserves Unbound retrieval on its child route.
+- **ADR-098:** Scan-First, Accessible Dashboard List Rows — establishes the dense List renderer, deterministic third line, binary star, and redundant status treatment.
+- **ADR-099:** Durable Global Dashboard Right-Swipe Action — adds the constrained persisted logging choice used by List gestures.
+- **ADR-100:** Relevance-First, Visibility-Safe Dashboard List Search — preserves scorer order and confines List search to visible local knowledge.
 
 ## Gotchas
 
@@ -136,6 +157,10 @@ The Dashboard owns no table. It reads `contacts` and related local data, while i
 8. **Keep the panel presentation separate from option content.** A future HUD may replace the container, but it must not reimplement query state, persistence, or option semantics.
 9. **Search collapse clears the term.** Leaving a hidden session term active would make a filtered list look unexplained; do not retain it without a visible active indication.
 10. **Long filter content must scroll.** The panel cap is deliberate, but clipping lower filter families or Clear filters makes the live controls unreachable.
+11. **Keep List status presentation separate from status state.** Snooze changes the row to neutral plus a snooze glyph; it does not rewrite `status` or create an Unknown status.
+12. **Timestamp text is untrusted at the renderer boundary.** Local-date parsing rejects rollover values; malformed recency renders neutral copy and malformed snoozes are inactive.
+13. **Do not re-sort scored List corpus results.** Dashboard order is a tie-breaker for corpus matches and the append order only for name/fuel fallbacks.
+14. **A stale Favourite write can still be durable.** Every successful settlement updates the base membership, even if a newer optimistic intent remains over it.
 
 ## Related Systems
 
@@ -162,3 +187,4 @@ The Dashboard owns no table. It reads `contacts` and related local data, while i
 | 2026-09-02 | 22 | Made Dashboard a tab root, moved capture to the universal FAB, and added Group Events and Archived overflow destinations. |
 | 2026-09-02 | 25 | Added shared durable query state, scoped populations/filters/search, and retired rank, banner, and Never Contacted Dashboard surfaces. |
 | 2026-09-02 | 26 | Added the live Population/Filters/Sort floating control surface, session search and view toggle, fixed Dashboard discovery entries, and dedicated Unbound name retrieval. |
+| 2026-09-02 | 27 | Added the scan-first List renderer, deterministic knowledge context, binary Favourite reconciliation, constrained swipe actions, and relevance-first List search. |
