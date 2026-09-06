@@ -106,7 +106,7 @@ category's phase (see Traceability).
 - [x] **LISTV-05**: Unsnoozed relationship state shows through two redundant channels — a same-weight status-colored border and a distinct status glyph; unevaluated contacts get a neutral border and no glyph; snoozed contacts get a neutral border and a snooze glyph
 - [ ] **LISTV-06**: During search, rows keep the name on line 1 and replace lines 2–3 with a compact match explanation plus the strongest highlighted snippet
 - [ ] **LISTV-07**: Tap opens Profile (a partially swiped row closes first); right swipe executes the configured logging action, left swipe routes to Edit Contact; one row swipe-revealed at a time; no destructive swipe actions
-- [ ] **LISTV-08**: User can choose globally between Quick Log and Log Contact for right-swipe (default Quick Log), stored durably and backup-portable; the action executes on gesture commitment
+- [x] **LISTV-08**: User can choose globally between Quick Log and Log Contact for right-swipe (default Quick Log), stored durably and backup-portable; the action executes on gesture commitment
 - [ ] **LISTV-09**: Assistive-technology users get row actions equivalent to the gestures and an accessible description covering name, category, recency, favorite, and relationship/snooze state without color
 - [ ] **LISTV-10**: Fast query changes update rows in place with restrained transitions (reduced-motion respected); skeletons only on initial or meaningfully delayed loads; cause-aware empty/error states shared semantically with Card View
 
