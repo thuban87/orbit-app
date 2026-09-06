@@ -178,6 +178,7 @@ All data is on-device SQLite. Migration 001 uses a surrogate `contacts.id` and a
 2. `mergeContacts()` resolves method and active-link collisions, reparents compatible contact-owned children, and snapshots a meaningful overwritten or dropped value in `field_history` inside one transaction.
 3. It recomputes `last_contact` through `recency-dao`, deletes the absorbed live contact, and writes a generic contact tombstone. The absorbed identity is not archived or normally restorable.
 4. The same transaction reparents compatible Memory, relationship, and current-state rows before deleting the absorbed contact; it clears would-be relationship self-links and demotes a conflicting current-state row rather than dropping history.
+5. It also reparents retained custom-field value-history rows to the survivor. An archive-gated purge instead tombstones and explicitly deletes those rows before contact deletion.
 
 ## Configuration
 
@@ -204,6 +205,7 @@ All data is on-device SQLite. Migration 001 uses a surrogate `contacts.id` and a
 - **ADR-075:** Binary Favourite Membership Without a User-Facing Order — makes favourite rank ineligible as a contact-picker sort key.
 - **ADR-082:** Universal Capture FAB, Canonical Picker, and Truthful Quick Log — adds the shared local target picker.
 - **ADR-089:** Recoverable Memory Lifecycle and Contact-Operation Integrity — extends merge and purge with explicit contact-knowledge integrity work.
+- **ADR-090:** Additive Custom-Field Value History and Deferred Contact Scope — requires retained field history to follow explicit contact lifecycle handling.
 - **ADR-035:** Native SMS Handoff with Guaranteed Clipboard Copy — partially superseded; native handoff and Copy remain the interaction boundary.
 - **ADR-059:** Normalized Contact Methods, Canonical Actionability, and Local Provenance — replaces scalar endpoint fields with ordered mergeable method rows.
 - **ADR-062:** Bound/Unbound Lifecycle and One-Way Cadence Assignment — separates active cadence participation from relationship data ownership.
@@ -247,6 +249,7 @@ All data is on-device SQLite. Migration 001 uses a surrogate `contacts.id` and a
 21. **Do not merge through archive or direct recency SQL.** Archive makes a normal restore possible, and a merge-local `MAX` bypasses the single recency writer.
 22. **Picker ordering is not favourite-rank ordering.** A favourite is a membership band only; use recency and then name inside that band.
 23. **Do not rely on cascade for a merge.** Contact deletion would discard knowledge rows; merge must reparent them and resolve relationship/current-state collisions first.
+24. **Retained custom-field history is a child with evidence.** Edit appends its prior raw value in the contact transaction; merge reparents it and purge tombstones it before deletion.
 
 ## Related Systems
 
@@ -288,3 +291,4 @@ All data is on-device SQLite. Migration 001 uses a surrogate `contacts.id` and a
 | 2026-08-31 | 21 | Purge cascade-deletes pending `interaction_assists` (documented exception to explicit fan-out); assist confirmation reuses the sole recency recomputer. |
 | 2026-09-02 | 22 | Added the local shell action-picker projection with membership-only favourites ordering and explicit archive search. |
 | 2026-09-03 | 24.1 | Extended merge and archive-gated purge with explicit contact-knowledge preservation and fan-out. |
+| 2026-09-03 | 24.2 | Added atomic retained custom-field history capture plus explicit merge and purge lifecycle handling. |
