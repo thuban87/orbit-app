@@ -75,8 +75,8 @@ export function createFavouriteOptimisticStore(): FavouriteOptimisticStore {
 }
 
 /**
- * Apply the persisted binary membership to a dashboard base row after its
- * latest optimistic write succeeds. Rank is intentionally membership-only.
+ * Apply a persisted binary membership to a dashboard base row after every
+ * successful optimistic write. Rank is intentionally membership-only.
  */
 export function applyCommittedMembership(
   rows: readonly DashboardRow[],

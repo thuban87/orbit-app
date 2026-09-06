@@ -729,13 +729,18 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
 
       void write(getExecutor(), contactId, localDateTime())
         .then(() => {
-          if (
-            favouriteStore.resolve(contactId, generation, "success") === "applied"
-          ) {
-            setRows((previousRows) =>
-              applyCommittedMembership(previousRows, contactId, nextMembership),
-            );
-          }
+          // Every completed SQLite write is a durable base-state update, even
+          // while a newer per-contact overlay remains visible. If that newer
+          // choice later fails, its overlay drops to reveal this committed row.
+          favouriteStore.resolve(
+            contactId,
+            generation,
+            "success",
+            nextMembership,
+          );
+          setRows((previousRows) =>
+            applyCommittedMembership(previousRows, contactId, nextMembership),
+          );
         })
         .catch((writeError: unknown) => {
           Logger.error(LOG_SCOPE, "failed to update favourite", writeError);
