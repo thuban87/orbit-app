@@ -4,7 +4,7 @@ milestone: v2.0
 milestone_name: Release Readiness
 current_phase: 27
 current_phase_name: dashboard-list-view
-status: verifying
+status: executing
 stopped_at: Completed 27-07-PLAN.md
 last_updated: "2026-09-06T04:29:54.927Z"
 last_activity: 2026-09-05
@@ -33,15 +33,15 @@ See: .planning/PROJECT.md (updated 2026-09-01 after v1.0 milestone)
 
 ## Current Position
 
-Phase: 27 (dashboard-list-view) — READY TO EXECUTE
-Plan: 6 of 6
-Status: Phase complete — ready for verification
+Phase: 27 (dashboard-list-view) — EXECUTING GAP CLOSURE
+Plan: 7 of 8
+Status: Executing the remaining gap-closure plan
 Carried forward (owner's bucket, NOT resolved here): D-11 default Memory-type display name — reconcile before Phase 34.
 Surface to owner (24.2-07, KNOW-15): milestone plan said Phase 36 owns the backup format-4 bump, but 24.1 already bumped to 4 (d677e2c); Plan 07 emits into the live format 4 with NO bump — that milestone instruction is stale.
 Deferred to Phase 31 (recorded in Plan 05): durable contact-scoped-def ownership + owner-purge semantics. Deferred to Phase 36 (ROADMAP breadcrumb): legacy AI-fuel confirm-path code removal.
 Last activity: 2026-09-05 — Phase 27 execution started
 Progress: 6/19 phases complete (v2.0) — 22, 23, 24.1, 24.2, 25, 26
-Next: `/gsd-execute-phase 27`.
+Next: `/gsd-execute-phase 27 --gaps-only`.
 
 **Milestone v2.0 structure (pre-decided by the owner from the fifteen milestone-2 dossiers + the
 2026-09-01 cross-dossier audit; not re-derived):** 22 App Shell · 23 Theme · 24 Contact Knowledge ·
