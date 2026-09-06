@@ -83,7 +83,7 @@ The system owns no remote state and no backend. SQLite supplies live candidate d
 
 ### Opening a notification
 
-1. A decay body tap checks current lifecycle before routing. A now-Unbound contact opens Profile instead of Compose; a live Bound contact retains the Dashboard-rooted Compose route.
+1. A decay body tap checks current lifecycle before routing. A now-Unbound contact opens Profile instead of Compose; a live Bound contact uses the typed nested Dashboard-tab Compose reset.
 2. A birthday body tap navigates to that contact's Profile.
 3. A digest body tap resets the stack to Dashboard then Digest, guaranteeing Back returns to Dashboard on warm and cold starts.
 4. The response gate reads a cold-start response once, clears it after handling, and waits for navigation readiness before applying a queued body-tap intent.
@@ -108,6 +108,7 @@ The system owns no remote state and no backend. SQLite supplies live candidate d
 
 - **ADR-039:** Pre-Scheduled Inexact Decay Reminders — reconciles generic, per-contact reminders without exact alarms or frozen fuel.
 - **ADR-040:** Exactly-Once Notification Actions and Dashboard-Rooted Tap Routing — keeps action writes DAO-owned and makes navigation deterministic.
+- **ADR-080:** Four-Tab Bottom Navigation Shell with Per-Tab Stacks — preserves the notification Dashboard fallback through the nested tab tree.
 - **ADR-041:** Notification Settings, Privacy Channels, and Birthday Alerts — persists policy in SQLite and uses versioned privacy channels.
 - **ADR-045:** Event-Driven Widget Refresh and Boot Recovery — keeps the widget current after a notification mark commits.
 - **ADR-055:** Dedicated Weekly Digest Scheduling and Persisted Notification Policy — adds the independent Sunday digest request, private channel, durable toggle, and dashboard-rooted tap reset.
@@ -127,6 +128,7 @@ The system owns no remote state and no backend. SQLite supplies live candidate d
 9. **Do not put digest counts in the notification body.** Scheduled content is frozen; the live Digest screen is the payload.
 10. **Do not migrate national endpoints with a guessed headless region.** The action path uses the shared platform region provider; an unavailable region leaves a national method non-actionable rather than inventing canonical identity.
 11. **Recheck lifecycle at delivered ingress.** A notification can outlive an Unbind; Mark may record real history, but stale decay Compose and Snooze actions must not revive cadence work.
+12. **Do not restore flat root routes in a notification response.** The response gate must use the shared nested Dashboard reset builders after the tab-shell conversion.
 
 ## Related Systems
 
@@ -147,3 +149,4 @@ The system owns no remote state and no backend. SQLite supplies live candidate d
 | 2026-08-23 | 15 | Added an independently reconciled weekly digest trigger, versioned private channel, policy toggle, and Digest reset route. |
 | 2026-08-27 | 18.1 | Supplied device region to the notification headless first-open migration path. |
 | 2026-08-27 | 18.2 | Made decay Bound-only, added Unbound birthday policy, and guarded stale notification actions and body taps. |
+| 2026-09-02 | 22 | Re-expressed body-tap destinations as typed nested Dashboard-tab resets without changing notification policy. |
