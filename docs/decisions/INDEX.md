@@ -22,7 +22,7 @@ not something you can pattern-match against.
 ## How to use this
 
 - **Is a decision still live?** Check the `Superseded by` column. 22 of
-  97 ADRs are superseded in whole or in part.
+  100 ADRs are superseded in whole or in part.
 - **Which decisions govern a file?** Don't grep this file — ask the graph:
   `npm run graph:ask -- governs src/db/field-values-dao.ts`, or follow the
   `governed_by` edges.
@@ -128,3 +128,6 @@ not something you can pattern-match against.
 | 095 | Live-Applying Dashboard Floating Control Surface | Accepted | 26-dashboard-control-surface | — | — | — | 8 | `src/components/control-surface`, `src/screens`, `src/stores` |
 | 096 | Dashboard Header and Overflow Discovery Paths | Accepted | 26-dashboard-control-surface | — | — | — | 8 | `src/components`, `src/navigation/tabs`, `src/screens` |
 | 097 | Scoped Dashboard Search and Dedicated Unbound Retrieval | Accepted | 26-dashboard-control-surface | — | — | — | 6 | `src/db`, `src/logic`, `src/screens` +1 |
+| 098 | Scan-First, Accessible Dashboard List Rows | Accepted | 27-dashboard-list-view | — | — | — | 7 | `src/components`, `src/components/icons`, `src/db` +2 |
+| 099 | Durable Global Dashboard Right-Swipe Action | Accepted | 27-dashboard-list-view | — | — | — | 6 | `src/backup`, `src/db`, `src/db/migrations` +2 |
+| 100 | Relevance-First, Visibility-Safe Dashboard List Search | Accepted | 27-dashboard-list-view | — | — | — | 6 | `src/components`, `src/db`, `src/logic` +1 |

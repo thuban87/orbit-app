@@ -107,5 +107,8 @@
 // NOTE: ADR-0095 [ACCEPTED] Live-Applying Dashboard Floating Control Surface
 // NOTE: ADR-0096 [ACCEPTED] Dashboard Header and Overflow Discovery Paths
 // NOTE: ADR-0097 [ACCEPTED] Scoped Dashboard Search and Dedicated Unbound Retrieval
+// NOTE: ADR-0098 [ACCEPTED] Scan-First, Accessible Dashboard List Rows
+// NOTE: ADR-0099 [ACCEPTED] Durable Global Dashboard Right-Swipe Action
+// NOTE: ADR-0100 [ACCEPTED] Relevance-First, Visibility-Safe Dashboard List Search
 
-export const ADR_COUNT = 97;
+export const ADR_COUNT = 100;
