@@ -25,8 +25,10 @@ import { inWriteTransaction } from "@/db/transaction";
 import type { SqlExecutor } from "@/db/types";
 import {
   DASHBOARD_SORT_MODES,
+  RIGHT_SWIPE_ACTIONS,
   type DashboardSortMode,
   type DashboardViewMode,
+  type RightSwipeAction,
   parseDashboardFilters,
   parseDashboardPopulations,
 } from "@/logic/dashboard-query-logic";
@@ -119,6 +121,8 @@ export interface AppSettings {
   dashboardFilters: string;
   /** Literal default sentinel or an explicit sort override. */
   dashboardSort: DashboardSortMode;
+  /** Committed action for a right swipe in Dashboard List view. */
+  dashboardRightSwipeAction: RightSwipeAction;
 
   // --- Optional-AI non-secret settings (Phase 14, AI-01) --------------------
   // NO API KEY LIVES HERE — provider credentials are SecureStore-only
@@ -222,6 +226,7 @@ export interface PortableSettingsSnapshot {
   dashboardPopulations?: string;
   dashboardFilters?: string;
   dashboardSort?: DashboardSortMode;
+  dashboardRightSwipeAction?: RightSwipeAction;
   modifiedAt: string;
 }
 
@@ -284,7 +289,8 @@ type WritableSettingsKey =
   | "dashboardViewMode"
   | "dashboardPopulations"
   | "dashboardFilters"
-  | "dashboardSort";
+  | "dashboardSort"
+  | "dashboardRightSwipeAction";
 
 /** The persisted (snake_case) column shape of the id=1 row. */
 interface AppSettingsRow {
@@ -313,6 +319,7 @@ interface AppSettingsRow {
   dashboard_populations: string;
   dashboard_filters: string;
   dashboard_sort: string;
+  dashboard_right_swipe_action: string;
   ai_provider: string;
   ai_model: string;
   ai_custom_endpoint: string;
@@ -398,6 +405,7 @@ const COLUMN_OF: Record<WritableSettingsKey, string> = {
   dashboardPopulations: "dashboard_populations",
   dashboardFilters: "dashboard_filters",
   dashboardSort: "dashboard_sort",
+  dashboardRightSwipeAction: "dashboard_right_swipe_action",
 };
 
 /** The saved setting is authoritative; device region is used only when it is absent. */
@@ -424,6 +432,7 @@ export async function getAppSettings(exec: SqlExecutor): Promise<AppSettings> {
             theme_package, galaxy_mode, standard_mode,
             galaxy_accent, standard_accent, galaxy_background, standard_background,
             dashboard_view_mode, dashboard_populations, dashboard_filters, dashboard_sort,
+            dashboard_right_swipe_action,
             ai_provider, ai_model, ai_custom_endpoint, ai_custom_model,
             ai_prompt_template, ai_ack_openai, ai_ack_anthropic,
             ai_ack_google, ai_ack_custom,
@@ -474,6 +483,7 @@ export async function getAppSettings(exec: SqlExecutor): Promise<AppSettings> {
     dashboardPopulations: row.dashboard_populations,
     dashboardFilters: row.dashboard_filters,
     dashboardSort: row.dashboard_sort as DashboardSortMode,
+    dashboardRightSwipeAction: row.dashboard_right_swipe_action as RightSwipeAction,
     // AI non-secret settings. The column default is `'none'`; the cast is a
     // read-shape convenience (validation on WRITE guarantees a known id).
     aiProvider: row.ai_provider as AiProviderId,
@@ -752,6 +762,20 @@ export function assertDashboardSort(field: string, v: unknown): void {
   }
 }
 
+export function assertDashboardRightSwipeAction(
+  field: string,
+  v: unknown,
+): void {
+  if (
+    typeof v !== "string" ||
+    !(RIGHT_SWIPE_ACTIONS as readonly string[]).includes(v)
+  ) {
+    throw new Error(
+      `updateAppSettings: ${field} must be a known right-swipe action, got ${String(v)}`,
+    );
+  }
+}
+
 function parseDashboardJson(field: string, v: unknown): unknown {
   if (typeof v !== "string") {
     throw new Error(`updateAppSettings: ${field} must be JSON text`);
@@ -842,6 +866,12 @@ function validateAppSettingsPatch(patch: AppSettingsPatch): void {
   }
   if (patch.dashboardSort !== undefined) {
     assertDashboardSort("dashboardSort", patch.dashboardSort);
+  }
+  if (patch.dashboardRightSwipeAction !== undefined) {
+    assertDashboardRightSwipeAction(
+      "dashboardRightSwipeAction",
+      patch.dashboardRightSwipeAction,
+    );
   }
   if (patch.dashboardPopulations !== undefined) {
     assertDashboardPopulations(

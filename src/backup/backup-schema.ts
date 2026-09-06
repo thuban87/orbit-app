@@ -170,6 +170,7 @@ export const PORTABLE_SETTINGS_KEYS = new Set([
   "dashboardPopulations",
   "dashboardFilters",
   "dashboardSort",
+  "dashboardRightSwipeAction",
 ]);
 
 const SECRET_SHAPED_KEY =

@@ -124,6 +124,9 @@ export const DASHBOARD_SORT_MODES = [
   "status",
 ] as const;
 export type DashboardSortMode = (typeof DASHBOARD_SORT_MODES)[number];
+/** The committed right-swipe action in Dashboard List view. */
+export const RIGHT_SWIPE_ACTIONS = ["quick-log", "log-contact"] as const;
+export type RightSwipeAction = (typeof RIGHT_SWIPE_ACTIONS)[number];
 /** Internal sort outcomes selected when the persisted sort is Default. */
 export type ResolvedDashboardSort =
   | Exclude<DashboardSortMode, "default">

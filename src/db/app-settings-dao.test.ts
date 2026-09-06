@@ -57,6 +57,7 @@ import { migration016 } from "@/db/migrations/016-contact-knowledge";
 import { migration017 } from "@/db/migrations/017-knowledge-egress-datamove";
 import { migration018 } from "@/db/migrations/018-custom-field-scope-history";
 import { migration019 } from "@/db/migrations/019-dashboard-prefs";
+import { migration020 } from "@/db/migrations/020-dashboard-swipe-pref";
 import { runMigrations } from "@/db/migrations/runner";
 import { inWriteTransaction } from "@/db/transaction";
 import type { SqlExecutor } from "@/db/types";
@@ -122,8 +123,9 @@ async function migrateToV5(): Promise<void> {
       migration017,
       migration018,
       migration019,
+      migration020,
     ],
-    19,
+    20,
     { now: NOW, newUid },
   );
 }
@@ -172,6 +174,7 @@ const DASHBOARD_DEFAULTS = {
   dashboardPopulations: "[]",
   dashboardFilters: "{}",
   dashboardSort: "default" as const,
+  dashboardRightSwipeAction: "quick-log" as const,
 };
 
 type KeysOverlap<A, B> = Extract<keyof A, keyof B>;
@@ -1250,5 +1253,25 @@ describe("app-settings-dao — dashboard preference settings (migration 019, Pha
     await expect((async () => updateAppSettings(exec, { dashboardPopulations: '["unknown"]' }, LATER))()).rejects.toThrow();
     await expect((async () => updateAppSettings(exec, { dashboardFilters: '{"unknown":["x"]}' }, LATER))()).rejects.toThrow();
     expect((await getAppSettings(exec)).dashboardSort).toBe("default");
+  });
+
+  it("round-trips the writable right-swipe action and rejects unknown values before writing", async () => {
+    const patch: AppSettingsPatch = { dashboardRightSwipeAction: "log-contact" };
+    await updateAppSettings(exec, patch, LATER);
+    expect((await getAppSettings(exec)).dashboardRightSwipeAction).toBe(
+      "log-contact",
+    );
+
+    await expect(
+      (async () =>
+        updateAppSettings(
+          exec,
+          { dashboardRightSwipeAction: "unexpected" as never },
+          NOW,
+        ))(),
+    ).rejects.toThrow(/right-swipe action/);
+    expect((await getAppSettings(exec)).dashboardRightSwipeAction).toBe(
+      "log-contact",
+    );
   });
 });

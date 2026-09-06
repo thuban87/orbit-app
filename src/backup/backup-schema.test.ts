@@ -22,6 +22,18 @@ describe("dashboard preference portable allowlist", () => {
       expect(PORTABLE_SETTINGS_KEYS.has(key)).toBe(true);
     }
   });
+
+  it("accepts the deferred right-swipe key while rejecting unknown siblings", () => {
+    const portable = valid();
+    portable.appSettings.dashboardRightSwipeAction = "quick-log";
+    expect(parseBackupManifest(portable).appSettings).toHaveProperty(
+      "dashboardRightSwipeAction",
+      "quick-log",
+    );
+
+    portable.appSettings.unrecognizedSibling = "nope";
+    expect(() => parseBackupManifest(portable)).toThrow(BackupSchemaError);
+  });
 });
 
 describe("parseBackupManifest", () => {
