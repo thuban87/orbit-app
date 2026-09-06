@@ -81,4 +81,10 @@ describe("selectCardLine3", () => {
     expect(selectCardLine3([], contactId, "Alex", NOW)).toEqual(first);
     expect(CARD_PROMPTS).not.toContain("What should you remember about {name}?");
   });
+
+  it("selects the only useful candidate directly", () => {
+    expect(
+      selectCardLine3([candidate({ id: 1, value: "\ud83d\udc15 Luna" })], 7, "Alex", NOW),
+    ).toMatchObject({ kind: "candidate", text: "\ud83d\udc15 Luna" });
+  });
 });
