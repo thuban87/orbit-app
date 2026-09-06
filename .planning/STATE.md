@@ -4,16 +4,16 @@ milestone: v2.0
 milestone_name: Release Readiness
 current_phase: 28
 current_phase_name: Dashboard Card View
-status: verifying
+status: executing
 stopped_at: Completed 28-07-PLAN.md
-last_updated: "2026-09-06T09:32:47.387Z"
+last_updated: "2026-09-06T10:01:05.728Z"
 last_activity: 2026-09-06
 last_activity_desc: Phase 28 execution started
-state_head: 90eff8cfb94c2c8fd3379b70f4f231b7e53a0b65
+state_head: ee3cce16caba3c1ef589571089b32c288cac9d76
 progress:
   total_phases: 20
   completed_phases: 4
-  total_plans: 58
+  total_plans: 59
   completed_plans: 57
 carried_forward:
 
@@ -33,9 +33,9 @@ See: .planning/PROJECT.md (updated 2026-09-01 after v1.0 milestone)
 
 ## Current Position
 
-Phase: 28 (Dashboard Card View) — EXECUTING
+Phase: 28 (Dashboard Card View) — READY TO EXECUTE
 Plan: 7 of 7
-Status: Phase complete — ready for verification
+Status: Ready to execute
 Carried forward (owner's bucket, NOT resolved here): D-11 default Memory-type display name — reconcile before Phase 34.
 Surface to owner (24.2-07, KNOW-15): milestone plan said Phase 36 owns the backup format-4 bump, but 24.1 already bumped to 4 (d677e2c); Plan 07 emits into the live format 4 with NO bump — that milestone instruction is stale.
 Deferred to Phase 31 (recorded in Plan 05): durable contact-scoped-def ownership + owner-purge semantics. Deferred to Phase 36 (ROADMAP breadcrumb): legacy AI-fuel confirm-path code removal.
