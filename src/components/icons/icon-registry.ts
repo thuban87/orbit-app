@@ -34,7 +34,7 @@ export const ICON_REGISTRY = {
   // ---- General screen icons (RESEARCH Pattern 4) ------------------------
   close: { outline: "close", filled: "close" },
   settings: { outline: "settings-outline", filled: "settings" },
-  favorite: { outline: "heart-outline", filled: "heart" },
+  favorite: { outline: "star-outline", filled: "star" },
   search: { outline: "search-outline", filled: "search" },
   back: { outline: "chevron-back", filled: "chevron-back" },
   add: { outline: "add", filled: "add" },
