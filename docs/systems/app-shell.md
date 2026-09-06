@@ -1,7 +1,7 @@
 # App Shell
 
 **Last updated:** 2026-09-02
-**Updated by phase:** 25-dashboard-data-state-foundation
+**Updated by phase:** 26-dashboard-control-surface
 **Owners:** `App.tsx`, `src/navigation/RootNavigator.tsx`, `src/navigation/tabs/`, `src/navigation/types.ts`, `src/navigation/reset-intents.ts`, `src/navigation/linking.ts`, `src/navigation/notification-gate.tsx`, `src/navigation/widget-linking.ts`, `src/components/UniversalFab.tsx`, `src/components/ShellAppBar.tsx`
 
 ## Purpose
@@ -23,7 +23,7 @@ The shell owns runtime navigation and consumes the durable theme contract; `app_
 | Route types | `src/navigation/types.ts` | Defines serializable tab and per-stack route parameters. |
 | Reset intents | `src/navigation/reset-intents.ts` | Sole owner of typed nested Dashboard-root reset states for external and completion paths. |
 | Transient/back state | `src/stores/shell-transient-store.ts`, `src/navigation/back-intent.ts` | Registers executable overlay dismissal callbacks and resolves transient-first Back behavior. |
-| Shell chrome | `src/components/ShellAppBar.tsx`, `src/navigation/use-bottom-clearance.ts` | Provides themed root/child app bars and shared tab/FAB clearance. |
+| Shell chrome | `src/components/ShellAppBar.tsx`, `src/navigation/use-bottom-clearance.ts` | Provides themed root/child app bars, measured compact trailing content, and shared tab/FAB clearance. |
 | Capture | `src/components/UniversalFab.tsx`, `src/components/ContactPicker.tsx`, `src/components/Snackbar.tsx` | Provides the universal action dial, local contact selection, and commit-truthful feedback. |
 | Intent gate | `src/navigation/linking.ts` | Converts provider-owned pending share state into ready-gated navigation to Capture. |
 | Backup-share gate | `src/navigation/backup-share-intent.ts` | Holds a narrow inbound backup-file intent until the backup restore surface is ready. |
@@ -46,7 +46,7 @@ The shell owns runtime navigation and consumes the durable theme contract; `app_
 | `src/screens/MemoryHistoryScreen.tsx` | Typed retained-current-state history destination. |
 | `src/navigation/reset-intents.ts` | Builds the only root-level Dashboard reset states. |
 | `src/components/UniversalFab.tsx` | Mounts the six-action shell capture dial once above browse/read surfaces. |
-| `src/components/ShellAppBar.tsx` | Supplies accessible themed root and child app bars. |
+| `src/components/ShellAppBar.tsx` | Supplies accessible themed root and child app bars, including measured icon-only fallback for constrained root destinations. |
 | `src/navigation/linking.ts` | Holds the navigation ref and the single ready-gated Capture navigation owner. |
 | `src/navigation/backup-share-intent.ts` | Handles the narrow Files-to-Orbit backup-share fallback without placing a file URI in route state. |
 | `src/navigation/notification-gate.tsx` | Owns warm/cold notification-response handling once navigation is ready. |
@@ -81,7 +81,7 @@ The shell owns runtime navigation and consumes the durable theme contract; `app_
 
 1. The fixed root tabs are Dashboard, Orrery, Backup / Restore, and Settings. Each renders a separate native stack, so switching tabs preserves its in-tab history.
 2. A retap on the active tab dismisses the top shell transient first; a subsequent retap pops that tab to its root. Focused workflows and an open software keyboard hide the tab bar and universal FAB.
-3. `ShellAppBar` and Android Back resolve a shell transient before ordinary stack navigation. Completed edits replace or focus their destination so Back never replays a finished workflow.
+3. `ShellAppBar` and Android Back resolve a shell transient before ordinary stack navigation. Dashboard control panels register a dismiss callback as that transient; completed edits replace or focus their destination so Back never replays a finished workflow.
 4. `reset-intents.ts` expresses notification, widget, Compose, import, reconcile, merge, and other external fallbacks as nested Dashboard-tab states. An in-app Profile Back instead remains origin-aware through its owning stack.
 
 ### Capturing from any browse surface
@@ -92,9 +92,11 @@ The shell owns runtime navigation and consumes the durable theme contract; `app_
 
 ### Navigating dashboard and settings
 
-1. Dashboard owns the prominent Group Events destination and overflow entries for Group Events and Archived Contacts; Archived remains the same destructive surface reached from Settings as well.
-2. Settings exposes low-traffic lifecycle and configuration controls in its own remembered tab stack. Its Appearance section changes package, mode, and curated accent live, then persists the active package's values through the validated settings DAO.
-3. Root tabs use branded/destination app bars without Back; child routes use a title and Back control. Native stack headers remain disabled so no duplicate chrome appears.
+1. Dashboard presents co-equal Your Week and Group Events header destinations. `ShellAppBar` measures the available bar and active text scale; both labels render only when both fit, otherwise both remain accessible icon-only controls.
+2. Dashboard’s fixed overflow is Group Events, Unbound Contacts, Archived Contacts, disabled Select Contacts, and Reset Dashboard View. Reset persists its query reset before clearing session state; Select Contacts stays disabled until Card multi-select exists.
+3. Archived remains the same destructive surface reached from Dashboard and Settings, while Unbound is a Dashboard child route. Both use shared child chrome, and their stack origin determines Back behavior after opening a Profile.
+4. Settings exposes low-traffic lifecycle and configuration controls in its own remembered tab stack. Its Appearance section changes package, mode, and curated accent live, then persists the active package's values through the validated settings DAO.
+5. Root tabs use branded/destination app bars without Back; child routes use a title and Back control. Native stack headers remain disabled so no duplicate chrome appears.
 
 ### Opening Backup & Restore
 
@@ -267,6 +269,8 @@ The shell owns runtime navigation and consumes the durable theme contract; `app_
 - **ADR-075:** Binary Favourite Membership Without a User-Facing Order — retires the shell's Manage favourites route and Settings entry.
 - **ADR-076:** Population-Reached Birthdays Without a Dashboard Banner — removes the Dashboard banner without changing local refresh ownership.
 - **ADR-093:** Scoped Composable Dashboard Population and Filter Model — retires the Never Contacted route and leaves its next visible control to Dashboard work.
+- **ADR-095:** Live-Applying Dashboard Floating Control Surface — registers Dashboard controls as a transient-first in-tree surface rather than a native modal.
+- **ADR-096:** Dashboard Header and Overflow Discovery Paths — defines measured header fallback, fixed overflow entries, and shared management-route chrome.
 
 ## Gotchas
 
@@ -299,6 +303,9 @@ The shell owns runtime navigation and consumes the durable theme contract; `app_
 24. **Do not hydrate theme after navigation mounts.** A first main frame in the wrong saved palette is a visual regression; only the neutral pre-ready splash may precede theme hydration.
 25. **Do not bypass semantic visual seams.** New screens use token roles, semantic icon names, scalable text, and shared action/overlay primitives; they do not add raw colour or base-family icon imports.
 26. **Keep contact-knowledge routes typed in both profile stacks.** Dashboard and Orrery Profile must expose the same serializable destinations; do not move Memory content into route parameters.
+27. **Root header labels must fail closed to icon-only.** Do not wrap, shrink, or independently hide a co-equal Dashboard destination when measured text no longer fits.
+28. **A disabled overflow entry must not close its menu.** Select Contacts is a visible future capability, not a no-op route or a hidden item.
+29. **Keep Archived registered in both owning stacks.** It is one screen with two deliberate entry paths; replacing either route with a duplicate breaks origin-aware Back behavior.
 
 ## Related Systems
 
@@ -348,3 +355,4 @@ The shell owns runtime navigation and consumes the durable theme contract; `app_
 | 2026-09-02 | 23 | Added restore-before-paint durable theming, live Appearance controls, semantic tab icons, and shared visual primitives. |
 | 2026-09-03 | 24.1 | Added typed contact-knowledge, Recently Deleted, and retained-history routes to both profile stacks. |
 | 2026-09-02 | 25 | Retired Manage favourites and Never Contacted navigation surfaces plus the Settings include-Unbound control. |
+| 2026-09-02 | 26 | Added measured Dashboard header fallback, fixed overflow behavior, transient-aware controls, and shared child chrome for Archived and Unbound routes. |
