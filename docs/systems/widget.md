@@ -1,32 +1,32 @@
 # Widget
 
-**Last updated:** 2026-08-31
-**Updated by phase:** 21-interaction-assist-reach-out
+**Last updated:** 2026-09-02
+**Updated by phase:** 25-dashboard-data-state-foundation
 **Owners:** `src/services/widget/`, `src/navigation/widget-linking.ts`, `src/services/widget/widget-quick-action-guard.ts`, `plugins/withWidgetBootReceiver.js`
 
 ## Purpose
 
-The Widget system gives Orbit a local Android home-screen shortcut board for manually ranked favourites. It renders status-colour avatars from existing local data, lets a user mark contact without opening the app, and offers profile, logging, and a `Contact` reach-out entry point without adding widget-specific SQLite state.
+The Widget system gives Orbit a local Android home-screen shortcut board for binary favourites in shared Dashboard Default order. It renders status-colour avatars from existing local data, lets a user mark contact without opening the app, and offers profile, logging, and a `Contact` reach-out entry point without adding widget-specific SQLite state.
 
 ## Architecture
 
 ### Data Model
 
-The widget owns no table, migration, or per-instance state. It reads the existing dashboard favourites projection, which carries a nullable derived status, ranked eligible fuel, and a relative photo path.
+The widget owns no table, migration, or per-instance state. It reads the Dashboard Favorites population projection, which carries a nullable derived status, eligible fuel, and a relative photo path.
 
 **Tables:**
-- `contacts` — supplies favourite rank, identity, photo reference, and the recency inputs to derived status.
+- `contacts` — supplies favourite membership, identity, photo reference, and the recency inputs to derived status.
 - `fuel` — supplies the eligible per-contact line shown only in the larger layout.
 - `interactions` — receives a full widget-sourced touchpoint when the user marks contacted.
 
 **Types** (`src/services/widget/widget-data.ts`):
-- `WidgetTile` — local render projection containing the rank-ordered contact, nullable status, deterministic initials/swatch, photo reference, and fuel line.
+- `WidgetTile` — local render projection containing the Dashboard-ordered contact, nullable status, deterministic initials/swatch, photo reference, and fuel line.
 
 ### Store, Service & DAO Layer
 
 | Layer | File | Responsibility |
 |---|---|---|
-| Projection service | `src/services/widget/widget-data.ts` | Reads dashboard favourites, preserves manual rank and nullable status, and shapes bounded tiles. |
+| Projection service | `src/services/widget/widget-data.ts` | Reads Favorites in Dashboard Default order, preserves nullable status, and shapes bounded tiles. |
 | Photo service | `src/services/widget/widget-photo.ts` | Converts a bounded local photo master to a base64 JPEG thumbnail or returns `null`. |
 | Render service | `src/services/widget/widget-render.tsx` | Builds size-specific RemoteViews trees from tiles and token-resolved colours. |
 | Task handler | `src/services/widget/widget-task-handler.tsx` | Handles widget lifecycle events and validates/commits headless marks. |
@@ -55,7 +55,7 @@ The widget owns no table, migration, or per-instance state. It reads the existin
 
 1. A lifecycle event or `requestWidgetUpdate` invokes `renderFavourites(widgetInfo)`.
 2. The renderer resolves the device region and opens/migrates SQLite when needed, then `loadWidgetTiles()` calls the Bound-only favourites projection. An Unbound dormant favourite cannot produce a tile.
-3. The tile shaper preserves `favourite_rank` order and nullable query-time status; it never recalculates either value.
+3. The tile shaper preserves Dashboard Default order and nullable query-time status; it never recalculates either value.
 4. Each local photo master is downsized and encoded as a base64 `data:` URI. A missing or failed thumbnail falls back to deterministic themed initials rather than blanking the grid.
 5. The renderer selects the small mark grid or larger fuel-and-action layout from widget width, then rasterises the RemoteViews tree with palette tokens.
 
@@ -78,7 +78,7 @@ The widget owns no table, migration, or per-instance state. It reads the existin
 | Constant | Value | File | Purpose |
 |---|---|---|---|
 | `updatePeriodMillis` | `0` | `app.config.ts` | Enforces event-push rather than periodic polling. |
-| `WIDGET_GRID_CAPACITY` | `6` | `src/services/widget/widget-data.ts` | Default rank-bounded tile count. |
+| `WIDGET_GRID_CAPACITY` | `6` | `src/services/widget/widget-data.ts` | Default bounded tile count. |
 | `SMALL_CAPACITY` / `LARGE_CAPACITY` | `6` / `4` | `src/services/widget/widget-render.tsx` | Size-specific render bounds. |
 | `LARGE_MIN_WIDTH_DP` | `280` | `src/services/widget/widget-render.tsx` | Selects the larger layout on the tuned device size. |
 | `THUMB_PX` / `THUMB_Q` | `88` / `0.6` | `src/services/widget/widget-photo.ts` | Bounds thumbnail decode and JPEG output cost. |
@@ -86,18 +86,20 @@ The widget owns no table, migration, or per-instance state. It reads the existin
 ## Decisions
 
 - **ADR-042:** Shared Status Palette for Dashboard and Widget Rings — both surfaces consume one status-token vocabulary.
-- **ADR-043:** Static Globally Mirrored Favourites Widget — instances share one manually ranked, state-free list.
+- **ADR-043:** Static Globally Mirrored Favourites Widget — instances share one state-free favourites list; its ordering source is superseded by ADR-075.
 - **ADR-044:** Headless Widget Actions and Dashboard-Rooted Deep Links — marks use the recency writer and links reset to Dashboard (its `Message → Compose` action is partially superseded by ADR-074).
 - **ADR-045:** Event-Driven Widget Refresh and Boot Recovery — event/launch/boot refresh replaces polling.
 - **ADR-059:** Normalized Contact Methods, Canonical Actionability, and Local Provenance — makes the widget's possible first-open pass device-region migration input.
 - **ADR-062:** Bound/Unbound Lifecycle and One-Way Cadence Assignment — excludes Unbound favourites and fails stale active actions closed.
 - **ADR-074:** Widget Contact Supersession and Strict Reach Deep-Link Fail-Safe — replaces the larger `Message` action with `Contact → orbit://reach`, deep-linking the shared router with a fail-safe lifecycle guard.
 - **ADR-080:** Four-Tab Bottom Navigation Shell with Per-Tab Stacks — preserves strict widget-link behavior while changing only the Dashboard reset shape.
+- **ADR-075:** Binary Favourite Membership Without a User-Facing Order — requires Favorites population Default ordering.
+- **ADR-093:** Scoped Composable Dashboard Population and Filter Model — makes the Widget a Dashboard population consumer.
 
 ## Gotchas
 
 1. **Never pass `file://` or network image sources to RemoteViews.** The widget encodes a local master to base64 `data:` and falls back to initials when encoding fails.
-2. **Never re-derive status or reorder tiles.** The dashboard projection already supplies nullable status and favourite-rank order; changing either can misstate never-contacted people or move an un-undoable mark target.
+2. **Never re-derive status or reorder tiles.** The Dashboard projection already supplies nullable status and Default order; changing either can misstate never-contacted people or restore a retired rank concept.
 3. **Do not run foreground sweep work in a widget task.** Headless taps may write one interaction but must not trigger unrelated cleanup, purge, or reconciliation.
 4. **Keep refresh best-effort after a committed mark.** Rendering can consume the headless budget; it must never roll back or throw past the interaction write.
 5. **Android 15 force-stop can grey the widget.** A manual launch re-arms it; boot recovery is a separate native path and the widget is never the sole route to logging.
@@ -125,3 +127,4 @@ The widget owns no table, migration, or per-instance state. It reads the existin
 | 2026-08-27 | 18.2 | Excluded Unbound favourites and added live lifecycle guards for stale widget actions. |
 | 2026-08-31 | 21 | Replaced the larger `Message → Compose` action with `Contact → orbit://reach` into the shared Reach Out router, with a discriminated missing/archived fail-safe guard and a consumed-once `openReachOut` param. |
 | 2026-09-02 | 22 | Re-expressed accepted widget-link and missing-contact fallback routes as nested Dashboard-tab states. |
+| 2026-09-02 | 25 | Repointed tiles to Favorites population Default order and made the favourites deep link safely reset Home. |
