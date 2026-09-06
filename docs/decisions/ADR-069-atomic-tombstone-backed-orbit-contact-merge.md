@@ -49,4 +49,4 @@ The system performs a user-confirmed, atomic merge into a chosen survivor. It ex
 - `src/components/MergeImpactSummary.tsx` — presents impact and hands typed choices to the writer.
 
 **Depends on:** ADR-010 (Single-Writer Interaction Recency Spine); ADR-056 (Tombstone-Backed UID Reconciliation for Portable Restores); ADR-059 (Normalized Contact Methods, Canonical Actionability, and Local Provenance)
-**Required by:** ADR-073 (Merge-Reparented, Purge-Cascaded Interaction Assists)
+**Required by:** ADR-073 (Merge-Reparented, Purge-Cascaded Interaction Assists); ADR-089 (Recoverable Memory Lifecycle and Contact-Operation Integrity)
