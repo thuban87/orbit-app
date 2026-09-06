@@ -47,4 +47,4 @@ The system scopes the term-free semantic corpus to the fully filtered eligible D
 - `src/db/dashboard-read.ts` — provides the fully filtered ordered eligible IDs consumed by search.
 
 **Depends on:** ADR-031 (Bound Local Fuel Search without FTS5); ADR-088 (Additive Contact-Knowledge Schema and Application-Owned Memory Registry)
-**Required by:** _None._
+**Required by:** ADR-097 (Scoped Dashboard Search and Dedicated Unbound Retrieval)

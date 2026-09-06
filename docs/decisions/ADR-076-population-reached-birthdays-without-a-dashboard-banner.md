@@ -48,4 +48,4 @@ The Dashboard has no permanent birthday banner or upcoming module between its co
 - `src/logic/birthday-logic.ts` — retained unchanged as the strict local-date parser and days-until computation.
 
 **Depends on:** ADR-011 (Query-Time Status and Never-Contacted Segregation); ADR-032 (Flat Dashboard Discovery and In-Query Contact Search)
-**Required by:** ADR-093 (Scoped Composable Dashboard Population and Filter Model)
+**Required by:** ADR-093 (Scoped Composable Dashboard Population and Filter Model); ADR-096 (Dashboard Header and Overflow Discovery Paths)

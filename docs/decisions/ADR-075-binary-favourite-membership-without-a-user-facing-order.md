@@ -51,4 +51,4 @@ Favourites are binary membership. The user toggles membership from the Profile s
 - `src/screens/SettingsScreen.tsx` — loses the Manage favourites entry.
 
 **Depends on:** ADR-008 (Initial Contact Schema as a Cross-Phase Data Contract); ADR-032 (Flat Dashboard Discovery and In-Query Contact Search)
-**Required by:** ADR-082 (Universal Capture FAB, Canonical Picker, and Truthful Quick Log); ADR-093 (Scoped Composable Dashboard Population and Filter Model)
+**Required by:** ADR-082 (Universal Capture FAB, Canonical Picker, and Truthful Quick Log); ADR-093 (Scoped Composable Dashboard Population and Filter Model); ADR-096 (Dashboard Header and Overflow Discovery Paths)

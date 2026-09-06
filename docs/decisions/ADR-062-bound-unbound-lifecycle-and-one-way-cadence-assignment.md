@@ -50,4 +50,4 @@ The system uses an independent `tracking_enabled` Bound/Unbound lifecycle. Bound
 - `src/services/widget/widget-quick-action-guard.ts` — rejects stale active-cadence widget actions while allowing a live Unbound Profile open.
 
 **Depends on:** ADR-009 (Crash-Safe Forward-Only SQLite Migrations); ADR-059 (Normalized Contact Methods, Canonical Actionability, and Local Provenance)
-**Required by:** ADR-063 (Versioned Lifecycle Backup and Dormant-Cadence Restore); ADR-066 (Deliberate Reviewed Import with Unbound Bulk Defaults); ADR-068 (User-Triggered, Source-Only Reconciliation with Durable Review); ADR-093 (Scoped Composable Dashboard Population and Filter Model).
+**Required by:** ADR-063 (Versioned Lifecycle Backup and Dormant-Cadence Restore); ADR-066 (Deliberate Reviewed Import with Unbound Bulk Defaults); ADR-068 (User-Triggered, Source-Only Reconciliation with Durable Review); ADR-093 (Scoped Composable Dashboard Population and Filter Model); ADR-097 (Scoped Dashboard Search and Dedicated Unbound Retrieval).
