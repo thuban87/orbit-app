@@ -59,4 +59,4 @@ Loss-bearing legacy inconsistencies roll back unchanged. A non-loss-bearing orph
 - `App.tsx` — gates navigation and renders accurate migration/bootstrap failure states.
 
 **Depends on:** ADR-009 (Crash-Safe Forward-Only SQLite Migrations)
-**Required by:** ADR-056 (Tombstone-Backed UID Reconciliation for Portable Restores)
+**Required by:** ADR-056 (Tombstone-Backed UID Reconciliation for Portable Restores); ADR-090 (Additive Custom-Field Value History and Deferred Contact Scope)

@@ -49,4 +49,4 @@ The system uses migration-012 local-only import-session and import-row snapshots
 - `src/backup/restore-apply.ts` — excludes local-only sessions from portable restore state and purges them for Replace-all.
 
 **Depends on:** ADR-009 (Crash-Safe Forward-Only SQLite Migrations); ADR-021 (Durable Relative-Path Photo Masters with Crash-Safe Lifecycle Cleanup)
-**Required by:** ADR-066 (Deliberate Reviewed Import with Unbound Bulk Defaults).
+**Required by:** ADR-066 (Deliberate Reviewed Import with Unbound Bulk Defaults); ADR-091 (Imported Contact Notes as AI-Off Typed Memories).

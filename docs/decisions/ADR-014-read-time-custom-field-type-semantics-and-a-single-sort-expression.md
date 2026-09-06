@@ -47,4 +47,4 @@ The system interprets custom-field values at read time with exactly seven permis
 - `src/components/CustomFieldValue.tsx` — renders valid values or the tap-to-fix state.
 
 **Depends on:** ADR-013 (Runtime Two-Table Custom Fields with Whitelist-Constructed DDL)
-**Required by:** _None._
+**Required by:** ADR-090 (Additive Custom-Field Value History and Deferred Contact Scope)
