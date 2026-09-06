@@ -12,7 +12,7 @@ AI suggestions create a short, user-editable message for a contact through a use
 
 ### Data Model
 
-AI has no per-contact table. Migration 004 extends the singleton `app_settings` row with non-secret provider configuration and four first-send acknowledgement flags; provider keys stay in Expo SecureStore and are never represented by SQLite, exports, logs, or navigation parameters.
+AI has no AI-owned per-contact table. Migration 004 extends the singleton `app_settings` row with non-secret provider configuration and four first-send acknowledgement flags; explicit Memory permission remains on the Memory row and provider keys stay in Expo SecureStore.
 
 **Tables:**
 - `app_settings` — singleton non-secret AI configuration.
@@ -44,6 +44,7 @@ AI has no per-contact table. Migration 004 extends the singleton `app_settings` 
 |------|------|
 | `src/db/migrations/004-ai-settings.ts` | Adds non-secret AI settings and default-off acknowledgement columns. |
 | `src/db/ai-context-read.ts` | Sole SQL/data projection for AI context. |
+| `src/db/memories-read.ts` | Supplies the explicit, live-only Memory eligibility projection. |
 | `src/ai/prompt-template.ts` | Sole `ResolvedPrompt` construction path. |
 | `src/services/AiService.ts` | Provider-specific request/response adapters. |
 | `src/ai/custom-endpoint.ts` | Validates Custom endpoint URLs and public literals. |
@@ -67,6 +68,7 @@ AI has no per-contact table. Migration 004 extends the singleton `app_settings` 
 4. `AiSuggestionLifecycle` owns the sole controller and 20-second timeout. It invalidates stale work on cancellation, unmount, configuration change, or a superseding request.
 5. A successful suggestion fills an empty draft or asks before replacing a non-empty one. Send and Copy preserve their existing handoff-only behavior and write no touchpoint, fuel, or recency value.
 6. An explicit request for an Unbound contact remains available. Its relationship context retains the closed projection, but unavailable cadence intensity becomes the fixed neutral aggregate rather than NULL arithmetic or a fabricated cadence.
+7. The context reader exposes a Memory only when its stored `allow_ai` flag is on and it is not deleted. This permission is independent of type, provenance, and Profile visibility; prompt-string serialization of this new projection remains the Phase-36 seam.
 
 ### Custom egress and model catalog
 
@@ -90,6 +92,7 @@ AI has no per-contact table. Migration 004 extends the singleton `app_settings` 
 - **ADR-052:** Compose-Owned AI Draft Lifecycle and Acknowledged Egress — keeps generation editable, acknowledged, cancellable, and non-writing.
 - **ADR-053:** Local-First LiteLLM AI Model Catalog — provides seed/cache model selection and explicit refresh.
 - **ADR-062:** Bound/Unbound Lifecycle and One-Way Cadence Assignment — permits explicit Unbound assistance without proactive cadence evaluation.
+- **ADR-081:** Retire AI-Proposed Fuel for Explicit Per-Item Permission — replaces provenance-based proposal eligibility with default-off Memory permission.
 
 ## Gotchas
 
@@ -100,10 +103,12 @@ AI has no per-contact table. Migration 004 extends the singleton `app_settings` 
 5. **Do not reconstruct a prompt after preview.** The frozen `ResolvedPrompt` object is the identity contract across preview, acknowledgement, and egress.
 6. **The owner accepted one device egress smoke test instead of the original full on-device escape matrix.** Shared JVM/vector tests cover the remaining address cases; keep that limitation visible if the guard changes.
 7. **Never invent cadence for an Unbound contact.** The neutral intensity aggregate is the only permitted representation of unavailable cadence in explicit AI context.
+8. **Memory permission fails closed in SQL.** Do not infer it from a Memory type, source, or visibility flag, and do not claim an eligible projection has reached a provider payload before its prompt serializer consumes it.
 
 ## Related Systems
 
 - **Custom fields** — exposes only definition-level opted-in values to the context reader.
+- **Contact Knowledge** — supplies explicitly opted-in live Memories through the egress projection.
 - **Contact methods** — owns Compose, Copy, and best-effort SMS handoff for a returned draft.
 - **Contacts** — supplies the profile entry and source identity without accepting an AI write.
 - **Persistence core** — applies migration 004 and the SQLite singleton contract.
@@ -115,3 +120,4 @@ AI has no per-contact table. Migration 004 extends the singleton `app_settings` 
 |------|-------|--------------|
 | 2026-08-18 | 14 | Created optional BYO-key AI suggestions, the protected egress boundary, Compose draft flow, and local-first model catalog. |
 | 2026-08-27 | 18.2 | Kept explicit Unbound AI available with neutral intensity and no normalized-method egress. |
+| 2026-09-03 | 24.2 | Added a default-off, SQL-gated Memory eligibility projection while deferring prompt serialization to Phase 36. |
