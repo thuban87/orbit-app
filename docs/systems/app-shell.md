@@ -1,7 +1,7 @@
 # App Shell
 
 **Last updated:** 2026-09-02
-**Updated by phase:** 27-dashboard-list-view
+**Updated by phase:** 28-dashboard-card-view
 **Owners:** `App.tsx`, `src/navigation/RootNavigator.tsx`, `src/navigation/tabs/`, `src/navigation/types.ts`, `src/navigation/reset-intents.ts`, `src/navigation/linking.ts`, `src/navigation/notification-gate.tsx`, `src/navigation/widget-linking.ts`, `src/components/UniversalFab.tsx`, `src/components/ShellAppBar.tsx`
 
 ## Purpose
@@ -94,10 +94,15 @@ The shell owns runtime navigation and consumes the durable theme contract; `app_
 ### Navigating dashboard and settings
 
 1. Dashboard presents co-equal Your Week and Group Events header destinations. `ShellAppBar` measures the available bar and active text scale; both labels render only when both fit, otherwise both remain accessible icon-only controls.
-2. Dashboard’s fixed overflow is Group Events, Unbound Contacts, Archived Contacts, disabled Select Contacts, and Reset Dashboard View. Reset persists its query reset before clearing session state; Select Contacts stays disabled until Card multi-select exists.
+2. Dashboard’s fixed overflow is Group Events, Unbound Contacts, Archived Contacts, Select Contacts, and Reset Dashboard View. Select Contacts persists Card View before entering its in-memory frozen selection session; Reset persists its query reset before clearing session state.
 3. Archived remains the same destructive surface reached from Dashboard and Settings, while Unbound is a Dashboard child route. Both use shared child chrome, and their stack origin determines Back behavior after opening a Profile.
 4. Settings exposes low-traffic lifecycle and configuration controls in its own remembered tab stack. Its Appearance section changes package, mode, and curated accent live, then persists the active package's values through the validated settings DAO.
 5. Root tabs use branded/destination app bars without Back; child routes use a title and Back control. Native stack headers remain disabled so no duplicate chrome appears.
+
+### Handing off detailed Dashboard logging
+
+1. Card View routes one selected contact to the existing `LogContact` route. Two or more targets navigate to `GroupLog` with an optional serializable `participantIds` array.
+2. `navigation/types.ts` defines the handoff only. The Group Interaction Logging phase consumes those IDs when it replaces the placeholder workflow; no contact data or callback crosses the route boundary.
 
 ### Opening Backup & Restore
 
@@ -227,6 +232,7 @@ The shell owns runtime navigation and consumes the durable theme contract; `app_
 - **ADR-084:** Four Semantic Theme Palettes, Curated Accents, and Contrast Validation — supplies the four-palette and live-accent contract.
 - **ADR-086:** Semantic Icons and Accessible Interaction Primitives — supplies registry, typography, status, action, and overlay seams.
 - **ADR-087:** Bundled Background Presets and Package-Specific Surface Treatment — supplies tokenized local background and surface primitives for later screen adoption.
+- **ADR-102:** Frozen-Universe Dashboard Multi-Select — adds the Select Contacts entry and serializable Group Log participant handoff.
 - **ADR-020:** Library-Only Photo Capture with Themed In-App Cropping and One-Time URL Download — adds the modal crop route and self-photo entry.
 - **ADR-022:** Tokenized Deterministic Initials Avatars — adds avatar fallback tokens to the theme contract.
 - **ADR-026:** Rogue Status for Unresponsive or Far-Overdue Contacts — adds a dedicated in-app rogue emphasis token.
@@ -361,3 +367,4 @@ The shell owns runtime navigation and consumes the durable theme contract; `app_
 | 2026-09-02 | 25 | Retired Manage favourites and Never Contacted navigation surfaces plus the Settings include-Unbound control. |
 | 2026-09-02 | 26 | Added measured Dashboard header fallback, fixed overflow behavior, transient-aware controls, and shared child chrome for Archived and Unbound routes. |
 | 2026-09-02 | 27 | Shared the Quick Log command and existing Dashboard Profile/Edit routing with accessible List gesture actions. |
+| 2026-09-02 | 28 | Enabled Select Contacts, added selection-first Back behavior, and defined the serializable Group Log participant handoff. |
