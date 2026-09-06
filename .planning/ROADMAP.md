@@ -142,7 +142,7 @@ All v1.0 commits are local on `main` and have NOT been pushed.
 - [x] **Phase 24.2: Contact Knowledge — Egress, Search, Types & Data-moves** - Bounded local search, per-item AI opt-in + Off Limits, expanded custom-field types + value history, imported notes, share-capture migration, backup coverage (destructive migration + ADR-030 retirement; KNOW-10..16) (completed 2026-09-04; goal ACHIEVED — verifier 7/7 must-haves, code review 0 blockers, on-device UAT 3/3 passed: memory AI toggle/sparkle, url/email/phone field types + tap-to-fix, imported Contacts notes; migrations 017+018 verified on-device user_version=18)
 - [x] **Phase 25: Dashboard Data & State Foundation** - Shared population/filter/sort/search query state, durable and restored on return (completed 2026-09-05; goal ACHIEVED — verifier 14/14 must-haves, code review 0 blockers/2 warnings/3 info with WR-01 fixed inline; migration 019 verified irreversibility-safe. Owner-accepted deferrals: D-13 Unbound name-lookup search + D-14 Not-Contacted chip → Phase 26, D-06 birthday at-a-glance → deferred Your Week — all with a live path preserved)
 - [x] **Phase 26: Dashboard Control Surface** - Lean header plus three equal live-applying anchored control panels (completed 2026-09-05; goal ACHIEVED — Pixel UAT 7/7 after a launch-blocking render loop was found + fixed inline (fc62a7b); owner reviewed the release APK and post-UAT fixes landed: archived rows open the profile / origin-aware return (53bb4af), control panels centered-on-screen + scrollable (c414e51). Owner decisions: panels centered both-axes (D-11 floating-not-modal preserved); count header stays total-live. D-13/D-14 carried from Phase 25 delivered — Unbound name-lookup search + Not-Contacted population)
-- [ ] **Phase 27: Dashboard List View** - Full-width three-line rows with status border + glyph, swipe logging, and search explanations
+- [x] **Phase 27: Dashboard List View** - Full-width three-line rows with status border + glyph, swipe logging, and search explanations (closed 2026-09-06 by owner approval; implementation, review, validation, and release build complete. Partial device-UAT coverage is retained in 27-UAT.md.)
 - [ ] **Phase 28: Dashboard Card View** - Avatar-first 3-column grid with long-press menu and multi-select bulk management
 - [ ] **Phase 29: Orrery Camera, Scale & Exploration** - One canonical 2.5D world with bounded camera, semantic zoom, density presets, and built-in Systems
 - [ ] **Phase 30: Orrery Systems** - Named dynamic + manual Systems authored in a floating HUD, with management, switching, and portability
@@ -394,7 +394,7 @@ All v1.0 commits are local on `main` and have NOT been pushed.
 
 **Canonical refs**: docs/dossier/milestone-2/phase-06-dashboard-list-view-dossier.md; docs/dossier/milestone-2/planning-notes/phase-06-planning-notes.md
 **Schema**: standalone migration **020** — additive `app_settings.dashboard_right_swipe_action` column (verified head+1 on disk 2026-09-05: migrations 001–019, `TARGET_VERSION=19` → first new is 020; the fold-into-Phase-25 option is foreclosed since 019 already shipped). Portable key `dashboardRightSwipeAction` allowlisted now in `PORTABLE_SETTINGS_KEYS`; no backup-format bump (Phase 36 owns that). Re-verify head+1 at execution time.
-**Plans**: 8/8 plans executed (6 waves; 2 gap-closure plans pending)
+**Plans**: 8/8 plans executed (6 waves; both gap-closure plans delivered; closed 2026-09-06 by owner approval with partial device-UAT coverage retained in `27-UAT.md`)
 **Wave 1**
 
 - [x] 27-01-PLAN.md — TRACER: additively widen shared read (last_contact + snooze_until) + one real ListRow end-to-end (identity + recency·category + status border/glyph, null-safe) wired into HomeScreen [LISTV-01/02/05]
@@ -643,7 +643,7 @@ All v1.0 commits are local on `main` and have NOT been pushed.
 | 24.2 Contact Knowledge (Egress, Search, Types & Data-moves) | 7/7 | In Progress|  |
 | 25. Dashboard Data & State Foundation | 6/7 | In Progress|  |
 | 26. Dashboard Control Surface | 7/7 | In Progress|  |
-| 27. Dashboard List View | 8/8 | In Progress|  |
+| 27. Dashboard List View | 8/8 | Complete | 2026-09-06 (owner-approved; UAT partial) |
 | 28. Dashboard Card View | 0/TBD | Not started | - |
 | 29. Orrery Camera, Scale & Exploration | 0/TBD | Not started | - |
 | 30. Orrery Systems | 0/TBD | Not started | - |

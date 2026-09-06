@@ -2,19 +2,19 @@
 gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Release Readiness
-current_phase: 27
-current_phase_name: dashboard-list-view
-status: executing
-stopped_at: Completed 27-08-PLAN.md
-last_updated: "2026-09-06T04:34:04.217Z"
-last_activity: 2026-09-05
-last_activity_desc: Phase 27 execution started
-state_head: 37fabbc2dd74d6ba4522560292c5dcc773d2f48f
+current_phase: 28
+current_phase_name: dashboard-card-view
+status: ready
+stopped_at: Phase 27 closed by owner approval; Phase 28 UI-SPEC approved
+last_updated: "2026-09-06T00:49:18-05:00"
+last_activity: 2026-09-06
+last_activity_desc: Phase 27 closed by owner approval; release APK built on droid
+state_head: 2c9981a4594882f91b5b303cfc18a074754c5d2a
 progress:
   total_phases: 20
-  completed_phases: 4
+  completed_phases: 7
   total_plans: 51
-  completed_plans: 50
+  completed_plans: 51
 carried_forward:
 
   - "D-11: default Memory-type display name is provisional (memory-registry.ts:10-12) — owner naming decision, must be reconciled before Phase 34"
@@ -29,19 +29,19 @@ carried_forward:
 See: .planning/PROJECT.md (updated 2026-09-01 after v1.0 milestone)
 
 **Core value:** Collapse the taps between "you're overdue with X" and the message actually being sent.
-**Current focus:** Phase 27 — Dashboard List View
+**Current focus:** Phase 28 — Dashboard Card View
 
 ## Current Position
 
-Phase: 27 (dashboard-list-view) — EXECUTING GAP CLOSURE
-Plan: 8 of 8
-Status: Executing the remaining gap-closure plan
+Phase: 28 (dashboard-card-view) — READY TO PLAN
+Plan: Not started
+Status: Phase 27 closed 2026-09-06 by owner approval. Implementation, code review, validation, and the droid release build are complete; the partial device-UAT record (1 passed, 4 blocked coverage checks) remains in `27-UAT.md` as accepted verification debt.
 Carried forward (owner's bucket, NOT resolved here): D-11 default Memory-type display name — reconcile before Phase 34.
 Surface to owner (24.2-07, KNOW-15): milestone plan said Phase 36 owns the backup format-4 bump, but 24.1 already bumped to 4 (d677e2c); Plan 07 emits into the live format 4 with NO bump — that milestone instruction is stale.
 Deferred to Phase 31 (recorded in Plan 05): durable contact-scoped-def ownership + owner-purge semantics. Deferred to Phase 36 (ROADMAP breadcrumb): legacy AI-fuel confirm-path code removal.
-Last activity: 2026-09-05 — Phase 27 execution started
-Progress: 6/19 phases complete (v2.0) — 22, 23, 24.1, 24.2, 25, 26
-Next: `/gsd-execute-phase 27 --gaps-only`.
+Last activity: 2026-09-06 — Phase 27 closed by owner approval; release APK built on droid
+Progress: 7/19 phases complete (v2.0) — 22, 23, 24.1, 24.2, 25, 26, 27
+Next: `/gsd-plan-phase 28`.
 
 **Milestone v2.0 structure (pre-decided by the owner from the fifteen milestone-2 dossiers + the
 2026-09-01 cross-dossier audit; not re-derived):** 22 App Shell · 23 Theme · 24 Contact Knowledge ·
@@ -554,11 +554,11 @@ _Also disposed at this close: 05/deferred-items.md (check:colors doc-comment) ma
 
 ## Session
 
-**Last session:** 2026-09-06T04:34:02.859Z
-**Stopped at:** Completed 27-08-PLAN.md
+**Last session:** 2026-09-06T00:49:18-05:00
+**Stopped at:** Phase 27 closed by owner approval; Phase 28 UI-SPEC approved
 _Prior stop (v1.0):_ Phase 21 UI-SPEC approved; milestone v1.0 closed 2026-09-01.
 _Prior stop (13-04):_ the orrery VISUAL VOCABULARY (theme tokens + two pure resolver modules, node-tested, 29 cases green): (1) five owner-tunable `ThemePalette` tokens seeded in `space-dark.dark` ONLY — `starPalette` (6 colours, gold `#F2C14E` at index 0, then amber/rose-red/violet/cyan/ice-white), `mutedStable/Wobble/Decay` (desaturated same-hue morph endpoints), `rogueExtinguished` (cold blue-grey `#3E4A6B` rogue BODY fill) — with an M6/C2-5 conformance test that IMPORTS the real `SELF_SUN_COLOUR_RE`/`assertSelfSunColour` from app-settings-dao and locks every starPalette entry to the ACTUAL DAO write-path rule (no re-inlined regex). (2) `orrery-ring-logic.ts` `orreryRingStyle(status, colors)` — REUSES `ringVisual` for `{color,opacity,width}` (status→colour mapped once), adds the `strokeStyle` axis (solid→dashed→faded→faintTrace) + `bodyFill` (rogue ring=`colors.rogue`, body=`rogueExtinguished`); `null`→canonical NEUTRAL (`colors.border`), never throws — the single fallback sun-occupant reuses (C2-2). (3) `sun-occupant-logic.ts` `resolveSunOccupant(input)` — NULL/archived/missing→self (A7, glow `selfSunColour ?? starPalette[0]`), live contact→its status glow via `orreryRingStyle(status, colors).color`, never-contacted (status `null`)→the reused neutral border (C2-2); accepts `status: ProfileStatus | null`. 5 commits (1801915 feat tokens+M6; d35d528 RED→4cbfad5 GREEN ring-logic; c923b16 RED→10780dd GREEN sun-occupant); tsc + check:colors clean; no deviations (one in-flight fix: a placeholder hex in the logic test was re-sourced from the palette after check:colors flagged it — C2-3). Committed locally on main (NOT pushed). Next: Wave 2 (13-05 render / 13-06 Settings sun-picker), Wave 3 (13-07 drag-release), Wave 4 (13-08 device UAT, autonomous:false).
-**Resume file:** None
+**Resume file:** /home/bwales/projects/orbit-app/.planning/phases/28-dashboard-card-view/28-UI-SPEC.md
 are archived under `.planning/milestones/v1.0-phases/`.)
 
 ## Phase 4 — Closeout (2026-08-15) ✅ COMPLETE
