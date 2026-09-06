@@ -3,7 +3,7 @@ status: partial
 phase: 27-dashboard-list-view
 source: [27-VERIFICATION.md]
 started: 2026-09-06T04:38:10Z
-updated: 2026-09-06T05:10:47Z
+updated: 2026-09-06T05:28:00Z
 ---
 
 ## Current Test
@@ -26,15 +26,14 @@ reason: "Automated device UAT verified the favourite button's Remove favourite â
 
 ### 3. FAB and List gestures
 expected: FAB behavior is unchanged; configured right swipe commits its action, left opens Edit, and only one row is revealed.
-result: issue
-reported: "Automated device UAT: an in-row right swipe logged UAT Ada and presented Undo. Activating Undo dismissed the affordance, but UAT Ada still showed Today after a forced app reload; the interaction persisted."
-severity: major
+result: passed
+reason: "Automated Pixel UAT verified the default quick-log right swipe, left swipe to Edit, and an open-row tap closing without navigation. The Undo button was retried inside its unobstructed upper hit area within one second; a read-only debug-database check after force-stop confirmed the newly logged interaction was deleted and prior recency restored. The initial raw tap landed beneath Expo's developer-warning overlay, so it never invoked Undo; the two resulting UAT interactions were removed through Orbit's normal Timeline delete flow."
 
 ### 4. Schema v20 physical readback
 expected: The singleton database row defaults to quick-log and the dashboard swipe preference survives a real device read/write path.
 result: blocked
 blocked_by: other
-reason: "The debug app and run-as access are available, but the device image exposes no sqlite3 shell client and no in-app setting surface exists to read/write the v20 preference without a data-extraction procedure."
+reason: "A read-only debug-database extraction verified the physical singleton row contains `dashboard_right_swipe_action = quick-log`, and the default right swipe executed Quick Log. This phase deliberately has no in-app setting surface to write the alternate `log-contact` value, so the real device write/read round-trip remains unavailable."
 
 ### 5. Search, states, and reduced motion
 expected: Search explanations/snippets and shared states render correctly; rapid updates are restrained and reduced motion disables animation.
@@ -45,19 +44,8 @@ reason: "Automated device UAT verified the search control and name-only UAT quer
 ## Summary
 
 total: 5
-passed: 0
-issues: 1
+passed: 1
+issues: 0
 pending: 0
 skipped: 0
 blocked: 4
-
-## Gaps
-
-- gap_id: G-27-3
-  truth: "Undoing a logged dashboard swipe restores the contact to its pre-swipe interaction state."
-  status: failed
-  reason: "Automated device UAT: an in-row right swipe logged UAT Ada and presented Undo. Activating Undo dismissed the affordance, but UAT Ada still showed Today after a forced app reload; the interaction persisted."
-  severity: major
-  test: 3
-  artifacts: []
-  missing: []
