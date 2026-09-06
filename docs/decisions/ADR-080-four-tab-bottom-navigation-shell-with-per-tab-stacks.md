@@ -52,4 +52,4 @@ The root navigation shell is a four-tab bottom navigator — Dashboard, Orrery, 
 - `src/screens/HomeScreen.tsx` — becomes the Dashboard tab root and hosts the overflow entry to Archived Contacts.
 
 **Depends on:** ADR-006 (Theme-Token Architecture); ADR-009 (Crash-Safe Forward-Only SQLite Migrations)
-**Required by:** _None._
+**Required by:** ADR-082 (Universal Capture FAB, Canonical Picker, and Truthful Quick Log)
