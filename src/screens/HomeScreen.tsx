@@ -52,7 +52,7 @@ import ReanimatedSwipeable, {
   type SwipeableMethods,
 } from "react-native-gesture-handler/ReanimatedSwipeable";
 import { useShallow } from "zustand/react/shallow";
-import { ContactCard } from "@/components/ContactCard";
+import { CardGrid } from "@/components/CardGrid";
 import { ListRow, type ListRowProps } from "@/components/ListRow";
 import { POPULATION_LABELS } from "@/components/control-surface/control-labels";
 import { DashboardControlRow } from "@/components/control-surface/DashboardControlRow";
@@ -1052,71 +1052,75 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
           </View>
         </View>
         <Animated.View style={[styles.listRegion, resultTransitionStyle]}>
-        <FlatList
-          data={error || showInitialSkeleton ? [] : rows}
-          keyExtractor={(item) => String(item.id)}
-          renderItem={({ item }) =>
-            query.viewMode === "list" ? (
-              <SwipeableListRow
-                contactId={item.id}
-                name={item.name}
-                photo={item.photo}
-                modifiedAt={item.modified_at}
-                categoryLabel={item.categoryLabel}
-                lastContact={item.last_contact}
-                snoozeUntil={item.snooze_until}
-                status={item.status}
-                now={listNow}
-                onPress={() => goToProfile(item.id)}
-                isFavourite={
-                  favouriteOverlay.get(item.id) ?? (item.favourite_rank !== null)
-                }
-                onToggleFavourite={() => {
-                  const renderedMembership =
-                    favouriteOverlay.get(item.id) ??
-                    (item.favourite_rank !== null);
-                  toggleFavourite(item.id, !renderedMembership);
-                }}
-                line3={line3ByContactId.get(item.id) ?? null}
-                searchResult={
-                  isListSearchMode
-                    ? (searchResultsByContactId.get(item.id) ?? null)
-                    : undefined
-                }
-                searchSnippet={isListSearchMode ? item.snippet : null}
-                onLogInteraction={onLogInteraction}
-                onEditContact={onEditContact}
-                openRowRef={openRowRef}
-              />
-            ) : (
-              <ContactCard
-                contactId={item.id}
-                name={item.name}
-                photo={item.photo}
-                modifiedAt={item.modified_at}
-                status={item.status}
-                categoryLabel={item.categoryLabel}
-                isFavourite={item.favourite_rank !== null}
-                fuelText={item.fuelText}
-                snippet={item.snippet}
-                onPress={() => goToProfile(item.id)}
-              />
-            )}
-          ListHeaderComponent={listHeader}
-          ListEmptyComponent={showInitialSkeleton ? <ListLoadingSkeleton /> : listEmpty}
-          contentContainerStyle={[
-            styles.content,
-            { paddingBottom: bottomClearance },
-          ]}
-          refreshControl={
-            <RefreshControl
+          {query.viewMode === "list" ? (
+            <FlatList
+              data={error || showInitialSkeleton ? [] : rows}
+              keyExtractor={(item) => String(item.id)}
+              renderItem={({ item }) => (
+                <SwipeableListRow
+                  contactId={item.id}
+                  name={item.name}
+                  photo={item.photo}
+                  modifiedAt={item.modified_at}
+                  categoryLabel={item.categoryLabel}
+                  lastContact={item.last_contact}
+                  snoozeUntil={item.snooze_until}
+                  status={item.status}
+                  now={listNow}
+                  onPress={() => goToProfile(item.id)}
+                  isFavourite={
+                    favouriteOverlay.get(item.id) ?? (item.favourite_rank !== null)
+                  }
+                  onToggleFavourite={() => {
+                    const renderedMembership =
+                      favouriteOverlay.get(item.id) ??
+                      (item.favourite_rank !== null);
+                    toggleFavourite(item.id, !renderedMembership);
+                  }}
+                  line3={line3ByContactId.get(item.id) ?? null}
+                  searchResult={
+                    isListSearchMode
+                      ? (searchResultsByContactId.get(item.id) ?? null)
+                      : undefined
+                  }
+                  searchSnippet={isListSearchMode ? item.snippet : null}
+                  onLogInteraction={onLogInteraction}
+                  onEditContact={onEditContact}
+                  openRowRef={openRowRef}
+                />
+              )}
+              ListHeaderComponent={listHeader}
+              ListEmptyComponent={showInitialSkeleton ? <ListLoadingSkeleton /> : listEmpty}
+              contentContainerStyle={[
+                styles.content,
+                { paddingBottom: bottomClearance },
+              ]}
+              refreshControl={
+                <RefreshControl
+                  refreshing={refreshing}
+                  onRefresh={onRefresh}
+                  tintColor={colors.accent}
+                  colors={[colors.accent]}
+                />
+              }
+            />
+          ) : (
+            <CardGrid
+              rows={rows}
+              now={listNow}
+              onPressContact={goToProfile}
+              favouriteOverlay={favouriteOverlay}
+              onToggleFavourite={toggleFavourite}
+              error={error}
+              showInitialSkeleton={showInitialSkeleton}
+              loadingSkeleton={<ListLoadingSkeleton />}
+              listHeader={listHeader}
+              listEmpty={listEmpty}
               refreshing={refreshing}
               onRefresh={onRefresh}
-              tintColor={colors.accent}
-              colors={[colors.accent]}
+              bottomClearance={bottomClearance}
             />
-          }
-        />
+          )}
         </Animated.View>
       </View>
       <DashboardOverlayHost />
