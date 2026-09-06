@@ -41,6 +41,9 @@ export interface ListRowProps {
   onToggleFavourite?: () => void;
   /** The selected adaptive third content line, owned by HomeScreen. */
   line3?: { text: string; iconName?: IconName } | null;
+  /** Gesture-equivalent actions injected by the list host. */
+  onLogInteraction?: () => void;
+  onEditContact?: () => void;
   /** Reserved for Plan 06's search-specific row presentation. */
   searchResult?: DashboardSearchResult | null;
 }
@@ -59,6 +62,8 @@ export function ListRow({
   isFavourite = false,
   onToggleFavourite,
   line3 = null,
+  onLogInteraction,
+  onEditContact,
 }: ListRowProps) {
   const { colors } = useTheme();
   const displayState: StatusDisplayState = isSnoozed(snoozeUntil, now)
@@ -83,6 +88,21 @@ export function ListRow({
       testID={`dashboard-list-row-${contactId}`}
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel}
+      accessibilityActions={
+        onLogInteraction && onEditContact
+          ? [
+              { name: "log-interaction", label: "Log Interaction" },
+              { name: "edit-contact", label: "Edit Contact" },
+            ]
+          : undefined
+      }
+      onAccessibilityAction={(event) => {
+        if (event.nativeEvent.actionName === "log-interaction") {
+          onLogInteraction?.();
+        } else if (event.nativeEvent.actionName === "edit-contact") {
+          onEditContact?.();
+        }
+      }}
       onPress={onPress}
       style={[
         styles.row,

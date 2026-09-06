@@ -170,7 +170,7 @@ function SwipeableListRow({
   onEditContact,
   openRowRef,
   ...rowProps
-}: ListRowProps & {
+}: Omit<ListRowProps, "onLogInteraction" | "onEditContact"> & {
   onLogInteraction: (contactId: number) => Promise<void>;
   onEditContact: (contactId: number) => void;
   openRowRef: { current: SwipeableMethods | null };
@@ -228,7 +228,14 @@ function SwipeableListRow({
       onSwipeableOpen={onSwipeableOpen}
       onSwipeableClose={onClose}
     >
-      <ListRow {...rowProps} onPress={onPress} />
+      <ListRow
+        {...rowProps}
+        onPress={onPress}
+        onLogInteraction={() => {
+          void onLogInteraction(rowProps.contactId);
+        }}
+        onEditContact={() => onEditContact(rowProps.contactId)}
+      />
     </ReanimatedSwipeable>
   );
 }
