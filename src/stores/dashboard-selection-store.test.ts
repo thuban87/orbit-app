@@ -8,6 +8,7 @@ describe("useDashboardSelectionStore", () => {
   beforeEach(() => {
     useDashboardSelectionStore.setState({
       mode: false,
+      sessionId: 0,
       selectedIds: new Set(),
       frozenUniverse: [],
     });
@@ -19,6 +20,7 @@ describe("useDashboardSelectionStore", () => {
     const state = useDashboardSelectionStore.getState();
     expect(state).toMatchObject({
       mode: true,
+      sessionId: 1,
       frozenUniverse: [1, 2, 3],
       selectedIds: new Set([2]),
     });
@@ -31,9 +33,23 @@ describe("useDashboardSelectionStore", () => {
 
     expect(useDashboardSelectionStore.getState()).toMatchObject({
       mode: true,
+      sessionId: 1,
       frozenUniverse: [1, 2, 3],
       selectedIds: new Set([2]),
     });
+  });
+
+  it("deduplicates the frozen universe and rejects an out-of-universe seed", () => {
+    useDashboardSelectionStore.getState().enterSelection([1, 2, 2, 3], 99);
+
+    expect(useDashboardSelectionStore.getState()).toMatchObject({
+      frozenUniverse: [1, 2, 3],
+      selectedIds: new Set(),
+    });
+
+    useDashboardSelectionStore.getState().exitSelection();
+    useDashboardSelectionStore.getState().enterSelection([1, 2, 2, 3], 2);
+    expect(useDashboardSelectionStore.getState().selectedIds).toEqual(new Set([2]));
   });
 
   it("toggles in-universe contacts idempotently and fences outsiders", () => {

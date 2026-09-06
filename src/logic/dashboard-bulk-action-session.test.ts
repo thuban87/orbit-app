@@ -1,5 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
-import { createBulkActionGate } from "@/logic/dashboard-bulk-action-session";
+import {
+  createBulkActionGate,
+  getCurrentSelectionIds,
+} from "@/logic/dashboard-bulk-action-session";
 
 function deferred<T>() {
   let resolve!: (value: T) => void;
@@ -36,5 +39,51 @@ describe("createBulkActionGate", () => {
 
     expect(snackbars[0].undo()).toEqual({ batchId: "first-and-only" });
     await vi.waitFor(() => expect(gate.pending).toBe(false));
+  });
+});
+
+describe("getCurrentSelectionIds", () => {
+  it("rejects a category read that resolves after its selection session exits", async () => {
+    const categories = deferred<{ id: number; name: string }[]>();
+    const bulkSetCategory = vi.fn();
+    let selection = {
+      mode: true,
+      sessionId: 1,
+      selectedIds: new Set([1, 2]),
+    };
+
+    const openCategoryPicker = async () => {
+      const sessionId = selection.sessionId;
+      await categories.promise;
+      if (!getCurrentSelectionIds(selection, sessionId)) return;
+      bulkSetCategory();
+    };
+
+    const pending = openCategoryPicker();
+    selection = { ...selection, mode: false, selectedIds: new Set() };
+    categories.resolve([]);
+    await pending;
+
+    expect(bulkSetCategory).not.toHaveBeenCalled();
+  });
+
+  it("rejects a stale open picker but uses IDs selected at a valid choice", () => {
+    const bulkSetCategory = vi.fn();
+    let selection = {
+      mode: true,
+      sessionId: 1,
+      selectedIds: new Set([1, 2]),
+    };
+    const staleSessionId = selection.sessionId;
+
+    selection = { mode: true, sessionId: 2, selectedIds: new Set([3]) };
+    const staleIds = getCurrentSelectionIds(selection, staleSessionId);
+    if (staleIds) bulkSetCategory(staleIds);
+    expect(bulkSetCategory).not.toHaveBeenCalled();
+
+    selection = { ...selection, selectedIds: new Set([3, 4]) };
+    const currentIds = getCurrentSelectionIds(selection, selection.sessionId);
+    if (currentIds) bulkSetCategory(currentIds);
+    expect(bulkSetCategory).toHaveBeenCalledExactlyOnceWith([3, 4]);
   });
 });
