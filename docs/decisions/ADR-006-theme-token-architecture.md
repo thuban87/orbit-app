@@ -52,6 +52,6 @@ Every colour resolves through theme tokens read via `useTheme().colors.*`. Hex l
 - `scripts/check-colors.sh` — the repo-wide no-hardcoded-colour gate (`npm run check:colors`).
 
 **Depends on:** None
-**Required by:** ADR-018 (Archive-Gated Contact Purge with Explicit Fan-Out); ADR-019 (Native Stack Contact Lifecycle Navigation); ADR-020 (Library-Only Photo Capture with Themed In-App Cropping and One-Time URL Download); ADR-022 (Tokenized Deterministic Initials Avatars); ADR-042 (Shared Status Palette for Dashboard and Widget Rings); ADR-047 (App-Level Assignable Sun and Themed Self Identity); ADR-083 (Durable Multi-Package Theme Configuration and Restore-Before-Paint)
+**Required by:** ADR-018 (Archive-Gated Contact Purge with Explicit Fan-Out); ADR-019 (Native Stack Contact Lifecycle Navigation); ADR-020 (Library-Only Photo Capture with Themed In-App Cropping and One-Time URL Download); ADR-022 (Tokenized Determininistic Initials Avatars); ADR-042 (Shared Status Palette for Dashboard and Widget Rings); ADR-047 (App-Level Assignable Sun and Themed Self Identity); ADR-083 (Durable Multi-Package Theme Configuration and Restore-Before-Paint); ADR-086 (Semantic Icons and Accessible Interaction Primitives)
 
 ---
