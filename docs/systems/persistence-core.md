@@ -1,7 +1,7 @@
 # Persistence Core
 
-**Last updated:** 2026-09-03
-**Updated by phase:** 24.1-contact-knowledge-foundation
+**Last updated:** 2026-09-02
+**Updated by phase:** 25-dashboard-data-state-foundation
 **Owners:** `src/db/database.ts`, `src/db/migrations/runner.ts`, `src/db/migrations/001-initial.ts`, `src/db/mutex.ts`, `src/db/transaction.ts`, `src/services/launch-sweep.ts`
 
 ## Purpose
@@ -21,7 +21,7 @@ The schema version is SQLite's `PRAGMA user_version`. Migrations 001–005 estab
 - `interactions` — dated contact touchpoints.
 - `contact_links`, `events`, `custom_field_defs`, `field_history`, `fuel` — durable supporting data introduced in the first schema.
 - `custom_field_values` — migration-006 normalized uid-bearing custom-field current state, unique per contact-and-definition pair.
-- `app_settings` — a singleton SQLite row for non-secret preferences, a monotonic exportable-data revision, and device-local backup health/configuration. Migration 015 adds the active theme package plus each package's remembered mode, accent ID, and background ID; NULL accent/background values resolve to package defaults at render. It never contains an API key, passphrase, or palette hex.
+- `app_settings` — a singleton SQLite row for non-secret preferences, a monotonic exportable-data revision, and device-local backup health/configuration. Migration 015 adds theme selection; migration 019 adds validated Dashboard view, population, filter, and sort preferences. It never contains an API key, passphrase, or palette hex.
 - `tombstones` — indefinitely retained type-and-UID deletion evidence for portable reconciliation.
 - `restore_photo_journal` — committed restore-photo finalization and cleanup work.
 - `contact_methods` — ordered UID-bearing phone/email rows with canonical/actionability data, optional label, and durable display order.
@@ -88,6 +88,7 @@ The schema version is SQLite's `PRAGMA user_version`. Migrations 001–005 estab
 | `src/db/migrations/016-contact-knowledge.ts` | Creates the additive contact-knowledge tables, constraints, and read indexes. |
 | `src/db/migrations/017-knowledge-egress-datamove.ts` | Uses a per-row copy proof before removing retired share and AI-proposal fuel rows. |
 | `src/db/migrations/018-custom-field-scope-history.ts` | Adds custom-field scope/history/group columns and the retained-history table. |
+| `src/db/migrations/019-dashboard-prefs.ts` | Adds checked Dashboard view/sort and validated JSON population/filter preference columns. |
 | `src/db/import-session-dao.ts` | Owns atomic session acceptance and transaction-composable import-row state transitions. |
 | `src/db/app-settings-dao.ts` | Typed, bounds-validated read and update boundary for application settings. |
 | `src/db/types.ts` | Testable database and migration interfaces. |
@@ -119,6 +120,7 @@ The schema version is SQLite's `PRAGMA user_version`. Migrations 001–005 estab
 18. Migration 016 adds Memories, structured relationships, and retained current-state entries without reshaping fuel or either custom-field table. Its partial current-state index and relationship self-link CHECK protect later writers.
 19. Migration 017 adds `memories.allow_ai` with a default of off. It copies each eligible share capture and legacy AI proposal to a verified Memory before removing that fuel row; a failed proof rolls the whole step back.
 20. Migration 018 adds global-default custom-field scope, history-retained/group metadata, and a separate UID-bearing value-history table while retaining ADR-001 current-pair constraints.
+21. Migration 019 adds defaulted Dashboard view, population, filter, and sort preferences. The two multi-value axes remain validated JSON text; a v0-to-v19 upgrade receives safe singleton defaults in the same forward-only sequence.
 
 ### Running launch maintenance
 
@@ -131,7 +133,7 @@ The schema version is SQLite's `PRAGMA user_version`. Migrations 001–005 estab
 | Constant | Value | File | Purpose |
 |---|---|---|---|
 | `BUSY_TIMEOUT_MS` | `5000` | `src/db/database.ts` | Wait budget for a busy shared connection. |
-| `TARGET_VERSION` | `18` | `src/db/database.ts` | Schema version after the contact-knowledge egress and custom-field-history migrations. |
+| `TARGET_VERSION` | `19` | `src/db/database.ts` | Schema version after the Dashboard preference migration. |
 
 ## Decisions
 
@@ -161,6 +163,7 @@ The schema version is SQLite's `PRAGMA user_version`. Migrations 001–005 estab
 - **ADR-089:** Recoverable Memory Lifecycle and Contact-Operation Integrity — registers a foreground retention hook over the migration-016 lifecycle.
 - **ADR-081:** Retire AI-Proposed Fuel for Explicit Per-Item Permission — defines migration 017's verified, non-destructive fuel retirement.
 - **ADR-090:** Additive Custom-Field Value History and Deferred Contact Scope — defines migration 018 without weakening normalized current-value pairs.
+- **ADR-092:** Durable Shared Dashboard Query State — defines migration 019's durable Dashboard preference boundary.
 
 ## Gotchas
 
@@ -184,6 +187,7 @@ The schema version is SQLite's `PRAGMA user_version`. Migrations 001–005 estab
 18. **Migration 016 is additive-only.** Do not use it to reshape fuel, change custom-field tables, or introduce a user-writable Memory-type table.
 19. **Retention remains a launch hook.** The Memory and relationship trash sweep rechecks staleness in its own transaction; do not replace it with a timer or nest a writer transaction.
 20. **A data move must prove each source row before removal.** Count equality is insufficient; re-read the mapped destination and let an integrity failure roll the version step back.
+21. **Dashboard preference defaults are semantic.** Keep `dashboard_sort='default'` rather than persisting a resolved population order, and validate JSON axes before query construction.
 
 ## Related Systems
 
@@ -219,3 +223,4 @@ The schema version is SQLite's `PRAGMA user_version`. Migrations 001–005 estab
 | 2026-09-02 | 23 | Added migration 015's durable package and per-package theme-preference columns. |
 | 2026-09-03 | 24.1 | Added migration 016's additive contact-knowledge schema and foreground retention hook. |
 | 2026-09-03 | 24.2 | Added migrations 017/018 for verified fuel carry-over, default-off Memory permission, and retained custom-field history. |
+| 2026-09-02 | 25 | Added migration 019 for durable, validated Dashboard query preferences. |
