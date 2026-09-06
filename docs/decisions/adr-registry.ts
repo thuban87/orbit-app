@@ -91,5 +91,6 @@
 // NOTE: ADR-0079 [ACCEPTED] On-Demand AI Transparency and Compose-Only Three-Suggestion Invocation
 // NOTE: ADR-0080 [ACCEPTED] Four-Tab Bottom Navigation Shell with Per-Tab Stacks
 // NOTE: ADR-0081 [ACCEPTED] Retire AI-Proposed Fuel for Explicit Per-Item Permission
+// NOTE: ADR-0082 [ACCEPTED] Universal Capture FAB, Canonical Picker, and Truthful Quick Log
 
-export const ADR_COUNT = 81;
+export const ADR_COUNT = 82;
