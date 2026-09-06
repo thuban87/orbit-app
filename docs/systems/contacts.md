@@ -1,7 +1,7 @@
 # Contacts
 
-**Last updated:** 2026-08-31
-**Updated by phase:** 21-interaction-assist-reach-out
+**Last updated:** 2026-09-03
+**Updated by phase:** 24.1-contact-knowledge-foundation
 **Owners:** `src/db/contacts-dao.ts`, `src/db/contact-read.ts`, `src/db/favourites-dao.ts`, `src/db/profile-dao.ts`, `src/db/contact-links-dao.ts`, `src/db/purge-dao.ts`, `src/db/recency-dao.ts`
 
 ## Purpose
@@ -43,6 +43,7 @@ All data is on-device SQLite. Migration 001 uses a surrogate `contacts.id` and a
   - `note` (`TEXT`, nullable) — local-only free-text touchpoint detail.
 - `events` — immutable archive, restore, snooze, and unsnooze history; these rows never participate in recency.
 - `tombstones` — generic permanent retirement evidence; a merged-away contact has a `contact` tombstone and is not an archived contact.
+- Contact Knowledge owns `memories`, `relationships`, and `current_state_entries`; their contact foreign keys cascade only for permanent contact removal, while contact merge reparents them explicitly.
 
 **Types** (`src/db/contacts-dao.ts` and `src/db/recency-dao.ts`):
 - `CreateContactFullInput` — a new contact, method drafts, optional first interaction, and custom values.
@@ -107,7 +108,7 @@ All data is on-device SQLite. Migration 001 uses a surrogate `contacts.id` and a
 
 1. The link DAO applies each add, edit, or remove with both the link and contact identities scoped to the intended row; phone and email live in normalized method rows rather than fixed contact columns.
 2. Archive sets `archived_at` from the profile only when the contact is live, then composes an immutable archive event in the same transaction. Live reads exclude archived contacts; Settings owns the distinct Archived contacts home.
-3. Restore clears the marker only when the contact is archived and records a matching restore event. Purge first verifies the archived state inside its write transaction, then explicitly deletes interactions, events, fuel, normalized custom-value pairs, links, field history, and the contact. Pending interaction assists are the one child removed by FK cascade rather than the explicit fan-out (a documented exception — assists are device-local and transient; see ADR-073).
+3. Restore clears the marker only when the contact is archived and records a matching restore event. Purge first verifies the archived state inside its write transaction, then explicitly counts and deletes interactions, events, fuel, normalized custom-value pairs, links, field history, and contact-knowledge children before deleting the contact. Pending interaction assists are the one child removed by FK cascade rather than the explicit fan-out (a documented exception — assists are device-local and transient; see ADR-073).
 4. Photo-file and notification cleanup are idempotent best-effort post-commit extensions registered by their owning systems.
 
 ### Binding and unbinding a relationship
@@ -176,6 +177,7 @@ All data is on-device SQLite. Migration 001 uses a surrogate `contacts.id` and a
 1. A user selects a survivor and explicitly resolves genuine scalar, photo, or competing-primary conflicts before confirmation.
 2. `mergeContacts()` resolves method and active-link collisions, reparents compatible contact-owned children, and snapshots a meaningful overwritten or dropped value in `field_history` inside one transaction.
 3. It recomputes `last_contact` through `recency-dao`, deletes the absorbed live contact, and writes a generic contact tombstone. The absorbed identity is not archived or normally restorable.
+4. The same transaction reparents compatible Memory, relationship, and current-state rows before deleting the absorbed contact; it clears would-be relationship self-links and demotes a conflicting current-state row rather than dropping history.
 
 ## Configuration
 
@@ -201,6 +203,7 @@ All data is on-device SQLite. Migration 001 uses a surrogate `contacts.id` and a
 - **ADR-033:** Profile Marking and Shared Drag-Reordered Favourites — owns reversible profile marking and guarded favourite-rank ordering.
 - **ADR-075:** Binary Favourite Membership Without a User-Facing Order — makes favourite rank ineligible as a contact-picker sort key.
 - **ADR-082:** Universal Capture FAB, Canonical Picker, and Truthful Quick Log — adds the shared local target picker.
+- **ADR-089:** Recoverable Memory Lifecycle and Contact-Operation Integrity — extends merge and purge with explicit contact-knowledge integrity work.
 - **ADR-035:** Native SMS Handoff with Guaranteed Clipboard Copy — partially superseded; native handoff and Copy remain the interaction boundary.
 - **ADR-059:** Normalized Contact Methods, Canonical Actionability, and Local Provenance — replaces scalar endpoint fields with ordered mergeable method rows.
 - **ADR-062:** Bound/Unbound Lifecycle and One-Way Cadence Assignment — separates active cadence participation from relationship data ownership.
@@ -243,6 +246,7 @@ All data is on-device SQLite. Migration 001 uses a surrogate `contacts.id` and a
 20. **Do not use a compatibility shortcut for imported contacts.** Import must compose the canonical creation core so contact invariants remain identical to manual creation.
 21. **Do not merge through archive or direct recency SQL.** Archive makes a normal restore possible, and a merge-local `MAX` bypasses the single recency writer.
 22. **Picker ordering is not favourite-rank ordering.** A favourite is a membership band only; use recency and then name inside that band.
+23. **Do not rely on cascade for a merge.** Contact deletion would discard knowledge rows; merge must reparent them and resolve relationship/current-state collisions first.
 
 ## Related Systems
 
@@ -259,6 +263,7 @@ All data is on-device SQLite. Migration 001 uses a surrogate `contacts.id` and a
 - **Backup & Restore** — exports UID-bearing contact state and restores it through tombstone-aware reconciliation.
 - **Contact Import** — creates or explicitly links contacts through the shared transaction seam.
 - **Interaction Assist & Reach Out** — its confirmation reuses the sole recency recomputer; purge cascade-deletes and merge reparents its pending assists.
+- **Contact Knowledge** — owns typed knowledge rows that profile navigation reads and contact lifecycle operations preserve or explicitly retire.
 
 ## Changelog
 
@@ -282,3 +287,4 @@ All data is on-device SQLite. Migration 001 uses a surrogate `contacts.id` and a
 | 2026-08-26 | 20 | Added explicit atomic duplicate merge, tombstone retirement, and recency recomputation through existing cores. |
 | 2026-08-31 | 21 | Purge cascade-deletes pending `interaction_assists` (documented exception to explicit fan-out); assist confirmation reuses the sole recency recomputer. |
 | 2026-09-02 | 22 | Added the local shell action-picker projection with membership-only favourites ordering and explicit archive search. |
+| 2026-09-03 | 24.1 | Extended merge and archive-gated purge with explicit contact-knowledge preservation and fan-out. |
