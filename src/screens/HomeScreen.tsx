@@ -73,6 +73,7 @@ import {
   listDashboardPopulation,
   listDashboardSearch,
 } from "@/db/dashboard-read";
+import { composeDashboardSearch } from "@/db/dashboard-search-read";
 import { getAppSettings } from "@/db/app-settings-dao";
 import { getExecutor, localDateTime } from "@/db/database";
 import { readLine3Candidates } from "@/db/dashboard-knowledge-read";
@@ -90,6 +91,7 @@ import {
   createFavouriteOptimisticStore,
 } from "@/logic/favourite-optimistic";
 import { selectLine3 } from "@/logic/list-row-selection";
+import type { DashboardSearchResult } from "@/logic/dashboard-search-match";
 import type { DashboardScreenProps } from "@/navigation/types";
 import { navigationRef } from "@/navigation/linking";
 import { useBottomClearance } from "@/navigation/use-bottom-clearance";
@@ -332,6 +334,9 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
   const [line3ByContactId, setLine3ByContactId] = useState<
     ReadonlyMap<number, ListRowLine3>
   >(() => new Map());
+  const [searchResultsByContactId, setSearchResultsByContactId] = useState<
+    ReadonlyMap<number, DashboardSearchResult | null>
+  >(() => new Map());
   const [favouriteStore] = useState(createFavouriteOptimisticStore);
   const favouriteOverlay = useSyncExternalStore(
     favouriteStore.subscribe,
@@ -502,11 +507,12 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
     let cancelled = false;
     const now = localDateTime();
     const term = debouncedSearchText.trim();
+    const isListSearch = query.viewMode === "list" && term !== "";
     (async () => {
       try {
         const exec = getExecutor();
         const [
-          list,
+          searchRead,
           live,
           neverContacted,
           snoozed,
@@ -516,9 +522,23 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
           favourites,
           allContacts,
         ] = await Promise.all([
-          term !== ""
-            ? listDashboardSearch(exec, query, term, now)
-            : listDashboardPopulation(exec, query, now),
+          isListSearch
+            ? composeDashboardSearch(exec, query, term, now).then((searchRows) => ({
+                rows: searchRows.map((searchRow) => searchRow.row),
+                resultsByContactId: new Map(
+                  searchRows.map((searchRow) => [
+                    searchRow.row.id,
+                    searchRow.match,
+                  ]),
+                ),
+              }))
+            : (term !== ""
+                ? listDashboardSearch(exec, query, term, now)
+                : listDashboardPopulation(exec, query, now)
+              ).then((rows) => ({
+                rows,
+                resultsByContactId: new Map<number, DashboardSearchResult | null>(),
+              })),
           countLiveContacts(exec),
           countNeverContacted(exec),
           countSnoozed(exec),
@@ -528,35 +548,39 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
           countFavourites(exec),
           countAllContacts(exec),
         ]);
-        const candidates = await readLine3Candidates(
-          exec,
-          list.map((row) => row.id),
-        );
-        const candidatesByContactId = new Map<number, typeof candidates>();
-        for (const candidate of candidates) {
-          const forContact = candidatesByContactId.get(candidate.contactId) ?? [];
-          forContact.push(candidate);
-          candidatesByContactId.set(candidate.contactId, forContact);
-        }
+        const list = searchRead.rows;
         const nextLine3ByContactId = new Map<number, ListRowLine3>();
-        const selectionNow = new Date(parseLocalMs(now));
-        for (const row of list) {
-          const selection = selectLine3(
-            candidatesByContactId.get(row.id) ?? [],
-            row.id,
-            row.name,
-            selectionNow,
+        if (query.viewMode === "list" && !isListSearch) {
+          const candidates = await readLine3Candidates(
+            exec,
+            list.map((row) => row.id),
           );
-          nextLine3ByContactId.set(row.id, {
-            text: selection.text,
-            ...(selection.kind === "candidate" && isIconName(selection.type)
-              ? { iconName: selection.type }
-              : {}),
-          });
+          const candidatesByContactId = new Map<number, typeof candidates>();
+          for (const candidate of candidates) {
+            const forContact = candidatesByContactId.get(candidate.contactId) ?? [];
+            forContact.push(candidate);
+            candidatesByContactId.set(candidate.contactId, forContact);
+          }
+          const selectionNow = new Date(parseLocalMs(now));
+          for (const row of list) {
+            const selection = selectLine3(
+              candidatesByContactId.get(row.id) ?? [],
+              row.id,
+              row.name,
+              selectionNow,
+            );
+            nextLine3ByContactId.set(row.id, {
+              text: selection.text,
+              ...(selection.kind === "candidate" && isIconName(selection.type)
+                ? { iconName: selection.type }
+                : {}),
+            });
+          }
         }
         if (cancelled) return;
         setRows(list);
         setLine3ByContactId(nextLine3ByContactId);
+        setSearchResultsByContactId(searchRead.resultsByContactId);
         setListNow(now);
         setCounts({ live, neverContacted, snoozed, archived, unbound });
         setPopulationCounts({
@@ -572,6 +596,7 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
         if (!cancelled) {
           setRows([]);
           setLine3ByContactId(new Map());
+          setSearchResultsByContactId(new Map());
           setError(true);
         }
       } finally {
@@ -678,6 +703,7 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
   // a non-empty population (or with a filter also active) never shows the
   // hidden-population or filter copy (MEDIUM-4).
   const term = debouncedSearchText.trim();
+  const isListSearchMode = query.viewMode === "list" && term !== "";
   const emptyState = selectDashboardEmptyState({
     live: counts.live,
     neverContacted: counts.neverContacted,
@@ -984,6 +1010,12 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
                   toggleFavourite(item.id, !renderedMembership);
                 }}
                 line3={line3ByContactId.get(item.id) ?? null}
+                searchResult={
+                  isListSearchMode
+                    ? (searchResultsByContactId.get(item.id) ?? null)
+                    : undefined
+                }
+                searchSnippet={isListSearchMode ? item.snippet : null}
                 onLogInteraction={onLogInteraction}
                 onEditContact={onEditContact}
                 openRowRef={openRowRef}

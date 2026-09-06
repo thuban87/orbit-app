@@ -21,8 +21,41 @@ import { TYPOGRAPHY } from "@/theme/tokens/typography";
 import { isSnoozed } from "@/utils/dates";
 import {
   buildRowAccessibilityDescription,
+  formatMatchCategories,
+  formatMatchExplanation,
   formatListRecency,
 } from "./list-row-content";
+
+function HighlightedSnippet({
+  text,
+  highlights,
+  color,
+}: {
+  text: string;
+  highlights: ReadonlyArray<{ readonly start: number; readonly length: number }>;
+  color: string;
+}) {
+  const sorted = [...highlights].sort((left, right) => left.start - right.start);
+  let cursor = 0;
+  return (
+    <>
+      {sorted.map((highlight, index) => {
+        const start = Math.max(cursor, Math.min(highlight.start, text.length));
+        const end = Math.max(start, Math.min(start + highlight.length, text.length));
+        const before = text.slice(cursor, start);
+        const matched = text.slice(start, end);
+        cursor = end;
+        return (
+          <Text key={`${highlight.start}-${highlight.length}-${index}`}>
+            {before}
+            <Text style={[styles.highlight, { color }]}>{matched}</Text>
+          </Text>
+        );
+      })}
+      {text.slice(cursor)}
+    </>
+  );
+}
 
 export interface ListRowProps {
   contactId: number;
@@ -46,6 +79,8 @@ export interface ListRowProps {
   onEditContact?: () => void;
   /** Reserved for Plan 06's search-specific row presentation. */
   searchResult?: DashboardSearchResult | null;
+  /** Name/fuel search fallback; present only when `searchResult` is null. */
+  searchSnippet?: string | null;
 }
 
 export function ListRow({
@@ -64,6 +99,8 @@ export function ListRow({
   line3 = null,
   onLogInteraction,
   onEditContact,
+  searchResult,
+  searchSnippet = null,
 }: ListRowProps) {
   const { colors } = useTheme();
   const displayState: StatusDisplayState = isSnoozed(snoozeUntil, now)
@@ -82,6 +119,19 @@ export function ListRow({
     isFavourite,
     displayState,
   });
+  const isSearchMode = searchResult !== undefined;
+  const strongestMatch = searchResult?.matches[0];
+  const searchExplanation = isSearchMode
+    ? formatMatchExplanation(
+        searchResult?.totalMatchCount ?? 1,
+        searchResult
+          ? formatMatchCategories(searchResult.matches.map((match) => match.sourceKind))
+          : [],
+        searchResult?.moreMatchesLabel,
+      )
+    : null;
+  const displayedSearchSnippet =
+    strongestMatch?.snippet ?? (searchResult === null ? searchSnippet : null);
 
   return (
     <Pressable
@@ -125,49 +175,77 @@ export function ListRow({
         >
           {name}
         </Text>
-        <View style={styles.metaRow}>
+        {isSearchMode ? (
           <Text
-            testID={`dashboard-list-row-meta-${contactId}`}
+            testID={`dashboard-list-row-match-explanation-${contactId}`}
             numberOfLines={1}
             ellipsizeMode="tail"
-            style={[styles.meta, styles.recency, { color: colors.textSecondary }]}
+            style={[styles.meta, { color: colors.textSecondary }]}
           >
-            {recency}
+            {searchExplanation}
           </Text>
-          {categoryLabel !== null ? (
-            <>
-              <Text style={[styles.meta, { color: colors.textSecondary }]}>·</Text>
-              <View
-                testID={`dashboard-list-row-category-${contactId}`}
-                style={[
-                  styles.categoryChip,
-                  { backgroundColor: colors.surfaceElevated },
-                ]}
-              >
-                <Text
-                  numberOfLines={1}
-                  ellipsizeMode="tail"
-                  style={[styles.meta, { color: colors.textSecondary }]}
+        ) : (
+          <View style={styles.metaRow}>
+            <Text
+              testID={`dashboard-list-row-meta-${contactId}`}
+              numberOfLines={1}
+              ellipsizeMode="tail"
+              style={[styles.meta, styles.recency, { color: colors.textSecondary }]}
+            >
+              {recency}
+            </Text>
+            {categoryLabel !== null ? (
+              <>
+                <Text style={[styles.meta, { color: colors.textSecondary }]}>·</Text>
+                <View
+                  testID={`dashboard-list-row-category-${contactId}`}
+                  style={[
+                    styles.categoryChip,
+                    { backgroundColor: colors.surfaceElevated },
+                  ]}
                 >
-                  {categoryLabel}
-                </Text>
-              </View>
-            </>
-          ) : null}
-        </View>
-        <View style={styles.line3}>
-          {line3?.iconName ? (
-            <Icon name={line3.iconName} size="sm" tone="textSecondary" />
-          ) : null}
-          <Text
-            testID={`dashboard-list-row-line3-${contactId}`}
-            numberOfLines={1}
-            ellipsizeMode="tail"
-            style={[styles.meta, styles.line3Text, { color: colors.textSecondary }]}
-          >
-            {line3?.text ?? ""}
-          </Text>
-        </View>
+                  <Text
+                    numberOfLines={1}
+                    ellipsizeMode="tail"
+                    style={[styles.meta, { color: colors.textSecondary }]}
+                  >
+                    {categoryLabel}
+                  </Text>
+                </View>
+              </>
+            ) : null}
+          </View>
+        )}
+        {isSearchMode ? (
+          displayedSearchSnippet !== null ? (
+            <Text
+              testID={`dashboard-list-row-search-snippet-${contactId}`}
+              numberOfLines={1}
+              ellipsizeMode="tail"
+              style={[styles.meta, styles.line3Text, { color: colors.textSecondary }]}
+            >
+              <HighlightedSnippet
+                text={displayedSearchSnippet}
+                highlights={strongestMatch?.highlights ?? []}
+                color={colors.textPrimary}
+              />
+            </Text>
+          ) : null
+        ) : (
+          <View style={styles.line3}>
+            {line3?.iconName ? (
+              <Icon name={line3.iconName} size="sm" tone="textSecondary" />
+            ) : null}
+            <Text
+              testID={`dashboard-list-row-line3-${contactId}`}
+              numberOfLines={1}
+              ellipsizeMode="tail"
+              style={[styles.meta, styles.line3Text, { color: colors.textSecondary }]}
+            >
+              {line3?.text ?? ""}
+            </Text>
+          </View>
+        )}
       </View>
       <View style={styles.trailing}>
         <Pressable
@@ -250,6 +328,12 @@ const styles = StyleSheet.create({
   },
   line3Text: {
     flex: 1,
+  },
+  highlight: {
+    fontFamily: TYPOGRAPHY.label.family,
+    fontSize: TYPOGRAPHY.label.size,
+    fontWeight: TYPOGRAPHY.label.weight,
+    lineHeight: TYPOGRAPHY.label.lineHeight,
   },
   trailing: {
     alignSelf: "stretch",
