@@ -31,6 +31,7 @@ import { isFocusedWorkflow } from "@/navigation/focused-route-classification";
 import { navigationRef } from "@/navigation/linking";
 import { FAB_EDGE_GAP, FAB_SIZE } from "@/navigation/use-bottom-clearance";
 import { notifyWidgetDataChanged } from "@/services/widget/widget-refresh";
+import { runQuickLog } from "@/services/quick-log-command";
 import { bumpShellRefresh } from "@/stores/shell-refresh-store";
 import { shellTransientStore } from "@/stores/shell-transient-store";
 import { showSnackbar } from "@/stores/snackbar-store";
@@ -195,87 +196,25 @@ export function UniversalFab() {
     if (hidden) closeDial();
   }, [closeDial, hidden]);
 
-  const undoQuickLog = useCallback(
-    (contactId: number, interactionId: number) => {
-      const deletion = quickLogUndoController.current.undo({
-        contactId,
-        interactionId,
-      });
-      if (!deletion) return;
-
-      void deletion
-        .then(() => {
-          // deleteTouchpoint recomputes recency but does not publish a data
-          // revision, so shell consumers and the widget need this explicit tick.
-          notifyWidgetDataChanged();
-          bumpShellRefresh();
-        })
-        .catch(() => {
-          showSnackbar({
-            kind: "error",
-            label: "Couldn't undo",
-            action: {
-              label: "Retry",
-              accessibilityLabel: "Retry undoing logged interaction",
-              onPress: () => undoQuickLog(contactId, interactionId),
-            },
-          });
-        });
-    },
-    [],
-  );
-
   const logContact = useCallback(
     (contactId: number) => {
-      if (quickLogPending.current) return;
-      quickLogPending.current = true;
-      const stamp = localDateTime();
-
-      void recordTouchpoint(getExecutor(), {
+      runQuickLog(
+        {
+          pendingRef: quickLogPending,
+          undoController: quickLogUndoController.current,
+          recordTouchpoint: (input) => recordTouchpoint(getExecutor(), input),
+          localDateTime,
+          newUid,
+          showSnackbar,
+          notifySuccessHaptic: () =>
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success),
+          notifyWidgetDataChanged,
+          bumpShellRefresh,
+        },
         contactId,
-        uid: newUid(),
-        occurredAt: stamp,
-        now: stamp,
-        channel: "unspecified",
-        direction: "outbound",
-        connected: 1,
-        quality: null,
-        source: "manual",
-      })
-        .then(({ interactionId }) => {
-          showSnackbar({
-            kind: "success",
-            label: "Logged",
-            action: {
-              label: "Undo",
-              accessibilityLabel: "Undo logged interaction",
-              onPress: () => undoQuickLog(contactId, interactionId),
-            },
-          });
-          void Haptics.notificationAsync(
-            Haptics.NotificationFeedbackType.Success,
-          );
-          notifyWidgetDataChanged();
-          bumpShellRefresh();
-        })
-        .catch(() => {
-          // A failed write is ordinary error feedback, not a destructive action:
-          // the shell haptic taxonomy deliberately reserves warning haptics.
-          showSnackbar({
-            kind: "error",
-            label: "Couldn't log",
-            action: {
-              label: "Retry",
-              accessibilityLabel: "Retry logging contact",
-              onPress: () => logContact(contactId),
-            },
-          });
-        })
-        .finally(() => {
-          quickLogPending.current = false;
-        });
+      );
     },
-    [undoQuickLog],
+    [],
   );
 
   const selectPickerContact = useCallback(
