@@ -22,7 +22,7 @@ Fuel uses the on-device SQLite table established empty in migration 1 and activa
   - `kind` (TEXT) — `recent`, `topic`, `fact`, `gift`, or `off_limits`.
   - `label`, `text`, `url` (TEXT nullable) — optional grouping, note, and independently stored link.
   - `created_at`, `modified_at` (TEXT) — local wall-clock timestamps.
-  - `source` (TEXT) — item provenance, including unconfirmed `ai`, confirmed `manual`, and captured `share`.
+  - `source` (TEXT) — item provenance for user-authored, confirmed/manual, and remaining captured items. Migration 017 retires legacy `ai` proposals and topic/share captures after verified carry-over.
 
 **Types** (`src/db/fuel-dao.ts` / `src/db/fuel-read.ts`):
 - `FuelKind` — the fixed five-kind vocabulary.
@@ -72,11 +72,11 @@ Fuel uses the on-device SQLite table established empty in migration 1 and activa
 4. `formatFuelAge` shows an item's local-calendar age without archiving, hiding, or deleting it.
 5. The larger Widget layout consumes the same already eligible ranked line; a fuel write publishes a best-effort rerender after its successful commit.
 
-### Reviewing an AI proposal
+### Retired AI-proposal rows
 
-1. An unconfirmed `source='ai'` row remains visible only in the profile editor and has a distinct Confirm/Dismiss treatment.
-2. Confirm runs `confirmFuel`, which changes the source to `manual` with a scoped update.
-3. Reloading makes the confirmed row eligible for ranking and search; Dismiss uses the ordinary delete path.
+1. Migration 017 copies each legacy `source='ai'` row to a default-off Memory and proves the copy before removing the fuel source row.
+2. The old confirmation controls remain inert because no shipped producer creates an AI-proposal fuel row; Phase 36 owns their removal.
+3. Explicit per-item AI consent now lives on Memories rather than a fuel provenance transition.
 
 ### Finding saved fuel
 
@@ -86,10 +86,9 @@ Fuel uses the on-device SQLite table established empty in migration 1 and activa
 
 ### Capturing shared material
 
-1. Capture resolves shared text or a browser title into editable `fuel.text` while retaining the canonical first URL in `fuel.url`.
-2. A single contact uses `addFuel`; multi-attach composes `addFuelCore` once per contact in one transaction, always with `kind='topic'` and `source='share'`.
-3. An optional note updates text only as `note — base`; a multi-contact note uses the atomic capture composer so `url` and `created_at` remain unchanged.
-4. None of these writes advances `last_contact` or creates an interaction.
+1. Migration 017 carries each legacy topic/share capture into a share-provenance Memory, preserving its text and URL before source removal.
+2. The data move removes the copied fuel row only after re-reading its destination, so the item does not double-surface.
+3. Capture remains separate from contact recency and never creates an interaction.
 
 ### Reconciling portable fuel
 
@@ -112,7 +111,7 @@ Fuel uses the on-device SQLite table established empty in migration 1 and activa
 - **ADR-026:** Rogue Status for Unresponsive or Far-Overdue Contacts — shares profile relationship feedback beside the fuel section.
 - **ADR-028:** Per-Item Conversational Fuel with Fixed Kinds — fuel is structured, one-row-per-item data rather than a blob or custom field.
 - **ADR-029:** In-Query Fuel Eligibility and a Shared Ranked Projection — private, unconfirmed, and blank rows are excluded before every glanceable read.
-- **ADR-030:** Explicit Confirmation of AI-Proposed Fuel — a user must confirm an AI proposal before it becomes eligible.
+- **ADR-030:** Explicit Confirmation of AI-Proposed Fuel — superseded by ADR-081; its legacy confirmation path is inert pending removal.
 - **ADR-031:** Bound Local Fuel Search without FTS5 — search stays local and literal-safe at the Phase-7 dataset scale.
 - **ADR-032:** Flat Dashboard Discovery and In-Query Contact Search — relocates the reusable local search surface to the dashboard.
 - **ADR-038:** Contact-Owned Share Capture Fuel — makes capture immediate, contact-owned topic fuel while preserving canonical URLs and status integrity.
@@ -120,6 +119,7 @@ Fuel uses the on-device SQLite table established empty in migration 1 and activa
 - **ADR-045:** Event-Driven Widget Refresh and Boot Recovery — publishes a refresh after widget-visible fuel mutations.
 - **ADR-056:** Tombstone-Backed UID Reconciliation for Portable Restores — prevents an older snapshot from resurrecting deleted fuel.
 - **ADR-057:** Full-State Versioned Backups with Verified Manual and Foreground SAF Snapshots — carries fuel in the complete portable manifest.
+- **ADR-081:** Retire AI-Proposed Fuel for Explicit Per-Item Permission — moves retired AI and share rows to verified, default-off Memories.
 
 ## Gotchas
 
@@ -132,6 +132,7 @@ Fuel uses the on-device SQLite table established empty in migration 1 and activa
 7. **Capture is not a touchpoint.** Do not route a shared item through a recency or interaction writer; it is fuel even when filed for a never-contacted person.
 8. **Do not create a widget-specific fuel reader.** The larger tile must retain the existing in-query eligibility exclusions and ranked projection.
 9. **Delete with durable evidence.** A missing or failed fuel target must not leave a false tombstone; capture, tombstone, and delete share one transaction.
+10. **Do not revive `source='ai'` as an egress control.** That model is superseded; per-item Memory permission is explicit and defaults off.
 
 ## Related Systems
 
@@ -139,6 +140,7 @@ Fuel uses the on-device SQLite table established empty in migration 1 and activa
 - **Custom fields** — stores structured sortable values, while fuel stores sayable conversational hooks.
 - **Dashboard** — owns the live name-plus-fuel search surface and card preview.
 - **Capture** — writes contact-owned `share` fuel and uses its timestamp for capture-MRU ordering.
+- **Contact Knowledge** — owns the post-migration share and retired-AI Memory records.
 - **Widget** — shows the existing eligible ranked line only on its larger layout.
 - **Backup & Restore** — exports fuel and reconciles it through its owning contact UID.
 
@@ -151,3 +153,4 @@ Fuel uses the on-device SQLite table established empty in migration 1 and activa
 | 2026-08-16 | 10 | Added immediate share capture, canonical URL preservation, and atomic multi-contact fuel writes. |
 | 2026-08-16 | 12 | Added larger-widget fuel consumption and post-mutation refresh publishing. |
 | 2026-08-24 | 17 | Added merge-safe fuel deletion evidence and portable reconciliation. |
+| 2026-09-03 | 24.2 | Retired legacy AI-proposal and topic/share fuel through verified carry-over to Memories. |
