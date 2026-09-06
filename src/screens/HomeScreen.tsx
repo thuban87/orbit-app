@@ -43,6 +43,7 @@ import {
   AccessibilityInfo,
   Alert,
   AppState,
+  BackHandler,
   FlatList,
   Pressable,
   RefreshControl,
@@ -381,11 +382,6 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
   const onReset = useCallback(() => {
     void resetDashboard();
   }, [resetDashboard]);
-  const overflowActions = buildDashboardOverflowActions({
-    navigation,
-    onReset,
-  });
-
   const [rows, setRows] = useState<DashboardRow[]>([]);
   const [line3ByContactId, setLine3ByContactId] = useState<
     ReadonlyMap<number, ListRowLine3>
@@ -924,6 +920,59 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
         .enterSelection(rows.map((row) => row.id), contactId);
     },
     [rows],
+  );
+
+  const onSelectContacts = useCallback(async () => {
+    const currentEligibleIds = rows.map((row) => row.id);
+    const { viewMode, setViewMode } = useDashboardQueryStore.getState();
+
+    try {
+      if (viewMode !== "card") {
+        await setViewMode(getExecutor(), "card");
+      }
+      useDashboardSelectionStore
+        .getState()
+        .enterSelection(currentEligibleIds);
+    } catch (selectContactsError) {
+      Logger.error(
+        LOG_SCOPE,
+        "failed to switch to card view before selection",
+        selectContactsError,
+      );
+      showSnackbar({
+        kind: "error",
+        label: "Couldn't start selecting contacts. Try again.",
+        action: {
+          label: "Retry",
+          accessibilityLabel: "Retry selecting contacts",
+          onPress: () => {
+            void onSelectContacts();
+          },
+        },
+      });
+    }
+  }, [rows]);
+
+  const overflowActions = buildDashboardOverflowActions({
+    navigation,
+    onReset,
+    onSelectContacts: () => {
+      void onSelectContacts();
+    },
+  });
+
+  useFocusEffect(
+    useCallback(() => {
+      const subscription = BackHandler.addEventListener(
+        "hardwareBackPress",
+        () => {
+          if (!selectionMode) return false;
+          exitSelection();
+          return true;
+        },
+      );
+      return () => subscription.remove();
+    }, [exitSelection, selectionMode]),
   );
 
   // The cause-aware empty state — delegated to the pure gate (no inline count

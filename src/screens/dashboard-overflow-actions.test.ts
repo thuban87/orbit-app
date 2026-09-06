@@ -5,8 +5,13 @@ describe("buildDashboardOverflowActions", () => {
   it("returns the fixed five-row Dashboard overflow from its object input", () => {
     const navigation = { navigate: vi.fn() };
     const onReset = vi.fn();
+    const onSelectContacts = vi.fn();
 
-    const actions = buildDashboardOverflowActions({ navigation, onReset });
+    const actions = buildDashboardOverflowActions({
+      navigation,
+      onReset,
+      onSelectContacts,
+    });
 
     expect(actions).toHaveLength(5);
     expect(actions.map(({ label }) => label)).toEqual([
@@ -23,7 +28,7 @@ describe("buildDashboardOverflowActions", () => {
       "dashboard-select-contacts-entry",
       "dashboard-reset-view-entry",
     ]);
-    expect(actions[3]?.disabled).toBe(true);
+    expect(actions[3]?.disabled).toBeUndefined();
 
     const forbiddenLabels = [
       "Manage Favorites",
@@ -39,5 +44,7 @@ describe("buildDashboardOverflowActions", () => {
 
     actions[4]?.onPress();
     expect(onReset).toHaveBeenCalledOnce();
+    actions[3]?.onPress();
+    expect(onSelectContacts).toHaveBeenCalledOnce();
   });
 });

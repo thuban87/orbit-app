@@ -8,6 +8,7 @@ export interface DashboardOverflowNavigation {
 interface BuildDashboardOverflowActionsInput {
   navigation: DashboardOverflowNavigation;
   onReset: () => void;
+  onSelectContacts: () => void;
 }
 
 /**
@@ -19,6 +20,7 @@ interface BuildDashboardOverflowActionsInput {
 export function buildDashboardOverflowActions({
   navigation,
   onReset,
+  onSelectContacts,
 }: BuildDashboardOverflowActionsInput): OverflowAction[] {
   return [
     {
@@ -38,8 +40,7 @@ export function buildDashboardOverflowActions({
     },
     {
       label: "Select Contacts",
-      disabled: true,
-      onPress: () => {},
+      onPress: onSelectContacts,
       testID: "dashboard-select-contacts-entry",
     },
     {
