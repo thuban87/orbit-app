@@ -1,10 +1,10 @@
 ---
 schema_version: 1
-open_count: 29
+open_count: 30
 waived_count: 0
 fixed_count: 6
-total_count: 35
-last_updated: 2026-09-06T02:32:39.320Z
+total_count: 36
+last_updated: 2026-09-06T03:32:24.036Z
 ---
 
 # Broken Windows Ledger
@@ -50,6 +50,7 @@ last_updated: 2026-09-06T02:32:39.320Z
 | 33 | 26 | unrun-verify | src/screens/ArchivedContactsScreen.tsx |  | Pixel Archived route, origin-aware Back, Restore, and purge-confirmation UAT pending | open |  | 2026-09-05T12:51:17.723Z |  |
 | 34 | 27 | unrun-verify | src/components/ListRow.tsx |  | Pixel null-status/never-contacted visual UAT remains unrun because prepared data had no fixture and Add Contact dismissed its sheet. | open |  | 2026-09-06T01:58:00.188Z |  |
 | 35 | 27 | unrun-verify | package.json |  | Plan 27-02 physical DEBUG database readback could not run because existing source imports expo-web-browser but the locked dependencies do not include expo-web-browser. | open |  | 2026-09-06T02:32:39.320Z |  |
+| 36 | 27 | unrun-verify | src/screens/HomeScreen.tsx |  | Plan 27-04 Pixel/TalkBack UAT for line-three content and optimistic favourite success/failure remains pending end-of-phase device verification. | open |  | 2026-09-06T03:32:24.036Z |  |
 
 ````json
 [
@@ -471,6 +472,18 @@ last_updated: 2026-09-06T02:32:39.320Z
     "status": "open",
     "reason": "",
     "recorded_at": "2026-09-06T02:32:39.320Z",
+    "resolved_at": null
+  },
+  {
+    "id": 36,
+    "kind": "unrun-verify",
+    "phase": "27",
+    "file": "src/screens/HomeScreen.tsx",
+    "line": null,
+    "description": "Plan 27-04 Pixel/TalkBack UAT for line-three content and optimistic favourite success/failure remains pending end-of-phase device verification.",
+    "status": "open",
+    "reason": "",
+    "recorded_at": "2026-09-06T03:32:24.036Z",
     "resolved_at": null
   }
 ]

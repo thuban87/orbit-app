@@ -394,7 +394,7 @@ All v1.0 commits are local on `main` and have NOT been pushed.
 
 **Canonical refs**: docs/dossier/milestone-2/phase-06-dashboard-list-view-dossier.md; docs/dossier/milestone-2/planning-notes/phase-06-planning-notes.md
 **Schema**: standalone migration **020** — additive `app_settings.dashboard_right_swipe_action` column (verified head+1 on disk 2026-09-05: migrations 001–019, `TARGET_VERSION=19` → first new is 020; the fold-into-Phase-25 option is foreclosed since 019 already shipped). Portable key `dashboardRightSwipeAction` allowlisted now in `PORTABLE_SETTINGS_KEYS`; no backup-format bump (Phase 36 owns that). Re-verify head+1 at execution time.
-**Plans**: 3/6 plans executed (5 waves)
+**Plans**: 4/6 plans executed (5 waves)
 **Wave 1**
 
 - [x] 27-01-PLAN.md — TRACER: additively widen shared read (last_contact + snooze_until) + one real ListRow end-to-end (identity + recency·category + status border/glyph, null-safe) wired into HomeScreen [LISTV-01/02/05]
@@ -406,7 +406,7 @@ All v1.0 commits are local on `main` and have NOT been pushed.
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
-- [ ] 27-04-PLAN.md — ListRow content: binary star (optimistic + revert) + line 3 render + colour-free a11y description [LISTV-03/04/09]
+- [x] 27-04-PLAN.md — ListRow content: binary star (optimistic + revert) + line 3 render + colour-free a11y description [LISTV-03/04/09]
 
 **Wave 4** *(blocked on Wave 3 completion)*
 
@@ -638,7 +638,7 @@ All v1.0 commits are local on `main` and have NOT been pushed.
 | 24.2 Contact Knowledge (Egress, Search, Types & Data-moves) | 7/7 | In Progress|  |
 | 25. Dashboard Data & State Foundation | 6/7 | In Progress|  |
 | 26. Dashboard Control Surface | 7/7 | In Progress|  |
-| 27. Dashboard List View | 3/6 | In Progress|  |
+| 27. Dashboard List View | 4/6 | In Progress|  |
 | 28. Dashboard Card View | 0/TBD | Not started | - |
 | 29. Orrery Camera, Scale & Exploration | 0/TBD | Not started | - |
 | 30. Orrery Systems | 0/TBD | Not started | - |
