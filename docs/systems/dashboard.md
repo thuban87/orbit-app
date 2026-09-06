@@ -1,8 +1,8 @@
 # Dashboard
 
 **Last updated:** 2026-09-02
-**Updated by phase:** 25-dashboard-data-state-foundation
-**Owners:** `src/db/dashboard-read.ts`, `src/logic/dashboard-query-logic.ts`, `src/logic/dashboard-gravity-filter.ts`, `src/db/knowledge-search-read.ts`, `src/services/knowledge-search.ts`, `src/logic/dashboard-search-match.ts`, `src/stores/dashboard-query-store.ts`, `src/stores/dashboard-session-store.ts`, `src/screens/HomeScreen.tsx`
+**Updated by phase:** 26-dashboard-control-surface
+**Owners:** `src/db/dashboard-read.ts`, `src/logic/dashboard-query-logic.ts`, `src/logic/dashboard-gravity-filter.ts`, `src/db/knowledge-search-read.ts`, `src/services/knowledge-search.ts`, `src/logic/dashboard-search-match.ts`, `src/stores/dashboard-query-store.ts`, `src/stores/dashboard-session-store.ts`, `src/components/control-surface/`, `src/screens/HomeScreen.tsx`
 
 ## Purpose
 
@@ -36,7 +36,8 @@ The Dashboard owns no table. It reads `contacts` and related local data, while i
 | Search read | `src/db/knowledge-search-read.ts` | Reads only the eligible IDs' user-facing semantic corpus. |
 | Search logic | `src/services/knowledge-search.ts` | Performs bounded typo-tolerant matching, coverage ranking, and raw-text offset mapping. |
 | Descriptor logic | `src/logic/dashboard-search-match.ts` | Produces prioritized highlighted match descriptors for renderers. |
-| Legacy surface | `src/screens/HomeScreen.tsx` | Retains refresh and destination behavior while later Dashboard render phases consume the foundation. |
+| Control surface | `src/components/control-surface/` | Separates option content from the floating panel presentation and durable query writes. |
+| Dashboard screen | `src/screens/HomeScreen.tsx` | Hosts controls, session search, refresh, destinations, and the List/Card renderer seam. |
 
 ### Key Files
 
@@ -45,7 +46,7 @@ The Dashboard owns no table. It reads `contacts` and related local data, while i
 | `src/db/migrations/019-dashboard-prefs.ts` | Adds the durable Dashboard preference columns. |
 | `src/db/app-settings-dao.ts` | Validates and persists Dashboard preference values. |
 | `src/logic/dashboard-query-logic.ts` | Defines populations, filters, sorting, and reset transitions. |
-| `src/db/dashboard-read.ts` | Owns the shared scoped population read and legacy read compatibility seams. |
+| `src/db/dashboard-read.ts` | Owns the shared scoped population and term-bearing reads plus bound-only empty-state counts. |
 | `src/logic/dashboard-gravity-filter.ts` | Narrows candidates by derived Gravity without stored state. |
 | `src/stores/dashboard-query-store.ts` | SQLite-backed durable query-state mirror. |
 | `src/stores/dashboard-session-store.ts` | Memory-only search and scroll state. |
@@ -54,6 +55,10 @@ The Dashboard owns no table. It reads `contacts` and related local data, while i
 | `src/logic/dashboard-search-match.ts` | Builds semantic labels, highlights, snippets, and overflow copy. |
 | `src/services/widget/widget-data.ts` | Consumes the Favorites population in Dashboard Default order. |
 | `src/logic/birthday-logic.ts` | Parses local birthdays for the 30-day Birthdays population. |
+| `src/components/control-surface/AnchoredPanel.tsx` | Renders the centered, in-tree floating control surface with a scroll cap, scrim, focus handoff, and reduced-motion-aware animation. |
+| `src/components/control-surface/DashboardControlRow.tsx` | Opens Population, Filters, and Sort, summarizes each axis, and sends intent-derived durable writes through the query store. |
+| `src/components/control-surface/DashboardOverlayHost.tsx` | Hosts the root-level in-tree Dashboard panel request. |
+| `src/screens/dashboard-overflow-actions.ts` | Defines the fixed Dashboard management and reset entries. |
 
 ## How It Works
 
@@ -72,19 +77,26 @@ The Dashboard owns no table. It reads `contacts` and related local data, while i
 3. `useDashboardSessionStore` keeps search text and scroll offset in memory, so a fresh launch starts at top with search cleared.
 4. `resetDashboardView()` restores Active Contacts, no filters, and Default sort while preserving List/Card preference; later control-surface work composes that reset with session clearing.
 
-### Searching eligible knowledge
+### Changing the visible Dashboard state
 
-1. A renderer passes the fully filtered, ordered Dashboard IDs to `listKnowledgeSearchCandidates()`.
-2. The read returns only those contacts' names, direct fields, semantic memories, relationships, searchable custom values, and user-facing notes; it never reads internal metadata into the corpus.
-3. `searchDashboard()` performs prefix, substring, and bounded edit-distance matching in TypeScript. Matching more distinct query terms ranks above matching fewer; resolved Dashboard order only breaks equal-relevance ties.
-4. `dashboard-search-match` returns at most three prioritized descriptors with raw-text highlight ranges and a `+N more` count. A name match does not hide useful secondary context.
+1. `DashboardControlRow` renders Population, Filters, and Sort as separate equal controls. Their summaries use one control-label source and collapse additional selected names to `+N`.
+2. A control opens intent-only option content through `DashboardOverlayHost`; the host presents one centered in-tree floating surface at a time. The visible Dashboard stays readable behind its themed scrim, but its background regions are touch- and accessibility-inert until dismissal.
+3. Option changes derive their next value from the current query-store state and persist through the validated settings DAO. They apply immediately; no Apply or Done step exists, and a zero-result selection leaves the panel open.
+4. The floating surface dismisses on a repeat press, outside press, or shell transient-first Back. Its content scrolls within a viewport cap so every Filter option remains reachable.
+
+### Searching the Dashboard
+
+1. Home keeps the Dashboard term in `dashboard-session-store`, debounces it, and clears it when the search affordance collapses; it survives Dashboard → Profile → Back but not a fresh app session.
+2. A term uses `listDashboardSearch()`; no term uses `listDashboardPopulation()`. Both receive one injected local wall-clock value for list and birthday-count coherence.
+3. A term relaxes only the implicit Active search scope to non-archived Bound contacts. Explicit populations and filters retain their selected boundaries, and all term matching remains LIKE-escaped and bound.
+4. The semantic reader still receives only fully filtered eligible IDs. It returns user-facing names, fields, semantic memories, relationships, searchable custom values, and notes; bounded TypeScript matching provides descriptors and highlights without FTS5.
 
 ### Retired legacy Dashboard surfaces
 
 1. Favourites are binary membership; the widget reads Favorites in shared Default order instead of user-visible rank order.
 2. The permanent birthday banner is absent. Birthdays remain reachable through the next-30-days population; richer upcoming-birthday presentation belongs to Your Week.
 3. The standalone Never Contacted screen and Settings toggle are retired. The Not Contacted data path remains for the next control-surface phase, and `countNeverContacted()` remains a Digest input.
-4. Legacy Home term search is Bound-only. The owner accepted a one-phase absence of typed Unbound lookup until Phase 26; the Unbound browse list remains available.
+4. Unbound contacts remain outside the Dashboard universe. Their child browse route now filters its loaded local rows by name and distinguishes a true empty state from no matching rows.
 
 ## Configuration
 
@@ -107,6 +119,9 @@ The Dashboard owns no table. It reads `contacts` and related local data, while i
 - **ADR-092:** Durable Shared Dashboard Query State — establishes the SQLite-backed durable and memory-only state boundary.
 - **ADR-093:** Scoped Composable Dashboard Population and Filter Model — defines the common eligible universe and filter/sort contract.
 - **ADR-094:** Eligibility-Scoped Semantic Dashboard Search — scopes corpus, relevance, descriptors, and highlights to that universe.
+- **ADR-095:** Live-Applying Dashboard Floating Control Surface — keeps separate query controls live-applying in one swappable in-tree presentation surface.
+- **ADR-096:** Dashboard Header and Overflow Discovery Paths — establishes the header destinations, fixed overflow, and management-route entry behavior.
+- **ADR-097:** Scoped Dashboard Search and Dedicated Unbound Retrieval — separates term-bearing Dashboard search from the population read and preserves Unbound retrieval on its child route.
 
 ## Gotchas
 
@@ -117,7 +132,9 @@ The Dashboard owns no table. It reads `contacts` and related local data, while i
 5. **Do not reintroduce FTS5 or a search index.** Dashboard typo tolerance stays bounded TypeScript scoring under ADR-031.
 6. **`favourite_rank` remains storage, not product order.** Internal readers still use it, so it is not dropped or repurposed here.
 7. **Upcoming birthdays have an intentional coverage gap.** Until Your Week lands, the 30-day population is the only Dashboard birthday surface.
-8. **The temporary Unbound typed-lookup gap is owner-accepted.** Do not restore an Unbound search row to legacy Home; Phase 26 owns its replacement.
+8. **Keep the panel presentation separate from option content.** A future HUD may replace the container, but it must not reimplement query state, persistence, or option semantics.
+9. **Search collapse clears the term.** Leaving a hidden session term active would make a filtered list look unexplained; do not retain it without a visible active indication.
+10. **Long filter content must scroll.** The panel cap is deliberate, but clipping lower filter families or Clear filters makes the live controls unreachable.
 
 ## Related Systems
 
@@ -143,3 +160,4 @@ The Dashboard owns no table. It reads `contacts` and related local data, while i
 | 2026-08-26 | 19 | Replaced direct creation with safe manual/import speed-dial choices. |
 | 2026-09-02 | 22 | Made Dashboard a tab root, moved capture to the universal FAB, and added Group Events and Archived overflow destinations. |
 | 2026-09-02 | 25 | Added shared durable query state, scoped populations/filters/search, and retired rank, banner, and Never Contacted Dashboard surfaces. |
+| 2026-09-02 | 26 | Added the live Population/Filters/Sort floating control surface, session search and view toggle, fixed Dashboard discovery entries, and dedicated Unbound name retrieval. |
