@@ -62,6 +62,7 @@ import ReanimatedSwipeable, {
   type SwipeableMethods,
 } from "react-native-gesture-handler/ReanimatedSwipeable";
 import { useShallow } from "zustand/react/shallow";
+import { BulkActionSurface } from "@/components/BulkActionSurface";
 import { CardContextMenu } from "@/components/CardContextMenu";
 import { CardGrid } from "@/components/CardGrid";
 import { ListRow, type ListRowProps } from "@/components/ListRow";
@@ -72,6 +73,20 @@ import { Icon } from "@/components/icons/Icon";
 import { ICON_REGISTRY, type IconName } from "@/components/icons/icon-registry";
 import { SegmentedControl } from "@/components/SegmentedControl";
 import { ShellAppBar } from "@/components/ShellAppBar";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { Sheet } from "@/components/ui/Sheet";
+import {
+  bulkAddFavourites,
+  bulkArchive,
+  bulkQuickLog,
+  bulkRemoveFavourites,
+  bulkSetCategory,
+  bulkSetFrequency,
+  bulkSnooze,
+  bulkUnsnooze,
+  undoBulkQuickLog,
+} from "@/db/bulk-actions-dao";
+import { listCategories } from "@/db/contact-read";
 import {
   countAllContacts,
   countArchived,
@@ -113,7 +128,7 @@ import { useDashboardQueryStore } from "@/stores/dashboard-query-store";
 import { useDashboardSelectionStore } from "@/stores/dashboard-selection-store";
 import { useDashboardSessionStore } from "@/stores/dashboard-session-store";
 import { bumpShellRefresh, useShellRefresh } from "@/stores/shell-refresh-store";
-import { showSnackbar } from "@/stores/snackbar-store";
+import { showSnackbar, snackbarStore } from "@/stores/snackbar-store";
 import { runQuickLog } from "@/services/quick-log-command";
 import { reconcileSchedule } from "@/services/notifications/notification-schedule";
 import { notifyWidgetDataChanged } from "@/services/widget/widget-refresh";
@@ -129,6 +144,9 @@ import { isSnoozed, parseLocalMs } from "@/utils/dates";
 
 /** The debounce interval (ms) that collapses a keystroke burst to one read. */
 const SEARCH_DEBOUNCE_MS = 220;
+/** Small selections remain instantly reversible; larger batches ask first. */
+const BULK_QUICK_LOG_CONFIRM_THRESHOLD = 5;
+const dismissSnackbar = () => snackbarStore.getState().dismiss();
 
 /** The two view-toggle segments — List then Card, each with its semantic icon. */
 const VIEW_TOGGLE_OPTIONS: {
@@ -149,6 +167,10 @@ const CARD_SNOOZE_PRESETS: { preset: SnoozePreset; label: string }[] = [
 ];
 
 type DashboardContactActionTarget = "LogContact" | "Edit";
+type BulkConfirmAction =
+  | { kind: "quick-log"; ids: number[] }
+  | { kind: "archive"; ids: number[] }
+  | { kind: "frequency"; ids: number[]; intervalDays: number };
 
 /** Dashboard detail routes must dispatch through the root tab navigator. */
 function navigateDashboardContactAction(
@@ -355,6 +377,9 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
   const toggleSelection = useDashboardSelectionStore((state) => state.toggle);
   const selectAll = useDashboardSelectionStore((state) => state.selectAll);
   const exitSelection = useDashboardSelectionStore((state) => state.exitSelection);
+  const removeFromUniverse = useDashboardSelectionStore(
+    (state) => state.removeFromUniverse,
+  );
   const bottomClearance = useBottomClearance();
 
   const resetDashboard = useCallback(async () => {
@@ -410,6 +435,16 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
     ? rows.filter((row) => frozenIds.has(row.id))
     : rows;
   const selectionCount = selectedIds.size;
+  const [bulkConfirm, setBulkConfirm] = useState<BulkConfirmAction | null>(null);
+  const [snoozePickerIds, setSnoozePickerIds] = useState<number[] | null>(null);
+  const [categoryPicker, setCategoryPicker] = useState<{
+    ids: number[];
+    categories: { id: number; name: string }[];
+  } | null>(null);
+  const [frequencyPickerIds, setFrequencyPickerIds] = useState<number[] | null>(
+    null,
+  );
+  const [frequencyDraft, setFrequencyDraft] = useState("");
 
   useEffect(() => {
     if (!selectionMode) return;
@@ -764,6 +799,209 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
       pullCancelRef.current?.();
     };
   }, []);
+
+  const reportBulkFailure = useCallback(
+    (operation: string, writeError: unknown, retry?: () => void) => {
+      Logger.error(LOG_SCOPE, `failed to ${operation}`, writeError);
+      AccessibilityInfo.announceForAccessibility(`Couldn't ${operation}`);
+      showSnackbar({
+        kind: "error",
+        label: `Couldn't ${operation}. Try again.`,
+        action: retry
+          ? {
+              label: "Retry",
+              accessibilityLabel: `Retry ${operation}`,
+              onPress: retry,
+            }
+          : {
+              label: "Dismiss",
+              accessibilityLabel: "Dismiss notification",
+              onPress: dismissSnackbar,
+            },
+      });
+    },
+    [],
+  );
+
+  const commitBulkOutcome = useCallback(
+    (label: string) => {
+      // A bulk transaction is one durable commit: refresh shell consumers once,
+      // then re-read the fenced Dashboard model. Do not reseed frozenUniverse.
+      notifyWidgetDataChanged();
+      bumpShellRefresh();
+      AccessibilityInfo.announceForAccessibility(label);
+      showSnackbar({
+        kind: "success",
+        label,
+        action: {
+          label: "Dismiss",
+          accessibilityLabel: "Dismiss notification",
+          onPress: dismissSnackbar,
+        },
+      });
+      reload();
+    },
+    [reload],
+  );
+
+  const performBulkQuickLog = useCallback(
+    async (ids: number[]) => {
+      try {
+        const receipt = await bulkQuickLog(getExecutor(), ids, localDateTime());
+        const label = `Logged ${ids.length} interactions`;
+        notifyWidgetDataChanged();
+        bumpShellRefresh();
+        AccessibilityInfo.announceForAccessibility(label);
+        showSnackbar({
+          kind: "success",
+          label,
+          action: {
+            label: "Undo",
+            accessibilityLabel: `Undo logging ${ids.length} interactions`,
+            onPress: () => {
+              void undoBulkQuickLog(getExecutor(), receipt, localDateTime())
+                .then(() => {
+                  commitBulkOutcome(`Undid ${ids.length} logged interactions`);
+                })
+                .catch((undoError: unknown) =>
+                  reportBulkFailure("undo bulk quick log", undoError),
+                );
+            },
+          },
+        });
+        reload();
+      } catch (writeError) {
+        reportBulkFailure("log interactions", writeError, () => {
+          void performBulkQuickLog(ids);
+        });
+      }
+    },
+    [commitBulkOutcome, reload, reportBulkFailure],
+  );
+
+  const performBulkArchive = useCallback(
+    async (ids: number[]) => {
+      try {
+        await bulkArchive(getExecutor(), ids, localDateTime());
+        // Archive is reversible, but it must disappear from this frozen universe.
+        removeFromUniverse(ids);
+        commitBulkOutcome(`Archived ${ids.length} contacts`);
+      } catch (writeError) {
+        reportBulkFailure("archive contacts", writeError, () => {
+          void performBulkArchive(ids);
+        });
+      }
+    },
+    [commitBulkOutcome, removeFromUniverse, reportBulkFailure],
+  );
+
+  const performBulkFrequency = useCallback(
+    async (ids: number[], intervalDays: number) => {
+      try {
+        await bulkSetFrequency(getExecutor(), ids, intervalDays, localDateTime());
+        commitBulkOutcome(
+          `Changed contact frequency to every ${intervalDays} days for ${ids.length} contacts`,
+        );
+      } catch (writeError) {
+        reportBulkFailure("change contact frequency", writeError, () => {
+          void performBulkFrequency(ids, intervalDays);
+        });
+      }
+    },
+    [commitBulkOutcome, reportBulkFailure],
+  );
+
+  const onBulkQuickLog = useCallback(() => {
+    const ids = [...selectedIds];
+    if (ids.length === 0) return;
+    if (ids.length > BULK_QUICK_LOG_CONFIRM_THRESHOLD) {
+      setBulkConfirm({ kind: "quick-log", ids });
+      return;
+    }
+    void performBulkQuickLog(ids);
+  }, [performBulkQuickLog, selectedIds]);
+
+  const onBulkLogInteraction = useCallback(() => {
+    const ids = [...selectedIds];
+    if (ids.length === 1) {
+      navigateDashboardContactAction(ids[0], "LogContact");
+    } else if (ids.length >= 2) {
+      navigation.navigate("GroupLog", { participantIds: ids });
+    }
+  }, [navigation, selectedIds]);
+
+  const onBulkAddFavourites = useCallback(() => {
+    const ids = [...selectedIds];
+    if (ids.length === 0) return;
+    void bulkAddFavourites(getExecutor(), ids, localDateTime())
+      .then(() => commitBulkOutcome(`Added ${ids.length} contacts to Favorites`))
+      .catch((writeError: unknown) =>
+        reportBulkFailure("add contacts to Favorites", writeError),
+      );
+  }, [commitBulkOutcome, reportBulkFailure, selectedIds]);
+
+  const onBulkRemoveFavourites = useCallback(() => {
+    const ids = [...selectedIds];
+    if (ids.length === 0) return;
+    void bulkRemoveFavourites(getExecutor(), ids, localDateTime())
+      .then(() =>
+        commitBulkOutcome(`Removed ${ids.length} contacts from Favorites`),
+      )
+      .catch((writeError: unknown) =>
+        reportBulkFailure("remove contacts from Favorites", writeError),
+      );
+  }, [commitBulkOutcome, reportBulkFailure, selectedIds]);
+
+  const onBulkOpenSnoozePicker = useCallback(() => {
+    const ids = [...selectedIds];
+    if (ids.length > 0) setSnoozePickerIds(ids);
+  }, [selectedIds]);
+
+  const onBulkUnsnooze = useCallback(() => {
+    const ids = [...selectedIds];
+    if (ids.length === 0) return;
+    void bulkUnsnooze(getExecutor(), ids, localDateTime())
+      .then(async () => {
+        commitBulkOutcome(`Unsnoozed ${ids.length} contacts`);
+        await reconcileSchedule(getExecutor()).catch((scheduleError) =>
+          Logger.error(LOG_SCOPE, "failed to reconcile after bulk unsnooze", scheduleError),
+        );
+      })
+      .catch((writeError: unknown) => reportBulkFailure("unsnooze contacts", writeError));
+  }, [commitBulkOutcome, reportBulkFailure, selectedIds]);
+
+  const onBulkOpenCategoryPicker = useCallback(() => {
+    const ids = [...selectedIds];
+    if (ids.length === 0) return;
+    void listCategories(getExecutor())
+      .then((categories) => setCategoryPicker({ ids, categories }))
+      .catch((readError: unknown) => reportBulkFailure("load categories", readError));
+  }, [reportBulkFailure, selectedIds]);
+
+  const onBulkArchive = useCallback(() => {
+    const ids = [...selectedIds];
+    if (ids.length > 0) setBulkConfirm({ kind: "archive", ids });
+  }, [selectedIds]);
+
+  const onBulkOpenFrequencyPicker = useCallback(() => {
+    const ids = [...selectedIds];
+    if (ids.length === 0) return;
+    setFrequencyDraft("");
+    setFrequencyPickerIds(ids);
+  }, [selectedIds]);
+
+  const onBulkConfirm = useCallback(() => {
+    const confirm = bulkConfirm;
+    if (!confirm) return;
+    setBulkConfirm(null);
+    if (confirm.kind === "quick-log") {
+      void performBulkQuickLog(confirm.ids);
+    } else if (confirm.kind === "archive") {
+      void performBulkArchive(confirm.ids);
+    } else {
+      void performBulkFrequency(confirm.ids, confirm.intervalDays);
+    }
+  }, [bulkConfirm, performBulkArchive, performBulkFrequency, performBulkQuickLog]);
 
   const goToProfile = useCallback(
     (contactId: number) => navigation.navigate("Profile", { contactId }),
@@ -1239,29 +1477,19 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
                 Select All
               </Text>
             </Pressable>
-            <Pressable
-              testID="dashboard-selection-exit"
-              accessibilityRole="button"
-              accessibilityLabel="Exit selection"
-              onPress={exitSelection}
-              style={styles.selectionAction}
-            >
-              <Icon name="close" size="sm" tone="textPrimary" />
-              <Text
-                style={[
-                  styles.selectionActionLabel,
-                  { color: colors.textPrimary },
-                ]}
-              >
-                Done
-              </Text>
-            </Pressable>
           </View>
-          <View
-            testID="dashboard-selection-bulk-actions-placeholder"
-            accessible={false}
-            accessibilityElementsHidden
-            style={styles.selectionBulkActions}
+          <BulkActionSurface
+            selectedCount={selectionCount}
+            onQuickLog={onBulkQuickLog}
+            onLogInteraction={onBulkLogInteraction}
+            onAddFavourites={onBulkAddFavourites}
+            onRemoveFavourites={onBulkRemoveFavourites}
+            onSnooze={onBulkOpenSnoozePicker}
+            onUnsnooze={onBulkUnsnooze}
+            onSetCategory={onBulkOpenCategoryPicker}
+            onArchive={onBulkArchive}
+            onChangeFrequency={onBulkOpenFrequencyPicker}
+            onExit={exitSelection}
           />
         </View>
       ) : (
@@ -1462,6 +1690,178 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
         }}
         onRequestClose={() => setContextMenuContactId(null)}
       />
+      <Sheet
+        visible={snoozePickerIds !== null}
+        onRequestClose={() => setSnoozePickerIds(null)}
+        variant="compact"
+      >
+        <Text style={[styles.bulkPickerTitle, { color: colors.textSecondary }]}>
+          Snooze contacts
+        </Text>
+        {CARD_SNOOZE_PRESETS.map(({ preset, label }) => (
+          <Pressable
+            key={preset}
+            testID={`bulk-snooze-preset-${preset}`}
+            accessibilityRole="button"
+            accessibilityLabel={`Snooze ${snoozePickerIds?.length ?? 0} contacts for ${label}`}
+            onPress={() => {
+              const ids = snoozePickerIds;
+              if (!ids) return;
+              setSnoozePickerIds(null);
+              void bulkSnooze(getExecutor(), ids, preset, localDateTime())
+                .then(async () => {
+                  commitBulkOutcome(`Snoozed ${ids.length} contacts`);
+                  await reconcileSchedule(getExecutor()).catch((scheduleError) =>
+                    Logger.error(
+                      LOG_SCOPE,
+                      "failed to reconcile after bulk snooze",
+                      scheduleError,
+                    ),
+                  );
+                })
+                .catch((writeError: unknown) =>
+                  reportBulkFailure("snooze contacts", writeError),
+                );
+            }}
+            style={[styles.bulkPickerRow, { borderColor: colors.border }]}
+          >
+            <Icon name="snooze" size="md" tone="textPrimary" />
+            <Text style={[styles.bulkPickerLabel, { color: colors.textPrimary }]}>
+              {label}
+            </Text>
+          </Pressable>
+        ))}
+      </Sheet>
+      <Sheet
+        visible={categoryPicker !== null}
+        onRequestClose={() => setCategoryPicker(null)}
+        variant="detail"
+      >
+        <Text style={[styles.bulkPickerTitle, { color: colors.textSecondary }]}>
+          Set category
+        </Text>
+        {categoryPicker?.categories.map((category) => (
+          <Pressable
+            key={category.id}
+            testID={`bulk-category-${category.id}`}
+            accessibilityRole="button"
+            accessibilityLabel={`Set category to ${category.name} for ${categoryPicker.ids.length} contacts`}
+            onPress={() => {
+              const picker = categoryPicker;
+              if (!picker) return;
+              setCategoryPicker(null);
+              void bulkSetCategory(
+                getExecutor(),
+                picker.ids,
+                category.id,
+                localDateTime(),
+              )
+                .then(() =>
+                  commitBulkOutcome(
+                    `Set category to ${category.name} for ${picker.ids.length} contacts`,
+                  ),
+                )
+                .catch((writeError: unknown) =>
+                  reportBulkFailure("set contact category", writeError),
+                );
+            }}
+            style={[styles.bulkPickerRow, { borderColor: colors.border }]}
+          >
+            <Icon name="category" size="md" tone="textPrimary" />
+            <Text style={[styles.bulkPickerLabel, { color: colors.textPrimary }]}>
+              {category.name}
+            </Text>
+          </Pressable>
+        ))}
+      </Sheet>
+      <Sheet
+        visible={frequencyPickerIds !== null}
+        onRequestClose={() => setFrequencyPickerIds(null)}
+        variant="compact"
+      >
+        <Text style={[styles.bulkPickerTitle, { color: colors.textSecondary }]}>
+          Change Contact Frequency
+        </Text>
+        <TextInput
+          testID="bulk-frequency-input"
+          accessibilityLabel="Frequency in days"
+          keyboardType="number-pad"
+          value={frequencyDraft}
+          onChangeText={setFrequencyDraft}
+          placeholder="Days"
+          placeholderTextColor={colors.textSecondary}
+          style={[
+            styles.bulkFrequencyInput,
+            {
+              backgroundColor: colors.surfaceElevated,
+              borderColor: colors.border,
+              color: colors.textPrimary,
+            },
+          ]}
+        />
+        <Pressable
+          testID="bulk-frequency-continue"
+          accessibilityRole="button"
+          accessibilityLabel="Confirm frequency"
+          onPress={() => {
+            const intervalDays = Number(frequencyDraft);
+            const ids = frequencyPickerIds;
+            if (!ids || !Number.isInteger(intervalDays) || intervalDays <= 0) {
+              AccessibilityInfo.announceForAccessibility(
+                "Frequency must be a positive whole number",
+              );
+              showSnackbar({
+                kind: "error",
+                label: "Frequency must be a positive whole number.",
+                action: {
+                  label: "Dismiss",
+                  accessibilityLabel: "Dismiss notification",
+                  onPress: dismissSnackbar,
+                },
+              });
+              return;
+            }
+            setFrequencyPickerIds(null);
+            setBulkConfirm({ kind: "frequency", ids, intervalDays });
+          }}
+          style={[
+            styles.bulkFrequencyContinue,
+            { backgroundColor: colors.accent, borderColor: colors.accent },
+          ]}
+        >
+          <Text style={[styles.bulkPickerLabel, { color: colors.background }]}>
+            Continue
+          </Text>
+        </Pressable>
+      </Sheet>
+      <ConfirmDialog
+        visible={bulkConfirm !== null}
+        onRequestClose={() => setBulkConfirm(null)}
+        title={
+          bulkConfirm?.kind === "quick-log"
+            ? `Log ${bulkConfirm.ids.length} interactions?`
+            : bulkConfirm?.kind === "archive"
+              ? `Archive ${bulkConfirm.ids.length} contacts?`
+              : "Change Contact Frequency?"
+        }
+        message={
+          bulkConfirm?.kind === "archive"
+            ? "Archived contacts leave the Dashboard. You can restore them from Archived Contacts."
+            : bulkConfirm?.kind === "frequency"
+              ? `Set all ${bulkConfirm.ids.length} contacts to every ${bulkConfirm.intervalDays} days?`
+              : undefined
+        }
+        confirmLabel={
+          bulkConfirm?.kind === "archive"
+            ? "Archive"
+            : bulkConfirm?.kind === "frequency"
+              ? "Change frequency"
+              : "Log interactions"
+        }
+        destructive={false}
+        onConfirm={onBulkConfirm}
+        onCancel={() => setBulkConfirm(null)}
+      />
     </View>
   );
 }
@@ -1574,8 +1974,35 @@ const styles = StyleSheet.create({
     fontWeight: TYPOGRAPHY.label.weight,
     lineHeight: TYPOGRAPHY.label.lineHeight,
   },
-  selectionBulkActions: {
-    minHeight: SPACING["2xl"],
+  bulkPickerTitle: {
+    fontFamily: TYPOGRAPHY.label.family,
+    fontSize: TYPOGRAPHY.label.size,
+    marginBottom: SPACING.sm,
+  },
+  bulkPickerRow: {
+    alignItems: "center",
+    borderTopWidth: StyleSheet.hairlineWidth,
+    flexDirection: "row",
+    gap: SPACING.md,
+    minHeight: 44,
+  },
+  bulkPickerLabel: {
+    fontFamily: TYPOGRAPHY.label.family,
+    fontSize: TYPOGRAPHY.label.size,
+  },
+  bulkFrequencyInput: {
+    borderRadius: RADII.md,
+    borderWidth: StyleSheet.hairlineWidth,
+    minHeight: 44,
+    paddingHorizontal: SPACING.sm,
+  },
+  bulkFrequencyContinue: {
+    alignItems: "center",
+    borderRadius: RADII.md,
+    borderWidth: StyleSheet.hairlineWidth,
+    justifyContent: "center",
+    minHeight: 44,
+    marginTop: SPACING.sm,
   },
   sortControl: {
     flexDirection: "row",

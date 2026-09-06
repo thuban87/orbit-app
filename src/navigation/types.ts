@@ -31,7 +31,12 @@ export type DashboardStackParamList = {
   GroupEvents: undefined;
   /** Placeholder routes the universal FAB exposes before their owning phases land. */
   LogContact: { contactId?: number } | undefined;
-  GroupLog: undefined;
+  /**
+   * Optional selected Dashboard participant ids. Phase 33 consumes these ids
+   * when it replaces the Group Log placeholder with the real group workflow.
+   * Serializable primitives only: no callbacks or contact data cross routes.
+   */
+  GroupLog: { participantIds?: number[] } | undefined;
   UpdateContact: { contactId?: number } | undefined;
   Memory: { contactId?: number } | undefined;
   Settings: undefined;
