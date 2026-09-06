@@ -1,7 +1,7 @@
 # Widget
 
 **Last updated:** 2026-09-02
-**Updated by phase:** 25-dashboard-data-state-foundation
+**Updated by phase:** 28-dashboard-card-view
 **Owners:** `src/services/widget/`, `src/navigation/widget-linking.ts`, `src/services/widget/widget-quick-action-guard.ts`, `plugins/withWidgetBootReceiver.js`
 
 ## Purpose
@@ -69,7 +69,7 @@ The widget owns no table, migration, or per-instance state. It reads the Dashboa
 
 ### Staying fresh and recovering
 
-1. Widget-visible foreground writes call `notifyWidgetDataChanged()` after their successful commit; the call is fire-and-forget and refresh failures are swallowed.
+1. Widget-visible foreground writes call `notifyWidgetDataChanged()` after their successful commit; the call is fire-and-forget and refresh failures are swallowed. A committed Dashboard bulk batch publishes exactly one refresh for the whole transaction, never one per selected contact.
 2. `App.tsx` registers `registerWidgetSweep()` only for a real foreground launch, never for a headless widget context.
 3. The native boot receiver handles only `BOOT_COMPLETED` and asks the widget library to update placed `OrbitFavourites` instances. No widget timer or polling period runs.
 
@@ -95,6 +95,7 @@ The widget owns no table, migration, or per-instance state. It reads the Dashboa
 - **ADR-080:** Four-Tab Bottom Navigation Shell with Per-Tab Stacks — preserves strict widget-link behavior while changing only the Dashboard reset shape.
 - **ADR-075:** Binary Favourite Membership Without a User-Facing Order — requires Favorites population Default ordering.
 - **ADR-093:** Scoped Composable Dashboard Population and Filter Model — makes the Widget a Dashboard population consumer.
+- **ADR-103:** Atomic Composed Dashboard Bulk Mutations — requires one post-commit widget refresh for a committed Dashboard batch.
 
 ## Gotchas
 
@@ -108,6 +109,7 @@ The widget owns no table, migration, or per-instance state. It reads the Dashboa
 8. **The widget is never a second assist writer.** `Contact` only emits `orbit://reach/<id>`; all assist creation and channel selection happen in the in-app router. Do not insert `interaction_assists` from any widget task.
 9. **A method-less `Contact` tap opens nothing and can strand `openReachOut`.** A favourite with no actionable phone/email resolves the deep-link but the router returns null, and the param is cleared only when `hasReachRoute` is true (review IN-02, owner-deferred). Clear it unconditionally if you touch that path.
 10. **Do not weaken the URI parser to accommodate tab routing.** Parsing and lifecycle guards stay unchanged; only the post-acceptance navigation state is nested below Dashboard.
+11. **Do not refresh once per bulk contact.** Widget refresh happens after the one committed batch transaction; per-contact refreshes add headless/render work without a newer durable state.
 
 ## Related Systems
 
@@ -128,3 +130,4 @@ The widget owns no table, migration, or per-instance state. It reads the Dashboa
 | 2026-08-31 | 21 | Replaced the larger `Message → Compose` action with `Contact → orbit://reach` into the shared Reach Out router, with a discriminated missing/archived fail-safe guard and a consumed-once `openReachOut` param. |
 | 2026-09-02 | 22 | Re-expressed accepted widget-link and missing-contact fallback routes as nested Dashboard-tab states. |
 | 2026-09-02 | 25 | Repointed tiles to Favorites population Default order and made the favourites deep link safely reset Home. |
+| 2026-09-02 | 28 | Documented one post-commit refresh for Dashboard bulk batches. |
