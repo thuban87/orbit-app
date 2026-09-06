@@ -116,14 +116,14 @@ category's phase (see Traceability).
 - [x] **CARDV-02**: Each card shows name, recency, and one compact adaptive context item (category and literal status text omitted); status renders as a thin status-colored avatar ring plus a small status glyph, never color-only; snoozed shows a neutral ring and snooze glyph
 - [x] **CARDV-03**: An always-visible Favorite star toggles binary membership; during search the card keeps its geometry showing name, matched-field label, and the strongest highlighted snippet
 - [ ] **CARDV-04**: Tap opens Profile; long-press opens a per-contact menu (View Profile, Quick Log, Log Interaction, Message, Edit Contact, Favorite/Unfavorite, Snooze/Unsnooze, Select) — Delete and Archive excluded from it; Card View does not duplicate List swipes
-- [ ] **CARDV-05**: User can enter multi-select from the long-press menu or Dashboard overflow Select Contacts; selection circles appear only in selection mode, card taps toggle selection, and the selected count is displayed
-- [ ] **CARDV-06**: Multi-select locks and replaces the Dashboard control area with selection actions; Select All operates over the result universe frozen when selection began
+- [x] **CARDV-05**: User can enter multi-select from the long-press menu or Dashboard overflow Select Contacts; selection circles appear only in selection mode, card taps toggle selection, and the selected count is displayed
+- [x] **CARDV-06**: Multi-select locks and replaces the Dashboard control area with selection actions; Select All operates over the result universe frozen when selection began
 - [x] **CARDV-07**: Bulk actions cover Quick Log, Log Interaction, Add to/Remove from Favorites, Snooze/Unsnooze, Set Category, Archive, and Sensitive Operations; Bulk Edit and multi-recipient Message are not offered
 - [x] **CARDV-08**: Bulk Quick Log writes one generic current-time interaction per selected contact (immediate + Undo for small selections, confirmation for large), composed through the canonical recency writers
 - [ ] **CARDV-09**: Detailed Log Interaction routes by count: 1 selected → individual flow; 2+ → Group Log with participants preloaded
 - [x] **CARDV-10**: Bulk Archive is the recoverable removal with confirmation; permanent deletion stays a manual per-contact action on the Archived list (ADR-018; no bulk delete, no contact quarantine/auto-purge)
 - [x] **CARDV-11**: Sensitive Operations contains Change Contact Frequency only, with a confirmation summarizing count and value; Gravity is never a bulk action
-- [ ] **CARDV-12**: After a successful ordinary bulk operation, selection mode persists (archived cards disappear); the user exits explicitly, and Back exits multi-select before navigating
+- [x] **CARDV-12**: After a successful ordinary bulk operation, selection mode persists (archived cards disappear); the user exits explicitly, and Back exits multi-select before navigating
 
 ### ORRC — Orrery Camera, Scale & Exploration (Phase 29)
 

@@ -1,10 +1,10 @@
 ---
 schema_version: 1
-open_count: 35
+open_count: 36
 waived_count: 0
 fixed_count: 6
-total_count: 41
-last_updated: 2026-09-06T08:31:42.020Z
+total_count: 42
+last_updated: 2026-09-06T08:50:50.786Z
 ---
 
 # Broken Windows Ledger
@@ -56,6 +56,7 @@ last_updated: 2026-09-06T08:31:42.020Z
 | 39 | 28 | stub | src/components/GridCard.tsx | 158 | Third card row is intentionally reserved for Plan 28-04 adaptive context and search content. | open |  | 2026-09-06T08:31:30.372Z |  |
 | 40 | 28 | deviation | src/screens/HomeScreen.tsx |  | Corrected stale renderer documentation after CardGrid replacement. | open |  | 2026-09-06T08:31:30.547Z |  |
 | 41 | 28 | unrun-verify | src/components/CardGrid.tsx |  | Pixel UAT remains required for card-grid layout, text scaling, status visuals, navigation, and optimistic favourite feedback. | open |  | 2026-09-06T08:31:42.020Z |  |
+| 42 | 28 | deviation | .planning/phases/28-dashboard-card-view/28-03-PLAN.md |  | Plan verification's grep -Lq status was inverted; executor used an equivalent no-match assertion. | open |  | 2026-09-06T08:50:50.786Z |  |
 
 ````json
 [
@@ -549,6 +550,18 @@ last_updated: 2026-09-06T08:31:42.020Z
     "status": "open",
     "reason": "",
     "recorded_at": "2026-09-06T08:31:42.020Z",
+    "resolved_at": null
+  },
+  {
+    "id": 42,
+    "kind": "deviation",
+    "phase": "28",
+    "file": ".planning/phases/28-dashboard-card-view/28-03-PLAN.md",
+    "line": null,
+    "description": "Plan verification's grep -Lq status was inverted; executor used an equivalent no-match assertion.",
+    "status": "open",
+    "reason": "",
+    "recorded_at": "2026-09-06T08:50:50.786Z",
     "resolved_at": null
   }
 ]
