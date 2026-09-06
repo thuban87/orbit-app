@@ -22,7 +22,7 @@ not something you can pattern-match against.
 ## How to use this
 
 - **Is a decision still live?** Check the `Superseded by` column. 22 of
-  94 ADRs are superseded in whole or in part.
+  97 ADRs are superseded in whole or in part.
 - **Which decisions govern a file?** Don't grep this file — ask the graph:
   `npm run graph:ask -- governs src/db/field-values-dao.ts`, or follow the
   `governed_by` edges.
@@ -125,3 +125,6 @@ not something you can pattern-match against.
 | 092 | Durable Shared Dashboard Query State | Accepted | 25-dashboard-data-state-foundation | — | — | — | 6 | `src/backup`, `src/db`, `src/db/migrations` +2 |
 | 093 | Scoped Composable Dashboard Population and Filter Model | Accepted | 25-dashboard-data-state-foundation | — | — | — | 6 | `src/db`, `src/logic`, `src/screens` +1 |
 | 094 | Eligibility-Scoped Semantic Dashboard Search | Accepted | 25-dashboard-data-state-foundation | — | — | — | 4 | `src/db`, `src/logic`, `src/services` |
+| 095 | Live-Applying Dashboard Floating Control Surface | Accepted | 26-dashboard-control-surface | — | — | — | 8 | `src/components/control-surface`, `src/screens`, `src/stores` |
+| 096 | Dashboard Header and Overflow Discovery Paths | Accepted | 26-dashboard-control-surface | — | — | — | 8 | `src/components`, `src/navigation/tabs`, `src/screens` |
+| 097 | Scoped Dashboard Search and Dedicated Unbound Retrieval | Accepted | 26-dashboard-control-surface | — | — | — | 6 | `src/db`, `src/logic`, `src/screens` +1 |

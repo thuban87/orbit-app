@@ -104,5 +104,8 @@
 // NOTE: ADR-0092 [ACCEPTED] Durable Shared Dashboard Query State
 // NOTE: ADR-0093 [ACCEPTED] Scoped Composable Dashboard Population and Filter Model
 // NOTE: ADR-0094 [ACCEPTED] Eligibility-Scoped Semantic Dashboard Search
+// NOTE: ADR-0095 [ACCEPTED] Live-Applying Dashboard Floating Control Surface
+// NOTE: ADR-0096 [ACCEPTED] Dashboard Header and Overflow Discovery Paths
+// NOTE: ADR-0097 [ACCEPTED] Scoped Dashboard Search and Dedicated Unbound Retrieval
 
-export const ADR_COUNT = 94;
+export const ADR_COUNT = 97;
