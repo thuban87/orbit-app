@@ -1,7 +1,7 @@
 # App Shell
 
-**Last updated:** 2026-09-03
-**Updated by phase:** 24.1-contact-knowledge-foundation
+**Last updated:** 2026-09-02
+**Updated by phase:** 25-dashboard-data-state-foundation
 **Owners:** `App.tsx`, `src/navigation/RootNavigator.tsx`, `src/navigation/tabs/`, `src/navigation/types.ts`, `src/navigation/reset-intents.ts`, `src/navigation/linking.ts`, `src/navigation/notification-gate.tsx`, `src/navigation/widget-linking.ts`, `src/components/UniversalFab.tsx`, `src/components/ShellAppBar.tsx`
 
 ## Purpose
@@ -29,7 +29,7 @@ The shell owns runtime navigation and consumes the durable theme contract; `app_
 | Backup-share gate | `src/navigation/backup-share-intent.ts` | Holds a narrow inbound backup-file intent until the backup restore surface is ready. |
 | Notification gate | `src/navigation/notification-gate.tsx` | Converts warm and cold local-notification responses into ready-gated actions or navigation. |
 | Widget gate | `src/navigation/widget-linking.ts` | Converts narrowly accepted widget `orbit://` links into ready-gated Dashboard-rooted resets. |
-| Settings surface | `src/screens/SettingsScreen.tsx` | Hosts low-traffic lifecycle routes, live Appearance controls, self-photo, sun controls, favourites, and non-secret AI configuration. |
+| Settings surface | `src/screens/SettingsScreen.tsx` | Hosts low-traffic lifecycle routes, live Appearance controls, self-photo, sun controls, and non-secret AI configuration. |
 | Theme contract | `src/theme/` | Defines four semantic palettes, curated accents, typography and motion tokens, local background/surface primitives, and their sole palette values. |
 | Interaction primitives | `src/components/icons/`, `src/components/ui/` | Provides semantic icons, non-colour status glyphs, scalable text, and shared action/overlay contracts. |
 
@@ -54,7 +54,7 @@ The shell owns runtime navigation and consumes the durable theme contract; `app_
 | `src/screens/CaptureScreen.tsx` | Provides the in-app target for a pending Android text share. |
 | `src/screens/HomeScreen.tsx` | Provides the dashboard Home and its destination entries. |
 | `src/screens/DigestScreen.tsx` | Provides the live weekly retrospective destination with its own themed Back chrome. |
-| `src/screens/SettingsScreen.tsx` | Provides the distinct settings home, including live Theme/Mode/Accent controls, AI configuration, self-photo, self-star, sun-centre, and Manage favourites entries. |
+| `src/screens/SettingsScreen.tsx` | Provides the distinct settings home, including live Theme/Mode/Accent controls, AI configuration, self-photo, self-star, and sun-centre entries. |
 | `src/screens/LegacyContactPickerScreen.tsx` | Provides the typed API-36-and-below custom contact-picker route and permission-recovery views. |
 | `src/services/import/start-contact-import.ts` | Selects one SDK-routed import acquisition path for dashboard and Settings entry points. |
 | `src/screens/ImportReviewScreen.tsx` | Provides the typed selected-contact review route and explicit duplicate choices. |
@@ -230,8 +230,8 @@ The shell owns runtime navigation and consumes the durable theme contract; `app_
 - **ADR-027:** Derived Profile-Only Gravity and Intensity — adds the gravity-tier ramp used by the profile bar.
 - **ADR-031:** Bound Local Fuel Search without FTS5 — adds the reusable Phase-7 FuelSearch route and Settings entry.
 - **ADR-032:** Flat Dashboard Discovery and In-Query Contact Search — moves search into Home and adds the dashboard's sibling list route.
-- **ADR-033:** Profile Marking and Shared Drag-Reordered Favourites — adds the shared Manage favourites route and entry points.
-- **ADR-034:** Birthday Banner and Re-query Dashboard Freshness — mounts the birthday and reliable refresh paths in Home.
+- **ADR-033:** Profile Marking and Shared Drag-Reordered Favourites — superseded by ADR-075 for the removed Manage favourites route and user-facing order.
+- **ADR-034:** Birthday Banner and Re-query Dashboard Freshness — superseded by ADR-076 for the removed banner; reliable refresh paths remain.
 - **ADR-036:** Entry-Agnostic Compose Navigation and Transmittable-Fuel Guardrails — adds the serializable Compose route and Home-reset Back behavior.
 - **ADR-037:** Text-Only Android Share Intent Integration — adds the provider-owned, ready-gated Capture route for native text shares.
 - **ADR-038:** Contact-Owned Share Capture Fuel — keeps the share-capture route on a selected contact rather than creating a standalone inbox.
@@ -264,6 +264,9 @@ The shell owns runtime navigation and consumes the durable theme contract; `app_
 - **ADR-074:** Widget Contact Supersession and Strict Reach Deep-Link Fail-Safe — adds the `orbit://reach/<id>` widget bridge and the consumed-once `openReachOut` Profile param with a stale-target Dashboard fail-safe.
 - **ADR-088:** Additive Contact-Knowledge Schema and Application-Owned Memory Registry — adds typed contact-knowledge routes in both profile-owning stacks.
 - **ADR-089:** Recoverable Memory Lifecycle and Contact-Operation Integrity — exposes the guarded Recently Deleted recovery destination.
+- **ADR-075:** Binary Favourite Membership Without a User-Facing Order — retires the shell's Manage favourites route and Settings entry.
+- **ADR-076:** Population-Reached Birthdays Without a Dashboard Banner — removes the Dashboard banner without changing local refresh ownership.
+- **ADR-093:** Scoped Composable Dashboard Population and Filter Model — retires the Never Contacted route and leaves its next visible control to Dashboard work.
 
 ## Gotchas
 
@@ -287,7 +290,7 @@ The shell owns runtime navigation and consumes the durable theme contract; `app_
 15. **Do not mount navigation after a bootstrap failure.** A classified migration failure has rolled back unchanged; generic failure copy must not promise unavailable support or recovery.
 16. **Restore route parameters must be content-free.** Pass only an opaque in-memory cache token and aggregate preview; never put a file URI, manifest, callback, or passphrase in navigation state.
 17. **Every possible first opener needs the migration region.** `openAndMigrate()` can run before React mounts from headless notification or widget work; database bootstrap itself stays free of native localization imports for node-testability.
-18. **Keep Unbound navigation retrieval-oriented.** The dedicated list and neutral search rows may open Profile, but active-orbit controls stay in their Bound query owners.
+18. **Keep Unbound navigation retrieval-oriented.** The dedicated browse list may open Profile, but active-orbit controls stay in their Bound query owners; the temporary typed-lookup gap is owned by Phase 26.
 19. **Import routes carry durable identifiers, never picker grants.** A selected-contact URI is temporary provider state and must not enter navigation parameters.
 20. **Keep contact-import routing single-sourced.** Dashboard and Settings must call the shared SDK-routing seam; duplicating the Android-version branch can make their permission behavior drift.
 21. **Do not overlap root recovery prompts.** Import resume takes precedence over reconciliation resume; a pending check must be resumed or discarded before starting another.
@@ -344,3 +347,4 @@ The shell owns runtime navigation and consumes the durable theme contract; `app_
 | 2026-09-02 | 22 | Replaced the flat root stack with four tab-owned stacks, nested external resets, shared chrome, and universal capture primitives. |
 | 2026-09-02 | 23 | Added restore-before-paint durable theming, live Appearance controls, semantic tab icons, and shared visual primitives. |
 | 2026-09-03 | 24.1 | Added typed contact-knowledge, Recently Deleted, and retained-history routes to both profile stacks. |
+| 2026-09-02 | 25 | Retired Manage favourites and Never Contacted navigation surfaces plus the Settings include-Unbound control. |
