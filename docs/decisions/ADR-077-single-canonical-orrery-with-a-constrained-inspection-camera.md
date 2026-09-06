@@ -48,4 +48,4 @@ The Orrery has one canonical, unnamed spatial visualization centred on relations
 - `src/components/SegmentedControl.tsx` — retired with its only consumer; provided the Status / Relationship selector.
 
 **Depends on:** ADR-046 (Query-Time Orrery Placement and Transactional Ring Ordering); ADR-047 (App-Level Assignable Sun and Themed Self Identity)
-**Required by:** _None._
+**Required by:** ADR-085 (Live Reduced-Motion Signal for Skia Ambient Animation)
