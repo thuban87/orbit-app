@@ -31,8 +31,16 @@
  */
 import { useFocusEffect, useIsFocused } from "@react-navigation/native";
 import * as Haptics from "expo-haptics";
-import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
+import {
+  AccessibilityInfo,
   Alert,
   AppState,
   FlatList,
@@ -113,6 +121,7 @@ import { useTheme } from "@/theme";
 import { EASING, MOTION } from "@/theme/tokens/motion";
 import { RADII } from "@/theme/tokens/radii";
 import { SPACING } from "@/theme/tokens/spacing";
+import { TYPOGRAPHY } from "@/theme/tokens/typography";
 import { useReducedMotion } from "@/theme/use-reduced-motion";
 import { Logger } from "@/utils/logger";
 import { isSnoozed, parseLocalMs } from "@/utils/dates";
@@ -337,6 +346,14 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
     })),
   );
   const hydrate = useDashboardQueryStore((state) => state.hydrate);
+  const selectionMode = useDashboardSelectionStore((state) => state.mode);
+  const selectedIds = useDashboardSelectionStore((state) => state.selectedIds);
+  const frozenUniverse = useDashboardSelectionStore(
+    (state) => state.frozenUniverse,
+  );
+  const toggleSelection = useDashboardSelectionStore((state) => state.toggle);
+  const selectAll = useDashboardSelectionStore((state) => state.selectAll);
+  const exitSelection = useDashboardSelectionStore((state) => state.exitSelection);
   const bottomClearance = useBottomClearance();
 
   const resetDashboard = useCallback(async () => {
@@ -388,6 +405,21 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
   const [error, setError] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [initialLoad, setInitialLoad] = useState(true);
+
+  const frozenIds = useMemo(
+    () => new Set(frozenUniverse),
+    [frozenUniverse],
+  );
+  const cardRows = selectionMode
+    ? rows.filter((row) => frozenIds.has(row.id))
+    : rows;
+  const selectionCount = selectedIds.size;
+
+  useEffect(() => {
+    if (!selectionMode) return;
+    const label = `${selectionCount} selected`;
+    AccessibilityInfo.announceForAccessibility(label);
+  }, [selectionCount, selectionMode]);
   const [resultGeneration, setResultGeneration] = useState(0);
   const [panelOpen, setPanelOpen] = useState(false);
   const [contextMenuContactId, setContextMenuContactId] = useState<number | null>(
@@ -1122,14 +1154,78 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
           )}
         />
       </View>
-      <DashboardControlRow onPanelOpenChange={setPanelOpen} />
+      {selectionMode ? (
+        <View
+          testID="dashboard-selection-controls"
+          accessibilityLabel={`${selectionCount} selected`}
+          style={[
+            styles.selectionControls,
+            {
+              backgroundColor: colors.surface,
+              borderColor: colors.border,
+            },
+          ]}
+        >
+          <Text
+            accessibilityLiveRegion="polite"
+            style={[styles.selectionCount, { color: colors.textPrimary }]}
+          >
+            {selectionCount} selected
+          </Text>
+          <View style={styles.selectionActions}>
+            <Pressable
+              testID="dashboard-selection-select-all"
+              accessibilityRole="button"
+              accessibilityLabel="Select All"
+              onPress={selectAll}
+              style={styles.selectionAction}
+            >
+              <Icon name="select-all" size="sm" tone="textPrimary" />
+              <Text
+                style={[
+                  styles.selectionActionLabel,
+                  { color: colors.textPrimary },
+                ]}
+              >
+                Select All
+              </Text>
+            </Pressable>
+            <Pressable
+              testID="dashboard-selection-exit"
+              accessibilityRole="button"
+              accessibilityLabel="Exit selection"
+              onPress={exitSelection}
+              style={styles.selectionAction}
+            >
+              <Icon name="close" size="sm" tone="textPrimary" />
+              <Text
+                style={[
+                  styles.selectionActionLabel,
+                  { color: colors.textPrimary },
+                ]}
+              >
+                Done
+              </Text>
+            </Pressable>
+          </View>
+          <View
+            testID="dashboard-selection-bulk-actions-placeholder"
+            accessible={false}
+            accessibilityElementsHidden
+            style={styles.selectionBulkActions}
+          />
+        </View>
+      ) : (
+        <DashboardControlRow onPanelOpenChange={setPanelOpen} />
+      )}
       <View
         accessible={!panelOpen}
         importantForAccessibility={panelOpen ? "no-hide-descendants" : "auto"}
         pointerEvents={panelOpen ? "none" : "auto"}
         style={styles.listRegion}
       >
-        <View testID="dashboard-search-row" style={styles.searchRow}>
+        {!selectionMode ? (
+          <View testID="dashboard-search-row" style={styles.searchRow}>
           <Pressable
             testID="dashboard-search-toggle"
             accessibilityRole="button"
@@ -1193,7 +1289,8 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
               onChange={onChangeView}
             />
           </View>
-        </View>
+          </View>
+        ) : null}
         <Animated.View style={[styles.listRegion, resultTransitionStyle]}>
           {query.viewMode === "list" ? (
             <FlatList
@@ -1249,7 +1346,7 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
             />
           ) : (
             <CardGrid
-              rows={rows}
+              rows={cardRows}
               now={listNow}
               onPressContact={goToProfile}
               onLongPressContact={openCardContextMenu}
@@ -1259,6 +1356,9 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
               onMessage={messageContact}
               onEditContact={onEditContact}
               onSelect={enterCardSelection}
+              selectionMode={selectionMode}
+              selectedIds={selectedIds}
+              onToggleSelect={toggleSelection}
               favouriteOverlay={favouriteOverlay}
               onToggleFavourite={toggleFavourite}
               line3ByContactId={line3ByContactId}
@@ -1395,6 +1495,38 @@ const styles = StyleSheet.create({
   },
   viewToggleWrap: {
     width: 96,
+  },
+  selectionControls: {
+    borderBottomWidth: 1,
+    gap: SPACING.sm,
+    paddingHorizontal: SPACING.base,
+    paddingVertical: SPACING.sm,
+  },
+  selectionCount: {
+    fontFamily: TYPOGRAPHY.body.family,
+    fontSize: TYPOGRAPHY.body.size,
+    fontWeight: TYPOGRAPHY.body.weight,
+    lineHeight: TYPOGRAPHY.body.lineHeight,
+  },
+  selectionActions: {
+    flexDirection: "row",
+    gap: SPACING.sm,
+  },
+  selectionAction: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: SPACING.xs,
+    minHeight: SPACING["2xl"],
+    paddingHorizontal: SPACING.sm,
+  },
+  selectionActionLabel: {
+    fontFamily: TYPOGRAPHY.label.family,
+    fontSize: TYPOGRAPHY.label.size,
+    fontWeight: TYPOGRAPHY.label.weight,
+    lineHeight: TYPOGRAPHY.label.lineHeight,
+  },
+  selectionBulkActions: {
+    minHeight: SPACING["2xl"],
   },
   sortControl: {
     flexDirection: "row",
