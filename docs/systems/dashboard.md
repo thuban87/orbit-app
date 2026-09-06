@@ -47,7 +47,7 @@ The dashboard owns no tables. It projects the on-device `contacts`, `categories`
 | `src/logic/birthday-logic.ts` | Strict local-date birthday parsing and days-until computation. |
 | `src/logic/dashboard-empty-logic.ts` | Pure cause-aware empty-state precedence. |
 | `src/stores/dashboard-prefs-store.ts` | Device-local sort/filter preference persistence. |
-| `src/components/AddSpeedDialFab.tsx` | Expands the Add affordance into manual-create and selected-contact import entries. |
+| `src/components/UniversalFab.tsx` | Shell-mounted universal six-action capture control; Dashboard supplies the browse surface beneath it. |
 
 ## How It Works
 
@@ -85,15 +85,14 @@ The dashboard owns no tables. It projects the on-device `contacts`, `categories`
 
 ### Opening Backup & Restore
 
-1. Home exposes a temporary Backup & Restore entry alongside its existing destination controls; the phase does not imply or add a navigation bar.
+1. Backup / Restore is a persistent shell tab with its own root; Home does not duplicate a bottom-navigation destination.
 2. A rare dismissible nudge appears only when meaningful data has no verified automatic backup, or changed data has remained unprotected for at least fourteen days.
 3. The nudge opens Backup & Restore and clears its dismissal only after the health condition resolves; it is never a permanent dashboard card.
 
 ### Starting contact import
 
-1. The Add affordance expands into `Import from Contacts` and `Create manually`; the manual path preserves the ordinary create route.
-2. The import entry opens selected-contact acquisition only when Android's privacy-preserving picker is available; unavailable devices retain manual creation.
-3. The invisible collapsed speed-dial scrim and option buttons have `pointerEvents="none"`; only the expanded control intercepts dashboard touches.
+1. The shell-mounted universal FAB exposes Add Contact alongside the other fixed capture actions; Dashboard does not own a second speed dial.
+2. Contact import remains available from its deliberate Settings integration path rather than the universal capture action set.
 
 ### Showing birthdays and empty states
 
@@ -117,6 +116,8 @@ The active dashboard and favourites reads select only Bound contacts. Search rem
 
 - **ADR-006:** Theme-Token Architecture — keeps Home's dashboard chrome on the shared token contract.
 - **ADR-019:** Native Stack Contact Lifecycle Navigation — establishes the typed navigation shell used by Home destination entries.
+- **ADR-080:** Four-Tab Bottom Navigation Shell with Per-Tab Stacks — makes Dashboard the remembered tab root and adds its overflow destinations.
+- **ADR-082:** Universal Capture FAB, Canonical Picker, and Truthful Quick Log — replaces the dashboard-local dial with shared shell capture behavior.
 - **ADR-032:** Flat Dashboard Discovery and In-Query Contact Search — makes the dashboard Home and owns local name-plus-fuel search.
 - **ADR-033:** Profile Marking and Shared Drag-Reordered Favourites — supplies the card marker and favourites filter/management surface.
 - **ADR-034:** Birthday Banner and Re-query Dashboard Freshness — defines birthday candidates and reliable local freshness.
@@ -145,7 +146,7 @@ The active dashboard and favourites reads select only Bound contacts. Search rem
 10. **Do not call a manual export healthy.** Dashboard health derives only from a verified automatic SAF snapshot and matching data revision.
 11. **Keep the backup nudge rare.** It is a recovery prompt for meaningful unprotected data, not a status card or recurring dashboard obligation.
 12. **Do not render active chrome for an Unbound retrieval row.** Its NULL status/progress/rank is deliberate; ContactCard remains a Bound-population component.
-13. **An invisible scrim still receives touches.** The collapsed speed dial must make its scrim and option buttons inert, not merely transparent.
+13. **Do not recreate a dashboard-local capture dial.** The universal FAB owns capture exposure and transient dismissal across browse surfaces.
 
 ## Related Systems
 
@@ -172,3 +173,4 @@ The active dashboard and favourites reads select only Bound contacts. Search rem
 | 2026-08-24 | 17 | Added a temporary Backup & Restore entry and rare health-driven protection nudge. |
 | 2026-08-27 | 18.2 | Added Bound-only active projections, neutral Unbound retrieval, dedicated browsing, and Never Contacted opt-in. |
 | 2026-08-26 | 19 | Replaced direct creation with safe manual/import speed-dial choices. |
+| 2026-09-02 | 22 | Made Dashboard a tab root, moved capture to the universal FAB, and added Group Events and Archived overflow destinations. |
