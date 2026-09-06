@@ -1,7 +1,7 @@
 # Persistence Core
 
-**Last updated:** 2026-08-26
-**Updated by phase:** 20-contact-reconciliation-merge
+**Last updated:** 2026-09-02
+**Updated by phase:** 23-theme-visual-system
 **Owners:** `src/db/database.ts`, `src/db/migrations/runner.ts`, `src/db/migrations/001-initial.ts`, `src/db/mutex.ts`, `src/db/transaction.ts`, `src/services/launch-sweep.ts`
 
 ## Purpose
@@ -21,7 +21,7 @@ The schema version is SQLite's `PRAGMA user_version`. Migrations 001–005 estab
 - `interactions` — dated contact touchpoints.
 - `contact_links`, `events`, `custom_field_defs`, `field_history`, `fuel` — durable supporting data introduced in the first schema.
 - `custom_field_values` — migration-006 normalized uid-bearing custom-field current state, unique per contact-and-definition pair.
-- `app_settings` — a singleton SQLite row for non-secret preferences, a monotonic exportable-data revision, and device-local backup health/configuration. It never contains an API key or passphrase.
+- `app_settings` — a singleton SQLite row for non-secret preferences, a monotonic exportable-data revision, and device-local backup health/configuration. Migration 015 adds the active theme package plus each package's remembered mode, accent ID, and background ID; NULL accent/background values resolve to package defaults at render. It never contains an API key, passphrase, or palette hex.
 - `tombstones` — indefinitely retained type-and-UID deletion evidence for portable reconciliation.
 - `restore_photo_journal` — committed restore-photo finalization and cleanup work.
 - `contact_methods` — ordered UID-bearing phone/email rows with canonical/actionability data, optional label, and durable display order.
@@ -54,6 +54,7 @@ The schema version is SQLite's `PRAGMA user_version`. Migrations 001–005 estab
 | Migration | `src/db/migrations/011-contact-lifecycle-schema.ts` | Rebuilds the contact graph without data changes to add lifecycle guards and lifecycle settings. |
 | Migration | `src/db/migrations/012-import-sessions.ts` | Adds local-only durable import-session and import-row state. |
 | Migration | `src/db/migrations/013-reconciliation-and-merge.ts` | Adds reconciliation-session, reviewed-source, and bulk-review resolution state. |
+| Migration | `src/db/migrations/015-theme-settings.ts` | Adds constrained, durable Galaxy/Standard theme settings with safe defaults. |
 | Settings DAO | `src/db/app-settings-dao.ts` | Validates and persists the singleton's notification, Orrery, and non-secret AI preference updates. |
 | Concurrency utility | `src/db/mutex.ts` | Serializes database write transactions in one JS runtime. |
 | Transaction utility | `src/db/transaction.ts` | Opens a hand-rolled transaction inside the shared non-reentrant mutex. |
@@ -78,6 +79,7 @@ The schema version is SQLite's `PRAGMA user_version`. Migrations 001–005 estab
 | `src/db/migrations/011-contact-lifecycle-schema.ts` | Adds `tracking_enabled`, nullable never-assigned cadence, one-way cadence guards, and lifecycle settings while preserving contact children. |
 | `src/db/migrations/012-import-sessions.ts` | Adds durable selected-contact snapshots, row-state constraints, and import indexes. |
 | `src/db/migrations/013-reconciliation-and-merge.ts` | Adds durable reconciliation cards, narrow source snapshots, and generic bulk-review dispositions. |
+| `src/db/migrations/015-theme-settings.ts` | Adds the package, per-package mode, and nullable accent/background option-ID columns. |
 | `src/db/import-session-dao.ts` | Owns atomic session acceptance and transaction-composable import-row state transitions. |
 | `src/db/app-settings-dao.ts` | Typed, bounds-validated read and update boundary for application settings. |
 | `src/db/types.ts` | Testable database and migration interfaces. |
@@ -105,6 +107,7 @@ The schema version is SQLite's `PRAGMA user_version`. Migrations 001–005 estab
 14. Migration 011 preserves all retained contact values and children while adding Bound/Unbound lifecycle state. Its checks require a positive integer cadence for Bound contacts, and its trigger prevents a previously assigned cadence from being cleared.
 15. Migration 012 adds local-only import sessions after a picker selection has been accepted. Its rows retain the durable recovery state but do not become part of portable backup contents.
 16. Migration 013 adds local-only reconciliation sessions, their changed-contact cards, narrow per-link reviewed-source snapshots, and durable bulk-review resolutions. It leaves existing contact tables intact; merge composes existing tombstone and child-table contracts inside the shared transaction boundary.
+17. Migration 015 adds the Galaxy/Standard package selection and per-package appearance memory. Its non-null package and mode defaults make a v0-to-v15 update land on Galaxy plus Follow System; nullable accent/background IDs remain unresolved until theme rendering.
 
 ### Running launch maintenance
 
@@ -117,7 +120,7 @@ The schema version is SQLite's `PRAGMA user_version`. Migrations 001–005 estab
 | Constant | Value | File | Purpose |
 |---|---|---|---|
 | `BUSY_TIMEOUT_MS` | `5000` | `src/db/database.ts` | Wait budget for a busy shared connection. |
-| `TARGET_VERSION` | `13` | `src/db/database.ts` | Schema version after the reconciliation-and-merge migration. |
+| `TARGET_VERSION` | `15` | `src/db/database.ts` | Schema version after durable theme-settings migration. |
 
 ## Decisions
 
@@ -142,6 +145,7 @@ The schema version is SQLite's `PRAGMA user_version`. Migrations 001–005 estab
 - **ADR-065:** Durable Resumable Contact-Import Sessions with Failure-Isolated Photos — defines migration 012's local-only recovery state.
 - **ADR-068:** User-Triggered, Source-Only Reconciliation with Durable Review — defines migration 013's narrow durable reconciliation state.
 - **ADR-069:** Atomic Tombstone-Backed Orbit Contact Merge — composes existing transaction and tombstone mechanisms for a local merge.
+- **ADR-083:** Durable Multi-Package Theme Configuration and Restore-Before-Paint — adds migration 015's durable, validated theme-setting boundary.
 
 ## Gotchas
 
@@ -161,6 +165,7 @@ The schema version is SQLite's `PRAGMA user_version`. Migrations 001–005 estab
 14. **Do not treat NULL cadence as Unbound.** It means no cadence has ever been assigned; `tracking_enabled` alone controls lifecycle participation.
 15. **Import sessions are not portable state.** A Replace-all restore clears them, and import recovery must never try to revive a source-provider grant.
 16. **Reconciliation snapshots are not a sync journal.** They retain only the source value needed to suppress an unchanged reviewed discrepancy.
+17. **Store theme IDs, not colours.** Accent and background values are validated option IDs or NULL; palette hex resolution belongs in the theme layer, never in SQLite.
 
 ## Related Systems
 
@@ -191,3 +196,4 @@ The schema version is SQLite's `PRAGMA user_version`. Migrations 001–005 estab
 | 2026-08-27 | 18.2 | Added migration 011 for Bound/Unbound lifecycle, one-way cadence guards, and lifecycle settings. |
 | 2026-08-26 | 19 | Added migration 012 for local-only durable contact-import sessions. |
 | 2026-08-26 | 20 | Added migration 013 for durable reconciliation sessions, narrow source memory, and bulk-review resolutions. |
+| 2026-09-02 | 23 | Added migration 015's durable package and per-package theme-preference columns. |
