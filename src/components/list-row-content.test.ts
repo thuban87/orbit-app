@@ -17,6 +17,13 @@ describe("ListRow content", () => {
     expect(formatListRecency("2026-07-28", now)).toBe("18d ago");
   });
 
+  it.each([
+    "2026-08-15 99:00:00",
+    "2026-02-29 12:00:00",
+  ])("renders corrupt non-null last-contact %s as neutral recency", (lastContact) => {
+    expect(formatListRecency(lastContact, now)).toBe("No interactions yet");
+  });
+
   it("composes recency and the one displayed category", () => {
     expect(formatLine2("18d ago", "Friend")).toBe("18d ago · Friend");
     expect(formatLine2("No interactions yet", null)).toBe("No interactions yet");
