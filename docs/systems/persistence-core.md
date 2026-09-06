@@ -12,7 +12,7 @@ The persistence core opens Orbit's on-device SQLite database and advances its sc
 
 ### Data Model
 
-The schema version is SQLite's `PRAGMA user_version`. Migrations 001–005 establish the initial application, settings, Orrery, AI, and digest-policy schema; migration 006 replaces dynamic custom-field columns with normalized current-value rows. Each relational data model is documented by its owning system doc.
+The schema version is SQLite's `PRAGMA user_version`. Migrations 001–005 establish the initial application, settings, Orrery, AI, and digest-policy schema; migration 006 replaces dynamic custom-field columns with normalized current-value rows. Migrations 017 and 018 add explicit Memory egress permission and additive custom-field history without reopening earlier migrations. Each relational data model is documented by its owning system doc.
 
 **Tables:**
 - `categories` — seeded, user-editable single-select contact groups.
@@ -31,6 +31,7 @@ The schema version is SQLite's `PRAGMA user_version`. Migrations 001–005 estab
 - `reconciliation_sessions`, `reconciliation_session_cards`, and `reconcile_source_snapshot` — local-only durable user-triggered reconciliation work and narrow per-link reviewed-source memory.
 - `bulk_review_resolutions` — durable fixed or ignored dispositions for flagged imported data; it never rewrites immutable source payloads.
 - `memories`, `relationships`, and `current_state_entries` — migration-016 contact-knowledge rows; their complete lifecycle and query contracts belong to Contact Knowledge.
+- `custom_field_value_history` — migration-018 append-only prior raw values for history-retained custom fields; it is portable state, unlike destructive-operation `field_history`.
 
 **Types** (`src/db/types.ts`):
 - `SqlExecutor` — database operations shared by Expo SQLite and the node-side test adapter.
@@ -57,6 +58,8 @@ The schema version is SQLite's `PRAGMA user_version`. Migrations 001–005 estab
 | Migration | `src/db/migrations/013-reconciliation-and-merge.ts` | Adds reconciliation-session, reviewed-source, and bulk-review resolution state. |
 | Migration | `src/db/migrations/015-theme-settings.ts` | Adds constrained, durable Galaxy/Standard theme settings with safe defaults. |
 | Migration | `src/db/migrations/016-contact-knowledge.ts` | Adds typed Memory, relationship, and current-state-history tables without a data move. |
+| Migration | `src/db/migrations/017-knowledge-egress-datamove.ts` | Adds default-off Memory permission and proves fuel-to-Memory copies before retiring source rows. |
+| Migration | `src/db/migrations/018-custom-field-scope-history.ts` | Adds scope-ready definition metadata and retained custom-field value history. |
 | Settings DAO | `src/db/app-settings-dao.ts` | Validates and persists the singleton's notification, Orrery, and non-secret AI preference updates. |
 | Concurrency utility | `src/db/mutex.ts` | Serializes database write transactions in one JS runtime. |
 | Transaction utility | `src/db/transaction.ts` | Opens a hand-rolled transaction inside the shared non-reentrant mutex. |
@@ -83,6 +86,8 @@ The schema version is SQLite's `PRAGMA user_version`. Migrations 001–005 estab
 | `src/db/migrations/013-reconciliation-and-merge.ts` | Adds durable reconciliation cards, narrow source snapshots, and generic bulk-review dispositions. |
 | `src/db/migrations/015-theme-settings.ts` | Adds the package, per-package mode, and nullable accent/background option-ID columns. |
 | `src/db/migrations/016-contact-knowledge.ts` | Creates the additive contact-knowledge tables, constraints, and read indexes. |
+| `src/db/migrations/017-knowledge-egress-datamove.ts` | Uses a per-row copy proof before removing retired share and AI-proposal fuel rows. |
+| `src/db/migrations/018-custom-field-scope-history.ts` | Adds custom-field scope/history/group columns and the retained-history table. |
 | `src/db/import-session-dao.ts` | Owns atomic session acceptance and transaction-composable import-row state transitions. |
 | `src/db/app-settings-dao.ts` | Typed, bounds-validated read and update boundary for application settings. |
 | `src/db/types.ts` | Testable database and migration interfaces. |
@@ -112,6 +117,8 @@ The schema version is SQLite's `PRAGMA user_version`. Migrations 001–005 estab
 16. Migration 013 adds local-only reconciliation sessions, their changed-contact cards, narrow per-link reviewed-source snapshots, and durable bulk-review resolutions. It leaves existing contact tables intact; merge composes existing tombstone and child-table contracts inside the shared transaction boundary.
 17. Migration 015 adds the Galaxy/Standard package selection and per-package appearance memory. Its non-null package and mode defaults make a v0-to-v15 update land on Galaxy plus Follow System; nullable accent/background IDs remain unresolved until theme rendering.
 18. Migration 016 adds Memories, structured relationships, and retained current-state entries without reshaping fuel or either custom-field table. Its partial current-state index and relationship self-link CHECK protect later writers.
+19. Migration 017 adds `memories.allow_ai` with a default of off. It copies each eligible share capture and legacy AI proposal to a verified Memory before removing that fuel row; a failed proof rolls the whole step back.
+20. Migration 018 adds global-default custom-field scope, history-retained/group metadata, and a separate UID-bearing value-history table while retaining ADR-001 current-pair constraints.
 
 ### Running launch maintenance
 
@@ -124,7 +131,7 @@ The schema version is SQLite's `PRAGMA user_version`. Migrations 001–005 estab
 | Constant | Value | File | Purpose |
 |---|---|---|---|
 | `BUSY_TIMEOUT_MS` | `5000` | `src/db/database.ts` | Wait budget for a busy shared connection. |
-| `TARGET_VERSION` | `16` | `src/db/database.ts` | Schema version after additive contact-knowledge migration. |
+| `TARGET_VERSION` | `18` | `src/db/database.ts` | Schema version after the contact-knowledge egress and custom-field-history migrations. |
 
 ## Decisions
 
@@ -152,6 +159,8 @@ The schema version is SQLite's `PRAGMA user_version`. Migrations 001–005 estab
 - **ADR-083:** Durable Multi-Package Theme Configuration and Restore-Before-Paint — adds migration 015's durable, validated theme-setting boundary.
 - **ADR-088:** Additive Contact-Knowledge Schema and Application-Owned Memory Registry — defines migration 016's new local knowledge tables and registry boundary.
 - **ADR-089:** Recoverable Memory Lifecycle and Contact-Operation Integrity — registers a foreground retention hook over the migration-016 lifecycle.
+- **ADR-081:** Retire AI-Proposed Fuel for Explicit Per-Item Permission — defines migration 017's verified, non-destructive fuel retirement.
+- **ADR-090:** Additive Custom-Field Value History and Deferred Contact Scope — defines migration 018 without weakening normalized current-value pairs.
 
 ## Gotchas
 
@@ -174,6 +183,7 @@ The schema version is SQLite's `PRAGMA user_version`. Migrations 001–005 estab
 17. **Store theme IDs, not colours.** Accent and background values are validated option IDs or NULL; palette hex resolution belongs in the theme layer, never in SQLite.
 18. **Migration 016 is additive-only.** Do not use it to reshape fuel, change custom-field tables, or introduce a user-writable Memory-type table.
 19. **Retention remains a launch hook.** The Memory and relationship trash sweep rechecks staleness in its own transaction; do not replace it with a timer or nest a writer transaction.
+20. **A data move must prove each source row before removal.** Count equality is insufficient; re-read the mapped destination and let an integrity failure roll the version step back.
 
 ## Related Systems
 
@@ -188,6 +198,7 @@ The schema version is SQLite's `PRAGMA user_version`. Migrations 001–005 estab
 - **Contact Import** — uses migration 012, serial write cores, and foreground recovery hooks for accepted selected-contact work.
 - **Contact Reconciliation** — uses migration 013, serial write cores, and foreground recovery for durable linked-contact review.
 - **Contact Knowledge** — uses migration 016 and a ready-gated foreground sweep for typed local knowledge retention.
+- **Custom fields** — uses migration 018's additive retained-value table while keeping the normalized current-value pair invariant.
 
 ## Changelog
 
@@ -207,3 +218,4 @@ The schema version is SQLite's `PRAGMA user_version`. Migrations 001–005 estab
 | 2026-08-26 | 20 | Added migration 013 for durable reconciliation sessions, narrow source memory, and bulk-review resolutions. |
 | 2026-09-02 | 23 | Added migration 015's durable package and per-package theme-preference columns. |
 | 2026-09-03 | 24.1 | Added migration 016's additive contact-knowledge schema and foreground retention hook. |
+| 2026-09-03 | 24.2 | Added migrations 017/018 for verified fuel carry-over, default-off Memory permission, and retained custom-field history. |
