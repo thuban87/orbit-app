@@ -87,6 +87,10 @@ export interface GridCardProps {
   onMessage?: () => void;
   onEditContact?: () => void;
   onSelect?: () => void;
+  /** Selection-mode presentation and card-level toggle behavior. */
+  selectionMode?: boolean;
+  selected?: boolean;
+  onToggleSelect?: () => void;
   /** The current binary favourite membership, owned by HomeScreen. */
   isFavourite?: boolean;
   onToggleFavourite?: () => void;
@@ -116,6 +120,9 @@ export function GridCard({
   onMessage,
   onEditContact,
   onSelect,
+  selectionMode = false,
+  selected = false,
+  onToggleSelect,
   isFavourite = false,
   onToggleFavourite,
   line3 = null,
@@ -131,13 +138,16 @@ export function GridCard({
     colors,
   );
   const recency = formatListRecency(lastContact, now);
-  const accessibilityLabel = buildRowAccessibilityDescription({
+  const baseAccessibilityLabel = buildRowAccessibilityDescription({
     name,
     category: categoryLabel,
     recency,
     isFavourite,
     displayState,
   });
+  const accessibilityLabel = selectionMode
+    ? `${baseAccessibilityLabel} ${selected ? "Selected." : "Not selected."}`
+    : baseAccessibilityLabel;
   const isSearchMode = searchResult !== undefined;
   const strongestMatch = searchResult?.matches[0];
   const searchExplanation = isSearchMode
@@ -168,7 +178,9 @@ export function GridCard({
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel}
       accessibilityActions={
-        accessibilityActions.length > 0 ? accessibilityActions : undefined
+        !selectionMode && accessibilityActions.length > 0
+          ? accessibilityActions
+          : undefined
       }
       onAccessibilityAction={(event) => {
         switch (event.nativeEvent.actionName) {
@@ -192,27 +204,62 @@ export function GridCard({
             break;
         }
       }}
-      onPress={onPress}
-      onLongPress={onLongPress}
+      onPress={selectionMode ? (onToggleSelect ?? onPress) : onPress}
+      onLongPress={selectionMode ? undefined : onLongPress}
       style={styles.card}
     >
       <GlassSurface blurAvailable={false} density="dense" style={styles.surface}>
-        <Pressable
-          testID={`dashboard-grid-card-favourite-${contactId}`}
-          accessibilityRole="button"
-          accessibilityLabel={isFavourite ? "Remove favourite" : "Add favourite"}
-          accessibilityState={{ selected: isFavourite }}
-          hitSlop={SPACING.sm}
-          onPress={onToggleFavourite}
-          style={styles.favouriteButton}
-        >
-          <Icon
-            name="favorite"
-            state={isFavourite ? "active" : "default"}
-            size="md"
-            tone={isFavourite ? "accent" : "textSecondary"}
-          />
-        </Pressable>
+        {selectionMode ? (
+          <Pressable
+            testID={`dashboard-grid-card-select-${contactId}`}
+            accessibilityRole="checkbox"
+            accessibilityLabel={`${selected ? "Deselect" : "Select"} ${name}`}
+            accessibilityState={{ checked: selected }}
+            hitSlop={SPACING.sm}
+            onPress={onToggleSelect}
+            style={styles.selectionButton}
+          >
+            <Icon
+              name="select"
+              state={selected ? "active" : "default"}
+              size="md"
+              tone={selected ? "accent" : "textSecondary"}
+            />
+          </Pressable>
+        ) : null}
+
+        {selectionMode ? (
+          <View
+            testID={`dashboard-grid-card-favourite-${contactId}`}
+            accessible={false}
+            accessibilityElementsHidden
+            style={styles.favouriteButton}
+          >
+            <Icon
+              name="favorite"
+              state={isFavourite ? "active" : "default"}
+              size="md"
+              tone={isFavourite ? "accent" : "textSecondary"}
+            />
+          </View>
+        ) : (
+          <Pressable
+            testID={`dashboard-grid-card-favourite-${contactId}`}
+            accessibilityRole="button"
+            accessibilityLabel={isFavourite ? "Remove favourite" : "Add favourite"}
+            accessibilityState={{ selected: isFavourite }}
+            hitSlop={SPACING.sm}
+            onPress={onToggleFavourite}
+            style={styles.favouriteButton}
+          >
+            <Icon
+              name="favorite"
+              state={isFavourite ? "active" : "default"}
+              size="md"
+              tone={isFavourite ? "accent" : "textSecondary"}
+            />
+          </Pressable>
+        )}
 
         <View style={styles.avatarArea}>
           <View
@@ -334,6 +381,16 @@ const styles = StyleSheet.create({
     marginBottom: -SPACING.sm,
     marginEnd: -SPACING.sm,
     marginTop: -SPACING.sm,
+  },
+  selectionButton: {
+    alignItems: "center",
+    justifyContent: "center",
+    left: SPACING.xs,
+    minHeight: SPACING["2xl"],
+    minWidth: SPACING["2xl"],
+    position: "absolute",
+    top: SPACING.xs,
+    zIndex: 1,
   },
   avatarArea: {
     alignItems: "center",

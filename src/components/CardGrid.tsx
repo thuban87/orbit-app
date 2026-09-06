@@ -19,6 +19,9 @@ export interface CardGridProps {
   onMessage?: (contactId: number) => void;
   onEditContact?: (contactId: number) => void;
   onSelect?: (contactId: number) => void;
+  selectionMode?: boolean;
+  selectedIds?: ReadonlySet<number>;
+  onToggleSelect?: (contactId: number) => void;
   favouriteOverlay: ReadonlyMap<number, boolean>;
   onToggleFavourite: (contactId: number, nextMembership: boolean) => void;
   line3ByContactId: ReadonlyMap<number, { text: string; iconName?: IconName }>;
@@ -54,6 +57,9 @@ export function CardGrid({
   onMessage,
   onEditContact,
   onSelect,
+  selectionMode = false,
+  selectedIds = new Set<number>(),
+  onToggleSelect,
   favouriteOverlay,
   onToggleFavourite,
   line3ByContactId,
@@ -81,6 +87,8 @@ export function CardGrid({
         line3ByContactId,
         searchResultsByContactId,
         isSearchMode,
+        selectionMode,
+        selectedIds,
       }}
       numColumns={numColumns}
       keyExtractor={(item) => String(item.id)}
@@ -128,6 +136,11 @@ export function CardGrid({
               onEditContact ? () => onEditContact(item.id) : undefined
             }
             onSelect={onSelect ? () => onSelect(item.id) : undefined}
+            selectionMode={selectionMode}
+            selected={selectedIds.has(item.id)}
+            onToggleSelect={
+              onToggleSelect ? () => onToggleSelect(item.id) : undefined
+            }
             isFavourite={renderedMembership}
             onToggleFavourite={() =>
               onToggleFavourite(item.id, !renderedMembership)
