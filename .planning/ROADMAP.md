@@ -437,8 +437,30 @@ All v1.0 commits are local on `main` and have NOT been pushed.
   5. Bulk Archive is the recoverable removal behind confirmation with permanent deletion staying a manual per-contact action on the Archived list, and after a successful ordinary bulk operation selection mode persists until the user exits explicitly, with Back exiting multi-select before navigating (CARDV-10/12)
 
 **Canonical refs**: docs/dossier/milestone-2/phase-07-dashboard-card-view-dossier-v0.2.md; docs/dossier/milestone-2/planning-notes/phase-07-planning-notes.md
-**Schema**: none
-**Plans**: TBD
+**Schema**: none (D-03 — no migration; every bulk op composes existing writers; TARGET_VERSION=20 / migration head 020 verified on disk at plan time)
+**Plans**: 7 plans (5 waves)
+**Wave 1**
+
+- [ ] 28-01-PLAN.md — TRACER: avatar-first grid renders real contacts end-to-end (status ring+glyph, favourite star) + 7 new icon-registry entries [CARDV-01/02/03]
+
+**Wave 2** *(blocked on Wave 1 completion; 02/03/04 parallel — disjoint files)*
+
+- [ ] 28-02-PLAN.md — bulk-actions-dao: extract non-mutexed *Cores + 8 atomic bulk composers (recency spine, immutable event trail, single-column category/frequency) [CARDV-07/08/10/11]
+- [ ] 28-03-PLAN.md — dashboard-selection-store: mode / selectedIds / frozen universe (pure in-memory) [CARDV-05/06/12]
+- [ ] 28-04-PLAN.md — Card content: compactness-biased adaptive line 3 + search-mode rendering (reuse shared reads) [CARDV-02/03]
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
+- [ ] 28-05-PLAN.md — Long-press context menu (locked 8-item order, routed; no swipe, no Delete/Archive) [CARDV-04]
+
+**Wave 4** *(blocked on Wave 3 completion)*
+
+- [ ] 28-06-PLAN.md — Multi-select mode: entry (long-press Select + overflow Select Contacts), top-left circles, control-area lock/replace, Select All over frozen universe, Back-exits-first [CARDV-05/06/12]
+
+**Wave 5** *(blocked on Wave 4 completion)*
+
+- [ ] 28-07-PLAN.md — Bulk-action surface + count-aware Log routing (1 individual / 2+ Group Log) + confirm/Undo + Archive-vanish + reduced-motion/a11y [CARDV-07/08/09/10/11/12]
+
 **UI hint**: yes
 
 ### Phase 29: Orrery Camera, Scale & Exploration
