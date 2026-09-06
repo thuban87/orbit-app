@@ -1,10 +1,10 @@
 ---
 schema_version: 1
-open_count: 32
+open_count: 35
 waived_count: 0
 fixed_count: 6
-total_count: 38
-last_updated: 2026-09-06T03:53:22.374Z
+total_count: 41
+last_updated: 2026-09-06T08:31:42.020Z
 ---
 
 # Broken Windows Ledger
@@ -53,6 +53,9 @@ last_updated: 2026-09-06T03:53:22.374Z
 | 36 | 27 | unrun-verify | src/screens/HomeScreen.tsx |  | Plan 27-04 Pixel/TalkBack UAT for line-three content and optimistic favourite success/failure remains pending end-of-phase device verification. | open |  | 2026-09-06T03:32:24.036Z |  |
 | 37 | 27 | unrun-verify | src/screens/HomeScreen.tsx |  | Physical Pixel swipe, TalkBack, and FAB regression UAT remains unrun because the existing expo-web-browser dependency fault prevents the DEBUG app from starting. | open |  | 2026-09-06T03:40:48.457Z |  |
 | 38 | 27 | unrun-verify | src/screens/HomeScreen.tsx |  | Phase 27 List search/motion Pixel UAT remains unrun because the pre-existing DEBUG expo-web-browser dependency prevents app launch; no dependency change was authorized. | open |  | 2026-09-06T03:53:22.374Z |  |
+| 39 | 28 | stub | src/components/GridCard.tsx | 158 | Third card row is intentionally reserved for Plan 28-04 adaptive context and search content. | open |  | 2026-09-06T08:31:30.372Z |  |
+| 40 | 28 | deviation | src/screens/HomeScreen.tsx |  | Corrected stale renderer documentation after CardGrid replacement. | open |  | 2026-09-06T08:31:30.547Z |  |
+| 41 | 28 | unrun-verify | src/components/CardGrid.tsx |  | Pixel UAT remains required for card-grid layout, text scaling, status visuals, navigation, and optimistic favourite feedback. | open |  | 2026-09-06T08:31:42.020Z |  |
 
 ````json
 [
@@ -510,6 +513,42 @@ last_updated: 2026-09-06T03:53:22.374Z
     "status": "open",
     "reason": "",
     "recorded_at": "2026-09-06T03:53:22.374Z",
+    "resolved_at": null
+  },
+  {
+    "id": 39,
+    "kind": "stub",
+    "phase": "28",
+    "file": "src/components/GridCard.tsx",
+    "line": 158,
+    "description": "Third card row is intentionally reserved for Plan 28-04 adaptive context and search content.",
+    "status": "open",
+    "reason": "",
+    "recorded_at": "2026-09-06T08:31:30.372Z",
+    "resolved_at": null
+  },
+  {
+    "id": 40,
+    "kind": "deviation",
+    "phase": "28",
+    "file": "src/screens/HomeScreen.tsx",
+    "line": null,
+    "description": "Corrected stale renderer documentation after CardGrid replacement.",
+    "status": "open",
+    "reason": "",
+    "recorded_at": "2026-09-06T08:31:30.547Z",
+    "resolved_at": null
+  },
+  {
+    "id": 41,
+    "kind": "unrun-verify",
+    "phase": "28",
+    "file": "src/components/CardGrid.tsx",
+    "line": null,
+    "description": "Pixel UAT remains required for card-grid layout, text scaling, status visuals, navigation, and optimistic favourite feedback.",
+    "status": "open",
+    "reason": "",
+    "recorded_at": "2026-09-06T08:31:42.020Z",
     "resolved_at": null
   }
 ]

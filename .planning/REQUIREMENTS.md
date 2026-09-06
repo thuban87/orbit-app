@@ -112,9 +112,9 @@ category's phase (see Traceability).
 
 ### CARDV — Dashboard Card View (Phase 28)
 
-- [ ] **CARDV-01**: User browses a compact avatar-first grid — 3 columns on a normal portrait phone (~9 cards visible), 2 on narrow devices/large text, more on wide devices — with floating avatar bubbles rather than boxed cards
-- [ ] **CARDV-02**: Each card shows name, recency, and one compact adaptive context item (category and literal status text omitted); status renders as a thin status-colored avatar ring plus a small status glyph, never color-only; snoozed shows a neutral ring and snooze glyph
-- [ ] **CARDV-03**: An always-visible Favorite star toggles binary membership; during search the card keeps its geometry showing name, matched-field label, and the strongest highlighted snippet
+- [x] **CARDV-01**: User browses a compact avatar-first grid — 3 columns on a normal portrait phone (~9 cards visible), 2 on narrow devices/large text, more on wide devices — with floating avatar bubbles rather than boxed cards
+- [x] **CARDV-02**: Each card shows name, recency, and one compact adaptive context item (category and literal status text omitted); status renders as a thin status-colored avatar ring plus a small status glyph, never color-only; snoozed shows a neutral ring and snooze glyph
+- [x] **CARDV-03**: An always-visible Favorite star toggles binary membership; during search the card keeps its geometry showing name, matched-field label, and the strongest highlighted snippet
 - [ ] **CARDV-04**: Tap opens Profile; long-press opens a per-contact menu (View Profile, Quick Log, Log Interaction, Message, Edit Contact, Favorite/Unfavorite, Snooze/Unsnooze, Select) — Delete and Archive excluded from it; Card View does not duplicate List swipes
 - [ ] **CARDV-05**: User can enter multi-select from the long-press menu or Dashboard overflow Select Contacts; selection circles appear only in selection mode, card taps toggle selection, and the selected count is displayed
 - [ ] **CARDV-06**: Multi-select locks and replaces the Dashboard control area with selection actions; Select All operates over the result universe frozen when selection began
