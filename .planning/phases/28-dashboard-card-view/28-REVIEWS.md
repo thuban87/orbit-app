@@ -1,177 +1,629 @@
 ---
 phase: 28
+cycle: 2
 reviewers: [codex, claude]
-reviewed_at: 2026-09-06T06:33:28Z
+reviewed_at: 2026-09-06T07:09:17Z
 plans_reviewed: [28-01-PLAN.md, 28-02-PLAN.md, 28-03-PLAN.md, 28-04-PLAN.md, 28-05-PLAN.md, 28-06-PLAN.md, 28-07-PLAN.md]
+revision_commit: 81ab2c2
 models:
-  codex: "gpt-5.6-terra (reasoning=low)"
+  codex: "gpt-5.6-terra (reasoning=medium)"
   claude: "claude-opus-4-8 (read-only subagent)"
 model_sources:
   codex: "banner"
-  claude: "subagent"
+  claude: "orchestrator-known"
 ---
 
-# Cross-AI Plan Review — Phase 28 (Dashboard Card View)
+# Cross-AI Plan Review — Phase 28 (Dashboard Card View) — CYCLE 2
+
+Re-review of the CURRENT plans on disk after the cycle-1 revision (commit `81ab2c2`, which
+incorporated cycle-1 feedback: 2 HIGH + 12 actionable). Two independent source-grounded reviewers:
+
+- **Codex** (`gpt-5.6-terra`, reasoning=medium) — ran in-repo with file access; verified claims against source.
+- **Claude** (`claude-opus-4-8`) — ran as a **read-only subagent** (per project convention: the skill's
+  built-in `claude -p` lane fails on a Write-permission gap; a read-only subagent is the reliable path and
+  keeps the pass independent of the orchestrator's write context). Verified every finding against code on disk.
+
+Both reviewers, and the orchestrator's own independent spot-verification, opened the actual DAOs, stores,
+navigation types, and HomeScreen — not just the plan text — per the project's "review the code, not the diff"
+mandate.
 
 ## Consensus Summary
 
-Both reviewers independently verified the plans against the code on disk (every finding below carries `file:line` evidence; neither review ran without repo access). Both converge on a strong verdict for the phase's highest-risk work — the atomic bulk data layer. The core/wrapper extraction idiom the plans copy is the repo's shipped pattern (`bulk-review-dao.ts:72-137`), the non-reentrant write mutex is real and correctly respected (`mutex.ts:32-36`, `transaction.ts:49-64`), `bulkQuickLog` routes through the sole recency writer (`recomputeLastContactCore`, `recency-dao.ts:159-176`), and `bulkArchive` preserves the immutable lifecycle-event trail (`contacts-dao.ts:541-562`, ADR-025). **No decision reversal was found** — ADR-018 (no bulk delete; archive reversible; purge stays manual per-contact) and ADR-075 (binary favourite membership, rank never surfaces) are upheld; no migration ships (D-03); no network is introduced on any read path; `localDateTime()`/`formatLocalDate()` is mandated.
+**Both reviewers agree: the revised plan set is substantially sound. HIGH concerns: 0.** No decision
+reversal (D-01..D-12, ADR-010/018/024/025/071/075, HANDOFF), no local-first violation (no network on any
+read/write path, no migration — the frequency guard rides the *existing* migration-011 CHECK, `localDateTime()`
+not `toISOString`, theme tokens gated by `check:colors`, animation reduced-motion-gated with an explicit
+no-per-frame-setState prohibition), and the single-recency-writer spine (ADR-010/024/071) plus immutable-event
+trail (ADR-025) are composed, never bypassed.
 
-The reviewers **diverge on severity**. Codex raised three HIGH concerns; Claude raised none. The aggregator adjudicated each against the source:
+### Both cycle-1 HIGH fixes verified SOUND (independently, against real code)
 
-- Codex HIGH-1 (Group Log preloaded participants) — **UPHELD as HIGH.** Real gap.
-- Codex HIGH-2 (bulk Quick Log Undo contract) — **UPHELD as HIGH.** Real gap.
-- Codex HIGH-3 (revision-bump: "copy `setContactPhotoCore`" would bump N times) — **DOWNGRADED to LOW (clarity).** Plan 02's explicit core specs (28-02:105-106) define the new category/frequency cores as bare single-column UPDATEs with no bump, and D-04 (28-02:22) mandates the bump exactly once per bulk transaction; the "copy the `setContactPhotoCore` shape" parenthetical (28-02:109) enumerates only the `?`-bound UPDATE + `changes===1` guard, not the bump. Claude independently reached the same conclusion (Plan 02 "correctly" mirrors the shape). An executor following the explicit core defs produces correct code; the only residual is wording that could be tightened.
+- **HIGH-1 (CARDV-09 — GroupLog route param + Phase 33 deferral): SOUND.** `src/navigation/types.ts:34` is
+  currently `GroupLog: undefined;`; the GroupLog screen is a placeholder (`FabActionPlaceholders.tsx:41`,
+  wired at `DashboardStack.tsx:38`). Extending the param to `{ participantIds?: number[] } | undefined` is
+  additive and serializable, matches the file's route-param convention, and does **not** reverse D-10 —
+  Group Event domain behaviour stays Phase 33 (`GroupEvents` is already a Phase-33 placeholder). The plan's
+  claim that `universal-fab-logic.ts:92` "never preselects" is FAB-scoped (not a multi-select constraint) is
+  correct — verified it sits inside `resolveFabTarget`'s `case "GroupLog"`.
+- **HIGH-2 (CARDV-08 — bulkQuickLog receipt + atomic undoBulkQuickLog): SOUND.** Verified: the write mutex
+  is non-reentrant (`mutex.ts:32-36`; `transaction.ts` documents the nested-txn hang); `insertInteractionCore`
+  / `recomputeLastContactCore` are already exported non-mutexed cores (`recency-dao.ts:425-428`);
+  `deleteInteractionCore` is correctly identified as the yet-to-be-extracted inner body of `deleteTouchpoint`
+  (`recency-dao.ts:313-346`, which today does **not** bump); `bumpDataRevisionCore` is the single revision bump
+  (`data-revision-dao.ts:5-21`). Composing N non-mutexed cores in one outer transaction with a single bump is
+  correct — `last_contact` lands on `now` (correlated `MAX(occurred_at)`), no deadlock, no double-bump. The
+  `direction:"outbound"` pin is genuinely required (insert defaults direction to `null` at `recency-dao.ts:205`)
+  and the `connected:1` pin is required for the `rarely_responds = 0 OR i.connected = 1` recompute filter.
+
+### The 28-07 `<flagged_assumption>` (per-action eligibility) is a correctly-recorded owner-bucket escalation
+
+Both reviewers confirm its facts against migration 011 (`CHECK (tracking_enabled = 0 OR interval_days IS NOT
+NULL)` at line 37 makes setting a cadence on an Unbound contact schema-legal, exactly as stated) and treat it
+as **RESOLVED** (owner decision surfaced with a safe default) — not an unresolved actionable finding.
 
 ### Agreed Strengths
-- Mutex-safe composition: compose non-mutexed `*Core`s inside one `inWriteTransaction`, never loop a mutexed top-level writer (both reviewers, `transaction.ts:49-64`, `mutex.ts:32-36`).
-- `bulkQuickLog` uses the single recency writer spine; `bulkArchive` keeps the immutable event trail (both, `recency-dao.ts:414`, `contacts-dao.ts:536-563`).
-- Category/frequency use new single-column cores instead of the metadata-clobbering `updateContactMetadataCore`; frequency guard respects the migration-011 `CHECK(interval_days > 0)` + `contacts_prevent_cadence_clear` trigger (both, `contacts-dao.ts:637-658`, `011-...:36,181-186`).
-- Ephemeral selection store correctly modeled (frozen universe, no persistence), unlike the persisted query store (both).
-- GridCard reuses ListRow's verified shared status/ring/favourite primitives — no forked source, D-11 (both, `ListRow.tsx:105-275`, `contact-card-ring.ts`).
 
-### Agreed Concerns
-- **Plan 04 line-3 selection** — both flag that the compactness bias must not disturb the shared candidate read/tiering: codex on the type-only-import purity contradiction and the `viewMode === "list"` candidate gate; Claude on the additive-vs-tiered ranking mismatch. Same subsystem, complementary findings.
+- The highest-risk plan, **28-02 (bulk-actions-dao)**, is correct-by-construction and matches every referenced
+  writer on disk: one outer `inWriteTransaction` per bulk op, non-mutexed `*Core` composition, immutable
+  lifecycle events, recency recompute, single revision bump, and an unusually strong node:sqlite test plan
+  (both reviewers rate its correctness highly).
+- **28-01** closes the cycle-1 CardGrid prop-contract gap — the full shared list-surface contract
+  (data-gating, skeleton-vs-empty, pull-to-refresh + error-retry, header, bottom clearance) is threaded
+  explicitly, mapping to real FlatList props at `HomeScreen.tsx:1055-1118`.
+- **28-04** correctly applies the cycle-1 fix: compactness is a within-tier tiebreak (not an additive score),
+  so a compact "other" candidate can never outrank an imminent meaningful date; a separate short prompt list
+  avoids reusing List's full-sentence prompts.
+- **28-05** composes the menu from `Sheet`/`overlay-base` (not the text-only `OverflowMenu`) and adds
+  card-level `accessibilityActions` (cycle-1 fixes reflected); Delete/Archive excluded, no swipe duplication.
+- **28-03/06** enforce the frozen-universe snapshot in the store (`enterSelection` re-entry no-op;
+  `removeFromUniverse` drops from both sets) and replace (not add-a-bottom-bar) the control area; Back exits
+  selection before nav.
+
+### Agreed / highest-priority Concern
+
+- **Frozen-universe enforcement gap across the refresh path (MEDIUM — codex, orchestrator-verified).** The
+  store correctly never *recomputes* `frozenUniverse`, but the renderer/toggle path is not fenced to it.
+  `HomeScreen` re-queries `rows` on focus (`HomeScreen.tsx:678`), foreground/AppState-active (`:690`), and
+  pull-to-refresh (`:706`), **and** 28-07 refreshes the shared model after every committed bulk op (`28-07`
+  Task 2). 28-06 renders the live `rows` and routes every card tap to `toggle(id)` (`28-03:85` accepts any id;
+  `28-06:92,115`). So a row that enters the live result set *after* selection began (e.g. a background
+  "mark-contacted" write, or a data change from a bulk op) can render a card and be toggled/acted on — an
+  id outside the snapshot. Select All is safe (uses `frozenUniverse`); toggle and render are not. This
+  under-enforces D-12 / SS S / Pitfall-6 (it strengthens, rather than reverses, the decision — so MEDIUM, not
+  a reversal-HIGH). Claude's L6 touches the adjacent angle (Select-All must seed from the *full* result array,
+  not a windowed subset).
 
 ### Divergent Views
-- **Group Log preloaded participants (CARDV-09).** Codex: HIGH blocker — the `GroupLog` route takes no params (`navigation/types.ts:34`), is a placeholder (`DashboardStack.tsx:38`), and the FAB deliberately "never preselects" (`universal-fab-logic.ts:92`), so Plan 07 cannot route 2+ "with participants preloaded" as written. Claude: did not flag. Adjudication: UPHELD — the requirement cannot be delivered without a route-param contract the plan does not define.
-- **Bulk Quick Log Undo (CARDV-08).** Codex: HIGH — `createQuickLogUndoController` accepts one `interactionId` (`universal-fab-logic.ts:56`), `bulkQuickLog` writes N and returns no batch receipt (28-02:23), so Plan 07's "reuse the existing fast-action Undo contract" (28-07:118) can't reverse a batch. Claude: did not flag Undo (its Plan 02 MEDIUM was the interaction *shape*, a separate point). Adjudication: UPHELD — a genuine reversibility gap.
-- **Revision-bump contradiction.** Codex HIGH vs Claude "correct." Adjudicated to LOW clarity (see above).
+
+- **28-02 photo-core boundary citation.** Codex (MEDIUM): the plan's parenthetical that the revision bump
+  "lives in `setContactPhoto`'s public wrapper, `contacts-dao.ts:658`" is **factually inverted** — the bump is
+  *inside* `setContactPhotoCore` (line 658); the public wrapper `setContactPhoto` (661-670) merely delegates.
+  An implementer reading the core will see a bump the plan attributes elsewhere. Claude reads the plan's
+  *instruction* ("copy only the single-column UPDATE + `changes===1` guard, not the trailing bump") as
+  correctly handled and does not flag the citation. **Orchestrator adjudication:** codex is factually right —
+  the bump is in the Core at :658, not the wrapper; the *instruction* is nonetheless clear and correct. Worth
+  a one-line citation fix so a future reader isn't confused, but low functional risk.
+
+## Actionable (MEDIUM / LOW) findings — not yet incorporated into the plans
+
+| # | Sev | Plan(s) | Finding | Fix needed in PLAN.md |
+|---|-----|---------|---------|-----------------------|
+| A1 | MEDIUM | 28-03 / 28-06 / 28-07 | Frozen-universe not fenced on the toggle/render path; live re-query + post-op refresh can introduce out-of-universe ids that render and are selectable | 28-03: make `toggle(id)` a no-op unless `frozenUniverse.includes(id)` (+ test). 28-06: render only `rows` whose id ∈ `frozenUniverse` while selection is active. 28-07: add an acceptance criterion depending on those before bulk-refresh wiring lands (+ UAT: refresh mid-selection introduces no selectable new id) |
+| A2 | MEDIUM | 28-07 | Net-new bulk **Snooze preset** picker and bulk **Set Category** picker are unspecified (no affordance/testID/confirm+announce copy/a11y) in an otherwise meticulous surface | Specify both pickers (which of `PRESET_MODIFIERS`; category source + component), testIDs (`bulk-snooze-preset-{id}`/`bulk-category-{id}`), and confirm/announce copy in Task 2 |
+| A3 | MEDIUM | 28-02 | Photo-core citation inverted: bump is inside `setContactPhotoCore` (`contacts-dao.ts:658`), not the public wrapper (divergent — codex flags, Claude reads instruction as handled; orchestrator confirms codex factually correct) | Reword truths line 24 / Task 1 (:102): "`setContactPhotoCore` itself owns its bump; copy only its bound single-column UPDATE + `changes===1` guard, never its bump." Drop the "lives in the public wrapper :658" claim |
+| A4 | MEDIUM | 28-04 | Selector is told to *mirror* `list-row-selection.ts`'s **private** `formatLocalDate` (lines 30-35) rather than import the shared helper — risks perpetuating duplicated local-date logic (CLAUDE.md: use `formatLocalDate()` from `src/utils/dates.ts`) | Amend Task 1 to require importing `formatLocalDate` from `src/utils/dates.ts` for imminent-date comparisons; prohibit a new/mirrored local formatter |
+| A5 | LOW | 28-02 | `undoBulkQuickLog` described "behavior-identical to N single-contact `deleteTouchpoint` undos", but it adds a `bumpDataRevisionCore` `deleteTouchpoint` omits (more correct, not identical) | Reword the truth line to "identical per-row reversal, plus a single data-revision bump the single-row path omits" |
+| A6 | LOW | 28-05 | Long-press menu "Snooze" routes to "the existing single-contact snooze flow" but `snoozeContact` needs a `SnoozePreset` — the concrete affordance/default is unnamed | Name the snooze-preset affordance the menu reuses (or state the default preset) |
+| A7 | LOW | 28-06 | Frozen universe seeded from "current rows' ids" is correct only if `rows` is the full result set (it is — FlatList virtualizes render only), but the assumption is implicit | Add a one-line note that `currentEligibleIds` must be the full result array, never a windowed subset |
+| A8 | LOW | 28-01 / 28-02 / 28-03 | Frontmatter/label tidy: 28-02 is `wave: 1` in frontmatter but wave 2 in the roadmap (disjoint files, harmless); 28-03 `depends_on:[28-01]` is spurious for a pure Zustand store | Align the roadmap wave label; relax 28-03 to `depends_on: []` (harmless, improves parallelism) |
+
+**Not counted (already resolved / not a plan change):** the per-action-eligibility `<flagged_assumption>`
+(properly recorded owner escalation — RESOLVED); Claude L2 (`bulkAddFavourites` idempotency — already covered
+by 28-02 Task 3); Claude L5 (28-04 `HomeScreen.tsx:601` gate shape — the plan already instructs the correct
+widening; a verify-at-execution note, not a plan gap); the CARDV-09 2+→placeholder path (per D-10; owner
+visibility only, do not reopen).
+
+**Counts — HIGH: 0. Actionable MEDIUM/LOW: 8 (A1-A8; 4 MEDIUM, 4 LOW).**
+
+---
 
 ## Codex Review
 
-_Model: gpt-5.6-terra (reasoning=low). Source-grounded (file:line citations present)._
 
-## Summary
+Overall: the revised plan set is substantially sound. It preserves the locked no-migration, composed-writer, immutable-event, local-only, theme-token, and Group Event ownership decisions. I found no decision reversal or local-first invariant violation. One medium cross-plan gap remains around enforcing the frozen selection universe after dashboard refreshes.
 
-The plan sequence is strong on the core data invariants: it recognizes the non-reentrant write mutex, preserves the sole recency writer, and treats bulk archive as lifecycle-event-bearing rather than a raw update. However, two implementation blockers need resolution before execution: Group Log cannot currently receive preloaded participants, and bulk Quick Log has no viable atomic Undo design. There is also a contradiction in the proposed extracted-core/bump-revision contract.
+## Cycle-1 HIGH fix verdicts
 
-## Strengths
+- **HIGH-1 / CARDV-09 — Sound.** Plan 07 changes only `DashboardStackParamList.GroupLog` to `{ participantIds?: number[] } | undefined` and routes selected numeric IDs; it explicitly defers consumption. The actual route is currently a placeholder: `src/navigation/types.ts:34`, `src/navigation/tabs/DashboardStack.tsx:38`, and `src/screens/placeholders/FabActionPlaceholders.tsx:41-48`. This is an additive handoff compatible with D-10, not implementation of Group Event behavior.
 
-- Plan 01 correctly replaces a legacy, non-interactive Card implementation. The current card branch renders `ContactCard` inside HomeScreen’s list `renderItem` at [HomeScreen.tsx](/home/bwales/projects/orbit-app/src/screens/HomeScreen.tsx:1055), and that component uses a literal `★` rather than the semantic icon registry at [ContactCard.tsx](/home/bwales/projects/orbit-app/src/components/ContactCard.tsx:181). The planned `GridCard`/`CardGrid` split is an appropriate correction.
+- **HIGH-2 / CARDV-08 — Sound as planned, but not yet implemented on disk.** The mutex is non-reentrant (`src/db/mutex.ts:32-35`; `src/db/transaction.ts:12-23`). Existing non-mutexed recency cores are real: `insertInteraction` and `recomputeLastContact` at `src/db/recency-dao.ts:159-214`, exported as cores at `src/db/recency-dao.ts:425-428`. `bumpDataRevisionCore` performs one singleton revision increment at `src/db/data-revision-dao.ts:5-21`. `deleteInteractionCore` does not yet exist—the current mutexed `deleteTouchpoint` body is at `src/db/recency-dao.ts:313-345`—but Plan 02 specifies extracting precisely that body, including scoped lookup/delete, tombstone insertion, and recency recompute. Composing it once per receipt entry in one outer transaction, then bumping revision once, is correct and avoids both deadlock and stale `last_contact`.
 
-- The card plans correctly reuse Dashboard-owned semantics rather than rederive them. `DashboardRow` already provides nullable `status`, `last_contact`, `snooze_until`, and favorite membership storage at [dashboard-read.ts](/home/bwales/projects/orbit-app/src/db/dashboard-read.ts:91). `ListRow` already composes snooze display state and ring rendering at [ListRow.tsx](/home/bwales/projects/orbit-app/src/components/ListRow.tsx:105).
+## 28-01 — Grid tracer and icon registry
 
-- Plan 02 correctly identifies the mutex risk. Nested `inWriteTransaction` calls permanently deadlock by design, as documented and implemented in [transaction.ts](/home/bwales/projects/orbit-app/src/db/transaction.ts:12). The proposed “one outer transaction plus non-mutexed cores” is the required model.
+**Summary:** A well-scoped renderer tracer. It correctly replaces the per-item card branch with a distinct grid scroll container while retaining the shared data, refresh, empty, error, and optimistic-favourite paths.
 
-- The recency and archive portions of Plan 02 align with actual code. `insertInteractionCore` and `recomputeLastContactCore` are exported specifically for caller-owned transactions at [recency-dao.ts](/home/bwales/projects/orbit-app/src/db/recency-dao.ts:414), while archive currently pairs its guarded update with `recordEventCore` at [contacts-dao.ts](/home/bwales/projects/orbit-app/src/db/contacts-dao.ts:536).
+**Strengths**
 
-- Plan 03’s ephemeral Zustand model fits the existing store conventions and correctly freezes result membership. It avoids durable query-store behavior, which currently performs persisted writes via its settings-facing actions.
+- Uses the existing row model, whose nullable card inputs are explicit in `src/db/dashboard-read.ts:91-110`.
+- Preserves the existing membership-only favourite behavior from `src/screens/HomeScreen.tsx:1071-1079`; it does not expose or sort on rank.
+- Correctly composes existing status primitives: `ringVisual` resolves tokenized ring colors/widths (`src/components/contact-card-ring.ts:45-61`) and `StatusGlyph` resolves through the single registry (`src/components/icons/StatusGlyph.tsx:48-55`).
+- Explicitly carries the FlatList surface contract that currently lives at `src/screens/HomeScreen.tsx:1055-1118`, avoiding a blank/errorless Card mode.
 
-- Plan 04 correctly builds on a bounded, batched knowledge read: `readLine3Candidates` already deduplicates contact IDs and fetches candidate sources in three bounded reads, rather than per-row queries, at [dashboard-knowledge-read.ts](/home/bwales/projects/orbit-app/src/db/dashboard-knowledge-read.ts:161). Birthday exclusion is already implemented defensively in the list selector at [list-row-selection.ts](/home/bwales/projects/orbit-app/src/logic/list-row-selection.ts:42).
+**Concerns**
 
-- Plan 06’s control-area replacement is compatible with the actual screen layout: `DashboardControlRow`, search, and view toggle are distinct regions at [HomeScreen.tsx](/home/bwales/projects/orbit-app/src/screens/HomeScreen.tsx:982). It can genuinely replace them without adding a bottom bar.
+- None found.
 
-## Concerns
+**Suggestions**
 
-- **HIGH — Plan 07 cannot route 2+ selected contacts to Group Log with participants preloaded.** `GroupLog` is explicitly typed with no params at [navigation/types.ts](/home/bwales/projects/orbit-app/src/navigation/types.ts:30), its current screen is a placeholder at [DashboardStack.tsx](/home/bwales/projects/orbit-app/src/navigation/tabs/DashboardStack.tsx:37), and the FAB deliberately states Group Log “never preselects” at [universal-fab-logic.ts](/home/bwales/projects/orbit-app/src/components/universal-fab-logic.ts:91). This is a real phase-ordering/API blocker, not wiring work inside HomeScreen.
+- No required plan change.
 
-- **HIGH — Plan 07’s “small bulk Quick Log + Undo” is unspecified and cannot reuse the existing single-interaction Undo contract.** `bulkQuickLog` is planned to write N interactions, while `createQuickLogUndoController` accepts exactly one `{contactId, interactionId}` at [universal-fab-logic.ts](/home/bwales/projects/orbit-app/src/components/universal-fab-logic.ts:54). `runQuickLog` receives one returned interaction ID from `recordTouchpoint` at [quick-log-command.ts](/home/bwales/projects/orbit-app/src/services/quick-log-command.ts:86). The plan must define a returned batch receipt and an atomic batch-reversal writer—or drop Undo for bulk Quick Log.
+**Risk Assessment:** **LOW.** The plan is additive, presentation-only, and accurately follows existing dashboard renderer seams.
 
-- **HIGH — Plan 02 contradicts itself on revision bumps in extracted cores.** It requires all cores to omit `bumpDataRevisionCore`, with each bulk composer bumping once. But it says category/frequency cores should copy `setContactPhotoCore`; the actual photo core itself calls `bumpDataRevisionCore` at [contacts-dao.ts](/home/bwales/projects/orbit-app/src/db/contacts-dao.ts:637). Copying that full shape violates the “exactly once per bulk transaction” invariant. The new category/frequency cores need a no-bump core plus a public transaction-owning wrapper, matching the bulk-review pattern.
+## 28-02 — Bulk actions DAO
 
-- **MEDIUM — Plan 04 has an internally conflicting purity criterion.** It directs `card-line3-selection.ts` to import the candidate type from `dashboard-knowledge-read`, but its acceptance criterion says the file must import “no `src/db` module.” The existing pure selector does use a type-only DB import at [list-row-selection.ts](/home/bwales/projects/orbit-app/src/logic/list-row-selection.ts:1). Permit type-only imports, or move the candidate type to a neutral module.
+**Summary:** The highest-risk plan is conceptually correct: it uses one outer write transaction, non-mutexed per-contact cores, immutable lifecycle events, recency recomputation, and one revision bump. Its test plan is unusually strong.
 
-- **MEDIUM — Plan 04’s claim that it will reuse the existing candidate read needs an explicit change to the current view-mode gate.** HomeScreen only reads candidates when `query.viewMode === "list"` at [HomeScreen.tsx](/home/bwales/projects/orbit-app/src/screens/HomeScreen.tsx:601). The plan must amend that condition to include normal Card mode; otherwise Card mode has no candidate data to select from.
+**Strengths**
 
-- **MEDIUM — Plan 05 does not meet its own accessibility requirement for card-level actions.** Making menu rows accessible after opening the menu is not equivalent to exposing actions on the card. `ListRow` demonstrates actual `accessibilityActions` plus `onAccessibilityAction` at [ListRow.tsx](/home/bwales/projects/orbit-app/src/components/ListRow.tsx:141). GridCard should expose at least Select, View Profile, Quick Log, Log Interaction, Message, and Edit through card accessibility actions.
+- Correctly identifies that nested writers would deadlock under the shared promise-chain mutex (`src/db/transaction.ts:12-23`).
+- Correctly pins Quick Log’s direction to `"outbound"`; the current insert default is actually `null`, not outbound (`src/db/recency-dao.ts:204-210`).
+- Correctly preserves recency: `recomputeLastContact` is the sole `last_contact` writer and handles `rarely_responds` connected-only behavior (`src/db/recency-dao.ts:145-175`).
+- Correctly requires archive events, matching the current archive writer’s guarded update plus `recordEventCore` composition (`src/db/contacts-dao.ts:541-561`).
+- The receipt-based undo design correctly scopes deletion by both interaction and contact IDs, matching the existing safe delete path (`src/db/recency-dao.ts:321-344`).
 
-- **MEDIUM — Plan 07 needs explicit widget/shell refresh handling after every successful bulk write.** HomeScreen’s single quick-log path calls both `notifyWidgetDataChanged` and `bumpShellRefresh` at [HomeScreen.tsx](/home/bwales/projects/orbit-app/src/screens/HomeScreen.tsx:394). A dashboard reload alone does not refresh widgets or other shell consumers. Bulk actions should perform these once after commit, not once per contact.
+**Concerns**
 
-- **LOW — The plan describes `OverflowMenu` as a semantic-icon-compatible action-sheet pattern, but its current API supports only text rows.** `OverflowAction` contains label/callback/disabled/test ID only at [OverflowMenu.tsx](/home/bwales/projects/orbit-app/src/components/OverflowMenu.tsx:27). `CardContextMenu` and `BulkActionSurface` should either extend this API deliberately or compose the existing modal/sheet primitives directly.
+- **MEDIUM — Plan 02 misstates the photo-core boundary, which could cause an implementer to copy the wrong pattern.** The plan says the revision bump “lives in `setContactPhoto`’s public wrapper” at Plan 02:24 and :102, but the actual bump is inside `setContactPhotoCore` at `src/db/contacts-dao.ts:637-659`; the wrapper merely delegates at `src/db/contacts-dao.ts:661-669`. The desired bulk-core rule is still right—new category/frequency cores must not bump—but the cited example is factually inverted.
 
-## Suggestions
+**Suggestions**
 
-- Add a dependency/seam prerequisite before Plan 07: define a serializable Group Log draft route parameter, its participant-preload contract, and ownership in the Group Interaction Logging phase. Do not silently broaden Phase 28 to implement Group Event persistence.
+- Update Plan 02 Task 1 to say: “Unlike the intended new bulk-only cores, `setContactPhotoCore` itself currently owns its revision bump; copy only its bound-update and `changes===1` guard, never its bump.” Remove the claim that the public wrapper owns line 658.
 
-- Change `bulkQuickLog` to return a batch receipt containing all inserted interaction IDs. If Undo remains required, add a dedicated atomic `undoBulkQuickLog(receipt)` DAO that deletes only those rows and recomputes recency for every affected contact in one transaction.
+**Risk Assessment:** **MEDIUM.** The transaction model is sound, but the incorrect source claim is directly adjacent to the single-bump invariant and should be corrected before execution.
 
-- Specify two layers for category and frequency:
-  - non-mutexed, no-revision `*Core` functions for bulk composition;
-  - public wrappers that open one transaction and bump revision once for standalone callers.
+## 28-03 — Selection store
 
-- Update Plan 04’s existing read condition to fetch candidates when the Dashboard is in either normal List or normal Card mode; preserve search behavior separately.
+**Summary:** The store is a clean, appropriately ephemeral Zustand model with good unit coverage for entry, selection, Select All, archive removal, and exit.
 
-- Add source-level and behavior tests for:
-  - Card accessibility actions;
-  - one widget/shell refresh per committed bulk operation;
-  - group-route participant handoff once the owning route exists;
-  - bulk Quick Log Undo atomicity, if retained.
+**Strengths**
 
-## Risk Assessment
+- Correctly keeps selection separate from durable query preferences; the existing query store is persistence-oriented while the dashboard session store provides the relevant in-memory analogue.
+- The frozen-universe snapshot and `removeFromUniverse` semantics faithfully implement D-12.
+- Tests cover re-entry, empty selection, Select All, archive removal, and reset.
 
-**HIGH** until the Group Log handoff and bulk Quick Log Undo contracts are resolved. The remaining work is mostly well-contained and follows existing architectural safeguards, but these two gaps would either fail type-checking/current navigation behavior or produce an incomplete/incorrect user-facing bulk workflow.
+**Concerns**
+
+- **MEDIUM — `toggle(id)` is not constrained to the frozen universe.** Plan 03:85 allows any ID to be added. HomeScreen deliberately refreshes query results on focus, foregrounding, and pull-to-refresh (`src/screens/HomeScreen.tsx:678-700`), so a live result arriving after selection begins can present an ID that was not in the snapshot. Plan 06 then calls `toggle(id)` directly. This weakens D-12’s frozen-universe boundary.
+
+**Suggestions**
+
+- Amend Plan 03 Task 1: make `toggle(id)` a no-op unless `frozenUniverse.includes(id)`.
+- Add a test proving an out-of-universe `toggle(99)` cannot alter `selectedIds`.
+
+**Risk Assessment:** **MEDIUM.** The state model is otherwise correct, but this is the primary remaining D-12 enforcement gap.
+
+## 28-04 — Adaptive card content and search mode
+
+**Summary:** The plan correctly reuses the shared knowledge read and search-match presentation while giving Cards a compact, deterministic selection policy.
+
+**Strengths**
+
+- Correctly recognizes that the existing candidate read is batched and must not become a per-card read (`src/db/dashboard-knowledge-read.ts:156-172`).
+- Preserves the existing strict priority ordering—imminent, pinned, then other—from `src/logic/list-row-selection.ts:77-101`.
+- Correctly identifies the live gating issue: current HomeScreen only reads candidates in normal List mode, so Card mode requires the specified widening.
+- Reuses the List search model rather than inventing match offsets or snippet semantics (`src/components/ListRow.tsx:122-134`, `:178-233`).
+
+**Concerns**
+
+- **MEDIUM — The plan tells the new selector to mirror a local date formatter instead of requiring the repository date helper.** `src/logic/list-row-selection.ts:30-40` implements a private `formatLocalDate`, while the required shared helper exists at `src/utils/dates.ts:17-22`. Plan 04:77-89 directs the new selector to mirror the analogue without explicitly using the shared helper. That risks perpetuating the prohibited duplicated local-date logic.
+
+**Suggestions**
+
+- Amend Plan 04 Task 1 to require importing `formatLocalDate` from `src/utils/dates.ts` for imminent-date comparisons and prohibit a new local formatter.
+
+**Risk Assessment:** **MEDIUM.** The data and presentation architecture is sound; the date-helper compliance detail needs tightening.
+
+## 28-05 — Long-press context menu
+
+**Summary:** The menu plan respects the locked eight-item scope, avoids swipe duplication, and correctly separates presentational sheet UI from canonical action routing.
+
+**Strengths**
+
+- Correctly does not assume `OverflowMenu` supports icons; it is text-only (`src/components/OverflowMenu.tsx:27-37`).
+- Uses the existing accessible-action pattern from `ListRow` (`src/components/ListRow.tsx:141-155`) rather than requiring users to perform a long press.
+- Correctly excludes Archive and Delete, preserving the separation between a normal per-contact menu and the multi-select bulk surface.
+
+**Concerns**
+
+- None found.
+
+**Suggestions**
+
+- No required plan change.
+
+**Risk Assessment:** **LOW.** It has a clear component boundary and preserves all locked interaction constraints.
+
+## 28-06 — Multi-select mode
+
+**Summary:** The control-area replacement, mode-dependent tap behavior, noninteractive star, explicit exit, and Back interception all align with D-12.
+
+**Strengths**
+
+- Correctly enables the currently disabled overflow entry at `src/screens/dashboard-overflow-actions.ts:39-44`.
+- Correctly replaces the normal controls rather than adding a bottom bar, matching the layout currently composed around `DashboardControlRow`, search, and the view toggle in `src/screens/HomeScreen.tsx:1000-1053`.
+- Uses a focused hardware Back handler, appropriate because HomeScreen is a root shell route; `ShellAppBar` only renders a Back affordance for child variants (`src/components/ShellAppBar.tsx:96-106`).
+
+**Concerns**
+
+- **MEDIUM — The plan inherits the unfenced toggle issue from Plan 03.** Plan 06:115 passes live rendered rows into `CardGrid` and Plan 06:92 routes every card press to `onToggleSelect`; meanwhile dashboard reloads can change `rows` (`src/screens/HomeScreen.tsx:678-700`). Without filtering cards to `frozenUniverse` and/or rejecting non-member toggles, a refreshed row outside the snapshot can be selected.
+
+**Suggestions**
+
+- Amend Plan 06 Task 2 to render only `rows` whose IDs remain in `frozenUniverse` while selection mode is active.
+- Depend on the Plan 03 toggle membership guard as defense in depth.
+
+**Risk Assessment:** **MEDIUM.** This is the same frozen-universe correctness issue, now at the renderer boundary.
+
+## 28-07 — Bulk action surface and wiring
+
+**Summary:** The bulk surface correctly limits scope to the decided operations, retains selection after ordinary writes, handles archive disappearance, and keeps Group Log routing as a Phase 33 handoff.
+
+**Strengths**
+
+- Explicit Add/Remove Favorites and Snooze/Unsnooze honor the binary-membership and no-ambiguous-toggle decisions.
+- Archive copy and non-destructive presentation align with the real reversible archive model (`src/db/contacts-dao.ts:529-561`).
+- Correctly avoids the existing one-interaction Undo controller, whose callback receives one `{contactId, interactionId}` pair (`src/screens/HomeScreen.tsx:384-392`).
+- Correctly refreshes widget and shell consumers only after committed work, following the existing quick-log wiring (`src/screens/HomeScreen.tsx:394-409`).
+- The properly recorded eligibility owner assumption is not an unresolved actionable finding.
+
+**Concerns**
+
+- **MEDIUM — Archive removal is handled, but refreshed non-archived rows are not explicitly kept outside the frozen selection universe.** Plan 07:134 removes archived IDs, but Plan 07:137 refreshes the dashboard after every bulk operation. Combined with Plan 03:85 and Plan 06:115, a refresh can introduce a row not in the original universe that remains selectable. This is a D-12 correctness gap, not an Archive-specific issue.
+
+**Suggestions**
+
+- Add an explicit Plan 07 dependency/acceptance criterion requiring the Plan 03 membership guard and Plan 06 frozen-row filtering before bulk refresh wiring lands.
+- Add device/UAT coverage: enter selection, cause a refresh that changes matching rows, verify no new ID can be selected or acted on.
+
+**Risk Assessment:** **MEDIUM.** The DAO and routing design are good; the remaining risk is selection-universe integrity across the required refresh path.
 
 ---
 
 ## Claude Review
 
-_Model: claude-opus-4-8, run as a read-only subagent (the `claude -p` reviewer lane is skipped inside Claude Code / has a known Write-permission gap). Source-grounded (file:line citations present)._
+*Ran as a read-only Claude subagent (see Consensus Summary for why).*
 
-# Cross-AI Peer Review — Phase 28 (Dashboard Card View)
 
-**Reviewer:** independent Claude reviewer (source-grounded against code on disk)
-**Scope:** 28-01…28-07 PLAN.md + 28-CONTEXT.md, verified against src/db, src/components, src/screens, src/stores, src/logic, migrations, and ADR-018/ADR-075.
-
-## 1. Summary
-
-This is a strong, unusually well source-grounded plan set. Every high-risk data-layer claim I checked against the actual code held up: the non-reentrant mutex is real (`src/db/mutex.ts:32-36`, `src/db/transaction.ts:11-29`), the core/wrapper extraction idiom the plans copy is exactly how the repo already composes atomic writes (`src/db/bulk-review-dao.ts:72-137`, `src/db/contacts-dao.ts` `createContactFull`), and the cited extraction targets, ADRs, and line references are accurate (a welcome change from prior planning artifacts). No decision reversals: ADR-018 (no bulk delete; archive is the recoverable removal; purge stays manual per-contact) and ADR-075 (binary favourite membership, rank never leaks) are honored, and CARDV-01…12 are fully covered across the seven plans with correct wave serialization of the shared `HomeScreen`/`GridCard` edits. The concerns are **specification gaps, not architectural flaws** — chiefly (a) the bulk Quick Log interaction shape is left partly to defaults and diverges from the canonical single-contact Quick Log, and (b) the `CardGrid` prop contract omits the empty/error/loading/refresh/header/padding surface the plan's own must_haves require it to reuse. Both are fixable with plan-text edits; no re-architecture is needed.
-
-## 2. Strengths
-
-- **The mutex-composition strategy is correct-by-construction and matches the codebase.** Plan 02's rule "compose non-mutexed `*Core`s inside one `inWriteTransaction`, never loop a mutexed top-level writer" is exactly the constraint enforced by `src/db/transaction.ts:49-64` + `src/db/mutex.ts:32-36` (a nested `inWriteTransaction` is a permanent hang). The `*Core`/wrapper split is already the shipped idiom (`bulk-review-dao.ts:72-137`, `recency-dao.ts:414-428`).
-- **bulkArchive preserves the immutable lifecycle-event trail (ADR-025).** The existing `archiveContact` already composes `recordEventCore` inside its one transaction with the `archived_at IS NULL` guard + `changes===1` throw (`contacts-dao.ts:541-562`); extracting `archiveContactCore` and looping it is behavior-identical, and the rollback-on-already-archived case (Plan 02 must_have + test) is guaranteed by that same guard.
-- **bulkQuickLog routes through the sole recency writer (ADR-010/024/071).** `recomputeLastContactCore` is the MAX-based recompute (`recency-dao.ts:159-176`); composing `insertInteractionCore` + `recomputeLastContactCore` per id is the correct spine, and `rejectFutureOccurredAt` (`log-guards.ts:68-82`) throws synchronously before the transaction opens — Plan 02 calls it up-front, correctly.
-- **Category/frequency correctly avoid the metadata-clobber writer.** `updateContactMetadataCore` rewrites the whole mutable column set (`contacts-dao.ts:316-333`); Plan 02 explicitly forbids routing single-column bulk ops through it and instead mirrors the single-column `setContactPhotoCore` shape (`contacts-dao.ts:637-659`). The `setContactFrequencyCore` positive-integer guard correctly respects migration 011's `CHECK (interval_days ... > 0)` (`011-contact-lifecycle-schema.ts:36`) and the `contacts_prevent_cadence_clear` trigger (`:181-186`) by never writing NULL.
-- **No decision reversal.** ADR-018 is *Accepted / one-way* ("permanent deletion lives only in the Archived list; destructive UI uses the `danger` token") — Plan 07 keeps bulk delete out, makes Archive reversible, and styles Archive **non-destructive** (danger reserved for purge), which is consistent, not a weakening. ADR-075 (binary membership, rank never surfaces) is upheld: `GridCard` reads `favourite_rank !== null` for membership only (Plan 01 prohibition), matching the shipped list row (`HomeScreen.tsx:1071-1078`).
-- **GridCard reuses the verified shared status/favourite primitives, no forked source (D-11).** ListRow's composition is exactly as the plan cites: `displayState = isSnoozed(...) ? "snoozed" : status` (`ListRow.tsx:106-108`), snooze→neutral ring via `ringVisual(null,...)` (`:110-113`, `contact-card-ring.ts:58-61`), star at `:251-266`, and the never-contacted glyph guard `displayState !== null ? <StatusGlyph/> : null` (`:267-275`). `statusGlyph`/`ringVisual` are the single source (`contact-card-ring.ts`).
-- **Selection store is correctly ephemeral (contrast the persisted query store).** Plan 03's pure `create<T>()((set)=>...)` model matches `dashboard-session-store.ts:21-27` (no persist, no exec, no DB) and is deliberately unlike `dashboard-query-store` — the frozen-universe invariant (D-12) is sound and testable.
-- **Requirements + waves.** CARDV-01…12 (`REQUIREMENTS.md:115-126`) each map to a plan; the shared `HomeScreen.tsx`/`GridCard.tsx` edits are serialized across waves (P01→P04→P05→P06→P07), and within wave 2 the parallel plans touch disjoint trees (P02 `src/db`, P03 `src/stores`, P04 `src/components`+`HomeScreen`), so there is no concurrent edit of a single file.
-- **Local-first intact.** No new dependency, no network on any read path, `localDateTime()`/`formatLocalDate()` mandated (Plan 07), no migration (D-03) — all honored.
-
-## 3. Concerns
-
-- **MEDIUM — Plan 02 bulkQuickLog leaves the interaction field shape to defaults, diverging from the canonical Quick Log.** The plan's behavior spec passes only `{uid, occurredAt, source}` to `insertInteractionCore` (28-02 Task 2). The canonical single-contact Quick Log (`src/services/quick-log-command.ts:87-97`) writes `channel:"unspecified", direction:"outbound", connected:1, quality:null, source:"manual"`. `insertInteractionCore` defaults (`recency-dao.ts:140-142,204-209`) supply `connected=1`, `channel="unspecified"`, `source="manual"` — **but `direction` defaults to `null`, not `"outbound"`** (`recency-dao.ts:205`). So a bulk-logged interaction will differ from a normally-quick-logged one on `direction` (and, if the executor overrides any default, potentially `connected` — which the recompute filter `contacts.rarely_responds = 0 OR i.connected = 1` at `recency-dao.ts:170` depends on for rarely-responds contacts). `quick-log-command.ts` is **not** in Plan 02's read_first, so the executor has no pointer to the shape it must match. Mechanism: inconsistent `direction` feeds the intensity/gravity math differently for bulk vs single logs. *Fix:* pin the exact shape in the plan and add a test that (1) asserts the written row matches the canonical Quick Log fields and (2) asserts `last_contact` updates for a `rarely_responds=1` contact.
-
-- **MEDIUM — Plan 01 CardGrid prop contract omits the shared empty/error/loading/refresh/header/padding surface it is required to reuse.** The must_haves (28-01) say the card branch reuses the shared `ListEmptyComponent`, loading skeleton, error state, and empty/error content. But today those are all owned by the *single shared FlatList* in `HomeScreen.tsx:1055-1119`: `data={error||showInitialSkeleton?[]:rows}`, `ListEmptyComponent={showInitialSkeleton?<ListLoadingSkeleton/>:listEmpty}` (`:1106`), `refreshControl` pull-to-refresh + error-retry (`:1111-1118`), `ListHeaderComponent={listHeader}` (`:1105`), and `contentContainerStyle` with `bottomClearance` (`:1107-1110`). Because a grid needs its own `numColumns` FlatList, these cannot be inherited implicitly — yet Plan 01 Task 3's CardGrid prop list is only `rows, now, onPressContact, favouriteOverlay, onToggleFavourite`. As written, a literal implementation loses pull-to-refresh, the "Pull down to try again" retry, the header, and bottom clearance in card mode. The parenthetical "mirror how the branch is chosen today" is misleading: today the branch is at *renderItem* level inside one FlatList (`:1058-1104`), not at container level. *Fix:* enumerate CardGrid's full prop contract (data-gating for error/skeleton, `ListEmptyComponent`, `refreshControl`, `ListHeaderComponent`, `contentContainerStyle`/`bottomClearance`) and state that HomeScreen selects container-level between the list FlatList and CardGrid while keeping both inside the `resultTransitionStyle` `Animated.View` (`:1054`).
-
-- **MEDIUM — Plan 04's selectCardLine3 "additive compactness bonus" does not match the analog's tiered model.** `selectLine3` is not a scored function: it is strict priority tiers — imminent → pinned → other → prompt, with birthdays pre-excluded and ties broken by a stable `(createdAt,id,kind,type)` key (`src/logic/list-row-selection.ts:77-102`). Plan 04 says "reuse the List relevance ordering as the base, then apply a compactness bonus (additive)" — there is no base *score* to add to, and a naive flat-score rewrite could let a compact "other" candidate outrank an imminent meaningful date, contradicting both the analog and the plan's own "trivial short fact must not displace much more useful context." *Fix:* specify that compactness only breaks ties **within** a tier (preserving imminent > pinned > other and the birthday exclusion), and note that Card needs its **own short prompt list** — the existing `PROMPTS` (`list-row-selection.ts:5-16`) are long sentences, unsuitable for the compact grid ("Add a detail", etc.).
-
-- **LOW — No per-action eligibility filtering of the frozen selection universe.** Bulk ops apply to every selected id regardless of contact type. `bulkSetFrequency` on an Unbound (`tracking_enabled=0`) contact is schema-legal (the `CHECK (tracking_enabled=0 OR interval_days IS NOT NULL)` at `011-...:37` is satisfied by any positive value) but semantically sets a cadence on an untracked contact; likewise bulk snooze on a never-contacted contact. The plans define the frozen universe as "eligible result universe" but never define per-action eligibility. Likely acceptable per the dossier, but worth an explicit owner confirmation rather than an implicit default.
-
-- **LOW — Plan 02 `depends_on: [28-01]` is over-conservative.** Plan 02 is pure data layer (`src/db/*`) with no symbol or file dependency on Plan 01 (UI/icons/HomeScreen). It could run in wave 1 alongside P01, shortening the critical path. Harmless as-is; noting only because P02 is the phase's longest-pole work.
-
-- **LOW — Stale doc comment left unaddressed.** `events-dao.ts:18-19,37-38` still claim `snooze`/`unsnooze` "have no producing feature," but `snooze-dao.ts:103-110,136-143` already produce them. Plan 02 correctly notes the comment is stale but does not schedule the one-line correction; leaving it invites a future agent to "reserve" an already-live event type.
-
-## 4. Suggestions (concrete PLAN.md edits)
-
-1. **28-02:** In Task 2 behavior and acceptance_criteria, pin `bulkQuickLog`'s interaction to `{channel:"unspecified", direction:"outbound", connected:1, quality:null, source:"manual"}` to match `runQuickLog` (`quick-log-command.ts:87-97`); add `src/services/quick-log-command.ts` to Task 2/3 read_first; add a test asserting the written columns and a `rarely_responds=1` recency-update case.
-2. **28-01:** In Task 3, expand the `CardGrid` prop signature to thread `ListEmptyComponent`/loading, error data-gating, `refreshControl`, `ListHeaderComponent`, and `contentContainerStyle`/`bottomClearance`; add an acceptance criterion that card mode retains pull-to-refresh, error-retry, header, and bottom clearance. State that HomeScreen swaps at container level inside the existing `Animated.View` (`HomeScreen.tsx:1054`).
-3. **28-04:** Reframe the ranking spec as "compactness breaks ties within the existing imminent→pinned→other tiers," not an additive score; require a separate short Card prompt list; keep birthday exclusion explicit.
-4. **28-07 / 28-CONTEXT:** Add one line on per-action eligibility (does frequency/snooze apply to Unbound/never-contacted selected contacts?) — either confirm "applies to all selected" or filter. Owner-bucket if it changes product behavior.
-5. **28-02:** Optionally correct the stale `events-dao.ts` producer comment as a trivial in-plan doc fix.
-6. **Optional:** Move Plan 02 to wave 1 (drop `depends_on: [28-01]`) to parallelize the longest-pole data-layer work.
-
-## 5. Risk Assessment
-
-**Overall: MEDIUM (leaning low-medium).**
-
-The highest-risk work — the atomic bulk data layer — is correct-by-construction, matches the repo's proven composition idiom, honors the single-recency-writer and immutable-event ADRs, and ships no migration; I verified each cited extraction target and constraint against the code. There are no decision reversals, no network on a read path, and full requirement coverage with sound wave ordering. What keeps this at MEDIUM rather than LOW is a cluster of **specification gaps in the plan text** — the bulk Quick Log interaction shape (a data-layer consistency issue in exactly the subsystem CLAUDE.md warns about), the underspecified CardGrid empty/error/refresh contract, and the mismatch between Plan 04's scoring language and the tiered selector it claims to mirror. None require re-architecture; all are closable by tightening the plans before execution. If suggestion (1) in particular is not adopted, expect a subtle bulk-vs-single Quick Log divergence that a diff-scoped review would miss.
+**Reviewer:** Independent source-grounded review (Claude). Read-only.
+**Method:** Every finding below was checked against the actual code on disk, not the plan text.
+Files opened and traced: `src/db/recency-dao.ts`, `mutex.ts`, `transaction.ts`, `events-dao.ts`,
+`data-revision-dao.ts`, `snooze-dao.ts`, `favourites-dao.ts`, `contacts-dao.ts` (archive/photo/metadata
+cores), `bulk-review-dao.ts`, `log-guards.ts`, `migrations/011-contact-lifecycle-schema.ts`,
+`src/navigation/types.ts`, `src/components/universal-fab-logic.ts`, `src/services/quick-log-command.ts`,
+`src/screens/HomeScreen.tsx` (quick-log path + render branch), `src/screens/dashboard-overflow-actions.ts`,
+plus all 7 PLAN.md files and `28-CONTEXT.md`.
 
 ---
 
-## Aggregator Adjudication (verified against source on disk)
+## VERDICT ON THE TWO CYCLE-1 HIGH FIXES
 
-The following were re-verified by the aggregator by opening the cited files:
+### HIGH-1 (CARDV-09 / 28-07 — GroupLog route param + Phase 33 deferral): **SOUND**
 
-- `GroupLog: undefined` at `src/navigation/types.ts:34`; placeholder at `src/navigation/tabs/DashboardStack.tsx:38`; "never preselects here" at `src/components/universal-fab-logic.ts:92`. → Codex HIGH-1 holds.
-- `createQuickLogUndoController` keys on a single `interactionId` (`src/components/universal-fab-logic.ts:56,64-75`); `bulkQuickLog` (28-02:23) writes N with no returned batch receipt. → Codex HIGH-2 holds.
-- `setContactPhotoCore` calls `bumpDataRevisionCore` (`src/db/contacts-dao.ts:658`), but Plan 02's explicit core defs (28-02:105-106) omit any bump and D-04 (28-02:22) fixes the bump at once-per-bulk-transaction. → Codex HIGH-3 downgraded to LOW clarity.
-- `HomeScreen.tsx:601` gates `readLine3Candidates` on `query.viewMode === "list"`; Plan 04 wires a card branch but never states the gate must be widened to card mode. → Codex MEDIUM (view-mode gate) holds.
-- Plan 04 Task 1 source assertion (28-04:94) says "no `src/db` module" yet "reuses the candidate types from `dashboard-knowledge-read`" (which is `src/db`). The analog uses a type-only DB import (`list-row-selection.ts:1`). → Codex MEDIUM (purity criterion) holds; permit type-only imports.
+Verified against `src/navigation/types.ts`:
+- Line 34 is exactly `GroupLog: undefined;` today — the plan's premise is accurate.
+- The proposed change to `GroupLog: { participantIds?: number[] } | undefined` is **additive and
+  serializable** (`number[]`, no callbacks), matching the file's stated route-param convention
+  (`CropPhoto`, `Compose`, `SurvivorSelect` all carry serializable object params). No existing route is
+  altered.
+- **Does NOT reverse D-10.** D-10 grants this phase "only the action, the routing, and multi-select UX";
+  Group Event domain behavior belongs to the later phase. `GroupEvents` is already a Phase-33 placeholder
+  (`types.ts:30-31`), and the plan explicitly defers `participantIds` consumption to Phase 33
+  (`28-07` truths line 23, prohibition line 48). This is a handoff contract, not a domain implementation.
+- The plan's claim that the FAB's "never preselects here" comment is **FAB-scoped** is correct:
+  `universal-fab-logic.ts:92` is inside `resolveFabTarget`'s `case "GroupLog"` and governs only the
+  shell FAB's navigation, not multi-select routing. Using it as a constraint on Phase 28 would be a
+  misread; the plan correctly does not treat it as one.
+- `GroupLog` is a reachable registered screen (the shell FAB already routes to it at
+  `universal-fab-logic.ts:93`), so navigating to it with params is safe.
 
-**Unresolved HIGH concerns: 2** (Group Log preloaded participants; bulk Quick Log Undo contract).
-**Actionable non-HIGH concerns not yet in any PLAN.md: 12** (see both reviews' Concerns/Suggestions — bulkQuickLog interaction shape; CardGrid prop contract; Plan 04 within-tier tiebreak + short prompt list; Plan 04 view-mode gate; Plan 04 type-only import; Plan 05 card accessibility actions; Plan 07 widget/shell refresh once per commit; OverflowMenu text-only API; per-action eligibility (owner-bucket if behavioral); revision-bump no-bump clarity; events-dao stale comment fix; Plan 02 depends_on over-conservative).
+No regression, no new problem introduced.
 
-To incorporate feedback into planning:
-  /gsd-plan-phase 28 --reviews
+### HIGH-2 (CARDV-08 / 28-02 — bulkQuickLog receipt + atomic undoBulkQuickLog): **SOUND**
+
+Each sub-claim verified against real code:
+
+- **(a) Mutex is non-reentrant — CONFIRMED.** `mutex.ts:32-36` is a single promise chain
+  (`const run = chain.then(fn, fn); chain = run.catch(...)`); `transaction.ts:11-29` documents that a
+  nested `inWriteTransaction` is a permanent hang. The plan's "compose non-mutexed cores, one outer
+  transaction" design is the only correct approach and is applied consistently.
+- **(b) Composable non-mutexed cores exist / will exist — CONFIRMED.**
+  - `insertInteractionCore`, `recomputeLastContactCore` are already exported non-mutexed cores
+    (`recency-dao.ts:425-428`).
+  - `deleteInteractionCore` does **not** exist yet — it is the inner body of `deleteTouchpoint`
+    (`recency-dao.ts:313-346`), which the plan correctly proposes to extract in Task 1. The plan's
+    description of that body (uid lookup scoped by `id AND contact_id`, `insertTombstoneCore`, DELETE
+    scoped by both keys, `recomputeLastContact`) matches the source exactly.
+  - `bumpDataRevisionCore` is the single revision bump (`data-revision-dao.ts:5-22`) — CONFIRMED.
+- **(c) Batch-in-one-transaction + single-bump is correct — CONFIRMED.**
+  - `bulkQuickLog`: per distinct contact (ids come from a `Set`), one `insertInteractionCore` +
+    `recomputeLastContactCore`, then one `bumpDataRevisionCore`. Because `recomputeLastContact` is a
+    correlated `MAX(occurred_at)` over current rows (`recency-dao.ts:164-176`) and all occurredAt = now,
+    `last_contact` lands on `now` correctly — no stale/wrong recency, no double bump.
+  - The **direction pin to `"outbound"` is genuinely required**: `insertInteraction` defaults
+    `direction` to `null` (`recency-dao.ts:205` `i.direction ?? null`), and the canonical Quick Log shape
+    is `direction:"outbound"` (`quick-log-command.ts:32`). The plan pins it explicitly — correct.
+  - The **`connected:1` pin also matters**: the rarely_responds recompute filter is
+    `rarely_responds = 0 OR i.connected = 1` (`recency-dao.ts:170`); pinning `connected=1` guarantees
+    `last_contact` advances even for a rarely_responds contact. Plan 02 tests this exact case
+    (Task 3 item 2) — good.
+  - `undoBulkQuickLog`: per receipt entry, `deleteInteractionCore` (re-looks up the uid from the row, so
+    the receipt needs only `{contactId, interactionId}` — correct), then one bump. A receipt entry
+    matching 0 rows throws → whole undo rolls back (atomic). `rejectFutureOccurredAt(now, now)` up front
+    only validates format (occurredAt===now), matching the single-contact path — correct.
+
+One small accuracy caveat (LOW, below): `undoBulkQuickLog` adds a `bumpDataRevisionCore` that the
+single-contact `deleteTouchpoint` does **not** call — so it is not strictly "behavior-identical," it is
+slightly *more* correct. Not a defect.
+
+---
+
+## CROSS-CUTTING ASSESSMENT
+
+- **No decision reversals found.** D-03..D-12 are all honored. No ADR (010/018/024/025/071/075) or
+  HANDOFF entry is weakened. No control is removed by name.
+- **Local-first invariants intact.** No network on any read/write path; no migration ships (D-03 — the
+  frequency guard rides on the *existing* migration-011 CHECK, verified below); `localDateTime()` used,
+  no `toISOString().split()`; theme tokens enforced via `check:colors` gates; animation is reduced-motion
+  gated with an explicit "no per-frame setState" prohibition (28-07 Task 3). All good.
+- **The single-recency-writer spine (ADR-010/024/071) and immutable-event trail (ADR-025) are composed,
+  never bypassed** — `bulkQuickLog`→`recomputeLastContactCore`, `bulkArchive`→`archiveContactCore`→
+  `recordEventCore`. Verified the source cores exist and are the right ones.
+- **The `<flagged_assumption>` in 28-07 is a correctly-recorded owner-bucket escalation, and its facts
+  check out.** Migration 011 has `CHECK (interval_days IS NULL OR (typeof(interval_days)='integer' AND
+  interval_days>0))` (line 36) and `CHECK (tracking_enabled = 0 OR interval_days IS NOT NULL)` (line 37),
+  plus the `contacts_prevent_cadence_clear` trigger (181-186). So setting a positive interval on an
+  Unbound (`tracking_enabled=0`) contact IS schema-legal, exactly as the assumption states, and
+  `setContactFrequencyCore` never writes NULL so it never trips the trigger. This is RESOLVED (owner
+  decision surfaced with a safe default), not an unresolved finding — I do not count it.
+
+**HIGH concerns: 0. Actionable MEDIUM: 1. Actionable LOW: 6.**
+
+---
+
+## PER-PLAN REVIEW
+
+### 28-01 — Tracer: avatar-first grid + icon registry (CARDV-01/02/03)
+
+**Summary.** Clean tracer. Replaces the legacy `ContactCard` card branch
+(`HomeScreen.tsx:1091-1104`, verified — it renders `ContactCard` with `isFavourite` but no
+`onToggleFavourite`, so the "non-functional star" claim is accurate) with a presentational `GridCard` +
+virtualized `CardGrid`, and lands 7 registry icons. Reuses the shared status/favourite/recency primitives
+rather than re-deriving them.
+
+**Strengths.**
+- Container-level view-mode swap inside the existing `resultTransitionStyle` Animated.View
+  (`HomeScreen.tsx:1054`) with exactly one scroll container per mode — verified that today's code branches
+  at `renderItem` level (`1058-1104`), so the plan's "move the branch up" instruction is grounded.
+- `CardGrid` is required to thread the **full** shared list-surface contract explicitly (data-gating,
+  `ListEmptyComponent` skeleton-vs-empty, `refreshControl` pull-to-refresh + error-retry, header,
+  `bottomClearance`) — the cycle-1 gap is closed, and each threaded prop maps to a real prop on the
+  current FlatList (`1105-1118`).
+- `numColumns` re-mount key gotcha and Avatar `cacheBust=modified_at` recycling correctness both called
+  out (Task 3).
+
+**Concerns.**
+- **LOW** — `28-01` frontmatter `depends_on: []`, `wave: 1`, but it and `28-02` both sit in wave 1 while
+  the prompt's roadmap places `28-02` in wave 2. Files are disjoint (icons/grid vs DAOs), so parallel
+  wave-1 execution is safe; this is a doc/label drift, not a correctness issue.
+
+**Suggestions.** None blocking. Optionally note in the plan that `ContactCard` remains in use elsewhere
+(it is imported by the current card branch only) so the executor does not delete it.
+
+**Risk: LOW.**
+
+### 28-02 — bulk-actions-dao: non-mutexed cores + 8 atomic composers (CARDV-07/08/10/11)
+
+**Summary.** The highest-risk plan, and the most carefully specified. Every core extraction and composer
+matches the real DAOs. This is where I concentrated verification (see HIGH-2 above).
+
+**Strengths (all verified in source).**
+- `archiveContact` (`contacts-dao.ts:536-563`) is exactly the mutexed body the plan lifts into
+  `archiveContactCore` (UPDATE `WHERE id=? AND archived_at IS NULL` + `changes===1` + `recordEventCore`),
+  and the wrapper keeps its trailing bump — the plan's "wrappers stay behavior-identical" instruction is
+  correct.
+- The plan correctly distinguishes `setContactPhotoCore` (`contacts-dao.ts:637-658`), whose public core
+  *does* call `bumpDataRevisionCore` at :658 — and instructs the new category/frequency cores to copy
+  only the single-column UPDATE + `changes===1` shape, **not** the trailing bump. This is the subtle trap
+  it was warned about in cycle 1; it is handled.
+- Correctly forbids routing category/frequency through `updateContactMetadataCore`
+  (`contacts-dao.ts:312-339`), which clobbers `name/interval_days/tracking_enabled/social_battery/...` —
+  verified that core rewrites the whole row.
+- `setContactFrequencyCore` positive-integer guard is justified and doubly safe against both the
+  `interval_days > 0` CHECK and the `contacts_prevent_cadence_clear` trigger (migration 011:36-37,181-186).
+- events-dao comment fix is **factually warranted**: `events-dao.ts:18-20,37-38` still claims snooze/
+  unsnooze have "no producer yet," but `snooze-dao.ts:103-110,136-143` already compose `recordEventCore`
+  for `snooze`/`unsnooze`. Comment-only correction is right.
+- Snooze cores: `snoozeContact`/`clearSnooze` (`snooze-dao.ts:79-146`) are mutexed twins composing
+  `recordEventCore` in-txn; extraction to cores (minus `inWriteTransaction`/bump) is straightforward and
+  the plan passes a fresh `newUid()` per contact for the event uid.
+
+**Concerns.**
+- **LOW** — Claim precision: `undoBulkQuickLog` is described as "behavior-identical to N single-contact
+  deleteTouchpoint undos," but it adds one `bumpDataRevisionCore` that `deleteTouchpoint`
+  (`recency-dao.ts:313-346`) does **not** call. The added bump is arguably *more* correct (an undo is a
+  real data change the backup-freshness gate should see). Recommend editing the truth line to say
+  "identical per-row reversal, plus a single data-revision bump the single-row path omits" so a future
+  reader is not confused. (Side observation, out of scope: the single-contact touchpoint-delete path
+  never bumps `data_revision`, so a lone Quick Log undo may not mark the DB dirty for backup — pre-existing,
+  not this phase's to fix.)
+- **LOW** — `bulkAddFavourites` idempotency: `setFavouriteRankCore` runs
+  `favourite_rank = (SELECT COALESCE(MAX(favourite_rank),-1)+1 ...)` per contact; re-adding an existing
+  favourite moves its rank. The plan's truth line already states "rank may move but membership is
+  unchanged" (binary star reads `!== null`), which is correct per ADR-075 — no action needed, but worth a
+  test asserting the star still reads membership after a rank move (Task 3 item covers "idempotent re-add"
+  — good).
+
+**Suggestions.** Apply the LOW claim-precision edit to the `undoBulkQuickLog` truth line. No functional
+change required.
+
+**Risk: LOW-MEDIUM** (data-layer, but exceptionally well grounded and test-gated with node:sqlite).
+
+### 28-03 — dashboard-selection-store (CARDV-05/06/12)
+
+**Summary.** Pure in-memory Zustand store (mode / selectedIds:Set / frozenUniverse), no persist, no DB.
+Modeled on `dashboard-session-store`. Correctly frozen-universe semantics and `removeFromUniverse` on
+both sets. Well tested.
+
+**Strengths.** `enterSelection` re-entry no-op (never re-snapshots the frozen universe) directly enforces
+D-12 / Pitfall-6; `removeFromUniverse` drops ids from both `selectedIds` and `frozenUniverse` so archived
+cards can never re-enter via Select All. Grep-gate for `persist|updateAppSettings|getExecutor|AsyncStorage`.
+
+**Concerns.**
+- **LOW** — `depends_on: [28-01]` is spurious: a pure Zustand store imports nothing from the grid/icon
+  work. This needlessly serializes it after 28-01 (harmless, just less parallelism). Could be `wave: 1,
+  depends_on: []`.
+
+**Suggestions.** Optionally relax the dependency. Otherwise none.
+
+**Risk: LOW.**
+
+### 28-04 — Card content: adaptive line-3 + search mode (CARDV-02/03)
+
+**Summary.** Adds a compactness-biased line-3 selector reusing the shared `readLine3Candidates` read and
+List's search-presentation helpers; widens the HomeScreen candidate-read gate to include card mode.
+
+**Strengths.**
+- Cycle-1 fix is properly reflected: compactness is a **within-tier tiebreak**, not an additive score, so
+  a compact "other" candidate can never outrank an imminent meaningful date (truths line 22; Task 1
+  mirrors `list-row-selection.ts:77-102` tier order). This is the right correction.
+- Separate SHORT prompt list (not List's full-sentence PROMPTS), deterministic per contact via
+  `contactId % len` — avoids flicker.
+- Reuses the shared read; the gate-widening at `HomeScreen.tsx:601` is the correct mechanism (the list
+  branch's `line3ByContactId`/`searchResult`/`searchSnippet` wiring at `1080-1086` is real and verified).
+
+**Concerns.**
+- **LOW** — I did not independently open `HomeScreen.tsx:601` (the `viewMode === "list" && !isListSearch`
+  gate); I verified the surrounding list-branch wiring is real, which makes the claim plausible, but the
+  exact line/condition is taken on the plan's word. Downgrade to an open item: the executor should
+  confirm the gate's exact shape before widening it. Not asserted as wrong.
+
+**Suggestions.** None blocking.
+
+**Risk: LOW.**
+
+### 28-05 — Long-press context menu (CARDV-04)
+
+**Summary.** Locked 8-item per-contact menu composed from `Sheet`/`overlay-base` (not the text-only
+`OverflowMenu`), routed to canonical flows, plus card-level accessibility actions.
+
+**Strengths.**
+- Cycle-1 fixes reflected: (a) the menu is composed from `Sheet`/`overlay-base`, with an explicit note
+  that `OverflowAction` is text-only (label/onPress/disabled/accessibilityLabel/testID) and must not be
+  handed icon rows; (b) card-level `accessibilityActions` + `onAccessibilityAction` on the GridCard
+  itself (mirroring `ListRow.tsx:141-155`) so AT users reach actions without a long-press. Both are the
+  right calls.
+- Correctly excludes Delete/Archive from the long-press menu (SS M) and adds no swipe gesture (SS L).
+- Tap vs long-press disambiguation via RN Pressable's mutual exclusivity is accurate.
+
+**Concerns.**
+- **LOW** — The menu's "Snooze" item routes to "the existing single-contact snooze flow," but
+  `snoozeContact` requires a `SnoozePreset` (`snooze-dao.ts:39,79`). The plan does not say whether the
+  single-tap Snooze presents the 3-preset picker or applies a default. If a profile snooze-preset picker
+  already exists it is fine to reuse; the plan should name it so the executor doesn't invent an
+  inconsistent affordance.
+
+**Suggestions.** Name the concrete snooze-preset affordance the menu reuses (or state the default preset).
+
+**Risk: LOW.**
+
+### 28-06 — Multi-select mode (CARDV-05/06/12)
+
+**Summary.** Turns the store + Select entry into the live surface: per-card selection control, tap-to-
+toggle, count + announcement, control-area lock/replace, Select All over the frozen universe, Android
+Back exits selection first. Enables the previously-disabled overflow "Select Contacts" entry.
+
+**Strengths.**
+- Verified the overflow entry is currently `disabled:true` with a no-op `onPress`
+  (`dashboard-overflow-actions.ts:39-44`, testID `dashboard-select-contacts-entry`), so the "enable +
+  wire onSelectContacts, keep testID, update its test" instruction is grounded.
+- Control-area **replacement** (not a new bottom bar), frozen Select-All, and query-store non-mutation on
+  enter/exit all directly enforce D-12.
+- `BackHandler` hardwareBackPress returning `true` while selection is active (consuming Back before nav)
+  is the correct pattern and is gated to focus.
+
+**Concerns.**
+- **LOW** — The frozen universe is seeded from "the current rows' ids." This is correct **only if `rows`
+  is the complete result set**, not a virtualized page. In this codebase the dashboard read returns the
+  full `DashboardRow[]` and FlatList virtualizes rendering only, so `rows.map(r=>r.id)` is the full
+  eligible universe — but the plan should state that assumption explicitly so Select-All can never
+  silently under-select. (No evidence it is paginated; flagged for confirmation, not asserted as a bug.)
+
+**Suggestions.** Add a one-line note that `currentEligibleIds` must be the full result array (not a
+windowed subset).
+
+**Risk: LOW.**
+
+### 28-07 — Bulk-action surface + count-aware routing + confirm/undo + archive-vanish + a11y (CARDV-07..12)
+
+**Summary.** Wires Plan 02's DAO into the Plan 06 surface. Both cycle-1 HIGH fixes live here and are
+sound (above). Explicit fav/snooze (no toggle-all), Archive non-destructive + `removeFromUniverse`,
+Sensitive Ops = Frequency only, commit-truthful feedback, one widget/shell refresh per commit,
+reduced-motion-gated transitions.
+
+**Strengths (verified).**
+- Uses `undoBulkQuickLog(receipt)`, explicitly **not** `createQuickLogUndoController` — verified the
+  latter keys on a single `interactionId` (`universal-fab-logic.ts:64-79`) and genuinely cannot reverse N
+  rows. Correct.
+- `notifyWidgetDataChanged()` + `bumpShellRefresh()` once per commit mirrors the real single quick-log
+  path at `HomeScreen.tsx:405-406` (verified) — a dashboard reload alone would leave the widget stale.
+- No bulk Delete, no destructive confirm, no Gravity; Archive copy describes archiving not quarantine
+  (D-07/D-08). Count-aware Log routing branches on `selectedIds.size` (1 → individual, 2+ → GroupLog,
+  0 → disabled).
+
+**Concerns.**
+- **MEDIUM** — **Under-specified net-new pickers for bulk Snooze and bulk Set Category.** Task 2 says
+  "surface the 3 presets" and "present the existing category options," but unlike the rest of this
+  plan (which pins testIDs, a11y, confirm copy, and thresholds) these two selection UIs have no concrete
+  affordance, testID, confirm/announcement copy, or a11y spec. There is no existing *bulk* preset/category
+  picker to reuse (the single-contact flows differ), so the executor is left to invent them — risking an
+  ad-hoc or inaccessible control in an otherwise meticulous surface. **Suggested PLAN.md change:** in
+  28-07 Task 2, specify the affordance for `onSnooze` (which of the 3 `PRESET_MODIFIERS` presets, via what
+  control) and `onSetCategory` (category source + picker component + testIDs like
+  `bulk-snooze-preset-{id}` / `bulk-category-{id}`), and add their confirm/announcement copy to the
+  Copywriting reference the plan already cites.
+- **LOW** — CARDV-09 is only *partially* deliverable in this phase by design: 2+ Log routes to the
+  `GroupLog` **placeholder**, which ignores `participantIds` until Phase 33. This is exactly what D-10
+  decided (routing yes, group-logging no), so it is **not** a reversal or defect — but the owner should be
+  aware that in a "release readiness" milestone, tapping Log Interaction with 2+ selected lands on a
+  placeholder screen. Enforcing the decision, not reopening it; noted for owner visibility only.
+
+**Suggestions.** Apply the MEDIUM picker-spec edit. No change to the routing/deferral (decided).
+
+**Risk: MEDIUM** (breadth of UI wiring + the two under-specified pickers; the data-layer correctness it
+depends on is owned and proven in Plan 02).
+
+---
+
+## CONSOLIDATED FINDINGS
+
+| # | Sev | Plan | Finding | Fix |
+|---|-----|------|---------|-----|
+| M1 | MEDIUM | 28-07 | Bulk Snooze preset picker + bulk Set Category picker are net-new but unspecified (no affordance/testID/copy/a11y) | Specify both pickers + testIDs + confirm copy in Task 2 |
+| L1 | LOW | 28-02 | `undoBulkQuickLog` "behavior-identical" claim is imprecise — it adds a bump `deleteTouchpoint` lacks (more correct, not identical) | Reword the truth line |
+| L2 | LOW | 28-02 | `bulkAddFavourites` rank-move idempotency — correct per ADR-075; ensure a test asserts star reads membership after re-add | Confirm Task 3 covers it (it does) |
+| L3 | LOW | 28-01/02 | Wave-label drift: 28-02 is wave 1 in frontmatter, wave 2 in the roadmap (disjoint files, harmless) | Align the roadmap label |
+| L4 | LOW | 28-03 | `depends_on:[28-01]` is spurious for a pure store | Relax to `wave:1, depends_on:[]` |
+| L5 | LOW | 28-04 | `HomeScreen.tsx:601` gate shape taken on the plan's word (surrounding wiring verified) | Executor confirms exact condition before widening |
+| L6 | LOW | 28-06 | Frozen universe = "current rows' ids" is correct only if `rows` is the full result set | Add a one-line note it must be the full array |
+| — | (owner) | 28-07 | Per-action eligibility `<flagged_assumption>` | Correctly recorded owner escalation — RESOLVED, not counted |
+| — | (decided) | 28-07 | CARDV-09 2+ path terminates at a placeholder until Phase 33 | Per D-10; owner visibility only, do not reopen |
+
+**HIGH: 0. Actionable MEDIUM: 1 (M1). Actionable LOW: 6 (L1-L6).**
+
+## OVERALL RISK: **LOW-MEDIUM**
+
+The data-layer core (28-02), which is where this repo's expensive bugs live, is correct-by-construction
+and matches every referenced writer on disk. Both cycle-1 HIGH fixes are sound and introduce no
+regression. The residual risk is concentrated in 28-07's UI breadth and its two under-specified pickers
+(M1). No decision reversal, no local-first violation, no recency/event-trail bypass. Recommend applying
+M1 and L1 before execution; L2-L6 are polish.
