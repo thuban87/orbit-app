@@ -20,8 +20,11 @@ import {
   type StatusDisplayState,
 } from "@/components/contact-card-ring";
 import { Icon } from "./Icon";
+import { statusDisplayLabel } from "./status-display-label";
 import type { IconSizeToken } from "@/theme/tokens/icon-size";
 import type { StatusTone } from "./icon-registry";
+
+export { statusDisplayLabel } from "./status-display-label";
 
 /** Per-state status/neutral tone token — a `StatusTone`, never a raw palette key. */
 const STATUS_TONE: Record<string, StatusTone> = {
@@ -31,16 +34,6 @@ const STATUS_TONE: Record<string, StatusTone> = {
   rogue: "rogue",
   snoozed: "border",
   null: "border",
-};
-
-/** Human-readable state name — the non-colour label channel. */
-const STATUS_LABEL: Record<string, string> = {
-  stable: "Stable",
-  wobble: "Wobbling",
-  decay: "Decaying",
-  rogue: "Rogue",
-  snoozed: "Snoozed",
-  null: "Not yet contacted",
 };
 
 function stateKey(state: StatusDisplayState): string {
@@ -55,7 +48,7 @@ export interface StatusGlyphProps {
 export function StatusGlyph({ state, size = "md" }: StatusGlyphProps) {
   const key = stateKey(state);
   const tone = STATUS_TONE[key];
-  const label = STATUS_LABEL[key];
+  const label = statusDisplayLabel(state);
   return (
     <View accessible accessibilityLabel={label}>
       <Icon name={statusGlyph(state)} tone={tone} size={size} />
