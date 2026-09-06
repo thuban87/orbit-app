@@ -1568,9 +1568,10 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
           </View>
           </View>
         ) : null}
-        <Animated.View style={[styles.listRegion, resultTransitionStyle]}>
+        <View style={styles.listRegion}>
           {query.viewMode === "list" ? (
-            <FlatList
+            <Animated.View style={[styles.listRegion, resultTransitionStyle]}>
+              <FlatList
               data={error || showInitialSkeleton ? [] : rows}
               keyExtractor={(item) => String(item.id)}
               renderItem={({ item }) => (
@@ -1620,9 +1621,14 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
                   colors={[colors.accent]}
                 />
               }
-            />
+              />
+            </Animated.View>
           ) : (
-            <CardGrid
+            <Animated.View
+              testID="dashboard-card-results"
+              style={[styles.listRegion, resultTransitionStyle]}
+            >
+              <CardGrid
               rows={cardRows}
               now={listNow}
               onPressContact={goToProfile}
@@ -1649,9 +1655,10 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
               refreshing={refreshing}
               onRefresh={onRefresh}
               bottomClearance={bottomClearance}
-            />
+              />
+            </Animated.View>
           )}
-        </Animated.View>
+        </View>
       </View>
       <DashboardOverlayHost />
       <CardContextMenu
