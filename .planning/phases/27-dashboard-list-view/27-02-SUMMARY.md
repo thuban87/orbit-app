@@ -11,9 +11,9 @@ provides:
   - Closed write-time right-swipe action validation and portable-key allowlisting.
 affects: [27-dashboard-list-view, 27-05, 36-ai-config]
 actuals:
-  tokens: 3190
+  tokens: 4536
   tasks: 2
-  commits: 2
+  commits: 3
 tech-stack:
   added: []
   patterns: [additive SQLite migration, closed-union settings validation, allowlist-now emit-later]
@@ -70,7 +70,7 @@ status: complete
 - **Started:** 2026-09-06T02:05:00Z
 - **Completed:** 2026-09-06T02:32:39Z
 - **Tasks:** 2/2 implementation tasks completed after the approved decision gate
-- **Files modified:** 8
+- **Files modified:** 12
 
 ## Accomplishments
 
@@ -82,6 +82,7 @@ status: complete
 
 1. **Task 2: Migration 020 — additive right-swipe preference column** — `5366f88` (`feat`)
 2. **Task 3: Preference DAO read/write/validate + backup allowlist** — `6aaddb1` (`feat`)
+3. **Post-merge regression fix: current-schema test fixtures** — `623ec09` (`fix`)
 
 ## Files Created/Modified
 
@@ -91,12 +92,17 @@ status: complete
 - `src/logic/dashboard-query-logic.ts` — right-swipe closed union.
 - `src/db/app-settings-dao.ts` — typed read, writable patch, SQL mapping, and validator.
 - `src/backup/backup-schema.ts` — allowlist-only portable key.
+- `src/services/notifications/notification-schedule.test.ts` — current-schema notification fixture migrated through v20.
+- `src/services/notifications/digest-schedule.test.ts` — current-schema digest fixture migrated through v20.
+- `src/backup/restore-apply.test.ts` — explicit current-schema restore fixture migrated through v20.
+- `src/db/migrations/full-chain.test.ts` — v20 migration-head and resulting-column regression coverage.
 
 ## Verification
 
 - `npx vitest run src/db/migrations/020-dashboard-swipe-pref.test.ts src/db/app-settings-dao.test.ts src/backup/backup-schema.test.ts` — 103 tests passed.
 - `npx tsc --noEmit` — passed.
 - `npm run check:colors` — passed.
+- `npm test` — passed (242 files, 2,264 tests) after the post-merge fixture fix.
 - Windows DEBUG build — completed after a clean Expo prebuild; physical database readback remains blocked by the pre-existing missing `expo-web-browser` dependency.
 
 ## Decisions Made
@@ -118,6 +124,16 @@ status: complete
 
 **Total deviations:** 1 auto-fixed (Rule 1). No source scope expansion.
 
+### Post-merge Regression Fix
+
+**2. [Rule 1 - Test fixture schema drift] Advanced explicit current-schema fixtures through migration 020.**
+- **Found during:** Full-suite verification after Plan 27-02 merged.
+- **Issue:** `notification-schedule.test.ts` stopped its in-memory migration chain at v19 while `getAppSettings()` now selects the v20 `dashboard_right_swipe_action` column, causing 33 notification tests to fail. Two sibling explicit-v19 fixtures and the full-chain head assertion had the same stale-current-schema assumption.
+- **Fix:** Registered `migration020` and target version 20 in the notification, digest, and restore fixtures; updated the full-chain regression to require a single v20 migration, target 20, and the new column.
+- **Files modified:** `src/services/notifications/notification-schedule.test.ts`, `src/services/notifications/digest-schedule.test.ts`, `src/backup/restore-apply.test.ts`, `src/db/migrations/full-chain.test.ts`
+- **Verification:** Focused suites: 7 files / 162 tests passed; full suite: 242 files / 2,264 tests passed; TypeScript, color, and whitespace checks passed.
+- **Committed in:** `623ec09`
+
 ## Issues Encountered
 
 The physical DEBUG readback could not complete because existing `src/services/auth.ts` imports `expo-web-browser` but the locked dependencies do not contain it. This is outside Plan 27-02 and is recorded in `.planning/WINDOWS.md` and `deferred-items.md`.
@@ -133,7 +149,7 @@ Plan 27-05 can read `dashboardRightSwipeAction` at swipe commit. Resolve the mis
 ## Self-Check: PASSED
 
 - Confirmed both created migration files and this summary exist on disk.
-- Confirmed task commits `5366f88` and `6aaddb1` exist in git history.
+- Confirmed task commits `5366f88`, `6aaddb1`, and post-merge fix `623ec09` exist in git history.
 
 ---
 *Phase: 27-dashboard-list-view*
