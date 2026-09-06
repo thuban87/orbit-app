@@ -50,6 +50,15 @@ export const ICON_REGISTRY = {
   "group-events": { outline: "people-outline", filled: "people" },
   "chevron-down": { outline: "chevron-down", filled: "chevron-down" },
 
+  // ---- Dashboard Card View actions and selection -----------------------
+  select: { outline: "ellipse-outline", filled: "checkmark-circle" },
+  "select-all": { outline: "checkmark-done-outline", filled: "checkmark-done" },
+  archive: { outline: "archive-outline", filled: "archive" },
+  snooze: { outline: "alarm-outline", filled: "alarm" },
+  category: { outline: "pricetag-outline", filled: "pricetag" },
+  frequency: { outline: "repeat-outline", filled: "repeat" },
+  overflow: { outline: "ellipsis-horizontal", filled: "ellipsis-horizontal" },
+
   // ---- Tab identities (the four persistent destinations) ----------------
   // `settings` above doubles as the Settings tab identity (TAB_ICON maps it).
   dashboard: { outline: "home-outline", filled: "home" },
