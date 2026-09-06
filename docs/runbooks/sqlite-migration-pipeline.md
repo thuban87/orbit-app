@@ -4,7 +4,7 @@
 
 Orbit evolves its on-device SQLite schema with ordered TypeScript migrations rather than SQL files or a remote database. Use this process when changing durable SQLite structure: it keeps one version step atomic, testable with node-side SQLite, and safe to retry after a failure.
 
-## Architecture (Phases 02, 11, 16, 17, 18.1)
+## Architecture (Phases 02, 11, 16, 17, 18.1, 24.2)
 
 The bootstrap opens `orbit.db`, sets connection PRAGMAs before opening a transaction, then calls the migration runner. The runner reads `PRAGMA user_version`, sorts pending steps, and commits each step's DDL and version bump together.
 
@@ -38,6 +38,8 @@ try {
 8. **`src/db/migrations/009-contact-method-normalization.ts`** — parent-table rebuild example: preserves/re-points every foreign-key child, proves child rows, and cuts a scalar representation over to normalized children.
 9. **`src/db/migrations/010-contact-method-label.ts`** — additive nullable metadata example following an immutable shipped rebuild.
 10. **`PRAGMA user_version`** — records the last fully committed step.
+11. **`src/db/migrations/017-knowledge-egress-datamove.ts`** — data-move example: copy every source row, re-read and prove its mapped destination, then remove the source inside the runner-owned transaction.
+12. **`src/db/migrations/018-custom-field-scope-history.ts`** — additive columns/table example that leaves a prior normalized current-value invariant intact.
 
 ## File Locations
 
@@ -57,6 +59,8 @@ try {
 | `src/db/migrations/009-contact-method-normalization.ts` | FK-safe contacts rebuild and normalized-method cutover. |
 | `src/db/migrations/009-contact-method-normalization.test.ts` | v8-to-v9 method, child-preservation, and rollback proof. |
 | `src/db/migrations/010-contact-method-label.ts` | Forward-only nullable method-label addition. |
+| `src/db/migrations/017-knowledge-egress-datamove.ts` | Verified copy-then-remove fuel-to-Memory data move. |
+| `src/db/migrations/018-custom-field-scope-history.ts` | Additive custom-field metadata and retained-value history. |
 | `src/db/migrations/full-chain.test.ts` | Runs the shared registered migration chain to the imported target version. |
 | `src/db/app-settings-dao.test.ts` | Migration-002 defaults and validated settings-write coverage. |
 | `src/db/__testkit__/node-sqlite.ts` | In-memory SQLite adapter for migration tests. |
@@ -81,7 +85,7 @@ try {
 
 3. **Register the migration** in the exported `MIGRATIONS` list in `src/db/database.ts`, and advance `TARGET_VERSION` to the same integer. The runner performs the transaction and `user_version` bump; do not add a second transaction or manually update `user_version` in the migration.
 
-4. **Add an in-memory test** beside the migration. Open the fixture from `src/db/__testkit__/node-sqlite.ts`, run the real migration runner, and assert the schema/data result plus retry safety for a throwing step where relevant. For a representation conversion, test source-byte preservation, complete destination coverage, and an unchanged source database after a classified failure.
+4. **Add an in-memory test** beside the migration. Open the fixture from `src/db/__testkit__/node-sqlite.ts`, run the real migration runner, and assert the schema/data result plus retry safety for a throwing step where relevant. For a representation conversion or data move, map every source row to a newly inserted destination, re-read each destination to prove the important values, then remove sources only after every proof passes. Test source-byte preservation, complete destination coverage, and an unchanged source database after a classified failure.
 
 5. **For a parent-table rebuild, derive and re-point every foreign-key child before dropping the old parent.** `PRAGMA defer_foreign_keys` delays constraint checking but does not suppress `ON DELETE` actions. Assert the child set, per-child row counts, retained references such as `app_settings.sun_contact_id`, and `foreign_key_check`; use one atomic migration transaction.
 
@@ -115,13 +119,15 @@ try {
 
 6. **Dropping a parent before its children point to the replacement.** Deferred checking does not stop SQLite's immediate cascade actions. Rebuild and verify every child first; `foreign_key_check` alone cannot prove rows were not cascaded away.
 
+7. **Treating equal row counts as a data-move proof.** Duplicate sources can mask a dropped row. Retain a source-to-destination mapping and re-read every destination before deleting any source.
+
 ## Smoke Test
 
 ```bash
-npx vitest run src/db/migrations/runner.test.ts src/db/migrations/full-chain.test.ts src/db/migrations/006-normalize-custom-field-values.test.ts src/db/migrations/007-tombstones.test.ts src/db/migrations/008-restore-photo-journal.test.ts src/db/migrations/009-contact-method-normalization.test.ts src/db/migrations/010-contact-method-label.test.ts
+npx vitest run src/db/migrations/runner.test.ts src/db/migrations/full-chain.test.ts src/db/migrations/006-normalize-custom-field-values.test.ts src/db/migrations/017-knowledge-egress-datamove.test.ts src/db/migrations/018-custom-field-scope-history.test.ts
 ```
 
-Expected: the runner and full-chain suites reach the registered target, while representation conversion, tombstone defaults, restore-journal checks, and the FK-safe normalized-method rebuild pass.
+Expected: the runner and full-chain suites reach the registered target, while representation conversion, verified data moves, and additive schema history checks pass.
 
 ```bash
 npx tsc --noEmit && npx biome check src/db
