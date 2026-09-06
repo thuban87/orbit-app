@@ -1,10 +1,10 @@
 ---
 schema_version: 1
-open_count: 37
+open_count: 38
 waived_count: 0
 fixed_count: 6
-total_count: 43
-last_updated: 2026-09-06T09:01:56.888Z
+total_count: 44
+last_updated: 2026-09-06T09:20:03.702Z
 ---
 
 # Broken Windows Ledger
@@ -58,6 +58,7 @@ last_updated: 2026-09-06T09:01:56.888Z
 | 41 | 28 | unrun-verify | src/components/CardGrid.tsx |  | Pixel UAT remains required for card-grid layout, text scaling, status visuals, navigation, and optimistic favourite feedback. | open |  | 2026-09-06T08:31:42.020Z |  |
 | 42 | 28 | deviation | .planning/phases/28-dashboard-card-view/28-03-PLAN.md |  | Plan verification's grep -Lq status was inverted; executor used an equivalent no-match assertion. | open |  | 2026-09-06T08:50:50.786Z |  |
 | 43 | 28 | unrun-verify | src/components/GridCard.tsx |  | Pixel UAT still required for adaptive/search card ellipsis and highlight appearance | open |  | 2026-09-06T09:01:56.888Z |  |
+| 44 | 28 | stub | src/screens/HomeScreen.tsx | 1261 | Selection bulk-actions placeholder region; Plan 07 owns the controls. | open |  | 2026-09-06T09:20:03.702Z |  |
 
 ````json
 [
@@ -575,6 +576,18 @@ last_updated: 2026-09-06T09:01:56.888Z
     "status": "open",
     "reason": "",
     "recorded_at": "2026-09-06T09:01:56.888Z",
+    "resolved_at": null
+  },
+  {
+    "id": 44,
+    "kind": "stub",
+    "phase": "28",
+    "file": "src/screens/HomeScreen.tsx",
+    "line": 1261,
+    "description": "Selection bulk-actions placeholder region; Plan 07 owns the controls.",
+    "status": "open",
+    "reason": "",
+    "recorded_at": "2026-09-06T09:20:03.702Z",
     "resolved_at": null
   }
 ]
