@@ -1,202 +1,211 @@
 ---
 phase: 28-dashboard-card-view
-verified: 2026-09-06T09:45:00Z
-status: gaps_found
+verified: 2026-09-06T11:44:05Z
+status: human_needed
 score: "0/5 roadmap must-haves verified"
-behavior_unverified: 4
+behavior_unverified: 5
 overrides_applied: 0
-gaps:
-  - truth: "Bulk Quick Log is immediate and reversibly undoable for a selected batch."
-    status: failed
-    reason: "A second press while the first batch is pending starts another bulk transaction. The singleton Snackbar retains only the later receipt, leaving the first committed batch without the advertised Undo path."
-    artifacts:
-      - path: "src/components/BulkActionSurface.tsx"
-        issue: "Action controls disable only at selectedCount === 0; there is no in-flight disabled state."
-      - path: "src/screens/HomeScreen.tsx"
-        issue: "performBulkQuickLog has no synchronous single-flight/pending guard."
-    missing:
-      - "Fence every bulk action with a synchronous in-flight guard plus rendered pending state."
-      - "Add a deferred-write test proving a double press commits one Quick Log batch and retains its Undo receipt."
-  - truth: "Bulk Set Category applies only to contacts selected when the operation is committed."
-    status: failed
-    reason: "The async category read captures selected IDs before await and stores that stale snapshot in the picker; a user can exit or change selection before choosing a category."
-    artifacts:
-      - path: "src/screens/HomeScreen.tsx"
-        issue: "onBulkOpenCategoryPicker captures ids before listCategories; picker commit uses picker.ids without revalidating a selection session."
-    missing:
-      - "Bind the picker to a selection-session token and revalidate at open and commit, or lock selection while it is pending."
-      - "Add a deferred category-read test for exit/change-selection before commit."
+re_verification:
+  previous_status: gaps_found
+  previous_score: "0/5"
+  gaps_closed:
+    - "Bulk Quick Log is immediate and reversibly undoable for a selected batch."
+    - "Bulk Set Category applies only to contacts selected when the operation is committed."
+  gaps_remaining: []
+  regressions: []
 behavior_unverified_items:
-  - truth: "The avatar-first grid remains readable at large text scale and handles grapheme-rich names/context/search snippets without layout corruption."
-    test: "On a Pixel, inspect normal, large-text, and grapheme-rich contacts in normal and search Card View."
-    expected: "Normal portrait is a compact three-column grid; large text reflows rather than clamps; text remains single-line ellipsized without broken graphemes."
-    why_human: "The relevant plan truths are backstop/device-UAT checks; TypeScript and source inspection cannot observe native layout or React Native text shaping."
-  - truth: "Card taps and long presses are correctly disambiguated and all eight menu actions operate from a real card."
-    test: "Tap and long-press a card, then exercise the context-menu actions and TalkBack actions."
-    expected: "Tap opens Profile only; long press opens the ordered eight-item menu only; no Delete or Archive row appears."
-    why_human: "There is no rendered-card/device interaction test; symbol wiring cannot prove native gesture arbitration or accessibility action delivery."
-  - truth: "Multi-select freezes the result universe, replaces controls, and Back exits selection before navigation."
-    test: "Enter selection both ways, refresh/change the dashboard results, Select All, and use Android Back."
-    expected: "Only entry-time rows remain selectable; controls are replaced, count updates, and Back exits selection without navigating."
-    why_human: "Store tests cover isolated state only; no integration test exercises the HomeScreen async entry, renderer fence, or BackHandler."
-  - truth: "After successful bulk operations selection persists while Archive removes only archived cards, and count-aware detailed logging reaches the intended destination."
-    test: "Perform each bulk action with one and multiple selected contacts, including Archive and Log Interaction."
-    expected: "Ordinary actions preserve selection, Archive removes archived cards, one contact goes to individual logging, and two or more go to Group Log with participant IDs."
-    why_human: "No HomeScreen/UI integration test exercises post-commit selection lifetime, navigation, confirm dialogs, or native picker behavior."
+  - truth: "User can browse the responsive avatar-first Card grid with all required status, context, favourite, and search presentation."
+    test: "On a fresh debug APK, inspect normal, narrow/large-text, wide, empty/error, and search states, including grapheme-rich names."
+    expected: "The measured grid changes columns appropriately; every card retains its geometry, status ring/glyph semantics, real context/search snippet, and readable ellipsis."
+    why_human: "No native render/device test exercises React Native layout, text shaping, or visual state composition."
+  - truth: "Tap opens Profile and long-press exposes exactly the eight safe card actions without duplicate press behavior."
+    test: "Tap and long-press a real card; invoke each sheet and TalkBack action."
+    expected: "Tap only opens Profile; long-press only opens the eight-row sheet; Delete, Archive, and List swipes are absent."
+    why_human: "Source wiring exists, but no rendered-card gesture or accessibility integration test runs it."
+  - truth: "Selection entry, frozen-universe rendering, Select All, count, control replacement, and Android Back behave as one user flow."
+    test: "Enter through both Select paths, refresh/change live results, Select All, then press Android Back."
+    expected: "Only entry-time contacts are selectable; the normal controls are replaced; count changes; Back exits selection before navigation."
+    why_human: "The Zustand unit tests and source fence do not execute HomeScreen's asynchronous/native interaction path."
+  - truth: "Every bulk action is reachable and correct, with count-aware detailed-log routing and recoverable Archive."
+    test: "For one and multiple selected contacts, run every bulk action, including large Quick Log/Archive/Frequency confirmation, pickers, and Undo."
+    expected: "Writes apply to the intended contacts; one detailed log opens the individual flow, two or more opens Group Log with IDs; only Archive removes cards; normal writes preserve selection."
+    why_human: "DAO and coordination tests prove the underlying contracts, but no HomeScreen integration test presses the real callbacks or confirms their rendered state."
+  - truth: "Bulk Quick Log remains single-flight through the actual control and selection can exit normally."
+    test: "Repeat the paired Quick Log action while a deliberately delayed write is pending, then use Done and Undo."
+    expected: "Exactly one write and one Undo receipt exist; Working/disabled controls are visible; Done does not unlock the in-flight writer."
+    why_human: "A fresh-APK Pixel check proved two immediate taps made one interaction and normal exit, but the device write completed too quickly to observe the pending window; WR-01 confirms the test is not a HomeScreen-level regression."
+decision_coverage:
+  honored: 11
+  total: 11
+  not_honored: []
+human_verification:
+  - test: "Exercise Card layout, large text, search, and grapheme-rich data on a device."
+    expected: "The grid stays compact, legible, and semantically complete across supported layout states."
+    why_human: "Native layout and text rendering are not covered by the test runtime."
+  - test: "Exercise real-card gestures, accessibility actions, selection, refresh, and Back."
+    expected: "Gesture arbitration, frozen selection, control replacement, and exit behavior match the roadmap contract."
+    why_human: "No rendered HomeScreen integration test exists."
+  - test: "Exercise all bulk actions, confirmations, pickers, Undo, and one-vs-many Log Interaction routing."
+    expected: "Only the intended selected contacts change, UI feedback is truthful, and archive is recoverable."
+    why_human: "WR-01 remains: coordination tests model the gate rather than pressing HomeScreen controls."
 ---
 
 # Phase 28: Dashboard Card View Verification Report
 
 **Phase Goal:** The Card view gives an avatar-first grid for fast visual scanning and becomes the single home for multi-select bulk management of contacts.
-**Verified:** 2026-09-06T09:45:00Z
-**Status:** gaps_found
-**Re-verification:** No — initial verification
+**Verified:** 2026-09-06T11:44:05Z
+**Status:** human_needed
+**Re-verification:** Yes — after gap closure
 
 ## Goal Achievement
+
+The two prior blockers are closed in current source. This is not a clean automated pass: all five roadmap criteria include runtime UI/gesture/layout flows that have no full HomeScreen integration test or complete device UAT. Under the behavior-evidence rule, source presence plus wiring cannot certify them.
 
 ### Observable Truths
 
 | # | Truth | Status | Evidence |
 | --- | --- | --- | --- |
-| 1 | Avatar-first responsive Card grid scans real Dashboard contacts with status, favourite, context, and search presentation. | ⚠️ PRESENT_BEHAVIOR_UNVERIFIED | `HomeScreen` obtains real SQLite `DashboardRow[]`, passes them to `CardGrid`, which renders `GridCard`; source has responsive keyed columns, ring/glyph/star, shared empty states and search data. Device text-scale/grapheme/layout backstops are untested. |
-| 2 | Tap opens Profile; long-press offers exactly the non-destructive per-contact menu, without List swipes. | ⚠️ PRESENT_BEHAVIOR_UNVERIFIED | `GridCard` owns RN `onPress`/`onLongPress`; `CardContextMenu` contains the locked eight action rows and no swipe dependency. No rendered/native gesture test exists. |
-| 3 | Multi-select is entered from menu or overflow, freezes the result universe, replaces Dashboard controls, and exits before Back navigation. | ⚠️ PRESENT_BEHAVIOR_UNVERIFIED | Store, render filter, selection controls, overflow callback, and `BackHandler` exist and are wired. No integration test covers their async/user interaction sequence. |
-| 4 | Bulk management safely performs the required actions, including immediate reversible Quick Log and current-selection category updates. | ✗ FAILED | Two observable release failures: duplicate Quick Log presses can leave a committed batch unundoable, and deferred Set Category can mutate contacts no longer selected. |
-| 5 | Bulk Archive is recoverable and selection persists correctly after normal operations. | ⚠️ PRESENT_BEHAVIOR_UNVERIFIED | DAO archive events, confirm copy, `removeFromUniverse`, and count-aware routing are present; no UI/integration test exercises post-commit behavior. |
+| 1 | Avatar-first responsive Card grid scans real contacts with status, favourite, adaptive context, and search presentation. | ⚠️ PRESENT_BEHAVIOR_UNVERIFIED | `HomeScreen` reads real `DashboardRow[]`, filters only active selection rows, and passes to `CardGrid`; `CardGrid` uses keyed `FlatList` columns from width/font scale and renders `GridCard` from those rows. `GridCard` renders ring + glyph, binary star, line 3, and search explanation/snippet. No device layout/text-scale/grapheme test. |
+| 2 | Card tap opens Profile; long-press offers exactly the eight safe per-contact actions, without List swipes. | ⚠️ PRESENT_BEHAVIOR_UNVERIFIED | `GridCard` wires normal `onPress` and `onLongPress`; `CardContextMenu` has exactly View Profile, Quick Log, Log Interaction, Message, Edit Contact, Favorite/Unfavorite, Snooze/Unsnooze, Select. No Delete/Archive row is present. Native gesture/accessibility behavior is unexercised. |
+| 3 | Multi-select enters from both paths, freezes its universe, replaces controls, and Back exits selection first. | ⚠️ PRESENT_BEHAVIOR_UNVERIFIED | Store snapshots/deduplicates universe, fences toggles, and removes archived IDs; `HomeScreen` filters `cardRows`, mounts `BulkActionSurface` in place of normal controls, and consumes `hardwareBackPress`. Unit tests cover the store, not the composed UI flow. |
+| 4 | Bulk surface safely performs Quick Log, detailed-log routing, explicit favourite/snooze actions, category, Archive, and frequency-only sensitive actions. | ⚠️ PRESENT_BEHAVIOR_UNVERIFIED | All actions are mounted and source-wired to atomic DAO composers; Quick Log's single-flight receipt path and category session revalidation close the old blockers. Focused 34-test suite proves gate/store/DAO behavior, and fresh-APK paired Quick Log taps made exactly one manual interaction. The host's complete control/picker/confirmation paths remain untested. |
+| 5 | Archive is recoverable, ordinary writes preserve selection, and Back exits before navigation. | ⚠️ PRESENT_BEHAVIOR_UNVERIFIED | DAO writes immutable archive events; `performBulkArchive` calls `removeFromUniverse` only after success, while normal completion does not exit selection; Back handler calls `exitBulkSelection` and returns `true`. No end-to-end native interaction test. |
 
-**Score:** 0/5 roadmap truths verified (4 present but behavior-unverified)
+**Score:** 0/5 roadmap truths verified (5 present, behavior-unverified)
 
-## Requirements Coverage
+### Re-verification of Previous Gaps
 
-| Requirement | Source plans | Status | Evidence |
-| --- | --- | --- | --- |
-| CARDV-01 | 01 | ⚠️ NEEDS HUMAN | Responsive real-data `CardGrid`/`GridCard` exists; device grid geometry/text scale remains unobserved. |
-| CARDV-02 | 01, 04 | ⚠️ NEEDS HUMAN | Shared status/ring/snooze composition and deterministic line-3 selector exist; rendered native presentation is untested. |
-| CARDV-03 | 01, 04 | ⚠️ NEEDS HUMAN | Binary optimistic star and shared search descriptors/snippet are wired; search geometry/highlight requires device check. |
-| CARDV-04 | 05 | ⚠️ NEEDS HUMAN | Locked menu and canonical routes are source-verified; native tap/long-press/accessibility delivery has no test. |
-| CARDV-05 | 03, 06 | ⚠️ NEEDS HUMAN | Entry points, circles, tap toggle, and count are wired; full UI flow is not tested. |
-| CARDV-06 | 03, 06 | ⚠️ NEEDS HUMAN | Store snapshot plus renderer fence/control replacement are present; no HomeScreen flow test proves it at runtime. |
-| CARDV-07 | 02, 07 | ✗ BLOCKED | Set Category may operate on stale, no-longer-selected IDs after `listCategories` resolves. |
-| CARDV-08 | 02, 07 | ✗ BLOCKED | A duplicate small-batch Quick Log can create an Undo receipt that the singleton Snackbar overwrites. |
-| CARDV-09 | 07 | ⚠️ NEEDS HUMAN | Source routes 1 to `LogContact`, 2+ to serializable `GroupLog.participantIds`; navigation flow has no UI test. |
-| CARDV-10 | 02, 07 | ⚠️ NEEDS HUMAN | Transactional archive with immutable events and non-destructive confirmation copy are present; actual archive/restore UX is untested. |
-| CARDV-11 | 02, 07 | ⚠️ NEEDS HUMAN | Frequency-only sensitive surface and positive-integer DAO guard exist; picker/confirmation needs device exercise. |
-| CARDV-12 | 03, 06, 07 | ⚠️ NEEDS HUMAN | `removeFromUniverse`, ordinary-operation persistence by omission, and `BackHandler` are wired; no interaction test covers the sequence. |
+| Previous blocker | Current evidence | Result |
+| --- | --- | --- |
+| Duplicate Quick Log could overwrite the first Undo receipt. | The gate synchronously claims before a write, consumes a claim once, and ignores stale releases. `HomeScreen` retains the consumed claim through `bulkQuickLog` and its receipt-backed Snackbar Undo. `BulkActionSurface` presents pending/disabled state. The focused suite passes and fresh-APK paired taps yielded one manual interaction. | ✓ Code-level gap closed; pending-window UI remains human verification. |
+| Deferred Set Category could mutate stale selected IDs. | Category loading and commit both query `getCurrentSelectionIds(useDashboardSelectionStore.getState(), sessionId)`; a changed/exited session yields no IDs and releases the claim. The store increments sessions only on valid entry and deduplicates/fences the universe. | ✓ Code-level gap closed; real picker host path remains human verification. |
 
-All twelve requirement IDs are claimed by at least one plan; none is orphaned. The two blocked requirements prevent the phase goal from being achieved.
-
-## Plan Must-Have Audit
-
-| Plan | Explicit source/test checks | Result | Exceptions |
-| --- | --- | --- | --- |
-| 28-01 | Grid components, semantic icon registry, shared data/empty-state/favourite wiring | Present and flowing | Two Pixel-only backstop truths (text reflow and grapheme rendering) remain unverified. |
-| 28-02 | Transactional composers, canonical Quick Log shape/receipt/undo, archive events, single-column category/frequency cores | Verified by focused DAO tests | Warning: `bulkSnooze` resolves the preset date once per contact, so a batch crossing midnight can use different dates. |
-| 28-03 | Ephemeral frozen-universe store, toggle fence, Select All, archive removal, exit | Partially verified by focused store tests | Warning: `enterSelection` accepts a seed not in its supplied universe, defeating the store-level invariant for a non-card caller. |
-| 28-04 | Shared candidate/search reads and deterministic strict-tier compact selector | Verified by focused selector tests | One Pixel grapheme/ellipsis backstop remains unverified. |
-| 28-05 | Eight-row menu, canonical host routes, no destructive rows/swipes | Present and wired | Tap/long-press and accessibility interaction need device evidence. |
-| 28-06 | Selection entry, controls, renderer fence, overflow enablement, Back hook | Present and wired | No integration test proves persisted async entry or Back behavior. |
-| 28-07 | Explicit action surface, DAO calls, confirmations, undo path, routing, archive removal | Partially wired | Quick Log single-flight and category selection-session integrity are missing (blocking). |
-
-## Required Artifacts
+### Required Artifacts
 
 | Artifact | Expected | Status | Details |
 | --- | --- | --- | --- |
-| `src/components/GridCard.tsx` | Avatar-first presentational card | ✓ VERIFIED | 454 substantive lines; shared Avatar/ring/glyph/recency/a11y helpers; no DB/navigation imports. |
-| `src/components/CardGrid.tsx` | Responsive virtualized grid | ✓ VERIFIED | Uses `useWindowDimensions`, keyed `FlatList`, full shared list surface contract, and real rows. |
-| `src/components/CardContextMenu.tsx` | Eight-action contact menu | ✓ VERIFIED | 163 substantive lines; fixed eight rows, semantic icons, no Delete/Archive. |
-| `src/components/BulkActionSurface.tsx` | Explicit bulk controls | ⚠️ PARTIAL | Surface is substantive and mounted, but has no pending-operation fence. |
-| `src/db/bulk-actions-dao.ts` | Atomic bulk composers | ✓ VERIFIED | One outer write transaction and core composition per action; focused SQLite tests pass. |
-| `src/stores/dashboard-selection-store.ts` | Ephemeral frozen selection session | ⚠️ PARTIAL | No persistence/DB usage and toggle is fenced; unvalidated `seedId` can be out of universe. |
-| `src/logic/card-line3-selection.ts` | Compact deterministic line-3 selection | ✓ VERIFIED | Shared date utility, strict tiers, birthday exclusion, stable prompt selection; focused tests pass. |
-| `src/navigation/types.ts` | GroupLog participant-ID handoff | ✓ VERIFIED | `GroupLog: { participantIds?: number[] } | undefined` is serializable and used by bulk routing. |
+| `src/components/GridCard.tsx` | Presentational avatar-first card | ✓ VERIFIED | Substantive card composition, native press/long-press paths, a11y actions, ring/glyph, star, context/search rows; data supplied only by props. |
+| `src/components/CardGrid.tsx` | Responsive virtualized real-data grid | ✓ VERIFIED | Keyed `FlatList`, measured columns, shared empty/loading/refresh surface, and `DashboardRow` → `GridCard` mapping. |
+| `src/components/CardContextMenu.tsx` | Eight-action non-destructive menu | ✓ VERIFIED | Fixed eight item array; no destructive rows or swipe mechanism. |
+| `src/stores/dashboard-selection-store.ts` | Ephemeral frozen selection session | ✓ VERIFIED | In-memory, deduplicated universe, valid-only seed, fence, select-all, archive removal, and explicit exit; active unit tests pass. |
+| `src/components/BulkActionSurface.tsx` | Explicit busy-aware bulk controls | ✓ VERIFIED | All required actions plus frequency-only sensitive sheet; `pending` disables actions and supplies visible/a11y busy state while Done remains operable. |
+| `src/logic/dashboard-bulk-action-session.ts` | Single-flight gate and session validator | ✓ VERIFIED | Synchronous claim/consume/release ownership and current-session ID helper, directly exercised by focused tests. |
+| `src/db/bulk-actions-dao.ts` | Atomic bulk writers and exact Quick Log undo | ✓ VERIFIED | One outer transaction per non-empty operation, composed cores, canonical Quick Log shape/receipt, immutable events, positive-frequency guard; node-SQLite behavioral tests pass. |
+| `src/navigation/types.ts` | Serializable Group Log handoff | ✓ VERIFIED | `GroupLog: { participantIds?: number[] } | undefined`, used by the 2+ selection route. |
 
-## Key Link Verification
+### Key Link Verification
 
 | From | To | Via | Status | Details |
 | --- | --- | --- | --- | --- |
-| SQLite dashboard reads | CardGrid → GridCard | `reload` sets real `rows`; CardGrid maps each row | ✓ WIRED | `dashboard-read.ts` runs `SELECT ... FROM contacts`; no static/mock fallback. |
-| Grid star | HomeScreen favourite overlay/DAO | rendered membership → existing optimistic `toggleFavourite` | ✓ WIRED | Binary membership is `favourite_rank !== null`; no rank ordering in Card components. |
-| Grid status | shared ring/glyph utilities | `isSnoozed` display state → `ringVisual` + `StatusGlyph` | ✓ WIRED | Null state omits glyph; snooze uses neutral ring plus snooze glyph. |
-| Menu/overflow Select | frozen selection store | `enterSelection(rows.map(...))` | ⚠️ PARTIAL | Normal callers seed valid rows, but store accepts an arbitrary out-of-universe seed. |
-| Bulk surface | DAO composers | HomeScreen callbacks | ✗ NOT SAFE | Calls are wired, but duplicate submission and stale category snapshot violate correctness. |
-| Small Quick Log | receipt → Snackbar Undo → atomic undo DAO | `undoBulkQuickLog(receipt)` | ✗ NOT SAFE | First of overlapping receipts is overwritten by the singleton snackbar. |
-| Archive success | selection store | `removeFromUniverse(ids)` | ✓ WIRED | Removes from both selected IDs and frozen universe after DAO success. |
-| Detailed Log | navigation | 1 `LogContact`; 2+ `GroupLog({participantIds})` | ✓ WIRED | Consumption is intentionally deferred to Phase 33, not a Phase 28 gap. |
+| SQLite Dashboard reads | `HomeScreen` → `CardGrid` → `GridCard` | `rows` / `cardRows` | ✓ WIRED | Real query results populate state; selection uses `rows.filter(frozenIds.has)` before rendering. |
+| Card favourite | Existing optimistic host path → favourites DAO | overlay membership and `toggleFavourite` | ✓ WIRED | Membership is `favourite_rank !== null`, not rank ordering; no Card-local writer. |
+| Card status | shared ring/glyph utilities | `isSnoozed` + `ringVisual` + `StatusGlyph` | ✓ WIRED | Snooze uses neutral ring, null status suppresses glyph, and accessibility description is textual. |
+| Context/overflow Select | selection store | `enterSelection(rows/currentEligibleIds)` | ✓ WIRED | Long-press seeds a current row; overflow awaits persisted Card view then enters. |
+| Bulk controls | HomeScreen handlers → DAO composers | synchronous gate / token claim | ✓ WIRED | Every writer-facing action obtains a claim; confirm/picker choices consume it once; completion is token-bound. |
+| Small Quick Log | DAO receipt → Snackbar Undo → atomic undo | `undoBulkQuickLog(receipt)` | ✓ WIRED | Receipt-specific Undo is retained; prior singleton-overlap failure is fenced. |
+| Category picker | session token → current IDs at choice → `bulkSetCategory` | `getCurrentSelectionIds` at read and commit | ✓ WIRED | Stale/exited/replaced selection writes nothing. |
+| Archive success | DAO → selection store | `removeFromUniverse(ids)` | ✓ WIRED | Only successful archive removes IDs; normal operations intentionally preserve selection. |
+| Detailed Log | count-aware navigation | 1 `LogContact`; 2+ `GroupLog({participantIds})` | ✓ WIRED | Phase 33 owns eventual Group Log consumption, not this phase. |
 
-## Data-Flow Trace (Level 4)
+### Data-Flow Trace (Level 4)
 
 | Artifact | Data variable | Source | Produces Real Data | Status |
 | --- | --- | --- | --- | --- |
-| `HomeScreen`/`CardGrid` | `rows` | `listDashboardPopulation` / `composeDashboardSearch` → SQLite `contacts` query | Yes | ✓ FLOWING |
-| `GridCard` line 3 | `line3ByContactId` | `readLine3Candidates` → `selectCardLine3` | Yes | ✓ FLOWING |
-| `GridCard` search rows | `searchResultsByContactId` / `item.snippet` | `composeDashboardSearch` descriptors | Yes | ✓ FLOWING |
-| Bulk category picker | `categories` | `listCategories(getExecutor())` | Yes, but target IDs are stale after async wait | ⚠️ STALE_TARGET |
+| `CardGrid` | `rows` / `cardRows` | `HomeScreen.reload` dashboard SQLite read; selection filter | Yes | ✓ FLOWING |
+| `GridCard` context/search | `line3ByContactId`, search results, `item.snippet` | shared candidate/search reads and selector | Yes | ✓ FLOWING |
+| Category picker | `categories`, current selected IDs | `listCategories(getExecutor())`, then active Zustand session | Yes | ✓ FLOWING |
+| Bulk mutation | selected IDs | frozen selection store → DAO composed transaction | Yes | ✓ FLOWING |
+
+## Requirements Coverage
+
+| Requirement | Status | Evidence |
+| --- | --- | --- |
+| CARDV-01 | ⚠️ NEEDS HUMAN | Responsive `CardGrid` and real-card data path exist; native geometry/text-scale validation is absent. |
+| CARDV-02 | ⚠️ NEEDS HUMAN | Ring/glyph/null/snooze composition and line-3 selector are wired; native visual/a11y rendering is unexercised. |
+| CARDV-03 | ⚠️ NEEDS HUMAN | Binary optimistic star and search descriptors/snippet are wired; real interaction/layout remains untested. |
+| CARDV-04 | ⚠️ NEEDS HUMAN | Exact safe menu and host routes are source-verified; no device gesture/accessibility test. |
+| CARDV-05 | ⚠️ NEEDS HUMAN | Both entry paths, selection circles/toggles/count, and store fence exist; no rendered UI flow test. |
+| CARDV-06 | ⚠️ NEEDS HUMAN | Frozen store plus renderer fence/control replacement is wired; refresh/Select All flow needs device verification. |
+| CARDV-07 | ⚠️ NEEDS HUMAN | Required explicit actions and session-safe category/single-flight contracts are source/test verified; real control paths are not tested. |
+| CARDV-08 | ⚠️ NEEDS HUMAN | DAO proves canonical rows/receipt/undo; Pixel paired-tap UAT proves one interaction, but large-confirm and visible pending/Undo UI remain untested. |
+| CARDV-09 | ⚠️ NEEDS HUMAN | Exact 1 vs 2+ route source wiring and serializable IDs exist; navigation flow needs device verification. |
+| CARDV-10 | ⚠️ NEEDS HUMAN | Atomic archive/events plus post-success universe removal are tested/source-wired; device recovery/confirmation UX untested. |
+| CARDV-11 | ⚠️ NEEDS HUMAN | Frequency-only sensitive surface and positive-integer DAO validation exist; rendered confirmation needs exercise. |
+| CARDV-12 | ⚠️ NEEDS HUMAN | Ordinary-operation persistence by omission, archive removal, and Back handler are source-wired; cross-screen sequence untested. |
+
+All CARDV-01 through CARDV-12 appear in Phase 28 plans; no requirement is orphaned.
 
 ## Behavioral Spot-Checks
 
-| Behavior | Command | Result | Status |
+| Behavior | Command / observation | Result | Status |
 | --- | --- | --- | --- |
-| Type integrity | `npx tsc --noEmit` | Exit 0 | ✓ PASS |
-| Theme-token integrity | `npm run check:colors` | Exit 0 | ✓ PASS |
-| Bulk atomicity/undo/frequency/archive | `npx vitest run src/db/bulk-actions-dao.test.ts` | Included focused run: 23 total tests across phase test files, exit 0 | ✓ PASS |
-| Frozen-store/line3/overflow contracts | `npx vitest run ...selection-store... ...line3... ...overflow...` | Included focused run: 23 total tests, exit 0 | ✓ PASS |
-| Duplicate Quick Log / stale category selection | Requirement-linked test search | No test found | ✗ FAIL |
+| Focused bulk correctness | `npx vitest run src/logic/dashboard-bulk-action-session.test.ts src/stores/dashboard-selection-store.test.ts src/db/bulk-actions-dao.test.ts src/db/snooze-dao.test.ts` | 4 files, 34 tests passed | ✓ PASS |
+| Type integrity | `npx tsc --noEmit` | exit 0 | ✓ PASS |
+| Theme-token integrity | `npm run check:colors` | exit 0 | ✓ PASS |
+| Whole workspace | `npm test` | 249 files, 2,332 tests passed | ✓ PASS |
+| Actual duplicate Quick Log path | Fresh droid-built debug APK / Pixel UAT | Two immediate Quick Log taps yielded one new manual interaction; selection exited normally; no RN error observed | ✓ PASS (partial scenario) |
 
 ## Probe Execution
 
-Step 7c: SKIPPED — no phase-declared or conventional `scripts/*/tests/probe-*.sh` probes exist.
+Step 7c: SKIPPED — Phase plans/summaries declare no probes and no `scripts/*/tests/probe-*.sh` file exists.
 
 ## Test Quality Audit
 
 | Test File | Linked Req | Active | Skipped | Circular | Assertion Level | Verdict |
 | --- | --- | --- | --- | --- | --- | --- |
-| `bulk-actions-dao.test.ts` | CARDV-07/08/10/11 | 11 | 0 | No writes/circular fixture generation | Value + transaction behavior | PASS |
-| `dashboard-selection-store.test.ts` | CARDV-05/06/12 | 6 | 0 | No | Value/state behavior | PARTIAL — lacks invalid seed case |
+| `bulk-actions-dao.test.ts` | CARDV-07/08/10/11 | 10 | 0 | No — real node-SQLite DB with independent assertions | Value + transactional behavior | PASS |
+| `dashboard-selection-store.test.ts` | CARDV-05/06/12 | 7 | 0 | No | Value/state behavior | PASS |
+| `dashboard-bulk-action-session.test.ts` | CARDV-06/07/08/12 | 6 | 0 | No | Deferred behavioral gate/session behavior | WARNING — models, rather than invokes, `HomeScreen` callbacks (WR-01). |
 | `card-line3-selection.test.ts` | CARDV-02/03 | 6 | 0 | No | Value/determinism | PASS |
-| `dashboard-overflow-actions.test.ts` | CARDV-05 | 2 | 0 | No | Value/callback | PARTIAL — does not test HomeScreen async persistence/entry |
+| `dashboard-overflow-actions.test.ts` | CARDV-05 | 1 | 0 | No | Value/callback | PARTIAL — no persisted-view/host entry test. |
 
-No disabled linked tests or circular expected-value generation was found. The missing duplicate-submit and stale-category tests are blocker-level because they leave core bulk behavior unproved and the source demonstrates the failures.
+No disabled requirement-linked tests or circular expected-value generation was found. The current review's WR-01 is retained as a warning, not promoted to a blocker: source inspection finds every actual `HomeScreen` action threaded through the gate, and direct device evidence covers the original duplicate-Quick-Log outcome. It nevertheless prevents a behavior-certified pass because host wiring can regress independently of its model tests.
 
 ## Anti-Patterns Found
 
 | File | Line | Pattern | Severity | Impact |
 | --- | --- | --- | --- | --- |
-| `src/components/BulkActionSurface.tsx` | 51, 97–99 | Disabled state depends only on zero selection | 🛑 BLOCKER | Allows overlapping writes and loss of first Undo receipt. |
-| `src/screens/HomeScreen.tsx` | 973–978, 1756–1764 | Async picker holds stale selected ID snapshot | 🛑 BLOCKER | Category can mutate no-longer-selected contacts. |
-| `src/stores/dashboard-selection-store.ts` | 31–39 | Seed ID not fenced to frozen universe | ⚠️ WARNING | Non-card caller can select an ineligible contact. |
-| `src/db/bulk-actions-dao.ts` | 131–138 | Snooze date resolved once per contact | ⚠️ WARNING | One batch can span local midnight and assign different dates. |
+| `src/logic/dashboard-bulk-action-session.test.ts` | 46–104 | Coordination tests reimplement callbacks instead of rendering/pressing `HomeScreen` controls (WR-01) | ⚠️ WARNING | A future host-wiring regression may retain passing helper tests. |
 
-No unreferenced `TBD`, `FIXME`, or `XXX` markers were found in phase-modified files. Existing `GroupLog` placeholder comments in navigation are explicitly tracked to Phase 33 and are not completion-debt markers for this phase.
+No unreferenced `TBD`, `FIXME`, or `XXX` marker appears in Phase 28 implementation files. Existing Group Log placeholder comments are explicitly owned by Phase 33's planned consumer and do not substitute for a Phase 28 implementation.
 
 ## Decision Coverage
 
-`check.decision-coverage-verify` reports **11/11** trackable `28-CONTEXT.md` decisions honored. This is advisory and does not override the observable failures above.
+`check.decision-coverage-verify` reports **11/11** trackable CONTEXT decisions honored. This is advisory; it does not convert unexercised native behavior into a pass.
 
-## Human Verification Required After Gap Closure
+## Human Verification Required
 
-1. **Grid readability and text handling**
+### 1. Card layout and content
 
-   **Test:** Exercise normal/large text, emoji/combining-mark names, context, and search snippets on a Pixel.
-   **Expected:** Compact avatar-first layout reflows rather than clamps; graphemes and ellipses render correctly.
-   **Why human:** Native RN measurement/text shaping is not covered by automated tests.
+**Test:** On the fresh debug APK, inspect normal/narrow/wide/large-text grid layouts, empty/error states, search, and grapheme-rich contact data.
 
-2. **Card interaction and accessibility**
+**Expected:** Cards stay avatar-first and readable, change columns correctly, retain ring + glyph semantics, and show appropriate context/search content without text corruption.
 
-   **Test:** Tap/long-press cards and invoke their TalkBack actions.
-   **Expected:** Tap and long-press are mutually exclusive; eight safe actions are reachable and correctly routed.
-   **Why human:** No render/device gesture test exists.
+**Why human:** React Native layout and text shaping are absent from the test environment.
 
-3. **Selection and bulk workflow**
+### 2. Card interactions and selection
 
-   **Test:** Enter selection through both paths, refresh results, Select All, use Back, and run every bulk action for one and multiple contacts.
-   **Expected:** Frozen universe, control replacement, count, archive disappearance, confirmations, routing, and reduced-motion behavior all hold.
-   **Why human:** These cross native UI, navigation, storage, and accessibility boundaries.
+**Test:** Tap/long-press a card, use TalkBack actions, enter selection from both entry points, refresh the Dashboard, Select All, and press Android Back.
+
+**Expected:** Gesture routes are exclusive and safe; selection freezes the original universe, replaces controls, counts correctly, and Back exits it before navigation.
+
+**Why human:** No native rendered-card/HomeScreen workflow test exists.
+
+### 3. Complete bulk-management workflow
+
+**Test:** With one and multiple contacts selected, exercise every bulk action, confirmations/pickers, Quick Log Undo, archive disappearance, and detailed-log routes. Repeat a delayed Quick Log to observe the pending window.
+
+**Expected:** Each action changes exactly the intended contacts; large actions confirm first; Quick Log is single-flight with one Undo receipt; only Archive removes cards; 1 opens individual log and 2+ preloads Group Log.
+
+**Why human:** The direct Pixel UAT validates one immediate double-tap outcome, but WR-01 identifies the missing host-level automated coverage for the broader workflow.
 
 ## Gaps Summary
 
-The Card renderer and DAO foundation are substantive, wired, and flow real data. The phase is nevertheless blocked because its advertised multi-select bulk-management home is unsafe under ordinary UI timing: a double press can create an unundoable Quick Log batch, and an async category picker can mutate a stale selection. Neither concern is scheduled to a later milestone phase, so neither is deferred.
+There are no remaining code-level blockers from the previous verification. The phase is at the escalation gate: source, data flow, focused behavioral tests, type/color checks, full tests, and the limited fresh-APK Quick Log UAT support the implementation, but complete goal achievement requires the three native user-flow checks above. No later roadmap phase specifically owns these Phase 28 Card View UAT behaviors, so none are deferred.
+
+**Next action:** Complete the listed Pixel UAT. If it passes, re-run verification; add a `HomeScreen`-level deferred-writer regression to retire WR-01 rather than treating the helper-only tests as permanent proof.
 
 ---
 
-_Verified: 2026-09-06T09:45:00Z_
+_Verified: 2026-09-06T11:44:05Z_
 _Verifier: the agent (gsd-verifier)_
