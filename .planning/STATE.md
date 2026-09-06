@@ -5,16 +5,16 @@ milestone_name: Release Readiness
 current_phase: 28
 current_phase_name: Dashboard Card View
 status: executing
-stopped_at: Completed 28-03-PLAN.md
-last_updated: "2026-09-06T08:51:17.245Z"
+stopped_at: Completed 28-04-PLAN.md
+last_updated: "2026-09-06T09:02:06.228Z"
 last_activity: 2026-09-06
 last_activity_desc: Phase 28 execution started
-state_head: fd939020bd79c5b1c89ba99f83f8edb49b4fe382
+state_head: 0a1ce14e2f1edfb3cec595e77f55ec4ba2e9166f
 progress:
   total_phases: 20
   completed_phases: 4
   total_plans: 58
-  completed_plans: 53
+  completed_plans: 54
 carried_forward:
 
   - "D-11: default Memory-type display name is provisional (memory-registry.ts:10-12) — owner naming decision, must be reconciled before Phase 34"
@@ -34,7 +34,7 @@ See: .planning/PROJECT.md (updated 2026-09-01 after v1.0 milestone)
 ## Current Position
 
 Phase: 28 (Dashboard Card View) — EXECUTING
-Plan: 4 of 7
+Plan: 5 of 7
 Status: Ready to execute
 Carried forward (owner's bucket, NOT resolved here): D-11 default Memory-type display name — reconcile before Phase 34.
 Surface to owner (24.2-07, KNOW-15): milestone plan said Phase 36 owns the backup format-4 bump, but 24.1 already bumped to 4 (d677e2c); Plan 07 emits into the live format 4 with NO bump — that milestone instruction is stale.
@@ -221,6 +221,7 @@ at plan time. All new durable preferences are `app_settings` columns, never Asyn
 | Phase 28-dashboard-card-view P01 | 8min | 3 tasks | 4 files |
 | Phase 28-dashboard-card-view P02 | 8m | 3 tasks | 8 files |
 | Phase 28 P03 | 6min | 2 tasks | 2 files |
+| Phase 28 P04 | 9min | 3 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -497,6 +498,8 @@ Foundational decisions affecting current work:
 - [Phase 28]: Bulk Quick Log pins canonical outbound/manual interaction columns and returns exact receipts for atomic undo.
 - [Phase 28]: Dashboard selection is ephemeral and freezes its entry-time eligible universe; toggles reject out-of-universe ids.
 - [Phase 28]: Bulk archive callers remove ids from both selectedIds and frozenUniverse so Select All cannot restore archived contacts.
+- [Phase 28]: Card compactness only ranks candidates within List-compatible priority tiers.
+- [Phase 28]: Any non-empty dashboard search produces shared descriptors before List/Card rendering diverges.
 
 ### Pending Todos
 
@@ -563,8 +566,8 @@ _Also disposed at this close: 05/deferred-items.md (check:colors doc-comment) ma
 
 ## Session
 
-**Last session:** 2026-09-06T08:51:15.675Z
-**Stopped at:** Completed 28-03-PLAN.md
+**Last session:** 2026-09-06T09:02:04.635Z
+**Stopped at:** Completed 28-04-PLAN.md
 _Prior stop (v1.0):_ Phase 21 UI-SPEC approved; milestone v1.0 closed 2026-09-01.
 _Prior stop (13-04):_ the orrery VISUAL VOCABULARY (theme tokens + two pure resolver modules, node-tested, 29 cases green): (1) five owner-tunable `ThemePalette` tokens seeded in `space-dark.dark` ONLY — `starPalette` (6 colours, gold `#F2C14E` at index 0, then amber/rose-red/violet/cyan/ice-white), `mutedStable/Wobble/Decay` (desaturated same-hue morph endpoints), `rogueExtinguished` (cold blue-grey `#3E4A6B` rogue BODY fill) — with an M6/C2-5 conformance test that IMPORTS the real `SELF_SUN_COLOUR_RE`/`assertSelfSunColour` from app-settings-dao and locks every starPalette entry to the ACTUAL DAO write-path rule (no re-inlined regex). (2) `orrery-ring-logic.ts` `orreryRingStyle(status, colors)` — REUSES `ringVisual` for `{color,opacity,width}` (status→colour mapped once), adds the `strokeStyle` axis (solid→dashed→faded→faintTrace) + `bodyFill` (rogue ring=`colors.rogue`, body=`rogueExtinguished`); `null`→canonical NEUTRAL (`colors.border`), never throws — the single fallback sun-occupant reuses (C2-2). (3) `sun-occupant-logic.ts` `resolveSunOccupant(input)` — NULL/archived/missing→self (A7, glow `selfSunColour ?? starPalette[0]`), live contact→its status glow via `orreryRingStyle(status, colors).color`, never-contacted (status `null`)→the reused neutral border (C2-2); accepts `status: ProfileStatus | null`. 5 commits (1801915 feat tokens+M6; d35d528 RED→4cbfad5 GREEN ring-logic; c923b16 RED→10780dd GREEN sun-occupant); tsc + check:colors clean; no deviations (one in-flight fix: a placeholder hex in the logic test was re-sourced from the palette after check:colors flagged it — C2-3). Committed locally on main (NOT pushed). Next: Wave 2 (13-05 render / 13-06 Settings sun-picker), Wave 3 (13-07 drag-release), Wave 4 (13-08 device UAT, autonomous:false).
 **Resume file:** None
