@@ -309,39 +309,44 @@ export function editTouchpointFull(
   });
 }
 
+/** Non-mutexed delete primitive for callers that already own a transaction. */
+export async function deleteInteractionCore(
+  exec: SqlExecutor,
+  input: DeleteTouchpointInput,
+): Promise<void> {
+  const target = await exec.getFirstAsync<{ uid: string }>(
+    "SELECT uid FROM interactions WHERE id = ? AND contact_id = ?",
+    [input.interactionId, input.contactId],
+  );
+  if (!target) {
+    throw new Error(
+      `deleteTouchpoint: no interaction matched id=${input.interactionId} for contactId=${input.contactId} (changed 0)`,
+    );
+  }
+  await insertTombstoneCore(exec, {
+    entityType: "interaction",
+    entityUid: target.uid,
+    deletedAt: input.now,
+  });
+  const result = await exec.runAsync(
+    "DELETE FROM interactions WHERE id = ? AND contact_id = ?",
+    [input.interactionId, input.contactId],
+  );
+  if (result.changes !== 1) {
+    throw new Error(
+      `deleteTouchpoint: no interaction matched id=${input.interactionId} for contactId=${input.contactId} (changed ${result.changes})`,
+    );
+  }
+  await recomputeLastContact(exec, input.contactId, input.now);
+}
+
 /** Delete an interaction, then recompute recency (NULL when none remain). */
 export function deleteTouchpoint(
   exec: SqlExecutor,
   input: DeleteTouchpointInput,
 ): Promise<void> {
   return inWriteTransaction(exec, async () => {
-    // WR-04: scope by BOTH keys (see editTouchpoint). A mismatched pair must not
-    // delete contact A's interaction while recomputing contact B — assert
-    // exactly one row was deleted, else roll back loudly.
-    const target = await exec.getFirstAsync<{ uid: string }>(
-      "SELECT uid FROM interactions WHERE id = ? AND contact_id = ?",
-      [input.interactionId, input.contactId],
-    );
-    if (!target) {
-      throw new Error(
-        `deleteTouchpoint: no interaction matched id=${input.interactionId} for contactId=${input.contactId} (changed 0)`,
-      );
-    }
-    await insertTombstoneCore(exec, {
-      entityType: "interaction",
-      entityUid: target.uid,
-      deletedAt: input.now,
-    });
-    const result = await exec.runAsync(
-      "DELETE FROM interactions WHERE id = ? AND contact_id = ?",
-      [input.interactionId, input.contactId],
-    );
-    if (result.changes !== 1) {
-      throw new Error(
-        `deleteTouchpoint: no interaction matched id=${input.interactionId} for contactId=${input.contactId} (changed ${result.changes})`,
-      );
-    }
-    await recomputeLastContact(exec, input.contactId, input.now);
+    await deleteInteractionCore(exec, input);
   });
 }
 

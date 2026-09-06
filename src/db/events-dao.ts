@@ -12,11 +12,9 @@
  * =============================================================================
  *
  * v1 vocabulary (`EventType`) is the full dossier set archive|restore|snooze|
- * unsnooze ([log → data] ~line 571 "a record of what the app did"). Only
- * `archive`/`restore` have a PRODUCER this phase — the archiveContact/
- * restoreContact retrofit (contacts-dao) composes `recordEventCore` inside its
- * one existing transaction. `snooze`/`unsnooze` are RESERVED (forward-compatible)
- * and have no producing feature until a later phase — do not write them here.
+ * unsnooze ([log → data] ~line 571 "a record of what the app did"). All four
+ * values have producers: contacts-dao composes archive/restore and snooze-dao
+ * composes snooze/unsnooze, each inside its owning transaction.
  *
  * NON-REENTRANCY (mirrors recency-dao's *Core split + transaction.ts):
  *   `recordEventCore` takes NO mutex and opens NO transaction — it assumes BEGIN
@@ -33,8 +31,7 @@ import { bumpDataRevisionCore } from "@/db/data-revision-dao";
 import type { SqlExecutor } from "@/db/types";
 
 /**
- * The v1 lifecycle-event vocabulary. `archive`/`restore` have producers this
- * phase; `snooze`/`unsnooze` are RESERVED for a later phase (no producer yet).
+ * The v1 lifecycle-event vocabulary. All four values have live producers.
  */
 export type EventType = "archive" | "restore" | "snooze" | "unsnooze";
 

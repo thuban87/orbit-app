@@ -915,7 +915,6 @@ describe("bulk composition contact cores", () => {
       uid: uid(),
       name: "Original",
       intervalDays: 14,
-      socialBattery: "high",
       now: NOW,
     });
 
@@ -927,7 +926,6 @@ describe("bulk composition contact cores", () => {
       name: "Original",
       category_id: 2,
       interval_days: 14,
-      social_battery: "high",
     });
   });
 

@@ -29,24 +29,33 @@ import type { SqlExecutor } from "@/db/types";
  * Re-marking an already-ranked contact would move it to the end — harmless and
  * unreachable from the star UI.
  */
+/** Non-mutexed favourite primitive for callers that already own a transaction. */
+export async function setFavouriteRankCore(
+  exec: SqlExecutor,
+  id: number,
+  now: string,
+): Promise<void> {
+  const result = await exec.runAsync(
+    `UPDATE contacts
+        SET favourite_rank = (SELECT COALESCE(MAX(favourite_rank), -1) + 1 FROM contacts),
+            modified_at = ?
+      WHERE id = ?`,
+    [now, id],
+  );
+  if (result.changes !== 1) {
+    throw new Error(
+      `setFavouriteRank: no contact matched id=${id} (changed ${result.changes})`,
+    );
+  }
+}
+
 export function setFavouriteRank(
   exec: SqlExecutor,
   id: number,
   now: string,
 ): Promise<void> {
   return inWriteTransaction(exec, async () => {
-    const result = await exec.runAsync(
-      `UPDATE contacts
-          SET favourite_rank = (SELECT COALESCE(MAX(favourite_rank), -1) + 1 FROM contacts),
-              modified_at = ?
-        WHERE id = ?`,
-      [now, id],
-    );
-    if (result.changes !== 1) {
-      throw new Error(
-        `setFavouriteRank: no contact matched id=${id} (changed ${result.changes})`,
-      );
-    }
+    await setFavouriteRankCore(exec, id, now);
     await bumpDataRevisionCore(exec);
   });
 }
@@ -56,21 +65,30 @@ export function setFavouriteRank(
  * One `?`-bound single-column UPDATE inside ONE transaction; asserts exactly one
  * row changed (a bad id throws → rollback). The recency column is untouched.
  */
+/** Non-mutexed favourite-clear primitive for callers that already own a transaction. */
+export async function clearFavouriteRankCore(
+  exec: SqlExecutor,
+  id: number,
+  now: string,
+): Promise<void> {
+  const result = await exec.runAsync(
+    "UPDATE contacts SET favourite_rank = NULL, modified_at = ? WHERE id = ?",
+    [now, id],
+  );
+  if (result.changes !== 1) {
+    throw new Error(
+      `clearFavouriteRank: no contact matched id=${id} (changed ${result.changes})`,
+    );
+  }
+}
+
 export function clearFavouriteRank(
   exec: SqlExecutor,
   id: number,
   now: string,
 ): Promise<void> {
   return inWriteTransaction(exec, async () => {
-    const result = await exec.runAsync(
-      "UPDATE contacts SET favourite_rank = NULL, modified_at = ? WHERE id = ?",
-      [now, id],
-    );
-    if (result.changes !== 1) {
-      throw new Error(
-        `clearFavouriteRank: no contact matched id=${id} (changed ${result.changes})`,
-      );
-    }
+    await clearFavouriteRankCore(exec, id, now);
     await bumpDataRevisionCore(exec);
   });
 }

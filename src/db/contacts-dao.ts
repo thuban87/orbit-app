@@ -338,6 +338,45 @@ export async function updateContactMetadataCore(
   }
 }
 
+/** Set one contact category inside a transaction already owned by the caller. */
+export async function setContactCategoryCore(
+  exec: SqlExecutor,
+  id: number,
+  categoryId: number | null,
+  now: string,
+): Promise<void> {
+  const result = await exec.runAsync(
+    "UPDATE contacts SET category_id = ?, modified_at = ? WHERE id = ?",
+    [categoryId, now, id],
+  );
+  if (result.changes !== 1) {
+    throw new Error(
+      `setContactCategoryCore: no contact matched id=${id} (changed ${result.changes})`,
+    );
+  }
+}
+
+/** Set one positive contact frequency inside a transaction already owned by the caller. */
+export async function setContactFrequencyCore(
+  exec: SqlExecutor,
+  id: number,
+  intervalDays: number,
+  now: string,
+): Promise<void> {
+  if (!Number.isInteger(intervalDays) || intervalDays <= 0) {
+    throw new Error(`intervalDays must be a positive integer, got ${intervalDays}`);
+  }
+  const result = await exec.runAsync(
+    "UPDATE contacts SET interval_days = ?, modified_at = ? WHERE id = ?",
+    [intervalDays, now, id],
+  );
+  if (result.changes !== 1) {
+    throw new Error(
+      `setContactFrequencyCore: no contact matched id=${id} (changed ${result.changes})`,
+    );
+  }
+}
+
 /**
  * Edit a contact's metadata + custom values atomically, recomputing recency only
  * when the `rarely_responds` flag flips or a first interaction is inserted. See the
@@ -533,31 +572,38 @@ export interface ArchivedContactRow {
  * event). The contact then fails every `archived_at IS NULL` live read and
  * appears in listArchived. `last_contact` is untouched.
  */
+/** Non-mutexed archive primitive for callers that already own a transaction. */
+export async function archiveContactCore(
+  exec: SqlExecutor,
+  id: number,
+  now: string,
+): Promise<void> {
+  const result = await exec.runAsync(
+    "UPDATE contacts SET archived_at = ?, modified_at = ? WHERE id = ? AND archived_at IS NULL",
+    [now, now, id],
+  );
+  if (result.changes !== 1) {
+    throw new Error(
+      `archiveContact: no live contact matched id=${id} (changed ${result.changes})`,
+    );
+  }
+  await recordEventCore(exec, {
+    contactId: id,
+    uid: newUid(),
+    type: "archive",
+    occurredAt: now,
+    detail: null,
+    now,
+  });
+}
+
 export function archiveContact(
   exec: SqlExecutor,
   id: number,
   now: string,
 ): Promise<void> {
   return inWriteTransaction(exec, async () => {
-    const result = await exec.runAsync(
-      "UPDATE contacts SET archived_at = ?, modified_at = ? WHERE id = ? AND archived_at IS NULL",
-      [now, now, id],
-    );
-    if (result.changes !== 1) {
-      throw new Error(
-        `archiveContact: no live contact matched id=${id} (changed ${result.changes})`,
-      );
-    }
-    // Immutable lifecycle event, composed inside THIS transaction (non-mutexed
-    // core — never nest inWriteTransaction). Only reached on a real transition.
-    await recordEventCore(exec, {
-      contactId: id,
-      uid: newUid(),
-      type: "archive",
-      occurredAt: now,
-      detail: null,
-      now,
-    });
+    await archiveContactCore(exec, id, now);
     await bumpDataRevisionCore(exec);
   });
 }

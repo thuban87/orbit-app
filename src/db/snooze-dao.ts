@@ -76,38 +76,42 @@ export interface ClearSnoozeInput {
  * the bare-`date()` dashboard contract. Asserts `changes===1` on the contacts
  * UPDATE (a bad id throws → rollback). `last_contact` is never touched.
  */
-export function snoozeContact(
+/** Non-mutexed snooze primitive for callers that already own a transaction. */
+export async function snoozeContactCore(
   exec: SqlExecutor,
   input: SnoozeContactInput,
 ): Promise<void> {
   const modifier = PRESET_MODIFIERS[input.preset];
+  const dateRow = await exec.getFirstAsync<{ until: string }>(
+    "SELECT date('now','localtime', ?) AS until",
+    [modifier],
+  );
+  const until = dateRow?.until ?? null;
+  const result = await exec.runAsync(
+    "UPDATE contacts SET snooze_until = ?, modified_at = ? WHERE id = ?",
+    [until, input.now, input.contactId],
+  );
+  if (result.changes !== 1) {
+    throw new Error(
+      `snoozeContact: no contact matched id=${input.contactId} (changed ${result.changes})`,
+    );
+  }
+  await recordEventCore(exec, {
+    contactId: input.contactId,
+    uid: input.uid,
+    type: "snooze",
+    occurredAt: input.now,
+    now: input.now,
+    detail: null,
+  });
+}
+
+export function snoozeContact(
+  exec: SqlExecutor,
+  input: SnoozeContactInput,
+): Promise<void> {
   return inWriteTransaction(exec, async () => {
-    // Compute the target date via SQLite (local, calendar-correct, no JS date
-    // math, no toISOString). A bound `?` modifier — never interpolated.
-    const dateRow = await exec.getFirstAsync<{ until: string }>(
-      "SELECT date('now','localtime', ?) AS until",
-      [modifier],
-    );
-    const until = dateRow?.until ?? null;
-    const result = await exec.runAsync(
-      "UPDATE contacts SET snooze_until = ?, modified_at = ? WHERE id = ?",
-      [until, input.now, input.contactId],
-    );
-    if (result.changes !== 1) {
-      throw new Error(
-        `snoozeContact: no contact matched id=${input.contactId} (changed ${result.changes})`,
-      );
-    }
-    // Immutable audit row, composed in the SAME transaction via the NON-mutexed
-    // core (never the mutexed recordEvent wrapper — nesting the mutex hangs).
-    await recordEventCore(exec, {
-      contactId: input.contactId,
-      uid: input.uid,
-      type: "snooze",
-      occurredAt: input.now,
-      now: input.now,
-      detail: null,
-    });
+    await snoozeContactCore(exec, input);
     await bumpDataRevisionCore(exec);
   });
 }
@@ -119,28 +123,36 @@ export function snoozeContact(
  * `uid` is REQUIRED, the insert is unconditional). Asserts `changes===1` on the
  * contacts UPDATE (a bad id throws → rollback). `last_contact` is never touched.
  */
+/** Non-mutexed unsnooze primitive for callers that already own a transaction. */
+export async function clearSnoozeCore(
+  exec: SqlExecutor,
+  input: ClearSnoozeInput,
+): Promise<void> {
+  const result = await exec.runAsync(
+    "UPDATE contacts SET snooze_until = NULL, modified_at = ? WHERE id = ?",
+    [input.now, input.contactId],
+  );
+  if (result.changes !== 1) {
+    throw new Error(
+      `clearSnooze: no contact matched id=${input.contactId} (changed ${result.changes})`,
+    );
+  }
+  await recordEventCore(exec, {
+    contactId: input.contactId,
+    uid: input.uid,
+    type: "unsnooze",
+    occurredAt: input.now,
+    now: input.now,
+    detail: null,
+  });
+}
+
 export function clearSnooze(
   exec: SqlExecutor,
   input: ClearSnoozeInput,
 ): Promise<void> {
   return inWriteTransaction(exec, async () => {
-    const result = await exec.runAsync(
-      "UPDATE contacts SET snooze_until = NULL, modified_at = ? WHERE id = ?",
-      [input.now, input.contactId],
-    );
-    if (result.changes !== 1) {
-      throw new Error(
-        `clearSnooze: no contact matched id=${input.contactId} (changed ${result.changes})`,
-      );
-    }
-    await recordEventCore(exec, {
-      contactId: input.contactId,
-      uid: input.uid,
-      type: "unsnooze",
-      occurredAt: input.now,
-      now: input.now,
-      detail: null,
-    });
+    await clearSnoozeCore(exec, input);
     await bumpDataRevisionCore(exec);
   });
 }
