@@ -1,7 +1,7 @@
 # App Shell
 
-**Last updated:** 2026-09-02
-**Updated by phase:** 23-theme-visual-system
+**Last updated:** 2026-09-03
+**Updated by phase:** 24.1-contact-knowledge-foundation
 **Owners:** `App.tsx`, `src/navigation/RootNavigator.tsx`, `src/navigation/tabs/`, `src/navigation/types.ts`, `src/navigation/reset-intents.ts`, `src/navigation/linking.ts`, `src/navigation/notification-gate.tsx`, `src/navigation/widget-linking.ts`, `src/components/UniversalFab.tsx`, `src/components/ShellAppBar.tsx`
 
 ## Purpose
@@ -41,6 +41,9 @@ The shell owns runtime navigation and consumes the durable theme contract; `app_
 | `src/navigation/RootNavigator.tsx` | Four-tab root, semantic registry tab icons, fade transition, focused-route and keyboard visibility, transient-first retap, and system-Back boundary. |
 | `src/navigation/tabs/` | Owns the native-stack registrations for each persistent tab. |
 | `src/navigation/types.ts` | Typed tab and stack contracts, including semantic placeholder routes. |
+| `src/screens/ThingsToRememberScreen.tsx` | Contact-knowledge surface reached from either contact-profile stack. |
+| `src/screens/RecentlyDeletedScreen.tsx` | Typed Memory recovery and confirmed permanent-delete destination. |
+| `src/screens/MemoryHistoryScreen.tsx` | Typed retained-current-state history destination. |
 | `src/navigation/reset-intents.ts` | Builds the only root-level Dashboard reset states. |
 | `src/components/UniversalFab.tsx` | Mounts the six-action shell capture dial once above browse/read surfaces. |
 | `src/components/ShellAppBar.tsx` | Supplies accessible themed root and child app bars. |
@@ -187,6 +190,12 @@ The shell owns runtime navigation and consumes the durable theme contract; `app_
 2. The navigator registers typed reconciliation grid, detail, completion, survivor selection, and merge-conflict routes. Screens fetch durable session or contact data instead of receiving source payloads in route state.
 3. `App.tsx` registers the foreground reconciliation resume sweep after database readiness. If import and reconciliation work are both resumable, the import prompt takes precedence so app-root sheets do not overlap.
 
+### Opening contact knowledge
+
+1. A contact profile in either the Dashboard or Orrery stack opens `ThingsToRemember` with a serializable contact ID.
+2. Both stacks also register typed `RecentlyDeleted` and `MemoryHistory` destinations, preserving native Back behavior for their origin.
+3. Each destination self-fetches its local SQLite projection; route parameters carry no Memory content or callbacks.
+
 ## Configuration
 
 | Constant | Value | File | Purpose |
@@ -253,6 +262,8 @@ The shell owns runtime navigation and consumes the durable theme contract; `app_
 - **ADR-069:** Atomic Tombstone-Backed Orbit Contact Merge — adds explicit survivor, conflict, and impact-confirmation navigation.
 - **ADR-070:** Durable Pending Interaction-Assist Lifecycle and Portable Opt-Out — mounts the app-global non-modal assist banner, the Settings toggle, and the ready-gated assist launch-sweep hook.
 - **ADR-074:** Widget Contact Supersession and Strict Reach Deep-Link Fail-Safe — adds the `orbit://reach/<id>` widget bridge and the consumed-once `openReachOut` Profile param with a stale-target Dashboard fail-safe.
+- **ADR-088:** Additive Contact-Knowledge Schema and Application-Owned Memory Registry — adds typed contact-knowledge routes in both profile-owning stacks.
+- **ADR-089:** Recoverable Memory Lifecycle and Contact-Operation Integrity — exposes the guarded Recently Deleted recovery destination.
 
 ## Gotchas
 
@@ -284,6 +295,7 @@ The shell owns runtime navigation and consumes the durable theme contract; `app_
 23. **The `orbit://reach` bridge stays with the other widget links.** It is parsed by the strict widget URI gate (anchored digits-only), not added to React Navigation linking config, so it cannot race the share-intent singleton.
 24. **Do not hydrate theme after navigation mounts.** A first main frame in the wrong saved palette is a visual regression; only the neutral pre-ready splash may precede theme hydration.
 25. **Do not bypass semantic visual seams.** New screens use token roles, semantic icon names, scalable text, and shared action/overlay primitives; they do not add raw colour or base-family icon imports.
+26. **Keep contact-knowledge routes typed in both profile stacks.** Dashboard and Orrery Profile must expose the same serializable destinations; do not move Memory content into route parameters.
 
 ## Related Systems
 
@@ -303,6 +315,7 @@ The shell owns runtime navigation and consumes the durable theme contract; `app_
 - **Interaction Assist & Reach Out** — mounts the app-global assist banner, the Settings toggle, the assist launch-sweep, and the `orbit://reach` widget bridge with its consumed-once Profile param.
 - **Persistence core** — owns migration 015 and the validated durable settings selection consumed before navigation mounts.
 - **Orrery** — consumes the theme tokens and shared motion/accessibility contract while retaining its specialized canvas treatment.
+- **Contact Knowledge** — supplies profile-reached Things to Remember, Recently Deleted, and retained-history screens in both contact stacks.
 
 ## Changelog
 
@@ -330,3 +343,4 @@ The shell owns runtime navigation and consumes the durable theme contract; `app_
 | 2026-08-31 | 21 | Mounted the app-global non-modal Interaction Assist banner (Back passes through) with its launch-sweep and Settings toggle, and added the `orbit://reach` widget bridge and consumed-once `openReachOut` Profile param. |
 | 2026-09-02 | 22 | Replaced the flat root stack with four tab-owned stacks, nested external resets, shared chrome, and universal capture primitives. |
 | 2026-09-02 | 23 | Added restore-before-paint durable theming, live Appearance controls, semantic tab icons, and shared visual primitives. |
+| 2026-09-03 | 24.1 | Added typed contact-knowledge, Recently Deleted, and retained-history routes to both profile stacks. |
