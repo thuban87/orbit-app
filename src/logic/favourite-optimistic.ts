@@ -12,10 +12,13 @@ type Listener = () => void;
 export interface FavouriteOptimisticStore {
   begin(contactId: number, desiredMembership: boolean): number;
   overlayFor(contactId: number): boolean | undefined;
+  committedMembershipFor(contactId: number): boolean | undefined;
+  effectiveMembershipFor(contactId: number, fallback: boolean): boolean;
   resolve(
     contactId: number,
     generation: number,
     outcome: FavouriteMutationOutcome,
+    committedMembership?: boolean,
   ): FavouriteMutationResolution;
   subscribe(listener: Listener): () => void;
   getSnapshot(): ReadonlyMap<number, boolean>;
@@ -24,6 +27,7 @@ export interface FavouriteOptimisticStore {
 export function createFavouriteOptimisticStore(): FavouriteOptimisticStore {
   const generations = new Map<number, number>();
   const overlay = new Map<number, boolean>();
+  const committedMembership = new Map<number, boolean>();
   const listeners = new Set<Listener>();
   let snapshot: ReadonlyMap<number, boolean> = new Map();
 
@@ -43,7 +47,18 @@ export function createFavouriteOptimisticStore(): FavouriteOptimisticStore {
     overlayFor(contactId) {
       return overlay.get(contactId);
     },
-    resolve(contactId, generation, _outcome) {
+    committedMembershipFor(contactId) {
+      return committedMembership.get(contactId);
+    },
+    effectiveMembershipFor(contactId, fallback) {
+      return (
+        overlay.get(contactId) ?? committedMembership.get(contactId) ?? fallback
+      );
+    },
+    resolve(contactId, generation, outcome, membership) {
+      if (outcome === "success" && membership !== undefined) {
+        committedMembership.set(contactId, membership);
+      }
       if (generations.get(contactId) !== generation) return "stale";
       overlay.delete(contactId);
       publish();

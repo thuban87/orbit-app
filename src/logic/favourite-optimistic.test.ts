@@ -61,7 +61,7 @@ describe("favourite optimistic reconciliation", () => {
     const generation = store.begin(9, true);
 
     expect(store.overlayFor(9)).toBe(true);
-    expect(store.resolve(9, generation, "success")).toBe("applied");
+    expect(store.resolve(9, generation, "success", true)).toBe("applied");
     expect(store.overlayFor(9)).toBeUndefined();
   });
 
@@ -73,7 +73,7 @@ describe("favourite optimistic reconciliation", () => {
 
     const generation = store.begin(2, true);
     const pending = store.getSnapshot();
-    store.resolve(2, generation, "success");
+    store.resolve(2, generation, "success", true);
     const settled = store.getSnapshot();
 
     expect(listener).toHaveBeenCalledTimes(2);
@@ -131,5 +131,25 @@ describe("favourite optimistic reconciliation", () => {
         [contactId],
       ),
     ).resolves.toMatchObject({ favourite_rank: expect.any(Number) });
+  });
+
+  it("keeps committed and optimistic memberships isolated per contact", () => {
+    const store = createFavouriteOptimisticStore();
+    const alexSet = store.begin(1, true);
+    const alexClear = store.begin(1, false);
+    const blairSet = store.begin(2, true);
+
+    expect(store.resolve(1, alexSet, "success", true)).toBe("stale");
+    expect(store.effectiveMembershipFor(1, false)).toBe(false);
+    expect(store.effectiveMembershipFor(2, false)).toBe(true);
+
+    expect(store.resolve(1, alexClear, "failure")).toBe("applied");
+    expect(store.effectiveMembershipFor(1, false)).toBe(true);
+    expect(store.effectiveMembershipFor(2, false)).toBe(true);
+    expect(store.overlayFor(2)).toBe(true);
+    expect(store.committedMembershipFor(2)).toBeUndefined();
+
+    expect(store.resolve(2, blairSet, "success", true)).toBe("applied");
+    expect(store.committedMembershipFor(2)).toBe(true);
   });
 });
