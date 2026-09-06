@@ -76,6 +76,12 @@ All log data lives in local SQLite. A touchpoint is distinct from a lifecycle ev
 4. The user can open `TouchpointRefineForm` to correct channel, direction, connection, quality, note, and local date/time; `editTouchpointFull()` writes every editable column then recomputes recency.
 5. Deletion is explicitly confirmed, permanently removes the row, and recomputes recency.
 
+### Quick Logging from the shell
+
+1. The universal FAB uses the current Profile contact or the canonical picker, then calls `recordTouchpoint()` with the established outbound, connected, manual, unspecified-channel defaults.
+2. The shell shows success and Undo only after that promise resolves. Undo calls `deleteTouchpoint()` with both the interaction and contact IDs; a failed write or undo shows retryable feedback rather than a false success.
+3. The shell publishes browse and widget refreshes only after a committed write or delete. Its single-flight guards prevent a rapid tap from creating or deleting more than one row.
+
 ### Recording notification actions
 
 1. The shared notification action handler routes Mark contacted through `recordTouchpoint()` with `source='notification'`, `direction='outbound'`, `channel='unspecified'`, `connected=1`, and `quality=NULL`.
@@ -127,6 +133,7 @@ All log data lives in local SQLite. A touchpoint is distinct from a lifecycle ev
 
 - **ADR-010:** Single-Writer Interaction Recency Spine — supplies the one maintained recency write path used by touchpoint mutations.
 - **ADR-023:** Structured Touchpoints and One-Tap Defaults — preserves independent interaction axes and explicit fast-path defaults.
+- **ADR-082:** Universal Capture FAB, Canonical Picker, and Truthful Quick Log — exposes the established fast path from the shell with commit-only feedback and canonical Undo.
 - **ADR-024:** Editable Touchpoint History and Recomputed Recency — makes the timeline the correction path and retains one writer.
 - **ADR-025:** Immutable Lifecycle Events in a Unified Timeline — separates event storage while unifying the profile read.
 - **ADR-026:** Rogue Status for Unresponsive or Far-Overdue Contacts — shares the connection-policy filter used by impact reads.
@@ -148,6 +155,7 @@ All log data lives in local SQLite. A touchpoint is distinct from a lifecycle ev
 7. **Do not bypass the recency DAO from a widget task.** A raw `last_contact` update or nested transaction breaks the serialized history/summary invariant.
 8. **Do not import a recency summary.** Restore derives `last_contact` from the reconciled interaction set after its write transaction.
 9. **The assist path still recomputes through the sole recomputer.** `markAssistLogged` composes `insertInteractionCore`/`recomputeLastContactCore` directly instead of `recordTouchpoint()` (to run inside its in-transaction re-read), but it must never write `last_contact` itself — the single-writer invariant is preserved by reusing `recomputeLastContactCore`.
+10. **Quick Log success is transaction truth, not an optimistic UI state.** Do not expose Undo or a success haptic until `recordTouchpoint()` resolves, and keep Retry/Undo single-flight.
 
 ## Related Systems
 
@@ -168,3 +176,4 @@ All log data lives in local SQLite. A touchpoint is distinct from a lifecycle ev
 | 2026-08-16 | 12 | Added widget-sourced headless one-tap writes through the existing recency DAO. |
 | 2026-08-24 | 17 | Added interaction deletion tombstones and restored-history recency recomputation. |
 | 2026-08-31 | 21 | Added assist confirmation as a new touchpoint writer (`source='assist'`, outbound, handoff-time `occurred_at`, connected per Call outcome) composing the shared recency cores in one transaction. |
+| 2026-09-02 | 22 | Added shell Quick Log as a guarded consumer of the existing canonical insert/delete paths. |
