@@ -99,5 +99,7 @@
 // NOTE: ADR-0087 [ACCEPTED] Bundled Background Presets and Package-Specific Surface Treatment
 // NOTE: ADR-0088 [ACCEPTED] Additive Contact-Knowledge Schema and Application-Owned Memory Registry
 // NOTE: ADR-0089 [ACCEPTED] Recoverable Memory Lifecycle and Contact-Operation Integrity
+// NOTE: ADR-0090 [ACCEPTED] Additive Custom-Field Value History and Deferred Contact Scope
+// NOTE: ADR-0091 [ACCEPTED] Imported Contact Notes as AI-Off Typed Memories
 
-export const ADR_COUNT = 89;
+export const ADR_COUNT = 91;
