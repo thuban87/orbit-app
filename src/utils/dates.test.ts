@@ -2,7 +2,12 @@
  * Unit tests for src/utils/dates.ts
  */
 import { describe, expect, it } from "vitest";
-import { formatLocalDate } from "@/utils/dates";
+import {
+  calendarDaysBetween,
+  formatLocalDate,
+  isSnoozed,
+  parseLocalMs,
+} from "@/utils/dates";
 
 describe("formatLocalDate", () => {
   it("formats a specific date as YYYY-MM-DD", () => {
@@ -42,5 +47,32 @@ describe("formatLocalDate", () => {
   it("handles leap year Feb 29", () => {
     const date = new Date(2028, 1, 29); // Feb 29, 2028 (leap year)
     expect(formatLocalDate(date)).toBe("2028-02-29");
+  });
+});
+
+describe("calendar day helpers", () => {
+  it("counts local calendar days across US spring-forward", () => {
+    const originalTZ = process.env.TZ;
+    process.env.TZ = "America/New_York";
+    try {
+      expect(
+        calendarDaysBetween(
+          parseLocalMs("2026-03-08 12:00:00"),
+          parseLocalMs("2026-03-09 12:00:00"),
+        ),
+      ).toBe(1);
+    } finally {
+      if (originalTZ === undefined) delete process.env.TZ;
+      else process.env.TZ = originalTZ;
+    }
+  });
+
+  it("matches the SQL active-snooze predicate with fail-closed parsing", () => {
+    const now = "2026-08-15 12:00:00";
+    expect(isSnoozed("2026-08-15", now)).toBe(false);
+    expect(isSnoozed("2026-08-14", now)).toBe(false);
+    expect(isSnoozed("2026-08-16", now)).toBe(true);
+    expect(() => isSnoozed("not a date", now)).not.toThrow();
+    expect(isSnoozed("not a date", now)).toBe(false);
   });
 });

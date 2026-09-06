@@ -197,6 +197,26 @@ describe("listDashboardPopulation — Phase 25 Active universe", () => {
     ).toEqual([live, snoozed].sort());
   });
 
+  it("projects last-contact and snooze fields for list row presentation", async () => {
+    const lastContact = STABLE();
+    const snoozeUntil = localDateOffset(5);
+    const contact = await seedContact({
+      name: "Projected",
+      lastContact,
+      snoozeUntil,
+    });
+
+    const populationRow = (await listDashboardPopulation(exec, active, NOW)).find(
+      (row) => row.id === contact,
+    );
+    const searchRow = (await listDashboardSearch(exec, active, "projected", NOW)).find(
+      (row) => row.id === contact,
+    );
+
+    expect(populationRow).toMatchObject({ last_contact: lastContact, snooze_until: snoozeUntil });
+    expect(searchRow).toMatchObject({ last_contact: lastContact, snooze_until: snoozeUntil });
+  });
+
   it("returns a deduped Favourites and Not Contacted OR-union with match reasons", async () => {
     const both = await seedContact({
       name: "Both",
