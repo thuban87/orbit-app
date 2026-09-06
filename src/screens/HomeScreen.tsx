@@ -113,6 +113,7 @@ import {
   selectDashboardEmptyState,
 } from "@/logic/dashboard-empty-logic";
 import type { DashboardViewMode } from "@/logic/dashboard-query-logic";
+import { createBulkActionGate } from "@/logic/dashboard-bulk-action-session";
 import {
   applyCommittedMembership,
   createFavouriteOptimisticStore,
@@ -435,6 +436,13 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
     ? rows.filter((row) => frozenIds.has(row.id))
     : rows;
   const selectionCount = selectedIds.size;
+  const [bulkActionPending, setBulkActionPending] = useState(false);
+  const bulkActionGateRef = useRef<ReturnType<typeof createBulkActionGate> | null>(
+    null,
+  );
+  if (!bulkActionGateRef.current) {
+    bulkActionGateRef.current = createBulkActionGate(setBulkActionPending);
+  }
   const [bulkConfirm, setBulkConfirm] = useState<BulkConfirmAction | null>(null);
   const [snoozePickerIds, setSnoozePickerIds] = useState<number[] | null>(null);
   const [categoryPicker, setCategoryPicker] = useState<{
@@ -823,6 +831,14 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
     [],
   );
 
+  const tryAcquireBulkAction = useCallback(
+    () => bulkActionGateRef.current?.tryAcquire() === true,
+    [],
+  );
+  const releaseBulkAction = useCallback(() => {
+    bulkActionGateRef.current?.release();
+  }, []);
+
   const commitBulkOutcome = useCallback(
     (label: string) => {
       // A bulk transaction is one durable commit: refresh shell consumers once,
@@ -845,121 +861,181 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
   );
 
   const performBulkQuickLog = useCallback(
-    async (ids: number[]) => {
-      try {
-        const receipt = await bulkQuickLog(getExecutor(), ids, localDateTime());
-        const label = `Logged ${ids.length} interactions`;
-        notifyWidgetDataChanged();
-        bumpShellRefresh();
-        AccessibilityInfo.announceForAccessibility(label);
-        showSnackbar({
-          kind: "success",
-          label,
-          action: {
-            label: "Undo",
-            accessibilityLabel: `Undo logging ${ids.length} interactions`,
-            onPress: () => {
-              void undoBulkQuickLog(getExecutor(), receipt, localDateTime())
-                .then(() => {
-                  commitBulkOutcome(`Undid ${ids.length} logged interactions`);
-                })
-                .catch((undoError: unknown) =>
-                  reportBulkFailure("undo bulk quick log", undoError),
-                );
+    (ids: number[], alreadyClaimed = false) => {
+      if (!alreadyClaimed && !tryAcquireBulkAction()) return;
+      void bulkQuickLog(getExecutor(), ids, localDateTime())
+        .then((receipt) => {
+          const label = `Logged ${ids.length} interactions`;
+          notifyWidgetDataChanged();
+          bumpShellRefresh();
+          AccessibilityInfo.announceForAccessibility(label);
+          showSnackbar({
+            kind: "success",
+            label,
+            action: {
+              label: "Undo",
+              accessibilityLabel: `Undo logging ${ids.length} interactions`,
+              onPress: () => {
+                void undoBulkQuickLog(getExecutor(), receipt, localDateTime())
+                  .then(() => {
+                    commitBulkOutcome(`Undid ${ids.length} logged interactions`);
+                  })
+                  .catch((undoError: unknown) =>
+                    reportBulkFailure("undo bulk quick log", undoError),
+                  );
+              },
             },
-          },
-        });
-        reload();
-      } catch (writeError) {
-        reportBulkFailure("log interactions", writeError, () => {
-          void performBulkQuickLog(ids);
-        });
-      }
+          });
+          reload();
+        })
+        .catch((writeError: unknown) => {
+          releaseBulkAction();
+          reportBulkFailure("log interactions", writeError, () => {
+            performBulkQuickLog(ids);
+          });
+        })
+        .finally(releaseBulkAction);
     },
-    [commitBulkOutcome, reload, reportBulkFailure],
+    [
+      commitBulkOutcome,
+      reload,
+      releaseBulkAction,
+      reportBulkFailure,
+      tryAcquireBulkAction,
+    ],
   );
 
   const performBulkArchive = useCallback(
-    async (ids: number[]) => {
-      try {
-        await bulkArchive(getExecutor(), ids, localDateTime());
-        // Archive is reversible, but it must disappear from this frozen universe.
-        removeFromUniverse(ids);
-        commitBulkOutcome(`Archived ${ids.length} contacts`);
-      } catch (writeError) {
-        reportBulkFailure("archive contacts", writeError, () => {
-          void performBulkArchive(ids);
-        });
-      }
+    (ids: number[], alreadyClaimed = false) => {
+      if (!alreadyClaimed && !tryAcquireBulkAction()) return;
+      void bulkArchive(getExecutor(), ids, localDateTime())
+        .then(() => {
+          // Archive is reversible, but it must disappear from this frozen universe.
+          removeFromUniverse(ids);
+          commitBulkOutcome(`Archived ${ids.length} contacts`);
+        })
+        .catch((writeError: unknown) => {
+          releaseBulkAction();
+          reportBulkFailure("archive contacts", writeError, () => {
+            performBulkArchive(ids);
+          });
+        })
+        .finally(releaseBulkAction);
     },
-    [commitBulkOutcome, removeFromUniverse, reportBulkFailure],
+    [
+      commitBulkOutcome,
+      releaseBulkAction,
+      removeFromUniverse,
+      reportBulkFailure,
+      tryAcquireBulkAction,
+    ],
   );
 
   const performBulkFrequency = useCallback(
-    async (ids: number[], intervalDays: number) => {
-      try {
-        await bulkSetFrequency(getExecutor(), ids, intervalDays, localDateTime());
-        commitBulkOutcome(
-          `Changed contact frequency to every ${intervalDays} days for ${ids.length} contacts`,
-        );
-      } catch (writeError) {
-        reportBulkFailure("change contact frequency", writeError, () => {
-          void performBulkFrequency(ids, intervalDays);
-        });
-      }
+    (ids: number[], intervalDays: number, alreadyClaimed = false) => {
+      if (!alreadyClaimed && !tryAcquireBulkAction()) return;
+      void bulkSetFrequency(getExecutor(), ids, intervalDays, localDateTime())
+        .then(() => {
+          commitBulkOutcome(
+            `Changed contact frequency to every ${intervalDays} days for ${ids.length} contacts`,
+          );
+        })
+        .catch((writeError: unknown) => {
+          releaseBulkAction();
+          reportBulkFailure("change contact frequency", writeError, () => {
+            performBulkFrequency(ids, intervalDays);
+          });
+        })
+        .finally(releaseBulkAction);
     },
-    [commitBulkOutcome, reportBulkFailure],
+    [
+      commitBulkOutcome,
+      releaseBulkAction,
+      reportBulkFailure,
+      tryAcquireBulkAction,
+    ],
   );
 
   const onBulkQuickLog = useCallback(() => {
+    if (!tryAcquireBulkAction()) return;
     const ids = [...selectedIds];
-    if (ids.length === 0) return;
+    if (ids.length === 0) {
+      releaseBulkAction();
+      return;
+    }
     if (ids.length > BULK_QUICK_LOG_CONFIRM_THRESHOLD) {
       setBulkConfirm({ kind: "quick-log", ids });
       return;
     }
-    void performBulkQuickLog(ids);
-  }, [performBulkQuickLog, selectedIds]);
+    performBulkQuickLog(ids, true);
+  }, [performBulkQuickLog, releaseBulkAction, selectedIds, tryAcquireBulkAction]);
 
   const onBulkLogInteraction = useCallback(() => {
+    if (!tryAcquireBulkAction()) return;
     const ids = [...selectedIds];
     if (ids.length === 1) {
       navigateDashboardContactAction(ids[0], "LogContact");
     } else if (ids.length >= 2) {
       navigation.navigate("GroupLog", { participantIds: ids });
     }
-  }, [navigation, selectedIds]);
+    releaseBulkAction();
+  }, [navigation, releaseBulkAction, selectedIds, tryAcquireBulkAction]);
 
   const onBulkAddFavourites = useCallback(() => {
+    if (!tryAcquireBulkAction()) return;
     const ids = [...selectedIds];
-    if (ids.length === 0) return;
+    if (ids.length === 0) {
+      releaseBulkAction();
+      return;
+    }
     void bulkAddFavourites(getExecutor(), ids, localDateTime())
       .then(() => commitBulkOutcome(`Added ${ids.length} contacts to Favorites`))
-      .catch((writeError: unknown) =>
-        reportBulkFailure("add contacts to Favorites", writeError),
-      );
-  }, [commitBulkOutcome, reportBulkFailure, selectedIds]);
+      .catch((writeError: unknown) => {
+        releaseBulkAction();
+        reportBulkFailure("add contacts to Favorites", writeError, onBulkAddFavourites);
+      })
+      .finally(releaseBulkAction);
+  }, [commitBulkOutcome, releaseBulkAction, reportBulkFailure, selectedIds, tryAcquireBulkAction]);
 
   const onBulkRemoveFavourites = useCallback(() => {
+    if (!tryAcquireBulkAction()) return;
     const ids = [...selectedIds];
-    if (ids.length === 0) return;
+    if (ids.length === 0) {
+      releaseBulkAction();
+      return;
+    }
     void bulkRemoveFavourites(getExecutor(), ids, localDateTime())
       .then(() =>
         commitBulkOutcome(`Removed ${ids.length} contacts from Favorites`),
       )
-      .catch((writeError: unknown) =>
-        reportBulkFailure("remove contacts from Favorites", writeError),
-      );
-  }, [commitBulkOutcome, reportBulkFailure, selectedIds]);
+      .catch((writeError: unknown) => {
+        releaseBulkAction();
+        reportBulkFailure(
+          "remove contacts from Favorites",
+          writeError,
+          onBulkRemoveFavourites,
+        );
+      })
+      .finally(releaseBulkAction);
+  }, [commitBulkOutcome, releaseBulkAction, reportBulkFailure, selectedIds, tryAcquireBulkAction]);
 
   const onBulkOpenSnoozePicker = useCallback(() => {
+    if (!tryAcquireBulkAction()) return;
     const ids = [...selectedIds];
-    if (ids.length > 0) setSnoozePickerIds(ids);
-  }, [selectedIds]);
+    if (ids.length === 0) {
+      releaseBulkAction();
+      return;
+    }
+    setSnoozePickerIds(ids);
+  }, [releaseBulkAction, selectedIds, tryAcquireBulkAction]);
 
   const onBulkUnsnooze = useCallback(() => {
+    if (!tryAcquireBulkAction()) return;
     const ids = [...selectedIds];
-    if (ids.length === 0) return;
+    if (ids.length === 0) {
+      releaseBulkAction();
+      return;
+    }
     void bulkUnsnooze(getExecutor(), ids, localDateTime())
       .then(async () => {
         commitBulkOutcome(`Unsnoozed ${ids.length} contacts`);
@@ -967,41 +1043,75 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
           Logger.error(LOG_SCOPE, "failed to reconcile after bulk unsnooze", scheduleError),
         );
       })
-      .catch((writeError: unknown) => reportBulkFailure("unsnooze contacts", writeError));
-  }, [commitBulkOutcome, reportBulkFailure, selectedIds]);
+      .catch((writeError: unknown) => {
+        releaseBulkAction();
+        reportBulkFailure("unsnooze contacts", writeError, onBulkUnsnooze);
+      })
+      .finally(releaseBulkAction);
+  }, [commitBulkOutcome, releaseBulkAction, reportBulkFailure, selectedIds, tryAcquireBulkAction]);
 
   const onBulkOpenCategoryPicker = useCallback(() => {
+    if (!tryAcquireBulkAction()) return;
     const ids = [...selectedIds];
-    if (ids.length === 0) return;
+    if (ids.length === 0) {
+      releaseBulkAction();
+      return;
+    }
     void listCategories(getExecutor())
       .then((categories) => setCategoryPicker({ ids, categories }))
-      .catch((readError: unknown) => reportBulkFailure("load categories", readError));
-  }, [reportBulkFailure, selectedIds]);
+      .catch((readError: unknown) => {
+        releaseBulkAction();
+        reportBulkFailure("load categories", readError, onBulkOpenCategoryPicker);
+      });
+  }, [releaseBulkAction, reportBulkFailure, selectedIds, tryAcquireBulkAction]);
 
   const onBulkArchive = useCallback(() => {
+    if (!tryAcquireBulkAction()) return;
     const ids = [...selectedIds];
-    if (ids.length > 0) setBulkConfirm({ kind: "archive", ids });
-  }, [selectedIds]);
+    if (ids.length === 0) {
+      releaseBulkAction();
+      return;
+    }
+    setBulkConfirm({ kind: "archive", ids });
+  }, [releaseBulkAction, selectedIds, tryAcquireBulkAction]);
 
   const onBulkOpenFrequencyPicker = useCallback(() => {
+    if (!tryAcquireBulkAction()) return;
     const ids = [...selectedIds];
-    if (ids.length === 0) return;
+    if (ids.length === 0) {
+      releaseBulkAction();
+      return;
+    }
     setFrequencyDraft("");
     setFrequencyPickerIds(ids);
-  }, [selectedIds]);
+  }, [releaseBulkAction, selectedIds, tryAcquireBulkAction]);
 
   const onBulkConfirm = useCallback(() => {
     const confirm = bulkConfirm;
     if (!confirm) return;
     setBulkConfirm(null);
     if (confirm.kind === "quick-log") {
-      void performBulkQuickLog(confirm.ids);
+      performBulkQuickLog(confirm.ids, true);
     } else if (confirm.kind === "archive") {
-      void performBulkArchive(confirm.ids);
+      performBulkArchive(confirm.ids, true);
     } else {
-      void performBulkFrequency(confirm.ids, confirm.intervalDays);
+      performBulkFrequency(confirm.ids, confirm.intervalDays, true);
     }
   }, [bulkConfirm, performBulkArchive, performBulkFrequency, performBulkQuickLog]);
+
+  const dismissBulkConfirm = useCallback(() => {
+    setBulkConfirm(null);
+    releaseBulkAction();
+  }, [releaseBulkAction]);
+
+  const exitBulkSelection = useCallback(() => {
+    setBulkConfirm(null);
+    setSnoozePickerIds(null);
+    setCategoryPicker(null);
+    setFrequencyPickerIds(null);
+    releaseBulkAction();
+    exitSelection();
+  }, [exitSelection, releaseBulkAction]);
 
   const goToProfile = useCallback(
     (contactId: number) => navigation.navigate("Profile", { contactId }),
@@ -1205,12 +1315,12 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
         "hardwareBackPress",
         () => {
           if (!selectionMode) return false;
-          exitSelection();
+          exitBulkSelection();
           return true;
         },
       );
       return () => subscription.remove();
-    }, [exitSelection, selectionMode]),
+    }, [exitBulkSelection, selectionMode]),
   );
 
   // The cause-aware empty state — delegated to the pure gate (no inline count
@@ -1480,6 +1590,7 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
           </View>
           <BulkActionSurface
             selectedCount={selectionCount}
+            pending={bulkActionPending}
             onQuickLog={onBulkQuickLog}
             onLogInteraction={onBulkLogInteraction}
             onAddFavourites={onBulkAddFavourites}
@@ -1489,7 +1600,7 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
             onSetCategory={onBulkOpenCategoryPicker}
             onArchive={onBulkArchive}
             onChangeFrequency={onBulkOpenFrequencyPicker}
-            onExit={exitSelection}
+            onExit={exitBulkSelection}
           />
         </View>
       ) : (
@@ -1699,7 +1810,10 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
       />
       <Sheet
         visible={snoozePickerIds !== null}
-        onRequestClose={() => setSnoozePickerIds(null)}
+        onRequestClose={() => {
+          setSnoozePickerIds(null);
+          releaseBulkAction();
+        }}
         variant="compact"
       >
         <Text style={[styles.bulkPickerTitle, { color: colors.textSecondary }]}>
@@ -1726,9 +1840,11 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
                     ),
                   );
                 })
-                .catch((writeError: unknown) =>
-                  reportBulkFailure("snooze contacts", writeError),
-                );
+                .catch((writeError: unknown) => {
+                  releaseBulkAction();
+                  reportBulkFailure("snooze contacts", writeError, onBulkOpenSnoozePicker);
+                })
+                .finally(releaseBulkAction);
             }}
             style={[styles.bulkPickerRow, { borderColor: colors.border }]}
           >
@@ -1741,7 +1857,10 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
       </Sheet>
       <Sheet
         visible={categoryPicker !== null}
-        onRequestClose={() => setCategoryPicker(null)}
+        onRequestClose={() => {
+          setCategoryPicker(null);
+          releaseBulkAction();
+        }}
         variant="detail"
       >
         <Text style={[styles.bulkPickerTitle, { color: colors.textSecondary }]}>
@@ -1768,9 +1887,15 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
                     `Set category to ${category.name} for ${picker.ids.length} contacts`,
                   ),
                 )
-                .catch((writeError: unknown) =>
-                  reportBulkFailure("set contact category", writeError),
-                );
+                .catch((writeError: unknown) => {
+                  releaseBulkAction();
+                  reportBulkFailure(
+                    "set contact category",
+                    writeError,
+                    onBulkOpenCategoryPicker,
+                  );
+                })
+                .finally(releaseBulkAction);
             }}
             style={[styles.bulkPickerRow, { borderColor: colors.border }]}
           >
@@ -1783,7 +1908,10 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
       </Sheet>
       <Sheet
         visible={frequencyPickerIds !== null}
-        onRequestClose={() => setFrequencyPickerIds(null)}
+        onRequestClose={() => {
+          setFrequencyPickerIds(null);
+          releaseBulkAction();
+        }}
         variant="compact"
       >
         <Text style={[styles.bulkPickerTitle, { color: colors.textSecondary }]}>
@@ -1843,7 +1971,7 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
       </Sheet>
       <ConfirmDialog
         visible={bulkConfirm !== null}
-        onRequestClose={() => setBulkConfirm(null)}
+        onRequestClose={dismissBulkConfirm}
         title={
           bulkConfirm?.kind === "quick-log"
             ? `Log ${bulkConfirm.ids.length} interactions?`
@@ -1867,7 +1995,7 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
         }
         destructive={false}
         onConfirm={onBulkConfirm}
-        onCancel={() => setBulkConfirm(null)}
+        onCancel={dismissBulkConfirm}
       />
     </View>
   );

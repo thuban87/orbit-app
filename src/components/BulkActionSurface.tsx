@@ -14,6 +14,7 @@ import { TYPOGRAPHY } from "@/theme/tokens/typography";
 
 export interface BulkActionSurfaceProps {
   selectedCount: number;
+  pending: boolean;
   onQuickLog: () => void;
   onLogInteraction: () => void;
   onAddFavourites: () => void;
@@ -35,6 +36,7 @@ interface BulkAction {
 
 export function BulkActionSurface({
   selectedCount,
+  pending,
   onQuickLog,
   onLogInteraction,
   onAddFavourites,
@@ -48,7 +50,7 @@ export function BulkActionSurface({
 }: BulkActionSurfaceProps) {
   const { colors } = useTheme();
   const [sensitiveVisible, setSensitiveVisible] = useState(false);
-  const disabled = selectedCount === 0;
+  const disabled = selectedCount === 0 || pending;
   const actions: BulkAction[] = [
     { id: "quick-log", label: "Quick Log", icon: "add", onPress: onQuickLog },
     {
@@ -88,13 +90,21 @@ export function BulkActionSurface({
   return (
     <>
       <View testID="dashboard-selection-bulk-actions" style={styles.actions}>
+        {pending ? (
+          <Text
+            accessibilityLiveRegion="polite"
+            style={[styles.pendingLabel, { color: colors.textSecondary }]}
+          >
+            Working…
+          </Text>
+        ) : null}
         {actions.map((action) => (
           <Pressable
             key={action.id}
             testID={`bulk-action-${action.id}`}
             accessibilityRole="button"
             accessibilityLabel={action.label}
-            accessibilityState={{ disabled }}
+            accessibilityState={{ disabled, busy: pending }}
             disabled={disabled}
             onPress={action.onPress}
             style={({ pressed }) => [
@@ -116,7 +126,7 @@ export function BulkActionSurface({
           testID="bulk-action-sensitive-operations"
           accessibilityRole="button"
           accessibilityLabel="More sensitive operations"
-          accessibilityState={{ disabled }}
+          accessibilityState={{ disabled, busy: pending }}
           disabled={disabled}
           onPress={() => setSensitiveVisible(true)}
           style={({ pressed }) => [
@@ -156,7 +166,7 @@ export function BulkActionSurface({
           testID="bulk-sensitive-frequency"
           accessibilityRole="button"
           accessibilityLabel="Change Contact Frequency"
-          accessibilityState={{ disabled }}
+          accessibilityState={{ disabled, busy: pending }}
           disabled={disabled}
           onPress={() => {
             setSensitiveVisible(false);
@@ -176,6 +186,11 @@ export function BulkActionSurface({
 
 const styles = StyleSheet.create({
   actions: { flexDirection: "row", flexWrap: "wrap", gap: SPACING.sm },
+  pendingLabel: {
+    fontFamily: TYPOGRAPHY.caption.family,
+    fontSize: TYPOGRAPHY.caption.size,
+    width: "100%",
+  },
   action: {
     alignItems: "center",
     borderWidth: StyleSheet.hairlineWidth,
