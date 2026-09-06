@@ -22,7 +22,7 @@ not something you can pattern-match against.
 ## How to use this
 
 - **Is a decision still live?** Check the `Superseded by` column. 22 of
-  91 ADRs are superseded in whole or in part.
+  94 ADRs are superseded in whole or in part.
 - **Which decisions govern a file?** Don't grep this file — ask the graph:
   `npm run graph:ask -- governs src/db/field-values-dao.ts`, or follow the
   `governed_by` edges.
@@ -122,3 +122,6 @@ not something you can pattern-match against.
 | 089 | Recoverable Memory Lifecycle and Contact-Operation Integrity | Accepted | 24.1-contact-knowledge-foundation | — | — | — | 7 | `src/db`, `src/screens`, `src/services` |
 | 090 | Additive Custom-Field Value History and Deferred Contact Scope | Accepted | 24.2-contact-knowledge-egress-search-types | — | — | — | 7 | `src/db`, `src/db/migrations` |
 | 091 | Imported Contact Notes as AI-Off Typed Memories | Accepted | 24.2-contact-knowledge-egress-search-types | — | — | — | 7 | `modules/orbit-contact-picker`, `modules/orbit-contact-picker/android/src/main/java/expo/modules/orbitcontactpicker`, `src/db` +1 |
+| 092 | Durable Shared Dashboard Query State | Accepted | 25-dashboard-data-state-foundation | — | — | — | 6 | `src/backup`, `src/db`, `src/db/migrations` +2 |
+| 093 | Scoped Composable Dashboard Population and Filter Model | Accepted | 25-dashboard-data-state-foundation | — | — | — | 6 | `src/db`, `src/logic`, `src/screens` +1 |
+| 094 | Eligibility-Scoped Semantic Dashboard Search | Accepted | 25-dashboard-data-state-foundation | — | — | — | 4 | `src/db`, `src/logic`, `src/services` |

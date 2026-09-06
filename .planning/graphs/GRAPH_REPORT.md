@@ -1,16 +1,16 @@
 # Graph Report - orbit-app  (2026-09-06)
 
 ## Corpus Check
-- 1352 files · ~1,773,155 words
+- 1352 files · ~1,773,463 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 13210 nodes · 22240 edges · 1058 communities (965 shown, 93 thin omitted)
+- 13211 nodes · 22241 edges · 1049 communities (960 shown, 89 thin omitted)
 - Extraction: 99% EXTRACTED · 1% INFERRED · 0% AMBIGUOUS · INFERRED: 142 edges (avg confidence: 0.72)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `da552208`
+- Built from commit: `bbb5c782`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -827,7 +827,6 @@
 - Validation Architecture
 - Phase 21 Device UAT Scoreboard
 - BackupEncryptionBackend
-- dashboard-selection-store.ts
 - 01-01-PLAN.md
 - 01-02-PLAN.md
 - 01-04-PLAN.md
@@ -1040,7 +1039,6 @@
 - Security Domain
 - Deferred Items
 - README.md
-- expo
 - expo-file-system
 - expo-font
 - expo-haptics
@@ -1055,16 +1053,9 @@
 - .continue-here.md
 - COVERAGE.md
 - @shopify/react-native-skia
-- seed
 - Migration006IntegrityError
-- migrateToV12
-- anchor-position.ts
-- motion.ts
-- Plan 20-03 — Per-contact reconciliation
-- Plan 20-06 — Bulk Review Surface + Phase Verification
 - localDateOffset
 - Directory
-- restore-photo-finalize-sweep.test.ts
 
 ## God Nodes (most connected - your core abstractions)
 1. `SqlExecutor` - 232 edges
@@ -1093,87 +1084,87 @@
 ## Import Cycles
 - None detected.
 
-## Communities (1058 total, 93 thin omitted)
+## Communities (1049 total, 89 thin omitted)
 
 ### Community 0 - "database.ts"
-Cohesion: 0.13
-Nodes (22): GlassSurface(), GlassSurfaceProps, styles, channel(), contrastRatio(), meetsAA(), relativeLuminance(), alphaComposite() (+14 more)
+Cohesion: 0.11
+Nodes (27): BackgroundHost(), DevButton(), MODES, PACKAGES, styles, ThemePreviewScreen(), GlassSurface(), GlassSurfaceProps (+19 more)
 
 ### Community 1 - "types.ts"
 Cohesion: 0.03
-Nodes (105): buildExportManifest(), migrated(), PHOTO, uidFactory(), db(), fs, text, uidFactory() (+97 more)
+Nodes (61): RFC-4122, migrated(), PHOTO, populateV6(), uidFactory(), insertContact(), migrateToV2(), migrateToV5() (+53 more)
 
 ### Community 2 - "field-types.ts"
-Cohesion: 0.08
-Nodes (28): ContactPicker(), ContactPickerProps, styles, AnchorRect, clampAnchorPosition(), PanelDimensions, panel, viewport (+20 more)
+Cohesion: 0.13
+Nodes (18): AnchorRect, clampAnchorPosition(), PanelDimensions, panel, viewport, ViewportDimensions, AnchoredPanel(), AnchoredPanelProps (+10 more)
 
 ### Community 3 - "001-initial.ts"
-Cohesion: 0.05
-Nodes (50): ScrimPointerEvents, speedDialScrimPointerEvents(), Snackbar(), styles, createQuickLogUndoController(), FabContext, FabNavigateIntent, FabPickThenIntent (+42 more)
+Cohesion: 0.04
+Nodes (59): ScrimPointerEvents, speedDialScrimPointerEvents(), ContactPicker(), ContactPickerProps, styles, createQuickLogUndoController(), FabContext, FabNavigateIntent (+51 more)
 
 ### Community 4 - "import-session-dao.ts"
 Cohesion: 0.10
 Nodes (22): Assert, CADENCE_OWNERS, _CadenceCreate, _CadenceDashProgress, _CadenceDashStatus, _CadenceEditRow, _CadenceImpactInputs, _CadenceUpdate (+14 more)
 
 ### Community 5 - "inWriteTransaction"
-Cohesion: 0.09
-Nodes (21): Architecture, Changelog, Configuration, Dashboard, Data Model, Decisions, Gotchas, Handling Bound and Unbound contacts (+13 more)
+Cohesion: 0.12
+Nodes (16): Architecture, Building the eligible result universe, Changelog, Configuration, Dashboard, Data Model, Decisions, Gotchas (+8 more)
 
 ### Community 6 - "import-session-read.ts"
-Cohesion: 0.28
-Nodes (7): ContactCard(), ContactCardProps, statusLabel(), styles, RankedFuelLine(), RankedFuelLineProps, styles
+Cohesion: 0.11
+Nodes (20): addRelationship(), addRelationshipCore(), assertNotSelfLink(), assertNullableBinaryVisibility(), assertOneChange(), assertPersonName(), deleteRelationship(), deleteRelationshipCore() (+12 more)
 
 ### Community 7 - "AiService.ts"
-Cohesion: 0.06
-Nodes (31): SecureFetchError, AiKeyStore, inputFor(), makePrompt(), secureCustomFetchMock, SecureFetchError, AiCloudProviderId, AiSettings (+23 more)
+Cohesion: 0.14
+Nodes (15): AiErrorCode, AiProvider, AnthropicProvider, classifyHttpStatus(), CustomProvider, extractGeminiModels(), extractIdList(), GoogleProvider (+7 more)
 
 ### Community 8 - "getExecutor"
-Cohesion: 0.09
-Nodes (27): main(), renderSeedModule(), SEED_PATH, CatalogFetch, CatalogFetchResponse, CatalogStorage, isEmptyCatalog(), isModelCatalog() (+19 more)
+Cohesion: 0.03
+Nodes (92): main(), renderSeedModule(), SEED_PATH, CatalogFetch, CatalogFetchResponse, CatalogStorage, isEmptyCatalog(), isModelCatalog() (+84 more)
 
 ### Community 9 - "HomeScreen.tsx"
 Cohesion: 0.05
-Nodes (39): CardContextMenu(), ListRowProps, BulkActionClaim, BulkActionGate, createBulkActionGate(), DashboardSelectionSessionSnapshot, getCurrentSelectionIds(), applyCommittedMembership() (+31 more)
+Nodes (55): CardContextMenu(), ListRowProps, count(), countAllContacts(), countArchived(), countFavourites(), countLiveContacts(), countSnoozed() (+47 more)
 
 ### Community 10 - "OrbitContactPickerModule"
 Cohesion: 0.09
 Nodes (29): Any, InputStream, Intent, Boolean, CodedException, Context, Module, Promise (+21 more)
 
 ### Community 11 - "encryption.ts"
-Cohesion: 0.06
-Nodes (27): BackupEncryptionProfile, EncryptedBackupEnvelope, APPROVED_BACKUP_ENCRYPTION_PROFILE, BackupEncryptionBackend, BackupEnvelopeCrypto, BackupEnvelopeCryptoOptions, BackupEnvelopeError, BackupEnvelopeErrorCode (+19 more)
+Cohesion: 0.08
+Nodes (17): BackupEnvelopeError, BackupEnvelopeErrorCode, base64(), decodeBase64(), encoder, envelopeKeys, hasOnlyKeys(), isIntegerBetween() (+9 more)
 
 ### Community 12 - "App.tsx"
 Cohesion: 0.21
 Nodes (13): combineDateAndTime(), DateOrStored, isCombinedInFuture(), localTimePart(), parseLocalDateTime(), toDate(), CHANNEL_OPTIONS, DIRECTION_OPTIONS (+5 more)
 
 ### Community 13 - "backup-service.ts"
-Cohesion: 0.05
-Nodes (66): AppShell(), styles, LinksEditor(), LinksEditorProps, openLinkUrl(), styles, ResumeReconcilePrompt(), ResumeReconcilePromptProps (+58 more)
+Cohesion: 0.04
+Nodes (91): AppShell(), styles, resumeImport(), ResumeImportPrompt(), ResumeImportPromptProps, RootNavigation, styles, ResumeReconcilePrompt() (+83 more)
 
 ### Community 14 - "index.ts"
-Cohesion: 0.13
-Nodes (28): StatusDisplayState, statusGlyph(), ALL_STATES, GridCard(), GridCardProps, styles, IconProps, statusDisplayLabel() (+20 more)
+Cohesion: 0.15
+Nodes (20): BulkReviewDbRow, BulkReviewFlag, listBulkReviewFlags(), sourceBirthday(), daysInMonth(), daysUntilBirthday(), isLeapYear(), isValidStoredBirthday() (+12 more)
 
 ### Community 15 - "model-catalog-filter.ts"
 Cohesion: 0.11
-Nodes (28): FirstClassDerived, getFirstClassDerived(), getImpactInputs(), ImpactInputs, filterByGravity(), GRAVITY_TIER_NAMES, GravityInputsLoader, computeGravity() (+20 more)
+Nodes (26): FirstClassDerived, getFirstClassDerived(), getImpactInputs(), ImpactInputs, filterByGravity(), GRAVITY_TIER_NAMES, GravityInputsLoader, computeGravity() (+18 more)
 
 ### Community 16 - "restore-apply.ts"
-Cohesion: 0.10
-Nodes (37): applyRestore(), assertCompleteIncomingPairs(), canonicalFor(), deleteActions(), DeleteCandidate, entities, entry(), FinalizeCandidate (+29 more)
+Cohesion: 0.08
+Nodes (42): applyRestore(), assertCompleteIncomingPairs(), canonicalFor(), deleteActions(), DeleteCandidate, entities, entry(), FinalizeCandidate (+34 more)
 
 ### Community 17 - "reconcile-apply.ts"
-Cohesion: 0.04
-Nodes (120): assertMeaningfulValue(), assertOneChange(), editHistoryEntry(), editHistoryEntryCore(), EditHistoryEntryInput, promoteToCurrentValue(), promoteToCurrentValueCore(), PromoteToCurrentValueInput (+112 more)
+Cohesion: 0.10
+Nodes (29): blankToNull(), initialDraft(), RelationshipDraft, RelationshipEditor(), RelationshipEditorProps, styles, EditHistoryEntryInput, PromoteToCurrentValueInput (+21 more)
 
 ### Community 18 - "ReconcileGridScreen.tsx"
-Cohesion: 0.07
-Nodes (40): CustomFieldValue(), CustomFieldValueProps, FieldSpec, presentValue(), styles, draftToFieldFields(), FieldDefDraft, FieldDraftFields (+32 more)
+Cohesion: 0.05
+Nodes (55): CustomFieldValue(), CustomFieldValueProps, FieldSpec, presentValue(), styles, draftToFieldFields(), FieldDefDraft, FieldDraftFields (+47 more)
 
 ### Community 19 - "AiSuggestionLifecycle"
 Cohesion: 0.12
-Nodes (15): ResolvedPrompt, CONFIG, CONTEXT, makeSeam(), Seam, AiSuggestionDeps, AiSuggestionLifecycle, AiSuggestionState (+7 more)
+Nodes (16): ResolvedPrompt, CONFIG, CONTEXT, makeSeam(), Seam, AiSuggestionDeps, AiSuggestionLifecycle, AiSuggestionState (+8 more)
 
 ### Community 20 - "Logger"
 Cohesion: 0.04
@@ -1213,43 +1204,43 @@ Nodes (11): Android Contact Reconciliation UAT Pipeline, Architecture (Phase 20)
 
 ### Community 29 - "contacts-dao.ts"
 Cohesion: 0.07
-Nodes (41): hasSharedBackup(), reconcileCompletionCounts, BACKUP_SHARE_MIME_TYPES, isBackupShareIntent(), navigationRef, ShareIntentGate(), applyBodyNav(), dataOf() (+33 more)
+Nodes (38): hasSharedBackup(), Counts, MergeImpactSummary(), plural(), styles, reconcileCompletionCounts, BACKUP_SHARE_MIME_TYPES, isBackupShareIntent() (+30 more)
 
 ### Community 30 - "SettingsScreen.tsx"
-Cohesion: 0.10
-Nodes (41): ringVisual, colors, ContactStatusRow, getContactStatus(), ProfileStatus, RawRow, RogueReason, getProfile() (+33 more)
+Cohesion: 0.08
+Nodes (46): ringVisual, ContactCard(), ContactCardProps, statusLabel(), styles, colors, OrbitBody(), OrbitBodyProps (+38 more)
 
 ### Community 31 - "localDateTime"
-Cohesion: 0.12
-Nodes (35): BackgroundHost(), BackgroundHostProps, styles, ADR-0048, DevButton(), MODES, PACKAGES, styles (+27 more)
+Cohesion: 0.23
+Nodes (17): BackgroundHostProps, styles, ADR-0048, AppSettings, PortableSettingsSnapshot, RightSwipeAction, ThemeStore, FakeOptions (+9 more)
 
 ### Community 32 - "app-settings-dao.ts"
-Cohesion: 0.09
-Nodes (33): ACCENT_FIELDS, AppSettingsRow, assertAccentId(), assertAiProvider(), assertBackgroundId(), assertDashboardFilters(), assertDashboardPopulations(), assertDashboardRightSwipeAction() (+25 more)
+Cohesion: 0.08
+Nodes (34): ACCENT_FIELDS, AppSettingsRow, assertAccentId(), assertAiProvider(), assertBackgroundId(), assertDashboardFilters(), assertDashboardPopulations(), assertDashboardRightSwipeAction() (+26 more)
 
 ### Community 33 - "backup-schema.ts"
 Cohesion: 0.12
 Nodes (27): assertUniqueRows(), assertUniqueTombstones(), compareRowAndTombstone(), ENTITY_POLICIES, EntityPolicy, incompatibleRows(), MergeableEntityType, newestRow() (+19 more)
 
 ### Community 34 - "PhotoSourcePicker.tsx"
-Cohesion: 0.12
-Nodes (26): resumeImport(), ResumeImportPrompt(), ResumeImportPromptProps, RootNavigation, styles, discardSession(), ImportSessionMode, getResumableSession() (+18 more)
+Cohesion: 0.07
+Nodes (65): choosePrimary(), removeMethodDraft(), updateMethodDraft(), listCategories(), getDb(), getExecutor(), def(), finalizeSessionIfTerminal() (+57 more)
 
 ### Community 35 - "impact.ts"
 Cohesion: 0.04
 Nodes (47): Alternatives Considered, Anti-patterns to avoid, Applicable ASVS Categories, Architectural Responsibility Map, Architecture (decoupled per D-10), Assumptions Log, Carried-Forward Pipeline Fixes — on-disk defect + fix + schema impact, Claude's Discretion (delegated to research/planning) (+39 more)
 
 ### Community 36 - "photo-storage.ts"
-Cohesion: 0.13
-Nodes (29): array(), assertPortableSettings(), fail(), FORWARD_MIGRATIONS, isBinaryFlag(), isMemoryProvenance(), isNullableBinaryFlag(), Migration (+21 more)
+Cohesion: 0.19
+Nodes (21): array(), assertPortableSettings(), fail(), FORWARD_MIGRATIONS, isBinaryFlag(), isMemoryProvenance(), isNullableBinaryFlag(), Migration (+13 more)
 
 ### Community 37 - "notification-schedule.test.ts"
-Cohesion: 0.05
-Nodes (98): migrations, photoMocks, newUid(), seedContact(), makeContact(), uid(), contact(), method() (+90 more)
+Cohesion: 0.04
+Nodes (139): db(), newUid(), seedContact(), makeContact(), uid(), contact(), email(), phone() (+131 more)
 
 ### Community 38 - "BackupScreen.tsx"
-Cohesion: 0.16
-Nodes (20): consumeSharedBackup(), pickBackupDocument(), BackupHealth, BackupHealthInput, BackupNudgeInput, BackupNudgeState, resolveBackupHealth(), resolveBackupNudge() (+12 more)
+Cohesion: 0.05
+Nodes (68): consumeSharedBackup(), pickBackupDocument(), RestoreApplyResult, RestoreMode, BackupEncryptionBenchmarkHarness(), styles, getAppSettings(), recordAutomaticBackupHealthCore() (+60 more)
 
 ### Community 39 - "NonPublicAddresses"
 Cohesion: 0.14
@@ -1260,16 +1251,16 @@ Cohesion: 0.04
 Nodes (45): Age formatter (pure, local, node-tested), Alternatives Considered, Anti-Patterns to Avoid, Applicable ASVS Categories, Architectural Responsibility Map, Architecture Patterns, Assumptions Log, Code Examples (+37 more)
 
 ### Community 41 - "index.ts"
-Cohesion: 0.17
-Nodes (22): RestoreApplyResult, RestoreMode, getAppSettings(), confirmReplaceAllRestore(), createRestoreApplySingleFlight(), createRestorePreviewCache(), initialRestoreApplyState(), replaceAllConfirmation() (+14 more)
+Cohesion: 0.15
+Nodes (19): normaliseLinkUrl(), MemoryCard(), MemoryCardProps, memoryTypeLabel(), openMemoryLink(), styles, { openURL }, blankToNull() (+11 more)
 
 ### Community 43 - "secure-fetch.ts"
-Cohesion: 0.11
-Nodes (16): cancel(), request(), NativeSecureFetchInput, NativeSecureFetchResult, OrbitSecureFetchModule, OrbitSecureFetchModule, generateRequestId(), mapNativeError() (+8 more)
+Cohesion: 0.16
+Nodes (12): validateCustomEndpoint(), generateRequestId(), mapNativeError(), NOTE: the transport-level guarantees (HTTPS→private rejection, redirect, secureCustomFetch(), SecureFetchError, SecureFetchErrorCode, SecureFetchInput (+4 more)
 
 ### Community 44 - "phase-17-runtime-integration.test.ts"
-Cohesion: 0.09
-Nodes (35): AXIS_DEFAULT_LABELS, CONTROL_ACTION_LABELS, CONTROL_AXIS_LABELS, FILTER_FAMILY_LABELS, FILTER_OPTION_LABELS, filterFamilyLabel(), filterOptionLabel(), POPULATION_LABELS (+27 more)
+Cohesion: 0.07
+Nodes (54): AXIS_DEFAULT_LABELS, CONTROL_ACTION_LABELS, CONTROL_AXIS_LABELS, FILTER_FAMILY_LABELS, FILTER_OPTION_LABELS, filterFamilyLabel(), filterOptionLabel(), POPULATION_LABELS (+46 more)
 
 ### Community 45 - "v1 Requirements"
 Cohesion: 0.10
@@ -1280,20 +1271,20 @@ Cohesion: 0.10
 Nodes (19): Architecture, Capturing and cropping a photo, Changelog, Configuration, Data Model, Decisions, Gotchas, How It Works (+11 more)
 
 ### Community 47 - "FuelEditor.tsx"
-Cohesion: 0.16
-Nodes (20): addLink(), addLinkCore(), applyLinkDiff(), assertOneChange(), listLinks(), removeLink(), removeLinkCore(), SeededLink (+12 more)
+Cohesion: 0.17
+Nodes (20): entries(), appendMemoryEntries(), ContactMethodRow, contactMethodsSql(), ContactRow, contactsSql(), CustomValueRow, customValuesSql() (+12 more)
 
 ### Community 48 - "biome.json"
 Cohesion: 0.08
 Nodes (25): source, assist, actions, files, includes, formatter, enabled, indentStyle (+17 more)
 
 ### Community 49 - "ai-context-read.ts"
-Cohesion: 0.13
-Nodes (22): codePoints(), DEFAULT_STYLE_NOTE, intensityLine(), qualityLine(), resolvePrompt(), sanitizeValue(), STATIC_INSTRUCTION, trimToCodePoints() (+14 more)
+Cohesion: 0.22
+Nodes (14): CadenceAggregate, IntensityAggregate, PromptContext, QualityAggregate, RankedFuelEntry, SharedFieldValue, ageDaysOf(), AggregateRow (+6 more)
 
 ### Community 50 - "create-contact-logic.ts"
-Cohesion: 0.21
-Nodes (17): addMethodDraft(), canonicalDuplicateCopy(), choosePrimary(), collapseCanonicalDuplicate(), discardBlankMethodDrafts(), EMPTY_METHOD_GROUPS, emptyMethodDraft(), MethodLabel (+9 more)
+Cohesion: 0.19
+Nodes (17): readSharedMemories(), compareCandidate(), CurrentStateCandidateRow, currentStateSql(), Line3CandidateKind, MemoryCandidateRow, memorySql(), placeholders() (+9 more)
 
 ### Community 51 - "DigestScreen.tsx"
 Cohesion: 0.06
@@ -1304,48 +1295,48 @@ Cohesion: 0.07
 Nodes (27): expo, expo-blur, expo-document-picker, expo-image-manipulator, expo-notifications, expo-sharing, expo-status-bar, expo-task-manager (+19 more)
 
 ### Community 53 - "ComposeScreen.tsx"
-Cohesion: 0.13
-Nodes (20): isBulkActionAvailable(), actionLabels, BulkAction, CandidateCardGrid(), CandidateCardGridProps, CandidateChoice, CandidateItem, styles (+12 more)
+Cohesion: 0.20
+Nodes (14): buildDesiredMethodList(), canonicalMethod(), classifyMethodFamily(), classifyReconciliation(), ClassifyReconciliationInput, classifyScalar(), RECONCILE_FIELD_FAMILIES, ReconcileFieldOption (+6 more)
 
 ### Community 54 - "RestorePreviewScreen.tsx"
 Cohesion: 0.07
-Nodes (27): AutomaticBackupDependencies, AutomaticBackupReencryptionDependencies, AutomaticBackupReencryptionResult, BackupPreview, BackupPreviewResult, backupServiceQueue, createAutomaticBackupReencryptionService(), encrypt() (+19 more)
+Nodes (35): automaticBackupFilename(), AutomaticBackupMetadata, filesToPrune(), isExpiredAutomaticBackup(), isOwnedAutomaticBackup(), shouldRunAutomaticBackup(), now, AutomaticBackupDependencies (+27 more)
 
 ### Community 55 - "ContactProfileScreen.tsx"
-Cohesion: 0.07
-Nodes (47): EVENT_LABELS, styles, TimelineRow(), TimelineRowProps, ContactMethodGroups, listActionablePrimaryMethods(), listContactMethodGroups(), selectActionablePrimaryMethods() (+39 more)
+Cohesion: 0.08
+Nodes (37): GravityBar(), GravityBarProps, styles, RankedFuelLine(), RankedFuelLineProps, styles, EVENT_LABELS, styles (+29 more)
 
 ### Community 56 - "contact-import-resume-sweep.ts"
-Cohesion: 0.16
-Nodes (24): countNeverContacted(), readIncludeUnboundNeverContacted(), GentleLine, OverlookedRow, QualityMarkRow, readGentleLine(), readOverlooked(), readRetrospective() (+16 more)
+Cohesion: 0.19
+Nodes (20): GentleLine, OverlookedRow, QualityMarkRow, readGentleLine(), readRetrospective(), RetrospectiveRow, AllQuietInputs, capGroup() (+12 more)
 
 ### Community 57 - "Avatar.tsx"
-Cohesion: 0.13
-Nodes (22): MenuAction, CardGrid(), CardGridProps, gridColumnCount(), styles, ICON_REGISTRY, IconName, IconTone (+14 more)
+Cohesion: 0.14
+Nodes (9): AI_PROVIDER_IDS, AiGenerationRequest, AiProviderConfig, AiSettings, AiService, inputFor(), makePrompt(), secureCustomFetchMock (+1 more)
 
 ### Community 58 - "assist-store.ts"
-Cohesion: 0.07
-Nodes (44): BirthdayNotificationCandidate, DecayEligibleCandidate, listBirthdayNotificationCandidates(), listDecayEligibleCandidates(), ensureChannels(), setChannel, allowedSlotForDay(), clampHour() (+36 more)
+Cohesion: 0.06
+Nodes (52): BirthdayNotificationCandidate, DecayEligibleCandidate, listBirthdayNotificationCandidates(), listDecayEligibleCandidates(), localDateOffset(), OVERDUE(), ROGUE(), seedContact() (+44 more)
 
 ### Community 59 - "lifecycle-consumer-ledger.test.ts"
-Cohesion: 0.13
-Nodes (19): addFuelRow(), addInteractionRows(), localDateOffset(), ROGUE(), seedContact(), SeedOpts, STABLE(), uid() (+11 more)
+Cohesion: 0.10
+Nodes (26): captureMultiAttach(), FuelRow, seedContact(), shareRow(), uid(), addFuelRow(), addInteractionRows(), seedContact() (+18 more)
 
 ### Community 60 - "CaptureScreen.tsx"
-Cohesion: 0.12
-Nodes (26): LinkDraft, ContactLinkRow, DraftLink, ContactEditRow, ContactForEdit, getContactForEdit(), isDuplicateName(), defsForEditForm() (+18 more)
+Cohesion: 0.05
+Nodes (79): addMethodDraft(), canonicalDuplicateCopy(), collapseCanonicalDuplicate(), ContactMethodEditorDraft, discardBlankMethodDrafts(), EMPTY_METHOD_GROUPS, emptyMethodDraft(), MethodGroups (+71 more)
 
 ### Community 61 - "reconcile-resume-sweep.ts"
-Cohesion: 0.15
-Nodes (16): FilterChip, FilterChipRow(), FilterChipRowProps, styles, DashboardFilter, DashboardSort, DashboardEmptyInput, DashboardEmptyState (+8 more)
+Cohesion: 0.18
+Nodes (12): assertNoLocalOnlyKeys(), buildExportManifest(), ExportManifestDeps, FORBIDDEN_KEYS, readManifest(), withPhoto(), BackupPhotoUnreadableError, getPortableSettingsSnapshot() (+4 more)
 
 ### Community 62 - "expo"
 Cohesion: 0.09
 Nodes (21): backgroundColor, backgroundImage, foregroundImage, monochromeImage, adaptiveIcon, predictiveBackGestureEnabled, expo, android (+13 more)
 
 ### Community 63 - "model-registry.ts"
-Cohesion: 0.17
-Nodes (18): asCatalogProvider(), better(), EMPTY, filterToFrontier(), FRONTIER_TIERS, FrontierTier, frontierWinners(), isDated() (+10 more)
+Cohesion: 0.20
+Nodes (14): ApplyReconcileSelectionsInput, ApplyReconcileSelectionsResult, ContactApplyRow, ReconcileWriteField, snapshotPriorScalar(), writeReviewedSnapshots(), assertOneChange(), ReviewedSnapshotMap (+6 more)
 
 ### Community 64 - "transaction.ts"
 Cohesion: 0.06
@@ -1360,8 +1351,8 @@ Cohesion: 0.12
 Nodes (15): Architecture, Changelog, Configuration, Data Model, Decisions, Gotchas, How It Works, Key Files (+7 more)
 
 ### Community 67 - "ImportReviewScreen.tsx"
-Cohesion: 0.10
-Nodes (26): groups(), FieldChoiceGroup(), FieldChoiceGroupProps, FieldChoiceMode, FieldChoiceOption, initialSelection(), styles, KEEP_ORBIT_PHOTO (+18 more)
+Cohesion: 0.22
+Nodes (13): assetSlot(), BACKGROUND_ORDER, BACKGROUND_SLOTS, BackgroundAssetSlot, NONE_SLOT_ID, PACKAGE_DEFAULT_SLOT, resolveAssetById(), resolveBackground() (+5 more)
 
 ### Community 68 - "recency-dao.ts"
 Cohesion: 0.12
@@ -1392,12 +1383,12 @@ Cohesion: 0.11
 Nodes (16): addNotificationResponseReceivedListener, AndroidImportance, AndroidNotificationVisibility, cancelScheduledNotificationAsync, clearLastNotificationResponseAsync, getAllScheduledNotificationsAsync, getLastNotificationResponseAsync, getPermissionsAsync (+8 more)
 
 ### Community 75 - "notification-gate.tsx"
-Cohesion: 0.21
-Nodes (17): ringColor(), ringWeight(), fixture, widgetPalette, WidgetTile, ActionButton(), asColor(), asImageSource() (+9 more)
+Cohesion: 0.20
+Nodes (13): ringColor(), ringWeight(), fixture, widgetPalette, LargeTile(), SmallTile(), applyAccent(), resolveMode() (+5 more)
 
 ### Community 76 - "BackupSettingsScreen.tsx"
-Cohesion: 0.07
-Nodes (47): assertOneChange(), ContactMetadataRow, ignoreBulkReviewFlag(), ignoreBulkReviewFlagCore(), IgnoreBulkReviewFlagInput, insertResolutionCore(), resolveBulkReviewFlag(), resolveBulkReviewFlagCore() (+39 more)
+Cohesion: 0.13
+Nodes (23): pickContacts(), listContactMethods(), assertSafeReconcileStagingRelative(), applyReconcileSelections(), draftFor(), ReconcileSelection, scalarLiveValue(), getReviewedSnapshots() (+15 more)
 
 ### Community 77 - "bulk-review-dao.test.ts"
 Cohesion: 0.12
@@ -1416,12 +1407,12 @@ Cohesion: 0.12
 Nodes (17): babel-preset-expo, @biomejs/biome, devDependencies, babel-preset-expo, @biomejs/biome, patch-package, tsx, @types/node (+9 more)
 
 ### Community 81 - "AiCloudProviderId"
-Cohesion: 0.14
-Nodes (17): DateFieldWidget(), styles, DropdownFieldWidget(), styles, NumberFieldWidget(), styles, styles, TextAreaFieldWidget() (+9 more)
+Cohesion: 0.23
+Nodes (12): KnowledgeSearchCandidate, MEMORY_TYPE_REGISTRY, buildDashboardSearchResult(), buildResult(), DashboardSearchMatch, DashboardSearchSourceKind, descriptor(), fieldLabel() (+4 more)
 
 ### Community 82 - "use-read-contacts-permission.ts"
 Cohesion: 0.13
-Nodes (30): assertSafeImportStagingRelative(), assertSafeReconcileStagingRelative(), assertSafeRelative(), assertSafeRestorePendingRelative(), acceptPickedContacts(), assertContactId(), contactPhotoRelPath(), importStagingRelPath() (+22 more)
+Nodes (30): assertSafeImportStagingRelative(), assertSafeRelative(), assertSafeRestorePendingRelative(), listJournalEntriesCore(), assertContactId(), contactPhotoRelPath(), deletePhoto(), deleteRestorePending() (+22 more)
 
 ### Community 83 - "OrbitSecureFetchModuleTest"
 Cohesion: 0.19
@@ -1448,16 +1439,16 @@ Cohesion: 0.14
 Nodes (13): Animation and pause boundary, Architecture (Phase 13), Assets, Code, Fallback Chain / Resolution Order, File Locations, Geometry and rendered state, How to Add or Change an Orrery Layer (+5 more)
 
 ### Community 89 - "widget-linking.ts"
-Cohesion: 0.11
-Nodes (20): createFileCatalogStorage(), resolveActiveCatalog(), InteractionAssistChannel, actionablePrimaryPhoneDestination(), ComposeControls, resolveComposeControls(), primaryPhone, consumeAiSuggestionIntent() (+12 more)
+Cohesion: 0.27
+Nodes (11): createReconcileSession(), insertReconcileCard(), newUid(), seedCard(), seedContact(), newUid(), seedCard(), seedContact() (+3 more)
 
 ### Community 90 - "saf-storage.ts"
-Cohesion: 0.11
-Nodes (20): Avatar(), AvatarProps, styles, ConsolidationPrompt(), sourceName(), SourcePreview(), SourceSnapshot, styles (+12 more)
+Cohesion: 0.26
+Nodes (11): compareCandidates(), firstStable(), formatLocalDate(), imminentWindowEnd(), isBirthday(), isImminent(), Line3Selection, PROMPTS (+3 more)
 
 ### Community 91 - "PhotoFieldWidget.tsx"
-Cohesion: 0.05
-Nodes (47): listContactsSummary(), PickContactsOptions, PickedContact, PickedMethod, readAllContacts(), readContactsByLookupKeys(), SelectedReadResult, OrbitContactPickerModule (+39 more)
+Cohesion: 0.11
+Nodes (30): listContactsSummary(), filterRows(), matchesQuery(), selectionCount(), rows, toggleSelection(), ContactPickerRow, toPickerRows() (+22 more)
 
 ### Community 92 - "contact-lifecycle-effects.ts"
 Cohesion: 0.11
@@ -1491,6 +1482,10 @@ Nodes (13): Active, Business Context, Constraints, Context, Core Value, Current 
 Cohesion: 0.15
 Nodes (11): adrDir, adrStatus, byId, graph, graphPath, Link, [mode, arg], Node (+3 more)
 
+### Community 100 - "contacts-dao.test.ts"
+Cohesion: 0.23
+Nodes (6): cancel(), request(), NativeSecureFetchInput, NativeSecureFetchResult, OrbitSecureFetchModule, OrbitSecureFetchModule
+
 ### Community 101 - "notification-ids.ts"
 Cohesion: 0.12
 Nodes (15): Architecture, Backup & Restore, Changelog, Configuration, Data Model, Decisions, Encrypting a backup, Exporting a snapshot (+7 more)
@@ -1520,8 +1515,8 @@ Cohesion: 0.13
 Nodes (14): Architecture, Changelog, Configuration, Data Model, Decisions, Gotchas, How It Works, Key Files (+6 more)
 
 ### Community 108 - "ConsumedBackupShare"
-Cohesion: 0.16
-Nodes (17): addSignal(), candidateFor(), candidateScore(), classifyCandidate(), ContactNameRow, DuplicateEvidenceCandidate, DuplicateEvidenceResult, DuplicateEvidenceSignal (+9 more)
+Cohesion: 0.18
+Nodes (16): addSignal(), candidateFor(), candidateScore(), classifyCandidate(), ContactNameRow, DuplicateEvidenceCandidate, DuplicateEvidenceResult, DuplicateEvidenceSignal (+8 more)
 
 ### Community 109 - "contact-picker-chunk.test.ts"
 Cohesion: 0.12
@@ -1579,21 +1574,25 @@ Nodes (7): findings, OWNERS, ROOT, scalarReferences(), SOURCE_ROOT, stripComment
 Cohesion: 0.22
 Nodes (8): abs, canonical, Graph, GraphLink, GraphNode, links, remap, seen
 
+### Community 122 - "File"
+Cohesion: 0.29
+Nodes (8): codePoints(), DEFAULT_STYLE_NOTE, intensityLine(), qualityLine(), resolvePrompt(), sanitizeValue(), STATIC_INSTRUCTION, trimToCodePoints()
+
 ### Community 123 - "006-normalize-custom-field-values.test.ts"
 Cohesion: 0.07
 Nodes (29): 1. Summary, 2. Strengths, 3. Concerns, 4. Suggestions, 5. Risk Assessment, Agreed Concerns, Agreed Strengths, Claude Review (+21 more)
 
 ### Community 124 - "011-contact-lifecycle-schema.test.ts"
-Cohesion: 0.18
-Nodes (12): getMergeCandidate(), listMergeCandidates(), MergeCandidate, tableExists(), recommendSurvivor(), scoreCandidate(), SurvivorContinuitySignal, SurvivorRecommendation (+4 more)
+Cohesion: 0.36
+Nodes (5): recommendSurvivor(), scoreCandidate(), SurvivorContinuitySignal, SurvivorRecommendation, SurvivorRecommendationCandidate
 
 ### Community 125 - "reconcile-session-read.ts"
-Cohesion: 0.06
-Nodes (47): isContactPickerAvailable(), pickContacts(), validateCustomEndpoint(), TruncationNotice, resolveEffectivePhoneRegion(), listSunCandidates(), RootStackParamList, pinResultCopy() (+39 more)
+Cohesion: 0.08
+Nodes (26): isContactPickerAvailable(), PickContactsOptions, PickedContact, PickedMethod, readAllContacts(), readContactsByLookupKeys(), SelectedReadResult, OrbitContactPickerModule (+18 more)
 
 ### Community 126 - "index.ts"
-Cohesion: 0.22
-Nodes (11): isFutureLocalDate(), PickDateResult, resolvePickedDate(), NOW, localNow(), daysAgo(), daysAgo(), daysAgo() (+3 more)
+Cohesion: 0.17
+Nodes (16): isFutureLocalDate(), PickDateResult, resolvePickedDate(), NOW, localNow(), daysAgo(), daysAgo(), daysAgo() (+8 more)
 
 ### Community 127 - "notification-actions.test.ts"
 Cohesion: 0.07
@@ -1601,7 +1600,7 @@ Nodes (29): 10. Merge entry (Cluster U), 11. Survivor selection — `SurvivorSel
 
 ### Community 128 - "adr-registry.ts"
 Cohesion: 0.01
-Nodes (182): ADR-0004, ADR-0005, ADR-0006, ADR-0007, ADR-0008, ADR-0009, ADR-0010, ADR-0012 (+174 more)
+Nodes (188): ADR-0004, ADR-0005, ADR-0006, ADR-0007, ADR-0008, ADR-0009, ADR-0010, ADR-0012 (+180 more)
 
 ### Community 129 - "3. Data layer"
 Cohesion: 0.29
@@ -1621,19 +1620,19 @@ Nodes (18): Architecture, Capturing shared material, Changelog, Configuration, C
 
 ### Community 133 - "crop-geometry.ts"
 Cohesion: 0.09
-Nodes (41): applyPopulationPostProcessing(), BirthdayCandidate, birthdayPredicate(), composePopulationRead(), count(), countAllContacts(), countArchived(), countBirthdayPopulation() (+33 more)
+Nodes (39): CardGrid(), CardGridProps, gridColumnCount(), styles, FilterChip, FilterChipRow(), FilterChipRowProps, styles (+31 more)
 
 ### Community 135 - "7. Visual design"
 Cohesion: 0.33
 Nodes (6): 7. Visual design, [DECIDED] Space theme throughout, [DECIDED] Theme tokens, [DECIDED] Two distinct screens — do not merge them, Rendering, The orrery — settled mechanics
 
 ### Community 136 - "linking.ts"
-Cohesion: 0.05
-Nodes (99): insertContact(), acknowledgeProvider(), setInteractionAssistEnabled(), insertContact(), updateAppSettings(), updateAppSettingsCore(), bulkAddFavourites(), bulkArchive() (+91 more)
+Cohesion: 0.03
+Nodes (183): acknowledgeProvider(), setInteractionAssistEnabled(), bulkAddFavourites(), bulkArchive(), bulkQuickLog(), bulkRemoveFavourites(), bulkSetCategory(), bulkSetFrequency() (+175 more)
 
 ### Community 137 - "File"
-Cohesion: 0.09
-Nodes (31): finishActivity(), OrbitShareFinishModule, seedContact(), uid(), captureMultiAttach(), captureMultiNote(), CapturePickRow, listCapturePickContacts() (+23 more)
+Cohesion: 0.06
+Nodes (47): finishActivity(), OrbitShareFinishModule, AssistBanner(), questionFor(), styles, AssistConfirmation(), AssistConfirmationProps, styles (+39 more)
 
 ### Community 138 - "System Docs"
 Cohesion: 0.40
@@ -1644,16 +1643,16 @@ Cohesion: 0.40
 Nodes (5): 4. Port analysis — verified against the repo, not estimated, Delete — Obsidian-only, no mobile analogue, Ports nearly as-is (~900 lines), Rewritten against SQLite (logic shapes reusable, implementation not), Rewritten entirely — UI
 
 ### Community 140 - "package.json"
-Cohesion: 0.10
-Nodes (26): assertSelfSunColour(), ACCENTS, AccentTone, AccentToneSet, applyAccent(), DEFAULT_ACCENT, isKnownAccentId(), resolveAccent() (+18 more)
+Cohesion: 0.15
+Nodes (18): ACCENTS, AccentTone, AccentToneSet, DEFAULT_ACCENT, isKnownAccentId(), resolveAccent(), auditLegacyGalaxyDark(), LEGACY_STATUS (+10 more)
 
 ### Community 141 - "ResumeReconcilePrompt.tsx"
-Cohesion: 0.44
-Nodes (6): getInitials(), hashName(), swatchIndex(), loadWidgetTiles(), shapeWidgetTiles(), ADR-0075
+Cohesion: 0.31
+Nodes (9): getInitials(), hashName(), swatchIndex(), listDashboardPopulation(), loadWidgetTiles(), shapeWidgetTiles(), ADR-0075, WidgetTile (+1 more)
 
 ### Community 142 - "sun-picker-read.test.ts"
-Cohesion: 0.05
-Nodes (90): listCategories(), AcceptImportSessionWithRowsInput, assertOneChange(), completeSession(), completeSessionCore(), createImportSession(), CreateImportSessionInput, deferNeedsReview() (+82 more)
+Cohesion: 0.04
+Nodes (95): assertOneChange(), ContactMetadataRow, ignoreBulkReviewFlag(), ignoreBulkReviewFlagCore(), IgnoreBulkReviewFlagInput, insertResolutionCore(), resolveBulkReviewFlag(), resolveBulkReviewFlagCore() (+87 more)
 
 ### Community 143 - "field-type-change.test.ts"
 Cohesion: 0.07
@@ -1729,7 +1728,7 @@ Nodes (7): QuickLogInput, QuickLogSnackbar, QuickLogUndoController, QuickLogUndo
 
 ### Community 191 - "fuel-dao.test.ts"
 Cohesion: 0.05
-Nodes (63): BulkAction, BulkActionSurface(), BulkActionSurfaceProps, styles, CardContextMenuProps, styles, Icon(), MemoryCard() (+55 more)
+Nodes (78): BulkAction, BulkActionSurface(), BulkActionSurfaceProps, styles, CardContextMenuProps, MenuAction, styles, StatusDisplayState (+70 more)
 
 ### Community 192 - "File"
 Cohesion: 0.08
@@ -1740,8 +1739,8 @@ Cohesion: 0.08
 Nodes (24): Additive migration, app_settings toggle plumbing, Channel immutability, File Classification, Focus-effect reload with cancelled guard, Metadata, No Analog Found, Notification engine coexistence (do not fold in) (+16 more)
 
 ### Community 194 - "transaction.ts"
-Cohesion: 0.13
-Nodes (16): assertBackupDays(), BackupSettingsFormInput, BackupSettingsPatchResult, buildBackupSettingsPatch(), EncryptionSetupResult, validateEncryptionSetup(), validateWholeBackupDays(), WholeBackupDaysResult (+8 more)
+Cohesion: 0.33
+Nodes (7): assertBackupDays(), BackupSettingsFormInput, BackupSettingsPatchResult, buildBackupSettingsPatch(), EncryptionSetupResult, validateWholeBackupDays(), WholeBackupDaysResult
 
 ### Community 195 - "recency-dao.test.ts"
 Cohesion: 0.08
@@ -1760,32 +1759,32 @@ Cohesion: 0.08
 Nodes (23): `app.config.ts` (native plugin registration), DAO node-sqlite test harness, Face tile / ＋ tile / confirmation-note surface (screen-local components), File Classification, Fuel writer (NEVER the last_contact DAO), Metadata, No Analog Found, `patches/expo-share-intent+8.0.1.patch` + local `finish()` module — NET-NEW NATIVE (no analog) (+15 more)
 
 ### Community 199 - "survivor-recommendation.ts"
-Cohesion: 0.27
-Nodes (4): createAiKeyStore(), keyItemName(), nativeSecureStoreBackend, SecureKeyBackend
+Cohesion: 0.16
+Nodes (7): AiKeyStore, createAiKeyStore(), keyItemName(), nativeSecureStoreBackend, SecureKeyBackend, AiCloudProviderId, AiKeyStoreLike
 
 ### Community 200 - "LinksEditor.tsx"
 Cohesion: 0.11
-Nodes (22): confirmRemovePhoto(), PhotoSourcePicker(), PhotoSourcePickerProps, styles, PersistCroppedMasterArgs, deletePhoto(), PhotoTargetDescriptor, profilePhotoRelPath() (+14 more)
+Nodes (15): concatChunks(), CONTENT_TYPE_MAP, downloadCappedToFile(), downloadImageToCache(), extFromContentType(), isAcceptedRasterContentType(), isImageUrl(), normalizeContentType() (+7 more)
 
 ### Community 201 - "buildDecayRequest"
 Cohesion: 0.08
 Nodes (24): Agreed Concerns (2+ lanes), Agreed Strengths (2+ lanes), Claude Review (Cycle 3), Codex Review (Cycle 3), Concerns, Consensus Summary (Cycle 3), Cross-AI Plan Review — Phase 20 (Convergence CYCLE 3), Cross-AI Plan Review — Phase 20 (Convergence Cycle 3) (+16 more)
 
 ### Community 202 - "contact-read.test.ts"
-Cohesion: 0.36
-Nodes (7): MethodGroups, LastSpokeValue, buildCreateInput(), BuildCreateInputDeps, CreateFormState, firstInteractionOccurredAt(), EditFormState
+Cohesion: 0.18
+Nodes (5): BackupEncryptionProfile, EncryptedBackupEnvelope, BackupEncryptionBackend, BackupEnvelopeCrypto, BackupEnvelopeCryptoOptions
 
 ### Community 203 - "011-contact-lifecycle-schema.test.ts"
-Cohesion: 0.27
-Nodes (6): OrbitBody(), OrbitBodyProps, resolvePhotoUri(), encodeWidgetThumb(), h, SaveFormat
+Cohesion: 0.21
+Nodes (4): createBackupEncryptionLifecycle(), EncryptionFlagStore, BackupPassphraseChangeStore, BackupPassphraseStore
 
 ### Community 204 - "field-sweep.test.ts"
-Cohesion: 0.11
-Nodes (11): defId(), newDef(), quarantineDaysAgo(), seedContact(), uid(), AppStateLike, hooks, installSweepTrigger() (+3 more)
+Cohesion: 0.23
+Nodes (6): defId(), getAllAsync(), newDef(), quarantineDaysAgo(), seedContact(), uid()
 
 ### Community 205 - "EditContactScreen.tsx"
-Cohesion: 0.31
-Nodes (8): localDateOffset(), OVERDUE(), ROGUE(), seedContact(), SeedOpts, STABLE(), uid(), WOBBLE()
+Cohesion: 0.27
+Nodes (9): applyLifecycleTransitionEffects(), bindWithLifecycleEffects(), defaultDeps, EffectDeps, EffectDepsOverride, LifecycleDeps, LifecycleDirection, exec (+1 more)
 
 ### Community 206 - "imported-contact-dao.ts"
 Cohesion: 0.09
@@ -1796,8 +1795,8 @@ Cohesion: 0.09
 Nodes (22): Ambient Layer + Pause (ORR-03), Angle↔Time Math (ORR-01 / ORR-04) — pure `orrery-geometry-logic.ts`, Architectural Responsibility Map, Assumptions Log, Don't Hand-Roll, Environment Availability, Metadata, Migration 003 (BLOCKING for the planner) — `app_settings` gains sun columns (+14 more)
 
 ### Community 208 - "Directory"
-Cohesion: 0.21
-Nodes (15): blankToNull(), DraftRow(), FuelDraft, FuelEditor(), FuelEditorProps, FuelEditPatch, FuelRow(), KIND_OPTIONS (+7 more)
+Cohesion: 0.14
+Nodes (21): blankToNull(), DraftRow(), FuelDraft, FuelEditor(), FuelEditorProps, FuelEditPatch, FuelRow(), KIND_OPTIONS (+13 more)
 
 ### Community 209 - "contact-read.test.ts"
 Cohesion: 0.09
@@ -1812,24 +1811,24 @@ Cohesion: 0.09
 Nodes (22): 20-01 — Merge tracer, 20-02 — Conflict-resolution UX, 20-03 — Per-contact reconciliation, 20-04 — Bulk reconciliation workspace, 20-05 — Resume and missing-source lifecycle, 20-06 — Bulk-review resolver and phase gate, Claude Review (Cycle 4), Concerns (+14 more)
 
 ### Community 212 - "field-sweep.test.ts"
-Cohesion: 0.04
-Nodes (57): __reset(), ScheduledRequestDouble, __setScheduled(), addMethodPiiFixture(), makeContact(), makeDef(), makeNeverAssignedUnboundContact(), uid() (+49 more)
+Cohesion: 0.05
+Nodes (64): __reset(), ScheduledRequestDouble, __setScheduled(), db(), migrations, newUid(), photoMocks, AI_DEFAULTS (+56 more)
 
 ### Community 213 - "ReconcileDetailScreen"
-Cohesion: 0.04
-Nodes (90): RFC-4122, setContactPhoto(), chain, withMutex(), applyReconcileSelections(), ApplyReconcileSelectionsInput, ApplyReconcileSelectionsResult, ContactApplyRow (+82 more)
+Cohesion: 0.09
+Nodes (40): link(), assertOneChange(), createReconcileSessionCore(), CreateReconcileSessionInput, discardSession(), discardSessionCore(), finalizeSessionIfTerminal(), finalizeSessionIfTerminalCore() (+32 more)
 
 ### Community 214 - "fail"
 Cohesion: 0.46
 Nodes (8): assertTextValue(), fail(), FIXED_LEGACY_COLUMNS, loadAndValidateDefs(), proveCopy(), quoteSafeColumn(), readLegacyRows(), snapshotOrphanColumn()
 
 ### Community 215 - "field-type-change.test.ts"
-Cohesion: 0.13
-Nodes (19): DAYS_TO_FREQUENCY, intendedLabel(), IntensityLine(), IntensityLineProps, styles, styles, TriStateLastSpoke(), TriStateLastSpokeProps (+11 more)
+Cohesion: 0.38
+Nodes (6): DAYS_TO_FREQUENCY, intendedLabel(), IntensityLine(), IntensityLineProps, styles, IntensityResult
 
 ### Community 216 - "assist-eligibility.ts"
-Cohesion: 0.60
-Nodes (4): isAssistEligible(), localDateTimeMs(), PendingAssistForBanner, selectBannerState()
+Cohesion: 0.23
+Nodes (8): EligiblePendingAssist, listEligiblePendingAssists(), isAssistEligible(), localDateTimeMs(), PendingAssistForBanner, selectBannerState(), AssistAppStateLike, AssistBannerStore
 
 ### Community 217 - "NativeGcmCipher"
 Cohesion: 0.09
@@ -1860,8 +1859,8 @@ Cohesion: 0.09
 Nodes (22): Actionable Notifications (NOTIF), AI Message Suggestions (AI), Backup, Export & Restore (BKP), Compose consumers' shared surface — see CMP; and the Orrery (ORR), Compose Screen & SMS Handoff (CMP), Contact CRUD & Lifecycle (CRUD), Contact Data Normalization (CDN), Contact Reconciliation & Merge (RCN) (+14 more)
 
 ### Community 224 - "FieldValueInput.tsx"
-Cohesion: 0.04
-Nodes (82): AssistBanner(), questionFor(), styles, AssistConfirmation(), AssistConfirmationProps, styles, BackupEncryptionBenchmarkHarness(), styles (+74 more)
+Cohesion: 0.03
+Nodes (90): Avatar(), AvatarProps, styles, isBulkActionAvailable(), actionLabels, BulkAction, CandidateCardGrid(), CandidateCardGridProps (+82 more)
 
 ### Community 225 - "merge-dao.ts"
 Cohesion: 0.11
@@ -1900,16 +1899,16 @@ Cohesion: 0.10
 Nodes (19): Actionable LOW Concerns, Actionable MEDIUM Concerns, Agreed HIGH Concerns, Claude Review, Codex Review, Consensus before final internal revision gate, Consensus before replan, Consensus Summary (+11 more)
 
 ### Community 234 - "FieldDefForm.tsx"
-Cohesion: 0.38
-Nodes (3): contact(), field(), uid()
+Cohesion: 0.20
+Nodes (6): inputFor(), makePrompt(), secureCustomFetchMock, SecureFetchError, AiError, KeyAccessor
 
 ### Community 235 - "memories-dao.ts"
 Cohesion: 0.32
-Nodes (4): editFull(), makeContact(), readInteraction(), uid()
+Nodes (6): BOUNDARY_TRIM, BOUNDARY_WS, CaptureInput, CapturePayload, nonBlank(), resolveCapturePayload()
 
 ### Community 236 - "knowledge-search.ts"
-Cohesion: 0.11
-Nodes (30): KnowledgeSearchCandidate, buildDashboardSearchResult(), buildResult(), DashboardSearchMatch, DashboardSearchSourceKind, descriptor(), fieldLabel(), priority() (+22 more)
+Cohesion: 0.19
+Nodes (19): boundedEditDistance(), CoverageRankedCandidate, itemText(), KnowledgeSearchHighlight, KnowledgeSearchItem, KnowledgeSearchTermMatch, matchCandidateEntries(), OffsetToken (+11 more)
 
 ### Community 237 - "Phase 13 — UI Design Contract (Orrery)"
 Cohesion: 0.11
@@ -1992,8 +1991,8 @@ Cohesion: 0.11
 Nodes (17): A. How Orbit imports a device contact, B. How a contact is "Bound"; changed vs unchanged classification, C. What makes a birthday "unreadable"/flagged, Cross-cutting answers, D. Scenario 5 — applied change vs resume detection, E. Merge flow — initiation, screens, labels, atomic proof, Orientation — where things live, Phase 20 — Contact Reconciliation & Merge — UAT Runbook Research (+9 more)
 
 ### Community 257 - "hydrate-theme-at-boot.ts"
-Cohesion: 0.18
-Nodes (10): AppSettingsPatch, diffPatch(), hydrateThemeAtBoot(), HydrateThemeDeps, FakeOptions, extractLegacyState(), isThemeMode(), LegacyThemeState (+2 more)
+Cohesion: 0.36
+Nodes (5): extractLegacyState(), isThemeMode(), LegacyThemeState, mapLegacyThemeBlob(), NOTE: it takes the ALREADY-PARSED value (the coordinator owns `getItem` +
 
 ### Community 258 - "Phase 1 Plan 05: FND-01 Cross-Machine Build/Deploy Proof Summary"
 Cohesion: 0.12
@@ -2232,8 +2231,8 @@ Cohesion: 0.12
 Nodes (16): Concerns, Concerns, Cross-AI Plan Review — Phase 19 System Contact Import (Cycle 2), Cycle 2 — Claude (Sonnet 5) Reviewer, Cycle 2 — Verification Coverage (advisory, not counted toward totals), HIGH, LOW, MEDIUM (+8 more)
 
 ### Community 317 - "card-line3-selection.ts"
-Cohesion: 0.09
-Nodes (34): compareCandidate(), CurrentStateCandidateRow, currentStateSql(), Line3Candidate, Line3CandidateKind, MemoryCandidateRow, memorySql(), placeholders() (+26 more)
+Cohesion: 0.23
+Nodes (13): Line3Candidate, CARD_PROMPTS, CardLine3Selection, compactnessClass(), compareCandidates(), compareWithinTier(), firstCompact(), imminentWindowEnd() (+5 more)
 
 ### Community 318 - "Phase 2 Plan 02: Migration 1 — the irreversible schema + PRAGMA bootstrap Summary"
 Cohesion: 0.13
@@ -2867,10 +2866,6 @@ Nodes (12): Agreed Concerns (2+ reviewers — highest priority), Agreed Strength
 Cohesion: 0.17
 Nodes (11): Accomplishments, Decisions Made, Deviations from Plan, Files Created/Modified, Issues Encountered, Next Phase Readiness, Performance, Phase 21 Plan 04: Interaction Assist Lifecycle Summary (+3 more)
 
-### Community 476 - "dashboard-knowledge-read.ts"
-Cohesion: 0.17
-Nodes (13): automaticBackupFilename(), AutomaticBackupMetadata, filesToPrune(), isExpiredAutomaticBackup(), isOwnedAutomaticBackup(), shouldRunAutomaticBackup(), now, recordAutomaticBackupHealthCore() (+5 more)
-
 ### Community 477 - "Goal Achievement"
 Cohesion: 0.18
 Nodes (10): Anti-Patterns Found, Behavioral Spot-Checks, Gaps Summary, Goal Achievement, Human Verification Required, Key Link Verification, Observable Truths, Phase 1: Project Scaffold & Portable Code Verification Report (+2 more)
@@ -2952,8 +2947,8 @@ Cohesion: 0.18
 Nodes (10): Accomplishments, Decisions Made, Deviations from Plan, Files Created/Modified, Known Stubs, Next Phase Readiness, Performance, Phase 18.2 Plan 09: Lifecycle Backup and Restore Summary (+2 more)
 
 ### Community 497 - "Phase 18.2 Bound/Unbound Lifecycle — Cross-AI Plan Review"
-Cohesion: 0.18
-Nodes (11): Concerns, Cross-Cutting Findings, Locked Decisions — Implementation Correctness (not reopened), Overall Phase Risk Assessment, Phase 18.2 Bound/Unbound Lifecycle — Cross-AI Plan Review, Phase Overview, Plan 18.2-02 — Lifecycle Write DAO + Capture, Risk Assessment (+3 more)
+Cohesion: 0.33
+Nodes (6): Concerns, Plan 18.2-02 — Lifecycle Write DAO + Capture, Risk Assessment, Strengths, Suggestions, Summary
 
 ### Community 498 - "Phase 18.2 — Bound/Unbound Lifecycle — Validation Strategy"
 Cohesion: 0.18
@@ -3164,8 +3159,8 @@ Cohesion: 0.20
 Nodes (9): Checker Sign-Off, Color, Copywriting Contract, Design System, Phase 21 — UI Design Contract, Registry Safety, Spacing Scale, Typography (+1 more)
 
 ### Community 550 - "contact-picker-order.ts"
-Cohesion: 0.21
-Nodes (11): CustomIntervalResult, IntervalUnit, parseCustomInterval(), UNIT_FACTORS, FrequencyPicker(), FrequencyPickerProps, PRESET_VALUES, PRESETS (+3 more)
+Cohesion: 0.12
+Nodes (21): CustomIntervalResult, IntervalUnit, parseCustomInterval(), UNIT_FACTORS, FrequencyPicker(), FrequencyPickerProps, PRESET_VALUES, PRESETS (+13 more)
 
 ### Community 551 - "Common Pitfalls"
 Cohesion: 0.22
@@ -3644,8 +3639,8 @@ Cohesion: 0.29
 Nodes (7): Concerns, Cross-AI Review: Phase 20 Plans (20-01 through 20-06) — Convergence Cycle 4, Cursor Review (Cycle 4), Risk Assessment, Strengths, Suggestions, Summary
 
 ### Community 670 - "Cross-AI Plan Review — Phase 20 Contact Reconciliation & Merge (Cycle 6)"
-Cohesion: 0.47
-Nodes (4): FuelRow, seedContact(), shareRow(), uid()
+Cohesion: 0.40
+Nodes (5): addMethodPiiFixture(), makeContact(), makeDef(), makeNeverAssignedUnboundContact(), uid()
 
 ### Community 671 - "Cycle 5 (Final) Convergence Review — Phase 20: Contact Reconciliation & Merge"
 Cohesion: 0.29
@@ -3768,8 +3763,8 @@ Cohesion: 0.33
 Nodes (6): Concerns, Plan 18.2-01 — v11 Lifecycle Schema Migration, Risk Assessment, Strengths, Suggestions, Summary
 
 ### Community 701 - "Plan 18.2-03 — Bound-Aware Query Owners"
-Cohesion: 0.33
-Nodes (6): Concerns, Plan 18.2-03 — Bound-Aware Query Owners, Risk Assessment, Strengths, Suggestions, Summary
+Cohesion: 0.18
+Nodes (11): Concerns, Cross-Cutting Findings, Locked Decisions — Implementation Correctness (not reopened), Overall Phase Risk Assessment, Phase 18.2 Bound/Unbound Lifecycle — Cross-AI Plan Review, Phase Overview, Plan 18.2-03 — Bound-Aware Query Owners, Risk Assessment (+3 more)
 
 ### Community 702 - "Plan 18.2-04 — Nullable Cadence Impact + Explicit AI"
 Cohesion: 0.33
@@ -3856,8 +3851,8 @@ Cohesion: 0.33
 Nodes (6): Concerns, LOW — BulkImportSetup selection count ignores pre-batch consolidation, LOW — Merge restore leaves runtime import sessions (accepted policy), LOW — Plan 01 blocks autonomous execution until owner approves migration 012, MEDIUM — `mapPickedContact` birthday handoff is internally inconsistent across plans 03/04/06, MEDIUM — Resume navigation to `ImportProgress` omits a required route param
 
 ### Community 723 - "Consensus Summary"
-Cohesion: 0.24
-Nodes (5): BackupPassphraseBackend, createBackupPassphraseStore(), nativeBackend, PendingBackupPassphraseChange, PendingPassphraseChangeReadResult
+Cohesion: 0.11
+Nodes (10): Directory, fs, insertContact(), text, uidFactory(), BackupPassphraseBackend, createBackupPassphraseStore(), nativeBackend (+2 more)
 
 ### Community 724 - "Plan 20-02 — Conflict-resolution UI"
 Cohesion: 0.33
@@ -3866,6 +3861,14 @@ Nodes (6): Concerns, Plan 20-03 — Per-Contact Reconciliation End-to-End, Risk 
 ### Community 725 - "Plan 20-06 — Bulk flagged-item resolver and phase gate"
 Cohesion: 0.33
 Nodes (7): isSafeColName(), makeColName(), slugify(), CONTACTS_COLUMNS, CUSTOM_FIELD_VALUES_COLUMNS, RESERVED_COLUMN_NAMES, ROWID_ALIASES
+
+### Community 726 - "Plan 20-01 — Tracer: Migration 013 + `mergeContacts` + Minimal Merge UI"
+Cohesion: 0.70
+Nodes (3): resolveEffectivePhoneRegion(), phoneRegionOverridePatch(), resolveSettingsPhoneRegion()
+
+### Community 727 - "Plan 20-04 — Bulk Check Linked Contacts + Durable Sessions"
+Cohesion: 0.83
+Nodes (3): seedContact(), seedFuel(), uid()
 
 ### Community 728 - "Reconcile bugs surfaced once READ_CONTACTS worked (ADR-003)"
 Cohesion: 0.33
@@ -4222,14 +4225,6 @@ Nodes (5): Phase Requirements → Test Map, Sampling Rate, Test Framework, Valid
 ### Community 816 - "Phase 21 Device UAT Scoreboard"
 Cohesion: 0.40
 Nodes (4): Evidence Rules, Final Recommendation (agent, DB-verified; owner sign-off NOT taken), Phase 21 Device UAT Scoreboard, Time-Travel Decision
-
-### Community 817 - "BackupEncryptionBackend"
-Cohesion: 0.40
-Nodes (5): addLinkRow(), makeContact(), makeContactRow(), makeDef(), uid()
-
-### Community 818 - "dashboard-selection-store.ts"
-Cohesion: 0.36
-Nodes (7): ContactMethodEditorDraft, ContactMethodsEditor(), ContactMethodsEditorProps, LABELS, STANDARD_LABELS, styles, typeCopy()
 
 ### Community 819 - "01-01-PLAN.md"
 Cohesion: 0.50
@@ -4808,8 +4803,8 @@ Cohesion: 0.50
 Nodes (4): Primary (HIGH confidence — files opened this session), Secondary (MEDIUM confidence), Sources, Tertiary (LOW confidence)
 
 ### Community 963 - "dashboard-session-store.ts"
-Cohesion: 0.12
-Nodes (16): BenchmarkResult, nowMs(), runBenchmark(), seedBenchmarkData(), SeedOptions, recreateIndexes(), listOrbitingContacts(), OrbitingContact (+8 more)
+Cohesion: 0.22
+Nodes (7): BenchmarkResult, nowMs(), runBenchmark(), seedBenchmarkData(), SeedOptions, recreateIndexes(), statusOrder
 
 ### Community 967 - "Security Domain"
 Cohesion: 0.67
@@ -4899,53 +4894,29 @@ Nodes (3): Code Examples, Re-reading current source state for reconciliation, To
 Cohesion: 0.67
 Nodes (3): Applicable ASVS Categories, Known Threat Patterns for {RN/Android, local-first, deep-links}, Security Domain
 
-### Community 1031 - "expo"
-Cohesion: 0.67
-Nodes (3): assist(), contact(), uid()
-
-### Community 1051 - "anchor-position.ts"
-Cohesion: 0.40
-Nodes (3): AI_COLUMNS, ALL_MIGRATIONS, migrateToV4()
-
-### Community 1052 - "motion.ts"
-Cohesion: 0.50
-Nodes (4): contact(), email(), phone(), uid()
-
-### Community 1053 - "Plan 20-03 — Per-contact reconciliation"
-Cohesion: 0.67
-Nodes (3): seedContact(), seedInteraction(), uid()
-
-### Community 1054 - "Plan 20-06 — Bulk Review Surface + Phase Verification"
-Cohesion: 0.67
-Nodes (3): seedContact(), seedThreeLive(), uid()
-
 ### Community 1056 - "localDateOffset"
-Cohesion: 0.39
-Nodes (7): ContactOpts, InteractionOpts, localDateOffset(), localDateTimeOffset(), seedContact(), seedInteraction(), uid()
-
-### Community 1059 - "restore-photo-finalize-sweep.test.ts"
-Cohesion: 0.23
-Nodes (10): deleteJournalEntryCore(), listJournalEntriesCore(), RestorePhotoJournalAction, RestorePhotoJournalEntry, RestorePhotoJournalTargetKind, deleteRestorePending(), drainEntry(), drainRestorePhotoJournal() (+2 more)
+Cohesion: 0.40
+Nodes (5): localDateOffset(), localDateTimeOffset(), seedContact(), seedInteraction(), uid()
 
 ## Knowledge Gaps
-- **7958 isolated node(s):** `styles`, `SchedulableTriggerInputTypes`, `AndroidImportance`, `AndroidNotificationVisibility`, `scheduled` (+7953 more)
+- **7956 isolated node(s):** `styles`, `SchedulableTriggerInputTypes`, `AndroidImportance`, `AndroidNotificationVisibility`, `scheduled` (+7951 more)
   These have ≤1 connection - possible missing edges or undocumented components.
-- **93 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **89 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `useTheme()` connect `FieldValueInput.tsx` to `database.ts`, `field-types.ts`, `001-initial.ts`, `import-session-read.ts`, `linking.ts`, `HomeScreen.tsx`, `File`, `App.tsx`, `backup-service.ts`, `index.ts`, `sun-picker-read.test.ts`, `package.json`, `reconcile-apply.ts`, `ReconcileGridScreen.tsx`, `contacts-dao.ts`, `SettingsScreen.tsx`, `localDateTime`, `PhotoSourcePicker.tsx`, `contact-picker-order.ts`, `BackupScreen.tsx`, `index.ts`, `phase-17-runtime-integration.test.ts`, `dashboard-selection-store.ts`, `create-contact-logic.ts`, `ComposeScreen.tsx`, `ContactProfileScreen.tsx`, `contact-import-resume-sweep.ts`, `Avatar.tsx`, `CaptureScreen.tsx`, `reconcile-resume-sweep.ts`, `fuel-dao.test.ts`, `transaction.ts`, `ImportReviewScreen.tsx`, `LinksEditor.tsx`, `notification-gate.tsx`, `Directory`, `AiCloudProviderId`, `ReconcileDetailScreen`, `field-type-change.test.ts`, `widget-linking.ts`, `saf-storage.ts`, `PhotoFieldWidget.tsx`, `011-contact-lifecycle-schema.test.ts`, `reconcile-session-read.ts`, `ai-service-guards.test.ts`?**
-  _High betweenness centrality (0.011) - this node is a cross-community bridge._
-- **Why does `SqlExecutor` connect `types.ts` to `field-types.ts`, `crop-geometry.ts`, `linking.ts`, `File`, `backup-service.ts`, `sun-picker-read.test.ts`, `model-catalog-filter.ts`, `restore-apply.ts`, `reconcile-apply.ts`, `ReconcileGridScreen.tsx`, `ResumeReconcilePrompt.tsx`, `anchor-position.ts`, `SettingsScreen.tsx`, `Cross-AI Plan Review — Phase 20 Contact Reconciliation & Merge (Cycle 6)`, `app-settings-dao.ts`, `localDateOffset`, `PhotoSourcePicker.tsx`, `restore-photo-finalize-sweep.test.ts`, `photo-storage.ts`, `notification-schedule.test.ts`, `FuelEditor.tsx`, `ai-context-read.ts`, `RestorePreviewScreen.tsx`, `ContactProfileScreen.tsx`, `contact-import-resume-sweep.ts`, `assist-store.ts`, `lifecycle-consumer-ledger.test.ts`, `CaptureScreen.tsx`, `card-line3-selection.ts`, `dashboard-session-store.ts`, `BackupSettingsScreen.tsx`, `EditContactScreen.tsx`, `field-sweep.test.ts`, `field-sweep.test.ts`, `ReconcileDetailScreen`, `widget-linking.ts`, `saf-storage.ts`, `PhotoFieldWidget.tsx`, `dashboard-knowledge-read.ts`, `FieldValueInput.tsx`, `timeline-read.test.ts`, `contacts-dao.test.ts`, `FieldDefForm.tsx`, `memories-dao.ts`, `ConsumedBackupShare`, `seedFullContact`, `011-contact-lifecycle-schema.test.ts`, `reconcile-session-read.ts`?**
-  _High betweenness centrality (0.011) - this node is a cross-community bridge._
-- **Why does `inWriteTransaction()` connect `linking.ts` to `types.ts`, `File`, `backup-service.ts`, `sun-picker-read.test.ts`, `restore-apply.ts`, `reconcile-apply.ts`, `ReconcileGridScreen.tsx`, `app-settings-dao.ts`, `PhotoSourcePicker.tsx`, `notification-schedule.test.ts`, `BackupScreen.tsx`, `FuelEditor.tsx`, `ContactProfileScreen.tsx`, `transaction.ts`, `dashboard-session-store.ts`, `BackupSettingsScreen.tsx`, `field-sweep.test.ts`, `field-sweep.test.ts`, `ReconcileDetailScreen`, `dashboard-knowledge-read.ts`, `FieldValueInput.tsx`, `contacts-dao.test.ts`, `seedFullContact`?**
-  _High betweenness centrality (0.004) - this node is a cross-community bridge._
+- **Why does `SqlExecutor` connect `sun-picker-read.test.ts` to `types.ts`, `001-initial.ts`, `crop-geometry.ts`, `import-session-read.ts`, `linking.ts`, `File`, `getExecutor`, `backup-service.ts`, `index.ts`, `model-catalog-filter.ts`, `restore-apply.ts`, `reconcile-apply.ts`, `ReconcileGridScreen.tsx`, `ResumeReconcilePrompt.tsx`, `SettingsScreen.tsx`, `app-settings-dao.ts`, `PhotoSourcePicker.tsx`, `notification-schedule.test.ts`, `phase-17-runtime-integration.test.ts`, `FuelEditor.tsx`, `ai-context-read.ts`, `create-contact-logic.ts`, `RestorePreviewScreen.tsx`, `ContactProfileScreen.tsx`, `contact-import-resume-sweep.ts`, `assist-store.ts`, `lifecycle-consumer-ledger.test.ts`, `CaptureScreen.tsx`, `reconcile-resume-sweep.ts`, `model-registry.ts`, `dashboard-session-store.ts`, `field-sweep.test.ts`, `EditContactScreen.tsx`, `Directory`, `use-read-contacts-permission.ts`, `Consensus Summary`, `field-sweep.test.ts`, `ReconcileDetailScreen`, `Plan 20-04 — Bulk Check Linked Contacts + Durable Sessions`, `assist-eligibility.ts`, `widget-linking.ts`, `FieldValueInput.tsx`, `timeline-read.test.ts`, `ConsumedBackupShare`, `seedFullContact`, `reconcile-session-read.ts`?**
+  _High betweenness centrality (0.010) - this node is a cross-community bridge._
+- **Why does `useTheme()` connect `FieldValueInput.tsx` to `database.ts`, `field-types.ts`, `001-initial.ts`, `crop-geometry.ts`, `getExecutor`, `File`, `HomeScreen.tsx`, `linking.ts`, `App.tsx`, `backup-service.ts`, `index.ts`, `reconcile-apply.ts`, `ReconcileGridScreen.tsx`, `contacts-dao.ts`, `SettingsScreen.tsx`, `localDateTime`, `PhotoSourcePicker.tsx`, `BackupScreen.tsx`, `contact-picker-order.ts`, `index.ts`, `phase-17-runtime-integration.test.ts`, `ContactProfileScreen.tsx`, `contact-import-resume-sweep.ts`, `CaptureScreen.tsx`, `fuel-dao.test.ts`, `notification-gate.tsx`, `BackupSettingsScreen.tsx`, `Directory`, `ReconcileDetailScreen`, `field-type-change.test.ts`, `PhotoFieldWidget.tsx`, `ai-service-guards.test.ts`?**
+  _High betweenness centrality (0.008) - this node is a cross-community bridge._
+- **Why does `inWriteTransaction()` connect `linking.ts` to `types.ts`, `import-session-read.ts`, `File`, `backup-service.ts`, `sun-picker-read.test.ts`, `restore-apply.ts`, `ReconcileGridScreen.tsx`, `app-settings-dao.ts`, `PhotoSourcePicker.tsx`, `notification-schedule.test.ts`, `BackupScreen.tsx`, `lifecycle-consumer-ledger.test.ts`, `reconcile-resume-sweep.ts`, `model-registry.ts`, `dashboard-session-store.ts`, `BackupSettingsScreen.tsx`, `field-sweep.test.ts`, `ReconcileDetailScreen`, `widget-linking.ts`, `seedFullContact`?**
+  _High betweenness centrality (0.005) - this node is a cross-community bridge._
 - **What connects `styles`, `SchedulableTriggerInputTypes`, `AndroidImportance` to the rest of the system?**
-  _7958 weakly-connected nodes found - possible documentation gaps or missing edges._
+  _7956 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `database.ts` be split into smaller, more focused modules?**
-  _Cohesion score 0.1282051282051282 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.11182795698924732 - nodes in this community are weakly interconnected._
 - **Should `types.ts` be split into smaller, more focused modules?**
-  _Cohesion score 0.03453689167974882 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.03350515463917526 - nodes in this community are weakly interconnected._
 - **Should `field-types.ts` be split into smaller, more focused modules?**
-  _Cohesion score 0.07926829268292683 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.13043478260869565 - nodes in this community are weakly interconnected._

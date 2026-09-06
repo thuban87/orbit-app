@@ -101,5 +101,8 @@
 // NOTE: ADR-0089 [ACCEPTED] Recoverable Memory Lifecycle and Contact-Operation Integrity
 // NOTE: ADR-0090 [ACCEPTED] Additive Custom-Field Value History and Deferred Contact Scope
 // NOTE: ADR-0091 [ACCEPTED] Imported Contact Notes as AI-Off Typed Memories
+// NOTE: ADR-0092 [ACCEPTED] Durable Shared Dashboard Query State
+// NOTE: ADR-0093 [ACCEPTED] Scoped Composable Dashboard Population and Filter Model
+// NOTE: ADR-0094 [ACCEPTED] Eligibility-Scoped Semantic Dashboard Search
 
-export const ADR_COUNT = 91;
+export const ADR_COUNT = 94;
