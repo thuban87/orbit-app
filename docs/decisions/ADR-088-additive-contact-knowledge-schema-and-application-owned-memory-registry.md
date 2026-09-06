@@ -54,4 +54,4 @@ The system uses migration 016 to add `memories`, `relationships`, and `current_s
 - `src/db/first-class-knowledge-read.ts` — projects first-class contact knowledge for the unified surface.
 
 **Depends on:** ADR-009 (Crash-Safe Forward-Only SQLite Migrations); ADR-028 (Per-Item Conversational Fuel with Fixed Kinds)
-**Required by:** _None._
+**Required by:** ADR-094 (Eligibility-Scoped Semantic Dashboard Search)
