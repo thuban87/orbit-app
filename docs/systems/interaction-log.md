@@ -1,8 +1,8 @@
 # Interaction Log
 
 **Last updated:** 2026-09-02
-**Updated by phase:** 27-dashboard-list-view
-**Owners:** `src/db/recency-dao.ts`, `src/db/events-dao.ts`, `src/db/timeline-read.ts`, `src/db/log-guards.ts`, `src/db/impact-read.ts`, `src/services/impact.ts`, `src/services/quick-log-command.ts`
+**Updated by phase:** 28-dashboard-card-view
+**Owners:** `src/db/recency-dao.ts`, `src/db/events-dao.ts`, `src/db/timeline-read.ts`, `src/db/log-guards.ts`, `src/db/impact-read.ts`, `src/services/impact.ts`, `src/services/quick-log-command.ts`, `src/db/bulk-actions-dao.ts`
 
 ## Purpose
 
@@ -61,6 +61,7 @@ All log data lives in local SQLite. A touchpoint is distinct from a lifecycle ev
 | `src/services/gravity-logic.ts` | Computes floor-bounded familiarity tiers. |
 | `src/services/intensity-logic.ts` | Computes outbound/mutual neutral rate and trailing cadence. |
 | `src/services/quick-log-command.ts` | Runs the shared commit-truthful Quick Log command, including single-flight Retry and Undo feedback. |
+| `src/db/bulk-actions-dao.ts` | Composes atomic multi-contact Quick Log, Undo, and archive paths from transaction-owned cores. |
 | `src/components/TimelineRow.tsx` | Renders touchpoints as editable and events as read-only. |
 | `src/components/TouchpointRefineForm.tsx` | Controls optional touchpoint-detail refinement. |
 | `src/components/GravityBar.tsx` | Displays a named gravity tier without a raw score. |
@@ -82,6 +83,12 @@ All log data lives in local SQLite. A touchpoint is distinct from a lifecycle ev
 1. The universal FAB and Dashboard List right-swipe action both select the current Profile contact or canonical picker as needed, then run `runQuickLog()` with the established outbound, connected, manual, unspecified-channel defaults.
 2. The shared command shows success and Undo only after `recordTouchpoint()` resolves. Undo calls `deleteTouchpoint()` with both the interaction and contact IDs; a failed write or undo shows retryable feedback rather than a false success.
 3. The command publishes browse and widget refreshes only after a committed write or delete. Its single-flight guards prevent a rapid tap or swipe from creating or deleting more than one row.
+
+### Quick Logging and archiving a Dashboard selection
+
+1. Dashboard Card View validates a selection, then `bulkQuickLog()` opens one transaction and writes one canonical outbound, connected, manual, unspecified-channel interaction per selected contact.
+2. The composer runs `insertInteractionCore()` and `recomputeLastContactCore()` for each row, returns the exact interaction receipt, and bumps data revision once. Undo composes `deleteInteractionCore()` for that receipt in one transaction, so it cannot remove another batch's history.
+3. `bulkArchive()` invokes the guarded archive core for every selected contact in its one transaction. Each archive receives its immutable event; a failed ID rolls the entire batch back.
 
 ### Recording notification actions
 
@@ -145,6 +152,7 @@ All log data lives in local SQLite. A touchpoint is distinct from a lifecycle ev
 - **ADR-071:** User-Attested Handoff-Time Interaction Logging Through the Sole Recency Writer — adds assist confirmation as a new outbound touchpoint writer at handoff time, composing the shared recency cores in one transaction.
 - **ADR-056:** Tombstone-Backed UID Reconciliation for Portable Restores — records interaction deletion evidence and blocks orphan restoration.
 - **ADR-057:** Full-State Versioned Backups with Verified Manual and Foreground SAF Snapshots — includes interaction history in full-state exports.
+- **ADR-103:** Atomic Composed Dashboard Bulk Mutations — preserves recency and immutable-event invariants in Dashboard batch work.
 
 ## Gotchas
 
@@ -159,6 +167,8 @@ All log data lives in local SQLite. A touchpoint is distinct from a lifecycle ev
 9. **The assist path still recomputes through the sole recomputer.** `markAssistLogged` composes `insertInteractionCore`/`recomputeLastContactCore` directly instead of `recordTouchpoint()` (to run inside its in-transaction re-read), but it must never write `last_contact` itself — the single-writer invariant is preserved by reusing `recomputeLastContactCore`.
 10. **Quick Log success is transaction truth, not an optimistic UI state.** Do not expose Undo or a success haptic until `recordTouchpoint()` resolves, and keep Retry/Undo single-flight.
 11. **List swipe must use the shared command.** A List-specific direct touchpoint write would drift from the FAB's haptic, Undo, Retry, and refresh guarantees.
+12. **A Dashboard batch must compose cores, not SQL shortcuts.** A direct batch interaction insert leaves recency stale, and a direct archive update omits immutable history.
+13. **Bulk Undo is receipt-scoped.** Use the exact interaction receipt from the committed batch; the single-contact Undo controller cannot reverse an N-contact write.
 
 ## Related Systems
 
@@ -181,3 +191,4 @@ All log data lives in local SQLite. A touchpoint is distinct from a lifecycle ev
 | 2026-08-31 | 21 | Added assist confirmation as a new touchpoint writer (`source='assist'`, outbound, handoff-time `occurred_at`, connected per Call outcome) composing the shared recency cores in one transaction. |
 | 2026-09-02 | 22 | Added shell Quick Log as a guarded consumer of the existing canonical insert/delete paths. |
 | 2026-09-02 | 27 | Extracted the shared Quick Log command for Dashboard List gestures while retaining commit-only feedback and the sole recency writer. |
+| 2026-09-02 | 28 | Added atomic Dashboard batch logging, receipt-scoped Undo, and archive event fan-out through composed cores. |
