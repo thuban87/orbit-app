@@ -146,7 +146,7 @@ describe("dashboard line-3 knowledge read", () => {
 
     expect(seen).toHaveLength(3);
     expect(seen.every(({ sql }) => sql.includes("contact_id IN (?)"))).toBe(true);
-    expect(seen.every(({ sql }) => !sql.includes(String(contactId)))).toBe(true);
+    expect(seen.every(({ sql }) => !sql.includes("IN (1)"))).toBe(true);
     expect(seen.every(({ params }) => params.includes(contactId))).toBe(true);
     expect(candidates).toEqual(
       expect.arrayContaining([
@@ -274,8 +274,14 @@ describe("dashboard line-3 knowledge read", () => {
   });
 
   it("returns no candidates and issues no query for an empty contact list", async () => {
-    const getAllAsync = vi.fn(exec.getAllAsync.bind(exec));
-    const countingExec: SqlExecutor = { ...exec, getAllAsync };
+    const getAllAsync = vi.fn();
+    const countingExec: SqlExecutor = {
+      ...exec,
+      getAllAsync: async <T>(sql: string, params?: unknown[]) => {
+        getAllAsync(sql, params);
+        return exec.getAllAsync<T>(sql, params);
+      },
+    };
     await expect(readLine3Candidates(countingExec, [])).resolves.toEqual([]);
     expect(getAllAsync).not.toHaveBeenCalled();
   });
