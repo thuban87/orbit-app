@@ -1,47 +1,46 @@
-/** Keyed resources + UI-thread projection; drawing and touch share one frame. */
-import {
-  Circle,
-  DashPathEffect,
-  Group,
-  Paragraph,
-  Path,
-  Skia,
-  type SkTypefaceFontProvider,
-  TextAlign,
-} from "@shopify/react-native-skia";
-import { useMemo } from "react";
+/** ADR-077: keyed resources; one UI-thread world/projection frame for all layers. */
+import { Group, type SkTypefaceFontProvider } from "@shopify/react-native-skia";
+import { useEffect, useMemo, useState } from "react";
 import { Gesture } from "react-native-gesture-handler";
 import {
   cancelAnimation,
   runOnJS,
+  runOnUI,
   type SharedValue,
   useDerivedValue,
   useSharedValue,
+  withTiming,
 } from "react-native-reanimated";
 import { getInitials, swatchIndex } from "@/components/avatar-initials";
-import { OrbitBody } from "@/components/orrery/OrbitBody";
-import { OrreryCanvas } from "@/components/orrery/OrreryCanvas";
-import { SunBody } from "@/components/orrery/SunBody";
 import {
   type CameraCell,
   type CameraPose,
   type CameraViewport,
-  IDENTITY_ZOOM,
   type OrreryIntent,
   type ProjectedFrame,
   panCamera,
-  projectFrame,
   tapIntent,
 } from "@/logic/orrery-camera-logic";
+import {
+  type AnimatedFrame,
+  beginWorldTransition,
+  billboardPose,
+  bodyKey,
+  projectAnimatedFrame,
+  sampleWorldTransition,
+} from "@/logic/orrery-frame";
 import { orreryRingStyle } from "@/logic/orrery-ring-logic";
 import { resolveSunOccupant } from "@/logic/sun-occupant-logic";
 import type { OrrerySceneSnapshot } from "@/services/orrery-scene";
 import type { ThemePalette } from "@/theme/theme-types";
+import { useReducedMotionShared } from "@/theme/use-reduced-motion";
+import { OrbitBody } from "./OrbitBody";
+import { OrreryCanvas } from "./OrreryCanvas";
+import { ProjectedOrbitRing } from "./ProjectedOrbitRing";
+import { SunBody } from "./SunBody";
 
 const PAN_MIN_DISTANCE = 10;
-const NAME_WIDTH = 180;
-const NAME_SIZE = 14;
-
+const WORLD_SETTLE_MS = 260;
 /** This exact registration is driven in the real-SQL tracer through native mocks. */
 export function createOrreryGestures({
   pose,
@@ -96,207 +95,83 @@ export function createOrreryGestures({
   return Gesture.Race(tap, pan);
 }
 
-interface ResourceProps {
-  index: number;
+interface BodyResource {
+  key: string;
+  body: OrrerySceneSnapshot["world"][number];
   scene: OrrerySceneSnapshot;
-  frame: SharedValue<ProjectedFrame>;
+}
+/** Retain photo/font owners until their decorative exit completes. No per-frame React. */
+function resourcesFor(scene: OrrerySceneSnapshot): BodyResource[] {
+  return scene.world.map((body) => ({ key: bodyKey(body), body, scene }));
+}
+function mergeResources(
+  previous: BodyResource[],
+  scene: OrrerySceneSnapshot,
+): BodyResource[] {
+  const current = resourcesFor(scene);
+  return [
+    ...previous.map(
+      (old) => current.find((item) => item.key === old.key) ?? old,
+    ),
+    ...current.filter((item) => !previous.some((old) => old.key === item.key)),
+  ];
+}
+
+function ProjectedBody({
+  resource,
+  frame,
+  colors,
+  fontProvider,
+  focused,
+}: {
+  resource: BodyResource;
+  frame: SharedValue<AnimatedFrame>;
   colors: ThemePalette;
   fontProvider: SkTypefaceFontProvider | null;
   focused: boolean;
-}
-
-function ProjectedContact({
-  index,
-  scene,
-  frame,
-  colors,
-  fontProvider,
-  focused,
-}: ResourceProps) {
-  const contact = scene.contacts[index];
-  // Explicit All/Not neutral members use the canonical border/body treatment.
-  const style = orreryRingStyle(contact.status, colors);
-  const worldRadius = scene.world[index].radius;
-  const transform = useDerivedValue(() => {
-    const body = frame.value.bodies[index];
-    return [
-      { translateX: body.x },
-      { translateY: body.y },
-      { scale: body.radius / worldRadius },
-    ];
-  });
-  const ringPath = useDerivedValue(() => {
-    const points = frame.value.bodies[index].ringPath;
-    const path = Skia.Path.Make();
-    if (points.length) {
-      path.moveTo(points[0].x, points[0].y);
-      for (let i = 1; i < points.length; i++)
-        path.lineTo(points[i].x, points[i].y);
-      path.close();
-    }
-    return path;
-  });
-  const dashed =
-    style.strokeStyle === "dashed" || style.strokeStyle === "faintTrace";
-  return (
-    <>
-      <Path
-        path={ringPath}
-        style="stroke"
-        strokeWidth={style.width}
-        color={style.color}
-        opacity={
-          style.strokeStyle === "faded"
-            ? 0.7
-            : style.strokeStyle === "faintTrace"
-              ? 0.3
-              : style.opacity
-        }
-      >
-        {dashed ? <DashPathEffect intervals={[6, 6]} phase={0} /> : null}
-      </Path>
-      <Group transform={transform}>
-        {focused ? (
-          <Circle
-            cx={0}
-            cy={0}
-            r={worldRadius + 4}
-            color={colors.accent}
-            style="stroke"
-            strokeWidth={2}
-          />
-        ) : null}
-        <OrbitBody
-          cx={0}
-          cy={0}
-          radius={worldRadius}
-          photo={contact.photo}
-          bodyFill={style.bodyFill}
-          swatch={
-            colors.avatarSwatches[
-              swatchIndex(contact.name, colors.avatarSwatches.length)
-            ]
-          }
-          swatchText={colors.avatarSwatchText}
-          initials={getInitials(contact.name)}
-          fontProvider={fontProvider}
-        />
-      </Group>
-      <IdentityLabel
-        index={index}
-        name={contact.name}
-        frame={frame}
-        colors={colors}
-        fontProvider={fontProvider}
-      />
-    </>
-  );
-}
-
-function IdentityLabel({
-  index,
-  name,
-  frame,
-  colors,
-  fontProvider,
-}: Pick<ResourceProps, "index" | "frame" | "colors" | "fontProvider"> & {
-  name: string;
 }) {
-  const paragraph = useMemo(() => {
-    if (!fontProvider) return null;
-    const result = Skia.ParagraphBuilder.Make(
-      { textAlign: TextAlign.Center, maxLines: 1, ellipsis: "…" },
-      fontProvider,
-    )
-      .pushStyle({
-        color: Skia.Color(colors.textPrimary),
-        backgroundColor: Skia.Color(colors.surface),
-        fontFamilies: ["Inter"],
-        fontSize: NAME_SIZE,
-      })
-      .addText(name)
-      .pop()
-      .build();
-    result.layout(NAME_WIDTH);
-    return result;
-  }, [fontProvider, name, colors]);
-  const x = useDerivedValue(() => frame.value.bodies[index].x - NAME_WIDTH / 2);
-  const y = useDerivedValue(
-    () => frame.value.bodies[index].y + frame.value.bodies[index].radius + 8,
+  const { body, scene, key } = resource;
+  const projection = useDerivedValue(() =>
+    billboardPose(frame.value, key, body.radius),
   );
-  const opacity = useDerivedValue(() =>
-    frame.value.pose.zoom >= IDENTITY_ZOOM ? 1 : 0,
-  );
-  return paragraph ? (
-    <Group opacity={opacity}>
-      <Paragraph paragraph={paragraph} x={x} y={y} width={NAME_WIDTH} />
-    </Group>
-  ) : null;
-}
-
-function ProjectedSun({
-  scene,
-  frame,
-  colors,
-  fontProvider,
-  focused,
-}: Omit<ResourceProps, "index">) {
-  const index = scene.world.length - 1;
   const resolved = resolveSunOccupant({
     ...scene.sun,
     starPalette: colors.starPalette,
     colors,
   });
+  const contact = scene.contacts.find((item) => item.id === body.id);
   const name =
-    resolved.kind === "self" ? scene.sun.selfName : scene.sun.sunContactName;
-  const transform = useDerivedValue(() => {
-    const body = frame.value.bodies[index];
-    return [
-      { translateX: body.x },
-      { translateY: body.y },
-      { scale: body.radius / 30 },
-    ];
-  });
-  return (
-    <>
-      <Group transform={transform}>
-        {focused ? (
-          <Circle
-            cx={0}
-            cy={0}
-            r={36}
-            color={colors.accent}
-            style="stroke"
-            strokeWidth={2}
-          />
-        ) : null}
-        <SunBody
-          cx={0}
-          cy={0}
-          radius={30}
-          glowRadius={54}
-          photo={resolved.photo}
-          glowColor={resolved.glowColor}
-          swatch={
-            colors.avatarSwatches[
-              swatchIndex(name, colors.avatarSwatches.length)
-            ]
-          }
-          swatchText={colors.avatarSwatchText}
-          initials={getInitials(name)}
-          fontProvider={fontProvider}
-        />
-      </Group>
-      {resolved.kind === "contact" ? (
-        <IdentityLabel
-          index={index}
-          name={name}
-          frame={frame}
-          colors={colors}
-          fontProvider={fontProvider}
-        />
-      ) : null}
-    </>
+    body.kind === "sun"
+      ? resolved.kind === "self"
+        ? scene.sun.selfName
+        : scene.sun.sunContactName
+      : (contact?.name ?? "");
+  const common = {
+    cx: 0,
+    cy: 0,
+    radius: body.radius,
+    projection,
+    swatch:
+      colors.avatarSwatches[swatchIndex(name, colors.avatarSwatches.length)],
+    swatchText: colors.avatarSwatchText,
+    initials: getInitials(name),
+    fontProvider,
+    focusColor: focused ? colors.accent : undefined,
+  };
+  // Each branch returns exactly ONE actual body root Group; no parent wrapper.
+  return body.kind === "sun" ? (
+    <SunBody
+      {...common}
+      photo={resolved.photo}
+      glowColor={resolved.glowColor}
+      glowRadius={body.radius * 1.8}
+    />
+  ) : (
+    <OrbitBody
+      {...common}
+      photo={contact?.photo ?? null}
+      bodyFill={orreryRingStyle(contact?.status ?? null, colors).bodyFill}
+    />
   );
 }
 
@@ -317,9 +192,70 @@ export function OrreryWorld({
   onIntent: (intent: OrreryIntent) => void;
   focusedIds: number[];
 }) {
-  const frame = useDerivedValue(() =>
-    projectFrame(scene.world, pose.value, viewport, scene.generation),
+  const reducedMotion = useReducedMotionShared();
+  const [registry, setRegistry] = useState(() => ({
+    scene,
+    resources: resourcesFor(scene),
+  }));
+  // React's guarded render adjustment publishes all new keyed resources together.
+  // It runs only on a new immutable snapshot, never on camera/animation frames.
+  if (registry.scene !== scene)
+    setRegistry({
+      scene,
+      resources: mergeResources(registry.resources, scene),
+    });
+  const resources =
+    registry.scene === scene
+      ? registry.resources
+      : mergeResources(registry.resources, scene);
+  const transition = useSharedValue(
+    beginWorldTransition([], scene.world, scene.generation),
   );
+  const progress = useSharedValue(1);
+  const frame = useDerivedValue(() =>
+    projectAnimatedFrame(
+      transition.value,
+      reducedMotion.value ? 1 : progress.value,
+      pose.value,
+      viewport,
+    ),
+  );
+  useEffect(() => {
+    const complete = () =>
+      setRegistry((current) =>
+        current.scene === scene
+          ? {
+              scene,
+              resources: current.resources.filter((resource) =>
+                scene.world.some((body) => bodyKey(body) === resource.key),
+              ),
+            }
+          : current,
+      );
+    runOnUI(() => {
+      "worklet";
+      if (transition.value.generation === scene.generation) return;
+      const displayed = sampleWorldTransition(
+        transition.value,
+        reducedMotion.value ? 1 : progress.value,
+      ).filter((body) => body.opacity > 0);
+      cancelAnimation(progress);
+      transition.value = beginWorldTransition(
+        displayed,
+        scene.world,
+        scene.generation,
+      );
+      progress.value = 0;
+      progress.value = withTiming(
+        1,
+        { duration: reducedMotion.value ? 100 : WORLD_SETTLE_MS },
+        (finished) => {
+          if (finished) runOnJS(complete)();
+        },
+      );
+    })();
+  }, [scene, transition, progress, reducedMotion]);
+  useEffect(() => () => cancelAnimation(progress), [progress]);
   const panStart = useSharedValue<CameraPose | null>(null);
   const gesture = useMemo(
     () =>
@@ -348,24 +284,39 @@ export function OrreryWorld({
       starColors={starColors}
       gesture={gesture}
     >
-      {scene.contacts.map((contact, index) => (
-        <ProjectedContact
-          key={contact.id}
-          index={index}
-          scene={scene}
-          frame={frame}
-          colors={colors}
-          fontProvider={fontProvider}
-          focused={focusedIds.includes(contact.id)}
-        />
-      ))}
-      <ProjectedSun
-        scene={scene}
-        frame={frame}
-        colors={colors}
-        fontProvider={fontProvider}
-        focused={focusedIds.includes(scene.world[scene.world.length - 1].id)}
-      />
+      <Group
+        clip={{ x: 0, y: 0, width: viewport.width, height: viewport.height }}
+      >
+        <Group>
+          {resources
+            .filter((r) => r.body.kind === "contact")
+            .map((resource) => (
+              <ProjectedOrbitRing
+                key={resource.key}
+                identity={resource.key}
+                frame={frame}
+                style={orreryRingStyle(
+                  resource.scene.contacts.find((c) => c.id === resource.body.id)
+                    ?.status ?? null,
+                  colors,
+                )}
+              />
+            ))}
+        </Group>
+        {/* RNRecorder flushes sorting at every non-Group command. Keep this run contiguous. */}
+        <Group>
+          {resources.map((resource) => (
+            <ProjectedBody
+              key={resource.key}
+              resource={resource}
+              frame={frame}
+              colors={colors}
+              fontProvider={fontProvider}
+              focused={focusedIds.includes(resource.body.id)}
+            />
+          ))}
+        </Group>
+      </Group>
     </OrreryCanvas>
   );
 }

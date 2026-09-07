@@ -239,7 +239,6 @@ export function OrreryScreen() {
       >
         {visible && scene ? (
           <OrreryWorld
-            key={scene.generation}
             scene={scene}
             pose={pose}
             viewport={viewport}

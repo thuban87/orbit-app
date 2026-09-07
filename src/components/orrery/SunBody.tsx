@@ -28,12 +28,15 @@ import {
   useImage,
 } from "@shopify/react-native-skia";
 import { useMemo } from "react";
-import { useDerivedValue } from "react-native-reanimated";
+import { type SharedValue, useDerivedValue } from "react-native-reanimated";
+import type { BillboardPose } from "@/logic/orrery-frame";
 import { resolvePhotoUri } from "@/services/photos/photo-storage";
 import { useReducedMotionShared } from "@/theme/use-reduced-motion";
 import { useOrreryClock } from "./orrery-clock-context";
 
 export interface SunBodyProps {
+  projection?: SharedValue<BillboardPose>;
+  focusColor?: string;
   /** Canvas centre x (`C.cx`). */
   cx: number;
   /** Canvas centre y (`C.cy`). */
@@ -76,7 +79,24 @@ export function SunBody({
   swatchText,
   initials,
   fontProvider,
+  projection,
+  focusColor,
 }: SunBodyProps) {
+  const transform = useDerivedValue(() =>
+    projection
+      ? [
+          { translateX: projection.value.x },
+          { translateY: projection.value.y },
+          { scale: projection.value.scale },
+        ]
+      : [],
+  );
+  const depth = useDerivedValue(() => projection?.value.depth ?? 0);
+  const layer = useDerivedValue(() => {
+    const paint = Skia.Paint();
+    paint.setAlphaf(projection?.value.opacity ?? 1);
+    return paint;
+  });
   // C2-1: unconditional hook, null-guarded source.
   const image = useImage(photo ? resolvePhotoUri(photo) : null);
 
@@ -139,7 +159,17 @@ export function SunBody({
   );
 
   return (
-    <Group>
+    <Group transform={transform} zIndex={depth} layer={layer}>
+      {focusColor ? (
+        <Circle
+          cx={cx}
+          cy={cy}
+          r={radius + 6}
+          color={focusColor}
+          style="stroke"
+          strokeWidth={2}
+        />
+      ) : null}
       {/* Glow halo — pulses (radius + opacity) off the ambient clock. */}
       <Circle
         cx={cx}

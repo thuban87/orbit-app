@@ -35,6 +35,8 @@ export interface WorldBody extends WorldPoint {
   ringRadius: number;
 }
 export interface ProjectedBody extends WorldBody {
+  /** Decorative transition departures must never produce live actions. */
+  interactive?: boolean;
   hitRadius: number;
   ringPath: WorldPoint[];
   depth: number;
@@ -506,6 +508,7 @@ export function collectHitCandidates(
     .filter(
       (body) =>
         body.id > 0 &&
+        body.interactive !== false &&
         (x - body.x) ** 2 + (y - body.y) ** 2 <= body.hitRadius ** 2,
     )
     .map((body) => body.id);

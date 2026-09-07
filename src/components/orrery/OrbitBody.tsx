@@ -16,9 +16,13 @@ import {
   useImage,
 } from "@shopify/react-native-skia";
 import { useMemo } from "react";
+import { type SharedValue, useDerivedValue } from "react-native-reanimated";
+import type { BillboardPose } from "@/logic/orrery-frame";
 import { resolvePhotoUri } from "@/services/photos/photo-storage";
 
 export interface OrbitBodyProps {
+  projection?: SharedValue<BillboardPose>;
+  focusColor?: string;
   /** Body center x in the projected wrapper local space. */
   cx: number;
   /** Body center y in the projected wrapper local space. */
@@ -52,7 +56,24 @@ export function OrbitBody({
   swatchText,
   initials,
   fontProvider,
+  projection,
+  focusColor,
 }: OrbitBodyProps) {
+  const transform = useDerivedValue(() =>
+    projection
+      ? [
+          { translateX: projection.value.x },
+          { translateY: projection.value.y },
+          { scale: projection.value.scale },
+        ]
+      : [],
+  );
+  const depth = useDerivedValue(() => projection?.value.depth ?? 0);
+  const layer = useDerivedValue(() => {
+    const paint = Skia.Paint();
+    paint.setAlphaf(projection?.value.opacity ?? 1);
+    return paint;
+  });
   // C2-1: unconditional hook, null-guarded source (photo may be null).
   const image = useImage(photo ? resolvePhotoUri(photo) : null);
 
@@ -89,7 +110,17 @@ export function OrbitBody({
   );
 
   return (
-    <Group>
+    <Group transform={transform} zIndex={depth} layer={layer}>
+      {focusColor ? (
+        <Circle
+          cx={cx}
+          cy={cy}
+          r={radius + 4}
+          color={focusColor}
+          style="stroke"
+          strokeWidth={2}
+        />
+      ) : null}
       {/* Canonical status outline; rogue retains its cold body treatment. */}
       <Circle cx={cx} cy={cy} r={radius} color={bodyFill} />
       {image ? (
