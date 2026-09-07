@@ -37,12 +37,14 @@ import {
   closeBeforeAction,
   clusterRows,
 } from "@/components/orrery/orrery-overlay-logic";
+import { satelliteContext } from "@/components/orrery/orrery-satellite-context";
 import { useOrreryCamera } from "@/components/orrery/use-orrery-camera";
 import { ShellAppBar } from "@/components/ShellAppBar";
 import { AppText } from "@/components/ui/AppText";
 import { Button } from "@/components/ui/Button";
 import { getExecutor, localDateTime } from "@/db/database";
 import { readOrreryContactTargetValidation } from "@/db/orrery-action-read";
+import { readOrrerySatellites } from "@/db/orrery-satellites-read";
 import { commitRingReorder } from "@/db/ring-seq-dao";
 import {
   type CameraPose,
@@ -68,7 +70,11 @@ import {
 import { navigationRef } from "@/navigation/linking";
 import type { RootStackParamList } from "@/navigation/types";
 import { useWindowMeasurement } from "@/navigation/use-window-measurement";
-import { loadOrreryScene } from "@/services/orrery-scene";
+import {
+  createOrrerySatelliteController,
+  loadOrreryScene,
+  type OrrerySatelliteState,
+} from "@/services/orrery-scene";
 import { useOrreryPreferencesStore } from "@/stores/orrery-preferences-store";
 import { createOrrerySystemStore } from "@/stores/orrery-system-store";
 import {
@@ -205,6 +211,51 @@ export function OrreryScreen() {
     [],
   );
   const state = useSystemStore();
+  const [satelliteState, setSatelliteState] = useState<OrrerySatelliteState>({
+    status: "ready",
+    sceneGeneration: null,
+    rows: [],
+  });
+  const satelliteController = useMemo(
+    () =>
+      createOrrerySatelliteController(
+        (scene) =>
+          readOrrerySatellites(
+            getExecutor(),
+            scene.systemSnapshot.members,
+            scene.system,
+          ),
+        setSatelliteState,
+      ),
+    [],
+  );
+  const reloadSatellites = useCallback(() => {
+    void satelliteController.reload(
+      useSystemStore.getState().current(),
+      useOrreryPreferencesStore.getState().committed.satellitesEnabled === 1,
+    );
+  }, [satelliteController, useSystemStore]);
+  useEffect(() => {
+    const unsubscribe = useSystemStore.subscribe((next, previous) => {
+      if (
+        next.generation !== previous.generation ||
+        next.snapshot !== previous.snapshot ||
+        next.status !== previous.status
+      )
+        reloadSatellites();
+    });
+    reloadSatellites();
+    return () => {
+      unsubscribe();
+      void satelliteController.reload(null, false);
+    };
+  }, [useSystemStore, satelliteController, reloadSatellites]);
+  useEffect(() => {
+    void satelliteController.reload(
+      useSystemStore.getState().current(),
+      preferences.satellitesEnabled === 1,
+    );
+  }, [preferences.satellitesEnabled, satelliteController, useSystemStore]);
   const focusSystem = useRef(state.requested.id);
   useEffect(() => {
     if (focusSystem.current !== state.requested.id) {
@@ -273,6 +324,14 @@ export function OrreryScreen() {
   }, [presentation, reload]);
 
   const scene = state.snapshot;
+  const satellites =
+    preferences.satellitesEnabled &&
+    isFocused &&
+    appActive &&
+    state.status === "ready" &&
+    satelliteState.sceneGeneration === scene?.generation
+      ? satelliteState
+      : undefined;
   const measured = usableCameraRect(viewport) !== null;
   const visible = measured && isFocused && appActive;
   const camera = useOrreryCamera({
@@ -540,6 +599,27 @@ export function OrreryScreen() {
             frame={camera.frame}
             blocked={overlaysOpen}
             onClear={clearFocus}
+            contextState={focusedMember ? satellites?.status : undefined}
+            onReloadContext={reloadSatellites}
+            relationshipContext={
+              focusedMember
+                ? satellites?.rows
+                    .filter(
+                      (row) =>
+                        row.parentId === focusedMember.id &&
+                        row.parentUid === focusedMember.uid,
+                    )
+                    .map((row) => {
+                      const text = satelliteContext(row, focusedMember.name);
+                      return (
+                        <View key={row.uid}>
+                          <AppText>{text.name}</AppText>
+                          <AppText role="caption">{text.relation}</AppText>
+                        </View>
+                      );
+                    })
+                : undefined
+            }
             onProfile={() => {
               const current = state.current();
               if (current)
@@ -724,6 +804,8 @@ export function OrreryScreen() {
         ) : null}
       </View>
       <OrreryContactsSheet
+        satellites={satellites}
+        onReloadSatellites={reloadSatellites}
         visible={contactsOpen}
         state={state}
         measured={measured}

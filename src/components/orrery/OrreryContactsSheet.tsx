@@ -11,10 +11,12 @@ import { AppText } from "@/components/ui/AppText";
 import { Button } from "@/components/ui/Button";
 import { Sheet } from "@/components/ui/Sheet";
 import { ALL_CONTACTS_SYSTEM } from "@/logic/orrery-system-logic";
+import type { OrrerySatelliteState } from "@/services/orrery-scene";
 import type { OrrerySystemState } from "@/stores/orrery-system-store";
 import { SPACING } from "@/theme/tokens/spacing";
 import { companionRows } from "./orrery-companion-logic";
 import { systemEmptyCopy } from "./orrery-controls-logic";
+import { satelliteContext } from "./orrery-satellite-context";
 
 /** Complete conventional access to the SAME committed System, including its sun. */
 export function OrreryContactsSheet({
@@ -24,6 +26,8 @@ export function OrreryContactsSheet({
   onClose,
   onAction,
   relationshipContextById,
+  satellites,
+  onReloadSatellites,
 }: {
   visible: boolean;
   state: OrrerySystemState;
@@ -31,6 +35,8 @@ export function OrreryContactsSheet({
   onClose: () => void;
   onAction: (kind: "focus" | "profile", id: number) => void;
   relationshipContextById?: Readonly<Record<number, ReactNode>>;
+  satellites?: OrrerySatelliteState;
+  onReloadSatellites?: () => void;
 }) {
   const { height } = useWindowDimensions();
   const scene = state.snapshot;
@@ -96,6 +102,20 @@ export function OrreryContactsSheet({
             <AppText>{member.name}</AppText>
             {context ? <AppText role="caption">{context}</AppText> : null}
             {relationshipContextById?.[member.id]}
+            {satellites?.rows
+              .filter(
+                (row) =>
+                  row.parentId === member.id && row.parentUid === member.uid,
+              )
+              .map((row) => {
+                const text = satelliteContext(row, member.name);
+                return (
+                  <View key={row.uid}>
+                    <AppText>{text.name}</AppText>
+                    <AppText role="caption">{text.relation}</AppText>
+                  </View>
+                );
+              })}
             <Button
               role="secondary"
               label="Focus in Orrery"
@@ -112,6 +132,19 @@ export function OrreryContactsSheet({
             />
           </View>
         ))}
+        {satellites?.status === "error" ? (
+          <>
+            <AppText>
+              Couldn't load relationship satellites. Your contacts are still
+              available.
+            </AppText>
+            <Button
+              role="secondary"
+              label="Reload satellites"
+              onPress={onReloadSatellites}
+            />
+          </>
+        ) : null}
         <Button role="secondary" label="Close contact list" onPress={onClose} />
       </ScrollView>
     </Sheet>

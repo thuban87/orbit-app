@@ -1,4 +1,6 @@
 /** Coherent local scene read; no image decoding, writes, or nested mutex. */
+
+import type { OrrerySatellite } from "@/db/orrery-satellites-read";
 import {
   MissingOrreryCategoryError,
   type OrrerySystemMember,
@@ -115,6 +117,50 @@ export async function loadOrreryScene(
 export interface OrreryLoadState {
   status: "loading" | "ready" | "error";
   snapshot: OrrerySceneSnapshot | null;
+}
+
+export interface OrrerySatelliteState {
+  status: "loading" | "ready" | "error";
+  sceneGeneration: number | null;
+  rows: OrrerySatellite[];
+}
+/** Optional reads own a separate generation and cannot publish into core scene state.
+ * Call reload(null,false) synchronously when the System request/lifecycle changes.
+ */
+export function createOrrerySatelliteController(
+  load: (scene: OrrerySceneSnapshot) => Promise<OrrerySatellite[]>,
+  publish: (state: OrrerySatelliteState) => void,
+) {
+  let generation = 0;
+  return {
+    async reload(scene: OrrerySceneSnapshot | null, enabled: boolean) {
+      const ticket = ++generation;
+      const sceneGeneration = scene?.generation ?? null;
+      publish({
+        status: enabled && scene ? "loading" : "ready",
+        sceneGeneration,
+        rows: [],
+      });
+      if (!scene || !enabled) return;
+      try {
+        const rows = await load(scene);
+        if (ticket !== generation) return;
+        publish({
+          status: "ready",
+          sceneGeneration,
+          rows: rows.filter((row) =>
+            scene.systemSnapshot.members.some(
+              (parent) =>
+                parent.id === row.parentId && parent.uid === row.parentUid,
+            ),
+          ),
+        });
+      } catch {
+        if (ticket === generation)
+          publish({ status: "error", sceneGeneration, rows: [] });
+      }
+    },
+  };
 }
 /** The current request owns publication; retained failure data is not actionable. */
 export function createOrrerySceneController(
