@@ -4,7 +4,7 @@ milestone: v2.0
 milestone_name: Release Readiness
 current_phase: 29
 current_phase_name: Orrery Camera, Scale & Exploration
-status: executing
+status: paused
 stopped_at: Completed 29-06-PLAN.md; owner requested pause before Plan 07
 last_updated: "2026-09-07T09:26:08.457Z"
 last_activity: 2026-09-07
@@ -33,7 +33,7 @@ See: .planning/PROJECT.md (updated 2026-09-01 after v1.0 milestone)
 
 ## Current Position
 
-Phase: 29 (Orrery Camera, Scale & Exploration) — EXECUTING
+Phase: 29 (Orrery Camera, Scale & Exploration) — PAUSED
 Plan: 7 of 12
 Status: Paused at owner request after Plan 29-06
 Carried forward (owner's bucket, NOT resolved here): D-11 default Memory-type display name — reconcile before Phase 34.

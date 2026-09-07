@@ -1,39 +1,119 @@
 {
   "version": "1.0",
-  "timestamp": "2026-09-05T12:59:39.228Z",
-  "phase": "26",
-  "phase_name": "Dashboard Control Surface",
-  "phase_dir": ".planning/phases/26-dashboard-control-surface",
+  "timestamp": "2026-09-07T09:27:08.696Z",
+  "phase": "29",
+  "phase_name": "Orrery Camera, Scale & Exploration",
+  "phase_dir": ".planning/phases/29-orrery-camera-scale-exploration",
   "plan": 7,
   "task": 1,
-  "total_tasks": 3,
+  "total_tasks": 2,
   "status": "paused",
   "completed_tasks": [
-    {"id": "26-01", "name": "Population control end-to-end tracer", "status": "done", "commit": "f6ebeb4"},
-    {"id": "26-02", "name": "Filters and Sort anchored panels", "status": "done", "commit": "908c309"},
-    {"id": "26-03", "name": "Population-aware Dashboard search read", "status": "done", "commit": "e00e093"},
-    {"id": "26-04", "name": "Dashboard header and overflow chrome", "status": "done", "commit": "e901234"},
-    {"id": "26-05", "name": "Archived child-route chrome", "status": "done", "commit": "20f4a58"},
-    {"id": "26-06", "name": "Unbound child-route search", "status": "done", "commit": "37a408f"}
+    {
+      "id": "29-01",
+      "name": "Canonical scene and camera tracer",
+      "status": "done",
+      "commit": "a67036e"
+    },
+    {
+      "id": "29-02",
+      "name": "Durable Orrery preferences",
+      "status": "done",
+      "commit": "0b854fa"
+    },
+    {
+      "id": "29-03",
+      "name": "Live System selection",
+      "status": "done",
+      "commit": "c1e1a3a"
+    },
+    {
+      "id": "29-04",
+      "name": "Growing world and bounded perspective",
+      "status": "done",
+      "commit": "9aef8cb"
+    },
+    {
+      "id": "29-05",
+      "name": "Shared billboard frame and semantic labels",
+      "status": "done",
+      "commit": "ccea9f0"
+    },
+    {
+      "id": "29-06",
+      "name": "Measured obstacles and reachable controls",
+      "status": "done",
+      "commit": "e467eb8"
+    }
   ],
   "remaining_tasks": [
-    {"id": "26-07/1", "name": "Search plus List/Card toggle row", "status": "not_started"},
-    {"id": "26-07/2", "name": "Wire listDashboardSearch and empty-state inputs", "status": "not_started"},
-    {"id": "26-07/3", "name": "Retire listDashboard and listNeverContacted safely", "status": "not_started"}
+    {
+      "id": "29-07",
+      "name": "Camera gestures, Polaris and animated recovery",
+      "status": "not_started"
+    },
+    {
+      "id": "29-08",
+      "name": "Contact/group focus and accessible companion",
+      "status": "not_started"
+    },
+    {
+      "id": "29-09",
+      "name": "Deliberate guarded ring reorder",
+      "status": "not_started"
+    },
+    {
+      "id": "29-10",
+      "name": "Relationship satellites",
+      "status": "not_started"
+    },
+    {
+      "id": "29-11",
+      "name": "Session restoration and lifecycle/error races",
+      "status": "not_started"
+    },
+    {
+      "id": "29-12",
+      "name": "Integrated verification, documentation and native checklist",
+      "status": "not_started"
+    }
   ],
   "blockers": [],
   "async_jobs": [],
   "human_actions_pending": [
-    {"action": "Run deferred Pixel UAT", "context": "Validate anchored Filter/Sort interaction, header 200% fallback, overflow Reset, Archived route, and the final Plan 07 search/toggle behavior.", "blocking": false}
+    {
+      "action": "End-of-phase native Skia/gestures/TalkBack and phone calibration checks",
+      "context": "WINDOWS entries45\u201350 and each plan SUMMARY; confirm package and Metro session before device use. No native evidence collected this session.",
+      "blocking": false
+    }
   ],
   "decisions": [
-    {"decision": "Pause after Wave 2", "rationale": "The user explicitly requested execution through Plan 26-06 only; Plan 26-07 remains the single executable plan.", "phase": "26"},
-    {"decision": "Preserve D-03 machinery during Plan 07", "rationale": "Only legacy listDashboard/listNeverContacted are retired; countNeverContacted and include_unbound_never_contacted policy/schema support remain until the Phase 36 coordinated backup change.", "phase": "26"}
+    {
+      "decision": "Pause after29-06 before29-07",
+      "rationale": "Explicit owner request during plan06; plan06 completed and verified before stopping.",
+      "phase": "29"
+    },
+    {
+      "decision": "All phase subagents use gpt-6-astra with medium reasoning",
+      "rationale": "Explicit owner model instruction; preserve on resume.",
+      "phase": "29"
+    },
+    {
+      "decision": "Sequential execution in current main checkout with no pushes/worktrees/branch switching",
+      "rationale": "Project and owner constraints.",
+      "phase": "29"
+    }
   ],
   "uncommitted_files": [
+    ".planning/phases/24.1-contact-knowledge-foundation/24.1-REVIEW-FIX.md",
     ".planning/phases/24.1-contact-knowledge-foundation/24.1-REVIEW.md",
-    ".planning/phases/24.1-contact-knowledge-foundation/24.1-REVIEW-FIX.md"
+    "tsconfig.json",
+    ".planning/phases/27-dashboard-list-view/27-VERIFICATION.md",
+    "modules/orbit-backup-document-picker/android/build/",
+    "modules/orbit-contact-picker/android/build/",
+    "modules/orbit-secure-fetch/android/build/",
+    "modules/orbit-share-finish/android/build/"
   ],
-  "next_action": "Resume with the full 26-07 plan, beginning Task 1 and reading every listed read_first file before editing.",
-  "context_notes": "Wave 1 and Wave 2 are complete with summaries and passing automated checks. The worktree is otherwise clean; the two listed Phase 24.1 files are pre-existing user edits and must remain untouched."
+  "next_action": "When owner resumes, run $gsd-execute-phase 29. Start29-07 task1; do not rerun completed01\u201306. Read HANDOFF.md, AGENTS.md, summaries and full plan context first.",
+  "context_notes": "Six of twelve plans complete. Full regression verified264 files/2472 tests; log /tmp/orbit-29-06-tests-final.log. Typecheck/colors/targeted Biome passed. All work locally committed. No active agents, tests, servers or external jobs started by this workflow remain. Phase review/verifier/native gates not yet run. GSD init wrongly counts29-PLAN-CHECK.md; canonical phase-plan-index correctly lists12 plans."
 }
