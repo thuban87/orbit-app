@@ -18,15 +18,16 @@ import {
   withTiming,
 } from "react-native-reanimated";
 import { swatchIndex } from "@/components/avatar-initials";
+import type { OrrerySatellite } from "@/db/orrery-satellites-read";
 import type {
   CameraPose,
   CameraViewport,
   OrreryIntent,
+  OrrerySatelliteTarget,
 } from "@/logic/orrery-camera-logic";
 import {
   focusEffectivelyOffscreen,
   type OrreryContactTarget,
-  resolveOrreryTap,
 } from "@/logic/orrery-focus-logic";
 import {
   type AnimatedFrame,
@@ -54,6 +55,10 @@ import {
   type ReorderIntent,
 } from "@/logic/orrery-reorder-logic";
 import { orreryRingStyle } from "@/logic/orrery-ring-logic";
+import {
+  deriveSatelliteBodies,
+  resolveSatelliteTap,
+} from "@/logic/orrery-satellite-logic";
 import { resolveSunOccupant } from "@/logic/sun-occupant-logic";
 import type { OrrerySceneSnapshot } from "@/services/orrery-scene";
 import type { ThemePalette } from "@/theme/theme-types";
@@ -63,6 +68,7 @@ import { OrreryCanvas } from "./OrreryCanvas";
 import { OrreryLabel, prepareOrreryText } from "./OrreryLabel";
 import { Polaris } from "./Polaris";
 import { ProjectedOrbitRing } from "./ProjectedOrbitRing";
+import { SatelliteBody } from "./SatelliteBody";
 import { SunBody } from "./SunBody";
 
 export { createOrreryGestures } from "./use-orrery-camera";
@@ -196,6 +202,8 @@ export function OrreryWorld({
   onFocusLost,
   onReorder,
   onReorderActivated,
+  satellites = [],
+  focusedSatellite,
 }: {
   scene: OrrerySceneSnapshot;
   camera: OrreryCameraController;
@@ -212,6 +220,8 @@ export function OrreryWorld({
   onFocusLost?: () => void;
   onReorder: (intent: ReorderIntent) => void;
   onReorderActivated: () => void;
+  satellites?: readonly OrrerySatellite[];
+  focusedSatellite?: OrrerySatelliteTarget | null;
 }) {
   const { fontScale } = useWindowDimensions();
   const reducedMotion = useReducedMotionShared();
@@ -234,6 +244,7 @@ export function OrreryWorld({
     beginWorldTransition([], scene.world, scene.generation),
   );
   const progress = useSharedValue(1);
+  const level = useSharedValue<SemanticLevel>("overview");
   const frame = useDerivedValue(() => {
     const sampled = sampleWorldTransition(
       transition.value,
@@ -244,8 +255,20 @@ export function OrreryWorld({
       sampled,
       held?.generation === scene.generation ? held : null,
     );
+    const moons = deriveSatelliteBodies(
+      world,
+      satellites,
+      scene.systemSnapshot.members,
+      true,
+      semanticLevel(pose.value.zoom, level.value),
+    );
+    const completeWorld = [...world, ...moons];
     return projectAnimatedFrame(
-      { generation: transition.value.generation, from: world, to: world },
+      {
+        generation: transition.value.generation,
+        from: completeWorld,
+        to: completeWorld,
+      },
       1,
       pose.value,
       viewport,
@@ -378,7 +401,6 @@ export function OrreryWorld({
       })),
     [labels],
   );
-  const level = useSharedValue<SemanticLevel>("overview");
   useAnimatedReaction(
     () => frame.value.pose.zoom,
     (zoom) => {
@@ -466,7 +488,7 @@ export function OrreryWorld({
         },
         resolveTap: (current, x, y) => {
           "worklet";
-          return resolveOrreryTap(
+          return resolveSatelliteTap(
             current,
             x,
             y,
@@ -506,6 +528,37 @@ export function OrreryWorld({
       focusEffectivelyOffscreen(frame.value, singleFocus),
     (lost, previous) => {
       if (lost && previous === false && onFocusLost) runOnJS(onFocusLost)();
+    },
+  );
+  useAnimatedReaction(
+    () => {
+      if (!focusedSatellite) return false;
+      const key = bodyKey({
+        id: -1,
+        kind: "satellite",
+        satelliteTarget: focusedSatellite,
+      });
+      const current = frame.value;
+      const body = current.bodies.find(
+        (b) => bodyKey(b) === key && b.interactive,
+      );
+      if (!body) return true;
+      const reach = body.hitRadius + 44;
+      const rect = current.viewport.usable ?? {
+        x: 0,
+        y: 0,
+        width: current.viewport.width,
+        height: current.viewport.height,
+      };
+      return (
+        body.x + reach < rect.x ||
+        body.x - reach > rect.x + rect.width ||
+        body.y + reach < rect.y ||
+        body.y - reach > rect.y + rect.height
+      );
+    },
+    (lost, previous) => {
+      if (lost && previous !== true && onFocusLost) runOnJS(onFocusLost)();
     },
   );
   return (
@@ -553,6 +606,32 @@ export function OrreryWorld({
               focused={focusedIds.includes(resource.body.id)}
             />
           ))}
+          {satellites.map((row) => {
+            const target = {
+              kind: "satellite" as const,
+              uid: row.uid,
+              parentId: row.parentId,
+              parentUid: row.parentUid,
+            };
+            const identity = bodyKey({
+              kind: "satellite",
+              id: -1,
+              satelliteTarget: target,
+            });
+            return (
+              <SatelliteBody
+                key={identity}
+                identity={identity}
+                frame={frame}
+                colors={colors}
+                focused={
+                  focusedSatellite?.uid === row.uid &&
+                  focusedSatellite.parentId === row.parentId &&
+                  focusedSatellite.parentUid === row.parentUid
+                }
+              />
+            );
+          })}
         </Group>
         {/* Labels/backplates are screen-space and never interrupt the body batch. */}
         <Group>

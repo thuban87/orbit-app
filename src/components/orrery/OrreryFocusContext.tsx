@@ -9,10 +9,12 @@ import { AppText } from "@/components/ui/AppText";
 import { Button } from "@/components/ui/Button";
 import { GlassSurface } from "@/components/ui/GlassSurface";
 import {
+  type OrrerySatelliteTarget,
   type ProjectedFrame,
   usableCameraRect,
 } from "@/logic/orrery-camera-logic";
 import type { OrreryContactTarget } from "@/logic/orrery-focus-logic";
+import { bodyKey } from "@/logic/orrery-frame";
 import { SPACING } from "@/theme/tokens/spacing";
 
 /** Lightweight identity follows the authoritative frame on the UI thread.
@@ -29,12 +31,12 @@ export function OrreryFocusContext({
   contextState = "ready",
   onReloadContext,
 }: {
-  target: OrreryContactTarget;
+  target: OrreryContactTarget | OrrerySatelliteTarget;
   name: string;
   frame: SharedValue<ProjectedFrame | null>;
   blocked: boolean;
   onClear: () => void;
-  onProfile: () => void;
+  onProfile?: () => void;
   relationshipContext?: ReactNode;
   contextState?: "loading" | "ready" | "error";
   onReloadContext?: () => void;
@@ -43,7 +45,12 @@ export function OrreryFocusContext({
   const position = useAnimatedStyle(() => {
     const current = frame.value;
     const region = current ? usableCameraRect(current.viewport) : null;
-    const body = current?.bodies.find((item) => item.id === target.id);
+    const body = current?.bodies.find((item) =>
+      target.kind === "satellite"
+        ? bodyKey(item) ===
+          bodyKey({ id: -1, kind: "satellite", satelliteTarget: target })
+        : item.kind !== "satellite" && item.id === target.id,
+    );
     if (!region || !body) return { opacity: 0 };
     const width = Math.min(280, region.width);
     const limit = Math.min(height, region.height / 2);
@@ -83,12 +90,14 @@ export function OrreryFocusContext({
         >
           <AppText>{name}</AppText>
           <Button role="secondary" label="Clear focus" onPress={onClear} />
-          <Button
-            role="secondary"
-            label="Open Profile"
-            accessibilityLabel={`Open Profile: ${name}`}
-            onPress={onProfile}
-          />
+          {target.kind !== "satellite" ? (
+            <Button
+              role="secondary"
+              label="Open Profile"
+              accessibilityLabel={`Open Profile: ${name}`}
+              onPress={onProfile}
+            />
+          ) : null}
           {contextState === "ready" ? relationshipContext : null}
           {contextState === "error" ? (
             <>

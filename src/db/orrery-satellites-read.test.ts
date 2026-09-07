@@ -4,13 +4,16 @@ import { nodeSqliteExecutor, openTestDb } from "@/db/__testkit__/node-sqlite";
 import { MIGRATIONS, TARGET_VERSION } from "@/db/database";
 import { mergeContacts } from "@/db/merge-dao";
 import { runMigrations } from "@/db/migrations/runner";
+import { readOrreryContactTargetValidation } from "@/db/orrery-action-read";
 import { readOrrerySatellites } from "@/db/orrery-satellites-read";
+import { purgeContact } from "@/db/purge-dao";
 import {
   addRelationship,
   deleteRelationship,
   editRelationship,
   restoreRelationship,
 } from "@/db/relationships-dao";
+import { validateOrreryContactTarget } from "@/logic/orrery-focus-logic";
 import {
   createOrrerySatelliteController,
   loadOrreryScene,
@@ -133,6 +136,73 @@ describe("eligible Orrery relationship projection", () => {
     await expect(readOrrerySatellites(exec, parents)).rejects.toThrow(
       "read failed",
     );
+  });
+  it("D-11 category exclusion preserves sun contact actions and requalification is reversible", async () => {
+    await add();
+    await exec.runAsync("UPDATE app_settings SET sun_contact_id=1");
+    await exec.runAsync("UPDATE contacts SET last_contact=? WHERE id=1", [now]);
+    await exec.runAsync(
+      "INSERT INTO categories(uid,name,display_order,created_at,modified_at) VALUES('category-test','Test',999,?,?)",
+      [now, now],
+    );
+    const system = { kind: "category" as const, uid: "category-test" };
+    const target = { kind: "contact-sun" as const, ...parents[0] };
+    expect(await readOrrerySatellites(exec, parents, system)).toEqual([]);
+    expect(
+      validateOrreryContactTarget(
+        target,
+        await readOrreryContactTargetValidation(exec, system, target),
+      ),
+    ).toBe(true);
+    await exec.runAsync(
+      "UPDATE contacts SET category_id=(SELECT id FROM categories WHERE uid='category-test') WHERE id=1",
+    );
+    expect(await readOrrerySatellites(exec, parents, system)).toHaveLength(1);
+    await exec.runAsync("UPDATE contacts SET category_id=NULL WHERE id=1");
+    expect(await readOrrerySatellites(exec, parents, system)).toEqual([]);
+    expect(
+      validateOrreryContactTarget(
+        target,
+        await readOrreryContactTargetValidation(exec, system, target),
+      ),
+    ).toBe(true);
+  });
+  it("physical purge reflects link clearing and then removes owned moons", async () => {
+    const id = await add();
+    await editRelationship(exec, { id, contactId: 1, linkedContactId: 2, now });
+    await exec.runAsync("UPDATE contacts SET archived_at=? WHERE id=2", [now]);
+    await purgeContact(exec, 2, { now });
+    expect(await readOrrerySatellites(exec, parents)).toHaveLength(1);
+    await exec.runAsync("UPDATE contacts SET archived_at=? WHERE id=1", [now]);
+    await purgeContact(exec, 1, { now });
+    expect(await readOrrerySatellites(exec, parents)).toEqual([]);
+  });
+  it("a late optional request cannot replace a newer successful System or re-enable Off", async () => {
+    await add();
+    const scene = await loadOrreryScene(exec, 1),
+      rows = await readOrrerySatellites(exec, parents);
+    const pending: ((value: typeof rows) => void)[] = [];
+    const states: OrrerySatelliteState[] = [];
+    const controller = createOrrerySatelliteController(
+      () => new Promise((resolve) => pending.push(resolve)),
+      (state) => states.push(state),
+    );
+    const older = controller.reload(scene, true);
+    const newer = controller.reload({ ...scene, generation: 2 }, true);
+    pending[1]([]);
+    await newer;
+    pending[0](rows);
+    await older;
+    expect(states.at(-1)).toEqual({
+      status: "ready",
+      sceneGeneration: 2,
+      rows: [],
+    });
+    const enabled = controller.reload(scene, true);
+    await controller.reload(scene, false);
+    pending[2](rows);
+    await enabled;
+    expect(states.at(-1)?.rows).toEqual([]);
   });
   it("separate optional generations discard excluded-parent, disabled and out-of-order completions; retry never erases contacts", async () => {
     await add();

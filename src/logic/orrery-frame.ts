@@ -23,8 +23,14 @@ export type AnimatedFrame = Omit<ProjectedFrame, "bodies"> & {
     visible: boolean;
   })[];
 };
-export function bodyKey(body: Pick<WorldBody, "id" | "kind">): string {
+export function bodyKey(
+  body: Pick<WorldBody, "id" | "kind" | "satelliteTarget">,
+): string {
   "worklet";
+  if (body.kind === "satellite" && body.satelliteTarget) {
+    const target = body.satelliteTarget;
+    return `satellite:${JSON.stringify([target.parentId, target.parentUid, target.uid])}`;
+  }
   return `${body.kind}:${body.id}`;
 }
 /** Retained keys keep their source order (native stable equal-depth ties).

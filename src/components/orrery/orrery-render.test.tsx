@@ -3,6 +3,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { nodeSqliteExecutor, openTestDb } from "@/db/__testkit__/node-sqlite";
 import { MIGRATIONS, TARGET_VERSION } from "@/db/database";
 import { runMigrations } from "@/db/migrations/runner";
+import { readOrrerySatellites } from "@/db/orrery-satellites-read";
+import { addRelationship } from "@/db/relationships-dao";
 import { HOME_CAMERA } from "@/logic/orrery-camera-logic";
 import { loadOrreryScene } from "@/services/orrery-scene";
 import { THEME_PRESETS } from "@/theme/theme-presets";
@@ -155,6 +157,60 @@ beforeEach(async () => {
 afterEach(() => db.close());
 
 describe("production Orrery native tree and resource contracts", () => {
+  it("renders tokenized moons in the same actual native depth batch and hides them at overview", async () => {
+    const exec = nodeSqliteExecutor(db);
+    await exec.runAsync(
+      "INSERT INTO contacts(uid,name,tracking_enabled,interval_days,created_at,modified_at) VALUES ('p','Parent',1,30,'2026-09-07','2026-09-07')",
+    );
+    const scene = await loadOrreryScene(exec, 1);
+    await addRelationship(exec, {
+      contactId: scene.contacts[0].id,
+      personName: "Moon",
+      createdAt: "2026-09-07",
+      now: "2026-09-07",
+    });
+    const satellites = await readOrrerySatellites(
+      exec,
+      scene.systemSnapshot.members,
+    );
+    const pose = { value: { ...HOME_CAMERA, zoom: 2 } };
+    const tree = resolve(
+      OrreryWorld({
+        scene,
+        satellites,
+        pose: pose as never,
+        viewport: { width: 500, height: 700 },
+        camera: useOrreryCamera({
+          pose: pose as never,
+          enabled: true,
+          extent: scene.extent,
+          viewport: { width: 500, height: 700 },
+          reduced: { value: false } as never,
+        }),
+        colors: THEME_PRESETS.galaxy.dark,
+        fontProvider: {} as never,
+        onIntent: vi.fn(),
+        onReorder: vi.fn(),
+        onReorderActivated: vi.fn(),
+        focusedIds: [],
+      }),
+    );
+    const bodies = tree[0].children[3];
+    expect(bodies.children.map((n) => n.type)).toEqual([
+      "skGroup",
+      "skGroup",
+      "skGroup",
+    ]);
+    const moon = bodies.children[2];
+    expect(moon.children[0].props.color).toBe(
+      THEME_PRESETS.galaxy.dark.textSecondary,
+    );
+    const transform = moon.props.transform as { value: { scale?: number }[] };
+    expect(transform.value[2].scale).toBeGreaterThan(0);
+    expect(transform.value[2].scale).toBeLessThanOrEqual(8);
+    pose.value = { ...pose.value, zoom: 1 };
+    expect(transform.value[2].scale).toBe(1); // absent frame -> hidden billboard, not a hit target
+  });
   it("keeps actual sun/contact root Groups in one consecutive batch with shared native paint layers", async () => {
     const exec = nodeSqliteExecutor(db);
     await exec.runAsync(

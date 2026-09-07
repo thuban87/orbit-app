@@ -8,6 +8,13 @@ export interface WorldPoint {
   x: number;
   y: number;
 }
+/** Relationship identity is never accepted as a contact command capability. */
+export interface OrrerySatelliteTarget {
+  kind: "satellite";
+  uid: string;
+  parentId: number;
+  parentUid: string;
+}
 export type CameraPose = {
   x: number;
   y: number;
@@ -31,7 +38,8 @@ export interface CameraViewport {
 export interface WorldBody extends WorldPoint {
   /** 0 identifies self, which has no Profile action. */
   id: number;
-  kind: "contact" | "sun";
+  kind: "contact" | "sun" | "satellite";
+  satelliteTarget?: OrrerySatelliteTarget;
   radius: number;
   ringRadius: number;
 }
@@ -515,7 +523,8 @@ export function collectHitCandidates(
     .map((body) => body.id);
 }
 export interface OrreryIntent {
-  kind: "none" | "clear" | "focus" | "profile" | "group";
+  kind: "none" | "clear" | "focus" | "profile" | "group" | "satellite";
+  satelliteTarget?: OrrerySatelliteTarget;
   ids: number[];
   generation: number;
   targets?: OrreryContactTarget[];

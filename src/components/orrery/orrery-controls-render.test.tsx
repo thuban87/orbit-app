@@ -331,4 +331,84 @@ describe("actual Orrery controls and detail sheet", () => {
       ).toBe(contextState === "error");
     }
   });
+  it("satellite focus exposes full identity, relation and dismissal without contact actions", () => {
+    const clear = vi.fn(),
+      profile = vi.fn();
+    const nodes = all(
+      resolve(
+        OrreryFocusContext({
+          target: { kind: "satellite", uid: "r", parentId: 1, parentUid: "p" },
+          name: "👩🏽‍🚀 李",
+          frame: { value: null } as never,
+          blocked: false,
+          onClear: clear,
+          onProfile: profile,
+          relationshipContext: "A key person for Parent",
+        }),
+      ),
+    );
+    expect(nodes.map((n) => n.text)).toContain("👩🏽‍🚀 李");
+    expect(nodes.map((n) => n.text)).toContain("A key person for Parent");
+    expect(
+      nodes.some((n) => String(n.props.accessibilityLabel).includes("Profile")),
+    ).toBe(false);
+    const dismiss = nodes.find(
+      (n) => n.props.accessibilityLabel === "Clear focus",
+    );
+    if (!dismiss) throw new Error("Missing satellite dismissal");
+    (dismiss.props.onPress as () => void)();
+    expect(clear).toHaveBeenCalledOnce();
+    expect(profile).not.toHaveBeenCalled();
+  });
+  it("companion exposes moons only below matching parent identities, and keeps read failure separate from empty", () => {
+    const member = { id: 1, uid: "p", name: "Parent" };
+    const row = {
+      uid: "r",
+      parentId: 1,
+      parentUid: "p",
+      personName: "月",
+      relationType: null,
+    };
+    const state = {
+      status: "ready",
+      requested: { id: "builtin:favorites", name: "Favorites" },
+      snapshot: {
+        contacts: [],
+        systemSnapshot: { members: [member], resolvedSunIdentity: member },
+      },
+    } as unknown as OrrerySystemState;
+    const render = (status: "ready" | "error", rows: (typeof row)[]) =>
+      all(
+        resolve(
+          OrreryContactsSheet({
+            visible: true,
+            state,
+            measured: true,
+            onClose: vi.fn(),
+            onAction: vi.fn(),
+            satellites: { status, sceneGeneration: 1, rows },
+            onReloadSatellites: vi.fn(),
+          }),
+        ),
+      );
+    expect(render("ready", [row]).map((n) => n.text)).toContain(
+      "A key person for Parent",
+    );
+    expect(
+      render("ready", [{ ...row, parentUid: "old" }]).map((n) => n.text),
+    ).not.toContain("月");
+    expect(
+      render("ready", []).some(
+        (n) => n.props.accessibilityLabel === "Reload satellites",
+      ),
+    ).toBe(false);
+    expect(
+      render("error", []).some(
+        (n) => n.props.accessibilityLabel === "Reload satellites",
+      ),
+    ).toBe(true);
+    if (!state.snapshot) throw new Error("Missing fixture snapshot");
+    state.snapshot.systemSnapshot.members = [];
+    expect(render("ready", [row]).map((n) => n.text)).not.toContain("月");
+  });
 });

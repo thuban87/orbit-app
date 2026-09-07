@@ -55,6 +55,7 @@ export function resolveOrreryTap(
   const bodies = frame.bodies.filter(
     (body) =>
       body.interactive !== false &&
+      body.kind !== "satellite" &&
       body.id > 0 &&
       x >= 0 &&
       y >= 0 &&

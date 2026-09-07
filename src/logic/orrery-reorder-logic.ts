@@ -34,6 +34,16 @@ export function captureReorder(
   y: number,
 ): ReorderDrag | null {
   "worklet";
+  // A plausible moon hit never authorizes reordering its overlapping contact.
+  if (
+    frame.bodies.some(
+      (body) =>
+        body.kind === "satellite" &&
+        body.interactive !== false &&
+        Math.hypot(x - body.x, y - body.y) <= body.hitRadius,
+    )
+  )
+    return null;
   const hits = collectHitCandidates(frame, x, y);
   if (
     hits.length !== 1 ||

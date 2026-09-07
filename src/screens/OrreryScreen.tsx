@@ -53,6 +53,8 @@ import {
   frameBodies,
   HOME_CAMERA,
   IDENTITY_ZOOM,
+  type OrreryIntent,
+  type OrrerySatelliteTarget,
   usableCameraRect,
 } from "@/logic/orrery-camera-logic";
 import {
@@ -180,6 +182,9 @@ export function OrreryScreen() {
   const hydrated = useOrreryPreferencesStore((store) => store.hydrated);
   const hydration = useOrreryPreferencesStore((store) => store.hydration);
   const [focusTargets, setFocusTargets] = useState<OrreryContactTarget[]>([]);
+  const [focusedSatellite, setFocusedSatellite] =
+    useState<OrrerySatelliteTarget | null>(null);
+  const satelliteAction = useRef(0);
   const focusedIds = useMemo(
     () => focusTargets.map((target) => target.id),
     [focusTargets],
@@ -332,6 +337,22 @@ export function OrreryScreen() {
     satelliteState.sceneGeneration === scene?.generation
       ? satelliteState
       : undefined;
+  const satelliteRow =
+    satellites?.status === "ready" && focusedSatellite
+      ? satellites.rows.find(
+          (row) =>
+            row.uid === focusedSatellite.uid &&
+            row.parentId === focusedSatellite.parentId &&
+            row.parentUid === focusedSatellite.parentUid,
+        )
+      : undefined;
+  useEffect(() => {
+    if (
+      !preferences.satellitesEnabled ||
+      (satellites?.status === "ready" && !satelliteRow)
+    )
+      setFocusedSatellite(null);
+  }, [preferences.satellitesEnabled, satellites, satelliteRow]);
   const measured = usableCameraRect(viewport) !== null;
   const visible = measured && isFocused && appActive;
   const camera = useOrreryCamera({
@@ -436,9 +457,68 @@ export function OrreryScreen() {
       }),
     [useSystemStore, navigation],
   );
-  const onIntent = actions.dispatch;
-  cancelIntent.current = actions.cancel;
+  const onIntent = useCallback(
+    async (intent: OrreryIntent) => {
+      const ticket = ++satelliteAction.current;
+      setFocusedSatellite(null);
+      if (intent.kind !== "satellite") {
+        await actions.dispatch(intent);
+        return;
+      }
+      actions.cancel("superseded");
+      const target = intent.satelliteTarget;
+      const current = useSystemStore.getState().current();
+      if (
+        !target ||
+        current?.generation !== intent.generation ||
+        !routeLive.current ||
+        AppState.currentState !== "active" ||
+        !useOrreryPreferencesStore.getState().committed.satellitesEnabled
+      )
+        return;
+      try {
+        const rows = await readOrrerySatellites(
+          getExecutor(),
+          current.systemSnapshot.members,
+          current.system,
+        );
+        if (
+          ticket !== satelliteAction.current ||
+          useSystemStore.getState().current()?.generation !==
+            intent.generation ||
+          !routeLive.current ||
+          AppState.currentState !== "active" ||
+          !useOrreryPreferencesStore.getState().committed.satellitesEnabled
+        )
+          return;
+        if (
+          !rows.some(
+            (row) =>
+              row.uid === target.uid &&
+              row.parentId === target.parentId &&
+              row.parentUid === target.parentUid,
+          )
+        ) {
+          reloadSatellites();
+          return;
+        }
+        setFocusTargets([]);
+        setClusterOpen(false);
+        setFocusError(null);
+        setFocusedSatellite(target);
+      } catch {
+        reloadSatellites();
+      }
+    },
+    [actions, useSystemStore, reloadSatellites],
+  );
+  cancelIntent.current = (reason) => {
+    satelliteAction.current++;
+    actions.cancel(reason);
+  };
   const clearFocus = useCallback(() => {
+    satelliteAction.current++;
+    setFocusedSatellite(null);
     actions.cancel("clear");
     setFocusTargets([]);
     setClusterOpen(false);
@@ -471,7 +551,10 @@ export function OrreryScreen() {
   useEffect(() => () => actions.cancel("dispose"), [actions]);
   useEffect(() => {
     const unsubscribe = useSystemStore.subscribe((next, previous) => {
-      if (next.generation !== previous.generation) actions.cancel("system");
+      if (next.generation !== previous.generation) {
+        satelliteAction.current++;
+        actions.cancel("system");
+      }
     });
     return unsubscribe;
   }, [actions, useSystemStore]);
@@ -512,6 +595,8 @@ export function OrreryScreen() {
     })();
   }, [scene, state.status, viewport, pose, focusedIds, camera.stop]);
   const recenter = () => {
+    satelliteAction.current++;
+    setFocusedSatellite(null);
     actions.cancel("recenter");
     setClusterOpen(false);
     setFocusTargets([]);
@@ -572,6 +657,8 @@ export function OrreryScreen() {
             onReorder={onReorder}
             onReorderActivated={acknowledgeReorder}
             focusedIds={focusedIds}
+            satellites={satellites?.rows}
+            focusedSatellite={focusedSatellite}
             clusterIds={clusterOpen ? focusedIds : []}
             onFocusLost={clusterOpen ? undefined : clearFocus}
             interactive={!overlaysOpen && state.status === "ready"}
@@ -592,6 +679,27 @@ export function OrreryScreen() {
           onRecenter={recenter}
           onResetNorth={resetNorth}
         />
+        {satelliteRow && focusedSatellite && scene ? (
+          <OrreryFocusContext
+            target={focusedSatellite}
+            name={satelliteRow.personName}
+            frame={camera.frame}
+            blocked={overlaysOpen}
+            onClear={clearFocus}
+            relationshipContext={
+              <AppText>
+                {
+                  satelliteContext(
+                    satelliteRow,
+                    scene.systemSnapshot.members.find(
+                      (p) => p.id === satelliteRow.parentId,
+                    )?.name ?? "",
+                  ).relation
+                }
+              </AppText>
+            }
+          />
+        ) : null}
         {focusedTarget && scene ? (
           <OrreryFocusContext
             target={focusedTarget}
