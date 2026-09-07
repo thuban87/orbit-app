@@ -116,6 +116,8 @@ Reserve space for the existing universal capture FAB rather than moving or remov
 
 System membership changes use restrained fade/shrink/settle continuity. Do not introduce the later spin/shedding/capture spectacle. Bodies remain timestamp-placed; new ambient contact revolution is not authorized by camera navigation. Profile, category CRUD, custom Systems, relationship editing and graph semantics remain with their owning phases.
 
+**Owner clarification — 2026-09-07, CONTEXT D-11:** A globally visible contact sun excluded from the selected System keeps its contact focus/Profile actions, but its satellite moons and their Orrery relationship context are hidden. Parent membership must qualify before the existing enabled/semantic visibility rules can reveal them. No nonmember sun row is added to the companion. This dated clarification supplements the original approved UI contract; it does not claim a new checker sign-off.
+
 ## Copywriting Contract
 
 Exact confirmed copy; braces denote live names/counts, never shipped placeholders. Existing project spelling in domain labels is preserved.

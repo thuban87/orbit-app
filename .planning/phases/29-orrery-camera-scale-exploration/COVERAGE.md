@@ -34,6 +34,7 @@ All rows below are COVERED by executable tasks; this is planned coverage, not pa
 | CONTEXT | D-08 live motion hook, shared-value controls, inactivity | 07, 11 |
 | CONTEXT | D-09 actual relationships, subordinate moon semantics | 10 |
 | CONTEXT | D-10 UID categories, no CRUD, physical-phone evidence boundary | 03, 12 |
+| CONTEXT | D-11 nonmember contact sun retains actions but hides satellite moons/context | 03, 08, 10, 12 |
 | RESEARCH / appendix | E-02 explicit All/Not Contacted widening | 03 |
 | RESEARCH / appendix | E-03 removal of the two-mode split | 01 |
 | RESEARCH / appendix | R-05 preference schema/portable acceptance; camera excluded | 02, 11 |
@@ -43,7 +44,10 @@ All rows below are COVERED by executable tasks; this is planned coverage, not pa
 | RESEARCH | Real delayed stationary-hold ownership and guarded complete permutation | 09 |
 | RESEARCH / checker | One transaction-composable current System predicate core; lock-time filtered membership and ID/UID validation including local-midnight change and reused IDs | 03-01 produces core/snapshot; 09-01 consumes under write lock; 09-02 captures; 12-01 integrates |
 | RESEARCH / checker | Global contact-sun action eligibility independent of active System; deterministic ambiguity without companion widening | 03-01 supplies sun ID/UID; 08-01/02 validates and orders; 08-03 exact companion; 12-01/02 automated/native coverage |
-| RESEARCH | Same-snapshot sun/member/impact reads; no Dashboard state leakage | 01, 03 |
+| RESEARCH | Same-snapshot sun/member/impact reads; no Dashboard state leakage | 01, 03, 04-01 |
+| RESEARCH / review | Batched read-only full-history Gravity parity and bounded mutex work | 04-01 |
+| RESEARCH / review | Narrow current ID/UID/member/sun tap probe sharing closed predicates | 03-01, 08-01 |
+| RESEARCH / review | Runnable day-only lock-time membership tests with test-local SQLite function override | 09-01, 12-01 |
 | RESEARCH | Measured shell obstacles, overlay focus restoration, full text | 05, 06, 08 |
 | RESEARCH | Request generations, coherent failures, fresh visit vs background | 02, 03, 10, 11 |
 | RESEARCH | Neutral-rank extension OPTIONAL; preserve eligibility | 09 (extension excluded, no blocker) |
@@ -149,4 +153,16 @@ Phase23 supplies live theme tokens, text/icon/overlay primitives and the actual 
 
 ## Design sampling audit
 
-All 28 implementation/documentation tasks include automated commands; all newly owned test paths have file-existence guards. Two or three tasks per plan; the first task is a real local data-to-interaction tracer. Read-first lists include every modified path, with current-content-if-present preconditions for new paths. Native Skia, gesture recognition, navigation reachability, TalkBack and phone calibration remain explicit human evidence obligations. No implementation checks were run by the planner.
+All 29 implementation/documentation tasks include automated commands; all newly owned test paths have file-existence guards. Two or three tasks per plan; the first task is a real local data-to-interaction tracer. Read-first lists include every modified path, with current-content-if-present preconditions for new paths. Native Skia, gesture recognition, navigation reachability, TalkBack and phone calibration remain explicit human evidence obligations. No application implementation checks were run by the planner; the standalone SQLite function feasibility probe is separately recorded.
+
+## Review incorporation and contract ownership — 2026-09-07
+
+- 29-01-01 removes the old radial Gesture.Pan, legacy commit bridge/shared drag state and ghost preview before camera pan becomes reachable. No rank writes from ordinary pan in intermediate waves;29-09-02 delivers the final hold reorder. Migration stays wave2 because screen wiring overlaps; no release between waves.
+- 29-04-01 owns src/db/orrery-impact-read.ts and its real-SQL tests. readOrreryImpactInputsCore accepts only ReadOnlyExecutor, batches256 bound IDs, preserves complete ImpactInputs history and computeContactGravity semantics, and runs inside the existing coherent snapshot before rendered Gravity mass. No per-person scene read loop.
+- 29-03-01 owns buildOrrerySystemWhere;29-08-01 reuses it in src/db/orrery-action-read.ts/readOrreryContactTargetValidation. The narrow probe validates live ID/UID, current membership/category and global sun policy with at most three SELECTs; no full scene or interaction read on each tap.
+- 29-09-01 owns src/db/__testkit__/sqlite-local-day.ts/openSqliteLocalDayFixture;29-12 consumes it. Exact per-fixture date('now','localtime') interception and native delegation for all other date calls make day-only lock-time rechecks runnable. No production day parameter or SQL-clock change. Both isolated connections close deterministically.
+- D-11 owner ruling hides satellite moons/targets/context for a globally visible nonmember sun while keeping that sun's contact actions. Plans03/08 establish the cross-contract;10 implements eligibility/reconciliation and12 integrates it.
+- 29-12-02 owns actual source citation upkeep in OrreryScreen/OrbitBody, generated ADR registry refresh, living docs and pending native checklist. No immutable ADR editing or manual generated-file edits; graph refresh only if needed via npm run graph:build.
+- Automated tracer completion permits expansion. Native Skia/navigation/gesture/accessibility obligations remain pending under the existing end-of-phase workflow until resolved; no added interim approval gate.
+
+All original37 edge predicates,55 UI considerations and16 requirements remain planned. The new owner decision is D-11, with11/11 locked decisions represented. The extra batch-to-render task makes29 implementation/documentation tasks across the same12 sequential plans. Counts describe coverage, not execution evidence.

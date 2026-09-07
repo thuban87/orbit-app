@@ -32,7 +32,7 @@ Per-phase validation contract for execution. Research and planning are not imple
 
 ## Per-Task Verification Map
 
-Final map: 12 plans, 12 waves, 28 tasks. Threat IDs below reference the owning plan's complete STRIDE register (ASVS1, high/critical blocking). All checks remain Pending execution. Test-file guards prevent a missing new suite from passing through an incidental existing filename filter.
+Final map: 12 plans, 12 waves, 29 tasks. Threat IDs below reference the owning plan's complete STRIDE register (ASVS1, high/critical blocking). All checks remain Pending execution. Test-file guards prevent a missing new suite from passing through an incidental existing filename filter.
 
 | Task | Wave | Requirements | Threat refs | Automated command | Status |
 |---|---|---|---|---|---|
@@ -44,8 +44,9 @@ Final map: 12 plans, 12 waves, 28 tasks. Threat IDs below reference the owning p
 | 29-03-01 | 3 | ORRC-11, ORRC-12, ORRC-15 | T-29-03-01, T-29-03-02 | `test -f src/db/orrery-system-read.test.ts && npm test -- orrery-system-read orrery-read` | Pending |
 | 29-03-02 | 3 | ORRC-11, ORRC-12, ORRC-15 | T-29-03-01, T-29-03-02 | `test -f src/stores/orrery-system-store.test.ts && npm test -- src/stores/orrery-system-store.test.ts` | Pending |
 | 29-03-03 | 3 | ORRC-11, ORRC-12, ORRC-15 | T-29-03-01, T-29-03-02 | `test -f src/components/orrery/orrery-controls-logic.test.ts && npm test -- orrery-controls-logic orrery-system-store orrery-system-read` | Pending |
-| 29-04-01 | 4 | ORRC-02, ORRC-03, ORRC-04, ORRC-05, ORRC-06 | T-29-04-01, T-29-04-02 | `test -f src/logic/orrery-world-logic.test.ts && npm test -- orrery-world-logic orrery-scene impact` | Pending |
-| 29-04-02 | 4 | ORRC-02, ORRC-03, ORRC-04, ORRC-05, ORRC-06 | T-29-04-01, T-29-04-02 | `test -f src/logic/orrery-camera-logic.test.ts && npm test -- orrery-camera-logic orrery-world-logic orrery-scene` | Pending |
+| 29-04-01 | 4 | ORRC-02, ORRC-03, ORRC-04, ORRC-05, ORRC-06 | T-29-04-03, T-29-04-01, T-29-04-02 | `test -f src/db/orrery-impact-read.test.ts && npm test -- src/db/orrery-impact-read.test.ts src/services/orrery-scene.test.ts` | Pending |
+| 29-04-02 | 4 | ORRC-02, ORRC-03, ORRC-04, ORRC-05, ORRC-06 | T-29-04-03, T-29-04-01, T-29-04-02 | `test -f src/logic/orrery-world-logic.test.ts && npm test -- orrery-world-logic orrery-scene impact` | Pending |
+| 29-04-03 | 4 | ORRC-02, ORRC-03, ORRC-04, ORRC-05, ORRC-06 | T-29-04-03, T-29-04-01, T-29-04-02 | `test -f src/logic/orrery-camera-logic.test.ts && npm test -- orrery-camera-logic orrery-world-logic orrery-scene` | Pending |
 | 29-05-01 | 5 | ORRC-03, ORRC-06, ORRC-07 | T-29-05-01, T-29-05-02 | `test -f src/logic/orrery-frame.test.ts && npm test -- src/logic/orrery-frame.test.ts src/services/orrery-scene.test.ts` | Pending |
 | 29-05-02 | 5 | ORRC-03, ORRC-06, ORRC-07 | T-29-05-01, T-29-05-02 | `test -f src/logic/orrery-label-logic.test.ts && npm test -- orrery-label-logic orrery-frame` | Pending |
 | 29-06-01 | 6 | ORRC-04, ORRC-09, ORRC-13, ORRC-15 | T-29-06-01, T-29-06-02 | `test -f src/components/orrery/orrery-obstacle-logic.test.ts && npm test -- src/components/orrery/orrery-obstacle-logic.test.ts` | Pending |
@@ -63,7 +64,7 @@ Final map: 12 plans, 12 waves, 28 tasks. Threat IDs below reference the owning p
 | 29-11-02 | 11 | ORRC-08, ORRC-11, ORRC-13, ORRC-16 | T-29-11-01, T-29-11-02 | `test -f src/theme/use-reduced-motion.test.ts && test -f src/logic/orrery-session-logic.test.ts && npm test -- src/theme/use-reduced-motion.test.ts src/logic/orrery-session-logic.test.ts src/logic/orrery-recovery-logic.test.ts` | Pending |
 | 29-11-03 | 11 | ORRC-08, ORRC-11, ORRC-13, ORRC-16 | T-29-11-01, T-29-11-02 | `test -f src/components/orrery/orrery-feedback-logic.test.ts && npm test -- src/components/orrery/orrery-feedback-logic.test.ts src/stores/orrery-system-store.test.ts src/stores/orrery-preferences-store.test.ts src/logic/orrery-frame.test.ts` | Pending |
 | 29-12-01 | 12 | ORRC-01, ORRC-02, ORRC-03, ORRC-04, ORRC-05, ORRC-06, ORRC-07, ORRC-08, ORRC-09, ORRC-10, ORRC-11, ORRC-12, ORRC-13, ORRC-14, ORRC-15, ORRC-16 | T-29-12-01, T-29-12-02 | `test -f src/services/orrery-exploration.integration.test.ts && test -f src/services/orrery-scene.test.ts && npm test -- src/services/orrery-exploration.integration.test.ts src/services/orrery-scene.test.ts` | Pending |
-| 29-12-02 | 12 | ORRC-01, ORRC-02, ORRC-03, ORRC-04, ORRC-05, ORRC-06, ORRC-07, ORRC-08, ORRC-09, ORRC-10, ORRC-11, ORRC-12, ORRC-13, ORRC-14, ORRC-15, ORRC-16 | T-29-12-01, T-29-12-02 | `npm test -- src/services/orrery-exploration.integration.test.ts` | Pending |
+| 29-12-02 | 12 | ORRC-01, ORRC-02, ORRC-03, ORRC-04, ORRC-05, ORRC-06, ORRC-07, ORRC-08, ORRC-09, ORRC-10, ORRC-11, ORRC-12, ORRC-13, ORRC-14, ORRC-15, ORRC-16 | T-29-12-01, T-29-12-02 | `npm run gen:adr-registry && npm test -- src/services/orrery-exploration.integration.test.ts` | Pending |
 
 ## Wave 0 Requirements
 
@@ -71,8 +72,11 @@ No new framework or package is required. Add tests with their owning implementat
 
 - World and project/inverse round trips, minimum spacing, neutral progress, deterministic nudges, depth bounds and Home framing.
 - Current projected hit candidates at intermediate animation fractions, semantic labels and input ownership/cancellation.
+- Batched Gravity inputs: exact parity with single-contact ImpactInputs/computeContactGravity, complete history, bounded chunk/query counts, ro-only composition and coherent policy/history snapshot (29-04-01).
+- Narrow target probe: at most three SELECTs, no interaction/catalog/full-member load, same ID/UID/member/category/sun guarantees and post-await generation checks (29-08-01).
+- D-11: excluded global sun retains contact actions but hides satellite moons/targets/context; On/overview/inspection and requalification/stale-read cases (29-10/12).
 - Real-SQL System membership matrix and read/write core parity; qualifying sun exactly once; global nonmember sun focus/Profile/ambiguity with Favorites/category exclusion while companion stays exact.
-- Filtered reorder revalidates the identified System's contacted visible membership, complete order, saved sun and ID/UID fingerprints under one write lock. Cover favorite/category/Charger/snooze/cadence/recency changes with unchanged full order/sun; queued-before-lock mutation; local midnight Snoozed/Needs Attention changes with unchanged dataRevision; reused numeric ID with changed UID; no writes/revision bump on rejection and hidden-slot preservation on success.
+- Filtered reorder revalidates the identified System's contacted visible membership, complete order, saved sun and ID/UID fingerprints under one write lock. Cover favorite/category/Charger/snooze/cadence/recency changes with unchanged full order/sun; queued-before-lock mutation; local midnight Snoozed/Needs Attention changes with unchanged dataRevision using the newly owned test-only openSqliteLocalDayFixture: intercept only exact date('now','localtime') on one connection, delegate other date calls natively, queue behind the shared mutex then advance only day and release; close both isolated connections; reused numeric ID with changed UID; no writes/revision bump on rejection and hidden-slot preservation on success.
 - Preference migration from current head and full chain, failed read/write behavior, optional portable keys and unchanged current export.
 - Session/departure reason, A→B→A out-of-order reads, same-System refresh versus switch failure, satellite invalidation.
 - Live Reduced Motion event before async seed, inactivity cleanup and cancellation during camera recovery.
@@ -101,4 +105,10 @@ Density/neighbor tuning and large-System performance remain assigned to release 
 - [ ] Feedback latency measured during execution
 - [x] `nyquist_compliant: true` records final plan sampling coverage only
 
-**Approval:** Design sampling checked; independent plan verification passed 2026-09-07 (see 29-PLAN-CHECK.md). Implementation and device verification pending. COVERAGE.md maps all 37 probe edges, 55 UI considerations, 16 requirements and D-01 through D-10.
+**Approval:** Previous plan set passed independent verification 2026-09-07 (historical 29-PLAN-CHECK.md). Review-mode changes require a fresh independent check; implementation and device verification remain pending. COVERAGE.md maps all 37 probe edges, 55 UI considerations, 16 requirements and D-01 through D-11.
+
+## Review-mode validation notes — 2026-09-07
+
+The new SQLite test helper is implemented in29-09 and reused in29-12. The standalone feasibility probe at /tmp/orbit-phase29-sqlite-day-probe.cjs passed; this is test-mechanism evidence only. Ordinary pan must leave ranks, modified_at and revision unchanged from29-01 onward. Native tracer obligations remain end-of-phase pending UAT, distinct from the automated tracer-before-expansion condition. No new interim owner approval gate is introduced.
+
+Planner structural checks on 2026-09-07: all12 numbered plan frontmatter and structures valid; one preexisting one-way-migration warning corresponds to D-03/D-06's already-approved action. Decision coverage11/11; task/file/wave audit12 plans,29 tasks,12 waves, no task over5 modified files and no missing declared owner; requirements16/16 and existing edges37/37. Estimate calibration factor1, confidence low, zero samples; largest revised projection38,000 tokens is below the100,000-token budget. git diff --check passed. These are planner checks only; independent review of the revised set is still required.

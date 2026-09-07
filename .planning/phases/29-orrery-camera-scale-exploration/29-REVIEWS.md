@@ -260,3 +260,23 @@ Both source-grounded reviewers found the 12-plan sequence unusually thorough on 
 - Current unresolved HIGH: 1.
 - Current actionable non-HIGH: 5.
 - Owner decision required before replanning: whether a globally assigned contact sun that remains visible while excluded from the active System retains its relationship satellites.
+
+## Replanning incorporation — 2026-09-07, after cycle 1
+
+The raw reviews and cycle-1 counts above are preserved as historical feedback. The following records planner incorporation, not reviewer sign-off or convergence. Independent checking and the next cross-AI cycle remain separate.
+
+| Current finding / suggestion | Executable disposition |
+|---|---|
+| HIGH legacy radial reorder competing with camera pan | 29-01-01 removes old recognizer/commit bridge/shared drag state/ghost preview at camera introduction and tests pan causes no rank writes. 29-09-02 restores final deliberate hold reorder. No release between waves. |
+| MEDIUM Gravity reader unowned / per-member mutex work | New29-04-01 owns readOrreryImpactInputsCore, exact full-history parity, bounded query count, ro-only snapshot composition and its first rendered derived mass. Subsequent04 tasks expand that working path. |
+| MEDIUM SQLite clock test capability not present | 29-09-01 owns new test-only openSqliteLocalDayFixture using per-connection DatabaseSync.function; only exact date('now','localtime') is intercepted, other date calls delegate to a second native SQLite connection. 29-12-01 reuses it for queued lock-time invalidation; production SQL/clock APIs remain unchanged. |
+| MEDIUM per-tap full snapshot | 29-08-01 owns readOrreryContactTargetValidation with at most three SELECTs, bound target identity, shared membership predicates/current sun policy and no member catalog/Gravity reads. Group and companion actions consume the same probe. |
+| MEDIUM excluded global sun satellites | Owner answered “I would say hide them for now”; recorded as dated D-11. Plans03/08/10/12 preserve sun contact actions but hide moons, targets and relationship context until parent membership qualifies. |
+| MEDIUM move migration to wave1 | Rejected in29-02-01 executable action: screen ownership overlaps tracer and preference wiring; all waves are unreleased sequential implementation. |
+| LOW shell-owned edits | Existing29-06-01 explicitly limits scope to measured obstacles and preserves shell routes, FAB location, Back and tab consumers; no extra shell redesign. |
+| LOW ADR citations/registry | 29-12-02 owns comment-only ADR-077/partially-live ADR-048 upkeep and npm run gen:adr-registry; registry never manually edited. Graph refresh only via npm run graph:build if separately needed. |
+| LOW partial setting CHECK | 29-02-01 now requires documenting SQL's partial constraint and complete grammar enforcement in both public/core validators. |
+| Discounted native-gate HIGH | 29-01-01 explicitly separates automated tracer-before-expansion from native end-of-phase evidence. 29-12-02 preserves existing end-of-phase pending UAT/verification obligations without adding a new owner approval checkpoint. |
+| Advisory baseline drift | CONTEXT D-03/D-08 corrected to existing backup format4 and Phase23 live motion hook; original consumption/backup ownership decisions remain. Historical RESEARCH quotes retain their dated meaning. |
+
+Clock-mechanism feasibility was exercised locally with Node's installed SQLite: dayD→D+1 changed Snoozed/Needs Attention results while stored rows and stored-date conversion stayed identical; native modifier and NULL date delegation passed. Reproduce during this session with node /tmp/orbit-phase29-sqlite-day-probe.cjs. This proves the test mechanism only, not the unimplemented Phase29 guarded DAO behavior.

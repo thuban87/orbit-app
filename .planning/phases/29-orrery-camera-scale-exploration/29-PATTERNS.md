@@ -257,6 +257,10 @@ The core revalidates for restore callers (lines 961–979) and checks exactly on
 | Pan/pinch/yaw/tilt/prolonged-reorder arbitration | Existing radial drag is not this multi-gesture camera |
 | Filtered-System complete rank merge with stale snapshot checks | Existing DAO only accepts the complete contacted permutation |
 
+## Review-mode additions — 2026-09-07
+
+The executable plans now own three concrete additions absent from the original pattern inventory: plan04 readOrreryImpactInputsCore/read-only full-history batch (single-contact analog getImpactInputs), plan08 readOrreryContactTargetValidation/narrow bound identity/member/sun probe (shared buildOrrerySystemWhere and sunOccupantIsSelf), and plan09 openSqliteLocalDayFixture/test-only per-connection clock function (node-sqlite adapter; exact local-day interception and native date delegation). The fixture is new test infrastructure, not an existing adapter feature. D-11 gates satellite parent context on System membership even for the visible global sun.
+
 ## Metadata
 
 **Search scope:** `src/{logic,db,stores,components,theme,services,screens}`, phase artifacts, dossier/planning notes and Orrery system doc. Five strong analog families were selected; neighboring files were opened for compatibility rather than expanding the analog hunt.
