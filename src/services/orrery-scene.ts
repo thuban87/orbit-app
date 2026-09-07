@@ -7,18 +7,17 @@ import {
 } from "@/db/orrery-system-read";
 import type { SqlExecutor } from "@/db/types";
 import type { OrreryIntent, WorldBody } from "@/logic/orrery-camera-logic";
-import {
-  deriveOrreryMetrics,
-  drawnRadius,
-  polarToXY,
-  progressToAngle,
-  ringRadius,
-} from "@/logic/orrery-geometry-logic";
+import { SUN_RADIUS } from "@/logic/orrery-geometry-logic";
 import {
   ALL_CONTACTS_SYSTEM,
   type OrrerySystemRef,
   systemRefId,
 } from "@/logic/orrery-system-logic";
+import {
+  deriveOrreryWorld,
+  gravityMassModifier,
+  orderOrreryMembers,
+} from "@/logic/orrery-world-logic";
 import type { SunOccupantLookup } from "@/logic/sun-occupant-logic";
 import type { GravityResult } from "@/services/gravity-logic";
 import { computeContactGravity } from "@/services/impact";
@@ -46,21 +45,7 @@ export interface OrrerySceneSnapshot {
   };
 }
 
-export const NEUTRAL_RESTING_ANGLE = 0;
-
-/** Modest visual-only mass; canonical Gravity policy remains in impact.ts. */
-export function gravityMassModifier(
-  gravity: GravityResult | undefined,
-): number {
-  return gravity
-    ? 0.9 +
-        0.2 *
-          Math.max(
-            0,
-            Math.min(1, gravity.tierIndex / Math.max(1, gravity.tierCount - 1)),
-          )
-    : 1;
-}
+export { NEUTRAL_RESTING_ANGLE } from "@/logic/orrery-world-logic";
 
 export async function loadOrreryScene(
   exec: SqlExecutor,
@@ -72,7 +57,7 @@ export async function loadOrreryScene(
     throw new MissingOrreryCategoryError(snapshot);
   const { settings, profile, header, occupant } = snapshot;
   const self = snapshot.resolvedSunIdentity === null;
-  const contacts = snapshot.orbiting;
+  const contacts = orderOrreryMembers(snapshot.orbiting);
   // A scene can queue behind photo-inclusive backup or app writes and its full
   // history read can delay Quick Log. Batching bounds statements, not latency.
   // Compute, layout and image work stay OUTSIDE the FIFO mutex. Cancellation
@@ -85,42 +70,23 @@ export async function loadOrreryScene(
       computeContactGravity(inputs, now),
     ]),
   );
-  // Fixed world spacing, independent of viewport. 29-04 expands density/Home.
-  // Give the reused drift resolver enough WORLD extent to avoid its legacy
-  // viewport clamp; no contact is compressed onto a phone's outer rim.
-  const extent = 160 + contacts.length * 34;
-  const metrics = deriveOrreryMetrics(
-    extent * 2 + 100,
-    extent * 2 + 100,
-    contacts.length,
+  const { bodies: world, extent } = deriveOrreryWorld(
+    contacts,
+    settings.orreryDensity,
+    gravity,
+    {
+      id: self ? 0 : (settings.sunContactId ?? 0),
+      kind: "sun",
+      x: 0,
+      y: 0,
+      radius:
+        SUN_RADIUS *
+        (self
+          ? 1
+          : gravityMassModifier(gravity.get(settings.sunContactId ?? 0))),
+      ringRadius: 0,
+    },
   );
-  const world: WorldBody[] = contacts.map((contact, rank) => ({
-    id: contact.id,
-    kind: "contact",
-    radius:
-      metrics.PLANET_RADIUS * gravityMassModifier(gravity.get(contact.id)),
-    ringRadius: ringRadius(rank, metrics),
-    ...polarToXY(
-      0,
-      0,
-      contact.progress === null || contact.status === null
-        ? ringRadius(rank, metrics)
-        : drawnRadius(contact.progress, rank, contact.status, metrics),
-      contact.progress === null
-        ? NEUTRAL_RESTING_ANGLE
-        : progressToAngle(contact.progress),
-    ),
-  }));
-  world.push({
-    id: self ? 0 : (settings.sunContactId ?? 0),
-    kind: "sun",
-    x: 0,
-    y: 0,
-    radius:
-      metrics.SUN_RADIUS *
-      (self ? 1 : gravityMassModifier(gravity.get(settings.sunContactId ?? 0))),
-    ringRadius: 0,
-  });
   return {
     preferences: {
       density: settings.orreryDensity,

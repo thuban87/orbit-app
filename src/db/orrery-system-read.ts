@@ -42,6 +42,7 @@ export interface OrrerySystemMember extends ContactIdentity {
   last_contact: string | null;
   rarely_responds: number;
   favourite_rank: number | null;
+  created_at?: string;
 }
 export interface OrreryMembersResult {
   status: "ready" | "missing-category";
@@ -63,7 +64,7 @@ export async function readOrrerySystemMembersCore(
   )
     return { status: "missing-category", system, members: [] };
   const members = await exec.getAllAsync<OrrerySystemMember>(
-    `SELECT c.id,c.uid,c.name,c.photo,c.ring_seq,c.rarely_responds,c.favourite_rank,c.last_contact,
+    `SELECT c.id,c.uid,c.name,c.photo,c.ring_seq,c.rarely_responds,c.favourite_rank,c.last_contact,c.created_at,
     CASE WHEN c.last_contact IS NULL THEN NULL ELSE (${PROGRESS_SQL}) END AS progress,
     CASE WHEN c.last_contact IS NULL THEN NULL ELSE (${STATUS_SQL}) END AS status
     FROM contacts c WHERE ${where.sql}
