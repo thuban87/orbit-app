@@ -92,6 +92,9 @@ describe("fresh narrow contact actions", () => {
       (await readOrreryContactTargetValidation(exec, category, target))
         .isMember,
     ).toBe(true);
+    await exec.runAsync("UPDATE contacts SET category_id=NULL WHERE id=?", [
+      target.id,
+    ]);
     await exec.runAsync("DELETE FROM categories WHERE uid='stable-category'");
     expect(
       (await readOrreryContactTargetValidation(exec, category, target)).status,
