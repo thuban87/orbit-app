@@ -8,7 +8,10 @@ import {
   StyleSheet,
   View,
 } from "react-native";
-import type { SharedValue } from "react-native-reanimated";
+import Animated, {
+  type SharedValue,
+  useAnimatedProps,
+} from "react-native-reanimated";
 import { Icon } from "@/components/icons/Icon";
 import { AppText } from "@/components/ui/AppText";
 import { GlassSurface } from "@/components/ui/GlassSurface";
@@ -20,6 +23,8 @@ import {
   controlsRegion,
   northOrientation,
 } from "./orrery-obstacle-logic";
+
+const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 export const ORRERY_CONTROLS_OBSTACLE = "orrery-camera-controls";
 export interface OrreryControlsProps {
@@ -41,6 +46,11 @@ export function OrreryControls({
   onRecenter,
   onResetNorth,
 }: OrreryControlsProps) {
+  const orientationProps = useAnimatedProps(() => ({
+    accessibilityValue: {
+      text: northOrientation(pose.value.yaw ?? 0, measured) ?? "",
+    },
+  }));
   const region = controlsRegion(viewport);
   const inputBlocked = blocked || (viewport.width > 0 && region === null);
   const state = cameraControlState(measured);
@@ -112,7 +122,7 @@ export function OrreryControls({
               Recenter
             </AppText>
           </Pressable>
-          <Pressable
+          <AnimatedPressable
             style={styles.control}
             accessibilityRole="button"
             accessibilityLabel="Reset north"
@@ -120,21 +130,14 @@ export function OrreryControls({
             accessibilityState={{
               disabled: inputBlocked || state.northDisabled,
             }}
-            onAccessibilityFocus={() => {
-              const orientation = northOrientation(
-                pose.value.yaw ?? 0,
-                measured,
-              );
-              if (orientation)
-                AccessibilityInfo.announceForAccessibility(orientation);
-            }}
+            animatedProps={orientationProps}
             onPress={onResetNorth}
           >
             <Icon name="north" size="md" />
             <AppText role="label" style={styles.label}>
               Reset north
             </AppText>
-          </Pressable>
+          </AnimatedPressable>
         </ScrollView>
       </GlassSurface>
     </View>

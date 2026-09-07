@@ -3,14 +3,18 @@ import { useEffect, useMemo } from "react";
 import { Gesture } from "react-native-gesture-handler";
 import {
   cancelAnimation,
+  ReduceMotion,
   runOnJS,
   runOnUI,
   type SharedValue,
+  useAnimatedReaction,
   useSharedValue,
+  withTiming,
 } from "react-native-reanimated";
 import {
   type CameraCell,
   type CameraPose,
+  type CameraViewport,
   type OrreryIntent,
   type ProjectedFrame,
   tapIntent,
@@ -27,6 +31,13 @@ import {
   TILT_DISTANCE,
 } from "@/logic/orrery-gesture-logic";
 
+import {
+  cameraExtent,
+  createCameraMotion,
+  type MotionRequest,
+  recoveryCurve,
+} from "@/logic/orrery-recovery-logic";
+
 interface GestureSamples {
   panX: number;
   panY: number;
@@ -34,6 +45,7 @@ interface GestureSamples {
   rotation: number;
   tiltY: number;
   tiltActive: boolean;
+  tiltOriginY?: number;
 }
 const initialSamples = (): GestureSamples => ({
   panX: 0,
@@ -51,19 +63,62 @@ export interface OrreryCameraInput {
 export function useOrreryCamera({
   pose,
   enabled,
+  extent,
+  viewport,
+  reduced,
 }: {
   pose: SharedValue<CameraPose>;
   enabled: boolean;
+  extent: number;
+  viewport: CameraViewport;
+  reduced: SharedValue<boolean>;
 }) {
   const input = useSharedValue(initialInput());
   const samples = useSharedValue(initialSamples());
   const live = useSharedValue(enabled);
-  const stop = useMemo(
-    () => () => {
-      "worklet";
-      cancelAnimation(pose);
+  const epoch = useSharedValue(0);
+  const active = useSharedValue<MotionRequest | null>(null);
+  const motion = useMemo(
+    () =>
+      createCameraMotion({
+        pose,
+        epoch,
+        active,
+        live,
+        reduced,
+        extent: cameraExtent(extent),
+        viewport,
+        cancel: () => {
+          "worklet";
+          cancelAnimation(pose);
+        },
+        animate: (plan, complete) => {
+          "worklet";
+          pose.value = plan.from;
+          pose.value = withTiming(
+            plan.animatedTarget,
+            {
+              duration: plan.duration,
+              easing: plan.reduced
+                ? (t: number) => {
+                    "worklet";
+                    return t;
+                  }
+                : recoveryCurve,
+              reduceMotion: ReduceMotion.Never,
+            },
+            (finished) => complete(finished === true),
+          );
+        },
+      }),
+    [pose, epoch, active, live, reduced, extent, viewport],
+  );
+  const stop = motion.stop;
+  useAnimatedReaction(
+    () => reduced.value,
+    (value, previous) => {
+      if (value && previous === false) motion.motionChanged();
     },
-    [pose],
   );
   useEffect(() => {
     runOnUI(() => {
@@ -84,10 +139,12 @@ export function useOrreryCamera({
     };
   }, [enabled, live, input, stop]);
   return useMemo(
-    () => ({ input, samples, live, stop }),
-    [input, samples, live, stop],
+    () => ({ input, samples, live, ...motion }),
+    [input, samples, live, motion],
   );
 }
+
+export type OrreryCameraController = ReturnType<typeof useOrreryCamera>;
 
 /** Export remains available to the real-SQL tracer. Plain cells are test-only defaults. */
 export function createOrreryGestures({
@@ -173,6 +230,7 @@ export function createOrreryGestures({
         panY: event.translationY,
       };
       if (input.value.owner !== "pan" || previous.owner === "multi") return;
+      stop();
       pose.value = cameraGestureStep(
         pose.value,
         {
@@ -216,6 +274,7 @@ export function createOrreryGestures({
         return;
       const previous = samples.value.scale;
       samples.value = { ...samples.value, scale: event.scale };
+      stop();
       pose.value = cameraGestureStep(
         pose.value,
         {
@@ -248,6 +307,7 @@ export function createOrreryGestures({
         return;
       const previous = samples.value.rotation;
       samples.value = { ...samples.value, rotation: event.rotation };
+      stop();
       pose.value = cameraGestureStep(
         pose.value,
         { kind: "yaw", delta: event.rotation - previous },
@@ -269,7 +329,34 @@ export function createOrreryGestures({
     .minPointers(2)
     .maxPointers(2)
     .averageTouches(true)
-    .activeOffsetY([-TILT_DISTANCE, TILT_DISTANCE])
+    .manualActivation(true)
+    .onTouchesDown((event) => {
+      "worklet";
+      samples.value = {
+        ...samples.value,
+        tiltOriginY:
+          event.allTouches.length === 2
+            ? (event.allTouches[0].y + event.allTouches[1].y) / 2
+            : undefined,
+      };
+    })
+    .onTouchesMove((event, manager) => {
+      "worklet";
+      if (!live.value || event.allTouches.length !== 2) return;
+      const centroid = (event.allTouches[0].y + event.allTouches[1].y) / 2;
+      const origin = samples.value.tiltOriginY;
+      if (origin === undefined)
+        samples.value = { ...samples.value, tiltOriginY: centroid };
+      else if (Math.abs(centroid - origin) >= TILT_DISTANCE) manager.activate();
+    })
+    .onTouchesUp(() => {
+      "worklet";
+      samples.value = {
+        ...samples.value,
+        tiltOriginY: undefined,
+        tiltActive: false,
+      };
+    })
     .onStart((event) => {
       "worklet";
       touch(2);
@@ -290,6 +377,7 @@ export function createOrreryGestures({
         return;
       const previous = samples.value.tiltY;
       samples.value = { ...samples.value, tiltY: event.translationY };
+      stop();
       pose.value = cameraGestureStep(
         pose.value,
         {

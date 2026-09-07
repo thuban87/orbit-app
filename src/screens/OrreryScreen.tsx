@@ -11,8 +11,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AppState, StyleSheet, View } from "react-native";
 import {
   cancelAnimation,
+  runOnUI,
   useSharedValue,
-  withTiming,
 } from "react-native-reanimated";
 import { OrreryContactsSheet } from "@/components/orrery/OrreryContactsSheet";
 import {
@@ -24,10 +24,8 @@ import { OrrerySystemSelector } from "@/components/orrery/OrrerySystemSelector";
 import { OrreryViewOptions } from "@/components/orrery/OrreryViewOptions";
 import { OrreryWorld } from "@/components/orrery/OrreryWorld";
 import { systemEmptyCopy } from "@/components/orrery/orrery-controls-logic";
-import {
-  canvasViewport,
-  resetNorthPose,
-} from "@/components/orrery/orrery-obstacle-logic";
+import { canvasViewport } from "@/components/orrery/orrery-obstacle-logic";
+import { useOrreryCamera } from "@/components/orrery/use-orrery-camera";
 import { ShellAppBar } from "@/components/ShellAppBar";
 import { AppText } from "@/components/ui/AppText";
 import { Button } from "@/components/ui/Button";
@@ -36,12 +34,12 @@ import {
   type CameraPose,
   type CameraRect,
   deriveHomePose,
-  FOCUS_MS,
   frameBodies,
   HOME_CAMERA,
   IDENTITY_ZOOM,
   usableCameraRect,
 } from "@/logic/orrery-camera-logic";
+import { cameraExtent, northTarget } from "@/logic/orrery-recovery-logic";
 import {
   ALL_CONTACTS_SYSTEM,
   parseSystemRef,
@@ -216,6 +214,16 @@ export function OrreryScreen() {
     }
   }, [presentation, reload]);
 
+  const scene = state.snapshot;
+  const measured = usableCameraRect(viewport) !== null;
+  const visible = measured && isFocused && appActive;
+  const camera = useOrreryCamera({
+    pose,
+    extent: cameraExtent(scene?.extent ?? 32),
+    viewport,
+    enabled: visible && !overlaysOpen,
+    reduced: reducedMotion,
+  });
   const focus = useCallback(
     (ids: number[]) => {
       const scene = useSystemStore.getState().current();
@@ -225,21 +233,15 @@ export function OrreryScreen() {
       setFocusedIds(ids);
       const framing = frameBodies(bodies, viewport, scene.extent, pose.value);
       if (!framing) return;
-      cancelAnimation(pose);
-      pose.value = withTiming(
-        {
-          ...framing.pose,
-          zoom:
-            ids.length === 1
-              ? Math.min(IDENTITY_ZOOM, framing.pose.zoom)
-              : framing.pose.zoom,
-        },
-        {
-          duration: reducedMotion.value ? 100 : FOCUS_MS,
-        },
-      );
+      runOnUI(camera.recover)({
+        ...framing.pose,
+        zoom:
+          ids.length === 1
+            ? Math.min(IDENTITY_ZOOM, framing.pose.zoom)
+            : framing.pose.zoom,
+      });
     },
-    [useSystemStore, pose, reducedMotion, viewport],
+    [useSystemStore, pose, camera.recover, viewport],
   );
   const onIntent = useMemo(
     () =>
@@ -259,7 +261,6 @@ export function OrreryScreen() {
       }),
     [useSystemStore, focus, navigation],
   );
-  const scene = state.snapshot;
   const lastHomeFrame = useRef("");
   useEffect(() => {
     if (!scene || state.status !== "ready") return;
@@ -276,23 +277,25 @@ export function OrreryScreen() {
     if (focusedBodies.length === 1)
       home.zoom = Math.min(IDENTITY_ZOOM, home.zoom);
     lastHomeFrame.current = key;
-    cancelAnimation(pose);
-    pose.value = home;
-  }, [scene, state.status, viewport, pose, focusedIds]);
-  const measured = usableCameraRect(viewport) !== null;
+    runOnUI(() => {
+      "worklet";
+      camera.stop();
+      pose.value = home;
+    })();
+  }, [scene, state.status, viewport, pose, focusedIds, camera.stop]);
   const recenter = () => {
     const home = deriveHomePose(state.snapshot?.world ?? [], viewport);
     if (!home) return;
-    cancelAnimation(pose);
-    pose.value = home;
     setFocusedIds([]);
+    runOnUI(camera.recover)(home);
   };
   const resetNorth = () => {
     if (!measured) return;
-    cancelAnimation(pose);
-    pose.value = resetNorthPose(pose.value);
+    runOnUI(() => {
+      "worklet";
+      camera.recover(northTarget(pose.value));
+    })();
   };
-  const visible = measured && isFocused && appActive;
   const empty = state.status === "ready" && scene?.contacts.length === 0;
   const qualifyingSun = !!scene?.systemSnapshot.members.some(
     (row) => row.id === scene.systemSnapshot.resolvedSunIdentity?.id,
@@ -321,6 +324,7 @@ export function OrreryScreen() {
         {visible && scene ? (
           <OrreryWorld
             scene={scene}
+            camera={camera}
             pose={pose}
             viewport={viewport}
             colors={colors}

@@ -49,8 +49,11 @@ function MeasuredTabBar(props: BottomTabBarProps) {
   const [keyboardOpen, setKeyboardOpen] = useState(false);
   const focused = props.state.routes[props.state.index];
   const options = props.descriptors[focused.key].options;
+  const tabStyle = StyleSheet.flatten(options.tabBarStyle);
   const hidden =
-    StyleSheet.flatten(options.tabBarStyle)?.display === "none" ||
+    (tabStyle != null &&
+      "display" in tabStyle &&
+      tabStyle.display === "none") ||
     (options.tabBarHideOnKeyboard === true && keyboardOpen);
   const measurement = useWindowObstacle("shell-tabs", !hidden, focused.key);
   useEffect(() => {

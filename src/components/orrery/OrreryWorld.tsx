@@ -33,6 +33,11 @@ import {
   type SemanticLevel,
   semanticLevel,
 } from "@/logic/orrery-label-logic";
+import {
+  cameraExtent,
+  hitPolaris,
+  northTarget,
+} from "@/logic/orrery-recovery-logic";
 import { orreryRingStyle } from "@/logic/orrery-ring-logic";
 import { resolveSunOccupant } from "@/logic/sun-occupant-logic";
 import type { OrrerySceneSnapshot } from "@/services/orrery-scene";
@@ -41,12 +46,16 @@ import { useReducedMotionShared } from "@/theme/use-reduced-motion";
 import { OrbitBody } from "./OrbitBody";
 import { OrreryCanvas } from "./OrreryCanvas";
 import { OrreryLabel, prepareOrreryText } from "./OrreryLabel";
+import { Polaris } from "./Polaris";
 import { ProjectedOrbitRing } from "./ProjectedOrbitRing";
 import { SunBody } from "./SunBody";
 
 export { createOrreryGestures } from "./use-orrery-camera";
 
-import { createOrreryGestures, useOrreryCamera } from "./use-orrery-camera";
+import {
+  createOrreryGestures,
+  type OrreryCameraController,
+} from "./use-orrery-camera";
 
 const WORLD_SETTLE_MS = 260;
 const LABEL_MAX_WIDTH = 200;
@@ -142,8 +151,10 @@ export function OrreryWorld({
   clusterIds = focusedIds.length > 1 ? focusedIds : [],
   focusedRelationById = {},
   interactive = true,
+  camera,
 }: {
   scene: OrrerySceneSnapshot;
+  camera: OrreryCameraController;
   pose: SharedValue<CameraPose>;
   viewport: CameraViewport;
   colors: ThemePalette;
@@ -218,17 +229,23 @@ export function OrreryWorld({
     })();
   }, [scene, transition, progress, reducedMotion]);
   useEffect(() => () => cancelAnimation(progress), [progress]);
-  const camera = useOrreryCamera({ pose, enabled: interactive });
   const gesture = useMemo(
     () =>
       createOrreryGestures({
         pose,
         frame,
         camera,
-        extent: scene.extent,
+        extent: cameraExtent(scene.extent),
         send: onIntent,
         enabled: interactive,
         stop: camera.stop,
+        coast: camera.coast,
+        onNorth: (x, y) => {
+          "worklet";
+          if (!hitPolaris(frame.value, scene.extent, x, y)) return false;
+          camera.recover(northTarget(pose.value));
+          return true;
+        },
       }),
     [pose, frame, camera, scene.extent, onIntent, interactive],
   );
@@ -382,6 +399,7 @@ export function OrreryWorld({
               />
             ))}
         </Group>
+        <Polaris frame={frame} extent={scene.extent} colors={colors} />
         {/* RNRecorder flushes sorting at every non-Group command. Keep this run contiguous. */}
         <Group>
           {resources.map((resource) => (

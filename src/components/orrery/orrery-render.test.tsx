@@ -8,6 +8,7 @@ import { loadOrreryScene } from "@/services/orrery-scene";
 import { THEME_PRESETS } from "@/theme/theme-presets";
 import { prepareOrreryText } from "./OrreryLabel";
 import { OrreryWorld } from "./OrreryWorld";
+import { useOrreryCamera } from "./use-orrery-camera";
 
 const native = vi.hoisted(() => ({
   paragraphs: [] as {
@@ -48,6 +49,7 @@ vi.mock("react-native-reanimated", () => ({
   runOnJS: (fn: unknown) => fn,
   runOnUI: (fn: unknown) => fn,
   withTiming: (v: unknown) => v,
+  ReduceMotion: { Never: "never" },
 }));
 vi.mock("react-native-gesture-handler", () => {
   const chain = new Proxy({}, { get: () => () => chain });
@@ -162,6 +164,13 @@ describe("production Orrery native tree and resource contracts", () => {
     const pose = { value: { ...HOME_CAMERA, tilt: 0.5 } };
     const tree = resolve(
       OrreryWorld({
+        camera: useOrreryCamera({
+          pose: { value: HOME_CAMERA } as never,
+          enabled: true,
+          extent: scene.extent,
+          viewport: { width: 400, height: 600 },
+          reduced: { value: false } as never,
+        }),
         scene,
         pose: pose as never,
         viewport: { width: 500, height: 700 },
@@ -171,7 +180,15 @@ describe("production Orrery native tree and resource contracts", () => {
         focusedIds: [],
       }),
     );
-    const [rings, bodies, labels] = tree[0].children;
+    const [rings, polaris, bodies, labels] = tree[0].children;
+    expect(polaris.children.map((child) => child.type)).toEqual([
+      "circle",
+      "path",
+      "circle",
+    ]);
+    expect(polaris.children[1].props.color).toBe(
+      THEME_PRESETS.galaxy.dark.textPrimary,
+    );
     expect(rings.children.every((child) => child.type === "path")).toBe(true);
     expect(bodies.children.map((child) => child.type)).toEqual([
       "skGroup",

@@ -26,6 +26,14 @@ vi.mock("react-native", () => ({
   },
   findNodeHandle: () => 7,
 }));
+vi.mock("react-native-reanimated", () => ({
+  default: { createAnimatedComponent: (component: unknown) => component },
+  useAnimatedProps: (fn: () => unknown) => ({
+    get value() {
+      return fn();
+    },
+  }),
+}));
 vi.mock("expo-blur", () => ({ BlurView: "BlurView" }));
 vi.mock("react-native-safe-area-context", () => ({
   SafeAreaView: "SafeAreaView",
@@ -124,15 +132,16 @@ describe("actual Orrery controls and detail sheet", () => {
     ui.onContacts.mock.calls[0][0]();
     expect(native.focus).toHaveBeenCalledWith(7);
   });
-  it("reports current yaw on accessible focus and exposes independent action callbacks", () => {
+  it("reports current yaw through live accessible value and exposes independent action callbacks", () => {
     const ui = controls();
     (ui.buttons[1].props.onPress as () => void)();
     (ui.buttons[2].props.onPress as () => void)();
     expect(ui.onRecenter).toHaveBeenCalledOnce();
     expect(ui.onResetNorth).toHaveBeenCalledOnce();
     ui.pose.value.yaw = Math.PI;
-    (ui.buttons[2].props.onAccessibilityFocus as () => void)();
-    expect(native.announce).toHaveBeenLastCalledWith("180 degrees from north");
+    expect(
+      (ui.buttons[2].props.animatedProps as { value: unknown }).value,
+    ).toEqual({ accessibilityValue: { text: "180 degrees from north" } });
     const hidden = controls(true, true);
     expect(hidden.nodes[0].props.pointerEvents).toBe("none");
     expect(hidden.nodes[0].props.importantForAccessibility).toBe(

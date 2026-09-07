@@ -122,6 +122,18 @@ describe("camera input ownership", () => {
     rotation.handlers.onUpdate({ numberOfPointers: 2, rotation: 0.5 });
     expect(pose.value.zoom).toBeCloseTo(1.5);
     expect(pose.value.yaw).toBeCloseTo(0.3);
+    const activate = vi.fn();
+    tilt.handlers.onTouchesDown({ allTouches: [{ y: 100 }, { y: 140 }] });
+    tilt.handlers.onTouchesMove(
+      { allTouches: [{ y: 110 }, { y: 150 }] },
+      { activate },
+    );
+    expect(activate).not.toHaveBeenCalled();
+    tilt.handlers.onTouchesMove(
+      { allTouches: [{ y: 128 }, { y: 168 }] },
+      { activate },
+    );
+    expect(activate).toHaveBeenCalledOnce();
     tilt.handlers.onStart({ translationY: 30 });
     tilt.handlers.onUpdate({ numberOfPointers: 2, translationY: 40 });
     expect(pose.value.tilt).toBeCloseTo(0.04);

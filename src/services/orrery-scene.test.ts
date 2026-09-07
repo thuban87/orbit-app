@@ -41,6 +41,7 @@ vi.mock("react-native-gesture-handler", () => {
       "minPointers",
       "averageTouches",
       "activeOffsetY",
+      "manualActivation",
     ])
       g[key] = () => g;
     for (const key of [
@@ -50,6 +51,8 @@ vi.mock("react-native-gesture-handler", () => {
       "onEnd",
       "onFinalize",
       "onTouchesDown",
+      "onTouchesMove",
+      "onTouchesUp",
     ])
       g[key] = (fn: (...args: unknown[]) => void) => {
         handlers[key] = fn;
