@@ -23,7 +23,13 @@ import { OrreryWorld } from "@/components/orrery/OrreryWorld";
 import { ShellAppBar } from "@/components/ShellAppBar";
 import { AppText } from "@/components/ui/AppText";
 import { Button } from "@/components/ui/Button";
-import { getExecutor } from "@/db/database";
+import {
+  getAppSettings,
+  ORRERY_DENSITIES,
+  type OrreryDensity,
+  updateAppSettings,
+} from "@/db/app-settings-dao";
+import { getExecutor, localDateTime } from "@/db/database";
 import {
   type CameraPose,
   constrainCamera,
@@ -55,6 +61,31 @@ export function OrreryScreen() {
     snapshot: null,
   });
   const [viewport, setViewport] = useState({ width: 0, height: 0 });
+  const [density, setDensity] = useState<OrreryDensity | null>(null);
+  const [preferenceBusy, setPreferenceBusy] = useState(false);
+  const [preferenceError, setPreferenceError] = useState(false);
+  useEffect(() => {
+    void getAppSettings(getExecutor())
+      .then((settings) => setDensity(settings.orreryDensity))
+      .catch(() => setPreferenceError(true));
+  }, []);
+  const saveDensity = async (next: OrreryDensity) => {
+    if (preferenceBusy || density === null || density === next) return;
+    setPreferenceBusy(true);
+    try {
+      await updateAppSettings(
+        getExecutor(),
+        { orreryDensity: next },
+        localDateTime(),
+      );
+      setDensity((await getAppSettings(getExecutor())).orreryDensity);
+      setPreferenceError(false);
+    } catch {
+      setPreferenceError(true);
+    } finally {
+      setPreferenceBusy(false);
+    }
+  };
   const [focusedIds, setFocusedIds] = useState<number[]>([]);
   const pose = useSharedValue<CameraPose>({ ...HOME_CAMERA });
   const reducedMotion = useReducedMotionShared();
@@ -146,6 +177,25 @@ export function OrreryScreen() {
       style={[styles.root, { backgroundColor: colors.background }]}
     >
       <ShellAppBar variant="root" title="Orrery" />
+      <View
+        accessibilityLabel="Density"
+        accessibilityState={{ busy: preferenceBusy || density === null }}
+      >
+        {ORRERY_DENSITIES.map((option) => (
+          <Button
+            key={option}
+            role="secondary"
+            label={`${option[0].toUpperCase()}${option.slice(1)}${density === option ? " — Selected" : ""}`}
+            disabled={preferenceBusy || density === null}
+            onPress={() => void saveDensity(option)}
+          />
+        ))}
+        {preferenceError ? (
+          <AppText>
+            Couldn't save your view options. Try that change again.
+          </AppText>
+        ) : null}
+      </View>
       <View
         testID="orrery-canvas-container"
         style={styles.canvasArea}

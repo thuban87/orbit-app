@@ -25,12 +25,12 @@ import { inWriteTransaction, type ReadOnlyExecutor } from "@/db/transaction";
 import type { SqlExecutor } from "@/db/types";
 import {
   DASHBOARD_SORT_MODES,
-  RIGHT_SWIPE_ACTIONS,
   type DashboardSortMode,
   type DashboardViewMode,
-  type RightSwipeAction,
   parseDashboardFilters,
   parseDashboardPopulations,
+  RIGHT_SWIPE_ACTIONS,
+  type RightSwipeAction,
 } from "@/logic/dashboard-query-logic";
 import {
   AI_PROVIDER_IDS,
@@ -45,12 +45,53 @@ import {
 } from "@/theme/theme-option-ids";
 import type { ThemeMode, ThemePackage } from "@/theme/theme-types";
 
+export const ORRERY_DENSITIES = ["spacious", "balanced", "compact"] as const;
+export type OrreryDensity = (typeof ORRERY_DENSITIES)[number];
+export const ORRERY_BUILTIN_SYSTEM_IDS = [
+  "builtin:all-contacts",
+  "builtin:favorites",
+  "builtin:needs-attention",
+  "builtin:not-contacted",
+  "builtin:snoozed",
+  "builtin:chargers",
+] as const;
+export type OrrerySystemId =
+  | (typeof ORRERY_BUILTIN_SYSTEM_IDS)[number]
+  | `category:${string}`;
+
+export function assertOrreryDensity(field: string, value: unknown): void {
+  if (
+    typeof value !== "string" ||
+    !(ORRERY_DENSITIES as readonly string[]).includes(value)
+  ) {
+    throw new Error(
+      `updateAppSettings: ${field} must be a known Orrery density`,
+    );
+  }
+}
+
+/** Stable category UID, never a local row id. Existence is resolved by the System read. */
+export function assertOrreryLastSystem(field: string, value: unknown): void {
+  if (
+    typeof value === "string" &&
+    ((ORRERY_BUILTIN_SYSTEM_IDS as readonly string[]).includes(value) ||
+      /^category:[^\s\p{Cc}]{1,256}$/u.test(value))
+  )
+    return;
+  throw new Error(
+    `updateAppSettings: ${field} must be a builtin System or bounded category UID`,
+  );
+}
+
 /**
  * The app-level notification settings, one row (id=1). Toggles are 0/1
  * integers; hours are 0-23 integers. This is the shape the scheduler reads and
  * the Settings UI edits.
  */
 export interface AppSettings {
+  orreryDensity: OrreryDensity;
+  orrerySatellitesEnabled: 0 | 1;
+  orreryLastSystem: OrrerySystemId;
   /** Master switch — 0 (off) until the user opts in at the value moment. */
   notificationsEnabled: 0 | 1;
   /** Decay (relationship-lapse) reminders, gated by the master switch. */
@@ -180,6 +221,10 @@ export interface AppSettings {
  * export/restore translate it to/from a contact UID at their wire boundary.
  */
 export interface PortableSettingsSnapshot {
+  // Phase 29 D-03: accepted on restore; emission remains Phase 36's boundary.
+  orreryDensity?: OrreryDensity;
+  orrerySatellitesEnabled?: 0 | 1;
+  orreryLastSystem?: OrrerySystemId;
   notificationsEnabled: 0 | 1;
   decayEnabled: 0 | 1;
   birthdayEnabled: 0 | 1;
@@ -258,6 +303,9 @@ export interface BackupBookkeepingPatch {
  * appears in a generic patch is silently dropped (never reaches SQL).
  */
 type WritableSettingsKey =
+  | "orreryDensity"
+  | "orrerySatellitesEnabled"
+  | "orreryLastSystem"
   | "notificationsEnabled"
   | "decayEnabled"
   | "birthdayEnabled"
@@ -294,6 +342,9 @@ type WritableSettingsKey =
 
 /** The persisted (snake_case) column shape of the id=1 row. */
 interface AppSettingsRow {
+  orrery_density: OrreryDensity;
+  orrery_satellites_enabled: 0 | 1;
+  orrery_last_system: OrrerySystemId;
   notifications_enabled: number;
   decay_enabled: number;
   birthday_enabled: number;
@@ -352,6 +403,7 @@ const HOUR_FIELDS: Array<keyof AppSettingsPatch> = [
 
 /** The 0/1 toggle fields, validated to exactly 0 or 1 on write. */
 const TOGGLE_FIELDS: Array<keyof AppSettingsPatch> = [
+  "orrerySatellitesEnabled",
   "notificationsEnabled",
   "decayEnabled",
   "birthdayEnabled",
@@ -373,6 +425,9 @@ const BACKUP_DAY_FIELDS: Array<keyof AppSettingsPatch> = [
  * generic patch cannot set an acknowledgement flag.
  */
 const COLUMN_OF: Record<WritableSettingsKey, string> = {
+  orreryDensity: "orrery_density",
+  orrerySatellitesEnabled: "orrery_satellites_enabled",
+  orreryLastSystem: "orrery_last_system",
   notificationsEnabled: "notifications_enabled",
   decayEnabled: "decay_enabled",
   birthdayEnabled: "birthday_enabled",
@@ -422,7 +477,9 @@ export function resolveEffectivePhoneRegion(
  * always exists, so a missing row signals a corrupted install rather than a
  * normal empty state.
  */
-export async function getAppSettings(exec: ReadOnlyExecutor): Promise<AppSettings> {
+export async function getAppSettings(
+  exec: ReadOnlyExecutor,
+): Promise<AppSettings> {
   const row = await exec.getFirstAsync<AppSettingsRow>(
     `SELECT notifications_enabled, decay_enabled, birthday_enabled,
             digest_enabled, interaction_assist_enabled, lockscreen_public, delivery_hour, quiet_start_hour,
@@ -433,6 +490,7 @@ export async function getAppSettings(exec: ReadOnlyExecutor): Promise<AppSetting
             galaxy_accent, standard_accent, galaxy_background, standard_background,
             dashboard_view_mode, dashboard_populations, dashboard_filters, dashboard_sort,
             dashboard_right_swipe_action,
+            orrery_density, orrery_satellites_enabled, orrery_last_system,
             ai_provider, ai_model, ai_custom_endpoint, ai_custom_model,
             ai_prompt_template, ai_ack_openai, ai_ack_anthropic,
             ai_ack_google, ai_ack_custom,
@@ -447,6 +505,9 @@ export async function getAppSettings(exec: ReadOnlyExecutor): Promise<AppSetting
     throw new Error("getAppSettings: app_settings id=1 row is missing");
   }
   return {
+    orreryDensity: row.orrery_density,
+    orrerySatellitesEnabled: row.orrery_satellites_enabled,
+    orreryLastSystem: row.orrery_last_system,
     notificationsEnabled: (row.notifications_enabled ? 1 : 0) as 0 | 1,
     decayEnabled: (row.decay_enabled ? 1 : 0) as 0 | 1,
     birthdayEnabled: (row.birthday_enabled ? 1 : 0) as 0 | 1,
@@ -483,7 +544,8 @@ export async function getAppSettings(exec: ReadOnlyExecutor): Promise<AppSetting
     dashboardPopulations: row.dashboard_populations,
     dashboardFilters: row.dashboard_filters,
     dashboardSort: row.dashboard_sort as DashboardSortMode,
-    dashboardRightSwipeAction: row.dashboard_right_swipe_action as RightSwipeAction,
+    dashboardRightSwipeAction:
+      row.dashboard_right_swipe_action as RightSwipeAction,
     // AI non-secret settings. The column default is `'none'`; the cast is a
     // read-shape convenience (validation on WRITE guarantees a known id).
     aiProvider: row.ai_provider as AiProviderId,
@@ -816,6 +878,10 @@ export function assertBackupDays(field: string, v: unknown): void {
 }
 
 function validateAppSettingsPatch(patch: AppSettingsPatch): void {
+  if (patch.orreryDensity !== undefined)
+    assertOrreryDensity("orreryDensity", patch.orreryDensity);
+  if (patch.orreryLastSystem !== undefined)
+    assertOrreryLastSystem("orreryLastSystem", patch.orreryLastSystem);
   for (const field of HOUR_FIELDS) {
     if (patch[field] !== undefined) {
       assertHour(field, patch[field]);
