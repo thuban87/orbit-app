@@ -1,3 +1,46 @@
+# Phase 29 Plan Check — focused warning revision
+
+## VERIFICATION PASSED
+
+**Review:** independent focused recheck, 2026-09-07.
+**Reviewed revision:** `e11bdca1946eb1f7107b3592240e8c3dca8e667b`.
+**Result:** both previous warnings resolved; **0 BLOCKERS, 0 WARNINGS**.
+**Scope:** PC-R1-01, PC-R1-02 and consequences for task order, ownership, verification and coverage. The comprehensive preceding review is preserved below; this recheck does not repeat its whole-phase audit or claim implementation/native acceptance.
+
+## Resolution evidence
+
+| Prior finding | Executable resolution | Assessment |
+|---|---|---|
+| WARNING PC-R1-01 — snapshot signature adaptations lacked wave-1 ownership | `29-01-PLAN.md:89` explains the same-plan type prerequisite; `29-01-00` names exactly the five DAO files in files/read_first/action and plan frontmatter. It changes only parameter types/imports for getAppSettings, getContactHeader, getContactStatus, getProfile and listOrbitingContacts. `29-01-01` passes callback ro directly and tests both self/contact-sun paths before expansion. `29-03-01` consumes these already-adapted contracts. | Resolved. No cast, outer-executor capture, nested transaction, SQL/population/return change or writer-capability narrowing is authorized. Existing SqlExecutor arguments structurally satisfy the selected read methods. |
+| WARNING PC-R1-02 — D-05 missing from implementing action | `29-03-PLAN.md:99` now starts “Per D-05”. The same action keeps explicit All/Not population widening, default contacted-only read, Bound/archive exclusions and null progress/status with fixed neutral placement. | Resolved. The citation is in executable task content and preserves the previously reviewed full decision scope. |
+
+Full current source verifies the five declarations at app-settings-dao.ts:425, contact-read.ts:67, contact-status-read.ts:54, profile-dao.ts:96 and orrery-read.ts:89. Their bodies use only getFirstAsync/getAllAsync. `transaction.ts:42` defines ReadOnlyExecutor as exactly that Pick of SqlExecutor; `inReadSnapshot` supplies it at the callback boundary. The complete types and transaction/mutex files confirm structural compatibility and the unchanged non-reentrant transaction ownership contract. The co-located settings writers (updateAppSettings/Core, setInteractionAssistEnabled, recordAutomaticBackupHealthCore, acknowledgeProvider) and profile photo writers still require the full executor and are explicitly excluded from the adaptation. Other readers retain their current signatures.
+
+The full current OrreryScreen supplies all five readers with getExecutor(), then consumes their existing return shapes; getProfile already returns the self photo as well as name, so snapshot composition needs no sixth signature adaptation for the screen's redundant getProfilePhoto read. The plan's self/contact-sun fixtures exercise the two loader branches. Full sun-occupant/status source and ADR-011 support preserving the current nullable read contracts while implementing D-05's explicit widening in the new System reader.
+
+## Ordering, ownership and validation consequences
+
+- The prerequisite is sequential inside wave 1: **29-01-00 → 29-01-01 → 29-01-02**. The rationale explicitly preserves the tracer as the first behavior-changing production slice, keeps the five-file task cap, and requires automated tracer success before expansion. It introduces no separate foundation phase or owner approval gate.
+- Both changed plans pass the installed `verify.plan-structure` check with zero errors/warnings. Their frontmatter file sets exactly equal their task-file unions: plan 01 has 13 distinct files across tasks of 5/5/4 files; plan 03 has 11 across 5/4/4. No prior task ID was removed; 29-01-00 is the only addition.
+- Independently parsed all 12 plan task maps: **30 unique tasks**, **30 matching validation commands**, **12 sequential waves** with the unchanged dependency chain. All tasks remain within the five-file cap. There is no same-wave plan pair or newly unordered shared-file owner.
+- Requirement frontmatter still covers **ORRC-01 through ORRC-16**; action references cover **D-01 through D-11**; all **37 EDGE IDs** remain. COVERAGE retains the nine UI rows/55 considerations and the original ownership, adding the five-reader prerequisite and reuse explicitly. D-11's excluded-sun satellite/context restriction and retained sun actions are unchanged.
+- The new task runs TypeScript followed by five existing DAO suites; all five exact test paths exist and match the repository's Vitest include pattern. `npm test` invokes `vitest run`. The tracer guards its new test path and typechecks the real loader; all 30 task commands match VALIDATION exactly. No new stub, missing Wave-0 prerequisite, watch-mode command or swallowed-error comparison is introduced. These commands remain pending execution.
+- Plan 01's calibrated estimate is **46,000 / 100,000 tokens (46%)**, within budget. Confidence is **low**, factor 1 with zero samples; the estimate is not a measured forecast. Its additional five files are restricted type changes, and the bounded prerequisite plus unchanged tracer sequencing addresses the broader file-count watchpoint already recorded by the prior review.
+
+## Grounding and limits
+
+Read HANDOFF and AGENTS; full revised plans 01/03, CONTEXT, COVERAGE, VALIDATION and prior report; full five DAO files, transaction/types/mutex, current OrreryScreen, sun-occupant/status logic and ADR-011; package/test configuration. Parsed all plan task/requirement/decision/edge maps for retention. Graph governance queries preceded source searches: all returned edges were **INFERRED**, including partial/superseded notices for ADR-052, ADR-033, ADR-035 and ADR-036; graph absence was not treated as absent governance. No project-local or configured plan-checker skills were present.
+
+This signature-only recheck makes no new global shared-table writer invariant claim and authorizes no runtime/data changes; the preceding comprehensive writer audit remains historical evidence below. No application test suite, device action, phase execution, graph/registry generation or application edit occurred. External cycle 2 remains the orchestrator's next gate; implementation and native evidence are still pending.
+
+```yaml
+issues: []
+```
+
+---
+
+## Previous comprehensive check and history (preserved verbatim)
+
 # Phase 29 Plan Check
 
 ## ISSUES FOUND
