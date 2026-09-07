@@ -8,13 +8,7 @@ import {
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useFonts } from "@shopify/react-native-skia";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import {
-  AppState,
-  type LayoutChangeEvent,
-  ScrollView,
-  StyleSheet,
-  View,
-} from "react-native";
+import { AppState, ScrollView, StyleSheet, View } from "react-native";
 import {
   cancelAnimation,
   useSharedValue,
@@ -24,17 +18,19 @@ import { OrrerySystemSelector } from "@/components/orrery/OrrerySystemSelector";
 import { OrreryViewOptions } from "@/components/orrery/OrreryViewOptions";
 import { OrreryWorld } from "@/components/orrery/OrreryWorld";
 import { systemEmptyCopy } from "@/components/orrery/orrery-controls-logic";
+import { canvasViewport } from "@/components/orrery/orrery-obstacle-logic";
 import { ShellAppBar } from "@/components/ShellAppBar";
 import { AppText } from "@/components/ui/AppText";
 import { Button } from "@/components/ui/Button";
 import { getExecutor } from "@/db/database";
 import {
   type CameraPose,
-  constrainCamera,
+  type CameraRect,
   deriveHomePose,
   FOCUS_MS,
+  frameBodies,
   HOME_CAMERA,
-  IDENTITY_ZOOM,
+  usableCameraRect,
 } from "@/logic/orrery-camera-logic";
 import {
   ALL_CONTACTS_SYSTEM,
@@ -43,12 +39,17 @@ import {
 } from "@/logic/orrery-system-logic";
 import { navigationRef } from "@/navigation/linking";
 import type { RootStackParamList } from "@/navigation/types";
+import { useWindowMeasurement } from "@/navigation/use-window-measurement";
 import {
   createOrreryIntentDispatcher,
   loadOrreryScene,
 } from "@/services/orrery-scene";
 import { useOrreryPreferencesStore } from "@/stores/orrery-preferences-store";
 import { createOrrerySystemStore } from "@/stores/orrery-system-store";
+import {
+  sameWindowRect,
+  useShellObstacleStore,
+} from "@/stores/shell-obstacle-store";
 import { useShellRefresh } from "@/stores/shell-refresh-store";
 import { useTheme } from "@/theme";
 import { SPACING } from "@/theme/tokens/spacing";
@@ -65,7 +66,22 @@ export function OrreryScreen() {
     ],
     "Space Grotesk": [require("../../assets/SpaceGrotesk-SemiBold.ttf")],
   });
-  const [viewport, setViewport] = useState({ width: 0, height: 0 });
+  const [canvasRect, setCanvasRect] = useState<CameraRect | null>(null);
+  const obstacles = useShellObstacleStore((store) => store.rects);
+  const measureCanvas = useCallback((rect: CameraRect | null) => {
+    setCanvasRect((previous) =>
+      sameWindowRect(previous, rect) ? previous : rect,
+    );
+  }, []);
+  const canvasMeasurement = useWindowMeasurement(
+    measureCanvas,
+    true,
+    obstacles["shell-tabs"],
+  );
+  const viewport = useMemo(
+    () => canvasViewport(canvasRect, Object.values(obstacles)),
+    [canvasRect, obstacles],
+  );
   const preferences = useOrreryPreferencesStore((store) => store.committed);
   const hydratePreferences = useOrreryPreferencesStore(
     (store) => store.hydrate,
@@ -163,15 +179,14 @@ export function OrreryScreen() {
       const bodies = scene.world.filter((body) => ids.includes(body.id));
       if (bodies.length === 0) return;
       setFocusedIds(ids);
-      const x = bodies.reduce((sum, body) => sum + body.x, 0) / bodies.length;
-      const y = bodies.reduce((sum, body) => sum + body.y, 0) / bodies.length;
+      const framing = frameBodies(bodies, viewport, scene.extent, pose.value);
+      if (!framing) return;
       cancelAnimation(pose);
-      pose.value = withTiming(
-        constrainCamera({ x, y, zoom: IDENTITY_ZOOM }, scene.extent),
-        { duration: reducedMotion.value ? 100 : FOCUS_MS },
-      );
+      pose.value = withTiming(framing.pose, {
+        duration: reducedMotion.value ? 100 : FOCUS_MS,
+      });
     },
-    [useSystemStore, pose, reducedMotion],
+    [useSystemStore, pose, reducedMotion, viewport],
   );
   const onIntent = useMemo(
     () =>
@@ -191,32 +206,25 @@ export function OrreryScreen() {
       }),
     [useSystemStore, focus, navigation],
   );
-  const onLayout = useCallback((event: LayoutChangeEvent) => {
-    const { width, height } = event.nativeEvent.layout;
-    setViewport((previous) =>
-      previous.width === width && previous.height === height
-        ? previous
-        : { width, height },
-    );
-  }, []);
   const scene = state.snapshot;
   const lastHomeFrame = useRef("");
   useEffect(() => {
     if (!scene || state.status !== "ready") return;
-    const key = `${systemRefId(scene.system)}:${scene.preferences.density}:${viewport.width}:${viewport.height}`;
+    const key = `${systemRefId(scene.system)}:${scene.preferences.density}:${JSON.stringify(viewport)}`;
     if (lastHomeFrame.current === key) return;
-    const home = deriveHomePose(scene.world, viewport);
+    const focusedBodies = scene.world.filter((body) =>
+      focusedIds.includes(body.id),
+    );
+    const home =
+      focusedBodies.length > 0
+        ? frameBodies(focusedBodies, viewport, scene.extent, pose.value)?.pose
+        : deriveHomePose(scene.world, viewport);
     if (!home) return; // Preserve the previous valid pose through zero measurement.
     lastHomeFrame.current = key;
     cancelAnimation(pose);
     pose.value = home;
-    setFocusedIds([]);
-  }, [scene, state.status, viewport, pose]);
-  const measured =
-    Number.isFinite(viewport.width) &&
-    Number.isFinite(viewport.height) &&
-    viewport.width > 0 &&
-    viewport.height > 0;
+  }, [scene, state.status, viewport, pose, focusedIds]);
+  const measured = usableCameraRect(viewport) !== null;
   const visible = measured && isFocused && appActive;
   const empty = state.status === "ready" && scene?.contacts.length === 0;
   const qualifyingSun = !!scene?.systemSnapshot.members.some(
@@ -238,8 +246,10 @@ export function OrreryScreen() {
       <ShellAppBar variant="root" title="Orrery" />
       <View
         testID="orrery-canvas-container"
+        ref={canvasMeasurement.ref}
+        collapsable={false}
         style={styles.canvasArea}
-        onLayout={onLayout}
+        onLayout={canvasMeasurement.onLayout}
       >
         {visible && scene ? (
           <OrreryWorld

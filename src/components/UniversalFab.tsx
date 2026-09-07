@@ -30,8 +30,9 @@ import { newUid } from "@/db/uid";
 import { isFocusedWorkflow } from "@/navigation/focused-route-classification";
 import { navigationRef } from "@/navigation/linking";
 import { FAB_EDGE_GAP, FAB_SIZE } from "@/navigation/use-bottom-clearance";
-import { notifyWidgetDataChanged } from "@/services/widget/widget-refresh";
+import { useWindowObstacle } from "@/navigation/use-window-measurement";
 import { runQuickLog } from "@/services/quick-log-command";
+import { notifyWidgetDataChanged } from "@/services/widget/widget-refresh";
 import { bumpShellRefresh } from "@/stores/shell-refresh-store";
 import { shellTransientStore } from "@/stores/shell-transient-store";
 import { showSnackbar } from "@/stores/snackbar-store";
@@ -117,7 +118,6 @@ function UniversalFabActionRow({
 export function UniversalFab() {
   const { colors } = useTheme();
   const tabBarHeight = useMeasuredTabBarHeight();
-  const fabRef = useRef<View>(null);
   const isOpenRef = useRef(false);
   const [open, setOpen] = useState(false);
   const [keyboardOpen, setKeyboardOpen] = useState(false);
@@ -191,31 +191,30 @@ export function UniversalFab() {
   }, []);
 
   const hidden = keyboardOpen || isFocusedWorkflow(currentRouteName);
+  const fabMeasurement = useWindowObstacle("shell-fab", !hidden, bottomOffset);
+  const fabRef = fabMeasurement.ref;
 
   useEffect(() => {
     if (hidden) closeDial();
   }, [closeDial, hidden]);
 
-  const logContact = useCallback(
-    (contactId: number) => {
-      runQuickLog(
-        {
-          pendingRef: quickLogPending,
-          undoController: quickLogUndoController.current,
-          recordTouchpoint: (input) => recordTouchpoint(getExecutor(), input),
-          localDateTime,
-          newUid,
-          showSnackbar,
-          notifySuccessHaptic: () =>
-            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success),
-          notifyWidgetDataChanged,
-          bumpShellRefresh,
-        },
-        contactId,
-      );
-    },
-    [],
-  );
+  const logContact = useCallback((contactId: number) => {
+    runQuickLog(
+      {
+        pendingRef: quickLogPending,
+        undoController: quickLogUndoController.current,
+        recordTouchpoint: (input) => recordTouchpoint(getExecutor(), input),
+        localDateTime,
+        newUid,
+        showSnackbar,
+        notifySuccessHaptic: () =>
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success),
+        notifyWidgetDataChanged,
+        bumpShellRefresh,
+      },
+      contactId,
+    );
+  }, []);
 
   const selectPickerContact = useCallback(
     (contactId: number) => {
@@ -316,6 +315,7 @@ export function UniversalFab() {
         </View>
         <Pressable
           ref={fabRef}
+          onLayout={fabMeasurement.onLayout}
           testID="dashboard-create-fab"
           accessibilityRole="button"
           accessibilityLabel="Add / capture"

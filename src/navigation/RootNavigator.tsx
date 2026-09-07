@@ -1,31 +1,32 @@
 import {
   BottomTabBar,
-  createBottomTabNavigator as createBottomTabs,
   type BottomTabBarProps,
   type BottomTabNavigationOptions,
   type BottomTabNavigationProp,
+  createBottomTabNavigator as createBottomTabs,
 } from "@react-navigation/bottom-tabs";
 import {
-  getFocusedRouteNameFromRoute,
-  StackActions,
   type EventArg,
+  getFocusedRouteNameFromRoute,
   type RouteProp,
+  StackActions,
 } from "@react-navigation/native";
-import { useEffect } from "react";
-import { BackHandler, View } from "react-native";
+import { useEffect, useState } from "react";
+import { BackHandler, Keyboard, StyleSheet, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Icon } from "@/components/icons/Icon";
 import { TAB_ICON } from "@/components/icons/icon-registry";
+import { BackupStack } from "@/navigation/tabs/BackupStack";
 import { DashboardStack } from "@/navigation/tabs/DashboardStack";
 import { OrreryStack } from "@/navigation/tabs/OrreryStack";
-import { BackupStack } from "@/navigation/tabs/BackupStack";
 import { SettingsStack } from "@/navigation/tabs/SettingsStack";
+import { shellTransientStore } from "@/stores/shell-transient-store";
+import { setTabBarHeight } from "@/stores/tab-bar-layout-store";
 import { useTheme } from "@/theme";
 import { resolveBackIntent } from "./back-intent";
 import { isFocusedWorkflow } from "./focused-route-classification";
-import { shellTransientStore } from "@/stores/shell-transient-store";
-import { setTabBarHeight } from "@/stores/tab-bar-layout-store";
 import type { TabParamList } from "./types";
+import { useWindowObstacle } from "./use-window-measurement";
 
 /**
  * The app's permanent four-tab shell. Each tab owns a native stack, preserving
@@ -45,9 +46,33 @@ type TabNavigation = BottomTabNavigationProp<TabParamList>;
 type TabRoute = RouteProp<TabParamList, keyof TabParamList>;
 
 function MeasuredTabBar(props: BottomTabBarProps) {
+  const [keyboardOpen, setKeyboardOpen] = useState(false);
+  const focused = props.state.routes[props.state.index];
+  const options = props.descriptors[focused.key].options;
+  const hidden =
+    StyleSheet.flatten(options.tabBarStyle)?.display === "none" ||
+    (options.tabBarHideOnKeyboard === true && keyboardOpen);
+  const measurement = useWindowObstacle("shell-tabs", !hidden, focused.key);
+  useEffect(() => {
+    const show = Keyboard.addListener("keyboardDidShow", () =>
+      setKeyboardOpen(true),
+    );
+    const hide = Keyboard.addListener("keyboardDidHide", () =>
+      setKeyboardOpen(false),
+    );
+    return () => {
+      show.remove();
+      hide.remove();
+    };
+  }, []);
   return (
     <View
-      onLayout={(event) => setTabBarHeight(event.nativeEvent.layout.height)}
+      ref={measurement.ref}
+      collapsable={false}
+      onLayout={(event) => {
+        setTabBarHeight(event.nativeEvent.layout.height);
+        measurement.onLayout(event);
+      }}
     >
       <BottomTabBar {...props} />
     </View>
