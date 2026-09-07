@@ -7,15 +7,25 @@
  * favourites reorder proves, cloned for the ring path.
  */
 import { describe, expect, it } from "vitest";
-import { computeRingReorder, mergeVisibleRingOrder } from "@/logic/ring-reorder-logic";
+import {
+  computeRingReorder,
+  mergeVisibleRingOrder,
+} from "@/logic/ring-reorder-logic";
 
 describe("filtered slots", () => {
   it("preserves every hidden slot", () => {
-    expect(mergeVisibleRingOrder([1,2,3,4,5], [2,4], [4,2])).toEqual([1,4,3,2,5]);
+    expect(mergeVisibleRingOrder([1, 2, 3, 4, 5], [2, 4], [4, 2])).toEqual([
+      1, 4, 3, 2, 5,
+    ]);
   });
-  it.each([[2,2], [2], [2,6]])("rejects invalid permutations %j", (...next) => {
-    expect(() => mergeVisibleRingOrder([1,2,3,4,5], [2,4], next)).toThrow();
-  });
+  it.each([[2, 2], [2], [2, 6]])(
+    "rejects invalid permutations %j",
+    (...next) => {
+      expect(() =>
+        mergeVisibleRingOrder([1, 2, 3, 4, 5], [2, 4], next),
+      ).toThrow();
+    },
+  );
 });
 
 describe("computeRingReorder — pure drag→order move", () => {

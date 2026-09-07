@@ -51,3 +51,24 @@ function clampIndex(index: number, length: number): number {
   }
   return index;
 }
+
+/** Only eligible slots may move; hidden IDs retain their complete-order slots. */
+export function mergeVisibleRingOrder(
+  full: readonly number[],
+  visible: readonly number[],
+  reordered: readonly number[],
+): number[] {
+  "worklet";
+  const selected = new Set(visible);
+  if (
+    new Set(full).size !== full.length ||
+    selected.size !== visible.length ||
+    new Set(reordered).size !== reordered.length ||
+    reordered.length !== visible.length ||
+    visible.some((id) => !full.includes(id)) ||
+    reordered.some((id) => !selected.has(id))
+  )
+    throw new Error("Invalid ring permutation");
+  let next = 0;
+  return full.map((id) => (selected.has(id) ? reordered[next++] : id));
+}

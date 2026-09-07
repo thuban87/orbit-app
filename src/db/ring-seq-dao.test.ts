@@ -17,7 +17,16 @@
  *     returns the intended dense/deterministic id order (a stale stored ring_seq
  *     on the formerly-hidden sun is harmless — rank is the read-time row index).
  */
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { openSqliteLocalDayFixture } from "@/db/__testkit__/sqlite-local-day";
+import { MIGRATIONS, TARGET_VERSION } from "@/db/database";
+import { withMutex } from "@/db/mutex";
+import { readOrrerySystemSnapshot } from "@/db/orrery-system-read";
+import { commitRingReorder, type RingReorderRequest } from "@/db/ring-seq-dao";
+import { parseSystemRef } from "@/logic/orrery-system-logic";
+
+vi.mock("expo-sqlite", () => ({}));
+
 import { nodeSqliteExecutor, openTestDb } from "@/db/__testkit__/node-sqlite";
 import { migration001 } from "@/db/migrations/001-initial";
 import { migration002 } from "@/db/migrations/002-app-settings";
@@ -40,10 +49,13 @@ const LATER = "2026-08-16 09:30:00";
 let uidCounter = 0;
 const uid = () => `uid-${++uidCounter}`;
 let exec: SqlExecutor;
+let baseDb: ReturnType<typeof openTestDb>;
+afterEach(() => baseDb.close());
 
 beforeEach(async () => {
   uidCounter = 0;
   const db = openTestDb();
+  baseDb = db;
   exec = nodeSqliteExecutor(db);
   await runMigrations(
     exec,
@@ -62,6 +74,263 @@ beforeEach(async () => {
     11,
     { now: NOW, newUid: uid, defaultPhoneRegion: "US" },
   );
+});
+
+describe("locked filtered reorder", () => {
+  let fixture: ReturnType<typeof openSqliteLocalDayFixture>;
+  let sql: SqlExecutor;
+  beforeEach(async () => {
+    fixture = openSqliteLocalDayFixture("2026-09-07");
+    sql = fixture.exec;
+    await runMigrations(sql, MIGRATIONS, TARGET_VERSION, {
+      now: NOW,
+      newUid: uid,
+      defaultPhoneRegion: "US",
+    });
+    for (let id = 1; id <= 5; id++)
+      await sql.runAsync(
+        `INSERT INTO contacts(id,uid,name,interval_days,last_contact,favourite_rank,ring_seq,created_at,modified_at)
+        VALUES (?,?,?,10,'2026-08-01',?,?,?,?)`,
+        [
+          id,
+          `person-${id}`,
+          `Person ${id}`,
+          id === 2 || id === 4 ? id : null,
+          id - 1,
+          NOW,
+          NOW,
+        ],
+      );
+  });
+  afterEach(() => fixture.close());
+  async function request(
+    token = "builtin:favorites",
+  ): Promise<RingReorderRequest> {
+    const snapshot = await readOrrerySystemSnapshot(
+      sql,
+      parseSystemRef(token)!,
+    );
+    return {
+      system: snapshot.system,
+      expectedFullOrderedIds: snapshot.completeContactedOrder,
+      expectedSavedSunContactId: snapshot.savedSunContactId,
+      expectedEligibleVisibleIds: snapshot.eligibleContactedVisibleIds,
+      expectedContactIdentities: snapshot.contactIdentities,
+      reorderedVisibleIds: [...snapshot.eligibleContactedVisibleIds].reverse(),
+    };
+  }
+  async function stored() {
+    return {
+      rows: await sql.getAllAsync("SELECT * FROM contacts ORDER BY id"),
+      settings: await sql.getAllAsync("SELECT * FROM app_settings"),
+    };
+  }
+  it("preserves hidden slots and bumps revision once, while unchanged release writes nothing", async () => {
+    const before = await stored();
+    const req = await request();
+    await commitRingReorder(
+      sql,
+      { ...req, reorderedVisibleIds: req.expectedEligibleVisibleIds },
+      LATER,
+    );
+    expect(await stored()).toEqual(before);
+    await commitRingReorder(sql, req, LATER);
+    expect((await listOrbitingContacts(sql)).map((row) => row.id)).toEqual([
+      1, 4, 3, 2, 5,
+    ]);
+    expect(
+      await sql.getFirstAsync("SELECT data_revision FROM app_settings"),
+    ).toEqual({ data_revision: 1 });
+    expect(
+      (
+        await sql.getAllAsync<{ last_contact: string }>(
+          "SELECT last_contact FROM contacts",
+        )
+      ).every((row) => row.last_contact === "2026-08-01"),
+    ).toBe(true);
+  });
+  it.each([
+    "UPDATE contacts SET favourite_rank=NULL WHERE id=2",
+    "UPDATE contacts SET favourite_rank=1 WHERE id=3",
+    "UPDATE contacts SET favourite_rank=CASE WHEN id=2 THEN NULL WHEN id=3 THEN 3 ELSE favourite_rank END",
+    "UPDATE contacts SET ring_seq=-1 WHERE id=3",
+    "UPDATE contacts SET archived_at='x' WHERE id=2",
+    "UPDATE contacts SET tracking_enabled=0 WHERE id=2",
+    "DELETE FROM contacts WHERE id=2",
+    "UPDATE app_settings SET sun_contact_id=1",
+  ])("rejects stale order/sun/population atomically: %s", async (mutation) => {
+    const req = await request();
+    await sql.runAsync(mutation);
+    const before = await stored();
+    await expect(commitRingReorder(sql, req, LATER)).rejects.toThrow();
+    expect(await stored()).toEqual(before);
+  });
+  it.each([[2, 2], [2], [2, 3]])(
+    "rejects duplicate/omitted/nonmember visible IDs %j",
+    async (...ids) => {
+      const req = await request();
+      const before = await stored();
+      await expect(
+        commitRingReorder(sql, { ...req, reorderedVisibleIds: ids }, LATER),
+      ).rejects.toThrow();
+      expect(await stored()).toEqual(before);
+    },
+  );
+  it("rejects numeric ID reuse with otherwise identical order/sun/membership", async () => {
+    const req = await request();
+    await sql.runAsync("DELETE FROM contacts WHERE id=5");
+    await sql.runAsync(
+      "INSERT INTO contacts(uid,name,interval_days,last_contact,ring_seq,created_at,modified_at) VALUES ('replacement','Replacement',10,'2026-08-01',4,?,?)",
+      [NOW, NOW],
+    );
+    expect((await request()).expectedFullOrderedIds).toEqual(
+      req.expectedFullOrderedIds,
+    );
+    const before = await stored();
+    await expect(commitRingReorder(sql, req, LATER)).rejects.toThrow(
+      /identities/,
+    );
+    expect(await stored()).toEqual(before);
+  });
+  it("fingerprints a neutral saved sun outside the complete contacted order", async () => {
+    await sql.runAsync("UPDATE contacts SET last_contact=NULL WHERE id=5");
+    await sql.runAsync("UPDATE app_settings SET sun_contact_id=5");
+    const req = await request();
+    await sql.runAsync("UPDATE contacts SET uid='other-sun' WHERE id=5");
+    await expect(commitRingReorder(sql, req, LATER)).rejects.toThrow(
+      /identities/,
+    );
+  });
+  it("accepts category rename but rejects changed category membership", async () => {
+    const category = await sql.getFirstAsync<{ id: number; uid: string }>(
+      "SELECT id,uid FROM categories LIMIT 1",
+    );
+    await sql.runAsync("UPDATE contacts SET category_id=? WHERE id IN (2,4)", [
+      category!.id,
+    ]);
+    const req = await request(`category:${category!.uid}`);
+    await sql.runAsync("UPDATE categories SET name='Renamed' WHERE id=?", [
+      category!.id,
+    ]);
+    await commitRingReorder(sql, req, LATER);
+    const stale = await request(`category:${category!.uid}`);
+    await sql.runAsync("UPDATE contacts SET category_id=NULL WHERE id=2");
+    const before = await stored();
+    await expect(commitRingReorder(sql, stale, LATER)).rejects.toThrow(
+      /membership/,
+    );
+    expect(await stored()).toEqual(before);
+  });
+  it.each([
+    [
+      "chargers",
+      "UPDATE contacts SET social_battery='Charger' WHERE id IN (2,4)",
+      "UPDATE contacts SET social_battery='Drain' WHERE id=2",
+    ],
+    [
+      "snoozed",
+      "UPDATE contacts SET snooze_until='2026-09-09' WHERE id IN (2,4)",
+      "UPDATE contacts SET snooze_until=NULL WHERE id=2",
+    ],
+    [
+      "needs-attention",
+      "UPDATE contacts SET last_contact='2026-09-01' WHERE id=3",
+      "UPDATE contacts SET interval_days=1 WHERE id=3",
+    ],
+    [
+      "needs-attention",
+      "UPDATE contacts SET last_contact='2026-09-01' WHERE id=3",
+      "UPDATE contacts SET last_contact='2026-08-01' WHERE id=3",
+    ],
+  ])("rechecks %s while queued", async (name, setup, mutation) => {
+    await sql.runAsync(setup);
+    const req = await request(`builtin:${name}`);
+    let release!: () => void;
+    const held = withMutex(
+      () =>
+        new Promise<void>((resolve) => {
+          release = resolve;
+        }),
+    );
+    await Promise.resolve();
+    const pending = commitRingReorder(sql, req, LATER);
+    await sql.runAsync(mutation);
+    const before = await stored();
+    release();
+    await held;
+    await expect(pending).rejects.toThrow(/membership/);
+    expect(await stored()).toEqual(before);
+  });
+  it.each(["snoozed", "needs-attention"])(
+    "rechecks %s at midnight without a write or revised request",
+    async (name) => {
+      await sql.runAsync(
+        "UPDATE contacts SET snooze_until='2026-09-08' WHERE id=2",
+      );
+      if (name === "needs-attention")
+        await sql.runAsync(
+          "UPDATE contacts SET last_contact='2026-08-31' WHERE id=3",
+        );
+      const req = await request(`builtin:${name}`);
+      const before = await stored();
+      let release!: () => void;
+      const held = withMutex(
+        () =>
+          new Promise<void>((resolve) => {
+            release = resolve;
+          }),
+      );
+      await Promise.resolve();
+      const queried: string[] = [];
+      const observed: SqlExecutor = {
+        ...sql,
+        getAllAsync: async (query, params) => {
+          if (query.includes("FROM contacts c WHERE"))
+            queried.push(
+              (await sql.getFirstAsync<{ day: string }>(
+                "SELECT date('now','localtime') AS day",
+              ))!.day,
+            );
+          return sql.getAllAsync(query, params);
+        },
+      };
+      const pending = commitRingReorder(observed, req, LATER);
+      expect(queried).toEqual([]);
+      fixture.setLocalDay("2026-09-08");
+      release();
+      await held;
+      await expect(pending).rejects.toThrow(/membership/);
+      expect(queried).toEqual(["2026-09-08"]);
+      expect(await stored()).toEqual(before);
+    },
+  );
+  it("delegates stored dates/modifiers/NULL natively and changes only exact current local day", async () => {
+    const native = openTestDb();
+    try {
+      for (const args of [
+        ["2026-08-31"],
+        ["2026-08-31", "+1 day"],
+        [null],
+        ["now"],
+        ["now", "localtime", "+1 day"],
+      ]) {
+        const query = `SELECT date(${args.map(() => "?").join(",")}) AS day`;
+        expect(await sql.getFirstAsync(query, args)).toEqual(
+          native.prepare(query).get(...args),
+        );
+      }
+      expect(
+        await sql.getFirstAsync("SELECT date('now','localtime') AS day"),
+      ).toEqual({ day: "2026-09-07" });
+      expect(() => fixture.setLocalDay("2026-02-30")).toThrow();
+      fixture.setLocalDay("2026-09-08");
+      expect(
+        await sql.getFirstAsync("SELECT date('now','localtime') AS day"),
+      ).toEqual({ day: "2026-09-08" });
+    } finally {
+      native.close();
+    }
+  });
 });
 
 interface SeedOpts {
