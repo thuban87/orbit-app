@@ -189,9 +189,13 @@ Moons inherit their parent's display eligibility, not independent membership or 
 
 ### 7. Guard-preserving reorder and the owner boundary
 
+**Resolved cross-plan contract (revision 1):** Plan29-03 owns `readOrrerySystemMembersCore(ReadOnlyExecutor, OrrerySystemRef)` with no mutex or transaction opening. Its snapshot wrapper returns complete contacted order, global sun, eligible contacted visible IDs and ID/UID fingerprints coherently. Plan29-09's `RingReorderRequest` carries that System identity and expected snapshot plus reordered visible IDs. Under the single write lock, the writer compares current complete order/saved sun/ID-UID identities, re-runs this exact System core at the current SQLite local day, and compares eligible contacted visible IDs before computing the hidden-slot-preserving merge. Favorites/category/Charger/snooze/cadence/recency changes can invalidate a filtered selection without changing the full order or sun. Local midnight changes Snoozed/Needs Attention membership without any dataRevision, so revision/generation checks alone are insufficient. Existing uniqueness/count/scoped-update guards remain. Numeric row IDs are not durable identity fingerprints: migration011 uses INTEGER PRIMARY KEY with separate UID uniqueness, so tests must reject reused IDs with different UIDs. These are planned guards, not claims that current code already supplies them. [VERIFIED baseline: src/db/favourites-dao.ts; src/db/snooze-dao.ts; src/db/bulk-actions-dao.ts; src/db/contacts-dao.ts; src/db/recency-dao.ts; src/db/status.ts; src/logic/dashboard-query-logic.ts; src/db/migrations/011-contact-lifecycle-schema.ts]
+
+**Resolved global-sun action contract:** Plan29-08 uses an explicit member/contact-sun target discriminant with ID/UID. A member requires live System membership; a contact-sun requires the current globally resolved occupant and live identity, independently of Favorites/category inclusion. Both revalidate from a fresh coherent read and current generation before focus/Profile dispatch. Ambiguous candidates preserve System member order and append a nonmember sun deterministically, deduplicating contact identity. Companion membership remains exact; no nonqualifying sun is added. Tests cover excluded-sun focus/Profile/ambiguity and changed occupant/identity rejection. This preserves the current screen's independent sun navigation and existing shared occupant policy. [VERIFIED: src/screens/OrreryScreen.tsx:430-448; src/logic/sun-occupant-logic.ts]
+
 The current writer `rewriteRingSeq` checks uniqueness, complete eligible count and a scoped one-row update for every ID inside one write transaction, then bumps revision. Its predicates require contacted, Bound, nonarchived contacts and exclude the caller-supplied sun. The empty case and duplicate/null stored ranks are already supported by read-time dense rank. Do not remove any guard to make a filtered System drag pass. [VERIFIED: src/db/ring-seq-dao.ts:60-113; src/db/orrery-read.ts:89-103]
 
-**Recommended permitted implementation:** Read the complete contacted order and the visible contacted subset. Reorder the visible subset, then replace only those subset slots in the complete order, preserving hidden members' relative positions. Pass the complete permutation through the guarded writer. Add a transaction-composable core if needed to validate an expected full membership/order snapshot and the **current** sun under the same lock before writing; do not nest mutex acquisition. Existing count-plus-scoped-updates rejects changed membership, but does not by itself reject an intervening reorder or changed saved sun when the caller passes stale exclusion. [VERIFIED: src/db/ring-seq-dao.ts:60-113; src/db/transaction.ts:11-28; recommendation derived from these guards]
+**Selected implementation:** Capture the complete contacted order, expected visible contacted membership, System identity, saved sun and ID/UID fingerprints from one snapshot. Pass those expectations plus the new visible permutation to the guarded writer. Inside its lock, validate the complete order/sun/identities and re-run the shared System membership core at the current local day before computing the complete permutation. Replace only visible slots and retain every existing guard; no nested mutex. Existing count-plus-scoped-updates detects changes to the complete eligible population but does not detect all filtered membership changes, intervening order/sun changes or numeric-ID reuse. [VERIFIED: src/db/ring-seq-dao.ts:60-113; src/db/transaction.ts:11-28; recommendation derived from these guards]
 
 **Owner boundary, not implied authorization:** Widening All Contacts/Not Contacted **display** is approved. The current writer explicitly excludes never-contacted and Unbound people. ADR-046 requires guarded rendered-scope ordering; it does not itself explicitly declare a contacted-only population. Plan the current contacted-only guard-preserving path. If persisted neutral-body rank editing is desired, obtain an explicit decision before extending that current code eligibility; this optional extension does not block the rest of planning. Unbound inclusion would additionally cross ADR-062's active-Orrery lifecycle boundary. Do not silently disable all filtered reorder or silently widen persistence. [VERIFIED: docs/decisions/ADR-046-query-time-orrery-placement-and-transactional-ring-ordering.md; docs/decisions/ADR-062-bound-unbound-lifecycle-and-one-way-cadence-assignment.md; 29-CONTEXT.md:24; src/db/ring-seq-dao.ts:80-101]
 
@@ -293,7 +297,7 @@ function mergeVisibleOrder<T>(full: readonly T[], visibleOrder: readonly T[]): T
 // The DAO still validates the complete contacted/sun-excluded population.
 ```
 
-This pure merge is not sufficient for concurrency; compare expected membership/order/current sun inside the write transaction before applying it. [VERIFIED: src/db/ring-seq-dao.ts:60-113; src/db/transaction.ts:11-28]
+This pure merge is not sufficient for concurrency; compare expected complete order/current sun/ID-UID fingerprints and re-resolved eligible System membership at the current local day inside the write transaction before applying it. [VERIFIED: src/db/ring-seq-dao.ts:60-113; src/db/transaction.ts:11-28]
 
 ## Recommended Plan Slices and New Seams
 
@@ -356,7 +360,7 @@ Quick commands are proposed test filters; new tests below do not yet exist. They
 | ORRC-07 | Focus, identity-level Profile, ambiguous cluster | Unit `npm test -- orrery-hit orrery-session`; native manual | New intermediate-frame hit-set and cluster state tests |
 | ORRC-08 | Session Profile return; fresh Home; no camera persistence | Unit `npm test -- orrery-session`; navigation manual | New departure-reason/profile-return/background scenarios |
 | ORRC-09 | Polaris yaw-only, all-axis Recenter, restrained inertia | Unit `npm test -- orrery-camera`; native manual | New partial reset/all-axis recovery/interruption tests |
-| ORRC-10 | Prolonged stationary hold, pan before arm, safe rank commit | SQL/unit `npm test -- ring-seq orrery-gesture` | Existing ring DAO tests; new filtered complete merge, stale order/sun and cancel cases |
+| ORRC-10 | Prolonged stationary hold, pan before arm, safe rank commit | SQL/unit `npm test -- ring-seq orrery-gesture` | Existing ring DAO tests; new filtered complete merge, stale order/sun/eligible membership/ID-UID and clock-only invalidation/cancel cases |
 | ORRC-11 | Built-ins/category Systems, live independent membership | SQL/unit `npm test -- orrery-system orrery-session` | New membership matrix and switch/refresh generation tests |
 | ORRC-12 | Explicit neutral never-contacted widening only | SQL `npm test -- orrery-read orrery-system` | Existing default read tests; new All/Not null health/progress and exclusion matrix |
 | ORRC-13 | Compact controls; durable defaults; no sort controls | Unit `npm test -- orrery-preferences`; UI/manual | New read/write failure, no-op and last-System tests |
@@ -404,7 +408,7 @@ This is a local mobile feature, not a web-authentication feature. OWASP's curren
 | Threat pattern | Category | Mitigation |
 |---|---|---|
 | Dynamic System/category data interpolated into SQL | Tampering | Closed resolver dispatch and parameter binding |
-| Stale filtered drag overwrites unrelated rank changes | Tampering | Expected snapshot/sun check and complete transaction rollback |
+| Stale filtered drag overwrites unrelated rank changes | Tampering | Expected complete order/sun/ID-UID and eligible System membership check at current local day under the same write lock; complete transaction rollback |
 | Corrupt preference payload creates invalid camera/layout state | Denial of service | Validate at DAO/parser boundary; finite bounded math; recoverable UI |
 | Deleted/linked relationship remains an actionable moon | Information disclosure / integrity | Live eligibility read, snapshot generation invalidation and no fabricated contact action |
 
@@ -425,13 +429,13 @@ These are phase-local controls; no authentication, telemetry, remote service or 
 
 ## Assumptions Log
 
-No training-only claim is used as a locked requirement. Proposed mathematics, file names, controller decomposition and tuning strategy are explicitly recommendations within delegated implementation scope. Native rendering/gesture usability and performance are **unverified**, not assumed passing. The sole potential product decision is extending reorder to newly displayed never-contacted/Unbound people; the report recommends preserving current eligibility until explicitly decided.
+No training-only claim is used as a locked requirement. Proposed mathematics, file names, controller decomposition and tuning strategy are explicitly recommendations within delegated implementation scope. Native rendering/gesture usability and performance are **unverified**, not assumed passing. The optional neutral-rank extension was not selected for this plan set; current contacted-only eligibility is preserved. No unresolved owner decision blocks planning.
 
-## Open Questions
+## Open Questions (RESOLVED)
 
-1. **Do neutral never-contacted bodies need persisted rank reordering in this phase?** Display inclusion is approved, write eligibility is currently contacted-only. The guard-preserving contacted implementation can be planned now. If neutral-body rank editing is required, ask the owner to authorize the extension before implementing it; Unbound inclusion is a separate, broader decision and is not in scope.
-2. **Device calibration:** Hold duration/slop, exact multi-touch tilt mapping, perspective strength, minimum readable size, tiny inertia and focus/recenter durations should be calibrated during implementation within the approved UI contract. These are delegated choices, not research blockers.
-3. **Actual migration head at execution:** Recheck the current registration list and directory; the verified head here is 20. This is an execution prerequisite, not an owner question.
+1. **Neutral rank extension — not selected.** Plans preserve current code's contacted-only rank eligibility and ADR-046's guarded rendered-scope ordering. Approved neutral display remains complete; no neutral/Unbound persistence extension is planned and no owner answer is pending.
+2. **Device calibration — delegated to implementation and release hardening:** Hold duration/slop, exact multi-touch tilt mapping, perspective strength, minimum readable size, tiny inertia and focus/recenter durations should be calibrated during implementation within the approved UI contract. These are delegated choices, not research blockers. Native tuning and measurement remain pending; planning does not claim them completed.
+3. **Actual migration head — resolved as an execution precondition:** Recheck the current registration list and directory; the verified head here is 20. This is an execution prerequisite, not an owner question.
 
 ## Environment Availability
 

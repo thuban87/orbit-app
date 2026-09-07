@@ -4,16 +4,16 @@ milestone: v2.0
 milestone_name: Release Readiness
 current_phase: 29
 current_phase_name: Orrery Camera, Scale & Exploration
-status: planning
-stopped_at: Phase 28 complete, ready to plan Phase 29
-last_updated: "2026-09-06T18:16:17.158Z"
-last_activity: 2026-09-06
-last_activity_desc: Phase 28 complete, transitioned to Phase 29
-state_head: 3432acbfec70469d44f407a2bc19b3b09a661095
+status: ready_to_execute
+stopped_at: Phase 29 plans verified; ready to execute
+last_updated: "2026-09-07T05:08:42.843Z"
+last_activity: 2026-09-07
+last_activity_desc: Phase 29 researched and planned; 12 plans verified
+state_head: 97bd561b2aa24c4e29c446ead7934627d581fa1d
 progress:
   total_phases: 20
   completed_phases: 5
-  total_plans: 59
+  total_plans: 72
   completed_plans: 58
 carried_forward:
 
@@ -29,19 +29,19 @@ carried_forward:
 See: .planning/PROJECT.md (updated 2026-09-01 after v1.0 milestone)
 
 **Core value:** Collapse the taps between "you're overdue with X" and the message actually being sent.
-**Current focus:** Phase 28 — Dashboard Card View
+**Current focus:** Phase 29 — Orrery Camera, Scale & Exploration
 
 ## Current Position
 
-Phase: 29 — Orrery Camera, Scale & Exploration
-Plan: Not started
-Status: Ready to plan
+Phase: 29 (Orrery Camera, Scale & Exploration) — READY TO EXECUTE
+Plan: 0/12 complete — 12 plans verified across 12 sequential waves
+Status: Ready to execute
 Carried forward (owner's bucket, NOT resolved here): D-11 default Memory-type display name — reconcile before Phase 34.
 Surface to owner (24.2-07, KNOW-15): milestone plan said Phase 36 owns the backup format-4 bump, but 24.1 already bumped to 4 (d677e2c); Plan 07 emits into the live format 4 with NO bump — that milestone instruction is stale.
 Deferred to Phase 31 (recorded in Plan 05): durable contact-scoped-def ownership + owner-purge semantics. Deferred to Phase 36 (ROADMAP breadcrumb): legacy AI-fuel confirm-path code removal.
-Last activity: 2026-09-06 — Phase 28 complete, transitioned to Phase 29
+Last activity: 2026-09-07 — Phase 29 research and independent plan verification complete
 Progress: 8/19 phases complete (v2.0) — 22, 23, 24.1, 24.2, 25, 26, 27, 28
-Next: `/gsd-plan-phase 29`.
+Next: `/gsd-execute-phase 29`.
 
 **Milestone v2.0 structure (pre-decided by the owner from the fifteen milestone-2 dossiers + the
 2026-09-01 cross-dossier audit; not re-derived):** 22 App Shell · 23 Theme · 24 Contact Knowledge ·
@@ -582,11 +582,11 @@ _Also disposed at this close: 05/deferred-items.md (check:colors doc-comment) ma
 
 ## Session
 
-**Last session:** 2026-09-06T11:23:26.670Z
-**Stopped at:** Phase 28 complete, ready to plan Phase 29
+**Last session:** 2026-09-07T05:08:42.843Z
+**Stopped at:** Phase 29 plans verified; ready to execute
 _Prior stop (v1.0):_ Phase 21 UI-SPEC approved; milestone v1.0 closed 2026-09-01.
 _Prior stop (13-04):_ the orrery VISUAL VOCABULARY (theme tokens + two pure resolver modules, node-tested, 29 cases green): (1) five owner-tunable `ThemePalette` tokens seeded in `space-dark.dark` ONLY — `starPalette` (6 colours, gold `#F2C14E` at index 0, then amber/rose-red/violet/cyan/ice-white), `mutedStable/Wobble/Decay` (desaturated same-hue morph endpoints), `rogueExtinguished` (cold blue-grey `#3E4A6B` rogue BODY fill) — with an M6/C2-5 conformance test that IMPORTS the real `SELF_SUN_COLOUR_RE`/`assertSelfSunColour` from app-settings-dao and locks every starPalette entry to the ACTUAL DAO write-path rule (no re-inlined regex). (2) `orrery-ring-logic.ts` `orreryRingStyle(status, colors)` — REUSES `ringVisual` for `{color,opacity,width}` (status→colour mapped once), adds the `strokeStyle` axis (solid→dashed→faded→faintTrace) + `bodyFill` (rogue ring=`colors.rogue`, body=`rogueExtinguished`); `null`→canonical NEUTRAL (`colors.border`), never throws — the single fallback sun-occupant reuses (C2-2). (3) `sun-occupant-logic.ts` `resolveSunOccupant(input)` — NULL/archived/missing→self (A7, glow `selfSunColour ?? starPalette[0]`), live contact→its status glow via `orreryRingStyle(status, colors).color`, never-contacted (status `null`)→the reused neutral border (C2-2); accepts `status: ProfileStatus | null`. 5 commits (1801915 feat tokens+M6; d35d528 RED→4cbfad5 GREEN ring-logic; c923b16 RED→10780dd GREEN sun-occupant); tsc + check:colors clean; no deviations (one in-flight fix: a placeholder hex in the logic test was re-sourced from the palette after check:colors flagged it — C2-3). Committed locally on main (NOT pushed). Next: Wave 2 (13-05 render / 13-06 Settings sun-picker), Wave 3 (13-07 drag-release), Wave 4 (13-08 device UAT, autonomous:false).
-**Resume file:** None
+**Resume file:** .planning/phases/29-orrery-camera-scale-exploration/29-01-PLAN.md
 are archived under `.planning/milestones/v1.0-phases/`.)
 
 ## Phase 4 — Closeout (2026-08-15) ✅ COMPLETE
@@ -611,11 +611,7 @@ was built via the desktop pipeline and driven through create→edit→archive→
 
 ## Operator Next Steps
 
-- Phase 22 plans converged (6 plans, 5 waves; 5-cycle cross-AI review, 0 HIGH). Review the plans if desired:
-  `cat .planning/phases/22-app-shell-navigation/22-0{1..6}-PLAN.md`.
-
-- Execute the phase: `/gsd-execute-phase 22` (Wave 1 is the four-tab-shell tracer, verified before chrome).
-- Optional before executing: `/gsd-validate-phase 22` to finalize the Nyquist VALIDATION.md sign-off
-  (non-blocking), and `/gsd-review --phase 22 --all` for cross-AI plan review.
-
+- Phase 29 is researched and planned: 12 plans, 28 tasks, 12 sequential waves. Independent plan verification passed; see `.planning/phases/29-orrery-camera-scale-exploration/29-PLAN-CHECK.md` and `COVERAGE.md`.
+- Execute the phase: `/gsd-execute-phase 29`. Start with the canonical-world tracer in Plan 01; each later wave depends on the prior wave.
+- Implementation tests and native/device verification remain pending execution. Follow `29-VALIDATION.md` and Plan 12 for the required evidence.
 - Commits stay local — agents never push; push when you're ready.

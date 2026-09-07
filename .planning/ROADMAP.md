@@ -480,8 +480,58 @@ All v1.0 commits are local on `main` and have NOT been pushed.
   5. User can switch among built-in Systems from a compact dropdown with continuity animation (All Contacts default; All Contacts and Not Contacted including never-contacted contacts at a fixed neutral resting angle with no fabricated progress), toggle Relationship Satellites (default Off) rendering unlinked person-like relationships as status-free moons that disappear once linked, and open an accessible "Contacts in this System" list with focus and open-Profile actions — with Reduced Motion stopping drift, twinkle, and inertia while manual camera control remains (ORRC-11/12/13/14/15/16)
 
 **Canonical refs**: docs/dossier/milestone-2/phase-08-orrery-camera-scale-exploration-dossier.md; docs/dossier/milestone-2/planning-notes/phase-08-planning-notes.md
-**Schema**: orrery preferences (may fold with Phase 30's migration; verify head+1 at plan time)
-**Plans**: TBD
+**Schema**: separate Phase 29 app_settings preference migration (current head20, planned21; recheck head+1 at execution); optional portable keys, current export/version changes remain Phase36
+**Plans**: 12 plans
+
+Plans:
+**Wave 1**
+
+- [ ] 29-01-PLAN.md — Canonical world and real data-to-interaction tracer
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [ ] 29-02-PLAN.md — Durable density, satellite and last-System preferences
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
+- [ ] 29-03-PLAN.md — Coherent built-in and Category System selection
+
+**Wave 4** *(blocked on Wave 3 completion)*
+
+- [ ] 29-04-PLAN.md — Growing world, density and bounded readable Home
+
+**Wave 5** *(blocked on Wave 4 completion)*
+
+- [ ] 29-05-PLAN.md — Shared projected frame, billboard depth and semantic labels
+
+**Wave 6** *(blocked on Wave 5 completion)*
+
+- [ ] 29-06-PLAN.md — Measured shell obstacles and reachable controls
+
+**Wave 7** *(blocked on Wave 6 completion)*
+
+- [ ] 29-07-PLAN.md — Camera gestures, Polaris and bounded Recenter
+
+**Wave 8** *(blocked on Wave 7 completion)*
+
+- [ ] 29-08-PLAN.md — Single/group focus and accessible companion
+
+**Wave 9** *(blocked on Wave 8 completion)*
+
+- [ ] 29-09-PLAN.md — Deliberate contacted-only guarded reorder
+
+**Wave 10** *(blocked on Wave 9 completion)*
+
+- [ ] 29-10-PLAN.md — Subordinate relationship satellites
+
+**Wave 11** *(blocked on Wave 10 completion)*
+
+- [ ] 29-11-PLAN.md — Session return, Reduced Motion and race-safe recovery
+
+**Wave 12** *(blocked on Wave 11 completion)*
+
+- [ ] 29-12-PLAN.md — Integrated verification and native evidence handoff
+
 **UI hint**: yes
 
 ### Phase 30: Orrery Systems
@@ -670,7 +720,7 @@ All v1.0 commits are local on `main` and have NOT been pushed.
 | 26. Dashboard Control Surface | 7/7 | In Progress|  |
 | 27. Dashboard List View | 8/8 | Complete | 2026-09-06 (owner-approved; UAT partial) |
 | 28. Dashboard Card View | 8/8 | In Progress|  |
-| 29. Orrery Camera, Scale & Exploration | 0/TBD | Not started | - |
+| 29. Orrery Camera, Scale & Exploration | 0/12 | Planned | - |
 | 30. Orrery Systems | 0/TBD | Not started | - |
 | 31. Profile Experience | 0/TBD | Not started | - |
 | 32. Interaction History & Insights | 0/TBD | Not started | - |
