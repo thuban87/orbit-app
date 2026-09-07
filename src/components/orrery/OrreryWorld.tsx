@@ -272,9 +272,11 @@ export function OrreryWorld({
     );
   }, []);
   const level = useSharedValue<SemanticLevel>("overview");
+  // Capture only the producer's input; the controller also contains its published output.
+  const reorder = camera.reorder;
   const frame = useDerivedValue(() => {
     const sampled = sampleWorldTransition(transition.value, progress.value);
-    const held = camera.reorder.value;
+    const held = reorder.value;
     const world = previewReorder(
       sampled,
       held?.generation === scene.generation ? held : null,
