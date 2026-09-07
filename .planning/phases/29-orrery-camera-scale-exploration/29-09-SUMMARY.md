@@ -124,6 +124,7 @@ Four task commits plus summary and tracking metadata commits. All local on main 
 
 - Native stationary hold activation, preactivation pan, multi-pointer cancellation and haptic/ghost-ring acknowledgment remain pending Plan 12 device verification. WINDOWS entry **53** records this obligation. No native accessibility or performance claim is made.
 - ORRC-10 remains pending because later integrated/native coverage is assigned to Plan 12. This summary records implementation progress without prematurely completing the shared requirement.
+- SDK advanced to Plan 10 of 12. ROADMAP's SDK scanner again counted `29-PLAN-CHECK.md` as a thirteenth plan; corrected it to 9/12 and removed the generated checkbox. Global progress update reported truncated phase scope and left milestone progress unchanged.
 - Lock wait/hold latency remains unmeasured. The existing shared FIFO transaction/mutex semantics are preserved.
 - No new placeholder source data, skipped test, network/auth/schema/file-access boundary, or unrun automated verification. Empty transient drag state and empty Skia paths are lifecycle cleanup, not stubs.
 
