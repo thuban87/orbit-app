@@ -14,7 +14,7 @@
  * SQL engine so the profile and the dashboard can never diverge.
  */
 import { PROGRESS_SQL, REASON_SQL, STATUS_SQL } from "@/db/status";
-import type { SqlExecutor } from "@/db/types";
+import type { ReadOnlyExecutor } from "@/db/transaction";
 
 /** The four query-time status buckets, INCLUDING rogue (unlike OrbitStatus). */
 export type ProfileStatus = "stable" | "wobble" | "decay" | "rogue";
@@ -52,7 +52,7 @@ interface RawRow {
  * mislabel a never-contacted contact as stable.
  */
 export async function getContactStatus(
-  exec: SqlExecutor,
+  exec: ReadOnlyExecutor,
   contactId: number,
 ): Promise<ContactStatusRow | null> {
   const row = await exec.getFirstAsync<RawRow>(

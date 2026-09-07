@@ -21,7 +21,7 @@
  */
 import { validateCustomEndpoint } from "@/ai/custom-endpoint";
 import { bumpDataRevisionCore } from "@/db/data-revision-dao";
-import { inWriteTransaction } from "@/db/transaction";
+import { inWriteTransaction, type ReadOnlyExecutor } from "@/db/transaction";
 import type { SqlExecutor } from "@/db/types";
 import {
   DASHBOARD_SORT_MODES,
@@ -422,7 +422,7 @@ export function resolveEffectivePhoneRegion(
  * always exists, so a missing row signals a corrupted install rather than a
  * normal empty state.
  */
-export async function getAppSettings(exec: SqlExecutor): Promise<AppSettings> {
+export async function getAppSettings(exec: ReadOnlyExecutor): Promise<AppSettings> {
   const row = await exec.getFirstAsync<AppSettingsRow>(
     `SELECT notifications_enabled, decay_enabled, birthday_enabled,
             digest_enabled, interaction_assist_enabled, lockscreen_public, delivery_hour, quiet_start_hour,

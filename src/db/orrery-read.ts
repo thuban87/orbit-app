@@ -45,7 +45,7 @@
  */
 import type { ProfileStatus } from "@/db/contact-status-read";
 import { PROGRESS_SQL, STATUS_SQL } from "@/db/status";
-import type { SqlExecutor } from "@/db/types";
+import type { ReadOnlyExecutor } from "@/db/transaction";
 
 /**
  * One orbiting body. `status`/`progress` are non-null: the orbiting WHERE pins
@@ -87,7 +87,7 @@ export const ORBITING_SELECT = `SELECT id,
  * rendering policy safely resolves an Unbound saved occupant to self.
  */
 export function listOrbitingContacts(
-  exec: SqlExecutor,
+  exec: ReadOnlyExecutor,
   opts?: { excludeContactId?: number | null },
 ): Promise<OrbitingContact[]> {
   const exclude = opts?.excludeContactId;

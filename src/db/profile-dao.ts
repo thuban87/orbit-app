@@ -21,7 +21,7 @@
  */
 import { assertSafeRelative } from "@/db/photo-relative-path";
 import { bumpDataRevisionCore } from "@/db/data-revision-dao";
-import { inWriteTransaction } from "@/db/transaction";
+import { inWriteTransaction, type ReadOnlyExecutor } from "@/db/transaction";
 import type { SqlExecutor } from "@/db/types";
 
 /** The self record as surfaced to Settings — `name` is null until edited. */
@@ -94,7 +94,7 @@ export async function getProfilePhoto(
 
 /** Read the self record's `{ name, photo, modified_at }` (id=1 seed row). */
 export async function getProfile(
-  exec: SqlExecutor,
+  exec: ReadOnlyExecutor,
 ): Promise<ProfileRecord | null> {
   return exec.getFirstAsync<ProfileRecord>(
     "SELECT name, photo, modified_at FROM profile WHERE id = 1",

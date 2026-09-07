@@ -13,6 +13,7 @@ import type { ContactMethodRow } from "@/db/contact-methods-dao";
 import { listContactMethodGroups } from "@/db/contact-methods-read";
 import type { CustomFieldDef } from "@/db/field-types";
 import { defsForEditForm, getValuesForContact } from "@/db/field-values-dao";
+import type { ReadOnlyExecutor } from "@/db/transaction";
 import type { SqlExecutor } from "@/db/types";
 
 /**
@@ -65,7 +66,7 @@ export function listCategories(
  * `archived_at IS NULL` (see the archived-read reconciliation in Plans 05/08).
  */
 export function getContactHeader(
-  exec: SqlExecutor,
+  exec: ReadOnlyExecutor,
   contactId: number,
 ): Promise<{
   id: number;
