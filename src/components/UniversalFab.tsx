@@ -135,13 +135,16 @@ export function UniversalFab() {
     ),
   );
   const bottomOffset = tabBarHeight + FAB_EDGE_GAP;
+  const hidden = keyboardOpen || isFocusedWorkflow(currentRouteName);
+  const fabMeasurement = useWindowObstacle("shell-fab", !hidden, bottomOffset);
+  const fabRef = fabMeasurement.ref;
 
   const restoreFabFocus = useCallback(() => {
     requestAnimationFrame(() => {
       const node = findNodeHandle(fabRef.current);
       if (node !== null) AccessibilityInfo.setAccessibilityFocus(node);
     });
-  }, []);
+  }, [fabRef]);
 
   const closeDial = useCallback(
     (restoreFocusAfterClose = true) => {
@@ -189,10 +192,6 @@ export function UniversalFab() {
     updateCurrentRoute();
     return navigationRef.current?.addListener("state", updateCurrentRoute);
   }, []);
-
-  const hidden = keyboardOpen || isFocusedWorkflow(currentRouteName);
-  const fabMeasurement = useWindowObstacle("shell-fab", !hidden, bottomOffset);
-  const fabRef = fabMeasurement.ref;
 
   useEffect(() => {
     if (hidden) closeDial();
