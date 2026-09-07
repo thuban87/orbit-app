@@ -168,3 +168,18 @@ All 30 tasks include automated commands; all newly owned test paths have file-ex
 - Automated tracer completion permits expansion. Native Skia/navigation/gesture/accessibility obligations remain pending under the existing end-of-phase workflow until resolved; no added interim approval gate.
 
 All original37 edge predicates,55 UI considerations and16 requirements remain planned. The new owner decision is D-11, with11/11 locked decisions represented. The batch-to-render task and five-reader type prerequisite make 30 tasks across the same 12 sequential plans. Counts describe coverage, not execution evidence.
+
+## Cycle 2 incorporation — 2026-09-07
+
+These additions preserve the plan/task/wave counts and existing source audit. They record executable planned coverage, not implementation or fresh reviewer sign-off.
+
+| Source / current concern | Executable ownership |
+|---|---|
+| RESEARCH / review: global mutex wait/coherence tradeoff and cancellation | 04-01 documents scene wait/hold cost and queued request invalidation; 08-01 retains the fresh probe and rejects queued cancelled intents; 12-01 tests real export→scene/action and scene→recency-write ordering; 12-02 records native backup/tap and scene/write observations and the D-10 Phase40 measured-optimization handoff. No mutex, timeout, priority or UI policy change. |
+| GOAL / ORRC-03/15 / review: ADR-027 display restriction partially superseded | 04-01/02 source comments distinguish retained Gravity policy from the dossier §E/§Z display exception. 12-02 and its SUMMARY explicitly hand the precise partial supersession to later KB extraction; immutable ADR bodies remain intact. ADR-093 corroborates Dashboard use only. |
+| RESEARCH / review: governing source-comment ownership | 01-01 camera: ADR-077. 03-01 System read: ADR-011/046/047/093 with explicit D-05/default-scope limits. 04-01 impact read: surviving ADR-027 policy and dossier exception. 04-02 world: ADR-046/011/077 plus retained ADR-027 policy and exception. 08-01 action read: ADR-011/047/093/077 for eligibility, sun, reused predicates and inspection. 12-02 verifies the completed comments; creation tasks own edits. |
+| RESEARCH / review: batch acceptance gate | 04-01 explicitly gates full-history parity, zero/256/257-ID statement counts, read-only/non-nested snapshot composition, rendered/hit mass, no stored scores and cancellation. |
+| RESEARCH / review: native consecutive-Group depth batch | 05-01 requires one contiguous run of comparable body Groups, independent rings/labels/backplates outside the depth layer, and source-tree inspection plus the existing native sun-occlusion check. |
+| Advisory category catalog owner and living-doc drift | 03-01 reads UID-bearing categories inside its existing System DAO. 12-02 records HomeScreen's current SegmentedControl usage without editing ADR-077 or deleting the component. |
+
+Graph-first discovery during this revision returned INFERRED metadata for impact-read→ADR-027 and existing Orrery geometry→ADR-046; transaction metadata includes older partially superseded decisions. Full ADR and installed source reads, not those edges, support these changes. No new shared-table invariant is introduced. Queueing facts come from the current mutex/transaction/export implementations; native latency remains unmeasured. The neutral-body drag advisory is already covered by29-09-02's nearest eligible contacted slot and unchanged eligibility; no new rank policy is inferred.
