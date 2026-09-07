@@ -81,8 +81,10 @@ export function commitRingReorder(
   exec: SqlExecutor,
   request: RingReorderRequest,
   now: string,
+  isCurrent: () => boolean = () => true,
 ): Promise<void> {
   return inWriteTransaction(exec, async () => {
+    if (!isCurrent()) throw new Error("Cancelled ring gesture");
     const saved = await exec.getFirstAsync<{ sun_contact_id: number | null }>(
       "SELECT sun_contact_id FROM app_settings WHERE id=1",
     );
@@ -124,7 +126,9 @@ export function commitRingReorder(
       request.reorderedVisibleIds,
     );
     if (sameIds(full, ordered)) return;
+    if (!isCurrent()) throw new Error("Cancelled ring gesture");
     await rewriteRingSeqCore(exec, ordered, now, saved.sun_contact_id);
+    if (!isCurrent()) throw new Error("Cancelled ring gesture");
   });
 }
 

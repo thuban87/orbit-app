@@ -177,10 +177,13 @@ describe("production Orrery native tree and resource contracts", () => {
         colors: THEME_PRESETS.galaxy.dark,
         fontProvider: {} as never,
         onIntent: () => {},
+        onReorder: () => {},
+        onReorderActivated: () => {},
         focusedIds: [],
       }),
     );
-    const [rings, polaris, bodies, labels] = tree[0].children;
+    const [rings, polaris, ghost, bodies, labels] = tree[0].children;
+    expect(ghost.props.color).toBe(THEME_PRESETS.galaxy.dark.accent);
     expect(polaris.children.map((child) => child.type)).toEqual([
       "circle",
       "path",

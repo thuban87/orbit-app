@@ -125,6 +125,26 @@ describe("locked filtered reorder", () => {
       settings: await sql.getAllAsync("SELECT * FROM app_settings"),
     };
   }
+  it("rolls back cancellation while queued or during scoped writes", async () => {
+    const req = await request();
+    const before = await stored();
+    await expect(
+      commitRingReorder(sql, req, LATER, () => false),
+    ).rejects.toThrow(/Cancelled/);
+    let live = true;
+    const interrupted: SqlExecutor = {
+      ...sql,
+      runAsync: async (query, params) => {
+        const result = await sql.runAsync(query, params);
+        if (query.includes("SET ring_seq")) live = false;
+        return result;
+      },
+    };
+    await expect(
+      commitRingReorder(interrupted, req, LATER, () => live),
+    ).rejects.toThrow(/Cancelled/);
+    expect(await stored()).toEqual(before);
+  });
   it("preserves hidden slots and bumps revision once, while unchanged release writes nothing", async () => {
     const before = await stored();
     const req = await request();

@@ -1,5 +1,6 @@
 /** ADR-077 canonical timestamp world; screen owns lifecycle and discrete intents. */
 // biome-ignore-all lint/a11y/useValidAriaRole: AppText role is semantic typography.
+
 import {
   useFocusEffect,
   useIsFocused,
@@ -7,6 +8,7 @@ import {
 } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useFonts } from "@shopify/react-native-skia";
+import * as Haptics from "expo-haptics";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AppState, StyleSheet, View } from "react-native";
 import {
@@ -39,8 +41,9 @@ import { useOrreryCamera } from "@/components/orrery/use-orrery-camera";
 import { ShellAppBar } from "@/components/ShellAppBar";
 import { AppText } from "@/components/ui/AppText";
 import { Button } from "@/components/ui/Button";
-import { getExecutor } from "@/db/database";
+import { getExecutor, localDateTime } from "@/db/database";
 import { readOrreryContactTargetValidation } from "@/db/orrery-action-read";
+import { commitRingReorder } from "@/db/ring-seq-dao";
 import {
   type CameraPose,
   type CameraRect,
@@ -56,6 +59,7 @@ import {
   type OrreryContactTarget,
 } from "@/logic/orrery-focus-logic";
 import { cameraExtent, northTarget } from "@/logic/orrery-recovery-logic";
+import type { ReorderIntent } from "@/logic/orrery-reorder-logic";
 import {
   ALL_CONTACTS_SYSTEM,
   parseSystemRef,
@@ -77,10 +81,16 @@ import { useTheme } from "@/theme";
 import { SPACING } from "@/theme/tokens/spacing";
 import { useReducedMotionShared } from "@/theme/use-reduced-motion";
 
+const acknowledgeReorder = () => {
+  void Haptics.selectionAsync().catch(() => {});
+};
+
 export function OrreryScreen() {
   const { colors } = useTheme();
   const [contactsOpen, setContactsOpen] = useState(false);
   const [clusterOpen, setClusterOpen] = useState(false);
+  const [reorderError, setReorderError] = useState(false);
+  const reorderBusy = useRef(false);
   const cancelIntent = useRef<(reason: OrreryCancellation) => void>(() => {});
   const routeLive = useRef(false);
   const restoreContactsFocus = useRef<(() => void) | null>(null);
@@ -272,6 +282,42 @@ export function OrreryScreen() {
     enabled: visible && !overlaysOpen,
     reduced: reducedMotion,
   });
+  const onReorder = useCallback(
+    async (intent: ReorderIntent) => {
+      const current = useSystemStore.getState().current();
+      if (
+        reorderBusy.current ||
+        !routeLive.current ||
+        AppState.currentState !== "active" ||
+        current?.generation !== intent.generation
+      )
+        return;
+      reorderBusy.current = true;
+      try {
+        await commitRingReorder(
+          getExecutor(),
+          intent.request,
+          localDateTime(),
+          () =>
+            routeLive.current &&
+            AppState.currentState === "active" &&
+            useSystemStore.getState().current()?.generation ===
+              intent.generation,
+        );
+        setReorderError(false);
+        await useSystemStore.getState().reload();
+      } catch {
+        setReorderError(true);
+      } finally {
+        reorderBusy.current = false;
+      }
+    },
+    [useSystemStore],
+  );
+  const reloadReorder = useCallback(async () => {
+    await useSystemStore.getState().reload();
+    if (useSystemStore.getState().status === "ready") setReorderError(false);
+  }, [useSystemStore]);
   const focus = useCallback(
     (targets: OrreryContactTarget[]) => {
       const ids = targets.map((target) => target.id);
@@ -464,10 +510,12 @@ export function OrreryScreen() {
             colors={colors}
             fontProvider={fontProvider}
             onIntent={onIntent}
+            onReorder={onReorder}
+            onReorderActivated={acknowledgeReorder}
             focusedIds={focusedIds}
             clusterIds={clusterOpen ? focusedIds : []}
             onFocusLost={clusterOpen ? undefined : clearFocus}
-            interactive={!overlaysOpen}
+            interactive={!overlaysOpen && state.status === "ready"}
           />
         ) : null}
         <OrrerySystemSelector
@@ -554,6 +602,23 @@ export function OrreryScreen() {
                 focusError === "error" ? "Reload System" : "Show All Contacts"
               }
               onPress={focusError === "error" ? reload : showAll}
+            />
+          </OrreryFeedback>
+        ) : null}
+        {reorderError ? (
+          <OrreryFeedback
+            obstacleId="orrery-reorder-feedback"
+            style={[styles.feedback, { backgroundColor: colors.surface }]}
+            contentContainerStyle={styles.feedbackContent}
+          >
+            <AppText>
+              Couldn't change the orbit order. The saved order has been
+              restored.
+            </AppText>
+            <Button
+              role="secondary"
+              label="Reload System"
+              onPress={() => void reloadReorder()}
             />
           </OrreryFeedback>
         ) : null}

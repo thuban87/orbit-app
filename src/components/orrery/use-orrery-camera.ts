@@ -24,19 +24,28 @@ import {
   type CameraInput,
   cameraGestureStep,
   cancelInput,
+  HOLD_MS,
+  HOLD_SLOP,
   initialInput,
   moveInput,
   PAN_DISTANCE,
   TAP_DISTANCE,
   TILT_DISTANCE,
 } from "@/logic/orrery-gesture-logic";
-
 import {
   cameraExtent,
   createCameraMotion,
   type MotionRequest,
   recoveryCurve,
 } from "@/logic/orrery-recovery-logic";
+import {
+  captureReorder,
+  moveReorder,
+  type ReorderDrag,
+  type ReorderExpectation,
+  type ReorderIntent,
+  releaseReorder,
+} from "@/logic/orrery-reorder-logic";
 
 interface GestureSamples {
   panX: number;
@@ -76,6 +85,7 @@ export function useOrreryCamera({
   const input = useSharedValue(initialInput());
   const samples = useSharedValue(initialSamples());
   const live = useSharedValue(enabled);
+  const reorder = useSharedValue<ReorderDrag | null>(null);
   const epoch = useSharedValue(0);
   const active = useSharedValue<MotionRequest | null>(null);
   const frame = useSharedValue<ProjectedFrame | null>(null);
@@ -126,6 +136,7 @@ export function useOrreryCamera({
       "worklet";
       live.value = enabled;
       if (!enabled) {
+        reorder.value = null;
         stop();
         input.value = cancelInput(input.value);
       }
@@ -134,14 +145,15 @@ export function useOrreryCamera({
       runOnUI(() => {
         "worklet";
         live.value = false;
+        reorder.value = null;
         input.value = cancelInput(input.value);
         stop();
       })();
     };
-  }, [enabled, live, input, stop]);
+  }, [enabled, live, input, stop, reorder]);
   return useMemo(
-    () => ({ input, samples, live, active, frame, ...motion }),
-    [input, samples, live, active, frame, motion],
+    () => ({ input, samples, live, active, frame, reorder, ...motion }),
+    [input, samples, live, active, frame, reorder, motion],
   );
 }
 
@@ -164,6 +176,7 @@ export function createOrreryGestures({
   onNorth,
   panStart,
   resolveTap,
+  reorder,
 }: {
   pose: CameraCell<CameraPose>;
   frame: CameraCell<ProjectedFrame>;
@@ -176,12 +189,20 @@ export function createOrreryGestures({
   onNorth?: (x: number, y: number) => boolean;
   panStart?: CameraCell<CameraPose | null>;
   resolveTap?: (frame: ProjectedFrame, x: number, y: number) => OrreryIntent;
+  reorder?: {
+    drag: CameraCell<ReorderDrag | null>;
+    expectation: ReorderExpectation;
+    generation: number;
+    acknowledge: () => void;
+    commit: (intent: ReorderIntent) => void;
+  };
 }) {
   const { input, samples, live } = camera;
   const touch = (pointers: number) => {
     "worklet";
     stop();
     input.value = moveInput(input.value, pointers, 0);
+    if (pointers > 1 && reorder) reorder.drag.value = null;
   };
   const tap = Gesture.Tap()
     .enabled(enabled)
@@ -262,7 +283,8 @@ export function createOrreryGestures({
     .onFinalize(() => {
       "worklet";
       if (panStart) panStart.value = null;
-      if (input.value.owner !== "multi") input.value = cancelInput(input.value);
+      // Losing a race may finalize Pan before the winning hold's onStart.
+      if (input.value.owner === "pan") input.value = cancelInput(input.value);
     });
   const pinch = Gesture.Pinch()
     .enabled(enabled)
@@ -400,5 +422,103 @@ export function createOrreryGestures({
       "worklet";
       samples.value = { ...samples.value, tiltActive: false };
     });
-  return Gesture.Race(tap, Gesture.Simultaneous(pan, pinch, rotation, tilt));
+  const cameraGestures = Gesture.Simultaneous(pan, pinch, rotation, tilt);
+  if (!reorder) return Gesture.Race(tap, cameraGestures);
+  const hold = Gesture.Pan()
+    .enabled(enabled)
+    .maxPointers(1)
+    .activateAfterLongPress(HOLD_MS)
+    .onTouchesDown((event, manager) => {
+      "worklet";
+      if (
+        event.numberOfTouches !== 1 ||
+        !live.value ||
+        frame.value.generation !== reorder.generation
+      ) {
+        reorder.drag.value = null;
+        manager.fail();
+        return;
+      }
+      const point = event.allTouches[0];
+      reorder.drag.value = captureReorder(
+        frame.value,
+        reorder.expectation,
+        point.x,
+        point.y,
+      );
+      if (!reorder.drag.value) manager.fail();
+    })
+    .onTouchesMove((event, manager) => {
+      "worklet";
+      const drag = reorder.drag.value;
+      const point = event.allTouches[0];
+      if (
+        event.numberOfTouches !== 1 ||
+        !live.value ||
+        frame.value.generation !== reorder.generation ||
+        (drag &&
+          !drag.active &&
+          point &&
+          Math.hypot(point.x - drag.origin.x, point.y - drag.origin.y) >
+            HOLD_SLOP)
+      ) {
+        reorder.drag.value = null;
+        manager.fail();
+      }
+    })
+    .onStart((event) => {
+      "worklet";
+      const drag = reorder.drag.value;
+      if (
+        !drag ||
+        !live.value ||
+        input.value.owner !== "pending" ||
+        event.numberOfPointers !== 1 ||
+        Math.hypot(event.translationX, event.translationY) > HOLD_SLOP
+      ) {
+        reorder.drag.value = null;
+        return;
+      }
+      stop();
+      input.value = { ...input.value, owner: "reorder" };
+      reorder.drag.value = { ...drag, active: true };
+      runOnJS(reorder.acknowledge)();
+    })
+    .onUpdate((event) => {
+      "worklet";
+      const drag = reorder.drag.value;
+      if (
+        !drag?.active ||
+        !live.value ||
+        input.value.owner !== "reorder" ||
+        event.numberOfPointers !== 1 ||
+        frame.value.generation !== drag.generation
+      ) {
+        reorder.drag.value = null;
+        return;
+      }
+      reorder.drag.value = moveReorder(drag, frame.value, event.x, event.y);
+    })
+    .onEnd((event, success) => {
+      "worklet";
+      const drag = reorder.drag.value;
+      const intent = releaseReorder(
+        drag,
+        frame.value.generation,
+        success &&
+          live.value &&
+          drag?.active === true &&
+          input.value.owner === "reorder" &&
+          event.numberOfPointers <= 1,
+      );
+      reorder.drag.value = null;
+      if (intent) runOnJS(reorder.commit)(intent);
+    })
+    .onFinalize(() => {
+      "worklet";
+      reorder.drag.value = null;
+      if (input.value.owner === "reorder")
+        input.value = cancelInput(input.value);
+    });
+  return Gesture.Race(tap, Gesture.Race(hold, cameraGestures));
 }

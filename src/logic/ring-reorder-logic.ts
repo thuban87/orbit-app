@@ -27,6 +27,7 @@ export function computeRingReorder(
   from: number,
   to: number,
 ): number[] {
+  "worklet";
   const next = orderedIds.slice(); // copy — never mutate the input
   if (next.length === 0) {
     return next;
@@ -43,6 +44,7 @@ export function computeRingReorder(
 
 /** Clamp `index` into the valid slot range `[0, length-1]`. */
 function clampIndex(index: number, length: number): number {
+  "worklet";
   if (index < 0) {
     return 0;
   }

@@ -1,5 +1,10 @@
 /** ADR-077: keyed resources; one UI-thread world/projection frame for all layers. */
-import { Group, type SkTypefaceFontProvider } from "@shopify/react-native-skia";
+import {
+  Group,
+  Path,
+  Skia,
+  type SkTypefaceFontProvider,
+} from "@shopify/react-native-skia";
 import { useEffect, useMemo, useState } from "react";
 import { useWindowDimensions } from "react-native";
 import {
@@ -43,6 +48,11 @@ import {
   hitPolaris,
   northTarget,
 } from "@/logic/orrery-recovery-logic";
+import {
+  previewReorder,
+  type ReorderDrag,
+  type ReorderIntent,
+} from "@/logic/orrery-reorder-logic";
 import { orreryRingStyle } from "@/logic/orrery-ring-logic";
 import { resolveSunOccupant } from "@/logic/sun-occupant-logic";
 import type { OrrerySceneSnapshot } from "@/services/orrery-scene";
@@ -65,6 +75,32 @@ import {
 const WORLD_SETTLE_MS = 260;
 const LABEL_MAX_WIDTH = 200;
 const LABEL_BODY_GAP = 8;
+
+function ReorderGhost({
+  frame,
+  drag,
+  color,
+}: {
+  frame: SharedValue<AnimatedFrame>;
+  drag: SharedValue<ReorderDrag | null>;
+  color: string;
+}) {
+  const path = useDerivedValue(() => {
+    const result = Skia.Path.Make();
+    const held = drag.value;
+    if (!held?.active) return result;
+    const body = frame.value.bodies.find((body) => body.id === held.id);
+    const points = body?.ringPath ?? [];
+    if (points.length) {
+      result.moveTo(points[0].x, points[0].y);
+      for (const point of points.slice(1)) result.lineTo(point.x, point.y);
+      result.close();
+    }
+    if (body) result.addCircle(body.x, body.y, body.radius + 4);
+    return result;
+  });
+  return <Path path={path} color={color} style="stroke" strokeWidth={2} />;
+}
 interface BodyResource {
   key: string;
   body: OrrerySceneSnapshot["world"][number];
@@ -158,6 +194,8 @@ export function OrreryWorld({
   interactive = true,
   camera,
   onFocusLost,
+  onReorder,
+  onReorderActivated,
 }: {
   scene: OrrerySceneSnapshot;
   camera: OrreryCameraController;
@@ -172,6 +210,8 @@ export function OrreryWorld({
   focusedRelationById?: Readonly<Record<number, string>>;
   interactive?: boolean;
   onFocusLost?: () => void;
+  onReorder: (intent: ReorderIntent) => void;
+  onReorderActivated: () => void;
 }) {
   const { fontScale } = useWindowDimensions();
   const reducedMotion = useReducedMotionShared();
@@ -194,14 +234,23 @@ export function OrreryWorld({
     beginWorldTransition([], scene.world, scene.generation),
   );
   const progress = useSharedValue(1);
-  const frame = useDerivedValue(() =>
-    projectAnimatedFrame(
+  const frame = useDerivedValue(() => {
+    const sampled = sampleWorldTransition(
       transition.value,
       reducedMotion.value ? 1 : progress.value,
+    );
+    const held = camera.reorder.value;
+    const world = previewReorder(
+      sampled,
+      held?.generation === scene.generation ? held : null,
+    );
+    return projectAnimatedFrame(
+      { generation: transition.value.generation, from: world, to: world },
+      1,
       pose.value,
       viewport,
-    ),
-  );
+    );
+  });
   // Conventional focus positioning consumes this same interpolated frame.
   useAnimatedReaction(
     () => frame.value,
@@ -225,6 +274,7 @@ export function OrreryWorld({
       );
     runOnUI(() => {
       "worklet";
+      camera.reorder.value = null;
       if (transition.value.generation === generation) return;
       const displayed = sampleWorldTransition(
         transition.value,
@@ -241,7 +291,7 @@ export function OrreryWorld({
         },
       );
     })();
-  }, [scene, transition, progress, reducedMotion]);
+  }, [scene, transition, progress, reducedMotion, camera.reorder]);
   useEffect(() => () => cancelAnimation(progress), [progress]);
   const starColors = useMemo(
     () => [colors.textSecondary, colors.textPrimary, ...colors.starPalette],
@@ -385,6 +435,17 @@ export function OrreryWorld({
     [scene],
   );
   const members = scene.systemSnapshot.members;
+  const reorderExpectation = useMemo(
+    () => ({
+      system: scene.system,
+      expectedFullOrderedIds: scene.systemSnapshot.completeContactedOrder,
+      expectedSavedSunContactId: scene.systemSnapshot.savedSunContactId,
+      expectedEligibleVisibleIds:
+        scene.systemSnapshot.eligibleContactedVisibleIds,
+      expectedContactIdentities: scene.systemSnapshot.contactIdentities,
+    }),
+    [scene],
+  );
   const gesture = useMemo(
     () =>
       createOrreryGestures({
@@ -396,6 +457,13 @@ export function OrreryWorld({
         enabled: interactive,
         stop: camera.stop,
         coast: camera.coast,
+        reorder: {
+          drag: camera.reorder,
+          expectation: reorderExpectation,
+          generation: scene.generation,
+          acknowledge: onReorderActivated,
+          commit: onReorder,
+        },
         resolveTap: (current, x, y) => {
           "worklet";
           return resolveOrreryTap(
@@ -424,6 +492,10 @@ export function OrreryWorld({
       identities,
       allocations,
       members,
+      reorderExpectation,
+      onReorder,
+      onReorderActivated,
+      scene.generation,
     ],
   );
   const singleFocus = focusedIds.length === 1 ? focusedIds[0] : null;
@@ -464,6 +536,11 @@ export function OrreryWorld({
             ))}
         </Group>
         <Polaris frame={frame} extent={scene.extent} colors={colors} />
+        <ReorderGhost
+          frame={frame}
+          drag={camera.reorder}
+          color={colors.accent}
+        />
         {/* RNRecorder flushes sorting at every non-Group command. Keep this run contiguous. */}
         <Group>
           {resources.map((resource) => (
