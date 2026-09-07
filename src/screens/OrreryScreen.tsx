@@ -1,4 +1,8 @@
-/** ADR-077 canonical timestamp world; screen owns lifecycle and discrete intents. */
+/**
+ * ADR-077 owns the single canonical timestamp world, camera and discrete intents.
+ * It partially supersedes ADR-048's dual-view/morph clauses; ADR-048's static
+ * contact placement and single unmountable ambient-clock lifecycle remain live.
+ */
 // biome-ignore-all lint/a11y/useValidAriaRole: AppText role is semantic typography.
 
 import {

@@ -1,5 +1,7 @@
 /**
  * ADR-077: canonical status body drawn in its projected parent coordinate space.
+ * ADR-048 remains live for static/status/keyed rendering only; ADR-077 partially
+ * supersedes its dual-view/morph behavior, which no longer governs this body.
  * Keyed, unconditional local image/font resources preserve hook identity.
  * No animation clock or independent world/camera position calculation lives here.
  */
