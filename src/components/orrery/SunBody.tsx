@@ -137,7 +137,7 @@ export function SunBody({
       return null;
     }
     const p = Skia.ParagraphBuilder.Make(
-      { textAlign: TextAlign.Center },
+      { textAlign: TextAlign.Center, maxLines: 1, ellipsis: "…" },
       fontProvider,
     )
       .pushStyle({

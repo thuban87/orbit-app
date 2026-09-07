@@ -1,17 +1,19 @@
 /** ADR-077: keyed resources; one UI-thread world/projection frame for all layers. */
 import { Group, type SkTypefaceFontProvider } from "@shopify/react-native-skia";
 import { useEffect, useMemo, useState } from "react";
+import { useWindowDimensions } from "react-native";
 import { Gesture } from "react-native-gesture-handler";
 import {
   cancelAnimation,
   runOnJS,
   runOnUI,
   type SharedValue,
+  useAnimatedReaction,
   useDerivedValue,
   useSharedValue,
   withTiming,
 } from "react-native-reanimated";
-import { getInitials, swatchIndex } from "@/components/avatar-initials";
+import { swatchIndex } from "@/components/avatar-initials";
 import {
   type CameraCell,
   type CameraPose,
@@ -29,6 +31,13 @@ import {
   projectAnimatedFrame,
   sampleWorldTransition,
 } from "@/logic/orrery-frame";
+import {
+  allocateLabels,
+  labelContext,
+  orreryInitials,
+  type SemanticLevel,
+  semanticLevel,
+} from "@/logic/orrery-label-logic";
 import { orreryRingStyle } from "@/logic/orrery-ring-logic";
 import { resolveSunOccupant } from "@/logic/sun-occupant-logic";
 import type { OrrerySceneSnapshot } from "@/services/orrery-scene";
@@ -36,11 +45,14 @@ import type { ThemePalette } from "@/theme/theme-types";
 import { useReducedMotionShared } from "@/theme/use-reduced-motion";
 import { OrbitBody } from "./OrbitBody";
 import { OrreryCanvas } from "./OrreryCanvas";
+import { OrreryLabel, prepareOrreryText } from "./OrreryLabel";
 import { ProjectedOrbitRing } from "./ProjectedOrbitRing";
 import { SunBody } from "./SunBody";
 
 const PAN_MIN_DISTANCE = 10;
 const WORLD_SETTLE_MS = 260;
+const LABEL_MAX_WIDTH = 200;
+const LABEL_BODY_GAP = 8;
 /** This exact registration is driven in the real-SQL tracer through native mocks. */
 export function createOrreryGestures({
   pose,
@@ -154,7 +166,7 @@ function ProjectedBody({
     swatch:
       colors.avatarSwatches[swatchIndex(name, colors.avatarSwatches.length)],
     swatchText: colors.avatarSwatchText,
-    initials: getInitials(name),
+    initials: orreryInitials(name),
     fontProvider,
     focusColor: focused ? colors.accent : undefined,
   };
@@ -183,6 +195,8 @@ export function OrreryWorld({
   fontProvider,
   onIntent,
   focusedIds,
+  clusterIds = focusedIds.length > 1 ? focusedIds : [],
+  focusedRelationById = {},
 }: {
   scene: OrrerySceneSnapshot;
   pose: SharedValue<CameraPose>;
@@ -191,7 +205,11 @@ export function OrreryWorld({
   fontProvider: SkTypefaceFontProvider | null;
   onIntent: (intent: OrreryIntent) => void;
   focusedIds: number[];
+  clusterIds?: number[];
+  /** Already-filtered, existing relation context only; supplied by focus/moon owner. */
+  focusedRelationById?: Readonly<Record<number, string>>;
 }) {
+  const { fontScale } = useWindowDimensions();
   const reducedMotion = useReducedMotionShared();
   const [registry, setRegistry] = useState(() => ({
     scene,
@@ -221,6 +239,8 @@ export function OrreryWorld({
     ),
   );
   useEffect(() => {
+    const world = scene.world;
+    const generation = scene.generation;
     const complete = () =>
       setRegistry((current) =>
         current.scene === scene
@@ -234,17 +254,13 @@ export function OrreryWorld({
       );
     runOnUI(() => {
       "worklet";
-      if (transition.value.generation === scene.generation) return;
+      if (transition.value.generation === generation) return;
       const displayed = sampleWorldTransition(
         transition.value,
         reducedMotion.value ? 1 : progress.value,
       ).filter((body) => body.opacity > 0);
       cancelAnimation(progress);
-      transition.value = beginWorldTransition(
-        displayed,
-        scene.world,
-        scene.generation,
-      );
+      transition.value = beginWorldTransition(displayed, world, generation);
       progress.value = 0;
       progress.value = withTiming(
         1,
@@ -276,6 +292,125 @@ export function OrreryWorld({
     () => [colors.textSecondary, colors.textPrimary, ...colors.starPalette],
     [colors],
   );
+  const labels = useMemo(
+    () =>
+      scene.world.flatMap((body) => {
+        if (body.id === 0) return [];
+        const member = scene.systemSnapshot.members.find(
+          (c) => c.id === body.id,
+        );
+        const name =
+          member?.name ??
+          (body.kind === "sun" ? scene.sun.sunContactName : undefined);
+        if (name === undefined) return [];
+        const focused = focusedIds.length === 1 && focusedIds[0] === body.id;
+        // D-11: nonmember global sun keeps identity, but no relationship context.
+        const context = labelContext(
+          member
+            ? member.status
+            : body.kind === "sun"
+              ? scene.sun.occupant?.status
+              : undefined,
+          scene.gravity.get(body.id),
+          focused && member ? focusedRelationById[body.id] : undefined,
+        );
+        const width = Math.min(LABEL_MAX_WIDTH * fontScale, viewport.width);
+        const text = prepareOrreryText(
+          name,
+          "label",
+          fontScale,
+          width,
+          fontProvider,
+          colors,
+        );
+        if (!text) return [];
+        return [
+          {
+            id: bodyKey(body),
+            name,
+            text,
+            context: context
+              ? prepareOrreryText(
+                  context,
+                  "caption",
+                  fontScale,
+                  width,
+                  fontProvider,
+                  colors,
+                )
+              : null,
+            focused,
+            cluster: clusterIds.includes(body.id),
+            favorite: member?.favourite_rank != null,
+          },
+        ];
+      }),
+    [
+      scene,
+      colors,
+      fontProvider,
+      fontScale,
+      viewport.width,
+      focusedIds,
+      clusterIds,
+      focusedRelationById,
+    ],
+  );
+  // Share only plain measured data; native paragraph/font resources stay off worklets.
+  const measured = useMemo(
+    () =>
+      labels.map((label) => ({
+        id: label.id,
+        name: label.name,
+        width: label.text.width,
+        height: label.text.height,
+        context: label.context?.text,
+        contextWidth: label.context?.width,
+        contextHeight: label.context?.height,
+        focused: label.focused,
+        cluster: label.cluster,
+        favorite: label.favorite,
+      })),
+    [labels],
+  );
+  const level = useSharedValue<SemanticLevel>("overview");
+  useAnimatedReaction(
+    () => frame.value.pose.zoom,
+    (zoom) => {
+      level.value = semanticLevel(zoom, level.value);
+    },
+  );
+  const allocations = useDerivedValue(() => {
+    const current = frame.value;
+    const candidates = measured.flatMap((label) => {
+      const body = current.bodies.find((b) => bodyKey(b) === label.id);
+      return body?.visible && body.interactive
+        ? [
+            {
+              ...label,
+              x: body.x - label.width / 2,
+              y: body.y + body.radius + LABEL_BODY_GAP,
+              alternateY: body.y - body.radius - LABEL_BODY_GAP - label.height,
+              opacity: body.opacity,
+            },
+          ]
+        : [];
+    });
+    const exclusions = current.bodies
+      .filter((b) => b.visible)
+      .map((b) => ({
+        x: b.x - b.radius,
+        y: b.y - b.radius,
+        width: b.radius * 2,
+        height: b.radius * 2,
+      }));
+    return allocateLabels(
+      candidates,
+      semanticLevel(current.pose.zoom, level.value),
+      current.viewport,
+      exclusions,
+    );
+  });
   return (
     <OrreryCanvas
       width={viewport.width}
@@ -314,6 +449,28 @@ export function OrreryWorld({
               fontProvider={fontProvider}
               focused={focusedIds.includes(resource.body.id)}
             />
+          ))}
+        </Group>
+        {/* Labels/backplates are screen-space and never interrupt the body batch. */}
+        <Group>
+          {labels.map((label) => (
+            <Group key={label.id}>
+              <OrreryLabel
+                identity={label.id}
+                text={label.text}
+                allocations={allocations}
+                colors={colors}
+              />
+              {label.context ? (
+                <OrreryLabel
+                  identity={label.id}
+                  text={label.context}
+                  allocations={allocations}
+                  colors={colors}
+                  context
+                />
+              ) : null}
+            </Group>
           ))}
         </Group>
       </Group>

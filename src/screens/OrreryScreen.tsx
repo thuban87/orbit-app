@@ -59,7 +59,11 @@ export function OrreryScreen() {
   const navigation =
     useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const fontProvider = useFonts({
-    Inter: [require("../../assets/Inter-SemiBold.ttf")],
+    Inter: [
+      require("../../assets/Inter-Regular.ttf"),
+      require("../../assets/Inter-SemiBold.ttf"),
+    ],
+    "Space Grotesk": [require("../../assets/SpaceGrotesk-SemiBold.ttf")],
   });
   const [viewport, setViewport] = useState({ width: 0, height: 0 });
   const preferences = useOrreryPreferencesStore((store) => store.committed);
