@@ -285,10 +285,30 @@ export async function applyRestore(exec: SqlExecutor, manifest: BackupManifest, 
   if (totals.insert + totals.update + totals.delete === 0 && !applySettings) return { status: "applied", mode, inserted: 0, updated: 0, retained: totals.retain, deleted: 0, blocked: totals.blocked, photosNeedingAttention: 0, photoCleanupPending: 0, scheduleResyncPending: false, preRestoreSnapshotCreated };
   const candidates = await stageCandidates(exec, plan, deps.sessionToken ?? newUid(), deps.stagePhoto ?? stageRestorePendingBase64);
   await inWriteTransaction(exec, async () => {
+    // ADR-010/ADR-056: child winners are independent of metadata winners.
+    // Include every changed contact (including qualification-flag changes) and
+    // capture old interaction parents before deletes/reparenting lose them.
+    const recencyUids = new Set(writes(plan, "contacts").map((action) => action.uid));
+    for (const action of plan.interactions) {
+      if (action.kind !== "insert" && action.kind !== "update" && action.kind !== "delete") continue;
+      const oldParent = await exec.getFirstAsync<{ uid: string }>(
+        "SELECT c.uid FROM interactions i JOIN contacts c ON c.id=i.contact_id WHERE i.uid=?",
+        [action.uid],
+      );
+      if (oldParent) recencyUids.add(oldParent.uid);
+      if (action.kind !== "delete" && typeof action.row?.contactUid === "string") recencyUids.add(action.row.contactUid);
+    }
     if (mode === "replace-all") await replaceAllReset(exec,manifest,candidates.deletes); else for (const entity of [...entities].reverse()) await deleteActions(exec,entity,plan[entity]);
     await importTombstones(exec,manifest); await upsertParents(exec,plan); await upsertContacts(exec,plan); await upsertChildren(exec,plan);
     const contacts = await idMap(exec,"contacts");
-    for (const action of writes(plan,"contacts")) await recomputeLastContactCore(exec,contacts.get(action.uid)!,action.row!.modified_at);
+    for (const uid of recencyUids) {
+      // Read after all writes: only surviving parents are recomputed, and the
+      // core must preserve the winning metadata stamp rather than re-date it.
+      const contact = await exec.getFirstAsync<{ id: number; modified_at: string }>(
+        "SELECT id,modified_at FROM contacts WHERE uid=?", [uid],
+      );
+      if (contact) await recomputeLastContactCore(exec,contact.id,contact.modified_at);
+    }
     for (const candidate of candidates.finalize) { const canonical = await canonicalFor(exec,candidate.target); if (!canonical) throw new Error("restore photo target disappeared before commit"); await writePhotoReference(exec,candidate.target,canonical); await insertJournalEntryCore(exec,entry("finalize",candidate.relativePath,candidate.target,canonical,manifest.metadata.exportedAt)); }
     for (const candidate of candidates.deletes) if (candidate.clearReference) await writePhotoReference(exec,candidate.target,null);
     for (const candidate of candidates.deletes) await insertJournalEntryCore(exec,entry("delete",`delete:${candidate.canonicalRelativePath}`,candidate.target,candidate.canonicalRelativePath,manifest.metadata.exportedAt));

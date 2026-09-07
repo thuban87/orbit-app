@@ -55,6 +55,9 @@ import { migration017 } from "@/db/migrations/017-knowledge-egress-datamove";
 import { migration018 } from "@/db/migrations/018-custom-field-scope-history";
 import { migration019 } from "@/db/migrations/019-dashboard-prefs";
 import { migration020 } from "@/db/migrations/020-dashboard-swipe-pref";
+import { migration021 } from "@/db/migrations/021-orrery-preferences";
+import { readOrrerySystemSnapshot } from "@/db/orrery-system-read";
+import { createContactWithInteraction, recordTouchpoint } from "@/db/recency-dao";
 import { runMigrations } from "@/db/migrations/runner";
 import type { SqlExecutor } from "@/db/types";
 
@@ -65,7 +68,7 @@ const migrations = [migration001, migration002, migration003, migration004, migr
 
 async function db(): Promise<SqlExecutor> {
   const exec = nodeSqliteExecutor(openTestDb());
-  await runMigrations(exec, migrations, 20, { now: NOW, newUid });
+  await runMigrations(exec, [...migrations, migration021], 21, { now: NOW, newUid });
   return exec;
 }
 
@@ -79,6 +82,133 @@ beforeEach(() => {
 });
 
 describe("applyRestore", () => {
+  it("recomputes a retained contact after inserting history and removes it from Not Contacted", async () => {
+    const source = await db();
+    const destination = await db();
+    const early = "2026-08-01 12:00:00";
+    const touch = "2026-08-20 12:00:00";
+    const metadata = "2026-08-21 12:00:00";
+    const incoming = await createContactWithInteraction(source, {
+      uid: "same-contact", name: "Older name", intervalDays: 14, now: early,
+    });
+    await recordTouchpoint(source, { contactId: incoming.contactId, uid: "touch", occurredAt: touch, now: touch });
+    await createContactWithInteraction(destination, {
+      uid: "same-contact", name: "Newer local name", intervalDays: 21, now: metadata,
+    });
+    const before = await readOrrerySystemSnapshot(destination, { kind: "builtin", id: "not-contacted" });
+    expect(before.members.map((row) => row.uid)).toEqual(["same-contact"]);
+    const manifest = await buildExportManifest(source, { exportedAt: NOW, readPhotoBase64: async () => "" });
+    await expect(applyRestore(destination, manifest, "merge")).resolves.toMatchObject({ status: "applied", inserted: 1, updated: 0 });
+    await expect(destination.getFirstAsync("SELECT name,interval_days,last_contact,modified_at FROM contacts WHERE uid='same-contact'"))
+      .resolves.toEqual({ name: "Newer local name", interval_days: 21, last_contact: touch, modified_at: metadata });
+    expect((await readOrrerySystemSnapshot(destination, { kind: "builtin", id: "not-contacted" })).members).toEqual([]);
+    const all = await readOrrerySystemSnapshot(destination);
+    expect(all.members[0].progress).toEqual(expect.any(Number));
+    // Reapplying identical history must preserve the same metadata winner.
+    await expect(applyRestore(destination, manifest, "merge")).resolves.toMatchObject({ inserted: 0, updated: 0, deleted: 0 });
+    await expect(destination.getFirstAsync("SELECT modified_at FROM contacts WHERE uid='same-contact'"))
+      .resolves.toEqual({ modified_at: metadata });
+  });
+
+  it.each(["lower-newest", "disconnect", "delete", "reparent"] as const)(
+    "recomputes retained old and new parents after interaction %s",
+    async (operation) => {
+      const destination = await db();
+      const older = "2026-08-10 12:00:00";
+      const newest = "2026-08-20 12:00:00";
+      const a = await createContactWithInteraction(destination, {
+        uid: "parent-a", name: "Local A", intervalDays: 14, rarelyResponds: 1, now: NOW,
+        firstInteraction: { uid: "latest", occurredAt: newest },
+      });
+      await createContactWithInteraction(destination, { uid: "parent-b", name: "Local B", intervalDays: 30, now: NOW });
+      if (operation === "lower-newest") await recordTouchpoint(destination, {
+        contactId: a.contactId, uid: "older", occurredAt: older, now: NOW,
+      });
+      const manifest = await buildExportManifest(destination, { exportedAt: NOW, readPhotoBase64: async () => "" });
+      manifest.contacts = manifest.contacts.map((row) => ({ ...row, name: "Losing incoming name", modifiedAt: older }));
+      const changedAt = "2026-08-26 12:00:00";
+      if (operation === "delete") {
+        manifest.interactions = [];
+        manifest.tombstones.push({ entityType: "interaction", entityUid: "latest", deletedAt: changedAt });
+      } else {
+        manifest.interactions = manifest.interactions.map((row) => row.uid !== "latest" ? row : {
+          ...row, modifiedAt: changedAt,
+          ...(operation === "lower-newest" ? { occurredAt: "2026-08-05 12:00:00" } : {}),
+          ...(operation === "disconnect" ? { connected: 0 } : {}),
+          ...(operation === "reparent" ? { contactUid: "parent-b" } : {}),
+        });
+      }
+      await expect(applyRestore(destination, parseBackupManifest(manifest), "merge")).resolves.toMatchObject({
+        status: "applied", updated: operation === "delete" ? 0 : 1, deleted: operation === "delete" ? 1 : 0,
+      });
+      await expect(destination.getAllAsync("SELECT uid,name,last_contact,modified_at FROM contacts ORDER BY uid")).resolves.toEqual([
+        { uid: "parent-a", name: "Local A", last_contact: operation === "lower-newest" ? older : null, modified_at: NOW },
+        { uid: "parent-b", name: "Local B", last_contact: operation === "reparent" ? newest : null, modified_at: NOW },
+      ]);
+      const notContacted = await readOrrerySystemSnapshot(destination, { kind: "builtin", id: "not-contacted" });
+      expect(notContacted.members.map((row) => row.uid).sort()).toEqual(
+        operation === "lower-newest" ? ["parent-b"] : operation === "reparent" ? ["parent-a"] : ["parent-a", "parent-b"],
+      );
+      if (operation === "delete") await expect(destination.getFirstAsync("SELECT deleted_at FROM tombstones WHERE entity_type='interaction' AND entity_uid='latest'"))
+        .resolves.toEqual({ deleted_at: changedAt });
+    },
+  );
+
+  it("recomputes changed contact qualification against retained history with the incoming metadata timestamp", async () => {
+    const destination = await db();
+    await createContactWithInteraction(destination, {
+      uid: "qualification", name: "Before", intervalDays: 14, now: NOW,
+      firstInteraction: { uid: "attempt", occurredAt: NOW, connected: 0 },
+    });
+    const manifest = await buildExportManifest(destination, { exportedAt: NOW, readPhotoBase64: async () => "" });
+    const changedAt = "2026-08-26 12:00:00";
+    manifest.contacts[0] = { ...manifest.contacts[0], rarelyResponds: 1, name: "After", modifiedAt: changedAt };
+    await expect(applyRestore(destination, manifest, "merge")).resolves.toMatchObject({ status: "applied", updated: 1 });
+    await expect(destination.getFirstAsync("SELECT name,rarely_responds,last_contact,modified_at FROM contacts WHERE uid='qualification'"))
+      .resolves.toEqual({ name: "After", rarely_responds: 1, last_contact: null, modified_at: changedAt });
+    expect((await readOrrerySystemSnapshot(destination, { kind: "builtin", id: "not-contacted" })).members.map((row) => row.uid)).toEqual(["qualification"]);
+  });
+
+  it("recomputes the surviving destination when the reparented interaction's old parent is deleted", async () => {
+    const destination = await db();
+    await createContactWithInteraction(destination, {
+      uid: "removed-parent", name: "Removed", intervalDays: 14, now: NOW,
+      firstInteraction: { uid: "moved-touch", occurredAt: NOW },
+    });
+    await createContactWithInteraction(destination, {
+      uid: "surviving-parent", name: "Survivor", intervalDays: 14, now: NOW,
+    });
+    const manifest = await buildExportManifest(destination, { exportedAt: NOW, readPhotoBase64: async () => "" });
+    manifest.contacts = manifest.contacts.filter((row) => row.uid === "surviving-parent");
+    manifest.interactions[0] = { ...manifest.interactions[0], contactUid: "surviving-parent", modifiedAt: "2026-08-26 12:00:00" };
+    manifest.tombstones.push({ entityType: "contact", entityUid: "removed-parent", deletedAt: "2026-08-26 12:00:00" });
+    await expect(applyRestore(destination, parseBackupManifest(manifest), "merge")).resolves.toMatchObject({ status: "applied", deleted: 1, updated: 1 });
+    await expect(destination.getAllAsync("SELECT uid,last_contact,modified_at FROM contacts")).resolves.toEqual([
+      { uid: "surviving-parent", last_contact: NOW, modified_at: NOW },
+    ]);
+    expect((await readOrrerySystemSnapshot(destination, { kind: "builtin", id: "not-contacted" })).members).toEqual([]);
+  });
+
+  it("rolls back changed history, recency, and tombstones if a later restore write fails", async () => {
+    const destination = await db();
+    await createContactWithInteraction(destination, {
+      uid: "atomic", name: "Local", intervalDays: 14, now: NOW,
+      firstInteraction: { uid: "deleted-touch", occurredAt: NOW },
+    });
+    const manifest = await buildExportManifest(destination, { exportedAt: NOW, readPhotoBase64: async () => "" });
+    manifest.interactions = [];
+    manifest.tombstones.push({ entityType: "interaction", entityUid: "deleted-touch", deletedAt: "2026-08-26 12:00:00" });
+    // The revision bump follows recency; failure here must undo both the child
+    // deletion and the already-executed sole-writer recomputation.
+    await destination.execAsync(`CREATE TRIGGER fail_restore_revision BEFORE UPDATE OF data_revision ON app_settings
+      BEGIN SELECT RAISE(ABORT, 'restore revision failed'); END`);
+    await expect(applyRestore(destination, manifest, "merge")).rejects.toThrow("restore revision failed");
+    await expect(destination.getFirstAsync("SELECT name,last_contact,modified_at FROM contacts WHERE uid='atomic'"))
+      .resolves.toEqual({ name: "Local", last_contact: NOW, modified_at: NOW });
+    await expect(destination.getAllAsync("SELECT uid FROM interactions")).resolves.toEqual([{ uid: "deleted-touch" }]);
+    await expect(destination.getAllAsync("SELECT entity_uid FROM tombstones")).resolves.toEqual([]);
+  });
+
   it("allows a newer merged knowledge row to be permanently deleted after its older tombstone survives", async () => {
     const source = await db();
     const destination = await db();
