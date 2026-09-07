@@ -30,6 +30,7 @@ import { ShellAppBar } from "@/components/ShellAppBar";
 import { AppText } from "@/components/ui/AppText";
 import { Button } from "@/components/ui/Button";
 import { getExecutor } from "@/db/database";
+import { readOrreryContactTargetValidation } from "@/db/orrery-action-read";
 import {
   type CameraPose,
   type CameraRect,
@@ -39,6 +40,11 @@ import {
   IDENTITY_ZOOM,
   usableCameraRect,
 } from "@/logic/orrery-camera-logic";
+import {
+  createOrreryFocusController,
+  type OrreryContactTarget,
+  reconcileFocus,
+} from "@/logic/orrery-focus-logic";
 import { cameraExtent, northTarget } from "@/logic/orrery-recovery-logic";
 import {
   ALL_CONTACTS_SYSTEM,
@@ -48,10 +54,7 @@ import {
 import { navigationRef } from "@/navigation/linking";
 import type { RootStackParamList } from "@/navigation/types";
 import { useWindowMeasurement } from "@/navigation/use-window-measurement";
-import {
-  createOrreryIntentDispatcher,
-  loadOrreryScene,
-} from "@/services/orrery-scene";
+import { loadOrreryScene } from "@/services/orrery-scene";
 import { useOrreryPreferencesStore } from "@/stores/orrery-preferences-store";
 import { createOrrerySystemStore } from "@/stores/orrery-system-store";
 import {
@@ -127,7 +130,14 @@ export function OrreryScreen() {
   );
   const hydrated = useOrreryPreferencesStore((store) => store.hydrated);
   const hydration = useOrreryPreferencesStore((store) => store.hydration);
-  const [focusedIds, setFocusedIds] = useState<number[]>([]);
+  const [focusTargets, setFocusTargets] = useState<OrreryContactTarget[]>([]);
+  const focusedIds = useMemo(
+    () => focusTargets.map((target) => target.id),
+    [focusTargets],
+  );
+  const [focusError, setFocusError] = useState<
+    "removed" | "missing-category" | "error" | null
+  >(null);
   const pose = useSharedValue<CameraPose>({ ...HOME_CAMERA });
   const reducedMotion = useReducedMotionShared();
   const useSystemStore = useMemo(
@@ -156,7 +166,7 @@ export function OrreryScreen() {
   useEffect(() => {
     if (focusSystem.current !== state.requested.id) {
       focusSystem.current = state.requested.id;
-      setFocusedIds([]);
+      setFocusTargets([]);
     }
   }, [state.requested.id]);
   const initialized = useRef(false);
@@ -225,12 +235,14 @@ export function OrreryScreen() {
     reduced: reducedMotion,
   });
   const focus = useCallback(
-    (ids: number[]) => {
+    (targets: OrreryContactTarget[]) => {
+      const ids = targets.map((target) => target.id);
       const scene = useSystemStore.getState().current();
       if (!scene) return;
       const bodies = scene.world.filter((body) => ids.includes(body.id));
       if (bodies.length === 0) return;
-      setFocusedIds(ids);
+      setFocusTargets(targets);
+      setFocusError(null);
       const framing = frameBodies(bodies, viewport, scene.extent, pose.value);
       if (!framing) return;
       runOnUI(camera.recover)({
@@ -243,24 +255,64 @@ export function OrreryScreen() {
     },
     [useSystemStore, pose, camera.recover, viewport],
   );
-  const onIntent = useMemo(
+  const actionEnvironment = useRef({ focus, active: isFocused && appActive });
+  actionEnvironment.current = { focus, active: isFocused && appActive };
+  const actions = useMemo(
     () =>
-      createOrreryIntentDispatcher({
-        current: () => useSystemStore.getState().current(),
-        validate: () =>
-          loadOrreryScene(
-            getExecutor(),
-            0,
-            useSystemStore.getState().requested.ref,
-          ),
-        focus,
-        group: focus,
-        clear: () => setFocusedIds([]),
+      createOrreryFocusController({
+        current: () =>
+          actionEnvironment.current.active
+            ? useSystemStore.getState().current()
+            : null,
+        validate: (system, target) =>
+          readOrreryContactTargetValidation(getExecutor(), system, target),
+        focus: (targets) => actionEnvironment.current.focus(targets),
+        group: (targets) => actionEnvironment.current.focus(targets),
+        clear: () => {
+          setFocusTargets([]);
+          setFocusError(null);
+        },
         openProfile: (contactId) =>
           navigation.navigate("Profile", { contactId }),
+        reject: (reason) => {
+          setFocusError(reason);
+          if (reason !== "error") setFocusTargets([]);
+        },
       }),
-    [useSystemStore, focus, navigation],
+    [useSystemStore, navigation],
   );
+  const onIntent = actions.dispatch;
+  const clearFocus = useCallback(() => {
+    actions.cancel("clear");
+    setFocusTargets([]);
+    setFocusError(null);
+  }, [actions]);
+  useEffect(() => {
+    if (!isFocused) actions.cancel("blur");
+    if (!appActive) actions.cancel("background");
+  }, [actions, isFocused, appActive]);
+  useEffect(() => () => actions.cancel("dispose"), [actions]);
+  useEffect(() => {
+    const unsubscribe = useSystemStore.subscribe((next, previous) => {
+      if (next.generation !== previous.generation) actions.cancel("system");
+    });
+    return unsubscribe;
+  }, [actions, useSystemStore]);
+  useEffect(() => {
+    if (!scene || state.status !== "ready") return;
+    setFocusTargets((targets) => {
+      const valid = targets.filter((target) =>
+        reconcileFocus(
+          target,
+          scene.systemSnapshot.members,
+          scene.systemSnapshot.resolvedSunIdentity,
+        ),
+      );
+      if (valid.length === targets.length) return targets;
+      setFocusError("removed");
+      return valid;
+    });
+  }, [scene, state.status]);
   const lastHomeFrame = useRef("");
   useEffect(() => {
     if (!scene || state.status !== "ready") return;
@@ -284,9 +336,11 @@ export function OrreryScreen() {
     })();
   }, [scene, state.status, viewport, pose, focusedIds, camera.stop]);
   const recenter = () => {
+    actions.cancel("recenter");
+    setFocusTargets([]);
+    setFocusError(null);
     const home = deriveHomePose(state.snapshot?.world ?? [], viewport);
     if (!home) return;
-    setFocusedIds([]);
     runOnUI(camera.recover)(home);
   };
   const resetNorth = () => {
@@ -331,6 +385,7 @@ export function OrreryScreen() {
             fontProvider={fontProvider}
             onIntent={onIntent}
             focusedIds={focusedIds}
+            onFocusLost={clearFocus}
             interactive={!overlaysOpen}
           />
         ) : null}
@@ -349,6 +404,28 @@ export function OrreryScreen() {
           onRecenter={recenter}
           onResetNorth={resetNorth}
         />
+        {focusError ? (
+          <OrreryFeedback
+            obstacleId="orrery-focus-feedback"
+            style={[styles.feedback, { backgroundColor: colors.surface }]}
+            contentContainerStyle={styles.feedbackContent}
+          >
+            <AppText>
+              {focusError === "error"
+                ? "Couldn't refresh this System. Showing the last loaded contacts."
+                : focusError === "missing-category"
+                  ? "This System is no longer available."
+                  : "This contact is no longer in this System."}
+            </AppText>
+            <Button
+              role="secondary"
+              label={
+                focusError === "error" ? "Reload System" : "Show All Contacts"
+              }
+              onPress={focusError === "error" ? reload : showAll}
+            />
+          </OrreryFeedback>
+        ) : null}
         {(state.status === "loading" || state.status === "initial") &&
         !scene &&
         hydration !== "error" ? (
@@ -459,7 +536,16 @@ export function OrreryScreen() {
           const snapshot = state.current();
           if (!snapshot) return;
           closeContacts(kind === "focus");
-          void onIntent({ kind, ids: [id], generation: snapshot.generation });
+          const member = snapshot.systemSnapshot.members.find(
+            (row) => row.id === id,
+          );
+          if (!member) return;
+          void onIntent({
+            kind,
+            ids: [id],
+            targets: [{ kind: "member", id, uid: member.uid }],
+            generation: snapshot.generation,
+          });
         }}
       />
     </View>

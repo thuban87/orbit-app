@@ -139,8 +139,8 @@ export function useOrreryCamera({
     };
   }, [enabled, live, input, stop]);
   return useMemo(
-    () => ({ input, samples, live, ...motion }),
-    [input, samples, live, motion],
+    () => ({ input, samples, live, active, ...motion }),
+    [input, samples, live, active, motion],
   );
 }
 
@@ -162,6 +162,7 @@ export function createOrreryGestures({
   coast = () => {},
   onNorth,
   panStart,
+  resolveTap,
 }: {
   pose: CameraCell<CameraPose>;
   frame: CameraCell<ProjectedFrame>;
@@ -173,6 +174,7 @@ export function createOrreryGestures({
   coast?: (kind: "pan" | "yaw", vx: number, vy: number) => void;
   onNorth?: (x: number, y: number) => boolean;
   panStart?: CameraCell<CameraPose | null>;
+  resolveTap?: (frame: ProjectedFrame, x: number, y: number) => OrreryIntent;
 }) {
   const { input, samples, live } = camera;
   const touch = (pointers: number) => {
@@ -196,7 +198,11 @@ export function createOrreryGestures({
       "worklet";
       if (!success || !live.value || input.value.owner !== "pending") return;
       if (onNorth?.(event.x, event.y)) return;
-      runOnJS(send)(tapIntent(frame.value, event.x, event.y, true));
+      runOnJS(send)(
+        resolveTap
+          ? resolveTap(frame.value, event.x, event.y)
+          : tapIntent(frame.value, event.x, event.y, true),
+      );
     });
   const pan = Gesture.Pan()
     .enabled(enabled)

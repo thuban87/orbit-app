@@ -19,6 +19,11 @@ import type {
   OrreryIntent,
 } from "@/logic/orrery-camera-logic";
 import {
+  focusEffectivelyOffscreen,
+  type OrreryContactTarget,
+  resolveOrreryTap,
+} from "@/logic/orrery-focus-logic";
+import {
   type AnimatedFrame,
   beginWorldTransition,
   billboardPose,
@@ -152,6 +157,7 @@ export function OrreryWorld({
   focusedRelationById = {},
   interactive = true,
   camera,
+  onFocusLost,
 }: {
   scene: OrrerySceneSnapshot;
   camera: OrreryCameraController;
@@ -165,6 +171,7 @@ export function OrreryWorld({
   /** Already-filtered, existing relation context only; supplied by focus/moon owner. */
   focusedRelationById?: Readonly<Record<number, string>>;
   interactive?: boolean;
+  onFocusLost?: () => void;
 }) {
   const { fontScale } = useWindowDimensions();
   const reducedMotion = useReducedMotionShared();
@@ -229,26 +236,6 @@ export function OrreryWorld({
     })();
   }, [scene, transition, progress, reducedMotion]);
   useEffect(() => () => cancelAnimation(progress), [progress]);
-  const gesture = useMemo(
-    () =>
-      createOrreryGestures({
-        pose,
-        frame,
-        camera,
-        extent: cameraExtent(scene.extent),
-        send: onIntent,
-        enabled: interactive,
-        stop: camera.stop,
-        coast: camera.coast,
-        onNorth: (x, y) => {
-          "worklet";
-          if (!hitPolaris(frame.value, scene.extent, x, y)) return false;
-          camera.recover(northTarget(pose.value));
-          return true;
-        },
-      }),
-    [pose, frame, camera, scene.extent, onIntent, interactive],
-  );
   const starColors = useMemo(
     () => [colors.textSecondary, colors.textPrimary, ...colors.starPalette],
     [colors],
@@ -372,6 +359,76 @@ export function OrreryWorld({
       exclusions,
     );
   });
+  const identities = useMemo<OrreryContactTarget[]>(
+    () => [
+      ...scene.systemSnapshot.members.map((member) => ({
+        kind: "member" as const,
+        id: member.id,
+        uid: member.uid,
+      })),
+      ...(scene.systemSnapshot.resolvedSunIdentity
+        ? [
+            {
+              ...scene.systemSnapshot.resolvedSunIdentity,
+              kind: "contact-sun" as const,
+            },
+          ]
+        : []),
+    ],
+    [scene],
+  );
+  const members = scene.systemSnapshot.members;
+  const gesture = useMemo(
+    () =>
+      createOrreryGestures({
+        pose,
+        frame,
+        camera,
+        extent: cameraExtent(scene.extent),
+        send: onIntent,
+        enabled: interactive,
+        stop: camera.stop,
+        coast: camera.coast,
+        resolveTap: (current, x, y) => {
+          "worklet";
+          return resolveOrreryTap(
+            current,
+            x,
+            y,
+            identities,
+            allocations.value.map((label) => label.id),
+            members,
+          );
+        },
+        onNorth: (x, y) => {
+          "worklet";
+          if (!hitPolaris(frame.value, scene.extent, x, y)) return false;
+          camera.recover(northTarget(pose.value));
+          return true;
+        },
+      }),
+    [
+      pose,
+      frame,
+      camera,
+      scene.extent,
+      onIntent,
+      interactive,
+      identities,
+      allocations,
+      members,
+    ],
+  );
+  const singleFocus = focusedIds.length === 1 ? focusedIds[0] : null;
+  useAnimatedReaction(
+    () =>
+      singleFocus !== null &&
+      camera.active.value === null &&
+      focusEffectivelyOffscreen(frame.value, singleFocus),
+    (lost, previous) => {
+      if (lost && previous === false && onFocusLost) runOnJS(onFocusLost)();
+    },
+  );
   return (
     <OrreryCanvas
       width={viewport.width}

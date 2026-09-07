@@ -3,6 +3,7 @@
  * world placement. Pan/zoom never change a person's timestamp angle or rank.
  * Projection is a single invertible tilted plane; billboards stay screen-facing.
  */
+import type { OrreryContactTarget } from "./orrery-focus-logic";
 export interface WorldPoint {
   x: number;
   y: number;
@@ -517,6 +518,7 @@ export interface OrreryIntent {
   kind: "none" | "clear" | "focus" | "profile" | "group";
   ids: number[];
   generation: number;
+  targets?: OrreryContactTarget[];
 }
 export function tapIntent(
   frame: ProjectedFrame,
