@@ -1,10 +1,10 @@
 ---
 schema_version: 1
-open_count: 45
+open_count: 46
 waived_count: 0
 fixed_count: 6
-total_count: 51
-last_updated: 2026-09-07T16:46:40.740Z
+total_count: 52
+last_updated: 2026-09-07T17:05:24.648Z
 ---
 
 # Broken Windows Ledger
@@ -66,6 +66,7 @@ last_updated: 2026-09-07T16:46:40.740Z
 | 49 | 29 | unrun-verify | src/components/orrery/OrreryWorld.tsx |  | Plan 29-05 native billboard sun occlusion, glyph shaping, layer visibility and scaled-text fit await Plan 12 device verification. | open |  | 2026-09-07T09:03:24.375Z |  |
 | 50 | 29 | unrun-verify | src/components/orrery/OrreryControls.tsx |  | Native window measurement, scaled control reachability, modal focus restoration and TalkBack orientation remain pending in Plan 12. | open |  | 2026-09-07T09:23:41.676Z |  |
 | 51 | 29 | unrun-verify | src/components/orrery/use-orrery-camera.ts |  | Plan 29-07 native pan/pinch/tilt/yaw arbitration, restrained recovery feel, world Polaris visibility and TalkBack orientation remain pending Plan 12 device verification. | open |  | 2026-09-07T16:46:40.740Z |  |
+| 52 | 29 | unrun-verify | src/screens/OrreryScreen.tsx |  | Plan 29-08 native TalkBack names/action order/trigger focus/modal isolation/large-font wrapping and floating group coexistence remain pending Plan 12. | open |  | 2026-09-07T17:05:24.648Z |  |
 
 ````json
 [
@@ -679,6 +680,18 @@ last_updated: 2026-09-07T16:46:40.740Z
     "status": "open",
     "reason": "",
     "recorded_at": "2026-09-07T16:46:40.740Z",
+    "resolved_at": null
+  },
+  {
+    "id": 52,
+    "kind": "unrun-verify",
+    "phase": "29",
+    "file": "src/screens/OrreryScreen.tsx",
+    "line": null,
+    "description": "Plan 29-08 native TalkBack names/action order/trigger focus/modal isolation/large-font wrapping and floating group coexistence remain pending Plan 12.",
+    "status": "open",
+    "reason": "",
+    "recorded_at": "2026-09-07T17:05:24.648Z",
     "resolved_at": null
   }
 ]
