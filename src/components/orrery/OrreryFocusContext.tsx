@@ -16,6 +16,7 @@ import {
 import type { OrreryContactTarget } from "@/logic/orrery-focus-logic";
 import { bodyKey } from "@/logic/orrery-frame";
 import { SPACING } from "@/theme/tokens/spacing";
+import { OrreryNotice } from "./OrreryFeedback";
 
 /** Lightweight identity follows the authoritative frame on the UI thread.
  * Optional relationship content belongs to the qualified parent (D-11).
@@ -39,7 +40,7 @@ export function OrreryFocusContext({
   onProfile?: () => void;
   relationshipContext?: ReactNode;
   contextState?: "loading" | "ready" | "error";
-  onReloadContext?: () => void;
+  onReloadContext?: () => void | Promise<void>;
 }) {
   const [height, setHeight] = useState(180);
   const position = useAnimatedStyle(() => {
@@ -100,19 +101,7 @@ export function OrreryFocusContext({
           ) : null}
           {contextState === "ready" ? relationshipContext : null}
           {contextState === "error" ? (
-            <>
-              <AppText>
-                Couldn't load relationship satellites. Your contacts are still
-                available.
-              </AppText>
-              {onReloadContext ? (
-                <Button
-                  role="secondary"
-                  label="Reload satellites"
-                  onPress={onReloadContext}
-                />
-              ) : null}
-            </>
+            <OrreryNotice kind="satellites" onAction={onReloadContext} />
           ) : null}
         </Animated.ScrollView>
       </GlassSurface>

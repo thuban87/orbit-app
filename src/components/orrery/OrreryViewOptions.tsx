@@ -20,6 +20,7 @@ import { useOrreryPreferencesStore } from "@/stores/orrery-preferences-store";
 import { shellTransientStore } from "@/stores/shell-transient-store";
 import { useTheme } from "@/theme";
 import { SPACING } from "@/theme/tokens/spacing";
+import { OrreryNotice } from "./OrreryFeedback";
 import { OrreryObstacle } from "./OrreryObstacle";
 
 const LABELS = {
@@ -193,29 +194,16 @@ export function OrreryViewOptions({
                     : "Loading view options…"}
                 </AppText>
               ) : null}
-              {preferences.hydration === "error" ? (
-                <AppText accessibilityLiveRegion="polite">
-                  Couldn't load your view options. Try loading them again.
-                </AppText>
-              ) : null}
-              {preferences.saveError ? (
-                <AppText accessibilityLiveRegion="polite">
-                  Couldn't save your view options. Try that change again.
-                </AppText>
-              ) : null}
               {preferences.hydration === "error" || preferences.saveError ? (
-                <View accessibilityState={{ busy }}>
-                  <Button
-                    role="secondary"
-                    label={
-                      preferences.hydration === "error"
-                        ? "Reload view options"
-                        : "Retry view change"
-                    }
-                    disabled={busy}
-                    onPress={() => void preferences.retry(getExecutor())}
-                  />
-                </View>
+                <OrreryNotice
+                  kind={
+                    preferences.hydration === "error"
+                      ? "settings"
+                      : "preferences"
+                  }
+                  busy={busy}
+                  onAction={() => preferences.retry(getExecutor())}
+                />
               ) : null}
               <Button
                 role="secondary"

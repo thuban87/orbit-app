@@ -30,7 +30,9 @@ describe("one animated Orrery frame", () => {
     expect(middle[0].radius).toBeLessThan(18);
     expect(middle[0].interactive).toBe(false);
     const returnTransition = beginWorldTransition(middle, [body(1, 70)], 3);
-    expect(sampleWorldTransition(returnTransition, 0)[0].radius).toBe(middle[0].radius);
+    expect(sampleWorldTransition(returnTransition, 0)[0].radius).toBe(
+      middle[0].radius,
+    );
   });
   it.each([0, 0.25, 0.5, 0.75, 1])(
     "projects displayed rings, bodies and hits together at %s",

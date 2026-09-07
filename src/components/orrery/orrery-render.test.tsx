@@ -23,6 +23,8 @@ vi.mock("expo-sqlite", () => ({}));
 vi.mock("react", async (original) => ({
   ...(await original<typeof import("react")>()),
   useMemo: (factory: () => unknown) => factory(),
+  useCallback: (callback: unknown) => callback,
+  useRef: (value: unknown) => ({ current: value }),
   useEffect: () => {},
   useState: (factory: () => unknown) => [factory(), () => {}],
 }));

@@ -132,33 +132,43 @@ export function createOrrerySatelliteController(
   publish: (state: OrrerySatelliteState) => void,
 ) {
   let generation = 0;
+  let pending: { scene: OrrerySceneSnapshot; work: Promise<void> } | null =
+    null;
   return {
-    async reload(scene: OrrerySceneSnapshot | null, enabled: boolean) {
+    reload(scene: OrrerySceneSnapshot | null, enabled: boolean): Promise<void> {
+      if (enabled && scene && pending?.scene === scene) return pending.work;
       const ticket = ++generation;
+      pending = null;
       const sceneGeneration = scene?.generation ?? null;
       publish({
         status: enabled && scene ? "loading" : "ready",
         sceneGeneration,
         rows: [],
       });
-      if (!scene || !enabled) return;
-      try {
-        const rows = await load(scene);
-        if (ticket !== generation) return;
-        publish({
-          status: "ready",
-          sceneGeneration,
-          rows: rows.filter((row) =>
-            scene.systemSnapshot.members.some(
-              (parent) =>
-                parent.id === row.parentId && parent.uid === row.parentUid,
+      if (!scene || !enabled) return Promise.resolve();
+      const work = (async () => {
+        try {
+          const rows = await load(scene);
+          if (ticket !== generation) return;
+          publish({
+            status: "ready",
+            sceneGeneration,
+            rows: rows.filter((row) =>
+              scene.systemSnapshot.members.some(
+                (parent) =>
+                  parent.id === row.parentId && parent.uid === row.parentUid,
+              ),
             ),
-          ),
-        });
-      } catch {
-        if (ticket === generation)
-          publish({ status: "error", sceneGeneration, rows: [] });
-      }
+          });
+        } catch {
+          if (ticket === generation)
+            publish({ status: "error", sceneGeneration, rows: [] });
+        }
+      })().finally(() => {
+        if (ticket === generation) pending = null;
+      });
+      pending = { scene, work };
+      return work;
     },
   };
 }

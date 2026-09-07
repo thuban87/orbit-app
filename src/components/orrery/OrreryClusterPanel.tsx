@@ -7,6 +7,7 @@ import type { CameraViewport } from "@/logic/orrery-camera-logic";
 import type { OrreryContactTarget } from "@/logic/orrery-focus-logic";
 import type { OrrerySceneSnapshot } from "@/services/orrery-scene";
 import { SPACING } from "@/theme/tokens/spacing";
+import { OrreryNotice } from "./OrreryFeedback";
 import { OrreryObstacle } from "./OrreryObstacle";
 import { clusterCount, clusterRegion } from "./orrery-overlay-logic";
 
@@ -28,7 +29,7 @@ export function OrreryClusterPanel({
   blocked: boolean;
   onClose: () => void;
   onAction: (kind: "focus" | "profile", target: OrreryContactTarget) => void;
-  onReload: () => void;
+  onReload: () => void | Promise<void>;
 }) {
   const region = clusterRegion(viewport);
   if (!targets.length || !region) return null;
@@ -57,18 +58,7 @@ export function OrreryClusterPanel({
             label="Close contact group"
             onPress={onClose}
           />
-          {stale ? (
-            <>
-              <AppText>
-                Couldn't refresh this System. Showing the last loaded contacts.
-              </AppText>
-              <Button
-                role="secondary"
-                label="Reload System"
-                onPress={onReload}
-              />
-            </>
-          ) : null}
+          {stale ? <OrreryNotice kind="stale" onAction={onReload} /> : null}
           {targets.map((target) => {
             const member = scene.systemSnapshot.members.find(
               (item) => item.id === target.id && item.uid === target.uid,

@@ -5,10 +5,11 @@ import {
   Skia,
   type SkTypefaceFontProvider,
 } from "@shopify/react-native-skia";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useWindowDimensions } from "react-native";
 import {
   cancelAnimation,
+  ReduceMotion,
   runOnJS,
   runOnUI,
   type SharedValue,
@@ -244,12 +245,35 @@ export function OrreryWorld({
     beginWorldTransition([], scene.world, scene.generation),
   );
   const progress = useSharedValue(1);
+  const mounted = useRef(true);
+  const focusKey = JSON.stringify([
+    scene.generation,
+    focusedIds,
+    focusedSatellite,
+  ]);
+  const latestFocus = useRef(focusKey);
+  latestFocus.current = focusKey;
+  const reportFocusLost = useCallback(() => {
+    if (mounted.current && latestFocus.current === focusKey) onFocusLost?.();
+  }, [focusKey, onFocusLost]);
+  const pruneResources = useCallback((generation: number) => {
+    if (!mounted.current) return;
+    setRegistry((current) =>
+      current.scene.generation === generation
+        ? {
+            ...current,
+            resources: current.resources.filter((resource) =>
+              current.scene.world.some(
+                (body) => bodyKey(body) === resource.key,
+              ),
+            ),
+          }
+        : current,
+    );
+  }, []);
   const level = useSharedValue<SemanticLevel>("overview");
   const frame = useDerivedValue(() => {
-    const sampled = sampleWorldTransition(
-      transition.value,
-      reducedMotion.value ? 1 : progress.value,
-    );
+    const sampled = sampleWorldTransition(transition.value, progress.value);
     const held = camera.reorder.value;
     const world = previewReorder(
       sampled,
@@ -284,38 +308,58 @@ export function OrreryWorld({
   useEffect(() => {
     const world = scene.world;
     const generation = scene.generation;
-    const complete = () =>
-      setRegistry((current) =>
-        current.scene === scene
-          ? {
-              scene,
-              resources: current.resources.filter((resource) =>
-                scene.world.some((body) => bodyKey(body) === resource.key),
-              ),
-            }
-          : current,
-      );
     runOnUI(() => {
       "worklet";
       camera.reorder.value = null;
       if (transition.value.generation === generation) return;
       const displayed = sampleWorldTransition(
         transition.value,
-        reducedMotion.value ? 1 : progress.value,
+        progress.value,
       ).filter((body) => body.opacity > 0);
       cancelAnimation(progress);
       transition.value = beginWorldTransition(displayed, world, generation);
       progress.value = 0;
       progress.value = withTiming(
         1,
-        { duration: reducedMotion.value ? 100 : WORLD_SETTLE_MS },
+        {
+          duration: reducedMotion.value ? 100 : WORLD_SETTLE_MS,
+          reduceMotion: ReduceMotion.Never,
+        },
         (finished) => {
-          if (finished) runOnJS(complete)();
+          if (finished) runOnJS(pruneResources)(generation);
         },
       );
     })();
-  }, [scene, transition, progress, reducedMotion, camera.reorder]);
-  useEffect(() => () => cancelAnimation(progress), [progress]);
+  }, [
+    scene,
+    transition,
+    progress,
+    reducedMotion,
+    camera.reorder,
+    pruneResources,
+  ]);
+  useAnimatedReaction(
+    () => reducedMotion.value,
+    (reduced, previous) => {
+      if (!reduced || previous !== false) return;
+      cancelAnimation(progress);
+      const generation = transition.value.generation;
+      progress.value = withTiming(
+        1,
+        { duration: 100, reduceMotion: ReduceMotion.Never },
+        (finished) => {
+          if (finished) runOnJS(pruneResources)(generation);
+        },
+      );
+    },
+  );
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+      cancelAnimation(progress);
+    };
+  }, [progress]);
   const starColors = useMemo(
     () => [colors.textSecondary, colors.textPrimary, ...colors.starPalette],
     [colors],
@@ -527,7 +571,7 @@ export function OrreryWorld({
       camera.active.value === null &&
       focusEffectivelyOffscreen(frame.value, singleFocus),
     (lost, previous) => {
-      if (lost && previous === false && onFocusLost) runOnJS(onFocusLost)();
+      if (lost && previous === false && onFocusLost) runOnJS(reportFocusLost)();
     },
   );
   useAnimatedReaction(
@@ -558,7 +602,7 @@ export function OrreryWorld({
       );
     },
     (lost, previous) => {
-      if (lost && previous !== true && onFocusLost) runOnJS(onFocusLost)();
+      if (lost && previous !== true && onFocusLost) runOnJS(reportFocusLost)();
     },
   );
   return (

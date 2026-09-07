@@ -28,6 +28,7 @@ export interface OrrerySystemState {
   persistence: "saved" | "saving" | "error";
   select: (system: OrrerySystemRef, name?: string) => Promise<void>;
   reload: () => Promise<void>;
+  retryReload: () => Promise<void>;
   cancel: () => void;
   current: () => OrrerySceneSnapshot | null;
   retryPersistence: () => Promise<void>;
@@ -44,9 +45,13 @@ export interface OrrerySystemAdapters {
 /** Request generations, not selected names or revisions, own async publication. */
 export function createOrrerySystemStore(io: OrrerySystemAdapters) {
   let active = false;
+  let retrying: Promise<void> | null = null;
+  let savingGeneration: number | null = null;
   return create<OrrerySystemState>()((set, get) => {
     const save = async (system: OrrerySystemRef, generation: number) => {
       if (!active || generation !== get().generation) return;
+      if (savingGeneration === generation) return;
+      savingGeneration = generation;
       set({ persistence: "saving" });
       let saved = false;
       try {
@@ -56,6 +61,7 @@ export function createOrrerySystemStore(io: OrrerySystemAdapters) {
       }
       if (active && generation === get().generation)
         set({ persistence: saved ? "saved" : "error" });
+      if (savingGeneration === generation) savingGeneration = null;
     };
     const select = async (system: OrrerySystemRef, name?: string) => {
       const id = systemRefId(system);
@@ -130,6 +136,15 @@ export function createOrrerySystemStore(io: OrrerySystemAdapters) {
       persistence: "saved",
       select,
       reload: () => select(get().requested.ref, get().requested.name),
+      retryReload: () => {
+        if (retrying) return retrying;
+        retrying = get()
+          .reload()
+          .finally(() => {
+            retrying = null;
+          });
+        return retrying;
+      },
       cancel: () => {
         active = false;
         set({ generation: get().generation + 1 });

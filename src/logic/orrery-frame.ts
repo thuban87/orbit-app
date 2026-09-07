@@ -58,10 +58,16 @@ export function beginWorldTransition(
     if (!base) continue;
     starts.push({
       ...(previous ?? base),
+      radius: previous?.radius ?? base.radius * 0.75,
       opacity: previous?.opacity ?? 0,
       interactive: live,
     });
-    ends.push({ ...base, opacity: live ? 1 : 0, interactive: live });
+    ends.push({
+      ...base,
+      radius: live ? base.radius : base.radius * 0.75,
+      opacity: live ? 1 : 0,
+      interactive: live,
+    });
   }
   return { generation, from: starts, to: ends };
 }

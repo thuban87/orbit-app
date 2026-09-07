@@ -12,6 +12,7 @@ const native = vi.hoisted(() => ({ announce: vi.fn(), focus: vi.fn() }));
 vi.mock("react", async (original) => ({
   ...(await original<typeof import("react")>()),
   useRef: (value: unknown) => ({ current: value }),
+  useMemo: (factory: () => unknown) => factory(),
   useEffect: () => {},
   useState: (value: unknown) => [value, () => {}],
 }));
@@ -175,6 +176,7 @@ describe("actual Orrery controls and detail sheet", () => {
               }
             : null,
         reload: vi.fn(),
+        retryReload: vi.fn(),
       } as unknown as OrrerySystemState;
       const close = vi.fn();
       const nodes = all(

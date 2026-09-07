@@ -32,7 +32,10 @@ const scene = (system = all): OrrerySceneSnapshot =>
 describe("System publication ownership", () => {
   it("coalesces recovery taps while leaving newer actual reloads generation-owned", async () => {
     const read = deferred<OrrerySceneSnapshot>();
-    const load = vi.fn().mockResolvedValueOnce(scene()).mockReturnValue(read.promise);
+    const load = vi
+      .fn()
+      .mockResolvedValueOnce(scene())
+      .mockReturnValue(read.promise);
     const store = createOrrerySystemStore({ load, persist: async () => true });
     await store.getState().select(all);
     const first = store.getState().retryReload();

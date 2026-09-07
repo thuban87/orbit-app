@@ -14,6 +14,7 @@ import { ALL_CONTACTS_SYSTEM } from "@/logic/orrery-system-logic";
 import type { OrrerySatelliteState } from "@/services/orrery-scene";
 import type { OrrerySystemState } from "@/stores/orrery-system-store";
 import { SPACING } from "@/theme/tokens/spacing";
+import { OrreryNotice } from "./OrreryFeedback";
 import { companionRows } from "./orrery-companion-logic";
 import { systemEmptyCopy } from "./orrery-controls-logic";
 import { satelliteContext } from "./orrery-satellite-context";
@@ -36,7 +37,7 @@ export function OrreryContactsSheet({
   onAction: (kind: "focus" | "profile", id: number) => void;
   relationshipContextById?: Readonly<Record<number, ReactNode>>;
   satellites?: OrrerySatelliteState;
-  onReloadSatellites?: () => void;
+  onReloadSatellites?: () => void | Promise<void>;
 }) {
   const { height } = useWindowDimensions();
   const scene = state.snapshot;
@@ -58,31 +59,19 @@ export function OrreryContactsSheet({
         <AppText role="heading">Contacts in this System</AppText>
         <AppText>{state.requested.name}</AppText>
         {state.status === "initial" || state.status === "loading" ? (
-          <AppText>Loading contacts…</AppText>
+          <OrreryNotice kind="list-loading" />
         ) : null}
         {state.status === "error" || state.status === "stale" ? (
-          <>
-            <AppText>
-              {state.status === "stale"
-                ? "Couldn't refresh this System. Showing the last loaded contacts."
-                : "Couldn't load this System. Try loading it again."}
-            </AppText>
-            <Button
-              role="secondary"
-              label="Reload System"
-              onPress={() => void state.reload()}
-            />
-          </>
+          <OrreryNotice
+            kind={state.status === "stale" ? "stale" : "read"}
+            onAction={state.retryReload}
+          />
         ) : null}
         {state.status === "missing-category" ? (
-          <>
-            <AppText>This System is no longer available.</AppText>
-            <Button
-              role="secondary"
-              label="Show All Contacts"
-              onPress={() => void state.select(ALL_CONTACTS_SYSTEM)}
-            />
-          </>
+          <OrreryNotice
+            kind="missing"
+            onAction={() => state.select(ALL_CONTACTS_SYSTEM)}
+          />
         ) : null}
         {empty ? (
           <>
@@ -133,17 +122,7 @@ export function OrreryContactsSheet({
           </View>
         ))}
         {satellites?.status === "error" ? (
-          <>
-            <AppText>
-              Couldn't load relationship satellites. Your contacts are still
-              available.
-            </AppText>
-            <Button
-              role="secondary"
-              label="Reload satellites"
-              onPress={onReloadSatellites}
-            />
-          </>
+          <OrreryNotice kind="satellites" onAction={onReloadSatellites} />
         ) : null}
         <Button role="secondary" label="Close contact list" onPress={onClose} />
       </ScrollView>

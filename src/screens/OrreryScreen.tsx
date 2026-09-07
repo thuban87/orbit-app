@@ -26,7 +26,10 @@ import {
   ORRERY_CONTROLS_OBSTACLE,
   OrreryControls,
 } from "@/components/orrery/OrreryControls";
-import { OrreryFeedback } from "@/components/orrery/OrreryFeedback";
+import {
+  OrreryFeedback,
+  OrreryNotice,
+} from "@/components/orrery/OrreryFeedback";
 import { OrreryFocusContext } from "@/components/orrery/OrreryFocusContext";
 import { OrrerySystemSelector } from "@/components/orrery/OrrerySystemSelector";
 import { OrreryViewOptions } from "@/components/orrery/OrreryViewOptions";
@@ -245,7 +248,7 @@ export function OrreryScreen() {
     [],
   );
   const reloadSatellites = useCallback(() => {
-    void satelliteController.reload(
+    return satelliteController.reload(
       useSystemStore.getState().current(),
       useOrreryPreferencesStore.getState().committed.satellitesEnabled === 1,
     );
@@ -292,7 +295,7 @@ export function OrreryScreen() {
       if (value !== "active") {
         if (routeLive.current) captureSession.current("background");
         cancelIntent.current("background");
-      }
+      } else captureGeneration.current++;
       setAppActive(value === "active");
     });
     return () => subscription.remove();
@@ -335,6 +338,10 @@ export function OrreryScreen() {
       void useSystemStore.getState().reload();
   }, [useSystemStore, isFocused, appActive]);
   useShellRefresh(reload);
+  const retryReload = useCallback(async () => {
+    if (routeLive.current && AppState.currentState === "active")
+      await useSystemStore.getState().retryReload();
+  }, [useSystemStore]);
   const presentation = `${preferences.density}:${preferences.satellitesEnabled}`;
   const lastPresentation = useRef(presentation);
   useEffect(() => {
@@ -383,12 +390,15 @@ export function OrreryScreen() {
     const ticket = ++captureGeneration.current;
     const generation = useOrrerySessionStore.getState().generation;
     const systemId = useSystemStore.getState().requested.id;
+    const sceneGeneration = useSystemStore.getState().generation;
     const target =
       !clusterOpen && focusTargets.length === 1 ? focusTargets[0] : null;
     const publish = (settled: CameraPose) => {
       if (
         ticket !== captureGeneration.current ||
-        generation !== useOrrerySessionStore.getState().generation
+        generation !== useOrrerySessionStore.getState().generation ||
+        (reason === "profile" &&
+          sceneGeneration !== useSystemStore.getState().generation)
       )
         return;
       useOrrerySessionStore
@@ -446,7 +456,7 @@ export function OrreryScreen() {
     [useSystemStore],
   );
   const reloadReorder = useCallback(async () => {
-    await useSystemStore.getState().reload();
+    await useSystemStore.getState().retryReload();
     if (useSystemStore.getState().status === "ready") setReorderError(false);
   }, [useSystemStore]);
   const focus = useCallback(
@@ -517,6 +527,7 @@ export function OrreryScreen() {
   );
   const onIntent = useCallback(
     async (intent: OrreryIntent) => {
+      captureGeneration.current++;
       const ticket = ++satelliteAction.current;
       setFocusedSatellite(null);
       if (intent.kind !== "satellite") {
@@ -743,7 +754,7 @@ export function OrreryScreen() {
     allContacts,
     qualifyingSun,
   );
-  const showAll = () => void state.select(ALL_CONTACTS_SYSTEM);
+  const showAll = () => state.select(ALL_CONTACTS_SYSTEM);
 
   return (
     <View
@@ -758,7 +769,7 @@ export function OrreryScreen() {
         style={styles.canvasArea}
         onLayout={canvasMeasurement.onLayout}
       >
-        {visible && scene ? (
+        {visible && sessionReady && scene ? (
           <OrreryWorld
             scene={scene}
             camera={camera}
@@ -861,7 +872,7 @@ export function OrreryScreen() {
             stale={state.status === "stale"}
             blocked={overlaysOpen}
             onClose={dismissCluster}
-            onReload={reload}
+            onReload={retryReload}
             onAction={(kind, target) => {
               const current = state.current();
               if (!current) return;
@@ -890,19 +901,15 @@ export function OrreryScreen() {
             style={[styles.feedback, { backgroundColor: colors.surface }]}
             contentContainerStyle={styles.feedbackContent}
           >
-            <AppText>
-              {focusError === "error"
-                ? "Couldn't refresh this System. Showing the last loaded contacts."
-                : focusError === "missing-category"
-                  ? "This System is no longer available."
-                  : "This contact is no longer in this System."}
-            </AppText>
-            <Button
-              role="secondary"
-              label={
-                focusError === "error" ? "Reload System" : "Show All Contacts"
+            <OrreryNotice
+              kind={
+                focusError === "error"
+                  ? "stale"
+                  : focusError === "missing-category"
+                    ? "missing"
+                    : "removed"
               }
-              onPress={focusError === "error" ? reload : showAll}
+              onAction={focusError === "error" ? retryReload : showAll}
             />
           </OrreryFeedback>
         ) : null}
@@ -912,14 +919,10 @@ export function OrreryScreen() {
             style={[styles.feedback, { backgroundColor: colors.surface }]}
             contentContainerStyle={styles.feedbackContent}
           >
-            <AppText>
-              Couldn't change the orbit order. The saved order has been
-              restored.
-            </AppText>
-            <Button
-              role="secondary"
-              label="Reload System"
-              onPress={() => void reloadReorder()}
+            <OrreryNotice
+              kind="reorder"
+              onAction={reloadReorder}
+              busy={state.status === "loading"}
             />
           </OrreryFeedback>
         ) : null}
@@ -931,7 +934,7 @@ export function OrreryScreen() {
             style={[styles.feedback, { backgroundColor: colors.surface }]}
             contentContainerStyle={styles.feedbackContent}
           >
-            <AppText>Loading your Orrery…</AppText>
+            <OrreryNotice kind="world-loading" />
           </OrreryFeedback>
         ) : null}
         {state.status === "error" || state.status === "stale" ? (
@@ -940,12 +943,10 @@ export function OrreryScreen() {
             style={[styles.feedback, { backgroundColor: colors.surface }]}
             contentContainerStyle={styles.feedbackContent}
           >
-            <AppText>
-              {scene
-                ? "Couldn't refresh this System. Showing the last loaded contacts."
-                : "Couldn't load this System. Try loading it again."}
-            </AppText>
-            <Button role="secondary" label="Reload System" onPress={reload} />
+            <OrreryNotice
+              kind={scene ? "stale" : "read"}
+              onAction={retryReload}
+            />
           </OrreryFeedback>
         ) : null}
         {state.status === "missing-category" ? (
@@ -955,12 +956,7 @@ export function OrreryScreen() {
             contentContainerStyle={styles.feedbackContent}
           >
             <AppText role="heading">{state.requested.name}</AppText>
-            <AppText>This System is no longer available.</AppText>
-            <Button
-              role="secondary"
-              label="Show All Contacts"
-              onPress={showAll}
-            />
+            <OrreryNotice kind="missing" onAction={showAll} />
           </OrreryFeedback>
         ) : null}
         {state.persistence === "error" && state.status === "ready" ? (
@@ -969,13 +965,9 @@ export function OrreryScreen() {
             style={[styles.saveFeedback, { backgroundColor: colors.surface }]}
             contentContainerStyle={styles.feedbackContent}
           >
-            <AppText>
-              Couldn't save your view options. Try that change again.
-            </AppText>
-            <Button
-              role="secondary"
-              label="Retry view change"
-              onPress={() => void state.retryPersistence()}
+            <OrreryNotice
+              kind="preferences"
+              onAction={state.retryPersistence}
             />
           </OrreryFeedback>
         ) : null}
@@ -985,13 +977,9 @@ export function OrreryScreen() {
             style={[styles.feedback, { backgroundColor: colors.surface }]}
             contentContainerStyle={styles.feedbackContent}
           >
-            <AppText>
-              Couldn't load your view options. Try loading them again.
-            </AppText>
-            <Button
-              role="secondary"
-              label="Reload view options"
-              onPress={() => void hydratePreferences(getExecutor())}
+            <OrreryNotice
+              kind="settings"
+              onAction={() => hydratePreferences(getExecutor())}
             />
           </OrreryFeedback>
         ) : null}
