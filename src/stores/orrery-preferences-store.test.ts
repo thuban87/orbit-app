@@ -32,6 +32,21 @@ function fixture() {
   return { store, read, write };
 }
 describe("Orrery preferences commit-before-publish", () => {
+  it("a hydration started during a write cannot publish its precommit snapshot", async () => {
+    const { store, read, write } = fixture();
+    await store.getState().hydrate(exec);
+    const writing = deferred<void>();
+    const reading = deferred<Partial<OrreryPreferences>>();
+    write.mockImplementationOnce(() => writing.promise);
+    read.mockImplementationOnce(() => reading.promise);
+    const save = store.getState().save(exec, { density: "compact" });
+    const hydrate = store.getState().hydrate(exec);
+    writing.resolve();
+    await save;
+    reading.resolve(defaults);
+    await hydrate;
+    expect(store.getState().committed.density).toBe("compact");
+  });
   it("defaults omitted values without writing and exposes initial hydration busy", async () => {
     const { store, read, write } = fixture();
     read.mockResolvedValueOnce({});

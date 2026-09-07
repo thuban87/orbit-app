@@ -19,17 +19,12 @@ import {
   useSharedValue,
   withTiming,
 } from "react-native-reanimated";
+import { OrreryViewOptions } from "@/components/orrery/OrreryViewOptions";
 import { OrreryWorld } from "@/components/orrery/OrreryWorld";
 import { ShellAppBar } from "@/components/ShellAppBar";
 import { AppText } from "@/components/ui/AppText";
 import { Button } from "@/components/ui/Button";
-import {
-  getAppSettings,
-  ORRERY_DENSITIES,
-  type OrreryDensity,
-  updateAppSettings,
-} from "@/db/app-settings-dao";
-import { getExecutor, localDateTime } from "@/db/database";
+import { getExecutor } from "@/db/database";
 import {
   type CameraPose,
   constrainCamera,
@@ -44,6 +39,7 @@ import {
   loadOrreryScene,
   type OrreryLoadState,
 } from "@/services/orrery-scene";
+import { useOrreryPreferencesStore } from "@/stores/orrery-preferences-store";
 import { useShellRefresh } from "@/stores/shell-refresh-store";
 import { useTheme } from "@/theme";
 import { SPACING } from "@/theme/tokens/spacing";
@@ -61,31 +57,10 @@ export function OrreryScreen() {
     snapshot: null,
   });
   const [viewport, setViewport] = useState({ width: 0, height: 0 });
-  const [density, setDensity] = useState<OrreryDensity | null>(null);
-  const [preferenceBusy, setPreferenceBusy] = useState(false);
-  const [preferenceError, setPreferenceError] = useState(false);
-  useEffect(() => {
-    void getAppSettings(getExecutor())
-      .then((settings) => setDensity(settings.orreryDensity))
-      .catch(() => setPreferenceError(true));
-  }, []);
-  const saveDensity = async (next: OrreryDensity) => {
-    if (preferenceBusy || density === null || density === next) return;
-    setPreferenceBusy(true);
-    try {
-      await updateAppSettings(
-        getExecutor(),
-        { orreryDensity: next },
-        localDateTime(),
-      );
-      setDensity((await getAppSettings(getExecutor())).orreryDensity);
-      setPreferenceError(false);
-    } catch {
-      setPreferenceError(true);
-    } finally {
-      setPreferenceBusy(false);
-    }
-  };
+  const preferences = useOrreryPreferencesStore((store) => store.committed);
+  const hydratePreferences = useOrreryPreferencesStore(
+    (store) => store.hydrate,
+  );
   const [focusedIds, setFocusedIds] = useState<number[]>([]);
   const pose = useSharedValue<CameraPose>({ ...HOME_CAMERA });
   const reducedMotion = useReducedMotionShared();
@@ -120,6 +95,15 @@ export function OrreryScreen() {
     if (isFocused && appActive) void controller.reload();
   }, [controller, isFocused, appActive]);
   useShellRefresh(reload);
+  useFocusEffect(
+    useCallback(() => {
+      if (appActive) void hydratePreferences(getExecutor());
+    }, [hydratePreferences, appActive]),
+  );
+  useEffect(() => {
+    // Changes here are discrete committed preferences, never camera frames.
+    if (preferences) reload();
+  }, [preferences, reload]);
 
   const focus = useCallback(
     (ids: number[]) => {
@@ -178,25 +162,6 @@ export function OrreryScreen() {
     >
       <ShellAppBar variant="root" title="Orrery" />
       <View
-        accessibilityLabel="Density"
-        accessibilityState={{ busy: preferenceBusy || density === null }}
-      >
-        {ORRERY_DENSITIES.map((option) => (
-          <Button
-            key={option}
-            role="secondary"
-            label={`${option[0].toUpperCase()}${option.slice(1)}${density === option ? " — Selected" : ""}`}
-            disabled={preferenceBusy || density === null}
-            onPress={() => void saveDensity(option)}
-          />
-        ))}
-        {preferenceError ? (
-          <AppText>
-            Couldn't save your view options. Try that change again.
-          </AppText>
-        ) : null}
-      </View>
-      <View
         testID="orrery-canvas-container"
         style={styles.canvasArea}
         onLayout={onLayout}
@@ -213,6 +178,7 @@ export function OrreryScreen() {
             focusedIds={focusedIds}
           />
         ) : null}
+        <OrreryViewOptions availableHeight={viewport.height} />
         {state.status === "loading" && !scene ? (
           <View style={styles.feedback}>
             <AppText>Loading your Orrery…</AppText>

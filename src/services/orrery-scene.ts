@@ -19,8 +19,11 @@ import {
   type SunOccupantLookup,
   sunOccupantIsSelf,
 } from "@/logic/sun-occupant-logic";
+import type { OrreryPreferences } from "@/stores/orrery-preferences-store";
 
 export interface OrrerySceneSnapshot {
+  /** Durable presentation inputs; density geometry/moons expand in 29-04/10. */
+  preferences: OrreryPreferences;
   generation: number;
   dataRevision: number;
   contacts: OrbitingContact[];
@@ -89,6 +92,11 @@ export function loadOrreryScene(
       ringRadius: 0,
     });
     return {
+      preferences: {
+        density: settings.orreryDensity,
+        satellitesEnabled: settings.orrerySatellitesEnabled,
+        lastSystem: settings.orreryLastSystem,
+      },
       generation,
       dataRevision: settings.dataRevision,
       contacts,

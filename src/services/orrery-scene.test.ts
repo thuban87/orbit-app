@@ -73,6 +73,23 @@ beforeEach(async () => {
 afterEach(() => db.close());
 
 describe("canonical SQLite scene tracer", () => {
+  it("carries committed density and satellite preferences into scene presentation without changing membership", async () => {
+    const before = await loadOrreryScene(exec);
+    await updateAppSettings(
+      exec,
+      { orreryDensity: "compact", orrerySatellitesEnabled: 1 },
+      "2026-09-07",
+    );
+    const after = await loadOrreryScene(exec);
+    expect(after.preferences).toEqual({
+      density: "compact",
+      satellitesEnabled: 1,
+      lastSystem: "builtin:all-contacts",
+    });
+    expect(after.contacts.map((contact) => contact.id)).toEqual(
+      before.contacts.map((contact) => contact.id),
+    );
+  });
   it("reads self and configured contact sun through the real snapshot and five readers", async () => {
     const scene = await loadOrreryScene(exec, 1);
     expect(scene.contacts.map((c) => c.id)).toEqual([id]);

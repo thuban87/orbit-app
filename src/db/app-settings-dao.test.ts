@@ -58,6 +58,7 @@ import { migration017 } from "@/db/migrations/017-knowledge-egress-datamove";
 import { migration018 } from "@/db/migrations/018-custom-field-scope-history";
 import { migration019 } from "@/db/migrations/019-dashboard-prefs";
 import { migration020 } from "@/db/migrations/020-dashboard-swipe-pref";
+import { migration021 } from "@/db/migrations/021-orrery-preferences";
 import { runMigrations } from "@/db/migrations/runner";
 import { inWriteTransaction } from "@/db/transaction";
 import type { SqlExecutor } from "@/db/types";
@@ -124,8 +125,9 @@ async function migrateToV5(): Promise<void> {
       migration018,
       migration019,
       migration020,
+      migration021,
     ],
-    20,
+    21,
     { now: NOW, newUid },
   );
 }
@@ -297,6 +299,9 @@ describe("app-settings-dao — read", () => {
     await migrateToV5();
     const settings = await getAppSettings(exec);
     const expected: AppSettings = {
+      orreryDensity: "balanced",
+      orrerySatellitesEnabled: 0,
+      orreryLastSystem: "builtin:all-contacts",
       notificationsEnabled: 0,
       decayEnabled: 1,
       birthdayEnabled: 1,
@@ -451,6 +456,9 @@ describe("app-settings-dao — validated write", () => {
       LATER,
     );
     expect(await getAppSettings(exec)).toEqual({
+      orreryDensity: "balanced",
+      orrerySatellitesEnabled: 0,
+      orreryLastSystem: "builtin:all-contacts",
       notificationsEnabled: 1,
       decayEnabled: 0,
       birthdayEnabled: 0,
