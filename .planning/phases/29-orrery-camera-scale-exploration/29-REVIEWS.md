@@ -1,8 +1,8 @@
 ---
 phase: 29
-cycle: 1
+latest_cycle: 2
 reviewers: [codex, claude]
-reviewed_at: 2026-09-07T00:34:11-05:00
+reviewed_at: 2026-09-07T06:50:19.539Z
 plans_reviewed: [29-01-PLAN.md, 29-02-PLAN.md, 29-03-PLAN.md, 29-04-PLAN.md, 29-05-PLAN.md, 29-06-PLAN.md, 29-07-PLAN.md, 29-08-PLAN.md, 29-09-PLAN.md, 29-10-PLAN.md, 29-11-PLAN.md, 29-12-PLAN.md]
 models:
   codex: "gpt-5.6-sol (reasoning=medium)"
@@ -11,6 +11,291 @@ model_sources:
   codex: "pinned"
   claude: "pinned"
 ---
+
+# Cross-AI Plan Review — Phase 29
+
+## Cycle 2 — Current Review
+
+### Codex Review
+
+## Summary
+
+The twelve-plan Phase 29 set has converged. I found no current actionable HIGH, MEDIUM, or LOW planning concerns.
+
+All cycle-1 actionable findings are fully resolved in executable task actions, acceptance criteria, verification, dependencies, or the explicit end-of-phase native gate. The plans preserve ADR-011, ADR-046, ADR-047, ADR-077, ADR-080, and ADR-085, including the owner’s D-11 ruling.
+
+Current counts:
+
+| Severity | Current count |
+|---|---:|
+| HIGH | 0 |
+| MEDIUM | 0 |
+| LOW | 0 |
+
+Graph execution was attempted first for the relevant existing files, but every query failed with a sandbox `tsx` IPC `EPERM` error. I therefore used the coordinator’s successful grounding results: all reported governance edges are **INFERRED document claims**, not EXTRACTED code citations. ADR-048’s dual-view half is superseded by ADR-077; absence of an edge for `OrreryStack.tsx` was not treated as evidence of no governance. The ADR bodies and source files were checked directly.
+
+## Strengths
+
+- The ordinary-drag collision is explicitly removed before camera pan becomes reachable. Plan 01 deletes the legacy radial recognizer, rank bridge, mirrored drag state, and ghost preview, and makes camera pan the sole ordinary-drag owner. Plan 09 later restores reorder only through the prolonged-hold recognizer and guarded DAO request. [Plan 29-01](</home/bwales/projects/orbit-app/.planning/phases/29-orrery-camera-scale-exploration/29-01-PLAN.md:108>), [Plan 29-09](</home/bwales/projects/orbit-app/.planning/phases/29-orrery-camera-scale-exploration/29-09-PLAN.md:104>)
+
+- The five snapshot prerequisites are concrete and correctly limited to type capability. `ReadOnlyExecutor` exposes only `getFirstAsync` and `getAllAsync`; Plan 01 changes the five named reader signatures while keeping writers on `SqlExecutor`. This is feasible against the current reader implementations and transaction contract. [transaction.ts](</home/bwales/projects/orbit-app/src/db/transaction.ts:42>), [Plan 29-01](</home/bwales/projects/orbit-app/.planning/phases/29-orrery-camera-scale-exploration/29-01-PLAN.md:96>)
+
+- D-05 is enforced without weakening the legacy default read. The current read still requires `last_contact IS NOT NULL`; Plan 03 introduces explicit All Contacts/Not Contacted widening with null health/progress and exports one transaction-composable membership core for both snapshots and reorder validation. [orrery-read.ts](</home/bwales/projects/orbit-app/src/db/orrery-read.ts:89>), [29-CONTEXT.md](</home/bwales/projects/orbit-app/.planning/phases/29-orrery-camera-scale-exploration/29-CONTEXT.md:24>), [Plan 29-03](</home/bwales/projects/orbit-app/.planning/phases/29-orrery-camera-scale-exploration/29-03-PLAN.md:99>)
+
+- Gravity expansion now has a named owner and preserves semantic parity. Plan 04 batches complete interaction histories through a read-only core inside the coherent snapshot, explicitly prohibiting truncation and per-contact queries. That matches the existing single-contact reader and `computeContactGravity`, including the `rarelyResponds` connected-only filter. [impact-read.ts](</home/bwales/projects/orbit-app/src/db/impact-read.ts:23>), [impact.ts](</home/bwales/projects/orbit-app/src/services/impact.ts:88>), [Plan 29-04](</home/bwales/projects/orbit-app/.planning/phases/29-orrery-camera-scale-exploration/29-04-PLAN.md:103>)
+
+- Action validation is bounded rather than scene-sized. Plan 08 owns a fresh ID/UID/member/current-sun probe with at most three SELECTs, shares Plan 03’s predicate builder, prohibits Gravity/history/full-scene reads, and rechecks generation after awaiting SQLite. [Plan 29-08](</home/bwales/projects/orbit-app/.planning/phases/29-orrery-camera-scale-exploration/29-08-PLAN.md:108>)
+
+- Reorder protection strengthens rather than removes the existing controls. The current DAO already checks uniqueness, complete contacted population, scoped one-row updates, and atomic rollback. Plan 09 adds expected full order, sun, ID/UID fingerprints, filtered membership, hidden-slot preservation, and current-local-day validation under the same write lock. [ring-seq-dao.ts](</home/bwales/projects/orbit-app/src/db/ring-seq-dao.ts:60>), [ADR-046](</home/bwales/projects/orbit-app/docs/decisions/ADR-046-query-time-orrery-placement-and-transactional-ring-ordering.md:18>), [Plan 29-09](</home/bwales/projects/orbit-app/.planning/phases/29-orrery-camera-scale-exploration/29-09-PLAN.md:92>)
+
+- The SQLite midnight test is now executable without changing production clock authority. Plan 09 owns a per-connection, test-only `date('now','localtime')` override, delegates every other date call to an untouched SQLite connection, and tests a queued write after the day changes. Plan 12 reuses it in production-path integration. [Plan 29-09](</home/bwales/projects/orbit-app/.planning/phases/29-orrery-camera-scale-exploration/29-09-PLAN.md:92>), [Plan 29-12](</home/bwales/projects/orbit-app/.planning/phases/29-orrery-camera-scale-exploration/29-12-PLAN.md:106>)
+
+- D-11 is consistent across membership, actions, companion rows, satellite reads, rendering, invalidation, and integration. A nonmember configured contact sun retains focus/Profile behavior but receives no moons, satellite targets, companion membership, or relationship context; membership restoration restores eligibility. [29-CONTEXT.md](</home/bwales/projects/orbit-app/.planning/phases/29-orrery-camera-scale-exploration/29-CONTEXT.md:29>), [Plan 29-03](</home/bwales/projects/orbit-app/.planning/phases/29-orrery-camera-scale-exploration/29-03-PLAN.md:100>), [Plan 29-08](</home/bwales/projects/orbit-app/.planning/phases/29-orrery-camera-scale-exploration/29-08-PLAN.md:132>), [Plan 29-10](</home/bwales/projects/orbit-app/.planning/phases/29-orrery-camera-scale-exploration/29-10-PLAN.md:92>), [Plan 29-12](</home/bwales/projects/orbit-app/.planning/phases/29-orrery-camera-scale-exploration/29-12-PLAN.md:106>)
+
+- Native evidence is represented honestly. The early automated tracer enables expansion but does not claim Skia/navigation proof. Plan 12 requires the complete native checklist to remain pending UAT and prevents phase verification from completing until those obligations are resolved. The configured mode is `end-of-phase`. [Plan 29-01](</home/bwales/projects/orbit-app/.planning/phases/29-orrery-camera-scale-exploration/29-01-PLAN.md:110>), [Plan 29-12](</home/bwales/projects/orbit-app/.planning/phases/29-orrery-camera-scale-exploration/29-12-PLAN.md:118>), [config.json](</home/bwales/projects/orbit-app/.planning/config.json:41>)
+
+## Concerns
+
+### HIGH
+
+None.
+
+### MEDIUM
+
+None.
+
+### LOW
+
+None.
+
+No new product, visual, priority, risk, security, ADR-reversal, or HANDOFF-reversal decision was uncovered.
+
+## Suggestions
+
+No replanning is required.
+
+During execution:
+
+- Treat Plan 01’s automated tracer and removal of the legacy reorder path as a hard expansion prerequisite.
+- Retain query-count instrumentation for the Plan 04 batch reader and Plan 08 action probe.
+- Keep Plan 12’s native checklist open until evidence is actually recorded; do not infer native rendering, gesture, TalkBack, or physical-phone performance from Node tests.
+- If the committed graph is expected to be current at phase close, assess whether the comment citation changes warrant the permitted `npm run graph:build`; this is maintenance advice, not a missing Phase 29 task.
+
+## Risk Assessment
+
+Planning risk is **moderate but controlled**. The residual risk comes from implementation breadth—30 tasks across a shared screen/world/camera subsystem—and from native gesture, Skia depth, accessibility, and physical-device behavior that cannot be established before implementation.
+
+Data-integrity risk is well covered: plans preserve the existing contacted-only rank boundary, explicit never-contacted widening, current-local-day membership semantics, ID/UID validation, transaction ownership, and local-only architecture. The manual writer audit found no conflicting alternate rank policy or satellite lifecycle model in the contacts, settings, relationships, merge, purge, restore, import, recency, favorite, snooze, and lifecycle writer families.
+
+## Current disposition
+
+| Prior-cycle item | Disposition | Basis |
+|---|---|---|
+| HIGH: camera pan could coexist with legacy radial reorder | **fully resolved** | Plan 01 removes the complete legacy path before pan; Plan 09 introduces the only replacement recognizer. |
+| Five reader signatures could not consume snapshot `ro` | **fully resolved** | Plan 01-00 changes exactly the five reader parameter types and verifies their regressions/type compatibility before the tracer. |
+| Gravity expansion lacked a batched complete-history owner | **fully resolved** | Plan 04 owns the read-only batched DAO, complete-history parity, query-count tests, and same-snapshot integration. |
+| Target revalidation risked a full scene/history reload per action | **fully resolved** | Plan 08 owns a bounded, narrow probe with shared predicates and at-most-three-SELECT verification. |
+| Local-midnight reorder invalidation lacked an executable test mechanism | **fully resolved** | Plan 09 owns the isolated SQLite local-day fixture and queued-lock test; Plan 12 reuses it. |
+| Excluded configured sun satellite behavior was unspecified | **fully resolved** | D-11 is encoded across Plans 03/08/10/12 with action, companion, context, invalidation, requalification, automated, and native cases. |
+| ADR-048/ADR-077 source citations could remain misleading | **fully resolved** | Plan 12 updates actual source comments, preserves only ADR-048’s live static behavior, regenerates the registry, and verifies comment-only changes. |
+| Native checks were pending | **fully resolved as a planning concern** | They remain honestly pending implementation, but the executable end-of-phase completion gate prevents a false completed verdict. |
+| Suggestion to move the preference migration into Wave 1 | **resolved with rationale; not actionable** | Plan 02 documents the shared `OrreryScreen` ownership conflict and absence of an intervening release. Current schema head is still 20, with an explicit head+1 execution precondition. [database.ts](</home/bwales/projects/orbit-app/src/db/database.ts:55>) |
+| Shell/navigation files listed as modified | **informational; not actionable** | Plans 06 and 11 give those files concrete obstacle-measurement and session-lifecycle work with tests. |
+
+**Current disposition: APPROVE — ready for execution, with 0 HIGH, 0 MEDIUM, and 0 LOW current findings.**
+
+---
+
+### Claude Review
+
+# Cross-AI Plan Review — Phase 29, Cycle 2 (Orrery Camera, Scale & Exploration)
+
+Reviewed on disk, against source, at commit `21a9136`. Graph queries executed successfully (`npm run graph:ask -- governs …`) for `OrreryScreen.tsx`, `OrbitBody.tsx`, `ring-seq-dao.ts`, `orrery-read.ts`, `app-settings-dao.ts`, `impact-read.ts`, `relationships-read.ts`, `OrreryStack.tsx`; **every returned edge was `INFERRED`** (ADR Key-files attribution), none `EXTRACTED`. `OrreryStack.tsx` returned "No ADR is recorded" — treated as no citation written, not as absence of governance. No files were edited; no device action was taken.
+
+## Summary
+
+The revised twelve-plan set resolves the cycle-1 HIGH and all five actionable non-HIGH concerns, and it does so with contracts I could verify against installed code rather than against the upstream artifacts. I verified each claimed mechanism independently rather than trusting the plans' own citations:
+
+- The legacy radial reorder path the cycle-1 HIGH named is exactly where the plan says it is (`OrreryScreen.tsx:463-647` — `bodiesShared`, `dragMetrics`, `activeDragId`, `commitRingSeq`/`commitRef`, `Gesture.Pan()` at :558, ghost preview at :636-647, `rewriteRingSeq` import at :76), and 29-01-01's action retires all of it in the same task that introduces camera pan.
+- The five reader signatures 29-01-00 adapts are at the lines it cites (`app-settings-dao.ts:425`, `contact-read.ts:67`, `contact-status-read.ts:54`, `profile-dao.ts:96`, `orrery-read.ts:89`), and `ReadOnlyExecutor` is a real `Pick<SqlExecutor,"getFirstAsync"|"getAllAsync">` (`transaction.ts:42`), so the widening is type-only and structurally safe at every existing caller.
+- **I ran the SQLite-clock mechanism myself.** On this repo's Node 22, `DatabaseSync.function('date',{varargs:true},…)` overrides the builtin: intercepting exactly `('now','localtime')` returns the controlled day, `date('2020-05-05','+1 day')` and `date(NULL)` delegate correctly to a second untouched connection, and `julianday('now')` is unaffected. Because `PROGRESS_SQL` is `julianday(date('now','localtime')) - julianday(date(last_contact))` (`status.ts:60`) and `SNOOZED_WHERE` uses `date('now','localtime')` (`dashboard-query-logic.ts:158-159`), a day-only override genuinely moves Snoozed and Needs Attention membership — 29-09-01's lock-time invalidation test is buildable exactly as specified.
+- The batched Gravity contract matches `getImpactInputs` field-for-field, including its `LEFT JOIN` no-history case and `occurred_at DESC, id DESC` ordering (`impact-read.ts:52-90`), and correctly refuses a history cutoff because `computeContactGravity` has a nonzero floor (`impact.ts:88-101`).
+- The Skia depth claim holds in the installed native recorder: `GroupProps.zIndex` exists (`Common.ts:92-94`) and `RNRecorder.h:59-66` sorts sibling groups with an explicit `order` tiebreak, so equal-depth ties are deterministic.
+
+Remaining risk is concentrated where the plans already say it is: native Skia, gesture arbitration, TalkBack and phone performance, all carried honestly as end-of-phase obligations under `human_verify_mode: end-of-phase` (`.planning/config.json:41`). I raise no current HIGH. Two MEDIUM and three LOW findings are new, and none is a product decision.
+
+## Strengths
+
+1. **The HIGH fix is placed in the only task that could close it.** Retiring the legacy writer *inside* 29-01-01 (not a follow-up task) plus a behavioral assertion that pan leaves `ring_seq`, `modified_at` and `dataRevision` byte-identical closes the window rather than narrowing it. The DAO guards it must not weaken are intact and unchanged (`ring-seq-dao.ts:72-112`: uniqueness, complete-effective-count, per-row `changes===1`).
+2. **Reorder integrity is stronger than the shipped writer.** `RingReorderRequest` adds expected complete order, saved sun, ID/UID fingerprints and re-resolved eligible membership at lock time, and correctly identifies that numeric IDs are reusable (`011-contact-lifecycle-schema.ts:18` — `INTEGER PRIMARY KEY` with separate `uid UNIQUE`). Composing `readOrrerySystemMembersCore` on the already-locked executor respects the non-reentrancy contract documented at `transaction.ts:12-28`.
+3. **Never-contacted segregation is enforced, not asserted.** 29-03-01 preserves `listOrbitingContacts`' `last_contact IS NOT NULL` default (`orrery-read.ts:96`) and widens only All Contacts / Not Contacted, with explicit `CASE` null health rather than `STATUS_SQL`'s `ELSE 'stable'` fallback (`status.ts:73-79`). That is D-05 and ADR-011 honored at the mechanism level.
+4. **D-11 is encoded consistently across four plans** (03-01 parent-eligibility, 08-03 companion/context exclusion, 10-01/10-02 read+render eligibility and requalification, 12-01/12-02 automated + native). The owner's ruling is applied without deferring satellite capability.
+5. **Baseline corrections are all true on disk:** `TARGET_VERSION = 20` (`database.ts:55`), `BACKUP_FORMAT_VERSION = 4` (`backup/types.ts:14`), the theme-key precedent for allowlisting-without-emission (`backup-schema.ts:155-162`), and the live reduced-motion seed race (`use-reduced-motion.ts:78-88`: a `.then` seed emits after a live event with no generation guard) — 29-11-02 enforces ADR-085's own stated risk rather than reversing it.
+6. **Honest evidence separation.** Automated tracer-before-expansion and native end-of-phase evidence are kept distinct in 29-01-01 and 29-12-02, with no new interim approval gate invented.
+
+## Concerns
+
+### MEDIUM — 1. The Orrery read path newly serializes on the single global write mutex, and nothing defines behavior when a long holder has it
+
+`inReadSnapshot` is `withMutex` + `BEGIN` (`transaction.ts:74-88`) over the one module-level promise chain (`mutex.ts:23,33-34`). Today its **only** production consumer is the backup export manifest (`export-manifest.ts:93`), whose own docstring says it "holds the shared mutex for the entire snapshot and can delay every app write" (`transaction.ts:66-72`). The current Orrery load takes no mutex at all — it issues plain reads (`OrreryScreen.tsx:215-268`).
+
+Phase 29 moves the Orrery onto that mutex twice over: 29-03-01/29-04-01 put the whole scene snapshot (settings, sun, members, batched impact inputs) inside one `inReadSnapshot`, and 29-08-01's `readOrreryContactTargetValidation` opens "one short `inReadSnapshot`" **per tap**.
+
+Failure scenario: an automatic backup export begins; the user taps a contact; the tap→Profile probe queues behind the export's full photo-inclusive snapshot and the Profile does not open for seconds, with no busy state — E4/E7's "loading" treatments cover reads, not lock waits, and no plan mentions the contention. A less extreme version happens on every Quick Log: the scene snapshot now blocks app writes on the app's core-value path.
+
+The plans partially mitigate the *size* of the work (T-29-04-03 bounds statement count; the probe is capped at three SELECTs), but the *contention* and its UX are unaddressed in any task, acceptance criterion, threat row or native check. Cheapest fix: state the tradeoff explicitly in 29-04-01/29-08-01 (or defer it with rationale to the hardening phase, per D-10), and add one native-checklist line for "tap during an automatic backup."
+
+### MEDIUM — 2. ADR-027 still records "orrery encodings — rejected" for Gravity, and no plan captures the supersession
+
+`npm run graph:ask -- governs src/db/impact-read.ts` returns ADR-027 (INFERRED), status **Accepted**, no supersession flag. Its Decision is "derives gravity and intensity at read time and shows them together **only on the contact profile**", and its rejected alternatives include "**Dashboard or orrery encodings** — rejected to preserve the contact-card surface and avoid overloading it" (`ADR-027…md:18,25`).
+
+ORRC-03 (Gravity-driven body mass) and ORRC-15 (Gravity context in the companion list) implement exactly that rejected encoding. This is **not** an escalation: the owner ratified it in dossier §E ([DECIDED], "Gravity as Visual Mass") and in the ORRC requirement set, and ADR-093 already broke "profile-only" for the Dashboard ("Gravity narrows the fully filtered result in TypeScript", `ADR-093…md:18,25`) without recording a supersession either. So the decision is settled; the **record** is not.
+
+The consequence is the one AGENTS.md warns about: after Phase 29 ships, an agent asking the graph what governs gravity gets a live Accepted ADR whose rejected-alternatives list names this exact feature. 29-12-02 owns ADR upkeep but scopes it to ADR-048/ADR-077 tokens in `OrreryScreen.tsx`/`OrbitBody.tsx` — nothing notes the ADR-027 tension. Add one line to 29-12-02 recording it (and flagging it for the KB extraction that mints superseding ADRs), or explicitly defer it with rationale.
+
+### LOW — 3. The new Orrery data path will be invisible to the ADR graph
+
+Per AGENTS.md, "a file is only connected to an ADR if the file cites `ADR-NNN` in a comment." Phase 29 creates the new authoritative Orrery read/write surface — `orrery-system-read.ts`, `orrery-impact-read.ts`, `orrery-action-read.ts`, `orrery-world-logic.ts`, `orrery-camera-logic.ts` — while `orrery-read.ts` and `ring-seq-dao.ts` (currently the only ADR-046-linked Orrery data files) become secondary. 29-12-02's citation task lists only `OrreryScreen.tsx`, `OrbitBody.tsx` and the generated registry in `files_modified`. Result: the files that actually enforce ADR-046's guarded ordering and ADR-011's segregation carry no citation. Extending 29-12-02's comment-only pass to the new files costs nothing and keeps `graph:ask` truthful.
+
+### LOW — 4. 29-04-01 has no `<acceptance_criteria>` block
+
+Task counts per plan: every plan matches tasks to acceptance blocks except 29-04 (3 tasks, 2 blocks). The missing one is 29-04-01 — the task added in this cycle to resolve the Gravity concern. The executor workflow treats `<acceptance_criteria>` as a hard verification gate (`execute-plan.md` step `execute`, item 3); with the block absent, only `<done>` and the `<verify>` command apply. The task's own `<behavior>` already states testable predicates (exact parity, query counts, no writable-capability use); promoting them into an acceptance block restores parity with the other 29 tasks.
+
+### LOW — 5. Native sibling depth sorting batches only *consecutive* Group children — unstated
+
+`RNRecorder.h:73-88`: `playGroup` accumulates pending sibling `Group`s and **flushes the sorted batch as soon as a non-Group child is encountered**. So a single non-Group sibling (a ring `Circle`, a stray `Paragraph`, a backplate) interleaved between body groups silently splits depth sorting into two independent batches, and a near body will no longer cross the sun. 29-05-01 gets the architecture right ("direct siblings within a single shared body layer", rings behind bodies) but never states this constraint, and no Node test can detect it — it is a native-only regression that would surface as "depth sometimes doesn't work." The plan's human-check ("near-body occlusion of sun") would catch it late; one sentence in 29-05-01's action would prevent it.
+
+## Suggestions
+
+- Record in 29-12-02 that ADR-077's Implementation section is stale on one point: it says `src/components/SegmentedControl.tsx` is "retired with its only consumer," but the component now has a second consumer (`HomeScreen.tsx:74,1765` — Dashboard view mode). The plans correctly do **not** delete it; the ADR body is immutable, so the living system doc is the right place to note it. (Advisory drift — not counted.)
+- 29-03-01 needs a category read that returns `uid`; `listCategories` returns only `{id, name}` (`contact-read.ts:49-55`) and `contact-read.ts` is not in 29-03's `files_modified`. The plan can satisfy this inside `orrery-system-read.ts` (`categories.uid` exists — `001-initial.ts:44`), but saying so explicitly avoids an executor reaching for a sixth file mid-task.
+- Consider naming, in 29-09-02, what a drag across an *interleaved neutral body* does in All Contacts. Never-contacted rows have `ring_seq NULL` and sort last under `COALESCE(ring_seq,1e9), created_at, id`, so they occupy outer rings; "nearest eligible contacted slot" is defined, but the visual outcome of dragging past them is the kind of thing that gets re-litigated during execution.
+
+## Risk Assessment
+
+**Plan risk: LOW–MEDIUM. Execution risk: MEDIUM–HIGH (unchanged, and correctly owned).**
+
+*Data-layer risk: LOW.* Every existing `ring_seq` guard is preserved and four are added; the migration is additive, correctly numbered against verified head 20, and correctly withholds wire emission; the default never-contacted exclusion survives; no shipped migration is edited. The one previously-unverifiable mechanism (the SQLite clock fixture) I executed myself and it works.
+
+*Product-decision risk: LOW.* No `[DECIDED]`/`[REJECTED]` item is reopened. D-11 is applied as ruled. The one recorded-decision tension I found (ADR-027, Concern 2) is a record-keeping gap behind an owner decision that was already ratified twice, not a reversal — no escalation required.
+
+*Integration/sequencing risk: MEDIUM.* Twelve strictly serial waves with shared mutable adapters (`OrreryScreen.tsx`, `OrreryWorld.tsx`, `use-orrery-camera.ts`) means a contract error in wave 1 propagates. Reordering is unreachable from wave 1 to wave 9 — accepted, unreleased, and explicitly stated.
+
+*Performance/latency risk: MEDIUM.* Concern 1 is the substantive new one; it will be invisible at the owner's scale until a backup runs concurrently.
+
+*Verification risk: MEDIUM.* Automated coverage of pure math, real SQL and controllers is strong. A large share of ORRC-02/03/07/09/10/16 still rests on a native checklist with no device time scheduled — accurately represented, never overstated.
+
+## Current disposition
+
+| Prior-cycle concern | Disposition | Evidence in the revised plan |
+|---|---|---|
+| HIGH — legacy radial reorder live when camera pan lands | **fully resolved** | 29-01-01 action retires the `Gesture.Pan` registration, `commitRingSeq`/`commitRef`/`commitFromWorklet`, `bodiesShared`/`dragMetrics`/`activeDragId` and ghost preview in the same task as pan; `<behavior>` asserts no rank DAO call and byte-identical `ring_seq`/`modified_at`/`dataRevision`; 29-09-02 restores hold-reorder |
+| MEDIUM — Gravity batch reader unowned / per-member work under the mutex | **fully resolved** | 29-04-01 owns `readOrreryImpactInputsCore(ReadOnlyExecutor, ids)` with exact `getImpactInputs` parity, complete history (no cutoff), 256-ID chunking, query-count and ro-only tests; per-member loops prohibited |
+| MEDIUM — controlled SQLite-clock executor not buildable | **fully resolved** | 29-09-01 owns `openSqliteLocalDayFixture`; mechanism independently verified by this review on Node 22 (builtin `date` override, native delegation for other forms, `julianday` untouched, day override does move `PROGRESS_SQL`/`SNOOZED_WHERE`) |
+| MEDIUM — full System snapshot re-read on every tap | **fully resolved** *(as stated)* | 29-08-01 owns `readOrreryContactTargetValidation`: ≤3 SELECTs, bound target identity, shared `buildOrrerySystemWhere`, `sunOccupantIsSelf` policy, no catalog/member/Gravity read. See new Concern 1 for the adjacent contention issue it does not address |
+| MEDIUM — excluded global-sun satellites unspecified | **fully resolved** | Owner ruling recorded as D-11 (`29-CONTEXT.md:30`) and encoded in 29-03-01, 29-08-03, 29-10-01/02, 29-12-01/02 |
+| MEDIUM — move the migration to wave 1 | **not actionable (explicitly rejected with rationale)** | 29-02-01 action states the rejection: `OrreryScreen.tsx` ownership overlaps the tracer and preference wiring; no release between waves |
+| LOW — Plan 29-06 touches shell-owned files | **fully resolved** | 29-06-01 scopes edits to measured obstacles and preserves FAB position, capture routes, tab-height consumers and Back |
+| LOW — ADR citation/registry upkeep absent | **partially resolved** | 29-12-02 covers `OrreryScreen.tsx`/`OrbitBody.tsx` comment tokens + `gen:adr-registry`; the new Orrery DAO/logic files remain uncited (new LOW 3) and the ADR-027 tension is unrecorded (new MEDIUM 2) |
+| LOW — `orrery_last_system` cannot be CHECK-constrained | **fully resolved** | 29-02-01 requires documenting the partial SQL constraint and enforcing the closed builtin/`category:<UID>` grammar in both the public validator and `updateAppSettingsCore` |
+| Codex HIGH — native acceptance not blocking | **fully resolved / not counted** | 29-01-01 separates automated tracer-before-expansion from native evidence; 29-12-02 carries the full E1–E9 native checklist as pending UAT under `human_verify_mode: end-of-phase` |
+
+**Current counts (convergence semantics — new, partial and still-open only):**
+
+- **HIGH: 0**
+- **MEDIUM actionable: 2** — (1) global-mutex contention on the new Orrery read/tap paths; (2) unrecorded ADR-027 supersession for Orrery Gravity.
+- **LOW actionable: 3** — (3) new Orrery data files carry no ADR citations; (4) 29-04-01 missing `<acceptance_criteria>`; (5) Skia consecutive-sibling depth batching constraint unstated.
+- Excluded from counts: fully resolved cycle-1 items, the explicitly rejected wave-1 migration move, and advisory cross-artifact drift (ADR-077's stale `SegmentedControl` key-file note).
+
+**Recommendation:** approve for execution. All five findings are additive edits to existing tasks; none requires an owner decision, and none blocks starting wave 1.
+
+---
+
+## Cycle 2 Consensus Summary
+
+Both exact-model, source-grounded lanes agree that the cycle-one HIGH and all cycle-one actionable non-HIGH concerns are fully resolved by the revised executable plans. Both found the core design ready for execution: the legacy reorder path is removed with camera pan, five readers acquire read-only snapshot-compatible signatures first, Gravity is batched under one snapshot, target validation is bounded, the local-day test seam is executable, D-11 is consistent, and native evidence remains an honest end-of-phase gate.
+
+The lanes diverged on new findings. Codex found no current planning concern. Claude found five additive non-HIGH gaps. Source and plan adjudication accepts all five as actionable wording/coverage changes because none is yet present in an executable action, acceptance criterion, verification item, threat row, or explicit deferral:
+
+1. **MEDIUM — global mutex contention is unspecified.** The new scene snapshot and per-action validation both use the one shared mutex. Plans bound query counts and model loading/error states but do not name the interaction with a long automatic-backup snapshot, define the UX, or explicitly defer contention testing with rationale. Add the tradeoff and a native/integration contention check or explicit Phase 40 deferral to 29-04/08/12.
+2. **MEDIUM — ADR-027 supersession traceability is absent.** The owner-approved dossier §E and ORRC-03/15 authorize Gravity in Orrery, while accepted ADR-027 still names Orrery encodings as rejected. This is already decided and requires no owner question or immutable ADR edit. Plan 29-12 must record the tension for living documentation and later KB extraction/superseding-ADR handling.
+3. **LOW — new authoritative Orrery files lack planned ADR citations.** Plan 29-12 owns source-comment citation upkeep only for the existing screen/body. Extend its comment-only pass to the new DAO/logic files that enforce ADR-011/046/077 and regenerate the registry as already planned.
+4. **LOW — 29-04-01 lacks an acceptance criterion.** Its behavior/action/done text is strong, but it is the only one of 30 tasks without an explicit `<acceptance_criteria>` gate. Add the already stated parity, bounded-query, read-only, and rendered-mass conditions.
+5. **LOW — native depth batching requires consecutive sibling Groups.** Plan 29-05 correctly specifies direct sibling body Groups, a single shared body layer, rings behind bodies, and native occlusion verification. The installed recorder flushes its sorted Group batch at a non-Group child, so add one preventive sentence prohibiting interleaved non-Group children in the depth-sorted body layer.
+
+The new findings are routine planning/doc details. They do not ask the owner to revisit product, visual, risk, security, ADR, or HANDOFF decisions. Planning risk remains low-to-medium; execution risk remains medium-to-high because the native camera/gesture/Skia/accessibility surface is broad.
+
+### Current consensus disposition
+
+- Current unresolved HIGH: **0**.
+- Current actionable non-HIGH: **5** (2 MEDIUM, 3 LOW).
+- Cycle-one unresolved count was 6; cycle two decreases it to 5, so convergence is progressing and is not stalled.
+- Recommendation: incorporate the five bounded changes, then run the next independent check/review cycle.
+
+## Cycle 2 Verification Coverage
+
+### Source-grounding authority and graph coverage
+
+- Effective authority: `grep`. Declarations and file existence can be VERIFIED. Type/signature compatibility, runtime behavior, native rendering, gesture arbitration, performance, and SQL semantics beyond source inspection are **UNCHECKABLE / INFO** under this authority unless separately exercised; they were never promoted to VERIFIED merely because a name exists.
+- Coordinator `npm run graph:ask -- governs` queries succeeded for every existing `files_modified` path used by the phase. Every returned edge was **INFERRED** from ADR Key-files metadata. ADR-048's dual-view/morph portion was flagged partially superseded by ADR-077. `OrreryStack.tsx` returned no ADR; this was treated as missing citation evidence, not absence of governance. Codex disclosed sandbox `tsx` IPC `EPERM`; Claude and the coordinator successfully queried the graph. Both lanes still read ADR/source directly.
+
+### Auditable existing-symbol matrix
+
+| Plan citation | Existing symbol or contract | Grounding verdict and source |
+|---|---|---|
+| 29-01:96 | `getAppSettings`, `getContactHeader`, `getContactStatus`, `getProfile`, `listOrbitingContacts` | VERIFIED declarations at `src/db/app-settings-dao.ts:425`, `src/db/contact-read.ts:67`, `src/db/contact-status-read.ts:54`, `src/db/profile-dao.ts:96`, `src/db/orrery-read.ts:89`; proposed parameter compatibility is UNCHECKABLE under grep. |
+| 29-01:96,108 | `ReadOnlyExecutor`, `SqlExecutor`, `inReadSnapshot` | VERIFIED at `src/db/transaction.ts:42`, `src/db/types.ts:17`, `src/db/transaction.ts:74`; transaction behavior verified by full source reading, signatures remain UNCHECKABLE. |
+| 29-01:105-110 | `nodeSqliteExecutor`; current radial `Gesture.Pan`, `commitRingSeq`, ghost preview | VERIFIED at `src/db/__testkit__/node-sqlite.ts:30` and current `src/screens/OrreryScreen.tsx:463-647`; planned removal is new work. |
+| 29-01:121-126 | `progressToAngle`, `polarToXY` | VERIFIED at `src/logic/orrery-geometry-logic.ts:109,118`. |
+| 29-02:93-118 | `TARGET_VERSION`, `MIGRATIONS`, `getPortableSettingsSnapshot`, `updateAppSettings`, `updateAppSettingsCore`, `PORTABLE_SETTINGS_KEYS`, `BACKUP_FORMAT_VERSION` | VERIFIED at `src/db/database.ts:55,58`, `src/db/app-settings-dao.ts:519,910,961`, `src/backup/backup-schema.ts:132`, `src/backup/types.ts:14`; new migration/fields are excluded below. |
+| 29-03:99-100 | `listOrbitingContacts`, `buildPopulationWhere`, `NOT_CONTACTED_WHERE`, `FAVOURITES_WHERE`, `SNOOZED_WHERE` | VERIFIED at `src/db/orrery-read.ts:89` and `src/logic/dashboard-query-logic.ts:157-183`; new shared System builder/core excluded below. |
+| 29-03:99-100 | `listCategories`, `resolveSunOccupant`, `sunOccupantIsSelf` | VERIFIED at `src/db/contact-read.ts:49` and `src/logic/sun-occupant-logic.ts:103,120`; source confirms the existing category reader omits UID. |
+| 29-04:103-114 | `getImpactInputs`, `computeContactGravity`, `ImpactInputs` | VERIFIED at `src/db/impact-read.ts:52`, `src/services/impact.ts:88`, and `src/services/impact-types.ts`; batched parity and new signature are UNCHECKABLE/new until implementation. |
+| 29-05:93 | Skia `GroupProps.zIndex` and recorder sibling ordering | VERIFIED dependency declarations/implementation at `node_modules/@shopify/react-native-skia/src/dom/types/Common.ts:92` and `cpp/api/recorder/RNRecorder.h:55-88`; native runtime behavior remains UNCHECKABLE. |
+| 29-06:89-101 | measured tab wrapper, `UniversalFab`, semantic `ICON_REGISTRY` | VERIFIED existing owners at `src/navigation/RootNavigator.tsx:47`, `src/components/UniversalFab.tsx:117`, `src/components/icons/icon-registry.ts:33`; obstacle registry/control symbols are new. |
+| 29-07:90-102 | Gesture Handler 2 builders and `shortestAngleDelta` | VERIFIED installed builder APIs under `node_modules/react-native-gesture-handler` and declaration at `src/logic/orrery-geometry-logic.ts:221`; arbitration and worklet behavior are UNCHECKABLE. |
+| 29-08:108-132 | `sunOccupantIsSelf`, existing Profile route, shared transient/Sheet primitives | VERIFIED source owners in `src/logic/sun-occupant-logic.ts:103`, navigation types/stack, and existing component/store source; the narrow target reader/focus logic are new. |
+| 29-09:92-104 | `computeRingReorder`, `rewriteRingSeq`, shared mutex/write transaction, Node `DatabaseSync.function` | VERIFIED at `src/logic/ring-reorder-logic.ts:25`, `src/db/ring-seq-dao.ts:60`, `src/db/mutex.ts`/`transaction.ts`, and `node_modules/@types/node/sqlite.d.ts:367`; Claude separately exercised the date override. New fixture/signatures are excluded. |
+| 29-10:90-102 | `resolveRelationshipVisibility` and relationships lifecycle schema | VERIFIED at `src/db/relationships-read.ts:39` and migration 016/relationship DAOs; satellite DAO/render symbols are new. |
+| 29-11:97-121 | `createReducedMotionController`, `useReducedMotionShared`, current Orrery clock consumers | VERIFIED at `src/theme/use-reduced-motion.ts:61,103`, `src/components/orrery/OrreryCanvas.tsx:92`, and `src/components/orrery/SunBody.tsx:68`; race fix/session controller are new. |
+| 29-12:106-120 | production writer families, `runMigrations`, ADR registry generator | VERIFIED source paths/declarations including `src/db/migrations/runner.ts:32`, contacts/recency/favourites/snooze/merge/purge/restore/relationships writers, and `scripts/gen-adr-registry.ts`; integrated behavior and new checklist are not yet implemented. |
+| verify commands throughout | `--noEmit` TypeScript flag and named npm scripts | VERIFIED from installed `tsc` and `package.json`; successful future test/native results are UNCHECKABLE until execution. |
+
+All existing paths named in the twelve plans' `files_modified` and `read_first` blocks were checked on disk. The review additionally read the full same-subsystem writers/readers enumerated in COVERAGE.md for contacts, interactions, relationships, categories, app_settings, and ring ordering before asserting invariants.
+
+### Explicit new-artifact exclusions
+
+These plan-declared outputs do not exist yet and were excluded from missing-symbol findings: `src/services/orrery-scene.ts`, `src/logic/orrery-camera-logic.ts`, `src/components/orrery/OrreryWorld.tsx`, `src/db/migrations/021-orrery-preferences.ts`, `src/stores/orrery-preferences-store.ts`, `src/components/orrery/OrreryViewOptions.tsx`, `src/logic/orrery-system-logic.ts`, `src/db/orrery-system-read.ts`, `src/stores/orrery-system-store.ts`, `src/components/orrery/OrrerySystemSelector.tsx`, `src/components/orrery/orrery-controls-logic.ts`, `src/db/orrery-impact-read.ts`, `src/logic/orrery-world-logic.ts`, `src/components/orrery/ProjectedOrbitRing.tsx`, `src/logic/orrery-label-logic.ts`, `src/components/orrery/OrreryLabel.tsx`, `src/stores/shell-obstacle-store.ts`, `src/components/orrery/OrreryControls.tsx`, `src/components/orrery/orrery-obstacle-logic.ts`, `src/components/orrery/use-orrery-camera.ts`, `src/logic/orrery-gesture-logic.ts`, `src/logic/orrery-recovery-logic.ts`, `src/components/orrery/Polaris.tsx`, `src/logic/orrery-focus-logic.ts`, `src/db/orrery-action-read.ts`, `src/components/orrery/OrreryClusterPanel.tsx`, `src/components/orrery/orrery-overlay-logic.ts`, `src/components/orrery/OrreryContactsSheet.tsx`, `src/components/orrery/orrery-companion-logic.ts`, `src/components/orrery/OrreryFocusContext.tsx`, `src/db/__testkit__/sqlite-local-day.ts`, `src/logic/orrery-reorder-logic.ts`, `src/db/orrery-satellites-read.ts`, `src/components/orrery/orrery-satellite-context.ts`, `src/logic/orrery-satellite-logic.ts`, `src/components/orrery/SatelliteBody.tsx`, `src/stores/orrery-session-store.ts`, `src/logic/orrery-session-logic.ts`, `src/components/orrery/OrreryFeedback.tsx`, the named new test files, and `29-NATIVE-CHECKLIST.md`.
+
+Named signatures for new artifacts — including `readOrrerySystemMembersCore`, `buildOrrerySystemWhere`, `readOrreryImpactInputsCore`, `readOrreryContactTargetValidation`, `openSqliteLocalDayFixture`, and `mergeVisibleRingOrder` — are NEW and therefore excluded from presence checking. Their proposed TypeScript signatures are also UNCHECKABLE under grep until implemented.
+
+### Cross-artifact fact drift (advisory; excluded from counts)
+
+- Deterministic phase status is `uncheckable`: `.planning/STATE.md:38` says `Ready to execute`; ROADMAP's table says `Planned`, outside the seam's recognized vocabulary. Authority is STATE. This is recorded as coverage, never treated as consistent or counted.
+- ROADMAP ORRC-01 through ORRC-16 match the union of plan requirement references, and the five roadmap success criteria are not contradicted by plan truths.
+- CONTEXT D-03 now correctly says backup format 4 already shipped and defers coordinated preference emission/versioning to Phase 36 (`29-CONTEXT.md:20`); D-08 now names the existing Phase 23 live hook (line 27); D-11 records the owner's excluded-sun ruling (line 30). No glossary contradiction remains.
+- ADR-077's stale statement that `SegmentedControl` retires with its only consumer is advisory document drift because Dashboard now consumes it; plans correctly do not delete it. It is not counted.
+
+## Cycle 2 Current Finding Dispositions
+
+| Finding | Current disposition |
+|---|---|
+| Cycle-one HIGH: camera pan vs legacy reorder | Fully resolved in 29-01-01; excluded from current counts. |
+| Cycle-one Gravity batch owner | Fully resolved in 29-04-01; excluded. |
+| Cycle-one local-day test capability | Fully resolved in 29-09/12 and independently exercised by Claude; excluded. |
+| Cycle-one full-scene per-tap validation | Fully resolved by the bounded 29-08 probe; new mutex-contention concern remains separately actionable. |
+| Cycle-one excluded-sun satellites | Fully resolved by owner D-11 and Plans 03/08/10/12; excluded. |
+| Cycle-one migration wave suggestion | Explicitly rejected with executable rationale in Plan 02; excluded. |
+| Cycle-one shell edit / partial CHECK notes | Incorporated or informational; excluded. |
+| Cycle-one ADR citation upkeep | Partially resolved: existing screen/body coverage is planned, but new authoritative files and ADR-027 traceability remain current findings. |
+| Cycle-one native completion gate | Fully resolved as a planning concern; native evidence remains correctly pending implementation. |
+| New mutex contention | Actionable MEDIUM. |
+| New ADR-027 traceability | Actionable MEDIUM; owner authorization already exists in dossier §E and ORRC-03/15. |
+| New-file ADR citations | Actionable LOW. |
+| Missing 29-04-01 acceptance criterion | Actionable LOW. |
+| Consecutive Group depth batch constraint | Actionable LOW as a preventive implementation constraint. |
+
+## Cycle 1 — Preserved History
 
 # Cross-AI Plan Review — Phase 29, Cycle 1
 
