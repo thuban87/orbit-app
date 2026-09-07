@@ -5,11 +5,11 @@ milestone_name: Release Readiness
 current_phase: 29
 current_phase_name: Orrery Camera, Scale & Exploration
 status: ready_to_execute
-stopped_at: Phase 29 plans verified; ready to execute
-last_updated: "2026-09-07T05:08:42.843Z"
+stopped_at: Phase 29 replan verified; external convergence cycle 2 pending
+last_updated: "2026-09-07T06:25:05.460Z"
 last_activity: 2026-09-07
-last_activity_desc: Phase 29 researched and planned; 12 plans verified
-state_head: 97bd561b2aa24c4e29c446ead7934627d581fa1d
+last_activity_desc: Phase 29 cycle-one findings incorporated; independent recheck passed
+state_head: e01ddcb9f51c27d20907733ba8114320ff0241c6
 progress:
   total_phases: 20
   completed_phases: 5
@@ -39,7 +39,7 @@ Status: Ready to execute
 Carried forward (owner's bucket, NOT resolved here): D-11 default Memory-type display name — reconcile before Phase 34.
 Surface to owner (24.2-07, KNOW-15): milestone plan said Phase 36 owns the backup format-4 bump, but 24.1 already bumped to 4 (d677e2c); Plan 07 emits into the live format 4 with NO bump — that milestone instruction is stale.
 Deferred to Phase 31 (recorded in Plan 05): durable contact-scoped-def ownership + owner-purge semantics. Deferred to Phase 36 (ROADMAP breadcrumb): legacy AI-fuel confirm-path code removal.
-Last activity: 2026-09-07 — Phase 29 research and independent plan verification complete
+Last activity: 2026-09-07 — Phase 29 cycle-one findings incorporated; independent recheck passed, external cycle 2 pending
 Progress: 8/19 phases complete (v2.0) — 22, 23, 24.1, 24.2, 25, 26, 27, 28
 Next: `/gsd-execute-phase 29`.
 
@@ -611,7 +611,7 @@ was built via the desktop pipeline and driven through create→edit→archive→
 
 ## Operator Next Steps
 
-- Phase 29 is researched and planned: 12 plans, 28 tasks, 12 sequential waves. Independent plan verification passed; see `.planning/phases/29-orrery-camera-scale-exploration/29-PLAN-CHECK.md` and `COVERAGE.md`.
+- Phase 29 is researched and planned: 12 plans, 30 tasks, 12 sequential waves. Cycle-one review findings and owner ruling D-11 are incorporated; independent recheck passed. External convergence cycle 2 is pending; see `.planning/phases/29-orrery-camera-scale-exploration/29-PLAN-CHECK.md`, `29-REVIEWS.md` and `COVERAGE.md`.
 - Execute the phase: `/gsd-execute-phase 29`. Start with the canonical-world tracer in Plan 01; each later wave depends on the prior wave.
 - Implementation tests and native/device verification remain pending execution. Follow `29-VALIDATION.md` and Plan 12 for the required evidence.
 - Commits stay local — agents never push; push when you're ready.
