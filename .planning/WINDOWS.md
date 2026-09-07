@@ -1,10 +1,10 @@
 ---
 schema_version: 1
-open_count: 38
+open_count: 39
 waived_count: 0
 fixed_count: 6
-total_count: 44
-last_updated: 2026-09-06T09:20:03.702Z
+total_count: 45
+last_updated: 2026-09-07T07:48:39.216Z
 ---
 
 # Broken Windows Ledger
@@ -59,6 +59,7 @@ last_updated: 2026-09-06T09:20:03.702Z
 | 42 | 28 | deviation | .planning/phases/28-dashboard-card-view/28-03-PLAN.md |  | Plan verification's grep -Lq status was inverted; executor used an equivalent no-match assertion. | open |  | 2026-09-06T08:50:50.786Z |  |
 | 43 | 28 | unrun-verify | src/components/GridCard.tsx |  | Pixel UAT still required for adaptive/search card ellipsis and highlight appearance | open |  | 2026-09-06T09:01:56.888Z |  |
 | 44 | 28 | stub | src/screens/HomeScreen.tsx | 1261 | Selection bulk-actions placeholder region; Plan 07 owns the controls. | open |  | 2026-09-06T09:20:03.702Z |  |
+| 45 | 29 | unrun-verify | src/screens/OrreryScreen.tsx |  | Native tracer pan-to-moved-body focus-to-Profile, Skia rendering and gesture arbitration remain pending the approved end-of-phase device session. | open |  | 2026-09-07T07:48:39.216Z |  |
 
 ````json
 [
@@ -588,6 +589,18 @@ last_updated: 2026-09-06T09:20:03.702Z
     "status": "open",
     "reason": "",
     "recorded_at": "2026-09-06T09:20:03.702Z",
+    "resolved_at": null
+  },
+  {
+    "id": 45,
+    "kind": "unrun-verify",
+    "phase": "29",
+    "file": "src/screens/OrreryScreen.tsx",
+    "line": null,
+    "description": "Native tracer pan-to-moved-body focus-to-Profile, Skia rendering and gesture arbitration remain pending the approved end-of-phase device session.",
+    "status": "open",
+    "reason": "",
+    "recorded_at": "2026-09-07T07:48:39.216Z",
     "resolved_at": null
   }
 ]
