@@ -73,6 +73,32 @@ beforeEach(async () => {
 afterEach(() => db.close());
 
 describe("canonical SQLite scene tracer", () => {
+  it("feeds canonical Gravity into the same rendered and hit-tested mass without storing scores", async () => {
+    const before = await loadOrreryScene(exec);
+    await exec.runAsync(
+      `INSERT INTO interactions(uid,contact_id,occurred_at,recorded_at,connected,direction,modified_at,source,channel)
+      SELECT 'mass-' || value, ?, datetime('now','localtime'),datetime('now','localtime'),1,'mutual',datetime('now','localtime'),'manual','unspecified'
+      FROM json_each(?)`,
+      [id, JSON.stringify(Array.from({ length: 24 }, (_, i) => i))],
+    );
+    const after = await loadOrreryScene(exec);
+    expect(after.gravity.get(id)?.tierName).toBe("deep");
+    expect(after.world[0].radius).toBeGreaterThan(before.world[0].radius);
+    const body = after.world[0];
+    const frame = projectFrame(
+      after.world,
+      { x: body.x, y: body.y, zoom: 2 },
+      viewport,
+      0,
+    );
+    expect(frame.bodies[0].radius).toBe(body.radius * 2);
+    expect(frame.bodies[0].hitRadius).toBe(frame.bodies[0].radius);
+    expect(
+      await exec.getAllAsync(
+        "SELECT name FROM pragma_table_info('contacts') WHERE name LIKE '%gravity%' OR name LIKE '%mass%'",
+      ),
+    ).toEqual([]);
+  });
   it("carries committed density and satellite preferences into scene presentation without changing membership", async () => {
     const before = await loadOrreryScene(exec);
     await updateAppSettings(

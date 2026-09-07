@@ -20,7 +20,10 @@ import {
   systemRefId,
 } from "@/logic/orrery-system-logic";
 import type { SunOccupantLookup } from "@/logic/sun-occupant-logic";
+import type { GravityResult } from "@/services/gravity-logic";
+import { computeContactGravity } from "@/services/impact";
 import type { OrreryPreferences } from "@/stores/orrery-preferences-store";
+import { formatLocalDate } from "@/utils/dates";
 
 export interface OrrerySceneSnapshot {
   /** Durable presentation inputs; density geometry/moons expand in 29-04/10. */
@@ -32,6 +35,7 @@ export interface OrrerySceneSnapshot {
   systemSnapshot: OrrerySystemSnapshot;
   world: WorldBody[];
   extent: number;
+  gravity: Map<number, GravityResult>;
   sun: {
     sunContactId: number | null;
     selfSunColour: string | null;
@@ -44,6 +48,20 @@ export interface OrrerySceneSnapshot {
 
 export const NEUTRAL_RESTING_ANGLE = 0;
 
+/** Modest visual-only mass; canonical Gravity policy remains in impact.ts. */
+export function gravityMassModifier(
+  gravity: GravityResult | undefined,
+): number {
+  return gravity
+    ? 0.9 +
+        0.2 *
+          Math.max(
+            0,
+            Math.min(1, gravity.tierIndex / Math.max(1, gravity.tierCount - 1)),
+          )
+    : 1;
+}
+
 export async function loadOrreryScene(
   exec: SqlExecutor,
   generation = 0,
@@ -55,6 +73,18 @@ export async function loadOrreryScene(
   const { settings, profile, header, occupant } = snapshot;
   const self = snapshot.resolvedSunIdentity === null;
   const contacts = snapshot.orbiting;
+  // A scene can queue behind photo-inclusive backup or app writes and its full
+  // history read can delay Quick Log. Batching bounds statements, not latency.
+  // Compute, layout and image work stay OUTSIDE the FIFO mutex. Cancellation
+  // invalidates publication immediately, but cannot dequeue the current SQL.
+  const date = new Date();
+  const now = `${formatLocalDate(date)} ${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}:${String(date.getSeconds()).padStart(2, "0")}`;
+  const gravity = new Map(
+    [...snapshot.impactInputs].map(([id, inputs]) => [
+      id,
+      computeContactGravity(inputs, now),
+    ]),
+  );
   // Fixed world spacing, independent of viewport. 29-04 expands density/Home.
   // Give the reused drift resolver enough WORLD extent to avoid its legacy
   // viewport clamp; no contact is compressed onto a phone's outer rim.
@@ -67,7 +97,8 @@ export async function loadOrreryScene(
   const world: WorldBody[] = contacts.map((contact, rank) => ({
     id: contact.id,
     kind: "contact",
-    radius: metrics.PLANET_RADIUS,
+    radius:
+      metrics.PLANET_RADIUS * gravityMassModifier(gravity.get(contact.id)),
     ringRadius: ringRadius(rank, metrics),
     ...polarToXY(
       0,
@@ -85,7 +116,9 @@ export async function loadOrreryScene(
     kind: "sun",
     x: 0,
     y: 0,
-    radius: metrics.SUN_RADIUS,
+    radius:
+      metrics.SUN_RADIUS *
+      (self ? 1 : gravityMassModifier(gravity.get(settings.sunContactId ?? 0))),
     ringRadius: 0,
   });
   return {
@@ -101,6 +134,7 @@ export async function loadOrreryScene(
     contacts,
     world,
     extent,
+    gravity,
     sun: {
       sunContactId: settings.sunContactId,
       selfSunColour: settings.selfSunColour,

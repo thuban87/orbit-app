@@ -7,6 +7,7 @@
 import { getAppSettings } from "@/db/app-settings-dao";
 import { getContactHeader } from "@/db/contact-read";
 import { getContactStatus, type ProfileStatus } from "@/db/contact-status-read";
+import { readOrreryImpactInputsCore } from "@/db/orrery-impact-read";
 import { listOrbitingContacts } from "@/db/orrery-read";
 import { getProfile } from "@/db/profile-dao";
 import { PROGRESS_SQL, STATUS_SQL } from "@/db/status";
@@ -72,7 +73,7 @@ export async function readOrrerySystemMembersCore(
   return { status: "ready", system, members };
 }
 
-/** All composition receives ro; Plan 04 extends this same lock with batch Gravity. */
+/** All composition receives ro, including the complete batched Gravity history. */
 export async function readOrrerySystemSnapshotCore(
   ro: ReadOnlyExecutor,
   system: OrrerySystemRef,
@@ -104,6 +105,10 @@ export async function readOrrerySystemSnapshotCore(
     "SELECT id,uid,name,display_order FROM categories ORDER BY display_order,uid",
   );
   const result = await readOrrerySystemMembersCore(ro, system);
+  const impactInputs = await readOrreryImpactInputsCore(ro, [
+    ...result.members.map((member) => member.id),
+    ...(resolvedSunIdentity ? [resolvedSunIdentity.id] : []),
+  ]);
   const orbiting = result.members.filter(
     (member) => member.id !== resolvedSunIdentity?.id,
   );
@@ -132,6 +137,7 @@ export async function readOrrerySystemSnapshotCore(
     contactIdentities.push(savedSunIdentity);
   return {
     ...result,
+    impactInputs,
     categories,
     orbiting,
     settings,
