@@ -56,14 +56,17 @@ interface GestureSamples {
   tiltActive: boolean;
   tiltOriginY?: number;
 }
-const initialSamples = (): GestureSamples => ({
-  panX: 0,
-  panY: 0,
-  scale: 1,
-  rotation: 0,
-  tiltY: 0,
-  tiltActive: false,
-});
+const initialSamples = (): GestureSamples => {
+  "worklet";
+  return {
+    panX: 0,
+    panY: 0,
+    scale: 1,
+    rotation: 0,
+    tiltY: 0,
+    tiltActive: false,
+  };
+};
 export interface OrreryCameraInput {
   input: CameraCell<CameraInput>;
   samples: CameraCell<GestureSamples>;
