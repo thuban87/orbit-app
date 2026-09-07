@@ -4,12 +4,12 @@ milestone: v2.0
 milestone_name: Release Readiness
 current_phase: 29
 current_phase_name: Orrery Camera, Scale & Exploration
-status: paused
+status: executing
 stopped_at: Completed 29-06-PLAN.md; owner requested pause before Plan 07
-last_updated: "2026-09-07T09:26:08.457Z"
+last_updated: "2026-09-07T16:32:43.700Z"
 last_activity: 2026-09-07
-last_activity_desc: Completed Plan 29-06 measured obstacles and reachable controls; owner requested pause
-state_head: 026c476e75caf3ad52d64c08f20583da89ccedce
+last_activity_desc: Phase 29 execution started
+state_head: 4a63a1d9243ec33675b0918820011ec76067bfc7
 progress:
   total_phases: 20
   completed_phases: 5
@@ -33,13 +33,13 @@ See: .planning/PROJECT.md (updated 2026-09-01 after v1.0 milestone)
 
 ## Current Position
 
-Phase: 29 (Orrery Camera, Scale & Exploration) — PAUSED
-Plan: 7 of 12
-Status: Paused at owner request after Plan 29-06
+Phase: 29 (Orrery Camera, Scale & Exploration) — EXECUTING
+Plan: 1 of 12
+Status: Executing Phase 29
 Carried forward (owner's bucket, NOT resolved here): D-11 default Memory-type display name — reconcile before Phase 34.
 Surface to owner (24.2-07, KNOW-15): milestone plan said Phase 36 owns the backup format-4 bump, but 24.1 already bumped to 4 (d677e2c); Plan 07 emits into the live format 4 with NO bump — that milestone instruction is stale.
 Deferred to Phase 31 (recorded in Plan 05): durable contact-scoped-def ownership + owner-purge semantics. Deferred to Phase 36 (ROADMAP breadcrumb): legacy AI-fuel confirm-path code removal.
-Last activity: 2026-09-07 — Completed Plan 29-06; full regression 264 files/2472 tests passed; owner requested pause; native checks pending end-of-phase
+Last activity: 2026-09-07 — Phase 29 execution started
 Progress: 8/19 phases complete (v2.0) — 22, 23, 24.1, 24.2, 25, 26, 27, 28
 Next: `/gsd-execute-phase 29`.
 

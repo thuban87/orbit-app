@@ -7,7 +7,7 @@
   "plan": 7,
   "task": 1,
   "total_tasks": 2,
-  "status": "paused",
+  "status": "resumed",
   "completed_tasks": [
     {
       "id": "29-01",
@@ -114,6 +114,6 @@
     "modules/orbit-secure-fetch/android/build/",
     "modules/orbit-share-finish/android/build/"
   ],
-  "next_action": "When owner resumes, run $gsd-execute-phase 29. Start29-07 task1; do not rerun completed01\u201306. Read HANDOFF.md, AGENTS.md, summaries and full plan context first.",
+  "next_action": "Execute29-07 onward; owner explicitly resumed and requested finishing phase29.",
   "context_notes": "Six of twelve plans complete. Full regression verified264 files/2472 tests; log /tmp/orbit-29-06-tests-final.log. Typecheck/colors/targeted Biome passed. All work locally committed. No active agents, tests, servers or external jobs started by this workflow remain. Phase review/verifier/native gates not yet run. GSD init wrongly counts29-PLAN-CHECK.md; canonical phase-plan-index correctly lists12 plans."
 }
