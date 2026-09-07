@@ -5,11 +5,11 @@ milestone_name: Release Readiness
 current_phase: 29
 current_phase_name: Orrery Camera, Scale & Exploration
 status: verifying
-stopped_at: Completed 29-12-PLAN.md; phase review and native acceptance pending
-last_updated: "2026-09-07T18:19:48.521Z"
+stopped_at: All 12 plans and review fixes complete; native UAT pending
+last_updated: "2026-09-07T19:01:28.901180+00:00"
 last_activity: 2026-09-07
-last_activity_desc: Completed Plan 29-12; 12 of 12 plans executed; phase verification pending
-state_head: bd8f5832830e4d4619e4eed49bd2cbd481536945
+last_activity_desc: All 12 plans executed; review clean; verifier human_needed; native UAT saved
+state_head: e812d70c3d6ac77db9c719e99cb04a9e44bb6512
 progress:
   total_phases: 20
   completed_phases: 5
@@ -35,13 +35,13 @@ See: .planning/PROJECT.md (updated 2026-09-01 after v1.0 milestone)
 
 Phase: 29 (Orrery Camera, Scale & Exploration) — VERIFICATION PENDING
 Plan: 12 of 12
-Status: Plans executed — phase review and native acceptance pending
+Status: Plans executed — code review clean; native acceptance pending
 Carried forward (owner's bucket, NOT resolved here): D-11 default Memory-type display name — reconcile before Phase 34.
 Surface to owner (24.2-07, KNOW-15): milestone plan said Phase 36 owns the backup format-4 bump, but 24.1 already bumped to 4 (d677e2c); Plan 07 emits into the live format 4 with NO bump — that milestone instruction is stale.
 Deferred to Phase 31 (recorded in Plan 05): durable contact-scoped-def ownership + owner-purge semantics. Deferred to Phase 36 (ROADMAP breadcrumb): legacy AI-fuel confirm-path code removal.
-Last activity: 2026-09-07 — Completed Plan 29-12; 12 of 12 plans executed
+Last activity: 2026-09-07 — Review fixes verified; 278 files / 2,595 tests passed; native UAT saved
 Progress: 8/19 phases complete (v2.0) — 22, 23, 24.1, 24.2, 25, 26, 27, 28
-Next: Orchestrator phase review/verifier; native acceptance remains pending.
+Next: $gsd-verify-work 29 — nine UAT groups preserve all native checklist states; do not advance Phase 30.
 
 **Milestone v2.0 structure (pre-decided by the owner from the fifteen milestone-2 dossiers + the
 2026-09-01 cross-dossier audit; not re-derived):** 22 App Shell · 23 Theme · 24 Contact Knowledge ·
@@ -609,7 +609,7 @@ _Also disposed at this close: 05/deferred-items.md (check:colors doc-comment) ma
 ## Session
 
 **Last session:** 2026-09-07T18:19:46.538Z
-**Stopped at:** Completed 29-12-PLAN.md; phase review and native acceptance pending
+**Stopped at:** All 12 plans and review fixes complete; native UAT pending
 _Prior stop (v1.0):_ Phase 21 UI-SPEC approved; milestone v1.0 closed 2026-09-01.
 _Prior stop (13-04):_ the orrery VISUAL VOCABULARY (theme tokens + two pure resolver modules, node-tested, 29 cases green): (1) five owner-tunable `ThemePalette` tokens seeded in `space-dark.dark` ONLY — `starPalette` (6 colours, gold `#F2C14E` at index 0, then amber/rose-red/violet/cyan/ice-white), `mutedStable/Wobble/Decay` (desaturated same-hue morph endpoints), `rogueExtinguished` (cold blue-grey `#3E4A6B` rogue BODY fill) — with an M6/C2-5 conformance test that IMPORTS the real `SELF_SUN_COLOUR_RE`/`assertSelfSunColour` from app-settings-dao and locks every starPalette entry to the ACTUAL DAO write-path rule (no re-inlined regex). (2) `orrery-ring-logic.ts` `orreryRingStyle(status, colors)` — REUSES `ringVisual` for `{color,opacity,width}` (status→colour mapped once), adds the `strokeStyle` axis (solid→dashed→faded→faintTrace) + `bodyFill` (rogue ring=`colors.rogue`, body=`rogueExtinguished`); `null`→canonical NEUTRAL (`colors.border`), never throws — the single fallback sun-occupant reuses (C2-2). (3) `sun-occupant-logic.ts` `resolveSunOccupant(input)` — NULL/archived/missing→self (A7, glow `selfSunColour ?? starPalette[0]`), live contact→its status glow via `orreryRingStyle(status, colors).color`, never-contacted (status `null`)→the reused neutral border (C2-2); accepts `status: ProfileStatus | null`. 5 commits (1801915 feat tokens+M6; d35d528 RED→4cbfad5 GREEN ring-logic; c923b16 RED→10780dd GREEN sun-occupant); tsc + check:colors clean; no deviations (one in-flight fix: a placeholder hex in the logic test was re-sourced from the palette after check:colors flagged it — C2-3). Committed locally on main (NOT pushed). Next: Wave 2 (13-05 render / 13-06 Settings sun-picker), Wave 3 (13-07 drag-release), Wave 4 (13-08 device UAT, autonomous:false).
 **Resume file:** None

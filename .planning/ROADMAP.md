@@ -480,8 +480,8 @@ All v1.0 commits are local on `main` and have NOT been pushed.
   5. User can switch among built-in Systems from a compact dropdown with continuity animation (All Contacts default; All Contacts and Not Contacted including never-contacted contacts at a fixed neutral resting angle with no fabricated progress), toggle Relationship Satellites (default Off) rendering unlinked person-like relationships as status-free moons that disappear once linked, and open an accessible "Contacts in this System" list with focus and open-Profile actions — with Reduced Motion stopping drift, twinkle, and inertia while manual camera control remains (ORRC-11/12/13/14/15/16)
 
 **Canonical refs**: docs/dossier/milestone-2/phase-08-orrery-camera-scale-exploration-dossier.md; docs/dossier/milestone-2/planning-notes/phase-08-planning-notes.md
-**Schema**: separate Phase 29 app_settings preference migration (current head20, planned21; recheck head+1 at execution); optional portable keys, current export/version changes remain Phase36
-**Plans**: 12/12 plans executed; phase review and native acceptance pending
+**Schema**: Phase 29 app_settings preference migration021 applied; optional portable keys, current export/version changes remain Phase36
+**Plans**: 12/12 plans executed; review clean; verifier human_needed; native acceptance in 29-UAT.md
 
 Plans:
 

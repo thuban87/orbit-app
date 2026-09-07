@@ -1,13 +1,13 @@
 {
   "version": "1.0",
-  "timestamp": "2026-09-07T09:27:08.696Z",
+  "timestamp": "2026-09-07T19:01:28.901180+00:00",
   "phase": "29",
   "phase_name": "Orrery Camera, Scale & Exploration",
   "phase_dir": ".planning/phases/29-orrery-camera-scale-exploration",
-  "plan": 7,
-  "task": 1,
-  "total_tasks": 2,
-  "status": "resumed",
+  "plan": 12,
+  "task": null,
+  "total_tasks": 0,
+  "status": "human_needed",
   "completed_tasks": [
     {
       "id": "29-01",
@@ -44,47 +44,58 @@
       "name": "Measured obstacles and reachable controls",
       "status": "done",
       "commit": "e467eb8"
-    }
-  ],
-  "remaining_tasks": [
+    },
     {
       "id": "29-07",
       "name": "Camera gestures, Polaris and animated recovery",
-      "status": "not_started"
+      "status": "done",
+      "commit": "f2b2798"
     },
     {
       "id": "29-08",
       "name": "Contact/group focus and accessible companion",
-      "status": "not_started"
+      "status": "done",
+      "commit": "e6ac3c5"
     },
     {
       "id": "29-09",
       "name": "Deliberate guarded ring reorder",
-      "status": "not_started"
+      "status": "done",
+      "commit": "c37bdb8"
     },
     {
       "id": "29-10",
       "name": "Relationship satellites",
-      "status": "not_started"
+      "status": "done",
+      "commit": "8390375"
     },
     {
       "id": "29-11",
       "name": "Session restoration and lifecycle/error races",
-      "status": "not_started"
+      "status": "done",
+      "commit": "070b50e"
     },
     {
       "id": "29-12",
       "name": "Integrated verification, documentation and native checklist",
-      "status": "not_started"
+      "status": "done",
+      "commit": "77d7129"
+    }
+  ],
+  "remaining_tasks": [
+    {
+      "id": "29-native-acceptance",
+      "name": "Run nine UAT groups preserving all native checklist states and workflows",
+      "status": "pending"
     }
   ],
   "blockers": [],
   "async_jobs": [],
   "human_actions_pending": [
     {
-      "action": "End-of-phase native Skia/gestures/TalkBack and phone calibration checks",
-      "context": "WINDOWS entries45\u201350 and each plan SUMMARY; confirm package and Metro session before device use. No native evidence collected this session.",
-      "blocking": false
+      "action": "Native acceptance via29-UAT.md and29-NATIVE-CHECKLIST.md",
+      "context": "All55E1-E9 states,N01-N12,automatic-backup contention and two presentation checks pending. Confirm package and Metro session before device use.",
+      "blocking": true
     }
   ],
   "decisions": [
@@ -102,6 +113,11 @@
       "decision": "Sequential execution in current main checkout with no pushes/worktrees/branch switching",
       "rationale": "Project and owner constraints.",
       "phase": "29"
+    },
+    {
+      "decision": "Owner resumed after Plan06 and requested finishing through",
+      "rationale": "Plans07-12 executed and review fixes completed; earlier pause instruction fulfilled and superseded.",
+      "phase": "29"
     }
   ],
   "uncommitted_files": [
@@ -114,6 +130,6 @@
     "modules/orbit-secure-fetch/android/build/",
     "modules/orbit-share-finish/android/build/"
   ],
-  "next_action": "Execute29-07 onward; owner explicitly resumed and requested finishing phase29.",
-  "context_notes": "Six of twelve plans complete. Full regression verified264 files/2472 tests; log /tmp/orbit-29-06-tests-final.log. Typecheck/colors/targeted Biome passed. All work locally committed. No active agents, tests, servers or external jobs started by this workflow remain. Phase review/verifier/native gates not yet run. GSD init wrongly counts29-PLAN-CHECK.md; canonical phase-plan-index correctly lists12 plans."
+  "next_action": "$gsd-verify-work 29 \u2014 execute and record native acceptance; do not rerun completed plans or advance Phase 30.",
+  "context_notes": "All 12 canonical plans executed. Five review findings fixed and independently rechecked; REVIEW clean. Goal verifier human_needed with no implementation blockers. Full suite278 files/2595 tests passed; typecheck/colors/whitespace passed. Local commits only. No device operations or workflow-started servers. GSD init miscounts29-PLAN-CHECK.md; canonical plan index has12 plans. verify:post capability checks remain part of acceptance workflow."
 }
