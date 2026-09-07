@@ -1,3 +1,72 @@
+# Phase 29 Plan Check — cycle 2 focused revision
+
+## VERIFICATION PASSED
+
+**Review:** independent focused recheck, 2026-09-07.
+**Reviewed revision:** `e5cb8c2adf7aa4f4e43434314f6b01ba6eae8615`.
+**Result:** all five current cycle-2 actionable findings resolved; **0 BLOCKERS, 0 WARNINGS**.
+**Scope:** full revised Plans 01/03/04/05/08/12, current review incorporation and supporting coverage/validation metadata, plus consequences for shared contracts and retained coverage. Earlier comprehensive checks remain below. This is plan verification, not external convergence or implementation/native acceptance.
+
+The roadmap goal remains one canonical, explorable 2.5D relationship-health world with bounded camera, semantic zoom, density, built-in Systems and an accessible companion. The additions preserve that goal and all 16 ORRC requirements.
+
+## Cycle 2 resolution evidence
+
+| Current actionable finding | Executable disposition | Independent assessment |
+|---|---|---|
+| Shared mutex contention on scene and target reads | 29-04-01 documents scene wait/hold cost, complete-history row cost and cancellation after enqueue. 29-08-01 requires fresh validation followed by action/route/System generation checks, cancellation through production dismissal/lifecycle paths and an uncancelled control. 29-12-01 owns real export→scene/action and scene→recency-write deferred-barrier integration. 29-12-02 owns native backup/tap and scene/write observations plus the D-10 Phase40 handoff. | Resolved. FIFO atomicity remains mandatory. Bounded queries are not represented as bounded latency; queued SQL may execute but cannot publish, persist a stale selection, focus or navigate after cancellation. No new timeout, priority, connection, busy UI or cached-validation bypass is introduced. |
+| ADR-027 still rejects Orrery Gravity display | 29-12-02 requires a named living-doc and SUMMARY handoff citing canonical dossier §E/§Z and ORRC-03/15 for later formal KB extraction. 29-04-01/02 distinguish the display exception in source comments. | Resolved as traceability, not a new owner decision. Full ADR-027 and the dossier establish the exact partial supersession: profile-only/Orrery-rejection display clauses change; derivation, complete history, floor, recency scope, no displayed raw score/human-worth framing and intensity policies survive. ADR-093 corroborates Dashboard history only. Immutable ADRs stay intact, and registry generation alone is not claimed to formalize the missing supersession. |
+| Five new authoritative files lack governing comments | Creation tasks own camera (01-01), System DAO (03-01), impact DAO (04-01), world logic (04-02), and action DAO (08-01) comments, with scoped ADR attribution. 12-02 verifies them while retaining its existing comment/registry work. | Resolved. The five-file task cap is preserved; the final documentation task does not acquire five additional source modifications. Comments explain the specific rule rather than claiming an entire older ADR still governs the new display. |
+| 29-04-01 lacks acceptance criteria | The task now has one explicit acceptance block covering exact batch/single-reader Gravity parity, complete history, zero/256/257-ID counts, read-only composition, coherent inputs, rendered/hit mass, unstored scores and queued cancellation. | Resolved. The existing owning test command runs these cases; no empty test or nominal pass is substituted. |
+| Native sorting requires consecutive sibling Groups | 29-05-01 mandates one consecutive batch of keyed body Groups including sun; independent rings, labels and backplates remain outside that layer. Acceptance includes production-tree inspection and retains native occlusion verification. | Resolved. Installed `RNRecorder.h` accumulates Group children and flushes at a non-Group command; `Common.ts` exposes Group zIndex. The instruction matches the actual native mechanism without crediting Node tests as rendering proof. |
+
+The advisory category catalog gap is also concrete: 03-01 owns its UID-bearing category SELECT inside the System DAO. 12-02 records the historical SegmentedControl consumer drift in living documentation while preserving the shared component. The existing nearest eligible contacted-slot reorder behavior remains unchanged.
+
+## Source grounding and test feasibility
+
+Read HANDOFF and AGENTS, full CONTEXT and canonical phase08 dossier/planning appendix, full ADR-027/093, current cycle-2 review and incorporation, and the actual relevant source rather than relying on review summaries. Source reads included the complete transaction/mutex files and their tests, export manifest and export tests, backup service, settings/contact/profile/status/Orrery/relationship/impact readers, Gravity orchestration, recency and ring writer analogs, shared Dashboard predicates and sun policy, current OrreryScreen, and its canvas/body/sun renderers. The living Orrery doc and relevant RESEARCH/PATTERNS contracts were checked. No project-local or configured checker skills were present.
+
+`buildExportManifest` calls `inReadSnapshot`, and its injected `readPhotoBase64` is awaited before that snapshot returns. A deferred photo promise therefore provides the real lock-holding test seam required by 12-01. An instrumented read executor can likewise pause a scene SELECT after acquisition while the actual `recordTouchpoint` transaction queues. The existing mutex is a single promise chain that continues after rejection; it has no dequeue operation. Deferred barriers with finally-release can establish ordering and stale-result rejection without sleeps, latency thresholds, mocked mutex ownership or application changes during this review.
+
+Graph-first governance queries succeeded. All returned governance edges were **INFERRED** document claims, including ADR-027 on impact-read and the partial ADR-048→ADR-077 supersession on screen/body; none was presented as an EXTRACTED code citation. Missing graph edges do not establish absent authority. This focused revision introduces no new global shared-table invariant; it does not rerun or replace the historical comprehensive every-writer audit below.
+
+## Retention and structural verification
+
+- Independently parsed all **12 plans / 30 tasks / 12 sequential waves**. Every task has exactly one files, read_first, action, acceptance_criteria, verify and done block; every task stays at or below five modified files. Each plan's files_modified set equals its task-file union.
+- The dependency chain is valid and acyclic; no same-wave plan pair exists. New reader/comment/test responsibilities remain in their owning tiers. No incompatible data transformation or newly unordered owner was found.
+- Requirement frontmatter retains **ORRC-01–16**, executable actions retain **D-01–11**, and all **37 EDGE IDs** remain. COVERAGE retains the nine UI rows/55 considerations. D-11 still hides excluded-sun moons/context while preserving current sun contact actions; production rank/time/identity guards are not weakened.
+- Installed `verify.plan-structure` reports all 12 plans valid. Its sole preexisting advisory is Plan02's one-way migration without a new checkpoint; D-03/D-06 already authorize this operation, so no repeat approval is required. Existing scope watchpoints are unchanged by these bounded additions.
+- **Nyquist design sampling: PASS.** VALIDATION exists and all 30 task commands match it exactly. Every task has automated verification; every wave is fully sampled, with no watch mode or swallowed-error comparison. New tests remain owned by their implementation tasks rather than an unresolved Wave-0 dependency. Application checks remain pending execution.
+- Responsibility-map placement remains compliant. RESEARCH's Open Questions section is RESOLVED; affected pattern analogs and read-only/controller/native boundaries remain intact.
+
+| Plan | Estimated tokens | Budget | Confidence / result |
+|---|---:|---:|---|
+| 01 | 46,000 | 100,000 | low / within |
+| 02 | 32,000 | 100,000 | low / within |
+| 03 | 33,000 | 100,000 | low / within |
+| 04 | 38,000 | 100,000 | low / within |
+| 05 | 30,000 | 100,000 | low / within |
+| 06 | 26,000 | 100,000 | low / within |
+| 07 | 31,000 | 100,000 | low / within |
+| 08 | 36,000 | 100,000 | low / within |
+| 09 | 29,000 | 100,000 | low / within |
+| 10 | 26,000 | 100,000 | low / within |
+| 11 | 28,000 | 100,000 | low / within |
+| 12 | 23,000 | 100,000 | low / within |
+
+All estimates were checked with `estimate-check --calibrated`; factor 1 and zero completed samples mean these are uncalibrated projections, not measured forecasts.
+
+## Limits and disposition
+
+No app tests, phase execution, native/device action, graph/registry generation or application/config/ADR edits occurred. The real future scene/action modules are not yet implemented; this check verifies the planned contracts and available test seams, not their eventual results. Native overlap, tap delay, Skia occlusion, gesture recognition, TalkBack and phone performance remain observed-or-pending end-of-phase obligations. An unobserved backup overlap cannot pass the contention case. The next external review remains a separate orchestrator gate.
+
+```yaml
+issues: []
+```
+
+---
+
+## Previous checks and history (preserved verbatim)
+
 # Phase 29 Plan Check — focused warning revision
 
 ## VERIFICATION PASSED
