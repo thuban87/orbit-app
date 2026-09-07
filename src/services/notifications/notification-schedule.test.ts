@@ -39,6 +39,7 @@ import { migration017 } from "@/db/migrations/017-knowledge-egress-datamove";
 import { migration018 } from "@/db/migrations/018-custom-field-scope-history";
 import { migration019 } from "@/db/migrations/019-dashboard-prefs";
 import { migration020 } from "@/db/migrations/020-dashboard-swipe-pref";
+import { migration021 } from "@/db/migrations/021-orrery-preferences";
 import { runMigrations } from "@/db/migrations/runner";
 import type { SqlExecutor } from "@/db/types";
 import { __resetSweepForTest, runLaunchSweep } from "@/services/launch-sweep";
@@ -84,7 +85,7 @@ beforeEach(async () => {
   uidCounter = 0;
   const db = openTestDb();
   exec = nodeSqliteExecutor(db);
-  // Current schema: getAppSettings reads the v20 durable right-swipe preference.
+  // Current schema: getAppSettings reads the v21 Orrery preferences.
   await runMigrations(
     exec,
     [
@@ -108,8 +109,9 @@ beforeEach(async () => {
       migration018,
       migration019,
       migration020,
+      migration021,
     ],
-    20,
+    21,
     { now: NOW, newUid: uid, defaultPhoneRegion: "US" },
   );
   __resetExpo();

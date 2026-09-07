@@ -118,6 +118,8 @@ describe("Orrery preferences commit-before-publish", () => {
     await store.getState().hydrate(exec);
     write.mockRejectedValueOnce(new Error("disk"));
     await store.getState().save(exec, { density: "compact" });
+    await store.getState().save(exec, { density: "balanced" });
+    expect(write).toHaveBeenCalledTimes(1);
     expect(store.getState()).toMatchObject({
       committed: defaults,
       saveError: true,

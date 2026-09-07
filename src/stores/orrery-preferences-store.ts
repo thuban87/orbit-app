@@ -140,7 +140,11 @@ export function createOrreryPreferencesStore(
         };
         const changed: Intent = {};
         for (const key of KEYS)
-          if (intent[key] !== undefined && intent[key] !== desired[key])
+          if (
+            intent[key] !== undefined &&
+            intent[key] !== desired[key] &&
+            (get().saving || intent[key] !== get().committed[key])
+          )
             Object.assign(changed, { [key]: intent[key] });
         if (Object.keys(changed).length === 0)
           return draining ?? Promise.resolve();
