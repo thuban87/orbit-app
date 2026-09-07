@@ -1,9 +1,13 @@
 ---
 phase: 29-orrery-camera-scale-exploration
 reviewed: 2026-09-07T18:34:20Z
+re_reviewed: 2026-09-07T18:49:25Z
 depth: deep
-files_reviewed: 113
+files_reviewed: 116
 files_reviewed_list:
+  - src/components/orrery/orrery-worklet-boundary.test.ts
+  - src/components/orrery/orrery-frame-mapper.test.ts
+  - src/screens/orrery-screen-framing.test.ts
   - src/backup/export-manifest.ts
   - src/backup/orrery-preferences-portability.test.ts
   - src/backup/reconciliation.ts
@@ -118,20 +122,40 @@ files_reviewed_list:
   - src/stores/shell-transient-store.ts
   - src/theme/use-reduced-motion.ts
 findings:
+  critical: 0
+  warning: 0
+  info: 0
+  total: 0
+resolved_findings:
   critical: 4
   warning: 1
-  info: 0
   total: 5
-status: issues_found
+status: clean
 ---
 
 # Phase 29: Code Review Report
 
 ## Narrative Findings (AI reviewer)
 
-Four BLOCKER findings and one WARNING were confirmed. CR-04 is a pre-existing shared restore defect exposed by the required subsystem audit; the other findings affect the Phase 29 implementation. No source changes, commits, device operations, or network/data transmissions were performed.
+All five original findings are resolved after the bounded fix re-review. No open BLOCKER or WARNING remains within that review scope. The original evidence below is retained as a historical audit trail; its line references describe the pre-fix revision and are not current defect locations. CR-04 was a pre-existing shared restore defect exposed by the subsystem audit. Reviewers changed only review artifacts and performed no device operations.
 
-### CR-01 — BLOCKER: Camera lifecycle invokes an ordinary JavaScript function on the UI runtime
+### Fix re-review — 2026-09-07
+
+The native reviewer reread the full current camera hook, camera/reorder logic, world renderer, screen, recovery logic, cluster/obstacle measurement chain, and all four targeted regression files. Commit contents and current source were checked for d9cb8ad, 6a8382d, 1428942, and c8138d5. The previously established graph/ADR authority and original coverage limits still apply; this is a bounded repair recheck, not a new claim of exhaustive repository coverage.
+
+| Historical finding | Resolution and independently checked evidence |
+|---|---|
+| CR-01 — BLOCKER, resolved | d9cb8ad makes the reset helper a worklet. The actual production Babel lifecycle worklets execute in the boundary harness for disabled setup and enabled/disabled cleanup; reset, cancellation, cleared frame/reorder and motion stopping are asserted. |
+| CR-02 — BLOCKER, resolved | 6a8382d adds nullable guarded inverse sampling while preserving the strict projection exception. Capture rejects invalid samples; crossing the horizon cancels the registered hold's drag and input owner. Returning to ground cannot revive the changed-rank preview or commit it. |
+| CR-03 — BLOCKER, resolved | 1428942 defers group framing until the panel obstacle is measured, includes group generation/identity in the framing key, and replaces recovery on measurement changes. The screen/camera harness covers delayed measurement, changed-size and same-size remeasurement, stale completion rejection, settled hit bounds, and close/late-measurement rejection. Actual child layout is adapted, so this does not certify native font layout. |
+| CR-04 — BLOCKER, resolved | f44648a was independently re-reviewed by the data reviewer, with full restore source/tests and 109 passing targeted tests. The orchestrator verified source and commit contents: affected old/new interaction parents are recomputed transactionally through the existing core while preserving winning metadata timestamps. |
+| WR-01 — WARNING, resolved | c8138d5 captures only the reorder SharedValue. The actual production-emitted updater and installed native mapper registry now settle after one idle projection/publication; a pose change produces exactly one further projection and preserves published-frame identity. |
+
+Independent native re-review command: `npm test -- src/components/orrery/orrery-worklet-boundary.test.ts src/components/orrery/orrery-frame-mapper.test.ts src/screens/orrery-screen-framing.test.ts src/logic/orrery-reorder-logic.test.ts` — **4 files / 16 tests passed**, exit 0. The tests were read to distinguish real production transform/mapper/geometry execution from adapted React/native scheduling and measurement. No open code defect was found in these fixes.
+
+The orchestrator additionally reports final combined checks of **278 test files / 2,595 tests passing**, TypeScript, color-token and whitespace checks exiting 0 (`/tmp/orbit-29-review-final-tests.log`). Native gesture arbitration, actual lifecycle transitions, photo decoding, font-scale/accessibility layout and physical-device rendering remain acceptance work; they are not represented as completed by this code-review status.
+
+### CR-01 — BLOCKER, RESOLVED: Camera lifecycle invokes an ordinary JavaScript function on the UI runtime
 
 **File:** `/home/bwales/projects/orbit-app/src/components/orrery/use-orrery-camera.ts:59`  
 **Call sites:** lines 141 and 152.
@@ -146,7 +170,7 @@ node -e 'const b=require("@babel/core"),tr=require("@babel/traverse").default;co
 
 **Preserving-control fix:** Give the helper a block body with a `"worklet"` directive, or inline its literal in the lifecycle worklets. Preserve UI-side cancellation, generation invalidation, blur/background stopping, and overlay gating. Add a production-transform boundary regression; identity `runOnUI` mocks in `src/logic/orrery-session-logic.test.ts` cannot exercise this failure.
 
-### CR-02 — BLOCKER: A valid reorder drag throws when its pointer crosses the projection horizon
+### CR-02 — BLOCKER, RESOLVED: A valid reorder drag throws when its pointer crosses the projection horizon
 
 **File:** `/home/bwales/projects/orbit-app/src/logic/orrery-reorder-logic.ts:83`  
 **Caller:** `src/components/orrery/use-orrery-camera.ts:504`.
@@ -157,7 +181,7 @@ Reorder unconditionally inverse-projects the pointer. At permitted high tilt and
 
 **Preserving-control fix:** Check the inverse domain and finite values before capture and movement; cancel the drag or ignore an unreachable sample according to one explicit policy. Ensure a cancelled drag cannot commit on release. Keep the projection denominator checks and the DAO's System, generation, identity, and eligible-slot checks. Extend `src/logic/orrery-reorder-logic.test.ts` to cover both sides of the horizon and the registered gesture's cancellation/release path.
 
-### CR-03 — BLOCKER: Opening a cluster fits against the old viewport, then interrupts recovery without refitting
+### CR-03 — BLOCKER, RESOLVED: Opening a cluster fits against the old viewport, then interrupts recovery without refitting
 
 **Files:** `/home/bwales/projects/orbit-app/src/screens/OrreryScreen.tsx:504`, `src/screens/OrreryScreen.tsx:475`, `src/screens/OrreryScreen.tsx:680`.
 
@@ -167,7 +191,7 @@ The group action opens the panel and immediately frames selected bodies using th
 
 **Preserving-control fix:** Coordinate group framing with the panel's actual measured obstacle, and recompute focused-body framing when that obstacle changes. Preserve the nonmodal canvas, obstacle avoidance, arbitrary-body framing, and cancellation of stale generations. Add an open → delayed measurement → settled framing regression in the screen/control integration harness; also cover closing the panel and font-size-driven measurement changes.
 
-### CR-04 — BLOCKER: Merge restore leaves recency stale for retained contacts whose history changes
+### CR-04 — BLOCKER, RESOLVED: Merge restore leaves recency stale for retained contacts whose history changes
 
 **File:** `/home/bwales/projects/orbit-app/src/backup/restore-apply.ts:291`  
 **Classification:** Pre-existing shared-subsystem defect; last source change predates Phase 29 (`9fa16d5`).
@@ -184,7 +208,7 @@ The final `notContacted` value comes from production `readOrrerySystemSnapshot` 
 
 **Preserving-control fix:** Collect every surviving contact affected by interaction insert/update/delete/reparenting, including the old parent captured before mutation, together with contacts whose recency qualification flags change. Recompute through the existing `recomputeLastContactCore` inside the same restore transaction. Preserve the winning contact metadata timestamp explicitly because this core also writes `modified_at`. Keep reconciliation precedence, tombstones, staged photo handling, single recency-writer discipline, and atomic restore. Add a regression beside the backup merge tests and assert actual Orrery System membership as well as `last_contact`.
 
-### WR-01 — WARNING: Publishing the projected frame feeds its own derived mapper indefinitely
+### WR-01 — WARNING, RESOLVED: Publishing the projected frame feeds its own derived mapper indefinitely
 
 **File:** `/home/bwales/projects/orbit-app/src/components/orrery/OrreryWorld.tsx:277`  
 **Feedback write:** line 305; camera object construction is `src/components/orrery/use-orrery-camera.ts:159`.
@@ -195,7 +219,7 @@ The frame updater reads `camera.reorder.value`, causing the production Babel wor
 
 **Preserving-control fix:** Capture the reorder SharedValue directly in the updater instead of the whole controller, keeping the published frame out of that updater's input closure. Retain the single projected-frame authority used by rendering and focus/hit geometry. Verify the compiled closure and that an idle publication cannot dirty its producer.
 
-## Coverage and limits
+## Initial-review coverage and limits
 
 The frontmatter lists the full application/test files read by the rendering reviewer and the collaborating data reviewer. Review followed render/camera/gesture registration, focus/action validation, photos, labels, depth ordering, session recovery, snapshot ownership, preferences, rank persistence, shared contact/interaction writers, merge/purge/import/restore, and the listed schema owners. Finding line references were reopened, and the restore reproduction was independently repeated by the consolidating reviewer.
 
@@ -205,4 +229,4 @@ Installed Skia recorder/visitor implementations and Reanimated/Worklets implemen
 
 This report does **not** certify an exhaustive repository audit: some bulk planning-document reads were truncated; unrelated portions of `backup-schema.ts` were only inspected around portable preference validation, and not every historical migration or entry-list test received a complete read. Those targeted/partial inspections are excluded from the full-file count. No structural-fallow substrate was supplied.
 
-The previously reported 275 suites / 2,581 passing tests were not rerun during this review and do not prove native execution. Native gesture arbitration, lifecycle transitions, photo decoding, accessibility/font-scale layout, and physical-device rendering remain pending verification. The worklet finding is backed by the actual transform and installed runtime implementation; no device crash or performance measurement is claimed. Findings recommend retaining existing security/product controls, not deleting them.
+At the initial review, the previously reported 275 suites / 2,581 passing tests were not rerun and did not prove native execution. The subsequent fix-recheck results are recorded above. Native gesture arbitration, lifecycle transitions, photo decoding, accessibility/font-scale layout, and physical-device rendering remain pending verification. The historical worklet finding was backed by the actual transform and installed runtime implementation; no device crash or performance measurement is claimed. All fixes retain existing security/product controls.
