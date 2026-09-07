@@ -4,6 +4,7 @@ import {
   DashPathEffect,
   Group,
   Paragraph,
+  Path,
   Skia,
   type SkTypefaceFontProvider,
   TextAlign,
@@ -80,6 +81,7 @@ export function createOrreryGestures({
         event.translationX,
         event.translationY,
         extent,
+        frame.value.viewport,
       );
     })
     .onEnd(() => {
@@ -123,17 +125,23 @@ function ProjectedContact({
       { scale: body.radius / worldRadius },
     ];
   });
-  const cx = useDerivedValue(() => frame.value.center.x);
-  const cy = useDerivedValue(() => frame.value.center.y);
-  const radius = useDerivedValue(() => frame.value.bodies[index].ringRadius);
+  const ringPath = useDerivedValue(() => {
+    const points = frame.value.bodies[index].ringPath;
+    const path = Skia.Path.Make();
+    if (points.length) {
+      path.moveTo(points[0].x, points[0].y);
+      for (let i = 1; i < points.length; i++)
+        path.lineTo(points[i].x, points[i].y);
+      path.close();
+    }
+    return path;
+  });
   const dashed =
     style.strokeStyle === "dashed" || style.strokeStyle === "faintTrace";
   return (
     <>
-      <Circle
-        cx={cx}
-        cy={cy}
-        r={radius}
+      <Path
+        path={ringPath}
         style="stroke"
         strokeWidth={style.width}
         color={style.color}
@@ -146,7 +154,7 @@ function ProjectedContact({
         }
       >
         {dashed ? <DashPathEffect intervals={[6, 6]} phase={0} /> : null}
-      </Circle>
+      </Path>
       <Group transform={transform}>
         {focused ? (
           <Circle

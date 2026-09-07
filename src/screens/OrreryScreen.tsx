@@ -31,6 +31,7 @@ import { getExecutor } from "@/db/database";
 import {
   type CameraPose,
   constrainCamera,
+  deriveHomePose,
   FOCUS_MS,
   HOME_CAMERA,
   IDENTITY_ZOOM,
@@ -195,6 +196,18 @@ export function OrreryScreen() {
     );
   }, []);
   const scene = state.snapshot;
+  const lastHomeFrame = useRef("");
+  useEffect(() => {
+    if (!scene || state.status !== "ready") return;
+    const key = `${systemRefId(scene.system)}:${scene.preferences.density}:${viewport.width}:${viewport.height}`;
+    if (lastHomeFrame.current === key) return;
+    const home = deriveHomePose(scene.world, viewport);
+    if (!home) return; // Preserve the previous valid pose through zero measurement.
+    lastHomeFrame.current = key;
+    cancelAnimation(pose);
+    pose.value = home;
+    setFocusedIds([]);
+  }, [scene, state.status, viewport, pose]);
   const measured =
     Number.isFinite(viewport.width) &&
     Number.isFinite(viewport.height) &&

@@ -63,6 +63,10 @@ interface LedgerEntry {
  * this test.
  */
 const CADENCE_OWNERS: Record<string, LedgerEntry> = {
+  "src/db/orrery-impact-read.ts": {
+    owner: "29-04-01",
+    note: "Batched canonical ImpactInputs preserve nullable interval_days without arithmetic; Gravity uses full history and connected scope, independently of cadence.",
+  },
   "src/db/status.ts": {
     owner: "18.2-04",
     note: "PROGRESS_SQL divides by interval_days; STATUS_CADENCE_PRECONDITION requires IS NOT NULL before the fragment is evaluated.",
