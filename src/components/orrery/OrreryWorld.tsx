@@ -112,6 +112,7 @@ function ProjectedContact({
   focused,
 }: ResourceProps) {
   const contact = scene.contacts[index];
+  // Explicit All/Not neutral members use the canonical border/body treatment.
   const style = orreryRingStyle(contact.status, colors);
   const worldRadius = scene.world[index].radius;
   const transform = useDerivedValue(() => {
