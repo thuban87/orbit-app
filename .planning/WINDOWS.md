@@ -1,10 +1,10 @@
 ---
 schema_version: 1
-open_count: 47
+open_count: 48
 waived_count: 0
 fixed_count: 6
-total_count: 53
-last_updated: 2026-09-07T17:23:55.487Z
+total_count: 54
+last_updated: 2026-09-07T17:57:06.340Z
 ---
 
 # Broken Windows Ledger
@@ -68,6 +68,7 @@ last_updated: 2026-09-07T17:23:55.487Z
 | 51 | 29 | unrun-verify | src/components/orrery/use-orrery-camera.ts |  | Plan 29-07 native pan/pinch/tilt/yaw arbitration, restrained recovery feel, world Polaris visibility and TalkBack orientation remain pending Plan 12 device verification. | open |  | 2026-09-07T16:46:40.740Z |  |
 | 52 | 29 | unrun-verify | src/screens/OrreryScreen.tsx |  | Plan 29-08 native TalkBack names/action order/trigger focus/modal isolation/large-font wrapping and floating group coexistence remain pending Plan 12. | open |  | 2026-09-07T17:05:24.648Z |  |
 | 53 | 29 | unrun-verify | src/components/orrery/use-orrery-camera.ts |  | Native stationary hold activation, preactivation pan, multi-pointer cancellation and haptic/ghost-ring acknowledgment remain pending Plan 12 device verification. | open |  | 2026-09-07T17:23:55.487Z |  |
+| 54 | 29 | unrun-verify | .planning/phases/29-orrery-camera-scale-exploration/29-VALIDATION.md |  | Plan 11 native Profile Back, tab reentry, background clock shutdown, live OS motion toggle and scaled-text recovery remain pending Plan 12 device verification. | open |  | 2026-09-07T17:57:06.340Z |  |
 
 ````json
 [
@@ -705,6 +706,18 @@ last_updated: 2026-09-07T17:23:55.487Z
     "status": "open",
     "reason": "",
     "recorded_at": "2026-09-07T17:23:55.487Z",
+    "resolved_at": null
+  },
+  {
+    "id": 54,
+    "kind": "unrun-verify",
+    "phase": "29",
+    "file": ".planning/phases/29-orrery-camera-scale-exploration/29-VALIDATION.md",
+    "line": null,
+    "description": "Plan 11 native Profile Back, tab reentry, background clock shutdown, live OS motion toggle and scaled-text recovery remain pending Plan 12 device verification.",
+    "status": "open",
+    "reason": "",
+    "recorded_at": "2026-09-07T17:57:06.340Z",
     "resolved_at": null
   }
 ]
