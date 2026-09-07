@@ -143,6 +143,10 @@ const CADENCE_OWNERS: Record<string, LedgerEntry> = {
  * mapped to its owning task and exact predicate.
  */
 const PREDICATE_OWNERS: Record<string, LedgerEntry> = {
+  "src/db/orrery-system-read.ts": {
+    owner: "29-03",
+    note: "Complete reorder identities require archived_at IS NULL AND tracking_enabled=1 AND last_contact IS NOT NULL, plus the saved-sun fingerprint. Explicit All/Not member widening retains Bound/archive scope and null health; other Systems remain contacted-only.",
+  },
   "src/logic/dashboard-query-logic.ts": {
     owner: "25-01",
     note: "ACTIVE_SEGREGATION_WHERE is the shared Active-universe predicate: archived-at-null, `tracking_enabled = 1`, and contacted; snooze suppression is intentionally absent.",
@@ -197,6 +201,10 @@ const PREDICATE_OWNERS: Record<string, LedgerEntry> = {
  * import a status fragment, so the fragment reach cannot silently disappear.
  */
 const STATUS_FRAGMENT_CONSUMERS: Record<string, LedgerEntry> = {
+  "src/db/orrery-system-read.ts": {
+    owner: "29-03",
+    note: "System members share PROGRESS_SQL/STATUS_SQL inside Bound scope; CASE preserves null health for explicit All/Not never-contacted members.",
+  },
   "src/db/contact-status-read.ts": {
     owner: "18.2-04",
     note: "Composes PROGRESS_SQL/STATUS_SQL/REASON_SQL into one by-id SELECT; returns a neutral null result for rows outside the cadence precondition.",

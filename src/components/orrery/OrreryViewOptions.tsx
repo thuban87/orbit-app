@@ -48,6 +48,10 @@ export function OrreryViewOptions({
     if (!open) return;
     shellTransientStore
       .getState()
+      .entries.find((entry) => entry.id === "orrery-system-selector")
+      ?.dismiss();
+    shellTransientStore
+      .getState()
       .openTransient(TRANSIENT_ID, () => latestDismiss.current());
     const frame = requestAnimationFrame(() => {
       const handle = findNodeHandle(heading.current);
@@ -228,7 +232,7 @@ const styles = StyleSheet.create({
     position: "absolute",
     top: SPACING.base,
     right: SPACING.base,
-    maxWidth: "90%",
+    maxWidth: "44%",
   },
   panel: {
     position: "absolute",

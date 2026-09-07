@@ -11,6 +11,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   AppState,
   type LayoutChangeEvent,
+  ScrollView,
   StyleSheet,
   View,
 } from "react-native";
@@ -19,8 +20,10 @@ import {
   useSharedValue,
   withTiming,
 } from "react-native-reanimated";
+import { OrrerySystemSelector } from "@/components/orrery/OrrerySystemSelector";
 import { OrreryViewOptions } from "@/components/orrery/OrreryViewOptions";
 import { OrreryWorld } from "@/components/orrery/OrreryWorld";
+import { systemEmptyCopy } from "@/components/orrery/orrery-controls-logic";
 import { ShellAppBar } from "@/components/ShellAppBar";
 import { AppText } from "@/components/ui/AppText";
 import { Button } from "@/components/ui/Button";
@@ -37,6 +40,7 @@ import {
   parseSystemRef,
   systemRefId,
 } from "@/logic/orrery-system-logic";
+import { navigationRef } from "@/navigation/linking";
 import type { RootStackParamList } from "@/navigation/types";
 import {
   createOrreryIntentDispatcher,
@@ -61,6 +65,8 @@ export function OrreryScreen() {
   const hydratePreferences = useOrreryPreferencesStore(
     (store) => store.hydrate,
   );
+  const hydrated = useOrreryPreferencesStore((store) => store.hydrated);
+  const hydration = useOrreryPreferencesStore((store) => store.hydration);
   const [focusedIds, setFocusedIds] = useState<number[]>([]);
   const pose = useSharedValue<CameraPose>({ ...HOME_CAMERA });
   const reducedMotion = useReducedMotionShared();
@@ -86,6 +92,13 @@ export function OrreryScreen() {
     [],
   );
   const state = useSystemStore();
+  const focusSystem = useRef(state.requested.id);
+  useEffect(() => {
+    if (focusSystem.current !== state.requested.id) {
+      focusSystem.current = state.requested.id;
+      setFocusedIds([]);
+    }
+  }, [state.requested.id]);
   const initialized = useRef(false);
   const isFocused = useIsFocused();
   const [appActive, setAppActive] = useState(
@@ -104,17 +117,7 @@ export function OrreryScreen() {
         void (async () => {
           await hydratePreferences(getExecutor());
           if (cancelled) return;
-          const pref = useOrreryPreferencesStore.getState();
-          if (!pref.hydrated) return;
-          if (!initialized.current) {
-            initialized.current = true;
-            await useSystemStore
-              .getState()
-              .select(
-                parseSystemRef(pref.committed.lastSystem) ??
-                  ALL_CONTACTS_SYSTEM,
-              );
-          } else await useSystemStore.getState().reload();
+          if (initialized.current) await useSystemStore.getState().reload();
         })();
       return () => {
         cancelled = true;
@@ -123,6 +126,17 @@ export function OrreryScreen() {
       };
     }, [useSystemStore, hydratePreferences, appActive, pose]),
   );
+  useEffect(() => {
+    if (hydrated && isFocused && appActive && !initialized.current) {
+      initialized.current = true;
+      const pref = useOrreryPreferencesStore.getState();
+      void useSystemStore
+        .getState()
+        .select(
+          parseSystemRef(pref.committed.lastSystem) ?? ALL_CONTACTS_SYSTEM,
+        );
+    }
+  }, [hydrated, isFocused, appActive, useSystemStore]);
   const reload = useCallback(() => {
     if (isFocused && appActive && initialized.current)
       void useSystemStore.getState().reload();
@@ -188,9 +202,16 @@ export function OrreryScreen() {
     viewport.height > 0;
   const visible = measured && isFocused && appActive;
   const empty = state.status === "ready" && scene?.contacts.length === 0;
-  const contactSun = scene?.world.some(
-    (body) => body.kind === "sun" && body.id > 0,
+  const qualifyingSun = !!scene?.systemSnapshot.members.some(
+    (row) => row.id === scene.systemSnapshot.resolvedSunIdentity?.id,
   );
+  const allContacts = state.requested.id === "builtin:all-contacts";
+  const emptyCopy = systemEmptyCopy(
+    state.requested.name,
+    allContacts,
+    qualifyingSun,
+  );
+  const showAll = () => void state.select(ALL_CONTACTS_SYSTEM);
 
   return (
     <View
@@ -215,39 +236,105 @@ export function OrreryScreen() {
             focusedIds={focusedIds}
           />
         ) : null}
+        <OrrerySystemSelector
+          state={state}
+          availableHeight={viewport.height}
+          enabled={hydrated}
+        />
         <OrreryViewOptions availableHeight={viewport.height} />
-        {state.status === "loading" && !scene ? (
-          <View style={styles.feedback}>
+        {(state.status === "loading" || state.status === "initial") &&
+        !scene &&
+        hydration !== "error" ? (
+          <ScrollView
+            style={[styles.feedback, { backgroundColor: colors.surface }]}
+            contentContainerStyle={styles.feedbackContent}
+          >
             <AppText>Loading your Orrery…</AppText>
-          </View>
+          </ScrollView>
         ) : null}
         {state.status === "error" || state.status === "stale" ? (
-          <View style={styles.feedback}>
+          <ScrollView
+            style={[styles.feedback, { backgroundColor: colors.surface }]}
+            contentContainerStyle={styles.feedbackContent}
+          >
             <AppText>
               {scene
                 ? "Couldn't refresh this System. Showing the last loaded contacts."
                 : "Couldn't load this System. Try loading it again."}
             </AppText>
             <Button role="secondary" label="Reload System" onPress={reload} />
-          </View>
+          </ScrollView>
+        ) : null}
+        {state.status === "missing-category" ? (
+          <ScrollView
+            style={[styles.feedback, { backgroundColor: colors.surface }]}
+            contentContainerStyle={styles.feedbackContent}
+          >
+            <AppText role="heading">{state.requested.name}</AppText>
+            <AppText>This System is no longer available.</AppText>
+            <Button
+              role="secondary"
+              label="Show All Contacts"
+              onPress={showAll}
+            />
+          </ScrollView>
+        ) : null}
+        {state.persistence === "error" && state.status === "ready" ? (
+          <ScrollView
+            style={[styles.saveFeedback, { backgroundColor: colors.surface }]}
+            contentContainerStyle={styles.feedbackContent}
+          >
+            <AppText>
+              Couldn't save your view options. Try that change again.
+            </AppText>
+            <Button
+              role="secondary"
+              label="Retry view change"
+              onPress={() => void state.retryPersistence()}
+            />
+          </ScrollView>
+        ) : null}
+        {hydration === "error" && !hydrated ? (
+          <ScrollView
+            style={[styles.feedback, { backgroundColor: colors.surface }]}
+            contentContainerStyle={styles.feedbackContent}
+          >
+            <AppText>
+              Couldn't load your view options. Try loading them again.
+            </AppText>
+            <Button
+              role="secondary"
+              label="Reload view options"
+              onPress={() => void hydratePreferences(getExecutor())}
+            />
+          </ScrollView>
         ) : null}
         {empty ? (
-          <View
+          <ScrollView
             testID="orrery-empty"
-            style={styles.feedback}
-            pointerEvents="none"
+            style={[styles.feedback, { backgroundColor: colors.surface }]}
+            contentContainerStyle={styles.feedbackContent}
           >
-            <AppText role="heading">
-              {contactSun
-                ? "Your contacts are centered here"
-                : "No contacts in your Orrery yet"}
-            </AppText>
-            <AppText>
-              {contactSun
-                ? "Open the contact at the center or choose another System."
-                : "Add a contact and choose a contact frequency to include them here."}
-            </AppText>
-          </View>
+            <AppText role="heading">{emptyCopy.heading}</AppText>
+            <AppText>{emptyCopy.body}</AppText>
+            {!allContacts ? (
+              <Button
+                role="secondary"
+                label="Show All Contacts"
+                onPress={showAll}
+              />
+            ) : !qualifyingSun ? (
+              <Button
+                role="secondary"
+                label="Add Contact"
+                onPress={() =>
+                  navigationRef.current?.navigate("DashboardTab", {
+                    screen: "Create",
+                  })
+                }
+              />
+            ) : null}
+          </ScrollView>
         ) : null}
       </View>
     </View>
@@ -258,9 +345,17 @@ const styles = StyleSheet.create({
   canvasArea: { flex: 1, alignItems: "center", justifyContent: "center" },
   feedback: {
     position: "absolute",
-    top: SPACING.base,
+    top: "25%",
+    maxHeight: "50%",
     left: SPACING.base,
     right: SPACING.base,
-    gap: SPACING.sm,
+  },
+  feedbackContent: { padding: SPACING.base, gap: SPACING.sm },
+  saveFeedback: {
+    position: "absolute",
+    bottom: SPACING.base,
+    left: SPACING.base,
+    right: SPACING.base,
+    maxHeight: "25%",
   },
 });
