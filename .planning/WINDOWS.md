@@ -1,10 +1,10 @@
 ---
 schema_version: 1
-open_count: 46
+open_count: 47
 waived_count: 0
 fixed_count: 6
-total_count: 52
-last_updated: 2026-09-07T17:05:24.648Z
+total_count: 53
+last_updated: 2026-09-07T17:23:55.487Z
 ---
 
 # Broken Windows Ledger
@@ -67,6 +67,7 @@ last_updated: 2026-09-07T17:05:24.648Z
 | 50 | 29 | unrun-verify | src/components/orrery/OrreryControls.tsx |  | Native window measurement, scaled control reachability, modal focus restoration and TalkBack orientation remain pending in Plan 12. | open |  | 2026-09-07T09:23:41.676Z |  |
 | 51 | 29 | unrun-verify | src/components/orrery/use-orrery-camera.ts |  | Plan 29-07 native pan/pinch/tilt/yaw arbitration, restrained recovery feel, world Polaris visibility and TalkBack orientation remain pending Plan 12 device verification. | open |  | 2026-09-07T16:46:40.740Z |  |
 | 52 | 29 | unrun-verify | src/screens/OrreryScreen.tsx |  | Plan 29-08 native TalkBack names/action order/trigger focus/modal isolation/large-font wrapping and floating group coexistence remain pending Plan 12. | open |  | 2026-09-07T17:05:24.648Z |  |
+| 53 | 29 | unrun-verify | src/components/orrery/use-orrery-camera.ts |  | Native stationary hold activation, preactivation pan, multi-pointer cancellation and haptic/ghost-ring acknowledgment remain pending Plan 12 device verification. | open |  | 2026-09-07T17:23:55.487Z |  |
 
 ````json
 [
@@ -692,6 +693,18 @@ last_updated: 2026-09-07T17:05:24.648Z
     "status": "open",
     "reason": "",
     "recorded_at": "2026-09-07T17:05:24.648Z",
+    "resolved_at": null
+  },
+  {
+    "id": 53,
+    "kind": "unrun-verify",
+    "phase": "29",
+    "file": "src/components/orrery/use-orrery-camera.ts",
+    "line": null,
+    "description": "Native stationary hold activation, preactivation pan, multi-pointer cancellation and haptic/ghost-ring acknowledgment remain pending Plan 12 device verification.",
+    "status": "open",
+    "reason": "",
+    "recorded_at": "2026-09-07T17:23:55.487Z",
     "resolved_at": null
   }
 ]
