@@ -86,9 +86,12 @@ describe("batched canonical Gravity snapshot", () => {
   it.each([0, 1, 100, 256, 257, 513])(
     "uses exactly ceil(unique valid IDs / 256) bound SELECTs for %i IDs",
     async (count) => {
-      const getAllAsync = vi.fn(exec.getAllAsync);
+      const getAllAsync = vi.fn<(sql: string, params?: unknown[]) => void>();
       const ro: ReadOnlyExecutor = {
-        getAllAsync,
+        getAllAsync: <T>(sql: string, params?: unknown[]) => {
+          getAllAsync(sql, params);
+          return exec.getAllAsync<T>(sql, params);
+        },
         getFirstAsync: exec.getFirstAsync,
       };
       const ids = Array.from({ length: count }, (_, i) => i + 1);
