@@ -1,10 +1,10 @@
 ---
 schema_version: 1
-open_count: 43
+open_count: 44
 waived_count: 0
 fixed_count: 6
-total_count: 49
-last_updated: 2026-09-07T09:03:24.375Z
+total_count: 50
+last_updated: 2026-09-07T09:23:41.676Z
 ---
 
 # Broken Windows Ledger
@@ -64,6 +64,7 @@ last_updated: 2026-09-07T09:03:24.375Z
 | 47 | 29 | unrun-verify | src/components/orrery/OrreryWorld.tsx |  | Plan 29-04 native Gravity mass, density/Home calibration, projected rings and gesture observations remain pending final Plan 12 device session; FIFO wait and hold latency unmeasured. | open |  | 2026-09-07T08:43:44.951Z |  |
 | 48 | 29 | lint-warning | src/db/lifecycle-consumer-ledger.test.ts |  | Pre-existing Biome formatter drift outside the new 29-04 cadence-owner entry; baseline HEAD reproduces the same formatting findings. | open |  | 2026-09-07T08:44:02.538Z |  |
 | 49 | 29 | unrun-verify | src/components/orrery/OrreryWorld.tsx |  | Plan 29-05 native billboard sun occlusion, glyph shaping, layer visibility and scaled-text fit await Plan 12 device verification. | open |  | 2026-09-07T09:03:24.375Z |  |
+| 50 | 29 | unrun-verify | src/components/orrery/OrreryControls.tsx |  | Native window measurement, scaled control reachability, modal focus restoration and TalkBack orientation remain pending in Plan 12. | open |  | 2026-09-07T09:23:41.676Z |  |
 
 ````json
 [
@@ -653,6 +654,18 @@ last_updated: 2026-09-07T09:03:24.375Z
     "status": "open",
     "reason": "",
     "recorded_at": "2026-09-07T09:03:24.375Z",
+    "resolved_at": null
+  },
+  {
+    "id": 50,
+    "kind": "unrun-verify",
+    "phase": "29",
+    "file": "src/components/orrery/OrreryControls.tsx",
+    "line": null,
+    "description": "Native window measurement, scaled control reachability, modal focus restoration and TalkBack orientation remain pending in Plan 12.",
+    "status": "open",
+    "reason": "",
+    "recorded_at": "2026-09-07T09:23:41.676Z",
     "resolved_at": null
   }
 ]
