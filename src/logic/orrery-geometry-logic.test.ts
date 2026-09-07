@@ -9,6 +9,7 @@
  * (`deriveOrreryMetrics` — H2 / C2-4 / C2-6).
  */
 import { describe, expect, it } from "vitest";
+import * as geometry from "@/logic/orrery-geometry-logic";
 import {
   deriveOrreryMetrics,
   drawnRadius,
@@ -25,6 +26,24 @@ import {
 } from "@/logic/orrery-geometry-logic";
 
 const HALF_PI = Math.PI / 2;
+
+describe("single canonical world contract", () => {
+  it("does not export a relationship resting-angle or mode-morph duration", () => {
+    expect("evenSpreadAngle" in geometry).toBe(false);
+    expect("MORPH_MS" in geometry).toBe(false);
+    expect("MORPH_MS" in deriveOrreryMetrics(400, 600, 1)).toBe(false);
+  });
+
+  it("repeating a timestamp snapshot preserves clockwise 0/half/full interval placement", () => {
+    const locate = () => [0, 0.25, 0.5, 1].map(progress => polarToXY(0, 0, 100, progressToAngle(progress)));
+    const first = locate();
+    expect(locate()).toEqual(first);
+    expect(first[0].y).toBe(-100);
+    expect(first[1].x).toBeCloseTo(100);
+    expect(first[2].y).toBe(100);
+    expect(first[3]).toEqual(first[0]);
+  });
+});
 
 describe("progressToAngle — 0 at top (12 o'clock), clockwise, wraps each interval", () => {
   it("0 → 0 rad (top)", () => {
