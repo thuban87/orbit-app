@@ -135,6 +135,7 @@ All commits are local on main with hooks enabled. No tracked deletions, dependen
 
 ## Remaining Cross-Plan and Native Evidence
 
+- STATE advances to Plan 6 of 12. The SDK again counted `29-PLAN-CHECK.md` as a thirteenth executable plan; corrected its generated ROADMAP checkbox/count to 5/12. Global progress recalculation declined the truncated phase scope, so existing milestone progress remains unchanged.
 - ORRC-03/06/07 remain pending at requirement level. COVERAGE assigns E1 completion across Plans 01/05/11; companion wrapping/full accessibility identity belongs to Plan 08, measured shell/control exclusions to Plan 06, focused/satellite relation sources to Plans 08/10, and integrated/native evidence to Plan 12. This plan supplies the renderer and exported seams, not a claim those later UI surfaces already exist.
 - Native circular media and real sun occlusion, native grapheme shaping, theme/scaled-text readability, touch behavior and TalkBack remain pending. WINDOWS entry **49** records the obligation. No native performance claim is made.
 - Ordinary System switches currently clear the old scene through the existing store; the new continuity applies to retained mounted same-System snapshots/density refreshes. Later lifecycle integration owns final transitions and stale/loading behavior.
