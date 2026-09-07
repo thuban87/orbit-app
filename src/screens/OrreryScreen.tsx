@@ -464,7 +464,7 @@ export function OrreryScreen() {
     if (useSystemStore.getState().status === "ready") setReorderError(false);
   }, [useSystemStore]);
   const focus = useCallback(
-    (targets: OrreryContactTarget[]) => {
+    (targets: OrreryContactTarget[], waitForPanel = false) => {
       const ids = targets.map((target) => target.id);
       const scene = useSystemStore.getState().current();
       if (!scene) return;
@@ -472,6 +472,11 @@ export function OrreryScreen() {
       if (bodies.length === 0) return;
       setFocusTargets(targets);
       setFocusError(null);
+      if (waitForPanel) {
+        // The group's measured obstacle owns its framing, including later reflows.
+        runOnUI(camera.stop)();
+        return;
+      }
       const framing = frameBodies(bodies, viewport, scene.extent, pose.value);
       if (!framing) return;
       runOnUI(camera.recover)({
@@ -482,7 +487,7 @@ export function OrreryScreen() {
             : framing.pose.zoom,
       });
     },
-    [useSystemStore, pose, camera.recover, viewport],
+    [useSystemStore, pose, camera.recover, camera.stop, viewport],
   );
   const actionEnvironment = useRef({ focus, active: isFocused && appActive });
   actionEnvironment.current = { focus, active: isFocused && appActive };
@@ -503,7 +508,7 @@ export function OrreryScreen() {
         },
         group: (targets) => {
           setClusterOpen(true);
-          actionEnvironment.current.focus(targets);
+          actionEnvironment.current.focus(targets, true);
         },
         clear: () => {
           setFocusTargets([]);
@@ -647,9 +652,18 @@ export function OrreryScreen() {
   }, [scene, state.status]);
   const lastHomeFrame = useRef("");
   const lastHomeDomain = useRef("");
+  const clusterMeasured = !!obstacles[CLUSTER_OBSTACLE];
   useEffect(() => {
     if (!scene || state.status !== "ready" || !visible || !sessionReady) return;
-    const key = `${systemRefId(scene.system)}:${scene.preferences.density}:${JSON.stringify(viewport)}`;
+    // Native measurement may arrive after opening or be cleared during font reflow.
+    if (clusterOpen && !clusterMeasured) {
+      lastHomeFrame.current = "";
+      return;
+    }
+    const groupKey = clusterOpen
+      ? `${scene.generation}:${focusedIds.join(",")}`
+      : "";
+    const key = `${systemRefId(scene.system)}:${scene.preferences.density}:${JSON.stringify(viewport)}:${groupKey}`;
     const domain = `${systemRefId(scene.system)}:${scene.preferences.density}`;
     const session = useOrrerySessionStore.getState();
     if (sessionResume === "restore") {
@@ -677,7 +691,11 @@ export function OrreryScreen() {
       }
     }
     if (lastHomeFrame.current === key && sessionResume === "active") return;
-    if (sessionResume === "active" && lastHomeDomain.current === domain) {
+    if (
+      sessionResume === "active" &&
+      lastHomeDomain.current === domain &&
+      !clusterOpen
+    ) {
       lastHomeFrame.current = key;
       const extent = cameraExtent(scene.extent);
       runOnUI(() => {
@@ -706,11 +724,13 @@ export function OrreryScreen() {
       setFocusError(null);
       session.resumed();
     }
-    runOnUI(() => {
-      "worklet";
-      camera.stop();
-      pose.value = home;
-    })();
+    if (clusterOpen) runOnUI(camera.recover)(home);
+    else
+      runOnUI(() => {
+        "worklet";
+        camera.stop();
+        pose.value = home;
+      })();
   }, [
     scene,
     state.status,
@@ -718,6 +738,9 @@ export function OrreryScreen() {
     pose,
     focusedIds,
     camera.stop,
+    camera.recover,
+    clusterOpen,
+    clusterMeasured,
     visible,
     sessionReady,
     sessionResume,
