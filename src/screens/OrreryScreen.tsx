@@ -13,6 +13,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AppState, StyleSheet, View } from "react-native";
 import {
   cancelAnimation,
+  runOnJS,
   runOnUI,
   useSharedValue,
 } from "react-native-reanimated";
@@ -49,6 +50,7 @@ import { commitRingReorder } from "@/db/ring-seq-dao";
 import {
   type CameraPose,
   type CameraRect,
+  clampCameraPose,
   deriveHomePose,
   frameBodies,
   HOME_CAMERA,
@@ -64,6 +66,7 @@ import {
 } from "@/logic/orrery-focus-logic";
 import { cameraExtent, northTarget } from "@/logic/orrery-recovery-logic";
 import type { ReorderIntent } from "@/logic/orrery-reorder-logic";
+import { restoreOrrerySession } from "@/logic/orrery-session-logic";
 import {
   ALL_CONTACTS_SYSTEM,
   parseSystemRef,
@@ -78,6 +81,7 @@ import {
   type OrrerySatelliteState,
 } from "@/services/orrery-scene";
 import { useOrreryPreferencesStore } from "@/stores/orrery-preferences-store";
+import { useOrrerySessionStore } from "@/stores/orrery-session-store";
 import { createOrrerySystemStore } from "@/stores/orrery-system-store";
 import {
   sameWindowRect,
@@ -101,6 +105,12 @@ export function OrreryScreen() {
   const reorderBusy = useRef(false);
   const cancelIntent = useRef<(reason: OrreryCancellation) => void>(() => {});
   const routeLive = useRef(false);
+  const captureSession = useRef<
+    (reason: "profile" | "background", after?: () => void) => void
+  >(() => {});
+  const captureGeneration = useRef(0);
+  const [sessionReady, setSessionReady] = useState(false);
+  const sessionResume = useOrrerySessionStore((store) => store.resume);
   const restoreContactsFocus = useRef<(() => void) | null>(null);
   const overlaysOpen = shellTransientStore((store) =>
     store.entries.some((entry) => entry.id !== "orrery-cluster"),
@@ -279,7 +289,10 @@ export function OrreryScreen() {
   }, [isFocused, appActive, closeContacts]);
   useEffect(() => {
     const subscription = AppState.addEventListener("change", (value) => {
-      if (value !== "active") cancelIntent.current("background");
+      if (value !== "active") {
+        if (routeLive.current) captureSession.current("background");
+        cancelIntent.current("background");
+      }
       setAppActive(value === "active");
     });
     return () => subscription.remove();
@@ -287,15 +300,18 @@ export function OrreryScreen() {
   useFocusEffect(
     useCallback(() => {
       routeLive.current = true;
+      setSessionReady(false);
       let cancelled = false;
       if (appActive)
         void (async () => {
           await hydratePreferences(getExecutor());
           if (cancelled) return;
           if (initialized.current) await useSystemStore.getState().reload();
+          if (!cancelled) setSessionReady(true);
         })();
       return () => {
         routeLive.current = false;
+        setSessionReady(false);
         cancelIntent.current("blur");
         cancelled = true;
         useSystemStore.getState().cancel();
@@ -362,6 +378,41 @@ export function OrreryScreen() {
     enabled: visible && !overlaysOpen,
     reduced: reducedMotion,
   });
+  // Stop and sample on the UI thread once per departure, never once per frame.
+  captureSession.current = (reason, after) => {
+    const ticket = ++captureGeneration.current;
+    const generation = useOrrerySessionStore.getState().generation;
+    const systemId = useSystemStore.getState().requested.id;
+    const target =
+      !clusterOpen && focusTargets.length === 1 ? focusTargets[0] : null;
+    const publish = (settled: CameraPose) => {
+      if (
+        ticket !== captureGeneration.current ||
+        generation !== useOrrerySessionStore.getState().generation
+      )
+        return;
+      useOrrerySessionStore
+        .getState()
+        .capture(
+          reason,
+          { pose: settled, focus: target, systemId },
+          generation,
+        );
+      after?.();
+    };
+    const stop = camera.stop;
+    runOnUI(() => {
+      "worklet";
+      stop();
+      runOnJS(publish)({ ...pose.value });
+    })();
+  };
+  useEffect(
+    () => () => {
+      captureGeneration.current++;
+    },
+    [],
+  );
   const onReorder = useCallback(
     async (intent: ReorderIntent) => {
       const current = useSystemStore.getState().current();
@@ -446,9 +497,16 @@ export function OrreryScreen() {
           setFocusError(null);
         },
         openProfile: (contactId) => {
+          const stack = navigation.getState();
+          useOrrerySessionStore
+            .getState()
+            .routeChanged(stack.routes.slice(0, stack.index + 1));
           setClusterOpen(false);
           shellTransientStore.getState().closeTransient("orrery-cluster");
-          navigation.navigate("Profile", { contactId });
+          captureSession.current("profile", () => {
+            if (routeLive.current && AppState.currentState === "active")
+              navigation.navigate("Profile", { contactId });
+          });
         },
         reject: (reason) => {
           setFocusError(reason);
@@ -573,12 +631,49 @@ export function OrreryScreen() {
     });
   }, [scene, state.status]);
   const lastHomeFrame = useRef("");
+  const lastHomeDomain = useRef("");
   useEffect(() => {
-    if (!scene || state.status !== "ready") return;
+    if (!scene || state.status !== "ready" || !visible || !sessionReady) return;
     const key = `${systemRefId(scene.system)}:${scene.preferences.density}:${JSON.stringify(viewport)}`;
-    if (lastHomeFrame.current === key) return;
-    const focusedBodies = scene.world.filter((body) =>
-      focusedIds.includes(body.id),
+    const domain = `${systemRefId(scene.system)}:${scene.preferences.density}`;
+    const session = useOrrerySessionStore.getState();
+    if (session.resume === "restore") {
+      const restored = restoreOrrerySession({
+        saved: session.saved,
+        systemId: systemRefId(scene.system),
+        members: scene.systemSnapshot.members,
+        sun: scene.systemSnapshot.resolvedSunIdentity,
+        extent: cameraExtent(scene.extent),
+      });
+      if (restored) {
+        lastHomeFrame.current = key;
+        lastHomeDomain.current = domain;
+        setFocusTargets(restored.focus ? [restored.focus] : []);
+        setClusterOpen(false);
+        if (session.saved?.focus && !restored.focus) setFocusError("removed");
+        const stop = camera.stop;
+        runOnUI(() => {
+          "worklet";
+          stop();
+          pose.value = restored.pose;
+        })();
+        session.resumed();
+        return;
+      }
+    }
+    if (lastHomeFrame.current === key && session.resume === "active") return;
+    if (session.resume === "active" && lastHomeDomain.current === domain) {
+      lastHomeFrame.current = key;
+      const extent = cameraExtent(scene.extent);
+      runOnUI(() => {
+        "worklet";
+        camera.stop();
+        pose.value = clampCameraPose(pose.value, extent);
+      })();
+      return;
+    }
+    const focusedBodies = scene.world.filter(
+      (body) => session.resume === "active" && focusedIds.includes(body.id),
     );
     const home =
       focusedBodies.length > 0
@@ -588,12 +683,30 @@ export function OrreryScreen() {
     if (focusedBodies.length === 1)
       home.zoom = Math.min(IDENTITY_ZOOM, home.zoom);
     lastHomeFrame.current = key;
+    lastHomeDomain.current = domain;
+    if (session.resume !== "active") {
+      setFocusTargets([]);
+      setFocusedSatellite(null);
+      setClusterOpen(false);
+      setFocusError(null);
+      session.resumed();
+    }
     runOnUI(() => {
       "worklet";
       camera.stop();
       pose.value = home;
     })();
-  }, [scene, state.status, viewport, pose, focusedIds, camera.stop]);
+  }, [
+    scene,
+    state.status,
+    viewport,
+    pose,
+    focusedIds,
+    camera.stop,
+    visible,
+    sessionReady,
+    sessionResume,
+  ]);
   const recenter = () => {
     satelliteAction.current++;
     setFocusedSatellite(null);
