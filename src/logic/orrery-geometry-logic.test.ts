@@ -4,8 +4,8 @@
  * Every correctness-critical calculation the Skia render surface (13-05/13-07)
  * consumes is asserted here node-side, before a single pixel is drawn:
  * angle↔time anchors + wrap, clockwise polar projection, ring radius, the drift
- * bands + the DRIFT_MAX clamp, hit-testing (nearest/tie/miss/empty), even-spread,
- * the shortest-path morph delta, and the shared measured-canvas responsive metrics
+ * bands + the legacy DRIFT_MAX clamp, legacy hit-testing (nearest/tie/miss/empty),
+ * the shortest-path angular delta, and the shared measured-canvas responsive metrics
  * (`deriveOrreryMetrics` — H2 / C2-4 / C2-6).
  */
 import { describe, expect, it } from "vitest";
@@ -14,7 +14,6 @@ import {
   deriveOrreryMetrics,
   drawnRadius,
   driftPush,
-  evenSpreadAngle,
   hitTest,
   MIN_GAP,
   PLANET_RADIUS,
@@ -35,7 +34,10 @@ describe("single canonical world contract", () => {
   });
 
   it("repeating a timestamp snapshot preserves clockwise 0/half/full interval placement", () => {
-    const locate = () => [0, 0.25, 0.5, 1].map(progress => polarToXY(0, 0, 100, progressToAngle(progress)));
+    const locate = () =>
+      [0, 0.25, 0.5, 1].map((progress) =>
+        polarToXY(0, 0, 100, progressToAngle(progress)),
+      );
     const first = locate();
     expect(locate()).toEqual(first);
     expect(first[0].y).toBe(-100);
@@ -174,17 +176,6 @@ describe("driftPush — the effective drawn-above-ring offset the drag-release i
   });
 });
 
-describe("evenSpreadAngle — uniform index/count sweep", () => {
-  it("index i of count n → (i/n)·2π", () => {
-    expect(evenSpreadAngle(0, 4)).toBeCloseTo(0);
-    expect(evenSpreadAngle(1, 4)).toBeCloseTo(HALF_PI);
-    expect(evenSpreadAngle(2, 4)).toBeCloseTo(Math.PI);
-  });
-  it("count 0 → 0 (no divide-by-zero)", () => {
-    expect(evenSpreadAngle(0, 0)).toBe(0);
-  });
-});
-
 describe("shortestAngleDelta — the short way round the wrap (Pitfall 2)", () => {
   it("350° → 10° goes +20°, not −340°", () => {
     const from = (350 * Math.PI) / 180;
@@ -277,7 +268,6 @@ describe("deriveOrreryMetrics — shared measured-canvas responsive layout (H2 /
     expect(C.HIT_RADIUS).toBeGreaterThan(0);
     expect(C.SUN_RADIUS).toBeGreaterThan(0);
     expect(C.SUN_GLOW_RADIUS).toBeGreaterThan(0);
-    expect(C.MORPH_MS).toBeGreaterThan(0);
     expect(C.DECAY_DRIFT_SPAN).toBeGreaterThan(0);
     expect(C.ROGUE_DRIFT_SPAN).toBeGreaterThan(0);
   });

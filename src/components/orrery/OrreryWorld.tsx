@@ -113,7 +113,6 @@ function ProjectedContact({
 }: ResourceProps) {
   const contact = scene.contacts[index];
   const style = orreryRingStyle(contact.status, colors);
-  const zeroMorph = useSharedValue(0);
   const worldRadius = scene.world[index].radius;
   const transform = useDerivedValue(() => {
     const body = frame.value.bodies[index];
@@ -164,7 +163,6 @@ function ProjectedContact({
           radius={worldRadius}
           photo={contact.photo}
           bodyFill={style.bodyFill}
-          mutedFill={style.bodyFill}
           swatch={
             colors.avatarSwatches[
               swatchIndex(contact.name, colors.avatarSwatches.length)
@@ -173,10 +171,6 @@ function ProjectedContact({
           swatchText={colors.avatarSwatchText}
           initials={getInitials(contact.name)}
           fontProvider={fontProvider}
-          morph={zeroMorph}
-          orbitRadius={0}
-          statusAngle={0}
-          angleDelta={0}
         />
       </Group>
       <IdentityLabel

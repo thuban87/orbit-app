@@ -59,8 +59,6 @@ export const MIN_GAP = 8;
 export const PLANET_RADIUS = 16;
 /** Hit-test radius (≥44px-diameter tap target). */
 export const HIT_RADIUS = 24;
-/** View-morph duration (ms). */
-export const MORPH_MS = 500;
 /** Outward drift span accrued across the full decay band [WOBBLE_MAX, ROGUE_K). */
 export const DECAY_DRIFT_SPAN = 40;
 /** Fixed outward drift for a rogue body — the furthest push (before DRIFT_MAX clamp). */
@@ -82,7 +80,6 @@ export interface OrreryMetrics {
   SUN_RADIUS: number;
   SUN_GLOW_RADIUS: number;
   HIT_RADIUS: number;
-  MORPH_MS: number;
   DECAY_DRIFT_SPAN: number;
   ROGUE_DRIFT_SPAN: number;
 }
@@ -128,7 +125,7 @@ export function polarToXY(
 }
 
 /**
- * The on-ring radius for a rank — the SHARED axis, fixed across the morph. Reads
+ * The on-ring radius for a rank — the canonical closeness axis. Reads
  * the canonical `C.ringInner` / `C.effectiveGap` (C2-6), never a raw fixed seed,
  * so the same (possibly compressed) gap governs every consumer.
  */
@@ -182,14 +179,6 @@ export function driftPush(
 }
 
 /**
- * Relationship-view resting angle — a uniform `index/count` spread (A4). The rings
- * already separate everyone by radius, so the angle axis is free. count 0 → 0.
- */
-export function evenSpreadAngle(index: number, count: number): number {
-  return count > 0 ? (index / count) * 2 * Math.PI : 0;
-}
-
-/**
  * Nearest body within `HIT_RADIUS` of (px, py), or null when the tap is outside
  * every body. `≤` on the running-best distance means the LAST body in the array
  * (the top-drawn one) wins ties / exact overlaps. Empty bodies → null.
@@ -214,9 +203,8 @@ export function hitTest(
 
 /**
  * The shortest signed angular delta from `from` to `to`, normalised into
- * [−π, π] — so interpolating 350°→10° goes +20°, not −340° (Pitfall 2). The morph
- * interpolates `from + t · shortestAngleDelta(from, to)` to take the short way
- * round the wrap.
+ * [−π, π] — so interpolating 350°→10° goes +20°, not −340° (Pitfall 2). Camera recovery can interpolate
+ * `from + t · shortestAngleDelta(from, to)` through the shortest yaw arc.
  */
 export function shortestAngleDelta(from: number, to: number): number {
   const TWO_PI = 2 * Math.PI;
@@ -268,7 +256,6 @@ export function deriveOrreryMetrics(
     SUN_RADIUS,
     SUN_GLOW_RADIUS,
     HIT_RADIUS,
-    MORPH_MS,
     DECAY_DRIFT_SPAN,
     ROGUE_DRIFT_SPAN,
   };
