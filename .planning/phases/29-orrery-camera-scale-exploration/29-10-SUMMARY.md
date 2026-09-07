@@ -130,6 +130,8 @@ No new literal Bound/cadence predicate was introduced: the new DAO consumes the 
 
 Plan 11 should retain the satellite controller subscription and route/action invalidation while completing the full session lifecycle. Plan 12 should verify the combined D-11 matrix, optional failure/retry, mixed-hit behavior and native presentation. ORRC-14/15 remain unchecked at phase level because integrated and native evidence belongs to Plan 12.
 
+Tracking SDK advanced to Plan 11 of 12 and recorded the execution metric/decision/session. Its progress recalculation declined the truncated milestone scope; the existing overall progress was retained. The roadmap SDK again counted `29-PLAN-CHECK.md` as a thirteenth plan; corrected the generated checklist/count to the twelve actual executable plans and ten summaries.
+
 ## Self-Check: PASSED
 
 All six created source/test files exist on disk; all four task commit hashes exist. Targeted and full regression, typecheck, colors, formatting and whitespace checks passed. No push, worktree, branch switch, install or device action occurred.
