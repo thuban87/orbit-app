@@ -72,7 +72,7 @@ describe("deliberate ring drag", () => {
     const captured = captureReorder(frame, request, body.x + 3, body.y + 2)!;
     expect(captured).not.toBeNull();
     const moved = moveReorder(captured, frame, body.x + 3, body.y + 2);
-    expect(moved.reorderedVisibleIds).toEqual([1, 2, 3]);
+    expect(moved?.reorderedVisibleIds).toEqual([1, 2, 3]);
     expect(releaseReorder(moved, 7, true)).toBeNull();
   });
   it("moves to the nearest eligible slot and emits only success in its captured generation", () => {
@@ -80,7 +80,7 @@ describe("deliberate ring drag", () => {
       c = frame.bodies[2];
     const captured = captureReorder(frame, request, a.x, a.y)!;
     const moved = moveReorder(captured, frame, c.x, c.y);
-    expect(moved.reorderedVisibleIds).toEqual([2, 3, 1]);
+    expect(moved?.reorderedVisibleIds).toEqual([2, 3, 1]);
     expect(
       releaseReorder(moved, 7, true)?.request.expectedContactIdentities,
     ).toEqual(request.expectedContactIdentities);
@@ -109,13 +109,13 @@ describe("deliberate ring drag", () => {
 });
 
 describe("registered hold recognizer", () => {
-  function harness() {
+  function harness(initialFrame = frame, expectation = request) {
     const drag = { value: null as ReorderDrag | null };
     const input = { value: initialInput() };
     const live = { value: true };
     const commit = vi.fn(),
       acknowledge = vi.fn();
-    const current = { value: frame };
+    const current = { value: initialFrame };
     const tree = createOrreryGestures({
       pose: { value: frame.pose },
       frame: current,
@@ -138,7 +138,7 @@ describe("registered hold recognizer", () => {
       },
       reorder: {
         drag,
-        expectation: request,
+        expectation,
         generation: 7,
         acknowledge,
         commit,
@@ -151,7 +151,7 @@ describe("registered hold recognizer", () => {
     const pan = others.gestures[0];
     tap.handlers.onBegin();
     pan.handlers.onBegin();
-    const a = frame.bodies[0];
+    const a = initialFrame.bodies.find((body) => body.kind === "contact")!;
     hold.handlers.onTouchesDown(
       { numberOfTouches: 1, allTouches: [a] },
       { fail: vi.fn() },
@@ -181,6 +181,61 @@ describe("registered hold recognizer", () => {
     handlers: Record<string, (...args: unknown[]) => void>;
     config: Record<string, unknown>;
   };
+  it("cancels an active drag crossing the horizon and cannot commit even after returning to reachable ground", () => {
+    const world = [
+      { id: 0, kind: "sun" as const, x: 0, y: 0, radius: 16, ringRadius: 0 },
+      {
+        id: 1,
+        kind: "contact" as const,
+        x: 200,
+        y: 0,
+        radius: 16,
+        ringRadius: 200,
+      },
+      {
+        id: 2,
+        kind: "contact" as const,
+        x: -250,
+        y: 0,
+        radius: 16,
+        ringRadius: 250,
+      },
+    ];
+    const tilted = projectFrame(
+      world,
+      clampCameraPose(
+        { x: 0, y: 0, zoom: 0.25, tilt: Math.PI / 3, yaw: 0 },
+        300,
+      ),
+      { width: 400, height: 700 },
+      7,
+    );
+    const expected = {
+      ...request,
+      expectedFullOrderedIds: [1, 2],
+      expectedEligibleVisibleIds: [1, 2],
+      expectedContactIdentities: request.expectedContactIdentities.slice(0, 2),
+    };
+    const drag = captureReorder(tilted, expected, 250, 350)!;
+    expect(drag).not.toBeNull();
+    expect(moveReorder(drag, tilted, 250, 350)).not.toBeNull();
+    expect(moveReorder(drag, tilted, 250, 0)).toBeNull();
+    for (const value of [NaN, Infinity, -Infinity]) {
+      expect(captureReorder(tilted, expected, value, 350)).toBeNull();
+      expect(moveReorder(drag, tilted, 250, value)).toBeNull();
+    }
+    const h = harness(tilted, expected);
+    h.start();
+    h.hold.handlers.onUpdate({ x: 262.5, y: 350, numberOfPointers: 1 });
+    expect(h.drag.value?.reorderedVisibleIds).toEqual([2, 1]);
+    h.hold.handlers.onUpdate({ x: 250, y: 0, numberOfPointers: 1 });
+    expect(h.drag.value).toBeNull();
+    expect(h.input.value.owner).toBe("cancelled");
+    h.hold.handlers.onUpdate({ x: 262.5, y: 350, numberOfPointers: 1 });
+    h.hold.handlers.onEnd({ numberOfPointers: 1 }, true);
+    h.hold.handlers.onFinalize();
+    expect(h.commit).not.toHaveBeenCalled();
+  });
   it("activates before movement, acknowledges once, previews, then commits only on successful release", () => {
     const h = harness();
     expect(h.hold.config.activateAfterLongPress).toEqual([HOLD_MS]);

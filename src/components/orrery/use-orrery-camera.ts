@@ -505,6 +505,7 @@ export function createOrreryGestures({
         return;
       }
       reorder.drag.value = moveReorder(drag, frame.value, event.x, event.y);
+      if (!reorder.drag.value) input.value = cancelInput(input.value);
     })
     .onEnd((event, success) => {
       "worklet";

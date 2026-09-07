@@ -426,6 +426,38 @@ export function projectWorldPoint(
     y: center.y + plane.y * Math.cos(pose.tilt ?? 0) * scale,
   };
 }
+/** Gesture samples can lie beyond the ground-plane horizon at legal tilt/zoom. */
+export function tryUnprojectToWorldPlane(
+  point: WorldPoint,
+  pose: CameraPose,
+  viewport: CameraViewport,
+): WorldPoint | null {
+  "worklet";
+  const rect = usableCameraRect(viewport);
+  const focal = pose.focalDistance ?? MIN_FOCAL_DISTANCE;
+  if (
+    !rect ||
+    ![
+      point.x,
+      point.y,
+      pose.x,
+      pose.y,
+      pose.zoom,
+      pose.tilt ?? 0,
+      pose.yaw ?? 0,
+      focal,
+    ].every(Number.isFinite) ||
+    pose.zoom <= 0 ||
+    focal <= 0
+  )
+    return null;
+  const sy = (point.y - rect.y - rect.height / 2) / pose.zoom;
+  const denominator =
+    focal * Math.cos(pose.tilt ?? 0) + sy * Math.sin(pose.tilt ?? 0);
+  if (!Number.isFinite(denominator) || denominator <= 0) return null;
+  const result = unprojectToWorldPlane(point, pose, viewport);
+  return Number.isFinite(result.x) && Number.isFinite(result.y) ? result : null;
+}
 export function unprojectToWorldPlane(
   point: WorldPoint,
   pose: CameraPose,

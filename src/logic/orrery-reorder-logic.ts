@@ -3,7 +3,7 @@ import type { RingReorderRequest } from "@/db/ring-seq-dao";
 import {
   collectHitCandidates,
   type ProjectedFrame,
-  unprojectToWorldPlane,
+  tryUnprojectToWorldPlane,
   type WorldBody,
 } from "./orrery-camera-logic";
 import { computeRingReorder } from "./ring-reorder-logic";
@@ -54,8 +54,13 @@ export function captureReorder(
     (b) => b.id === hits[0] && b.kind === "contact",
   );
   if (!body) return null;
-  const center = unprojectToWorldPlane(body, frame.pose, frame.viewport);
-  const pointer = unprojectToWorldPlane({ x, y }, frame.pose, frame.viewport);
+  const center = tryUnprojectToWorldPlane(body, frame.pose, frame.viewport);
+  const pointer = tryUnprojectToWorldPlane(
+    { x, y },
+    frame.pose,
+    frame.viewport,
+  );
+  if (!center || !pointer) return null;
   const radii = request.expectedEligibleVisibleIds.map(
     (id) => frame.bodies.find((b) => b.id === id)?.ringRadius,
   );
@@ -78,11 +83,14 @@ export function moveReorder(
   frame: ProjectedFrame,
   x: number,
   y: number,
-): ReorderDrag {
+): ReorderDrag | null {
   "worklet";
-  const point = unprojectToWorldPlane({ x, y }, frame.pose, frame.viewport);
+  // Unreachable samples cancel the entire hold; returning to ground cannot revive it.
+  const point = tryUnprojectToWorldPlane({ x, y }, frame.pose, frame.viewport);
+  if (!point) return null;
   const radius =
     Math.hypot(point.x - drag.offset.x, point.y - drag.offset.y) - drag.drift;
+  if (!Number.isFinite(radius)) return null;
   let nearest = 0;
   for (let i = 1; i < drag.radii.length; i++)
     if (radius >= (drag.radii[i - 1] + drag.radii[i]) / 2 - 1e-8) nearest = i;
