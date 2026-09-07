@@ -5,9 +5,10 @@ import {
   BackupSchemaError,
 } from "@/backup/types";
 import {
-  isCurrentStateFieldKey,
-  isMemoryTypeKey,
-} from "@/db/memory-registry";
+  assertOrreryDensity,
+  assertOrreryLastSystem,
+} from "@/db/app-settings-dao";
+import { isCurrentStateFieldKey, isMemoryTypeKey } from "@/db/memory-registry";
 
 /** Displayed before any preview or restore work for a file from a newer app. */
 export const UPDATE_FIRST_MESSAGE =
@@ -171,6 +172,10 @@ export const PORTABLE_SETTINGS_KEYS = new Set([
   "dashboardFilters",
   "dashboardSort",
   "dashboardRightSwipeAction",
+  // Phase 29: optional restore acceptance only. Phase 36 owns wire emission.
+  "orreryDensity",
+  "orrerySatellitesEnabled",
+  "orreryLastSystem",
 ]);
 
 const SECRET_SHAPED_KEY =
@@ -203,6 +208,21 @@ function assertPortableSettings(
       fail("appSettings contains a local-only or secret member");
     }
   }
+  // The same closed grammar guards ordinary writes AND restore's core writer.
+  // Category UID existence is intentionally resolved later by the System read.
+  try {
+    if (settings.orreryDensity !== undefined)
+      assertOrreryDensity("orreryDensity", settings.orreryDensity);
+    if (settings.orreryLastSystem !== undefined)
+      assertOrreryLastSystem("orreryLastSystem", settings.orreryLastSystem);
+  } catch {
+    fail("appSettings has an invalid Orrery preference");
+  }
+  if (
+    settings.orrerySatellitesEnabled !== undefined &&
+    !isBinaryFlag(settings.orrerySatellitesEnabled)
+  )
+    fail("appSettings has an invalid Orrery satellite flag");
   if (
     settings.sunContactUid !== null &&
     (typeof settings.sunContactUid !== "string" ||
@@ -229,11 +249,15 @@ function isBinaryFlag(value: unknown): value is 0 | 1 {
   return value === 0 || value === 1;
 }
 
-function isNullableBinaryFlag(value: unknown): value is 0 | 1 | null | undefined {
+function isNullableBinaryFlag(
+  value: unknown,
+): value is 0 | 1 | null | undefined {
   return value === null || value === undefined || isBinaryFlag(value);
 }
 
-function isMemoryProvenance(value: unknown): value is "user" | "import" | "share" {
+function isMemoryProvenance(
+  value: unknown,
+): value is "user" | "import" | "share" {
   return value === "user" || value === "import" || value === "share";
 }
 
@@ -448,18 +472,38 @@ function validate(manifest: RawManifest): BackupManifest {
   }
   uidSet(customFieldValueHistory, "customFieldValueHistory");
   for (const history of customFieldValueHistory) {
-    if (typeof history.contactUid !== "string" || !contacts.has(history.contactUid))
+    if (
+      typeof history.contactUid !== "string" ||
+      !contacts.has(history.contactUid)
+    )
       fail("customFieldValueHistory has an unknown contact UID");
-    if (typeof history.fieldDefUid !== "string" || !defs.has(history.fieldDefUid))
+    if (
+      typeof history.fieldDefUid !== "string" ||
+      !defs.has(history.fieldDefUid)
+    )
       fail("customFieldValueHistory has an unknown field definition UID");
   }
   for (const memory of arrays.memories) {
-    if (typeof memory.contactUid !== "string" || !contacts.has(memory.contactUid))
+    if (
+      typeof memory.contactUid !== "string" ||
+      !contacts.has(memory.contactUid)
+    )
       fail("memories has an unknown contact UID");
     for (const key of ["type", "createdAt", "modifiedAt"] as const)
       if (typeof memory[key] !== "string") fail("memories has an invalid row");
-    for (const key of ["customLabel", "value", "note", "url", "meaningfulDate", "deletedAt"] as const)
-      if (memory[key] !== null && memory[key] !== undefined && typeof memory[key] !== "string")
+    for (const key of [
+      "customLabel",
+      "value",
+      "note",
+      "url",
+      "meaningfulDate",
+      "deletedAt",
+    ] as const)
+      if (
+        memory[key] !== null &&
+        memory[key] !== undefined &&
+        typeof memory[key] !== "string"
+      )
         fail("memories has an invalid optional value");
     const type = memory.type;
     if (typeof type !== "string" || !isMemoryTypeKey(type))
@@ -478,29 +522,59 @@ function validate(manifest: RawManifest): BackupManifest {
     ) {
       fail("memories requires a value or custom label");
     }
-    if (!isBinaryFlag(memory.pinned) || !isBinaryFlag(memory.outdated) || !isNullableBinaryFlag(memory.hidden))
+    if (
+      !isBinaryFlag(memory.pinned) ||
+      !isBinaryFlag(memory.outdated) ||
+      !isNullableBinaryFlag(memory.hidden)
+    )
       fail("memories has an invalid flag");
     if (!isMemoryProvenance(memory.provenance))
       fail("memories has an invalid provenance");
   }
   for (const relationship of arrays.relationships) {
-    if (typeof relationship.contactUid !== "string" || !contacts.has(relationship.contactUid) || typeof relationship.personName !== "string" || typeof relationship.createdAt !== "string" || typeof relationship.modifiedAt !== "string")
+    if (
+      typeof relationship.contactUid !== "string" ||
+      !contacts.has(relationship.contactUid) ||
+      typeof relationship.personName !== "string" ||
+      typeof relationship.createdAt !== "string" ||
+      typeof relationship.modifiedAt !== "string"
+    )
       fail("relationships has an invalid row");
     if (relationship.personName.trim().length === 0)
       fail("relationships requires a person name");
     for (const key of ["relationType", "note", "deletedAt"] as const)
-      if (relationship[key] !== null && relationship[key] !== undefined && typeof relationship[key] !== "string")
+      if (
+        relationship[key] !== null &&
+        relationship[key] !== undefined &&
+        typeof relationship[key] !== "string"
+      )
         fail("relationships has an invalid optional value");
-    if (relationship.linkedContactUid !== null && relationship.linkedContactUid !== undefined && (typeof relationship.linkedContactUid !== "string" || !contacts.has(relationship.linkedContactUid)))
+    if (
+      relationship.linkedContactUid !== null &&
+      relationship.linkedContactUid !== undefined &&
+      (typeof relationship.linkedContactUid !== "string" ||
+        !contacts.has(relationship.linkedContactUid))
+    )
       fail("relationships has an unknown linked contact UID");
     if (relationship.linkedContactUid === relationship.contactUid)
       fail("relationships cannot link a contact to itself");
-    if (!isBinaryFlag(relationship.pinned) || !isNullableBinaryFlag(relationship.hidden))
+    if (
+      !isBinaryFlag(relationship.pinned) ||
+      !isNullableBinaryFlag(relationship.hidden)
+    )
       fail("relationships has an invalid flag");
   }
   const currentPairs = new Set<string>();
   for (const entry of arrays.currentStateEntries) {
-    if (typeof entry.contactUid !== "string" || !contacts.has(entry.contactUid) || typeof entry.fieldKey !== "string" || typeof entry.value !== "string" || typeof entry.createdAt !== "string" || typeof entry.modifiedAt !== "string" || (entry.isCurrent !== 0 && entry.isCurrent !== 1))
+    if (
+      typeof entry.contactUid !== "string" ||
+      !contacts.has(entry.contactUid) ||
+      typeof entry.fieldKey !== "string" ||
+      typeof entry.value !== "string" ||
+      typeof entry.createdAt !== "string" ||
+      typeof entry.modifiedAt !== "string" ||
+      (entry.isCurrent !== 0 && entry.isCurrent !== 1)
+    )
       fail("currentStateEntries has an invalid row");
     if (!isCurrentStateFieldKey(entry.fieldKey))
       fail("currentStateEntries has an unregistered field key");
@@ -508,7 +582,8 @@ function validate(manifest: RawManifest): BackupManifest {
       fail("currentStateEntries has a blank value");
     if (entry.isCurrent === 1) {
       const pair = `${entry.contactUid}\u0000${entry.fieldKey}`;
-      if (currentPairs.has(pair)) fail("currentStateEntries has duplicate current value");
+      if (currentPairs.has(pair))
+        fail("currentStateEntries has duplicate current value");
       currentPairs.add(pair);
     }
   }
@@ -616,7 +691,10 @@ function validate(manifest: RawManifest): BackupManifest {
   for (const relationship of arrays.relationships) {
     if (!survivingContacts.has(relationship.contactUid as string))
       fail("relationships has no surviving contact parent");
-    if (typeof relationship.linkedContactUid === "string" && !survivingContacts.has(relationship.linkedContactUid))
+    if (
+      typeof relationship.linkedContactUid === "string" &&
+      !survivingContacts.has(relationship.linkedContactUid)
+    )
       fail("relationships has no surviving linked contact parent");
   }
   for (const entry of arrays.currentStateEntries)
