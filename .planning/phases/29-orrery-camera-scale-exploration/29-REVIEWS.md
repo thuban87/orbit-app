@@ -1,6 +1,8 @@
 ---
 phase: 29
 latest_cycle: 3
+convergence_status: converged
+convergence_basis: owner_acceptance
 reviewers: [codex, claude]
 reviewed_at: 2026-09-07T07:22:21.000Z
 plans_reviewed: [29-01-PLAN.md, 29-02-PLAN.md, 29-03-PLAN.md, 29-04-PLAN.md, 29-05-PLAN.md, 29-06-PLAN.md, 29-07-PLAN.md, 29-08-PLAN.md, 29-09-PLAN.md, 29-10-PLAN.md, 29-11-PLAN.md, 29-12-PLAN.md]
@@ -13,6 +15,14 @@ model_sources:
 ---
 
 # Cross-AI Plan Review — Phase 29
+
+## Final disposition — owner-accepted convergence
+
+On 2026-09-07 the owner said, “If that cycle just had 1 small result, I think we can mark this as converged now.” Phase 29 is therefore **converged after three external cycles**, with no further review cycle required.
+
+The last external result remains **0 HIGH / 1 actionable LOW**. Astra-high subsequently incorporated that LOW's photo-bearing fixture and explicit barrier-entry assertion into Plan 29-12 in commit `2f8d9e6`; focused plan checks passed. This clarification was not sent through another independent checker or external review. Cycle 4 preparation was cancelled before either external lane ran. Earlier reports and their historical counts are retained below.
+
+Requested models were honored: Codex `gpt-5.6-sol` with medium reasoning and Claude `claude-opus-5` for external reviews; Codex `gpt-6-astra` with high reasoning for replanning and plan checking. Temporary model settings were restored. The 12 plans / 30 tasks are ready for execution; implementation and native verification remain pending.
 
 ## Cycle 3 — Current Review
 
