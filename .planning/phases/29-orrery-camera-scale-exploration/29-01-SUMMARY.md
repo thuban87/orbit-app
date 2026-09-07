@@ -142,6 +142,7 @@ Followed ADR-077's approved transition. The tracer camera is deliberately top-do
 
 - Requirement bookkeeping is conservative: ORRC-01 is implemented here; ORRC-02 and ORRC-07 remain in progress because their full tilt/yaw/pinch and cluster-panel acceptance belongs to later plans. No phase-wide completion is claimed by this tracer.
 - No runtime/domain scope deviations. A compile-time integration adjustment uses a `CameraPose` type alias compatible with installed Reanimated animatable objects and an injected worklet stop callback for the native gesture test adapter.
+- Closeout SDK counted `29-PLAN-CHECK.md` as a thirteenth executable plan; corrected its generated ROADMAP counter/list back to the approved 12 plans. `state.update-progress` explicitly skipped its prose update because phase scope is truncated; the plan counter advanced correctly to 2 of 12 and no global phase-completion claim was added.
 
 ## Known Stubs and Later-Plan Boundaries
 

@@ -127,7 +127,7 @@ category's phase (see Traceability).
 
 ### ORRC — Orrery Camera, Scale & Exploration (Phase 29)
 
-- [ ] **ORRC-01**: The Orrery presents one canonical relationship-health visualization; the Status/Relationship mode split and its toggle are removed (ADR-077)
+- [x] **ORRC-01**: The Orrery presents one canonical relationship-health visualization; the Status/Relationship mode split and its toggle are removed (ADR-077)
 - [ ] **ORRC-02**: User can pan, pinch-zoom, tilt (bounded — never inverted or unusably edge-on), and yaw a stable sun-centered world; yaw changes the view, never a contact's underlying placement
 - [ ] **ORRC-03**: Perspective depth is noticeable but bounded; avatars and labels stay billboarded and readable; contact size is subtly influenced by derived Gravity and never editable
 - [ ] **ORRC-04**: Home framing fits the whole system while comfortably readable, then stops shrinking — large counts grow the world physically with meaningful minimum ring spacing; the complete All Contacts view is never disabled
