@@ -22,6 +22,16 @@ const body = (id: number, radius: number): WorldBody => ({
   ringRadius: id === 0 ? 0 : radius,
 });
 describe("one animated Orrery frame", () => {
+  it("grows entries and shrinks inert departures without snapping an interrupted size", () => {
+    const seed = beginWorldTransition([], [body(1, 70)], 1);
+    expect(sampleWorldTransition(seed, 0)[0].radius).toBeLessThan(18);
+    const exit = beginWorldTransition(sampleWorldTransition(seed, 1), [], 2);
+    const middle = sampleWorldTransition(exit, 0.5);
+    expect(middle[0].radius).toBeLessThan(18);
+    expect(middle[0].interactive).toBe(false);
+    const returnTransition = beginWorldTransition(middle, [body(1, 70)], 3);
+    expect(sampleWorldTransition(returnTransition, 0)[0].radius).toBe(middle[0].radius);
+  });
   it.each([0, 0.25, 0.5, 0.75, 1])(
     "projects displayed rings, bodies and hits together at %s",
     (fraction) => {

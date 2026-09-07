@@ -30,6 +30,21 @@ const scene = (system = all): OrrerySceneSnapshot =>
     systemSnapshot: { categories: [] },
   }) as unknown as OrrerySceneSnapshot;
 describe("System publication ownership", () => {
+  it("coalesces recovery taps while leaving newer actual reloads generation-owned", async () => {
+    const read = deferred<OrrerySceneSnapshot>();
+    const load = vi.fn().mockResolvedValueOnce(scene()).mockReturnValue(read.promise);
+    const store = createOrrerySystemStore({ load, persist: async () => true });
+    await store.getState().select(all);
+    const first = store.getState().retryReload();
+    const second = store.getState().retryReload();
+    expect(load).toHaveBeenCalledTimes(2);
+    read.reject(new Error("read"));
+    await Promise.all([first, second]);
+    expect(store.getState().status).toBe("stale");
+    load.mockResolvedValue(scene());
+    await store.getState().retryReload();
+    expect(store.getState().status).toBe("ready");
+  });
   it("A→B→A completion order publishes/persists only the last generation", async () => {
     const reads = [
       deferred<OrrerySceneSnapshot>(),
