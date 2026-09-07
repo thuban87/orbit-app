@@ -2,7 +2,6 @@
 import { Group, type SkTypefaceFontProvider } from "@shopify/react-native-skia";
 import { useEffect, useMemo, useState } from "react";
 import { useWindowDimensions } from "react-native";
-import { Gesture } from "react-native-gesture-handler";
 import {
   cancelAnimation,
   runOnJS,
@@ -14,14 +13,10 @@ import {
   withTiming,
 } from "react-native-reanimated";
 import { swatchIndex } from "@/components/avatar-initials";
-import {
-  type CameraCell,
-  type CameraPose,
-  type CameraViewport,
-  type OrreryIntent,
-  type ProjectedFrame,
-  panCamera,
-  tapIntent,
+import type {
+  CameraPose,
+  CameraViewport,
+  OrreryIntent,
 } from "@/logic/orrery-camera-logic";
 import {
   type AnimatedFrame,
@@ -49,68 +44,13 @@ import { OrreryLabel, prepareOrreryText } from "./OrreryLabel";
 import { ProjectedOrbitRing } from "./ProjectedOrbitRing";
 import { SunBody } from "./SunBody";
 
-const PAN_MIN_DISTANCE = 10;
+export { createOrreryGestures } from "./use-orrery-camera";
+
+import { createOrreryGestures, useOrreryCamera } from "./use-orrery-camera";
+
 const WORLD_SETTLE_MS = 260;
 const LABEL_MAX_WIDTH = 200;
 const LABEL_BODY_GAP = 8;
-/** This exact registration is driven in the real-SQL tracer through native mocks. */
-export function createOrreryGestures({
-  pose,
-  frame,
-  panStart,
-  extent,
-  send,
-  stop,
-  enabled = true,
-}: {
-  pose: CameraCell<CameraPose>;
-  frame: CameraCell<ProjectedFrame>;
-  panStart: CameraCell<CameraPose | null>;
-  extent: number;
-  send: (intent: OrreryIntent) => void;
-  stop: () => void;
-  enabled?: boolean;
-}) {
-  const tap = Gesture.Tap()
-    .enabled(enabled)
-    .maxDistance(8)
-    .onEnd((event, success) => {
-      "worklet";
-      if (success)
-        runOnJS(send)(tapIntent(frame.value, event.x, event.y, success));
-    });
-  const pan = Gesture.Pan()
-    .enabled(enabled)
-    .minDistance(PAN_MIN_DISTANCE)
-    .maxPointers(1)
-    .onBegin(() => {
-      "worklet";
-      stop();
-      panStart.value = pose.value;
-    })
-    .onUpdate((event) => {
-      "worklet";
-      if (panStart.value === null || event.numberOfPointers !== 1) return;
-      pose.value = panCamera(
-        panStart.value,
-        event.translationX,
-        event.translationY,
-        extent,
-        frame.value.viewport,
-      );
-    })
-    .onEnd(() => {
-      "worklet";
-      // Camera movement is transient. Neither success nor failure owns a DAO.
-      panStart.value = null;
-    })
-    .onFinalize(() => {
-      "worklet";
-      panStart.value = null;
-    });
-  return Gesture.Race(tap, pan);
-}
-
 interface BodyResource {
   key: string;
   body: OrrerySceneSnapshot["world"][number];
@@ -278,22 +218,19 @@ export function OrreryWorld({
     })();
   }, [scene, transition, progress, reducedMotion]);
   useEffect(() => () => cancelAnimation(progress), [progress]);
-  const panStart = useSharedValue<CameraPose | null>(null);
+  const camera = useOrreryCamera({ pose, enabled: interactive });
   const gesture = useMemo(
     () =>
       createOrreryGestures({
         pose,
         frame,
-        panStart,
+        camera,
         extent: scene.extent,
         send: onIntent,
         enabled: interactive,
-        stop: () => {
-          "worklet";
-          cancelAnimation(pose);
-        },
+        stop: camera.stop,
       }),
-    [pose, frame, panStart, scene.extent, onIntent, interactive],
+    [pose, frame, camera, scene.extent, onIntent, interactive],
   );
   const starColors = useMemo(
     () => [colors.textSecondary, colors.textPrimary, ...colors.starPalette],

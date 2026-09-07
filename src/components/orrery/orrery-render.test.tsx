@@ -51,7 +51,16 @@ vi.mock("react-native-reanimated", () => ({
 }));
 vi.mock("react-native-gesture-handler", () => {
   const chain = new Proxy({}, { get: () => () => chain });
-  return { Gesture: { Tap: () => chain, Pan: () => chain, Race: () => chain } };
+  return {
+    Gesture: {
+      Tap: () => chain,
+      Pan: () => chain,
+      Race: () => chain,
+      Pinch: () => chain,
+      Rotation: () => chain,
+      Simultaneous: () => chain,
+    },
+  };
 });
 vi.mock("@shopify/react-native-skia", async () => {
   // Use the INSTALLED production Group implementation, including its skLayer behavior.

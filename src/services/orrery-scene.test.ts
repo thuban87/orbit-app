@@ -33,9 +33,24 @@ vi.mock("react-native-gesture-handler", () => {
   const builder = () => {
     const handlers: Record<string, (...args: unknown[]) => void> = {};
     const g: Record<string, unknown> = { handlers };
-    for (const key of ["minDistance", "maxDistance", "maxPointers", "enabled"])
+    for (const key of [
+      "minDistance",
+      "maxDistance",
+      "maxPointers",
+      "enabled",
+      "minPointers",
+      "averageTouches",
+      "activeOffsetY",
+    ])
       g[key] = () => g;
-    for (const key of ["onBegin", "onStart", "onUpdate", "onEnd", "onFinalize"])
+    for (const key of [
+      "onBegin",
+      "onStart",
+      "onUpdate",
+      "onEnd",
+      "onFinalize",
+      "onTouchesDown",
+    ])
       g[key] = (fn: (...args: unknown[]) => void) => {
         handlers[key] = fn;
         return g;
@@ -46,6 +61,9 @@ vi.mock("react-native-gesture-handler", () => {
     Gesture: {
       Pan: builder,
       Tap: builder,
+      Pinch: builder,
+      Rotation: builder,
+      Simultaneous: (...gestures: unknown[]) => ({ gestures }),
       Race: (...gestures: unknown[]) => ({ gestures }),
     },
   };
@@ -148,11 +166,12 @@ describe("canonical SQLite scene tracer", () => {
       send,
       stop: vi.fn(),
     });
-    const [tap, pan] = (
+    const [tap, multi] = (
       gestures as unknown as {
         gestures: { handlers: Record<string, (...args: unknown[]) => void> }[];
       }
     ).gestures;
+    const pan = (multi as unknown as { gestures: (typeof tap)[] }).gestures[0];
     const drawn = frame.value.bodies.find((b) => b.id === id)!;
     pan.handlers.onBegin({ x: drawn.x, y: drawn.y });
     pan.handlers.onUpdate({
@@ -167,6 +186,7 @@ describe("canonical SQLite scene tracer", () => {
     expect(collectHitCandidates(frame.value, moved.x, moved.y)).toEqual([id]);
     tap.handlers.onEnd({ x: moved.x, y: moved.y }, false);
     expect(send).not.toHaveBeenCalled();
+    tap.handlers.onBegin({});
     tap.handlers.onEnd({ x: moved.x, y: moved.y }, true);
     expect(send).toHaveBeenCalledWith(
       expect.objectContaining({ kind: "focus", ids: [id] }),
