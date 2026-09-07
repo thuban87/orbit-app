@@ -1,8 +1,8 @@
 ---
 phase: 29
-latest_cycle: 2
+latest_cycle: 3
 reviewers: [codex, claude]
-reviewed_at: 2026-09-07T06:50:19.539Z
+reviewed_at: 2026-09-07T07:22:21.000Z
 plans_reviewed: [29-01-PLAN.md, 29-02-PLAN.md, 29-03-PLAN.md, 29-04-PLAN.md, 29-05-PLAN.md, 29-06-PLAN.md, 29-07-PLAN.md, 29-08-PLAN.md, 29-09-PLAN.md, 29-10-PLAN.md, 29-11-PLAN.md, 29-12-PLAN.md]
 models:
   codex: "gpt-5.6-sol (reasoning=medium)"
@@ -13,6 +13,254 @@ model_sources:
 ---
 
 # Cross-AI Plan Review — Phase 29
+
+## Cycle 3 — Current Review
+
+Models were pinned through the declared reviewer lanes and verified from their invocation results:
+
+- Codex: `gpt-5.6-sol (reasoning=medium)`, source `pinned`, non-stub.
+- Claude: `claude-opus-5 (reasoning=medium)`, source `pinned`, non-stub.
+
+### Codex Review
+
+# 1. Summary
+
+**Disposition: APPROVE.** I found no current actionable planning concern in the twelve Phase 29 plans.
+
+Commit `e5cb8c2` incorporates all five Cycle 2 Claude findings into executable task actions, acceptance criteria, verification, must-haves, or justified Phase 40/native deferrals. The revisions preserve the existing transaction, rank, Gravity, local-first, and lifecycle constraints rather than weakening them.
+
+Graph discovery was attempted first but every `npm run graph:ask -- governs …` invocation failed because `tsx` could not create its IPC socket under the sandbox (`EPERM`). I therefore treated all coordinator-supplied graph relationships as **INFERRED**, not code assertions:
+
+- **INFERRED:** `OrreryScreen.tsx` and `OrbitBody.tsx` → ADR-048, partially superseded by ADR-077, plus ADR-077.
+- **INFERRED:** `ring-seq-dao.ts` → ADR-046.
+- **INFERRED:** `impact-read.ts` → ADR-027.
+- **INFERRED:** `use-reduced-motion.ts` → ADR-085.
+- **INFERRED:** `export-manifest.ts` → ADR-057, ADR-060 partially superseded by ADR-063, and ADR-063.
+
+No **EXTRACTED** graph edge was independently observable because graph execution failed. The relevant ADR bodies, plans, dossier, and source were validated directly.
+
+Evidence limitations:
+
+- Planned new signatures such as `readOrreryImpactInputsCore`, `readOrreryContactTargetValidation`, `readOrrerySystemMembersCore`, and `useOrreryCamera` are **UNCHECKABLE until implemented**. Their compatibility is specified and their required existing dependencies are present.
+- Actual gesture arbitration, future Skia tree behavior, billboard appearance, TalkBack behavior, focus restoration, and physical-phone performance are **UNCHECKABLE before implementation/native execution**. The plans correctly retain these as pending end-of-phase gates.
+
+# 2. Strengths
+
+- **Shared FIFO serialization is preserved accurately.** The current mutex is one promise chain and provides no dequeue or SQL-abort mechanism ([mutex.ts](</home/bwales/projects/orbit-app/src/db/mutex.ts:22>)); `inReadSnapshot` uses that same mutex for the entire transaction ([transaction.ts](</home/bwales/projects/orbit-app/src/db/transaction.ts:66>)). Plan 04 explicitly retains this model, acknowledges that complete-history reads may delay writes, and specifies logical generation cancellation without claiming SQL cancellation ([29-04-PLAN.md](</home/bwales/projects/orbit-app/.planning/phases/29-orrery-camera-scale-exploration/29-04-PLAN.md:103>)). Plan 08 does the same for fresh action validation and requires post-await generation checks before focus or navigation ([29-08-PLAN.md](</home/bwales/projects/orbit-app/.planning/phases/29-orrery-camera-scale-exploration/29-08-PLAN.md:108>)).
+
+- **The backup-contention test uses the real production seam.** `buildExportManifest` accepts an injected `readPhotoBase64` dependency ([export-manifest.ts](</home/bwales/projects/orbit-app/src/backup/export-manifest.ts:7>)), awaits contact/custom-field photos while still inside its `inReadSnapshot` ([export-manifest.ts](</home/bwales/projects/orbit-app/src/backup/export-manifest.ts:68>), [export-manifest.ts](</home/bwales/projects/orbit-app/src/backup/export-manifest.ts:91>)), and therefore supports the proposed deferred-photo barrier without mocking transaction ownership. Plan 12 also specifies a separate scene-read/write barrier and explicitly prohibits elapsed-time sleeps or native-responsiveness inference ([29-12-PLAN.md](</home/bwales/projects/orbit-app/.planning/phases/29-orrery-camera-scale-exploration/29-12-PLAN.md:106>)).
+
+- **Fresh action validation remains mandatory.** Plan 08’s bounded probe requires live ID/UID, active-System membership or current global-sun identity, current category existence where applicable, and route/System generation after the awaited read. It expressly forbids falling back to cached identity during mutex contention ([29-08-PLAN.md](</home/bwales/projects/orbit-app/.planning/phases/29-orrery-camera-scale-exploration/29-08-PLAN.md:107>)).
+
+- **ADR-027 is handled with the required precision.** The ADR currently says Gravity and Intensity are derived at read time, profile-only, floor-bounded, and not raw-score presentation ([ADR-027](</home/bwales/projects/orbit-app/docs/decisions/ADR-027-derived-profile-only-gravity-and-intensity.md:14>)). The dossier later authorizes modest derived Gravity mass and companion-list context ([phase dossier](</home/bwales/projects/orbit-app/docs/dossier/milestone-2/phase-08-orrery-camera-scale-exploration-dossier.md:100>), [phase dossier](</home/bwales/projects/orbit-app/docs/dossier/milestone-2/phase-08-orrery-camera-scale-exploration-dossier.md:500>)). Plans 04 and 12 limit supersession to that display restriction while retaining derived-never-stored, complete-history/floor/rarely-responds scope, intensity/cadence policy, and the prohibition on raw-score or human-worth framing ([29-04-PLAN.md](</home/bwales/projects/orbit-app/.planning/phases/29-orrery-camera-scale-exploration/29-04-PLAN.md:103>), [29-12-PLAN.md](</home/bwales/projects/orbit-app/.planning/phases/29-orrery-camera-scale-exploration/29-12-PLAN.md:118>)). Existing calculations corroborate those retained rules: complete interaction history is read deterministically ([impact-read.ts](</home/bwales/projects/orbit-app/src/db/impact-read.ts:34>)), ancient history retains a nonzero floor ([impact.ts](</home/bwales/projects/orbit-app/src/services/impact.ts:46>)), and `rarelyResponds` filters Gravity to connected rows ([impact.ts](</home/bwales/projects/orbit-app/src/services/impact.ts:78>)).
+
+- **Immutable decision records remain immutable.** Plan 12 updates living documentation and generated registry output, delegates formal partial-supersession recording to later KB extraction, and explicitly prohibits editing existing ADR bodies or inventing an ADR number ([29-12-PLAN.md](</home/bwales/projects/orbit-app/.planning/phases/29-orrery-camera-scale-exploration/29-12-PLAN.md:118>)).
+
+- **Creation tasks own governing source comments.** Plan 01 owns the camera’s ADR-077 comment ([29-01-PLAN.md](</home/bwales/projects/orbit-app/.planning/phases/29-orrery-camera-scale-exploration/29-01-PLAN.md:108>)); Plan 03 owns System-reader ADR-011/046/047/093 attribution and the UID-bearing category catalog ([29-03-PLAN.md](</home/bwales/projects/orbit-app/.planning/phases/29-orrery-camera-scale-exploration/29-03-PLAN.md:99>)); Plan 04 owns Gravity/world attribution; and Plan 08 owns action-validation attribution. Plan 12 verifies these instead of claiming modification ownership for their files.
+
+- **Plan 04-01 now has a complete executable gate.** Its acceptance criterion covers exact single-reader parity, complete ancient history, 0/256/257-ID query counts, read-only capability, no nested mutex, rendered/hit-tested mass, no stored score, and cancellation while queued ([29-04-PLAN.md](</home/bwales/projects/orbit-app/.planning/phases/29-orrery-camera-scale-exploration/29-04-PLAN.md:105>)).
+
+- **The Skia sibling-batch contract matches the installed recorder.** `GroupProps` exposes `zIndex` ([Common.ts](</home/bwales/projects/orbit-app/node_modules/@shopify/react-native-skia/src/dom/types/Common.ts:92>)), while the recorder flushes its sortable pending-Group batch whenever it encounters a non-Group child ([RNRecorder.h](</home/bwales/projects/orbit-app/node_modules/@shopify/react-native-skia/cpp/api/recorder/RNRecorder.h:55>)). Plan 05 therefore correctly requires one consecutive run of comparable keyed body Groups with rings, labels, and backplates outside it ([29-05-PLAN.md](</home/bwales/projects/orbit-app/.planning/phases/29-orrery-camera-scale-exploration/29-05-PLAN.md:93>)). Actual native occlusion remains correctly **UNCHECKABLE** pending the human check.
+
+- **D-11 is closed consistently.** The owner’s ruling keeps a nonmember configured contact sun focusable and Profile-actionable while excluding it from companion membership, moons, satellite targets, and relationship context ([29-CONTEXT.md](</home/bwales/projects/orbit-app/.planning/phases/29-orrery-camera-scale-exploration/29-CONTEXT.md:30>)). Plans 03, 08, 10, and 12 apply that same distinction to reads, actions, companion rows, rendering, invalidation, requalification, automated coverage, and native coverage ([29-03-PLAN.md](</home/bwales/projects/orbit-app/.planning/phases/29-orrery-camera-scale-exploration/29-03-PLAN.md:100>), [29-08-PLAN.md](</home/bwales/projects/orbit-app/.planning/phases/29-orrery-camera-scale-exploration/29-08-PLAN.md:133>), [29-10-PLAN.md](</home/bwales/projects/orbit-app/.planning/phases/29-orrery-camera-scale-exploration/29-10-PLAN.md:92>)).
+
+- **The stale SegmentedControl note is resolved without deleting a live shared component.** Current source confirms `HomeScreen` still consumes `SegmentedControl` ([HomeScreen.tsx](</home/bwales/projects/orbit-app/src/screens/HomeScreen.tsx:1765>)). Plan 12 explicitly records that correction in the living document while leaving immutable ADR-077 untouched ([29-12-PLAN.md](</home/bwales/projects/orbit-app/.planning/phases/29-orrery-camera-scale-exploration/29-12-PLAN.md:118>)).
+
+- **Native evidence is honestly gated.** Validation says Node tests cannot substitute for native rendering, recognition, accessibility, or phone performance ([29-VALIDATION.md](</home/bwales/projects/orbit-app/.planning/phases/29-orrery-camera-scale-exploration/29-VALIDATION.md:26>)). The checklist includes automatic-backup contention, cancellation, scene/write contention, TalkBack, gestures, depth, and physical-phone calibration, with unobserved cases remaining pending ([29-VALIDATION.md](</home/bwales/projects/orbit-app/.planning/phases/29-orrery-camera-scale-exploration/29-VALIDATION.md:86>)).
+
+# 3. Concerns
+
+## HIGH
+
+None.
+
+## MEDIUM
+
+None.
+
+## LOW
+
+None.
+
+No current actionable planning concern remains.
+
+# 4. Suggestions
+
+No replanning is required.
+
+During execution:
+
+- Preserve Plan 01’s tracer and legacy-reorder removal as the prerequisite before camera expansion.
+- Keep the Plan 04 and Plan 08 mutex-barrier tests deterministic and retain the uncancelled controls alongside cancellation cases.
+- Treat Plan 12’s native checklist as genuinely pending until observed. Do not infer gesture, Skia, TalkBack, or responsiveness results from Node tests.
+- Carry any measured long-history/photo-library contention into Phase 40 under D-10 without adding priorities, timeouts, alternate connections, stale validation, or snapshot bypasses.
+
+# 5. Risk Assessment
+
+**Planning risk: low. Execution risk: moderate to high but controlled.**
+
+The main residual risks are implementation breadth, non-reentrant transaction composition, shared-mutex wait time, native gesture ownership, future Skia tree construction, TalkBack focus behavior, and physical-device rendering/performance. These risks are assigned concrete automated barriers or final native checks rather than represented as already solved.
+
+Data-integrity risk is comparatively low: the plans retain the contacted-only reorder boundary, current-local-day predicate evaluation, complete-order and ID/UID guards, single transaction ownership, derived-never-stored Gravity, and exact relationship lifecycle semantics. Routine contention and density tuning are appropriately deferred to existing D-10/Phase 40 hardening and do not require a new owner decision.
+
+# 6. Current Finding Counts
+
+| Category | Count |
+|---|---:|
+| HIGH | 0 |
+| Actionable non-HIGH | 0 |
+
+**Current disposition: APPROVE — no actionable Phase 29 planning concern remains.**
+
+---
+
+### Claude Review
+
+I ran graph discovery first, then validated every load-bearing claim against source on disk (not the diff), and independently exercised the two mechanisms cycle 2 could not verify.
+
+---
+
+# Cross-AI Plan Review — Phase 29, Cycle 3
+
+## 1. Summary
+
+Graph discovery succeeded for every existing `files_modified` path. **Every returned edge is INFERRED** (ADR Key-files attribution); none is EXTRACTED from a code comment. The coordinator hints were reproduced exactly: `OrreryScreen.tsx`/`OrbitBody.tsx` → ADR-0048 (⚠ superseded by ADR-077, partial — dual view/morph) + ADR-0077; `ring-seq-dao.ts` → ADR-0046; `impact-read.ts` → ADR-0027; `use-reduced-motion.ts` → ADR-0085; `export-manifest.ts` → ADR-0057/0060 (⚠ superseded by 063, partial)/0063. I validated each against the ADR body and the source rather than the edge.
+
+**All five cycle-2 findings are closed in executable PLAN contracts**, verified against task actions/acceptance/verify rather than the retrospective table. I found no HIGH and no MEDIUM. One new LOW: the Plan 12-01 export-contention barrier depends on a fixture property no task states, and fails silently (green, vacuous) if the executor omits it.
+
+Two mechanisms I verified myself rather than accepting:
+
+- **The SQLite local-day fixture (29-09-01) works on this Node.** I ran it: `db.function('date',{varargs:true},…)` overrides the builtin on one connection only; `date('now','localtime')` returns the controlled day, `date('2020-05-05','+1 day')` → `2020-05-06` and `date(NULL)` → `null` both delegate correctly to an untouched second connection, `julianday('now')` is unaffected, and after `setLocalDay` a `julianday(date('now','localtime')) - julianday(date(…))` expression — the shape of `PROGRESS_SQL` (`src/db/status.ts:59`) — moves by exactly 1. The lock-time membership test is buildable as written.
+- **`buildExportManifest` is genuinely injectable and its photo reads genuinely hold the mutex.** `ExportManifestDeps.readPhotoBase64` (`export-manifest.ts:7-10`) is awaited inside `readManifest`, which runs inside `inReadSnapshot` (`export-manifest.ts:139`). Deferring that callback does hold the shared mutex — the mechanism is real. See the LOW for its precondition.
+
+---
+
+## 2. Strengths
+
+1. **The cycle-1 HIGH remains correctly and completely closed at source.** The legacy path is exactly where 29-01-01 says: `Gesture.Pan()` at `OrreryScreen.tsx:556`, `commitRingSeq`/`commitRef`/`commitFromWorklet` at `:498-549`, `bodiesShared`/`dragMetrics`/`activeDragId`/`draggedPush` at `:463-476`, ghost preview at `:636-651`, `rewriteRingSeq` import at `:76`. All of it is retired in the same task that introduces camera pan, with a behavioral assertion that pan leaves `ring_seq`, `modified_at` and `dataRevision` byte-identical.
+
+2. **Plan 04/08 preserve the mutex contract and describe cancellation honestly.** `withMutex` is a single non-reentrant FIFO promise chain (`mutex.ts:32-36`) with no dequeue affordance, and `inReadSnapshot` is `withMutex` + `BEGIN` (`transaction.ts:74-88`). 29-04-01 states the queued read "may finish and must be discarded" and explicitly says the mutex "cannot dequeue/cancel SQL"; 29-08-01 says "This is logical cancellation: do not claim the existing mutex dequeues SQL or aborts another transaction." Both retain FIFO ordering, snapshot atomicity, read-only capability and — critically — 29-08-01 keeps the **mandatory fresh probe**: "never fall back to cached identity while waiting," and rechecks both action generation and route/System *after* awaiting. No timeout, priority, extra connection, busy-UI or bypass is introduced.
+
+3. **ADR-027 is handled exactly at the authorized boundary.** ADR-027's Decision ("only on the contact profile") and its rejected alternative ("Dashboard or orrery encodings — rejected") are real and still Accepted. 29-12-02 supersedes *only* those two clauses, names the exact owner authority (canonical phase-08 dossier §E "Gravity as Visual Mass", §Z accessible companion, ORRC-03/15), and explicitly preserves derived-never-stored, full-history/floor/`rarelyResponds` scope, no displayed raw score or human-worth framing, and all intensity/cadence policy. It forbids guessing an ADR number, forbids mutating immutable bodies, cites ADR-093 only as corroborating Dashboard precedent, routes the identity allocation to `extract-phase-kb`, and carries the handoff into `29-12-SUMMARY.md`. 29-04-01 and 29-04-02 carry the same scoping into their source comments. The complete-history requirement is correct: `computeGravity` has a nonzero floor (`impact.ts` `FLOOR_W`), so a cutoff would silently change results.
+
+4. **The batch reader's parity contract is exact and checkable.** `getImpactInputs` (`impact-read.ts:52-91`) is a single `LEFT JOIN` ordered `i.occurred_at DESC, i.id DESC` with the no-history case preserved as a NULL-filler row. 29-04-01's acceptance names precisely that: same-`now` parity across ancient history, zero-history and missing IDs; **zero SELECTs on empty input; exactly `ceil(uniqueIds/256)` with `1→1` and `257→2`**; `ro`-only, no nested transaction, no captured writable executor; mass reaching rendered *and hit* bounds; scores unstored; queued-cancellation. The missing-acceptance gap from cycle 2 is closed — **30 tasks, 30 `<acceptance_criteria>` blocks**.
+
+5. **The native depth constraint is stated correctly and matches the installed recorder.** `RNRecorder.h` `playGroup` accumulates sibling `Group`s and calls `flushPendingGroups` **the moment a non-Group child appears** (`:78-88`), sorting by `zIndex` with an `order` tiebreak (`:59-66`). `GroupProps.zIndex` exists (`Common.ts:92-94`). 29-05-01 now requires one contiguous run of body Groups, forbids interleaved `Circle`/`Path`/`Paragraph`/backplate draws in the depth layer, and keeps rings and label layers outside it — with source-tree inspection as acceptance and native occlusion still a human check.
+
+6. **Every remaining cycle-3 checklist item lands where it should.** 29-03-01 owns the UID-bearing category catalog inside `orrery-system-read.ts` (existing `listCategories` returns only `{id, name}` — `contact-read.ts:49-55`) without a sixth file. 29-12-02 records the ADR-077 `SegmentedControl` staleness in the living doc and retains the component — correctly, since `HomeScreen.tsx:74,1765` is a live second consumer. Governing source comments are owned by the five *creation* tasks (01-01 ADR-077; 03-01 ADR-011/046/047/093; 04-01 ADR-027; 04-02 ADR-046/011/077+027; 08-01 ADR-011/047/093/077), with 12-02 verifying rather than re-owning them.
+
+7. **Data-layer invariants are strengthened, never weakened.** `rewriteRingSeq` (`ring-seq-dao.ts:72-112`) holds uniqueness, effective-count match, and per-row `changes===1` under one `inWriteTransaction`; Plan 09 preserves all three and adds expected full order, saved sun, ID/UID fingerprints and lock-time re-resolved membership at the current SQLite day. `listOrbitingContacts` keeps `last_contact IS NOT NULL` (`orrery-read.ts:96`) and only All/Not Contacted widen — necessary, because `STATUS_SQL` ends `ELSE 'stable'` (`status.ts:73-77`). The five 29-01-00 readers are all genuinely read-only (`getFirstAsync`/`getAllAsync` only), so that task is type-only and safe. Migration head is `TARGET_VERSION = 20` with `migration020` last registered; `BACKUP_FORMAT_VERSION = 4`; the allowlist-without-emission precedent is real (`backup-schema.ts:155-162`, `app-settings-dao.ts:205-231`).
+
+---
+
+## 3. Concerns
+
+### HIGH
+
+None.
+
+### MEDIUM
+
+None.
+
+### LOW
+
+**1. The Plan 12-01 export-contention barrier silently no-ops unless the fixture contains a photo-bearing row — and no task says so.**
+
+*Mechanism.* `readPhotoBase64` is only invoked from `withPhoto` (`export-manifest.ts:24-38`), which returns early when `row.photo` is `null`/`undefined`, and from the photo-type custom-field branch (`:97-103`). If the integration fixture has no contact photo, no profile photo, and no `photo`-type custom-field value, the injected deferred callback is **never called**. `buildExportManifest` then completes promptly and releases the mutex.
+
+*Failure scenario.* The executor builds the fixture from the "Unicode/duplicate display names, zero/one/sun-only/many, missing optional photo/context" list the task actually enumerates — all photo-less. The export runs to completion in milliseconds. The scene loader and action probe then acquire the mutex normally, so "assert neither overtakes export" passes **vacuously**, "release the photo read in `finally`" is a no-op on a never-armed deferral, and the queued-cancellation assertions never exercise a queued state at all. The test is green and the contention/cancellation contract — the whole point of the cycle-2 MEDIUM fix — is unverified.
+
+*Why it counts.* This is the same class as the cycle-2 SQLite-clock finding: a specified mechanism that cannot engage. The plans are otherwise scrupulous about naming the fixture property that arms a barrier (29-09-01 names "a Snoozed parent expiring at D+1" and "a Needs Attention parent crossing its threshold"). 12-01 says "Build non-vacuous integration fixtures" generally, but never states this precondition.
+
+*Fix (one clause).* In 29-12-01's action, require the export fixture to include at least one photo-bearing row that routes through the deferred reader, and add an assertion that `readPhotoBase64` was actually invoked before the queued scene/action requests are asserted against it.
+
+---
+
+## 4. Suggestions
+
+Non-blocking, execution-time only — none require replanning:
+
+- When 29-12-01 lands, assert the *invocation count* of the injected `readPhotoBase64`, not just the ordering outcome. That single assertion converts the concern above into an impossible-to-miss failure.
+- 29-01-01's scene loader can drop the current screen's redundant `getProfilePhoto` call: `getProfile` already selects `photo` (`profile-dao.ts:96-102`), so the five-reader list in 29-01-00 stays complete without a sixth signature change. Worth stating so an executor doesn't reach for `getProfilePhoto` (still `SqlExecutor`) inside the `ro` snapshot and stall.
+- 29-08-01's ≤3-SELECT bound is achievable only if category existence and target membership share one statement (e.g. `SELECT EXISTS(…categories…) , EXISTS(<membership>)`). That's a fine implementation route; naming it would spare the executor a mid-task rediscovery of why a 4th SELECT looked necessary.
+
+---
+
+## 5. Risk Assessment
+
+**Plan risk: LOW. Execution risk: MEDIUM–HIGH, correctly owned and honestly represented.**
+
+- *Data layer: LOW.* Every existing `ring_seq` guard survives and four are added; composition-under-one-lock respects the documented non-reentrancy hazard (`transaction.ts:12-28`); the migration is additive and correctly numbered against verified head 20 with an execution-time recheck; backup emission is withheld; no shipped migration is edited; the never-contacted default read survives. Both previously unverifiable mechanisms (SQLite clock, export barrier) I exercised or read to completion — the clock works; the export barrier works given the LOW's precondition.
+- *Product-decision risk: LOW.* No `[DECIDED]`/`[REJECTED]` item is reopened. The one ADR tension (ADR-027) is a **record-keeping** gap behind an already-ratified owner decision, now routed to KB extraction without touching an immutable body. D-11 is applied as ruled and not reopened. **No escalation is required.**
+- *Sequencing risk: MEDIUM.* Twelve strictly serial waves over shared mutable adapters (`OrreryScreen.tsx`, `OrreryWorld.tsx`, `use-orrery-camera.ts`); a wave-1 contract error propagates. Reordering is unreachable from wave 1 to wave 9 — accepted, unreleased, and stated.
+- *Latency risk: MEDIUM, deferred.* The Orrery moves onto the shared mutex for both scene loads and per-tap probes, joining automatic backup's photo-inclusive snapshot. Statement counts are bounded; **row counts and wall-clock are not**. Measured optimization is assigned to Phase 40 under D-10 with observation obligations recorded — which cycle 3 explicitly declares is not a new owner decision.
+- *Verification risk: MEDIUM.* Node coverage of pure math, real SQL and controllers is strong. Native Skia depth, gesture arbitration, TalkBack, and all physical-phone performance remain **UNCHECKABLE** from this environment and rest on 29-12-02's E1–E9 checklist under `human_verify_mode: end-of-phase`. Nothing in the plans overstates this; native evidence is carried as pending, never asserted.
+
+**Explicitly UNCHECKABLE here** (labeled, not silently passed): proposed new-symbol signatures (`readOrreryImpactInputsCore`, `readOrreryContactTargetValidation`, `buildOrrerySystemWhere`, `readOrrerySystemMembersCore`, `mergeVisibleRingOrder`, `openSqliteLocalDayFixture`) — all are declared new artifacts and excluded from missing-symbol findings; native gesture recognition and Skia render behavior; TalkBack focus order; device performance.
+
+---
+
+## 6. Current finding counts
+
+| Category | Count |
+|---|---:|
+| **HIGH** | **0** |
+| **Actionable non-HIGH** | **1** (0 MEDIUM, 1 LOW) |
+
+The single actionable item is the Plan 12-01 export-fixture precondition — a one-clause addition to an existing task action plus one assertion.
+
+**Excluded from counts** (per the stated convergence rules): all five cycle-2 findings, independently verified closed in executable actions/acceptance/verify rather than the retrospective table; the explicitly rejected wave-1 migration move (Plan 02-01 documents the `OrreryScreen.tsx` ownership conflict and the absence of an intervening release); advisory cross-artifact drift already recorded for handoff (ADR-027 graph status, ADR-077's stale `SegmentedControl` note, CONTEXT baseline corrections); and native/device evidence correctly pending behind a concrete final gate.
+
+Cycle 1 carried 6 unresolved; cycle 2 carried 5; cycle 3 carries 1. Convergence is progressing and is not stalled. **Recommendation: approve for execution** — the LOW is an additive edit to an existing task and does not block starting wave 1.
+
+---
+
+## Cycle 3 Consensus Summary
+
+Both source-grounded reviewers independently verified that all five cycle-2 findings are now represented in executable Plan 29 contracts. They agree that no HIGH or MEDIUM concern remains. Codex found no actionable issue. Claude found one actionable LOW in Plan 29-12-01: its real `buildExportManifest` contention fixture must explicitly contain a row whose photo path invokes the injected deferred `readPhotoBase64`, and the test must assert that callback/barrier entry before it asserts that scene/action work remains queued. Without those two conditions, the intended mutex-contention test can pass without arming the photo barrier.
+
+### Agreed Strengths
+
+- Plans 29-04 and 29-08 preserve the shared non-reentrant FIFO mutex, snapshot/fresh-probe integrity, and logical cancellation without claiming queued SQL can be dequeued or aborted.
+- Plan 29-12 uses the real export manifest seam and deterministic deferred barriers, preserves native evidence as pending, and defers measured contention optimization under the already-approved D-10/Phase 40 boundary.
+- ADR-027's owner-authorized Orrery display exception is scoped precisely; its derivation, complete-history/floor/rarely-responds, no-raw-score/human-worth, and intensity/cadence policies remain live, while immutable ADR bodies remain untouched.
+- Governing comments, Plan 04-01 acceptance, consecutive sibling Skia body Groups, category UID ownership, D-11, and the living-doc SegmentedControl correction all have explicit owners and verification.
+
+### Current Concern
+
+- **LOW — Plan 29-12-01 export contention fixture can be vacuous.** Add a photo-bearing export row and assert that `readPhotoBase64` entered its deferred barrier before queue/cancellation assertions. This is actionable because the exact fixture precondition and barrier-entry assertion are absent from the executable task.
+
+### Risk Assessment
+
+Planning risk remains low. Execution risk remains medium due to breadth, native gesture/Skia/TalkBack proof, shared-mutex contention, and physical-phone calibration; the plans assign those risks to deterministic tests and pending native gates rather than claiming they are already resolved. No owner decision, security posture change, or ADR/HANDOFF reversal is required for the single LOW.
+
+## Cycle 3 Verification Coverage
+
+### Source grounding
+
+- Effective authority: `grep`. Under this authority, declarations and paths were verified against current source; signatures and native/runtime behavior beyond declarations remain **UNCHECKABLE / INFO** unless traced by source or exercised by a test.
+- Auditable existing-symbol checks from quoted plan references include: Plan 29-01 line 96 → `getAppSettings` (`src/db/app-settings-dao.ts:425`), `getContactHeader` (`src/db/contact-read.ts:67`), `getContactStatus` (`src/db/contact-status-read.ts:54`), `getProfile` (`src/db/profile-dao.ts:96`), `listOrbitingContacts` (`src/db/orrery-read.ts:89`), and `ReadOnlyExecutor` (`src/db/transaction.ts:42`); Plan 29-01 line 108 → `inReadSnapshot` (`src/db/transaction.ts:74`), `rewriteRingSeq` (`src/db/ring-seq-dao.ts:60`), `progressToAngle` and `polarToXY` (`src/logic/orrery-geometry-logic.ts:109,118`); Plan 29-04 line 103 → `getImpactInputs` (`src/db/impact-read.ts:52`) and `computeContactGravity` (`src/services/impact.ts:88`); Plan 29-12 line 106 → `buildExportManifest` (`src/backup/export-manifest.ts:92`) and its injected `readPhotoBase64` (`src/backup/export-manifest.ts:7`); Plan 29-11 → `createReducedMotionController` and `useReducedMotionShared` (`src/theme/use-reduced-motion.ts:61,103`).
+- Planned declarations listed in each plan's `Artifacts this phase produces` were excluded from missing-symbol checks. Representative exclusions: `readOrreryImpactInputsCore`, `readOrreryContactTargetValidation`, `buildOrrerySystemWhere`, `readOrrerySystemMembersCore`, `mergeVisibleRingOrder`, `openSqliteLocalDayFixture`, and `useOrreryCamera`.
+- Signature compatibility under grep, native gesture arbitration, future Skia render ordering/appearance, TalkBack focus, device navigation reachability, and physical-phone performance remain **UNCHECKABLE / INFO** and are assigned to implementation tests or the final native checklist.
+- Coordinator graph-first queries succeeded. All returned governance edges were **INFERRED**, including ADR-048's partial supersession by ADR-077; no edge was represented as a code assertion. The Codex lane disclosed that its own graph commands failed on the sandbox's `tsx` IPC socket. Claude reproduced the coordinator graph results directly.
+- Full shared-data review followed `COVERAGE.md`: the contacts, app_settings, relationships, migration-chain, restore/merge, and export readers/writers were treated as subsystem scope before global invariant assertions. No absence of a graph SQL edge was treated as evidence of no writer.
+
+### Cross-artifact fact drift
+
+- The deterministic phase-status seam returned `uncheckable`: STATE says `Ready to execute`, while ROADMAP says `Planned`, which is outside the seam's recognized vocabulary. STATE.md remains the named authority. This is coverage-only and excluded from convergence counts.
+- The current plan union still covers ORRC-01 through ORRC-16 and D-01 through D-11; the root post-planning checker independently reported 11/11 trackable decisions and all 27 combined requirements/decisions covered at commit `ece43c9`.
+- Existing advisory drift remains historical and excluded from convergence counts: the graph can still show ADR-027 Accepted until later KB extraction records its already-authorized display exception, and ADR-077's old SegmentedControl-only-consumer implementation note is stale because HomeScreen now uses the component.
+- No new contradictory roadmap success criterion, requirement ID, phase term, owner decision, or security/risk posture was found.
+
+## Cycle 3 Current Disposition
+
+- Current unresolved HIGH: 0.
+- Current actionable non-HIGH: 1.
+- The count excludes all historical/resolved findings and advisory cross-artifact drift.
+- Replanning needed: Plan 29-12-01 must require a photo-bearing export fixture and an assertion that the deferred photo reader/barrier was entered before queue assertions.
+- Owner escalation: none.
+
 
 ## Cycle 2 — Current Review
 
