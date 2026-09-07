@@ -14,6 +14,10 @@ import {
   runOnUI,
   useSharedValue,
 } from "react-native-reanimated";
+import {
+  CLUSTER_OBSTACLE,
+  OrreryClusterPanel,
+} from "@/components/orrery/OrreryClusterPanel";
 import { OrreryContactsSheet } from "@/components/orrery/OrreryContactsSheet";
 import {
   ORRERY_CONTROLS_OBSTACLE,
@@ -25,6 +29,10 @@ import { OrreryViewOptions } from "@/components/orrery/OrreryViewOptions";
 import { OrreryWorld } from "@/components/orrery/OrreryWorld";
 import { systemEmptyCopy } from "@/components/orrery/orrery-controls-logic";
 import { canvasViewport } from "@/components/orrery/orrery-obstacle-logic";
+import {
+  closeBeforeAction,
+  clusterRows,
+} from "@/components/orrery/orrery-overlay-logic";
 import { useOrreryCamera } from "@/components/orrery/use-orrery-camera";
 import { ShellAppBar } from "@/components/ShellAppBar";
 import { AppText } from "@/components/ui/AppText";
@@ -43,7 +51,6 @@ import {
 import {
   createOrreryFocusController,
   type OrreryContactTarget,
-  reconcileFocus,
 } from "@/logic/orrery-focus-logic";
 import { cameraExtent, northTarget } from "@/logic/orrery-recovery-logic";
 import {
@@ -70,8 +77,11 @@ import { useReducedMotionShared } from "@/theme/use-reduced-motion";
 export function OrreryScreen() {
   const { colors } = useTheme();
   const [contactsOpen, setContactsOpen] = useState(false);
+  const [clusterOpen, setClusterOpen] = useState(false);
   const restoreContactsFocus = useRef<(() => void) | null>(null);
-  const overlaysOpen = shellTransientStore((store) => store.entries.length > 0);
+  const overlaysOpen = shellTransientStore((store) =>
+    store.entries.some((entry) => entry.id !== "orrery-cluster"),
+  );
   const closeContacts = useCallback((restore = true) => {
     setContactsOpen(false);
     shellTransientStore.getState().closeTransient("orrery-contacts");
@@ -119,7 +129,25 @@ export function OrreryScreen() {
       canvasViewport(
         canvasRect,
         Object.entries(obstacles)
-          .filter(([key]) => key !== ORRERY_CONTROLS_OBSTACLE)
+          .filter(
+            ([key]) =>
+              key !== ORRERY_CONTROLS_OBSTACLE &&
+              key !== CLUSTER_OBSTACLE &&
+              key !== "orrery-focus-context",
+          )
+          .map(([, rect]) => rect),
+      ),
+    [canvasRect, obstacles],
+  );
+  const panelViewport = useMemo(
+    () =>
+      canvasViewport(
+        canvasRect,
+        Object.entries(obstacles)
+          .filter(
+            ([key]) =>
+              key !== CLUSTER_OBSTACLE && key !== "orrery-focus-context",
+          )
           .map(([, rect]) => rect),
       ),
     [canvasRect, obstacles],
@@ -167,6 +195,7 @@ export function OrreryScreen() {
     if (focusSystem.current !== state.requested.id) {
       focusSystem.current = state.requested.id;
       setFocusTargets([]);
+      setClusterOpen(false);
     }
   }, [state.requested.id]);
   const initialized = useRef(false);
@@ -266,14 +295,24 @@ export function OrreryScreen() {
             : null,
         validate: (system, target) =>
           readOrreryContactTargetValidation(getExecutor(), system, target),
-        focus: (targets) => actionEnvironment.current.focus(targets),
-        group: (targets) => actionEnvironment.current.focus(targets),
+        focus: (targets) => {
+          setClusterOpen(false);
+          actionEnvironment.current.focus(targets);
+        },
+        group: (targets) => {
+          setClusterOpen(true);
+          actionEnvironment.current.focus(targets);
+        },
         clear: () => {
           setFocusTargets([]);
+          setClusterOpen(false);
           setFocusError(null);
         },
-        openProfile: (contactId) =>
-          navigation.navigate("Profile", { contactId }),
+        openProfile: (contactId) => {
+          setClusterOpen(false);
+          shellTransientStore.getState().closeTransient("orrery-cluster");
+          navigation.navigate("Profile", { contactId });
+        },
         reject: (reason) => {
           setFocusError(reason);
           if (reason !== "error") setFocusTargets([]);
@@ -285,11 +324,32 @@ export function OrreryScreen() {
   const clearFocus = useCallback(() => {
     actions.cancel("clear");
     setFocusTargets([]);
+    setClusterOpen(false);
     setFocusError(null);
   }, [actions]);
+  const dismissCluster = useCallback(() => {
+    actions.cancel("outside");
+    setClusterOpen(false);
+    setFocusTargets([]);
+    shellTransientStore.getState().closeTransient("orrery-cluster");
+  }, [actions]);
   useEffect(() => {
-    if (!isFocused) actions.cancel("blur");
-    if (!appActive) actions.cancel("background");
+    if (!clusterOpen) return;
+    shellTransientStore
+      .getState()
+      .openTransient("orrery-cluster", dismissCluster);
+    return () =>
+      shellTransientStore.getState().closeTransient("orrery-cluster");
+  }, [clusterOpen, dismissCluster]);
+  useEffect(() => {
+    if (!isFocused) {
+      actions.cancel("blur");
+      setClusterOpen(false);
+    }
+    if (!appActive) {
+      actions.cancel("background");
+      setClusterOpen(false);
+    }
   }, [actions, isFocused, appActive]);
   useEffect(() => () => actions.cancel("dispose"), [actions]);
   useEffect(() => {
@@ -301,15 +361,14 @@ export function OrreryScreen() {
   useEffect(() => {
     if (!scene || state.status !== "ready") return;
     setFocusTargets((targets) => {
-      const valid = targets.filter((target) =>
-        reconcileFocus(
-          target,
-          scene.systemSnapshot.members,
-          scene.systemSnapshot.resolvedSunIdentity,
-        ),
+      const valid = clusterRows(
+        targets,
+        scene.systemSnapshot.members,
+        scene.systemSnapshot.resolvedSunIdentity,
       );
       if (valid.length === targets.length) return targets;
       setFocusError("removed");
+      if (!valid.length) setClusterOpen(false);
       return valid;
     });
   }, [scene, state.status]);
@@ -337,6 +396,7 @@ export function OrreryScreen() {
   }, [scene, state.status, viewport, pose, focusedIds, camera.stop]);
   const recenter = () => {
     actions.cancel("recenter");
+    setClusterOpen(false);
     setFocusTargets([]);
     setFocusError(null);
     const home = deriveHomePose(state.snapshot?.world ?? [], viewport);
@@ -385,7 +445,8 @@ export function OrreryScreen() {
             fontProvider={fontProvider}
             onIntent={onIntent}
             focusedIds={focusedIds}
-            onFocusLost={clearFocus}
+            clusterIds={clusterOpen ? focusedIds : []}
+            onFocusLost={clusterOpen ? undefined : clearFocus}
             interactive={!overlaysOpen}
           />
         ) : null}
@@ -404,6 +465,37 @@ export function OrreryScreen() {
           onRecenter={recenter}
           onResetNorth={resetNorth}
         />
+        {clusterOpen && scene ? (
+          <OrreryClusterPanel
+            targets={focusTargets}
+            scene={scene}
+            viewport={panelViewport}
+            stale={state.status === "stale"}
+            blocked={overlaysOpen}
+            onClose={dismissCluster}
+            onReload={reload}
+            onAction={(kind, target) => {
+              const current = state.current();
+              if (!current) return;
+              closeBeforeAction(
+                () => {
+                  setClusterOpen(false);
+                  shellTransientStore
+                    .getState()
+                    .closeTransient("orrery-cluster");
+                },
+                () => {
+                  void onIntent({
+                    kind,
+                    ids: [target.id],
+                    targets: [target],
+                    generation: current.generation,
+                  });
+                },
+              );
+            }}
+          />
+        ) : null}
         {focusError ? (
           <OrreryFeedback
             obstacleId="orrery-focus-feedback"
