@@ -68,6 +68,31 @@ function makeMock(opts: { seed?: boolean; seedPromise?: Promise<boolean> }) {
 }
 
 describe("createReducedMotionController", () => {
+  it("live changes outrank a seed that resolves later", async () => {
+    const seed = deferred<boolean>();
+    const mock = makeMock({ seedPromise: seed.promise });
+    const emit = vi.fn();
+    createReducedMotionController(mock.accessibilityInfo, emit);
+    mock.emitChange(true);
+    seed.resolve(false);
+    await Promise.resolve();
+    expect(emit.mock.calls).toEqual([[true]]);
+  });
+  it("multiple live changes stay authoritative and repeated disposal is harmless", async () => {
+    const seed = deferred<boolean>();
+    const mock = makeMock({ seedPromise: seed.promise });
+    const emit = vi.fn();
+    const controller = createReducedMotionController(mock.accessibilityInfo, emit);
+    mock.emitChange(true);
+    mock.emitChange(false);
+    mock.emitChange(true);
+    seed.resolve(false);
+    await Promise.resolve();
+    expect(emit.mock.calls).toEqual([[true], [false], [true]]);
+    controller.dispose();
+    controller.dispose();
+    expect(mock.remove).toHaveBeenCalledTimes(1);
+  });
   it("seeds from isReduceMotionEnabled() via emit(seed)", async () => {
     const mock = makeMock({ seed: true });
     const emit = vi.fn();
