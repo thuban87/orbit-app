@@ -1,10 +1,10 @@
 ---
 schema_version: 1
-open_count: 42
+open_count: 43
 waived_count: 0
 fixed_count: 6
-total_count: 48
-last_updated: 2026-09-07T08:44:02.538Z
+total_count: 49
+last_updated: 2026-09-07T09:03:24.375Z
 ---
 
 # Broken Windows Ledger
@@ -63,6 +63,7 @@ last_updated: 2026-09-07T08:44:02.538Z
 | 46 | 29 | unrun-verify | src/components/orrery/OrrerySystemSelector.tsx |  | Native System selector, Skia neutral bodies, TalkBack focus return and scaled-text layout await the approved end-of-phase device session. | open |  | 2026-09-07T08:24:38.350Z |  |
 | 47 | 29 | unrun-verify | src/components/orrery/OrreryWorld.tsx |  | Plan 29-04 native Gravity mass, density/Home calibration, projected rings and gesture observations remain pending final Plan 12 device session; FIFO wait and hold latency unmeasured. | open |  | 2026-09-07T08:43:44.951Z |  |
 | 48 | 29 | lint-warning | src/db/lifecycle-consumer-ledger.test.ts |  | Pre-existing Biome formatter drift outside the new 29-04 cadence-owner entry; baseline HEAD reproduces the same formatting findings. | open |  | 2026-09-07T08:44:02.538Z |  |
+| 49 | 29 | unrun-verify | src/components/orrery/OrreryWorld.tsx |  | Plan 29-05 native billboard sun occlusion, glyph shaping, layer visibility and scaled-text fit await Plan 12 device verification. | open |  | 2026-09-07T09:03:24.375Z |  |
 
 ````json
 [
@@ -640,6 +641,18 @@ last_updated: 2026-09-07T08:44:02.538Z
     "status": "open",
     "reason": "",
     "recorded_at": "2026-09-07T08:44:02.538Z",
+    "resolved_at": null
+  },
+  {
+    "id": 49,
+    "kind": "unrun-verify",
+    "phase": "29",
+    "file": "src/components/orrery/OrreryWorld.tsx",
+    "line": null,
+    "description": "Plan 29-05 native billboard sun occlusion, glyph shaping, layer visibility and scaled-text fit await Plan 12 device verification.",
+    "status": "open",
+    "reason": "",
+    "recorded_at": "2026-09-07T09:03:24.375Z",
     "resolved_at": null
   }
 ]
