@@ -216,7 +216,7 @@ All v1.0 commits are local on `main` and have NOT been pushed.
 **Plans**: 7 plans
 **Wave 1**
 
-- [x] 23-01-PLAN.md — TRACER: persisted theme resolves package × mode with restore-before-paint (migration 015, DAO/backup plumbing, orbit-theme import) [THEME-01/03/13]
+- [x] 23-01-PLAN.md — TRACER: persisted theme resolves package × mode with restore-before-paint (migration 015, DAO/backup plumbing, orbit-theme import) [THEME-01/03/12]
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
@@ -481,9 +481,10 @@ All v1.0 commits are local on `main` and have NOT been pushed.
 
 **Canonical refs**: docs/dossier/milestone-2/phase-08-orrery-camera-scale-exploration-dossier.md; docs/dossier/milestone-2/planning-notes/phase-08-planning-notes.md
 **Schema**: separate Phase 29 app_settings preference migration (current head20, planned21; recheck head+1 at execution); optional portable keys, current export/version changes remain Phase36
-**Plans**: 2/12 plans executed
+**Plans**: 3/12 plans executed
 
 Plans:
+
 
 **Wave 1**
 
@@ -495,7 +496,7 @@ Plans:
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
-- [ ] 29-03-PLAN.md — Coherent built-in and Category System selection
+- [x] 29-03-PLAN.md — Coherent built-in and Category System selection
 
 **Wave 4** *(blocked on Wave 3 completion)*
 
@@ -721,7 +722,7 @@ Plans:
 | 26. Dashboard Control Surface | 7/7 | In Progress|  |
 | 27. Dashboard List View | 8/8 | Complete | 2026-09-06 (owner-approved; UAT partial) |
 | 28. Dashboard Card View | 8/8 | In Progress|  |
-| 29. Orrery Camera, Scale & Exploration | 2/12 | In Progress|  |
+| 29. Orrery Camera, Scale & Exploration | 3/12 | In Progress|  |
 | 30. Orrery Systems | 0/TBD | Not started | - |
 | 31. Profile Experience | 0/TBD | Not started | - |
 | 32. Interaction History & Insights | 0/TBD | Not started | - |
