@@ -5,16 +5,16 @@ milestone_name: Release Readiness
 current_phase: 29
 current_phase_name: Orrery Camera, Scale & Exploration
 status: executing
-stopped_at: Completed 29-05-PLAN.md
-last_updated: "2026-09-07T09:06:00.162Z"
+stopped_at: Completed 29-06-PLAN.md; owner requested pause before Plan 07
+last_updated: "2026-09-07T09:26:08.457Z"
 last_activity: 2026-09-07
-last_activity_desc: Completed Plan 29-05 shared billboard frame and semantic labels
-state_head: b082b99a391a022f45e63e527780a68d106419a2
+last_activity_desc: Completed Plan 29-06 measured obstacles and reachable controls; owner requested pause
+state_head: 026c476e75caf3ad52d64c08f20583da89ccedce
 progress:
   total_phases: 20
   completed_phases: 5
   total_plans: 72
-  completed_plans: 63
+  completed_plans: 64
 carried_forward:
 
   - "D-11: default Memory-type display name is provisional (memory-registry.ts:10-12) — owner naming decision, must be reconciled before Phase 34"
@@ -34,12 +34,12 @@ See: .planning/PROJECT.md (updated 2026-09-01 after v1.0 milestone)
 ## Current Position
 
 Phase: 29 (Orrery Camera, Scale & Exploration) — EXECUTING
-Plan: 6 of 12
-Status: Ready to execute
+Plan: 7 of 12
+Status: Paused at owner request after Plan 29-06
 Carried forward (owner's bucket, NOT resolved here): D-11 default Memory-type display name — reconcile before Phase 34.
 Surface to owner (24.2-07, KNOW-15): milestone plan said Phase 36 owns the backup format-4 bump, but 24.1 already bumped to 4 (d677e2c); Plan 07 emits into the live format 4 with NO bump — that milestone instruction is stale.
 Deferred to Phase 31 (recorded in Plan 05): durable contact-scoped-def ownership + owner-purge semantics. Deferred to Phase 36 (ROADMAP breadcrumb): legacy AI-fuel confirm-path code removal.
-Last activity: 2026-09-07 — Completed Plan 29-05; full regression 262 files/2456 tests passed, native checks pending end-of-phase
+Last activity: 2026-09-07 — Completed Plan 29-06; full regression 264 files/2472 tests passed; owner requested pause; native checks pending end-of-phase
 Progress: 8/19 phases complete (v2.0) — 22, 23, 24.1, 24.2, 25, 26, 27, 28
 Next: `/gsd-execute-phase 29`.
 
@@ -232,6 +232,7 @@ at plan time. All new durable preferences are `app_settings` columns, never Asyn
 | Phase 29 P03 | 16min | 3 tasks | 16 files |
 | Phase 29 P04 | 16min | 3 tasks | 13 files |
 | Phase 29 P05 | 18min | 2 tasks | 13 files |
+| Phase 29 P06 | 18min | 2 tasks | 16 files |
 
 ## Accumulated Context
 
@@ -529,6 +530,7 @@ Foundational decisions affecting current work:
 - [Phase 29]: 29-03: Global sun identity is separate from System membership and satellite-parent eligibility; complete contacted rank inputs exclude neutral rows.
 - [Phase 29]: 29-04: Full-history batch Gravity stays inside the existing coherent FIFO read snapshot; calculation and rendering stay outside. Dossier E/Z extends display scope only.
 - [Phase 29]: 29-05: Native body roots use shared SkPaint layers so sun/contact Groups remain one consecutive depth batch; labels use separate screen-space paint layers.
+- [Phase 29]: 29-06: Measure the actual canvas container before scene readiness; controls omit their own obstacle for placement, while world framing includes shell, HUD, controls and feedback bounds.
 
 ### Pending Todos
 
@@ -595,8 +597,8 @@ _Also disposed at this close: 05/deferred-items.md (check:colors doc-comment) ma
 
 ## Session
 
-**Last session:** 2026-09-07T09:05:58.214Z
-**Stopped at:** Completed 29-05-PLAN.md
+**Last session:** 2026-09-07T09:26:06.515Z
+**Stopped at:** Completed 29-06-PLAN.md; owner requested pause before Plan 07
 _Prior stop (v1.0):_ Phase 21 UI-SPEC approved; milestone v1.0 closed 2026-09-01.
 _Prior stop (13-04):_ the orrery VISUAL VOCABULARY (theme tokens + two pure resolver modules, node-tested, 29 cases green): (1) five owner-tunable `ThemePalette` tokens seeded in `space-dark.dark` ONLY — `starPalette` (6 colours, gold `#F2C14E` at index 0, then amber/rose-red/violet/cyan/ice-white), `mutedStable/Wobble/Decay` (desaturated same-hue morph endpoints), `rogueExtinguished` (cold blue-grey `#3E4A6B` rogue BODY fill) — with an M6/C2-5 conformance test that IMPORTS the real `SELF_SUN_COLOUR_RE`/`assertSelfSunColour` from app-settings-dao and locks every starPalette entry to the ACTUAL DAO write-path rule (no re-inlined regex). (2) `orrery-ring-logic.ts` `orreryRingStyle(status, colors)` — REUSES `ringVisual` for `{color,opacity,width}` (status→colour mapped once), adds the `strokeStyle` axis (solid→dashed→faded→faintTrace) + `bodyFill` (rogue ring=`colors.rogue`, body=`rogueExtinguished`); `null`→canonical NEUTRAL (`colors.border`), never throws — the single fallback sun-occupant reuses (C2-2). (3) `sun-occupant-logic.ts` `resolveSunOccupant(input)` — NULL/archived/missing→self (A7, glow `selfSunColour ?? starPalette[0]`), live contact→its status glow via `orreryRingStyle(status, colors).color`, never-contacted (status `null`)→the reused neutral border (C2-2); accepts `status: ProfileStatus | null`. 5 commits (1801915 feat tokens+M6; d35d528 RED→4cbfad5 GREEN ring-logic; c923b16 RED→10780dd GREEN sun-occupant); tsc + check:colors clean; no deviations (one in-flight fix: a placeholder hex in the logic test was re-sourced from the palette after check:colors flagged it — C2-3). Committed locally on main (NOT pushed). Next: Wave 2 (13-05 render / 13-06 Settings sun-picker), Wave 3 (13-07 drag-release), Wave 4 (13-08 device UAT, autonomous:false).
 **Resume file:** None
@@ -625,6 +627,6 @@ was built via the desktop pipeline and driven through create→edit→archive→
 ## Operator Next Steps
 
 - Phase 29 is researched and planned: 12 plans, 30 tasks, 12 sequential waves. Owner accepted convergence after three external cycles (last external result: 0 HIGH / 1 LOW); the final LOW fixture clarification and owner ruling D-11 are incorporated. No cycle 4 review was run; see `.planning/phases/29-orrery-camera-scale-exploration/29-PLAN-CHECK.md`, `29-REVIEWS.md` and `COVERAGE.md`.
-- Plans 29-01 through 29-05 are complete and committed. Continue `/gsd-execute-phase 29` at Plan 06; each later wave depends on the prior wave.
-- Plan 05's full regression passed: 262 files/2456 tests (`/tmp/orbit-29-05-tests-final.log`), plus typecheck, color and targeted Biome checks. Multi-plan ORRC requirements remain pending. Native/device verification remains pending under `29-VALIDATION.md` and Plan 12.
+- Plans 29-01 through 29-06 are complete and committed. Paused at the owner's request after Plan 06; when authorized to resume, continue `/gsd-execute-phase 29` at Plan 07. Each later wave depends on the prior wave.
+- Plan 06's full regression passed: 264 files/2472 tests (`/tmp/orbit-29-06-tests-final.log`), plus typecheck, color and targeted Biome checks. Multi-plan ORRC requirements remain pending. Plan 07 owns Polaris rendering and animated recovery; Plan 08 expands the working Contacts sheet. Native/device verification remains pending under `29-VALIDATION.md` and Plan 12.
 - Commits stay local — agents never push; push when you're ready.
