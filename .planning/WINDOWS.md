@@ -1,10 +1,10 @@
 ---
 schema_version: 1
-open_count: 44
+open_count: 45
 waived_count: 0
 fixed_count: 6
-total_count: 50
-last_updated: 2026-09-07T09:23:41.676Z
+total_count: 51
+last_updated: 2026-09-07T16:46:40.740Z
 ---
 
 # Broken Windows Ledger
@@ -65,6 +65,7 @@ last_updated: 2026-09-07T09:23:41.676Z
 | 48 | 29 | lint-warning | src/db/lifecycle-consumer-ledger.test.ts |  | Pre-existing Biome formatter drift outside the new 29-04 cadence-owner entry; baseline HEAD reproduces the same formatting findings. | open |  | 2026-09-07T08:44:02.538Z |  |
 | 49 | 29 | unrun-verify | src/components/orrery/OrreryWorld.tsx |  | Plan 29-05 native billboard sun occlusion, glyph shaping, layer visibility and scaled-text fit await Plan 12 device verification. | open |  | 2026-09-07T09:03:24.375Z |  |
 | 50 | 29 | unrun-verify | src/components/orrery/OrreryControls.tsx |  | Native window measurement, scaled control reachability, modal focus restoration and TalkBack orientation remain pending in Plan 12. | open |  | 2026-09-07T09:23:41.676Z |  |
+| 51 | 29 | unrun-verify | src/components/orrery/use-orrery-camera.ts |  | Plan 29-07 native pan/pinch/tilt/yaw arbitration, restrained recovery feel, world Polaris visibility and TalkBack orientation remain pending Plan 12 device verification. | open |  | 2026-09-07T16:46:40.740Z |  |
 
 ````json
 [
@@ -666,6 +667,18 @@ last_updated: 2026-09-07T09:23:41.676Z
     "status": "open",
     "reason": "",
     "recorded_at": "2026-09-07T09:23:41.676Z",
+    "resolved_at": null
+  },
+  {
+    "id": 51,
+    "kind": "unrun-verify",
+    "phase": "29",
+    "file": "src/components/orrery/use-orrery-camera.ts",
+    "line": null,
+    "description": "Plan 29-07 native pan/pinch/tilt/yaw arbitration, restrained recovery feel, world Polaris visibility and TalkBack orientation remain pending Plan 12 device verification.",
+    "status": "open",
+    "reason": "",
+    "recorded_at": "2026-09-07T16:46:40.740Z",
     "resolved_at": null
   }
 ]
