@@ -1,10 +1,10 @@
 ---
 schema_version: 1
-open_count: 40
+open_count: 42
 waived_count: 0
 fixed_count: 6
-total_count: 46
-last_updated: 2026-09-07T08:24:38.350Z
+total_count: 48
+last_updated: 2026-09-07T08:44:02.538Z
 ---
 
 # Broken Windows Ledger
@@ -61,6 +61,8 @@ last_updated: 2026-09-07T08:24:38.350Z
 | 44 | 28 | stub | src/screens/HomeScreen.tsx | 1261 | Selection bulk-actions placeholder region; Plan 07 owns the controls. | open |  | 2026-09-06T09:20:03.702Z |  |
 | 45 | 29 | unrun-verify | src/screens/OrreryScreen.tsx |  | Native tracer pan-to-moved-body focus-to-Profile, Skia rendering and gesture arbitration remain pending the approved end-of-phase device session. | open |  | 2026-09-07T07:48:39.216Z |  |
 | 46 | 29 | unrun-verify | src/components/orrery/OrrerySystemSelector.tsx |  | Native System selector, Skia neutral bodies, TalkBack focus return and scaled-text layout await the approved end-of-phase device session. | open |  | 2026-09-07T08:24:38.350Z |  |
+| 47 | 29 | unrun-verify | src/components/orrery/OrreryWorld.tsx |  | Plan 29-04 native Gravity mass, density/Home calibration, projected rings and gesture observations remain pending final Plan 12 device session; FIFO wait and hold latency unmeasured. | open |  | 2026-09-07T08:43:44.951Z |  |
+| 48 | 29 | lint-warning | src/db/lifecycle-consumer-ledger.test.ts |  | Pre-existing Biome formatter drift outside the new 29-04 cadence-owner entry; baseline HEAD reproduces the same formatting findings. | open |  | 2026-09-07T08:44:02.538Z |  |
 
 ````json
 [
@@ -614,6 +616,30 @@ last_updated: 2026-09-07T08:24:38.350Z
     "status": "open",
     "reason": "",
     "recorded_at": "2026-09-07T08:24:38.350Z",
+    "resolved_at": null
+  },
+  {
+    "id": 47,
+    "kind": "unrun-verify",
+    "phase": "29",
+    "file": "src/components/orrery/OrreryWorld.tsx",
+    "line": null,
+    "description": "Plan 29-04 native Gravity mass, density/Home calibration, projected rings and gesture observations remain pending final Plan 12 device session; FIFO wait and hold latency unmeasured.",
+    "status": "open",
+    "reason": "",
+    "recorded_at": "2026-09-07T08:43:44.951Z",
+    "resolved_at": null
+  },
+  {
+    "id": 48,
+    "kind": "lint-warning",
+    "phase": "29",
+    "file": "src/db/lifecycle-consumer-ledger.test.ts",
+    "line": null,
+    "description": "Pre-existing Biome formatter drift outside the new 29-04 cadence-owner entry; baseline HEAD reproduces the same formatting findings.",
+    "status": "open",
+    "reason": "",
+    "recorded_at": "2026-09-07T08:44:02.538Z",
     "resolved_at": null
   }
 ]
