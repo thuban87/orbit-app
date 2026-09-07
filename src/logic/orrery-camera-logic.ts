@@ -279,8 +279,17 @@ export function anchorCameraPose(
   extent: number,
 ): CameraPose {
   "worklet";
-  const anchor = unprojectToWorldPlane(screen, start, viewport);
   const next = clampCameraPose(requested, extent);
+  // At wide zoom a screen point can be sky, beyond the finite plane's horizon.
+  // Such a pinch has no world anchor; zoom about the current camera center.
+  const center = projectionCenter(viewport);
+  for (const pose of [start, next]) {
+    const focal = pose.focalDistance ?? MIN_FOCAL_DISTANCE;
+    const sy = (screen.y - center.y) / pose.zoom;
+    if (focal * Math.cos(pose.tilt ?? 0) + sy * Math.sin(pose.tilt ?? 0) <= 0)
+      return next;
+  }
+  const anchor = unprojectToWorldPlane(screen, start, viewport);
   const after = unprojectToWorldPlane(screen, next, viewport);
   return clampCameraPose(
     { ...next, x: next.x + anchor.x - after.x, y: next.y + anchor.y - after.y },
@@ -543,8 +552,18 @@ export function panCamera(
   "worklet";
   if (viewport) {
     const center = projectionCenter(viewport);
+    const focal = start.focalDistance ?? deriveFocalDistance(extent),
+      tilt = start.tilt ?? 0;
+    const reach = 2 * Math.SQRT2 * Math.max(1, extent);
+    const minY =
+      (-reach * Math.cos(tilt) * focal) / (focal + reach * Math.sin(tilt));
+    const maxY =
+      (reach * Math.cos(tilt) * focal) / (focal - reach * Math.sin(tilt));
+    // Restrict gesture sampling to the reachable plane before inverse math;
+    // projection itself is never patched with a denominator clamp.
+    const sampleY = clamp(-dy / start.zoom, minY, maxY, 0);
     const anchor = unprojectToWorldPlane(
-      { x: center.x - dx, y: center.y - dy },
+      { x: center.x - dx, y: center.y + sampleY * start.zoom },
       start,
       viewport,
     );

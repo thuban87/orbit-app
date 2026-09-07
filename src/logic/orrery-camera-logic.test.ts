@@ -10,6 +10,7 @@ import {
   MAX_ZOOM,
   MIN_READABLE_RADIUS,
   MIN_ZOOM,
+  panCamera,
   perspectiveScale,
   projectFrame,
   projectWorldPoint,
@@ -28,6 +29,29 @@ const body = (x: number, y: number, radius = 16, id = 1): WorldBody => ({
   ringRadius: Math.hypot(x, y),
 });
 describe("bounded invertible inspection camera", () => {
+  it("keeps large drags and pinches on sky finite at maximum tilt and minimum zoom", () => {
+    const pose = clampCameraPose(
+      { ...HOME_CAMERA, zoom: MIN_ZOOM, tilt: MAX_TILT },
+      100,
+    );
+    for (const dy of [-10000, -600, 0, 600, 10000]) {
+      const pan = panCamera(pose, 600, dy, 100, viewport);
+      expect(Object.values(pan).every(Number.isFinite)).toBe(true);
+      expect(Math.abs(pan.x)).toBeLessThanOrEqual(100);
+      expect(Math.abs(pan.y)).toBeLessThanOrEqual(100);
+    }
+    expect(
+      Object.values(
+        anchorCameraPose(
+          pose,
+          { ...pose, zoom: 4 },
+          { x: 0, y: 0 },
+          viewport,
+          100,
+        ),
+      ).every(Number.isFinite),
+    ).toBe(true);
+  });
   it("clamps zoom/tilt/pan and wraps yaw at exact boundaries and neighboring epsilon", () => {
     for (const boundary of [MIN_ZOOM, MAX_ZOOM])
       for (const delta of [-1e-8, 0, 1e-8]) {
