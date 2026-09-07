@@ -32,11 +32,12 @@ Per-phase validation contract for execution. Research and planning are not imple
 
 ## Per-Task Verification Map
 
-Final map: 12 plans, 12 waves, 29 tasks. Threat IDs below reference the owning plan's complete STRIDE register (ASVS1, high/critical blocking). All checks remain Pending execution. Test-file guards prevent a missing new suite from passing through an incidental existing filename filter.
+Final map: 12 plans, 12 waves, 30 tasks. Threat IDs below reference the owning plan's complete STRIDE register (ASVS1, high/critical blocking). All checks remain Pending execution. Test-file guards prevent a missing new suite from passing through an incidental existing filename filter.
 
 | Task | Wave | Requirements | Threat refs | Automated command | Status |
 |---|---|---|---|---|---|
-| 29-01-01 | 1 | ORRC-01, ORRC-02, ORRC-07 | T-29-01-01, T-29-01-02 | `test -f src/services/orrery-scene.test.ts && npm test -- src/services/orrery-scene.test.ts` | Pending |
+| 29-01-00 | 1 | ORRC-01, ORRC-02, ORRC-07 | T-29-01-01 | `npx tsc --noEmit && npm test -- src/db/app-settings-dao.test.ts src/db/contact-read.test.ts src/db/contact-status-read.test.ts src/db/profile-dao.test.ts src/db/orrery-read.test.ts` | Pending |
+| 29-01-01 | 1 | ORRC-01, ORRC-02, ORRC-07 | T-29-01-01, T-29-01-02 | `test -f src/services/orrery-scene.test.ts && npx tsc --noEmit && npm test -- src/services/orrery-scene.test.ts` | Pending |
 | 29-01-02 | 1 | ORRC-01, ORRC-02, ORRC-07 | T-29-01-01, T-29-01-02 | `test -f src/logic/orrery-geometry-logic.test.ts && npm test -- orrery-geometry orrery-ring sun-occupant orrery-scene` | Pending |
 | 29-02-01 | 2 | ORRC-05, ORRC-13 | T-29-02-01, T-29-02-02 | `test -f src/db/orrery-preferences.test.ts && npm test -- src/db/orrery-preferences.test.ts` | Pending |
 | 29-02-02 | 2 | ORRC-05, ORRC-13 | T-29-02-01, T-29-02-02 | `test -f src/stores/orrery-preferences-store.test.ts && npm test -- orrery-preferences` | Pending |
@@ -70,6 +71,7 @@ Final map: 12 plans, 12 waves, 29 tasks. Threat IDs below reference the owning p
 
 No new framework or package is required. Add tests with their owning implementation tasks before consumers depend on the new behavior; do not create empty test stubs solely to satisfy the map.
 
+- 29-01-00 is a type-only prerequisite for five existing readers, checked with the existing reader suites and TypeScript. 29-01-01 remains the first behavior-changing tracer and uses self/contact-sun fixtures to compose all five readers through snapshot ro before expansion; no new test scaffold is needed for the signature-only task.
 - World and project/inverse round trips, minimum spacing, neutral progress, deterministic nudges, depth bounds and Home framing.
 - Current projected hit candidates at intermediate animation fractions, semantic labels and input ownership/cancellation.
 - Batched Gravity inputs: exact parity with single-contact ImpactInputs/computeContactGravity, complete history, bounded chunk/query counts, ro-only composition and coherent policy/history snapshot (29-04-01).
@@ -111,4 +113,4 @@ Density/neighbor tuning and large-System performance remain assigned to release 
 
 The new SQLite test helper is implemented in29-09 and reused in29-12. The standalone feasibility probe at /tmp/orbit-phase29-sqlite-day-probe.cjs passed; this is test-mechanism evidence only. Ordinary pan must leave ranks, modified_at and revision unchanged from29-01 onward. Native tracer obligations remain end-of-phase pending UAT, distinct from the automated tracer-before-expansion condition. No new interim owner approval gate is introduced.
 
-Planner structural checks on 2026-09-07: all12 numbered plan frontmatter and structures valid; one preexisting one-way-migration warning corresponds to D-03/D-06's already-approved action. Decision coverage11/11; task/file/wave audit12 plans,29 tasks,12 waves, no task over5 modified files and no missing declared owner; requirements16/16 and existing edges37/37. Estimate calibration factor1, confidence low, zero samples; largest revised projection38,000 tokens is below the100,000-token budget. git diff --check passed. These are planner checks only; independent review of the revised set is still required.
+Planner structural checks on 2026-09-07: all12 numbered plan frontmatter and structures valid; one preexisting one-way-migration warning corresponds to D-03/D-06's already-approved action. Decision coverage11/11; task/file/wave audit 12 plans, 30 tasks, 12 waves, no task over5 modified files and no missing declared owner; requirements16/16 and existing edges37/37. Estimate calibration factor1, confidence low, zero samples; largest revised projection 46,000 tokens is below the 100,000-token budget. git diff --check passed. These are planner checks only; independent review of the revised set is still required.
