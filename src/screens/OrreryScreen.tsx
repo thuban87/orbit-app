@@ -637,7 +637,7 @@ export function OrreryScreen() {
     const key = `${systemRefId(scene.system)}:${scene.preferences.density}:${JSON.stringify(viewport)}`;
     const domain = `${systemRefId(scene.system)}:${scene.preferences.density}`;
     const session = useOrrerySessionStore.getState();
-    if (session.resume === "restore") {
+    if (sessionResume === "restore") {
       const restored = restoreOrrerySession({
         saved: session.saved,
         systemId: systemRefId(scene.system),
@@ -661,8 +661,8 @@ export function OrreryScreen() {
         return;
       }
     }
-    if (lastHomeFrame.current === key && session.resume === "active") return;
-    if (session.resume === "active" && lastHomeDomain.current === domain) {
+    if (lastHomeFrame.current === key && sessionResume === "active") return;
+    if (sessionResume === "active" && lastHomeDomain.current === domain) {
       lastHomeFrame.current = key;
       const extent = cameraExtent(scene.extent);
       runOnUI(() => {
@@ -673,7 +673,7 @@ export function OrreryScreen() {
       return;
     }
     const focusedBodies = scene.world.filter(
-      (body) => session.resume === "active" && focusedIds.includes(body.id),
+      (body) => sessionResume === "active" && focusedIds.includes(body.id),
     );
     const home =
       focusedBodies.length > 0
@@ -684,7 +684,7 @@ export function OrreryScreen() {
       home.zoom = Math.min(IDENTITY_ZOOM, home.zoom);
     lastHomeFrame.current = key;
     lastHomeDomain.current = domain;
-    if (session.resume !== "active") {
+    if (sessionResume !== "active") {
       setFocusTargets([]);
       setFocusedSatellite(null);
       setClusterOpen(false);

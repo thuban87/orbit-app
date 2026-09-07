@@ -63,6 +63,7 @@ export function createReducedMotionController(
   emit: (value: boolean) => void,
 ): ReducedMotionController {
   let disposed = false;
+  let liveGeneration = 0;
 
   // Subscribe ONCE, synchronously — a live toggle that fires before the seed
   // promise resolves is still forwarded.
@@ -70,6 +71,7 @@ export function createReducedMotionController(
     "reduceMotionChanged",
     (value: boolean) => {
       if (disposed) return;
+      liveGeneration++;
       emit(value);
     },
   );
@@ -79,7 +81,7 @@ export function createReducedMotionController(
   accessibilityInfo
     .isReduceMotionEnabled()
     .then((value) => {
-      if (disposed) return;
+      if (disposed || liveGeneration !== 0) return;
       emit(value);
     })
     .catch(() => {
@@ -89,6 +91,7 @@ export function createReducedMotionController(
 
   return {
     dispose() {
+      if (disposed) return;
       disposed = true;
       subscription.remove();
     },

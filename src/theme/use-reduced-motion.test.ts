@@ -82,7 +82,10 @@ describe("createReducedMotionController", () => {
     const seed = deferred<boolean>();
     const mock = makeMock({ seedPromise: seed.promise });
     const emit = vi.fn();
-    const controller = createReducedMotionController(mock.accessibilityInfo, emit);
+    const controller = createReducedMotionController(
+      mock.accessibilityInfo,
+      emit,
+    );
     mock.emitChange(true);
     mock.emitChange(false);
     mock.emitChange(true);

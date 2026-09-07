@@ -137,6 +137,8 @@ export function useOrreryCamera({
       live.value = enabled;
       if (!enabled) {
         reorder.value = null;
+        frame.value = null;
+        samples.value = initialSamples();
         stop();
         input.value = cancelInput(input.value);
       }
@@ -146,11 +148,13 @@ export function useOrreryCamera({
         "worklet";
         live.value = false;
         reorder.value = null;
+        frame.value = null;
+        samples.value = initialSamples();
         input.value = cancelInput(input.value);
         stop();
       })();
     };
-  }, [enabled, live, input, stop, reorder]);
+  }, [enabled, live, input, stop, reorder, frame, samples]);
   return useMemo(
     () => ({ input, samples, live, active, frame, reorder, ...motion }),
     [input, samples, live, active, frame, reorder, motion],
