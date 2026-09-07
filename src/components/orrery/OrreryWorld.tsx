@@ -61,6 +61,7 @@ export function createOrreryGestures({
   extent,
   send,
   stop,
+  enabled = true,
 }: {
   pose: CameraCell<CameraPose>;
   frame: CameraCell<ProjectedFrame>;
@@ -68,8 +69,10 @@ export function createOrreryGestures({
   extent: number;
   send: (intent: OrreryIntent) => void;
   stop: () => void;
+  enabled?: boolean;
 }) {
   const tap = Gesture.Tap()
+    .enabled(enabled)
     .maxDistance(8)
     .onEnd((event, success) => {
       "worklet";
@@ -77,6 +80,7 @@ export function createOrreryGestures({
         runOnJS(send)(tapIntent(frame.value, event.x, event.y, success));
     });
   const pan = Gesture.Pan()
+    .enabled(enabled)
     .minDistance(PAN_MIN_DISTANCE)
     .maxPointers(1)
     .onBegin(() => {
@@ -197,6 +201,7 @@ export function OrreryWorld({
   focusedIds,
   clusterIds = focusedIds.length > 1 ? focusedIds : [],
   focusedRelationById = {},
+  interactive = true,
 }: {
   scene: OrrerySceneSnapshot;
   pose: SharedValue<CameraPose>;
@@ -208,6 +213,7 @@ export function OrreryWorld({
   clusterIds?: number[];
   /** Already-filtered, existing relation context only; supplied by focus/moon owner. */
   focusedRelationById?: Readonly<Record<number, string>>;
+  interactive?: boolean;
 }) {
   const { fontScale } = useWindowDimensions();
   const reducedMotion = useReducedMotionShared();
@@ -281,12 +287,13 @@ export function OrreryWorld({
         panStart,
         extent: scene.extent,
         send: onIntent,
+        enabled: interactive,
         stop: () => {
           "worklet";
           cancelAnimation(pose);
         },
       }),
-    [pose, frame, panStart, scene.extent, onIntent],
+    [pose, frame, panStart, scene.extent, onIntent, interactive],
   );
   const starColors = useMemo(
     () => [colors.textSecondary, colors.textPrimary, ...colors.starPalette],

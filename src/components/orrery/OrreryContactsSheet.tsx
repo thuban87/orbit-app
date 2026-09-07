@@ -1,0 +1,109 @@
+// biome-ignore-all lint/a11y/useValidAriaRole: AppText uses semantic typography roles.
+import {
+  ScrollView,
+  StyleSheet,
+  useWindowDimensions,
+  View,
+} from "react-native";
+import { AppText } from "@/components/ui/AppText";
+import { Button } from "@/components/ui/Button";
+import { Sheet } from "@/components/ui/Sheet";
+import { ALL_CONTACTS_SYSTEM } from "@/logic/orrery-system-logic";
+import type { OrrerySystemState } from "@/stores/orrery-system-store";
+import { SPACING } from "@/theme/tokens/spacing";
+import { systemEmptyCopy } from "./orrery-controls-logic";
+
+/** Current System truth and basic actions; Plan 08 expands row media/context. */
+export function OrreryContactsSheet({
+  visible,
+  state,
+  measured,
+  onClose,
+  onAction,
+}: {
+  visible: boolean;
+  state: OrrerySystemState;
+  measured: boolean;
+  onClose: () => void;
+  onAction: (kind: "focus" | "profile", id: number) => void;
+}) {
+  const { height } = useWindowDimensions();
+  const scene = state.snapshot;
+  const empty = state.status === "ready" && scene?.contacts.length === 0;
+  const qualifyingSun = !!scene?.systemSnapshot.members.some(
+    (member) => member.id === scene.systemSnapshot.resolvedSunIdentity?.id,
+  );
+  const emptyCopy = systemEmptyCopy(
+    state.requested.name,
+    state.requested.id === "builtin:all-contacts",
+    qualifyingSun,
+  );
+  return (
+    <Sheet visible={visible} onRequestClose={onClose} variant="detail">
+      <ScrollView
+        style={{ maxHeight: height * 0.45 }}
+        contentContainerStyle={styles.content}
+      >
+        <AppText role="heading">Contacts in this System</AppText>
+        <AppText>{state.requested.name}</AppText>
+        {state.status === "initial" || state.status === "loading" ? (
+          <AppText>Loading contacts…</AppText>
+        ) : null}
+        {state.status === "error" || state.status === "stale" ? (
+          <>
+            <AppText>
+              {state.status === "stale"
+                ? "Couldn't refresh this System. Showing the last loaded contacts."
+                : "Couldn't load this System. Try loading it again."}
+            </AppText>
+            <Button
+              role="secondary"
+              label="Reload System"
+              onPress={() => void state.reload()}
+            />
+          </>
+        ) : null}
+        {state.status === "missing-category" ? (
+          <>
+            <AppText>This System is no longer available.</AppText>
+            <Button
+              role="secondary"
+              label="Show All Contacts"
+              onPress={() => void state.select(ALL_CONTACTS_SYSTEM)}
+            />
+          </>
+        ) : null}
+        {empty ? (
+          <>
+            <AppText role="heading">{emptyCopy.heading}</AppText>
+            <AppText>{emptyCopy.body}</AppText>
+          </>
+        ) : null}
+        {scene?.systemSnapshot.members.map((member) => (
+          <View key={member.uid} style={styles.row}>
+            <AppText>{member.name}</AppText>
+            <Button
+              role="secondary"
+              label="Focus in Orrery"
+              accessibilityLabel={`Focus in Orrery: ${member.name}`}
+              disabled={state.status !== "ready" || !measured}
+              onPress={() => onAction("focus", member.id)}
+            />
+            <Button
+              role="secondary"
+              label="Open Profile"
+              accessibilityLabel={`Open Profile: ${member.name}`}
+              disabled={state.status !== "ready"}
+              onPress={() => onAction("profile", member.id)}
+            />
+          </View>
+        ))}
+        <Button role="secondary" label="Close contact list" onPress={onClose} />
+      </ScrollView>
+    </Sheet>
+  );
+}
+const styles = StyleSheet.create({
+  content: { gap: SPACING.base },
+  row: { gap: SPACING.sm },
+});

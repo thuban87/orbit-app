@@ -18,6 +18,7 @@ import type { OrrerySystemState } from "@/stores/orrery-system-store";
 import { shellTransientStore } from "@/stores/shell-transient-store";
 import { useTheme } from "@/theme";
 import { SPACING } from "@/theme/tokens/spacing";
+import { OrreryObstacle } from "./OrreryObstacle";
 import {
   buildSystemChoices,
   registerSystemSelectorTransient,
@@ -43,6 +44,9 @@ export function OrrerySystemSelector({
   const latest = useRef(dismiss);
   latest.current = dismiss;
   const busy = state.status === "initial" || state.status === "loading";
+  const blocked = shellTransientStore((store) =>
+    store.entries.some((entry) => entry.id !== "orrery-system-selector"),
+  );
   const rows = buildSystemChoices(state.categories);
   useEffect(() => {
     if (!open) return;
@@ -76,7 +80,9 @@ export function OrrerySystemSelector({
   const top = SPACING.base + height + SPACING.sm;
   return (
     <View
-      pointerEvents="box-none"
+      pointerEvents={blocked ? "none" : "box-none"}
+      importantForAccessibility={blocked ? "no-hide-descendants" : "auto"}
+      accessibilityElementsHidden={blocked}
       style={[
         styles.root,
         { zIndex: open ? 30 : 10, elevation: open ? 30 : 10 },
@@ -90,7 +96,8 @@ export function OrrerySystemSelector({
           onPress={dismiss}
         />
       ) : null}
-      <View
+      <OrreryObstacle
+        obstacleId="orrery-system-trigger"
         style={styles.trigger}
         onLayout={(event) => setHeight(event.nativeEvent.layout.height)}
       >
@@ -115,9 +122,13 @@ export function OrrerySystemSelector({
             <Icon name="chevron-down" size="sm" />
           </Pressable>
         </GlassSurface>
-      </View>
+      </OrreryObstacle>
       {open ? (
-        <View style={[styles.panel, { top }]} accessibilityViewIsModal>
+        <OrreryObstacle
+          obstacleId="orrery-system-panel"
+          style={[styles.panel, { top }]}
+          accessibilityViewIsModal
+        >
           <GlassSurface density="dense">
             <ScrollView
               style={{
@@ -190,7 +201,7 @@ export function OrrerySystemSelector({
               />
             </ScrollView>
           </GlassSurface>
-        </View>
+        </OrreryObstacle>
       ) : null}
     </View>
   );

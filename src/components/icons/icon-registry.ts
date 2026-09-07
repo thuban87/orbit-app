@@ -49,6 +49,8 @@ export const ICON_REGISTRY = {
   "your-week": { outline: "calendar-outline", filled: "calendar" },
   "group-events": { outline: "people-outline", filled: "people" },
   "chevron-down": { outline: "chevron-down", filled: "chevron-down" },
+  recenter: { outline: "locate-outline", filled: "locate" },
+  north: { outline: "compass-outline", filled: "compass" },
 
   // ---- Dashboard Card View actions and selection -----------------------
   select: { outline: "ellipse-outline", filled: "checkmark-circle" },

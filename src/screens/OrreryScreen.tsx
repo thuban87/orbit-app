@@ -8,17 +8,26 @@ import {
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useFonts } from "@shopify/react-native-skia";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { AppState, ScrollView, StyleSheet, View } from "react-native";
+import { AppState, StyleSheet, View } from "react-native";
 import {
   cancelAnimation,
   useSharedValue,
   withTiming,
 } from "react-native-reanimated";
+import { OrreryContactsSheet } from "@/components/orrery/OrreryContactsSheet";
+import {
+  ORRERY_CONTROLS_OBSTACLE,
+  OrreryControls,
+} from "@/components/orrery/OrreryControls";
+import { OrreryFeedback } from "@/components/orrery/OrreryFeedback";
 import { OrrerySystemSelector } from "@/components/orrery/OrrerySystemSelector";
 import { OrreryViewOptions } from "@/components/orrery/OrreryViewOptions";
 import { OrreryWorld } from "@/components/orrery/OrreryWorld";
 import { systemEmptyCopy } from "@/components/orrery/orrery-controls-logic";
-import { canvasViewport } from "@/components/orrery/orrery-obstacle-logic";
+import {
+  canvasViewport,
+  resetNorthPose,
+} from "@/components/orrery/orrery-obstacle-logic";
 import { ShellAppBar } from "@/components/ShellAppBar";
 import { AppText } from "@/components/ui/AppText";
 import { Button } from "@/components/ui/Button";
@@ -30,6 +39,7 @@ import {
   FOCUS_MS,
   frameBodies,
   HOME_CAMERA,
+  IDENTITY_ZOOM,
   usableCameraRect,
 } from "@/logic/orrery-camera-logic";
 import {
@@ -51,12 +61,33 @@ import {
   useShellObstacleStore,
 } from "@/stores/shell-obstacle-store";
 import { useShellRefresh } from "@/stores/shell-refresh-store";
+import { shellTransientStore } from "@/stores/shell-transient-store";
 import { useTheme } from "@/theme";
 import { SPACING } from "@/theme/tokens/spacing";
 import { useReducedMotionShared } from "@/theme/use-reduced-motion";
 
 export function OrreryScreen() {
   const { colors } = useTheme();
+  const [contactsOpen, setContactsOpen] = useState(false);
+  const restoreContactsFocus = useRef<(() => void) | null>(null);
+  const overlaysOpen = shellTransientStore((store) => store.entries.length > 0);
+  const closeContacts = useCallback((restore = true) => {
+    setContactsOpen(false);
+    shellTransientStore.getState().closeTransient("orrery-contacts");
+    if (restore) requestAnimationFrame(() => restoreContactsFocus.current?.());
+  }, []);
+  const openContacts = useCallback((restore: () => void) => {
+    restoreContactsFocus.current = restore;
+    setContactsOpen(true);
+  }, []);
+  useEffect(() => {
+    if (!contactsOpen) return;
+    shellTransientStore
+      .getState()
+      .openTransient("orrery-contacts", closeContacts);
+    return () =>
+      shellTransientStore.getState().closeTransient("orrery-contacts");
+  }, [contactsOpen, closeContacts]);
   const navigation =
     useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const fontProvider = useFonts({
@@ -80,6 +111,16 @@ export function OrreryScreen() {
   );
   const viewport = useMemo(
     () => canvasViewport(canvasRect, Object.values(obstacles)),
+    [canvasRect, obstacles],
+  );
+  const controlsViewport = useMemo(
+    () =>
+      canvasViewport(
+        canvasRect,
+        Object.entries(obstacles)
+          .filter(([key]) => key !== ORRERY_CONTROLS_OBSTACLE)
+          .map(([, rect]) => rect),
+      ),
     [canvasRect, obstacles],
   );
   const preferences = useOrreryPreferencesStore((store) => store.committed);
@@ -125,6 +166,9 @@ export function OrreryScreen() {
   const [appActive, setAppActive] = useState(
     AppState.currentState === "active",
   );
+  useEffect(() => {
+    if (!isFocused || !appActive) closeContacts(false);
+  }, [isFocused, appActive, closeContacts]);
   useEffect(() => {
     const subscription = AppState.addEventListener("change", (value) =>
       setAppActive(value === "active"),
@@ -182,9 +226,18 @@ export function OrreryScreen() {
       const framing = frameBodies(bodies, viewport, scene.extent, pose.value);
       if (!framing) return;
       cancelAnimation(pose);
-      pose.value = withTiming(framing.pose, {
-        duration: reducedMotion.value ? 100 : FOCUS_MS,
-      });
+      pose.value = withTiming(
+        {
+          ...framing.pose,
+          zoom:
+            ids.length === 1
+              ? Math.min(IDENTITY_ZOOM, framing.pose.zoom)
+              : framing.pose.zoom,
+        },
+        {
+          duration: reducedMotion.value ? 100 : FOCUS_MS,
+        },
+      );
     },
     [useSystemStore, pose, reducedMotion, viewport],
   );
@@ -220,11 +273,25 @@ export function OrreryScreen() {
         ? frameBodies(focusedBodies, viewport, scene.extent, pose.value)?.pose
         : deriveHomePose(scene.world, viewport);
     if (!home) return; // Preserve the previous valid pose through zero measurement.
+    if (focusedBodies.length === 1)
+      home.zoom = Math.min(IDENTITY_ZOOM, home.zoom);
     lastHomeFrame.current = key;
     cancelAnimation(pose);
     pose.value = home;
   }, [scene, state.status, viewport, pose, focusedIds]);
   const measured = usableCameraRect(viewport) !== null;
+  const recenter = () => {
+    const home = deriveHomePose(state.snapshot?.world ?? [], viewport);
+    if (!home) return;
+    cancelAnimation(pose);
+    pose.value = home;
+    setFocusedIds([]);
+  };
+  const resetNorth = () => {
+    if (!measured) return;
+    cancelAnimation(pose);
+    pose.value = resetNorthPose(pose.value);
+  };
   const visible = measured && isFocused && appActive;
   const empty = state.status === "ready" && scene?.contacts.length === 0;
   const qualifyingSun = !!scene?.systemSnapshot.members.some(
@@ -260,6 +327,7 @@ export function OrreryScreen() {
             fontProvider={fontProvider}
             onIntent={onIntent}
             focusedIds={focusedIds}
+            interactive={!overlaysOpen}
           />
         ) : null}
         <OrrerySystemSelector
@@ -268,18 +336,29 @@ export function OrreryScreen() {
           enabled={hydrated}
         />
         <OrreryViewOptions availableHeight={viewport.height} />
+        <OrreryControls
+          viewport={controlsViewport}
+          measured={measured}
+          blocked={overlaysOpen}
+          pose={pose}
+          onContacts={openContacts}
+          onRecenter={recenter}
+          onResetNorth={resetNorth}
+        />
         {(state.status === "loading" || state.status === "initial") &&
         !scene &&
         hydration !== "error" ? (
-          <ScrollView
+          <OrreryFeedback
+            obstacleId="orrery-loading-feedback"
             style={[styles.feedback, { backgroundColor: colors.surface }]}
             contentContainerStyle={styles.feedbackContent}
           >
             <AppText>Loading your Orrery…</AppText>
-          </ScrollView>
+          </OrreryFeedback>
         ) : null}
         {state.status === "error" || state.status === "stale" ? (
-          <ScrollView
+          <OrreryFeedback
+            obstacleId="orrery-read-feedback"
             style={[styles.feedback, { backgroundColor: colors.surface }]}
             contentContainerStyle={styles.feedbackContent}
           >
@@ -289,10 +368,11 @@ export function OrreryScreen() {
                 : "Couldn't load this System. Try loading it again."}
             </AppText>
             <Button role="secondary" label="Reload System" onPress={reload} />
-          </ScrollView>
+          </OrreryFeedback>
         ) : null}
         {state.status === "missing-category" ? (
-          <ScrollView
+          <OrreryFeedback
+            obstacleId="orrery-missing-feedback"
             style={[styles.feedback, { backgroundColor: colors.surface }]}
             contentContainerStyle={styles.feedbackContent}
           >
@@ -303,10 +383,11 @@ export function OrreryScreen() {
               label="Show All Contacts"
               onPress={showAll}
             />
-          </ScrollView>
+          </OrreryFeedback>
         ) : null}
         {state.persistence === "error" && state.status === "ready" ? (
-          <ScrollView
+          <OrreryFeedback
+            obstacleId="orrery-save-feedback"
             style={[styles.saveFeedback, { backgroundColor: colors.surface }]}
             contentContainerStyle={styles.feedbackContent}
           >
@@ -318,10 +399,11 @@ export function OrreryScreen() {
               label="Retry view change"
               onPress={() => void state.retryPersistence()}
             />
-          </ScrollView>
+          </OrreryFeedback>
         ) : null}
         {hydration === "error" && !hydrated ? (
-          <ScrollView
+          <OrreryFeedback
+            obstacleId="orrery-settings-feedback"
             style={[styles.feedback, { backgroundColor: colors.surface }]}
             contentContainerStyle={styles.feedbackContent}
           >
@@ -333,10 +415,11 @@ export function OrreryScreen() {
               label="Reload view options"
               onPress={() => void hydratePreferences(getExecutor())}
             />
-          </ScrollView>
+          </OrreryFeedback>
         ) : null}
         {empty ? (
-          <ScrollView
+          <OrreryFeedback
+            obstacleId="orrery-empty-feedback"
             testID="orrery-empty"
             style={[styles.feedback, { backgroundColor: colors.surface }]}
             contentContainerStyle={styles.feedbackContent}
@@ -360,9 +443,21 @@ export function OrreryScreen() {
                 }
               />
             ) : null}
-          </ScrollView>
+          </OrreryFeedback>
         ) : null}
       </View>
+      <OrreryContactsSheet
+        visible={contactsOpen}
+        state={state}
+        measured={measured}
+        onClose={() => closeContacts()}
+        onAction={(kind, id) => {
+          const snapshot = state.current();
+          if (!snapshot) return;
+          closeContacts(kind === "focus");
+          void onIntent({ kind, ids: [id], generation: snapshot.generation });
+        }}
+      />
     </View>
   );
 }

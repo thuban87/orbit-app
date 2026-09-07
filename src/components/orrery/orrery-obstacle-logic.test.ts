@@ -9,7 +9,14 @@ import {
   createShellObstacleStore,
   createWindowMeasurement,
 } from "@/stores/shell-obstacle-store";
-import { canvasViewport, controlsRegion, cameraControlState, northOrientation, resetNorthPose, polarisWorldPoint } from "./orrery-obstacle-logic";
+import {
+  cameraControlState,
+  canvasViewport,
+  controlsRegion,
+  northOrientation,
+  polarisWorldPoint,
+  resetNorthPose,
+} from "./orrery-obstacle-logic";
 
 describe("measured shell obstacles", () => {
   it("updates keyed rectangles without duplicate publications and removes invalid bounds", () => {
@@ -114,37 +121,76 @@ describe("measured shell obstacles", () => {
 
 describe("reachable camera controls", () => {
   it("reserves the bottom-right column above FAB and tabs with 16 edge and 8 obstacle gaps", () => {
-    const region = controlsRegion({ width: 400, height: 700, obstacles: [
-      { x: 0, y: 640, width: 400, height: 60 },
-      { x: 324, y: 568, width: 56, height: 56 },
-      { x: 220, y: 16, width: 164, height: 60 },
-    ] });
+    const region = controlsRegion({
+      width: 400,
+      height: 700,
+      obstacles: [
+        { x: 0, y: 640, width: 400, height: 60 },
+        { x: 324, y: 568, width: 56, height: 56 },
+        { x: 220, y: 16, width: 164, height: 60 },
+      ],
+    });
     expect(region).toEqual({ x: 184, y: 84, width: 200, height: 476 });
     expect(region!.x + region!.width).toBe(384);
   });
   it("makes large-text controls scroll within the actual free column and rejects unavailable bounds", () => {
-    expect(controlsRegion({ width: 160, height: 300, obstacles: [{ x: 0, y: 240, width: 160, height: 60 }] })).toEqual({ x: 16, y: 16, width: 128, height: 216 });
+    expect(
+      controlsRegion({
+        width: 160,
+        height: 300,
+        obstacles: [{ x: 0, y: 240, width: 160, height: 60 }],
+      }),
+    ).toEqual({ x: 16, y: 16, width: 128, height: 216 });
     expect(controlsRegion({ width: 400, height: 0 })).toBeNull();
     expect(controlsRegion({ width: 40, height: 700 })).toBeNull();
-    expect(controlsRegion({ width: 400, height: 700, obstacles: [{ x: 0, y: 0, width: 400, height: 700 }] })).toBeNull();
+    expect(
+      controlsRegion({
+        width: 400,
+        height: 700,
+        obstacles: [{ x: 0, y: 0, width: 400, height: 700 }],
+      }),
+    ).toBeNull();
   });
   it("enables Contacts during initial/load/error and guards only camera recovery before measurement", () => {
-    expect(cameraControlState(false)).toEqual({ contactsDisabled: false, recenterDisabled: true, northDisabled: true });
-    expect(cameraControlState(true)).toEqual({ contactsDisabled: false, recenterDisabled: false, northDisabled: false });
+    expect(cameraControlState(false)).toEqual({
+      contactsDisabled: false,
+      recenterDisabled: true,
+      northDisabled: true,
+    });
+    expect(cameraControlState(true)).toEqual({
+      contactsDisabled: false,
+      recenterDisabled: false,
+      northDisabled: false,
+    });
     expect(northOrientation(Math.PI / 2, false)).toBeUndefined();
     expect(northOrientation(Math.PI / 2, true)).toBe("90 degrees from north");
     expect(northOrientation(-Math.PI / 2, true)).toBe("270 degrees from north");
     expect(northOrientation(NaN, true)).toBeUndefined();
   });
   it("resets yaw alone and keeps Polaris a world landmark even without contacts", () => {
-    const pose = { x: 45, y: -20, zoom: 2, tilt: 0.4, yaw: 1, focalDistance: 1200 };
+    const pose = {
+      x: 45,
+      y: -20,
+      zoom: 2,
+      tilt: 0.4,
+      yaw: 1,
+      focalDistance: 1200,
+    };
     expect(resetNorthPose(pose)).toEqual({ ...pose, yaw: 0 });
     const point = polarisWorldPoint(1);
     expect(point.x).toBe(0);
     expect(point.y).toBeLessThan(0);
     const viewport = { width: 400, height: 600 };
-    const north = projectWorldPoint(point, deriveHomePose([], viewport)!, viewport);
-    const east = projectWorldPoint(point, { ...deriveHomePose([], viewport)!, yaw: Math.PI / 2 }, viewport);
+    const north = projectWorldPoint(
+      point,
+      deriveHomePose([], viewport)!,
+      viewport,
+    );
+    const east = projectWorldPoint(
+      point,
+      { ...deriveHomePose([], viewport)!, yaw: Math.PI / 2 },
+      viewport,
+    );
     expect(north.y).toBeLessThan(300);
     expect(east.x).toBeGreaterThan(200);
   });

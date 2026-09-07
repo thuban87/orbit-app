@@ -20,6 +20,7 @@ import { useOrreryPreferencesStore } from "@/stores/orrery-preferences-store";
 import { shellTransientStore } from "@/stores/shell-transient-store";
 import { useTheme } from "@/theme";
 import { SPACING } from "@/theme/tokens/spacing";
+import { OrreryObstacle } from "./OrreryObstacle";
 
 const LABELS = {
   spacious: "Spacious",
@@ -37,6 +38,9 @@ export function OrreryViewOptions({
   const preferences = useOrreryPreferencesStore();
   const { colors } = useTheme();
   const focused = useIsFocused();
+  const blocked = shellTransientStore((store) =>
+    store.entries.some((entry) => entry.id !== TRANSIENT_ID),
+  );
   const [open, setOpen] = useState(false);
   const [triggerHeight, setTriggerHeight] = useState(44);
   const trigger = useRef<View>(null);
@@ -77,7 +81,12 @@ export function OrreryViewOptions({
   const disabled = busy || !preferences.hydrated;
   const panelTop = SPACING.base + triggerHeight + SPACING.sm;
   return (
-    <View pointerEvents="box-none" style={styles.root}>
+    <View
+      pointerEvents={blocked ? "none" : "box-none"}
+      importantForAccessibility={blocked ? "no-hide-descendants" : "auto"}
+      accessibilityElementsHidden={blocked}
+      style={styles.root}
+    >
       {open ? (
         <Pressable
           style={StyleSheet.absoluteFill}
@@ -86,7 +95,8 @@ export function OrreryViewOptions({
           onPress={dismiss}
         />
       ) : null}
-      <View
+      <OrreryObstacle
+        obstacleId="orrery-view-trigger"
         style={styles.trigger}
         onLayout={(event) => setTriggerHeight(event.nativeEvent.layout.height)}
       >
@@ -102,9 +112,10 @@ export function OrreryViewOptions({
             <AppText role="label">View options</AppText>
           </Pressable>
         </GlassSurface>
-      </View>
+      </OrreryObstacle>
       {open ? (
-        <View
+        <OrreryObstacle
+          obstacleId="orrery-view-panel"
           style={[styles.panel, { top: panelTop }]}
           accessibilityViewIsModal
         >
@@ -213,7 +224,7 @@ export function OrreryViewOptions({
               />
             </ScrollView>
           </GlassSurface>
-        </View>
+        </OrreryObstacle>
       ) : null}
     </View>
   );
