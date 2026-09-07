@@ -17,6 +17,7 @@ import {
 import {
   ALL_CONTACTS_SYSTEM,
   type OrrerySystemRef,
+  systemRefId,
 } from "@/logic/orrery-system-logic";
 import type { SunOccupantLookup } from "@/logic/sun-occupant-logic";
 import type { OrreryPreferences } from "@/stores/orrery-preferences-store";
@@ -179,10 +180,22 @@ export function createOrreryIntentDispatcher(adapters: {
       adapters.current()?.generation !== intent.generation
     )
       return;
+    const current = adapters.current();
+    if (!current || systemRefId(current.system) !== systemRefId(fresh.system))
+      return;
+    const identity = (scene: OrrerySceneSnapshot, id: number) =>
+      scene.systemSnapshot.members.find((row) => row.id === id)?.uid ??
+      (scene.systemSnapshot.resolvedSunIdentity?.id === id
+        ? scene.systemSnapshot.resolvedSunIdentity.uid
+        : undefined);
     if (
       intent.ids.length === 0 ||
       intent.ids.some(
-        (id) => id <= 0 || !fresh.world.some((body) => body.id === id),
+        (id) =>
+          id <= 0 ||
+          !fresh.world.some((body) => body.id === id) ||
+          identity(current, id) === undefined ||
+          identity(current, id) !== identity(fresh, id),
       )
     )
       return;

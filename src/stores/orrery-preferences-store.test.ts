@@ -32,6 +32,20 @@ function fixture() {
   return { store, read, write };
 }
 describe("Orrery preferences commit-before-publish", () => {
+  it("a successful System return to the saved choice supersedes a failed destination intent", async () => {
+    const { store, write } = fixture();
+    await store.getState().hydrate(exec);
+    write.mockRejectedValueOnce(new Error("disk"));
+    await store.getState().save(exec, { lastSystem: "builtin:favorites" });
+    await store.getState().save(exec, { lastSystem: "builtin:all-contacts" });
+    expect(store.getState()).toMatchObject({
+      committed: defaults,
+      pendingIntent: null,
+      saveError: false,
+    });
+    await store.getState().retry(exec);
+    expect(store.getState().committed.lastSystem).toBe("builtin:all-contacts");
+  });
   it("a hydration started during a write cannot publish its precommit snapshot", async () => {
     const { store, read, write } = fixture();
     await store.getState().hydrate(exec);

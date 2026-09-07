@@ -7,7 +7,7 @@ import {
 } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useFonts } from "@shopify/react-native-skia";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   AppState,
   type LayoutChangeEvent,
@@ -32,14 +32,18 @@ import {
   HOME_CAMERA,
   IDENTITY_ZOOM,
 } from "@/logic/orrery-camera-logic";
+import {
+  ALL_CONTACTS_SYSTEM,
+  parseSystemRef,
+  systemRefId,
+} from "@/logic/orrery-system-logic";
 import type { RootStackParamList } from "@/navigation/types";
 import {
   createOrreryIntentDispatcher,
-  createOrrerySceneController,
   loadOrreryScene,
-  type OrreryLoadState,
 } from "@/services/orrery-scene";
 import { useOrreryPreferencesStore } from "@/stores/orrery-preferences-store";
+import { createOrrerySystemStore } from "@/stores/orrery-system-store";
 import { useShellRefresh } from "@/stores/shell-refresh-store";
 import { useTheme } from "@/theme";
 import { SPACING } from "@/theme/tokens/spacing";
@@ -52,10 +56,6 @@ export function OrreryScreen() {
   const fontProvider = useFonts({
     Inter: [require("../../assets/Inter-SemiBold.ttf")],
   });
-  const [state, setState] = useState<OrreryLoadState>({
-    status: "loading",
-    snapshot: null,
-  });
   const [viewport, setViewport] = useState({ width: 0, height: 0 });
   const preferences = useOrreryPreferencesStore((store) => store.committed);
   const hydratePreferences = useOrreryPreferencesStore(
@@ -64,14 +64,29 @@ export function OrreryScreen() {
   const [focusedIds, setFocusedIds] = useState<number[]>([]);
   const pose = useSharedValue<CameraPose>({ ...HOME_CAMERA });
   const reducedMotion = useReducedMotionShared();
-  const controller = useMemo(
+  const useSystemStore = useMemo(
     () =>
-      createOrrerySceneController(
-        (generation) => loadOrreryScene(getExecutor(), generation),
-        setState,
-      ),
+      createOrrerySystemStore({
+        load: (system, generation) =>
+          loadOrreryScene(getExecutor(), generation, system),
+        persist: async (system) => {
+          const store = useOrreryPreferencesStore.getState();
+          const id = systemRefId(system);
+          if (store.saveError && store.pendingIntent?.lastSystem === id)
+            await store.retry(getExecutor());
+          else await store.save(getExecutor(), { lastSystem: id });
+          const latest = useOrreryPreferencesStore.getState();
+          return (
+            latest.hydrated &&
+            !latest.saveError &&
+            latest.committed.lastSystem === systemRefId(system)
+          );
+        },
+      }),
     [],
   );
+  const state = useSystemStore();
+  const initialized = useRef(false);
   const isFocused = useIsFocused();
   const [appActive, setAppActive] = useState(
     AppState.currentState === "active",
@@ -84,30 +99,47 @@ export function OrreryScreen() {
   }, []);
   useFocusEffect(
     useCallback(() => {
-      if (appActive) void controller.reload();
+      let cancelled = false;
+      if (appActive)
+        void (async () => {
+          await hydratePreferences(getExecutor());
+          if (cancelled) return;
+          const pref = useOrreryPreferencesStore.getState();
+          if (!pref.hydrated) return;
+          if (!initialized.current) {
+            initialized.current = true;
+            await useSystemStore
+              .getState()
+              .select(
+                parseSystemRef(pref.committed.lastSystem) ??
+                  ALL_CONTACTS_SYSTEM,
+              );
+          } else await useSystemStore.getState().reload();
+        })();
       return () => {
-        controller.cancel();
+        cancelled = true;
+        useSystemStore.getState().cancel();
         cancelAnimation(pose);
       };
-    }, [controller, appActive, pose]),
+    }, [useSystemStore, hydratePreferences, appActive, pose]),
   );
   const reload = useCallback(() => {
-    if (isFocused && appActive) void controller.reload();
-  }, [controller, isFocused, appActive]);
+    if (isFocused && appActive && initialized.current)
+      void useSystemStore.getState().reload();
+  }, [useSystemStore, isFocused, appActive]);
   useShellRefresh(reload);
-  useFocusEffect(
-    useCallback(() => {
-      if (appActive) void hydratePreferences(getExecutor());
-    }, [hydratePreferences, appActive]),
-  );
+  const presentation = `${preferences.density}:${preferences.satellitesEnabled}`;
+  const lastPresentation = useRef(presentation);
   useEffect(() => {
-    // Changes here are discrete committed preferences, never camera frames.
-    if (preferences) reload();
-  }, [preferences, reload]);
+    if (lastPresentation.current !== presentation) {
+      lastPresentation.current = presentation;
+      reload();
+    }
+  }, [presentation, reload]);
 
   const focus = useCallback(
     (ids: number[]) => {
-      const scene = controller.current();
+      const scene = useSystemStore.getState().current();
       if (!scene) return;
       const bodies = scene.world.filter((body) => ids.includes(body.id));
       if (bodies.length === 0) return;
@@ -120,20 +152,25 @@ export function OrreryScreen() {
         { duration: reducedMotion.value ? 100 : FOCUS_MS },
       );
     },
-    [controller, pose, reducedMotion],
+    [useSystemStore, pose, reducedMotion],
   );
   const onIntent = useMemo(
     () =>
       createOrreryIntentDispatcher({
-        current: controller.current,
-        validate: () => loadOrreryScene(getExecutor()),
+        current: () => useSystemStore.getState().current(),
+        validate: () =>
+          loadOrreryScene(
+            getExecutor(),
+            0,
+            useSystemStore.getState().requested.ref,
+          ),
         focus,
         group: focus,
         clear: () => setFocusedIds([]),
         openProfile: (contactId) =>
           navigation.navigate("Profile", { contactId }),
       }),
-    [controller, focus, navigation],
+    [useSystemStore, focus, navigation],
   );
   const onLayout = useCallback((event: LayoutChangeEvent) => {
     const { width, height } = event.nativeEvent.layout;
@@ -184,7 +221,7 @@ export function OrreryScreen() {
             <AppText>Loading your Orrery…</AppText>
           </View>
         ) : null}
-        {state.status === "error" ? (
+        {state.status === "error" || state.status === "stale" ? (
           <View style={styles.feedback}>
             <AppText>
               {scene

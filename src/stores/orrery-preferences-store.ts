@@ -143,7 +143,11 @@ export function createOrreryPreferencesStore(
           if (
             intent[key] !== undefined &&
             intent[key] !== desired[key] &&
-            (get().saving || intent[key] !== get().committed[key])
+            // A loaded System is usable before its preference saves. Returning
+            // to the durable System must supersede a failed destination intent.
+            (key === "lastSystem" ||
+              get().saving ||
+              intent[key] !== get().committed[key])
           )
             Object.assign(changed, { [key]: intent[key] });
         if (Object.keys(changed).length === 0)
