@@ -3,14 +3,17 @@ import { describe, expect, it, vi } from "vitest";
 import { HOME_CAMERA } from "@/logic/orrery-camera-logic";
 import type { OrrerySystemState } from "@/stores/orrery-system-store";
 import { THEME_PRESETS } from "@/theme/theme-presets";
+import { OrreryClusterPanel } from "./OrreryClusterPanel";
 import { OrreryContactsSheet } from "./OrreryContactsSheet";
 import { OrreryControls } from "./OrreryControls";
+import { OrreryFocusContext } from "./OrreryFocusContext";
 
 const native = vi.hoisted(() => ({ announce: vi.fn(), focus: vi.fn() }));
 vi.mock("react", async (original) => ({
   ...(await original<typeof import("react")>()),
   useRef: (value: unknown) => ({ current: value }),
   useEffect: () => {},
+  useState: (value: unknown) => [value, () => {}],
 }));
 vi.mock("react-native", () => ({
   View: "View",
@@ -27,14 +30,21 @@ vi.mock("react-native", () => ({
   findNodeHandle: () => 7,
 }));
 vi.mock("react-native-reanimated", () => ({
-  default: { createAnimatedComponent: (component: unknown) => component },
+  default: {
+    View: "AnimatedView",
+    ScrollView: "ScrollView",
+    createAnimatedComponent: (component: unknown) => component,
+  },
+  useAnimatedStyle: (fn: () => unknown) => fn(),
   useAnimatedProps: (fn: () => unknown) => ({
     get value() {
       return fn();
     },
   }),
 }));
+vi.mock("@react-navigation/native", () => ({ useIsFocused: () => true }));
 vi.mock("expo-blur", () => ({ BlurView: "BlurView" }));
+vi.mock("@/components/Avatar", () => ({ Avatar: "Avatar" }));
 vi.mock("react-native-safe-area-context", () => ({
   SafeAreaView: "SafeAreaView",
 }));
@@ -230,6 +240,11 @@ describe("actual Orrery controls and detail sheet", () => {
       ),
     );
     expect(nodes.filter((node) => node.text === name)).toHaveLength(1);
+    expect(
+      nodes
+        .filter((node) => node.type === "Avatar")
+        .map((node) => node.props.contactId),
+    ).toEqual(["sun", "other"]);
     const buttons = nodes.filter((node) =>
       String(node.props.accessibilityLabel).startsWith("Open Profile:"),
     );
@@ -247,5 +262,73 @@ describe("actual Orrery controls and detail sheet", () => {
       ["profile", 3],
       ["focus", 3],
     ]);
+  });
+  it("renders a nonmodal group with wrapping identity, bounded scroll and independent focus/Profile actions", () => {
+    const target = { kind: "contact-sun" as const, id: 3, uid: "sun" };
+    const action = vi.fn();
+    const close = vi.fn();
+    const scene = {
+      systemSnapshot: { members: [] },
+      sun: { sunContactName: "Outside sun" },
+    } as never;
+    const nodes = all(
+      resolve(
+        OrreryClusterPanel({
+          targets: [target],
+          scene,
+          viewport: { width: 400, height: 700 },
+          stale: true,
+          blocked: false,
+          onClose: close,
+          onAction: action,
+          onReload: vi.fn(),
+        }),
+      ),
+    );
+    expect(nodes.some((node) => node.type === "Modal")).toBe(false);
+    expect(nodes.map((node) => node.text).join(" ")).toContain("1 contact");
+    expect(
+      nodes.find((node) => node.type === "ScrollView")?.props.style,
+    ).toEqual({ maxHeight: 280 });
+    const profile = nodes.find(
+      (node) => node.props.accessibilityLabel === "Open Profile: Outside sun",
+    );
+    if (!profile) throw new Error("Missing group Profile action");
+    (profile.props.onPress as () => void)();
+    expect(action).toHaveBeenCalledWith("profile", target);
+    expect(nodes[0].props.pointerEvents).toBe("auto");
+  });
+  it("keeps focused identity and dismissal available while optional context loads or fails", () => {
+    for (const contextState of ["loading", "error"] as const) {
+      const nodes = all(
+        resolve(
+          OrreryFocusContext({
+            target: { kind: "member", id: 1, uid: "a" },
+            name: "Full identity",
+            frame: { value: null } as never,
+            blocked: false,
+            onClear: vi.fn(),
+            onProfile: vi.fn(),
+            contextState,
+            onReloadContext: vi.fn(),
+          }),
+        ),
+      );
+      expect(nodes.map((node) => node.text)).toContain("Full identity");
+      expect(
+        nodes.some((node) => node.props.accessibilityLabel === "Clear focus"),
+      ).toBe(true);
+      expect(
+        nodes.some(
+          (node) =>
+            node.props.accessibilityLabel === "Open Profile: Full identity",
+        ),
+      ).toBe(true);
+      expect(
+        nodes.some(
+          (node) => node.props.accessibilityLabel === "Reload satellites",
+        ),
+      ).toBe(contextState === "error");
+    }
   });
 });

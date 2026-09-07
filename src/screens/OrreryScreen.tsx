@@ -24,9 +24,11 @@ import {
   OrreryControls,
 } from "@/components/orrery/OrreryControls";
 import { OrreryFeedback } from "@/components/orrery/OrreryFeedback";
+import { OrreryFocusContext } from "@/components/orrery/OrreryFocusContext";
 import { OrrerySystemSelector } from "@/components/orrery/OrrerySystemSelector";
 import { OrreryViewOptions } from "@/components/orrery/OrreryViewOptions";
 import { OrreryWorld } from "@/components/orrery/OrreryWorld";
+import { companionAction } from "@/components/orrery/orrery-companion-logic";
 import { systemEmptyCopy } from "@/components/orrery/orrery-controls-logic";
 import { canvasViewport } from "@/components/orrery/orrery-obstacle-logic";
 import {
@@ -50,6 +52,7 @@ import {
 } from "@/logic/orrery-camera-logic";
 import {
   createOrreryFocusController,
+  type OrreryCancellation,
   type OrreryContactTarget,
 } from "@/logic/orrery-focus-logic";
 import { cameraExtent, northTarget } from "@/logic/orrery-recovery-logic";
@@ -78,6 +81,8 @@ export function OrreryScreen() {
   const { colors } = useTheme();
   const [contactsOpen, setContactsOpen] = useState(false);
   const [clusterOpen, setClusterOpen] = useState(false);
+  const cancelIntent = useRef<(reason: OrreryCancellation) => void>(() => {});
+  const routeLive = useRef(false);
   const restoreContactsFocus = useRef<(() => void) | null>(null);
   const overlaysOpen = shellTransientStore((store) =>
     store.entries.some((entry) => entry.id !== "orrery-cluster"),
@@ -207,13 +212,15 @@ export function OrreryScreen() {
     if (!isFocused || !appActive) closeContacts(false);
   }, [isFocused, appActive, closeContacts]);
   useEffect(() => {
-    const subscription = AppState.addEventListener("change", (value) =>
-      setAppActive(value === "active"),
-    );
+    const subscription = AppState.addEventListener("change", (value) => {
+      if (value !== "active") cancelIntent.current("background");
+      setAppActive(value === "active");
+    });
     return () => subscription.remove();
   }, []);
   useFocusEffect(
     useCallback(() => {
+      routeLive.current = true;
       let cancelled = false;
       if (appActive)
         void (async () => {
@@ -222,6 +229,8 @@ export function OrreryScreen() {
           if (initialized.current) await useSystemStore.getState().reload();
         })();
       return () => {
+        routeLive.current = false;
+        cancelIntent.current("blur");
         cancelled = true;
         useSystemStore.getState().cancel();
         cancelAnimation(pose);
@@ -290,7 +299,9 @@ export function OrreryScreen() {
     () =>
       createOrreryFocusController({
         current: () =>
-          actionEnvironment.current.active
+          actionEnvironment.current.active &&
+          routeLive.current &&
+          AppState.currentState === "active"
             ? useSystemStore.getState().current()
             : null,
         validate: (system, target) =>
@@ -321,6 +332,7 @@ export function OrreryScreen() {
     [useSystemStore, navigation],
   );
   const onIntent = actions.dispatch;
+  cancelIntent.current = actions.cancel;
   const clearFocus = useCallback(() => {
     actions.cancel("clear");
     setFocusTargets([]);
@@ -415,6 +427,14 @@ export function OrreryScreen() {
     (row) => row.id === scene.systemSnapshot.resolvedSunIdentity?.id,
   );
   const allContacts = state.requested.id === "builtin:all-contacts";
+  const focusedTarget =
+    !clusterOpen && focusTargets.length === 1 ? focusTargets[0] : null;
+  const focusedMember = focusedTarget
+    ? scene?.systemSnapshot.members.find(
+        (member) =>
+          member.id === focusedTarget.id && member.uid === focusedTarget.uid,
+      )
+    : null;
   const emptyCopy = systemEmptyCopy(
     state.requested.name,
     allContacts,
@@ -465,6 +485,25 @@ export function OrreryScreen() {
           onRecenter={recenter}
           onResetNorth={resetNorth}
         />
+        {focusedTarget && scene ? (
+          <OrreryFocusContext
+            target={focusedTarget}
+            name={focusedMember?.name ?? scene.sun.sunContactName}
+            frame={camera.frame}
+            blocked={overlaysOpen}
+            onClear={clearFocus}
+            onProfile={() => {
+              const current = state.current();
+              if (current)
+                void onIntent({
+                  kind: "profile",
+                  ids: [focusedTarget.id],
+                  targets: [focusedTarget],
+                  generation: current.generation,
+                });
+            }}
+          />
+        ) : null}
         {clusterOpen && scene ? (
           <OrreryClusterPanel
             targets={focusTargets}
@@ -628,16 +667,8 @@ export function OrreryScreen() {
           const snapshot = state.current();
           if (!snapshot) return;
           closeContacts(kind === "focus");
-          const member = snapshot.systemSnapshot.members.find(
-            (row) => row.id === id,
-          );
-          if (!member) return;
-          void onIntent({
-            kind,
-            ids: [id],
-            targets: [{ kind: "member", id, uid: member.uid }],
-            generation: snapshot.generation,
-          });
+          const intent = companionAction(snapshot, kind, id);
+          if (intent) void onIntent(intent);
         }}
       />
     </View>

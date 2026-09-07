@@ -202,6 +202,13 @@ export function OrreryWorld({
       viewport,
     ),
   );
+  // Conventional focus positioning consumes this same interpolated frame.
+  useAnimatedReaction(
+    () => frame.value,
+    (value) => {
+      camera.frame.value = value;
+    },
+  );
   useEffect(() => {
     const world = scene.world;
     const generation = scene.generation;

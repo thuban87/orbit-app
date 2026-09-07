@@ -78,6 +78,7 @@ export function useOrreryCamera({
   const live = useSharedValue(enabled);
   const epoch = useSharedValue(0);
   const active = useSharedValue<MotionRequest | null>(null);
+  const frame = useSharedValue<ProjectedFrame | null>(null);
   const motion = useMemo(
     () =>
       createCameraMotion({
@@ -139,8 +140,8 @@ export function useOrreryCamera({
     };
   }, [enabled, live, input, stop]);
   return useMemo(
-    () => ({ input, samples, live, active, ...motion }),
-    [input, samples, live, active, motion],
+    () => ({ input, samples, live, active, frame, ...motion }),
+    [input, samples, live, active, frame, motion],
   );
 }
 

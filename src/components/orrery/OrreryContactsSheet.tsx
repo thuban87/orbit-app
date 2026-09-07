@@ -1,31 +1,36 @@
 // biome-ignore-all lint/a11y/useValidAriaRole: AppText uses semantic typography roles.
+import type { ReactNode } from "react";
 import {
   ScrollView,
   StyleSheet,
   useWindowDimensions,
   View,
 } from "react-native";
+import { Avatar } from "@/components/Avatar";
 import { AppText } from "@/components/ui/AppText";
 import { Button } from "@/components/ui/Button";
 import { Sheet } from "@/components/ui/Sheet";
 import { ALL_CONTACTS_SYSTEM } from "@/logic/orrery-system-logic";
 import type { OrrerySystemState } from "@/stores/orrery-system-store";
 import { SPACING } from "@/theme/tokens/spacing";
+import { companionRows } from "./orrery-companion-logic";
 import { systemEmptyCopy } from "./orrery-controls-logic";
 
-/** Current System truth and basic actions; Plan 08 expands row media/context. */
+/** Complete conventional access to the SAME committed System, including its sun. */
 export function OrreryContactsSheet({
   visible,
   state,
   measured,
   onClose,
   onAction,
+  relationshipContextById,
 }: {
   visible: boolean;
   state: OrrerySystemState;
   measured: boolean;
   onClose: () => void;
   onAction: (kind: "focus" | "profile", id: number) => void;
+  relationshipContextById?: Readonly<Record<number, ReactNode>>;
 }) {
   const { height } = useWindowDimensions();
   const scene = state.snapshot;
@@ -79,9 +84,18 @@ export function OrreryContactsSheet({
             <AppText>{emptyCopy.body}</AppText>
           </>
         ) : null}
-        {scene?.systemSnapshot.members.map((member) => (
+        {companionRows(scene).map(({ member, context }) => (
           <View key={member.uid} style={styles.row}>
+            <Avatar
+              photo={member.photo}
+              name={member.name}
+              contactId={member.uid}
+              cacheBust={scene?.dataRevision}
+              size={44}
+            />
             <AppText>{member.name}</AppText>
+            {context ? <AppText role="caption">{context}</AppText> : null}
+            {relationshipContextById?.[member.id]}
             <Button
               role="secondary"
               label="Focus in Orrery"
