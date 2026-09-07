@@ -481,7 +481,7 @@ All v1.0 commits are local on `main` and have NOT been pushed.
 
 **Canonical refs**: docs/dossier/milestone-2/phase-08-orrery-camera-scale-exploration-dossier.md; docs/dossier/milestone-2/planning-notes/phase-08-planning-notes.md
 **Schema**: separate Phase 29 app_settings preference migration (current head20, planned21; recheck head+1 at execution); optional portable keys, current export/version changes remain Phase36
-**Plans**: 10/12 plans executed
+**Plans**: 11/12 plans executed
 
 Plans:
 
@@ -528,7 +528,7 @@ Plans:
 
 **Wave 11** *(blocked on Wave 10 completion)*
 
-- [ ] 29-11-PLAN.md — Session return, Reduced Motion and race-safe recovery
+- [x] 29-11-PLAN.md — Session return, Reduced Motion and race-safe recovery
 
 **Wave 12** *(blocked on Wave 11 completion)*
 
@@ -722,7 +722,7 @@ Plans:
 | 26. Dashboard Control Surface | 7/7 | In Progress|  |
 | 27. Dashboard List View | 8/8 | Complete | 2026-09-06 (owner-approved; UAT partial) |
 | 28. Dashboard Card View | 8/8 | In Progress|  |
-| 29. Orrery Camera, Scale & Exploration | 10/12 | In Progress|  |
+| 29. Orrery Camera, Scale & Exploration | 11/12 | In Progress|  |
 | 30. Orrery Systems | 0/TBD | Not started | - |
 | 31. Profile Experience | 0/TBD | Not started | - |
 | 32. Interaction History & Insights | 0/TBD | Not started | - |

@@ -139,6 +139,7 @@ Six task commits plus summary and tracking commits, all local on main with hooks
 - ORRC-08/11/13/16 remain unchecked at phase level because their integration/native evidence spans Plan 12. They progressed here; no partial requirement is marked complete.
 - No known placeholder source data, skipped test or unrun automated verify remains. Existing empty transient fields represent cleanup/state, not stubs. No new network, authentication, filesystem or schema trust boundary was introduced.
 - Estimate-scale actuals: ceil(61,278 realized source/test diff characters / 4) = **15,320**; not harness token usage.
+- Tracking SDK advanced to Plan 12 of 12 and recorded metrics/session/decision. Progress recalculation declined the truncated milestone scope. ROADMAP incorrectly included `29-PLAN-CHECK.md` as plan 13; its generated checkbox/count were corrected to 11/12 actual executable plans.
 
 ## Self-Check: PASSED
 
