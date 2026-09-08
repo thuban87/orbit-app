@@ -2,10 +2,19 @@
 import { listSystemOverrides } from "@/db/systems-dao";
 import type { ReadOnlyExecutor } from "@/db/transaction";
 import {
+  filterByGravity,
+  type GravityInputsLoader,
+} from "@/logic/dashboard-gravity-filter";
+import {
   ACTIVE_SEGREGATION_WHERE,
+  buildFilterWhere,
   CONTACT_FREQUENCY_BANDS,
+  DASHBOARD_POPULATION_SCOPE_WHERE,
   type DashboardFilters,
+  FAVOURITES_WHERE,
   NEEDS_ATTENTION_VALUE,
+  NOT_CONTACTED_WHERE,
+  SNOOZED_WHERE,
   SOCIAL_BATTERY_VALUES,
 } from "@/logic/dashboard-query-logic";
 import { GRAVITY_TIERS } from "@/services/impact";
@@ -133,6 +142,39 @@ export async function mapRulesToFilters(
     gravityTiers: [...new Set(gravityTiers)],
     broken,
   };
+}
+
+/** Query canonical SQL candidates, then narrow derived Gravity in TypeScript. */
+export async function resolveCandidateIds(
+  exec: ReadOnlyExecutor,
+  mapped: MappedSystemRules,
+  now: string,
+  gravityInputsFor: GravityInputsLoader,
+): Promise<number[]> {
+  const filter = buildFilterWhere(mapped.filters);
+  const clauses = [
+    mapped.populationScope || mapped.notContacted
+      ? DASHBOARD_POPULATION_SCOPE_WHERE
+      : ACTIVE_SEGREGATION_WHERE,
+  ];
+  const params: unknown[] = [];
+  if (filter.sql) {
+    clauses.push(`(${filter.sql})`);
+    params.push(...filter.params);
+  }
+  if (mapped.favorite) clauses.push(FAVOURITES_WHERE);
+  if (mapped.snoozed) clauses.push(SNOOZED_WHERE);
+  if (mapped.notContacted && !mapped.populationScope)
+    clauses.push(NOT_CONTACTED_WHERE);
+  const rows = await exec.getAllAsync<{ id: number }>(
+    `SELECT c.id FROM contacts c WHERE ${clauses.join(" AND ")}
+     ORDER BY COALESCE(c.ring_seq,1e9), c.created_at, c.id`,
+    params,
+  );
+  const candidateIds = rows.map((row) => row.id);
+  return mapped.gravityTiers.length
+    ? filterByGravity(candidateIds, mapped.gravityTiers, gravityInputsFor, now)
+    : candidateIds;
 }
 
 /**

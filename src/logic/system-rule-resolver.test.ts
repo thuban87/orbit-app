@@ -193,22 +193,47 @@ describe("stored System rule mapping", () => {
 
 describe("System candidate resolution", () => {
   it("uses explicit scope, canonical boolean fragments, stable order, and a post-query Gravity pass", async () => {
-    const activeFavorite = await addContact({ uid: "active-favorite", lastContact: "2026-09-01" });
-    const neverFavorite = await addContact({ uid: "never-favorite", lastContact: null });
-    const activePlain = await addContact({ uid: "active-plain", lastContact: "2026-09-01" });
-    await exec.runAsync("UPDATE contacts SET favourite_rank=0, ring_seq=3 WHERE id=?", [activeFavorite]);
-    await exec.runAsync("UPDATE contacts SET favourite_rank=0, ring_seq=1 WHERE id=?", [neverFavorite]);
-    await exec.runAsync("UPDATE contacts SET ring_seq=2 WHERE id=?", [activePlain]);
+    const activeFavorite = await addContact({
+      uid: "active-favorite",
+      lastContact: "2026-09-01",
+    });
+    const neverFavorite = await addContact({
+      uid: "never-favorite",
+      lastContact: null,
+    });
+    const activePlain = await addContact({
+      uid: "active-plain",
+      lastContact: "2026-09-01",
+    });
+    await exec.runAsync(
+      "UPDATE contacts SET favourite_rank=0, ring_seq=3 WHERE id=?",
+      [activeFavorite],
+    );
+    await exec.runAsync(
+      "UPDATE contacts SET favourite_rank=0, ring_seq=1 WHERE id=?",
+      [neverFavorite],
+    );
+    await exec.runAsync("UPDATE contacts SET ring_seq=2 WHERE id=?", [
+      activePlain,
+    ]);
 
     const favorites = await mapRulesToFilters(exec, [
       { uid: "favorite", family: "favorite", value: FAVORITE_RULE_VALUE },
     ]);
-    expect(await resolveCandidateIds(exec, favorites, NOW, async () => null)).toEqual([activeFavorite]);
+    expect(
+      await resolveCandidateIds(exec, favorites, NOW, async () => null),
+    ).toEqual([activeFavorite]);
 
     const all = await mapRulesToFilters(exec, [
-      { uid: "scope", family: SCOPE_POPULATION_FAMILY, value: SCOPE_POPULATION_VALUE },
+      {
+        uid: "scope",
+        family: SCOPE_POPULATION_FAMILY,
+        value: SCOPE_POPULATION_VALUE,
+      },
     ]);
-    expect(await resolveCandidateIds(exec, all, NOW, async () => null)).toEqual([neverFavorite, activePlain, activeFavorite]);
+    expect(await resolveCandidateIds(exec, all, NOW, async () => null)).toEqual(
+      [neverFavorite, activePlain, activeFavorite],
+    );
 
     const deep = await mapRulesToFilters(exec, [
       { uid: "gravity", family: "gravity", value: "deep" },
@@ -216,8 +241,22 @@ describe("System candidate resolution", () => {
     expect(
       await resolveCandidateIds(exec, deep, NOW, async (id) =>
         id === activePlain
-          ? { trackingEnabled: 1, intervalDays: 14, rarelyResponds: 0, interactions: Array.from({ length: 20 }, () => ({ occurredAt: NOW, connected: 1, direction: "outbound" })) }
-          : { trackingEnabled: 1, intervalDays: 14, rarelyResponds: 0, interactions: [] },
+          ? {
+              trackingEnabled: 1,
+              intervalDays: 14,
+              rarelyResponds: 0,
+              interactions: Array.from({ length: 20 }, () => ({
+                occurredAt: NOW,
+                connected: 1,
+                direction: "outbound",
+              })),
+            }
+          : {
+              trackingEnabled: 1,
+              intervalDays: 14,
+              rarelyResponds: 0,
+              interactions: [],
+            },
       ),
     ).toEqual([activePlain]);
   });
