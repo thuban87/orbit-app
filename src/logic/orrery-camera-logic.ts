@@ -279,6 +279,50 @@ export function deriveHomePose(
   );
 }
 
+export function projectWorldPoint(
+  point: WorldPoint,
+  pose: CameraPose,
+  viewport: CameraViewport,
+): WorldPoint {
+  "worklet";
+  assertProjection(point, pose, viewport);
+  const center = projectionCenter(viewport),
+    plane = cameraPlane(point, pose),
+    scale = perspectiveScale(point, pose) * pose.zoom;
+  return {
+    x: center.x + plane.x * scale,
+    y: center.y + plane.y * Math.cos(pose.tilt ?? 0) * scale,
+  };
+}
+// Defined ABOVE its callers on purpose: a Reanimated worklet that references
+// another worklet defined LATER in the same module captures it as `undefined`
+// on-device (the transform breaks function hoisting), crashing with
+// "undefined is not a function" on the UI thread — while Node/vitest, which
+// keeps normal hoisting, passes. Phase 29 pinch/recenter crash. Keep every
+// worklet helper defined before the worklets that call it.
+export function unprojectToWorldPlane(
+  point: WorldPoint,
+  pose: CameraPose,
+  viewport: CameraViewport,
+): WorldPoint {
+  "worklet";
+  assertProjection(point, pose, viewport);
+  const center = projectionCenter(viewport),
+    focal = pose.focalDistance ?? MIN_FOCAL_DISTANCE,
+    tilt = pose.tilt ?? 0,
+    yaw = pose.yaw ?? 0;
+  const sx = (point.x - center.x) / pose.zoom,
+    sy = (point.y - center.y) / pose.zoom;
+  const denominator = focal * Math.cos(tilt) + sy * Math.sin(tilt);
+  if (!Number.isFinite(denominator) || denominator <= 0)
+    throw new Error("Point outside inverse Orrery camera plane");
+  const y = (sy * focal) / denominator,
+    x = (sx * (focal - y * Math.sin(tilt))) / focal;
+  return {
+    x: pose.x + x * Math.cos(yaw) + y * Math.sin(yaw),
+    y: pose.y - x * Math.sin(yaw) + y * Math.cos(yaw),
+  };
+}
 /** Preserve the world point under a screen anchor AFTER zoom/axis clamping.
  * If preserving it would leave legal pan bounds, those bounds take precedence.
  */
@@ -411,21 +455,6 @@ export function frameBodies(
   return result;
 }
 
-export function projectWorldPoint(
-  point: WorldPoint,
-  pose: CameraPose,
-  viewport: CameraViewport,
-): WorldPoint {
-  "worklet";
-  assertProjection(point, pose, viewport);
-  const center = projectionCenter(viewport),
-    plane = cameraPlane(point, pose),
-    scale = perspectiveScale(point, pose) * pose.zoom;
-  return {
-    x: center.x + plane.x * scale,
-    y: center.y + plane.y * Math.cos(pose.tilt ?? 0) * scale,
-  };
-}
 /** Gesture samples can lie beyond the ground-plane horizon at legal tilt/zoom. */
 export function tryUnprojectToWorldPlane(
   point: WorldPoint,
@@ -457,29 +486,6 @@ export function tryUnprojectToWorldPlane(
   if (!Number.isFinite(denominator) || denominator <= 0) return null;
   const result = unprojectToWorldPlane(point, pose, viewport);
   return Number.isFinite(result.x) && Number.isFinite(result.y) ? result : null;
-}
-export function unprojectToWorldPlane(
-  point: WorldPoint,
-  pose: CameraPose,
-  viewport: CameraViewport,
-): WorldPoint {
-  "worklet";
-  assertProjection(point, pose, viewport);
-  const center = projectionCenter(viewport),
-    focal = pose.focalDistance ?? MIN_FOCAL_DISTANCE,
-    tilt = pose.tilt ?? 0,
-    yaw = pose.yaw ?? 0;
-  const sx = (point.x - center.x) / pose.zoom,
-    sy = (point.y - center.y) / pose.zoom;
-  const denominator = focal * Math.cos(tilt) + sy * Math.sin(tilt);
-  if (!Number.isFinite(denominator) || denominator <= 0)
-    throw new Error("Point outside inverse Orrery camera plane");
-  const y = (sy * focal) / denominator,
-    x = (sx * (focal - y * Math.sin(tilt))) / focal;
-  return {
-    x: pose.x + x * Math.cos(yaw) + y * Math.sin(yaw),
-    y: pose.y - x * Math.sin(yaw) + y * Math.cos(yaw),
-  };
 }
 export function projectFrame(
   world: readonly WorldBody[],

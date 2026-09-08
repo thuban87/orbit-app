@@ -14,6 +14,23 @@
  * clamping returns an unchanged copy.
  */
 
+// Defined ABOVE its caller on purpose: a Reanimated worklet that references
+// another worklet defined LATER in the same module captures it as `undefined`
+// on-device (the transform breaks function hoisting), crashing with
+// "undefined is not a function" on the UI thread — while Node/vitest passes.
+// Phase 29 long-press reorder crash. Keep worklet helpers above their callers.
+/** Clamp `index` into the valid slot range `[0, length-1]`. */
+function clampIndex(index: number, length: number): number {
+  "worklet";
+  if (index < 0) {
+    return 0;
+  }
+  if (index > length - 1) {
+    return length - 1;
+  }
+  return index;
+}
+
 /**
  * Move the element at `from` to `to`, returning a NEW ordered id array.
  *
@@ -40,18 +57,6 @@ export function computeRingReorder(
   const [moved] = next.splice(clampedFrom, 1);
   next.splice(clampedTo, 0, moved);
   return next;
-}
-
-/** Clamp `index` into the valid slot range `[0, length-1]`. */
-function clampIndex(index: number, length: number): number {
-  "worklet";
-  if (index < 0) {
-    return 0;
-  }
-  if (index > length - 1) {
-    return length - 1;
-  }
-  return index;
 }
 
 /** Only eligible slots may move; hidden IDs retain their complete-order slots. */
