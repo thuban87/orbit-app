@@ -9,6 +9,8 @@ import { readOrrerySystemMembersCore } from "@/db/orrery-system-read";
 import { runMigrations } from "@/db/migrations/runner";
 import type { SqlExecutor } from "@/db/types";
 import { resolveCustomSystemMembers } from "@/logic/system-rule-resolver";
+import { loadOrreryScene } from "@/services/orrery-scene";
+import { createOrrerySystemStore } from "@/stores/orrery-system-store";
 
 const NOW = "2026-09-08 12:00:00";
 let exec: SqlExecutor;
@@ -73,6 +75,15 @@ describe("manual-only custom System resolver", () => {
       members: [{ id: included }],
       brokenRules: [],
     });
+
+    const store = createOrrerySystemStore({
+      load: (selected, generation) =>
+        loadOrreryScene(exec, generation, selected),
+      persist: async () => true,
+    });
+    await store.getState().select(ref, system.name);
+    expect(store.getState().status).toBe("ready");
+    expect(store.getState().current()?.system).toEqual(ref);
   });
 
   it("distinguishes a missing custom System from a valid empty one", async () => {
