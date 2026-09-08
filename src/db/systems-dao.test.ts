@@ -567,6 +567,58 @@ describe("systems DAO", () => {
     ).rejects.toThrow("immutable");
   });
 
+  it("rejects malformed System rule vocabulary before replacing durable rules", async () => {
+    const system = await createCustomSystem(exec, {
+      name: "Validated",
+      now: NOW,
+    });
+    const ref = `custom:${system.uid}` as const;
+    await setSystemRules(exec, {
+      systemRef: ref,
+      rules: [{ family: "favorite", value: "on" }],
+      now: NOW,
+    });
+
+    await expect(
+      setSystemRules(exec, {
+        systemRef: ref,
+        rules: [{ family: "unknown", value: "on" }],
+        now: NOW,
+      }),
+    ).rejects.toThrow("invalid System rule");
+    await expect(
+      setSystemRules(exec, {
+        systemRef: ref,
+        rules: [{ family: "social-battery", value: "Bogus" }],
+        now: NOW,
+      }),
+    ).rejects.toThrow("invalid System rule");
+    await expect(
+      setSystemRules(exec, {
+        systemRef: ref,
+        rules: [{ family: "category", value: "bad uid" }],
+        now: NOW,
+      }),
+    ).rejects.toThrow("invalid System rule");
+
+    expect(await listSystemRules(exec, system.id)).toMatchObject([
+      { family: "favorite", value: "on" },
+    ]);
+    await expect(
+      saveSystemDefinition(exec, {
+        systemRef: null,
+        name: "Never persisted",
+        rules: [{ family: "not-contacted", value: "off" }],
+        overrideIntent: [],
+        prunableExclusionContactIds: [],
+        now: NOW,
+      }),
+    ).rejects.toThrow("invalid System rule");
+    expect(
+      (await listCustomSystems(exec)).map(({ name }) => name),
+    ).not.toContain("Never persisted");
+  });
+
   it("persists only valid built-in or Category visibility preferences", async () => {
     const categoryRef = `category:${await firstCategoryUid()}` as const;
     const custom = await createCustomSystem(exec, {

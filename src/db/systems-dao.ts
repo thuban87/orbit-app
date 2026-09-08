@@ -9,10 +9,16 @@ import { inWriteTransaction, type ReadOnlyExecutor } from "@/db/transaction";
 import type { SqlExecutor } from "@/db/types";
 import { newUid } from "@/db/uid";
 import {
+  CONTACT_FREQUENCY_BANDS,
+  NEEDS_ATTENTION_VALUE,
+  SOCIAL_BATTERY_VALUES,
+} from "@/logic/dashboard-query-logic";
+import {
   BUILTIN_SYSTEM_LABELS,
   type OrrerySystemRef,
   parseSystemRef,
 } from "@/logic/orrery-system-logic";
+import { GRAVITY_TIERS } from "@/services/impact";
 
 export interface CustomSystem {
   id: number;
@@ -83,6 +89,43 @@ export interface SystemDefinitionDraft {
   overrideIntent: readonly SystemOverrideIntent[];
   prunableExclusionContactIds: readonly number[];
   now: string;
+}
+
+const CATEGORY_UID_RE = /^[^\s\p{Cc}]{1,256}$/u;
+
+/**
+ * The durable System-rule grammar. Missing Categories remain readable broken
+ * rules by design, but writers never introduce an unknown family, value, or
+ * malformed portable UID.
+ */
+export function assertSystemRuleDrafts(
+  rules: readonly SystemRuleDraft[],
+): void {
+  const seen = new Set<string>();
+  for (const rule of rules) {
+    const duplicateKey = `${rule.family}\u0000${rule.value}`;
+    if (seen.has(duplicateKey)) {
+      throw new Error("systems-dao: duplicate System rule");
+    }
+    seen.add(duplicateKey);
+    const valid =
+      (rule.family === "category" && CATEGORY_UID_RE.test(rule.value)) ||
+      (rule.family === "favorite" && rule.value === "on") ||
+      (rule.family === "needs-attention" &&
+        rule.value === NEEDS_ATTENTION_VALUE) ||
+      (rule.family === "gravity" &&
+        GRAVITY_TIERS.some((tier) => tier.name === rule.value)) ||
+      (rule.family === "social-battery" &&
+        (SOCIAL_BATTERY_VALUES as readonly string[]).includes(rule.value)) ||
+      (rule.family === "contact-frequency" &&
+        Object.hasOwn(CONTACT_FREQUENCY_BANDS, rule.value)) ||
+      (rule.family === "not-contacted" && rule.value === "on") ||
+      (rule.family === "snoozed" && rule.value === "on") ||
+      (rule.family === "scope" && rule.value === "population");
+    if (!valid) {
+      throw new Error("systems-dao: invalid System rule family or value");
+    }
+  }
 }
 
 function mapSystem(row: {
@@ -359,6 +402,7 @@ export async function restoreDeletedSystemCore(
   input: { snapshot: DeletedSystemSnapshot; now: string },
 ): Promise<CustomSystem> {
   const { snapshot, now } = input;
+  assertSystemRuleDrafts(snapshot.rules);
   await assertUniqueSystemName(exec, { name: snapshot.name });
   const inserted = await exec.runAsync(
     "INSERT INTO systems (uid, name, created_at, modified_at) VALUES (?, ?, ?, ?)",
@@ -536,6 +580,7 @@ export async function setSystemRulesCore(
     now: string;
   },
 ): Promise<void> {
+  assertSystemRuleDrafts(input.rules);
   const system = await getCustomSystemForRef(exec, input.systemRef);
   await exec.runAsync("DELETE FROM system_rules WHERE system_id = ?", [
     system.id,
@@ -704,6 +749,7 @@ export async function saveSystemDefinitionCore(
   exec: SqlExecutor,
   draft: SystemDefinitionDraft,
 ): Promise<CustomSystem> {
+  assertSystemRuleDrafts(draft.rules);
   const system =
     draft.systemRef === null
       ? await createCustomSystemCore(exec, { name: draft.name, now: draft.now })
