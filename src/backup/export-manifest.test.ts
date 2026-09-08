@@ -1,42 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
 
 vi.mock("expo-sqlite", () => ({}));
-vi.mock("@/db/app-settings-dao", () => ({
-  getPortableSettingsSnapshot: async (exec: {
-    getFirstAsync<T>(sql: string): Promise<T | null>;
-  }) => {
-    const row = await exec.getFirstAsync<{
-      sun_contact_id: number | null;
-      modified_at: string;
-    }>("SELECT sun_contact_id, modified_at FROM app_settings WHERE id = 1");
-    if (!row) throw new Error("missing settings");
-    return {
-      notificationsEnabled: 0 as const,
-      decayEnabled: 1 as const,
-      birthdayEnabled: 1 as const,
-      digestEnabled: 1 as const,
-      lockscreenPublic: 0 as const,
-      deliveryHour: 9,
-      quietStartHour: 21,
-      quietEndHour: 8,
-      sunContactId: row.sun_contact_id,
-      selfSunColour: null,
-      aiProvider: "none",
-      aiModel: "",
-      aiCustomEndpoint: "",
-      aiCustomModel: "",
-      aiPromptTemplate: "",
-      backupIntervalDays: 1,
-      backupRetentionDays: 7,
-      phoneRegionOverride: null,
-      includeUnboundNeverContacted: 0,
-      birthdayUnboundEnabled: 1,
-      modifiedAt: row.modified_at,
-    };
-  },
-}));
 
 import { buildExportManifest } from "@/backup/export-manifest";
+import { BACKUP_FORMAT_VERSION } from "@/backup/types";
 import { nodeSqliteExecutor, openTestDb } from "@/db/__testkit__/node-sqlite";
 import { MIGRATIONS, TARGET_VERSION } from "@/db/database";
 import { runMigrations } from "@/db/migrations/runner";
@@ -44,6 +11,49 @@ import { runMigrations } from "@/db/migrations/runner";
 const NOW = "2026-08-25 12:00:00";
 
 describe("buildExportManifest", () => {
+  it("pins the format-4 portable-settings wire shape before Phase 36", async () => {
+    let count = 0;
+    const exec = nodeSqliteExecutor(openTestDb());
+    await runMigrations(exec, MIGRATIONS, TARGET_VERSION, {
+      now: NOW,
+      newUid: () => `uid-${++count}`,
+    });
+
+    const manifest = await buildExportManifest(exec, {
+      exportedAt: NOW,
+      readPhotoBase64: async () => "AQID",
+    });
+
+    // D-06 trip-wire: Phase 36 owns the coordinated wire change to v5.
+    expect(BACKUP_FORMAT_VERSION).toBe(4);
+    expect(manifest.backupFormatVersion).toBe(4);
+    expect(Object.keys(manifest.appSettings).sort()).toEqual([
+      "aiCustomEndpoint",
+      "aiCustomModel",
+      "aiModel",
+      "aiPromptTemplate",
+      "aiProvider",
+      "backupIntervalDays",
+      "backupRetentionDays",
+      "birthdayEnabled",
+      "birthdayUnboundEnabled",
+      "decayEnabled",
+      "deliveryHour",
+      "digestEnabled",
+      "includeUnboundNeverContacted",
+      "interactionAssistEnabled",
+      "lockscreenPublic",
+      "modifiedAt",
+      "notificationsEnabled",
+      "phoneRegionOverride",
+      "quietEndHour",
+      "quietStartHour",
+      "selfSunColour",
+      "sunContactUid",
+    ]);
+    expect(manifest.appSettings).not.toHaveProperty("orreryLastSystem");
+  });
+
   it("exports full portable state with bytes and never local paths or backup bookkeeping", async () => {
     let count = 0;
     const exec = nodeSqliteExecutor(openTestDb());

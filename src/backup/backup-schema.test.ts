@@ -36,6 +36,23 @@ describe("dashboard preference portable allowlist", () => {
   });
 });
 
+describe("Systems restore acceptance (declare-only)", () => {
+  it("accepts a custom System token while rejecting malformed System tokens", () => {
+    const custom = valid();
+    custom.appSettings.orreryLastSystem = "custom:abc123";
+    expect(parseBackupManifest(custom).appSettings).toHaveProperty(
+      "orreryLastSystem",
+      "custom:abc123",
+    );
+
+    const malformed = valid();
+    malformed.appSettings.orreryLastSystem = "custom:bad\nuid";
+    expect(() => parseBackupManifest(malformed)).toThrow(
+      "appSettings has an invalid Orrery preference",
+    );
+  });
+});
+
 describe("parseBackupManifest", () => {
   it("accepts a different SQLite schema version because backupFormatVersion alone gates compatibility", () => {
     expect(parseBackupManifest(valid()).metadata.sqliteUserVersion).toBe(999);

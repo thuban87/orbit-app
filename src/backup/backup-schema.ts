@@ -175,6 +175,10 @@ export const PORTABLE_SETTINGS_KEYS = new Set([
   // Phase 29: optional restore acceptance only. Phase 36 owns wire emission.
   "orreryDensity",
   "orrerySatellitesEnabled",
+  // Phase 30 (declare-only): the widened validator accepts a restored
+  // custom:<uid> last-active System. Systems tables remain Phase 36 wire
+  // entities; do not add them to getPortableSettingsSnapshot before its
+  // coordinated format bump and forward migration.
   "orreryLastSystem",
 ]);
 
@@ -208,7 +212,8 @@ function assertPortableSettings(
       fail("appSettings contains a local-only or secret member");
     }
   }
-  // The same closed grammar guards ordinary writes AND restore's core writer.
+  // The same closed grammar guards ordinary writes AND restore's core writer;
+  // this includes Phase 30 custom:<uid> tokens without emitting Systems data.
   // Category UID existence is intentionally resolved later by the System read.
   try {
     if (settings.orreryDensity !== undefined)
