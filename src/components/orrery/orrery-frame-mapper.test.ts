@@ -8,6 +8,7 @@ import {
   beginWorldTransition,
   projectAnimatedFrame,
   sampleWorldTransition,
+  spinSwitchWorld,
 } from "@/logic/orrery-frame";
 import { semanticLevel } from "@/logic/orrery-label-logic";
 import { previewReorder } from "@/logic/orrery-reorder-logic";
@@ -86,6 +87,8 @@ it("the emitted projection closure settles after publication under the installed
       ),
     ),
     progress: cell(1),
+    switchIntensity: cell(0),
+    reducedMotion: cell(false),
     pose,
     level: cell("overview"),
     viewport: { width: 400, height: 700 },
@@ -94,6 +97,7 @@ it("the emitted projection closure settles after publication under the installed
     camera: { reorder, frame: published },
     reorder,
     sampleWorldTransition,
+    spinSwitchWorld,
     previewReorder,
     deriveSatelliteBodies,
     semanticLevel,
