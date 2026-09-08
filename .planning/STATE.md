@@ -4,19 +4,20 @@ milestone: v2.0
 milestone_name: Release Readiness
 current_phase: 29
 current_phase_name: Orrery Camera, Scale & Exploration
-status: verifying
-stopped_at: All 12 plans and review fixes complete; native UAT pending
-last_updated: "2026-09-07T19:01:28.901180+00:00"
-last_activity: 2026-09-07
-last_activity_desc: All 12 plans executed; review clean; verifier human_needed; native UAT saved
+status: complete
+stopped_at: Phase 29 complete (owner-approved) — device UAT 8/9 pass on release build; H6 backup contention BLOCKED (SAF folder grant), deferred to Phase 40
+last_updated: "2026-09-08T01:50:00+00:00"
+last_activity: 2026-09-08
+last_activity_desc: Phase 29 device UAT complete (8/9 pass); two on-device blocker gesture crashes fixed (f979263); H6 blocked/deferred to Phase 40
 state_head: e812d70c3d6ac77db9c719e99cb04a9e44bb6512
 progress:
   total_phases: 20
-  completed_phases: 5
+  completed_phases: 6
   total_plans: 72
-  completed_plans: 70
+  completed_plans: 72
 carried_forward:
 
+  - "H6 (Phase 29 UAT) BLOCKED → Phase 40: backup/scene contention overlap unmeasured — the SAF backup-folder grant needs reconnecting, and ordinary navigation does not prove snapshot overlap (see 29-UAT.md, 29-NATIVE-CHECKLIST.md)"
   - "D-11: default Memory-type display name is provisional (memory-registry.ts:10-12) — owner naming decision, must be reconciled before Phase 34"
   - "UI-REVIEW warnings (non-blocking): accent→accentText token misrole (8 sites); Add-memory CTA uses hand-rolled link vs Button primitive; ContactPicker/Snackbar off type/spacing scale — triage fix-now vs fold into 24.2"
 
@@ -33,15 +34,15 @@ See: .planning/PROJECT.md (updated 2026-09-01 after v1.0 milestone)
 
 ## Current Position
 
-Phase: 29 (Orrery Camera, Scale & Exploration) — VERIFICATION PENDING
+Phase: 29 (Orrery Camera, Scale & Exploration) — COMPLETE (owner-approved 2026-09-08)
 Plan: 12 of 12
-Status: Plans executed — code review clean; native acceptance pending
+Status: Device UAT 8/9 pass on the release build; two on-device blocker crashes (gesture/pinch + long-press reorder) found and fixed inline (f979263 — Reanimated worklet forward-reference class). H6 backup contention BLOCKED (SAF folder grant) → deferred Phase 40.
 Carried forward (owner's bucket, NOT resolved here): D-11 default Memory-type display name — reconcile before Phase 34.
 Surface to owner (24.2-07, KNOW-15): milestone plan said Phase 36 owns the backup format-4 bump, but 24.1 already bumped to 4 (d677e2c); Plan 07 emits into the live format 4 with NO bump — that milestone instruction is stale.
 Deferred to Phase 31 (recorded in Plan 05): durable contact-scoped-def ownership + owner-purge semantics. Deferred to Phase 36 (ROADMAP breadcrumb): legacy AI-fuel confirm-path code removal.
-Last activity: 2026-09-07 — Review fixes verified; 278 files / 2,595 tests passed; native UAT saved
-Progress: 8/19 phases complete (v2.0) — 22, 23, 24.1, 24.2, 25, 26, 27, 28
-Next: $gsd-verify-work 29 — nine UAT groups preserve all native checklist states; do not advance Phase 30.
+Last activity: 2026-09-08 — Phase 29 device UAT complete (8/9 pass; H6 blocked→P40); blocker gesture crashes fixed (f979263)
+Progress: 9/19 phases complete (v2.0) — 22, 23, 24.1, 24.2, 25, 26, 27, 28, 29
+Next: Phase 29 closed. Push f979263 + 80111e2. Then plan the next phase (28 or 30) at owner's discretion.
 
 **Milestone v2.0 structure (pre-decided by the owner from the fifteen milestone-2 dossiers + the
 2026-09-01 cross-dossier audit; not re-derived):** 22 App Shell · 23 Theme · 24 Contact Knowledge ·
