@@ -6,10 +6,10 @@ current_phase: 30
 current_phase_name: Orrery Systems
 status: complete
 stopped_at: Phase 30 UI-SPEC approved
-last_updated: "2026-09-08T10:11:03.553Z"
+last_updated: "2026-09-08T16:28:50.036Z"
 last_activity: 2026-09-08
 last_activity_desc: Phase 29 device UAT complete (8/9 pass); two on-device blocker gesture crashes fixed (f979263); H6 blocked/deferred to Phase 40
-state_head: e3de53ecd0f8b0c7dcde82f4988dbc9445d81156
+state_head: 45081f81066f51513dc9c0d4a25457b563df9451
 progress:
   total_phases: 20
   completed_phases: 5
