@@ -151,6 +151,10 @@ const PREDICATE_OWNERS: Record<string, LedgerEntry> = {
     owner: "30-02",
     note: "Custom-System rule candidates default to ACTIVE_SEGREGATION_WHERE (archived_at IS NULL, tracking_enabled = 1, contacted); only explicit Not Contacted or scope:population widens the base scope.",
   },
+  "src/db/systems-members-read.ts": {
+    owner: "30-07",
+    note: "Manage Members' Add People source reuses DASHBOARD_POPULATION_SCOPE_WHERE: archived_at IS NULL AND tracking_enabled = 1, including eligible never-contacted contacts while excluding Archived and Unbound rows.",
+  },
   "src/db/orrery-system-read.ts": {
     owner: "29-03",
     note: "Complete reorder identities require archived_at IS NULL AND tracking_enabled=1 AND last_contact IS NOT NULL, plus the saved-sun fingerprint. Explicit All/Not member widening retains Bound/archive scope and null health; other Systems remain contacted-only.",
