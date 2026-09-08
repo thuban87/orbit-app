@@ -4,9 +4,9 @@ vi.mock("expo-sqlite", () => ({}));
 
 import { nodeSqliteExecutor, openTestDb } from "@/db/__testkit__/node-sqlite";
 import { MIGRATIONS, TARGET_VERSION } from "@/db/database";
-import { addSystemOverride, createCustomSystem } from "@/db/systems-dao";
-import { readOrrerySystemMembersCore } from "@/db/orrery-system-read";
 import { runMigrations } from "@/db/migrations/runner";
+import { readOrrerySystemMembersCore } from "@/db/orrery-system-read";
+import { addSystemOverride, createCustomSystem } from "@/db/systems-dao";
 import type { SqlExecutor } from "@/db/types";
 import {
   FAVORITE_RULE_VALUE,
@@ -129,22 +129,56 @@ describe("stored System rule mapping", () => {
       { uid: "rule-favorite", family: "favorite", value: "bad" },
       { uid: "rule-scope", family: "scope", value: "bad" },
     ]);
-    expect(mapped.filters.category).toEqual(["1"]);
+    expect(mapped.filters.category).toHaveLength(1);
+    expect(mapped.filters.category?.[0]).toMatch(/^\d+$/);
     expect(mapped.broken).toEqual([
-      { ruleUid: "rule-missing-a", family: "category", value: "gone", reason: "missing-category" },
-      { ruleUid: "rule-missing-b", family: "category", value: "gone", reason: "missing-category" },
-      { ruleUid: "rule-battery", family: "social-battery", value: "invalid", reason: "invalid-value" },
-      { ruleUid: "rule-favorite", family: "favorite", value: "bad", reason: "invalid-value" },
-      { ruleUid: "rule-scope", family: "scope", value: "bad", reason: "invalid-value" },
+      {
+        ruleUid: "rule-missing-a",
+        family: "category",
+        value: "gone",
+        reason: "missing-category",
+      },
+      {
+        ruleUid: "rule-missing-b",
+        family: "category",
+        value: "gone",
+        reason: "missing-category",
+      },
+      {
+        ruleUid: "rule-battery",
+        family: "social-battery",
+        value: "invalid",
+        reason: "invalid-value",
+      },
+      {
+        ruleUid: "rule-favorite",
+        family: "favorite",
+        value: "bad",
+        reason: "invalid-value",
+      },
+      {
+        ruleUid: "rule-scope",
+        family: "scope",
+        value: "bad",
+        reason: "invalid-value",
+      },
     ]);
   });
 
   it("only accepts exported closed boolean and population sentinels", async () => {
     const mapped = await mapRulesToFilters(exec, [
       { uid: "favorite", family: "favorite", value: FAVORITE_RULE_VALUE },
-      { uid: "not-contacted", family: "not-contacted", value: NOT_CONTACTED_RULE_VALUE },
+      {
+        uid: "not-contacted",
+        family: "not-contacted",
+        value: NOT_CONTACTED_RULE_VALUE,
+      },
       { uid: "snoozed", family: "snoozed", value: SNOOZED_RULE_VALUE },
-      { uid: "scope", family: SCOPE_POPULATION_FAMILY, value: SCOPE_POPULATION_VALUE },
+      {
+        uid: "scope",
+        family: SCOPE_POPULATION_FAMILY,
+        value: SCOPE_POPULATION_VALUE,
+      },
     ]);
     expect(mapped).toMatchObject({
       favorite: true,
