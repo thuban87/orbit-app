@@ -104,36 +104,48 @@ export async function deleteManagedSystem(input: {
     systemRef: input.systemRef,
     now: localDateTime(),
   });
-  await refreshOrreryPreferences();
-  await input.onChanged();
-  showSnackbar({
-    kind: "success",
-    label: "System deleted",
-    action: {
-      label: "Undo",
-      accessibilityLabel: "Undo System deletion",
-      onPress: () => {
-        void (async () => {
-          try {
-            await restoreDeletedSystemAndActiveSelection(getExecutor(), {
-              snapshot: deletion.snapshot,
-              restoreActiveSelection: deletion.wasActive,
-              now: localDateTime(),
-            });
-          } catch {
-            errorSnackbar("Couldn't undo — that name is in use again");
-            return;
-          }
-          try {
-            await refreshOrreryPreferences();
-            await input.onChanged();
-          } catch {
-            errorSnackbar("System restored, but the list couldn't refresh.");
-          }
-        })();
+  const showDeleteUndo = (label: string) =>
+    showSnackbar({
+      kind: "success",
+      label,
+      action: {
+        label: "Undo",
+        accessibilityLabel: "Undo System deletion",
+        onPress: () => {
+          void (async () => {
+            try {
+              await restoreDeletedSystemAndActiveSelection(getExecutor(), {
+                snapshot: deletion.snapshot,
+                restoreActiveSelection: deletion.wasActive,
+                now: localDateTime(),
+              });
+            } catch {
+              errorSnackbar("Couldn't undo — that name is in use again");
+              return;
+            }
+            try {
+              await refreshOrreryPreferences();
+              await input.onChanged();
+            } catch {
+              errorSnackbar("System restored, but the list couldn't refresh.");
+            }
+          })();
+        },
       },
-    },
-  });
+    });
+
+  // The destructive DAO composite has committed. Register its sole recovery
+  // path before fallible cache/list reads; a refresh error must never recast a
+  // completed deletion as a failed one.
+  showDeleteUndo("System deleted");
+  try {
+    await refreshOrreryPreferences();
+    await input.onChanged();
+  } catch {
+    // Replacing the transient message is safe only when the replacement keeps
+    // the same Undo action available to the user.
+    showDeleteUndo("System deleted, but the list couldn't refresh.");
+  }
 }
 
 function SystemRow({

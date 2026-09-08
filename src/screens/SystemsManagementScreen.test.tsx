@@ -181,6 +181,35 @@ describe("SystemsManagementScreen contracts", () => {
     );
   });
 
+  it("keeps Undo available when the post-commit list refresh fails", async () => {
+    vi.mocked(dao.deleteSystemWithActiveFallback).mockResolvedValue({
+      snapshot: {
+        uid: "family",
+        name: "Family",
+        rules: [],
+        overrides: [],
+        prefs: null,
+      },
+      wasActive: false,
+    });
+    const onChanged = vi.fn().mockRejectedValue(new Error("read failed"));
+
+    await expect(
+      deleteManagedSystem({
+        systemRef: "custom:family",
+        onChanged,
+      }),
+    ).resolves.toBeUndefined();
+
+    expect(onChanged).toHaveBeenCalledOnce();
+    expect(snackbar.showSnackbar).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        label: "System deleted, but the list couldn't refresh.",
+        action: expect.objectContaining({ label: "Undo" }),
+      }),
+    );
+  });
+
   it("keeps a failed Undo non-destructive and does not reselect the deleted System", async () => {
     vi.mocked(dao.deleteSystemWithActiveFallback).mockResolvedValue({
       snapshot: {
