@@ -309,7 +309,7 @@ describe("SystemsManagementScreen contracts", () => {
     ).toEqual(["System deleted"]);
   });
 
-  it("keeps a failed Undo non-destructive and does not reselect the deleted System", async () => {
+  it("refreshes the durable deletion after a failed Undo suppresses a deferred delete refresh", async () => {
     vi.mocked(dao.deleteSystemWithActiveFallback).mockResolvedValue({
       snapshot: {
         uid: "family",
@@ -323,18 +323,41 @@ describe("SystemsManagementScreen contracts", () => {
     vi.mocked(dao.restoreDeletedSystemAndActiveSelection).mockRejectedValue(
       new Error("name in use"),
     );
-
-    await deleteManagedSystem({
-      systemRef: "custom:family",
-      onChanged: vi.fn().mockResolvedValue(undefined),
+    let resolveInitialRefresh: (() => void) | undefined;
+    const initialRefresh = new Promise<void>((resolve) => {
+      resolveInitialRefresh = resolve;
     });
+    const published: string[] = [];
+    const onChanged = vi
+      .fn()
+      .mockImplementationOnce(async (isCurrent: () => boolean) => {
+        await initialRefresh;
+        if (isCurrent()) published.push("stale deletion");
+      })
+      .mockImplementationOnce(async (isCurrent: () => boolean) => {
+        if (isCurrent()) published.push("deleted");
+      });
+
+    const deleting = deleteManagedSystem({
+      systemRef: "custom:family",
+      onChanged,
+    });
+    await vi.waitFor(() => expect(onChanged).toHaveBeenCalledOnce());
     vi.mocked(snackbar.showSnackbar).mock.calls[0][0].action.onPress();
     await vi.waitFor(() =>
-      expect(snackbar.showSnackbar).toHaveBeenLastCalledWith(
-        expect.objectContaining({
-          label: "Couldn't undo — that name is in use again",
-        }),
-      ),
+      expect(dao.restoreDeletedSystemAndActiveSelection).toHaveBeenCalledOnce(),
+    );
+    resolveInitialRefresh?.();
+
+    await deleting;
+    await vi.waitFor(() => expect(onChanged).toHaveBeenCalledTimes(2));
+    expect(published).toEqual(["deleted"]);
+    expect(state.prefs.hydrate).toHaveBeenCalledTimes(2);
+    expect(snackbar.showSnackbar).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        label: "Couldn't undo — that name is in use again",
+        action: expect.objectContaining({ label: "Dismiss" }),
+      }),
     );
     expect(state.prefs.save).not.toHaveBeenCalled();
   });

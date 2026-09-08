@@ -126,7 +126,19 @@ export async function deleteManagedSystem(input: {
                 now: localDateTime(),
               });
             } catch {
-              errorSnackbar("Couldn't undo — that name is in use again");
+              try {
+                // Undo invalidated the delete refresh before the restore attempt.
+                // A failed restore leaves the deletion durable, so wait for that
+                // stale refresh to settle, then publish its actual final state.
+                await postDeleteRefresh;
+                await refreshOrreryPreferences();
+                await input.onChanged(() => true);
+                errorSnackbar("Couldn't undo — that name is in use again");
+              } catch {
+                errorSnackbar(
+                  "Couldn't undo — that name is in use again. Refresh Systems to see the current list.",
+                );
+              }
               return;
             }
             try {
