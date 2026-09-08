@@ -32,12 +32,30 @@ export function computeMembershipDelta(
  * identical memberships are 0 and a full turnover is 1.
  */
 export function switchIntensity(delta: MembershipDelta): number {
-  const comparedMemberships = delta.entering + delta.leaving + delta.overlap * 2;
+  const comparedMemberships =
+    delta.entering + delta.leaving + delta.overlap * 2;
   if (comparedMemberships === 0) return 0;
   return Math.max(
     0,
     Math.min(1, (delta.entering + delta.leaving) / comparedMemberships),
   );
+}
+
+/** Same-System refreshes and restored sessions never start the switch effect. */
+export function switchTransitionIntensity(
+  isInSessionSwitch: boolean,
+  delta: MembershipDelta,
+): number {
+  return isInSessionSwitch ? switchIntensity(delta) : 0;
+}
+
+/** A retained focus stays selected, but only a non-switch may frame it. */
+export function selectSystemFraming<T>(
+  forceHome: boolean,
+  focusedPose: T | undefined,
+  homePose: T | undefined,
+): T | undefined {
+  return forceHome || focusedPose === undefined ? homePose : focusedPose;
 }
 
 /** Keeps a selected contact through a switch only when both Systems contain it. */

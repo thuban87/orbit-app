@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import {
   MissingOrreryCategoryError,
+  MissingOrreryCustomSystemError,
   type OrreryCategory,
 } from "@/db/orrery-system-read";
 import {
@@ -119,6 +120,10 @@ export function createOrrerySystemStore(io: OrrerySystemAdapters) {
             categories: error.snapshot.categories,
             catalogLoaded: true,
           });
+        } else if (error instanceof MissingOrreryCustomSystemError) {
+          // This re-enters select with a fresh generation; the generation guard
+          // abandons the stale custom request, so it cannot recurse into a loop.
+          void select(ALL_CONTACTS_SYSTEM);
         } else set({ status: get().snapshot ? "stale" : "error" });
       }
     };

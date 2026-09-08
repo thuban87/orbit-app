@@ -2,7 +2,9 @@ import { describe, expect, it } from "vitest";
 import {
   computeMembershipDelta,
   preservedFocus,
+  selectSystemFraming,
   switchIntensity,
+  switchTransitionIntensity,
 } from "./orrery-switch-animation";
 
 describe("orrery System switch animation math", () => {
@@ -40,5 +42,18 @@ describe("orrery System switch animation math", () => {
     expect(preservedFocus(2, [1, 2], [2, 3])).toBe(2);
     expect(preservedFocus(1, [1, 2], [2, 3])).toBeNull();
     expect(preservedFocus(null, [1, 2], [2, 3])).toBeNull();
+  });
+
+  it("uses Home framing for a real switch while a same-System focus change frames the body", () => {
+    const home = { zoom: 1 };
+    const focused = { zoom: 2 };
+    expect(selectSystemFraming(true, focused, home)).toBe(home);
+    expect(selectSystemFraming(false, focused, home)).toBe(focused);
+  });
+
+  it("keeps intensity at zero for a same-System reload or session restore", () => {
+    const delta = computeMembershipDelta([1, 2], [3, 4]);
+    expect(switchTransitionIntensity(false, delta)).toBe(0);
+    expect(switchTransitionIntensity(true, delta)).toBe(1);
   });
 });

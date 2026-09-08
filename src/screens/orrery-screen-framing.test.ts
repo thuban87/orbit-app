@@ -3,6 +3,7 @@ import { runInNewContext } from "node:vm";
 import { expect, it, vi } from "vitest";
 import { canvasViewport } from "@/components/orrery/orrery-obstacle-logic";
 import * as overlayLogic from "@/components/orrery/orrery-overlay-logic";
+import * as switchLogic from "@/components/orrery/orrery-switch-animation";
 import * as cameraLogic from "@/logic/orrery-camera-logic";
 import * as focusLogic from "@/logic/orrery-focus-logic";
 import * as gestureLogic from "@/logic/orrery-gesture-logic";
@@ -190,6 +191,7 @@ function harness() {
           if (id.includes("orrery-gesture-logic")) return gestureLogic;
           if (id.includes("orrery-recovery-logic")) return recoveryLogic;
           if (id.includes("orrery-system-logic")) return systemLogic;
+          if (id.includes("orrery-switch-animation")) return switchLogic;
           if (id.includes("orrery-overlay-logic")) return overlayLogic;
           if (id.includes("orrery-obstacle-logic")) return { canvasViewport };
           if (id.includes("orrery-system-store"))

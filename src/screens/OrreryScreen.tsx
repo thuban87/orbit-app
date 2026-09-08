@@ -20,6 +20,7 @@ import {
   runOnJS,
   runOnUI,
   useSharedValue,
+  withTiming,
 } from "react-native-reanimated";
 import {
   CLUSTER_OBSTACLE,
@@ -46,6 +47,12 @@ import {
   clusterRows,
 } from "@/components/orrery/orrery-overlay-logic";
 import { satelliteContext } from "@/components/orrery/orrery-satellite-context";
+import {
+  computeMembershipDelta,
+  preservedFocus,
+  selectSystemFraming,
+  switchTransitionIntensity,
+} from "@/components/orrery/orrery-switch-animation";
 import { useOrreryCamera } from "@/components/orrery/use-orrery-camera";
 import { ShellAppBar } from "@/components/ShellAppBar";
 import { AppText } from "@/components/ui/AppText";
@@ -103,6 +110,10 @@ import { useReducedMotionShared } from "@/theme/use-reduced-motion";
 const acknowledgeReorder = () => {
   void Haptics.selectionAsync().catch(() => {});
 };
+
+/** Identifies commits emitted by this screen's otherwise-local System store. */
+const LOCAL_SELECT_ORIGIN = Symbol("orrery-local-select");
+const SWITCH_INTENSITY_MS = 260;
 
 export function OrreryScreen() {
   const { colors } = useTheme();
@@ -193,6 +204,9 @@ export function OrreryScreen() {
     [canvasRect, obstacles],
   );
   const preferences = useOrreryPreferencesStore((store) => store.committed);
+  const committedOrigin = useOrreryPreferencesStore(
+    (store) => store.committedOrigin,
+  );
   const hydratePreferences = useOrreryPreferencesStore(
     (store) => store.hydrate,
   );
@@ -210,6 +224,7 @@ export function OrreryScreen() {
     "removed" | "missing-category" | "error" | null
   >(null);
   const pose = useSharedValue<CameraPose>({ ...HOME_CAMERA });
+  const switchIntensity = useSharedValue(0);
   const reducedMotion = useReducedMotionShared();
   const useSystemStore = useMemo(
     () =>
@@ -221,7 +236,12 @@ export function OrreryScreen() {
           const id = systemRefId(system);
           if (store.saveError && store.pendingIntent?.lastSystem === id)
             await store.retry(getExecutor());
-          else await store.save(getExecutor(), { lastSystem: id });
+          else
+            await store.save(
+              getExecutor(),
+              { lastSystem: id },
+              LOCAL_SELECT_ORIGIN,
+            );
           const latest = useOrreryPreferencesStore.getState();
           return (
             latest.hydrated &&
@@ -233,6 +253,71 @@ export function OrreryScreen() {
     [],
   );
   const state = useSystemStore();
+  const focusTargetsRef = useRef(focusTargets);
+  focusTargetsRef.current = focusTargets;
+  const hasReadySystem = useRef(false);
+  const switchSourceIds = useRef<number[] | null>(null);
+  const switchHomeGeneration = useRef<number | null>(null);
+  useEffect(() => {
+    const unsubscribe = useSystemStore.subscribe((next, previous) => {
+      if (
+        next.status === "loading" &&
+        previous.status === "ready" &&
+        previous.snapshot
+      ) {
+        const isInSessionSwitch =
+          hasReadySystem.current && next.requested.id !== previous.requested.id;
+        switchSourceIds.current = isInSessionSwitch
+          ? previous.snapshot.systemSnapshot.members.map((member) => member.id)
+          : null;
+        if (!isInSessionSwitch) switchIntensity.value = 0;
+        return;
+      }
+      if (next.status !== "ready" || !next.snapshot) return;
+      hasReadySystem.current = true;
+      const sourceIds = switchSourceIds.current;
+      switchSourceIds.current = null;
+      if (!sourceIds) return;
+      const destinationIds = next.snapshot.systemSnapshot.members.map(
+        (member) => member.id,
+      );
+      const retainedFocus =
+        focusTargetsRef.current.length === 1
+          ? preservedFocus(
+              focusTargetsRef.current[0].id,
+              sourceIds,
+              destinationIds,
+            )
+          : null;
+      setFocusTargets((targets) =>
+        targets.length === 1 && retainedFocus === targets[0].id ? targets : [],
+      );
+      switchHomeGeneration.current = next.generation;
+      const intensity = switchTransitionIntensity(
+        true,
+        computeMembershipDelta(sourceIds, destinationIds),
+      );
+      runOnUI((value: number) => {
+        "worklet";
+        if (reducedMotion.value) {
+          switchIntensity.value = 0;
+          return;
+        }
+        switchIntensity.value = 0;
+        switchIntensity.value = withTiming(
+          value,
+          { duration: SWITCH_INTENSITY_MS },
+          (finished) => {
+            if (finished)
+              switchIntensity.value = withTiming(0, {
+                duration: SWITCH_INTENSITY_MS,
+              });
+          },
+        );
+      })(intensity);
+    });
+    return unsubscribe;
+  }, [useSystemStore, switchIntensity, reducedMotion]);
   const [satelliteState, setSatelliteState] = useState<OrrerySatelliteState>({
     status: "ready",
     sceneGeneration: null,
@@ -282,7 +367,6 @@ export function OrreryScreen() {
   useEffect(() => {
     if (focusSystem.current !== state.requested.id) {
       focusSystem.current = state.requested.id;
-      setFocusTargets([]);
       setClusterOpen(false);
     }
   }, [state.requested.id]);
@@ -326,17 +410,32 @@ export function OrreryScreen() {
       };
     }, [useSystemStore, hydratePreferences, appActive, pose]),
   );
+  const reconciledCommittedOrigin = useRef<unknown>(undefined);
   useEffect(() => {
-    if (hydrated && isFocused && appActive && !initialized.current) {
-      initialized.current = true;
-      const pref = useOrreryPreferencesStore.getState();
-      void useSystemStore
-        .getState()
-        .select(
-          parseSystemRef(pref.committed.lastSystem) ?? ALL_CONTACTS_SYSTEM,
-        );
-    }
-  }, [hydrated, isFocused, appActive, useSystemStore]);
+    if (!hydrated || !isFocused || !appActive) return;
+    const system =
+      parseSystemRef(preferences.lastSystem) ?? ALL_CONTACTS_SYSTEM;
+    const id = systemRefId(system);
+    const firstReconcile = !initialized.current;
+    const originChanged = reconciledCommittedOrigin.current !== committedOrigin;
+    reconciledCommittedOrigin.current = committedOrigin;
+    if (
+      !firstReconcile &&
+      (!originChanged || committedOrigin === LOCAL_SELECT_ORIGIN)
+    )
+      return;
+    initialized.current = true;
+    const active = useSystemStore.getState();
+    if (active.requested.id !== id || !active.snapshot)
+      void active.select(system);
+  }, [
+    hydrated,
+    isFocused,
+    appActive,
+    preferences.lastSystem,
+    committedOrigin,
+    useSystemStore,
+  ]);
   const reload = useCallback(() => {
     if (isFocused && appActive && initialized.current)
       void useSystemStore.getState().reload();
@@ -708,10 +807,18 @@ export function OrreryScreen() {
     const focusedBodies = scene.world.filter(
       (body) => sessionResume === "active" && focusedIds.includes(body.id),
     );
-    const home =
+    // Dossier §V keeps a shared focus selected, but a real System switch still
+    // lands at canonical Home rather than framing that retained contact.
+    const forceSwitchHome =
+      sessionResume !== "restore" &&
+      switchHomeGeneration.current === scene.generation;
+    const home = selectSystemFraming(
+      forceSwitchHome,
       focusedBodies.length > 0
         ? frameBodies(focusedBodies, viewport, scene.extent, pose.value)?.pose
-        : deriveHomePose(scene.world, viewport);
+        : undefined,
+      deriveHomePose(scene.world, viewport),
+    );
     if (!home) return; // Preserve the previous valid pose through zero measurement.
     if (focusedBodies.length === 1)
       home.zoom = Math.min(IDENTITY_ZOOM, home.zoom);
@@ -781,6 +888,7 @@ export function OrreryScreen() {
     allContacts,
     qualifyingSun,
   );
+  const brokenRules = scene?.systemSnapshot.brokenRules ?? [];
   const showAll = () => state.select(ALL_CONTACTS_SYSTEM);
 
   return (
@@ -810,6 +918,7 @@ export function OrreryScreen() {
             focusedIds={focusedIds}
             satellites={satellites?.rows}
             focusedSatellite={focusedSatellite}
+            switchIntensity={switchIntensity}
             clusterIds={clusterOpen ? focusedIds : []}
             onFocusLost={clusterOpen ? undefined : clearFocus}
             interactive={!overlaysOpen && state.status === "ready"}
@@ -996,6 +1105,20 @@ export function OrreryScreen() {
               kind="preferences"
               onAction={state.retryPersistence}
             />
+          </OrreryFeedback>
+        ) : null}
+        {brokenRules.length > 0 ? (
+          <OrreryFeedback
+            obstacleId="orrery-broken-system-feedback"
+            style={[styles.saveFeedback, { backgroundColor: colors.surface }]}
+            contentContainerStyle={styles.feedbackContent}
+          >
+            <AppText role="label">This System needs attention</AppText>
+            <AppText role="caption">
+              {brokenRules.length === 1
+                ? "One membership rule could not be applied."
+                : `${brokenRules.length} membership rules could not be applied.`}
+            </AppText>
           </OrreryFeedback>
         ) : null}
         {hydration === "error" && !hydrated ? (

@@ -109,6 +109,26 @@ describe("Orrery preferences commit-before-publish", () => {
     expect(write).toHaveBeenCalledTimes(1);
     expect(store.getState().committed.density).toBe("compact");
   });
+  it("stamps an origin only when a last-System value is actually committed", async () => {
+    const { store, write } = fixture();
+    await store.getState().hydrate(exec);
+    const localOrigin = Symbol("local");
+    const initialOrigin = store.getState().committedOrigin;
+    await store
+      .getState()
+      .save(exec, { lastSystem: "builtin:favorites" }, localOrigin);
+    expect(store.getState().committedOrigin).toBe(localOrigin);
+
+    await store
+      .getState()
+      .save(exec, { lastSystem: "builtin:favorites" }, localOrigin);
+    expect(store.getState().committedOrigin).toBe(localOrigin);
+
+    write.mockRejectedValueOnce(new Error("disk"));
+    await store.getState().save(exec, { lastSystem: "builtin:chargers" });
+    expect(store.getState().committedOrigin).toBe(localOrigin);
+    expect(initialOrigin).toBeNull();
+  });
   it("serializes conflicting updates including reversal to the previously saved value", async () => {
     const { store, write } = fixture();
     await store.getState().hydrate(exec);

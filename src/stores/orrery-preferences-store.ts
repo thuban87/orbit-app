@@ -25,13 +25,15 @@ interface PreferencesAdapters {
 }
 export interface OrreryPreferencesState {
   committed: OrreryPreferences;
+  /** Changes only after an actual committed last-System publication. */
+  committedOrigin: unknown | null;
   hydrated: boolean;
   hydration: "idle" | "loading" | "ready" | "error";
   saving: boolean;
   saveError: boolean;
   pendingIntent: Intent | null;
   hydrate: (exec: SqlExecutor) => Promise<void>;
-  save: (exec: SqlExecutor, intent: Intent) => Promise<void>;
+  save: (exec: SqlExecutor, intent: Intent, origin?: unknown) => Promise<void>;
   retry: (exec: SqlExecutor) => Promise<void>;
 }
 const KEYS = ["density", "satellitesEnabled", "lastSystem"] as const;
@@ -66,6 +68,7 @@ export function createOrreryPreferencesStore(
   let reading: Promise<void> | null = null;
   let draining: Promise<void> | null = null;
   let inFlight: Intent | null = null;
+  let pendingLastSystemOrigin: unknown | null = null;
   return create<OrreryPreferencesState>()((set, get) => {
     const drain = (exec: SqlExecutor): Promise<void> => {
       if (draining) return draining;
@@ -73,6 +76,7 @@ export function createOrreryPreferencesStore(
       const work = async () => {
         while (get().pendingIntent) {
           const intent = { ...get().pendingIntent };
+          const lastSystemOrigin = pendingLastSystemOrigin;
           inFlight = intent;
           ++generation;
           try {
@@ -85,10 +89,18 @@ export function createOrreryPreferencesStore(
           const remaining = { ...get().pendingIntent };
           for (const key of KEYS)
             if (remaining[key] === intent[key]) delete remaining[key];
+          const publishedLastSystem = intent.lastSystem !== undefined;
           set({
             committed: { ...get().committed, ...intent },
+            // A no-op or failed write never reaches this publication point, so
+            // observers cannot mistake a phantom local origin for a self-echo.
+            ...(publishedLastSystem
+              ? { committedOrigin: lastSystemOrigin ?? {} }
+              : {}),
             pendingIntent: Object.keys(remaining).length ? remaining : null,
           });
+          if (remaining.lastSystem === undefined)
+            pendingLastSystemOrigin = null;
         }
         set({ saving: false });
       };
@@ -100,6 +112,7 @@ export function createOrreryPreferencesStore(
     };
     return {
       committed: { ...DEFAULT_ORRERY_PREFERENCES },
+      committedOrigin: null,
       hydrated: false,
       hydration: "idle",
       saving: false,
@@ -130,7 +143,7 @@ export function createOrreryPreferencesStore(
         });
         return reading;
       },
-      save: (exec, intent) => {
+      save: (exec, intent, origin) => {
         // Never infer durable defaults after an unread/failed initial load.
         if (!get().hydrated) return Promise.resolve();
         const desired = {
@@ -152,6 +165,8 @@ export function createOrreryPreferencesStore(
             Object.assign(changed, { [key]: intent[key] });
         if (Object.keys(changed).length === 0)
           return draining ?? Promise.resolve();
+        if (changed.lastSystem !== undefined)
+          pendingLastSystemOrigin = origin ?? {};
         set({ pendingIntent: { ...get().pendingIntent, ...changed } });
         return drain(exec);
       },

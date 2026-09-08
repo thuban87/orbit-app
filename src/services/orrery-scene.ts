@@ -3,6 +3,7 @@
 import type { OrrerySatellite } from "@/db/orrery-satellites-read";
 import {
   MissingOrreryCategoryError,
+  MissingOrreryCustomSystemError,
   type OrrerySystemMember,
   type OrrerySystemSnapshot,
   readOrrerySystemSnapshot,
@@ -57,6 +58,8 @@ export async function loadOrreryScene(
   const snapshot = await readOrrerySystemSnapshot(exec, system);
   if (snapshot.status === "missing-category")
     throw new MissingOrreryCategoryError(snapshot);
+  if (snapshot.status === "missing-custom")
+    throw new MissingOrreryCustomSystemError(snapshot);
   const { settings, profile, header, occupant } = snapshot;
   const self = snapshot.resolvedSunIdentity === null;
   const contacts = orderOrreryMembers(snapshot.orbiting);
