@@ -4,10 +4,13 @@ vi.mock("expo-sqlite", () => ({}));
 
 import { nodeSqliteExecutor, openTestDb } from "@/db/__testkit__/node-sqlite";
 import { MIGRATIONS, TARGET_VERSION } from "@/db/database";
+import { runMigrations } from "@/db/migrations/runner";
+import { readOrrerySystemMembersCore } from "@/db/orrery-system-read";
 import {
   addSystemOverride,
   createCustomSystem,
-  deleteSystem,
+  deleteSystemWithActiveFallback,
+  duplicateSystem,
   getSystem,
   listCustomSystems,
   listSystemOverrides,
@@ -16,21 +19,18 @@ import {
   mapBuiltinPredicateToRules,
   nextDuplicateName,
   pruneSystemExclusions,
-  reorderSystems,
   renameSystem,
+  reorderSystems,
   resetSystemOverrides,
   restoreDeletedSystem,
   saveMembershipOverrides,
   saveSystemDefinition,
+  setSystemHidden,
   setSystemOverride,
   setSystemRules,
-  setSystemHidden,
-  duplicateSystem,
 } from "@/db/systems-dao";
-import { runMigrations } from "@/db/migrations/runner";
-import { readOrrerySystemMembersCore } from "@/db/orrery-system-read";
-import { resolveCustomSystemMembers } from "@/logic/system-rule-resolver";
 import type { SqlExecutor } from "@/db/types";
+import { resolveCustomSystemMembers } from "@/logic/system-rule-resolver";
 
 const NOW = "2026-09-08 12:00:00";
 let exec: SqlExecutor;
@@ -104,7 +104,10 @@ describe("systems DAO", () => {
   });
 
   it("renames only custom Systems with a nonempty cross-catalog-unique name", async () => {
-    const system = await createCustomSystem(exec, { name: "Inner Circle", now: NOW });
+    const system = await createCustomSystem(exec, {
+      name: "Inner Circle",
+      now: NOW,
+    });
     await renameSystem(exec, {
       systemRef: `custom:${system.uid}`,
       name: "Study Group",
@@ -136,14 +139,22 @@ describe("systems DAO", () => {
   });
 
   it("deletes only System metadata and restores a uid-stable portable snapshot", async () => {
-    const system = await createCustomSystem(exec, { name: "Restore Me", now: NOW });
+    const system = await createCustomSystem(exec, {
+      name: "Restore Me",
+      now: NOW,
+    });
     const contactId = await addContact("Alex");
     const ref = `custom:${system.uid}` as const;
     await exec.runAsync(
       "INSERT INTO system_rules (uid, system_id, family, value, created_at) VALUES (?, ?, ?, ?, ?)",
       ["rule-restore", system.id, "social-battery", "Charger", NOW],
     );
-    await setSystemOverride(exec, { systemRef: ref, contactId, mode: "include", now: NOW });
+    await setSystemOverride(exec, {
+      systemRef: ref,
+      contactId,
+      mode: "include",
+      now: NOW,
+    });
     await exec.runAsync(
       "INSERT INTO system_prefs (uid, system_ref, display_order, hidden, created_at, modified_at) VALUES (?, ?, ?, ?, ?, ?)",
       ["pref-restore", ref, 4, 1, NOW, NOW],
@@ -152,7 +163,11 @@ describe("systems DAO", () => {
       "SELECT COUNT(*) AS count FROM contacts",
     );
 
-    const snapshot = await deleteSystem(exec, { systemRef: ref });
+    const deletion = await deleteSystemWithActiveFallback(exec, {
+      systemRef: ref,
+      now: NOW,
+    });
+    const { snapshot } = deletion;
     expect(snapshot).toMatchObject({
       uid: system.uid,
       name: "Restore Me",
@@ -163,7 +178,11 @@ describe("systems DAO", () => {
     expect(await getSystem(exec, system.uid)).toBeNull();
     expect(await listSystemOverrides(exec, ref)).toEqual([]);
     expect(await listSystemPrefs(exec)).toEqual([]);
-    expect(await exec.getFirstAsync<{ count: number }>("SELECT COUNT(*) AS count FROM contacts")).toEqual(beforeContacts);
+    expect(
+      await exec.getFirstAsync<{ count: number }>(
+        "SELECT COUNT(*) AS count FROM contacts",
+      ),
+    ).toEqual(beforeContacts);
 
     // Consume the deleted rowid so the restored rules must use the newly
     // inserted System id rather than accidentally replaying the stale one.
@@ -174,59 +193,171 @@ describe("systems DAO", () => {
     expect(await listSystemRules(exec, restored.id)).toMatchObject([
       { systemId: restored.id, family: "social-battery", value: "Charger" },
     ]);
-    expect(await listSystemOverrides(exec, ref)).toMatchObject([{ contactId, mode: "include" }]);
+    expect(await listSystemOverrides(exec, ref)).toMatchObject([
+      { contactId, mode: "include" },
+    ]);
     expect(await listSystemPrefs(exec)).toMatchObject([
       { systemRef: ref, displayOrder: 4, hidden: 1 },
     ]);
-    await expect(deleteSystem(exec, { systemRef: "builtin:favorites" })).rejects.toThrow("immutable");
     await expect(
-      deleteSystem(exec, { systemRef: `category:${await firstCategoryUid()}` }),
+      deleteSystemWithActiveFallback(exec, {
+        systemRef: "builtin:favorites",
+        now: NOW,
+      }),
+    ).rejects.toThrow("immutable");
+    await expect(
+      deleteSystemWithActiveFallback(exec, {
+        systemRef: `category:${await firstCategoryUid()}`,
+        now: NOW,
+      }),
     ).rejects.toThrow("immutable");
   });
 
+  it("atomically falls back from an active deleted System and bumps revision once", async () => {
+    const system = await createCustomSystem(exec, { name: "Active", now: NOW });
+    const ref = `custom:${system.uid}` as const;
+    await exec.runAsync(
+      "UPDATE app_settings SET orrery_last_system = ? WHERE id = 1",
+      [ref],
+    );
+    const before = await exec.getFirstAsync<{ data_revision: number }>(
+      "SELECT data_revision FROM app_settings WHERE id = 1",
+    );
+
+    const deletion = await deleteSystemWithActiveFallback(exec, {
+      systemRef: ref,
+      now: NOW,
+    });
+
+    expect(deletion.wasActive).toBe(true);
+    expect(deletion.snapshot.uid).toBe(system.uid);
+    expect(
+      await exec.getFirstAsync<{
+        orrery_last_system: string;
+        data_revision: number;
+      }>(
+        "SELECT orrery_last_system, data_revision FROM app_settings WHERE id = 1",
+      ),
+    ).toEqual({
+      orrery_last_system: "builtin:all-contacts",
+      data_revision: (before?.data_revision ?? 0) + 1,
+    });
+    expect(await getSystem(exec, system.uid)).toBeNull();
+  });
+
   it("guards every override write with catalog validation and supports valid immutable bases", async () => {
-    const system = await createCustomSystem(exec, { name: "Overrides", now: NOW });
+    const system = await createCustomSystem(exec, {
+      name: "Overrides",
+      now: NOW,
+    });
     const [first, second, third] = await Promise.all([
       addContact("Alex"),
       addContact("Bea"),
       addContact("Cal"),
     ]);
     const ref = `custom:${system.uid}` as const;
-    await setSystemOverride(exec, { systemRef: ref, contactId: first, mode: "include", now: NOW });
-    await setSystemOverride(exec, { systemRef: ref, contactId: first, mode: "exclude", now: NOW });
-    expect(await listSystemOverrides(exec, ref)).toMatchObject([{ contactId: first, mode: "exclude" }]);
-    await setSystemOverride(exec, { systemRef: ref, contactId: first, mode: null, now: NOW });
+    await setSystemOverride(exec, {
+      systemRef: ref,
+      contactId: first,
+      mode: "include",
+      now: NOW,
+    });
+    await setSystemOverride(exec, {
+      systemRef: ref,
+      contactId: first,
+      mode: "exclude",
+      now: NOW,
+    });
+    expect(await listSystemOverrides(exec, ref)).toMatchObject([
+      { contactId: first, mode: "exclude" },
+    ]);
+    await setSystemOverride(exec, {
+      systemRef: ref,
+      contactId: first,
+      mode: null,
+      now: NOW,
+    });
     expect(await listSystemOverrides(exec, ref)).toEqual([]);
 
-    await setSystemOverride(exec, { systemRef: ref, contactId: first, mode: "exclude", now: NOW });
-    await setSystemOverride(exec, { systemRef: ref, contactId: second, mode: "exclude", now: NOW });
-    await setSystemOverride(exec, { systemRef: ref, contactId: third, mode: "exclude", now: NOW });
-    await pruneSystemExclusions(exec, { systemRef: ref, contactIds: [first, third] });
-    expect(await listSystemOverrides(exec, ref)).toMatchObject([{ contactId: second, mode: "exclude" }]);
+    await setSystemOverride(exec, {
+      systemRef: ref,
+      contactId: first,
+      mode: "exclude",
+      now: NOW,
+    });
+    await setSystemOverride(exec, {
+      systemRef: ref,
+      contactId: second,
+      mode: "exclude",
+      now: NOW,
+    });
+    await setSystemOverride(exec, {
+      systemRef: ref,
+      contactId: third,
+      mode: "exclude",
+      now: NOW,
+    });
+    await pruneSystemExclusions(exec, {
+      systemRef: ref,
+      contactIds: [first, third],
+    });
+    expect(await listSystemOverrides(exec, ref)).toMatchObject([
+      { contactId: second, mode: "exclude" },
+    ]);
     await resetSystemOverrides(exec, { systemRef: ref });
     expect(await listSystemOverrides(exec, ref)).toEqual([]);
 
     const categoryRef = `category:${await firstCategoryUid()}` as const;
-    await setSystemOverride(exec, { systemRef: "builtin:favorites", contactId: first, mode: "include", now: NOW });
-    await setSystemOverride(exec, { systemRef: categoryRef, contactId: second, mode: "exclude", now: NOW });
-    expect(await listSystemOverrides(exec, "builtin:favorites")).toHaveLength(1);
+    await setSystemOverride(exec, {
+      systemRef: "builtin:favorites",
+      contactId: first,
+      mode: "include",
+      now: NOW,
+    });
+    await setSystemOverride(exec, {
+      systemRef: categoryRef,
+      contactId: second,
+      mode: "exclude",
+      now: NOW,
+    });
+    expect(await listSystemOverrides(exec, "builtin:favorites")).toHaveLength(
+      1,
+    );
     expect(await listSystemOverrides(exec, categoryRef)).toHaveLength(1);
     await expect(
-      setSystemOverride(exec, { systemRef: "custom:missing", contactId: first, mode: "include", now: NOW }),
+      setSystemOverride(exec, {
+        systemRef: "custom:missing",
+        contactId: first,
+        mode: "include",
+        now: NOW,
+      }),
     ).rejects.toThrow("unknown System");
-    await expect(resetSystemOverrides(exec, { systemRef: "custom:missing" })).rejects.toThrow("unknown System");
     await expect(
-      pruneSystemExclusions(exec, { systemRef: "custom:missing", contactIds: [first] }),
+      resetSystemOverrides(exec, { systemRef: "custom:missing" }),
+    ).rejects.toThrow("unknown System");
+    await expect(
+      pruneSystemExclusions(exec, {
+        systemRef: "custom:missing",
+        contactIds: [first],
+      }),
     ).rejects.toThrow("unknown System");
   });
 
   it("uses deterministic case-insensitive Copy names across the complete catalog", () => {
-    expect(nextDuplicateName("Inner Circle", new Set())).toBe("Inner Circle Copy");
-    expect(nextDuplicateName("Inner Circle", new Set(["inner circle copy"]))).toBe("Inner Circle Copy 2");
+    expect(nextDuplicateName("Inner Circle", new Set())).toBe(
+      "Inner Circle Copy",
+    );
+    expect(
+      nextDuplicateName("Inner Circle", new Set(["inner circle copy"])),
+    ).toBe("Inner Circle Copy 2");
     expect(
       nextDuplicateName(
         "Inner Circle",
-        new Set(["inner circle copy", "INNER CIRCLE COPY 2"].map((name) => name.toLocaleLowerCase())),
+        new Set(
+          ["inner circle copy", "INNER CIRCLE COPY 2"].map((name) =>
+            name.toLocaleLowerCase(),
+          ),
+        ),
       ),
     ).toBe("Inner Circle Copy 3");
   });
@@ -240,23 +371,37 @@ describe("systems DAO", () => {
       rules: [{ family: "social-battery", value: "Charger" }],
       now: NOW,
     });
-    await setSystemOverride(exec, { systemRef: sourceRef, contactId, mode: "include", now: NOW });
+    await setSystemOverride(exec, {
+      systemRef: sourceRef,
+      contactId,
+      mode: "include",
+      now: NOW,
+    });
 
-    const customCopy = await duplicateSystem(exec, { systemRef: sourceRef, now: NOW });
+    const customCopy = await duplicateSystem(exec, {
+      systemRef: sourceRef,
+      now: NOW,
+    });
     expect(customCopy.name).toBe("Source Copy");
     expect(await listSystemRules(exec, customCopy.id)).toMatchObject([
       { family: "social-battery", value: "Charger" },
     ]);
-    expect(await listSystemOverrides(exec, `custom:${customCopy.uid}`)).toMatchObject([
-      { contactId, mode: "include" },
-    ]);
+    expect(
+      await listSystemOverrides(exec, `custom:${customCopy.uid}`),
+    ).toMatchObject([{ contactId, mode: "include" }]);
 
-    const chargers = await duplicateSystem(exec, { systemRef: "builtin:chargers", now: NOW });
+    const chargers = await duplicateSystem(exec, {
+      systemRef: "builtin:chargers",
+      now: NOW,
+    });
     expect(await listSystemRules(exec, chargers.id)).toMatchObject([
       { family: "social-battery", value: "Charger" },
     ]);
     const categoryUid = await firstCategoryUid();
-    const category = await duplicateSystem(exec, { systemRef: `category:${categoryUid}`, now: NOW });
+    const category = await duplicateSystem(exec, {
+      systemRef: `category:${categoryUid}`,
+      now: NOW,
+    });
     expect(await listSystemRules(exec, category.id)).toMatchObject([
       { family: "category", value: categoryUid },
     ]);
@@ -268,7 +413,10 @@ describe("systems DAO", () => {
       "INSERT INTO contacts (uid, name, interval_days, created_at, modified_at) VALUES (?, ?, ?, ?, ?)",
       [`contact-${++sequence}`, "Never contacted", 14, NOW, NOW],
     );
-    const copy = await duplicateSystem(exec, { systemRef: "builtin:all-contacts", now: NOW });
+    const copy = await duplicateSystem(exec, {
+      systemRef: "builtin:all-contacts",
+      now: NOW,
+    });
     expect(await listSystemRules(exec, copy.id)).toMatchObject([
       { family: "scope", value: "population" },
     ]);
@@ -276,9 +424,18 @@ describe("systems DAO", () => {
       kind: "builtin",
       id: "all-contacts",
     });
-    const custom = await resolveCustomSystemMembers(exec, copy, NOW, async () => null);
-    expect(custom.memberIds).toEqual(builtin.members.map((member) => member.id));
-    expect(custom.memberIds).toEqual(expect.arrayContaining([contacted, neverContacted.lastInsertRowId]));
+    const custom = await resolveCustomSystemMembers(
+      exec,
+      copy,
+      NOW,
+      async () => null,
+    );
+    expect(custom.memberIds).toEqual(
+      builtin.members.map((member) => member.id),
+    );
+    expect(custom.memberIds).toEqual(
+      expect.arrayContaining([contacted, neverContacted.lastInsertRowId]),
+    );
   });
 
   it("saves custom definitions atomically and immutable-base overrides without mutating base rows", async () => {
@@ -292,9 +449,9 @@ describe("systems DAO", () => {
       now: NOW,
     });
     expect(await listSystemRules(exec, saved.id)).toHaveLength(1);
-    expect(await listSystemOverrides(exec, `custom:${saved.uid}`)).toMatchObject([
-      { contactId, mode: "include" },
-    ]);
+    expect(
+      await listSystemOverrides(exec, `custom:${saved.uid}`),
+    ).toMatchObject([{ contactId, mode: "include" }]);
     await expect(
       saveSystemDefinition(exec, {
         systemRef: null,
@@ -308,9 +465,13 @@ describe("systems DAO", () => {
         now: NOW,
       }),
     ).rejects.toThrow();
-    expect((await listCustomSystems(exec)).map((system) => system.name)).not.toContain("Rollback Me");
+    expect(
+      (await listCustomSystems(exec)).map((system) => system.name),
+    ).not.toContain("Rollback Me");
 
-    const beforeSystems = await exec.getFirstAsync<{ count: number }>("SELECT COUNT(*) AS count FROM systems");
+    const beforeSystems = await exec.getFirstAsync<{ count: number }>(
+      "SELECT COUNT(*) AS count FROM systems",
+    );
     await saveMembershipOverrides(exec, {
       systemRef: "builtin:favorites",
       overrideIntent: [{ contactId, mode: "include" }],
@@ -320,20 +481,27 @@ describe("systems DAO", () => {
     expect(await listSystemOverrides(exec, "builtin:favorites")).toMatchObject([
       { contactId, mode: "include" },
     ]);
-    expect(await exec.getFirstAsync<{ count: number }>("SELECT COUNT(*) AS count FROM systems")).toEqual(beforeSystems);
+    expect(
+      await exec.getFirstAsync<{ count: number }>(
+        "SELECT COUNT(*) AS count FROM systems",
+      ),
+    ).toEqual(beforeSystems);
   });
 
   it("maps each immutable predicate to the stored rule vocabulary", () => {
-    expect(mapBuiltinPredicateToRules({ kind: "builtin", id: "favorites" })).toEqual([
-      { family: "favorite", value: "on" },
-    ]);
-    expect(mapBuiltinPredicateToRules({ kind: "builtin", id: "all-contacts" })).toEqual([
-      { family: "scope", value: "population" },
-    ]);
+    expect(
+      mapBuiltinPredicateToRules({ kind: "builtin", id: "favorites" }),
+    ).toEqual([{ family: "favorite", value: "on" }]);
+    expect(
+      mapBuiltinPredicateToRules({ kind: "builtin", id: "all-contacts" }),
+    ).toEqual([{ family: "scope", value: "population" }]);
   });
 
   it("rejects immutable rule writes and preserves rules when resetting membership overrides", async () => {
-    const system = await createCustomSystem(exec, { name: "Rule Reset", now: NOW });
+    const system = await createCustomSystem(exec, {
+      name: "Rule Reset",
+      now: NOW,
+    });
     const ref = `custom:${system.uid}` as const;
     const contactId = await addContact("Alex");
     await setSystemRules(exec, {
@@ -341,7 +509,12 @@ describe("systems DAO", () => {
       rules: [{ family: "favorite", value: "on" }],
       now: NOW,
     });
-    await setSystemOverride(exec, { systemRef: ref, contactId, mode: "include", now: NOW });
+    await setSystemOverride(exec, {
+      systemRef: ref,
+      contactId,
+      mode: "include",
+      now: NOW,
+    });
     await resetSystemOverrides(exec, { systemRef: ref });
     expect(await listSystemRules(exec, system.id)).toMatchObject([
       { family: "favorite", value: "on" },
@@ -357,25 +530,47 @@ describe("systems DAO", () => {
 
   it("persists only valid built-in or Category visibility preferences", async () => {
     const categoryRef = `category:${await firstCategoryUid()}` as const;
-    const custom = await createCustomSystem(exec, { name: "No Hide", now: NOW });
-    await setSystemHidden(exec, { systemRef: categoryRef, hidden: true, now: NOW });
+    const custom = await createCustomSystem(exec, {
+      name: "No Hide",
+      now: NOW,
+    });
+    await setSystemHidden(exec, {
+      systemRef: categoryRef,
+      hidden: true,
+      now: NOW,
+    });
     expect(await listSystemPrefs(exec)).toMatchObject([
       { systemRef: categoryRef, hidden: 1 },
     ]);
     await expect(
-      setSystemHidden(exec, { systemRef: "builtin:all-contacts", hidden: true, now: NOW }),
+      setSystemHidden(exec, {
+        systemRef: "builtin:all-contacts",
+        hidden: true,
+        now: NOW,
+      }),
     ).rejects.toThrow("All Contacts");
     await expect(
-      setSystemHidden(exec, { systemRef: `custom:${custom.uid}`, hidden: true, now: NOW }),
+      setSystemHidden(exec, {
+        systemRef: `custom:${custom.uid}`,
+        hidden: true,
+        now: NOW,
+      }),
     ).rejects.toThrow("deleted, not hidden");
     await expect(
-      setSystemHidden(exec, { systemRef: "custom:missing", hidden: true, now: NOW }),
+      setSystemHidden(exec, {
+        systemRef: "custom:missing",
+        hidden: true,
+        now: NOW,
+      }),
     ).rejects.toThrow("unknown System");
   });
 
   it("reorders a validated catalog while keeping All Contacts at order zero", async () => {
     const categoryRef = `category:${await firstCategoryUid()}` as const;
-    const custom = await createCustomSystem(exec, { name: "Ordered", now: NOW });
+    const custom = await createCustomSystem(exec, {
+      name: "Ordered",
+      now: NOW,
+    });
     const customRef = `custom:${custom.uid}` as const;
     await reorderSystems(exec, {
       orderedRefs: [categoryRef, customRef, "builtin:favorites"],
@@ -384,10 +579,16 @@ describe("systems DAO", () => {
     const prefs = await listSystemPrefs(exec);
     expect(prefs).toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ systemRef: "builtin:all-contacts", displayOrder: 0 }),
+        expect.objectContaining({
+          systemRef: "builtin:all-contacts",
+          displayOrder: 0,
+        }),
         expect.objectContaining({ systemRef: categoryRef, displayOrder: 1 }),
         expect.objectContaining({ systemRef: customRef, displayOrder: 2 }),
-        expect.objectContaining({ systemRef: "builtin:favorites", displayOrder: 3 }),
+        expect.objectContaining({
+          systemRef: "builtin:favorites",
+          displayOrder: 3,
+        }),
       ]),
     );
     await expect(

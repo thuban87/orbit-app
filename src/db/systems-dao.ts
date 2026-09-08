@@ -1,13 +1,17 @@
 /** Durable custom-System definitions and cross-kind override reads/writes. */
-import type { OrrerySystemId } from "@/db/app-settings-dao";
+import {
+  assertOrreryLastSystem,
+  type OrrerySystemId,
+  updateAppSettingsCore,
+} from "@/db/app-settings-dao";
 import { bumpDataRevisionCore } from "@/db/data-revision-dao";
 import { inWriteTransaction, type ReadOnlyExecutor } from "@/db/transaction";
 import type { SqlExecutor } from "@/db/types";
 import { newUid } from "@/db/uid";
 import {
   BUILTIN_SYSTEM_LABELS,
-  parseSystemRef,
   type OrrerySystemRef,
+  parseSystemRef,
 } from "@/logic/orrery-system-logic";
 
 export interface CustomSystem {
@@ -58,6 +62,12 @@ export interface DeletedSystemSnapshot {
   rules: SystemRuleDraft[];
   overrides: Array<{ contactId: number; mode: SystemOverrideMode }>;
   prefs: { displayOrder: number | null; hidden: 0 | 1 } | null;
+}
+
+export interface DeletedSystemResult {
+  snapshot: DeletedSystemSnapshot;
+  /** True only when this transaction moved the active System to All Contacts. */
+  wasActive: boolean;
 }
 
 export interface SystemOverrideIntent {
@@ -156,7 +166,9 @@ export async function assertKnownSystemRef(
       ])
     )
       return ref;
-  } else if (await exec.getFirstAsync("SELECT id FROM systems WHERE uid = ?", [ref.uid])) {
+  } else if (
+    await exec.getFirstAsync("SELECT id FROM systems WHERE uid = ?", [ref.uid])
+  ) {
     return ref;
   }
   throw new Error("systems-dao: unknown System reference");
@@ -168,7 +180,9 @@ export function assertMutableCustomRef(
 ): Extract<OrrerySystemRef, { kind: "custom" }> {
   const ref = parseSystemRef(systemRef);
   if (ref?.kind !== "custom") {
-    throw new Error("systems-dao: immutable System definitions cannot be changed");
+    throw new Error(
+      "systems-dao: immutable System definitions cannot be changed",
+    );
   }
   return ref;
 }
@@ -303,21 +317,40 @@ export async function deleteSystemCore(
   if (deletedPrefs.changes !== (prefs ? 1 : 0)) {
     throw new Error("deleteSystem: preference row changed during delete");
   }
-  const deletedSystem = await exec.runAsync("DELETE FROM systems WHERE id = ?", [
-    system.id,
-  ]);
+  const deletedSystem = await exec.runAsync(
+    "DELETE FROM systems WHERE id = ?",
+    [system.id],
+  );
   assertOneChange("deleteSystem", deletedSystem.changes);
   return { uid: system.uid, name: system.name, rules, overrides, prefs };
 }
 
-export function deleteSystem(
+/**
+ * Delete a custom System and repair an active selection under one writer lock.
+ * The snapshot is intentionally returned only after the whole operation commits,
+ * so callers can never offer Undo for a partially-completed destructive write.
+ */
+export function deleteSystemWithActiveFallback(
   exec: SqlExecutor,
-  input: { systemRef: OrrerySystemId },
-): Promise<DeletedSystemSnapshot> {
+  input: { systemRef: OrrerySystemId; now: string },
+): Promise<DeletedSystemResult> {
   return inWriteTransaction(exec, async () => {
+    const stored = await exec.getFirstAsync<{ orrery_last_system: string }>(
+      "SELECT orrery_last_system FROM app_settings WHERE id = 1",
+    );
+    if (!stored) throw new Error("deleteSystem: missing app settings row");
+    assertOrreryLastSystem("orreryLastSystem", stored.orrery_last_system);
+    const wasActive = stored.orrery_last_system === input.systemRef;
     const snapshot = await deleteSystemCore(exec, input);
+    if (wasActive) {
+      await updateAppSettingsCore(
+        exec,
+        { orreryLastSystem: "builtin:all-contacts" },
+        input.now,
+      );
+    }
     await bumpDataRevisionCore(exec);
-    return snapshot;
+    return { snapshot, wasActive };
   });
 }
 
@@ -478,7 +511,9 @@ export async function setSystemRulesCore(
   },
 ): Promise<void> {
   const system = await getCustomSystemForRef(exec, input.systemRef);
-  await exec.runAsync("DELETE FROM system_rules WHERE system_id = ?", [system.id]);
+  await exec.runAsync("DELETE FROM system_rules WHERE system_id = ?", [
+    system.id,
+  ]);
   for (const rule of input.rules) {
     const result = await exec.runAsync(
       "INSERT INTO system_rules (uid, system_id, family, value, created_at) VALUES (?, ?, ?, ?, ?)",
@@ -510,8 +545,10 @@ export function nextDuplicateName(
   const base = normalizeSystemName(baseName);
   let ordinal = 1;
   while (true) {
-    const candidate = ordinal === 1 ? `${base} Copy` : `${base} Copy ${ordinal}`;
-    if (!existingNamesLowercased.has(candidate.toLocaleLowerCase())) return candidate;
+    const candidate =
+      ordinal === 1 ? `${base} Copy` : `${base} Copy ${ordinal}`;
+    if (!existingNamesLowercased.has(candidate.toLocaleLowerCase()))
+      return candidate;
     ordinal += 1;
   }
 }
@@ -551,9 +588,7 @@ async function existingSystemNamesLowercased(
       ...Object.values(BUILTIN_SYSTEM_LABELS),
       ...systems.map((system) => system.name),
       ...categories.map((category) => category.name),
-    ].map(
-      (name) => name.toLocaleLowerCase(),
-    ),
+    ].map((name) => name.toLocaleLowerCase()),
   );
 }
 
@@ -584,7 +619,11 @@ async function duplicateSource(
       [ref.uid],
     );
     if (!category) throw new Error("systems-dao: unknown System reference");
-    return { name: category.name, rules: mapBuiltinPredicateToRules(ref), overrides: [] };
+    return {
+      name: category.name,
+      rules: mapBuiltinPredicateToRules(ref),
+      overrides: [],
+    };
   }
   return {
     name: BUILTIN_SYSTEM_LABELS[ref.id],
@@ -602,7 +641,10 @@ export async function duplicateSystemCore(
     source.name,
     await existingSystemNamesLowercased(exec),
   );
-  const duplicate = await createCustomSystemCore(exec, { name, now: input.now });
+  const duplicate = await createCustomSystemCore(exec, {
+    name,
+    now: input.now,
+  });
   const duplicateRef = `custom:${duplicate.uid}` as OrrerySystemId;
   await setSystemRulesCore(exec, {
     systemRef: duplicateRef,
@@ -645,7 +687,11 @@ export async function saveSystemDefinitionCore(
           now: draft.now,
         });
   const systemRef = `custom:${system.uid}` as OrrerySystemId;
-  await setSystemRulesCore(exec, { systemRef, rules: draft.rules, now: draft.now });
+  await setSystemRulesCore(exec, {
+    systemRef,
+    rules: draft.rules,
+    now: draft.now,
+  });
   for (const intent of draft.overrideIntent) {
     await setSystemOverrideCore(exec, {
       systemRef,

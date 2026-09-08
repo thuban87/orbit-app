@@ -2,30 +2,26 @@
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useCallback, useRef, useState } from "react";
-import {
-  Alert,
-  Pressable,
-  StyleSheet,
-  TextInput,
-  View,
-} from "react-native";
+import { Alert, Pressable, StyleSheet, TextInput, View } from "react-native";
 import ReorderableList, {
-  reorderItems,
   type ReorderableListRenderItemInfo,
   type ReorderableListReorderEvent,
+  reorderItems,
   useReorderableDrag,
 } from "react-native-reorderable-list";
 import { Icon } from "@/components/icons/Icon";
+import { buildSystemChoices } from "@/components/orrery/orrery-controls-logic";
 import { ShellAppBar } from "@/components/ShellAppBar";
 import { AppText } from "@/components/ui/AppText";
 import { Button } from "@/components/ui/Button";
+import type { OrrerySystemId } from "@/db/app-settings-dao";
 import { getExecutor, localDateTime } from "@/db/database";
 import {
   readOrrerySystemMembersCore,
   readOrrerySystemSnapshot,
 } from "@/db/orrery-system-read";
 import {
-  deleteSystem,
+  deleteSystemWithActiveFallback,
   duplicateSystem,
   listCustomSystems,
   listSystemOverrides,
@@ -36,15 +32,13 @@ import {
   restoreDeletedSystem,
   setSystemHidden,
 } from "@/db/systems-dao";
-import type { OrrerySystemId } from "@/db/app-settings-dao";
 import type { SystemDescriptor } from "@/logic/orrery-system-logic";
 import type { RootStackParamList } from "@/navigation/types";
-import { showSnackbar, snackbarStore } from "@/stores/snackbar-store";
 import { useOrreryPreferencesStore } from "@/stores/orrery-preferences-store";
+import { showSnackbar, snackbarStore } from "@/stores/snackbar-store";
 import { useTheme } from "@/theme";
 import { RADII } from "@/theme/tokens/radii";
 import { SPACING } from "@/theme/tokens/spacing";
-import { buildSystemChoices } from "@/components/orrery/orrery-controls-logic";
 
 const ALL_CONTACTS_REF = "builtin:all-contacts" as OrrerySystemId;
 
@@ -64,7 +58,9 @@ function isCustom(row: SystemManagementRow): boolean {
 }
 
 /** Keep the protected System visibly and durably first, even after a drag. */
-export function pinAllContacts<T extends { id: string }>(rows: readonly T[]): T[] {
+export function pinAllContacts<T extends { id: string }>(
+  rows: readonly T[],
+): T[] {
   const allContacts = rows.find((row) => row.id === ALL_CONTACTS_REF);
   return allContacts
     ? [allContacts, ...rows.filter((row) => row.id !== ALL_CONTACTS_REF)]
@@ -92,22 +88,23 @@ function errorSnackbar(label: string): void {
   });
 }
 
-/** Hydration is mandatory when Settings is reached before OrreryScreen mounts. */
-export async function publishLastSystem(lastSystem: OrrerySystemId): Promise<void> {
+/** Refresh the in-memory selection after a DAO composite commits its settings write. */
+async function refreshOrreryPreferences(): Promise<void> {
   const exec = getExecutor();
   const prefs = useOrreryPreferencesStore.getState();
-  if (!prefs.hydrated) await prefs.hydrate(exec);
-  await useOrreryPreferencesStore.getState().save(exec, { lastSystem });
+  await prefs.hydrate(exec);
 }
 
 /** Delete never touches contacts; its snapshot powers the short-lived Undo action. */
 export async function deleteManagedSystem(input: {
   systemRef: OrrerySystemId;
-  active: boolean;
   onChanged: () => Promise<void>;
 }): Promise<void> {
-  const snapshot = await deleteSystem(getExecutor(), { systemRef: input.systemRef });
-  if (input.active) await publishLastSystem(ALL_CONTACTS_REF);
+  const deletion = await deleteSystemWithActiveFallback(getExecutor(), {
+    systemRef: input.systemRef,
+    now: localDateTime(),
+  });
+  await refreshOrreryPreferences();
   await input.onChanged();
   showSnackbar({
     kind: "success",
@@ -118,8 +115,10 @@ export async function deleteManagedSystem(input: {
       onPress: () => {
         void (async () => {
           try {
-            await restoreDeletedSystem(getExecutor(), { snapshot, now: localDateTime() });
-            if (input.active) await publishLastSystem(input.systemRef);
+            await restoreDeletedSystem(getExecutor(), {
+              snapshot: deletion.snapshot,
+              now: localDateTime(),
+            });
             await input.onChanged();
           } catch {
             errorSnackbar("Couldn't undo — that name is in use again");
@@ -151,17 +150,32 @@ function SystemRow({
   const drag = useReorderableDrag();
   const actions = managementActions(row);
   const indicator = row.broken
-    ? { icon: "status-decay" as const, tone: "danger" as const, label: "Needs attention" }
+    ? {
+        icon: "status-decay" as const,
+        tone: "danger" as const,
+        label: "Needs attention",
+      }
     : row.memberCount === 0
-      ? { icon: "status-wobble" as const, tone: "statusWobble" as const, label: "Empty" }
+      ? {
+          icon: "status-wobble" as const,
+          tone: "statusWobble" as const,
+          label: "Empty",
+        }
       : row.hasOverrides
-        ? { icon: "status-neutral" as const, tone: "textSecondary" as const, label: "Overrides" }
+        ? {
+            icon: "status-neutral" as const,
+            tone: "textSecondary" as const,
+            label: "Overrides",
+          }
         : null;
 
   return (
     <View
       testID={`system-row-${row.id}`}
-      style={[styles.row, { backgroundColor: colors.surface, borderColor: colors.border }]}
+      style={[
+        styles.row,
+        { backgroundColor: colors.surface, borderColor: colors.border },
+      ]}
     >
       <Pressable
         accessibilityRole="button"
@@ -195,8 +209,16 @@ function SystemRow({
               ]}
             />
             <View style={styles.actionRow}>
-              <Button role="secondary" label="Cancel" onPress={onCancelRename} />
-              <Button role="primary" label="Save name" onPress={onSubmitRename} />
+              <Button
+                role="secondary"
+                label="Cancel"
+                onPress={onCancelRename}
+              />
+              <Button
+                role="primary"
+                label="Save name"
+                onPress={onSubmitRename}
+              />
             </View>
           </>
         ) : (
@@ -209,7 +231,10 @@ function SystemRow({
             {indicator ? (
               <View style={styles.indicator}>
                 <Icon name={indicator.icon} size="sm" tone={indicator.tone} />
-                <AppText role="caption" style={{ color: colors[indicator.tone] }}>
+                <AppText
+                  role="caption"
+                  style={{ color: colors[indicator.tone] }}
+                >
                   {indicator.label}
                 </AppText>
               </View>
@@ -234,7 +259,8 @@ function SystemRow({
 
 export function SystemsManagementScreen() {
   const { colors } = useTheme();
-  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const navigation =
+    useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const [rows, setRows] = useState<SystemManagementRow[]>([]);
   const committedRows = useRef<SystemManagementRow[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -263,7 +289,8 @@ export function SystemsManagementScreen() {
           hidden: pref?.hidden === 1,
           hasOverrides: overrides.length > 0,
           broken:
-            members.status !== "ready" || (members.brokenRules?.length ?? 0) > 0,
+            members.status !== "ready" ||
+            (members.brokenRules?.length ?? 0) > 0,
           sourceIndex,
           displayOrder: pref?.displayOrder,
         };
@@ -277,7 +304,13 @@ export function SystemsManagementScreen() {
               (b.displayOrder ?? Number.MAX_SAFE_INTEGER) ||
             a.sourceIndex - b.sourceIndex,
         )
-        .map(({ sourceIndex: _sourceIndex, displayOrder: _displayOrder, ...row }) => row),
+        .map(
+          ({
+            sourceIndex: _sourceIndex,
+            displayOrder: _displayOrder,
+            ...row
+          }) => row,
+        ),
     );
     committedRows.current = ordered;
     setRows(ordered);
@@ -285,7 +318,9 @@ export function SystemsManagementScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      void load().catch(() => setError("Couldn't load Systems. Please try again."));
+      void load().catch(() =>
+        setError("Couldn't load Systems. Please try again."),
+      );
     }, [load]),
   );
 
@@ -310,7 +345,8 @@ export function SystemsManagementScreen() {
       setRenamingId(null);
       await load();
     } catch (cause) {
-      const message = cause instanceof Error ? cause.message : "Couldn't rename this System.";
+      const message =
+        cause instanceof Error ? cause.message : "Couldn't rename this System.";
       setError(
         message.includes("already exists")
           ? `A System named "${renameValue.trim()}" already exists. Choose a different name.`
@@ -330,11 +366,8 @@ export function SystemsManagementScreen() {
           onPress: () => {
             void (async () => {
               try {
-                const active =
-                  useOrreryPreferencesStore.getState().committed.lastSystem === row.id;
                 await deleteManagedSystem({
                   systemRef: row.id,
-                  active,
                   onChanged: load,
                 });
               } catch {
@@ -419,10 +452,14 @@ export function SystemsManagementScreen() {
       })
       .catch(() => {
         setRows(committedRows.current);
-        setError("Couldn't save the new System order. The previous order was restored.");
+        setError(
+          "Couldn't save the new System order. The previous order was restored.",
+        );
       });
   };
-  const renderItem = ({ item }: ReorderableListRenderItemInfo<SystemManagementRow>) => (
+  const renderItem = ({
+    item,
+  }: ReorderableListRenderItemInfo<SystemManagementRow>) => (
     <SystemRow
       row={item}
       renaming={renamingId === item.id}
@@ -439,11 +476,17 @@ export function SystemsManagementScreen() {
   const empty = rows.length === 0 && !error;
 
   return (
-    <View testID="systems-management-screen" style={[styles.root, { backgroundColor: colors.background }]}>
+    <View
+      testID="systems-management-screen"
+      style={[styles.root, { backgroundColor: colors.background }]}
+    >
       <ShellAppBar variant="child" title="Systems" />
       <View style={styles.content}>
         {error ? (
-          <AppText accessibilityLiveRegion="polite" style={{ color: colors.danger }}>
+          <AppText
+            accessibilityLiveRegion="polite"
+            style={{ color: colors.danger }}
+          >
             {error}
           </AppText>
         ) : null}
@@ -477,7 +520,12 @@ const styles = StyleSheet.create({
     padding: SPACING.md,
     gap: SPACING.sm,
   },
-  dragHandle: { minWidth: 44, minHeight: 44, justifyContent: "center", alignItems: "center" },
+  dragHandle: {
+    minWidth: 44,
+    minHeight: 44,
+    justifyContent: "center",
+    alignItems: "center",
+  },
   rowBody: { flex: 1, gap: SPACING.sm },
   actionRow: { flexDirection: "row", flexWrap: "wrap", gap: SPACING.sm },
   indicator: { flexDirection: "row", alignItems: "center", gap: SPACING.xs },

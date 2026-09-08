@@ -44,7 +44,7 @@ vi.mock("@/db/orrery-system-read", () => ({
   readOrrerySystemSnapshot: vi.fn(),
 }));
 vi.mock("@/db/systems-dao", () => ({
-  deleteSystem: vi.fn(),
+  deleteSystemWithActiveFallback: vi.fn(),
   duplicateSystem: vi.fn(),
   listCustomSystems: vi.fn(),
   listSystemOverrides: vi.fn(),
@@ -69,7 +69,7 @@ vi.mock("@/components/orrery/orrery-controls-logic", () => ({
   buildSystemChoices: vi.fn(),
 }));
 
-const { deleteManagedSystem, managementActions, pinAllContacts, publishLastSystem } = await import(
+const { deleteManagedSystem, managementActions, pinAllContacts } = await import(
   "./SystemsManagementScreen"
 );
 const dao = await import("@/db/systems-dao");
@@ -92,10 +92,13 @@ describe("SystemsManagementScreen contracts", () => {
     state.prefs.committed.lastSystem = "builtin:all-contacts";
   });
   it("pins All Contacts first and never offers destructive or immutable-base actions", () => {
-    expect(pinAllContacts([{ ...allContacts, id: "custom:late" }, allContacts])[0]).toBe(
-      allContacts,
-    );
-    expect(managementActions(allContacts)).toEqual(["Duplicate", "Manage Members"]);
+    expect(
+      pinAllContacts([{ ...allContacts, id: "custom:late" }, allContacts])[0],
+    ).toBe(allContacts);
+    expect(managementActions(allContacts)).toEqual([
+      "Duplicate",
+      "Manage Members",
+    ]);
   });
 
   it("gives built-ins override authoring without Rename/Delete and custom Systems their lifecycle actions", () => {
@@ -122,20 +125,16 @@ describe("SystemsManagementScreen contracts", () => {
     ).toEqual(["Edit", "Rename", "Duplicate", "Delete"]);
   });
 
-  it("hydrates before publishing the active-delete fallback, then restores selection only after Undo succeeds", async () => {
-    const calls: string[] = [];
-    state.prefs.hydrated = false;
-    state.prefs.hydrate.mockImplementation(async () => {
-      calls.push("hydrate");
-      state.prefs.hydrated = true;
-    });
-    state.prefs.save.mockImplementation(async () => calls.push("save"));
-    vi.mocked(dao.deleteSystem).mockResolvedValue({
-      uid: "family",
-      name: "Family",
-      rules: [],
-      overrides: [],
-      prefs: null,
+  it("offers Undo only after the DAO commits the delete/fallback composite", async () => {
+    vi.mocked(dao.deleteSystemWithActiveFallback).mockResolvedValue({
+      snapshot: {
+        uid: "family",
+        name: "Family",
+        rules: [],
+        overrides: [],
+        prefs: null,
+      },
+      wasActive: true,
     });
     vi.mocked(dao.restoreDeletedSystem).mockResolvedValue({
       id: 1,
@@ -148,56 +147,52 @@ describe("SystemsManagementScreen contracts", () => {
 
     await deleteManagedSystem({
       systemRef: "custom:family",
-      active: true,
       onChanged,
     });
 
-    expect(calls).toEqual(["hydrate", "save"]);
-    expect(state.prefs.save).toHaveBeenCalledWith("exec", {
-      lastSystem: "builtin:all-contacts",
+    expect(dao.deleteSystemWithActiveFallback).toHaveBeenCalledWith("exec", {
+      systemRef: "custom:family",
+      now: "now",
     });
+    expect(state.prefs.hydrate).toHaveBeenCalledWith("exec");
+    expect(state.prefs.save).not.toHaveBeenCalled();
     expect(snackbar.showSnackbar).toHaveBeenCalledWith(
       expect.objectContaining({ label: "System deleted" }),
     );
 
-    const undo = vi.mocked(snackbar.showSnackbar).mock.calls[0][0].action.onPress;
+    const undo = vi.mocked(snackbar.showSnackbar).mock.calls[0][0].action
+      .onPress;
     undo();
     await vi.waitFor(() => expect(dao.restoreDeletedSystem).toHaveBeenCalled());
-    expect(state.prefs.save).toHaveBeenLastCalledWith("exec", {
-      lastSystem: "custom:family",
-    });
   });
 
   it("keeps a failed Undo non-destructive and does not reselect the deleted System", async () => {
-    vi.mocked(dao.deleteSystem).mockResolvedValue({
-      uid: "family",
-      name: "Family",
-      rules: [],
-      overrides: [],
-      prefs: null,
+    vi.mocked(dao.deleteSystemWithActiveFallback).mockResolvedValue({
+      snapshot: {
+        uid: "family",
+        name: "Family",
+        rules: [],
+        overrides: [],
+        prefs: null,
+      },
+      wasActive: true,
     });
-    vi.mocked(dao.restoreDeletedSystem).mockRejectedValue(new Error("name in use"));
+    vi.mocked(dao.restoreDeletedSystem).mockRejectedValue(
+      new Error("name in use"),
+    );
 
     await deleteManagedSystem({
       systemRef: "custom:family",
-      active: true,
       onChanged: vi.fn().mockResolvedValue(undefined),
     });
     vi.mocked(snackbar.showSnackbar).mock.calls[0][0].action.onPress();
     await vi.waitFor(() =>
       expect(snackbar.showSnackbar).toHaveBeenLastCalledWith(
-        expect.objectContaining({ label: "Couldn't undo — that name is in use again" }),
+        expect.objectContaining({
+          label: "Couldn't undo — that name is in use again",
+        }),
       ),
     );
-    expect(state.prefs.save).toHaveBeenCalledTimes(1);
-  });
-
-  it("does not publish an unhydrated selection until its hydration completes", async () => {
-    state.prefs.hydrated = false;
-    state.prefs.hydrate.mockImplementation(async () => {
-      state.prefs.hydrated = true;
-    });
-    await publishLastSystem("custom:family");
-    expect(state.prefs.hydrate).toHaveBeenCalledBefore(state.prefs.save);
+    expect(state.prefs.save).not.toHaveBeenCalled();
   });
 });
