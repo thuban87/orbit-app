@@ -128,6 +128,67 @@ export function assertSystemRuleDrafts(
   }
 }
 
+/**
+ * A delete snapshot is a replay of already-durable rows, not a new authoring
+ * request. Validate its SQLite-shaped structure without applying the current
+ * closed rule vocabulary: older data can intentionally remain visible as a
+ * broken rule until the user repairs it.
+ */
+function assertDeletedSystemSnapshot(snapshot: DeletedSystemSnapshot): void {
+  if (
+    !snapshot ||
+    typeof snapshot.uid !== "string" ||
+    typeof snapshot.name !== "string" ||
+    !Array.isArray(snapshot.rules) ||
+    !Array.isArray(snapshot.overrides)
+  ) {
+    throw new Error("restoreDeletedSystem: malformed delete snapshot");
+  }
+  assertOrreryLastSystem("snapshot system uid", `custom:${snapshot.uid}`);
+
+  const ruleKeys = new Set<string>();
+  for (const rule of snapshot.rules) {
+    if (
+      !rule ||
+      typeof rule.family !== "string" ||
+      typeof rule.value !== "string"
+    ) {
+      throw new Error("restoreDeletedSystem: malformed snapshot rule");
+    }
+    const key = `${rule.family}\u0000${rule.value}`;
+    if (ruleKeys.has(key)) {
+      throw new Error("restoreDeletedSystem: duplicate snapshot rule");
+    }
+    ruleKeys.add(key);
+  }
+
+  const overrideContactIds = new Set<number>();
+  for (const override of snapshot.overrides) {
+    if (
+      !override ||
+      !Number.isInteger(override.contactId) ||
+      override.contactId <= 0 ||
+      (override.mode !== "include" && override.mode !== "exclude")
+    ) {
+      throw new Error("restoreDeletedSystem: malformed snapshot override");
+    }
+    if (overrideContactIds.has(override.contactId)) {
+      throw new Error("restoreDeletedSystem: duplicate snapshot override");
+    }
+    overrideContactIds.add(override.contactId);
+  }
+
+  if (
+    snapshot.prefs !== null &&
+    (!snapshot.prefs ||
+      (snapshot.prefs.displayOrder !== null &&
+        !Number.isInteger(snapshot.prefs.displayOrder)) ||
+      (snapshot.prefs.hidden !== 0 && snapshot.prefs.hidden !== 1))
+  ) {
+    throw new Error("restoreDeletedSystem: malformed snapshot preferences");
+  }
+}
+
 function mapSystem(row: {
   id: number;
   uid: string;
@@ -402,7 +463,7 @@ export async function restoreDeletedSystemCore(
   input: { snapshot: DeletedSystemSnapshot; now: string },
 ): Promise<CustomSystem> {
   const { snapshot, now } = input;
-  assertSystemRuleDrafts(snapshot.rules);
+  assertDeletedSystemSnapshot(snapshot);
   await assertUniqueSystemName(exec, { name: snapshot.name });
   const inserted = await exec.runAsync(
     "INSERT INTO systems (uid, name, created_at, modified_at) VALUES (?, ?, ?, ?)",

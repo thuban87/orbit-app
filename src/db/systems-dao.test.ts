@@ -284,6 +284,57 @@ describe("systems DAO", () => {
     });
   });
 
+  it("restores historical broken rules unchanged while keeping them visible for repair", async () => {
+    const system = await createCustomSystem(exec, {
+      name: "Historical Rules",
+      now: NOW,
+    });
+    const ref = `custom:${system.uid}` as const;
+    await exec.runAsync(
+      "INSERT INTO system_rules (uid, system_id, family, value, created_at) VALUES (?, ?, ?, ?, ?)",
+      ["historical-invalid", system.id, "gravity", "not-a-tier", NOW],
+    );
+    await exec.runAsync(
+      "INSERT INTO system_rules (uid, system_id, family, value, created_at) VALUES (?, ?, ?, ?, ?)",
+      ["historical-missing", system.id, "category", "no-longer-exists", NOW],
+    );
+
+    const deletion = await deleteSystemWithActiveFallback(exec, {
+      systemRef: ref,
+      now: NOW,
+    });
+    const restored = await restoreDeletedSystem(exec, {
+      snapshot: deletion.snapshot,
+      now: NOW,
+    });
+
+    expect(await listSystemRules(exec, restored.id)).toMatchObject([
+      { family: "gravity", value: "not-a-tier" },
+      { family: "category", value: "no-longer-exists" },
+    ]);
+    await expect(
+      resolveCustomSystemMembers(
+        exec,
+        { uid: restored.uid },
+        NOW,
+        async () => null,
+      ),
+    ).resolves.toMatchObject({
+      brokenRules: [
+        {
+          family: "gravity",
+          value: "not-a-tier",
+          reason: "invalid-value",
+        },
+        {
+          family: "category",
+          value: "no-longer-exists",
+          reason: "missing-category",
+        },
+      ],
+    });
+  });
+
   it("guards every override write with catalog validation and supports valid immutable bases", async () => {
     const system = await createCustomSystem(exec, {
       name: "Overrides",
@@ -617,6 +668,19 @@ describe("systems DAO", () => {
     expect(
       (await listCustomSystems(exec)).map(({ name }) => name),
     ).not.toContain("Never persisted");
+
+    // Direct SQL represents pre-validation historical storage only. New
+    // duplicate writes still go through the closed draft vocabulary.
+    await exec.runAsync(
+      "INSERT INTO system_rules (uid, system_id, family, value, created_at) VALUES (?, ?, ?, ?, ?)",
+      ["historical-invalid-copy", system.id, "gravity", "not-a-tier", NOW],
+    );
+    await expect(
+      duplicateSystem(exec, { systemRef: ref, now: NOW }),
+    ).rejects.toThrow("invalid System rule");
+    expect(
+      (await listCustomSystems(exec)).map(({ name }) => name),
+    ).not.toContain("Validated Copy");
   });
 
   it("persists only valid built-in or Category visibility preferences", async () => {
