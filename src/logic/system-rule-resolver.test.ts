@@ -12,6 +12,7 @@ import {
   FAVORITE_RULE_VALUE,
   mapRulesToFilters,
   NOT_CONTACTED_RULE_VALUE,
+  applyMembershipOverrides,
   resolveCandidateIds,
   resolveCustomSystemMembers,
   SCOPE_POPULATION_FAMILY,
@@ -259,5 +260,18 @@ describe("System candidate resolution", () => {
             },
       ),
     ).toEqual([activePlain]);
+  });
+});
+
+describe("membership overrides", () => {
+  it("unions eligible additions, excludes only matching candidates, and marks stale excludes prunable", () => {
+    expect(
+      applyMembershipOverrides({
+        candidateIds: [1, 2],
+        includeIds: [3, 4],
+        eligibleIncludeIds: [3],
+        excludeIds: [2, 4],
+      }),
+    ).toEqual({ memberIds: [1, 3], prunableExclusionContactIds: [4] });
   });
 });
