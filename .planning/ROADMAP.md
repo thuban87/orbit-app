@@ -550,31 +550,34 @@ Plans:
 
 **Canonical refs**: docs/dossier/milestone-2/phase-09-orrery-systems-dossier.md; docs/dossier/milestone-2/planning-notes/phase-09-planning-notes.md
 **Schema**: Systems tables — migration **022** (verified head+1 on disk at plan time 2026-09-08: migrations 001–021, `TARGET_VERSION=21` → first new is 022; re-verify at execution time). Creates `systems` + `system_rules` + `system_overrides` + `system_prefs`; does NOT touch `app_settings` (`orrery_last_system` already exists, migration 021). Backup is **declare-only** — no `BACKUP_FORMAT_VERSION` bump (Phase 36 owns v5).
-**Plans**: 10 plans (5 waves)
+**Plans**: 10 plans (6 waves) — re-sequenced in the cross-AI reviews replan so the builder route (30-08) lands before management (30-06) that navigates to it, and the switcher (30-05) lands after management provides its route + data-flow owner
 **Wave 1**
 
-- [ ] 30-01-PLAN.md — TRACER: migration 022 (Systems table set, one-way-door checkpoint) + thin manual-only custom System end-to-end (union/grammar/resolver/read/switcher) [ORRS-01/02/12]
+- [ ] 30-01-PLAN.md — TRACER: migration 022 (Systems table set, one-way-door checkpoint) + thin manual-only custom System end-to-end (union/grammar/resolver/read/switcher) + custom-routing-before-buildWhere guard + missing-custom read result + cross-catalog name uniqueness [ORRS-01/02/12]
 
 **Wave 2** *(blocked on Wave 1)*
 
-- [ ] 30-02-PLAN.md — Custom-System membership resolver: rules (OR/AND) + Gravity TS pass + inc/exc pruning + broken-rule detection [ORRS-01/02/04]
-- [ ] 30-03-PLAN.md — systems-dao full CRUD: rename/delete+fallback/duplicate/reorder/hide-show/overrides/reset + CI-unique names + immutability [ORRS-02/03/09/10]
-- [ ] 30-04-PLAN.md — Backup declare-only: restore-accept custom:<uid> + Systems entity contract for Phase 36 (no wire emission, no format bump) [ORRS-14]
+- [ ] 30-02-PLAN.md — Custom-System membership resolver: rules (OR/AND) + Gravity TS pass + inc/exc pruning + broken-rule detection (ruleUid) + scope:population base-mode + draft-vs-persisted resolvers + stable ordering [ORRS-01/02/04]
+- [ ] 30-03-PLAN.md — systems-dao full CRUD: rename/delete+fallback/duplicate(All Contacts→scope:population)/reorder/hide-show(catalog-validated)/overrides(setSystemOverride)/reset + atomic saveSystemDefinition + uid-preserving Undo + prune + cross-catalog CI-unique names + immutability [ORRS-02/03/09/10]
+- [ ] 30-04-PLAN.md — Backup declare-only: restore-accept custom:<uid> (pinned vs types.ts) + Systems entity contract for Phase 36 (no wire emission, no format bump) [ORRS-14]
 
 **Wave 3** *(blocked on Wave 2)*
 
-- [ ] 30-06-PLAN.md — Systems Management screen + routes (Orrery + Settings) + contact-safe delete+Undo [ORRS-03/04/09/10]
-- [ ] 30-07-PLAN.md — Manage Members: searchable virtualized multi-select grid (preselect/exclude-in-place/add/counts) on the picker LOGIC [ORRS-02/06]
-- [ ] 30-10-PLAN.md — Switch animation + camera: Home framing + shared-focus preservation + delta-adaptive spin/shed/capture + reduced-motion crossfade [ORRS-12/13]
+- [ ] 30-07-PLAN.md — Manage Members: searchable virtualized multi-select grid (preselect/exclude-in-place/add/counts) on the picker LOGIC, local photo path, setSystemOverride intent [ORRS-02/06]
+- [ ] 30-10-PLAN.md — Switch animation + camera: Home framing + shared-focus preservation (replaces the unconditional focus-clear) + stash/diff membership delta + delta-adaptive spin/shed/capture in OrreryWorld + reduced-motion crossfade + startup missing-custom fallback [ORRS-12/13]
 
 **Wave 4** *(blocked on Wave 3)*
 
-- [ ] 30-05-PLAN.md — Switcher extension: management order/visibility/live counts/empty-vs-broken severity + Manage Systems entry + 3 icon keys [ORRS-11]
-- [ ] 30-08-PLAN.md — Builder HUD wizard: Definition accordions (8 axes) + live count + embed Manage Members + save-switch semantics + discard guard [ORRS-01/02/05/08]
+- [ ] 30-08-PLAN.md — Builder HUD wizard: Definition accordions (8 axes) + draft live count (resolveMembershipFromDefinition) + embed Manage Members + atomic save-switch semantics + SystemBuilder route in BOTH stacks + whole-canvas inert + discard guard [ORRS-01/02/05/08]
 
 **Wave 5** *(blocked on Wave 4)*
 
-- [ ] 30-09-PLAN.md — Full-canvas Preview: simplified render over reused Phase 29 layout + Preview/Edit bar + Save-from-Preview [ORRS-07]
+- [ ] 30-06-PLAN.md — Systems Management screen + routes (Orrery + Settings) + Create/Edit → SystemBuilder (both stacks) + contact-safe delete+Undo + active-delete persists All-Contacts fallback [ORRS-03/04/09/10]
+- [ ] 30-09-PLAN.md — Full-canvas Preview: simplified render over the shared Phase 29 scene derivation + focus/AppState lifecycle + Preview/Edit bar + Save-from-Preview [ORRS-07]
+
+**Wave 6** *(blocked on Wave 5)*
+
+- [ ] 30-05-PLAN.md — Switcher extension: management order/visibility/live counts (bounded)/empty-vs-broken severity + OrreryScreen catalog data-flow owner + Manage Systems entry + 3 icon keys [ORRS-11]
 
 **UI hint**: yes
 
