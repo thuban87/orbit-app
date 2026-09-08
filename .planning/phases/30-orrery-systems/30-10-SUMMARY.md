@@ -14,9 +14,9 @@ provides:
   - Missing-custom restore fallback to All Contacts
 affects: [30-06, 30-08, orrery, settings, custom-systems]
 actuals:
-  tokens: 7211
+  tokens: 7617
   tasks: 3
-  commits: 5
+  commits: 6
 tech-stack:
   added: []
   patterns:
@@ -94,6 +94,7 @@ status: complete
 2. **Task 2: Switch selection, focus, persistence, fallback, and affordance wiring** — `3834fd3`
 3. **Task 3: Existing frame pipeline intensity/spin modulation** — `b74c230`
 4. **Task 3 regression coverage** — `e549b3e`
+5. **Cross-route failure-edge correction** — `807ae0c`
 
 ## Decisions Made
 
@@ -113,6 +114,14 @@ status: complete
 - **Verification:** Targeted mapper test passes.
 - **Commit:** `e549b3e`
 
+**2. [Rule 1 - Bug] Allowed a foreign same-ref selection to republish after a local write failure**
+- **Found during:** Final cross-route persistence review
+- **Issue:** A failed local save left a pending same-ref intent, which could make a later genuine external writer of that ref look like a no-op and retain the local origin.
+- **Fix:** A foreign origin may reassert the pending same `lastSystem`, producing its own real commit and observer-visible origin token.
+- **Files modified:** `src/stores/orrery-preferences-store.ts`, `src/stores/orrery-preferences-store.test.ts`
+- **Verification:** Preference store test covers the failed-local then foreign-same-ref sequence.
+- **Commit:** `807ae0c`
+
 ## Issues Encountered
 
 - `npm test` runs 2,600 tests successfully but remains nonzero because the known `src/backup/restore-apply.test.ts` and `src/stores/orrery-system-store.test.ts` suites hit Vitest/Rolldown's React Native Flow parser limitation. This was not masked or changed. The former Task 3 mapper failure is resolved.
@@ -130,3 +139,7 @@ Phase 30's management and builder routes can persist `lastSystem` without an ori
 ---
 *Phase: 30-orrery-systems*
 *Completed: 2026-09-08*
+
+## Self-Check: PASSED
+
+- Summary exists and all task commits (`0bc1c98`, `08a78f9`, `3834fd3`, `b74c230`, `e549b3e`, `807ae0c`) exist in git history.
