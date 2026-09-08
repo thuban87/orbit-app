@@ -8,7 +8,15 @@ import { addSystemOverride, createCustomSystem } from "@/db/systems-dao";
 import { readOrrerySystemMembersCore } from "@/db/orrery-system-read";
 import { runMigrations } from "@/db/migrations/runner";
 import type { SqlExecutor } from "@/db/types";
-import { resolveCustomSystemMembers } from "@/logic/system-rule-resolver";
+import {
+  FAVORITE_RULE_VALUE,
+  mapRulesToFilters,
+  NOT_CONTACTED_RULE_VALUE,
+  resolveCustomSystemMembers,
+  SCOPE_POPULATION_FAMILY,
+  SCOPE_POPULATION_VALUE,
+  SNOOZED_RULE_VALUE,
+} from "@/logic/system-rule-resolver";
 import { loadOrreryScene } from "@/services/orrery-scene";
 import { createOrrerySystemStore } from "@/stores/orrery-system-store";
 
@@ -103,6 +111,47 @@ describe("manual-only custom System resolver", () => {
       status: "ready",
       members: [],
       brokenRules: [],
+    });
+  });
+});
+
+describe("stored System rule mapping", () => {
+  it("maps valid category rules and preserves distinct broken rule identities", async () => {
+    await exec.runAsync(
+      "INSERT INTO categories(uid,name,display_order,created_at,modified_at) VALUES ('friends','Friends',0,?,?)",
+      [NOW, NOW],
+    );
+    const mapped = await mapRulesToFilters(exec, [
+      { uid: "rule-good", family: "category", value: "friends" },
+      { uid: "rule-missing-a", family: "category", value: "gone" },
+      { uid: "rule-missing-b", family: "category", value: "gone" },
+      { uid: "rule-battery", family: "social-battery", value: "invalid" },
+      { uid: "rule-favorite", family: "favorite", value: "bad" },
+      { uid: "rule-scope", family: "scope", value: "bad" },
+    ]);
+    expect(mapped.filters.category).toEqual(["1"]);
+    expect(mapped.broken).toEqual([
+      { ruleUid: "rule-missing-a", family: "category", value: "gone", reason: "missing-category" },
+      { ruleUid: "rule-missing-b", family: "category", value: "gone", reason: "missing-category" },
+      { ruleUid: "rule-battery", family: "social-battery", value: "invalid", reason: "invalid-value" },
+      { ruleUid: "rule-favorite", family: "favorite", value: "bad", reason: "invalid-value" },
+      { ruleUid: "rule-scope", family: "scope", value: "bad", reason: "invalid-value" },
+    ]);
+  });
+
+  it("only accepts exported closed boolean and population sentinels", async () => {
+    const mapped = await mapRulesToFilters(exec, [
+      { uid: "favorite", family: "favorite", value: FAVORITE_RULE_VALUE },
+      { uid: "not-contacted", family: "not-contacted", value: NOT_CONTACTED_RULE_VALUE },
+      { uid: "snoozed", family: "snoozed", value: SNOOZED_RULE_VALUE },
+      { uid: "scope", family: SCOPE_POPULATION_FAMILY, value: SCOPE_POPULATION_VALUE },
+    ]);
+    expect(mapped).toMatchObject({
+      favorite: true,
+      notContacted: true,
+      snoozed: true,
+      populationScope: true,
+      broken: [],
     });
   });
 });
