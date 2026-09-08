@@ -4,10 +4,11 @@ reviewers: [codex, claude]
 reviewed_at: 2026-09-08T11:44:25Z        # cycle 1
 reviewed_at_cycle2: 2026-09-08T12:37:11Z  # cycle 2 (this file accumulates per cycle)
 reviewed_at_cycle3: 2026-09-08T15:20:00Z  # cycle 3
-cycles: 3
+reviewed_at_cycle4: 2026-09-08T17:05:00Z  # cycle 4
+cycles: 4
 plans_reviewed: [30-01-PLAN.md, 30-02-PLAN.md, 30-03-PLAN.md, 30-04-PLAN.md, 30-05-PLAN.md, 30-06-PLAN.md, 30-07-PLAN.md, 30-08-PLAN.md, 30-09-PLAN.md, 30-10-PLAN.md]
 models:
-  codex: "gpt-5.6-terra (reasoning=high)"     # cycle 3 ran codex direct at reasoning=high
+  codex: "gpt-5.6-terra (reasoning=high)"     # cycles 3 & 4 ran codex direct at reasoning=high
   claude: "claude-opus (read-only subagent lane)"
 model_sources:
   codex: "config"
@@ -18,6 +19,9 @@ cycle2_summary:
 cycle3_summary:
   current_high: 3
   current_actionable: 11
+cycle4_summary:
+  current_high: 3
+  current_actionable: 3
 ---
 
 # Cross-AI Plan Review — Phase 30 (Orrery Systems)
@@ -1101,3 +1105,95 @@ The current Phase 30 plans (10 PLAN.md files on disk) are exceptionally mature: 
 ## 5. Risk Assessment
 
 **Overall: MEDIUM.** The data-integrity core (migration, DAO write boundary, transaction atomicity, resolver purity, cascade/ref-keyed cleanup, injection safety) is genuinely strong and the plans' factual claims verify against source — that part is LOW risk. The MEDIUM rating is driven almost entirely by the single HIGH finding: an in-scope `[DECIDED]` requirement (built-in/Category overrides, ORRS-03) that the 10 plans neither apply at read time nor expose for authoring, while still advertising it in the UI. That is a scope/consistency decision the owner or planner must make before execution, not something an executor should silently resolve — but it is not a one-way-door data hazard, so it does not rise to HIGH overall. The two LOW items are polish. No decision-reversal, no data-corruption, and no migration-ordering risk was found.
+
+---
+
+# Cross-AI Plan Review — Phase 30 (Orrery Systems) — CYCLE 4
+
+> **Cycle 4** re-review of the CURRENT plans on disk after the cycle-3 replan (commit `d4bf544` — "cross-route selection seam, built-in/Category override completion, focus-vs-Home framing, +8 actionables"). Reviewers: `codex` (gpt-5.6-terra, reasoning=high — run directly via `codex exec` in a read-only sandbox, source-grounded) and `claude` (Opus, read-only orchestrator analysis pass — the headless `claude -p` lane has a known Write-permission failure in this repo; owner explicitly approved the Claude lane for this run). The Claude lane this cycle was a **context-inheriting orchestrator fork** (it shares the orchestrator's priors, so its independent weight is lower than codex's — its distinct contribution is folded in and labelled). Both lanes had full repo read access and verified plan claims against source; neither wrote, committed, or pushed. This section ACCUMULATES onto the cycle-1/2/3 records above — it does not replace them. Findings are judged only for whether they REMAIN unresolved against the current plans; cycle-1/2/3 items the replans incorporated or deferred/rejected in a PLAN.md are not recounted.
+
+## Cycle 4 Consensus Summary
+
+**The cycle-3 replan landed and the three cycle-3 HIGHs are resolved at their core.** The orchestrator independently re-verified against source (not the reviewer summaries or the diff): (HIGH #1) `useOrreryPreferencesStore` is a genuine module-level singleton (`orrery-preferences-store.ts:166`), `save()` commits `lastSystem` when it differs (`:148`), and the loop guard's premise holds on disk — `orrery-system-store.ts:89` sets `requested` before `io.persist` runs at `:112`, so a self-write finds `committed === requested.id` and the observer skips; (HIGH #2) the read-path override application is shared (`applyMembershipOverrides` used by both the custom resolver and the builtin/category branch, 30-02:201), authoring is wired (30-06 Manage-Members action → 30-08 override-only mode → 30-03 `saveMembershipOverrides` override-only composite), and `assertKnownSystemRef` is now mandatory on every ref-keyed write (30-03, actionable #6); (HIGH #3) the framing branch (`OrreryScreen.tsx:708-714`) and unconditional focus clear (`:281-288`) are exactly as cited, and 30-10 forces `deriveHomePose` on a real switch (gated by the switch-vs-reload token) while preserving focus selection. All **11 cycle-3 actionable items (#1–#11) are incorporated** in the current plan files with tasks + acceptance criteria (verified directly, not from a reviewer's claim).
+
+**But the cycle-3 selection-channel and gravity-loader fixes each EXPOSED a new seam the replan did not close, and both reviewers independently reach the same cluster this cycle — the phase carries 3 unresolved HIGH into cycle 4, all NEW.** Codex rates the phase **HIGH** on three counts (Settings-origin selection write dropped when the preferences store is unhydrated; the equality-only observer loop guard reversing a rapid B→C switch; the draft membership engine's now-required gravity loader never constructed by the builder/preview callers). The orchestrator **code-verified all three against source on disk** and they are real. The Claude (fork) lane corroborated the three cycle-3 resolutions and the loop-guard premise, and added one LOW: the 30-08/30-06 `depends_on` don't explicitly list 30-10 (the observer's before-writers ordering is incidental to wave arithmetic, not encoded). This is the same shape as cycles 1–3: the data-integrity core is strong; the residual risk is at cross-plan wiring seams the latest fix newly exposed.
+
+### Orchestrator verification (code, not the diff — not the reviewer summaries)
+Confirmed against source on disk:
+- **HIGH #A (Settings-origin selection write no-ops when unhydrated) — REAL, NEW.** `useOrreryPreferencesStore.save()` early-returns `Promise.resolve()` while `!hydrated` (`orrery-preferences-store.ts:135`). The ONLY hydration call site is inside `OrreryScreen`'s `useFocusEffect` (`OrreryScreen.tsx:314`); `OrreryViewOptions` uses the store but never hydrates. The builder (30-08) and management (30-06) are reachable from the **Settings stack**. So on a cold path where the user opens Settings → Systems and creates/deletes a System **before ever mounting the focused Orrery**, both writers' `useOrreryPreferencesStore.getState().save({lastSystem})` calls (30-08:197 save-new; 30-06 active-delete/Undo) silently no-op: the System row commits, but neither the durable preference nor the observer-triggering commit is emitted. Save-new then neither switches nor persists (ORRS-08 broken, **no backstop**); active-delete relies only on the missing-custom relaunch fallback (30-01/30-10), not a live/persisted fallback. No plan specifies a hydrate-before-selection-write for non-Orrery callers.
+- **HIGH #B (observer loop guard is equality-only; a stale local commit reverses a rapid switch) — REAL, NEW.** The 30-10 observer skips only when `committed.lastSystem === active requested.id` (equality). But the switcher permits a new selection at any time (`OrrerySystemSelector.tsx` rows are always pressable; no persist lock) and `orrery-system-store.ts` `select()` has no lock against a second select during an in-flight persist — it just increments `generation`. The prefs `drain` (`orrery-preferences-store.ts:70-100`) publishes `committed` asynchronously after the SQLite write. So on a rapid B→C: `select(B)` sets `requested=B` and enqueues `committed=B`; `select(C)` sets `requested=C` before B's commit publishes; when `committed=B` then publishes, the observer sees `B ≠ requested(C)`, treats B as an EXTERNAL write, and re-selects B — reversing the user's C. The 30-10 test covers only a final self-write, not this interleaving. The channel needs a local-origin / generation acknowledgement, not equality alone.
+- **HIGH #C (draft membership engine's required gravity loader unconstructed by builder/preview) — REAL, NEW (a re-exposed portion of cycle-3 actionable #1).** 30-02:195/:201 makes `resolveMembershipFromDefinition(exec, {rules,overrides,now}, gravityInputsFor)` — the loader is now a REQUIRED 4th parameter — and correctly assigns production-read construction to `orrery-system-read.ts` (actionable #1). But the builder is a SEPARATE draft caller: 30-08:32/:186/:197 all call `resolveMembershipFromDefinition(exec, { rules, overrides, now })` with **3 args and no loader** (grep for `gravityInputsFor`/`readOrreryImpactInputsCore` in 30-08-PLAN.md is empty), and 30-09:44/:108 consumes `resolveMembershipFromDefinition` memberIds for the provisional preview with no loader either. A gravity-rule draft therefore cannot produce a valid live count / embedded grid / preview — a type failure or an unspecified fallback on a `[DECIDED]` ORRS-01 rule family. Loader construction must be assigned to the builder (or a db-facing draft-read wrapper the builder/preview call).
+- **MEDIUM (built-in/Category override read-path under-specifies full-row fetch for manual includes) — REAL, NEW.** 30-02:201 applies `applyMembershipOverrides` (an id-set operation returning `{memberIds, prunableExclusionContactIds}`) to the builtin/category branch "after the base member read." But `readOrrerySystemMembersCore` for builtin/category runs ONE `SELECT … WHERE ${where.sql}` returning full `OrrerySystemMember` rows (`orrery-system-read.ts:66-74`), and a manual INCLUDE is by definition a contact OUTSIDE that base predicate — so its full row (name/photo/progress) is never fetched. The custom path re-SELECTs `WHERE c.id IN (memberIds)` for full rows (30-01); the builtin/category branch as written does not. Result: a manual-included non-matching contact would be dropped from (or render dataless on) the built-in/Category **canvas**, silently defeating the "override-able" INCLUDE half of ORRS-03 that HIGH #2 set out to complete (the builder grid is fine — 30-07 unions `readMemberRowsByIds` — but the render path is not). Fix: specify that the builtin/category branch fetches full rows for the union `(base ∪ eligible-includes)` via an id-based SELECT, not just adjust an id set.
+- **All 11 cycle-3 actionables incorporated (verified in the current plan files):** #1 gravity-loader production-read wiring (30-02); #2 selector open/close `onOpenChange` signal (30-05:35/:73/:183); #3 count-strategy consistency built-in-batched-vs-custom-resolver (30-05:33/:148/:165); #4 30-01 tracer claim narrowed to DAO→resolver→read→store.select (30-01:36/:55); #5 30-10 switch-vs-reload discriminator token (30-10:267); #6 `assertKnownSystemRef` mandatory on override writers (30-03); #7 30-09 `inReadSnapshot` boundary + sun exclusion (30-09:32/:114/:115); #8 30-06 Undo failed-restore catch (30-06:150/:80); #9 30-05 display-order tie-break (30-05:36/:149/:164); #10 30-07 grid display-row union (30-07:32/:65/:143); #11 30-02 stale-exclusion discard-at-read/prune-at-save policy (30-02:82/:147).
+
+### Agreed Strengths (both lanes)
+- The three cycle-3 HIGHs are resolved at their core; the preferences store is a real singleton; the override read/write/builder paths line up; the switch token explicitly gates BOTH intensity and Home framing.
+- No decision reversal against the dossier / HANDOFF / ADRs. D-05/D-06/D-07/E-02 hold; the `custom_field_*` invariants are untouched; local-first / theme-token / no-per-frame-React-state invariants are preserved. HIGH #2 was resolved by COMPLETING [DECIDED] ORRS-03 (§153/§173/§363), not deferring or inverting it.
+
+### Divergent Views
+- **Overall risk:** Codex **HIGH** (three execute-blocking selection/loader seams) vs Claude-fork **MEDIUM–HIGH** (corroborates resolutions; independently surfaced only the LOW `depends_on` edge). Orchestrator adjudication: **3 unresolved HIGH** carry into cycle 4 — all NEW, all codex-raised, all orchestrator-verified against source. The Claude lane's lower severity reflects that it scoped mainly to *whether the cycle-3 fixes landed* (they did) rather than probing the new mechanisms' failure modes; this is again a coverage divergence, not a factual disagreement. The fork's shared-priors caveat (above) means codex is the load-bearing independent lane this cycle.
+- **HIGH #B window:** genuine but narrow (requires a second select within one async SQLite-write window). Rated HIGH because it defeats the *explicitly-claimed* loop guard and produces a wrong active System; the fix (generation/origin ack) is a real design addition not present in any plan.
+
+## Cycle 4 — Unresolved HIGH concerns (orchestrator-adjudicated, verified real; all NEW this cycle)
+1. **Settings-origin selection write is dropped when the preferences store is unhydrated (30-08 save-new; 30-06 active-delete).** `save()` no-ops while `!hydrated` (`orrery-preferences-store.ts:135`) and only `OrreryScreen` hydrates (`OrreryScreen.tsx:314`); the builder and management are Settings-stack-reachable. A System created/deleted from Settings before the Orrery ever mounts emits neither the durable preference nor the observer commit — save-new fails to switch/persist (ORRS-08, no backstop). *Change:* give the non-Orrery selection writers (30-08, 30-06) an explicit hydrate-before-write (await `hydrate(getExecutor())` if `!hydrated`, or an error/retry path), or guarantee app-scoped hydration of the preferences store independent of Orrery focus; add a test for a Settings-origin save-new with the Orrery unmounted.
+2. **The cross-route observer's loop guard is equality-only and reverses a rapid switch (30-10).** During B→C, B's async prefs commit publishes after `requested=C`, so the observer treats `committed=B` as external and re-selects B (`30-10` observer spec vs `orrery-system-store.ts:66-124`, `orrery-preferences-store.ts:70-100`). *Change:* make the observer acknowledge local-origin/generation (ignore any `committed` value that originated from this store's own persist, even a stale one) rather than comparing equality to the current `requested.id`; add a B→C interleaving test, not only the final-self-write test.
+3. **The draft membership engine's now-required `gravityInputsFor` loader is never constructed by the builder (30-08) or preview (30-09) callers.** 30-02:195 makes it a required parameter; 30-08:32/:186/:197 and 30-09:44 call it with 3 args and never build the loader from `readOrreryImpactInputsCore` — a gravity-rule draft's live count/grid/preview cannot resolve. *Change:* assign loader construction to the builder/preview (or a db-facing draft-read wrapper they call), update the 30-08/30-09 call sites + must-haves to the 4-arg contract, and add a gravity-rule draft test on the builder path.
+
+## Cycle 4 — Actionable non-HIGH concerns (not yet in any PLAN.md task/AC/must-have; not deferred/rejected)
+1. **[MED] 30-02** — the builtin/category override read-path (30-02:201) applies overrides to an id set but does not fetch full member rows for manual INCLUDES (contacts outside `buildOrrerySystemWhere`; `orrery-system-read.ts:66-74` SELECTs only the base predicate). A manual-included contact would be dropped/dataless on the built-in/Category canvas — the INCLUDE half of ORRS-03/HIGH #2's read-path application is incomplete. *Change:* specify that the builtin/category branch fetches full `OrrerySystemMember` rows for the union `(base ∪ eligible-includes)` via an id-based SELECT (mirroring the custom path), then subtracts excludes — not merely an id-set union; add a read-path test asserting a manual-included non-matching contact renders as a member row for a built-in System.
+2. **[LOW] 30-08 / 30-06** — neither writer's `depends_on` lists 30-10, so the observer-before-writer ordering that HIGH #1's live switch relies on holds only incidentally via wave arithmetic (30-10 wave 3; 30-08 wave 4; 30-06 wave 5). *Change:* add `30-10` to `depends_on` in 30-08-PLAN.md and 30-06-PLAN.md so the observer-lands-first guarantee is encoded in the dependency graph, not an artifact of wave numbering.
+3. **[LOW] 30-10** — the switch-token force-Home reconciliation (30-10:335) must not fire on the `sessionResume === "restore"` path (`OrreryScreen.tsx:669-692`), which legitimately restores a saved pose+focus on resume/relaunch. Risk is low (that branch returns before `:708`, and `domain` includes `systemRefId`), but it is unstated. *Change:* state in 30-10 Task 2 that the switch token is set only for an in-session user switch (a `requested.id` change from a prior READY system), NOT the launch/session-restore path, so force-Home never overrides a legitimate session restore.
+
+None of the above reverses a recorded decision. The 3 HIGHs are all cross-plan wiring seams NEWLY EXPOSED by the cycle-3 selection-channel and gravity-loader fixes (a preferences-store hydration precondition, an equality-only observer guard, and an un-threaded required loader on the builder/preview draft callers) — contained, well-localized repairs, not architectural unknowns. The non-HIGH items are contained plan-text/contract tightenings; #1 touches device-observable render behavior.
+
+---
+
+## Codex Review (Cycle 4)
+
+*Model: gpt-5.6-terra (reasoning=high); run directly via `codex exec` in a read-only sandbox (source-grounded). The gsd-review runner self-skips the `claude` lane inside Claude Code, and its `codex` lane defaults to reasoning=low; this cycle ran codex directly at the configured reasoning=high for a deeper pass.*
+
+## Summary
+
+The three cycle-3 fixes are largely coherent: the preference store is genuinely global, the override read/write/builder paths now line up, and the switch token explicitly gates both intensity and Home framing. However, three HIGH seams remain: two new failures in the cross-route selection channel and one still-open Gravity-loader caller gap.
+
+## Per-plan notes
+
+- **30-08:** Settings-origin save-new can silently lose its selection; its draft resolver calls also lack the required Gravity loader.
+- **30-10:** The proposed observer mistakes an earlier local persistence commit for an external selection during rapid switching.
+- **30-02:** It correctly wires Gravity for the production custom read, but not for the builder’s provisional-draft caller.
+
+## Concerns
+
+- **HIGH — NEW this cycle:** A System created from Settings may not become active or persist as last-active. Plan 30-08 registers the builder in Settings and then saves `lastSystem` through the global preferences store, but that store’s only hydration path is the focused Orrery screen. [`30-08-PLAN.md:154`], [`30-08-PLAN.md:197`], [`OrreryScreen.tsx:307`], [`orrery-preferences-store.ts:133`]. `save()` intentionally resolves without writing while `hydrated === false`; therefore the Settings-only path can commit the new System definition but emit neither the durable preference update nor the observer-triggering commit. The plan needs an explicit hydrate-before-selection-write/error path for non-Orrery callers.
+
+- **HIGH — NEW this cycle:** The stated “requested before persist” loop guard does not handle stale commits from the same local store. A user can select B, let B reach ready and begin its async preference write, then select C; the selector permits another selection while persistence is ongoing. [`orrery-system-store.ts:51`], [`orrery-system-store.ts:66`], [`orrery-preferences-store.ts:74`], [`OrrerySystemSelector.tsx:151`]. When B’s queued commit publishes, `requested.id` is C, so the proposed observer treats B as external and re-selects B, invalidating C’s load. [`30-10-PLAN.md:157`]. The proposed test covers only a final self-write, not this B→C interleaving. The channel needs local-origin/generation acknowledgement, not equality alone.
+
+- **HIGH — still-open portion of cycle-3’s Gravity-loader finding:** Plan 30-02 makes `resolveMembershipFromDefinition` require an injected `gravityInputsFor` loader and correctly assigns production-read construction to `orrery-system-read`. [`30-02-PLAN.md:195`], [`30-02-PLAN.md:201`]. But the builder remains a separate provisional caller and every planned invocation omits that loader. [`30-08-PLAN.md:32`], [`30-08-PLAN.md:154`]. A Gravity rule therefore cannot produce a valid live draft count/member grid without either a type failure or an unspecified fallback. Assign loader construction to the builder (or a DB-facing draft-read wrapper) and add a Gravity-draft test.
+
+## Risk assessment
+
+**HIGH.** The override and framing fixes are adequately specified, but the new cross-route selection mechanism can drop a Settings-created System or reverse a rapid local selection; the builder also lacks a callable Gravity-resolution dependency.
+
+---
+
+## Claude Review (Cycle 4)
+
+*Read-only orchestrator analysis pass (context-inheriting fork; shares orchestrator priors — weighted below codex as an independent lane, per the provenance note above). Verified plan claims against source on disk; wrote/committed/pushed nothing.*
+
+## Summary
+
+The cycle-3 replan landed: all three cycle-3 HIGHs are resolved at their core and all 11 cycle-3 actionables are incorporated with tasks/ACs. The loop-guard premise verifies on disk (`orrery-system-store.ts:89` sets `requested` before `io.persist` at `:112`; `useOrreryPreferencesStore` is a real singleton at `orrery-preferences-store.ts:166`; `save()` commits `lastSystem` when it differs at `:148`). The framing branch (`OrreryScreen.tsx:708-714`) and unconditional focus clear (`:281-288`) are exactly as 30-10 cites, and the switch-token force-Home reconciliation is well-formed. The built-in/Category override architecture (read-path `applyMembershipOverrides`, override-only builder mode, override-only save composite, mandatory `assertKnownSystemRef`) lines up across 30-01/02/03/06/08. No decision reversal.
+
+## Concerns
+
+- **LOW — NEW this cycle:** 30-08 (`depends_on: [30-02, 30-03, 30-07]`) and 30-06 (`depends_on: [30-03, 30-08]`) do not list 30-10, yet HIGH #1's live-switch correctness needs 30-10's observer to exist before those writers run. The ordering currently holds only incidentally via wave placement (30-10 wave 3; 30-07 pushes 30-08 to wave 4; 30-06 wave 5). Add `30-10` to both writers' `depends_on` so the observer-lands-first ordering is encoded in the dependency graph.
+- (Corroborated, folded into the orchestrator HIGHs above) the preferences-store hydration precondition on Settings-stack writers, and the equality-only observer guard, are real; both were independently reached by the codex lane and orchestrator-verified against source.
+
+## Risk assessment
+
+**MEDIUM–HIGH.** The resolutions are real and disk-grounded; residual risk is concentrated in the newly-exposed cross-route selection-channel seams (hydration precondition, observer guard) and the un-threaded gravity loader on the builder/preview draft callers — the codex lane's three HIGHs, all orchestrator-verified.
+
+## Cycle 4 Consensus concerns (top 3)
+1. Settings-origin selection write dropped when the preferences store is unhydrated (ORRS-08, no backstop for save-new) — HIGH.
+2. Equality-only observer loop guard reverses a rapid B→C switch (needs generation/origin ack) — HIGH.
+3. Draft membership engine's required `gravityInputsFor` loader never constructed by the builder/preview callers — HIGH.
