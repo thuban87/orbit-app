@@ -65,6 +65,16 @@ export interface SystemOverrideIntent {
   mode: SystemOverrideMode | null;
 }
 
+export interface SystemDefinitionDraft {
+  /** null creates a custom System; a custom ref edits that definition. */
+  systemRef: OrrerySystemId | null;
+  name: string;
+  rules: readonly SystemRuleDraft[];
+  overrideIntent: readonly SystemOverrideIntent[];
+  prunableExclusionContactIds: readonly number[];
+  now: string;
+}
+
 function mapSystem(row: {
   id: number;
   uid: string;
@@ -451,6 +461,250 @@ export function resetSystemOverrides(
 ): Promise<void> {
   return inWriteTransaction(exec, async () => {
     await resetSystemOverridesCore(exec, input);
+    await bumpDataRevisionCore(exec);
+  });
+}
+
+/** Replace a custom System's complete predicate while the caller owns the transaction. */
+export async function setSystemRulesCore(
+  exec: SqlExecutor,
+  input: {
+    systemRef: OrrerySystemId;
+    rules: readonly SystemRuleDraft[];
+    now: string;
+  },
+): Promise<void> {
+  const system = await getCustomSystemForRef(exec, input.systemRef);
+  await exec.runAsync("DELETE FROM system_rules WHERE system_id = ?", [system.id]);
+  for (const rule of input.rules) {
+    const result = await exec.runAsync(
+      "INSERT INTO system_rules (uid, system_id, family, value, created_at) VALUES (?, ?, ?, ?, ?)",
+      [newUid(), system.id, rule.family, rule.value, input.now],
+    );
+    assertOneChange("setSystemRules", result.changes);
+  }
+}
+
+export function setSystemRules(
+  exec: SqlExecutor,
+  input: {
+    systemRef: OrrerySystemId;
+    rules: readonly SystemRuleDraft[];
+    now: string;
+  },
+): Promise<void> {
+  return inWriteTransaction(exec, async () => {
+    await setSystemRulesCore(exec, input);
+    await bumpDataRevisionCore(exec);
+  });
+}
+
+/** Deterministic duplicate labels are checked case-insensitively by the caller. */
+export function nextDuplicateName(
+  baseName: string,
+  existingNamesLowercased: ReadonlySet<string>,
+): string {
+  const base = normalizeSystemName(baseName);
+  let ordinal = 1;
+  while (true) {
+    const candidate = ordinal === 1 ? `${base} Copy` : `${base} Copy ${ordinal}`;
+    if (!existingNamesLowercased.has(candidate.toLocaleLowerCase())) return candidate;
+    ordinal += 1;
+  }
+}
+
+/** Convert closed immutable predicates into the editable stored-rule vocabulary. */
+export function mapBuiltinPredicateToRules(
+  system: Exclude<OrrerySystemRef, { kind: "custom" }>,
+): SystemRuleDraft[] {
+  if (system.kind === "category") {
+    return [{ family: "category", value: system.uid }];
+  }
+  switch (system.id) {
+    case "all-contacts":
+      return [{ family: "scope", value: "population" }];
+    case "favorites":
+      return [{ family: "favorite", value: "on" }];
+    case "needs-attention":
+      return [{ family: "needs-attention", value: "on" }];
+    case "not-contacted":
+      return [{ family: "not-contacted", value: "on" }];
+    case "snoozed":
+      return [{ family: "snoozed", value: "on" }];
+    case "chargers":
+      return [{ family: "social-battery", value: "Charger" }];
+  }
+}
+
+async function existingSystemNamesLowercased(
+  exec: ReadOnlyExecutor,
+): Promise<Set<string>> {
+  const [systems, categories] = await Promise.all([
+    exec.getAllAsync<{ name: string }>("SELECT name FROM systems"),
+    exec.getAllAsync<{ name: string }>("SELECT name FROM categories"),
+  ]);
+  return new Set(
+    [
+      ...Object.values(BUILTIN_SYSTEM_LABELS),
+      ...systems.map((system) => system.name),
+      ...categories.map((category) => category.name),
+    ].map(
+      (name) => name.toLocaleLowerCase(),
+    ),
+  );
+}
+
+async function duplicateSource(
+  exec: ReadOnlyExecutor,
+  systemRef: OrrerySystemId,
+): Promise<{
+  name: string;
+  rules: SystemRuleDraft[];
+  overrides: Array<{ contactId: number; mode: SystemOverrideMode }>;
+}> {
+  const ref = await assertKnownSystemRef(exec, systemRef);
+  if (ref.kind === "custom") {
+    const system = await getCustomSystemForRef(exec, systemRef);
+    const [rules, overrides] = await Promise.all([
+      listSystemRules(exec, system.id),
+      listSystemOverrides(exec, systemRef),
+    ]);
+    return {
+      name: system.name,
+      rules: rules.map(({ family, value }) => ({ family, value })),
+      overrides: overrides.map(({ contactId, mode }) => ({ contactId, mode })),
+    };
+  }
+  if (ref.kind === "category") {
+    const category = await exec.getFirstAsync<{ name: string }>(
+      "SELECT name FROM categories WHERE uid = ?",
+      [ref.uid],
+    );
+    if (!category) throw new Error("systems-dao: unknown System reference");
+    return { name: category.name, rules: mapBuiltinPredicateToRules(ref), overrides: [] };
+  }
+  return {
+    name: BUILTIN_SYSTEM_LABELS[ref.id],
+    rules: mapBuiltinPredicateToRules(ref),
+    overrides: [],
+  };
+}
+
+export async function duplicateSystemCore(
+  exec: SqlExecutor,
+  input: { systemRef: OrrerySystemId; now: string },
+): Promise<CustomSystem> {
+  const source = await duplicateSource(exec, input.systemRef);
+  const name = nextDuplicateName(
+    source.name,
+    await existingSystemNamesLowercased(exec),
+  );
+  const duplicate = await createCustomSystemCore(exec, { name, now: input.now });
+  const duplicateRef = `custom:${duplicate.uid}` as OrrerySystemId;
+  await setSystemRulesCore(exec, {
+    systemRef: duplicateRef,
+    rules: source.rules,
+    now: input.now,
+  });
+  for (const override of source.overrides) {
+    await setSystemOverrideCore(exec, {
+      systemRef: duplicateRef,
+      contactId: override.contactId,
+      mode: override.mode,
+      now: input.now,
+    });
+  }
+  return duplicate;
+}
+
+export function duplicateSystem(
+  exec: SqlExecutor,
+  input: { systemRef: OrrerySystemId; now: string },
+): Promise<CustomSystem> {
+  return inWriteTransaction(exec, async () => {
+    const duplicate = await duplicateSystemCore(exec, input);
+    await bumpDataRevisionCore(exec);
+    return duplicate;
+  });
+}
+
+/** Compose custom definition writes without nesting the non-reentrant mutex. */
+export async function saveSystemDefinitionCore(
+  exec: SqlExecutor,
+  draft: SystemDefinitionDraft,
+): Promise<CustomSystem> {
+  const system =
+    draft.systemRef === null
+      ? await createCustomSystemCore(exec, { name: draft.name, now: draft.now })
+      : await renameSystemCore(exec, {
+          systemRef: draft.systemRef,
+          name: draft.name,
+          now: draft.now,
+        });
+  const systemRef = `custom:${system.uid}` as OrrerySystemId;
+  await setSystemRulesCore(exec, { systemRef, rules: draft.rules, now: draft.now });
+  for (const intent of draft.overrideIntent) {
+    await setSystemOverrideCore(exec, {
+      systemRef,
+      contactId: intent.contactId,
+      mode: intent.mode,
+      now: draft.now,
+    });
+  }
+  await pruneSystemExclusionsCore(exec, {
+    systemRef,
+    contactIds: draft.prunableExclusionContactIds,
+  });
+  return system;
+}
+
+export function saveSystemDefinition(
+  exec: SqlExecutor,
+  draft: SystemDefinitionDraft,
+): Promise<CustomSystem> {
+  return inWriteTransaction(exec, async () => {
+    const system = await saveSystemDefinitionCore(exec, draft);
+    await bumpDataRevisionCore(exec);
+    return system;
+  });
+}
+
+/** Immutable bases own only manual deltas, never a systems or rules row. */
+export async function saveMembershipOverridesCore(
+  exec: SqlExecutor,
+  input: {
+    systemRef: OrrerySystemId;
+    overrideIntent: readonly SystemOverrideIntent[];
+    prunableExclusionContactIds: readonly number[];
+    now: string;
+  },
+): Promise<void> {
+  await assertKnownSystemRef(exec, input.systemRef);
+  for (const intent of input.overrideIntent) {
+    await setSystemOverrideCore(exec, {
+      systemRef: input.systemRef,
+      contactId: intent.contactId,
+      mode: intent.mode,
+      now: input.now,
+    });
+  }
+  await pruneSystemExclusionsCore(exec, {
+    systemRef: input.systemRef,
+    contactIds: input.prunableExclusionContactIds,
+  });
+}
+
+export function saveMembershipOverrides(
+  exec: SqlExecutor,
+  input: {
+    systemRef: OrrerySystemId;
+    overrideIntent: readonly SystemOverrideIntent[];
+    prunableExclusionContactIds: readonly number[];
+    now: string;
+  },
+): Promise<void> {
+  return inWriteTransaction(exec, async () => {
+    await saveMembershipOverridesCore(exec, input);
     await bumpDataRevisionCore(exec);
   });
 }
