@@ -44,6 +44,15 @@ export interface OrreryCategory {
   name: string;
   display_order: number;
 }
+
+/** Builder-safe category labels keep stable UID rule tokens out of UI SQL. */
+export function listOrrerySystemCategories(
+  exec: ReadOnlyExecutor,
+): Promise<Array<{ uid: string; name: string }>> {
+  return exec.getAllAsync<{ uid: string; name: string }>(
+    "SELECT uid, name FROM categories ORDER BY display_order, uid",
+  );
+}
 export interface OrrerySystemMember extends ContactIdentity {
   name: string;
   photo: string | null;

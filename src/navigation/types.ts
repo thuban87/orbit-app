@@ -120,6 +120,7 @@ export type DashboardStackParamList = {
 /** The Orrery owns its visual root and duplicates contact detail for origin-aware Back. */
 export type OrreryStackParamList = {
   Orrery: undefined;
+  SystemBuilder: { systemUid?: string; systemRef?: string } | undefined;
   Profile: { contactId: number; openReachOut?: boolean };
   ThingsToRemember: { contactId: number };
   RecentlyDeleted: { contactId: number };
@@ -155,6 +156,7 @@ export type BackupStackParamList = {
 
 export type SettingsStackParamList = {
   Settings: undefined;
+  SystemBuilder: { systemUid?: string; systemRef?: string } | undefined;
   CustomFields: undefined;
   Archived: undefined;
   Profile: { contactId: number; openReachOut?: boolean };

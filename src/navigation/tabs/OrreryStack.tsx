@@ -11,6 +11,7 @@ import { MergeConflictsScreen } from "@/screens/MergeConflictsScreen";
 import { OrreryScreen } from "@/screens/OrreryScreen";
 import { RecentlyDeletedScreen } from "@/screens/RecentlyDeletedScreen";
 import { SurvivorSelectScreen } from "@/screens/SurvivorSelectScreen";
+import { SystemBuilderScreen } from "@/screens/SystemBuilderScreen";
 import { ThingsToRememberScreen } from "@/screens/ThingsToRememberScreen";
 import { useOrrerySessionStore } from "@/stores/orrery-session-store";
 import type { OrreryStackParamList } from "../types";
@@ -40,6 +41,7 @@ export function OrreryStack() {
       screenOptions={{ headerShown: false }}
     >
       <Stack.Screen name="Orrery" component={OrreryScreen} />
+      <Stack.Screen name="SystemBuilder" component={SystemBuilderScreen} />
       <Stack.Screen name="Profile" component={ContactProfileScreen} />
       <Stack.Screen
         name="ThingsToRemember"
