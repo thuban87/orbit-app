@@ -12,9 +12,9 @@ provides:
   - Custom-member routing through the canonical Orrery read pipeline
 affects: [30-02, 30-03, 30-05, 30-10, systems-management]
 actuals:
-  tokens: 9155
+  tokens: 9277
   tasks: 3
-  commits: 6
+  commits: 7
 tech-stack:
   added: []
   patterns:
@@ -50,6 +50,9 @@ coverage:
     verification:
       - kind: integration
         ref: "src/logic/system-rule-resolver.test.ts#manual-only custom System resolver"
+        status: pass
+      - kind: integration
+        ref: "src/logic/system-rule-resolver.test.ts#manual-only custom System resolver (store.select)"
         status: pass
     human_judgment: false
   - id: D3
@@ -87,7 +90,7 @@ status: complete
 
 1. **Task 1: Sign off migration table shape** — owner selected `ref-keyed-four-table` before execution.
 2. **Task 2: Migration 022 + registration + schema-invariant tests** — `3036710` (RED), `1ab6cbf` (GREEN), `57f1ed2` (constraint coverage).
-3. **Task 3: Thin end-to-end manual-only custom System** — `03e39c7` (RED), `311c9ec` (GREEN).
+3. **Task 3: Thin end-to-end manual-only custom System** — `03e39c7` (RED), `311c9ec` (GREEN), `4a4108b` (store selection tracer).
 4. **Regression correction:** `5910f4f` updates existing migration-chain target expectations after the deliberate version bump.
 
 ## Decisions Made
