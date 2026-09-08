@@ -22,7 +22,9 @@ async function migrateTo(version: number): Promise<void> {
 describe("migration 022 — Orrery Systems", () => {
   it("reaches v22 from a fresh database and from a v21 database", async () => {
     await migrateTo(22);
-    expect(await exec.getFirstAsync<{ user_version: number }>("PRAGMA user_version")).toEqual({
+    expect(
+      await exec.getFirstAsync<{ user_version: number }>("PRAGMA user_version"),
+    ).toEqual({
       user_version: 22,
     });
 
@@ -33,7 +35,12 @@ describe("migration 022 — Orrery Systems", () => {
       "SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name",
     );
     expect(tables.map((table) => table.name)).toEqual(
-      expect.arrayContaining(["systems", "system_rules", "system_overrides", "system_prefs"]),
+      expect.arrayContaining([
+        "systems",
+        "system_rules",
+        "system_overrides",
+        "system_prefs",
+      ]),
     );
   });
 
@@ -105,9 +112,30 @@ describe("migration 022 — Orrery Systems", () => {
       ),
     ).toThrow();
     await exec.runAsync(
+      "INSERT INTO contacts (uid, name, interval_days, created_at, modified_at) VALUES (?, ?, ?, ?, ?)",
+      ["contact-2", "Blair", 14, NOW, NOW],
+    );
+    const contactTwo = await exec.getFirstAsync<{ id: number }>(
+      "SELECT id FROM contacts WHERE uid = ?",
+      ["contact-2"],
+    );
+    expect(contactTwo).not.toBeNull();
+    expect(() =>
+      exec.runAsync(
+        "INSERT INTO system_overrides (uid, system_ref, contact_id, mode, created_at) VALUES (?, ?, ?, ?, ?)",
+        ["override-1", "custom:other", contactTwo!.id, "include", NOW],
+      ),
+    ).toThrow();
+    await exec.runAsync(
       "INSERT INTO system_prefs (uid, system_ref, created_at, modified_at) VALUES (?, ?, ?, ?)",
       ["pref-1", "custom:system-1", NOW, NOW],
     );
+    expect(() =>
+      exec.runAsync(
+        "INSERT INTO system_prefs (uid, system_ref, created_at, modified_at) VALUES (?, ?, ?, ?)",
+        ["pref-1", "custom:other", NOW, NOW],
+      ),
+    ).toThrow();
     expect(() =>
       exec.runAsync(
         "INSERT INTO system_prefs (uid, system_ref, created_at, modified_at) VALUES (?, ?, ?, ?)",
@@ -117,9 +145,16 @@ describe("migration 022 — Orrery Systems", () => {
 
     await exec.runAsync("DELETE FROM contacts WHERE id = ?", [contact!.id]);
     expect(
-      await exec.getFirstAsync("SELECT id FROM system_overrides WHERE uid = ?", ["override-1"]),
+      await exec.getFirstAsync(
+        "SELECT id FROM system_overrides WHERE uid = ?",
+        ["override-1"],
+      ),
     ).toBeNull();
     await exec.runAsync("DELETE FROM systems WHERE id = ?", [system!.id]);
-    expect(await exec.getFirstAsync("SELECT id FROM system_rules WHERE uid = ?", ["rule-1"])).toBeNull();
+    expect(
+      await exec.getFirstAsync("SELECT id FROM system_rules WHERE uid = ?", [
+        "rule-1",
+      ]),
+    ).toBeNull();
   });
 });
