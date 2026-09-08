@@ -98,12 +98,15 @@ async function refreshOrreryPreferences(): Promise<void> {
 /** Delete never touches contacts; its snapshot powers the short-lived Undo action. */
 export async function deleteManagedSystem(input: {
   systemRef: OrrerySystemId;
-  onChanged: () => Promise<void>;
+  /** The callback must decline any result once its refresh is no longer current. */
+  onChanged: (isCurrent: () => boolean) => Promise<void>;
 }): Promise<void> {
   const deletion = await deleteSystemWithActiveFallback(getExecutor(), {
     systemRef: input.systemRef,
     now: localDateTime(),
   });
+  let undoStarted = false;
+  let postDeleteRefresh: Promise<void>;
   const showDeleteUndo = (label: string) =>
     showSnackbar({
       kind: "success",
@@ -113,6 +116,9 @@ export async function deleteManagedSystem(input: {
         accessibilityLabel: "Undo System deletion",
         onPress: () => {
           void (async () => {
+            // Invalidate the delete refresh before its pending reads can publish
+            // a deleted view or replace this Undo after restoration commits.
+            undoStarted = true;
             try {
               await restoreDeletedSystemAndActiveSelection(getExecutor(), {
                 snapshot: deletion.snapshot,
@@ -124,8 +130,11 @@ export async function deleteManagedSystem(input: {
               return;
             }
             try {
+              // hydrate() serializes overlapping reads. Let the pre-Undo read
+              // settle first, then read again from the restored durable state.
+              await postDeleteRefresh;
               await refreshOrreryPreferences();
-              await input.onChanged();
+              await input.onChanged(() => true);
             } catch {
               errorSnackbar("System restored, but the list couldn't refresh.");
             }
@@ -138,14 +147,18 @@ export async function deleteManagedSystem(input: {
   // path before fallible cache/list reads; a refresh error must never recast a
   // completed deletion as a failed one.
   showDeleteUndo("System deleted");
-  try {
-    await refreshOrreryPreferences();
-    await input.onChanged();
-  } catch {
-    // Replacing the transient message is safe only when the replacement keeps
-    // the same Undo action available to the user.
-    showDeleteUndo("System deleted, but the list couldn't refresh.");
-  }
+  postDeleteRefresh = (async () => {
+    try {
+      await refreshOrreryPreferences();
+      if (!undoStarted) await input.onChanged(() => !undoStarted);
+    } catch {
+      // Replacing the transient message is safe only when it still describes
+      // the current operation and keeps its recovery action available.
+      if (!undoStarted)
+        showDeleteUndo("System deleted, but the list couldn't refresh.");
+    }
+  })();
+  await postDeleteRefresh;
 }
 
 function SystemRow({
@@ -286,7 +299,7 @@ export function SystemsManagementScreen() {
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState("");
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (isCurrent: () => boolean = () => true) => {
     const exec = getExecutor();
     const [snapshot, customSystems, prefs] = await Promise.all([
       readOrrerySystemSnapshot(exec),
@@ -331,8 +344,10 @@ export function SystemsManagementScreen() {
           }) => row,
         ),
     );
-    committedRows.current = ordered;
-    setRows(ordered);
+    if (isCurrent()) {
+      committedRows.current = ordered;
+      setRows(ordered);
+    }
   }, []);
 
   useFocusEffect(
@@ -451,7 +466,7 @@ export function SystemsManagementScreen() {
             style: "destructive",
             onPress: () => {
               void resetSystemOverrides(getExecutor(), { systemRef })
-                .then(load)
+                .then(() => load())
                 .catch(() => setError("Couldn't reset membership overrides."));
             },
           },

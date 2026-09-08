@@ -210,6 +210,105 @@ describe("SystemsManagementScreen contracts", () => {
     );
   });
 
+  it("does not let a deferred pre-Undo refresh publish stale state or a second Undo", async () => {
+    vi.mocked(dao.deleteSystemWithActiveFallback).mockResolvedValue({
+      snapshot: {
+        uid: "family",
+        name: "Family",
+        rules: [],
+        overrides: [],
+        prefs: null,
+      },
+      wasActive: true,
+    });
+    vi.mocked(dao.restoreDeletedSystemAndActiveSelection).mockResolvedValue({
+      id: 1,
+      uid: "family",
+      name: "Family",
+      createdAt: "now",
+      modifiedAt: "now",
+    });
+    let resolveInitialRefresh: (() => void) | undefined;
+    const initialRefresh = new Promise<void>((resolve) => {
+      resolveInitialRefresh = resolve;
+    });
+    const published: string[] = [];
+    const onChanged = vi
+      .fn()
+      .mockImplementationOnce(async (isCurrent: () => boolean) => {
+        await initialRefresh;
+        if (isCurrent()) published.push("deleted");
+      })
+      .mockImplementationOnce(async (isCurrent: () => boolean) => {
+        if (isCurrent()) published.push("restored");
+      });
+
+    const deleting = deleteManagedSystem({
+      systemRef: "custom:family",
+      onChanged,
+    });
+    await vi.waitFor(() => expect(onChanged).toHaveBeenCalledOnce());
+
+    vi.mocked(snackbar.showSnackbar).mock.calls[0][0].action.onPress();
+    await vi.waitFor(() =>
+      expect(dao.restoreDeletedSystemAndActiveSelection).toHaveBeenCalledOnce(),
+    );
+    resolveInitialRefresh?.();
+
+    await deleting;
+    await vi.waitFor(() => expect(onChanged).toHaveBeenCalledTimes(2));
+    expect(published).toEqual(["restored"]);
+    expect(vi.mocked(snackbar.showSnackbar)).toHaveBeenCalledOnce();
+  });
+
+  it("does not replace a restored System with a late failed delete refresh", async () => {
+    vi.mocked(dao.deleteSystemWithActiveFallback).mockResolvedValue({
+      snapshot: {
+        uid: "family",
+        name: "Family",
+        rules: [],
+        overrides: [],
+        prefs: null,
+      },
+      wasActive: false,
+    });
+    vi.mocked(dao.restoreDeletedSystemAndActiveSelection).mockResolvedValue({
+      id: 1,
+      uid: "family",
+      name: "Family",
+      createdAt: "now",
+      modifiedAt: "now",
+    });
+    let rejectInitialRefresh: ((reason?: unknown) => void) | undefined;
+    const initialRefresh = new Promise<void>((_resolve, reject) => {
+      rejectInitialRefresh = reject;
+    });
+    const onChanged = vi
+      .fn()
+      .mockImplementationOnce(() => initialRefresh)
+      .mockResolvedValueOnce(undefined);
+
+    const deleting = deleteManagedSystem({
+      systemRef: "custom:family",
+      onChanged,
+    });
+    await vi.waitFor(() => expect(onChanged).toHaveBeenCalledOnce());
+
+    vi.mocked(snackbar.showSnackbar).mock.calls[0][0].action.onPress();
+    await vi.waitFor(() =>
+      expect(dao.restoreDeletedSystemAndActiveSelection).toHaveBeenCalledOnce(),
+    );
+    rejectInitialRefresh?.(new Error("stale read failed"));
+
+    await deleting;
+    await vi.waitFor(() => expect(onChanged).toHaveBeenCalledTimes(2));
+    expect(
+      vi
+        .mocked(snackbar.showSnackbar)
+        .mock.calls.map(([message]) => message.label),
+    ).toEqual(["System deleted"]);
+  });
+
   it("keeps a failed Undo non-destructive and does not reselect the deleted System", async () => {
     vi.mocked(dao.deleteSystemWithActiveFallback).mockResolvedValue({
       snapshot: {
