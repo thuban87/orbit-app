@@ -50,4 +50,4 @@ The system stores nullable `sun_contact_id` and `self_sun_colour` in the singlet
 - `src/screens/SettingsScreen.tsx` — exposes the self-star swatches and Sun / centre picker.
 
 **Depends on:** ADR-006 (Theme-Token Architecture); ADR-009 (Crash-Safe Forward-Only SQLite Migrations).
-**Required by:** ADR-048 (Status-Default Static Orrery with a Single-Canvas Morph)
+**Required by:** ADR-048 (Status-Default Static Orrery with a Single-Canvas Morph); ADR-104 (Durable Orrery Preferences and Live System Scope)

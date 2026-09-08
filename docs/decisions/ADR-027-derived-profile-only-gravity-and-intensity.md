@@ -51,4 +51,4 @@ The system derives gravity and intensity at read time from interaction history a
 - `src/components/IntensityLine.tsx` — renders the neutral intensity and cadence line.
 
 **Depends on:** ADR-023 (Structured Touchpoints and One-Tap Defaults); ADR-026 (Rogue Status for Unresponsive or Far-Overdue Contacts)
-**Required by:** _None._
+**Required by:** ADR-106 (Derived Orrery Gravity Visual Mass and Accessible Context)

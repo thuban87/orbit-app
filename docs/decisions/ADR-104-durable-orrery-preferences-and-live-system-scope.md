@@ -48,4 +48,4 @@ The system stores validated density, satellite-toggle, and closed last-System to
 - `src/stores/orrery-preferences-store.ts` — publishes a choice only after its serialized SQLite commit.
 
 **Depends on:** ADR-009 (Crash-Safe Forward-Only SQLite Migrations); ADR-011 (Query-Time Status and Never-Contacted Segregation); ADR-047 (App-Level Assignable Sun and Themed Self Identity); ADR-093 (Scoped Composable Dashboard Population and Filter Model)
-**Required by:** _None._
+**Required by:** ADR-105 (Scoped Relationship Satellites for System-Member Context); ADR-106 (Derived Orrery Gravity Visual Mass and Accessible Context)
