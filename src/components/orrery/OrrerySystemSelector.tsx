@@ -1,5 +1,6 @@
 // biome-ignore-all lint/a11y/useValidAriaRole: AppText uses semantic typography roles.
-import { useIsFocused } from "@react-navigation/native";
+import { useIsFocused, useNavigation } from "@react-navigation/native";
+import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   AccessibilityInfo,
@@ -14,6 +15,8 @@ import { Icon } from "@/components/icons/Icon";
 import { AppText } from "@/components/ui/AppText";
 import { Button } from "@/components/ui/Button";
 import { GlassSurface } from "@/components/ui/GlassSurface";
+import type { SystemCatalogEntry } from "@/db/systems-catalog-read";
+import type { RootStackParamList } from "@/navigation/types";
 import type { OrrerySystemState } from "@/stores/orrery-system-store";
 import { shellTransientStore } from "@/stores/shell-transient-store";
 import { useTheme } from "@/theme";
@@ -29,25 +32,46 @@ export function OrrerySystemSelector({
   state,
   availableHeight,
   enabled,
+  catalog,
+  counts,
+  broken,
+  onOpenChange,
 }: {
   state: OrrerySystemState;
   availableHeight: number;
   enabled: boolean;
+  catalog: readonly SystemCatalogEntry[];
+  counts: ReadonlyMap<string, number>;
+  broken: ReadonlyMap<string, boolean>;
+  onOpenChange: (open: boolean, requestId: number) => void;
 }) {
   const { colors } = useTheme();
+  const navigation =
+    useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const focused = useIsFocused();
   const [open, setOpen] = useState(false);
   const [height, setHeight] = useState(44);
   const trigger = useRef<View>(null);
   const heading = useRef<View>(null);
-  const dismiss = useCallback(() => setOpen(false), []);
+  const requestId = useRef(0);
+  const openRef = useRef(false);
+  const setSelectorOpen = useCallback(
+    (next: boolean) => {
+      if (openRef.current === next) return;
+      openRef.current = next;
+      setOpen(next);
+      onOpenChange(next, ++requestId.current);
+    },
+    [onOpenChange],
+  );
+  const dismiss = useCallback(() => setSelectorOpen(false), [setSelectorOpen]);
   const latest = useRef(dismiss);
   latest.current = dismiss;
   const busy = state.status === "initial" || state.status === "loading";
   const blocked = shellTransientStore((store) =>
     store.entries.some((entry) => entry.id !== "orrery-system-selector"),
   );
-  const rows = buildSystemChoices(state.categories);
+  const rows = buildSystemChoices(catalog, counts, broken);
   useEffect(() => {
     if (!open) return;
     // Only one Orrery popup owns the screen; shell Back still dismisses its top entry.
@@ -109,7 +133,7 @@ export function OrrerySystemSelector({
             accessibilityRole="button"
             accessibilityLabel={systemSelectorLabel(state.requested.name)}
             accessibilityState={{ expanded: open, busy, disabled: !enabled }}
-            onPress={() => setOpen((value) => !value)}
+            onPress={() => setSelectorOpen(!open)}
           >
             <AppText
               role="label"
@@ -147,11 +171,34 @@ export function OrrerySystemSelector({
               </View>
               {rows.map((row) => {
                 const selected = row.id === state.requested.id;
+                const stateLabel =
+                  row.severity === "empty"
+                    ? ", empty"
+                    : row.severity === "broken"
+                      ? ", needs attention"
+                      : "";
+                const indicator =
+                  row.severity === "empty"
+                    ? {
+                        name: "system-empty" as const,
+                        tone: "statusWobble" as const,
+                      }
+                    : row.severity === "broken"
+                      ? {
+                          name: "system-broken" as const,
+                          tone: "danger" as const,
+                        }
+                      : row.overrides
+                        ? {
+                            name: "system-overrides" as const,
+                            tone: "textSecondary" as const,
+                          }
+                        : null;
                 return (
                   <Pressable
                     key={row.id}
                     accessibilityRole="radio"
-                    accessibilityLabel={row.name}
+                    accessibilityLabel={`${row.name}${stateLabel}`}
                     accessibilityState={{
                       checked: selected,
                       busy: selected && busy,
@@ -168,10 +215,40 @@ export function OrrerySystemSelector({
                       dismiss();
                     }}
                   >
-                    <AppText role="label">
-                      {row.name}
-                      {selected ? " — Selected" : ""}
-                    </AppText>
+                    <View style={styles.rowContent}>
+                      <View style={styles.rowText}>
+                        <AppText
+                          role="label"
+                          numberOfLines={1}
+                          ellipsizeMode="tail"
+                          style={styles.rowName}
+                        >
+                          {`${row.name} — ${row.count ?? "…"}${selected ? " — Selected" : ""}`}
+                        </AppText>
+                        {row.severity !== "none" ? (
+                          <AppText
+                            role="caption"
+                            style={{
+                              color:
+                                row.severity === "broken"
+                                  ? colors.danger
+                                  : colors.statusWobble,
+                            }}
+                          >
+                            {row.severity === "broken"
+                              ? "Needs attention"
+                              : "Empty"}
+                          </AppText>
+                        ) : null}
+                      </View>
+                      {indicator ? (
+                        <Icon
+                          name={indicator.name}
+                          size="sm"
+                          tone={indicator.tone}
+                        />
+                      ) : null}
+                    </View>
                   </Pressable>
                 );
               })}
@@ -194,6 +271,18 @@ export function OrrerySystemSelector({
                   />
                 </>
               ) : null}
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Manage Systems"
+                style={[styles.manageRow, { borderColor: colors.border }]}
+                onPress={() => {
+                  dismiss();
+                  navigation.navigate("SystemsManagement");
+                }}
+              >
+                <AppText role="label">Manage Systems</AppText>
+                <Icon name="settings" size="sm" tone="textSecondary" />
+              </Pressable>
               <Button
                 role="secondary"
                 label="Close System selector"
@@ -230,5 +319,16 @@ const styles = StyleSheet.create({
     maxWidth: "90%",
   },
   row: { minHeight: 44, minWidth: 44, padding: SPACING.md },
+  rowContent: { flexDirection: "row", alignItems: "center", gap: SPACING.sm },
+  rowText: { flex: 1, flexShrink: 1 },
+  rowName: { flexShrink: 1 },
+  manageRow: {
+    minHeight: 44,
+    padding: SPACING.md,
+    borderWidth: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
   content: { padding: SPACING.base, gap: SPACING.sm },
 });

@@ -62,6 +62,12 @@ import { readOrreryContactTargetValidation } from "@/db/orrery-action-read";
 import { readOrrerySatellites } from "@/db/orrery-satellites-read";
 import { commitRingReorder } from "@/db/ring-seq-dao";
 import {
+  countBuiltinAndCategorySystemMembers,
+  countSystemMembers,
+  readSystemsCatalog,
+  type SystemCatalogEntry,
+} from "@/db/systems-catalog-read";
+import {
   type CameraPose,
   type CameraRect,
   clampCameraPose,
@@ -114,6 +120,12 @@ const acknowledgeReorder = () => {
 /** Identifies commits emitted by this screen's otherwise-local System store. */
 const LOCAL_SELECT_ORIGIN = Symbol("orrery-local-select");
 const SWITCH_INTENSITY_MS = 260;
+const MAX_CUSTOM_SYSTEM_COUNTS_PER_OPEN = 12;
+
+type SystemCountCache = {
+  counts: Map<string, number>;
+  broken: Map<string, boolean>;
+};
 
 export function OrreryScreen() {
   const { colors } = useTheme();
@@ -253,6 +265,17 @@ export function OrreryScreen() {
     [],
   );
   const state = useSystemStore();
+  const [systemCatalog, setSystemCatalog] = useState<SystemCatalogEntry[]>([]);
+  const [systemCounts, setSystemCounts] = useState<Map<string, number>>(
+    new Map(),
+  );
+  const [systemBroken, setSystemBroken] = useState<Map<string, boolean>>(
+    new Map(),
+  );
+  const [systemSelectorRequest, setSystemSelectorRequest] = useState<
+    number | null
+  >(null);
+  const systemCountCache = useRef(new Map<number, SystemCountCache>());
   const focusTargetsRef = useRef(focusTargets);
   focusTargetsRef.current = focusTargets;
   const hasReadySystem = useRef(false);
@@ -455,6 +478,91 @@ export function OrreryScreen() {
   }, [presentation, reload]);
 
   const scene = state.snapshot;
+  const catalogRevision = scene?.dataRevision ?? null;
+  useEffect(() => {
+    if (!isFocused || !appActive) return;
+    // Re-read after a data-revision change even when the focused System stays put.
+    void catalogRevision;
+    let cancelled = false;
+    void readSystemsCatalog(getExecutor())
+      .then((catalog) => {
+        if (!cancelled) setSystemCatalog(catalog);
+      })
+      .catch(() => {
+        if (!cancelled) setSystemCatalog([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isFocused, appActive, catalogRevision]);
+  useEffect(() => {
+    const cached =
+      catalogRevision === null
+        ? undefined
+        : systemCountCache.current.get(catalogRevision);
+    setSystemCounts(cached ? new Map(cached.counts) : new Map());
+    setSystemBroken(cached ? new Map(cached.broken) : new Map());
+  }, [catalogRevision]);
+  useEffect(() => {
+    if (
+      systemSelectorRequest === null ||
+      catalogRevision === null ||
+      systemCatalog.length === 0
+    )
+      return;
+    const cached = systemCountCache.current.get(catalogRevision);
+    if (cached) {
+      setSystemCounts(new Map(cached.counts));
+      setSystemBroken(new Map(cached.broken));
+      return;
+    }
+    let cancelled = false;
+    const visible = systemCatalog.filter((entry) => !entry.hidden);
+    const fixed = visible
+      .map((entry) => entry.ref)
+      .filter((ref) => ref.kind !== "custom");
+    const custom = visible.filter((entry) => entry.ref.kind === "custom");
+    const counts = new Map<string, number>();
+    const broken = new Map<string, boolean>();
+    const publish = () => {
+      if (!cancelled) {
+        setSystemCounts(new Map(counts));
+        setSystemBroken(new Map(broken));
+      }
+    };
+    void (async () => {
+      const fixedCounts = await countBuiltinAndCategorySystemMembers(
+        getExecutor(),
+        fixed,
+      );
+      if (cancelled) return;
+      for (const [id, count] of fixedCounts) counts.set(id, count);
+      publish();
+      for (const entry of custom.slice(0, MAX_CUSTOM_SYSTEM_COUNTS_PER_OPEN)) {
+        const result = await countSystemMembers(getExecutor(), entry.ref);
+        if (cancelled) return;
+        counts.set(entry.id, result.count);
+        broken.set(entry.id, result.brokenRules.length > 0);
+        publish();
+      }
+      if (!cancelled)
+        systemCountCache.current.set(catalogRevision, {
+          counts: new Map(counts),
+          broken: new Map(broken),
+        });
+    })().catch(() => {
+      // A stale count must not displace a usable selector or System scene.
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [systemSelectorRequest, catalogRevision, systemCatalog]);
+  const onSystemSelectorOpenChange = useCallback(
+    (open: boolean, requestId: number) => {
+      setSystemSelectorRequest(open ? requestId : null);
+    },
+    [],
+  );
   const satellites =
     preferences.satellitesEnabled &&
     isFocused &&
@@ -928,6 +1036,10 @@ export function OrreryScreen() {
           state={state}
           availableHeight={viewport.height}
           enabled={hydrated}
+          catalog={systemCatalog}
+          counts={systemCounts}
+          broken={systemBroken}
+          onOpenChange={onSystemSelectorOpenChange}
         />
         <OrreryViewOptions availableHeight={viewport.height} />
         <OrreryControls
