@@ -147,6 +147,10 @@ const CADENCE_OWNERS: Record<string, LedgerEntry> = {
  * mapped to its owning task and exact predicate.
  */
 const PREDICATE_OWNERS: Record<string, LedgerEntry> = {
+  "src/db/systems-catalog-read.ts": {
+    owner: "30-05",
+    note: "Switcher fixed-System count correction admits a manual include only when `archived_at IS NULL AND tracking_enabled = 1`; base predicates and custom resolution retain their existing System-specific Bound/population semantics.",
+  },
   "src/logic/system-rule-resolver.ts": {
     owner: "30-02",
     note: "Custom-System rule candidates default to ACTIVE_SEGREGATION_WHERE (archived_at IS NULL, tracking_enabled = 1, contacted); only explicit Not Contacted or scope:population widens the base scope.",

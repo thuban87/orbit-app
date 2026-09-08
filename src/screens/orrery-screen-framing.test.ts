@@ -237,6 +237,12 @@ function harness() {
                 target: unknown,
               ) => ({ status: "ready", identity: target, isMember: true }),
             };
+          if (id.includes("systems-catalog-read"))
+            return {
+              countBuiltinAndCategorySystemMembers: async () => new Map(),
+              countSystemMembers: async () => ({ count: 0, brokenRules: [] }),
+              readSystemsCatalog: async () => [],
+            };
           if (id.includes("/db/database")) return { getExecutor: () => ({}) };
           if (id.includes("use-reduced-motion"))
             return {
