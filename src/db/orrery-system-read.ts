@@ -15,7 +15,6 @@ import { PROGRESS_SQL, STATUS_SQL } from "@/db/status";
 import { listSystemOverrides, type SystemOverride } from "@/db/systems-dao";
 import { inReadSnapshot, type ReadOnlyExecutor } from "@/db/transaction";
 import type { SqlExecutor } from "@/db/types";
-import type { GravityInputsLoader } from "@/logic/dashboard-gravity-filter";
 import {
   ALL_CONTACTS_SYSTEM,
   buildOrrerySystemWhere,
@@ -31,6 +30,7 @@ import {
   type BrokenRule,
   resolveCustomSystemMembers,
   resolveMembershipFromDefinition,
+  type SystemGravityInputsLoader,
   type SystemRule,
 } from "@/logic/system-rule-resolver";
 
@@ -68,23 +68,31 @@ const MEMBER_SELECT = `SELECT c.id,c.uid,c.name,c.photo,c.ring_seq,c.rarely_resp
   CASE WHEN c.last_contact IS NULL THEN NULL ELSE (${STATUS_SQL}) END AS status
   FROM contacts c`;
 
-function makeGravityInputsLoader(exec: ReadOnlyExecutor): GravityInputsLoader {
-  const cache = new Map<
-    number,
+function makeGravityInputsLoader(
+  exec: ReadOnlyExecutor,
+): SystemGravityInputsLoader {
+  type ImpactInput =
     Awaited<ReturnType<typeof readOrreryImpactInputsCore>> extends Map<
       number,
       infer T
     >
       ? T
-      : never
-  >();
-  return async (id) => {
+      : never;
+  const cache = new Map<number, ImpactInput>();
+  const preload = async (ids: readonly number[]) => {
+    const missing = ids.filter((id) => !cache.has(id));
+    if (!missing.length) return;
+    const loaded = await readOrreryImpactInputsCore(exec, missing);
+    for (const [key, value] of loaded) cache.set(key, value);
+  };
+  const loader: SystemGravityInputsLoader = async (id) => {
     if (!cache.has(id)) {
-      const loaded = await readOrreryImpactInputsCore(exec, [id]);
-      for (const [key, value] of loaded) cache.set(key, value);
+      await preload([id]);
     }
     return cache.get(id) ?? null;
   };
+  loader.preload = preload;
+  return loader;
 }
 
 async function selectMembersByIds(

@@ -274,9 +274,9 @@ describe("membership overrides", () => {
       applyMembershipOverrides({
         candidateIds: [1, 2],
         includeIds: [3, 4],
-        eligibleIncludeIds: [3],
+        eligibleIncludeIds: [3, 4],
         excludeIds: [2, 4],
       }),
-    ).toEqual({ memberIds: [1, 3], prunableExclusionContactIds: [4] });
+    ).toEqual({ memberIds: [1, 3, 4], prunableExclusionContactIds: [4] });
   });
 });

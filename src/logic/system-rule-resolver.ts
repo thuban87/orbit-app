@@ -1,10 +1,5 @@
 /** Resolve persisted custom-System rules and manual overrides into contact ids. */
-import {
-  listSystemOverrides,
-  listSystemRules,
-  type SystemOverride,
-} from "@/db/systems-dao";
-import type { ReadOnlyExecutor } from "@/db/transaction";
+
 import {
   filterByGravity,
   type GravityInputsLoader,
@@ -22,6 +17,17 @@ import {
   SOCIAL_BATTERY_VALUES,
 } from "@/logic/dashboard-query-logic";
 import { GRAVITY_TIERS } from "@/services/impact";
+import {
+  listSystemOverrides,
+  listSystemRules,
+  type SystemOverride,
+} from "../db/systems-dao";
+import type { ReadOnlyExecutor } from "../db/transaction";
+
+/** Optional batch hook lets DB callers hydrate the gravity cache once. */
+export type SystemGravityInputsLoader = GravityInputsLoader & {
+  preload?: (ids: readonly number[]) => Promise<void>;
+};
 
 export interface BrokenRule {
   ruleUid: string;
@@ -153,7 +159,7 @@ export async function resolveCandidateIds(
   exec: ReadOnlyExecutor,
   mapped: MappedSystemRules,
   now: string,
-  gravityInputsFor: GravityInputsLoader,
+  gravityInputsFor: SystemGravityInputsLoader,
 ): Promise<number[]> {
   const filter = buildFilterWhere(mapped.filters);
   const clauses = [
@@ -176,9 +182,14 @@ export async function resolveCandidateIds(
     params,
   );
   const candidateIds = rows.map((row) => row.id);
-  return mapped.gravityTiers.length
-    ? filterByGravity(candidateIds, mapped.gravityTiers, gravityInputsFor, now)
-    : candidateIds;
+  if (!mapped.gravityTiers.length) return candidateIds;
+  await gravityInputsFor.preload?.(candidateIds);
+  return filterByGravity(
+    candidateIds,
+    mapped.gravityTiers,
+    gravityInputsFor,
+    now,
+  );
 }
 
 export function applyMembershipOverrides(input: {
@@ -192,16 +203,18 @@ export function applyMembershipOverrides(input: {
 > {
   const candidates = new Set(input.candidateIds);
   const eligibleIncludes = new Set(input.eligibleIncludeIds);
-  const excludes = new Set(input.excludeIds);
   const prunableExclusionContactIds = input.excludeIds.filter(
     (id) => !candidates.has(id),
+  );
+  const effectiveExcludes = new Set(
+    input.excludeIds.filter((id) => candidates.has(id)),
   );
   const memberIds = [
     ...input.candidateIds,
     ...input.includeIds.filter(
       (id) => !candidates.has(id) && eligibleIncludes.has(id),
     ),
-  ].filter((id) => !excludes.has(id));
+  ].filter((id) => !effectiveExcludes.has(id));
   return { memberIds: [...new Set(memberIds)], prunableExclusionContactIds };
 }
 
@@ -230,7 +243,7 @@ export async function resolveMembershipFromDefinition(
     overrides: readonly SystemOverride[];
     now: string;
   },
-  gravityInputsFor: GravityInputsLoader,
+  gravityInputsFor: SystemGravityInputsLoader,
 ): Promise<ResolvedCustomSystemMembers> {
   const mapped = await mapRulesToFilters(exec, definition.rules);
   const candidateIds = definition.rules.length
@@ -255,7 +268,7 @@ export async function resolveCustomSystemMembers(
   exec: ReadOnlyExecutor,
   system: { uid: string },
   now: string,
-  gravityInputsFor: GravityInputsLoader,
+  gravityInputsFor: SystemGravityInputsLoader,
 ): Promise<ResolvedCustomSystemMembers> {
   const row = await exec.getFirstAsync<{ id: number }>(
     "SELECT id FROM systems WHERE uid = ?",
