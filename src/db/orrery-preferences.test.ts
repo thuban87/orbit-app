@@ -29,7 +29,7 @@ describe("Orrery preferences migration and DAO", () => {
     async (version) => {
       await runMigrations(exec, MIGRATIONS, version, deps);
       await runMigrations(exec, MIGRATIONS, TARGET_VERSION, deps);
-      expect(TARGET_VERSION).toBe(21);
+      expect(TARGET_VERSION).toBe(22);
       expect(await getAppSettings(exec)).toMatchObject({
         orreryDensity: "balanced",
         orrerySatellitesEnabled: 0,
