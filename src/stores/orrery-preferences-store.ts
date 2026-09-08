@@ -146,14 +146,26 @@ export function createOrreryPreferencesStore(
       save: (exec, intent, origin) => {
         // Never infer durable defaults after an unread/failed initial load.
         if (!get().hydrated) return Promise.resolve();
+        const originToken = origin ?? {};
         const desired = {
           ...get().committed,
           ...inFlight,
           ...get().pendingIntent,
         };
         const changed: Intent = {};
+        // A foreign route can reassert the same value after this screen's
+        // failed save. It must get a real publication with its own origin,
+        // rather than inheriting the failed local origin on retry.
         for (const key of KEYS)
           if (
+            key === "lastSystem" &&
+            intent[key] !== undefined &&
+            intent[key] === desired[key] &&
+            get().pendingIntent?.lastSystem !== undefined &&
+            originToken !== pendingLastSystemOrigin
+          )
+            Object.assign(changed, { [key]: intent[key] });
+          else if (
             intent[key] !== undefined &&
             intent[key] !== desired[key] &&
             // A loaded System is usable before its preference saves. Returning
@@ -166,7 +178,7 @@ export function createOrreryPreferencesStore(
         if (Object.keys(changed).length === 0)
           return draining ?? Promise.resolve();
         if (changed.lastSystem !== undefined)
-          pendingLastSystemOrigin = origin ?? {};
+          pendingLastSystemOrigin = originToken;
         set({ pendingIntent: { ...get().pendingIntent, ...changed } });
         return drain(exec);
       },

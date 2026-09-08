@@ -129,6 +129,20 @@ describe("Orrery preferences commit-before-publish", () => {
     expect(store.getState().committedOrigin).toBe(localOrigin);
     expect(initialOrigin).toBeNull();
   });
+  it("lets a foreign reassertion publish after a local System save fails", async () => {
+    const { store, write } = fixture();
+    await store.getState().hydrate(exec);
+    const localOrigin = Symbol("local");
+    write.mockRejectedValueOnce(new Error("disk"));
+    await store
+      .getState()
+      .save(exec, { lastSystem: "builtin:favorites" }, localOrigin);
+    expect(store.getState().committedOrigin).toBeNull();
+
+    await store.getState().save(exec, { lastSystem: "builtin:favorites" });
+    expect(store.getState().committed.lastSystem).toBe("builtin:favorites");
+    expect(store.getState().committedOrigin).not.toBe(localOrigin);
+  });
   it("serializes conflicting updates including reversal to the previously saved value", async () => {
     const { store, write } = fixture();
     await store.getState().hydrate(exec);
