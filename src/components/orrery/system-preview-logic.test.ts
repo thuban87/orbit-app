@@ -5,9 +5,7 @@ import {
   previewMembershipSummary,
 } from "./system-preview-logic";
 
-function scene(
-  world: ProvisionalOrreryScene["world"],
-): ProvisionalOrreryScene {
+function scene(world: ProvisionalOrreryScene["world"]): ProvisionalOrreryScene {
   return { world } as ProvisionalOrreryScene;
 }
 
@@ -64,8 +62,6 @@ describe("System preview projection", () => {
   it("uses the copy-contract membership summary", () => {
     expect(previewMembershipSummary([])).toBe("0 members");
     expect(previewMembershipSummary([{ id: 1 }])).toBe("1 member");
-    expect(previewMembershipSummary([{ id: 1 }, { id: 2 }])).toBe(
-      "2 members",
-    );
+    expect(previewMembershipSummary([{ id: 1 }, { id: 2 }])).toBe("2 members");
   });
 });

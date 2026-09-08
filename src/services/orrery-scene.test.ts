@@ -16,6 +16,7 @@ import {
   createOrreryIntentDispatcher,
   createOrrerySceneController,
   loadOrreryScene,
+  readProvisionalOrreryScene,
 } from "@/services/orrery-scene";
 
 vi.mock("expo-sqlite", () => ({}));
@@ -94,6 +95,28 @@ beforeEach(async () => {
 afterEach(() => db.close());
 
 describe("canonical SQLite scene tracer", () => {
+  it("derives provisional System geometry from full records and keeps a resolved sun out of orbit", async () => {
+    const second = (
+      await exec.runAsync(
+        `INSERT INTO contacts (uid, name, interval_days, tracking_enabled, last_contact, ring_seq, created_at, modified_at)
+         VALUES ('second', 'Blair', 90, 1, '2026-08-01 12:00:00', 1, '2026-08-01', '2026-08-01')`,
+      )
+    ).lastInsertRowId;
+    const provisional = await readProvisionalOrreryScene(exec, [id, second]);
+    expect(provisional.contacts.map((contact) => contact.id)).toEqual([
+      id,
+      second,
+    ]);
+    const bodies = provisional.world.filter((body) => body.kind === "contact");
+    expect(bodies).toHaveLength(2);
+    expect(bodies[0]).not.toMatchObject({ x: bodies[1].x, y: bodies[1].y });
+
+    await updateAppSettings(exec, { sunContactId: second }, "2026-09-02");
+    const withSun = await readProvisionalOrreryScene(exec, [id, second]);
+    expect(withSun.contacts.map((contact) => contact.id)).toEqual([id]);
+    expect(withSun.world.find((body) => body.id === second)?.kind).toBe("sun");
+  });
+
   it("feeds canonical Gravity into the same rendered and hit-tested mass without storing scores", async () => {
     const before = await loadOrreryScene(exec);
     await exec.runAsync(
