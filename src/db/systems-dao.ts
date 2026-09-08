@@ -414,6 +414,32 @@ export function restoreDeletedSystem(
   });
 }
 
+/**
+ * Restore a deleted System and, when its deletion displaced the active
+ * selection, restore that selection in the same durable operation.
+ */
+export function restoreDeletedSystemAndActiveSelection(
+  exec: SqlExecutor,
+  input: {
+    snapshot: DeletedSystemSnapshot;
+    restoreActiveSelection: boolean;
+    now: string;
+  },
+): Promise<CustomSystem> {
+  return inWriteTransaction(exec, async () => {
+    const system = await restoreDeletedSystemCore(exec, input);
+    if (input.restoreActiveSelection) {
+      await updateAppSettingsCore(
+        exec,
+        { orreryLastSystem: `custom:${system.uid}` },
+        input.now,
+      );
+    }
+    await bumpDataRevisionCore(exec);
+    return system;
+  });
+}
+
 export async function setSystemOverrideCore(
   exec: SqlExecutor,
   input: {

@@ -29,7 +29,7 @@ import {
   renameSystem,
   reorderSystems,
   resetSystemOverrides,
-  restoreDeletedSystem,
+  restoreDeletedSystemAndActiveSelection,
   setSystemHidden,
 } from "@/db/systems-dao";
 import type { SystemDescriptor } from "@/logic/orrery-system-logic";
@@ -115,13 +115,20 @@ export async function deleteManagedSystem(input: {
       onPress: () => {
         void (async () => {
           try {
-            await restoreDeletedSystem(getExecutor(), {
+            await restoreDeletedSystemAndActiveSelection(getExecutor(), {
               snapshot: deletion.snapshot,
+              restoreActiveSelection: deletion.wasActive,
               now: localDateTime(),
             });
-            await input.onChanged();
           } catch {
             errorSnackbar("Couldn't undo — that name is in use again");
+            return;
+          }
+          try {
+            await refreshOrreryPreferences();
+            await input.onChanged();
+          } catch {
+            errorSnackbar("System restored, but the list couldn't refresh.");
           }
         })();
       },

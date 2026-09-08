@@ -23,6 +23,7 @@ import {
   reorderSystems,
   resetSystemOverrides,
   restoreDeletedSystem,
+  restoreDeletedSystemAndActiveSelection,
   saveMembershipOverrides,
   saveSystemDefinition,
   setSystemHidden,
@@ -243,6 +244,44 @@ describe("systems DAO", () => {
       data_revision: (before?.data_revision ?? 0) + 1,
     });
     expect(await getSystem(exec, system.uid)).toBeNull();
+  });
+
+  it("atomically restores the System and its active selection after Undo", async () => {
+    const system = await createCustomSystem(exec, {
+      name: "Undo Active",
+      now: NOW,
+    });
+    const ref = `custom:${system.uid}` as const;
+    await exec.runAsync(
+      "UPDATE app_settings SET orrery_last_system = ? WHERE id = 1",
+      [ref],
+    );
+    const deletion = await deleteSystemWithActiveFallback(exec, {
+      systemRef: ref,
+      now: NOW,
+    });
+    const beforeRestore = await exec.getFirstAsync<{ data_revision: number }>(
+      "SELECT data_revision FROM app_settings WHERE id = 1",
+    );
+
+    const restored = await restoreDeletedSystemAndActiveSelection(exec, {
+      snapshot: deletion.snapshot,
+      restoreActiveSelection: deletion.wasActive,
+      now: NOW,
+    });
+
+    expect(restored.uid).toBe(system.uid);
+    expect(
+      await exec.getFirstAsync<{
+        orrery_last_system: string;
+        data_revision: number;
+      }>(
+        "SELECT orrery_last_system, data_revision FROM app_settings WHERE id = 1",
+      ),
+    ).toEqual({
+      orrery_last_system: ref,
+      data_revision: (beforeRestore?.data_revision ?? 0) + 1,
+    });
   });
 
   it("guards every override write with catalog validation and supports valid immutable bases", async () => {

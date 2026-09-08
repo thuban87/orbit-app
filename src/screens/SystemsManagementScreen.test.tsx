@@ -52,7 +52,7 @@ vi.mock("@/db/systems-dao", () => ({
   renameSystem: vi.fn(),
   reorderSystems: vi.fn(),
   resetSystemOverrides: vi.fn(),
-  restoreDeletedSystem: vi.fn(),
+  restoreDeletedSystemAndActiveSelection: vi.fn(),
   setSystemHidden: vi.fn(),
 }));
 vi.mock("@/stores/snackbar-store", () => ({
@@ -136,7 +136,7 @@ describe("SystemsManagementScreen contracts", () => {
       },
       wasActive: true,
     });
-    vi.mocked(dao.restoreDeletedSystem).mockResolvedValue({
+    vi.mocked(dao.restoreDeletedSystemAndActiveSelection).mockResolvedValue({
       id: 1,
       uid: "family",
       name: "Family",
@@ -163,7 +163,22 @@ describe("SystemsManagementScreen contracts", () => {
     const undo = vi.mocked(snackbar.showSnackbar).mock.calls[0][0].action
       .onPress;
     undo();
-    await vi.waitFor(() => expect(dao.restoreDeletedSystem).toHaveBeenCalled());
+    await vi.waitFor(() =>
+      expect(dao.restoreDeletedSystemAndActiveSelection).toHaveBeenCalledWith(
+        "exec",
+        {
+          snapshot: {
+            uid: "family",
+            name: "Family",
+            rules: [],
+            overrides: [],
+            prefs: null,
+          },
+          restoreActiveSelection: true,
+          now: "now",
+        },
+      ),
+    );
   });
 
   it("keeps a failed Undo non-destructive and does not reselect the deleted System", async () => {
@@ -177,7 +192,7 @@ describe("SystemsManagementScreen contracts", () => {
       },
       wasActive: true,
     });
-    vi.mocked(dao.restoreDeletedSystem).mockRejectedValue(
+    vi.mocked(dao.restoreDeletedSystemAndActiveSelection).mockRejectedValue(
       new Error("name in use"),
     );
 
