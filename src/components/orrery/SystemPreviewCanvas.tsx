@@ -1,6 +1,6 @@
 import { useIsFocused } from "@react-navigation/native";
 import { Canvas, Circle, Fill, Group } from "@shopify/react-native-skia";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { AppState, StyleSheet, useWindowDimensions, View } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import {
@@ -66,6 +66,10 @@ function ActiveSystemPreviewCanvas({
   const { colors } = useTheme();
   const { width, height } = useWindowDimensions();
   const markers = useMemo(() => buildPreviewMarkers(scene), [scene]);
+  const reportFocusBody = useCallback(
+    (contactId: number) => focusPreviewBody(contactId, onFocusBody),
+    [onFocusBody],
+  );
   const panX = useSharedValue(0);
   const panY = useSharedValue(0);
   const panStartX = useSharedValue(0);
@@ -115,7 +119,7 @@ function ActiveSystemPreviewCanvas({
       (event.x - width / 2 - panX.value) / zoom.value,
       (event.y - height / 2 - panY.value) / zoom.value,
     );
-    if (marker) runOnJS(focusPreviewBody)(marker.id, onFocusBody);
+    if (marker) runOnJS(reportFocusBody)(marker.id);
   });
   const gesture = Gesture.Race(tap, Gesture.Simultaneous(pan, pinch));
 
