@@ -100,6 +100,36 @@ export async function publishLastSystem(lastSystem: OrrerySystemId): Promise<voi
   await useOrreryPreferencesStore.getState().save(exec, { lastSystem });
 }
 
+/** Delete never touches contacts; its snapshot powers the short-lived Undo action. */
+export async function deleteManagedSystem(input: {
+  systemRef: OrrerySystemId;
+  active: boolean;
+  onChanged: () => Promise<void>;
+}): Promise<void> {
+  const snapshot = await deleteSystem(getExecutor(), { systemRef: input.systemRef });
+  if (input.active) await publishLastSystem(ALL_CONTACTS_REF);
+  await input.onChanged();
+  showSnackbar({
+    kind: "success",
+    label: "System deleted",
+    action: {
+      label: "Undo",
+      accessibilityLabel: "Undo System deletion",
+      onPress: () => {
+        void (async () => {
+          try {
+            await restoreDeletedSystem(getExecutor(), { snapshot, now: localDateTime() });
+            if (input.active) await publishLastSystem(input.systemRef);
+            await input.onChanged();
+          } catch {
+            errorSnackbar("Couldn't undo — that name is in use again");
+          }
+        })();
+      },
+    },
+  });
+}
+
 function SystemRow({
   row,
   renaming,
@@ -302,30 +332,10 @@ export function SystemsManagementScreen() {
               try {
                 const active =
                   useOrreryPreferencesStore.getState().committed.lastSystem === row.id;
-                const snapshot = await deleteSystem(getExecutor(), { systemRef: row.id });
-                if (active) await publishLastSystem(ALL_CONTACTS_REF);
-                await load();
-                showSnackbar({
-                  kind: "success",
-                  label: "System deleted",
-                  action: {
-                    label: "Undo",
-                    accessibilityLabel: "Undo System deletion",
-                    onPress: () => {
-                      void (async () => {
-                        try {
-                          await restoreDeletedSystem(getExecutor(), {
-                            snapshot,
-                            now: localDateTime(),
-                          });
-                          if (active) await publishLastSystem(row.id);
-                          await load();
-                        } catch {
-                          errorSnackbar("Couldn't undo — that name is in use again");
-                        }
-                      })();
-                    },
-                  },
+                await deleteManagedSystem({
+                  systemRef: row.id,
+                  active,
+                  onChanged: load,
                 });
               } catch {
                 setError("Couldn't delete this System. Please try again.");
