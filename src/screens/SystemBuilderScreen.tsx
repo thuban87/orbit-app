@@ -184,6 +184,7 @@ function BuilderBackgroundCanvas() {
   return (
     <Canvas
       testID="system-builder-background-canvas"
+      pointerEvents="none"
       accessibilityElementsHidden
       importantForAccessibility="no-hide-descendants"
       style={styles.backgroundCanvas}
