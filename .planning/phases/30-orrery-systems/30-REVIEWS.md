@@ -1,7 +1,9 @@
 ---
 phase: 30
 reviewers: [codex, claude]
-reviewed_at: 2026-09-08T11:44:25Z
+reviewed_at: 2026-09-08T11:44:25Z        # cycle 1
+reviewed_at_cycle2: 2026-09-08T12:37:11Z  # cycle 2 (this file accumulates per cycle)
+cycles: 2
 plans_reviewed: [30-01-PLAN.md, 30-02-PLAN.md, 30-03-PLAN.md, 30-04-PLAN.md, 30-05-PLAN.md, 30-06-PLAN.md, 30-07-PLAN.md, 30-08-PLAN.md, 30-09-PLAN.md, 30-10-PLAN.md]
 models:
   codex: "gpt-5.6-terra (reasoning=low)"
@@ -9,6 +11,9 @@ models:
 model_sources:
   codex: "banner"
   claude: "orchestrator-subagent"
+cycle2_summary:
+  current_high: 3
+  current_actionable: 12
 ---
 
 # Cross-AI Plan Review — Phase 30 (Orrery Systems)
@@ -457,3 +462,327 @@ HIGH headline: **Plan 10's declared file set (OrreryScreen.tsx + a pure math mod
 ## Overall risk assessment: **MEDIUM**
 
 Justification: The data layer (plans 01-04) — the place this repo's correctness bugs historically live — is the strongest part: migration number verified against disk, all predicate/gravity/backup references verified accurate at the cited lines, injection-safe, forward-only, and with the irreversible schema shape correctly gated behind a human checkpoint. That half is LOW risk. The MEDIUM rating is driven by plan 10: one HIGH scope gap (the per-body switch animation cannot be rendered from the declared files) plus two MEDIUM integration gaps (focus-preservation vs. the existing unconditional focus-clear, and delta source-ids vs. the store's null-during-loading behavior), all in device-verified territory that `npm test` will not catch — and one MEDIUM in plan 01 (custom routing order / `buildOrrerySystemWhere` guard). None is a decision reversal; all are recoverable with the wiring made explicit before execution.
+
+
+---
+
+# Cross-AI Plan Review — Phase 30 (Orrery Systems) — CYCLE 2
+
+> **Cycle 2** re-review of the CURRENT plans on disk after the cycle-1 replan (commit `a6f4d02` — "reachability, atomicity, data-flow, renderer scope, missing-System handling"). Reviewers: `codex` (gpt-5.6-terra, reasoning=low, source-grounded runner lane) and `claude` (Opus, read-only orchestrator subagent — the headless `claude -p` lane has a known Write-permission failure in this repo; owner explicitly approved the Claude lane for this run). Both had full repo read access and verified plan claims against source; neither wrote, committed, or pushed. This section ACCUMULATES onto the cycle-1 record above — it does not replace it. Findings are judged only for whether they REMAIN unresolved against the current plans; cycle-1 items the replan incorporated or deferred in a PLAN.md are not recounted.
+
+## Cycle 2 Consensus Summary
+
+The replan is **substantially stronger** and both reviewers agree on it: **every cycle-1 HIGH is genuinely incorporated into the current PLAN.md files, and each fix rests on a disk fact both lanes (and the orchestrator) independently re-verified.** Cross-catalog name uniqueness, custom read-routing order + `buildOrrerySystemWhere` throw-guard, the `missing-custom` domain result, atomic `saveSystemDefinition` (single non-reentrant transaction), uid-preserving undo restore, All-Contacts `scope:population` duplication, the `resolveMembershipFromDefinition` draft engine, the OrreryScreen data-flow owner + `catalog` prop, the Settings-stack `SystemBuilder` registration (both stacks) with corrected wave ordering (06 now depends on 08), `OrreryWorld` brought into plan-10 scope, the focus-clear replacement, the stash-at-loading/diff-at-ready delta capture, and the declare-only backup contract with the real missing-custom fallback chain — all present and disk-grounded. No ADR/HANDOFF/dossier decision is reversed (D-05/D-06/D-07/E-02 hold; `custom_field_*` invariants untouched).
+
+**The reviewers diverge on residual risk, and the divergence is one of coverage, not contradiction — the same shape as cycle 1.** Claude rates the phase **MEDIUM with zero unresolved HIGH**, having scoped its pass to *whether the cycle-1 fixes were incorporated* (they were) plus internal consistency and the render-loop. Codex rates the phase **HIGH ("should not execute until the resolver → member-grid → builder → preview data contracts are repaired")**, reaching a NEW cluster of cross-plan **consumer-contract** gaps that the replan exposed but did not close. **The orchestrator code-verified every consequential Codex HIGH against source on disk and all check out as real** — this is Codex reaching integration seams Claude did not enumerate, not Codex overreach. Symmetrically, Claude surfaced one NEW render-pipeline finding (plan-10 Task 3 duplicating the existing `orrery-frame` shed/capture pipeline) that Codex did not raise and the orchestrator also verified as real. The two lanes are complementary.
+
+### Orchestrator verification (code, not the diff — not the reviewer summaries)
+Confirmed against source on disk:
+- **`candidateIds` is absent from the resolver return.** `resolveMembershipFromDefinition` returns `{ memberIds, brokenRules, prunableExclusionContactIds }` (`30-02-PLAN.md:165,170`); `resolveCandidateIds` is internal only. 30-07's `deriveMemberRows(candidateIds, includeIds, excludeIds, contactRows)` and the builder's embedded grid need the pre-override candidate set to classify member/excluded/added (ORRS-06). Real, unresolved.
+- **`SystemBuilder` is an opaque native `Stack.Screen`.** `OrrerySystemSelector` is a **component rendered inside `OrreryScreen`** (`OrreryScreen.tsx:818`, over the canvas at `:800`) — not a route — so its "HUD over the live Orrery" model does not transfer to a pushed opaque route; there is **no `presentation: 'transparentModal'`** anywhere in the stacks. Plan 08's "make the entire production Orrery behind the HUD inert" has nothing behind it. Real, unresolved.
+- **Provisional-scene inputs are unsourced.** The real derivation (`orrery-scene.ts`) needs ordered member records + impact inputs + density + sun/settings; the resolver returns ids and `systems-members-read` returns `{id,name,photo,searchMethods}`. No plan produces the scene inputs for an unsaved draft's id set. Real, unresolved.
+- **`matchesQuery`/`filterRows` are typed to `ContactPickerRow`** (`contact-picker-selection.ts:17,28-32`), which requires `lookupKey/displayName/primaryMethod/photoThumbUri`; 30-07's `SystemMemberRow` is `{id,name,photo,searchMethods}` with no adapter specified. Real.
+- **`deriveHomePose(world, viewport)` is the canonical Home framing** (`OrreryScreen.tsx:714,755`); `HOME_CAMERA` is only the initial seed (`:212`). Plan 10 Task 2's "send to HOME_CAMERA" contradicts its own "canonical Home framing" must-have. Real.
+- **Dossier §R limits Hide/Show to built-in/category** ("Built-in/category-derived Systems may be Hidden/Shown"); 30-03's `setSystemHidden` accepting custom refs diverges. Real.
+- **`orrery-frame.ts` already sheds/captures on generation change** (`beginWorldTransition` 39-72, `sampleWorldTransition` 74-93; driven in `OrreryWorld.tsx:245,259,278,292`); 30-10 references `orrery-frame` zero times and proposes a redundant parallel entering/leaving prop. Real.
+- **30-06 is missing its `</objective>` closing tag** (all 9 other plans have it). Real.
+
+### Agreed Strengths (both lanes)
+- Migration 022 number (`TARGET_VERSION → 22`) re-verified on disk; additive/forward-only; no `app_settings` ALTER; irreversible table shape gated behind a blocking human checkpoint.
+- All cycle-1 HIGHs incorporated with accurate disk citations (unusually, the plans' "verified against source" claims hold up).
+- Atomic save rationale is real (`transaction.ts` non-reentrant); DAO-only-writer grep gates; injection-safe closed-vocabulary writes; Hermes-crypto + worklet-forward-ref hazards cited; local-first and theme-token invariants preserved; no decision reversals.
+
+### Agreed / cross-cutting Concerns
+- Residual risk concentrates in the **render loop and the cross-plan data contracts feeding the authoring UI** (plans 05/07/08/09/10), all device-verified `backstop` territory that `npm test` will not catch.
+
+### Divergent Views
+- **Overall risk:** Codex **HIGH** (execute-blocking data-contract repairs) vs Claude **MEDIUM** (no unresolved HIGH). Orchestrator adjudication: the three Codex data-contract HIGHs are **real and unresolved** (verified above); the phase carries **3 unresolved HIGH** into cycle 2. This is a coverage divergence — Claude did not probe the consumer contracts — not a factual disagreement.
+- **Plan 10 Task 3:** Claude MEDIUM (duplicates the existing `orrery-frame` pipeline) — Codex did not raise it; orchestrator-verified real.
+- **`ContactPickerRow` reuse (30-07):** Codex HIGH (type-incompatible) — orchestrator rates it MEDIUM (a mechanical adapter closes it) but confirms it is unspecified. Claude did not raise it.
+
+## Cycle 2 — Unresolved HIGH concerns (orchestrator-adjudicated, verified real)
+1. **Resolver contract omits `candidateIds` (30-02 → 30-07/30-08).** The pre-override rule-candidate set is needed to render exclude-in-place (ORRS-06) and the builder's embedded grid; `resolveMembershipFromDefinition` does not return it. *Change:* add `candidateIds` to `ResolvedMembership`/the draft-engine return in 30-02, and have 30-07/30-08 consume it.
+2. **Builder HUD presentation/canvas ownership unspecified & self-contradictory (30-08).** `SystemBuilder` is a normal opaque `Stack.Screen`, so there is no live Orrery behind it to make inert; the plan mixes "own canvas" and "production Orrery behind the HUD" without deciding. *Change:* specify either a transparent/modal presentation that retains the Orrery route underneath, or make the builder own its own background scene/canvas, and re-target the a11y-inert requirement accordingly.
+3. **Provisional-scene inputs are produced by no plan (30-09).** The shared `orrery-scene` derivation seam needs full member records + impact inputs + density + sun/settings for an unsaved draft's id set; nothing supplies them. *Change:* add a `readProvisionalOrreryScene(exec, memberIds)` read/service seam (batching member records + impact inputs + settings + sun) as the Preview's input, owned by 30-09 (or 30-02/30-07).
+
+## Cycle 2 — Actionable non-HIGH concerns (not yet in any PLAN.md task/AC/must-have; not deferred)
+1. **[MED] 30-07** — `matchesQuery`/`filterRows` are typed to `ContactPickerRow`; `SystemMemberRow` cannot feed them. *Change:* add an explicit `SystemMemberRow → ContactPickerRow` adapter (search/selection only, local `photo` kept separate) to Task 1/3.
+2. **[MED] 30-10 Task 3** — reconcile with the existing `orrery-frame` world-transition pipeline (`beginWorldTransition`/`sampleWorldTransition`, already driven by OrreryWorld) instead of a parallel enter/leave prop. *Change:* pass only the `switchIntensity` SharedValue + a spin term (modulating the existing transition's magnitude/easing), drop the redundant entering/leaving id-set prop, add `src/logic/orrery-frame.ts` to Task 3 read_first.
+3. **[MED] 30-10 Task 2** — Home framing. *Change:* replace "send the destination camera to `HOME_CAMERA`" with `deriveHomePose(destination.world, viewport)` (canonical framing at `OrreryScreen.tsx:714/755`); keep `HOME_CAMERA` only as the initial seed.
+4. **[MED] 30-10** — active broken-canvas state (E7) has no data path. *Change:* add a `brokenRules`/`systemHealth` signal to `OrreryMembersResult`/the scene snapshot so the active-canvas needs-attention affordance has a source (currently a device-verify backstop with nothing feeding it).
+5. **[MED] 30-03 Task 3** — `setSystemHidden` accepts custom refs; dossier §R limits Hide/Show to built-in/category (custom is deleted). *Change:* reject `{kind:"custom"}` in `setSystemHiddenCore` + add a DAO test.
+6. **[MED] 30-05 Task 2/3** — the "bounded COUNT" still triggers a full member resolve + a per-System `readOrreryImpactInputsCore` scan for custom/gravity Systems (N per dropdown-open). *Change:* specify an async, revision-keyed count cache with progressive row updates / batched non-gravity SQL counts + a cap, in the must-haves (not only as a device-UAT backstop).
+7. **[MED] 30-02 Task 1** — closed-token validation defines sentinels for category/battery/frequency/needs-attention/gravity but not for the Favorite/Not-Contacted/Snoozed/`scope:population` boolean/system axes. *Change:* define + test exported sentinel constants for those axes so a malformed boolean-axis value becomes a `BrokenRule`.
+8. **[LOW] 30-06** — the `<objective>` block is not closed before `<execution_context>` (missing `</objective>`; all 9 other plans have it). *Change:* add the closing tag.
+9. **[LOW] 30-10 Task 2** — the missing-custom catch re-enters `select(ALL_CONTACTS_SYSTEM)` from inside `select()`'s catch (re-entrant, unlike the terminal missing-category branch). *Change:* note the generation/`same`-guard interaction so it cannot loop.
+10. **[LOW] 30-02 Task 2** — fix the `readOrreryImpactInputsCore` citation (defined at `orrery-impact-read.ts:23`, invoked at `orrery-system-read.ts:109`) and state whether the resolver **injects** the gravity loader (preferred, matches `dashboard-gravity-filter.ts`) or imports it (logic→db inversion).
+11. **[LOW] 30-09 Task 1** — pin the exact current `orrery-scene` derivation symbol to factor the provisional entry point from, replacing the guess-set grep (`generateScene|deriveScene`) in the acceptance criteria.
+12. **[LOW] 30-04 Task 2** — the contract doc should explicitly state custom-rule Category UIDs remain portable identifiers, repaired as broken rules, never silently discarded.
+
+None of the above reverses a recorded decision. The three HIGHs are cross-plan contract repairs (touch plans 02/07/08/09); the non-HIGH items are plan-text tightenings, only #2/#3/#4 touching device-observable behavior.
+
+---
+
+## Codex Review (Cycle 2)
+
+*Model: gpt-5.6-terra (reasoning=low); source-grounded gsd-review runner lane. Graph queries were unavailable in the sandbox (`tsx` IPC), so Codex verified directly against source + dossiers.*
+
+## Overall
+
+The replan is substantially stronger: it correctly extends the existing System union/read/store pipeline, preserves the migration and backup sequencing, and addresses the prior missing-custom, atomic-save, route-order, and Skia ownership problems. I found four remaining cross-plan implementation gaps, two of them high-impact.
+
+Graph queries could not run in this sandbox (`tsx` cannot create its IPC pipe), so I verified directly against the source and dossiers instead.
+
+### 30-01 — Foundation
+
+Summary: Sound thin-slice approach, with the irreversible schema correctly human-gated.
+
+Strengths:
+
+- Correctly avoids re-adding `orrery_last_system`; it already exists in migration 021 and `TARGET_VERSION` is currently 21. [021-orrery-preferences.ts:12](/home/bwales/projects/orbit-app/src/db/migrations/021-orrery-preferences.ts:12), [database.ts:56](/home/bwales/projects/orbit-app/src/db/database.ts:56)
+- The proposed early custom routing is necessary: the current reader calls `buildOrrerySystemWhere()` before any kind-specific handling. [orrery-system-read.ts:54](/home/bwales/projects/orbit-app/src/db/orrery-system-read.ts:54)
+- The custom `WHERE` throw-guard correctly protects the current builtin-only `switch (system.id)`. [orrery-system-logic.ts:73](/home/bwales/projects/orbit-app/src/logic/orrery-system-logic.ts:73)
+
+Concerns: None remaining beyond the intended blocking schema-shape checkpoint.
+
+Suggestions: Keep the checkpoint and explicitly record the chosen ref-keyed cleanup invariant in the migration test.
+
+Risk: MEDIUM — solely because it is a forward-only migration.
+
+### 30-02 — Resolver
+
+Summary: Correct predicate composition and scope handling, but its return contract is insufficient for the downstream member editor.
+
+Strengths:
+
+- It preserves the critical default segregation: active scope requires `last_contact IS NOT NULL`, while the population scope deliberately does not. [dashboard-query-logic.ts:149](/home/bwales/projects/orbit-app/src/logic/dashboard-query-logic.ts:149)
+- Keeping Gravity out of SQL is correct; the canonical implementation is a TypeScript post-filter. [dashboard-gravity-filter.ts:19](/home/bwales/projects/orbit-app/src/logic/dashboard-gravity-filter.ts:19)
+- Stable candidate ordering matches the existing Orrery member read ordering. [orrery-system-read.ts:66](/home/bwales/projects/orbit-app/src/db/orrery-system-read.ts:66)
+
+Concerns:
+
+- HIGH — `resolveMembershipFromDefinition` returns only `memberIds`, broken rules, and prunable exclusions, but Manage Members requires the pre-override `candidateIds` to distinguish rule matches from manual additions/exclusions. [30-02-PLAN.md:163](/home/bwales/projects/orbit-app/.planning/phases/30-orrery-systems/30-02-PLAN.md:163), [30-07-PLAN.md:156](/home/bwales/projects/orbit-app/.planning/phases/30-orrery-systems/30-07-PLAN.md:156) Without it, re-opening an editor cannot accurately render “Excluded in place.”
+- MEDIUM — closed-token validation is incomplete in the stated mapper: it validates category, battery, frequency, needs-attention, and gravity, but does not define/validate the required sentinel values for Favorite, Not Contacted, Snoozed, or `scope:population`. [30-02-PLAN.md:103](/home/bwales/projects/orbit-app/.planning/phases/30-orrery-systems/30-02-PLAN.md:103)
+
+Suggestions: Return `candidateIds` in `ResolvedMembership`, and define exported constants plus malformed-row tests for every boolean/system-only rule value.
+
+Risk: HIGH — this contract drives both membership correctness and the authoring UI.
+
+### 30-03 — DAO
+
+Summary: Strong transaction and deletion design; one permission boundary remains broader than the dossier.
+
+Strengths:
+
+- The plan respects the project’s non-reentrant transaction contract. [transaction.ts:12](/home/bwales/projects/orbit-app/src/db/transaction.ts:12)
+- UID-preserving restore is the right design for ref-keyed override/preferences records.
+- All-Contacts duplication correctly needs `scope:population`; an empty custom definition would otherwise use active-only scope. [30-03-PLAN.md:136](/home/bwales/projects/orbit-app/.planning/phases/30-orrery-systems/30-03-PLAN.md:136)
+
+Concerns:
+
+- MEDIUM — `setSystemHidden` is specified to accept every known ref, including custom Systems. [30-03-PLAN.md:167](/home/bwales/projects/orbit-app/.planning/phases/30-orrery-systems/30-03-PLAN.md:167) The dossier deliberately limits hide/show to built-in and category Systems; custom Systems are deleted instead. [phase-09-orrery-systems-dossier.md:371](/home/bwales/projects/orbit-app/docs/dossier/milestone-2/phase-09-orrery-systems-dossier.md:371) Enforce that boundary in the DAO, not just the screen.
+
+Suggestions: Reject `{kind:"custom"}` in `setSystemHiddenCore` and add a DAO test.
+
+Risk: MEDIUM.
+
+### 30-04 — Backup contract
+
+Summary: Correctly declare-only and well sequenced.
+
+Strengths:
+
+- Restore already validates the preference through `assertOrreryLastSystem`. [backup-schema.ts:211](/home/bwales/projects/orbit-app/src/backup/backup-schema.ts:211)
+- The backup format is currently 4 in the canonical types module. [types.ts:14](/home/bwales/projects/orbit-app/src/backup/types.ts:14)
+- Export currently has no Systems-table reads, so preserving this plan’s “no emission” constraint protects the wire shape. [export-manifest.ts:40](/home/bwales/projects/orbit-app/src/backup/export-manifest.ts:40)
+
+Concerns: None material.
+
+Suggestions: Make the document explicitly state that custom-rule Category UIDs remain portable identifiers and are repaired as broken rules, never silently discarded.
+
+Risk: LOW.
+
+### 30-05 — Switcher
+
+Summary: The data-flow owner is now clear, but the count strategy is not genuinely bounded at scale.
+
+Strengths:
+
+- `OrreryScreen` is the right owner; today the selector receives only state/height/enabled and derives only builtins/categories. [OrrerySystemSelector.tsx:28](/home/bwales/projects/orbit-app/src/components/orrery/OrrerySystemSelector.tsx:28), [orrery-controls-logic.ts:7](/home/bwales/projects/orbit-app/src/components/orrery/orrery-controls-logic.ts:7)
+- Icon-and-text severity meets the dossier’s non-color-only rule. [30-UI-SPEC.md:84](/home/bwales/projects/orbit-app/.planning/phases/30-orrery-systems/30-UI-SPEC.md:84)
+
+Concerns:
+
+- MEDIUM — “bounded COUNT” conflicts with the stated custom path: custom/Gravity counts resolve full member ID sets. [30-05-PLAN.md:132](/home/bwales/projects/orbit-app/.planning/phases/30-orrery-systems/30-05-PLAN.md:132) Gravity itself iterates every candidate. [dashboard-gravity-filter.ts:30](/home/bwales/projects/orbit-app/src/logic/dashboard-gravity-filter.ts:30) Opening a switcher with many custom Systems can therefore trigger N full resolutions.
+
+Suggestions: Specify an asynchronous, revision-keyed count cache with progressive row updates; batch non-Gravity SQL counts; defer/cancel work when the selector closes.
+
+Risk: MEDIUM.
+
+### 30-06 — Management
+
+Summary: Route sequencing and active-delete persistence are now sound.
+
+Strengths:
+
+- Both stacks are independent native navigators, so registering the builder and management routes in both is necessary. [OrreryStack.tsx:30](/home/bwales/projects/orbit-app/src/navigation/tabs/OrreryStack.tsx:30), [SettingsStack.tsx:30](/home/bwales/projects/orbit-app/src/navigation/tabs/SettingsStack.tsx:30)
+- The preferences store persists `lastSystem` through the application settings writer. [orrery-preferences-store.ts:47](/home/bwales/projects/orbit-app/src/stores/orrery-preferences-store.ts:47)
+
+Concerns:
+
+- LOW — the plan’s `<objective>` block is not closed before `<execution_context>`. [30-06-PLAN.md:55](/home/bwales/projects/orbit-app/.planning/phases/30-orrery-systems/30-06-PLAN.md:55) This may not break execution, but it makes structured-plan tooling less reliable.
+
+Suggestions: Close `</objective>` before the execution context.
+
+Risk: LOW.
+
+### 30-07 — Manage Members
+
+Summary: Local-photo handling and virtualized-grid intent are good, but the picker-logic reuse is currently type-incompatible.
+
+Strengths:
+
+- It correctly rejects use of `photoThumbUri`, which is explicitly ephemeral rather than a durable Orbit photo path. [contact-picker-source.ts:14](/home/bwales/projects/orbit-app/src/logic/contact-picker-source.ts:14)
+- The lifecycle rule correctly retains archived manual inclusions but does not render them as members. [phase-09-orrery-systems-dossier.md:126](/home/bwales/projects/orbit-app/docs/dossier/milestone-2/phase-09-orrery-systems-dossier.md:126)
+
+Concerns:
+
+- HIGH — `filterRows`/`matchesQuery` accept `ContactPickerRow`, which requires `lookupKey`, `displayName`, `primaryMethod`, and `photoThumbUri`. [contact-picker-selection.ts:17](/home/bwales/projects/orbit-app/src/logic/contact-picker-selection.ts:17), [contact-picker-source.ts:10](/home/bwales/projects/orbit-app/src/logic/contact-picker-source.ts:10) The plan instead defines `SystemMemberRow` as `{id, name, photo, searchMethods}` while also saying it will pass those rows to picker logic. [30-07-PLAN.md:131](/home/bwales/projects/orbit-app/.planning/phases/30-orrery-systems/30-07-PLAN.md:131) That does not type-check or faithfully reuse the logic.
+- HIGH — it depends on `candidateIds`, which Plan 02 does not expose. [30-07-PLAN.md:156](/home/bwales/projects/orbit-app/.planning/phases/30-orrery-systems/30-07-PLAN.md:156)
+
+Suggestions: Define an explicit adapter from `SystemMemberRow` to `ContactPickerRow` for search/selection only, preserving the local `photo` separately; add `candidateIds` to the resolver contract.
+
+Risk: HIGH.
+
+### 30-08 — Builder
+
+Summary: Atomic save and dual-stack routing are correctly covered, but the floating-HUD mechanism is not compatible with the current stack architecture as written.
+
+Strengths:
+
+- Calling a single DAO composite after edits is necessary under the explicitly non-reentrant transaction primitive. [transaction.ts:19](/home/bwales/projects/orbit-app/src/db/transaction.ts:19)
+- The plan correctly avoids switching a newly-created System before the write commits.
+
+Concerns:
+
+- HIGH — the plan describes a HUD over the “production Orrery behind” the builder, but `SystemBuilder` is planned as a normal screen in native stacks. Existing Orrery rendering exists only inside `OrreryScreen`. [OrreryScreen.tsx:799](/home/bwales/projects/orbit-app/src/screens/OrreryScreen.tsx:799), [OrreryStack.tsx:42](/home/bwales/projects/orbit-app/src/navigation/tabs/OrreryStack.tsx:42) Navigating to a standard new stack screen does not leave that screen as an accessible/inert background. The plan must choose a transparent/modal presentation with a retained Orrery route, or make the builder explicitly own a background scene/canvas.
+- HIGH — it needs the unresolved pre-override candidate IDs for the embedded member grid. [30-08-PLAN.md:165](/home/bwales/projects/orbit-app/.planning/phases/30-orrery-systems/30-08-PLAN.md:165)
+
+Suggestions: Specify the route presentation and ownership of the behind-HUD canvas; complete the resolver/grid contract before execution.
+
+Risk: HIGH.
+
+### 30-09 — Preview
+
+Summary: Correctly identifies that member IDs alone are insufficient, but no upstream plan supplies the required scene inputs.
+
+Strengths:
+
+- Reusing the scene derivation is right: the real scene uses ordered contacts, derived Gravity, preferences, sun identity, and world derivation. [orrery-scene.ts:57](/home/bwales/projects/orbit-app/src/services/orrery-scene.ts:57), [orrery-scene.ts:75](/home/bwales/projects/orbit-app/src/services/orrery-scene.ts:75)
+- Lifecycle gating follows the existing unmount-to-stop-clock contract. [OrreryCanvas.tsx:2](/home/bwales/projects/orbit-app/src/components/orrery/OrreryCanvas.tsx:2)
+
+Concerns:
+
+- HIGH — no planned API produces provisional scene records. The resolver returns IDs, not contact records/impact inputs/sun/profile/settings. [30-02-PLAN.md:165](/home/bwales/projects/orbit-app/.planning/phases/30-orrery-systems/30-02-PLAN.md:165) The member read proposed in Plan 07 only carries ID, name, photo, and search data. [30-07-PLAN.md:131](/home/bwales/projects/orbit-app/.planning/phases/30-orrery-systems/30-07-PLAN.md:131) That cannot feed the real scene derivation, which needs impact inputs and settings. [orrery-scene.ts:69](/home/bwales/projects/orbit-app/src/services/orrery-scene.ts:69)
+
+Suggestions: Add a `readProvisionalOrreryScene(exec, memberIds)` read/service seam that batches complete member records, impact inputs, settings, profile, and sun identity, then invokes the shared world derivation.
+
+Risk: HIGH.
+
+### 30-10 — Switch experience
+
+Summary: The renderer ownership, stale-custom fallback, and loading-edge stash address prior risks; Home framing and broken-canvas state remain underspecified.
+
+Strengths:
+
+- The loading-edge stash design matches the store: a new different System clears the snapshot during loading. [orrery-system-store.ts:89](/home/bwales/projects/orbit-app/src/stores/orrery-system-store.ts:89)
+- The plan correctly replaces the existing unconditional focus clear. [OrreryScreen.tsx:281](/home/bwales/projects/orbit-app/src/screens/OrreryScreen.tsx:281)
+- `OrreryWorld` is the correct renderer owner and already retains exiting resources across scene changes. [OrreryWorld.tsx:116](/home/bwales/projects/orbit-app/src/components/orrery/OrreryWorld.tsx:116)
+
+Concerns:
+
+- MEDIUM — sending the camera directly to `HOME_CAMERA` is not the current canonical Home framing. The current implementation calculates Home from the destination world and viewport via `deriveHomePose`. [OrreryScreen.tsx:711](/home/bwales/projects/orbit-app/src/screens/OrreryScreen.tsx:711) Directly assigning `HOME_CAMERA` risks failing fit/readability for different System sizes.
+- MEDIUM — active broken-state UI is only called a device backstop; no plan carries `brokenRules` from the resolver into `OrreryMembersResult`/scene snapshot. The current snapshot carries only result members/status. [orrery-system-read.ts:47](/home/bwales/projects/orbit-app/src/db/orrery-system-read.ts:47) The active-canvas needs-attention state therefore has no proposed data path.
+
+Suggestions: Define Home as `deriveHomePose(destination.world, viewport)` while clearing prior camera state; add `brokenRules` or a `systemHealth` signal to the snapshot and render it deliberately.
+
+Risk: MEDIUM.
+
+The phase should not execute until the resolver → member-grid → builder → preview data contracts are repaired.
+
+## Claude Review (Cycle 2)
+
+*Run as a read-only orchestrator subagent (see Lane provenance above), not `claude -p`. Independent Claude (Opus), code-verified: every load-bearing plan claim checked against the file on disk.*
+
+# Cross-AI Plan Review — Phase 30 (Orrery Systems), CYCLE 2
+
+**Scope discipline:** judged only whether concerns REMAIN against the *current* plans (post-`a6f4d02`); cycle-1 findings the replan incorporated or deferred in a PLAN.md are not recounted.
+
+## Baseline re-verified on disk (this cycle)
+- `TARGET_VERSION = 21` (`src/db/database.ts:56`); migration head is `021-orrery-preferences.ts`. Next migration is **022** — every plan's number is correct.
+- `BACKUP_FORMAT_VERSION = 4` (`src/backup/types.ts:14`) — plan 04's pin target is right.
+- `transaction.ts:12-13,47` documents the non-reentrant mutex — plans 03/08's atomicity rationale is real.
+- `useReducedMotionShared()` (`src/theme/use-reduced-motion.ts:106`) and `useReducedMotion()` (`:125`) exist — plan 10's D-09 disk-correction holds.
+- `OrrerySystemRef` union is `builtin | category` (`src/logic/orrery-system-logic.ts:24-26`) — extension target correct.
+- `contact-picker-source.ts:16` — "Ephemeral external thumbnail URI; never a durable photo-storage path" — plan 07's photo claim verified verbatim.
+
+**Every cycle-1 HIGH is genuinely incorporated into the current plans**, and each fix's disk premise re-verified. Only one cosmetic mis-citation found.
+
+## 30-01 — Persistence foundation + thin vertical slice
+**Strengths.** The two cycle-1 traps are fixed with the exact disk mechanism: `readOrrerySystemMembersCore` calls `buildOrrerySystemWhere(system)` **unconditionally at `orrery-system-read.ts:58`**, and `buildOrrerySystemWhere` (`orrery-system-logic.ts:73-115`) has a `switch (system.id)` with **no `default`** (implicit `undefined` return). Plan 01 mandates an early custom branch before line 58 and a `custom` throw-guard. `missing-category`/`MissingOrreryCategoryError` (`orrery-system-read.ts:48,167`) is the real template the `missing-custom` result parallels. Cross-catalog uniqueness correctly reasoned as un-expressible in one SQLite index and pushed into a DAO check.
+**Concerns.** None ≥ MEDIUM. Cycle-1 Claude MEDIUM (routing order + guard), Codex HIGH (uniqueness), Codex MEDIUM (exclusion subtraction) all **RESOLVED**. **Risk: LOW.**
+
+## 30-02 — Rule resolver
+**Strengths.** Candidate `ORDER BY COALESCE(c.ring_seq,1e9),c.created_at,c.id` matches `readOrrerySystemMembersCore`'s live ordering (`orrery-system-read.ts:71`). `resolveMembershipFromDefinition(draft)` cleanly resolves the cycle-1 draft-count HIGH. Gravity-as-post-query with injected loader matches `filterByGravity(candidateIds, tiers, loadInputs, now)` (`dashboard-gravity-filter.ts:19-22`).
+**Concerns.**
+- **LOW — NEW — cosmetic mis-citation.** Task 2 `read_first` says `readOrreryImpactInputsCore` is at "`orrery-system-read.ts` lines 108-112". It is **defined** in `src/db/orrery-impact-read.ts:23` and merely *invoked* at `orrery-system-read.ts:109`.
+- **LOW — NEW — layering direction.** If the resolver imports `readOrreryImpactInputsCore` directly from `orrery-impact-read.ts`, it inverts the injected-loader convention (`dashboard-gravity-filter.ts` takes a loader). Not circular, functional — but injecting keeps the logic layer db-free.
+**Risk: LOW.** Cycle-1 concerns (ordering, `ruleUid`, empty-`sql` guard, draft engine, `scope:population`) all **RESOLVED**.
+
+## 30-03 — Full Systems DAO
+**Strengths.** `saveSystemDefinitionCore` composes only non-mutexed `…Core` helpers inside **one** `inWriteTransaction`, never nesting public wrappers — answers the atomicity HIGH; grounded in `transaction.ts:12-13`. `restoreDeletedSystem` preserves the original `uid` and re-inserts rules against the *new* row id — fixes the undo-remapping HIGH; portable `DeletedSystemSnapshot` avoids replaying stale `system_id`. All-Contacts → single `scope:population` rule. DAO-only-writer enforced by a grep gate.
+**Concerns.** None ≥ MEDIUM. Cycle-1 HIGHs (atomicity, All-Contacts, undo, prune owner) + MEDIUMs (override replacement, catalog validation) all **RESOLVED**. **Risk: LOW.**
+
+## 30-04 — Backup contract (declare-only)
+**Strengths.** The backstop must-have now names the **real** fallback chain (plan-01 `missing-custom` → plan-10 launch fallback) instead of the cycle-1 phantom pre-existing fallback. Pin target corrected to `types.ts:14` (= 4); export-manifest left untouched.
+**Concerns.** None ≥ MEDIUM. Cycle-1 HIGH + LOWs **RESOLVED**. **Risk: LOW.**
+
+## 30-05 — Switcher
+**Strengths.** The data-flow HIGH is answered with the verified fact: selector today takes only `{state, availableHeight, enabled}` (`OrrerySystemSelector.tsx:30-35`) and calls `buildSystemChoices(state.categories)` (`:50`). Plan 05 adds a `catalog` prop, names OrreryScreen owner. Bounded, dropdown-open, revision-cached counts incorporated.
+**Concerns.**
+- **LOW — NEW — count cost real but only deferred.** `countSystemMembers` for a custom/gravity System runs a candidate SELECT + a per-System `readOrreryImpactInputsCore` batch; many gravity Systems → non-trivial at dropdown-open. Record the caching key + a cap strategy in the SUMMARY rather than discovering cost on-device.
+**Risk: LOW–MEDIUM.**
+
+## 30-06 — Systems Management + routes
+**Strengths.** Settings-stack reachability HIGH resolved structurally: `OrreryStack.tsx`/`SettingsStack.tsx` are confirmed separate navigators; plan 06 now `depends_on:[30-03,30-08]` (wave 5, after builder wave 4) so Create/Edit navigate to a live `SystemBuilder` route in **both** stacks — no dead TODO seam. Active-System delete now **persists** `orrery_last_system = builtin:all-contacts`.
+**Concerns.** None ≥ MEDIUM. Cycle-1 HIGHs/MEDIUM **RESOLVED**. **Risk: LOW.**
+
+## 30-07 — Manage Members grid
+**Strengths.** Local-photo fix grounded in `contact-picker-source.ts:16`; `systems-members-read` returns durable `c.photo` with a test asserting ≠ external thumb URI. Override intent emits `{contactId, mode|null}` deltas keyed to the single replacement op.
+**Concerns.** None ≥ MEDIUM raised in this lane. Both cycle-1 MEDIUMs **RESOLVED**. (See Codex Cycle-2 for the `ContactPickerRow` adapter and `candidateIds` gaps — orchestrator-verified real.) **Risk: LOW.**
+
+## 30-08 — Builder HUD
+**Strengths.** Draft live-count + save-atomicity HIGHs answered with plan-02/03 primitives; Task 3 tests assert `saveSystemDefinition` once and `store.select` only after commit (not at all on forced failure). Whole-canvas inert via a shell transient. Edit-non-active `goBack()`s rather than depending on the later `SystemsManagement` route.
+**Concerns.** None ≥ MEDIUM raised in this lane. (See Codex Cycle-2 for the HUD-over-opaque-route presentation gap and the `candidateIds` dependency — orchestrator-verified real.) **Risk: LOW–MEDIUM.**
+
+## 30-09 — Full-canvas Preview
+**Strengths.** Member-ids-insufficient MEDIUM answered by consuming a shared `orrery-scene` derivation. Preview owns its own `SystemPreviewCanvas`, needing no OrreryWorld edit. Lifecycle-pause MEDIUM answered by mirroring `OrreryCanvas`'s unmount-while-unfocused; worklet forward-ref hazard cited.
+**Concerns.**
+- **LOW — NEW — "shared provisional entry point" asserted, not located.** Task 1 requires *exposing* a provisional entry point of `orrery-scene.ts` but doesn't name the exact current derivation function to factor out (acceptance grep is a guess-set `orrery-scene|generateScene|deriveScene`). Pin the real exported symbol. (See Codex Cycle-2 for the deeper provisional-scene INPUT-sourcing HIGH.)
+**Risk: LOW–MEDIUM.**
+
+## 30-10 — System-switch experience
+**Strengths (all disk-verified).** Focus-clear: `OrreryScreen.tsx:283-288` is the requested-id effect calling `setFocusTargets([])` at **line 285**; plan replaces (not supplements) it and reconciles the `:641-648` re-validation, leaving the eight other event-specific clears untouched. Delta source-ids: store sets `snapshot: same ? before.snapshot : null` during loading (`orrery-system-store.ts:92-93`) — on a real switch `same` is false → snapshot→null, the exact trap the stash-at-loading design avoids. Renderer scope: OrreryWorld now in `files_modified`; verified it receives `scene/pose/…/focusedIds/satellites` (`OrreryWorld.tsx:191-224`) with **no** transition/intensity prop and reads `useReducedMotionShared()` at `:228`, rendered at `OrreryScreen.tsx:800`. Startup fallback: `loadOrreryScene` throws `MissingOrreryCategoryError` (`orrery-scene.ts:58-59`), store catch special-cases it (`orrery-system-store.ts:115-121`); the parallel missing-custom throw + silent All-Contacts re-select is a coherent extension.
+**Concerns.**
+- **MEDIUM — NEW — Task 3's transition contract duplicates OrreryWorld's existing generation-keyed world-transition pipeline, unreconciled.** OrreryWorld already sheds/captures on every scene-generation change: `beginWorldTransition(from, world, generation)` (`orrery-frame.ts:39-72`) computes leaving bodies (in `from`, not `world` → end `opacity:0`, `radius*0.75`, `interactive:false`) and entering bodies (→ start `opacity:0`, grow to `1`); `sampleWorldTransition` (`:74-93`) interpolates; OrreryWorld drives it via `mergeResources`/`pruneResources`/`projectAnimatedFrame` (`OrreryWorld.tsx:245,259,278,292`). A System switch already produces a new generation → this exact shed/capture. Plan 10 Task 3 proposes a **separate** entering/leaving member-id-set prop consumed by the per-body draw — re-deriving what `beginWorldTransition` already tracks. An executor could build a parallel transition that double-animates opacity/radius or fights the sampled frame; a device-UAT `backstop`, so `npm test` won't catch it. What ORRS-13 genuinely adds is (a) the membership-delta **intensity** SharedValue and (b) a per-body **spin** — both should *modulate* the existing `orrery-frame` transition, not stand beside it. *Fix:* rewrite Task 3 to integrate with (scale/extend) `beginWorldTransition`/`sampleWorldTransition`, pass only the intensity SharedValue + spin, drop the redundant id-set prop; add `orrery-frame.ts` to read_first.
+- **LOW — NEW — re-entrant silent re-select.** The missing-category branch sets a terminal `status:"missing-category"` (`orrery-system-store.ts:117`); plan 10's missing-custom branch instead re-enters `select(ALL_CONTACTS_SYSTEM)` from inside a `select()` catch — re-entrant, minting a new generation while unwinding the failed one. Almost certainly fine, but note the generation/`same`-guard interaction so no select loop forms.
+- Cycle-1: renderer scope HIGH **RESOLVED** (OrreryWorld in scope) but see the NEW MEDIUM about *how*; focus-clear **RESOLVED**; delta source-ids **RESOLVED**; startup fallback **RESOLVED**.
+**Risk: MEDIUM** — residual risk still concentrates here, now as one device-only integration concern.
+
+## Cross-plan observations (Claude, Cycle 2)
+1. **Wave/dependency graph coherent.** W1: 01 · W2: 02,03,04 · W3: 07,10 · W4: 08 · W5: 06,09 · W6: 05. Shared-file edits are sequential: `navigation/*`+stacks (08 W4 → 06 W5), `orrery-scene.ts` (10 W3 → 09 W5), `OrreryScreen.tsx` (10 W3 → 05 W6), `SystemBuilderScreen.tsx` (08 W4 → 09 W5). No within-wave clobber. Note that 06 and 08 both edit all three nav files — safe only because 08 (W4) precedes 06 (W5).
+2. **Decision integrity — no reversals.** D-05, D-06, D-07, E-02 all held; no ADR/HANDOFF entry deleted/weakened/inverted; `custom_field_*`/`sortExpr()`/`field_history` untouched (this phase adds `system_*` tables only).
+3. **Hazard sweep clean where in scope:** local-first preserved; theme-token rule gated by `npm run check:colors` incl. Skia; `newUid()` Hermes-crypto guard reused; worklet forward-ref cited in 09/10; migration additive/forward-only, no `app_settings` ALTER in 022.
+
+## Claude closing
+**Overall phase risk: MEDIUM.** Data layer (01–04) LOW; every cycle-1 HIGH incorporated and disk-verified. This lane found **no unresolved HIGH** — but note it scoped to cycle-1-incorporation + internal consistency and did **not** enumerate the downstream consumer contracts where the Codex lane found new HIGHs (candidateIds, builder presentation, provisional-scene inputs); the orchestrator verified those Codex HIGHs are real (see Cycle-2 Consensus). Claude's actionable items: (1) [MED] 30-10 Task 3 reconcile with `orrery-frame`; (2) [LOW] 30-10 re-entrant re-select note; (3) [LOW] 30-02 citation + loader-injection direction; (4) [LOW] 30-09 pin the exact `orrery-scene` symbol; (5) [LOW] 30-05 record count caching key + cap.
