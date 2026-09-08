@@ -1,10 +1,11 @@
 ---
 phase: 30
 slug: orrery-systems
-status: draft
+status: approved
 shadcn_initialized: false
 preset: none
 created: 2026-09-08
+reviewed_at: 2026-09-08
 ---
 
 # Phase 30 — UI Design Contract
@@ -132,23 +133,22 @@ Exact confirmed copy. Braces denote live names/counts, never shipped placeholder
 
 ## UI Considerations
 
-> Shape-rooted UI *state* coverage. Empty/error COPY lives in Copywriting above; this references those rows.
+> Shape-rooted UI *state* coverage. Empty/error COPY lives in the Copywriting Contract above; this section covers state coverage and references those rows.
 
-Applicable state considerations resolved: **all covered** across the phase's authoring, management, switcher, and canvas surfaces. These are UI acceptance truths, not proof of implementation; Reduced Motion, theme changes, largest text, long names, zero/one/many members, broken rules, and large-System scale require later device verification (§Z, §X).
+Probe executed after dimension review with the installed `ui-consideration-probe.cjs` (35 applicable considerations across eight surfaces). Every resolution below is drawn from the phase dossier (§B–AA), the settled decision record — no state was left to fresh judgment. The engine returned E1 (floating HUD wizard) and E4 (Preview) as `unclassified` (heuristic cue-miss); their real element kinds are supplied as overrides below (E1 is a nav wizard + form + interactive controls; E4 is a media canvas + interactive controls + nav bar), which raises their loading/empty/error/overflow states rather than dropping them.
 
-| Category | Element(s) | Status | Resolution / Reason |
-|----------|-----------|--------|---------------------|
-| empty | Builder match count / Manage Members | ✅ covered | A rule set (or manual-only System) matching zero contacts is valid; count reads "0 members", Manage Members shows an empty grid with Add People still available (§B/§L). |
-| empty | Switcher / active canvas | ✅ covered | Empty-but-valid Systems stay listed, selectable, and show the empty caution indicator + the empty-canvas copy with the restrained comet decorative feedback (§J); comet is removed/replaced under Reduced Motion. |
-| loading | Live membership query behind builder | ✅ covered | Membership may update while the builder is open, but the production Orrery does not rebuild on every rule toggle (§O); busy state marks the affected control, not the whole world. |
-| error | Broken rule (referenced entity deleted) | ✅ covered | Broken rules are never silently deleted/rewritten; they remain visible as needing attention with `system-broken` severity + text; other valid rules/inclusions keep resolving (§I/§J). |
-| error | Delete / reorder / override persistence | ✅ covered | Failed writes surface a retry and restore the prior saved state; deletion offers Undo (§R) before it is durable. |
-| populated | Manage Members grid | ✅ covered | Rule matches enter preselected; overrides are legible on reopen; counts show total + added + excluded (§M/§O). |
-| partial | Customized built-in / Category System | ✅ covered | Built-ins/Category Systems show a neutral overrides indicator when manual includes/excludes exist; base definition stays immutable (§G/§H). |
-| overflow | Large System membership | ✅ covered | No product cap (§T/§Z); Manage Members virtualizes + searches; Preview uses simplified body rendering; production Orrery uses Phase 29 culling/LOD. Never mount every full-detail body. |
-| overflow | Switcher / Management list | ✅ covered | Lists scroll in management order; All Contacts pinned first; hidden Systems omitted from the switcher (§Q/§U). |
-| zero-one-many | Counts and cluster/member copy | ✅ covered | Singular/plural count copy ("1 member" / "{count} members"); zero-member Systems remain visible and selectable (§U). |
-| long-text | System names, accordion summaries | ✅ covered | Trigger/rows truncate to one line with a full accessible name; accordion summaries and member names wrap; nothing hides text under font scaling (§Y). |
+Applicable state considerations resolved: **all covered** across the phase's authoring, management, switcher, and canvas surfaces. These are UI acceptance truths, not proof of implementation. The states marked *(device-verify)* — Reduced Motion crossfade, largest supported text, long names, zero/one/many members, broken-rule rendering, switch-animation intensity, canonical Home framing, and large-System scale (§Z, §X, §V/§W) — are acceptance obligations the planner must carry to on-device verification, not settled by reading the spec.
+
+| Element | Confirmed kinds | Category | Status | Resolution / Reason |
+|---|---|---|---|---|
+| E1 Floating HUD wizard (§K) | nav, form, interactive-control | loading, error, long-text | ✅ covered | The multi-page HUD is fully operable without touching the canvas; background Orrery is removed from a11y focus while open. A save-in-progress marks the affected control busy, not the whole canvas. Meaningful unsaved changes route through the shell's `useDiscardKeepGuard` ("Discard changes?" / Keep editing / Discard, §P). Page titles and the name field wrap/scale under largest text *(device-verify)*. |
+| E2 Definition page (§L) | form, interactive-control | empty, loading, error, partial, overflow, long-text | ✅ covered | A rule set matching zero contacts is valid; live match count reads "0 members". Accordions summarize active values by label not count. Empty-name → "Give this System a name."; duplicate-name → the §T collision error. The production Orrery does not rebuild on every rule toggle (§O). Accordion summaries wrap; many rule families scroll. Largest-text layout *(device-verify)*. |
+| E3 Manage Members (§M) | list-collection, form, media, interactive-control | empty, loading, error, populated, partial, overflow, zero-one-many | ✅ covered | Rule matches enter preselected; deselection marks **Excluded** in place (kept visible, de-emphasized); Add People manually includes eligible active contacts, tagged **Added**, legible on reopen. Zero matches shows an empty grid with Add People still available. Counts show total · added · excluded. Grid virtualizes + searches; hundreds of cards inspectable without eager mount (§Z). Missing photo → initials. Failed override write restores prior saved state with retry. Large-membership rendering *(device-verify)*. |
+| E4 Preview (§N) | media, interactive-control, nav | empty, loading, overflow, long-text | ✅ covered | Full-canvas simplified render (sun, rails, simple markers, approximate real sizing) over real Phase 29 layout; pan/zoom supported, tilt/yaw not exposed; a body tap may focus but never opens Profile. Previewing a zero-member System shows the empty treatment. A textual membership summary is always available (visual interpretation never mandatory). Simplified rendering scales to large membership; Save available from both Preview and the HUD. Scale/perf *(device-verify)*. |
+| E5 Systems Management (§Q/§R/§S/§T) | list-collection, nav, interactive-control | empty, loading, error, populated, partial, overflow, zero-one-many | ✅ covered | Flat management screen, reachable from switcher ("Manage Systems") and Settings. All Contacts pinned first, non-deletable, non-renamable. Delete (custom) never touches contact data; short-lived Undo snackbar (`snackbar-store`), no 30-day quarantine; active-System delete falls back to All Contacts silently. Built-in/Category base immutable; overrides show a neutral indicator; duplicable into editable custom Systems. Reorder is long-press drag with accent preview + 44-min handle; failure restores committed order with feedback. Unique case-insensitive names. Lists scroll; largest-text rows *(device-verify)*. |
+| E6 Switcher (§U) | list-collection, nav, interactive-control | empty, loading, error, populated, partial, overflow, zero-one-many, long-text | ✅ covered | `{systemName} ▾` trigger + dropdown in Management order; All Contacts first; hidden Systems omitted. Live counts (`{systemName} — {count}`). Zero-member Systems stay visible/selectable. Empty (`system-empty`, statusWobble) and broken (`system-broken`, danger) states expose distinct indicators, each with an a11y name ("{systemName}, empty" / "{systemName}, needs attention") — never hue alone (§Y). Trigger/rows truncate to one line with a full accessible name; long lists scroll *(device-verify for text scaling)*. |
+| E7 Canvas empty/broken states (§J) | media, static-content | empty, error, overflow, long-text | ✅ covered | Empty-but-valid: empty-state copy + a **restrained comet** (decorative, not a constant loop), removed/replaced under Reduced Motion *(device-verify)*. Broken: continues resolving valid definition; shows a small **non-blocking** needs-attention affordance + `system-broken` severity; repaired via the ordinary editor, no reconciliation wizard (§I). Broken rules are never silently deleted or rewritten. Large membership uses Phase 29 culling/LOD — never mount every full-detail body (§Z, device-verify). |
+| E8 Switch transition (§V/§W/§X) | media, interactive-control | loading, error, long-text | ✅ covered | Switching sends the destination to canonical Phase 29 **Home framing** (prior pan/zoom/tilt not preserved); a focus present in both source and destination is preserved through the transition, else cleared *(device-verify)*. Animation is spin + shedding/capture, intensity **adaptive to membership delta**, driven by the Skia render loop / Reanimated shared values (never per-frame React state), pausing on `useIsFocused === false` / AppState background; interaction resumes once destination geometry is stable. OS Reduced Motion replaces it with a simple crossfade/reposition via `useReducedMotionShared()` / `useReducedMotion()` (§X) *(device-verify)*. |
 
 ## Interaction Contracts
 
