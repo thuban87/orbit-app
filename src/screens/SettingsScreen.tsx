@@ -2225,6 +2225,21 @@ export function SettingsScreen() {
       </Pressable>
 
       <Pressable
+        testID="settings-systems-row"
+        accessibilityRole="button"
+        accessibilityLabel="Systems"
+        onPress={() => navigation.navigate("SystemsManagement")}
+        style={[
+          styles.row,
+          { backgroundColor: colors.surface, borderColor: colors.border },
+        ]}
+      >
+        <Text style={[styles.rowLabel, { color: colors.textPrimary }]}>
+          Systems
+        </Text>
+      </Pressable>
+
+      <Pressable
         testID="settings-archived-row"
         accessibilityRole="button"
         accessibilityLabel="Archived contacts"

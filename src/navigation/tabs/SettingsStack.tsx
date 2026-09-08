@@ -18,6 +18,7 @@ import { ReconcileGridScreen } from "@/screens/ReconcileGridScreen";
 import { SettingsScreen } from "@/screens/SettingsScreen";
 import { SurvivorSelectScreen } from "@/screens/SurvivorSelectScreen";
 import { SystemBuilderScreen } from "@/screens/SystemBuilderScreen";
+import { SystemsManagementScreen } from "@/screens/SystemsManagementScreen";
 import type { SettingsScreenProps, SettingsStackParamList } from "../types";
 
 const Stack = createNativeStackNavigator<SettingsStackParamList>();
@@ -36,6 +37,10 @@ export function SettingsStack() {
     >
       <Stack.Screen name="Settings" component={SettingsScreen} />
       <Stack.Screen name="SystemBuilder" component={SystemBuilderScreen} />
+      <Stack.Screen
+        name="SystemsManagement"
+        component={SystemsManagementScreen}
+      />
       <Stack.Screen name="CustomFields" component={CustomFieldsRoute} />
       <Stack.Screen name="Archived" component={ArchivedContactsScreen} />
       <Stack.Screen name="Profile" component={ContactProfileScreen} />

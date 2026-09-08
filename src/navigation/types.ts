@@ -121,6 +121,7 @@ export type DashboardStackParamList = {
 export type OrreryStackParamList = {
   Orrery: undefined;
   SystemBuilder: { systemUid?: string; systemRef?: string } | undefined;
+  SystemsManagement: undefined;
   Profile: { contactId: number; openReachOut?: boolean };
   ThingsToRemember: { contactId: number };
   RecentlyDeleted: { contactId: number };
@@ -157,6 +158,7 @@ export type BackupStackParamList = {
 export type SettingsStackParamList = {
   Settings: undefined;
   SystemBuilder: { systemUid?: string; systemRef?: string } | undefined;
+  SystemsManagement: undefined;
   CustomFields: undefined;
   Archived: undefined;
   Profile: { contactId: number; openReachOut?: boolean };

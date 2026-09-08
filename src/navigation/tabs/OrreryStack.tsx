@@ -12,6 +12,7 @@ import { OrreryScreen } from "@/screens/OrreryScreen";
 import { RecentlyDeletedScreen } from "@/screens/RecentlyDeletedScreen";
 import { SurvivorSelectScreen } from "@/screens/SurvivorSelectScreen";
 import { SystemBuilderScreen } from "@/screens/SystemBuilderScreen";
+import { SystemsManagementScreen } from "@/screens/SystemsManagementScreen";
 import { ThingsToRememberScreen } from "@/screens/ThingsToRememberScreen";
 import { useOrrerySessionStore } from "@/stores/orrery-session-store";
 import type { OrreryStackParamList } from "../types";
@@ -42,6 +43,10 @@ export function OrreryStack() {
     >
       <Stack.Screen name="Orrery" component={OrreryScreen} />
       <Stack.Screen name="SystemBuilder" component={SystemBuilderScreen} />
+      <Stack.Screen
+        name="SystemsManagement"
+        component={SystemsManagementScreen}
+      />
       <Stack.Screen name="Profile" component={ContactProfileScreen} />
       <Stack.Screen
         name="ThingsToRemember"
