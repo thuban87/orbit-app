@@ -2,130 +2,97 @@
 
 ## Overview
 
-Use this process when adding or materially changing a visual or interaction layer in Orbit's Skia Orrery. It keeps relationship state local and derived, isolates dynamic Skia hooks in keyed children, preserves token-only colour use, and treats physical-device rendering as the proof for canvas behavior.
+Use this process when adding or materially changing a visual or interaction layer in Orbit's Skia Orrery. It keeps the canonical world separate from the transient camera, derives relationship state locally, preserves token-only colour use, and treats physical-device rendering as the proof for canvas behavior.
 
-## Architecture (Phase 13)
+## Architecture (Phase 29)
 
-`OrreryScreen` owns local reads, measured layout, navigation, and gesture commits. It builds Skia children and passes them to `OrreryCanvas`; that canvas is conditionally mounted and owns the single ambient `useClock()`. `OrbitBody` owns one planet's `useImage` and morph worklets, while `SunBody` consumes the shared clock for its pulse.
+`OrreryScreen` owns local scene reloads, measured obstacles, navigation, lifecycle cancellation, and the canvas mount gate. `loadOrreryScene()` reads one coherent System snapshot, then derives Gravity and world geometry after that snapshot releases. `OrreryWorld` projects that immutable world through the UI-thread camera frame; only discrete focus, Profile, and reorder intents cross to JavaScript.
 
-### Geometry and rendered state
+### World, camera, and System scope
 
-**Files:** `src/logic/orrery-geometry-logic.ts`, `src/db/orrery-read.ts`
+**Files:** `src/services/orrery-scene.ts`, `src/logic/orrery-world-logic.ts`, `src/logic/orrery-camera-logic.ts`, `src/db/orrery-system-read.ts`
 
-The local read composes the status engine's SQL and returns a dense display order. Geometry stays in a React-Native-free module so it can be node-tested before a canvas is involved.
+The world holds timestamp/neutral placement, density spacing, bounded collision nudges, and modest derived Gravity mass. The camera holds transient pan, zoom, tilt, yaw, and focal distance. A System is a closed built-in or Category-UID predicate over current local data; it is never Dashboard state or a frozen member list.
 
 ```typescript
-const metrics = deriveOrreryMetrics(canvasWidth, canvasHeight, orbiting.length);
-const angle = progressToAngle(contact.progress);
-const radius = drawnRadius(contact.progress, rank, contact.status, metrics);
-const point = polarToXY(metrics.cx, metrics.cy, radius, angle);
+const scene = await loadOrreryScene(exec, generation, system);
+const home = deriveHomePose(scene.world, viewport);
+const frame = projectFrame(scene.world, pose, viewport, generation);
 ```
 
-### Animation and pause boundary
+### Render and lifecycle boundary
 
-**File:** `src/components/orrery/OrreryCanvas.tsx`
+**Files:** `src/components/orrery/OrreryWorld.tsx`, `src/components/orrery/OrreryCanvas.tsx`, `src/components/orrery/use-orrery-camera.ts`
 
-`OrreryCanvas` is the only ambient-clock owner. It stays mounted only when the route is focused, the app is foregrounded, and dimensions are valid. The screen chrome may remain mounted; the Canvas subtree must not.
+`OrreryWorld` renders keyed body resources, semantic labels, satellites, and hit targets from one sampled projected frame. `OrreryCanvas` remains the only ambient-clock owner and is unmounted when the route blurs, the app backgrounds, or dimensions are invalid. Reanimated owns continuous camera and render-loop work; React state changes only for discrete data and UI state.
 
-### Fallback Chain / Resolution Order
+### Relationship satellites
 
-1. **Local photo** — `OrbitBody` or `SunBody` loads the raw relative path through `resolvePhotoUri()`.
-2. **Themed initials avatar** — a missing or failed image renders the deterministic avatar swatch and bundled Inter Paragraph text.
-3. **Empty sky** — no orbiting contacts leaves the sun visible with the in-app first-contact prompt.
+**Files:** `src/db/orrery-satellites-read.ts`, `src/logic/orrery-satellite-logic.ts`
+
+The reader returns only unlinked, nondeleted, visible structured Relationships whose parents are members of the active System. The logic derives subordinate moon positions and context-only actions. Satellites have no contact health, Gravity, Profile, rank, logging, or children.
 
 ## File Locations
 
-### Assets
-
-**Directory:** `assets/`
-
-`Inter-SemiBold.ttf` is the bundled font used by Skia's Paragraph API. Keep an Orrery font local and bundled; Skia has no reliable OS-font fallback for the initials path.
-
-### Code
-
 | File | Purpose |
 |---|---|
-| `src/screens/OrreryScreen.tsx` | Screen-level local reads, layout, view state, gestures, and canvas mount gate. |
-| `src/components/orrery/OrreryCanvas.tsx` | Canvas, starfield, sole ambient clock, and gesture detector. |
-| `src/components/orrery/OrbitBody.tsx` | One keyed planet with photo/fallback and Status ↔ Relationship morph. |
-| `src/components/orrery/SunBody.tsx` | Central occupant, glow, and shared-clock pulse. |
-| `src/logic/orrery-geometry-logic.ts` | Pure angles, positions, drift, hit testing, and responsive metrics. |
-| `src/logic/orrery-ring-logic.ts` | Status-ring style and rogue-body vocabulary. |
-| `src/theme/theme-types.ts` | Theme contract for star, muted, and extinguished-rogue values. |
-| `src/theme/theme-presets.ts` | Sole home of the Orrery's palette literals. |
+| `src/screens/OrreryScreen.tsx` | Owns screen lifecycle, layout obstacles, controls, navigation, and cancellation. |
+| `src/services/orrery-scene.ts` | Loads coherent scene state and coordinates optional satellite work. |
+| `src/db/orrery-system-read.ts` | Reads live System members, global sun identity, and guarded reorder fingerprints. |
+| `src/logic/orrery-world-logic.ts` | Derives density-aware canonical world geometry and bounded Gravity mass. |
+| `src/logic/orrery-camera-logic.ts` | Owns bounded projection, inverse, Home, hit targets, and arbitrary-body framing. |
+| `src/components/orrery/OrreryWorld.tsx` | Renders the world from the current UI-thread projected frame. |
+| `src/db/ring-seq-dao.ts` | Commits a validated System-scoped reorder under the shared write lock. |
 
 ## How to Add or Change an Orrery Layer
 
-1. **Define deterministic visual math** in `src/logic/orrery-geometry-logic.ts` when the layer changes position, hit testing, size, or timing. Keep it free of React Native, Skia, and screen state.
+1. **Put deterministic placement or hit math** in `src/logic/orrery-world-logic.ts` or `src/logic/orrery-camera-logic.ts`. Keep it free of React Native, Skia, and mutable screen state.
 
-2. **Add node tests** beside that logic before editing the screen:
+2. **Compose local data into the existing snapshot.** A scene reader receives the snapshot executor from `readOrrerySystemSnapshotCore`; it must not open a nested mutex, perform per-contact queries, or add a network dependency.
 
-   ```bash
-   npx vitest run src/logic/orrery-geometry-logic.test.ts
-   ```
+3. **Add visible colours as theme tokens.** Pass resolved tokens into Skia components. Do not add a colour literal outside `src/theme/theme-presets.ts`.
 
-   Cover normal, zero/short canvas, maximum drift, and overlap boundaries relevant to the change.
+4. **Keep body resources keyed and hooks unconditional.** A dynamic map may return a keyed child, but must not call `useImage`, `useDerivedValue`, or another hook directly. A photo-less body passes a null-guarded source to its child hook.
 
-3. **Add visible colours as theme tokens** in `src/theme/theme-types.ts` and `src/theme/theme-presets.ts`. Pass resolved tokens as props to Skia components; never add a raw colour literal outside the preset file.
+5. **Use the shared UI-thread frame for continuous behavior.** Do not use `setState` for camera, interpolation, labels, depth, or animation frames. Put worklet helpers before their worklet callers: Reanimated's transform does not preserve ordinary function-hoisting behavior.
 
-4. **Put per-body hooks in a keyed child.** A dynamic `.map()` in `OrreryScreen` may return elements, but it must not call `useImage`, `useDerivedValue`, or another hook. For a new body layer, use the existing boundary:
+6. **Route reordering through `commitRingReorder()`.** The request must carry the complete contacted order, current System membership, sun, and ID/UID fingerprints. It may permute only eligible visible slots and must never write `last_contact` or nest `inWriteTransaction()`.
 
-   ```tsx
-   {orbiting.map((contact) => (
-     <OrbitBody key={contact.id} {...bodyProps(contact)} />
-   ))}
-   ```
-
-5. **Preserve unconditional image hooks.** Give `useImage` a null-guarded source so a photo-less contact never changes hook order:
-
-   ```tsx
-   const image = useImage(photo ? resolvePhotoUri(photo) : null);
-   ```
-
-6. **Keep a continuous animation inside `OrreryCanvas`.** For a new ambient worklet, consume its existing clock or add it there. Gate the element, not only a derived value:
-
-   ```tsx
-   const canvasVisible = dimsValid && isFocused && appState === "active";
-   return canvasVisible ? <OrreryCanvas {...props} /> : null;
-   ```
-
-7. **Route direct manipulation through existing pure logic and the DAO.** A rank change must use `computeRingReorder()` then `rewriteRingSeq()` with the current `sunContactId` exclusion. Do not write `last_contact` and do not nest an `inWriteTransaction()` call.
-
-8. **Verify source-level gates**, then build and inspect on a physical Pixel:
+7. **Run the focused checks and inspect on a physical Pixel.** The desktop emulator cannot establish Skia performance or native gesture behavior.
 
    ```bash
+   npx vitest run src/db/orrery-system-read.test.ts src/db/orrery-impact-read.test.ts src/db/orrery-satellites-read.test.ts src/logic/orrery-camera-logic.test.ts src/logic/orrery-world-logic.test.ts src/logic/ring-reorder-logic.test.ts src/services/orrery-scene.test.ts
    npx tsc --noEmit
    npm run check:colors
-   npm test
    ```
 
 ### What You Don't Need to Change
 
-- Do not duplicate `PROGRESS_SQL`, `STATUS_SQL`, or `ROGUE_K`; `orrery-read` imports the status engine's source of truth.
-- Do not add stored status, progress, or visual rank fields; display rank is dense and read-time derived.
-- Do not add a second sun-assignment gesture to the canvas; Settings owns **Sun / centre**.
-- Do not modify photo storage or introduce a network image path; the Orrery consumes the established local master/fallback pipeline.
+- Do not duplicate `PROGRESS_SQL` or `STATUS_SQL`; the System reader consumes the status engine's source of truth.
+- Do not store camera pose, focus, status, progress, Gravity, or display rank. Camera state is a navigation session; the others are derived reads.
+- Do not add a second Orrery mode, an Orrery sun-assignment gesture, a custom-System editor, or social-graph schema.
+- Do not treat a satellite as a contact or add photo/network retrieval for it.
 
 ## Pitfalls
 
 1. **Canvas visibility is not clock pause.** Hiding a derived value leaves `useClock()` running. Unmount `OrreryCanvas` when blurred, backgrounded, or unmeasured.
 
-2. **Remove drift before converting a radial release to rank.** Use the dragged body's `driftPush`; otherwise a rogue body jumps rings even when released where it was picked up.
+2. **A worklet helper declared after its caller can crash only on device.** Reanimated can capture that later helper as `undefined` even though Vitest passes. Keep helper definitions above their worklet callers.
 
-3. **Keep sun exclusion symmetric.** The render read and `rewriteRingSeq()` guards must exclude the same contact sun, or the transactional count guard rejects the drag list.
+3. **A Category name is not a System identity.** Persist and validate the Category UID; resolve deletion at read time and recover to All Contacts.
 
-4. **Respect high-density limits.** The current minimum gap can overlap planets at high contact counts. Treat a capacity change as a visual/product decision and test it on a device.
+4. **Global-sun actionability does not grant membership.** An excluded contact sun has focus/Profile actions but no companion row or satellite context.
 
-5. **Fast Refresh can leave Expo SQLite statements invalid in debug.** A clean relaunch is the first diagnostic step before changing a local read query.
+5. **A bounded query is not a latency guarantee.** Scene and fresh target reads queue behind the shared snapshot mutex; cancellation must suppress publication rather than bypassing the transaction order.
 
 ## Smoke Test
 
 ```bash
-npx vitest run src/logic/orrery-geometry-logic.test.ts src/logic/orrery-ring-logic.test.ts src/logic/ring-reorder-logic.test.ts src/logic/sun-occupant-logic.test.ts
+npx vitest run src/db/orrery-system-read.test.ts src/db/orrery-impact-read.test.ts src/db/orrery-satellites-read.test.ts src/logic/orrery-camera-logic.test.ts src/logic/orrery-world-logic.test.ts src/logic/ring-reorder-logic.test.ts src/services/orrery-scene.test.ts
 npx tsc --noEmit
 npm run check:colors
 ```
 
-Expected: all targeted tests pass, TypeScript emits no errors, and the colour gate reports no literals outside theme presets.
+Expected: the focused suites pass, TypeScript emits no errors, and the colour gate reports no literals outside theme presets.
 
-On a physical Pixel, open the dashboard Orbit button; verify the sun, rings, photo/fallback planets, Status ↔ Relationship morph, radial reorder, and blur/background pause for any changed layer.
+On a physical Pixel, verify pan, pinch, tilt, yaw, focus/Profile behavior, ambiguous-group access, a System change, satellite visibility, guarded hold-reorder, and blur/background pause for a changed layer. Record native evidence in the Phase 29 checklist before making rendering or performance claims.
