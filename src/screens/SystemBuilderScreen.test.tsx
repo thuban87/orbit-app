@@ -27,6 +27,24 @@ vi.mock("@shopify/react-native-skia", () => ({
   Circle: "Circle",
   Fill: "Fill",
 }));
+vi.mock("react-native-gesture-handler", () => {
+  const chain = new Proxy({}, { get: () => () => chain });
+  return {
+    Gesture: {
+      Pan: () => chain,
+      Pinch: () => chain,
+      Tap: () => chain,
+      Race: () => chain,
+      Simultaneous: () => chain,
+    },
+    GestureDetector: "GestureDetector",
+  };
+});
+vi.mock("react-native-reanimated", () => ({
+  runOnJS: (callback: unknown) => callback,
+  useDerivedValue: (factory: () => unknown) => ({ value: factory() }),
+  useSharedValue: (value: unknown) => ({ value }),
+}));
 vi.mock("@/components/orrery/ManageMembersGrid", () => ({
   ManageMembersGrid: "ManageMembersGrid",
 }));
