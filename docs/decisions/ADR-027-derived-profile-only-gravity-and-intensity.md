@@ -7,7 +7,7 @@
 **Reversibility:** reversible
 **Migration:** None
 **Supersedes:** None
-**Superseded by:** None
+**Superseded by:** ADR-106 (partial — Orrery Gravity display scope and companion context)
 
 ## Context
 
