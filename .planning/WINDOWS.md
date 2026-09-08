@@ -1,10 +1,10 @@
 ---
 schema_version: 1
-open_count: 49
+open_count: 50
 waived_count: 0
 fixed_count: 6
-total_count: 55
-last_updated: 2026-09-07T18:18:34.663Z
+total_count: 56
+last_updated: 2026-09-08T20:10:20.227Z
 ---
 
 # Broken Windows Ledger
@@ -70,6 +70,7 @@ last_updated: 2026-09-07T18:18:34.663Z
 | 53 | 29 | unrun-verify | src/components/orrery/use-orrery-camera.ts |  | Native stationary hold activation, preactivation pan, multi-pointer cancellation and haptic/ghost-ring acknowledgment remain pending Plan 12 device verification. | open |  | 2026-09-07T17:23:55.487Z |  |
 | 54 | 29 | unrun-verify | .planning/phases/29-orrery-camera-scale-exploration/29-VALIDATION.md |  | Plan 11 native Profile Back, tab reentry, background clock shutdown, live OS motion toggle and scaled-text recovery remain pending Plan 12 device verification. | open |  | 2026-09-07T17:57:06.340Z |  |
 | 55 | 29 | unrun-verify | .planning/phases/29-orrery-camera-scale-exploration/29-NATIVE-CHECKLIST.md |  | Plan 29-12: all 55 E1–E9 native states and combined gesture, accessibility, lifecycle and automatic-backup contention checks remain pending; no device evidence collected. | open |  | 2026-09-07T18:18:34.663Z |  |
+| 56 | 30 | stub | src/logic/system-rule-resolver.ts |  | Rule evaluation, gravity, exclusion pruning, and broken-rule population are intentionally deferred to Plan 30-02. | open |  | 2026-09-08T20:10:20.227Z |  |
 
 ````json
 [
@@ -731,6 +732,18 @@ last_updated: 2026-09-07T18:18:34.663Z
     "status": "open",
     "reason": "",
     "recorded_at": "2026-09-07T18:18:34.663Z",
+    "resolved_at": null
+  },
+  {
+    "id": 56,
+    "kind": "stub",
+    "phase": "30",
+    "file": "src/logic/system-rule-resolver.ts",
+    "line": null,
+    "description": "Rule evaluation, gravity, exclusion pruning, and broken-rule population are intentionally deferred to Plan 30-02.",
+    "status": "open",
+    "reason": "",
+    "recorded_at": "2026-09-08T20:10:20.227Z",
     "resolved_at": null
   }
 ]
