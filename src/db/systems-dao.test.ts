@@ -12,6 +12,7 @@ import {
   deleteSystemWithActiveFallback,
   duplicateSystem,
   getSystem,
+  isSystemRuleDraftValid,
   listCustomSystems,
   listSystemOverrides,
   listSystemPrefs,
@@ -24,6 +25,7 @@ import {
   resetSystemOverrides,
   restoreDeletedSystem,
   restoreDeletedSystemAndActiveSelection,
+  type SystemRuleDraft,
   saveMembershipOverrides,
   saveSystemDefinition,
   setSystemHidden,
@@ -728,6 +730,37 @@ describe("systems DAO", () => {
         now: NOW,
       }),
     ).rejects.toThrow("invalid System rule");
+
+    const malformedRuntimeRules: unknown[] = [
+      { family: "category", value: 42 },
+      { family: "category", value: null },
+      { family: "category", value: undefined },
+      { family: null, value: "category-uid" },
+      { family: undefined, value: "category-uid" },
+      { family: 42, value: "category-uid" },
+      null,
+    ];
+    for (const rule of malformedRuntimeRules) {
+      const draft = rule as SystemRuleDraft;
+      expect(isSystemRuleDraftValid(draft)).toBe(false);
+      await expect(
+        setSystemRules(exec, {
+          systemRef: ref,
+          rules: [draft],
+          now: NOW,
+        }),
+      ).rejects.toThrow("invalid System rule");
+      await expect(
+        saveSystemDefinition(exec, {
+          systemRef: ref,
+          name: system.name,
+          rules: [draft],
+          overrideIntent: [],
+          prunableExclusionContactIds: [],
+          now: NOW,
+        }),
+      ).rejects.toThrow("invalid System rule");
+    }
 
     expect(await listSystemRules(exec, system.id)).toMatchObject([
       { family: "favorite", value: "on" },

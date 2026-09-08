@@ -95,6 +95,13 @@ const CATEGORY_UID_RE = /^[^\s\p{Cc}]{1,256}$/u;
 
 /** Whether one row belongs to the closed grammar accepted for new writes. */
 export function isSystemRuleDraftValid(rule: SystemRuleDraft): boolean {
+  if (
+    !rule ||
+    typeof rule.family !== "string" ||
+    typeof rule.value !== "string"
+  ) {
+    return false;
+  }
   return (
     (rule.family === "category" && CATEGORY_UID_RE.test(rule.value)) ||
     (rule.family === "favorite" && rule.value === "on") ||
@@ -120,16 +127,19 @@ export function isSystemRuleDraftValid(rule: SystemRuleDraft): boolean {
 export function assertSystemRuleDrafts(
   rules: readonly SystemRuleDraft[],
 ): void {
+  if (!Array.isArray(rules)) {
+    throw new Error("systems-dao: invalid System rules");
+  }
   const seen = new Set<string>();
   for (const rule of rules) {
+    if (!isSystemRuleDraftValid(rule)) {
+      throw new Error("systems-dao: invalid System rule family or value");
+    }
     const duplicateKey = `${rule.family}\u0000${rule.value}`;
     if (seen.has(duplicateKey)) {
       throw new Error("systems-dao: duplicate System rule");
     }
     seen.add(duplicateKey);
-    if (!isSystemRuleDraftValid(rule)) {
-      throw new Error("systems-dao: invalid System rule family or value");
-    }
   }
 }
 
