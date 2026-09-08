@@ -93,6 +93,34 @@ export function sampleWorldTransition(
     };
   });
 }
+
+/**
+ * Adds a short, reversible per-body sweep to a System transition. It only
+ * rotates projected world geometry; opacity and radius stay owned by the
+ * transition sampler above. At zero intensity the returned geometry is the
+ * steady-state frame exactly.
+ */
+export function spinSwitchWorld(
+  world: readonly AnimatedWorldBody[],
+  intensity: number,
+  progress: number,
+): AnimatedWorldBody[] {
+  "worklet";
+  const phase = Math.sin(Math.max(0, Math.min(1, progress)) * Math.PI);
+  if (intensity <= 0 || Math.abs(phase) < 1e-9) return [...world];
+  return world.map((body) => {
+    if (body.kind !== "contact") return body;
+    const direction = body.id % 2 === 0 ? 1 : -1;
+    const angle = direction * intensity * phase * 0.22;
+    const cosine = Math.cos(angle);
+    const sine = Math.sin(angle);
+    return {
+      ...body,
+      x: body.x * cosine - body.y * sine,
+      y: body.x * sine + body.y * cosine,
+    };
+  });
+}
 export function projectAnimatedFrame(
   transition: WorldTransition,
   fraction: number,

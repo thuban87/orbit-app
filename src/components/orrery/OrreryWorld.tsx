@@ -37,6 +37,7 @@ import {
   bodyKey,
   projectAnimatedFrame,
   sampleWorldTransition,
+  spinSwitchWorld,
 } from "@/logic/orrery-frame";
 import {
   allocateLabels,
@@ -205,6 +206,7 @@ export function OrreryWorld({
   onReorderActivated,
   satellites = [],
   focusedSatellite,
+  switchIntensity,
 }: {
   scene: OrrerySceneSnapshot;
   camera: OrreryCameraController;
@@ -223,6 +225,8 @@ export function OrreryWorld({
   onReorderActivated: () => void;
   satellites?: readonly OrrerySatellite[];
   focusedSatellite?: OrrerySatelliteTarget | null;
+  /** Shared render-loop signal; membership stays owned by the frame transition. */
+  switchIntensity: SharedValue<number>;
 }) {
   const { fontScale } = useWindowDimensions();
   const reducedMotion = useReducedMotionShared();
@@ -275,7 +279,21 @@ export function OrreryWorld({
   // Capture only the producer's input; the controller also contains its published output.
   const reorder = camera.reorder;
   const frame = useDerivedValue(() => {
-    const sampled = sampleWorldTransition(transition.value, progress.value);
+    const intensity = reducedMotion.value ? 0 : switchIntensity.value;
+    // This modulation is inert at zero and deliberately leaves the sampler as
+    // the sole owner of entering/leaving opacity and radius.
+    const easedProgress = Math.max(
+      0,
+      Math.min(
+        1,
+        progress.value + Math.sin(progress.value * Math.PI) * intensity * 0.075,
+      ),
+    );
+    const sampled = spinSwitchWorld(
+      sampleWorldTransition(transition.value, easedProgress),
+      intensity,
+      progress.value,
+    );
     const held = reorder.value;
     const world = previewReorder(
       sampled,

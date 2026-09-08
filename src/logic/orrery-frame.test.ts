@@ -10,6 +10,7 @@ import {
   bodyKey,
   projectAnimatedFrame,
   sampleWorldTransition,
+  spinSwitchWorld,
 } from "./orrery-frame";
 
 const viewport = { width: 1000, height: 1000 };
@@ -118,5 +119,17 @@ describe("one animated Orrery frame", () => {
     expect(frame.bodies).toHaveLength(2);
     expect(frame.bodies[0].visible).toBe(false);
     expect(frame.bodies[1].visible).toBe(true);
+  });
+  it("adds a reversible per-body switch spin without changing the zero-intensity frame", () => {
+    const world = sampleWorldTransition(
+      beginWorldTransition([], [body(1, 70)], 1),
+      1,
+    );
+    expect(spinSwitchWorld(world, 0, 0.5)).toEqual(world);
+    const spun = spinSwitchWorld(world, 1, 0.5);
+    expect(spun[0].x).not.toBe(world[0].x);
+    expect(spun[0].y).not.toBe(world[0].y);
+    expect(spinSwitchWorld(world, 1, 0)).toEqual(world);
+    expect(spinSwitchWorld(world, 1, 1)).toEqual(world);
   });
 });

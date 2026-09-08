@@ -195,6 +195,7 @@ describe("production Orrery native tree and resource contracts", () => {
         onReorder: vi.fn(),
         onReorderActivated: vi.fn(),
         focusedIds: [],
+        switchIntensity: { value: 0 } as never,
       }),
     );
     const bodies = tree[0].children[3];
@@ -238,6 +239,7 @@ describe("production Orrery native tree and resource contracts", () => {
         onReorder: () => {},
         onReorderActivated: () => {},
         focusedIds: [],
+        switchIntensity: { value: 0 } as never,
       }),
     );
     const [rings, polaris, ghost, bodies, labels] = tree[0].children;
