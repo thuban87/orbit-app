@@ -14,7 +14,6 @@ import {
   createCustomSystem,
   setSystemHidden,
   setSystemOverride,
-  setSystemRules,
 } from "@/db/systems-dao";
 import type { SqlExecutor } from "@/db/types";
 
@@ -86,11 +85,12 @@ describe("Systems catalog read", () => {
       mode: "include",
       now: NOW,
     });
-    await setSystemRules(exec, {
-      systemRef: `custom:${custom.uid}`,
-      rules: [{ family: "gravity", value: "not-a-tier" }],
-      now: NOW,
-    });
+    // Historical/restore data may contain a now-invalid rule; writers reject
+    // it, while catalog reads must still surface its broken state.
+    await exec.runAsync(
+      "INSERT INTO system_rules (uid, system_id, family, value, created_at) VALUES (?, ?, ?, ?, ?)",
+      [`catalog-rule-${++sequence}`, custom.id, "gravity", "not-a-tier", NOW],
+    );
 
     const batch = await countBuiltinAndCategorySystemMembers(exec, [
       { kind: "builtin", id: "all-contacts" },

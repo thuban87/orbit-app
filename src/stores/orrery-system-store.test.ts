@@ -1,4 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
+// The store's reader types traverse database.ts; node tests use injected readers.
+vi.mock("expo-sqlite", () => ({}));
 import {
   MissingOrreryCategoryError,
   type OrrerySystemSnapshot,
