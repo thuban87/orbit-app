@@ -4,6 +4,7 @@ vi.mock("expo-sqlite", () => ({}));
 
 import { nodeSqliteExecutor, openTestDb } from "@/db/__testkit__/node-sqlite";
 import { MIGRATIONS, TARGET_VERSION } from "@/db/database";
+import { runMigrations } from "@/db/migrations/runner";
 import {
   countBuiltinAndCategorySystemMembers,
   countSystemMembers,
@@ -15,7 +16,6 @@ import {
   setSystemOverride,
   setSystemRules,
 } from "@/db/systems-dao";
-import { runMigrations } from "@/db/migrations/runner";
 import type { SqlExecutor } from "@/db/types";
 
 const NOW = "2026-09-08 12:00:00";
@@ -40,7 +40,10 @@ beforeEach(async () => {
 
 describe("Systems catalog read", () => {
   it("returns custom Systems with persisted visibility/order and override presence without resolving members", async () => {
-    const custom = await createCustomSystem(exec, { name: "Close Friends", now: NOW });
+    const custom = await createCustomSystem(exec, {
+      name: "Close Friends",
+      now: NOW,
+    });
     const contactId = await addContact("Alex");
     await setSystemHidden(exec, {
       systemRef: "builtin:favorites",
@@ -59,11 +62,15 @@ describe("Systems catalog read", () => {
     });
 
     const catalog = await readSystemsCatalog(exec);
-    expect(catalog.find((row) => row.id === "builtin:favorites")).toMatchObject({
-      hidden: true,
-      displayOrder: 7,
-    });
-    expect(catalog.find((row) => row.id === `custom:${custom.uid}`)).toMatchObject({
+    expect(catalog.find((row) => row.id === "builtin:favorites")).toMatchObject(
+      {
+        hidden: true,
+        displayOrder: 7,
+      },
+    );
+    expect(
+      catalog.find((row) => row.id === `custom:${custom.uid}`),
+    ).toMatchObject({
       name: "Close Friends",
       hasOverrides: true,
       createdAt: custom.createdAt,
@@ -94,6 +101,9 @@ describe("Systems catalog read", () => {
 
     await expect(
       countSystemMembers(exec, { kind: "custom", uid: custom.uid }),
-    ).resolves.toMatchObject({ count: 1, brokenRules: [{ family: "gravity" }] });
+    ).resolves.toMatchObject({
+      count: 1,
+      brokenRules: [{ family: "gravity" }],
+    });
   });
 });

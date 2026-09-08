@@ -111,11 +111,13 @@ describe("Orrery System controls", () => {
       severity: "empty",
       overrides: true,
     });
-    expect(rows.find((row) => row.id === "custom:close-friends")).toMatchObject({
-      count: 1,
-      severity: "broken",
-      overrides: false,
-    });
+    expect(rows.find((row) => row.id === "custom:close-friends")).toMatchObject(
+      {
+        count: 1,
+        severity: "broken",
+        overrides: false,
+      },
+    );
   });
   it("preserves full long name in accessibility while the trigger can visually ellipsize", () => {
     const name = "A long name ".repeat(30);
