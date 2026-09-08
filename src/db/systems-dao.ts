@@ -345,6 +345,9 @@ export async function restoreDeletedSystemCore(
     );
   }
   const systemRef = `custom:${snapshot.uid}` as OrrerySystemId;
+  // The restored uid now exists, so every ref-keyed replay uses the same
+  // catalog validation boundary as ordinary override/pref writes.
+  await assertKnownSystemRef(exec, systemRef);
   for (const override of snapshot.overrides) {
     await exec.runAsync(
       "INSERT INTO system_overrides (uid, system_ref, contact_id, mode, created_at) VALUES (?, ?, ?, ?, ?)",
@@ -705,6 +708,96 @@ export function saveMembershipOverrides(
 ): Promise<void> {
   return inWriteTransaction(exec, async () => {
     await saveMembershipOverridesCore(exec, input);
+    await bumpDataRevisionCore(exec);
+  });
+}
+
+/** Persist switcher visibility for an immutable base; custom Systems are deleted. */
+export async function setSystemHiddenCore(
+  exec: SqlExecutor,
+  input: { systemRef: OrrerySystemId; hidden: boolean; now: string },
+): Promise<void> {
+  const ref = await assertKnownSystemRef(exec, input.systemRef);
+  if (ref.kind === "custom") {
+    throw new Error("systems-dao: custom Systems are deleted, not hidden");
+  }
+  if (ref.kind === "builtin" && ref.id === "all-contacts") {
+    throw new Error("systems-dao: All Contacts cannot be hidden");
+  }
+  const result = await exec.runAsync(
+    `INSERT INTO system_prefs (uid, system_ref, hidden, created_at, modified_at)
+     VALUES (?, ?, ?, ?, ?)
+     ON CONFLICT(system_ref) DO UPDATE SET
+       hidden = excluded.hidden,
+       modified_at = excluded.modified_at`,
+    [newUid(), input.systemRef, input.hidden ? 1 : 0, input.now, input.now],
+  );
+  assertOneChange("setSystemHidden", result.changes);
+}
+
+export function setSystemHidden(
+  exec: SqlExecutor,
+  input: { systemRef: OrrerySystemId; hidden: boolean; now: string },
+): Promise<void> {
+  return inWriteTransaction(exec, async () => {
+    await setSystemHiddenCore(exec, input);
+    await bumpDataRevisionCore(exec);
+  });
+}
+
+async function setSystemDisplayOrderCore(
+  exec: SqlExecutor,
+  input: { systemRef: OrrerySystemId; displayOrder: number; now: string },
+): Promise<void> {
+  const result = await exec.runAsync(
+    `INSERT INTO system_prefs
+       (uid, system_ref, display_order, hidden, created_at, modified_at)
+     VALUES (?, ?, ?, 0, ?, ?)
+     ON CONFLICT(system_ref) DO UPDATE SET
+       display_order = excluded.display_order,
+       modified_at = excluded.modified_at`,
+    [newUid(), input.systemRef, input.displayOrder, input.now, input.now],
+  );
+  assertOneChange("reorderSystems", result.changes);
+}
+
+/** Write the submitted catalog order while pinning All Contacts at index zero. */
+export async function reorderSystemsCore(
+  exec: SqlExecutor,
+  input: { orderedRefs: readonly OrrerySystemId[]; now: string },
+): Promise<void> {
+  const seen = new Set<string>();
+  for (const systemRef of input.orderedRefs) {
+    if (seen.has(systemRef)) {
+      throw new Error("reorderSystems: duplicate System reference");
+    }
+    seen.add(systemRef);
+    await assertKnownSystemRef(exec, systemRef);
+  }
+  const allContacts = "builtin:all-contacts" as OrrerySystemId;
+  await setSystemDisplayOrderCore(exec, {
+    systemRef: allContacts,
+    displayOrder: 0,
+    now: input.now,
+  });
+  let displayOrder = 1;
+  for (const systemRef of input.orderedRefs) {
+    if (systemRef === allContacts) continue;
+    await setSystemDisplayOrderCore(exec, {
+      systemRef,
+      displayOrder,
+      now: input.now,
+    });
+    displayOrder += 1;
+  }
+}
+
+export function reorderSystems(
+  exec: SqlExecutor,
+  input: { orderedRefs: readonly OrrerySystemId[]; now: string },
+): Promise<void> {
+  return inWriteTransaction(exec, async () => {
+    await reorderSystemsCore(exec, input);
     await bumpDataRevisionCore(exec);
   });
 }

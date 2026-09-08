@@ -16,6 +16,7 @@ import {
   mapBuiltinPredicateToRules,
   nextDuplicateName,
   pruneSystemExclusions,
+  reorderSystems,
   renameSystem,
   resetSystemOverrides,
   restoreDeletedSystem,
@@ -23,6 +24,7 @@ import {
   saveSystemDefinition,
   setSystemOverride,
   setSystemRules,
+  setSystemHidden,
   duplicateSystem,
 } from "@/db/systems-dao";
 import { runMigrations } from "@/db/migrations/runner";
@@ -328,5 +330,71 @@ describe("systems DAO", () => {
     expect(mapBuiltinPredicateToRules({ kind: "builtin", id: "all-contacts" })).toEqual([
       { family: "scope", value: "population" },
     ]);
+  });
+
+  it("rejects immutable rule writes and preserves rules when resetting membership overrides", async () => {
+    const system = await createCustomSystem(exec, { name: "Rule Reset", now: NOW });
+    const ref = `custom:${system.uid}` as const;
+    const contactId = await addContact("Alex");
+    await setSystemRules(exec, {
+      systemRef: ref,
+      rules: [{ family: "favorite", value: "on" }],
+      now: NOW,
+    });
+    await setSystemOverride(exec, { systemRef: ref, contactId, mode: "include", now: NOW });
+    await resetSystemOverrides(exec, { systemRef: ref });
+    expect(await listSystemRules(exec, system.id)).toMatchObject([
+      { family: "favorite", value: "on" },
+    ]);
+    await expect(
+      setSystemRules(exec, {
+        systemRef: "builtin:favorites",
+        rules: [],
+        now: NOW,
+      }),
+    ).rejects.toThrow("immutable");
+  });
+
+  it("persists only valid built-in or Category visibility preferences", async () => {
+    const categoryRef = `category:${await firstCategoryUid()}` as const;
+    const custom = await createCustomSystem(exec, { name: "No Hide", now: NOW });
+    await setSystemHidden(exec, { systemRef: categoryRef, hidden: true, now: NOW });
+    expect(await listSystemPrefs(exec)).toMatchObject([
+      { systemRef: categoryRef, hidden: 1 },
+    ]);
+    await expect(
+      setSystemHidden(exec, { systemRef: "builtin:all-contacts", hidden: true, now: NOW }),
+    ).rejects.toThrow("All Contacts");
+    await expect(
+      setSystemHidden(exec, { systemRef: `custom:${custom.uid}`, hidden: true, now: NOW }),
+    ).rejects.toThrow("deleted, not hidden");
+    await expect(
+      setSystemHidden(exec, { systemRef: "custom:missing", hidden: true, now: NOW }),
+    ).rejects.toThrow("unknown System");
+  });
+
+  it("reorders a validated catalog while keeping All Contacts at order zero", async () => {
+    const categoryRef = `category:${await firstCategoryUid()}` as const;
+    const custom = await createCustomSystem(exec, { name: "Ordered", now: NOW });
+    const customRef = `custom:${custom.uid}` as const;
+    await reorderSystems(exec, {
+      orderedRefs: [categoryRef, customRef, "builtin:favorites"],
+      now: NOW,
+    });
+    const prefs = await listSystemPrefs(exec);
+    expect(prefs).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ systemRef: "builtin:all-contacts", displayOrder: 0 }),
+        expect.objectContaining({ systemRef: categoryRef, displayOrder: 1 }),
+        expect.objectContaining({ systemRef: customRef, displayOrder: 2 }),
+        expect.objectContaining({ systemRef: "builtin:favorites", displayOrder: 3 }),
+      ]),
+    );
+    await expect(
+      reorderSystems(exec, { orderedRefs: [customRef, customRef], now: NOW }),
+    ).rejects.toThrow("duplicate");
+    await expect(
+      reorderSystems(exec, { orderedRefs: ["custom:missing"], now: NOW }),
+    ).rejects.toThrow("unknown System");
   });
 });
