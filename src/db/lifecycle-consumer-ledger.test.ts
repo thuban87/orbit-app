@@ -147,6 +147,10 @@ const CADENCE_OWNERS: Record<string, LedgerEntry> = {
  * mapped to its owning task and exact predicate.
  */
 const PREDICATE_OWNERS: Record<string, LedgerEntry> = {
+  "src/logic/system-rule-resolver.ts": {
+    owner: "30-02",
+    note: "Custom-System rule candidates default to ACTIVE_SEGREGATION_WHERE (archived_at IS NULL, tracking_enabled = 1, contacted); only explicit Not Contacted or scope:population widens the base scope.",
+  },
   "src/db/orrery-system-read.ts": {
     owner: "29-03",
     note: "Complete reorder identities require archived_at IS NULL AND tracking_enabled=1 AND last_contact IS NOT NULL, plus the saved-sun fingerprint. Explicit All/Not member widening retains Bound/archive scope and null health; other Systems remain contacted-only.",
@@ -311,12 +315,14 @@ describe("lifecycle consumer ledger — nullable cadence (CDN-02)", () => {
     // miss them. Assert each is a named owner AND still imports a fragment.
     for (const file of Object.keys(STATUS_FRAGMENT_CONSUMERS)) {
       const code = readFileSync(join(ROOT, file), "utf8");
-      expect(code, `${file} must import a status fragment from @/db/status`).toMatch(
-        /from "@\/db\/status"/,
-      );
-      expect(code, `${file} must reference a PROGRESS_SQL/STATUS_SQL fragment`).toMatch(
-        /PROGRESS_SQL|STATUS_SQL|STATUS_CADENCE_PRECONDITION/,
-      );
+      expect(
+        code,
+        `${file} must import a status fragment from @/db/status`,
+      ).toMatch(/from "@\/db\/status"/);
+      expect(
+        code,
+        `${file} must reference a PROGRESS_SQL/STATUS_SQL fragment`,
+      ).toMatch(/PROGRESS_SQL|STATUS_SQL|STATUS_CADENCE_PRECONDITION/);
     }
   });
 
@@ -358,7 +364,10 @@ describe("lifecycle consumer ledger — orbiting/favourite Bound set (CDN-03)", 
       "src/services/notifications/decay-suppression.ts",
       "src/db/unbound-read.ts",
     ]) {
-      expect(PREDICATE_OWNERS[file], `${file} must be a named predicate owner`).toBeDefined();
+      expect(
+        PREDICATE_OWNERS[file],
+        `${file} must be a named predicate owner`,
+      ).toBeDefined();
     }
   });
 
@@ -390,7 +399,10 @@ describe("lifecycle consumer ledger — proactive ingress owners", () => {
     // no lifecycle gate — a delivered tap is an EXPLICIT person-level action,
     // permitted for Unbound (dossier Cluster N), unlike a proactive quick action.
     const nav = stripComments(
-      readFileSync(join(ROOT, "src/services/notifications/notification-nav.ts"), "utf8"),
+      readFileSync(
+        join(ROOT, "src/services/notifications/notification-nav.ts"),
+        "utf8",
+      ),
     );
     expect(nav).toMatch(/name:\s*"Compose"/);
     expect(nav, "a delivered tap must not be lifecycle-gated").not.toMatch(
@@ -429,10 +441,16 @@ type Assert<T extends true> = T;
 type NullAssignable<T, K extends keyof T> = null extends T[K] ? true : false;
 
 // `contacts.interval_days` is nullable at v11; every cadence-bearing view agrees:
-type _CadenceImpactInputs = Assert<NullAssignable<ImpactInputs, "intervalDays">>;
+type _CadenceImpactInputs = Assert<
+  NullAssignable<ImpactInputs, "intervalDays">
+>;
 type _CadenceEditRow = Assert<NullAssignable<ContactEditRow, "interval_days">>;
-type _CadenceCreate = Assert<NullAssignable<CreateContactFullInput, "intervalDays">>;
-type _CadenceUpdate = Assert<NullAssignable<UpdateContactFullInput, "intervalDays">>;
+type _CadenceCreate = Assert<
+  NullAssignable<CreateContactFullInput, "intervalDays">
+>;
+type _CadenceUpdate = Assert<
+  NullAssignable<UpdateContactFullInput, "intervalDays">
+>;
 // DashboardRow carries no raw interval_days; cadence is projected as the nullable
 // derived status/progress pair, which must stay nullable so an Unbound row reads
 // neither stable nor overdue.
