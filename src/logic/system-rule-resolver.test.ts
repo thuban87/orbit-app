@@ -9,10 +9,10 @@ import { readOrrerySystemMembersCore } from "@/db/orrery-system-read";
 import { addSystemOverride, createCustomSystem } from "@/db/systems-dao";
 import type { SqlExecutor } from "@/db/types";
 import {
+  applyMembershipOverrides,
   FAVORITE_RULE_VALUE,
   mapRulesToFilters,
   NOT_CONTACTED_RULE_VALUE,
-  applyMembershipOverrides,
   resolveCandidateIds,
   resolveCustomSystemMembers,
   SCOPE_POPULATION_FAMILY,
@@ -73,16 +73,21 @@ describe("manual-only custom System resolver", () => {
         now: NOW,
       });
 
-    const resolved = await resolveCustomSystemMembers(exec, ref);
+    const resolved = await resolveCustomSystemMembers(
+      exec,
+      ref,
+      NOW,
+      async () => null,
+    );
     expect(resolved).toEqual({
-      memberIds: [included],
+      memberIds: [included, ineligible],
       candidateIds: [],
       brokenRules: [],
-      prunableExclusionContactIds: [],
+      prunableExclusionContactIds: [excluded],
     });
     expect(await readOrrerySystemMembersCore(exec, ref)).toMatchObject({
       status: "ready",
-      members: [{ id: included }],
+      members: [{ id: included }, { id: ineligible }],
       brokenRules: [],
     });
 

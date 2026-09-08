@@ -7,25 +7,32 @@
 import { getAppSettings } from "@/db/app-settings-dao";
 import { getContactHeader } from "@/db/contact-read";
 import { getContactStatus, type ProfileStatus } from "@/db/contact-status-read";
+import { localDateTime } from "@/db/database";
 import { readOrreryImpactInputsCore } from "@/db/orrery-impact-read";
 import { listOrbitingContacts } from "@/db/orrery-read";
 import { getProfile } from "@/db/profile-dao";
 import { PROGRESS_SQL, STATUS_SQL } from "@/db/status";
+import { listSystemOverrides, type SystemOverride } from "@/db/systems-dao";
 import { inReadSnapshot, type ReadOnlyExecutor } from "@/db/transaction";
 import type { SqlExecutor } from "@/db/types";
+import type { GravityInputsLoader } from "@/logic/dashboard-gravity-filter";
 import {
   ALL_CONTACTS_SYSTEM,
   buildOrrerySystemWhere,
   type OrrerySystemRef,
+  systemRefId,
 } from "@/logic/orrery-system-logic";
-import {
-  resolveCustomSystemMembers,
-  type BrokenRule,
-} from "@/logic/system-rule-resolver";
 import {
   mapSunOccupantLookup,
   sunOccupantIsSelf,
 } from "@/logic/sun-occupant-logic";
+import {
+  applyMembershipOverrides,
+  type BrokenRule,
+  resolveCustomSystemMembers,
+  resolveMembershipFromDefinition,
+  type SystemRule,
+} from "@/logic/system-rule-resolver";
 
 export interface ContactIdentity {
   id: number;
@@ -56,6 +63,88 @@ export interface OrreryMembersResult {
   brokenRules?: BrokenRule[];
 }
 
+const MEMBER_SELECT = `SELECT c.id,c.uid,c.name,c.photo,c.ring_seq,c.rarely_responds,c.favourite_rank,c.last_contact,c.created_at,
+  CASE WHEN c.last_contact IS NULL THEN NULL ELSE (${PROGRESS_SQL}) END AS progress,
+  CASE WHEN c.last_contact IS NULL THEN NULL ELSE (${STATUS_SQL}) END AS status
+  FROM contacts c`;
+
+function makeGravityInputsLoader(exec: ReadOnlyExecutor): GravityInputsLoader {
+  const cache = new Map<
+    number,
+    Awaited<ReturnType<typeof readOrreryImpactInputsCore>> extends Map<
+      number,
+      infer T
+    >
+      ? T
+      : never
+  >();
+  return async (id) => {
+    if (!cache.has(id)) {
+      const loaded = await readOrreryImpactInputsCore(exec, [id]);
+      for (const [key, value] of loaded) cache.set(key, value);
+    }
+    return cache.get(id) ?? null;
+  };
+}
+
+async function selectMembersByIds(
+  exec: ReadOnlyExecutor,
+  ids: readonly number[],
+): Promise<OrrerySystemMember[]> {
+  if (!ids.length) return [];
+  return exec.getAllAsync<OrrerySystemMember>(
+    `${MEMBER_SELECT} WHERE c.id IN (${ids.map(() => "?").join(", ")})
+     ORDER BY COALESCE(c.ring_seq,1e9),c.created_at,c.id`,
+    [...ids],
+  );
+}
+
+async function eligibleIncludes(
+  exec: ReadOnlyExecutor,
+  overrides: readonly SystemOverride[],
+): Promise<number[]> {
+  const ids = overrides
+    .filter((row) => row.mode === "include")
+    .map((row) => row.contactId);
+  if (!ids.length) return [];
+  const rows = await exec.getAllAsync<{ id: number }>(
+    `SELECT c.id FROM contacts c WHERE c.archived_at IS NULL AND c.tracking_enabled=1
+     AND c.id IN (${ids.map(() => "?").join(", ")})`,
+    ids,
+  );
+  return rows.map((row) => row.id);
+}
+
+/** Pre-override truth for the builder's override-only mode. */
+export async function readOrrerySystemBaseMemberIds(
+  exec: ReadOnlyExecutor,
+  system: Exclude<OrrerySystemRef, { kind: "custom" }>,
+): Promise<number[]> {
+  const where = buildOrrerySystemWhere(system);
+  const rows = await exec.getAllAsync<{ id: number }>(
+    `SELECT c.id FROM contacts c WHERE ${where.sql}
+     ORDER BY COALESCE(c.ring_seq,1e9),c.created_at,c.id`,
+    where.params,
+  );
+  return rows.map((row) => row.id);
+}
+
+/** Builder/preview draft entry point; loader construction remains in the DB layer. */
+export function resolveDraftMembership(
+  exec: ReadOnlyExecutor,
+  definition: {
+    rules: readonly SystemRule[];
+    overrides: readonly SystemOverride[];
+    now: string;
+  },
+) {
+  return resolveMembershipFromDefinition(
+    exec,
+    definition,
+    makeGravityInputsLoader(exec),
+  );
+}
+
 /** No mutex/BEGIN: also callable inside the guarded rank writer's transaction. */
 export async function readOrrerySystemMembersCore(
   exec: ReadOnlyExecutor,
@@ -68,7 +157,12 @@ export async function readOrrerySystemMembersCore(
       ]))
     )
       return { status: "missing-custom", system, members: [] };
-    const resolved = await resolveCustomSystemMembers(exec, system);
+    const resolved = await resolveCustomSystemMembers(
+      exec,
+      system,
+      localDateTime(),
+      makeGravityInputsLoader(exec),
+    );
     if (resolved.memberIds.length === 0)
       return {
         status: "ready",
@@ -76,14 +170,7 @@ export async function readOrrerySystemMembersCore(
         members: [],
         brokenRules: resolved.brokenRules,
       };
-    const members = await exec.getAllAsync<OrrerySystemMember>(
-      `SELECT c.id,c.uid,c.name,c.photo,c.ring_seq,c.rarely_responds,c.favourite_rank,c.last_contact,c.created_at,
-      CASE WHEN c.last_contact IS NULL THEN NULL ELSE (${PROGRESS_SQL}) END AS progress,
-      CASE WHEN c.last_contact IS NULL THEN NULL ELSE (${STATUS_SQL}) END AS status
-      FROM contacts c WHERE c.id IN (${resolved.memberIds.map(() => "?").join(", ")})
-      ORDER BY COALESCE(c.ring_seq,1e9),c.created_at,c.id`,
-      resolved.memberIds,
-    );
+    const members = await selectMembersByIds(exec, resolved.memberIds);
     return {
       status: "ready",
       system,
@@ -99,15 +186,33 @@ export async function readOrrerySystemMembersCore(
     ]))
   )
     return { status: "missing-category", system, members: [] };
-  const members = await exec.getAllAsync<OrrerySystemMember>(
-    `SELECT c.id,c.uid,c.name,c.photo,c.ring_seq,c.rarely_responds,c.favourite_rank,c.last_contact,c.created_at,
-    CASE WHEN c.last_contact IS NULL THEN NULL ELSE (${PROGRESS_SQL}) END AS progress,
-    CASE WHEN c.last_contact IS NULL THEN NULL ELSE (${STATUS_SQL}) END AS status
-    FROM contacts c WHERE ${where.sql}
-    ORDER BY COALESCE(c.ring_seq,1e9),c.created_at,c.id`,
-    where.params,
-  );
-  return { status: "ready", system, members };
+  const overrides = await listSystemOverrides(exec, systemRefId(system));
+  if (!overrides.length) {
+    const members = await exec.getAllAsync<OrrerySystemMember>(
+      `${MEMBER_SELECT} WHERE ${where.sql}
+       ORDER BY COALESCE(c.ring_seq,1e9),c.created_at,c.id`,
+      where.params,
+    );
+    return { status: "ready", system, members };
+  }
+  const candidateIds = await readOrrerySystemBaseMemberIds(exec, system);
+  const includeIds = overrides
+    .filter((row) => row.mode === "include")
+    .map((row) => row.contactId);
+  const excludeIds = overrides
+    .filter((row) => row.mode === "exclude")
+    .map((row) => row.contactId);
+  const applied = applyMembershipOverrides({
+    candidateIds,
+    includeIds,
+    excludeIds,
+    eligibleIncludeIds: await eligibleIncludes(exec, overrides),
+  });
+  return {
+    status: "ready",
+    system,
+    members: await selectMembersByIds(exec, applied.memberIds),
+  };
 }
 
 /** All composition receives ro, including the complete batched Gravity history. */

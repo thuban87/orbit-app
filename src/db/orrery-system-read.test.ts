@@ -7,6 +7,7 @@ import {
   readOrrerySystemMembersCore,
   readOrrerySystemSnapshot,
 } from "@/db/orrery-system-read";
+import { addSystemOverride } from "@/db/systems-dao";
 import { inWriteTransaction } from "@/db/transaction";
 import {
   buildOrrerySystemWhere,
@@ -64,6 +65,38 @@ async function person(
 }
 
 describe("explicit Orrery System membership", () => {
+  it("layers built-in overrides onto base members and reselects full included rows", async () => {
+    const favorite = await person({ favorite: true, ring: 2 });
+    const added = await person({ ring: 1 });
+    await exec.runAsync(
+      "UPDATE contacts SET name='Manual add', photo='file://photo' WHERE id=?",
+      [added.id],
+    );
+    await addSystemOverride(exec, {
+      systemRef: "builtin:favorites",
+      contactId: added.id,
+      mode: "include",
+      now: "2026-09-01",
+    });
+    await addSystemOverride(exec, {
+      systemRef: "builtin:favorites",
+      contactId: favorite.id,
+      mode: "exclude",
+      now: "2026-09-01",
+    });
+    const result = await readOrrerySystemMembersCore(
+      exec,
+      ref("builtin:favorites"),
+    );
+    expect(result.members).toEqual([
+      expect.objectContaining({
+        id: added.id,
+        name: "Manual add",
+        photo: "file://photo",
+        ring_seq: 1,
+      }),
+    ]);
+  });
   it("crosses contacted/never × Bound/Unbound × live/archived without widening the default reader", async () => {
     let live!: { id: number; uid: string };
     let neutral!: typeof live;
