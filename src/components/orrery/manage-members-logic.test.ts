@@ -1,0 +1,88 @@
+import { describe, expect, it } from "vitest";
+import {
+  applyAdd,
+  applyDeselect,
+  deriveMemberRows,
+  overrideCounts,
+  type SystemMemberRow,
+  toPickerRow,
+} from "@/components/orrery/manage-members-logic";
+import { filterRows } from "@/logic/contact-picker-selection";
+
+const rows: SystemMemberRow[] = [
+  {
+    id: 1,
+    name: "Rule match",
+    photo: "photos/rule.jpg",
+    searchMethods: ["rule@example.com"],
+    available: true,
+  },
+  {
+    id: 2,
+    name: "Manual active",
+    photo: "photos/manual.jpg",
+    searchMethods: ["manual@example.com"],
+    available: true,
+  },
+  {
+    id: 3,
+    name: "Archived include",
+    photo: "photos/archived.jpg",
+    searchMethods: ["archived@example.com"],
+    available: false,
+  },
+  {
+    id: 4,
+    name: "Never contacted",
+    photo: null,
+    searchMethods: ["never@example.com"],
+    available: true,
+  },
+];
+
+describe("Manage Members override logic", () => {
+  it("keeps a deselected rule match visible as an exclusion", () => {
+    const member = deriveMemberRows([1], [], [], rows)[0];
+    expect(member.state).toBe("member");
+    expect(applyDeselect(member)).toEqual({ contactId: 1, mode: "exclude" });
+
+    expect(deriveMemberRows([1], [], [1], rows)).toEqual([
+      expect.objectContaining({ id: 1, state: "excluded" }),
+    ]);
+  });
+
+  it("adapts durable local member rows for the picker search helpers", () => {
+    const pickerRow = toPickerRow(rows[0]);
+    expect(pickerRow).toEqual({
+      lookupKey: "1",
+      displayName: "Rule match",
+      primaryMethod: "rule@example.com",
+      searchMethods: ["rule@example.com"],
+      photoThumbUri: null,
+    });
+    expect(filterRows([pickerRow], "RULE MATCH")).toEqual([pickerRow]);
+  });
+
+  it("counts manual additions while retaining unavailable archived inclusions", () => {
+    const derived = deriveMemberRows([1], [2, 3], [], rows);
+    expect(derived.map((row) => [row.id, row.state])).toEqual([
+      [1, "member"],
+      [2, "added"],
+      [3, "archived-added"],
+    ]);
+    expect(overrideCounts(derived)).toEqual({
+      total: 2,
+      added: 1,
+      excluded: 0,
+    });
+    expect(applyAdd(rows[1])).toEqual({ contactId: 2, mode: "include" });
+    expect(applyDeselect(derived[1])).toEqual({ contactId: 2, mode: null });
+  });
+
+  it("keeps an in-union never-contacted candidate and drops stale exclusions", () => {
+    const derived = deriveMemberRows([4], [], [2], rows);
+    expect(derived).toEqual([
+      expect.objectContaining({ id: 4, state: "member" }),
+    ]);
+  });
+});
