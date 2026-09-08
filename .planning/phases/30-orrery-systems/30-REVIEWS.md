@@ -3,17 +3,21 @@ phase: 30
 reviewers: [codex, claude]
 reviewed_at: 2026-09-08T11:44:25Z        # cycle 1
 reviewed_at_cycle2: 2026-09-08T12:37:11Z  # cycle 2 (this file accumulates per cycle)
-cycles: 2
+reviewed_at_cycle3: 2026-09-08T15:20:00Z  # cycle 3
+cycles: 3
 plans_reviewed: [30-01-PLAN.md, 30-02-PLAN.md, 30-03-PLAN.md, 30-04-PLAN.md, 30-05-PLAN.md, 30-06-PLAN.md, 30-07-PLAN.md, 30-08-PLAN.md, 30-09-PLAN.md, 30-10-PLAN.md]
 models:
-  codex: "gpt-5.6-terra (reasoning=low)"
+  codex: "gpt-5.6-terra (reasoning=high)"     # cycle 3 ran codex direct at reasoning=high
   claude: "claude-opus (read-only subagent lane)"
 model_sources:
-  codex: "banner"
+  codex: "config"
   claude: "orchestrator-subagent"
 cycle2_summary:
   current_high: 3
   current_actionable: 12
+cycle3_summary:
+  current_high: 3
+  current_actionable: 11
 ---
 
 # Cross-AI Plan Review — Phase 30 (Orrery Systems)
@@ -786,3 +790,314 @@ The phase should not execute until the resolver → member-grid → builder → 
 
 ## Claude closing
 **Overall phase risk: MEDIUM.** Data layer (01–04) LOW; every cycle-1 HIGH incorporated and disk-verified. This lane found **no unresolved HIGH** — but note it scoped to cycle-1-incorporation + internal consistency and did **not** enumerate the downstream consumer contracts where the Codex lane found new HIGHs (candidateIds, builder presentation, provisional-scene inputs); the orchestrator verified those Codex HIGHs are real (see Cycle-2 Consensus). Claude's actionable items: (1) [MED] 30-10 Task 3 reconcile with `orrery-frame`; (2) [LOW] 30-10 re-entrant re-select note; (3) [LOW] 30-02 citation + loader-injection direction; (4) [LOW] 30-09 pin the exact `orrery-scene` symbol; (5) [LOW] 30-05 record count caching key + cap.
+
+---
+
+# Cross-AI Plan Review — Phase 30 (Orrery Systems) — CYCLE 3
+
+> **Cycle 3** re-review of the CURRENT plans on disk after the cycle-2 replan (commit `008fc2e` — "candidateIds contract, builder own-canvas presentation, provisional-scene seam, orrery-frame reconcile" — plus `abbaa9d` fixing two 30-10 artifact-line doc nits). Reviewers: `codex` (gpt-5.6-terra, reasoning=high — run directly via `codex exec` read-only sandbox, source-grounded) and `claude` (Opus, read-only orchestrator subagent — the headless `claude -p` lane has a known Write-permission failure in this repo; owner explicitly approved the Claude lane for this run). Both had full repo read access and verified plan claims against source; neither wrote, committed, or pushed. This section ACCUMULATES onto the cycle-1 and cycle-2 records above — it does not replace them. Findings are judged only for whether they REMAIN unresolved against the current plans; cycle-1/cycle-2 items the replans incorporated or deferred in a PLAN.md are not recounted.
+
+## Cycle 3 Consensus Summary
+
+**The cycle-2 replan fully landed.** The orchestrator independently re-verified — against source, not the reviewer summaries — that all **3 cycle-2 HIGHs and the 12 cycle-2 actionable non-HIGH items are incorporated in the current plans**, and the disk facts they cite check out: `candidateIds` is now produced by `resolveMembershipFromDefinition`/`resolveCustomSystemMembers` (30-02) and consumed by 30-07 `deriveMemberRows` + 30-08 embedded grid; the builder owns its own fresh/canonical background canvas (grounded in dossier §K:236/§N:296 [DECIDED], a plan-fidelity fix, not a reversal) with the a11y-inert target re-pointed to that canvas; `readProvisionalOrreryScene(exec, memberIds)` is owned by 30-09 and reproduces `loadOrreryScene`'s derivation; 30-10 modulates the existing `orrery-frame` shed/capture pipeline (verified `beginWorldTransition`/`sampleWorldTransition` at `orrery-frame.ts:39/74`) and uses `deriveHomePose` (verified `OrreryScreen.tsx:714/755`, `HOME_CAMERA` seed at :212) instead of a raw assignment; `setSystemHidden` rejects custom refs (§R); the `toPickerRow` adapter, per-axis sentinel constants, and the 30-06 `</objective>` tag are all present. No cycle-2 finding regressed.
+
+**Both reviewers agree the data-integrity core is strong and disk-grounded, and both raise NEW cross-plan concerns the cycle-2 replan exposed but did not close.** The two lanes are complementary and largely non-overlapping this cycle. **Codex** rates the phase **HIGH**, reaching a cluster of **architecture/wiring seams**: the active-System store is an `OrreryScreen`-local factory instance with no cross-route access path (blocking `store.select` from management/builder), the resolver's gravity loader is named but not threaded/owned by any read-path caller, the switcher's count lifecycle lacks an open/close signal + a coherent batch-vs-resolver count strategy, a Category-deletion cleanup boundary, and a focus-vs-Home-framing conflict on switch. **Claude** rates the phase **MEDIUM with one NEW HIGH**: built-in/Category membership overrides (ORRS-03 [DECIDED]) are neither applied at the read path nor authorable, yet are surfaced in the UI (indicator + Reset). **The orchestrator code-verified every consequential finding against source on disk** and adjudicated below.
+
+### Orchestrator verification (code, not the diff — not the reviewer summaries)
+Confirmed against source on disk:
+- **The orrery-system store is a local factory instance.** `createOrrerySystemStore` is a factory (`orrery-system-store.ts:46`) instantiated via `useMemo` INSIDE `OrreryScreen` (`OrreryScreen.tsx:214`); grep finds **no provider / React context / global singleton / selection-intent service**. So 30-06's "call the orrery store `select`" (30-06:158) and 30-08's `store.select(newRef)` (30-08:183) — both reachable via the Settings stack — have no handle to that instance. Real, unresolved. (30-06 persists the `orrery_last_system` preference too, which covers *relaunch*, not a live in-session switch.)
+- **Built-in/Category overrides are read-inert and unauthorable, yet surfaced.** `readOrrerySystemMembersCore` applies overrides only on the `custom` branch (via the resolver); `builtin`/`category` go through `buildOrrerySystemWhere` (`orrery-system-logic.ts:73-115`), which never reads `system_overrides`, and 30-01 keeps that path "exactly as-is." 30-06 gives built-in/Category rows only Duplicate / Hide-Show / Reset-Overrides — **no Edit/Manage-Members entry** (Edit is custom-only, `30-06:125`) — yet 30-05:29 and 30-06:31/:125 render the `system-overrides` indicator + a Reset action. ORRS-03 (`REQUIREMENTS.md:151`, "override-able with visible indication") is half-delivered. Real, unresolved; partly a scope call for the owner.
+- **Focus-preservation defeats canonical Home framing on switch.** The existing scene-framing effect picks `frameBodies(focusedBodies…)` whenever `focusedBodies.length > 0` and only otherwise `deriveHomePose` (`OrreryScreen.tsx:711-714`). 30-10 both PRESERVES a surviving focus target (Task 2 item 2) AND requires canonical Home framing via `deriveHomePose` (item 3) but never reconciles/bypasses that branch — two competing pose writers at the ready edge. With focus preserved the existing branch reframes to the focused bodies, contradicting ORRS-12's "canonical Home framing, no pan/zoom/tilt preserved." Real, unresolved.
+- **Gravity loader is named but not threaded/owned.** 30-02 says the gravity-inputs loader is INJECTED (not imported) and "provided by the resolver's caller (the db read layer / builder)" (30-02:149), but the resolver signatures it defines — `resolveCustomSystemMembers(exec, ref, now)` / `resolveMembershipFromDefinition(exec, {rules,overrides,now})` — carry **no loader parameter**, and **no plan edits `orrery-system-read.ts`** (the real render caller, which routes custom → resolver per 30-01:194) to construct+inject it via `readOrreryImpactInputsCore`. The injection contract is internally incomplete. Real, actionable.
+- **Category-deletion cleanup is a SAFE deferral, not an unresolved gap.** Codex rates the missing Category-deletion fallout handler HIGH, but 30-04:25-26 documents built-in/Category override + orphan-repair as a **Phase-36** expectation, and grep confirms there is **no runtime category-delete path** anywhere in `src/` (only `orrery-exploration.integration.test.ts:956` and `orrery-focus-logic.test.ts:98`). The orphan case cannot be triggered in Phase 30. Adjudicated: deferred-safe — NOT counted as an unresolved HIGH.
+- **30-05 already has the data-flow owner + async count cache** (the cycle-2 catalog gap is closed): OrreryScreen loads `readSystemsCatalog` + bounded counts and threads them via a new `catalog` prop (30-05:32/:64/:65). The residual codex concerns are narrower (open/close signal; batch-vs-resolver ambiguity) — actionable, not architectural.
+
+### Agreed Strengths (both lanes)
+- Migration 022 number (`TARGET_VERSION → 22`) re-verified on disk; additive/forward-only; `orrery_last_system` not re-added; irreversible shape human-gated.
+- All cycle-2 HIGHs + actionable items incorporated with accurate disk citations; the plans' "verified against source" claims hold up.
+- `custom`-routing throw-guard, atomic non-reentrant `saveSystemDefinition`, resolver purity + intentional-write prune ownership, injection-safe `?`-bound closed-vocabulary writes, gravity-as-post-query-TS-pass, uid-preserving Undo, local-first / theme-token invariants — all preserved; no decision reversals.
+
+### Divergent Views
+- **Overall risk:** Codex **HIGH** (execute-blocking wiring seams) vs Claude **MEDIUM** (one HIGH, otherwise strong). Orchestrator adjudication: **3 unresolved HIGH** carry into cycle 3 — the store-selection ownership seam (codex, verified), the built-in/Category override coverage gap (claude, verified), and the focus-vs-Home framing conflict (codex, verified). This is again a coverage divergence — the lanes probed different seams — not a factual disagreement.
+- **Category-deletion cleanup:** Codex **HIGH** vs Claude + orchestrator **deferred-safe** (Phase-36 documented; no in-phase trigger). Not counted.
+- **Gravity-loader wiring:** Codex **HIGH** vs orchestrator **MEDIUM actionable** (a contained contract/threading fix with a named provider, not a design unknown).
+- **30-01 "switcher-visible" success claim:** Codex **HIGH** vs orchestrator **MEDIUM actionable** (the DAO→resolver→read→`store.select` chain is proven; only the selector-data wiring — explicitly deferred to 30-05 in 30-01:194 — is not, so the success criterion at 30-01:240 overstates the tracer's reach).
+
+## Cycle 3 — Unresolved HIGH concerns (orchestrator-adjudicated, verified real)
+1. **Cross-route active-System selection ownership is unspecified (30-06 + 30-08).** The `orrery-system` store is an `OrreryScreen`-local `useMemo` factory instance (`orrery-system-store.ts:46`, `OrreryScreen.tsx:214`) with no provider/context/global/intent seam, yet 30-06 (active-delete → `store.select(ALL_CONTACTS)` + Undo re-select, 30-06:158) and 30-08 (save-new → `store.select(newRef)`; active-edit refresh, 30-08:183) invoke it from routes reachable via the Settings stack. The persisted-preference fallback covers relaunch only, not a live switch. Blocks [DECIDED] ORRS-08 save-select and the active-delete live fallback. *Change:* introduce a single app-scoped System-selection owner (provider/context or a selection-intent service the preferences store already hints at) that both the management screen and the builder can call, and have both stacks resolve it; specify it BEFORE 30-06/30-08 execute and update their `store.select` references + tests to use it.
+2. **Built-in/Category membership overrides are read-inert and unauthorable, yet surfaced (ORRS-03 [DECIDED]).** `readOrrerySystemMembersCore` applies overrides only for `custom` refs; the `builtin`/`category` `buildOrrerySystemWhere` path never consults `system_overrides` and no plan changes it; 30-06 offers no Manage-Members/Edit entry for those rows (Edit is custom-only) — so nothing can author overrides on them — while 30-05/30-06 still render the `system-overrides` indicator + "Reset Overrides." Half of ORRS-03 ("override-able with visible indication") is dead UI. *Change (owner/planner scope call):* either (a) apply overrides for built-in/Category at the read path (`resolveMembershipFromDefinition` can back a synthesized base-predicate rule set) AND add a Manage-Members entry for those rows in 30-06; or (b) explicitly defer built-in/Category override authoring+application and gate the indicator + Reset action behind that deferral so no inert affordance ships — naming which half of dossier §153/§363 is deferred.
+3. **Preserved focus defeats canonical Home framing on System switch (ORRS-12 [DECIDED]) (30-10).** The existing scene-framing effect frames to `frameBodies` whenever a focus target survives (`OrreryScreen.tsx:711-714`), only otherwise `deriveHomePose`. 30-10 both preserves a surviving focus target and requires canonical Home framing on switch but never reconciles/replaces that branch — so when focus is preserved the camera reframes to the focused bodies, not Home. *Change:* in 30-10 Task 2, force `deriveHomePose` during a System switch even when a focus target survives (decouple focus-target preservation from focus-framing), and add a test asserting the resulting pose is Home framing, not `frameBodies`, when a preserved focus is present.
+
+## Cycle 3 — Actionable non-HIGH concerns (not yet in any PLAN.md task/AC/must-have; not deferred/rejected)
+1. **[MED] 30-02** — the gravity-inputs loader injection is incomplete: `resolveMembershipFromDefinition`/`resolveCustomSystemMembers` carry no loader param and no plan edits `orrery-system-read.ts` to construct+inject it. *Change:* add the loader parameter to both resolver entry points and give the `orrery-system-read.ts` custom-branch caller (owned by 30-02, extending 30-01's routing) the job of building it from `readOrreryImpactInputsCore` and passing it in; test a gravity-rule custom System resolving on the real read path.
+2. **[MED] 30-05** — no open/close signal from the selector to the count owner. `open` is private `useState` in `OrrerySystemSelector` (`:39`); OrreryScreen is assigned dropdown-open loading + close-cancellation but cannot observe it. *Change:* add an `onOpenChange(open, requestId)` (or lifted-open-state) contract to the selector in Task 3 so the owner starts counts at open and cancels outstanding work at close.
+3. **[MED] 30-05** — internal inconsistency in the count strategy: line 33 says "non-gravity Systems counted via a single batched SQL COUNT pass," but 30-05:138/:144 route "custom/gravity via the resolver." A rule-bearing custom System has an arbitrary predicate + overrides and cannot join a single batched COUNT. *Change:* state explicitly that only built-in/Category refs are batch-COUNTed; ALL custom refs go through the capped/progressive resolver path regardless of gravity.
+4. **[MED] 30-01** — the success criterion (30-01:240) and truth line (30-01:36) claim a custom System is "switcher-visible/selectable" end-to-end, but 30-01 wires only DAO→resolver→read→`store.select`; the selector-data (catalog prop) is explicitly deferred to 30-05 (30-01:194). *Change:* narrow 30-01's claim to the chain it actually proves and move the selectable-in-the-live-switcher claim to 30-05.
+5. **[MED] 30-10** — `switchIntensity` has no switch-vs-reload discriminator or reset/decay. The stash-at-loading/diff-at-ready capture fires on every loading→ready edge, so a same-System data-driven membership change (a contact edited in/out) would compute a nonzero delta and animate as a switch. *Change:* gate intensity to actual System switches via a switch-generation/reason token, and reset/decay intensity after its transition; add an integration test for a non-switch reload.
+6. **[MED] 30-03** — `assertKnownSystemRef` is mandated only for `setSystemHidden`/`reorderSystems`, not for the override writers. `system_overrides.system_ref` is free text with no FK. *Change:* make catalog ref-validation mandatory for `setSystemOverride`/`resetSystemOverrides`/`pruneSystemExclusions` too (defense-in-depth against phantom override rows), with a DAO test.
+7. **[MED] 30-09** — `readProvisionalOrreryScene` spans members + impact inputs + settings + profile + sun but does not state an atomic read boundary; the production read wraps dependents in `inReadSnapshot` (`orrery-system-read.ts:160`). *Change:* specify `inReadSnapshot(exec, ro => …)` for the provisional read and test that a resolved non-member sun is excluded from orbiting bodies.
+8. **[LOW/MED] 30-06** — `restoreDeletedSystem` can throw a raw UNIQUE-constraint error if the name is re-taken during the Undo window (`systems.name COLLATE NOCASE` is a hard unique index; the restore skips `assertUniqueSystemName`). *Change:* add a behavior line to 30-06 Task 3 — the Undo handler catches a failed restore and surfaces a non-destructive message instead of throwing.
+9. **[LOW] 30-05** — the display-order tie-break for Systems lacking a `system_prefs` row (nullable `display_order`, created only on first reorder/hide) is unstated. *Change:* name the default-order fallback (e.g. built-ins in `ORRERY_BUILTIN_SYSTEM_IDS` order, then categories by `display_order`, then customs by `created_at`) so first-launch switcher order is deterministic.
+10. **[LOW] 30-07** — ensure the grid's display-row load explicitly unions rule candidates + overrides + active Add-People rows, so a never-contacted rule candidate isn't dropped by a grid sourced only from active member rows. *Change:* make the union an explicit read/prop contract in Task 1/3 and unit-test a never-contacted rule candidate + an archived manual include.
+11. **[LOW] 30-02** — the stale-exclusion policy is under-documented: the resolver reports `prunableExclusionContactIds` but physical deletion happens only at the next definition write, so an ordinary contact update can leave a stale exclusion row until then. *Change:* document explicitly that stale exclusions are semantically discarded at read and physically pruned at the next definition save (dossier §E:110), so the persisted-but-ignored window is an accepted, stated policy (relevant to Phase-36 backup contents).
+
+None of the above reverses a recorded decision. The 3 HIGHs are: one architectural seam (store-selection ownership, plans 06/08), one [DECIDED]-coverage/scope call (built-in/Category overrides, plans 01/05/06 — owner/planner), and one [DECIDED]-behavior reconciliation (focus-vs-Home framing, plan 10). The non-HIGH items are contained plan-text/contract tightenings; #1/#2/#3/#5/#7 touch device-observable behavior.
+
+---
+
+## Codex Review (Cycle 3)
+
+*Model: gpt-5.6-terra (reasoning=high); run directly via `codex exec` in a read-only sandbox (source-grounded). The gsd-review runner self-skips the `claude` lane inside Claude Code, and its `codex` lane defaults to reasoning=low; this cycle ran codex directly at the configured reasoning=high for a deeper pass.*
+
+# Phase 30 Plan Review — Cycle 3
+
+Overall: strong dossier fidelity and much better separation of DAO, resolver, renderer, and UI than prior cycles. However, five unresolved execution seams remain: custom-System switcher wiring, gravity-loader ownership, Category-deletion cleanup, cross-route active-System ownership, and Home-framing versus preserved-focus behavior. Overall risk: **HIGH until these are replanned**.
+
+## 30-01 — Persistence tracer
+
+**Summary:** The migration and thin resolver are well scoped, but the claimed end-to-end switcher tracer cannot work with the current caller graph.
+
+**Strengths**
+
+- Correctly treats migration 022 as a checkpoint; the current schema head is indeed 21 in [database.ts](/home/bwales/projects/orbit-app/src/db/database.ts:56), and `orrery_last_system` already exists in [migration 021](/home/bwales/projects/orbit-app/src/db/migrations/021-orrery-preferences.ts:16).
+- Correctly plans custom routing before the unconditional `buildOrrerySystemWhere()` call, which presently runs at [orrery-system-read.ts](/home/bwales/projects/orbit-app/src/db/orrery-system-read.ts:58).
+
+**Concerns**
+
+- **HIGH — the tracer cannot make a custom System selectable in the actual switcher.** The plan changes only `orrery-controls-logic`, but the selector still calls `buildSystemChoices(state.categories)` at [OrrerySystemSelector.tsx](/home/bwales/projects/orbit-app/src/components/orrery/OrrerySystemSelector.tsx:50). Its parent passes only `state`, height, and enabled at [OrreryScreen.tsx](/home/bwales/projects/orbit-app/src/screens/OrreryScreen.tsx:818). No planned caller can provide `listCustomSystems()` output.
+
+**Suggestions**
+
+- Either narrow the tracer’s promise to “custom choice construction is unit-tested,” or introduce the minimal catalog prop/data owner in 30-01. The cleaner option is to defer the actual selectable-switcher claim to 30-05.
+
+**Risk assessment:** **HIGH** — its stated vertical-slice proof is false without a caller change.
+
+## 30-02 — Membership resolver
+
+**Summary:** The predicate composition, closed-vocabulary validation, and pre-override `candidateIds` contract are sound. The gravity dependency is not fully wired.
+
+**Strengths**
+
+- Reuses Dashboard’s active/population boundaries rather than weakening segregation; [ACTIVE_SEGREGATION_WHERE](/home/bwales/projects/orbit-app/src/logic/dashboard-query-logic.ts:149) and [DASHBOARD_POPULATION_SCOPE_WHERE](/home/bwales/projects/orbit-app/src/logic/dashboard-query-logic.ts:154) support the intended E-02 split.
+- Correctly keeps Gravity out of SQL; `buildFilterWhere()` deliberately emits no Gravity SQL at [dashboard-query-logic.ts](/home/bwales/projects/orbit-app/src/logic/dashboard-query-logic.ts:113).
+
+**Concerns**
+
+- **HIGH — the injected Gravity loader has no defined wiring path.** `filterByGravity()` requires an async per-contact loader at [dashboard-gravity-filter.ts](/home/bwales/projects/orbit-app/src/logic/dashboard-gravity-filter.ts:19), while the real batch source requires a read-snapshot executor at [orrery-impact-read.ts](/home/bwales/projects/orbit-app/src/db/orrery-impact-read.ts:23). This plan modifies only the resolver, not `orrery-system-read` or the builder callers that must inject/cache that loader.
+- **MEDIUM — stale exclusions are only physically pruned on a later System save.** The dossier requires them discarded when a contact stops matching, not merely ignored in a read ([dossier §E](/home/bwales/projects/orbit-app/docs/dossier/milestone-2/phase-09-orrery-systems-dossier.md:110)). Ordinary contact updates can otherwise leave stale rows indefinitely and export them in a later backup.
+
+**Suggestions**
+
+- Define one resolver context, e.g. `{ gravityInputsFor(ids), now }`, and add the caller changes to this plan.
+- Decide and test the durable-pruning trigger: an explicit post-resolution maintenance write, or a documented “semantic discard now, physical cleanup at next definition write” policy approved against the dossier wording.
+
+**Risk assessment:** **HIGH** — Gravity Systems otherwise have no executable dependency contract.
+
+## 30-03 — Systems DAO
+
+**Summary:** The DAO centralization, transaction-core discipline, and uid-preserving Undo are excellent. Category-derived ref cleanup is missing.
+
+**Strengths**
+
+- Correctly follows the non-reentrant transaction rule documented in [transaction.ts](/home/bwales/projects/orbit-app/src/db/transaction.ts:12).
+- Correctly keeps System deletion metadata-only; `contacts` are separate rows with category references in [migration 001](/home/bwales/projects/orbit-app/src/db/migrations/001-initial.ts:61).
+
+**Concerns**
+
+- **HIGH — no callable Category-deletion fallout handler is planned.** Category Systems are required to disappear on Category deletion and their customization needs a warning/cleanup path ([dossier §H](/home/bwales/projects/orbit-app/docs/dossier/milestone-2/phase-09-orrery-systems-dossier.md:165)). Ref-keyed `system_overrides` and `system_prefs` have no FK to a Category, so deleting a Category otherwise leaves orphan overrides/prefs. The plan only cleans those rows for custom-System deletion.
+- **MEDIUM — `setSystemOverride`, reset, and prune are not stated to validate `system_ref`.** The plan validates refs for hide/reorder, but an override row’s free-text ref has no schema FK. That permits phantom ref rows unless every override writer uses the same catalog validation.
+
+**Suggestions**
+
+- Add a Phase-37-facing DAO seam such as `inspectCategorySystemImpact(uid)` and `removeCategorySystemCustomizationCore(uid)`. It must delete only Category ref prefs/overrides while retaining custom `category:<uid>` rules as broken.
+- Make `assertKnownSystemRef` mandatory for every ref-keyed mutation, not only ordering/visibility.
+
+**Risk assessment:** **HIGH** — Category deletion is an explicit phase requirement and currently has no durable cleanup boundary.
+
+## 30-04 — Backup contract
+
+**Summary:** Correctly declare-only and appropriately protects the format boundary.
+
+**Strengths**
+
+- Correctly recognizes format 4 as current; [types.ts](/home/bwales/projects/orbit-app/src/backup/types.ts:14) is the canonical definition.
+- Correctly avoids emitting new settings: the current portable projection omits Orrery preferences at [app-settings-dao.ts](/home/bwales/projects/orbit-app/src/db/app-settings-dao.ts:581).
+
+**Concerns**
+
+- **LOW — the contract should explicitly point Phase 36 to the Category-cleanup/orphan policy added to 30-03.** Otherwise restore has a documented Category-rule policy but no corresponding treatment for orphaned Category customization refs.
+
+**Suggestions**
+
+- Cross-reference the Category cleanup API/contract once 30-03 adds it.
+
+**Risk assessment:** **LOW** — no wire-shape regression is planned.
+
+## 30-05 — Switcher
+
+**Summary:** The explicit OrreryScreen data owner fixes the earlier catalog gap, but the count lifecycle remains underspecified and internally contradictory.
+
+**Strengths**
+
+- Preserves the existing focus/AppState dismissal behavior at [OrrerySystemSelector.tsx](/home/bwales/projects/orbit-app/src/components/orrery/OrrerySystemSelector.tsx:71).
+- Uses semantic icon registry additions rather than inline glyphs.
+
+**Concerns**
+
+- **HIGH — OrreryScreen cannot currently know when counts should begin or be cancelled.** `open` is private selector state at [OrrerySystemSelector.tsx](/home/bwales/projects/orbit-app/src/components/orrery/OrrerySystemSelector.tsx:39); no `onOpenChange` or request token is planned, yet OrreryScreen is assigned dropdown-open loading/cancellation.
+- **HIGH — “one batched SQL COUNT pass for all non-Gravity Systems” is not implementable as written for arbitrary custom definitions plus manual overrides.** Each custom System may have its own AND/OR predicate and override set; the current Gravity filter is also sequential per member ([dashboard-gravity-filter.ts](/home/bwales/projects/orbit-app/src/logic/dashboard-gravity-filter.ts:31)). The plan needs a concrete query strategy or must cap all custom resolution, not only Gravity ones.
+
+**Suggestions**
+
+- Add an explicit selector `onOpenChange(open, requestId)` contract and cancellation generation.
+- Separate counts into: batched built-ins/category counts, then capped progressive custom resolver jobs. Document exactly which rows show loading state and how stale jobs are discarded.
+
+**Risk assessment:** **HIGH** — the switcher’s central performance behavior lacks a runnable ownership contract.
+
+## 30-06 — Management screen
+
+**Summary:** Route registration and DAO-only mutation boundaries are well chosen, but the screen cannot currently control the active Orrery System.
+
+**Strengths**
+
+- Correctly registers from both independent stacks; they are genuinely separate navigators in [OrreryStack.tsx](/home/bwales/projects/orbit-app/src/navigation/tabs/OrreryStack.tsx:18) and [SettingsStack.tsx](/home/bwales/projects/orbit-app/src/navigation/tabs/SettingsStack.tsx:22).
+- Correctly persists the fallback preference rather than treating active deletion as UI-only.
+
+**Concerns**
+
+- **HIGH — the requested “orrery store select” is unreachable from this route.** `createOrrerySystemStore()` is a factory ([orrery-system-store.ts](/home/bwales/projects/orbit-app/src/stores/orrery-system-store.ts:46)), but its instance is created locally inside `OrreryScreen` ([OrreryScreen.tsx](/home/bwales/projects/orbit-app/src/screens/OrreryScreen.tsx:214)). Management has no provider, global instance, or intent service through which it can select All Contacts or restore the undone System.
+- **MEDIUM — it uses the eventual expanded `buildSystemChoices` behavior while 30-05 depends on 30-06.** Current `buildSystemChoices` only builds built-ins/categories ([orrery-controls-logic.ts](/home/bwales/projects/orbit-app/src/components/orrery/orrery-controls-logic.ts:7)); management needs a shared catalog/order helper that lands before both screens.
+
+**Suggestions**
+
+- Create one app-scoped System-selection intent/service or provider before 30-06/30-08. It must allow Settings-origin actions without duplicating persistence.
+- Move shared catalog ordering into 30-03 or 30-06; make 30-05 consume it afterward.
+
+**Risk assessment:** **HIGH** — active-delete fallback and Undo cannot work from the planned route architecture.
+
+## 30-07 — Manage Members
+
+**Summary:** This is well designed and correctly adapts the reusable picker logic rather than the single-select component.
+
+**Strengths**
+
+- Correctly keeps local photo paths separate from `photoThumbUri`, which is explicitly ephemeral in [contact-picker-source.ts](/home/bwales/projects/orbit-app/src/logic/contact-picker-source.ts:16).
+- Correctly adapts to the picker shape required by [matchesQuery/filterRows](/home/bwales/projects/orbit-app/src/logic/contact-picker-selection.ts:17).
+
+**Concerns**
+
+- **LOW — ensure the component’s display-row load always unions rule candidates, overrides, and active Add-People rows.** Otherwise a Not Contacted rule candidate could be absent from a grid sourced only by `listActiveMemberRows`.
+
+**Suggestions**
+
+- Make that union an explicit prop/read contract and unit-test a never-contacted rule candidate plus an archived manual include.
+
+**Risk assessment:** **LOW** — the core interaction model is complete.
+
+## 30-08 — Builder HUD
+
+**Summary:** The own-canvas presentation model now matches the dossier, and draft membership/save semantics are strong. It shares the active-System ownership blocker from 30-06.
+
+**Strengths**
+
+- Correctly uses an opaque, builder-owned canvas; current stacks have ordinary screens with no transparent-modal presentation ([OrreryStack.tsx](/home/bwales/projects/orbit-app/src/navigation/tabs/OrreryStack.tsx:30)).
+- Correctly avoids nested DAO transactions; the one-transaction save requirement matches [transaction.ts](/home/bwales/projects/orbit-app/src/db/transaction.ts:19).
+
+**Concerns**
+
+- **HIGH — `store.select(newRef)` and active-edit refresh are unavailable from SystemBuilder.** The store instance is local to OrreryScreen, while the builder can be reached through either stack. This prevents ORRS-08’s new/active/non-active save behavior from being reliably implemented.
+
+**Suggestions**
+
+- Resolve the shared selection owner before this plan. Test a builder entered from Settings and from Orrery, including save-new, active-edit, and undo restoration.
+
+**Risk assessment:** **HIGH** — a central save outcome is not reachable from the planned route topology.
+
+## 30-09 — Preview
+
+**Summary:** Good correction from id-only marker mapping to shared world derivation. The new provisional read needs the same coherent-read boundary as the production scene.
+
+**Strengths**
+
+- Correctly recognizes that layout requires full `OrrerySystemMember`, gravity, density, and sun inputs; the production derivation uses all of them at [orrery-scene.ts](/home/bwales/projects/orbit-app/src/services/orrery-scene.ts:62).
+- Correctly keeps Preview simplified and prohibits Profile navigation.
+
+**Concerns**
+
+- **MEDIUM — `readProvisionalOrreryScene` must explicitly use `inReadSnapshot`.** The production member/system read wraps its dependent reads at [orrery-system-read.ts](/home/bwales/projects/orbit-app/src/db/orrery-system-read.ts:160). The proposed provisional read spans members, impact inputs, settings, profile, and sun data but does not explicitly state the atomic snapshot boundary.
+
+**Suggestions**
+
+- Specify `inReadSnapshot(exec, ro => …)` and test that the provisional scene excludes the resolved non-member sun from orbiting bodies, matching [orrery-system-read.ts](/home/bwales/projects/orbit-app/src/db/orrery-system-read.ts:113).
+
+**Risk assessment:** **MEDIUM** — without snapshot consistency, Preview can construct geometry from mismatched inputs.
+
+## 30-10 — Switching and animation
+
+**Summary:** The existing shed/capture pipeline is correctly understood, but Home framing and preserved focus still conflict in the current screen effect.
+
+**Strengths**
+
+- Correctly reuses the existing transition pipeline: entering/leaving opacity/radius are already derived in [orrery-frame.ts](/home/bwales/projects/orbit-app/src/logic/orrery-frame.ts:39).
+- Correctly recognizes the loading-edge snapshot issue: a new-System selection clears the old snapshot at [orrery-system-store.ts](/home/bwales/projects/orbit-app/src/stores/orrery-system-store.ts:89).
+
+**Concerns**
+
+- **HIGH — preserving focus currently causes focus framing, not canonical Home framing.** The existing effect chooses `frameBodies(...)` whenever focused IDs remain ([OrreryScreen.tsx](/home/bwales/projects/orbit-app/src/screens/OrreryScreen.tsx:708)), only otherwise using `deriveHomePose` ([OrreryScreen.tsx](/home/bwales/projects/orbit-app/src/screens/OrreryScreen.tsx:714)). The plan says Home framing but does not explicitly replace this branch or test the resulting pose.
+- **MEDIUM — no lifecycle/reset contract is specified for `switchIntensity`.** `OrreryWorld` transitions for every changed scene generation ([OrreryWorld.tsx](/home/bwales/projects/orbit-app/src/components/orrery/OrreryWorld.tsx:310)); a retained nonzero intensity could incorrectly animate a normal data reload as a System switch.
+
+**Suggestions**
+
+- Track a transition reason/generation. For a System switch, force `deriveHomePose` even if a focus survives; preserve the focus target without reframing to it.
+- Reset or decay intensity after its matching transition, and pass a switch-generation token so ordinary reloads always use zero intensity. Add an integration-level test for both conditions.
+
+**Risk assessment:** **HIGH** — the current focus branch can directly violate ORRS-12’s canonical Home-frame requirement.
+
+## Priority replan order
+
+1. Add a shared active-System selection/intent owner for plans 06 and 08.
+2. Add Category-system impact/cleanup APIs in plan 03.
+3. Make resolver Gravity context explicit and wire every caller in plan 02.
+4. Rework plan 05’s dropdown-open/count/cancellation ownership.
+5. Make plan 10 explicitly bypass focus framing during a System switch.
+---
+
+## Claude Review (Cycle 3)
+
+*Model: Claude Opus (read-only orchestrator subagent). The headless `claude -p` gsd-review lane has a known Write-permission failure in this repo (MEMORY: "Claude reviewer via subagent"); the owner explicitly approved the Claude lane for this run, so it ran as a read-only analysis subagent with full repo read access — it did not write, commit, or push. Every cited seam was verified against source on disk.*
+
+## 1. Summary
+
+The current Phase 30 plans (10 PLAN.md files on disk) are exceptionally mature: two prior review cycles resolved 17 findings, and this cycle's revisions are verifiable against source — every file:line, symbol, and table shape spot-checked matches the actual code (migration head is genuinely 021 / `TARGET_VERSION = 21`, so `022` is correct; `buildOrrerySystemWhere`'s no-`default` switch at `orrery-system-logic.ts:82-114` really would fail to type-check on a `custom` member without the guard; `orrery-system-read.ts:58` really calls `buildOrrerySystemWhere` before the category-existence check; the store sets `snapshot=null` on the loading edge at `orrery-system-store.ts:93`; `transaction.ts` is explicitly non-reentrant; all `dashboard-query-logic` fragments exist at the cited lines). The data-layer design (ref-keyed Option-A tables, DAO-transactional cross-catalog uniqueness, forward-only additive migration, `?`-bound values, resolver-as-pure-read + intentional-write prune owner, atomic `saveSystemDefinition`, uid-preserving Undo) is sound and well-guarded. One genuinely new, unresolved gap: built-in/Category **manual membership overrides** — an explicit `[DECIDED]` requirement (ORRS-03) — have no authoring entry point and are **silently ignored at read time**, while the switcher/management surfaces still advertise an "overrides" indicator and "Reset Overrides" for those Systems. Everything else examined is either correctly handled or correctly deferred.
+
+## 2. Strengths
+
+- **Migration 022 is additive/forward-only and correctly numbered.** `src/db/database.ts:56` is `TARGET_VERSION = 21` and `migrations/` head is `021-orrery-preferences.ts`, so `022` and the "do not re-add `app_settings.orrery_last_system`" prohibition (30-01 truth line 33) are exactly right.
+- **The `custom`-routing correctness argument is real, not hand-waved.** `buildOrrerySystemWhere` (`orrery-system-logic.ts:73-115`) is a no-`default` exhaustive switch over `system.id`; adding a `custom` union member without the pre-switch throw-guard genuinely breaks both type-checking and runtime — plan 30-01 diagnoses and fixes this precisely.
+- **Resolver purity / write-ownership split is enforced with a comment-stripped negative grep gate** (30-02 Task 3 acceptance); stale-exclusion pruning is correctly assigned to an intentional caller write (`pruneSystemExclusionsCore`, 30-03) rather than the read.
+- **Save atomicity respects the non-reentrant transaction contract** (`transaction.ts:8,47`); `saveSystemDefinitionCore` composes non-mutexed cores in one `inWriteTransaction` (30-03/30-08), and 30-08 tests that a failed save does not call `store.select`.
+- **Ref-keyed orphan cleanup is handled where it can be:** custom delete removes `system_overrides`/`system_prefs` rows in the same transaction (30-03 Task 1) since they are not FK-bound to `systems`; the category-deletion orphan case is correctly documented + accepted as Phase-36 orphan-repair (30-04 T-30-14), and there is in fact **no runtime category-delete path** in the app today (grep found none outside tests), so that deferral is safe.
+- **Gravity stays a post-query TS pass** with an injected loader (`dashboard-gravity-filter.ts:19-38` confirms the loader convention and order-preservation) — no logic→db import, no gravity token in SQL.
+
+## 3. Concerns
+
+- **HIGH — Built-in/Category manual membership overrides are unimplemented at the read path and have no authoring entry point, yet are surfaced as a supported feature (unresolved, new).**
+  - **Decision/requirement:** Dossier `phase-09-orrery-systems-dossier.md:153` ("Users may layer manual inclusion/exclusion overrides on top of built-in base definitions"), `:173` (Category-derived Systems "may carry manual membership overrides"), `:363` ("edit/reset built-in/category-derived membership overrides"), and goal 4 at `:635` — all `[DECIDED]`. `ROADMAP.md:546` maps this to ORRS-03 ("…override-able with visible indication…").
+  - **Read-path mechanism:** For `builtin`/`category` refs, `readOrrerySystemMembersCore` (`src/db/orrery-system-read.ts:54-75`) computes membership purely from `buildOrrerySystemWhere` (`orrery-system-logic.ts:73-115`), which never consults `system_overrides`. Only `custom` refs are routed to the resolver (30-01 explicitly: "Keep the builtin/category `buildOrrerySystemWhere` path exactly as-is"). **No plan changes this branch.** So a manual include/exclude on `builtin:favorites` or `category:<uid>` would be written but never reflected in what the Orrery renders.
+  - **Authoring gap:** Manage Members (the only override-authoring UI) is embedded **only** in the custom-System builder (30-08 Task 3). Plan 30-06's built-in/Category rows offer only Duplicate, Hide/Show, and "Reset Overrides (when overrides exist)" (30-06:31, :125) — there is no Edit/Manage-Members entry for them, despite dossier `:363` naming "edit … built-in/category-derived membership overrides" as a management capability.
+  - **Resulting inconsistency:** 30-05:29/:32 and 30-06:31 both render a neutral `system-overrides` indicator for a "customized built-in/Category System," fed by `listSystemOverrides` — but nothing can create those override rows, and even if they existed (e.g. a Phase-36 backup restore, which 30-04 explicitly serializes built-in/Category overrides) the membership would not honor them. The indicator is effectively dead, and "Reset Overrides" acts on rows no in-phase path can produce.
+  - **Why it's HIGH:** an in-scope `[DECIDED]` requirement is not deliverable by these 10 plans, and the surfaced-but-inert override affordances are an internal contradiction. It is *not* data-corruption and *not* a decision reversal — but it is a real, current coverage/correctness gap that survived two review cycles. **This is partly a scope question for the owner/planner:** either (a) route built-in/Category refs through an override-applying resolver in `readOrrerySystemMembersCore` and add a Manage-Members entry for them in 30-06, or (b) if built-in/Category override *authoring* is being deferred, say so explicitly and drop/annotate the override indicator + Reset action so the phase does not ship dead UI against a `[DECIDED]` capability.
+
+- **LOW/MEDIUM — `restoreDeletedSystem` can throw a raw UNIQUE-constraint error if the name was re-taken during the Undo window (new).** 30-03 Task 1 (`:104`, `:111`) preserves the original uid and states `assertUniqueSystemName` "may be skipped … for the exact restored uid/name." But `systems(name COLLATE NOCASE)` is a hard UNIQUE index (30-01:159). If, between delete and Undo, the user creates/renames another System to that name, the restore INSERT fails at the DB layer with a raw constraint error rather than the friendly §T copy, and 30-06's Undo snackbar handler (`:150`, `:158`) has no stated failure handling. Probability is low (single-user, short-lived Undo), but the Undo path should catch a failed restore and surface a message rather than an unhandled throw. Worth one sentence in 30-06 Task 3 behavior.
+
+- **LOW — `system_prefs` default ordering for un-reordered built-in/Category rows is unstated.** `system_prefs.display_order` is nullable and rows are created only on first reorder/hide (30-01:159). 30-05's pure `buildSystemChoices` pins All Contacts first and omits hidden, but the plans don't state the tie-break for Systems lacking a prefs row. Not a correctness bug (deterministic ordering exists elsewhere), but 30-05 should name the default-order fallback so first-launch switcher order is stable.
+
+## 4. Suggestions
+
+- **30-01 / 30-02 / 30-06 (the HIGH):** Decide scope with the owner, then either (a) make `readOrrerySystemMembersCore` compose `buildOrrerySystemWhere` (base) **∪ includes ∖ excludes** for `builtin`/`category` refs — `resolveMembershipFromDefinition` is already a general `{rules, overrides}` engine and could back this with a synthesized base-predicate rule set — and add a Manage-Members action to built-in/Category rows in 30-06; or (b) explicitly mark built-in/Category override *authoring + application* as deferred (to a later phase / Phase 36 restore only), and in 30-05/30-06 gate the `system-overrides` indicator and "Reset Overrides" action behind that deferral so no inert affordance ships. Name which half of dossier `:153`/`:363` is being deferred if (b).
+- **30-06 Task 3:** add a behavior line: "Undo `restoreDeletedSystem` catches a failed restore (e.g. the name was taken during the Undo window) and surfaces a non-destructive message rather than throwing."
+- **30-05 Task 3:** state the display-order fallback for Systems without a `system_prefs` row (e.g. built-ins in `ORRERY_BUILTIN_SYSTEM_IDS` order, then categories by `display_order`, then customs by created_at) so switcher order is deterministic before any reorder.
+
+## 5. Risk Assessment
+
+**Overall: MEDIUM.** The data-integrity core (migration, DAO write boundary, transaction atomicity, resolver purity, cascade/ref-keyed cleanup, injection safety) is genuinely strong and the plans' factual claims verify against source — that part is LOW risk. The MEDIUM rating is driven almost entirely by the single HIGH finding: an in-scope `[DECIDED]` requirement (built-in/Category overrides, ORRS-03) that the 10 plans neither apply at read time nor expose for authoring, while still advertising it in the UI. That is a scope/consistency decision the owner or planner must make before execution, not something an executor should silently resolve — but it is not a one-way-door data hazard, so it does not rise to HIGH overall. The two LOW items are polish. No decision-reversal, no data-corruption, and no migration-ordering risk was found.
