@@ -5,7 +5,8 @@ reviewed_at: 2026-09-08T11:44:25Z        # cycle 1
 reviewed_at_cycle2: 2026-09-08T12:37:11Z  # cycle 2 (this file accumulates per cycle)
 reviewed_at_cycle3: 2026-09-08T15:20:00Z  # cycle 3
 reviewed_at_cycle4: 2026-09-08T17:05:00Z  # cycle 4
-cycles: 4
+reviewed_at_cycle5: 2026-09-08T18:40:00Z  # cycle 5 (final)
+cycles: 5
 plans_reviewed: [30-01-PLAN.md, 30-02-PLAN.md, 30-03-PLAN.md, 30-04-PLAN.md, 30-05-PLAN.md, 30-06-PLAN.md, 30-07-PLAN.md, 30-08-PLAN.md, 30-09-PLAN.md, 30-10-PLAN.md]
 models:
   codex: "gpt-5.6-terra (reasoning=high)"     # cycles 3 & 4 ran codex direct at reasoning=high
@@ -22,6 +23,9 @@ cycle3_summary:
 cycle4_summary:
   current_high: 3
   current_actionable: 3
+cycle5_summary:
+  current_high: 1
+  current_actionable: 0
 ---
 
 # Cross-AI Plan Review — Phase 30 (Orrery Systems)
@@ -1197,3 +1201,89 @@ The cycle-3 replan landed: all three cycle-3 HIGHs are resolved at their core an
 1. Settings-origin selection write dropped when the preferences store is unhydrated (ORRS-08, no backstop for save-new) — HIGH.
 2. Equality-only observer loop guard reverses a rapid B→C switch (needs generation/origin ack) — HIGH.
 3. Draft membership engine's required `gravityInputsFor` loader never constructed by the builder/preview callers — HIGH.
+
+---
+
+# Cross-AI Plan Review — Phase 30 (Orrery Systems) — CYCLE 5 (FINAL)
+
+> **Cycle 5** re-review of the CURRENT plans on disk after the cycle-4 replan (commit `dc96536` — "hydrate-guarded Settings-origin selection writes (HIGH #1), local-origin observer guard (HIGH #2), db-facing resolveDraftMembership loader wrapper (HIGH #3); builtin/category full-row include fetch, 30-10 depends_on, session-restore switch-token gate"). Reviewers: `codex` (gpt-5.6-terra, reasoning=high — run directly via `codex exec` in a read-only sandbox, source-grounded) and `claude` (read-only orchestrator source-analysis pass — the gsd-review runner self-skips the `claude` lane inside Claude Code and the headless `claude -p` lane has a known Write-permission failure in this repo; owner explicitly approved the Claude lane for this run). Both lanes had full repo read access and verified every plan claim against source on disk; neither wrote, committed, or pushed. This section ACCUMULATES onto the cycle-1/2/3/4 records above — it does not replace them. Findings are judged only for whether they REMAIN unresolved against the current plans; cycle-1..4 items the replans incorporated or deferred/rejected in a PLAN.md are not recounted.
+
+## Cycle 5 Consensus Summary
+
+**Three of the four cycle-4 fixes are fully landed and source-grounded; the fourth (HIGH #2, the cross-route observer loop guard) is only PARTIALLY resolved — both lanes converged on the same residual, independently, and the orchestrator code-verified it.** The orchestrator re-verified against source (not the reviewer summaries, not the diff):
+
+- **Cycle-4 HIGH #1 (unhydrated Settings-origin selection write) — RESOLVED, verified.** The hydrate-before-write guard (`if (!prefs.hydrated) await prefs.hydrate(getExecutor())`, idempotent via the store's own `reading` promise at `orrery-preferences-store.ts:108-109`) is now present on BOTH unhydrated writers the cycle-4 finding named: 30-08 save-new AND 30-06 active-delete + Undo re-select — each with a dedicated "unhydrated → hydrate-before-save" test and a `grep -n "hydrate"` acceptance gate. The premise holds on disk: `save()` no-ops while `!hydrated` (`orrery-preferences-store.ts:135`) and the sole hydration site is `OrreryScreen.tsx:314`.
+- **Cycle-4 HIGH #3 (draft gravity-loader unconstructed) — RESOLVED, verified.** 30-02 adds the db-facing `resolveDraftMembership(exec, { rules, overrides, now })` wrapper (in `src/db/orrery-system-read.ts`, the db layer) that builds `gravityInputsFor` from `readOrreryImpactInputsCore` (`orrery-impact-read.ts:23`) and delegates to the 4-arg engine. All three draft call sites now route through it: 30-08 (live count + embedded grid), 30-09 (preview memberIds), with a comment-stripped negative grep gate in 30-08 proving the builder never calls the 3-arg engine or imports the loader source directly. The replan additionally swept the SAME loader-construction gap in 30-05's `countSystemMembers` (not a flagged finding) — good defensive consistency.
+- **Cycle-4 MED (builtin/category override read-path dropped manual INCLUDES) — RESOLVED, verified.** 30-02 now specifies a full-row id-based re-SELECT for the `(base ∪ eligible-includes)` union when override rows exist, mirroring the custom path's `WHERE c.id IN (?…)` projection + `ORDER BY COALESCE(c.ring_seq,1e9),c.created_at,c.id` (the exact ORDER BY at `orrery-system-read.ts:71`), with the no-override fast path kept byte-identical. The premise holds: the base SELECT at `orrery-system-read.ts:66-74` filters on the base predicate only, so a manual include outside it needs the re-SELECT. A read-path test asserts a manual-included non-matching contact returns as a FULL member row.
+- **Cycle-4 actionables #2 (depends_on) and #3 (session-restore token) — RESOLVED, verified.** `30-10` is added to `depends_on` of 30-08 and 30-06; the full graph is acyclic and wave-consistent (30-10 wave 3 has no edge to 30-08 wave 4 / 30-06 wave 5, so the new edges introduce no cycle). The switch-vs-reload token is gated to fire only on an in-session `requested.id` change from a prior READY system, NOT the `sessionResume === "restore"` path (`OrreryScreen.tsx:669-692`, which returns before the `:708-714` framing branch).
+
+**But cycle-4 HIGH #2 is not fully closed.** The cycle-4 fix replaced the equality-only guard with a `pendingLocalOrigins` **ref-value multiset** recorded by the persist adapter BEFORE `save()`, and added the B→C interleaving regression test. That closes the *specific* B→C reversal. It does NOT robustly distinguish a stale LOCAL echo from a GENUINE EXTERNAL selection carrying the same ref, because the preferences store publishes only a **value**, not a commit-origin token. The orchestrator traced a concrete failure path on disk (below); codex reached the same conclusion independently and rates it HIGH.
+
+### Orchestrator verification (code, not the diff — not the reviewer summaries)
+- **HIGH (cycle-4 HIGH #2 PARTIALLY RESOLVED — the ref-value origin ledger leaks a phantom on every no-op/failed local persist, and later swallows a genuine external write of that ref) — REAL, verified on disk.** The local system store calls its persist adapter after EVERY ready select (`orrery-system-store.ts:112` → the adapter at `OrreryScreen.tsx:219-231`), including an **observer-driven** (externally-originated) select. Per the plan the adapter records the ref into `pendingLocalOrigins` synchronously BEFORE `save()` (`30-10-PLAN.md` Task 2 behavior/action). But when the committed value is unchanged — exactly the case after an externally-driven select, where `committed.lastSystem` already equals the ref that triggered the observer — `save()` early-returns without republishing `committed` (`orrery-preferences-store.ts:135`, and the coalesce/no-op returns at `:153-154`), so the drain never publishes (`:88`) and the observer never fires to CONSUME that ledger entry. The recorded ref is a **phantom** that lingers. Sequence that breaks: (1) external write of X (e.g. create System X from Settings) → observer selects X → adapter records X, `save(X)` no-ops → phantom X in ledger; (2) user switches locally to Y in the Orrery; (3) a GENUINE external write of X arrives (re-select X from Settings, or an active-delete fallback that lands on X) → `committed` transitions Y→X and publishes → observer sees X in the ledger, consumes it as a "self echo", and does NOT re-select → the genuine cross-route switch is silently dropped live (it still persists, so a relaunch recovers, but the active System stays Y). Failed local persists have the same shape — a failed intent never publishes `committed` (`orrery-preferences-store.ts:79-83`), so its pre-`save` ledger record also lingers. Neither loosely-specified plan variant closes this: the ref multiset leaks as shown, and "stamp a monotonic local-select generation the observer can compare" does not help either unless the *committed publication itself* carries the origin — which the store does not do today. This is the same class of failure cycle-4 HIGH #2 set out to fix (a wrong active System from a realistic selection sequence that defeats the explicitly-claimed guard), so it is judged PARTIALLY RESOLVED, not closed.
+  - **Required plan change (both lanes agree):** extend `src/stores/orrery-preferences-store.ts` so each committed-selection publication carries an opaque **commit id / origin token** (not just the value); the local persist adapter supplies a fresh token per local commit and the observer suppresses a re-select ONLY on an exactly-matching committed token, NEVER on a matching ref string. Update 30-10 Task 2's files/contracts and the persist-store read_first accordingly, and add tests for: a NO-OP local persistence (externally-driven select), a FAILED/coalesced local persistence, and a later genuine external write of the SAME ref (must drive a live switch).
+
+### Agreed Strengths (both lanes)
+- HIGH #1, HIGH #3, the MED full-row include fetch, and both cycle-4 actionables are landed, grounded, and test-backed against real source anchors (`orrery-preferences-store.ts`, `orrery-system-read.ts`, `orrery-impact-read.ts`, `OrreryScreen.tsx`).
+- No decision reversal against the dossier / HANDOFF / ADRs. Last-active remains a D-05 `app_settings` preference; `custom_field_*` invariants untouched; local-first / theme-token / no-per-frame-React-state invariants preserved. HIGH #2's completion of the override read path completes [DECIDED] ORRS-03 rather than weakening it.
+- The dependency graph is acyclic and wave-consistent after the new `depends_on` edges.
+
+### Divergent Views
+- **Severity of the residual:** codex **HIGH**; the Claude (read-only orchestrator) pass concurred at **HIGH** after tracing the phantom-leak path against source. There is no factual disagreement this cycle — both lanes and the orchestrator agree the ledger-as-ref-value is not an origin protocol and that a store-level commit-origin token is required. Rated HIGH (not MEDIUM) for consistency with the cycle-4 severity call on the same channel: it silently produces a wrong active System on a realistic repeat sequence and defeats the explicitly-claimed loop guard; it self-heals only on relaunch.
+
+## Cycle 5 — Unresolved HIGH concerns (orchestrator-adjudicated, verified real)
+1. **Cross-route observer loop guard is a ref-value ledger, not an origin protocol (30-10 Task 2) — PARTIALLY RESOLVED cycle-4 HIGH #2.** The persist adapter records each ref into `pendingLocalOrigins` before `save()`; an externally-driven select (and a failed/coalesced local persist) produces a no-op `save()` that never republishes `committed`, so the ledger entry is never consumed and lingers as a phantom. A later genuine external write of that same ref is then consumed as a "self echo" and does not drive the live switch (verified: `orrery-system-store.ts:112` → `OrreryScreen.tsx:219-231`; `orrery-preferences-store.ts:135/:153-154/:79-83/:88`). *Change:* publish an opaque commit-origin token WITH `committed` from `orrery-preferences-store.ts`; the local persist adapter supplies a fresh token per local commit; the observer suppresses a re-select only on an exactly-matching committed token, never on a matching ref string. Add tests for a no-op local persist, a failed/coalesced local persist, and a later external write of the same ref (must switch live).
+
+## Cycle 5 — Actionable non-HIGH concerns (not yet in any PLAN.md task/AC/must-have; not deferred/rejected)
+None. The only residual is the HIGH above; the phantom-leak-on-failed-persist edge is the same root cause and is subsumed by that HIGH's required fix (the commit-origin token also closes the failed/coalesced-persist case). No separate MEDIUM/LOW remains uncovered: the cycle-4 MED and actionables #2/#3 are all incorporated into PLAN.md with tasks + acceptance criteria and were verified on disk.
+
+---
+
+## Codex Review (Cycle 5)
+
+*Model: gpt-5.6-terra (reasoning=high); run directly via `codex exec` in a read-only sandbox (source-grounded). The gsd-review runner self-skips the `claude` lane inside Claude Code and its `codex` lane defaults to reasoning=low; this cycle ran codex directly at reasoning=high for a deeper pass, as cycles 3–4 did.*
+
+## Summary
+
+Three Cycle‑4 fixes are fully specified and grounded in the current source. The cross-route local-origin observer remains only partially resolved: a ref-value ledger cannot reliably distinguish a local echo from a genuine external selection with the same ref, and the current preference API exposes no commit-origin token.
+
+## Cycle-4 fix verification
+
+- **#1 — LANDED & GROUNDED.** Builder save-new hydrates before saving `lastSystem` in [30-08-PLAN.md:35](/home/bwales/projects/orbit-app/.planning/phases/30-orrery-systems/30-08-PLAN.md:35), [30-08-PLAN.md:205](/home/bwales/projects/orbit-app/.planning/phases/30-orrery-systems/30-08-PLAN.md:205). This directly addresses the current pre-hydration no-op at [orrery-preferences-store.ts:133](/home/bwales/projects/orbit-app/src/stores/orrery-preferences-store.ts:133). Active-delete and Undo receive the same guard in [30-06-PLAN.md:29](/home/bwales/projects/orbit-app/.planning/phases/30-orrery-systems/30-06-PLAN.md:29).
+
+- **#2 — PARTIAL.** The plan replaces equality-only logic with a `pendingLocalOrigins` ledger and includes the B→C regression test in [30-10-PLAN.md:27](/home/bwales/projects/orbit-app/.planning/phases/30-orrery-systems/30-10-PLAN.md:27), [30-10-PLAN.md:50](/home/bwales/projects/orbit-app/.planning/phases/30-orrery-systems/30-10-PLAN.md:50). But the current preference store publishes only a value, not an origin or commit ID ([orrery-preferences-store.ts:88](/home/bwales/projects/orbit-app/src/stores/orrery-preferences-store.ts:88)); see concern below.
+
+- **#3 — LANDED & GROUNDED.** `resolveDraftMembership` is explicitly DB-owned, constructs the Gravity loader, and delegates to the four-argument engine in [30-02-PLAN.md:203](/home/bwales/projects/orbit-app/.planning/phases/30-orrery-systems/30-02-PLAN.md:203), [30-02-PLAN.md:210](/home/bwales/projects/orbit-app/.planning/phases/30-orrery-systems/30-02-PLAN.md:210). Builder count/grid use it in [30-08-PLAN.md:32](/home/bwales/projects/orbit-app/.planning/phases/30-orrery-systems/30-08-PLAN.md:32); Preview consumes the builder’s `resolveDraftMembership` member IDs in [30-09-PLAN.md:44](/home/bwales/projects/orbit-app/.planning/phases/30-orrery-systems/30-09-PLAN.md:44). This matches the actual Gravity loader API at [orrery-impact-read.ts:23](/home/bwales/projects/orbit-app/src/db/orrery-impact-read.ts:23).
+
+- **#4 — LANDED & GROUNDED.** The built-in/category branch now computes override membership, then re-selects complete member rows with the existing deterministic order in [30-02-PLAN.md:206](/home/bwales/projects/orbit-app/.planning/phases/30-orrery-systems/30-02-PLAN.md:206), [30-02-PLAN.md:210](/home/bwales/projects/orbit-app/.planning/phases/30-orrery-systems/30-02-PLAN.md:210). This is necessary because the current base query only fetches rows satisfying the original predicate ([orrery-system-read.ts:66](/home/bwales/projects/orbit-app/src/db/orrery-system-read.ts:66)). Eligibility is preserved through `eligibleIncludeIds`; ordering is explicit.
+
+## Concerns
+
+- **HIGH — STILL-OPEN:** Ref-value local-origin ledger is not an origin protocol. The plan consumes a pending entry merely because the committed value equals a locally recorded ref ([30-10-PLAN.md:27](/home/bwales/projects/orbit-app/.planning/phases/30-orrery-systems/30-10-PLAN.md:27)). But a local persist after an externally driven selection is a no-op when the requested `lastSystem` already equals `committed.lastSystem` ([orrery-preferences-store.ts:141](/home/bwales/projects/orbit-app/src/stores/orrery-preferences-store.ts:141)), while the local store nevertheless invokes its persist adapter after every ready selection ([orrery-system-store.ts:105](/home/bwales/projects/orbit-app/src/stores/orrery-system-store.ts:105), [OrreryScreen.tsx:219](/home/bwales/projects/orbit-app/src/screens/OrreryScreen.tsx:219)). Recording before `save()` therefore leaks a stale ref entry; later, after a local switch away, a genuine external write of that ref is consumed as a “self echo” and does not switch the local store. Failed/coalesced writes have the same problem because failed intents never publish `committed` ([orrery-preferences-store.ts:79](/home/bwales/projects/orbit-app/src/stores/orrery-preferences-store.ts:79)).
+
+  Required plan change: extend `orrery-preferences-store.ts` and Plan 10’s files/contracts so each committed selection publication carries an opaque commit ID plus optional origin token. The local persist adapter supplies a fresh token; the observer suppresses only an exactly matching committed token, never a matching ref string. Add tests for no-op local persistence, failed/coalesced local persistence, and a later external write of the same ref.
+
+## Risk assessment
+
+**HIGH.** The selection channel is required for Settings-origin saves, active-delete fallback, and Undo. Its remaining ambiguity can silently ignore a genuine cross-route selection, so the central switch contract is not yet reliable.
+
+---
+
+## Claude Review (Cycle 5)
+
+*Read-only orchestrator source-analysis pass (the gsd-review `claude` lane self-skips inside Claude Code; the headless `claude -p` lane has a known Write-permission failure in this repo; owner explicitly approved the Claude lane). Verified every plan claim against source on disk; wrote/committed/pushed nothing during review.*
+
+## Summary
+
+The cycle-4 replan (`dc96536`) landed all four fixes plus both actionables. Three of the four fixes (HIGH #1 hydrate-guard on both writers, HIGH #3 `resolveDraftMembership` db wrapper across all three draft call sites, MED full-row include re-SELECT) are complete and source-grounded, with tests and grep gates. The two actionables (30-10 `depends_on`, session-restore token gate) are incorporated and introduce no dependency cycle. The single residual is cycle-4 HIGH #2: the observer's local-origin ledger is a ref-value multiset recorded before `save()`, which cannot distinguish a stale local echo from a genuine external write of the same ref once a phantom entry leaks on a no-op/failed local persist.
+
+## Concerns
+
+- **HIGH — PARTIALLY RESOLVED (cycle-4 HIGH #2):** ref-value ledger leaks a phantom on every no-op/failed local persist and later swallows a genuine external re-write of that ref (traced against `orrery-system-store.ts:112`, `OrreryScreen.tsx:219-231`, `orrery-preferences-store.ts:135/:153-154/:79-83/:88`). Fix requires a store-published commit-origin token; the observer must match the token, not the ref string. Same conclusion as the codex lane, independently reached.
+
+## Risk assessment
+
+**MEDIUM–HIGH.** The data-integrity core and three of four fixes are solid and disk-grounded; the residual is one cross-route selection-channel guard that still defeats itself on a realistic repeat/failed-persist sequence. Contained, well-localized repair (extend the preferences-store publication with an origin token; match on it in the observer), not an architectural unknown.
+
+## Cycle 5 Consensus concern (single)
+1. Cross-route observer loop guard is a ref-value ledger, not an origin protocol — a phantom entry from a no-op/failed local persist later swallows a genuine external write of the same ref, dropping the live cross-route switch (needs a store-published commit-origin token) — HIGH, PARTIALLY RESOLVED.
