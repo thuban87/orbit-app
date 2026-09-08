@@ -1,3 +1,7 @@
+import {
+  selectionCount,
+  toggleSelection,
+} from "@/logic/contact-picker-selection";
 import type { ContactPickerRow } from "@/logic/contact-picker-source";
 
 /** A durable local contact row used by the System membership editor. */
@@ -66,16 +70,18 @@ export function overrideCounts(rows: readonly DerivedMemberRow[]): {
   added: number;
   excluded: number;
 } {
-  return rows.reduce(
-    (counts, row) => ({
-      total:
-        counts.total +
-        (row.state === "member" || row.state === "added" ? 1 : 0),
-      added: counts.added + (row.state === "added" ? 1 : 0),
-      excluded: counts.excluded + (row.state === "excluded" ? 1 : 0),
-    }),
-    { total: 0, added: 0, excluded: 0 },
+  const selected = rows.reduce(
+    (ids, row) =>
+      row.state === "member" || row.state === "added"
+        ? toggleSelection(ids, String(row.id))
+        : ids,
+    new Set<string>(),
   );
+  return {
+    total: selectionCount(selected),
+    added: rows.filter((row) => row.state === "added").length,
+    excluded: rows.filter((row) => row.state === "excluded").length,
+  };
 }
 
 /**
