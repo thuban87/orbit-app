@@ -86,6 +86,10 @@ vi.mock("@/theme", () => ({ useTheme: () => ({ colors: {} }) }));
 const { saveCustomBuilderDraft, saveOverrideBuilderDraft } = await import(
   "./SystemBuilderScreen"
 );
+const { previewSaveAction } = await import("./SystemBuilderScreen");
+const { focusPreviewBody } = await import(
+  "@/components/orrery/SystemPreviewCanvas"
+);
 
 beforeEach(() => {
   hydrated = false;
@@ -98,6 +102,24 @@ beforeEach(() => {
 });
 
 describe("SystemBuilder save selection channel", () => {
+  it("keeps a Preview body tap inside the unsaved workflow", () => {
+    const focus = vi.fn();
+    const navigateToProfile = vi.fn();
+
+    focusPreviewBody(42, focus);
+
+    expect(focus).toHaveBeenCalledExactlyOnceWith(42);
+    expect(navigateToProfile).not.toHaveBeenCalled();
+  });
+
+  it("uses the HUD save routing from the Preview/Edit bar", async () => {
+    const save = vi.fn().mockResolvedValue(undefined);
+
+    await previewSaveAction(save);
+
+    expect(save).toHaveBeenCalledExactlyOnceWith();
+  });
+
   it("commits once, hydrates a cold preferences store, then publishes lastSystem", async () => {
     await saveCustomBuilderDraft({
       systemRef: null,
