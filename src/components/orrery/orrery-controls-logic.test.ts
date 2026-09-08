@@ -22,6 +22,24 @@ describe("Orrery System controls", () => {
       "category:z",
     ]);
     expect(rows.filter((row) => row.name === "Same")).toHaveLength(2);
+    expect(
+      buildSystemChoices(
+        [],
+        [
+          {
+            id: 4,
+            uid: "manual-system",
+            name: "Manual System",
+            createdAt: "2026-09-08",
+            modifiedAt: "2026-09-08",
+          },
+        ],
+      ).at(-1),
+    ).toMatchObject({
+      id: "custom:manual-system",
+      ref: { kind: "custom", uid: "manual-system" },
+      name: "Manual System",
+    });
   });
   it("preserves full long name in accessibility while the trigger can visually ellipsize", () => {
     const name = "A long name ".repeat(30);

@@ -1,4 +1,5 @@
 import type { OrreryCategory } from "@/db/orrery-system-read";
+import type { CustomSystem } from "@/db/systems-dao";
 import {
   BUILTIN_SYSTEMS,
   type SystemDescriptor,
@@ -6,6 +7,7 @@ import {
 
 export function buildSystemChoices(
   categories: readonly OrreryCategory[],
+  customSystems: readonly CustomSystem[] = [],
 ): SystemDescriptor[] {
   return [
     ...BUILTIN_SYSTEMS,
@@ -22,6 +24,13 @@ export function buildSystemChoices(
           name: row.name,
         }),
       ),
+    ...customSystems.map(
+      (row): SystemDescriptor => ({
+        id: `custom:${row.uid}`,
+        ref: { kind: "custom", uid: row.uid },
+        name: row.name,
+      }),
+    ),
   ];
 }
 export function systemSelectorLabel(name: string): string {

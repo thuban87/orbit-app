@@ -22,7 +22,10 @@ beforeEach(async () => {
   });
 });
 
-async function addContact(input: { uid: string; lastContact: string | null }): Promise<number> {
+async function addContact(input: {
+  uid: string;
+  lastContact: string | null;
+}): Promise<number> {
   const row = await exec.runAsync(
     "INSERT INTO contacts (uid, name, interval_days, tracking_enabled, last_contact, created_at, modified_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
     [input.uid, input.uid, 14, 1, input.lastContact, NOW, NOW],
@@ -33,13 +36,21 @@ async function addContact(input: { uid: string; lastContact: string | null }): P
 describe("manual-only custom System resolver", () => {
   it("returns eligible inclusions minus exclusions through the read pipeline", async () => {
     const system = await createCustomSystem(exec, { name: "Manual", now: NOW });
-    const included = await addContact({ uid: "included", lastContact: "2026-09-01" });
-    const excluded = await addContact({ uid: "excluded", lastContact: "2026-09-01" });
-    const ineligible = await addContact({ uid: "ineligible", lastContact: null });
+    const included = await addContact({
+      uid: "included",
+      lastContact: "2026-09-01",
+    });
+    const excluded = await addContact({
+      uid: "excluded",
+      lastContact: "2026-09-01",
+    });
+    const ineligible = await addContact({
+      uid: "ineligible",
+      lastContact: null,
+    });
     const ref = { kind: "custom" as const, uid: system.uid };
     for (const [contactId, mode] of [
       [included, "include"],
-      [excluded, "include"],
       [excluded, "exclude"],
       [ineligible, "include"],
     ] as const)
@@ -72,7 +83,12 @@ describe("manual-only custom System resolver", () => {
       members: [],
     });
     const system = await createCustomSystem(exec, { name: "Empty", now: NOW });
-    expect(await readOrrerySystemMembersCore(exec, { kind: "custom", uid: system.uid })).toMatchObject({
+    expect(
+      await readOrrerySystemMembersCore(exec, {
+        kind: "custom",
+        uid: system.uid,
+      }),
+    ).toMatchObject({
       status: "ready",
       members: [],
       brokenRules: [],

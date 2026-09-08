@@ -30,7 +30,10 @@ beforeEach(async () => {
 
 describe("systems DAO", () => {
   it("creates and reads a custom System plus its manual override", async () => {
-    const system = await createCustomSystem(exec, { name: "Close Friends", now: NOW });
+    const system = await createCustomSystem(exec, {
+      name: "Close Friends",
+      now: NOW,
+    });
     expect(system.uid).toBeTruthy();
     expect(await getSystem(exec, system.uid)).toEqual(system);
     expect(await listCustomSystems(exec)).toEqual([system]);
@@ -47,24 +50,24 @@ describe("systems DAO", () => {
       mode: "include",
       now: NOW,
     });
-    expect(await listSystemOverrides(exec, `custom:${system.uid}`)).toMatchObject([
-      { contactId: contact.lastInsertRowId, mode: "include" },
-    ]);
+    expect(
+      await listSystemOverrides(exec, `custom:${system.uid}`),
+    ).toMatchObject([{ contactId: contact.lastInsertRowId, mode: "include" }]);
   });
 
   it("rejects case-insensitive custom, built-in, and Category name collisions", async () => {
     await createCustomSystem(exec, { name: "Close Friends", now: NOW });
-    await expect(createCustomSystem(exec, { name: "close friends", now: NOW })).rejects.toThrow(
-      "A System named close friends already exists",
-    );
-    await expect(createCustomSystem(exec, { name: "all contacts", now: NOW })).rejects.toThrow(
-      "A System named all contacts already exists",
-    );
-    await expect(createCustomSystem(exec, { name: "FAVORITES", now: NOW })).rejects.toThrow(
-      "A System named FAVORITES already exists",
-    );
-    await expect(createCustomSystem(exec, { name: "family", now: NOW })).rejects.toThrow(
-      "A System named family already exists",
-    );
+    await expect(
+      createCustomSystem(exec, { name: "close friends", now: NOW }),
+    ).rejects.toThrow("A System named close friends already exists");
+    await expect(
+      createCustomSystem(exec, { name: "all contacts", now: NOW }),
+    ).rejects.toThrow("A System named all contacts already exists");
+    await expect(
+      createCustomSystem(exec, { name: "FAVORITES", now: NOW }),
+    ).rejects.toThrow("A System named FAVORITES already exists");
+    await expect(
+      createCustomSystem(exec, { name: "family", now: NOW }),
+    ).rejects.toThrow("A System named family already exists");
   });
 });

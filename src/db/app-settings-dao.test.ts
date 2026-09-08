@@ -25,6 +25,7 @@ import {
   acknowledgeProvider,
   assertAccentId,
   assertBackgroundId,
+  assertOrreryLastSystem,
   assertPhoneRegionOverride,
   assertThemeMode,
   assertThemePackage,
@@ -1281,5 +1282,22 @@ describe("app-settings-dao — dashboard preference settings (migration 019, Pha
     expect((await getAppSettings(exec)).dashboardRightSwipeAction).toBe(
       "log-contact",
     );
+  });
+});
+
+describe("app-settings-dao — custom Orrery System grammar", () => {
+  it("accepts bounded custom tokens without invalidating builtin/category tokens", () => {
+    expect(() =>
+      assertOrreryLastSystem("orreryLastSystem", "custom:system-uid"),
+    ).not.toThrow();
+    expect(() =>
+      assertOrreryLastSystem("orreryLastSystem", "builtin:all-contacts"),
+    ).not.toThrow();
+    expect(() =>
+      assertOrreryLastSystem("orreryLastSystem", "category:category-uid"),
+    ).not.toThrow();
+    expect(() =>
+      assertOrreryLastSystem("orreryLastSystem", "custom:bad\u0000uid"),
+    ).toThrow();
   });
 });

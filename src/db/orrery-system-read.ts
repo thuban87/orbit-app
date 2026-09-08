@@ -19,6 +19,10 @@ import {
   type OrrerySystemRef,
 } from "@/logic/orrery-system-logic";
 import {
+  resolveCustomSystemMembers,
+  type BrokenRule,
+} from "@/logic/system-rule-resolver";
+import {
   mapSunOccupantLookup,
   sunOccupantIsSelf,
 } from "@/logic/sun-occupant-logic";
@@ -45,9 +49,11 @@ export interface OrrerySystemMember extends ContactIdentity {
   created_at?: string;
 }
 export interface OrreryMembersResult {
-  status: "ready" | "missing-category";
+  status: "ready" | "missing-category" | "missing-custom";
   system: OrrerySystemRef;
   members: OrrerySystemMember[];
+  /** Custom resolver diagnostics; omitted for existing built-in/category paths. */
+  brokenRules?: BrokenRule[];
 }
 
 /** No mutex/BEGIN: also callable inside the guarded rank writer's transaction. */
@@ -55,6 +61,36 @@ export async function readOrrerySystemMembersCore(
   exec: ReadOnlyExecutor,
   system: OrrerySystemRef,
 ): Promise<OrreryMembersResult> {
+  if (system.kind === "custom") {
+    if (
+      !(await exec.getFirstAsync("SELECT id FROM systems WHERE uid = ?", [
+        system.uid,
+      ]))
+    )
+      return { status: "missing-custom", system, members: [] };
+    const resolved = await resolveCustomSystemMembers(exec, system);
+    if (resolved.memberIds.length === 0)
+      return {
+        status: "ready",
+        system,
+        members: [],
+        brokenRules: resolved.brokenRules,
+      };
+    const members = await exec.getAllAsync<OrrerySystemMember>(
+      `SELECT c.id,c.uid,c.name,c.photo,c.ring_seq,c.rarely_responds,c.favourite_rank,c.last_contact,c.created_at,
+      CASE WHEN c.last_contact IS NULL THEN NULL ELSE (${PROGRESS_SQL}) END AS progress,
+      CASE WHEN c.last_contact IS NULL THEN NULL ELSE (${STATUS_SQL}) END AS status
+      FROM contacts c WHERE c.id IN (${resolved.memberIds.map(() => "?").join(", ")})
+      ORDER BY COALESCE(c.ring_seq,1e9),c.created_at,c.id`,
+      resolved.memberIds,
+    );
+    return {
+      status: "ready",
+      system,
+      members,
+      brokenRules: resolved.brokenRules,
+    };
+  }
   const where = buildOrrerySystemWhere(system);
   if (
     system.kind === "category" &&
@@ -167,5 +203,12 @@ export function readOrrerySystemSnapshot(
 export class MissingOrreryCategoryError extends Error {
   constructor(public readonly snapshot: OrrerySystemSnapshot) {
     super("Orrery category no longer exists");
+  }
+}
+
+/** Parallel missing-System domain error; Plan 10 owns its fallback behavior. */
+export class MissingOrreryCustomSystemError extends Error {
+  constructor(public readonly snapshot: OrrerySystemSnapshot) {
+    super("Orrery custom System no longer exists");
   }
 }

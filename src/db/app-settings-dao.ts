@@ -57,7 +57,8 @@ export const ORRERY_BUILTIN_SYSTEM_IDS = [
 ] as const;
 export type OrrerySystemId =
   | (typeof ORRERY_BUILTIN_SYSTEM_IDS)[number]
-  | `category:${string}`;
+  | `category:${string}`
+  | `custom:${string}`;
 
 export function assertOrreryDensity(field: string, value: unknown): void {
   if (
@@ -75,11 +76,11 @@ export function assertOrreryLastSystem(field: string, value: unknown): void {
   if (
     typeof value === "string" &&
     ((ORRERY_BUILTIN_SYSTEM_IDS as readonly string[]).includes(value) ||
-      /^category:[^\s\p{Cc}]{1,256}$/u.test(value))
+      /^(?:category|custom):[^\s\p{Cc}]{1,256}$/u.test(value))
   )
     return;
   throw new Error(
-    `updateAppSettings: ${field} must be a builtin System or bounded category UID`,
+    `updateAppSettings: ${field} must be a builtin System or bounded category/custom UID`,
   );
 }
 

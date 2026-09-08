@@ -23,7 +23,8 @@ export type OrreryBuiltinId =
   | "chargers";
 export type OrrerySystemRef =
   | { kind: "builtin"; id: OrreryBuiltinId }
-  | { kind: "category"; uid: string };
+  | { kind: "category"; uid: string }
+  | { kind: "custom"; uid: string };
 export interface SystemDescriptor {
   ref: OrrerySystemRef;
   id: OrrerySystemId;
@@ -48,15 +49,19 @@ export function parseSystemRef(value: unknown): OrrerySystemRef | null {
     return null;
   }
   const token = value as OrrerySystemId;
+  if (token.startsWith("custom:"))
+    return { kind: "custom", uid: token.slice(7) };
   if (token.startsWith("category:"))
     return { kind: "category", uid: token.slice(9) };
   return { kind: "builtin", id: token.slice(8) as OrreryBuiltinId };
 }
 export function systemRefId(system: OrrerySystemRef): OrrerySystemId {
   const token =
-    system.kind === "category"
-      ? `category:${system.uid}`
-      : `builtin:${system.id}`;
+    system.kind === "custom"
+      ? `custom:${system.uid}`
+      : system.kind === "category"
+        ? `category:${system.uid}`
+        : `builtin:${system.id}`;
   assertOrreryLastSystem("System", token);
   return token as OrrerySystemId;
 }
@@ -74,6 +79,9 @@ export function buildOrrerySystemWhere(
   system: OrrerySystemRef,
 ): PopulationWhere {
   systemRefId(system); // Validate even callers crossing an untyped boundary.
+  if (system.kind === "custom") {
+    throw new Error("custom Systems resolve via the resolver, not a WHERE");
+  }
   if (system.kind === "category")
     return {
       sql: `${ACTIVE_SEGREGATION_WHERE} AND EXISTS (SELECT 1 FROM categories cat WHERE cat.id=c.category_id AND cat.uid=?)`,
