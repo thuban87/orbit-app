@@ -5,18 +5,22 @@
  * ADR-077: fresh identity guards inspection/Profile over the canonical world.
  */
 
-import type { ContactIdentity } from "@/db/orrery-system-read";
+import {
+  type ContactIdentity,
+  readOrrerySystemMembersCore,
+} from "@/db/orrery-system-read";
 import { inReadSnapshot } from "@/db/transaction";
 import type { SqlExecutor } from "@/db/types";
 import type { OrreryContactTarget } from "@/logic/orrery-focus-logic";
 import {
   buildOrrerySystemWhere,
   type OrrerySystemRef,
+  systemRefId,
 } from "@/logic/orrery-system-logic";
 import { sunOccupantIsSelf } from "@/logic/sun-occupant-logic";
 
 export interface OrreryTargetValidation {
-  status: "ready" | "missing-category";
+  status: "ready" | "missing-category" | "missing-custom";
   identity: ContactIdentity | null;
   isMember: boolean;
   resolvedSunIdentity: ContactIdentity | null;
@@ -30,12 +34,27 @@ export function readOrreryContactTargetValidation(
   system: OrrerySystemRef,
   target: OrreryContactTarget,
 ): Promise<OrreryTargetValidation> {
-  const where = buildOrrerySystemWhere(system);
+  // Preserve the synchronous closed-token boundary before opening a snapshot.
+  systemRefId(system);
   return inReadSnapshot(exec, async (ro) => {
-    const row = await ro.getFirstAsync<ContactIdentity & { member: number }>(
-      `SELECT c.id,c.uid,CASE WHEN (${where.sql}) THEN 1 ELSE 0 END AS member FROM contacts c WHERE c.id=? AND c.uid=?`,
-      [...where.params, target.id, target.uid],
-    );
+    // Custom definitions have rules and overrides, so their membership cannot
+    // be represented by the immutable System WHERE predicate. Resolve them in
+    // this same snapshot before checking the narrow target identity.
+    const customMembers =
+      system.kind === "custom"
+        ? await readOrrerySystemMembersCore(ro, system)
+        : null;
+    const where =
+      system.kind === "custom" ? null : buildOrrerySystemWhere(system);
+    const row = where
+      ? await ro.getFirstAsync<ContactIdentity & { member: number }>(
+          `SELECT c.id,c.uid,CASE WHEN (${where.sql}) THEN 1 ELSE 0 END AS member FROM contacts c WHERE c.id=? AND c.uid=?`,
+          [...where.params, target.id, target.uid],
+        )
+      : await ro.getFirstAsync<ContactIdentity>(
+          "SELECT c.id,c.uid FROM contacts c WHERE c.id=? AND c.uid=?",
+          [target.id, target.uid],
+        );
     const sun = await ro.getFirstAsync<{
       saved: number | null;
       id: number | null;
@@ -56,15 +75,26 @@ export function readOrreryContactTargetValidation(
               trackingEnabled: sun.tracking_enabled ?? 0,
             },
     });
-    const categoryExists =
-      system.kind !== "category" ||
-      !!(await ro.getFirstAsync("SELECT id FROM categories WHERE uid=?", [
-        system.uid,
-      ]));
+    const status =
+      customMembers?.status === "missing-custom"
+        ? "missing-custom"
+        : system.kind === "category" &&
+            !(await ro.getFirstAsync("SELECT id FROM categories WHERE uid=?", [
+              system.uid,
+            ]))
+          ? "missing-category"
+          : "ready";
+    const customMemberIds = new Set(
+      customMembers?.members.map((member) => member.id),
+    );
     return {
-      status: categoryExists ? "ready" : "missing-category",
+      status,
       identity: row ? { id: row.id, uid: row.uid } : null,
-      isMember: categoryExists && row?.member === 1,
+      isMember:
+        status === "ready" &&
+        (where
+          ? (row as (ContactIdentity & { member: number }) | null)?.member === 1
+          : customMemberIds.has(target.id)),
       resolvedSunIdentity:
         !self && sun.id !== null && sun.uid !== null
           ? { id: sun.id, uid: sun.uid }

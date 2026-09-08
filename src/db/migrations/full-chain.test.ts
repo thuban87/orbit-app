@@ -63,7 +63,10 @@ describe("registered migration chain", () => {
     expect(
       MIGRATIONS.filter((migration) => migration.version === 22),
     ).toHaveLength(1);
-    expect(TARGET_VERSION).toBe(22);
+    expect(
+      MIGRATIONS.filter((migration) => migration.version === 23),
+    ).toHaveLength(1);
+    expect(TARGET_VERSION).toBe(23);
     expect(
       await exec.getFirstAsync<{ user_version: number }>("PRAGMA user_version"),
     ).toEqual({
@@ -89,6 +92,7 @@ describe("registered migration chain", () => {
       "orrery_density",
       "orrery_satellites_enabled",
       "orrery_last_system",
+      "orrery_system_selection_revision",
     ]) {
       expect(appSettingsCols.has(col)).toBe(true);
     }

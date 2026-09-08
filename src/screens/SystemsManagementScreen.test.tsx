@@ -69,9 +69,12 @@ vi.mock("@/components/orrery/orrery-controls-logic", () => ({
   buildSystemChoices: vi.fn(),
 }));
 
-const { deleteManagedSystem, managementActions, pinAllContacts } = await import(
-  "./SystemsManagementScreen"
-);
+const {
+  createManagementLoadGuard,
+  deleteManagedSystem,
+  managementActions,
+  pinAllContacts,
+} = await import("./SystemsManagementScreen");
 const dao = await import("@/db/systems-dao");
 const snackbar = await import("@/stores/snackbar-store");
 
@@ -125,6 +128,29 @@ describe("SystemsManagementScreen contracts", () => {
     ).toEqual(["Edit", "Rename", "Duplicate", "Delete"]);
   });
 
+  it("only lets the latest deferred management load publish or report an error", async () => {
+    const nextGuard = createManagementLoadGuard();
+    let releaseOlder!: () => void;
+    const olderDone = new Promise<void>((resolve) => {
+      releaseOlder = resolve;
+    });
+    const published: string[] = [];
+    const older = nextGuard();
+    const olderLoad = olderDone.then(() => {
+      if (older()) published.push("older");
+    });
+    const newer = nextGuard();
+    if (newer()) published.push("newer");
+    releaseOlder();
+    await olderLoad;
+    expect(published).toEqual(["newer"]);
+
+    const staleFailure = nextGuard();
+    const currentFailure = nextGuard();
+    expect(staleFailure()).toBe(false);
+    expect(currentFailure()).toBe(true);
+  });
+
   it("offers Undo only after the DAO commits the delete/fallback composite", async () => {
     vi.mocked(dao.deleteSystemWithActiveFallback).mockResolvedValue({
       snapshot: {
@@ -135,6 +161,7 @@ describe("SystemsManagementScreen contracts", () => {
         prefs: null,
       },
       wasActive: true,
+      fallbackSelectionRevision: 1,
     });
     vi.mocked(dao.restoreDeletedSystemAndActiveSelection).mockResolvedValue({
       id: 1,
@@ -175,6 +202,7 @@ describe("SystemsManagementScreen contracts", () => {
             prefs: null,
           },
           restoreActiveSelection: true,
+          fallbackSelectionRevision: 1,
           now: "now",
         },
       ),
@@ -191,6 +219,7 @@ describe("SystemsManagementScreen contracts", () => {
         prefs: null,
       },
       wasActive: false,
+      fallbackSelectionRevision: null,
     });
     const onChanged = vi.fn().mockRejectedValue(new Error("read failed"));
 
@@ -220,6 +249,7 @@ describe("SystemsManagementScreen contracts", () => {
         prefs: null,
       },
       wasActive: true,
+      fallbackSelectionRevision: 1,
     });
     vi.mocked(dao.restoreDeletedSystemAndActiveSelection).mockResolvedValue({
       id: 1,
@@ -271,6 +301,7 @@ describe("SystemsManagementScreen contracts", () => {
         prefs: null,
       },
       wasActive: false,
+      fallbackSelectionRevision: null,
     });
     vi.mocked(dao.restoreDeletedSystemAndActiveSelection).mockResolvedValue({
       id: 1,
@@ -319,6 +350,7 @@ describe("SystemsManagementScreen contracts", () => {
         prefs: null,
       },
       wasActive: true,
+      fallbackSelectionRevision: 1,
     });
     vi.mocked(dao.restoreDeletedSystemAndActiveSelection).mockRejectedValue(
       new Error("name in use"),

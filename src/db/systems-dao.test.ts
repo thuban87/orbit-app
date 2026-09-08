@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("expo-sqlite", () => ({}));
 
 import { nodeSqliteExecutor, openTestDb } from "@/db/__testkit__/node-sqlite";
+import { updateAppSettings } from "@/db/app-settings-dao";
 import { MIGRATIONS, TARGET_VERSION } from "@/db/database";
 import { runMigrations } from "@/db/migrations/runner";
 import { readOrrerySystemMembersCore } from "@/db/orrery-system-read";
@@ -269,6 +270,7 @@ describe("systems DAO", () => {
     const restored = await restoreDeletedSystemAndActiveSelection(exec, {
       snapshot: deletion.snapshot,
       restoreActiveSelection: deletion.wasActive,
+      fallbackSelectionRevision: deletion.fallbackSelectionRevision,
       now: NOW,
     });
 
@@ -285,6 +287,55 @@ describe("systems DAO", () => {
       data_revision: (beforeRestore?.data_revision ?? 0) + 1,
     });
   });
+
+  it.each([
+    "builtin:favorites",
+    "builtin:all-contacts",
+    "category:family",
+    "custom:other-system",
+  ] as const)(
+    "restores deleted data without overwriting a newer %s selection",
+    async (nextRef) => {
+      const deleted = await createCustomSystem(exec, {
+        name: "Undo Source",
+        now: NOW,
+      });
+      const other = await createCustomSystem(exec, {
+        name: "Other System",
+        now: NOW,
+      });
+      const ref = `custom:${deleted.uid}` as const;
+      const category = await firstCategoryUid();
+      const target =
+        nextRef === "category:family"
+          ? (`category:${category}` as const)
+          : nextRef === "custom:other-system"
+            ? (`custom:${other.uid}` as const)
+            : nextRef;
+      await updateAppSettings(exec, { orreryLastSystem: ref }, NOW);
+      const deletion = await deleteSystemWithActiveFallback(exec, {
+        systemRef: ref,
+        now: NOW,
+      });
+      // This includes a deliberate All Contacts re-selection, which has the
+      // same value as deletion's fallback but a newer durable revision.
+      await updateAppSettings(exec, { orreryLastSystem: target }, NOW);
+
+      await restoreDeletedSystemAndActiveSelection(exec, {
+        snapshot: deletion.snapshot,
+        restoreActiveSelection: deletion.wasActive,
+        fallbackSelectionRevision: deletion.fallbackSelectionRevision,
+        now: NOW,
+      });
+
+      expect(await getSystem(exec, deleted.uid)).not.toBeNull();
+      expect(
+        await exec.getFirstAsync<{ orrery_last_system: string }>(
+          "SELECT orrery_last_system FROM app_settings WHERE id=1",
+        ),
+      ).toEqual({ orrery_last_system: target });
+    },
+  );
 
   it("restores historical broken rules unchanged while keeping them visible for repair", async () => {
     const system = await createCustomSystem(exec, {

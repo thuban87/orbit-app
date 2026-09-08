@@ -33,7 +33,12 @@ export interface OrreryPreferencesState {
   saveError: boolean;
   pendingIntent: Intent | null;
   hydrate: (exec: SqlExecutor) => Promise<void>;
-  save: (exec: SqlExecutor, intent: Intent, origin?: unknown) => Promise<void>;
+  save: (
+    exec: SqlExecutor,
+    intent: Intent,
+    origin?: unknown,
+    forceLastSystemCommit?: boolean,
+  ) => Promise<void>;
   retry: (exec: SqlExecutor) => Promise<void>;
 }
 const KEYS = ["density", "satellitesEnabled", "lastSystem"] as const;
@@ -143,7 +148,7 @@ export function createOrreryPreferencesStore(
         });
         return reading;
       },
-      save: (exec, intent, origin) => {
+      save: (exec, intent, origin, forceLastSystemCommit = false) => {
         // Never infer durable defaults after an unread/failed initial load.
         if (!get().hydrated) return Promise.resolve();
         const originToken = origin ?? {};
@@ -161,8 +166,9 @@ export function createOrreryPreferencesStore(
             key === "lastSystem" &&
             intent[key] !== undefined &&
             intent[key] === desired[key] &&
-            get().pendingIntent?.lastSystem !== undefined &&
-            originToken !== pendingLastSystemOrigin
+            (forceLastSystemCommit ||
+              (get().pendingIntent?.lastSystem !== undefined &&
+                originToken !== pendingLastSystemOrigin))
           )
             Object.assign(changed, { [key]: intent[key] });
           else if (

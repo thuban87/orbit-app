@@ -74,6 +74,8 @@ export interface DeletedSystemResult {
   snapshot: DeletedSystemSnapshot;
   /** True only when this transaction moved the active System to All Contacts. */
   wasActive: boolean;
+  /** Durable fallback revision required to restore the active selection on Undo. */
+  fallbackSelectionRevision: number | null;
 }
 
 export interface SystemOverrideIntent {
@@ -454,22 +456,33 @@ export function deleteSystemWithActiveFallback(
   input: { systemRef: OrrerySystemId; now: string },
 ): Promise<DeletedSystemResult> {
   return inWriteTransaction(exec, async () => {
-    const stored = await exec.getFirstAsync<{ orrery_last_system: string }>(
-      "SELECT orrery_last_system FROM app_settings WHERE id = 1",
+    const stored = await exec.getFirstAsync<{
+      orrery_last_system: string;
+      orrery_system_selection_revision: number;
+    }>(
+      "SELECT orrery_last_system, orrery_system_selection_revision FROM app_settings WHERE id = 1",
     );
     if (!stored) throw new Error("deleteSystem: missing app settings row");
     assertOrreryLastSystem("orreryLastSystem", stored.orrery_last_system);
     const wasActive = stored.orrery_last_system === input.systemRef;
     const snapshot = await deleteSystemCore(exec, input);
+    let fallbackSelectionRevision: number | null = null;
     if (wasActive) {
       await updateAppSettingsCore(
         exec,
         { orreryLastSystem: "builtin:all-contacts" },
         input.now,
       );
+      const fallback = await exec.getFirstAsync<{
+        orrery_system_selection_revision: number;
+      }>(
+        "SELECT orrery_system_selection_revision FROM app_settings WHERE id = 1",
+      );
+      if (!fallback) throw new Error("deleteSystem: missing app settings row");
+      fallbackSelectionRevision = fallback.orrery_system_selection_revision;
     }
     await bumpDataRevisionCore(exec);
-    return { snapshot, wasActive };
+    return { snapshot, wasActive, fallbackSelectionRevision };
   });
 }
 
@@ -543,17 +556,39 @@ export function restoreDeletedSystemAndActiveSelection(
   input: {
     snapshot: DeletedSystemSnapshot;
     restoreActiveSelection: boolean;
+    fallbackSelectionRevision: number | null;
     now: string;
   },
 ): Promise<CustomSystem> {
   return inWriteTransaction(exec, async () => {
     const system = await restoreDeletedSystemCore(exec, input);
     if (input.restoreActiveSelection) {
-      await updateAppSettingsCore(
-        exec,
-        { orreryLastSystem: `custom:${system.uid}` },
-        input.now,
+      if (!Number.isSafeInteger(input.fallbackSelectionRevision)) {
+        throw new Error(
+          "restoreDeletedSystem: missing fallback selection revision",
+        );
+      }
+      const stored = await exec.getFirstAsync<{
+        orrery_last_system: OrrerySystemId;
+        orrery_system_selection_revision: number;
+      }>(
+        "SELECT orrery_last_system, orrery_system_selection_revision FROM app_settings WHERE id = 1",
       );
+      if (!stored)
+        throw new Error("restoreDeletedSystem: missing app settings row");
+      // Both token and revision are required. The revision preserves an
+      // explicit re-selection of All Contacts as well as any other System.
+      if (
+        stored.orrery_last_system === "builtin:all-contacts" &&
+        stored.orrery_system_selection_revision ===
+          input.fallbackSelectionRevision
+      ) {
+        await updateAppSettingsCore(
+          exec,
+          { orreryLastSystem: `custom:${system.uid}` },
+          input.now,
+        );
+      }
     }
     await bumpDataRevisionCore(exec);
     return system;

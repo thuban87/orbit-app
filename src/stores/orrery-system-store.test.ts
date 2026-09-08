@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
+
 // The store's reader types traverse database.ts; node tests use injected readers.
 vi.mock("expo-sqlite", () => ({}));
+
 import {
   MissingOrreryCategoryError,
   type OrrerySystemSnapshot,
@@ -32,6 +34,16 @@ const scene = (system = all): OrrerySceneSnapshot =>
     systemSnapshot: { categories: [] },
   }) as unknown as OrrerySceneSnapshot;
 describe("System publication ownership", () => {
+  it("marks an explicit same-System selection for durable preference revisioning, but not a reload", async () => {
+    const persist = vi.fn().mockResolvedValue(true);
+    const store = createOrrerySystemStore({
+      load: async (system) => scene(system),
+      persist,
+    });
+    await store.getState().select(all, undefined, true);
+    await store.getState().reload();
+    expect(persist.mock.calls).toEqual([[all, true], [all]]);
+  });
   it("coalesces recovery taps while leaving newer actual reloads generation-owned", async () => {
     const read = deferred<OrrerySceneSnapshot>();
     const load = vi

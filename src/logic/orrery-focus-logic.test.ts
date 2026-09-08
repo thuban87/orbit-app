@@ -5,6 +5,11 @@ import { runMigrations } from "@/db/migrations/runner";
 import { withMutex } from "@/db/mutex";
 import { readOrreryContactTargetValidation } from "@/db/orrery-action-read";
 import { readOrrerySystemSnapshot } from "@/db/orrery-system-read";
+import {
+  createCustomSystem,
+  setSystemOverride,
+  setSystemRules,
+} from "@/db/systems-dao";
 import { HOME_CAMERA, projectFrame } from "./orrery-camera-logic";
 import {
   createOrreryFocusController,
@@ -194,6 +199,99 @@ describe("fresh narrow contact actions", () => {
     );
     expect(missing.status).toBe("missing-category");
     expect(validateOrreryContactTarget(sun, missing)).toBe(false);
+  });
+  it("resolves manual, rule-derived, and historically broken custom members for profile, group, and sun actions", async () => {
+    const manual = await person();
+    const derived = await person();
+    const excludedSun = await person();
+    const custom = await createCustomSystem(exec, {
+      name: "Action System",
+      now: "2026-09-01",
+    });
+    const system: OrrerySystemRef = { kind: "custom", uid: custom.uid };
+    await exec.runAsync("UPDATE contacts SET favourite_rank=0 WHERE id=?", [
+      derived.id,
+    ]);
+    await setSystemRules(exec, {
+      systemRef: `custom:${custom.uid}`,
+      rules: [{ family: "favorite", value: "on" }],
+      now: "2026-09-01",
+    });
+    await setSystemOverride(exec, {
+      systemRef: `custom:${custom.uid}`,
+      contactId: manual.id,
+      mode: "include",
+      now: "2026-09-01",
+    });
+    // Old malformed rows remain observable broken rules, but never prevent
+    // the current valid rule and override from resolving.
+    await exec.runAsync(
+      "INSERT INTO system_rules(uid,system_id,family,value,created_at) VALUES ('historic',?,?,?,'x')",
+      [custom.id, "retired-family", "legacy"],
+    );
+    await exec.runAsync("UPDATE app_settings SET sun_contact_id=?", [
+      excludedSun.id,
+    ]);
+
+    expect(
+      validateOrreryContactTarget(
+        manual,
+        await readOrreryContactTargetValidation(exec, system, manual),
+      ),
+    ).toBe(true);
+    expect(
+      validateOrreryContactTarget(
+        derived,
+        await readOrreryContactTargetValidation(exec, system, derived),
+      ),
+    ).toBe(true);
+    expect(
+      validateOrreryContactTarget(
+        excludedSun,
+        await readOrreryContactTargetValidation(exec, system, excludedSun),
+      ),
+    ).toBe(false);
+    const sun = { ...excludedSun, kind: "contact-sun" as const };
+    expect(
+      validateOrreryContactTarget(
+        sun,
+        await readOrreryContactTargetValidation(exec, system, sun),
+      ),
+    ).toBe(true);
+
+    const openProfile = vi.fn();
+    const group = vi.fn();
+    const controller = createOrreryFocusController({
+      current: () => ({ generation: 1, system }),
+      validate: (ref, target) =>
+        readOrreryContactTargetValidation(exec, ref, target),
+      focus: vi.fn(),
+      group,
+      clear: vi.fn(),
+      openProfile,
+      reject: vi.fn(),
+    });
+    await controller.dispatch({
+      kind: "profile",
+      generation: 1,
+      ids: [manual.id],
+      targets: [manual],
+    });
+    await controller.dispatch({
+      kind: "group",
+      generation: 1,
+      ids: [manual.id, derived.id],
+      targets: [manual, derived],
+    });
+    await controller.dispatch({
+      kind: "profile",
+      generation: 1,
+      ids: [sun.id],
+      targets: [sun],
+    });
+    expect(openProfile).toHaveBeenNthCalledWith(1, manual.id);
+    expect(openProfile).toHaveBeenNthCalledWith(2, sun.id);
+    expect(group).toHaveBeenCalledWith([manual, derived]);
   });
   for (const reason of [
     "superseded",

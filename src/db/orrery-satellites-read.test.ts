@@ -13,6 +13,11 @@ import {
   editRelationship,
   restoreRelationship,
 } from "@/db/relationships-dao";
+import {
+  createCustomSystem,
+  setSystemOverride,
+  setSystemRules,
+} from "@/db/systems-dao";
 import { validateOrreryContactTarget } from "@/logic/orrery-focus-logic";
 import {
   createOrrerySatelliteController,
@@ -114,6 +119,40 @@ describe("eligible Orrery relationship projection", () => {
     expect(
       await readOrrerySatellites(exec, [{ id: 1, uid: "old" }], system),
     ).toEqual([]);
+  });
+  it("uses resolved custom members for satellites, including rule and manual members beside historic broken rules", async () => {
+    await add(1);
+    await add(2);
+    const custom = await createCustomSystem(exec, {
+      name: "Satellite System",
+      now,
+    });
+    const ref = { kind: "custom" as const, uid: custom.uid };
+    await exec.runAsync(
+      "UPDATE contacts SET favourite_rank=0,last_contact=? WHERE id=2",
+      [now],
+    );
+    await setSystemRules(exec, {
+      systemRef: `custom:${custom.uid}`,
+      rules: [{ family: "favorite", value: "on" }],
+      now,
+    });
+    await setSystemOverride(exec, {
+      systemRef: `custom:${custom.uid}`,
+      contactId: 1,
+      mode: "include",
+      now,
+    });
+    await exec.runAsync(
+      "INSERT INTO system_rules(uid,system_id,family,value,created_at) VALUES ('historic',?,?,?,'x')",
+      [custom.id, "retired-family", "legacy"],
+    );
+
+    expect(
+      (await readOrrerySatellites(exec, parents, ref)).map(
+        (row) => row.parentId,
+      ),
+    ).toEqual([1, 2]);
   });
   it("merge clears would-be self links and reparents the same durable relationship", async () => {
     const id = await add(2);

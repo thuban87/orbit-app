@@ -70,7 +70,7 @@ export function OrreryContactsSheet({
         {state.status === "missing-category" ? (
           <OrreryNotice
             kind="missing"
-            onAction={() => state.select(ALL_CONTACTS_SYSTEM)}
+            onAction={() => state.select(ALL_CONTACTS_SYSTEM, undefined, true)}
           />
         ) : null}
         {empty ? (

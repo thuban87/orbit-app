@@ -211,7 +211,7 @@ export function OrrerySystemSelector({
                       },
                     ]}
                     onPress={() => {
-                      void state.select(row.ref, row.name);
+                      void state.select(row.ref, row.name, true);
                       dismiss();
                     }}
                   >

@@ -1,5 +1,8 @@
 /** ADR-088 structured people; D-11 requires selected System membership, even for a sun. */
-import type { ContactIdentity } from "@/db/orrery-system-read";
+import {
+  type ContactIdentity,
+  readOrrerySystemMembersCore,
+} from "@/db/orrery-system-read";
 import { resolveRelationshipVisibility } from "@/db/relationships-read";
 import { inReadSnapshot } from "@/db/transaction";
 import type { SqlExecutor } from "@/db/types";
@@ -31,8 +34,19 @@ export async function readOrrerySatellites(
     ).values(),
   ];
   if (!unique.length) return [];
-  const where = buildOrrerySystemWhere(system);
   return inReadSnapshot(exec, async (ro) => {
+    // Custom membership is rule/override-derived rather than a SQL predicate.
+    // Resolve it under this snapshot and constrain the relationship query to
+    // those current members; never pass a custom ref to the immutable builder.
+    const customMembers =
+      system.kind === "custom"
+        ? await readOrrerySystemMembersCore(ro, system)
+        : null;
+    const where =
+      system.kind === "custom" ? null : buildOrrerySystemWhere(system);
+    const customMemberIds =
+      customMembers?.members.map((member) => member.id) ?? [];
+    if (system.kind === "custom" && customMemberIds.length === 0) return [];
     const result: OrrerySatellite[] = [];
     for (let start = 0; start < unique.length; start += PARENT_BATCH_SIZE) {
       const batch = unique.slice(start, start + PARENT_BATCH_SIZE);
@@ -42,10 +56,14 @@ export async function readOrrerySatellites(
         `SELECT r.uid,r.contact_id AS parentId,c.uid AS parentUid,
           r.person_name AS personName,r.relation_type AS relationType,r.hidden
          FROM relationships r JOIN contacts c ON c.id=r.contact_id
-         WHERE ${where.sql} AND c.id IN (${batch.map(() => "?").join(",")})
+         WHERE ${where ? where.sql : `c.id IN (${customMemberIds.map(() => "?").join(",")})`}
+           AND c.id IN (${batch.map(() => "?").join(",")})
            AND r.deleted_at IS NULL AND r.linked_contact_id IS NULL
          ORDER BY r.uid`,
-        [...where.params, ...batch.map((p) => p.id)],
+        [
+          ...(where ? where.params : customMemberIds),
+          ...batch.map((p) => p.id),
+        ],
       );
       for (const { hidden, ...row } of rows)
         if (

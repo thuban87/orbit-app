@@ -1059,6 +1059,12 @@ export async function updateAppSettingsCore(
     }
   }
   // `modified_at` is always set, so an empty patch is a well-formed UPDATE.
+  // The revision is deliberately internal-only: it distinguishes an automatic
+  // All Contacts fallback from a later explicit selection of the same token.
+  if (patch.orreryLastSystem !== undefined)
+    setClauses.push(
+      "orrery_system_selection_revision = orrery_system_selection_revision + 1",
+    );
   setClauses.push("modified_at = ?");
   const finalParams = [...params, now];
 

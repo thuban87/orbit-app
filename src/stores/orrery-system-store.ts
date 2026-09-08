@@ -27,7 +27,11 @@ export interface OrrerySystemState {
   categories: OrreryCategory[];
   catalogLoaded: boolean;
   persistence: "saved" | "saving" | "error";
-  select: (system: OrrerySystemRef, name?: string) => Promise<void>;
+  select: (
+    system: OrrerySystemRef,
+    name?: string,
+    userInitiated?: boolean,
+  ) => Promise<void>;
   reload: () => Promise<void>;
   retryReload: () => Promise<void>;
   cancel: () => void;
@@ -40,7 +44,10 @@ export interface OrrerySystemAdapters {
     generation: number,
   ) => Promise<OrrerySceneSnapshot>;
   /** Uses the serialized preference writer; false retains retryable unsaved intent. */
-  persist: (system: OrrerySystemRef) => Promise<boolean>;
+  persist: (
+    system: OrrerySystemRef,
+    userInitiated?: boolean,
+  ) => Promise<boolean>;
 }
 
 /** Request generations, not selected names or revisions, own async publication. */
@@ -49,14 +56,20 @@ export function createOrrerySystemStore(io: OrrerySystemAdapters) {
   let retrying: Promise<void> | null = null;
   let savingGeneration: number | null = null;
   return create<OrrerySystemState>()((set, get) => {
-    const save = async (system: OrrerySystemRef, generation: number) => {
+    const save = async (
+      system: OrrerySystemRef,
+      generation: number,
+      userInitiated: boolean,
+    ) => {
       if (!active || generation !== get().generation) return;
       if (savingGeneration === generation) return;
       savingGeneration = generation;
       set({ persistence: "saving" });
       let saved = false;
       try {
-        saved = await io.persist(system);
+        saved = userInitiated
+          ? await io.persist(system, true)
+          : await io.persist(system);
       } catch {
         /* Successful scene remains usable. */
       }
@@ -64,7 +77,11 @@ export function createOrrerySystemStore(io: OrrerySystemAdapters) {
         set({ persistence: saved ? "saved" : "error" });
       if (savingGeneration === generation) savingGeneration = null;
     };
-    const select = async (system: OrrerySystemRef, name?: string) => {
+    const select = async (
+      system: OrrerySystemRef,
+      name?: string,
+      userInitiated = false,
+    ) => {
       const id = systemRefId(system);
       const before = get();
       const generation = before.generation + 1;
@@ -110,7 +127,7 @@ export function createOrrerySystemStore(io: OrrerySystemAdapters) {
           catalogLoaded: true,
           requested: { ...requested, name: currentName ?? requested.name },
         });
-        await save(system, generation);
+        await save(system, generation, userInitiated);
       } catch (error) {
         if (!active || generation !== get().generation) return;
         if (error instanceof MissingOrreryCategoryError) {
@@ -162,7 +179,7 @@ export function createOrrerySystemStore(io: OrrerySystemAdapters) {
           : null,
       retryPersistence: async () => {
         const snapshot = get().current();
-        if (snapshot) await save(snapshot.system, get().generation);
+        if (snapshot) await save(snapshot.system, get().generation, false);
       },
     };
   });

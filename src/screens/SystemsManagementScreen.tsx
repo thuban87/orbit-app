@@ -76,6 +76,15 @@ export function managementActions(row: SystemManagementRow): string[] {
   return actions;
 }
 
+/** A newer request owns publication; mutation callbacks can add their own guard. */
+export function createManagementLoadGuard() {
+  let generation = 0;
+  return (operationCurrent: () => boolean = () => true) => {
+    const request = ++generation;
+    return () => request === generation && operationCurrent();
+  };
+}
+
 function errorSnackbar(label: string): void {
   showSnackbar({
     kind: "error",
@@ -86,6 +95,13 @@ function errorSnackbar(label: string): void {
       onPress: () => snackbarStore.getState().dismiss(),
     },
   });
+}
+
+function undoFailureLabel(cause: unknown): string {
+  return cause instanceof Error &&
+    /already exists|name in use/i.test(cause.message)
+    ? "Couldn't undo — that name is in use again"
+    : "Couldn't undo. The System remains deleted.";
 }
 
 /** Refresh the in-memory selection after a DAO composite commits its settings write. */
@@ -123,20 +139,22 @@ export async function deleteManagedSystem(input: {
               await restoreDeletedSystemAndActiveSelection(getExecutor(), {
                 snapshot: deletion.snapshot,
                 restoreActiveSelection: deletion.wasActive,
+                fallbackSelectionRevision: deletion.fallbackSelectionRevision,
                 now: localDateTime(),
               });
-            } catch {
+            } catch (cause) {
+              const undoFailure = undoFailureLabel(cause);
               try {
                 // Undo invalidated the delete refresh before the restore attempt.
                 // A failed restore leaves the deletion durable, so wait for that
                 // stale refresh to settle, then publish its actual final state.
                 await postDeleteRefresh;
                 await refreshOrreryPreferences();
-                await input.onChanged(() => true);
-                errorSnackbar("Couldn't undo — that name is in use again");
+                await input.onChanged(() => undoStarted);
+                errorSnackbar(undoFailure);
               } catch {
                 errorSnackbar(
-                  "Couldn't undo — that name is in use again. Refresh Systems to see the current list.",
+                  `${undoFailure} Refresh Systems to see the current list.`,
                 );
               }
               return;
@@ -146,7 +164,7 @@ export async function deleteManagedSystem(input: {
               // settle first, then read again from the restored durable state.
               await postDeleteRefresh;
               await refreshOrreryPreferences();
-              await input.onChanged(() => true);
+              await input.onChanged(() => undoStarted);
             } catch {
               errorSnackbar("System restored, but the list couldn't refresh.");
             }
@@ -310,55 +328,63 @@ export function SystemsManagementScreen() {
   const [error, setError] = useState<string | null>(null);
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState("");
+  const nextLoadGuard = useRef(createManagementLoadGuard());
 
   const load = useCallback(async (isCurrent: () => boolean = () => true) => {
-    const exec = getExecutor();
-    const [snapshot, customSystems, prefs] = await Promise.all([
-      readOrrerySystemSnapshot(exec),
-      listCustomSystems(exec),
-      listSystemPrefs(exec),
-    ]);
-    const prefByRef = new Map(prefs.map((pref) => [pref.systemRef, pref]));
-    const choices = buildSystemChoices(snapshot.categories, customSystems);
-    const loaded = await Promise.all(
-      choices.map(async (choice, sourceIndex) => {
-        const [members, overrides] = await Promise.all([
-          readOrrerySystemMembersCore(exec, choice.ref),
-          listSystemOverrides(exec, choice.id),
-        ]);
-        const pref = prefByRef.get(choice.id);
-        return {
-          ...choice,
-          memberCount: members.members.length,
-          hidden: pref?.hidden === 1,
-          hasOverrides: overrides.length > 0,
-          broken:
-            members.status !== "ready" ||
-            (members.brokenRules?.length ?? 0) > 0,
-          sourceIndex,
-          displayOrder: pref?.displayOrder,
-        };
-      }),
-    );
-    const ordered = pinAllContacts(
-      [...loaded]
-        .sort(
-          (a, b) =>
-            (a.displayOrder ?? Number.MAX_SAFE_INTEGER) -
-              (b.displayOrder ?? Number.MAX_SAFE_INTEGER) ||
-            a.sourceIndex - b.sourceIndex,
-        )
-        .map(
-          ({
-            sourceIndex: _sourceIndex,
-            displayOrder: _displayOrder,
-            ...row
-          }) => row,
-        ),
-    );
-    if (isCurrent()) {
-      committedRows.current = ordered;
-      setRows(ordered);
+    const requestCurrent = nextLoadGuard.current(isCurrent);
+    try {
+      const exec = getExecutor();
+      const [snapshot, customSystems, prefs] = await Promise.all([
+        readOrrerySystemSnapshot(exec),
+        listCustomSystems(exec),
+        listSystemPrefs(exec),
+      ]);
+      const prefByRef = new Map(prefs.map((pref) => [pref.systemRef, pref]));
+      const choices = buildSystemChoices(snapshot.categories, customSystems);
+      const loaded = await Promise.all(
+        choices.map(async (choice, sourceIndex) => {
+          const [members, overrides] = await Promise.all([
+            readOrrerySystemMembersCore(exec, choice.ref),
+            listSystemOverrides(exec, choice.id),
+          ]);
+          const pref = prefByRef.get(choice.id);
+          return {
+            ...choice,
+            memberCount: members.members.length,
+            hidden: pref?.hidden === 1,
+            hasOverrides: overrides.length > 0,
+            broken:
+              members.status !== "ready" ||
+              (members.brokenRules?.length ?? 0) > 0,
+            sourceIndex,
+            displayOrder: pref?.displayOrder,
+          };
+        }),
+      );
+      const ordered = pinAllContacts(
+        [...loaded]
+          .sort(
+            (a, b) =>
+              (a.displayOrder ?? Number.MAX_SAFE_INTEGER) -
+                (b.displayOrder ?? Number.MAX_SAFE_INTEGER) ||
+              a.sourceIndex - b.sourceIndex,
+          )
+          .map(
+            ({
+              sourceIndex: _sourceIndex,
+              displayOrder: _displayOrder,
+              ...row
+            }) => row,
+          ),
+      );
+      if (requestCurrent()) {
+        committedRows.current = ordered;
+        setRows(ordered);
+      }
+    } catch (cause) {
+      // A stale request owns neither rows nor the error UI. Its caller may
+      // still await completion, but a newer request alone can report failure.
+      if (requestCurrent()) throw cause;
     }
   }, []);
 

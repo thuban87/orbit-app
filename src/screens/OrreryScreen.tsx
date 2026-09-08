@@ -243,7 +243,7 @@ export function OrreryScreen() {
       createOrrerySystemStore({
         load: (system, generation) =>
           loadOrreryScene(getExecutor(), generation, system),
-        persist: async (system) => {
+        persist: async (system, userInitiated = false) => {
           const store = useOrreryPreferencesStore.getState();
           const id = systemRefId(system);
           if (store.saveError && store.pendingIntent?.lastSystem === id)
@@ -253,6 +253,7 @@ export function OrreryScreen() {
               getExecutor(),
               { lastSystem: id },
               LOCAL_SELECT_ORIGIN,
+              userInitiated,
             );
           const latest = useOrreryPreferencesStore.getState();
           return (
@@ -450,7 +451,7 @@ export function OrreryScreen() {
     initialized.current = true;
     const active = useSystemStore.getState();
     if (active.requested.id !== id || !active.snapshot)
-      void active.select(system);
+      void active.select(system, undefined, false);
   }, [
     hydrated,
     isFocused,
@@ -997,7 +998,7 @@ export function OrreryScreen() {
     qualifyingSun,
   );
   const brokenRules = scene?.systemSnapshot.brokenRules ?? [];
-  const showAll = () => state.select(ALL_CONTACTS_SYSTEM);
+  const showAll = () => state.select(ALL_CONTACTS_SYSTEM, undefined, true);
 
   return (
     <View
