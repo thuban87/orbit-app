@@ -36,7 +36,7 @@
 // NOTE: ADR-0024 [ACCEPTED] Editable Touchpoint History and Recomputed Recency
 // NOTE: ADR-0025 [ACCEPTED] Immutable Lifecycle Events in a Unified Timeline
 // NOTE: ADR-0026 [ACCEPTED] Rogue Status for Unresponsive or Far-Overdue Contacts
-// NOTE: ADR-0027 [ACCEPTED] Derived Profile-Only Gravity and Intensity
+// IMPORTANT: ADR-0027 [SUPERSEDED BY ADR-106 (partial — Orrery Gravity display scope and companion context)] Derived Profile-Only Gravity and Intensity
 // NOTE: ADR-0028 [ACCEPTED] Per-Item Conversational Fuel with Fixed Kinds
 // IMPORTANT: ADR-0029 [SUPERSEDED BY ADR-039 (partial)] In-Query Fuel Eligibility and a Shared Ranked Projection
 // IMPORTANT: ADR-0030 [SUPERSEDED BY ADR-081] Explicit Confirmation of AI-Proposed Fuel
@@ -113,5 +113,8 @@
 // NOTE: ADR-0101 [ACCEPTED] Avatar-First Accessible Dashboard Card Renderer
 // NOTE: ADR-0102 [ACCEPTED] Frozen-Universe Dashboard Multi-Select
 // NOTE: ADR-0103 [ACCEPTED] Atomic Composed Dashboard Bulk Mutations
+// NOTE: ADR-0104 [ACCEPTED] Durable Orrery Preferences and Live System Scope
+// NOTE: ADR-0105 [ACCEPTED] Scoped Relationship Satellites for System-Member Context
+// NOTE: ADR-0106 [ACCEPTED] Derived Orrery Gravity Visual Mass and Accessible Context
 
-export const ADR_COUNT = 103;
+export const ADR_COUNT = 106;

@@ -21,8 +21,8 @@ not something you can pattern-match against.
 
 ## How to use this
 
-- **Is a decision still live?** Check the `Superseded by` column. 22 of
-  103 ADRs are superseded in whole or in part.
+- **Is a decision still live?** Check the `Superseded by` column. 23 of
+  106 ADRs are superseded in whole or in part.
 - **Which decisions govern a file?** Don't grep this file — ask the graph:
   `npm run graph:ask -- governs src/db/field-values-dao.ts`, or follow the
   `governed_by` edges.
@@ -57,7 +57,7 @@ not something you can pattern-match against.
 | 024 | Editable Touchpoint History and Recomputed Recency | Accepted | 06-interaction-log-status-impact | — | — | — | 5 | `src/components`, `src/db`, `src/screens` |
 | 025 | Immutable Lifecycle Events in a Unified Timeline | Accepted | 06-interaction-log-status-impact | — | — | — | 5 | `src/components`, `src/db` |
 | 026 | Rogue Status for Unresponsive or Far-Overdue Contacts | Accepted | 06-interaction-log-status-impact | — | — | — | 5 | `src/db`, `src/screens`, `src/theme` |
-| 027 | Derived Profile-Only Gravity and Intensity | Accepted | 06-interaction-log-status-impact | — | — | — | 6 | `src/components`, `src/db`, `src/services` |
+| 027 | Derived Profile-Only Gravity and Intensity | Accepted | 06-interaction-log-status-impact | — | ADR-106 (partial — Orrery Gravity display scope and companion context) | — | 6 | `src/components`, `src/db`, `src/services` |
 | 028 | Per-Item Conversational Fuel with Fixed Kinds | Accepted | 07-conversational-fuel | — | — | — | 5 | `src/components`, `src/db`, `src/db/migrations` +1 |
 | 029 | In-Query Fuel Eligibility and a Shared Ranked Projection | Accepted | 07-conversational-fuel | — | ADR-039 (partial) | — | 5 | `src/components`, `src/db`, `src/screens` +1 |
 | 030 | Explicit Confirmation of AI-Proposed Fuel | Accepted | 07-conversational-fuel | — | ADR-081 | — | 4 | `src/components`, `src/db`, `src/screens` |
@@ -134,3 +134,6 @@ not something you can pattern-match against.
 | 101 | Avatar-First Accessible Dashboard Card Renderer | Accepted | 28-dashboard-card-view | — | — | — | 5 | `src/components`, `src/components/icons`, `src/logic` +1 |
 | 102 | Frozen-Universe Dashboard Multi-Select | Accepted | 28-dashboard-card-view | — | — | — | 5 | `src/components`, `src/navigation`, `src/screens` +1 |
 | 103 | Atomic Composed Dashboard Bulk Mutations | Accepted | 28-dashboard-card-view | — | — | — | 6 | `src/db` |
+| 104 | Durable Orrery Preferences and Live System Scope | Accepted | 29-orrery-camera-scale-exploration | — | — | — | 5 | `src/db`, `src/db/migrations`, `src/logic` +1 |
+| 105 | Scoped Relationship Satellites for System-Member Context | Accepted | 29-orrery-camera-scale-exploration | — | — | — | 4 | `src/components/orrery`, `src/db`, `src/logic` |
+| 106 | Derived Orrery Gravity Visual Mass and Accessible Context | Accepted | 29-orrery-camera-scale-exploration | ADR-027 (partial — profile-only presentation and rejected Orrery encoding clauses) | — | — | 5 | `src/components/orrery`, `src/db`, `src/logic` +1 |
