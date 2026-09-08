@@ -146,6 +146,24 @@ export async function saveCustomBuilderDraft(input: {
     .save(exec, { lastSystem: refFromUid(saved.uid) });
 }
 
+/** Immutable built-ins and Categories persist only their membership deltas. */
+export async function saveOverrideBuilderDraft(input: {
+  systemRef: OrrerySystemId;
+  overrideIntent: readonly SystemOverrideIntent[];
+  prunableExclusionContactIds: readonly number[];
+  now: string;
+}): Promise<void> {
+  await saveMembershipOverrides(getExecutor(), input);
+}
+
+function saveErrorMessage(cause: unknown, name: string): string {
+  const message =
+    cause instanceof Error ? cause.message : "Couldn't save this System.";
+  return message.includes("already exists")
+    ? `A System named "${name.trim()}" already exists. Choose a different name.`
+    : message;
+}
+
 function nameForOverrideRef(
   systemRef: string,
   categories: readonly { uid: string; name: string }[],
@@ -367,9 +385,8 @@ export function SystemBuilderScreen({ navigation, route }: Props) {
     }
     setSaving(true);
     try {
-      const exec = getExecutor();
       if (overrideOnly && systemRef) {
-        await saveMembershipOverrides(exec, {
+        await saveOverrideBuilderDraft({
           systemRef: systemRef as OrrerySystemId,
           overrideIntent,
           prunableExclusionContactIds: membership.prunableExclusionContactIds,
@@ -388,9 +405,7 @@ export function SystemBuilderScreen({ navigation, route }: Props) {
       bypassRef.current = true;
       navigation.goBack();
     } catch (cause) {
-      setError(
-        cause instanceof Error ? cause.message : "Couldn't save this System.",
-      );
+      setError(saveErrorMessage(cause, draft.name));
     } finally {
       setSaving(false);
     }
