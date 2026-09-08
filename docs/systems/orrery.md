@@ -1,6 +1,6 @@
 # Orrery
 
-**Last updated:** 2026-09-07
+**Last updated:** 2026-09-02
 
 **Updated by phase:** 29-orrery-camera-scale-exploration
 
@@ -8,9 +8,11 @@
 
 ## Purpose and governing decisions
 
-One canonical relationship-health world lets the user inspect local contacts through a bounded camera. Dashboard remains the daily working surface. Distant isolated contacts focus to visible identity; inspected contacts open Profile; ambiguous touch targets open a conventional contact group. The accessible companion represents exactly the selected System.
+One canonical relationship-health world lets the user inspect local contacts through a bounded camera. Dashboard remains the daily working surface. Distant isolated contacts focus to visible identity; inspected contacts open Profile; ambiguous touch targets open a conventional contact group. The accessible companion represents exactly the selected live System.
 
 ADR-077 partially supersedes ADR-048: the Status/Relationship toggle and relationship morph are gone. Timestamp placement, status treatments, keyed media and the single unmountable ambient clock remain. ADR-077's historical claim that SegmentedControl had only the Orrery consumer is stale: HomeScreen now uses the shared Dashboard view control. Retain that component.
+
+ADR-104 defines the durable preference boundary and live System scope. ADR-105 limits relationship satellites to optional context for current System-member parents. ADR-106 partially supersedes ADR-027 only for modest derived Gravity body mass and named companion context; it leaves every other Gravity and Intensity policy intact.
 
 ## Architecture and ownership
 
@@ -86,13 +88,14 @@ The real SQLite integration proves production-written `avatars/profile.jpg` ente
 
 **Unmeasured:** native backup/tap overlap, long-history/photo-library wait/hold timing, frame timing and GPU behavior. The checklist requires normal automatic-backup tap-to-focus/Profile and cancellation observations, plus scene refresh concurrent with normal Quick Log. Record contact/history/photo scale, target type and whether overlap was actually observed. If overlap is unconfirmed, keep the case pending. Phase 40 owns measured contention optimization and final density/neighbor/large-System calibration. No timeout, priority, busy treatment, additional connection or control bypass is authorized by this handoff. Wall-clock tap delay is not JS/Skia frame time; only physical-phone evidence can support performance claims.
 
-## KB extraction handoff: precise ADR-027 partial supersession
+## Decisions
 
-The owner-approved [canonical Phase 08 dossier](../dossier/milestone-2/phase-08-orrery-camera-scale-exploration-dossier.md) **§E “Gravity as Visual Mass”** and **§Z “Accessible Companion List”**, together with **ORRC-03 and ORRC-15** in [REQUIREMENTS](../../.planning/REQUIREMENTS.md), supersede ADR-027's **profile-only presentation and rejected Orrery encoding clauses in this consumer**. They authorize modest derived body mass and accessible named Gravity context. ADR-093 corroborates prior Dashboard Gravity use; it is not the authority for Orrery.
-
-All remaining ADR-027 policies stay live: derived-never-stored Gravity, complete history/ancient floor, Rarely-responds connected scope aligned with recency, no displayed raw score or human-worth framing, and every intensity/cadence policy. This is a narrow display exception, not a new scoring or storage model.
-
-The required later `extract-phase-kb` workflow must formalize this already-authorized partial reversal and allocate its new ADR identity. Do not guess a number or mutate immutable ADR-027/077 bodies. `gen:adr-registry` reflects ADR source facts only; it cannot record a supersession absent from those sources. Until extraction, the graph may still show ADR-027 Accepted without the display exception. Plan 29-12's summary carries this exact authority for milestone-close extraction.
+- **ADR-046:** Query-Time Orrery Placement and Transactional Ring Ordering — keeps placement derived and rank writes guarded; Phase 29 narrows a reorder to validated visible System slots while preserving the complete order.
+- **ADR-047:** App-Level Assignable Sun and Themed Self Identity — keeps global sun identity independent of System membership.
+- **ADR-077:** Single Canonical Orrery with a Constrained Inspection Camera — supplies the single status world and bounded camera model.
+- **ADR-104:** Durable Orrery Preferences and Live System Scope — adds validated migration-021 preferences and coherent live System snapshots.
+- **ADR-105:** Scoped Relationship Satellites for System-Member Context — renders unlinked relationship moons only as optional, subordinate member context.
+- **ADR-106:** Derived Orrery Gravity Visual Mass and Accessible Context — permits bounded derived Gravity body mass and companion context while partially superseding ADR-027's display restriction.
 
 ## Deferred seams and evidence limits
 
@@ -110,4 +113,4 @@ The required later `extract-phase-kb` workflow must formalize this already-autho
 | 2026-08-27 | 18.2 | Made orbit/picker/reorder Bound-only and preserved saved Unbound sun fallback. |
 | 2026-09-02 | 22 | Added post-Quick-Log projection refresh. |
 | 2026-09-02 | 23 | Added live Reduced Motion for ambient consumers. |
-| 2026-09-07 | 29 | Replaced dual-view rendering with canonical world/camera/Systems; documented preferences, sessions, guarded filtered ordering, relationship moons, tested contention, native-pending acceptance and precise ADR-027 extraction handoff. |
+| 2026-09-02 | 29 | Replaced dual-view rendering with canonical world/camera/Systems; added preferences, sessions, guarded filtered ordering, relationship moons, and ADR-104–106 decision records. |
