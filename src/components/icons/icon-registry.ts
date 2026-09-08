@@ -81,6 +81,15 @@ export const ICON_REGISTRY = {
   "status-rogue": { outline: "remove-circle-outline", filled: "remove-circle" },
   "status-neutral": { outline: "ellipse-outline", filled: "ellipse-outline" },
   "status-snoozed": { outline: "moon-outline", filled: "moon" },
+
+  // ---- Orrery System selector states (Phase 30) -------------------------
+  // Distinct silhouettes communicate empty/broken/overridden without colour.
+  "system-empty": { outline: "warning-outline", filled: "warning" },
+  "system-broken": {
+    outline: "stop-circle-outline",
+    filled: "stop-circle",
+  },
+  "system-overrides": { outline: "layers-outline", filled: "layers" },
 } as const;
 
 /** The registered semantic names. An unregistered name fails `tsc`. */
