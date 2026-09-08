@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { ProvisionalOrreryScene } from "@/services/orrery-scene";
 import {
   buildPreviewMarkers,
+  previewMemberOptions,
   previewMembershipSummary,
 } from "./system-preview-logic";
 
@@ -63,5 +64,17 @@ describe("System preview projection", () => {
     expect(previewMembershipSummary([])).toBe("0 members");
     expect(previewMembershipSummary([{ id: 1 }])).toBe("1 member");
     expect(previewMembershipSummary([{ id: 1 }, { id: 2 }])).toBe("2 members");
+  });
+
+  it("provides named, non-canvas focus targets for every preview member", () => {
+    expect(
+      previewMemberOptions([
+        { id: 7, name: "Alex" },
+        { id: 9, name: "Bea" },
+      ]),
+    ).toEqual([
+      { id: 7, name: "Alex" },
+      { id: 9, name: "Bea" },
+    ]);
   });
 });

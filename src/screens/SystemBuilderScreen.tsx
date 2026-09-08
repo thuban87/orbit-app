@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert,
   AppState,
+  Pressable,
   ScrollView,
   StyleSheet,
   TextInput,
@@ -22,7 +23,10 @@ import {
   rulesToDraft,
   type SystemBuilderDraft,
 } from "@/components/orrery/system-builder-logic";
-import { previewMembershipSummary } from "@/components/orrery/system-preview-logic";
+import {
+  previewMemberOptions,
+  previewMembershipSummary,
+} from "@/components/orrery/system-preview-logic";
 import { AppText } from "@/components/ui/AppText";
 import { Button } from "@/components/ui/Button";
 import { GlassSurface } from "@/components/ui/GlassSurface";
@@ -469,6 +473,13 @@ export function SystemBuilderScreen({ navigation, route }: Props) {
   const excludeIds = currentOverrides
     .filter((entry) => entry.mode === "exclude")
     .map((entry) => entry.contactId);
+  const previewMembers = useMemo(
+    () => (previewScene ? previewMemberOptions(previewScene.contacts) : []),
+    [previewScene],
+  );
+  const focusedPreviewMember = previewMembers.find(
+    (member) => member.id === previewFocusedId,
+  );
 
   return (
     <View style={styles.root}>
@@ -499,10 +510,56 @@ export function SystemBuilderScreen({ navigation, route }: Props) {
                   No members in this System yet.
                 </AppText>
               ) : null}
-              {previewFocusedId !== null ? (
+              {focusedPreviewMember ? (
                 <AppText role="caption" accessibilityLiveRegion="polite">
-                  Focused member
+                  Focused member: {focusedPreviewMember.name}
                 </AppText>
+              ) : null}
+              {previewMembers.length ? (
+                <>
+                  <AppText role="label">Preview members</AppText>
+                  <ScrollView
+                    horizontal
+                    contentContainerStyle={styles.previewMembers}
+                    showsHorizontalScrollIndicator={false}
+                  >
+                    {previewMembers.map((member) => {
+                      const selected = member.id === previewFocusedId;
+                      return (
+                        <Pressable
+                          key={member.id}
+                          testID={`system-preview-member-${member.id}`}
+                          accessibilityRole="button"
+                          accessibilityLabel={`Focus ${member.name} in preview`}
+                          accessibilityState={{ selected }}
+                          onPress={() => setPreviewFocusedId(member.id)}
+                          style={[
+                            styles.previewMember,
+                            {
+                              backgroundColor: selected
+                                ? colors.accent
+                                : colors.surface,
+                              borderColor: selected
+                                ? colors.accent
+                                : colors.border,
+                            },
+                          ]}
+                        >
+                          <AppText
+                            role="label"
+                            style={{
+                              color: selected
+                                ? colors.onAccent
+                                : colors.textPrimary,
+                            }}
+                          >
+                            {member.name}
+                          </AppText>
+                        </Pressable>
+                      );
+                    })}
+                  </ScrollView>
+                </>
               ) : null}
               <View style={styles.previewActions}>
                 <Button
@@ -683,6 +740,14 @@ const styles = StyleSheet.create({
     left: SPACING.base,
   },
   previewContent: { padding: SPACING.base, gap: SPACING.sm },
+  previewMembers: { gap: SPACING.sm, paddingVertical: SPACING.xs },
+  previewMember: {
+    minHeight: 44,
+    justifyContent: "center",
+    borderWidth: 1,
+    borderRadius: RADII.md,
+    paddingHorizontal: SPACING.md,
+  },
   previewActions: { flexDirection: "row", gap: SPACING.sm, flexWrap: "wrap" },
   header: {
     flexDirection: "row",

@@ -125,7 +125,12 @@ function ActiveSystemPreviewCanvas({
 
   return (
     <GestureDetector gesture={gesture}>
-      <Canvas testID="system-preview-canvas" style={styles.canvas}>
+      <Canvas
+        testID="system-preview-canvas"
+        accessibilityElementsHidden
+        importantForAccessibility="no-hide-descendants"
+        style={styles.canvas}
+      >
         <Fill color={colors.background} />
         <Group clip={{ x: 0, y: 0, width, height }}>
           <Group transform={transform}>

@@ -12,6 +12,21 @@ export type PreviewMarkerResult =
   | { kind: "empty"; markers: [] }
   | { kind: "ready"; markers: PreviewMarker[] };
 
+export type PreviewMemberOption = {
+  id: number;
+  name: string;
+};
+
+/** The non-canvas Preview equivalent keeps every member focusable by name. */
+export function previewMemberOptions(
+  contacts: readonly Pick<
+    ProvisionalOrreryScene["contacts"][number],
+    "id" | "name"
+  >[],
+): PreviewMemberOption[] {
+  return contacts.map(({ id, name }) => ({ id, name }));
+}
+
 /**
  * Maps the shared provisional scene into deliberately simple marker geometry.
  * `readProvisionalOrreryScene` owns all membership, scale, and placement work;
