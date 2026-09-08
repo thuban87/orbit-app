@@ -1,7 +1,7 @@
 # Persistence Core
 
 **Last updated:** 2026-09-02
-**Updated by phase:** 27-dashboard-list-view
+**Updated by phase:** 29-orrery-camera-scale-exploration
 **Owners:** `src/db/database.ts`, `src/db/migrations/runner.ts`, `src/db/migrations/001-initial.ts`, `src/db/mutex.ts`, `src/db/transaction.ts`, `src/services/launch-sweep.ts`
 
 ## Purpose
@@ -21,7 +21,7 @@ The schema version is SQLite's `PRAGMA user_version`. Migrations 001–005 estab
 - `interactions` — dated contact touchpoints.
 - `contact_links`, `events`, `custom_field_defs`, `field_history`, `fuel` — durable supporting data introduced in the first schema.
 - `custom_field_values` — migration-006 normalized uid-bearing custom-field current state, unique per contact-and-definition pair.
-- `app_settings` — a singleton SQLite row for non-secret preferences, a monotonic exportable-data revision, and device-local backup health/configuration. Migration 015 adds theme selection; migrations 019 and 020 add validated Dashboard query and right-swipe-action preferences. It never contains an API key, passphrase, or palette hex.
+- `app_settings` — a singleton SQLite row for non-secret preferences, a monotonic exportable-data revision, and device-local backup health/configuration. Migration 015 adds theme selection; migrations 019 and 020 add validated Dashboard query and right-swipe-action preferences; migration 021 adds validated Orrery density, satellite, and last-System preferences. It never contains an API key, passphrase, or palette hex.
 - `tombstones` — indefinitely retained type-and-UID deletion evidence for portable reconciliation.
 - `restore_photo_journal` — committed restore-photo finalization and cleanup work.
 - `contact_methods` — ordered UID-bearing phone/email rows with canonical/actionability data, optional label, and durable display order.
@@ -90,6 +90,7 @@ The schema version is SQLite's `PRAGMA user_version`. Migrations 001–005 estab
 | `src/db/migrations/018-custom-field-scope-history.ts` | Adds custom-field scope/history/group columns and the retained-history table. |
 | `src/db/migrations/019-dashboard-prefs.ts` | Adds checked Dashboard view/sort and validated JSON population/filter preference columns. |
 | `src/db/migrations/020-dashboard-swipe-pref.ts` | Adds the constrained `quick-log` / `log-contact` Dashboard right-swipe action. |
+| `src/db/migrations/021-orrery-preferences.ts` | Adds constrained Orrery density, satellite-toggle, and last-System settings. |
 | `src/db/import-session-dao.ts` | Owns atomic session acceptance and transaction-composable import-row state transitions. |
 | `src/db/app-settings-dao.ts` | Typed, bounds-validated read and update boundary for application settings. |
 | `src/db/types.ts` | Testable database and migration interfaces. |
@@ -123,6 +124,7 @@ The schema version is SQLite's `PRAGMA user_version`. Migrations 001–005 estab
 20. Migration 018 adds global-default custom-field scope, history-retained/group metadata, and a separate UID-bearing value-history table while retaining ADR-001 current-pair constraints.
 21. Migration 019 adds defaulted Dashboard view, population, filter, and sort preferences. The two multi-value axes remain validated JSON text; a v0-to-v19 upgrade receives safe singleton defaults in the same forward-only sequence.
 22. Migration 020 adds `dashboard_right_swipe_action` with a Quick Log default and a SQLite CHECK over the two supported actions. It is additive, so every earlier singleton row receives the default during its normal forward upgrade.
+23. Migration 021 adds constrained Orrery density, satellite-toggle, and last-System columns. It defaults to Balanced, satellites off, and All Contacts; the DAO validates the complete System-token grammar while stale Category existence is resolved on read.
 
 ### Running launch maintenance
 
@@ -135,7 +137,7 @@ The schema version is SQLite's `PRAGMA user_version`. Migrations 001–005 estab
 | Constant | Value | File | Purpose |
 |---|---|---|---|
 | `BUSY_TIMEOUT_MS` | `5000` | `src/db/database.ts` | Wait budget for a busy shared connection. |
-| `TARGET_VERSION` | `20` | `src/db/database.ts` | Schema version after the Dashboard right-swipe preference migration. |
+| `TARGET_VERSION` | `21` | `src/db/database.ts` | Schema version after the Orrery preference migration. |
 
 ## Decisions
 
@@ -167,6 +169,7 @@ The schema version is SQLite's `PRAGMA user_version`. Migrations 001–005 estab
 - **ADR-090:** Additive Custom-Field Value History and Deferred Contact Scope — defines migration 018 without weakening normalized current-value pairs.
 - **ADR-092:** Durable Shared Dashboard Query State — defines migration 019's durable Dashboard preference boundary.
 - **ADR-099:** Durable Global Dashboard Right-Swipe Action — defines migration 020's constrained, defaulted action preference.
+- **ADR-104:** Durable Orrery Preferences and Live System Scope — defines migration 021's constrained, defaulted Orrery preference boundary.
 
 ## Gotchas
 
@@ -192,6 +195,7 @@ The schema version is SQLite's `PRAGMA user_version`. Migrations 001–005 estab
 19. **Retention remains a launch hook.** The Memory and relationship trash sweep rechecks staleness in its own transaction; do not replace it with a timer or nest a writer transaction.
 20. **A data move must prove each source row before removal.** Count equality is insufficient; re-read the mapped destination and let an integrity failure roll the version step back.
 21. **Dashboard preference defaults are semantic.** Keep `dashboard_sort='default'` rather than persisting a resolved population order, and validate JSON axes before query construction.
+22. **Orrery camera state is never an app setting.** Migration 021 stores only density, satellite visibility, and last-System; camera pose and focus stay in navigation-session memory.
 
 ## Related Systems
 
@@ -200,6 +204,7 @@ The schema version is SQLite's `PRAGMA user_version`. Migrations 001–005 estab
 - **Custom fields** — uses migration 006, the shared transaction, and the launch-sweep registry for normalized-row cleanup.
 - **Notifications** — reads the persisted policy during launch/foreground schedule reconciliation.
 - **Orrery** — reads and writes the app-level sun settings added by migration 003.
+- **Orrery** — validates and stores migration-021 view preferences while resolving live System membership separately from Dashboard state.
 - **AI suggestions** — persists non-secret settings and acknowledgement state through migration 004 while keeping credentials outside SQLite.
 - **Digest** — reads the migration-005 scheduling preference and registers a post-migration launch-sweep reconcile.
 - **Backup & Restore** — uses migrations 007/008, revisions, snapshots, and launch recovery without a backend.
@@ -229,3 +234,4 @@ The schema version is SQLite's `PRAGMA user_version`. Migrations 001–005 estab
 | 2026-09-03 | 24.2 | Added migrations 017/018 for verified fuel carry-over, default-off Memory permission, and retained custom-field history. |
 | 2026-09-02 | 25 | Added migration 019 for durable, validated Dashboard query preferences. |
 | 2026-09-02 | 27 | Added migration 020's defaulted, CHECK-constrained global Dashboard right-swipe action. |
+| 2026-09-02 | 29 | Added migration 021's constrained Orrery density, satellite, and last-System preferences. |
