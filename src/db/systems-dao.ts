@@ -1,13 +1,14 @@
 /** Durable custom-System definitions and cross-kind override reads/writes. */
-import {
-  assertOrreryLastSystem,
-  type OrrerySystemId,
-} from "@/db/app-settings-dao";
+import type { OrrerySystemId } from "@/db/app-settings-dao";
 import { bumpDataRevisionCore } from "@/db/data-revision-dao";
 import { inWriteTransaction, type ReadOnlyExecutor } from "@/db/transaction";
 import type { SqlExecutor } from "@/db/types";
 import { newUid } from "@/db/uid";
-import { BUILTIN_SYSTEM_LABELS } from "@/logic/orrery-system-logic";
+import {
+  BUILTIN_SYSTEM_LABELS,
+  parseSystemRef,
+  type OrrerySystemRef,
+} from "@/logic/orrery-system-logic";
 
 export interface CustomSystem {
   id: number;
@@ -44,6 +45,24 @@ export interface SystemPref {
   hidden: 0 | 1;
   createdAt: string;
   modifiedAt: string;
+}
+
+export interface SystemRuleDraft {
+  family: string;
+  value: string;
+}
+
+export interface DeletedSystemSnapshot {
+  uid: string;
+  name: string;
+  rules: SystemRuleDraft[];
+  overrides: Array<{ contactId: number; mode: SystemOverrideMode }>;
+  prefs: { displayOrder: number | null; hidden: 0 | 1 } | null;
+}
+
+export interface SystemOverrideIntent {
+  contactId: number;
+  mode: SystemOverrideMode | null;
 }
 
 function mapSystem(row: {
@@ -89,21 +108,77 @@ export async function assertUniqueSystemName(
   }
 }
 
+function normalizeSystemName(name: string): string {
+  const normalized = name.trim();
+  if (!normalized) throw new Error("Give this System a name.");
+  return normalized;
+}
+
+function assertOneChange(op: string, changes: number): void {
+  if (changes !== 1) {
+    throw new Error(`${op}: expected one changed row, got ${changes}`);
+  }
+}
+
+async function getCustomSystemForRef(
+  exec: ReadOnlyExecutor,
+  systemRef: OrrerySystemId,
+): Promise<CustomSystem> {
+  const ref = assertMutableCustomRef(systemRef);
+  const system = await getSystem(exec, ref.uid);
+  if (!system) throw new Error("systems-dao: unknown custom System");
+  return system;
+}
+
+/** Ensure a syntactically valid System token still exists in its catalog. */
+export async function assertKnownSystemRef(
+  exec: ReadOnlyExecutor,
+  systemRef: OrrerySystemId,
+): Promise<OrrerySystemRef> {
+  const ref = parseSystemRef(systemRef);
+  if (!ref) throw new Error("systems-dao: unknown System reference");
+  if (ref.kind === "builtin") {
+    if (Object.hasOwn(BUILTIN_SYSTEM_LABELS, ref.id)) return ref;
+  } else if (ref.kind === "category") {
+    if (
+      await exec.getFirstAsync("SELECT id FROM categories WHERE uid = ?", [
+        ref.uid,
+      ])
+    )
+      return ref;
+  } else if (await exec.getFirstAsync("SELECT id FROM systems WHERE uid = ?", [ref.uid])) {
+    return ref;
+  }
+  throw new Error("systems-dao: unknown System reference");
+}
+
+/** Base predicates are read-only; only custom definitions may change their shape. */
+export function assertMutableCustomRef(
+  systemRef: OrrerySystemId,
+): Extract<OrrerySystemRef, { kind: "custom" }> {
+  const ref = parseSystemRef(systemRef);
+  if (ref?.kind !== "custom") {
+    throw new Error("systems-dao: immutable System definitions cannot be changed");
+  }
+  return ref;
+}
+
 /** Insert a custom definition while an outer writer owns the transaction. */
 export async function createCustomSystemCore(
   exec: SqlExecutor,
   input: { name: string; now: string },
 ): Promise<CustomSystem> {
-  await assertUniqueSystemName(exec, { name: input.name });
+  const name = normalizeSystemName(input.name);
+  await assertUniqueSystemName(exec, { name });
   const uid = newUid();
   const result = await exec.runAsync(
     "INSERT INTO systems (uid, name, created_at, modified_at) VALUES (?, ?, ?, ?)",
-    [uid, input.name, input.now, input.now],
+    [uid, name, input.now, input.now],
   );
   return {
     id: result.lastInsertRowId,
     uid,
-    name: input.name,
+    name,
     createdAt: input.now,
     modifiedAt: input.now,
   };
@@ -137,13 +212,7 @@ export async function addSystemOverrideCore(
     now: string;
   },
 ): Promise<void> {
-  assertOrreryLastSystem("systemRef", input.systemRef);
-  assertOverrideMode(input.mode);
-  await exec.runAsync(
-    `INSERT INTO system_overrides (uid, system_ref, contact_id, mode, created_at)
-     VALUES (?, ?, ?, ?, ?)`,
-    [newUid(), input.systemRef, input.contactId, input.mode, input.now],
-  );
+  await setSystemOverrideCore(exec, input);
 }
 
 export function addSystemOverride(
@@ -157,6 +226,231 @@ export function addSystemOverride(
 ): Promise<void> {
   return inWriteTransaction(exec, async () => {
     await addSystemOverrideCore(exec, input);
+    await bumpDataRevisionCore(exec);
+  });
+}
+
+export async function renameSystemCore(
+  exec: SqlExecutor,
+  input: { systemRef: OrrerySystemId; name: string; now: string },
+): Promise<CustomSystem> {
+  const system = await getCustomSystemForRef(exec, input.systemRef);
+  const name = normalizeSystemName(input.name);
+  await assertUniqueSystemName(exec, { name, excludeId: system.id });
+  const result = await exec.runAsync(
+    "UPDATE systems SET name = ?, modified_at = ? WHERE id = ?",
+    [name, input.now, system.id],
+  );
+  assertOneChange("renameSystem", result.changes);
+  return { ...system, name, modifiedAt: input.now };
+}
+
+export function renameSystem(
+  exec: SqlExecutor,
+  input: { systemRef: OrrerySystemId; name: string; now: string },
+): Promise<CustomSystem> {
+  return inWriteTransaction(exec, async () => {
+    const system = await renameSystemCore(exec, input);
+    await bumpDataRevisionCore(exec);
+    return system;
+  });
+}
+
+export async function deleteSystemCore(
+  exec: SqlExecutor,
+  input: { systemRef: OrrerySystemId },
+): Promise<DeletedSystemSnapshot> {
+  const system = await getCustomSystemForRef(exec, input.systemRef);
+  const rules = await exec.getAllAsync<{ family: string; value: string }>(
+    "SELECT family, value FROM system_rules WHERE system_id = ? ORDER BY id",
+    [system.id],
+  );
+  const overrides = await exec.getAllAsync<{
+    contactId: number;
+    mode: SystemOverrideMode;
+  }>(
+    "SELECT contact_id AS contactId, mode FROM system_overrides WHERE system_ref = ? ORDER BY id",
+    [input.systemRef],
+  );
+  const prefs = await exec.getFirstAsync<{
+    displayOrder: number | null;
+    hidden: 0 | 1;
+  }>(
+    "SELECT display_order AS displayOrder, hidden FROM system_prefs WHERE system_ref = ?",
+    [input.systemRef],
+  );
+  const deletedOverrides = await exec.runAsync(
+    "DELETE FROM system_overrides WHERE system_ref = ?",
+    [input.systemRef],
+  );
+  if (deletedOverrides.changes !== overrides.length) {
+    throw new Error("deleteSystem: override rows changed during delete");
+  }
+  const deletedPrefs = await exec.runAsync(
+    "DELETE FROM system_prefs WHERE system_ref = ?",
+    [input.systemRef],
+  );
+  if (deletedPrefs.changes !== (prefs ? 1 : 0)) {
+    throw new Error("deleteSystem: preference row changed during delete");
+  }
+  const deletedSystem = await exec.runAsync("DELETE FROM systems WHERE id = ?", [
+    system.id,
+  ]);
+  assertOneChange("deleteSystem", deletedSystem.changes);
+  return { uid: system.uid, name: system.name, rules, overrides, prefs };
+}
+
+export function deleteSystem(
+  exec: SqlExecutor,
+  input: { systemRef: OrrerySystemId },
+): Promise<DeletedSystemSnapshot> {
+  return inWriteTransaction(exec, async () => {
+    const snapshot = await deleteSystemCore(exec, input);
+    await bumpDataRevisionCore(exec);
+    return snapshot;
+  });
+}
+
+export async function restoreDeletedSystemCore(
+  exec: SqlExecutor,
+  input: { snapshot: DeletedSystemSnapshot; now: string },
+): Promise<CustomSystem> {
+  const { snapshot, now } = input;
+  await assertUniqueSystemName(exec, { name: snapshot.name });
+  const inserted = await exec.runAsync(
+    "INSERT INTO systems (uid, name, created_at, modified_at) VALUES (?, ?, ?, ?)",
+    [snapshot.uid, snapshot.name, now, now],
+  );
+  const system: CustomSystem = {
+    id: inserted.lastInsertRowId,
+    uid: snapshot.uid,
+    name: snapshot.name,
+    createdAt: now,
+    modifiedAt: now,
+  };
+  for (const rule of snapshot.rules) {
+    await exec.runAsync(
+      "INSERT INTO system_rules (uid, system_id, family, value, created_at) VALUES (?, ?, ?, ?, ?)",
+      [newUid(), system.id, rule.family, rule.value, now],
+    );
+  }
+  const systemRef = `custom:${snapshot.uid}` as OrrerySystemId;
+  for (const override of snapshot.overrides) {
+    await exec.runAsync(
+      "INSERT INTO system_overrides (uid, system_ref, contact_id, mode, created_at) VALUES (?, ?, ?, ?, ?)",
+      [newUid(), systemRef, override.contactId, override.mode, now],
+    );
+  }
+  if (snapshot.prefs) {
+    await exec.runAsync(
+      "INSERT INTO system_prefs (uid, system_ref, display_order, hidden, created_at, modified_at) VALUES (?, ?, ?, ?, ?, ?)",
+      [
+        newUid(),
+        systemRef,
+        snapshot.prefs.displayOrder,
+        snapshot.prefs.hidden,
+        now,
+        now,
+      ],
+    );
+  }
+  return system;
+}
+
+export function restoreDeletedSystem(
+  exec: SqlExecutor,
+  input: { snapshot: DeletedSystemSnapshot; now: string },
+): Promise<CustomSystem> {
+  return inWriteTransaction(exec, async () => {
+    const system = await restoreDeletedSystemCore(exec, input);
+    await bumpDataRevisionCore(exec);
+    return system;
+  });
+}
+
+export async function setSystemOverrideCore(
+  exec: SqlExecutor,
+  input: {
+    systemRef: OrrerySystemId;
+    contactId: number;
+    mode: SystemOverrideMode | null;
+    now: string;
+  },
+): Promise<void> {
+  await assertKnownSystemRef(exec, input.systemRef);
+  if (input.mode === null) {
+    await exec.runAsync(
+      "DELETE FROM system_overrides WHERE system_ref = ? AND contact_id = ?",
+      [input.systemRef, input.contactId],
+    );
+    return;
+  }
+  assertOverrideMode(input.mode);
+  const result = await exec.runAsync(
+    `INSERT INTO system_overrides (uid, system_ref, contact_id, mode, created_at)
+     VALUES (?, ?, ?, ?, ?)
+     ON CONFLICT(system_ref, contact_id) DO UPDATE SET mode = excluded.mode`,
+    [newUid(), input.systemRef, input.contactId, input.mode, input.now],
+  );
+  assertOneChange("setSystemOverride", result.changes);
+}
+
+export function setSystemOverride(
+  exec: SqlExecutor,
+  input: {
+    systemRef: OrrerySystemId;
+    contactId: number;
+    mode: SystemOverrideMode | null;
+    now: string;
+  },
+): Promise<void> {
+  return inWriteTransaction(exec, async () => {
+    await setSystemOverrideCore(exec, input);
+    await bumpDataRevisionCore(exec);
+  });
+}
+
+export async function pruneSystemExclusionsCore(
+  exec: SqlExecutor,
+  input: { systemRef: OrrerySystemId; contactIds: readonly number[] },
+): Promise<void> {
+  await assertKnownSystemRef(exec, input.systemRef);
+  const contactIds = [...new Set(input.contactIds)];
+  if (!contactIds.length) return;
+  await exec.runAsync(
+    `DELETE FROM system_overrides
+      WHERE system_ref = ? AND mode = 'exclude'
+        AND contact_id IN (${contactIds.map(() => "?").join(", ")})`,
+    [input.systemRef, ...contactIds],
+  );
+}
+
+export function pruneSystemExclusions(
+  exec: SqlExecutor,
+  input: { systemRef: OrrerySystemId; contactIds: readonly number[] },
+): Promise<void> {
+  return inWriteTransaction(exec, async () => {
+    await pruneSystemExclusionsCore(exec, input);
+    await bumpDataRevisionCore(exec);
+  });
+}
+
+export async function resetSystemOverridesCore(
+  exec: SqlExecutor,
+  input: { systemRef: OrrerySystemId },
+): Promise<void> {
+  await assertKnownSystemRef(exec, input.systemRef);
+  await exec.runAsync("DELETE FROM system_overrides WHERE system_ref = ?", [
+    input.systemRef,
+  ]);
+}
+
+export function resetSystemOverrides(
+  exec: SqlExecutor,
+  input: { systemRef: OrrerySystemId },
+): Promise<void> {
+  return inWriteTransaction(exec, async () => {
+    await resetSystemOverridesCore(exec, input);
     await bumpDataRevisionCore(exec);
   });
 }
