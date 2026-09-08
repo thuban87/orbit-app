@@ -155,6 +155,14 @@ describe("Phase 17 composed backup regressions", () => {
       // explicitly discards cards for its absorbed contact, then re-finalizes the
       // owning session by its remaining non-terminal card count.
       ["reconciliation_session_cards", "device-local reconciliation workflow state"],
+      // Phase 30 Systems are durable local state, but their backup wire shape is
+      // explicitly deferred to Phase 36. Until that format work lands, deleting
+      // a System definition/rule/override/preference is intentionally not a
+      // mergeable operation; do not invent tombstones for entities not emitted.
+      ["systems", "Phase 36 Systems backup serialization is deferred"],
+      ["system_rules", "Phase 36 Systems backup serialization is deferred"],
+      ["system_overrides", "Phase 36 Systems backup serialization is deferred"],
+      ["system_prefs", "Phase 36 Systems backup serialization is deferred"],
     ]);
     for (const table of writers) {
       expect(
