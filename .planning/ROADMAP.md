@@ -549,8 +549,33 @@ Plans:
   5. The switcher lists Systems in management order with live counts, hidden Systems omitted, and distinct empty-valid vs broken indicators; the last active System persists across relaunch and switching lands at canonical Home framing preserving a focus present in both; membership deltas animate proportionally with a simple crossfade under Reduced Motion; and backup/restore preserves definitions, rules, overrides, ordering, visibility, and the last-active preference (ORRS-11/12/13/14)
 
 **Canonical refs**: docs/dossier/milestone-2/phase-09-orrery-systems-dossier.md; docs/dossier/milestone-2/planning-notes/phase-09-planning-notes.md
-**Schema**: Systems tables (verify head+1 at plan time)
-**Plans**: TBD
+**Schema**: Systems tables — migration **022** (verified head+1 on disk at plan time 2026-09-08: migrations 001–021, `TARGET_VERSION=21` → first new is 022; re-verify at execution time). Creates `systems` + `system_rules` + `system_overrides` + `system_prefs`; does NOT touch `app_settings` (`orrery_last_system` already exists, migration 021). Backup is **declare-only** — no `BACKUP_FORMAT_VERSION` bump (Phase 36 owns v5).
+**Plans**: 10 plans (5 waves)
+**Wave 1**
+
+- [ ] 30-01-PLAN.md — TRACER: migration 022 (Systems table set, one-way-door checkpoint) + thin manual-only custom System end-to-end (union/grammar/resolver/read/switcher) [ORRS-01/02/12]
+
+**Wave 2** *(blocked on Wave 1)*
+
+- [ ] 30-02-PLAN.md — Custom-System membership resolver: rules (OR/AND) + Gravity TS pass + inc/exc pruning + broken-rule detection [ORRS-01/02/04]
+- [ ] 30-03-PLAN.md — systems-dao full CRUD: rename/delete+fallback/duplicate/reorder/hide-show/overrides/reset + CI-unique names + immutability [ORRS-02/03/09/10]
+- [ ] 30-04-PLAN.md — Backup declare-only: restore-accept custom:<uid> + Systems entity contract for Phase 36 (no wire emission, no format bump) [ORRS-14]
+
+**Wave 3** *(blocked on Wave 2)*
+
+- [ ] 30-06-PLAN.md — Systems Management screen + routes (Orrery + Settings) + contact-safe delete+Undo [ORRS-03/04/09/10]
+- [ ] 30-07-PLAN.md — Manage Members: searchable virtualized multi-select grid (preselect/exclude-in-place/add/counts) on the picker LOGIC [ORRS-02/06]
+- [ ] 30-10-PLAN.md — Switch animation + camera: Home framing + shared-focus preservation + delta-adaptive spin/shed/capture + reduced-motion crossfade [ORRS-12/13]
+
+**Wave 4** *(blocked on Wave 3)*
+
+- [ ] 30-05-PLAN.md — Switcher extension: management order/visibility/live counts/empty-vs-broken severity + Manage Systems entry + 3 icon keys [ORRS-11]
+- [ ] 30-08-PLAN.md — Builder HUD wizard: Definition accordions (8 axes) + live count + embed Manage Members + save-switch semantics + discard guard [ORRS-01/02/05/08]
+
+**Wave 5** *(blocked on Wave 4)*
+
+- [ ] 30-09-PLAN.md — Full-canvas Preview: simplified render over reused Phase 29 layout + Preview/Edit bar + Save-from-Preview [ORRS-07]
+
 **UI hint**: yes
 
 ### Phase 31: Profile Experience
@@ -722,7 +747,7 @@ Plans:
 | 27. Dashboard List View | 8/8 | Complete | 2026-09-06 (owner-approved; UAT partial) |
 | 28. Dashboard Card View | 8/8 | In Progress|  |
 | 29. Orrery Camera, Scale & Exploration | 12/12 | In Progress|  |
-| 30. Orrery Systems | 0/TBD | Not started | - |
+| 30. Orrery Systems | 0/10 | Planned | - |
 | 31. Profile Experience | 0/TBD | Not started | - |
 | 32. Interaction History & Insights | 0/TBD | Not started | - |
 | 33. Group Interaction Logging | 0/TBD | Not started | - |
