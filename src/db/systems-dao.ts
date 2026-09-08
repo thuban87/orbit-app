@@ -93,6 +93,25 @@ export interface SystemDefinitionDraft {
 
 const CATEGORY_UID_RE = /^[^\s\p{Cc}]{1,256}$/u;
 
+/** Whether one row belongs to the closed grammar accepted for new writes. */
+export function isSystemRuleDraftValid(rule: SystemRuleDraft): boolean {
+  return (
+    (rule.family === "category" && CATEGORY_UID_RE.test(rule.value)) ||
+    (rule.family === "favorite" && rule.value === "on") ||
+    (rule.family === "needs-attention" &&
+      rule.value === NEEDS_ATTENTION_VALUE) ||
+    (rule.family === "gravity" &&
+      GRAVITY_TIERS.some((tier) => tier.name === rule.value)) ||
+    (rule.family === "social-battery" &&
+      (SOCIAL_BATTERY_VALUES as readonly string[]).includes(rule.value)) ||
+    (rule.family === "contact-frequency" &&
+      Object.hasOwn(CONTACT_FREQUENCY_BANDS, rule.value)) ||
+    (rule.family === "not-contacted" && rule.value === "on") ||
+    (rule.family === "snoozed" && rule.value === "on") ||
+    (rule.family === "scope" && rule.value === "population")
+  );
+}
+
 /**
  * The durable System-rule grammar. Missing Categories remain readable broken
  * rules by design, but writers never introduce an unknown family, value, or
@@ -108,21 +127,7 @@ export function assertSystemRuleDrafts(
       throw new Error("systems-dao: duplicate System rule");
     }
     seen.add(duplicateKey);
-    const valid =
-      (rule.family === "category" && CATEGORY_UID_RE.test(rule.value)) ||
-      (rule.family === "favorite" && rule.value === "on") ||
-      (rule.family === "needs-attention" &&
-        rule.value === NEEDS_ATTENTION_VALUE) ||
-      (rule.family === "gravity" &&
-        GRAVITY_TIERS.some((tier) => tier.name === rule.value)) ||
-      (rule.family === "social-battery" &&
-        (SOCIAL_BATTERY_VALUES as readonly string[]).includes(rule.value)) ||
-      (rule.family === "contact-frequency" &&
-        Object.hasOwn(CONTACT_FREQUENCY_BANDS, rule.value)) ||
-      (rule.family === "not-contacted" && rule.value === "on") ||
-      (rule.family === "snoozed" && rule.value === "on") ||
-      (rule.family === "scope" && rule.value === "population");
-    if (!valid) {
+    if (!isSystemRuleDraftValid(rule)) {
       throw new Error("systems-dao: invalid System rule family or value");
     }
   }
@@ -643,16 +648,76 @@ export async function setSystemRulesCore(
 ): Promise<void> {
   assertSystemRuleDrafts(input.rules);
   const system = await getCustomSystemForRef(exec, input.systemRef);
+  await replaceSystemRulesCore(exec, {
+    system,
+    rules: input.rules,
+    now: input.now,
+  });
+}
+
+async function replaceSystemRulesCore(
+  exec: SqlExecutor,
+  input: {
+    system: CustomSystem;
+    rules: readonly SystemRuleDraft[];
+    now: string;
+  },
+): Promise<void> {
   await exec.runAsync("DELETE FROM system_rules WHERE system_id = ?", [
-    system.id,
+    input.system.id,
   ]);
   for (const rule of input.rules) {
     const result = await exec.runAsync(
       "INSERT INTO system_rules (uid, system_id, family, value, created_at) VALUES (?, ?, ?, ?, ?)",
-      [newUid(), system.id, rule.family, rule.value, input.now],
+      [newUid(), input.system.id, rule.family, rule.value, input.now],
     );
     assertOneChange("setSystemRules", result.changes);
   }
+}
+
+function storedRuleNeedsPassthrough(rule: SystemRuleDraft): boolean {
+  // scope:population is valid durable grammar but deliberately has no Builder
+  // control. Invalid historical rows remain intact rather than becoming a new
+  // user-authored write merely because another field was saved.
+  return (
+    (rule.family === "scope" && rule.value === "population") ||
+    !isSystemRuleDraftValid(rule)
+  );
+}
+
+/**
+ * Replacement saves accept only a strict caller draft, then replay the exact
+ * non-authorable rows already on this System. This deliberately has no input
+ * for caller-supplied passthrough rows, so it cannot create invalid data.
+ */
+async function setSystemRulesPreservingStoredPassthroughCore(
+  exec: SqlExecutor,
+  input: {
+    systemRef: OrrerySystemId;
+    rules: readonly SystemRuleDraft[];
+    now: string;
+  },
+): Promise<void> {
+  assertSystemRuleDrafts(input.rules);
+  const system = await getCustomSystemForRef(exec, input.systemRef);
+  const stored = await listSystemRules(exec, system.id);
+  const ruleKeys = new Set(
+    input.rules.map((rule) => `${rule.family}\u0000${rule.value}`),
+  );
+  const replacement = [...input.rules];
+  for (const rule of stored) {
+    if (!storedRuleNeedsPassthrough(rule)) continue;
+    const key = `${rule.family}\u0000${rule.value}`;
+    if (!ruleKeys.has(key)) {
+      replacement.push({ family: rule.family, value: rule.value });
+      ruleKeys.add(key);
+    }
+  }
+  await replaceSystemRulesCore(exec, {
+    system,
+    rules: replacement,
+    now: input.now,
+  });
 }
 
 export function setSystemRules(
@@ -820,11 +885,18 @@ export async function saveSystemDefinitionCore(
           now: draft.now,
         });
   const systemRef = `custom:${system.uid}` as OrrerySystemId;
-  await setSystemRulesCore(exec, {
-    systemRef,
-    rules: draft.rules,
-    now: draft.now,
-  });
+  if (draft.systemRef === null)
+    await setSystemRulesCore(exec, {
+      systemRef,
+      rules: draft.rules,
+      now: draft.now,
+    });
+  else
+    await setSystemRulesPreservingStoredPassthroughCore(exec, {
+      systemRef,
+      rules: draft.rules,
+      now: draft.now,
+    });
   for (const intent of draft.overrideIntent) {
     await setSystemOverrideCore(exec, {
       systemRef,

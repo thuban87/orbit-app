@@ -1,4 +1,8 @@
-import type { SystemOverrideIntent, SystemRuleDraft } from "@/db/systems-dao";
+import {
+  isSystemRuleDraftValid,
+  type SystemOverrideIntent,
+  type SystemRuleDraft,
+} from "@/db/systems-dao";
 import {
   CONTACT_FREQUENCY_BANDS,
   SOCIAL_BATTERY_VALUES,
@@ -118,6 +122,39 @@ export function rulesToDraft(rules: readonly SystemRuleDraft[]): RuleDraft {
     }
   }
   return draft;
+}
+
+/**
+ * Keep stored grammar the accordion cannot safely author out of its editable
+ * draft. The caller carries it into provisional resolution; the DAO separately
+ * replays only rows it reads from durable storage during an edit save.
+ */
+export function partitionStoredRulesForBuilder(
+  rules: readonly SystemRuleDraft[],
+): { draft: RuleDraft; passthrough: SystemRuleDraft[] } {
+  const editable = rules.filter(
+    (rule) =>
+      isSystemRuleDraftValid(rule) &&
+      rule.family !== "scope" &&
+      rule.family !== "favorite" &&
+      rule.family !== "needs-attention" &&
+      rule.family !== "not-contacted" &&
+      rule.family !== "snoozed",
+  );
+  const booleanRules = rules.filter(
+    (rule) =>
+      (rule.family === "favorite" ||
+        rule.family === "needs-attention" ||
+        rule.family === "not-contacted" ||
+        rule.family === "snoozed") &&
+      isSystemRuleDraftValid(rule),
+  );
+  return {
+    draft: rulesToDraft([...editable, ...booleanRules]),
+    passthrough: rules.filter(
+      (rule) => !editable.includes(rule) && !booleanRules.includes(rule),
+    ),
+  };
 }
 
 /** The DAO's closed row vocabulary; text input never becomes a SQL token. */

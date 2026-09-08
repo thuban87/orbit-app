@@ -528,6 +528,83 @@ describe("systems DAO", () => {
     );
   });
 
+  it("preserves a duplicated All Contacts predicate and historical broken rows on an unchanged Builder save", async () => {
+    const contacted = await addContact("Contacted");
+    const neverContacted = await exec.runAsync(
+      "INSERT INTO contacts (uid, name, interval_days, created_at, modified_at) VALUES (?, ?, ?, ?, ?)",
+      [`contact-${++sequence}`, "Never contacted", 14, NOW, NOW],
+    );
+    const copy = await duplicateSystem(exec, {
+      systemRef: "builtin:all-contacts",
+      now: NOW,
+    });
+    const copyRef = `custom:${copy.uid}` as const;
+    await exec.runAsync(
+      "INSERT INTO system_rules (uid, system_id, family, value, created_at) VALUES (?, ?, ?, ?, ?)",
+      ["historical-unknown", copy.id, "retired-family", "legacy", NOW],
+    );
+    await exec.runAsync(
+      "INSERT INTO system_rules (uid, system_id, family, value, created_at) VALUES (?, ?, ?, ?, ?)",
+      ["historical-invalid-boolean", copy.id, "favorite", "off", NOW],
+    );
+    const before = await resolveCustomSystemMembers(
+      exec,
+      copy,
+      NOW,
+      async () => null,
+    );
+
+    // An unchanged Builder draft contains none of the unrepresentable rows.
+    // The DAO, rather than caller input, replays those exact stored values.
+    await saveSystemDefinition(exec, {
+      systemRef: copyRef,
+      name: copy.name,
+      rules: [],
+      overrideIntent: [],
+      prunableExclusionContactIds: [],
+      now: NOW,
+    });
+
+    expect(
+      (await listSystemRules(exec, copy.id)).map(({ family, value }) => ({
+        family,
+        value,
+      })),
+    ).toEqual([
+      { family: "scope", value: "population" },
+      { family: "retired-family", value: "legacy" },
+      { family: "favorite", value: "off" },
+    ]);
+    expect(
+      (await resolveCustomSystemMembers(exec, copy, NOW, async () => null))
+        .memberIds,
+    ).toEqual(before.memberIds);
+    expect(before.memberIds).toEqual(
+      expect.arrayContaining([contacted, neverContacted.lastInsertRowId]),
+    );
+
+    await expect(
+      saveSystemDefinition(exec, {
+        systemRef: copyRef,
+        name: copy.name,
+        rules: [{ family: "favorite", value: "off" }],
+        overrideIntent: [],
+        prunableExclusionContactIds: [],
+        now: NOW,
+      }),
+    ).rejects.toThrow("invalid System rule");
+    expect(
+      (await listSystemRules(exec, copy.id)).map(({ family, value }) => ({
+        family,
+        value,
+      })),
+    ).toEqual([
+      { family: "scope", value: "population" },
+      { family: "retired-family", value: "legacy" },
+      { family: "favorite", value: "off" },
+    ]);
+  });
+
   it("saves custom definitions atomically and immutable-base overrides without mutating base rows", async () => {
     const contactId = await addContact("Alex");
     const saved = await saveSystemDefinition(exec, {

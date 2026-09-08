@@ -3,6 +3,7 @@ import {
   draftToRules,
   emptyRuleDraft,
   isMeaningfulChange,
+  partitionStoredRulesForBuilder,
   summarizeFamily,
 } from "./system-builder-logic";
 
@@ -57,5 +58,23 @@ describe("System builder draft logic", () => {
         overrideIntent: [{ contactId: 8, mode: "include" }],
       }),
     ).toBe(true);
+  });
+
+  it("keeps scope and historical broken rows outside the editable Builder draft", () => {
+    const projected = partitionStoredRulesForBuilder([
+      { family: "scope", value: "population" },
+      { family: "social-battery", value: "Charger" },
+      { family: "favorite", value: "off" },
+      { family: "retired-family", value: "legacy" },
+    ]);
+
+    expect(draftToRules(projected.draft)).toEqual([
+      { family: "social-battery", value: "Charger" },
+    ]);
+    expect(projected.passthrough).toEqual([
+      { family: "scope", value: "population" },
+      { family: "favorite", value: "off" },
+      { family: "retired-family", value: "legacy" },
+    ]);
   });
 });

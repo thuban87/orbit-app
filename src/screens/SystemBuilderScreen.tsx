@@ -19,6 +19,7 @@ import {
   draftToRules,
   emptyRuleDraft,
   isMeaningfulChange,
+  partitionStoredRulesForBuilder,
   type RuleDraft,
   rulesToDraft,
   type SystemBuilderDraft,
@@ -45,6 +46,7 @@ import {
   resetSystemOverrides,
   type SystemOverride,
   type SystemOverrideIntent,
+  type SystemRuleDraft,
   saveMembershipOverrides,
   saveSystemDefinition,
 } from "@/db/systems-dao";
@@ -244,6 +246,9 @@ export function SystemBuilderScreen({ navigation, route }: Props) {
     [],
   );
   const [baseCandidateIds, setBaseCandidateIds] = useState<number[]>([]);
+  const [passthroughRules, setPassthroughRules] = useState<SystemRuleDraft[]>(
+    [],
+  );
   const [activeRows, setActiveRows] = useState<
     Awaited<ReturnType<typeof listActiveMemberRows>>
   >([]);
@@ -278,6 +283,7 @@ export function SystemBuilderScreen({ navigation, route }: Props) {
     const active = await listActiveMemberRows(exec);
     let name = "";
     let rules: RuleDraft = emptyRuleDraft();
+    let loadedPassthroughRules: SystemRuleDraft[] = [];
     let candidateIds: number[] = [];
     let overrides: SystemOverrideIntent[] = [];
     if (overrideOnly && systemRef) {
@@ -301,7 +307,9 @@ export function SystemBuilderScreen({ navigation, route }: Props) {
         listSystemRules(exec, system.id),
         listSystemOverrides(exec, customRef),
       ]);
-      rules = rulesToDraft(storedRules);
+      const projected = partitionStoredRulesForBuilder(storedRules);
+      rules = projected.draft;
+      loadedPassthroughRules = projected.passthrough;
       overrides = storedOverrides.map(({ contactId, mode }) => ({
         contactId,
         mode,
@@ -312,6 +320,7 @@ export function SystemBuilderScreen({ navigation, route }: Props) {
     setCategories(loadedCategories);
     setActiveRows(active);
     setBaseCandidateIds(candidateIds);
+    setPassthroughRules(loadedPassthroughRules);
     setBaseOverrides(overrides);
     setOverrideIntent([]);
     setDraft(nextDraft);
@@ -354,10 +363,12 @@ export function SystemBuilderScreen({ navigation, route }: Props) {
               activeRows.filter((row) => row.available).map((row) => row.id),
             )
           : await resolveDraftMembership(exec, {
-              rules: draftToRules(draft.rules).map((rule, index) => ({
-                uid: `draft-${index}`,
-                ...rule,
-              })),
+              rules: [...draftToRules(draft.rules), ...passthroughRules].map(
+                (rule, index) => ({
+                  uid: `draft-${index}`,
+                  ...rule,
+                }),
+              ),
               overrides: toOverrides(
                 customRef ?? "custom:draft",
                 currentOverrides,
@@ -400,6 +411,7 @@ export function SystemBuilderScreen({ navigation, route }: Props) {
     customRef,
     draft.rules,
     overrideOnly,
+    passthroughRules,
     ready,
   ]);
 
