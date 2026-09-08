@@ -49,62 +49,71 @@ describe("migration 022 — Orrery Systems", () => {
     );
     expect(system).not.toBeNull();
 
-    await expect(
+    expect(() =>
       exec.runAsync(
         "INSERT INTO systems (uid, name, created_at, modified_at) VALUES (?, ?, ?, ?)",
         ["system-1", "Other", NOW, NOW],
       ),
-    ).rejects.toThrow();
-    await expect(
+    ).toThrow();
+    expect(() =>
       exec.runAsync(
         "INSERT INTO systems (uid, name, created_at, modified_at) VALUES (?, ?, ?, ?)",
         ["system-2", "friends", NOW, NOW],
       ),
-    ).rejects.toThrow();
+    ).toThrow();
 
     await exec.runAsync(
       "INSERT INTO system_rules (uid, system_id, family, value, created_at) VALUES (?, ?, ?, ?, ?)",
       ["rule-1", system!.id, "category", "family", NOW],
     );
-    await expect(
+    expect(() =>
       exec.runAsync(
         "INSERT INTO system_rules (uid, system_id, family, value, created_at) VALUES (?, ?, ?, ?, ?)",
         ["rule-2", system!.id, "category", "family", NOW],
       ),
-    ).rejects.toThrow();
-    await expect(
+    ).toThrow();
+    expect(() =>
       exec.runAsync(
         "INSERT INTO system_rules (uid, system_id, family, value, created_at) VALUES (?, ?, ?, ?, ?)",
         ["rule-1", system!.id, "frequency", "weekly", NOW],
       ),
-    ).rejects.toThrow();
+    ).toThrow();
 
+    await exec.runAsync(
+      "INSERT INTO contacts (uid, name, interval_days, created_at, modified_at) VALUES (?, ?, ?, ?, ?)",
+      ["contact-1", "Alex", 14, NOW, NOW],
+    );
     const contact = await exec.getFirstAsync<{ id: number }>(
-      "SELECT id FROM contacts LIMIT 1",
+      "SELECT id FROM contacts WHERE uid = ?",
+      ["contact-1"],
     );
     expect(contact).not.toBeNull();
     await exec.runAsync(
       "INSERT INTO system_overrides (uid, system_ref, contact_id, mode, created_at) VALUES (?, ?, ?, ?, ?)",
       ["override-1", "custom:system-1", contact!.id, "include", NOW],
     );
-    await expect(
+    expect(() =>
       exec.runAsync(
         "INSERT INTO system_overrides (uid, system_ref, contact_id, mode, created_at) VALUES (?, ?, ?, ?, ?)",
         ["override-2", "custom:system-1", contact!.id, "exclude", NOW],
       ),
-    ).rejects.toThrow();
-    await expect(
+    ).toThrow();
+    expect(() =>
       exec.runAsync(
         "INSERT INTO system_overrides (uid, system_ref, contact_id, mode, created_at) VALUES (?, ?, ?, ?, ?)",
         ["override-1", "custom:other", contact!.id, "include", NOW],
       ),
-    ).rejects.toThrow();
-    await expect(
+    ).toThrow();
+    await exec.runAsync(
+      "INSERT INTO system_prefs (uid, system_ref, created_at, modified_at) VALUES (?, ?, ?, ?)",
+      ["pref-1", "custom:system-1", NOW, NOW],
+    );
+    expect(() =>
       exec.runAsync(
         "INSERT INTO system_prefs (uid, system_ref, created_at, modified_at) VALUES (?, ?, ?, ?)",
-        ["pref-1", "custom:system-1", NOW, NOW],
+        ["pref-2", "custom:system-1", NOW, NOW],
       ),
-    ).rejects.toThrow();
+    ).toThrow();
 
     await exec.runAsync("DELETE FROM contacts WHERE id = ?", [contact!.id]);
     expect(
