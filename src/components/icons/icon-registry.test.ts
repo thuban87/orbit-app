@@ -27,6 +27,13 @@ const STATUS_GLYPH_NAMES = [
   "status-snoozed",
 ] as const satisfies readonly IconName[];
 
+/** Systems state must stay distinguishable without relying on colour alone. */
+const SYSTEM_STATE_NAMES = [
+  "system-empty",
+  "system-broken",
+  "system-overrides",
+] as const satisfies readonly IconName[];
+
 /** General semantic names the app screens draw through (RESEARCH Pattern 4). */
 const BASE_NAMES = [
   "close",
@@ -63,6 +70,20 @@ describe("ICON_REGISTRY", () => {
       expect(ICON_REGISTRY[name].outline).toBeTruthy();
       expect(ICON_REGISTRY[name].filled).toBeTruthy();
     }
+  });
+
+  it("registers distinct semantic System-state icon pairs", () => {
+    for (const name of SYSTEM_STATE_NAMES) {
+      expect(ICON_REGISTRY[name]).toBeDefined();
+      expect(ICON_REGISTRY[name].outline).toBeTruthy();
+      expect(ICON_REGISTRY[name].filled).toBeTruthy();
+    }
+    expect(ICON_REGISTRY["system-empty"].outline).not.toBe(
+      ICON_REGISTRY["system-broken"].outline,
+    );
+    expect(ICON_REGISTRY["system-broken"].outline).not.toBe(
+      ICON_REGISTRY["system-overrides"].outline,
+    );
   });
 
   it("reserves the `warning` name required by Plan 07 (REVIEWS 23-05 LOW)", () => {
