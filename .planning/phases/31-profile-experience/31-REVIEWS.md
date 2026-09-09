@@ -1,7 +1,7 @@
 ---
 phase: 31
 reviewers: [codex, claude]
-reviewed_at: 2026-09-09T06:16:37-05:00
+reviewed_at: 2026-09-09T06:38:35-05:00
 plans_reviewed: [31-01-PLAN.md, 31-02-PLAN.md, 31-03-PLAN.md, 31-04-PLAN.md, 31-05-PLAN.md, 31-06-PLAN.md, 31-07-PLAN.md, 31-08-PLAN.md, 31-09-PLAN.md, 31-10-PLAN.md]
 models:
   codex: "gpt-5.6-sol (reasoning=low)"
@@ -590,3 +590,69 @@ CYCLE_SUMMARY: current_high=1 current_actionable=1
 ## Current Actionable Non-HIGH Concerns
 
 - **MEDIUM — The Category-deletion fallout test fixture is underspecified.** Because `contacts.category_id` has default `NO ACTION`, Plan 02 must require nulling/reassigning target-Category contacts inside the synthetic deletion test transaction before deleting the Category, then assert Category presentation-assignment cleanup and global/factory resolution for the affected contacts.
+
+---
+
+# Convergence Cycle 4 — Revised Plans
+
+## Codex Review — Cycle 4
+
+### Summary
+
+Codex reviewed all ten current plans against the complete relevant source, migrations, DAOs, readers, and tests. It found no current HIGH, MEDIUM, or LOW concern requiring a PLAN.md revision. The earlier migration-contract ordering, live head+1 derivation, immutable snooze-event behavior, snapshot-reader executor compatibility, PROF-05 inheritance, FK-on Category-deletion fixture, background launch reconciliation, manager-state coverage, and incremental physical-device gates are all incorporated.
+
+`graph:ask` was attempted first for the Profile host, database registry, transaction layer, settings DAO, Category/frequency writers, snooze DAO, fuel reader, photo lifecycle, Sheet, and `App.tsx`. Every query failed before graph access because `tsx` could not create its IPC socket (`EPERM` under `/tmp/tsx-1000`), so no graph edge is classified as EXTRACTED or INFERRED; the review used direct source verification instead.
+
+### Strengths
+
+- Plan 01 freezes the closed persisted vocabulary before the irreversible migration, derives head+1 from the live registry immediately before implementation, and retains an explicit schema checkpoint.
+- Plan 02 enforces independent presentation axes and settled Category-null fallthrough through both real writer families, with the synthetic deletion fixture now clearing/reassigning references before the default-`NO ACTION` FK permits deletion.
+- Plan 03 preserves unconditional immutable snooze/unsnooze events while preventing only UI double submission.
+- Plan 04 widens only read exports to `ReadOnlyExecutor`, preserves writer cores on `SqlExecutor`, and composes one coherent snapshot without casts.
+- Plans 05–08 specify separate reach capabilities, deterministic responsive layout, source-owned knowledge actions, accessible editor parity, and transactional manager race handling.
+- Plan 09 registers DB-aware background reconciliation in the ready-gated foreground launch path and tests interruption, concurrency, multi-referrer, purge, and restore-era states.
+- Plan 10 supplies complete navigation-origin, accessibility, theme, data-boundary, and physical-device acceptance without adding network reads or widening AI egress.
+
+### Concerns
+
+None.
+
+### Plan Changes Needed
+
+None.
+
+### Risk Assessment
+
+**MEDIUM execution risk, no planning blocker.** Remaining risk is inherent in the breadth of native sheet behavior and filesystem/SQLite coordination, and is already covered by staged tests and physical-device gates.
+
+## Claude Review — Cycle 4
+
+> [reviewed-without-source-citations] Claude was pinned to `sonnet (reasoning=low)` but emitted no `file:line` source citations, so its verdict and two documentation suggestions are down-weighted as a plan-text review.
+
+### Summary
+
+Claude found no current HIGH concern and verified that all prior HIGH findings are incorporated. It suggested two documentation-precision edits: naming migration 023 in Plan 01's previous-head fixture and naming a concrete headless entry artifact in Plan 09.
+
+### Adjudication
+
+Neither suggestion is actionable before execution. Plan 01 intentionally derives both migration endpoints from live constants and already names `src/db/migrations/023-orrery-system-selection-revision.ts` in Task 1's required reading; baking the current head into the execution fixture would weaken the live head+1 contract. Plan 09 names `App.tsx` as the only registration file, requires registration inside its ready-gated launch block, includes `App.tsx` and the existing photo sweep in required reading, and explicitly prohibits module-scope/headless registration. The live concrete headless entry is already visible in `App.tsx` as `src/services/notifications/headless-task`; no additional PLAN.md wording is required to make the boundary executable.
+
+### Risk Assessment
+
+**LOW by this reviewer.** No correctness, decision, privacy, transaction, migration, or lifecycle blocker remains.
+
+## Consensus Summary — Cycle 4
+
+Both requested lanes completed successfully with the configured models: Codex used `gpt-5.6-sol (reasoning=low)` and Claude used pinned `sonnet (reasoning=low)`. Both found all prior HIGH concerns incorporated and no current HIGH concern.
+
+Codex's source-grounded review found no actionable non-HIGH concern. Claude's two uncited documentation suggestions do not require plan changes: one would hardcode the migration head that the plans deliberately resolve at execution time, and the other asks for a headless artifact name where the plan already constrains ownership to `App.tsx`'s ready-gated block and forbids all module-scope/headless paths. Phase 31 has therefore converged at the planning gate.
+
+CYCLE_SUMMARY: current_high=0 current_actionable=0
+
+## Current HIGH Concerns
+
+None.
+
+## Current Actionable Non-HIGH Concerns
+
+None.
