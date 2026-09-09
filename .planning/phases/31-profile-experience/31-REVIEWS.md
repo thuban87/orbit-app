@@ -1,7 +1,7 @@
 ---
 phase: 31
 reviewers: [codex, claude]
-reviewed_at: 2026-09-09T05:26:25-05:00
+reviewed_at: 2026-09-09T05:57:19-05:00
 plans_reviewed: [31-01-PLAN.md, 31-02-PLAN.md, 31-03-PLAN.md, 31-04-PLAN.md, 31-05-PLAN.md, 31-06-PLAN.md, 31-07-PLAN.md, 31-08-PLAN.md, 31-09-PLAN.md, 31-10-PLAN.md]
 models:
   codex: "gpt-5.6-sol (reasoning=low)"
@@ -474,3 +474,57 @@ There are also 33 unique actionable MEDIUM/LOW findings. These mainly require sh
 - Codex rated the overall plan HIGH pending three concrete correctness fixes; Claude rated it MEDIUM while separately identifying two HIGH execution-integrity issues. The difference is severity aggregation, not disagreement that revisions are required.
 - Only Codex identified the immutable snooze-event conflict, ReadOnlyExecutor signature mismatch, and missing background launch reconciliation through direct source tracing.
 - Only Claude classified migration-number drift as HIGH and called for explicit owner confirmation on the no-Category inheritance assumption.
+
+---
+
+# Convergence Cycle 2 — Revised Plans
+
+## Codex Review — Cycle 2
+
+### Summary
+
+The revised plans resolve the cycle-1 blockers around migration numbering, persisted-contract ordering, snooze audit events, snapshot-compatible readers, background reconciliation, manager state models, and incremental native testing. One actionable HIGH remains: the owner decision for no-Category inheritance is scheduled after resolver and persistence behavior that already encodes fallthrough.
+
+### Strengths
+
+- Plan 01 now freezes and tests the semantic module-ID and collapse-map vocabulary before authorizing the irreversible migration (`31-01-PLAN.md:35-48`) and derives the migration version from the live contiguous registry at execution time (`31-01-PLAN.md:53-65`).
+- Plan 03 explicitly preserves the existing unconditional immutable snooze/unsnooze event on repeated invocations (`31-03-PLAN.md:64-71`), consistent with `src/db/snooze-dao.ts:16-23`.
+- Plan 04 now requires a dedicated aggregate test and `ReadOnlyExecutor`-compatible child readers, allowing one coherent `inReadSnapshot` without casts or nested snapshots (`31-04-PLAN.md:69-121`).
+- Plan 09 now covers launch reconciliation, interrupted replacements, restore-era missing files, rapid concurrent writes, and multi-referrer protection (`31-09-PLAN.md:84-112`).
+- Physical-device smoke gates now follow the first Profile host, editor, and background-manager slices rather than being deferred entirely to Plan 10 (`31-05-PLAN.md:119-121`, `31-07-PLAN.md:80-81`, `31-09-PLAN.md:110-112`).
+
+### Concern
+
+- **HIGH — The no-Category owner decision occurs after implementation of behavior that depends on it.** Plan 02 Task 1 implements and tests `contact → Category → global → factory/theme` resolution and fallthrough (`31-02-PLAN.md:47-68`). Plan 08 Task 2 later asks whether clearing a Category should fall through or retain the former presentation and says neither behavior may be encoded first (`31-08-PLAN.md:63-76`). The case is reachable because `contacts.category_id` is nullable (`src/db/migrations/011-contact-lifecycle-schema.ts:16-38`) and current writers accept null (`src/db/contacts-dao.ts:312-350`). The offered retain outcome would require atomically materializing both effective presentation axes during the Category-clearing write, but Plan 08 Task 3 owns only the manager/editor components (`31-08-PLAN.md:78-96`) and not the contact writer/edit workflow or presentation DAO. Move the blocking owner checkpoint before Plan 02 Task 1 and propagate the chosen rule into resolver, presentation-DAO, and Category-write tests. If retain remains an option, explicitly add the writers needed to implement that materialization atomically.
+
+### Risk Assessment
+
+**MEDIUM-HIGH pending one ordering correction.** The plan architecture and verification strategy are otherwise materially converged, with no remaining evidence of migration, privacy, AI-egress, transaction, or background-recovery regressions.
+
+## Claude Review — Cycle 2
+
+> [reviewed-without-source-citations] The Claude lane was pinned to `sonnet (reasoning=low)` but emitted no `file:line` source citations, so its verdict is down-weighted as a plan-text review.
+
+Claude found no current HIGH concern and confirmed that the five prior HIGH findings are addressed in the revised plans. It identified one LOW documentation-precision issue: Plan 04 asks to widen read-only snapshot readers to `ReadOnlyExecutor`, but should state explicitly that write functions sharing those files retain `SqlExecutor`. This is especially relevant in `src/db/value-history-dao.ts`, where `listValueHistory` is a read while `appendValueHistoryCore` and `maybeAppendPriorValueHistoryCore` are transaction-composed writers (`src/db/value-history-dao.ts:14-66`).
+
+### Risk Assessment
+
+**LOW by this reviewer.** The remaining point is a plan-ownership/signature clarification, not an architectural blocker.
+
+## Consensus Summary — Cycle 2
+
+Both requested lanes ran successfully with the configured models: Codex used `gpt-5.6-sol (reasoning=low)` and Claude used pinned `sonnet (reasoning=low)`. Both consider all five cycle-1 HIGH findings resolved in the revised plans. No reviewer found a new privacy, network-read, AI-egress, migration-numbering, immutable-event, snapshot-composition, or background-reconciliation regression.
+
+The reviews diverge on the no-Category checkpoint. Codex source-grounded the ordering and ownership conflict and rates it HIGH; Claude did not preserve source citations and reported no HIGH. The source confirms that Plan 02 would encode ordinary fallthrough before Plan 08 asks the owner whether fallthrough or durable retention is desired, and that the retain option lacks writer ownership. The Codex finding therefore remains current and carries full weight.
+
+One actionable LOW remains outside the plan: Plan 04's task-local ownership/signature language should name the affected implementation/test files and state that only read exports widen to `ReadOnlyExecutor`, while transaction-composed writers retain `SqlExecutor`.
+
+CYCLE_SUMMARY: current_high=1 current_actionable=1
+
+## Current HIGH Concerns
+
+- Plan 08's no-Category inheritance checkpoint occurs after Plan 02 implements fallthrough, and its retain option lacks ownership of the contact/presentation writers needed for atomic materialization. Move the checkpoint before Plan 02 Task 1, then propagate the owner-selected rule into resolver, DAO, and Category-write tests; if retain stays selectable, add the required writer/edit-workflow ownership.
+
+## Current Actionable Non-HIGH Concerns
+
+- **LOW — Plan 04 reader-signature ownership is imprecise.** Add all affected reader implementation/test files to Task 1's task-local `<files>` and state that only the read exports widen to `ReadOnlyExecutor`; transaction-composed writers such as `appendValueHistoryCore` and `maybeAppendPriorValueHistoryCore` keep `SqlExecutor`.
