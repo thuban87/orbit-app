@@ -2,6 +2,7 @@ import type {
   ProfileModuleId,
   ProfileModuleParentId,
 } from "./persisted-contract";
+import { PROFILE_MODULE_IDS } from "./persisted-contract";
 import type { ProfileModuleSize } from "./types";
 
 export interface ProfileModuleDefinition {
@@ -143,3 +144,24 @@ export const PROFILE_MODULE_REGISTRY: Readonly<
     supportedSizes: [],
   },
 });
+
+/**
+ * Stable renderer identities. Persisted layouts address these semantic keys,
+ * never React component names, so a later phase can replace a renderer without
+ * migrating layout JSON.
+ */
+export const PROFILE_MODULE_RENDERERS = Object.freeze(
+  Object.fromEntries(PROFILE_MODULE_IDS.map((id) => [id, id])),
+) as Readonly<Record<ProfileModuleId, ProfileModuleId>>;
+
+export function createProfileModuleRendererRegistry<T>(
+  renderers: Readonly<Record<ProfileModuleId, T>>,
+  replacements: { history?: T } = {},
+): Readonly<Record<ProfileModuleId, T>> {
+  return Object.freeze({
+    ...renderers,
+    ...(replacements.history === undefined
+      ? {}
+      : { "interaction-history": replacements.history }),
+  });
+}

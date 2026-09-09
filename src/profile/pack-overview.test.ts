@@ -75,10 +75,10 @@ describe("packOverviewModules", () => {
 
   it("rejects sizes that a semantic module does not declare", () => {
     expect(() =>
-      packOverviewModules(
-        [{ id: "gravity", size: "2x1" }],
-        { width: 328, fontScale: 1 },
-      ),
+      packOverviewModules([{ id: "gravity", size: "2x1" }], {
+        width: 328,
+        fontScale: 1,
+      }),
     ).toThrow("illegal size for Profile module gravity");
   });
 });

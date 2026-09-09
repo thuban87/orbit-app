@@ -4,6 +4,7 @@ import {
   PROFILE_MODULE_REGISTRY,
   PROFILE_MODULE_RENDERERS,
 } from "./module-registry";
+import type { ProfileModuleId } from "./persisted-contract";
 import { PROFILE_MODULE_IDS } from "./persisted-contract";
 
 describe("Profile module renderer registry", () => {
@@ -18,7 +19,10 @@ describe("Profile module renderer registry", () => {
   it("replaces History without changing its persisted semantic identity", () => {
     const replacement = Symbol("Phase 32 History renderer");
     const registry = createProfileModuleRendererRegistry(
-      Object.fromEntries(PROFILE_MODULE_IDS.map((id) => [id, id])),
+      { ...PROFILE_MODULE_RENDERERS } as Record<
+        ProfileModuleId,
+        ProfileModuleId | symbol
+      >,
       { history: replacement },
     );
 
