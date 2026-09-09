@@ -32,6 +32,12 @@ import {
   RelationshipOverview,
   type RelationshipSheetId,
 } from "./RelationshipOverview";
+import {
+  type KnowledgeActionIntent,
+  type KnowledgeChildId,
+  type KnowledgeViewAllIntent,
+  ThingsToRemember,
+} from "./ThingsToRemember";
 
 type CollapsePlacement = {
   id: ProfileCollapsibleModuleId;
@@ -191,6 +197,20 @@ export interface ProfileModuleHostProps {
     request: { preset: "3d" | "1w" | "1m" } | { until: string },
   ) => Promise<void>;
   onUnsnooze: () => Promise<void>;
+  /** Screen-owned routing into the source-specific knowledge editors and histories. */
+  onKnowledgeAction: (intent: KnowledgeActionIntent) => void;
+  onKnowledgeViewAll: (intent: KnowledgeViewAllIntent) => void;
+  onOpenValueHistory: (target: {
+    contactId: number;
+    fieldDefId: number;
+  }) => void;
+  /** User-triggered method handoff; the screen owns native action/assist semantics. */
+  onContactMethodAction: (
+    method:
+      | ProfileSnapshot["methods"]["phone"][number]
+      | ProfileSnapshot["methods"]["email"][number],
+    action: "call" | "message" | "email",
+  ) => void;
   /** Lets the thin screen refresh its resolved presentation after a durable write. */
   onCollapseCommitted?: (collapse: ProfileCollapseMap) => void;
 }
@@ -210,6 +230,10 @@ export function ProfileModuleHost({
   onSetFrequency,
   onSnooze,
   onUnsnooze,
+  onKnowledgeAction,
+  onKnowledgeViewAll,
+  onOpenValueHistory,
+  onContactMethodAction,
   onCollapseCommitted,
 }: ProfileModuleHostProps) {
   const [collapse, setCollapse] = useState<ProfileCollapseMap>(
@@ -293,9 +317,18 @@ export function ProfileModuleHost({
           summary={knowledgeChildSummary(snapshot, placement.id)}
           onToggle={toggle}
         >
-          <AppText role="body">
-            {knowledgeChildSummary(snapshot, placement.id)}
-          </AppText>
+          {snapshot.knowledge.status === "error" ? (
+            <AppText role="body">{snapshot.knowledge.message}</AppText>
+          ) : (
+            <ThingsToRemember
+              contactId={snapshot.identity.id}
+              knowledge={snapshot.knowledge.data}
+              childIds={[placement.id as KnowledgeChildId]}
+              onAction={onKnowledgeAction}
+              onViewAll={onKnowledgeViewAll}
+              onOpenValueHistory={onOpenValueHistory}
+            />
+          )}
         </ProfileSection>
       ))}
     </View>
@@ -319,6 +352,32 @@ export function ProfileModuleHost({
                   : "This email address can’t be used yet."}
               </AppText>
             ) : null}
+            {method.method_type === "phone" ? (
+              <View style={styles.methodActions}>
+                <Button
+                  role="tertiary"
+                  label="Call"
+                  disabled={method.is_actionable !== 1}
+                  accessibilityLabel={`Call ${method.display_value}`}
+                  onPress={() => onContactMethodAction(method, "call")}
+                />
+                <Button
+                  role="tertiary"
+                  label="Message"
+                  disabled={method.is_actionable !== 1}
+                  accessibilityLabel={`Message ${method.display_value}`}
+                  onPress={() => onContactMethodAction(method, "message")}
+                />
+              </View>
+            ) : (
+              <Button
+                role="tertiary"
+                label="Email"
+                disabled={method.is_actionable !== 1}
+                accessibilityLabel={`Email ${method.display_value}`}
+                onPress={() => onContactMethodAction(method, "email")}
+              />
+            )}
           </View>
         ))}
       </View>
@@ -451,4 +510,5 @@ const styles = StyleSheet.create({
   sectionCopy: { flex: 1, gap: SPACING.xs },
   sectionBody: { gap: SPACING.sm, padding: SPACING.base },
   method: { gap: SPACING.xs },
+  methodActions: { flexDirection: "row", flexWrap: "wrap", gap: SPACING.sm },
 });
