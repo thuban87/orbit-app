@@ -5,6 +5,7 @@ import {
   beginSwitchChoreography,
   CAPTURE_END,
   CAPTURE_START,
+  retargetSwitchChoreography,
   SETTLE_START,
   SHED_END,
   SHED_START,
@@ -210,5 +211,74 @@ describe("Orrery System-switch choreography", () => {
     expect(
       new Set(first.entries.map(({ stagger }) => stagger)).size,
     ).toBeGreaterThan(1);
+  });
+
+  it("re-targets from the exact displayed sample as roles change", () => {
+    const a = [contact(1, 70, 0.1)];
+    const b = [contact(1, 130, 1), contact(2, 190, 1.8)];
+    const c = [contact(1, 210, 2.4), contact(3, 260, 2.9)];
+    const first = beginSwitchChoreography(a, b, 20, {
+      intensity: 0.7,
+      reducedMotion: false,
+    });
+    const displayed = sampleSwitchChoreography(first, 0.61);
+    const retargeted = retargetSwitchChoreography(first, 0.61, c, 21, {
+      intensity: 0.8,
+      reducedMotion: false,
+    });
+    const initial = sampleSwitchChoreography(retargeted, 0);
+    for (const prior of displayed.world) {
+      const next = initial.world.find((body) => body.id === prior.id)!;
+      expect(next).toMatchObject({
+        x: prior.x,
+        y: prior.y,
+        radius: prior.radius,
+        ringRadius: prior.ringRadius,
+        opacity: prior.opacity,
+      });
+    }
+    expect(
+      retargeted.entries.find((entry) => entry.key === "contact:2")?.role,
+    ).toBe("leaving");
+    expect(
+      retargeted.entries.find((entry) => entry.key === "contact:1")?.role,
+    ).toBe("retained");
+  });
+
+  it("is byte-stable while progress is held", () => {
+    const transition = beginSwitchChoreography(
+      [contact(1, 80)],
+      [contact(2, 180)],
+      22,
+      { intensity: 1, reducedMotion: false },
+    );
+    const held = 0.537;
+    expect(JSON.stringify(sampleSwitchChoreography(transition, held))).toBe(
+      JSON.stringify(sampleSwitchChoreography(transition, held)),
+    );
+  });
+
+  it("uses only crossfade and direct reposition for Reduced Motion", () => {
+    const source = [contact(1, 80, 0.2), contact(2, 130, 0.8)];
+    const destination = [contact(1, 180, 1.4), contact(3, 240, 2.1)];
+    const transition = beginSwitchChoreography(source, destination, 23, {
+      intensity: 1,
+      reducedMotion: true,
+    });
+    const middle = sampleSwitchChoreography(transition, 0.5);
+    expect(middle.accumulatedRotation).toBe(0);
+    expect(middle.angularVelocity).toBe(0);
+    expect(radialDistance(middle.world.find((body) => body.id === 2)!)).toBe(
+      radialDistance(source[1]),
+    );
+    expect(radialDistance(middle.world.find((body) => body.id === 3)!)).toBe(
+      radialDistance(destination[1]),
+    );
+    expect(middle.world.find((body) => body.id === 1)?.interactive).toBe(true);
+    expect(
+      sampleSwitchChoreography(transition, 1).world.find(
+        (body) => body.id === 1,
+      ),
+    ).toMatchObject(destination[0]);
   });
 });

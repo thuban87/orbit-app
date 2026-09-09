@@ -13,7 +13,11 @@ import {
   sampleWorldTransition,
   spinSwitchWorld,
 } from "./orrery-frame";
-import { beginSwitchChoreography } from "./orrery-switch-choreography";
+import {
+  beginSwitchChoreography,
+  retargetSwitchChoreography,
+  sampleSwitchChoreography,
+} from "./orrery-switch-choreography";
 
 const viewport = { width: 1000, height: 1000 };
 const body = (id: number, radius: number): WorldBody => ({
@@ -53,6 +57,39 @@ describe("one animated Orrery frame", () => {
     );
     expect(collectHitCandidates(frame, projected.x, projected.y)).toEqual([]);
     expect(frame.bodies.map(bodyKey)).toEqual(frame.sample.world.map(bodyKey));
+  });
+  it("projects an interrupted re-target from the exact displayed geometry", () => {
+    const first = beginSwitchChoreography(
+      [body(1, 70)],
+      [body(1, 140), body(2, 210)],
+      13,
+      { intensity: 1, reducedMotion: false },
+    );
+    const displayed = sampleSwitchChoreography(first, 0.57);
+    const next = retargetSwitchChoreography(
+      first,
+      0.57,
+      [body(1, 240), body(3, 300)],
+      14,
+      { intensity: 1, reducedMotion: false },
+    );
+    const frame = projectSwitchChoreographyFrame(
+      next,
+      0,
+      HOME_CAMERA,
+      viewport,
+    );
+    for (const prior of displayed.world) {
+      const sampled = frame.sample.world.find(
+        (entry) => bodyKey(entry) === bodyKey(prior),
+      )!;
+      expect(sampled).toMatchObject({
+        x: prior.x,
+        y: prior.y,
+        radius: prior.radius,
+        opacity: prior.opacity,
+      });
+    }
   });
   it("grows entries and shrinks inert departures without snapping an interrupted size", () => {
     const seed = beginWorldTransition([], [body(1, 70)], 1);
