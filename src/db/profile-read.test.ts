@@ -8,8 +8,8 @@ import { MIGRATIONS, TARGET_VERSION } from "@/db/database";
 import { runMigrations } from "@/db/migrations/runner";
 import {
   ProfileOptionalSectionError,
-  readProfileSnapshot,
   type ProfileReadDependencies,
+  readProfileSnapshot,
 } from "@/db/profile-read";
 import type { SqlExecutor } from "@/db/types";
 
@@ -73,10 +73,18 @@ describe("coherent local Profile snapshot", () => {
     const contactId = await contact();
     const dependencies: Partial<ProfileReadDependencies> = {
       readKnowledge: async () => {
-        throw new ProfileOptionalSectionError("knowledge", "Unavailable for now");
+        throw new ProfileOptionalSectionError(
+          "knowledge",
+          "Unavailable for now",
+        );
       },
     };
-    const result = await readProfileSnapshot(exec, contactId, OPTIONS, dependencies);
+    const result = await readProfileSnapshot(
+      exec,
+      contactId,
+      OPTIONS,
+      dependencies,
+    );
     expect(result?.knowledge).toEqual({
       status: "error",
       message: "Unavailable for now",
