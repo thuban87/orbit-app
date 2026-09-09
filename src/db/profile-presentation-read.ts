@@ -3,6 +3,7 @@ import type { SqlExecutor } from "@/db/types";
 import { parseProfileCollapseMap } from "@/profile/persisted-contract";
 import type {
   ProfileLayoutDocument,
+  ProfilePresentationAssignment,
   ProfilePresentationInputs,
 } from "@/profile/types";
 
@@ -29,6 +30,25 @@ export interface ProfileTemplateUsage {
   categories: number;
   contacts: number;
   total: number;
+}
+
+/**
+ * Read one Category's independent presentation axes for a write that changes
+ * only layout or only background. Feature UI must never recreate this SQL or
+ * erase the sibling axis while assigning a template.
+ */
+export async function readCategoryProfilePresentation(
+  exec: ReadOnlyExecutor,
+  categoryId: number,
+): Promise<ProfilePresentationAssignment> {
+  const row = await exec.getFirstAsync<ProfilePresentationAssignment>(
+    `SELECT layout_template_uid AS layoutTemplateUid,
+            background_template_uid AS backgroundTemplateUid
+       FROM profile_category_presentation
+      WHERE category_id=?`,
+    [categoryId],
+  );
+  return row ?? { layoutTemplateUid: null, backgroundTemplateUid: null };
 }
 
 export function listProfileLayoutTemplates(

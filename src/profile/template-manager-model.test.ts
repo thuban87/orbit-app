@@ -6,8 +6,8 @@ import {
   openTemplateManagerPage,
   retainTemplateFailure,
   setTemplateDraft,
-  settleTemplateOperation,
   setTemplateUsage,
+  settleTemplateOperation,
 } from "./template-manager-model";
 
 describe("Profile template manager model", () => {
@@ -34,7 +34,9 @@ describe("Profile template manager model", () => {
     });
     const pending = beginTemplateOperation(initial, "family");
     expect(pending.accepted).toBe(true);
-    expect(beginTemplateOperation(pending.state, "family").accepted).toBe(false);
+    expect(beginTemplateOperation(pending.state, "family").accepted).toBe(
+      false,
+    );
 
     const failed = retainTemplateFailure(
       pending.state,
@@ -44,9 +46,9 @@ describe("Profile template manager model", () => {
     expect(failed.draft).toEqual(initial.draft);
     expect(failed.error).toBe("Couldn't save this template. Try again.");
     expect(failed.pendingTemplateUids).toEqual([]);
-    expect(settleTemplateOperation(failed, "family").pendingTemplateUids).toEqual(
-      [],
-    );
+    expect(
+      settleTemplateOperation(failed, "family").pendingTemplateUids,
+    ).toEqual([]);
   });
 
   it("marks stale usage explicitly until a refreshed count is published", () => {

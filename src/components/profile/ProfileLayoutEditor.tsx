@@ -52,6 +52,8 @@ export interface ProfileLayoutEditorProps {
   onCommitted?: (layout: ProfileLayoutDocument) => void;
   /** Plan 08 owns template creation; this component only hands it a draft intent. */
   onSaveAsTemplate?: (layout: ProfileLayoutDocument) => void;
+  /** A canonical manager may save the same draft as a reusable template. */
+  onSaveDraft?: (layout: ProfileLayoutDocument) => Promise<void>;
 }
 
 function RowDragHandle({
@@ -227,6 +229,7 @@ export function ProfileLayoutEditor({
   onRequestClose,
   onCommitted,
   onSaveAsTemplate,
+  onSaveDraft,
 }: ProfileLayoutEditorProps) {
   const [initial, setInitial] = useState(() =>
     createProfileLayoutEditorDraft(layout),
@@ -288,11 +291,13 @@ export function ProfileLayoutEditor({
     const result = await saveLayoutEditorDraft({
       draft,
       save: (nextLayout) =>
-        setContactFreeformLayout(getExecutor(), {
-          contactId,
-          layout: nextLayout,
-          now: localDateTime(),
-        }),
+        onSaveDraft
+          ? onSaveDraft(nextLayout)
+          : setContactFreeformLayout(getExecutor(), {
+              contactId,
+              layout: nextLayout,
+              now: localDateTime(),
+            }),
     });
     if (result.ok) {
       onCommitted?.(draft);
