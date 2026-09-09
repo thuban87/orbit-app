@@ -2,7 +2,10 @@ import { describe, expect, it, vi } from "vitest";
 import type { ContactMethodRow } from "@/db/contact-methods-dao";
 import {
   canStartLifecycleTransition,
+  closeTopmostProfileOverlay,
   commitProfileOverviewToggle,
+  profileOverflowEntries,
+  profileOriginIntent,
   profileLifecycleView,
   profileMethodGroups,
   unbindConfirmation,
@@ -224,5 +227,48 @@ describe("Relationship Overview collapse tracer", () => {
 
     expect(result).toEqual({ ok: false, expanded: false });
     expect(published).toEqual([]);
+  });
+});
+
+describe("integrated Profile controller contracts", () => {
+  it("keeps the required overflow ordering and only exposes conditional presentation actions", () => {
+    expect(
+      profileOverflowEntries({
+        snoozed: false,
+        hasFreeformLayout: true,
+        hasContactPresentationOverride: true,
+      }),
+    ).toEqual([
+      "edit",
+      "snooze",
+      "archive",
+      "separator",
+      "layout",
+      "background",
+      "save-layout-template",
+      "reset",
+    ]);
+    expect(
+      profileOverflowEntries({
+        snoozed: true,
+        hasFreeformLayout: false,
+        hasContactPresentationOverride: false,
+      }),
+    ).toEqual([
+      "edit",
+      "unsnooze",
+      "archive",
+      "separator",
+      "layout",
+      "background",
+    ]);
+  });
+
+  it("closes only the topmost overlay before ordinary native-stack Back", () => {
+    expect(closeTopmostProfileOverlay("background")).toBe(null);
+    expect(closeTopmostProfileOverlay("templates")).toBe(null);
+    expect(closeTopmostProfileOverlay("layout")).toBe(null);
+    expect(closeTopmostProfileOverlay("overflow")).toBe(null);
+    expect(closeTopmostProfileOverlay(null)).toBe(null);
   });
 });
