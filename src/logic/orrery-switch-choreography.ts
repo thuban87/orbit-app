@@ -249,7 +249,10 @@ function sampleReduced(
       entry.destination ? destination.opacity : 0,
       position,
     ),
-    interactive: !!entry.destination && progress >= 1,
+    interactive:
+      entry.role === "retained" ||
+      (entry.role === "anchor" && !!entry.destination) ||
+      (!!entry.destination && progress >= 1),
   };
 }
 
@@ -275,7 +278,7 @@ function sampleRetained(
     sourceAngle + pathAngle * rotationProgress,
     mix(source.ringRadius, destination.ringRadius, smoothstep(progress)),
     mix(source.radius, destination.radius, smoothstep(progress)),
-    1,
+    mix(source.opacity, 1, smoothstep(progress)),
     true,
   );
 }
@@ -421,6 +424,12 @@ export function sampleSwitchChoreography(
     angularVelocity,
     world: transition.entries.map((entry) => {
       "worklet";
+      if (progress <= 0 && entry.source)
+        return {
+          ...entry.source,
+          interactive:
+            entry.role === "leaving" ? false : entry.source.interactive,
+        };
       if (progress >= 1 && entry.destination)
         return { ...entry.destination, opacity: 1, interactive: true };
       if (progress >= 1 && entry.source)
@@ -451,4 +460,21 @@ export function sampleSwitchChoreography(
       return sampleAnchor(entry, progress);
     }),
   };
+}
+
+/** A rapid A→B→C switch rebases on B's currently displayed geometry. */
+export function retargetSwitchChoreography(
+  transition: SwitchChoreography,
+  displayedProgress: number,
+  destinationWorld: readonly WorldBody[],
+  generation: number,
+  options: SwitchChoreographyOptions,
+): SwitchChoreography {
+  "worklet";
+  return beginSwitchChoreography(
+    sampleSwitchChoreography(transition, displayedProgress).world,
+    destinationWorld,
+    generation,
+    options,
+  );
 }
