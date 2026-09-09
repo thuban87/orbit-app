@@ -6,11 +6,36 @@ import { runMigrations } from "@/db/migrations/runner";
 import { readOrrerySatellites } from "@/db/orrery-satellites-read";
 import { addRelationship } from "@/db/relationships-dao";
 import { HOME_CAMERA } from "@/logic/orrery-camera-logic";
+import { beginSwitchChoreography } from "@/logic/orrery-switch-choreography";
 import { loadOrreryScene } from "@/services/orrery-scene";
 import { THEME_PRESETS } from "@/theme/theme-presets";
 import { prepareOrreryText } from "./OrreryLabel";
 import { OrreryWorld } from "./OrreryWorld";
 import { useOrreryCamera } from "./use-orrery-camera";
+
+const switchRuntime = (
+  scene: Awaited<ReturnType<typeof loadOrreryScene>>,
+  pose: { value: typeof HOME_CAMERA },
+) => ({
+  transition: {
+    value: beginSwitchChoreography(scene.world, scene.world, scene.generation, {
+      intensity: 0,
+      reducedMotion: false,
+    }),
+  },
+  progress: { value: 1 },
+  cameraFrom: pose,
+  cameraTo: pose,
+  running: { value: false },
+  resources: scene.world.map((body) => ({
+    key: `${body.kind}:${body.id}`,
+    body,
+    scene,
+  })),
+  publish: vi.fn(),
+  pause: vi.fn(),
+  resume: vi.fn(),
+});
 
 const native = vi.hoisted(() => ({
   paragraphs: [] as {
@@ -195,7 +220,7 @@ describe("production Orrery native tree and resource contracts", () => {
         onReorder: vi.fn(),
         onReorderActivated: vi.fn(),
         focusedIds: [],
-        switchIntensity: { value: 0 } as never,
+        switchRuntime: switchRuntime(scene, pose as never) as never,
       }),
     );
     const bodies = tree[0].children[3];
@@ -239,7 +264,7 @@ describe("production Orrery native tree and resource contracts", () => {
         onReorder: () => {},
         onReorderActivated: () => {},
         focusedIds: [],
-        switchIntensity: { value: 0 } as never,
+        switchRuntime: switchRuntime(scene, pose as never) as never,
       }),
     );
     const [rings, polaris, ghost, bodies, labels] = tree[0].children;

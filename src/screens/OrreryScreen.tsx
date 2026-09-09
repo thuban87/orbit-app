@@ -20,7 +20,6 @@ import {
   runOnJS,
   runOnUI,
   useSharedValue,
-  withTiming,
 } from "react-native-reanimated";
 import {
   CLUSTER_OBSTACLE,
@@ -49,11 +48,12 @@ import {
 import { satelliteContext } from "@/components/orrery/orrery-satellite-context";
 import {
   computeMembershipDelta,
+  switchIntensity as membershipSwitchIntensity,
   preservedFocus,
   selectSystemFraming,
-  switchTransitionIntensity,
 } from "@/components/orrery/orrery-switch-animation";
 import { useOrreryCamera } from "@/components/orrery/use-orrery-camera";
+import { useOrrerySwitchRuntime } from "@/components/orrery/use-orrery-switch-runtime";
 import { ShellAppBar } from "@/components/ShellAppBar";
 import { AppText } from "@/components/ui/AppText";
 import { Button } from "@/components/ui/Button";
@@ -119,7 +119,6 @@ const acknowledgeReorder = () => {
 
 /** Identifies commits emitted by this screen's otherwise-local System store. */
 const LOCAL_SELECT_ORIGIN = Symbol("orrery-local-select");
-const SWITCH_INTENSITY_MS = 260;
 const MAX_CUSTOM_SYSTEM_COUNTS_PER_OPEN = 12;
 
 type SystemCountCache = {
@@ -236,7 +235,6 @@ export function OrreryScreen() {
     "removed" | "missing-category" | "error" | null
   >(null);
   const pose = useSharedValue<CameraPose>({ ...HOME_CAMERA });
-  const switchIntensity = useSharedValue(0);
   const reducedMotion = useReducedMotionShared();
   const useSystemStore = useMemo(
     () =>
@@ -266,6 +264,10 @@ export function OrreryScreen() {
     [],
   );
   const state = useSystemStore();
+  const switchRuntime = useOrrerySwitchRuntime(pose, reducedMotion);
+  const publishSwitch = switchRuntime.publish;
+  const pauseSwitch = switchRuntime.pause;
+  const resumeSwitch = switchRuntime.resume;
   const [systemCatalog, setSystemCatalog] = useState<SystemCatalogEntry[]>([]);
   const [systemCounts, setSystemCounts] = useState<Map<string, number>>(
     new Map(),
@@ -294,17 +296,28 @@ export function OrreryScreen() {
         switchSourceIds.current = isInSessionSwitch
           ? previous.snapshot.systemSnapshot.members.map((member) => member.id)
           : null;
-        if (!isInSessionSwitch) switchIntensity.value = 0;
         return;
       }
       if (next.status !== "ready" || !next.snapshot) return;
       hasReadySystem.current = true;
       const sourceIds = switchSourceIds.current;
       switchSourceIds.current = null;
-      if (!sourceIds) return;
       const destinationIds = next.snapshot.systemSnapshot.members.map(
         (member) => member.id,
       );
+      const destinationHome =
+        deriveHomePose(next.snapshot.world, viewport) ?? pose.value;
+      publishSwitch(
+        next.snapshot,
+        !!sourceIds,
+        sourceIds
+          ? membershipSwitchIntensity(
+              computeMembershipDelta(sourceIds, destinationIds),
+            )
+          : 0,
+        sourceIds ? destinationHome : pose.value,
+      );
+      if (!sourceIds) return;
       const retainedFocus =
         focusTargetsRef.current.length === 1
           ? preservedFocus(
@@ -317,31 +330,9 @@ export function OrreryScreen() {
         targets.length === 1 && retainedFocus === targets[0].id ? targets : [],
       );
       switchHomeGeneration.current = next.generation;
-      const intensity = switchTransitionIntensity(
-        true,
-        computeMembershipDelta(sourceIds, destinationIds),
-      );
-      runOnUI((value: number) => {
-        "worklet";
-        if (reducedMotion.value) {
-          switchIntensity.value = 0;
-          return;
-        }
-        switchIntensity.value = 0;
-        switchIntensity.value = withTiming(
-          value,
-          { duration: SWITCH_INTENSITY_MS },
-          (finished) => {
-            if (finished)
-              switchIntensity.value = withTiming(0, {
-                duration: SWITCH_INTENSITY_MS,
-              });
-          },
-        );
-      })(intensity);
     });
     return unsubscribe;
-  }, [useSystemStore, switchIntensity, reducedMotion]);
+  }, [useSystemStore, publishSwitch, viewport, pose]);
   const [satelliteState, setSatelliteState] = useState<OrrerySatelliteState>({
     status: "ready",
     sceneGeneration: null,
@@ -405,13 +396,14 @@ export function OrreryScreen() {
   useEffect(() => {
     const subscription = AppState.addEventListener("change", (value) => {
       if (value !== "active") {
+        pauseSwitch();
         if (routeLive.current) captureSession.current("background");
         cancelIntent.current("background");
       } else captureGeneration.current++;
       setAppActive(value === "active");
     });
     return () => subscription.remove();
-  }, []);
+  }, [pauseSwitch]);
   useFocusEffect(
     useCallback(() => {
       routeLive.current = true;
@@ -425,6 +417,7 @@ export function OrreryScreen() {
           if (!cancelled) setSessionReady(true);
         })();
       return () => {
+        pauseSwitch();
         routeLive.current = false;
         setSessionReady(false);
         cancelIntent.current("blur");
@@ -432,7 +425,7 @@ export function OrreryScreen() {
         useSystemStore.getState().cancel();
         cancelAnimation(pose);
       };
-    }, [useSystemStore, hydratePreferences, appActive, pose]),
+    }, [useSystemStore, hydratePreferences, appActive, pose, pauseSwitch]),
   );
   const reconciledCommittedOrigin = useRef<unknown>(undefined);
   useEffect(() => {
@@ -590,6 +583,9 @@ export function OrreryScreen() {
   }, [preferences.satellitesEnabled, satellites, satelliteRow]);
   const measured = usableCameraRect(viewport) !== null;
   const visible = measured && isFocused && appActive;
+  useEffect(() => {
+    if (visible && sessionReady && scene) resumeSwitch();
+  }, [visible, sessionReady, scene, resumeSwitch]);
   const camera = useOrreryCamera({
     pose,
     extent: cameraExtent(scene?.extent ?? 32),
@@ -921,8 +917,15 @@ export function OrreryScreen() {
     const forceSwitchHome =
       sessionResume !== "restore" &&
       switchHomeGeneration.current === scene.generation;
+    if (forceSwitchHome) {
+      // The screen-owned choreography already samples from the displayed pose
+      // to destination Home. Assigning Home here would snap its first frame.
+      lastHomeFrame.current = key;
+      lastHomeDomain.current = domain;
+      return;
+    }
     const home = selectSystemFraming(
-      forceSwitchHome,
+      false,
       focusedBodies.length > 0
         ? frameBodies(focusedBodies, viewport, scene.extent, pose.value)?.pose
         : undefined,
@@ -1027,7 +1030,7 @@ export function OrreryScreen() {
             focusedIds={focusedIds}
             satellites={satellites?.rows}
             focusedSatellite={focusedSatellite}
-            switchIntensity={switchIntensity}
+            switchRuntime={switchRuntime}
             clusterIds={clusterOpen ? focusedIds : []}
             onFocusLost={clusterOpen ? undefined : clearFocus}
             interactive={!overlaysOpen && state.status === "ready"}

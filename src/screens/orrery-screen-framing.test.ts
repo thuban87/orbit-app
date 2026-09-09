@@ -192,6 +192,18 @@ function harness() {
           if (id.includes("orrery-recovery-logic")) return recoveryLogic;
           if (id.includes("orrery-system-logic")) return systemLogic;
           if (id.includes("orrery-switch-animation")) return switchLogic;
+          if (id.includes("use-orrery-switch-runtime"))
+            return {
+              useOrrerySwitchRuntime: () =>
+                (
+                  hooks.useRef({
+                    publish: () => {},
+                    pause: () => {},
+                    resume: () => {},
+                    resources: [],
+                  }) as { current: unknown }
+                ).current,
+            };
           if (id.includes("orrery-overlay-logic")) return overlayLogic;
           if (id.includes("orrery-obstacle-logic")) return { canvasViewport };
           if (id.includes("orrery-system-store"))

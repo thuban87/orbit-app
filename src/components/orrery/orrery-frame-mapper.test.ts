@@ -3,16 +3,27 @@ import { createRequire } from "node:module";
 import { runInNewContext } from "node:vm";
 import ts from "typescript";
 import { expect, it, vi } from "vitest";
+
+vi.mock("react-native-reanimated", () => ({
+  cancelAnimation: vi.fn(),
+  ReduceMotion: { Never: "never" },
+  runOnJS: (fn: unknown) => fn,
+  runOnUI: (fn: unknown) => fn,
+  useAnimatedReaction: vi.fn(),
+  useSharedValue: (value: unknown) => ({ value }),
+  withTiming: (value: unknown) => value,
+}));
+
 import { HOME_CAMERA } from "@/logic/orrery-camera-logic";
-import {
-  beginWorldTransition,
-  projectAnimatedFrame,
-  sampleWorldTransition,
-  spinSwitchWorld,
-} from "@/logic/orrery-frame";
+import { projectAnimatedFrame } from "@/logic/orrery-frame";
 import { semanticLevel } from "@/logic/orrery-label-logic";
 import { previewReorder } from "@/logic/orrery-reorder-logic";
 import { deriveSatelliteBodies } from "@/logic/orrery-satellite-logic";
+import {
+  beginSwitchChoreography,
+  sampleSwitchChoreography,
+} from "@/logic/orrery-switch-choreography";
+import { sampleOrrerySwitchCamera } from "./use-orrery-switch-runtime";
 
 const require = createRequire(import.meta.url);
 const babel = require("@babel/core");
@@ -76,19 +87,28 @@ it("the emitted projection closure settles after publication under the installed
   const published = cell<unknown>(null),
     projected = cell<unknown>(null),
     reorder = cell(null);
-  const pose = cell({ ...HOME_CAMERA });
   const projection = vi.fn(projectAnimatedFrame);
-  const available: Record<string, unknown> = {
-    transition: cell(
-      beginWorldTransition(
-        [],
-        [{ id: 0, kind: "sun", x: 0, y: 0, radius: 16, ringRadius: 0 }],
-        7,
-      ),
+  const progress = cell(1);
+  const transition = cell(
+    beginSwitchChoreography(
+      [],
+      [{ id: 0, kind: "sun", x: 0, y: 0, radius: 16, ringRadius: 0 }],
+      7,
+      { intensity: 0.8, reducedMotion: false },
     ),
-    progress: cell(1),
-    switchIntensity: cell(0),
-    reducedMotion: cell(false),
+  );
+  const cameraFrom = cell({ ...HOME_CAMERA, x: 12, zoom: 1.4 });
+  const cameraTo = cell({ ...HOME_CAMERA });
+  const pose = cell({ ...HOME_CAMERA });
+  const available: Record<string, unknown> = {
+    switchRuntime: {
+      transition,
+      progress,
+      cameraFrom,
+      cameraTo,
+    },
+    sampleSwitchChoreography,
+    sampleOrrerySwitchCamera,
     pose,
     level: cell("overview"),
     viewport: { width: 400, height: 700 },
@@ -96,8 +116,6 @@ it("the emitted projection closure settles after publication under the installed
     satellites: [],
     camera: { reorder, frame: published },
     reorder,
-    sampleWorldTransition,
-    spinSwitchWorld,
     previewReorder,
     deriveSatelliteBodies,
     semanticLevel,
@@ -180,9 +198,11 @@ it("the emitted projection closure settles after publication under the installed
   expect(publish).toHaveBeenCalledTimes(1);
   expect(published.value).toBe(projected.value);
   expect(names).not.toContain("camera");
-  pose.value = { ...HOME_CAMERA, zoom: 2 };
-  for (let i = 0; i < 5; i++) tick();
-  expect(projection).toHaveBeenCalledTimes(2);
-  expect(publish).toHaveBeenCalledTimes(2);
-  expect(published.value).toBe(projected.value);
+  for (const phaseProgress of [0.1, 0.3, 0.55, 0.85, 1]) {
+    progress.value = phaseProgress;
+    for (let i = 0; i < 5; i++) tick();
+    expect(published.value).toBe(projected.value);
+  }
+  expect(projection).toHaveBeenCalledTimes(6);
+  expect(publish).toHaveBeenCalledTimes(6);
 });

@@ -1,5 +1,16 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { CameraPose, WorldBody } from "@/logic/orrery-camera-logic";
+
+vi.mock("react-native-reanimated", () => ({
+  cancelAnimation: vi.fn(),
+  ReduceMotion: { Never: "never" },
+  runOnJS: (fn: unknown) => fn,
+  runOnUI: (fn: unknown) => fn,
+  useAnimatedReaction: vi.fn(),
+  useSharedValue: (value: unknown) => ({ value }),
+  withTiming: (value: unknown) => value,
+}));
+
 import {
   beginOrrerySwitchRuntime,
   createSettledOrrerySwitchRuntime,
@@ -35,6 +46,13 @@ const homeCamera: CameraPose = {
   focalDistance: 320,
 };
 
+const visibleGeometry = (
+  sample: ReturnType<typeof sampleOrrerySwitchRuntime>,
+) =>
+  sample.world
+    .filter((body) => body.opacity > 0)
+    .map(({ interactive: _interactive, ...body }) => body);
+
 describe("screen-owned Orrery switch runtime", () => {
   it("starts at the exact displayed world/camera and settles exactly at destination Home", () => {
     const settled = createSettledOrrerySwitchRuntime(
@@ -50,12 +68,13 @@ describe("screen-owned Orrery switch runtime", () => {
       { intensity: 1, reducedMotion: false },
     );
 
-    expect(sampleOrrerySwitchRuntime(running, 0)).toEqual(
-      sampleOrrerySwitchRuntime(settled, 1),
-    );
+    const first = sampleOrrerySwitchRuntime(running, 0);
+    const before = sampleOrrerySwitchRuntime(settled, 1);
+    expect(first.camera).toEqual(before.camera);
+    expect(visibleGeometry(first)).toEqual(visibleGeometry(before));
     const completed = sampleOrrerySwitchRuntime(running, 1);
     expect(completed.camera).toEqual(homeCamera);
-    expect(completed.world).toEqual(
+    expect(completed.world.filter((body) => body.opacity > 0)).toEqual(
       destinationWorld.map((body) => ({
         ...body,
         opacity: 1,
@@ -84,7 +103,9 @@ describe("screen-owned Orrery switch runtime", () => {
       { ...homeCamera, zoom: 0.75 },
       { intensity: 0.5, reducedMotion: false },
     );
-    expect(sampleOrrerySwitchRuntime(bc, 0)).toEqual(displayed);
+    const retargeted = sampleOrrerySwitchRuntime(bc, 0);
+    expect(retargeted.camera).toEqual(displayed.camera);
+    expect(visibleGeometry(retargeted)).toEqual(visibleGeometry(displayed));
   });
 
   it("holds byte-identical progress, world, and camera across pause/remount/resume", () => {

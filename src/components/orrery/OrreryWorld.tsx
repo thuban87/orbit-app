@@ -5,18 +5,14 @@ import {
   Skia,
   type SkTypefaceFontProvider,
 } from "@shopify/react-native-skia";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 import { useWindowDimensions } from "react-native";
 import {
-  cancelAnimation,
-  ReduceMotion,
   runOnJS,
-  runOnUI,
   type SharedValue,
   useAnimatedReaction,
   useDerivedValue,
   useSharedValue,
-  withTiming,
 } from "react-native-reanimated";
 import { swatchIndex } from "@/components/avatar-initials";
 import type { OrrerySatellite } from "@/db/orrery-satellites-read";
@@ -32,12 +28,9 @@ import {
 } from "@/logic/orrery-focus-logic";
 import {
   type AnimatedFrame,
-  beginWorldTransition,
   billboardPose,
   bodyKey,
   projectAnimatedFrame,
-  sampleWorldTransition,
-  spinSwitchWorld,
 } from "@/logic/orrery-frame";
 import {
   allocateLabels,
@@ -61,10 +54,10 @@ import {
   deriveSatelliteBodies,
   resolveSatelliteTap,
 } from "@/logic/orrery-satellite-logic";
+import { sampleSwitchChoreography } from "@/logic/orrery-switch-choreography";
 import { resolveSunOccupant } from "@/logic/sun-occupant-logic";
 import type { OrrerySceneSnapshot } from "@/services/orrery-scene";
 import type { ThemePalette } from "@/theme/theme-types";
-import { useReducedMotionShared } from "@/theme/use-reduced-motion";
 import { OrbitBody } from "./OrbitBody";
 import { OrreryCanvas } from "./OrreryCanvas";
 import { OrreryLabel, prepareOrreryText } from "./OrreryLabel";
@@ -72,6 +65,11 @@ import { Polaris } from "./Polaris";
 import { ProjectedOrbitRing } from "./ProjectedOrbitRing";
 import { SatelliteBody } from "./SatelliteBody";
 import { SunBody } from "./SunBody";
+import {
+  type OrreryBodyResource,
+  type OrrerySwitchRuntime,
+  sampleOrrerySwitchCamera,
+} from "./use-orrery-switch-runtime";
 
 export { createOrreryGestures } from "./use-orrery-camera";
 
@@ -80,7 +78,6 @@ import {
   type OrreryCameraController,
 } from "./use-orrery-camera";
 
-const WORLD_SETTLE_MS = 260;
 const LABEL_MAX_WIDTH = 200;
 const LABEL_BODY_GAP = 8;
 
@@ -109,28 +106,6 @@ function ReorderGhost({
   });
   return <Path path={path} color={color} style="stroke" strokeWidth={2} />;
 }
-interface BodyResource {
-  key: string;
-  body: OrrerySceneSnapshot["world"][number];
-  scene: OrrerySceneSnapshot;
-}
-/** Retain photo/font owners until their decorative exit completes. No per-frame React. */
-function resourcesFor(scene: OrrerySceneSnapshot): BodyResource[] {
-  return scene.world.map((body) => ({ key: bodyKey(body), body, scene }));
-}
-function mergeResources(
-  previous: BodyResource[],
-  scene: OrrerySceneSnapshot,
-): BodyResource[] {
-  const current = resourcesFor(scene);
-  return [
-    ...previous.map(
-      (old) => current.find((item) => item.key === old.key) ?? old,
-    ),
-    ...current.filter((item) => !previous.some((old) => old.key === item.key)),
-  ];
-}
-
 function ProjectedBody({
   resource,
   frame,
@@ -138,7 +113,7 @@ function ProjectedBody({
   fontProvider,
   focused,
 }: {
-  resource: BodyResource;
+  resource: OrreryBodyResource;
   frame: SharedValue<AnimatedFrame>;
   colors: ThemePalette;
   fontProvider: SkTypefaceFontProvider | null;
@@ -206,7 +181,7 @@ export function OrreryWorld({
   onReorderActivated,
   satellites = [],
   focusedSatellite,
-  switchIntensity,
+  switchRuntime,
 }: {
   scene: OrrerySceneSnapshot;
   camera: OrreryCameraController;
@@ -225,30 +200,11 @@ export function OrreryWorld({
   onReorderActivated: () => void;
   satellites?: readonly OrrerySatellite[];
   focusedSatellite?: OrrerySatelliteTarget | null;
-  /** Shared render-loop signal; membership stays owned by the frame transition. */
-  switchIntensity: SharedValue<number>;
+  /** Screen-owned runtime survives this canvas consumer being unmounted. */
+  switchRuntime: OrrerySwitchRuntime;
 }) {
   const { fontScale } = useWindowDimensions();
-  const reducedMotion = useReducedMotionShared();
-  const [registry, setRegistry] = useState(() => ({
-    scene,
-    resources: resourcesFor(scene),
-  }));
-  // React's guarded render adjustment publishes all new keyed resources together.
-  // It runs only on a new immutable snapshot, never on camera/animation frames.
-  if (registry.scene !== scene)
-    setRegistry({
-      scene,
-      resources: mergeResources(registry.resources, scene),
-    });
-  const resources =
-    registry.scene === scene
-      ? registry.resources
-      : mergeResources(registry.resources, scene);
-  const transition = useSharedValue(
-    beginWorldTransition([], scene.world, scene.generation),
-  );
-  const progress = useSharedValue(1);
+  const resources = switchRuntime.resources;
   const mounted = useRef(true);
   const focusKey = JSON.stringify([
     scene.generation,
@@ -260,40 +216,22 @@ export function OrreryWorld({
   const reportFocusLost = useCallback(() => {
     if (mounted.current && latestFocus.current === focusKey) onFocusLost?.();
   }, [focusKey, onFocusLost]);
-  const pruneResources = useCallback((generation: number) => {
-    if (!mounted.current) return;
-    setRegistry((current) =>
-      current.scene.generation === generation
-        ? {
-            ...current,
-            resources: current.resources.filter((resource) =>
-              current.scene.world.some(
-                (body) => bodyKey(body) === resource.key,
-              ),
-            ),
-          }
-        : current,
-    );
-  }, []);
   const level = useSharedValue<SemanticLevel>("overview");
   // Capture only the producer's input; the controller also contains its published output.
   const reorder = camera.reorder;
   const frame = useDerivedValue(() => {
-    const intensity = reducedMotion.value ? 0 : switchIntensity.value;
-    // This modulation is inert at zero and deliberately leaves the sampler as
-    // the sole owner of entering/leaving opacity and radius.
-    const easedProgress = Math.max(
-      0,
-      Math.min(
-        1,
-        progress.value + Math.sin(progress.value * Math.PI) * intensity * 0.075,
-      ),
-    );
-    const sampled = spinSwitchWorld(
-      sampleWorldTransition(transition.value, easedProgress),
-      intensity,
-      progress.value,
-    );
+    const sampled = sampleSwitchChoreography(
+      switchRuntime.transition.value,
+      switchRuntime.progress.value,
+    ).world;
+    const sampledCamera =
+      switchRuntime.progress.value >= 1
+        ? pose.value
+        : sampleOrrerySwitchCamera(
+            switchRuntime.cameraFrom.value,
+            switchRuntime.cameraTo.value,
+            switchRuntime.progress.value,
+          );
     const held = reorder.value;
     const world = previewReorder(
       sampled,
@@ -304,17 +242,17 @@ export function OrreryWorld({
       satellites,
       scene.systemSnapshot.members,
       true,
-      semanticLevel(pose.value.zoom, level.value),
+      semanticLevel(sampledCamera.zoom, level.value),
     );
     const completeWorld = [...world, ...moons];
     return projectAnimatedFrame(
       {
-        generation: transition.value.generation,
+        generation: switchRuntime.transition.value.generation,
         from: completeWorld,
         to: completeWorld,
       },
       1,
-      pose.value,
+      sampledCamera,
       viewport,
     );
   });
@@ -326,60 +264,11 @@ export function OrreryWorld({
     },
   );
   useEffect(() => {
-    const world = scene.world;
-    const generation = scene.generation;
-    runOnUI(() => {
-      "worklet";
-      camera.reorder.value = null;
-      if (transition.value.generation === generation) return;
-      const displayed = sampleWorldTransition(
-        transition.value,
-        progress.value,
-      ).filter((body) => body.opacity > 0);
-      cancelAnimation(progress);
-      transition.value = beginWorldTransition(displayed, world, generation);
-      progress.value = 0;
-      progress.value = withTiming(
-        1,
-        {
-          duration: reducedMotion.value ? 100 : WORLD_SETTLE_MS,
-          reduceMotion: ReduceMotion.Never,
-        },
-        (finished) => {
-          if (finished) runOnJS(pruneResources)(generation);
-        },
-      );
-    })();
-  }, [
-    scene,
-    transition,
-    progress,
-    reducedMotion,
-    camera.reorder,
-    pruneResources,
-  ]);
-  useAnimatedReaction(
-    () => reducedMotion.value,
-    (reduced, previous) => {
-      if (!reduced || previous !== false) return;
-      cancelAnimation(progress);
-      const generation = transition.value.generation;
-      progress.value = withTiming(
-        1,
-        { duration: 100, reduceMotion: ReduceMotion.Never },
-        (finished) => {
-          if (finished) runOnJS(pruneResources)(generation);
-        },
-      );
-    },
-  );
-  useEffect(() => {
     mounted.current = true;
     return () => {
       mounted.current = false;
-      cancelAnimation(progress);
     };
-  }, [progress]);
+  }, []);
   const starColors = useMemo(
     () => [colors.textSecondary, colors.textPrimary, ...colors.starPalette],
     [colors],
