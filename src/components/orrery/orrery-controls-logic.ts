@@ -29,7 +29,13 @@ export function buildSystemChoices(
   countsOrCustom: ReadonlyMap<string, number> | readonly CustomSystem[] = [],
   broken: ReadonlyMap<string, boolean> = new Map(),
 ): SystemChoice[] | SystemDescriptor[] {
-  if (source.some((row) => "displayOrder" in row)) {
+  // The selector renders once with an empty catalog while its read is in
+  // flight. Inspecting a row cannot discriminate that state, so discriminate
+  // by the second argument instead: selector callers always supply a count
+  // map, while the legacy Management caller supplies a CustomSystem array.
+  if (
+    typeof (countsOrCustom as ReadonlyMap<string, number>).get === "function"
+  ) {
     const catalog = source as readonly SystemCatalogEntry[];
     const counts = countsOrCustom as ReadonlyMap<string, number>;
     const builtinOrder = new Map(

@@ -9,6 +9,10 @@ import type { SystemCatalogEntry } from "@/db/systems-catalog-read";
 import { BUILTIN_SYSTEMS } from "@/logic/orrery-system-logic";
 
 describe("Orrery System controls", () => {
+  it("treats an empty source with count maps as an empty selector catalog", () => {
+    expect(buildSystemChoices([], new Map(), new Map())).toEqual([]);
+  });
+
   it("keeps every empty builtin in fixed order and sorts actual categories by display_order then UID", () => {
     expect(buildSystemChoices([])).toEqual(BUILTIN_SYSTEMS);
     const rows = buildSystemChoices([
