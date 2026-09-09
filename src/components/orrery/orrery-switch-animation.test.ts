@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   computeMembershipDelta,
+  createSwitchChoreographyOptions,
   preservedFocus,
   selectSystemFraming,
   switchIntensity,
@@ -55,5 +56,27 @@ describe("orrery System switch animation math", () => {
     const delta = computeMembershipDelta([1, 2], [3, 4]);
     expect(switchTransitionIntensity(false, delta)).toBe(0);
     expect(switchTransitionIntensity(true, delta)).toBe(1);
+  });
+
+  it("converts the membership delta into the canonical choreography profile", () => {
+    const overlap = computeMembershipDelta([1, 2, 3, 4], [1, 2, 3, 5]);
+    const turnover = computeMembershipDelta([1, 2, 3, 4], [5, 6, 7, 8]);
+    expect(createSwitchChoreographyOptions(true, overlap, false)).toEqual({
+      intensity: 0.25,
+      reducedMotion: false,
+    });
+    expect(
+      createSwitchChoreographyOptions(true, turnover, false).intensity,
+    ).toBeGreaterThan(
+      createSwitchChoreographyOptions(true, overlap, false).intensity,
+    );
+    expect(createSwitchChoreographyOptions(false, turnover, false)).toEqual({
+      intensity: 0,
+      reducedMotion: false,
+    });
+    expect(createSwitchChoreographyOptions(true, turnover, true)).toEqual({
+      intensity: 1,
+      reducedMotion: true,
+    });
   });
 });

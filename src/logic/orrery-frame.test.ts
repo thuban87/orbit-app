@@ -9,11 +9,11 @@ import {
   beginWorldTransition,
   bodyKey,
   projectAnimatedFrame,
+  projectSwitchChoreographyFrame,
   sampleWorldTransition,
   spinSwitchWorld,
 } from "./orrery-frame";
 import { beginSwitchChoreography } from "./orrery-switch-choreography";
-import { projectSwitchChoreographyFrame } from "./orrery-frame";
 
 const viewport = { width: 1000, height: 1000 };
 const body = (id: number, radius: number): WorldBody => ({
@@ -52,9 +52,7 @@ describe("one animated Orrery frame", () => {
       ),
     );
     expect(collectHitCandidates(frame, projected.x, projected.y)).toEqual([]);
-    expect(frame.bodies.map(bodyKey)).toEqual(
-      frame.sample.world.map(bodyKey),
-    );
+    expect(frame.bodies.map(bodyKey)).toEqual(frame.sample.world.map(bodyKey));
   });
   it("grows entries and shrinks inert departures without snapping an interrupted size", () => {
     const seed = beginWorldTransition([], [body(1, 70)], 1);
