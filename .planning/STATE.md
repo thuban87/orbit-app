@@ -2,19 +2,19 @@
 gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Release Readiness
-current_phase: 30
-current_phase_name: Orrery Systems
-status: complete
-stopped_at: Phase 30 UI-SPEC approved
-last_updated: "2026-09-08T16:28:50.036Z"
-last_activity: 2026-09-08
-last_activity_desc: Phase 29 device UAT complete (8/9 pass); two on-device blocker gesture crashes fixed (f979263); H6 blocked/deferred to Phase 40
-state_head: 45081f81066f51513dc9c0d4a25457b563df9451
+current_phase: 31
+current_phase_name: Profile Experience
+status: planning
+stopped_at: Phase 30 complete, ready to plan Phase 31
+last_updated: "2026-09-09T06:28:02.253Z"
+last_activity: 2026-09-09
+last_activity_desc: Phase 30 complete, transitioned to Phase 31
+state_head: 9311f393092edd829e1f5fe85003f1686615334b
 progress:
   total_phases: 20
-  completed_phases: 5
-  total_plans: 82
-  completed_plans: 70
+  completed_phases: 6
+  total_plans: 84
+  completed_plans: 82
 carried_forward:
 
   - "H6 (Phase 29 UAT) BLOCKED → Phase 40: backup/scene contention overlap unmeasured — the SAF backup-folder grant needs reconnecting, and ordinary navigation does not prove snapshot overlap (see 29-UAT.md, 29-NATIVE-CHECKLIST.md)"
@@ -27,22 +27,22 @@ carried_forward:
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-09-01 after v1.0 milestone)
+See: .planning/PROJECT.md (updated 2026-09-09 after Phase 30)
 
 **Core value:** Collapse the taps between "you're overdue with X" and the message actually being sent.
-**Current focus:** Phase 29 — Orrery Camera, Scale & Exploration
+**Current focus:** Phase 31 — Profile Experience
 
 ## Current Position
 
-Phase: 30 (Orrery Systems) — READY TO EXECUTE
-Plan: 12 of 12
-Status: Device UAT 8/9 pass on the release build; two on-device blocker crashes (gesture/pinch + long-press reorder) found and fixed inline (f979263 — Reanimated worklet forward-reference class). H6 backup contention BLOCKED (SAF folder grant) → deferred Phase 40.
+Phase: 31 — Profile Experience
+Plan: Not started
+Status: Ready to plan
 Carried forward (owner's bucket, NOT resolved here): D-11 default Memory-type display name — reconcile before Phase 34.
 Surface to owner (24.2-07, KNOW-15): milestone plan said Phase 36 owns the backup format-4 bump, but 24.1 already bumped to 4 (d677e2c); Plan 07 emits into the live format 4 with NO bump — that milestone instruction is stale.
 Deferred to Phase 31 (recorded in Plan 05): durable contact-scoped-def ownership + owner-purge semantics. Deferred to Phase 36 (ROADMAP breadcrumb): legacy AI-fuel confirm-path code removal.
-Last activity: 2026-09-08 — Phase 29 device UAT complete (8/9 pass; H6 blocked→P40); blocker gesture crashes fixed (f979263)
-Progress: 9/19 phases complete (v2.0) — 22, 23, 24.1, 24.2, 25, 26, 27, 28, 29
-Next: Phase 29 closed. Push f979263 + 80111e2. Then plan the next phase (28 or 30) at owner's discretion.
+Last activity: 2026-09-09 — Phase 30 complete, transitioned to Phase 31
+Progress: 10/19 phases complete (v2.0) — 22, 23, 24.1, 24.2, 25, 26, 27, 28, 29, 30
+Next: Phase 31 — discuss/profile planning when the owner is ready.
 
 **Milestone v2.0 structure (pre-decided by the owner from the fifteen milestone-2 dossiers + the
 2026-09-01 cross-dossier audit; not re-derived):** 22 App Shell · 23 Theme · 24 Contact Knowledge ·
@@ -58,7 +58,7 @@ at plan time. All new durable preferences are `app_settings` columns, never Asyn
 
 **Velocity:**
 
-- Total plans completed: 47
+- Total plans completed: 59
 - Average duration: —
 - Total execution time: 0 hours
 
@@ -73,6 +73,7 @@ at plan time. All new durable preferences are `app_settings` columns, never Asyn
 | 23 | 7 | - | - |
 | 25 | 7 | - | - |
 | 28 | 8 | - | - |
+| 30 | 12 | - | - |
 
 **Recent Trend:**
 
@@ -609,11 +610,11 @@ _Also disposed at this close: 05/deferred-items.md (check:colors doc-comment) ma
 
 ## Session
 
-**Last session:** 2026-09-08T07:59:47.945Z
-**Stopped at:** Phase 30 UI-SPEC approved
+**Last session:** 2026-09-09T06:28:02.253Z
+**Stopped at:** Phase 30 complete, ready to plan Phase 31
 _Prior stop (v1.0):_ Phase 21 UI-SPEC approved; milestone v1.0 closed 2026-09-01.
 _Prior stop (13-04):_ the orrery VISUAL VOCABULARY (theme tokens + two pure resolver modules, node-tested, 29 cases green): (1) five owner-tunable `ThemePalette` tokens seeded in `space-dark.dark` ONLY — `starPalette` (6 colours, gold `#F2C14E` at index 0, then amber/rose-red/violet/cyan/ice-white), `mutedStable/Wobble/Decay` (desaturated same-hue morph endpoints), `rogueExtinguished` (cold blue-grey `#3E4A6B` rogue BODY fill) — with an M6/C2-5 conformance test that IMPORTS the real `SELF_SUN_COLOUR_RE`/`assertSelfSunColour` from app-settings-dao and locks every starPalette entry to the ACTUAL DAO write-path rule (no re-inlined regex). (2) `orrery-ring-logic.ts` `orreryRingStyle(status, colors)` — REUSES `ringVisual` for `{color,opacity,width}` (status→colour mapped once), adds the `strokeStyle` axis (solid→dashed→faded→faintTrace) + `bodyFill` (rogue ring=`colors.rogue`, body=`rogueExtinguished`); `null`→canonical NEUTRAL (`colors.border`), never throws — the single fallback sun-occupant reuses (C2-2). (3) `sun-occupant-logic.ts` `resolveSunOccupant(input)` — NULL/archived/missing→self (A7, glow `selfSunColour ?? starPalette[0]`), live contact→its status glow via `orreryRingStyle(status, colors).color`, never-contacted (status `null`)→the reused neutral border (C2-2); accepts `status: ProfileStatus | null`. 5 commits (1801915 feat tokens+M6; d35d528 RED→4cbfad5 GREEN ring-logic; c923b16 RED→10780dd GREEN sun-occupant); tsc + check:colors clean; no deviations (one in-flight fix: a placeholder hex in the logic test was re-sourced from the palette after check:colors flagged it — C2-3). Committed locally on main (NOT pushed). Next: Wave 2 (13-05 render / 13-06 Settings sun-picker), Wave 3 (13-07 drag-release), Wave 4 (13-08 device UAT, autonomous:false).
-**Resume file:** .planning/phases/30-orrery-systems/30-UI-SPEC.md
+**Resume file:** None
 are archived under `.planning/milestones/v1.0-phases/`.)
 
 ## Phase 4 — Closeout (2026-08-15) ✅ COMPLETE

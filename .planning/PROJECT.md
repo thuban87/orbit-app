@@ -114,6 +114,9 @@ are local on `main`, NOT pushed.
   review, explicit atomic Orbit-to-Orbit merge with tombstoning.
 - ✓ **Interaction assist & reach out** — v1.0 (Phase 21). Shared Call/Text/Email routing, durable
   post-handoff assist confirmation, widget Contact integration.
+- ✓ **Orrery Systems** — v2.0 (Phase 30). Named built-in, Category, and custom Systems with
+  rule/manual membership, HUD authoring and Preview, management, durable selection, and an
+  owner-approved delta-adaptive Skia switch choreography with Reduced Motion replacement.
 
 ### Active
 
@@ -246,6 +249,8 @@ are local on `main`, NOT pushed.
 | Reconciliation re-read enables `READ_CONTACTS` on API 37+ (ADR-003, supersedes ADR-002 partial) — user-initiated only | The one-shot picker can't supply an ongoing linked-set comparison; owner-approved after device UAT (20-reconcile) | ✓ Good (v1.0) |
 | Bound/Unbound contact lifecycle is independent of cadence; merge tombstones the absorbed contact (not archive) | Preserves future-sync compatibility without building sync now; existing contacts migrate Bound (18.2, 20) | ✓ Good (v1.0) |
 | Interaction Assist writes a durable pending assist before native handoff and logs the interaction at handoff time through the single recency writer | Local, user-initiated, no passive monitoring; never resurrects merged/purged contacts (21-assist) | ✓ Good (v1.0) |
+| Orrery Systems use normalized definitions/rules/overrides with a single DAO writer; Category Systems retain immutable generated bases | Keeps membership local, composable, and truthful while preserving safe override and broken-reference behavior (30-systems) | ✓ Good (v2.0) |
+| System switching is one UI-thread choreography over retained/leaving/entering roles, with screen-owned pause/re-target state and a Reduced Motion replacement | Prevents React publication steps, preserves lifecycle/camera continuity, and delivers the owner-approved spin/shedding/capture behavior (30-systems) | ✓ Good (v2.0) |
 
 ## Evolution
 
@@ -266,4 +271,4 @@ This document evolves at phase transitions and milestone boundaries.
 5. Update Context with current state
 
 ---
-*Last updated: 2026-09-02 after starting milestone v2.0 Release Readiness*
+*Last updated: 2026-09-09 after completing Phase 30 Orrery Systems*
