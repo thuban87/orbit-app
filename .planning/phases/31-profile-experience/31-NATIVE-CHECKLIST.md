@@ -4,18 +4,17 @@
 
 **Build/runtime:** package `com.bwales.orbit`; Metro tmux session `orbit`; use `emu-connect`, then resolve exactly one authorized serial with `~/.local/bin/adb devices -l`.
 
-**Status:** Pending owner acceptance after Plan 31-10 Task 3.
+**Status:** Objective Pixel evidence recorded; pending owner acceptance after Plan 31-10 Task 3.
 
 ## Evidence header
 
-Record before beginning:
+Recorded 2026-09-09T16:38:10-05:00:
 
-- Date/time:
-- `emu-connect status` target:
-- Authorized physical serial/model:
-- APK/debug build and Metro state:
-- Theme/mode:
-- Seed contacts used (bound, unbound, missing-data, long-data):
+- `emu-connect status`: `device`; exactly one authorized USB target.
+- Authorized physical serial/model: `1A071FDEE002BU` / Pixel 6 Pro (`raven`).
+- APK/runtime: `com.bwales.orbit` debug `1.0.0` (versionCode 1); Orbit Metro listened on host `8082`, with device `tcp:8081` reverse-mapped to it.
+- Theme/mode observed: Galaxy dark.
+- Seed contact exercised: bound Andrew Wales; existing UAT contacts remain available for the owner scenarios.
 
 ## Checklist
 
@@ -23,13 +22,13 @@ Mark every row PASS/FAIL with a short observation. A failed row is a gap for pla
 
 | # | Area | Verification | PASS/FAIL + evidence |
 |---:|---|---|---|
-| 1 | Target | `emu-connect` selects `device`, not remote emulator; exactly one authorized physical Pixel is listed. | |
-| 2 | Shell | Dashboard → Profile → Back returns to the same Dashboard state. | |
+| 1 | Target | `emu-connect` selects `device`, not remote emulator; exactly one authorized physical Pixel is listed. | PASS — `emu-connect status` reported `device`; `adb devices -l` reported only Pixel 6 Pro serial `1A071FDEE002BU`. |
+| 2 | Shell | Dashboard → Profile → Back returns to the same Dashboard state. | PASS — Dashboard card opened Andrew Wales Profile; Android Back returned to the same populated Dashboard grid. |
 | 3 | Shell | Orrery → Profile → Back returns to Orrery without changing its selected system. | |
 | 4 | Shell | Settings/Archived → Profile → Back returns to its source stack. | |
 | 5 | Shell | Widget contact deep link opens Profile and Back returns to Dashboard. | |
 | 6 | Shell | Notification Profile/reach entry returns through its reset Dashboard stack; Reach Out opens once. | |
-| 7 | Hero | Bound contact shows fixed avatar/name/Category/Favorite/Message/Call/one overflow in both themes. | |
+| 7 | Hero | Bound contact shows fixed avatar/name/Category/Favorite/Message/Call/one overflow in both themes. | PENDING OWNER — Galaxy dark Pixel tree exposed Avatar, name, Family Category, Favorite, Message, Call, and one `More actions for Andrew Wales` control. Standard/theme-switch coverage remains. |
 | 8 | Hero | Missing phone/email retains Message and Call geometry, with accurate disabled reasons. | |
 | 9 | Hero | Long name/category at large text wraps/reflows without overlap or a shrunk semantic role. | |
 | 10 | Hero | Favorite changes only after its committed write and survives focus/relaunch. | |
@@ -55,10 +54,10 @@ Mark every row PASS/FAIL with a short observation. A failed row is a gap for pla
 | 30 | TTR | Tap detail, long-press management, and accessibility actions reach source-owner management flows. | |
 | 31 | Off Limits | Ordinary Off Limits uses caution semantics, no sparkle, and no inferred AI permission. | |
 | 32 | Custom fields | Invalid values expose their recovery state; long/grouped values remain understandable. | |
-| 33 | Overflow | Exact order: Edit, Snooze/Unsnooze, Archive, separator, Profile Layout, Background, conditional Save, conditional Reset. | |
-| 34 | Overflow | No Profile AI-draft action appears; Message → Compose remains available. | |
-| 35 | Overlay | A topmost sheet makes Profile underlay inert; Android Back closes the topmost sheet before native-stack Back. | |
-| 36 | Layout | Profile Layout edit shows fixed-Hero preview, drag plus Move controls, visibility/default expansion, and legal size options. | |
+| 33 | Overflow | Exact order: Edit, Snooze/Unsnooze, Archive, separator, Profile Layout, Background, conditional Save, conditional Reset. | PENDING OWNER — inherited-layout Pixel menu visibly ordered Edit, Snooze, Archive, separator, Profile Layout, Background. Expanded-sheet repair keeps all shown entries above the safe area; conditional freeform/reset cases remain. |
+| 34 | Overflow | No Profile AI-draft action appears; Message → Compose remains available. | PENDING OWNER — no Profile AI action appeared in the Pixel menu; owner must confirm Message → Compose. |
+| 35 | Overlay | A topmost sheet makes Profile underlay inert; Android Back closes the topmost sheet before native-stack Back. | PASS — clean Profile actions sheet dimmed the underlay; first Android Back dismissed it while retaining Profile, second Back returned to Dashboard. |
+| 36 | Layout | Profile Layout edit shows fixed-Hero preview, drag plus Move controls, visibility/default expansion, and legal size options. | PENDING OWNER — Pixel editor exposed `Fixed Hero` preview, `Drag … to reorder`, Move up/down, visibility, default-expansion controls, Save, and Cancel. Full legal-size/large-text verification remains. |
 | 37 | Layout | Long labels retain Save/Cancel/reorder reachability at large text and screen reader. | |
 | 38 | Layout | Cancel/dirty dismissal preserves committed layout; Save commits complete layout and reloads it. | |
 | 39 | Templates | Create/rename/preview/assignment/usage/delete flows describe inherited vs contact override truthfully. | |
