@@ -605,7 +605,19 @@ Plans:
 **Canonical refs**: docs/dossier/milestone-2/phase-10-profile-experience-dossier.md; docs/dossier/milestone-2/planning-notes/phase-10-planning-notes.md
 **Consumes from Phase 24.2** (deferred UI, owner-approved 2026-09-04): the custom-field **value-history backlist** viewer (reads `value-history-dao.ts` / `custom_field_value_history`) and **grouped custom-field rendering** (`custom_field_defs.field_group`). 24.2 shipped these as data-layer only. Confirm at Phase 31 planning whether the Profile is the right surface or a dedicated custom-fields UI phase is needed; if the latter, re-home this note.
 **Schema**: profile layout/background templates (verify head+1 at plan time)
-**Plans**: TBD
+**Plans**: 10 plans
+
+Plans:
+- [ ] 31-01-PLAN.md — Forward-only presentation schema, closed contracts, and end-to-end resolution tracer
+- [ ] 31-02-PLAN.md — Presentation reads and atomic template/assignment/reset/fallout DAOs
+- [ ] 31-03-PLAN.md — Nullable-cadence-safe metrics and composed Frequency/Snooze actions
+- [ ] 31-04-PLAN.md — Coherent local Profile snapshot, semantic knowledge, methods, and interim History reads
+- [ ] 31-05-PLAN.md — Fixed Hero, responsive Relationship Overview, and semantic module host
+- [ ] 31-06-PLAN.md — Things to Remember, grouped custom fields, value-history backlist, and Contact Methods
+- [ ] 31-07-PLAN.md — Accessible focused Profile layout chooser/editor
+- [ ] 31-08-PLAN.md — Reusable layout-template management and assignment flows
+- [ ] 31-09-PLAN.md — Safe local background crop/storage/templates and assignment editor
+- [ ] 31-10-PLAN.md — Host integration, documentation, full regression, and physical-device UAT
 **UI hint**: yes
 
 ### Phase 32: Interaction History & Insights
