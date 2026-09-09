@@ -9,7 +9,15 @@ import {
   readProfileCollapseOverride,
   setProfileCollapseOverride,
 } from "@/db/profile-presentation-dao";
+import {
+  countProfileTemplateUsage,
+  listProfileBackgroundTemplates,
+  listProfileLayoutTemplates,
+  readProfilePresentationInputs,
+} from "@/db/profile-presentation-read";
 import type { SqlExecutor } from "@/db/types";
+import { FACTORY_PROFILE_LAYOUT } from "@/profile/presentation-schema";
+import { resolveProfilePresentation } from "@/profile/resolve-presentation";
 
 const NOW = "2026-09-09 12:00:00";
 let exec: SqlExecutor;
@@ -79,5 +87,110 @@ describe("Profile collapse persistence", () => {
       },
     };
     expect(await readProfileCollapseOverride(malformed, contactId)).toEqual({});
+  });
+});
+
+describe("Profile presentation read model", () => {
+  it("reads all hierarchy inputs and preserves independent explicit axes", async () => {
+    const categoryId = (
+      await exec.runAsync(
+        "INSERT INTO categories(uid,name,display_order,created_at,modified_at) VALUES(?,?,?,?,?)",
+        ["category", "Friends", 0, NOW, NOW],
+      )
+    ).lastInsertRowId;
+    await exec.runAsync("UPDATE contacts SET category_id=? WHERE id=?", [
+      categoryId,
+      contactId,
+    ]);
+    const layoutJson = JSON.stringify(FACTORY_PROFILE_LAYOUT);
+    for (const [uid, name] of [
+      ["global-layout", "Global layout"],
+      ["category-layout", "Category layout"],
+      ["contact-layout", "Contact layout"],
+    ]) {
+      await exec.runAsync(
+        "INSERT INTO profile_layout_templates(uid,name,layout_json,created_at,modified_at) VALUES(?,?,?,?,?)",
+        [uid, name, layoutJson, NOW, NOW],
+      );
+    }
+    for (const [uid, name] of [
+      ["global-bg", "Global background"],
+      ["category-bg", "Category background"],
+      ["contact-bg", "Contact background"],
+    ]) {
+      await exec.runAsync(
+        "INSERT INTO profile_background_templates(uid,name,image_path,created_at,modified_at) VALUES(?,?,?,?,?)",
+        [uid, name, `profile-backgrounds/${uid}.webp`, NOW, NOW],
+      );
+    }
+    await exec.runAsync(
+      "UPDATE app_settings SET profile_layout_template_uid=?,profile_background_template_uid=? WHERE id=1",
+      ["global-layout", "global-bg"],
+    );
+    await exec.runAsync(
+      "INSERT INTO profile_category_presentation(category_id,layout_template_uid,background_template_uid,created_at,modified_at) VALUES(?,?,?,?,?)",
+      [categoryId, "category-layout", "category-bg", NOW, NOW],
+    );
+    await exec.runAsync(
+      "INSERT INTO profile_contact_presentation(contact_id,layout_template_uid,background_template_uid,collapse_json,created_at,modified_at) VALUES(?,?,?,?,?,?)",
+      [contactId, "contact-layout", "contact-bg", "{}", NOW, NOW],
+    );
+
+    const input = await readProfilePresentationInputs(exec, contactId, {
+      factoryLayout: FACTORY_PROFILE_LAYOUT,
+      themeBackground: "theme:galaxy",
+    });
+    expect(input).toMatchObject({
+      global: {
+        layoutTemplateUid: "global-layout",
+        backgroundTemplateUid: "global-bg",
+      },
+      category: {
+        layoutTemplateUid: "category-layout",
+        backgroundTemplateUid: "category-bg",
+      },
+      contact: {
+        layoutTemplateUid: "contact-layout",
+        backgroundTemplateUid: "contact-bg",
+      },
+    });
+    expect(resolveProfilePresentation(input)).toMatchObject({
+      layout: { source: "contact-template" },
+      background: { source: "contact" },
+    });
+    expect(await listProfileLayoutTemplates(exec)).toHaveLength(3);
+    expect(await listProfileBackgroundTemplates(exec)).toHaveLength(3);
+  });
+
+  it("reports usage by scope and never counts freeform layouts as templates", async () => {
+    const categoryId = (
+      await exec.runAsync(
+        "INSERT INTO categories(uid,name,display_order,created_at,modified_at) VALUES(?,?,?,?,?)",
+        ["category", "Friends", 0, NOW, NOW],
+      )
+    ).lastInsertRowId;
+    const layoutJson = JSON.stringify(FACTORY_PROFILE_LAYOUT);
+    await exec.runAsync(
+      "INSERT INTO profile_layout_templates(uid,name,layout_json,created_at,modified_at) VALUES(?,?,?,?,?)",
+      ["layout", "Layout", layoutJson, NOW, NOW],
+    );
+    await exec.runAsync(
+      "UPDATE app_settings SET profile_layout_template_uid=? WHERE id=1",
+      ["layout"],
+    );
+    await exec.runAsync(
+      "INSERT INTO profile_category_presentation(category_id,layout_template_uid,created_at,modified_at) VALUES(?,?,?,?)",
+      [categoryId, "layout", NOW, NOW],
+    );
+    await exec.runAsync(
+      "INSERT INTO profile_contact_presentation(contact_id,freeform_layout_json,collapse_json,created_at,modified_at) VALUES(?,?,?,?,?)",
+      [contactId, layoutJson, "{}", NOW, NOW],
+    );
+    expect(await countProfileTemplateUsage(exec, "layout", "layout")).toEqual({
+      global: 1,
+      categories: 1,
+      contacts: 0,
+      total: 2,
+    });
   });
 });
