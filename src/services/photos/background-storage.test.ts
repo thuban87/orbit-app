@@ -8,7 +8,9 @@ const h = vi.hoisted(() => ({
 vi.mock("expo-file-system", () => {
   const uri = (parts: unknown[]) =>
     parts
-      .map((part) => (typeof part === "string" ? part : (part as { uri: string }).uri))
+      .map((part) =>
+        typeof part === "string" ? part : (part as { uri: string }).uri,
+      )
       .map((part, index) =>
         index === 0
           ? part.replace(/\/+$/, "")

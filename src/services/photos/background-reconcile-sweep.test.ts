@@ -1,5 +1,12 @@
-import { describe, expect, it } from "vitest";
-import { planBackgroundReconciliation } from "./background-reconcile-sweep";
+import { describe, expect, it, vi } from "vitest";
+
+vi.mock("expo-file-system", () => ({
+  Directory: class {},
+  File: class {},
+  Paths: { document: { uri: "file:///doc" } },
+}));
+
+import { planBackgroundReconciliation } from "./background-reconcile-model";
 
 describe("background launch reconciliation plan", () => {
   it("keeps a path while any template row can still reach it through global, Category, or contact assignment", () => {
@@ -27,9 +34,7 @@ describe("background launch reconciliation plan", () => {
         to: "profile-backgrounds/live.jpg",
       },
     ]);
-    expect(plan.missingReferences).toEqual([
-      "profile-backgrounds/missing.jpg",
-    ]);
+    expect(plan.missingReferences).toEqual(["profile-backgrounds/missing.jpg"]);
   });
 
   it("deletes an unreferenced interrupted backup instead of resurrecting it", () => {
@@ -39,7 +44,10 @@ describe("background launch reconciliation plan", () => {
         referencedPaths: new Set(),
       }).actions,
     ).toEqual([
-      { kind: "deleteBak", relative: "profile-backgrounds/unreferenced.jpg.bak" },
+      {
+        kind: "deleteBak",
+        relative: "profile-backgrounds/unreferenced.jpg.bak",
+      },
     ]);
   });
 });
