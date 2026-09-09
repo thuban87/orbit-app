@@ -34,7 +34,8 @@ describe("background manager model", () => {
     );
     const failed = finishBackgroundPreparation(started, "pick-1", {
       ok: false,
-      message: "Couldn't prepare that image. Choose another image or try again.",
+      message:
+        "Couldn't prepare that image. Choose another image or try again.",
     });
     expect(failed.committedPath).toBe("profile-backgrounds/old.jpg");
     expect(failed.error).toContain("Couldn't prepare");
@@ -50,7 +51,10 @@ describe("background manager model", () => {
     ).toEqual({ kind: "close" });
     expect(
       requestBackgroundManagerDismissal(
-        beginBackgroundPreparation(createBackgroundManagerState(null), "pick-1"),
+        beginBackgroundPreparation(
+          createBackgroundManagerState(null),
+          "pick-1",
+        ),
       ),
     ).toEqual({ kind: "confirm-discard" });
   });

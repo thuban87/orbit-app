@@ -29,7 +29,6 @@ import { WidgetLinkingGate } from "@/navigation/widget-linking";
 import { registerBackupSweep } from "@/services/backup-sweep";
 import { getDeviceRegion } from "@/services/device-region";
 import { registerFieldSweep } from "@/services/field-sweep";
-import { registerMemoryTrashSweep } from "@/services/memory-trash-sweep";
 import {
   type ResumableImport,
   registerImportResumeSweep,
@@ -43,6 +42,7 @@ import {
   installSweepTrigger,
   registerSweepHook,
 } from "@/services/launch-sweep";
+import { registerMemoryTrashSweep } from "@/services/memory-trash-sweep";
 // Module-scope side-effect import (Pitfall P5): importing headless-task RUNS its
 // `TaskManager.defineTask` + `registerTaskAsync` so a killed-app action tap reaches
 // the headless write path. React never mounts in the headless context, so no
@@ -55,6 +55,7 @@ import "@/services/notifications/headless-task";
 import { registerDigestScheduleSweep } from "@/services/notifications/digest-schedule";
 import { FOREGROUND_NOTIFICATION_BEHAVIOR } from "@/services/notifications/notification-ids";
 import { registerNotificationScheduleSweep } from "@/services/notifications/notification-schedule";
+import { registerBackgroundReconcileSweep } from "@/services/photos/background-reconcile-sweep";
 import { registerPhotoReconcileSweep } from "@/services/photos/photo-reconcile-sweep";
 import { registerRestorePhotoFinalizeSweep } from "@/services/photos/restore-photo-finalize-sweep";
 import { registerWidgetSweep } from "@/services/widget/widget-refresh";
@@ -113,6 +114,7 @@ let backupSweepRegistered = false;
 // One-shot guard for the photo-write reconciliation hook (PHOTO-03/05), on the
 // SAME registry and under the SAME re-entrancy reasoning as the field sweep.
 let photoReconcileRegistered = false;
+let backgroundReconcileRegistered = false;
 let restorePhotoFinalizeSweepRegistered = false;
 // One-shot guard for the notification-schedule reconcile hook (NOTIF-01/04), on the
 // SAME registry and under the SAME re-entrancy reasoning. Registered ready-gated so
@@ -235,6 +237,14 @@ function AppShell() {
     if (!photoReconcileRegistered) {
       registerPhotoReconcileSweep();
       photoReconcileRegistered = true;
+    }
+    // Profile image derivatives use their own UID-derived namespace and must
+    // reconcile only after migrations expose template referrers. Register before
+    // the trigger so interrupted swaps and zero-referrer orphans recover on the
+    // cold-start sweep, never from module scope or a background timer.
+    if (!backgroundReconcileRegistered) {
+      registerBackgroundReconcileSweep(getExecutor);
+      backgroundReconcileRegistered = true;
     }
     // A committed restore-photo journal is drained only on real foreground
     // launches, after migration readiness and before the cold-start sweep fires.
