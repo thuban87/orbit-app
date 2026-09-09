@@ -120,6 +120,7 @@ The backup manifest is a versioned wire model separate from SQLite's schema vers
 12. **Do not require a new array from an older format-4 file.** There is no 4→4 forward migration, so optional additive arrays normalize during parse before validation and restore.
 13. **Allowlisting is not emission for Dashboard preferences.** Migration 019 makes the keys durable and restorable; the current manifest projection stays unchanged until its coordinated format bump.
 14. **The right-swipe action follows the same deferred-wire rule.** Accepting its key in validation does not authorize format-4 export or restore emission before the coordinated backup change.
+15. **Profile presentation is not a format-4 entity.** The nullable global Profile preference keys are allowlisted, but templates, assignments, freeform layouts, collapse maps, and local background bytes must not be emitted/restored until the coordinated Profile wire-format decision.
 
 ## Related Systems
 
@@ -146,3 +147,4 @@ The backup manifest is a versioned wire model separate from SQLite's schema vers
 | 2026-09-03 | 24.2 | Added Memory permission, retained custom-field history, scope metadata, and compatible format-4 restoration. |
 | 2026-09-02 | 25 | Allowlisted durable Dashboard preferences for a future wire without changing the current backup format. |
 | 2026-09-02 | 27 | Allowlisted the durable Dashboard right-swipe action for a future wire without changing the current backup format. |
+| 2026-09-09 | 31 | Documented Profile presentation's format-4 boundary: global preference keys are accepted, while Profile entities and background bytes remain device-local pending the coordinated backup format decision. |

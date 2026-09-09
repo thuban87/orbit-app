@@ -30,6 +30,7 @@ Read the relevant system doc *before* making changes to that subsystem.
 | Capture | `capture.md` | `db/capture-dao.ts`, `db/capture-read.ts` | 10 |
 | Notifications | `notifications.md` | `db/notification-read.ts`, `db/snooze-dao.ts`, `services/notifications/` | 11 |
 | Widget | `widget.md` | `services/widget/` | 12 |
+| Profile presentation | `profile.md` | `screens/ContactProfileScreen.tsx`, `db/profile-read.ts`, `db/profile-presentation-*.ts`, `profile/`, `components/profile/` | 31 |
 | AI suggestions | `ai-suggestions.md` | `ai/`, `services/AiService.ts`, `services/ai-key-store.ts`, `db/ai-context-read.ts`, `db/app-settings-dao.ts`, `logic/ai-suggestion-logic.ts`, `screens/SettingsScreen.tsx`, `screens/ComposeScreen.tsx` (sole user-configured network path) | 14 |
 | Digest | `digest.md` | `db/digest-read.ts` | 15 |
 | Backup & restore | `backup-restore.md` | `services/backup/`, `services/backup-sweep.ts`, `db/restore-photo-journal-dao.ts`, `db/app-settings-dao.ts`, `db/data-revision-dao.ts` | 17 |
