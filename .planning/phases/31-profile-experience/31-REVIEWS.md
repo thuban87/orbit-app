@@ -1,7 +1,7 @@
 ---
 phase: 31
 reviewers: [codex, claude]
-reviewed_at: 2026-09-09T05:57:19-05:00
+reviewed_at: 2026-09-09T06:16:37-05:00
 plans_reviewed: [31-01-PLAN.md, 31-02-PLAN.md, 31-03-PLAN.md, 31-04-PLAN.md, 31-05-PLAN.md, 31-06-PLAN.md, 31-07-PLAN.md, 31-08-PLAN.md, 31-09-PLAN.md, 31-10-PLAN.md]
 models:
   codex: "gpt-5.6-sol (reasoning=low)"
@@ -528,3 +528,65 @@ CYCLE_SUMMARY: current_high=1 current_actionable=1
 ## Current Actionable Non-HIGH Concerns
 
 - **LOW — Plan 04 reader-signature ownership is imprecise.** Add all affected reader implementation/test files to Task 1's task-local `<files>` and state that only the read exports widen to `ReadOnlyExecutor`; transaction-composed writers such as `appendValueHistoryCore` and `maybeAppendPriorValueHistoryCore` keep `SqlExecutor`.
+
+---
+
+# Convergence Cycle 3 — Revised Plans
+
+## Claude Review — Cycle 3
+
+### Summary
+
+Claude verified the revised plan claims against the migration registry, transaction boundary, Category writers, snapshot readers, Sheet variants, settings/backup allowlists, field-type contract, and launch-reconciliation pattern. It found the five cycle-1 HIGH concerns and both cycle-2 findings incorporated. One new source-grounded test-design gap remains.
+
+### Strengths
+
+- The current plans derive migration head+1 at execution time, freeze persisted semantics before schema authorization, preserve unconditional snooze/unsnooze audit events, widen only snapshot read exports to `ReadOnlyExecutor`, register launch-time background reconciliation, and place the Category-clear behavior before resolver/DAO work.
+- Plan 04 names all five snapshot readers that currently require signature widening while preserving transaction-composed writers as `SqlExecutor`.
+- Plan 07's additive expanded `Sheet` variant matches the live component's current compact/detail-only contract.
+
+### Concern
+
+- **MEDIUM — Plan 02's Category-deletion test does not specify a fixture that can reach the intended fallout assertion with foreign keys enabled.** `contacts.category_id` uses plain `REFERENCES categories(id)` with no `ON DELETE` action (`src/db/migrations/001-initial.ts:61-67`), so SQLite's default `NO ACTION` rejects deletion while a contact still references the Category. Plan 02 currently says only to delete a real Category row with foreign keys enabled (`31-02-PLAN.md:116`). A zero-contact Category would test presentation-assignment cleanup but not the planned “affected contacts resolve through global/factory” behavior. The plan must require nulling/reassigning referencing contacts in the same test transaction before deleting the Category, then assert presentation-assignment cleanup and fallback resolution.
+
+### Risk Assessment
+
+**LOW apart from the test-fixture precision gap.** This reviewer found no remaining architectural, migration, privacy, or transaction-safety defect.
+
+## Codex Review — Cycle 3
+
+### Summary
+
+Codex verified the revised plans against the governing dossier, requirements, migrations, and all production Category-writing paths. It found one current HIGH decision conflict: the newly introduced `retain` checkpoint option reverses the settled inheritance rule.
+
+### Strengths
+
+- Plan 04 now narrows `ReadOnlyExecutor` widening to read exports and preserves write-side executor contracts.
+- Earlier fixes remain incorporated: runtime-derived migration version, immutable snooze events, coherent snapshot composition, launch reconciliation, manager state models, and incremental physical-device gates.
+- The plans add no network Profile read, hardcoded color, Off Limits permission inference, widened AI egress, or React-state-per-frame animation.
+
+### Concern
+
+- **HIGH — Plan 01's `retain` option contradicts PROF-05 and the governing Profile decisions.** The dossier says inherited backgrounds and purely inherited layouts follow a contact's new Category while explicit contact overrides survive (`docs/dossier/milestone-2/phase-10-profile-experience-dossier.md:97-101,165-169`); PROF-05 states the same unconditional rule (`.planning/REQUIREMENTS.md:170`). Phase 31 research removes any residual ambiguity: after Category deletion, affected contacts fall through to global/factory and the implementation “must not materialize” former Category values onto contacts (`31-RESEARCH.md:235-243`). Plan 01 nevertheless offers durable retention by materializing inherited axes as contact-owned assignments (`31-01-PLAN.md:73-81`), and Plan 02 implements that branch (`31-02-PLAN.md:109-118`). This is a decision reversal, so it cannot be presented as an owner checkpoint to choose anew. Remove the no-Category decision and `retain` option from Plan 01; require Category-to-null fallthrough for both axes, preserving explicit contact assignments/freeform overrides. Remove retention/materialization branching from Plan 02 and replace the PROF-05 `OWNER CHECKPOINT` in `31-COVERAGE.md` with an explicit fallthrough test.
+
+### Risk Assessment
+
+**HIGH until the `retain` alternative is removed.** Once corrected, remaining execution risk is driven by the phase's broad native UI and image-lifecycle surface, not an unresolved architecture decision.
+
+## Consensus Summary — Cycle 3
+
+Both requested lanes ran successfully. Claude was pinned to `sonnet (reasoning=low)` and Codex resolved to `gpt-5.6-sol (reasoning=low)`. Both verified that the previously identified migration, schema ordering, snooze-event, snapshot-reader, reconciliation, manager-state, and incremental-device-test issues are incorporated in the revised plans.
+
+The source adjudication retains Codex's HIGH finding. The `retain` alternative conflicts not only with the broad dossier/requirement wording but with `31-RESEARCH.md`'s explicit prohibition on materializing former Category presentation onto contacts. Under the repository authority rules, this is enforcement of a recorded decision rather than an owner decision to reopen.
+
+Claude's MEDIUM deletion-test finding is also current and independent: once the plan requires fallthrough, the synthetic FK-on deletion test must explicitly clear/reassign referencing contacts before deleting the Category so it reaches both assignment cleanup and affected-contact fallback assertions.
+
+CYCLE_SUMMARY: current_high=1 current_actionable=1
+
+## Current HIGH Concerns
+
+- **Plan 01/02 reopen and permit reversal of settled PROF-05 inheritance.** Remove the no-Category owner decision and `retain` option; require inherited layout/background to fall through to global/factory when Category becomes null while explicit contact overrides survive. Remove retention/materialization code and tests from Plan 02, and change `31-COVERAGE.md` from `OWNER CHECKPOINT` to explicit fallthrough coverage.
+
+## Current Actionable Non-HIGH Concerns
+
+- **MEDIUM — The Category-deletion fallout test fixture is underspecified.** Because `contacts.category_id` has default `NO ACTION`, Plan 02 must require nulling/reassigning target-Category contacts inside the synthetic deletion test transaction before deleting the Category, then assert Category presentation-assignment cleanup and global/factory resolution for the affected contacts.
