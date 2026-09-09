@@ -12,6 +12,8 @@ import {
   sampleWorldTransition,
   spinSwitchWorld,
 } from "./orrery-frame";
+import { beginSwitchChoreography } from "./orrery-switch-choreography";
+import { projectSwitchChoreographyFrame } from "./orrery-frame";
 
 const viewport = { width: 1000, height: 1000 };
 const body = (id: number, radius: number): WorldBody => ({
@@ -23,6 +25,37 @@ const body = (id: number, radius: number): WorldBody => ({
   ringRadius: id === 0 ? 0 : radius,
 });
 describe("one animated Orrery frame", () => {
+  it("projects the choreography sample as the sole ring, body, and hit world", () => {
+    const transition = beginSwitchChoreography(
+      [body(1, 70)],
+      [body(2, 180)],
+      12,
+      { intensity: 1, reducedMotion: false },
+    );
+    const progress = 0.66;
+    const frame = projectSwitchChoreographyFrame(
+      transition,
+      progress,
+      HOME_CAMERA,
+      viewport,
+    );
+    const entering = frame.sample.world.find((entry) => entry.id === 2)!;
+    const projected = frame.bodies.find((entry) => entry.id === 2)!;
+    expect(projected).toMatchObject(
+      projectWorldPoint(entering, frame.pose, viewport),
+    );
+    expect(projected.ringPath[0]).toMatchObject(
+      projectWorldPoint(
+        { x: 0, y: -entering.ringRadius },
+        frame.pose,
+        viewport,
+      ),
+    );
+    expect(collectHitCandidates(frame, projected.x, projected.y)).toEqual([]);
+    expect(frame.bodies.map(bodyKey)).toEqual(
+      frame.sample.world.map(bodyKey),
+    );
+  });
   it("grows entries and shrinks inert departures without snapping an interrupted size", () => {
     const seed = beginWorldTransition([], [body(1, 70)], 1);
     expect(sampleWorldTransition(seed, 0)[0].radius).toBeLessThan(18);
