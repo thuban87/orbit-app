@@ -1,11 +1,47 @@
 import { describe, expect, it } from "vitest";
 import {
   FREQUENCY_CHOICES,
+  profileHeroActionState,
   relationshipExplanation,
   relationshipSheetReducer,
   SNOOZE_CHOICES,
   validateCustomSnoozeDate,
 } from "./relationship-sheet-model";
+
+describe("fixed Hero action capability", () => {
+  it("keeps Call and Message independent with readable disabled reasons", () => {
+    expect(
+      profileHeroActionState({
+        phone: null,
+        email: { is_actionable: 1 } as never,
+      }),
+    ).toEqual({
+      message: { enabled: true, route: "compose", reason: null },
+      call: {
+        enabled: false,
+        route: null,
+        reason: "Add a phone number to call this contact.",
+      },
+    });
+    expect(
+      profileHeroActionState({
+        phone: { is_actionable: 0 } as never,
+        email: null,
+      }),
+    ).toEqual({
+      message: {
+        enabled: false,
+        route: null,
+        reason: "Add a phone number or email to message this contact.",
+      },
+      call: {
+        enabled: false,
+        route: null,
+        reason: "Add a phone number to call this contact.",
+      },
+    });
+  });
+});
 
 describe("relationship explanations", () => {
   it("names only the actual available Status factors and History/Insights routes", () => {
@@ -76,7 +112,8 @@ describe("relationship explanations", () => {
         available: true,
         label: "Active",
         visualValue: 3,
-        context: "No contact frequency — showing this month's activity instead.",
+        context:
+          "No contact frequency — showing this month's activity instead.",
         window: {
           kind: "calendar-month",
           start: "2026-09-01",
@@ -126,15 +163,36 @@ describe("frequency and snooze choices", () => {
 
   it("exposes all presets, custom-date, and conditional Unsnooze actions", () => {
     expect(SNOOZE_CHOICES).toEqual([
-      { kind: "preset", preset: "3d", label: "3 days", accessibilityLabel: "Snooze for 3 days" },
-      { kind: "preset", preset: "1w", label: "1 week", accessibilityLabel: "Snooze for 1 week" },
-      { kind: "preset", preset: "1m", label: "1 month", accessibilityLabel: "Snooze for 1 month" },
-      { kind: "custom", label: "Choose date", accessibilityLabel: "Choose a custom snooze date" },
+      {
+        kind: "preset",
+        preset: "3d",
+        label: "3 days",
+        accessibilityLabel: "Snooze for 3 days",
+      },
+      {
+        kind: "preset",
+        preset: "1w",
+        label: "1 week",
+        accessibilityLabel: "Snooze for 1 week",
+      },
+      {
+        kind: "preset",
+        preset: "1m",
+        label: "1 month",
+        accessibilityLabel: "Snooze for 1 month",
+      },
+      {
+        kind: "custom",
+        label: "Choose date",
+        accessibilityLabel: "Choose a custom snooze date",
+      },
     ]);
   });
 
   it("validates future local custom dates without UTC conversion", () => {
-    expect(validateCustomSnoozeDate("2026-09-10", "2026-09-09")).toEqual({ valid: true });
+    expect(validateCustomSnoozeDate("2026-09-10", "2026-09-09")).toEqual({
+      valid: true,
+    });
     for (const value of ["", "2026-02-30", "2026-09-09", "not-a-date"]) {
       expect(validateCustomSnoozeDate(value, "2026-09-09")).toEqual({
         valid: false,
@@ -147,8 +205,16 @@ describe("frequency and snooze choices", () => {
 describe("persist-first relationship sheet state", () => {
   it("publishes committed values only after success", () => {
     const initial = { committed: 30, draft: 30, pending: false, error: null };
-    const pending = relationshipSheetReducer(initial, { type: "submit", value: 14 });
-    expect(pending).toEqual({ committed: 30, draft: 14, pending: true, error: null });
+    const pending = relationshipSheetReducer(initial, {
+      type: "submit",
+      value: 14,
+    });
+    expect(pending).toEqual({
+      committed: 30,
+      draft: 14,
+      pending: true,
+      error: null,
+    });
     expect(relationshipSheetReducer(pending, { type: "success" })).toEqual({
       committed: 14,
       draft: 14,
@@ -168,7 +234,9 @@ describe("persist-first relationship sheet state", () => {
       pending: false,
       error: "Couldn't save your changes. Nothing was applied. Try again.",
     });
-    expect(relationshipSheetReducer(failed, { type: "retry" }).pending).toBe(true);
+    expect(relationshipSheetReducer(failed, { type: "retry" }).pending).toBe(
+      true,
+    );
     expect(relationshipSheetReducer(failed, { type: "dismiss" })).toEqual({
       committed: "3d",
       draft: "3d",
