@@ -1,4 +1,5 @@
 /** Pure membership math for the Skia-driven System switch presentation. */
+import type { SwitchChoreographyOptions } from "@/logic/orrery-switch-choreography";
 export interface MembershipDelta {
   overlap: number;
   entering: number;
@@ -47,6 +48,18 @@ export function switchTransitionIntensity(
   delta: MembershipDelta,
 ): number {
   return isInSessionSwitch ? switchIntensity(delta) : 0;
+}
+
+/** Converts discrete selection state into the canonical render-loop profile. */
+export function createSwitchChoreographyOptions(
+  isInSessionSwitch: boolean,
+  delta: MembershipDelta,
+  reducedMotion: boolean,
+): SwitchChoreographyOptions {
+  return {
+    intensity: switchTransitionIntensity(isInSessionSwitch, delta),
+    reducedMotion,
+  };
 }
 
 /** A retained focus stays selected, but only a non-switch may frame it. */

@@ -10,6 +10,7 @@ export const SETTLE_START = 0.72;
 export const BASE_RADIAL_DISPLACEMENT = 52;
 export const RADIAL_DISPLACEMENT_RANGE = 118;
 export const INTERACTION_READY_PROGRESS = CAPTURE_END;
+export const STAGGER_WINDOW = 0.035;
 
 export type SwitchChoreographyRole =
   | "retained"
@@ -94,6 +95,14 @@ function keyOf(
     return `satellite:${JSON.stringify([target.parentId, target.parentUid, target.uid])}`;
   }
   return `${body.kind}:${body.id}`;
+}
+
+function stableUnit(key: string): number {
+  "worklet";
+  let hash = 2166136261;
+  for (let index = 0; index < key.length; index++)
+    hash = Math.imul(hash ^ key.charCodeAt(index), 16777619);
+  return (hash >>> 0) / 4294967295;
 }
 
 function animated(
@@ -281,7 +290,13 @@ function sampleLeaving(
   const source = entry.source;
   if (!source)
     throw new Error("Leaving choreography entry is missing source geometry");
-  const shed = smoothstep(intervalProgress(progress, SHED_START, SHED_END));
+  const shed = smoothstep(
+    intervalProgress(
+      progress,
+      SHED_START + entry.stagger,
+      SHED_END + entry.stagger,
+    ),
+  );
   const distance = Math.hypot(source.x, source.y) + radialDisplacement * shed;
   return atPolar(
     source,
@@ -308,7 +323,11 @@ function sampleEntering(
       "Entering choreography entry is missing destination geometry",
     );
   const capture = smoothstep(
-    intervalProgress(progress, CAPTURE_START, CAPTURE_END),
+    intervalProgress(
+      progress,
+      CAPTURE_START + entry.stagger,
+      CAPTURE_END + entry.stagger,
+    ),
   );
   const destinationDistance = Math.hypot(destination.x, destination.y);
   const remainingRotation = (1 - rotationProgress) * turns * Math.PI * 2;
@@ -359,7 +378,7 @@ export function beginSwitchChoreography(
             : from
               ? "leaving"
               : "entering",
-        stagger: 0,
+        stagger: contact ? stableUnit(key) * STAGGER_WINDOW : 0,
       },
     ];
   });
