@@ -39,6 +39,7 @@ import {
 import { GravityBar } from "@/components/GravityBar";
 import { IntensityLine } from "@/components/IntensityLine";
 import { OverflowMenu } from "@/components/OverflowMenu";
+import { ProfileOverviewTracer } from "@/components/profile/ProfileOverviewTracer";
 import { RankedFuelLine } from "@/components/RankedFuelLine";
 import { ReachOutRouter } from "@/components/ReachOutRouter";
 import { TimelineRow } from "@/components/TimelineRow";
@@ -75,6 +76,7 @@ import {
 } from "@/db/fuel-read";
 import { getImpactInputs } from "@/db/impact-read";
 import { deriveReachRoutes } from "@/db/interaction-assist-read";
+import { readProfileCollapseOverride } from "@/db/profile-presentation-dao";
 import {
   deleteTouchpoint,
   editTouchpointFull,
@@ -214,11 +216,7 @@ export function ContactProfileScreen({
   const [logging, setLogging] = useState(false);
   const [reachOutOpen, setReachOutOpen] = useState(false);
   const [assistEnabled, setAssistEnabled] = useState(true);
-  // Whether an AI provider is configured (aiProvider !== 'none'). Gates the
-  // additive "AI draft" entry (Plan 14-05) so a never-configured user never sees
-  // a control that leads to an inert Compose flow — the exact prompt + first-send
-  // acknowledgement all live in Compose, not here.
-  const [aiConfigured, setAiConfigured] = useState(false);
+  const [overviewExpanded, setOverviewExpanded] = useState(true);
   // The touchpoint currently open in the refine form (null = form closed) and
   // its controlled value. The parent owns both — the form is presentational.
   const [editingId, setEditingId] = useState<number | null>(null);
@@ -247,6 +245,7 @@ export function ContactProfileScreen({
         defs,
         methods,
         externalLink,
+        collapseOverrides,
       ] = await Promise.all([
         getContactHeader(exec, contactId),
         listTimeline(exec, contactId),
@@ -261,6 +260,7 @@ export function ContactProfileScreen({
           "SELECT id FROM external_contact_links WHERE contact_id = ? AND is_active = 1 ORDER BY id ASC LIMIT 1",
           [contactId],
         ),
+        readProfileCollapseOverride(exec, contactId),
       ]);
       const values = await getValuesForContact(exec, contactId, defs);
       setHeader(row);
@@ -273,8 +273,7 @@ export function ContactProfileScreen({
       setStatus(statusRow);
       setFuel(fuelRows);
       setRankedFuel(rankedFuelRows);
-      // Show the additive "AI draft" entry only when a provider is configured.
-      setAiConfigured(settings.aiProvider !== "none");
+      setOverviewExpanded(collapseOverrides["relationship-overview"] ?? true);
       // Derive gravity AND intensity from the SAME impact inputs (read once so
       // they can never disagree); hide both until there is interaction history.
       // localDateTime() is captured once so both derivations share one "now".
@@ -846,6 +845,13 @@ export function ContactProfileScreen({
         />
       </View>
 
+      <ProfileOverviewTracer
+        contactId={contactId}
+        status={status?.status ?? null}
+        expanded={overviewExpanded}
+        onExpandedChange={setOverviewExpanded}
+      />
+
       {!reachRoutes.hidden ? (
         <Pressable
           testID="contact-profile-reach-out"
@@ -1092,35 +1098,6 @@ export function ContactProfileScreen({
           Message
         </Text>
       </Pressable>
-
-      {/* "AI draft" (AI-02) — additive entry, shown only when a provider is
-          configured. Navigates to the SAME entry-agnostic Compose surface with a
-          serializable, consume-once `requestAiSuggestion` intent so Compose (the
-          sole editable-draft surface, which holds the real contact-specific
-          prompt + first-send acknowledgement) auto-starts one suggestion. Never a
-          parallel result surface. Accent-OUTLINE (secondary) so the filled
-          "Message"/"Log contact" primaries keep their hierarchy. */}
-      {aiConfigured ? (
-        <Pressable
-          testID="contact-profile-ai-draft"
-          accessibilityRole="button"
-          accessibilityLabel={`Draft a message with AI for ${header?.name ?? ""}`}
-          onPress={() =>
-            navigation.navigate("Compose", {
-              contactId,
-              requestAiSuggestion: true,
-            })
-          }
-          style={[
-            styles.logContact,
-            { backgroundColor: colors.background, borderColor: colors.accent },
-          ]}
-        >
-          <Text style={[styles.logContactText, { color: colors.accent }]}>
-            AI draft
-          </Text>
-        </Pressable>
-      ) : null}
 
       <Pressable
         testID="contact-profile-log-contact"

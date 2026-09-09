@@ -73,10 +73,11 @@ describe("Profile collapse persistence", () => {
   });
 
   it("falls back safely when a legacy/corrupt reader returns malformed JSON", async () => {
-    const malformed = {
-      ...exec,
-      getFirstAsync: async () => ({ collapse_json: "not-json" }),
-    } satisfies SqlExecutor;
+    const malformed: Pick<SqlExecutor, "getFirstAsync"> = {
+      async getFirstAsync<T>() {
+        return { collapse_json: "not-json" } as T;
+      },
+    };
     expect(await readProfileCollapseOverride(malformed, contactId)).toEqual({});
   });
 });

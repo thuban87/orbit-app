@@ -40,7 +40,9 @@ describe("Profile presentation migration", () => {
         PROFILE_PRESENTATION_SCHEMA_VERSION,
       );
       expect(
-        await exec.getFirstAsync<{ user_version: number }>("PRAGMA user_version"),
+        await exec.getFirstAsync<{ user_version: number }>(
+          "PRAGMA user_version",
+        ),
       ).toEqual({ user_version: PROFILE_PRESENTATION_SCHEMA_VERSION });
       const tables = await exec.getAllAsync<{ name: string }>(
         "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name",
@@ -90,7 +92,13 @@ describe("Profile presentation migration", () => {
     expect(() =>
       exec.runAsync(
         "INSERT INTO profile_contact_presentation(contact_id,collapse_json,created_at,modified_at) VALUES(?,?,?,?)",
-        [1, '[]', NOW, NOW],
+        [1, "[]", NOW, NOW],
+      ),
+    ).toThrow();
+    expect(() =>
+      exec.runAsync(
+        "INSERT INTO profile_background_templates(uid,name,image_path,created_at,modified_at) VALUES(?,?,?,?,?)",
+        ["unsafe-bg", "Unsafe", "../outside.webp", NOW, NOW],
       ),
     ).toThrow();
   });
@@ -118,7 +126,13 @@ describe("Profile presentation migration", () => {
     );
     await exec.runAsync(
       "INSERT INTO profile_background_templates(uid,name,image_path,created_at,modified_at) VALUES(?,?,?,?,?)",
-      ["background", "Background", "profile-backgrounds/background.webp", NOW, NOW],
+      [
+        "background",
+        "Background",
+        "profile-backgrounds/background.webp",
+        NOW,
+        NOW,
+      ],
     );
     await exec.runAsync(
       "INSERT INTO profile_category_presentation(category_id,layout_template_uid,background_template_uid,created_at,modified_at) VALUES(?,?,?,?,?)",
@@ -145,7 +159,9 @@ describe("Profile presentation migration", () => {
       ),
     ).toEqual({ background_template_uid: "background" });
 
-    await exec.runAsync("DELETE FROM contacts WHERE id=?", [contact.lastInsertRowId]);
+    await exec.runAsync("DELETE FROM contacts WHERE id=?", [
+      contact.lastInsertRowId,
+    ]);
     expect(
       await exec.getFirstAsync(
         "SELECT contact_id FROM profile_contact_presentation WHERE contact_id=?",

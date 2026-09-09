@@ -1,5 +1,6 @@
 import type { ContactMethodRow } from "@/db/contact-methods-dao";
 import type { ContactMethodGroups } from "@/db/contact-methods-read";
+import type { ProfileCollapseMap } from "@/profile/persisted-contract";
 
 export type ProfileMethodType = "phone" | "email";
 
@@ -79,6 +80,28 @@ export function canStartLifecycleTransition(input: {
   bindEnabled: boolean;
 }): boolean {
   return !input.pending && input.bindEnabled;
+}
+
+/**
+ * Persist-first collapse publication: the screen changes only after a durable
+ * readback confirms the value, and retains the prior state on any failure.
+ */
+export async function commitProfileOverviewToggle(input: {
+  currentExpanded: boolean;
+  write: (expanded: boolean) => Promise<void>;
+  read: () => Promise<ProfileCollapseMap>;
+  publish: (expanded: boolean) => void;
+}): Promise<{ ok: boolean; expanded: boolean }> {
+  try {
+    await input.write(!input.currentExpanded);
+    const persisted = await input.read();
+    const expanded =
+      persisted["relationship-overview"] ?? input.currentExpanded;
+    input.publish(expanded);
+    return { ok: true, expanded };
+  } catch {
+    return { ok: false, expanded: input.currentExpanded };
+  }
 }
 
 const typePresentation: Record<ProfileMethodType, string> = {
