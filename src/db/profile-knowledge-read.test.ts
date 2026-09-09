@@ -5,11 +5,11 @@ vi.mock("expo-sqlite", () => ({}));
 import { nodeSqliteExecutor, openTestDb } from "@/db/__testkit__/node-sqlite";
 import { MIGRATIONS, TARGET_VERSION } from "@/db/database";
 import { getRankedFuel, RANKED_FUEL_EXCLUSIONS } from "@/db/fuel-read";
+import { runMigrations } from "@/db/migrations/runner";
 import {
   readProfileKnowledge,
   readProfileOffLimits,
 } from "@/db/profile-knowledge-read";
-import { runMigrations } from "@/db/migrations/runner";
 import type { ReadOnlyExecutor } from "@/db/transaction";
 import type { SqlExecutor } from "@/db/types";
 
@@ -94,7 +94,9 @@ describe("Profile knowledge projection", () => {
 
     const result = await readProfileKnowledge(readOnly(), owner);
     expect(result.currentState.last_talked_about?.value).toBe("The garden");
-    expect(result.featured.items.map((item) => `${item.owner}:${item.id}`)).toEqual([
+    expect(
+      result.featured.items.map((item) => `${item.owner}:${item.id}`),
+    ).toEqual([
       `relationship:${visibleRelationship.lastInsertRowId}`,
       `memory:${visibleMemory.lastInsertRowId}`,
     ]);
@@ -167,7 +169,10 @@ describe("Profile knowledge projection", () => {
     );
 
     const result = await readProfileKnowledge(readOnly(), owner);
-    expect(result.customFields.map((group) => group.name)).toEqual(["Home", null]);
+    expect(result.customFields.map((group) => group.name)).toEqual([
+      "Home",
+      null,
+    ]);
     expect(result.customFields[0].items[0]).toMatchObject({
       fieldDefId: numberDef.lastInsertRowId,
       rawValue: "about three",
@@ -200,7 +205,7 @@ describe("Profile knowledge projection", () => {
     expect(await readProfileOffLimits(readOnly(), owner)).toEqual([
       expect.objectContaining({ kind: "off_limits", text: "Avoid layoffs" }),
     ]);
-    expect(await getRankedFuel(readOnly(), owner)).toEqual([
+    expect(await getRankedFuel(exec, owner)).toEqual([
       expect.objectContaining({ kind: "topic", text: "Ask about hiking" }),
     ]);
     expect(RANKED_FUEL_EXCLUSIONS).toBe(

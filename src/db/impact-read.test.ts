@@ -26,8 +26,8 @@ import {
   createContactWithInteraction,
   recordTouchpoint,
 } from "@/db/recency-dao";
-import type { SqlExecutor } from "@/db/types";
 import type { ReadOnlyExecutor } from "@/db/transaction";
+import type { SqlExecutor } from "@/db/types";
 
 const NOW = "2026-08-14 12:00:00";
 
@@ -80,7 +80,9 @@ describe("getImpactInputs — the shared impact-inputs read", () => {
       getFirstAsync: exec.getFirstAsync.bind(exec),
       getAllAsync: exec.getAllAsync.bind(exec),
     };
-    expect(await getImpactInputs(readOnly, c)).toMatchObject({ interactions: [] });
+    expect(await getImpactInputs(readOnly, c)).toMatchObject({
+      interactions: [],
+    });
   });
   it("returns Bound lifecycle, intervalDays, and rarelyResponds for the contact", async () => {
     const c = await makeContact(45, 1);

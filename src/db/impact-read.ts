@@ -11,7 +11,7 @@
  * On the read path there is NO network (local-first, CLAUDE.md).
  */
 
-import type { SqlExecutor } from "@/db/types";
+import type { ReadOnlyExecutor } from "@/db/transaction";
 
 /**
  * The rows both derived quantities consume. `trackingEnabled` and nullable
@@ -50,7 +50,7 @@ export interface ImpactInputs {
  * are NULL (filtered out below), distinct from a missing contact (zero rows).
  */
 export async function getImpactInputs(
-  exec: SqlExecutor,
+  exec: ReadOnlyExecutor,
   contactId: number,
 ): Promise<ImpactInputs | null> {
   const rows = await exec.getAllAsync<{

@@ -1,5 +1,5 @@
 import type { ContactMethodRow } from "@/db/contact-methods-dao";
-import type { SqlExecutor } from "@/db/types";
+import type { ReadOnlyExecutor } from "@/db/transaction";
 
 export type ContactMethodGroups = Record<"phone" | "email", ContactMethodRow[]>;
 
@@ -20,7 +20,7 @@ export function selectActionablePrimaryMethods(groups: ContactMethodGroups): {
 
 /** Ordered type groups for profile and edit-form reads. */
 export async function listContactMethodGroups(
-  exec: SqlExecutor,
+  exec: ReadOnlyExecutor,
   contactId: number,
 ): Promise<ContactMethodGroups> {
   const rows = await exec.getAllAsync<ContactMethodRow>(
@@ -39,7 +39,7 @@ export async function listContactMethodGroups(
 }
 
 export async function listActionablePrimaryMethods(
-  exec: SqlExecutor,
+  exec: ReadOnlyExecutor,
   contactId: number,
 ): Promise<{ phone: ContactMethodRow | null; email: ContactMethodRow | null }> {
   return selectActionablePrimaryMethods(

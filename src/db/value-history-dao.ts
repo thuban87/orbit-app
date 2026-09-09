@@ -1,4 +1,5 @@
 /** Additive, backup-includable history for opted-in custom-field values. */
+import type { ReadOnlyExecutor } from "@/db/transaction";
 import type { SqlExecutor } from "@/db/types";
 import { newUid } from "@/db/uid";
 
@@ -14,7 +15,12 @@ export interface ValueHistoryEntry {
 /** Non-mutexed append for composition into the owning edit transaction. */
 export async function appendValueHistoryCore(
   exec: SqlExecutor,
-  input: { contactId: number; fieldDefId: number; value: string | null; now: string },
+  input: {
+    contactId: number;
+    fieldDefId: number;
+    value: string | null;
+    now: string;
+  },
 ): Promise<void> {
   await exec.runAsync(
     `INSERT INTO custom_field_value_history
@@ -30,7 +36,12 @@ export async function appendValueHistoryCore(
  */
 export async function maybeAppendPriorValueHistoryCore(
   exec: SqlExecutor,
-  input: { contactId: number; fieldDefId: number; incomingValue: string | null; now: string },
+  input: {
+    contactId: number;
+    fieldDefId: number;
+    incomingValue: string | null;
+    now: string;
+  },
 ): Promise<void> {
   const def = await exec.getFirstAsync<{ history_retained: number }>(
     "SELECT history_retained FROM custom_field_defs WHERE id = ?",
@@ -53,7 +64,7 @@ export async function maybeAppendPriorValueHistoryCore(
 
 /** Deferred Phase-31 history drill-in read; newest retained value first. */
 export function listValueHistory(
-  exec: SqlExecutor,
+  exec: ReadOnlyExecutor,
   contactId: number,
   fieldDefId: number,
 ): Promise<ValueHistoryEntry[]> {

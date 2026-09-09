@@ -1,8 +1,6 @@
 /** Read choke point for live typed Memories. */
-import {
-  isMemoryTypeKey,
-  MEMORY_TYPE_REGISTRY,
-} from "@/db/memory-registry";
+import { isMemoryTypeKey, MEMORY_TYPE_REGISTRY } from "@/db/memory-registry";
+import type { ReadOnlyExecutor } from "@/db/transaction";
 import type { SqlExecutor } from "@/db/types";
 
 export interface MemoryRow {
@@ -54,7 +52,7 @@ SELECT id, uid, contact_id, type, custom_label, value, note, url,
 
 /** Return a contact's live Memories with deterministic glanceable ordering. */
 export function listMemoriesForContact(
-  exec: SqlExecutor,
+  exec: ReadOnlyExecutor,
   contactId: number,
 ): Promise<MemoryRow[]> {
   return exec.getAllAsync<MemoryRow>(LIST_MEMORIES_FOR_CONTACT, [contactId]);
@@ -114,9 +112,11 @@ export function resolveVisibility(
  * owner through non-Profile surfaces; this filter is presentation-only.
  */
 export async function listProfileVisibleMemoriesForContact(
-  exec: SqlExecutor,
+  exec: ReadOnlyExecutor,
   contactId: number,
 ): Promise<MemoryRow[]> {
   const rows = await listMemoriesForContact(exec, contactId);
-  return rows.filter((row) => resolveVisibility(row.type, row.hidden) === "show");
+  return rows.filter(
+    (row) => resolveVisibility(row.type, row.hidden) === "show",
+  );
 }

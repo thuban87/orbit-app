@@ -4,15 +4,15 @@ vi.mock("expo-sqlite", () => ({}));
 
 import { nodeSqliteExecutor, openTestDb } from "@/db/__testkit__/node-sqlite";
 import { MIGRATIONS, TARGET_VERSION } from "@/db/database";
+import { RELATIONSHIPS_GROUP } from "@/db/memory-registry";
+import { runMigrations } from "@/db/migrations/runner";
 import { addRelationship } from "@/db/relationships-dao";
 import {
   listRelationshipsForContact,
   resolveRelationshipVisibility,
 } from "@/db/relationships-read";
-import { RELATIONSHIPS_GROUP } from "@/db/memory-registry";
-import { runMigrations } from "@/db/migrations/runner";
-import type { SqlExecutor } from "@/db/types";
 import type { ReadOnlyExecutor } from "@/db/transaction";
+import type { SqlExecutor } from "@/db/types";
 
 const NOW = "2026-09-04 12:00:00";
 let exec: SqlExecutor;
@@ -107,7 +107,9 @@ describe("relationships read", () => {
   });
 
   it("returns an empty list for a contact with no relationships", async () => {
-    expect(await listRelationshipsForContact(exec, await seedContact("Alex"))).toEqual([]);
+    expect(
+      await listRelationshipsForContact(exec, await seedContact("Alex")),
+    ).toEqual([]);
   });
 
   it("resolves explicit and inherited visibility defensively", () => {

@@ -14,8 +14,8 @@ import { migration007 } from "@/db/migrations/007-tombstones";
 import { migration009 } from "@/db/migrations/009-contact-method-normalization";
 import { migration010 } from "@/db/migrations/010-contact-method-label";
 import { runMigrations } from "@/db/migrations/runner";
-import type { SqlExecutor } from "@/db/types";
 import type { ReadOnlyExecutor } from "@/db/transaction";
+import type { SqlExecutor } from "@/db/types";
 
 const NOW = "2026-08-28 10:00:00";
 let counter = 0;
@@ -107,7 +107,10 @@ describe("contact method reads", () => {
     };
     const groups = await listContactMethodGroups(readOnly, contactId);
     expect(groups.phone).toHaveLength(2);
-    expect(groups.phone[0]).toMatchObject({ raw_value: "invalid", is_actionable: 0 });
+    expect(groups.phone[0]).toMatchObject({
+      raw_value: "invalid",
+      is_actionable: 0,
+    });
   });
 
   it("returns empty groups and no primary for a contact without methods", async () => {

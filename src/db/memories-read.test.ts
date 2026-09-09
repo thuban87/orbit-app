@@ -6,16 +6,16 @@ import { nodeSqliteExecutor, openTestDb } from "@/db/__testkit__/node-sqlite";
 import { MIGRATIONS, TARGET_VERSION } from "@/db/database";
 import { addMemory } from "@/db/memories-dao";
 import {
-  listMemoriesForContact,
   listAiEligibleMemories,
+  listMemoriesForContact,
   listProfileVisibleMemoriesForContact,
   listRecentlyDeleted,
   resolveVisibility,
 } from "@/db/memories-read";
 import { MEMORY_TYPE_REGISTRY } from "@/db/memory-registry";
 import { runMigrations } from "@/db/migrations/runner";
-import type { SqlExecutor } from "@/db/types";
 import type { ReadOnlyExecutor } from "@/db/transaction";
+import type { SqlExecutor } from "@/db/types";
 
 const NOW = "2026-09-04 12:00:00";
 let exec: SqlExecutor;
@@ -59,11 +59,16 @@ describe("memories read", () => {
     });
 
     expect(await listAiEligibleMemories(exec, contactId)).toEqual([]);
-    await exec.runAsync("UPDATE memories SET allow_ai = 1 WHERE id = ?", [memoryId]);
-    expect((await listAiEligibleMemories(exec, contactId)).map((row) => row.id)).toEqual([
+    await exec.runAsync("UPDATE memories SET allow_ai = 1 WHERE id = ?", [
       memoryId,
     ]);
-    await exec.runAsync("UPDATE memories SET deleted_at = ? WHERE id = ?", [NOW, memoryId]);
+    expect(
+      (await listAiEligibleMemories(exec, contactId)).map((row) => row.id),
+    ).toEqual([memoryId]);
+    await exec.runAsync("UPDATE memories SET deleted_at = ? WHERE id = ?", [
+      NOW,
+      memoryId,
+    ]);
     expect(await listAiEligibleMemories(exec, contactId)).toEqual([]);
   });
 
@@ -190,15 +195,14 @@ describe("memories read", () => {
       otherId,
     ]);
 
-    expect((await listRecentlyDeleted(exec, contactId)).map((row) => row.id)).toEqual([
-      newerId,
-      olderId,
-    ]);
-    expect((await listRecentlyDeleted(exec, otherContactId)).map((row) => row.id)).toEqual([
-      otherId,
-    ]);
-    expect((await listMemoriesForContact(exec, contactId)).map((row) => row.id)).toEqual([
-      liveId,
-    ]);
+    expect(
+      (await listRecentlyDeleted(exec, contactId)).map((row) => row.id),
+    ).toEqual([newerId, olderId]);
+    expect(
+      (await listRecentlyDeleted(exec, otherContactId)).map((row) => row.id),
+    ).toEqual([otherId]);
+    expect(
+      (await listMemoriesForContact(exec, contactId)).map((row) => row.id),
+    ).toEqual([liveId]);
   });
 });

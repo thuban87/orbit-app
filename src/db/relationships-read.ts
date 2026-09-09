@@ -1,6 +1,6 @@
 /** Read choke point for live structured contact relationships. */
 import { RELATIONSHIPS_GROUP } from "@/db/memory-registry";
-import type { SqlExecutor } from "@/db/types";
+import type { ReadOnlyExecutor } from "@/db/transaction";
 
 export interface RelationshipRow {
   id: number;
@@ -29,14 +29,18 @@ SELECT r.id, r.uid, r.contact_id, r.person_name, r.relation_type,
 
 /** List a contact's live Key People rows with their optional linked contact name. */
 export function listRelationshipsForContact(
-  exec: SqlExecutor,
+  exec: ReadOnlyExecutor,
   contactId: number,
 ): Promise<RelationshipRow[]> {
-  return exec.getAllAsync<RelationshipRow>(LIST_RELATIONSHIPS_FOR_CONTACT, [contactId]);
+  return exec.getAllAsync<RelationshipRow>(LIST_RELATIONSHIPS_FOR_CONTACT, [
+    contactId,
+  ]);
 }
 
 /** Resolve a Key People item's Profile presentation preference, never privacy. */
-export function resolveRelationshipVisibility(hidden: number | null): "show" | "hide" {
+export function resolveRelationshipVisibility(
+  hidden: number | null,
+): "show" | "hide" {
   if (hidden === 1) return "hide";
   if (hidden === 0) return "show";
   return RELATIONSHIPS_GROUP.visibilityDefault;
