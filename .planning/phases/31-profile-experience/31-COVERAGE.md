@@ -12,7 +12,7 @@ Phase 31 adds no external API, SDK, network endpoint, credential, or remote data
 
 ## Specless edge-probe coverage
 
-The required deterministic probe reported 50 applicable, 0 resolved, and 50 unresolved rows. The plan set resolves behavior-specific rows to assertions/device backstops, carries six unclassified rows as flagged assumptions, and routes the product-level no-Category ambiguity to a blocking owner checkpoint. Count check: 50 input rows = 43 resolved rows + 6 flagged assumptions + 1 owner checkpoint; no row is dropped.
+The required deterministic probe reported 50 applicable, 0 resolved, and 50 unresolved rows. The plan set resolves behavior-specific rows to assertions/device backstops and carries six unclassified rows as flagged assumptions. Count check: 50 input rows = 44 resolved rows + 6 flagged assumptions; no row is dropped.
 
 | Requirement | Category | Resolution |
 |---|---|---|
@@ -25,7 +25,7 @@ The required deterministic probe reported 50 applicable, 0 resolved, and 50 unre
 | PROF-03 | concurrency | Explicit: one outer write transaction makes template edits and assignment fallout atomic. |
 | PROF-04 | idempotency | Explicit: repeated save of the same background identity replaces safely without duplicate durable rows. |
 | PROF-04 | concurrency | Explicit: draft/processing cancellation and failure leave the committed background and bytes unchanged. |
-| PROF-05 | unclassified | OWNER CHECKPOINT (Plan 01 Task 2, before resolver/DAO implementation): decide both-axis inheritance after changing to no Category; Plan 02 implements and tests only the recorded outcome. |
+| PROF-05 | unclassified | Explicit: when Category changes to null, inherited layout/background fall through independently to global then factory/theme; explicit contact template assignments and freeform overrides survive byte-for-byte, and no former Category value is copied into contact presentation state. Plan 02 tests both real contact-write paths plus FK-on Category-deletion fallout. |
 | PROF-06 | adjacency | Explicit: editor preview is contained in the topmost sheet and does not make underlying controls interactive. |
 | PROF-06 | empty | Explicit: editor displays every eligible module with placeholders when the preview contact lacks data. |
 | PROF-06 | ordering | Explicit: Save commits the complete canonical draft order; Cancel commits none of it. |
