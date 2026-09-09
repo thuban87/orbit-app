@@ -39,6 +39,7 @@ import { runMigrations } from "@/db/migrations/runner";
 import { recordTouchpoint } from "@/db/recency-dao";
 import { inWriteTransaction } from "@/db/transaction";
 import type { SqlExecutor } from "@/db/types";
+import { FACTORY_PROFILE_LAYOUT } from "@/profile/presentation-schema";
 
 const NOW = "2026-08-14 12:00:00";
 
@@ -55,6 +56,50 @@ beforeEach(async () => {
     now: NOW,
     newUid: uid,
     defaultPhoneRegion: "US",
+  });
+});
+
+describe("updateContactFull — Profile inheritance boundary", () => {
+  it("clears Category without creating or rewriting contact presentation state", async () => {
+    const categoryId = (
+      await exec.runAsync(
+        "INSERT INTO categories(uid,name,display_order,created_at,modified_at) VALUES(?,?,?,?,?)",
+        ["category-profile", "Friends", 0, NOW, NOW],
+      )
+    ).lastInsertRowId;
+    const { contactId } = await createContactFull(exec, {
+      uid: uid(),
+      name: "Profile boundary",
+      intervalDays: 14,
+      categoryId,
+      now: NOW,
+    });
+    const freeform = JSON.stringify(FACTORY_PROFILE_LAYOUT);
+    await exec.runAsync(
+      "INSERT INTO profile_contact_presentation(contact_id,freeform_layout_json,collapse_json,created_at,modified_at) VALUES(?,?,?,?,?)",
+      [contactId, freeform, '{"things-to-remember":false}', NOW, NOW],
+    );
+    await updateContactFull(exec, {
+      id: contactId,
+      name: "Profile boundary",
+      intervalDays: 14,
+      now: NOW,
+      rarelyResponds: 0,
+      remindersOff: 0,
+      categoryId: null,
+    });
+    expect(
+      await exec.getFirstAsync("SELECT category_id FROM contacts WHERE id=?", [contactId]),
+    ).toEqual({ category_id: null });
+    expect(
+      await exec.getFirstAsync(
+        "SELECT freeform_layout_json,collapse_json FROM profile_contact_presentation WHERE contact_id=?",
+        [contactId],
+      ),
+    ).toEqual({
+      freeform_layout_json: freeform,
+      collapse_json: '{"things-to-remember":false}',
+    });
   });
 });
 

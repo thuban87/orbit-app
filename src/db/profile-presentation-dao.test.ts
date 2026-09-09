@@ -6,8 +6,19 @@ import { nodeSqliteExecutor, openTestDb } from "@/db/__testkit__/node-sqlite";
 import { MIGRATIONS, TARGET_VERSION } from "@/db/database";
 import { runMigrations } from "@/db/migrations/runner";
 import {
+  assignCategoryProfilePresentation,
+  assignContactBackgroundTemplate,
+  assignContactLayoutTemplate,
+  assignGlobalProfilePresentation,
+  createProfileBackgroundTemplate,
+  createProfileLayoutTemplate,
+  deleteProfileBackgroundTemplate,
+  deleteProfileLayoutTemplate,
   readProfileCollapseOverride,
+  resetProfilePresentation,
+  setContactFreeformLayout,
   setProfileCollapseOverride,
+  updateProfileLayoutTemplate,
 } from "@/db/profile-presentation-dao";
 import {
   countProfileTemplateUsage,
@@ -192,5 +203,174 @@ describe("Profile presentation read model", () => {
       contacts: 0,
       total: 2,
     });
+  });
+});
+
+describe("Profile presentation mutation API", () => {
+  it("creates, edits, and assigns templates atomically with one revision per public write", async () => {
+    const before = (
+      await exec.getFirstAsync<{ data_revision: number }>(
+        "SELECT data_revision FROM app_settings WHERE id=1",
+      )
+    )!.data_revision;
+    await createProfileLayoutTemplate(exec, {
+      uid: "layout",
+      name: "Close Friends",
+      layout: FACTORY_PROFILE_LAYOUT,
+      now: NOW,
+    });
+    expect(
+      (
+        await exec.getFirstAsync<{ data_revision: number }>(
+          "SELECT data_revision FROM app_settings WHERE id=1",
+        )
+      )!.data_revision,
+    ).toBe(before + 1);
+    await expect(
+      createProfileLayoutTemplate(exec, {
+        uid: "layout-2",
+        name: "close friends",
+        layout: FACTORY_PROFILE_LAYOUT,
+        now: NOW,
+      }),
+    ).rejects.toThrow();
+    expect(await listProfileLayoutTemplates(exec)).toHaveLength(1);
+
+    await assignGlobalProfilePresentation(exec, {
+      layoutTemplateUid: "layout",
+      backgroundTemplateUid: null,
+      now: NOW,
+    });
+    await updateProfileLayoutTemplate(exec, {
+      uid: "layout",
+      name: "Close Friends",
+      layout: {
+        ...FACTORY_PROFILE_LAYOUT,
+        topLevel: FACTORY_PROFILE_LAYOUT.topLevel.map((item) => ({
+          ...item,
+          visible: false,
+        })),
+      },
+      now: NOW,
+    });
+    const input = await readProfilePresentationInputs(exec, contactId, {
+      factoryLayout: FACTORY_PROFILE_LAYOUT,
+      themeBackground: "theme:galaxy",
+    });
+    expect(resolveProfilePresentation(input).layout.document.topLevel[0]?.visible).toBe(false);
+  });
+
+  it("clears collapse on an explicit layout switch and reset deletes only contact presentation", async () => {
+    await createProfileLayoutTemplate(exec, {
+      uid: "layout",
+      name: "Layout",
+      layout: FACTORY_PROFILE_LAYOUT,
+      now: NOW,
+    });
+    await setProfileCollapseOverride(exec, {
+      contactId,
+      moduleId: "relationship-overview",
+      expanded: false,
+      now: NOW,
+    });
+    await assignContactLayoutTemplate(exec, {
+      contactId,
+      templateUid: "layout",
+      now: NOW,
+    });
+    expect(await readProfileCollapseOverride(exec, contactId)).toEqual({});
+    await exec.runAsync(
+      "UPDATE contacts SET favourite_rank=1,snooze_until='2026-09-20' WHERE id=?",
+      [contactId],
+    );
+    await resetProfilePresentation(exec, contactId, NOW);
+    expect(
+      await exec.getFirstAsync(
+        "SELECT favourite_rank,snooze_until FROM contacts WHERE id=?",
+        [contactId],
+      ),
+    ).toEqual({ favourite_rank: 1, snooze_until: "2026-09-20" });
+    expect(
+      await exec.getFirstAsync(
+        "SELECT contact_id FROM profile_contact_presentation WHERE contact_id=?",
+        [contactId],
+      ),
+    ).toBeNull();
+  });
+
+  it("deletes in-use templates with per-axis fallout while preserving freeform and safe image cleanup", async () => {
+    await createProfileLayoutTemplate(exec, {
+      uid: "layout",
+      name: "Layout",
+      layout: FACTORY_PROFILE_LAYOUT,
+      now: NOW,
+    });
+    await assignContactLayoutTemplate(exec, {
+      contactId,
+      templateUid: "layout",
+      now: NOW,
+    });
+    await deleteProfileLayoutTemplate(exec, "layout", NOW);
+    expect(
+      await exec.getFirstAsync<{ layout_template_uid: string | null }>(
+        "SELECT layout_template_uid FROM profile_contact_presentation WHERE contact_id=?",
+        [contactId],
+      ),
+    ).toEqual({ layout_template_uid: null });
+
+    await setContactFreeformLayout(exec, {
+      contactId,
+      layout: FACTORY_PROFILE_LAYOUT,
+      now: NOW,
+    });
+    for (const uid of ["background-a", "background-b"]) {
+      await createProfileBackgroundTemplate(exec, {
+        uid,
+        name: uid,
+        imagePath: "profile-backgrounds/shared.webp",
+        now: NOW,
+      });
+    }
+    await assignContactBackgroundTemplate(exec, {
+      contactId,
+      templateUid: "background-a",
+      now: NOW,
+    });
+    expect(await deleteProfileBackgroundTemplate(exec, "background-a", NOW)).toBeNull();
+    expect(await deleteProfileBackgroundTemplate(exec, "background-b", NOW)).toBe(
+      "profile-backgrounds/shared.webp",
+    );
+    expect(
+      await exec.getFirstAsync<{ freeform_layout_json: string | null }>(
+        "SELECT freeform_layout_json FROM profile_contact_presentation WHERE contact_id=?",
+        [contactId],
+      ),
+    ).toEqual({ freeform_layout_json: JSON.stringify(FACTORY_PROFILE_LAYOUT) });
+  });
+
+  it("removes Category assignments after same-transaction FK-safe Category deletion", async () => {
+    const categoryId = (
+      await exec.runAsync(
+        "INSERT INTO categories(uid,name,display_order,created_at,modified_at) VALUES(?,?,?,?,?)",
+        ["category", "Friends", 0, NOW, NOW],
+      )
+    ).lastInsertRowId;
+    await exec.runAsync("UPDATE contacts SET category_id=? WHERE id=?", [categoryId, contactId]);
+    await assignCategoryProfilePresentation(exec, {
+      categoryId,
+      layoutTemplateUid: null,
+      backgroundTemplateUid: null,
+      now: NOW,
+    });
+    await exec.execAsync("BEGIN");
+    await exec.runAsync("UPDATE contacts SET category_id=NULL WHERE category_id=?", [categoryId]);
+    await exec.runAsync("DELETE FROM categories WHERE id=?", [categoryId]);
+    await exec.execAsync("COMMIT");
+    expect(
+      await exec.getFirstAsync(
+        "SELECT category_id FROM profile_category_presentation WHERE category_id=?",
+        [categoryId],
+      ),
+    ).toBeNull();
   });
 });

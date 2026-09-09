@@ -16,6 +16,7 @@ import { createContactFull } from "@/db/contacts-dao";
 import { MIGRATIONS, TARGET_VERSION } from "@/db/database";
 import { runMigrations } from "@/db/migrations/runner";
 import type { SqlExecutor } from "@/db/types";
+import { FACTORY_PROFILE_LAYOUT } from "@/profile/presentation-schema";
 
 const NOW = "2026-09-06 12:00:00";
 let uidCounter = 0;
@@ -115,6 +116,34 @@ describe("bulkQuickLog", () => {
     ).rejects.toThrow(/no interaction matched/);
     expect(await count("interactions")).toBe(2);
     expect(await count("tombstones")).toBe(0);
+  });
+});
+
+describe("bulkSetCategory — Profile inheritance boundary", () => {
+  it("sets Category to null without materializing or rewriting Profile overrides", async () => {
+    const categoryId = (
+      await exec.runAsync(
+        "INSERT INTO categories(uid,name,display_order,created_at,modified_at) VALUES(?,?,?,?,?)",
+        ["bulk-category", "Friends", 0, NOW, NOW],
+      )
+    ).lastInsertRowId;
+    const contactId = await seedContact("Inherited");
+    await exec.runAsync("UPDATE contacts SET category_id=? WHERE id=?", [categoryId, contactId]);
+    const freeform = JSON.stringify(FACTORY_PROFILE_LAYOUT);
+    await exec.runAsync(
+      "INSERT INTO profile_contact_presentation(contact_id,freeform_layout_json,collapse_json,created_at,modified_at) VALUES(?,?,?,?,?)",
+      [contactId, freeform, "{}", NOW, NOW],
+    );
+    await bulkSetCategory(exec, [contactId], null, NOW);
+    expect(
+      await exec.getFirstAsync("SELECT category_id FROM contacts WHERE id=?", [contactId]),
+    ).toEqual({ category_id: null });
+    expect(
+      await exec.getFirstAsync(
+        "SELECT freeform_layout_json FROM profile_contact_presentation WHERE contact_id=?",
+        [contactId],
+      ),
+    ).toEqual({ freeform_layout_json: freeform });
   });
 });
 
