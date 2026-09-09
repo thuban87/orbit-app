@@ -30,6 +30,7 @@ import {
   beginTemplateOperation,
   clearTemplateDraft,
   createTemplateManagerState,
+  describeTemplateAssignment,
   managerBackIntent,
   openTemplateManagerPage,
   popTemplateManagerPage,
@@ -42,6 +43,7 @@ import {
 import type {
   ProfileLayoutDocument,
   ProfilePresentationInputs,
+  ProfilePresentationSource,
 } from "@/profile/types";
 import { useTheme } from "@/theme";
 import { RADII } from "@/theme/tokens/radii";
@@ -54,6 +56,11 @@ export interface ProfileTemplateManagerProps {
   contactName: string;
   /** Current resolved Layout source, named for the user rather than raw IDs. */
   effectiveSource: string;
+  /** Resolved source remains explicit so inherited and override rows never merge. */
+  effectiveLayoutSource: Extract<
+    ProfilePresentationSource,
+    "contact-template" | "contact-freeform" | "category" | "global" | "factory"
+  >;
   /** The contact's current freeform layout, if any, for Save Current Layout. */
   freeformLayout: ProfileLayoutDocument | null;
   /** Current hierarchy inputs let layout writes retain the independent background axis. */
@@ -88,6 +95,7 @@ export function ProfileTemplateManager({
   contactId,
   contactName,
   effectiveSource,
+  effectiveLayoutSource,
   freeformLayout,
   presentation,
   onRequestClose,
@@ -326,6 +334,10 @@ export function ProfileTemplateManager({
   const deleteTemplate = deleteUid
     ? templates.find((template) => template.uid === deleteUid)
     : null;
+  const assignmentDescription = describeTemplateAssignment({
+    source: effectiveLayoutSource,
+    templateName: effectiveSource,
+  });
 
   return (
     <>
@@ -543,9 +555,9 @@ export function ProfileTemplateManager({
           {activePage.kind === "assignment" && activeTemplate ? (
             <View style={styles.content}>
               <AppText role="heading">Assign {activeTemplate.name}</AppText>
-              <AppText role="body">
-                Choose a scope. Inherited and contact Override remain distinct
-                states.
+              <AppText role="body">{assignmentDescription.text}</AppText>
+              <AppText role="caption">
+                This contact is currently {assignmentDescription.kind}.
               </AppText>
               <Button
                 role="secondary"

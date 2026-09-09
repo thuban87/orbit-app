@@ -2,13 +2,13 @@ import { describe, expect, it } from "vitest";
 import {
   beginTemplateOperation,
   createTemplateManagerState,
+  describeTemplateAssignment,
   managerBackIntent,
   openTemplateManagerPage,
   retainTemplateFailure,
   setTemplateDraft,
   setTemplateUsage,
   settleTemplateOperation,
-  describeTemplateAssignment,
 } from "./template-manager-model";
 
 describe("Profile template manager model", () => {
@@ -66,16 +66,25 @@ describe("Profile template manager model", () => {
 
   it("keeps inherited and contact override assignment states distinct", () => {
     expect(
-      describeTemplateAssignment({ source: "category", templateName: "Friends" }),
+      describeTemplateAssignment({
+        source: "category",
+        templateName: "Friends",
+      }),
     ).toEqual({
       kind: "inherited",
       text: "Inherited from Category template Friends",
     });
     expect(
-      describeTemplateAssignment({ source: "contact-template", templateName: "Weekend" }),
+      describeTemplateAssignment({
+        source: "contact-template",
+        templateName: "Weekend",
+      }),
     ).toEqual({ kind: "override", text: "Contact override: Weekend" });
     expect(
-      describeTemplateAssignment({ source: "contact-freeform", templateName: null }),
+      describeTemplateAssignment({
+        source: "contact-freeform",
+        templateName: null,
+      }),
     ).toEqual({
       kind: "override",
       text: "Contact override: freeform layout",

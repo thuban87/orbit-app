@@ -1,5 +1,5 @@
 import type { ProfileTemplateUsage } from "@/db/profile-presentation-read";
-import type { ProfileLayoutDocument } from "./types";
+import type { ProfileLayoutDocument, ProfilePresentationSource } from "./types";
 
 export type TemplateManagerPage =
   | { kind: "list" }
@@ -26,6 +26,43 @@ export interface TemplateManagerState {
   pendingTemplateUids: readonly string[];
   usage: Readonly<Record<string, TemplateUsageState>>;
   error: string | null;
+}
+
+export interface TemplateAssignmentDescription {
+  kind: "inherited" | "override";
+  text: string;
+}
+
+/** Assignment labels name the durable source, never infer it from visual selection. */
+export function describeTemplateAssignment(input: {
+  source: Extract<
+    ProfilePresentationSource,
+    "contact-template" | "contact-freeform" | "category" | "global" | "factory"
+  >;
+  templateName: string | null;
+}): TemplateAssignmentDescription {
+  if (input.source === "contact-template") {
+    return {
+      kind: "override",
+      text: `Contact override: ${input.templateName ?? "saved template"}`,
+    };
+  }
+  if (input.source === "contact-freeform") {
+    return { kind: "override", text: "Contact override: freeform layout" };
+  }
+  if (input.source === "category") {
+    return {
+      kind: "inherited",
+      text: `Inherited from Category template ${input.templateName ?? "layout"}`,
+    };
+  }
+  if (input.source === "global") {
+    return {
+      kind: "inherited",
+      text: `Inherited from global template ${input.templateName ?? "layout"}`,
+    };
+  }
+  return { kind: "inherited", text: "Inherited from factory layout" };
 }
 
 export type TemplateManagerBackIntent =
