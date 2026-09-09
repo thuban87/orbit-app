@@ -6,6 +6,11 @@ import {
   projectFrame,
   type WorldBody,
 } from "./orrery-camera-logic";
+import {
+  type SwitchChoreography,
+  type SwitchChoreographySample,
+  sampleSwitchChoreography,
+} from "./orrery-switch-choreography";
 
 export interface AnimatedWorldBody extends WorldBody {
   opacity: number;
@@ -140,6 +145,43 @@ export function projectAnimatedFrame(
         ...body,
         opacity,
         interactive: world[index].interactive && opacity > 0,
+        visible:
+          opacity > 0 &&
+          body.x + reach >= 0 &&
+          body.y + reach >= 0 &&
+          body.x - reach <= viewport.width &&
+          body.y - reach <= viewport.height,
+      };
+    }),
+  };
+}
+
+/** One choreography sample is the sole world for projection, rings and hits. */
+export function projectSwitchChoreographyFrame(
+  transition: SwitchChoreography,
+  fraction: number,
+  pose: CameraPose,
+  viewport: CameraViewport,
+): AnimatedFrame & { sample: SwitchChoreographySample } {
+  "worklet";
+  const sample = sampleSwitchChoreography(transition, fraction);
+  const frame = projectFrame(
+    sample.world,
+    pose,
+    viewport,
+    transition.generation,
+  );
+  return {
+    ...frame,
+    sample,
+    bodies: frame.bodies.map((body, index) => {
+      const current = sample.world[index];
+      const opacity = current.opacity;
+      const reach = body.radius * (body.kind === "sun" ? 2 : 1.3);
+      return {
+        ...body,
+        opacity,
+        interactive: current.interactive && opacity > 0,
         visible:
           opacity > 0 &&
           body.x + reach >= 0 &&
