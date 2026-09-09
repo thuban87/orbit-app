@@ -3,14 +3,12 @@ import {
   createAllSectionsPreview,
   createProfileLayoutEditorDraft,
   isMeaningfulLayoutChange,
-  profileLayoutEditorReducer,
   type ProfileLayoutEditorAction,
+  profileLayoutEditorReducer,
 } from "./layout-editor-reducer";
 import { FACTORY_PROFILE_LAYOUT } from "./presentation-schema";
 
-function reduce(
-  actions: readonly ProfileLayoutEditorAction[],
-) {
+function reduce(actions: readonly ProfileLayoutEditorAction[]) {
   return actions.reduce(profileLayoutEditorReducer, FACTORY_PROFILE_LAYOUT);
 }
 
@@ -62,9 +60,9 @@ describe("Profile layout editor reducer", () => {
       toIndex: 99,
     });
 
-    expect(first).toBe(FACTORY_PROFILE_LAYOUT);
-    expect(crossParent).toBe(FACTORY_PROFILE_LAYOUT);
-    expect(outOfRange).toBe(FACTORY_PROFILE_LAYOUT);
+    expect(first).toStrictEqual(FACTORY_PROFILE_LAYOUT);
+    expect(crossParent).toStrictEqual(FACTORY_PROFILE_LAYOUT);
+    expect(outOfRange).toStrictEqual(FACTORY_PROFILE_LAYOUT);
   });
 
   it("keeps a parser-valid complete draft and restores any persisted omission as a preview placeholder", () => {
