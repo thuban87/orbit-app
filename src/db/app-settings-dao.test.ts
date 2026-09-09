@@ -60,6 +60,9 @@ import { migration018 } from "@/db/migrations/018-custom-field-scope-history";
 import { migration019 } from "@/db/migrations/019-dashboard-prefs";
 import { migration020 } from "@/db/migrations/020-dashboard-swipe-pref";
 import { migration021 } from "@/db/migrations/021-orrery-preferences";
+import { migration022 } from "@/db/migrations/022-orrery-systems";
+import { migration023 } from "@/db/migrations/023-orrery-system-selection-revision";
+import { profilePresentationMigration } from "@/db/migrations/profile-presentation";
 import { runMigrations } from "@/db/migrations/runner";
 import { inWriteTransaction } from "@/db/transaction";
 import type { SqlExecutor } from "@/db/types";
@@ -127,8 +130,11 @@ async function migrateToV5(): Promise<void> {
       migration019,
       migration020,
       migration021,
+      migration022,
+      migration023,
+      profilePresentationMigration,
     ],
-    21,
+    24,
     { now: NOW, newUid },
   );
 }
@@ -1299,5 +1305,39 @@ describe("app-settings-dao — custom Orrery System grammar", () => {
     expect(() =>
       assertOrreryLastSystem("orreryLastSystem", "custom:bad\u0000uid"),
     ).toThrow();
+  });
+});
+
+describe("app-settings-dao — Profile presentation preferences", () => {
+  beforeEach(async () => {
+    await migrateToV5();
+  });
+
+  it("round-trips nullable global template UIDs without emitting them in format 4", async () => {
+    await exec.runAsync(
+      "INSERT INTO profile_layout_templates(uid,name,layout_json,created_at,modified_at) VALUES(?,?,?,?,?)",
+      ["layout-global", "Global", JSON.stringify({ version: 1 }), NOW, NOW],
+    );
+    await exec.runAsync(
+      "INSERT INTO profile_background_templates(uid,name,image_path,created_at,modified_at) VALUES(?,?,?,?,?)",
+      ["background-global", "Global", "profile-backgrounds/global.webp", NOW, NOW],
+    );
+    await updateAppSettings(
+      exec,
+      {
+        profileLayoutTemplateUid: "layout-global",
+        profileBackgroundTemplateUid: "background-global",
+      },
+      LATER,
+    );
+    expect(await getAppSettings(exec)).toMatchObject({
+      profileLayoutTemplateUid: "layout-global",
+      profileBackgroundTemplateUid: "background-global",
+    });
+    const snapshot = await getPortableSettingsSnapshot(exec);
+    expect(snapshot).not.toHaveProperty("profileLayoutTemplateUid");
+    expect(snapshot).not.toHaveProperty("profileBackgroundTemplateUid");
+    expect(PORTABLE_SETTINGS_KEYS.has("profileLayoutTemplateUid")).toBe(true);
+    expect(PORTABLE_SETTINGS_KEYS.has("profileBackgroundTemplateUid")).toBe(true);
   });
 });
