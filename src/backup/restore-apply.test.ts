@@ -59,6 +59,8 @@ import { migration019 } from "@/db/migrations/019-dashboard-prefs";
 import { migration020 } from "@/db/migrations/020-dashboard-swipe-pref";
 import { migration021 } from "@/db/migrations/021-orrery-preferences";
 import { migration022 } from "@/db/migrations/022-orrery-systems";
+import { migration023 } from "@/db/migrations/023-orrery-system-selection-revision";
+import { profilePresentationMigration } from "@/db/migrations/profile-presentation";
 import { readOrrerySystemSnapshot } from "@/db/orrery-system-read";
 import { createContactWithInteraction, recordTouchpoint } from "@/db/recency-dao";
 import { runMigrations } from "@/db/migrations/runner";
@@ -71,7 +73,18 @@ const migrations = [migration001, migration002, migration003, migration004, migr
 
 async function db(): Promise<SqlExecutor> {
   const exec = nodeSqliteExecutor(openTestDb());
-  await runMigrations(exec, [...migrations, migration021, migration022], 22, { now: NOW, newUid });
+  await runMigrations(
+    exec,
+    [
+      ...migrations,
+      migration021,
+      migration022,
+      migration023,
+      profilePresentationMigration,
+    ],
+    24,
+    { now: NOW, newUid },
+  );
   return exec;
 }
 

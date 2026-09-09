@@ -163,6 +163,21 @@ describe("Phase 17 composed backup regressions", () => {
       ["system_rules", "Phase 36 Systems backup serialization is deferred"],
       ["system_overrides", "Phase 36 Systems backup serialization is deferred"],
       ["system_prefs", "Phase 36 Systems backup serialization is deferred"],
+      // Phase 31 Profile presentation is likewise intentionally absent from
+      // backup format 4. Restore accepts only its dangling global references;
+      // it must never synthesize partial template or assignment entities.
+      [
+        "profile_contact_presentation",
+        "Profile presentation backup serialization is deferred",
+      ],
+      [
+        "profile_layout_templates",
+        "Profile presentation backup serialization is deferred",
+      ],
+      [
+        "profile_background_templates",
+        "Profile presentation backup serialization is deferred",
+      ],
     ]);
     for (const table of writers) {
       expect(

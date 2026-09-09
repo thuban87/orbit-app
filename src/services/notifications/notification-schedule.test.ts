@@ -40,6 +40,9 @@ import { migration018 } from "@/db/migrations/018-custom-field-scope-history";
 import { migration019 } from "@/db/migrations/019-dashboard-prefs";
 import { migration020 } from "@/db/migrations/020-dashboard-swipe-pref";
 import { migration021 } from "@/db/migrations/021-orrery-preferences";
+import { migration022 } from "@/db/migrations/022-orrery-systems";
+import { migration023 } from "@/db/migrations/023-orrery-system-selection-revision";
+import { profilePresentationMigration } from "@/db/migrations/profile-presentation";
 import { runMigrations } from "@/db/migrations/runner";
 import type { SqlExecutor } from "@/db/types";
 import { __resetSweepForTest, runLaunchSweep } from "@/services/launch-sweep";
@@ -85,7 +88,7 @@ beforeEach(async () => {
   uidCounter = 0;
   const db = openTestDb();
   exec = nodeSqliteExecutor(db);
-  // Current schema: getAppSettings reads the v21 Orrery preferences.
+  // Current schema: getAppSettings reads the v24 Profile preferences.
   await runMigrations(
     exec,
     [
@@ -110,8 +113,11 @@ beforeEach(async () => {
       migration019,
       migration020,
       migration021,
+      migration022,
+      migration023,
+      profilePresentationMigration,
     ],
-    21,
+    24,
     { now: NOW, newUid: uid, defaultPhoneRegion: "US" },
   );
   __resetExpo();
