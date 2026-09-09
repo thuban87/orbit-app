@@ -32,6 +32,75 @@ export interface ProfileLifecycleView {
   bindEnabled: boolean;
 }
 
+export type ProfileOverlay =
+  | "overflow"
+  | "snooze"
+  | "layout"
+  | "templates"
+  | "background"
+  | null;
+
+export type ProfileOverflowEntry =
+  | "edit"
+  | "snooze"
+  | "unsnooze"
+  | "archive"
+  | "separator"
+  | "layout"
+  | "background"
+  | "save-layout-template"
+  | "reset";
+
+/** The screen presents exactly one modal surface, so Back never leaks to its underlay. */
+export function closeTopmostProfileOverlay(_overlay: ProfileOverlay): null {
+  return null;
+}
+
+/** Keep the product-mandated overflow order independent from view rendering. */
+export function profileOverflowEntries(input: {
+  snoozed: boolean;
+  hasFreeformLayout: boolean;
+  hasContactPresentationOverride: boolean;
+}): ProfileOverflowEntry[] {
+  return [
+    "edit",
+    input.snoozed ? "unsnooze" : "snooze",
+    "archive",
+    "separator",
+    "layout",
+    "background",
+    ...(input.hasFreeformLayout ? (["save-layout-template"] as const) : []),
+    ...(input.hasContactPresentationOverride ? (["reset"] as const) : []),
+  ];
+}
+
+export type ProfileOrigin =
+  | "dashboard"
+  | "orrery"
+  | "settings"
+  | "widget"
+  | "notification";
+
+/**
+ * All origins retain the stack's own Back semantics. Widget and notification
+ * reset construction happens at the linking/notification boundary, not here.
+ */
+export function profileOriginIntent(
+  origin: ProfileOrigin,
+  contactId: number,
+  openReachOut?: boolean,
+): {
+  origin: ProfileOrigin;
+  route: { contactId: number; openReachOut?: boolean };
+  back: "native-go-back";
+} {
+  return {
+    origin,
+    route: openReachOut ? { contactId, openReachOut: true } : { contactId },
+    back: "native-go-back",
+  };
+}
+
 /**
  * Lifecycle-only presentation state. Cadence stays durable data; this model
  * decides only which participation controls may be rendered around it.

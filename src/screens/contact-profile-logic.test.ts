@@ -4,10 +4,9 @@ import {
   canStartLifecycleTransition,
   closeTopmostProfileOverlay,
   commitProfileOverviewToggle,
-  profileOverflowEntries,
-  profileOriginIntent,
   profileLifecycleView,
   profileMethodGroups,
+  profileOverflowEntries,
   unbindConfirmation,
 } from "@/screens/contact-profile-logic";
 

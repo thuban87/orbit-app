@@ -9,6 +9,12 @@ import type { MergeResolutions } from "@/db/merge-dao";
 import type { RestorePreviewRoute } from "@/screens/backup-restore-logic";
 import type { PhotoTargetDescriptor } from "@/services/photos/photo-storage";
 
+/** Serializable Profile route state shared by every stack that can open it. */
+export type ProfileRouteParams = {
+  contactId: number;
+  openReachOut?: boolean;
+};
+
 /**
  * The single route → params contract for the app's native-stack navigator
  * (Phase 4's real navigation shell, replacing the Phase-1→3 dependency-free
@@ -42,7 +48,7 @@ export type DashboardStackParamList = {
   Settings: undefined;
   CustomFields: undefined;
   Create: undefined;
-  Profile: { contactId: number; openReachOut?: boolean };
+  Profile: ProfileRouteParams;
   ThingsToRemember: { contactId: number };
   RecentlyDeleted: { contactId: number };
   MemoryHistory: { contactId: number; fieldKey: CurrentStateFieldKey };
@@ -122,7 +128,7 @@ export type OrreryStackParamList = {
   Orrery: undefined;
   SystemBuilder: { systemUid?: string; systemRef?: string } | undefined;
   SystemsManagement: undefined;
-  Profile: { contactId: number; openReachOut?: boolean };
+  Profile: ProfileRouteParams;
   ThingsToRemember: { contactId: number };
   RecentlyDeleted: { contactId: number };
   MemoryHistory: { contactId: number; fieldKey: CurrentStateFieldKey };
@@ -161,7 +167,7 @@ export type SettingsStackParamList = {
   SystemsManagement: undefined;
   CustomFields: undefined;
   Archived: undefined;
-  Profile: { contactId: number; openReachOut?: boolean };
+  Profile: ProfileRouteParams;
   CropPhoto: {
     rawUri: string;
     target: PhotoTargetDescriptor;
