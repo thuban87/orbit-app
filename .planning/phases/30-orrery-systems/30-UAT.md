@@ -3,7 +3,7 @@ status: partial
 phase: 30-orrery-systems
 source: [30-VERIFICATION.md]
 started: 2026-09-08T23:42:37Z
-updated: 2026-09-09T00:47:55Z
+updated: 2026-09-09T01:55:33Z
 ---
 
 ## Current Test
@@ -33,51 +33,23 @@ device_evidence: "Pixel 6 Pro at font_scale 2.0: Settings and Systems remained r
 
 ### 4. Operate Management from Orrery and Settings
 expected: Management operations refresh correctly, preserve All Contacts' constraints, and ordinary delete Undo restores metadata without changing contacts.
-result: issue
-reported: "Pixel device test: Settings Management refreshed and deletion preserved all 18 contacts, but tapping Undo removed the snackbar without restoring the deleted Work Copy System. The Orrery entry point is also unreachable because Orrery crashes on render."
-severity: major
+result: pass
+device_evidence: "Pixel 6 Pro: Settings and Orrery both opened Systems Management; All Contacts remained pinned with no hide/reorder control; deletion preserved all 18 contacts; tapping Undo within the six-second action window restored Work Copy with its exact UID. The earlier Undo report was a test-timing false positive after the snackbar had expired."
 
 ### 5. Switch on the physical Pixel with normal and Reduced Motion
 expected: Home framing/focus persistence works; motion intensity follows membership delta; Reduced Motion uses only crossfade/reposition; empty and broken states are distinguishable.
-result: issue
-reported: "Pixel device test: opening Orrery immediately raises a Render Error (undefined is not a function) at orrery-controls-logic.ts:100 from OrrerySystemSelector.tsx:31, so switching, focus persistence, empty/broken presentation, and both motion modes cannot be exercised."
-severity: blocker
+result: pending
+device_evidence: "Rebuilt debug APK on Pixel 6 Pro: Orrery opens without the prior crash; All Contacts (6), Favorites (2), and valid-empty Needs Attention (0) switch successfully; shared UAT Grace focus survives Favorites -> All Contacts while the real switch lands at Home; Favorites restores after force-stop/relaunch; normal and Android Reduced Motion (animator scale 0) switches completed, with the reduced-motion recording showing crossfade/reposition and no rotational sweep. Broken-rule presentation and comparative membership-delta motion feel still need owner review."
 
 ## Summary
 
 total: 5
-passed: 2
-issues: 2
-pending: 1
+passed: 3
+issues: 0
+pending: 2
 skipped: 0
 blocked: 0
 
 ## Gaps
 
-- gap_id: G-30-4
-  truth: "Both Management entry points refresh the list; deleting a custom System offers Undo that restores metadata without contacts changing."
-  status: failed
-  reason: "Pixel device test: deletion preserved all 18 contacts, but tapping Undo dismissed the recovery snackbar without restoring the deleted System; Orrery Management is unreachable due to the Orrery render crash."
-  severity: major
-  test: 4
-  root_cause: ""
-  artifacts: []
-  missing: []
-  debug_session: ""
-
-- gap_id: G-30-5
-  truth: "System switching works on a physical Pixel under normal and Reduced Motion, preserving framing/focus and distinguishing empty from broken Systems."
-  status: failed
-  reason: "Pixel device test: Orrery crashes during initial render before its switcher can be operated."
-  severity: blocker
-  test: 5
-  root_cause: "buildSystemChoices discriminates overloads with source.some(...); the initially empty catalog falls into the legacy categories branch and calls .map on the counts Map as if it were a CustomSystem array."
-  artifacts:
-    - path: "src/components/orrery/orrery-controls-logic.ts"
-      issue: "Empty catalog is misclassified at runtime and countsOrCustom.map is invoked on a Map."
-    - path: "src/components/orrery/OrrerySystemSelector.tsx"
-      issue: "Renders buildSystemChoices against the initially empty catalog."
-  missing:
-    - "Use an overload discriminator that handles an empty SystemCatalogEntry array."
-    - "Add a regression test for the selector's initial empty-catalog render."
-  debug_session: ""
+[none]
