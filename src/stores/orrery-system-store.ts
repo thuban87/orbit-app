@@ -108,7 +108,10 @@ export function createOrrerySystemStore(io: OrrerySystemAdapters) {
         generation,
         requested,
         status: "loading",
-        snapshot: same ? before.snapshot : null,
+        // Keep the outgoing generation mounted until the destination is ready.
+        // OrreryWorld owns the sampled world transition; clearing here destroys
+        // that owner before it can animate the new generation.
+        snapshot: before.snapshot,
       });
       try {
         const result = await io.load(system, generation);
@@ -141,7 +144,12 @@ export function createOrrerySystemStore(io: OrrerySystemAdapters) {
           // This re-enters select with a fresh generation; the generation guard
           // abandons the stale custom request, so it cannot recurse into a loop.
           void select(ALL_CONTACTS_SYSTEM);
-        } else set({ status: get().snapshot ? "stale" : "error" });
+        } else
+          set({
+            status: same && get().snapshot ? "stale" : "error",
+            // A failed real switch must not leave the wrong System visible.
+            snapshot: same ? get().snapshot : null,
+          });
       }
     };
     return {

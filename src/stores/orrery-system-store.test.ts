@@ -99,9 +99,29 @@ describe("System publication ownership", () => {
     expect(store.getState().current()).toBeNull();
     const switchRead = store.getState().select(fav);
     expect(store.getState().requested.id).toBe("builtin:favorites");
-    expect(store.getState().snapshot).toBeNull();
     await switchRead;
-    expect(store.getState().status).toBe("error");
+    expect(store.getState()).toMatchObject({ status: "error", snapshot: null });
+  });
+  it("keeps the prior world mounted while a different System loads, then clears it if the switch fails", async () => {
+    const switchRead = deferred<OrrerySceneSnapshot>();
+    const store = createOrrerySystemStore({
+      load: vi
+        .fn()
+        .mockResolvedValueOnce(scene(all))
+        .mockReturnValueOnce(switchRead.promise),
+      persist: async () => true,
+    });
+    await store.getState().select(all);
+
+    const pending = store.getState().select(fav);
+    expect(store.getState()).toMatchObject({
+      status: "loading",
+      snapshot: { system: all },
+    });
+
+    switchRead.reject(new Error("SQLite"));
+    await pending;
+    expect(store.getState()).toMatchObject({ status: "error", snapshot: null });
   });
   it("disposal invalidates pending publication/persistence and rejected intent validation", async () => {
     const read = deferred<OrrerySceneSnapshot>();
