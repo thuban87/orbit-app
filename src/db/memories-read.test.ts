@@ -15,6 +15,7 @@ import {
 import { MEMORY_TYPE_REGISTRY } from "@/db/memory-registry";
 import { runMigrations } from "@/db/migrations/runner";
 import type { SqlExecutor } from "@/db/types";
+import type { ReadOnlyExecutor } from "@/db/transaction";
 
 const NOW = "2026-09-04 12:00:00";
 let exec: SqlExecutor;
@@ -39,6 +40,14 @@ async function seedContact(): Promise<number> {
 }
 
 describe("memories read", () => {
+  it("accepts the structurally read-only snapshot executor", async () => {
+    const contactId = await seedContact();
+    const readOnly: ReadOnlyExecutor = {
+      getFirstAsync: exec.getFirstAsync.bind(exec),
+      getAllAsync: exec.getAllAsync.bind(exec),
+    };
+    expect(await listMemoriesForContact(readOnly, contactId)).toEqual([]);
+  });
   it("keeps default-off Memories out of the explicit AI egress projection", async () => {
     const contactId = await seedContact();
     const memoryId = await addMemory(exec, {

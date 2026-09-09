@@ -15,6 +15,7 @@ import { migration009 } from "@/db/migrations/009-contact-method-normalization";
 import { migration010 } from "@/db/migrations/010-contact-method-label";
 import { runMigrations } from "@/db/migrations/runner";
 import type { SqlExecutor } from "@/db/types";
+import type { ReadOnlyExecutor } from "@/db/transaction";
 
 const NOW = "2026-08-28 10:00:00";
 let counter = 0;
@@ -94,6 +95,19 @@ describe("contact method reads", () => {
       phone: { raw_value: "+13125551234" },
       email: { raw_value: "a@example.com" },
     });
+  });
+
+  it("accepts the structurally read-only snapshot executor and preserves complete rows", async () => {
+    const contactId = await contact();
+    await method(contactId, "phone", "invalid", 0, 1, 0);
+    await method(contactId, "phone", "+13125551234", 1, 0, 1);
+    const readOnly: ReadOnlyExecutor = {
+      getFirstAsync: exec.getFirstAsync.bind(exec),
+      getAllAsync: exec.getAllAsync.bind(exec),
+    };
+    const groups = await listContactMethodGroups(readOnly, contactId);
+    expect(groups.phone).toHaveLength(2);
+    expect(groups.phone[0]).toMatchObject({ raw_value: "invalid", is_actionable: 0 });
   });
 
   it("returns empty groups and no primary for a contact without methods", async () => {

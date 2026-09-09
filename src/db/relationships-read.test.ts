@@ -12,6 +12,7 @@ import {
 import { RELATIONSHIPS_GROUP } from "@/db/memory-registry";
 import { runMigrations } from "@/db/migrations/runner";
 import type { SqlExecutor } from "@/db/types";
+import type { ReadOnlyExecutor } from "@/db/transaction";
 
 const NOW = "2026-09-04 12:00:00";
 let exec: SqlExecutor;
@@ -36,6 +37,14 @@ async function seedContact(name: string): Promise<number> {
 }
 
 describe("relationships read", () => {
+  it("accepts the structurally read-only snapshot executor", async () => {
+    const contactId = await seedContact("Alex");
+    const readOnly: ReadOnlyExecutor = {
+      getFirstAsync: exec.getFirstAsync.bind(exec),
+      getAllAsync: exec.getAllAsync.bind(exec),
+    };
+    expect(await listRelationshipsForContact(readOnly, contactId)).toEqual([]);
+  });
   it("lists only live rows with linked names in deterministic pinned order", async () => {
     const alex = await seedContact("Alex");
     const blair = await seedContact("Blair");

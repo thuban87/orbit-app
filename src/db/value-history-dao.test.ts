@@ -9,6 +9,7 @@ import { createField } from "@/db/field-ddl";
 import { listValueHistory } from "@/db/value-history-dao";
 import { runMigrations } from "@/db/migrations/runner";
 import type { SqlExecutor } from "@/db/types";
+import type { ReadOnlyExecutor } from "@/db/transaction";
 
 const NOW = "2026-09-04 12:00:00";
 const LATER = "2026-09-04 12:01:00";
@@ -35,6 +36,13 @@ beforeEach(async () => {
 });
 
 describe("retained custom-field value history", () => {
+  it("allows history reads through a structurally read-only snapshot executor", async () => {
+    const readOnly: ReadOnlyExecutor = {
+      getFirstAsync: exec.getFirstAsync.bind(exec),
+      getAllAsync: exec.getAllAsync.bind(exec),
+    };
+    expect(await listValueHistory(readOnly, 999, 999)).toEqual([]);
+  });
   it("records changing prior raw values through the real updateContactFull edit path", async () => {
     const { contactId } = await createContactFull(exec, {
       uid: uid(), name: "Alex", intervalDays: 30, now: NOW,
