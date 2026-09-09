@@ -51,6 +51,7 @@ import {
   switchIntensity as membershipSwitchIntensity,
   preservedFocus,
   selectSystemFraming,
+  shouldPublishSwitchScene,
 } from "@/components/orrery/orrery-switch-animation";
 import { useOrreryCamera } from "@/components/orrery/use-orrery-camera";
 import { useOrrerySwitchRuntime } from "@/components/orrery/use-orrery-switch-runtime";
@@ -286,6 +287,7 @@ export function OrreryScreen() {
   const switchHomeGeneration = useRef<number | null>(null);
   useEffect(() => {
     const unsubscribe = useSystemStore.subscribe((next, previous) => {
+      if (!shouldPublishSwitchScene(next, previous)) return;
       if (
         next.status === "loading" &&
         previous.status === "ready" &&

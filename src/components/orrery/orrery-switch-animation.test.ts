@@ -4,11 +4,32 @@ import {
   createSwitchChoreographyOptions,
   preservedFocus,
   selectSystemFraming,
+  shouldPublishSwitchScene,
   switchIntensity,
   switchTransitionIntensity,
 } from "./orrery-switch-animation";
 
 describe("orrery System switch animation math", () => {
+  it("does not reset a running switch for persistence-only store publications", () => {
+    const snapshot = { generation: 2 };
+    const ready = { status: "ready", generation: 2, snapshot };
+    const saved = { ...ready, persistence: "saved" };
+    const saving = { ...ready, persistence: "saving" };
+    expect(shouldPublishSwitchScene(saved, saving)).toBe(false);
+    expect(
+      shouldPublishSwitchScene({ ...ready, status: "loading" }, ready),
+    ).toBe(true);
+    expect(shouldPublishSwitchScene({ ...ready, generation: 3 }, ready)).toBe(
+      true,
+    );
+    expect(
+      shouldPublishSwitchScene(
+        { ...ready, snapshot: { generation: 2 } },
+        ready,
+      ),
+    ).toBe(true);
+  });
+
   it("measures overlap, entering, leaving, and total membership", () => {
     expect(computeMembershipDelta([1, 2, 3], [2, 3, 4, 5])).toEqual({
       overlap: 2,

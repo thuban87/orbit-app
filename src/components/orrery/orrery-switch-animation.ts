@@ -7,6 +7,28 @@ export interface MembershipDelta {
   total: number;
 }
 
+export interface SwitchScenePublication {
+  status: string;
+  generation: number;
+  snapshot: unknown;
+}
+
+/**
+ * Zustand also publishes persistence-only changes after a System selection.
+ * Those must not be interpreted as a second scene publication: doing so
+ * replaces the running UI-thread choreography with an immediate settled frame.
+ */
+export function shouldPublishSwitchScene(
+  next: SwitchScenePublication,
+  previous: SwitchScenePublication,
+): boolean {
+  return (
+    next.status !== previous.status ||
+    next.generation !== previous.generation ||
+    next.snapshot !== previous.snapshot
+  );
+}
+
 /**
  * Measures the two System memberships as sets so intensity reflects turnover,
  * rather than the absolute number of contacts in either System.
