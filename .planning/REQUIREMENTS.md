@@ -163,26 +163,26 @@ category's phase (see Traceability).
 
 ### PROF — Profile Experience (Phase 31)
 
-- [ ] **PROF-01**: Profile presents a fixed Hero — large avatar, name, Category, Favorite, Message, Call, overflow, optional background — that templates never restructure; Message/Call stay present but disabled (with accessible explanation) when no usable method exists
+- [x] **PROF-01**: Profile presents a fixed Hero — large avatar, name, Category, Favorite, Message, Call, overflow, optional background — that templates never restructure; Message/Call stay present but disabled (with accessible explanation) when no usable method exists
 - [ ] **PROF-02**: User can reorder, hide/show, and set default expanded/collapsed state for top-level sections, and reorder eligible child sections within their parent — no third nesting level, no hand-ordering of individual items
 - [ ] **PROF-03**: User can create reusable named layout templates assigned globally, per Category, or per contact; template edits update assigned Profiles; explicit contact assignment outranks Category; freeform contact overrides are never silently rewritten
 - [ ] **PROF-04**: User can create background templates from custom images (drag/reposition + pinch crop) with the same assignment hierarchy; theme-aware readability treatment applies automatically
 - [ ] **PROF-05**: When a contact changes Category, inherited layout/background follow the new Category while explicit contact overrides survive
 - [ ] **PROF-06**: Layout editing is a deliberate mode from Profile overflow — reveals all eligible sections regardless of data, live-previews against a real contact, and requires explicit Save/Cancel; a freeform layout can be saved as a template at any time
 - [ ] **PROF-07**: Expanded/collapsed state persists per contact overriding template defaults; switching templates clears prior presentation overrides; Reset Profile Presentation clears only presentation state — never data, Favorite, Snooze, AI permissions, or knowledge
-- [ ] **PROF-08**: Factory order below the Hero is Relationship Overview → Things to Remember → Contact Methods → Interaction History; enabled sections with no data appear collapsed with a useful summary rather than vanishing
-- [ ] **PROF-09**: Relationship Overview renders an auto-packed tile grid (declared size variants, no arbitrary placement) with Orbit Status, Gravity, Intensity, Last Interaction, Contact Frequency, and Snooze tiles
-- [ ] **PROF-10**: Orbit Status shows its literal label, is not editable, adds no new factors or weighting, and tapping it explains the actual inputs with a route toward Insights
-- [ ] **PROF-11**: Gravity presents as a named tier plus a wide-range size-coded sphere, never editable; Intensity presents as a compact histogram resolving its interval from the contact's cadence, with a defined fallback for Unbound contacts (ADR-062 guard — decided once, jointly with Phase 32)
-- [ ] **PROF-12**: User can change Contact Frequency directly from its tile with immediate apply; user can snooze/unsnooze from the Snooze tile using presets or a narrow custom duration/date route
+- [x] **PROF-08**: Factory order below the Hero is Relationship Overview → Things to Remember → Contact Methods → Interaction History; enabled sections with no data appear collapsed with a useful summary rather than vanishing
+- [x] **PROF-09**: Relationship Overview renders an auto-packed tile grid (declared size variants, no arbitrary placement) with Orbit Status, Gravity, Intensity, Last Interaction, Contact Frequency, and Snooze tiles
+- [x] **PROF-10**: Orbit Status shows its literal label, is not editable, adds no new factors or weighting, and tapping it explains the actual inputs with a route toward Insights
+- [x] **PROF-11**: Gravity presents as a named tier plus a wide-range size-coded sphere, never editable; Intensity presents as a compact histogram resolving its interval from the contact's cadence, with a defined fallback for Unbound contacts (ADR-062 guard — decided once, jointly with Phase 32)
+- [x] **PROF-12**: User can change Contact Frequency directly from its tile with immediate apply; user can snooze/unsnooze from the Snooze tile using presets or a narrow custom duration/date route
 - [ ] **PROF-13**: Contact Methods shows ordinary-sized sets in full, actionable when valid, readable-disabled when malformed/imported
 - [ ] **PROF-14**: Things to Remember is a one-column configurable section with factory child order Pinned → Last Talked About → Key People → Current Location → Memories → Custom Fields → Off Limits → Imported Notes (enabled, collapsed)
 - [ ] **PROF-15**: Remembered-information cards are compact — blank metadata consumes no space, long content truncates, ~3 items then View All; cards tap to detail and long-press to Edit / Pin / Hide; no permanent inline edit/delete controls
 - [ ] **PROF-16**: Hidden-from-Profile items stay out of normal rendering but remain recoverable via administration and a Show hidden toggle; hiding never implies privacy, deletion, or AI change
 - [ ] **PROF-17**: Off Limits is visible by default with distinct caution presentation ("Avoid bringing these up"); Phase 31 omits its sparkle because ordinary Off Limits storage has no explicit AI-permission field, preserves a future explicit-permission renderer seam, never infers permission, and does not widen AI egress
-- [ ] **PROF-18**: Interaction History exists as a configurable bottom section with minimal interim content behind a replaceable renderer seam Phase 32 upgrades without touching layout persistence
-- [ ] **PROF-19**: Profile overflow lists contact actions before presentation actions and has no AI-draft entry — drafting is reached via Message → Draft with AI (ADR-079)
-- [ ] **PROF-20**: Profile customization is operable without precise drag, and all state (status, tiers, hidden/expanded/assignment) is exposed textually
+- [x] **PROF-18**: Interaction History exists as a configurable bottom section with minimal interim content behind a replaceable renderer seam Phase 32 upgrades without touching layout persistence
+- [x] **PROF-19**: Profile overflow lists contact actions before presentation actions and has no AI-draft entry — drafting is reached via Message → Draft with AI (ADR-079)
+- [x] **PROF-20**: Profile customization is operable without precise drag, and all state (status, tiers, hidden/expanded/assignment) is exposed textually
 
 ### HIST — Interaction History & Insights (Phase 32)
 

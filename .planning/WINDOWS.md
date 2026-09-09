@@ -1,10 +1,10 @@
 ---
 schema_version: 1
-open_count: 51
+open_count: 52
 waived_count: 0
 fixed_count: 6
-total_count: 57
-last_updated: 2026-09-09T16:31:58.466Z
+total_count: 58
+last_updated: 2026-09-09T19:49:42.984Z
 ---
 
 # Broken Windows Ledger
@@ -72,6 +72,7 @@ last_updated: 2026-09-09T16:31:58.466Z
 | 55 | 29 | unrun-verify | .planning/phases/29-orrery-camera-scale-exploration/29-NATIVE-CHECKLIST.md |  | Plan 29-12: all 55 E1–E9 native states and combined gesture, accessibility, lifecycle and automatic-backup contention checks remain pending; no device evidence collected. | open |  | 2026-09-07T18:18:34.663Z |  |
 | 56 | 30 | stub | src/logic/system-rule-resolver.ts |  | Rule evaluation, gravity, exclusion pruning, and broken-rule population are intentionally deferred to Plan 30-02. | open |  | 2026-09-08T20:10:20.227Z |  |
 | 57 | 31 | unrun-verify | package.json |  | npm run check is unavailable because package.json has no check script | open |  | 2026-09-09T16:31:58.466Z |  |
+| 58 | 31 | unrun-verify | .planning/phases/31-profile-experience/31-VALIDATION.md |  | Hero/Overview native smoke awaits Plan 31-10 host integration; Task 31-05 verified physical topology only. | open |  | 2026-09-09T19:49:42.984Z |  |
 
 ````json
 [
@@ -757,6 +758,18 @@ last_updated: 2026-09-09T16:31:58.466Z
     "status": "open",
     "reason": "",
     "recorded_at": "2026-09-09T16:31:58.466Z",
+    "resolved_at": null
+  },
+  {
+    "id": 58,
+    "kind": "unrun-verify",
+    "phase": "31",
+    "file": ".planning/phases/31-profile-experience/31-VALIDATION.md",
+    "line": null,
+    "description": "Hero/Overview native smoke awaits Plan 31-10 host integration; Task 31-05 verified physical topology only.",
+    "status": "open",
+    "reason": "",
+    "recorded_at": "2026-09-09T19:49:42.984Z",
     "resolved_at": null
   }
 ]
