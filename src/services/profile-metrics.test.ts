@@ -9,9 +9,7 @@ import {
 
 const NOW = "2026-09-09 12:00:00";
 
-function impactInputs(
-  overrides: Partial<ImpactInputs> = {},
-): ImpactInputs {
+function impactInputs(overrides: Partial<ImpactInputs> = {}): ImpactInputs {
   return {
     trackingEnabled: 1,
     intervalDays: 30,
@@ -23,7 +21,7 @@ function impactInputs(
         direction: "outbound",
       },
       {
-        occurredAt: "2026-08-20 10:00:00",
+        occurredAt: "2026-07-20 10:00:00",
         connected: 1,
         direction: "mutual",
       },
@@ -212,7 +210,7 @@ describe("Profile Overview metric models", () => {
       currentCount: 1,
       intendedPerPeriod: null,
       multiple: null,
-      trailingAvgGapDays: null,
+      trailingAvgGapDays: 1,
     });
   });
 
