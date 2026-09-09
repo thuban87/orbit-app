@@ -25,7 +25,7 @@ The required deterministic probe reported 50 applicable, 0 resolved, and 50 unre
 | PROF-03 | concurrency | Explicit: one outer write transaction makes template edits and assignment fallout atomic. |
 | PROF-04 | idempotency | Explicit: repeated save of the same background identity replaces safely without duplicate durable rows. |
 | PROF-04 | concurrency | Explicit: draft/processing cancellation and failure leave the committed background and bytes unchanged. |
-| PROF-05 | unclassified | OWNER CHECKPOINT (Plan 08 Task 2): decide both-axis inheritance after changing to no Category; no behavior is silently assumed. |
+| PROF-05 | unclassified | OWNER CHECKPOINT (Plan 01 Task 2, before resolver/DAO implementation): decide both-axis inheritance after changing to no Category; Plan 02 implements and tests only the recorded outcome. |
 | PROF-06 | adjacency | Explicit: editor preview is contained in the topmost sheet and does not make underlying controls interactive. |
 | PROF-06 | empty | Explicit: editor displays every eligible module with placeholders when the preview contact lacks data. |
 | PROF-06 | ordering | Explicit: Save commits the complete canonical draft order; Cancel commits none of it. |
