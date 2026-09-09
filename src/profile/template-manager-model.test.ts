@@ -8,6 +8,7 @@ import {
   setTemplateDraft,
   setTemplateUsage,
   settleTemplateOperation,
+  describeTemplateAssignment,
 } from "./template-manager-model";
 
 describe("Profile template manager model", () => {
@@ -61,5 +62,23 @@ describe("Profile template manager model", () => {
     expect(stale.usage.weekday).toMatchObject({ stale: false, total: 6 });
     const pending = beginTemplateOperation(stale, "weekday").state;
     expect(pending.usage.weekday).toMatchObject({ stale: true, total: 6 });
+  });
+
+  it("keeps inherited and contact override assignment states distinct", () => {
+    expect(
+      describeTemplateAssignment({ source: "category", templateName: "Friends" }),
+    ).toEqual({
+      kind: "inherited",
+      text: "Inherited from Category template Friends",
+    });
+    expect(
+      describeTemplateAssignment({ source: "contact-template", templateName: "Weekend" }),
+    ).toEqual({ kind: "override", text: "Contact override: Weekend" });
+    expect(
+      describeTemplateAssignment({ source: "contact-freeform", templateName: null }),
+    ).toEqual({
+      kind: "override",
+      text: "Contact override: freeform layout",
+    });
   });
 });
