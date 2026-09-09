@@ -10,6 +10,7 @@ import {
   updateAppSettingsCore,
 } from "@/db/app-settings-dao";
 import { MIGRATIONS, TARGET_VERSION } from "@/db/database";
+import { migration021 } from "@/db/migrations/021-orrery-preferences";
 import { runMigrations } from "@/db/migrations/runner";
 import { newUid } from "@/db/uid";
 
@@ -29,7 +30,8 @@ describe("Orrery preferences migration and DAO", () => {
     async (version) => {
       await runMigrations(exec, MIGRATIONS, version, deps);
       await runMigrations(exec, MIGRATIONS, TARGET_VERSION, deps);
-      expect(TARGET_VERSION).toBe(22);
+      expect(migration021.version).toBe(21);
+      expect(MIGRATIONS).toContain(migration021);
       expect(await getAppSettings(exec)).toMatchObject({
         orreryDensity: "balanced",
         orrerySatellitesEnabled: 0,
