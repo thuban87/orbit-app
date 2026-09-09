@@ -15,20 +15,16 @@ import { useTheme } from "@/theme";
 import { RADII } from "@/theme/tokens/radii";
 import { SPACING } from "@/theme/tokens/spacing";
 import { BaseOverlay, type OverlayLifecycle } from "./overlay-base";
+import { SHEET_HEIGHT_PERCENT, type SheetVariant } from "./sheet-contract";
 
 /** Sheet heights (dossier §O): compact list vs. half-height detail. */
-export type SheetVariant = "compact" | "detail";
+export type { SheetVariant } from "./sheet-contract";
 
 export interface SheetProps extends OverlayLifecycle {
   /** Height variant; defaults to `compact`. */
   variant?: SheetVariant;
   children: ReactNode;
 }
-
-const MAX_HEIGHT: Record<SheetVariant, DimensionValue> = {
-  compact: "40%",
-  detail: "60%",
-};
 
 export function Sheet({
   visible,
@@ -49,9 +45,12 @@ export function Sheet({
         edges={["bottom"]}
         style={[
           styles.sheet,
-          { maxHeight: MAX_HEIGHT[variant] },
+          variant === "expanded"
+            ? { height: SHEET_HEIGHT_PERCENT.expanded as DimensionValue }
+            : { maxHeight: SHEET_HEIGHT_PERCENT[variant] as DimensionValue },
           { backgroundColor: colors.surface, borderColor: colors.border },
         ]}
+        accessibilityViewIsModal
       >
         <View style={styles.handleWrap}>
           <View style={[styles.handle, { backgroundColor: colors.border }]} />
