@@ -312,7 +312,10 @@ export function ProfileLayoutEditor({
     <Sheet
       visible={visible}
       onRequestClose={closeOrGuard}
-      variant={page === "editor" ? "expanded" : "detail"}
+      // The chooser includes a primary action and close affordance; use the
+      // same expanded geometry as the editor so both controls remain visible
+      // above the device safe area at ordinary font scale.
+      variant="expanded"
     >
       {page === "chooser" ? (
         <View style={styles.chooser}>
