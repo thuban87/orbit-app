@@ -397,7 +397,10 @@ export function ContactProfileScreen({
             <Sheet
               visible={overlay === "overflow"}
               onRequestClose={closeOverlay}
-              variant="detail"
+              // The Profile action list can contain eight entries. It needs the
+              // expanded sheet so the bottom presentation actions stay reachable
+              // on a physical phone without clipping below the safe area.
+              variant="expanded"
             >
               <View style={styles.menu}>
                 <AppText role="heading">Profile actions</AppText>
