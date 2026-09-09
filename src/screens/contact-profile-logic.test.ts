@@ -210,4 +210,19 @@ describe("Relationship Overview collapse tracer", () => {
     expect(published).toEqual([]);
     expect(result).toEqual({ ok: false, expanded: true });
   });
+
+  it("keeps failure isolated to the requested section and leaves its visible state unchanged", async () => {
+    const published: boolean[] = [];
+    const result = await commitProfileOverviewToggle({
+      currentExpanded: false,
+      write: async () => {
+        throw new Error("storage unavailable");
+      },
+      read: async () => ({ "relationship-overview": true }),
+      publish: (expanded) => published.push(expanded),
+    });
+
+    expect(result).toEqual({ ok: false, expanded: false });
+    expect(published).toEqual([]);
+  });
 });

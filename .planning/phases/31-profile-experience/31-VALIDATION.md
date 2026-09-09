@@ -52,7 +52,7 @@ created: 2026-09-09
 | 31-04-T3 | 31-04 Task 3 (TDD) | 4 | PROF-01/08/10/11/13/14/16/17/18 | T-31-09/10/11 | Aggregate snapshot cases extend the precise 31-04-T1/T2 read tests red before composition | integration | `npx vitest run src/db/profile-knowledge-read.test.ts src/db/profile-history-read.test.ts` | ❌ extend 31-04-T1/T2 tests first | ⬜ pending |
 | 31-05-T1 | 31-05 Task 1 (TDD) | 5 | PROF-09/18/20 | T-31-13 | Packing/renderer tests precede algorithms | unit | `npx vitest run src/profile/pack-overview.test.ts src/profile/module-registry.test.ts` | ❌ create first | ⬜ pending |
 | 31-05-T2 | 31-05 Task 2 (TDD contract) | 5 | PROF-10/11/12/20 | T-31-12/14 | Explanation/frequency/snooze contract tests precede sheets | unit | `npx vitest run src/profile/relationship-sheet-model.test.ts` | ❌ create first | ⬜ pending |
-| 31-05-T3 | 31-05 Task 3 | 5 | PROF-07/08/18/20 | T-31-12 | Collapse readback/relaunch/failure tests extend tracer before host expansion | integration | `npx vitest run src/db/profile-presentation-dao.test.ts src/screens/contact-profile-logic.test.ts` | ❌ extend first | ⬜ pending |
+| 31-05-T3 | 31-05 Task 3 | 5 | PROF-07/08/18/20 | T-31-12 | Collapse readback/relaunch/failure tests extend tracer before host expansion | integration | `npx vitest run src/profile/module-registry.test.ts src/db/profile-history-read.test.ts src/db/profile-presentation-dao.test.ts src/screens/contact-profile-logic.test.ts` | ✅ | ✅ green (26 tests) |
 | 31-06-T1 | 31-06 Task 1 (TDD) | 6 | PROF-14/15/16/17 | T-31-15/16 | Ten-type exhaustive presentation/no-sparkle tests precede adapters | unit | `npx vitest run src/profile/knowledge-presentation.test.ts` | ❌ create first | ⬜ pending |
 | 31-06-T2 | 31-06 Task 2 | 6 | PROF-13/14/15/16/17/20 | T-31-15/16 | Renderer UI consumes the semantic cases owned by 31-06-T1 and method cases owned by 31-04-T1 | contract/check | `npx vitest run src/profile/knowledge-presentation.test.ts src/db/contact-methods-read.test.ts && npm run check` | ✅ consumes 31-06-T1 + 31-04-T1 | ⬜ pending |
 | 31-07-T1 | 31-07 Task 1 (TDD) | 7 | PROF-02/06/09/20 | T-31-17/18 | Reducer parity tests precede editor reducer | unit | `npx vitest run src/profile/layout-editor-reducer.test.ts` | ❌ create first | ⬜ pending |
@@ -109,6 +109,13 @@ There is no detached implementation-free Wave 0 plan. `31-01 Task 1` is the exec
 | Relationship explanations and selectors | PROF-10/11/12/20 | Native sheet focus, dismissal, selected states, and pending/error feedback require device observation | Open Status/Gravity/Intensity explanations; follow Status to current History; exercise every Frequency choice and Snooze preset/custom duration/date, including failure/Retry and Back/scrim dismissal |
 | Durable top-level and child collapse | PROF-07/08/20 | Relaunch persistence and native accessibility announcements require end-to-end execution | Toggle one top-level and one eligible Things-to-Remember child, restart, verify readback; induce/observe failure retention and Retry; verify expanded/collapsed announcements |
 | Origin-aware navigation and final Profile composition | PROF-01/18/19 | Navigation stack behavior and the renderer seam require end-to-end app execution | Open Profile from each supported origin, exercise Hero and section actions, return, and confirm the correct destination and state |
+
+### 31-05 Task 3 device-precondition evidence — 2026-09-09
+
+- Confirmed the Metro tmux session is `orbit`.
+- `emu-connect status` selected the USB `device` topology with Metro listening on port 8081 and the SDK platform-tools ADB client (37.0.0).
+- `~/.local/bin/adb devices -l` reported exactly one authorized physical target: Pixel 6 Pro (`raven`); the package remains `com.bwales.orbit`.
+- The new `ProfileModuleHost` is intentionally not mounted into `ContactProfileScreen` until Plan 31-10, which owns the thin-controller integration. Hero/Overview/reflow/sheet Back interaction could therefore not be honestly observed in this plan; Plan 31-10's physical checklist remains the executable native acceptance for those behaviors.
 
 ---
 
