@@ -42,6 +42,7 @@ import { performReachOut } from "@/services/reach-out/handoff";
 import { useShellRefresh } from "@/stores/shell-refresh-store";
 import { useTheme } from "@/theme";
 import { SPACING } from "@/theme/tokens/spacing";
+import { surfaceOpacityForDensity } from "@/theme/tokens/surface";
 import { formatLocalDate } from "@/utils/dates";
 import { Logger } from "@/utils/logger";
 
@@ -53,6 +54,10 @@ export function ContactProfileScreen({
   route,
 }: RootStackScreenProps<"Profile">) {
   const { colors, package: themePackage } = useTheme();
+  const presentationScrimOpacity = surfaceOpacityForDensity(
+    themePackage,
+    "presentation",
+  );
   const contactId = route.params.contactId;
   const [snapshot, setSnapshot] = useState<ProfileSnapshot | null>(null);
   const [loading, setLoading] = useState(true);
@@ -273,7 +278,10 @@ export function ContactProfileScreen({
               pointerEvents="none"
               style={[
                 StyleSheet.absoluteFill,
-                { backgroundColor: colors.surface, opacity: 0.72 },
+                {
+                  backgroundColor: colors.surface,
+                  opacity: presentationScrimOpacity,
+                },
               ]}
             />
           </>
@@ -468,7 +476,7 @@ export function ContactProfileScreen({
                   return (
                     <Button
                       key={entry}
-                      role={entry === "archive" ? "destructive" : "secondary"}
+                      role="secondary"
                       label={labels[entry]}
                       onPress={onPress}
                     />
