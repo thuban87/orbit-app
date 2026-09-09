@@ -1,8 +1,8 @@
 # Phase 31: Profile Experience - Pattern Map
 
 **Mapped:** 2026-09-09
-**Files analyzed:** 40 new/modified files
-**Analogs found:** 40 / 40
+**Files analyzed:** 43 new/modified files
+**Analogs found:** 43 / 43
 
 The graph was used first for discovery. Its `governs` results for `ContactProfileScreen.tsx`, `database.ts`, `photo-pipeline.ts`, and `memories-read.ts` were all **INFERRED** ADR key-file edges, not code assertions. It correctly flagged the relevant supersessions (ADR-079 over ADR-052 for the Profile AI entry; ADR-078 partially over ADR-036 for human-visible Off Limits). Every assignment below was then checked against the complete live files.
 

@@ -79,7 +79,7 @@ Compose (D-10-209/210 vs D-RM-014).
 - **Number it head+1 at plan time**, verified against `src/db/migrations/` on disk. Head at audit
   time was 14.
 - **Must land after:** Phase 3 (R-01 knowledge model) and Phase 2 (theme/background presets).
-- **Must land before:** Phase 16's format-4 backup bump; declare the new entities for serialization.
+- **Backup sequencing amendment (owner-approved, 2026-09-09):** live `BACKUP_FORMAT_VERSION` is already 4, so v4 is spent. Phase 10/Profile Experience does not bump or widen current wire-format emission. It adds only its durable preference keys to the portable-settings declaration/snapshot allowlist. Phase 16/current Phase 36 owns the coordinated closing v5 — or an owner-decided extend-v4-in-place — covering every new template/assignment/image entity and referenced file together.
 - **No schema** for custom snooze end date.
 
 ## Stub-contract seams exported to Phases 15/17/18/Your Week

@@ -10,7 +10,7 @@
 ### Locked Decisions
 - **D-01:** Read the phase dossier (canonical_refs) IN FULL before planning. Where present, its dated "Amendment — audit resolutions 2026-09-01" section overrides older text — this dossier has no standalone amendment block; the resolutions were folded inline, so read the amended §C and §D text as authoritative. [DECIDED] and [REJECTED] items are settled: reopening one, or reversing any Accepted ADR or HANDOFF.md entry, is an owner decision — stop and ask, never "fix" it.
 - **D-02:** Read the phase planning-notes file (canonical_refs) as a binding appendix: every REPLAN finding must be reflected in the plan, and every trip-wire is a stop-and-ask.
-- **D-03:** This phase ships SQLite schema. Never assume a migration number — verify head+1 against `src/db/migrations/` and `TARGET_VERSION` in `src/db/database.ts` on disk at plan time (numbers drift every schema phase). Milestone order is schema → consumers → backup; the backup v4 bump is Phase 36's final plan. All new durable preferences are `app_settings` columns added to `PORTABLE_SETTINGS_KEYS`, never AsyncStorage.
+- **D-03:** This phase ships SQLite schema. Never assume a migration number — verify head+1 against `src/db/migrations/` and `TARGET_VERSION` in `src/db/database.ts` on disk at plan time (numbers drift every schema phase). Live `BACKUP_FORMAT_VERSION` is already 4, so Phase 31 does not bump or widen emission. It adds only its durable preference keys to the portable-settings declaration/snapshot allowlist. Phase 36 owns the coordinated closing v5 — or an owner-decided extend-v4-in-place — for all new template/assignment/image entities and referenced files.
 
 ### Phase-specific constraints
 - **D-04:** The Profile "AI draft" entry (`src/screens/ContactProfileScreen.tsx:1075`) is **removed** (E-06 resolved). Drafting stays reachable in two taps via Message → Draft with AI. **ADR-079 supersedes ADR-052** on this point; do not restore a separate Profile AI action.
@@ -464,21 +464,19 @@ const cropGesture = Gesture.Simultaneous(panGesture, pinchGesture);
 |---|-------|---------|---------------|
 | — | None. Recommendations above are derived from locked decisions and inspected repository contracts; unresolved product/ownership gaps are listed below rather than assumed. | — | — |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **Off Limits sparkle has no current storage source — RESOLVED by owner 2026-09-09**
    - What we know: Off Limits remains a `fuel` kind, and `FuelItem` has no AI-permission field; per-item `allow_ai` exists on typed Memories only. ADR-081 explicitly says Memories have no Off Limits kind. [VERIFIED: `src/db/fuel-read.ts:27-42`; `src/db/memory-registry.ts:14-59`; ADR-081]
    - Resolution: PROF-17 and D-12 narrow the branch. Render ordinary Off Limits with caution semantics and no sparkle; keep the adapter capable of accepting a future explicit permission only after an owning phase supplies durable storage. Never infer permission from visibility/kind/source/location. Do not add an Off Limits `allow_ai` migration and do not widen egress. [VERIFIED: owner ruling; live fuel schema/read/write/backup audit]
 
-2. **Custom-field rows with no `field_group` need display copy**
+2. **Custom-field rows with no `field_group` — RESOLVED by dossier §AG implementation discretion**
    - What we know: `field_group` is nullable and Profile must honor configured groups, but group customization is not a third layout level. [VERIFIED: `src/db/migrations/018-custom-field-scope-history.ts:17-19`; dossier §AG]
-   - What's unclear: The approved documents do not name the null-group heading. [VERIFIED: dossier and `31-UI-SPEC.md`]
-   - Recommendation: Use no extra heading when there is only one null group; when mixed with named groups, use the existing Custom Fields section heading and visually separate named groups without inventing a durable group name. This is presentation implementation detail, not stored state. [VERIFIED: dossier §AG grants exact variants to implementation]
+   - Resolution: When only null-group rows exist, render them directly under Custom Fields with no extra heading. When named and null groups coexist, keep null rows directly under the existing Custom Fields section and visually separate only the named groups. Do not invent or store a null-group name. [VERIFIED: dossier §AG grants this presentation detail to implementation]
 
-3. **Template/background portability is sequenced after schema**
-   - What we know: D-03 says schema → consumers → backup and assigns the backup v4 bump to Phase 36; durable preferences must enter `PORTABLE_SETTINGS_KEYS`. [VERIFIED: CONTEXT D-03]
-   - What's unclear: Phase 31 cannot complete cross-device backup round-trip for new entity tables without taking Phase 36's coordinated format work. [VERIFIED: CONTEXT D-03]
-   - Recommendation: Add new app-settings columns to the portable-settings snapshot/allowlist now so reads and validation know them, but do not widen the current backup wire format or invent partial entity restore. Phase 36 must add templates, assignments, and referenced files together. Record this explicit handoff in the plan and schema docs. [VERIFIED: CONTEXT D-03]
+3. **Template/background portability sequencing — RESOLVED by owner-approved roadmap amendment**
+   - What we know: live `BACKUP_FORMAT_VERSION` is 4, so v4 is already spent. [VERIFIED: `src/backup/types.ts`; CONTEXT D-03]
+   - Resolution: Phase 31 adds its durable preference keys to the portable-settings declaration/snapshot allowlist only. It does not emit new template, assignment, or image entities into the current wire format and does not implement partial entity restore. Phase 36 coordinates all new entities and referenced files in closing v5, or uses extend-v4-in-place only if the owner decides that alternative. [VERIFIED: CONTEXT D-03; owner-approved roadmap amendment]
 
 ## Environment Availability
 
