@@ -550,7 +550,7 @@ Plans:
 
 **Canonical refs**: docs/dossier/milestone-2/phase-09-orrery-systems-dossier.md; docs/dossier/milestone-2/planning-notes/phase-09-planning-notes.md
 **Schema**: Systems tables — migration **022** (verified head+1 on disk at plan time 2026-09-08: migrations 001–021, `TARGET_VERSION=21` → first new is 022; re-verify at execution time). Creates `systems` + `system_rules` + `system_overrides` + `system_prefs`; does NOT touch `app_settings` (`orrery_last_system` already exists, migration 021). Backup is **declare-only** — no `BACKUP_FORMAT_VERSION` bump (Phase 36 owns v5).
-**Plans**: 10 plans (6 waves) — re-sequenced in the cross-AI reviews replan so the builder route (30-08) lands before management (30-06) that navigates to it, and the switcher (30-05) lands after management provides its route + data-flow owner
+**Plans**: 12 plans (8 waves) — Plans 30-11/12 are corrective ORRS-13 work restoring the owner-approved staged spin/shedding/capture choreography after Plan 30-10 delivered only the Phase-29 continuity effect plus a small reversible spin
 **Wave 1**
 
 - [ ] 30-01-PLAN.md — TRACER: migration 022 (Systems table set, one-way-door checkpoint) + thin manual-only custom System end-to-end (union/grammar/resolver/read/switcher) + custom-routing-before-buildWhere guard + missing-custom read result + cross-catalog name uniqueness [ORRS-01/02/12]
@@ -578,6 +578,14 @@ Plans:
 **Wave 6** *(blocked on Wave 5)*
 
 - [ ] 30-05-PLAN.md — Switcher extension: management order/visibility/live counts (bounded)/empty-vs-broken severity + OrreryScreen catalog data-flow owner + Manage Systems entry + 3 icon keys [ORRS-11]
+
+**Wave 7** *(blocked on Wave 6)*
+
+- [ ] 30-11-PLAN.md — Corrective choreography engine: explicit accelerate/shed/capture/settle phases, retained/leaving/entering trajectories, delta-scaled drama, interruption/pause semantics, and deterministic motion-property tests [ORRS-13]
+
+**Wave 8** *(blocked on Wave 7)*
+
+- [ ] 30-12-PLAN.md — Live Skia integration with lifecycle-surviving state and continuous Home framing; physical-Pixel tuning/evidence, debug install via temporary 8082 reverse, release APK on droid, and blocking owner approval [ORRS-13]
 
 **UI hint**: yes
 
