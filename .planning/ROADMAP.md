@@ -608,16 +608,46 @@ Plans:
 **Plans**: 10 plans
 
 Plans:
+**Wave 1**
+
 - [ ] 31-01-PLAN.md — Forward-only presentation schema and clickable persisted Overview-collapse tracer
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
 - [ ] 31-02-PLAN.md — Presentation reads and atomic template/assignment/reset/fallout DAOs
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
 - [ ] 31-03-PLAN.md — Nullable-cadence-safe metrics and composed Frequency/Snooze actions
+
+**Wave 4** *(blocked on Wave 3 completion)*
+
 - [ ] 31-04-PLAN.md — Coherent local Profile snapshot, semantic knowledge, methods, and interim History reads
+
+**Wave 5** *(blocked on Wave 4 completion)*
+
 - [ ] 31-05-PLAN.md — Fixed Hero, responsive Relationship Overview, and semantic module host
+
+**Wave 6** *(blocked on Wave 5 completion)*
+
 - [ ] 31-06-PLAN.md — Things to Remember, grouped custom fields, value-history backlist, and Contact Methods
+
+**Wave 7** *(blocked on Wave 6 completion)*
+
 - [ ] 31-07-PLAN.md — Accessible focused Profile layout chooser/editor
+
+**Wave 8** *(blocked on Wave 7 completion)*
+
 - [ ] 31-08-PLAN.md — Reusable layout-template management and assignment flows
+
+**Wave 9** *(blocked on Wave 8 completion)*
+
 - [ ] 31-09-PLAN.md — Safe local background crop/storage/templates and assignment editor
+
+**Wave 10** *(blocked on Wave 9 completion)*
+
 - [ ] 31-10-PLAN.md — Host integration, documentation, full regression, and physical-device UAT
+
 **UI hint**: yes
 
 ### Phase 32: Interaction History & Insights
