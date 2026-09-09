@@ -1,10 +1,10 @@
 ---
 schema_version: 1
-open_count: 50
+open_count: 51
 waived_count: 0
 fixed_count: 6
-total_count: 56
-last_updated: 2026-09-08T20:10:20.227Z
+total_count: 57
+last_updated: 2026-09-09T16:31:58.466Z
 ---
 
 # Broken Windows Ledger
@@ -71,6 +71,7 @@ last_updated: 2026-09-08T20:10:20.227Z
 | 54 | 29 | unrun-verify | .planning/phases/29-orrery-camera-scale-exploration/29-VALIDATION.md |  | Plan 11 native Profile Back, tab reentry, background clock shutdown, live OS motion toggle and scaled-text recovery remain pending Plan 12 device verification. | open |  | 2026-09-07T17:57:06.340Z |  |
 | 55 | 29 | unrun-verify | .planning/phases/29-orrery-camera-scale-exploration/29-NATIVE-CHECKLIST.md |  | Plan 29-12: all 55 E1–E9 native states and combined gesture, accessibility, lifecycle and automatic-backup contention checks remain pending; no device evidence collected. | open |  | 2026-09-07T18:18:34.663Z |  |
 | 56 | 30 | stub | src/logic/system-rule-resolver.ts |  | Rule evaluation, gravity, exclusion pruning, and broken-rule population are intentionally deferred to Plan 30-02. | open |  | 2026-09-08T20:10:20.227Z |  |
+| 57 | 31 | unrun-verify | package.json |  | npm run check is unavailable because package.json has no check script | open |  | 2026-09-09T16:31:58.466Z |  |
 
 ````json
 [
@@ -744,6 +745,18 @@ last_updated: 2026-09-08T20:10:20.227Z
     "status": "open",
     "reason": "",
     "recorded_at": "2026-09-08T20:10:20.227Z",
+    "resolved_at": null
+  },
+  {
+    "id": 57,
+    "kind": "unrun-verify",
+    "phase": "31",
+    "file": "package.json",
+    "line": null,
+    "description": "npm run check is unavailable because package.json has no check script",
+    "status": "open",
+    "reason": "",
+    "recorded_at": "2026-09-09T16:31:58.466Z",
     "resolved_at": null
   }
 ]

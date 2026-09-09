@@ -41,7 +41,7 @@ created: 2026-09-09
 | Task ID | Plan | Wave | Requirement | Threat Ref | Secure Behavior | Test Type | Automated Command | File Exists | Status |
 |---------|------|------|-------------|------------|-----------------|-----------|-------------------|-------------|--------|
 | 31-01-T1 | 31-01 Task 1 | 1 | baseline | — | Full pre-change suite/check runtime is measured before implementation | regression | `npm test && npm run check` | ✅ command | ⚠️ baseline recorded |
-| 31-01-T3 | 31-01 Task 3 (TDD tracer) | 1 | PROF-01/07/08/10 | T-31-01/02 | Migration chain and clickable collapse tap→write→readback/relaunch path start red, then pass | integration | `npx vitest run src/db/migrations/024-profile-presentation.test.ts src/db/profile-presentation-dao.test.ts src/screens/contact-profile-logic.test.ts` | ❌ create first | ⬜ pending |
+| 31-01-T3 | 31-01 Task 3 (TDD tracer) | 1 | PROF-01/07/08/10 | T-31-01/02 | Migration chain and clickable collapse tap→write→readback/relaunch path start red, then pass | integration | `npx vitest run src/db/migrations/profile-presentation.test.ts src/db/profile-presentation-dao.test.ts src/screens/contact-profile-logic.test.ts` | ✅ | ✅ green |
 | 31-02-T1 | 31-02 Task 1 (TDD) | 2 | PROF-02/03/05/07/08 | T-31-01 | Closed parser/resolver tests are authored red before contracts | unit | `npx vitest run src/profile/presentation-schema.test.ts src/profile/resolve-presentation.test.ts src/db/app-settings-dao.test.ts` | ❌ create first | ⬜ pending |
 | 31-02-T2 | 31-02 Task 2 (TDD) | 2 | PROF-03/05/07 | T-31-04/06 | Read/fallthrough/usage fixtures extend the DAO test red before reader implementation | integration | `npx vitest run src/db/profile-presentation-dao.test.ts` | ❌ extend 31-01-T3 test first | ⬜ pending |
 | 31-02-T3 | 31-02 Task 3 (TDD) | 2 | PROF-03/04/05/07 | T-31-04/05/06 | DAO reset/delete/collapse plus settled two-axis Category-to-null fallthrough through Edit/bulk writers; FK-on deletion fixture nulls/reassigns referencing contacts before delete, then asserts assignment cleanup, global/factory resolution, and explicit override survival | integration | `npx vitest run src/db/profile-presentation-dao.test.ts src/db/contacts-dao.test.ts src/db/bulk-actions-dao.test.ts src/profile/resolve-presentation.test.ts` | ❌ extend first | ⬜ pending |
@@ -83,10 +83,11 @@ These failures predate the persisted Profile contract and are recorded rather th
 
 There is no detached implementation-free Wave 0 plan. `31-01 Task 1` is the executable baseline gate before schema implementation; every missing test is created RED as the first move of its named `tdd="true"` owner task. `wave_0_complete` is true because that baseline has now been measured and recorded above.
 
-- [ ] `src/profile/presentation-schema.test.ts` — closed/versioned persisted document
+- [x] `src/profile/persisted-contract.test.ts` — minimum closed/versioned persisted vocabulary
+- [ ] `src/profile/presentation-schema.test.ts` — expanded persisted document and template contract
 - [ ] `src/profile/resolve-presentation.test.ts` — hierarchy and fallout matrix
-- [ ] `src/db/migrations/024-profile-presentation.test.ts` — fresh and 023→024 chains
-- [ ] `src/db/profile-presentation-dao.test.ts` — atomic CRUD/reset/template deletion
+- [x] `src/db/migrations/profile-presentation.test.ts` — fresh and previous-head schema chains
+- [x] `src/db/profile-presentation-dao.test.ts` — atomic collapse write/readback/rollback tracer (CRUD/reset/template deletion expands in 31-02)
 - [ ] `src/profile/pack-overview.test.ts` — supported variants and no avoidable holes
 - [ ] `src/profile/layout-editor-reducer.test.ts` — drag and accessible action parity
 - [ ] `src/services/profile-metrics.test.ts` — truthful status and shared Unbound month fallback
