@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
-  parseProfileCollapseMap,
-  parseProfileLayoutDocument,
   PROFILE_LAYOUT_DOCUMENT_VERSION,
   PROFILE_MODULE_IDS,
   PROFILE_MODULE_PARENT,
+  parseProfileCollapseMap,
+  parseProfileLayoutDocument,
   serializeProfileCollapseMap,
   serializeProfileLayoutDocument,
 } from "./persisted-contract";
@@ -70,21 +70,21 @@ describe("persisted Profile presentation vocabulary", () => {
     });
   });
 
-  it("canonicalizes module order and JSON property order", () => {
+  it("canonicalizes JSON property order without changing user module order", () => {
     expect(serializeProfileLayoutDocument(validDocument)).toBe(
       JSON.stringify({
         version: PROFILE_LAYOUT_DOCUMENT_VERSION,
         topLevel: [
-          { id: "relationship-overview", visible: true, expanded: true },
           { id: "interaction-history", visible: true, expanded: false },
+          { id: "relationship-overview", visible: true, expanded: true },
         ],
         overview: [
-          { id: "orbit-status", visible: true, expanded: true },
           { id: "snooze", visible: true, expanded: false },
+          { id: "orbit-status", visible: true, expanded: true },
         ],
         thingsToRemember: [
-          { id: "pinned-featured", visible: true, expanded: true },
           { id: "off-limits", visible: true, expanded: true },
+          { id: "pinned-featured", visible: true, expanded: true },
         ],
       }),
     );

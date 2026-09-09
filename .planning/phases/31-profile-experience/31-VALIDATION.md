@@ -5,7 +5,7 @@ slug: profile-experience
 # audit-milestone §5.5 distinguishes NOT-VALIDATED (draft) from PARTIAL (validated + nyquist_compliant: false) (#2117)
 status: draft
 nyquist_compliant: false
-wave_0_complete: false
+wave_0_complete: true
 created: 2026-09-09
 ---
 
@@ -23,7 +23,7 @@ created: 2026-09-09
 | **Config file** | `vitest.config.ts` |
 | **Quick run command** | `npx vitest run <changed-test-file>` |
 | **Full suite command** | `npm test` |
-| **Estimated runtime** | Measure during Wave 0 and record before implementation waves |
+| **Estimated runtime** | 28.64s for the 292-file full Vitest suite on 2026-09-09 |
 
 ---
 
@@ -40,7 +40,7 @@ created: 2026-09-09
 
 | Task ID | Plan | Wave | Requirement | Threat Ref | Secure Behavior | Test Type | Automated Command | File Exists | Status |
 |---------|------|------|-------------|------------|-----------------|-----------|-------------------|-------------|--------|
-| 31-01-T2 | 31-01 Task 2 | 1 | baseline | — | Full pre-change suite/check runtime is measured before implementation | regression | `npm test && npm run check` | ✅ command | ⬜ pending |
+| 31-01-T1 | 31-01 Task 1 | 1 | baseline | — | Full pre-change suite/check runtime is measured before implementation | regression | `npm test && npm run check` | ✅ command | ⚠️ baseline recorded |
 | 31-01-T3 | 31-01 Task 3 (TDD tracer) | 1 | PROF-01/07/08/10 | T-31-01/02 | Migration chain and clickable collapse tap→write→readback/relaunch path start red, then pass | integration | `npx vitest run src/db/migrations/024-profile-presentation.test.ts src/db/profile-presentation-dao.test.ts src/screens/contact-profile-logic.test.ts` | ❌ create first | ⬜ pending |
 | 31-02-T1 | 31-02 Task 1 (TDD) | 2 | PROF-02/03/05/07/08 | T-31-01 | Closed parser/resolver tests are authored red before contracts | unit | `npx vitest run src/profile/presentation-schema.test.ts src/profile/resolve-presentation.test.ts src/db/app-settings-dao.test.ts` | ❌ create first | ⬜ pending |
 | 31-02-T2 | 31-02 Task 2 (TDD) | 2 | PROF-03/05/07 | T-31-04/06 | Read/fallthrough/usage fixtures extend the DAO test red before reader implementation | integration | `npx vitest run src/db/profile-presentation-dao.test.ts` | ❌ extend 31-01-T3 test first | ⬜ pending |
@@ -67,11 +67,21 @@ created: 2026-09-09
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
 
+## Wave 0 Baseline Measurement
+
+Measured before Phase 31 production changes on 2026-09-09:
+
+- `npm test` — **28.64s**, 292 test files: 291 passed / 1 failed; 2694 tests: 2691 passed / 3 failed. The three existing failures are all in `src/db/orrery-preferences.test.ts:32`, whose Phase 29 assertion still expects `TARGET_VERSION` 22 while the live Phase 30 registry is already 23.
+- `npm run check` — **0.13s**, command unavailable because `package.json` has no `check` script. This is pre-existing plan/tooling drift; the repository currently exposes `check:colors`, while TypeScript and Biome remain direct commands.
+- Baseline logs: `/tmp/orbit-31-01-baseline-test.log` and `/tmp/orbit-31-01-baseline-check.log` (local execution evidence, not repository artifacts).
+
+These failures predate the persisted Profile contract and are recorded rather than repaired in Phase 31 Task 1.
+
 ---
 
 ## Test Ownership / Pre-implementation State
 
-There is no detached implementation-free Wave 0 plan. `31-01 Task 2` is the executable baseline gate before production edits; every missing test is created RED as the first move of its named `tdd="true"` owner task. `wave_0_complete` remains `false` until the baseline task has run and recorded its measurement.
+There is no detached implementation-free Wave 0 plan. `31-01 Task 1` is the executable baseline gate before schema implementation; every missing test is created RED as the first move of its named `tdd="true"` owner task. `wave_0_complete` is true because that baseline has now been measured and recorded above.
 
 - [ ] `src/profile/presentation-schema.test.ts` — closed/versioned persisted document
 - [ ] `src/profile/resolve-presentation.test.ts` — hierarchy and fallout matrix
