@@ -50,9 +50,27 @@ const input: KnowledgePresentationInput = {
       hiddenCount: 1,
       showHiddenAvailable: true,
     },
-    relationships: { items: [], total: 0, remainingCount: 0, hiddenCount: 0, showHiddenAvailable: false },
-    memories: { items: [], total: 0, remainingCount: 0, hiddenCount: 0, showHiddenAvailable: false },
-    importedNotes: { items: [], total: 0, remainingCount: 0, hiddenCount: 0, showHiddenAvailable: false },
+    relationships: {
+      items: [],
+      total: 0,
+      remainingCount: 0,
+      hiddenCount: 0,
+      showHiddenAvailable: false,
+    },
+    memories: {
+      items: [],
+      total: 0,
+      remainingCount: 0,
+      hiddenCount: 0,
+      showHiddenAvailable: false,
+    },
+    importedNotes: {
+      items: [],
+      total: 0,
+      remainingCount: 0,
+      hiddenCount: 0,
+      showHiddenAvailable: false,
+    },
     customFields: [
       {
         name: null,
@@ -173,9 +191,15 @@ describe("knowledge presentation", () => {
     expect(formatCustomFieldValue("date", "2026-09-09")).toBe("2026-09-09");
     expect(formatCustomFieldValue("toggle", "1")).toBe("Yes");
     expect(formatCustomFieldValue("number", "3")).toBe("3");
-    expect(formatCustomFieldValue("photo", "/photos/pet.jpg")).toBe("Photo added");
-    expect(formatCustomFieldValue("url", "orbit.example")).toBe("orbit.example");
-    expect(formatCustomFieldValue("email", "me@example.test")).toBe("me@example.test");
+    expect(formatCustomFieldValue("photo", "/photos/pet.jpg")).toBe(
+      "Photo added",
+    );
+    expect(formatCustomFieldValue("url", "orbit.example")).toBe(
+      "orbit.example",
+    );
+    expect(formatCustomFieldValue("email", "me@example.test")).toBe(
+      "me@example.test",
+    );
     expect(formatCustomFieldValue("phone", "+1 555 0100")).toBe("+1 555 0100");
   });
 });
