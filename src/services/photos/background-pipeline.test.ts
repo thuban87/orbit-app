@@ -20,18 +20,16 @@ describe("prepareProfileBackground", () => {
     });
     const persist = vi.fn().mockResolvedValue("backgrounds/bg-one.jpg");
 
-    await expect(
-      prepareProfileBackground({
-        rawUri: "content://picked-image",
-        transform: crop,
-        output: { width: 1080, height: 720 },
-        cropAndResize,
-        persist,
-      }),
-    ).resolves.toEqual({
-      relativePath: "backgrounds/bg-one.jpg",
-      crop: expect.objectContaining({ width: 4000, height: 2666.6666666666665 }),
+    const prepared = await prepareProfileBackground({
+      rawUri: "content://picked-image",
+      transform: crop,
+      output: { width: 1080, height: 720 },
+      cropAndResize,
+      persist,
     });
+    expect(prepared.relativePath).toBe("backgrounds/bg-one.jpg");
+    expect(prepared.crop.width).toBe(4000);
+    expect(prepared.crop.height).toBeCloseTo(2666.6666666666665, 8);
     expect(cropAndResize).toHaveBeenCalledWith(
       expect.objectContaining({
         rawUri: "content://picked-image",
@@ -49,7 +47,9 @@ describe("prepareProfileBackground", () => {
         rawUri: "content://picked-image",
         transform: crop,
         output: { width: 1080, height: 720 },
-        cropAndResize: vi.fn().mockResolvedValue({ uri: "file:///cache/out.jpg", release }),
+        cropAndResize: vi
+          .fn()
+          .mockResolvedValue({ uri: "file:///cache/out.jpg", release }),
         persist: vi.fn().mockRejectedValue(new Error("disk full")),
       }),
     ).rejects.toThrow("Could not prepare profile background");

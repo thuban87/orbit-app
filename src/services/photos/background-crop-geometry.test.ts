@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
+  type BackgroundCropTransform,
   clampBackgroundTransform,
   computeBackgroundCrop,
   getBackgroundPanBounds,
-  type BackgroundCropTransform,
 } from "./background-crop-geometry";
 
 function transform(
