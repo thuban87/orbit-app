@@ -1,13 +1,15 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+
 vi.mock("expo-sqlite", () => ({}));
+
 import { nodeSqliteExecutor, openTestDb } from "@/db/__testkit__/node-sqlite";
 import { MIGRATIONS, TARGET_VERSION } from "@/db/database";
+import { runMigrations } from "@/db/migrations/runner";
 import {
   setProfileContactFrequency,
   snoozeProfileContact,
   unsnoozeProfileContact,
 } from "@/db/profile-relationship-actions";
-import { runMigrations } from "@/db/migrations/runner";
 import type { SqlExecutor } from "@/db/types";
 
 const NOW = "2026-09-09 12:00:00";
@@ -83,10 +85,9 @@ function traceTransactions(base: SqlExecutor) {
 
 describe("setProfileContactFrequency", () => {
   it("uses the live scalar core behavior and bumps revision exactly once", async () => {
-    await exec.runAsync(
-      "UPDATE contacts SET tracking_enabled=0 WHERE id=?",
-      [contactId],
-    );
+    await exec.runAsync("UPDATE contacts SET tracking_enabled=0 WHERE id=?", [
+      contactId,
+    ]);
     await setProfileContactFrequency(exec, {
       contactId,
       intervalDays: 14,
