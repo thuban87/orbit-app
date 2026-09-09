@@ -40,20 +40,27 @@ created: 2026-09-09
 
 | Task ID | Plan | Wave | Requirement | Threat Ref | Secure Behavior | Test Type | Automated Command | File Exists | Status |
 |---------|------|------|-------------|------------|-----------------|-----------|-------------------|-------------|--------|
-| 31-W0-01 | TBD | 0 | PROF-02/03/05/07/08 | T-31-01 | Closed parser rejects malformed/tampered layout documents and falls back safely | unit | `npx vitest run src/profile/presentation-schema.test.ts src/profile/resolve-presentation.test.ts` | ❌ W0 | ⬜ pending |
-| 31-W0-02 | TBD | 0 | PROF-03/04/05/07 | T-31-02 | Migration and CRUD preserve FK integrity; reset/delete affect presentation only | integration | `npx vitest run src/db/migrations/024-profile-presentation.test.ts src/db/profile-presentation-dao.test.ts` | ❌ W0 | ⬜ pending |
-| 31-W0-03 | TBD | 0 | PROF-09/20 | T-31-03 | Packing is deterministic and accessible reorder actions match drag behavior | unit | `npx vitest run src/profile/pack-overview.test.ts src/profile/layout-editor-reducer.test.ts` | ❌ W0 | ⬜ pending |
-| 31-W0-04 | TBD | 0 | PROF-10/11 | — | Metrics retain existing semantics and use the shared calendar-month fallback | unit | `npx vitest run src/services/profile-metrics.test.ts` | ❌ W0 | ⬜ pending |
-| 31-W0-05 | TBD | 0 | PROF-12 | T-31-04 | Frequency and snooze writes compose atomically without nested transactions | integration | `npx vitest run src/db/profile-relationship-actions.test.ts` | ❌ W0 | ⬜ pending |
-| 31-W0-06 | TBD | 0 | PROF-13 | T-31-05 | Complete method sets remain readable; malformed values never become actionable | unit/integration | `npx vitest run src/db/contact-methods-read.test.ts` | ✅ extend | ⬜ pending |
-| 31-W0-07 | TBD | 0 | PROF-14/15/16/17 | T-31-06 | Source boundaries, hidden/pinned rules, grouping, caps, and Off Limits isolation are preserved | unit/integration | `npx vitest run src/db/profile-knowledge-read.test.ts src/profile/knowledge-presentation.test.ts` | ❌ W0 | ⬜ pending |
-| 31-W0-08 | TBD | 0 | PROF-18 | — | Interim history projection is bounded and renderer lookup remains replaceable | unit/integration | `npx vitest run src/db/profile-history-read.test.ts src/profile/module-registry.test.ts` | ❌ W0 | ⬜ pending |
+| 31-01-T2 | 31-01 Task 2 | 1 | baseline | — | Full pre-change suite/check runtime is measured before implementation | regression | `npm test && npm run check` | ✅ command | ⬜ pending |
+| 31-01-T3 | 31-01 Task 3 (TDD tracer) | 1 | PROF-01/07/08/10 | T-31-01/02 | Migration chain and clickable collapse tap→write→readback/relaunch path start red, then pass | integration | `npx vitest run src/db/migrations/024-profile-presentation.test.ts src/db/profile-presentation-dao.test.ts src/screens/contact-profile-logic.test.ts` | ❌ create first | ⬜ pending |
+| 31-02-T1 | 31-02 Task 1 (TDD) | 2 | PROF-02/03/05/07/08 | T-31-01 | Closed parser/resolver tests are authored red before contracts | unit | `npx vitest run src/profile/presentation-schema.test.ts src/profile/resolve-presentation.test.ts src/db/app-settings-dao.test.ts` | ❌ create first | ⬜ pending |
+| 31-02-T3 | 31-02 Task 3 (TDD) | 2 | PROF-03/04/05/07 | T-31-04/05/06 | DAO reset/delete/collapse tests are extended red before implementation | integration | `npx vitest run src/db/profile-presentation-dao.test.ts` | ❌ extend first | ⬜ pending |
+| 31-03-T1 | 31-03 Task 1 (TDD) | 3 | PROF-10/11 | T-31-07 | Metrics tests precede shared calendar-month implementation | unit | `npx vitest run src/services/profile-metrics.test.ts` | ❌ create first | ⬜ pending |
+| 31-03-T2 | 31-03 Task 2 (TDD) | 3 | PROF-12 | T-31-08 | Frequency/snooze rollback/event tests precede writers | integration | `npx vitest run src/db/profile-relationship-actions.test.ts` | ❌ create first | ⬜ pending |
+| 31-04-T1 | 31-04 Task 1 (TDD) | 4 | PROF-13/14/15/16/17 | T-31-09/10/11 | Method/knowledge/Off-Limits no-sparkle boundary tests precede readers | unit/integration | `npx vitest run src/db/profile-knowledge-read.test.ts src/db/contact-methods-read.test.ts` | ❌ create/extend first | ⬜ pending |
+| 31-04-T2 | 31-04 Task 2 (TDD) | 4 | PROF-18 | — | Bounded history tests precede reader | integration | `npx vitest run src/db/profile-history-read.test.ts` | ❌ create first | ⬜ pending |
+| 31-05-T1 | 31-05 Task 1 (TDD) | 5 | PROF-09/18/20 | T-31-13 | Packing/renderer tests precede algorithms | unit | `npx vitest run src/profile/pack-overview.test.ts src/profile/module-registry.test.ts` | ❌ create first | ⬜ pending |
+| 31-05-T2 | 31-05 Task 2 (TDD contract) | 5 | PROF-10/11/12/20 | T-31-12/14 | Explanation/frequency/snooze contract tests precede sheets | unit | `npx vitest run src/profile/relationship-sheet-model.test.ts` | ❌ create first | ⬜ pending |
+| 31-05-T3 | 31-05 Task 3 | 5 | PROF-07/08/18/20 | T-31-12 | Collapse readback/relaunch/failure tests extend tracer before host expansion | integration | `npx vitest run src/db/profile-presentation-dao.test.ts src/screens/contact-profile-logic.test.ts` | ❌ extend first | ⬜ pending |
+| 31-06-T1 | 31-06 Task 1 (TDD) | 6 | PROF-14/15/16/17 | T-31-15/16 | Ten-type exhaustive presentation/no-sparkle tests precede adapters | unit | `npx vitest run src/profile/knowledge-presentation.test.ts` | ❌ create first | ⬜ pending |
+| 31-07-T1 | 31-07 Task 1 (TDD) | 7 | PROF-02/06/09/20 | T-31-17/18 | Reducer parity tests precede editor reducer | unit | `npx vitest run src/profile/layout-editor-reducer.test.ts` | ❌ create first | ⬜ pending |
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
 
 ---
 
-## Wave 0 Requirements
+## Test Ownership / Pre-implementation State
+
+There is no detached implementation-free Wave 0 plan. `31-01 Task 2` is the executable baseline gate before production edits; every missing test is created RED as the first move of its named `tdd="true"` owner task. `wave_0_complete` remains `false` until the baseline task has run and recorded its measurement.
 
 - [ ] `src/profile/presentation-schema.test.ts` — closed/versioned persisted document
 - [ ] `src/profile/resolve-presentation.test.ts` — hierarchy and fallout matrix
@@ -76,7 +83,9 @@ created: 2026-09-09
 | Fixed Hero geometry, disabled action explanations, and overflow ordering | PROF-01/19/20 | Native layout and accessibility semantics are not proven by render-free Node tests | On the physical Android target, inspect populated and missing-method contacts in both themes; verify screen-reader labels and disabled explanations |
 | Background crop and template assignment | PROF-04 | Crop gestures, native image decode, and final visual composition require device observation | On the physical target, crop portrait and landscape images, save/cancel, switch assignments, restart, and confirm persistence and density scrim behavior |
 | Deliberate layout edit mode and live preview | PROF-06/20 | Drag, focus, dismissal, large-text, and accessible action parity are native interactions | Enter edit mode from overflow, exercise drag and textual alternatives, test Save/Cancel/dirty dismissal, then repeat with large text and screen reader enabled |
-| Things to Remember detail and long-press actions | PROF-15/16 | Gesture recognition, focused sheet behavior, truncation, and navigation are UI-observable | Verify tap-to-detail, long-press Edit/Pin/Hide, View All, Show hidden, and Off Limits caution styling without changing sparkle semantics |
+| Things to Remember detail and long-press actions | PROF-15/16/17 | Gesture recognition, focused sheet behavior, truncation, and navigation are UI-observable | Verify tap-to-detail, long-press Edit/Pin/Hide, View All, Show hidden, and Off Limits caution styling with no sparkle or inferred permission |
+| Relationship explanations and selectors | PROF-10/11/12/20 | Native sheet focus, dismissal, selected states, and pending/error feedback require device observation | Open Status/Gravity/Intensity explanations; follow Status to current History; exercise every Frequency choice and Snooze preset/custom duration/date, including failure/Retry and Back/scrim dismissal |
+| Durable top-level and child collapse | PROF-07/08/20 | Relaunch persistence and native accessibility announcements require end-to-end execution | Toggle one top-level and one eligible Things-to-Remember child, restart, verify readback; induce/observe failure retention and Retry; verify expanded/collapsed announcements |
 | Origin-aware navigation and final Profile composition | PROF-01/18/19 | Navigation stack behavior and the renderer seam require end-to-end app execution | Open Profile from each supported origin, exercise Hero and section actions, return, and confirm the correct destination and state |
 
 ---

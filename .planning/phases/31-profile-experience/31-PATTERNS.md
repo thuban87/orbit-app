@@ -19,6 +19,7 @@ Current schema head is **23** (`TARGET_VERSION = 23`, migrations 001–023). The
 | `src/profile/pack-overview.ts` | utility | transform | `src/logic/orrery-reorder-logic.ts` | role-match |
 | `src/profile/layout-editor-reducer.ts` | utility | event-driven | `src/components/orrery/system-builder-logic.ts` | exact |
 | `src/profile/knowledge-presentation.ts` | utility | transform | `src/screens/contact-profile-logic.ts` | exact |
+| `src/profile/relationship-sheet-model.ts` | utility/controller | event-driven | `src/components/control-surface/PopulationPanelContent.tsx` | role-match |
 | `src/db/migrations/024-profile-presentation.ts` | migration | batch | `src/db/migrations/022-orrery-systems.ts` | exact |
 | `src/db/database.ts` | config | batch | existing migration registration in same file | exact |
 | `src/db/app-settings-dao.ts` | model/service | CRUD | existing theme/dashboard preference fields in same file | exact |
@@ -31,6 +32,7 @@ Current schema head is **23** (`TARGET_VERSION = 23`, migrations 001–023). The
 | `src/services/profile-metrics.ts` | service | transform | `src/services/impact.ts` + `src/db/contact-status-read.ts` | exact |
 | `src/components/profile/ProfileHero.tsx` | component | request-response | `src/screens/ContactProfileScreen.tsx` | role-match |
 | `src/components/profile/RelationshipOverview.tsx` | component | transform | `src/components/control-surface/PopulationPanelContent.tsx` | role-match |
+| `src/components/profile/ProfileRelationshipSheets.tsx` | component/controller | event-driven | `src/components/ui/Sheet.tsx` + `src/components/control-surface/PopulationPanelContent.tsx` | exact |
 | `src/components/profile/ThingsToRemember.tsx` | component | request-response | `src/components/MemoryCard.tsx` | exact |
 | `src/components/profile/ProfileModuleHost.tsx` | component/provider | transform | `src/components/ui/BackgroundHost.tsx` | role-match |
 | `src/components/profile/ProfileLayoutEditor.tsx` | component | event-driven | `src/screens/SystemBuilderScreen.tsx` | exact |
@@ -50,6 +52,7 @@ Current schema head is **23** (`TARGET_VERSION = 23`, migrations 001–023). The
 | `src/db/profile-relationship-actions.test.ts` | test | CRUD/event-driven | `src/db/snooze-dao.test.ts` | exact |
 | `src/db/profile-knowledge-read.test.ts` | test | request-response | `src/db/memories-read.test.ts` + `fuel-read.test.ts` | exact |
 | `src/profile/knowledge-presentation.test.ts` | test | transform | `src/screens/contact-profile-logic.test.ts` | exact |
+| `src/profile/relationship-sheet-model.test.ts` | test | event-driven | `src/logic/dashboard-query-logic.test.ts` | role-match |
 | `src/db/profile-history-read.test.ts` | test | request-response | `src/db/timeline-read.test.ts` | exact |
 | `src/db/contact-methods-read.test.ts` (modify) | test | request-response | existing file | exact |
 
@@ -275,7 +278,7 @@ const rows = await exec.getAllAsync<ContactMethodRow>(
 );
 ```
 
-Compact knowledge cards should copy `MemoryCard.tsx:35-110`: semantic theme tokens, optional rows omitted, two-line value/note previews, explicit Pinned/Outdated labels, and the sparkle only when `allow_ai === 1`. Long-press management must also be reachable through accessibility actions or detail.
+Compact Memory cards should copy `MemoryCard.tsx:35-110`: semantic theme tokens, optional rows omitted, two-line value/note previews, explicit Pinned/Outdated labels, and sparkle only when the source model explicitly carries `allow_ai === 1`. Ordinary Off Limits fuel rows have no permission field and therefore render no sparkle in Phase 31; their adapter may accept only a future explicit durable permission and must never infer it. Long-press management must also be reachable through accessibility actions or detail.
 
 All action controls stay rendered when unavailable and set `accessibilityState.disabled` plus a discoverable reason. All styles use `AppText`, semantic `Icon`, `GlassSurface`, spacing/radius tokens, and theme colors; no raw glyph or hardcoded color.
 
@@ -311,6 +314,8 @@ try {
 ```
 
 Adapt the guard to sheet dismissal/Android Back. No drag, visibility toggle, size choice, or live preview writes SQLite before Save. Failed Save retains the entire draft.
+
+Relationship explanation/selection sheets use the same topmost `Sheet` framing but are not intent-only: a pure controller model supplies truthful Status/Gravity/Intensity explanation rows, the current-History action plus Phase-32 `onOpenInsights` seam, complete Frequency choices, Snooze presets, and validated custom duration/date state. Copy `PopulationPanelContent`'s explicit selected/disabled labels and committed-state publication pattern; a failed write retains the committed selection and offers Retry.
 
 Use the shared sheet's `BaseOverlay` pattern (`Sheet.tsx:33-62`) for scrim/Back behavior and themed safe-area framing. The approved editor needs an expanded/near-full variant; extend the shared primitive only if necessary rather than creating a second overlay implementation. While open, underlying Profile/FAB/nav must be pointer-inert and removed from accessibility focus.
 

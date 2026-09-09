@@ -21,6 +21,7 @@
 - **D-09:** Profile/Hero backgrounds are permitted: the `HANDOFF.md` §7 restriction against backgrounds behind text-heavy screens is **superseded** (owner-approved 2026-09-01). Readability comes from Phase 23's opacity-by-density surface rule, not from restricting placement. Background image-memory cost is a flagged hand-off to release hardening.
 - **D-10:** Category assignments for layouts and backgrounds inherit **Category deletion fallout** (trip-wire) — Phase 37 owns Category CRUD, but the fallout behavior for layout/background assignment must be planned here. `Reset Profile Presentation` clears only contact-specific layout/collapse/background overrides — never contact data, Favorite, Snooze, AI permissions, or knowledge items.
 - **D-11:** Interaction History is a minimal interim section behind a **replaceable renderer seam** that Phase 32 upgrades without touching layout persistence. Do not build the final heatmap/timeline/drill-down here.
+- **D-12:** Ordinary Off Limits remains `fuel` without `allow_ai`; Phase 31 renders caution semantics without sparkle, preserves only a future explicit-permission seam, never infers permission, adds no Off Limits permission schema, and widens no AI egress.
 
 ### the agent's Discretion
 - Everything the dossier marks [DERIVED], plus open implementation details that do not touch a [DECIDED] item, an ADR, or a HANDOFF.md entry.
@@ -276,7 +277,7 @@ Frequency immediate-apply should get a named public Profile writer around the ex
 - Off Limits must use a new narrow Profile-only SQL reader with `contact_id = ? AND kind = 'off_limits'`, not `getRankedFuel()` and not the all-kinds `listFuelForEditor()`. This intentionally changes Profile visibility only; `RANKED_FUEL_EXCLUSIONS` must continue to read `kind != 'off_limits'` for dashboard/prompt-facing projections. [VERIFIED: `src/db/fuel-read.ts:19-65,133-153`; dossier §AH; ADR-078]
 - Pinned/Featured is a reference projection over visible pinned Memories and relationships, capped at three, not a copied entity. [VERIFIED: dossier §Y; `src/db/memories-read.ts`; `src/db/relationships-read.ts`]
 
-The Profile can display the sparkle on any item model that already carries `allow_ai=1`. Current Off Limits fuel rows carry no `allow_ai` field, so Phase 31 must preserve a renderer seam for that future state but must not invent permission from visibility, kind, source, or location. [VERIFIED: `src/db/fuel-read.ts:31-42`; `src/db/migrations/017-knowledge-egress-datamove.ts`; ADR-078/081]
+The Profile displays the sparkle only on models that already carry explicit `allow_ai=1` (currently Memories). Ordinary Off Limits fuel rows carry no such field, so Phase 31 renders them without sparkle and preserves a future explicit-permission seam without inference, schema, or egress changes. [VERIFIED: CONTEXT D-12; `src/db/fuel-read.ts:31-42`; `src/db/migrations/017-knowledge-egress-datamove.ts`; ADR-078/081]
 
 ### Pattern 6: Background Pipeline as a Sibling, Not an Avatar Hack
 
@@ -465,10 +466,9 @@ const cropGesture = Gesture.Simultaneous(panGesture, pinchGesture);
 
 ## Open Questions
 
-1. **Off Limits sparkle has no current storage source**
+1. **Off Limits sparkle has no current storage source — RESOLVED by owner 2026-09-09**
    - What we know: Off Limits remains a `fuel` kind, and `FuelItem` has no AI-permission field; per-item `allow_ai` exists on typed Memories only. ADR-081 explicitly says Memories have no Off Limits kind. [VERIFIED: `src/db/fuel-read.ts:27-42`; `src/db/memory-registry.ts:14-59`; ADR-081]
-   - What's unclear: PROF-17 requires that an AI-enabled Off Limits item show the ordinary sparkle, but no current row can represent that combined state. [VERIFIED: PROF-17]
-   - Recommendation: Do not add or infer a new permission model in Phase 31. Render the existing visible Off Limits state, keep its adapter capable of accepting explicit permission later, and call the sparkle branch unreachable until the owning AI-permission phase supplies a durable gate. If acceptance requires toggling it now, stop and ask the owner because that expands the permission/storage model. [VERIFIED: CONTEXT D-01/D-08 and ADR-078/081]
+   - Resolution: PROF-17 and D-12 narrow the branch. Render ordinary Off Limits with caution semantics and no sparkle; keep the adapter capable of accepting a future explicit permission only after an owning phase supplies durable storage. Never infer permission from visibility/kind/source/location. Do not add an Off Limits `allow_ai` migration and do not widen egress. [VERIFIED: owner ruling; live fuel schema/read/write/backup audit]
 
 2. **Custom-field rows with no `field_group` need display copy**
    - What we know: `field_group` is nullable and Profile must honor configured groups, but group customization is not a third layout level. [VERIFIED: `src/db/migrations/018-custom-field-scope-history.ts:17-19`; dossier §AG]

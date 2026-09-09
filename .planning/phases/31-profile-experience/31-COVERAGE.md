@@ -58,6 +58,8 @@ The required deterministic probe reported 50 applicable, 0 resolved, and 50 unre
 | PROF-17 | adjacency | Explicit: Off Limits is its own caution section, not merged with Memories or AI state. |
 | PROF-17 | empty | Explicit: empty enabled Off Limits remains collapsed with a useful summary. |
 | PROF-17 | ordering | Explicit: factory child order places Off Limits seventh, before Imported Notes. |
+
+All three PROF-17 edge rows inherit D-12: ordinary Off Limits renders caution semantics with no sparkle; the future permission input remains absent unless durable storage is introduced by an owning phase, and no existing field may be used as a proxy.
 | PROF-18 | unclassified | FLAGGED ASSUMPTION: `latest few` is a hard limit of three rows plus last-contact summary and View all history. |
 | PROF-19 | adjacency | Explicit: one separator divides contact actions from presentation actions. |
 | PROF-19 | empty | Explicit: conditional Save/Reset entries disappear when inapplicable without adding an AI-draft entry. |
@@ -84,7 +86,7 @@ Routine correctness findings (injection, path traversal, transaction rollback, m
 |---|---:|---|
 | GOAL | 1 | Plans 01–10 cover fixed Hero, modular presentation, templates/backgrounds, and Overview. |
 | REQ | PROF-01…PROF-20 | Every ID appears in plan frontmatter and task assertions. |
-| CONTEXT | D-01…D-11 | Plan 01 locks source/migration/AI/cadence/presentation/history constraints; downstream tasks cite the applicable D-ID. |
+| CONTEXT | D-01…D-12 | Plan 01 locks source/migration/AI/cadence/presentation/history/Off-Limits constraints; downstream tasks cite the applicable D-ID. |
 | RESEARCH | 10 architecture/pitfall groups | Closed contracts, migration/DAO, aggregate reads/actions, semantic renderers, focused editors, safe backgrounds, host cleanup, tests, and handoffs are all planned. |
 | UI-SPEC | E1…E10, 65 explicit + 8 backstop | Explicit states are assigned to implementation plans; all eight backstops are retained in Plan 10 physical-device UAT. |
 

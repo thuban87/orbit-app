@@ -179,7 +179,7 @@ category's phase (see Traceability).
 - [ ] **PROF-14**: Things to Remember is a one-column configurable section with factory child order Pinned → Last Talked About → Key People → Current Location → Memories → Custom Fields → Off Limits → Imported Notes (enabled, collapsed)
 - [ ] **PROF-15**: Remembered-information cards are compact — blank metadata consumes no space, long content truncates, ~3 items then View All; cards tap to detail and long-press to Edit / Pin / Hide; no permanent inline edit/delete controls
 - [ ] **PROF-16**: Hidden-from-Profile items stay out of normal rendering but remain recoverable via administration and a Show hidden toggle; hiding never implies privacy, deletion, or AI change
-- [ ] **PROF-17**: Off Limits is visible by default with distinct caution presentation ("Avoid bringing these up"); an AI-enabled Off Limits item shows the ordinary sparkle without changing its meaning
+- [ ] **PROF-17**: Off Limits is visible by default with distinct caution presentation ("Avoid bringing these up"); Phase 31 omits its sparkle because ordinary Off Limits storage has no explicit AI-permission field, preserves a future explicit-permission renderer seam, never infers permission, and does not widen AI egress
 - [ ] **PROF-18**: Interaction History exists as a configurable bottom section with minimal interim content behind a replaceable renderer seam Phase 32 upgrades without touching layout persistence
 - [ ] **PROF-19**: Profile overflow lists contact actions before presentation actions and has no AI-draft entry — drafting is reached via Message → Draft with AI (ADR-079)
 - [ ] **PROF-20**: Profile customization is operable without precise drag, and all state (status, tiers, hidden/expanded/assignment) is exposed textually
