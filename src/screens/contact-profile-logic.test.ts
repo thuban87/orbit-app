@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { ContactMethodRow } from "@/db/contact-methods-dao";
 import {
   canStartLifecycleTransition,
+  commitProfileOverviewToggle,
   profileLifecycleView,
   profileMethodGroups,
   unbindConfirmation,
@@ -173,5 +174,40 @@ describe("profile lifecycle actions", () => {
     expect(
       canStartLifecycleTransition({ pending: false, bindEnabled: false }),
     ).toBe(false);
+  });
+});
+
+describe("Relationship Overview collapse tracer", () => {
+  it("publishes only the committed readback value", async () => {
+    const published: boolean[] = [];
+    const write = vi.fn(async () => {});
+    const read = vi.fn(async () => ({ "relationship-overview": false }));
+
+    const result = await commitProfileOverviewToggle({
+      currentExpanded: true,
+      write,
+      read,
+      publish: (expanded) => published.push(expanded),
+    });
+
+    expect(write).toHaveBeenCalledWith(false);
+    expect(read).toHaveBeenCalledOnce();
+    expect(published).toEqual([false]);
+    expect(result).toEqual({ ok: true, expanded: false });
+  });
+
+  it("retains the prior visible state when persistence fails", async () => {
+    const published: boolean[] = [];
+    const result = await commitProfileOverviewToggle({
+      currentExpanded: true,
+      write: async () => {
+        throw new Error("disk full");
+      },
+      read: async () => ({ "relationship-overview": false }),
+      publish: (expanded) => published.push(expanded),
+    });
+
+    expect(published).toEqual([]);
+    expect(result).toEqual({ ok: false, expanded: true });
   });
 });
