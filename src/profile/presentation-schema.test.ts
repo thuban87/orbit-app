@@ -36,7 +36,9 @@ describe("Profile presentation schema", () => {
     [
       {
         ...FACTORY_PROFILE_LAYOUT,
-        overview: [{ id: "gravity", visible: true, expanded: true, size: "2x2" }],
+        overview: [
+          { id: "gravity", visible: true, expanded: true, size: "2x2" },
+        ],
       },
       "size",
     ],

@@ -53,6 +53,26 @@ describe("Systems restore acceptance (declare-only)", () => {
   });
 });
 
+describe("Profile presentation restore acceptance (declare-only)", () => {
+  it("accepts dangling global template UIDs without requiring partial template entities", () => {
+    const portable = valid();
+    portable.appSettings.profileLayoutTemplateUid = "layout-not-in-format-4";
+    portable.appSettings.profileBackgroundTemplateUid = "background-not-in-format-4";
+    expect(parseBackupManifest(portable).appSettings).toMatchObject({
+      profileLayoutTemplateUid: "layout-not-in-format-4",
+      profileBackgroundTemplateUid: "background-not-in-format-4",
+    });
+    expect(portable).not.toHaveProperty("profileLayoutTemplates");
+    expect(portable).not.toHaveProperty("profileBackgroundTemplates");
+  });
+
+  it("rejects malformed template UIDs", () => {
+    const portable = valid();
+    portable.appSettings.profileLayoutTemplateUid = "bad\nuid";
+    expect(() => parseBackupManifest(portable)).toThrow(/Profile template UID/);
+  });
+});
+
 describe("parseBackupManifest", () => {
   it("accepts a different SQLite schema version because backupFormatVersion alone gates compatibility", () => {
     expect(parseBackupManifest(valid()).metadata.sqliteUserVersion).toBe(999);

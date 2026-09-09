@@ -165,6 +165,8 @@ export interface AppSettings {
   dashboardSort: DashboardSortMode;
   /** Committed action for a right swipe in Dashboard List view. */
   dashboardRightSwipeAction: RightSwipeAction;
+  profileLayoutTemplateUid: string | null;
+  profileBackgroundTemplateUid: string | null;
 
   // --- Optional-AI non-secret settings (Phase 14, AI-01) --------------------
   // NO API KEY LIVES HERE — provider credentials are SecureStore-only
@@ -273,6 +275,10 @@ export interface PortableSettingsSnapshot {
   dashboardFilters?: string;
   dashboardSort?: DashboardSortMode;
   dashboardRightSwipeAction?: RightSwipeAction;
+  /** Phase 31 declare/restore only; format-4 emission remains unchanged. */
+  profileLayoutTemplateUid?: string | null;
+  /** Phase 31 declare/restore only; format-4 emission remains unchanged. */
+  profileBackgroundTemplateUid?: string | null;
   modifiedAt: string;
 }
 
@@ -339,7 +345,9 @@ type WritableSettingsKey =
   | "dashboardPopulations"
   | "dashboardFilters"
   | "dashboardSort"
-  | "dashboardRightSwipeAction";
+  | "dashboardRightSwipeAction"
+  | "profileLayoutTemplateUid"
+  | "profileBackgroundTemplateUid";
 
 /** The persisted (snake_case) column shape of the id=1 row. */
 interface AppSettingsRow {
@@ -372,6 +380,8 @@ interface AppSettingsRow {
   dashboard_filters: string;
   dashboard_sort: string;
   dashboard_right_swipe_action: string;
+  profile_layout_template_uid: string | null;
+  profile_background_template_uid: string | null;
   ai_provider: string;
   ai_model: string;
   ai_custom_endpoint: string;
@@ -462,6 +472,8 @@ const COLUMN_OF: Record<WritableSettingsKey, string> = {
   dashboardFilters: "dashboard_filters",
   dashboardSort: "dashboard_sort",
   dashboardRightSwipeAction: "dashboard_right_swipe_action",
+  profileLayoutTemplateUid: "profile_layout_template_uid",
+  profileBackgroundTemplateUid: "profile_background_template_uid",
 };
 
 /** The saved setting is authoritative; device region is used only when it is absent. */
@@ -491,6 +503,7 @@ export async function getAppSettings(
             galaxy_accent, standard_accent, galaxy_background, standard_background,
             dashboard_view_mode, dashboard_populations, dashboard_filters, dashboard_sort,
             dashboard_right_swipe_action,
+            profile_layout_template_uid, profile_background_template_uid,
             orrery_density, orrery_satellites_enabled, orrery_last_system,
             ai_provider, ai_model, ai_custom_endpoint, ai_custom_model,
             ai_prompt_template, ai_ack_openai, ai_ack_anthropic,
@@ -547,6 +560,8 @@ export async function getAppSettings(
     dashboardSort: row.dashboard_sort as DashboardSortMode,
     dashboardRightSwipeAction:
       row.dashboard_right_swipe_action as RightSwipeAction,
+    profileLayoutTemplateUid: row.profile_layout_template_uid ?? null,
+    profileBackgroundTemplateUid: row.profile_background_template_uid ?? null,
     // AI non-secret settings. The column default is `'none'`; the cast is a
     // read-shape convenience (validation on WRITE guarantees a known id).
     aiProvider: row.ai_provider as AiProviderId,

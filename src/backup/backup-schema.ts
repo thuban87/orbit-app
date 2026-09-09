@@ -180,6 +180,10 @@ export const PORTABLE_SETTINGS_KEYS = new Set([
   // entities; do not add them to getPortableSettingsSnapshot before its
   // coordinated format bump and forward migration.
   "orreryLastSystem",
+  // Phase 31: accepted for restore only. Template entities and emission remain
+  // coordinated Phase 36 work; dangling UIDs are preserved for read-time fallout.
+  "profileLayoutTemplateUid",
+  "profileBackgroundTemplateUid",
 ]);
 
 const SECRET_SHAPED_KEY =
@@ -228,6 +232,21 @@ function assertPortableSettings(
     !isBinaryFlag(settings.orrerySatellitesEnabled)
   )
     fail("appSettings has an invalid Orrery satellite flag");
+  for (const key of [
+    "profileLayoutTemplateUid",
+    "profileBackgroundTemplateUid",
+  ] as const) {
+    const value = settings[key];
+    if (
+      value !== undefined &&
+      value !== null &&
+      (typeof value !== "string" ||
+        value.length === 0 ||
+        value.length > 256 ||
+        /[\s\p{Cc}]/u.test(value))
+    )
+      fail("appSettings has an invalid Profile template UID");
+  }
   if (
     settings.sunContactUid !== null &&
     (typeof settings.sunContactUid !== "string" ||

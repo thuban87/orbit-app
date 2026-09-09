@@ -1,13 +1,17 @@
 import { describe, expect, it } from "vitest";
 import { FACTORY_PROFILE_LAYOUT } from "./presentation-schema";
 import { resolveProfilePresentation } from "./resolve-presentation";
+import type { ProfilePresentationInputs } from "./types";
 
 const layout = (visible: boolean) => ({
   ...FACTORY_PROFILE_LAYOUT,
-  topLevel: FACTORY_PROFILE_LAYOUT.topLevel.map((item) => ({ ...item, visible })),
+  topLevel: FACTORY_PROFILE_LAYOUT.topLevel.map((item) => ({
+    ...item,
+    visible,
+  })),
 });
 
-const base = () => ({
+const base = (): ProfilePresentationInputs => ({
   factoryLayout: FACTORY_PROFILE_LAYOUT,
   themeBackground: "theme:galaxy",
   layoutTemplates: [
@@ -20,8 +24,14 @@ const base = () => ({
     { uid: "category-bg", imagePath: "profile-backgrounds/category.webp" },
     { uid: "contact-bg", imagePath: "profile-backgrounds/contact.webp" },
   ],
-  global: { layoutTemplateUid: "global-layout", backgroundTemplateUid: "global-bg" },
-  category: { layoutTemplateUid: "category-layout", backgroundTemplateUid: "category-bg" },
+  global: {
+    layoutTemplateUid: "global-layout",
+    backgroundTemplateUid: "global-bg",
+  },
+  category: {
+    layoutTemplateUid: "category-layout",
+    backgroundTemplateUid: "category-bg",
+  },
   contact: {
     layoutTemplateUid: null,
     freeformLayout: null,
@@ -42,7 +52,7 @@ describe("resolveProfilePresentation", () => {
   it("falls through missing references without rewriting or hiding diagnostics", () => {
     const input = base();
     input.contact.layoutTemplateUid = "missing-layout";
-    input.category.backgroundTemplateUid = "missing-bg";
+    input.category!.backgroundTemplateUid = "missing-bg";
     const resolved = resolveProfilePresentation(input);
     expect(resolved.layout.source).toBe("category");
     expect(resolved.background.source).toBe("global");

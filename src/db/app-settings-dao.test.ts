@@ -186,6 +186,11 @@ const DASHBOARD_DEFAULTS = {
   dashboardRightSwipeAction: "quick-log" as const,
 };
 
+const PROFILE_PRESENTATION_DEFAULTS = {
+  profileLayoutTemplateUid: null,
+  profileBackgroundTemplateUid: null,
+};
+
 type KeysOverlap<A, B> = Extract<keyof A, keyof B>;
 type IsNever<T> = [T] extends [never] ? true : false;
 const portableAndBookkeepingAreDisjoint: IsNever<
@@ -328,6 +333,7 @@ describe("app-settings-dao — read", () => {
       // Theme starts on the seeded package + follow-system, accent/background NULL.
       ...THEME_DEFAULTS,
       ...DASHBOARD_DEFAULTS,
+      ...PROFILE_PRESENTATION_DEFAULTS,
       // AI starts disabled: provider `none`, empty config, acks 0 (AI-01).
       ...AI_DEFAULTS,
       ...BACKUP_DEFAULTS,
@@ -485,6 +491,7 @@ describe("app-settings-dao — validated write", () => {
       // Theme fields untouched by this patch — still the seeded defaults.
       ...THEME_DEFAULTS,
       ...DASHBOARD_DEFAULTS,
+      ...PROFILE_PRESENTATION_DEFAULTS,
       // AI fields untouched by this patch — still the disabled defaults.
       ...AI_DEFAULTS,
       ...BACKUP_DEFAULTS,
