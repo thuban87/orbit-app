@@ -689,10 +689,17 @@ Plans:
 **Plans:** 4 plans
 
 Plans:
+**Wave 1**
 
 - [ ] 31.1-01-PLAN.md — TRACER: per-package background setter + single shell BackgroundHost mount + transparent nav theme + focused-route density + Home cooperates + Orrery excluded (device-proven)
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
 - [ ] 31.1-02-PLAN.md — Inline grouped Background picker in Settings → Appearance (all 8 + None/Solid, per-package write) + Settings root cooperates
 - [ ] 31.1-03-PLAN.md — Cooperating screen roots: flip 30 ordinary screen roots transparent (Orrery + Profile excluded), grouped by density tier
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
 - [ ] 31.1-04-PLAN.md — Full regression + D-19 B physical-Pixel device-UAT matrix + Profile precedence/regression + standalone release-APK native gate
 
 **UI hint**: yes
