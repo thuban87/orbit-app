@@ -1,18 +1,14 @@
 ---
-status: testing
+status: complete
 phase: 31-profile-experience
 source: 31-01-SUMMARY.md, 31-02-SUMMARY.md, 31-03-SUMMARY.md, 31-04-SUMMARY.md, 31-05-SUMMARY.md, 31-06-SUMMARY.md, 31-07-SUMMARY.md, 31-08-SUMMARY.md, 31-09-SUMMARY.md, 31-VERIFICATION.md
 started: 2026-09-09T16:38:10-05:00
-updated: 2026-09-10T06:14:00-05:00
+updated: 2026-09-10T06:20:00-05:00
 ---
 
 ## Current Test
 
-number: 8
-name: Re-test repaired cross-Profile template discovery and assignment
-expected: |
-  A template created from one Profile is visible from another Profile and can be assigned to an arbitrary third contact without changing that contact's background or Category. Preview only needs to function; its deferred aesthetics are not part of this check.
-awaiting: user response
+[testing complete]
 
 ## Tests
 
@@ -67,10 +63,10 @@ evidence: "owner approval `approved` delivered to Plan 31-14 executor 2026-09-10
 
 ### 8. Layout templates are globally discoverable and assignable to any contact
 expected: A layout template created from one Profile is visible from another Profile, and its assignment flow can target any individual contact rather than only the currently open Profile.
-result: pending
+result: pass
 reported: "Can't assign a template to another user individually... it only allows me to assign as global default, to one of the categories, or to the contact of the profile I'm currently in... [another contact's] layout editor doesn't list the other templates I've made elsewhere, it prompts to make a new template from scratch."
-observed: "Plan 31-14 and its review fix provide automated coverage for the repaired shared library and arbitrary-contact assignment path. A post-fix physical Pixel re-test remains pending."
-evidence: "Plan 31-14 focused gate: `src/components/profile/profile-template-manager.contract.test.ts`; `src/db/profile-presentation-dao.test.ts`; `src/profile/resolve-presentation.test.ts`; `src/profile/template-manager-model.test.ts`; `src/screens/contact-profile-logic.test.ts` (36 tests passed, 2026-09-10)"
+observed: "The owner physically re-tested the repaired flow on the authorized Pixel and approved cross-Profile template discovery, Preview functionality, and arbitrary-contact assignment. Automated coverage additionally proves the selected contact receives only the layout override while its background, Category, cadence, and other facts remain unchanged."
+evidence: "owner approval `approved` after the final bounded template lifecycle check, 2026-09-10; `src/components/profile/profile-template-manager.contract.test.ts`; `src/db/profile-presentation-dao.test.ts`; `src/profile/resolve-presentation.test.ts`; `src/profile/template-manager-model.test.ts`; `src/screens/contact-profile-logic.test.ts`"
 
 ### 9. Background assignments can return to the theme default
 expected: Global, Category, and contact background assignment surfaces expose a truthful clear/inherit action; clearing the global assignment returns Profiles without narrower overrides to the original theme background.
@@ -86,9 +82,9 @@ The owner reported that the template Preview page "looks like garbage" but expli
 ## Summary
 
 total: 9
-passed: 8
+passed: 9
 issues: 0
-pending: 1
+pending: 0
 skipped: 0
 blocked: 0
 
