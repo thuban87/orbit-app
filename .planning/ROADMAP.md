@@ -147,6 +147,7 @@ All v1.0 commits are local on `main` and have NOT been pushed.
 - [x] **Phase 29: Orrery Camera, Scale & Exploration** - One canonical 2.5D world with bounded camera, semantic zoom, density presets, and built-in Systems (completed 2026-09-08 by owner approval; device UAT 8/9 pass on the release build — two blocker crashes on gesture/pinch and long-press reorder were found on-device and fixed inline (f979263, a Reanimated worklet forward-reference class the vitest suite structurally cannot catch). **H6 backup contention BLOCKED** — the SAF backup-folder grant needs reconnecting, and per the native checklist the measured contention/overlap is deferred to Phase 40; not a phase-29 defect. Full record in 29-UAT.md.)
 - [ ] **Phase 30: Orrery Systems** - Named dynamic + manual Systems authored in a floating HUD, with management, switching, and portability
 - [ ] **Phase 31: Profile Experience** - Fixed Hero, modular reorderable sections, layout/background templates, Relationship Overview tile grid
+- [ ] **Phase 31.1: App-Wide System Backgrounds** (INSERTED) - Select the approved bundled art as a persistent system background across regular app screens, with Orrery excluded and Profile photos taking precedence
 - [ ] **Phase 32: Interaction History & Insights** - Activity heatmap (Cycles lens), intensity, Rolodex History Browser, canonical Interaction Detail/Edit
 - [ ] **Phase 33: Group Interaction Logging** - Group Event parent with canonical child interactions, inheritance/overrides, and atomic fan-out
 - [ ] **Phase 34: Rapid Capture & Update Flows** - Streamlined Add Contact, Quick Log with post-log capture, Tone vocabulary, Update Contact chooser loop
@@ -605,48 +606,82 @@ Plans:
 **Canonical refs**: docs/dossier/milestone-2/phase-10-profile-experience-dossier.md; docs/dossier/milestone-2/planning-notes/phase-10-planning-notes.md
 **Consumes from Phase 24.2** (deferred UI, owner-approved 2026-09-04): the custom-field **value-history backlist** viewer (reads `value-history-dao.ts` / `custom_field_value_history`) and **grouped custom-field rendering** (`custom_field_defs.field_group`). 24.2 shipped these as data-layer only. Confirm at Phase 31 planning whether the Profile is the right surface or a dedicated custom-fields UI phase is needed; if the latter, re-home this note.
 **Schema**: profile layout/background templates (verify head+1 at plan time)
-**Plans**: 10 plans
+**Plans**: 11/13 plans executed
 
 Plans:
 **Wave 1**
 
-- [ ] 31-01-PLAN.md — Forward-only presentation schema and clickable persisted Overview-collapse tracer
+- [x] 31-01-PLAN.md — Forward-only presentation schema and clickable persisted Overview-collapse tracer
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 31-02-PLAN.md — Presentation reads and atomic template/assignment/reset/fallout DAOs
+- [x] 31-02-PLAN.md — Presentation reads and atomic template/assignment/reset/fallout DAOs
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
-- [ ] 31-03-PLAN.md — Nullable-cadence-safe metrics and composed Frequency/Snooze actions
+- [x] 31-03-PLAN.md — Nullable-cadence-safe metrics and composed Frequency/Snooze actions
 
 **Wave 4** *(blocked on Wave 3 completion)*
 
-- [ ] 31-04-PLAN.md — Coherent local Profile snapshot, semantic knowledge, methods, and interim History reads
+- [x] 31-04-PLAN.md — Coherent local Profile snapshot, semantic knowledge, methods, and interim History reads
 
 **Wave 5** *(blocked on Wave 4 completion)*
 
-- [ ] 31-05-PLAN.md — Fixed Hero, responsive Relationship Overview, and semantic module host
+- [x] 31-05-PLAN.md — Fixed Hero, responsive Relationship Overview, and semantic module host
 
 **Wave 6** *(blocked on Wave 5 completion)*
 
-- [ ] 31-06-PLAN.md — Things to Remember, grouped custom fields, value-history backlist, and Contact Methods
+- [x] 31-06-PLAN.md — Things to Remember, grouped custom fields, value-history backlist, and Contact Methods
 
 **Wave 7** *(blocked on Wave 6 completion)*
 
-- [ ] 31-07-PLAN.md — Accessible focused Profile layout chooser/editor
+- [x] 31-07-PLAN.md — Accessible focused Profile layout chooser/editor
 
 **Wave 8** *(blocked on Wave 7 completion)*
 
-- [ ] 31-08-PLAN.md — Reusable layout-template management and assignment flows
+- [x] 31-08-PLAN.md — Reusable layout-template management and assignment flows
 
 **Wave 9** *(blocked on Wave 8 completion)*
 
-- [ ] 31-09-PLAN.md — Safe local background crop/storage/templates and assignment editor
+- [x] 31-09-PLAN.md — Safe local background crop/storage/templates and assignment editor
 
 **Wave 10** *(blocked on Wave 9 completion)*
 
 - [ ] 31-10-PLAN.md — Host integration, documentation, full regression, and physical-device UAT
+
+**Wave 11** *(blocked on Wave 10 completion)*
+
+- [x] 31-11-PLAN.md — Bounded remediation for Profile background rendering, editor/sheet geometry, factory collapse, and compact header
+
+**Wave 12** *(blocked on Wave 11 completion)*
+
+- [x] 31-12-PLAN.md — Owner-approved background art plus release-renderer remediation and verification
+
+**Wave 13** *(blocked on Wave 12 completion)*
+
+- [ ] 31-13-PLAN.md — Modern direct-touch Profile-background cropper and honest physical-Pixel gesture verification
+
+**UI hint**: yes
+
+### Phase 31.1: App-Wide System Backgrounds (INSERTED)
+
+**Goal**: The owner can select any of the eight approved bundled backgrounds (or None/Solid) as Orbit's persistent System background, see it fixed behind every regular in-app screen, and rely on the Orrery keeping its specialized canvas while any resolved Profile photo background cleanly overrides the System background.
+**Depends on**: Phases 23, 31
+**Requirements**: THEME-03, THEME-04; preserves PROF-01, PROF-04, PROF-05
+**Success Criteria** (what must be TRUE):
+
+  1. Settings → Appearance exposes all eight already-approved bundled WebPs plus None/Solid with accessible names/previews; selection previews live, persists through the existing package-specific `app_settings` fields, survives relaunch, and each theme package remembers its own choice.
+  2. The selected System background renders fixed behind all regular React Native app pages and scrolling content through the shared theme/background primitives; readable density-aware surfaces remain above it, and no screen regresses to an opaque page wash, intrinsic-size tile, black corner, or hardcoded colour.
+  3. The Orrery remains an intentional exception and continues using its specialized visualization background rather than the selected System background.
+  4. Profile precedence is deterministic: any resolved app-owned Profile photo template (`contact → Category → global`) overrides the System background; a Profile with no resolved photo uses the selected System background. Existing Profile photo importing, cropping, assignment, fallback, and reset behavior remains intact.
+  5. Everything remains local-only and offline: only bundled assets and validated app-owned files render, a bundled/decode failure degrades to the themed solid fallback, and debug-first plus final standalone-release checks cover both theme packages, scrolling, dense screens, Profile override/fallback, and the Orrery exception on the physical Pixel.
+
+**Canonical refs**: `docs/dossier/milestone-2/phase-02-theme-visual-system-dossier.md` §§D–F, Q, R; `docs/dossier/milestone-2/phase-10-profile-experience-dossier.md` §D; `docs/decisions/ADR-087-bundled-background-presets-and-package-specific-surface-treatment.md`; `.planning/phases/31.1-app-wide-system-backgrounds/31.1-CONTEXT.md`
+**Schema**: none — `galaxy_background` and `standard_background` already exist in `app_settings`; do not add replacement preference storage or bump the backup format
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (run `$gsd-discuss-phase 31.1`, then `$gsd-plan-phase 31.1`)
 
 **UI hint**: yes
 
@@ -801,7 +836,8 @@ Plans:
 | 28. Dashboard Card View | 8/8 | In Progress|  |
 | 29. Orrery Camera, Scale & Exploration | 12/12 | In Progress|  |
 | 30. Orrery Systems | 0/10 | Planned | - |
-| 31. Profile Experience | 0/TBD | Not started | - |
+| 31. Profile Experience | 11/13 | In Progress|  |
+| 31.1 App-Wide System Backgrounds | 0/TBD | Not started | - |
 | 32. Interaction History & Insights | 0/TBD | Not started | - |
 | 33. Group Interaction Logging | 0/TBD | Not started | - |
 | 34. Rapid Capture & Update Flows | 0/TBD | Not started | - |
