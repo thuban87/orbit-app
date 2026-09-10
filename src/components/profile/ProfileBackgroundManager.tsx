@@ -156,6 +156,8 @@ export function ProfileBackgroundManager({
   const startHeight = useSharedValue(1);
   const pinchFocalX = useSharedValue(0);
   const pinchFocalY = useSharedValue(0);
+  const pinchRatioX = useSharedValue(0.5);
+  const pinchRatioY = useSharedValue(0.5);
 
   const refresh = useCallback(async () => {
     setListLoading(true);
@@ -229,14 +231,16 @@ export function ProfileBackgroundManager({
     startY.value = selectionY.value;
     pinchFocalX.value = (event.focalX - displayOffsetX.value) / displayScale.value;
     pinchFocalY.value = (event.focalY - displayOffsetY.value) / displayScale.value;
+    pinchRatioX.value = (pinchFocalX.value - startX.value) / startWidth.value;
+    pinchRatioY.value = (pinchFocalY.value - startY.value) / startHeight.value;
   }).onUpdate((event) => {
     const width = startWidth.value / event.scale;
     const focalX = pinchFocalX.value;
     const focalY = pinchFocalY.value;
     selectionWidth.value = width;
     selectionHeight.value = width / profileAspect;
-    selectionX.value = focalX - width / 2;
-    selectionY.value = focalY - selectionHeight.value / 2;
+    selectionX.value = focalX - width * pinchRatioX.value;
+    selectionY.value = focalY - selectionHeight.value * pinchRatioY.value;
     clampSelection();
   }).onEnd(() => runOnJS(publishStatus)(selectionX.value, selectionY.value, selectionWidth.value, selectionHeight.value));
   const sourceImageStyle = useAnimatedStyle(() => ({ height: sourceHeight.value * displayScale.value, left: displayOffsetX.value, top: displayOffsetY.value, width: sourceWidth.value * displayScale.value }));
