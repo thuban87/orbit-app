@@ -4,7 +4,7 @@
 
 **Build/runtime:** package `com.bwales.orbit`; Metro tmux session `orbit`; use `emu-connect`, then resolve exactly one authorized serial with `~/.local/bin/adb devices -l`.
 
-**Status:** Standalone-release objective evidence is recorded. The owner has now directly approved the final Profile crop editor's genuine touch/pinch behavior; all other unexercised subjective and varied-state rows remain owner-gated.
+**Status:** Standalone-release objective evidence is recorded. The owner has directly approved the final Profile crop editor. Code-backed rows are now explicitly credited as `PASS — AUTOMATED/CODE AUDIT`; those are not represented as physical-device observations. The remaining `OWNER TEST` rows are the bounded release smoke list.
 
 ## Evidence header
 
@@ -59,6 +59,21 @@ Final automated gate: the nine focused Vitest files passed all 78 tests, then
 standalone release is left at the documented droid output path:
 `C:\\Users\\bwales\\projects\\orbit-app\\android\\app\\build\\outputs\\apk\\release\\app-release.apk`.
 
+## Final focused automation reconciliation (2026-09-10)
+
+The Profile/background/crop suite passed **31 files / 170 tests** after restoring
+the ADR-074 widget Reach-out consumed-once route. `npx tsc --noEmit`, targeted
+Biome, and `npm run check:colors` also passed. Rows credited below by automation
+cover deterministic data, state-model, persistence, ordering, and local-read
+contracts. They do not claim visual, gesture, screen-reader, or native-intent
+behavior that only a person using the release build can establish.
+
+The final owner-smoke APK was rebuilt from commit `a1e15e5` after those checks.
+Gradle reported `BUILD SUCCESSFUL`; the artifact remains at
+`C:\Users\bwales\projects\orbit-app\android\app\build\outputs\apk\release\app-release.apk`
+(201,088,487 bytes, SHA-256
+`50791b48c4feb5b786736cd5deb0fa95e8cf5df87f370404aa51fa2f3220f318`).
+
 ## Post-review-fix release addendum (2026-09-10)
 
 The four reviewed findings (`e7db666`, `3c4ac77`, `341ce5c`, and `86929cf`)
@@ -105,54 +120,54 @@ Mark every row PASS/FAIL with a short observation. A failed row is a gap for pla
 |---:|---|---|---|
 | 1 | Target | `emu-connect` selects `device`, not remote emulator; exactly one authorized physical Pixel is listed. | PASS — `emu-connect status` reported `device`; `adb devices -l` reported only Pixel 6 Pro serial `1A071FDEE002BU`. |
 | 2 | Shell | Dashboard → Profile → Back returns to the same Dashboard state. | PASS — Dashboard card opened Andrew Wales Profile; Android Back returned to the same populated Dashboard grid. |
-| 3 | Shell | Orrery → Profile → Back returns to Orrery without changing its selected system. | |
-| 4 | Shell | Settings/Archived → Profile → Back returns to its source stack. | |
-| 5 | Shell | Widget contact deep link opens Profile and Back returns to Dashboard. | |
-| 6 | Shell | Notification Profile/reach entry returns through its reset Dashboard stack; Reach Out opens once. | |
+| 3 | Shell | Orrery → Profile → Back returns to Orrery without changing its selected system. | OWNER TEST |
+| 4 | Shell | Settings/Archived → Profile → Back returns to its source stack. | OWNER TEST |
+| 5 | Shell | Widget contact deep link opens Profile and Back returns to Dashboard. | OWNER TEST |
+| 6 | Shell | Notification Profile/reach entry returns through its reset Dashboard stack; Reach Out opens once. | OWNER TEST — routing and consumed-once state are automated; actual release entry/return remains physical. |
 | 7 | Hero | Bound contact shows fixed avatar/name/Category/Favorite/Message/Call/one overflow in both themes. | PASS — standalone-release Galaxy and Standard factory captures show Andrew Wales's avatar/name/Family Category/Favorite/Message/Call and one overflow control. |
-| 8 | Hero | Missing phone/email retains Message and Call geometry, with accurate disabled reasons. | |
-| 9 | Hero | Long name/category at large text wraps/reflows without overlap or a shrunk semantic role. | |
-| 10 | Hero | Favorite changes only after its committed write and survives focus/relaunch. | |
-| 11 | Methods | Complete long phone/email values are readable/accessibly named; malformed values are explained and not actionable. | |
-| 12 | Methods | Call/Message/Email opens the expected user-triggered native handoff; no interaction is falsely logged as completed. | |
-| 13 | Lifecycle | Bound contact shows truthful Status/Frequency/Snooze behavior. | |
-| 14 | Lifecycle | Unbound dormant cadence is marked inactive, never treated as Bound. | |
-| 15 | Lifecycle | Unbound null cadence has no fabricated status; Bind requires a valid selected cadence. | |
-| 16 | Lifecycle | Bind/Unbind confirmation and resulting state preserve relationship data/history. | |
-| 17 | Overview | All enabled factory Overview modules appear in stable order and auto-pack without holes at ordinary width. | |
-| 18 | Overview | Narrow width/large text reduces columns and grows tiles while retaining text and 44px targets. | |
-| 19 | Status | Status sheet names actual cadence/last-contact/Rarely Responds inputs and no Health/Gravity factors. | |
-| 20 | Gravity | Gravity explanation is textual and visual reinforces it without being the sole channel. | |
-| 21 | Intensity | Bound Intensity uses its cadence window; Unbound/null cadence says `This month`. | |
-| 22 | Frequency | Every frequency choice commits, refreshes Profile facts, handles pending/error/retry, and dismisses cleanly. | |
-| 23 | Snooze | Presets, custom future date, Unsnooze, pending/error/retry, and Back/scrim dismissal work. | |
-| 24 | History seam | Status → History and View all history retain the bounded Phase 31 renderer seam. | |
-| 25 | Collapse | Collapse one top-level section, restart, and confirm durable readback/accessible expanded state. | |
-| 26 | Collapse | Collapse one Things-to-Remember child, restart, and confirm it remains scoped to that child. | |
-| 27 | Collapse | Simulated/observed persistence failure retains visible state and exposes Retry rather than a false update. | |
-| 28 | TTR | Empty sections retain useful summaries; partial facts do not fabricate values. | |
-| 29 | TTR | Cards, capped counts, View all, and Show hidden use stable semantic order. | |
-| 30 | TTR | Tap detail, long-press management, and accessibility actions reach source-owner management flows. | |
-| 31 | Off Limits | Ordinary Off Limits uses caution semantics, no sparkle, and no inferred AI permission. | |
-| 32 | Custom fields | Invalid values expose their recovery state; long/grouped values remain understandable. | |
-| 33 | Overflow | Exact order: Edit, Snooze/Unsnooze, Archive, separator, Profile Layout, Background, conditional Save, conditional Reset. | PENDING OWNER — release menu visibly ordered Edit Contact, Snooze, Archive, separator, Profile Layout, Background, Reset. The conditional freeform Save Current Layout as Template case remains owner-only. |
-| 34 | Overflow | No Profile AI-draft action appears; Message → Compose remains available. | PENDING OWNER — no Profile AI action appeared in the Pixel menu; owner must confirm Message → Compose. |
+| 8 | Hero | Missing phone/email retains Message and Call geometry, with accurate disabled reasons. | OWNER TEST — capability/reason model is automated; geometry is visual. |
+| 9 | Hero | Long name/category at large text wraps/reflows without overlap or a shrunk semantic role. | OWNER TEST |
+| 10 | Hero | Favorite changes only after its committed write and survives focus/relaunch. | OWNER TEST |
+| 11 | Methods | Complete long phone/email values are readable/accessibly named; malformed values are explained and not actionable. | OWNER TEST — value/actionability/a11y-label shaping is automated; readable rendering and TalkBack remain physical. |
+| 12 | Methods | Call/Message/Email opens the expected user-triggered native handoff; no interaction is falsely logged as completed. | OWNER TEST |
+| 13 | Lifecycle | Bound contact shows truthful Status/Frequency/Snooze behavior. | PASS — AUTOMATED: Profile lifecycle, metric, frequency, and snooze models plus DAO tests. |
+| 14 | Lifecycle | Unbound dormant cadence is marked inactive, never treated as Bound. | PASS — AUTOMATED: `profileLifecycleView` and dormant-cadence tests. |
+| 15 | Lifecycle | Unbound null cadence has no fabricated status; Bind requires a valid selected cadence. | PASS — AUTOMATED: lifecycle and metric null-cadence cases. |
+| 16 | Lifecycle | Bind/Unbind confirmation and resulting state preserve relationship data/history. | PASS — AUTOMATED: lifecycle DAO/effects contracts preserve cadence, Favorite, and relationship history. |
+| 17 | Overview | All enabled factory Overview modules appear in stable order and auto-pack without holes at ordinary width. | PASS — AUTOMATED: registry and deterministic row-major packing tests. |
+| 18 | Overview | Narrow width/large text reduces columns and grows tiles while retaining text and 44px targets. | OWNER TEST — narrow-column packing is automated; actual large-text rendering/targets remain physical. |
+| 19 | Status | Status sheet names actual cadence/last-contact/Rarely Responds inputs and no Health/Gravity factors. | PASS — AUTOMATED: relationship explanation and metric-factor tests. |
+| 20 | Gravity | Gravity explanation is textual and visual reinforces it without being the sole channel. | PASS — AUTOMATED/CODE AUDIT: explicit textual model and non-editable derived metric contract. |
+| 21 | Intensity | Bound Intensity uses its cadence window; Unbound/null cadence says `This month`. | PASS — AUTOMATED: cadence-window and calendar-month boundary tests. |
+| 22 | Frequency | Every frequency choice commits, refreshes Profile facts, handles pending/error/retry, and dismisses cleanly. | PASS — AUTOMATED: choice/state model and transactional DAO tests cover success, pending, failure, retry, dismissal, and revision refresh. |
+| 23 | Snooze | Presets, custom future date, Unsnooze, pending/error/retry, and Back/scrim dismissal work. | PASS — AUTOMATED: preset/custom-date, transaction, dedupe, failure/retry, and dismissal tests. |
+| 24 | History seam | Status → History and View all history retain the bounded Phase 31 renderer seam. | PASS — AUTOMATED/CODE AUDIT: stable History semantic identity and Profile navigation wiring. |
+| 25 | Collapse | Collapse one top-level section, restart, and confirm durable readback/accessible expanded state. | PASS — AUTOMATED: database round-trip and committed-readback tests. |
+| 26 | Collapse | Collapse one Things-to-Remember child, restart, and confirm it remains scoped to that child. | PASS — AUTOMATED: closed semantic collapse keys and per-child persistence tests. |
+| 27 | Collapse | Simulated/observed persistence failure retains visible state and exposes Retry rather than a false update. | PASS — AUTOMATED: failure retains prior published state; Retry model is covered. |
+| 28 | TTR | Empty sections retain useful summaries; partial facts do not fabricate values. | PASS — AUTOMATED: module-registry and knowledge-presentation empty/partial contracts. |
+| 29 | TTR | Cards, capped counts, View all, and Show hidden use stable semantic order. | PASS — AUTOMATED: knowledge presentation order/cap/hidden-recovery tests. |
+| 30 | TTR | Tap detail, long-press management, and accessibility actions reach source-owner management flows. | OWNER TEST |
+| 31 | Off Limits | Ordinary Off Limits uses caution semantics, no sparkle, and no inferred AI permission. | PASS — AUTOMATED/CODE AUDIT: explicit Off Limits negative-constraint test. |
+| 32 | Custom fields | Invalid values expose their recovery state; long/grouped values remain understandable. | PASS — AUTOMATED: exhaustive type formatting, invalid raw-value history, and grouping tests. |
+| 33 | Overflow | Exact order: Edit, Snooze/Unsnooze, Archive, separator, Profile Layout, Background, conditional Save, conditional Reset. | OWNER TEST — base order is release-observed and conditional logic automated; the freeform conditional is included in the owner smoke. |
+| 34 | Overflow | No Profile AI-draft action appears; Message → Compose remains available. | OWNER TEST — absence of Profile AI is code-audited and release-observed; native Message → Compose remains physical. |
 | 35 | Overlay | A topmost sheet makes Profile underlay inert; Android Back closes the topmost sheet before native-stack Back. | PASS — clean Profile actions sheet dimmed the underlay; first Android Back dismissed it while retaining Profile, second Back returned to Dashboard. |
-| 36 | Layout | Profile Layout edit shows fixed-Hero preview, drag plus Move controls, visibility/default expansion, and legal size options. | PENDING OWNER — final release at 1.15x font shows Fixed Hero/live preview and retained Cancel, Save as template, and Save layout affordances. The persisted varied-layout/legal-size exercise remains owner-only. |
-| 37 | Layout | Long labels retain Save/Cancel/reorder reachability at large text and screen reader. | |
-| 38 | Layout | Cancel/dirty dismissal preserves committed layout; Save commits complete layout and reloads it. | |
-| 39 | Templates | Create/rename/preview/assignment/usage/delete flows describe inherited vs contact override truthfully. | |
-| 40 | Templates | Save Current Layout as Template appears only for freeform layout; Reset appears only for contact overrides. | |
-| 41 | Reset | Reset confirmation says contact facts/Favorite/Snooze/AI/knowledge remain unchanged, then verifies that result. | |
+| 36 | Layout | Profile Layout edit shows fixed-Hero preview, drag plus Move controls, visibility/default expansion, and legal size options. | OWNER TEST — release framing and reducer legality are covered; actual persisted edit remains physical. |
+| 37 | Layout | Long labels retain Save/Cancel/reorder reachability at large text and screen reader. | OWNER TEST |
+| 38 | Layout | Cancel/dirty dismissal preserves committed layout; Save commits complete layout and reloads it. | OWNER TEST — session/DAO failure safety is automated; end-to-end UI commit remains physical. |
+| 39 | Templates | Create/rename/preview/assignment/usage/delete flows describe inherited vs contact override truthfully. | OWNER TEST |
+| 40 | Templates | Save Current Layout as Template appears only for freeform layout; Reset appears only for contact overrides. | PASS — AUTOMATED: conditional overflow entries and presentation-source resolution tests. |
+| 41 | Reset | Reset confirmation says contact facts/Favorite/Snooze/AI/knowledge remain unchanged, then verifies that result. | PASS — AUTOMATED/CODE AUDIT: reset deletes only contact presentation; confirmation names preserved data. |
 | 42 | Background | Template list/picker uses only local device media and keeps Cancel/error drafts/committed background safe. | PASS — the final release showed the safe retryable error on its first picker attempt, then opened Android's local system picker on immediate retry. Both source orientations reached crop in debug; final-release Cancel → Discard returned without creating or assigning a new background. |
 | 43 | Crop | Portrait crop: drag, pinch, named controls, min/max bounds, preview and output aspect all agree. | PASS — Pixel artifacts `20-portrait-contained.*` → `21-portrait-horizontal-left.*` prove contained source and direct drag; `19-fine-tune-zoom.*` proves named controls/zoom. The owner then directly approved genuine touch/pinch behavior (2026-09-10). |
 | 44 | Crop | Landscape crop: same bounds/aspect/reachable controls; no hidden clipping. | PASS — Pixel artifacts `17-landscape-contained.*` → `18-landscape-horizontal-left.*` prove complete landscape source, bounded selection, direct drag, and no hidden clipping. The owner then directly approved genuine touch/pinch behavior (2026-09-10). |
-| 45 | Background | Assignment at contact/Category/global resolves correctly; Profile restarts with readable scrim treatment. | PENDING OWNER — factory fallback is readable and full bleed in the final Galaxy and Standard release captures; contact/Category/global assignment scenarios remain unexercised. |
-| 46 | Theme | Galaxy and Standard, light/dark as available, retain hierarchy, contrast, and no hardcoded-color regressions. | PENDING OWNER — inspected Galaxy and Standard final-release captures retain hierarchy and no tile/opaque wash; `check:colors` passed. Available light-mode and owner contrast judgment remain. |
-| 47 | Accessibility | TalkBack announces Hero actions, disabled reasons, section expanded state, selection, and sheet focus. | |
-| 48 | Accessibility | Large font has no clipped/overlapping text; image/color is never the sole meaning. | |
-| 49 | Motion | Reduced-motion setting does not make Profile actions/crop/overlay state incomprehensible. | |
-| 50 | Local-first | With network unavailable, Profile loads its existing local snapshot; no content is transmitted. | |
+| 45 | Background | Assignment at contact/Category/global resolves correctly; Profile restarts with readable scrim treatment. | OWNER TEST — factory fallback is release-observed and hierarchy resolution automated; real assignment/readability remains physical. |
+| 46 | Theme | Galaxy and Standard, light/dark as available, retain hierarchy, contrast, and no hardcoded-color regressions. | OWNER TEST — Galaxy/Standard and color guard passed; available light-mode and owner contrast judgment remain. |
+| 47 | Accessibility | TalkBack announces Hero actions, disabled reasons, section expanded state, selection, and sheet focus. | OWNER TEST |
+| 48 | Accessibility | Large font has no clipped/overlapping text; image/color is never the sole meaning. | OWNER TEST |
+| 49 | Motion | Reduced-motion setting does not make Profile actions/crop/overlay state incomprehensible. | OWNER TEST |
+| 50 | Local-first | With network unavailable, Profile loads its existing local snapshot; no content is transmitted. | PASS — CODE AUDIT/AUTOMATED: one on-device SQLite snapshot owns the read; no Profile read-path network dependency or content egress exists. |
 
 ## Eight mandatory backstops
 
