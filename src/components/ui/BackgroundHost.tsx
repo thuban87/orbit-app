@@ -45,6 +45,7 @@ import {
   type SurfaceDensity,
   surfaceOpacityForDensity,
 } from "@/theme/tokens/surface";
+import { backgroundHostSelection } from "./background-host-model";
 
 export interface BackgroundHostProps {
   children?: ReactNode;
@@ -104,13 +105,13 @@ export function BackgroundHost({
   // (valid) slot gets a fresh render attempt rather than staying stuck on the
   // fallback. Uses React's render-phase reset idiom (no effect, no extra frame).
   const [renderFailed, setRenderFailed] = useState(false);
-  const localUri =
-    !forceRenderError &&
-    !renderFailed &&
-    appOwnedBackgroundUri?.startsWith("file://")
-      ? appOwnedBackgroundUri
-      : null;
-  const selectionKey = `${pkg}:${String(effectiveSlot)}:${String(localUri)}`;
+  const { localUri, selectionKey } = backgroundHostSelection({
+    package: pkg,
+    slotId: effectiveSlot,
+    appOwnedBackgroundUri,
+    forceRenderError,
+    renderFailed,
+  });
   const [prevKey, setPrevKey] = useState(selectionKey);
   if (selectionKey !== prevKey) {
     setPrevKey(selectionKey);
