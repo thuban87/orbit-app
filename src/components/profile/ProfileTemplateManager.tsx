@@ -39,6 +39,7 @@ import {
   setTemplateUsage,
   settleTemplateOperation,
   type TemplateManagerState,
+  templateLayoutForNewTemplate,
 } from "@/profile/template-manager-model";
 import type {
   ProfileLayoutDocument,
@@ -63,11 +64,15 @@ export interface ProfileTemplateManagerProps {
   >;
   /** The contact's current freeform layout, if any, for Save Current Layout. */
   freeformLayout: ProfileLayoutDocument | null;
+  /** An unsaved canonical editor draft, preferred over any persisted freeform layout. */
+  pendingTemplateLayout?: ProfileLayoutDocument | null;
   /** Current hierarchy inputs let layout writes retain the independent background axis. */
   presentation: ProfilePresentationInputs;
   onRequestClose: () => void;
   /** Called only after a durable create/edit/assignment/delete succeeds. */
   onCommitted?: () => void;
+  /** Clears a consumed editor handoff only after the new template is durable. */
+  onPendingTemplateResolved?: () => void;
 }
 
 type Category = { id: number; name: string };
@@ -97,9 +102,11 @@ export function ProfileTemplateManager({
   effectiveSource,
   effectiveLayoutSource,
   freeformLayout,
+  pendingTemplateLayout = null,
   presentation,
   onRequestClose,
   onCommitted,
+  onPendingTemplateResolved,
 }: ProfileTemplateManagerProps) {
   const { colors } = useTheme();
   const [state, setState] = useState<TemplateManagerState>(
@@ -125,6 +132,10 @@ export function ProfileTemplateManager({
         : null,
     [activePage, templates],
   );
+  const currentLayoutForNewTemplate = templateLayoutForNewTemplate({
+    pendingTemplateLayout,
+    freeformLayout,
+  });
 
   const refresh = useCallback(async () => {
     const exec = getExecutor();
@@ -245,6 +256,7 @@ export function ProfileTemplateManager({
               })
             : cleared;
         });
+        if (pendingTemplateLayout) onPendingTemplateResolved?.();
         setAssignCreatedTemplate(false);
       }
     })();
@@ -361,7 +373,7 @@ export function ProfileTemplateManager({
                 {contactName} currently uses {effectiveSource}. Templates change
                 every Profile assigned to them.
               </AppText>
-              {freeformLayout ? (
+              {currentLayoutForNewTemplate ? (
                 <Button
                   role="secondary"
                   label="Save current layout as template"
@@ -370,7 +382,7 @@ export function ProfileTemplateManager({
                     setState(
                       setTemplateDraft(state, {
                         name: `${contactName}'s layout`,
-                        layout: freeformLayout,
+                        layout: currentLayoutForNewTemplate,
                       }),
                     );
                   }}

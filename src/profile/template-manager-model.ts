@@ -33,6 +33,17 @@ export interface TemplateAssignmentDescription {
   text: string;
 }
 
+/**
+ * A layout-editor handoff wins over the last persisted freeform layout. It is
+ * already a canonical copy, and is never mutated by the template manager.
+ */
+export function templateLayoutForNewTemplate(input: {
+  pendingTemplateLayout: ProfileLayoutDocument | null;
+  freeformLayout: ProfileLayoutDocument | null;
+}): ProfileLayoutDocument | null {
+  return input.pendingTemplateLayout ?? input.freeformLayout;
+}
+
 /** Assignment labels name the durable source, never infer it from visual selection. */
 export function describeTemplateAssignment(input: {
   source: Extract<

@@ -25,6 +25,7 @@ import {
 } from "@/db/profile-relationship-actions";
 import type { RootStackScreenProps } from "@/navigation/types";
 import { resolveProfilePresentation } from "@/profile/resolve-presentation";
+import type { ProfileLayoutDocument } from "@/profile/types";
 import {
   closeTopmostProfileOverlay,
   PROFILE_APP_BAR,
@@ -59,6 +60,8 @@ export function ContactProfileScreen({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [overlay, setOverlay] = useState<ProfileOverlay>(null);
+  const [pendingTemplateLayout, setPendingTemplateLayout] =
+    useState<ProfileLayoutDocument | null>(null);
   const [pendingFavourite, setPendingFavourite] = useState(false);
   const [bindIntervalDays, setBindIntervalDays] = useState(30);
   const [bindIntervalValid, setBindIntervalValid] = useState(false);
@@ -507,7 +510,10 @@ export function ContactProfileScreen({
               layout={presentation.layout.document}
               onRequestClose={closeOverlay}
               onCommitted={() => void load()}
-              onSaveAsTemplate={() => setOverlay("templates")}
+              onSaveAsTemplate={(draft) => {
+                setPendingTemplateLayout(draft);
+                setOverlay("templates");
+              }}
             />
             <ProfileTemplateManager
               visible={overlay === "templates"}
@@ -516,9 +522,14 @@ export function ContactProfileScreen({
               effectiveSource={presentation.layout.source}
               effectiveLayoutSource={presentation.layout.source}
               freeformLayout={freeformLayout}
+              pendingTemplateLayout={pendingTemplateLayout}
               presentation={snapshot.presentation}
-              onRequestClose={closeOverlay}
+              onRequestClose={() => {
+                setPendingTemplateLayout(null);
+                closeOverlay();
+              }}
               onCommitted={() => void load()}
+              onPendingTemplateResolved={() => setPendingTemplateLayout(null)}
             />
             <ProfileBackgroundManager
               visible={overlay === "background"}

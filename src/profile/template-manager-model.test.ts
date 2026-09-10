@@ -1,4 +1,7 @@
 import { describe, expect, it } from "vitest";
+import { profileLayoutEditorReducer } from "./layout-editor-reducer";
+import { createLayoutTemplateIntent } from "./layout-editor-session";
+import { FACTORY_PROFILE_LAYOUT } from "./presentation-schema";
 import {
   beginTemplateOperation,
   createTemplateManagerState,
@@ -9,6 +12,7 @@ import {
   setTemplateDraft,
   setTemplateUsage,
   settleTemplateOperation,
+  templateLayoutForNewTemplate,
 } from "./template-manager-model";
 
 describe("Profile template manager model", () => {
@@ -89,5 +93,33 @@ describe("Profile template manager model", () => {
       kind: "override",
       text: "Contact override: freeform layout",
     });
+  });
+
+  it("carries an edited unsaved layout into template creation without a freeform fallback", () => {
+    const edited = profileLayoutEditorReducer(FACTORY_PROFILE_LAYOUT, {
+      type: "move",
+      id: "interaction-history",
+      direction: "up",
+    });
+    const pendingTemplateLayout = createLayoutTemplateIntent(edited);
+    const layout = templateLayoutForNewTemplate({
+      pendingTemplateLayout,
+      freeformLayout: null,
+    });
+
+    expect(layout).toEqual(edited);
+    expect(layout?.topLevel.map((item) => item.id)).toEqual([
+      "relationship-overview",
+      "things-to-remember",
+      "interaction-history",
+      "contact-methods",
+    ]);
+    expect(layout?.topLevel.every((item) => !item.expanded)).toBe(true);
+    expect(
+      templateLayoutForNewTemplate({
+        pendingTemplateLayout: null,
+        freeformLayout: null,
+      }),
+    ).toBeNull();
   });
 });
