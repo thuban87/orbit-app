@@ -4,6 +4,7 @@ import {
   canStartLifecycleTransition,
   closeTopmostProfileOverlay,
   commitProfileOverviewToggle,
+  consumeProfileReachOutIntent,
   PROFILE_APP_BAR,
   profileLifecycleView,
   profileMethodGroups,
@@ -274,5 +275,26 @@ describe("integrated Profile controller contracts", () => {
     expect(closeTopmostProfileOverlay("layout")).toBe(null);
     expect(closeTopmostProfileOverlay("overflow")).toBe(null);
     expect(closeTopmostProfileOverlay(null)).toBe(null);
+  });
+
+  it("consumes widget Reach out once and opens only when a route exists", () => {
+    expect(
+      consumeProfileReachOutIntent({
+        openReachOut: true,
+        hasReachRoute: true,
+      }),
+    ).toEqual({ clear: true, open: true });
+    expect(
+      consumeProfileReachOutIntent({
+        openReachOut: true,
+        hasReachRoute: false,
+      }),
+    ).toEqual({ clear: true, open: false });
+    expect(
+      consumeProfileReachOutIntent({
+        openReachOut: undefined,
+        hasReachRoute: true,
+      }),
+    ).toEqual({ clear: false, open: false });
   });
 });

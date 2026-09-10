@@ -105,6 +105,18 @@ export function profileOriginIntent(
 }
 
 /**
+ * Consume the widget-only Reach out intent exactly once. A methodless contact
+ * still clears the flag so returning to Profile cannot replay stale intent.
+ */
+export function consumeProfileReachOutIntent(input: {
+  openReachOut?: boolean;
+  hasReachRoute: boolean;
+}): { clear: boolean; open: boolean } {
+  const clear = input.openReachOut === true;
+  return { clear, open: clear && input.hasReachRoute };
+}
+
+/**
  * Lifecycle-only presentation state. Cadence stays durable data; this model
  * decides only which participation controls may be rendered around it.
  */

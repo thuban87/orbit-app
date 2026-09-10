@@ -1,6 +1,6 @@
 // biome-ignore-all lint/a11y/useValidAriaRole: AppText role is a typography role.
 import { useFocusEffect } from "@react-navigation/native";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Alert, ScrollView, StyleSheet, View } from "react-native";
 import { FrequencyPicker } from "@/components/FrequencyPicker";
 import { ProfileBackgroundManager } from "@/components/profile/ProfileBackgroundManager";
@@ -8,6 +8,7 @@ import { ProfileHero } from "@/components/profile/ProfileHero";
 import { ProfileLayoutEditor } from "@/components/profile/ProfileLayoutEditor";
 import { ProfileModuleHost } from "@/components/profile/ProfileModuleHost";
 import { ProfileTemplateManager } from "@/components/profile/ProfileTemplateManager";
+import { ReachOutRouter } from "@/components/ReachOutRouter";
 import { AppText } from "@/components/ui/AppText";
 import { BackgroundHost } from "@/components/ui/BackgroundHost";
 import { Button } from "@/components/ui/Button";
@@ -16,6 +17,7 @@ import { getAppSettings } from "@/db/app-settings-dao";
 import { archiveContact } from "@/db/contacts-dao";
 import { getExecutor, localDateTime } from "@/db/database";
 import { clearFavouriteRank, setFavouriteRank } from "@/db/favourites-dao";
+import { deriveReachRoutes } from "@/db/interaction-assist-read";
 import { resetProfilePresentation } from "@/db/profile-presentation-dao";
 import { type ProfileSnapshot, readProfileSnapshot } from "@/db/profile-read";
 import {
@@ -28,6 +30,7 @@ import { resolveProfilePresentation } from "@/profile/resolve-presentation";
 import type { ProfileLayoutDocument } from "@/profile/types";
 import {
   closeTopmostProfileOverlay,
+  consumeProfileReachOutIntent,
   PROFILE_APP_BAR,
   type ProfileOverlay,
   profileLifecycleView,
@@ -66,15 +69,21 @@ export function ContactProfileScreen({
   const [bindIntervalDays, setBindIntervalDays] = useState(30);
   const [bindIntervalValid, setBindIntervalValid] = useState(false);
   const [transitioning, setTransitioning] = useState(false);
+  const [reachOutOpen, setReachOutOpen] = useState(false);
+  const [assistEnabled, setAssistEnabled] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const next = await readProfileSnapshot(getExecutor(), contactId, {
-        now: localDateTime(),
-        themeBackground: `theme:${themePackage}`,
-      });
+      const [next, settings] = await Promise.all([
+        readProfileSnapshot(getExecutor(), contactId, {
+          now: localDateTime(),
+          themeBackground: `theme:${themePackage}`,
+        }),
+        getAppSettings(getExecutor()),
+      ]);
+      setAssistEnabled(settings.interactionAssistEnabled === 1);
       if (!next) {
         setSnapshot(null);
         setError("This contact is no longer available.");
@@ -96,6 +105,31 @@ export function ContactProfileScreen({
     () => (snapshot ? resolveProfilePresentation(snapshot.presentation) : null),
     [snapshot],
   );
+  const reachRoutes = useMemo(
+    () =>
+      deriveReachRoutes(
+        snapshot?.actionableMethods ?? { phone: null, email: null },
+      ),
+    [snapshot?.actionableMethods],
+  );
+
+  useEffect(() => {
+    if (loading || (snapshot && snapshot.identity.id !== contactId)) return;
+    const intent = consumeProfileReachOutIntent({
+      openReachOut: route.params.openReachOut,
+      hasReachRoute: !reachRoutes.hidden,
+    });
+    if (!intent.clear) return;
+    navigation.setParams({ openReachOut: undefined });
+    if (intent.open) setReachOutOpen(true);
+  }, [
+    contactId,
+    loading,
+    navigation,
+    reachRoutes.hidden,
+    route.params.openReachOut,
+    snapshot,
+  ]);
   const lifecycle = profileLifecycleView({
     trackingEnabled: snapshot?.identity.trackingEnabled ?? 0,
     intervalDays: snapshot?.identity.intervalDays ?? null,
@@ -538,6 +572,14 @@ export function ContactProfileScreen({
               presentation={snapshot.presentation}
               onRequestClose={closeOverlay}
               onCommitted={() => void load()}
+            />
+            <ReachOutRouter
+              visible={reachOutOpen}
+              contactId={contactId}
+              routes={reachRoutes}
+              methodGroups={snapshot.methods}
+              assistEnabled={assistEnabled}
+              onClose={() => setReachOutOpen(false)}
             />
           </>
         ) : null}
