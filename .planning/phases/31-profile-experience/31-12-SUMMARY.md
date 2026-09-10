@@ -171,14 +171,33 @@ inspected [home shell](/home/bwales/projects/orbit-app/.planning/phases/31-profi
 is persisted with its UI tree. The focused 10-file review suite passed 74 tests,
 and TypeScript, color, and whitespace checks passed.
 
-CR-03's physical crop proof remains **blocked, not waived**: after opening
-Background → Choose photo, the release picker returned its safe manager error
-state before a portrait or landscape source could be selected. The inspected
-[picker failure state](/home/bwales/projects/orbit-app/.planning/phases/31-profile-experience/evidence/31-12-release/release-post-review-picker.png)
-retains Back, retry, and empty-state affordances. No owner media or background
-assignment was injected merely to force a crop screen. Unit coverage for the
-shared portrait target passed; owner/device follow-up needs a usable photo-picker
-source to inspect portrait and landscape crop viewports before saving nothing.
+The first post-review picker attempt returned its safe manager error state.
+Subsequent debug and final-release attempts opened Android's local system photo
+picker normally, including an immediate retry in the final release. Real
+portrait and landscape sources then exposed a second CR-03 usability problem:
+the exact Profile-aspect preview pushed its controls below the sheet. Commit
+`00d9c56` introduced the dedicated crop workspace. A focused follow-up review
+then found that its full-window preview was still physically clipped by the
+sheet. Commit `91cc837` made the header, measured preview region, and controls
+separate in-flow regions; the visible preview now scales to the actual remaining
+space while retaining the exact output aspect. Both orientations were inspected
+at 1.15x font, and Cancel → Discard left no new saved template or assignment.
+
+The final standalone release was built from `91cc837`, installed, and launched
+without Metro on the physical Pixel. Its APK remains at
+`C:\\Users\\bwales\\projects\\orbit-app\\android\\app\\build\\outputs\\apk\\release\\app-release.apk`
+with SHA-256 `fdda5f69ba95b794b847bc78e9b821c6b4fbbcf38671bbf11d48f08eaf60532d`.
+The release crop canvas measured 838×1816 pixels inside the unobstructed region;
+the complete horizontally scrollable control set and both final actions were
+reachable. The full suite passed 319 files / 2845 tests, followed by TypeScript,
+Biome, colour, and whitespace checks.
+
+The eight approved bundled images are not directly selectable in the current
+Background manager; it manages user-imported photo templates only. The owner
+identified the desired follow-up as a global System background selector used
+throughout the app except Orrery and profiles with photo overrides. That is
+explicitly deferred to the bounded Phase 31.1 scope rather than misrepresented
+as part of this completed Profile repair.
 
 ---
 

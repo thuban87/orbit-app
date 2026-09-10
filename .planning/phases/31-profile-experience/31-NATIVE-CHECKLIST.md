@@ -12,7 +12,7 @@ Recorded 2026-09-09T16:38:10-05:00:
 
 - `emu-connect status`: `device`; exactly one authorized USB target.
 - Authorized physical serial/model: `1A071FDEE002BU` / Pixel 6 Pro (`raven`).
-- APK/runtime: `com.bwales.orbit` debug `1.0.0` (versionCode 1); Orbit Metro listened on host `8082`, with device `tcp:8081` reverse-mapped to it.
+- APK/runtime: `com.bwales.orbit` debug `1.0.0` (versionCode 1); Orbit Metro listened on host `8082`, with device `tcp:8082` reverse-mapped to it.
 - Theme/mode observed: Galaxy dark.
 - Seed contact exercised: bound Andrew Wales; existing UAT contacts remain available for the owner scenarios.
 
@@ -67,7 +67,7 @@ were rebuilt from current HEAD with a clean droid `npm ci` (which applied
 `assembleRelease --console=plain --no-daemon`. The resulting standalone APK is
 at `C:\\Users\\bwales\\projects\\orbit-app\\android\\app\\build\\outputs\\apk\\release\\app-release.apk`
 and has SHA-256
-`4e3bfa0192489aef248e8ebb14bbc345817a37eb53e66598aae9d4939668e052`.
+`fdda5f69ba95b794b847bc78e9b821c6b4fbbcf38671bbf11d48f08eaf60532d`.
 
 - The current APK installed successfully on the same authorized Pixel 6 Pro,
   launched standalone, and rendered Orbit's home shell. The shell was directly
@@ -75,15 +75,18 @@ and has SHA-256
 - The focused review regression suite passed all current 74 tests across 10
   files, followed by `npx tsc --noEmit`, `npm run check:colors`, and
   `git diff --check`.
-- Opening Background → Choose photo produced the manager's safe retryable
-  picker-error state, inspected at [release-post-review-picker.png](/home/bwales/projects/orbit-app/.planning/phases/31-profile-experience/evidence/31-12-release/release-post-review-picker.png): Back, error copy, retry, and the empty-state explanation remained visible. This is picker-error recovery evidence, not a fabricated `file://` render-error test.
-- **Open device blocker — crop verification:** the release picker returned to
-  the manager with `Couldn't open your photos. Please try again.` before any
-  source was selectable. No portrait or landscape crop viewport was reached.
-  No media, background template, crop draft, or assignment was injected into
-  owner data merely to force that state. The CR-03 geometry unit coverage
-  passed, but physical portrait/landscape crop confirmation remains pending a
-  usable device photo-picker source.
+- The first post-review and final-release picker attempts returned the manager's
+  safe retryable error state. Immediate retries and repeated debug-client runs
+  opened Android's local-only system picker normally.
+- Real portrait and landscape sources reached the repaired crop editor. After a
+  focused review caught the first redesign clipping its preview, `91cc837`
+  separated the header, measured preview region, and controls. The final release
+  rendered the complete 838×1816 Profile-aspect canvas between those controls,
+  exposed every named pan/zoom action through the horizontal strip, and kept
+  Cancel and Use background reachable at 1.15x font. Cancel followed by Discard
+  closed the draft without creating or assigning a new background. Evidence:
+  [final crop](/home/bwales/projects/orbit-app/.planning/phases/31-profile-experience/evidence/31-12-release/release-final-crop-ui.xml)
+  and [scrolled controls](/home/bwales/projects/orbit-app/.planning/phases/31-profile-experience/evidence/31-12-release/release-final-crop-controls-ui.xml).
 
 ## Checklist
 
@@ -132,9 +135,9 @@ Mark every row PASS/FAIL with a short observation. A failed row is a gap for pla
 | 39 | Templates | Create/rename/preview/assignment/usage/delete flows describe inherited vs contact override truthfully. | |
 | 40 | Templates | Save Current Layout as Template appears only for freeform layout; Reset appears only for contact overrides. | |
 | 41 | Reset | Reset confirmation says contact facts/Favorite/Snooze/AI/knowledge remain unchanged, then verifies that result. | |
-| 42 | Background | Template list/picker uses only local device media and keeps Cancel/error drafts/committed background safe. | PENDING OWNER — post-review release picker failure retained Back, clear retryable error copy, Choose photo, and the empty manager state ([evidence](/home/bwales/projects/orbit-app/.planning/phases/31-profile-experience/evidence/31-12-release/release-post-review-picker.png)). No source was selectable, so populated/error/cancel draft paths and crop were not fabricated by mutating owner data; focused model tests passed. |
-| 43 | Crop | Portrait crop: drag, pinch, named controls, min/max bounds, preview and output aspect all agree. | BLOCKED — current standalone release could not open a device photo source; see the post-review picker-error evidence and addendum. Portrait crop is not self-certified by the CR-03 unit test. |
-| 44 | Crop | Landscape crop: same bounds/aspect/reachable controls; no hidden clipping. | BLOCKED — current standalone release could not open a device photo source; see the post-review picker-error evidence and addendum. Landscape crop is not self-certified by the CR-03 unit test. |
+| 42 | Background | Template list/picker uses only local device media and keeps Cancel/error drafts/committed background safe. | PASS — the final release showed the safe retryable error on its first picker attempt, then opened Android's local system picker on immediate retry. Both source orientations reached crop in debug; final-release Cancel → Discard returned without creating or assigning a new background. |
+| 43 | Crop | Portrait crop: drag, pinch, named controls, min/max bounds, preview and output aspect all agree. | PASS — a real portrait source reached the repaired Profile-aspect editor at 1.15x font ([debug UI tree](/home/bwales/projects/orbit-app/.planning/phases/31-profile-experience/evidence/31-12-release/debug-crop-portrait-ui.xml)); shared geometry and fit tests cover clamp bounds, normal/enlarged control regions, and the 2048px output aspect. The final release measured the same aspect in an unobstructed 838×1816 canvas ([release UI tree](/home/bwales/projects/orbit-app/.planning/phases/31-profile-experience/evidence/31-12-release/release-final-crop-ui.xml)). |
+| 44 | Crop | Landscape crop: same bounds/aspect/reachable controls; no hidden clipping. | PASS — real landscape sources rendered cover-cropped in debug and final release. The release control strip exposed every named direction/zoom action without hiding Cancel or Use background ([scrolled UI tree](/home/bwales/projects/orbit-app/.planning/phases/31-profile-experience/evidence/31-12-release/release-final-crop-controls-ui.xml)); the 838×1816 preview occupied exactly the region between the header and controls. |
 | 45 | Background | Assignment at contact/Category/global resolves correctly; Profile restarts with readable scrim treatment. | PENDING OWNER — factory fallback is readable and full bleed in the final Galaxy and Standard release captures; contact/Category/global assignment scenarios remain unexercised. |
 | 46 | Theme | Galaxy and Standard, light/dark as available, retain hierarchy, contrast, and no hardcoded-color regressions. | PENDING OWNER — inspected Galaxy and Standard final-release captures retain hierarchy and no tile/opaque wash; `check:colors` passed. Available light-mode and owner contrast judgment remain. |
 | 47 | Accessibility | TalkBack announces Hero actions, disabled reasons, section expanded state, selection, and sheet focus. | |
