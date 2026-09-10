@@ -16,4 +16,20 @@ describe("ProfileBackgroundManager crop workspace contract", () => {
     );
     expect(source).not.toContain("viewportWidth / source.width");
   });
+
+  it("keeps global/category clear and contact inheritance reachable without a selected template", () => {
+    const source = readFileSync(
+      resolve(__dirname, "ProfileBackgroundManager.tsx"),
+      "utf8",
+    );
+
+    expect(source).toContain('label="Clear global background"');
+    expect(source).toContain("Clear ${category.name} background");
+    expect(source).toContain(
+      "Inherit Category, global, or theme background for ${contactName}",
+    );
+    expect(source).toContain('scope === "clear-global" ? null : selectedUid');
+    expect(source).toContain('scope === "clear-category" ? null : selectedUid');
+    expect(source).toContain('scope === "inherit" ? null : selectedUid');
+  });
 });

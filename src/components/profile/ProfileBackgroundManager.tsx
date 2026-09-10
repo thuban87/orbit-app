@@ -383,20 +383,32 @@ export function ProfileBackgroundManager({
 
   const assign = useCallback(
     async (
-      scope: "global" | "category" | "contact" | "inherit",
+      scope:
+        | "global"
+        | "clear-global"
+        | "category"
+        | "clear-category"
+        | "contact"
+        | "inherit",
       categoryId?: number,
     ) => {
-      if (!selectedUid || saving) return;
+      const needsSelectedTemplate =
+        scope === "global" || scope === "category" || scope === "contact";
+      if ((needsSelectedTemplate && !selectedUid) || saving) return;
       setSaving(true);
       try {
         const now = localDateTime();
-        if (scope === "global") {
+        if (scope === "global" || scope === "clear-global") {
           await assignGlobalProfilePresentation(getExecutor(), {
             layoutTemplateUid: presentation.global.layoutTemplateUid,
-            backgroundTemplateUid: selectedUid,
+            backgroundTemplateUid:
+              scope === "clear-global" ? null : selectedUid,
             now,
           });
-        } else if (scope === "category" && categoryId !== undefined) {
+        } else if (
+          (scope === "category" || scope === "clear-category") &&
+          categoryId !== undefined
+        ) {
           const current = await readCategoryProfilePresentation(
             getExecutor(),
             categoryId,
@@ -404,7 +416,8 @@ export function ProfileBackgroundManager({
           await assignCategoryProfilePresentation(getExecutor(), {
             categoryId,
             layoutTemplateUid: current.layoutTemplateUid,
-            backgroundTemplateUid: selectedUid,
+            backgroundTemplateUid:
+              scope === "clear-category" ? null : selectedUid,
             now,
           });
         } else {
@@ -498,6 +511,29 @@ export function ProfileBackgroundManager({
               role="primary"
               label="Choose photo"
               onPress={() => void chooseImage()}
+            />
+            <AppText role="label">Background assignment</AppText>
+            <AppText role="body">
+              Clear an assignment to use the next available Category, global, or
+              active theme background. Layout choices stay unchanged.
+            </AppText>
+            <Button
+              role="secondary"
+              label="Clear global background"
+              onPress={() => void assign("clear-global")}
+            />
+            {categories.map((category) => (
+              <Button
+                key={`clear-${category.id}`}
+                role="secondary"
+                label={`Clear ${category.name} background`}
+                onPress={() => void assign("clear-category", category.id)}
+              />
+            ))}
+            <Button
+              role="secondary"
+              label={`Inherit Category, global, or theme background for ${contactName}`}
+              onPress={() => void assign("inherit")}
             />
             {listState.kind === "loading" ? (
               <AppText role="body">Loading backgrounds…</AppText>
