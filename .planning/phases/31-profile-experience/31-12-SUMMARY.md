@@ -156,6 +156,30 @@ Verified the summary, final chooser capture, approved production asset, release-
 patch, and all four task commits exist. `git diff --check` passed before the
 summary commit.
 
+## Post-Review-Fix Addendum (2026-09-10)
+
+Four review corrections were already committed in `e7db666`, `3c4ac77`,
+`341ce5c`, and `86929cf`. Their current-HEAD release verification rebuilt the
+standalone APK on droid at
+`C:\\Users\\bwales\\projects\\orbit-app\\android\\app\\build\\outputs\\apk\\release\\app-release.apk`
+with SHA-256 `4e3bfa0192489aef248e8ebb14bbc345817a37eb53e66598aae9d4939668e052`.
+`npm ci` applied `react-native-screens@4.26.2`; the clean prebuild and final
+sequential `assembleRelease --console=plain --no-daemon` completed successfully.
+
+The APK installed and launched standalone on the authorized Pixel 6 Pro; the
+inspected [home shell](/home/bwales/projects/orbit-app/.planning/phases/31-profile-experience/evidence/31-12-release/release-post-review-home.png)
+is persisted with its UI tree. The focused 10-file review suite passed 74 tests,
+and TypeScript, color, and whitespace checks passed.
+
+CR-03's physical crop proof remains **blocked, not waived**: after opening
+Background → Choose photo, the release picker returned its safe manager error
+state before a portrait or landscape source could be selected. The inspected
+[picker failure state](/home/bwales/projects/orbit-app/.planning/phases/31-profile-experience/evidence/31-12-release/release-post-review-picker.png)
+retains Back, retry, and empty-state affordances. No owner media or background
+assignment was injected merely to force a crop screen. Unit coverage for the
+shared portrait target passed; owner/device follow-up needs a usable photo-picker
+source to inspect portrait and landscape crop viewports before saving nothing.
+
 ---
 
 *Phase: 31-profile-experience*

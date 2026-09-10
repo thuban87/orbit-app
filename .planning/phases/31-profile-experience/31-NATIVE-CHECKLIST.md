@@ -59,6 +59,32 @@ Final automated gate: the nine focused Vitest files passed all 78 tests, then
 standalone release is left at the documented droid output path:
 `C:\\Users\\bwales\\projects\\orbit-app\\android\\app\\build\\outputs\\apk\\release\\app-release.apk`.
 
+## Post-review-fix release addendum (2026-09-10)
+
+The four reviewed findings (`e7db666`, `3c4ac77`, `341ce5c`, and `86929cf`)
+were rebuilt from current HEAD with a clean droid `npm ci` (which applied
+`react-native-screens@4.26.2`), clean Expo Android prebuild, and
+`assembleRelease --console=plain --no-daemon`. The resulting standalone APK is
+at `C:\\Users\\bwales\\projects\\orbit-app\\android\\app\\build\\outputs\\apk\\release\\app-release.apk`
+and has SHA-256
+`4e3bfa0192489aef248e8ebb14bbc345817a37eb53e66598aae9d4939668e052`.
+
+- The current APK installed successfully on the same authorized Pixel 6 Pro,
+  launched standalone, and rendered Orbit's home shell. The shell was directly
+  inspected at [release-post-review-home.png](/home/bwales/projects/orbit-app/.planning/phases/31-profile-experience/evidence/31-12-release/release-post-review-home.png).
+- The focused review regression suite passed all current 74 tests across 10
+  files, followed by `npx tsc --noEmit`, `npm run check:colors`, and
+  `git diff --check`.
+- Opening Background → Choose photo produced the manager's safe retryable
+  picker-error state, inspected at [release-post-review-picker.png](/home/bwales/projects/orbit-app/.planning/phases/31-profile-experience/evidence/31-12-release/release-post-review-picker.png): Back, error copy, retry, and the empty-state explanation remained visible. This is picker-error recovery evidence, not a fabricated `file://` render-error test.
+- **Open device blocker — crop verification:** the release picker returned to
+  the manager with `Couldn't open your photos. Please try again.` before any
+  source was selectable. No portrait or landscape crop viewport was reached.
+  No media, background template, crop draft, or assignment was injected into
+  owner data merely to force that state. The CR-03 geometry unit coverage
+  passed, but physical portrait/landscape crop confirmation remains pending a
+  usable device photo-picker source.
+
 ## Checklist
 
 Mark every row PASS/FAIL with a short observation. A failed row is a gap for planning, not an implicit waiver.
@@ -106,9 +132,9 @@ Mark every row PASS/FAIL with a short observation. A failed row is a gap for pla
 | 39 | Templates | Create/rename/preview/assignment/usage/delete flows describe inherited vs contact override truthfully. | |
 | 40 | Templates | Save Current Layout as Template appears only for freeform layout; Reset appears only for contact overrides. | |
 | 41 | Reset | Reset confirmation says contact facts/Favorite/Snooze/AI/knowledge remain unchanged, then verifies that result. | |
-| 42 | Background | Template list/picker uses only local device media and keeps Cancel/error drafts/committed background safe. | PENDING OWNER — final release's real empty manager is nonblank and exposes Back/Choose photo. Populated/error/cancel draft paths were not fabricated by mutating owner data; focused model tests passed. |
-| 43 | Crop | Portrait crop: drag, pinch, named controls, min/max bounds, preview and output aspect all agree. | |
-| 44 | Crop | Landscape crop: same bounds/aspect/reachable controls; no hidden clipping. | |
+| 42 | Background | Template list/picker uses only local device media and keeps Cancel/error drafts/committed background safe. | PENDING OWNER — post-review release picker failure retained Back, clear retryable error copy, Choose photo, and the empty manager state ([evidence](/home/bwales/projects/orbit-app/.planning/phases/31-profile-experience/evidence/31-12-release/release-post-review-picker.png)). No source was selectable, so populated/error/cancel draft paths and crop were not fabricated by mutating owner data; focused model tests passed. |
+| 43 | Crop | Portrait crop: drag, pinch, named controls, min/max bounds, preview and output aspect all agree. | BLOCKED — current standalone release could not open a device photo source; see the post-review picker-error evidence and addendum. Portrait crop is not self-certified by the CR-03 unit test. |
+| 44 | Crop | Landscape crop: same bounds/aspect/reachable controls; no hidden clipping. | BLOCKED — current standalone release could not open a device photo source; see the post-review picker-error evidence and addendum. Landscape crop is not self-certified by the CR-03 unit test. |
 | 45 | Background | Assignment at contact/Category/global resolves correctly; Profile restarts with readable scrim treatment. | PENDING OWNER — factory fallback is readable and full bleed in the final Galaxy and Standard release captures; contact/Category/global assignment scenarios remain unexercised. |
 | 46 | Theme | Galaxy and Standard, light/dark as available, retain hierarchy, contrast, and no hardcoded-color regressions. | PENDING OWNER — inspected Galaxy and Standard final-release captures retain hierarchy and no tile/opaque wash; `check:colors` passed. Available light-mode and owner contrast judgment remain. |
 | 47 | Accessibility | TalkBack announces Hero actions, disabled reasons, section expanded state, selection, and sheet focus. | |
