@@ -144,8 +144,8 @@ blocked: 0
   debug_session: "physical Pixel reproduction 2026-09-09"
 
 - truth: "The background cropper shows the complete source image with a Profile-aspect selection box that responds to drag and pinch, without an always-visible horizontally scrolling adjustment toolbar."
-  status: failed
-  reason: "Owner verified on the physical Pixel that only ordinary control buttons respond; pan and pinch do not, and the visible adjustment controls require horizontal scrolling."
+  status: pending-owner-verification
+  reason: "Plan 31-13 added the Modal-local Gesture Handler root, source-bounded selection workspace, dim mask, and Fine tune disclosure. Automated geometry/pipeline/type/color checks pass and the debug APK was installed on the authorized Pixel; direct drag and genuine two-pointer pinch remain pending owner observation."
   severity: blocker
   test: 6
   root_cause: "ProfileBackgroundManager renders GestureDetector inside BaseOverlay's native React Native Modal without a GestureHandlerRootView in that modal root; Android buttons therefore work while gesture-handler recognition does not. The current cover-image/fixed-viewport interaction and seven-button horizontal strip also do not match the owner-approved selection-box crop model."
@@ -164,4 +164,4 @@ blocked: 0
     - "Map the final selection rectangle directly to an in-bounds source-pixel crop while retaining the existing local JPEG derivative, output cap, naming, assignment, cancellation, and failure-safety behavior."
     - "Remove the always-visible horizontal zoom/direction strip; keep Cancel, Reset, and Use background primary, with any no-precise-drag fine adjustment behind one compact secondary action."
     - "Revoke the unsupported crop PASS and require physical-Pixel debug evidence of actual gesture-driven geometry changes before rebuilding a release APK."
-  debug_session: "owner physical Pixel UAT 2026-09-10"
+  debug_session: "Plan 31-13 debug install 2026-09-10; owner two-pointer gesture verification pending"
