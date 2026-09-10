@@ -1,7 +1,7 @@
 ---
 phase: 31-profile-experience
 plan: 12
-status: awaiting-owner-approval
+status: approved
 created: 2026-09-09
 generation: built-in-imagegen
 ---
@@ -119,10 +119,14 @@ Final remaster target: at or below `#B8C4D0`.
 
 ## Owner decision
 
-**Status:** Awaiting one complete direction decision.
+**Status:** Approved — complete eight-slot direction.
 
-Review the [contact sheet](evidence/31-12-art/contact-sheet.png) and every linked
-candidate together. Reply `approved` to approve this complete eight-slot direction,
-or provide one revision request with each change keyed by its slot ID. Partial
-feedback is a revision request, not approval; production assets remain untouched
-until a complete approval is recorded here.
+**Recorded:** 2026-09-10
+
+**Owner response (verbatim):** “love the bacjground designs, approved. please continue”
+
+This is recorded as approval of every candidate shown together on the linked
+[contact sheet](evidence/31-12-art/contact-sheet.png): Galaxy deep-space,
+starfield, nebula, and aurora; and Standard dawn, paper, dusk, and mesh. Task 3
+may now remaster those exact local candidates into the established production WebP
+slots, preserving their IDs, package mapping, local-only boundary, and AA contract.
