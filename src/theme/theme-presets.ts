@@ -34,6 +34,7 @@ export const THEME_PRESETS: Record<ThemePackage, ThemePreset> = {
       background: "#0B0E1A",
       surface: "#141828",
       surfaceElevated: "#1D2235",
+      profileBackgroundScrim: "#0B0E1AB8",
       // Accent OVERLAY trio, seeded with the galaxy default accent (nebula-blue)
       // dark tone; the provider overlays the active accent at render (Plan 03).
       // fill stays #6C8CFF (the former single `accent`) so existing consumers see
@@ -126,6 +127,7 @@ export const THEME_PRESETS: Record<ThemePackage, ThemePreset> = {
       background: "#EDF0F9",
       surface: "#FBFCFE",
       surfaceElevated: "#FFFFFF",
+      profileBackgroundScrim: "#EDF0F9B8",
       // nebula-blue LIGHT default tone: a deeper blue fill (white onAccent AA on
       // it) with an even deeper accentText tone (AA >=4.5 on the light surfaces).
       accent: "#3355E6",
@@ -184,6 +186,7 @@ export const THEME_PRESETS: Record<ThemePackage, ThemePreset> = {
       background: "#101216",
       surface: "#191C22",
       surfaceElevated: "#242830",
+      profileBackgroundScrim: "#101216C4",
       // slate-indigo DARK default tone (Standard default accent): calmer than
       // galaxy's nebula-blue. fill with a deep onAccent (AA on fill) + a light
       // indigo accentText (AA on the dark surfaces).
@@ -236,6 +239,7 @@ export const THEME_PRESETS: Record<ThemePackage, ThemePreset> = {
       background: "#F2F3F6",
       surface: "#FFFFFF",
       surfaceElevated: "#FDFDFE",
+      profileBackgroundScrim: "#F2F3F6C4",
       // slate-indigo LIGHT default tone.
       accent: "#4453B0",
       onAccent: "#FFFFFF",

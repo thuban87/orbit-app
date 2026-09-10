@@ -122,10 +122,10 @@ const placement = (
 export const FACTORY_PROFILE_LAYOUT: ProfileLayoutDocument = {
   version: PROFILE_LAYOUT_DOCUMENT_VERSION,
   topLevel: [
-    placement("relationship-overview", true),
-    placement("things-to-remember", true),
-    placement("contact-methods", true),
-    placement("interaction-history", true),
+    placement("relationship-overview", false),
+    placement("things-to-remember", false),
+    placement("contact-methods", false),
+    placement("interaction-history", false),
   ],
   overview: [
     placement("orbit-status", false, "2x1"),

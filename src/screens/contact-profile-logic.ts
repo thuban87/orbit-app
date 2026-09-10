@@ -51,6 +51,9 @@ export type ProfileOverflowEntry =
   | "save-layout-template"
   | "reset";
 
+/** One compact Profile app-bar row and the shared minimum icon target. */
+export const PROFILE_APP_BAR = Object.freeze({ height: 56, touchTarget: 44 });
+
 /** The screen presents exactly one modal surface, so Back never leaks to its underlay. */
 export function closeTopmostProfileOverlay(_overlay: ProfileOverlay): null {
   return null;

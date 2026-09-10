@@ -4,6 +4,7 @@ import {
   canStartLifecycleTransition,
   closeTopmostProfileOverlay,
   commitProfileOverviewToggle,
+  PROFILE_APP_BAR,
   profileLifecycleView,
   profileMethodGroups,
   profileOverflowEntries,
@@ -230,6 +231,10 @@ describe("Relationship Overview collapse tracer", () => {
 });
 
 describe("integrated Profile controller contracts", () => {
+  it("uses one standard compact app bar with reachable icon targets", () => {
+    expect(PROFILE_APP_BAR).toEqual({ height: 56, touchTarget: 44 });
+  });
+
   it("keeps the required overflow ordering and only exposes conditional presentation actions", () => {
     expect(
       profileOverflowEntries({

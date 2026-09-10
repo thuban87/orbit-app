@@ -1,7 +1,7 @@
 // biome-ignore-all lint/a11y/useValidAriaRole: AppText role is a typography role.
 import { useFocusEffect } from "@react-navigation/native";
 import { useCallback, useMemo, useState } from "react";
-import { Alert, Image, ScrollView, StyleSheet, View } from "react-native";
+import { Alert, ScrollView, StyleSheet, View } from "react-native";
 import { FrequencyPicker } from "@/components/FrequencyPicker";
 import { ProfileBackgroundManager } from "@/components/profile/ProfileBackgroundManager";
 import { ProfileHero } from "@/components/profile/ProfileHero";
@@ -27,6 +27,7 @@ import type { RootStackScreenProps } from "@/navigation/types";
 import { resolveProfilePresentation } from "@/profile/resolve-presentation";
 import {
   closeTopmostProfileOverlay,
+  PROFILE_APP_BAR,
   type ProfileOverlay,
   profileLifecycleView,
   profileOverflowEntries,
@@ -42,7 +43,6 @@ import { performReachOut } from "@/services/reach-out/handoff";
 import { useShellRefresh } from "@/stores/shell-refresh-store";
 import { useTheme } from "@/theme";
 import { SPACING } from "@/theme/tokens/spacing";
-import { surfaceOpacityForDensity } from "@/theme/tokens/surface";
 import { formatLocalDate } from "@/utils/dates";
 import { Logger } from "@/utils/logger";
 
@@ -54,10 +54,6 @@ export function ContactProfileScreen({
   route,
 }: RootStackScreenProps<"Profile">) {
   const { colors, package: themePackage } = useTheme();
-  const presentationScrimOpacity = surfaceOpacityForDensity(
-    themePackage,
-    "presentation",
-  );
   const contactId = route.params.contactId;
   const [snapshot, setSnapshot] = useState<ProfileSnapshot | null>(null);
   const [loading, setLoading] = useState(true);
@@ -265,33 +261,29 @@ export function ContactProfileScreen({
       : null;
 
   return (
-    <BackgroundHost density="presentation">
+    <BackgroundHost
+      density="presentation"
+      appOwnedBackgroundUri={backgroundUri}
+      readability="profile"
+    >
       <View testID="contact-profile-screen" style={styles.root}>
-        {backgroundUri ? (
-          <>
-            <Image
-              source={{ uri: backgroundUri }}
-              style={StyleSheet.absoluteFill}
-              resizeMode="cover"
+        {snapshot && presentation ? (
+          <View style={styles.appBar}>
+            <Button
+              role="iconOnly"
+              icon="back"
+              accessibilityLabel="Back"
+              onPress={() => navigation.goBack()}
             />
-            <View
-              pointerEvents="none"
-              style={[
-                StyleSheet.absoluteFill,
-                {
-                  backgroundColor: colors.surface,
-                  opacity: presentationScrimOpacity,
-                },
-              ]}
+            <Button
+              role="iconOnly"
+              icon="overflow"
+              accessibilityLabel={`More actions for ${snapshot.identity.name}`}
+              onPress={() => setOverlay("overflow")}
             />
-          </>
+          </View>
         ) : null}
         <ScrollView contentContainerStyle={styles.content}>
-          <Button
-            role="tertiary"
-            label="Back"
-            onPress={() => navigation.goBack()}
-          />
           {loading && !snapshot ? <AppText>Loading Profile…</AppText> : null}
           {error ? <AppText>{error}</AppText> : null}
           {snapshot && presentation ? (
@@ -308,7 +300,6 @@ export function ContactProfileScreen({
                   const phone = snapshot.actionableMethods.phone;
                   if (phone) void launchMethod(phone, "call");
                 }}
-                onOpenOverflow={() => setOverlay("overflow")}
               />
               {lifecycle.kind !== "bound" ? (
                 <View
@@ -546,6 +537,13 @@ export function ContactProfileScreen({
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
+  appBar: {
+    alignItems: "center",
+    flexDirection: "row",
+    height: PROFILE_APP_BAR.height,
+    justifyContent: "space-between",
+    paddingHorizontal: SPACING.base,
+  },
   content: {
     gap: SPACING.base,
     padding: SPACING.base,

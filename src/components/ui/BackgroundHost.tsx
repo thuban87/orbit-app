@@ -32,7 +32,7 @@
 
 import type { ReactNode } from "react";
 import { useState } from "react";
-import { Image, StyleSheet, View } from "react-native";
+import { Image, StyleSheet, useWindowDimensions, View } from "react-native";
 import { useThemeStore } from "@/stores/theme-store";
 import { useTheme } from "@/theme";
 import {
@@ -70,6 +70,14 @@ export interface BackgroundHostProps {
    * that exercises `onError -> None/Solid` on device without deleting an asset).
    */
   forceRenderError?: boolean;
+  /**
+   * An already-resolved derivative in app-owned document storage. Remote URIs
+   * are deliberately rejected so a Profile background cannot create a network
+   * read path.
+   */
+  appOwnedBackgroundUri?: string | null;
+  /** Profile uses its dedicated readability token; all other hosts use SURFACE. */
+  readability?: "default" | "profile";
 }
 
 export function BackgroundHost({
@@ -78,8 +86,12 @@ export function BackgroundHost({
   themePackage,
   slotId,
   forceRenderError = false,
+  appOwnedBackgroundUri = null,
+  readability = "default",
 }: BackgroundHostProps) {
   const { colors, package: activePackage } = useTheme();
+  const { height: viewportHeight, width: viewportWidth } =
+    useWindowDimensions();
   const storeGalaxy = useThemeStore((s) => s.galaxyBackground);
   const storeStandard = useThemeStore((s) => s.standardBackground);
 
@@ -91,8 +103,14 @@ export function BackgroundHost({
   // Latch a render failure, resetting whenever the selection changes so a new
   // (valid) slot gets a fresh render attempt rather than staying stuck on the
   // fallback. Uses React's render-phase reset idiom (no effect, no extra frame).
-  const selectionKey = `${pkg}:${String(effectiveSlot)}`;
   const [renderFailed, setRenderFailed] = useState(false);
+  const localUri =
+    !forceRenderError &&
+    !renderFailed &&
+    appOwnedBackgroundUri?.startsWith("file://")
+      ? appOwnedBackgroundUri
+      : null;
+  const selectionKey = `${pkg}:${String(effectiveSlot)}:${String(localUri)}`;
   const [prevKey, setPrevKey] = useState(selectionKey);
   if (selectionKey !== prevKey) {
     setPrevKey(selectionKey);
@@ -107,16 +125,28 @@ export function BackgroundHost({
 
   // Density scrim opacity is token-sourced (surface.ts) — denser -> more opaque.
   const scrimOpacity = surfaceOpacityForDensity(pkg, density);
+  const scrimStyle =
+    readability === "profile"
+      ? { backgroundColor: colors.profileBackgroundScrim }
+      : { backgroundColor: colors.surface, opacity: scrimOpacity };
+  const imageSource = localUri
+    ? { uri: localUri }
+    : resolved.kind === "asset"
+      ? resolved.source()
+      : null;
 
   return (
     <View style={styles.root}>
       {/* Fixed background layer — absolute fill BEHIND the scrollable content, so it
           never scrolls with it (THEME-04). */}
       <View style={StyleSheet.absoluteFill} pointerEvents="none">
-        {resolved.kind === "asset" ? (
+        {imageSource ? (
           <Image
-            source={resolved.source()}
-            style={StyleSheet.absoluteFill}
+            source={imageSource}
+            style={[
+              StyleSheet.absoluteFill,
+              { height: viewportHeight, width: viewportWidth },
+            ]}
             resizeMode="cover"
             // A RENDER failure (decode/null image) silently degrades to None/Solid
             // via the node-tested reducer — no user-facing error.
@@ -133,12 +163,7 @@ export function BackgroundHost({
         )}
         {/* Density scrim — the surface tint at the density opacity keeps content
             readable. For None/Solid this simply deepens the solid background. */}
-        <View
-          style={[
-            StyleSheet.absoluteFill,
-            { backgroundColor: colors.surface, opacity: scrimOpacity },
-          ]}
-        />
+        <View style={[StyleSheet.absoluteFill, scrimStyle]} />
       </View>
       {/* Scrollable content sits above the fixed background. */}
       <View style={styles.content}>{children}</View>

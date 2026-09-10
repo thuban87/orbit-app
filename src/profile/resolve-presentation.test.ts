@@ -58,12 +58,22 @@ describe("resolveProfilePresentation", () => {
         expanded: true,
       })),
     };
-    input.layoutTemplates[2] = { uid: "contact-layout", layout: templateLayout };
     input.contact.layoutTemplateUid = "contact-layout";
     input.contact.collapse = { "contact-methods": false };
 
-    const resolved = resolveProfilePresentation(input);
-    expect(resolved.layout.document.topLevel.every((placement) => placement.expanded)).toBe(true);
+    const resolved = resolveProfilePresentation({
+      ...input,
+      layoutTemplates: input.layoutTemplates.map((template) =>
+        template.uid === "contact-layout"
+          ? { ...template, layout: templateLayout }
+          : template,
+      ),
+    });
+    expect(
+      resolved.layout.document.topLevel.every(
+        (placement) => placement.expanded,
+      ),
+    ).toBe(true);
     expect(resolved.collapse).toEqual({ "contact-methods": false });
   });
 

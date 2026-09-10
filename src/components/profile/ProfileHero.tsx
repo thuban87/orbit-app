@@ -14,7 +14,6 @@ export function ProfileHero({
   onToggleFavourite,
   onMessage,
   onCall,
-  onOpenOverflow,
   pendingFavourite = false,
 }: {
   identity: ProfileIdentity;
@@ -22,7 +21,6 @@ export function ProfileHero({
   onToggleFavourite: () => void;
   onMessage: () => void;
   onCall: () => void;
-  onOpenOverflow: () => void;
   pendingFavourite?: boolean;
 }) {
   const actions = profileHeroActionState(actionableMethods);
@@ -45,12 +43,6 @@ export function ProfileHero({
             state={identity.favouriteRank === null ? "default" : "active"}
           />
         </Pressable>
-        <Button
-          role="iconOnly"
-          icon="overflow"
-          accessibilityLabel={`More actions for ${identity.name}`}
-          onPress={onOpenOverflow}
-        />
       </View>
       <Avatar
         photo={identity.photo}
@@ -110,7 +102,7 @@ const styles = StyleSheet.create({
   utilityRow: {
     alignSelf: "stretch",
     flexDirection: "row",
-    justifyContent: "space-between",
+    justifyContent: "flex-end",
   },
   iconAction: {
     minWidth: 44,

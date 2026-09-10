@@ -52,6 +52,12 @@ export interface ThemePalette {
   surface: string;
   surfaceElevated: string;
   /**
+   * Profile-only transparent readability treatment for an app-owned or bundled
+   * background. This must not be substituted for shared Surface/GlassSurface
+   * tokens, whose density contract remains app-wide.
+   */
+  profileBackgroundScrim: string;
+  /**
    * The filled-accent background (Primary button / active state). SEEDED per
    * preset with the package default accent's mode-resolved `fill` and OVERLAID
    * at render by the provider with the active package's accent (Plan 03 /
