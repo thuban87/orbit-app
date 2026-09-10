@@ -1,14 +1,14 @@
 ---
-status: passed
+status: issues_found
 phase: 31-profile-experience
 source: 31-01-SUMMARY.md, 31-02-SUMMARY.md, 31-03-SUMMARY.md, 31-04-SUMMARY.md, 31-05-SUMMARY.md, 31-06-SUMMARY.md, 31-07-SUMMARY.md, 31-08-SUMMARY.md, 31-09-SUMMARY.md
 started: 2026-09-09T16:38:10-05:00
-updated: 2026-09-10T06:15:00-05:00
+updated: 2026-09-10T03:41:27-05:00
 ---
 
 ## Current Test
 
-[reconciled — all six reported Profile gaps have retained remediation evidence; the owner directly approved the final touch/pinch crop editor]
+[owner release smoke found three remaining functional gaps after the first six remediations passed]
 
 ## Tests
 
@@ -54,11 +54,36 @@ reported: "Touch doesn't appear to work on it at all outside of the control butt
 observed: "Plan 31-13 physical-Pixel evidence proves direct one-finger drag on real portrait and landscape sources, source-bounded selection, and reflowing Fine tune controls. The owner subsequently performed and explicitly approved the genuine touch/pinch behavior, describing the final crop editor as ‘amazing and exactly what I was looking for.’"
 evidence: ".planning/phases/31-profile-experience/evidence/31-13-debug/17-landscape-contained.png; .planning/phases/31-profile-experience/evidence/31-13-debug/20-portrait-contained.png; owner approval recorded in execution request 2026-09-10"
 
+### 7. Layout editor supports direct drag reordering
+expected: A section can be reordered by direct drag, while the named Move controls remain an equivalent non-precise fallback.
+result: fail
+reported: "No drag operations on the layout edit screen. Manual move button work fine though."
+observed: "Owner release smoke confirms named Move controls work, but direct drag does not."
+evidence: "owner release-smoke report 2026-09-10"
+
+### 8. Layout templates are globally discoverable and assignable to any contact
+expected: A layout template created from one Profile is visible from another Profile, and its assignment flow can target any individual contact rather than only the currently open Profile.
+result: fail
+reported: "Can't assign a template to another user individually... it only allows me to assign as global default, to one of the categories, or to the contact of the profile I'm currently in... [another contact's] layout editor doesn't list the other templates I've made elsewhere, it prompts to make a new template from scratch."
+observed: "The current Profile-scoped manager exposes only the host contact as an individual assignment target, and the ordinary Profile Layout route does not expose the shared template library for an inherited-layout contact."
+evidence: "owner release-smoke report 2026-09-10"
+
+### 9. Background assignments can return to the theme default
+expected: Global, Category, and contact background assignment surfaces expose a truthful clear/inherit action; clearing the global assignment returns Profiles without narrower overrides to the original theme background.
+result: fail
+reported: "I changed the global default background to a new picture... now there's no way to remove the picture from the background and just have a plain background like it was originally."
+observed: "The assignment UI can set a global background template but provides no escape hatch that clears the global background axis."
+evidence: "owner release-smoke report 2026-09-10"
+
+### Deferred polish: layout-template preview
+
+The owner reported that the template Preview page "looks like garbage" but explicitly accepted handling that visual treatment in a later polish pass. It is not part of this functional gap closure unless execution discovers that the preview is unusable rather than merely unattractive.
+
 ## Summary
 
-total: 6
+total: 9
 passed: 6
-issues: 0
+issues: 3
 pending: 0
 skipped: 0
 blocked: 0
