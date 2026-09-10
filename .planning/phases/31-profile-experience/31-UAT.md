@@ -3,12 +3,12 @@ status: partial
 phase: 31-profile-experience
 source: 31-01-SUMMARY.md, 31-02-SUMMARY.md, 31-03-SUMMARY.md, 31-04-SUMMARY.md, 31-05-SUMMARY.md, 31-06-SUMMARY.md, 31-07-SUMMARY.md, 31-08-SUMMARY.md, 31-09-SUMMARY.md
 started: 2026-09-09T16:38:10-05:00
-updated: 2026-09-10T00:00:00-05:00
+updated: 2026-09-10T01:45:00-05:00
 ---
 
 ## Current Test
 
-[testing paused — background crop interaction remains a blocker after the first remediation]
+[testing paused — Plan 31-13 remediation is installed; owner pinch verification remains]
 
 ## Tests
 
@@ -44,16 +44,17 @@ severity: major
 
 ### 6. Background cropper provides direct modern touch manipulation
 expected: The complete source image is visible beneath a Profile-aspect selection box; one-finger drag repositions the selection, pinch resizes it within source bounds, and the primary crop screen does not require a horizontally scrolling strip of zoom or directional buttons.
-result: issue
+result: pending
 reported: "Touch doesn't appear to work on it at all outside of the control buttons. Can't pinch to zoom/unzoom, pan, nothing... the controls are all on one row meaning you have to scroll horizontally... I don't understand why this isn't a modern picture cropper like our profile picture cropper is."
+observed: "Plan 31-13 debug verification on the physical Pixel directly dragged real landscape and portrait source selections from center to an edge; the retained UI trees changed from `aligned top center` to `aligned top left`. A second portrait swipe moved left to right and updated the terminal text accordingly. Fine tune remained open, exposed all named controls without horizontal scrolling, and Zoom in changed the textual crop size from 62% to 54%. No gesture/worklet runtime exception appeared. Genuine two-pointer pinch remains owner-only verification."
 severity: blocker
 
 ## Summary
 
 total: 6
 passed: 0
-issues: 6
-pending: 0
+issues: 5
+pending: 1
 skipped: 0
 blocked: 0
 
@@ -145,23 +146,19 @@ blocked: 0
 
 - truth: "The background cropper shows the complete source image with a Profile-aspect selection box that responds to drag and pinch, without an always-visible horizontally scrolling adjustment toolbar."
   status: pending-owner-verification
-  reason: "Plan 31-13 added the Modal-local Gesture Handler root, source-bounded selection workspace, dim mask, and Fine tune disclosure. Automated geometry/pipeline/type/color checks pass and the debug APK was installed on the authorized Pixel; direct drag and genuine two-pointer pinch remain pending owner observation."
+  reason: "Plan 31-13 added the Modal-local Gesture Handler root, full-source bounded selection workspace, dim mask, and reflowing Fine tune disclosure. Automated geometry/pipeline/type/color checks pass, and physical-Pixel evidence proves direct one-finger drag on landscape and portrait sources plus named Fine tune zoom. Genuine two-pointer pinch remains pending owner observation."
   severity: blocker
   test: 6
   root_cause: "ProfileBackgroundManager renders GestureDetector inside BaseOverlay's native React Native Modal without a GestureHandlerRootView in that modal root; Android buttons therefore work while gesture-handler recognition does not. The current cover-image/fixed-viewport interaction and seven-button horizontal strip also do not match the owner-approved selection-box crop model."
   artifacts:
     - path: "src/components/ui/overlay-base.tsx"
-      issue: "The separate native Modal root is not wrapped for react-native-gesture-handler on Android."
+      issue: "Resolved in Plan 31-13: the separate native Modal root now has its own GestureHandlerRootView."
     - path: "src/components/profile/ProfileBackgroundManager.tsx"
-      issue: "The crop UI transforms a cover-scaled image inside a nearly full-height fixed viewport and exposes Reset, zoom, and four movement buttons in a horizontal ScrollView."
+      issue: "Resolved in Plan 31-13: the full source is contained in a full-width gesture surface beneath the bounded selection, and ordinary controls reflow without a horizontal strip."
     - path: "src/services/photos/background-crop-geometry.ts"
-      issue: "Geometry models image pan/scale under a fixed destination viewport rather than an aspect-locked selection rectangle over a contained full-source preview."
+      issue: "Resolved in Plan 31-13: source-selection geometry clamps translation and focal pinch resizing to the source."
     - path: ".planning/phases/31-profile-experience/31-NATIVE-CHECKLIST.md"
       issue: "Rows 43 and 44 claim PASS without evidence that physical drag or pinch changed the crop."
   missing:
-    - "Provide a gesture-handler root for modal content and prove real Android drag and pinch recognition."
-    - "Show the complete contained source image beneath a dimmed outside mask and movable/resizable Profile-aspect selection rectangle."
-    - "Map the final selection rectangle directly to an in-bounds source-pixel crop while retaining the existing local JPEG derivative, output cap, naming, assignment, cancellation, and failure-safety behavior."
-    - "Remove the always-visible horizontal zoom/direction strip; keep Cancel, Reset, and Use background primary, with any no-precise-drag fine adjustment behind one compact secondary action."
-    - "Revoke the unsupported crop PASS and require physical-Pixel debug evidence of actual gesture-driven geometry changes before rebuilding a release APK."
-  debug_session: "Plan 31-13 debug install 2026-09-10; owner two-pointer gesture verification pending"
+    - "On the physical Pixel, the owner directly performs a genuine two-pointer pinch on portrait and landscape sources and confirms resize remains bounded."
+  debug_session: "Plan 31-13 physical-Pixel debug evidence 2026-09-10; landscape/portrait direct drag and Fine tune verified, owner two-pointer pinch pending"
