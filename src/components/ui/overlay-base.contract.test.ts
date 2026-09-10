@@ -7,7 +7,7 @@ describe("BaseOverlay Android Modal gesture-root contract", () => {
     const source = readFileSync(resolve(__dirname, "overlay-base.tsx"), "utf8");
     expect(source).toContain('import { GestureHandlerRootView }');
     expect(source).toMatch(
-      /<RNModal[\s\S]*?>\s*<GestureHandlerRootView style={styles\.root}>/,
+      /<RNModal[\s\S]*?<GestureHandlerRootView style={styles\.root}>/,
     );
   });
 });

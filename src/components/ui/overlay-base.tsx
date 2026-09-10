@@ -29,6 +29,7 @@ import {
   View,
   type ViewStyle,
 } from "react-native";
+import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { useTheme } from "@/theme";
 
 /** Scrim opacity applied to `colors.background` (the DropdownFieldWidget idiom). */
@@ -92,7 +93,10 @@ export function BaseOverlay({
       // non-dismissable (destructive) overlay, which requires an explicit choice.
       onRequestClose={dismissable ? onRequestClose : noop}
     >
-      <View style={[styles.root, { justifyContent: justify }]}>
+      {/* Android RN Modal content is a separate native root; RNGH's installed
+          and official Modal guidance requires its own full-height root. */}
+      <GestureHandlerRootView style={styles.root}>
+        <View style={[styles.root, { justifyContent: justify }]}>
         {dismissable ? (
           <Pressable
             accessibilityRole="button"
@@ -122,7 +126,8 @@ export function BaseOverlay({
         <View ref={contentRef} collapsable={false} style={contentStyle}>
           {children}
         </View>
-      </View>
+        </View>
+      </GestureHandlerRootView>
     </RNModal>
   );
 }

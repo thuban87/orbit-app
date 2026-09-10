@@ -14,6 +14,7 @@ import {
 } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, {
+  runOnJS,
   useAnimatedStyle,
   useSharedValue,
 } from "react-native-reanimated";
@@ -49,6 +50,13 @@ import {
 import type { ProfilePresentationInputs } from "@/profile/types";
 import { prepareProfileBackground } from "@/services/photos/background-pipeline";
 import {
+  clampBackgroundCropSelection,
+  createInitialBackgroundCropSelection,
+  describeBackgroundCropSelection,
+  pinchResizeBackgroundCropSelection,
+  translateBackgroundCropSelection,
+} from "@/services/photos/background-crop-geometry";
+import {
   backgroundDerivativeRelPath,
   deleteBackgroundDerivative,
   persistBackgroundDerivative,
@@ -64,7 +72,7 @@ import { SPACING } from "@/theme/tokens/spacing";
 import { Logger } from "@/utils/logger";
 
 const LOG_SCOPE = "profile-background-manager";
-const MAX_SCALE = 8;
+const MAX_ZOOM = 8;
 
 type Page = "list" | "crop" | "name" | "assign";
 type CropSource = { uri: string; width: number; height: number };
@@ -128,15 +136,24 @@ export function ProfileBackgroundManager({
   const [saving, setSaving] = useState(false);
   const [listLoading, setListLoading] = useState(false);
   const [listError, setListError] = useState<string | null>(null);
+  const [cropStatus, setCropStatus] = useState("");
+  const [fineTuneOpen, setFineTuneOpen] = useState(false);
   const tokenCounter = useRef(0);
   const activeTokenRef = useRef<string | null>(null);
 
-  const scale = useSharedValue(1);
-  const translateX = useSharedValue(0);
-  const translateY = useSharedValue(0);
-  const startScale = useSharedValue(1);
+  const displayScale = useSharedValue(1);
+  const displayOffsetX = useSharedValue(0);
+  const displayOffsetY = useSharedValue(0);
+  const sourceWidth = useSharedValue(1);
+  const sourceHeight = useSharedValue(1);
+  const selectionX = useSharedValue(0);
+  const selectionY = useSharedValue(0);
+  const selectionWidth = useSharedValue(1);
+  const selectionHeight = useSharedValue(1);
   const startX = useSharedValue(0);
   const startY = useSharedValue(0);
+  const startWidth = useSharedValue(1);
+  const startHeight = useSharedValue(1);
 
   const refresh = useCallback(async () => {
     setListLoading(true);
@@ -161,86 +178,60 @@ export function ProfileBackgroundManager({
     void refresh();
   }, [refresh, visible]);
 
-  const cropBase = useMemo(() => {
-    if (!source || !cropPreview) return null;
-    return Math.max(
-      cropPreview.width / source.width,
-      cropPreview.height / source.height,
-    );
-  }, [cropPreview, source]);
-
-  const clampSharedPan = useCallback(
-    (nextScale: number, nextX: number, nextY: number) => {
-      if (!source || !cropBase || !cropPreview) return;
-      const boundedScale = Math.max(1, Math.min(nextScale, MAX_SCALE));
-      const maxX = Math.max(
-        0,
-        (source.width * cropBase * boundedScale - cropPreview.width) / 2,
-      );
-      const maxY = Math.max(
-        0,
-        (source.height * cropBase * boundedScale - cropPreview.height) / 2,
-      );
-      scale.value = boundedScale;
-      translateX.value = Math.max(-maxX, Math.min(nextX, maxX));
-      translateY.value = Math.max(-maxY, Math.min(nextY, maxY));
+  const profileAspect = cropTarget.preview.width / cropTarget.preview.height;
+  const publishStatus = useCallback(
+    (x: number, y: number, width: number, height: number) => {
+      if (source) setCropStatus(describeBackgroundCropSelection({ originX: x, originY: y, width, height }, source));
     },
-    [cropBase, cropPreview, scale, source, translateX, translateY],
+    [source],
   );
-
-  const pan = Gesture.Pan()
-    .onStart(() => {
-      startX.value = translateX.value;
-      startY.value = translateY.value;
-    })
-    .onUpdate((event) => {
-      if (!source || !cropBase || !cropPreview) return;
-      const maxX = Math.max(
-        0,
-        (source.width * cropBase * scale.value - cropPreview.width) / 2,
-      );
-      const maxY = Math.max(
-        0,
-        (source.height * cropBase * scale.value - cropPreview.height) / 2,
-      );
-      translateX.value = Math.max(
-        -maxX,
-        Math.min(startX.value + event.translationX, maxX),
-      );
-      translateY.value = Math.max(
-        -maxY,
-        Math.min(startY.value + event.translationY, maxY),
-      );
-    });
-  const pinch = Gesture.Pinch()
-    .onStart(() => {
-      startScale.value = scale.value;
-    })
-    .onUpdate((event) => {
-      if (!source || !cropBase || !cropPreview) return;
-      const nextScale = Math.max(
-        1,
-        Math.min(startScale.value * event.scale, MAX_SCALE),
-      );
-      const maxX = Math.max(
-        0,
-        (source.width * cropBase * nextScale - cropPreview.width) / 2,
-      );
-      const maxY = Math.max(
-        0,
-        (source.height * cropBase * nextScale - cropPreview.height) / 2,
-      );
-      scale.value = nextScale;
-      translateX.value = Math.max(-maxX, Math.min(translateX.value, maxX));
-      translateY.value = Math.max(-maxY, Math.min(translateY.value, maxY));
-    });
-  const animatedImageStyle = useAnimatedStyle(() => ({
-    transform: [
-      { translateX: translateX.value },
-      { translateY: translateY.value },
-      { scale: scale.value },
-    ],
-  }));
+  useEffect(() => {
+    if (!source || !cropPreview) return;
+    const initial = createInitialBackgroundCropSelection(source, profileAspect);
+    const scale = Math.min(cropPreview.width / source.width, cropPreview.height / source.height);
+    displayScale.value = scale;
+    sourceWidth.value = source.width;
+    sourceHeight.value = source.height;
+    displayOffsetX.value = (cropPreview.width - source.width * scale) / 2;
+    displayOffsetY.value = (cropPreview.height - source.height * scale) / 2;
+    selectionX.value = initial.originX;
+    selectionY.value = initial.originY;
+    selectionWidth.value = initial.width;
+    selectionHeight.value = initial.height;
+    setFineTuneOpen(false);
+    publishStatus(initial.originX, initial.originY, initial.width, initial.height);
+  }, [cropPreview, displayOffsetX, displayOffsetY, displayScale, profileAspect, publishStatus, selectionHeight, selectionWidth, selectionX, selectionY, source, sourceHeight, sourceWidth]);
+  const clampSelection = () => {
+    "worklet";
+    const maxWidth = Math.min(sourceWidth.value, sourceHeight.value * profileAspect);
+    const width = Math.max(maxWidth / MAX_ZOOM, Math.min(selectionWidth.value, maxWidth));
+    selectionWidth.value = width;
+    selectionHeight.value = width / profileAspect;
+  };
+  const pan = Gesture.Pan().onStart(() => {
+    startX.value = selectionX.value;
+    startY.value = selectionY.value;
+  }).onUpdate((event) => {
+    selectionX.value = startX.value + event.translationX / displayScale.value;
+    selectionY.value = startY.value + event.translationY / displayScale.value;
+    const maxX = Math.max(0, sourceWidth.value - selectionWidth.value);
+    selectionX.value = Math.max(0, Math.min(selectionX.value, maxX));
+    selectionY.value = Math.max(0, Math.min(selectionY.value, sourceHeight.value - selectionHeight.value));
+  }).onEnd(() => runOnJS(publishStatus)(selectionX.value, selectionY.value, selectionWidth.value, selectionHeight.value));
+  const pinch = Gesture.Pinch().onStart(() => {
+    startWidth.value = selectionWidth.value;
+    startHeight.value = selectionHeight.value;
+    startX.value = selectionX.value;
+    startY.value = selectionY.value;
+  }).onUpdate((event) => {
+    selectionWidth.value = Math.max(startWidth.value / MAX_ZOOM, Math.min(startWidth.value / event.scale, startWidth.value));
+    selectionHeight.value = selectionWidth.value / profileAspect;
+    selectionX.value = startX.value;
+    selectionY.value = startY.value;
+    clampSelection();
+  }).onEnd(() => runOnJS(publishStatus)(selectionX.value, selectionY.value, selectionWidth.value, selectionHeight.value));
+  const sourceImageStyle = useAnimatedStyle(() => ({ height: sourceHeight.value * displayScale.value, left: displayOffsetX.value, top: displayOffsetY.value, width: sourceWidth.value * displayScale.value }));
+  const selectionStyle = useAnimatedStyle(() => ({ height: selectionHeight.value * displayScale.value, left: displayOffsetX.value + selectionX.value * displayScale.value, top: displayOffsetY.value + selectionY.value * displayScale.value, width: selectionWidth.value * displayScale.value }));
 
   const chooseImage = useCallback(async () => {
     try {
@@ -253,9 +244,6 @@ export function ProfileBackgroundManager({
       if (!asset?.uri || !asset.width || !asset.height) return;
       const token = `background-${++tokenCounter.current}`;
       activeTokenRef.current = token;
-      scale.value = 1;
-      translateX.value = 0;
-      translateY.value = 0;
       setSource({ uri: asset.uri, width: asset.width, height: asset.height });
       setManagerState((state) => beginBackgroundPreparation(state, token));
       setPage("crop");
@@ -266,7 +254,7 @@ export function ProfileBackgroundManager({
         error: "Couldn't open your photos. Please try again.",
       }));
     }
-  }, [scale, translateX, translateY]);
+  }, []);
 
   const prepareCrop = useCallback(async () => {
     if (!source || !cropPreview || saving) return;
@@ -278,15 +266,11 @@ export function ProfileBackgroundManager({
     try {
       const prepared = await prepareProfileBackground({
         rawUri: source.uri,
-        transform: {
-          destinationWidth: cropPreview.width,
-          destinationHeight: cropPreview.height,
-          srcWidth: source.width,
-          srcHeight: source.height,
-          scale: scale.value,
-          translateX: translateX.value,
-          translateY: translateY.value,
-        },
+        selection: clampBackgroundCropSelection(
+          { originX: selectionX.value, originY: selectionY.value, width: selectionWidth.value, height: selectionHeight.value },
+          source,
+          profileAspect,
+        ),
         output: cropTarget.output,
         cropAndResize: async ({ rawUri, crop, output }) => {
           const rendered = await ImageManipulator.manipulate(rawUri)
@@ -338,11 +322,13 @@ export function ProfileBackgroundManager({
     contactName,
     cropPreview,
     cropTarget.output,
+    profileAspect,
     saving,
-    scale,
+    selectionHeight,
+    selectionWidth,
+    selectionX,
+    selectionY,
     source,
-    translateX,
-    translateY,
   ]);
 
   const retryCrop = useCallback(() => {
@@ -469,10 +455,6 @@ export function ProfileBackgroundManager({
 
   const selected =
     templates.find((template) => template.uid === selectedUid) ?? null;
-  const imageStyle =
-    source && cropBase
-      ? { width: source.width * cropBase, height: source.height * cropBase }
-      : null;
   const listState = resolveBackgroundListState({
     loading: listLoading,
     error: listError,
@@ -618,14 +600,13 @@ export function ProfileBackgroundManager({
                 );
               }}
             >
-              {cropPreview && imageStyle ? (
+              {cropPreview ? (
                 <View style={[styles.cropViewport, cropPreview]}>
                   <GestureDetector gesture={Gesture.Simultaneous(pan, pinch)}>
-                    <Animated.Image
-                      source={{ uri: source.uri }}
-                      style={[imageStyle, animatedImageStyle]}
-                      resizeMode="stretch"
-                    />
+                    <Animated.View style={styles.cropTouchSurface}>
+                      <Animated.Image source={{ uri: source.uri }} style={[styles.containedSource, sourceImageStyle]} resizeMode="stretch" />
+                      <Animated.View pointerEvents="none" style={[styles.cropSelection, { borderColor: colors.accent }, selectionStyle]} />
+                    </Animated.View>
                   </GestureDetector>
                 </View>
               ) : null}
@@ -636,96 +617,66 @@ export function ProfileBackgroundManager({
                   {managerState.error}
                 </AppText>
               ) : null}
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator
-                contentContainerStyle={styles.cropControlRow}
-              >
+              <AppText accessibilityLiveRegion="polite" role="body">{cropStatus}</AppText>
+              {fineTuneOpen ? <View style={styles.fineTuneControls}>
                 <Button
                   role="tertiary"
                   label="Reset"
                   accessibilityLabel="Reset crop"
-                  onPress={() => clampSharedPan(1, 0, 0)}
+                  onPress={() => {
+                    if (!source) return;
+                    const next = createInitialBackgroundCropSelection(source, profileAspect);
+                    selectionX.value = next.originX;
+                    selectionY.value = next.originY;
+                    selectionWidth.value = next.width;
+                    selectionHeight.value = next.height;
+                    publishStatus(next.originX, next.originY, next.width, next.height);
+                  }}
                 />
                 <Button
                   role="tertiary"
-                  label="Zoom +"
+                  label="Zoom in"
                   accessibilityLabel="Zoom in"
-                  onPress={() =>
-                    clampSharedPan(
-                      scale.value * 1.15,
-                      translateX.value,
-                      translateY.value,
-                    )
-                  }
+                  onPress={() => source && (() => { const next = pinchResizeBackgroundCropSelection({ originX: selectionX.value, originY: selectionY.value, width: selectionWidth.value, height: selectionHeight.value }, source, profileAspect, { x: selectionX.value + selectionWidth.value / 2, y: selectionY.value + selectionHeight.value / 2 }, 1.15); selectionX.value = next.originX; selectionY.value = next.originY; selectionWidth.value = next.width; selectionHeight.value = next.height; publishStatus(next.originX, next.originY, next.width, next.height); })()}
                 />
                 <Button
                   role="tertiary"
-                  label="Zoom −"
+                  label="Zoom out"
                   accessibilityLabel="Zoom out"
-                  onPress={() =>
-                    clampSharedPan(
-                      scale.value / 1.15,
-                      translateX.value,
-                      translateY.value,
-                    )
-                  }
+                  onPress={() => source && (() => { const next = pinchResizeBackgroundCropSelection({ originX: selectionX.value, originY: selectionY.value, width: selectionWidth.value, height: selectionHeight.value }, source, profileAspect, { x: selectionX.value + selectionWidth.value / 2, y: selectionY.value + selectionHeight.value / 2 }, 1 / 1.15); selectionX.value = next.originX; selectionY.value = next.originY; selectionWidth.value = next.width; selectionHeight.value = next.height; publishStatus(next.originX, next.originY, next.width, next.height); })()}
                 />
                 <Button
                   role="tertiary"
-                  label="←"
+                  label="Move left"
                   accessibilityLabel="Move left"
-                  onPress={() =>
-                    clampSharedPan(
-                      scale.value,
-                      translateX.value - 24,
-                      translateY.value,
-                    )
-                  }
+                  onPress={() => source && (() => { const next = translateBackgroundCropSelection({ originX: selectionX.value, originY: selectionY.value, width: selectionWidth.value, height: selectionHeight.value }, source, -24, 0); selectionX.value = next.originX; selectionY.value = next.originY; publishStatus(next.originX, next.originY, next.width, next.height); })()}
                 />
                 <Button
                   role="tertiary"
-                  label="→"
+                  label="Move right"
                   accessibilityLabel="Move right"
-                  onPress={() =>
-                    clampSharedPan(
-                      scale.value,
-                      translateX.value + 24,
-                      translateY.value,
-                    )
-                  }
+                  onPress={() => source && (() => { const next = translateBackgroundCropSelection({ originX: selectionX.value, originY: selectionY.value, width: selectionWidth.value, height: selectionHeight.value }, source, 24, 0); selectionX.value = next.originX; selectionY.value = next.originY; publishStatus(next.originX, next.originY, next.width, next.height); })()}
                 />
                 <Button
                   role="tertiary"
-                  label="↑"
+                  label="Move up"
                   accessibilityLabel="Move up"
-                  onPress={() =>
-                    clampSharedPan(
-                      scale.value,
-                      translateX.value,
-                      translateY.value - 24,
-                    )
-                  }
+                  onPress={() => source && (() => { const next = translateBackgroundCropSelection({ originX: selectionX.value, originY: selectionY.value, width: selectionWidth.value, height: selectionHeight.value }, source, 0, -24); selectionX.value = next.originX; selectionY.value = next.originY; publishStatus(next.originX, next.originY, next.width, next.height); })()}
                 />
                 <Button
                   role="tertiary"
-                  label="↓"
+                  label="Move down"
                   accessibilityLabel="Move down"
-                  onPress={() =>
-                    clampSharedPan(
-                      scale.value,
-                      translateX.value,
-                      translateY.value + 24,
-                    )
-                  }
+                  onPress={() => source && (() => { const next = translateBackgroundCropSelection({ originX: selectionX.value, originY: selectionY.value, width: selectionWidth.value, height: selectionHeight.value }, source, 0, 24); selectionX.value = next.originX; selectionY.value = next.originY; publishStatus(next.originX, next.originY, next.width, next.height); })()}
                 />
-              </ScrollView>
+              </View> : null}
               <View style={styles.cropActions}>
                 <Button
                   role="secondary"
                   label="Cancel"
                   onPress={closeOrGuard}
                 />
+                <Button role="tertiary" label="Fine tune" onPress={() => setFineTuneOpen((open) => !open)} />
                 {managerState.error ? (
                   <Button
                     role="secondary"
@@ -834,6 +785,9 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     overflow: "hidden",
   },
+  cropTouchSurface: { flex: 1 },
+  containedSource: { position: "absolute" },
+  cropSelection: { borderWidth: 2, position: "absolute" },
   cropEditor: {
     flex: 1,
     overflow: "hidden",
@@ -851,6 +805,7 @@ const styles = StyleSheet.create({
     padding: SPACING.sm,
   },
   cropControlRow: { gap: SPACING.xs, paddingRight: SPACING.sm },
+  fineTuneControls: { flexDirection: "row", flexWrap: "wrap", gap: SPACING.xs },
   cropActions: {
     flexDirection: "row",
     flexWrap: "wrap",
