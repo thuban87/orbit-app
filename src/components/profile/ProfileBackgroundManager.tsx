@@ -41,6 +41,7 @@ import {
   beginBackgroundPreparation,
   cancelBackgroundPreparation,
   createBackgroundManagerState,
+  deleteBackgroundTemplateAndRefresh,
   finishBackgroundPreparation,
   requestBackgroundManagerDismissal,
   resolveBackgroundListState,
@@ -534,16 +535,29 @@ export function ProfileBackgroundManager({
                                 style: "destructive",
                                 onPress: () =>
                                   void (async () => {
-                                    const orphan =
-                                      await deleteProfileBackgroundTemplate(
-                                        getExecutor(),
-                                        template.uid,
-                                        localDateTime(),
+                                    try {
+                                      await deleteBackgroundTemplateAndRefresh({
+                                        removeTemplate: () =>
+                                          deleteProfileBackgroundTemplate(
+                                            getExecutor(),
+                                            template.uid,
+                                            localDateTime(),
+                                          ),
+                                        removeDerivative:
+                                          deleteBackgroundDerivative,
+                                        refresh,
+                                        onCommitted,
+                                      });
+                                    } catch (error) {
+                                      Logger.error(
+                                        LOG_SCOPE,
+                                        "failed to delete background template",
+                                        error,
                                       );
-                                    if (orphan)
-                                      deleteBackgroundDerivative(orphan);
-                                    await refresh();
-                                    onCommitted?.();
+                                      setListError(
+                                        "Couldn't delete that background. Try again.",
+                                      );
+                                    }
                                   })(),
                               },
                             ],

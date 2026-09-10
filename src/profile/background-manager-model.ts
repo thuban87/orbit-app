@@ -106,3 +106,20 @@ export function requestBackgroundManagerDismissal(
 ): { kind: "close" } | { kind: "confirm-discard" } {
   return state.dirty ? { kind: "confirm-discard" } : { kind: "close" };
 }
+
+/**
+ * The destructive database transaction must finish before any derived bytes
+ * are cleaned up or the list is refreshed. Rejections intentionally reach the
+ * UI caller so it can retain the current list and offer a retry.
+ */
+export async function deleteBackgroundTemplateAndRefresh(input: {
+  removeTemplate: () => Promise<string | null>;
+  removeDerivative: (relativePath: string) => void;
+  refresh: () => Promise<void>;
+  onCommitted?: () => void;
+}): Promise<void> {
+  const orphan = await input.removeTemplate();
+  if (orphan) input.removeDerivative(orphan);
+  await input.refresh();
+  input.onCommitted?.();
+}

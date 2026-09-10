@@ -1,8 +1,9 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   beginBackgroundPreparation,
   cancelBackgroundPreparation,
   createBackgroundManagerState,
+  deleteBackgroundTemplateAndRefresh,
   finishBackgroundPreparation,
   requestBackgroundManagerDismissal,
   resolveBackgroundListState,
@@ -93,5 +94,38 @@ describe("background manager model", () => {
       message: "Couldn't load background templates. Try again.",
       retry: true,
     });
+  });
+
+  it("refreshes only after a successful background-template deletion", async () => {
+    const events: string[] = [];
+    await deleteBackgroundTemplateAndRefresh({
+      removeTemplate: async () => {
+        events.push("delete");
+        return "profile-backgrounds/orphan.jpg";
+      },
+      removeDerivative: (path) => events.push(`derivative:${path}`),
+      refresh: async () => {
+        events.push("refresh");
+      },
+      onCommitted: () => events.push("committed"),
+    });
+    expect(events).toEqual([
+      "delete",
+      "derivative:profile-backgrounds/orphan.jpg",
+      "refresh",
+      "committed",
+    ]);
+
+    const refresh = vi.fn();
+    await expect(
+      deleteBackgroundTemplateAndRefresh({
+        removeTemplate: async () => {
+          throw new Error("transaction failed");
+        },
+        removeDerivative: vi.fn(),
+        refresh,
+      }),
+    ).rejects.toThrow("transaction failed");
+    expect(refresh).not.toHaveBeenCalled();
   });
 });
