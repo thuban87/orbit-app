@@ -3,12 +3,12 @@ status: partial
 phase: 31-profile-experience
 source: 31-01-SUMMARY.md, 31-02-SUMMARY.md, 31-03-SUMMARY.md, 31-04-SUMMARY.md, 31-05-SUMMARY.md, 31-06-SUMMARY.md, 31-07-SUMMARY.md, 31-08-SUMMARY.md, 31-09-SUMMARY.md
 started: 2026-09-09T16:38:10-05:00
-updated: 2026-09-09T17:56:38-05:00
+updated: 2026-09-10T00:00:00-05:00
 ---
 
 ## Current Test
 
-[testing paused — five blocker/major Profile presentation gaps require closure before remaining physical-device UAT]
+[testing paused — background crop interaction remains a blocker after the first remediation]
 
 ## Tests
 
@@ -42,11 +42,17 @@ result: issue
 reported: "The header seems massively tall on the profile pages, like 100px or so... that header should be like 30% as tall as it currently is unless that box is meant to be something I'm missing."
 severity: major
 
+### 6. Background cropper provides direct modern touch manipulation
+expected: The complete source image is visible beneath a Profile-aspect selection box; one-finger drag repositions the selection, pinch resizes it within source bounds, and the primary crop screen does not require a horizontally scrolling strip of zoom or directional buttons.
+result: issue
+reported: "Touch doesn't appear to work on it at all outside of the control buttons. Can't pinch to zoom/unzoom, pan, nothing... the controls are all on one row meaning you have to scroll horizontally... I don't understand why this isn't a modern picture cropper like our profile picture cropper is."
+severity: blocker
+
 ## Summary
 
-total: 5
+total: 6
 passed: 0
-issues: 5
+issues: 6
 pending: 0
 skipped: 0
 blocked: 0
@@ -136,3 +142,26 @@ blocked: 0
     - "Keep Favorite adjacent to identity in the fixed Hero and preserve origin-aware Back behavior."
     - "Verify long-name, large-text, accessibility-label, and source-stack navigation behavior on device."
   debug_session: "physical Pixel reproduction 2026-09-09"
+
+- truth: "The background cropper shows the complete source image with a Profile-aspect selection box that responds to drag and pinch, without an always-visible horizontally scrolling adjustment toolbar."
+  status: failed
+  reason: "Owner verified on the physical Pixel that only ordinary control buttons respond; pan and pinch do not, and the visible adjustment controls require horizontal scrolling."
+  severity: blocker
+  test: 6
+  root_cause: "ProfileBackgroundManager renders GestureDetector inside BaseOverlay's native React Native Modal without a GestureHandlerRootView in that modal root; Android buttons therefore work while gesture-handler recognition does not. The current cover-image/fixed-viewport interaction and seven-button horizontal strip also do not match the owner-approved selection-box crop model."
+  artifacts:
+    - path: "src/components/ui/overlay-base.tsx"
+      issue: "The separate native Modal root is not wrapped for react-native-gesture-handler on Android."
+    - path: "src/components/profile/ProfileBackgroundManager.tsx"
+      issue: "The crop UI transforms a cover-scaled image inside a nearly full-height fixed viewport and exposes Reset, zoom, and four movement buttons in a horizontal ScrollView."
+    - path: "src/services/photos/background-crop-geometry.ts"
+      issue: "Geometry models image pan/scale under a fixed destination viewport rather than an aspect-locked selection rectangle over a contained full-source preview."
+    - path: ".planning/phases/31-profile-experience/31-NATIVE-CHECKLIST.md"
+      issue: "Rows 43 and 44 claim PASS without evidence that physical drag or pinch changed the crop."
+  missing:
+    - "Provide a gesture-handler root for modal content and prove real Android drag and pinch recognition."
+    - "Show the complete contained source image beneath a dimmed outside mask and movable/resizable Profile-aspect selection rectangle."
+    - "Map the final selection rectangle directly to an in-bounds source-pixel crop while retaining the existing local JPEG derivative, output cap, naming, assignment, cancellation, and failure-safety behavior."
+    - "Remove the always-visible horizontal zoom/direction strip; keep Cancel, Reset, and Use background primary, with any no-precise-drag fine adjustment behind one compact secondary action."
+    - "Revoke the unsupported crop PASS and require physical-Pixel debug evidence of actual gesture-driven geometry changes before rebuilding a release APK."
+  debug_session: "owner physical Pixel UAT 2026-09-10"
