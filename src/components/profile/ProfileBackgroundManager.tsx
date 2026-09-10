@@ -179,21 +179,27 @@ export function ProfileBackgroundManager({
     [source],
   );
   useEffect(() => {
-    if (!source || !cropSpace) return;
+    if (!source) return;
     const initial = createInitialBackgroundCropSelection(source, profileAspect);
-    const scale = Math.min(viewportWidth / source.width, cropSpace.height / source.height);
-    displayScale.value = scale;
     sourceWidth.value = source.width;
     sourceHeight.value = source.height;
-    displayOffsetX.value = (viewportWidth - source.width * scale) / 2;
-    displayOffsetY.value = (cropSpace.height - source.height * scale) / 2;
     selectionX.value = initial.originX;
     selectionY.value = initial.originY;
     selectionWidth.value = initial.width;
     selectionHeight.value = initial.height;
     setFineTuneOpen(false);
     publishStatus(initial.originX, initial.originY, initial.width, initial.height);
-  }, [cropSpace, displayOffsetX, displayOffsetY, displayScale, profileAspect, publishStatus, selectionHeight, selectionWidth, selectionX, selectionY, source, sourceHeight, sourceWidth, viewportWidth]);
+  }, [profileAspect, publishStatus, selectionHeight, selectionWidth, selectionX, selectionY, source, sourceHeight, sourceWidth]);
+  useEffect(() => {
+    if (!source || !cropSpace) return;
+    const scale = Math.min(
+      viewportWidth / source.width,
+      cropSpace.height / source.height,
+    );
+    displayScale.value = scale;
+    displayOffsetX.value = (viewportWidth - source.width * scale) / 2;
+    displayOffsetY.value = (cropSpace.height - source.height * scale) / 2;
+  }, [cropSpace, displayOffsetX, displayOffsetY, displayScale, source, viewportWidth]);
   const clampSelection = () => {
     "worklet";
     const maxWidth = Math.min(sourceWidth.value, sourceHeight.value * profileAspect);
@@ -212,7 +218,7 @@ export function ProfileBackgroundManager({
     const maxX = Math.max(0, sourceWidth.value - selectionWidth.value);
     selectionX.value = Math.max(0, Math.min(selectionX.value, maxX));
     selectionY.value = Math.max(0, Math.min(selectionY.value, sourceHeight.value - selectionHeight.value));
-  }).onEnd(() => runOnJS(publishStatus)(selectionX.value, selectionY.value, selectionWidth.value, selectionHeight.value));
+  }).onFinalize(() => runOnJS(publishStatus)(selectionX.value, selectionY.value, selectionWidth.value, selectionHeight.value));
   const pinch = Gesture.Pinch().onStart((event) => {
     startWidth.value = selectionWidth.value;
     startHeight.value = selectionHeight.value;
@@ -231,7 +237,7 @@ export function ProfileBackgroundManager({
     selectionX.value = focalX - width * pinchRatioX.value;
     selectionY.value = focalY - selectionHeight.value * pinchRatioY.value;
     clampSelection();
-  }).onEnd(() => runOnJS(publishStatus)(selectionX.value, selectionY.value, selectionWidth.value, selectionHeight.value));
+  }).onFinalize(() => runOnJS(publishStatus)(selectionX.value, selectionY.value, selectionWidth.value, selectionHeight.value));
   const sourceImageStyle = useAnimatedStyle(() => ({ height: sourceHeight.value * displayScale.value, left: displayOffsetX.value, top: displayOffsetY.value, width: sourceWidth.value * displayScale.value }));
   const selectionStyle = useAnimatedStyle(() => ({ height: selectionHeight.value * displayScale.value, left: displayOffsetX.value + selectionX.value * displayScale.value, top: displayOffsetY.value + selectionY.value * displayScale.value, width: selectionWidth.value * displayScale.value }));
   const maskTopStyle = useAnimatedStyle(() => ({ height: displayOffsetY.value + selectionY.value * displayScale.value }));
