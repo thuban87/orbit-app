@@ -363,6 +363,124 @@ describe("Profile presentation mutation API", () => {
     });
   });
 
+  it("clears each background scope through fresh reads without changing its sibling presentation data", async () => {
+    const categoryId = (
+      await exec.runAsync(
+        "INSERT INTO categories(uid,name,display_order,created_at,modified_at) VALUES(?,?,?,?,?)",
+        ["clear-category", "Clear Category", 0, NOW, NOW],
+      )
+    ).lastInsertRowId;
+    await exec.runAsync("UPDATE contacts SET category_id=? WHERE id=?", [
+      categoryId,
+      contactId,
+    ]);
+    for (const [uid, name] of [
+      ["clear-global-layout", "Clear global layout"],
+      ["clear-category-layout", "Clear category layout"],
+    ]) {
+      await createProfileLayoutTemplate(exec, {
+        uid,
+        name,
+        layout: FACTORY_PROFILE_LAYOUT,
+        now: NOW,
+      });
+    }
+    for (const [uid, name] of [
+      ["clear-global-background", "Clear global background"],
+      ["clear-category-background", "Clear category background"],
+      ["clear-contact-background", "Clear contact background"],
+    ]) {
+      await createProfileBackgroundTemplate(exec, {
+        uid,
+        name,
+        imagePath: `profile-backgrounds/${uid}.webp`,
+        now: NOW,
+      });
+    }
+
+    await assignGlobalProfilePresentation(exec, {
+      layoutTemplateUid: "clear-global-layout",
+      backgroundTemplateUid: "clear-global-background",
+      now: NOW,
+    });
+    await assignCategoryProfilePresentation(exec, {
+      categoryId,
+      layoutTemplateUid: "clear-category-layout",
+      backgroundTemplateUid: "clear-category-background",
+      now: NOW,
+    });
+    await setContactFreeformLayout(exec, {
+      contactId,
+      layout: FACTORY_PROFILE_LAYOUT,
+      now: NOW,
+    });
+    await setProfileCollapseOverride(exec, {
+      contactId,
+      moduleId: "relationship-overview",
+      expanded: false,
+      now: NOW,
+    });
+    await assignContactBackgroundTemplate(exec, {
+      contactId,
+      templateUid: "clear-contact-background",
+      now: NOW,
+    });
+
+    await assignContactBackgroundTemplate(exec, {
+      contactId,
+      templateUid: null,
+      now: NOW,
+    });
+    let input = await readProfilePresentationInputs(exec, contactId, {
+      factoryLayout: FACTORY_PROFILE_LAYOUT,
+      themeBackground: "theme:galaxy",
+    });
+    expect(resolveProfilePresentation(input)).toMatchObject({
+      background: { source: "category", templateUid: "clear-category-background" },
+      layout: { source: "contact-freeform" },
+      collapse: { "relationship-overview": false },
+    });
+
+    await assignCategoryProfilePresentation(exec, {
+      categoryId,
+      layoutTemplateUid: "clear-category-layout",
+      backgroundTemplateUid: null,
+      now: NOW,
+    });
+    input = await readProfilePresentationInputs(exec, contactId, {
+      factoryLayout: FACTORY_PROFILE_LAYOUT,
+      themeBackground: "theme:galaxy",
+    });
+    expect(input.category).toEqual({
+      layoutTemplateUid: "clear-category-layout",
+      backgroundTemplateUid: null,
+    });
+    expect(resolveProfilePresentation(input)).toMatchObject({
+      background: { source: "global", templateUid: "clear-global-background" },
+      layout: { source: "contact-freeform" },
+      collapse: { "relationship-overview": false },
+    });
+
+    await assignGlobalProfilePresentation(exec, {
+      layoutTemplateUid: "clear-global-layout",
+      backgroundTemplateUid: null,
+      now: NOW,
+    });
+    input = await readProfilePresentationInputs(exec, contactId, {
+      factoryLayout: FACTORY_PROFILE_LAYOUT,
+      themeBackground: "theme:galaxy",
+    });
+    expect(input.global).toEqual({
+      layoutTemplateUid: "clear-global-layout",
+      backgroundTemplateUid: null,
+    });
+    expect(resolveProfilePresentation(input)).toMatchObject({
+      background: { source: "theme", imagePath: "theme:galaxy" },
+      layout: { source: "contact-freeform" },
+      collapse: { "relationship-overview": false },
+    });
+  });
+
   it("deletes in-use templates with per-axis fallout while preserving freeform and safe image cleanup", async () => {
     await createProfileLayoutTemplate(exec, {
       uid: "layout",

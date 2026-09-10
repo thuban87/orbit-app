@@ -116,4 +116,16 @@ describe("resolveProfilePresentation", () => {
       document: layout(false),
     });
   });
+
+  it("falls through cleared background axes to the theme without changing layout precedence", () => {
+    const input = base();
+    input.contact.backgroundTemplateUid = null;
+    input.category!.backgroundTemplateUid = null;
+    input.global.backgroundTemplateUid = null;
+
+    expect(resolveProfilePresentation(input)).toMatchObject({
+      background: { source: "theme", imagePath: "theme:galaxy" },
+      layout: { source: "category", templateUid: "category-layout" },
+    });
+  });
 });
