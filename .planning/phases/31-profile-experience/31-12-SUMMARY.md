@@ -42,7 +42,10 @@ coverage:
     requirement: PROF-01
     verification:
       - kind: unit
-        ref: npx vitest run src/theme/backgrounds.test.ts src/theme/tokens/surface.test.ts
+        ref: src/theme/backgrounds.test.ts
+        status: pass
+      - kind: unit
+        ref: src/theme/tokens/surface.test.ts
         status: pass
     human_judgment: false
   - id: D2

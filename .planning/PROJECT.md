@@ -117,6 +117,9 @@ are local on `main`, NOT pushed.
 - ✓ **Orrery Systems** — v2.0 (Phase 30). Named built-in, Category, and custom Systems with
   rule/manual membership, HUD authoring and Preview, management, durable selection, and an
   owner-approved delta-adaptive Skia switch choreography with Reduced Motion replacement.
+- ✓ **Profile Experience** — v2.0 (Phase 31). Fixed Hero over semantic modular sections,
+  reusable layout and local-photo background templates, explanatory relationship tiles, safe
+  presentation-only persistence, and owner-approved physical-Pixel workflows.
 
 ### Active
 
@@ -251,6 +254,8 @@ are local on `main`, NOT pushed.
 | Interaction Assist writes a durable pending assist before native handoff and logs the interaction at handoff time through the single recency writer | Local, user-initiated, no passive monitoring; never resurrects merged/purged contacts (21-assist) | ✓ Good (v1.0) |
 | Orrery Systems use normalized definitions/rules/overrides with a single DAO writer; Category Systems retain immutable generated bases | Keeps membership local, composable, and truthful while preserving safe override and broken-reference behavior (30-systems) | ✓ Good (v2.0) |
 | System switching is one UI-thread choreography over retained/leaving/entering roles, with screen-owned pause/re-target state and a Reduced Motion replacement | Prevents React publication steps, preserves lifecycle/camera continuity, and delivers the owner-approved spin/shedding/capture behavior (30-systems) | ✓ Good (v2.0) |
+| Profile presentation resolves layout and background independently through contact → Category → global → factory/theme, with presentation-only reset and axis-specific writes | Inheritance remains live without copying state, while contact facts, Favorite, Snooze, knowledge, and sibling presentation axes stay protected (31-profile) | ✓ Good (v2.0) |
+| Profile editing supports both direct drag and named Move actions; background cropping uses a full-source bounded selection with direct touch/pinch | Modern native interaction remains available without making precision gestures the only control path (31-profile) | ✓ Good (v2.0) |
 
 ## Evolution
 
@@ -271,4 +276,4 @@ This document evolves at phase transitions and milestone boundaries.
 5. Update Context with current state
 
 ---
-*Last updated: 2026-09-09 after completing Phase 30 Orrery Systems*
+*Last updated: 2026-09-10 after completing Phase 31 Profile Experience*

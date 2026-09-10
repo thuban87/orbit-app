@@ -146,7 +146,7 @@ All v1.0 commits are local on `main` and have NOT been pushed.
 - [ ] **Phase 28: Dashboard Card View** - Avatar-first 3-column grid with long-press menu and multi-select bulk management
 - [x] **Phase 29: Orrery Camera, Scale & Exploration** - One canonical 2.5D world with bounded camera, semantic zoom, density presets, and built-in Systems (completed 2026-09-08 by owner approval; device UAT 8/9 pass on the release build — two blocker crashes on gesture/pinch and long-press reorder were found on-device and fixed inline (f979263, a Reanimated worklet forward-reference class the vitest suite structurally cannot catch). **H6 backup contention BLOCKED** — the SAF backup-folder grant needs reconnecting, and per the native checklist the measured contention/overlap is deferred to Phase 40; not a phase-29 defect. Full record in 29-UAT.md.)
 - [ ] **Phase 30: Orrery Systems** - Named dynamic + manual Systems authored in a floating HUD, with management, switching, and portability
-- [ ] **Phase 31: Profile Experience** - Fixed Hero, modular reorderable sections, layout/background templates, Relationship Overview tile grid
+- [x] **Phase 31: Profile Experience** - Fixed Hero, modular reorderable sections, layout/background templates, Relationship Overview tile grid (completed 2026-09-10)
 - [ ] **Phase 31.1: App-Wide System Backgrounds** (INSERTED) - Select the approved bundled art as a persistent system background across regular app screens, with Orrery excluded and Profile photos taking precedence
 - [ ] **Phase 32: Interaction History & Insights** - Activity heatmap (Cycles lens), intensity, Rolodex History Browser, canonical Interaction Detail/Edit
 - [ ] **Phase 33: Group Interaction Logging** - Group Event parent with canonical child interactions, inheritance/overrides, and atomic fan-out
@@ -606,7 +606,7 @@ Plans:
 **Canonical refs**: docs/dossier/milestone-2/phase-10-profile-experience-dossier.md; docs/dossier/milestone-2/planning-notes/phase-10-planning-notes.md
 **Consumes from Phase 24.2** (deferred UI, owner-approved 2026-09-04): the custom-field **value-history backlist** viewer (reads `value-history-dao.ts` / `custom_field_value_history`) and **grouped custom-field rendering** (`custom_field_defs.field_group`). 24.2 shipped these as data-layer only. Confirm at Phase 31 planning whether the Profile is the right surface or a dedicated custom-fields UI phase is needed; if the latter, re-home this note.
 **Schema**: profile layout/background templates (verify head+1 at plan time)
-**Plans**: 14/15 plans executed
+**Plans**: 15/15 plans complete
 
 Plans:
 **Wave 1**
@@ -647,7 +647,7 @@ Plans:
 
 **Wave 10** *(blocked on Wave 9 completion)*
 
-- [ ] 31-10-PLAN.md — Host integration, documentation, full regression, and physical-device UAT
+- [x] 31-10-PLAN.md — Host integration, documentation, full regression, and physical-device UAT
 
 **Wave 11** *(blocked on Wave 10 completion)*
 
@@ -845,7 +845,7 @@ Plans:
 | 28. Dashboard Card View | 8/8 | In Progress|  |
 | 29. Orrery Camera, Scale & Exploration | 12/12 | In Progress|  |
 | 30. Orrery Systems | 0/10 | Planned | - |
-| 31. Profile Experience | 14/15 | In Progress|  |
+| 31. Profile Experience | 15/15 | Complete   | 2026-09-10 |
 | 31.1 App-Wide System Backgrounds | 0/TBD | Not started | - |
 | 32. Interaction History & Insights | 0/TBD | Not started | - |
 | 33. Group Interaction Logging | 0/TBD | Not started | - |
