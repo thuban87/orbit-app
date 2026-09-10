@@ -18,7 +18,7 @@ awaiting: user response
 
 ### 1. Profile background renders as intentional full-bleed art
 expected: A selected bundled background fills the Profile viewport behind readable content, with no intrinsic-size tile, opaque grey field, or scroll-sticky artifact.
-result: pending
+result: pass
 reported: "The background is just not there... the entire page's background on every contact is an opaque grey color with a weird like 50x50px black box at the top left of the window that sticks with scrolling."
 observed: "Plan 31-12 replaced the placeholder bundle with owner-approved artwork and repaired the full-viewport Profile renderer. Retained standalone-release Galaxy and Standard captures show full-bleed art, readable content, no black tile, and no opaque wash."
 evidence: ".planning/phases/31-profile-experience/evidence/31-12-release/release-profile-galaxy-factory.png; .planning/phases/31-profile-experience/evidence/31-12-release/release-profile-standard-factory.png"
@@ -67,7 +67,7 @@ evidence: "owner approval `approved` delivered to Plan 31-14 executor 2026-09-10
 
 ### 8. Layout templates are globally discoverable and assignable to any contact
 expected: A layout template created from one Profile is visible from another Profile, and its assignment flow can target any individual contact rather than only the currently open Profile.
-result: pass
+result: pending
 reported: "Can't assign a template to another user individually... it only allows me to assign as global default, to one of the categories, or to the contact of the profile I'm currently in... [another contact's] layout editor doesn't list the other templates I've made elsewhere, it prompts to make a new template from scratch."
 observed: "Plan 31-14 and its review fix provide automated coverage for the repaired shared library and arbitrary-contact assignment path. A post-fix physical Pixel re-test remains pending."
 evidence: "Plan 31-14 focused gate: `src/components/profile/profile-template-manager.contract.test.ts`; `src/db/profile-presentation-dao.test.ts`; `src/profile/resolve-presentation.test.ts`; `src/profile/template-manager-model.test.ts`; `src/screens/contact-profile-logic.test.ts` (36 tests passed, 2026-09-10)"
