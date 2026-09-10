@@ -1,80 +1,97 @@
 import { describe, expect, it } from "vitest";
 import {
-  type BackgroundCropTransform,
-  clampBackgroundTransform,
-  computeBackgroundCrop,
-  getBackgroundPanBounds,
+  clampBackgroundCropSelection,
+  createInitialBackgroundCropSelection,
+  describeBackgroundCropSelection,
+  pinchResizeBackgroundCropSelection,
+  translateBackgroundCropSelection,
 } from "./background-crop-geometry";
 import { profileBackgroundTarget } from "./profile-background-target";
 
 const target = profileBackgroundTarget({ width: 1080, height: 2400 });
 
-function transform(
-  overrides: Partial<BackgroundCropTransform> = {},
-): BackgroundCropTransform {
-  return {
-    destinationWidth: target.preview.width,
-    destinationHeight: target.preview.height,
-    srcWidth: 4000,
-    srcHeight: 3000,
-    scale: 1,
-    translateX: 0,
-    translateY: 0,
-    ...overrides,
-  };
+const aspect = target.preview.width / target.preview.height;
+
+function expectBounded(
+  selection: { originX: number; originY: number; width: number; height: number },
+  source: { width: number; height: number },
+) {
+  expect(selection.width / selection.height).toBeCloseTo(aspect, 8);
+  expect(selection.originX).toBeGreaterThanOrEqual(0);
+  expect(selection.originY).toBeGreaterThanOrEqual(0);
+  expect(selection.originX + selection.width).toBeLessThanOrEqual(source.width);
+  expect(selection.originY + selection.height).toBeLessThanOrEqual(source.height);
 }
 
-describe("Profile background crop geometry", () => {
-  it("covers the measured portrait Profile aspect from portrait, landscape, and square sources", () => {
+describe("Profile background source-selection geometry", () => {
+  it("creates a largest contained Profile-aspect selection for portrait, landscape, square, small, and large sources", () => {
     for (const source of [
-      { srcWidth: 3000, srcHeight: 4000 },
-      { srcWidth: 4000, srcHeight: 3000 },
-      { srcWidth: 3000, srcHeight: 3000 },
+      { width: 3000, height: 4000 },
+      { width: 4000, height: 3000 },
+      { width: 3000, height: 3000 },
+      { width: 40, height: 31 },
+      { width: 8000, height: 6000 },
     ]) {
-      const crop = computeBackgroundCrop(transform(source));
-      expect(crop.width / crop.height).toBeCloseTo(
-        target.preview.width / target.preview.height,
+      const selection = createInitialBackgroundCropSelection(source, aspect);
+      expectBounded(selection, source);
+      expect(selection.originX).toBeCloseTo(
+        (source.width - selection.width) / 2,
         8,
       );
-      expect(crop.originX).toBeGreaterThanOrEqual(0);
-      expect(crop.originY).toBeGreaterThanOrEqual(0);
-      expect(crop.originX + crop.width).toBeLessThanOrEqual(source.srcWidth);
-      expect(crop.originY + crop.height).toBeLessThanOrEqual(source.srcHeight);
+      expect(selection.originY).toBeCloseTo(
+        (source.height - selection.height) / 2,
+        8,
+      );
     }
   });
 
-  it("uses min/max scale without changing the requested Profile aspect", () => {
-    const min = computeBackgroundCrop(transform({ scale: 1 }));
-    const max = computeBackgroundCrop(transform({ scale: 8 }));
-    expect(max.width).toBeLessThan(min.width);
-    expect(max.height).toBeLessThan(min.height);
-    expect(max.width / max.height).toBeCloseTo(
-      target.preview.width / target.preview.height,
-      8,
+  it("clamps drag translation identically at every source edge without resizing", () => {
+    const source = { width: 4000, height: 3000 };
+    const initial = createInitialBackgroundCropSelection(source, aspect);
+    const moved = translateBackgroundCropSelection(
+      initial,
+      source,
+      100_000,
+      -100_000,
     );
+
+    expect(moved.width).toBe(initial.width);
+    expect(moved.height).toBe(initial.height);
+    expect(moved.originX + moved.width).toBe(source.width);
+    expect(moved.originY).toBe(0);
+    expectBounded(moved, source);
   });
 
-  it("clamps extreme pan against the same bounds used by adjust controls", () => {
-    const input = transform({ scale: 2 });
-    const bounds = getBackgroundPanBounds(input);
-    const clamped = clampBackgroundTransform({
-      ...input,
-      translateX: 100_000,
-      translateY: -100_000,
-    });
-    expect(clamped.translateX).toBe(bounds.maxX);
-    expect(clamped.translateY).toBe(bounds.minY);
+  it("pinch-resizes around its source focal point and clamps the same selection at an edge", () => {
+    const source = { width: 4000, height: 3000 };
+    const initial = createInitialBackgroundCropSelection(source, aspect);
+    const pinched = pinchResizeBackgroundCropSelection(
+      initial,
+      source,
+      aspect,
+      { x: 3000, y: 600 },
+      2,
+    );
 
-    const crop = computeBackgroundCrop(clamped);
-    expect(crop.originX).toBe(0);
-    expect(crop.originY + crop.height).toBe(input.srcHeight);
+    expect(pinched.width).toBeCloseTo(initial.width / 2, 8);
+    expect(pinched.height).toBeCloseTo(initial.height / 2, 8);
+    expectBounded(pinched, source);
+
+    const edge = clampBackgroundCropSelection(
+      { ...pinched, originX: 100_000, originY: -100_000 },
+      source,
+      aspect,
+    );
+    expect(edge.originX + edge.width).toBe(source.width);
+    expect(edge.originY).toBe(0);
   });
 
-  it("has zero pan room on an exact-fit axis", () => {
-    const bounds = getBackgroundPanBounds(
-      transform({ srcWidth: 1350, srcHeight: 3000 }),
-    );
-    expect(bounds.minX).toBe(0);
-    expect(bounds.maxX).toBe(0);
+  it("publishes a concise textual selection state for non-drag operation", () => {
+    expect(
+      describeBackgroundCropSelection(
+        { originX: 0, originY: 0, width: 100, height: 200 },
+        { width: 200, height: 400 },
+      ),
+    ).toBe("Crop uses 50% of the image, aligned top left.");
   });
 });

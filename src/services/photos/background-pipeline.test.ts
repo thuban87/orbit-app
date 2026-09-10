@@ -4,18 +4,10 @@ import { profileBackgroundTarget } from "./profile-background-target";
 
 const target = profileBackgroundTarget({ width: 1080, height: 2400 });
 
-const crop = {
-  destinationWidth: target.preview.width,
-  destinationHeight: target.preview.height,
-  srcWidth: 4000,
-  srcHeight: 3000,
-  scale: 1,
-  translateX: 0,
-  translateY: 0,
-};
+const selection = { originX: 1325, originY: 0, width: 1350, height: 3000 };
 
 describe("prepareProfileBackground", () => {
-  it("crops source pixels to the measured Profile aspect, encodes once, persists once, and releases resources", async () => {
+  it("passes the exact clamped source-pixel selection through one crop/resize/encode, persists once, and releases resources", async () => {
     const release = vi.fn();
     const cropAndResize = vi.fn().mockResolvedValue({
       uri: "file:///cache/prepared.jpg",
@@ -25,20 +17,18 @@ describe("prepareProfileBackground", () => {
 
     const prepared = await prepareProfileBackground({
       rawUri: "content://picked-image",
-      transform: crop,
+      selection,
       output: target.output,
       cropAndResize,
       persist,
     });
     expect(prepared.relativePath).toBe("backgrounds/bg-one.jpg");
-    expect(prepared.crop.width).toBe(1350);
-    expect(prepared.crop.height).toBe(3000);
-    expect(cropAndResize).toHaveBeenCalledWith(
-      expect.objectContaining({
-        rawUri: "content://picked-image",
-        output: target.output,
-      }),
-    );
+    expect(prepared.crop).toEqual(selection);
+    expect(cropAndResize).toHaveBeenCalledWith({
+      rawUri: "content://picked-image",
+      crop: selection,
+      output: target.output,
+    });
     expect(persist).toHaveBeenCalledWith("file:///cache/prepared.jpg");
     expect(release).toHaveBeenCalledOnce();
   });
@@ -48,7 +38,7 @@ describe("prepareProfileBackground", () => {
     await expect(
       prepareProfileBackground({
         rawUri: "content://picked-image",
-        transform: crop,
+        selection,
         output: target.output,
         cropAndResize: vi
           .fn()
