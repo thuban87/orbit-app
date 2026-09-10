@@ -56,17 +56,17 @@ evidence: ".planning/phases/31-profile-experience/evidence/31-13-debug/17-landsc
 
 ### 7. Layout editor supports direct drag reordering
 expected: A section can be reordered by direct drag, while the named Move controls remain an equivalent non-precise fallback.
-result: fail
+result: pass
 reported: "No drag operations on the layout edit screen. Manual move button work fine though."
-observed: "Owner release smoke confirms named Move controls work, but direct drag does not."
-evidence: "owner release-smoke report 2026-09-10"
+observed: "The owner directly performed and approved the genuine press-drag-release interaction on the physical Pixel after the editor switched to the installed release-reorder control. Legal release reorders before Save; named Move up and Move down remain available as the non-precision fallback."
+evidence: "owner approval `approved` delivered to Plan 31-14 executor 2026-09-10; `src/profile/layout-editor-reducer.test.ts`; `src/components/profile/profile-layout-editor.contract.test.ts`"
 
 ### 8. Layout templates are globally discoverable and assignable to any contact
 expected: A layout template created from one Profile is visible from another Profile, and its assignment flow can target any individual contact rather than only the currently open Profile.
-result: fail
+result: pass
 reported: "Can't assign a template to another user individually... it only allows me to assign as global default, to one of the categories, or to the contact of the profile I'm currently in... [another contact's] layout editor doesn't list the other templates I've made elsewhere, it prompts to make a new template from scratch."
-observed: "The current Profile-scoped manager exposes only the host contact as an individual assignment target, and the ordinary Profile Layout route does not expose the shared template library for an inherited-layout contact."
-evidence: "owner release-smoke report 2026-09-10"
+observed: "Automated coverage confirms every Profile Layout chooser opens the one durable template library and its assignment page opens the canonical local picker with archived contacts excluded. The selected contact receives only a layout-template override; its background, category, cadence, and other contact facts remain unchanged. The host-only inherited action remains distinct."
+evidence: "Plan 31-14 focused gate: `src/components/profile/profile-template-manager.contract.test.ts`; `src/db/profile-presentation-dao.test.ts`; `src/profile/resolve-presentation.test.ts`; `src/profile/template-manager-model.test.ts`; `src/screens/contact-profile-logic.test.ts` (36 tests passed, 2026-09-10)"
 
 ### 9. Background assignments can return to the theme default
 expected: Global, Category, and contact background assignment surfaces expose a truthful clear/inherit action; clearing the global assignment returns Profiles without narrower overrides to the original theme background.
