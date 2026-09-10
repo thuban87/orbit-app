@@ -42,6 +42,7 @@ import {
   createBackgroundManagerState,
   finishBackgroundPreparation,
   requestBackgroundManagerDismissal,
+  resolveBackgroundListState,
 } from "@/profile/background-manager-model";
 import type { ProfilePresentationInputs } from "@/profile/types";
 import { prepareProfileBackground } from "@/services/photos/background-pipeline";
@@ -101,6 +102,8 @@ export function ProfileBackgroundManager({
     createBackgroundManagerState(null),
   );
   const [saving, setSaving] = useState(false);
+  const [listLoading, setListLoading] = useState(false);
+  const [listError, setListError] = useState<string | null>(null);
   const tokenCounter = useRef(0);
   const activeTokenRef = useRef<string | null>(null);
 
@@ -112,23 +115,26 @@ export function ProfileBackgroundManager({
   const startY = useSharedValue(0);
 
   const refresh = useCallback(async () => {
-    const [nextTemplates, nextCategories] = await Promise.all([
-      listProfileBackgroundTemplates(getExecutor()),
-      listCategories(getExecutor()),
-    ]);
-    setTemplates(nextTemplates);
-    setCategories(nextCategories);
+    setListLoading(true);
+    setListError(null);
+    try {
+      const [nextTemplates, nextCategories] = await Promise.all([
+        listProfileBackgroundTemplates(getExecutor()),
+        listCategories(getExecutor()),
+      ]);
+      setTemplates(nextTemplates);
+      setCategories(nextCategories);
+    } catch (error) {
+      Logger.error(LOG_SCOPE, "failed to load background templates", error);
+      setListError("Couldn't load background templates. Try again.");
+    } finally {
+      setListLoading(false);
+    }
   }, []);
 
   useEffect(() => {
     if (!visible) return;
-    void refresh().catch((error) => {
-      Logger.error(LOG_SCOPE, "failed to load background templates", error);
-      setManagerState((state) => ({
-        ...state,
-        error: "Couldn't load background templates. Try again.",
-      }));
-    });
+    void refresh();
   }, [refresh, visible]);
 
   const cropBase = useMemo(() => {
@@ -437,6 +443,11 @@ export function ProfileBackgroundManager({
     source && cropBase
       ? { width: source.width * cropBase, height: source.height * cropBase }
       : null;
+  const listState = resolveBackgroundListState({
+    loading: listLoading,
+    error: listError,
+    templateCount: templates.length,
+  });
 
   return (
     <Sheet visible={visible} onRequestClose={closeOrGuard} variant="expanded">
@@ -451,7 +462,10 @@ export function ProfileBackgroundManager({
           </AppText>
         ) : null}
         {page === "list" ? (
-          <ScrollView contentContainerStyle={styles.content}>
+          <ScrollView
+            style={styles.workspace}
+            contentContainerStyle={styles.content}
+          >
             <AppText role="body">
               Background templates are separate from layout templates.
             </AppText>
@@ -460,62 +474,88 @@ export function ProfileBackgroundManager({
               label="Choose photo"
               onPress={() => void chooseImage()}
             />
-            {templates.map((template) => (
-              <GlassSurface
-                key={template.uid}
-                density="dense"
-                style={styles.row}
-              >
-                <Image
-                  source={{ uri: resolveBackgroundUri(template.imagePath) }}
-                  style={styles.thumbnail}
+            {listState.kind === "loading" ? (
+              <AppText role="body">Loading backgrounds…</AppText>
+            ) : null}
+            {listState.kind === "empty" ? (
+              <AppText role="body">
+                No saved backgrounds yet. Choose a photo to create one.
+              </AppText>
+            ) : null}
+            {listState.kind === "error" ? (
+              <>
+                <AppText style={{ color: colors.danger }}>
+                  {listState.message}
+                </AppText>
+                <Button
+                  role="secondary"
+                  label="Retry"
+                  onPress={() => void refresh()}
                 />
-                <View style={styles.rowText}>
-                  <AppText role="label">{template.name}</AppText>
-                  <Button
-                    role="tertiary"
-                    label="Assign"
-                    onPress={() => {
-                      setSelectedUid(template.uid);
-                      setPage("assign");
-                    }}
-                  />
-                  <Button
-                    role="tertiary"
-                    label="Delete"
-                    onPress={() =>
-                      Alert.alert(
-                        "Delete background template?",
-                        "Profiles using it will fall back to their Category or default background. Contact information will not change.",
-                        [
-                          { text: "Cancel", style: "cancel" },
-                          {
-                            text: "Delete template",
-                            style: "destructive",
-                            onPress: () =>
-                              void (async () => {
-                                const orphan =
-                                  await deleteProfileBackgroundTemplate(
-                                    getExecutor(),
-                                    template.uid,
-                                    localDateTime(),
-                                  );
-                                if (orphan) deleteBackgroundDerivative(orphan);
-                                await refresh();
-                                onCommitted?.();
-                              })(),
-                          },
-                        ],
-                      )
-                    }
-                  />
-                </View>
-              </GlassSurface>
-            ))}
+              </>
+            ) : null}
+            {listState.kind === "populated"
+              ? templates.map((template) => (
+                  <GlassSurface
+                    key={template.uid}
+                    density="dense"
+                    style={styles.row}
+                  >
+                    <Image
+                      source={{ uri: resolveBackgroundUri(template.imagePath) }}
+                      style={styles.thumbnail}
+                    />
+                    <View style={styles.rowText}>
+                      <AppText role="label">{template.name}</AppText>
+                      <Button
+                        role="tertiary"
+                        label="Assign"
+                        onPress={() => {
+                          setSelectedUid(template.uid);
+                          setPage("assign");
+                        }}
+                      />
+                      <Button
+                        role="tertiary"
+                        label="Delete"
+                        onPress={() =>
+                          Alert.alert(
+                            "Delete background template?",
+                            "Profiles using it will fall back to their Category or default background. Contact information will not change.",
+                            [
+                              { text: "Cancel", style: "cancel" },
+                              {
+                                text: "Delete template",
+                                style: "destructive",
+                                onPress: () =>
+                                  void (async () => {
+                                    const orphan =
+                                      await deleteProfileBackgroundTemplate(
+                                        getExecutor(),
+                                        template.uid,
+                                        localDateTime(),
+                                      );
+                                    if (orphan)
+                                      deleteBackgroundDerivative(orphan);
+                                    await refresh();
+                                    onCommitted?.();
+                                  })(),
+                              },
+                            ],
+                          )
+                        }
+                      />
+                    </View>
+                  </GlassSurface>
+                ))
+              : null}
           </ScrollView>
         ) : null}
         {page === "crop" && source && imageStyle ? (
-          <View style={styles.content}>
+          <ScrollView
+            style={styles.workspace}
+            contentContainerStyle={styles.content}
+          >
             <AppText role="body">
               Pinch to crop and drag to reposition. The preview uses the Profile
               aspect.
@@ -617,10 +657,13 @@ export function ProfileBackgroundManager({
               disabled={saving}
               onPress={() => void prepareCrop()}
             />
-          </View>
+          </ScrollView>
         ) : null}
         {page === "name" ? (
-          <View style={styles.content}>
+          <ScrollView
+            style={styles.workspace}
+            contentContainerStyle={styles.content}
+          >
             <AppText role="body">
               Name this reusable background template.
             </AppText>
@@ -643,10 +686,13 @@ export function ProfileBackgroundManager({
               disabled={saving || !templateName.trim()}
               onPress={() => void saveTemplate()}
             />
-          </View>
+          </ScrollView>
         ) : null}
         {page === "assign" && selected ? (
-          <ScrollView contentContainerStyle={styles.content}>
+          <ScrollView
+            style={styles.workspace}
+            contentContainerStyle={styles.content}
+          >
             <AppText role="heading">Assign {selected.name}</AppText>
             <Button
               role="secondary"
@@ -681,6 +727,7 @@ export function ProfileBackgroundManager({
 
 const styles = StyleSheet.create({
   root: { flex: 1, gap: SPACING.sm },
+  workspace: { flex: 1 },
   heading: {
     alignItems: "center",
     flexDirection: "row",

@@ -15,7 +15,11 @@ import { useTheme } from "@/theme";
 import { RADII } from "@/theme/tokens/radii";
 import { SPACING } from "@/theme/tokens/spacing";
 import { BaseOverlay, type OverlayLifecycle } from "./overlay-base";
-import { SHEET_HEIGHT_PERCENT, type SheetVariant } from "./sheet-contract";
+import {
+  SHEET_BODY_FLEX,
+  SHEET_HEIGHT_PERCENT,
+  type SheetVariant,
+} from "./sheet-contract";
 
 /** Sheet heights (dossier §O): compact list vs. half-height detail. */
 export type { SheetVariant } from "./sheet-contract";
@@ -55,7 +59,14 @@ export function Sheet({
         <View style={styles.handleWrap}>
           <View style={[styles.handle, { backgroundColor: colors.border }]} />
         </View>
-        <View style={styles.body}>{children}</View>
+        <View
+          style={[
+            styles.body,
+            SHEET_BODY_FLEX[variant] === 1 ? styles.expandedBody : null,
+          ]}
+        >
+          {children}
+        </View>
       </SafeAreaView>
     </BaseOverlay>
   );
@@ -63,6 +74,7 @@ export function Sheet({
 
 const styles = StyleSheet.create({
   sheet: {
+    flexDirection: "column",
     borderTopLeftRadius: RADII.xl,
     borderTopRightRadius: RADII.xl,
     borderTopWidth: StyleSheet.hairlineWidth,
@@ -84,4 +96,5 @@ const styles = StyleSheet.create({
     paddingHorizontal: SPACING.lg,
     paddingBottom: SPACING.lg,
   },
+  expandedBody: { flex: 1 },
 });

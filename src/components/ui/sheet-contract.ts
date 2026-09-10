@@ -10,3 +10,10 @@ export const SHEET_HEIGHT_PERCENT: Readonly<Record<SheetVariant, string>> =
     // Focused workflows need room for a scrollable editor plus reachable actions.
     expanded: "92%",
   });
+
+/**
+ * Compact and detail sheets size to their content; expanded workflows reserve
+ * the remaining shell height for a scrollable workspace and fixed actions.
+ */
+export const SHEET_BODY_FLEX: Readonly<Record<SheetVariant, number>> =
+  Object.freeze({ compact: 0, detail: 0, expanded: 1 });

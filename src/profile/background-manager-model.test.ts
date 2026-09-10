@@ -62,13 +62,25 @@ describe("background manager model", () => {
 
   it("describes visible list states and retry affordance without touching draft state", () => {
     expect(
-      resolveBackgroundListState({ loading: true, error: null, templateCount: 0 }),
+      resolveBackgroundListState({
+        loading: true,
+        error: null,
+        templateCount: 0,
+      }),
     ).toEqual({ kind: "loading" });
     expect(
-      resolveBackgroundListState({ loading: false, error: null, templateCount: 0 }),
+      resolveBackgroundListState({
+        loading: false,
+        error: null,
+        templateCount: 0,
+      }),
     ).toEqual({ kind: "empty" });
     expect(
-      resolveBackgroundListState({ loading: false, error: null, templateCount: 2 }),
+      resolveBackgroundListState({
+        loading: false,
+        error: null,
+        templateCount: 2,
+      }),
     ).toEqual({ kind: "populated", templateCount: 2 });
     expect(
       resolveBackgroundListState({

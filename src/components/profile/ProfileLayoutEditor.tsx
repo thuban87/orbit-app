@@ -312,10 +312,7 @@ export function ProfileLayoutEditor({
     <Sheet
       visible={visible}
       onRequestClose={closeOrGuard}
-      // The chooser includes a primary action and close affordance; use the
-      // same expanded geometry as the editor so both controls remain visible
-      // above the device safe area at ordinary font scale.
-      variant="expanded"
+      variant={page === "chooser" ? "detail" : "expanded"}
     >
       {page === "chooser" ? (
         <View style={styles.chooser}>
@@ -335,7 +332,10 @@ export function ProfileLayoutEditor({
         </View>
       ) : (
         <View style={styles.editor} accessibilityViewIsModal>
-          <ScrollView contentContainerStyle={styles.editorContent}>
+          <ScrollView
+            style={styles.editorScroll}
+            contentContainerStyle={styles.editorContent}
+          >
             <AppText role="heading">Edit layout</AppText>
             <AppText role="body">
               Drag a handle or use Move up and Move down. Every section stays in
@@ -399,6 +399,7 @@ export function ProfileLayoutEditor({
 const styles = StyleSheet.create({
   chooser: { gap: SPACING.base },
   editor: { flex: 1, gap: SPACING.sm },
+  editorScroll: { flex: 1 },
   editorContent: { gap: SPACING.sm, paddingBottom: SPACING.base },
   editorRow: { gap: SPACING.sm, padding: SPACING.sm },
   rowHeading: { alignItems: "center", flexDirection: "row", gap: SPACING.sm },

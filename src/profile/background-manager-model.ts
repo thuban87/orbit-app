@@ -10,6 +10,28 @@ export type BackgroundPreparationResult =
   | { ok: true; relativePath: string }
   | { ok: false; message: string };
 
+export type BackgroundListState =
+  | { kind: "loading" }
+  | { kind: "empty" }
+  | { kind: "populated"; templateCount: number }
+  | { kind: "error"; message: string; retry: true };
+
+/** Keeps list feedback visible without conflating it with a crop draft failure. */
+export function resolveBackgroundListState({
+  loading,
+  error,
+  templateCount,
+}: {
+  loading: boolean;
+  error: string | null;
+  templateCount: number;
+}): BackgroundListState {
+  if (loading) return { kind: "loading" };
+  if (error) return { kind: "error", message: error, retry: true };
+  if (templateCount === 0) return { kind: "empty" };
+  return { kind: "populated", templateCount };
+}
+
 export function createBackgroundManagerState(
   committedPath: string | null,
 ): BackgroundManagerState {
