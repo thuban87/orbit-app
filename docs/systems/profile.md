@@ -1,6 +1,6 @@
 # Profile presentation
 
-**Last updated:** 2026-09-09
+**Last updated:** 2026-09-10
 **Updated by phase:** 31-profile-experience
 **Owners:** `src/screens/ContactProfileScreen.tsx`, `src/db/profile-read.ts`, `src/db/profile-presentation-read.ts`, `src/db/profile-presentation-dao.ts`, and `src/profile/`
 
@@ -110,6 +110,7 @@ Phase 32 owns the full History UX while preserving `interaction-history`. Phase 
 
 | Date | Phase | What changed |
 |------|-------|--------------|
+| 2026-09-10 | 31 | Reconciled the six owner-reported Profile UAT gaps against Plans 31-11 through 31-13. Retained physical-Pixel evidence closes the background, sheet, manager, factory-collapse, and compact-bar reports; the owner directly approved the final crop editor's genuine touch/pinch behavior. This does **not** convert the independent unexercised native-checklist rows into passes. |
 | 2026-09-09 | 31 | A droid-built standalone release was installed and inspected on the physical Pixel: Galaxy and Standard local backgrounds rendered full bleed with a compact factory Profile, the release layout chooser/editor remained reachable at 1.15x text after the shared Sheet geometry repair, and the actual empty local Background manager was nonblank. Populated/crop/assistive-technology and owner visual acceptance remain explicitly gated in `31-NATIVE-CHECKLIST.md`. |
 | 2026-09-09 | 31 | Physical Pixel objective pass confirmed the fixed Hero, origin Back, inert Profile actions sheet, and reachable overflow/layout chooser controls; broader theme, assistive-technology, varied-data, crop, and local-only acceptance remains owner-gated in `31-NATIVE-CHECKLIST.md`. |
 | 2026-09-09 | 31 | Added the Profile presentation controller, local snapshot/resolution architecture, customization boundaries, and Phase 32/36/37/40 handoffs. |

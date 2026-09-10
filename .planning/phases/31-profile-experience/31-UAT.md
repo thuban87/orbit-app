@@ -1,69 +1,74 @@
 ---
-status: partial
+status: passed
 phase: 31-profile-experience
 source: 31-01-SUMMARY.md, 31-02-SUMMARY.md, 31-03-SUMMARY.md, 31-04-SUMMARY.md, 31-05-SUMMARY.md, 31-06-SUMMARY.md, 31-07-SUMMARY.md, 31-08-SUMMARY.md, 31-09-SUMMARY.md
 started: 2026-09-09T16:38:10-05:00
-updated: 2026-09-10T01:45:00-05:00
+updated: 2026-09-10T06:15:00-05:00
 ---
 
 ## Current Test
 
-[testing paused — Plan 31-13 remediation is installed; owner pinch verification remains]
+[reconciled — all six reported Profile gaps have retained remediation evidence; the owner directly approved the final touch/pinch crop editor]
 
 ## Tests
 
 ### 1. Profile background renders as intentional full-bleed art
 expected: A selected bundled background fills the Profile viewport behind readable content, with no intrinsic-size tile, opaque grey field, or scroll-sticky artifact.
-result: issue
+result: pass
 reported: "The background is just not there... the entire page's background on every contact is an opaque grey color with a weird like 50x50px black box at the top left of the window that sticks with scrolling."
-severity: blocker
+observed: "Plan 31-12 replaced the placeholder bundle with owner-approved artwork and repaired the full-viewport Profile renderer. Retained standalone-release Galaxy and Standard captures show full-bleed art, readable content, no black tile, and no opaque wash."
+evidence: ".planning/phases/31-profile-experience/evidence/31-12-release/release-profile-galaxy-factory.png; .planning/phases/31-profile-experience/evidence/31-12-release/release-profile-standard-factory.png"
 
 ### 2. Profile layout chooser and editor use the available sheet height
 expected: The chooser is sized to its content and the active editor provides a usable scrolling workspace with persistent reachable Save and Cancel controls.
-result: issue
+result: pass
 reported: "The profile layout is a full-screen-bottom-drawer but the contents of the menu only take up maybe the top 30% of the drawer... This also squeezes all of the editing options into a band that's like 100px tall."
-severity: blocker
+observed: "Plan 31-11 repaired the expanded Sheet body and Plan 31-12 verified on the standalone Pixel release that the chooser is content-sized while the editor scrolls with Cancel and Save controls reachable above navigation."
+evidence: ".planning/phases/31-profile-experience/evidence/31-12-release/release-layout-chooser-fixed.png; .planning/phases/31-profile-experience/evidence/31-12-release/release-layout-editor-fixed.png"
 
 ### 3. Background manager exposes its list and controls
 expected: Choosing Background opens a usable manager whose background choices, assignment state, and actions are visible and scrollable.
-result: issue
+result: pass
 reported: "Choosing Backgrounds from the overflow menu brings up another full-screen bottom-drawer with a Back button but nothing else."
-severity: blocker
+observed: "Plan 31-11 repaired the expanded manager workspace; Plan 31-12 inspected the real local empty state on the standalone Pixel release, where Back, Choose photo, and explanatory copy were visible."
+evidence: ".planning/phases/31-profile-experience/evidence/31-12-release/release-background-manager-empty.png"
 
 ### 4. Factory Profile sections start collapsed
 expected: A contact using the factory layout opens with Relationship Overview, Things to Remember, Contact Methods, and Interaction History collapsed while preserving per-contact persisted expansion choices thereafter.
-result: issue
+result: pass
 reported: "I feel like the 4 sections on the profile page need to default to collapsed, makes the pages much cleaner from the jump."
-severity: major
+observed: "The factory document now sets all four top-level modules collapsed. Retained physical-Pixel captures show Relationship Overview, Things to Remember, Contact Methods, and Interaction History collapsed; resolver/DAO tests retain persisted-collapse precedence."
+evidence: ".planning/phases/31-profile-experience/evidence/31-12-release/release-profile-galaxy-factory.png; src/profile/presentation-schema.test.ts; src/db/profile-presentation-dao.test.ts"
 
 ### 5. Profile app bar is compact
 expected: Profile uses a compact app bar with an icon-only Back affordance and overflow while keeping Favorite with the fixed Hero; the shell consumes about one standard 56dp row rather than two tall rows.
-result: issue
+result: pass
 reported: "The header seems massively tall on the profile pages, like 100px or so... that header should be like 30% as tall as it currently is unless that box is meant to be something I'm missing."
-severity: major
+observed: "Plan 31-11 installed a single 56dp Profile app bar with icon-only Back and overflow controls; retained 1.30x-font physical-Pixel capture shows those controls and collapsed sections reachable."
+evidence: ".planning/phases/31-profile-experience/evidence/31-11-debug/08-profile-large-text-clean.png; src/screens/contact-profile-logic.test.ts"
 
 ### 6. Background cropper provides direct modern touch manipulation
 expected: The complete source image is visible beneath a Profile-aspect selection box; one-finger drag repositions the selection, pinch resizes it within source bounds, and the primary crop screen does not require a horizontally scrolling strip of zoom or directional buttons.
-result: pending
+result: pass
 reported: "Touch doesn't appear to work on it at all outside of the control buttons. Can't pinch to zoom/unzoom, pan, nothing... the controls are all on one row meaning you have to scroll horizontally... I don't understand why this isn't a modern picture cropper like our profile picture cropper is."
-observed: "Plan 31-13 debug verification on the physical Pixel directly dragged real landscape and portrait source selections from center to an edge; the retained UI trees changed from `aligned top center` to `aligned top left`. A second portrait swipe moved left to right and updated the terminal text accordingly. Fine tune remained open, exposed all named controls without horizontal scrolling, and Zoom in changed the textual crop size from 62% to 54%. No gesture/worklet runtime exception appeared. Genuine two-pointer pinch remains owner-only verification."
-severity: blocker
+observed: "Plan 31-13 physical-Pixel evidence proves direct one-finger drag on real portrait and landscape sources, source-bounded selection, and reflowing Fine tune controls. The owner subsequently performed and explicitly approved the genuine touch/pinch behavior, describing the final crop editor as ‘amazing and exactly what I was looking for.’"
+evidence: ".planning/phases/31-profile-experience/evidence/31-13-debug/17-landscape-contained.png; .planning/phases/31-profile-experience/evidence/31-13-debug/20-portrait-contained.png; owner approval recorded in execution request 2026-09-10"
 
 ## Summary
 
 total: 6
-passed: 0
-issues: 5
-pending: 1
+passed: 6
+issues: 0
+pending: 0
 skipped: 0
 blocked: 0
 
-## Gaps
+## Resolved gaps
 
 - truth: "A selected bundled background fills the Profile viewport as intentional art behind readable content, with no intrinsic-size square or opaque-grey wash."
-  status: failed
+  status: resolved
   reason: "User reported an opaque grey background and a small black square fixed at the upper-left on every contact."
-  severity: blocker
+  resolved_by: "Plan 31-12 approved art and standalone Pixel release evidence."
   test: 1
   root_cause: "All eight bundled WebPs are 96x96 uniform-fill placeholders; BackgroundHost relies on absoluteFill without explicit image dimensions in the release renderer; and the Profile presentation surface opacity nearly hides the background."
   artifacts:
@@ -73,16 +78,13 @@ blocked: 0
       issue: "The local image layer does not establish explicit width/height coverage on the physical release renderer."
     - path: "src/theme/surface.ts"
       issue: "Global presentation surface opacity is too high for Profile background legibility and should not be weakened globally to fix one screen."
-  missing:
-    - "Replace all eight placeholder WebPs with approved production assets for the existing Galaxy and Standard slot names."
-    - "Give the background image explicit full-viewport cover geometry and verify it through release screenshots."
-    - "Add Profile-specific semantic readability treatment that preserves AA contrast without changing shared GlassSurface opacity tokens."
+  resolved_evidence: "release-profile-galaxy-factory.png and release-profile-standard-factory.png"
   debug_session: "physical Pixel reproduction 2026-09-09"
 
 - truth: "The layout chooser is content-sized and the expanded layout editor dedicates the available body height to a scrollable editing workspace with reachable Save and Cancel controls."
-  status: failed
+  status: resolved
   reason: "User reported a mostly empty full-screen drawer and an editor compressed into an approximately 100px band."
-  severity: blocker
+  resolved_by: "Plan 31-11 expanded Sheet repair and Plan 31-12 standalone-release evidence."
   test: 2
   root_cause: "ProfileLayoutEditor forces both chooser and editor through the expanded Sheet variant, while Sheet.body has no flex allocation; the nested flex root and ScrollView therefore collapse to content height inside a fixed 92%-height shell."
   artifacts:
@@ -90,16 +92,13 @@ blocked: 0
       issue: "Chooser and editor share the same forced expanded geometry despite different content needs."
     - path: "src/components/ui/Sheet.tsx"
       issue: "Expanded sheet body does not own the remaining vertical space required by flex/ScrollView children."
-  missing:
-    - "Use an adaptive/detail chooser presentation and retain expanded presentation only for the editing workspace."
-    - "Allocate remaining height to expanded sheet bodies without regressing compact/detail sheets."
-    - "Add renderer-level and physical-device assertions for scrollable content plus persistent Save/Cancel reachability."
+  resolved_evidence: "release-layout-chooser-fixed.png and release-layout-editor-fixed.png"
   debug_session: "physical Pixel reproduction 2026-09-09"
 
 - truth: "The Background manager displays its list, assignment state, and controls in a usable scrollable sheet."
-  status: failed
+  status: resolved
   reason: "User reported that the Background drawer contains only a Back button."
-  severity: blocker
+  resolved_by: "Plan 31-11 manager geometry repair and Plan 31-12 standalone-release evidence."
   test: 3
   root_cause: "ProfileBackgroundManager places a flex root and ScrollView inside the same non-flex expanded Sheet.body, collapsing the manager content while leaving the fixed expanded shell visible."
   artifacts:
@@ -107,30 +106,25 @@ blocked: 0
       issue: "Manager content depends on parent height that the shared expanded sheet body does not provide."
     - path: "src/components/ui/Sheet.tsx"
       issue: "Expanded body geometry collapses the manager's flex content."
-  missing:
-    - "Repair expanded-body layout and choose content-appropriate list versus crop/assignment sheet variants."
-    - "Cover empty, populated, loading, and error manager states with visible/reachable actions."
-    - "Verify manager content on the physical Pixel release renderer."
+  resolved_evidence: "release-background-manager-empty.png; background-manager-model tests cover non-destructive loading/error/populated states."
   debug_session: "physical Pixel reproduction 2026-09-09"
 
 - truth: "The four factory top-level Profile sections default to collapsed without overwriting saved per-contact expansion state."
-  status: failed
+  status: resolved
   reason: "Owner requested all four Profile sections default collapsed for a cleaner initial page."
-  severity: major
+  resolved_by: "Plan 31-11 factory-layout update and retained Pixel captures."
   test: 4
   root_cause: "FACTORY_PROFILE_LAYOUT marks every top-level section expanded:true."
   artifacts:
     - path: "src/profile/presentation-schema.ts"
       issue: "Factory defaults expand all four top-level sections."
-  missing:
-    - "Set only the four factory top-level defaults to expanded:false."
-    - "Prove existing persisted contact collapse maps and template-authored defaults retain precedence; do not migrate or reset user presentation state."
+  resolved_evidence: "presentation-schema and profile-presentation DAO tests; release-profile-galaxy-factory.png"
   debug_session: "source diagnosis 2026-09-09"
 
 - truth: "Profile uses one compact app bar with icon-only Back and overflow while Favorite remains part of the fixed Hero."
-  status: failed
+  status: resolved
   reason: "User reported an approximately 100px header and requested it be reduced to roughly 30% of its current height."
-  severity: major
+  resolved_by: "Plan 31-11 compact app bar repair and retained 1.30x-font Pixel capture."
   test: 5
   root_cause: "ContactProfileScreen renders a standalone full-width text Back control above ProfileHero, while ProfileHero renders Favorite and overflow in a second utility row."
   artifacts:
@@ -138,16 +132,12 @@ blocked: 0
       issue: "Standalone text Back control creates a full extra header row."
     - path: "src/components/profile/ProfileHero.tsx"
       issue: "Overflow is separated from Back in a second utility row, compounding shell height."
-  missing:
-    - "Compose a single approximately 56dp app bar with 44x44 icon-only Back and overflow targets."
-    - "Keep Favorite adjacent to identity in the fixed Hero and preserve origin-aware Back behavior."
-    - "Verify long-name, large-text, accessibility-label, and source-stack navigation behavior on device."
+  resolved_evidence: "08-profile-large-text-clean.png and contact-profile-logic.test.ts"
   debug_session: "physical Pixel reproduction 2026-09-09"
 
 - truth: "The background cropper shows the complete source image with a Profile-aspect selection box that responds to drag and pinch, without an always-visible horizontally scrolling adjustment toolbar."
-  status: pending-owner-verification
-  reason: "Plan 31-13 added the Modal-local Gesture Handler root, full-source bounded selection workspace, dim mask, and reflowing Fine tune disclosure. Automated geometry/pipeline/type/color checks pass, and physical-Pixel evidence proves direct one-finger drag on landscape and portrait sources plus named Fine tune zoom. Genuine two-pointer pinch remains pending owner observation."
-  severity: blocker
+  status: resolved
+  reason: "Plan 31-13 added the Modal-local Gesture Handler root, full-source bounded selection workspace, dim mask, and reflowing Fine tune disclosure. Retained physical-Pixel evidence proves direct one-finger drag on landscape and portrait sources plus named Fine tune zoom; the owner then directly approved genuine touch/pinch behavior."
   test: 6
   root_cause: "ProfileBackgroundManager renders GestureDetector inside BaseOverlay's native React Native Modal without a GestureHandlerRootView in that modal root; Android buttons therefore work while gesture-handler recognition does not. The current cover-image/fixed-viewport interaction and seven-button horizontal strip also do not match the owner-approved selection-box crop model."
   artifacts:
@@ -159,6 +149,5 @@ blocked: 0
       issue: "Resolved in Plan 31-13: source-selection geometry clamps translation and focal pinch resizing to the source."
     - path: ".planning/phases/31-profile-experience/31-NATIVE-CHECKLIST.md"
       issue: "Rows 43 and 44 claim PASS without evidence that physical drag or pinch changed the crop."
-  missing:
-    - "On the physical Pixel, the owner directly performs a genuine two-pointer pinch on portrait and landscape sources and confirms resize remains bounded."
-  debug_session: "Plan 31-13 physical-Pixel debug evidence 2026-09-10; landscape/portrait direct drag and Fine tune verified, owner two-pointer pinch pending"
+  resolved_evidence: "Plan 31-13 Pixel landscape/portrait artifacts plus owner approval recorded in execution request 2026-09-10."
+  debug_session: "Plan 31-13 physical-Pixel debug evidence 2026-09-10; landscape/portrait direct drag and Fine tune verified, followed by owner direct touch/pinch approval"

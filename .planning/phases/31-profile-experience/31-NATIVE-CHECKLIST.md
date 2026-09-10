@@ -4,7 +4,7 @@
 
 **Build/runtime:** package `com.bwales.orbit`; Metro tmux session `orbit`; use `emu-connect`, then resolve exactly one authorized serial with `~/.local/bin/adb devices -l`.
 
-**Status:** Standalone-release objective evidence recorded; remaining subjective and varied-state acceptance is owner-gated.
+**Status:** Standalone-release objective evidence is recorded. The owner has now directly approved the final Profile crop editor's genuine touch/pinch behavior; all other unexercised subjective and varied-state rows remain owner-gated.
 
 ## Evidence header
 
@@ -88,6 +88,15 @@ and has SHA-256
   [final crop](/home/bwales/projects/orbit-app/.planning/phases/31-profile-experience/evidence/31-12-release/release-final-crop-ui.xml)
   and [scrolled controls](/home/bwales/projects/orbit-app/.planning/phases/31-profile-experience/evidence/31-12-release/release-final-crop-controls-ui.xml).
 
+## Post-Plan-31-13 crop reconciliation (2026-09-10)
+
+Plan 31-13 supplied physical-Pixel evidence for direct drag and bounded
+portrait/landscape selection. The owner then directly exercised and explicitly
+approved the final editor's genuine touch/pinch behavior: “amazing and exactly
+what I was looking for.” That approval closes only the crop interaction rows
+below. It is not evidence for the independent pending accessibility, varied-data,
+navigation, assignment-hierarchy, or theme rows.
+
 ## Checklist
 
 Mark every row PASS/FAIL with a short observation. A failed row is a gap for planning, not an implicit waiver.
@@ -136,8 +145,8 @@ Mark every row PASS/FAIL with a short observation. A failed row is a gap for pla
 | 40 | Templates | Save Current Layout as Template appears only for freeform layout; Reset appears only for contact overrides. | |
 | 41 | Reset | Reset confirmation says contact facts/Favorite/Snooze/AI/knowledge remain unchanged, then verifies that result. | |
 | 42 | Background | Template list/picker uses only local device media and keeps Cancel/error drafts/committed background safe. | PASS — the final release showed the safe retryable error on its first picker attempt, then opened Android's local system picker on immediate retry. Both source orientations reached crop in debug; final-release Cancel → Discard returned without creating or assigning a new background. |
-| 43 | Crop | Portrait crop: drag, pinch, named controls, min/max bounds, preview and output aspect all agree. | PENDING OWNER — physical-Pixel evidence `20-portrait-contained.*` → `21-portrait-horizontal-left.*` proves one-finger drag and terminal textual state; `19-fine-tune-zoom.*` proves reflowing named controls and a 62% → 54% zoom change. Genuine two-pointer pinch still requires owner observation. |
-| 44 | Crop | Landscape crop: same bounds/aspect/reachable controls; no hidden clipping. | PENDING OWNER — physical-Pixel evidence `17-landscape-contained.*` → `18-landscape-horizontal-left.*` proves the complete landscape source, source-bounded selection, one-finger drag, and terminal textual state without hidden clipping. A genuine two-pointer pinch cannot be synthesized by available adb tooling and still requires owner observation. |
+| 43 | Crop | Portrait crop: drag, pinch, named controls, min/max bounds, preview and output aspect all agree. | PASS — Pixel artifacts `20-portrait-contained.*` → `21-portrait-horizontal-left.*` prove contained source and direct drag; `19-fine-tune-zoom.*` proves named controls/zoom. The owner then directly approved genuine touch/pinch behavior (2026-09-10). |
+| 44 | Crop | Landscape crop: same bounds/aspect/reachable controls; no hidden clipping. | PASS — Pixel artifacts `17-landscape-contained.*` → `18-landscape-horizontal-left.*` prove complete landscape source, bounded selection, direct drag, and no hidden clipping. The owner then directly approved genuine touch/pinch behavior (2026-09-10). |
 | 45 | Background | Assignment at contact/Category/global resolves correctly; Profile restarts with readable scrim treatment. | PENDING OWNER — factory fallback is readable and full bleed in the final Galaxy and Standard release captures; contact/Category/global assignment scenarios remain unexercised. |
 | 46 | Theme | Galaxy and Standard, light/dark as available, retain hierarchy, contrast, and no hardcoded-color regressions. | PENDING OWNER — inspected Galaxy and Standard final-release captures retain hierarchy and no tile/opaque wash; `check:colors` passed. Available light-mode and owner contrast judgment remain. |
 | 47 | Accessibility | TalkBack announces Hero actions, disabled reasons, section expanded state, selection, and sheet focus. | |
@@ -154,5 +163,5 @@ Rows 9, 18, 11, 37, 39, 43/44, 47, and 48 are the plan's eight mandatory device 
 - [ ] Every row passed with recorded evidence.
 - [x] Release launch and the 1.15x layout-chooser clipping failure were repaired and have retained evidence; no release failure is waived.
 - [ ] Any failure has a numbered observation and gap-closure owner.
-- [ ] Owner approval: `approved`.
-- [ ] Post-UAT documentation reconciliation recorded in `docs/systems/profile.md` and the Plan 31-10 summary.
+- [ ] Owner approval: `approved` for the complete 50-row checklist. Crop-only approval is recorded above; it does not imply this sign-off.
+- [ ] Post-UAT documentation reconciliation recorded in `docs/systems/profile.md` and the Plan 31-10 summary. The six reported UAT gaps are reconciled in `31-UAT.md`; the missing Plan 31-10 summary remains blocked on the independent checklist rows.
