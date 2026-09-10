@@ -18,21 +18,22 @@ export function profileBackgroundTarget(viewport: {
 }): ProfileBackgroundTarget {
   const viewportWidth = Math.max(1, viewport.width);
   const viewportHeight = Math.max(1, viewport.height);
-  const previewWidth = Math.min(MAX_PREVIEW_WIDTH, viewportWidth);
-  const previewHeight = previewWidth * (viewportHeight / viewportWidth);
+  const previewScale = Math.min(1, MAX_PREVIEW_WIDTH / viewportWidth);
+  const previewWidth = viewportWidth * previewScale;
+  const previewHeight = viewportHeight * previewScale;
   const desiredLongEdge =
-    Math.max(previewWidth, previewHeight) * OUTPUT_DENSITY;
+    Math.max(viewportWidth, viewportHeight) * OUTPUT_DENSITY;
   const outputLongEdge = Math.min(
     MAX_PROFILE_BACKGROUND_OUTPUT_LONG_EDGE,
     Math.round(desiredLongEdge),
   );
-  const outputScale = outputLongEdge / Math.max(previewWidth, previewHeight);
+  const outputScale = outputLongEdge / Math.max(viewportWidth, viewportHeight);
 
   return {
     preview: { width: previewWidth, height: previewHeight },
     output: {
-      width: Math.max(1, Math.round(previewWidth * outputScale)),
-      height: Math.max(1, Math.round(previewHeight * outputScale)),
+      width: Math.max(1, Math.round(viewportWidth * outputScale)),
+      height: Math.max(1, Math.round(viewportHeight * outputScale)),
     },
   };
 }

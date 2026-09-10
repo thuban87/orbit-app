@@ -6,18 +6,20 @@ import {
 
 describe("Profile background target", () => {
   it("shares the measured portrait Profile aspect between preview and bounded output", () => {
-    const target = profileBackgroundTarget({ width: 1080, height: 2400 });
+    const target = profileBackgroundTarget({ width: 411, height: 891 });
 
     expect(target.preview.width / target.preview.height).toBeCloseTo(
-      1080 / 2400,
+      411 / 891,
       8,
     );
     expect(target.output.width / target.output.height).toBeCloseTo(
-      1080 / 2400,
+      411 / 891,
       3,
     );
-    expect(
-      Math.max(target.output.width, target.output.height),
-    ).toBeLessThanOrEqual(MAX_PROFILE_BACKGROUND_OUTPUT_LONG_EDGE);
+    expect(target.preview.width).toBeLessThanOrEqual(360);
+    expect(target.preview.height).toBeLessThanOrEqual(891);
+    expect(Math.max(target.output.width, target.output.height)).toBe(
+      MAX_PROFILE_BACKGROUND_OUTPUT_LONG_EDGE,
+    );
   });
 });

@@ -458,11 +458,13 @@ export function ProfileBackgroundManager({
   return (
     <Sheet visible={visible} onRequestClose={closeOrGuard} variant="expanded">
       <View style={styles.root} accessibilityViewIsModal>
-        <View style={styles.heading}>
-          <AppText role="heading">Profile backgrounds</AppText>
-          <Button role="secondary" label="Back" onPress={closeOrGuard} />
-        </View>
-        {managerState.error ? (
+        {page !== "crop" ? (
+          <View style={styles.heading}>
+            <AppText role="heading">Profile backgrounds</AppText>
+            <Button role="secondary" label="Back" onPress={closeOrGuard} />
+          </View>
+        ) : null}
+        {page !== "crop" && managerState.error ? (
           <AppText style={{ color: colors.danger }}>
             {managerState.error}
           </AppText>
@@ -571,14 +573,7 @@ export function ProfileBackgroundManager({
           </ScrollView>
         ) : null}
         {page === "crop" && source && imageStyle ? (
-          <ScrollView
-            style={styles.workspace}
-            contentContainerStyle={styles.content}
-          >
-            <AppText role="body">
-              Pinch to crop and drag to reposition. The preview uses the Profile
-              aspect.
-            </AppText>
+          <View style={styles.cropEditor}>
             <View style={[styles.cropViewport, cropTarget.preview]}>
               <GestureDetector gesture={Gesture.Simultaneous(pan, pinch)}>
                 <Animated.Image
@@ -588,95 +583,128 @@ export function ProfileBackgroundManager({
                 />
               </GestureDetector>
             </View>
-            <View style={styles.controls}>
-              <Button
-                role="tertiary"
-                label="Reset crop"
-                onPress={() => clampSharedPan(1, 0, 0)}
-              />
-              <Button
-                role="tertiary"
-                label="Zoom in"
-                onPress={() =>
-                  clampSharedPan(
-                    scale.value * 1.15,
-                    translateX.value,
-                    translateY.value,
-                  )
-                }
-              />
-              <Button
-                role="tertiary"
-                label="Zoom out"
-                onPress={() =>
-                  clampSharedPan(
-                    scale.value / 1.15,
-                    translateX.value,
-                    translateY.value,
-                  )
-                }
-              />
-              <Button
-                role="tertiary"
-                label="Move left"
-                onPress={() =>
-                  clampSharedPan(
-                    scale.value,
-                    translateX.value - 24,
-                    translateY.value,
-                  )
-                }
-              />
-              <Button
-                role="tertiary"
-                label="Move right"
-                onPress={() =>
-                  clampSharedPan(
-                    scale.value,
-                    translateX.value + 24,
-                    translateY.value,
-                  )
-                }
-              />
-              <Button
-                role="tertiary"
-                label="Move up"
-                onPress={() =>
-                  clampSharedPan(
-                    scale.value,
-                    translateX.value,
-                    translateY.value - 24,
-                  )
-                }
-              />
-              <Button
-                role="tertiary"
-                label="Move down"
-                onPress={() =>
-                  clampSharedPan(
-                    scale.value,
-                    translateX.value,
-                    translateY.value + 24,
-                  )
-                }
-              />
-            </View>
-            <Button role="secondary" label="Cancel" onPress={closeOrGuard} />
-            {managerState.error ? (
-              <Button
-                role="secondary"
-                label="Retry"
-                disabled={saving}
-                onPress={retryCrop}
-              />
-            ) : null}
-            <Button
-              role="primary"
-              label={saving ? "Preparing…" : "Use background"}
-              disabled={saving}
-              onPress={() => void prepareCrop()}
-            />
-          </ScrollView>
+            <GlassSurface density="dense" style={styles.cropTopOverlay}>
+              <View style={styles.heading}>
+                <AppText role="heading">Crop background</AppText>
+                <Button role="secondary" label="Back" onPress={closeOrGuard} />
+              </View>
+              <AppText role="body">
+                Drag to reposition. Pinch or use the controls to zoom.
+              </AppText>
+            </GlassSurface>
+            <GlassSurface density="dense" style={styles.cropBottomOverlay}>
+              {managerState.error ? (
+                <AppText style={{ color: colors.danger }}>
+                  {managerState.error}
+                </AppText>
+              ) : null}
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator
+                contentContainerStyle={styles.cropControlRow}
+              >
+                <Button
+                  role="tertiary"
+                  label="Reset"
+                  accessibilityLabel="Reset crop"
+                  onPress={() => clampSharedPan(1, 0, 0)}
+                />
+                <Button
+                  role="tertiary"
+                  label="Zoom +"
+                  accessibilityLabel="Zoom in"
+                  onPress={() =>
+                    clampSharedPan(
+                      scale.value * 1.15,
+                      translateX.value,
+                      translateY.value,
+                    )
+                  }
+                />
+                <Button
+                  role="tertiary"
+                  label="Zoom −"
+                  accessibilityLabel="Zoom out"
+                  onPress={() =>
+                    clampSharedPan(
+                      scale.value / 1.15,
+                      translateX.value,
+                      translateY.value,
+                    )
+                  }
+                />
+                <Button
+                  role="tertiary"
+                  label="←"
+                  accessibilityLabel="Move left"
+                  onPress={() =>
+                    clampSharedPan(
+                      scale.value,
+                      translateX.value - 24,
+                      translateY.value,
+                    )
+                  }
+                />
+                <Button
+                  role="tertiary"
+                  label="→"
+                  accessibilityLabel="Move right"
+                  onPress={() =>
+                    clampSharedPan(
+                      scale.value,
+                      translateX.value + 24,
+                      translateY.value,
+                    )
+                  }
+                />
+                <Button
+                  role="tertiary"
+                  label="↑"
+                  accessibilityLabel="Move up"
+                  onPress={() =>
+                    clampSharedPan(
+                      scale.value,
+                      translateX.value,
+                      translateY.value - 24,
+                    )
+                  }
+                />
+                <Button
+                  role="tertiary"
+                  label="↓"
+                  accessibilityLabel="Move down"
+                  onPress={() =>
+                    clampSharedPan(
+                      scale.value,
+                      translateX.value,
+                      translateY.value + 24,
+                    )
+                  }
+                />
+              </ScrollView>
+              <View style={styles.cropActions}>
+                <Button
+                  role="secondary"
+                  label="Cancel"
+                  onPress={closeOrGuard}
+                />
+                {managerState.error ? (
+                  <Button
+                    role="secondary"
+                    label="Retry"
+                    disabled={saving}
+                    onPress={retryCrop}
+                  />
+                ) : null}
+                <Button
+                  role="primary"
+                  label={saving ? "Preparing…" : "Use background"}
+                  disabled={saving}
+                  onPress={() => void prepareCrop()}
+                />
+              </View>
+            </GlassSurface>
+          </View>
         ) : null}
         {page === "name" ? (
           <ScrollView
@@ -763,11 +791,38 @@ const styles = StyleSheet.create({
   rowText: { flex: 1, gap: SPACING.xs },
   thumbnail: { borderRadius: RADII.md, height: 56, width: 84 },
   cropViewport: {
+    alignSelf: "center",
     alignItems: "center",
     justifyContent: "center",
     overflow: "hidden",
   },
-  controls: { flexDirection: "row", flexWrap: "wrap", gap: SPACING.xs },
+  cropEditor: {
+    alignItems: "center",
+    flex: 1,
+    justifyContent: "center",
+    overflow: "hidden",
+  },
+  cropTopOverlay: {
+    left: 0,
+    padding: SPACING.sm,
+    position: "absolute",
+    right: 0,
+    top: 0,
+  },
+  cropBottomOverlay: {
+    bottom: 0,
+    left: 0,
+    padding: SPACING.sm,
+    position: "absolute",
+    right: 0,
+  },
+  cropControlRow: { gap: SPACING.xs, paddingRight: SPACING.sm },
+  cropActions: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: SPACING.sm,
+    justifyContent: "space-between",
+  },
   input: {
     borderRadius: RADII.md,
     borderWidth: 1,
