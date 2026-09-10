@@ -1,15 +1,18 @@
 // biome-ignore-all lint/a11y/useValidAriaRole: AppText role is a typography prop.
-import { useEffect, useMemo, useReducer, useRef, useState } from "react";
+import { useEffect, useReducer, useRef, useState } from "react";
 import {
   Alert,
-  PanResponder,
   Pressable,
-  ScrollView,
   StyleSheet,
   Switch,
   useWindowDimensions,
   View,
 } from "react-native";
+import {
+  NestedReorderableList,
+  ScrollViewContainer,
+  useReorderableDrag,
+} from "react-native-reorderable-list";
 import { Icon } from "@/components/icons/Icon";
 import { AppText } from "@/components/ui/AppText";
 import { Button } from "@/components/ui/Button";
@@ -30,6 +33,7 @@ import {
 } from "@/profile/layout-editor-session";
 import { PROFILE_MODULE_REGISTRY } from "@/profile/module-registry";
 import { packOverviewModules } from "@/profile/pack-overview";
+import type { ProfileModuleParentId } from "@/profile/persisted-contract";
 import type {
   ProfileLayoutDocument,
   ProfileModulePlacement,
@@ -58,31 +62,18 @@ export interface ProfileLayoutEditorProps {
 
 function RowDragHandle({
   label,
-  onMove,
 }: {
   label: string;
-  onMove: (direction: "up" | "down") => void;
 }) {
-  const panResponder = useMemo(
-    () =>
-      PanResponder.create({
-        onStartShouldSetPanResponder: () => true,
-        onMoveShouldSetPanResponder: (_, gesture) => Math.abs(gesture.dy) > 8,
-        onPanResponderRelease: (_, gesture) => {
-          if (gesture.dy <= -20) onMove("up");
-          if (gesture.dy >= 20) onMove("down");
-        },
-      }),
-    [onMove],
-  );
+  const drag = useReorderableDrag();
 
   return (
     <Pressable
-      accessibilityRole="adjustable"
+      accessibilityRole="button"
       accessibilityLabel={`Drag ${label} to reorder`}
-      accessibilityHint="Swipe up or down to move this section one position."
+      accessibilityHint="Long press, then drag to a new position in this section."
       style={styles.dragHandle}
-      {...panResponder.panHandlers}
+      onLongPress={drag}
     >
       <Icon name="sort" tone="textSecondary" size="md" />
     </Pressable>
@@ -105,7 +96,7 @@ function EditorRow({
   return (
     <GlassSurface density="dense" style={styles.editorRow}>
       <View style={styles.rowHeading}>
-        <RowDragHandle label={definition.label} onMove={move} />
+        <RowDragHandle label={definition.label} />
         <View style={styles.rowLabel}>
           <AppText role="label">{definition.label}</AppText>
           <AppText role="caption">
@@ -174,6 +165,30 @@ function EditorRow({
         {placement.visible ? "Shown in this layout" : "Hidden in this layout"}
       </AppText>
     </GlassSurface>
+  );
+}
+
+function ReorderableBucket({
+  parent,
+  items,
+  dispatch,
+}: {
+  parent: ProfileModuleParentId;
+  items: ProfileModulePlacement[];
+  dispatch: React.Dispatch<ProfileLayoutEditorAction>;
+}) {
+  return (
+    <NestedReorderableList
+      data={items}
+      keyExtractor={(placement) => placement.id}
+      onReorder={({ from, to }) => {
+        dispatch({ type: "reorder", parent, id: items[from].id, toIndex: to });
+      }}
+      renderItem={({ item }) => (
+        <EditorRow placement={item} dispatch={dispatch} />
+      )}
+      scrollable={false}
+    />
   );
 }
 
@@ -332,7 +347,7 @@ export function ProfileLayoutEditor({
         </View>
       ) : (
         <View style={styles.editor} accessibilityViewIsModal>
-          <ScrollView
+          <ScrollViewContainer
             style={styles.editorScroll}
             contentContainerStyle={styles.editorContent}
           >
@@ -343,30 +358,24 @@ export function ProfileLayoutEditor({
             </AppText>
             <Preview layout={draft} />
             <AppText role="label">Profile sections</AppText>
-            {draft.topLevel.map((placement) => (
-              <EditorRow
-                key={placement.id}
-                placement={placement}
-                dispatch={dispatch}
-              />
-            ))}
+            <ReorderableBucket
+              parent="profile"
+              items={draft.topLevel}
+              dispatch={dispatch}
+            />
             <AppText role="label">Relationship Overview</AppText>
-            {draft.overview.map((placement) => (
-              <EditorRow
-                key={placement.id}
-                placement={placement}
-                dispatch={dispatch}
-              />
-            ))}
+            <ReorderableBucket
+              parent="relationship-overview"
+              items={draft.overview}
+              dispatch={dispatch}
+            />
             <AppText role="label">Things to Remember</AppText>
-            {draft.thingsToRemember.map((placement) => (
-              <EditorRow
-                key={placement.id}
-                placement={placement}
-                dispatch={dispatch}
-              />
-            ))}
-          </ScrollView>
+            <ReorderableBucket
+              parent="things-to-remember"
+              items={draft.thingsToRemember}
+              dispatch={dispatch}
+            />
+          </ScrollViewContainer>
           {saveError ? <AppText role="caption">{saveError}</AppText> : null}
           <View style={styles.footer}>
             <Button
@@ -401,7 +410,7 @@ const styles = StyleSheet.create({
   editor: { flex: 1, gap: SPACING.sm },
   editorScroll: { flex: 1 },
   editorContent: { gap: SPACING.sm, paddingBottom: SPACING.base },
-  editorRow: { gap: SPACING.sm, padding: SPACING.sm },
+  editorRow: { gap: SPACING.sm, marginBottom: SPACING.sm, padding: SPACING.sm },
   rowHeading: { alignItems: "center", flexDirection: "row", gap: SPACING.sm },
   rowLabel: { flex: 1, gap: SPACING.xs },
   rowControls: { flexDirection: "row", flexWrap: "wrap", gap: SPACING.xs },
