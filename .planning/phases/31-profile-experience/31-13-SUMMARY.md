@@ -18,6 +18,7 @@ actuals:
 - Added deterministic contained selection, pan, focal pinch, textual state, and direct pipeline crop tests.
 - Preserved the one-pass local JPEG derivative, UID-relative storage, release, and failure contracts.
 - Added `GestureHandlerRootView` at the shared RN Modal root, a contained source preview, selection border, dimmed outside mask, and named Fine tune controls.
+- Corrected the workspace integration after Pixel inspection: the source now fills the measured editor width while the Profile-aspect selection stays source-bounded.
 - Installed the debug APK on the authorized physical Pixel with Metro and `adb reverse` active; captured debug device artifacts.
 
 ## Verification
@@ -29,6 +30,8 @@ actuals:
 ## Pending owner verification
 
 Rows 43–44 are intentionally **PENDING OWNER**. Standard adb automation cannot create a trustworthy two-pointer pinch. The owner should open real portrait and landscape images in the debug crop editor, directly drag and pinch the selection, and confirm Fine tune state/control reachability.
+
+The current physical Pixel screenshot is `evidence/31-13-debug/12-crop-full-width.png`; it shows the landscape source contained across the editor workspace rather than inside a Profile-shaped viewport.
 
 ## Deviations from Plan
 
