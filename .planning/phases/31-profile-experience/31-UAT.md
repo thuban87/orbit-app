@@ -70,10 +70,10 @@ evidence: "Plan 31-14 focused gate: `src/components/profile/profile-template-man
 
 ### 9. Background assignments can return to the theme default
 expected: Global, Category, and contact background assignment surfaces expose a truthful clear/inherit action; clearing the global assignment returns Profiles without narrower overrides to the original theme background.
-result: fail
+result: pass
 reported: "I changed the global default background to a new picture... now there's no way to remove the picture from the background and just have a plain background like it was originally."
-observed: "The assignment UI can set a global background template but provides no escape hatch that clears the global background axis."
-evidence: "owner release-smoke report 2026-09-10"
+observed: "On the authorized physical Pixel, the owner assigned a saved global background, verified it on an unrelated Profile without a narrower override, cleared the global assignment, then left and reopened that Profile. It returned to the active theme background rather than the saved image. Targeted fresh-read tests retain Category-clear and contact-inherit precedence plus sibling-axis preservation."
+evidence: "owner approval `approved` delivered to Plan 31-15 executor 2026-09-10; `src/db/profile-presentation-dao.test.ts`; `src/profile/resolve-presentation.test.ts`; `src/components/profile/profile-background-manager.contract.test.ts` (27 focused tests passed)"
 
 ### Deferred polish: layout-template preview
 
