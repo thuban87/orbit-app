@@ -1,7 +1,5 @@
 import {
   type BackgroundCropRect,
-  type BackgroundCropTransform,
-  computeBackgroundCrop,
 } from "./background-crop-geometry";
 
 /** The screen-class derivative dimensions, derived from the actual Profile host. */
@@ -18,7 +16,8 @@ export interface PreparedBackgroundResource {
 
 export interface PrepareProfileBackgroundArgs {
   rawUri: string;
-  transform: BackgroundCropTransform;
+  /** Exact, source-bounded pixels selected by the crop workspace. */
+  selection: BackgroundCropRect;
   output: BackgroundDerivativeSize;
   /** Native adapter: source-pixel crop, resize, and one JPEG encode. */
   cropAndResize: (input: {
@@ -44,7 +43,7 @@ export class BackgroundPipelineError extends Error {
  */
 export async function prepareProfileBackground({
   rawUri,
-  transform,
+  selection,
   output,
   cropAndResize,
   persist,
@@ -52,7 +51,7 @@ export async function prepareProfileBackground({
   relativePath: string;
   crop: BackgroundCropRect;
 }> {
-  const crop = computeBackgroundCrop(transform);
+  const crop = selection;
   let resource: PreparedBackgroundResource | undefined;
   try {
     resource = await cropAndResize({ rawUri, crop, output });

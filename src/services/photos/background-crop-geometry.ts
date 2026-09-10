@@ -1,22 +1,8 @@
 /**
- * Pure geometry for the Profile background crop workflow. Unlike identity-photo
- * cropping, the destination is the measured Profile aspect rather than a fixed
- * square. Gesture and named adjustment callers must both use these bounds.
+ * Pure source-pixel geometry for the Profile background crop workflow. The UI
+ * renders this selection at a contained display scale, while persistence sends
+ * this exact clamped rectangle to the image manipulator.
  */
-
-export interface BackgroundCropTransform {
-  /** Measured Profile preview/output size in screen pixels. */
-  destinationWidth: number;
-  destinationHeight: number;
-  /** Decoded source dimensions in source pixels. */
-  srcWidth: number;
-  srcHeight: number;
-  /** Cover-scale multiplier: one is the minimum permitted scale. */
-  scale: number;
-  /** Centre-origin screen-pixel translations. */
-  translateX: number;
-  translateY: number;
-}
 
 export interface BackgroundCropRect {
   originX: number;
@@ -25,82 +11,160 @@ export interface BackgroundCropRect {
   height: number;
 }
 
-export interface BackgroundPanBounds {
-  minX: number;
-  maxX: number;
-  minY: number;
-  maxY: number;
+export interface BackgroundCropSource {
+  width: number;
+  height: number;
 }
+
+export interface BackgroundCropPoint {
+  x: number;
+  y: number;
+}
+
+const MIN_SELECTION_EDGE = 1;
 
 const clamp = (value: number, min: number, max: number): number =>
   Math.max(min, Math.min(value, max));
 
-function coverScale(input: BackgroundCropTransform): number {
-  return Math.max(
-    input.destinationWidth / input.srcWidth,
-    input.destinationHeight / input.srcHeight,
-  );
-}
-
-function effectiveScale(input: BackgroundCropTransform): number {
-  return coverScale(input) * Math.max(1, input.scale);
-}
-
-/** Returns the only legal centre-origin pan range for a current crop scale. */
-export function getBackgroundPanBounds(
-  input: BackgroundCropTransform,
-): BackgroundPanBounds {
-  const scale = effectiveScale(input);
-  const halfOverflowX = Math.max(
-    0,
-    (input.srcWidth * scale - input.destinationWidth) / 2,
-  );
-  const halfOverflowY = Math.max(
-    0,
-    (input.srcHeight * scale - input.destinationHeight) / 2,
-  );
+function safeSource(source: BackgroundCropSource): BackgroundCropSource {
   return {
-    minX: halfOverflowX === 0 ? 0 : -halfOverflowX,
-    maxX: halfOverflowX,
-    minY: halfOverflowY === 0 ? 0 : -halfOverflowY,
-    maxY: halfOverflowY,
+    width: Math.max(MIN_SELECTION_EDGE, source.width),
+    height: Math.max(MIN_SELECTION_EDGE, source.height),
   };
 }
 
-/** Normalizes a gesture or named-control transform to the common legal bounds. */
-export function clampBackgroundTransform(
-  input: BackgroundCropTransform,
-): BackgroundCropTransform {
-  const scale = Math.max(1, input.scale);
-  const bounds = getBackgroundPanBounds({ ...input, scale });
+function safeAspect(aspect: number): number {
+  return Number.isFinite(aspect) && aspect > 0 ? aspect : 1;
+}
+
+function largestContainedSize(
+  source: BackgroundCropSource,
+  aspect: number,
+): { width: number; height: number } {
+  const normalizedSource = safeSource(source);
+  const normalizedAspect = safeAspect(aspect);
+  const widthFromHeight = normalizedSource.height * normalizedAspect;
+  if (widthFromHeight <= normalizedSource.width) {
+    return { width: widthFromHeight, height: normalizedSource.height };
+  }
   return {
-    ...input,
-    scale,
-    translateX: clamp(input.translateX, bounds.minX, bounds.maxX),
-    translateY: clamp(input.translateY, bounds.minY, bounds.maxY),
+    width: normalizedSource.width,
+    height: normalizedSource.width / normalizedAspect,
+  };
+}
+
+/** Creates the largest Profile-aspect crop rectangle that fits in the source. */
+export function createInitialBackgroundCropSelection(
+  source: BackgroundCropSource,
+  aspect: number,
+): BackgroundCropRect {
+  const normalizedSource = safeSource(source);
+  const size = largestContainedSize(normalizedSource, aspect);
+  return {
+    originX: (normalizedSource.width - size.width) / 2,
+    originY: (normalizedSource.height - size.height) / 2,
+    ...size,
   };
 }
 
 /**
- * Maps the currently clamped Profile preview transform to an in-bounds
- * source-pixel rectangle suitable for an image-manipulator crop operation.
+ * Normalizes a source rectangle to the requested aspect and clamps it wholly
+ * inside the decoded source. The selection never gains pixels beyond source.
  */
-export function computeBackgroundCrop(
-  input: BackgroundCropTransform,
+export function clampBackgroundCropSelection(
+  selection: BackgroundCropRect,
+  source: BackgroundCropSource,
+  aspect: number,
 ): BackgroundCropRect {
-  const normalized = clampBackgroundTransform(input);
-  const scale = effectiveScale(normalized);
-  const width = normalized.destinationWidth / scale;
-  const height = normalized.destinationHeight / scale;
+  const normalizedSource = safeSource(source);
+  const normalizedAspect = safeAspect(aspect);
+  const maximum = largestContainedSize(normalizedSource, normalizedAspect);
+  const proposedWidth = Number.isFinite(selection.width)
+    ? Math.max(MIN_SELECTION_EDGE, selection.width)
+    : maximum.width;
+  const width = Math.min(maximum.width, proposedWidth);
+  const height = width / normalizedAspect;
   const originX = clamp(
-    (normalized.srcWidth - width) / 2 - normalized.translateX / scale,
+    Number.isFinite(selection.originX) ? selection.originX : 0,
     0,
-    normalized.srcWidth - width,
+    normalizedSource.width - width,
   );
   const originY = clamp(
-    (normalized.srcHeight - height) / 2 - normalized.translateY / scale,
+    Number.isFinite(selection.originY) ? selection.originY : 0,
     0,
-    normalized.srcHeight - height,
+    normalizedSource.height - height,
   );
   return { originX, originY, width, height };
+}
+
+/** Moves a selection in source pixels without changing its dimensions. */
+export function translateBackgroundCropSelection(
+  selection: BackgroundCropRect,
+  source: BackgroundCropSource,
+  deltaX: number,
+  deltaY: number,
+): BackgroundCropRect {
+  const aspect = selection.width / selection.height;
+  return clampBackgroundCropSelection(
+    {
+      ...selection,
+      originX: selection.originX + (Number.isFinite(deltaX) ? deltaX : 0),
+      originY: selection.originY + (Number.isFinite(deltaY) ? deltaY : 0),
+    },
+    source,
+    aspect,
+  );
+}
+
+/**
+ * Resizes around a focal source point. A scale above one zooms in (shrinks the
+ * selected source rectangle); below one zooms out, constrained to source bounds.
+ */
+export function pinchResizeBackgroundCropSelection(
+  selection: BackgroundCropRect,
+  source: BackgroundCropSource,
+  aspect: number,
+  focal: BackgroundCropPoint,
+  pinchScale: number,
+): BackgroundCropRect {
+  const normalized = clampBackgroundCropSelection(selection, source, aspect);
+  const scale = Number.isFinite(pinchScale) && pinchScale > 0 ? pinchScale : 1;
+  const width = normalized.width / scale;
+  const height = width / safeAspect(aspect);
+  const focalX = Number.isFinite(focal.x) ? focal.x : normalized.originX + normalized.width / 2;
+  const focalY = Number.isFinite(focal.y) ? focal.y : normalized.originY + normalized.height / 2;
+  const xRatio = (focalX - normalized.originX) / normalized.width;
+  const yRatio = (focalY - normalized.originY) / normalized.height;
+  return clampBackgroundCropSelection(
+    {
+      originX: focalX - width * xRatio,
+      originY: focalY - height * yRatio,
+      width,
+      height,
+    },
+    source,
+    aspect,
+  );
+}
+
+/** Formats the selection as a short non-gesture status announcement. */
+export function describeBackgroundCropSelection(
+  selection: BackgroundCropRect,
+  source: BackgroundCropSource,
+): string {
+  const normalizedSource = safeSource(source);
+  const percent = Math.round((selection.width / normalizedSource.width) * 100);
+  const horizontal =
+    selection.originX <= 0
+      ? "left"
+      : selection.originX + selection.width >= normalizedSource.width
+        ? "right"
+        : "center";
+  const vertical =
+    selection.originY <= 0
+      ? "top"
+      : selection.originY + selection.height >= normalizedSource.height
+        ? "bottom"
+        : "center";
+  return `Crop uses ${percent}% of the image, aligned ${vertical} ${horizontal}.`;
 }
