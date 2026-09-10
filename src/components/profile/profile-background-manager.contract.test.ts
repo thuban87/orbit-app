@@ -32,4 +32,16 @@ describe("ProfileBackgroundManager crop workspace contract", () => {
     expect(source).toContain('scope === "clear-category" ? null : selectedUid');
     expect(source).toContain('scope === "inherit" ? null : selectedUid');
   });
+
+  it("returns a clean reopened manager to the list before exposing assignment controls", () => {
+    const source = readFileSync(
+      resolve(__dirname, "ProfileBackgroundManager.tsx"),
+      "utf8",
+    );
+
+    expect(source).toContain("const opening = !wasVisibleRef.current");
+    expect(source).toContain("shouldResetBackgroundManagerViewOnOpen(managerState)");
+    expect(source).toContain('setPage("list")');
+    expect(source).toContain("setSelectedUid(null)");
+  });
 });

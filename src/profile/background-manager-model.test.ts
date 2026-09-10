@@ -8,6 +8,7 @@ import {
   requestBackgroundManagerDismissal,
   resolveBackgroundListState,
   retryBackgroundPreparation,
+  shouldResetBackgroundManagerViewOnOpen,
 } from "./background-manager-model";
 
 describe("background manager model", () => {
@@ -59,6 +60,22 @@ describe("background manager model", () => {
         ),
       ),
     ).toEqual({ kind: "confirm-discard" });
+  });
+
+  it("returns a clean manager to its list view on reopen without bypassing a crop guard", () => {
+    expect(
+      shouldResetBackgroundManagerViewOnOpen(
+        createBackgroundManagerState(null),
+      ),
+    ).toBe(true);
+    expect(
+      shouldResetBackgroundManagerViewOnOpen(
+        beginBackgroundPreparation(
+          createBackgroundManagerState(null),
+          "pick-1",
+        ),
+      ),
+    ).toBe(false);
   });
 
   it("describes visible list states and retry affordance without touching draft state", () => {

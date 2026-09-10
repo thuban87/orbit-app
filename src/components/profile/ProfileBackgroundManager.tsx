@@ -46,6 +46,7 @@ import {
   finishBackgroundPreparation,
   requestBackgroundManagerDismissal,
   resolveBackgroundListState,
+  shouldResetBackgroundManagerViewOnOpen,
 } from "@/profile/background-manager-model";
 import { prepareProfileBackground } from "@/services/photos/background-pipeline";
 import {
@@ -126,6 +127,7 @@ export function ProfileBackgroundManager({
   const [fineTuneOpen, setFineTuneOpen] = useState(false);
   const tokenCounter = useRef(0);
   const activeTokenRef = useRef<string | null>(null);
+  const wasVisibleRef = useRef(false);
 
   const displayScale = useSharedValue(1);
   const displayOffsetX = useSharedValue(0);
@@ -164,9 +166,25 @@ export function ProfileBackgroundManager({
   }, []);
 
   useEffect(() => {
-    if (!visible) return;
+    if (!visible) {
+      wasVisibleRef.current = false;
+      return;
+    }
+    const opening = !wasVisibleRef.current;
+    wasVisibleRef.current = true;
+    if (!opening) return;
+    if (shouldResetBackgroundManagerViewOnOpen(managerState)) {
+      activeTokenRef.current = null;
+      setManagerState((current) => cancelBackgroundPreparation(current));
+      setPage("list");
+      setSelectedUid(null);
+      setSource(null);
+      setTemplateName("");
+      setCropStatus("");
+      setFineTuneOpen(false);
+    }
     void refresh();
-  }, [refresh, visible]);
+  }, [managerState, refresh, visible]);
 
   const profileAspect = cropTarget.preview.width / cropTarget.preview.height;
   const publishStatus = useCallback(

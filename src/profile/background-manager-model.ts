@@ -107,6 +107,13 @@ export function requestBackgroundManagerDismissal(
   return state.dirty ? { kind: "confirm-discard" } : { kind: "close" };
 }
 
+/** A clean reopen is a fresh manager visit; an unsaved crop must remain guarded. */
+export function shouldResetBackgroundManagerViewOnOpen(
+  state: BackgroundManagerState,
+): boolean {
+  return !state.dirty;
+}
+
 /**
  * The destructive database transaction must finish before any derived bytes
  * are cleaned up or the list is refreshed. Rejections intentionally reach the
