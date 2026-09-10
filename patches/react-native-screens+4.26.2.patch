@@ -1,0 +1,13 @@
+diff --git a/node_modules/react-native-screens/android/build.gradle b/node_modules/react-native-screens/android/build.gradle
+--- a/node_modules/react-native-screens/android/build.gradle
++++ b/node_modules/react-native-screens/android/build.gradle
+@@ -171,8 +171,9 @@ android {
+     sourceSets.main {
+         ext.androidResDir = "src/main/res"
+         java {
+             srcDirs += [
+                 "src/fabric/java",
++                "${project.buildDir}/generated/source/codegen/java",
+             ]
+         }
+         res {

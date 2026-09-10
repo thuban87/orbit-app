@@ -44,6 +44,7 @@ export function Sheet({
       justify="flex-end"
       dismissable
       scrimAccessibilityLabel="Dismiss"
+      contentStyle={styles.overlayContent}
     >
       <SafeAreaView
         edges={["bottom"]}
@@ -73,6 +74,9 @@ export function Sheet({
 }
 
 const styles = StyleSheet.create({
+  // Percent-height variants need a concrete parent height. Without this flex
+  // wrapper, a detail sheet can clip its last action at large system fonts.
+  overlayContent: { flex: 1, justifyContent: "flex-end" },
   sheet: {
     flexDirection: "column",
     borderTopLeftRadius: RADII.xl,
