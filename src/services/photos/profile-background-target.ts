@@ -12,6 +12,30 @@ export interface ProfileBackgroundTarget {
   output: { width: number; height: number };
 }
 
+/**
+ * Fits the Profile-shaped crop canvas inside the space left after the crop
+ * controls have laid out. The display size may be smaller than the durable
+ * output, but both retain the exact same aspect ratio.
+ */
+export function fitProfileBackgroundPreview(
+  viewport: { width: number; height: number },
+  available: { width: number; height: number },
+): { width: number; height: number } {
+  const viewportWidth = Math.max(1, viewport.width);
+  const viewportHeight = Math.max(1, viewport.height);
+  const availableWidth = Math.max(1, available.width);
+  const availableHeight = Math.max(1, available.height);
+  const scale = Math.min(
+    availableWidth / viewportWidth,
+    availableHeight / viewportHeight,
+  );
+
+  return {
+    width: viewportWidth * scale,
+    height: viewportHeight * scale,
+  };
+}
+
 export function profileBackgroundTarget(viewport: {
   width: number;
   height: number;
