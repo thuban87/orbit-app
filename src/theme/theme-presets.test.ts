@@ -80,6 +80,7 @@ describe("resolvePalette", () => {
       "background",
       "surface",
       "surfaceElevated",
+      "profileBackgroundScrim",
       "accent",
       "textPrimary",
       "textSecondary",

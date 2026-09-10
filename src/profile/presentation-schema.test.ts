@@ -10,6 +10,9 @@ describe("Profile presentation schema", () => {
       FACTORY_PROFILE_LAYOUT,
     );
     expect(FACTORY_PROFILE_LAYOUT.topLevel).toHaveLength(4);
+    expect(
+      FACTORY_PROFILE_LAYOUT.topLevel.every((placement) => !placement.expanded),
+    ).toBe(true);
     expect(FACTORY_PROFILE_LAYOUT.overview).toHaveLength(6);
     expect(FACTORY_PROFILE_LAYOUT.thingsToRemember).toHaveLength(8);
   });

@@ -49,6 +49,24 @@ describe("resolveProfilePresentation", () => {
     expect(resolved.background.source).toBe("category");
   });
 
+  it("keeps template defaults and persisted contact collapse authoritative over factory fallback", () => {
+    const input = base();
+    const templateLayout = {
+      ...FACTORY_PROFILE_LAYOUT,
+      topLevel: FACTORY_PROFILE_LAYOUT.topLevel.map((placement) => ({
+        ...placement,
+        expanded: true,
+      })),
+    };
+    input.layoutTemplates[2] = { uid: "contact-layout", layout: templateLayout };
+    input.contact.layoutTemplateUid = "contact-layout";
+    input.contact.collapse = { "contact-methods": false };
+
+    const resolved = resolveProfilePresentation(input);
+    expect(resolved.layout.document.topLevel.every((placement) => placement.expanded)).toBe(true);
+    expect(resolved.collapse).toEqual({ "contact-methods": false });
+  });
+
   it("falls through missing references without rewriting or hiding diagnostics", () => {
     const input = base();
     input.contact.layoutTemplateUid = "missing-layout";
