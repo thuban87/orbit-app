@@ -12,7 +12,7 @@ import { getExecutor, localDateTime } from "@/db/database";
 import {
   assignCategoryProfilePresentation,
   assignContactLayoutTemplate,
-  assignGlobalProfilePresentation,
+  assignGlobalProfileLayoutTemplate,
   createProfileLayoutTemplate,
   deleteProfileLayoutTemplate,
   updateProfileLayoutTemplate,
@@ -311,9 +311,8 @@ export function ProfileTemplateManager({
     void runTemplateOperation(activeTemplate.uid, async () => {
       const now = localDateTime();
       if (scope === "global") {
-        await assignGlobalProfilePresentation(getExecutor(), {
-          layoutTemplateUid: activeTemplate.uid,
-          backgroundTemplateUid: presentation.global.backgroundTemplateUid,
+        await assignGlobalProfileLayoutTemplate(getExecutor(), {
+          templateUid: activeTemplate.uid,
           now,
         });
       } else if (scope === "category" && categoryId !== undefined) {

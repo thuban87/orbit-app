@@ -27,7 +27,7 @@ import { getExecutor, localDateTime } from "@/db/database";
 import {
   assignCategoryProfilePresentation,
   assignContactBackgroundTemplate,
-  assignGlobalProfilePresentation,
+  assignGlobalProfileBackgroundTemplate,
   createProfileBackgroundTemplate,
   deleteProfileBackgroundTemplate,
 } from "@/db/profile-presentation-dao";
@@ -47,7 +47,6 @@ import {
   requestBackgroundManagerDismissal,
   resolveBackgroundListState,
 } from "@/profile/background-manager-model";
-import type { ProfilePresentationInputs } from "@/profile/types";
 import { prepareProfileBackground } from "@/services/photos/background-pipeline";
 import {
   clampBackgroundCropSelection,
@@ -81,7 +80,6 @@ export interface ProfileBackgroundManagerProps {
   visible: boolean;
   contactId: number;
   contactName: string;
-  presentation: ProfilePresentationInputs;
   onRequestClose: () => void;
   onCommitted?: () => void;
 }
@@ -95,7 +93,6 @@ export function ProfileBackgroundManager({
   visible,
   contactId,
   contactName,
-  presentation,
   onRequestClose,
   onCommitted,
 }: ProfileBackgroundManagerProps) {
@@ -399,10 +396,8 @@ export function ProfileBackgroundManager({
       try {
         const now = localDateTime();
         if (scope === "global" || scope === "clear-global") {
-          await assignGlobalProfilePresentation(getExecutor(), {
-            layoutTemplateUid: presentation.global.layoutTemplateUid,
-            backgroundTemplateUid:
-              scope === "clear-global" ? null : selectedUid,
+          await assignGlobalProfileBackgroundTemplate(getExecutor(), {
+            templateUid: scope === "clear-global" ? null : selectedUid,
             now,
           });
         } else if (
@@ -443,7 +438,6 @@ export function ProfileBackgroundManager({
     [
       contactId,
       onCommitted,
-      presentation.global.layoutTemplateUid,
       refresh,
       saving,
       selectedUid,

@@ -570,7 +570,6 @@ export function ContactProfileScreen({
               visible={overlay === "background"}
               contactId={contactId}
               contactName={snapshot.identity.name}
-              presentation={snapshot.presentation}
               onRequestClose={closeOverlay}
               onCommitted={() => void load()}
             />

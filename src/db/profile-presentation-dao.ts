@@ -261,6 +261,48 @@ export function assignGlobalProfilePresentation(
   });
 }
 
+/**
+ * Changes only the global layout axis. Keeping this as a narrow UPDATE avoids
+ * reconstructing the background axis from a potentially stale Profile read.
+ */
+export function assignGlobalProfileLayoutTemplate(
+  exec: SqlExecutor,
+  input: { templateUid: string | null; now: string },
+): Promise<void> {
+  return inWriteTransaction(exec, async () => {
+    const result = await exec.runAsync(
+      `UPDATE app_settings
+          SET profile_layout_template_uid=?, modified_at=?
+        WHERE id=1`,
+      [input.templateUid, input.now],
+    );
+    if (result.changes !== 1)
+      throw new Error("Profile global settings row is missing");
+    await bumpDataRevisionCore(exec);
+  });
+}
+
+/**
+ * Changes only the global background axis. Keeping this as a narrow UPDATE
+ * preserves a layout assignment made after the manager's Profile snapshot.
+ */
+export function assignGlobalProfileBackgroundTemplate(
+  exec: SqlExecutor,
+  input: { templateUid: string | null; now: string },
+): Promise<void> {
+  return inWriteTransaction(exec, async () => {
+    const result = await exec.runAsync(
+      `UPDATE app_settings
+          SET profile_background_template_uid=?, modified_at=?
+        WHERE id=1`,
+      [input.templateUid, input.now],
+    );
+    if (result.changes !== 1)
+      throw new Error("Profile global settings row is missing");
+    await bumpDataRevisionCore(exec);
+  });
+}
+
 export function assignCategoryProfilePresentation(
   exec: SqlExecutor,
   input: ProfileAssignmentWrite & { categoryId: number },

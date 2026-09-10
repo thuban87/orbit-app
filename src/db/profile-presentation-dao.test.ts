@@ -9,6 +9,8 @@ import {
   assignCategoryProfilePresentation,
   assignContactBackgroundTemplate,
   assignContactLayoutTemplate,
+  assignGlobalProfileBackgroundTemplate,
+  assignGlobalProfileLayoutTemplate,
   assignGlobalProfilePresentation,
   createProfileBackgroundTemplate,
   createProfileLayoutTemplate,
@@ -478,6 +480,42 @@ describe("Profile presentation mutation API", () => {
       background: { source: "theme", imagePath: "theme:galaxy" },
       layout: { source: "contact-freeform" },
       collapse: { "relationship-overview": false },
+    });
+  });
+
+  it("preserves both global axes when managers commit from stale presentation snapshots", async () => {
+    await createProfileLayoutTemplate(exec, {
+      uid: "fresh-layout",
+      name: "Fresh layout",
+      layout: FACTORY_PROFILE_LAYOUT,
+      now: NOW,
+    });
+    await createProfileBackgroundTemplate(exec, {
+      uid: "fresh-background",
+      name: "Fresh background",
+      imagePath: "profile-backgrounds/fresh-background.webp",
+      now: NOW,
+    });
+
+    // Each manager could have opened when both axes were null. Axis-specific
+    // writes must still retain the other manager's later durable selection.
+    await assignGlobalProfileLayoutTemplate(exec, {
+      templateUid: "fresh-layout",
+      now: NOW,
+    });
+    await assignGlobalProfileBackgroundTemplate(exec, {
+      templateUid: "fresh-background",
+      now: NOW,
+    });
+
+    expect(
+      await exec.getFirstAsync(
+        `SELECT profile_layout_template_uid, profile_background_template_uid
+           FROM app_settings WHERE id=1`,
+      ),
+    ).toEqual({
+      profile_layout_template_uid: "fresh-layout",
+      profile_background_template_uid: "fresh-background",
     });
   });
 
