@@ -154,6 +154,8 @@ export function ProfileBackgroundManager({
   const startY = useSharedValue(0);
   const startWidth = useSharedValue(1);
   const startHeight = useSharedValue(1);
+  const pinchFocalX = useSharedValue(0);
+  const pinchFocalY = useSharedValue(0);
 
   const refresh = useCallback(async () => {
     setListLoading(true);
@@ -207,6 +209,8 @@ export function ProfileBackgroundManager({
     const width = Math.max(maxWidth / MAX_ZOOM, Math.min(selectionWidth.value, maxWidth));
     selectionWidth.value = width;
     selectionHeight.value = width / profileAspect;
+    selectionX.value = Math.max(0, Math.min(selectionX.value, sourceWidth.value - width));
+    selectionY.value = Math.max(0, Math.min(selectionY.value, sourceHeight.value - selectionHeight.value));
   };
   const pan = Gesture.Pan().onStart(() => {
     startX.value = selectionX.value;
@@ -218,20 +222,29 @@ export function ProfileBackgroundManager({
     selectionX.value = Math.max(0, Math.min(selectionX.value, maxX));
     selectionY.value = Math.max(0, Math.min(selectionY.value, sourceHeight.value - selectionHeight.value));
   }).onEnd(() => runOnJS(publishStatus)(selectionX.value, selectionY.value, selectionWidth.value, selectionHeight.value));
-  const pinch = Gesture.Pinch().onStart(() => {
+  const pinch = Gesture.Pinch().onStart((event) => {
     startWidth.value = selectionWidth.value;
     startHeight.value = selectionHeight.value;
     startX.value = selectionX.value;
     startY.value = selectionY.value;
+    pinchFocalX.value = (event.focalX - displayOffsetX.value) / displayScale.value;
+    pinchFocalY.value = (event.focalY - displayOffsetY.value) / displayScale.value;
   }).onUpdate((event) => {
-    selectionWidth.value = Math.max(startWidth.value / MAX_ZOOM, Math.min(startWidth.value / event.scale, startWidth.value));
-    selectionHeight.value = selectionWidth.value / profileAspect;
-    selectionX.value = startX.value;
-    selectionY.value = startY.value;
+    const width = startWidth.value / event.scale;
+    const focalX = pinchFocalX.value;
+    const focalY = pinchFocalY.value;
+    selectionWidth.value = width;
+    selectionHeight.value = width / profileAspect;
+    selectionX.value = focalX - width / 2;
+    selectionY.value = focalY - selectionHeight.value / 2;
     clampSelection();
   }).onEnd(() => runOnJS(publishStatus)(selectionX.value, selectionY.value, selectionWidth.value, selectionHeight.value));
   const sourceImageStyle = useAnimatedStyle(() => ({ height: sourceHeight.value * displayScale.value, left: displayOffsetX.value, top: displayOffsetY.value, width: sourceWidth.value * displayScale.value }));
   const selectionStyle = useAnimatedStyle(() => ({ height: selectionHeight.value * displayScale.value, left: displayOffsetX.value + selectionX.value * displayScale.value, top: displayOffsetY.value + selectionY.value * displayScale.value, width: selectionWidth.value * displayScale.value }));
+  const maskTopStyle = useAnimatedStyle(() => ({ height: displayOffsetY.value + selectionY.value * displayScale.value }));
+  const maskBottomStyle = useAnimatedStyle(() => ({ top: displayOffsetY.value + (selectionY.value + selectionHeight.value) * displayScale.value }));
+  const maskLeftStyle = useAnimatedStyle(() => ({ height: selectionHeight.value * displayScale.value, top: displayOffsetY.value + selectionY.value * displayScale.value, width: displayOffsetX.value + selectionX.value * displayScale.value }));
+  const maskRightStyle = useAnimatedStyle(() => ({ height: selectionHeight.value * displayScale.value, left: displayOffsetX.value + (selectionX.value + selectionWidth.value) * displayScale.value, top: displayOffsetY.value + selectionY.value * displayScale.value }));
 
   const chooseImage = useCallback(async () => {
     try {
@@ -605,6 +618,10 @@ export function ProfileBackgroundManager({
                   <GestureDetector gesture={Gesture.Simultaneous(pan, pinch)}>
                     <Animated.View style={styles.cropTouchSurface}>
                       <Animated.Image source={{ uri: source.uri }} style={[styles.containedSource, sourceImageStyle]} resizeMode="stretch" />
+                      <Animated.View pointerEvents="none" style={[styles.cropMask, styles.cropMaskTop, { backgroundColor: colors.background }, maskTopStyle]} />
+                      <Animated.View pointerEvents="none" style={[styles.cropMask, styles.cropMaskBottom, { backgroundColor: colors.background }, maskBottomStyle]} />
+                      <Animated.View pointerEvents="none" style={[styles.cropMask, styles.cropMaskLeft, { backgroundColor: colors.background }, maskLeftStyle]} />
+                      <Animated.View pointerEvents="none" style={[styles.cropMask, styles.cropMaskRight, { backgroundColor: colors.background }, maskRightStyle]} />
                       <Animated.View pointerEvents="none" style={[styles.cropSelection, { borderColor: colors.accent }, selectionStyle]} />
                     </Animated.View>
                   </GestureDetector>
@@ -787,6 +804,11 @@ const styles = StyleSheet.create({
   },
   cropTouchSurface: { flex: 1 },
   containedSource: { position: "absolute" },
+  cropMask: { opacity: 0.62, position: "absolute" },
+  cropMaskTop: { left: 0, right: 0, top: 0 },
+  cropMaskBottom: { bottom: 0, left: 0, right: 0 },
+  cropMaskLeft: { left: 0 },
+  cropMaskRight: { right: 0 },
   cropSelection: { borderWidth: 2, position: "absolute" },
   cropEditor: {
     flex: 1,
