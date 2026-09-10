@@ -181,11 +181,11 @@ export function ProfileBackgroundManager({
   useEffect(() => {
     if (!source || !cropSpace) return;
     const initial = createInitialBackgroundCropSelection(source, profileAspect);
-    const scale = Math.min(cropSpace.width / source.width, cropSpace.height / source.height);
+    const scale = Math.min(viewportWidth / source.width, cropSpace.height / source.height);
     displayScale.value = scale;
     sourceWidth.value = source.width;
     sourceHeight.value = source.height;
-    displayOffsetX.value = (cropSpace.width - source.width * scale) / 2;
+    displayOffsetX.value = (viewportWidth - source.width * scale) / 2;
     displayOffsetY.value = (cropSpace.height - source.height * scale) / 2;
     selectionX.value = initial.originX;
     selectionY.value = initial.originY;
@@ -193,7 +193,7 @@ export function ProfileBackgroundManager({
     selectionHeight.value = initial.height;
     setFineTuneOpen(false);
     publishStatus(initial.originX, initial.originY, initial.width, initial.height);
-  }, [cropSpace, displayOffsetX, displayOffsetY, displayScale, profileAspect, publishStatus, selectionHeight, selectionWidth, selectionX, selectionY, source, sourceHeight, sourceWidth]);
+  }, [cropSpace, displayOffsetX, displayOffsetY, displayScale, profileAspect, publishStatus, selectionHeight, selectionWidth, selectionX, selectionY, source, sourceHeight, sourceWidth, viewportWidth]);
   const clampSelection = () => {
     "worklet";
     const maxWidth = Math.min(sourceWidth.value, sourceHeight.value * profileAspect);
@@ -606,7 +606,7 @@ export function ProfileBackgroundManager({
               }}
             >
               {cropSpace ? (
-                <View style={[styles.cropViewport, cropSpace]}>
+                <View style={[styles.cropViewport, { height: cropSpace.height, width: "100%" }]}>
                   <GestureDetector gesture={Gesture.Simultaneous(pan, pinch)}>
                     <Animated.View style={styles.cropTouchSurface}>
                       <Animated.Image source={{ uri: source.uri }} style={[styles.containedSource, sourceImageStyle]} resizeMode="stretch" />
