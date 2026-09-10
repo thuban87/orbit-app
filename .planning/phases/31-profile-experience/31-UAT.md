@@ -1,20 +1,24 @@
 ---
-status: issues_found
+status: testing
 phase: 31-profile-experience
-source: 31-01-SUMMARY.md, 31-02-SUMMARY.md, 31-03-SUMMARY.md, 31-04-SUMMARY.md, 31-05-SUMMARY.md, 31-06-SUMMARY.md, 31-07-SUMMARY.md, 31-08-SUMMARY.md, 31-09-SUMMARY.md
+source: 31-01-SUMMARY.md, 31-02-SUMMARY.md, 31-03-SUMMARY.md, 31-04-SUMMARY.md, 31-05-SUMMARY.md, 31-06-SUMMARY.md, 31-07-SUMMARY.md, 31-08-SUMMARY.md, 31-09-SUMMARY.md, 31-VERIFICATION.md
 started: 2026-09-09T16:38:10-05:00
-updated: 2026-09-10T03:41:27-05:00
+updated: 2026-09-10T06:14:00-05:00
 ---
 
 ## Current Test
 
-[owner release smoke found three remaining functional gaps after the first six remediations passed]
+number: 8
+name: Re-test repaired cross-Profile template discovery and assignment
+expected: |
+  A template created from one Profile is visible from another Profile and can be assigned to an arbitrary third contact without changing that contact's background or Category. Preview only needs to function; its deferred aesthetics are not part of this check.
+awaiting: user response
 
 ## Tests
 
 ### 1. Profile background renders as intentional full-bleed art
 expected: A selected bundled background fills the Profile viewport behind readable content, with no intrinsic-size tile, opaque grey field, or scroll-sticky artifact.
-result: pass
+result: pending
 reported: "The background is just not there... the entire page's background on every contact is an opaque grey color with a weird like 50x50px black box at the top left of the window that sticks with scrolling."
 observed: "Plan 31-12 replaced the placeholder bundle with owner-approved artwork and repaired the full-viewport Profile renderer. Retained standalone-release Galaxy and Standard captures show full-bleed art, readable content, no black tile, and no opaque wash."
 evidence: ".planning/phases/31-profile-experience/evidence/31-12-release/release-profile-galaxy-factory.png; .planning/phases/31-profile-experience/evidence/31-12-release/release-profile-standard-factory.png"
@@ -65,7 +69,7 @@ evidence: "owner approval `approved` delivered to Plan 31-14 executor 2026-09-10
 expected: A layout template created from one Profile is visible from another Profile, and its assignment flow can target any individual contact rather than only the currently open Profile.
 result: pass
 reported: "Can't assign a template to another user individually... it only allows me to assign as global default, to one of the categories, or to the contact of the profile I'm currently in... [another contact's] layout editor doesn't list the other templates I've made elsewhere, it prompts to make a new template from scratch."
-observed: "Automated coverage confirms every Profile Layout chooser opens the one durable template library and its assignment page opens the canonical local picker with archived contacts excluded. The selected contact receives only a layout-template override; its background, category, cadence, and other contact facts remain unchanged. The host-only inherited action remains distinct."
+observed: "Plan 31-14 and its review fix provide automated coverage for the repaired shared library and arbitrary-contact assignment path. A post-fix physical Pixel re-test remains pending."
 evidence: "Plan 31-14 focused gate: `src/components/profile/profile-template-manager.contract.test.ts`; `src/db/profile-presentation-dao.test.ts`; `src/profile/resolve-presentation.test.ts`; `src/profile/template-manager-model.test.ts`; `src/screens/contact-profile-logic.test.ts` (36 tests passed, 2026-09-10)"
 
 ### 9. Background assignments can return to the theme default
@@ -82,9 +86,9 @@ The owner reported that the template Preview page "looks like garbage" but expli
 ## Summary
 
 total: 9
-passed: 6
-issues: 3
-pending: 0
+passed: 8
+issues: 0
+pending: 1
 skipped: 0
 blocked: 0
 
