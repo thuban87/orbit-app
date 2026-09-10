@@ -33,6 +33,8 @@ Rows 43–44 are intentionally **PENDING OWNER**. Standard adb automation cannot
 
 The current physical Pixel screenshot is `evidence/31-13-debug/12-crop-full-width.png`; it shows the landscape source contained across the editor workspace rather than inside a Profile-shaped viewport.
 
+After the workspace correction, Pixel capture `14-fine-tune-open.png` and its UI tree confirm that Fine tune remains open and exposes Reset, zoom, and named directional controls. A genuine two-pointer pinch remains the only required direct-touch observation that safe adb automation cannot establish.
+
 ## Deviations from Plan
 
 ### Auto-fixed issues
