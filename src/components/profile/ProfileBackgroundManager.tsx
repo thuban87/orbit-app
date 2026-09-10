@@ -63,7 +63,6 @@ import {
   resolveBackgroundUri,
 } from "@/services/photos/background-storage";
 import {
-  fitProfileBackgroundPreview,
   profileBackgroundTarget,
 } from "@/services/photos/profile-background-target";
 import { useTheme } from "@/theme";
@@ -112,16 +111,6 @@ export function ProfileBackgroundManager({
     width: number;
     height: number;
   } | null>(null);
-  const cropPreview = useMemo(
-    () =>
-      cropSpace
-        ? fitProfileBackgroundPreview(
-            { width: viewportWidth, height: viewportHeight },
-            cropSpace,
-          )
-        : null,
-    [cropSpace, viewportHeight, viewportWidth],
-  );
   const [page, setPage] = useState<Page>("list");
   const [templates, setTemplates] = useState<ProfileBackgroundTemplateRow[]>(
     [],
@@ -190,21 +179,21 @@ export function ProfileBackgroundManager({
     [source],
   );
   useEffect(() => {
-    if (!source || !cropPreview) return;
+    if (!source || !cropSpace) return;
     const initial = createInitialBackgroundCropSelection(source, profileAspect);
-    const scale = Math.min(cropPreview.width / source.width, cropPreview.height / source.height);
+    const scale = Math.min(cropSpace.width / source.width, cropSpace.height / source.height);
     displayScale.value = scale;
     sourceWidth.value = source.width;
     sourceHeight.value = source.height;
-    displayOffsetX.value = (cropPreview.width - source.width * scale) / 2;
-    displayOffsetY.value = (cropPreview.height - source.height * scale) / 2;
+    displayOffsetX.value = (cropSpace.width - source.width * scale) / 2;
+    displayOffsetY.value = (cropSpace.height - source.height * scale) / 2;
     selectionX.value = initial.originX;
     selectionY.value = initial.originY;
     selectionWidth.value = initial.width;
     selectionHeight.value = initial.height;
     setFineTuneOpen(false);
     publishStatus(initial.originX, initial.originY, initial.width, initial.height);
-  }, [cropPreview, displayOffsetX, displayOffsetY, displayScale, profileAspect, publishStatus, selectionHeight, selectionWidth, selectionX, selectionY, source, sourceHeight, sourceWidth]);
+  }, [cropSpace, displayOffsetX, displayOffsetY, displayScale, profileAspect, publishStatus, selectionHeight, selectionWidth, selectionX, selectionY, source, sourceHeight, sourceWidth]);
   const clampSelection = () => {
     "worklet";
     const maxWidth = Math.min(sourceWidth.value, sourceHeight.value * profileAspect);
@@ -274,7 +263,7 @@ export function ProfileBackgroundManager({
   }, []);
 
   const prepareCrop = useCallback(async () => {
-    if (!source || !cropPreview || saving) return;
+    if (!source || saving) return;
     const token = activeTokenRef.current;
     if (!token) return;
     setSaving(true);
@@ -337,7 +326,6 @@ export function ProfileBackgroundManager({
     }
   }, [
     contactName,
-    cropPreview,
     cropTarget.output,
     profileAspect,
     saving,
@@ -617,8 +605,8 @@ export function ProfileBackgroundManager({
                 );
               }}
             >
-              {cropPreview ? (
-                <View style={[styles.cropViewport, cropPreview]}>
+              {cropSpace ? (
+                <View style={[styles.cropViewport, cropSpace]}>
                   <GestureDetector gesture={Gesture.Simultaneous(pan, pinch)}>
                     <Animated.View style={styles.cropTouchSurface}>
                       <Animated.Image source={{ uri: source.uri }} style={[styles.containedSource, sourceImageStyle]} resizeMode="stretch" />
