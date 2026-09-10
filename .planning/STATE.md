@@ -5,10 +5,10 @@ milestone_name: Release Readiness
 current_phase: 31.1
 current_phase_name: app-wide-system-backgrounds
 status: executing
-stopped_at: Phase 31.1 UI-SPEC approved
+stopped_at: Phase 31.1 plans converged via cross-AI review
 last_updated: "2026-09-10T19:00:52.215Z"
 last_activity: 2026-09-10
-last_activity_desc: Phase 31 complete, transitioned to Phase 31.1
+last_activity_desc: Phase 31.1 plans converged (cross-AI review — codex+claude); ready to execute
 state_head: 14a72e0dc836c437c01e2993e4d09d8cd707f176
 progress:
   total_phases: 21
@@ -40,9 +40,9 @@ Status: Ready to execute
 Carried forward (owner's bucket, NOT resolved here): D-11 default Memory-type display name — reconcile before Phase 34.
 Surface to owner (24.2-07, KNOW-15): milestone plan said Phase 36 owns the backup format-4 bump, but 24.1 already bumped to 4 (d677e2c); Plan 07 emits into the live format 4 with NO bump — that milestone instruction is stale.
 Deferred to Phase 31 (recorded in Plan 05): durable contact-scoped-def ownership + owner-purge semantics. Deferred to Phase 36 (ROADMAP breadcrumb): legacy AI-fuel confirm-path code removal.
-Last activity: 2026-09-10 — Phase 31 complete, transitioned to Phase 31.1
+Last activity: 2026-09-10 — Phase 31.1 plans converged via cross-AI review (codex+claude, 3 cycles); D-22/D-23 recorded
 Progress: 11 completed v2.0 phases — 22, 23, 24.1, 24.2, 25, 26, 27, 28, 29, 30, 31
-Next: Discuss and plan Phase 31.1 App-Wide System Backgrounds in the owner's separate sessions.
+Next: Execute Phase 31.1 — /gsd-execute-phase 31.1
 
 **Milestone v2.0 structure (pre-decided by the owner from the fifteen milestone-2 dossiers + the
 2026-09-01 cross-dossier audit; not re-derived):** 22 App Shell · 23 Theme · 24 Contact Knowledge ·
