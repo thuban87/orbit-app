@@ -16,6 +16,22 @@ Recorded 2026-09-09T16:38:10-05:00:
 - Theme/mode observed: Galaxy dark.
 - Seed contact exercised: bound Andrew Wales; existing UAT contacts remain available for the owner scenarios.
 
+## Plan 31-11 focused debug evidence (not final UAT sign-off)
+
+Recorded 2026-09-09 on the authorized physical Pixel 6 Pro. These inspected
+screenshots close only the five renderer/presentation gaps addressed by Plan
+31-11; the remaining rows below remain owner-facing release verification.
+
+| Gap | Evidence | Observation |
+|---|---|---|
+| G01 Profile readability/background host | [ordinary Profile](/home/bwales/projects/orbit-app/.planning/phases/31-profile-experience/evidence/31-11-debug/06-profile-background-factory-collapse.png) | Galaxy's local theme background fills behind the Profile with no intrinsic-size black tile or opaque grey wash. The Hero, section labels, and controls remain legible. The seeded contact has no saved app-owned background, so this records the reachable theme-backed resolution rather than fabricating an image assignment. |
+| G02 Layout chooser/editor geometry | [chooser](/home/bwales/projects/orbit-app/.planning/phases/31-profile-experience/evidence/31-11-debug/01-layout-chooser.png), [editor top](/home/bwales/projects/orbit-app/.planning/phases/31-profile-experience/evidence/31-11-debug/02-layout-editor-top.png), [editor scrolled](/home/bwales/projects/orbit-app/.planning/phases/31-profile-experience/evidence/31-11-debug/03-layout-editor-scrolled-footer.png) | The chooser is bounded to its content. The editor uses the available sheet body; after scrolling through sections, Cancel, Save as template, and Save layout remain persistent above navigation. |
+| G03 Background manager | [empty manager](/home/bwales/projects/orbit-app/.planning/phases/31-profile-experience/evidence/31-11-debug/05-background-manager-empty.png) | The reachable empty state visibly exposes the Back and Choose photo actions plus explanatory copy; it is no longer an empty expanded shell. The focused `background-manager-model` suite covers loading, error/retry, and populated list contracts. Those artificial states were not mutated into the owner's local contact data. |
+| G04 Factory collapse | [ordinary Profile](/home/bwales/projects/orbit-app/.planning/phases/31-profile-experience/evidence/31-11-debug/04-profile-compact-header-factory-collapse.png) | Relationship Overview, Things to Remember, Contact Methods, and Interaction History render collapsed for the factory presentation. |
+| G05 Compact Profile bar | [ordinary Profile](/home/bwales/projects/orbit-app/.planning/phases/31-profile-experience/evidence/31-11-debug/04-profile-compact-header-factory-collapse.png), [1.30x font scale](/home/bwales/projects/orbit-app/.planning/phases/31-profile-experience/evidence/31-11-debug/08-profile-large-text-clean.png) | One compact row contains icon-only Back and overflow controls. At 1.30x system font scale, both controls and all collapsed section affordances remain reachable; the prior 1.15 scale was restored after capture. |
+
+Focused automated gate: 9 Vitest files / 78 tests passed, followed by `npx tsc --noEmit` and `npm run check:colors` (2026-09-09). The existing resolver/schema tests cover factory defaults and stored-presentation precedence; no contact state was changed for debug capture.
+
 ## Checklist
 
 Mark every row PASS/FAIL with a short observation. A failed row is a gap for planning, not an implicit waiver.
