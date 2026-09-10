@@ -298,6 +298,71 @@ describe("Profile presentation mutation API", () => {
     ).toBeNull();
   });
 
+  it("assigns a selected second contact only a layout-template override", async () => {
+    const categoryId = (
+      await exec.runAsync(
+        "INSERT INTO categories(uid,name,display_order,created_at,modified_at) VALUES(?,?,?,?,?)",
+        ["friends", "Friends", 0, NOW, NOW],
+      )
+    ).lastInsertRowId;
+    const selectedContactId = (
+      await exec.runAsync(
+        "INSERT INTO contacts(uid,name,category_id,interval_days,tracking_enabled,created_at,modified_at) VALUES(?,?,?,?,?,?,?)",
+        ["selected", "Selected Contact", categoryId, 14, 1, NOW, NOW],
+      )
+    ).lastInsertRowId;
+    await createProfileLayoutTemplate(exec, {
+      uid: "selected-layout",
+      name: "Selected layout",
+      layout: FACTORY_PROFILE_LAYOUT,
+      now: NOW,
+    });
+    await createProfileBackgroundTemplate(exec, {
+      uid: "selected-background",
+      name: "Selected background",
+      imagePath: "profile-backgrounds/selected.webp",
+      now: NOW,
+    });
+    await assignContactBackgroundTemplate(exec, {
+      contactId: selectedContactId,
+      templateUid: "selected-background",
+      now: NOW,
+    });
+    await setProfileCollapseOverride(exec, {
+      contactId: selectedContactId,
+      moduleId: "relationship-overview",
+      expanded: false,
+      now: NOW,
+    });
+
+    await assignContactLayoutTemplate(exec, {
+      contactId: selectedContactId,
+      templateUid: "selected-layout",
+      now: NOW,
+    });
+
+    expect(
+      await exec.getFirstAsync(
+        "SELECT category_id,interval_days,tracking_enabled FROM contacts WHERE id=?",
+        [selectedContactId],
+      ),
+    ).toEqual({
+      category_id: categoryId,
+      interval_days: 14,
+      tracking_enabled: 1,
+    });
+    expect(
+      await exec.getFirstAsync(
+        "SELECT layout_template_uid,background_template_uid,collapse_json FROM profile_contact_presentation WHERE contact_id=?",
+        [selectedContactId],
+      ),
+    ).toEqual({
+      layout_template_uid: "selected-layout",
+      background_template_uid: "selected-background",
+      collapse_json: "{}",
+    });
+  });
+
   it("deletes in-use templates with per-axis fallout while preserving freeform and safe image cleanup", async () => {
     await createProfileLayoutTemplate(exec, {
       uid: "layout",
