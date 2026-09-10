@@ -606,7 +606,7 @@ Plans:
 **Canonical refs**: docs/dossier/milestone-2/phase-10-profile-experience-dossier.md; docs/dossier/milestone-2/planning-notes/phase-10-planning-notes.md
 **Consumes from Phase 24.2** (deferred UI, owner-approved 2026-09-04): the custom-field **value-history backlist** viewer (reads `value-history-dao.ts` / `custom_field_value_history`) and **grouped custom-field rendering** (`custom_field_defs.field_group`). 24.2 shipped these as data-layer only. Confirm at Phase 31 planning whether the Profile is the right surface or a dedicated custom-fields UI phase is needed; if the latter, re-home this note.
 **Schema**: profile layout/background templates (verify head+1 at plan time)
-**Plans**: 13/15 plans executed
+**Plans**: 14/15 plans executed
 
 Plans:
 **Wave 1**
@@ -667,7 +667,7 @@ Plans:
 
 **Wave 15** *(blocked on Wave 14 completion)*
 
-- [ ] 31-15-PLAN.md — Background assignment clear/inherit escape hatches with theme fallback
+- [x] 31-15-PLAN.md — Background assignment clear/inherit escape hatches with theme fallback
 
 **UI hint**: yes
 
@@ -845,7 +845,7 @@ Plans:
 | 28. Dashboard Card View | 8/8 | In Progress|  |
 | 29. Orrery Camera, Scale & Exploration | 12/12 | In Progress|  |
 | 30. Orrery Systems | 0/10 | Planned | - |
-| 31. Profile Experience | 13/15 | In Progress|  |
+| 31. Profile Experience | 14/15 | In Progress|  |
 | 31.1 App-Wide System Backgrounds | 0/TBD | Not started | - |
 | 32. Interaction History & Insights | 0/TBD | Not started | - |
 | 33. Group Interaction Logging | 0/TBD | Not started | - |
