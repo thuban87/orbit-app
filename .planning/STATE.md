@@ -5,16 +5,16 @@ milestone_name: Release Readiness
 current_phase: 31
 current_phase_name: Profile Experience
 status: Ready to execute
-stopped_at: Phase 31 cropper gap plan 13 verified; ready to execute
-last_updated: "2026-09-10T05:47:03.812Z"
+stopped_at: Phase 31 gap Plan 13 implemented; owner two-pointer pinch UAT pending
+last_updated: "2026-09-10T06:48:12.856Z"
 last_activity: 2026-09-10
-last_activity_desc: Phase 31 cropper remediation planned and verified
-state_head: 24d0d17488d819d4b72711f5f51eee3d149bd78c
+last_activity_desc: Phase 31 gap Plan 13 implemented and direct drag verified
+state_head: 3848a6d31f8f97217518f5e8d16af1209ae3605a
 progress:
   total_phases: 21
   completed_phases: 6
   total_plans: 97
-  completed_plans: 93
+  completed_plans: 94
 carried_forward:
 
   - "H6 (Phase 29 UAT) BLOCKED → Phase 40: backup/scene contention overlap unmeasured — the SAF backup-folder grant needs reconnecting, and ordinary navigation does not prove snapshot overlap (see 29-UAT.md, 29-NATIVE-CHECKLIST.md)"
@@ -30,19 +30,19 @@ carried_forward:
 See: .planning/PROJECT.md (updated 2026-09-09 after Phase 30)
 
 **Core value:** Collapse the taps between "you're overdue with X" and the message actually being sent.
-**Current focus:** Phase 31 — Profile Experience cropper remediation
+**Current focus:** Phase 31 — Profile Experience
 
 ## Current Position
 
-Phase: 31 (Profile Experience) — READY TO EXECUTE
-Plan: 13 of 13
-Status: Ready to execute
+Phase: 31 (Profile Experience) — READY TO EXECUTE REMAINING PLAN
+Plan: 10 of 13
+Status: Gap Plan 13 complete; Plan 10 remains
 Carried forward (owner's bucket, NOT resolved here): D-11 default Memory-type display name — reconcile before Phase 34.
 Surface to owner (24.2-07, KNOW-15): milestone plan said Phase 36 owns the backup format-4 bump, but 24.1 already bumped to 4 (d677e2c); Plan 07 emits into the live format 4 with NO bump — that milestone instruction is stale.
 Deferred to Phase 31 (recorded in Plan 05): durable contact-scoped-def ownership + owner-purge semantics. Deferred to Phase 36 (ROADMAP breadcrumb): legacy AI-fuel confirm-path code removal.
-Last activity: 2026-09-10 — Phase 31 cropper remediation plan verified
+Last activity: 2026-09-10 — Phase 31 crop remediation implemented; direct portrait/landscape drag verified on Pixel
 Progress: 10/19 phases complete (v2.0) — 22, 23, 24.1, 24.2, 25, 26, 27, 28, 29, 30
-Next: $gsd-execute-phase 31 --gaps-only
+Next: Owner verifies genuine two-pointer pinch, then `$gsd-execute-phase 31 --wave 10`
 
 **Milestone v2.0 structure (pre-decided by the owner from the fifteen milestone-2 dossiers + the
 2026-09-01 cross-dossier audit; not re-derived):** 22 App Shell · 23 Theme · 24 Contact Knowledge ·

@@ -659,7 +659,7 @@ Plans:
 
 **Wave 13** *(blocked on Wave 12 completion)*
 
-- [ ] 31-13-PLAN.md — Modern direct-touch Profile-background cropper and honest physical-Pixel gesture verification
+- [x] 31-13-PLAN.md — Modern direct-touch Profile-background cropper and honest physical-Pixel gesture verification
 
 **UI hint**: yes
 

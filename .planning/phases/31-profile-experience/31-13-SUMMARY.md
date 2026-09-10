@@ -28,6 +28,7 @@ actuals:
 - Focused crop/pipeline/target/storage/reconciliation/model/sheet/overlay suites passed (24 tests).
 - `npx tsc --noEmit`, `npm run check:colors`, and `git diff --check` passed.
 - Debug APK build was run on droid and installed on the physical Pixel. No release build was used.
+- The physical-Pixel `Use background` smoke check completed crop/resize and reached the template-name step; Discard then returned to Profile without committing the draft.
 - Full regression run: 320 test files / 2,835 tests passed; the pre-existing unrelated `src/components/orrery/orrery-controls-render.test.tsx` transform failure remains outside this gap plan.
 
 ## Pending owner verification
