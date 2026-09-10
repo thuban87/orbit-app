@@ -25,6 +25,8 @@ export interface ContactPickerProps {
   onSelect: (contactId: number) => void;
   /** Optional owner exclusion for relationship links; existing callers see all rows. */
   excludeContactId?: number;
+  /** Profile template assignment must never surface archived contacts, even while searching. */
+  allowArchivedSearch?: boolean;
 }
 
 /** A shell-owned, local-first picker shared by all contact-targeting actions. */
@@ -33,6 +35,7 @@ export function ContactPicker({
   onDismiss,
   onSelect,
   excludeContactId,
+  allowArchivedSearch = true,
 }: ContactPickerProps) {
   const { colors } = useTheme();
   const [term, setTerm] = useState("");
@@ -65,7 +68,9 @@ export function ContactPicker({
     setLoading(true);
     setFailed(false);
 
-    void listPickerContacts(getExecutor(), { includeArchived: hasSearch })
+    void listPickerContacts(getExecutor(), {
+      includeArchived: allowArchivedSearch && hasSearch,
+    })
       .then((nextRows) => {
         if (requestId.current === currentRequest) setRows(nextRows);
       })
@@ -78,7 +83,7 @@ export function ContactPicker({
       .finally(() => {
         if (requestId.current === currentRequest) setLoading(false);
       });
-  }, [hasSearch, visible]);
+  }, [allowArchivedSearch, hasSearch, visible]);
 
   const filteredRows = useMemo(
     () =>

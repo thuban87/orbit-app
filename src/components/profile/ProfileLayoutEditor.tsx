@@ -56,6 +56,8 @@ export interface ProfileLayoutEditorProps {
   onCommitted?: (layout: ProfileLayoutDocument) => void;
   /** Plan 08 owns template creation; this component only hands it a draft intent. */
   onSaveAsTemplate?: (layout: ProfileLayoutDocument) => void;
+  /** Opens the shared template library without first creating a freeform layout. */
+  onManageTemplates?: () => void;
   /** A canonical manager may save the same draft as a reusable template. */
   onSaveDraft?: (layout: ProfileLayoutDocument) => Promise<void>;
 }
@@ -244,6 +246,7 @@ export function ProfileLayoutEditor({
   onRequestClose,
   onCommitted,
   onSaveAsTemplate,
+  onManageTemplates,
   onSaveDraft,
 }: ProfileLayoutEditorProps) {
   const [initial, setInitial] = useState(() =>
@@ -343,6 +346,13 @@ export function ProfileLayoutEditor({
             label="Edit layout"
             onPress={() => setPage("editor")}
           />
+          {onManageTemplates ? (
+            <Button
+              role="secondary"
+              label="Layout templates"
+              onPress={onManageTemplates}
+            />
+          ) : null}
           <Button role="secondary" label="Close" onPress={closeOrGuard} />
         </View>
       ) : (

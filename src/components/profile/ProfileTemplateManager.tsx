@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Alert, ScrollView, StyleSheet, TextInput, View } from "react-native";
 import { AppText } from "@/components/ui/AppText";
+import { ContactPicker } from "@/components/ContactPicker";
 import { Button } from "@/components/ui/Button";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { GlassSurface } from "@/components/ui/GlassSurface";
@@ -122,6 +123,7 @@ export function ProfileTemplateManager({
   } | null>(null);
   const [deleteUid, setDeleteUid] = useState<string | null>(null);
   const [assignCreatedTemplate, setAssignCreatedTemplate] = useState(false);
+  const [contactPickerVisible, setContactPickerVisible] = useState(false);
   const pendingTemplateUids = useRef(new Set<string>());
 
   const activePage = activeTemplateManagerPage(state);
@@ -302,6 +304,7 @@ export function ProfileTemplateManager({
 
   const assign = (
     scope: "global" | "category" | "contact" | "inherit",
+    targetContactId = contactId,
     categoryId?: number,
   ) => {
     if (!activeTemplate) return;
@@ -326,7 +329,7 @@ export function ProfileTemplateManager({
         });
       } else if (scope === "contact") {
         await assignContactLayoutTemplate(getExecutor(), {
-          contactId,
+          contactId: targetContactId,
           templateUid: activeTemplate.uid,
           now,
         });
@@ -582,10 +585,10 @@ export function ProfileTemplateManager({
                   key={category.id}
                   role="tertiary"
                   label={`Assign to ${category.name}`}
-                  onPress={() => assign("category", category.id)}
+                  onPress={() => assign("category", undefined, category.id)}
                 />
               ))}
-              <AppText role="label">Contact</AppText>
+              <AppText role="label">This Profile</AppText>
               <Button
                 role="primary"
                 label={`Use for ${contactName}`}
@@ -596,14 +599,31 @@ export function ProfileTemplateManager({
                 label={`Use inherited layout for ${contactName}`}
                 onPress={() => assign("inherit")}
               />
+              <AppText role="label">Individual contact</AppText>
+              <Button
+                role="secondary"
+                label="Choose individual contact"
+                onPress={() => setContactPickerVisible(true)}
+              />
               <AppText role="caption">
-                Applying or removing a contact selection clears only that
-                contact's collapsed-section overrides after the write commits.
+                Choose any active local contact to give it this template as a
+                direct layout override. Applying or removing a contact
+                selection clears only that contact's collapsed-section
+                overrides after the write commits.
               </AppText>
             </View>
           ) : null}
         </View>
       </Sheet>
+      <ContactPicker
+        visible={contactPickerVisible}
+        allowArchivedSearch={false}
+        onDismiss={() => setContactPickerVisible(false)}
+        onSelect={(selectedContactId) => {
+          setContactPickerVisible(false);
+          assign("contact", selectedContactId);
+        }}
+      />
       <ConfirmDialog
         visible={deleteTemplate !== null}
         onRequestClose={() => setDeleteUid(null)}

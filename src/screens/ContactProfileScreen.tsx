@@ -548,6 +548,7 @@ export function ContactProfileScreen({
                 setPendingTemplateLayout(draft);
                 setOverlay("templates");
               }}
+              onManageTemplates={() => setOverlay("templates")}
             />
             <ProfileTemplateManager
               visible={overlay === "templates"}
