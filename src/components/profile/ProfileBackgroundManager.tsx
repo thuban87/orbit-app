@@ -193,13 +193,13 @@ export function ProfileBackgroundManager({
   useEffect(() => {
     if (!source || !cropSpace) return;
     const scale = Math.min(
-      viewportWidth / source.width,
+      cropSpace.width / source.width,
       cropSpace.height / source.height,
     );
     displayScale.value = scale;
-    displayOffsetX.value = (viewportWidth - source.width * scale) / 2;
+    displayOffsetX.value = (cropSpace.width - source.width * scale) / 2;
     displayOffsetY.value = (cropSpace.height - source.height * scale) / 2;
-  }, [cropSpace, displayOffsetX, displayOffsetY, displayScale, source, viewportWidth]);
+  }, [cropSpace, displayOffsetX, displayOffsetY, displayScale, source]);
   const clampSelection = () => {
     "worklet";
     const maxWidth = Math.min(sourceWidth.value, sourceHeight.value * profileAspect);
@@ -800,7 +800,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     overflow: "hidden",
   },
-  cropTouchSurface: { flex: 1 },
+  cropTouchSurface: { flex: 1, width: "100%" },
   containedSource: { position: "absolute" },
   cropMask: { opacity: 0.62, position: "absolute" },
   cropMaskTop: { left: 0, right: 0, top: 0 },
