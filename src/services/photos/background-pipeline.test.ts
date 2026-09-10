@@ -1,9 +1,12 @@
 import { describe, expect, it, vi } from "vitest";
 import { prepareProfileBackground } from "./background-pipeline";
+import { profileBackgroundTarget } from "./profile-background-target";
+
+const target = profileBackgroundTarget({ width: 1080, height: 2400 });
 
 const crop = {
-  destinationWidth: 360,
-  destinationHeight: 240,
+  destinationWidth: target.preview.width,
+  destinationHeight: target.preview.height,
   srcWidth: 4000,
   srcHeight: 3000,
   scale: 1,
@@ -23,17 +26,17 @@ describe("prepareProfileBackground", () => {
     const prepared = await prepareProfileBackground({
       rawUri: "content://picked-image",
       transform: crop,
-      output: { width: 1080, height: 720 },
+      output: target.output,
       cropAndResize,
       persist,
     });
     expect(prepared.relativePath).toBe("backgrounds/bg-one.jpg");
-    expect(prepared.crop.width).toBe(4000);
-    expect(prepared.crop.height).toBeCloseTo(2666.6666666666665, 8);
+    expect(prepared.crop.width).toBe(1350);
+    expect(prepared.crop.height).toBe(3000);
     expect(cropAndResize).toHaveBeenCalledWith(
       expect.objectContaining({
         rawUri: "content://picked-image",
-        output: { width: 1080, height: 720 },
+        output: target.output,
       }),
     );
     expect(persist).toHaveBeenCalledWith("file:///cache/prepared.jpg");
@@ -46,7 +49,7 @@ describe("prepareProfileBackground", () => {
       prepareProfileBackground({
         rawUri: "content://picked-image",
         transform: crop,
-        output: { width: 1080, height: 720 },
+        output: target.output,
         cropAndResize: vi
           .fn()
           .mockResolvedValue({ uri: "file:///cache/out.jpg", release }),

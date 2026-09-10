@@ -5,13 +5,16 @@ import {
   computeBackgroundCrop,
   getBackgroundPanBounds,
 } from "./background-crop-geometry";
+import { profileBackgroundTarget } from "./profile-background-target";
+
+const target = profileBackgroundTarget({ width: 1080, height: 2400 });
 
 function transform(
   overrides: Partial<BackgroundCropTransform> = {},
 ): BackgroundCropTransform {
   return {
-    destinationWidth: 360,
-    destinationHeight: 240,
+    destinationWidth: target.preview.width,
+    destinationHeight: target.preview.height,
     srcWidth: 4000,
     srcHeight: 3000,
     scale: 1,
@@ -22,14 +25,17 @@ function transform(
 }
 
 describe("Profile background crop geometry", () => {
-  it("covers the actual landscape Profile aspect from portrait, landscape, and square sources", () => {
+  it("covers the measured portrait Profile aspect from portrait, landscape, and square sources", () => {
     for (const source of [
       { srcWidth: 3000, srcHeight: 4000 },
       { srcWidth: 4000, srcHeight: 3000 },
       { srcWidth: 3000, srcHeight: 3000 },
     ]) {
       const crop = computeBackgroundCrop(transform(source));
-      expect(crop.width / crop.height).toBeCloseTo(360 / 240, 8);
+      expect(crop.width / crop.height).toBeCloseTo(
+        target.preview.width / target.preview.height,
+        8,
+      );
       expect(crop.originX).toBeGreaterThanOrEqual(0);
       expect(crop.originY).toBeGreaterThanOrEqual(0);
       expect(crop.originX + crop.width).toBeLessThanOrEqual(source.srcWidth);
@@ -42,7 +48,10 @@ describe("Profile background crop geometry", () => {
     const max = computeBackgroundCrop(transform({ scale: 8 }));
     expect(max.width).toBeLessThan(min.width);
     expect(max.height).toBeLessThan(min.height);
-    expect(max.width / max.height).toBeCloseTo(1.5, 8);
+    expect(max.width / max.height).toBeCloseTo(
+      target.preview.width / target.preview.height,
+      8,
+    );
   });
 
   it("clamps extreme pan against the same bounds used by adjust controls", () => {
@@ -63,7 +72,7 @@ describe("Profile background crop geometry", () => {
 
   it("has zero pan room on an exact-fit axis", () => {
     const bounds = getBackgroundPanBounds(
-      transform({ srcWidth: 3000, srcHeight: 2000 }),
+      transform({ srcWidth: 1350, srcHeight: 3000 }),
     );
     expect(bounds.minX).toBe(0);
     expect(bounds.maxX).toBe(0);

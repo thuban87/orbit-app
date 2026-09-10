@@ -9,6 +9,7 @@ import {
   ScrollView,
   StyleSheet,
   TextInput,
+  useWindowDimensions,
   View,
 } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
@@ -52,15 +53,13 @@ import {
   persistBackgroundDerivative,
   resolveBackgroundUri,
 } from "@/services/photos/background-storage";
+import { profileBackgroundTarget } from "@/services/photos/profile-background-target";
 import { useTheme } from "@/theme";
 import { RADII } from "@/theme/tokens/radii";
 import { SPACING } from "@/theme/tokens/spacing";
 import { Logger } from "@/utils/logger";
 
 const LOG_SCOPE = "profile-background-manager";
-const PREVIEW_WIDTH = 360;
-const PREVIEW_HEIGHT = 240;
-const OUTPUT_SCALE = 3;
 const MAX_SCALE = 8;
 
 type Page = "list" | "crop" | "name" | "assign";
@@ -90,6 +89,13 @@ export function ProfileBackgroundManager({
   onCommitted,
 }: ProfileBackgroundManagerProps) {
   const { colors } = useTheme();
+  const { height: viewportHeight, width: viewportWidth } =
+    useWindowDimensions();
+  const cropTarget = useMemo(
+    () =>
+      profileBackgroundTarget({ width: viewportWidth, height: viewportHeight }),
+    [viewportHeight, viewportWidth],
+  );
   const [page, setPage] = useState<Page>("list");
   const [templates, setTemplates] = useState<ProfileBackgroundTemplateRow[]>(
     [],
@@ -140,10 +146,10 @@ export function ProfileBackgroundManager({
   const cropBase = useMemo(() => {
     if (!source) return null;
     return Math.max(
-      PREVIEW_WIDTH / source.width,
-      PREVIEW_HEIGHT / source.height,
+      cropTarget.preview.width / source.width,
+      cropTarget.preview.height / source.height,
     );
-  }, [source]);
+  }, [cropTarget, source]);
 
   const clampSharedPan = useCallback(
     (nextScale: number, nextX: number, nextY: number) => {
@@ -151,17 +157,18 @@ export function ProfileBackgroundManager({
       const boundedScale = Math.max(1, Math.min(nextScale, MAX_SCALE));
       const maxX = Math.max(
         0,
-        (source.width * cropBase * boundedScale - PREVIEW_WIDTH) / 2,
+        (source.width * cropBase * boundedScale - cropTarget.preview.width) / 2,
       );
       const maxY = Math.max(
         0,
-        (source.height * cropBase * boundedScale - PREVIEW_HEIGHT) / 2,
+        (source.height * cropBase * boundedScale - cropTarget.preview.height) /
+          2,
       );
       scale.value = boundedScale;
       translateX.value = Math.max(-maxX, Math.min(nextX, maxX));
       translateY.value = Math.max(-maxY, Math.min(nextY, maxY));
     },
-    [cropBase, scale, source, translateX, translateY],
+    [cropBase, cropTarget, scale, source, translateX, translateY],
   );
 
   const pan = Gesture.Pan()
@@ -173,11 +180,12 @@ export function ProfileBackgroundManager({
       if (!source || !cropBase) return;
       const maxX = Math.max(
         0,
-        (source.width * cropBase * scale.value - PREVIEW_WIDTH) / 2,
+        (source.width * cropBase * scale.value - cropTarget.preview.width) / 2,
       );
       const maxY = Math.max(
         0,
-        (source.height * cropBase * scale.value - PREVIEW_HEIGHT) / 2,
+        (source.height * cropBase * scale.value - cropTarget.preview.height) /
+          2,
       );
       translateX.value = Math.max(
         -maxX,
@@ -200,11 +208,11 @@ export function ProfileBackgroundManager({
       );
       const maxX = Math.max(
         0,
-        (source.width * cropBase * nextScale - PREVIEW_WIDTH) / 2,
+        (source.width * cropBase * nextScale - cropTarget.preview.width) / 2,
       );
       const maxY = Math.max(
         0,
-        (source.height * cropBase * nextScale - PREVIEW_HEIGHT) / 2,
+        (source.height * cropBase * nextScale - cropTarget.preview.height) / 2,
       );
       scale.value = nextScale;
       translateX.value = Math.max(-maxX, Math.min(translateX.value, maxX));
@@ -255,18 +263,15 @@ export function ProfileBackgroundManager({
       const prepared = await prepareProfileBackground({
         rawUri: source.uri,
         transform: {
-          destinationWidth: PREVIEW_WIDTH,
-          destinationHeight: PREVIEW_HEIGHT,
+          destinationWidth: cropTarget.preview.width,
+          destinationHeight: cropTarget.preview.height,
           srcWidth: source.width,
           srcHeight: source.height,
           scale: scale.value,
           translateX: translateX.value,
           translateY: translateY.value,
         },
-        output: {
-          width: PREVIEW_WIDTH * OUTPUT_SCALE,
-          height: PREVIEW_HEIGHT * OUTPUT_SCALE,
-        },
+        output: cropTarget.output,
         cropAndResize: async ({ rawUri, crop, output }) => {
           const rendered = await ImageManipulator.manipulate(rawUri)
             .crop(crop)
@@ -313,7 +318,7 @@ export function ProfileBackgroundManager({
     } finally {
       setSaving(false);
     }
-  }, [contactName, saving, scale, source, translateX, translateY]);
+  }, [contactName, cropTarget, saving, scale, source, translateX, translateY]);
 
   const retryCrop = useCallback(() => {
     if (!source || saving) return;
@@ -560,7 +565,7 @@ export function ProfileBackgroundManager({
               Pinch to crop and drag to reposition. The preview uses the Profile
               aspect.
             </AppText>
-            <View style={styles.cropViewport}>
+            <View style={[styles.cropViewport, cropTarget.preview]}>
               <GestureDetector gesture={Gesture.Simultaneous(pan, pinch)}>
                 <Animated.Image
                   source={{ uri: source.uri }}
@@ -745,10 +750,8 @@ const styles = StyleSheet.create({
   thumbnail: { borderRadius: RADII.md, height: 56, width: 84 },
   cropViewport: {
     alignItems: "center",
-    height: PREVIEW_HEIGHT,
     justifyContent: "center",
     overflow: "hidden",
-    width: PREVIEW_WIDTH,
   },
   controls: { flexDirection: "row", flexWrap: "wrap", gap: SPACING.xs },
   input: {
