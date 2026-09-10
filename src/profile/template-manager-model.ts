@@ -33,6 +33,26 @@ export interface TemplateAssignmentDescription {
   text: string;
 }
 
+/** List loading has its own recovery path; mutation failures retain their page and draft. */
+export interface TemplateManagerListLoadState {
+  loading: boolean;
+  error: string | null;
+}
+
+export function createTemplateManagerListLoadState(): TemplateManagerListLoadState {
+  return { loading: false, error: null };
+}
+
+export function beginTemplateManagerListLoad(): TemplateManagerListLoadState {
+  return { loading: true, error: null };
+}
+
+export function finishTemplateManagerListLoad(
+  error: string | null,
+): TemplateManagerListLoadState {
+  return { loading: false, error };
+}
+
 /**
  * A layout-editor handoff wins over the last persisted freeform layout. It is
  * already a canonical copy, and is never mutated by the template manager.

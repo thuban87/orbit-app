@@ -31,4 +31,13 @@ describe("shared Profile layout-template library contract", () => {
     expect(manager).toContain("contactId: targetContactId");
     expect(picker).toContain("allowArchivedSearch?: boolean");
   });
+
+  it("offers a truthful retry for a failed template-list read and clears it before retrying", () => {
+    const manager = source("ProfileTemplateManager.tsx");
+
+    expect(manager).toContain("beginTemplateManagerListLoad()");
+    expect(manager).toContain("finishTemplateManagerListLoad(null)");
+    expect(manager).toContain('label="Retry"');
+    expect(manager).toContain("onPress={() => void loadList()}");
+  });
 });

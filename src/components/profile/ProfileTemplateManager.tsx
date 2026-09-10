@@ -28,8 +28,11 @@ import { newUid } from "@/db/uid";
 import { parseAndCanonicalizeProfileLayout } from "@/profile/presentation-schema";
 import {
   activeTemplateManagerPage,
+  beginTemplateManagerListLoad,
   beginTemplateOperation,
+  createTemplateManagerListLoadState,
   clearTemplateDraft,
+  finishTemplateManagerListLoad,
   createTemplateManagerState,
   describeTemplateAssignment,
   managerBackIntent,
@@ -115,7 +118,9 @@ export function ProfileTemplateManager({
   );
   const [templates, setTemplates] = useState<ProfileLayoutTemplateRow[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [listLoad, setListLoad] = useState(
+    createTemplateManagerListLoadState,
+  );
   const [editingLayout, setEditingLayout] = useState<{
     uid: string | null;
     name: string;
@@ -164,18 +169,24 @@ export function ProfileTemplateManager({
     );
   }, []);
 
+  const loadList = useCallback(async () => {
+    setListLoad(beginTemplateManagerListLoad());
+    try {
+      await refresh();
+      setListLoad(finishTemplateManagerListLoad(null));
+    } catch {
+      setListLoad(
+        finishTemplateManagerListLoad(
+          "Couldn't load layout templates. Try again.",
+        ),
+      );
+    }
+  }, [refresh]);
+
   useEffect(() => {
     if (!visible) return;
-    setLoading(true);
-    void refresh()
-      .catch(() =>
-        setState((current) => ({
-          ...current,
-          error: "Couldn't load layout templates. Try again.",
-        })),
-      )
-      .finally(() => setLoading(false));
-  }, [refresh, visible]);
+    void loadList();
+  }, [loadList, visible]);
 
   const closeOrBack = () => {
     const intent = managerBackIntent(state);
@@ -406,8 +417,20 @@ export function ProfileTemplateManager({
                   );
                 }}
               />
-              {loading ? <AppText>Loading templates…</AppText> : null}
-              {!loading && templates.length === 0 ? (
+              {listLoad.loading ? <AppText>Loading templates…</AppText> : null}
+              {listLoad.error ? (
+                <>
+                  <AppText style={{ color: colors.danger }}>
+                    {listLoad.error}
+                  </AppText>
+                  <Button
+                    role="secondary"
+                    label="Retry"
+                    onPress={() => void loadList()}
+                  />
+                </>
+              ) : null}
+              {!listLoad.loading && !listLoad.error && templates.length === 0 ? (
                 <AppText role="body">
                   No reusable templates yet. The default layout is still
                   available.

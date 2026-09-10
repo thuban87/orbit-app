@@ -4,6 +4,8 @@ import { createLayoutTemplateIntent } from "./layout-editor-session";
 import { FACTORY_PROFILE_LAYOUT } from "./presentation-schema";
 import {
   beginTemplateOperation,
+  beginTemplateManagerListLoad,
+  createTemplateManagerListLoadState,
   createTemplateManagerState,
   describeTemplateAssignment,
   managerBackIntent,
@@ -12,10 +14,28 @@ import {
   setTemplateDraft,
   setTemplateUsage,
   settleTemplateOperation,
+  finishTemplateManagerListLoad,
   templateLayoutForNewTemplate,
 } from "./template-manager-model";
 
 describe("Profile template manager model", () => {
+  it("clears a failed list read before a successful retry publishes fresh templates", () => {
+    const failed = finishTemplateManagerListLoad(
+      "Couldn't load layout templates. Try again.",
+    );
+    expect(failed).toEqual({
+      loading: false,
+      error: "Couldn't load layout templates. Try again.",
+    });
+    expect(beginTemplateManagerListLoad()).toEqual({
+      loading: true,
+      error: null,
+    });
+    expect(finishTemplateManagerListLoad(null)).toEqual(
+      createTemplateManagerListLoadState(),
+    );
+  });
+
   it("uses an internal page stack before dirty guarding or dismissing the sheet", () => {
     const initial = createTemplateManagerState();
     const edit = openTemplateManagerPage(initial, {
