@@ -151,10 +151,10 @@ export const BACKGROUND_VEIL_OPACITY: Record<
   // Galaxy art is dark; light text stays high-contrast over it, so the veil is
   // light and the deep-space art reads prominently between cards (owner asked for
   // more background — tuned lighter 2026-09-11).
-  galaxy: { presentation: 0.15, comfortable: 0.3, dense: 0.45 },
+  galaxy: { presentation: 0.05, comfortable: 0.15, dense: 0.3 },
   // Standard art includes mid-tone assets (Dusk/Mesh); a touch heavier than
   // galaxy and dense forms lean calmer, but art shows generously on browse screens.
-  standard: { presentation: 0.2, comfortable: 0.35, dense: 0.5 },
+  standard: { presentation: 0.08, comfortable: 0.2, dense: 0.38 },
 };
 
 /**
