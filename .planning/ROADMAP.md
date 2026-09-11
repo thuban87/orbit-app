@@ -722,13 +722,13 @@ Plans:
 **Plans:** 8 plans
 **Wave 1**
 
-- [ ] 32-01-PLAN.md — Migration 025 + Tone/channel vocabulary lockstep + duration/allow_ai/history-pref columns + refine-form fields (wave 1, tracer, one-way checkpoint)
-- [ ] 32-02-PLAN.md — Bind/Unbind immutable lifecycle events (wave 1)
+- [ ] 32-01-PLAN.md — Migration 025 + shared vocabulary map + Tone/channel consumer lockstep + duration/allow_ai/history-pref columns + refine-form fields (wave 1, tracer, one-way checkpoint)
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 32-03-PLAN.md — Reusable history aggregation seam (window/buckets/cycles/intensity-window) + canonical history-read (wave 2)
-- [ ] 32-04-PLAN.md — Canonical Edit Interaction route through the recency spine (wave 2)
+- [ ] 32-02-PLAN.md — Bind/Unbind immutable lifecycle events + restore-side vocabulary remap (wave 2)
+- [ ] 32-03-PLAN.md — Reusable history aggregation seam (window/buckets/cycles/window-scoped intensity) + canonical history-read + inert group seam (wave 2)
+- [ ] 32-04-PLAN.md — Canonical Edit Interaction route + interaction-load read + all-stack registration (wave 2)
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
