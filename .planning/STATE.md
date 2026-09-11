@@ -5,11 +5,11 @@ milestone_name: Release Readiness
 current_phase: 31.1
 current_phase_name: app-wide-system-backgrounds
 status: verifying
-stopped_at: "31.1-05 corrective (background-visibility release failure): veil decoupled from card opacity + chrome protected; 2924 tests pass; debug-validated on Pixel across both packages+modes; release built & delivered — AWAITING owner personal-phone validation"
-last_updated: "2026-09-11T09:25:00.000Z"
+stopped_at: "31.1-05 + 31.1-06 (background visibility + glassy cards): veil decoupled/lowered, ChromeScrim, and MODE-AWARE GLASSY CARDS (glassy when art tone matches mode, opaque otherwise; galaxy glow Android elevation removed). 2927 tests pass; debug-validated on Pixel across all 4 package×mode combos; release rebuilt & delivered — AWAITING owner personal-phone validation"
+last_updated: "2026-09-11T13:00:00.000Z"
 last_activity: 2026-09-11
-last_activity_desc: "31.1-05 corrective for owner-reported release background failure — veil lightened + ChromeScrim; debug-validated on Pixel; release APK built"
-state_head: d94030e
+last_activity_desc: "31.1-06 mode-aware glassy content cards (background shows through) + Android-elevation fix; owner-approved on debug Pixel; release APK rebuilt"
+state_head: 4ab5ecc
 progress:
   total_phases: 21
   completed_phases: 7
@@ -36,9 +36,9 @@ See: .planning/PROJECT.md (updated 2026-09-10 after Phase 31)
 
 ## Current Position
 
-Phase: 31.1 (app-wide-system-backgrounds) — CORRECTIVE IN VALIDATION
-Plan: 4 of 4 + corrective 31.1-05 (executed, debug-validated)
-Status: Owner-reported release failure (backgrounds invisible on regular screens) diagnosed + fixed in 31.1-05 — BackgroundHost veil decoupled from card opacity + ChromeScrim protects bare chrome. 2924 tests pass; debug-validated on the Pixel (Galaxy Nebula + Standard Dusk, both modes). Release APK built + delivered to Drive. Phase stays OPEN until the owner validates the release on his personal phone.
+Phase: 31.1 (app-wide-system-backgrounds) — CORRECTIVE + ENHANCEMENT IN VALIDATION
+Plan: 4 of 4 + corrective 31.1-05 + enhancement 31.1-06 (executed, debug-validated)
+Status: (1) 31.1-05 fixed the owner-reported release failure (backgrounds invisible) — veil decoupled from card opacity + ChromeScrim. (2) 31.1-06 made content cards MODE-AWARE GLASSY so the background shows THROUGH them (glassy when art tone matches mode — galaxy↔dark, standard↔light; opaque otherwise for readability), fixed the Android-elevation dark-inner-rect artifact, and lowered the veil near-zero. 2927 tests pass (AA proven for all 4 package×mode combos); debug-validated on the Pixel. Release APK rebuilt + delivered to Drive. Phase stays OPEN until the owner validates on his personal phone. See memories mode-aware-glassy-cards, android-elevation-opaque-on-translucent.
 Carried forward (owner's bucket, NOT resolved here): D-11 default Memory-type display name — reconcile before Phase 34.
 Surface to owner (24.2-07, KNOW-15): milestone plan said Phase 36 owns the backup format-4 bump, but 24.1 already bumped to 4 (d677e2c); Plan 07 emits into the live format 4 with NO bump — that milestone instruction is stale.
 Deferred to Phase 31 (recorded in Plan 05): durable contact-scoped-def ownership + owner-purge semantics. Deferred to Phase 36 (ROADMAP breadcrumb): legacy AI-fuel confirm-path code removal.
