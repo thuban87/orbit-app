@@ -4,17 +4,17 @@ milestone: v2.0
 milestone_name: Release Readiness
 current_phase: 31.1
 current_phase_name: app-wide-system-backgrounds
-status: verifying
-stopped_at: "31.1-05 + 31.1-06 (background visibility + glassy cards): veil decoupled/lowered, ChromeScrim, and MODE-AWARE GLASSY CARDS (glassy when art tone matches mode, opaque otherwise; galaxy glow Android elevation removed). 2927 tests pass; debug-validated on Pixel across all 4 package×mode combos; release rebuilt & delivered — AWAITING owner personal-phone validation"
-last_updated: "2026-09-11T13:00:00.000Z"
+status: phase-complete
+stopped_at: "Phase 31.1 COMPLETE (owner-approved 2026-09-11): 31.1-05 background-visibility fix (veil decoupled from card opacity + ChromeScrim) + 31.1-06 mode-aware glassy cards (background shows through; Android-elevation fix). 2927 tests pass; release delivered + owner-validated. Next: pick the next roadmap phase (gsd-next) — NOTE Phase 30 Orrery Systems still shows [ ] open in ROADMAP with dirty 30-REVIEW files; reconcile separately."
+last_updated: "2026-09-11T13:05:00.000Z"
 last_activity: 2026-09-11
-last_activity_desc: "31.1-06 mode-aware glassy content cards (background shows through) + Android-elevation fix; owner-approved on debug Pixel; release APK rebuilt"
+last_activity_desc: "Phase 31.1 buttoned up — 31.1-05 + 31.1-06 complete, owner-approved; SUMMARYs written, ROADMAP + UAT marked complete"
 state_head: 4ab5ecc
 progress:
   total_phases: 21
-  completed_phases: 7
-  total_plans: 104
-  completed_plans: 101
+  completed_phases: 8
+  total_plans: 105
+  completed_plans: 103
 carried_forward:
 
   - "31.1 NOT complete: 31.1-05 corrective (backgrounds were invisible on the owner's release — full-screen scrim at card opacity) is executed + debug-validated + release built/delivered, but the phase stays open until the owner validates the release on his personal phone (the prior 31.1-04 gate's false positive is why). See 31.1-05-PLAN.md, 31.1-UAT.md (superseded + corrective section)."
@@ -36,9 +36,11 @@ See: .planning/PROJECT.md (updated 2026-09-10 after Phase 31)
 
 ## Current Position
 
-Phase: 31.1 (app-wide-system-backgrounds) — CORRECTIVE + ENHANCEMENT IN VALIDATION
-Plan: 4 of 4 + corrective 31.1-05 + enhancement 31.1-06 (executed, debug-validated)
-Status: (1) 31.1-05 fixed the owner-reported release failure (backgrounds invisible) — veil decoupled from card opacity + ChromeScrim. (2) 31.1-06 made content cards MODE-AWARE GLASSY so the background shows THROUGH them (glassy when art tone matches mode — galaxy↔dark, standard↔light; opaque otherwise for readability), fixed the Android-elevation dark-inner-rect artifact, and lowered the veil near-zero. 2927 tests pass (AA proven for all 4 package×mode combos); debug-validated on the Pixel. Release APK rebuilt + delivered to Drive. Phase stays OPEN until the owner validates on his personal phone. See memories mode-aware-glassy-cards, android-elevation-opaque-on-translucent.
+Phase: 31.1 (app-wide-system-backgrounds) — ✅ COMPLETE (owner-approved 2026-09-11)
+Plan: 4 of 4 + corrective 31.1-05 + enhancement 31.1-06 — all complete (SUMMARYs written)
+Status: (1) 31.1-05 fixed the owner-reported release failure (backgrounds invisible) — veil decoupled from card opacity + ChromeScrim. (2) 31.1-06 made content cards MODE-AWARE GLASSY so the background shows THROUGH them (glassy when art tone matches mode — galaxy↔dark, standard↔light; opaque otherwise for readability), fixed the Android-elevation dark-inner-rect artifact, and lowered the veil near-zero. 2927 tests pass (AA proven for all 4 package×mode combos); release delivered to Drive (SHA `70b1498a…`) and owner-approved ("looks good all around"). 9 commits local/unpushed — owner pushes.
+Parked (owner, future): theme-merge into one Dark/Light switch; Deep Space/Starfield removal. See memories mode-aware-glassy-cards, android-elevation-opaque-on-translucent, theme-merge-into-mode-parked.
+FYI (separate): Phase 30 (Orrery Systems) still shows [ ] in ROADMAP with dirty 30-REVIEW files — reconcile independently.
 Carried forward (owner's bucket, NOT resolved here): D-11 default Memory-type display name — reconcile before Phase 34.
 Surface to owner (24.2-07, KNOW-15): milestone plan said Phase 36 owns the backup format-4 bump, but 24.1 already bumped to 4 (d677e2c); Plan 07 emits into the live format 4 with NO bump — that milestone instruction is stale.
 Deferred to Phase 31 (recorded in Plan 05): durable contact-scoped-def ownership + owner-purge semantics. Deferred to Phase 36 (ROADMAP breadcrumb): legacy AI-fuel confirm-path code removal.
