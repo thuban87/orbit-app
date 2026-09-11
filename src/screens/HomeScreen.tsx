@@ -1465,7 +1465,7 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
     </View>
   );
 
-  const listEmpty = error ? (
+  const listEmptyContent = error ? (
     <View testID="dashboard-error-state" style={styles.emptyState}>
       <Text style={[styles.emptyHeading, { color: colors.textPrimary }]}>
         Couldn't load your contacts
@@ -1557,6 +1557,14 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
         </Text>
       )}
     </View>
+  ) : null;
+
+  // Chrome scrim (31.1-05): empty-state copy sits on the bare background, so back
+  // it locally to stay AA over the lightened veil. Cards already back their own.
+  const listEmpty = listEmptyContent ? (
+    <ChromeScrim style={styles.emptyPanel} radius={RADII.md}>
+      {listEmptyContent}
+    </ChromeScrim>
   ) : null;
 
   return (
@@ -2282,8 +2290,14 @@ const styles = StyleSheet.create({
   },
   emptyState: {
     gap: 8,
-    marginTop: 24,
     alignItems: "flex-start",
+  },
+  emptyPanel: {
+    marginTop: 24,
+    marginHorizontal: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    overflow: "hidden",
   },
   emptyHeading: {
     fontSize: 18,

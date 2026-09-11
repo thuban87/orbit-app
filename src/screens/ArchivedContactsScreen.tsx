@@ -27,6 +27,7 @@ import {
   View,
 } from "react-native";
 import { ShellAppBar } from "@/components/ShellAppBar";
+import { ChromeScrim } from "@/components/ui/ChromeScrim";
 import {
   type ArchivedContactRow,
   listArchived,
@@ -43,6 +44,7 @@ import { buildNotificationPurgeCleanup } from "@/services/notifications/purge-no
 import { buildPhotoPurgeCleanup } from "@/services/photos/purge-photo-cleanup";
 import { notifyWidgetDataChanged } from "@/services/widget/widget-refresh";
 import { useTheme } from "@/theme";
+import { RADII } from "@/theme/tokens/radii";
 import { Logger } from "@/utils/logger";
 
 const LOG_SCOPE = "archived-contacts";
@@ -188,23 +190,27 @@ export function ArchivedContactsScreen() {
         contentContainerStyle={styles.content}
       >
         {rows.length === 0 ? (
-          <View testID="archived-empty" style={styles.emptyState}>
-            <Text style={[styles.emptyHeading, { color: colors.textPrimary }]}>
-              No archived contacts
-            </Text>
-            <Text style={[styles.emptyBody, { color: colors.textSecondary }]}>
-              Contacts you archive are kept here until you delete them
-              permanently.
-            </Text>
-          </View>
+          <ChromeScrim style={styles.emptyScrim} radius={RADII.md}>
+            <View testID="archived-empty" style={styles.emptyState}>
+              <Text style={[styles.emptyHeading, { color: colors.textPrimary }]}>
+                No archived contacts
+              </Text>
+              <Text style={[styles.emptyBody, { color: colors.textSecondary }]}>
+                Contacts you archive are kept here until you delete them
+                permanently.
+              </Text>
+            </View>
+          </ChromeScrim>
         ) : (
           <>
-            <Text
-              testID="archived-count"
-              style={[styles.count, { color: colors.textSecondary }]}
-            >
-              {countLabel(rows.length)}
-            </Text>
+            <ChromeScrim style={styles.countScrim} radius={RADII.sm}>
+              <Text
+                testID="archived-count"
+                style={[styles.count, { color: colors.textSecondary }]}
+              >
+                {countLabel(rows.length)}
+              </Text>
+            </ChromeScrim>
 
             {rows.map((contact) => (
               <View
@@ -273,6 +279,16 @@ const styles = StyleSheet.create({
   count: {
     fontSize: 13,
     fontWeight: "600",
+  },
+  countScrim: {
+    alignSelf: "flex-start",
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    overflow: "hidden",
+  },
+  emptyScrim: {
+    padding: 16,
+    overflow: "hidden",
   },
   emptyState: {
     gap: 8,

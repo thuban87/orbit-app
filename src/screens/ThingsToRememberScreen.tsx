@@ -15,6 +15,7 @@ import {
   type RelationshipDraft,
 } from "@/components/RelationshipEditor";
 import { AppText } from "@/components/ui";
+import { ChromeScrim } from "@/components/ui/ChromeScrim";
 import { setCurrentStateValue } from "@/db/current-state-history-dao";
 import {
   getCurrentStateValues,
@@ -68,6 +69,7 @@ import {
 import type { RootStackScreenProps } from "@/navigation/types";
 import { snackbarStore } from "@/stores/snackbar-store";
 import { useTheme } from "@/theme";
+import { RADII } from "@/theme/tokens/radii";
 import { SPACING } from "@/theme/tokens/spacing";
 import { Logger } from "@/utils/logger";
 import { rowsForKnowledgeDisplay } from "./things-to-remember-ordering";
@@ -433,7 +435,7 @@ export function ThingsToRememberScreen({
       testID="things-to-remember-screen"
       contentContainerStyle={styles.content}
     >
-      <View style={styles.header}>
+      <ChromeScrim style={styles.header} radius={RADII.lg}>
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Back"
@@ -455,7 +457,7 @@ export function ThingsToRememberScreen({
             Recently Deleted
           </AppText>
         </Pressable>
-      </View>
+      </ChromeScrim>
       <View
         testID={`knowledge-group-${CURRENT_STATE_GROUP}`}
         style={[styles.group, { borderColor: colors.border }]}
@@ -475,13 +477,15 @@ export function ThingsToRememberScreen({
         </View>
       </View>
       {isEmpty ? (
-        <View testID="things-to-remember-empty" style={styles.empty}>
-          <AppText role="heading">Nothing to remember yet</AppText>
-          <AppText role="body" style={{ color: colors.textSecondary }}>
-            Add birthdays, gift ideas, key people, and anything worth bringing
-            up next time.
-          </AppText>
-        </View>
+        <ChromeScrim style={styles.emptyScrim} radius={RADII.md}>
+          <View testID="things-to-remember-empty" style={styles.empty}>
+            <AppText role="heading">Nothing to remember yet</AppText>
+            <AppText role="body" style={{ color: colors.textSecondary }}>
+              Add birthdays, gift ideas, key people, and anything worth bringing
+              up next time.
+            </AppText>
+          </View>
+        </ChromeScrim>
       ) : null}
       <View style={[styles.group, { borderColor: colors.border }]}>
         <AppText role="heading">Featured &amp; current</AppText>
@@ -688,13 +692,14 @@ const styles = StyleSheet.create({
   content: { gap: SPACING.lg, padding: SPACING.base },
   currentStateRow: { gap: SPACING.xs },
   empty: { gap: SPACING.sm },
+  emptyScrim: { overflow: "hidden", padding: SPACING.base },
   group: {
     borderRadius: SPACING.md,
     borderWidth: 1,
     gap: SPACING.md,
     padding: SPACING.base,
   },
-  header: { gap: SPACING.base },
+  header: { gap: SPACING.base, overflow: "hidden", padding: SPACING.md },
   inlineDraft: { flexDirection: "row", flexWrap: "wrap", gap: SPACING.sm },
   input: {
     borderRadius: SPACING.sm,

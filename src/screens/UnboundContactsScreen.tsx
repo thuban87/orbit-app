@@ -10,10 +10,12 @@ import {
 } from "react-native";
 import { Avatar } from "@/components/Avatar";
 import { ShellAppBar } from "@/components/ShellAppBar";
+import { ChromeScrim } from "@/components/ui/ChromeScrim";
 import { getExecutor } from "@/db/database";
 import { listUnbound, type UnboundRow } from "@/db/unbound-read";
 import type { RootStackScreenProps } from "@/navigation/types";
 import { useTheme } from "@/theme";
+import { RADII } from "@/theme/tokens/radii";
 import { Logger } from "@/utils/logger";
 import {
   filterUnboundByName,
@@ -66,17 +68,21 @@ export function UnboundContactsScreen({
       <ShellAppBar variant="child" title="Unbound contacts" />
 
       {error ? (
-        <View testID="unbound-contacts-error" style={styles.screenState}>
-          <Text style={[styles.emptyBody, { color: colors.textSecondary }]}>
-            Couldn&apos;t load contacts. Please go back and retry.
-          </Text>
-        </View>
+        <ChromeScrim style={styles.screenStateScrim} radius={RADII.md}>
+          <View testID="unbound-contacts-error" style={styles.screenState}>
+            <Text style={[styles.emptyBody, { color: colors.textSecondary }]}>
+              Couldn&apos;t load contacts. Please go back and retry.
+            </Text>
+          </View>
+        </ChromeScrim>
       ) : rows === null ? (
-        <View testID="unbound-contacts-loading" style={styles.screenState}>
-          <Text style={[styles.emptyBody, { color: colors.textSecondary }]}>
-            Loading contacts…
-          </Text>
-        </View>
+        <ChromeScrim style={styles.screenStateScrim} radius={RADII.md}>
+          <View testID="unbound-contacts-loading" style={styles.screenState}>
+            <Text style={[styles.emptyBody, { color: colors.textSecondary }]}>
+              Loading contacts…
+            </Text>
+          </View>
+        </ChromeScrim>
       ) : (
         <View style={styles.content}>
           <View style={styles.searchRow}>
@@ -111,34 +117,40 @@ export function UnboundContactsScreen({
           </View>
 
           {rows.length === 0 ? (
-            <View testID="unbound-contacts-empty" style={styles.emptyState}>
-              <Text style={[styles.emptyHeading, { color: colors.textPrimary }]}>
-                No unbound contacts
-              </Text>
-              <Text style={[styles.emptyBody, { color: colors.textSecondary }]}>
-                Contacts you unbind stay here, with their details and history ready
-                when you want to bind them again.
-              </Text>
-            </View>
+            <ChromeScrim style={styles.emptyScrim} radius={RADII.md}>
+              <View testID="unbound-contacts-empty" style={styles.emptyState}>
+                <Text style={[styles.emptyHeading, { color: colors.textPrimary }]}>
+                  No unbound contacts
+                </Text>
+                <Text style={[styles.emptyBody, { color: colors.textSecondary }]}>
+                  Contacts you unbind stay here, with their details and history ready
+                  when you want to bind them again.
+                </Text>
+              </View>
+            </ChromeScrim>
           ) : (
             <>
-              <Text
-                testID="unbound-contacts-count"
-                style={[styles.count, { color: colors.textSecondary }]}
-              >
-                {hasTerm
-                  ? unboundCountLabel(filteredRows.length, { matching: true })
-                  : unboundCountLabel(rows.length)}
-              </Text>
+              <ChromeScrim style={styles.countScrim} radius={RADII.sm}>
+                <Text
+                  testID="unbound-contacts-count"
+                  style={[styles.count, { color: colors.textSecondary }]}
+                >
+                  {hasTerm
+                    ? unboundCountLabel(filteredRows.length, { matching: true })
+                    : unboundCountLabel(rows.length)}
+                </Text>
+              </ChromeScrim>
               {hasTerm && filteredRows.length === 0 ? (
-                <View testID="unbound-contacts-no-match" style={styles.emptyState}>
-                  <Text style={[styles.emptyHeading, { color: colors.textPrimary }]}>
-                    No matching unbound contacts
-                  </Text>
-                  <Text style={[styles.emptyBody, { color: colors.textSecondary }]}>
-                    Try another name.
-                  </Text>
-                </View>
+                <ChromeScrim style={styles.emptyScrim} radius={RADII.md}>
+                  <View testID="unbound-contacts-no-match" style={styles.emptyState}>
+                    <Text style={[styles.emptyHeading, { color: colors.textPrimary }]}>
+                      No matching unbound contacts
+                    </Text>
+                    <Text style={[styles.emptyBody, { color: colors.textSecondary }]}>
+                      Try another name.
+                    </Text>
+                  </View>
+                </ChromeScrim>
               ) : (
                 <FlatList
                   data={filteredRows}
@@ -216,7 +228,16 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  count: { fontSize: 13, fontWeight: "600", marginBottom: 8 },
+  count: { fontSize: 13, fontWeight: "600" },
+  countScrim: {
+    alignSelf: "flex-start",
+    marginBottom: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    overflow: "hidden",
+  },
+  emptyScrim: { padding: 16, overflow: "hidden" },
+  screenStateScrim: { overflow: "hidden" },
   listContent: { gap: 8, paddingBottom: 16 },
   row: {
     minHeight: 64,

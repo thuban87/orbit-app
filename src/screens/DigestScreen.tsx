@@ -30,6 +30,7 @@ import { useCallback, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { Avatar } from "@/components/Avatar";
 import { ContactCard } from "@/components/ContactCard";
+import { ChromeScrim } from "@/components/ui/ChromeScrim";
 import type { ProfileStatus } from "@/db/contact-status-read";
 import { countNeverContacted } from "@/db/dashboard-read";
 import { getExecutor } from "@/db/database";
@@ -52,6 +53,7 @@ import {
 } from "@/logic/digest-logic";
 import type { RootStackScreenProps } from "@/navigation/types";
 import { useTheme } from "@/theme";
+import { RADII } from "@/theme/tokens/radii";
 import { Logger } from "@/utils/logger";
 
 const LOG_SCOPE = "digest";
@@ -124,7 +126,7 @@ export function DigestScreen({ navigation }: RootStackScreenProps<"Digest">) {
       testID="digest-root"
       style={styles.root}
     >
-      <View style={styles.header}>
+      <ChromeScrim style={styles.header} radius={RADII.md}>
         <Pressable
           testID="digest-back"
           accessibilityRole="button"
@@ -140,17 +142,19 @@ export function DigestScreen({ navigation }: RootStackScreenProps<"Digest">) {
         >
           Your week
         </Text>
-      </View>
+      </ChromeScrim>
 
       {state.phase === "error" ? (
-        <View testID="digest-error" style={styles.emptyState}>
-          <Text style={[styles.emptyHeading, { color: colors.textPrimary }]}>
-            Couldn't load your week
-          </Text>
-          <Text style={[styles.emptyBody, { color: colors.textSecondary }]}>
-            Try opening it again in a moment.
-          </Text>
-        </View>
+        <ChromeScrim style={styles.emptyScrim} radius={RADII.md}>
+          <View testID="digest-error" style={styles.emptyState}>
+            <Text style={[styles.emptyHeading, { color: colors.textPrimary }]}>
+              Couldn't load your week
+            </Text>
+            <Text style={[styles.emptyBody, { color: colors.textSecondary }]}>
+              Try opening it again in a moment.
+            </Text>
+          </View>
+        </ChromeScrim>
       ) : state.phase === "loaded" ? (
         <DigestBody
           data={state.data}
@@ -213,14 +217,16 @@ function DigestBody({
 
   if (allQuiet) {
     return (
-      <View testID="digest-empty-all-quiet" style={styles.emptyState}>
-        <Text style={[styles.emptyHeading, { color: colors.textPrimary }]}>
-          All quiet this week
-        </Text>
-        <Text style={[styles.emptyBody, { color: colors.textSecondary }]}>
-          No catch-ups to look back on, and no one's slipping. Enjoy the calm.
-        </Text>
-      </View>
+      <ChromeScrim style={styles.emptyScrim} radius={RADII.md}>
+        <View testID="digest-empty-all-quiet" style={styles.emptyState}>
+          <Text style={[styles.emptyHeading, { color: colors.textPrimary }]}>
+            All quiet this week
+          </Text>
+          <Text style={[styles.emptyBody, { color: colors.textSecondary }]}>
+            No catch-ups to look back on, and no one's slipping. Enjoy the calm.
+          </Text>
+        </View>
+      </ChromeScrim>
     );
   }
 
@@ -238,9 +244,11 @@ function DigestBody({
       <View testID="digest-retrospective" style={styles.section}>
         {retrospective.length > 0 ? (
           <>
-            <Text style={[styles.lead, { color: colors.textSecondary }]}>
-              You caught up with these people this week
-            </Text>
+            <ChromeScrim style={styles.leadScrim} radius={RADII.sm}>
+              <Text style={[styles.lead, { color: colors.textSecondary }]}>
+                You caught up with these people this week
+              </Text>
+            </ChromeScrim>
             {retrospective.map((row) => (
               <Pressable
                 key={row.id}
@@ -270,18 +278,22 @@ function DigestBody({
             ))}
           </>
         ) : (
-          <Text style={[styles.lead, { color: colors.textSecondary }]}>
-            No catch-ups logged this week
-          </Text>
+          <ChromeScrim style={styles.leadScrim} radius={RADII.sm}>
+            <Text style={[styles.lead, { color: colors.textSecondary }]}>
+              No catch-ups logged this week
+            </Text>
+          </ChromeScrim>
         )}
       </View>
 
       {/* 2. Gentle effortful line — quiet aside, only when clearly real. */}
       {effortfulShown ? (
         <View testID="digest-gentle-line" style={styles.section}>
-          <Text style={[styles.gentleText, { color: colors.textSecondary }]}>
-            A few recent conversations have felt effortful.
-          </Text>
+          <ChromeScrim style={styles.leadScrim} radius={RADII.sm}>
+            <Text style={[styles.gentleText, { color: colors.textSecondary }]}>
+              A few recent conversations have felt effortful.
+            </Text>
+          </ChromeScrim>
           <View style={styles.gentleNames}>
             {gentle.people.map((person) => (
               <Pressable
@@ -303,12 +315,14 @@ function DigestBody({
       {/* 3. The overlooked — Drifting, Gone quiet, then the backlog nudge. */}
       {drifting.length > 0 ? (
         <View style={styles.section}>
-          <Text
-            testID="digest-overlooked-drifting"
-            style={[styles.groupLabel, { color: colors.textSecondary }]}
-          >
-            Drifting
-          </Text>
+          <ChromeScrim style={styles.leadScrim} radius={RADII.sm}>
+            <Text
+              testID="digest-overlooked-drifting"
+              style={[styles.groupLabel, { color: colors.textSecondary }]}
+            >
+              Drifting
+            </Text>
+          </ChromeScrim>
           {driftingRows.map((row) => (
             <ContactCard
               key={row.id}
@@ -342,12 +356,14 @@ function DigestBody({
 
       {goneQuiet.length > 0 ? (
         <View style={styles.section}>
-          <Text
-            testID="digest-overlooked-gonequiet"
-            style={[styles.groupLabel, { color: colors.textSecondary }]}
-          >
-            Gone quiet
-          </Text>
+          <ChromeScrim style={styles.leadScrim} radius={RADII.sm}>
+            <Text
+              testID="digest-overlooked-gonequiet"
+              style={[styles.groupLabel, { color: colors.textSecondary }]}
+            >
+              Gone quiet
+            </Text>
+          </ChromeScrim>
           {goneQuietRows.map((row) => (
             <ContactCard
               key={row.id}
@@ -409,6 +425,19 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    overflow: "hidden",
+  },
+  emptyScrim: {
+    padding: 16,
+    overflow: "hidden",
+  },
+  leadScrim: {
+    alignSelf: "flex-start",
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    overflow: "hidden",
   },
   backBtn: {
     borderWidth: 1,

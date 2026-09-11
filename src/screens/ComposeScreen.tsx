@@ -58,6 +58,7 @@ import { resolvePrompt } from "@/ai/prompt-template";
 import type { ResolvedPrompt } from "@/ai/prompt-types";
 import { resolveMaxOutputTokens } from "@/ai/token-budget";
 import { Avatar } from "@/components/Avatar";
+import { ChromeScrim } from "@/components/ui/ChromeScrim";
 import { readPromptContext } from "@/db/ai-context-read";
 import {
   type AppSettings,
@@ -92,6 +93,7 @@ import { formatFuelAge } from "@/services/fuel-age";
 import { fuelKindLabel } from "@/services/fuel-kind-label";
 import { performReachOut } from "@/services/reach-out/handoff";
 import { useTheme } from "@/theme";
+import { RADII } from "@/theme/tokens/radii";
 import { Logger } from "@/utils/logger";
 
 /**
@@ -760,15 +762,17 @@ export function ComposeScreen({
   // ---- Render --------------------------------------------------------------
 
   const backPill = (
-    <Pressable
-      testID="compose-back"
-      accessibilityRole="button"
-      accessibilityLabel="Back"
-      onPress={goHome}
-      style={[styles.backBtn, { borderColor: colors.border }]}
-    >
-      <Text style={{ color: colors.textSecondary }}>Back</Text>
-    </Pressable>
+    <ChromeScrim style={styles.backScrim} radius={RADII.sm}>
+      <Pressable
+        testID="compose-back"
+        accessibilityRole="button"
+        accessibilityLabel="Back"
+        onPress={goHome}
+        style={[styles.backBtn, { borderColor: colors.border }]}
+      >
+        <Text style={{ color: colors.textSecondary }}>Back</Text>
+      </Pressable>
+    </ChromeScrim>
   );
 
   // "loading" shows minimal chrome + Back; "error" shows Back after its Alert;
@@ -814,29 +818,35 @@ export function ComposeScreen({
           cacheBust={header.modified_at}
           size={64}
         />
-        <Text
-          testID="compose-name"
-          accessibilityRole="header"
-          style={[styles.title, { color: colors.textPrimary }]}
-        >
-          {header.name}
-        </Text>
+        <ChromeScrim style={styles.nameScrim} radius={RADII.sm}>
+          <Text
+            testID="compose-name"
+            accessibilityRole="header"
+            style={[styles.title, { color: colors.textPrimary }]}
+          >
+            {header.name}
+          </Text>
+        </ChromeScrim>
       </View>
 
       {/* Conversational fuel — read-only reference cards, placed ABOVE the draft
           (talking points visible while composing). Every row is from getRankedFuel
           (off_limits + unconfirmed AI + blank excluded in-query); render ALL rows. */}
       <View testID="compose-fuel" style={styles.section}>
-        <Text style={[styles.sectionHeading, { color: colors.textSecondary }]}>
-          CONVERSATIONAL FUEL
-        </Text>
-        {fuel.length === 0 ? (
-          <Text
-            testID="compose-fuel-empty"
-            style={[styles.helper, { color: colors.textSecondary }]}
-          >
-            No fuel yet. Add some on their profile.
+        <ChromeScrim style={styles.headingScrim} radius={RADII.sm}>
+          <Text style={[styles.sectionHeading, { color: colors.textSecondary }]}>
+            CONVERSATIONAL FUEL
           </Text>
+        </ChromeScrim>
+        {fuel.length === 0 ? (
+          <ChromeScrim style={styles.helperScrim} radius={RADII.sm}>
+            <Text
+              testID="compose-fuel-empty"
+              style={[styles.helper, { color: colors.textSecondary }]}
+            >
+              No fuel yet. Add some on their profile.
+            </Text>
+          </ChromeScrim>
         ) : (
           fuel.map((row, index) => (
             <View
@@ -876,9 +886,11 @@ export function ComposeScreen({
 
       {/* Draft — opens BLANK, multiline. */}
       <View testID="compose-draft" style={styles.section}>
-        <Text style={[styles.sectionHeading, { color: colors.textSecondary }]}>
-          YOUR MESSAGE
-        </Text>
+        <ChromeScrim style={styles.headingScrim} radius={RADII.sm}>
+          <Text style={[styles.sectionHeading, { color: colors.textSecondary }]}>
+            YOUR MESSAGE
+          </Text>
+        </ChromeScrim>
         <TextInput
           testID="compose-draft-input"
           value={draft}
@@ -1011,13 +1023,35 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 8,
   },
+  backScrim: {
+    alignSelf: "flex-start",
+    overflow: "hidden",
+  },
   title: {
     flex: 1,
     fontSize: 24,
     fontWeight: "700",
   },
+  nameScrim: {
+    flex: 1,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    overflow: "hidden",
+  },
   section: {
     gap: 8,
+  },
+  headingScrim: {
+    alignSelf: "flex-start",
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    overflow: "hidden",
+  },
+  helperScrim: {
+    alignSelf: "flex-start",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    overflow: "hidden",
   },
   sectionHeading: {
     fontSize: 13,
