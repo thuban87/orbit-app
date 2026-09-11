@@ -35,7 +35,12 @@ describe("Profile presentation migration", () => {
       if (fromVersion > 0) await migrateTo(fromVersion);
       await migrateTo(PROFILE_PRESENTATION_SCHEMA_VERSION);
 
-      expect(TARGET_VERSION).toBe(PROFILE_PRESENTATION_SCHEMA_VERSION);
+      // TARGET_VERSION is the build head, which advances past this migration as
+      // later schema phases land (migration 025 made 25 the head); this migration
+      // is no longer the head, so assert the build target includes it, not equals it.
+      expect(TARGET_VERSION).toBeGreaterThanOrEqual(
+        PROFILE_PRESENTATION_SCHEMA_VERSION,
+      );
       expect(profilePresentationMigration.version).toBe(
         PROFILE_PRESENTATION_SCHEMA_VERSION,
       );

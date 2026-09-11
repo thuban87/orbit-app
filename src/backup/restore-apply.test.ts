@@ -60,6 +60,7 @@ import { migration020 } from "@/db/migrations/020-dashboard-swipe-pref";
 import { migration021 } from "@/db/migrations/021-orrery-preferences";
 import { migration022 } from "@/db/migrations/022-orrery-systems";
 import { migration023 } from "@/db/migrations/023-orrery-system-selection-revision";
+import { migration025 } from "@/db/migrations/025-interaction-history-schema";
 import { profilePresentationMigration } from "@/db/migrations/profile-presentation";
 import { readOrrerySystemSnapshot } from "@/db/orrery-system-read";
 import { createContactWithInteraction, recordTouchpoint } from "@/db/recency-dao";
@@ -81,8 +82,9 @@ async function db(): Promise<SqlExecutor> {
       migration022,
       migration023,
       profilePresentationMigration,
+      migration025,
     ],
-    24,
+    25,
     { now: NOW, newUid },
   );
   return exec;

@@ -20,6 +20,7 @@ import { migration011 } from "@/db/migrations/011-contact-lifecycle-schema";
 import { migration012 } from "@/db/migrations/012-import-sessions";
 import { migration013 } from "@/db/migrations/013-reconciliation-and-merge";
 import { migration014 } from "@/db/migrations/014-interaction-assists";
+import { migration025 } from "@/db/migrations/025-interaction-history-schema";
 import { runMigrations } from "@/db/migrations/runner";
 import type { SqlExecutor } from "@/db/types";
 
@@ -39,6 +40,9 @@ const MIGRATIONS = [
   migration012,
   migration013,
   migration014,
+  // migration 025 adds interactions.duration/allow_ai and remaps the channel
+  // vocabulary — markAssistLogged now writes into a v25 interactions row.
+  migration025,
 ];
 
 let exec: SqlExecutor;
@@ -48,7 +52,7 @@ const uid = () => `uid-${++counter}`;
 beforeEach(async () => {
   counter = 0;
   exec = nodeSqliteExecutor(openTestDb());
-  await runMigrations(exec, MIGRATIONS, 14, { now: NOW, newUid: uid });
+  await runMigrations(exec, MIGRATIONS, 25, { now: NOW, newUid: uid });
 });
 
 async function contact(name = "Alex"): Promise<number> {
@@ -144,6 +148,45 @@ describe("interaction assist write DAO", () => {
       ),
     ).toEqual({ status: "logged" });
   });
+
+  it.each([
+    ["call", "Call"],
+    ["text", "Message"],
+    ["email", "Message"],
+  ] as const)(
+    "remaps a '%s' transport assist to interactions.channel '%s' at log time (T-32-03)",
+    async (transport, expectedChannel) => {
+      const contactId = await contact();
+      const assistUid = await createPendingAssist(exec, {
+        contactId,
+        channel: transport,
+        endpointValue:
+          transport === "email" ? "alex@example.com" : "+15551234567",
+        now: "2026-08-31 11:00:00",
+      });
+
+      await markAssistLogged(exec, { assistUid, connected: 1, now: NOW });
+
+      // The stored interactions row carries the MIGRATED channel label — never a
+      // retired 'call'/'text'/'email' value (email must not re-introduce the
+      // retired 'email' channel into a v25 interactions row).
+      expect(
+        await exec.getFirstAsync<{ channel: string; allow_ai: number }>(
+          "SELECT channel, allow_ai FROM interactions WHERE contact_id = ?",
+          [contactId],
+        ),
+      ).toEqual({ channel: expectedChannel, allow_ai: 0 });
+
+      // interaction_assists keeps its RAW transport value — its call|text|email
+      // CHECK (migration 014) is untouched, not rebuilt.
+      expect(
+        await exec.getFirstAsync<{ channel: string }>(
+          "SELECT channel FROM interaction_assists WHERE uid = ?",
+          [assistUid],
+        ),
+      ).toEqual({ channel: transport });
+    },
+  );
 
   it("does not log dismissed or failed assists", async () => {
     const contactId = await contact();

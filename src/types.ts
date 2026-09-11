@@ -35,7 +35,14 @@ export type OrbitStatus = "stable" | "wobble" | "decay" | "snoozed";
 export type SocialBattery = "Charger" | "Neutral" | "Drain";
 
 /**
- * Type of last interaction with a contact.
+ * @deprecated UNUSED LEGACY TYPE — intentionally excluded from the Phase 32
+ * channel vocabulary migration (D-06 consumer audit). It carries the pre-migration
+ * six-value channel vocabulary, but NO code path populates `OrbitContact.lastInteraction`
+ * from the persisted `interactions.channel` column (it is only referenced at its
+ * declaration and as the optional field below). It is therefore NOT a persisted-channel
+ * consumer and was deliberately left un-migrated rather than remapped. If a future
+ * feature ever derives this from `interactions.channel`, migrate it to the
+ * Message/Call/In Person vocabulary at that point.
  */
 export type LastInteractionType =
   | "call"

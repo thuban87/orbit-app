@@ -15,6 +15,8 @@ import type { DatabaseSync } from "node:sqlite";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { nodeSqliteExecutor, openTestDb } from "@/db/__testkit__/node-sqlite";
 import { migration001 } from "@/db/migrations/001-initial";
+import { migration002 } from "@/db/migrations/002-app-settings";
+import { migration025 } from "@/db/migrations/025-interaction-history-schema";
 import { runMigrations } from "@/db/migrations/runner";
 import type { SqlExecutor } from "@/db/types";
 
@@ -71,7 +73,10 @@ async function seed(): Promise<void> {
   db = openTestDb();
   const exec = nodeSqliteExecutor(db);
   let seedUidN = 0;
-  await runMigrations(exec, [migration001], 1, {
+  // migration 025 adds interactions.duration/allow_ai (recordTouchpoint writes
+  // them); it requires app_settings (002). tracking_enabled is added manually
+  // below (it belongs to migration 011, which this minimal chain omits).
+  await runMigrations(exec, [migration001, migration002, migration025], 25, {
     now: h.now,
     newUid: () => `seed-uid-${++seedUidN}`,
   });

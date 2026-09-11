@@ -70,9 +70,13 @@ export interface RecordTouchpointInput {
   direction?: string | null;
   /** 0/1 — drives the rarely_responds recency filter (default 1 = connected). */
   connected?: number;
-  /** good|fine|hard|null. */
+  /** Tone: Positive|Neutral|Negative|null (D-06; other/unspecified legacy pass-through). */
   quality?: string | null;
   note?: string | null;
+  /** Optional interaction duration in whole seconds (HIST-14); absent -> NULL, never 0. */
+  duration?: number | null;
+  /** Per-interaction Allow-AI gate, 0/1 (D-04); absent -> 0 (OFF). */
+  allowAi?: number;
   /** manual|widget|notification|ai (default 'manual'). */
   source?: string;
 }
@@ -95,9 +99,13 @@ export interface EditTouchpointFullInput {
   direction: string | null;
   /** 0/1 — drives the rarely_responds recency filter. */
   connected: number;
-  /** good|fine|hard|null. */
+  /** Tone: Positive|Neutral|Negative|null (D-06; other/unspecified legacy pass-through). */
   quality: string | null;
   note: string | null;
+  /** Interaction duration in whole seconds (HIST-14); null when none. */
+  duration: number | null;
+  /** Per-interaction Allow-AI gate, 0/1 (D-04). The refine form seeds it (default 0/OFF). */
+  allowAi: number;
 }
 
 /** A deletion of an existing interaction. */
@@ -115,8 +123,13 @@ export interface FirstInteractionInput {
   channel?: string;
   direction?: string | null;
   connected?: number;
+  /** Tone: Positive|Neutral|Negative|null (D-06). */
   quality?: string | null;
   note?: string | null;
+  /** Optional interaction duration in whole seconds (HIST-14); absent -> NULL. */
+  duration?: number | null;
+  /** Per-interaction Allow-AI gate, 0/1 (D-04); absent -> 0 (OFF). */
+  allowAi?: number;
   source?: string;
 }
 
@@ -140,6 +153,8 @@ export interface CreateContactInput {
 const DEFAULT_CHANNEL = "unspecified";
 const DEFAULT_SOURCE = "manual";
 const DEFAULT_CONNECTED = 1;
+/** Per-interaction Allow-AI gate defaults OFF (D-04); matches the column DEFAULT 0. */
+const DEFAULT_ALLOW_AI = 0;
 
 /**
  * The single recency recompute. ONE correlated UPDATE: sets `last_contact` to
@@ -188,14 +203,19 @@ async function insertInteraction(
     connected?: number;
     quality?: string | null;
     note?: string | null;
+    duration?: number | null;
+    allowAi?: number;
     source?: string;
   },
 ): Promise<number> {
+  // duration/allow_ai (migration 025) are bound as `?` params, never interpolated
+  // (T-32-04). Omitted -> duration NULL, allow_ai 0 (OFF, D-04) via the values here
+  // (which also match the column DEFAULTs).
   const result = await exec.runAsync(
     `INSERT INTO interactions
        (uid, contact_id, occurred_at, recorded_at, channel, direction,
-        connected, quality, note, source, modified_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        connected, quality, note, duration, allow_ai, source, modified_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       i.uid,
       contactId,
@@ -206,6 +226,8 @@ async function insertInteraction(
       i.connected ?? DEFAULT_CONNECTED,
       i.quality ?? null,
       i.note ?? null,
+      i.duration ?? null,
+      i.allowAi ?? DEFAULT_ALLOW_AI,
       i.source ?? DEFAULT_SOURCE,
       now,
     ],
@@ -245,7 +267,8 @@ export function recordTouchpoint(
 /**
  * The SINGLE interaction-edit path (LOG-01/02/04/06). Updates EVERY editable
  * column of the matched (id, contact_id) row — occurred_at, channel, direction,
- * connected, quality, note, modified_at — then ALWAYS recomputes recency. Because
+ * connected, quality (Tone), note, duration, allow_ai, modified_at — then ALWAYS
+ * recomputes recency. Because
  * recompute is an idempotent MAX over current rows, "always recompute" is correct
  * regardless of which field changed: a note-only edit is a no-op MAX, lowering the
  * newest row moves last_contact back, and editing a rarely_responds row to
@@ -285,6 +308,8 @@ export function editTouchpointFull(
               connected   = ?,
               quality     = ?,
               note        = ?,
+              duration    = ?,
+              allow_ai    = ?,
               modified_at = ?
         WHERE id = ? AND contact_id = ?`,
       [
@@ -294,6 +319,8 @@ export function editTouchpointFull(
         input.connected,
         input.quality,
         input.note,
+        input.duration,
+        input.allowAi,
         input.now,
         input.interactionId,
         input.contactId,

@@ -133,10 +133,11 @@ interface QualityMarkRow {
 /**
  * The gentle "effortful" line source — recent `interactions.quality` marks over
  * the (deliberately wider) effortful window, archived excluded, `quality NOT
- * NULL`. Returns the `hard` count, the `total` of good|fine|hard marks, and the
- * distinct people (name-ordered) with at least one hard mark. The SHOW decision
- * is left to `shouldShowEffortful` in the screen (this read stays neutral).
- * Tally idiom mirrors ai-context-read.ts:122-140.
+ * NULL`. Returns the `hard` count (Negative marks), the `total` of
+ * Positive/Neutral/Negative marks (the migrated Tone vocabulary, D-06), and the
+ * distinct people (name-ordered) with at least one Negative mark. The SHOW
+ * decision is left to `shouldShowEffortful` in the screen (this read stays
+ * neutral). Tally idiom mirrors ai-context-read.ts.
  */
 export async function readGentleLine(exec: SqlExecutor): Promise<GentleLine> {
   const rows = await exec.getAllAsync<QualityMarkRow>(
@@ -151,14 +152,21 @@ export async function readGentleLine(exec: SqlExecutor): Promise<GentleLine> {
     ORDER BY c.name COLLATE NOCASE, i.contact_id`,
   );
 
+  // Tally over the migrated Tone vocabulary (D-06): Positive/Neutral/Negative
+  // replace good/fine/hard. Negative is the effortful ("hard") case. Comparing
+  // the stale literals here would silently zero the gentle line after 025 lands.
   let hard = 0;
   let total = 0;
   const peopleById = new Map<number, string>();
   for (const r of rows) {
-    if (r.quality === "good" || r.quality === "fine" || r.quality === "hard") {
+    if (
+      r.quality === "Positive" ||
+      r.quality === "Neutral" ||
+      r.quality === "Negative"
+    ) {
       total += 1;
     }
-    if (r.quality === "hard") {
+    if (r.quality === "Negative") {
       hard += 1;
       if (!peopleById.has(r.contact_id)) {
         peopleById.set(r.contact_id, r.name);

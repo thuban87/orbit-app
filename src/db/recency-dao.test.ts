@@ -18,6 +18,7 @@ import { migration004 } from "@/db/migrations/004-ai-settings";
 import { migration005 } from "@/db/migrations/005-digest-settings";
 import { migration006 } from "@/db/migrations/006-normalize-custom-field-values";
 import { migration007 } from "@/db/migrations/007-tombstones";
+import { migration025 } from "@/db/migrations/025-interaction-history-schema";
 import { runMigrations } from "@/db/migrations/runner";
 import {
   createContactWithInteraction,
@@ -48,8 +49,13 @@ beforeEach(async () => {
       migration005,
       migration006,
       migration007,
+      // migration 025 adds interactions.duration/allow_ai — the columns the single
+      // recency writer now populates. The runner applies only the array members
+      // <= target, so 008-024 stay skipped; 025 depends only on interactions (001)
+      // and app_settings (002).
+      migration025,
     ],
-    7,
+    25,
     { now: NOW, newUid: uid },
   );
 });
@@ -93,6 +99,8 @@ async function readInteraction(interactionId: number): Promise<{
   connected: number;
   quality: string | null;
   note: string | null;
+  duration: number | null;
+  allow_ai: number;
 }> {
   const row = await exec.getFirstAsync<{
     occurred_at: string;
@@ -101,8 +109,10 @@ async function readInteraction(interactionId: number): Promise<{
     connected: number;
     quality: string | null;
     note: string | null;
+    duration: number | null;
+    allow_ai: number;
   }>(
-    "SELECT occurred_at, channel, direction, connected, quality, note FROM interactions WHERE id = ?",
+    "SELECT occurred_at, channel, direction, connected, quality, note, duration, allow_ai FROM interactions WHERE id = ?",
     [interactionId],
   );
   if (!row) throw new Error(`no interaction ${interactionId}`);
@@ -125,6 +135,8 @@ async function editFull(
     connected: number;
     quality: string | null;
     note: string | null;
+    duration: number | null;
+    allowAi: number;
   }> = {},
 ): Promise<void> {
   const cur = await readInteraction(interactionId);
@@ -139,6 +151,9 @@ async function editFull(
     connected: overrides.connected ?? cur.connected,
     quality: overrides.quality !== undefined ? overrides.quality : cur.quality,
     note: overrides.note !== undefined ? overrides.note : cur.note,
+    duration:
+      overrides.duration !== undefined ? overrides.duration : cur.duration,
+    allowAi: overrides.allowAi ?? cur.allow_ai,
   });
 }
 
@@ -265,11 +280,13 @@ describe("recency DAO — (id, contactId) scoping guards recency (WR-04)", () =>
         contactId: b,
         occurredAt: "2026-01-01 10:00:00",
         now: NOW,
-        channel: "call",
+        channel: "Call",
         direction: "outbound",
         connected: 1,
         quality: null,
         note: null,
+        duration: null,
+        allowAi: 0,
       }),
     ).rejects.toThrow(/no interaction matched/);
 
@@ -390,11 +407,13 @@ describe("recency DAO — editTouchpointFull (single full edit path, LOG-01/02/0
       contactId: c,
       occurredAt: "2026-06-15 18:45:00",
       now: NOW,
-      channel: "call",
+      channel: "Call",
       direction: "inbound",
       connected: 0,
-      quality: "good",
+      quality: "Positive",
       note: "caught up over the phone",
+      duration: 1800,
+      allowAi: 1,
     });
 
     const row = await exec.getFirstAsync<{
@@ -404,18 +423,22 @@ describe("recency DAO — editTouchpointFull (single full edit path, LOG-01/02/0
       connected: number;
       quality: string | null;
       note: string | null;
+      duration: number | null;
+      allow_ai: number;
       modified_at: string;
     }>(
-      `SELECT occurred_at, channel, direction, connected, quality, note, modified_at
+      `SELECT occurred_at, channel, direction, connected, quality, note, duration, allow_ai, modified_at
          FROM interactions WHERE id = ?`,
       [interactionId],
     );
     expect(row?.occurred_at).toBe("2026-06-15 18:45:00");
-    expect(row?.channel).toBe("call");
+    expect(row?.channel).toBe("Call");
     expect(row?.direction).toBe("inbound");
     expect(row?.connected).toBe(0);
-    expect(row?.quality).toBe("good");
+    expect(row?.quality).toBe("Positive");
     expect(row?.note).toBe("caught up over the phone");
+    expect(row?.duration).toBe(1800);
+    expect(row?.allow_ai).toBe(1);
     expect(row?.modified_at).toBe(NOW);
     // Only interaction, connected=0 on a NORMAL contact still counts → recency
     // follows the edited occurred_at.
@@ -463,11 +486,13 @@ describe("recency DAO — editTouchpointFull (single full edit path, LOG-01/02/0
         contactId: c,
         occurredAt: "2026-09-01 10:00:00",
         now: NOW,
-        channel: "call",
+        channel: "Call",
         direction: "outbound",
         connected: 1,
         quality: null,
         note: null,
+        duration: null,
+        allowAi: 0,
       }),
     ).rejects.toThrow(/future/i);
 
@@ -780,6 +805,122 @@ describe("recency DAO — one-tap record path (LOG-01 / LOG-06)", () => {
     });
     expect(await interactionCount(c)).toBe(1);
     expect(await lastContact(c)).toBe(NOW);
+  });
+});
+
+describe("recency DAO — duration / allow_ai round-trip (HIST-14 / D-04)", () => {
+  it("defaults duration to NULL and allow_ai to 0 when the record path omits them", async () => {
+    const c = await makeContact();
+    const { interactionId } = await recordTouchpoint(exec, {
+      contactId: c,
+      uid: uid(),
+      occurredAt: "2026-06-01 10:00:00",
+      now: NOW,
+    });
+    const row = await readInteraction(interactionId);
+    // Absent duration reads back NULL, never 0; allow_ai defaults OFF.
+    expect(row.duration).toBeNull();
+    expect(row.allow_ai).toBe(0);
+  });
+
+  it("round-trips an explicit duration and allow_ai=1 through recordTouchpoint", async () => {
+    const c = await makeContact();
+    const { interactionId } = await recordTouchpoint(exec, {
+      contactId: c,
+      uid: uid(),
+      occurredAt: "2026-06-01 10:00:00",
+      now: NOW,
+      duration: 900,
+      allowAi: 1,
+    });
+    const row = await readInteraction(interactionId);
+    expect(row.duration).toBe(900);
+    expect(row.allow_ai).toBe(1);
+  });
+
+  it("an edit can clear a duration back to NULL and withdraw allow_ai to 0", async () => {
+    const c = await makeContact();
+    const { interactionId } = await recordTouchpoint(exec, {
+      contactId: c,
+      uid: uid(),
+      occurredAt: "2026-06-01 10:00:00",
+      now: NOW,
+      duration: 600,
+      allowAi: 1,
+    });
+    await editFull(interactionId, c, NOW, { duration: null, allowAi: 0 });
+    const row = await readInteraction(interactionId);
+    expect(row.duration).toBeNull();
+    expect(row.allow_ai).toBe(0);
+  });
+});
+
+describe("deleteTouchpoint — DAO-level delete regression (D-05 / HIST-13, Plan 07 consumes this)", () => {
+  it("deleting a NON-newest row keeps recency on the surviving newest row", async () => {
+    const c = await makeContact();
+    const older = await recordTouchpoint(exec, {
+      contactId: c,
+      uid: uid(),
+      occurredAt: "2026-05-01 10:00:00",
+      now: NOW,
+    });
+    await recordTouchpoint(exec, {
+      contactId: c,
+      uid: uid(),
+      occurredAt: "2026-07-01 10:00:00",
+      now: NOW,
+    });
+    expect(await lastContact(c)).toBe("2026-07-01 10:00:00");
+
+    // Delete the OLDER (non-newest) row — recency must stay on the newest.
+    await deleteTouchpoint(exec, {
+      interactionId: older.interactionId,
+      contactId: c,
+      now: NOW,
+    });
+    expect(await interactionCount(c)).toBe(1);
+    expect(await lastContact(c)).toBe("2026-07-01 10:00:00");
+    // The tombstone for the deleted (older) row exists.
+    expect((await interactionTombstones()).length).toBe(1);
+  });
+
+  it("a forced-failure delete rolls back, preserving the interaction row and its recency", async () => {
+    const c = await makeContact();
+    const interactionUid = uid();
+    const { interactionId } = await recordTouchpoint(exec, {
+      contactId: c,
+      uid: interactionUid,
+      occurredAt: "2026-07-01 10:00:00",
+      now: NOW,
+    });
+
+    // Force the tombstone insert (inside the delete transaction) to throw by
+    // pre-seeding a duplicate interaction tombstone for the same uid — the
+    // tombstone table's UNIQUE(entity_type, entity_uid) makes the in-txn insert
+    // fail, rolling back the whole delete.
+    const baseRun = exec.runAsync.bind(exec);
+    const failingExec: SqlExecutor = {
+      ...exec,
+      runAsync: async (sql, params) => {
+        if (sql.includes("DELETE FROM interactions")) {
+          throw new Error("forced delete failure");
+        }
+        return baseRun(sql, params);
+      },
+    };
+
+    await expect(
+      deleteTouchpoint(failingExec, {
+        interactionId,
+        contactId: c,
+        now: NOW,
+      }),
+    ).rejects.toThrow(/forced delete failure/);
+
+    // The interaction survives and recency is intact; no tombstone committed.
+    expect(await interactionCount(c)).toBe(1);
+    expect(await lastContact(c)).toBe("2026-07-01 10:00:00");
+    expect(await interactionTombstones()).toEqual([]);
   });
 });
 

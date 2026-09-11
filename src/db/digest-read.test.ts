@@ -35,6 +35,7 @@ import { migration007 } from "@/db/migrations/007-tombstones";
 import { migration009 } from "@/db/migrations/009-contact-method-normalization";
 import { migration010 } from "@/db/migrations/010-contact-method-label";
 import { migration011 } from "@/db/migrations/011-contact-lifecycle-schema";
+import { migration025 } from "@/db/migrations/025-interaction-history-schema";
 import { runMigrations } from "@/db/migrations/runner";
 import type { SqlExecutor } from "@/db/types";
 
@@ -326,38 +327,38 @@ describe("readGentleLine", () => {
     const cara = await seedContact({ name: "Cara", archivedAt: NOW });
     const dan = await seedContact({ name: "Dan" });
 
-    // Ann: 2 hard + 1 good in window → contributes 2 hard, 3 total, in people.
+    // Ann: 2 Negative + 1 Positive in window → 2 hard, 3 total, in people.
     await seedInteraction(ann, {
       occurredAt: localDateTimeOffset(-1, "10:00:00"),
-      quality: "hard",
+      quality: "Negative",
     });
     await seedInteraction(ann, {
       occurredAt: localDateTimeOffset(-3, "10:00:00"),
-      quality: "hard",
+      quality: "Negative",
     });
     await seedInteraction(ann, {
       occurredAt: localDateTimeOffset(-5, "10:00:00"),
-      quality: "good",
+      quality: "Positive",
     });
-    // Bob: 1 fine in window → 0 hard, 1 total, NOT in people.
+    // Bob: 1 Neutral in window → 0 hard, 1 total, NOT in people.
     await seedInteraction(bob, {
       occurredAt: localDateTimeOffset(-2, "10:00:00"),
-      quality: "fine",
+      quality: "Neutral",
     });
     // Bob: a quality=NULL mark in window → excluded from the tally entirely.
     await seedInteraction(bob, {
       occurredAt: localDateTimeOffset(-2, "11:00:00"),
       quality: null,
     });
-    // Cara (archived): a hard mark → excluded entirely.
+    // Cara (archived): a Negative mark → excluded entirely.
     await seedInteraction(cara, {
       occurredAt: localDateTimeOffset(-1, "10:00:00"),
-      quality: "hard",
+      quality: "Negative",
     });
-    // Dan: a hard mark OUTSIDE the window → excluded.
+    // Dan: a Negative mark OUTSIDE the window → excluded.
     await seedInteraction(dan, {
       occurredAt: localDateTimeOffset(-20, "10:00:00"),
-      quality: "hard",
+      quality: "Negative",
     });
 
     const line: GentleLine = await readGentleLine(exec);
@@ -366,11 +367,11 @@ describe("readGentleLine", () => {
     expect(line.people).toEqual([{ id: ann, name: "Ann" }]);
   });
 
-  it("returns hard=1 for a single hard mark (the screen gate decides show)", async () => {
+  it("returns hard=1 for a single Negative mark (the screen gate decides show)", async () => {
     const solo = await seedContact({ name: "Solo" });
     await seedInteraction(solo, {
       occurredAt: localDateTimeOffset(-1, "10:00:00"),
-      quality: "hard",
+      quality: "Negative",
     });
     const line = await readGentleLine(exec);
     expect(line.hard).toBe(1);
@@ -385,7 +386,7 @@ describe("readGentleLine", () => {
     });
     await seedInteraction(unbound, {
       occurredAt: localDateTimeOffset(-1, "10:00:00"),
-      quality: "hard",
+      quality: "Negative",
     });
     expect(await readGentleLine(exec)).toEqual({
       hard: 1,
@@ -398,6 +399,62 @@ describe("readGentleLine", () => {
     await seedContact({ name: "Nobody" });
     const line = await readGentleLine(exec);
     expect(line).toEqual({ hard: 0, total: 0, people: [] });
+  });
+});
+
+describe("readGentleLine — migrated-vocabulary regression (D-06 trip-wire)", () => {
+  it("tallies the effortful line over a legacy-then-migrated fixture (no silent zero)", async () => {
+    // Seed legacy quality values on the pre-025 schema, then apply migration 025.
+    // A stale 'good'/'fine'/'hard' comparison in readGentleLine would silently
+    // zero the tally the instant the vocabulary migrates on a real device.
+    let n = 0;
+    const seedUid = () => `dg-mig-${++n}`;
+    const legacyExec = nodeSqliteExecutor(openTestDb());
+    await runMigrations(legacyExec, [migration001, migration002], 2, {
+      now: NOW,
+      newUid: seedUid,
+    });
+
+    const contactResult = await legacyExec.runAsync(
+      `INSERT INTO contacts (uid, name, interval_days, created_at, modified_at)
+       VALUES (?, 'Legacy Person', 30, ?, ?)`,
+      [seedUid(), NOW, NOW],
+    );
+    const contactId = contactResult.lastInsertRowId;
+    // Two legacy 'hard' + one 'good' in the recent window.
+    for (const [quality, day] of [
+      ["hard", -1],
+      ["hard", -3],
+      ["good", -5],
+    ] as const) {
+      await legacyExec.runAsync(
+        `INSERT INTO interactions
+           (uid, contact_id, occurred_at, recorded_at, channel, connected, quality, source, modified_at)
+         VALUES (?, ?, ?, ?, 'text', 1, ?, 'manual', ?)`,
+        [
+          seedUid(),
+          contactId,
+          localDateTimeOffset(day, "10:00:00"),
+          NOW,
+          quality,
+          NOW,
+        ],
+      );
+    }
+
+    await runMigrations(
+      legacyExec,
+      [migration001, migration002, migration025],
+      25,
+      { now: NOW, newUid: seedUid },
+    );
+
+    // After remap: two Negative + one Positive → hard=2, total=3.
+    expect(await readGentleLine(legacyExec)).toEqual({
+      hard: 2,
+      total: 3,
+      people: [{ id: contactId, name: "Legacy Person" }],
+    });
   });
 });
 

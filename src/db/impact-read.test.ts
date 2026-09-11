@@ -21,6 +21,7 @@ import { migration007 } from "@/db/migrations/007-tombstones";
 import { migration009 } from "@/db/migrations/009-contact-method-normalization";
 import { migration010 } from "@/db/migrations/010-contact-method-label";
 import { migration011 } from "@/db/migrations/011-contact-lifecycle-schema";
+import { migration025 } from "@/db/migrations/025-interaction-history-schema";
 import { runMigrations } from "@/db/migrations/runner";
 import {
   createContactWithInteraction,
@@ -53,8 +54,11 @@ beforeEach(async () => {
       migration009,
       migration010,
       migration011,
+      // migration 025 adds interactions.duration/allow_ai (the recency writer
+      // populates them); runner applies only array members <= target.
+      migration025,
     ],
-    11,
+    25,
     { now: NOW, newUid: uid, defaultPhoneRegion: "US" },
   );
 });

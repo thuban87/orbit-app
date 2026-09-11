@@ -56,12 +56,24 @@ export interface IntensityAggregate {
 
 /**
  * A neutral aggregate distribution of interaction quality over a contact's
- * history — counts of the closed `good | fine | hard` enum only. A pure count,
- * never the underlying rows and never any free-text column.
+ * history. A pure count, never the underlying rows and never any free-text column.
+ *
+ * FIELD-NAME / VALUE MISMATCH IS DELIBERATE (D-06, RESEARCH A3): Phase 32 renamed
+ * the STORED vocabulary to Tone but KEPT these internal field names to hold the
+ * blast radius. The mapping is exact and unmissable:
+ *   `good`  = Positive
+ *   `fine`  = Neutral
+ *   `hard`  = Negative
+ * `readInteractionAggregates` compares the migrated Positive/Neutral/Negative
+ * literals and tallies them into these fields; do NOT ripple a rename into the
+ * prompt builder this phase.
  */
 export interface QualityAggregate {
+  /** Count of `Positive` (Tone) interactions. */
   readonly good: number;
+  /** Count of `Neutral` (Tone) interactions. */
   readonly fine: number;
+  /** Count of `Negative` (Tone) interactions. */
   readonly hard: number;
 }
 

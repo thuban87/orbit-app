@@ -17,6 +17,8 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { nodeSqliteExecutor, openTestDb } from "@/db/__testkit__/node-sqlite";
 import { migration001 } from "@/db/migrations/001-initial";
+import { migration002 } from "@/db/migrations/002-app-settings";
+import { migration025 } from "@/db/migrations/025-interaction-history-schema";
 import { runMigrations } from "@/db/migrations/runner";
 import { createContactWithInteraction } from "@/db/recency-dao";
 import type { SqlExecutor } from "@/db/types";
@@ -33,7 +35,13 @@ beforeEach(async () => {
   uidCounter = 0;
   const db = openTestDb();
   exec = nodeSqliteExecutor(db);
-  await runMigrations(exec, [migration001], 1, { now: NOW, newUid: uid });
+  // migration 025 adds interactions.duration/allow_ai (the columns the recency
+  // writer now populates); it requires app_settings (002). The runner applies only
+  // array members <= target, so 003-024 stay skipped.
+  await runMigrations(exec, [migration001, migration002, migration025], 25, {
+    now: NOW,
+    newUid: uid,
+  });
 });
 
 async function makeContact(): Promise<number> {

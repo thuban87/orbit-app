@@ -69,7 +69,10 @@ describe("registered migration chain", () => {
     expect(
       MIGRATIONS.filter((migration) => migration.version === 24),
     ).toHaveLength(1);
-    expect(TARGET_VERSION).toBe(24);
+    expect(
+      MIGRATIONS.filter((migration) => migration.version === 25),
+    ).toHaveLength(1);
+    expect(TARGET_VERSION).toBe(25);
     expect(
       await exec.getFirstAsync<{ user_version: number }>("PRAGMA user_version"),
     ).toEqual({
@@ -98,9 +101,21 @@ describe("registered migration chain", () => {
       "orrery_system_selection_revision",
       "profile_layout_template_uid",
       "profile_background_template_uid",
+      "history_lens",
+      "history_cycle_count",
     ]) {
       expect(appSettingsCols.has(col)).toBe(true);
     }
+    // Migration 025's two new interaction columns are present after the full chain.
+    const interactionCols = new Set(
+      (
+        await exec.getAllAsync<{ name: string }>(
+          "PRAGMA table_info(interactions)",
+        )
+      ).map((r) => r.name),
+    );
+    expect(interactionCols.has("duration")).toBe(true);
+    expect(interactionCols.has("allow_ai")).toBe(true);
     expect(
       await exec.getFirstAsync<{ name: string }>(
         "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'tombstones'",

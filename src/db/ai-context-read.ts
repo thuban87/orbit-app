@@ -121,6 +121,11 @@ async function readInteractionAggregates(
     [contactId],
   );
 
+  // The QualityAggregate field names stay { good, fine, hard } (RESEARCH A3,
+  // minimal blast radius) but the STORED vocabulary is now the Tone vocabulary
+  // (D-06): good = 'Positive', fine = 'Neutral', hard = 'Negative'. Compare the
+  // migrated literals — a stale 'good'/'fine'/'hard' comparison here would count
+  // zero on every device the instant migration 025 lands.
   let good = 0;
   let fine = 0;
   let hard = 0;
@@ -129,11 +134,11 @@ async function readInteractionAggregates(
     if (r.connected === 1) {
       connectedCount += 1;
     }
-    if (r.quality === "good") {
+    if (r.quality === "Positive") {
       good += 1;
-    } else if (r.quality === "fine") {
+    } else if (r.quality === "Neutral") {
       fine += 1;
-    } else if (r.quality === "hard") {
+    } else if (r.quality === "Negative") {
       hard += 1;
     }
   }

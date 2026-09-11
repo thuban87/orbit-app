@@ -30,6 +30,7 @@ import { migration010 } from "@/db/migrations/010-contact-method-label";
 import { migration011 } from "@/db/migrations/011-contact-lifecycle-schema";
 import { migration016 } from "@/db/migrations/016-contact-knowledge";
 import { migration017 } from "@/db/migrations/017-knowledge-egress-datamove";
+import { migration025 } from "@/db/migrations/025-interaction-history-schema";
 import { runMigrations } from "@/db/migrations/runner";
 import {
   createContactWithInteraction,
@@ -67,7 +68,7 @@ beforeEach(async () => {
     11,
     { now: NOW, newUid: uid, defaultPhoneRegion: "US" },
   );
-  await runMigrations(exec, [migration016, migration017], 17, {
+  await runMigrations(exec, [migration016, migration017, migration025], 25, {
     now: NOW,
     newUid: uid,
     defaultPhoneRegion: "US",
@@ -535,5 +536,67 @@ describe("readPromptContext — allowlist projection (H1)", () => {
       trailingAvgGapDays: null,
     });
     expect(JSON.stringify(ctx)).not.toMatch(/RAW_|FORMATTED_|CANONICAL_/);
+  });
+});
+
+describe("readInteractionAggregates — migrated-vocabulary regression (D-06 trip-wire)", () => {
+  it("counts Positive/Neutral/Negative over a jump-from-legacy-migrated fixture (no silent zero)", async () => {
+    // Build a fixture at the PRE-025 schema, seed legacy quality values via raw
+    // INSERT, then apply migration 025 to remap them. If readInteractionAggregates
+    // still compared the stale 'good'/'fine'/'hard' literals, every count would
+    // silently read zero — this proves it compares the migrated Tone vocabulary.
+    let n = 0;
+    const seedUid = () => `mig-uid-${++n}`;
+    const legacyExec = nodeSqliteExecutor(openTestDb());
+    const preMigrations = [
+      migration001,
+      migration002,
+      migration003,
+      migration004,
+      migration005,
+      migration006,
+      migration007,
+      migration009,
+      migration010,
+      migration011,
+      migration016,
+      migration017,
+    ];
+    await runMigrations(legacyExec, preMigrations, 17, {
+      now: NOW,
+      newUid: seedUid,
+      defaultPhoneRegion: "US",
+    });
+
+    const contactResult = await legacyExec.runAsync(
+      `INSERT INTO contacts
+         (uid, name, interval_days, tracking_enabled, created_at, modified_at)
+       VALUES (?, 'Legacy Alex', 30, 1, ?, ?)`,
+      [seedUid(), NOW, NOW],
+    );
+    const contactId = contactResult.lastInsertRowId;
+    // Two 'good', one 'fine', one 'hard' — LEGACY literals, seeded pre-migration.
+    for (const quality of ["good", "good", "fine", "hard"]) {
+      await legacyExec.runAsync(
+        `INSERT INTO interactions
+           (uid, contact_id, occurred_at, recorded_at, channel, direction,
+            connected, quality, source, modified_at)
+         VALUES (?, ?, ?, ?, 'text', 'outbound', 1, ?, 'manual', ?)`,
+        [seedUid(), contactId, "2026-07-01 10:00:00", NOW, quality, NOW],
+      );
+    }
+
+    // Apply migration 025 — remaps the four legacy rows to Positive/Neutral/Negative.
+    await runMigrations(legacyExec, [...preMigrations, migration025], 25, {
+      now: NOW,
+      newUid: seedUid,
+      defaultPhoneRegion: "US",
+    });
+
+    const ctx = await readPromptContext(legacyExec, contactId, NOW);
+    // good=Positive (2), fine=Neutral (1), hard=Negative (1) — non-zero, matching.
+    expect(ctx.quality).toEqual({ good: 2, fine: 1, hard: 1 });
+    // The newest channel was 'text' -> migrated to 'Message'.
+    expect(ctx.newestChannel).toBe("Message");
   });
 });

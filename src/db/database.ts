@@ -45,10 +45,11 @@ import { migration020 } from "@/db/migrations/020-dashboard-swipe-pref";
 import { migration021 } from "@/db/migrations/021-orrery-preferences";
 import { migration022 } from "@/db/migrations/022-orrery-systems";
 import { migration023 } from "@/db/migrations/023-orrery-system-selection-revision";
+import { profilePresentationMigration } from "@/db/migrations/profile-presentation";
 import {
-  PROFILE_PRESENTATION_SCHEMA_VERSION,
-  profilePresentationMigration,
-} from "@/db/migrations/profile-presentation";
+  INTERACTION_HISTORY_SCHEMA_VERSION,
+  migration025,
+} from "@/db/migrations/025-interaction-history-schema";
 import { runMigrations } from "@/db/migrations/runner";
 import type { Migration, SqlExecutor } from "@/db/types";
 import { newUid } from "@/db/uid";
@@ -59,7 +60,7 @@ import { formatLocalDate } from "@/utils/dates";
 /** Milliseconds a busy connection waits before erroring (concurrent headless access). */
 export const BUSY_TIMEOUT_MS = 5000;
 /** The schema version this build expects; the runner migrates up to this. */
-export const TARGET_VERSION = PROFILE_PRESENTATION_SCHEMA_VERSION;
+export const TARGET_VERSION = INTERACTION_HISTORY_SCHEMA_VERSION;
 
 /** The one authoritative migration registration list, shared by bootstrap and tests. */
 export const MIGRATIONS: Migration[] = [
@@ -87,6 +88,7 @@ export const MIGRATIONS: Migration[] = [
   migration022,
   migration023,
   profilePresentationMigration,
+  migration025,
 ];
 
 const DATABASE_NAME = "orbit.db";

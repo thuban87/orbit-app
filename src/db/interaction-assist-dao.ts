@@ -1,4 +1,5 @@
 import { bumpDataRevisionCore } from "@/db/data-revision-dao";
+import { remapLegacyChannel } from "@/db/interaction-vocabulary";
 import { rejectFutureOccurredAt } from "@/db/log-guards";
 import {
   insertInteractionCore,
@@ -102,7 +103,13 @@ export function markAssistLogged(
         {
           uid: newUid(),
           occurredAt: transactionAssist.handoff_at,
-          channel: transactionAssist.channel,
+          // Route the assist TRANSPORT channel through the single shared vocabulary
+          // map (D-06): call->Call, text->Message, AND email->Message. The 014
+          // transport CHECK permits 'email', so without this remap an email assist
+          // would persist a retired 'email' value into a v25 interactions row
+          // (review cycle-2 HIGH, T-32-03). interaction_assists.channel keeps its
+          // call|text|email transport CHECK — it is NOT rebuilt.
+          channel: remapLegacyChannel(transactionAssist.channel),
           direction: "outbound",
           connected: input.connected,
           note: input.note ?? null,
