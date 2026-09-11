@@ -12,7 +12,7 @@ function FabActionPlaceholder({
   const { colors } = useTheme();
 
   return (
-    <View style={[styles.root, { backgroundColor: colors.background }]}>
+    <View style={styles.root}>
       <ShellAppBar variant="child" title={title} />
       <View style={styles.content}>
         <Text

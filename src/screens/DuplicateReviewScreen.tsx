@@ -218,7 +218,7 @@ export function DuplicateReviewScreen({
 
   const currentChoices = currentLink?.item.candidates ?? [];
   return (
-    <View style={[styles.root, { backgroundColor: colors.background }]}>
+    <View style={styles.root}>
       <View style={styles.header}>
         <Pressable
           accessibilityRole="button"

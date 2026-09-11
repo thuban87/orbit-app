@@ -107,7 +107,7 @@ export function ImportCompleteScreen({
 
   if (loading) {
     return (
-      <View style={[styles.root, { backgroundColor: colors.background }]}>
+      <View style={styles.root}>
         <Text style={[styles.body, { color: colors.textSecondary }]}>
           Loading import summary…
         </Text>
@@ -117,7 +117,7 @@ export function ImportCompleteScreen({
 
   if (error || counts === null) {
     return (
-      <View style={[styles.root, { backgroundColor: colors.background }]}>
+      <View style={styles.root}>
         <Text style={[styles.title, { color: colors.textPrimary }]}>
           Import complete
         </Text>
@@ -131,7 +131,7 @@ export function ImportCompleteScreen({
   return (
     <View
       testID="import-complete-screen"
-      style={[styles.root, { backgroundColor: colors.background }]}
+      style={styles.root}
     >
       <Text
         accessibilityRole="header"

@@ -547,7 +547,7 @@ export function CaptureScreen(_props: RootStackScreenProps<"Capture">) {
     return (
       <View
         testID="capture-picker-root"
-        style={[styles.errorRoot, { backgroundColor: colors.background }]}
+        style={styles.errorRoot}
       >
         <Text
           testID="capture-error-state"
@@ -743,7 +743,7 @@ export function CaptureScreen(_props: RootStackScreenProps<"Capture">) {
   const doneDisabled = selected.size === 0 || committing;
 
   return (
-    <View style={{ flex: 1, backgroundColor: colors.background }}>
+    <View style={{ flex: 1 }}>
       <FlatList
         testID="capture-picker-root"
         data={data}

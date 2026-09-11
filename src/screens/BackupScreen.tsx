@@ -286,7 +286,7 @@ export function BackupScreen({ navigation }: RootStackScreenProps<"Backup">) {
   const healthColor = health?.kind === "healthy" ? colors.statusStable : colors.statusWobble;
 
   return (
-    <ScrollView testID="backup-screen" style={{ backgroundColor: colors.background }} contentContainerStyle={[styles.content, { paddingBottom: bottomClearance }]}>
+    <ScrollView testID="backup-screen" contentContainerStyle={[styles.content, { paddingBottom: bottomClearance }]}>
       <ShellAppBar variant="root" title="Backup & Restore" />
 
       {health ? (

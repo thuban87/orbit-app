@@ -338,7 +338,6 @@ export function CustomFieldsScreen({ onBack }: CustomFieldsScreenProps) {
   return (
     <ScrollView
       testID="custom-fields-screen"
-      style={{ backgroundColor: colors.background }}
       contentContainerStyle={styles.content}
     >
       <View style={styles.header}>

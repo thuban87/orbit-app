@@ -319,7 +319,7 @@ export function CropPhotoScreen({
   return (
     <View
       testID="crop-photo-screen"
-      style={[styles.root, { backgroundColor: colors.background }]}
+      style={styles.root}
     >
       <View style={styles.header}>
         <Text

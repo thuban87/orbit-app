@@ -181,7 +181,6 @@ export function BulkImportSetupScreen({
 
   return (
     <ScrollView
-      style={{ backgroundColor: colors.background }}
       contentContainerStyle={styles.content}
     >
       <View style={styles.header}>

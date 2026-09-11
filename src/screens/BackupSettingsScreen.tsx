@@ -349,7 +349,6 @@ export function BackupSettingsScreen({
   return (
     <ScrollView
       testID="backup-settings-screen"
-      style={{ backgroundColor: colors.background }}
       contentContainerStyle={styles.content}
     >
       <View style={styles.header}>

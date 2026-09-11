@@ -548,7 +548,7 @@ export function EditContactScreen({
     return (
       <View
         testID="edit-contact-loading"
-        style={[styles.loading, { backgroundColor: colors.background }]}
+        style={styles.loading}
       >
         <Text style={{ color: colors.textSecondary }}>Loading…</Text>
       </View>
@@ -566,7 +566,6 @@ export function EditContactScreen({
   return (
     <ScrollView
       testID="edit-contact-screen"
-      style={{ backgroundColor: colors.background }}
       contentContainerStyle={styles.content}
     >
       <View style={styles.header}>

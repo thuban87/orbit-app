@@ -196,7 +196,6 @@ export function CreateContactScreen({
   return (
     <ScrollView
       testID="create-contact-screen"
-      style={{ backgroundColor: colors.background }}
       contentContainerStyle={styles.content}
     >
       <View style={styles.header}>

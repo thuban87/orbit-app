@@ -777,7 +777,6 @@ export function ComposeScreen({
     return (
       <ScrollView
         testID="compose-screen"
-        style={{ backgroundColor: colors.background }}
         contentContainerStyle={styles.content}
       >
         <View style={styles.header}>{backPill}</View>
@@ -803,7 +802,6 @@ export function ComposeScreen({
   return (
     <ScrollView
       testID="compose-screen"
-      style={{ backgroundColor: colors.background }}
       contentContainerStyle={styles.content}
     >
       {/* Header row: Back pill, Avatar, contact name. */}

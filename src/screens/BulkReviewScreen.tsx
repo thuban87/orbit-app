@@ -107,7 +107,6 @@ export function BulkReviewScreen({
   return (
     <ScrollView
       testID="bulk-review-screen"
-      style={{ backgroundColor: colors.background }}
       contentContainerStyle={styles.content}
     >
       <View style={styles.header}>

@@ -165,7 +165,7 @@ export function RestorePreviewScreen({
 
   if (expired) {
     return (
-      <ScrollView testID="restore-preview-expired" style={{ backgroundColor: colors.background }} contentContainerStyle={styles.content}>
+      <ScrollView testID="restore-preview-expired" contentContainerStyle={styles.content}>
         <Pressable accessibilityRole="button" accessibilityLabel="Back to backup and restore" onPress={returnToSelection} style={[styles.back, { borderColor: colors.border }]}><Text style={{ color: colors.textSecondary }}>Back</Text></Pressable>
         <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
           <Text accessibilityRole="header" style={[styles.title, { color: colors.textPrimary }]}>Preview expired</Text>
@@ -178,7 +178,7 @@ export function RestorePreviewScreen({
 
   const { preview } = route.params;
   return (
-    <ScrollView testID="restore-preview-screen" style={{ backgroundColor: colors.background }} contentContainerStyle={styles.content}>
+    <ScrollView testID="restore-preview-screen" contentContainerStyle={styles.content}>
       <Pressable accessibilityRole="button" accessibilityLabel="Back" accessibilityState={{ disabled: applying }} disabled={applying} onPress={() => navigation.goBack()} style={[styles.back, { borderColor: colors.border, opacity: applying ? 0.6 : 1 }]}><Text style={{ color: colors.textSecondary }}>Back</Text></Pressable>
       <Text accessibilityRole="header" style={[styles.title, { color: colors.textPrimary }]}>Restore preview</Text>
       <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>

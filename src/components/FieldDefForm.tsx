@@ -187,7 +187,6 @@ export function FieldDefForm(props: FieldDefFormProps) {
   return (
     <ScrollView
       testID="field-def-form"
-      style={{ backgroundColor: colors.background }}
       contentContainerStyle={styles.content}
       keyboardShouldPersistTaps="handled"
     >

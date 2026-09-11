@@ -341,7 +341,6 @@ export function ImportReviewScreen({
 
   return (
     <ScrollView
-      style={{ backgroundColor: colors.background }}
       contentContainerStyle={styles.content}
     >
       <View style={styles.header}>

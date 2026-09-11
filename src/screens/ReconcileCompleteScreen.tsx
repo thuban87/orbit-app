@@ -34,8 +34,8 @@ export function ReconcileCompleteScreen({ navigation, route }: RootStackScreenPr
   }, [route.params.sessionId]);
   useEffect(() => { void load().catch(() => setFailed(true)); }, [load]);
 
-  if (failed || counts === null) return <View style={[styles.root, { backgroundColor: colors.background }]}><Text style={[styles.title, { color: colors.textPrimary }]}>Check complete</Text><Text style={[styles.body, { color: colors.textSecondary }]}>Couldn&apos;t load the check summary. Please go back and try again.</Text></View>;
-  return <View testID="reconcile-complete-screen" style={[styles.root, { backgroundColor: colors.background }]}>
+  if (failed || counts === null) return <View style={styles.root}><Text style={[styles.title, { color: colors.textPrimary }]}>Check complete</Text><Text style={[styles.body, { color: colors.textSecondary }]}>Couldn&apos;t load the check summary. Please go back and try again.</Text></View>;
+  return <View testID="reconcile-complete-screen" style={styles.root}>
     <Text style={[styles.title, { color: colors.textPrimary }]}>Check complete</Text>
     <View style={styles.counts}>
       {footerEntry("Checked", counts.checked, colors)}

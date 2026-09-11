@@ -158,15 +158,15 @@ export function MergeConflictsScreen({ navigation, route }: RootStackScreenProps
     navigation.navigate("MergeImpactSummary", { survivorId, absorbedId, resolutions });
   };
 
-  if (failed) return <View style={[styles.root, { backgroundColor: colors.background }]}><Text style={{ color: colors.danger }}>Couldn&apos;t load merge conflicts. Nothing was changed.</Text></View>;
-  if (!data) return <View style={[styles.root, { backgroundColor: colors.background }]}><Text style={{ color: colors.textSecondary }}>Loading merge conflicts…</Text></View>;
+  if (failed) return <View style={styles.root}><Text style={{ color: colors.danger }}>Couldn&apos;t load merge conflicts. Nothing was changed.</Text></View>;
+  if (!data) return <View style={styles.root}><Text style={{ color: colors.textSecondary }}>Loading merge conflicts…</Text></View>;
 
   const choiceOptions = (survivor: string, absorbed: string): FieldChoiceOption<MergeConflictChoice>[] => [
     { id: "survivor", value: survivor, provenance: provenance(data.survivor.name) },
     { id: "absorbed", value: absorbed, provenance: provenance(data.absorbed.name) },
   ];
 
-  return <ScrollView contentContainerStyle={[styles.root, { backgroundColor: colors.background }]}>
+  return <ScrollView contentContainerStyle={styles.root}>
     <Text style={[styles.title, { color: colors.textPrimary }]}>Resolve merge conflicts</Text>
     <Text style={[styles.body, { color: colors.textSecondary }]}>Choose the value to keep for every difference.</Text>
     {scalarConflicts.map((conflict) => <FieldChoiceGroup key={conflict.key} label={conflict.label} options={choiceOptions(conflict.survivor, conflict.absorbed)} mode="conflict" selectedId={scalarChoices[conflict.key] ?? null} onChange={(option) => setScalarChoices((current) => ({ ...current, [conflict.key]: option.id }))} />)}

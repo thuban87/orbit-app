@@ -53,7 +53,7 @@ export function ImportProgressScreen({
 
   const progress = total === 0 ? 0 : Math.min(done / total, 1);
   return (
-    <View style={[styles.root, { backgroundColor: colors.background }]}>
+    <View style={styles.root}>
       <Text
         accessibilityRole="header"
         style={[styles.title, { color: colors.textPrimary }]}

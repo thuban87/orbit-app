@@ -9,7 +9,7 @@ export function RestoreResultScreen({
   const { colors } = useTheme();
   const { added, updated, newerLocalKept, deletionsApplied, replaceSafetySnapshot } = route.params;
   return (
-    <ScrollView testID="restore-result-screen" style={{ backgroundColor: colors.background }} contentContainerStyle={styles.content}>
+    <ScrollView testID="restore-result-screen" contentContainerStyle={styles.content}>
       <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
         <Text accessibilityRole="header" style={[styles.title, { color: colors.textPrimary }]}>Backup restored</Text>
         <Text style={[styles.body, { color: colors.textSecondary }]}>Added: {added} · Updated: {updated} · Newer local kept: {newerLocalKept} · Deletions applied: {deletionsApplied}</Text>

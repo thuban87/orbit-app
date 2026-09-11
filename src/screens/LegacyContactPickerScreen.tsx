@@ -179,7 +179,7 @@ export function LegacyContactPickerScreen({
   return (
     <View
       testID="legacy-contact-picker-screen"
-      style={[styles.root, { backgroundColor: colors.background }]}
+      style={styles.root}
     >
       <View style={styles.header}>
         <Pressable

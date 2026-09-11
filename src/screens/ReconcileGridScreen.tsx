@@ -278,7 +278,7 @@ export function ReconcileGridScreen({ navigation, route }: RootStackScreenProps<
     setMessage(failures.length ? `${failures.length} card${failures.length === 1 ? "" : "s"} could not be applied. Try again.` : null);
   }, [itemById, refreshCards, sessionId]);
 
-  return <View style={[styles.root, { backgroundColor: colors.background }]}>
+  return <View style={styles.root}>
     <Text style={[styles.title, { color: colors.textPrimary }]}>Check linked contacts</Text>
     {message ? <Text style={[styles.message, { color: colors.textSecondary }]}>{message}</Text> : null}
     {needsContactsAccess ? <Pressable onPress={() => { void openContactsSettings(); }} style={[styles.settingsButton, { borderColor: colors.border }]}><Text style={{ color: colors.textPrimary }}>Open Settings</Text></Pressable> : null}

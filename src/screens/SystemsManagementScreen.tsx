@@ -550,7 +550,7 @@ export function SystemsManagementScreen() {
   return (
     <View
       testID="systems-management-screen"
-      style={[styles.root, { backgroundColor: colors.background }]}
+      style={styles.root}
     >
       <ShellAppBar variant="child" title="Systems" />
       <View style={styles.content}>
