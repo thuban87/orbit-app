@@ -686,7 +686,7 @@ Plans:
 
 **Canonical refs**: `docs/dossier/milestone-2/phase-02-theme-visual-system-dossier.md` §§D–F, Q, R; `docs/dossier/milestone-2/phase-10-profile-experience-dossier.md` §D; `docs/decisions/ADR-087-bundled-background-presets-and-package-specific-surface-treatment.md`; `.planning/phases/31.1-app-wide-system-backgrounds/31.1-CONTEXT.md`
 **Schema**: none — `galaxy_background` and `standard_background` already exist in `app_settings`; do not add replacement preference storage or bump the backup format
-**Plans:** 1/4 plans executed
+**Plans:** 2/4 plans executed
 
 Plans:
 **Wave 1**
@@ -695,7 +695,7 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 31.1-02-PLAN.md — Inline grouped Background picker in Settings → Appearance (all 8 + None/Solid, per-package write) + Settings root cooperates
+- [x] 31.1-02-PLAN.md — Inline grouped Background picker in Settings → Appearance (all 8 + None/Solid, per-package write) + Settings root cooperates
 - [ ] 31.1-03-PLAN.md — Cooperating screen roots: flip 30 ordinary screen roots transparent (Orrery + Profile excluded), grouped by density tier
 
 **Wave 3** *(blocked on Wave 2 completion)*
@@ -856,7 +856,7 @@ Plans:
 | 29. Orrery Camera, Scale & Exploration | 12/12 | In Progress|  |
 | 30. Orrery Systems | 0/10 | Planned | - |
 | 31. Profile Experience | 15/15 | Complete   | 2026-09-10 |
-| 31.1 App-Wide System Backgrounds | 1/4 | In Progress|  |
+| 31.1 App-Wide System Backgrounds | 2/4 | In Progress|  |
 | 32. Interaction History & Insights | 0/TBD | Not started | - |
 | 33. Group Interaction Logging | 0/TBD | Not started | - |
 | 34. Rapid Capture & Update Flows | 0/TBD | Not started | - |

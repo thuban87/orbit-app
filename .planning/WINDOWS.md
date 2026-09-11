@@ -1,10 +1,10 @@
 ---
 schema_version: 1
-open_count: 52
+open_count: 53
 waived_count: 0
 fixed_count: 6
-total_count: 58
-last_updated: 2026-09-09T19:49:42.984Z
+total_count: 59
+last_updated: 2026-09-11T00:27:18.188Z
 ---
 
 # Broken Windows Ledger
@@ -73,6 +73,7 @@ last_updated: 2026-09-09T19:49:42.984Z
 | 56 | 30 | stub | src/logic/system-rule-resolver.ts |  | Rule evaluation, gravity, exclusion pruning, and broken-rule population are intentionally deferred to Plan 30-02. | open |  | 2026-09-08T20:10:20.227Z |  |
 | 57 | 31 | unrun-verify | package.json |  | npm run check is unavailable because package.json has no check script | open |  | 2026-09-09T16:31:58.466Z |  |
 | 58 | 31 | unrun-verify | .planning/phases/31-profile-experience/31-VALIDATION.md |  | Hero/Overview native smoke awaits Plan 31-10 host integration; Task 31-05 verified physical topology only. | open |  | 2026-09-09T19:49:42.984Z |  |
+| 59 | 31.1 | unrun-verify | src/screens/SettingsScreen.tsx |  | Device live-preview, per-package persistence, and relaunch restoration remain UAT to preserve the owner’s current preference. | open |  | 2026-09-11T00:27:18.188Z |  |
 
 ````json
 [
@@ -770,6 +771,18 @@ last_updated: 2026-09-09T19:49:42.984Z
     "status": "open",
     "reason": "",
     "recorded_at": "2026-09-09T19:49:42.984Z",
+    "resolved_at": null
+  },
+  {
+    "id": 59,
+    "kind": "unrun-verify",
+    "phase": "31.1",
+    "file": "src/screens/SettingsScreen.tsx",
+    "line": null,
+    "description": "Device live-preview, per-package persistence, and relaunch restoration remain UAT to preserve the owner’s current preference.",
+    "status": "open",
+    "reason": "",
+    "recorded_at": "2026-09-11T00:27:18.188Z",
     "resolved_at": null
   }
 ]
