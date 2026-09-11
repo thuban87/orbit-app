@@ -163,6 +163,8 @@ export type BackupStackParamList = {
 
 export type SettingsStackParamList = {
   Settings: undefined;
+  /** DEV-only device-UAT harness; its route is compile-time gated from release. */
+  __ThemePreview: undefined;
   SystemBuilder: { systemUid?: string; systemRef?: string } | undefined;
   SystemsManagement: undefined;
   CustomFields: undefined;

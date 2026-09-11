@@ -852,6 +852,23 @@ export function SettingsScreen() {
     >
       <ShellAppBar variant="root" title="Settings" />
 
+      {__DEV__ ? (
+        <Pressable
+          testID="settings-dev-theme-preview-row"
+          accessibilityRole="button"
+          accessibilityLabel="Open background failure test harness"
+          onPress={() => navigation.navigate("__ThemePreview")}
+          style={[
+            styles.row,
+            { backgroundColor: colors.surface, borderColor: colors.border },
+          ]}
+        >
+          <Text style={[styles.rowLabel, { color: colors.textPrimary }]}>
+            Background failure test harness
+          </Text>
+        </Pressable>
+      ) : null}
+
       {/* Appearance (23-08) — the in-app entry point for the theme axes that
           resolve through ThemeProvider app-wide today: package, mode, accent.
           Each control drives a live store setter (instant restyle) AND persists

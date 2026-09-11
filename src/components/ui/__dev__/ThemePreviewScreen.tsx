@@ -53,6 +53,10 @@ function DevButton({ label, onPress }: { label: string; onPress: () => void }) {
 
 const PACKAGES: ThemePackage[] = ["galaxy", "standard"];
 const MODES: ThemeMode[] = ["light", "dark", "system"];
+// A deliberately absent local app-owned URI. Unlike a broken bundled require,
+// this reaches the mounted Image's runtime onError path on Android.
+const MISSING_APP_OWNED_BACKGROUND_URI =
+  "file:///data/user/0/com.bwales.orbit/files/__missing-background-uat__.webp";
 
 // A block of filler copy so the fixed background is visibly fixed while scrolling.
 const PARAGRAPH =
@@ -70,6 +74,7 @@ export default function ThemePreviewScreen() {
   const [density, setDensity] = useState<SurfaceDensity>("presentation");
   const [blurAvailable, setBlurAvailable] = useState(true);
   const [forceError, setForceError] = useState(false);
+  const [missingAppOwnedUri, setMissingAppOwnedUri] = useState(false);
 
   const slotId = order[slotIndex % order.length];
 
@@ -97,6 +102,9 @@ export default function ThemePreviewScreen() {
       density={density}
       slotId={slotId}
       forceRenderError={forceError}
+      appOwnedBackgroundUri={
+        missingAppOwnedUri ? MISSING_APP_OWNED_BACKGROUND_URI : null
+      }
     >
       <View style={styles.controls}>
         <DevButton label={`pkg: ${themePackage}`} onPress={cyclePackage} />
@@ -110,6 +118,10 @@ export default function ThemePreviewScreen() {
         <DevButton
           label={`onError: ${forceError ? "on" : "off"}`}
           onPress={() => setForceError((e) => !e)}
+        />
+        <DevButton
+          label={`missing file URI: ${missingAppOwnedUri ? "on" : "off"}`}
+          onPress={() => setMissingAppOwnedUri((enabled) => !enabled)}
         />
       </View>
       <ScrollView contentContainerStyle={styles.scroll}>

@@ -21,6 +21,12 @@ import { SystemBuilderScreen } from "@/screens/SystemBuilderScreen";
 import { SystemsManagementScreen } from "@/screens/SystemsManagementScreen";
 import type { SettingsScreenProps, SettingsStackParamList } from "../types";
 
+// Kept behind a compile-time guard so Metro removes the device-UAT-only harness
+// and its failure toggles from release bundles.
+const ThemePreviewScreen = __DEV__
+  ? require("@/components/ui/__dev__/ThemePreviewScreen").default
+  : null;
+
 const Stack = createNativeStackNavigator<SettingsStackParamList>();
 
 function CustomFieldsRoute({
@@ -36,6 +42,9 @@ export function SettingsStack() {
       screenOptions={{ headerShown: false }}
     >
       <Stack.Screen name="Settings" component={SettingsScreen} />
+      {__DEV__ && ThemePreviewScreen ? (
+        <Stack.Screen name="__ThemePreview" component={ThemePreviewScreen} />
+      ) : null}
       <Stack.Screen name="SystemBuilder" component={SystemBuilderScreen} />
       <Stack.Screen
         name="SystemsManagement"
