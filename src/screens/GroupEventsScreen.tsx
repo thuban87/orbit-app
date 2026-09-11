@@ -7,7 +7,7 @@ export function GroupEventsScreen() {
   const { colors } = useTheme();
 
   return (
-    <View style={[styles.root, { backgroundColor: colors.background }]}>
+    <View style={styles.root}>
       <ShellAppBar variant="child" title="Group Events" />
       <View style={styles.content}>
         <Text accessibilityRole="header" style={[styles.heading, { color: colors.textPrimary }]}>

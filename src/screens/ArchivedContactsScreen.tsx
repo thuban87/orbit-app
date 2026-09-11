@@ -181,11 +181,10 @@ export function ArchivedContactsScreen() {
   return (
     <View
       testID="archived-contacts-screen"
-      style={{ flex: 1, backgroundColor: colors.background }}
+      style={{ flex: 1 }}
     >
       <ShellAppBar variant="child" title="Archived" />
       <ScrollView
-        style={{ backgroundColor: colors.background }}
         contentContainerStyle={styles.content}
       >
         {rows.length === 0 ? (

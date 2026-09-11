@@ -65,7 +65,7 @@ export function RecentlyDeletedScreen({
   };
 
   return (
-    <View style={[styles.root, { backgroundColor: colors.background }]}>
+    <View style={styles.root}>
       <View style={styles.header}>
         <Pressable
           accessibilityRole="button"

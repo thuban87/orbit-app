@@ -119,7 +119,7 @@ export function MemoryHistoryScreen({
       .catch((error) => Logger.error(LOG_SCOPE, "failed to promote history entry", error));
 
   return (
-    <View style={[styles.root, { backgroundColor: colors.background }]}>
+    <View style={styles.root}>
       <View style={styles.header}>
         <Pressable
           accessibilityRole="button"

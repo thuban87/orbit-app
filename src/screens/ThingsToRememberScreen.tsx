@@ -431,7 +431,6 @@ export function ThingsToRememberScreen({
   return (
     <ScrollView
       testID="things-to-remember-screen"
-      style={{ backgroundColor: colors.background }}
       contentContainerStyle={styles.content}
     >
       <View style={styles.header}>

@@ -61,7 +61,7 @@ export function UnboundContactsScreen({
   return (
     <View
       testID="unbound-contacts-screen"
-      style={[styles.root, { backgroundColor: colors.background }]}
+      style={styles.root}
     >
       <ShellAppBar variant="child" title="Unbound contacts" />
 

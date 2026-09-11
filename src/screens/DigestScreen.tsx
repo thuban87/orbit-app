@@ -122,7 +122,7 @@ export function DigestScreen({ navigation }: RootStackScreenProps<"Digest">) {
   return (
     <View
       testID="digest-root"
-      style={[styles.root, { backgroundColor: colors.background }]}
+      style={styles.root}
     >
       <View style={styles.header}>
         <Pressable
