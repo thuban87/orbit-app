@@ -8,6 +8,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Alert,
   FlatList,
+  Image,
   Modal,
   Pressable,
   ScrollView,
@@ -15,6 +16,7 @@ import {
   Switch,
   Text,
   TextInput,
+  useWindowDimensions,
   View,
 } from "react-native";
 import { requestPinWidget } from "react-native-android-widget";
@@ -69,8 +71,22 @@ import { useAssistBanner } from "@/stores/assist-store";
 import { useThemeStore } from "@/stores/theme-store";
 import { useTheme } from "@/theme";
 import { ACCENTS } from "@/theme/accents";
-import { ACCENT_IDS, type AccentId } from "@/theme/theme-option-ids";
-import type { ThemeMode, ThemePackage } from "@/theme/theme-types";
+import {
+  BACKGROUND_ORDER,
+  NONE_SLOT_ID,
+  PACKAGE_DEFAULT_SLOT,
+  resolveRenderableBackground,
+} from "@/theme/backgrounds";
+import {
+  ACCENT_IDS,
+  type AccentId,
+  type BackgroundSlotId,
+} from "@/theme/theme-option-ids";
+import type {
+  ThemeMode,
+  ThemePackage,
+  ThemePalette,
+} from "@/theme/theme-types";
 import { Logger } from "@/utils/logger";
 import { pickContacts } from "../../modules/orbit-contact-picker";
 import { pinResultCopy } from "./settings-add-widget";
@@ -114,6 +130,84 @@ function seedForHour(hour: number): Date {
   return d;
 }
 
+const BACKGROUND_LABELS: Record<BackgroundSlotId, string> = {
+  "galaxy-deep-space": "Deep Space",
+  "galaxy-starfield": "Starfield",
+  "galaxy-nebula": "Nebula",
+  "galaxy-aurora": "Aurora",
+  "standard-dawn": "Dawn",
+  "standard-paper": "Paper",
+  "standard-dusk": "Dusk",
+  "standard-mesh": "Mesh",
+  none: "None (Solid)",
+};
+
+type BackgroundThumbnailProps = {
+  colors: ThemePalette;
+  columnWidth: "23%" | "48%";
+  label: string;
+  onPress: (slot: BackgroundSlotId) => void;
+  selected: boolean;
+  slot: BackgroundSlotId;
+  sourcePackage: ThemePackage;
+};
+
+function BackgroundThumbnail({
+  colors,
+  columnWidth,
+  label,
+  onPress,
+  selected,
+  slot,
+  sourcePackage,
+}: BackgroundThumbnailProps) {
+  const [thumbFailed, setThumbFailed] = useState(false);
+  const resolved = resolveRenderableBackground(
+    sourcePackage,
+    slot,
+    thumbFailed,
+  );
+
+  return (
+    <Pressable
+      testID={`settings-theme-background-${slot}`}
+      accessibilityRole="button"
+      accessibilityLabel={`${label} background`}
+      accessibilityState={{ selected }}
+      onPress={() => onPress(slot)}
+      style={[
+        styles.backgroundThumbnail,
+        {
+          flexBasis: columnWidth,
+          backgroundColor: colors.surface,
+          borderColor: selected ? colors.accent : colors.border,
+        },
+      ]}
+    >
+      <View
+        style={[
+          styles.backgroundPreview,
+          { backgroundColor: colors.background },
+        ]}
+      >
+        {resolved.kind === "asset" ? (
+          <Image
+            source={resolved.source()}
+            style={StyleSheet.absoluteFill}
+            resizeMode="cover"
+            onError={() => setThumbFailed(true)}
+          />
+        ) : null}
+      </View>
+      <Text
+        style={[styles.backgroundThumbnailLabel, { color: colors.textPrimary }]}
+      >
+        {label}
+      </Text>
+    </Pressable>
+  );
+}
+
 /**
  * SettingsScreen — the low-traffic host for the two CRUD-05 "separate homes":
  * Custom Fields (relocated off the Phase-3 `HomeScreen` dependency-free route)
@@ -138,6 +232,7 @@ function seedForHour(hour: number): Date {
  */
 export function SettingsScreen() {
   const { colors, mode } = useTheme();
+  const { fontScale } = useWindowDimensions();
   // Appearance (23-08): live theme selection from the store — the ThemeProvider
   // re-renders from these, so a change restyles the whole app instantly; the
   // persist() helper below writes the durable app_settings columns.
@@ -146,12 +241,17 @@ export function SettingsScreen() {
   const standardMode = useThemeStore((s) => s.standardMode);
   const galaxyAccent = useThemeStore((s) => s.galaxyAccent);
   const standardAccent = useThemeStore((s) => s.standardAccent);
+  const galaxyBackground = useThemeStore((s) => s.galaxyBackground);
+  const standardBackground = useThemeStore((s) => s.standardBackground);
   const setThemePackage = useThemeStore((s) => s.setPackage);
   const setModeForActivePackage = useThemeStore(
     (s) => s.setModeForActivePackage,
   );
   const setAccentForActivePackage = useThemeStore(
     (s) => s.setAccentForActivePackage,
+  );
+  const setBackgroundForActivePackage = useThemeStore(
+    (s) => s.setBackgroundForActivePackage,
   );
   const bottomClearance = useBottomClearance();
   const navigation =
@@ -176,6 +276,12 @@ export function SettingsScreen() {
   const [phoneRegionSearch, setPhoneRegionSearch] = useState("");
   const [resumableReconcile, setResumableReconcile] =
     useState<ResumableReconcile | null>(null);
+
+  const activeBackground =
+    themePackage === "galaxy" ? galaxyBackground : standardBackground;
+  const selectedBackgroundSlot =
+    activeBackground ?? PACKAGE_DEFAULT_SLOT[themePackage];
+  const backgroundColumnWidth = fontScale >= 1.3 ? "48%" : "23%";
 
   const onImportContacts = useCallback(async () => {
     try {
@@ -958,6 +1064,66 @@ export function SettingsScreen() {
           </View>
           <Text style={[styles.helper, { color: colors.textSecondary }]}>
             The accent tints buttons, links, and active states across the app.
+          </Text>
+        </View>
+
+        {/* Background (per active package) — all bundled slots remain selectable
+            regardless of the active package; only the destination preference
+            column changes. A failed thumbnail silently becomes themed solid. */}
+        <View
+          testID="settings-theme-background-row"
+          style={[
+            styles.row,
+            { backgroundColor: colors.surface, borderColor: colors.border },
+          ]}
+        >
+          <Text style={[styles.rowLabel, { color: colors.textPrimary }]}>
+            Background
+          </Text>
+          {(["galaxy", "standard"] as ThemePackage[]).map((sourcePackage) => (
+            <View key={sourcePackage} style={styles.backgroundSubgroup}>
+              <Text
+                style={[
+                  styles.backgroundSubgroupLabel,
+                  { color: colors.textSecondary },
+                ]}
+              >
+                {sourcePackage === "galaxy" ? "Galaxy" : "Standard"}
+              </Text>
+              <View style={styles.backgroundGrid}>
+                {BACKGROUND_ORDER[sourcePackage]
+                  .filter((slot) => slot !== NONE_SLOT_ID)
+                  .map((slot) => (
+                    <BackgroundThumbnail
+                      key={slot}
+                      colors={colors}
+                      columnWidth={backgroundColumnWidth}
+                      label={BACKGROUND_LABELS[slot]}
+                      onPress={() => undefined}
+                      selected={selectedBackgroundSlot === slot}
+                      slot={slot}
+                      sourcePackage={sourcePackage}
+                    />
+                  ))}
+              </View>
+            </View>
+          ))}
+          <View style={styles.backgroundSubgroup}>
+            <View style={styles.backgroundGrid}>
+              <BackgroundThumbnail
+                colors={colors}
+                columnWidth={backgroundColumnWidth}
+                label={BACKGROUND_LABELS[NONE_SLOT_ID]}
+                onPress={() => undefined}
+                selected={selectedBackgroundSlot === NONE_SLOT_ID}
+                slot={NONE_SLOT_ID}
+                sourcePackage={themePackage}
+              />
+            </View>
+          </View>
+          <Text style={[styles.helper, { color: colors.textSecondary }]}>
+            Backgrounds stay fixed behind your screens. Each package remembers
+            its own choice.
           </Text>
         </View>
       </View>
@@ -2327,6 +2493,35 @@ const styles = StyleSheet.create({
     height: 44,
     borderRadius: 22,
     borderWidth: 3,
+  },
+  backgroundSubgroup: {
+    gap: 8,
+  },
+  backgroundSubgroupLabel: {
+    fontSize: 14,
+    fontWeight: "600",
+  },
+  backgroundGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  backgroundThumbnail: {
+    minHeight: 44,
+    flexGrow: 1,
+    gap: 6,
+    borderWidth: 2,
+    borderRadius: 10,
+    padding: 6,
+  },
+  backgroundPreview: {
+    height: 64,
+    overflow: "hidden",
+    borderRadius: 6,
+  },
+  backgroundThumbnailLabel: {
+    fontSize: 13,
+    fontWeight: "600",
   },
   themeChipRow: {
     flexDirection: "row",
