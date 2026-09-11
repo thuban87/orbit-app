@@ -126,6 +126,84 @@ export function surfaceOpacityForDensity(
 }
 
 /**
+ * BACKGROUND VEIL (31.1-05 / D-31.1-05-A) — the opacity of the `BackgroundHost`
+ * full-screen scrim, DECOUPLED from the card `densityOpacity` above.
+ *
+ * The shipped 31.1 host reused `surfaceOpacityForDensity` (0.88–1.00) as a
+ * full-screen wash, which left only 0–12% of the selected art visible and made
+ * every selection look identical on regular screens (owner production-release
+ * failure). Card readability does NOT come from this veil — it comes from the
+ * per-card `GlassSurface` tint that text sits on (the AA proof in
+ * `surface.test.ts` composites text over `card-tint over the asset`, never over
+ * this host scrim). So the veil can be much lighter to reveal the art, while
+ * bare-on-background CHROME (app bar, section headings, empty states) gets its
+ * own local backing (`CHROME_SCRIM_OPACITY`) instead of depending on the veil.
+ *
+ * TUNABLE (CLAUDE.md): these are the single-number knobs tuned on-device. Kept
+ * MONOTONIC non-decreasing (denser -> more veil -> less art) and bounded so every
+ * package/density still shows a visible slice of the selected background — the
+ * `surface.test.ts` visibility-floor guard fails if that regresses toward 0.
+ */
+export const BACKGROUND_VEIL_OPACITY: Record<
+  ThemePackage,
+  Record<SurfaceDensity, number>
+> = {
+  // Galaxy art is dark; light text stays high-contrast over it, so the veil can
+  // be light and the deep-space art reads clearly between cards.
+  galaxy: { presentation: 0.3, comfortable: 0.45, dense: 0.6 },
+  // Standard art includes mid-tone assets (Dusk/Mesh); the veil is a touch
+  // heavier and dense forms lean readable, but art still shows on browse screens.
+  standard: { presentation: 0.35, comfortable: 0.5, dense: 0.65 },
+};
+
+/**
+ * The minimum fraction of the selected background art that must remain visible
+ * (1 - veil) at each density — the anti-regression floor for the shipped bug.
+ * Presentation (browse) screens must show a clearly present background; dense
+ * (form/settings) screens may wash more for readability but never to ~zero.
+ */
+export const MIN_BACKGROUND_CONTRIBUTION: Record<SurfaceDensity, number> = {
+  presentation: 0.4,
+  comfortable: 0.3,
+  dense: 0.2,
+};
+
+/** The `BackgroundHost` veil opacity for a package at a given content density. */
+export function backgroundVeilOpacity(
+  themePackage: ThemePackage,
+  density: SurfaceDensity,
+): number {
+  return BACKGROUND_VEIL_OPACITY[themePackage][density];
+}
+
+/**
+ * CHROME SCRIM (31.1-05) — the opacity of a LOCAL surface-tinted backing drawn
+ * behind bare-on-background "chrome" text (app bar title/back, the dashboard
+ * count, section headings, empty states) that does NOT sit on a `GlassSurface`
+ * card. With the veil lightened (above), this chrome would otherwise sit on raw
+ * art; the local scrim keeps it AA-readable independent of the veil, so the veil
+ * can stay light. Reuses `colors.surface` as the tint (like cards). Set to the
+ * MINIMUM that keeps text/status foregrounds AA over the scrim composited on each
+ * asset's brightest pixel — `surface.test.ts` proves it per asset/package/mode.
+ *
+ * The worst case (secondary text over the lightest Standard asset in light mode,
+ * and over the darkest Galaxy asset in light mode) forces this to the same floor
+ * as the card `liveGlassTintOpacity` — chrome text needs card-equivalent backing
+ * to stay AA. It is `<= liveGlassTintOpacity`; the veil (not this) is what reveals
+ * the art in the card gutters and margins, so chrome bands staying near-opaque is
+ * the accepted readability cost of "protect chrome".
+ */
+export const CHROME_SCRIM_OPACITY: Record<ThemePackage, number> = {
+  galaxy: 0.88,
+  standard: 0.97,
+};
+
+/** The local chrome-scrim backing opacity for a package. */
+export function chromeScrimOpacity(themePackage: ThemePackage): number {
+  return CHROME_SCRIM_OPACITY[themePackage];
+}
+
+/**
  * The token-only surface style `GlassSurface` consumes. Every colour field is a
  * palette-token KEY (resolved to a real colour by the component via `useTheme()`),
  * every opacity a declared token value — no raw colour, no ad-hoc opacity.

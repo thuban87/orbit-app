@@ -5,6 +5,10 @@ import { resolvePalette } from "../theme-presets";
 import type { ResolvedMode, ThemePackage, ThemePalette } from "../theme-types";
 import {
   alphaComposite,
+  BACKGROUND_VEIL_OPACITY,
+  backgroundVeilOpacity,
+  chromeScrimOpacity,
+  MIN_BACKGROUND_CONTRIBUTION,
   resolveSurfaceStyle,
   SURFACE,
   SURFACE_COLOR_TOKEN_KEYS,
@@ -79,6 +83,52 @@ describe("SURFACE tokens — density opacity is monotonic (denser -> more opaque
   });
 });
 
+describe("background-veil visibility floor (31.1-05 — the shipped-bug guard)", () => {
+  // Regression guard for the owner production-release failure: the BackgroundHost
+  // veil must leave a VISIBLE slice of the selected art at every package/density.
+  // The shipped 31.1 reused the card density opacity (0.88–1.00) as a full-screen
+  // wash, leaving 0–12% art — every selection looked identical. This fails if any
+  // package/density background contribution (1 - veil) regresses below its floor.
+  it("each package/density keeps background contribution >= its density floor", () => {
+    for (const pkg of PACKAGES) {
+      for (const density of SURFACE_DENSITIES) {
+        const veil = backgroundVeilOpacity(pkg, density);
+        expect(veil, `${pkg}/${density} veil in (0,1)`).toBeGreaterThan(0);
+        expect(veil, `${pkg}/${density} veil in (0,1)`).toBeLessThan(1);
+        const contribution = 1 - veil;
+        expect(
+          contribution,
+          `${pkg}/${density}: only ${(contribution * 100).toFixed(0)}% art visible (floor ${MIN_BACKGROUND_CONTRIBUTION[density]})`,
+        ).toBeGreaterThanOrEqual(MIN_BACKGROUND_CONTRIBUTION[density]);
+      }
+    }
+  });
+
+  it("the veil is strictly lighter than the card surface opacity it replaced", () => {
+    // The whole fix: the host veil is DECOUPLED from and lighter than the card
+    // density opacity, so lightening the veil never silently tracks card opacity.
+    for (const pkg of PACKAGES) {
+      for (const density of SURFACE_DENSITIES) {
+        expect(
+          backgroundVeilOpacity(pkg, density),
+          `${pkg}/${density}: veil must be lighter than card surface opacity`,
+        ).toBeLessThan(surfaceOpacityForDensity(pkg, density));
+      }
+    }
+  });
+
+  it("veil opacity is monotonic non-decreasing (denser -> more veil -> less art)", () => {
+    for (const pkg of PACKAGES) {
+      let prev = -1;
+      for (const density of SURFACE_DENSITIES) {
+        const veil = BACKGROUND_VEIL_OPACITY[pkg][density];
+        expect(veil).toBeGreaterThanOrEqual(prev);
+        prev = veil;
+      }
+    }
+  });
+});
+
 describe("live-glass opacity-ordering guard (REVIEWS 23-06 MEDIUM)", () => {
   it("liveGlassTintOpacity >= fallbackTintOpacity per package (live never more translucent)", () => {
     for (const pkg of PACKAGES) {
@@ -141,6 +191,39 @@ describe("COMPOSITED per-asset live-glass AA (cycle-3 MEDIUM — the primary pro
       });
     }
   }
+});
+
+describe("chrome-scrim AA (31.1-05 — bare-on-background text stays readable)", () => {
+  // Bare chrome (app bar, dashboard count, section headings, empty states) does
+  // NOT sit on a GlassSurface card. With the veil lightened it would sit on raw
+  // art, so a LOCAL chrome scrim (surface tint @ chromeScrimOpacity) backs it.
+  // Every text/status foreground over that scrim composited on each asset's
+  // brightest pixel must meet AA — the guarantee that "protect chrome" preserves
+  // readability while the veil reveals the art.
+  for (const [id, slot] of Object.entries(BACKGROUND_SLOTS)) {
+    const pkg = slot.package;
+    for (const mode of MODES) {
+      it(`${id} @ ${pkg}/${mode}: foregrounds over the chrome scrim on the brightest pixel meet AA`, () => {
+        const palette = resolvePalette(pkg, mode);
+        const tint = palette[SURFACE[pkg].tintTokenKey];
+        const chrome = alphaComposite(
+          tint,
+          slot.brightestPixel,
+          chromeScrimOpacity(pkg),
+        );
+        assertForegroundsAA(chrome, palette, `${id} @ ${pkg}/${mode} chrome`);
+      });
+    }
+  }
+
+  it("chrome scrim is lighter than the card live-glass tint (art still shows behind chrome)", () => {
+    for (const pkg of PACKAGES) {
+      expect(
+        chromeScrimOpacity(pkg),
+        `${pkg}: chrome scrim should be lighter than the card tint`,
+      ).toBeLessThanOrEqual(SURFACE[pkg].liveGlassTintOpacity);
+    }
+  });
 });
 
 describe("surface-token-only selector guard (cycle-3 LOW, finding #4)", () => {

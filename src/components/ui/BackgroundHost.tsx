@@ -42,8 +42,8 @@ import {
 import type { BackgroundSlotId } from "@/theme/theme-option-ids";
 import type { ThemePackage } from "@/theme/theme-types";
 import {
+  backgroundVeilOpacity,
   type SurfaceDensity,
-  surfaceOpacityForDensity,
 } from "@/theme/tokens/surface";
 import { backgroundHostSelection } from "./background-host-model";
 
@@ -124,8 +124,10 @@ export function BackgroundHost({
     forceRenderError || renderFailed,
   );
 
-  // Density scrim opacity is token-sourced (surface.ts) — denser -> more opaque.
-  const scrimOpacity = surfaceOpacityForDensity(pkg, density);
+  // Background veil opacity is token-sourced (surface.ts, D-31.1-05-A) — a LIGHT
+  // per-package/density wash DECOUPLED from the card surface opacity, so the
+  // selected art stays visible while cards (not this veil) carry text readability.
+  const scrimOpacity = backgroundVeilOpacity(pkg, density);
   const scrimStyle =
     readability === "profile"
       ? { backgroundColor: colors.profileBackgroundScrim }
