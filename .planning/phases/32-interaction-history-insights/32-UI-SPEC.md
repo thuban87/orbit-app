@@ -1,10 +1,11 @@
 ---
 phase: 32
 slug: interaction-history-insights
-status: draft
+status: approved
 shadcn_initialized: false
 preset: none
 created: 2026-09-11
+reviewed_at: 2026-09-11
 ---
 
 # Phase 32 — Interaction History & Insights — UI Design Contract
@@ -105,7 +106,7 @@ section fixes is **which token plays which role** in the History surfaces, and *
 | Structure | `border` / `borderStrong` | cell borders, current-cycle outline, wheel selection frame, dividers |
 
 **Accent reserved for (explicit — never "all interactive elements"):**
-1. Primary CTA fill: **Log interaction** and **Save** buttons (`accent` fill + `onAccent` label).
+1. Primary CTA fill: **Log interaction** and **Save changes** buttons (`accent` fill + `onAccent` label).
 2. The **active** lens segment in the `SegmentedControl` (shipped filled-accent idiom).
 3. The **heatmap saturation ramp** — the per-palette `heatmapScale` ramp is authored in the package's accent hue family (see New Tokens Required). This is the count encoding; it is the single accent use that carries data.
 4. The **wheel's centered/selected date** emphasis and the selection frame's inner accent hairline.
@@ -148,7 +149,7 @@ Verbatim from the dossier where it dictated copy (§L, §S, §X); Claude-authore
 |---------|------|
 | Primary CTA — empty date/cell | `Log interaction` |
 | Primary CTA — populated date/cell | `See details` |
-| Edit route save | `Save` |
+| Edit route save | `Save changes` |
 | Group-event link | `View Group Event` |
 | Conversion seam (standalone Interaction Detail overflow) | `Add participants / Make this a group interaction` |
 | Heatmap context card — populated | line 1 `{date or date range}` · line 2 `{n} interactions` · action `See details` (example: `Aug 4 – Aug 17` / `3 interactions`) |
@@ -211,7 +212,7 @@ Each surface's visual + interaction contract. All reached from the Profile Histo
 - Focused route (headerShown:false convention; own Back chrome; canonical unsaved-change behavior). Wraps the existing `TouchpointRefineForm` value shape + `editTouchpointFull` (the sole recency writer — never a set-based `UPDATE interactions`).
 - Edits all editable fields: date/time, channel/type, direction, connected, **Tone**, note, optional **duration** (presets 5m/15m/30m/1h/2h/Custom; entry in min/hr, stored nullable seconds), and **Allow AI** toggle.
 - **Rejects future dates** (`rejectFutureOccurredAt`), saves through the single-writer spine, refreshes derived consumers (heatmap buckets, Intensity, Last Interaction, Status, Gravity) automatically.
-- Primary action is a `Save` Primary button (`accent`/`onAccent`).
+- Primary action is a `Save changes` Primary button (`accent`/`onAccent`).
 
 ### 8. Hard-delete confirmation
 - `ConfirmDialog` destructive variant: `danger` fill + `warning` glyph + `onDanger` label + no scrim-dismiss (explicit choice required). Copy per the Copywriting Contract. Names the derived-metric consequences. NO trash/quarantine subsystem (D-11). Deleting a group-linked child removes only that participant's interaction (routes through `deleteTouchpoint`).
@@ -254,7 +255,9 @@ History must be **fully usable without colour, wheel gestures, or marker iconogr
 
 State coverage for the History surfaces. Empty/error COPY lives in the Copywriting Contract above; this table covers state coverage and references those rows.
 
-Applicable state considerations resolved: 8 covered, 1 backstop, 0 unresolved.
+**Probe reconciliation (step 9.5).** The `ui-consideration-probe` engine proposed 45 applicable considerations across the 9 surfaces (E1 Heatmap, E2 Intensity, E3 Browser, E4 context card, E5 Detail Sheet, E6 Interaction Detail, E7 Edit route, E8 delete confirm, E9 empty section). None were owner-taste or one-way-door decisions — all are design-contract completeness, resolved by the orchestrator from the SPEC + CLAUDE.md's local-first rule (no per-consideration owner prompt, per the workflow's `--auto` convention and to avoid over-asking). The two categories the initial authoring under-covered — **error/failure** and per-surface **loading** — are resolved explicitly below.
+
+Applicable state considerations resolved: 13 covered, 2 backstop, 0 unresolved (0 silently dropped).
 
 | Category | Element(s) | Status | Resolution / Reason |
 |----------|------------|--------|---------------------|
@@ -267,6 +270,11 @@ Applicable state considerations resolved: 8 covered, 1 backstop, 0 unresolved.
 | overflow | Year-lens dense grid; 20-cycle heatmap; many records in one day's sheet | ✅ covered | Year grid scrolls; cycle grid fixed 5-col; Detail Sheet (`detail` height) scrolls its interleaved list |
 | no-cadence | Cycles lens for an Unbound / no-cadence contact | ✅ covered | Cycles lens is not meaningful without a cadence — fall back to `7 Days` (or hide the Cycles segment) and never divide by a null interval; coordinate the exact choice with Phase 31's identical note (D-09) |
 | loading | Detail Sheet full-record resolution | ✅ covered | Markers/summaries load date-indexed; full records resolve lazily when a date/period sheet opens (dossier §AB) |
+| loading | Heatmap / Intensity / Browser initial reads | ✅ covered | Date-indexed bucket/marker/summary reads are synchronous local SQLite queries — no spinner contract; if a large Year read is slow it degrades gracefully (dense-grid perf owned by Phase 40, dossier §AC). No network on any read path (local-first). |
+| error | Pure-read surfaces (Heatmap, Intensity, Browser, context card, Detail Sheet, Interaction Detail) | ✅ covered | Local-first / on-device SQLite: read paths have no network and no bespoke per-surface error state; a DB-read failure surfaces through the app-global error boundary, not a hand-rolled History error view. Recorded so this is a deliberate choice, not a silent gap. |
+| error | Edit Interaction save (validation + write failure) | ✅ covered | Future-date validation shows the inline `Future dates aren't allowed…` rejection; a failed save preserves full form state and never shows completion (mirrors the CAPT/TouchpointRefineForm locked idiom); the write goes through the single recency spine so a partial write cannot land. |
+| error | Hard-delete failure | 🧪 backstop | A failed `deleteTouchpoint` must leave the interaction and its derived metrics (Status/Gravity/Intensity/Last Interaction) intact and re-enable the control with an error surface — verify the delete-failure path on-device (no optimistic vanish before the transaction commits). |
+| unclassified | Heatmap multi-lens switching (E1); conditional Allow-AI sparkle (E6) | ✅ covered | Probe manual-review nudges: both are fully specified — lens state persists via `history_lens`/`history_cycle_count` in `app_settings` with `SegmentedControl`; the sparkle renders only when `allow_ai` is ON and nothing when OFF (D-04). No open question. |
 
 <!-- Status vocabulary locked by probe-core projectTruths: ✅ covered → truth string lifted to must_haves.truths;
      🧪 backstop → { statement, verification: backstop }; ⚠ unresolved → explicit planner assumption. -->
@@ -285,11 +293,11 @@ Not applicable — this is a React Native project with no shadcn registry and **
 
 ## Checker Sign-Off
 
-- [ ] Dimension 1 Copywriting: PASS
-- [ ] Dimension 2 Visuals: PASS
-- [ ] Dimension 3 Color: PASS
-- [ ] Dimension 4 Typography: PASS
-- [ ] Dimension 5 Spacing: PASS
-- [ ] Dimension 6 Registry Safety: PASS
+- [x] Dimension 1 Copywriting: PASS (FLAG resolved — Edit route CTA promoted to `Save changes`)
+- [x] Dimension 2 Visuals: PASS
+- [x] Dimension 3 Color: PASS
+- [x] Dimension 4 Typography: PASS
+- [x] Dimension 5 Spacing: PASS
+- [x] Dimension 6 Registry Safety: PASS
 
-**Approval:** pending
+**Approval:** approved 2026-09-11 (gsd-ui-checker VERIFIED; Copywriting FLAG resolved inline)
