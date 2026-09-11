@@ -1,361 +1,334 @@
 ---
 phase: 32
 reviewers: [codex, claude]
-reviewed_at: 2026-09-11T20:06:10Z
+reviewed_at: 2026-09-11
+cycle: 2
 plans_reviewed: [32-01-PLAN.md, 32-02-PLAN.md, 32-03-PLAN.md, 32-04-PLAN.md, 32-05-PLAN.md, 32-06-PLAN.md, 32-07-PLAN.md, 32-08-PLAN.md]
 models:
-  codex: "gpt-5.6-terra (reasoning=low)"
-  claude: "claude-opus-4-8 (read-only subagent, repo-grounded)"
+  codex: "gpt-5.6-terra (reasoning=high)"
+  claude: "claude read-only subagent"
 model_sources:
   codex: "banner"
-  claude: "orchestrator-subagent"
+  claude: "subagent"
 ---
 
-# Cross-AI Plan Review — Phase 32
+# Cross-AI Plan Review — Phase 32 (Interaction History & Insights) — Convergence Cycle 2
 
-Both lanes reviewed against the actual source on disk (not plan text alone). The
-`interactions` table is shared and Phase 32 owns migration 025 that rewrites its
-`quality`/`channel` VALUES in place; both reviewers enumerated the table's writers
-before asserting invariants, per the project rule. Lanes that ran: **codex**
-(gpt-5.6-terra, reasoning=low) and **claude** (Opus 4.8 read-only subagent). No lane
-was dropped; both produced full, file:line-cited reviews.
+Both lanes ran with full repo read access and cited `file:line` evidence throughout; both are weighted as grounded plan reviews. This cycle judges the plans as revised in commit `2befa75` (cycle-1 fixes). The orchestrator independently source-verified the load-bearing claims below (migration head = 24, the two `quality` literal consumers, the `restore-apply.ts:189` verbatim writer, `SettingsStack` route registrations, the `computeIntensity` core signature).
 
 ## Consensus Summary
 
-The migration itself — the phase's self-identified highest risk — is its **best-handled**
-area, and both reviewers verified this against source: `interactions.quality`/`channel`
-are CHECK-less (`001-initial.ts:103,106`) so the `ALTER ADD COLUMN + UPDATE ... CASE`
-remap needs no table rebuild; head is correctly re-derived (`profile-presentation.ts:4`
-= v24 → 025 next); the value-comparison consumer list (`ai-context-read.ts:132-136`,
-`digest-read.ts:158-161`) is complete; `interaction_assists.channel` transport CHECK is
-correctly left untouched; the recency single-writer spine and immutable-events contract
-are consumed, not bypassed; local-first, theme-token, `formatLocalDate`, and Skia/worklet
-discipline are all honored with mechanical grep gates.
+**Overall:** The revision holds all three settled boundaries — no Phase-33 group schema in migration 025, no Phase-36 `BACKUP_FORMAT_VERSION` bump, no `quality` column rename. Both reviewers independently confirmed no forbidden-reversal defect (D-07/D-12, backup format, column name are all intact). Cycle-1's HIGH findings (restore/export vocabulary miscount, the checkpoint reopening a settled rename, pause-on-blur ownership, delete-DAO test homing) are genuinely resolved on disk. What remains are correctness-detail and specification gaps in individual plans, not architectural flaws.
 
-The residual risk is concentrated in **cross-phase seams and route wiring**, where the two
-reviewers diverge on severity: codex rates the phase **HIGH ("do not execute unchanged")**
-and raises a HIGH per affected plan; claude rates it **MEDIUM**, folding routes/restore into
-MEDIUM and reserving its single HIGH for the group/Phase-33 coupling. The orchestrator note
-(reviewing the code on disk) confirms the load-bearing claims from both: no `group_events`
-schema exists today; `SettingsStack.tsx:55` hosts Profile but Plan 04 registers
-`EditInteraction` only in Dashboard+Orrery; `LogContact` is `LogContactPlaceholderScreen`
-(`DashboardStack.tsx:37`); `restore-apply.ts:189` inserts `quality` verbatim with no remap.
+**Verdict split:** codex "changes requested" (4 HIGH); claude MEDIUM (0 HIGH, 3 MEDIUM). The divergence is severity calibration, not disagreement on facts — both reviewers (and the orchestrator's own on-disk check) agree the underlying gaps are real.
 
-### Agreed Strengths
-- **Migration 025 is additive/forward-only and correctly numbered (025), with a complete, grep-verified consumer list.** (both) `interactions` is CHECK-less so no rebuild; `allow_ai INTEGER NOT NULL DEFAULT 0 CHECK(allow_ai IN (0,1))` mirrors the `memories.allow_ai` precedent.
-- **The recency-DAO single-writer spine is consumed, not bypassed** (`editTouchpointFull` scopes by id AND contact_id, asserts changes===1, recomputes recency; `deleteTouchpoint` writes the tombstone in-txn). Plans 04/07 route through these exact entry points. (both)
-- **`interaction_assists` transport CHECK (`call|text|email`, `014-interaction-assists.ts:12`) is correctly preserved**, with vocabulary mapped at log time in `markAssistLogged`. (both)
-- **Privacy gate is fail-closed:** `allow_ai` defaults 0/OFF, sparkle strictly gated on `allow_ai===1`, and Phase 32 does not wire note egress. (claude; consistent with codex)
+### Agreed Strengths (raised by both reviewers)
+- Migration 025 is ALTER+UPDATE only (no rebuild) — verified `interactions` has no CHECK on `channel`/`quality`; additive columns + value remap are safe and forward-only.
+- `allow_ai INTEGER NOT NULL DEFAULT 0 CHECK(allow_ai IN (0,1))` is fail-closed and stronger than the cited `017` precedent; every INSERT that omits it (restore, benchmark, recency core) lands OFF (D-04 privacy).
+- The single-writer recency spine is respected everywhere (`recency-dao.ts` insert/edit/delete cores); the delete regression is correctly homed at the DAO in Plan 01.
+- The group seam is inert by construction (no `group_event_id` column exists; `isGroupLinked` resolves hard-false), grep-gated against early group schema — D-12 held.
+- Keeping the SQL column `quality` is load-bearing and correctly locked (`export-manifest.ts:52`, `restore-apply.ts:65,189` round-trip by name).
 
-### Agreed Concerns (highest priority — raised or corroborated by both)
-- **[HIGH] Group-linked behavior (HIST-16/17, D-10 group clauses) in Plans 03 & 07 depends on Phase-33 schema that does not exist yet.** No `group_event_id` column and no `group_events` table exist in `src/` (only an empty placeholder screen); D-07 places that linkage in Phase 33 (migration 026+). Plan 03 Task 3 asserts a "group-parent+child pair, parent excluded from counts" acceptance criterion that is **not constructible** against the Phase-32 schema; Plan 07 renders group context/note/"View Group Event" keyed on the missing field. **Escalation, not a closeable finding:** the wrong resolution — an executor adding `group_event_id` to migration 025 to make the fixture pass — reverses D-07 (an owner-recorded sequencing decision). Reframe as an inert seam (group predicate hard-false until Phase 33), drop the not-yet-representable fixtures, and surface to the owner. (codex HIGH ×2 plans; claude HIGH + explicit D-07 reversal trap)
-- **[HIGH] The restore/export path re-opens the vocabulary miscount the migration closes.** `restore-apply.ts:189` INSERTs `interactions.quality`/`channel` from the backup **verbatim**; `export-manifest.ts:52` serializes them raw; `BACKUP_FORMAT_VERSION` stays 4. A format-4 backup captured *before* Phase 32 (values `good`/`fine`/`hard`, `text`/`email`) restored onto a v25 device lands legacy literals that migration 025 never re-remaps, so `ai-context-read.ts:132` / `digest-read.ts:158` silently miscount — the same D-06/Pitfall-1 failure via the restore backdoor. No plan or clearly-chartered Phase-36 item covers value-remap-on-restore. (codex HIGH — framed as widened-schema; claude MEDIUM — framed as vocabulary miscount; orchestrator verified the vocabulary angle against source)
-- **[HIGH] New Edit/Log routes are not reachable from a Settings-originated Profile.** Profile is hosted in three stacks (`Dashboard:44`, `Settings:55`, `Orrery:50`), but Plan 04 registers `EditInteraction` only in Dashboard+Orrery (mirroring `Edit`), and `LogContact` lives only in Dashboard. React Navigation throws on an unregistered route name. Register both in all Profile-hosting stacks (or at RootStack) and make it a hard acceptance criterion, not a Plan-08 backstop. (codex HIGH; claude MEDIUM)
+### Agreed Concerns (raised by both reviewers — highest priority)
+- **Plan 01 — `markAssistLogged` omits `email → Message`** (codex HIGH, claude MEDIUM). `interaction-assist-dao.ts:98` writes the assist `channel` raw; the `014` CHECK allows `call|text|email`; the plan enumerates only `call→Call`/`text→Message`. An `email` assist reintroduces the retired `email` value into a v25 DB — a live writer re-opening the partial-rename hazard the phase treats as HIGH (T-32-03). **Fix:** route the assist channel through the shared `remapLegacyChannel` and add an `email`-assist test case.
+- **Plan 03 — window-scoped intensity is underspecified** (codex HIGH: the `now`/reference-instant passed to `computeIntensity` is unspecified, so a historical window computed against real "now" reads ~0, breaking HIST-06; claude MEDIUM: the window-derived *period* formula is unspecified and only inequality-tested). **Fix:** require passing `effectiveNow = end of the selected window` AND pin the period formula; add a fixed-**value** intensity assertion for a past window that contains interactions (not just "two windows differ").
+- **Plan 05 — app-settings persistence seam incompletely named** (codex HIGH: `AppSettingsPatch = Partial<Omit<PortableSettingsSnapshot>>` at `app-settings-dao.ts:286`, so `historyLens`/`historyCycleCount` must be added to `PortableSettingsSnapshot` (`:226`) or `updateAppSettings({historyLens})` will not typecheck; claude MEDIUM: "the SELECT column list" is ambiguous — extend `getAppSettings` (`:496`), not the Phase-36-reserved snapshot SELECT (`:627`)). **Fix:** name `PortableSettingsSnapshot` and `getAppSettings` explicitly among the seams, and assert the portable-snapshot emission path stays untouched.
 
-### Divergent Views
-- **Overall severity: codex HIGH vs claude MEDIUM.** Codex treats each under-specified downstream plan as an independent HIGH blocker; claude judges the migration foundation solid enough that the phase is MEDIUM and drops to LOW once the group coupling + restore gap are resolved. Both agree the plan set should not execute unchanged.
-- **Plan 01 checkpoint (quality→tone rename gate):** codex rates HIGH — the roadmap/D-06 already settle "keep the `quality` column," so presenting the rename as a blocking owner choice reopens a settled decision (and risks a reversal if an executor picks rename). Claude read the same checkpoint as merely confirming the irreversible mechanics and did not flag it. Treat as: remove the redundant rename option, keep "retain `quality`" as a plan invariant.
-- **Plan 03 intensity window-scoping:** codex HIGH — `computeContactIntensity` (`impact.ts:134`) computes its own cadence-sized period over all `ImpactInputs.interactions` (`impact-read.ts:55`), so a wrapper cannot truthfully claim "same selected Heatmap window" without a new window-aware intensity API. Claude did not separately raise this. Worth resolving before Plan 05 consumes it.
+### Divergent Views (raised by one reviewer — worth investigating)
+- **Plan 08 — Settings-originated knowledge-change route crash (codex HIGH; claude did not flag).** Orchestrator-verified on disk: `SettingsStack.tsx` registers neither `ThingsToRemember` nor `MemoryHistory`, while Dashboard/Orrery do; `ContactProfileScreen.tsx:398-413` navigates to `ThingsToRemember`. Plan 08 wires the History `onOpenKnowledgeChange` through "the profile's existing knowledge nav" and claims "no new cross-stack gap." That claim is only half-true: the reused callback already targets a route unregistered in Settings, so a Settings-originated History knowledge-change edit navigates to an unregistered route and throws. The gap is pre-existing (Phase 32 reuses, not introduces, the target) but Phase 32 gives it a new Settings-reachable entry point. **Fix (parallel to what Plan 08 already does for `LogContact`):** register `ThingsToRemember` + `MemoryHistory` in `SettingsStack`, or explicitly scope the knowledge-change action out of Settings-originated History with a Settings-origin UAT.
+- **Plan 01 — migration CASE derived from a mutable helper (codex MEDIUM; claude did not flag).** The plan permits migration 025 to build its SQL CASE from `interaction-vocabulary.ts` at runtime; a later helper edit would silently alter a shipped migration's behavior. The plan already offers the safe alternative ("or add a test pinning the migration SQL outputs equal to the helper outputs") — make that the required option: freeze the CASE literals in the migration and test-pin them against the shared helper.
+- **Plan 03 — complete-contact knowledge read seam (codex MEDIUM; claude verified the module exists).** codex reads `current-state-history-read.ts:61` as a single-field-at-a-time seam; claude confirmed `getCurrentStateHistory` exists. **Fix:** require the read to surface every registered current-state field (not one `fieldKey`) and test ≥2 distinct field keys + same-timestamp ordering.
+
+### Lower-severity actionable items (LOW)
+- **Plan 02:** specify `recordEventCore` `occurredAt = now` and assert `occurred_at === now` in the round-trip test.
+- **Plan 07:** confirm `TimelineRow` is actually reused as the sheet's per-record renderer in `DateDetailSheet`; if not, the bind/unbind `EVENT_LABELS` edit is dead code and lifecycle rows need their own renderer.
+- **Plan 08:** add a one-line note that HIST-15's real detailed-log form is a Phase-34 deliverable so verification does not over-credit it (the plan already scopes this correctly; this is a verifier-facing note).
 
 ---
 
 ## Codex Review
 
-# Phase 32 Plan Review
+_Model: gpt-5.6-terra (reasoning=high). Full repo read access; source-grounded._
 
-Overall: **HIGH risk; do not execute unchanged.** The migration/recency discipline is strong, but several plans depend on Phase 33 schema and routes that do not exist yet, and Plan 01 reopens a decision already locked in the roadmap.
+# Phase 32 plan review — cycle 2
 
-## Plan 01 — Migration / vocabulary / refine form
+Overall verdict: **changes requested**. The revision successfully preserves the settled boundaries—no Phase-33 group schema, no Phase-36 backup bump, and no `quality` column rename—but four HIGH gaps remain.
 
-**Summary:** Good migration-first sequencing and strong test intent, but the blocking checkpoint conflicts with the settled Phase 32 schema contract.
+## Plan 01 — Migration and vocabulary
 
-**Strengths**
-
-- Correctly keeps migration registration explicit; the live chain ends at `profilePresentationMigration` version 24 in [database.ts](/home/bwales/projects/orbit-app/src/db/database.ts:62).
-- Correctly routes ordinary interaction writes through the recency DAO, whose insert/edit paths are the production DML chokepoints in [recency-dao.ts](/home/bwales/projects/orbit-app/src/db/recency-dao.ts:195) and [recency-dao.ts](/home/bwales/projects/orbit-app/src/db/recency-dao.ts:281).
-- Correctly preserves `interaction_assists` as a transport vocabulary: its persisted CHECK is `call|text|email` in [014-interaction-assists.ts](/home/bwales/projects/orbit-app/src/db/migrations/014-interaction-assists.ts:12).
-
-**Concerns**
-
-- **HIGH — The checkpoint reopens a settled decision.** The supplied roadmap explicitly says migration 025 retains SQL column `quality`; this is no longer an owner choice. The plan’s “rename-tone” option should be removed, not presented as a blocking decision.
-- **HIGH — It does not update all actual restore/export paths for the widened live schema.** Export currently selects only `quality`, `note`, etc., with no `duration` or `allow_ai` in [export-manifest.ts](/home/bwales/projects/orbit-app/src/backup/export-manifest.ts:48); restore likewise has a fixed interaction INSERT/UPSERT shape in [restore-apply.ts](/home/bwales/projects/orbit-app/src/backup/restore-apply.ts:189). Deferring portable wire changes to Phase 36 is correct, but the plan needs an explicit compatibility test/documented behavior for an interim export/restore, otherwise those new local values silently disappear.
-- **MEDIUM — The plan omits `LastInteractionType`, still defined as old vocabulary in [types.ts](/home/bwales/projects/orbit-app/src/types.ts:43).** Either migrate/deprecate it or demonstrate it is intentionally unrelated to persisted interaction channels.
-- **MEDIUM — “Keep internal field names `good/fine/hard`” is a confusing semantic mismatch.** `readInteractionAggregates` currently returns those exact fields in [ai-context-read.ts](/home/bwales/projects/orbit-app/src/db/ai-context-read.ts:132). If retained, the alias needs a type/comment that makes `good → Positive`, etc. mechanically unambiguous.
-
-**Suggestions**
-
-- Remove the rename checkpoint and make “retain `quality` column” a plan invariant.
-- Add an explicit interim-backup behavior test and a Phase 36 handoff test case.
-- Include `src/types.ts` in the consumer audit or document why it is not a domain interaction vocabulary.
-
-**Risk:** **HIGH** — irreversible migration plus incomplete wire-shape/consumer inventory.
-
-## Plan 02 — Bind/Unbind events
-
-**Summary:** Small, well-scoped plan that correctly composes within the existing transaction.
+**Summary:** Strong migration/consumer-lockstep plan, but Interaction Assist still leaves one legacy channel path unmigrated.
 
 **Strengths**
 
-- `bindContact` and `unbindContact` already own one `inWriteTransaction` each in [contact-lifecycle-dao.ts](/home/bwales/projects/orbit-app/src/db/contact-lifecycle-dao.ts:42) and [contact-lifecycle-dao.ts](/home/bwales/projects/orbit-app/src/db/contact-lifecycle-dao.ts:92).
-- `recordEventCore` is specifically a non-transaction-opening composition primitive in [events-dao.ts](/home/bwales/projects/orbit-app/src/db/events-dao.ts:60).
-- No migration is needed: event `type` is text without a schema CHECK.
+- The existing interaction schema has no channel/quality CHECK, so additive columns plus value updates are appropriate; no rebuild is needed. [`001-initial.ts:97`](/home/bwales/projects/orbit-app/src/db/migrations/001-initial.ts:97)
+- The plan correctly targets the active aggregate and digest literal comparisons, which currently still test `good`/`fine`/`hard`. [`ai-context-read.ts:132`](/home/bwales/projects/orbit-app/src/db/ai-context-read.ts:132) [`digest-read.ts:158`](/home/bwales/projects/orbit-app/src/db/digest-read.ts:158)
+- It respects the single recency writer: current inserts and edits are centralized in [`recency-dao.ts:195`](/home/bwales/projects/orbit-app/src/db/recency-dao.ts:195) and [`recency-dao.ts:281`](/home/bwales/projects/orbit-app/src/db/recency-dao.ts:281).
 
 **Concerns**
 
-- **LOW — “event is not editable through any lifecycle path” is not directly testable from this DAO test alone.** Immutability is enforced structurally by absence of an event-update API, not by a bind/unbind behavior assertion.
+- **HIGH — `email` Interaction Assists will continue writing the retired interaction channel.** The source assist table permits `call`, `text`, **and `email`**. [`014-interaction-assists.ts:12`](/home/bwales/projects/orbit-app/src/db/migrations/014-interaction-assists.ts:12) The live assist writer passes that transport value directly into the interaction core. [`interaction-assist-dao.ts:98`](/home/bwales/projects/orbit-app/src/db/interaction-assist-dao.ts:98) Yet the plan only specifies `call → Call` and `text → Message`. [`32-01-PLAN.md:167`](/home/bwales/projects/orbit-app/.planning/phases/32-interaction-history-insights/32-01-PLAN.md:167) An email assist would create `interactions.channel='email'` after migration 025, violating the remapped vocabulary and leaving an unrenderable legacy value in the new form.
+
+- **MEDIUM — historical migration behavior must not depend on a mutable helper.** The plan permits migration 025 to generate its SQL CASE from `interaction-vocabulary.ts`. [`32-01-PLAN.md:135`](/home/bwales/projects/orbit-app/.planning/phases/32-interaction-history-insights/32-01-PLAN.md:135) Since the runner invokes the migration implementation at upgrade time, not from a frozen SQL artifact, a later helper edit would silently alter a shipped migration’s behavior. [`runner.ts:47`](/home/bwales/projects/orbit-app/src/db/migrations/runner.ts:47)
 
 **Suggestions**
 
-- Test rollback: force `recordEventCore` or revision bump to fail and prove both the contact lifecycle change and event insert roll back.
+- Add `email → Message` to `markAssistLogged`, with a regression test for all three allowed assist channels.
+- Choose the plan’s safer option: keep migration 025’s CASE literals frozen in the migration and test-pin them against the shared helper. Restore can consume the helper directly.
 
-**Risk:** **LOW**.
+**Risk assessment:** **HIGH** until the email path is covered; migration 025 is irreversible.
+
+## Plan 02 — Lifecycle events and restore mapping
+
+**Summary:** Sound dependency placement and transaction composition.
+
+**Strengths**
+
+- `bindContact` and `unbindContact` already own write transactions, making `recordEventCore` the correct composition primitive. [`contact-lifecycle-dao.ts:43`](/home/bwales/projects/orbit-app/src/db/contact-lifecycle-dao.ts:43) [`events-dao.ts:60`](/home/bwales/projects/orbit-app/src/db/events-dao.ts:60)
+- Events are schema-flexible `TEXT`, so no event migration is needed. [`001-initial.ts:115`](/home/bwales/projects/orbit-app/src/db/migrations/001-initial.ts:115)
+- Restore is a distinct raw interaction writer. [`restore-apply.ts:189`](/home/bwales/projects/orbit-app/src/backup/restore-apply.ts:189) Plan 02 correctly owns its legacy vocabulary remap rather than assuming migration 025 covers restored rows.
+
+**Concerns**
+
+- None beyond the Plan 01 email-map dependency.
+
+**Suggestions**
+
+- Include an email-assisted restored interaction in the restore regression once Plan 01’s mapping is corrected.
+
+**Risk assessment:** **MEDIUM**; implementation is well-scoped but depends on Plan 01’s canonical mapping.
 
 ## Plan 03 — Aggregation and history read
 
-**Summary:** Correctly extracts pure date math, but currently cannot fulfill its Group Event promises and misstates intensity reuse.
+**Summary:** The count-only/group-inert redesign is correct, but the proposed intensity wrapper still cannot correctly calculate historical windows.
 
 **Strengths**
 
-- Uses local-date discipline consistent with [formatLocalDate usage](/home/bwales/projects/orbit-app/src/db/database.ts:108).
-- Correctly treats nullable cadence as a tagged unavailable condition; the existing canonical guard is in [impact.ts](/home/bwales/projects/orbit-app/src/services/impact.ts:134).
-- Keeps the new history read local and read-only, consistent with the existing interim projection in [profile-history-read.ts](/home/bwales/projects/orbit-app/src/db/profile-history-read.ts:43).
+- The plan correctly avoids `computeContactIntensity`, whose period is cadence-based and operates over all loaded interactions. [`impact.ts:134`](/home/bwales/projects/orbit-app/src/services/impact.ts:134)
+- It correctly preserves the nullable-cadence unavailable guard. [`impact.ts:138`](/home/bwales/projects/orbit-app/src/services/impact.ts:138)
+- Group behavior remains inert without introducing `group_event_id`, consistent with D-12.
 
 **Concerns**
 
-- **HIGH — Group Event parent/child exclusion is impossible at this phase’s dependency point.** There is no `group_event_id`, Group Event table, or parent schema today; Phase 33 owns that later migration. Plan 03 depends only on 32-01, yet claims it can test a parent/child pair and exclude parent rows. This must become a Phase 33-provided query seam or a later integration task.
-- **HIGH — `computeContactIntensity` is not window-scoped.** It receives all `ImpactInputs.interactions` and computes its own cadence-sized period in [impact.ts](/home/bwales/projects/orbit-app/src/services/impact.ts:134); `ImpactInputs` itself loads all contact interactions in [impact-read.ts](/home/bwales/projects/orbit-app/src/db/impact-read.ts:55). A wrapper cannot truthfully claim “same selected Heatmap window” unless it filters/copies inputs or extracts a lower-level window-aware intensity function.
-- **MEDIUM — The plan chooses the Unbound Cycles fallback (“default to 7 Days”) despite research marking it as an unresolved owner-coordination decision.**
+- **HIGH — filtering to a historical window is insufficient if `computeIntensity` still receives real “now.”** `computeIntensity` calculates its active period as `now - periodDays` and excludes prior-window rows outside that interval. [`intensity-logic.ts:110`](/home/bwales/projects/orbit-app/src/services/intensity-logic.ts:110) [`intensity-logic.ts:135`](/home/bwales/projects/orbit-app/src/services/intensity-logic.ts:135) Plan 03 requires filtering and then calling that core, but does not require passing a window-end reference instant. [`32-03-PLAN.md:122`](/home/bwales/projects/orbit-app/.planning/phases/32-interaction-history-insights/32-03-PLAN.md:122) Thus navigating to, say, last March would likely show zero current intensity even if that selected month contains interactions.
+
+- **MEDIUM — the knowledge-history source lacks a complete-contact read seam.** The existing history reader only returns one specified field key at a time. [`current-state-history-read.ts:61`](/home/bwales/projects/orbit-app/src/db/current-state-history-read.ts:61) Plan 03 promises the whole date-indexed knowledge-change family but only says to source it from that file. [`32-03-PLAN.md:150`](/home/bwales/projects/orbit-app/.planning/phases/32-interaction-history-insights/32-03-PLAN.md:150) A single-field fixture could pass while other registered current-state histories disappear.
 
 **Suggestions**
 
-- Remove group-specific behavior from 32-03 and define an extensible interaction-row shape; add Group Event exclusion once Phase 33 storage exists.
-- Specify a new pure window-scoped intensity API and tests proving changes to lens/page alter its result.
-- Stop for the owner’s Unbound-Cycles decision before implementing it.
+- Define `effectiveNow = endOfSelectedWindow at 23:59:59` and pass it to `computeIntensity`; add a regression where a prior-month window has qualifying interactions and reports their non-zero count.
+- Add `listCurrentStateHistoryForContact`, or explicitly iterate every registered current-state field. Test at least two distinct field keys and same-timestamp ordering.
 
-**Risk:** **HIGH**.
+**Risk assessment:** **HIGH** because incorrect historical Intensity directly violates HIST-06.
 
-## Plan 04 — Edit Interaction route
+## Plan 04 — Canonical Edit Interaction
 
-**Summary:** Correct recency-writer intent, but it lacks the data-loading dependency and route coverage needed to work.
+**Summary:** Well grounded in the existing recency spine and navigation topology.
 
 **Strengths**
 
-- Correctly prohibits direct interaction SQL; `editTouchpointFull` scopes by both interaction and contact, checks exactly one changed row, then recomputes recency in [recency-dao.ts](/home/bwales/projects/orbit-app/src/db/recency-dao.ts:281).
-- Correctly preserves failure/rollback semantics through the DAO transaction.
+- The plan uses the only safe edit path, which scopes by both interaction and contact, recomputes recency, and rejects future timestamps. [`recency-dao.ts:258`](/home/bwales/projects/orbit-app/src/db/recency-dao.ts:258)
+- The future-date copy is already exported and reusable. [`TouchpointRefineForm.tsx:56`](/home/bwales/projects/orbit-app/src/components/TouchpointRefineForm.tsx:56)
+- It correctly identifies all three current Profile hosts: Dashboard, Orrery, and Settings. [`types.ts:51`](/home/bwales/projects/orbit-app/src/navigation/types.ts:51) [`types.ts:131`](/home/bwales/projects/orbit-app/src/navigation/types.ts:131) [`types.ts:172`](/home/bwales/projects/orbit-app/src/navigation/types.ts:172)
 
 **Concerns**
 
-- **HIGH — The route has no identified way to load the full interaction.** The existing profile history read selects no note and no new columns in [profile-history-read.ts](/home/bwales/projects/orbit-app/src/db/profile-history-read.ts:48). Proposed `history-read.ts` is Plan 03, but Plan 04 does not depend on it.
-- **HIGH — Registration omits Settings.** Settings also hosts `ContactProfileScreen` in [SettingsStack.tsx](/home/bwales/projects/orbit-app/src/navigation/tabs/SettingsStack.tsx:55), but the plan adds EditInteraction only to Dashboard and Orrery. A profile opened from Settings would navigate to an unregistered route.
-- **MEDIUM — It duplicates the future-date guard despite saying it will not.** The DAO guard is already authoritative in [recency-dao.ts](/home/bwales/projects/orbit-app/src/db/recency-dao.ts:267). UI prevalidation is fine for inline feedback, but it must be explicitly described as UX-only and tested to agree with the DAO, not as a second source of truth.
-- **MEDIUM — Its specified error copy differs from the existing refine-form copy** (“That time is in the future…”) in [TouchpointRefineForm.tsx](/home/bwales/projects/orbit-app/src/components/TouchpointRefineForm.tsx:56).
+- None found.
 
 **Suggestions**
 
-- Depend on 32-03 and add a `readInteractionForEdit(contactId, interactionId)` read.
-- Register the route in every stack that renders Profile, including Settings, or use a root route.
-- Consolidate the future-date message/validation contract.
+- Add a test that an edit of a historical interaction refreshes the HistorySection data revision/read path after returning.
 
-**Risk:** **HIGH**.
+**Risk assessment:** **LOW**.
 
-## Plan 05 — Heatmap, intensity, preferences
+## Plan 05 — Heatmap, Intensity UI, and preferences
 
-**Summary:** Good presentational separation and token discipline, but persistence and intensity wiring are underspecified.
+**Summary:** Presentation boundaries and token discipline are good; preference persistence is not fully threaded through the type/wire contract.
 
 **Strengths**
 
-- Static RN Views are appropriate for a heatmap; no Skia loop is needed.
-- The token-only approach matches the project’s existing theme pattern.
-- Context-card callbacks keep sheet ownership out of the presentation component.
+- The plan correctly uses a presentational, DB-free static heatmap; static RN cells avoid an unnecessary render loop.
+- It distinguishes structural blanks from zero-count days, which is important because existing theme palettes only expose ordinary surface/status tokens today. [`theme-types.ts:168`](/home/bwales/projects/orbit-app/src/theme/theme-types.ts:168)
 
 **Concerns**
 
-- **HIGH — Adding accessors is not enough for `app_settings` persistence.** The DAO has a closed `AppSettings` model, SQL row type, SELECT, writable key union, and column map: [app-settings-dao.ts](/home/bwales/projects/orbit-app/src/db/app-settings-dao.ts:90), [app-settings-dao.ts](/home/bwales/projects/orbit-app/src/db/app-settings-dao.ts:438), and [app-settings-dao.ts](/home/bwales/projects/orbit-app/src/db/app-settings-dao.ts:464). The plan’s files are sufficient, but its action must explicitly modify all of these seams and validate lens/preset values.
-- **MEDIUM — “Intensity over the same window” remains blocked by Plan 03’s incorrect wrapper design.**
-- **MEDIUM — The planned `heatmapScale` definition conflates empty-cell and active-level semantics.** It separately adds `heatmapCellEmpty`; specify which index applies to a real zero-count cell versus a structural Month blank.
+- **HIGH — `PortableSettingsSnapshot` is omitted, so typed writes and restore portability are incomplete.** `AppSettingsPatch` is defined from `PortableSettingsSnapshot`. [`app-settings-dao.ts:226`](/home/bwales/projects/orbit-app/src/db/app-settings-dao.ts:226) [`app-settings-dao.ts:285`](/home/bwales/projects/orbit-app/src/db/app-settings-dao.ts:285) The plan lists `AppSettings`, row, SELECT, writable union, and `COLUMN_OF`, but not the optional snapshot fields. [`32-05-PLAN.md:82`](/home/bwales/projects/orbit-app/.planning/phases/32-interaction-history-insights/32-05-PLAN.md:82) Without optional `historyLens` and `historyCycleCount` there, `updateAppSettings(..., { historyLens })` cannot typecheck; the intended restore-accept path is also undocumented at its primary type seam.
 
 **Suggestions**
 
-- Enumerate all DAO model/mapping/validation edits, not merely “add accessors.”
-- Add component/logic tests for a real zero, a structural blank, and cycle-current emphasis.
+- Add optional keys to `PortableSettingsSnapshot`, retain their intentional omission from `getPortableSettingsSnapshot`, and test:
+  1. normal typed UI update;
+  2. restore acceptance of incoming values;
+  3. current-format export omission.
 
-**Risk:** **MEDIUM-HIGH**.
+**Risk assessment:** **HIGH** until the durable preference contract is complete.
 
 ## Plan 06 — Rolodex browser
 
-**Summary:** Good separation of wheel math from RN rendering and strong motion/a11y intent.
+**Summary:** Strong animation, accessibility, and lifecycle ownership plan.
 
 **Strengths**
 
-- Correctly keeps leap-year/date-clamp logic node-testable.
-- Correctly requires non-gesture navigation and reduced-motion support.
-- Correctly avoids opening detail on scroll; actions remain explicit.
+- The plan follows the existing reduced-motion split: a shared value for worklets and state-backed value for the React tree. [`use-reduced-motion.ts:106`](/home/bwales/projects/orbit-app/src/theme/use-reduced-motion.ts:106)
+- Conditional mounting is the established mechanism for halting active Skia animation on blur/background. [`OrreryCanvas.tsx:2`](/home/bwales/projects/orbit-app/src/components/orrery/OrreryCanvas.tsx:2)
 
 **Concerns**
 
-- **MEDIUM — “Conditionally mounted when focused/backgrounded” is not achievable from the proposed component boundary without passing focus/AppState in.** Neither `RolodexWheel` nor `RolodexBrowser` currently owns navigation focus; make the ownership/API explicit.
-- **MEDIUM — The plan allows optional Skia glow but doesn’t include a defined token contract for that glow.** Theme-token colors are required even in Skia draws.
-- **LOW — The proposed verification grep for `useState` is over-broad.** React state for selected date/drawer visibility is acceptable; only per-frame animation state is prohibited.
+- None found.
 
 **Suggestions**
 
-- Pass `isFocused`/app-active state from the screen or place the lifecycle hook in Browser.
-- Replace the `useState` grep with a testable architectural assertion: gesture updates shared values; committed selection only updates state after settling.
+- Make Pixel UAT explicitly test a non-gesture date adjustment from every wheel position, including today and a leap-day boundary.
 
-**Risk:** **MEDIUM**.
+**Risk assessment:** **MEDIUM** due to device-only gesture/worklet verification.
 
-## Plan 07 — Detail sheet / group routing
+## Plan 07 — Detail sheet and deletion
 
-**Summary:** Correct hard-delete and Allow-AI intent, but it is prematurely implementing Phase 33 behavior.
+**Summary:** Correctly uses the delete spine and keeps group behavior inert.
 
 **Strengths**
 
-- Correctly uses `deleteTouchpoint`, which writes the tombstone, deletes by both keys, and recomputes recency in [recency-dao.ts](/home/bwales/projects/orbit-app/src/db/recency-dao.ts:313).
-- Correctly keeps the sparkle a presentation of the durable `allow_ai` gate rather than transmitting notes.
-- Adding labels to `TimelineRow` is aligned with its safe raw-type fallback in [TimelineRow.tsx](/home/bwales/projects/orbit-app/src/components/TimelineRow.tsx:25).
+- The hard-delete UI is correctly directed to the existing tombstone-plus-recompute path. [`recency-dao.ts:313`](/home/bwales/projects/orbit-app/src/db/recency-dao.ts:313)
+- Bind/unbind labels are necessary because the current renderer only labels archive/restore/snooze/unsnooze. [`TimelineRow.tsx:25`](/home/bwales/projects/orbit-app/src/components/TimelineRow.tsx:25)
+- The knowledge-change callback avoids hard-coding a new navigation target.
 
 **Concerns**
 
-- **HIGH — Group context, child overrides, Group Note, and “Edit Group Event” are not implementable before Phase 33.** No group schema or route exists; a placeholder navigation target is not a usable HIST-17 implementation.
-- **HIGH — “Knowledge changes editable per owning model” has no identified source/query contract.** Existing timeline read unions only `interactions` and `events` in [timeline-read.ts](/home/bwales/projects/orbit-app/src/db/timeline-read.ts:63). Plan 03 similarly only specifies interactions/lifecycle data. The third required record family needs an explicit source and edit-routing map.
-- **MEDIUM — Delete’s mutation behavior has no node test.** A UI grep cannot prove tombstone, recency recomputation, or failed-delete preservation; the DAO already has test seams and should be exercised.
+- None intrinsic, but this plan inherits the Plan 03 full-knowledge-history gap and Plan 08 Settings navigation gap.
 
 **Suggestions**
 
-- Defer Group Event UI behavior to an explicit Phase 33 integration plan, retaining only a future-compatible interaction detail seam now.
-- Define knowledge-change record types and every owning model route before building the sheet.
-- Add DAO-level delete regression tests covering newest/non-newest and failure rollback.
+- Add a detail-sheet integration test with two knowledge fields once Plan 03 exposes the complete family.
 
-**Risk:** **HIGH**.
+**Risk assessment:** **MEDIUM** due to those downstream integration dependencies.
 
-## Plan 08 — Profile assembly
+## Plan 08 — Profile integration
 
-**Summary:** Correctly targets the renderer seam, but it cannot deliver canonical logging or valid navigation with the planned dependencies.
+**Summary:** Correctly replaces the interim renderer seam and fixes LogContact reachability, but the knowledge-change callback remains broken from Settings-originated Profiles.
 
 **Strengths**
 
-- Replacing only `renderHistory` is the right preservation boundary; the current temporary renderer is isolated in [ProfileModuleHost.tsx](/home/bwales/projects/orbit-app/src/components/profile/ProfileModuleHost.tsx:387).
-- The existing route is presently a placeholder, confirming the plan correctly recognizes Phase 32 owns the future route contract: [FabActionPlaceholders.tsx](/home/bwales/projects/orbit-app/src/screens/placeholders/FabActionPlaceholders.tsx:26).
+- The current History renderer is a contained seam, so replacing it need not alter layout persistence. [`ProfileModuleHost.tsx:387`](/home/bwales/projects/orbit-app/src/components/profile/ProfileModuleHost.tsx:387)
+- The plan correctly adds `LogContact` to Orrery and Settings, where it is currently absent. [`OrreryStack.tsx:44`](/home/bwales/projects/orbit-app/src/navigation/tabs/OrreryStack.tsx:44) [`SettingsStack.tsx:44`](/home/bwales/projects/orbit-app/src/navigation/tabs/SettingsStack.tsx:44)
 
 **Concerns**
 
-- **HIGH — It claims empty-date logging routes into “canonical detailed logging,” but the only registered `LogContact` screen is a placeholder in DashboardStack** at [DashboardStack.tsx](/home/bwales/projects/orbit-app/src/navigation/tabs/DashboardStack.tsx:37), and it has no `prefillDate` consumption. Phase 34 must own the actual form; Phase 32 can only establish a typed route contract and an intentionally unavailable placeholder path.
-- **HIGH — Profile navigation is origin-stack-local.** `ContactProfileScreen` calls navigation from whichever stack rendered it, including Settings; it currently routes “history” to ThingsToRemember in [ContactProfileScreen.tsx](/home/bwales/projects/orbit-app/src/screens/ContactProfileScreen.tsx:393). Plan 08 must redesign that callback contract and ensure all target routes exist in all profile-hosting stacks.
-- **MEDIUM — It says lifecycle-only contacts should show history rather than an empty state, but Plan 03’s history read must return a distinct “has lifecycle records” signal; the plan currently only describes interactions and markers informally.**
+- **HIGH — Settings-originated knowledge-change editing will navigate to an unregistered route.** Plan 08 routes `onOpenKnowledgeChange` through the existing Profile callback. [`32-08-PLAN.md:108`](/home/bwales/projects/orbit-app/.planning/phases/32-interaction-history-insights/32-08-PLAN.md:108) That callback navigates to `ThingsToRemember`. [`ContactProfileScreen.tsx:403`](/home/bwales/projects/orbit-app/src/screens/ContactProfileScreen.tsx:403) SettingsStack registers neither `ThingsToRemember` nor `MemoryHistory`. [`SettingsStack.tsx:44`](/home/bwales/projects/orbit-app/src/navigation/tabs/SettingsStack.tsx:44) Dashboard and Orrery do register both. [`DashboardStack.tsx:46`](/home/bwales/projects/orbit-app/src/navigation/tabs/DashboardStack.tsx:46) [`OrreryStack.tsx:50`](/home/bwales/projects/orbit-app/src/navigation/tabs/OrreryStack.tsx:50)
 
 **Suggestions**
 
-- Make the Phase 32 behavior an explicit typed intent (`LogContact { contactId, prefillDate }`) with a Phase 34 acceptance test that consumes it.
-- Add route registration/forwarding for Dashboard, Orrery, and Settings.
-- Add a lifecycle-only fixture through HistorySection, not just pure orchestration logic.
+- Add `ThingsToRemember` and `MemoryHistory` route types and registrations to SettingsStack, with a Settings-originated Profile UAT covering a knowledge-change row through to its owning edit flow.
 
-**Risk:** **HIGH**.
-
-## Required replanning changes
-
-1. Remove the Plan 01 `quality → tone` decision gate; retaining `quality` is settled.
-2. Resolve the Unbound Cycles fallback with the owner before implementation.
-3. Fix Plan 03 intensity architecture so it is genuinely scoped to the selected History window.
-4. Move all Group Event-dependent behavior from Plans 03/07 into Phase 33 or a post-33 integration plan.
-5. Add a complete interaction-load read and correct stack registration before Plan 04.
-6. Specify interim backup behavior for `duration` and `allow_ai`, since current export/restore fixed projections omit both.
-
+**Risk assessment:** **HIGH** because HIST-10’s editable knowledge changes crash or fail to route from a supported Profile origin.
 ---
 
 ## Claude Review
 
-# Cross-AI Peer Review — Phase 32: Interaction History & Insights
+_Read-only Claude subagent (per project convention — the in-harness `claude -p` reviewer self-skips). Full repo read access; source-grounded._
 
-**Reviewer:** Claude (Opus 4.8), independent peer review
-**Method:** Every claim below was checked against the actual code on disk in `/home/bwales/projects/orbit-app`, not against plan text alone. The `interactions` table's writers were enumerated by full-tree grep before asserting any invariant about it (per the project's "read every writer" rule). `file:line` citations are from files opened this session.
+# Cross-AI Plan Review — Phase 32 (Interaction History & Insights), Convergence Cycle 2
 
----
+**Overall risk verdict: MEDIUM — plans are well-grounded and cycle-1 HIGHs are genuinely resolved on disk; remaining issues are correctness-detail gaps, not architectural flaws. HIGH concerns: 0. (3 MEDIUM worth fixing before execution; several LOW.)**
 
-## 1. Summary (overall)
+I verified every load-bearing claim against the actual code, including grepping **every** writer/reader of `interactions` (`recency-dao`, `restore-apply`, `export-manifest`, `ai-context-read`, `digest-read`, `purge-dao`, `benchmark`, `interaction-assist-dao`, `queries.ts`, `timeline-read`, `merge-candidate-read`). The migration head, the single-writer spine, the closed app-settings model, the navigation gaps, and the intensity core are all as the plans describe.
 
-This is a strong, unusually well-grounded plan set. The phase's self-identified highest risk — the forward-only, irreversible `quality`/`channel` vocabulary migration on the shared `interactions` table — is planned correctly: additive `ALTER + UPDATE` only (the table is CHECK-less, so no rebuild), jump-from-v1 tested, `allow_ai` mirroring an exact prior precedent, and the value-comparison consumer list is **complete and accurate** as verified by grep. The single-writer recency spine, the immutable-events contract, local-first read paths, and the Skia/worklet discipline are all correctly identified and consumed rather than re-implemented. The residual risk is concentrated in three places the plans under-handle: (1) the **group-linked behaviors (HIST-16/17, D-10 group clauses) depend on Phase 33 schema that does not exist yet**, making parts of Plans 03/07 untestable at Phase 32 and creating a D-07-reversal trap; (2) the **restore path does not remap the migrated vocabulary**, re-opening the exact Pitfall-1 miscount via a backdoor; and (3) **route reachability from a Settings-originated Profile** is not covered for the new Edit/Log routes. None of these is a fatal design flaw; all are addressable before execution.
+## Cross-cutting verification (the facts the whole phase rests on)
 
-**Overall risk: MEDIUM.**
+- **Migration head is 24, next is 25.** `src/db/database.ts:62` `TARGET_VERSION = PROFILE_PRESENTATION_SCHEMA_VERSION`; the last numbered file is `023-…` and the head is the unnumbered `profile-presentation.ts`. Plan 01's `025-` filename + `version: 25` is correct.
+- **Literal consumers of `quality` are exactly two:** `ai-context-read.ts:132/134/136` (`=== "good"/"fine"/"hard"`) and `digest-read.ts:158/161`. No other file compares those literals (full-tree grep). Plan 01's consumer list is complete for the *comparison* sites.
+- **`queries.ts:39/52` (NEWEST_PER_CONTACT/FOR_CONTACT) and `timeline-read.ts:75` read `channel`/`quality` but never compare literals** — they pass values through, so the migration flows through automatically. Correctly excluded from the lockstep list. `Contact.lastInteraction`/`LastInteractionType` (`types.ts:40,82`) has **no populating code path** — Plan 01 Task 2's "unused legacy type" audit is accurate.
+- **Single-writer spine confirmed:** `editTouchpointFull` (`recency-dao.ts:280`) rejects future dates pre-txn, scopes by `id AND contact_id`, asserts `changes===1`, recomputes; `deleteInteractionCore` (`:313-345`) writes the tombstone in-txn then recomputes.
+- **`events.type` is `TEXT NOT NULL` with no CHECK** (`001-initial.ts:120`) — D-08's "no migration, TS-union-only" is correct; `bindContact`/`unbindContact` (`contact-lifecycle-dao.ts:27-110`) currently write **no** event.
+- **`impact.ts` exposes a pure `computeIntensity(interactions, periodDays, rarelyResponds, now)` core** that `computeContactIntensity` delegates to (`impact.ts:134-147`); the nullable-cadence guard is real. Plan 03's window-scoping strategy is mechanically feasible.
+- **Navigation gaps are real:** `Profile` is registered in Dashboard, Orrery **and** Settings; `Edit` (contact) is in Dashboard/Orrery but **not** Settings; `LogContact` is in **Dashboard only**. Plans 04 and 08 correctly target those exact gaps.
+- **`app-settings-dao` is a genuinely closed model** with multiple seams (interface `:92`, `WritableSettingsKey` `:312`, `AppSettingsRow` `:353`, `COLUMN_OF` `:438`, and **two** SELECTs at `:496` and `:627`). Plan 05's "accessors alone are insufficient" framing is correct.
 
----
+## Plan 01 — Migration 025 + vocabulary lockstep
+**Summary.** The riskiest plan and the best-specified. Checkpoint, single-source vocabulary module, atomic consumer lockstep, D-12 prohibition all present. ALTER+UPDATE only (no rebuild) — verified `interactions` has no CHECK on `channel`/`quality`.
 
-## 2. Strengths (with evidence)
+**Strengths.** `allow_ai INTEGER NOT NULL DEFAULT 0 CHECK(allow_ai IN (0,1))` is stronger than precedent `017-knowledge-egress-datamove.ts:35` (no CHECK); DEFAULT 0 makes `benchmark.ts:120`, `restore-apply.ts:189`, `insertInteractionCore` (`recency-dao.ts:194`) all land OFF (fail-closed). Keeping SQL column `quality` is load-bearing (`export-manifest.ts:52`, `restore-apply.ts:65,189`). Delete-DAO regression correctly homed in `recency-dao.test.ts`.
 
-- **The irreversible migration is correctly scoped as additive.** `interactions` has no CHECK on `channel`/`quality` (`src/db/migrations/001-initial.ts:103,106` — `channel TEXT NOT NULL DEFAULT 'unspecified'`, `quality TEXT`), so the plan's `ALTER ADD COLUMN + UPDATE ... CASE` shape needs no table rebuild and cannot hit a `DROP COLUMN`/rebuild hazard. `allow_ai INTEGER NOT NULL DEFAULT 0 CHECK(allow_ai IN (0,1))` mirrors the verified precedent in `017-knowledge-egress-datamove.ts` (memories.allow_ai). Migration head is correctly re-verified: `PROFILE_PRESENTATION_SCHEMA_VERSION = 24` (`src/db/migrations/profile-presentation.ts:4`), `TARGET_VERSION = PROFILE_PRESENTATION_SCHEMA_VERSION` (`src/db/database.ts:62`) → next = 25. (Plan 01)
+**Concerns.**
+- **MEDIUM — `markAssistLogged` channel mapping omits `'email'`.** `interaction-assist-dao.ts:98-111` writes `channel: transactionAssist.channel` **raw**, and the `014` CHECK allows `'call' | 'text' | 'email'` (`014-interaction-assists.ts:12`). Plan 01's must-have/acceptance enumerate only `'call'→Call` and `'text'→Message` — never `'email'`. An email assist logs a legacy `'email'` value into a v25 DB after migration — a live writer re-introducing pre-migration vocabulary, exactly the partial-rename hazard the phase guards against. Fix: route through shared `remapLegacyChannel` (maps `email→Message`), add an assist-of-`email` test.
 
-- **The D-06 consumer list is complete — verified independently.** A full-tree grep for value literals `'good'/'fine'/'hard'` returns exactly: `src/db/ai-context-read.ts:132-136`, `src/db/digest-read.ts:158-161`, and the form enum `src/components/TouchpointRefineForm.tsx:73`. Both value-comparison consumers (`ai-context-read`, `digest-read`) are in Plan 01's `files_modified`. The other `interactions.channel`/`quality` readers (`src/db/timeline-read.ts:75-123`, `src/components/TimelineRow.tsx:67-79`) are **pass-through** (they render the raw string, no literal comparison), so they display the migrated vocabulary correctly with no logic change — confirmed by reading `TimelineRow.tsx:67-79`. (Plan 01)
+**Risk: MEDIUM.**
 
-- **Channel value-consumers are correctly triaged as out of scope.** Every `channel === "call"|"text"|"email"` site I found (`AssistBanner.tsx:15`, `AssistConfirmation.tsx:43`, `ReachOutRouter.tsx:53-68`, `PendingConfirmationsSheet.tsx:20`, `services/reach-out/handoff.ts:60-71`, and `ContactProfileScreen.tsx:196` which feeds `performReachOut`) operates on the **assist/reach-out transport vocabulary** (`call|text|email`, CHECK-locked at `014-interaction-assists.ts:12`), not `interactions.channel`. D-06 deliberately preserves that transport CHECK and maps at log time (`markAssistLogged`). The plan's decision to leave these untouched is correct. (Plan 01)
+## Plan 02 — Bind/Unbind events + restore-side remap
+**Summary.** Correctly additive at the TS layer (no migration), composes `recordEventCore` inside existing transactions, closes the D-06 restore backdoor using Plan 01's shared map.
 
-- **The single-writer recency spine is consumed, never bypassed.** `editTouchpointFull` (`recency-dao.ts:258-310`) rejects a future `occurred_at` *before* opening the transaction (`:268`), scopes the UPDATE by `id AND contact_id` (`:289`), asserts `changes === 1` (`:302`), and always `recomputeLastContact` (`:307`). `deleteTouchpoint`/`deleteInteractionCore` (`:313-351`) writes an `entityType:"interaction"` tombstone in-txn (`:326-327`) before the DELETE and recomputes. Plans 04 and 07 consume these exact entry points with source-grep gates against bespoke `UPDATE/DELETE interactions`. This is exactly right. (Plans 04, 07)
+**Strengths.** `recordEventCore` (`events-dao.ts:60`) is the non-mutexed in-txn primitive; placement before `bumpDataRevisionCore` inside `bindContact`'s existing `inWriteTransaction` (`contact-lifecycle-dao.ts:43`) avoids nested-transaction hang. Restore backdoor is real (`restore-apply.ts:189` inserts verbatim); single-owning restore-apply here avoids same-wave overlap. Verified no event-type allowlist/exhaustive switch exists — bind/unbind round-trip safely.
 
-- **Bind/unbind (Plan 02) is precise and low-risk — every claim verified.** `recordEventCore`'s signature (`events-dao.ts:60-79`) matches the plan's call `{uid, contactId, type, occurredAt, detail, now}` exactly. `bindContact`/`unbindContact` each already run a single `inWriteTransaction` ending in `bumpDataRevisionCore` (`contact-lifecycle-dao.ts:43-80`, `:92-106`), so inserting `recordEventCore` before that call composes cores in one txn with no nesting. `EventType` is `"archive"|"restore"|"snooze"|"unsnooze"` (`events-dao.ts:36`) and `events.type` is CHECK-less → additive at the TS union only, no migration. A grep for any exhaustive `EventType` switch in `restore-apply.ts`/`backup-schema.ts` returned **nothing**, confirming the plan's premise that bind/unbind round-trip verbatim (`restore-apply.ts` inserts `events.type` as text). (Plan 02)
+**Concerns.**
+- **LOW — event `occurred_at` source unspecified.** `recordEventCore({… occurredAt …})` should set `occurredAt = now` (the bind moment); name it so the executor doesn't invent a field. Assert `occurred_at === now` in the test.
 
-- **Local-first is honored on every read path.** `history-read` is specified as a `ReadOnlyExecutor` with no transaction and no network; the aggregation seam (`window/buckets/cycles/intensity-window`) is pure functions with no DAO/store import. No plan introduces a network dependency. (Plan 03)
+**Risk: LOW.**
 
-- **Skia/animation discipline directly addresses the known on-device hazards.** The heatmap is deliberately static RN `View` cells (no `useClock`, no render loop) — sidestepping the worklet-forward-ref crash surface entirely (Plan 05, grep-gated against `Skia|useClock`). The Rolodex wheel (the only animated surface) mandates Reanimated shared values (never per-frame setState), helper worklets defined above callers, `useReducedMotionShared` in a worklet, and pause-on-blur via conditional mount — mirroring the proven `OrreryCanvas` pattern and the `worklet-forward-ref-hazard` memory. (Plans 05, 06)
+## Plan 03 — Reusable aggregation seam
+**Summary.** Strong architecture — pure window/bucket/cycle/intensity modules plus canonical `history-read`. Window-scoped intensity fix and inert group seam correctly framed against D-12.
 
-- **The privacy gate is fail-closed and correctly placed.** `allow_ai DEFAULT 0 CHECK(allow_ai IN (0,1))` is the durable OFF default; the sparkle is strictly gated on `allow_ai === 1` (Plan 07 Task 1, unit-tested); Phase 32 explicitly does **not** wire note egress (`ai-context-read.ts:101-122` still selects only channel/quality/connected). This honors D-04's owner trip-wire. Even the restore INSERT omits `allow_ai` (`restore-apply.ts:189`), so restored rows default to 0 (OFF) — fail-closed. (Plans 01, 07)
+**Strengths.** `computeIntensity` pure core exists (`impact.ts:134-147`); inert-seam framing correct (no `group_event_id` column, `isGroupLinked` hard-false, grep-gate enforces D-12); knowledge family sourced from `current-state-history-read.ts` (`getCurrentStateHistory` exists).
 
-- **Theme-token discipline and `formatLocalDate`.** `heatmapScale`/marker tokens are per-palette with a `check:colors` gate (Plan 05); date math mandates `formatLocalDate()` (exists at `src/utils/dates.ts:17`) with a `toISOString` grep-gate (Plans 03, 06). Both are project non-negotiables and are enforced mechanically.
+**Concerns.**
+- **MEDIUM — window-derived intensity period is unspecified and value-untested.** Today `intensityPeriodDays(intervalDays)` returns the *cadence* interval (`impact.ts:139`) — it defines what "intensity" *means*. Plan 03 replaces it with "a period derived from the window span" but gives no formula, and the only test is "two windows yield different results" — which passes for almost any period function. Pin the period formula and add a **value** assertion, not just an inequality.
+- **LOW — Unbound returns `{available:false}` for *all* lenses** (consistent with D-09 but confirm intended for 7 Days/Month/Year, not only Cycles).
 
----
+**Risk: MEDIUM.**
 
-## 3. Concerns (severity-tagged, with evidence and mechanism)
+## Plan 04 — Canonical Edit Interaction route
+**Summary.** Correctly routes through the sole writer, adds the missing read, closes the Settings registration gap.
 
-### HIGH
+**Strengths.** Saves via `editTouchpointFull` (`recency-dao.ts:280`) which currently omits `duration`/`allow_ai` — so the Plan 01 dep is genuinely required + correctly ordered. `readInteractionForEdit` scoped by `id AND contact_id`; reuses `FUTURE_DATETIME_MESSAGE` (`TouchpointRefineForm.tsx:56`). Settings registration gap is real; registering in all three Profile-hosting stacks is correct.
 
-- **[HIGH] Group-linked behavior (HIST-16/HIST-17, D-10 group clauses) cannot be implemented or tested at Phase 32 — and the plans' fixtures tempt a D-07 reversal.**
-  Evidence: a full grep for `group_event_id`/`group_events` finds **no such column and no such table** anywhere in `src/` — only an empty placeholder `GroupEventsScreen.tsx` and a nav route. `interactions` (`001-initial.ts:97-106`) has no group linkage. D-07 explicitly places `group_event_id` in **Phase 33 (migration 026+)** and forbids Phase 32 adding it.
-  Yet Plan 03 Task 3 asserts a testable behavior — *"a group-parent-plus-child pair proving the parent is excluded from counts"* — and an acceptance criterion *"the group-parent+child fixture yields one interaction record (the child) and a count that does not include the parent."* That fixture is **not constructible** against the Phase-32 schema: there is no way to mark an interaction as a group child or represent a parent row. Plan 07 similarly builds `GroupScopePrompt` and group-context rendering (badge/title/group note/View Group Event) keyed on a linkage field that will not exist until Phase 33.
-  Mechanism / why it's HIGH: an executor told to "prove the parent is excluded" has two bad paths — (a) write a **vacuous or misleading test** that greens without exercising the invariant, or (b) **add `group_event_id` to migration 025 to make the fixture representable**, which reverses D-07 (an owner-recorded sequencing decision) via exactly the "make the test pass" instinct CLAUDE.md warns against. The count-only invariant is in fact satisfied *structurally* (Phase 33 parents will live in a separate `group_events` table and never be `interactions` rows), so nothing needs a runtime filter — but the plans frame it as a testable filter over data that cannot exist yet.
-  Required fix: reframe the group surfaces in Plans 03/07 as **inert seams** gated on a group-linkage predicate that is hard-`false` until Phase 33; **drop the "group-parent+child" fixtures** as not-yet-representable and replace the acceptance criterion with "counts come only from `interactions` rows (parents are not `interactions` rows)"; keep `GroupScopePrompt`/group-context as unmounted-until-Phase-33 code with a note. This is an escalation-adjacent item because the wrong resolution reverses D-07 — surface it to the owner rather than letting an executor decide at the keyboard.
+**Concerns.**
+- **LOW — shared edits to `navigation/types.ts` across waves.** Plan 04 (wave 2) and Plan 08 (wave 4) both edit it; sequential is safe, but the Plan 08 executor must *add* to param lists Plan 04 created, not regenerate.
 
-### MEDIUM
+**Risk: LOW.**
 
-- **[MEDIUM] Restore of a pre-Phase-32 backup does not remap the migrated vocabulary — Pitfall 1 via the restore backdoor.**
-  Evidence: migration 025's `UPDATE interactions SET quality/channel = CASE ...` runs **only during schema upgrade**. Restore is a separate path: `restore-apply.ts:189` does `INSERT INTO interactions (... quality ...) VALUES (...)` with the backed-up value **verbatim** (also the serializer `export-manifest.ts:52` selects `i.quality` raw). `BACKUP_FORMAT_VERSION` is already `4` (`export-manifest.test.ts:28`) and Phase 32 does **not** bump it, so a format-4 backup captured *before* Phase 32 (containing `quality='good'`, `channel='text'`) is accepted (`MAX_SUPPORTED_BACKUP_FORMAT_VERSION = BACKUP_FORMAT_VERSION`, `backup-schema.ts:16,778`) and its legacy literals land in a v25 DB. The now-migrated consumers `ai-context-read.ts:132` (`r.quality === "Positive"`) and `digest-read.ts:158` then **silently miscount** — the exact failure mode the plan guards against for on-device rows, re-introduced through restore.
-  Mechanism: the migration and the restore INSERT are two different writers of `interactions`; the plan closes the migration writer but not the restore writer. Neither Plan 01 nor a clearly-chartered Phase 36 item covers *value*-remap-on-restore (Phase 36 / AICFG-17 covers the format bump and "retired keys," not a same-named column's value vocabulary).
-  Required fix: at minimum add an explicit hand-off note that Phase 36's restore validation must value-remap legacy `quality`/`channel` on ingest, and add a Phase-32 test asserting the miscount does not occur *or* documenting it as a known gap for the 32→36 window. Best: a small remap-on-restore guard in the restore ingest for interaction rows.
+## Plan 05 — Heatmap / Intensity / tokens + persistence
+**Summary.** Correctly identifies the closed app-settings seams; heatmap stays static (no Skia loop). One ambiguity around *which* SELECT to extend.
 
-- **[MEDIUM] EditInteraction and empty-date LogContact routes may not resolve from a Settings-originated Profile.**
-  Evidence: `ContactProfileScreen` ("Profile") is registered in **three** stacks — `DashboardStack.tsx:44`, `SettingsStack.tsx:55`, `OrreryStack.tsx:50`. But `Edit` is registered only in Dashboard (`:57`) and Orrery (`:57`) — **not** Settings; and `LogContact` only in Dashboard (`:37`). Plan 04 registers `EditInteraction` mirroring `Edit` (Dashboard + Orrery only), so it inherits the SettingsStack gap. Profile is reachable from the Settings tab (Archived Contacts → Profile per DASHC-09/SHELL-12). From such a Profile, the History section's Edit action → `EditInteraction` and empty-date → `LogContact` would fail to resolve in the current navigator.
-  Mechanism: React Navigation throws when navigating to a route name absent from the active stack (absent a parent-level registration). Plan 08's backstop flags this *for LogContact only* ("register in the relevant stack(s) or route via root if it does not"); nothing addresses `EditInteraction` in SettingsStack.
-  Required fix: register `EditInteraction` (and confirm `LogContact`) in **all three** Profile-hosting stacks, or register them at `RootStack` (the research notes `RootStackParamList` reachability) so any origin resolves. Make this an explicit acceptance criterion, not a deferred backstop.
+**Strengths.** Closed-model seam list accurate (interface `:92`, `WritableSettingsKey` `:312`, `AppSettingsRow` `:353`, `COLUMN_OF` `:438`). Static RN Views sidestep the worklet hazard; structural current-cycle marking (no second hue) enforces D-10; `check:colors` gate is real.
 
-- **[MEDIUM] Plan 01 is large (17 files / ~85k tokens / confidence: low) and its Task 3 is a hard dependency of three downstream plans.**
-  Evidence: the `scope_acceptance` block consciously (and correctly) keeps the migration + `ai-context-read`/`digest-read` consumers atomic, permitting only Task 3 (the `TouchpointRefineForm` extension + backup allowlist) to slip to a follow-up commit. But Plan 04 (wraps the extended form), Plan 05 (reads `history_lens`/`history_cycle_count` via `app-settings-dao`), and Plan 07 (renders the `allow_ai` sparkle from the new column) all depend on Task 3's outputs.
-  Mechanism: if Task 3 lands as a later commit, Waves 2–3 could begin against an incomplete Plan 01 (missing form fields / uncommitted column readers), producing tsc breaks or building against a stale contract.
-  Required fix: make the follow-up-commit seam explicit that **Task 3 must land before Wave 2 starts**, and gate wave promotion on the full Plan-01 file set, not just Tasks 1–2.
+**Concerns.**
+- **MEDIUM — "the SELECT column list" is ambiguous; there are two SELECTs.** `getAppSettings` (`:496`, the runtime read) vs a second `Pick`-typed snapshot/bookkeeping SELECT (`:627`). To read the pref back at runtime, Plan 05 must extend `getAppSettings` (`:496`) and must **not** add the keys to any emission/snapshot path reserved for Phase 36 (D-11/A4). Name `getAppSettings` explicitly; assert the portable-snapshot path is untouched (mirror Plan 01 Task 3's grep-gate).
 
-### LOW
+**Risk: MEDIUM** (wrong-SELECT edit would cross the Phase-36 boundary).
 
-- **[LOW] `QualityAggregate` internal field names drift from stored values.** Plan 01 Task 2 keeps `{good, fine, hard}` field names in `prompt-types.ts:113-114` while the SQL now stores `Positive/Neutral/Negative` (RESEARCH A3, minimal blast radius). The aggregate stays *correct* (only the comparison literal changes; `ai-context-read.ts:132-136` still increments the same field), but a field literally named `good` will count `Positive` rows. Documented as an alias — a maintainability smell, not a bug. Acceptable; ensure the in-file comment is unmissable.
+## Plan 06 — Rolodex History Browser
+**Summary.** The only genuinely animated surface; render-loop discipline handled correctly.
 
-- **[LOW] `duration`/`allow_ai` are not in the backup this phase (by design) → restore resets them.** `restore-apply.ts:189` and `export-manifest.ts:52` list neither column, so a restore drops `duration` (→NULL) and resets `allow_ai` (→0, fail-closed). This is the intended Phase-36 boundary, but a user who set `allow_ai=1` and restores loses that state. Safe (fail-closed) and correct for now; add it to the Phase-36 hand-off so serialization + a "restore never falsely appears more-permissive" check are not forgotten.
+**Strengths.** Mirrors proven `OrreryCanvas.tsx` (Reanimated + GestureDetector, conditional-mount pause); moves math into node-tested `rolodex-logic.ts`; explicit `useIsFocused`+`AppState` ownership in `RolodexBrowser`; token-gated-or-dropped Skia glow; precise "gesture→shared values; committed selection→React state after settle" assertion.
 
-- **[LOW] `heatmapScale` must clear AA across all four palettes.** Count-saturation ramps can compress low-end contrast; Plan 05 flags authoring the tokens to pass palette contrast tests and (correctly) makes current-cycle a *structural* cue, not a hue. Final density/large-text QA is deferred to Phase 40 — reasonable, but keep the `check:colors`/contrast assertion in the Plan-05 gate, not only Phase 40.
+**Concerns.**
+- **LOW — performance is device-only and unmeasurable here** (three synchronized wheels + markers; correctly deferred to Pixel backstop; emulator can't validate per project MEMORY). No code defect.
 
-- **[LOW] `EditTouchpointFullInput` gains `duration`/`allow_ai`; existing callers must thread them.** Note that a grep finds **no current production caller** of `editTouchpointFull` outside comments (`recency-dao.ts` internal + doc refs in `touchpoint-refine-logic.ts`/`TouchpointRefineForm.tsx`); the live callers are `deleteTouchpoint` (`HomeScreen.tsx:485`, `UniversalFab.tsx:130`). This makes Plan 04 the *first* real consumer of `editTouchpointFull` — which cleanly validates the "one canonical Edit route" claim — but also means the input-type widening is compiler-gated with essentially no legacy call sites at risk. Low.
+**Risk: LOW.**
 
----
+## Plan 07 — Detail Sheet + Interaction Detail + hard-delete + group seam
+**Summary.** Inspect/edit/delete heart, owner-locked invariants at the UI edge.
 
-## 4. Suggestions
+**Strengths.** Delete consumes `deleteTouchpoint` (`recency-dao.ts:313-345`); UI re-implements no DELETE. Sparkle strictly gated on `allow_ai===1`; group note kept off the AI path (ADR-078). Group seam inert by construction, grep-gated; `TimelineRow.EVENT_LABELS` bind/unbind extension reads lifecycle rows correctly.
 
-1. **Resolve the group-linkage coupling before execution (owner-facing).** Decide explicitly: Phase 32 ships group surfaces as inert seams (predicate hard-false, no group fixtures), OR the owner authorizes moving `group_event_id` earlier (a D-07 reversal — owner's call). Do not let an executor infer this from a "prove exclusion" acceptance criterion. Rewrite Plan 03 Task 3 and Plan 07 Task 3 accordingly.
-2. **Add a restore-vocabulary guard or an explicit Phase-36 hand-off** for legacy `quality`/`channel` values on ingest, plus a test over a legacy-format-4 fixture asserting `ai-context-read`/`digest-read` counts are not silently zeroed post-restore.
-3. **Register `EditInteraction` + `LogContact` in all Profile-hosting stacks (Dashboard/Settings/Orrery) or at RootStack**, and promote this from a Plan-08 backstop to a hard acceptance criterion in Plan 04 and Plan 08.
-4. **Gate Wave-2 promotion on the complete Plan-01 file set** (including Task 3), given Plans 04/05/07 depend on the extended form/columns.
-5. **Keep one node test that migrates a jump-from-v1 fixture and then runs `readInteractionAggregates` + the digest gentle-line over the result** (Plan 01 already implies this in Pitfall 1) — it is the single highest-value regression guard in the phase; make it non-optional.
-6. **Add an assertion that `interaction_assists.channel` CHECK is untouched** (a source-grep that `014-interaction-assists.ts:12`'s CHECK is unchanged), so no executor "helpfully" migrates the transport vocabulary and breaks the assist path.
+**Concerns.**
+- **LOW — `TimelineRow`/`timeline-read` appear currently unmounted in production.** No importer of `TimelineRow` and no caller of `timeline-read`'s `LIST_TIMELINE` outside their own files/tests. Plan 07 re-mounts `TimelineRow` in `DateDetailSheet`, so the `EVENT_LABELS` edit becomes live there — but confirm `TimelineRow` is actually reused (not just labeled); else the bind/unbind label edit is dead code.
 
----
+**Risk: LOW.**
 
-## 5. Risk Assessment
+## Plan 08 — Profile History integration
+**Summary.** The user-facing payoff. Correctly upgrades only the renderer seam, distinguishes lifecycle-only from empty, owns the typed LogContact contract.
 
-**Overall: MEDIUM.**
+**Strengths.** `ProfileModuleHost.renderHistory` (`:387`) is the exact stub to replace; leaving the summary case + layout persistence untouched is right. `hasLifecycleRecords` drives the empty predicate. `LogContact` registration gap is real (Dashboard-only); adding to Orrery+Settings with typed `prefillDate` is the correct fix.
 
-Justification: the phase's *stated* highest risk — the irreversible on-device vocabulary migration — is, on verification, its *best-handled* area: additive-only, correctly numbered, jump-from-v1 tested, precedent-backed, and consumer-complete (the value-comparison consumer list is exactly two files, both in the plan; channel transport consumers are correctly excluded). The recency-spine, immutable-events, local-first, theme-token, and Skia/worklet non-negotiables are all consumed rather than violated, with mechanical grep/`check:colors` gates. That earns a lot of trust.
+**Concerns.**
+- **MEDIUM (scope-honesty, not a defect) — HIST-15 is only partially delivered.** `LogContact` target is `LogContactPlaceholderScreen`; Phase 32 ships the route/context *contract* only, Phase 34 owns the real form. Plan reframes this correctly, but Success Criterion #5 is not fully closed until Phase 34 — flag so the verifier doesn't over-credit HIST-15.
+- **LOW — additive merge on `navigation/types.ts`** (as under Plan 04).
 
-The MEDIUM (not LOW) rating comes from three verified gaps that live where correctness bugs live in this repo — the data layer and cross-phase seams: (1) the group-linked requirements are chartered to Phase 32 but their schema is Phase 33, creating untestable acceptance criteria and a D-07-reversal trap; (2) the restore writer of `interactions` re-opens the exact vocabulary miscount the migration closes; and (3) the new Edit/Log routes may not resolve from a Settings-originated Profile. None is a deep design error — each is a scoping/hand-off/registration fix — but (1) and (2) can produce silently-wrong data on unreachable devices, which is precisely the failure class this project is most anxious about. Resolve (1) and (2) with owner input, register the routes, and the phase drops comfortably to LOW.
+**Risk: LOW–MEDIUM.**
 
+## Dependency ordering & scope (cross-plan)
+- **Wave structure is clean and correctly gated.** No two same-wave plans modify the same file. `recency-dao.ts`/`interaction-vocabulary.ts` single-owned by Plan 01; `restore-apply.ts` single-owned by Plan 02. Only cross-wave shared file is `navigation/types.ts` (Plan 04 → Plan 08), safe sequentially.
+- **Plan 01 Task 3 gate correctly enforced** (Plans 04/05/07 consume Task 3 outputs; scope-acceptance gates wave-2 promotion on full Plan-01 set).
+- **No D-12 / D-07 reversal anywhere.** Group behavior is an inert predicate over an absent `group_event_id`, grep-gated. Migration 025 adds only `duration`, `allow_ai`, `history_lens`, `history_cycle_count` + value remap. No `BACKUP_FORMAT_VERSION` bump. Column stays `quality`. **All three project constraints respected — no forbidden-reversal defects found.**
+- **Local-first preserved:** every new read is a `ReadOnlyExecutor`, no transaction, no network.
+
+## Do the plans achieve the phase goal?
+Yes, with one honest caveat: HIST-15 is delivered as a route contract only (real form is Phase 34). The one substantive correctness risk to fix before execution is the **Plan 01 `email`-assist channel mapping gap** (MEDIUM), plus the two ambiguity fixes (Plan 03 intensity period, Plan 05 which-SELECT).
