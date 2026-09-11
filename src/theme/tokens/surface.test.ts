@@ -7,6 +7,9 @@ import {
   alphaComposite,
   BACKGROUND_VEIL_OPACITY,
   backgroundVeilOpacity,
+  CARD_GLASS_OPACITY,
+  cardMatchesMode,
+  cardTintOpacity,
   chromeScrimOpacity,
   MIN_BACKGROUND_CONTRIBUTION,
   resolveSurfaceStyle,
@@ -171,26 +174,70 @@ describe("glass-composite AA — Plan 03 handoff over the tinted FALLBACK surfac
   }
 });
 
-describe("COMPOSITED per-asset live-glass AA (cycle-3 MEDIUM — the primary proof)", () => {
+describe("COMPOSITED per-asset card AA — the ACTUAL mode-aware card tint (31.1-06)", () => {
   // Every text/status foreground composited over
-  //   alphaComposite(live glass tint @ liveGlassTintOpacity, asset brightest pixel)
-  // meets AA-equivalent contrast, per asset/package/mode. Validates the DECLARED
-  // worst-case pixel; the shipped .webp bytes are enforced by the device-UAT.
+  //   alphaComposite(card tint @ cardTintOpacity(pkg, mode, presentation), asset)
+  // meets AA per asset/package/mode. This proves BOTH regimes: the GLASSY matched
+  // regime (galaxy↔dark, standard↔light — light/dark text over a matched-tone art)
+  // AND the OPAQUE mismatched regime (galaxy-in-light, standard-in-dark — card falls
+  // back opaque so text stays readable). Presentation is the most translucent
+  // (worst-case) density. Validates the DECLARED brightest pixel; the shipped .webp
+  // bytes are enforced by the device-UAT.
   for (const [id, slot] of Object.entries(BACKGROUND_SLOTS)) {
     const pkg = slot.package;
     for (const mode of MODES) {
-      it(`${id} @ ${pkg}/${mode}: foregrounds over live glass on the brightest pixel meet AA`, () => {
+      const regime = cardMatchesMode(pkg, mode) ? "glassy" : "opaque";
+      it(`${id} @ ${pkg}/${mode} (${regime}): foregrounds over the card on the brightest pixel meet AA`, () => {
         const palette = resolvePalette(pkg, mode);
         const tint = palette[SURFACE[pkg].tintTokenKey];
         const composite = alphaComposite(
           tint,
           slot.brightestPixel,
-          SURFACE[pkg].liveGlassTintOpacity,
+          cardTintOpacity(pkg, mode, "presentation"),
         );
-        assertForegroundsAA(composite, palette, `${id} @ ${pkg}/${mode} live`);
+        assertForegroundsAA(
+          composite,
+          palette,
+          `${id} @ ${pkg}/${mode} ${regime} card`,
+        );
       });
     }
   }
+});
+
+describe("mode-aware card glass model (31.1-06)", () => {
+  it("cardMatchesMode: galaxy↔dark and standard↔light are the glassy (matched) regimes", () => {
+    expect(cardMatchesMode("galaxy", "dark")).toBe(true);
+    expect(cardMatchesMode("galaxy", "light")).toBe(false);
+    expect(cardMatchesMode("standard", "light")).toBe(true);
+    expect(cardMatchesMode("standard", "dark")).toBe(false);
+  });
+
+  it("the matched-regime glass opacity is genuinely lighter than the opaque band", () => {
+    for (const pkg of PACKAGES) {
+      expect(CARD_GLASS_OPACITY[pkg]).toBeGreaterThan(0);
+      // Glassy cards let the background show through — strictly lighter than the
+      // most translucent step of the opaque (mismatched) band.
+      expect(CARD_GLASS_OPACITY[pkg]).toBeLessThan(
+        surfaceOpacityForDensity(pkg, SURFACE_DENSITIES[0]),
+      );
+    }
+  });
+
+  it("cardTintOpacity returns the glass value when matched, the opaque band when not", () => {
+    for (const pkg of PACKAGES) {
+      for (const mode of MODES) {
+        for (const density of SURFACE_DENSITIES) {
+          const o = cardTintOpacity(pkg, mode, density);
+          expect(o).toBe(
+            cardMatchesMode(pkg, mode)
+              ? CARD_GLASS_OPACITY[pkg]
+              : surfaceOpacityForDensity(pkg, density),
+          );
+        }
+      }
+    }
+  });
 });
 
 describe("chrome-scrim AA (31.1-05 — bare-on-background text stays readable)", () => {
@@ -209,19 +256,21 @@ describe("chrome-scrim AA (31.1-05 — bare-on-background text stays readable)",
         const chrome = alphaComposite(
           tint,
           slot.brightestPixel,
-          chromeScrimOpacity(pkg),
+          chromeScrimOpacity(pkg, mode),
         );
         assertForegroundsAA(chrome, palette, `${id} @ ${pkg}/${mode} chrome`);
       });
     }
   }
 
-  it("chrome scrim is lighter than the card live-glass tint (art still shows behind chrome)", () => {
+  it("chrome goes glassy in the matched regime and opaque when mismatched (mirrors cards)", () => {
     for (const pkg of PACKAGES) {
-      expect(
-        chromeScrimOpacity(pkg),
-        `${pkg}: chrome scrim should be lighter than the card tint`,
-      ).toBeLessThanOrEqual(SURFACE[pkg].liveGlassTintOpacity);
+      for (const mode of MODES) {
+        // Chrome reuses the densest card step for a little extra bare-text backing.
+        expect(chromeScrimOpacity(pkg, mode)).toBe(
+          cardTintOpacity(pkg, mode, "dense"),
+        );
+      }
     }
   });
 });

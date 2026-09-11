@@ -25,9 +25,9 @@ import { type StyleProp, StyleSheet, View, type ViewStyle } from "react-native";
 import { useTheme } from "@/theme";
 import { RADII } from "@/theme/tokens/radii";
 import {
+  cardTintOpacity,
   resolveSurfaceStyle,
   type SurfaceDensity,
-  surfaceOpacityForDensity,
 } from "@/theme/tokens/surface";
 
 export interface GlassSurfaceProps {
@@ -60,11 +60,10 @@ export function GlassSurface({
   const { colors, mode, package: themePackage } = useTheme();
   const s = resolveSurfaceStyle(themePackage, blurAvailable);
 
-  // The rendered tint opacity: the live glass tint (>= fallback) for a glass
-  // surface, and the density-driven opacity for a flat one (denser -> more opaque).
-  const tintOpacity = s.glass
-    ? s.liveGlassTintOpacity
-    : surfaceOpacityForDensity(themePackage, density);
+  // Mode-aware card tint (31.1-06): glassy when the background art tone matches
+  // the mode (galaxy↔dark, standard↔light) so the background shows THROUGH the
+  // card; opaque otherwise so text stays readable over a mismatched art.
+  const tintOpacity = cardTintOpacity(themePackage, mode, density);
 
   const tintColor = colors[s.tintTokenKey];
   const borderColor = colors[s.borderTokenKey];
@@ -77,7 +76,11 @@ export function GlassSurface({
           shadowOpacity: 0.35,
           shadowRadius: 12,
           shadowOffset: { width: 0, height: 0 },
-          elevation: 6,
+          // NO Android `elevation` (31.1-06): on Android, elevation on a now-glassy
+          // (translucent) surface renders an opaque dark inner rectangle that blocks
+          // the background from showing through the card. The iOS shadow props above
+          // keep the subtle glow on iOS; Android forgoes it for true glass. (Minor
+          // deviation from dossier §F "subtle glow" — Android-only.)
         }
       : {};
 

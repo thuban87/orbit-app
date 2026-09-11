@@ -30,8 +30,8 @@ export interface ChromeScrimProps {
 }
 
 export function ChromeScrim({ children, style, radius }: ChromeScrimProps) {
-  const { colors, package: themePackage } = useTheme();
-  const opacity = chromeScrimOpacity(themePackage);
+  const { colors, mode, package: themePackage } = useTheme();
+  const opacity = chromeScrimOpacity(themePackage, mode);
   return (
     <View style={style}>
       <View

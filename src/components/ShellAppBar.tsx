@@ -41,7 +41,7 @@ export function ShellAppBar({
   trailing,
   trailingLabelProbe,
 }: ShellAppBarProps) {
-  const { colors, package: themePackage } = useTheme();
+  const { colors, mode, package: themePackage } = useTheme();
   const navigation = useNavigation();
   const [rootWidth, setRootWidth] = useState(0);
   const [titleWidth, setTitleWidth] = useState(0);
@@ -101,7 +101,7 @@ export function ShellAppBar({
         pointerEvents="none"
         style={[
           StyleSheet.absoluteFill,
-          { backgroundColor: colors.surface, opacity: chromeScrimOpacity(themePackage) },
+          { backgroundColor: colors.surface, opacity: chromeScrimOpacity(themePackage, mode) },
         ]}
       />
       {variant === "child" ? (

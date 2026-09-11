@@ -31,7 +31,7 @@
  * one composite helper over `#RRGGBB` hexes, so the module stays node-testable.
  */
 
-import type { ThemePackage } from "../theme-types";
+import type { ResolvedMode, ThemePackage } from "../theme-types";
 
 /**
  * The palette colour-token keys a surface field may reference. Constrained to the
@@ -102,6 +102,9 @@ export const SURFACE: Record<ThemePackage, SurfaceTokenSet> = {
     tintTokenKey: "surface",
     borderTokenKey: "borderStrong",
     glowTokenKey: "accent",
+    // The OPAQUE band — used when the mode does NOT match the art tone (galaxy art
+    // is dark, so this applies in LIGHT mode) to keep text readable. In the matched
+    // regime the card goes glassy instead (see CARD_GLASS_OPACITY / cardTintOpacity).
     densityOpacity: { presentation: 0.88, comfortable: 0.93, dense: 0.97 },
     liveGlassTintOpacity: 0.88,
     fallbackTintOpacity: 0.88,
@@ -111,6 +114,8 @@ export const SURFACE: Record<ThemePackage, SurfaceTokenSet> = {
     tintTokenKey: "surface",
     borderTokenKey: "border",
     glowTokenKey: null,
+    // The OPAQUE band — applied when mode does NOT match the art tone (standard art
+    // is light, so this applies in DARK mode). Matched (light mode) goes glassy.
     densityOpacity: { presentation: 0.97, comfortable: 0.99, dense: 1.0 },
     liveGlassTintOpacity: 0.97,
     fallbackTintOpacity: 0.97,
@@ -123,6 +128,56 @@ export function surfaceOpacityForDensity(
   density: SurfaceDensity,
 ): number {
   return SURFACE[themePackage].densityOpacity[density];
+}
+
+/**
+ * GLASSY CARDS (31.1-06) — mode-aware card tint so the selected background shows
+ * THROUGH the content, not just the gutters.
+ *
+ * A card's tint opacity is the SAME thing that backs its text, so a translucent
+ * card only stays readable when the background ART TONE matches the mode: galaxy
+ * art is dark (readable glassy in DARK mode — light text over dark art), standard
+ * art is light (readable glassy in LIGHT mode — dark text over light art). In the
+ * MISMATCHED regime (galaxy-in-light, standard-in-dark — the cross-combos the
+ * owner's parked theme-merge would retire) a glassy card would put text over a
+ * mismatched-tone composite and fail AA, so the card falls back to the OPAQUE band
+ * (`SURFACE.densityOpacity`) and stays readable. `surface.test.ts` proves AA per
+ * asset for BOTH regimes across all four package×mode combos.
+ *
+ * TUNABLE: the matched-regime glass opacity (owner-approved near-transparent
+ * galaxy cards, 2026-09-11). Standard is a touch higher (its light art needs a
+ * little more tint under dark text).
+ */
+export const CARD_GLASS_OPACITY: Record<ThemePackage, number> = {
+  galaxy: 0.05,
+  // Standard's mid-tone assets (Dusk/Mesh) under dark secondary text set the floor;
+  // 0.5 clears AA there while still far more transparent than the old 0.97 slab.
+  standard: 0.5,
+};
+
+/**
+ * True when the resolved mode matches the package's background art tone, so a
+ * glassy (translucent) card stays text-readable. galaxy↔dark, standard↔light.
+ */
+export function cardMatchesMode(
+  themePackage: ThemePackage,
+  mode: ResolvedMode,
+): boolean {
+  return themePackage === "galaxy" ? mode === "dark" : mode === "light";
+}
+
+/**
+ * The card tint opacity: glassy in the matched regime (art tone matches mode),
+ * else the opaque density band so text stays readable over a mismatched art.
+ */
+export function cardTintOpacity(
+  themePackage: ThemePackage,
+  mode: ResolvedMode,
+  density: SurfaceDensity,
+): number {
+  return cardMatchesMode(themePackage, mode)
+    ? CARD_GLASS_OPACITY[themePackage]
+    : SURFACE[themePackage].densityOpacity[density];
 }
 
 /**
@@ -151,10 +206,10 @@ export const BACKGROUND_VEIL_OPACITY: Record<
   // Galaxy art is dark; light text stays high-contrast over it, so the veil is
   // light and the deep-space art reads prominently between cards (owner asked for
   // more background — tuned lighter 2026-09-11).
-  galaxy: { presentation: 0.05, comfortable: 0.15, dense: 0.3 },
+  galaxy: { presentation: 0.02, comfortable: 0.1, dense: 0.22 },
   // Standard art includes mid-tone assets (Dusk/Mesh); a touch heavier than
   // galaxy and dense forms lean calmer, but art shows generously on browse screens.
-  standard: { presentation: 0.08, comfortable: 0.2, dense: 0.38 },
+  standard: { presentation: 0.05, comfortable: 0.14, dense: 0.3 },
 };
 
 /**
@@ -187,21 +242,17 @@ export function backgroundVeilOpacity(
  * MINIMUM that keeps text/status foregrounds AA over the scrim composited on each
  * asset's brightest pixel — `surface.test.ts` proves it per asset/package/mode.
  *
- * The worst case (secondary text over the lightest Standard asset in light mode,
- * and over the darkest Galaxy asset in light mode) forces this to the same floor
- * as the card `liveGlassTintOpacity` — chrome text needs card-equivalent backing
- * to stay AA. It is `<= liveGlassTintOpacity`; the veil (not this) is what reveals
- * the art in the card gutters and margins, so chrome bands staying near-opaque is
- * the accepted readability cost of "protect chrome".
+ * MODE-AWARE (31.1-06): like the cards, the chrome backing goes glassy in the
+ * matched regime (art tone matches mode) so the app bar / bare chrome stays
+ * consistent with the glassy content, and opaque in the mismatched regime so bare
+ * text stays readable. It reuses `cardTintOpacity` at the densest (most opaque,
+ * worst-case) step for a little extra backing under bare text with no card.
  */
-export const CHROME_SCRIM_OPACITY: Record<ThemePackage, number> = {
-  galaxy: 0.88,
-  standard: 0.97,
-};
-
-/** The local chrome-scrim backing opacity for a package. */
-export function chromeScrimOpacity(themePackage: ThemePackage): number {
-  return CHROME_SCRIM_OPACITY[themePackage];
+export function chromeScrimOpacity(
+  themePackage: ThemePackage,
+  mode: ResolvedMode,
+): number {
+  return cardTintOpacity(themePackage, mode, "dense");
 }
 
 /**
