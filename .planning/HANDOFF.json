@@ -1,135 +1,79 @@
 {
   "version": "1.0",
-  "timestamp": "2026-09-07T19:01:28.901180+00:00",
-  "phase": "29",
-  "phase_name": "Orrery Camera, Scale & Exploration",
-  "phase_dir": ".planning/phases/29-orrery-camera-scale-exploration",
-  "plan": 12,
-  "task": null,
-  "total_tasks": 0,
-  "status": "human_needed",
+  "timestamp": "2026-09-11T08:16:23.085Z",
+  "phase": "31.1",
+  "phase_name": "app-wide-system-backgrounds",
+  "phase_dir": ".planning/phases/31.1-app-wide-system-backgrounds",
+  "plan": 4,
+  "task": 3,
+  "total_tasks": 3,
+  "status": "paused",
   "completed_tasks": [
     {
-      "id": "29-01",
-      "name": "Canonical scene and camera tracer",
-      "status": "done",
-      "commit": "a67036e"
+      "id": 1,
+      "name": "Shell background host, route classification, and Settings picker",
+      "status": "implemented",
+      "commits": ["b71081c", "3a9a513", "8811784", "93b4fdd", "e009420", "99076a8"]
     },
     {
-      "id": "29-02",
-      "name": "Durable Orrery preferences",
-      "status": "done",
-      "commit": "0b854fa"
+      "id": 2,
+      "name": "Cooperating browse and dense screen roots",
+      "status": "implemented",
+      "commits": ["79719c", "8359b98", "412db0b"]
     },
     {
-      "id": "29-03",
-      "name": "Live System selection",
-      "status": "done",
-      "commit": "c1e1a3a"
-    },
-    {
-      "id": "29-04",
-      "name": "Growing world and bounded perspective",
-      "status": "done",
-      "commit": "9aef8cb"
-    },
-    {
-      "id": "29-05",
-      "name": "Shared billboard frame and semantic labels",
-      "status": "done",
-      "commit": "ccea9f0"
-    },
-    {
-      "id": "29-06",
-      "name": "Measured obstacles and reachable controls",
-      "status": "done",
-      "commit": "e467eb8"
-    },
-    {
-      "id": "29-07",
-      "name": "Camera gestures, Polaris and animated recovery",
-      "status": "done",
-      "commit": "f2b2798"
-    },
-    {
-      "id": "29-08",
-      "name": "Contact/group focus and accessible companion",
-      "status": "done",
-      "commit": "e6ac3c5"
-    },
-    {
-      "id": "29-09",
-      "name": "Deliberate guarded ring reorder",
-      "status": "done",
-      "commit": "c37bdb8"
-    },
-    {
-      "id": "29-10",
-      "name": "Relationship satellites",
-      "status": "done",
-      "commit": "8390375"
-    },
-    {
-      "id": "29-11",
-      "name": "Session restoration and lifecycle/error races",
-      "status": "done",
-      "commit": "070b50e"
-    },
-    {
-      "id": "29-12",
-      "name": "Integrated verification, documentation and native checklist",
-      "status": "done",
-      "commit": "77d7129"
+      "id": 3,
+      "name": "DEBUG/release Pixel UAT and release artifact gate",
+      "status": "executed_but_invalidated_by_owner_release_test",
+      "commits": ["09ba594", "4f47852", "7a9289f", "2bf96f6", "5111597", "f57bbb8"]
     }
   ],
   "remaining_tasks": [
     {
-      "id": "29-native-acceptance",
-      "name": "Run nine UAT groups preserving all native checklist states and workflows",
-      "status": "pending"
-    }
-  ],
-  "blockers": [],
-  "async_jobs": [],
-  "human_actions_pending": [
+      "id": 1,
+      "name": "Treat the owner-reported release failure as phase-blocking; reproduce and correct the background composition so selection is visibly observable on regular screens.",
+      "status": "not_started"
+    },
     {
-      "action": "Native acceptance via29-UAT.md and29-NATIVE-CHECKLIST.md",
-      "context": "All55E1-E9 states,N01-N12,automatic-backup contention and two presentation checks pending. Confirm package and Metro session before device use.",
-      "blocking": true
+      "id": 2,
+      "name": "Re-run debug and standalone-release visual validation after the correction, including an explicit asset-to-asset comparison on regular presentation, comfortable, and dense routes.",
+      "status": "not_started"
+    },
+    {
+      "id": 3,
+      "name": "Complete independent phase verification and update phase tracking only after the production failure is resolved.",
+      "status": "not_started"
     }
   ],
+  "blockers": [
+    {
+      "description": "Owner installed app-release-31.1-04.apk on a personal phone and reports that choosing any of the eight backgrounds or None changes the Settings selection but produces no visible background change on other app pages.",
+      "type": "technical",
+      "workaround": "None. Do not mark Phase 31.1 complete; diagnose and repair before another release gate."
+    },
+    {
+      "description": "Source inspection identifies a likely render-composition cause: BackgroundHost paints its asset first, then a full-screen colors.surface scrim. SURFACE density opacities are Galaxy 0.88/0.93/0.97 and Standard 0.97/0.99/1.0 (presentation/comfortable/dense), which leaves only 12% or less of Galaxy art and 3%, 1%, or 0% of Standard art visible before opaque component surfaces.",
+      "type": "technical",
+      "workaround": "Confirm by reproducing on a release-capable device, then design a readable but observably distinct composition consistent with the dossier/owner visual intent."
+    }
+  ],
+  "async_jobs": [],
+  "human_actions_pending": [],
   "decisions": [
     {
-      "decision": "Pause after29-06 before29-07",
-      "rationale": "Explicit owner request during plan06; plan06 completed and verified before stopping.",
-      "phase": "29"
+      "decision": "Pause Phase 31.1 rather than closing it despite the recorded debug/release UAT pass.",
+      "rationale": "The owner’s real-device release report contradicts the acceptance claim and is phase-blocking."
     },
     {
-      "decision": "All phase subagents use gpt-6-astra with medium reasoning",
-      "rationale": "Explicit owner model instruction; preserve on resume.",
-      "phase": "29"
-    },
-    {
-      "decision": "Sequential execution in current main checkout with no pushes/worktrees/branch switching",
-      "rationale": "Project and owner constraints.",
-      "phase": "29"
-    },
-    {
-      "decision": "Owner resumed after Plan06 and requested finishing through",
-      "rationale": "Plans07-12 executed and review fixes completed; earlier pause instruction fulfilled and superseded.",
-      "phase": "29"
+      "decision": "Do not treat the selector/persistence path as the primary suspected fault yet.",
+      "rationale": "Settings updates Zustand immediately and persists the active package column; BackgroundHost consumes the selected store value. The full-screen scrim is the stronger source-backed explanation for imperceptible visuals."
     }
   ],
   "uncommitted_files": [
-    ".planning/phases/24.1-contact-knowledge-foundation/24.1-REVIEW-FIX.md",
-    ".planning/phases/24.1-contact-knowledge-foundation/24.1-REVIEW.md",
     "tsconfig.json",
-    ".planning/phases/27-dashboard-list-view/27-VERIFICATION.md",
-    "modules/orbit-backup-document-picker/android/build/",
-    "modules/orbit-contact-picker/android/build/",
-    "modules/orbit-secure-fetch/android/build/",
-    "modules/orbit-share-finish/android/build/"
+    ".planning/phases/30-orrery-systems/30-REVIEW.md",
+    ".planning/phases/30-orrery-systems/30-REVIEW-FIX.md"
   ],
-  "next_action": "$gsd-verify-work 29 \u2014 execute and record native acceptance; do not rerun completed plans or advance Phase 30.",
-  "context_notes": "All 12 canonical plans executed. Five review findings fixed and independently rechecked; REVIEW clean. Goal verifier human_needed with no implementation blockers. Full suite278 files/2595 tests passed; typecheck/colors/whitespace passed. Local commits only. No device operations or workflow-started servers. GSD init miscounts29-PLAN-CHECK.md; canonical plan index has12 plans. verify:post capability checks remain part of acceptance workflow."
+  "next_action": "Read the phase handoff and the canonical dossier/UI spec, reproduce the owner report with a selected contrast-maximizing background in a standalone release, then plan a corrective gap that makes backgrounds visibly observable without weakening readability or the Orrery/Profile exceptions.",
+  "context_notes": "All four original plans are committed, but the phase is NOT verified or complete. The standalone artifact was delivered to droid Drive and installed on a Pixel. An attempted independent verifier failed only because the agent hit a usage limit; no 31.1-VERIFICATION.md was created."
 }
