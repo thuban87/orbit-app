@@ -73,6 +73,7 @@ import { Icon } from "@/components/icons/Icon";
 import { ICON_REGISTRY, type IconName } from "@/components/icons/icon-registry";
 import { SegmentedControl } from "@/components/SegmentedControl";
 import { ShellAppBar } from "@/components/ShellAppBar";
+import { ChromeScrim } from "@/components/ui/ChromeScrim";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { Sheet } from "@/components/ui/Sheet";
 import {
@@ -1452,12 +1453,14 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
   const listHeader = (
     <View style={styles.header}>
       {!error && counts.live > 0 ? (
-        <Text
-          testID="dashboard-header-count"
-          style={[styles.countHeader, { color: colors.textSecondary }]}
-        >
-          {`${counts.live} contact${counts.live === 1 ? "" : "s"}`}
-        </Text>
+        <ChromeScrim style={styles.countScrim} radius={RADII.sm}>
+          <Text
+            testID="dashboard-header-count"
+            style={[styles.countHeader, { color: colors.textSecondary }]}
+          >
+            {`${counts.live} contact${counts.live === 1 ? "" : "s"}`}
+          </Text>
+        </ChromeScrim>
       ) : null}
     </View>
   );
@@ -2138,6 +2141,12 @@ const styles = StyleSheet.create({
   header: {
     gap: 10,
     marginBottom: 4,
+  },
+  countScrim: {
+    alignSelf: "flex-start",
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    overflow: "hidden",
   },
   countHeader: {
     fontSize: 13,

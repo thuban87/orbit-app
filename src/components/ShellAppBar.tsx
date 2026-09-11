@@ -4,6 +4,7 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 import { resolveBackIntent } from "@/navigation/back-intent";
 import { shellTransientStore } from "@/stores/shell-transient-store";
 import { useTheme } from "@/theme";
+import { chromeScrimOpacity } from "@/theme/tokens/surface";
 import { OverflowMenu, type OverflowAction } from "./OverflowMenu";
 
 interface TrailingFitOptions {
@@ -40,7 +41,7 @@ export function ShellAppBar({
   trailing,
   trailingLabelProbe,
 }: ShellAppBarProps) {
-  const { colors } = useTheme();
+  const { colors, package: themePackage } = useTheme();
   const navigation = useNavigation();
   const [rootWidth, setRootWidth] = useState(0);
   const [titleWidth, setTitleWidth] = useState(0);
@@ -93,6 +94,16 @@ export function ShellAppBar({
       }}
       style={[styles.root, { borderColor: colors.border }]}
     >
+      {/* Chrome scrim (31.1-05): a local surface backing so the title/Back stay
+          AA-readable over the now-visible background veil. Token-only, behind the
+          row (absolute fill), never intercepts touches. */}
+      <View
+        pointerEvents="none"
+        style={[
+          StyleSheet.absoluteFill,
+          { backgroundColor: colors.surface, opacity: chromeScrimOpacity(themePackage) },
+        ]}
+      />
       {variant === "child" ? (
         <Pressable
           accessibilityRole="button"
