@@ -558,6 +558,18 @@ export function SettingsScreen() {
     }
   }, []);
 
+  const onSelectBackground = useCallback(
+    (slot: BackgroundSlotId) => {
+      setBackgroundForActivePackage(slot);
+      void persist(
+        themePackage === "galaxy"
+          ? { galaxyBackground: slot }
+          : { standardBackground: slot },
+      );
+    },
+    [persist, setBackgroundForActivePackage, themePackage],
+  );
+
   const savePhoneRegionOverride = useCallback(
     async (input: string): Promise<boolean> => {
       try {
@@ -833,7 +845,6 @@ export function SettingsScreen() {
   return (
     <ScrollView
       testID="settings-screen"
-      style={{ backgroundColor: colors.background }}
       contentContainerStyle={[
         styles.content,
         { paddingBottom: bottomClearance },
@@ -1099,7 +1110,7 @@ export function SettingsScreen() {
                       colors={colors}
                       columnWidth={backgroundColumnWidth}
                       label={BACKGROUND_LABELS[slot]}
-                      onPress={() => undefined}
+                      onPress={onSelectBackground}
                       selected={selectedBackgroundSlot === slot}
                       slot={slot}
                       sourcePackage={sourcePackage}
@@ -1114,7 +1125,7 @@ export function SettingsScreen() {
                 colors={colors}
                 columnWidth={backgroundColumnWidth}
                 label={BACKGROUND_LABELS[NONE_SLOT_ID]}
-                onPress={() => undefined}
+                onPress={onSelectBackground}
                 selected={selectedBackgroundSlot === NONE_SLOT_ID}
                 slot={NONE_SLOT_ID}
                 sourcePackage={themePackage}
