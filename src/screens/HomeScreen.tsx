@@ -1559,7 +1559,7 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
   return (
     <View
       testID="dashboard-root"
-      style={[styles.root, { backgroundColor: colors.background }]}
+      style={styles.root}
     >
       <View
         accessible={!panelOpen}

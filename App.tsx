@@ -60,6 +60,7 @@ import { registerPhotoReconcileSweep } from "@/services/photos/photo-reconcile-s
 import { registerRestorePhotoFinalizeSweep } from "@/services/photos/restore-photo-finalize-sweep";
 import { registerWidgetSweep } from "@/services/widget/widget-refresh";
 import { subscribeAppState, useAssistBanner } from "@/stores/assist-store";
+import { setFocusedRouteName } from "@/stores/focused-route-store";
 import {
   themeSelectionFromSettings,
   useThemeStore,
@@ -67,6 +68,7 @@ import {
 import { ThemeProvider, useTheme } from "@/theme";
 import { loadAppFonts } from "@/theme/fonts";
 import { hydrateThemeAtBoot } from "@/theme/hydrate-theme-at-boot";
+import { navigationTheme } from "@/theme/navigation-theme";
 import { Logger } from "@/utils/logger";
 
 /**
@@ -140,7 +142,7 @@ let reconcileResumeSweepRegistered = false;
 let interactionAssistSweepRegistered = false;
 
 function AppShell() {
-  const { colors } = useTheme();
+  const { colors, mode } = useTheme();
   const [ready, setReady] = useState(false);
   const [error, setError] = useState<unknown>(null);
   // Reactive navigator-readiness flag (A4-refine). `NavigationContainer`'s
@@ -153,6 +155,10 @@ function AppShell() {
     useState<ResumableImport | null>(null);
   const [resumableReconcile, setResumableReconcile] =
     useState<ResumableReconcile | null>(null);
+
+  const syncFocusedRoute = () => {
+    setFocusedRouteName(navigationRef.current?.getCurrentRoute()?.name);
+  };
 
   // 1. Migrate before first render. Hold `ready` false until it resolves. A
   //    rejection (failed migration) is caught so the app surfaces a themed error
@@ -361,7 +367,15 @@ function AppShell() {
   // (with `hasShareIntent`) — driving the pending share to Capture the moment
   // BOTH settle (A4/A4-refine), with no linking getInitialURL racing the provider.
   return (
-    <NavigationContainer ref={navigationRef} onReady={() => setNavReady(true)}>
+    <NavigationContainer
+      ref={navigationRef}
+      theme={navigationTheme[mode]}
+      onReady={() => {
+        setNavReady(true);
+        syncFocusedRoute();
+      }}
+      onStateChange={syncFocusedRoute}
+    >
       <ShareIntentGate isReady={navReady} />
       {/* Render-null gate: owns its own response listener + cold-start read; keyed
           on the SAME reactive navReady flag as ShareIntentGate so a tap routes the
@@ -395,6 +409,11 @@ function AppShell() {
   );
 }
 
+function ThemedStatusBar() {
+  const { mode } = useTheme();
+  return <StatusBar style={mode === "light" ? "dark" : "light"} />;
+}
+
 export default function App() {
   // Task 17-07 only: a purpose-built release APK can opt into the native KDF
   // timing harness. This literal is compiled in by Expo only for that one
@@ -419,7 +438,7 @@ export default function App() {
       <SafeAreaProvider>
         <ShareIntentProvider>
           <ThemeProvider>
-            <StatusBar style="light" />
+            <ThemedStatusBar />
             {benchmarkMode ? (
               <BackupEncryptionBenchmarkHarness />
             ) : (

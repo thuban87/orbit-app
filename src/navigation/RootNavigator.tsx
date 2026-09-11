@@ -16,15 +16,21 @@ import { BackHandler, Keyboard, StyleSheet, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Icon } from "@/components/icons/Icon";
 import { TAB_ICON } from "@/components/icons/icon-registry";
+import { BackgroundHost } from "@/components/ui/BackgroundHost";
 import { BackupStack } from "@/navigation/tabs/BackupStack";
 import { DashboardStack } from "@/navigation/tabs/DashboardStack";
 import { OrreryStack } from "@/navigation/tabs/OrreryStack";
 import { SettingsStack } from "@/navigation/tabs/SettingsStack";
+import { useFocusedRouteStore } from "@/stores/focused-route-store";
 import { shellTransientStore } from "@/stores/shell-transient-store";
 import { setTabBarHeight } from "@/stores/tab-bar-layout-store";
 import { useTheme } from "@/theme";
 import { resolveBackIntent } from "./back-intent";
-import { isFocusedWorkflow } from "./focused-route-classification";
+import {
+  densityForRoute,
+  isFocusedWorkflow,
+  systemBackgroundSlotOverride,
+} from "./focused-route-classification";
 import type { TabParamList } from "./types";
 import { useWindowObstacle } from "./use-window-measurement";
 
@@ -113,6 +119,7 @@ function handleActiveTabPress(
 
 export function RootNavigator() {
   const { colors } = useTheme();
+  const focusedRoute = useFocusedRouteStore((state) => state.routeName);
 
   useEffect(() => {
     let subscription: { remove: () => void } | undefined;
@@ -175,65 +182,74 @@ export function RootNavigator() {
   });
 
   return (
-    <SafeAreaView edges={["top"]} style={{ flex: 1 }}>
-      <Tab.Navigator
-        initialRouteName="DashboardTab"
-        tabBar={(props) => <MeasuredTabBar {...props} />}
-        screenOptions={({ route }) => ({
-          headerShown: false,
-          tabBarHideOnKeyboard: true,
-          animation: "fade",
-          tabBarActiveTintColor: colors.accent,
-          tabBarInactiveTintColor: colors.textSecondary,
-          tabBarStyle: { backgroundColor: colors.surface },
-          // Route each tab through the semantic icon registry (the ad-hoc
-          // per-route glyph map is retired). Icon resolves colour via its own
-          // theme tone — accent when
-          // focused, textSecondary otherwise — mirroring the tab bar's former
-          // active/inactive tint, and size via the ICON_SIZE `lg` token.
-          tabBarIcon: ({ focused }) => (
-            <Icon
-              name={TAB_ICON[route.name]}
-              state={focused ? "active" : "default"}
-              tone={focused ? "accent" : "textSecondary"}
-              size="lg"
-            />
-          ),
-        })}
-      >
-        <Tab.Screen
-          name="DashboardTab"
-          component={DashboardStack}
-          options={({ route }) => tabOptions("Dashboard", route, "Home")}
-          listeners={({ navigation, route }) => ({
-            tabPress: (event) => handleActiveTabPress(event, navigation, route),
+    <BackgroundHost
+      density={densityForRoute(focusedRoute)}
+      slotId={systemBackgroundSlotOverride(focusedRoute)}
+    >
+      <SafeAreaView edges={["top"]} style={{ flex: 1 }}>
+        <Tab.Navigator
+          initialRouteName="DashboardTab"
+          tabBar={(props) => <MeasuredTabBar {...props} />}
+          screenOptions={({ route }) => ({
+            headerShown: false,
+            tabBarHideOnKeyboard: true,
+            animation: "fade",
+            tabBarActiveTintColor: colors.accent,
+            tabBarInactiveTintColor: colors.textSecondary,
+            tabBarStyle: { backgroundColor: colors.surface },
+            // Route each tab through the semantic icon registry (the ad-hoc
+            // per-route glyph map is retired). Icon resolves colour via its own
+            // theme tone — accent when
+            // focused, textSecondary otherwise — mirroring the tab bar's former
+            // active/inactive tint, and size via the ICON_SIZE `lg` token.
+            tabBarIcon: ({ focused }) => (
+              <Icon
+                name={TAB_ICON[route.name]}
+                state={focused ? "active" : "default"}
+                tone={focused ? "accent" : "textSecondary"}
+                size="lg"
+              />
+            ),
           })}
-        />
-        <Tab.Screen
-          name="OrreryTab"
-          component={OrreryStack}
-          options={({ route }) => tabOptions("Orrery", route, "Orrery")}
-          listeners={({ navigation, route }) => ({
-            tabPress: (event) => handleActiveTabPress(event, navigation, route),
-          })}
-        />
-        <Tab.Screen
-          name="BackupTab"
-          component={BackupStack}
-          options={({ route }) => tabOptions("Backup", route, "Backup")}
-          listeners={({ navigation, route }) => ({
-            tabPress: (event) => handleActiveTabPress(event, navigation, route),
-          })}
-        />
-        <Tab.Screen
-          name="SettingsTab"
-          component={SettingsStack}
-          options={({ route }) => tabOptions("Settings", route, "Settings")}
-          listeners={({ navigation, route }) => ({
-            tabPress: (event) => handleActiveTabPress(event, navigation, route),
-          })}
-        />
-      </Tab.Navigator>
-    </SafeAreaView>
+        >
+          <Tab.Screen
+            name="DashboardTab"
+            component={DashboardStack}
+            options={({ route }) => tabOptions("Dashboard", route, "Home")}
+            listeners={({ navigation, route }) => ({
+              tabPress: (event) =>
+                handleActiveTabPress(event, navigation, route),
+            })}
+          />
+          <Tab.Screen
+            name="OrreryTab"
+            component={OrreryStack}
+            options={({ route }) => tabOptions("Orrery", route, "Orrery")}
+            listeners={({ navigation, route }) => ({
+              tabPress: (event) =>
+                handleActiveTabPress(event, navigation, route),
+            })}
+          />
+          <Tab.Screen
+            name="BackupTab"
+            component={BackupStack}
+            options={({ route }) => tabOptions("Backup", route, "Backup")}
+            listeners={({ navigation, route }) => ({
+              tabPress: (event) =>
+                handleActiveTabPress(event, navigation, route),
+            })}
+          />
+          <Tab.Screen
+            name="SettingsTab"
+            component={SettingsStack}
+            options={({ route }) => tabOptions("Settings", route, "Settings")}
+            listeners={({ navigation, route }) => ({
+              tabPress: (event) =>
+                handleActiveTabPress(event, navigation, route),
+            })}
+          />
+        </Tab.Navigator>
+      </SafeAreaView>
+    </BackgroundHost>
   );
 }
