@@ -6,10 +6,10 @@ current_phase: 32
 current_phase_name: interaction-history-insights
 status: phase-complete
 stopped_at: "Phase 31.1 COMPLETE (owner-approved 2026-09-11): 31.1-05 background-visibility fix (veil decoupled from card opacity + ChromeScrim) + 31.1-06 mode-aware glassy cards (background shows through; Android-elevation fix). 2927 tests pass; release delivered + owner-validated. Next: pick the next roadmap phase (gsd-next) — NOTE Phase 30 Orrery Systems still shows [ ] open in ROADMAP with dirty 30-REVIEW files; reconcile separately."
-last_updated: "2026-09-11T20:46:13.037Z"
+last_updated: "2026-09-11T21:22:20.604Z"
 last_activity: 2026-09-11
 last_activity_desc: Phase 31.1 buttoned up — 31.1-05 + 31.1-06 complete, owner-approved; SUMMARYs written, ROADMAP + UAT marked complete
-state_head: fe97130bcb1a006e179b9f7f4705a05919e11608
+state_head: 147bd3541d4c21c20303b9b9040d40d6bebde8f2
 progress:
   total_phases: 21
   completed_phases: 8
