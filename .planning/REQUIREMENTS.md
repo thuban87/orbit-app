@@ -36,7 +36,7 @@ category's phase (see Traceability).
 
 - [ ] **THEME-01**: User can choose a theme package (Galaxy or Standard) independently of appearance mode (Light / Dark / Follow System), yielding all four combinations; Follow System tracks the OS live; first launch defaults to Galaxy + Follow System
 - [ ] **THEME-02**: User can pick a UI accent color from a curated palette (~8–10 choices), separate from the owner/star color setting
-- [ ] **THEME-03**: Each theme package remembers its own accent, background, and appearance choices; all appearance changes preview live; theme-critical preferences restore before first render (no wrong-theme flash)
+- [x] **THEME-03**: Each theme package remembers its own accent, background, and appearance choices; all appearance changes preview live; theme-critical preferences restore before first render (no wrong-theme flash)
 - [x] **THEME-04**: User can choose from curated bundled backgrounds per theme (~4–5) plus None/Solid, all shipped locally; backgrounds stay fixed while content scrolls, and surface opacity increases with content density so dense screens stay readable
 - [x] **THEME-05**: Galaxy renders glass-forward (translucency, glow) with optionally very subtle ambient motion; Standard renders cleaner, flatter, quieter
 - [ ] **THEME-06**: The app respects the OS reduced-motion preference, stopping or simplifying nonessential motion app-wide (a reusable hook consumable from the Skia render loop)
