@@ -5,18 +5,19 @@ milestone_name: Release Readiness
 current_phase: 31.1
 current_phase_name: app-wide-system-backgrounds
 status: verifying
-stopped_at: Completed 31.1-04-PLAN.md
-last_updated: "2026-09-11T02:48:11.970Z"
-last_activity: 2026-09-10
-last_activity_desc: Phase 31.1 Plan 01 tracer complete; ready for Plan 02
-state_head: 2bf96f6126faf55fb3b5424131a20af1f15e4e04
+stopped_at: "31.1-05 corrective (background-visibility release failure): veil decoupled from card opacity + chrome protected; 2924 tests pass; debug-validated on Pixel across both packages+modes; release built & delivered — AWAITING owner personal-phone validation"
+last_updated: "2026-09-11T09:25:00.000Z"
+last_activity: 2026-09-11
+last_activity_desc: "31.1-05 corrective for owner-reported release background failure — veil lightened + ChromeScrim; debug-validated on Pixel; release APK built"
+state_head: d94030e
 progress:
   total_phases: 21
   completed_phases: 7
-  total_plans: 103
+  total_plans: 104
   completed_plans: 101
 carried_forward:
 
+  - "31.1 NOT complete: 31.1-05 corrective (backgrounds were invisible on the owner's release — full-screen scrim at card opacity) is executed + debug-validated + release built/delivered, but the phase stays open until the owner validates the release on his personal phone (the prior 31.1-04 gate's false positive is why). See 31.1-05-PLAN.md, 31.1-UAT.md (superseded + corrective section)."
   - "H6 (Phase 29 UAT) BLOCKED → Phase 40: backup/scene contention overlap unmeasured — the SAF backup-folder grant needs reconnecting, and ordinary navigation does not prove snapshot overlap (see 29-UAT.md, 29-NATIVE-CHECKLIST.md)"
   - "D-11: default Memory-type display name is provisional (memory-registry.ts:10-12) — owner naming decision, must be reconciled before Phase 34"
   - "UI-REVIEW warnings (non-blocking): accent→accentText token misrole (8 sites); Add-memory CTA uses hand-rolled link vs Button primitive; ContactPicker/Snackbar off type/spacing scale — triage fix-now vs fold into 24.2"
@@ -34,9 +35,9 @@ See: .planning/PROJECT.md (updated 2026-09-10 after Phase 31)
 
 ## Current Position
 
-Phase: 31.1 (app-wide-system-backgrounds) — IN PROGRESS
-Plan: 4 of 4 complete
-Status: Phase complete — ready for verification
+Phase: 31.1 (app-wide-system-backgrounds) — CORRECTIVE IN VALIDATION
+Plan: 4 of 4 + corrective 31.1-05 (executed, debug-validated)
+Status: Owner-reported release failure (backgrounds invisible on regular screens) diagnosed + fixed in 31.1-05 — BackgroundHost veil decoupled from card opacity + ChromeScrim protects bare chrome. 2924 tests pass; debug-validated on the Pixel (Galaxy Nebula + Standard Dusk, both modes). Release APK built + delivered to Drive. Phase stays OPEN until the owner validates the release on his personal phone.
 Carried forward (owner's bucket, NOT resolved here): D-11 default Memory-type display name — reconcile before Phase 34.
 Surface to owner (24.2-07, KNOW-15): milestone plan said Phase 36 owns the backup format-4 bump, but 24.1 already bumped to 4 (d677e2c); Plan 07 emits into the live format 4 with NO bump — that milestone instruction is stale.
 Deferred to Phase 31 (recorded in Plan 05): durable contact-scoped-def ownership + owner-purge semantics. Deferred to Phase 36 (ROADMAP breadcrumb): legacy AI-fuel confirm-path code removal.
