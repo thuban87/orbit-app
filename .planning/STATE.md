@@ -2,18 +2,18 @@
 gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Release Readiness
-current_phase: 31.1
-current_phase_name: app-wide-system-backgrounds
+current_phase: 32
+current_phase_name: Interaction History & Insights
 status: phase-complete
 stopped_at: "Phase 31.1 COMPLETE (owner-approved 2026-09-11): 31.1-05 background-visibility fix (veil decoupled from card opacity + ChromeScrim) + 31.1-06 mode-aware glassy cards (background shows through; Android-elevation fix). 2927 tests pass; release delivered + owner-validated. Next: pick the next roadmap phase (gsd-next) — NOTE Phase 30 Orrery Systems still shows [ ] open in ROADMAP with dirty 30-REVIEW files; reconcile separately."
-last_updated: "2026-09-11T13:05:00.000Z"
+last_updated: "2026-09-11T19:27:37.564Z"
 last_activity: 2026-09-11
-last_activity_desc: "Phase 31.1 buttoned up — 31.1-05 + 31.1-06 complete, owner-approved; SUMMARYs written, ROADMAP + UAT marked complete"
-state_head: 4ab5ecc
+last_activity_desc: Phase 31.1 buttoned up — 31.1-05 + 31.1-06 complete, owner-approved; SUMMARYs written, ROADMAP + UAT marked complete
+state_head: c5e524767fac74a224be69f314e7e1e717782ff3
 progress:
   total_phases: 21
   completed_phases: 8
-  total_plans: 105
+  total_plans: 112
   completed_plans: 103
 carried_forward:
 
@@ -36,7 +36,7 @@ See: .planning/PROJECT.md (updated 2026-09-10 after Phase 31)
 
 ## Current Position
 
-Phase: 31.1 (app-wide-system-backgrounds) — ✅ COMPLETE (owner-approved 2026-09-11)
+Phase: 32 (Interaction History & Insights) — READY TO EXECUTE
 Plan: 4 of 4 + corrective 31.1-05 + enhancement 31.1-06 — all complete (SUMMARYs written)
 Status: (1) 31.1-05 fixed the owner-reported release failure (backgrounds invisible) — veil decoupled from card opacity + ChromeScrim. (2) 31.1-06 made content cards MODE-AWARE GLASSY so the background shows THROUGH them (glassy when art tone matches mode — galaxy↔dark, standard↔light; opaque otherwise for readability), fixed the Android-elevation dark-inner-rect artifact, and lowered the veil near-zero. 2927 tests pass (AA proven for all 4 package×mode combos); release delivered to Drive (SHA `70b1498a…`) and owner-approved ("looks good all around"). 9 commits local/unpushed — owner pushes.
 Parked (owner, future): theme-merge into one Dark/Light switch; Deep Space/Starfield removal. See memories mode-aware-glassy-cards, android-elevation-opaque-on-translucent, theme-merge-into-mode-parked.

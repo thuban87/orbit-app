@@ -720,14 +720,26 @@ Plans:
 **Canonical refs**: docs/dossier/milestone-2/phase-11-interaction-history-insights-dossier-v0.2-group-events.md; docs/dossier/milestone-2/planning-notes/phase-11-planning-notes.md
 **Schema**: Phase 32 OWNS the shared interactions migration (migration 025, verified head+1 on disk = 24 at plan time): Tone/channel value remap + nullable duration seconds + allow_ai DEFAULT 0 on interactions, + history_lens/history_cycle_count on app_settings; SQL column stays `quality` (values migrate, name does not). Phase 34 consumes these columns; Phase 33 adds group_event_id later (026+); Phase 36 owns the backup format bump.
 **Plans:** 8 plans
+**Wave 1**
+
 - [ ] 32-01-PLAN.md — Migration 025 + Tone/channel vocabulary lockstep + duration/allow_ai/history-pref columns + refine-form fields (wave 1, tracer, one-way checkpoint)
 - [ ] 32-02-PLAN.md — Bind/Unbind immutable lifecycle events (wave 1)
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
 - [ ] 32-03-PLAN.md — Reusable history aggregation seam (window/buckets/cycles/intensity-window) + canonical history-read (wave 2)
 - [ ] 32-04-PLAN.md — Canonical Edit Interaction route through the recency spine (wave 2)
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
 - [ ] 32-05-PLAN.md — Heatmap/marker theme tokens + ActivityHeatmap + IntensityChart + lens persistence + context card (wave 3)
 - [ ] 32-06-PLAN.md — Rolodex History Browser (synchronized wheels, markers, drawer, reduced motion) (wave 3)
 - [ ] 32-07-PLAN.md — Shared Detail Sheet + Interaction Detail (sparkle, group context) + hard-delete + group scope routing (wave 3)
+
+**Wave 4** *(blocked on Wave 3 completion)*
+
 - [ ] 32-08-PLAN.md — Profile History section integration (replace timeline) + empty-date logging route + empty state (wave 4)
+
 **UI hint**: yes
 
 ### Phase 33: Group Interaction Logging
