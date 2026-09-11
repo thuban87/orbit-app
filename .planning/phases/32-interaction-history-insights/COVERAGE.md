@@ -1,0 +1,1 @@
+No external API integration: Phase 32 surfaces an existing per-interaction `allow_ai` flag (a restrained sparkle when ON) and adds the durable column + Edit toggle, but it makes no call to any AI provider/SDK/service — actual note transmission is Phase 36's egress wiring, and all History read paths are on-device SQLite with no network (local-first).
