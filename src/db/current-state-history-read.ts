@@ -57,9 +57,15 @@ export async function getCurrentStateValues(
   return values;
 }
 
-/** Read a field's complete retained history, newest creation first. */
+/**
+ * Read a field's complete retained history, newest creation first.
+ *
+ * Accepts a read-only surface (`getAllAsync` only) so read-layer callers such as
+ * `history-read` can compose it without holding a writable executor — this is a
+ * pure SELECT, no transaction.
+ */
 export function getCurrentStateHistory(
-  exec: SqlExecutor,
+  exec: Pick<SqlExecutor, "getAllAsync">,
   contactId: number,
   fieldKey: CurrentStateFieldKey,
 ): Promise<CurrentStateEntryRow[]> {
