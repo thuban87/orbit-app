@@ -213,6 +213,42 @@ export interface ThemePalette {
    * `theme-presets` (the only colour-literal file), owner-tunable.
    */
   rogueExtinguished: string;
+  /**
+   * Ordered COUNT-SATURATION ramp for the Activity Heatmap (HIST-02, UI-SPEC "New
+   * Tokens Required"). Length MUST be 5, ASCENDING in saturation/intensity:
+   * `heatmapScale[0]` is the REAL zero-count cell plate (a faint themed plate,
+   * distinct from `surface` and from the structural `heatmapCellEmpty` blank);
+   * indices 1..4 are rising interaction-count levels in the package accent-hue
+   * family. Indexed by the pure `heatmapLevel(count, lens)` bucket helper (day
+   * lenses cap at index 3; the cycle lens uses the full ramp to index 4).
+   * ORDER-STABLE — reordering restyles every level. Galaxy authors a luminous
+   * ramp; Standard a flatter neutral ramp. Seeded in `theme-presets` (the only
+   * colour-literal file), authored to pass the palette contrast tests like
+   * `gravityTiers`. `readonly` because consumers only ever index it.
+   */
+  heatmapScale: readonly string[];
+  /**
+   * The STRUCTURAL out-of-window blank fill for a heatmap grid position that is
+   * NOT a real date (Month leading/trailing weekday padding, Year first-column
+   * padding). It must read DISTINCTLY from a real zero-count day
+   * (`heatmapScale[0]`) so an empty placeholder never masquerades as "logged
+   * nothing that day" (HIST-02, UI-SPEC). Typically transparent so the section
+   * background shows through. Seeded per-palette in `theme-presets`.
+   */
+  heatmapCellEmpty: string;
+  /**
+   * Filled history-marker dot fill for interaction-bearing dates (UI-SPEC §History
+   * markers). Record TYPE is conveyed by SILHOUETTE (filled dot) primarily; this
+   * token is the fill. Accent-hue family. Seeded per-palette in `theme-presets`.
+   */
+  markerInteraction: string;
+  /**
+   * Outline/ring history-marker stroke for lifecycle-only dates (UI-SPEC §History
+   * markers). Distinct SILHOUETTE (ring, not filled) is the primary cue; this is
+   * its stroke tone — a neutral/secondary hue distinct from `markerInteraction`.
+   * Seeded per-palette in `theme-presets`.
+   */
+  markerLifecycle: string;
 }
 
 /**

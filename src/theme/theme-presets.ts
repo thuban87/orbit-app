@@ -117,6 +117,18 @@ export const THEME_PRESETS: Record<ThemePackage, ThemePreset> = {
       // planet BODY uses this blue-grey; the rogue RING keeps the warm `rogue`
       // amber (#E0904A) at faint-trace opacity. Owner-tunable.
       rogueExtinguished: "#3E4A6B",
+      // Activity Heatmap count-saturation ramp (HIST-02). Luminous nebula-blue
+      // ramp: [0] a faint blue-tinted plate for a REAL zero-count day (distinct
+      // from surface #141828 AND from the transparent structural blank below);
+      // [1..4] rise toward a bright nebula-blue. ORDER-STABLE. Owner-tunable seed.
+      heatmapScale: ["#1A2138", "#2E3E6E", "#42579E", "#5A78D6", "#8AA6FF"],
+      // Structural out-of-window blank (Month/Year padding) — transparent so the
+      // section background shows through and it never reads as a zero-count day.
+      heatmapCellEmpty: "#00000000",
+      // History markers: filled interaction dot (nebula-blue family) vs a neutral
+      // ring stroke for lifecycle-only dates (silhouette is the primary cue).
+      markerInteraction: "#8FA6FF",
+      markerLifecycle: "#8B93B0",
     },
     // GALAXY LIGHT (authored Plan 03) — a light deep-space treatment: cool
     // off-white surfaces, deep-navy text, deeper accent/status hues retuned so
@@ -174,6 +186,14 @@ export const THEME_PRESETS: Record<ThemePackage, ThemePreset> = {
       mutedWobble: "#9A8654",
       mutedDecay: "#A87264",
       rogueExtinguished: "#8892A8",
+      // Activity Heatmap ramp, galaxy LIGHT: ascending = deeper/more-saturated on
+      // the near-white background. [0] a faint plate for a REAL zero-count day
+      // (distinct from surface #FBFCFE and the transparent structural blank);
+      // [1..4] deepen toward the light-mode nebula-blue accent (#3355E6).
+      heatmapScale: ["#DDE3F5", "#B9C6F0", "#8CA0E6", "#5B72D6", "#3355E6"],
+      heatmapCellEmpty: "#00000000",
+      markerInteraction: "#2A46C7",
+      markerLifecycle: "#515A78",
     },
   },
   // The SECOND package — a calmer, FLATTER treatment vs galaxy's deep-space
@@ -231,6 +251,14 @@ export const THEME_PRESETS: Record<ThemePackage, ThemePreset> = {
       mutedWobble: "#BFB488",
       mutedDecay: "#C08E82",
       rogueExtinguished: "#414957",
+      // Activity Heatmap ramp, standard DARK: a flatter slate-indigo ramp (calmer
+      // than galaxy's luminous one). [0] a faint plate for a REAL zero-count day
+      // (distinct from surface #191C22 and the transparent structural blank);
+      // [1..4] rise toward the slate-indigo accent (#8091D6).
+      heatmapScale: ["#1C2130", "#333E63", "#4A5891", "#6675C0", "#9AA8E0"],
+      heatmapCellEmpty: "#00000000",
+      markerInteraction: "#9AA8E0",
+      markerLifecycle: "#9AA1AD",
     },
     // STANDARD LIGHT (authored Plan 03) — a flat, calm light palette: neutral
     // off-white surfaces, near-black text, deeper accent/status hues retuned for
@@ -280,6 +308,14 @@ export const THEME_PRESETS: Record<ThemePackage, ThemePreset> = {
       mutedWobble: "#94824E",
       mutedDecay: "#A87264",
       rogueExtinguished: "#7E889C",
+      // Activity Heatmap ramp, standard LIGHT: a flat slate-indigo ramp deepening
+      // on the near-white background. [0] a faint plate for a REAL zero-count day
+      // (distinct from surface #FFFFFF and the transparent structural blank);
+      // [1..4] deepen toward the light-mode slate-indigo accent (#4453B0).
+      heatmapScale: ["#E0E3F0", "#BCC3E6", "#8F9AD2", "#6070BE", "#4453B0"],
+      heatmapCellEmpty: "#00000000",
+      markerInteraction: "#3C4AA0",
+      markerLifecycle: "#565D6B",
     },
   },
 };

@@ -85,6 +85,45 @@ export function assertOrreryLastSystem(field: string, value: unknown): void {
 }
 
 /**
+ * The four Activity-Heatmap lenses persisted globally in `history_lens`
+ * (migration 025, D-11). Mirrors `HeatmapLens` in services/history/window.ts;
+ * defined locally so this DAO does not import a service module. Default 'cycles'.
+ */
+export const HISTORY_LENSES = ["cycles", "7days", "month", "year"] as const;
+export type HistoryLens = (typeof HISTORY_LENSES)[number];
+
+/**
+ * The Cycles-lens count presets persisted globally in `history_cycle_count`
+ * (migration 025, D-11). 5-per-row grid arrangements; default 10.
+ */
+export const HISTORY_CYCLE_COUNTS = [5, 10, 15, 20] as const;
+export type HistoryCycleCount = (typeof HISTORY_CYCLE_COUNTS)[number];
+
+/** Throw unless `v` is a known history lens (`history_lens`, HIST-03/D-11). */
+export function assertHistoryLens(field: string, v: unknown): void {
+  if (
+    typeof v !== "string" ||
+    !(HISTORY_LENSES as readonly string[]).includes(v)
+  ) {
+    throw new Error(
+      `updateAppSettings: ${field} must be a known history lens, got ${String(v)}`,
+    );
+  }
+}
+
+/** Throw unless `v` is a known cycle-count preset (`history_cycle_count`). */
+export function assertHistoryCycleCount(field: string, v: unknown): void {
+  if (
+    typeof v !== "number" ||
+    !(HISTORY_CYCLE_COUNTS as readonly number[]).includes(v)
+  ) {
+    throw new Error(
+      `updateAppSettings: ${field} must be a known cycle-count preset (5/10/15/20), got ${String(v)}`,
+    );
+  }
+}
+
+/**
  * The app-level notification settings, one row (id=1). Toggles are 0/1
  * integers; hours are 0-23 integers. This is the shape the scheduler reads and
  * the Settings UI edits.
@@ -167,6 +206,12 @@ export interface AppSettings {
   dashboardRightSwipeAction: RightSwipeAction;
   profileLayoutTemplateUid: string | null;
   profileBackgroundTemplateUid: string | null;
+
+  // --- History surfaces (Phase 32, migration 025, D-11) --------------------
+  /** Global Activity-Heatmap lens preference. NOT NULL, defaults 'cycles'. */
+  historyLens: HistoryLens;
+  /** Global Cycles-lens count preset. NOT NULL, defaults 10. */
+  historyCycleCount: HistoryCycleCount;
 
   // --- Optional-AI non-secret settings (Phase 14, AI-01) --------------------
   // NO API KEY LIVES HERE — provider credentials are SecureStore-only
@@ -279,6 +324,16 @@ export interface PortableSettingsSnapshot {
   profileLayoutTemplateUid?: string | null;
   /** Phase 31 declare/restore only; format-4 emission remains unchanged. */
   profileBackgroundTemplateUid?: string | null;
+  // --- History keys (Phase 32, D-11) — allowlisted + writable NOW, EMISSION ---
+  // DEFERRED. Declared OPTIONAL (`?:`), exactly the Phase-23/25/31 shape, so they
+  // enter `AppSettingsPatch` (writable via updateAppSettings — the runtime lens
+  // switch persists through it) AND so a getPortableSettingsSnapshot return that
+  // OMITS them still typechecks. Their emission in the snapshot SELECT/return is
+  // DEFERRED to Phase 36's backup-format plan (D-11 portability, D-03). Do NOT add
+  // these to the getPortableSettingsSnapshot SELECT this phase and do NOT bump
+  // BACKUP_FORMAT_VERSION — emitting now would silently change the live wire shape.
+  historyLens?: HistoryLens;
+  historyCycleCount?: HistoryCycleCount;
   modifiedAt: string;
 }
 
@@ -347,7 +402,9 @@ type WritableSettingsKey =
   | "dashboardSort"
   | "dashboardRightSwipeAction"
   | "profileLayoutTemplateUid"
-  | "profileBackgroundTemplateUid";
+  | "profileBackgroundTemplateUid"
+  | "historyLens"
+  | "historyCycleCount";
 
 /** The persisted (snake_case) column shape of the id=1 row. */
 interface AppSettingsRow {
@@ -382,6 +439,8 @@ interface AppSettingsRow {
   dashboard_right_swipe_action: string;
   profile_layout_template_uid: string | null;
   profile_background_template_uid: string | null;
+  history_lens: string;
+  history_cycle_count: number;
   ai_provider: string;
   ai_model: string;
   ai_custom_endpoint: string;
@@ -474,6 +533,8 @@ const COLUMN_OF: Record<WritableSettingsKey, string> = {
   dashboardRightSwipeAction: "dashboard_right_swipe_action",
   profileLayoutTemplateUid: "profile_layout_template_uid",
   profileBackgroundTemplateUid: "profile_background_template_uid",
+  historyLens: "history_lens",
+  historyCycleCount: "history_cycle_count",
 };
 
 /** The saved setting is authoritative; device region is used only when it is absent. */
@@ -504,6 +565,7 @@ export async function getAppSettings(
             dashboard_view_mode, dashboard_populations, dashboard_filters, dashboard_sort,
             dashboard_right_swipe_action,
             profile_layout_template_uid, profile_background_template_uid,
+            history_lens, history_cycle_count,
             orrery_density, orrery_satellites_enabled, orrery_last_system,
             ai_provider, ai_model, ai_custom_endpoint, ai_custom_model,
             ai_prompt_template, ai_ack_openai, ai_ack_anthropic,
@@ -562,6 +624,11 @@ export async function getAppSettings(
       row.dashboard_right_swipe_action as RightSwipeAction,
     profileLayoutTemplateUid: row.profile_layout_template_uid ?? null,
     profileBackgroundTemplateUid: row.profile_background_template_uid ?? null,
+    // History surfaces (migration 025). NOT NULL enum/preset columns; the cast is
+    // a read-shape convenience — the column defaults + write validators guarantee
+    // a known lens/preset value.
+    historyLens: row.history_lens as HistoryLens,
+    historyCycleCount: row.history_cycle_count as HistoryCycleCount,
     // AI non-secret settings. The column default is `'none'`; the cast is a
     // read-shape convenience (validation on WRITE guarantees a known id).
     aiProvider: row.ai_provider as AiProviderId,
@@ -963,6 +1030,12 @@ function validateAppSettingsPatch(patch: AppSettingsPatch): void {
   }
   if (patch.dashboardFilters !== undefined) {
     assertDashboardFilters("dashboardFilters", patch.dashboardFilters);
+  }
+  if (patch.historyLens !== undefined) {
+    assertHistoryLens("historyLens", patch.historyLens);
+  }
+  if (patch.historyCycleCount !== undefined) {
+    assertHistoryCycleCount("historyCycleCount", patch.historyCycleCount);
   }
   if (patch.phoneRegionOverride !== undefined) {
     assertPhoneRegionOverride("phoneRegionOverride", patch.phoneRegionOverride);

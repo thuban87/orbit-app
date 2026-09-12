@@ -62,6 +62,7 @@ import { migration020 } from "@/db/migrations/020-dashboard-swipe-pref";
 import { migration021 } from "@/db/migrations/021-orrery-preferences";
 import { migration022 } from "@/db/migrations/022-orrery-systems";
 import { migration023 } from "@/db/migrations/023-orrery-system-selection-revision";
+import { migration025 } from "@/db/migrations/025-interaction-history-schema";
 import { profilePresentationMigration } from "@/db/migrations/profile-presentation";
 import { runMigrations } from "@/db/migrations/runner";
 import { inWriteTransaction } from "@/db/transaction";
@@ -133,8 +134,9 @@ async function migrateToV5(): Promise<void> {
       migration022,
       migration023,
       profilePresentationMigration,
+      migration025,
     ],
-    24,
+    25,
     { now: NOW, newUid },
   );
 }
@@ -189,6 +191,12 @@ const DASHBOARD_DEFAULTS = {
 const PROFILE_PRESENTATION_DEFAULTS = {
   profileLayoutTemplateUid: null,
   profileBackgroundTemplateUid: null,
+};
+
+/** Migration-025 history defaults (D-11): lens 'cycles', cycle count 10. */
+const HISTORY_DEFAULTS = {
+  historyLens: "cycles" as const,
+  historyCycleCount: 10 as const,
 };
 
 type KeysOverlap<A, B> = Extract<keyof A, keyof B>;
@@ -334,6 +342,8 @@ describe("app-settings-dao — read", () => {
       ...THEME_DEFAULTS,
       ...DASHBOARD_DEFAULTS,
       ...PROFILE_PRESENTATION_DEFAULTS,
+      // History lens/preset default to 'cycles' / 10 (migration 025, D-11).
+      ...HISTORY_DEFAULTS,
       // AI starts disabled: provider `none`, empty config, acks 0 (AI-01).
       ...AI_DEFAULTS,
       ...BACKUP_DEFAULTS,
@@ -492,6 +502,8 @@ describe("app-settings-dao — validated write", () => {
       ...THEME_DEFAULTS,
       ...DASHBOARD_DEFAULTS,
       ...PROFILE_PRESENTATION_DEFAULTS,
+      // History fields untouched by this patch — still the seeded defaults.
+      ...HISTORY_DEFAULTS,
       // AI fields untouched by this patch — still the disabled defaults.
       ...AI_DEFAULTS,
       ...BACKUP_DEFAULTS,
@@ -1346,5 +1358,68 @@ describe("app-settings-dao — Profile presentation preferences", () => {
     expect(snapshot).not.toHaveProperty("profileBackgroundTemplateUid");
     expect(PORTABLE_SETTINGS_KEYS.has("profileLayoutTemplateUid")).toBe(true);
     expect(PORTABLE_SETTINGS_KEYS.has("profileBackgroundTemplateUid")).toBe(true);
+  });
+});
+
+describe("app-settings-dao — history lens/preset settings (migration 025, D-11)", () => {
+  beforeEach(async () => {
+    await migrateToV5();
+  });
+
+  it("getAppSettings returns the seeded history defaults ('cycles' / 10)", async () => {
+    const settings = await getAppSettings(exec);
+    expect(settings.historyLens).toBe("cycles");
+    expect(settings.historyCycleCount).toBe(10);
+  });
+
+  it("round-trips a written lens and cycle-count preset", async () => {
+    await updateAppSettings(
+      exec,
+      { historyLens: "month", historyCycleCount: 20 },
+      LATER,
+    );
+    const settings = await getAppSettings(exec);
+    expect(settings.historyLens).toBe("month");
+    expect(settings.historyCycleCount).toBe(20);
+    // Each writable axis round-trips independently across the known value sets.
+    await updateAppSettings(exec, { historyLens: "year" }, LATER);
+    await updateAppSettings(exec, { historyCycleCount: 5 }, LATER);
+    const after = await getAppSettings(exec);
+    expect(after.historyLens).toBe("year");
+    expect(after.historyCycleCount).toBe(5);
+  });
+
+  it.each([
+    { patch: { historyLens: "weekly" }, label: "unknown lens" },
+    { patch: { historyLens: "7Days" }, label: "wrong-cased lens" },
+    { patch: { historyCycleCount: 7 }, label: "off-preset cycle count" },
+    { patch: { historyCycleCount: 0 }, label: "zero cycle count" },
+  ])(
+    "rejects an out-of-range history value before writing ($label)",
+    async ({ patch }) => {
+      await expect(
+        (async () =>
+          updateAppSettings(
+            exec,
+            patch as Parameters<typeof updateAppSettings>[1],
+            LATER,
+          ))(),
+      ).rejects.toThrow();
+      // The write never opened — settings stay at their seeded defaults.
+      const settings = await getAppSettings(exec);
+      expect(settings.historyLens).toBe("cycles");
+      expect(settings.historyCycleCount).toBe(10);
+    },
+  );
+
+  it("does not emit history keys through the portable snapshot (Phase 36 owns emission)", async () => {
+    await updateAppSettings(
+      exec,
+      { historyLens: "7days", historyCycleCount: 15 },
+      LATER,
+    );
+    const snapshot = await getPortableSettingsSnapshot(exec);
+    expect(snapshot).not.toHaveProperty("historyLens");
+    expect(snapshot).not.toHaveProperty("historyCycleCount");
   });
 });
