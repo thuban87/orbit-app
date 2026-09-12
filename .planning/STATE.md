@@ -5,16 +5,16 @@ milestone_name: Release Readiness
 current_phase: 33
 current_phase_name: Group Interaction Logging
 status: executing
-stopped_at: Completed 33-01-PLAN.md
-last_updated: "2026-09-12T10:32:28.137Z"
+stopped_at: Completed 33-02-PLAN.md
+last_updated: "2026-09-12T10:44:39.203Z"
 last_activity: 2026-09-12
 last_activity_desc: Phase 33 execution started
-state_head: 1e59bd1fe8538b87c0f82f91944339fa5e809b43
+state_head: 4bb6216069ae768a753d04a42009daf1d0003372
 progress:
   total_phases: 21
   completed_phases: 8
   total_plans: 119
-  completed_plans: 111
+  completed_plans: 112
 carried_forward:
 
   - "31.1 NOT complete: 31.1-05 corrective (backgrounds were invisible on the owner's release — full-screen scrim at card opacity) is executed + debug-validated + release built/delivered, but the phase stays open until the owner validates the release on his personal phone (the prior 31.1-04 gate's false positive is why). See 31.1-05-PLAN.md, 31.1-UAT.md (superseded + corrective section)."
@@ -37,7 +37,7 @@ See: .planning/PROJECT.md (updated 2026-09-10 after Phase 31)
 ## Current Position
 
 Phase: 33 (Group Interaction Logging) — EXECUTING
-Plan: 2 of 7
+Plan: 3 of 7
 Status: Ready to execute
 Parked (owner, future): theme-merge into one Dark/Light switch; Deep Space/Starfield removal. See memories mode-aware-glassy-cards, android-elevation-opaque-on-translucent, theme-merge-into-mode-parked.
 FYI (separate): Phase 30 (Orrery Systems) still shows [ ] in ROADMAP with dirty 30-REVIEW files — reconcile independently.
@@ -263,6 +263,7 @@ at plan time. All new durable preferences are `app_settings` columns, never Asyn
 | Phase 32 P07 | 12min | 3 tasks | 6 files |
 | Phase 32 P08 | 8min | 2 tasks | 8 files |
 | Phase 33-group-interaction-logging P01 | 25min | 5 tasks | 17 files |
+| Phase 33-group-interaction-logging P02 | 16min | 2 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -583,6 +584,7 @@ Foundational decisions affecting current work:
 - [Phase 31.1]: 31.1-04: Final acceptance is a fresh droid release build, physical-Pixel smoke, and checksum-matched droid Drive delivery.
 - [Phase 33]: Migration 026 uses only Channel/Tone/Duration follow flags; direction/connected are participant-owned.
 - [Phase 33]: Same-group contact merges reject with typed remediation before reparenting; no child interaction is discarded.
+- [Phase 33]: Phase 33 Plan 02: ContactPicker multi-select is a discriminated union; Group Event profile routes register in every hosting stack.
 
 ### Pending Todos
 
@@ -649,8 +651,8 @@ _Also disposed at this close: 05/deferred-items.md (check:colors doc-comment) ma
 
 ## Session
 
-**Last session:** 2026-09-12T10:32:24.683Z
-**Stopped at:** Completed 33-01-PLAN.md
+**Last session:** 2026-09-12T10:44:35.757Z
+**Stopped at:** Completed 33-02-PLAN.md
 _Prior stop (v1.0):_ Phase 21 UI-SPEC approved; milestone v1.0 closed 2026-09-01.
 _Prior stop (13-04):_ the orrery VISUAL VOCABULARY (theme tokens + two pure resolver modules, node-tested, 29 cases green): (1) five owner-tunable `ThemePalette` tokens seeded in `space-dark.dark` ONLY — `starPalette` (6 colours, gold `#F2C14E` at index 0, then amber/rose-red/violet/cyan/ice-white), `mutedStable/Wobble/Decay` (desaturated same-hue morph endpoints), `rogueExtinguished` (cold blue-grey `#3E4A6B` rogue BODY fill) — with an M6/C2-5 conformance test that IMPORTS the real `SELF_SUN_COLOUR_RE`/`assertSelfSunColour` from app-settings-dao and locks every starPalette entry to the ACTUAL DAO write-path rule (no re-inlined regex). (2) `orrery-ring-logic.ts` `orreryRingStyle(status, colors)` — REUSES `ringVisual` for `{color,opacity,width}` (status→colour mapped once), adds the `strokeStyle` axis (solid→dashed→faded→faintTrace) + `bodyFill` (rogue ring=`colors.rogue`, body=`rogueExtinguished`); `null`→canonical NEUTRAL (`colors.border`), never throws — the single fallback sun-occupant reuses (C2-2). (3) `sun-occupant-logic.ts` `resolveSunOccupant(input)` — NULL/archived/missing→self (A7, glow `selfSunColour ?? starPalette[0]`), live contact→its status glow via `orreryRingStyle(status, colors).color`, never-contacted (status `null`)→the reused neutral border (C2-2); accepts `status: ProfileStatus | null`. 5 commits (1801915 feat tokens+M6; d35d528 RED→4cbfad5 GREEN ring-logic; c923b16 RED→10780dd GREEN sun-occupant); tsc + check:colors clean; no deviations (one in-flight fix: a placeholder hex in the logic test was re-sourced from the palette after check:colors flagged it — C2-3). Committed locally on main (NOT pushed). Next: Wave 2 (13-05 render / 13-06 Settings sun-picker), Wave 3 (13-07 drag-release), Wave 4 (13-08 device UAT, autonomous:false).
 **Resume file:** None

@@ -757,11 +757,11 @@ Plans:
 
 **Canonical refs**: docs/dossier/milestone-2/phase-12-group-interaction-logging-dossier.md; docs/dossier/milestone-2/planning-notes/phase-12-planning-notes.md
 **Schema**: group events — migration 026 (verified head+1 on disk: TARGET_VERSION = 25)
-**Plans**: 1/7 plans executed (5 waves)
+**Plans**: 2/7 plans executed (5 waves)
 **Wave 1**
 
 - [x] 33-01-PLAN.md — Migration 026 + write-spine tracer + tombstone + parent-never-counts/egress guards (W1)
-- [ ] 33-02-PLAN.md — ContactPicker multi-select + Group Event route types (W1)
+- [x] 33-02-PLAN.md — ContactPicker multi-select + Group Event route types (W1)
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
@@ -900,7 +900,7 @@ Plans:
 | 31. Profile Experience | 15/15 | Complete   | 2026-09-10 |
 | 31.1 App-Wide System Backgrounds | 4/4 | In Progress|  |
 | 32. Interaction History & Insights | 8/8 | In Progress|  |
-| 33. Group Interaction Logging | 1/7 | In Progress|  |
+| 33. Group Interaction Logging | 2/7 | In Progress|  |
 | 34. Rapid Capture & Update Flows | 0/TBD | Not started | - |
 | 35. Messaging & AI Compose | 0/TBD | Not started | - |
 | 36. AI Configuration & Prompting | 0/TBD | Not started | - |
