@@ -80,6 +80,15 @@ export interface GroupEventLifecycleInput {
   now: string;
 }
 
+export interface ConvertInteractionToGroupEventInput {
+  interactionId: number;
+  contactId: number;
+  /** Fresh durable UID for the new parent, distinct from the child UID. */
+  uid: string;
+  title: string;
+  now: string;
+}
+
 type ParticipantFollowChange =
   | { follow: true }
   | { follow: false; value: string | null | number };
@@ -716,5 +725,85 @@ export function deleteGroupEventAndInteractions(
       { bumpRevision: false },
     );
     await bumpDataRevisionCore(exec);
+  });
+}
+
+/**
+ * Promote an existing standalone interaction into the first canonical child of
+ * a newly-created parent. The interaction keeps both its local id and durable
+ * UID; only its linkage and materialized-follow state change.
+ */
+export function convertInteractionToGroupEvent(
+  exec: SqlExecutor,
+  input: ConvertInteractionToGroupEventInput,
+): Promise<{ groupEventId: number }> {
+  if (typeof input.title !== "string" || input.title.trim().length === 0) {
+    return Promise.reject(
+      new Error("convertInteractionToGroupEvent: title must not be blank"),
+    );
+  }
+  if (typeof input.uid !== "string" || input.uid.trim().length === 0) {
+    return Promise.reject(
+      new Error("convertInteractionToGroupEvent: uid must not be blank"),
+    );
+  }
+
+  return inWriteTransaction(exec, async () => {
+    const source = await exec.getFirstAsync<{
+      occurred_at: string;
+      channel: string;
+      quality: string | null;
+      duration: number | null;
+      group_event_id: number | null;
+    }>(
+      `SELECT occurred_at, channel, quality, duration, group_event_id
+         FROM interactions
+        WHERE id = ? AND contact_id = ?`,
+      [input.interactionId, input.contactId],
+    );
+    if (!source) {
+      throw new Error(
+        `convertInteractionToGroupEvent: no interaction matched id=${input.interactionId} for contactId=${input.contactId}`,
+      );
+    }
+    if (source.group_event_id !== null) {
+      throw new Error(
+        `convertInteractionToGroupEvent: interaction id=${input.interactionId} must be standalone`,
+      );
+    }
+
+    const parent = await exec.runAsync(
+      `INSERT INTO group_events
+         (uid, title, occurred_at, channel, quality, duration, group_note, created_at, modified_at)
+       VALUES (?, ?, ?, ?, ?, ?, NULL, ?, ?)`,
+      [
+        input.uid,
+        input.title.trim(),
+        source.occurred_at,
+        source.channel,
+        source.quality,
+        source.duration,
+        input.now,
+        input.now,
+      ],
+    );
+    const groupEventId = parent.lastInsertRowId;
+    const linked = await exec.runAsync(
+      `UPDATE interactions
+          SET group_event_id = ?,
+              ge_follow_channel = 1,
+              ge_follow_quality = 1,
+              ge_follow_duration = 1,
+              modified_at = ?
+        WHERE id = ? AND contact_id = ? AND group_event_id IS NULL`,
+      [groupEventId, input.now, input.interactionId, input.contactId],
+    );
+    if (linked.changes !== 1) {
+      throw new Error(
+        `convertInteractionToGroupEvent: interaction id=${input.interactionId} is no longer standalone`,
+      );
+    }
+    await bumpDataRevisionCore(exec);
+    return { groupEventId };
   });
 }
