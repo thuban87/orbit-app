@@ -9,7 +9,7 @@
  *
  * DATE DISCIPLINE (CLAUDE.md, dates.ts): every date is a local `YYYY-MM-DD`
  * string; all arithmetic goes through `formatLocalDate()` over local `Date`
- * components. `toISOString()`/UTC slicing is NEVER used — it produces an evening
+ * components. UTC ISO slicing is NEVER used — it produces an evening
  * off-by-one that has already bitten this project once. String comparison of
  * `YYYY-MM-DD` is chronological, so `<=` on the strings is a valid date order.
  *

@@ -10,7 +10,7 @@
  *
  * Pure: no DB/store/component import, no transaction. Local-date only — the
  * stored `occurred_at` is already a LOCAL wall-clock string (DATA-05), so its
- * date is the leading `YYYY-MM-DD`; we never route it through `toISOString()`.
+ * date is the leading `YYYY-MM-DD`; we never route it through UTC ISO slicing.
  */
 import type { HeatmapLens, HistoryWindow } from "@/services/history/window";
 
