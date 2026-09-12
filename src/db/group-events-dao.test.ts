@@ -6,8 +6,11 @@ import { nodeSqliteExecutor, openTestDb } from "@/db/__testkit__/node-sqlite";
 import { readDataRevision } from "@/db/data-revision-dao";
 import { MIGRATIONS, TARGET_VERSION } from "@/db/database";
 import {
+  addParticipant,
   clearParticipantOverride,
   createGroupEvent,
+  deleteGroupChild,
+  detachParticipant,
   saveParticipantEdits,
   setParticipantFields,
   setParticipantOverride,
@@ -27,6 +30,149 @@ beforeEach(async () => {
   await runMigrations(exec, MIGRATIONS, TARGET_VERSION, {
     now: NOW,
     newUid: uid,
+  });
+});
+
+describe("group participant lifecycle", () => {
+  it("adds an archived participant at the event wall-clock with resolved shared values", async () => {
+    const { groupEventId } = await groupWithThreeChildren();
+    const archived = await contact("Archived");
+    await exec.runAsync("UPDATE contacts SET archived_at = ? WHERE id = ?", [
+      NOW,
+      archived,
+    ]);
+    const revision = await readDataRevision(exec);
+
+    await addParticipant(exec, {
+      groupEventId,
+      contactId: archived,
+      uid: uid(),
+      direction: "mutual",
+      connected: 0,
+      note: "private participant note",
+      now: "2026-09-12 13:00:00",
+    });
+
+    expect(
+      await exec.getFirstAsync(
+        "SELECT occurred_at, channel, quality, duration, direction, connected, note, ge_follow_channel, ge_follow_quality, ge_follow_duration FROM interactions WHERE contact_id = ?",
+        [archived],
+      ),
+    ).toEqual({
+      occurred_at: "2026-09-10 18:00:00",
+      channel: "Call",
+      quality: "Positive",
+      duration: 3600,
+      direction: "mutual",
+      connected: 0,
+      note: "private participant note",
+      ge_follow_channel: 1,
+      ge_follow_quality: 1,
+      ge_follow_duration: 1,
+    });
+    expect(
+      await exec.getFirstAsync<{ last_contact: string }>(
+        "SELECT last_contact FROM contacts WHERE id = ?",
+        [archived],
+      ),
+    ).toEqual({ last_contact: "2026-09-10 18:00:00" });
+    expect(await readDataRevision(exec)).toBe(revision + 1);
+  });
+
+  it("rejects a duplicate participant without writing a second child", async () => {
+    const { groupEventId, alex } = await groupWithThreeChildren();
+    const before = await count("interactions");
+    await expect(
+      addParticipant(exec, {
+        groupEventId,
+        contactId: alex,
+        uid: uid(),
+        now: NOW,
+      }),
+    ).rejects.toThrow();
+    expect(await count("interactions")).toBe(before);
+  });
+
+  it("deletes only a scoped participant through its tombstone and detaches without copying Group Note", async () => {
+    const { groupEventId, alex, sam, jordan } = await groupWithThreeChildren();
+    const children = await groupChildren(groupEventId);
+    const samChild = children.find((child) => child.contact_id === sam)!;
+    const alexChild = children.find((child) => child.contact_id === alex)!;
+    const revision = await readDataRevision(exec);
+
+    await deleteGroupChild(exec, {
+      groupEventId,
+      interactionId: samChild.id,
+      contactId: sam,
+      now: NOW,
+    });
+    expect(await groupChildren(groupEventId)).toHaveLength(2);
+    expect(
+      await exec.getFirstAsync<{ entity_type: string }>(
+        "SELECT entity_type FROM tombstones WHERE entity_uid = ?",
+        [(await exec.getFirstAsync<{ uid: string }>("SELECT uid FROM interactions WHERE id = ?", [alexChild.id]))!.uid],
+      ),
+    ).toBeUndefined();
+
+    await detachParticipant(exec, {
+      groupEventId,
+      interactionId: alexChild.id,
+      now: NOW,
+    });
+    expect(
+      await exec.getFirstAsync(
+        "SELECT group_event_id, ge_follow_channel, ge_follow_quality, ge_follow_duration, note FROM interactions WHERE id = ?",
+        [alexChild.id],
+      ),
+    ).toEqual({
+      group_event_id: null,
+      ge_follow_channel: null,
+      ge_follow_quality: null,
+      ge_follow_duration: null,
+      note: "Alex note",
+    });
+    expect(await groupChildren(groupEventId)).toHaveLength(1);
+    expect((await groupChildren(groupEventId))[0]?.contact_id).toBe(jordan);
+    expect(await readDataRevision(exec)).toBe(revision + 2);
+  });
+
+  it("rejects delete and detach for a child outside the supplied event", async () => {
+    const { groupEventId, alex } = await groupWithThreeChildren();
+    const child = (await groupChildren(groupEventId)).find(
+      (row) => row.contact_id === alex,
+    )!;
+    const other = await createGroupEvent(exec, {
+      uid: uid(),
+      title: "Other",
+      occurredAt: NOW,
+      now: NOW,
+      participants: [],
+    });
+    const before = await exec.getFirstAsync(
+      "SELECT group_event_id, note FROM interactions WHERE id = ?",
+      [child.id],
+    );
+    await expect(
+      deleteGroupChild(exec, {
+        groupEventId: other.groupEventId,
+        interactionId: child.id,
+        contactId: alex,
+        now: NOW,
+      }),
+    ).rejects.toThrow(/not a member/);
+    await expect(
+      detachParticipant(exec, {
+        groupEventId: other.groupEventId,
+        interactionId: child.id,
+        now: NOW,
+      }),
+    ).rejects.toThrow(/not a member/);
+    expect(
+      await exec.getFirstAsync(
+        "SELECT group_event_id, note FROM interactions WHERE id = ?",
+        [child.id],
+      ),
+    ).toEqual(before);
   });
 });
 
