@@ -728,7 +728,7 @@ Plans:
 
 - [x] 32-02-PLAN.md — Bind/Unbind immutable lifecycle events + restore-side vocabulary remap (wave 2)
 - [x] 32-03-PLAN.md — Reusable history aggregation seam (window/buckets/cycles/window-scoped intensity) + canonical history-read + inert group seam (wave 2)
-- [ ] 32-04-PLAN.md — Canonical Edit Interaction route + interaction-load read + all-stack registration (wave 2)
+- [x] 32-04-PLAN.md — Canonical Edit Interaction route + interaction-load read + all-stack registration (wave 2)
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
@@ -877,7 +877,7 @@ Plans:
 | 30. Orrery Systems | 0/10 | Planned | - |
 | 31. Profile Experience | 15/15 | Complete   | 2026-09-10 |
 | 31.1 App-Wide System Backgrounds | 4/4 | In Progress|  |
-| 32. Interaction History & Insights | 3/8 | In Progress|  |
+| 32. Interaction History & Insights | 4/8 | In Progress|  |
 | 33. Group Interaction Logging | 0/TBD | Not started | - |
 | 34. Rapid Capture & Update Flows | 0/TBD | Not started | - |
 | 35. Messaging & AI Compose | 0/TBD | Not started | - |
