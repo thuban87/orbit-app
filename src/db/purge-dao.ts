@@ -77,7 +77,7 @@ interface PurgeChildSpec {
 }
 
 /** Every tombstone type is deliberately given a purge disposition here. */
-const PURGE_CHILDREN: Record<TombstoneEntityType, PurgeChildSpec | null> = {
+export const PURGE_CHILDREN: Record<TombstoneEntityType, PurgeChildSpec | null> = {
   contact: null,
   interaction: { countSql: "SELECT COUNT(*) AS n FROM interactions WHERE contact_id = ?", tombstoneSql: "SELECT uid FROM interactions WHERE contact_id = ?", deleteSql: "DELETE FROM interactions WHERE contact_id = ?" },
   event: { countSql: "SELECT COUNT(*) AS n FROM events WHERE contact_id = ?", tombstoneSql: "SELECT uid FROM events WHERE contact_id = ?", deleteSql: "DELETE FROM events WHERE contact_id = ?" },
@@ -92,6 +92,8 @@ const PURGE_CHILDREN: Record<TombstoneEntityType, PurgeChildSpec | null> = {
   memory: { countSql: "SELECT COUNT(*) AS n FROM memories WHERE contact_id = ?", tombstoneSql: "SELECT uid FROM memories WHERE contact_id = ?", deleteSql: "DELETE FROM memories WHERE contact_id = ?" },
   relationship: { countSql: "SELECT COUNT(*) AS n FROM relationships WHERE contact_id = ?", tombstoneSql: "SELECT uid FROM relationships WHERE contact_id = ?", deleteSql: "DELETE FROM relationships WHERE contact_id = ?" },
   current_state_entry: { countSql: "SELECT COUNT(*) AS n FROM current_state_entries WHERE contact_id = ?", tombstoneSql: "SELECT uid FROM current_state_entries WHERE contact_id = ?", deleteSql: "DELETE FROM current_state_entries WHERE contact_id = ?" },
+  // Group Events are not contact-scoped purge children.
+  group_event: null,
 };
 
 const KNOWLEDGE_CHILD_TABLES = {

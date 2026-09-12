@@ -19,7 +19,8 @@ export type TombstoneEntityType =
   | "custom_field_value_history"
   | "memory"
   | "relationship"
-  | "current_state_entry";
+  | "current_state_entry"
+  | "group_event";
 
 export interface TombstoneInput {
   entityType: TombstoneEntityType;
@@ -33,7 +34,7 @@ export interface Tombstone {
   deletedAt: string;
 }
 
-function assertTombstoneEntityType(
+export function assertTombstoneEntityType(
   value: unknown,
 ): asserts value is TombstoneEntityType {
   switch (value) {
@@ -51,6 +52,7 @@ function assertTombstoneEntityType(
     case "memory":
     case "relationship":
     case "current_state_entry":
+    case "group_event":
       return;
     default:
       throw new Error(`unsupported tombstone entity type: ${String(value)}`);
