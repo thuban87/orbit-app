@@ -1,10 +1,11 @@
 ---
 phase: 34
 slug: rapid-capture-update-flows
-status: draft
+status: approved
 shadcn_initialized: false
 preset: none
 created: 2026-09-12
+reviewed_at: 2026-09-12
 ---
 
 # Phase 34 — UI Design Contract
@@ -176,22 +177,28 @@ surface them for the owner before locking copy.
 
 ## UI Considerations
 
-State coverage for the shape-rooted UI states these flows produce. Empty/error COPY lives in the
-Copywriting Contract above; this table covers state behavior and references those rows.
+State coverage for the shape-rooted UI states these flows produce, from the post-verification
+`ui-consideration-probe` sweep. Empty/error COPY lives in the Copywriting Contract above; this table
+covers state BEHAVIOR and references those rows (de-dup, not restated).
 
-Applicable state considerations resolved: 5 covered, 3 backstop, 1 unresolved.
+**Surfaces probed:** E1 Add Contact · E2 Quick Log (+ post-log editor) · E3 Detailed Log Interaction ·
+E4 Update Contact chooser · E5 Memory editor · E6 Edit Contact accordion.
 
-| Category | Element(s) | Status | Resolution / Reason |
-|----------|------------|--------|---------------------|
-| partial | Add Contact name-only | ✅ covered | Name is the only required field; Save persists with Category/Frequency/methods/photo absent and routes to the new Profile (CAPT-01). |
-| empty | Add Contact never-contacted | ✅ covered | Last-spoke defaults Today; "Not yet" creates NO interaction (not a null-date row) — see Copywriting empty-state row (CAPT-02, ADR-016). |
-| error | Save failure (all four flows) | ✅ covered | Renders "Couldn't save / Please try again.", preserves form state, never shows completion, exposes Retry where recoverable (CAPT-14, dossier §AE). |
-| error | Future date/time entry | ✅ covered | Locked `FUTURE_DATE_MESSAGE` / `FUTURE_DATETIME_MESSAGE` in `danger` text; prior selection kept; backdating older dates allowed with no age warning (CAPT-07/W). |
-| error | Validation reveals section | ✅ covered | A blocking error reveals + focuses the containing accordion; field-level actionable text (CAPT-14, dossier §AD). |
-| overflow | Update Contact chooser with many custom fields | 🧪 backstop | Named custom fields surface directly; chooser may rank/search/group/collapse rather than an unbounded flat wall (dossier §Z). Exact threshold is tuning — held-out UI-state test that many-field chooser stays bounded and scrollable. |
-| long-text | Long contact name / long note / long custom-field name | 🧪 backstop | Titles, chooser rows, and preview strips must truncate or wrap without breaking layout in all four palettes and at large OS text scale (dossier §AJ reflow). |
-| zero-one-many | Update Contact repeated-update session | 🧪 backstop | After each inner Save, return to the chooser with the same contact targeted; a subtle recent-success indication, not a rigid checklist; Done exits (CAPT-12, dossier §AA). |
-| loading | Preselected-contact resolution / DAO read | ⚠ unresolved | Preselection skips the picker when the invoking context identifies a contact (CAPT-13); the transient loading treatment while resolving the target is a planner assumption — no shipped pattern is mandated here. |
+**Probe result:** 35 applicable state considerations across 6 surfaces — **25 covered (explicit) /
+9 backstop / 1 unresolved**. Rows below consolidate identical resolutions across surfaces; every
+(surface × category) cell the probe raised is represented.
+
+| Category | Surfaces | Status | Resolution / Reason |
+|----------|----------|--------|---------------------|
+| empty | E1–E6 | ✅ covered | Add Contact requires only Name and persists with all else absent (CAPT-01); "Not yet" last-spoke records NO interaction (CAPT-02, ADR-016); Quick Log's post-log editor and the Memory editor open empty with the default type preselected by key; Update chooser is never truly empty (built-in rows always present, dossier §Z); Edit Contact always shows the full record. See Copywriting empty-state rows. |
+| error | E1–E6 | ✅ covered | Save failure renders locked "Couldn't save / Please try again.", preserves form state, never shows completion, exposes Retry where recoverable (CAPT-14, dossier §AE); future date/time uses locked `FUTURE_DATE_MESSAGE` / `FUTURE_DATETIME_MESSAGE` in `danger` text keeping the prior selection (CAPT-07/W); a blocking validation error reveals + focuses the containing accordion with field-level actionable text (CAPT-14, dossier §AD). See Copywriting error rows. |
+| partial | E1–E6 | ✅ covered | Optional fields absent is a valid saved state everywhere (name-only contact; Tone omitted shows no selection and is never Neutral, CAPT-08); the post-log editor / Memory editor save an Interaction Note or a Memory, never both (CAPT-05); the Update chooser omits inapplicable named custom-field rows while keeping the generic Custom Fields row (dossier §Z). |
+| populated | E1, E4 | ✅ covered | Add Contact's Show More reveals the advanced enrichment sections at full volume; the Update chooser's happy path is the full built-in action list plus any named custom-field rows (CAPT-04/12). |
+| loading | E1, E2, E3, E5, E6 | ✅ covered | Local-first: these surfaces hydrate from on-device SQLite with no network on the read path and render immediately — no blocking spinner (CLAUDE.md, ADR local-first). |
+| loading | E4 (preselected-contact resolution / DAO read) | ⚠ unresolved — planner must treat as assumption | Preselection skips the picker when the invoking context identifies a contact (CAPT-13); the transient treatment while resolving the target is a planner assumption — no shipped loading pattern is mandated here. |
+| overflow | E1, E4 | 🧪 backstop | Add Contact's revealed sections and the Update chooser's named custom fields surface directly and may be many; the surface may rank/search/group/collapse rather than present an unbounded flat wall (dossier §Z). Held-out UI-state test: the many-field chooser stays bounded and scrollable, no clipped/unreachable rows. `verification: backstop`. |
+| long-text | E1–E6 | 🧪 backstop | Long contact names, notes, and custom-field names must truncate or wrap without breaking layout in all four resolved palettes and at large OS text scale (dossier §AJ reflow). Held-out UI-state test across titles, chooser rows, and preview strips. `verification: backstop`. |
+| zero-one-many | E4 | 🧪 backstop | After each inner Save the chooser returns with the same contact targeted and a subtle recent-success indication, not a rigid checklist; Done exits (CAPT-12, dossier §AA). Held-out UI-state test: the repeated-update session reads correctly at zero, one, and many completed updates. `verification: backstop`. |
 
 <!-- Status vocabulary locked by probe-core projectTruths: ✅ covered → truth string; 🧪 backstop →
      scalar { statement, verification: backstop } (no evidence at verify → insufficient_spec →
@@ -213,11 +220,11 @@ gate: not applicable.
 
 ## Checker Sign-Off
 
-- [ ] Dimension 1 Copywriting: PASS
-- [ ] Dimension 2 Visuals: PASS
-- [ ] Dimension 3 Color: PASS
-- [ ] Dimension 4 Typography: PASS
-- [ ] Dimension 5 Spacing: PASS
-- [ ] Dimension 6 Registry Safety: PASS
+- [x] Dimension 1 Copywriting: FLAG (non-blocking — single-word "Save"/"Done" CTAs; locked/shipped app-bar idiom, action disambiguated by routing; owner-pending names correctly flagged not fabricated)
+- [x] Dimension 2 Visuals: FLAG (non-blocking — per-flow focal point not explicitly declared; icon-only a11y covered)
+- [x] Dimension 3 Color: PASS
+- [x] Dimension 4 Typography: PASS
+- [x] Dimension 5 Spacing: PASS
+- [x] Dimension 6 Registry Safety: PASS
 
-**Approval:** pending
+**Approval:** VERIFIED 2026-09-12 (gsd-ui-checker) — 4 PASS / 2 non-blocking FLAG; no decision reversals; all cited token/file refs verified against code on disk.
