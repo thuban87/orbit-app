@@ -187,12 +187,12 @@ category's phase (see Traceability).
 ### HIST — Interaction History & Insights (Phase 32)
 
 - [ ] **HIST-01**: The Profile History section presents three children — Activity Heatmap, Intensity, and History Browser — replacing the vertical timeline
-- [ ] **HIST-02**: The Heatmap encodes interaction count only; lifecycle and non-interaction records never affect saturation or its context card; deleting/re-dating an interaction updates the affected bucket
-- [ ] **HIST-03**: User can switch Heatmap lenses — Cycles, 7 Days, Month, Year — with the last-used lens persisting globally (durable, backup-portable)
-- [ ] **HIST-04**: Cycles is the default lens: each block is one currently-configured Contact Frequency cycle, presets 5/10/15/20 (default 10, persisting globally), newest bottom-right, with one-cycle shifting and window paging; the current cycle is distinguished structurally, not by a second hue; a defined fallback exists for Unbound contacts (decided once with Phase 31)
-- [ ] **HIST-05**: 7 Days is rolling; Month preserves real weekday geometry; Year is a dense daily grid; all support prev/next navigation and block future dates
-- [ ] **HIST-06**: Intensity renders over the same selected History window as the Heatmap — lens or period changes re-render both — with no prediction
-- [ ] **HIST-07**: Tapping a Heatmap cell opens a small anchored context card first (count + See details, or 0 + Log interaction); the shared detail sheet opens only from it
+- [x] **HIST-02**: The Heatmap encodes interaction count only; lifecycle and non-interaction records never affect saturation or its context card; deleting/re-dating an interaction updates the affected bucket
+- [x] **HIST-03**: User can switch Heatmap lenses — Cycles, 7 Days, Month, Year — with the last-used lens persisting globally (durable, backup-portable)
+- [x] **HIST-04**: Cycles is the default lens: each block is one currently-configured Contact Frequency cycle, presets 5/10/15/20 (default 10, persisting globally), newest bottom-right, with one-cycle shifting and window paging; the current cycle is distinguished structurally, not by a second hue; a defined fallback exists for Unbound contacts (decided once with Phase 31)
+- [x] **HIST-05**: 7 Days is rolling; Month preserves real weekday geometry; Year is a dense daily grid; all support prev/next navigation and block future dates
+- [x] **HIST-06**: Intensity renders over the same selected History window as the Heatmap — lens or period changes re-render both — with no prediction
+- [x] **HIST-07**: Tapping a Heatmap cell opens a small anchored context card first (count + See details, or 0 + Log interaction); the shared detail sheet opens only from it
 - [ ] **HIST-08**: The History Browser is a Rolodex with synchronized Month/Day/Year wheels, Day primary, conventional invalid-date clamping, today as the maximum; eventful dates are marked before selection (filled = interaction-bearing, outline = lifecycle-only) with counts exposed to accessibility
 - [ ] **HIST-09**: A drawer beneath the wheels summarizes the selected date and exposes See details / Log interaction; scrolling never auto-opens the sheet
 - [ ] **HIST-10**: Heatmap and Browser share one period/date detail sheet interleaving all records chronologically with semantic icons — editable Interactions, read-only lifecycle events (Archive/Restore/Snooze/Unsnooze/Bind/Unbind), and history-aware knowledge changes editable per their owning model; Contact Frequency and Category changes are excluded in v1

@@ -5,16 +5,16 @@ milestone_name: Release Readiness
 current_phase: 32
 current_phase_name: Interaction History & Insights
 status: executing
-stopped_at: Completed 32-04-PLAN.md (canonical Edit Interaction route + contact-scoped interaction-load read + all-stack registration)
-last_updated: "2026-09-11T19:48:00.000Z"
+stopped_at: Completed 32-05-PLAN.md (heatmap/marker theme tokens + static count-only ActivityHeatmap across all four lenses + anchored count-only HeatmapContextCard + window-scoped IntensityChart + lens/preset persistence through app-settings-dao)
+last_updated: "2026-09-12T01:09:47.013Z"
 last_activity: 2026-09-11
-last_activity_desc: Phase 32 Plan 04 executed (EditInteractionScreen wraps the extended refine form + saves through editTouchpointFull; read + logic node-tested; registered in Dashboard/Orrery/Settings)
-state_head: d5631ff
+last_activity_desc: Phase 32 Plan 05 executed (per-palette heatmapScale/heatmapCellEmpty/markerInteraction/markerLifecycle tokens; historyLens/historyCycleCount threaded through every app-settings-dao seam; presentational ActivityHeatmap/HeatmapContextCard/IntensityChart consuming Plan 03's aggregation seam; cell classification node-tested)
+state_head: cd62229bd4744b504854147ae100f911c1a4b6b3
 progress:
   total_phases: 21
   completed_phases: 7
   total_plans: 112
-  completed_plans: 106
+  completed_plans: 107
 carried_forward:
 
   - "31.1 NOT complete: 31.1-05 corrective (backgrounds were invisible on the owner's release — full-screen scrim at card opacity) is executed + debug-validated + release built/delivered, but the phase stays open until the owner validates the release on his personal phone (the prior 31.1-04 gate's false positive is why). See 31.1-05-PLAN.md, 31.1-UAT.md (superseded + corrective section)."
@@ -37,16 +37,16 @@ See: .planning/PROJECT.md (updated 2026-09-10 after Phase 31)
 ## Current Position
 
 Phase: 32 (Interaction History & Insights) — EXECUTING
-Plan: 5 of 8
-Status: Executing (32-01, 32-02, 32-03, 32-04 complete — canonical Edit Interaction route registered in all three Profile-hosting stacks; ready for Plans 05–08)
+Plan: 6 of 8
+Status: Executing (32-01..32-05 complete — heatmap/marker tokens + static count-only ActivityHeatmap + anchored context card + window-scoped IntensityChart + lens/preset persistence shipped as presentational surfaces; ready for Plans 06–08)
 Parked (owner, future): theme-merge into one Dark/Light switch; Deep Space/Starfield removal. See memories mode-aware-glassy-cards, android-elevation-opaque-on-translucent, theme-merge-into-mode-parked.
 FYI (separate): Phase 30 (Orrery Systems) still shows [ ] in ROADMAP with dirty 30-REVIEW files — reconcile independently.
 Carried forward (owner's bucket, NOT resolved here): D-11 default Memory-type display name — reconcile before Phase 34.
 Surface to owner (24.2-07, KNOW-15): milestone plan said Phase 36 owns the backup format-4 bump, but 24.1 already bumped to 4 (d677e2c); Plan 07 emits into the live format 4 with NO bump — that milestone instruction is stale.
 Deferred to Phase 31 (recorded in Plan 05): durable contact-scoped-def ownership + owner-purge semantics. Deferred to Phase 36 (ROADMAP breadcrumb): legacy AI-fuel confirm-path code removal.
-Last activity: 2026-09-11 — Phase 32 Plan 04 executed (canonical Edit Interaction route + interaction-load read + all-stack registration)
+Last activity: 2026-09-11 — Phase 32 Plan 05 executed (heatmap/marker tokens + ActivityHeatmap/HeatmapContextCard/IntensityChart + lens/preset persistence)
 Progress: 11 completed v2.0 phases — 22, 23, 24.1, 24.2, 25, 26, 27, 28, 29, 30, 31
-Next: Execute Phase 32 Plan 05 — /gsd-execute-phase 32
+Next: Execute Phase 32 Plan 06 — /gsd-execute-phase 32
 
 **Milestone v2.0 structure (pre-decided by the owner from the fifteen milestone-2 dossiers + the
 2026-09-01 cross-dossier audit; not re-derived):** 22 App Shell · 23 Theme · 24 Contact Knowledge ·
@@ -257,6 +257,7 @@ at plan time. All new durable preferences are `app_settings` columns, never Asyn
 | Phase 32 P02 | 6min | 3 tasks | 6 files |
 | Phase 32 P03 | 8min | 3 tasks | 11 files |
 | Phase 32 P04 | 15min | 2 tasks | 11 files |
+| Phase 32 P05 | 12min | 3 tasks | 12 files |
 
 ## Accumulated Context
 
