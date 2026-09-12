@@ -10,16 +10,16 @@ import { DigestScreen } from "@/screens/DigestScreen";
 import { EditContactScreen } from "@/screens/EditContactScreen";
 import { EditInteractionScreen } from "@/screens/EditInteractionScreen";
 import { GroupEventsScreen } from "@/screens/GroupEventsScreen";
+import { GroupLogScreen } from "@/screens/GroupLogScreen";
 import { HomeScreen } from "@/screens/HomeScreen";
 import { MemoryHistoryScreen } from "@/screens/MemoryHistoryScreen";
 import { MergeConflictsScreen } from "@/screens/MergeConflictsScreen";
-import { RecentlyDeletedScreen } from "@/screens/RecentlyDeletedScreen";
 import {
-  GroupLogPlaceholderScreen,
   LogContactPlaceholderScreen,
   MemoryPlaceholderScreen,
   UpdateContactPlaceholderScreen,
 } from "@/screens/placeholders/FabActionPlaceholders";
+import { RecentlyDeletedScreen } from "@/screens/RecentlyDeletedScreen";
 import { SurvivorSelectScreen } from "@/screens/SurvivorSelectScreen";
 import { ThingsToRememberScreen } from "@/screens/ThingsToRememberScreen";
 import { UnboundContactsScreen } from "@/screens/UnboundContactsScreen";
@@ -36,7 +36,7 @@ export function DashboardStack() {
       <Stack.Screen name="Home" component={HomeScreen} />
       <Stack.Screen name="GroupEvents" component={GroupEventsScreen} />
       <Stack.Screen name="LogContact" component={LogContactPlaceholderScreen} />
-      <Stack.Screen name="GroupLog" component={GroupLogPlaceholderScreen} />
+      <Stack.Screen name="GroupLog" component={GroupLogScreen} />
       <Stack.Screen
         name="UpdateContact"
         component={UpdateContactPlaceholderScreen}
@@ -47,19 +47,10 @@ export function DashboardStack() {
         name="ThingsToRemember"
         component={ThingsToRememberScreen}
       />
-      <Stack.Screen
-        name="RecentlyDeleted"
-        component={RecentlyDeletedScreen}
-      />
-      <Stack.Screen
-        name="MemoryHistory"
-        component={MemoryHistoryScreen}
-      />
+      <Stack.Screen name="RecentlyDeleted" component={RecentlyDeletedScreen} />
+      <Stack.Screen name="MemoryHistory" component={MemoryHistoryScreen} />
       <Stack.Screen name="Edit" component={EditContactScreen} />
-      <Stack.Screen
-        name="EditInteraction"
-        component={EditInteractionScreen}
-      />
+      <Stack.Screen name="EditInteraction" component={EditInteractionScreen} />
       <Stack.Screen name="Create" component={CreateContactScreen} />
       <Stack.Screen name="Compose" component={ComposeScreen} />
       <Stack.Screen name="Capture" component={CaptureScreen} />
