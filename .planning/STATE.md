@@ -5,16 +5,16 @@ milestone_name: Release Readiness
 current_phase: 32
 current_phase_name: Interaction History & Insights
 status: executing
-stopped_at: Completed 32-02-PLAN.md (bind/unbind immutable lifecycle events + restore vocab/consent backdoor closure)
-last_updated: "2026-09-11T19:16:00.000Z"
+stopped_at: Completed 32-03-PLAN.md (temporal aggregation seam: window/buckets/cycles/intensity-window + canonical history-read DAO)
+last_updated: "2026-09-11T19:33:00.000Z"
 last_activity: 2026-09-11
-last_activity_desc: Phase 32 Plan 02 executed (bind/unbind events + D-06/D-04 restore backdoors closed)
-state_head: 9fd9498
+last_activity_desc: Phase 32 Plan 03 executed (pure history-aggregation seam + canonical history-read; group seam inert per D-12)
+state_head: 7e98c25
 progress:
   total_phases: 21
   completed_phases: 7
   total_plans: 112
-  completed_plans: 104
+  completed_plans: 105
 carried_forward:
 
   - "31.1 NOT complete: 31.1-05 corrective (backgrounds were invisible on the owner's release — full-screen scrim at card opacity) is executed + debug-validated + release built/delivered, but the phase stays open until the owner validates the release on his personal phone (the prior 31.1-04 gate's false positive is why). See 31.1-05-PLAN.md, 31.1-UAT.md (superseded + corrective section)."
@@ -37,16 +37,16 @@ See: .planning/PROJECT.md (updated 2026-09-10 after Phase 31)
 ## Current Position
 
 Phase: 32 (Interaction History & Insights) — EXECUTING
-Plan: 3 of 8
-Status: Ready to execute (32-01, 32-02 complete)
+Plan: 4 of 8
+Status: Executing (32-01, 32-02, 32-03 complete — aggregation seam + canonical history-read ready for Plans 04–08)
 Parked (owner, future): theme-merge into one Dark/Light switch; Deep Space/Starfield removal. See memories mode-aware-glassy-cards, android-elevation-opaque-on-translucent, theme-merge-into-mode-parked.
 FYI (separate): Phase 30 (Orrery Systems) still shows [ ] in ROADMAP with dirty 30-REVIEW files — reconcile independently.
 Carried forward (owner's bucket, NOT resolved here): D-11 default Memory-type display name — reconcile before Phase 34.
 Surface to owner (24.2-07, KNOW-15): milestone plan said Phase 36 owns the backup format-4 bump, but 24.1 already bumped to 4 (d677e2c); Plan 07 emits into the live format 4 with NO bump — that milestone instruction is stale.
 Deferred to Phase 31 (recorded in Plan 05): durable contact-scoped-def ownership + owner-purge semantics. Deferred to Phase 36 (ROADMAP breadcrumb): legacy AI-fuel confirm-path code removal.
-Last activity: 2026-09-11 — Phase 32 execution started
+Last activity: 2026-09-11 — Phase 32 Plan 03 executed (history-aggregation seam + canonical history-read)
 Progress: 11 completed v2.0 phases — 22, 23, 24.1, 24.2, 25, 26, 27, 28, 29, 30, 31
-Next: Execute Phase 31.1 Plan 02 — /gsd-execute-phase 31.1
+Next: Execute Phase 32 Plan 04 — /gsd-execute-phase 32
 
 **Milestone v2.0 structure (pre-decided by the owner from the fifteen milestone-2 dossiers + the
 2026-09-01 cross-dossier audit; not re-derived):** 22 App Shell · 23 Theme · 24 Contact Knowledge ·
@@ -255,6 +255,7 @@ at plan time. All new durable preferences are `app_settings` columns, never Asyn
 | Phase 31.1 P04 | 300min | 3 tasks | 6 files |
 | Phase 32 P01 | 20min | 3 tasks | 25 files |
 | Phase 32 P02 | 6min | 3 tasks | 6 files |
+| Phase 32 P03 | 8min | 3 tasks | 11 files |
 
 ## Accumulated Context
 
