@@ -1,10 +1,11 @@
 ---
 phase: 33
 slug: group-interaction-logging
-status: draft
+status: approved
 shadcn_initialized: false
 preset: none
 created: 2026-09-11
+reviewed_at: 2026-09-11
 ---
 
 # Phase 33 — UI Design Contract
@@ -124,22 +125,25 @@ All copy below is prescriptive. Destructive confirmations mirror the shipped `In
 
 ## UI Considerations
 
-> Shape-rooted UI *state* coverage for Phase 33's surfaces. Empty/error COPY lives in the Copywriting Contract above; rows here reference it rather than restate it.
+> Shape-rooted UI *state* coverage for Phase 33's surfaces. Empty/error COPY lives in the Copywriting Contract above; rows here reference it rather than restate it. Coverage computed by the UI-consideration probe over the 7 described surfaces (Group Log/Edit form, participant override editor, multi-select picker, Group Event Detail, browse page, destructive/lifecycle confirmations, child-edit scope prompt); resolutions deduplicated across surfaces where one state answer applies.
 
-Applicable state considerations resolved: 8 covered, 2 backstop, 0 unresolved.
+Applicable state considerations resolved: 11 covered (explicit), 2 backstop, 0 unresolved.
 
 | Category | Element(s) | Status | Resolution / Reason |
 |----------|------------|--------|---------------------|
 | empty | Group Events browse page (no events) | ✅ covered | Renders the documented "No group events yet" heading + body; deep-link-ready seam already routed |
 | empty | Group Log form with zero participants | ✅ covered | Zero-participant is a VALID saved state (dossier §C); shows "No participants yet" prompt, never an error; Save remains enabled |
 | empty | Search no-results on browse page | ✅ covered | Documented "No group events match "{term}"" over title + participant search |
-| loading | Multi-select participant picker; browse-page list | ✅ covered | Reuse `ContactPicker`'s existing `ActivityIndicator` load state; list renders skeleton/spinner only on initial/meaningfully-delayed load (mirrors LISTV-10 idiom) |
+| loading | Multi-select participant picker; browse-page list; Group Event Detail fetch | ✅ covered | Reuse `ContactPicker`'s existing `ActivityIndicator` load state; list/detail render a spinner only on initial/meaningfully-delayed load (mirrors LISTV-10 idiom) |
 | error | Group Event save / fan-out failure | ✅ covered | Atomic rollback (GRP-11); documented error copy; form stays open with input intact, nothing committed, control re-enabled — no optimistic vanish |
+| error | Participant recency fan-out failure on date edit | ✅ covered | Whole transaction rolled back; documented "Couldn't update the group event. Your changes weren't saved." (dossier §AA); form state preserved |
 | populated | Group Event Detail with participants | ✅ covered | Presentation-first; participant compact cards open child Interaction Detail (dossier §R/§S) |
-| partial | Mixed inherit/override participants | ✅ covered | Each participant card shows a concise override summary by text + icon (e.g. "Follows event" vs "Tone: Negative · 45m"); state never colour-alone |
+| partial | Mixed inherit/override participants (Detail cards + override editor) | ✅ covered | Each participant card + the override editor shows a concise inherit-vs-override summary by text + icon (e.g. "Follows event" vs "Tone: Negative · 45m"); state never colour-alone; explicit "Follow event …" clear affordance |
 | zero-one-many | Participant count fan-out (0 / 1 / many) | ✅ covered | 0 = valid no-op; each participant = exactly one canonical child via the recency cores; parent never counts (GRP-02, dossier §B/§AD) |
-| overflow | Large participant sets (no cap) | 🧪 backstop | No product cap (dossier §K); picker + participant list must virtualize (`FlatList`) and stay searchable — needs a device UI-state check at a realistic large count (Phase-18/40 reflow seam) |
-| long-text | Long event title / long Group Note / long contact names | 🧪 backstop | `body`/`label` reflow (never truncate critical semantics; large text grows card height — dossier §AE); needs a held-out long-content visual check |
+| confirmation / destructive | Dissolve · Delete Group Event & Interactions · three-way Remove-participant | ✅ covered | Fully specified in the Copywriting Contract: each names the consequence and the confirm action; Dissolve/Delete are `ConfirmDialog` destructive (danger fill + `warning` glyph, no scrim-dismiss), Remove-participant is a three-option `Sheet compact` not a binary dialog (dossier §N). *(Probe returned this surface `unclassified` — a data-shape classifier miss on an action-confirm surface, not a gap; resolved by reference to the copy contract.)* |
+| scope-select | Child-edit scope prompt (`GroupScopePrompt`) | ✅ covered | Static two-option `Sheet compact` ("Edit individual interaction" / "Edit Group Event") with fixed labels — no data load, so empty/loading/error/partial/long-text are n/a by shape; routes `onEditGroup` to the real Edit Group Event form (dossier §S) |
+| overflow | Large participant sets (no cap) | 🧪 backstop | No product cap (dossier §K); picker + participant list must virtualize (`FlatList`) and stay searchable — needs a device UI-state check at a realistic large count (Phase-18/40 reflow seam). *Verification: backstop (held-out device UI-state check).* |
+| long-text | Long event title / long Group Note / long contact names | 🧪 backstop | `body`/`label` reflow (never truncate critical semantics; large text grows card height — dossier §AE); needs a held-out long-content visual check. *Verification: backstop (held-out device visual check).* |
 
 ---
 
@@ -155,11 +159,11 @@ Not applicable — no shadcn, no component registry. Phase 33 consumes only in-r
 
 ## Checker Sign-Off
 
-- [ ] Dimension 1 Copywriting: PASS
-- [ ] Dimension 2 Visuals: PASS
-- [ ] Dimension 3 Color: PASS
-- [ ] Dimension 4 Typography: PASS
-- [ ] Dimension 5 Spacing: PASS
-- [ ] Dimension 6 Registry Safety: PASS
+- [x] Dimension 1 Copywriting: PASS
+- [x] Dimension 2 Visuals: PASS
+- [x] Dimension 3 Color: PASS
+- [x] Dimension 4 Typography: PASS
+- [x] Dimension 5 Spacing: PASS
+- [x] Dimension 6 Registry Safety: PASS
 
-**Approval:** pending
+**Approval:** approved (gsd-ui-checker, 2026-09-11) — 6/6 dimensions PASS, all reuse claims verified on disk, no decision reversals
