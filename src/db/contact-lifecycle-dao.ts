@@ -8,8 +8,10 @@
  * that has never received a cadence must be given a positive one explicitly.
  */
 import { bumpDataRevisionCore } from "@/db/data-revision-dao";
+import { recordEventCore } from "@/db/events-dao";
 import { inWriteTransaction } from "@/db/transaction";
 import type { SqlExecutor } from "@/db/types";
+import { newUid } from "@/db/uid";
 
 function assertPositiveCadence(intervalDays: number): void {
   if (!Number.isInteger(intervalDays) || intervalDays <= 0) {
@@ -76,6 +78,18 @@ export function bindContact(
         `bindContact: no unchanged Unbound contact matched id=${id} (changed ${result.changes})`,
       );
     }
+    // Record the immutable 'bind' lifecycle moment (D-08, ADR-025). Composed via
+    // the NON-mutexed core inside this ALREADY-OPEN transaction — never a nested
+    // inWriteTransaction (the write mutex is non-reentrant; nesting hangs). The
+    // event's occurredAt is the bind moment `now`, not invented from another field.
+    await recordEventCore(exec, {
+      uid: newUid(),
+      contactId: id,
+      type: "bind",
+      occurredAt: now,
+      detail: null,
+      now,
+    });
     await bumpDataRevisionCore(exec);
   });
 }
@@ -101,6 +115,17 @@ export function unbindContact(
         `unbindContact: no Bound contact matched id=${id} (changed ${result.changes})`,
       );
     }
+    // Record the immutable 'unbind' lifecycle moment (D-08, ADR-025). Same
+    // composition rule as bindContact: NON-mutexed core inside this already-open
+    // transaction, occurredAt = the unbind moment `now`.
+    await recordEventCore(exec, {
+      uid: newUid(),
+      contactId: id,
+      type: "unbind",
+      occurredAt: now,
+      detail: null,
+      now,
+    });
     await bumpDataRevisionCore(exec);
   });
 }

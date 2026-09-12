@@ -11,10 +11,13 @@
  *   add an `UPDATE events` here — it would break the immutability contract.
  * =============================================================================
  *
- * v1 vocabulary (`EventType`) is the full dossier set archive|restore|snooze|
- * unsnooze ([log → data] ~line 571 "a record of what the app did"). All four
- * values have producers: contacts-dao composes archive/restore and snooze-dao
- * composes snooze/unsnooze, each inside its owning transaction.
+ * Vocabulary (`EventType`) is the full dossier set archive|restore|snooze|
+ * unsnooze plus the two lifecycle moments bind|unbind ([log → data] ~line 571
+ * "a record of what the app did"; D-08). Every value has a producer: contacts-dao
+ * composes archive/restore, snooze-dao composes snooze/unsnooze, and
+ * contact-lifecycle-dao composes bind/unbind — each inside its owning
+ * transaction. `events.type` is CHECK-less TEXT, so adding bind/unbind is a TS
+ * union change only, no migration (D-08).
  *
  * NON-REENTRANCY (mirrors recency-dao's *Core split + transaction.ts):
  *   `recordEventCore` takes NO mutex and opens NO transaction — it assumes BEGIN
@@ -31,9 +34,15 @@ import { bumpDataRevisionCore } from "@/db/data-revision-dao";
 import type { SqlExecutor } from "@/db/types";
 
 /**
- * The v1 lifecycle-event vocabulary. All four values have live producers.
+ * The lifecycle-event vocabulary. Every value has a live producer.
  */
-export type EventType = "archive" | "restore" | "snooze" | "unsnooze";
+export type EventType =
+  | "archive"
+  | "restore"
+  | "snooze"
+  | "unsnooze"
+  | "bind"
+  | "unbind";
 
 /** One immutable events row to record against an existing contact. */
 export interface RecordEventInput {
