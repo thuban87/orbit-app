@@ -82,7 +82,6 @@ import {
   nextWindow,
   prevWindow,
 } from "@/services/history/window";
-import { useTheme } from "@/theme";
 import { SPACING } from "@/theme/tokens/spacing";
 import { formatLocalDate } from "@/utils/dates";
 
@@ -147,7 +146,6 @@ export function HistorySection({
   onOpenKnowledgeChange,
   testID = "history-section",
 }: HistorySectionProps) {
-  const { colors } = useTheme();
   const navigation =
     useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const today = useMemo(() => formatLocalDate(new Date()), []);
