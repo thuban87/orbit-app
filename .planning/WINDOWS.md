@@ -1,10 +1,10 @@
 ---
 schema_version: 1
-open_count: 54
+open_count: 55
 waived_count: 0
 fixed_count: 6
-total_count: 60
-last_updated: 2026-09-12T00:06:10.377Z
+total_count: 61
+last_updated: 2026-09-12T01:53:34.970Z
 ---
 
 # Broken Windows Ledger
@@ -75,6 +75,7 @@ last_updated: 2026-09-12T00:06:10.377Z
 | 58 | 31 | unrun-verify | .planning/phases/31-profile-experience/31-VALIDATION.md |  | Hero/Overview native smoke awaits Plan 31-10 host integration; Task 31-05 verified physical topology only. | open |  | 2026-09-09T19:49:42.984Z |  |
 | 59 | 31.1 | unrun-verify | src/screens/SettingsScreen.tsx |  | Device live-preview, per-package persistence, and relaunch restoration remain UAT to preserve the owner’s current preference. | open |  | 2026-09-11T00:27:18.188Z |  |
 | 60 | 32 | unrun-verify | src/components/TouchpointRefineForm.tsx |  | Device UAT of extended TouchpointRefineForm (Tone/duration chips/Allow-AI toggle) deferred — Pixel not attached at 32-01 execution | open |  | 2026-09-12T00:06:10.377Z |  |
+| 61 | 32 | unrun-verify | src/components/history/HistorySection.tsx |  | Device UAT deferred to phase gate: populated/empty/lifecycle-only render, cell->card->sheet, drawer->sheet, empty-date LogContact from Settings-origin, knowledge-change edit from Settings-origin, reduced motion | open |  | 2026-09-12T01:53:34.970Z |  |
 
 ````json
 [
@@ -796,6 +797,18 @@ last_updated: 2026-09-12T00:06:10.377Z
     "status": "open",
     "reason": "",
     "recorded_at": "2026-09-12T00:06:10.377Z",
+    "resolved_at": null
+  },
+  {
+    "id": 61,
+    "kind": "unrun-verify",
+    "phase": "32",
+    "file": "src/components/history/HistorySection.tsx",
+    "line": null,
+    "description": "Device UAT deferred to phase gate: populated/empty/lifecycle-only render, cell->card->sheet, drawer->sheet, empty-date LogContact from Settings-origin, knowledge-change edit from Settings-origin, reduced motion",
+    "status": "open",
+    "reason": "",
+    "recorded_at": "2026-09-12T01:53:34.970Z",
     "resolved_at": null
   }
 ]

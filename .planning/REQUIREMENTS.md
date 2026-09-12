@@ -186,7 +186,7 @@ category's phase (see Traceability).
 
 ### HIST — Interaction History & Insights (Phase 32)
 
-- [ ] **HIST-01**: The Profile History section presents three children — Activity Heatmap, Intensity, and History Browser — replacing the vertical timeline
+- [x] **HIST-01**: The Profile History section presents three children — Activity Heatmap, Intensity, and History Browser — replacing the vertical timeline
 - [x] **HIST-02**: The Heatmap encodes interaction count only; lifecycle and non-interaction records never affect saturation or its context card; deleting/re-dating an interaction updates the affected bucket
 - [x] **HIST-03**: User can switch Heatmap lenses — Cycles, 7 Days, Month, Year — with the last-used lens persisting globally (durable, backup-portable)
 - [x] **HIST-04**: Cycles is the default lens: each block is one currently-configured Contact Frequency cycle, presets 5/10/15/20 (default 10, persisting globally), newest bottom-right, with one-cycle shifting and window paging; the current cycle is distinguished structurally, not by a second hue; a defined fallback exists for Unbound contacts (decided once with Phase 31)
@@ -200,10 +200,10 @@ category's phase (see Traceability).
 - [x] **HIST-12**: A canonical Edit Interaction route can change every current editable field including date/time, Tone, duration, and the Allow AI toggle; future dates are rejected and derived consumers refresh on save
 - [x] **HIST-13**: Interaction deletion stays hard-delete behind an explicit irreversible confirmation naming derived-metric consequences; no trash subsystem
 - [x] **HIST-14**: Interactions gain optional duration — presets (5m/15m/30m/1h/2h/Custom) or none, never asked by Quick Log, shown only when present, and excluded from Status/Gravity/Intensity this milestone
-- [ ] **HIST-15**: Empty historical dates route into canonical detailed logging with contact preselected and the date prefilled for single-day contexts; Quick Log is never used for backfill
+- [x] **HIST-15**: Empty historical dates route into canonical detailed logging with contact preselected and the date prefilled for single-day contexts; Quick Log is never used for backfill
 - [x] **HIST-16**: A Group Event parent never appears as a second History row and never increments any count or derived metric; a group-linked Interaction Detail shows restrained Group Event context (badge, title, separate Group Note, View Group Event) *(satisfied structurally in Phase 32 — dormant predicate-gated seam, hard-false until Phase 33's group_event_id; D-12)*
 - [x] **HIST-17**: Editing a group-linked Interaction first asks the scope — individual override editor vs Edit Group Event; deleting a group-linked child removes only that participant *(satisfied structurally in Phase 32 — GroupScopePrompt seam present, hard-false path never fires until Phase 33; D-12)*
-- [ ] **HIST-18**: History is fully usable without color, wheel gestures, or marker iconography; Reduced Motion simplifies wheel depth/inertia without removing navigation
+- [x] **HIST-18**: History is fully usable without color, wheel gestures, or marker iconography; Reduced Motion simplifies wheel depth/inertia without removing navigation
 
 ### GRP — Group Interaction Logging (Phase 33)
 
