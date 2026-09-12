@@ -64,7 +64,9 @@ function inheritedDisplay<Field extends InheritableGroupField>(
   const following = isFollowing(child, field);
   return {
     label: fieldMeta[field].label,
-    value: (following ? event[field] : child[field]) as GroupInheritanceChild[Field],
+    value: (following
+      ? event[field]
+      : child[field]) as GroupInheritanceChild[Field],
     following,
   };
 }

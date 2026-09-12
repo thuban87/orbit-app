@@ -133,7 +133,9 @@ const followColumn: Record<InheritableGroupField, string> = {
 
 const INHERITABLE_FIELDS = ["channel", "quality", "duration"] as const;
 
-function assertInheritableField(field: string): asserts field is InheritableGroupField {
+function assertInheritableField(
+  field: string,
+): asserts field is InheritableGroupField {
   if (!(INHERITABLE_FIELDS as readonly string[]).includes(field)) {
     throw new Error(`Group Event field ${field} cannot follow the event`);
   }
@@ -158,14 +160,21 @@ function assertFieldValue(
     throw new Error("Group Event Tone overrides require string or null values");
   }
   if (field === "duration" && value !== null && typeof value !== "number") {
-    throw new Error("Group Event duration overrides require number or null values");
+    throw new Error(
+      "Group Event duration overrides require number or null values",
+    );
   }
 }
 
 function changedChild(
   child: GroupChildRow,
   now: string,
-  changes: Partial<Pick<GroupChildRow, "occurredAt" | InheritableGroupField | "direction" | "connected" | "note">>,
+  changes: Partial<
+    Pick<
+      GroupChildRow,
+      "occurredAt" | InheritableGroupField | "direction" | "connected" | "note"
+    >
+  >,
 ) {
   return {
     interactionId: child.id,
@@ -173,11 +182,13 @@ function changedChild(
     occurredAt: changes.occurredAt ?? child.occurredAt,
     now,
     channel: changes.channel ?? child.channel,
-    direction: changes.direction !== undefined ? changes.direction : child.direction,
+    direction:
+      changes.direction !== undefined ? changes.direction : child.direction,
     connected: changes.connected ?? child.connected,
     quality: changes.quality !== undefined ? changes.quality : child.quality,
     note: changes.note !== undefined ? changes.note : child.note,
-    duration: changes.duration !== undefined ? changes.duration : child.duration,
+    duration:
+      changes.duration !== undefined ? changes.duration : child.duration,
     allowAi: child.allowAi,
   };
 }
@@ -208,7 +219,10 @@ async function loadGroupChildren(
 
 async function loadGroupChild(
   exec: SqlExecutor,
-  input: Pick<SaveParticipantEditsInput, "interactionId" | "contactId" | "groupEventId">,
+  input: Pick<
+    SaveParticipantEditsInput,
+    "interactionId" | "contactId" | "groupEventId"
+  >,
 ): Promise<GroupChildRow> {
   const row = await exec.getFirstAsync<GroupChildRow>(
     `${GROUP_CHILD_SELECT}
@@ -225,7 +239,10 @@ async function loadGroupChild(
 
 async function updateFollowFlag(
   exec: SqlExecutor,
-  input: Pick<SaveParticipantEditsInput, "interactionId" | "contactId" | "groupEventId">,
+  input: Pick<
+    SaveParticipantEditsInput,
+    "interactionId" | "contactId" | "groupEventId"
+  >,
   field: InheritableGroupField,
   following: boolean,
 ): Promise<void> {
@@ -233,7 +250,12 @@ async function updateFollowFlag(
     `UPDATE interactions
         SET ${followColumn[field]} = ?
       WHERE id = ? AND contact_id = ? AND group_event_id = ?`,
-    [following ? 1 : 0, input.interactionId, input.contactId, input.groupEventId],
+    [
+      following ? 1 : 0,
+      input.interactionId,
+      input.contactId,
+      input.groupEventId,
+    ],
   );
   if (result.changes !== 1) {
     throw new Error(
@@ -251,7 +273,9 @@ export function createGroupEvent(
   input: CreateGroupEventInput,
 ): Promise<{ groupEventId: number }> {
   if (typeof input.title !== "string" || input.title.trim().length === 0) {
-    return Promise.reject(new Error("createGroupEvent: title must not be blank"));
+    return Promise.reject(
+      new Error("createGroupEvent: title must not be blank"),
+    );
   }
   if (typeof input.uid !== "string" || input.uid.trim().length === 0) {
     return Promise.reject(new Error("createGroupEvent: uid must not be blank"));
@@ -345,7 +369,9 @@ export function updateGroupEvent(
         [operation.value, input.now, input.groupEventId],
       );
       if (result.changes !== 1) {
-        throw new Error(`Group Event id=${input.groupEventId} no longer exists`);
+        throw new Error(
+          `Group Event id=${input.groupEventId} no longer exists`,
+        );
       }
       const children = computeFollowingChildren(
         await loadGroupChildren(exec, input.groupEventId),
@@ -366,7 +392,9 @@ export function updateGroupEvent(
         [input.patch.groupNote.value, input.now, input.groupEventId],
       );
       if (result.changes !== 1) {
-        throw new Error(`Group Event id=${input.groupEventId} no longer exists`);
+        throw new Error(
+          `Group Event id=${input.groupEventId} no longer exists`,
+        );
       }
       changed = true;
     }
@@ -427,7 +455,10 @@ export function setParticipantFields(
 ): Promise<void> {
   return inWriteTransaction(exec, async () => {
     const child = await loadGroupChild(exec, input);
-    await editTouchpointFullCore(exec, changedChild(child, input.now, input.fields));
+    await editTouchpointFullCore(
+      exec,
+      changedChild(child, input.now, input.fields),
+    );
     await bumpDataRevisionCore(exec);
   });
 }
@@ -443,7 +474,8 @@ export function saveParticipantEdits(
   try {
     for (const field of ["channel", "quality", "duration"] as const) {
       const operation = input.follow?.[field];
-      if (operation && !operation.follow) assertFieldValue(field, operation.value);
+      if (operation && !operation.follow)
+        assertFieldValue(field, operation.value);
     }
   } catch (error) {
     return Promise.reject(error);
@@ -453,8 +485,14 @@ export function saveParticipantEdits(
     const child = await loadGroupChild(exec, input);
     const followEntries = (["channel", "quality", "duration"] as const)
       .map((field) => [field, input.follow?.[field]] as const)
-      .filter((entry): entry is readonly [InheritableGroupField, ParticipantFollowChange] => entry[1] !== undefined);
-    const hasDirectFields = input.fields !== undefined && Object.keys(input.fields).length > 0;
+      .filter(
+        (
+          entry,
+        ): entry is readonly [InheritableGroupField, ParticipantFollowChange] =>
+          entry[1] !== undefined,
+      );
+    const hasDirectFields =
+      input.fields !== undefined && Object.keys(input.fields).length > 0;
     if (followEntries.length === 0 && !hasDirectFields) return;
 
     // Read exactly once for the save, after membership has been asserted.
@@ -471,10 +509,13 @@ export function saveParticipantEdits(
     };
     for (const [field, operation] of followEntries) {
       ordinaryChanges[field] = operation.follow
-        ? eventValue(event, field) as never
-        : operation.value as never;
+        ? (eventValue(event, field) as never)
+        : (operation.value as never);
     }
-    await editTouchpointFullCore(exec, changedChild(child, input.now, ordinaryChanges));
+    await editTouchpointFullCore(
+      exec,
+      changedChild(child, input.now, ordinaryChanges),
+    );
     for (const [field, operation] of followEntries) {
       await updateFollowFlag(exec, input, field, operation.follow);
     }

@@ -70,15 +70,17 @@ describe("Group Event inheritance", () => {
       mike,
       jordan,
     ]);
-    expect(computeFollowingChildren([sarah, mike, jordan], "duration")).toEqual([
-      sarah,
-      jordan,
-    ]);
+    expect(computeFollowingChildren([sarah, mike, jordan], "duration")).toEqual(
+      [sarah, jordan],
+    );
   });
 
   it("keeps direction and connected participant-owned plain values", () => {
     const display = resolveDisplay(sarah, event);
-    expect(display.direction).toEqual({ label: "Direction", value: "outbound" });
+    expect(display.direction).toEqual({
+      label: "Direction",
+      value: "outbound",
+    });
     expect(display.connected).toEqual({ label: "Connected", value: 1 });
     expect(display.direction).not.toHaveProperty("following");
     expect(display.connected).not.toHaveProperty("following");

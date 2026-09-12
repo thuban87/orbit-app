@@ -24,7 +24,10 @@ let exec: SqlExecutor;
 beforeEach(async () => {
   counter = 0;
   exec = nodeSqliteExecutor(openTestDb());
-  await runMigrations(exec, MIGRATIONS, TARGET_VERSION, { now: NOW, newUid: uid });
+  await runMigrations(exec, MIGRATIONS, TARGET_VERSION, {
+    now: NOW,
+    newUid: uid,
+  });
 });
 
 async function contact(name = "Alex"): Promise<number> {
@@ -36,7 +39,13 @@ async function contact(name = "Alex"): Promise<number> {
 }
 
 async function count(table: "group_events" | "interactions"): Promise<number> {
-  return (await exec.getFirstAsync<{ n: number }>(`SELECT COUNT(*) AS n FROM ${table}`))?.n ?? 0;
+  return (
+    (
+      await exec.getFirstAsync<{ n: number }>(
+        `SELECT COUNT(*) AS n FROM ${table}`,
+      )
+    )?.n ?? 0
+  );
 }
 
 async function groupWithThreeChildren(): Promise<{
@@ -58,9 +67,27 @@ async function groupWithThreeChildren(): Promise<{
     duration: 3600,
     groupNote: "Original shared note",
     participants: [
-      { contactId: alex, uid: uid(), direction: "outbound", connected: 1, note: "Alex note" },
-      { contactId: sam, uid: uid(), direction: "inbound", connected: 0, note: "Sam note" },
-      { contactId: jordan, uid: uid(), direction: null, connected: 1, note: "Jordan note" },
+      {
+        contactId: alex,
+        uid: uid(),
+        direction: "outbound",
+        connected: 1,
+        note: "Alex note",
+      },
+      {
+        contactId: sam,
+        uid: uid(),
+        direction: "inbound",
+        connected: 0,
+        note: "Sam note",
+      },
+      {
+        contactId: jordan,
+        uid: uid(),
+        direction: null,
+        connected: 1,
+        note: "Jordan note",
+      },
     ],
   });
   return { groupEventId, alex, sam, jordan };
@@ -93,12 +120,21 @@ async function groupChildren(groupEventId: number) {
 describe("createGroupEvent", () => {
   it("persists a valid zero-participant parent without an interaction", async () => {
     const result = await createGroupEvent(exec, {
-      uid: uid(), title: "Book club", occurredAt: NOW, now: NOW, participants: [],
+      uid: uid(),
+      title: "Book club",
+      occurredAt: NOW,
+      now: NOW,
+      participants: [],
     });
     expect(result.groupEventId).toBeGreaterThan(0);
     expect(await count("group_events")).toBe(1);
     expect(await count("interactions")).toBe(0);
-    expect(await exec.getFirstAsync<{ channel: string }>("SELECT channel FROM group_events WHERE id = ?", [result.groupEventId])).toEqual({ channel: "In Person" });
+    expect(
+      await exec.getFirstAsync<{ channel: string }>(
+        "SELECT channel FROM group_events WHERE id = ?",
+        [result.groupEventId],
+      ),
+    ).toEqual({ channel: "In Person" });
   });
 
   it("fans out canonical children and recomputes each participant recency", async () => {
@@ -106,39 +142,114 @@ describe("createGroupEvent", () => {
     const sam = await contact("Sam");
     const occurredAt = "2026-09-10 18:00:00";
     const { groupEventId } = await createGroupEvent(exec, {
-      uid: uid(), title: "Dinner", occurredAt, now: NOW, channel: "Call", quality: "Positive", duration: 3600,
+      uid: uid(),
+      title: "Dinner",
+      occurredAt,
+      now: NOW,
+      channel: "Call",
+      quality: "Positive",
+      duration: 3600,
       participants: [
-        { contactId: alex, uid: uid(), direction: "outbound", connected: 1, note: "Alex note" },
+        {
+          contactId: alex,
+          uid: uid(),
+          direction: "outbound",
+          connected: 1,
+          note: "Alex note",
+        },
         { contactId: sam, uid: uid(), direction: "inbound", connected: 0 },
       ],
     });
-    const rows = await exec.getAllAsync<{ contact_id: number; group_event_id: number; ge_follow_channel: number; ge_follow_quality: number; ge_follow_duration: number; direction: string; connected: number }>(
+    const rows = await exec.getAllAsync<{
+      contact_id: number;
+      group_event_id: number;
+      ge_follow_channel: number;
+      ge_follow_quality: number;
+      ge_follow_duration: number;
+      direction: string;
+      connected: number;
+    }>(
       "SELECT contact_id, group_event_id, ge_follow_channel, ge_follow_quality, ge_follow_duration, direction, connected FROM interactions ORDER BY contact_id",
     );
     expect(rows).toHaveLength(2);
-    expect(rows.map((row) => row.group_event_id)).toEqual([groupEventId, groupEventId]);
-    expect(rows.every((row) => row.ge_follow_channel === 1 && row.ge_follow_quality === 1 && row.ge_follow_duration === 1)).toBe(true);
-    expect(rows.find((row) => row.contact_id === alex)).toMatchObject({ direction: "outbound", connected: 1 });
-    expect(await exec.getFirstAsync<{ last_contact: string }>("SELECT last_contact FROM contacts WHERE id = ?", [alex])).toEqual({ last_contact: occurredAt });
+    expect(rows.map((row) => row.group_event_id)).toEqual([
+      groupEventId,
+      groupEventId,
+    ]);
+    expect(
+      rows.every(
+        (row) =>
+          row.ge_follow_channel === 1 &&
+          row.ge_follow_quality === 1 &&
+          row.ge_follow_duration === 1,
+      ),
+    ).toBe(true);
+    expect(rows.find((row) => row.contact_id === alex)).toMatchObject({
+      direction: "outbound",
+      connected: 1,
+    });
+    expect(
+      await exec.getFirstAsync<{ last_contact: string }>(
+        "SELECT last_contact FROM contacts WHERE id = ?",
+        [alex],
+      ),
+    ).toEqual({ last_contact: occurredAt });
     // Sam's unconnected row does not qualify as recency only if their contact is rarely-responds;
     // here it remains the sole normal-contact interaction.
-    expect(await exec.getFirstAsync<{ last_contact: string }>("SELECT last_contact FROM contacts WHERE id = ?", [sam])).toEqual({ last_contact: occurredAt });
+    expect(
+      await exec.getFirstAsync<{ last_contact: string }>(
+        "SELECT last_contact FROM contacts WHERE id = ?",
+        [sam],
+      ),
+    ).toEqual({ last_contact: occurredAt });
   });
 
   it("rejects duplicate membership atomically", async () => {
     const alex = await contact();
-    await expect(createGroupEvent(exec, {
-      uid: uid(), title: "Dinner", occurredAt: NOW, now: NOW,
-      participants: [{ contactId: alex, uid: uid() }, { contactId: alex, uid: uid() }],
-    })).rejects.toThrow();
+    await expect(
+      createGroupEvent(exec, {
+        uid: uid(),
+        title: "Dinner",
+        occurredAt: NOW,
+        now: NOW,
+        participants: [
+          { contactId: alex, uid: uid() },
+          { contactId: alex, uid: uid() },
+        ],
+      }),
+    ).rejects.toThrow();
     expect(await count("group_events")).toBe(0);
     expect(await count("interactions")).toBe(0);
   });
 
   it("rejects future, blank-title, and blank-uid inputs before writing", async () => {
-    await expect(createGroupEvent(exec, { uid: uid(), title: "Future", occurredAt: "2026-09-12 12:00:01", now: NOW, participants: [] })).rejects.toThrow();
-    await expect(createGroupEvent(exec, { uid: uid(), title: "  ", occurredAt: NOW, now: NOW, participants: [] })).rejects.toThrow();
-    await expect(createGroupEvent(exec, { uid: "", title: "Valid", occurredAt: NOW, now: NOW, participants: [] })).rejects.toThrow();
+    await expect(
+      createGroupEvent(exec, {
+        uid: uid(),
+        title: "Future",
+        occurredAt: "2026-09-12 12:00:01",
+        now: NOW,
+        participants: [],
+      }),
+    ).rejects.toThrow();
+    await expect(
+      createGroupEvent(exec, {
+        uid: uid(),
+        title: "  ",
+        occurredAt: NOW,
+        now: NOW,
+        participants: [],
+      }),
+    ).rejects.toThrow();
+    await expect(
+      createGroupEvent(exec, {
+        uid: "",
+        title: "Valid",
+        occurredAt: NOW,
+        now: NOW,
+        participants: [],
+      }),
+    ).rejects.toThrow();
     expect(await count("group_events")).toBe(0);
   });
 });
@@ -164,10 +275,12 @@ describe("updateGroupEvent", () => {
       },
     });
 
-    expect(await exec.getFirstAsync(
-      "SELECT occurred_at, channel, quality, duration, group_note FROM group_events WHERE id = ?",
-      [groupEventId],
-    )).toEqual({
+    expect(
+      await exec.getFirstAsync(
+        "SELECT occurred_at, channel, quality, duration, group_note FROM group_events WHERE id = ?",
+        [groupEventId],
+      ),
+    ).toEqual({
       occurred_at: "2026-09-11 19:00:00",
       channel: "Message",
       quality: null,
@@ -176,12 +289,39 @@ describe("updateGroupEvent", () => {
     });
     const children = await groupChildren(groupEventId);
     expect(children).toHaveLength(3);
-    expect(children.every((child) => child.occurred_at === "2026-09-11 19:00:00" && child.channel === "Message" && child.duration === null)).toBe(true);
-    expect(children.find((child) => child.contact_id === sam)?.quality).toBe("Negative");
-    expect(children.filter((child) => child.contact_id !== sam).every((child) => child.quality === null)).toBe(true);
-    expect(children.map((child) => child.note)).toEqual(["Alex note", "Sam note", "Jordan note"]);
-    expect(await exec.getFirstAsync<{ last_contact: string }>("SELECT last_contact FROM contacts WHERE id = ?", [alex])).toEqual({ last_contact: "2026-09-11 19:00:00" });
-    expect(await exec.getFirstAsync<{ last_contact: string }>("SELECT last_contact FROM contacts WHERE id = ?", [jordan])).toEqual({ last_contact: "2026-09-11 19:00:00" });
+    expect(
+      children.every(
+        (child) =>
+          child.occurred_at === "2026-09-11 19:00:00" &&
+          child.channel === "Message" &&
+          child.duration === null,
+      ),
+    ).toBe(true);
+    expect(children.find((child) => child.contact_id === sam)?.quality).toBe(
+      "Negative",
+    );
+    expect(
+      children
+        .filter((child) => child.contact_id !== sam)
+        .every((child) => child.quality === null),
+    ).toBe(true);
+    expect(children.map((child) => child.note)).toEqual([
+      "Alex note",
+      "Sam note",
+      "Jordan note",
+    ]);
+    expect(
+      await exec.getFirstAsync<{ last_contact: string }>(
+        "SELECT last_contact FROM contacts WHERE id = ?",
+        [alex],
+      ),
+    ).toEqual({ last_contact: "2026-09-11 19:00:00" });
+    expect(
+      await exec.getFirstAsync<{ last_contact: string }>(
+        "SELECT last_contact FROM contacts WHERE id = ?",
+        [jordan],
+      ),
+    ).toEqual({ last_contact: "2026-09-11 19:00:00" });
   });
 
   it("writes a Group Note only on its parent and keeps omitted fields intact", async () => {
@@ -192,20 +332,35 @@ describe("updateGroupEvent", () => {
       now: NOW,
       patch: { groupNote: { value: null } },
     });
-    expect(await exec.getFirstAsync<{ group_note: string | null }>("SELECT group_note FROM group_events WHERE id = ?", [groupEventId])).toEqual({ group_note: null });
+    expect(
+      await exec.getFirstAsync<{ group_note: string | null }>(
+        "SELECT group_note FROM group_events WHERE id = ?",
+        [groupEventId],
+      ),
+    ).toEqual({ group_note: null });
     expect(await groupChildren(groupEventId)).toEqual(before);
-    expect(await exec.getFirstAsync<{ channel: string; quality: string; duration: number }>("SELECT channel, quality, duration FROM group_events WHERE id = ?", [groupEventId])).toEqual({ channel: "Call", quality: "Positive", duration: 3600 });
+    expect(
+      await exec.getFirstAsync<{
+        channel: string;
+        quality: string;
+        duration: number;
+      }>("SELECT channel, quality, duration FROM group_events WHERE id = ?", [
+        groupEventId,
+      ]),
+    ).toEqual({ channel: "Call", quality: "Positive", duration: 3600 });
   });
 
   it("rejects a future date before opening a transaction", async () => {
     const { groupEventId } = await groupWithThreeChildren();
     const revision = await readDataRevision(exec);
-    await expect(updateGroupEvent(exec, {
-      groupEventId,
-      now: NOW,
-      occurredAt: "2026-09-12 12:00:01",
-      patch: {},
-    })).rejects.toThrow(/future/);
+    await expect(
+      updateGroupEvent(exec, {
+        groupEventId,
+        now: NOW,
+        occurredAt: "2026-09-12 12:00:01",
+        patch: {},
+      }),
+    ).rejects.toThrow(/future/);
     expect(await readDataRevision(exec)).toBe(revision);
   });
 
@@ -217,18 +372,25 @@ describe("updateGroupEvent", () => {
     expect(await groupChildren(groupEventId)).toEqual(before);
     expect(await readDataRevision(exec)).toBe(revision);
 
-    await exec.runAsync("DELETE FROM group_events WHERE id = ?", [groupEventId]);
-    await expect(updateGroupEvent(exec, {
+    await exec.runAsync("DELETE FROM group_events WHERE id = ?", [
       groupEventId,
-      now: NOW,
-      patch: { groupNote: { value: "cannot write" } },
-    })).rejects.toThrow(/no longer exists/);
+    ]);
+    await expect(
+      updateGroupEvent(exec, {
+        groupEventId,
+        now: NOW,
+        patch: { groupNote: { value: "cannot write" } },
+      }),
+    ).rejects.toThrow(/no longer exists/);
     expect(await readDataRevision(exec)).toBe(revision);
   });
 
   it("rolls every date/shared/note write back when a late child write fails", async () => {
     const { groupEventId } = await groupWithThreeChildren();
-    const beforeParent = await exec.getFirstAsync("SELECT occurred_at, channel, quality, duration, group_note FROM group_events WHERE id = ?", [groupEventId]);
+    const beforeParent = await exec.getFirstAsync(
+      "SELECT occurred_at, channel, quality, duration, group_note FROM group_events WHERE id = ?",
+      [groupEventId],
+    );
     const beforeChildren = await groupChildren(groupEventId);
     const revision = await readDataRevision(exec);
     const baseRun = exec.runAsync.bind(exec);
@@ -243,13 +405,23 @@ describe("updateGroupEvent", () => {
         return baseRun(sql, params);
       },
     };
-    await expect(updateGroupEvent(failingExec, {
-      groupEventId,
-      now: NOW,
-      occurredAt: "2026-09-11 19:00:00",
-      patch: { channel: { value: "Message" }, groupNote: { value: "Changed" } },
-    })).rejects.toThrow(/forced child failure/);
-    expect(await exec.getFirstAsync("SELECT occurred_at, channel, quality, duration, group_note FROM group_events WHERE id = ?", [groupEventId])).toEqual(beforeParent);
+    await expect(
+      updateGroupEvent(failingExec, {
+        groupEventId,
+        now: NOW,
+        occurredAt: "2026-09-11 19:00:00",
+        patch: {
+          channel: { value: "Message" },
+          groupNote: { value: "Changed" },
+        },
+      }),
+    ).rejects.toThrow(/forced child failure/);
+    expect(
+      await exec.getFirstAsync(
+        "SELECT occurred_at, channel, quality, duration, group_note FROM group_events WHERE id = ?",
+        [groupEventId],
+      ),
+    ).toEqual(beforeParent);
     expect(await groupChildren(groupEventId)).toEqual(beforeChildren);
     expect(await readDataRevision(exec)).toBe(revision);
   });
@@ -263,181 +435,369 @@ describe("participant override primitives", () => {
     const samChild = children.find((child) => child.contact_id === sam)!;
 
     await setParticipantOverride(exec, {
-      interactionId: alexChild.id, contactId: alex, groupEventId, now: NOW,
-      field: "quality", value: "Negative",
+      interactionId: alexChild.id,
+      contactId: alex,
+      groupEventId,
+      now: NOW,
+      field: "quality",
+      value: "Negative",
     });
     // Equal values are still an explicit detached override.
     await setParticipantOverride(exec, {
-      interactionId: samChild.id, contactId: sam, groupEventId, now: NOW,
-      field: "quality", value: "Positive",
+      interactionId: samChild.id,
+      contactId: sam,
+      groupEventId,
+      now: NOW,
+      field: "quality",
+      value: "Positive",
     });
     await updateGroupEvent(exec, {
-      groupEventId, now: NOW, patch: { quality: { value: "Neutral" } },
+      groupEventId,
+      now: NOW,
+      patch: { quality: { value: "Neutral" } },
     });
-    expect(await exec.getFirstAsync("SELECT quality, ge_follow_quality FROM interactions WHERE id = ?", [alexChild.id])).toEqual({ quality: "Negative", ge_follow_quality: 0 });
-    expect(await exec.getFirstAsync("SELECT quality, ge_follow_quality FROM interactions WHERE id = ?", [samChild.id])).toEqual({ quality: "Positive", ge_follow_quality: 0 });
+    expect(
+      await exec.getFirstAsync(
+        "SELECT quality, ge_follow_quality FROM interactions WHERE id = ?",
+        [alexChild.id],
+      ),
+    ).toEqual({ quality: "Negative", ge_follow_quality: 0 });
+    expect(
+      await exec.getFirstAsync(
+        "SELECT quality, ge_follow_quality FROM interactions WHERE id = ?",
+        [samChild.id],
+      ),
+    ).toEqual({ quality: "Positive", ge_follow_quality: 0 });
 
     await clearParticipantOverride(exec, {
-      interactionId: alexChild.id, contactId: alex, groupEventId, now: NOW,
+      interactionId: alexChild.id,
+      contactId: alex,
+      groupEventId,
+      now: NOW,
       field: "quality",
     });
-    expect(await exec.getFirstAsync("SELECT quality, ge_follow_quality FROM interactions WHERE id = ?", [alexChild.id])).toEqual({ quality: "Neutral", ge_follow_quality: 1 });
+    expect(
+      await exec.getFirstAsync(
+        "SELECT quality, ge_follow_quality FROM interactions WHERE id = ?",
+        [alexChild.id],
+      ),
+    ).toEqual({ quality: "Neutral", ge_follow_quality: 1 });
     await updateGroupEvent(exec, {
-      groupEventId, now: NOW, patch: { quality: { value: "Positive" } },
+      groupEventId,
+      now: NOW,
+      patch: { quality: { value: "Positive" } },
     });
-    expect(await exec.getFirstAsync("SELECT quality FROM interactions WHERE id = ?", [alexChild.id])).toEqual({ quality: "Positive" });
-    expect(await exec.getFirstAsync("SELECT quality FROM interactions WHERE id = ?", [samChild.id])).toEqual({ quality: "Positive" });
-    expect(await exec.getFirstAsync<{ ge_follow_quality: number }>("SELECT ge_follow_quality FROM interactions WHERE id = ?", [samChild.id])).toEqual({ ge_follow_quality: 0 });
+    expect(
+      await exec.getFirstAsync(
+        "SELECT quality FROM interactions WHERE id = ?",
+        [alexChild.id],
+      ),
+    ).toEqual({ quality: "Positive" });
+    expect(
+      await exec.getFirstAsync(
+        "SELECT quality FROM interactions WHERE id = ?",
+        [samChild.id],
+      ),
+    ).toEqual({ quality: "Positive" });
+    expect(
+      await exec.getFirstAsync<{ ge_follow_quality: number }>(
+        "SELECT ge_follow_quality FROM interactions WHERE id = ?",
+        [samChild.id],
+      ),
+    ).toEqual({ ge_follow_quality: 0 });
   });
 
   it("rolls back value and flag together when the scoped flag update fails", async () => {
     const { groupEventId, alex } = await groupWithThreeChildren();
-    const child = (await groupChildren(groupEventId)).find((row) => row.contact_id === alex)!;
+    const child = (await groupChildren(groupEventId)).find(
+      (row) => row.contact_id === alex,
+    )!;
     const revision = await readDataRevision(exec);
     const baseRun = exec.runAsync.bind(exec);
     const failingExec: SqlExecutor = {
       ...exec,
       runAsync: async (sql, params) => {
-        if (sql.includes("SET ge_follow_quality")) throw new Error("forced flag failure");
+        if (sql.includes("SET ge_follow_quality"))
+          throw new Error("forced flag failure");
         return baseRun(sql, params);
       },
     };
-    await expect(setParticipantOverride(failingExec, {
-      interactionId: child.id, contactId: alex, groupEventId, now: NOW,
-      field: "quality", value: "Negative",
-    })).rejects.toThrow(/forced flag failure/);
-    expect(await exec.getFirstAsync("SELECT quality, ge_follow_quality FROM interactions WHERE id = ?", [child.id])).toEqual({ quality: "Positive", ge_follow_quality: 1 });
+    await expect(
+      setParticipantOverride(failingExec, {
+        interactionId: child.id,
+        contactId: alex,
+        groupEventId,
+        now: NOW,
+        field: "quality",
+        value: "Negative",
+      }),
+    ).rejects.toThrow(/forced flag failure/);
+    expect(
+      await exec.getFirstAsync(
+        "SELECT quality, ge_follow_quality FROM interactions WHERE id = ?",
+        [child.id],
+      ),
+    ).toEqual({ quality: "Positive", ge_follow_quality: 1 });
     expect(await readDataRevision(exec)).toBe(revision);
   });
 
   it("writes participant-only fields without changing follow state", async () => {
     const { groupEventId, alex } = await groupWithThreeChildren();
-    const child = (await groupChildren(groupEventId)).find((row) => row.contact_id === alex)!;
+    const child = (await groupChildren(groupEventId)).find(
+      (row) => row.contact_id === alex,
+    )!;
     await setParticipantFields(exec, {
-      interactionId: child.id, contactId: alex, groupEventId, now: NOW,
-      fields: { direction: "mutual", connected: 0, note: "private participant note" },
+      interactionId: child.id,
+      contactId: alex,
+      groupEventId,
+      now: NOW,
+      fields: {
+        direction: "mutual",
+        connected: 0,
+        note: "private participant note",
+      },
     });
-    expect(await exec.getFirstAsync(
-      "SELECT direction, connected, note, ge_follow_channel, ge_follow_quality, ge_follow_duration FROM interactions WHERE id = ?",
-      [child.id],
-    )).toEqual({
-      direction: "mutual", connected: 0, note: "private participant note",
-      ge_follow_channel: 1, ge_follow_quality: 1, ge_follow_duration: 1,
+    expect(
+      await exec.getFirstAsync(
+        "SELECT direction, connected, note, ge_follow_channel, ge_follow_quality, ge_follow_duration FROM interactions WHERE id = ?",
+        [child.id],
+      ),
+    ).toEqual({
+      direction: "mutual",
+      connected: 0,
+      note: "private participant note",
+      ge_follow_channel: 1,
+      ge_follow_quality: 1,
+      ge_follow_duration: 1,
     });
   });
 
   it("rejects malformed group membership for every participant primitive", async () => {
     const { groupEventId, alex } = await groupWithThreeChildren();
     const other = await createGroupEvent(exec, {
-      uid: uid(), title: "Other", occurredAt: NOW, now: NOW, participants: [],
+      uid: uid(),
+      title: "Other",
+      occurredAt: NOW,
+      now: NOW,
+      participants: [],
     });
-    const child = (await groupChildren(groupEventId)).find((row) => row.contact_id === alex)!;
-    const before = await exec.getFirstAsync("SELECT channel, direction, connected, note, ge_follow_channel FROM interactions WHERE id = ?", [child.id]);
-    await expect(setParticipantOverride(exec, {
-      interactionId: child.id, contactId: alex, groupEventId: other.groupEventId, now: NOW,
-      field: "channel", value: "Message",
-    })).rejects.toThrow(/not a member/);
-    await expect(clearParticipantOverride(exec, {
-      interactionId: child.id, contactId: alex, groupEventId: other.groupEventId, now: NOW,
-      field: "channel",
-    })).rejects.toThrow(/not a member/);
-    await expect(setParticipantFields(exec, {
-      interactionId: child.id, contactId: alex, groupEventId: other.groupEventId, now: NOW,
-      fields: { note: "cannot write" },
-    })).rejects.toThrow(/not a member/);
-    expect(await exec.getFirstAsync("SELECT channel, direction, connected, note, ge_follow_channel FROM interactions WHERE id = ?", [child.id])).toEqual(before);
+    const child = (await groupChildren(groupEventId)).find(
+      (row) => row.contact_id === alex,
+    )!;
+    const before = await exec.getFirstAsync(
+      "SELECT channel, direction, connected, note, ge_follow_channel FROM interactions WHERE id = ?",
+      [child.id],
+    );
+    await expect(
+      setParticipantOverride(exec, {
+        interactionId: child.id,
+        contactId: alex,
+        groupEventId: other.groupEventId,
+        now: NOW,
+        field: "channel",
+        value: "Message",
+      }),
+    ).rejects.toThrow(/not a member/);
+    await expect(
+      clearParticipantOverride(exec, {
+        interactionId: child.id,
+        contactId: alex,
+        groupEventId: other.groupEventId,
+        now: NOW,
+        field: "channel",
+      }),
+    ).rejects.toThrow(/not a member/);
+    await expect(
+      setParticipantFields(exec, {
+        interactionId: child.id,
+        contactId: alex,
+        groupEventId: other.groupEventId,
+        now: NOW,
+        fields: { note: "cannot write" },
+      }),
+    ).rejects.toThrow(/not a member/);
+    expect(
+      await exec.getFirstAsync(
+        "SELECT channel, direction, connected, note, ge_follow_channel FROM interactions WHERE id = ?",
+        [child.id],
+      ),
+    ).toEqual(before);
   });
 
   it("rejects non-inheritable override targets instead of inventing a follow flag", async () => {
     const { groupEventId, alex } = await groupWithThreeChildren();
-    const child = (await groupChildren(groupEventId)).find((row) => row.contact_id === alex)!;
-    await expect(setParticipantOverride(exec, {
-      interactionId: child.id, contactId: alex, groupEventId, now: NOW,
-      field: "direction" as never, value: "outbound",
-    })).rejects.toThrow(/cannot follow/);
-    await expect(clearParticipantOverride(exec, {
-      interactionId: child.id, contactId: alex, groupEventId, now: NOW,
-      field: "connected" as never,
-    })).rejects.toThrow(/cannot follow/);
+    const child = (await groupChildren(groupEventId)).find(
+      (row) => row.contact_id === alex,
+    )!;
+    await expect(
+      setParticipantOverride(exec, {
+        interactionId: child.id,
+        contactId: alex,
+        groupEventId,
+        now: NOW,
+        field: "direction" as never,
+        value: "outbound",
+      }),
+    ).rejects.toThrow(/cannot follow/);
+    await expect(
+      clearParticipantOverride(exec, {
+        interactionId: child.id,
+        contactId: alex,
+        groupEventId,
+        now: NOW,
+        field: "connected" as never,
+      }),
+    ).rejects.toThrow(/cannot follow/);
   });
 });
 
 describe("saveParticipantEdits", () => {
   it("commits a follow-field override and participant note together with one bump", async () => {
     const { groupEventId, alex } = await groupWithThreeChildren();
-    const child = (await groupChildren(groupEventId)).find((row) => row.contact_id === alex)!;
+    const child = (await groupChildren(groupEventId)).find(
+      (row) => row.contact_id === alex,
+    )!;
     const revision = await readDataRevision(exec);
     await saveParticipantEdits(exec, {
-      interactionId: child.id, contactId: alex, groupEventId, now: NOW,
+      interactionId: child.id,
+      contactId: alex,
+      groupEventId,
+      now: NOW,
       follow: { quality: { follow: false, value: "Negative" } },
       fields: { note: "private changed note" },
     });
-    expect(await exec.getFirstAsync("SELECT quality, ge_follow_quality, note FROM interactions WHERE id = ?", [child.id])).toEqual({ quality: "Negative", ge_follow_quality: 0, note: "private changed note" });
+    expect(
+      await exec.getFirstAsync(
+        "SELECT quality, ge_follow_quality, note FROM interactions WHERE id = ?",
+        [child.id],
+      ),
+    ).toEqual({
+      quality: "Negative",
+      ge_follow_quality: 0,
+      note: "private changed note",
+    });
     expect(await readDataRevision(exec)).toBe(revision + 1);
   });
 
   it("rolls all field classes back when a flag write fails after the core edit", async () => {
     const { groupEventId, alex } = await groupWithThreeChildren();
-    const child = (await groupChildren(groupEventId)).find((row) => row.contact_id === alex)!;
+    const child = (await groupChildren(groupEventId)).find(
+      (row) => row.contact_id === alex,
+    )!;
     const revision = await readDataRevision(exec);
     const baseRun = exec.runAsync.bind(exec);
     const failingExec: SqlExecutor = {
       ...exec,
       runAsync: async (sql, params) => {
-        if (sql.includes("SET ge_follow_quality")) throw new Error("forced save flag failure");
+        if (sql.includes("SET ge_follow_quality"))
+          throw new Error("forced save flag failure");
         return baseRun(sql, params);
       },
     };
-    await expect(saveParticipantEdits(failingExec, {
-      interactionId: child.id, contactId: alex, groupEventId, now: NOW,
-      follow: { quality: { follow: false, value: "Negative" } },
-      fields: { note: "must roll back" },
-    })).rejects.toThrow(/forced save flag failure/);
-    expect(await exec.getFirstAsync("SELECT quality, ge_follow_quality, note FROM interactions WHERE id = ?", [child.id])).toEqual({ quality: "Positive", ge_follow_quality: 1, note: "Alex note" });
+    await expect(
+      saveParticipantEdits(failingExec, {
+        interactionId: child.id,
+        contactId: alex,
+        groupEventId,
+        now: NOW,
+        follow: { quality: { follow: false, value: "Negative" } },
+        fields: { note: "must roll back" },
+      }),
+    ).rejects.toThrow(/forced save flag failure/);
+    expect(
+      await exec.getFirstAsync(
+        "SELECT quality, ge_follow_quality, note FROM interactions WHERE id = ?",
+        [child.id],
+      ),
+    ).toEqual({ quality: "Positive", ge_follow_quality: 1, note: "Alex note" });
     expect(await readDataRevision(exec)).toBe(revision);
   });
 
   it("re-resolves a follow field from the current event and scopes the composite save to membership", async () => {
     const { groupEventId, alex } = await groupWithThreeChildren();
-    const child = (await groupChildren(groupEventId)).find((row) => row.contact_id === alex)!;
+    const child = (await groupChildren(groupEventId)).find(
+      (row) => row.contact_id === alex,
+    )!;
     await setParticipantOverride(exec, {
-      interactionId: child.id, contactId: alex, groupEventId, now: NOW,
-      field: "duration", value: 600,
+      interactionId: child.id,
+      contactId: alex,
+      groupEventId,
+      now: NOW,
+      field: "duration",
+      value: 600,
     });
     await updateGroupEvent(exec, {
-      groupEventId, now: NOW, patch: { duration: { value: 7200 } },
+      groupEventId,
+      now: NOW,
+      patch: { duration: { value: 7200 } },
     });
     await saveParticipantEdits(exec, {
-      interactionId: child.id, contactId: alex, groupEventId, now: NOW,
+      interactionId: child.id,
+      contactId: alex,
+      groupEventId,
+      now: NOW,
       follow: { duration: { follow: true } },
     });
-    expect(await exec.getFirstAsync("SELECT duration, ge_follow_duration FROM interactions WHERE id = ?", [child.id])).toEqual({ duration: 7200, ge_follow_duration: 1 });
+    expect(
+      await exec.getFirstAsync(
+        "SELECT duration, ge_follow_duration FROM interactions WHERE id = ?",
+        [child.id],
+      ),
+    ).toEqual({ duration: 7200, ge_follow_duration: 1 });
 
     const other = await createGroupEvent(exec, {
-      uid: uid(), title: "Other", occurredAt: NOW, now: NOW, participants: [],
+      uid: uid(),
+      title: "Other",
+      occurredAt: NOW,
+      now: NOW,
+      participants: [],
     });
-    const before = await exec.getFirstAsync("SELECT direction, connected, note FROM interactions WHERE id = ?", [child.id]);
-    await expect(saveParticipantEdits(exec, {
-      interactionId: child.id, contactId: alex, groupEventId: other.groupEventId, now: NOW,
-      fields: { direction: "mutual", note: "cannot write" },
-    })).rejects.toThrow(/not a member/);
-    expect(await exec.getFirstAsync("SELECT direction, connected, note FROM interactions WHERE id = ?", [child.id])).toEqual(before);
+    const before = await exec.getFirstAsync(
+      "SELECT direction, connected, note FROM interactions WHERE id = ?",
+      [child.id],
+    );
+    await expect(
+      saveParticipantEdits(exec, {
+        interactionId: child.id,
+        contactId: alex,
+        groupEventId: other.groupEventId,
+        now: NOW,
+        fields: { direction: "mutual", note: "cannot write" },
+      }),
+    ).rejects.toThrow(/not a member/);
+    expect(
+      await exec.getFirstAsync(
+        "SELECT direction, connected, note FROM interactions WHERE id = ?",
+        [child.id],
+      ),
+    ).toEqual(before);
   });
 
   it("persists direct-only participant edits without changing follow flags", async () => {
     const { groupEventId, alex } = await groupWithThreeChildren();
-    const child = (await groupChildren(groupEventId)).find((row) => row.contact_id === alex)!;
+    const child = (await groupChildren(groupEventId)).find(
+      (row) => row.contact_id === alex,
+    )!;
     const revision = await readDataRevision(exec);
     await saveParticipantEdits(exec, {
-      interactionId: child.id, contactId: alex, groupEventId, now: NOW,
+      interactionId: child.id,
+      contactId: alex,
+      groupEventId,
+      now: NOW,
       fields: { direction: null, connected: 0, note: "direct only" },
     });
-    expect(await exec.getFirstAsync(
-      "SELECT direction, connected, note, ge_follow_channel, ge_follow_quality, ge_follow_duration FROM interactions WHERE id = ?",
-      [child.id],
-    )).toEqual({
-      direction: null, connected: 0, note: "direct only",
-      ge_follow_channel: 1, ge_follow_quality: 1, ge_follow_duration: 1,
+    expect(
+      await exec.getFirstAsync(
+        "SELECT direction, connected, note, ge_follow_channel, ge_follow_quality, ge_follow_duration FROM interactions WHERE id = ?",
+        [child.id],
+      ),
+    ).toEqual({
+      direction: null,
+      connected: 0,
+      note: "direct only",
+      ge_follow_channel: 1,
+      ge_follow_quality: 1,
+      ge_follow_duration: 1,
     });
     expect(await readDataRevision(exec)).toBe(revision + 1);
   });
