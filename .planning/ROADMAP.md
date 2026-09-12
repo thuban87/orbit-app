@@ -726,7 +726,7 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 32-02-PLAN.md — Bind/Unbind immutable lifecycle events + restore-side vocabulary remap (wave 2)
+- [x] 32-02-PLAN.md — Bind/Unbind immutable lifecycle events + restore-side vocabulary remap (wave 2)
 - [ ] 32-03-PLAN.md — Reusable history aggregation seam (window/buckets/cycles/window-scoped intensity) + canonical history-read + inert group seam (wave 2)
 - [ ] 32-04-PLAN.md — Canonical Edit Interaction route + interaction-load read + all-stack registration (wave 2)
 

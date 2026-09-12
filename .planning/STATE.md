@@ -5,16 +5,16 @@ milestone_name: Release Readiness
 current_phase: 32
 current_phase_name: Interaction History & Insights
 status: executing
-stopped_at: Completed 32-01-PLAN.md (migration 025 + vocabulary lockstep + refine form)
-last_updated: "2026-09-12T00:06:28.310Z"
+stopped_at: Completed 32-02-PLAN.md (bind/unbind immutable lifecycle events + restore vocab/consent backdoor closure)
+last_updated: "2026-09-11T19:16:00.000Z"
 last_activity: 2026-09-11
-last_activity_desc: Phase 32 execution started
-state_head: d5204d18c7fff9ca09d26ede0d29b6a4fc78977f
+last_activity_desc: Phase 32 Plan 02 executed (bind/unbind events + D-06/D-04 restore backdoors closed)
+state_head: 9fd9498
 progress:
   total_phases: 21
   completed_phases: 7
   total_plans: 112
-  completed_plans: 103
+  completed_plans: 104
 carried_forward:
 
   - "31.1 NOT complete: 31.1-05 corrective (backgrounds were invisible on the owner's release — full-screen scrim at card opacity) is executed + debug-validated + release built/delivered, but the phase stays open until the owner validates the release on his personal phone (the prior 31.1-04 gate's false positive is why). See 31.1-05-PLAN.md, 31.1-UAT.md (superseded + corrective section)."
@@ -37,8 +37,8 @@ See: .planning/PROJECT.md (updated 2026-09-10 after Phase 31)
 ## Current Position
 
 Phase: 32 (Interaction History & Insights) — EXECUTING
-Plan: 2 of 8
-Status: Ready to execute
+Plan: 3 of 8
+Status: Ready to execute (32-01, 32-02 complete)
 Parked (owner, future): theme-merge into one Dark/Light switch; Deep Space/Starfield removal. See memories mode-aware-glassy-cards, android-elevation-opaque-on-translucent, theme-merge-into-mode-parked.
 FYI (separate): Phase 30 (Orrery Systems) still shows [ ] in ROADMAP with dirty 30-REVIEW files — reconcile independently.
 Carried forward (owner's bucket, NOT resolved here): D-11 default Memory-type display name — reconcile before Phase 34.
@@ -254,6 +254,7 @@ at plan time. All new durable preferences are `app_settings` columns, never Asyn
 | Phase 31.1 P03 | 7 min | 3 tasks | 34 files |
 | Phase 31.1 P04 | 300min | 3 tasks | 6 files |
 | Phase 32 P01 | 20min | 3 tasks | 25 files |
+| Phase 32 P02 | 6min | 3 tasks | 6 files |
 
 ## Accumulated Context
 
