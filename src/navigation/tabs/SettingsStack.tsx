@@ -10,6 +10,7 @@ import { DuplicateReviewScreen } from "@/screens/DuplicateReviewScreen";
 import { EditGroupEventScreen } from "@/screens/EditGroupEventScreen";
 import { EditInteractionScreen } from "@/screens/EditInteractionScreen";
 import { EditParticipantScreen } from "@/screens/EditParticipantScreen";
+import { GroupEventDetailScreen } from "@/screens/GroupEventDetailScreen";
 import { ImportCompleteScreen } from "@/screens/ImportCompleteScreen";
 import { ImportProgressScreen } from "@/screens/ImportProgressScreen";
 import { ImportReviewScreen } from "@/screens/ImportReviewScreen";
@@ -72,6 +73,10 @@ export function SettingsStack() {
       />
       <Stack.Screen name="MemoryHistory" component={MemoryHistoryScreen} />
       <Stack.Screen name="EditInteraction" component={EditInteractionScreen} />
+      <Stack.Screen
+        name="GroupEventDetail"
+        component={GroupEventDetailScreen}
+      />
       <Stack.Screen name="EditGroupEvent" component={EditGroupEventScreen} />
       <Stack.Screen name="EditParticipant" component={EditParticipantScreen} />
       <Stack.Screen name="CropPhoto" component={CropPhotoScreen} />

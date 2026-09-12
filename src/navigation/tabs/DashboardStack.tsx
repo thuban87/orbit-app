@@ -11,6 +11,7 @@ import { EditContactScreen } from "@/screens/EditContactScreen";
 import { EditGroupEventScreen } from "@/screens/EditGroupEventScreen";
 import { EditInteractionScreen } from "@/screens/EditInteractionScreen";
 import { EditParticipantScreen } from "@/screens/EditParticipantScreen";
+import { GroupEventDetailScreen } from "@/screens/GroupEventDetailScreen";
 import { GroupEventsScreen } from "@/screens/GroupEventsScreen";
 import { GroupLogScreen } from "@/screens/GroupLogScreen";
 import { HomeScreen } from "@/screens/HomeScreen";
@@ -37,6 +38,10 @@ export function DashboardStack() {
     >
       <Stack.Screen name="Home" component={HomeScreen} />
       <Stack.Screen name="GroupEvents" component={GroupEventsScreen} />
+      <Stack.Screen
+        name="GroupEventDetail"
+        component={GroupEventDetailScreen}
+      />
       <Stack.Screen name="LogContact" component={LogContactPlaceholderScreen} />
       <Stack.Screen name="GroupLog" component={GroupLogScreen} />
       <Stack.Screen
