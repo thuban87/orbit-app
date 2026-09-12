@@ -31,6 +31,7 @@ import {
   formatDrawerSummary,
   formatWheelDate,
   markerFor,
+  minBrowseYear,
   parseWheelDate,
   rollDate,
   type WheelDate,
@@ -40,9 +41,6 @@ import { AppText } from "@/components/ui/AppText";
 import { Button } from "@/components/ui/Button";
 import { SPACING } from "@/theme/tokens/spacing";
 import { useTheme } from "@/theme";
-
-/** How many years back the Year wheel browses. Today's year is the max. */
-const BROWSE_YEARS_BACK = 30;
 
 const MONTHS = [
   "Jan",
@@ -106,7 +104,9 @@ export function RolodexBrowser({
   }, []);
   const mounted = measured && isFocused && appActive;
 
-  const minYear = todayWd.year - BROWSE_YEARS_BACK;
+  // Year strip floor — shares BROWSE_YEARS_BACK with rolodex-logic's
+  // clampToMinYear so the wheel's span and the roll clamp cannot drift apart.
+  const minYear = minBrowseYear(todayWd);
 
   const monthItems: WheelItem[] = useMemo(
     () => MONTHS.map((label, i) => ({ key: `m${i}`, label })),
@@ -174,7 +174,9 @@ export function RolodexBrowser({
             testID={`${testID}-year`}
             label="Year"
             items={yearItems}
-            selectedIndex={selected.year - minYear}
+            // rollDate now floors the year at minYear, so this is >= 0; the
+            // Math.max is belt-and-suspenders for an out-of-range initialDate.
+            selectedIndex={Math.max(0, selected.year - minYear)}
             onStep={stepYear}
             reduced={reduced}
             colors={colors}

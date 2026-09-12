@@ -89,6 +89,34 @@ export function clampToToday(wd: WheelDate, today: WheelDate): WheelDate {
 }
 
 /**
+ * How many years back the Year wheel browses. Today's year is the max; the year
+ * strip spans `[today.year - BROWSE_YEARS_BACK, today.year]`. Lives here (not in
+ * `RolodexBrowser.tsx`) so the wheel's `minYear` bound and `clampToMinYear`'s
+ * floor share ONE source of truth.
+ */
+export const BROWSE_YEARS_BACK = 30;
+
+/** The lowest browsable year (year floor) for a given today. */
+export function minBrowseYear(today: WheelDate): number {
+  return today.year - BROWSE_YEARS_BACK;
+}
+
+/**
+ * Clamp a date UP to the lowest browsable year when a roll/step would drive it
+ * below the Year wheel's floor (`today.year - BROWSE_YEARS_BACK`). The symmetric
+ * lower bound to `clampToToday`: without it, `selected.year` could fall below
+ * `minYear` and the Year strip's `selectedIndex = selected.year - minYear` would
+ * go negative, positioning onto a nonexistent row (drawer/wheel desync). Month
+ * and day are preserved (leap-aware via `clampDate` for the Feb-29 edge).
+ */
+export function clampToMinYear(wd: WheelDate, today: WheelDate): WheelDate {
+  const minYear = minBrowseYear(today);
+  return wd.year < minYear
+    ? clampDate({ year: minYear, month: wd.month, day: wd.day })
+    : wd;
+}
+
+/**
  * Roll the selected date along one wheel axis by `delta` steps, then apply the
  * conventional invalid-date clamp and the today-as-max clamp.
  *
@@ -97,6 +125,11 @@ export function clampToToday(wd: WheelDate, today: WheelDate): WheelDate {
  * - `month`: shifts the month with a Year carry at the Dec/Jan seam, then clamps
  *   the day to the target month's length (Aug 31 -> Feb -> 28/29).
  * - `year`: shifts the year, then clamps the day (Feb 29 -> non-leap -> Feb 28).
+ *
+ * The result is bounded on BOTH ends: `clampToToday` caps it at today (upper) and
+ * `clampToMinYear` floors it at `today.year - BROWSE_YEARS_BACK` (lower), so a
+ * rolled/stepped/panned date can never leave the Year wheel's `[minYear, today]`
+ * span and desync the strip.
  */
 export function rollDate(
   current: WheelDate,
@@ -128,7 +161,7 @@ export function rollDate(
       break;
     }
   }
-  return clampToToday(next, today);
+  return clampToMinYear(clampToToday(next, today), today);
 }
 
 /** Pluralize a count against a singular/plural noun pair. */
