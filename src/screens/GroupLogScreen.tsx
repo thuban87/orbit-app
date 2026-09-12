@@ -43,8 +43,12 @@ export function GroupLogScreen({
   route,
 }: RootStackScreenProps<"GroupLog">) {
   const { colors } = useTheme();
+  const initialValueRef = useRef<TouchpointRefineValue | null>(null);
+  if (initialValueRef.current === null)
+    initialValueRef.current = newGroupValue();
+  const initialValue = initialValueRef.current;
   const [title, setTitle] = useState("");
-  const [value, setValue] = useState(newGroupValue);
+  const [value, setValue] = useState(initialValue);
   const [groupNote, setGroupNote] = useState("");
   const [participantIds, setParticipantIds] = useState<number[]>(
     () => route.params?.participantIds ?? [],
@@ -55,7 +59,7 @@ export function GroupLogScreen({
   const seedRef = useRef(
     JSON.stringify({
       title: "",
-      value: newGroupValue(),
+      value: initialValue,
       groupNote: "",
       participantIds: route.params?.participantIds ?? [],
     }),
