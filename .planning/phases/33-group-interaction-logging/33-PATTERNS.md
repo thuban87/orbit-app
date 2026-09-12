@@ -13,7 +13,7 @@
 | New/Modified File | Role | Data Flow | Closest Analog | Match Quality |
 |-------------------|------|-----------|----------------|---------------|
 | `src/db/migrations/026-group-events-schema.ts` (new) | migration | schema (additive DDL) | `src/db/migrations/025-interaction-history-schema.ts` | exact |
-| `src/db/group-events-dao.ts` (new) | DAO / service | CRUD + transactional fan-out | `src/db/contacts-dao.ts` (`createContactFull`) + `src/db/recency-dao.ts` (`editTouchpointFull`/`deleteInteractionCore`) | exact |
+| `src/db/group-events-dao.ts` (new) | DAO / service | CRUD + transactional fan-out | `src/db/contacts-dao.ts` (`createContactFull`) + `src/db/recency-dao.ts` (`editTouchpointFullCore`/`deleteInteractionCore` — the non-mutexed cores) | exact |
 | `src/db/group-events-read.ts` (new) | DAO (read) | request-response (pure reads) | `src/db/history-read.ts` / `src/backup/export-manifest.ts` read idiom | role-match |
 | `src/logic/group-inheritance.ts` (new) | logic (pure module) | transform | `src/components/history/interaction-detail-logic.ts` (`buildGroupContext`) | role-match |
 | `src/db/tombstones-dao.ts` (modified) | DAO | event-driven (delete evidence) | itself — add `group_event` to the entity union | exact (self) |
@@ -63,20 +63,21 @@ export {
 ```
 `insertInteractionCore` body is `recency-dao.ts:194-236` — a single `?`-bound `INSERT INTO interactions (...13 cols...)`. **Extend this core** to accept optional `groupEventId` + `ge_follow_*` params (all `?`-bound, default NULL) per RESEARCH A5 — keeps 100% of child inserts on the one write path.
 
-**Shared-value fan-out edit** uses `editTouchpointFull` (`recency-dao.ts:281-337`). Critical contract: it **SETs every editable column unconditionally** (no COALESCE) and re-runs `rejectFutureOccurredAt`, so read the child row first and pass its whole current record with only the changed field overwritten:
+**Shared-value fan-out edit** composes `editTouchpointFullCore` — the non-mutexed edit primitive **extracted from `editTouchpointFull`'s transaction body in Plan 01** (Task 4). NEVER call the mutexed `editTouchpointFull` wrapper inside the group txn: its own `inWriteTransaction` nested in yours is a permanent hang (transaction.ts non-reentrancy). Critical contract: the core **SETs every editable column unconditionally** (no COALESCE), so read the child row first and pass its whole current record with only the changed field overwritten. Unlike the wrapper, the core does NOT re-run `rejectFutureOccurredAt` and does NOT bump the revision — the composing DAO owns the future-date guard (once, before the txn) and the single trailing `bumpDataRevisionCore`:
 ```typescript
-// recency-dao.ts:303-328 — UPDATE sets occurred_at,channel,direction,connected,
-// quality,note,duration,allow_ai,modified_at WHERE id=? AND contact_id=?
+// The core body extracted from recency-dao.ts:303-334 — UPDATE sets occurred_at,channel,
+// direction,connected,quality,note,duration,allow_ai,modified_at WHERE id=? AND contact_id=?
 if (result.changes !== 1) { throw new Error(...); }   // loud rollback, not silent corruption
 await recomputeLastContact(exec, input.contactId, input.now);
-await bumpDataRevisionCore(exec);
+// NOTE: bumpDataRevisionCore lives in the composing DAO's transaction (one bump per fan-out),
+// NOT inside editTouchpointFullCore — mirrors insertInteractionCore.
 ```
 
 **Delete a child** uses `deleteInteractionCore` (`recency-dao.ts:340-368`) — writes an `interaction` tombstone (`insertTombstoneCore`) **before** the DELETE, then recomputes recency. Never raw `DELETE FROM interactions`; never rely on FK `ON DELETE CASCADE` (bypasses tombstone + recompute).
 
 **Three-way Remove / Dissolve / Convert** (RESEARCH Patterns 3-5): "Keep as individual" / Dissolve detach is `UPDATE interactions SET group_event_id=NULL, ge_follow_*=NULL, modified_at=? WHERE id=?` + `bumpDataRevisionCore` (values already materialized, no recompute needed); **never copy `group_note` into the participant note** (dossier §O). Delete-Group-Event-&-Interactions loops `deleteInteractionCore` then `DELETE FROM group_events` + a `group_event` tombstone.
 
-**ANTI-PATTERNS (trip-wires, stop-and-ask if tempted):** bulk `INSERT INTO interactions ... VALUES (?),(?)`; nesting `inWriteTransaction` (calling `deleteTouchpoint`/`recordTouchpoint`/`editTouchpointFull` wrappers inside a group txn → permanent hang — call the `*Core` inside your own txn instead); adding `group_events` to `ai-context-read.ts`; adding an archived-contact guard.
+**ANTI-PATTERNS (trip-wires, stop-and-ask if tempted):** bulk `INSERT INTO interactions ... VALUES (?),(?)`; nesting `inWriteTransaction` (calling `deleteTouchpoint`/`recordTouchpoint`/`editTouchpointFull` wrappers inside a group txn → permanent hang — compose the non-mutexed `deleteInteractionCore`/`insertInteractionCore`/`editTouchpointFullCore` inside your own txn instead); adding `group_events` to `ai-context-read.ts`; adding an archived-contact guard.
 
 ---
 
@@ -224,7 +225,7 @@ UPDATE contacts SET last_contact = (
 
 ## No Analog Found
 
-None. Every new file has a strong in-repo analog; this phase introduces no external packages and no novel data-flow shape. The one genuinely new construct — the per-field `ge_follow_*` live-inheritance flags — is a discretion storage-shape decision (RESEARCH A1), not a missing-pattern gap; its fan-out mechanics reuse `editTouchpointFull` verbatim.
+None. Every new file has a strong in-repo analog; this phase introduces no external packages and no novel data-flow shape. The one genuinely new construct — the per-field `ge_follow_*` live-inheritance flags — is a discretion storage-shape decision (RESEARCH A1), not a missing-pattern gap; its fan-out mechanics reuse the `editTouchpointFullCore` body verbatim (the non-mutexed core extracted from `editTouchpointFull` in Plan 01).
 
 ## Metadata
 

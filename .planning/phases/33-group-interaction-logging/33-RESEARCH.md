@@ -41,7 +41,7 @@ Per dossier "Explicitly Deferred": planned/future Group Events, in-app social ca
 | GRP-01 | Create Group Event: required title + date/time, participants optional, zero-participant valid | New `group_events` table (title NOT NULL, occurred_at NOT NULL); zero children when no participants — Architecture §Schema, §Atomic Fan-Out |
 | GRP-02 | Each participant → exactly one canonical child Interaction; parent never counts anywhere | Child = ordinary `interactions` row with nullable `group_event_id`; parent lives in a separate table read by NO metric consumer; heatmap/status/AI already read `interactions` only — verified inert seam in `buckets.ts`, `history-read.ts`, `status.ts` |
 | GRP-03 | Shared Channel/Tone/Duration at event level, live inheritance; Group Log defaults In Person / Tone unset / Duration unset, exempt from Channel-default pref | Shared values on `group_events`; materialized-value + per-field follow-flag model (§Inheritance); defaults are app-level constants |
-| GRP-04 | Per-participant override of Channel/Tone/Duration/Direction/Connected; clear via "Follow event…"; date/time + title never overridable | Per-field follow flags on the child row; `editTouchpointFull` rewrites resolved value; title/occurred_at not exposed in participant editor |
+| GRP-04 | Per-participant override of Channel/Tone/Duration/Direction/Connected; clear via "Follow event…"; date/time + title never overridable | Per-field follow flags on the child row; `editTouchpointFullCore` (composed inside the DAO's own txn) rewrites resolved value; title/occurred_at not exposed in participant editor |
 | GRP-05 | One shared Group Note owned by event, distinct from participant note; never transmitted to AI | `group_events.group_note`; `ai-context-read.ts` never reads that table (verified line-cited) — structural ban |
 | GRP-06 | Add/remove participants via shared multi-select picker (no cap); post-save add inherits current shared values stamped at event date/time; remove → Delete/Keep-as-individual/Cancel | Extend `ContactPicker` to multi-select; add = `insertInteractionCore` with event's current resolved values + occurred_at; three-way remove (§Remove-Participant) |
 | GRP-07 | Convert ordinary Interaction → Group Event without losing identity/UID; values seed shared defaults | In-place `UPDATE interactions SET group_event_id=…` — no delete/recreate (§Conversion) |
@@ -63,7 +63,7 @@ The single load-bearing correctness rule (D-05, ADR-010/024/071) is that **`cont
 
 The Group Note AI-egress ban (D-04/GRP-05) is preserved **structurally, for free**, provided the Group Note lives on the new parent table and nothing adds that table to `ai-context-read.ts` — which today reads only `name` + category + `channel/quality/connected` aggregates + opted-in fuel/memories/custom values, and **never a note column**. `[VERIFIED: src/db/ai-context-read.ts:108-152]`
 
-**Primary recommendation:** Add migration **026** (`group_events` table + nullable `interactions.group_event_id` + per-field follow-flags + `UNIQUE(group_event_id, contact_id)`), store **resolved values materialized on the child row** (existing consumers stay untouched) with **explicit per-field follow flags** driving live inheritance via fan-out `editTouchpointFull`, and route 100% of child writes through the recency cores inside one `inWriteTransaction`. Do NOT bump the backup format (Phase 36 owns that) but DO define the entity shape, a `group_event` tombstone, and the orphan-repair rule.
+**Primary recommendation:** Add migration **026** (`group_events` table + nullable `interactions.group_event_id` + per-field follow-flags + `UNIQUE(group_event_id, contact_id)`), store **resolved values materialized on the child row** (existing consumers stay untouched) with **explicit per-field follow flags** driving live inheritance via fan-out `editTouchpointFullCore` (the non-mutexed core extracted in Plan 01 — never the mutexed `editTouchpointFull` wrapper, which would nest `inWriteTransaction` and hang), and route 100% of child writes through the recency cores inside one `inWriteTransaction`. Do NOT bump the backup format (Phase 36 owns that) but DO define the entity shape, a `group_event` tombstone, and the orphan-repair rule.
 
 ---
 
@@ -87,7 +87,7 @@ The Group Note AI-egress ban (D-04/GRP-05) is preserved **structurally, for free
 ### Core (in-repo modules the plan builds on)
 | Module | Path | Purpose | Why standard |
 |--------|------|---------|--------------|
-| Recency cores | `src/db/recency-dao.ts` | `insertInteractionCore`, `recomputeLastContactCore`, `editTouchpointFull`, `deleteInteractionCore`, `deleteTouchpoint` | The ONLY sanctioned interaction write path (ADR-010/024/071, D-05) `[VERIFIED: recency-dao.ts:238-378,446-460]` |
+| Recency cores | `src/db/recency-dao.ts` | non-mutexed cores: `insertInteractionCore`, `recomputeLastContactCore`, `deleteInteractionCore` (+ `editTouchpointFullCore`, extracted in Plan 01); mutexed wrappers: `recordTouchpoint`, `editTouchpointFull`, `deleteTouchpoint` | The ONLY sanctioned interaction write path (ADR-010/024/071, D-05); compose the non-mutexed cores inside ONE txn, never a mutexed wrapper `[VERIFIED: recency-dao.ts:238-378,446-460]` |
 | Transaction primitive | `src/db/transaction.ts` | `inWriteTransaction` (mutexed BEGIN/COMMIT/ROLLBACK) | The one shared, non-reentrant write boundary `[VERIFIED: transaction.ts:49-64]` |
 | Compose exemplar | `src/db/contacts-dao.ts` | `createContactFull` / `createContactFullCore` | Canonical "enter mutex once, call `*Core` only" pattern `[VERIFIED: contacts-dao.ts:116-199]` |
 | Future-date guard | `src/db/log-guards.ts` | `rejectFutureOccurredAt` | GRP-12 rejection, applied before any transaction opens `[VERIFIED: recency-dao.ts:52,249-253]` |
@@ -247,7 +247,7 @@ export function createGroupEvent(exec: SqlExecutor, input: CreateGroupInput) {
 
 ### Pattern 2: Live inheritance — materialized value + follow flag (GRP-03/04)
 
-**What:** The child row always holds the **resolved** value in its ordinary column (`channel/quality/duration/direction/connected`); a sibling `ge_follow_<field>` flag records whether that value follows the event. **Editing a shared event value fans out** an `editTouchpointFull` to every child whose flag for that field is `1`, rewriting the resolved value. **Overriding** sets the flag to `0`. **"Follow event tone"** sets the flag back to `1` and rewrites the resolved value from the current event value. **Why not resolve-at-read:** existing consumers read the resolved columns directly and must stay group-unaware.
+**What:** The child row always holds the **resolved** value in its ordinary column (`channel/quality/duration/direction/connected`); a sibling `ge_follow_<field>` flag records whether that value follows the event. **Editing a shared event value fans out** an `editTouchpointFullCore` (the non-mutexed core; never the mutexed `editTouchpointFull` wrapper — that would nest `inWriteTransaction` and hang) to every child whose flag for that field is `1`, rewriting the resolved value. **Overriding** sets the flag to `0`. **"Follow event tone"** sets the flag back to `1` and rewrites the resolved value from the current event value. **Why not resolve-at-read:** existing consumers read the resolved columns directly and must stay group-unaware.
 
 ```typescript
 // Fan-out on a shared Tone change: rewrite only children still following.
@@ -258,14 +258,15 @@ return inWriteTransaction(exec, async () => {
     `SELECT id, contact_id, occurred_at, channel, direction, connected, quality, note, duration, allow_ai
        FROM interactions WHERE group_event_id=? AND ge_follow_quality=1`, [groupEventId]);
   for (const c of following) {
-    await editTouchpointFull(...) // supply ALL editable columns from c, with quality=newTone
-    // editTouchpointFull recomputes recency (a no-op MAX for a tone change) — correct + required by D-05
+    await editTouchpointFullCore(...) // supply ALL editable columns from c, with quality=newTone
+    // editTouchpointFullCore recomputes recency (a no-op MAX for a tone change) — correct + required by D-05.
+    // Compose the CORE, never the mutexed editTouchpointFull: nesting inWriteTransaction is a permanent hang.
   }
-  await bumpDataRevisionCore(exec);
+  await bumpDataRevisionCore(exec);   // single bump for the whole txn (the core does not bump)
 });
 ```
 
-Note: `editTouchpointFull` **requires every editable column** (it SETs each unconditionally) and re-applies `rejectFutureOccurredAt`, so read the child row first and pass its current values with only the changed field overwritten. `[VERIFIED: recency-dao.ts:89-109,281-337]`
+Note: the fan-out composes `editTouchpointFullCore` — the non-mutexed edit primitive **extracted from `editTouchpointFull`'s transaction body in Phase-33 Plan 01** — inside its own single `inWriteTransaction`. It **requires every editable column** (SETs each unconditionally), so read the child row first and pass its current values with only the changed field overwritten. Unlike the mutexed `editTouchpointFull` wrapper, the core does NOT open a transaction, does NOT re-apply `rejectFutureOccurredAt`, and does NOT bump the data revision — the composing caller owns the future-date guard (once, before the txn, since every child inherits the event `occurred_at`) and the single trailing `bumpDataRevisionCore`, exactly as `createContactFull`/`createGroupEvent` do with `insertInteractionCore`. Composing the mutexed `editTouchpointFull` here instead would nest `inWriteTransaction` and hang permanently. `[VERIFIED (current wrapper body): recency-dao.ts:89-109,281-337; transaction.ts:10-29]`
 
 ### Pattern 3: Three-way Remove Participant (GRP-06, D-11, dossier §N/§O)
 
@@ -284,7 +285,7 @@ In-place, preserving the interaction's `id`/`uid`: create the `group_events` par
 
 ### Anti-Patterns to Avoid
 - **Bulk `INSERT INTO interactions` for participants** — leaves `last_contact` wrong for every participant (the exact `benchmark.ts:119` mistake called out in planning-notes R-02). `[VERIFIED: planning-notes R-02 constraint 1]`
-- **Nesting `inWriteTransaction`** (e.g. calling `deleteTouchpoint` inside a group txn) — permanent hang; call `deleteInteractionCore` instead. `[VERIFIED: transaction.ts:11-29; recency-dao.ts:340-378]`
+- **Nesting `inWriteTransaction`** (e.g. calling the mutexed `deleteTouchpoint` OR `editTouchpointFull` wrapper inside a group txn) — permanent hang; compose the non-mutexed `deleteInteractionCore` / `editTouchpointFullCore` (extracted in Plan 01) instead. `[VERIFIED: transaction.ts:11-29; recency-dao.ts:281-378]`
 - **Relying on FK `ON DELETE CASCADE`** to remove children — bypasses recency recompute + tombstone.
 - **Adding `group_events` to `ai-context-read.ts`** — reverses D-04/ADR-078. Stop and ask.
 - **Adding an archived-contact guard** to block archived participants — reverses D-07. Stop and ask.
@@ -313,10 +314,10 @@ In-place, preserving the interaction's `id`/`uid`: create the `group_events` par
 **What goes wrong:** `last_contact` never advances for participants (or advances to the wrong row). **Why:** the recompute is a correlated `MAX` per contact; a set INSERT skips it. **How to avoid:** loop `insertInteractionCore` + `recomputeLastContactCore` per participant. **Warning signs:** a group DAO containing `INSERT INTO interactions ... VALUES (?),(?),...` or `SELECT ... FROM` inserts.
 
 ### Pitfall 2: Fan-out cost on large events (no cap)
-**What goes wrong:** an event date edit on a 40-participant event issues 40 `editTouchpointFull` (each recomputes recency). **Why:** no product cap (dossier §K). **How to avoid:** keep it one transaction (D-08 "bound the cost"); accept the per-row cost — it is correct, and realistic sets are small (HANDOFF §10: tens of contacts). The UI-SPEC flags large-set reflow as a device backstop, not a correctness gate.
+**What goes wrong:** an event date edit on a 40-participant event issues 40 `editTouchpointFullCore` calls (each recomputes recency). **Why:** no product cap (dossier §K). **How to avoid:** keep it one transaction (D-08 "bound the cost"); accept the per-row cost — it is correct, and realistic sets are small (HANDOFF §10: tens of contacts). The UI-SPEC flags large-set reflow as a device backstop, not a correctness gate.
 
-### Pitfall 3: `editTouchpointFull` needs every column
-**What goes wrong:** a shared-value fan-out that passes only the changed field nulls out the child's other fields. **Why:** `editTouchpointFull` SETs each editable column unconditionally (no COALESCE). **How to avoid:** read the child row first, overwrite only the changed field, pass the whole record. `[VERIFIED: recency-dao.ts:281-337]`
+### Pitfall 3: `editTouchpointFullCore` needs every column
+**What goes wrong:** a shared-value fan-out that passes only the changed field nulls out the child's other fields. **Why:** `editTouchpointFullCore` (like the `editTouchpointFull` body it is extracted from) SETs each editable column unconditionally (no COALESCE). **How to avoid:** read the child row first, overwrite only the changed field, pass the whole record. `[VERIFIED: recency-dao.ts:281-337]`
 
 ### Pitfall 4: Group Note leaking to AI via a future read
 **What goes wrong:** a well-meaning "include recent group context" join adds `group_events` to the egress read. **Why:** convenience. **How to avoid:** treat `ai-context-read.ts`'s closed projection as immutable for this phase; the ban is enforced by *not touching* that file. `[VERIFIED: ai-context-read.ts:8-27]`
@@ -342,12 +343,19 @@ The three canonical skeletons are in **Architecture Patterns** (create fan-out, 
 ```typescript
 // Source: src/db/recency-dao.ts:446-460  (the composition primitives) [VERIFIED]
 export {
-  insertInteraction as insertInteractionCore,     // (exec, contactId, now, i) -> rowid; assumes BEGIN open
+  insertInteraction as insertInteractionCore,     // (exec, contactId, now, i) -> rowid; assumes BEGIN open; no bump
   recomputeLastContact as recomputeLastContactCore, // (exec, contactId, now); the ONLY last_contact writer
 };
-// deleteInteractionCore(exec, {interactionId, contactId, now})  -> tombstone + recompute [VERIFIED: recency-dao.ts:340-368]
-// editTouchpointFull(exec, {interactionId, contactId, occurredAt, now, channel, direction,
-//                           connected, quality, note, duration, allowAi}) [VERIFIED: recency-dao.ts:89-109,281-337]
+// deleteInteractionCore(exec, {interactionId, contactId, now})  -> tombstone + recompute; assumes BEGIN open [VERIFIED: recency-dao.ts:340-368]
+//
+// editTouchpointFullCore(exec, {interactionId, contactId, occurredAt, now, channel, direction,
+//                               connected, quality, note, duration, allowAi})
+//   TO BE EXTRACTED in Phase-33 Plan 01 from editTouchpointFull's transaction body: UPDATE-every-column
+//   + changes===1 guard + recomputeLastContact. Assumes BEGIN open; takes NO mutex; does NOT re-guard the
+//   future date and does NOT bump the revision (the composing caller owns both). The mutexed public
+//   editTouchpointFull becomes a thin wrapper: rejectFutureOccurredAt, then
+//   inWriteTransaction(() => { editTouchpointFullCore(...); bumpDataRevisionCore(...) }).
+//   [VERIFIED (current wrapper body): recency-dao.ts:89-109,281-337]
 ```
 
 ```typescript
@@ -383,19 +391,22 @@ Not applicable — no external ecosystem is involved. The relevant "state of the
 
 ---
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **Exact override-state storage shape (A1).**
    - What we know: must be *explicit per-field* state (dossier §G: current-value equality is insufficient); child must retain resolved values.
    - What's unclear: discrete flag columns vs JSON mask vs side table.
    - Recommendation: discrete `ge_follow_*` columns — cleanest fan-out predicate and backup. Planner's call (discretion).
+   - **RESOLVED:** discrete per-field `ge_follow_*` flag columns (A1, planner discretion) — implemented in Plan 01 migration 026 and the Plan 03 fan-out predicate `computeFollowingChildren`. Not a decision reversal.
 
 2. **Should `duration`/`allow_ai`/`group_event_id` be added to the backup entity shape *now* as a Phase-36 handoff spec, or fully deferred?**
    - What we know: Phase 33 must NOT bump the format (D-10) but MUST hand over the shape.
    - Recommendation: write the complete target entity list (columns + tombstone + orphan rule) into the plan/handoff doc; Phase 36 executes. Note the pre-existing `duration`/`allow_ai` backup gap so Phase 36 closes all three together.
+   - **RESOLVED:** hand over the complete entity shape now (columns + `group_event` tombstone + orphan rule); Phase 36 executes the format-4 bump (D-10). The orphan-repair OUTCOME (A3) is owner-pending and flagged in Plan 05.
 
 3. **Where does "Convert to Group Event" title come from?**
    - dossier §P seeds shared defaults from the interaction but title is event-only and required (§C). Recommendation: prompt for a title in the convert flow (a required field), seed channel/tone/duration from the interaction.
+   - **RESOLVED:** the Convert flow prompts for a required title and seeds channel/tone/duration from the source interaction, preserving its id/uid (Plan 05, GRP-07/D-11).
 
 ---
 

@@ -756,8 +756,30 @@ Plans:
   5. Dissolve leaves children surviving standalone with materialized values while Delete Group Event & Interactions is permanent — each behind explicit confirmation, with deleting one child affecting only that participant — every fan-out mutation is atomic (complete or fully rolled back with form state preserved) and routes through the canonical recency writers, backdating is supported through now while future dates are rejected, and the whole structure survives backup and restore without flattening (GRP-10/11/12/13)
 
 **Canonical refs**: docs/dossier/milestone-2/phase-12-group-interaction-logging-dossier.md; docs/dossier/milestone-2/planning-notes/phase-12-planning-notes.md
-**Schema**: group events (verify head+1 at plan time)
-**Plans**: TBD
+**Schema**: group events — migration 026 (verified head+1 on disk: TARGET_VERSION = 25)
+**Plans**: 7 plans (5 waves)
+**Wave 1**
+
+- [ ] 33-01-PLAN.md — Migration 026 + write-spine tracer + tombstone + parent-never-counts/egress guards (W1)
+- [ ] 33-02-PLAN.md — ContactPicker multi-select + Group Event route types (W1)
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [ ] 33-03-PLAN.md — Live inheritance logic + shared/date edit fan-outs + per-field override (W2)
+- [ ] 33-04-PLAN.md — Group Events read layer (browse, search, detail, participant resolution) (W2)
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
+- [ ] 33-05-PLAN.md — Participant add/remove, dissolve/delete, convert + backup entity handoff (W3)
+
+**Wave 4** *(blocked on Wave 3 completion)*
+
+- [ ] 33-06-PLAN.md — Group Log create form + Edit Group Event form + participant override editor (W4)
+
+**Wave 5** *(blocked on Wave 4 completion)*
+
+- [ ] 33-07-PLAN.md — Group Event Detail + browse UI + history seam activation (scope prompt, convert, group block) (W5)
+
 **UI hint**: yes
 
 ### Phase 34: Rapid Capture & Update Flows
@@ -878,7 +900,7 @@ Plans:
 | 31. Profile Experience | 15/15 | Complete   | 2026-09-10 |
 | 31.1 App-Wide System Backgrounds | 4/4 | In Progress|  |
 | 32. Interaction History & Insights | 8/8 | In Progress|  |
-| 33. Group Interaction Logging | 0/TBD | Not started | - |
+| 33. Group Interaction Logging | 0/7 | Planned | - |
 | 34. Rapid Capture & Update Flows | 0/TBD | Not started | - |
 | 35. Messaging & AI Compose | 0/TBD | Not started | - |
 | 36. AI Configuration & Prompting | 0/TBD | Not started | - |

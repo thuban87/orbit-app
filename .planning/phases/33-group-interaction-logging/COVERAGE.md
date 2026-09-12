@@ -1,0 +1,1 @@
+No external API integration: local-first on-device SQLite, no external service. The only egress-adjacent concern is the Group Note AI-egress ban (GRP-05/D-04), which is enforced as a NON-ACTION — the closed `ai-context-read.ts` projection is never extended to read `group_events`. There is no external API, SDK, or network call in this phase's scope.
