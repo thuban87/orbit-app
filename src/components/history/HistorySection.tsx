@@ -413,6 +413,7 @@ export function HistorySection({
       <GroupTitlePromptSheet
         visible={converting && detailInteraction !== null}
         onRequestClose={() => setConverting(false)}
+        error={conversionError}
         onConfirm={(title) => {
           if (!detailInteraction) return;
           void convertInteractionToGroupEvent(getExecutor(), {
@@ -434,11 +435,6 @@ export function HistorySection({
             );
         }}
       />
-      {conversionError ? (
-        <AppText role="caption" style={{ color: colors.danger }}>
-          {conversionError}
-        </AppText>
-      ) : null}
     </View>
   );
 }

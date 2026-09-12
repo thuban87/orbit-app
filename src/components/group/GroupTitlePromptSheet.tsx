@@ -9,6 +9,7 @@ interface GroupTitlePromptSheetProps {
   visible: boolean;
   onRequestClose: () => void;
   onConfirm: (title: string) => void;
+  error?: string | null;
 }
 
 /** Android-safe local title entry for creating a parent around one interaction. */
@@ -16,6 +17,7 @@ export function GroupTitlePromptSheet({
   visible,
   onRequestClose,
   onConfirm,
+  error = null,
 }: GroupTitlePromptSheetProps) {
   const { colors } = useTheme();
   const [title, setTitle] = useState("");
@@ -46,6 +48,11 @@ export function GroupTitlePromptSheet({
             },
           ]}
         />
+        {error ? (
+          <AppText role="caption" style={{ color: colors.danger }}>
+            {error}
+          </AppText>
+        ) : null}
         <View style={styles.actions}>
           <Button role="secondary" label="Cancel" onPress={onRequestClose} />
           <Button
