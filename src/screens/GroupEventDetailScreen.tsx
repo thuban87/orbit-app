@@ -10,7 +10,7 @@ import { ShellAppBar } from "@/components/ShellAppBar";
 import { AppText, ConfirmDialog } from "@/components/ui";
 import { getExecutor, localDateTime } from "@/db/database";
 import {
-  addParticipant,
+  addParticipants,
   deleteGroupChild,
   deleteGroupEventAndInteractions,
   detachParticipant,
@@ -25,6 +25,10 @@ import { newUid } from "@/db/uid";
 import type { RootStackScreenProps } from "@/navigation/types";
 import { useTheme } from "@/theme";
 import { SPACING } from "@/theme/tokens/spacing";
+import {
+  buildGroupEventDetailInteraction,
+  groupEventDurationLabel,
+} from "./group-event-detail-logic";
 
 const DISSOLVE = {
   title: "Dissolve this group event?",
@@ -52,14 +56,23 @@ export function GroupEventDetailScreen({
   const [detail, setDetail] = useState<GroupEventParticipant | null>(null);
   const [confirm, setConfirm] = useState<"dissolve" | "delete" | null>(null);
 
-  const load = useCallback(async () => {
-    try {
-      setEvent(await readGroupEventDetail(getExecutor(), { groupEventId }));
-      setFailed(false);
-    } catch {
-      setFailed(true);
-    }
-  }, [groupEventId]);
+  const load = useCallback(
+    async ({ throwOnFailure = false } = {}) => {
+      try {
+        const loaded = await readGroupEventDetail(getExecutor(), {
+          groupEventId,
+        });
+        if (!loaded)
+          throw new Error("This group event is no longer available.");
+        setEvent(loaded);
+        setFailed(false);
+      } catch (error) {
+        setFailed(true);
+        if (throwOnFailure) throw error;
+      }
+    },
+    [groupEventId],
+  );
   useFocusEffect(
     useCallback(() => {
       void load();
@@ -67,18 +80,19 @@ export function GroupEventDetailScreen({
   );
 
   const addSelected = async (contactIds: number[]) => {
-    setPickerVisible(false);
     try {
-      for (const contactId of contactIds)
-        await addParticipant(getExecutor(), {
-          groupEventId,
+      await addParticipants(getExecutor(), {
+        groupEventId,
+        participants: contactIds.map((contactId) => ({
           contactId,
           uid: newUid(),
-          now: localDateTime(),
-        });
-      await load();
-    } catch {
+        })),
+        now: localDateTime(),
+      });
+      await load({ throwOnFailure: true });
+    } catch (error) {
       setFailed(true);
+      throw error;
     }
   };
   const remove = async (keep: boolean) => {
@@ -124,24 +138,7 @@ export function GroupEventDetailScreen({
     }
   };
   const interaction =
-    detail && event
-      ? {
-          id: detail.interactionId,
-          occurredAt: event.occurredAt,
-          date: event.occurredAt.slice(0, 10),
-          channel: detail.channel,
-          direction: detail.direction,
-          connected: detail.connected,
-          quality: detail.quality,
-          note: detail.note,
-          duration: detail.duration,
-          allowAi: 0,
-          groupEventId: event.id,
-          groupTitle: event.title,
-          groupNote: event.groupNote,
-          groupLinked: true,
-        }
-      : null;
+    detail && event ? buildGroupEventDetailInteraction(event, detail) : null;
   const confirmCopy = confirm === "dissolve" ? DISSOLVE : DELETE;
 
   if (!event)
@@ -187,7 +184,7 @@ export function GroupEventDetailScreen({
             <DetailField label="Tone" value={event.quality} />
             <DetailField
               label="Duration"
-              value={event.duration == null ? null : `${event.duration} min`}
+              value={groupEventDurationLabel(event.duration)}
             />
             <DetailField label="Group Note" value={event.groupNote} />
             <AppText role="label">Participants</AppText>

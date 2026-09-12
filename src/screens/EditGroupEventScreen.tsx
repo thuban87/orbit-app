@@ -23,7 +23,7 @@ import {
 import { AppText, Button, Sheet } from "@/components/ui";
 import { getExecutor, localDateTime } from "@/db/database";
 import {
-  addParticipant,
+  addParticipants,
   deleteGroupChild,
   detachParticipant,
   saveParticipantEdits,
@@ -81,23 +81,26 @@ export function EditGroupEventScreen({
   const baselineRef = useRef<string | null>(null);
   const bypassRef = useRef(false);
 
-  const load = useCallback(async () => {
-    try {
-      const loaded = await readGroupEventDetail(getExecutor(), {
-        groupEventId,
-      });
-      if (!loaded) {
-        setError("This group event is no longer available.");
-        return;
+  const load = useCallback(
+    async ({ throwOnFailure = false } = {}) => {
+      try {
+        const loaded = await readGroupEventDetail(getExecutor(), {
+          groupEventId,
+        });
+        if (!loaded) {
+          throw new Error("This group event is no longer available.");
+        }
+        const nextDraft = eventDraft(loaded);
+        baselineRef.current = JSON.stringify(nextDraft);
+        setEvent(loaded);
+        setDraft(nextDraft);
+      } catch (error) {
+        setError("Couldn't load this group event. Please go back and retry.");
+        if (throwOnFailure) throw error;
       }
-      const nextDraft = eventDraft(loaded);
-      baselineRef.current = JSON.stringify(nextDraft);
-      setEvent(loaded);
-      setDraft(nextDraft);
-    } catch {
-      setError("Couldn't load this group event. Please go back and retry.");
-    }
-  }, [groupEventId]);
+    },
+    [groupEventId],
+  );
 
   useEffect(() => {
     void load();
@@ -144,21 +147,19 @@ export function EditGroupEventScreen({
   }
 
   async function addSelected(contactIds: number[]) {
-    setPickerVisible(false);
     try {
-      await Promise.all(
-        contactIds.map((contactId) =>
-          addParticipant(getExecutor(), {
-            groupEventId,
-            contactId,
-            uid: newUid(),
-            now: localDateTime(),
-          }),
-        ),
-      );
-      await load();
-    } catch {
+      await addParticipants(getExecutor(), {
+        groupEventId,
+        participants: contactIds.map((contactId) => ({
+          contactId,
+          uid: newUid(),
+        })),
+        now: localDateTime(),
+      });
+      await load({ throwOnFailure: true });
+    } catch (error) {
       setError("Couldn't update the group event. Your changes weren't saved.");
+      throw error;
     }
   }
 

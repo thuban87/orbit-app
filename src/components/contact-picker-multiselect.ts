@@ -25,6 +25,28 @@ export function orderedSelection(selected: ReadonlySet<number>): number[] {
   return [...selected];
 }
 
+export type MultiSelectConfirmation =
+  | { readonly ok: true; readonly contactIds: number[] }
+  | { readonly ok: false; readonly contactIds: number[] };
+
+/**
+ * Normalize synchronous legacy owners and awaited write owners into one picker
+ * outcome. A failed owner deliberately preserves the ordered selection so the
+ * Modal can remain open for a retry.
+ */
+export async function confirmMultiSelection(
+  selected: ReadonlySet<number>,
+  onConfirm: (contactIds: number[]) => void | Promise<void>,
+): Promise<MultiSelectConfirmation> {
+  const contactIds = orderedSelection(selected);
+  try {
+    await onConfirm(contactIds);
+    return { ok: true, contactIds };
+  } catch {
+    return { ok: false, contactIds };
+  }
+}
+
 export interface PickerExclusions {
   excludeContactId?: number;
   excludeContactIds?: readonly number[];

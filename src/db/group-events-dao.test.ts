@@ -7,6 +7,7 @@ import { readDataRevision } from "@/db/data-revision-dao";
 import { MIGRATIONS, TARGET_VERSION } from "@/db/database";
 import {
   addParticipant,
+  addParticipants,
   clearParticipantOverride,
   convertInteractionToGroupEvent,
   createGroupEvent,
@@ -219,7 +220,10 @@ describe("group event lifecycle", () => {
       ),
     ).toEqual(
       expect.arrayContaining([
-        ...childUids.map(({ uid }) => ({ entity_type: "interaction", entity_uid: uid })),
+        ...childUids.map(({ uid }) => ({
+          entity_type: "interaction",
+          entity_uid: uid,
+        })),
         { entity_type: "group_event", entity_uid: parent!.uid },
       ]),
     );
@@ -248,7 +252,9 @@ describe("group event lifecycle", () => {
     await expect(
       deleteGroupEventAndInteractions(exec, { groupEventId: 9999, now: NOW }),
     ).rejects.toThrow(/no longer exists/);
-    expect(await exec.getAllAsync("SELECT * FROM tombstones")).toEqual(tombstones);
+    expect(await exec.getAllAsync("SELECT * FROM tombstones")).toEqual(
+      tombstones,
+    );
   });
 
   it("rolls a deletion loop back when a child delete fails", async () => {
@@ -276,6 +282,122 @@ describe("group event lifecycle", () => {
 });
 
 describe("group participant lifecycle", () => {
+  it("adds a saved participant batch atomically with parent values and one revision bump", async () => {
+    const { groupEventId } = await groupWithThreeChildren();
+    const taylor = await contact("Taylor");
+    const morgan = await contact("Morgan");
+    const revision = await readDataRevision(exec);
+
+    await addParticipants(exec, {
+      groupEventId,
+      participants: [
+        {
+          contactId: taylor,
+          uid: uid(),
+          direction: "outbound",
+          note: "Taylor note",
+        },
+        { contactId: morgan, uid: uid(), connected: 0, note: "Morgan note" },
+      ],
+      now: NOW,
+    });
+
+    expect(
+      await exec.getAllAsync(
+        "SELECT contact_id, occurred_at, channel, quality, duration, ge_follow_channel, ge_follow_quality, ge_follow_duration FROM interactions WHERE group_event_id = ? AND contact_id IN (?, ?) ORDER BY contact_id",
+        [groupEventId, taylor, morgan],
+      ),
+    ).toEqual([
+      expect.objectContaining({
+        occurred_at: "2026-09-10 18:00:00",
+        channel: "Call",
+        quality: "Positive",
+        duration: 3600,
+        ge_follow_channel: 1,
+        ge_follow_quality: 1,
+        ge_follow_duration: 1,
+      }),
+      expect.objectContaining({
+        occurred_at: "2026-09-10 18:00:00",
+        channel: "Call",
+        quality: "Positive",
+        duration: 3600,
+        ge_follow_channel: 1,
+        ge_follow_quality: 1,
+        ge_follow_duration: 1,
+      }),
+    ]);
+    expect(await readDataRevision(exec)).toBe(revision + 1);
+  });
+
+  it("rolls a late saved participant batch write back without recency or revision changes", async () => {
+    const { groupEventId } = await groupWithThreeChildren();
+    const taylor = await contact("Taylor");
+    const morgan = await contact("Morgan");
+    const revision = await readDataRevision(exec);
+    const baseRun = exec.runAsync.bind(exec);
+    let interactionWrites = 0;
+    const failingExec: SqlExecutor = {
+      ...exec,
+      runAsync: async (sql, params) => {
+        if (sql.startsWith("INSERT INTO interactions")) {
+          interactionWrites += 1;
+          if (interactionWrites === 2)
+            throw new Error("forced later child failure");
+        }
+        return baseRun(sql, params);
+      },
+    };
+
+    await expect(
+      addParticipants(failingExec, {
+        groupEventId,
+        participants: [
+          { contactId: taylor, uid: uid() },
+          { contactId: morgan, uid: uid() },
+        ],
+        now: NOW,
+      }),
+    ).rejects.toThrow(/later child failure/);
+    expect(await count("interactions")).toBe(3);
+    for (const contactId of [taylor, morgan]) {
+      expect(
+        await exec.getFirstAsync<{ last_contact: string | null }>(
+          "SELECT last_contact FROM contacts WHERE id = ?",
+          [contactId],
+        ),
+      ).toEqual({ last_contact: null });
+    }
+    expect(await readDataRevision(exec)).toBe(revision);
+  });
+
+  it("rejects a duplicate batch input or existing member before any batch prefix writes", async () => {
+    const { groupEventId, alex } = await groupWithThreeChildren();
+    const taylor = await contact("Taylor");
+    const before = await count("interactions");
+    await expect(
+      addParticipants(exec, {
+        groupEventId,
+        participants: [
+          { contactId: taylor, uid: uid() },
+          { contactId: taylor, uid: uid() },
+        ],
+        now: NOW,
+      }),
+    ).rejects.toThrow(/duplicate contact/);
+    await expect(
+      addParticipants(exec, {
+        groupEventId,
+        participants: [
+          { contactId: taylor, uid: uid() },
+          { contactId: alex, uid: uid() },
+        ],
+        now: NOW,
+      }),
+    ).rejects.toThrow(/already a group participant/);
+    expect(await count("interactions")).toBe(before);
+  });
+
   it("adds an archived participant at the event wall-clock with resolved shared values", async () => {
     const { groupEventId } = await groupWithThreeChildren();
     const archived = await contact("Archived");
@@ -340,12 +462,10 @@ describe("group participant lifecycle", () => {
     const children = await groupChildren(groupEventId);
     const samChild = children.find((child) => child.contact_id === sam)!;
     const alexChild = children.find((child) => child.contact_id === alex)!;
-    const samUid = (
-      await exec.getFirstAsync<{ uid: string }>(
-        "SELECT uid FROM interactions WHERE id = ?",
-        [samChild.id],
-      )
-    )!.uid;
+    const samUid = (await exec.getFirstAsync<{ uid: string }>(
+      "SELECT uid FROM interactions WHERE id = ?",
+      [samChild.id],
+    ))!.uid;
     const revision = await readDataRevision(exec);
 
     await deleteGroupChild(exec, {

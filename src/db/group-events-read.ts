@@ -34,6 +34,8 @@ export interface GroupEventParticipant {
   readonly geFollowQuality: number | null;
   readonly geFollowDuration: number | null;
   readonly note: string | null;
+  /** Stored child consent state; Group Event Detail only presents this value. */
+  readonly allowAi: number;
 }
 
 export interface GroupEventDetail {
@@ -154,7 +156,8 @@ export function resolveParticipants(
             member.ge_follow_channel AS geFollowChannel,
             member.ge_follow_quality AS geFollowQuality,
             member.ge_follow_duration AS geFollowDuration,
-            member.note
+            member.note,
+            member.allow_ai AS allowAi
        FROM interactions AS member
        JOIN contacts AS contact ON contact.id = member.contact_id
       WHERE member.group_event_id = ?

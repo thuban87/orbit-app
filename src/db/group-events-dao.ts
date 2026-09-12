@@ -7,8 +7,8 @@ import {
   insertInteractionCore,
   recomputeLastContactCore,
 } from "@/db/recency-dao";
-import { inWriteTransaction } from "@/db/transaction";
 import { insertTombstoneCore } from "@/db/tombstones-dao";
+import { inWriteTransaction } from "@/db/transaction";
 import type { SqlExecutor } from "@/db/types";
 import {
   computeFollowingChildren,
@@ -59,6 +59,17 @@ export interface AddParticipantInput {
   direction?: string | null;
   connected?: number;
   note?: string | null;
+  now: string;
+}
+
+/**
+ * One saved-event participant confirmation. The caller mints every child UID
+ * before this single transaction begins so a rejected batch has no durable
+ * prefix and no retry-time identity ambiguity.
+ */
+export interface AddParticipantsInput {
+  groupEventId: number;
+  participants: Omit<AddParticipantInput, "groupEventId" | "now">[];
   now: string;
 }
 
@@ -567,28 +578,63 @@ export function saveParticipantEdits(
  * are materialized at their current resolved values; Direction and Connected
  * remain participant-owned and deliberately have no follow flag.
  */
+export function addParticipants(
+  exec: SqlExecutor,
+  input: AddParticipantsInput,
+): Promise<void> {
+  return inWriteTransaction(exec, async () => {
+    const event = await loadGroupEvent(exec, input.groupEventId);
+
+    const contactIds = input.participants.map(({ contactId }) => contactId);
+    if (new Set(contactIds).size !== contactIds.length) {
+      throw new Error(
+        "addParticipants: duplicate contact in participant batch",
+      );
+    }
+    const existingContactIds = new Set(
+      (await loadGroupChildren(exec, input.groupEventId)).map(
+        (child) => child.contactId,
+      ),
+    );
+    for (const contactId of contactIds) {
+      if (existingContactIds.has(contactId)) {
+        throw new Error(
+          `addParticipants: contactId=${contactId} is already a group participant`,
+        );
+      }
+    }
+
+    for (const participant of input.participants) {
+      await insertInteractionCore(exec, participant.contactId, input.now, {
+        uid: participant.uid,
+        occurredAt: event.occurred_at,
+        channel: eventValue(event, "channel") as string,
+        quality: event.quality,
+        duration: event.duration,
+        direction: participant.direction ?? null,
+        connected: participant.connected,
+        note: participant.note ?? null,
+        groupEventId: input.groupEventId,
+        geFollowChannel: 1,
+        geFollowQuality: 1,
+        geFollowDuration: 1,
+      });
+      await recomputeLastContactCore(exec, participant.contactId, input.now);
+    }
+    await bumpDataRevisionCore(exec);
+  });
+}
+
+/** Backward-compatible one-item facade over the one atomic batch transaction. */
 export function addParticipant(
   exec: SqlExecutor,
   input: AddParticipantInput,
 ): Promise<void> {
-  return inWriteTransaction(exec, async () => {
-    const event = await loadGroupEvent(exec, input.groupEventId);
-    await insertInteractionCore(exec, input.contactId, input.now, {
-      uid: input.uid,
-      occurredAt: event.occurred_at,
-      channel: eventValue(event, "channel") as string,
-      quality: event.quality,
-      duration: event.duration,
-      direction: input.direction ?? null,
-      connected: input.connected,
-      note: input.note ?? null,
-      groupEventId: input.groupEventId,
-      geFollowChannel: 1,
-      geFollowQuality: 1,
-      geFollowDuration: 1,
-    });
-    await recomputeLastContactCore(exec, input.contactId, input.now);
-    await bumpDataRevisionCore(exec);
+  const { groupEventId, now, ...participant } = input;
+  return addParticipants(exec, {
+    groupEventId,
+    now,
+    participants: [participant],
   });
 }
 

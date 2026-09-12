@@ -215,6 +215,10 @@ describe("Group Event detail and participant resolution reads", () => {
       field: "quality",
       value: "Negative",
     });
+    await exec.runAsync("UPDATE interactions SET allow_ai = ? WHERE id = ?", [
+      1,
+      samChild.id,
+    ]);
 
     await expect(readGroupEventDetail(exec, { groupEventId })).resolves.toEqual(
       {
@@ -240,6 +244,7 @@ describe("Group Event detail and participant resolution reads", () => {
             geFollowQuality: 1,
             geFollowDuration: 1,
             note: "Alex note",
+            allowAi: 0,
           }),
           expect.objectContaining({
             contactId: sam,
@@ -254,6 +259,7 @@ describe("Group Event detail and participant resolution reads", () => {
             geFollowQuality: 0,
             geFollowDuration: 1,
             note: "Sam note",
+            allowAi: 1,
           }),
         ],
       },
@@ -261,7 +267,7 @@ describe("Group Event detail and participant resolution reads", () => {
     await expect(resolveParticipants(exec, { groupEventId })).resolves.toEqual(
       expect.arrayContaining([
         expect.objectContaining({ contactId: alex }),
-        expect.objectContaining({ contactId: sam }),
+        expect.objectContaining({ contactId: sam, allowAi: 1 }),
       ]),
     );
     const participants = await resolveParticipants(exec, { groupEventId });

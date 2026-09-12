@@ -21,7 +21,7 @@ import { useTheme } from "@/theme";
 import {
   applyPickerExclusions,
   clearSelection,
-  orderedSelection,
+  confirmMultiSelection,
   selectionCount,
   toggleSelection,
 } from "./contact-picker-multiselect";
@@ -46,7 +46,7 @@ type SingleSelectContactPickerProps = ContactPickerBaseProps & {
 
 type MultiSelectContactPickerProps = ContactPickerBaseProps & {
   mode: "multi";
-  onConfirm: (contactIds: number[]) => void;
+  onConfirm: (contactIds: number[]) => void | Promise<void>;
   initialSelected?: number[];
   onSelect?: never;
 };
@@ -70,6 +70,8 @@ export function ContactPicker(props: ContactPickerProps) {
   const [rows, setRows] = useState<PickerContactRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [failed, setFailed] = useState(false);
+  const [confirmError, setConfirmError] = useState(false);
+  const [confirming, setConfirming] = useState(false);
   const [selectedContactIds, setSelectedContactIds] = useState<Set<number>>(
     () => new Set(),
   );
@@ -146,11 +148,23 @@ export function ContactPicker(props: ContactPickerProps) {
     [dismiss, props],
   );
 
-  const confirmSelection = useCallback(() => {
+  const confirmSelection = useCallback(async () => {
     if (props.mode !== "multi") return;
-    props.onConfirm(orderedSelection(selectedContactIds));
+    if (confirming) return;
+    setConfirming(true);
+    setConfirmError(false);
+    const outcome = await confirmMultiSelection(
+      selectedContactIds,
+      props.onConfirm,
+    );
+    setConfirming(false);
+    if (!outcome.ok) {
+      setConfirmError(true);
+      return;
+    }
+    setSelectedContactIds(clearSelection());
     dismiss();
-  }, [dismiss, props, selectedContactIds]);
+  }, [confirming, dismiss, props, selectedContactIds]);
 
   return (
     <Modal
@@ -322,9 +336,15 @@ export function ContactPicker(props: ContactPickerProps) {
                 <Button
                   role="primary"
                   label="Done"
-                  onPress={confirmSelection}
+                  disabled={confirming}
+                  onPress={() => void confirmSelection()}
                 />
               </View>
+              {confirmError ? (
+                <Text style={[styles.confirmError, { color: colors.danger }]}>
+                  Couldn't add those contacts. Please try again.
+                </Text>
+              ) : null}
             </View>
           ) : null}
         </View>
@@ -431,6 +451,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: 8,
   },
+  confirmError: { marginTop: 8 },
   selectionCount: {
     fontSize: 14,
     fontWeight: "600",
