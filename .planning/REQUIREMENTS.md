@@ -209,8 +209,8 @@ category's phase (see Traceability).
 
 - [x] **GRP-01**: User can create a Group Event with required title and date/time; participants are optional and a zero-participant event is valid (event-first capture)
 - [x] **GRP-02**: Each participant receives exactly one canonical child Interaction; the parent never counts as an additional interaction anywhere
-- [ ] **GRP-03**: Shared Channel, Tone, and Duration live at event level with live inheritance; Group Log defaults Channel In Person, Tone unset, Duration unset, and is exempt from the ordinary Channel-default preference
-- [ ] **GRP-04**: User can override Channel, Tone, Duration, Direction, and Connected per participant and clear an override via explicit "Follow event…" wording; date/time and title are never participant-overridable
+- [x] **GRP-03**: Shared Channel, Tone, and Duration live at event level with live inheritance; Group Log defaults Channel In Person, Tone unset, Duration unset, and is exempt from the ordinary Channel-default preference
+- [x] **GRP-04**: User can override Channel, Tone, Duration, Direction, and Connected per participant and clear an override via explicit "Follow event…" wording; date/time and title are never participant-overridable
 - [x] **GRP-05**: One shared Group Note is owned by the event, distinct from participant notes; a Group Note is never transmitted to AI under any circumstance (ADR-078 context; no toggle exists for it)
 - [ ] **GRP-06**: User can add/remove participants via the shared multi-select picker (no cap); adding after save inherits current shared values stamped at the event date/time; removing prompts Delete interaction / Keep as individual / Cancel
 - [ ] **GRP-07**: User can convert an existing ordinary Interaction into a Group Event without it losing its identity/UID; its values seed the shared defaults
