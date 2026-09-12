@@ -6,6 +6,7 @@ import { ComposeScreen } from "@/screens/ComposeScreen";
 import { ContactProfileScreen } from "@/screens/ContactProfileScreen";
 import { CropPhotoScreen } from "@/screens/CropPhotoScreen";
 import { EditContactScreen } from "@/screens/EditContactScreen";
+import { EditInteractionScreen } from "@/screens/EditInteractionScreen";
 import { MemoryHistoryScreen } from "@/screens/MemoryHistoryScreen";
 import { MergeConflictsScreen } from "@/screens/MergeConflictsScreen";
 import { OrreryScreen } from "@/screens/OrreryScreen";
@@ -55,6 +56,10 @@ export function OrreryStack() {
       <Stack.Screen name="RecentlyDeleted" component={RecentlyDeletedScreen} />
       <Stack.Screen name="MemoryHistory" component={MemoryHistoryScreen} />
       <Stack.Screen name="Edit" component={EditContactScreen} />
+      <Stack.Screen
+        name="EditInteraction"
+        component={EditInteractionScreen}
+      />
       <Stack.Screen name="Compose" component={ComposeScreen} />
       <Stack.Screen name="CropPhoto" component={CropPhotoScreen} />
       <Stack.Screen name="SurvivorSelect" component={SurvivorSelectScreen} />

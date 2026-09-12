@@ -7,6 +7,7 @@ import { ContactProfileScreen } from "@/screens/ContactProfileScreen";
 import { CropPhotoScreen } from "@/screens/CropPhotoScreen";
 import { CustomFieldsScreen } from "@/screens/CustomFieldsScreen";
 import { DuplicateReviewScreen } from "@/screens/DuplicateReviewScreen";
+import { EditInteractionScreen } from "@/screens/EditInteractionScreen";
 import { ImportCompleteScreen } from "@/screens/ImportCompleteScreen";
 import { ImportProgressScreen } from "@/screens/ImportProgressScreen";
 import { ImportReviewScreen } from "@/screens/ImportReviewScreen";
@@ -53,6 +54,10 @@ export function SettingsStack() {
       <Stack.Screen name="CustomFields" component={CustomFieldsRoute} />
       <Stack.Screen name="Archived" component={ArchivedContactsScreen} />
       <Stack.Screen name="Profile" component={ContactProfileScreen} />
+      <Stack.Screen
+        name="EditInteraction"
+        component={EditInteractionScreen}
+      />
       <Stack.Screen name="CropPhoto" component={CropPhotoScreen} />
       <Stack.Screen
         name="LegacyContactPicker"

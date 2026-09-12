@@ -53,6 +53,8 @@ export type DashboardStackParamList = {
   RecentlyDeleted: { contactId: number };
   MemoryHistory: { contactId: number; fieldKey: CurrentStateFieldKey };
   Edit: { contactId: number };
+  /** The canonical Edit Interaction route (HIST-12); scoped by contact + interaction. */
+  EditInteraction: { contactId: number; interactionId: number };
   Archived: undefined;
   /**
    * The in-app Skia crop screen (PHOTO-01). Params are SERIALIZABLE only — a raw
@@ -133,6 +135,8 @@ export type OrreryStackParamList = {
   RecentlyDeleted: { contactId: number };
   MemoryHistory: { contactId: number; fieldKey: CurrentStateFieldKey };
   Edit: { contactId: number };
+  /** The canonical Edit Interaction route (HIST-12); scoped by contact + interaction. */
+  EditInteraction: { contactId: number; interactionId: number };
   Compose: { contactId: number; requestAiSuggestion?: boolean };
   CropPhoto: {
     rawUri: string;
@@ -170,6 +174,12 @@ export type SettingsStackParamList = {
   CustomFields: undefined;
   Archived: undefined;
   Profile: ProfileRouteParams;
+  /**
+   * The canonical Edit Interaction route (HIST-12). Registered here too because
+   * Profile is hosted in Settings (Archived → Profile), and RootStackParamList is
+   * a TYPE intersection — each stack must register the screen it can reach.
+   */
+  EditInteraction: { contactId: number; interactionId: number };
   CropPhoto: {
     rawUri: string;
     target: PhotoTargetDescriptor;
