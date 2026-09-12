@@ -366,6 +366,42 @@ describe("applyRestore", () => {
     )).resolves.toEqual({ tracking_enabled: 0, interval_days: 14 });
   });
 
+  it("round-trips bind and unbind lifecycle events with their type strings intact", async () => {
+    const source = await db();
+    const owner = await source.runAsync(
+      "INSERT INTO contacts (uid,name,interval_days,rarely_responds,reminders_off,created_at,modified_at) VALUES (?,?,?,?,?,?,?)",
+      ["lifecycle-owner", "Owner", 14, 0, 0, NOW, NOW],
+    );
+    // Insert one of every lifecycle event type — the two NEW types (bind/unbind)
+    // alongside a pre-existing one — to prove restore inserts type verbatim and no
+    // downstream reader throws on the new EventType values (D-08, T-32-07).
+    await source.runAsync(
+      "INSERT INTO events (uid,contact_id,type,occurred_at,detail,recorded_at,modified_at) VALUES (?,?,?,?,?,?,?)",
+      ["evt-bind", owner.lastInsertRowId, "bind", NOW, null, NOW, NOW],
+    );
+    await source.runAsync(
+      "INSERT INTO events (uid,contact_id,type,occurred_at,detail,recorded_at,modified_at) VALUES (?,?,?,?,?,?,?)",
+      ["evt-unbind", owner.lastInsertRowId, "unbind", "2026-08-26 12:00:00", null, "2026-08-26 12:00:00", "2026-08-26 12:00:00"],
+    );
+    await source.runAsync(
+      "INSERT INTO events (uid,contact_id,type,occurred_at,detail,recorded_at,modified_at) VALUES (?,?,?,?,?,?,?)",
+      ["evt-archive", owner.lastInsertRowId, "archive", NOW, null, NOW, NOW],
+    );
+    const manifest = await buildExportManifest(source, { exportedAt: NOW, readPhotoBase64: async () => "" });
+    // The export carries the new type strings; parse must not reject them either.
+    expect(parseBackupManifest(manifest).events.map((e) => e.type).sort()).toEqual(["archive", "bind", "unbind"]);
+
+    const destination = await db();
+    await expect(applyRestore(destination, manifest, "replace-all")).resolves.toMatchObject({ status: "applied" });
+    await expect(destination.getAllAsync<{ uid: string; type: string; occurred_at: string }>(
+      "SELECT uid,type,occurred_at FROM events ORDER BY uid",
+    )).resolves.toEqual([
+      { uid: "evt-archive", type: "archive", occurred_at: NOW },
+      { uid: "evt-bind", type: "bind", occurred_at: NOW },
+      { uid: "evt-unbind", type: "unbind", occurred_at: "2026-08-26 12:00:00" },
+    ]);
+  });
+
   it("retains assigned local cadence when a newer valid Unbound merge proposes null cadence", async () => {
     const destination = await db();
     await destination.runAsync(
