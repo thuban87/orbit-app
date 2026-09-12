@@ -8,6 +8,7 @@ import {
   recomputeLastContactCore,
 } from "@/db/recency-dao";
 import { inWriteTransaction } from "@/db/transaction";
+import { insertTombstoneCore } from "@/db/tombstones-dao";
 import type { SqlExecutor } from "@/db/types";
 import {
   computeFollowingChildren,
@@ -71,6 +72,11 @@ export interface DeleteGroupChildInput {
 export interface DetachParticipantInput {
   groupEventId: number;
   interactionId: number;
+  now: string;
+}
+
+export interface GroupEventLifecycleInput {
+  groupEventId: number;
   now: string;
 }
 
@@ -621,6 +627,94 @@ export function detachParticipant(
         `Group Event child id=${input.interactionId} is not a member of groupEventId=${input.groupEventId}`,
       );
     }
+    await bumpDataRevisionCore(exec);
+  });
+}
+
+async function loadGroupEventUid(
+  exec: SqlExecutor,
+  groupEventId: number,
+): Promise<string> {
+  const parent = await exec.getFirstAsync<{ uid: string }>(
+    "SELECT uid FROM group_events WHERE id = ?",
+    [groupEventId],
+  );
+  if (!parent) {
+    throw new Error(`Group Event id=${groupEventId} no longer exists`);
+  }
+  return parent.uid;
+}
+
+/**
+ * Remove the parent while retaining each canonical child as a standalone row.
+ * Linkage and all follow flags are cleared as one operation; Group Note stays
+ * parent-only and is never copied into a child note.
+ */
+export function dissolveGroupEvent(
+  exec: SqlExecutor,
+  input: GroupEventLifecycleInput,
+): Promise<void> {
+  return inWriteTransaction(exec, async () => {
+    const parentUid = await loadGroupEventUid(exec, input.groupEventId);
+    await exec.runAsync(
+      `UPDATE interactions
+          SET group_event_id = NULL,
+              ge_follow_channel = NULL,
+              ge_follow_quality = NULL,
+              ge_follow_duration = NULL,
+              modified_at = ?
+        WHERE group_event_id = ?`,
+      [input.now, input.groupEventId],
+    );
+    await exec.runAsync("DELETE FROM group_events WHERE id = ?", [
+      input.groupEventId,
+    ]);
+    await insertTombstoneCore(
+      exec,
+      {
+        entityType: "group_event",
+        entityUid: parentUid,
+        deletedAt: input.now,
+      },
+      { bumpRevision: false },
+    );
+    await bumpDataRevisionCore(exec);
+  });
+}
+
+/**
+ * Remove a group event and its children. Each child flows through the canonical
+ * delete core so its interaction tombstone and contact recency stay correct.
+ */
+export function deleteGroupEventAndInteractions(
+  exec: SqlExecutor,
+  input: GroupEventLifecycleInput,
+): Promise<void> {
+  return inWriteTransaction(exec, async () => {
+    const parentUid = await loadGroupEventUid(exec, input.groupEventId);
+    for (const child of await loadGroupChildren(exec, input.groupEventId)) {
+      await deleteInteractionCore(
+        exec,
+        {
+          interactionId: child.id,
+          contactId: child.contactId,
+          now: input.now,
+        },
+        { bumpRevision: false },
+      );
+    }
+    await exec.runAsync("DELETE FROM group_events WHERE id = ?", [
+      input.groupEventId,
+    ]);
+    await insertTombstoneCore(
+      exec,
+      {
+        entityType: "group_event",
+        entityUid: parentUid,
+        deletedAt: input.now,
+      },
+      { bumpRevision: false },
+    );
     await bumpDataRevisionCore(exec);
   });
 }
