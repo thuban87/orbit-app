@@ -219,15 +219,24 @@ async function insertInteraction(
     geFollowDuration?: number | null;
   },
 ): Promise<number> {
-  // duration/allow_ai (migration 025) are bound as `?` params, never interpolated
-  // (T-32-04). Omitted -> duration NULL, allow_ai 0 (OFF, D-04) via the values here
-  // (which also match the column DEFAULTs).
+  // Group columns are included only when a Group Event write supplies them.
+  // Ordinary rows rely on the nullable migration-026 defaults, which also keeps
+  // isolated pre-026 fixtures useful for DAO unit tests. Both SQL fragments are
+  // static; no input is interpolated.
+  const hasGroupFields =
+    i.groupEventId != null ||
+    i.geFollowChannel != null ||
+    i.geFollowQuality != null ||
+    i.geFollowDuration != null;
+  const groupColumns = hasGroupFields
+    ? ", group_event_id, ge_follow_channel, ge_follow_quality, ge_follow_duration"
+    : "";
+  const groupValues = hasGroupFields ? ", ?, ?, ?, ?" : "";
   const result = await exec.runAsync(
     `INSERT INTO interactions
        (uid, contact_id, occurred_at, recorded_at, channel, direction,
-        connected, quality, note, duration, allow_ai, source, modified_at,
-        group_event_id, ge_follow_channel, ge_follow_quality, ge_follow_duration)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        connected, quality, note, duration, allow_ai, source, modified_at${groupColumns})
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?${groupValues})`,
     [
       i.uid,
       contactId,
@@ -242,10 +251,14 @@ async function insertInteraction(
       i.allowAi ?? DEFAULT_ALLOW_AI,
       i.source ?? DEFAULT_SOURCE,
       now,
-      i.groupEventId ?? null,
-      i.geFollowChannel ?? null,
-      i.geFollowQuality ?? null,
-      i.geFollowDuration ?? null,
+      ...(hasGroupFields
+        ? [
+            i.groupEventId ?? null,
+            i.geFollowChannel ?? null,
+            i.geFollowQuality ?? null,
+            i.geFollowDuration ?? null,
+          ]
+        : []),
     ],
   );
   return result.lastInsertRowId;
