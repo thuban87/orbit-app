@@ -52,15 +52,33 @@ describe("resolveActiveWindow — lens -> window", () => {
 });
 
 describe("isEmptyHistory — the 'No history yet' predicate", () => {
-  it("is TRUE only when there are zero interactions AND no lifecycle records", () => {
+  it("is TRUE only when all three record families are empty (no interactions, no lifecycle, no knowledge changes)", () => {
     expect(
-      isEmptyHistory({ interactions: [], hasLifecycleRecords: false }),
+      isEmptyHistory({
+        interactions: [],
+        hasLifecycleRecords: false,
+        knowledgeChanges: [],
+      }),
     ).toBe(true);
   });
 
   it("is FALSE for a lifecycle-only contact (zero interactions, has lifecycle)", () => {
     expect(
-      isEmptyHistory({ interactions: [], hasLifecycleRecords: true }),
+      isEmptyHistory({
+        interactions: [],
+        hasLifecycleRecords: true,
+        knowledgeChanges: [],
+      }),
+    ).toBe(false);
+  });
+
+  it("is FALSE for a knowledge-change-only contact (zero interactions, no lifecycle, has knowledge changes)", () => {
+    expect(
+      isEmptyHistory({
+        interactions: [],
+        hasLifecycleRecords: false,
+        knowledgeChanges: [{ id: 1 }],
+      }),
     ).toBe(false);
   });
 
@@ -69,6 +87,7 @@ describe("isEmptyHistory — the 'No history yet' predicate", () => {
       isEmptyHistory({
         interactions: [{ id: 1 }],
         hasLifecycleRecords: false,
+        knowledgeChanges: [],
       }),
     ).toBe(false);
   });
@@ -78,6 +97,7 @@ describe("isEmptyHistory — the 'No history yet' predicate", () => {
       isEmptyHistory({
         interactions: [{ id: 1 }, { id: 2 }],
         hasLifecycleRecords: true,
+        knowledgeChanges: [{ id: 9 }],
       }),
     ).toBe(false);
   });

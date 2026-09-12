@@ -38,17 +38,26 @@ export function resolveActiveWindow(
 /**
  * The "No history yet" empty-section predicate (HIST-01).
  *
- * TRUE only when the contact has zero interactions AND no lifecycle records. A
- * lifecycle-only contact (zero interactions but `hasLifecycleRecords` true) is
- * NOT empty — it shows the zero-count Heatmap/Browser surfaces, not the empty
- * section (Plan 03's `hasLifecycleRecords` signal is the discriminator). A
- * contact with any interaction is likewise not empty.
+ * TRUE only when the contact has NONE of the three record families the History
+ * section surfaces: zero interactions AND no lifecycle records AND no
+ * history-aware knowledge changes. A contact with only ONE family populated is
+ * NOT empty — a lifecycle-only contact (via Plan 03's `hasLifecycleRecords`
+ * discriminator) and a knowledge-change-only contact (edited fields but zero
+ * interactions/lifecycle) both show the zero-count Heatmap/Browser surfaces and
+ * their DateDetailSheet rows, never the empty section. Omitting `knowledgeChanges`
+ * here wrongly hid the third family's rows behind "No history yet" (dossier: the
+ * three record families are preserved; item #13).
  */
 export function isEmptyHistory(history: {
   readonly interactions: readonly unknown[];
   readonly hasLifecycleRecords: boolean;
+  readonly knowledgeChanges: readonly unknown[];
 }): boolean {
-  return history.interactions.length === 0 && !history.hasLifecycleRecords;
+  return (
+    history.interactions.length === 0 &&
+    !history.hasLifecycleRecords &&
+    history.knowledgeChanges.length === 0
+  );
 }
 
 /** The typed LogContact navigation payload (contact preselected + date prefilled). */

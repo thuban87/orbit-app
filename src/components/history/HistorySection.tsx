@@ -24,10 +24,11 @@
  *     { contactId, prefillDate } route (contact preselected + date prefilled),
  *     NEVER a quick-log payload (HIST-15). Phase 34 fills the real form.
  *
- * The empty-section state ("No history yet") shows ONLY when the contact has no
- * interactions AND no lifecycle records; a lifecycle-only contact shows the
- * zero-count surfaces instead (Plan 03's `hasLifecycleRecords`, via the pure
- * `isEmptyHistory`).
+ * The empty-section state ("No history yet") shows ONLY when the contact has none
+ * of the three record families — no interactions AND no lifecycle records AND no
+ * knowledge changes; a contact with only lifecycle records or only knowledge
+ * changes shows the zero-count surfaces instead (Plan 03's `hasLifecycleRecords`
+ * + `knowledgeChanges`, via the pure `isEmptyHistory`).
  *
  * DB-through-a-component (the established HomeScreen/InteractionDetail idiom):
  * reads go through the `history-read` DAO and `app-settings-dao`; there is no
