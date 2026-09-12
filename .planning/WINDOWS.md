@@ -1,10 +1,10 @@
 ---
 schema_version: 1
-open_count: 56
+open_count: 57
 waived_count: 0
 fixed_count: 6
-total_count: 62
-last_updated: 2026-09-12T10:58:15.403Z
+total_count: 63
+last_updated: 2026-09-12T11:06:50.981Z
 ---
 
 # Broken Windows Ledger
@@ -77,6 +77,7 @@ last_updated: 2026-09-12T10:58:15.403Z
 | 60 | 32 | unrun-verify | src/components/TouchpointRefineForm.tsx |  | Device UAT of extended TouchpointRefineForm (Tone/duration chips/Allow-AI toggle) deferred — Pixel not attached at 32-01 execution | open |  | 2026-09-12T00:06:10.377Z |  |
 | 61 | 32 | unrun-verify | src/components/history/HistorySection.tsx |  | Device UAT deferred to phase gate: populated/empty/lifecycle-only render, cell->card->sheet, drawer->sheet, empty-date LogContact from Settings-origin, knowledge-change edit from Settings-origin, reduced motion | open |  | 2026-09-12T01:53:34.970Z |  |
 | 62 | 33 | unrun-verify | package.json |  | Full npm test did not reach a final result before the 30-second harness command cap; focused Group Event suites passed. | open |  | 2026-09-12T10:58:15.403Z |  |
+| 63 | 33 | unrun-verify | src/db/group-events-read.test.ts |  | Full npm test exceeded the executor 30-second command cap twice before a final result. | open |  | 2026-09-12T11:06:50.981Z |  |
 
 ````json
 [
@@ -822,6 +823,18 @@ last_updated: 2026-09-12T10:58:15.403Z
     "status": "open",
     "reason": "",
     "recorded_at": "2026-09-12T10:58:15.403Z",
+    "resolved_at": null
+  },
+  {
+    "id": 63,
+    "kind": "unrun-verify",
+    "phase": "33",
+    "file": "src/db/group-events-read.test.ts",
+    "line": null,
+    "description": "Full npm test exceeded the executor 30-second command cap twice before a final result.",
+    "status": "open",
+    "reason": "",
+    "recorded_at": "2026-09-12T11:06:50.981Z",
     "resolved_at": null
   }
 ]

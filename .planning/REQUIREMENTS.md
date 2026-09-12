@@ -214,8 +214,8 @@ category's phase (see Traceability).
 - [x] **GRP-05**: One shared Group Note is owned by the event, distinct from participant notes; a Group Note is never transmitted to AI under any circumstance (ADR-078 context; no toggle exists for it)
 - [ ] **GRP-06**: User can add/remove participants via the shared multi-select picker (no cap); adding after save inherits current shared values stamped at the event date/time; removing prompts Delete interaction / Keep as individual / Cancel
 - [ ] **GRP-07**: User can convert an existing ordinary Interaction into a Group Event without it losing its identity/UID; its values seed the shared defaults
-- [ ] **GRP-08**: Group Event Detail is presentation-first (participant cards open child Interaction Detail); Edit Group Event is a separate focused form
-- [ ] **GRP-09**: User can browse Group Events on a lean reverse-chronological page searchable by title and participant, reachable from the Dashboard header and overflow
+- [x] **GRP-08**: Group Event Detail is presentation-first (participant cards open child Interaction Detail); Edit Group Event is a separate focused form
+- [x] **GRP-09**: User can browse Group Events on a lean reverse-chronological page searchable by title and participant, reachable from the Dashboard header and overflow
 - [ ] **GRP-10**: User can Dissolve a Group Event (children survive standalone with materialized values) or Delete Group Event & Interactions (permanent), each behind explicit confirmation; deleting one child affects only that participant
 - [x] **GRP-11**: All Group Event fan-out mutations are atomic — complete or fully rolled back with form state preserved on failure — and every child write routes through the canonical recency writers (single-writer invariant)
 - [x] **GRP-12**: Historical/backdated Group Events are supported through now; future-dated events are rejected
