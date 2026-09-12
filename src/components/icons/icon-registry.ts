@@ -37,6 +37,7 @@ export const ICON_REGISTRY = {
   favorite: { outline: "star-outline", filled: "star" },
   search: { outline: "search-outline", filled: "search" },
   back: { outline: "chevron-back", filled: "chevron-back" },
+  forward: { outline: "chevron-forward", filled: "chevron-forward" },
   add: { outline: "add", filled: "add" },
   message: { outline: "chatbubble-outline", filled: "chatbubble" },
   call: { outline: "call-outline", filled: "call" },
