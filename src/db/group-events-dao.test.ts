@@ -98,6 +98,12 @@ describe("group participant lifecycle", () => {
     const children = await groupChildren(groupEventId);
     const samChild = children.find((child) => child.contact_id === sam)!;
     const alexChild = children.find((child) => child.contact_id === alex)!;
+    const samUid = (
+      await exec.getFirstAsync<{ uid: string }>(
+        "SELECT uid FROM interactions WHERE id = ?",
+        [samChild.id],
+      )
+    )!.uid;
     const revision = await readDataRevision(exec);
 
     await deleteGroupChild(exec, {
@@ -110,9 +116,9 @@ describe("group participant lifecycle", () => {
     expect(
       await exec.getFirstAsync<{ entity_type: string }>(
         "SELECT entity_type FROM tombstones WHERE entity_uid = ?",
-        [(await exec.getFirstAsync<{ uid: string }>("SELECT uid FROM interactions WHERE id = ?", [alexChild.id]))!.uid],
+        [samUid],
       ),
-    ).toBeUndefined();
+    ).toEqual({ entity_type: "interaction" });
 
     await detachParticipant(exec, {
       groupEventId,

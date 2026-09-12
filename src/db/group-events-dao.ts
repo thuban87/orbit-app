@@ -2,6 +2,7 @@
 import { bumpDataRevisionCore } from "@/db/data-revision-dao";
 import { rejectFutureOccurredAt } from "@/db/log-guards";
 import {
+  deleteInteractionCore,
   editTouchpointFullCore,
   insertInteractionCore,
   recomputeLastContactCore,
@@ -48,6 +49,29 @@ export interface UpdateGroupEventInput {
   now: string;
   occurredAt?: string;
   patch: UpdateGroupEventPatch;
+}
+
+export interface AddParticipantInput {
+  groupEventId: number;
+  contactId: number;
+  uid: string;
+  direction?: string | null;
+  connected?: number;
+  note?: string | null;
+  now: string;
+}
+
+export interface DeleteGroupChildInput {
+  groupEventId: number;
+  interactionId: number;
+  contactId: number;
+  now: string;
+}
+
+export interface DetachParticipantInput {
+  groupEventId: number;
+  interactionId: number;
+  now: string;
 }
 
 type ParticipantFollowChange =
@@ -518,6 +542,84 @@ export function saveParticipantEdits(
     );
     for (const [field, operation] of followEntries) {
       await updateFollowFlag(exec, input, field, operation.follow);
+    }
+    await bumpDataRevisionCore(exec);
+  });
+}
+
+/**
+ * Add a canonical child at the parent event's local wall-clock. Shared fields
+ * are materialized at their current resolved values; Direction and Connected
+ * remain participant-owned and deliberately have no follow flag.
+ */
+export function addParticipant(
+  exec: SqlExecutor,
+  input: AddParticipantInput,
+): Promise<void> {
+  return inWriteTransaction(exec, async () => {
+    const event = await loadGroupEvent(exec, input.groupEventId);
+    await insertInteractionCore(exec, input.contactId, input.now, {
+      uid: input.uid,
+      occurredAt: event.occurred_at,
+      channel: eventValue(event, "channel") as string,
+      quality: event.quality,
+      duration: event.duration,
+      direction: input.direction ?? null,
+      connected: input.connected,
+      note: input.note ?? null,
+      groupEventId: input.groupEventId,
+      geFollowChannel: 1,
+      geFollowQuality: 1,
+      geFollowDuration: 1,
+    });
+    await recomputeLastContactCore(exec, input.contactId, input.now);
+    await bumpDataRevisionCore(exec);
+  });
+}
+
+/** Delete one verified group child through the canonical tombstone/recency core. */
+export function deleteGroupChild(
+  exec: SqlExecutor,
+  input: DeleteGroupChildInput,
+): Promise<void> {
+  return inWriteTransaction(exec, async () => {
+    await loadGroupChild(exec, input);
+    await deleteInteractionCore(
+      exec,
+      {
+        interactionId: input.interactionId,
+        contactId: input.contactId,
+        now: input.now,
+      },
+      { bumpRevision: false },
+    );
+    await bumpDataRevisionCore(exec);
+  });
+}
+
+/**
+ * Keep a participant as a standalone interaction. Values were materialized
+ * while linked, so this neither recomputes recency nor leaks Group Note.
+ */
+export function detachParticipant(
+  exec: SqlExecutor,
+  input: DetachParticipantInput,
+): Promise<void> {
+  return inWriteTransaction(exec, async () => {
+    const result = await exec.runAsync(
+      `UPDATE interactions
+          SET group_event_id = NULL,
+              ge_follow_channel = NULL,
+              ge_follow_quality = NULL,
+              ge_follow_duration = NULL,
+              modified_at = ?
+        WHERE id = ? AND group_event_id = ?`,
+      [input.now, input.interactionId, input.groupEventId],
+    );
+    if (result.changes !== 1) {
+      throw new Error(
+        `Group Event child id=${input.interactionId} is not a member of groupEventId=${input.groupEventId}`,
+      );
     }
     await bumpDataRevisionCore(exec);
   });
