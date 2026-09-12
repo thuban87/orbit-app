@@ -22,6 +22,7 @@ for FND-01 (plan 01-05) and for the Phase 10 native share-target build.
 | droid toolchain | OpenJDK 17, `ANDROID_HOME=C:\Users\bwales\AppData\Local\Android\Sdk`, node (v25.x), npm (v11.x), **bsdtar** (`tar` present), `scp` present |
 | **`rsync` on droid** | **ABSENT** — `ssh droid 'rsync --version'` fails. Use the **tar-over-ssh** transport below. |
 | Physical device | Pixel 6 Pro, serial **`1A071FDEE002BU`** (model `raven`), authorised over USB. **Always read the serial from `~/.local/bin/adb devices` — never hardcode `emulator-5554`.** |
+| Lock screen | **No device lock is configured.** If the lock screen is showing, dismiss it with `adb shell input keyevent 82` (or an upward swipe); do not treat it as an authentication blocker. |
 | APK artifact | `android\app\build\outputs\apk\release\app-release.apk` (standalone release, ~73 MB) |
 
 **Permissions caveat.** This repo's `.claude/settings.local.json` allows `rsync`/`scp`/`ssh`
