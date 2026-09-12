@@ -10,7 +10,9 @@ import {
   clearParticipantOverride,
   createGroupEvent,
   deleteGroupChild,
+  deleteGroupEventAndInteractions,
   detachParticipant,
+  dissolveGroupEvent,
   saveParticipantEdits,
   setParticipantFields,
   setParticipantOverride,
@@ -30,6 +32,132 @@ beforeEach(async () => {
   await runMigrations(exec, MIGRATIONS, TARGET_VERSION, {
     now: NOW,
     newUid: uid,
+  });
+});
+
+describe("group event lifecycle", () => {
+  it("dissolves every child to a standalone interaction and tombstones the fetched parent uid", async () => {
+    const { groupEventId } = await groupWithThreeChildren();
+    const parent = await exec.getFirstAsync<{ uid: string }>(
+      "SELECT uid FROM group_events WHERE id = ?",
+      [groupEventId],
+    );
+    const revision = await readDataRevision(exec);
+
+    await dissolveGroupEvent(exec, { groupEventId, now: NOW });
+
+    expect(await count("group_events")).toBe(0);
+    expect(
+      await exec.getAllAsync(
+        "SELECT group_event_id, ge_follow_channel, ge_follow_quality, ge_follow_duration, note FROM interactions",
+      ),
+    ).toEqual([
+      {
+        group_event_id: null,
+        ge_follow_channel: null,
+        ge_follow_quality: null,
+        ge_follow_duration: null,
+        note: "Alex note",
+      },
+      {
+        group_event_id: null,
+        ge_follow_channel: null,
+        ge_follow_quality: null,
+        ge_follow_duration: null,
+        note: "Sam note",
+      },
+      {
+        group_event_id: null,
+        ge_follow_channel: null,
+        ge_follow_quality: null,
+        ge_follow_duration: null,
+        note: "Jordan note",
+      },
+    ]);
+    expect(
+      await exec.getFirstAsync(
+        "SELECT entity_type, entity_uid FROM tombstones WHERE entity_uid = ?",
+        [parent!.uid],
+      ),
+    ).toEqual({ entity_type: "group_event", entity_uid: parent!.uid });
+    expect(await readDataRevision(exec)).toBe(revision + 1);
+  });
+
+  it("deletes every child through interaction tombstones before removing the parent", async () => {
+    const { groupEventId, alex, sam, jordan } = await groupWithThreeChildren();
+    const parent = await exec.getFirstAsync<{ uid: string }>(
+      "SELECT uid FROM group_events WHERE id = ?",
+      [groupEventId],
+    );
+    const childUids = await exec.getAllAsync<{ uid: string }>(
+      "SELECT uid FROM interactions WHERE group_event_id = ?",
+      [groupEventId],
+    );
+    const revision = await readDataRevision(exec);
+
+    await deleteGroupEventAndInteractions(exec, { groupEventId, now: NOW });
+
+    expect(await count("interactions")).toBe(0);
+    expect(await count("group_events")).toBe(0);
+    expect(
+      await exec.getAllAsync<{ entity_type: string; entity_uid: string }>(
+        "SELECT entity_type, entity_uid FROM tombstones ORDER BY entity_uid",
+      ),
+    ).toEqual(
+      expect.arrayContaining([
+        ...childUids.map(({ uid }) => ({ entity_type: "interaction", entity_uid: uid })),
+        { entity_type: "group_event", entity_uid: parent!.uid },
+      ]),
+    );
+    for (const contactId of [alex, sam, jordan]) {
+      expect(
+        await exec.getFirstAsync<{ last_contact: string | null }>(
+          "SELECT last_contact FROM contacts WHERE id = ?",
+          [contactId],
+        ),
+      ).toEqual({ last_contact: null });
+    }
+    expect(await readDataRevision(exec)).toBe(revision + 1);
+  });
+
+  it("handles zero participants and rejects a nonexistent parent without a tombstone", async () => {
+    const { groupEventId } = await createGroupEvent(exec, {
+      uid: uid(),
+      title: "Empty",
+      occurredAt: NOW,
+      now: NOW,
+      participants: [],
+    });
+    await dissolveGroupEvent(exec, { groupEventId, now: NOW });
+    expect(await count("interactions")).toBe(0);
+    const tombstones = await exec.getAllAsync("SELECT * FROM tombstones");
+    await expect(
+      deleteGroupEventAndInteractions(exec, { groupEventId: 9999, now: NOW }),
+    ).rejects.toThrow(/no longer exists/);
+    expect(await exec.getAllAsync("SELECT * FROM tombstones")).toEqual(tombstones);
+  });
+
+  it("rolls a deletion loop back when a child delete fails", async () => {
+    const { groupEventId } = await groupWithThreeChildren();
+    const revision = await readDataRevision(exec);
+    const baseRun = exec.runAsync.bind(exec);
+    let deletes = 0;
+    const failingExec: SqlExecutor = {
+      ...exec,
+      runAsync: async (sql, params) => {
+        if (sql.startsWith("DELETE FROM interactions")) {
+          deletes += 1;
+          if (deletes === 2) throw new Error("forced child delete failure");
+        }
+        return baseRun(sql, params);
+      },
+    };
+    await expect(
+      deleteGroupEventAndInteractions(failingExec, { groupEventId, now: NOW }),
+    ).rejects.toThrow(/forced child delete failure/);
+    expect(await count("interactions")).toBe(3);
+    expect(await count("group_events")).toBe(1);
+    expect(await readDataRevision(exec)).toBe(revision);
   });
 });
 
