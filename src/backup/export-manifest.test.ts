@@ -54,6 +54,41 @@ describe("buildExportManifest", () => {
     expect(manifest.appSettings).not.toHaveProperty("orreryLastSystem");
   });
 
+  it("emits the migrated interaction vocabulary from a post-migration DB without a source change (D-06)", async () => {
+    let count = 0;
+    const exec = nodeSqliteExecutor(openTestDb());
+    await runMigrations(exec, MIGRATIONS, TARGET_VERSION, {
+      now: NOW,
+      newUid: () => `uid-${++count}`,
+    });
+    await exec.runAsync(
+      `INSERT INTO contacts (uid, name, interval_days, created_at, modified_at) VALUES (?, ?, ?, ?, ?)`,
+      ["vocab-c", "Vocab", 7, NOW, NOW],
+    );
+    const contact = await exec.getFirstAsync<{ id: number }>(
+      "SELECT id FROM contacts WHERE uid = ?",
+      ["vocab-c"],
+    );
+    // A row already carrying the migrated (post-025) vocabulary. Export SELECTs the
+    // live quality/channel column, so it serializes Positive/Message automatically —
+    // export-manifest.ts is NOT changed and BACKUP_FORMAT_VERSION is NOT bumped.
+    await exec.runAsync(
+      `INSERT INTO interactions (uid, contact_id, occurred_at, recorded_at, channel, connected, quality, source, modified_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ["vocab-i", contact!.id, NOW, NOW, "Message", 1, "Positive", "manual", NOW],
+    );
+
+    const manifest = await buildExportManifest(exec, {
+      exportedAt: NOW,
+      readPhotoBase64: async () => "",
+    });
+
+    expect(manifest.interactions).toEqual([
+      expect.objectContaining({ uid: "vocab-i", quality: "Positive", channel: "Message" }),
+    ]);
+    // Phase 36 owns the format bump; this guard keeps it unchanged this phase.
+    expect(BACKUP_FORMAT_VERSION).toBe(4);
+  });
+
   it("exports full portable state with bytes and never local paths or backup bookkeeping", async () => {
     let count = 0;
     const exec = nodeSqliteExecutor(openTestDb());

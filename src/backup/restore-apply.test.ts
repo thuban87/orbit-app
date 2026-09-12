@@ -366,6 +366,81 @@ describe("applyRestore", () => {
     )).resolves.toEqual({ tracking_enabled: 0, interval_days: 14 });
   });
 
+  it("remaps legacy interaction vocabulary on restore ingest via the shared map (D-06 backdoor)", async () => {
+    const source = await db();
+    const owner = await source.runAsync(
+      "INSERT INTO contacts (uid,name,interval_days,rarely_responds,reminders_off,created_at,modified_at) VALUES (?,?,?,?,?,?,?)",
+      ["vocab-owner", "Owner", 14, 0, 0, NOW, NOW],
+    );
+    // A pre-Phase-32 (format-4) backup carries LEGACY quality/channel values. We
+    // simulate that by inserting the retired literals directly (no CHECK on these
+    // columns) and exporting verbatim — the restore writer must remap on ingest so
+    // ai-context-read/digest-read never miscount through the restore backdoor.
+    await source.runAsync(
+      "INSERT INTO interactions (uid,contact_id,occurred_at,recorded_at,channel,connected,quality,source,modified_at) VALUES (?,?,?,?,?,?,?,?,?)",
+      ["i-good-text", owner.lastInsertRowId, NOW, NOW, "text", 1, "good", "manual", NOW],
+    );
+    await source.runAsync(
+      "INSERT INTO interactions (uid,contact_id,occurred_at,recorded_at,channel,connected,quality,source,modified_at) VALUES (?,?,?,?,?,?,?,?,?)",
+      ["i-hard-email", owner.lastInsertRowId, NOW, NOW, "email", 1, "hard", "manual", NOW],
+    );
+    // An already-migrated row must round-trip unchanged (passthrough).
+    await source.runAsync(
+      "INSERT INTO interactions (uid,contact_id,occurred_at,recorded_at,channel,connected,quality,source,modified_at) VALUES (?,?,?,?,?,?,?,?,?)",
+      ["i-new", owner.lastInsertRowId, NOW, NOW, "Message", 1, "Positive", "manual", NOW],
+    );
+    const manifest = await buildExportManifest(source, { exportedAt: NOW, readPhotoBase64: async () => "" });
+    // The manifest carries the legacy values verbatim (export reads the column).
+    expect(manifest.interactions.find((i) => i.uid === "i-good-text")).toMatchObject({ quality: "good", channel: "text" });
+
+    const destination = await db();
+    await expect(applyRestore(destination, manifest, "replace-all")).resolves.toMatchObject({ status: "applied" });
+    await expect(destination.getAllAsync<{ uid: string; quality: string | null; channel: string }>(
+      "SELECT uid,quality,channel FROM interactions ORDER BY uid",
+    )).resolves.toEqual([
+      { uid: "i-good-text", quality: "Positive", channel: "Message" },
+      { uid: "i-hard-email", quality: "Negative", channel: "Message" },
+      { uid: "i-new", quality: "Positive", channel: "Message" },
+    ]);
+  });
+
+  it("forces allow_ai=0 on the merge/update arm — restore never keeps an interaction AI-permissive (D-04)", async () => {
+    const older = NOW;
+    const newer = "2026-08-25 12:05:00";
+    // Source (backup): a winning interaction row (newer modified_at). The manifest
+    // wire omits allow_ai entirely (Phase 36 owns serialization).
+    const source = await db();
+    const sOwner = await source.runAsync(
+      "INSERT INTO contacts (uid,name,interval_days,rarely_responds,reminders_off,created_at,modified_at) VALUES (?,?,?,?,?,?,?)",
+      ["consent-owner", "Owner", 14, 0, 0, NOW, NOW],
+    );
+    await source.runAsync(
+      "INSERT INTO interactions (uid,contact_id,occurred_at,recorded_at,channel,connected,quality,source,modified_at) VALUES (?,?,?,?,?,?,?,?,?)",
+      ["consent-i", sOwner.lastInsertRowId, NOW, NOW, "Message", 1, "Positive", "manual", newer],
+    );
+    const manifest = await buildExportManifest(source, { exportedAt: NOW, readPhotoBase64: async () => "" });
+    expect(manifest.interactions[0]).not.toHaveProperty("allow_ai");
+
+    // Destination: an EXISTING v25 interaction (same uid) with allow_ai=1 and an
+    // OLDER modified_at, so the backup row wins reconciliation and emits an UPDATE.
+    const destination = await db();
+    const dOwner = await destination.runAsync(
+      "INSERT INTO contacts (uid,name,interval_days,rarely_responds,reminders_off,created_at,modified_at) VALUES (?,?,?,?,?,?,?)",
+      ["consent-owner", "Owner", 14, 0, 0, NOW, NOW],
+    );
+    await destination.runAsync(
+      "INSERT INTO interactions (uid,contact_id,occurred_at,recorded_at,channel,connected,quality,source,allow_ai,modified_at) VALUES (?,?,?,?,?,?,?,?,?,?)",
+      ["consent-i", dOwner.lastInsertRowId, NOW, NOW, "Message", 1, "Positive", "manual", 1, older],
+    );
+
+    await expect(applyRestore(destination, manifest, "merge")).resolves.toMatchObject({ status: "applied", updated: 1 });
+    // SQLite's column DEFAULT 0 fires only on fresh INSERT; the ON CONFLICT UPDATE
+    // arm must force allow_ai=0 or the destination consent bit silently survives.
+    await expect(destination.getFirstAsync<{ allow_ai: number }>(
+      "SELECT allow_ai FROM interactions WHERE uid=?", ["consent-i"],
+    )).resolves.toEqual({ allow_ai: 0 });
+  });
+
   it("round-trips bind and unbind lifecycle events with their type strings intact", async () => {
     const source = await db();
     const owner = await source.runAsync(
