@@ -1,10 +1,10 @@
 ---
 schema_version: 1
-open_count: 53
+open_count: 54
 waived_count: 0
 fixed_count: 6
-total_count: 59
-last_updated: 2026-09-11T00:27:18.188Z
+total_count: 60
+last_updated: 2026-09-12T00:06:10.377Z
 ---
 
 # Broken Windows Ledger
@@ -74,6 +74,7 @@ last_updated: 2026-09-11T00:27:18.188Z
 | 57 | 31 | unrun-verify | package.json |  | npm run check is unavailable because package.json has no check script | open |  | 2026-09-09T16:31:58.466Z |  |
 | 58 | 31 | unrun-verify | .planning/phases/31-profile-experience/31-VALIDATION.md |  | Hero/Overview native smoke awaits Plan 31-10 host integration; Task 31-05 verified physical topology only. | open |  | 2026-09-09T19:49:42.984Z |  |
 | 59 | 31.1 | unrun-verify | src/screens/SettingsScreen.tsx |  | Device live-preview, per-package persistence, and relaunch restoration remain UAT to preserve the owner’s current preference. | open |  | 2026-09-11T00:27:18.188Z |  |
+| 60 | 32 | unrun-verify | src/components/TouchpointRefineForm.tsx |  | Device UAT of extended TouchpointRefineForm (Tone/duration chips/Allow-AI toggle) deferred — Pixel not attached at 32-01 execution | open |  | 2026-09-12T00:06:10.377Z |  |
 
 ````json
 [
@@ -783,6 +784,18 @@ last_updated: 2026-09-11T00:27:18.188Z
     "status": "open",
     "reason": "",
     "recorded_at": "2026-09-11T00:27:18.188Z",
+    "resolved_at": null
+  },
+  {
+    "id": 60,
+    "kind": "unrun-verify",
+    "phase": "32",
+    "file": "src/components/TouchpointRefineForm.tsx",
+    "line": null,
+    "description": "Device UAT of extended TouchpointRefineForm (Tone/duration chips/Allow-AI toggle) deferred — Pixel not attached at 32-01 execution",
+    "status": "open",
+    "reason": "",
+    "recorded_at": "2026-09-12T00:06:10.377Z",
     "resolved_at": null
   }
 ]

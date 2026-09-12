@@ -3,16 +3,16 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Release Readiness
 current_phase: 32
-current_phase_name: interaction-history-insights
-status: phase-complete
-stopped_at: "Phase 31.1 COMPLETE (owner-approved 2026-09-11): 31.1-05 background-visibility fix (veil decoupled from card opacity + ChromeScrim) + 31.1-06 mode-aware glassy cards (background shows through; Android-elevation fix). 2927 tests pass; release delivered + owner-validated. Next: pick the next roadmap phase (gsd-next) — NOTE Phase 30 Orrery Systems still shows [ ] open in ROADMAP with dirty 30-REVIEW files; reconcile separately."
-last_updated: "2026-09-11T21:50:31.676Z"
+current_phase_name: Interaction History & Insights
+status: executing
+stopped_at: Completed 32-01-PLAN.md (migration 025 + vocabulary lockstep + refine form)
+last_updated: "2026-09-12T00:06:28.310Z"
 last_activity: 2026-09-11
-last_activity_desc: Phase 31.1 buttoned up — 31.1-05 + 31.1-06 complete, owner-approved; SUMMARYs written, ROADMAP + UAT marked complete
-state_head: fea4343b1ce59f26b2ffc593aa1b10ac2b4c61e6
+last_activity_desc: Phase 32 execution started
+state_head: d5204d18c7fff9ca09d26ede0d29b6a4fc78977f
 progress:
   total_phases: 21
-  completed_phases: 8
+  completed_phases: 7
   total_plans: 112
   completed_plans: 103
 carried_forward:
@@ -32,19 +32,19 @@ carried_forward:
 See: .planning/PROJECT.md (updated 2026-09-10 after Phase 31)
 
 **Core value:** Collapse the taps between "you're overdue with X" and the message actually being sent.
-**Current focus:** Phase 31.1 — App-Wide System Backgrounds
+**Current focus:** Phase 32 — Interaction History & Insights
 
 ## Current Position
 
-Phase: 32 (interaction-history-insights) — READY TO EXECUTE
-Plan: 4 of 4 + corrective 31.1-05 + enhancement 31.1-06 — all complete (SUMMARYs written)
-Status: (1) 31.1-05 fixed the owner-reported release failure (backgrounds invisible) — veil decoupled from card opacity + ChromeScrim. (2) 31.1-06 made content cards MODE-AWARE GLASSY so the background shows THROUGH them (glassy when art tone matches mode — galaxy↔dark, standard↔light; opaque otherwise for readability), fixed the Android-elevation dark-inner-rect artifact, and lowered the veil near-zero. 2927 tests pass (AA proven for all 4 package×mode combos); release delivered to Drive (SHA `70b1498a…`) and owner-approved ("looks good all around"). 9 commits local/unpushed — owner pushes.
+Phase: 32 (Interaction History & Insights) — EXECUTING
+Plan: 2 of 8
+Status: Ready to execute
 Parked (owner, future): theme-merge into one Dark/Light switch; Deep Space/Starfield removal. See memories mode-aware-glassy-cards, android-elevation-opaque-on-translucent, theme-merge-into-mode-parked.
 FYI (separate): Phase 30 (Orrery Systems) still shows [ ] in ROADMAP with dirty 30-REVIEW files — reconcile independently.
 Carried forward (owner's bucket, NOT resolved here): D-11 default Memory-type display name — reconcile before Phase 34.
 Surface to owner (24.2-07, KNOW-15): milestone plan said Phase 36 owns the backup format-4 bump, but 24.1 already bumped to 4 (d677e2c); Plan 07 emits into the live format 4 with NO bump — that milestone instruction is stale.
 Deferred to Phase 31 (recorded in Plan 05): durable contact-scoped-def ownership + owner-purge semantics. Deferred to Phase 36 (ROADMAP breadcrumb): legacy AI-fuel confirm-path code removal.
-Last activity: 2026-09-10 — Phase 31.1 Plan 01 tracer complete and device-accepted
+Last activity: 2026-09-11 — Phase 32 execution started
 Progress: 11 completed v2.0 phases — 22, 23, 24.1, 24.2, 25, 26, 27, 28, 29, 30, 31
 Next: Execute Phase 31.1 Plan 02 — /gsd-execute-phase 31.1
 
@@ -253,6 +253,7 @@ at plan time. All new durable preferences are `app_settings` columns, never Asyn
 | Phase 31.1 P02 | 4 min | 2 tasks | 1 files |
 | Phase 31.1 P03 | 7 min | 3 tasks | 34 files |
 | Phase 31.1 P04 | 300min | 3 tasks | 6 files |
+| Phase 32 P01 | 20min | 3 tasks | 25 files |
 
 ## Accumulated Context
 
@@ -637,8 +638,8 @@ _Also disposed at this close: 05/deferred-items.md (check:colors doc-comment) ma
 
 ## Session
 
-**Last session:** 2026-09-11T02:48:08.866Z
-**Stopped at:** Completed 31.1-04-PLAN.md
+**Last session:** 2026-09-12T00:06:25.231Z
+**Stopped at:** Completed 32-01-PLAN.md (migration 025 + vocabulary lockstep + refine form)
 _Prior stop (v1.0):_ Phase 21 UI-SPEC approved; milestone v1.0 closed 2026-09-01.
 _Prior stop (13-04):_ the orrery VISUAL VOCABULARY (theme tokens + two pure resolver modules, node-tested, 29 cases green): (1) five owner-tunable `ThemePalette` tokens seeded in `space-dark.dark` ONLY — `starPalette` (6 colours, gold `#F2C14E` at index 0, then amber/rose-red/violet/cyan/ice-white), `mutedStable/Wobble/Decay` (desaturated same-hue morph endpoints), `rogueExtinguished` (cold blue-grey `#3E4A6B` rogue BODY fill) — with an M6/C2-5 conformance test that IMPORTS the real `SELF_SUN_COLOUR_RE`/`assertSelfSunColour` from app-settings-dao and locks every starPalette entry to the ACTUAL DAO write-path rule (no re-inlined regex). (2) `orrery-ring-logic.ts` `orreryRingStyle(status, colors)` — REUSES `ringVisual` for `{color,opacity,width}` (status→colour mapped once), adds the `strokeStyle` axis (solid→dashed→faded→faintTrace) + `bodyFill` (rogue ring=`colors.rogue`, body=`rogueExtinguished`); `null`→canonical NEUTRAL (`colors.border`), never throws — the single fallback sun-occupant reuses (C2-2). (3) `sun-occupant-logic.ts` `resolveSunOccupant(input)` — NULL/archived/missing→self (A7, glow `selfSunColour ?? starPalette[0]`), live contact→its status glow via `orreryRingStyle(status, colors).color`, never-contacted (status `null`)→the reused neutral border (C2-2); accepts `status: ProfileStatus | null`. 5 commits (1801915 feat tokens+M6; d35d528 RED→4cbfad5 GREEN ring-logic; c923b16 RED→10780dd GREEN sun-occupant); tsc + check:colors clean; no deviations (one in-flight fix: a placeholder hex in the logic test was re-sourced from the palette after check:colors flagged it — C2-3). Committed locally on main (NOT pushed). Next: Wave 2 (13-05 render / 13-06 Settings sun-picker), Wave 3 (13-07 drag-release), Wave 4 (13-08 device UAT, autonomous:false).
 **Resume file:** None

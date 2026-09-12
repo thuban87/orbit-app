@@ -719,10 +719,10 @@ Plans:
 
 **Canonical refs**: docs/dossier/milestone-2/phase-11-interaction-history-insights-dossier-v0.2-group-events.md; docs/dossier/milestone-2/planning-notes/phase-11-planning-notes.md
 **Schema**: Phase 32 OWNS the shared interactions migration (migration 025, verified head+1 on disk = 24 at plan time): Tone/channel value remap + nullable duration seconds + allow_ai DEFAULT 0 on interactions, + history_lens/history_cycle_count on app_settings; SQL column stays `quality` (values migrate, name does not). Phase 34 consumes these columns; Phase 33 adds group_event_id later (026+); Phase 36 owns the backup format bump.
-**Plans:** 8 plans
+**Plans:** 1/8 plans executed
 **Wave 1**
 
-- [ ] 32-01-PLAN.md — Migration 025 + shared vocabulary map + Tone/channel consumer lockstep + duration/allow_ai/history-pref columns + refine-form fields (wave 1, tracer, one-way checkpoint)
+- [x] 32-01-PLAN.md — Migration 025 + shared vocabulary map + Tone/channel consumer lockstep + duration/allow_ai/history-pref columns + refine-form fields (wave 1, tracer, one-way checkpoint)
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
@@ -877,7 +877,7 @@ Plans:
 | 30. Orrery Systems | 0/10 | Planned | - |
 | 31. Profile Experience | 15/15 | Complete   | 2026-09-10 |
 | 31.1 App-Wide System Backgrounds | 4/4 | In Progress|  |
-| 32. Interaction History & Insights | 0/TBD | Not started | - |
+| 32. Interaction History & Insights | 1/8 | In Progress|  |
 | 33. Group Interaction Logging | 0/TBD | Not started | - |
 | 34. Rapid Capture & Update Flows | 0/TBD | Not started | - |
 | 35. Messaging & AI Compose | 0/TBD | Not started | - |
