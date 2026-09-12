@@ -35,8 +35,14 @@ export type DashboardStackParamList = {
   Home: undefined;
   /** Placeholder until Phase 33 supplies the Group Events workflow. */
   GroupEvents: undefined;
-  /** Placeholder routes the universal FAB exposes before their owning phases land. */
-  LogContact: { contactId?: number } | undefined;
+  /**
+   * The detailed-log entry (universal FAB today; the empty-date History action
+   * in Phase 32). `prefillDate` is the local `YYYY-MM-DD` an empty date/cell
+   * "Log interaction" prefills so the contact is preselected AND the date is set
+   * (HIST-15). Phase 32 owns the typed route CONTRACT + placeholder target;
+   * Phase 34 fills the real detailed-log form that consumes `prefillDate`.
+   */
+  LogContact: { contactId?: number; prefillDate?: string } | undefined;
   /**
    * Optional selected Dashboard participant ids. Phase 33 consumes these ids
    * when it replaces the Group Log placeholder with the real group workflow.
@@ -131,6 +137,12 @@ export type OrreryStackParamList = {
   SystemBuilder: { systemUid?: string; systemRef?: string } | undefined;
   SystemsManagement: undefined;
   Profile: ProfileRouteParams;
+  /**
+   * The detailed-log route (HIST-15). Registered here because Profile is hosted
+   * in the Orrery stack, so an Orrery-originated empty-date "Log interaction"
+   * must resolve rather than throw on an unregistered route name.
+   */
+  LogContact: { contactId?: number; prefillDate?: string } | undefined;
   ThingsToRemember: { contactId: number };
   RecentlyDeleted: { contactId: number };
   MemoryHistory: { contactId: number; fieldKey: CurrentStateFieldKey };
@@ -174,6 +186,21 @@ export type SettingsStackParamList = {
   CustomFields: undefined;
   Archived: undefined;
   Profile: ProfileRouteParams;
+  /**
+   * The detailed-log route (HIST-15). Registered here because Profile is hosted
+   * in Settings (Archived → Profile), so a Settings-originated empty-date "Log
+   * interaction" must resolve rather than throw on an unregistered route name.
+   */
+  LogContact: { contactId?: number; prefillDate?: string } | undefined;
+  /**
+   * Knowledge-change edit routes. The History section's `onOpenKnowledgeChange`
+   * reuses ContactProfileScreen's existing knowledge nav to `ThingsToRemember`
+   * (and `MemoryHistory`), which are registered in Dashboard/Orrery but were
+   * ABSENT here — so a Settings-originated knowledge-change edit would throw on
+   * an unregistered route. Registered to mirror those stacks (review cycle-2 HIGH).
+   */
+  ThingsToRemember: { contactId: number };
+  MemoryHistory: { contactId: number; fieldKey: CurrentStateFieldKey };
   /**
    * The canonical Edit Interaction route (HIST-12). Registered here too because
    * Profile is hosted in Settings (Archived → Profile), and RootStackParamList is
