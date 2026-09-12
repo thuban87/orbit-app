@@ -49,7 +49,10 @@ describe("applyPickerExclusions", () => {
 
   it("never offers an already-present contact", () => {
     expect(
-      applyPickerExclusions(rows, { excludeContactId: 1, excludeContactIds: [2] }),
+      applyPickerExclusions(rows, {
+        excludeContactId: 1,
+        excludeContactIds: [2],
+      }),
     ).toEqual([rows[2]]);
   });
 
