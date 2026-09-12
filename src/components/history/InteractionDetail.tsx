@@ -1,24 +1,38 @@
 /**
- * InteractionDetail (HIST-11, D-04, D-12) — the canonical single-interaction
- * inspection surface, shown in a `Sheet` (`detail` height).
+ * InteractionDetail (HIST-11, HIST-13, HIST-17, D-04, D-11, D-12) — the canonical
+ * single-interaction inspection surface, shown in a `Sheet` (`detail` height).
  *
  * Complete, blank-field-free inspection: it renders ONLY the present fields
  * (channel / when / direction / connected / Tone / duration / note) via the pure
  * `interaction-detail-logic` projection — an absent field produces no row. The
  * long note reflows (never truncated). A restrained Allow-AI `sparkle`
  * (`accentText`, `icon-size sm`) appears ONLY when `allow_ai === 1`; nothing is
- * rendered when OFF (D-04). Edit and Delete are exposed; the delete confirmation
- * + recency-spine wiring lands in Plan-07 Task 3.
+ * rendered when OFF (D-04).
+ *
+ * DELETE is a true HARD delete (D-11) — no trash/quarantine. It runs behind the
+ * `ConfirmDialog` destructive variant (danger fill + `warning` glyph + `onDanger`,
+ * no scrim-dismiss) whose body names the Status/Gravity/Intensity consequences,
+ * and routes ONLY through `deleteTouchpoint` — the single recency writer that
+ * tombstones in-txn and recomputes (never a bespoke DELETE). A FAILED delete
+ * leaves the interaction and its derived metrics intact, re-enables the control,
+ * and surfaces an inline error — there is NO optimistic vanish before commit.
+ *
+ * EDIT routing is gated on the group-link predicate (HIST-17): a standalone
+ * interaction (every Phase-32 row — groupLinked is hard-false) goes straight to
+ * the Edit Interaction route via `onEdit`; a group-linked one would first open the
+ * dormant `GroupScopePrompt` (never reached this phase — D-12).
  *
  * A dormant group-context block (badge / group title / distinct group note /
  * participant note / View Group Event) is gated on the group-context shaper,
- * which is null for every Phase-32 interaction (no group-event id — D-12), so the
- * block never renders this phase. It references no group-event column.
+ * which is null for every Phase-32 interaction (no group-event id), so the block
+ * never renders this phase. It references no group-event column.
  *
  * All colours resolve through theme tokens (check:colors); record families and
  * the sparkle read by icon + label, never colour alone.
  */
+import { useState } from "react";
 import { StyleSheet, View } from "react-native";
+import { GroupScopePrompt } from "@/components/history/GroupScopePrompt";
 import { Icon } from "@/components/icons/Icon";
 import {
   buildDetailRows,
@@ -27,32 +41,89 @@ import {
 } from "@/components/history/interaction-detail-logic";
 import { AppText } from "@/components/ui/AppText";
 import { Button } from "@/components/ui/Button";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { Sheet } from "@/components/ui/Sheet";
+import { getExecutor, localDateTime } from "@/db/database";
 import type { HistoryInteractionRecord } from "@/db/history-read";
+import { deleteTouchpoint } from "@/db/recency-dao";
+import { notifyWidgetDataChanged } from "@/services/widget/widget-refresh";
 import { useTheme } from "@/theme";
 import { SPACING } from "@/theme/tokens/spacing";
+
+/** Destructive confirmation copy (UI-SPEC Copywriting Contract / dossier §X). */
+const DELETE_TITLE = "Delete this interaction?";
+const DELETE_BODY =
+  "This can't be undone and may change this contact's Status, Gravity, and Intensity.";
+const DELETE_CONFIRM = "Delete interaction";
+/** Inline error when the hard delete fails — the interaction is preserved. */
+const DELETE_FAILED_MESSAGE =
+  "Couldn't delete this interaction. Please try again.";
 
 export interface InteractionDetailProps {
   visible: boolean;
   onRequestClose: () => void;
   interaction: HistoryInteractionRecord;
-  /** Open the canonical Edit Interaction route for this interaction. */
+  /** The owning contact — scopes the recency-spine delete. */
+  contactId: number;
+  /** Open the canonical Edit Interaction route (standalone path). */
   onEdit: () => void;
-  /** Begin the hard-delete flow for this interaction (confirm wired in Task 3). */
-  onDelete: () => void;
+  /** Called after a confirmed successful delete (parent closes + refreshes). */
+  onDeleted: () => void;
 }
 
 export function InteractionDetail({
   visible,
   onRequestClose,
   interaction,
+  contactId,
   onEdit,
-  onDelete,
+  onDeleted,
 }: InteractionDetailProps) {
   const { colors } = useTheme();
   const rows = buildDetailRows(interaction);
   // Dormant seam (D-12): null for every Phase-32 record (no group-event id).
   const group = buildGroupContext(interaction);
+
+  const [confirmVisible, setConfirmVisible] = useState(false);
+  const [scopeVisible, setScopeVisible] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // Edit gating (HIST-17): standalone -> EditInteraction directly; group-linked ->
+  // the dormant scope prompt (never reached in Phase 32, groupLinked hard-false).
+  const onEditPress = () => {
+    if (interaction.groupLinked) {
+      setScopeVisible(true);
+    } else {
+      onEdit();
+    }
+  };
+
+  const onConfirmDelete = async () => {
+    if (deleting) {
+      return;
+    }
+    setDeleting(true);
+    setError(null);
+    try {
+      // The single recency writer: tombstone in-txn + recompute (D-05/ADR-010).
+      await deleteTouchpoint(getExecutor(), {
+        contactId,
+        interactionId: interaction.id,
+        now: localDateTime(),
+      });
+      notifyWidgetDataChanged();
+      setConfirmVisible(false);
+      setDeleting(false);
+      onDeleted();
+    } catch {
+      // No optimistic vanish: the interaction + its derived metrics are intact.
+      // Re-enable the control and surface an inline error.
+      setDeleting(false);
+      setConfirmVisible(false);
+      setError(DELETE_FAILED_MESSAGE);
+    }
+  };
 
   return (
     <Sheet visible={visible} onRequestClose={onRequestClose} variant="detail">
@@ -108,10 +179,44 @@ export function InteractionDetail({
         </View>
       ) : null}
 
+      {error ? (
+        <AppText role="caption" style={{ color: colors.danger }}>
+          {error}
+        </AppText>
+      ) : null}
+
       <View style={styles.actions}>
-        <Button role="secondary" label="Edit" onPress={onEdit} />
-        <Button role="destructive" label="Delete" onPress={onDelete} />
+        <Button role="secondary" label="Edit" onPress={onEditPress} />
+        <Button
+          role="destructive"
+          label="Delete"
+          disabled={deleting}
+          onPress={() => setConfirmVisible(true)}
+        />
       </View>
+
+      <ConfirmDialog
+        visible={confirmVisible}
+        destructive
+        title={DELETE_TITLE}
+        message={DELETE_BODY}
+        confirmLabel={DELETE_CONFIRM}
+        onConfirm={onConfirmDelete}
+        onRequestClose={() => setConfirmVisible(false)}
+      />
+
+      <GroupScopePrompt
+        visible={scopeVisible}
+        onRequestClose={() => setScopeVisible(false)}
+        onEditIndividual={() => {
+          setScopeVisible(false);
+          onEdit();
+        }}
+        onEditGroup={() => {
+          // Phase-33 Edit Group Event flow (placeholder target this phase).
+          setScopeVisible(false);
+        }}
+      />
     </Sheet>
   );
 }
