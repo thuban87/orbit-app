@@ -31,8 +31,12 @@ import {
   View,
 } from "react-native";
 import {
+  coerceAllowAi,
   combineDateAndTime,
+  DURATION_PRESETS,
+  formatDurationLabel,
   isCombinedInFuture,
+  parseCustomDurationMinutes,
   parseLocalDateTime,
 } from "@/components/touchpoint-refine-logic";
 import { useTheme } from "@/theme";
@@ -41,36 +45,42 @@ import { useTheme } from "@/theme";
 export interface TouchpointRefineValue {
   /** Local wall-clock `YYYY-MM-DD HH:MM:SS`. */
   occurredAt: string;
-  /** call|text|in-person|email|other|unspecified. */
+  /** Message|Call|In Person|other|unspecified (D-06; other/unspecified are legacy pass-through). */
   channel: string;
   /** outbound|inbound|mutual|null. */
   direction: string | null;
   /** 0/1 — connected drives the rarely_responds recency filter. */
   connected: number;
-  /** good|fine|hard|null. */
+  /** Tone: Positive|Neutral|Negative|null (D-06); null = unset, never treated as Neutral. */
   quality: string | null;
   note: string | null;
+  /** Optional interaction duration in whole seconds (HIST-14); null = none. */
+  duration: number | null;
+  /** Per-interaction Allow-AI gate, 0/1 (D-04); defaults 0 (OFF). */
+  allowAi: number;
 }
 
 /** Locked copy (mirrors TriStateLastSpoke's future-date rejection). */
 export const FUTURE_DATETIME_MESSAGE =
   "That time is in the future. Pick now or earlier.";
 
-/** The closed channel enum (dossier). */
+/**
+ * The channel control (D-06): Message/Call/In Person are the primary labels;
+ * other/unspecified stay representable so a legacy row is never silently rewritten.
+ */
 const CHANNEL_OPTIONS = [
-  "call",
-  "text",
-  "in-person",
-  "email",
-  "other",
-  "unspecified",
+  { value: "Message", label: "Message" },
+  { value: "Call", label: "Call" },
+  { value: "In Person", label: "In Person" },
+  { value: "other", label: "Other" },
+  { value: "unspecified", label: "Unspecified" },
 ] as const;
 
 /** The direction enum; null = unset ("No selection"). */
 const DIRECTION_OPTIONS = ["outbound", "inbound", "mutual"] as const;
 
-/** The quality enum; null = unset ("No selection"). */
-const QUALITY_OPTIONS = ["good", "fine", "hard"] as const;
+/** The Tone enum (D-06); null = unset ("No selection"), never treated as Neutral. */
+const TONE_OPTIONS = ["Positive", "Neutral", "Negative"] as const;
 
 interface TouchpointRefineFormProps {
   /** The controlled value — the parent seeds and owns it. */
@@ -96,6 +106,9 @@ export function TouchpointRefineForm({
   // dialogs are sequential — the combine happens only after the time is chosen).
   const [pendingDate, setPendingDate] = useState<Date | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // Raw text of the Custom-duration entry (minutes). The persisted seconds live on
+  // `value.duration`; this only backs the free-text field while the user types.
+  const [customMinutes, setCustomMinutes] = useState("");
 
   // Seed both dialogs from the stored occurred_at, preserving time-of-day.
   const seed = parseLocalDateTime(value.occurredAt);
@@ -191,7 +204,7 @@ export function TouchpointRefineForm({
             style={{ color: colors.textPrimary }}
           >
             {CHANNEL_OPTIONS.map((o) => (
-              <Picker.Item key={o} label={o} value={o} />
+              <Picker.Item key={o.value} label={o.label} value={o.value} />
             ))}
           </Picker>
         </View>
@@ -239,11 +252,9 @@ export function TouchpointRefineForm({
         />
       </View>
 
-      {/* Quality */}
+      {/* Tone */}
       <View style={styles.field}>
-        <Text style={[styles.label, { color: colors.textSecondary }]}>
-          Quality
-        </Text>
+        <Text style={[styles.label, { color: colors.textSecondary }]}>Tone</Text>
         <View
           style={[
             styles.control,
@@ -251,15 +262,15 @@ export function TouchpointRefineForm({
           ]}
         >
           <Picker
-            testID={`${testID}-quality`}
-            accessibilityLabel="Quality"
+            testID={`${testID}-tone`}
+            accessibilityLabel="Tone"
             selectedValue={value.quality ?? ""}
             onValueChange={(v) => set("quality", v === "" ? null : String(v))}
             dropdownIconColor={colors.textSecondary}
             style={{ color: colors.textPrimary }}
           >
             <Picker.Item label="No selection" value="" />
-            {QUALITY_OPTIONS.map((o) => (
+            {TONE_OPTIONS.map((o) => (
               <Picker.Item key={o} label={o} value={o} />
             ))}
           </Picker>
@@ -288,6 +299,104 @@ export function TouchpointRefineForm({
               color: colors.textPrimary,
             },
           ]}
+        />
+      </View>
+
+      {/* Duration (optional; descriptive only — never feeds Status/Gravity/Intensity) */}
+      <View style={styles.field}>
+        <Text style={[styles.label, { color: colors.textSecondary }]}>
+          Duration
+        </Text>
+        <View style={styles.chipRow}>
+          {DURATION_PRESETS.map((preset) => {
+            const selected = value.duration === preset.seconds;
+            return (
+              <Pressable
+                key={preset.label}
+                testID={`${testID}-duration-${preset.label}`}
+                accessibilityRole="button"
+                accessibilityLabel={`Duration ${preset.label}`}
+                accessibilityState={{ selected }}
+                onPress={() => {
+                  setCustomMinutes("");
+                  set("duration", preset.seconds);
+                }}
+                style={[
+                  styles.chip,
+                  {
+                    backgroundColor: colors.surface,
+                    borderColor: selected ? colors.accent : colors.border,
+                  },
+                ]}
+              >
+                <Text style={{ color: colors.textPrimary }}>{preset.label}</Text>
+              </Pressable>
+            );
+          })}
+          <Pressable
+            testID={`${testID}-duration-none`}
+            accessibilityRole="button"
+            accessibilityLabel="Duration none"
+            accessibilityState={{ selected: value.duration === null }}
+            onPress={() => {
+              setCustomMinutes("");
+              set("duration", null);
+            }}
+            style={[
+              styles.chip,
+              {
+                backgroundColor: colors.surface,
+                borderColor:
+                  value.duration === null ? colors.accent : colors.border,
+              },
+            ]}
+          >
+            <Text style={{ color: colors.textPrimary }}>None</Text>
+          </Pressable>
+        </View>
+        <TextInput
+          testID={`${testID}-duration-custom`}
+          accessibilityLabel="Custom duration in minutes"
+          value={customMinutes}
+          onChangeText={(t) => {
+            setCustomMinutes(t);
+            // parseCustomDurationMinutes returns null for empty/invalid/out-of-range
+            // (the "none" outcome), so an in-progress or bad entry never persists a
+            // 0 or an out-of-bound duration.
+            set("duration", parseCustomDurationMinutes(t));
+          }}
+          keyboardType="number-pad"
+          placeholder="Custom (minutes)"
+          placeholderTextColor={colors.textSecondary}
+          style={[
+            styles.control,
+            {
+              backgroundColor: colors.surface,
+              borderColor: colors.border,
+              color: colors.textPrimary,
+            },
+          ]}
+        />
+        <Text
+          testID={`${testID}-duration-label`}
+          style={[styles.hint, { color: colors.textSecondary }]}
+        >
+          {formatDurationLabel(value.duration)}
+        </Text>
+      </View>
+
+      {/* Allow AI (per-interaction egress gate; defaults OFF — D-04) */}
+      <View style={[styles.field, styles.toggleRow]}>
+        <Text style={[styles.label, { color: colors.textPrimary }]}>
+          Allow AI
+        </Text>
+        <Switch
+          testID={`${testID}-allow-ai`}
+          accessibilityLabel="Allow AI"
+          value={value.allowAi === 1}
+          onValueChange={(v) => set("allowAi", coerceAllowAi(v))}
+          trackColor={{ false: colors.border, true: colors.accent }}
+          thumbColor={colors.surfaceElevated}
         />
       </View>
 
@@ -333,6 +442,21 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
+  },
+  chipRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  chip: {
+    minHeight: 40,
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 14,
+    justifyContent: "center",
+  },
+  hint: {
+    fontSize: 13,
   },
   noteInput: {
     minHeight: 88,

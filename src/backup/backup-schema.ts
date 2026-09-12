@@ -184,6 +184,12 @@ export const PORTABLE_SETTINGS_KEYS = new Set([
   // coordinated Phase 36 work; dangling UIDs are preserved for read-time fallout.
   "profileLayoutTemplateUid",
   "profileBackgroundTemplateUid",
+  // Phase 32 (declare-only, D-11 / A4): the two durable history preferences are
+  // accepted for restore only so a future backup that CARRIES them validates.
+  // getPortableSettingsSnapshot does NOT emit them and BACKUP_FORMAT_VERSION is
+  // unchanged this phase — emission + the format bump are Phase 36.
+  "historyLens",
+  "historyCycleCount",
 ]);
 
 const SECRET_SHAPED_KEY =

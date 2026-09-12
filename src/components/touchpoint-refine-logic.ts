@@ -95,3 +95,74 @@ export function isCombinedInFuture(combined: string, now: string): boolean {
     return true;
   }
 }
+
+// --- Optional interaction duration (HIST-14) --------------------------------
+//
+// `interactions.duration` is a nullable INTEGER of whole SECONDS (migration 025);
+// absent reads back NULL, never 0. The refine form offers minute/hour presets plus
+// a Custom minute entry and a None/clear option. Duration is DESCRIPTIVE only this
+// milestone — it must never feed Status/Gravity/Intensity.
+
+/** One duration preset — a display label and its whole-second value. */
+export interface DurationPreset {
+  readonly label: string;
+  readonly seconds: number;
+}
+
+/** The fixed duration presets offered beside Custom and None. */
+export const DURATION_PRESETS: readonly DurationPreset[] = [
+  { label: "5m", seconds: 5 * 60 },
+  { label: "15m", seconds: 15 * 60 },
+  { label: "30m", seconds: 30 * 60 },
+  { label: "1h", seconds: 60 * 60 },
+  { label: "2h", seconds: 2 * 60 * 60 },
+];
+
+/** Upper bound on a custom duration entry (24 hours) — a guard against fat-finger entry. */
+export const MAX_DURATION_SECONDS = 24 * 60 * 60;
+
+/**
+ * Parse a Custom duration entered in whole MINUTES into bounded whole SECONDS.
+ * Returns `null` for empty / non-numeric / non-positive / over-24h input — i.e. the
+ * "none" outcome — so the caller never persists a 0 or an out-of-range duration.
+ */
+export function parseCustomDurationMinutes(input: string): number | null {
+  const trimmed = input.trim();
+  if (!/^\d+$/.test(trimmed)) {
+    return null;
+  }
+  const minutes = Number(trimmed);
+  if (!Number.isInteger(minutes) || minutes <= 0) {
+    return null;
+  }
+  const seconds = minutes * 60;
+  return seconds > MAX_DURATION_SECONDS ? null : seconds;
+}
+
+/** A short human label for a stored duration (whole seconds), or "None" when null. */
+export function formatDurationLabel(seconds: number | null): string {
+  if (seconds === null || seconds <= 0) {
+    return "None";
+  }
+  const preset = DURATION_PRESETS.find((p) => p.seconds === seconds);
+  if (preset) {
+    return preset.label;
+  }
+  const totalMinutes = Math.round(seconds / 60);
+  if (totalMinutes < 60) {
+    return `${totalMinutes}m`;
+  }
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  return minutes === 0 ? `${hours}h` : `${hours}h ${minutes}m`;
+}
+
+// --- Per-interaction Allow-AI gate (D-04) -----------------------------------
+
+/**
+ * Coerce a control value to the durable Allow-AI flag. The gate defaults OFF: only
+ * an explicit `1`/`true` yields 1; everything else (including `undefined`) is 0.
+ */
+export function coerceAllowAi(value: unknown): 0 | 1 {
+  return value === 1 || value === true ? 1 : 0;
+}

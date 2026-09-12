@@ -10,8 +10,13 @@
  */
 import { describe, expect, it } from "vitest";
 import {
+  coerceAllowAi,
   combineDateAndTime,
+  DURATION_PRESETS,
+  formatDurationLabel,
   isCombinedInFuture,
+  MAX_DURATION_SECONDS,
+  parseCustomDurationMinutes,
   parseLocalDateTime,
 } from "@/components/touchpoint-refine-logic";
 
@@ -101,5 +106,72 @@ describe("isCombinedInFuture", () => {
     expect(isCombinedInFuture(NOW, NOW)).toBe(false);
     expect(isCombinedInFuture("2026-08-14 11:59:59", NOW)).toBe(false);
     expect(isCombinedInFuture("2026-01-01 00:00:00", NOW)).toBe(false);
+  });
+});
+
+describe("duration presets (HIST-14)", () => {
+  it("maps each preset label to the right whole-second value", () => {
+    expect(DURATION_PRESETS.map((p) => [p.label, p.seconds])).toEqual([
+      ["5m", 300],
+      ["15m", 900],
+      ["30m", 1800],
+      ["1h", 3600],
+      ["2h", 7200],
+    ]);
+  });
+});
+
+describe("parseCustomDurationMinutes", () => {
+  it("parses a whole-minute entry into bounded whole seconds", () => {
+    expect(parseCustomDurationMinutes("45")).toBe(45 * 60);
+    expect(parseCustomDurationMinutes(" 90 ")).toBe(90 * 60);
+    // 24h exactly is allowed (the boundary).
+    expect(parseCustomDurationMinutes(String(MAX_DURATION_SECONDS / 60))).toBe(
+      MAX_DURATION_SECONDS,
+    );
+  });
+
+  it("yields null (the none outcome) for empty / non-numeric / non-positive / over-bound entry", () => {
+    expect(parseCustomDurationMinutes("")).toBeNull();
+    expect(parseCustomDurationMinutes("   ")).toBeNull();
+    expect(parseCustomDurationMinutes("abc")).toBeNull();
+    expect(parseCustomDurationMinutes("1.5")).toBeNull();
+    expect(parseCustomDurationMinutes("-5")).toBeNull();
+    expect(parseCustomDurationMinutes("0")).toBeNull();
+    // Over 24h is rejected (never persists an out-of-range duration).
+    expect(parseCustomDurationMinutes(String(MAX_DURATION_SECONDS / 60 + 1))).toBeNull();
+  });
+});
+
+describe("formatDurationLabel", () => {
+  it("shows None for null or non-positive", () => {
+    expect(formatDurationLabel(null)).toBe("None");
+    expect(formatDurationLabel(0)).toBe("None");
+  });
+
+  it("uses the preset label when the seconds match a preset", () => {
+    expect(formatDurationLabel(1800)).toBe("30m");
+    expect(formatDurationLabel(3600)).toBe("1h");
+  });
+
+  it("formats an arbitrary custom duration in minutes / hours", () => {
+    expect(formatDurationLabel(45 * 60)).toBe("45m");
+    expect(formatDurationLabel(90 * 60)).toBe("1h 30m");
+    expect(formatDurationLabel(3 * 60 * 60)).toBe("3h");
+  });
+});
+
+describe("coerceAllowAi (D-04 — defaults OFF)", () => {
+  it("defaults to 0 for anything that is not an explicit on value", () => {
+    expect(coerceAllowAi(undefined)).toBe(0);
+    expect(coerceAllowAi(null)).toBe(0);
+    expect(coerceAllowAi(0)).toBe(0);
+    expect(coerceAllowAi(false)).toBe(0);
+    expect(coerceAllowAi("1")).toBe(0);
+  });
+
+  it("returns 1 only for an explicit on value", () => {
+    expect(coerceAllowAi(1)).toBe(1);
+    expect(coerceAllowAi(true)).toBe(1);
   });
 });
