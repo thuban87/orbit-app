@@ -9,6 +9,7 @@ import { CropPhotoScreen } from "@/screens/CropPhotoScreen";
 import { DigestScreen } from "@/screens/DigestScreen";
 import { EditContactScreen } from "@/screens/EditContactScreen";
 import { EditInteractionScreen } from "@/screens/EditInteractionScreen";
+import { EditParticipantScreen } from "@/screens/EditParticipantScreen";
 import { GroupEventsScreen } from "@/screens/GroupEventsScreen";
 import { GroupLogScreen } from "@/screens/GroupLogScreen";
 import { HomeScreen } from "@/screens/HomeScreen";
@@ -51,6 +52,7 @@ export function DashboardStack() {
       <Stack.Screen name="MemoryHistory" component={MemoryHistoryScreen} />
       <Stack.Screen name="Edit" component={EditContactScreen} />
       <Stack.Screen name="EditInteraction" component={EditInteractionScreen} />
+      <Stack.Screen name="EditParticipant" component={EditParticipantScreen} />
       <Stack.Screen name="Create" component={CreateContactScreen} />
       <Stack.Screen name="Compose" component={ComposeScreen} />
       <Stack.Screen name="Capture" component={CaptureScreen} />
