@@ -1,245 +1,250 @@
 ---
 phase: 33
-cycle: 4
+cycle: 5
 reviewers: [claude, codex]
-reviewed_at: 2026-09-12T09:05:00Z
+reviewed_at: 2026-09-12T08:18:39Z
 plans_reviewed: [33-01-PLAN.md, 33-02-PLAN.md, 33-03-PLAN.md, 33-04-PLAN.md, 33-05-PLAN.md, 33-06-PLAN.md, 33-07-PLAN.md]
 models:
   claude: "opus (read-only verification agent)"
-  codex: "gpt-5.6-terra (reasoning=high)"
+  codex: "gpt-5.6 (codex exec, read-only repo access)"
 model_sources:
   claude: "subagent"
   codex: "banner"
 cycle_summary:
-  current_high: 2
-  current_actionable: 3
+  current_high: 0
+  current_actionable: 5
 ---
 
-# Cross-AI Plan Review — Phase 33: Group Interaction Logging (Cycle 4)
+# Cross-AI Plan Review — Phase 33: Group Interaction Logging (Cycle 5, final)
 
-> Cycle 4 of the convergence loop. The 7 plans were revised (commit f198004) to resolve cycle-3's
-> 5 actionable findings (cycle 3 had 0 HIGH). Both lanes re-verified FRESH against the live repo,
-> and the orchestrator independently verified every load-bearing claim below against the code on
-> disk (`src/db/migrations/001,025`, `database.ts` `TARGET_VERSION`, `recency-dao.ts`,
-> `merge-dao.ts`, `transaction.ts`, `ai-context-read.ts`, `history-read.ts`,
-> `InteractionDetail.tsx`, `ContactPicker.tsx`, and the 7 plans) rather than trusting reviewer
-> summaries — per the repo "review the code, not the diff" mandate.
+> Cycle 5 of the convergence loop. The 7 plans were revised (commit f2504d2) to resolve cycle-4's
+> 2 HIGH + 3 actionable findings. Both lanes re-verified FRESH against the live repo, and the
+> orchestrator independently verified every load-bearing claim below against the code on disk
+> (`merge-dao.ts`, `recency-dao.ts`, `ai-context-read.ts`, `tombstones-dao.ts`, `purge-dao.ts`,
+> `ContactPicker.tsx`, `MergeImpactSummary.tsx`, `TouchpointRefineForm.tsx`,
+> `touchpoint-refine-logic.ts`, `restore-apply.ts`, `database.ts`, migration 025, and the 7 plans)
+> rather than trusting reviewer summaries — per the repo "review the code, not the diff" mandate.
 >
-> The `--codex` lane ran directly (`codex exec`, read-only sandbox) at **gpt-5.6-terra,
-> reasoning=high** (cycle 3 was reasoning=low). The `--claude` lane ran as a read-only Opus agent
-> (the `claude -p` reviewer fails on a Write-permission gap on this host; owner-approved
-> substitution); it independently re-verified findings against disk and **converged with codex**
-> rather than raising divergent ones.
+> The `--codex` lane ran directly (`codex exec`, read-only sandbox, source-grounded). The `--claude`
+> lane ran as a read-only Opus agent (the `claude -p` reviewer fails on a Write-permission gap on
+> this host; owner-approved substitution); it independently re-verified findings against disk.
 
 ## Consensus Summary
 
-**All five cycle-3 findings are genuinely RESOLVED** — both lanes agree and the orchestrator
-verified each against source, not prose:
+**All FIVE cycle-4 findings are genuinely RESOLVED in the current plans (f2504d2)** — both lanes
+agree and the orchestrator verified each against source, not prose:
 
-1. **Parent-existence guard (Plan 03) — RESOLVED.** `updateGroupEvent` fetches/asserts the parent
-   as the FIRST statement in its sole transaction and rejects a missing parent WITHOUT a revision
-   bump, with tests for event-deleted-before-save and empty-patch (33-03:25,162,170,177; threat
-   T-33-27). Matches the loud-failure pattern at `recency-dao.ts:329` (`changes !== 1`).
-2. **Channel nullability (Plan 03) — RESOLVED.** The patch types `channel?: { value: string }`
-   (never null), grounded in `interactions.channel TEXT NOT NULL DEFAULT 'unspecified'`
-   (`001-initial.ts:103`) and `EditTouchpointFullInput.channel: string` (`recency-dao.ts:97`)
-   (33-03:26,161,170,181).
-3. **Group-child Delete affordance (Plan 07) — RESOLVED.** Plan 07 documents the history Delete of
-   a group child as intentionally the generic `deleteTouchpoint` per D-11 (33-07:44,191,201);
-   `deleteTouchpoint` (`recency-dao.ts:371`) is id+contact-scoped with a `changes !== 1` guard —
-   removes exactly that one child. Not rerouted through `deleteGroupChild`.
-4. **Convert return contract (Plan 05) — RESOLVED.** `convertInteractionToGroupEvent` explicitly
-   RETURNS the new parent's `groupEventId` in behavior/action/acceptance and the key_link
-   (33-05:41,51,190,196,209); Plan 07 navigates on it (33-07:191).
-5. **`tsc --noEmit` in DAO verifies — RESOLVED.** Present in Plan 03 (all 3 tasks: 33-03:138,173,210),
-   Plan 04 (both tasks: 33-04:100,127), and Plan 05 (all 3 tasks: 33-05:138,168,206).
+1. **HIGH-1 — atomic participant Save — RESOLVED.** Plan 03 Task 4 adds `saveParticipantEdits`: one
+   `inWriteTransaction`, one trailing `bumpDataRevisionCore`, composing `editTouchpointFullCore`
+   ONCE + one explicit scoped `UPDATE … SET ge_follow_<field>` per follow-field at the CORE level
+   — never the mutexed per-field ops (avoids the `inWriteTransaction` non-reentrancy hang;
+   transaction.ts:12). Membership-scoped (`AND group_event_id=?`, `changes===1`); mid-save
+   injected-failure rollback test (value + flag + direct field all revert, revision delta 0).
+   Plan 06's editor Save invokes ONLY this op; prohibition against chaining added. Threat T-33-29.
+2. **HIGH-2 — merge collision under migration 026's partial UNIQUE — RESOLVED (data-safety half).**
+   Plan 01 adds a blocking `checkpoint:decision` (outcome = owner) + Task 5 that reads
+   `merge-dao.ts`. Every cited line is accurate: the blanket reparent `UPDATE interactions SET
+   contact_id=?` (merge-dao.ts:89) via the table loop (:180) inside the sole `inWriteTransaction`
+   (:98), the trailing `recomputeLastContactCore(survivor)` (:215), and the real
+   `current_state_entries` partial-UNIQUE pre-handling precedent (:153-165) the task mirrors. The
+   collision-detection query is correct; the typed throw rolls the whole merge back with no row
+   loss and no destructive survivor. Threat T-33-28. **Caveat below (actionable #1): the
+   *remediation* half of the outcome is not actually delivered by the merge screen.**
+3. **MED-1 — convert DAO-level `group_event_id IS NULL` guard — RESOLVED.** Plan 05 Task 3 adds a
+   txn-local source read asserting `group_event_id IS NULL` BEFORE the parent INSERT, plus the
+   in-place `UPDATE … WHERE id=? AND contact_id=? AND group_event_id IS NULL` with `changes===1`.
+   Genuinely below the UI; rollback leaves no orphan parent. Threat T-33-31.
+4. **MED-2 — distinct child-uid minting — RESOLVED.** Plan 06 Task 2 mints ONE parent uid + a
+   DISTINCT child uid per selected contact via a pure unit-tested builder
+   (`src/logic/group-log-participant-inputs.ts`), grounded in `interactions.uid NOT NULL UNIQUE`.
+5. **MED-3 — `excludeContactIds` on ContactPicker — RESOLVED.** Plan 02 Task 1 adds
+   `excludeContactIds?: number[]` to the shared base props + a pure `applyPickerExclusions` helper,
+   replacing the confirmed inline filter `rows.filter((row) => row.id !== excludeContactId)`
+   (ContactPicker.tsx:88-97). Plan 06 Task 4 passes the event's current participant set.
 
 The data-correctness spine remains sound and **reverses no recorded ADR/HANDOFF/dossier decision**:
-migration 026 = head+1 (`TARGET_VERSION = INTERACTION_HISTORY_SCHEMA_VERSION`, head `025` on disk);
-the single-writer fan-out composes the `*Core` primitives; the non-reentrant-mutex deadlock is
-designed out via `editTouchpointFullCore`; and the Group-Note AI-egress ban is structurally
-preserved (`ai-context-read.ts:117` selects only `channel, quality, connected FROM interactions`,
-never joins `group_events`, reads no note column).
+migration 026 = head+1 (TARGET_VERSION 25 on disk, INTERACTION_HISTORY_SCHEMA_VERSION); the
+single-writer fan-out composes the `*Core` primitives (the NON-mutexed CORE export block exists at
+recency-dao.ts:446); the non-reentrant-mutex deadlock is designed out via `editTouchpointFullCore`;
+and the Group-Note AI-egress ban is structurally preserved (`ai-context-read.ts:116-122` selects
+only `channel, quality, connected`, never joins `group_events`, reads no note column).
 
-**Residual this cycle: 2 HIGH + 3 actionable MEDIUM — all NEW, none in any PLAN.md yet.** The
-stronger codex model (terra/high vs cycle-3's low) surfaced two data-integrity paths the earlier
-lower-effort pass missed, both verified against disk. Neither is a regression from the cycle-3
-fixes; both are pre-existing cross-subsystem gaps the plans never closed.
+**Residual this cycle: 0 HIGH + 5 actionable (3 MEDIUM + 2 LOW) — all NEW, none in any PLAN.md
+yet.** Codex ran a deeper source-grounded pass than cycle 4 and surfaced these; the Opus lane
+independently corroborated actionable #1 against disk. None is a regression from the cycle-4 fixes;
+all are pre-existing cross-subsystem/plan-text gaps the plans never closed. The convergence loop has
+NOT fully converged on zero actionable — the remaining items are non-HIGH and non-data-corrupting,
+so termination-vs-one-more-cycle is a planner/owner call.
 
 ### Agreed Strengths (maintainer-verified)
-- `updateGroupEvent`'s first-statement parent guard mirrors the loud-failure idiom at
-  `recency-dao.ts:295-335`; a missing parent throws before the trailing `bumpDataRevisionCore`.
-- The AI egress boundary is a structural non-action: `ai-context-read.ts:8-27,116-121` is a closed
-  projection; Plan 01 forbids editing it and tests group-note unreachability under allow_ai 0 and 1.
-- Core-composition design respects transaction non-reentrancy (`transaction.ts`); every fan-out
-  uses `editTouchpointFullCore`, never the mutexed wrapper.
-- Cross-stack route registration (GroupEventDetail/EditGroupEvent/EditParticipant in all three
-  Profile-hosting stacks) and the three-flag schema (`ge_follow_channel/quality/duration` only) are
-  intact and correct (Plans 01/02/06/07).
+- `saveParticipantEdits` composes the non-mutexed core correctly; the mutexed per-field ops are
+  explicitly forbidden inside it (transaction.ts non-reentrancy). Mid-save rollback encodes D-08.
+- `mergeContacts` data-safety under the new partial UNIQUE is genuinely correct: atomic rollback,
+  no row loss, no destructive survivor; mirrors the existing `current_state_entries` precedent.
+- Convert guard is at the DAO/SQL level, not just UI; distinct child-uid minting is well-founded;
+  `excludeContactIds` cleanly extends the shared picker without forking it.
+- AI egress boundary is a structural non-action; `PURGE_CHILDREN` is an exhaustive Record with
+  `group_event: null` the correct disposition; `insertTombstoneCore` already accepts `bumpRevision`.
+
+### Agreed Concerns (raised by 2+ reviewers)
+- **Merge-remediation UX is not delivered (actionable #1).** BOTH the codex and Opus lanes
+  independently found that `MergeImpactSummary.tsx:19,21` discards the thrown error and shows a
+  fixed generic "…Try again." — so Plan 01's repeated "the merge screen's existing catch renders
+  remediation guidance" claim, and its "no merge-UI file is edited" consequence, are false against
+  the code. Orchestrator-verified.
 
 ### Divergent Views
-- None material. The Opus lane converged with codex on every finding; it added one incidental
-  disk-verified fact (ContactPicker exposes only a single `excludeContactId?: number`), which the
-  orchestrator promotes to actionable #3 below.
+- Codex went broader (5 findings across Plans 01/05/06 + wording/FK-hardening); Opus focused on the
+  five fixes and converged on the one substantive UX gap. No contradiction between the lanes.
 
-### Owner escalation (surface, do not auto-resolve)
-- **Contact-merge × Group-Event collision semantics (part of HIGH-2).** When two contacts who are
-  both participants of the SAME Group Event are merged, the partial `UNIQUE(group_event_id,
-  contact_id)` cannot hold two children for one contact. The *engineering gap* (the merge silently
-  breaks) is a plan actionable (below). But the *resolution outcome* — reject the merge with
-  remediation copy, vs. reconcile the two children into one while preserving one-child-per-participant
-  + recency + tombstones — changes user-visible data semantics and is an **owner-bucket** decision.
-  Do not let an executor silently pick a destructive survivor. Flag to owner before the fixing plan
-  executes.
-- **A3 restore orphan-repair outcome (D-10).** Unchanged from cycle 3: Plan 05 holds this
-  `owner_pending` with a recommended default (detach-to-standalone) + Phase-36 handoff. The plan's
-  *handling* is clean; per the review charter this is **not** counted as an unresolved HIGH/actionable.
-  Surfaced only so the owner decision is not lost.
+### Owner escalation (surface, do not auto-resolve — NOT counted as unresolved actionable)
+- **Merge-collision resolution OUTCOME (reject-with-remediation vs reconcile).** Correctly encoded
+  as a blocking `checkpoint:decision` in Plan 01 (default: Option A, reject-with-remediation;
+  Option B reconcile requires explicit owner authorization). Handling is structurally sound — but
+  note actionable #1: the checkpoint is framed on a partly-false premise (that remediation copy
+  reaches the user), so the owner should decide A-vs-B on corrected information.
+- **A3 restore orphan-repair outcome (D-10).** Unchanged: Plan 05 holds this `owner_pending` with a
+  recommended default (detach-to-standalone) + Phase-36 handoff. Handling is clean; not counted.
 
 ---
 
-## Current HIGH Concerns (2)
+## Current HIGH Concerns (0)
 
-1. **[HIGH — NEW — codex + Opus, disk-verified] The participant-editor Save is not atomic across the
-   field classes it exposes (Plan 06 Task 3 + Plan 03).**
-   `EditParticipantScreen`/`ParticipantOverrideEditor` expose Channel, Tone, Duration, Direction,
-   Connected, and the participant note in one form with one Save (33-06:34,36,57,184-185). Save is
-   wired to THREE separate Plan-03 DAO ops — `setParticipantOverride`, `clearParticipantOverride`
-   (follow-fields) and `setParticipantFields` (direction/connected/note) — and each op independently
-   `inWriteTransaction`s and owns its own trailing `bumpDataRevisionCore` (33-03:199-207). There is
-   NO aggregate participant-save DAO. If a user changes a follow-field AND a direct field in one Save
-   and the second op fails, the first has already committed: the screen's own must-have "Save/fan-out
-   failure keeps the form open with all input intact, **nothing committed**" (33-06:38) and D-08's
-   "participant changes … commit completely or roll back completely — no partial visible state"
-   (33-CONTEXT.md:27) are both false. **Plan change:** add a single `updateParticipant` /
-   `saveParticipantEdits` DAO to Plan 03 that composes every selected field-class edit (override
-   value+flag writes AND direct direction/connected/note writes) in ONE `inWriteTransaction` with ONE
-   trailing bump; have Plan 06's editor invoke only that op; add a mid-save injected-failure rollback
-   test proving neither field persists.
+None. Both cycle-4 HIGHs (participant-Save atomicity; merge-collision data safety) are fully
+resolved and orchestrator-verified against code.
 
-2. **[HIGH — NEW — codex + Opus, disk-verified] Migration 026's per-event participant UNIQUE index
-   breaks the existing contact-merge writer (Plan 01 vs `merge-dao.ts`).**
-   Migration 026 creates `CREATE UNIQUE INDEX idx_group_member_unique ON interactions(group_event_id,
-   contact_id) WHERE group_event_id IS NOT NULL` (33-01:193). `mergeContacts` reparents interactions
-   with a blanket set-based `UPDATE interactions SET contact_id = ? … WHERE contact_id = ?`
-   (`merge-dao.ts:89` via the `reparent()` loop at `:180`), all inside one `inWriteTransaction`
-   (`merge-dao.ts:98`). If both the survivor and the absorbed contact are children of the SAME Group
-   Event, the reparent sets the absorbed child to a `(group_event_id, contact_id)` pair that already
-   exists → partial-UNIQUE violation → the ENTIRE contact merge rolls back with a raw SQLite error.
-   No Phase-33 plan reads or modifies `merge-dao.ts` (absent from Plan 01 and Plan 05 `files_modified`).
-   Independently, the blanket UPDATE mutates a group child outside the recency-core path (D-05
-   trip-wire). **Plan change:** add a group-aware merge task (Plan 01 or Plan 05) that reads
-   `merge-dao.ts`, handles the collision deterministically, keeps the one-child-per-participant
-   invariant + recency + tombstones, and tests both the collision and the no-collision reparent. The
-   collision-resolution *outcome* is an owner decision (see Owner escalation) — the task must carry
-   that as a blocking checkpoint, not a silent choice.
+## Current Actionable Non-HIGH Concerns (5 — all NEW, none in any PLAN.md)
 
-## Current Actionable Non-HIGH Concerns (3)
+1. **[MEDIUM — codex + Opus, disk-verified] Merge-collision "remediation" is not user-surfaceable;
+   Plan 01 asserts a UI mechanism that does not exist.**
+   `MergeImpactSummary.tsx:19` catches with `.catch(() => setFailed(true))` — the typed error
+   object is discarded — and `:21` renders a fixed `"Couldn't merge these contacts. Nothing was
+   changed. Try again."`. Plan 01 (must-have truths, Task 5 action/acceptance, and the checkpoint's
+   Option A) repeatedly claims "the merge screen's existing catch renders remediation guidance …
+   so no merge-UI file is edited." That is false: the message is thrown away, and "Try again" is
+   actively misleading for this case (retry fails identically until the user removes one contact
+   from the shared group event). Data safety is unaffected (atomic rollback), so MEDIUM not HIGH,
+   but the *handling* of the owner-approved "reject-with-**remediation**" outcome is structurally
+   wrong. **Plan change:** either (a) add `MergeImpactSummary.tsx` to Plan 01 Task 5's
+   `files_modified` and have the catch surface the typed collision error's message (drop the "no
+   merge-UI file is edited" claim); or (b) correct the plan text to state the outcome is "reject
+   with a generic failure message (no specific remediation shown)" and reframe the checkpoint so
+   the owner decides A-vs-B on accurate information. Consider a machine-readable error `code` on the
+   typed error rather than string-matching.
 
-1. **[MEDIUM — NEW — codex] `convertInteractionToGroupEvent` is guarded only by the UI, not by its
-   DAO contract (Plan 05 Task 3).**
-   The op reads the interaction, inserts a parent, then `UPDATE interactions SET group_event_id=…
-   WHERE id=? AND contact_id=?` (33-05:196) — it never requires the source row's `group_event_id IS
-   NULL`. Plan 07 only offers convert for `!interaction.groupLinked` (33-07:190), so the UI guards it,
-   but a stale/direct caller could convert an already-group-linked child, silently detaching it from
-   its original event and minting a duplicate parent — inconsistent with the DAO-level membership
-   discipline every other op in this phase enforces. **Plan change:** in Plan 05, require a
-   transaction-local source read asserting `group_event_id IS NULL` (or add `AND group_event_id IS
-   NULL` to the UPDATE and assert `changes === 1`) before inserting the parent; add a test that a
-   group-linked source leaves no new parent and no changed link.
+2. **[MEDIUM — codex, disk-verified] The Phase-36 `33-BACKUP-HANDOFF.md` (Plan 05 Task 3) is
+   incomplete for the restore architecture actually on disk.** It specifies durable `groupEventUid`,
+   parent-before-child upsert, and an orphan outcome, but does not hand off the exhaustive places
+   an entity must be registered to participate in restore: `MergeableEntityType`/policies
+   (reconciliation.ts:8,46); restore's `entities`, `tableOf`, and tombstone mappings
+   (restore-apply.ts:50); schema validation + tombstone allowlist (backup-schema.ts:197,322); and
+   replace-all reset order (restore-apply.ts:254,267). **Plan change:** expand the handoff's
+   required-content list in Plan 05 to enumerate these files/registries plus explicit Phase-36
+   tests (merge restore, replace-all restore, deleted-parent tombstones, approved orphan
+   disposition). (Not asking to decide A3 now.)
 
-2. **[MEDIUM — NEW — codex] Group Log's child-UID contract is underspecified (Plan 06 Task 2).**
-   `createGroupEvent` requires each participant to carry its own `uid` and the parent its own `uid`
-   (33-01:194-196), and `interactions.uid` is `NOT NULL UNIQUE` (`001-initial.ts:98`). But Plan 06
-   Task 2 says only to call `createGroupEvent` "with the selected participants (passing **a**
-   freshly-minted `uid`)" — singular (33-06:153). Read literally, an executor could pass one shared
-   uid (collides across children) or conflate the parent uid with a child uid. **Plan change:** make
-   Plan 06 Task 2 explicit — mint one parent uid AND map every selected contact to a distinct
-   `{ contactId, uid: newUid(), … }` child input before the call; back it with a unit-tested input
-   builder or a two-participant integration seam.
+3. **[MEDIUM — codex, disk-verified] Plan 06 promises future-date copy a reused component cannot
+   produce.** Plan 06 requires the locked copy "Group events can't be in the future." (33-06:43,165),
+   but `TouchpointRefineForm` exposes only `value/onChange/now/testID` (TouchpointRefineForm.tsx:90)
+   and renders the fixed `FUTURE_DATETIME_MESSAGE` = "That time is in the future. Pick now or
+   earlier." (touchpoint-refine-logic.ts:92-93) via its own inline validation, which fires before
+   Save (so the DAO `rejectFutureOccurredAt` copy the plan points to never shows for an
+   inline-picked future date). **Plan change:** add a narrow optional `futureDateMessage` prop to
+   `TouchpointRefineForm` (defaulting to the existing message) — or give Group Log / Edit Group
+   Event their own date control — and test BOTH the existing interaction copy and the Group Event
+   copy.
 
-3. **[MEDIUM — NEW — Opus] Adding participants to an existing event cannot exclude current members
-   (Plan 07 Task 2 / Plan 02).**
-   `ContactPicker`'s shared props carry only a single `excludeContactId?: number`
-   (`ContactPicker.tsx:27,91-93`); Plan 02's multi arm adds `initialSelected?: number[]` but no
-   set-exclusion (33-02:104). Plan 07's Detail "Add Participant" opens the multi-select picker →
-   `addParticipant` (33-07:158) without excluding the event's current participant set. A user can
-   re-select an already-present contact; `addParticipant` then throws on `idx_group_member_unique`
-   (Plan 05), turning a UX papercut into a hard, rolled-back add. **Plan change:** extend the picker
-   base to `excludeContactIds?: number[]` (or have the Add-Participant flow filter out current
-   participants before calling `addParticipant`), and have Plan 07/06 pass the current participant set;
-   add a test that an already-present contact is not offered.
+4. **[LOW — codex, disk-verified] Correct the restore source-grounding statement in Plans 01 and
+   05.** Both describe restore's direct interaction upsert as one that "does NOT recompute
+   last_contact" (33-01:285; 33-05:128). That is false at the operation level: restore's later
+   transaction-local loop collects every affected contact UID (old parents + new `contactUid`) and
+   calls `recomputeLastContactCore` for each surviving contact in the SAME outer transaction
+   (restore-apply.ts:299-316). **Plan change:** state that restore is a separate writer with a
+   deferred, transaction-contained recompute, rather than an exception that leaves recency stale.
+   (The audit's conclusion — "not altered by this phase" — is unchanged; only the reasoning is
+   inaccurate.)
+
+5. **[LOW — codex] Make the FK follow-flag safety-net invariant explicit (migration 026 / Plan 05).**
+   Migration 026's proposed `ON DELETE SET NULL` on `interactions.group_event_id` clears only the
+   link, not the three `ge_follow_*` flags; an FK-driven parent removal would leave a standalone
+   child marked as following an absent event. The normal dissolve path clears both, and the plans
+   forbid relying on FK cascade for deletes — but the safety net can still fire. **Plan change:**
+   add a migration/DAO invariant test (and a Phase-36 restore/reset rule) requiring linkage and all
+   follow flags to be cleared together. Aligns with the proposed orphan repair, does not change it.
 
 ---
 
-## Codex Review (gpt-5.6-terra, reasoning=high)
+## Codex Review (gpt-5.6, codex exec, read-only)
 
-### Summary
-Cycle 4 genuinely resolves all five named cycle-3 findings; the main data spine is carefully
-designed around the non-reentrant transaction mutex and the closed AI egress projection. Two
-high-severity paths remain without an atomic/invariant-preserving implementation, plus two
-create/convert contract holes. Risk: **HIGH** until incorporated.
+### Verdict
+Request changes — MEDIUM risk. Strong transaction/recency design (composes non-mutexed cores under
+one `inWriteTransaction`, preserves parent-never-counts, addresses the merge/index collision).
+Correct three MEDIUM findings (Plans 01, 05, 06) before execution; two LOW hardening/wording items.
+The two owner-bucket items are correctly represented as a blocking merge decision and an
+owner-pending restore assumption; neither counted.
 
-### Cycle-3 finding disposition (codex)
-1. RESOLVED — parent existence asserted first, missing-parent/no-bump test prescribed (33-03:161-170,176-182).
-2. RESOLVED — `channel` constrained to `{ value: string }` vs the NOT NULL column (33-03:161,170-181; 001-initial.ts:96-109).
-3. RESOLVED — Plan 07 documents the generic `deleteTouchpoint` path for group children as intentional D-11 (33-07:191,201).
-4. RESOLVED — convert's `groupEventId` return is in behavior/action/acceptance + caller contract (33-05:190-196,208-210; 33-07:191).
-5. RESOLVED — `npx tsc --noEmit` in Plan 03/04/05 DAO task verifies (33-03:172-173,209-210; 33-04:99-100,126-127; 33-05:137-138,167-168,205-206).
+### Source audit (all production `interactions` writers, not the plans' inventory)
+- recency DAO insert/update/delete + correlated recompute (recency-dao.ts:159,215,304,359).
+- restore upserts interactions then recomputes each survivor's recency in the same outer
+  transaction (restore-apply.ts:201,303,316).
+- contact purge is an intentional whole-contact deletion fan-out (purge-dao.ts:318); migration 025
+  migrates existing literals only (025:45); benchmark seeding is throwaway setup (benchmark.ts:101).
+- `mergeContacts` is the important non-core writer: generic reparent updates interactions in its
+  table loop, then recomputes the survivor once (merge-dao.ts:88,180,215). Plan 01 correctly brings
+  it into scope.
 
-### HIGH — participant-editor save is not atomic across the fields the form exposes
-Separate `setParticipantOverride`/`clearParticipantOverride`/`setParticipantFields` ops, each its
-own transaction + bump (33-06:183-185; 33-03:207-210); a first-succeeds/second-fails save leaves a
-partial commit, contradicting 33-06:38 and D-08 (33-CONTEXT.md:27). Add one transaction-owning
-participant-save DAO; editor invokes only that; add a mid-save rollback test. *(HIGH-1.)*
+### Findings (see the aggregated actionable list above for the resolution each needs)
+- MEDIUM — merge remediation not user-surfaceable (MergeImpactSummary.tsx:19,21). *(Actionable #1.)*
+- MEDIUM — Phase-36 backup handoff incomplete for the on-disk restore architecture
+  (reconciliation.ts:8,46; restore-apply.ts:50,254,267; backup-schema.ts:197,322). *(Actionable #2.)*
+- MEDIUM — Plan 06 future-date copy mismatch vs `TouchpointRefineForm` fixed message
+  (TouchpointRefineForm.tsx:90,153; touchpoint-refine-logic.ts:92). *(Actionable #3.)*
+- LOW — restore-recompute wording false in Plans 01/05 (restore-apply.ts:299,316). *(Actionable #4.)*
+- LOW — FK `ON DELETE SET NULL` cannot clear the `ge_follow_*` flags. *(Actionable #5.)*
 
-### HIGH — migration UNIQUE breaks the existing contact-merge writer
-`UNIQUE(group_event_id, contact_id)` (33-01:193) vs `mergeContacts`' set-based `UPDATE interactions
-SET contact_id` (`merge-dao.ts:88-90,180`); both-in-same-event → whole merge rolls back. No plan
-touches `merge-dao.ts`. Needs a group-aware merge task + tests; collision outcome is an owner
-decision (reject vs reconcile) — do not silently pick a destructive survivor. *(HIGH-2.)*
-
-### MEDIUM — conversion guarded only by the UI, not its DAO contract
-`convertInteractionToGroupEvent` never requires source `group_event_id IS NULL` (33-05:190-196);
-a stale caller could relink an already-linked child. Add the standalone-source assertion + zero-write
-linked-child test. *(Actionable #1.)*
-
-### MEDIUM — Group Log does not specify a distinct UID per fan-out child
-DAO requires per-participant `uid` (33-01:194-196) and `interactions.uid` is NOT NULL UNIQUE
-(001-initial.ts:97-103), but Group Log says "a freshly-minted `uid`" singular (33-06:152-153). Make
-the screen mint one parent uid + a distinct child uid per contact. *(Actionable #2.)*
-
-### Verified coverage (codex)
-- The AI boundary stays structural: `ai-context-read.ts:116-121` projects only channel/quality/connected, never joins `group_events` (33-01:249-250 leaves it untouched).
-- `deleteTouchpoint` delegates to the id+contact-scoped core (`recency-dao.ts:340-377`) — the group-child history Delete removes exactly one child (D-11-correct).
-- `updateGroupEvent`'s parent guard matches the loud-failure style at `recency-dao.ts:295-335`.
+### Per-plan risk
+Plan 01 MEDIUM (until merge-UI + FK/reset land), Plan 02 LOW, Plan 03 LOW, Plan 04 LOW, Plan 05
+MEDIUM (until handoff exhaustive), Plan 06 MEDIUM (until future-date copy fixed), Plan 07 LOW.
+Overall: revise Plans 01, 05, 06 for the three MEDIUMs, retain the owner checkpoints exactly as
+encoded, then proceed.
 
 ## Claude Review (read-only Opus verification agent)
 
 ### Summary
-Independently re-verified all five cycle-3 fixes against the code on disk — **all five genuinely
-landed** (parent guard, channel `{value:string}`, generic-delete documentation, convert return
-contract, DAO `tsc`). Traced the new-cycle concerns codex raised and **corroborated them against
-source**: confirmed `merge-dao.ts:89,180` performs a set-based `UPDATE interactions SET contact_id`
-inside one `inWriteTransaction` (`:98`) that collides with migration 026's partial UNIQUE, and that
-neither Plan 01 nor Plan 05 touches `merge-dao.ts`; confirmed the participant editor drives multiple
-separate Plan-03 transactions with no aggregate save; confirmed Plan 01 requires a distinct uid per
-participant while Plan 06 says "a freshly-minted uid" (singular). Additional disk-verified fact:
-`ContactPicker` exposes only a single `excludeContactId?: number` (`ContactPicker.tsx:27`), so the
-add-to-existing-event flow cannot exclude the current participant set (actionable #3). No decision
-reversal; the spine and egress ban are sound.
+Independently opened every referenced file and did a grep-based writer audit of `interactions`. All
+five cycle-4 fixes land correctly and match the code they build on — `saveParticipantEdits`
+atomicity, the merge data-safety half (every file:line accurate, mirrors the current_state_entries
+precedent), the DAO-level convert guard, distinct child-uid minting, and `excludeContactIds`. One
+substantive discrepancy: fix #2's UX half. The plans repeatedly assert "the merge screen's existing
+catch renders remediation guidance," but `MergeImpactSummary.tsx:19` discards the error and `:21`
+shows a fixed generic "…Try again." — so the "remediation" half of the owner-approved
+"reject-with-remediation" outcome is not delivered, and the copy misdirects (retry fails
+identically). MEDIUM: data correctness holds (atomic rollback, no loss), but the plan claims a UI
+mechanism that does not exist and frames the owner checkpoint on that false premise.
 
-### Risk Assessment — MEDIUM-HIGH
-Architecture and the cycle-3 repairs are sound and verified in the plans, but two unaddressed
-cross-subsystem data-integrity paths (participant-save atomicity vs D-08; merge-UNIQUE collision)
-must be incorporated before convergence. Nothing reverses a `[DECIDED]`/ADR/HANDOFF item; the only
-owner escalations are the merge-collision *semantics* and the already-flagged A3 orphan-repair
-deferral (handling confirmed clean).
+### Verified strengths
+- `editTouchpointFull` (recency-dao.ts:281-337) is mutexed and `inWriteTransaction` is non-reentrant
+  (documented hang hazard at :159-173) — composing the *core* is the only safe path (fix #1 correct).
+- Merge reparent + recompute lines all accurate (merge-dao.ts:89,98,180,215); mirrors the
+  current_state_entries partial-UNIQUE pre-handling at :153-165 (fix #2 data-safety correct).
+- Convert guard is two-layer and below the UI (fix #3); `interactions.uid` NOT NULL UNIQUE confirmed
+  (fix #4); the inline single-id filter at ContactPicker.tsx:88-97 is exactly what fix #5 replaces.
+- D-04 egress ban preserved by omission (ai-context-read.ts:116-122); `PURGE_CHILDREN` exhaustive
+  Record (purge-dao.ts:80); migration head 025/TARGET 25 → 026 is head+1 (database.ts:63,91).
+
+### Risk Assessment — LOW–MEDIUM
+All five fixes are correct on the axis that carries irreversible, on-device, no-recovery
+consequences (schema shape, transaction atomicity, single-writer recency spine, AI egress ban,
+merge data-safety under the new partial UNIQUE) — verified against code, not plan text. The one
+substantive concern (fix #2 remediation UX) is a false code-behavior claim with a real but
+non-corrupting user-facing consequence and a small, well-scoped remedy. Owner-bucket items are
+correctly encoded.
 
 ---
 
-*Review method: codex lane via `codex exec` (gpt-5.6-terra, reasoning=high, read-only repo access);
+*Review method: codex lane via `codex exec` (gpt-5.6, read-only repo access, source-grounded);
 Claude lane via a read-only Opus verification agent (owner-approved; `claude -p` lane unavailable on
 this host). The orchestrator verified every load-bearing claim against code on disk and git, per the
 repo "review the code, not the diff" mandate — no subagent summary was reported as fact without
-independent verification.*
+independent verification (`MergeImpactSummary.tsx`, `TouchpointRefineForm.tsx`,
+`touchpoint-refine-logic.ts`, `restore-apply.ts`, `merge-dao.ts` all re-read directly).*
