@@ -131,6 +131,12 @@ export interface FirstInteractionInput {
   /** Per-interaction Allow-AI gate, 0/1 (D-04); absent -> 0 (OFF). */
   allowAi?: number;
   source?: string;
+  /** Optional Group Event linkage; standalone interactions remain NULL. */
+  groupEventId?: number | null;
+  /** Group-event live-inheritance flags (Channel, Tone, Duration only). */
+  geFollowChannel?: number | null;
+  geFollowQuality?: number | null;
+  geFollowDuration?: number | null;
 }
 
 /** A new contact, optionally with its first touchpoint, created atomically. */
@@ -206,6 +212,10 @@ async function insertInteraction(
     duration?: number | null;
     allowAi?: number;
     source?: string;
+    groupEventId?: number | null;
+    geFollowChannel?: number | null;
+    geFollowQuality?: number | null;
+    geFollowDuration?: number | null;
   },
 ): Promise<number> {
   // duration/allow_ai (migration 025) are bound as `?` params, never interpolated
@@ -214,8 +224,9 @@ async function insertInteraction(
   const result = await exec.runAsync(
     `INSERT INTO interactions
        (uid, contact_id, occurred_at, recorded_at, channel, direction,
-        connected, quality, note, duration, allow_ai, source, modified_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        connected, quality, note, duration, allow_ai, source, modified_at,
+        group_event_id, ge_follow_channel, ge_follow_quality, ge_follow_duration)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       i.uid,
       contactId,
@@ -230,6 +241,10 @@ async function insertInteraction(
       i.allowAi ?? DEFAULT_ALLOW_AI,
       i.source ?? DEFAULT_SOURCE,
       now,
+      i.groupEventId ?? null,
+      i.geFollowChannel ?? null,
+      i.geFollowQuality ?? null,
+      i.geFollowDuration ?? null,
     ],
   );
   return result.lastInsertRowId;
@@ -293,6 +308,16 @@ export function editTouchpointFull(
     return Promise.reject(err);
   }
   return inWriteTransaction(exec, async () => {
+    await editTouchpointFullCore(exec, input);
+    await bumpDataRevisionCore(exec);
+  });
+}
+
+/** Non-mutexed full-edit primitive for a caller that already owns a transaction. */
+export async function editTouchpointFullCore(
+  exec: SqlExecutor,
+  input: EditTouchpointFullInput,
+): Promise<void> {
     // WR-04: scope by BOTH keys. Recompute uses the caller-supplied contactId,
     // so if (interactionId, contactId) don't actually pair, an id-only UPDATE
     // would edit contact A's row while recomputing contact B — leaving A's
@@ -332,14 +357,13 @@ export function editTouchpointFull(
       );
     }
     await recomputeLastContact(exec, input.contactId, input.now);
-    await bumpDataRevisionCore(exec);
-  });
 }
 
 /** Non-mutexed delete primitive for callers that already own a transaction. */
 export async function deleteInteractionCore(
   exec: SqlExecutor,
   input: DeleteTouchpointInput,
+  { bumpRevision = true }: { bumpRevision?: boolean } = {},
 ): Promise<void> {
   const target = await exec.getFirstAsync<{ uid: string }>(
     "SELECT uid FROM interactions WHERE id = ? AND contact_id = ?",
@@ -354,7 +378,7 @@ export async function deleteInteractionCore(
     entityType: "interaction",
     entityUid: target.uid,
     deletedAt: input.now,
-  });
+  }, { bumpRevision });
   const result = await exec.runAsync(
     "DELETE FROM interactions WHERE id = ? AND contact_id = ?",
     [input.interactionId, input.contactId],
