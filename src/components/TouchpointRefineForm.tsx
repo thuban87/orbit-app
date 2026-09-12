@@ -34,8 +34,8 @@ import {
   coerceAllowAi,
   combineDateAndTime,
   DURATION_PRESETS,
-  formatDurationLabel,
   FUTURE_DATETIME_MESSAGE,
+  formatDurationLabel,
   isCombinedInFuture,
   parseCustomDurationMinutes,
   parseLocalDateTime,
@@ -96,13 +96,43 @@ interface TouchpointRefineFormProps {
   now: string;
   /** Stable testID root; controls derive from it. */
   testID?: string;
+  /**
+   * Optional allow-list for reuse in scoped edit surfaces. Omitting it preserves
+   * the canonical full interaction-edit form.
+   */
+  visibleFields?: ReadonlyArray<TouchpointRefineField>;
+  /** Optional caller-specific copy for the inline future-date validation. */
+  futureDateMessage?: string;
 }
+
+export type TouchpointRefineField =
+  | "datetime"
+  | "channel"
+  | "direction"
+  | "connected"
+  | "tone"
+  | "note"
+  | "duration"
+  | "allowAi";
+
+const ALL_FIELDS: ReadonlySet<TouchpointRefineField> = new Set([
+  "datetime",
+  "channel",
+  "direction",
+  "connected",
+  "tone",
+  "note",
+  "duration",
+  "allowAi",
+]);
 
 export function TouchpointRefineForm({
   value,
   onChange,
   now,
   testID = "touchpoint-refine",
+  visibleFields,
+  futureDateMessage = FUTURE_DATETIME_MESSAGE,
 }: TouchpointRefineFormProps) {
   const { colors } = useTheme();
   const [showDatePicker, setShowDatePicker] = useState(false);
@@ -114,6 +144,7 @@ export function TouchpointRefineForm({
   // Raw text of the Custom-duration entry (minutes). The persisted seconds live on
   // `value.duration`; this only backs the free-text field while the user types.
   const [customMinutes, setCustomMinutes] = useState("");
+  const fields = visibleFields ? new Set(visibleFields) : ALL_FIELDS;
 
   // Seed both dialogs from the stored occurred_at, preserving time-of-day.
   const seed = parseLocalDateTime(value.occurredAt);
@@ -152,7 +183,7 @@ export function TouchpointRefineForm({
     const combined = combineDateAndTime(day, time);
     if (isCombinedInFuture(combined, now)) {
       // Future datetime — surface the locked copy, keep the prior selection.
-      setError(FUTURE_DATETIME_MESSAGE);
+      setError(futureDateMessage);
       return;
     }
     setError(null);
@@ -162,248 +193,272 @@ export function TouchpointRefineForm({
   return (
     <View testID={testID} style={styles.form}>
       {/* Date + time */}
-      <View style={styles.field}>
-        <Text style={[styles.label, { color: colors.textSecondary }]}>
-          Date & time
-        </Text>
-        <Pressable
-          testID={`${testID}-datetime`}
-          accessibilityRole="button"
-          accessibilityLabel="Correct date and time"
-          onPress={openDateTime}
-          style={[
-            styles.control,
-            { backgroundColor: colors.surface, borderColor: colors.border },
-          ]}
-        >
-          <Text style={{ color: colors.textPrimary }}>{value.occurredAt}</Text>
-        </Pressable>
-        {error ? (
-          <Text
-            testID={`${testID}-error`}
-            accessibilityLabel={error}
-            style={[styles.error, { color: colors.danger }]}
-          >
-            {error}
+      {fields.has("datetime") ? (
+        <View style={styles.field}>
+          <Text style={[styles.label, { color: colors.textSecondary }]}>
+            Date & time
           </Text>
-        ) : null}
-      </View>
-
-      {/* Channel */}
-      <View style={styles.field}>
-        <Text style={[styles.label, { color: colors.textSecondary }]}>
-          Channel
-        </Text>
-        <View
-          style={[
-            styles.control,
-            { backgroundColor: colors.surface, borderColor: colors.border },
-          ]}
-        >
-          <Picker
-            testID={`${testID}-channel`}
-            accessibilityLabel="Channel"
-            selectedValue={value.channel}
-            onValueChange={(v) => set("channel", String(v))}
-            dropdownIconColor={colors.textSecondary}
-            style={{ color: colors.textPrimary }}
-          >
-            {CHANNEL_OPTIONS.map((o) => (
-              <Picker.Item key={o.value} label={o.label} value={o.value} />
-            ))}
-          </Picker>
-        </View>
-      </View>
-
-      {/* Direction */}
-      <View style={styles.field}>
-        <Text style={[styles.label, { color: colors.textSecondary }]}>
-          Direction
-        </Text>
-        <View
-          style={[
-            styles.control,
-            { backgroundColor: colors.surface, borderColor: colors.border },
-          ]}
-        >
-          <Picker
-            testID={`${testID}-direction`}
-            accessibilityLabel="Direction"
-            selectedValue={value.direction ?? ""}
-            onValueChange={(v) => set("direction", v === "" ? null : String(v))}
-            dropdownIconColor={colors.textSecondary}
-            style={{ color: colors.textPrimary }}
-          >
-            <Picker.Item label="No selection" value="" />
-            {DIRECTION_OPTIONS.map((o) => (
-              <Picker.Item key={o} label={o} value={o} />
-            ))}
-          </Picker>
-        </View>
-      </View>
-
-      {/* Connected */}
-      <View style={[styles.field, styles.toggleRow]}>
-        <Text style={[styles.label, { color: colors.textPrimary }]}>
-          Connected
-        </Text>
-        <Switch
-          testID={`${testID}-connected`}
-          accessibilityLabel="Connected"
-          value={value.connected === 1}
-          onValueChange={(v) => set("connected", v ? 1 : 0)}
-          trackColor={{ false: colors.border, true: colors.accent }}
-          thumbColor={colors.surfaceElevated}
-        />
-      </View>
-
-      {/* Tone */}
-      <View style={styles.field}>
-        <Text style={[styles.label, { color: colors.textSecondary }]}>Tone</Text>
-        <View
-          style={[
-            styles.control,
-            { backgroundColor: colors.surface, borderColor: colors.border },
-          ]}
-        >
-          <Picker
-            testID={`${testID}-tone`}
-            accessibilityLabel="Tone"
-            selectedValue={value.quality ?? ""}
-            onValueChange={(v) => set("quality", v === "" ? null : String(v))}
-            dropdownIconColor={colors.textSecondary}
-            style={{ color: colors.textPrimary }}
-          >
-            <Picker.Item label="No selection" value="" />
-            {TONE_OPTIONS.map((o) => (
-              <Picker.Item key={o} label={o} value={o} />
-            ))}
-          </Picker>
-        </View>
-      </View>
-
-      {/* Note */}
-      <View style={styles.field}>
-        <Text style={[styles.label, { color: colors.textSecondary }]}>
-          Note
-        </Text>
-        <TextInput
-          testID={`${testID}-note`}
-          accessibilityLabel="Note"
-          value={value.note ?? ""}
-          onChangeText={(t) => set("note", t === "" ? null : t)}
-          multiline
-          placeholder="Add a detail"
-          placeholderTextColor={colors.textSecondary}
-          style={[
-            styles.control,
-            styles.noteInput,
-            {
-              backgroundColor: colors.surface,
-              borderColor: colors.border,
-              color: colors.textPrimary,
-            },
-          ]}
-        />
-      </View>
-
-      {/* Duration (optional; descriptive only — never feeds Status/Gravity/Intensity) */}
-      <View style={styles.field}>
-        <Text style={[styles.label, { color: colors.textSecondary }]}>
-          Duration
-        </Text>
-        <View style={styles.chipRow}>
-          {DURATION_PRESETS.map((preset) => {
-            const selected = value.duration === preset.seconds;
-            return (
-              <Pressable
-                key={preset.label}
-                testID={`${testID}-duration-${preset.label}`}
-                accessibilityRole="button"
-                accessibilityLabel={`Duration ${preset.label}`}
-                accessibilityState={{ selected }}
-                onPress={() => {
-                  setCustomMinutes("");
-                  set("duration", preset.seconds);
-                }}
-                style={[
-                  styles.chip,
-                  {
-                    backgroundColor: colors.surface,
-                    borderColor: selected ? colors.accent : colors.border,
-                  },
-                ]}
-              >
-                <Text style={{ color: colors.textPrimary }}>{preset.label}</Text>
-              </Pressable>
-            );
-          })}
           <Pressable
-            testID={`${testID}-duration-none`}
+            testID={`${testID}-datetime`}
             accessibilityRole="button"
-            accessibilityLabel="Duration none"
-            accessibilityState={{ selected: value.duration === null }}
-            onPress={() => {
-              setCustomMinutes("");
-              set("duration", null);
-            }}
+            accessibilityLabel="Correct date and time"
+            onPress={openDateTime}
             style={[
-              styles.chip,
-              {
-                backgroundColor: colors.surface,
-                borderColor:
-                  value.duration === null ? colors.accent : colors.border,
-              },
+              styles.control,
+              { backgroundColor: colors.surface, borderColor: colors.border },
             ]}
           >
-            <Text style={{ color: colors.textPrimary }}>None</Text>
+            <Text style={{ color: colors.textPrimary }}>
+              {value.occurredAt}
+            </Text>
           </Pressable>
+          {error ? (
+            <Text
+              testID={`${testID}-error`}
+              accessibilityLabel={error}
+              style={[styles.error, { color: colors.danger }]}
+            >
+              {error}
+            </Text>
+          ) : null}
         </View>
-        <TextInput
-          testID={`${testID}-duration-custom`}
-          accessibilityLabel="Custom duration in minutes"
-          value={customMinutes}
-          onChangeText={(t) => {
-            setCustomMinutes(t);
-            // parseCustomDurationMinutes returns null for empty/invalid/out-of-range
-            // (the "none" outcome), so an in-progress or bad entry never persists a
-            // 0 or an out-of-bound duration.
-            set("duration", parseCustomDurationMinutes(t));
-          }}
-          keyboardType="number-pad"
-          placeholder="Custom (minutes)"
-          placeholderTextColor={colors.textSecondary}
-          style={[
-            styles.control,
-            {
-              backgroundColor: colors.surface,
-              borderColor: colors.border,
-              color: colors.textPrimary,
-            },
-          ]}
-        />
-        <Text
-          testID={`${testID}-duration-label`}
-          style={[styles.hint, { color: colors.textSecondary }]}
-        >
-          {formatDurationLabel(value.duration)}
-        </Text>
-      </View>
+      ) : null}
+
+      {/* Channel */}
+      {fields.has("channel") ? (
+        <View style={styles.field}>
+          <Text style={[styles.label, { color: colors.textSecondary }]}>
+            Channel
+          </Text>
+          <View
+            style={[
+              styles.control,
+              { backgroundColor: colors.surface, borderColor: colors.border },
+            ]}
+          >
+            <Picker
+              testID={`${testID}-channel`}
+              accessibilityLabel="Channel"
+              selectedValue={value.channel}
+              onValueChange={(v) => set("channel", String(v))}
+              dropdownIconColor={colors.textSecondary}
+              style={{ color: colors.textPrimary }}
+            >
+              {CHANNEL_OPTIONS.map((o) => (
+                <Picker.Item key={o.value} label={o.label} value={o.value} />
+              ))}
+            </Picker>
+          </View>
+        </View>
+      ) : null}
+
+      {/* Direction */}
+      {fields.has("direction") ? (
+        <View style={styles.field}>
+          <Text style={[styles.label, { color: colors.textSecondary }]}>
+            Direction
+          </Text>
+          <View
+            style={[
+              styles.control,
+              { backgroundColor: colors.surface, borderColor: colors.border },
+            ]}
+          >
+            <Picker
+              testID={`${testID}-direction`}
+              accessibilityLabel="Direction"
+              selectedValue={value.direction ?? ""}
+              onValueChange={(v) =>
+                set("direction", v === "" ? null : String(v))
+              }
+              dropdownIconColor={colors.textSecondary}
+              style={{ color: colors.textPrimary }}
+            >
+              <Picker.Item label="No selection" value="" />
+              {DIRECTION_OPTIONS.map((o) => (
+                <Picker.Item key={o} label={o} value={o} />
+              ))}
+            </Picker>
+          </View>
+        </View>
+      ) : null}
+
+      {/* Connected */}
+      {fields.has("connected") ? (
+        <View style={[styles.field, styles.toggleRow]}>
+          <Text style={[styles.label, { color: colors.textPrimary }]}>
+            Connected
+          </Text>
+          <Switch
+            testID={`${testID}-connected`}
+            accessibilityLabel="Connected"
+            value={value.connected === 1}
+            onValueChange={(v) => set("connected", v ? 1 : 0)}
+            trackColor={{ false: colors.border, true: colors.accent }}
+            thumbColor={colors.surfaceElevated}
+          />
+        </View>
+      ) : null}
+
+      {/* Tone */}
+      {fields.has("tone") ? (
+        <View style={styles.field}>
+          <Text style={[styles.label, { color: colors.textSecondary }]}>
+            Tone
+          </Text>
+          <View
+            style={[
+              styles.control,
+              { backgroundColor: colors.surface, borderColor: colors.border },
+            ]}
+          >
+            <Picker
+              testID={`${testID}-tone`}
+              accessibilityLabel="Tone"
+              selectedValue={value.quality ?? ""}
+              onValueChange={(v) => set("quality", v === "" ? null : String(v))}
+              dropdownIconColor={colors.textSecondary}
+              style={{ color: colors.textPrimary }}
+            >
+              <Picker.Item label="No selection" value="" />
+              {TONE_OPTIONS.map((o) => (
+                <Picker.Item key={o} label={o} value={o} />
+              ))}
+            </Picker>
+          </View>
+        </View>
+      ) : null}
+
+      {/* Note */}
+      {fields.has("note") ? (
+        <View style={styles.field}>
+          <Text style={[styles.label, { color: colors.textSecondary }]}>
+            Note
+          </Text>
+          <TextInput
+            testID={`${testID}-note`}
+            accessibilityLabel="Note"
+            value={value.note ?? ""}
+            onChangeText={(t) => set("note", t === "" ? null : t)}
+            multiline
+            placeholder="Add a detail"
+            placeholderTextColor={colors.textSecondary}
+            style={[
+              styles.control,
+              styles.noteInput,
+              {
+                backgroundColor: colors.surface,
+                borderColor: colors.border,
+                color: colors.textPrimary,
+              },
+            ]}
+          />
+        </View>
+      ) : null}
+
+      {/* Duration (optional; descriptive only — never feeds Status/Gravity/Intensity) */}
+      {fields.has("duration") ? (
+        <View style={styles.field}>
+          <Text style={[styles.label, { color: colors.textSecondary }]}>
+            Duration
+          </Text>
+          <View style={styles.chipRow}>
+            {DURATION_PRESETS.map((preset) => {
+              const selected = value.duration === preset.seconds;
+              return (
+                <Pressable
+                  key={preset.label}
+                  testID={`${testID}-duration-${preset.label}`}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Duration ${preset.label}`}
+                  accessibilityState={{ selected }}
+                  onPress={() => {
+                    setCustomMinutes("");
+                    set("duration", preset.seconds);
+                  }}
+                  style={[
+                    styles.chip,
+                    {
+                      backgroundColor: colors.surface,
+                      borderColor: selected ? colors.accent : colors.border,
+                    },
+                  ]}
+                >
+                  <Text style={{ color: colors.textPrimary }}>
+                    {preset.label}
+                  </Text>
+                </Pressable>
+              );
+            })}
+            <Pressable
+              testID={`${testID}-duration-none`}
+              accessibilityRole="button"
+              accessibilityLabel="Duration none"
+              accessibilityState={{ selected: value.duration === null }}
+              onPress={() => {
+                setCustomMinutes("");
+                set("duration", null);
+              }}
+              style={[
+                styles.chip,
+                {
+                  backgroundColor: colors.surface,
+                  borderColor:
+                    value.duration === null ? colors.accent : colors.border,
+                },
+              ]}
+            >
+              <Text style={{ color: colors.textPrimary }}>None</Text>
+            </Pressable>
+          </View>
+          <TextInput
+            testID={`${testID}-duration-custom`}
+            accessibilityLabel="Custom duration in minutes"
+            value={customMinutes}
+            onChangeText={(t) => {
+              setCustomMinutes(t);
+              // parseCustomDurationMinutes returns null for empty/invalid/out-of-range
+              // (the "none" outcome), so an in-progress or bad entry never persists a
+              // 0 or an out-of-bound duration.
+              set("duration", parseCustomDurationMinutes(t));
+            }}
+            keyboardType="number-pad"
+            placeholder="Custom (minutes)"
+            placeholderTextColor={colors.textSecondary}
+            style={[
+              styles.control,
+              {
+                backgroundColor: colors.surface,
+                borderColor: colors.border,
+                color: colors.textPrimary,
+              },
+            ]}
+          />
+          <Text
+            testID={`${testID}-duration-label`}
+            style={[styles.hint, { color: colors.textSecondary }]}
+          >
+            {formatDurationLabel(value.duration)}
+          </Text>
+        </View>
+      ) : null}
 
       {/* Allow AI (per-interaction egress gate; defaults OFF — D-04) */}
-      <View style={[styles.field, styles.toggleRow]}>
-        <Text style={[styles.label, { color: colors.textPrimary }]}>
-          Allow AI
-        </Text>
-        <Switch
-          testID={`${testID}-allow-ai`}
-          accessibilityLabel="Allow AI"
-          value={value.allowAi === 1}
-          onValueChange={(v) => set("allowAi", coerceAllowAi(v))}
-          trackColor={{ false: colors.border, true: colors.accent }}
-          thumbColor={colors.surfaceElevated}
-        />
-      </View>
+      {fields.has("allowAi") ? (
+        <View style={[styles.field, styles.toggleRow]}>
+          <Text style={[styles.label, { color: colors.textPrimary }]}>
+            Allow AI
+          </Text>
+          <Switch
+            testID={`${testID}-allow-ai`}
+            accessibilityLabel="Allow AI"
+            value={value.allowAi === 1}
+            onValueChange={(v) => set("allowAi", coerceAllowAi(v))}
+            trackColor={{ false: colors.border, true: colors.accent }}
+            thumbColor={colors.surfaceElevated}
+          />
+        </View>
+      ) : null}
 
       {showDatePicker ? (
         <DateTimePicker
