@@ -24,8 +24,8 @@ requirements-completed: [GRP-07, GRP-08, GRP-09, GRP-10]
 actuals:
   tokens: 10622
   tasks: 3
-  commits: 3
-duration: 33min
+  commits: 5
+duration: 40min
 completed: 2026-09-12
 status: complete
 ---
@@ -45,6 +45,8 @@ status: complete
 1. Task 1 — `31c594c`: Group Event browse page.
 2. Task 2 — `ed44b7a`: Group Event Detail, participant cards, lifecycle actions, and stack registrations.
 3. Task 3 — `41954c3`: History group context, scope routing, and conversion title Sheet.
+4. Rule 1 follow-up — `285517e`: Visible conversion failure feedback inside the title Sheet.
+5. Follow-up cleanup — `b4840ab`: Remove the now-unused HistorySection theme import.
 
 ## Verification
 
@@ -69,7 +71,7 @@ status: complete
 - **Issue:** A rejected conversion promise could leave a user without feedback.
 - **Fix:** Kept the prompt open and surfaced a local retry message.
 - **Files modified:** `src/components/history/HistorySection.tsx`.
-- **Commit:** `41954c3`.
+- **Commits:** `41954c3`, `285517e`.
 
 ## Known Stubs
 
@@ -78,4 +80,4 @@ None.
 ## Self-Check: PASSED
 
 - Confirmed all four created presentation components/screens exist.
-- Confirmed commits `31c594c`, `ed44b7a`, and `41954c3` exist locally.
+- Confirmed commits `31c594c`, `ed44b7a`, `41954c3`, `285517e`, and `b4840ab` exist locally.
