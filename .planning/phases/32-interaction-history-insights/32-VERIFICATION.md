@@ -1,11 +1,11 @@
 ---
 phase: 32-interaction-history-insights
 verified: 2026-09-12T02:18:44Z
-status: human_needed
-score: 12/18 must-have truth-clusters verified statically/by test; 6 gated on device UAT
-behavior_unverified: 6
+status: passed
+score: 18/18 — 12 verified statically/by test; 6 device-UAT items verified on-device (Pixel 6 Pro, real data, migration 025 v24→v25) 2026-09-12, see 32-UAT.md (6/6 PASS)
+behavior_unverified: 0
 overrides_applied: 0
-re_verification:
+re_verification: device UAT completed by orchestrator on the attached Pixel; all 6 human_verification items PASS (32-UAT.md)
 human_verification:
   - test: "TouchpointRefineForm extended controls on the Pixel"
     expected: "Tone chips (Positive/Neutral/Negative), Duration presets (5m/15m/30m/1h/2h/Custom or none), and the Allow-AI Switch render, are reachable, toggle, and persist; Allow-AI defaults OFF (D-04)."
