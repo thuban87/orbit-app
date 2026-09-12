@@ -49,10 +49,11 @@
  *   byte-identical. Phases 4/6 inherit this contract.
  * -----------------------------------------------------------------------------
  */
+
+import { bumpDataRevisionCore } from "@/db/data-revision-dao";
 import { rejectFutureOccurredAt } from "@/db/log-guards";
 import { insertTombstoneCore } from "@/db/tombstones-dao";
 import { inWriteTransaction } from "@/db/transaction";
-import { bumpDataRevisionCore } from "@/db/data-revision-dao";
 import type { SqlExecutor } from "@/db/types";
 
 /** A touchpoint to record against an existing contact. */
@@ -318,15 +319,15 @@ export async function editTouchpointFullCore(
   exec: SqlExecutor,
   input: EditTouchpointFullInput,
 ): Promise<void> {
-    // WR-04: scope by BOTH keys. Recompute uses the caller-supplied contactId,
-    // so if (interactionId, contactId) don't actually pair, an id-only UPDATE
-    // would edit contact A's row while recomputing contact B — leaving A's
-    // last_contact stale (the exact "recency silently wrong after a mutation"
-    // failure this module's invariant guards against). Scoping by contact_id
-    // makes a mismatch update 0 rows; asserting changes === 1 turns that into a
-    // loud rollback instead of silent corruption.
-    const result = await exec.runAsync(
-      `UPDATE interactions
+  // WR-04: scope by BOTH keys. Recompute uses the caller-supplied contactId,
+  // so if (interactionId, contactId) don't actually pair, an id-only UPDATE
+  // would edit contact A's row while recomputing contact B — leaving A's
+  // last_contact stale (the exact "recency silently wrong after a mutation"
+  // failure this module's invariant guards against). Scoping by contact_id
+  // makes a mismatch update 0 rows; asserting changes === 1 turns that into a
+  // loud rollback instead of silent corruption.
+  const result = await exec.runAsync(
+    `UPDATE interactions
           SET occurred_at = ?,
               channel     = ?,
               direction   = ?,
@@ -337,26 +338,26 @@ export async function editTouchpointFullCore(
               allow_ai    = ?,
               modified_at = ?
         WHERE id = ? AND contact_id = ?`,
-      [
-        input.occurredAt,
-        input.channel,
-        input.direction,
-        input.connected,
-        input.quality,
-        input.note,
-        input.duration,
-        input.allowAi,
-        input.now,
-        input.interactionId,
-        input.contactId,
-      ],
+    [
+      input.occurredAt,
+      input.channel,
+      input.direction,
+      input.connected,
+      input.quality,
+      input.note,
+      input.duration,
+      input.allowAi,
+      input.now,
+      input.interactionId,
+      input.contactId,
+    ],
+  );
+  if (result.changes !== 1) {
+    throw new Error(
+      `editTouchpointFull: no interaction matched id=${input.interactionId} for contactId=${input.contactId} (changed ${result.changes})`,
     );
-    if (result.changes !== 1) {
-      throw new Error(
-        `editTouchpointFull: no interaction matched id=${input.interactionId} for contactId=${input.contactId} (changed ${result.changes})`,
-      );
-    }
-    await recomputeLastContact(exec, input.contactId, input.now);
+  }
+  await recomputeLastContact(exec, input.contactId, input.now);
 }
 
 /** Non-mutexed delete primitive for callers that already own a transaction. */
@@ -374,11 +375,15 @@ export async function deleteInteractionCore(
       `deleteTouchpoint: no interaction matched id=${input.interactionId} for contactId=${input.contactId} (changed 0)`,
     );
   }
-  await insertTombstoneCore(exec, {
-    entityType: "interaction",
-    entityUid: target.uid,
-    deletedAt: input.now,
-  }, { bumpRevision });
+  await insertTombstoneCore(
+    exec,
+    {
+      entityType: "interaction",
+      entityUid: target.uid,
+      deletedAt: input.now,
+    },
+    { bumpRevision },
+  );
   const result = await exec.runAsync(
     "DELETE FROM interactions WHERE id = ? AND contact_id = ?",
     [input.interactionId, input.contactId],

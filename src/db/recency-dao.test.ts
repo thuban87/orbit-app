@@ -19,13 +19,17 @@ import { migration005 } from "@/db/migrations/005-digest-settings";
 import { migration006 } from "@/db/migrations/006-normalize-custom-field-values";
 import { migration007 } from "@/db/migrations/007-tombstones";
 import { migration025 } from "@/db/migrations/025-interaction-history-schema";
+import { migration026 } from "@/db/migrations/026-group-events-schema";
 import { runMigrations } from "@/db/migrations/runner";
 import {
   createContactWithInteraction,
+  deleteInteractionCore,
   deleteTouchpoint,
   editTouchpointFull,
+  editTouchpointFullCore,
   recordTouchpoint,
 } from "@/db/recency-dao";
+import { inWriteTransaction } from "@/db/transaction";
 import type { SqlExecutor } from "@/db/types";
 
 const NOW = "2026-08-14 12:00:00";
@@ -54,8 +58,9 @@ beforeEach(async () => {
       // <= target, so 008-024 stay skipped; 025 depends only on interactions (001)
       // and app_settings (002).
       migration025,
+      migration026,
     ],
-    25,
+    26,
     { now: NOW, newUid: uid },
   );
 });
@@ -945,5 +950,62 @@ describe("recency DAO — local wall-clock timestamp contract (DATA-05)", () => 
     expect(row?.occurred_at).toBe(local);
     // last_contact inherits the identical string — Phase-4 status reads it as-is.
     expect(await lastContact(c)).toBe(local);
+  });
+});
+
+describe("recency DAO — composable cores", () => {
+  it("edits inside a caller-owned transaction without nesting the write mutex", async () => {
+    const contactId = await makeContact();
+    const { interactionId } = await recordTouchpoint(exec, {
+      contactId,
+      uid: uid(),
+      occurredAt: "2026-07-01 10:00:00",
+      now: NOW,
+    });
+    await inWriteTransaction(exec, async () => {
+      await editTouchpointFullCore(exec, {
+        interactionId,
+        contactId,
+        occurredAt: "2026-07-02 10:00:00",
+        now: NOW,
+        channel: "Call",
+        direction: null,
+        connected: 1,
+        quality: null,
+        note: null,
+        duration: null,
+        allowAi: 0,
+      });
+    });
+    expect(await lastContact(contactId)).toBe("2026-07-02 10:00:00");
+  });
+
+  it("lets a composing delete suppress its inner revision bump", async () => {
+    const contactId = await makeContact();
+    const { interactionId } = await recordTouchpoint(exec, {
+      contactId,
+      uid: uid(),
+      occurredAt: "2026-07-01 10:00:00",
+      now: NOW,
+    });
+    const before = await exec.getFirstAsync<{ data_revision: number }>(
+      "SELECT data_revision FROM app_settings WHERE id = 1",
+    );
+    await inWriteTransaction(exec, async () => {
+      await deleteInteractionCore(
+        exec,
+        { interactionId, contactId, now: NOW },
+        { bumpRevision: false },
+      );
+    });
+    expect(
+      (
+        await exec.getFirstAsync<{ data_revision: number }>(
+          "SELECT data_revision FROM app_settings WHERE id = 1",
+        )
+      )?.data_revision,
+    ).toBe(before?.data_revision);
+    expect(await interactionTombstones()).toHaveLength(1);
+    expect(await lastContact(contactId)).toBeNull();
   });
 });
