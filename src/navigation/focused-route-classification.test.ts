@@ -26,6 +26,8 @@ const focusedRoutes = [
   "ReconcileComplete",
   "LogContact",
   "GroupLog",
+  "EditGroupEvent",
+  "EditParticipant",
   "UpdateContact",
   "Memory",
 ];
@@ -42,6 +44,7 @@ const browseRoutes = [
   "UnboundContacts",
   "Digest",
   "GroupEvents",
+  "GroupEventDetail",
   "RestorePreview",
   "RestoreResult",
 ];
@@ -55,9 +58,12 @@ describe("isFocusedWorkflow", () => {
     expect(isFocusedWorkflow(routeName)).toBe(false);
   });
 
-  it("treats an unknown route as browse/read", () => {
-    expect(isFocusedWorkflow("FutureRoute")).toBe(false);
-  });
+  it.each(["GroupEventDetail", "FutureRoute"])(
+    "treats %s as browse/read by default",
+    (routeName) => {
+      expect(isFocusedWorkflow(routeName)).toBe(false);
+    },
+  );
 });
 
 const routeDensities = [

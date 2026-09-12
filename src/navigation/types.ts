@@ -49,6 +49,13 @@ export type DashboardStackParamList = {
    * Serializable primitives only: no callbacks or contact data cross routes.
    */
   GroupLog: { participantIds?: number[] } | undefined;
+  GroupEventDetail: { groupEventId: number };
+  EditGroupEvent: { groupEventId: number };
+  EditParticipant: {
+    groupEventId: number;
+    interactionId: number;
+    contactId: number;
+  };
   UpdateContact: { contactId?: number } | undefined;
   Memory: { contactId?: number } | undefined;
   Settings: undefined;
@@ -149,6 +156,18 @@ export type OrreryStackParamList = {
   Edit: { contactId: number };
   /** The canonical Edit Interaction route (HIST-12); scoped by contact + interaction. */
   EditInteraction: { contactId: number; interactionId: number };
+  /**
+   * Group Event routes are registered here because Profile is hosted in the
+   * Orrery stack. RootStackParamList is a type intersection, so the history
+   * surface must resolve these routes in every stack that can host Profile.
+   */
+  GroupEventDetail: { groupEventId: number };
+  EditGroupEvent: { groupEventId: number };
+  EditParticipant: {
+    groupEventId: number;
+    interactionId: number;
+    contactId: number;
+  };
   Compose: { contactId: number; requestAiSuggestion?: boolean };
   CropPhoto: {
     rawUri: string;
@@ -207,6 +226,18 @@ export type SettingsStackParamList = {
    * a TYPE intersection — each stack must register the screen it can reach.
    */
   EditInteraction: { contactId: number; interactionId: number };
+  /**
+   * Group Event routes are registered here because Profile is hosted in Settings
+   * (Archived → Profile). RootStackParamList is a type intersection, so the
+   * history surface must resolve these routes in every stack that can host Profile.
+   */
+  GroupEventDetail: { groupEventId: number };
+  EditGroupEvent: { groupEventId: number };
+  EditParticipant: {
+    groupEventId: number;
+    interactionId: number;
+    contactId: number;
+  };
   CropPhoto: {
     rawUri: string;
     target: PhotoTargetDescriptor;

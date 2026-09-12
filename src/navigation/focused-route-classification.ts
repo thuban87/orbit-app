@@ -25,6 +25,8 @@ const FOCUSED_WORKFLOW_ROUTES = new Set<string>([
   "ReconcileComplete",
   "LogContact",
   "GroupLog",
+  "EditGroupEvent",
+  "EditParticipant",
   "UpdateContact",
   "Memory",
 ]);
