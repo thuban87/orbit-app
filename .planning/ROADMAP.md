@@ -797,7 +797,28 @@ Plans:
 
 **Canonical refs**: docs/dossier/milestone-2/phase-13-rapid-capture-update-flows-dossier.md; docs/dossier/milestone-2/planning-notes/phase-13-planning-notes.md
 **Schema**: shared interactions migration with Phase 32 — Tone, channel, duration, Allow AI (owning phase decided once at plan time; verify head+1 at plan time)
-**Plans**: TBD
+**Plans**: 8 plans across 3 waves
+**Wave 1**
+
+- [ ] 34-01-PLAN.md — Default Interaction Channel data layer: migration 027 (app_settings only) + DAO + declare-only backup portability (CAPT-11)
+- [ ] 34-02-PLAN.md — D-11 Memory-type displayName swap + CAPT-15 vocabulary satisfied-by-dependency verification (no new migration)
+- [ ] 34-03-PLAN.md — streamlined three-section Add Contact + Show More enrichment (atomic create) + AccordionSection primitive & validation interface (CAPT-01/02/03/14)
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [ ] 34-04-PLAN.md — detailed Log Interaction screen: scoped channelOptions + Duration under More Options + preference consumer (CAPT-07/08/09/10/11/13/14)
+- [ ] 34-05-PLAN.md — Edit Contact persistence: extend updateContactFull for the five knowledge subdomains + edit-contact-logic assembly/resolver (CAPT-04)
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
+- [ ] 34-06-PLAN.md — Quick Log post-log Note/Memory capture: two-action snackbar + PostLogNoteEditor (CAPT-05/13)
+- [ ] 34-07-PLAN.md — Update Contact chooser loop + full Memory editor (CAPT-06/12/13/14)
+- [ ] 34-08-PLAN.md — Edit Contact IA: top-level accordion sections composing every editor + reveal-and-focus + dirty-state (CAPT-04/14)
+
+**Cross-cutting constraints:**
+
+- The remembered-channel write is confined to the successful-save path; an interrupted save that did not persist the interaction leaves remembered_interaction_channel unchanged (CAPT-11 concurrency edge).
+
 **UI hint**: yes
 
 ### Phase 35: Messaging & AI Compose
