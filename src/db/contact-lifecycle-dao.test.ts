@@ -90,6 +90,21 @@ async function dataRevision(): Promise<number> {
   return setting?.data_revision ?? -1;
 }
 
+async function events(contactId: number) {
+  return exec.getAllAsync<{
+    uid: string;
+    type: string;
+    occurred_at: string;
+    detail: string | null;
+    recorded_at: string;
+    modified_at: string;
+  }>(
+    `SELECT uid, type, occurred_at, detail, recorded_at, modified_at
+       FROM events WHERE contact_id = ? ORDER BY id`,
+    [contactId],
+  );
+}
+
 describe("contact lifecycle DAO", () => {
   it("unbinds without altering cadence, favourite rank, or relationship history", async () => {
     const contactId = await seedContact({
@@ -163,6 +178,69 @@ describe("contact lifecycle DAO", () => {
       modified_at: LATER,
     });
     expect(await dataRevision()).toBe(1);
+  });
+
+  it("writes exactly one immutable 'bind' event at the bind moment, inside the bind transaction", async () => {
+    const contactId = await seedContact({
+      intervalDays: 31,
+      trackingEnabled: 0,
+    });
+
+    await bindContact(exec, contactId, LATER);
+
+    const rows = await events(contactId);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({
+      type: "bind",
+      occurred_at: LATER,
+      detail: null,
+      recorded_at: LATER,
+      modified_at: LATER,
+    });
+    // The bind event carries a distinct merge-key uid (not a seeded one).
+    expect(rows[0]?.uid).toEqual(expect.any(String));
+    expect(rows[0]?.uid.length).toBeGreaterThan(0);
+  });
+
+  it("writes exactly one immutable 'unbind' event at the unbind moment, inside the unbind transaction", async () => {
+    const contactId = await seedContact({
+      intervalDays: 30,
+      trackingEnabled: 1,
+    });
+
+    await unbindContact(exec, contactId, LATER);
+
+    const rows = await events(contactId);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({
+      type: "unbind",
+      occurred_at: LATER,
+      detail: null,
+      recorded_at: LATER,
+      modified_at: LATER,
+    });
+  });
+
+  it("appends lifecycle events insert-only — a later unbind never mutates the earlier bind event", async () => {
+    const later2 = "2026-08-28 14:00:00";
+    const contactId = await seedContact({
+      intervalDays: 31,
+      trackingEnabled: 0,
+    });
+
+    await bindContact(exec, contactId, LATER);
+    const afterBind = await events(contactId);
+    expect(afterBind).toHaveLength(1);
+    const bindEvent = afterBind[0]!;
+
+    await unbindContact(exec, contactId, later2);
+    const afterUnbind = await events(contactId);
+
+    // The earlier bind event is untouched (immutable, insert-only — ADR-025):
+    // exactly two events, and the bind row is byte-for-byte what it was.
+    expect(afterUnbind).toHaveLength(2);
+    expect(afterUnbind[0]).toEqual(bindEvent);
+    expect(afterUnbind[1]).toMatchObject({ type: "unbind", occurred_at: later2 });
   });
 
   it("rejects nonexistent or wrong-state transition targets without advancing revision", async () => {
