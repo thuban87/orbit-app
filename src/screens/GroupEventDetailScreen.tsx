@@ -256,6 +256,17 @@ export function GroupEventDetailScreen({
               contactId: detail.contactId,
             })
           }
+          onViewGroupEvent={() => setDetail(null)}
+          onEditGroupEvent={() =>
+            navigation.navigate("EditGroupEvent", { groupEventId })
+          }
+          onEditParticipant={() =>
+            navigation.navigate("EditParticipant", {
+              groupEventId,
+              interactionId: detail.interactionId,
+              contactId: detail.contactId,
+            })
+          }
           onDeleted={() => {
             setDetail(null);
             void load();

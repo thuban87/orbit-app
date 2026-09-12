@@ -1,19 +1,13 @@
+// biome-ignore-all lint/a11y/useValidAriaRole: Orbit's Button/AppText `role` is a domain prop, not ARIA.
 /**
- * GroupScopePrompt (HIST-17, D-05/D-12) — DORMANT SEAM code.
+ * GroupScopePrompt (HIST-17, D-11) — explicit linked-interaction scope choice.
  *
  * When a group-linked interaction is edited, the user must first choose scope —
  * there is NO hybrid editor (D-05). This prompt presents that choice:
  *   • 'Edit individual interaction' → the participant override editor
  *     (participant-overridable fields only: Channel, Tone, Duration, Direction,
  *     Connected, participant note, Allow AI);
- *   • 'Edit Group Event' → the Phase-33 Edit Group Event flow (a placeholder
- *     target this phase — Phase 33 owns group persistence).
- *
- * In Phase 32 the group-link predicate is hard-FALSE for every interaction (no
- * group-event id column exists — D-12), so standalone Edit ALWAYS routes straight
- * to EditInteraction and this prompt is NEVER reached. It is ready-for-Phase-33
- * seam markup, not a live surface. It references no group-event column; making it
- * "exercisable" by adding group schema would reverse D-07/D-12 — stop and ask.
+ *   • 'Edit Group Event' → the focused Group Event editor.
  *
  * All colours resolve through theme tokens (check:colors).
  */

@@ -1,3 +1,4 @@
+// biome-ignore-all lint/a11y/useValidAriaRole: Orbit's Button/AppText `role` is a domain prop, not ARIA.
 /**
  * HistorySection (Plan 08, HIST-01/HIST-06/HIST-15/HIST-18) — the assembled
  * Profile History section, mounted by `ProfileModuleHost.renderHistory()` in
@@ -41,10 +42,11 @@ import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useCallback, useMemo, useState } from "react";
 import { StyleSheet, View } from "react-native";
+import { GroupTitlePromptSheet } from "@/components/group/GroupTitlePromptSheet";
+import type { HeatmapCellTarget } from "@/components/history/ActivityHeatmap";
 import { ActivityHeatmap } from "@/components/history/ActivityHeatmap";
 import { DateDetailSheet } from "@/components/history/DateDetailSheet";
 import { HeatmapContextCard } from "@/components/history/HeatmapContextCard";
-import type { HeatmapCellTarget } from "@/components/history/ActivityHeatmap";
 import {
   buildLogRoute,
   countByCycle,
@@ -63,21 +65,24 @@ import {
   updateAppSettings,
 } from "@/db/app-settings-dao";
 import { getExecutor, localDateTime } from "@/db/database";
+import { convertInteractionToGroupEvent } from "@/db/group-events-dao";
 import { type ContactHistory, readContactHistory } from "@/db/history-read";
 import type { ImpactInputs } from "@/db/impact-read";
 import type { CurrentStateFieldKey } from "@/db/memory-registry";
+import { newUid } from "@/db/uid";
 import type { RootStackParamList } from "@/navigation/types";
 import { buckets } from "@/services/history/buckets";
 import { cycles } from "@/services/history/cycles";
+import {
+  type IntensityWindowResult,
+  intensityWindow,
+} from "@/services/history/intensity-window";
 import {
   type HistoryWindow,
   nextWindow,
   prevWindow,
 } from "@/services/history/window";
-import {
-  intensityWindow,
-  type IntensityWindowResult,
-} from "@/services/history/intensity-window";
+import { useTheme } from "@/theme";
 import { SPACING } from "@/theme/tokens/spacing";
 import { formatLocalDate } from "@/utils/dates";
 
@@ -142,6 +147,7 @@ export function HistorySection({
   onOpenKnowledgeChange,
   testID = "history-section",
 }: HistorySectionProps) {
+  const { colors } = useTheme();
   const navigation =
     useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const today = useMemo(() => formatLocalDate(new Date()), []);
@@ -154,6 +160,8 @@ export function HistorySection({
   const [card, setCard] = useState<HeatmapCellTarget | null>(null);
   const [sheet, setSheet] = useState<SheetScope | null>(null);
   const [detailId, setDetailId] = useState<number | null>(null);
+  const [converting, setConverting] = useState(false);
+  const [conversionError, setConversionError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     const exec = getExecutor();
@@ -195,17 +203,15 @@ export function HistorySection({
   }, []);
 
   // --- The one shared window everything reads --------------------------------
-  const interactions = useMemo(
-    () => history?.interactions ?? [],
-    [history],
-  );
+  const interactions = useMemo(() => history?.interactions ?? [], [history]);
   const window = resolveActiveWindow(lens, refDate, today);
   const counts = useMemo(
     () => (window ? buckets(window, interactions) : new Map<string, number>()),
     [window, interactions],
   );
   const cyclesResult = useMemo(
-    () => cycles({ intervalDays, trackingEnabled, count: cycleCount, now: today }),
+    () =>
+      cycles({ intervalDays, trackingEnabled, count: cycleCount, now: today }),
     [intervalDays, trackingEnabled, cycleCount, today],
   );
   const cycleCounts = useMemo(
@@ -269,8 +275,7 @@ export function HistorySection({
     [openSheetForDate],
   );
 
-  const detailInteraction =
-    interactions.find((i) => i.id === detailId) ?? null;
+  const detailInteraction = interactions.find((i) => i.id === detailId) ?? null;
 
   // Records scoped to the open sheet (single date or cycle range, inclusive).
   const sheetRecords = useMemo(() => {
@@ -300,7 +305,11 @@ export function HistorySection({
         <AppText role="caption">
           Log an interaction to start seeing activity here.
         </AppText>
-        <Button role="primary" label="Log interaction" onPress={() => log(today)} />
+        <Button
+          role="primary"
+          label="Log interaction"
+          onPress={() => log(today)}
+        />
       </View>
     );
   }
@@ -371,11 +380,64 @@ export function HistorySection({
               interactionId,
             });
           }}
+          onViewGroupEvent={(groupEventId) => {
+            setDetailId(null);
+            navigation.navigate("GroupEventDetail", { groupEventId });
+          }}
+          onEditGroupEvent={(groupEventId) => {
+            setDetailId(null);
+            navigation.navigate("EditGroupEvent", { groupEventId });
+          }}
+          onEditParticipant={(
+            groupEventId,
+            interactionId,
+            participantContactId,
+          ) => {
+            setDetailId(null);
+            navigation.navigate("EditParticipant", {
+              groupEventId,
+              interactionId,
+              contactId: participantContactId,
+            });
+          }}
+          onConvertToGroup={() => {
+            setConversionError(null);
+            setConverting(true);
+          }}
           onDeleted={() => {
             setDetailId(null);
             void load();
           }}
         />
+      ) : null}
+      <GroupTitlePromptSheet
+        visible={converting && detailInteraction !== null}
+        onRequestClose={() => setConverting(false)}
+        onConfirm={(title) => {
+          if (!detailInteraction) return;
+          void convertInteractionToGroupEvent(getExecutor(), {
+            interactionId: detailInteraction.id,
+            contactId,
+            title,
+            uid: newUid(),
+            now: localDateTime(),
+          })
+            .then(({ groupEventId }) => {
+              setConverting(false);
+              setDetailId(null);
+              navigation.navigate("GroupEventDetail", { groupEventId });
+            })
+            .catch(() =>
+              setConversionError(
+                "Couldn't create this group event. Please try again.",
+              ),
+            );
+        }}
+      />
+      {conversionError ? (
+        <AppText role="caption" style={{ color: colors.danger }}>
+          {conversionError}
+        </AppText>
       ) : null}
     </View>
   );
