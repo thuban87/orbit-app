@@ -734,7 +734,7 @@ Plans:
 
 - [x] 32-05-PLAN.md — Heatmap/marker theme tokens + ActivityHeatmap + IntensityChart + lens persistence + context card (wave 3)
 - [x] 32-06-PLAN.md — Rolodex History Browser (synchronized wheels, markers, drawer, reduced motion) (wave 3)
-- [ ] 32-07-PLAN.md — Shared Detail Sheet + Interaction Detail (sparkle, group context) + hard-delete + group scope routing (wave 3)
+- [x] 32-07-PLAN.md — Shared Detail Sheet + Interaction Detail (sparkle, group context) + hard-delete + group scope routing (wave 3)
 
 **Wave 4** *(blocked on Wave 3 completion)*
 
@@ -877,7 +877,7 @@ Plans:
 | 30. Orrery Systems | 0/10 | Planned | - |
 | 31. Profile Experience | 15/15 | Complete   | 2026-09-10 |
 | 31.1 App-Wide System Backgrounds | 4/4 | In Progress|  |
-| 32. Interaction History & Insights | 5/8 | In Progress|  |
+| 32. Interaction History & Insights | 7/8 | In Progress|  |
 | 33. Group Interaction Logging | 0/TBD | Not started | - |
 | 34. Rapid Capture & Update Flows | 0/TBD | Not started | - |
 | 35. Messaging & AI Compose | 0/TBD | Not started | - |

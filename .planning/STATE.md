@@ -5,16 +5,16 @@ milestone_name: Release Readiness
 current_phase: 32
 current_phase_name: Interaction History & Insights
 status: executing
-stopped_at: Completed 32-06-PLAN.md (Rolodex History Browser — pure node-tested date roll/clamp/marker logic + RolodexWheel gesture roller (Reanimated shared-value scroll, worklet-forward-ref-safe depth, reduced-motion, non-gesture steppers, silhouette markers) + RolodexBrowser three synchronized Month/Day/Year wheels owning the pause-on-blur lifecycle + lifecycle-inclusive drawer that never auto-opens the sheet)
-last_updated: "2026-09-12T01:24:00.000Z"
+stopped_at: Completed 32-07-PLAN.md (Shared Detail Sheet + Interaction Detail + hard-delete + group seam — DateDetailSheet interleaves interactions/lifecycle(Bound/Unbound)/knowledge-change families by semantic icon; InteractionDetail present-only rows + Allow-AI sparkle (strict allow_ai===1) + hard-delete via deleteTouchpoint behind the destructive ConfirmDialog; GroupScopePrompt + group context dormant predicate-gated seam that never fires in Phase 32, D-12)
+last_updated: "2026-09-12T02:10:00.000Z"
 last_activity: 2026-09-11
-last_activity_desc: Phase 32 Plan 06 executed (rolodex-logic pure roll/clamp/marker/drawer helpers, 18 node tests; RolodexWheel + RolodexBrowser Reanimated/Gesture-Handler wheels, Day primary, markers from Plan 03, reduced-motion-aware, no per-frame setState, no Skia; optional Galaxy glow dropped rather than hardcode a colour)
-state_head: c92d378
+last_activity_desc: Phase 32 Plan 07 executed (interaction-detail-logic pure projection/sparkle/group-seam with 12 node tests TDD; DateDetailSheet + InteractionDetail + GroupScopePrompt; shared EVENT_LABELS extended bind→Bound/unbind→Unbound; hard-delete routes through deleteTouchpoint, failure preserves the row + metrics; group surfaces inert seam, no group_event_id referenced)
+state_head: 4b36891
 progress:
   total_phases: 21
   completed_phases: 7
   total_plans: 112
-  completed_plans: 108
+  completed_plans: 109
 carried_forward:
 
   - "31.1 NOT complete: 31.1-05 corrective (backgrounds were invisible on the owner's release — full-screen scrim at card opacity) is executed + debug-validated + release built/delivered, but the phase stays open until the owner validates the release on his personal phone (the prior 31.1-04 gate's false positive is why). See 31.1-05-PLAN.md, 31.1-UAT.md (superseded + corrective section)."
@@ -37,16 +37,16 @@ See: .planning/PROJECT.md (updated 2026-09-10 after Phase 31)
 ## Current Position
 
 Phase: 32 (Interaction History & Insights) — EXECUTING
-Plan: 7 of 8
-Status: Executing (32-01..32-06 complete — heatmap/marker tokens + ActivityHeatmap + context card + IntensityChart + lens/preset persistence + Rolodex History Browser (synchronized wheels, markers, drawer, reduced motion) shipped; ready for Plans 07–08)
+Plan: 8 of 8
+Status: Executing (32-01..32-07 complete — heatmap/marker tokens + ActivityHeatmap + context card + IntensityChart + lens/preset persistence + Rolodex History Browser + shared Detail Sheet/Interaction Detail (sparkle, hard-delete via deleteTouchpoint) + dormant group seam shipped; ready for Plan 08)
 Parked (owner, future): theme-merge into one Dark/Light switch; Deep Space/Starfield removal. See memories mode-aware-glassy-cards, android-elevation-opaque-on-translucent, theme-merge-into-mode-parked.
 FYI (separate): Phase 30 (Orrery Systems) still shows [ ] in ROADMAP with dirty 30-REVIEW files — reconcile independently.
 Carried forward (owner's bucket, NOT resolved here): D-11 default Memory-type display name — reconcile before Phase 34.
 Surface to owner (24.2-07, KNOW-15): milestone plan said Phase 36 owns the backup format-4 bump, but 24.1 already bumped to 4 (d677e2c); Plan 07 emits into the live format 4 with NO bump — that milestone instruction is stale.
 Deferred to Phase 31 (recorded in Plan 05): durable contact-scoped-def ownership + owner-purge semantics. Deferred to Phase 36 (ROADMAP breadcrumb): legacy AI-fuel confirm-path code removal.
-Last activity: 2026-09-11 — Phase 32 Plan 06 executed (Rolodex History Browser: pure roll/clamp/marker logic + RolodexWheel/RolodexBrowser synchronized wheels, markers, drawer, reduced motion)
+Last activity: 2026-09-11 — Phase 32 Plan 07 executed (shared Detail Sheet + Interaction Detail + hard-delete + dormant group seam; TDD pure logic + tsc/check:colors/grep gates green; 3062 tests pass)
 Progress: 11 completed v2.0 phases — 22, 23, 24.1, 24.2, 25, 26, 27, 28, 29, 30, 31
-Next: Execute Phase 32 Plan 07 — /gsd-execute-phase 32
+Next: Execute Phase 32 Plan 08 — /gsd-execute-phase 32
 
 **Milestone v2.0 structure (pre-decided by the owner from the fifteen milestone-2 dossiers + the
 2026-09-01 cross-dossier audit; not re-derived):** 22 App Shell · 23 Theme · 24 Contact Knowledge ·
@@ -259,6 +259,7 @@ at plan time. All new durable preferences are `app_settings` columns, never Asyn
 | Phase 32 P04 | 15min | 2 tasks | 11 files |
 | Phase 32 P05 | 12min | 3 tasks | 12 files |
 | Phase 32 P06 | 9min | 2 tasks | 4 files |
+| Phase 32 P07 | 12min | 3 tasks | 6 files |
 
 ## Accumulated Context
 
