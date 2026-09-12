@@ -7,6 +7,7 @@ import { ContactProfileScreen } from "@/screens/ContactProfileScreen";
 import { CropPhotoScreen } from "@/screens/CropPhotoScreen";
 import { CustomFieldsScreen } from "@/screens/CustomFieldsScreen";
 import { DuplicateReviewScreen } from "@/screens/DuplicateReviewScreen";
+import { EditGroupEventScreen } from "@/screens/EditGroupEventScreen";
 import { EditInteractionScreen } from "@/screens/EditInteractionScreen";
 import { EditParticipantScreen } from "@/screens/EditParticipantScreen";
 import { ImportCompleteScreen } from "@/screens/ImportCompleteScreen";
@@ -71,6 +72,7 @@ export function SettingsStack() {
       />
       <Stack.Screen name="MemoryHistory" component={MemoryHistoryScreen} />
       <Stack.Screen name="EditInteraction" component={EditInteractionScreen} />
+      <Stack.Screen name="EditGroupEvent" component={EditGroupEventScreen} />
       <Stack.Screen name="EditParticipant" component={EditParticipantScreen} />
       <Stack.Screen name="CropPhoto" component={CropPhotoScreen} />
       <Stack.Screen
