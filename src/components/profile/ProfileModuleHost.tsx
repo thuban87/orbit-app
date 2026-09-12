@@ -5,7 +5,9 @@ import { Icon } from "@/components/icons/Icon";
 import { AppText } from "@/components/ui/AppText";
 import { Button } from "@/components/ui/Button";
 import { GlassSurface } from "@/components/ui/GlassSurface";
+import { HistorySection } from "@/components/history/HistorySection";
 import { getExecutor, localDateTime } from "@/db/database";
+import type { CurrentStateFieldKey } from "@/db/memory-registry";
 import {
   readProfileCollapseOverride,
   setProfileCollapseOverride,
@@ -199,6 +201,11 @@ export interface ProfileModuleHostProps {
   onUnsnooze: () => Promise<void>;
   /** Screen-owned routing into the source-specific knowledge editors and histories. */
   onKnowledgeAction: (intent: KnowledgeActionIntent) => void;
+  /**
+   * Reuse the screen's EXISTING knowledge navigation for a History detail-sheet
+   * knowledge-change row (decision-preserving — no new cross-stack target).
+   */
+  onOpenKnowledgeChange: (fieldKey: CurrentStateFieldKey) => void;
   onKnowledgeViewAll: (intent: KnowledgeViewAllIntent) => void;
   onOpenValueHistory: (target: {
     contactId: number;
@@ -233,6 +240,7 @@ export function ProfileModuleHost({
   onKnowledgeAction,
   onKnowledgeViewAll,
   onOpenValueHistory,
+  onOpenKnowledgeChange,
   onContactMethodAction,
   onCollapseCommitted,
 }: ProfileModuleHostProps) {
@@ -388,22 +396,18 @@ export function ProfileModuleHost({
     if (snapshot.history.status === "error") {
       return <AppText role="body">{snapshot.history.message}</AppText>;
     }
-    if (snapshot.history.data.entries.length === 0) {
-      return <AppText role="body">No interactions yet</AppText>;
-    }
+    // The assembled Profile History section (Plan 08): Heatmap + Intensity +
+    // Rolodex browser behind this renderer seam, replacing the old
+    // channel·occurredAt + "View all history" stub. Layout persistence and the
+    // interaction-history summary case are untouched.
     return (
-      <View style={styles.stack}>
-        {snapshot.history.data.entries.map((entry) => (
-          <AppText key={entry.id} role="body">
-            {entry.channel} · {entry.occurredAt}
-          </AppText>
-        ))}
-        <Button
-          role="tertiary"
-          label="View all history"
-          onPress={onOpenHistory}
-        />
-      </View>
+      <HistorySection
+        contactId={snapshot.identity.id}
+        intervalDays={snapshot.identity.intervalDays}
+        trackingEnabled={snapshot.identity.trackingEnabled}
+        impactInputs={snapshot.impactInputs}
+        onOpenKnowledgeChange={onOpenKnowledgeChange}
+      />
     );
   };
 

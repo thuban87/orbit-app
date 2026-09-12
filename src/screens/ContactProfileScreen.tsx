@@ -406,6 +406,11 @@ export function ContactProfileScreen({
                 onKnowledgeViewAll={() =>
                   navigation.navigate("ThingsToRemember", { contactId })
                 }
+                // History detail-sheet knowledge-change edit reuses the SAME
+                // existing knowledge nav (decision-preserving — no new target).
+                onOpenKnowledgeChange={() =>
+                  navigation.navigate("ThingsToRemember", { contactId })
+                }
                 // Value-history remains owned by the Knowledge flow. Profile
                 // deliberately carries only a stable detail intent and never
                 // coerces a custom-field id into the current-state route key.

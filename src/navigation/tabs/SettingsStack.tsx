@@ -12,7 +12,9 @@ import { ImportCompleteScreen } from "@/screens/ImportCompleteScreen";
 import { ImportProgressScreen } from "@/screens/ImportProgressScreen";
 import { ImportReviewScreen } from "@/screens/ImportReviewScreen";
 import { LegacyContactPickerScreen } from "@/screens/LegacyContactPickerScreen";
+import { MemoryHistoryScreen } from "@/screens/MemoryHistoryScreen";
 import { MergeConflictsScreen } from "@/screens/MergeConflictsScreen";
+import { LogContactPlaceholderScreen } from "@/screens/placeholders/FabActionPlaceholders";
 import { ReconcileCompleteScreen } from "@/screens/ReconcileCompleteScreen";
 import { ReconcileDetailScreen } from "@/screens/ReconcileDetailScreen";
 import { ReconcileGridScreen } from "@/screens/ReconcileGridScreen";
@@ -20,6 +22,7 @@ import { SettingsScreen } from "@/screens/SettingsScreen";
 import { SurvivorSelectScreen } from "@/screens/SurvivorSelectScreen";
 import { SystemBuilderScreen } from "@/screens/SystemBuilderScreen";
 import { SystemsManagementScreen } from "@/screens/SystemsManagementScreen";
+import { ThingsToRememberScreen } from "@/screens/ThingsToRememberScreen";
 import type { SettingsScreenProps, SettingsStackParamList } from "../types";
 
 // Kept behind a compile-time guard so Metro removes the device-UAT-only harness
@@ -54,6 +57,18 @@ export function SettingsStack() {
       <Stack.Screen name="CustomFields" component={CustomFieldsRoute} />
       <Stack.Screen name="Archived" component={ArchivedContactsScreen} />
       <Stack.Screen name="Profile" component={ContactProfileScreen} />
+      {/* Detailed-log route (HIST-15): a Settings-originated (Archived -> Profile)
+          empty-date "Log interaction" must resolve here. */}
+      <Stack.Screen name="LogContact" component={LogContactPlaceholderScreen} />
+      {/* Knowledge-change edit routes (review cycle-2 HIGH): the History
+          detail-sheet's knowledge-change edit reuses ContactProfileScreen's nav
+          to ThingsToRemember; register both here (parallel to Dashboard/Orrery)
+          so a Settings-originated edit resolves instead of throwing. */}
+      <Stack.Screen
+        name="ThingsToRemember"
+        component={ThingsToRememberScreen}
+      />
+      <Stack.Screen name="MemoryHistory" component={MemoryHistoryScreen} />
       <Stack.Screen
         name="EditInteraction"
         component={EditInteractionScreen}
