@@ -23,7 +23,10 @@ import { migration007 } from "@/db/migrations/007-tombstones";
 import { migration009 } from "@/db/migrations/009-contact-method-normalization";
 import { migration010 } from "@/db/migrations/010-contact-method-label";
 import { migration011 } from "@/db/migrations/011-contact-lifecycle-schema";
+import { migration025 } from "@/db/migrations/025-interaction-history-schema";
+import { migration026 } from "@/db/migrations/026-group-events-schema";
 import { runMigrations } from "@/db/migrations/runner";
+import { createGroupEvent } from "@/db/group-events-dao";
 import { ROGUE_K } from "@/db/status";
 import type { SqlExecutor } from "@/db/types";
 import { formatLocalDate } from "@/utils/dates";
@@ -53,8 +56,10 @@ beforeEach(async () => {
       migration009,
       migration010,
       migration011,
+      migration025,
+      migration026,
     ],
-    11,
+    26,
     { now: NOW, newUid: uid, defaultPhoneRegion: "US" },
   );
 });
@@ -196,5 +201,18 @@ describe("getContactStatus", () => {
     const res = await getContactStatus(exec, id);
     expect(res?.rarely_responds).toBe(1);
     expect(res?.last_contact).toBe(lc);
+  });
+
+  it("derives status recency from a lone Group Event child, never its parent", async () => {
+    const contactId = await seedContact({ name: "Group child", intervalDays: 30, lastContact: null });
+    const occurredAt = "2026-08-10 12:00:00";
+    await createGroupEvent(exec, {
+      uid: uid(), title: "Dinner", occurredAt, now: NOW,
+      participants: [{ contactId, uid: uid() }],
+    });
+    const status = await getContactStatus(exec, contactId);
+    expect(status?.last_contact).toBe(occurredAt);
+    expect(status?.status).not.toBeNull();
+    expect((await exec.getFirstAsync<{ n: number }>("SELECT COUNT(*) AS n FROM interactions WHERE contact_id = ?", [contactId]))?.n).toBe(1);
   });
 });

@@ -19,12 +19,8 @@
  * COUNT-ONLY (D-10): markers/counts resolve ONLY from `interactions` rows.
  * Lifecycle events are surfaced but never counted into the interaction count.
  *
- * GROUP SEAM IS INERT (D-12): `isGroupLinked` is a predicate keyed on a
- * group-event-id field that DOES NOT EXIST in Phase 32 (that column lands in
- * Phase 33's migration 026+). So it resolves hard-false for every row — a Group
- * Event parent can never be an `interactions` row and thus never double-counts,
- * WITHOUT any group schema or constructible parent fixture. This module never
- * selects, joins, or assumes the group-event-id column.
+ * Group Event context is joined only for local presentation. The parent remains
+ * outside `interactions`, so every metric continues to count child rows once.
  *
  * Read-only: a `ReadOnlyExecutor` (no transaction), every value `?`-bound, no
  * string interpolation, no network (local-first, CLAUDE.md). Local-date only —
@@ -49,7 +45,9 @@ export interface HistoryInteractionRecord {
   readonly note: string | null;
   readonly duration: number | null;
   readonly allowAi: number;
-  /** INERT SEAM (D-12): always false in Phase 32 (no group-event-id column). */
+  readonly groupEventId: number | null;
+  readonly groupTitle: string | null;
+  readonly groupNote: string | null;
   readonly groupLinked: boolean;
 }
 
@@ -115,6 +113,9 @@ interface InteractionDbRow {
   note: string | null;
   duration: number | null;
   allow_ai: number | null;
+  group_event_id: number | null;
+  group_title: string | null;
+  group_note: string | null;
 }
 
 interface EventDbRow {
@@ -135,12 +136,16 @@ function localDateOf(stored: string): string {
 
 // Closed SELECTs (superseding profile-history-read's shape, no LIMIT). Only the
 // contact id is bound; static column names are literal text (T-06-04). No
-// group-event-id column anywhere (D-12).
-const SELECT_INTERACTIONS = `SELECT id, occurred_at, channel, direction, connected,
-                                    quality, note, duration, allow_ai
-                               FROM interactions
-                              WHERE contact_id = ?
-                              ORDER BY occurred_at DESC, id DESC`;
+// This is a local read, not the closed AI egress projection. Qualify every
+// shared column so the Group Event JOIN cannot become ambiguous.
+const SELECT_INTERACTIONS = `SELECT i.id, i.occurred_at, i.channel, i.direction, i.connected,
+                                    i.quality, i.note, i.duration, i.allow_ai,
+                                    i.group_event_id, ge.title AS group_title,
+                                    ge.group_note AS group_note
+                               FROM interactions AS i
+                               LEFT JOIN group_events AS ge ON ge.id = i.group_event_id
+                              WHERE i.contact_id = ?
+                              ORDER BY i.occurred_at DESC, i.id DESC`;
 
 const SELECT_EVENTS = `SELECT id, occurred_at, type, detail
                          FROM events
@@ -170,8 +175,10 @@ export async function readContactHistory(
     note: row.note,
     duration: row.duration,
     allowAi: row.allow_ai ?? 0,
-    // INERT SEAM: the row carries no group-event-id in Phase 32 -> hard-false.
-    groupLinked: isGroupLinked({}),
+    groupEventId: row.group_event_id,
+    groupTitle: row.group_title,
+    groupNote: row.group_note,
+    groupLinked: isGroupLinked({ groupEventId: row.group_event_id }),
   }));
 
   const lifecycleEvents: HistoryLifecycleRecord[] = eventRows.map((row) => ({

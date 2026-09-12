@@ -16,6 +16,7 @@ import { nodeSqliteExecutor, openTestDb } from "@/db/__testkit__/node-sqlite";
 import { MIGRATIONS, TARGET_VERSION } from "@/db/database";
 import { setCurrentStateValue } from "@/db/current-state-history-dao";
 import { isGroupLinked, readContactHistory } from "@/db/history-read";
+import { createGroupEvent } from "@/db/group-events-dao";
 import { runMigrations } from "@/db/migrations/runner";
 import type { SqlExecutor } from "@/db/types";
 
@@ -192,6 +193,21 @@ describe("isGroupLinked — inert seam (D-12)", () => {
     // The predicate itself is hard-false: no group_event_id field exists.
     expect(isGroupLinked({})).toBe(false);
     expect(isGroupLinked({ groupEventId: undefined })).toBe(false);
+  });
+});
+
+describe("readContactHistory — Group Event local context", () => {
+  it("surfaces one group child with local context while the parent never becomes history", async () => {
+    const exec = await freshExec();
+    const contactId = await makeContact(exec);
+    const { groupEventId } = await createGroupEvent(exec, {
+      uid: uid(), title: "Dinner", occurredAt: "2026-09-01 18:00:00", now: NOW,
+      groupNote: "GROUP_NOTE_LOCAL_ONLY", participants: [{ contactId, uid: uid() }],
+    });
+    const history = await readContactHistory(exec, contactId);
+    expect(history.interactions).toHaveLength(1);
+    expect(history.interactions[0]).toMatchObject({ groupLinked: true, groupEventId, groupTitle: "Dinner", groupNote: "GROUP_NOTE_LOCAL_ONLY" });
+    expect(history.markers.get("2026-09-01")).toMatchObject({ interactionCount: 1 });
   });
 });
 

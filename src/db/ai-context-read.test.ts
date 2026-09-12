@@ -31,11 +31,13 @@ import { migration011 } from "@/db/migrations/011-contact-lifecycle-schema";
 import { migration016 } from "@/db/migrations/016-contact-knowledge";
 import { migration017 } from "@/db/migrations/017-knowledge-egress-datamove";
 import { migration025 } from "@/db/migrations/025-interaction-history-schema";
+import { migration026 } from "@/db/migrations/026-group-events-schema";
 import { runMigrations } from "@/db/migrations/runner";
 import {
   createContactWithInteraction,
   recordTouchpoint,
 } from "@/db/recency-dao";
+import { createGroupEvent } from "@/db/group-events-dao";
 import type { SqlExecutor } from "@/db/types";
 
 const NOW = "2026-08-14 12:00:00";
@@ -68,10 +70,26 @@ beforeEach(async () => {
     11,
     { now: NOW, newUid: uid, defaultPhoneRegion: "US" },
   );
-  await runMigrations(exec, [migration016, migration017, migration025], 25, {
+  await runMigrations(exec, [migration016, migration017, migration025, migration026], 26, {
     now: NOW,
     newUid: uid,
     defaultPhoneRegion: "US",
+  });
+});
+
+describe("readPromptContext — Group Notes are structurally unreachable", () => {
+  it("never egresses a group note at either Allow-AI setting", async () => {
+    const contactId = await makeContact();
+    const { groupEventId } = await createGroupEvent(exec, {
+      uid: uid(), title: "Dinner", occurredAt: NOW, now: NOW,
+      groupNote: "GROUP_NOTE_EGRESS_FORBIDDEN", participants: [{ contactId, uid: uid(), note: "CHILD_NOTE" }],
+    });
+    const child = await exec.getFirstAsync<{ id: number }>("SELECT id FROM interactions WHERE group_event_id = ?", [groupEventId]);
+    expect(child).not.toBeNull();
+    for (const allowAi of [0, 1]) {
+      await exec.runAsync("UPDATE interactions SET allow_ai = ? WHERE id = ?", [allowAi, child?.id]);
+      expect(JSON.stringify(await readPromptContext(exec, contactId, NOW))).not.toContain("GROUP_NOTE_EGRESS_FORBIDDEN");
+    }
   });
 });
 
