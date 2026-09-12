@@ -83,6 +83,16 @@ export function combineDateAndTime(
 }
 
 /**
+ * The single locked future-date rejection copy (mirrors TriStateLastSpoke's
+ * future-date rejection). Defined HERE — in the pure, node-safe logic module —
+ * rather than in `TouchpointRefineForm.tsx` so that both the RN form and the
+ * node-tested edit logic (Plan 04) import ONE copy without pulling react-native
+ * into the vitest env. `TouchpointRefineForm` re-exports it for existing importers.
+ */
+export const FUTURE_DATETIME_MESSAGE =
+  "That time is in the future. Pick now or earlier.";
+
+/**
  * True when the combined local datetime is strictly after `now` (both local
  * wall-clock `YYYY-MM-DD HH:MM:SS`). Reuses the shared LOG-06 `rejectFutureOccurredAt`
  * compare so the UI flags exactly what the DAO would reject. Equal / past → false.

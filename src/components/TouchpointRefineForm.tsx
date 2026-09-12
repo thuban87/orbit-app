@@ -35,6 +35,7 @@ import {
   combineDateAndTime,
   DURATION_PRESETS,
   formatDurationLabel,
+  FUTURE_DATETIME_MESSAGE,
   isCombinedInFuture,
   parseCustomDurationMinutes,
   parseLocalDateTime,
@@ -60,9 +61,13 @@ export interface TouchpointRefineValue {
   allowAi: number;
 }
 
-/** Locked copy (mirrors TriStateLastSpoke's future-date rejection). */
-export const FUTURE_DATETIME_MESSAGE =
-  "That time is in the future. Pick now or earlier.";
+/**
+ * Locked copy (mirrors TriStateLastSpoke's future-date rejection). Defined in the
+ * pure `touchpoint-refine-logic` module and re-exported here so existing importers
+ * of `@/components/TouchpointRefineForm` keep working while the node-tested edit
+ * logic (Plan 04) can import the SAME single copy without loading react-native.
+ */
+export { FUTURE_DATETIME_MESSAGE };
 
 /**
  * The channel control (D-06): Message/Call/In Person are the primary labels;
