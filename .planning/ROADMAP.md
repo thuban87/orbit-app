@@ -148,7 +148,7 @@ All v1.0 commits are local on `main` and have NOT been pushed.
 - [ ] **Phase 30: Orrery Systems** - Named dynamic + manual Systems authored in a floating HUD, with management, switching, and portability
 - [x] **Phase 31: Profile Experience** - Fixed Hero, modular reorderable sections, layout/background templates, Relationship Overview tile grid (completed 2026-09-10)
 - [x] **Phase 31.1: App-Wide System Backgrounds** (INSERTED) - Select the approved bundled art as a persistent system background across regular app screens, with Orrery excluded and Profile photos taking precedence (completed 2026-09-11; owner-approved. Plans 01–04 + corrective 31.1-05 [visibility: veil decoupled from card opacity + ChromeScrim] + enhancement 31.1-06 [mode-aware glassy cards; Android-elevation fix]. The prior 31.1-04 UAT was a false positive — superseded. Release validated on the owner's personal phone. Parked to future: theme-merge into a single Dark/Light switch, Deep Space/Starfield removal.)
-- [ ] **Phase 32: Interaction History & Insights** - Activity heatmap (Cycles lens), intensity, Rolodex History Browser, canonical Interaction Detail/Edit
+- [x] **Phase 32: Interaction History & Insights** - Activity heatmap (Cycles lens), intensity, Rolodex History Browser, canonical Interaction Detail/Edit (completed 2026-09-11)
 - [ ] **Phase 33: Group Interaction Logging** - Group Event parent with canonical child interactions, inheritance/overrides, and atomic fan-out
 - [ ] **Phase 34: Rapid Capture & Update Flows** - Streamlined Add Contact, Quick Log with post-log capture, Tone vocabulary, Update Contact chooser loop
 - [ ] **Phase 35: Messaging & AI Compose** - Compose-first drafting workspace, Text/Email transmit handoff, Research side, three-suggestion AI review
