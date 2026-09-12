@@ -8,6 +8,7 @@ import { MIGRATIONS, TARGET_VERSION } from "@/db/database";
 import {
   addParticipant,
   clearParticipantOverride,
+  convertInteractionToGroupEvent,
   createGroupEvent,
   deleteGroupChild,
   deleteGroupEventAndInteractions,
@@ -19,6 +20,7 @@ import {
   updateGroupEvent,
 } from "@/db/group-events-dao";
 import { runMigrations } from "@/db/migrations/runner";
+import { recordTouchpoint } from "@/db/recency-dao";
 import type { SqlExecutor } from "@/db/types";
 
 const NOW = "2026-09-12 12:00:00";
@@ -32,6 +34,118 @@ beforeEach(async () => {
   await runMigrations(exec, MIGRATIONS, TARGET_VERSION, {
     now: NOW,
     newUid: uid,
+  });
+});
+
+describe("convertInteractionToGroupEvent", () => {
+  it("preserves the source interaction identity and returns its new parent id", async () => {
+    const alex = await contact("Alex");
+    const source = await recordTouchpoint(exec, {
+      contactId: alex,
+      uid: "child-uid",
+      occurredAt: "2026-09-10 18:00:00",
+      now: NOW,
+      channel: "Call",
+      quality: "Positive",
+      duration: 1800,
+      direction: "inbound",
+      connected: 0,
+      note: null,
+    });
+    const revision = await readDataRevision(exec);
+
+    const { groupEventId } = await convertInteractionToGroupEvent(exec, {
+      interactionId: source.interactionId,
+      contactId: alex,
+      title: "  Supper  ",
+      uid: "parent-uid",
+      now: NOW,
+    });
+
+    expect(
+      await exec.getFirstAsync(
+        "SELECT uid, title, occurred_at, channel, quality, duration FROM group_events WHERE id = ?",
+        [groupEventId],
+      ),
+    ).toEqual({
+      uid: "parent-uid",
+      title: "Supper",
+      occurred_at: "2026-09-10 18:00:00",
+      channel: "Call",
+      quality: "Positive",
+      duration: 1800,
+    });
+    expect(
+      await exec.getFirstAsync(
+        "SELECT id, uid, group_event_id, ge_follow_channel, ge_follow_quality, ge_follow_duration, direction, connected FROM interactions WHERE id = ?",
+        [source.interactionId],
+      ),
+    ).toEqual({
+      id: source.interactionId,
+      uid: "child-uid",
+      group_event_id: groupEventId,
+      ge_follow_channel: 1,
+      ge_follow_quality: 1,
+      ge_follow_duration: 1,
+      direction: "inbound",
+      connected: 0,
+    });
+    expect(await readDataRevision(exec)).toBe(revision + 1);
+  });
+
+  it("rejects blank parent metadata before writing and cannot convert a linked child", async () => {
+    const alex = await contact("Alex");
+    const source = await recordTouchpoint(exec, {
+      contactId: alex,
+      uid: "standalone-child",
+      occurredAt: NOW,
+      now: NOW,
+    });
+    await expect(
+      convertInteractionToGroupEvent(exec, {
+        interactionId: source.interactionId,
+        contactId: alex,
+        title: "  ",
+        uid: "parent-blank-title",
+        now: NOW,
+      }),
+    ).rejects.toThrow(/title must not be blank/);
+    await expect(
+      convertInteractionToGroupEvent(exec, {
+        interactionId: source.interactionId,
+        contactId: alex,
+        title: "Valid",
+        uid: "",
+        now: NOW,
+      }),
+    ).rejects.toThrow(/uid must not be blank/);
+    expect(await count("group_events")).toBe(0);
+
+    const { groupEventId } = await createGroupEvent(exec, {
+      uid: "existing-parent",
+      title: "Already linked",
+      occurredAt: NOW,
+      now: NOW,
+      participants: [{ contactId: alex, uid: "linked-child" }],
+    });
+    const linked = (await groupChildren(groupEventId))[0]!;
+    const before = await count("group_events");
+    await expect(
+      convertInteractionToGroupEvent(exec, {
+        interactionId: linked.id,
+        contactId: alex,
+        title: "Should not mint",
+        uid: "unexpected-parent",
+        now: NOW,
+      }),
+    ).rejects.toThrow(/standalone/);
+    expect(await count("group_events")).toBe(before);
+    expect(
+      await exec.getFirstAsync<{ group_event_id: number }>(
+        "SELECT group_event_id FROM interactions WHERE id = ?",
+        [linked.id],
+      ),
+    ).toEqual({ group_event_id: groupEventId });
   });
 });
 
