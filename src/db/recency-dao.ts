@@ -64,7 +64,7 @@ export interface RecordTouchpointInput {
   occurredAt: string;
   /** Local wall-clock now — immutable `recorded_at` + `modified_at` stamps. */
   now: string;
-  /** call|text|in-person|email|other|unspecified. */
+  /** Message|Call|In Person|other|unspecified (D-06; legacy values pass through). */
   channel?: string;
   /** outbound|inbound|mutual|null. */
   direction?: string | null;
@@ -93,7 +93,7 @@ export interface EditTouchpointFullInput {
   occurredAt: string;
   /** Local wall-clock now — new `modified_at`. */
   now: string;
-  /** call|text|in-person|email|other|unspecified. */
+  /** Message|Call|In Person|other|unspecified (D-06; legacy values pass through). */
   channel: string;
   /** outbound|inbound|mutual|null. */
   direction: string | null;
