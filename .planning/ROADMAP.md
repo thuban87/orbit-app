@@ -733,7 +733,7 @@ Plans:
 **Wave 3** *(blocked on Wave 2 completion)*
 
 - [x] 32-05-PLAN.md — Heatmap/marker theme tokens + ActivityHeatmap + IntensityChart + lens persistence + context card (wave 3)
-- [ ] 32-06-PLAN.md — Rolodex History Browser (synchronized wheels, markers, drawer, reduced motion) (wave 3)
+- [x] 32-06-PLAN.md — Rolodex History Browser (synchronized wheels, markers, drawer, reduced motion) (wave 3)
 - [ ] 32-07-PLAN.md — Shared Detail Sheet + Interaction Detail (sparkle, group context) + hard-delete + group scope routing (wave 3)
 
 **Wave 4** *(blocked on Wave 3 completion)*
