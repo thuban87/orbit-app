@@ -72,8 +72,11 @@ export function IntensityChart({
 
   return (
     <View testID={testID} style={styles.container}>
-      {/* Neutral rate copy — reuse the IntensityLine contract verbatim. */}
-      <IntensityLine intensity={intensity} />
+      {/* Neutral rate copy — reuse the IntensityLine contract. The count/fill
+          stay window-scoped, but the "…intended" cadence must describe the
+          CONTACT, so pass its real interval (cadenceDays) rather than let the
+          caption read the window-span periodDays (Phase 32 review #1). */}
+      <IntensityLine intensity={intensity} cadenceDays={intensity.cadenceDays} />
       {/* Neutral progress bar (structure tokens only, never a warning hue). */}
       <View
         testID={`${testID}-bar-track`}

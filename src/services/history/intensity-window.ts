@@ -34,8 +34,18 @@ import { calendarDaysBetween, parseLocalMs } from "@/utils/dates";
 import { computeIntensity, type IntensityResult } from "@/services/intensity-logic";
 import type { HistoryWindow } from "@/services/history/window";
 
-/** A window-scoped intensity result, or the tagged no-cadence unavailable marker. */
-export type IntensityWindowResult = (IntensityResult & { readonly available: true }) | { readonly available: false };
+/**
+ * A window-scoped intensity result, or the tagged no-cadence unavailable marker.
+ *
+ * `periodDays` (from `IntensityResult`) is the WINDOW day-span the count/fill are
+ * measured over. `cadenceDays` is the CONTACT'S configured interval — carried
+ * alongside so the "…intended" caption can describe the contact's true cadence
+ * rather than the window span (Phase 32 review #1). Guaranteed present (a Bound
+ * contact has a non-null `intervalDays`; Unbound short-circuits to unavailable).
+ */
+export type IntensityWindowResult =
+  | (IntensityResult & { readonly available: true; readonly cadenceDays: number })
+  | { readonly available: false };
 
 /**
  * Derive intensity scoped to `window` for the contact described by `inputs`.
@@ -69,5 +79,9 @@ export function intensityWindow(inputs: ImpactInputs, window: HistoryWindow): In
   const periodDays = calendarDaysBetween(startMs, endMs) + 1;
 
   const result = computeIntensity(filtered, periodDays, inputs.rarelyResponds, effectiveNow);
-  return { ...result, available: true };
+  // `periodDays` (in `result`) is the window span; `cadenceDays` carries the
+  // contact's real interval so the caption reports the contact's TRUE cadence,
+  // not the window span (Phase 32 review #1). intervalDays is non-null here — the
+  // Unbound guard above returned early otherwise.
+  return { ...result, available: true, cadenceDays: inputs.intervalDays };
 }
