@@ -24,7 +24,7 @@
  * Every colour resolves through `useTheme().colors.*` (CLAUDE.md / check:colors).
  */
 import { useFocusEffect } from "@react-navigation/native";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { ScrollView, StyleSheet, View } from "react-native";
 import {
   MemoryEditor,
@@ -64,6 +64,11 @@ export function MemoryScreen({
   // Single-flight guard: block a second concurrent write while one is in flight
   // so a double-tap cannot create a duplicate Memory (CAPT-06 idempotency).
   const [saving, setSaving] = useState(false);
+  // A successful inner Save returns to the Update Contact chooser (dossier §AA).
+  // Navigating is deferred to an effect (not fired inside the async save
+  // handler) so MemoryEditor finishes its own close() before this screen
+  // unmounts — avoiding a setState-on-unmounted warning mid-commit.
+  const [savedTick, setSavedTick] = useState(0);
 
   const load = useCallback(
     async (cancelled: () => boolean = () => false) => {
@@ -95,7 +100,12 @@ export function MemoryScreen({
     }, [load]),
   );
 
-  const returnToChooser = () => navigation.goBack();
+  // Return to the Update Contact chooser after a committed save (deferred).
+  useEffect(() => {
+    if (savedTick > 0) navigation.goBack();
+  }, [savedTick, navigation]);
+
+  const returnToChooser = () => setSavedTick((tick) => tick + 1);
   const failureNotice = () =>
     showSnackbar({
       kind: "error",
