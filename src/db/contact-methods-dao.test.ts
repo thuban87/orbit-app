@@ -4,6 +4,7 @@ import {
   applyContactMethodDiff,
   type ContactMethodDraft,
   listContactMethods,
+  setContactMethodPrimary,
 } from "@/db/contact-methods-dao";
 import { migration001 } from "@/db/migrations/001-initial";
 import { migration002 } from "@/db/migrations/002-app-settings";
@@ -249,8 +250,164 @@ describe("applyContactMethodDiff", () => {
       ),
     ).toEqual([]);
   });
+});
 
-  it("never sends invalid, duplicate, or failed-save method values to Logger", async () => {
+async function readDataRevision(e: SqlExecutor): Promise<number> {
+  const row = await e.getFirstAsync<{ data_revision: number }>(
+    "SELECT data_revision FROM app_settings WHERE id = 1",
+  );
+  return row?.data_revision ?? -1;
+}
+
+/** Seed a contact with two phones (first is primary) + one email (primary). */
+async function seedTwoPhonesOneEmail(contactId: number) {
+  await applyContactMethodDiff(exec, {
+    contactId,
+    seeded: [],
+    current: [
+      phone("312 555 1234"),
+      phone("773 555 1234"),
+      email("person@example.com"),
+    ],
+    now: NOW,
+    effectivePhoneRegion: "US",
+  });
+  const rows = await listContactMethods(exec, contactId);
+  const phones = rows.filter((r) => r.method_type === "phone");
+  const emails = rows.filter((r) => r.method_type === "email");
+  return {
+    primaryPhone: phones.find((r) => r.is_primary === 1)!,
+    otherPhone: phones.find((r) => r.is_primary === 0)!,
+    primaryEmail: emails[0],
+  };
+}
+
+describe("setContactMethodPrimary (HIGH-7 / A3 single-method primary writer)", () => {
+  it("swaps the primary of a type (clear-before-promote) with NO UNIQUE violation", async () => {
+    const contactId = await contact();
+    const { primaryPhone, otherPhone } = await seedTwoPhonesOneEmail(contactId);
+
+    await setContactMethodPrimary(exec, {
+      contactId,
+      methodId: otherPhone.id,
+      methodType: "phone",
+      now: NOW,
+    });
+
+    const rows = await listContactMethods(exec, contactId);
+    const byId = new Map(rows.map((r) => [r.id, r]));
+    // Prior primary cleared, target promoted — exactly one phone primary.
+    expect(byId.get(primaryPhone.id)?.is_primary).toBe(0);
+    expect(byId.get(otherPhone.id)?.is_primary).toBe(1);
+    expect(
+      rows.filter((r) => r.method_type === "phone" && r.is_primary === 1),
+    ).toHaveLength(1);
+  });
+
+  it("does not touch the other method_type's primary", async () => {
+    const contactId = await contact();
+    const { otherPhone, primaryEmail } = await seedTwoPhonesOneEmail(contactId);
+
+    await setContactMethodPrimary(exec, {
+      contactId,
+      methodId: otherPhone.id,
+      methodType: "phone",
+      now: NOW,
+    });
+
+    const rows = await listContactMethods(exec, contactId);
+    expect(rows.find((r) => r.id === primaryEmail.id)?.is_primary).toBe(1);
+    expect(
+      rows.filter((r) => r.method_type === "email" && r.is_primary === 1),
+    ).toHaveLength(1);
+  });
+
+  it("rejects a method id that does not belong to the contact — no write", async () => {
+    const owner = await contact("Owner");
+    const stranger = await contact("Stranger");
+    const { primaryPhone } = await seedTwoPhonesOneEmail(owner);
+    await applyContactMethodDiff(exec, {
+      contactId: stranger,
+      seeded: [],
+      current: [phone("415 555 9999")],
+      now: NOW,
+      effectivePhoneRegion: "US",
+    });
+    const [strangerPhone] = await listContactMethods(exec, stranger);
+
+    await expect(
+      setContactMethodPrimary(exec, {
+        contactId: owner,
+        methodId: strangerPhone.id,
+        methodType: "phone",
+        now: NOW,
+      }),
+    ).rejects.toThrow();
+
+    // Owner's phone primary is untouched.
+    const rows = await listContactMethods(exec, owner);
+    expect(rows.find((r) => r.id === primaryPhone.id)?.is_primary).toBe(1);
+  });
+
+  it("rejects a method id whose stored method_type disagrees with the passed methodType — NO write, both primaries intact (#5)", async () => {
+    const contactId = await contact();
+    const { primaryPhone, primaryEmail } =
+      await seedTwoPhonesOneEmail(contactId);
+
+    // An email method id passed with methodType:'phone' matches no row → throw
+    // BEFORE any clear, so neither the phone nor the email primary is orphaned.
+    await expect(
+      setContactMethodPrimary(exec, {
+        contactId,
+        methodId: primaryEmail.id,
+        methodType: "phone",
+        now: NOW,
+      }),
+    ).rejects.toThrow();
+
+    const rows = await listContactMethods(exec, contactId);
+    expect(rows.find((r) => r.id === primaryPhone.id)?.is_primary).toBe(1);
+    expect(rows.find((r) => r.id === primaryEmail.id)?.is_primary).toBe(1);
+    expect(
+      rows.filter((r) => r.method_type === "phone" && r.is_primary === 1),
+    ).toHaveLength(1);
+  });
+
+  it("bumps data_revision on a real swap (matching the diff path)", async () => {
+    const contactId = await contact();
+    const { otherPhone } = await seedTwoPhonesOneEmail(contactId);
+    const before = await readDataRevision(exec);
+
+    await setContactMethodPrimary(exec, {
+      contactId,
+      methodId: otherPhone.id,
+      methodType: "phone",
+      now: NOW,
+    });
+
+    expect(await readDataRevision(exec)).toBe(before + 1);
+  });
+
+  it("is a no-op when the target is already primary — state unchanged, no spurious data_revision bump", async () => {
+    const contactId = await contact();
+    const { primaryPhone } = await seedTwoPhonesOneEmail(contactId);
+    const before = await readDataRevision(exec);
+
+    await setContactMethodPrimary(exec, {
+      contactId,
+      methodId: primaryPhone.id,
+      methodType: "phone",
+      now: NOW,
+    });
+
+    expect(await readDataRevision(exec)).toBe(before);
+    const rows = await listContactMethods(exec, contactId);
+    expect(rows.find((r) => r.id === primaryPhone.id)?.is_primary).toBe(1);
+  });
+});
+
+describe("applyContactMethodDiff (extra)", () => {
+  it("never sends invalid, duplicate, or failed-save method values to Logger (guard)", async () => {
     const contactId = await contact();
     const error = vi.spyOn(Logger, "error");
     const warn = vi.spyOn(Logger, "warn");
