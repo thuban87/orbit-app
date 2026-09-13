@@ -835,8 +835,19 @@ Plans:
   5. One adaptive AI action offers Draft with AI or Rewrite with AI, returning three unlabeled varied suggestions on a non-destructive review surface that changes the editor only on explicit "Choose this" with Try Again replacing the set; generation is cancellable and failure-safe with the manual draft preserved, the three AI states (Off / On+Ready / On+Needs Attention) are honored without silently hiding AI, manual composition and Research work in every state, and Compose is deep-link-ready and origin-aware, leaving no finished draft in Back history (COMP-09/12/13/14)
 
 **Canonical refs**: docs/dossier/milestone-2/phase-14-messaging-ai-compose-dossier.md; docs/dossier/milestone-2/planning-notes/phase-14-planning-notes.md
-**Schema**: compose preferences (verify head+1 at plan time)
-**Plans**: TBD
+**Schema**: compose preferences — migration 028 (head verified on disk at plan time: 027/TARGET_VERSION 27 → next 028)
+**Plans**: 9 plans (waves 1–5)
+
+Plans:
+- [ ] 35-01-PLAN.md — TRACER: end-to-end Text reach-out (blank editor → Transmit → additive "Did you send it?" → confirmed log) + compose-session-store
+- [ ] 35-02-PLAN.md — Data-layer preference foundation: migration 028 + app-settings-dao compose-mode + backup allowlist (one-way migration checkpoint)
+- [ ] 35-03-PLAN.md — Delivery logic: compose-logic Text/Email + no-destination + remembered-mode; handoff email subject/body (no-dep mailto)
+- [ ] 35-04-PLAN.md — AI invocation logic: reshape AiSuggestionLifecycle (single→three, drop ack gate) + ai-availability three-state adapter (D-12)
+- [ ] 35-05-PLAN.md — AI egress shape-carry: ai-context-read carries ADR-078 avoidance-constraint + gated-note shapes (D-13, no egress widening)
+- [ ] 35-06-PLAN.md — Research side (read-only projection) + session-only Message Focus (≤3, no permission)
+- [ ] 35-07-PLAN.md — ComposeScreen integration: Text/Email mode + Subject + no-destination + remembered-on-commit
+- [ ] 35-08-PLAN.md — ComposeScreen integration: adaptive AI action + three-suggestion review + three availability states
+- [ ] 35-09-PLAN.md — ComposeScreen integration: Research entry + Message Focus display + origin-aware return + retire AI-intent plumbing
 **UI hint**: yes
 
 ### Phase 36: AI Configuration & Prompting
