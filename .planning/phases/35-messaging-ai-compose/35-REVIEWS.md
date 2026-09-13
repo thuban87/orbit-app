@@ -1,17 +1,154 @@
 ---
 phase: 35
 reviewers: [codex, claude]
-reviewed_at: 2026-09-13T08:29:05Z
-cycle: 1
+reviewed_at: 2026-09-13T09:17:55Z
+cycle: 2
 plans_reviewed: [35-01-PLAN.md, 35-02-PLAN.md, 35-03-PLAN.md, 35-04-PLAN.md, 35-05-PLAN.md, 35-06-PLAN.md, 35-07-PLAN.md, 35-08-PLAN.md, 35-09-PLAN.md]
 models:
-  codex: "gpt-5.6-terra (reasoning=low)"
-  claude: "sonnet (reasoning=low)"
+  codex: "gpt-5.6-terra (reasoning=medium)"
+  claude: "unknown"
 model_sources:
-  codex: "banner"
-  claude: "pinned"
-cycle_summary: current_high=8 current_actionable=7
+  codex: "config"
+  claude: "unknown"
+cycle_summary: current_high=3 current_actionable=4
 ---
+
+# Cross-AI Plan Review — Phase 35: Messaging & AI Compose (cycle 2)
+
+Convergence **cycle 2**, re-reviewing the CURRENT plans on disk after the cycle-1 replan (commit `ba58631`). Two source-grounded reviewers ran: **Codex** (`gpt-5.6-terra`, reasoning=medium, via `codex exec` with read-only repo access) and **Claude** (a read-only Claude Code subagent — the `claude -p` CLI lane is not used in this repo due to a known Write-permission failure; model id not recoverable from a subagent, recorded `unknown`). Both cited concrete `file:line` evidence against the live repo; neither ran without repo access. The orchestrator (this aggregator) independently verified every load-bearing claim below against the code on disk — the migration head, the `fuel`/`interactions`/`app_settings` schemas, the `PromptContext`/`resolvePrompt` egress seam, the abort/stale-guard machinery, and ADR-078/ADR-079 — per "review the code, not the diff."
+
+**Cycle-1 → cycle-2 delta:** cycle 1 recorded `current_high=8 current_actionable=7`. The replan resolved **all 8** cycle-1 HIGHs; both reviewers independently confirm each is genuinely closed (assistUid return contract, SMS-probe-vs-Email, three-variant mechanism, PromptContext file scope, ComposeResearch route registration, normalized ResearchItem eligibility, `setContactMethodPrimary` DAO, origin-aware caller updates). The findings below are counted **only** against the current plans; resolved cycle-1 items are excluded. The full cycle-1 review is retained verbatim at the bottom of this file for history.
+
+## Consensus Summary
+
+The revised plan set is well-grounded, ADR-aware, and correctly reuses the assist lifecycle, the migration idiom (028 verified as head+1 on disk: `TARGET_VERSION=27`), the fuel-exclusion invariants, and the closed `PromptContext` egress allowlist. The carry-only egress architecture (plan 35-05) is provably safe this phase — `resolvePrompt` serializes fields explicitly and never spreads context (prompt-template.ts:142/164), and a prompt-template regression fences non-transmission. **One consensus concern** carries across both lanes; the remaining unresolved items are single-lane, source-verified plan-completeness gaps.
+
+**Not an owner escalation (recorded for clarity):** plan 35-04 removes the ADR-052 first-send acknowledgement gate. This is **enforcing ADR-079** (owner-ratified 2026-09-01), which supersedes ADR-052 and whose rejected-alternatives list *explicitly rejects* keeping the acknowledgement gate. Both reviewers correctly read this as decision-enforcement, not reversal; neither proposed restoring it; the `ai_ack_*` columns are deliberately left in place (forward-only) and the orphaned DAO writer untouched. Verified against `docs/decisions/ADR-079-*.md` and `src/db/app-settings-dao.ts`. No escalation. (The inverse would be true — restoring the ack gate would reverse ADR-079 and *would* be an owner decision.)
+
+### Agreed Strengths
+- Assist lifecycle is additive/reuse-only; Phase 35 adds no new `interactions` writer; `markAssistLogged` stamps `occurredAt = handoff_at` and remaps channel (interaction-assist-dao.ts:105/112). Both reviewers.
+- Migration 028 correctly verified as head+1 on disk (027 / `TARGET_VERSION 27`), app_settings-only, with a blocking-human irreversibility checkpoint. Both reviewers.
+- D-13 / ADR-078 egress boundary respected: plan 35-05 carries shape only, does not widen egress, leaves `fuel-read.ts` exclusions intact and fenced by regression tests. Both reviewers.
+- Backup keys allowlisted-not-emitted with no `BACKUP_FORMAT_VERSION` bump (D-03), matching the Phase 23/25/29/30/31/32/34 precedent. Both reviewers.
+
+### Agreed Concerns
+- **Off-limits avoidance-constraint has no per-item AI-permission source (plan 35-05).** Both lanes independently found this. The `fuel` table (migration 011:92) has no `allow_ai`/`share_with_ai` column, and no migration adds one (028 is app_settings-only), yet ADR-078 requires distinguishing **AI-enabled** off-limits items (carried as negative constraints) from **AI-disabled** ones (never sent) — ADR-078 explicitly rejects sending AI-disabled off-limits items. So plan 35-05's must-have ("populate `avoidanceConstraints` from an AI-eligibility-gated off-limits read") and its acceptance tests ("AI-disabled off-limits appears in NEITHER collection", "AI-enabled off-limits appears ONLY in avoidanceConstraints") are **not implementable against the current schema**. The `gatedRecentInteractionNotes` half is fine (`interactions.allow_ai` exists, migration 025). **Severity divergence:** Codex rates this **HIGH / owner escalation under ADR-078**; Claude rates it **MEDIUM** because Phase 35 is carry-only and the regression fence proves nothing serializes this phase (no live leak). **The aggregator elevates it to HIGH and surfaces it as an OWNER DECISION** — it sits on the ADR-078 egress-authorization boundary that D-08/D-13 reserve to the owner, and the naive "carry all off-limits ungated" resolution would seed the ADR-078 *rejected-alternative* shape for Phase 36 to transmit. See the Owner Escalation section below.
+
+### Divergent Views
+- **35-04 sibling-abort on rejection (Codex HIGH; Claude did not flag).** Codex: `generateVariants(generateOne, prompt, signal, count)` receives only a read-only `AbortSignal`, so the helper cannot abort siblings; the current lifecycle clears `this.controller = null` on a generate failure *without* calling `controller.abort()` (verified at ai-suggestion-logic.ts). So on one variant's rejection, up to two sibling provider calls stay in flight — the plan claims "the shared AbortController aborts the in-flight siblings" (35-04 truth), a control it does not deliver as scoped. Aggregator verified the current no-abort pattern; kept HIGH because the plan asserts a cancellation control its specified mechanism doesn't keep. Fix is a small, in-plan refinement.
+- **35-08 Rewrite source-draft bounded-prompt path (Codex HIGH; Claude considered the cycle-1 MEDIUM addressed).** Codex: `resolvePrompt(template, context)` has no source-draft parameter, `ResolvedPrompt` has no source-draft field, the lifecycle `resolvePrompt` dep is parameterless (verified), and 35-08 modifies only `ComposeScreen.tsx` — so the user's draft cannot enter the promised "closed/delimited prompt-construction path (not raw-concatenated)" (35-04 truth) without an unplanned prompt-layer API change, and it is ambiguous whether "Rewrite with AI" is even functional in Phase 35 given rendering is Phase 36's job. The draft is the user's own text (lower egress risk than contact data), which is why Claude weighted it lower, but the assigned-scope/functional-seam gap is real. Aggregator kept HIGH pending a plan clarification of where/how the draft reaches the provider this phase.
+
+## OWNER ESCALATION (surfaced, not closed)
+
+**Off-limits AI-permission source — plan 35-05 / ADR-078 egress-authorization boundary.** ADR-078 authorizes transmitting *AI-enabled* off-limits items as negative avoidance constraints and forbids transmitting *AI-disabled* ones, but the `fuel` table has no per-item AI-permission column and ADR-078's own Migration note assigns a column only for *per-interaction* Allow-AI (migration 025), not for off-limits fuel. Plan 35-05's specified AI-enabled/AI-disabled gate therefore has nothing to gate on. This is an egress-authorization decision (which is owner-bucket per CLAUDE.md), not a mechanical bug fix. **Decision needed from the owner/planner:** where does off-limits per-item AI-eligibility live, and which phase owns adding it? Options include (a) declare `avoidanceConstraints` a carry-only **empty** typed shape in Phase 35 (defer the off-limits source to the phase that adds the permission model; keep `gatedRecentInteractionNotes` as specified) and rewrite 35-05's off-limits acceptance test accordingly, or (b) assign a `fuel` per-item AI-permission column + its migration and permission UI to an owning phase before 35-05 executes. Do NOT let an executor silently pick "carry all off-limits ungated" — that seeds the ADR-078 rejected-alternative for Phase 36 to transmit.
+
+
+---
+
+## Codex Review
+
+_Model: gpt-5.6-terra (reasoning=medium). Source-grounded, read-only repo access._
+
+# Cycle 2 Plan Review — Phase 35
+
+## Summary
+
+The revised plan set is substantially stronger: it correctly preserves the durable assist lifecycle, uses the migration head on disk (v27), separates carry-only AI context work from Phase 36 prompt rendering, and sequences Text/Email before screen integration. However, four implementation gaps remain: the AI fan-out cannot abort siblings as specified, Rewrite has no defined bounded prompt-construction API, Off Limits lacks a verified per-item authorization source, and Research omits Relationships.
+
+## Strengths
+
+- **35-01:** Correctly makes the Compose confirmation additive to the durable assist path. `markAssistLogged` already writes at `handoff_at` and remaps transport channels through the shared vocabulary mapper ([interaction-assist-dao.ts:99](/home/bwales/projects/orbit-app/src/db/interaction-assist-dao.ts:99), [interaction-assist-dao.ts:112](/home/bwales/projects/orbit-app/src/db/interaction-assist-dao.ts:112)). Returning the created assist UID avoids an unsafe contact/timestamp lookup.
+
+- **35-02:** The migration plan matches the actual migration head: `TARGET_VERSION` resolves through migration 027 and `MIGRATIONS` ends at 027 ([database.ts:68](/home/bwales/projects/orbit-app/src/db/database.ts:68), [database.ts:96](/home/bwales/projects/orbit-app/src/db/database.ts:96)). The blocking checkpoint is appropriate for irreversible schema work.
+
+- **35-03:** Introducing a narrow primary-method writer is justified. The only current writer is the full seeded/current diff API ([contact-methods-dao.ts:99](/home/bwales/projects/orbit-app/src/db/contact-methods-dao.ts:99), [contact-methods-dao.ts:298](/home/bwales/projects/orbit-app/src/db/contact-methods-dao.ts:298)); its clear-before-set ordering is necessary for the partial unique primary constraint ([contact-methods-dao.ts:179](/home/bwales/projects/orbit-app/src/db/contact-methods-dao.ts:179)).
+
+- **35-05:** The carry-only strategy is well bounded. `resolvePrompt` explicitly serializes selected context fields rather than spreading the context ([prompt-template.ts:164](/home/bwales/projects/orbit-app/src/ai/prompt-template.ts:164)), so a regression test can meaningfully prove the new fields are not yet transmitted.
+
+- **35-09:** Registering Research in both stacks addresses a real current gap: each stack presently registers `Compose` but no `ComposeResearch` ([DashboardStack.tsx:59](/home/bwales/projects/orbit-app/src/navigation/tabs/DashboardStack.tsx:59), [OrreryStack.tsx:73](/home/bwales/projects/orbit-app/src/navigation/tabs/OrreryStack.tsx:73)).
+
+## Concerns
+
+- **HIGH — 35-04: `generateVariants` cannot abort siblings with only an `AbortSignal`.** The plan specifies `generateVariants(generateOne, prompt, signal)` and claims it aborts siblings on one rejection. An `AbortSignal` is read-only; only the lifecycle’s `AbortController` can call `abort()`. The current lifecycle catches a failed generation by clearing its controller, but does not abort it ([ai-suggestion-logic.ts:300](/home/bwales/projects/orbit-app/src/logic/ai-suggestion-logic.ts:300), [ai-suggestion-logic.ts:304](/home/bwales/projects/orbit-app/src/logic/ai-suggestion-logic.ts:304)). This leaves up to two provider calls running after `Promise.all` rejects, violating the stated cancellation/privacy guarantee.
+
+  - Fix: make the lifecycle abort its controller before surfacing any non-stale generation failure, or pass an explicit `abort()` capability to the fan-out helper. Add a test proving sibling providers observe `signal.aborted` after one sibling rejects.
+
+- **HIGH — 35-08: Rewrite source-draft cannot enter the promised bounded prompt path under the planned file scope.** The current resolver accepts only `(template, context)` ([prompt-template.ts:142](/home/bwales/projects/orbit-app/src/ai/prompt-template.ts:142)), and `ResolvedPrompt` has no source-draft field ([prompt-types.ts:159](/home/bwales/projects/orbit-app/src/ai/prompt-types.ts:159)). The current lifecycle’s `resolvePrompt` dependency is parameterless ([ai-suggestion-logic.ts:111](/home/bwales/projects/orbit-app/src/logic/ai-suggestion-logic.ts:111)), while plan 35-08 modifies only `ComposeScreen.tsx`. Therefore it cannot satisfy “delimited within the prompt-construction path” without either raw concatenation or an unplanned API change.
+
+  - Fix: explicitly assign a small `prompt-types.ts`/`prompt-template.ts` extension to a plan: bounded, delimited `sourceDraft` input; a resolver test for trimming/delimiting it; and an inspector/payload identity test. This is user-authored data, but still must follow the same prompt-injection controls.
+
+- **HIGH — 35-05: no verified authorization gate exists for `fuel.kind = 'off_limits'`.** The plan requires “AI-enabled” versus “AI-disabled” Off Limits rows, yet `fuel` reads expose no `allow_ai` field ([fuel-read.ts:32](/home/bwales/projects/orbit-app/src/db/fuel-read.ts:32)); the owner-facing Off Limits reader is likewise only `fuel` columns ([profile-knowledge-read.ts:181](/home/bwales/projects/orbit-app/src/db/profile-knowledge-read.ts:181)). In contrast, the existing explicit gates are on Memories ([memories-read.ts:23](/home/bwales/projects/orbit-app/src/db/memories-read.ts:23)) and interactions ([025-interaction-history-schema.ts:47](/home/bwales/projects/orbit-app/src/db/migrations/025-interaction-history-schema.ts:47)).
+
+  This makes plan 35-05’s required distinction unimplementable without inventing permission semantics or a schema change. Because it governs new AI egress, this is an **owner escalation** under ADR-078, not an implementation detail.
+
+  - Fix: stop before implementation and have the owner specify the durable authorization model for Off Limits: a field on fuel, a migrated/retyped memory representation, or another already-ratified model. Then assign its migration and permission UI to the owning phase.
+
+- **MEDIUM — 35-06: Research planning omits structured Relationships.** The dossier calls Key People / Relationships useful Research content ([phase-14 dossier:280](/home/bwales/projects/orbit-app/docs/dossier/milestone-2/phase-14-messaging-ai-compose-dossier.md:280)), and a dedicated read exists ([relationships-read.ts:21](/home/bwales/projects/orbit-app/src/db/relationships-read.ts:21)). But 35-06’s projection inputs enumerate memories, custom fields, first-class fields, and current state without `relationships-read.ts` ([35-06-PLAN.md:101](/home/bwales/projects/orbit-app/.planning/phases/35-messaging-ai-compose/35-06-PLAN.md:101)).
+
+  - Fix: add `listRelationshipsForContact` and visibility handling to the normalized projection, explicitly mark it AI-ineligible unless/until a permission model exists, and add a populated-relationship test.
+
+- **MEDIUM — 35-07: the proposed picker lacks the data required to know that no stored primary exists.** `selectActionablePrimaryMethods` intentionally falls back to the first actionable row ([contact-methods-read.ts:10](/home/bwales/projects/orbit-app/src/db/contact-methods-read.ts:10)). It cannot tell the screen whether that result was an explicit primary or merely fallback. Plan 35-07 requires a picker “when … multiple candidate destinations and no primary” ([35-07-PLAN.md:96](/home/bwales/projects/orbit-app/.planning/phases/35-messaging-ai-compose/35-07-PLAN.md:96)) but names only that selector.
+
+  - Fix: have the plan explicitly consume `listContactMethodGroups`, or add a pure resolver returning the effective destination plus explicit-primary/candidate metadata. Test the multi-actionable/no-primary picker path.
+
+- **MEDIUM — 35-09 deletes the intent module but leaves its test out of scope.** The plan deletes `ai-suggestion-navigation.ts`, but its existing test imports that module directly ([ai-suggestion-navigation.test.ts:11](/home/bwales/projects/orbit-app/src/navigation/ai-suggestion-navigation.test.ts:11)) and asserts the retired route param ([ai-suggestion-navigation.test.ts:47](/home/bwales/projects/orbit-app/src/navigation/ai-suggestion-navigation.test.ts:47)). `npm test` will fail unless the test is removed or rewritten.
+
+  - Fix: include `src/navigation/ai-suggestion-navigation.test.ts` in 35-09 and delete it with the obsolete helper, or replace it with a current serializable-origin-param test.
+
+## Risk Assessment
+
+**HIGH.** The overall architecture is sound, but the Off Limits authorization ambiguity is an AI-egress owner decision, and the fan-out/Rewrite gaps would otherwise produce a misleading cancellation guarantee and an unbounded prompt-construction workaround. Resolve those two HIGH findings before execution; the remaining items are straightforward plan amendments.
+---
+
+## Claude Review
+
+_Read-only Claude Code subagent (not the `claude -p` CLI lane). Source-grounded, verified file:line claims against disk._
+
+# Cross-AI Plan Review — Phase 35: Messaging & AI Compose (Cycle 2)
+
+## 1. Summary
+
+The revised (post-`ba58631`) plan set is in strong shape and materially better than cycle 1. I verified the plans against the actual code on disk — not the diff — and nearly every load-bearing `file:line` citation is accurate (handoff.ts `Promise<void>` at :49; `resolveComposeControls(hasPhone, smsAvailable)` two-arg at compose-logic.ts:71–73; the ack gate + `AI_REQUEST_TIMEOUT_MS=20_000` + `this.gen` stale-guard in ai-suggestion-logic.ts; `channel: "text"` at ComposeScreen.tsx:456; `PromptContext` at prompt-types.ts:111 with `sharedMemories?` at :138; `resolvePrompt` serializing fields explicitly at prompt-template.ts:142; `remapLegacyChannel` at interaction-assist-dao.ts:112 stamping `occurredAt = handoff_at` at :105; nav routes at DashboardStack.tsx:59 / OrreryStack.tsx:73 / types.ts:102,171; the Profile caller at ContactProfileScreen.tsx:335). All eight cycle‑1 HIGH findings are genuinely resolved in the current plans (details below). The migration numbering is correct: the chain is contiguous 1→27 (the apparent "024 gap" is `profilePresentationMigration` = version 24), `TARGET_VERSION = 27`, so plan 35‑02's `028` is truly head+1, and the plan re-verifies at execution time. The one genuinely new, unresolved issue I surface is a data-layer gap under plan 35‑05: the off‑limits **avoidance‑constraint** shape has no per‑item AI‑permission source in the current schema, so its specified AI‑enabled/AI‑disabled gate cannot be built as written. Because Phase 35 is carry‑only (a regression fence proves nothing serializes), the actual egress blast radius this phase is contained, but it touches the ADR‑078 egress‑authorization boundary and warrants an owner/planner decision.
+
+## 2. Strengths (verified on disk)
+
+- **Cycle‑1 HIGH‑1 (assistUid) is properly closed.** handoff.ts today returns `Promise<void>` at :49 and uses `assistUid` only internally for `markAssistFailed` at :68–69 (verified). Plan 35‑01 Task 2 widens the return to `{ handoffStarted, assistUid }` and Task 3 gates the confirmation panel on `handoffStarted === true && assistUid !== null`, eliminating the fragile re-query both cycle‑1 reviewers feared.
+- **Assist coexistence / recency-writer invariant is real.** I enumerated every production writer of `interactions`: they all route through `insertInteractionCore` / `recomputeLastContactCore` in recency-dao.ts (contacts-dao, bulk-actions-dao, group-events-dao, merge-dao, interaction-assist-dao). `markAssistLogged` stamps `occurredAt = transactionAssist.handoff_at` (:105) and remaps channel (:112). Phase 35 adds **no** new interactions writer — the "sole recency writer" claim and the D‑04/D‑06 reuse posture are accurate.
+- **Carry-only egress architecture is sound.** `resolvePrompt` (prompt-template.ts:142) reads `context.rankedFuel` etc. field‑by‑field and never spreads the context, so adding OPTIONAL fields to `PromptContext` cannot transmit them. Plan 35‑05 correctly places the new fields in prompt-types.ts:111 (HIGH‑4 fix), keeps them optional (no fixture breakage), and adds a prompt-template regression proving the sentinel never reaches `prompt/inspectorDisplay/payload`.
+- **ADR‑078 is honored as a superseding decision, not reversed.** ADR‑078 is owner‑ratified (2026‑09‑01) and D‑13 scopes Phase 35 to carry‑only; `fuel-read.ts`'s `RANKED_FUEL_EXCLUSIONS` (:133) stays untouched and fenced by a regression test. No plan relaxes an exclusion.
+- **Backup allowlist-not-emit uses a real, exact precedent.** backup-schema.ts already carries this idiom for Phases 23/25/29/30/31/32/34; the Phase‑34 block (:61–66) is the precise template, and it warns that keys must be **camelCase** (`defaultMessageMode`), not snake_case — which plan 35‑02 gets right. No `BACKUP_FORMAT_VERSION` bump, consistent with D‑03.
+- **Well-sequenced ack-gate removal with no cross-wave tsc break.** 35‑01 strips all AI/ack wiring from ComposeScreen (re-added in 35‑08 wave 4), while 35‑04 reshapes the lifecycle in wave 1; nothing consumes the reshaped lifecycle until 35‑08, so there's no window where the screen wires the old ack against the new contract. `ai_ack_*` columns are deliberately left (forward-only), with an explicit prohibition against re-adding an `acknowledgeProvider` call.
+
+**Cycle‑1 HIGHs, all resolved:** HIGH‑1 assistUid (35‑01 T2), HIGH‑2 SMS‑probe‑vs‑Email (35‑03/35‑07, probe scoped to Text), HIGH‑3 three‑variant mechanism (35‑04 `generateVariants` fan‑out, AiService unchanged — verified `generate(): Promise<string>` at AiService.ts:92), HIGH‑4 PromptContext file scope (35‑05), HIGH‑5 ComposeResearch route registration in both stacks (35‑09), HIGH‑6 normalized ResearchItem eligibility across `allow_ai`/`share_with_ai`/none (35‑06; verified memories-read.ts:31, profile-knowledge-read.ts:88, first-class-knowledge-read.ts exports `getFirstClassFields`:27 / `getFirstClassDerived`:59, current-state has no AI field), HIGH‑7 `setContactMethodPrimary` DAO (35‑03 T4; verified no such writer exists today), HIGH‑8 origin-aware caller updates (35‑09 T2). The cycle‑1 MEDIUMs (Not‑yet vs Don't‑log semantics, DAO shape threading, Rewrite source-draft placement, wave-ordering note) are also addressed.
+
+## 3. Concerns
+
+- **MEDIUM (new, unresolved; owner/planner touch) — the off‑limits "avoidance‑constraint" shape (plan 35‑05) has no per‑item AI‑permission source in the schema.** Off Limits items live in `fuel` as `kind='off_limits'` (profile-knowledge-read.ts:182–193 `readProfileOffLimits`, selecting `id, contact_id, kind, label, text, url, created_at, source`). The `fuel` table (migration 011:92–97) has **no** `allow_ai`/`share_with_ai`/AI‑permission column, and no migration adds one (028 is `app_settings`‑only). Yet ADR‑078:18 and dossier §355 gate avoidance-constraint egress on whether each Off Limits item is *AI‑authorized*, and ADR‑078:23 explicitly **rejects** sending AI‑disabled Off Limits items. Plan 35‑05's must‑have — populate `avoidanceConstraints` "from an AI‑eligibility‑gated off‑limits read" — and its acceptance test "an AI‑disabled off‑limits item appears in NEITHER collection" / "an AI‑enabled off‑limits item appears ONLY in avoidanceConstraints" **cannot be implemented against the current schema**, because there is no AI‑enabled vs AI‑disabled distinction for off_limits fuel rows. RESEARCH.md line 342 spots the parallel interaction‑note case ("the `allow_ai` gate column already exists; the projection code does not") but only for `interactions.allow_ai` (migration 025, verified) — it never identifies a permission source for off‑limits, and neither does any plan. *Mechanism / why it matters:* the three resolutions an executor could reach all carry risk — (a) carry **all** off‑limits ungated seeds a shape that, when Phase 36 renders it, transmits AI‑disabled off‑limits = the ADR‑078 rejected alternative; (b) carry **none** makes SC‑11's avoidance half vacuous; (c) add a `fuel.allow_ai` column = an unplanned, irreversible schema migration outside this phase's stated one‑migration scope. *Blast radius this phase is bounded* because 35‑05 is carry‑only and the prompt-template regression proves non‑transmission — so nothing actually leaks in Phase 35 regardless. But the spec as written points the executor at an unbuildable gate on the egress‑authorization boundary, which is exactly the class D‑08/D‑13 reserve to the owner.
+  - *Contrast:* the **gatedRecentInteractionNotes** half of 35‑05 is well‑grounded — `interactions` has both `allow_ai` (migration 025:48) and `note` (001:107 / 011 rebuild), so that gate is implementable and testable. The gap is specific to off‑limits.
+
+- **LOW — origin‑aware return spans two stacks; verify the `'profile'` pop resolves in the Orrery stack.** ComposeScreen is registered in both DashboardStack and OrreryStack; ContactProfileScreen (the only caller passing `origin:'profile'`) is used in both. Plan 35‑09 T2 correctly leaves HomeScreen/widget/notification callers unmodified (optional param type‑checks). The "pop toward Profile" return path is device‑backstop‑only (no unit test), and stack‑dependent — worth an explicit note that the return dispatch must resolve within whichever stack launched Compose. Not a blocker.
+
+- **LOW — 35‑05's `avoidanceConstraints` empty-shape default should be made the explicit interim.** Given the concern above, if the owner/planner decides off‑limits sourcing is deferred, the cleanest carry‑only posture is for `readComposeResearch`/`readPromptContext` to carry an **empty** `avoidanceConstraints` array this phase (the gated‑note half proceeds normally). The plan currently implies population; it should state the empty‑until‑gate‑exists fallback so the executor doesn't improvise ungated population.
+
+## 4. Suggestions (concrete, per-plan)
+
+- **Plan 35‑05 (must_haves + Task 1 action/acceptance):** Resolve the off‑limits source before execution. Either (a) state that `avoidanceConstraints` is carried as an **empty typed shape** this phase pending a per‑item off‑limits AI‑permission (and drop/replace the "AI‑disabled off‑limits appears in neither collection" acceptance test with a "shape carried empty; no off‑limits text serialized" test), or (b) escalate to the owner that ADR‑078's authorized off‑limits avoidance requires a per‑item permission column on `fuel` that does not exist, so its *source* (not just its rendering) is a decision — likely Phase 36 / knowledge‑foundation scope. Keep the `gatedRecentInteractionNotes` half as specified (it is buildable).
+- **Plan 35‑05 (Task 1 read_first):** Add profile-knowledge-read.ts:182 (`readProfileOffLimits` → `fuel.kind='off_limits'`) and migration 011:92 (fuel schema) to the read list so the executor sees there is no `allow_ai` on off_limits before attempting the gate.
+- **Plan 35‑09 (Task 2 acceptance):** Add an explicit check that the origin‑aware return dispatch resolves within the launching stack (Dashboard vs Orrery), since the pop‑toward‑Profile path is otherwise only device‑verified.
+
+## 5. Risk Assessment
+
+**Overall: MEDIUM (bordering LOW).** The plan set is unusually well‑grounded — every file:line I spot‑checked was accurate, the migration/recency‑writer/egress invariants hold, all eight cycle‑1 HIGHs are genuinely closed, and the carry‑only egress architecture is provably safe via the prompt‑template regression. The single material open item is the off‑limits avoidance‑constraint source gap in plan 35‑05: it cannot be built as specified against the current schema, and its naive resolution would seed the ADR‑078 rejected‑alternative shape for Phase 36. It is **not** a live egress leak this phase (carry‑only + regression fence contain it), which is why I rate MEDIUM rather than HIGH — but because it sits on the egress‑authorization boundary that D‑08/D‑13 reserve to the owner, it should be resolved (owner decision on off‑limits permission source, or an explicit empty‑shape interim) before 35‑05 executes. With that one clarification, this drops to LOW and is ready to run.
+
+---
+
+<!-- ============================================================ -->
+<!-- CYCLE 1 ARCHIVE (superseded — all 8 HIGHs resolved by ba58631) -->
+<!-- Retained verbatim for convergence history. Counts below are cycle-1. -->
+<!-- ============================================================ -->
+
+# [ARCHIVED] Cycle 1 Review (cycle_summary: current_high=8 current_actionable=7)
+
 
 # Cross-AI Plan Review — Phase 35: Messaging & AI Compose (cycle 1)
 
