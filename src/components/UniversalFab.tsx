@@ -18,6 +18,10 @@ import Animated, {
 import { speedDialScrimPointerEvents } from "@/components/add-speed-dial-fab-logic";
 import { ContactPicker } from "@/components/ContactPicker";
 import {
+  PostLogNoteEditor,
+  type PostLogNoteTarget,
+} from "@/components/PostLogNoteEditor";
+import {
   createQuickLogUndoController,
   getFocusedContactContext,
   resolveFabTarget,
@@ -123,6 +127,9 @@ export function UniversalFab() {
   const [keyboardOpen, setKeyboardOpen] = useState(false);
   const [currentRouteName, setCurrentRouteName] = useState("Home");
   const [pickerFlow, setPickerFlow] = useState<PickerFlow | null>(null);
+  const [postLogTarget, setPostLogTarget] = useState<PostLogNoteTarget | null>(
+    null,
+  );
   const expanded = useSharedValue(0);
   const quickLogPending = useRef(false);
   const quickLogUndoController = useRef(
@@ -210,6 +217,7 @@ export function UniversalFab() {
           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success),
         notifyWidgetDataChanged,
         bumpShellRefresh,
+        openPostLogEditor: setPostLogTarget,
       },
       contactId,
     );
@@ -277,13 +285,29 @@ export function UniversalFab() {
     />
   );
 
+  // Stays mounted alongside the picker so a Quick Log fired from the FAB can
+  // open the post-log editor even while the FAB overlay is hidden.
+  const postLogEditor = (
+    <PostLogNoteEditor
+      target={postLogTarget}
+      onClose={() => setPostLogTarget(null)}
+    />
+  );
+
   // The picker owns a TextInput. It must stay mounted while that input opens
   // the keyboard; hiding the FAB overlay must not also unmount the modal.
-  if (hidden) return picker;
+  if (hidden)
+    return (
+      <>
+        {picker}
+        {postLogEditor}
+      </>
+    );
 
   return (
     <>
       {picker}
+      {postLogEditor}
       <View pointerEvents="box-none" style={styles.overlay}>
         <AnimatedPressable
           accessibilityLabel="Dismiss capture actions"

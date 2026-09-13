@@ -15,3 +15,9 @@ scope boundary — only auto-fix issues directly caused by the current task's ch
 - **Already flagged:** STATE.md Current Position notes "Phase 30 (Orrery Systems)
   still shows [ ] in ROADMAP with dirty 30-REVIEW files — reconcile independently."
 - **Disposition:** left untouched (out of scope). Reconcile with Phase 30.
+- **34-06 re-confirmation:** still failing identically (`1 failed | 348 passed`
+  suites; 3263 individual tests pass). 34-06 touches only `src/screens/post-log-*`,
+  `src/stores/snackbar-*`, `src/components/Snackbar.tsx`,
+  `src/components/PostLogNoteEditor.tsx`, `src/services/quick-log-command*`,
+  `src/screens/HomeScreen.tsx`, `src/components/UniversalFab.tsx` — none in
+  `src/components/orrery/`. Untouched by 34-06 commits.

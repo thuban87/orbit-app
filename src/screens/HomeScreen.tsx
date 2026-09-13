@@ -66,6 +66,10 @@ import { BulkActionSurface } from "@/components/BulkActionSurface";
 import { CardContextMenu } from "@/components/CardContextMenu";
 import { CardGrid } from "@/components/CardGrid";
 import { ListRow, type ListRowProps } from "@/components/ListRow";
+import {
+  PostLogNoteEditor,
+  type PostLogNoteTarget,
+} from "@/components/PostLogNoteEditor";
 import { POPULATION_LABELS } from "@/components/control-surface/control-labels";
 import { DashboardControlRow } from "@/components/control-surface/DashboardControlRow";
 import { DashboardOverlayHost } from "@/components/control-surface/DashboardOverlayHost";
@@ -479,6 +483,9 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
     null,
   );
   const openRowRef = useRef<SwipeableMethods | null>(null);
+  const [postLogTarget, setPostLogTarget] = useState<PostLogNoteTarget | null>(
+    null,
+  );
   const quickLogPending = useRef(false);
   const quickLogUndoController = useRef(
     createQuickLogUndoController(({ contactId, interactionId }) =>
@@ -503,6 +510,7 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success),
         notifyWidgetDataChanged,
         bumpShellRefresh,
+        openPostLogEditor: setPostLogTarget,
       },
       contactId,
     );
@@ -2113,6 +2121,10 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
         destructive={false}
         onConfirm={onBulkConfirm}
         onCancel={dismissBulkConfirm}
+      />
+      <PostLogNoteEditor
+        target={postLogTarget}
+        onClose={() => setPostLogTarget(null)}
       />
     </View>
   );
