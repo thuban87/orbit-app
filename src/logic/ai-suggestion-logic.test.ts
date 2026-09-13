@@ -1,22 +1,25 @@
 /**
- * ai-suggestion-logic — proof of the one-request Compose AI lifecycle (14-05).
+ * ai-suggestion-logic — proof of the ADR-079 three-suggestion Compose AI
+ * lifecycle (Phase 35-04, reshaped from Plan 14-05).
  *
  * Node-pure: every effect is injected, so this suite proves off-device that the
  * lifecycle keeps ONE request live, owns the SINGLE AbortController + timeout
- * (H4), gates the first send on acknowledgement (H5), orders egress strictly
- * after a durable ack (C2-H3), drops a stale intent after the ack await (C3-H4),
- * never auto-retries (T-14-07), requires confirmation before replacing a
- * non-empty draft (T-14-14), and exposes ONE immutable ResolvedPrompt reference
- * to both the gate view-state and the provider call (M1 / C3-M1).
+ * (H4), decides Draft-vs-Rewrite via the injected `isEditorEmpty` predicate and
+ * carries the Rewrite source-draft through `resolvePrompt`, resolves to a
+ * non-destructive three-suggestion review surface (the editor is untouched until
+ * an explicit `chooseSuggestion`), aborts its sole controller on a non-stale
+ * generation failure so a fan-out rejection cancels the in-flight siblings
+ * (HIGH-2), never auto-retries (T-14-07), and drops a stale/superseded
+ * completion. There is NO ack gate (D-09/ADR-079) and NO single-suggestion
+ * confirm-replace shape.
  */
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { ResolvedPrompt } from "@/ai/prompt-types";
 import {
   AI_REQUEST_TIMEOUT_MS,
-  AiSuggestionLifecycle,
   type AiSuggestionDeps,
+  AiSuggestionLifecycle,
   type AiSuggestionState,
-  type RequestConfig,
 } from "@/logic/ai-suggestion-logic";
 
 /** Flush pending microtasks/timers so a fire-and-forget `begin()` reaches its
@@ -50,56 +53,50 @@ function makePrompt(text: string): ResolvedPrompt {
   }) as ResolvedPrompt;
 }
 
-const CONFIG: RequestConfig = {
-  provider: "openai",
-  model: "gpt-x",
-  contactId: 42,
-};
+/** The three drafts a successful fan-out resolves to, in deterministic order. */
+const THREE = ["ALPHA", "BRAVO", "CHARLIE"] as const;
 
 interface Harness {
   lifecycle: AiSuggestionLifecycle;
   deps: {
-    [K in keyof AiSuggestionDeps]: ReturnType<typeof vi.fn> & AiSuggestionDeps[K];
+    [K in keyof AiSuggestionDeps]: ReturnType<typeof vi.fn> &
+      AiSuggestionDeps[K];
   };
   states: AiSuggestionState[];
   controllers: AbortController[];
   timers: Array<{ fn: () => void; ms: number }>;
   fireTimer: (i?: number) => void;
   prompt: ResolvedPrompt;
-  /** Override the config `currentConfig()` returns (stale-guard tests). */
-  setConfig: (c: RequestConfig) => void;
   /** Override the active flag `isActive()` returns. */
   setActive: (a: boolean) => void;
-  /** Override the acknowledged flag. */
-  setAcked: (a: boolean) => void;
+  /** Override the editor-empty predicate + body. */
+  setEditor: (empty: boolean, body?: string) => void;
 }
 
 function makeHarness(
   overrides: Partial<AiSuggestionDeps> = {},
   opts: {
     prompt?: ResolvedPrompt;
-    acked?: boolean;
-    draftEmpty?: boolean;
+    editorEmpty?: boolean;
+    editorBody?: string;
     generate?: AiSuggestionDeps["generate"];
-    acknowledgeProvider?: AiSuggestionDeps["acknowledgeProvider"];
   } = {},
 ): Harness {
   const prompt = opts.prompt ?? makePrompt("PROMPT-BODY");
   const states: AiSuggestionState[] = [];
   const controllers: AbortController[] = [];
   const timers: Array<{ fn: () => void; ms: number }> = [];
-  let config = CONFIG;
   let active = true;
-  let acked = opts.acked ?? false;
+  let editorEmpty = opts.editorEmpty ?? true;
+  let editorBody = opts.editorBody ?? "";
 
   const deps = {
-    resolvePrompt: vi.fn(async () => prompt),
-    isProviderAcknowledged: vi.fn(() => acked),
-    acknowledgeProvider:
-      opts.acknowledgeProvider ?? vi.fn(async () => undefined),
-    generate: opts.generate ?? vi.fn(async () => "SUGGESTED DRAFT"),
+    resolvePrompt: vi.fn(async (_sourceDraft?: string) => prompt),
+    generate:
+      opts.generate ?? vi.fn(async () => [...THREE] as readonly string[]),
     applyDraft: vi.fn(),
-    isDraftEmpty: vi.fn(() => opts.draftEmpty ?? true),
+    isEditorEmpty: vi.fn(() => editorEmpty),
+    getEditorBody: vi.fn(() => editorBody),
     createController: vi.fn(() => {
       const c = new AbortController();
       controllers.push(c);
@@ -112,7 +109,6 @@ function makeHarness(
     }),
     clearTimer: vi.fn(),
     isActive: vi.fn(() => active),
-    currentConfig: vi.fn(() => config),
     sanitizeError: vi.fn((err: unknown) =>
       err && typeof err === "object" && "code" in err
         ? String((err as { code: unknown }).code)
@@ -133,204 +129,101 @@ function makeHarness(
     timers,
     prompt,
     fireTimer: (i = 0) => timers[i]?.fn(),
-    setConfig: (c) => {
-      config = c;
-    },
     setActive: (a) => {
       active = a;
     },
-    setAcked: (a) => {
-      acked = a;
+    setEditor: (empty, body = "") => {
+      editorEmpty = empty;
+      editorBody = body;
     },
   };
 }
 
-describe("AiSuggestionLifecycle — ack gate (H5)", () => {
-  it("blocks the first send until acknowledgement — no generate before ack", async () => {
-    const h = makeHarness({}, { acked: false });
+describe("AiSuggestionLifecycle — three-suggestion success (ADR-079)", () => {
+  it("exposes exactly three unlabeled suggestions and does NOT mutate the draft", async () => {
+    const h = makeHarness({}, { editorEmpty: true });
     await h.lifecycle.begin();
 
     expect(h.lifecycle.getState()).toEqual({
-      status: "needs-acknowledgement",
-      provider: "openai",
-      prompt: h.prompt,
+      status: "review",
+      suggestions: ["ALPHA", "BRAVO", "CHARLIE"],
     });
-    expect(h.deps.generate).not.toHaveBeenCalled();
-    expect(h.deps.createController).not.toHaveBeenCalled();
+    // Generation is non-destructive: nothing is applied until chooseSuggestion.
+    expect(h.deps.applyDraft).not.toHaveBeenCalled();
   });
 
-  it("a declined provider makes NO network call and returns to idle", async () => {
-    const h = makeHarness({}, { acked: false });
+  it("chooseSuggestion(index) applies EXACTLY one suggestion, then idles", async () => {
+    const h = makeHarness({}, { editorEmpty: true });
     await h.lifecycle.begin();
-    h.lifecycle.decline();
 
+    h.lifecycle.chooseSuggestion(1);
+    expect(h.deps.applyDraft).toHaveBeenCalledTimes(1);
+    expect(h.deps.applyDraft).toHaveBeenCalledWith("BRAVO");
     expect(h.lifecycle.getState()).toEqual({ status: "idle" });
-    expect(h.deps.acknowledgeProvider).not.toHaveBeenCalled();
-    expect(h.deps.generate).not.toHaveBeenCalled();
   });
 
-  it("acknowledge persists the ack THEN dispatches with the same prompt (C2-H3)", async () => {
-    const h = makeHarness({}, { acked: false });
+  it("an out-of-range chooseSuggestion index is a no-op", async () => {
+    const h = makeHarness({}, { editorEmpty: true });
     await h.lifecycle.begin();
-    await h.lifecycle.acknowledge();
 
-    expect(h.deps.acknowledgeProvider).toHaveBeenCalledTimes(1);
-    expect(h.deps.generate).toHaveBeenCalledTimes(1);
-    // Same immutable prompt reference reached the provider (M1 / C3-M1).
-    expect(h.deps.generate.mock.calls[0][0]).toBe(h.prompt);
-    expect(h.deps.generate.mock.calls[0][0].payload).toBe(h.prompt.payload);
+    h.lifecycle.chooseSuggestion(9);
+    expect(h.deps.applyDraft).not.toHaveBeenCalled();
+    expect(h.lifecycle.getState()).toEqual({
+      status: "review",
+      suggestions: ["ALPHA", "BRAVO", "CHARLIE"],
+    });
   });
 
-  it("an already-acknowledged provider skips the gate entirely", async () => {
-    const h = makeHarness({}, { acked: true });
+  it("has NO needs-acknowledgement state — begin() goes straight to egress", async () => {
+    const h = makeHarness({}, { editorEmpty: true });
     await h.lifecycle.begin();
 
-    expect(h.deps.acknowledgeProvider).not.toHaveBeenCalled();
+    // The gate is gone: a single generate fires with no ack await.
     expect(h.deps.generate).toHaveBeenCalledTimes(1);
+    const seen = h.states.map((s) => s.status);
+    expect(seen).not.toContain("needs-acknowledgement");
+    expect(seen).toEqual(["resolving", "loading", "review"]);
   });
 });
 
-describe("AiSuggestionLifecycle — durable-ack ordering (C2-H3)", () => {
-  it("creates NO controller and calls NO generate until the ack write resolves", async () => {
-    const ack = deferred<void>();
-    const h = makeHarness(
-      {},
-      { acked: false, acknowledgeProvider: vi.fn(() => ack.promise) },
-    );
+describe("AiSuggestionLifecycle — Draft vs Rewrite source-draft carry (HIGH-3)", () => {
+  it("Draft (empty editor) calls resolvePrompt with NO sourceDraft (undefined)", async () => {
+    const h = makeHarness({}, { editorEmpty: true, editorBody: "" });
     await h.lifecycle.begin();
-    const ackP = h.lifecycle.acknowledge();
 
-    // Ack in flight — nothing may egress yet.
-    expect(h.deps.createController).not.toHaveBeenCalled();
-    expect(h.deps.generate).not.toHaveBeenCalled();
-
-    ack.resolve();
-    await ackP;
-    expect(h.deps.createController).toHaveBeenCalledTimes(1);
-    expect(h.deps.generate).toHaveBeenCalledTimes(1);
+    expect(h.deps.resolvePrompt).toHaveBeenCalledTimes(1);
+    expect(h.deps.resolvePrompt).toHaveBeenCalledWith(undefined);
   });
 
-  it("a REJECTED ack write results in ZERO generate calls", async () => {
+  it("Rewrite (non-empty editor) calls resolvePrompt WITH the current editor body", async () => {
     const h = makeHarness(
       {},
-      {
-        acked: false,
-        acknowledgeProvider: vi.fn(async () => {
-          throw { code: "network" };
-        }),
-      },
+      { editorEmpty: false, editorBody: "my own half-written note" },
     );
     await h.lifecycle.begin();
-    await h.lifecycle.acknowledge();
 
-    expect(h.deps.generate).not.toHaveBeenCalled();
-    expect(h.deps.createController).not.toHaveBeenCalled();
-    expect(h.lifecycle.getState()).toEqual({ status: "error", code: "network" });
-  });
-});
-
-describe("AiSuggestionLifecycle — stale guard after the ack await (C3-H4)", () => {
-  it("drops the request if Cancel happens during the pending ack", async () => {
-    const ack = deferred<void>();
-    const h = makeHarness(
-      {},
-      { acked: false, acknowledgeProvider: vi.fn(() => ack.promise) },
+    expect(h.deps.resolvePrompt).toHaveBeenCalledTimes(1);
+    expect(h.deps.resolvePrompt).toHaveBeenCalledWith(
+      "my own half-written note",
     );
-    await h.lifecycle.begin();
-    const ackP = h.lifecycle.acknowledge();
-    h.lifecycle.cancel(); // during the pending ack
-    ack.resolve();
-    await ackP;
-
-    expect(h.deps.createController).not.toHaveBeenCalled();
-    expect(h.deps.generate).not.toHaveBeenCalled();
-  });
-
-  it("drops the request if unmount/navigation happens during the pending ack", async () => {
-    const ack = deferred<void>();
-    const h = makeHarness(
-      {},
-      { acked: false, acknowledgeProvider: vi.fn(() => ack.promise) },
-    );
-    await h.lifecycle.begin();
-    const ackP = h.lifecycle.acknowledge();
-    h.lifecycle.dispose(); // navigated away / unmounted
-    ack.resolve();
-    await ackP;
-
-    expect(h.deps.createController).not.toHaveBeenCalled();
-    expect(h.deps.generate).not.toHaveBeenCalled();
-  });
-
-  it("drops the request if the config changes during the pending ack", async () => {
-    const ack = deferred<void>();
-    const h = makeHarness(
-      {},
-      { acked: false, acknowledgeProvider: vi.fn(() => ack.promise) },
-    );
-    await h.lifecycle.begin();
-    const ackP = h.lifecycle.acknowledge();
-    // Model changed under the pending ack, but nothing bumped the token.
-    h.setConfig({ provider: "openai", model: "gpt-y", contactId: 42 });
-    ack.resolve();
-    await ackP;
-
-    expect(h.deps.createController).not.toHaveBeenCalled();
-    expect(h.deps.generate).not.toHaveBeenCalled();
-  });
-
-  it("drops the request if the screen is inactive after the ack resolves", async () => {
-    const ack = deferred<void>();
-    const h = makeHarness(
-      {},
-      { acked: false, acknowledgeProvider: vi.fn(() => ack.promise) },
-    );
-    await h.lifecycle.begin();
-    const ackP = h.lifecycle.acknowledge();
-    h.setActive(false);
-    ack.resolve();
-    await ackP;
-
-    expect(h.deps.generate).not.toHaveBeenCalled();
-  });
-
-  it("an UNCHANGED intent proceeds to egress after the ack resolves", async () => {
-    const ack = deferred<void>();
-    const h = makeHarness(
-      {},
-      { acked: false, acknowledgeProvider: vi.fn(() => ack.promise) },
-    );
-    await h.lifecycle.begin();
-    const ackP = h.lifecycle.acknowledge();
-    ack.resolve();
-    await ackP;
-
-    expect(h.deps.createController).toHaveBeenCalledTimes(1);
-    expect(h.deps.generate).toHaveBeenCalledTimes(1);
   });
 });
 
 describe("AiSuggestionLifecycle — single controller ownership (H4)", () => {
   it("hands the sole controller's signal to generate", async () => {
-    const gen = deferred<string>();
-    const h = makeHarness(
-      {},
-      { acked: true, generate: vi.fn(() => gen.promise) },
-    );
+    const gen = deferred<readonly string[]>();
+    const h = makeHarness({}, { generate: vi.fn(() => gen.promise) });
     void h.lifecycle.begin();
     await flush();
 
     expect(h.controllers).toHaveLength(1);
     expect(h.deps.generate.mock.calls[0][1]).toBe(h.controllers[0].signal);
-    gen.resolve("draft");
+    gen.resolve([...THREE]);
   });
 
-  it("Cancel aborts the SAME controller that was handed to generate", async () => {
-    const gen = deferred<string>();
-    const h = makeHarness(
-      {},
-      { acked: true, generate: vi.fn(() => gen.promise) },
-    );
+  it("Cancel aborts the SAME controller handed to generate and preserves the draft", async () => {
+    const gen = deferred<readonly string[]>();
+    const h = makeHarness({}, { generate: vi.fn(() => gen.promise) });
     void h.lifecycle.begin();
     await flush();
     const signal = h.deps.generate.mock.calls[0][1] as AbortSignal;
@@ -338,15 +231,13 @@ describe("AiSuggestionLifecycle — single controller ownership (H4)", () => {
 
     h.lifecycle.cancel();
     expect(signal.aborted).toBe(true);
+    expect(h.deps.applyDraft).not.toHaveBeenCalled();
     expect(h.lifecycle.getState()).toEqual({ status: "idle" });
   });
 
   it("unmount aborts the SAME controller handed to generate", async () => {
-    const gen = deferred<string>();
-    const h = makeHarness(
-      {},
-      { acked: true, generate: vi.fn(() => gen.promise) },
-    );
+    const gen = deferred<readonly string[]>();
+    const h = makeHarness({}, { generate: vi.fn(() => gen.promise) });
     void h.lifecycle.begin();
     await flush();
     const signal = h.deps.generate.mock.calls[0][1] as AbortSignal;
@@ -356,11 +247,8 @@ describe("AiSuggestionLifecycle — single controller ownership (H4)", () => {
   });
 
   it("a config change aborts the SAME controller handed to generate", async () => {
-    const gen = deferred<string>();
-    const h = makeHarness(
-      {},
-      { acked: true, generate: vi.fn(() => gen.promise) },
-    );
+    const gen = deferred<readonly string[]>();
+    const h = makeHarness({}, { generate: vi.fn(() => gen.promise) });
     void h.lifecycle.begin();
     await flush();
     const signal = h.deps.generate.mock.calls[0][1] as AbortSignal;
@@ -371,13 +259,13 @@ describe("AiSuggestionLifecycle — single controller ownership (H4)", () => {
   });
 
   it("a second begin aborts the first request's controller (one request at a time)", async () => {
-    const gen1 = deferred<string>();
-    const gen2 = deferred<string>();
+    const gen1 = deferred<readonly string[]>();
+    const gen2 = deferred<readonly string[]>();
     const generate = vi
       .fn()
       .mockReturnValueOnce(gen1.promise)
       .mockReturnValueOnce(gen2.promise);
-    const h = makeHarness({}, { acked: true, generate });
+    const h = makeHarness({}, { generate });
     void h.lifecycle.begin();
     await flush();
     const firstSignal = h.controllers[0].signal;
@@ -386,141 +274,140 @@ describe("AiSuggestionLifecycle — single controller ownership (H4)", () => {
     await flush();
     expect(firstSignal.aborted).toBe(true);
     expect(h.controllers).toHaveLength(2);
-    gen1.resolve("stale");
-    gen2.resolve("fresh");
+    gen1.resolve(["stale"]);
+    gen2.resolve([...THREE]);
+  });
+});
+
+describe("AiSuggestionLifecycle — non-stale failure aborts the controller (HIGH-2)", () => {
+  it("aborts its AbortController when generate rejects on a non-stale request", async () => {
+    // A recording generate captures the signal it was handed and then rejects.
+    let capturedSignal: AbortSignal | null = null;
+    const generate = vi.fn(async (_p: ResolvedPrompt, signal: AbortSignal) => {
+      capturedSignal = signal;
+      throw { code: "network" };
+    });
+    const h = makeHarness({}, { editorEmpty: true, generate });
+    await h.lifecycle.begin();
+
+    // HIGH-2: on a non-stale rejection the lifecycle aborts its controller so the
+    // still-in-flight sibling provider calls (sharing this signal) are cancelled.
+    expect(capturedSignal).not.toBeNull();
+    expect((capturedSignal as unknown as AbortSignal).aborted).toBe(true);
+    // The manual draft is preserved and a code-only error is surfaced.
+    expect(h.deps.applyDraft).not.toHaveBeenCalled();
+    expect(h.lifecycle.getState()).toEqual({
+      status: "error",
+      code: "network",
+    });
   });
 });
 
 describe("AiSuggestionLifecycle — timeout owned by the lifecycle (H4)", () => {
   it("arms the 20s timeout with the lifecycle's own timer", async () => {
-    const gen = deferred<string>();
-    const h = makeHarness(
-      {},
-      { acked: true, generate: vi.fn(() => gen.promise) },
-    );
+    const gen = deferred<readonly string[]>();
+    const h = makeHarness({}, { generate: vi.fn(() => gen.promise) });
     void h.lifecycle.begin();
     await flush();
 
     expect(h.timers).toHaveLength(1);
     expect(h.timers[0].ms).toBe(AI_REQUEST_TIMEOUT_MS);
-    gen.resolve("draft");
+    gen.resolve([...THREE]);
   });
 
-  it("a fired timeout aborts the controller and surfaces a sanitized timeout", async () => {
-    const gen = deferred<string>();
-    const h = makeHarness(
-      {},
-      { acked: true, generate: vi.fn(() => gen.promise) },
-    );
+  it("a fired timeout aborts the controller, surfaces timeout, preserves the draft", async () => {
+    const gen = deferred<readonly string[]>();
+    const h = makeHarness({}, { generate: vi.fn(() => gen.promise) });
     void h.lifecycle.begin();
     await flush();
     const signal = h.controllers[0].signal;
 
     h.fireTimer();
     expect(signal.aborted).toBe(true);
-    expect(h.lifecycle.getState()).toEqual({ status: "error", code: "timeout" });
-
-    // A late completion after the timeout cannot mutate anything.
-    gen.resolve("late draft");
-    await flush();
-    expect(h.deps.applyDraft).not.toHaveBeenCalled();
-  });
-});
-
-describe("AiSuggestionLifecycle — draft replacement (T-14-14)", () => {
-  it("applies a validated draft directly when the editor is empty", async () => {
-    const h = makeHarness({}, { acked: true, draftEmpty: true });
-    await h.lifecycle.begin();
-
-    expect(h.deps.applyDraft).toHaveBeenCalledWith("SUGGESTED DRAFT");
-    expect(h.lifecycle.getState()).toEqual({ status: "idle" });
-  });
-
-  it("requires confirmation before replacing a NON-empty draft", async () => {
-    const h = makeHarness({}, { acked: true, draftEmpty: false });
-    await h.lifecycle.begin();
-
-    expect(h.deps.applyDraft).not.toHaveBeenCalled();
     expect(h.lifecycle.getState()).toEqual({
-      status: "confirm-replace",
-      suggestion: "SUGGESTED DRAFT",
+      status: "error",
+      code: "timeout",
     });
 
-    h.lifecycle.confirmReplace();
-    expect(h.deps.applyDraft).toHaveBeenCalledWith("SUGGESTED DRAFT");
-    expect(h.lifecycle.getState()).toEqual({ status: "idle" });
-  });
-
-  it("cancelReplace keeps the existing draft untouched", async () => {
-    const h = makeHarness({}, { acked: true, draftEmpty: false });
-    await h.lifecycle.begin();
-    h.lifecycle.cancelReplace();
-
+    // A late completion after the timeout cannot mutate anything.
+    gen.resolve([...THREE]);
+    await flush();
     expect(h.deps.applyDraft).not.toHaveBeenCalled();
-    expect(h.lifecycle.getState()).toEqual({ status: "idle" });
   });
 });
 
 describe("AiSuggestionLifecycle — stale completion + explicit retry", () => {
   it("a cancelled request's later completion cannot mutate the draft", async () => {
-    const gen = deferred<string>();
-    const h = makeHarness(
-      {},
-      { acked: true, draftEmpty: true, generate: vi.fn(() => gen.promise) },
-    );
+    const gen = deferred<readonly string[]>();
+    const h = makeHarness({}, { generate: vi.fn(() => gen.promise) });
     void h.lifecycle.begin();
     await flush();
     h.lifecycle.cancel();
-    gen.resolve("STALE DRAFT");
+    gen.resolve([...THREE]);
     await flush();
 
     expect(h.deps.applyDraft).not.toHaveBeenCalled();
     expect(h.lifecycle.getState()).toEqual({ status: "idle" });
+  });
+
+  it("retry() replaces the three suggestions and retains NO history", async () => {
+    const generate = vi
+      .fn()
+      .mockResolvedValueOnce(["A1", "A2", "A3"])
+      .mockResolvedValueOnce(["B1", "B2", "B3"]);
+    const h = makeHarness({}, { editorEmpty: true, generate });
+    await h.lifecycle.begin();
+    expect(h.lifecycle.getState()).toEqual({
+      status: "review",
+      suggestions: ["A1", "A2", "A3"],
+    });
+
+    await h.lifecycle.retry();
+    // The whole set is replaced; there is no accumulated history.
+    expect(generate).toHaveBeenCalledTimes(2);
+    expect(h.lifecycle.getState()).toEqual({
+      status: "review",
+      suggestions: ["B1", "B2", "B3"],
+    });
   });
 
   it("never auto-retries after an error; retry() starts a fresh request", async () => {
     const generate = vi
       .fn()
       .mockRejectedValueOnce({ code: "network" })
-      .mockResolvedValueOnce("RETRY DRAFT");
-    const h = makeHarness({}, { acked: true, draftEmpty: true, generate });
+      .mockResolvedValueOnce([...THREE]);
+    const h = makeHarness({}, { editorEmpty: true, generate });
     await h.lifecycle.begin();
 
-    expect(h.lifecycle.getState()).toEqual({ status: "error", code: "network" });
+    expect(h.lifecycle.getState()).toEqual({
+      status: "error",
+      code: "network",
+    });
     expect(generate).toHaveBeenCalledTimes(1); // no automatic retry
 
     await h.lifecycle.retry();
     expect(generate).toHaveBeenCalledTimes(2);
-    expect(h.deps.applyDraft).toHaveBeenCalledWith("RETRY DRAFT");
+    expect(h.lifecycle.getState()).toEqual({
+      status: "review",
+      suggestions: ["ALPHA", "BRAVO", "CHARLIE"],
+    });
   });
 });
 
-describe("AiSuggestionLifecycle — one immutable prompt across consumers (M1)", () => {
-  it("exposes the SAME ResolvedPrompt reference to the gate view-state and generate", async () => {
+describe("AiSuggestionLifecycle — one immutable prompt reaches generate (M1)", () => {
+  it("hands the SAME ResolvedPrompt reference the resolver produced to generate", async () => {
     const prompt = makePrompt("IDENTITY BODY");
-    const h = makeHarness({}, { prompt, acked: false });
+    const h = makeHarness({}, { prompt, editorEmpty: true });
     await h.lifecycle.begin();
 
-    // The needs-acknowledgement state carries the exact object the inspector +
-    // acknowledgement views render.
-    const gated = h.lifecycle.getState();
-    expect(gated.status).toBe("needs-acknowledgement");
-    if (gated.status === "needs-acknowledgement") {
-      expect(gated.prompt).toBe(prompt);
-    }
     expect(h.deps.resolvePrompt).toHaveBeenCalledTimes(1);
-
-    await h.lifecycle.acknowledge();
-    // The provider received the very same object (strict reference identity).
     expect(h.deps.generate.mock.calls[0][0]).toBe(prompt);
+    expect(h.deps.generate.mock.calls[0][0].payload).toBe(prompt.payload);
   });
 });
 
 describe("AiSuggestionLifecycle — dispose never strands (regression)", () => {
   it("dispose() during 'resolving' resets the visible state to idle", async () => {
-    // A resolvePrompt that only settles when we release it keeps the lifecycle in
-    // 'resolving' — the exact window in which a focus-effect cleanup used to strand
-    // the UI forever (self-inflicted setParams→dispose race; see ComposeScreen).
     let release: (p: ResolvedPrompt) => void = () => {};
     const pending = new Promise<ResolvedPrompt>((res) => {
       release = res;
@@ -530,9 +417,7 @@ describe("AiSuggestionLifecycle — dispose never strands (regression)", () => {
     const begun = h.lifecycle.begin();
     expect(h.states.at(-1)?.status).toBe("resolving");
 
-    // Navigation away / unmount disposes the in-flight request.
     h.lifecycle.dispose();
-    // MUST be reset to idle — never left stranded in 'resolving'.
     expect(h.states.at(-1)?.status).toBe("idle");
 
     // The now-stale deferred resolution must not resurrect the flow.
