@@ -194,3 +194,45 @@ describe("compose-session-store — Message Focus", () => {
     expect(useComposeSession.getState().messageFocus).toEqual([]);
   });
 });
+
+/**
+ * Add-to-AI eligibility guard (COMP-11 / HIGH-6, T-35-15/T-35-16). The store fences
+ * "AI-authorized only" and "Off Limits is never Message Focus" over the VALIDATED
+ * ResearchItem shape — it reads the item's `aiEligible` / `isOffLimits` fields, not
+ * raw source rows. Off Limits can never be added even though it is human-visible.
+ */
+describe("compose-session-store — Add-to-AI eligibility guard", () => {
+  it("rejects a ResearchItem that is not aiEligible", () => {
+    const store = useComposeSession.getState();
+    store.startSession(7);
+    store.addToFocus(
+      researchItem({ id: "firstclass:birthday", aiEligible: false }),
+    );
+
+    expect(useComposeSession.getState().messageFocus).toEqual([]);
+  });
+
+  it("rejects an Off Limits item (never Message Focus), even if aiEligible is spoofed true", () => {
+    const store = useComposeSession.getState();
+    store.startSession(7);
+    // Off Limits is always aiEligible=false at the read boundary; the store still
+    // rejects it defensively even if isOffLimits and aiEligible disagree.
+    store.addToFocus(
+      researchItem({ id: "offlimits:9", isOffLimits: true, aiEligible: true }),
+    );
+
+    expect(useComposeSession.getState().messageFocus).toEqual([]);
+  });
+
+  it("admits an aiEligible item (up to the cap of three)", () => {
+    const store = useComposeSession.getState();
+    store.startSession(7);
+    store.addToFocus(researchItem({ id: "memory:1", aiEligible: true }));
+    store.addToFocus(researchItem({ id: "custom:2", aiEligible: true }));
+    store.addToFocus(researchItem({ id: "memory:3", aiEligible: true }));
+
+    expect(
+      useComposeSession.getState().messageFocus.map((item) => item.id),
+    ).toEqual(["memory:1", "custom:2", "memory:3"]);
+  });
+});
