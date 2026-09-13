@@ -16,6 +16,8 @@ import { describe, expect, it } from "vitest";
 import type { ContactMethodRow } from "@/db/contact-methods-dao";
 import {
   actionablePrimaryPhoneDestination,
+  type ComposeExit,
+  composeExitDisposition,
   effectiveMode,
   nextRememberedMode,
   resolveComposeControls,
@@ -292,5 +294,47 @@ describe("actionablePrimaryPhoneDestination", () => {
         canonical_value: null,
       }),
     ).toBeNull();
+  });
+});
+
+describe("composeExitDisposition — per-path session + navigation table (COMP-14 / D-10)", () => {
+  it("clears the session AND removes the finished route ONLY on a confirmed log", () => {
+    expect(composeExitDisposition("logged")).toEqual({
+      clearSession: true,
+      removeFinishedRoute: true,
+      navigatesToOrigin: true,
+    });
+  });
+
+  it("preserves the session on ordinary Back but still returns toward origin (COMP-07)", () => {
+    expect(composeExitDisposition("back")).toEqual({
+      clearSession: false,
+      removeFinishedRoute: false,
+      navigatesToOrigin: true,
+    });
+  });
+
+  it.each<ComposeExit>(["transmit-pending", "not-yet", "copy"])(
+    "preserves the session and stays on Compose for the non-finishing exit '%s'",
+    (exit) => {
+      expect(composeExitDisposition(exit)).toEqual({
+        clearSession: false,
+        removeFinishedRoute: false,
+        navigatesToOrigin: false,
+      });
+    },
+  );
+
+  it("NEVER clears the session on any exit except the confirmed log (clear-on-confirm fence)", () => {
+    const exits: ComposeExit[] = [
+      "back",
+      "transmit-pending",
+      "not-yet",
+      "copy",
+    ];
+    for (const exit of exits) {
+      expect(composeExitDisposition(exit).clearSession).toBe(false);
+    }
+    expect(composeExitDisposition("logged").clearSession).toBe(true);
   });
 });

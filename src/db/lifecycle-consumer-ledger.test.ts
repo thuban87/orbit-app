@@ -428,7 +428,14 @@ describe("lifecycle consumer ledger — proactive ingress owners", () => {
       join(ROOT, "src/screens/ContactProfileScreen.tsx"),
       "utf8",
     );
-    expect(screen).toContain('navigation.navigate("Compose", { contactId })');
+    // The Message → Compose navigation still carries `contactId` and is NOT placed
+    // behind any lifecycle/trackingEnabled guard. Plan 35-09 added an origin-aware
+    // `origin: 'profile'` param (COMP-14) so a Profile-launched send returns to
+    // Profile; the assertion tolerates that added param but still pins the
+    // contactId-carrying, not-lifecycle-gated navigate (intent preserved).
+    expect(screen).toMatch(
+      /navigation\.navigate\(\s*"Compose",\s*\{\s*contactId\b[\s\S]*?origin:\s*"profile"[\s\S]*?\}\s*\)/,
+    );
     // The lifecycle view model governs only bind/cadence controls; it exposes no
     // flag that could suppress Compose.
     const guard = readFileSync(

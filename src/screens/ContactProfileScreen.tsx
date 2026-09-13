@@ -332,7 +332,12 @@ export function ContactProfileScreen({
                   pendingFavourite || lifecycle.kind !== "bound"
                 }
                 onToggleFavourite={() => void toggleFavourite()}
-                onMessage={() => navigation.navigate("Compose", { contactId })}
+                onMessage={() =>
+                  navigation.navigate("Compose", {
+                    contactId,
+                    origin: "profile",
+                  })
+                }
                 onCall={() => {
                   const phone = snapshot.actionableMethods.phone;
                   if (phone) void launchMethod(phone, "call");

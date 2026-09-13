@@ -234,3 +234,78 @@ export function resolveCopyTargets(
 ): CopyTargets {
   return { body, subject: mode === "email" ? subject : null };
 }
+
+/**
+ * The distinct ways the user can leave an in-progress compose flow (COMP-14 / D-10).
+ *   - `back`             — ordinary Back, no send.
+ *   - `transmit-pending` — Transmit fired, the "Did you send it?" panel is open but
+ *                          the send is not yet confirmed.
+ *   - `not-yet`          — the user dismissed that panel ("Not yet").
+ *   - `logged`           — the user confirmed the send ("Yes, log interaction") and
+ *                          the assist row logged successfully.
+ *   - `copy`             — the user copied the draft.
+ */
+export type ComposeExit =
+  | "back"
+  | "transmit-pending"
+  | "not-yet"
+  | "logged"
+  | "copy";
+
+/** The per-exit SESSION + NAVIGATION disposition (COMP-14 / D-10, review MEDIUM #3). */
+export interface ComposeExitDisposition {
+  /**
+   * Clear THIS contact's session draft (body/subject/mode/destination/Message
+   * Focus). TRUE for the confirmed-log path ONLY — every other exit PRESERVES the
+   * in-memory session (COMP-07 / D-10). Ordinary Back never clears.
+   */
+  clearSession: boolean;
+  /**
+   * Remove the finished Compose route from Back history so a completed draft can
+   * never be resurrected/re-sent (T-35-20). TRUE for the confirmed-log path only.
+   */
+  removeFinishedRoute: boolean;
+  /**
+   * Navigate AWAY toward the launch origin (vs staying on Compose). TRUE for Back
+   * (returns toward origin) and the confirmed log; FALSE for transmit-pending,
+   * "Not yet", and Copy (all stay on the Compose surface).
+   */
+  navigatesToOrigin: boolean;
+}
+
+/**
+ * Enumerate the per-path disposition so the clear-on-confirm vs preserve-on-Back
+ * distinction (decided by D-10 + 35-01 but never previously enumerated per path) is
+ * a single pure, node-tested mapping the screen consumes — no scattered ad-hoc
+ * clear/reset calls. Pure: same input → same output; never throws.
+ *
+ * ONLY the confirmed `logged` path is a "finished" flow: it clears the session and
+ * removes the finished route. Back preserves the session but still returns toward
+ * origin. Transmit-pending / "Not yet" / Copy preserve everything and stay put.
+ */
+export function composeExitDisposition(
+  exit: ComposeExit,
+): ComposeExitDisposition {
+  switch (exit) {
+    case "logged":
+      return {
+        clearSession: true,
+        removeFinishedRoute: true,
+        navigatesToOrigin: true,
+      };
+    case "back":
+      return {
+        clearSession: false,
+        removeFinishedRoute: false,
+        navigatesToOrigin: true,
+      };
+    case "transmit-pending":
+    case "not-yet":
+    case "copy":
+      return {
+        clearSession: false,
+        removeFinishedRoute: false,
+        navigatesToOrigin: false,
+      };
+  }
+}

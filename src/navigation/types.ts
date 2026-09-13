@@ -16,6 +16,15 @@ export type ProfileRouteParams = {
 };
 
 /**
+ * Where a Compose session was launched from, driving origin-aware return
+ * (COMP-14 / HIGH-8). A serializable primitive only. `profile` returns toward the
+ * contact Profile (pop within whichever stack hosted it); `dashboard`/`deep-link`
+ * keep the default dashboard-reset semantics. Absent/`undefined` is treated as the
+ * default (dashboard) case, so existing callers need no change.
+ */
+export type ComposeOrigin = "profile" | "dashboard" | "deep-link";
+
+/**
  * The single route → params contract for the app's native-stack navigator
  * (Phase 4's real navigation shell, replacing the Phase-1→3 dependency-free
  * `HomeScreen` `useState` toggle).
@@ -98,8 +107,17 @@ export type DashboardStackParamList = {
    * so a focus reload / re-render cannot repeat the (potentially billable)
    * request (T-14-16). Absent/`undefined` is the ordinary "opened to compose"
    * case — no suggestion is auto-started.
+   *
+   * `origin` (Plan 35-09, COMP-14) is an OPTIONAL serializable primitive naming
+   * the launch context so a completed send/log or Back returns toward it — the
+   * Profile caller passes `'profile'`; dashboard/widget/notification callers omit
+   * it and keep the default dashboard-reset semantics.
    */
-  Compose: { contactId: number; requestAiSuggestion?: boolean };
+  Compose: {
+    contactId: number;
+    requestAiSuggestion?: boolean;
+    origin?: ComposeOrigin;
+  };
   /**
    * The read-only "Things to Remember" Research sibling of Compose (COMP-08,
    * plan 35-06 screen / 35-09 wiring). Carries the SERIALIZABLE `contactId` only —
@@ -176,7 +194,11 @@ export type OrreryStackParamList = {
     interactionId: number;
     contactId: number;
   };
-  Compose: { contactId: number; requestAiSuggestion?: boolean };
+  Compose: {
+    contactId: number;
+    requestAiSuggestion?: boolean;
+    origin?: ComposeOrigin;
+  };
   /** The read-only Things to Remember Research sibling of Compose — registered
    *  here too because Compose is hosted in the Orrery stack (COMP-08). */
   ComposeResearch: { contactId: number };

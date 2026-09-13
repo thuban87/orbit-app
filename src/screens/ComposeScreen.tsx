@@ -101,6 +101,8 @@ import {
 import {
   actionablePrimaryPhoneDestination,
   type ComposeControls,
+  type ComposeExit,
+  composeExitDisposition,
   effectiveMode,
   nextRememberedMode,
   resolveComposeControls,
@@ -269,15 +271,56 @@ export function ComposeScreen({
   // the Compose side (COMP-11 / COMP-10 display).
   const messageFocus = useComposeSession((s) => s.messageFocus);
 
-  // Back → Dashboard root. Reset the parent tab tree so this stays correct when
-  // Compose was opened from the Orrery stack as well as Dashboard.
-  const goHome = useCallback(
+  // The launch origin (COMP-14 / HIGH-8). Only the Profile caller passes
+  // `'profile'`; dashboard/widget/notification callers omit it and take the
+  // default dashboard-reset return.
+  const origin = route.params.origin;
+
+  // Default return → Dashboard root. Resets the parent tab tree so this stays
+  // correct when Compose was opened from the Orrery stack as well as Dashboard.
+  // Also the return whenever the contact is gone (archived/deleted) — a Profile
+  // return is meaningless then.
+  const resetToDashboard = useCallback(
     () =>
       navigation
         .getParent<NavigationProp<TabParamList>>()
         ?.reset(resetToDashboardRoot()),
     [navigation],
   );
+
+  // Origin-aware return (COMP-14): a Profile-launched Compose pops back to the
+  // Profile within WHICHEVER stack hosted it (stack-agnostic goBack — never a
+  // hardcoded stack, since ContactProfileScreen lives in both the Dashboard and
+  // Orrery stacks), which also removes the finished Compose route from Back
+  // history. Every other origin keeps the dashboard reset. Falls back to the
+  // dashboard reset if there is nothing to pop to.
+  const returnToOrigin = useCallback(() => {
+    if (origin === "profile" && navigation.canGoBack()) {
+      navigation.goBack();
+    } else {
+      resetToDashboard();
+    }
+  }, [origin, navigation, resetToDashboard]);
+
+  // Consume the pure per-path disposition (COMP-14 / D-10) instead of scattering
+  // ad-hoc clear/reset calls: clear the session ONLY on a confirmed log, and
+  // navigate toward origin for Back + the confirmed log (the latter removing the
+  // finished route). transmit-pending / "Not yet" / Copy are no-ops here (stay).
+  const performExit = useCallback(
+    (exit: ComposeExit) => {
+      const disposition = composeExitDisposition(exit);
+      if (disposition.clearSession) {
+        clearSession(contactId);
+      }
+      if (disposition.navigatesToOrigin) {
+        returnToOrigin();
+      }
+    },
+    [contactId, clearSession, returnToOrigin],
+  );
+
+  // Ordinary Back (Button + hardware): preserve the session, return toward origin.
+  const onBack = useCallback(() => performExit("back"), [performExit]);
 
   // Mirror the editor body into a ref so the lifecycle's isEditorEmpty /
   // getEditorBody deps always read the CURRENT body (never a stale closure).
@@ -479,7 +522,7 @@ export function ComposeScreen({
           // so treat archived exactly like missing.
           if (row === null || row.archived_at !== null) {
             setScreenState("missing");
-            goHome();
+            resetToDashboard();
             return;
           }
           setHeader({
@@ -545,19 +588,19 @@ export function ComposeScreen({
         focusedRef.current = false;
         lifecycleRef.current?.dispose();
       };
-    }, [contactId, goHome, startSession, setMode]),
+    }, [contactId, resetToDashboard, startSession, setMode]),
   );
 
-  // Android hardware/system Back → dashboard too (consume the event so
-  // native-stack doesn't pop to the profile). Registered while focused.
+  // Android hardware/system Back → origin-aware return (consume the event so
+  // native-stack doesn't do its own uncontrolled pop). Registered while focused.
   useFocusEffect(
     useCallback(() => {
       const sub = BackHandler.addEventListener("hardwareBackPress", () => {
-        goHome();
+        onBack();
         return true;
       });
       return () => sub.remove();
-    }, [goHome]),
+    }, [onBack]),
   );
 
   // Clear a pending "Message copied" timer on unmount (no setState after teardown).
@@ -795,7 +838,9 @@ export function ComposeScreen({
   // its handoff_at (markAssistLogged reused UNCHANGED, D-06). connected=1 matches
   // the app-global text/email confirmation (its only affirmative is confirm(1)).
   // Latched so a re-tap during the write cannot double-log (T-35-05). On success,
-  // clear the session (Transmit-confirmed — COMP-07 / D-10).
+  // this is the ONLY "finished" exit (COMP-14 / D-10): the disposition helper
+  // clears the session and returns toward origin, removing the finished Compose
+  // route from Back history so the sent draft can't resurrect (T-35-20).
   const onConfirmYes = useCallback(async () => {
     if (logging || confirm === null) {
       return;
@@ -808,7 +853,7 @@ export function ComposeScreen({
         now: localDateTime(),
       });
       setConfirm(null);
-      clearSession(contactId);
+      performExit("logged");
     } catch (err) {
       // The assist row persists (stamped at handoff_at); the app-global banner +
       // pending sheet still offer logging later — no lost state, no false success.
@@ -821,7 +866,7 @@ export function ComposeScreen({
     } finally {
       setLogging(false);
     }
-  }, [logging, confirm, contactId, clearSession]);
+  }, [logging, confirm, performExit]);
 
   // "Not yet" — close ONLY the local panel and leave the durable assist row
   // PENDING (D-05). Do NOT call markAssistDismissed; the durable "Don't log" path
@@ -839,7 +884,7 @@ export function ComposeScreen({
         role="tertiary"
         label="Back"
         accessibilityLabel="Back"
-        onPress={goHome}
+        onPress={onBack}
       />
     </ChromeScrim>
   );
