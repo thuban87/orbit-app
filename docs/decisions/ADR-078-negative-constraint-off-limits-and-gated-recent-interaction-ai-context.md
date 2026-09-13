@@ -7,7 +7,7 @@
 **Reversibility:** costly
 **Migration:** None in this ADR; a future migration adds the per-interaction Allow-AI column, numbered at plan time.
 **Supersedes:** ADR-050 (partial — Off Limits and permitted interaction notes); ADR-036 (partial — Off Limits visible on the Research side)
-**Superseded by:** None
+**Superseded by:** ADR-107 (partial — Off Limits AI egress reversed; the gated recent-interaction-note carry and the Group Notes ban below remain in force)
 
 ## Context
 

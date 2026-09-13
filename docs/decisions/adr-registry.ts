@@ -87,7 +87,7 @@
 // NOTE: ADR-0075 [ACCEPTED] Binary Favourite Membership Without a User-Facing Order
 // NOTE: ADR-0076 [ACCEPTED] Population-Reached Birthdays Without a Dashboard Banner
 // NOTE: ADR-0077 [ACCEPTED] Single Canonical Orrery with a Constrained Inspection Camera
-// NOTE: ADR-0078 [ACCEPTED] Negative-Constraint Off Limits and Gated Recent-Interaction AI Context
+// IMPORTANT: ADR-0078 [SUPERSEDED BY ADR-107 (partial — Off Limits AI egress reversed; the gated recent-interaction-note carry and the Group Notes ban below remain in force)] Negative-Constraint Off
 // NOTE: ADR-0079 [ACCEPTED] On-Demand AI Transparency and Compose-Only Three-Suggestion Invocation
 // NOTE: ADR-0080 [ACCEPTED] Four-Tab Bottom Navigation Shell with Per-Tab Stacks
 // NOTE: ADR-0081 [ACCEPTED] Retire AI-Proposed Fuel for Explicit Per-Item Permission
@@ -116,5 +116,6 @@
 // NOTE: ADR-0104 [ACCEPTED] Durable Orrery Preferences and Live System Scope
 // NOTE: ADR-0105 [ACCEPTED] Scoped Relationship Satellites for System-Member Context
 // NOTE: ADR-0106 [ACCEPTED] Derived Orrery Gravity Visual Mass and Accessible Context
+// NOTE: ADR-0107 [ACCEPTED] Off Limits Excluded from All AI Egress
 
-export const ADR_COUNT = 106;
+export const ADR_COUNT = 107;
