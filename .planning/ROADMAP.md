@@ -839,15 +839,30 @@ Plans:
 **Plans**: 9 plans (waves 1–5)
 
 Plans:
+**Wave 1**
+
 - [ ] 35-01-PLAN.md — TRACER: end-to-end Text reach-out (blank editor → Transmit → additive "Did you send it?" → confirmed log) + compose-session-store
 - [ ] 35-02-PLAN.md — Data-layer preference foundation: migration 028 + app-settings-dao compose-mode + backup allowlist (one-way migration checkpoint)
-- [ ] 35-03-PLAN.md — Delivery logic: compose-logic Text/Email + no-destination + remembered-mode; handoff email subject/body (no-dep mailto)
 - [ ] 35-04-PLAN.md — AI invocation logic: reshape AiSuggestionLifecycle (single→three, drop ack gate) + ai-availability three-state adapter (D-12)
 - [ ] 35-05-PLAN.md — AI egress shape-carry: ai-context-read carries ADR-078 avoidance-constraint + gated-note shapes (D-13, no egress widening)
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [ ] 35-03-PLAN.md — Delivery logic: compose-logic Text/Email + no-destination + remembered-mode; handoff email subject/body (no-dep mailto)
 - [ ] 35-06-PLAN.md — Research side (read-only projection) + session-only Message Focus (≤3, no permission)
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
 - [ ] 35-07-PLAN.md — ComposeScreen integration: Text/Email mode + Subject + no-destination + remembered-on-commit
+
+**Wave 4** *(blocked on Wave 3 completion)*
+
 - [ ] 35-08-PLAN.md — ComposeScreen integration: adaptive AI action + three-suggestion review + three availability states
+
+**Wave 5** *(blocked on Wave 4 completion)*
+
 - [ ] 35-09-PLAN.md — ComposeScreen integration: Research entry + Message Focus display + origin-aware return + retire AI-intent plumbing
+
 **UI hint**: yes
 
 ### Phase 36: AI Configuration & Prompting
