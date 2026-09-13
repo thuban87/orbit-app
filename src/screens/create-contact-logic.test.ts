@@ -238,4 +238,49 @@ describe("buildCreateInput", () => {
     );
     expect(out.firstInteraction).toBeUndefined();
   });
+
+  it("omits all enrichment arrays on the lean name-only path", () => {
+    const out = buildCreateInput(state(), deps());
+    expect(out).not.toHaveProperty("memories");
+    expect(out).not.toHaveProperty("relationships");
+    expect(out).not.toHaveProperty("currentStateEntries");
+    expect(out).not.toHaveProperty("offLimits");
+  });
+
+  it("passes memories, relationships and offLimits drafts through", () => {
+    const out = buildCreateInput(
+      state({
+        memories: [{ type: "general", value: "Loves hiking" }],
+        relationships: [{ personName: "Alex", relationType: "sibling" }],
+        offLimits: [{ kind: "off_limits", text: "politics" }],
+      }),
+      deps(),
+    );
+    expect(out.memories).toEqual([{ type: "general", value: "Loves hiking" }]);
+    expect(out.relationships).toEqual([
+      { personName: "Alex", relationType: "sibling" },
+    ]);
+    expect(out.offLimits).toEqual([{ kind: "off_limits", text: "politics" }]);
+  });
+
+  it("maps non-blank Last Talked About + Current Location to currentStateEntries", () => {
+    const out = buildCreateInput(
+      state({ lastTalkedAbout: "  new job ", currentLocation: "Berlin" }),
+      deps(),
+    );
+    expect(out.currentStateEntries).toEqual([
+      { fieldKey: "last_talked_about", value: "new job" },
+      { fieldKey: "current_location", value: "Berlin" },
+    ]);
+  });
+
+  it("omits a blank/whitespace current-state value", () => {
+    const out = buildCreateInput(
+      state({ lastTalkedAbout: "   ", currentLocation: "Berlin" }),
+      deps(),
+    );
+    expect(out.currentStateEntries).toEqual([
+      { fieldKey: "current_location", value: "Berlin" },
+    ]);
+  });
 });

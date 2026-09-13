@@ -104,6 +104,14 @@ export async function applyContactMethodDiffCore(
     current: ContactMethodDraft[];
     now: string;
     effectivePhoneRegion?: string | null;
+    /**
+     * Whether this core owns its `data_revision` bump (default true, preserving
+     * the standalone `applyContactMethodDiff` wrapper + every other caller). An
+     * AGGREGATE writer that composes this core inside a larger transaction (e.g.
+     * `createContactFullCore`) passes `false` so it can own the SINGLE bump for
+     * the whole composed write — closing the create-path under-bump/double-bump.
+     */
+    bumpRevision?: boolean;
   },
 ): Promise<ContactMethodSaveResult> {
   const prepared: PreparedDraft[] = [];
@@ -274,7 +282,7 @@ export async function applyContactMethodDiffCore(
     }
   }
 
-  if (changed) await bumpDataRevisionCore(exec);
+  if (changed && (params.bumpRevision ?? true)) await bumpDataRevisionCore(exec);
   const methods = await listContactMethods(exec, params.contactId);
   return collision
     ? {

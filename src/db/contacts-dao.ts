@@ -55,6 +55,10 @@ import {
   type ContactMethodSaveResult,
   listContactMethods,
 } from "@/db/contact-methods-dao";
+import {
+  type SetCurrentStateValueInput,
+  setCurrentStateValueCore,
+} from "@/db/current-state-history-dao";
 import { bumpDataRevisionCore } from "@/db/data-revision-dao";
 import { recordEventCore } from "@/db/events-dao";
 import { listDefs } from "@/db/field-defs-dao";
@@ -62,6 +66,12 @@ import {
   assertContactScopedWriteAllowedCore,
   upsertValueCore,
 } from "@/db/field-values-dao";
+import { addFuelCore, type NewFuelItem } from "@/db/fuel-dao";
+import { addMemoryCore, type NewMemoryInput } from "@/db/memories-dao";
+import {
+  addRelationshipCore,
+  type NewRelationshipInput,
+} from "@/db/relationships-dao";
 import { maybeAppendPriorValueHistoryCore } from "@/db/value-history-dao";
 import { assertSafeRelative } from "@/db/photo-relative-path";
 import {
@@ -79,6 +89,40 @@ export interface CustomValueInput {
   fieldDefId: number;
   value: string | null;
 }
+
+// =============================================================================
+// SHOW-MORE ENRICHMENT (CAPT-01) — create-path element shapes.
+//
+// Each array element carries ONLY the per-record SEMANTIC fields and OMITS the
+// framework fields that do not exist until the contact row is inserted
+// (`contactId`, the `createdAt`/`now` stamps, and — for fuel — a minted `uid` +
+// `source`). `createContactFullCore` injects that full normalization set post-
+// insert before invoking each `*Core` writer, so the element shape is NOT the raw
+// `*Core` writer input on the create path (Review cycle-3/4 MEDIUM). Keeping the
+// shapes as `Omit<...>` of the writer inputs guarantees they stay in lockstep
+// with the underlying DAO contracts.
+// =============================================================================
+
+/** A Memory to create with the contact (semantic fields only). */
+export type CreateMemoryInput = Omit<
+  NewMemoryInput,
+  "contactId" | "createdAt" | "now"
+>;
+/** A relationship to create with the contact (semantic fields only). */
+export type CreateRelationshipInput = Omit<
+  NewRelationshipInput,
+  "contactId" | "createdAt" | "now"
+>;
+/** A current-state value (Last Talked About / Current Location) — semantic only. */
+export type CreateCurrentStateInput = Omit<
+  SetCurrentStateValueInput,
+  "contactId" | "now"
+>;
+/** A fuel row (Off Limits and other kinds) to create — semantic fields only. */
+export type CreateFuelInput = Omit<
+  NewFuelItem,
+  "uid" | "contactId" | "createdAt" | "source" | "now"
+>;
 
 /**
  * A brand-new contact plus (optionally) its first touchpoint and `show_on_new`
@@ -107,6 +151,18 @@ export interface CreateContactFullInput {
   methodDrafts?: ContactMethodDraft[];
   /** Caller-resolved device/override region; omitted values fail closed. */
   methodNormalization?: ContactMethodNormalizationContext;
+  /**
+   * Show-More enrichment (CAPT-01) — each is OPTIONAL; omitting all preserves the
+   * lean name-only create path. Every supplied record is written INSIDE the single
+   * create transaction (ADR-016) via its `*Core` writer, so an interrupted create
+   * rolls back the contact AND all enrichment (never a partial contact or orphan).
+   */
+  memories?: CreateMemoryInput[];
+  relationships?: CreateRelationshipInput[];
+  /** Last Talked About + Current Location values. */
+  currentStateEntries?: CreateCurrentStateInput[];
+  /** Off Limits (and any other fuel-kind) rows. */
+  offLimits?: CreateFuelInput[];
 }
 
 /**
@@ -228,6 +284,45 @@ export async function createContactFullCore(
     );
   }
 
+  // Show-More enrichment (CAPT-01) — composed INSIDE this single transaction
+  // (ADR-016). Each element carries ONLY semantic fields; inject the framework
+  // set that does not exist until the contact row was inserted. A throw in any
+  // *Core writer rolls back the whole composition (no partial contact / orphan).
+  for (const memory of input.memories ?? []) {
+    await addMemoryCore(exec, {
+      ...memory,
+      contactId,
+      createdAt: input.now,
+      now: input.now,
+    });
+  }
+  for (const relationship of input.relationships ?? []) {
+    await addRelationshipCore(exec, {
+      ...relationship,
+      contactId,
+      createdAt: input.now,
+      now: input.now,
+    });
+  }
+  for (const entry of input.currentStateEntries ?? []) {
+    await setCurrentStateValueCore(exec, {
+      ...entry,
+      contactId,
+      now: input.now,
+    });
+  }
+  for (const fuel of input.offLimits ?? []) {
+    // Fuel additionally needs a minted uid + provenance beyond contactId/stamps.
+    await addFuelCore(exec, {
+      ...fuel,
+      uid: newUid(),
+      contactId,
+      createdAt: input.now,
+      source: "user",
+      now: input.now,
+    });
+  }
+
   const methodSaveResult =
     input.methodDrafts === undefined
       ? null
@@ -238,10 +333,17 @@ export async function createContactFullCore(
           now: input.now,
           effectivePhoneRegion:
             input.methodNormalization?.effectivePhoneRegion ?? null,
+          // The aggregate owns the single bump (below); suppress the sub-bump.
+          bumpRevision: false,
         });
-  // The method core owns the one revision bump when it changes; aggregate-only
-  // writes retain the existing single revision bump.
-  if (methodSaveResult === null) await bumpDataRevisionCore(exec);
+  // createContactFullCore is the SOLE `data_revision` bumper for the composed
+  // create: the contact INSERT is always a change and the method core ran with
+  // its bump suppressed, so a knowledge-only / unchanged-method create still
+  // advances backup-freshness by EXACTLY 1 and no path double-bumps (Review
+  // cycle-3 MEDIUM). The composed create adds NO delete core, so the
+  // `deleteFuelCore` default-bump exception (the EDIT path, fixed in 34-05) is
+  // unreachable here.
+  await bumpDataRevisionCore(exec);
   return {
     contactId,
     interactionId,

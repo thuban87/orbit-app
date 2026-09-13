@@ -26,7 +26,13 @@ import {
   toMethodDrafts,
 } from "@/components/contact-methods-editor-model";
 import type { LastSpokeValue } from "@/components/tri-state-last-spoke-logic";
-import type { CreateContactFullInput } from "@/db/contacts-dao";
+import type {
+  CreateContactFullInput,
+  CreateCurrentStateInput,
+  CreateFuelInput,
+  CreateMemoryInput,
+  CreateRelationshipInput,
+} from "@/db/contacts-dao";
 
 /** The create form's controlled state (the screen owns the React state). */
 export interface CreateFormState {
@@ -44,6 +50,19 @@ export interface CreateFormState {
   methods: MethodGroups;
   /** Custom-field values keyed by `col_name` (from FieldValueInput). */
   values: Record<string, string | null>;
+  /**
+   * Show-More enrichment drafts (CAPT-01) — all OPTIONAL; omitting them preserves
+   * the lean name-only create path. Assembled by `buildCreateInput` into the
+   * atomic `createContactFull` transaction (ADR-016). Elements carry the SEMANTIC
+   * fields only — the DAO injects the framework set post-insert.
+   */
+  memories?: CreateMemoryInput[];
+  relationships?: CreateRelationshipInput[];
+  /** Single current value for "Last Talked About" (blank → omitted). */
+  lastTalkedAbout?: string;
+  /** Single current value for "Current Location" (blank → omitted). */
+  currentLocation?: string;
+  offLimits?: CreateFuelInput[];
 }
 
 /** Caller-supplied non-deterministic inputs, so the builder stays pure/testable. */
@@ -182,5 +201,32 @@ export function buildCreateInput(
       direction: null,
     };
   }
+
+  // Show-More enrichment — only set each array when non-empty so a name-only
+  // create stays lean (omitting all enrichment). Every element carries the
+  // semantic fields only; the DAO injects the framework set post-insert.
+  const memories = state.memories ?? [];
+  if (memories.length > 0) input.memories = memories;
+  const relationships = state.relationships ?? [];
+  if (relationships.length > 0) input.relationships = relationships;
+  const currentStateEntries: CreateCurrentStateInput[] = [];
+  if (state.lastTalkedAbout?.trim()) {
+    currentStateEntries.push({
+      fieldKey: "last_talked_about",
+      value: state.lastTalkedAbout.trim(),
+    });
+  }
+  if (state.currentLocation?.trim()) {
+    currentStateEntries.push({
+      fieldKey: "current_location",
+      value: state.currentLocation.trim(),
+    });
+  }
+  if (currentStateEntries.length > 0) {
+    input.currentStateEntries = currentStateEntries;
+  }
+  const offLimits = state.offLimits ?? [];
+  if (offLimits.length > 0) input.offLimits = offLimits;
+
   return input;
 }

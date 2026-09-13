@@ -42,8 +42,25 @@ import {
 } from "@/components/contact-methods-editor-model";
 import { FieldValueInput } from "@/components/FieldValueInput";
 import { FrequencyPicker } from "@/components/FrequencyPicker";
+import {
+  FuelEditor,
+  type FuelDraft,
+  type FuelEditPatch,
+} from "@/components/FuelEditor";
+import {
+  MemoryEditor,
+  type MemoryDraft,
+  type MemoryEditPatch,
+} from "@/components/MemoryEditor";
+import {
+  RelationshipEditor,
+  type RelationshipDraft,
+} from "@/components/RelationshipEditor";
 import { TriStateLastSpoke } from "@/components/TriStateLastSpoke";
-import { AccordionSection, AppText } from "@/components/ui";
+import { AccordionSection, AppText, Button } from "@/components/ui";
+import type { FuelItem } from "@/db/fuel-read";
+import type { MemoryRow } from "@/db/memories-read";
+import type { RelationshipRow } from "@/db/relationships-read";
 import type { LastSpokeValue } from "@/components/tri-state-last-spoke-logic";
 import { getAppSettings } from "@/db/app-settings-dao";
 import { isDuplicateName, listCategories } from "@/db/contact-read";
@@ -81,6 +98,76 @@ function confirmDuplicate(name: string): Promise<boolean> {
       { cancelable: true, onDismiss: () => resolve(false) },
     );
   });
+}
+
+// -- Draft → display-row adapters ---------------------------------------------
+// The Show-More sections reuse the profile enrichment editors (same vocabulary as
+// Edit Contact), but on the CREATE path there is no contact row yet: drafts are
+// collected in local state and persisted ATOMICALLY by `createContactFull` on
+// Save. These adapters render collected drafts as the editors' committed-row
+// shape with synthetic ids (the array index) so add/edit/remove work pre-create.
+const DRAFT_TS = "";
+
+function memoryDraftToRow(draft: MemoryDraft, index: number): MemoryRow {
+  return {
+    id: index,
+    uid: "",
+    contact_id: 0,
+    type: draft.type,
+    custom_label: draft.customLabel,
+    value: draft.value,
+    note: draft.note,
+    url: draft.url,
+    meaningful_date: draft.meaningfulDate,
+    pinned: draft.pinned ? 1 : 0,
+    outdated: draft.outdated ? 1 : 0,
+    hidden: draft.hidden === null ? null : draft.hidden ? 1 : 0,
+    provenance: "user",
+    created_at: DRAFT_TS,
+    modified_at: DRAFT_TS,
+    deleted_at: null,
+    allow_ai: 0,
+  };
+}
+
+function relationshipDraftToRow(
+  draft: RelationshipDraft,
+  index: number,
+): RelationshipRow {
+  return {
+    id: index,
+    uid: "",
+    contact_id: 0,
+    person_name: draft.personName,
+    relation_type: draft.relationType,
+    linked_contact_id: draft.linkedContactId,
+    linked_contact_name: null,
+    note: draft.note,
+    pinned: draft.pinned ? 1 : 0,
+    hidden: draft.hidden,
+    created_at: DRAFT_TS,
+    modified_at: DRAFT_TS,
+    deleted_at: null,
+  };
+}
+
+function fuelDraftToItem(
+  draft: FuelDraft,
+  index: number,
+  now: string,
+): FuelItem {
+  return {
+    id: index,
+    contact_id: 0,
+    kind: draft.kind,
+    label: draft.label,
+    text: draft.text,
+    // A real stamp so the editor's age line reads "today" for a fresh draft
+    // (a blank created_at would parse to NaN in formatFuelAge).
+    created_at: now,
+    url: draft.url,
+    source: "user",
+  };
 }
 
 export function CreateContactScreen({
@@ -121,10 +208,32 @@ export function CreateContactScreen({
   // behind Show More (Task 3).
   const [expandedSections, setExpandedSections] = useState<
     Record<string, boolean>
-  >({ identity: true, relationship: false, methods: false });
+  >({
+    identity: true,
+    relationship: false,
+    methods: false,
+    lastTalked: false,
+    keyPeople: false,
+    currentLocation: false,
+    memories: false,
+    custom: false,
+    offLimits: false,
+  });
   const setSectionExpanded = useCallback((sectionId: string, next: boolean) => {
     setExpandedSections((prev) => ({ ...prev, [sectionId]: next }));
   }, []);
+
+  // Show-More advanced enrichment (CAPT-01). All optional; each draft flows into
+  // the single atomic create transaction via buildCreateInput — no rendered
+  // control fails to persist (Review HIGH #4).
+  const [showMore, setShowMore] = useState(false);
+  const [memoryDrafts, setMemoryDrafts] = useState<MemoryDraft[]>([]);
+  const [relationshipDrafts, setRelationshipDrafts] = useState<
+    RelationshipDraft[]
+  >([]);
+  const [lastTalkedAbout, setLastTalkedAbout] = useState("");
+  const [currentLocation, setCurrentLocation] = useState("");
+  const [fuelDrafts, setFuelDrafts] = useState<FuelDraft[]>([]);
 
   const load = useCallback(async () => {
     try {
@@ -162,6 +271,11 @@ export function CreateContactScreen({
       lastSpoke,
       methods,
       values,
+      memories: memoryDrafts,
+      relationships: relationshipDrafts,
+      lastTalkedAbout,
+      currentLocation,
+      offLimits: fuelDrafts,
     }),
     [
       name,
@@ -172,10 +286,17 @@ export function CreateContactScreen({
       lastSpoke,
       methods,
       values,
+      memoryDrafts,
+      relationshipDrafts,
+      lastTalkedAbout,
+      currentLocation,
+      fuelDrafts,
     ],
   );
 
   const savable = canSave(formState) && !saving;
+  // A single per-render local stamp so fuel drafts show a stable "today" age.
+  const draftNow = localDateTime();
 
   async function handleSave() {
     if (!canSave(formState) || saving) {
@@ -380,7 +501,13 @@ export function CreateContactScreen({
         ) : null}
       </AccordionSection>
 
-      <View style={styles.field}>
+      {/* -- Contact Methods section. -- */}
+      <AccordionSection
+        sectionId="methods"
+        title="Contact Methods"
+        expanded={expandedSections.methods}
+        onExpandedChange={(next) => setSectionExpanded("methods", next)}
+      >
         <ContactMethodsEditor
           testID="create-contact-methods"
           methods={methods}
@@ -397,28 +524,180 @@ export function CreateContactScreen({
             setMethods((current) => choosePrimary(current, uid))
           }
         />
-      </View>
+      </AccordionSection>
 
-      {/* -- Custom block: show_on_new fields, AFTER the fixed block -- */}
-      {createDefs.length > 0 ? (
-        <View testID="create-contact-custom-block" style={styles.customBlock}>
-          {createDefs.map((def) => (
-            <View key={def.id} style={styles.field}>
-              <Text style={[styles.label, { color: colors.textSecondary }]}>
-                {def.label}
-              </Text>
-              <FieldValueInput
-                testID={`create-contact-custom-${def.col_name}`}
-                field={def}
-                value={values[def.col_name] ?? null}
-                onChange={(v) =>
-                  setValues((prev) => ({ ...prev, [def.col_name]: v }))
-                }
-              />
-            </View>
-          ))}
-        </View>
-      ) : null}
+      {/* -- Show More: reveals the advanced enrichment sections (dossier §D). -- */}
+      {showMore ? (
+        <>
+          <AccordionSection
+            sectionId="lastTalked"
+            title="Last Talked About"
+            expanded={expandedSections.lastTalked}
+            onExpandedChange={(next) => setSectionExpanded("lastTalked", next)}
+          >
+            <TextInput
+              testID="create-contact-last-talked"
+              accessibilityLabel="Last talked about"
+              value={lastTalkedAbout}
+              onChangeText={setLastTalkedAbout}
+              placeholder="What did you last talk about?"
+              placeholderTextColor={colors.textSecondary}
+              style={[
+                styles.input,
+                {
+                  color: colors.textPrimary,
+                  backgroundColor: colors.surface,
+                  borderColor: colors.border,
+                },
+              ]}
+            />
+          </AccordionSection>
+
+          <AccordionSection
+            sectionId="keyPeople"
+            title="Key People"
+            expanded={expandedSections.keyPeople}
+            onExpandedChange={(next) => setSectionExpanded("keyPeople", next)}
+          >
+            <RelationshipEditor
+              contactId={0}
+              items={relationshipDrafts.map(relationshipDraftToRow)}
+              onAdd={async (draft: RelationshipDraft) => {
+                setRelationshipDrafts((prev) => [...prev, draft]);
+                return true;
+              }}
+              onEdit={async (id: number, draft: RelationshipDraft) => {
+                setRelationshipDrafts((prev) =>
+                  prev.map((d, i) => (i === id ? draft : d)),
+                );
+                return true;
+              }}
+              onDelete={(id: number) =>
+                setRelationshipDrafts((prev) =>
+                  prev.filter((_, i) => i !== id),
+                )
+              }
+              onRestore={() => {}}
+            />
+          </AccordionSection>
+
+          <AccordionSection
+            sectionId="currentLocation"
+            title="Current Location"
+            expanded={expandedSections.currentLocation}
+            onExpandedChange={(next) =>
+              setSectionExpanded("currentLocation", next)
+            }
+          >
+            <TextInput
+              testID="create-contact-current-location"
+              accessibilityLabel="Current location"
+              value={currentLocation}
+              onChangeText={setCurrentLocation}
+              placeholder="Where are they now?"
+              placeholderTextColor={colors.textSecondary}
+              style={[
+                styles.input,
+                {
+                  color: colors.textPrimary,
+                  backgroundColor: colors.surface,
+                  borderColor: colors.border,
+                },
+              ]}
+            />
+          </AccordionSection>
+
+          <AccordionSection
+            sectionId="memories"
+            title="Memories"
+            expanded={expandedSections.memories}
+            onExpandedChange={(next) => setSectionExpanded("memories", next)}
+          >
+            <MemoryEditor
+              testID="create-contact-memories"
+              items={memoryDrafts.map(memoryDraftToRow)}
+              globalAiEnabled={false}
+              onAdd={async (draft: MemoryDraft) => {
+                setMemoryDrafts((prev) => [...prev, draft]);
+                return true;
+              }}
+              onEdit={async (id: number, patch: MemoryEditPatch) => {
+                setMemoryDrafts((prev) =>
+                  prev.map((d, i) => (i === id ? patch : d)),
+                );
+                return true;
+              }}
+              onDelete={(id: number) =>
+                setMemoryDrafts((prev) => prev.filter((_, i) => i !== id))
+              }
+              onRestore={() => {}}
+              onSetAllowAi={() => {}}
+            />
+          </AccordionSection>
+
+          {createDefs.length > 0 ? (
+            <AccordionSection
+              sectionId="custom"
+              title="Custom Fields"
+              expanded={expandedSections.custom}
+              onExpandedChange={(next) => setSectionExpanded("custom", next)}
+            >
+              <View testID="create-contact-custom-block" style={styles.customBlock}>
+                {createDefs.map((def) => (
+                  <View key={def.id} style={styles.field}>
+                    <AppText role="label" style={{ color: colors.textSecondary }}>
+                      {def.label}
+                    </AppText>
+                    <FieldValueInput
+                      testID={`create-contact-custom-${def.col_name}`}
+                      field={def}
+                      value={values[def.col_name] ?? null}
+                      onChange={(v) =>
+                        setValues((prev) => ({ ...prev, [def.col_name]: v }))
+                      }
+                    />
+                  </View>
+                ))}
+              </View>
+            </AccordionSection>
+          ) : null}
+
+          <AccordionSection
+            sectionId="offLimits"
+            title="Off Limits"
+            expanded={expandedSections.offLimits}
+            onExpandedChange={(next) => setSectionExpanded("offLimits", next)}
+          >
+            <FuelEditor
+              testID="create-contact-off-limits"
+              items={fuelDrafts.map((d, i) =>
+                fuelDraftToItem(d, i, draftNow),
+              )}
+              now={draftNow}
+              onAdd={async (draft: FuelDraft) => {
+                setFuelDrafts((prev) => [...prev, draft]);
+                return true;
+              }}
+              onEdit={(id: number, patch: FuelEditPatch) =>
+                setFuelDrafts((prev) =>
+                  prev.map((d, i) => (i === id ? { ...d, ...patch } : d)),
+                )
+              }
+              onDelete={(id: number) =>
+                setFuelDrafts((prev) => prev.filter((_, i) => i !== id))
+              }
+              onConfirm={() => {}}
+            />
+          </AccordionSection>
+        </>
+      ) : (
+        <Button
+          testID="create-contact-show-more"
+          role="tertiary"
+          label="Show More"
+          onPress={() => setShowMore(true)}
+        />
+      )}
 
       <Pressable
         testID="create-contact-save"

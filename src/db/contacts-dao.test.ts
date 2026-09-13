@@ -34,6 +34,7 @@ import {
   setContactFrequencyCore,
   updateContactFull,
 } from "@/db/contacts-dao";
+import { readDataRevision } from "@/db/data-revision-dao";
 import { MIGRATIONS, TARGET_VERSION } from "@/db/database";
 import { runMigrations } from "@/db/migrations/runner";
 import { recordTouchpoint } from "@/db/recency-dao";
@@ -1247,5 +1248,149 @@ describe("listArchived — inverse read, most-recently-archived first", () => {
       now: NOW,
     });
     expect(await listArchived(exec)).toEqual([]);
+  });
+});
+
+describe("createContactFull — Show More enrichment (CAPT-01, ADR-016)", () => {
+  it("round-trips every enrichment kind atomically inside the single create txn", async () => {
+    const { contactId } = await createContactFull(exec, {
+      uid: uid(),
+      name: "Enriched",
+      intervalDays: 14,
+      now: NOW,
+      memories: [{ type: "general", value: "Loves hiking" }],
+      relationships: [{ personName: "Alex", relationType: "sibling" }],
+      currentStateEntries: [
+        { fieldKey: "last_talked_about", value: "new job" },
+        { fieldKey: "current_location", value: "Berlin" },
+      ],
+      offLimits: [{ kind: "off_limits", text: "politics" }],
+    });
+
+    const memory = await exec.getFirstAsync<{ value: string }>(
+      "SELECT value FROM memories WHERE contact_id = ?",
+      [contactId],
+    );
+    expect(memory?.value).toBe("Loves hiking");
+
+    const relationship = await exec.getFirstAsync<{
+      person_name: string;
+      relation_type: string;
+    }>("SELECT person_name, relation_type FROM relationships WHERE contact_id = ?", [
+      contactId,
+    ]);
+    expect(relationship?.person_name).toBe("Alex");
+    expect(relationship?.relation_type).toBe("sibling");
+
+    const states = await exec.getAllAsync<{ field_key: string; value: string }>(
+      "SELECT field_key, value FROM current_state_entries WHERE contact_id = ? AND is_current = 1 ORDER BY field_key",
+      [contactId],
+    );
+    expect(states).toEqual([
+      { field_key: "current_location", value: "Berlin" },
+      { field_key: "last_talked_about", value: "new job" },
+    ]);
+
+    const fuel = await exec.getFirstAsync<{ kind: string; text: string }>(
+      "SELECT kind, text FROM fuel WHERE contact_id = ?",
+      [contactId],
+    );
+    expect(fuel?.kind).toBe("off_limits");
+    expect(fuel?.text).toBe("politics");
+  });
+
+  it("injects the FULL framework set for relationships and fuel (cycle-4 MEDIUM #1)", async () => {
+    const { contactId } = await createContactFull(exec, {
+      uid: uid(),
+      name: "Framework fields",
+      intervalDays: 14,
+      now: NOW,
+      relationships: [{ personName: "Sam" }],
+      offLimits: [{ kind: "off_limits", text: "work drama" }],
+    });
+
+    const relationship = await exec.getFirstAsync<{
+      created_at: string | null;
+      modified_at: string | null;
+    }>("SELECT created_at, modified_at FROM relationships WHERE contact_id = ?", [
+      contactId,
+    ]);
+    expect(relationship?.created_at).toBe(NOW);
+    expect(relationship?.modified_at).toBe(NOW);
+
+    const fuel = await exec.getFirstAsync<{
+      uid: string | null;
+      source: string | null;
+      created_at: string | null;
+      modified_at: string | null;
+    }>(
+      "SELECT uid, source, created_at, modified_at FROM fuel WHERE contact_id = ?",
+      [contactId],
+    );
+    expect(fuel?.uid).toBeTruthy();
+    expect(fuel?.source).toBe("user");
+    expect(fuel?.created_at).toBe(NOW);
+    expect(fuel?.modified_at).toBe(NOW);
+  });
+
+  it("rolls back the contact AND all enrichment when an enrichment write throws", async () => {
+    await expect(
+      createContactFull(exec, {
+        uid: uid(),
+        name: "Rollback",
+        intervalDays: 14,
+        now: NOW,
+        memories: [{ type: "general", value: "should not persist" }],
+        // An empty person name throws inside addRelationshipCore → whole rollback.
+        relationships: [{ personName: "   " }],
+      }),
+    ).rejects.toThrow();
+
+    expect(
+      await exec.getFirstAsync<{ n: number }>(
+        "SELECT COUNT(*) AS n FROM contacts WHERE name = ?",
+        ["Rollback"],
+      ),
+    ).toEqual({ n: 0 });
+    expect(
+      await exec.getFirstAsync<{ n: number }>(
+        "SELECT COUNT(*) AS n FROM memories",
+      ),
+    ).toEqual({ n: 0 });
+    expect(
+      await exec.getFirstAsync<{ n: number }>(
+        "SELECT COUNT(*) AS n FROM relationships",
+      ),
+    ).toEqual({ n: 0 });
+  });
+
+  it("bumps data_revision EXACTLY once for a knowledge-only create with unchanged method drafts", async () => {
+    const before = await readDataRevision(exec);
+    await createContactFull(exec, {
+      uid: uid(),
+      name: "Knowledge only",
+      intervalDays: 14,
+      now: NOW,
+      // Empty method drafts = supplied-but-unchanged; the sub-writer would NOT
+      // bump, so the aggregate must own the single bump.
+      methodDrafts: [],
+      methodNormalization: { effectivePhoneRegion: "US" },
+      memories: [{ type: "general", value: "one enrichment field" }],
+    });
+    expect(await readDataRevision(exec)).toBe(before + 1);
+  });
+
+  it("bumps data_revision EXACTLY once for a create that also changes methods (no double-bump)", async () => {
+    const before = await readDataRevision(exec);
+    await createContactFull(exec, {
+      uid: uid(),
+      name: "With methods",
+      intervalDays: 14,
+      now: NOW,
+      methodDrafts: [{ uid: uid(), type: "phone", value: "555-1234" }],
+      methodNormalization: { effectivePhoneRegion: "US" },
+      memories: [{ type: "general", value: "also an enrichment field" }],
+    });
+    expect(await readDataRevision(exec)).toBe(before + 1);
   });
 });
