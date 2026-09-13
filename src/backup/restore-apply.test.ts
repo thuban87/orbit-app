@@ -61,6 +61,8 @@ import { migration021 } from "@/db/migrations/021-orrery-preferences";
 import { migration022 } from "@/db/migrations/022-orrery-systems";
 import { migration023 } from "@/db/migrations/023-orrery-system-selection-revision";
 import { migration025 } from "@/db/migrations/025-interaction-history-schema";
+import { migration026 } from "@/db/migrations/026-group-events-schema";
+import { migration027 } from "@/db/migrations/027-default-interaction-channel";
 import { profilePresentationMigration } from "@/db/migrations/profile-presentation";
 import { readOrrerySystemSnapshot } from "@/db/orrery-system-read";
 import { createContactWithInteraction, recordTouchpoint } from "@/db/recency-dao";
@@ -83,8 +85,10 @@ async function db(): Promise<SqlExecutor> {
       migration023,
       profilePresentationMigration,
       migration025,
+      migration026,
+      migration027,
     ],
-    25,
+    27,
     { now: NOW, newUid },
   );
   return exec;
@@ -762,6 +766,35 @@ describe("applyRestore", () => {
     const destination = await db();
     await expect(applyRestore(destination, manifest, "merge")).resolves.toMatchObject({ status: "applied" });
     await expect(destination.getFirstAsync<{ phone_region_override: string }>("SELECT phone_region_override FROM app_settings WHERE id=1")).resolves.toEqual({ phone_region_override: "GB" });
+  });
+
+  it("restores the declare-only camelCase channel keys into their SQLite columns via COLUMN_OF (CAPT-11)", async () => {
+    const source = await db();
+    // Bump the source settings stamp so applySettings triggers (newer wins), then
+    // inject the DECLARE-ONLY camelCase MANIFEST keys the export never emits, to
+    // prove the restore path maps them through COLUMN_OF into the intended columns
+    // (a snake_case key would find no COLUMN_OF entry and be silently dropped — HIGH #2).
+    await source.runAsync("UPDATE app_settings SET modified_at=? WHERE id=1", ["2026-08-25 12:01:00"]);
+    const manifest = await buildExportManifest(source, { exportedAt: NOW, readPhotoBase64: async () => "" });
+    (manifest.appSettings as Record<string, unknown>).defaultInteractionChannel = "Call";
+    (manifest.appSettings as Record<string, unknown>).rememberedInteractionChannel = "In Person";
+    const destination = await db();
+    await expect(applyRestore(destination, parseBackupManifest(manifest), "merge")).resolves.toMatchObject({ status: "applied" });
+    await expect(destination.getFirstAsync<{ default_interaction_channel: string; remembered_interaction_channel: string }>("SELECT default_interaction_channel, remembered_interaction_channel FROM app_settings WHERE id=1"))
+      .resolves.toEqual({ default_interaction_channel: "Call", remembered_interaction_channel: "In Person" });
+  });
+
+  it("rejects an out-of-vocabulary restored channel value before writing (CAPT-11, T-34-03)", async () => {
+    const source = await db();
+    await source.runAsync("UPDATE app_settings SET modified_at=? WHERE id=1", ["2026-08-25 12:01:00"]);
+    const manifest = await buildExportManifest(source, { exportedAt: NOW, readPhotoBase64: async () => "" });
+    (manifest.appSettings as Record<string, unknown>).defaultInteractionChannel = "totally-bogus";
+    const destination = await db();
+    // The DAO validators reused at the restore boundary reject the value before the
+    // write opens, so the column stays at its seeded default and nothing persists.
+    await expect(applyRestore(destination, manifest, "merge")).rejects.toThrow();
+    await expect(destination.getFirstAsync<{ default_interaction_channel: string }>("SELECT default_interaction_channel FROM app_settings WHERE id=1"))
+      .resolves.toEqual({ default_interaction_channel: "remember" });
   });
 
   it("round-trips allow_ai, scoped/history/group defs, value history, soft-deletes, and a history tombstone in merge", async () => {

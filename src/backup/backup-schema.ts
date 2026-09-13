@@ -5,8 +5,10 @@ import {
   BackupSchemaError,
 } from "@/backup/types";
 import {
+  assertDefaultInteractionChannel,
   assertOrreryDensity,
   assertOrreryLastSystem,
+  assertRememberedInteractionChannel,
 } from "@/db/app-settings-dao";
 import { isCurrentStateFieldKey, isMemoryTypeKey } from "@/db/memory-registry";
 
@@ -190,6 +192,15 @@ export const PORTABLE_SETTINGS_KEYS = new Set([
   // unchanged this phase — emission + the format bump are Phase 36.
   "historyLens",
   "historyCycleCount",
+  // Phase 34 (declare-only, CAPT-11 / D-03): the durable Default Interaction
+  // Channel preference and its remembered value are accepted for restore only.
+  // These are the camelCase MANIFEST keys (matching COLUMN_OF's key side and the
+  // restore cast to AppSettingsPatch) — NOT the snake_case SQLite column names,
+  // which would pass .has() nowhere and silently drop at restore (Review HIGH #2).
+  // getPortableSettingsSnapshot does NOT emit them and the backup format version
+  // is unchanged this phase — emission + the format bump are Phase 36.
+  "defaultInteractionChannel",
+  "rememberedInteractionChannel",
 ]);
 
 const SECRET_SHAPED_KEY =
@@ -232,6 +243,24 @@ function assertPortableSettings(
       assertOrreryLastSystem("orreryLastSystem", settings.orreryLastSystem);
   } catch {
     fail("appSettings has an invalid Orrery preference");
+  }
+  // CAPT-11 / T-34-03: reject a malformed/adversarial restored channel value at
+  // the backup boundary, reusing the SAME DAO validators that guard ordinary
+  // writes, so it can never reach the DB. The remembered value is always a
+  // concrete channel (never the 'remember' sentinel).
+  try {
+    if (settings.defaultInteractionChannel !== undefined)
+      assertDefaultInteractionChannel(
+        "defaultInteractionChannel",
+        settings.defaultInteractionChannel,
+      );
+    if (settings.rememberedInteractionChannel !== undefined)
+      assertRememberedInteractionChannel(
+        "rememberedInteractionChannel",
+        settings.rememberedInteractionChannel,
+      );
+  } catch {
+    fail("appSettings has an invalid interaction channel");
   }
   if (
     settings.orrerySatellitesEnabled !== undefined &&

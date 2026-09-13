@@ -36,6 +36,42 @@ describe("dashboard preference portable allowlist", () => {
   });
 });
 
+describe("default interaction channel portable allowlist (declare-only, CAPT-11)", () => {
+  it("allowlists both camelCase MANIFEST keys, NOT the snake_case columns", () => {
+    // camelCase MANIFEST keys match COLUMN_OF's key side + the restore cast; the
+    // snake_case column names would pass .has() nowhere and drop at restore (HIGH #2).
+    for (const key of ["defaultInteractionChannel", "rememberedInteractionChannel"]) {
+      expect(PORTABLE_SETTINGS_KEYS.has(key)).toBe(true);
+    }
+    for (const key of ["default_interaction_channel", "remembered_interaction_channel"]) {
+      expect(PORTABLE_SETTINGS_KEYS.has(key)).toBe(false);
+    }
+  });
+
+  it("accepts the deferred camelCase channel keys while rejecting unknown siblings", () => {
+    const portable = valid();
+    portable.appSettings.defaultInteractionChannel = "Call";
+    portable.appSettings.rememberedInteractionChannel = "In Person";
+    expect(parseBackupManifest(portable).appSettings).toMatchObject({ defaultInteractionChannel: "Call", rememberedInteractionChannel: "In Person" });
+    portable.appSettings.unrecognizedSibling = "nope";
+    expect(() => parseBackupManifest(portable)).toThrow(BackupSchemaError);
+  });
+
+  it("rejects an out-of-vocabulary channel value at the parse boundary", () => {
+    const badDefault = valid(); badDefault.appSettings.defaultInteractionChannel = "bogus";
+    expect(() => parseBackupManifest(badDefault)).toThrow(/invalid interaction channel/i);
+    // 'remember' is a valid DEFAULT sentinel but NOT a valid remembered value.
+    const badRemembered = valid(); badRemembered.appSettings.rememberedInteractionChannel = "remember";
+    expect(() => parseBackupManifest(badRemembered)).toThrow(/invalid interaction channel/i);
+  });
+
+  it("does not inject the channel keys when a manifest omits them (parser adds nothing)", () => {
+    const parsed = parseBackupManifest(valid());
+    expect(parsed.appSettings).not.toHaveProperty("defaultInteractionChannel");
+    expect(parsed.appSettings).not.toHaveProperty("rememberedInteractionChannel");
+  });
+});
+
 describe("Systems restore acceptance (declare-only)", () => {
   it("accepts a custom System token while rejecting malformed System tokens", () => {
     const custom = valid();

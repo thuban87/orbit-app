@@ -72,7 +72,13 @@ describe("registered migration chain", () => {
     expect(
       MIGRATIONS.filter((migration) => migration.version === 25),
     ).toHaveLength(1);
-    expect(TARGET_VERSION).toBe(26);
+    expect(
+      MIGRATIONS.filter((migration) => migration.version === 26),
+    ).toHaveLength(1);
+    expect(
+      MIGRATIONS.filter((migration) => migration.version === 27),
+    ).toHaveLength(1);
+    expect(TARGET_VERSION).toBe(27);
     expect(
       await exec.getFirstAsync<{ user_version: number }>("PRAGMA user_version"),
     ).toEqual({
@@ -103,6 +109,8 @@ describe("registered migration chain", () => {
       "profile_background_template_uid",
       "history_lens",
       "history_cycle_count",
+      "default_interaction_channel",
+      "remembered_interaction_channel",
     ]) {
       expect(appSettingsCols.has(col)).toBe(true);
     }

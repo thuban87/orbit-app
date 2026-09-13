@@ -43,6 +43,8 @@ import { migration021 } from "@/db/migrations/021-orrery-preferences";
 import { migration022 } from "@/db/migrations/022-orrery-systems";
 import { migration023 } from "@/db/migrations/023-orrery-system-selection-revision";
 import { migration025 } from "@/db/migrations/025-interaction-history-schema";
+import { migration026 } from "@/db/migrations/026-group-events-schema";
+import { migration027 } from "@/db/migrations/027-default-interaction-channel";
 import { profilePresentationMigration } from "@/db/migrations/profile-presentation";
 import { runMigrations } from "@/db/migrations/runner";
 import type { SqlExecutor } from "@/db/types";
@@ -118,8 +120,10 @@ beforeEach(async () => {
       migration023,
       profilePresentationMigration,
       migration025,
+      migration026,
+      migration027,
     ],
-    25,
+    27,
     { now: NOW, newUid: uid, defaultPhoneRegion: "US" },
   );
   __resetExpo();
