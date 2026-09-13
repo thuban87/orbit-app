@@ -32,37 +32,41 @@ import {
   View,
 } from "react-native";
 import { ContactMethodsEditor } from "@/components/ContactMethodsEditor";
+import { ContactPicker } from "@/components/ContactPicker";
 import {
   addMethodDraft,
+  choosePrimary,
   type MethodGroups,
   removeMethodDraft,
   resolveEffectivePhoneRegion,
   seedMethodGroups,
   toMethodDrafts,
   updateMethodDraft,
-  choosePrimary,
 } from "@/components/contact-methods-editor-model";
-import { ContactPicker } from "@/components/ContactPicker";
 import { FieldValueInput } from "@/components/FieldValueInput";
 import { FrequencyPicker } from "@/components/FrequencyPicker";
 import {
-  RelationshipEditor,
   type RelationshipDraft,
+  RelationshipEditor,
 } from "@/components/RelationshipEditor";
 import { ShellAppBar } from "@/components/ShellAppBar";
 import { AppText } from "@/components/ui";
 import { getAppSettings } from "@/db/app-settings-dao";
-import { getContactHeader } from "@/db/contact-read";
 import {
   applyContactMethodDiff,
   listContactMethods,
 } from "@/db/contact-methods-dao";
-import { getExecutor, localDateTime } from "@/db/database";
+import { getContactHeader } from "@/db/contact-read";
 import { setCurrentStateValue } from "@/db/current-state-history-dao";
 import { getCurrentStateValue } from "@/db/current-state-history-read";
-import { defsForEditForm, getValuesForContact, upsertValue } from "@/db/field-values-dao";
+import { getExecutor, localDateTime } from "@/db/database";
 import { listDefs } from "@/db/field-defs-dao";
 import type { CustomFieldDef } from "@/db/field-types";
+import {
+  defsForEditForm,
+  getValuesForContact,
+  upsertValue,
+} from "@/db/field-values-dao";
 import { addFuel, deleteFuel, editFuel } from "@/db/fuel-dao";
 import { type FuelItem, listFuelForEditor } from "@/db/fuel-read";
 import type { CurrentStateFieldKey } from "@/db/memory-registry";
@@ -78,8 +82,8 @@ import {
   type RelationshipRow,
 } from "@/db/relationships-read";
 import { newUid } from "@/db/uid";
-import { getDeviceRegion } from "@/services/device-region";
 import type { DashboardScreenProps } from "@/navigation/types";
+import { getDeviceRegion } from "@/services/device-region";
 import { showSnackbar } from "@/stores/snackbar-store";
 import { useTheme } from "@/theme";
 import { RADII } from "@/theme/tokens/radii";
@@ -88,9 +92,9 @@ import { Logger } from "@/utils/logger";
 import {
   buildChooserRows,
   type ChooserRow,
-  finishSession,
   cancelRow,
   completeSave,
+  finishSession,
   openRow,
   selectApplicableDefs,
   startSession,
@@ -249,7 +253,11 @@ function CurrentStateFocusedEditor({
           },
         ]}
       />
-      <PrimaryButton label="Save" disabled={!value.trim() || saving} onPress={() => void save()} />
+      <PrimaryButton
+        label="Save"
+        disabled={!value.trim() || saving}
+        onPress={() => void save()}
+      />
     </EditorFrame>
   );
 }
@@ -286,7 +294,12 @@ function KeyPeopleFocusedEditor({
   const add = async (draft: RelationshipDraft): Promise<boolean> => {
     try {
       const now = localDateTime();
-      await addRelationship(getExecutor(), { contactId, ...draft, createdAt: now, now });
+      await addRelationship(getExecutor(), {
+        contactId,
+        ...draft,
+        createdAt: now,
+        now,
+      });
       setSavedTick((tick) => tick + 1);
       return true;
     } catch (cause) {
@@ -294,9 +307,17 @@ function KeyPeopleFocusedEditor({
       return false;
     }
   };
-  const edit = async (id: number, draft: RelationshipDraft): Promise<boolean> => {
+  const edit = async (
+    id: number,
+    draft: RelationshipDraft,
+  ): Promise<boolean> => {
     try {
-      await editRelationship(getExecutor(), { id, contactId, ...draft, now: localDateTime() });
+      await editRelationship(getExecutor(), {
+        id,
+        contactId,
+        ...draft,
+        now: localDateTime(),
+      });
       setSavedTick((tick) => tick + 1);
       return true;
     } catch (cause) {
@@ -305,11 +326,21 @@ function KeyPeopleFocusedEditor({
     }
   };
   const restore = (id: number) =>
-    void restoreRelationship(getExecutor(), { id, contactId, now: localDateTime() })
+    void restoreRelationship(getExecutor(), {
+      id,
+      contactId,
+      now: localDateTime(),
+    })
       .then(load)
-      .catch((cause) => Logger.error(LOG_SCOPE, "failed to restore relationship", cause));
+      .catch((cause) =>
+        Logger.error(LOG_SCOPE, "failed to restore relationship", cause),
+      );
   const remove = (id: number) =>
-    void deleteRelationship(getExecutor(), { id, contactId, now: localDateTime() })
+    void deleteRelationship(getExecutor(), {
+      id,
+      contactId,
+      now: localDateTime(),
+    })
       .then(() => {
         void load();
         showSnackbar({
@@ -322,7 +353,9 @@ function KeyPeopleFocusedEditor({
           },
         });
       })
-      .catch((cause) => Logger.error(LOG_SCOPE, "failed to delete relationship", cause));
+      .catch((cause) =>
+        Logger.error(LOG_SCOPE, "failed to delete relationship", cause),
+      );
 
   return (
     <EditorFrame title="Key people" error={false} onCancel={onCancel}>
@@ -404,7 +437,9 @@ function OffLimitsFocusedEditor({
   const remove = (id: number) =>
     void deleteFuel(getExecutor(), { id, contactId, now: localDateTime() })
       .then(load)
-      .catch((cause) => Logger.error(LOG_SCOPE, "failed to delete off-limits", cause));
+      .catch((cause) =>
+        Logger.error(LOG_SCOPE, "failed to delete off-limits", cause),
+      );
 
   return (
     <EditorFrame title="Off Limits" error={error} onCancel={onCancel}>
@@ -473,7 +508,9 @@ function ContactMethodFocusedEditor({
   onCancel: () => void;
 }) {
   const [groups, setGroups] = useState<MethodGroups>({ phone: [], email: [] });
-  const [seeded, setSeeded] = useState<Awaited<ReturnType<typeof listContactMethods>>>([]);
+  const [seeded, setSeeded] = useState<
+    Awaited<ReturnType<typeof listContactMethods>>
+  >([]);
   const [region, setRegion] = useState<string | null>(null);
   const [error, setError] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -495,7 +532,10 @@ function ContactMethodFocusedEditor({
         }),
       );
       setRegion(
-        resolveEffectivePhoneRegion(settings.phoneRegionOverride, getDeviceRegion()),
+        resolveEffectivePhoneRegion(
+          settings.phoneRegionOverride,
+          getDeviceRegion(),
+        ),
       );
     })().catch((cause) =>
       Logger.error(LOG_SCOPE, "failed to seed contact methods", cause),
@@ -531,11 +571,17 @@ function ContactMethodFocusedEditor({
       <ContactMethodsEditor
         methods={groups}
         onAdd={(type) => setGroups((g) => addMethodDraft(g, type, newUid()))}
-        onUpdate={(uid, patch) => setGroups((g) => updateMethodDraft(g, uid, patch))}
+        onUpdate={(uid, patch) =>
+          setGroups((g) => updateMethodDraft(g, uid, patch))
+        }
         onRemove={(uid) => setGroups((g) => removeMethodDraft(g, uid))}
         onChoosePrimary={(uid) => setGroups((g) => choosePrimary(g, uid))}
       />
-      <PrimaryButton label="Save" disabled={saving} onPress={() => void save()} />
+      <PrimaryButton
+        label="Save"
+        disabled={saving}
+        onPress={() => void save()}
+      />
     </EditorFrame>
   );
 }
@@ -596,7 +642,11 @@ function ContactFrequencyFocusedEditor({
         onChange={setIntervalDays}
         onValidityChange={setValid}
       />
-      <PrimaryButton label="Save" disabled={saving || !valid} onPress={() => void save()} />
+      <PrimaryButton
+        label="Save"
+        disabled={saving || !valid}
+        onPress={() => void save()}
+      />
     </EditorFrame>
   );
 }
@@ -656,12 +706,21 @@ function CustomFieldFocusedEditor({
   return (
     <EditorFrame title={def.label} error={error} onCancel={onCancel}>
       <FieldValueInput
-        field={{ type: def.type, label: def.label, options: def.options, col_name: def.col_name }}
+        field={{
+          type: def.type,
+          label: def.label,
+          options: def.options,
+          col_name: def.col_name,
+        }}
         value={value}
         onChange={setValue}
         contactId={contactId}
       />
-      <PrimaryButton label="Save" disabled={saving} onPress={() => void save()} />
+      <PrimaryButton
+        label="Save"
+        disabled={saving}
+        onPress={() => void save()}
+      />
     </EditorFrame>
   );
 }
@@ -785,7 +844,8 @@ export function UpdateContactScreen({
     );
   }
 
-  const activeRow = rows.find((row) => row.key === session.activeRowKey) ?? null;
+  const activeRow =
+    rows.find((row) => row.key === session.activeRowKey) ?? null;
 
   const renderActiveEditor = () => {
     if (!activeRow) return null;
@@ -803,19 +863,35 @@ export function UpdateContactScreen({
         );
       case "key_people":
         return (
-          <KeyPeopleFocusedEditor contactId={contactId} onSaved={onSaved} onCancel={onCancel} />
+          <KeyPeopleFocusedEditor
+            contactId={contactId}
+            onSaved={onSaved}
+            onCancel={onCancel}
+          />
         );
       case "off_limits":
         return (
-          <OffLimitsFocusedEditor contactId={contactId} onSaved={onSaved} onCancel={onCancel} />
+          <OffLimitsFocusedEditor
+            contactId={contactId}
+            onSaved={onSaved}
+            onCancel={onCancel}
+          />
         );
       case "contact_method":
         return (
-          <ContactMethodFocusedEditor contactId={contactId} onSaved={onSaved} onCancel={onCancel} />
+          <ContactMethodFocusedEditor
+            contactId={contactId}
+            onSaved={onSaved}
+            onCancel={onCancel}
+          />
         );
       case "contact_frequency":
         return (
-          <ContactFrequencyFocusedEditor contactId={contactId} onSaved={onSaved} onCancel={onCancel} />
+          <ContactFrequencyFocusedEditor
+            contactId={contactId}
+            onSaved={onSaved}
+            onCancel={onCancel}
+          />
         );
       case "custom_field": {
         const def = liveDefs.find((d) => d.id === activeRow.fieldDefId);

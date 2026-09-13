@@ -217,8 +217,6 @@ export function finishSession(session: ChooserSession): ChooserSession {
 /** The chooser row list is showing (contact targeted, no editor open, not done). */
 export function isChooserVisible(session: ChooserSession): boolean {
   return (
-    session.contactId !== null &&
-    session.activeRowKey === null &&
-    !session.done
+    session.contactId !== null && session.activeRowKey === null && !session.done
   );
 }

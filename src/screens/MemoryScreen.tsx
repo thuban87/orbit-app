@@ -27,8 +27,8 @@ import { useFocusEffect } from "@react-navigation/native";
 import { useCallback, useEffect, useState } from "react";
 import { ScrollView, StyleSheet, View } from "react-native";
 import {
-  MemoryEditor,
   type MemoryDraft,
+  MemoryEditor,
   type MemoryEditPatch,
 } from "@/components/MemoryEditor";
 import { ShellAppBar } from "@/components/ShellAppBar";
@@ -110,7 +110,11 @@ export function MemoryScreen({
     showSnackbar({
       kind: "error",
       label: "Couldn't save. Please try again.",
-      action: { label: "Dismiss", accessibilityLabel: "Dismiss error", onPress: () => {} },
+      action: {
+        label: "Dismiss",
+        accessibilityLabel: "Dismiss error",
+        onPress: () => {},
+      },
     });
 
   const add = async (draft: MemoryDraft): Promise<boolean> => {
@@ -118,7 +122,12 @@ export function MemoryScreen({
     setSaving(true);
     try {
       const now = localDateTime();
-      await addMemory(getExecutor(), { contactId, ...draft, createdAt: now, now });
+      await addMemory(getExecutor(), {
+        contactId,
+        ...draft,
+        createdAt: now,
+        now,
+      });
       returnToChooser();
       return true;
     } catch (error) {
@@ -155,7 +164,9 @@ export function MemoryScreen({
     if (contactId === null) return;
     void restoreMemory(getExecutor(), { id, contactId, now: localDateTime() })
       .then(() => load())
-      .catch((error) => Logger.error(LOG_SCOPE, "failed to restore memory", error));
+      .catch((error) =>
+        Logger.error(LOG_SCOPE, "failed to restore memory", error),
+      );
   };
 
   const remove = (id: number) => {
@@ -173,7 +184,9 @@ export function MemoryScreen({
           },
         });
       })
-      .catch((error) => Logger.error(LOG_SCOPE, "failed to delete memory", error));
+      .catch((error) =>
+        Logger.error(LOG_SCOPE, "failed to delete memory", error),
+      );
   };
 
   const setAllowAi = (id: number, allow: boolean) => {

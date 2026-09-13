@@ -2,8 +2,8 @@ import { describe, expect, it } from "vitest";
 import type { CustomFieldDef } from "@/db/field-types";
 import {
   buildChooserRows,
-  cancelRow,
   type ChooserRow,
+  cancelRow,
   completeSave,
   finishSession,
   GENERIC_CUSTOM_FIELDS_LABEL,
@@ -137,9 +137,7 @@ describe("selectApplicableDefs", () => {
       always_show: 1,
       quarantined_at: "2026-09-01 00:00:00",
     });
-    expect(
-      selectApplicableDefs([quarantined], { cf_q: "x" }),
-    ).toHaveLength(0);
+    expect(selectApplicableDefs([quarantined], { cf_q: "x" })).toHaveLength(0);
   });
 
   it("orders applicable defs by display_order", () => {
