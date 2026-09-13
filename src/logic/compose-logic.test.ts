@@ -19,6 +19,7 @@ import {
   effectiveMode,
   nextRememberedMode,
   resolveComposeControls,
+  resolveCopyTargets,
   resolveUsableMode,
 } from "@/logic/compose-logic";
 
@@ -251,6 +252,25 @@ describe("nextRememberedMode — advances ONLY on a Transmit/Copy commit (COMP-0
 
   it("returns the current remembered mode on an ad-hoc in-session switch (not committed)", () => {
     expect(nextRememberedMode("text", "email", false)).toBe("text");
+  });
+});
+
+describe("resolveCopyTargets — body-only vs subject-only Copy targets (COMP-04)", () => {
+  it("main Copy target is the Body regardless of mode", () => {
+    expect(resolveCopyTargets("text", "the body", "the subject").body).toBe(
+      "the body",
+    );
+    expect(resolveCopyTargets("email", "the body", "the subject").body).toBe(
+      "the body",
+    );
+  });
+
+  it("Subject copy target is the Subject and is offered in Email mode ONLY", () => {
+    expect(resolveCopyTargets("email", "the body", "the subject").subject).toBe(
+      "the subject",
+    );
+    // Text mode has no Subject affordance → the target is null (not offered).
+    expect(resolveCopyTargets("text", "the body", "the subject").subject).toBeNull();
   });
 });
 

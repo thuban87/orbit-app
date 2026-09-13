@@ -209,3 +209,28 @@ export function nextRememberedMode(
 ): RememberedMessageMode {
   return committed ? adHocMode : current;
 }
+
+/** The two Copy affordances the compose surface exposes (COMP-04). */
+export interface CopyTargets {
+  /** The MAIN Copy affordance always copies the Body text — in any mode. */
+  body: string;
+  /**
+   * The separate Subject copy affordance's target: the Subject text in Email
+   * mode, or `null` when the affordance is NOT offered (Text mode has no Subject).
+   */
+  subject: string | null;
+}
+
+/**
+ * Resolve the two Copy targets so the screen never inlines the rule (WR-02). The
+ * main Copy target is ALWAYS the Body; the Subject copy affordance targets the
+ * Subject and is offered in Email mode ONLY (`null` in Text mode). Pure; never
+ * throws.
+ */
+export function resolveCopyTargets(
+  mode: MessageMode,
+  body: string,
+  subject: string,
+): CopyTargets {
+  return { body, subject: mode === "email" ? subject : null };
+}
