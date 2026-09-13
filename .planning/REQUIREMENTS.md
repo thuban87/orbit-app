@@ -335,7 +335,7 @@ Status values: **Pending** = roadmapped, not yet planned.
 | HIST-01…18 | Phase 32 — Interaction History & Insights | Pending |
 | GRP-01…13 | Phase 33 — Group Interaction Logging | Pending |
 | CAPT-01…15 | Phase 34 — Rapid Capture & Update Flows | Pending |
-| COMP-01…14 | Phase 35 — Messaging & AI Compose | Pending |
+| COMP-01…14 | Phase 35 — Messaging & AI Compose | Complete |
 | AICFG-01…17 | Phase 36 — AI Configuration & Prompting | Pending |
 | (deferred) | Phases 37–40 — Settings / Your Week / Onboarding / Release Hardening | Deferred planning |
 

@@ -2,19 +2,19 @@
 gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Release Readiness
-current_phase: 35
-current_phase_name: Messaging & AI Compose
-status: executing
-stopped_at: Completed 35-09-PLAN.md
-last_updated: "2026-09-13T18:00:00.000Z"
+current_phase: 36
+current_phase_name: AI Configuration & Prompting
+status: planning
+stopped_at: Phase 35 complete, ready to plan Phase 36
+last_updated: "2026-09-13T20:14:01.808Z"
 last_activity: 2026-09-13
-last_activity_desc: "Completed 35-09 (final Compose expansion: registered the ComposeResearch route in both stacks + param lists via a plain-prop route adapter; Compose-side 'Things to Remember · N' session-preserving entry + compact 'Message focus · N' summary (hidden when empty, Off Limits structurally excluded); origin-aware return driven by the pure composeExitDisposition table — confirmed-log clears the session + removes the finished route, Back preserves + returns toward origin, ContactProfileScreen passes origin:'profile' popping back to Profile from either stack; retired the requestAiSuggestion consume-once AI-intent plumbing + its module + orphaned test. COMP-08/10/11/14 closed. Phase 35 plan set complete 9/9 — origin-aware Back-stack behaviour is Pixel phase-gate UAT)"
-state_head: bfa33cb
+last_activity_desc: Phase 35 complete, transitioned to Phase 36
+state_head: ace6bd9d7f0fc0a2b28cb978e7f7418c222666b0
 progress:
   total_phases: 21
-  completed_phases: 9
+  completed_phases: 10
   total_plans: 137
-  completed_plans: 134
+  completed_plans: 135
 carried_forward:
 
   - "31.1 NOT complete: 31.1-05 corrective (backgrounds were invisible on the owner's release — full-screen scrim at card opacity) is executed + debug-validated + release built/delivered, but the phase stays open until the owner validates the release on his personal phone (the prior 31.1-04 gate's false positive is why). See 31.1-05-PLAN.md, 31.1-UAT.md (superseded + corrective section)."
@@ -32,20 +32,20 @@ carried_forward:
 See: .planning/PROJECT.md (updated 2026-09-10 after Phase 31)
 
 **Core value:** Collapse the taps between "you're overdue with X" and the message actually being sent.
-**Current focus:** Phase 35 — Messaging & AI Compose
+**Current focus:** Phase 36 — AI Configuration & Prompting (ready to plan; Phase 35 complete)
 
 ## Current Position
 
-Phase: 35 (Messaging & AI Compose) — EXECUTING
-Plan: 35-08 complete (8 of 9 plans done: 35-01, 35-05, 35-02, 35-03, 35-04, 35-06, 35-07, 35-08)
-Status: 35-08 committed — AI re-wired into the now-mode-aware ComposeScreen against the reshaped 35-04 lifecycle. resolvePrompt(template, context, sourceDraft?) gains an optional bounded/delimited MESSAGE TO REWRITE block (fence-neutralized, code-point-capped, joins the scaffold so the end hard-trim never severs it; §P-411 minimal framing) — sourceDraft is a PARAM not a PromptContext field, egress allowlist unchanged. The screen re-creates the provider-wiring 35-01 removed (AiService/settings/catalog refs, refreshProviders/getActiveProvider/model-selection/resolveMaxOutputTokens) and wires generate = generateVariants(generateOne, prompt, signal, 3) where generateOne builds GenerationInput with a DISTINCT per-call variantTemperature (COMP-12 varied-suggestions lever). One adaptive Draft/Rewrite action (begin() only on tap, never a focus/mount effect); a non-destructive three-suggestion review surface at body 16/24 (Choose this = the sole editor mutation, Try Again replaces, Cancel dismisses, Rewrite shows original + keep-original). Availability is SOURCED on focus via an async aiKeyStore.getKey PRESENCE read (boolean only, never the value) fed to computeAiAvailability; an observed unauthorized flips a session-local flag → needs-attention (cleared on a later success); Off/Ready/Needs-Attention drive AI rendering with the manual editor/Copy/Transmit always usable; the sanitized error-code→short-line mapping is re-created (never raw provider text). AiService untouched; no ack gate; ADR-070/071 coexistence intact. COMP-09/12/13 closed (screen-level; Pixel phase-gate UAT is the render backstop). Next is 35-09 (Research entry + Message Focus display + origin-aware return + retire AI-intent plumbing) — the last plan of the phase.
-Prior status: 35-07 committed — ComposeScreen wired for Text AND Email as a thin consumer of the 35-03 compose-logic. Mode inits from migration-028 default_message_mode/remembered_message_mode via effectiveMode on a FRESH session only; an ad-hoc "Make this an email"/"a text" switch flips session mode WITHOUT persisting; the remembered mode advances (updateAppSettings) via nextRememberedMode ONLY on a committed Transmit/main-Copy (never the switch, never Subject-copy). Destinations resolve per mode from one listContactMethodGroups read (selectActionablePrimaryMethods + 4-arg resolveComposeControls + resolveUsableMode preferred-then-fallback); usable no-destination state (Transmit hidden + accessible caption + Copy sole primary, not an error); establish-primary picker shown only with ≥2 actionable candidates + no explicit stored primary → setContactMethodPrimary (never applyContactMethodDiff). Email exposes a Subject field (bound to 35-01 store subject/setSubject) + a separate Subject-copy affordance ("Subject copied") while main Copy stays body-only ("Message copied") via resolveCopyTargets; Transmit derives channel+endpoint from the usable mode and carries subject+body into the email arm — no hardcoded channel literal. COMP-02/03/04 closed (screen-level; Pixel phase-gate UAT is the render backstop). Wave 3 complete; next is Wave 4 (35-08 AI, 35-09 Research entry + Message Focus + nav).
+Phase: 36 — AI Configuration & Prompting
+Plan: Not started
+Status: Ready to plan
+Prior status: Phase 35 COMPLETE (all 9 plans, waves 1–5). Verifier 5/5 must-haves + all 14 COMP IDs; code review 1 blocker (CR-01 restore-path 'remember'-sentinel — assertRememberedMessageMode added at DAO + backup boundaries) + 3 warnings, all fixed; Wave-1 cross-plan regression (35-05→006 test) fixed. Migration 028 (app_settings.default_message_mode/remembered_message_mode) proven on-device at user_version=28 with correct defaults on the Pixel 3a; full owner test plan passed on the Moto Razr release APK (orbit-phase35-release-2026-09-13.apk in G:\My Drive\IT\Software\Orbit). 3391 tests pass, tsc/colors clean; AiService.ts untouched all phase (AI egress not widened). Commits local on main, NOT pushed.
 Parked (owner, future): theme-merge into one Dark/Light switch; Deep Space/Starfield removal. See memories mode-aware-glassy-cards, android-elevation-opaque-on-translucent, theme-merge-into-mode-parked.
 FYI (separate): Phase 30 (Orrery Systems) still shows [ ] in ROADMAP with dirty 30-REVIEW files — reconcile independently.
 Carried forward (owner's bucket, NOT resolved here): D-11 default Memory-type display name — reconcile before Phase 34.
 Surface to owner (24.2-07, KNOW-15): milestone plan said Phase 36 owns the backup format-4 bump, but 24.1 already bumped to 4 (d677e2c); Plan 07 emits into the live format 4 with NO bump — that milestone instruction is stale.
 Deferred to Phase 31 (recorded in Plan 05): durable contact-scoped-def ownership + owner-purge semantics. Deferred to Phase 36 (ROADMAP breadcrumb): legacy AI-fuel confirm-path code removal.
-Last activity: 2026-09-13 — Completed 35-08 (AI re-wired into ComposeScreen: bounded Rewrite sourceDraft in resolvePrompt + adaptive Draft/Rewrite action + generateVariants fan-out + non-destructive three-suggestion review + three availability states sourced from an on-focus credential-presence read + re-created sanitized error surface)
+Last activity: 2026-09-13 — Phase 35 complete, transitioned to Phase 36
 Progress: 11 completed v2.0 phases — 22, 23, 24.1, 24.2, 25, 26, 27, 28, 29, 30, 31
 Next: End-of-phase Pixel UAT for Phase 34 (see 34-08-SUMMARY coverage), then verify/close the phase.
 
@@ -63,7 +63,7 @@ at plan time. All new durable preferences are `app_settings` columns, never Asyn
 
 **Velocity:**
 
-- Total plans completed: 90
+- Total plans completed: 99
 - Average duration: —
 - Total execution time: 0 hours
 
@@ -82,6 +82,7 @@ at plan time. All new durable preferences are `app_settings` columns, never Asyn
 | 31 | 15 | - | - |
 | 32 | 8 | - | - |
 | 34 | 8 | - | - |
+| 35 | 9 | - | - |
 
 **Recent Trend:**
 
@@ -685,7 +686,7 @@ _Also disposed at this close: 05/deferred-items.md (check:colors doc-comment) ma
 ## Session
 
 **Last session:** 2026-09-13T16:38:51.737Z
-**Stopped at:** Completed 35-04-PLAN.md
+**Stopped at:** Phase 35 complete, ready to plan Phase 36
 _Prior stop (v1.0):_ Phase 21 UI-SPEC approved; milestone v1.0 closed 2026-09-01.
 _Prior stop (13-04):_ the orrery VISUAL VOCABULARY (theme tokens + two pure resolver modules, node-tested, 29 cases green): (1) five owner-tunable `ThemePalette` tokens seeded in `space-dark.dark` ONLY — `starPalette` (6 colours, gold `#F2C14E` at index 0, then amber/rose-red/violet/cyan/ice-white), `mutedStable/Wobble/Decay` (desaturated same-hue morph endpoints), `rogueExtinguished` (cold blue-grey `#3E4A6B` rogue BODY fill) — with an M6/C2-5 conformance test that IMPORTS the real `SELF_SUN_COLOUR_RE`/`assertSelfSunColour` from app-settings-dao and locks every starPalette entry to the ACTUAL DAO write-path rule (no re-inlined regex). (2) `orrery-ring-logic.ts` `orreryRingStyle(status, colors)` — REUSES `ringVisual` for `{color,opacity,width}` (status→colour mapped once), adds the `strokeStyle` axis (solid→dashed→faded→faintTrace) + `bodyFill` (rogue ring=`colors.rogue`, body=`rogueExtinguished`); `null`→canonical NEUTRAL (`colors.border`), never throws — the single fallback sun-occupant reuses (C2-2). (3) `sun-occupant-logic.ts` `resolveSunOccupant(input)` — NULL/archived/missing→self (A7, glow `selfSunColour ?? starPalette[0]`), live contact→its status glow via `orreryRingStyle(status, colors).color`, never-contacted (status `null`)→the reused neutral border (C2-2); accepts `status: ProfileStatus | null`. 5 commits (1801915 feat tokens+M6; d35d528 RED→4cbfad5 GREEN ring-logic; c923b16 RED→10780dd GREEN sun-occupant); tsc + check:colors clean; no deviations (one in-flight fix: a placeholder hex in the logic test was re-sourced from the palette after check:colors flagged it — C2-3). Committed locally on main (NOT pushed). Next: Wave 2 (13-05 render / 13-06 Settings sun-picker), Wave 3 (13-07 drag-release), Wave 4 (13-08 device UAT, autonomous:false).
 **Resume file:** None
