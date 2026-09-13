@@ -37,8 +37,51 @@ import {
 } from "@/components/contact-methods-editor-model";
 import type { LastSpokeValue } from "@/components/tri-state-last-spoke-logic";
 import type { ContactForEdit } from "@/db/contact-read";
-import type { UpdateContactFullInput } from "@/db/contacts-dao";
-import { firstInteractionOccurredAt } from "./create-contact-logic";
+import type {
+  CreateCurrentStateInput,
+  CreateFuelInput,
+  CreateMemoryInput,
+  CreateRelationshipInput,
+  EditFuelPatch,
+  EditMemoryPatch,
+  EditRelationshipPatch,
+  KnowledgeCollectionDiff,
+  KnowledgeDeleteRef,
+  UpdateContactFullInput,
+} from "@/db/contacts-dao";
+import {
+  firstInteractionOccurredAt,
+  resolveErrorSection,
+  type SectionFieldMap,
+  type ValidationError,
+} from "./create-contact-logic";
+
+export type { SectionFieldMap, ValidationError };
+// Re-export the shared pure resolver + its types so 34-08 (and its tests) can
+// import the reveal-and-focus contract from the edit surface directly.
+export { resolveErrorSection };
+
+// =============================================================================
+// KNOWLEDGE-SUBDOMAIN DRAFT ROWS (CAPT-04, dossier §E).
+//
+// A collection draft row is the create-path semantic shape PLUS an optional row
+// `id`: an EXISTING seeded row carries its `id`, a NEW row omits it. `buildEditInput`
+// diffs the current draft against the seeded baseline (same shape) into the pinned
+// `{ add, edit, delete }` contract `updateContactFull` applies — the DAO never
+// re-diffs (Review cycle-3 LOW).
+// =============================================================================
+
+/** A Memory draft row (existing rows carry `id`; new rows omit it). */
+export type MemoryDraftRow = CreateMemoryInput & { id?: number };
+/** A relationship draft row (existing rows carry `id`; new rows omit it). */
+export type RelationshipDraftRow = CreateRelationshipInput & { id?: number };
+/** An off-limits fuel draft row (existing rows carry `id`; new rows omit it). */
+export type FuelDraftRow = CreateFuelInput & { id?: number };
+
+/** The two current-state fields, keyed for the seeded baseline comparison. */
+export type CurrentStateSeed = Partial<
+  Record<"last_talked_about" | "current_location", string>
+>;
 
 /** The edit form's controlled state (the screen owns the React state). */
 export interface EditFormState {
@@ -73,6 +116,19 @@ export interface EditFormState {
    * nothing.
    */
   lastSpoke: LastSpokeValue;
+  /**
+   * Knowledge-subdomain drafts (CAPT-04, dossier §E) — all OPTIONAL; omitting them
+   * preserves the lean metadata+custom-values edit. `buildEditInput` diffs each
+   * against its seeded baseline (deps.seeded*) into the `{ add, edit, delete }`
+   * contract. `offLimits` rows are off_limits fuel only (kind forced by the diff).
+   */
+  memories?: MemoryDraftRow[];
+  relationships?: RelationshipDraftRow[];
+  offLimits?: FuelDraftRow[];
+  /** Single current value for "Last talked about" (blank → no write). */
+  lastTalkedAbout?: string;
+  /** Single current value for "Current location" (blank → no write). */
+  currentLocation?: string;
 }
 
 /** Caller-supplied non-deterministic inputs, so the builder stays pure/testable. */
@@ -88,6 +144,16 @@ export interface BuildEditInputDeps {
   /** The seeded `contact.last_contact IS NULL` flag — gates the firstInteraction path. */
   neverContacted: boolean;
   effectivePhoneRegion: string | null;
+  /**
+   * Seeded knowledge baselines (same draft shape) the current draft is diffed
+   * against. Omitted baselines are treated as empty (every draft row is an add).
+   * `seededOffLimits` is DEFENSIVELY re-filtered to `kind === "off_limits"` inside
+   * `buildEditInput` — see the off-limits kind-scope note (Review cycle-4 MEDIUM #3).
+   */
+  seededMemories?: MemoryDraftRow[];
+  seededRelationships?: RelationshipDraftRow[];
+  seededOffLimits?: FuelDraftRow[];
+  seededCurrentState?: CurrentStateSeed;
 }
 
 /** A never-contacted contact (`last_contact IS NULL`) may set its first contact here. */
@@ -168,12 +234,140 @@ export function canSave(state: EditFormState): boolean {
   );
 }
 
+// =============================================================================
+// VALIDATION REVEAL-AND-FOCUS (Edit Contact) — reuses the SAME pure resolver as
+// the create surface (34-03). Only blocking-error-producing fields need a map
+// entry; the map is the section↔field contract 34-08's AccordionSections drive.
+// =============================================================================
+
+/**
+ * The Edit-Contact field→section map. Only fields that can raise a BLOCKING save
+ * error need an entry (name, cadence). The knowledge subdomains raise no blocking
+ * validation today, so they carry no entry — an unmapped error is skipped by the
+ * shared `resolveErrorSection` and the next mapped error resolves.
+ */
+export const EDIT_SECTION_FIELD_MAP: SectionFieldMap = {
+  name: "identity",
+  frequency: "relationship",
+  phone: "methods",
+  email: "methods",
+};
+
+/**
+ * The blocking validation errors for the Edit-Contact form, in reveal order: name
+ * first (Identity), then an invalid cadence WHILE Bound (Relationship Basics).
+ * Mirrors `canSave`; empty = savable. Yields the per-field detail
+ * `resolveErrorSection` routes to a section.
+ */
+export function collectEditBlockingErrors(
+  state: EditFormState,
+): ValidationError[] {
+  const errors: ValidationError[] = [];
+  if (state.name.trim().length === 0) {
+    errors.push({ field: "name", message: "Enter a name to save." });
+  }
+  if (state.trackingEnabled !== false && !state.intervalValid) {
+    errors.push({ field: "frequency", message: "Pick a valid frequency." });
+  }
+  return errors;
+}
+
+/** The comparable signature of a draft row (all fields EXCEPT the row `id`). */
+function rowSignature(row: Record<string, unknown>): string {
+  const { id: _id, ...rest } = row;
+  const keys = Object.keys(rest).sort();
+  return JSON.stringify(keys.map((key) => [key, rest[key]]));
+}
+
+/**
+ * Diff a knowledge collection's seeded baseline vs the current draft into the
+ * pinned `{ add, edit, delete }` contract, keyed by row-identity `id`:
+ *   • a draft row with NO `id` → `add`;
+ *   • a draft row whose `id` exists in the seed AND whose signature changed → `edit`
+ *     (edited in place — never a duplicate add);
+ *   • a seeded `id` absent from the draft → `delete`.
+ * Returns `undefined` when nothing changed (the subdomain is then omitted from the
+ * edit input — an untouched subdomain writes nothing). The DAO applies these lists
+ * and never re-diffs.
+ */
+function diffKnowledgeCollection<TRow extends { id?: number }, TAdd, TEdit>(
+  seed: TRow[],
+  draft: TRow[],
+  toAdd: (row: TRow) => TAdd,
+  toEdit: (row: TRow & { id: number }) => TEdit,
+): KnowledgeCollectionDiff<TAdd, TEdit> | undefined {
+  const seedById = new Map<number, TRow>();
+  for (const row of seed) {
+    if (row.id != null) seedById.set(row.id, row);
+  }
+
+  const add: TAdd[] = [];
+  const edit: TEdit[] = [];
+  const draftIds = new Set<number>();
+  for (const row of draft) {
+    if (row.id == null) {
+      add.push(toAdd(row));
+      continue;
+    }
+    draftIds.add(row.id);
+    const seeded = seedById.get(row.id);
+    if (seeded === undefined) {
+      // An id with no seeded match (should not happen) — treat as a new add.
+      add.push(toAdd(row));
+      continue;
+    }
+    if (rowSignature(seeded) !== rowSignature(row)) {
+      edit.push(toEdit(row as TRow & { id: number }));
+    }
+  }
+
+  const del: KnowledgeDeleteRef[] = [];
+  for (const id of seedById.keys()) {
+    if (!draftIds.has(id)) del.push({ id });
+  }
+
+  if (add.length === 0 && edit.length === 0 && del.length === 0)
+    return undefined;
+  const result: KnowledgeCollectionDiff<TAdd, TEdit> = {};
+  if (add.length > 0) result.add = add;
+  if (edit.length > 0) result.edit = edit;
+  if (del.length > 0) result.delete = del;
+  return result;
+}
+
+/** The current-state entries whose trimmed draft value is non-blank AND changed. */
+function currentStateEntriesDiff(
+  state: EditFormState,
+  seed: CurrentStateSeed,
+): CreateCurrentStateInput[] {
+  const entries: CreateCurrentStateInput[] = [];
+  const consider = (
+    fieldKey: "last_talked_about" | "current_location",
+    draftValue: string | undefined,
+  ): void => {
+    const value = draftValue?.trim();
+    if (!value) return; // blank → no write (clearing is out of scope, as on create)
+    if (value === seed[fieldKey]) return; // unchanged → no history row
+    entries.push({ fieldKey, value });
+  };
+  consider("last_talked_about", state.lastTalkedAbout);
+  consider("current_location", state.currentLocation);
+  return entries;
+}
+
 /**
  * Build the atomic-edit input for `updateContactFull`. Blank controls are
  * discarded while nonblank invalid method drafts remain durable; `name` is trimmed. The custom block is `editDefs`
  * mapped to the current values (a missing key -> null). A `firstInteraction` is
  * added ONLY when the contact is never-contacted AND the tri-state is Today/Pick
  * date (owner ruling); otherwise it is omitted and no interaction is written.
+ *
+ * Knowledge subdomains (CAPT-04, dossier §E): each draft is diffed against its
+ * seeded baseline into the pinned `{ add, edit, delete }` contract; an untouched
+ * subdomain is omitted entirely. The `offLimits` diff is KIND-SCOPED — the seed is
+ * defensively filtered to `kind === "off_limits"` and every add/edit forces
+ * `kind:"off_limits"` so a `recent`/`topic`/`fact`/`gift` row can NEVER appear in
+ * the off_limits diff (Review cycle-4 MEDIUM #3, DATA LOSS).
  */
 export function buildEditInput(
   state: EditFormState,
@@ -215,5 +409,67 @@ export function buildEditInput(
       };
     }
   }
+
+  // KNOWLEDGE SUBDOMAINS (CAPT-04, §E) — diff each draft vs its seeded baseline
+  // into the pinned {add,edit,delete} contract; omit an untouched subdomain.
+  if (state.memories !== undefined) {
+    const diff = diffKnowledgeCollection<
+      MemoryDraftRow,
+      CreateMemoryInput,
+      EditMemoryPatch
+    >(
+      deps.seededMemories ?? [],
+      state.memories,
+      ({ id: _id, ...add }) => add,
+      (row) => ({ ...row }),
+    );
+    if (diff) input.memories = diff;
+  }
+
+  if (state.relationships !== undefined) {
+    const diff = diffKnowledgeCollection<
+      RelationshipDraftRow,
+      CreateRelationshipInput,
+      EditRelationshipPatch
+    >(
+      deps.seededRelationships ?? [],
+      state.relationships,
+      ({ id: _id, ...add }) => add,
+      (row) => ({ ...row }),
+    );
+    if (diff) input.relationships = diff;
+  }
+
+  if (state.offLimits !== undefined) {
+    // KIND-SCOPE both sides to off_limits (DATA LOSS guard, cycle-4 MEDIUM #3):
+    // filter the seed defensively and force kind on every add/edit, so no
+    // recent/topic/fact/gift row can ever land in the off_limits diff.
+    const seededOffLimits = (deps.seededOffLimits ?? []).filter(
+      (row) => row.kind === "off_limits",
+    );
+    const draftOffLimits = state.offLimits.filter(
+      (row) => row.kind === "off_limits",
+    );
+    const diff = diffKnowledgeCollection<
+      FuelDraftRow,
+      CreateFuelInput,
+      EditFuelPatch
+    >(
+      seededOffLimits,
+      draftOffLimits,
+      ({ id: _id, ...add }) => ({ ...add, kind: "off_limits" }),
+      (row) => ({ ...row, kind: "off_limits" }),
+    );
+    if (diff) input.offLimits = diff;
+  }
+
+  const currentStateEntries = currentStateEntriesDiff(
+    state,
+    deps.seededCurrentState ?? {},
+  );
+  if (currentStateEntries.length > 0) {
+    input.currentStateEntries = currentStateEntries;
+  }
+
   return input;
 }

@@ -6,9 +6,14 @@ import {
   buildBirthdayForStorage,
   buildEditInput,
   canSave,
+  collectEditBlockingErrors,
+  EDIT_SECTION_FIELD_MAP,
   type EditFormState,
+  type FuelDraftRow,
   isNeverContacted,
+  type MemoryDraftRow,
   parseBirthdayForForm,
+  resolveErrorSection,
   seedEditState,
 } from "./edit-contact-logic";
 
@@ -328,5 +333,136 @@ describe("buildEditInput", () => {
       deps({ neverContacted: false }),
     );
     expect(out.firstInteraction).toBeUndefined();
+  });
+});
+
+// =============================================================================
+// Plan 34-05 Task 3 — knowledge-subdomain payload assembly (CAPT-04, §E).
+// =============================================================================
+
+describe("buildEditInput — knowledge-subdomain diffs (CAPT-04, §E)", () => {
+  it("omits every knowledge subdomain when the draft state is untouched (undefined)", () => {
+    const out = buildEditInput(state(), deps());
+    expect(out.memories).toBeUndefined();
+    expect(out.relationships).toBeUndefined();
+    expect(out.offLimits).toBeUndefined();
+    expect(out.currentStateEntries).toBeUndefined();
+  });
+
+  it("omits a subdomain whose draft equals its seed (no add/edit/delete)", () => {
+    const seeded: MemoryDraftRow[] = [{ id: 1, type: "general", value: "same" }];
+    const out = buildEditInput(
+      state({ memories: [{ id: 1, type: "general", value: "same" }] }),
+      deps({ seededMemories: seeded }),
+    );
+    expect(out.memories).toBeUndefined();
+  });
+
+  it("emits {add,edit,delete} keyed by id: new -> add, changed existing -> edit (no duplicate), removed -> delete", () => {
+    const seeded: MemoryDraftRow[] = [
+      { id: 1, type: "general", value: "keep-but-edit" },
+      { id: 2, type: "general", value: "to-remove" },
+    ];
+    const draft: MemoryDraftRow[] = [
+      { id: 1, type: "general", value: "edited" }, // existing, changed -> edit
+      { type: "general", value: "brand new" }, // no id -> add
+      // id 2 dropped -> delete
+    ];
+    const out = buildEditInput(
+      state({ memories: draft }),
+      deps({ seededMemories: seeded }),
+    );
+
+    expect(out.memories?.add).toEqual([{ type: "general", value: "brand new" }]);
+    expect(out.memories?.edit).toEqual([
+      { id: 1, type: "general", value: "edited" },
+    ]);
+    // Edited row is in `edit`, NOT `add` (no duplicate).
+    expect(out.memories?.add?.some((m) => (m as { value: string }).value === "edited")).toBe(
+      false,
+    );
+    expect(out.memories?.delete).toEqual([{ id: 2 }]);
+  });
+
+  it("current-state: emits an entry only when non-blank AND changed from seed", () => {
+    // unchanged -> omitted
+    expect(
+      buildEditInput(
+        state({ lastTalkedAbout: "same" }),
+        deps({ seededCurrentState: { last_talked_about: "same" } }),
+      ).currentStateEntries,
+    ).toBeUndefined();
+
+    // blank -> omitted
+    expect(
+      buildEditInput(state({ currentLocation: "   " }), deps()).currentStateEntries,
+    ).toBeUndefined();
+
+    // changed -> emitted (trimmed)
+    expect(
+      buildEditInput(
+        state({ lastTalkedAbout: " new topic ", currentLocation: "Berlin" }),
+        deps({ seededCurrentState: { last_talked_about: "old topic" } }),
+      ).currentStateEntries,
+    ).toEqual([
+      { fieldKey: "last_talked_about", value: "new topic" },
+      { fieldKey: "current_location", value: "Berlin" },
+    ]);
+  });
+
+  it("off_limits diff is KIND-SCOPED: a non-off_limits seed row is NEVER a delete, and every add/edit carries kind:off_limits (DATA LOSS guard)", () => {
+    const seeded: FuelDraftRow[] = [
+      { id: 10, kind: "off_limits", text: "politics" },
+      { id: 11, kind: "recent", text: "coffee" }, // MUST never be computed as a delete
+      { id: 12, kind: "gift", text: "book" }, // MUST never be computed as a delete
+    ];
+    const draft: FuelDraftRow[] = [
+      // off_limits id 10 dropped -> should be the ONLY delete
+      { kind: "off_limits", text: "religion" }, // new off_limits -> add
+    ];
+
+    const out = buildEditInput(
+      state({ offLimits: draft }),
+      deps({ seededOffLimits: seeded }),
+    );
+
+    expect(out.offLimits?.delete).toEqual([{ id: 10 }]); // only the off_limits row
+    expect(out.offLimits?.add).toEqual([{ kind: "off_limits", text: "religion" }]);
+    for (const add of out.offLimits?.add ?? []) {
+      expect(add.kind).toBe("off_limits");
+    }
+  });
+
+  it("off_limits edit in place forces kind:off_limits on the edit patch", () => {
+    const seeded: FuelDraftRow[] = [{ id: 20, kind: "off_limits", text: "old" }];
+    const out = buildEditInput(
+      state({ offLimits: [{ id: 20, kind: "off_limits", text: "new" }] }),
+      deps({ seededOffLimits: seeded }),
+    );
+    expect(out.offLimits?.edit).toEqual([
+      { id: 20, kind: "off_limits", text: "new" },
+    ]);
+  });
+});
+
+describe("resolveErrorSection + collectEditBlockingErrors (reveal-and-focus)", () => {
+  it("maps the first blocking error to its section id", () => {
+    const errors = collectEditBlockingErrors(state({ name: "   " }));
+    expect(resolveErrorSection(errors, EDIT_SECTION_FIELD_MAP)).toBe("identity");
+  });
+
+  it("maps a cadence error to the relationship section", () => {
+    const errors = collectEditBlockingErrors(
+      state({ name: "OK", trackingEnabled: true, intervalValid: false }),
+    );
+    expect(resolveErrorSection(errors, EDIT_SECTION_FIELD_MAP)).toBe(
+      "relationship",
+    );
+  });
+
+  it("returns null when there are no blocking errors", () => {
+    const errors = collectEditBlockingErrors(state());
+    expect(errors).toEqual([]);
+    expect(resolveErrorSection(errors, EDIT_SECTION_FIELD_MAP)).toBeNull();
   });
 });
