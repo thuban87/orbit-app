@@ -45,7 +45,6 @@ import { migration020 } from "@/db/migrations/020-dashboard-swipe-pref";
 import { migration021 } from "@/db/migrations/021-orrery-preferences";
 import { migration022 } from "@/db/migrations/022-orrery-systems";
 import { migration023 } from "@/db/migrations/023-orrery-system-selection-revision";
-import { profilePresentationMigration } from "@/db/migrations/profile-presentation";
 import {
   INTERACTION_HISTORY_SCHEMA_VERSION,
   migration025,
@@ -56,6 +55,7 @@ import {
   COMPOSE_MESSAGE_MODE_SCHEMA_VERSION,
   migration028,
 } from "@/db/migrations/028-compose-message-mode";
+import { profilePresentationMigration } from "@/db/migrations/profile-presentation";
 import { runMigrations } from "@/db/migrations/runner";
 import type { Migration, SqlExecutor } from "@/db/types";
 import { newUid } from "@/db/uid";
