@@ -9,16 +9,22 @@ These two suites fail on the pre-35-02 tree as well. Neither imports any module
 35-02 touched (`app-settings-dao`, `backup-schema`, `database.ts`), and the
 failures reproduce with 35-02's Task 3 changes reverted. Not fixed here.
 
-1. **`src/db/migrations/006-normalize-custom-field-values.test.ts`** — test
-   "preserves the populated v5 profile through normalized lifecycle, read, AI,
-   history, and purge paths" fails with `Error: no such column: allow_ai`
-   (`allow_ai` is a migration-025 interactions column). The suite's own
-   migration/read setup is out of sync with a column a read path expects.
-2. **`src/components/orrery/orrery-controls-render.test.tsx`** — render test
-   failure, unrelated to the data layer.
+1. **`src/db/migrations/006-normalize-custom-field-values.test.ts`** — ✅ **RESOLVED
+   (commit `51c8eb9`).** This was NOT pre-existing: it was a phase-35 cross-plan
+   regression introduced by **35-05**, which added an unconditional
+   `SELECT note, allow_ai FROM interactions` into `readPromptContext` via
+   `readGatedRecentInteractionNotes`. The 006 test builds its DB only to schema v6
+   and calls `readPromptContext`, so the v25 `allow_ai` column was absent. The
+   orchestrator's Wave-1 post-merge gate caught it and fixed the **test fixture**
+   (added `allow_ai INTEGER NOT NULL DEFAULT 0 CHECK(allow_ai IN (0,1))`, mirroring
+   migration 025); production egress code is unchanged. **Do not re-log this as an
+   open failure — the 006 test passes (9/9) as of Wave 1.**
+2. **`src/components/orrery/orrery-controls-render.test.tsx`** — genuinely
+   pre-existing (`SyntaxError: Unexpected token 'typeof'`, transform-level; the
+   suite fails to load). Added in Phase 29 (`5d38954`), references no phase-35
+   file. Still open — owner's call, tracked with the Phase 30 cleanup.
 
-Recommend triaging these independently (owner's call on priority); they are not
-regressions from 35-02.
+Only #2 remains open; #1 is fixed.
 ## [35-04] Pre-existing unrelated test failure — orrery-controls-render.test.tsx
 
 - **Discovered during:** 35-04 overall verification (full `npx vitest run`).
