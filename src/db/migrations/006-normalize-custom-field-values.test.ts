@@ -401,6 +401,14 @@ describe("migration006 — lossless legacy custom-value normalization", () => {
       newUid: uid,
       defaultPhoneRegion: "US",
     });
+    // readPromptContext's gated-note branch (35-05) reads interactions.allow_ai,
+    // the durable AI-egress gate migration 025 adds (default OFF). This v6 proof
+    // only migrates to v18, so mirror migration 025's exact column shape here so
+    // the current-schema read path runs; default 0 means no interaction opts in
+    // and the custom-field leak assertions below stay authoritative.
+    await exec.execAsync(
+      "ALTER TABLE interactions ADD COLUMN allow_ai INTEGER NOT NULL DEFAULT 0 CHECK(allow_ai IN (0, 1))",
+    );
     const liveDefs = await listDefs(exec, { includeQuarantined: false });
     const initial = await getValuesForContact(exec, alex, liveDefs);
     expect(initial).toMatchObject({
