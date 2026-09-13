@@ -20,7 +20,7 @@ describe("UNIVERSAL_FAB_ACTIONS", () => {
     expect(UNIVERSAL_FAB_ACTIONS).toEqual([
       { id: "AddContact", label: "Add Contact" },
       { id: "QuickLog", label: "Quick Log" },
-      { id: "LogContact", label: "Log Contact" },
+      { id: "LogContact", label: "Log Interaction" },
       { id: "GroupLog", label: "Group Log" },
       { id: "UpdateContact", label: "Update Contact" },
       { id: "Memory", label: "Memory" },

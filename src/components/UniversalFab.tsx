@@ -50,7 +50,7 @@ const ACTION_ACCESSIBILITY_LABELS: Record<
 > = {
   AddContact: { accessibilityLabel: "Add Contact" },
   QuickLog: { accessibilityLabel: "Quick Log" },
-  LogContact: { accessibilityLabel: "Log Contact" },
+  LogContact: { accessibilityLabel: "Log Interaction" },
   GroupLog: { accessibilityLabel: "Group Log" },
   UpdateContact: { accessibilityLabel: "Update Contact" },
   Memory: { accessibilityLabel: "Memory" },
