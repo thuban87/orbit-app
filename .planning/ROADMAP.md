@@ -797,12 +797,12 @@ Plans:
 
 **Canonical refs**: docs/dossier/milestone-2/phase-13-rapid-capture-update-flows-dossier.md; docs/dossier/milestone-2/planning-notes/phase-13-planning-notes.md
 **Schema**: shared interactions migration with Phase 32 — Tone, channel, duration, Allow AI (owning phase decided once at plan time; verify head+1 at plan time)
-**Plans**: 2/8 plans executed across 3 waves
+**Plans**: 3/8 plans executed across 3 waves
 **Wave 1**
 
 - [x] 34-01-PLAN.md — Default Interaction Channel data layer: migration 027 (app_settings only) + DAO + declare-only backup portability (CAPT-11)
 - [x] 34-02-PLAN.md — D-11 Memory-type displayName swap + CAPT-15 vocabulary satisfied-by-dependency verification (no new migration)
-- [ ] 34-03-PLAN.md — streamlined three-section Add Contact + Show More enrichment (atomic create) + AccordionSection primitive & validation interface (CAPT-01/02/03/14)
+- [x] 34-03-PLAN.md — streamlined three-section Add Contact + Show More enrichment (atomic create) + AccordionSection primitive & validation interface (CAPT-01/02/03/14)
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
