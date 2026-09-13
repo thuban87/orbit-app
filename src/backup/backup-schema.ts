@@ -6,9 +6,11 @@ import {
 } from "@/backup/types";
 import {
   assertDefaultInteractionChannel,
+  assertMessageMode,
   assertOrreryDensity,
   assertOrreryLastSystem,
   assertRememberedInteractionChannel,
+  assertRememberedMessageMode,
 } from "@/db/app-settings-dao";
 import { isCurrentStateFieldKey, isMemoryTypeKey } from "@/db/memory-registry";
 
@@ -270,6 +272,22 @@ function assertPortableSettings(
       );
   } catch {
     fail("appSettings has an invalid interaction channel");
+  }
+  // COMP-02 / CR-01: reject a malformed/adversarial restored message mode at the
+  // backup boundary, reusing the SAME DAO validators that guard ordinary writes,
+  // so an invalid value can never reach the CHECK-free remembered_message_mode
+  // column (migration 028). default_message_mode may hold the 'remember' sentinel;
+  // remembered_message_mode is always a concrete mode ('text' | 'email').
+  try {
+    if (settings.defaultMessageMode !== undefined)
+      assertMessageMode("defaultMessageMode", settings.defaultMessageMode);
+    if (settings.rememberedMessageMode !== undefined)
+      assertRememberedMessageMode(
+        "rememberedMessageMode",
+        settings.rememberedMessageMode,
+      );
+  } catch {
+    fail("appSettings has an invalid message mode");
   }
   if (
     settings.orrerySatellitesEnabled !== undefined &&

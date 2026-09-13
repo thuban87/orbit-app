@@ -213,6 +213,24 @@ export function assertMessageMode(field: string, v: unknown): void {
 }
 
 /**
+ * Throw unless `v` is a CONCRETE compose mode ('text' | 'email'), never the
+ * 'remember' sentinel. This is the concrete-only counterpart to assertMessageMode
+ * and the enforced write-time guard for remembered_message_mode, which has NO DB
+ * CHECK by design (migration 028). It mirrors assertRememberedInteractionChannel
+ * (the T-34-03 precedent): the compile-time RememberedMessageMode type is bypassed
+ * on the restore/backup path, so this runtime guard is what actually keeps the
+ * 'remember' sentinel out of the CHECK-free column and out of effectiveMode's
+ * transmit-channel resolution.
+ */
+export function assertRememberedMessageMode(field: string, v: unknown): void {
+  if (v !== "text" && v !== "email") {
+    throw new Error(
+      `updateAppSettings: ${field} must be 'text' or 'email', got ${String(v)}`,
+    );
+  }
+}
+
+/**
  * The app-level notification settings, one row (id=1). Toggles are 0/1
  * integers; hours are 0-23 integers. This is the shape the scheduler reads and
  * the Settings UI edits.
@@ -1211,7 +1229,10 @@ function validateAppSettingsPatch(patch: AppSettingsPatch): void {
     assertMessageMode("defaultMessageMode", patch.defaultMessageMode);
   }
   if (patch.rememberedMessageMode !== undefined) {
-    assertMessageMode("rememberedMessageMode", patch.rememberedMessageMode);
+    assertRememberedMessageMode(
+      "rememberedMessageMode",
+      patch.rememberedMessageMode,
+    );
   }
   if (patch.phoneRegionOverride !== undefined) {
     assertPhoneRegionOverride("phoneRegionOverride", patch.phoneRegionOverride);

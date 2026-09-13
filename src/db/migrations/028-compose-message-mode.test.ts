@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("expo-sqlite", () => ({}));
 
+import { assertRememberedMessageMode } from "@/db/app-settings-dao";
 import { nodeSqliteExecutor, openTestDb } from "@/db/__testkit__/node-sqlite";
 import { MIGRATIONS, TARGET_VERSION } from "@/db/database";
 import { COMPOSE_MESSAGE_MODE_SCHEMA_VERSION } from "@/db/migrations/028-compose-message-mode";
@@ -95,11 +96,13 @@ describe("migration 028 — compose default message mode preference", () => {
     }
   });
 
-  it("leaves remembered_message_mode CHECK-free (DAO assertMessageMode guards writes)", async () => {
+  it("leaves remembered_message_mode CHECK-free (DAO assertRememberedMessageMode guards writes)", async () => {
     await runMigrations(exec, MIGRATIONS, 28, { now: NOW, newUid });
 
     // No DB-level CHECK on remembered_message_mode by design — the raw column
-    // accepts any TEXT; the DAO's assertMessageMode is the write-time guard.
+    // accepts any TEXT; the DAO's assertRememberedMessageMode is the write-time
+    // guard (CR-01: the concrete-only validator, NOT the permissive
+    // assertMessageMode, which admits the 'remember' sentinel).
     await exec.runAsync(
       "UPDATE app_settings SET remembered_message_mode = ? WHERE id = 1",
       ["email"],
@@ -109,6 +112,28 @@ describe("migration 028 — compose default message mode preference", () => {
         "SELECT remembered_message_mode FROM app_settings WHERE id = 1",
       ),
     ).toEqual({ remembered_message_mode: "email" });
+  });
+
+  it("DAO guard rejects the 'remember' sentinel for remembered_message_mode (CR-01/WR-03)", async () => {
+    await runMigrations(exec, MIGRATIONS, 28, { now: NOW, newUid });
+
+    // The column has no CHECK, so a raw UPDATE with 'remember' would succeed —
+    // proving the missing constraint the DAO validator must backstop.
+    await exec.runAsync(
+      "UPDATE app_settings SET remembered_message_mode = ? WHERE id = 1",
+      ["remember"],
+    );
+    expect(
+      await exec.getFirstAsync<{ remembered_message_mode: string }>(
+        "SELECT remembered_message_mode FROM app_settings WHERE id = 1",
+      ),
+    ).toEqual({ remembered_message_mode: "remember" });
+
+    // The concrete-only DAO validator is what actually keeps the sentinel out on
+    // every runtime + restore write path.
+    expect(() =>
+      assertRememberedMessageMode("rememberedMessageMode", "remember"),
+    ).toThrow();
   });
 
   it("does not touch the interactions table", async () => {

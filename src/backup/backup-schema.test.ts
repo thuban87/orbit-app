@@ -72,6 +72,48 @@ describe("default interaction channel portable allowlist (declare-only, CAPT-11)
   });
 });
 
+describe("compose message mode portable allowlist (declare-only, COMP-02)", () => {
+  it("allowlists both camelCase MANIFEST keys, NOT the snake_case columns", () => {
+    for (const key of ["defaultMessageMode", "rememberedMessageMode"]) {
+      expect(PORTABLE_SETTINGS_KEYS.has(key)).toBe(true);
+    }
+    for (const key of ["default_message_mode", "remembered_message_mode"]) {
+      expect(PORTABLE_SETTINGS_KEYS.has(key)).toBe(false);
+    }
+  });
+
+  it("accepts the deferred camelCase message-mode keys while rejecting unknown siblings", () => {
+    const portable = valid();
+    portable.appSettings.defaultMessageMode = "remember";
+    portable.appSettings.rememberedMessageMode = "email";
+    expect(parseBackupManifest(portable).appSettings).toMatchObject({
+      defaultMessageMode: "remember",
+      rememberedMessageMode: "email",
+    });
+    portable.appSettings.unrecognizedSibling = "nope";
+    expect(() => parseBackupManifest(portable)).toThrow(BackupSchemaError);
+  });
+
+  it("rejects an out-of-vocabulary message mode value at the parse boundary", () => {
+    const badDefault = valid();
+    badDefault.appSettings.defaultMessageMode = "sms";
+    expect(() => parseBackupManifest(badDefault)).toThrow(/invalid message mode/i);
+    // CR-01: 'remember' is a valid DEFAULT sentinel but NOT a valid remembered
+    // value — the CHECK-free remembered_message_mode column must reject it here.
+    const badRemembered = valid();
+    badRemembered.appSettings.rememberedMessageMode = "remember";
+    expect(() => parseBackupManifest(badRemembered)).toThrow(
+      /invalid message mode/i,
+    );
+  });
+
+  it("does not inject the message-mode keys when a manifest omits them (parser adds nothing)", () => {
+    const parsed = parseBackupManifest(valid());
+    expect(parsed.appSettings).not.toHaveProperty("defaultMessageMode");
+    expect(parsed.appSettings).not.toHaveProperty("rememberedMessageMode");
+  });
+});
+
 describe("Systems restore acceptance (declare-only)", () => {
   it("accepts a custom System token while rejecting malformed System tokens", () => {
     const custom = valid();

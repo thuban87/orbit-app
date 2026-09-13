@@ -30,6 +30,7 @@ import {
   assertOrreryLastSystem,
   assertPhoneRegionOverride,
   assertRememberedInteractionChannel,
+  assertRememberedMessageMode,
   assertThemeMode,
   assertThemePackage,
   type BackupBookkeepingPatch,
@@ -1642,6 +1643,35 @@ describe("app-settings-dao — compose message mode (migration 028, COMP-02)", (
   it("rejects an out-of-vocabulary message mode", () => {
     expect(() => assertMessageMode("defaultMessageMode", "sms")).toThrow();
     expect(() => assertMessageMode("defaultMessageMode", "Text")).toThrow();
+  });
+
+  it("rejects 'remember' as a remembered message mode (always a concrete mode)", () => {
+    // remembered_message_mode is the resolved last choice, never the sentinel —
+    // the CHECK-free column's only guard (CR-01, mirrors T-34-03 channels).
+    expect(() =>
+      assertRememberedMessageMode("rememberedMessageMode", "remember"),
+    ).toThrow();
+    expect(() =>
+      assertRememberedMessageMode("rememberedMessageMode", "sms"),
+    ).toThrow();
+    for (const value of ["text", "email"]) {
+      expect(() =>
+        assertRememberedMessageMode("rememberedMessageMode", value),
+      ).not.toThrow();
+    }
+  });
+
+  it("rejects a 'remember' remembered message mode before writing (updateAppSettings guard)", async () => {
+    await expect(
+      (async () =>
+        updateAppSettings(
+          exec,
+          { rememberedMessageMode: "remember" as never },
+          LATER,
+        ))(),
+    ).rejects.toThrow();
+    // The write never opened — the remembered mode stays at its seeded default.
+    expect((await getAppSettings(exec)).rememberedMessageMode).toBe("text");
   });
 
   it("rejects an out-of-vocabulary value before writing, leaving the row unchanged (updateAppSettings guard)", async () => {
