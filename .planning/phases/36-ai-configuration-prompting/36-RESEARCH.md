@@ -430,18 +430,22 @@ const res = await WebBrowser.openAuthSessionAsync(authUrl, redirect);
 
 ---
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **OpenRouter redirect capture on Android dev/release client.**
    - Known: app scheme is `orbit`; `openAuthSessionAsync` returns the redirect URL.
    - Unclear: exact intent-filter/`singleTask` config and whether `callback_url` (deep-link) vs headless (on-screen code) is more robust in the custom dev client.
    - Recommendation: spike on the Pixel before committing the OpenRouter plan's approach.
+   - RESOLVED: deferred to a Pixel device-UAT spike (cannot be validated off-device); 36-02 carries the OAuth approach + anti-CSRF `state`/strict-callback controls, and the device spike validates the redirect capture.
 
 2. **`ai_ack_openrouter` — add or narrow?** (See On-Disk #3 caveat.) Recommendation: add the column to keep the `never` switch honest; it's cheap and forward-only.
+   - RESOLVED: surfaced as an explicit add-column-vs-narrow sub-decision at the 36-01 migration checkpoint (ADR-079 not reversed either way).
 
 3. **Exact multi-connection schema shape.** Recommendation: minimal `ai_connections` table + active pointer; settle in plan (Claude's discretion within dossier §D/§J).
+   - RESOLVED: 36-01 defines the `ai_connections` table + `ai_active_connection` pointer (with a zero/one active-pointer invariant test).
 
 4. **Full v5 entity inventory completeness.** Recommendation: at plan time, diff every "Backup/Restore preserves X" dossier claim (planning-notes lists 8) against `export-manifest.ts` reads; enumerate Systems + template + AI/personalization entities explicitly in the FINAL plan.
+   - RESOLVED: 36-08 enumerates the v5 entity inventory (all 9 newly-serialized entity tables + interaction gap columns) with a real export→restore roundtrip.
 
 ---
 

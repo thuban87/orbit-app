@@ -3,17 +3,17 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Release Readiness
 current_phase: 36
-current_phase_name: AI Configuration & Prompting
+current_phase_name: ai-configuration-prompting
 status: executing
 stopped_at: Phase 36 UI-SPEC approved
-last_updated: "2026-09-13T22:11:22.010Z"
+last_updated: "2026-09-13T23:56:33.063Z"
 last_activity: 2026-09-13
 last_activity_desc: Phase 35 complete, transitioned to Phase 36
-state_head: 8a0d881a8451c5f80cb19e208eefe069b6721858
+state_head: 07e74fe072fde14062c023d77fa5524c94b6f4fa
 progress:
   total_phases: 21
   completed_phases: 10
-  total_plans: 145
+  total_plans: 146
   completed_plans: 135
 carried_forward:
 
@@ -36,7 +36,7 @@ See: .planning/PROJECT.md (updated 2026-09-10 after Phase 31)
 
 ## Current Position
 
-Phase: 36 (AI Configuration & Prompting) — READY TO EXECUTE
+Phase: 36 (ai-configuration-prompting) — READY TO EXECUTE
 Plan: Not started
 Status: Ready to execute
 Prior status: Phase 35 COMPLETE (all 9 plans, waves 1–5). Verifier 5/5 must-haves + all 14 COMP IDs; code review 1 blocker (CR-01 restore-path 'remember'-sentinel — assertRememberedMessageMode added at DAO + backup boundaries) + 3 warnings, all fixed; Wave-1 cross-plan regression (35-05→006 test) fixed. Migration 028 (app_settings.default_message_mode/remembered_message_mode) proven on-device at user_version=28 with correct defaults on the Pixel 3a; full owner test plan passed on the Moto Razr release APK (orbit-phase35-release-2026-09-13.apk in G:\My Drive\IT\Software\Orbit). 3391 tests pass, tsc/colors clean; AiService.ts untouched all phase (AI egress not widened). Commits local on main, NOT pushed.
