@@ -436,6 +436,51 @@ describe("exported RANKED_FUEL_EXCLUSIONS + RANK_CASE — parity with getRankedF
   });
 });
 
+/**
+ * Phase 35 egress-exclusion regression FENCE (Trip-Wire 3 / Pitfall 2).
+ *
+ * D-14 / ADR-107 keep Off Limits out of ALL AI egress: `fuel-read.ts`'s
+ * off_limits exclusion is UNRELAXED and no `fuel` AI-permission column exists.
+ * These assertions pin the two structural facts so any future edit that widens
+ * the positive projection — or that starts surfacing off_limits on a glanceable
+ * read — fails loudly in CI. No production change accompanies them.
+ */
+describe("egress-exclusion fence — off_limits stays out of the ranked projection (D-14/ADR-107)", () => {
+  it("getRankedFuel returns NO off_limits row for a contact that has one", async () => {
+    const c = await seedContact();
+    await addRow(c, {
+      kind: "off_limits",
+      created_at: "2026-08-15 09:00:00",
+      text: "private avoid-topic",
+    });
+    const surviving = await addRow(c, {
+      kind: "topic",
+      created_at: "2026-08-10 09:00:00",
+      text: "safe topic",
+    });
+
+    const ranked = await getRankedFuel(exec, c);
+    // The off_limits row is excluded IN SQL; only the ordinary row ranks.
+    expect(ranked.some((r) => r.kind === "off_limits")).toBe(false);
+    expect(ranked.map((r) => r.id)).toEqual([surviving.id]);
+  });
+
+  it("listFuelForEditor IS the one read that surfaces the off_limits row", async () => {
+    const c = await seedContact();
+    const offLimits = await addRow(c, {
+      kind: "off_limits",
+      created_at: "2026-08-15 09:00:00",
+      text: "private avoid-topic",
+    });
+
+    // The editor read must include off_limits (you edit it on the profile);
+    // the ranked/AI-facing projection must not (asserted above).
+    const editor = await listFuelForEditor(exec, c);
+    expect(editor.some((r) => r.id === offLimits.id)).toBe(true);
+    expect(editor.some((r) => r.kind === "off_limits")).toBe(true);
+  });
+});
+
 describe("exported escapeLike — backslash-first ordering preserved", () => {
   it("escapes backslash before % and _ (so added escapes are not re-escaped)", () => {
     expect(escapeLike("50%")).toBe("50\\%");
