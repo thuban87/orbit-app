@@ -124,6 +124,62 @@ export function assertHistoryCycleCount(field: string, v: unknown): void {
 }
 
 /**
+ * The Default Interaction Channel vocabulary (CAPT-11, migration 027). `remember`
+ * is the sentinel meaning "use the last remembered choice"; the three concrete
+ * literals MUST match the frozen stored-channel vocabulary migration 025 wrote
+ * (D-06). This tuple drives `default_interaction_channel`. The remembered value
+ * is always a CONCRETE channel (never the 'remember' sentinel), so its own
+ * vocabulary is this tuple minus `remember`.
+ */
+export const DEFAULT_INTERACTION_CHANNELS = [
+  "remember",
+  "Message",
+  "Call",
+  "In Person",
+] as const;
+export type DefaultInteractionChannel =
+  (typeof DEFAULT_INTERACTION_CHANNELS)[number];
+
+/** The concrete channels a remembered value can hold — no 'remember' sentinel. */
+export const REMEMBERED_INTERACTION_CHANNELS = [
+  "Message",
+  "Call",
+  "In Person",
+] as const;
+export type RememberedInteractionChannel =
+  (typeof REMEMBERED_INTERACTION_CHANNELS)[number];
+
+/** Throw unless `v` is a known default interaction channel (incl. 'remember'). */
+export function assertDefaultInteractionChannel(
+  field: string,
+  v: unknown,
+): void {
+  if (
+    typeof v !== "string" ||
+    !(DEFAULT_INTERACTION_CHANNELS as readonly string[]).includes(v)
+  ) {
+    throw new Error(
+      `updateAppSettings: ${field} must be one of remember/Message/Call/In Person, got ${String(v)}`,
+    );
+  }
+}
+
+/** Throw unless `v` is a concrete remembered channel (never the 'remember' sentinel). */
+export function assertRememberedInteractionChannel(
+  field: string,
+  v: unknown,
+): void {
+  if (
+    typeof v !== "string" ||
+    !(REMEMBERED_INTERACTION_CHANNELS as readonly string[]).includes(v)
+  ) {
+    throw new Error(
+      `updateAppSettings: ${field} must be one of Message/Call/In Person, got ${String(v)}`,
+    );
+  }
+}
+
+/**
  * The app-level notification settings, one row (id=1). Toggles are 0/1
  * integers; hours are 0-23 integers. This is the shape the scheduler reads and
  * the Settings UI edits.
@@ -212,6 +268,20 @@ export interface AppSettings {
   historyLens: HistoryLens;
   /** Global Cycles-lens count preset. NOT NULL, defaults 10. */
   historyCycleCount: HistoryCycleCount;
+
+  // --- Rapid capture channel default (Phase 34, migration 027, CAPT-11) -----
+  /**
+   * Ordinary-logging Default Interaction Channel preference. NOT NULL, defaults
+   * 'remember' (the sentinel that reads `rememberedInteractionChannel`); a fixed
+   * selection stores its own channel literal. Group Log deliberately does NOT
+   * consume this (defaults In Person per §Q).
+   */
+  defaultInteractionChannel: DefaultInteractionChannel;
+  /**
+   * Last successful ordinary-save channel. NOT NULL, defaults 'Message'. Always
+   * a concrete channel; updated ONLY on a successful ordinary (non-group) save.
+   */
+  rememberedInteractionChannel: RememberedInteractionChannel;
 
   // --- Optional-AI non-secret settings (Phase 14, AI-01) --------------------
   // NO API KEY LIVES HERE — provider credentials are SecureStore-only
@@ -334,6 +404,15 @@ export interface PortableSettingsSnapshot {
   // BACKUP_FORMAT_VERSION — emitting now would silently change the live wire shape.
   historyLens?: HistoryLens;
   historyCycleCount?: HistoryCycleCount;
+  // --- Channel-default keys (Phase 34, CAPT-11) — writable NOW, EMISSION -----
+  // DEFERRED. Same declare-only shape as the history keys above: declared
+  // OPTIONAL so they enter `AppSettingsPatch` (writable via updateAppSettings)
+  // AND so a getPortableSettingsSnapshot return that OMITS them still typechecks.
+  // Emission in the snapshot SELECT/return is DEFERRED to Phase 36 (D-03). Do NOT
+  // add these to getPortableSettingsSnapshot this phase and do NOT bump
+  // BACKUP_FORMAT_VERSION.
+  defaultInteractionChannel?: DefaultInteractionChannel;
+  rememberedInteractionChannel?: RememberedInteractionChannel;
   modifiedAt: string;
 }
 
@@ -404,7 +483,9 @@ type WritableSettingsKey =
   | "profileLayoutTemplateUid"
   | "profileBackgroundTemplateUid"
   | "historyLens"
-  | "historyCycleCount";
+  | "historyCycleCount"
+  | "defaultInteractionChannel"
+  | "rememberedInteractionChannel";
 
 /** The persisted (snake_case) column shape of the id=1 row. */
 interface AppSettingsRow {
@@ -441,6 +522,8 @@ interface AppSettingsRow {
   profile_background_template_uid: string | null;
   history_lens: string;
   history_cycle_count: number;
+  default_interaction_channel: string;
+  remembered_interaction_channel: string;
   ai_provider: string;
   ai_model: string;
   ai_custom_endpoint: string;
@@ -535,6 +618,8 @@ const COLUMN_OF: Record<WritableSettingsKey, string> = {
   profileBackgroundTemplateUid: "profile_background_template_uid",
   historyLens: "history_lens",
   historyCycleCount: "history_cycle_count",
+  defaultInteractionChannel: "default_interaction_channel",
+  rememberedInteractionChannel: "remembered_interaction_channel",
 };
 
 /** The saved setting is authoritative; device region is used only when it is absent. */
@@ -566,6 +651,7 @@ export async function getAppSettings(
             dashboard_right_swipe_action,
             profile_layout_template_uid, profile_background_template_uid,
             history_lens, history_cycle_count,
+            default_interaction_channel, remembered_interaction_channel,
             orrery_density, orrery_satellites_enabled, orrery_last_system,
             ai_provider, ai_model, ai_custom_endpoint, ai_custom_model,
             ai_prompt_template, ai_ack_openai, ai_ack_anthropic,
@@ -629,6 +715,12 @@ export async function getAppSettings(
     // a known lens/preset value.
     historyLens: row.history_lens as HistoryLens,
     historyCycleCount: row.history_cycle_count as HistoryCycleCount,
+    // Channel default (migration 027). NOT NULL columns; the cast is a read-shape
+    // convenience — the CHECK + write validators guarantee a known channel.
+    defaultInteractionChannel:
+      row.default_interaction_channel as DefaultInteractionChannel,
+    rememberedInteractionChannel:
+      row.remembered_interaction_channel as RememberedInteractionChannel,
     // AI non-secret settings. The column default is `'none'`; the cast is a
     // read-shape convenience (validation on WRITE guarantees a known id).
     aiProvider: row.ai_provider as AiProviderId,
@@ -1036,6 +1128,18 @@ function validateAppSettingsPatch(patch: AppSettingsPatch): void {
   }
   if (patch.historyCycleCount !== undefined) {
     assertHistoryCycleCount("historyCycleCount", patch.historyCycleCount);
+  }
+  if (patch.defaultInteractionChannel !== undefined) {
+    assertDefaultInteractionChannel(
+      "defaultInteractionChannel",
+      patch.defaultInteractionChannel,
+    );
+  }
+  if (patch.rememberedInteractionChannel !== undefined) {
+    assertRememberedInteractionChannel(
+      "rememberedInteractionChannel",
+      patch.rememberedInteractionChannel,
+    );
   }
   if (patch.phoneRegionOverride !== undefined) {
     assertPhoneRegionOverride("phoneRegionOverride", patch.phoneRegionOverride);

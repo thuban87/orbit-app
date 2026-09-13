@@ -25,11 +25,14 @@ import {
   acknowledgeProvider,
   assertAccentId,
   assertBackgroundId,
+  assertDefaultInteractionChannel,
   assertOrreryLastSystem,
   assertPhoneRegionOverride,
+  assertRememberedInteractionChannel,
   assertThemeMode,
   assertThemePackage,
   type BackupBookkeepingPatch,
+  DEFAULT_INTERACTION_CHANNELS,
   getAppSettings,
   getPortableSettingsSnapshot,
   recordAutomaticBackupHealthCore,
@@ -63,6 +66,8 @@ import { migration021 } from "@/db/migrations/021-orrery-preferences";
 import { migration022 } from "@/db/migrations/022-orrery-systems";
 import { migration023 } from "@/db/migrations/023-orrery-system-selection-revision";
 import { migration025 } from "@/db/migrations/025-interaction-history-schema";
+import { migration026 } from "@/db/migrations/026-group-events-schema";
+import { migration027 } from "@/db/migrations/027-default-interaction-channel";
 import { profilePresentationMigration } from "@/db/migrations/profile-presentation";
 import { runMigrations } from "@/db/migrations/runner";
 import { inWriteTransaction } from "@/db/transaction";
@@ -135,8 +140,10 @@ async function migrateToV5(): Promise<void> {
       migration023,
       profilePresentationMigration,
       migration025,
+      migration026,
+      migration027,
     ],
-    25,
+    27,
     { now: NOW, newUid },
   );
 }
@@ -197,6 +204,15 @@ const PROFILE_PRESENTATION_DEFAULTS = {
 const HISTORY_DEFAULTS = {
   historyLens: "cycles" as const,
   historyCycleCount: 10 as const,
+};
+
+/**
+ * Migration-027 default-interaction-channel defaults (CAPT-11): the preference
+ * seeds 'remember' (Remember Last Choice), the remembered value seeds 'Message'.
+ */
+const CHANNEL_DEFAULTS = {
+  defaultInteractionChannel: "remember" as const,
+  rememberedInteractionChannel: "Message" as const,
 };
 
 type KeysOverlap<A, B> = Extract<keyof A, keyof B>;
@@ -344,6 +360,8 @@ describe("app-settings-dao — read", () => {
       ...PROFILE_PRESENTATION_DEFAULTS,
       // History lens/preset default to 'cycles' / 10 (migration 025, D-11).
       ...HISTORY_DEFAULTS,
+      // Default interaction channel seeds 'remember' / 'Message' (migration 027, CAPT-11).
+      ...CHANNEL_DEFAULTS,
       // AI starts disabled: provider `none`, empty config, acks 0 (AI-01).
       ...AI_DEFAULTS,
       ...BACKUP_DEFAULTS,
@@ -504,6 +522,8 @@ describe("app-settings-dao — validated write", () => {
       ...PROFILE_PRESENTATION_DEFAULTS,
       // History fields untouched by this patch — still the seeded defaults.
       ...HISTORY_DEFAULTS,
+      // Channel-default fields untouched by this patch — still the seeded defaults.
+      ...CHANNEL_DEFAULTS,
       // AI fields untouched by this patch — still the disabled defaults.
       ...AI_DEFAULTS,
       ...BACKUP_DEFAULTS,
@@ -1264,12 +1284,16 @@ describe("app-settings-dao — dashboard preference settings (migration 019, Pha
   });
 
   it("round-trips the four durable dashboard preference axes but does not emit them", async () => {
-    await updateAppSettings(exec, {
-      dashboardViewMode: "card",
-      dashboardPopulations: '["favourites"]',
-      dashboardFilters: '{"category":["family"]}',
-      dashboardSort: "name-asc",
-    }, LATER);
+    await updateAppSettings(
+      exec,
+      {
+        dashboardViewMode: "card",
+        dashboardPopulations: '["favourites"]',
+        dashboardFilters: '{"category":["family"]}',
+        dashboardSort: "name-asc",
+      },
+      LATER,
+    );
     expect(await getAppSettings(exec)).toMatchObject({
       dashboardViewMode: "card",
       dashboardPopulations: '["favourites"]',
@@ -1277,20 +1301,44 @@ describe("app-settings-dao — dashboard preference settings (migration 019, Pha
       dashboardSort: "name-asc",
     });
     const snapshot = await getPortableSettingsSnapshot(exec);
-    for (const key of ["dashboardViewMode", "dashboardPopulations", "dashboardFilters", "dashboardSort"]) {
+    for (const key of [
+      "dashboardViewMode",
+      "dashboardPopulations",
+      "dashboardFilters",
+      "dashboardSort",
+    ]) {
       expect(snapshot).not.toHaveProperty(key);
     }
   });
 
   it("rejects invalid dashboard preference JSON and enum values before writes", async () => {
-    await expect((async () => updateAppSettings(exec, { dashboardSort: "rank" as never }, LATER))()).rejects.toThrow();
-    await expect((async () => updateAppSettings(exec, { dashboardPopulations: '["unknown"]' }, LATER))()).rejects.toThrow();
-    await expect((async () => updateAppSettings(exec, { dashboardFilters: '{"unknown":["x"]}' }, LATER))()).rejects.toThrow();
+    await expect(
+      (async () =>
+        updateAppSettings(exec, { dashboardSort: "rank" as never }, LATER))(),
+    ).rejects.toThrow();
+    await expect(
+      (async () =>
+        updateAppSettings(
+          exec,
+          { dashboardPopulations: '["unknown"]' },
+          LATER,
+        ))(),
+    ).rejects.toThrow();
+    await expect(
+      (async () =>
+        updateAppSettings(
+          exec,
+          { dashboardFilters: '{"unknown":["x"]}' },
+          LATER,
+        ))(),
+    ).rejects.toThrow();
     expect((await getAppSettings(exec)).dashboardSort).toBe("default");
   });
 
   it("round-trips the writable right-swipe action and rejects unknown values before writing", async () => {
-    const patch: AppSettingsPatch = { dashboardRightSwipeAction: "log-contact" };
+    const patch: AppSettingsPatch = {
+      dashboardRightSwipeAction: "log-contact",
+    };
     await updateAppSettings(exec, patch, LATER);
     expect((await getAppSettings(exec)).dashboardRightSwipeAction).toBe(
       "log-contact",
@@ -1339,7 +1387,13 @@ describe("app-settings-dao — Profile presentation preferences", () => {
     );
     await exec.runAsync(
       "INSERT INTO profile_background_templates(uid,name,image_path,created_at,modified_at) VALUES(?,?,?,?,?)",
-      ["background-global", "Global", "profile-backgrounds/global.webp", NOW, NOW],
+      [
+        "background-global",
+        "Global",
+        "profile-backgrounds/global.webp",
+        NOW,
+        NOW,
+      ],
     );
     await updateAppSettings(
       exec,
@@ -1357,7 +1411,9 @@ describe("app-settings-dao — Profile presentation preferences", () => {
     expect(snapshot).not.toHaveProperty("profileLayoutTemplateUid");
     expect(snapshot).not.toHaveProperty("profileBackgroundTemplateUid");
     expect(PORTABLE_SETTINGS_KEYS.has("profileLayoutTemplateUid")).toBe(true);
-    expect(PORTABLE_SETTINGS_KEYS.has("profileBackgroundTemplateUid")).toBe(true);
+    expect(PORTABLE_SETTINGS_KEYS.has("profileBackgroundTemplateUid")).toBe(
+      true,
+    );
   });
 });
 
@@ -1421,5 +1477,114 @@ describe("app-settings-dao — history lens/preset settings (migration 025, D-11
     const snapshot = await getPortableSettingsSnapshot(exec);
     expect(snapshot).not.toHaveProperty("historyLens");
     expect(snapshot).not.toHaveProperty("historyCycleCount");
+  });
+});
+
+describe("app-settings-dao — default interaction channel (migration 027, CAPT-11)", () => {
+  beforeEach(async () => {
+    await migrateToV5();
+  });
+
+  it("getAppSettings returns the seeded channel defaults ('remember' / 'Message')", async () => {
+    const settings = await getAppSettings(exec);
+    expect(settings.defaultInteractionChannel).toBe("remember");
+    expect(settings.rememberedInteractionChannel).toBe("Message");
+  });
+
+  it("round-trips a written default channel via updateAppSettings", async () => {
+    await updateAppSettings(
+      exec,
+      { defaultInteractionChannel: "In Person" },
+      LATER,
+    );
+    expect((await getAppSettings(exec)).defaultInteractionChannel).toBe(
+      "In Person",
+    );
+  });
+
+  it("round-trips a written remembered channel via updateAppSettings", async () => {
+    await updateAppSettings(
+      exec,
+      { rememberedInteractionChannel: "Call" },
+      LATER,
+    );
+    expect((await getAppSettings(exec)).rememberedInteractionChannel).toBe(
+      "Call",
+    );
+  });
+
+  it("exposes the full default-channel vocabulary as a tuple (remember + 3 channels)", () => {
+    expect([...DEFAULT_INTERACTION_CHANNELS]).toEqual([
+      "remember",
+      "Message",
+      "Call",
+      "In Person",
+    ]);
+  });
+
+  it("accepts every default-channel literal including the 'remember' sentinel", () => {
+    for (const value of ["remember", "Message", "Call", "In Person"]) {
+      expect(() =>
+        assertDefaultInteractionChannel("defaultInteractionChannel", value),
+      ).not.toThrow();
+    }
+  });
+
+  it("rejects an out-of-vocabulary default channel", () => {
+    expect(() =>
+      assertDefaultInteractionChannel("defaultInteractionChannel", "bogus"),
+    ).toThrow();
+    expect(() =>
+      assertDefaultInteractionChannel("defaultInteractionChannel", "message"),
+    ).toThrow();
+  });
+
+  it("rejects 'remember' as a remembered channel (always a concrete channel)", () => {
+    // remembered_interaction_channel is the resolved last choice, never the sentinel.
+    expect(() =>
+      assertRememberedInteractionChannel(
+        "rememberedInteractionChannel",
+        "remember",
+      ),
+    ).toThrow();
+    for (const value of ["Message", "Call", "In Person"]) {
+      expect(() =>
+        assertRememberedInteractionChannel(
+          "rememberedInteractionChannel",
+          value,
+        ),
+      ).not.toThrow();
+    }
+  });
+
+  it("rejects an out-of-vocabulary channel before writing (updateAppSettings guard)", async () => {
+    await expect(
+      (async () =>
+        updateAppSettings(
+          exec,
+          {
+            defaultInteractionChannel: "unexpected" as never,
+          },
+          LATER,
+        ))(),
+    ).rejects.toThrow();
+    // The write never opened — the preference stays at its seeded default.
+    expect((await getAppSettings(exec)).defaultInteractionChannel).toBe(
+      "remember",
+    );
+  });
+
+  it("does not emit the channel keys through the portable snapshot (Phase 36 owns emission)", async () => {
+    await updateAppSettings(
+      exec,
+      {
+        defaultInteractionChannel: "Call",
+        rememberedInteractionChannel: "Call",
+      },
+      LATER,
+    );
+    const snapshot = await getPortableSettingsSnapshot(exec);
+    expect(snapshot).not.toHaveProperty("defaultInteractionChannel");
+    expect(snapshot).not.toHaveProperty("rememberedInteractionChannel");
   });
 });
