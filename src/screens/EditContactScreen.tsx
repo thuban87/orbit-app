@@ -49,6 +49,7 @@ import { useFocusEffect } from "@react-navigation/native";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert,
+  findNodeHandle,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -132,12 +133,15 @@ import { Logger } from "@/utils/logger";
 import {
   buildEditInput,
   canSave,
+  collectEditBlockingErrors,
   type CurrentStateSeed,
+  EDIT_SECTION_FIELD_MAP,
   type EditFormState,
   type FuelDraftRow,
   isNeverContacted,
   type MemoryDraftRow,
   type RelationshipDraftRow,
+  resolveErrorSection,
   seedEditState,
 } from "./edit-contact-logic";
 
@@ -454,9 +458,8 @@ export function EditContactScreen({
   }, []);
 
   // Reveal-and-focus targets (CAPT-14): the scroll container + each section's root
-  // View, so a blocked Save can expand the erroring section and scroll it into
-  // view via the AccordionSection interface (blocked-save wiring lands with the
-  // validation slice).
+  // View, so a blocked Save can expand the erroring section and scroll it (its
+  // first invalid field) into view via the AccordionSection interface.
   const scrollRef = useRef<ScrollView>(null);
   const sectionRefs = useRef<Record<string, View | null>>({});
   const registerSectionRef = useCallback(
@@ -464,6 +467,28 @@ export function EditContactScreen({
       sectionRefs.current[sectionId] = node;
     },
     [],
+  );
+  const revealAndFocus = useCallback(
+    (sectionId: string) => {
+      setSectionExpanded(sectionId, true);
+      // Scroll after the expand re-render so the section's laid-out position is
+      // final. Best-effort: the expand is the load-bearing reveal; a measure
+      // failure leaves the section open, just not auto-scrolled.
+      requestAnimationFrame(() => {
+        const node = sectionRefs.current[sectionId];
+        const scroll = scrollRef.current;
+        const scrollHandle = scroll ? findNodeHandle(scroll) : null;
+        if (node && scroll && scrollHandle != null) {
+          node.measureLayout(
+            scrollHandle,
+            (_x, y) =>
+              scroll.scrollTo({ y: Math.max(0, y - 16), animated: true }),
+            () => {},
+          );
+        }
+      });
+    },
+    [setSectionExpanded],
   );
 
   // Read every knowledge subdomain seed for the contact (§E). `getContactForEdit`
@@ -857,7 +882,17 @@ export function EditContactScreen({
   }
 
   async function handleSave() {
-    if (!form || !canSave(form) || saving) {
+    if (!form || saving) {
+      return;
+    }
+    // Blocking validation reveals + focuses the erroring accordion (via the tested
+    // resolveErrorSection resolver + the AccordionSection interface) rather than
+    // silently no-op'ing; the form state is preserved and no completion is shown
+    // (CAPT-14, dossier §AD).
+    const blocking = collectEditBlockingErrors(form);
+    if (blocking.length > 0) {
+      const sectionId = resolveErrorSection(blocking, EDIT_SECTION_FIELD_MAP);
+      if (sectionId) revealAndFocus(sectionId);
       return;
     }
     const trimmed = form.name.trim();
@@ -1556,12 +1591,16 @@ export function EditContactScreen({
         />
       </AccordionSection>
 
+      {/* Save stays PRESSABLE when the form is incomplete so a blocked press
+          reveals + focuses the erroring section (CAPT-14) rather than being an
+          inert disabled button; it is only truly disabled while a save is in
+          flight. Visual emphasis still follows `savable`. */}
       <Pressable
         testID="edit-contact-save"
         accessibilityRole="button"
         accessibilityLabel="Save changes"
-        accessibilityState={{ disabled: !savable }}
-        disabled={!savable}
+        accessibilityState={{ disabled: saving }}
+        disabled={saving}
         onPress={() => void handleSave()}
         style={[
           styles.saveBtn,
