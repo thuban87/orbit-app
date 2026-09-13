@@ -26,6 +26,20 @@ describe("Memory type registry", () => {
     expect(isMemoryTypeKey("made_up_type")).toBe(false);
   });
 
+  it("resolves the D-11 owner-final Memory-type display names without collision", () => {
+    // D-11 (owner-resolved 2026-09-12): general → "Memory", custom → "Custom".
+    expect(MEMORY_TYPE_REGISTRY.general.displayName).toBe("Memory");
+    expect(MEMORY_TYPE_REGISTRY.custom.displayName).toBe("Custom");
+    // No two built-in memory types may share a display name (a duplicate would let
+    // a user mis-file a Memory — T-34-05).
+    const displayNames = Object.values(MEMORY_TYPE_REGISTRY).map(
+      (meta) => meta.displayName,
+    );
+    expect(new Set(displayNames).size).toBe(displayNames.length);
+    // Rapid capture still requests the default type BY KEY, never by display name.
+    expect(DEFAULT_MEMORY_TYPE_KEY).toBe("general");
+  });
+
   it("owns the complete history-aware field contract", () => {
     expect(CURRENT_STATE_FIELD_KEYS).toEqual([
       "last_talked_about",
