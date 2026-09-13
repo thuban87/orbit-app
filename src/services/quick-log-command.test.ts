@@ -21,6 +21,9 @@ function createDeps(overrides: Partial<RunQuickLogDeps> = {}) {
     pendingRef: { current: false },
     undoController: { undo: vi.fn(() => Promise.resolve()) },
     recordTouchpoint: vi.fn(() => Promise.resolve({ interactionId: 12 })),
+    readChannelPreference: vi.fn(() =>
+      Promise.resolve({ pref: "Message" as const, remembered: null }),
+    ),
     localDateTime: vi.fn(() => "2026-09-06 09:00:00"),
     newUid: vi.fn(() => "interaction-uid"),
     showSnackbar: (snackbar) => snackbars.push(snackbar),
@@ -45,7 +48,7 @@ describe("runQuickLog", () => {
       uid: "interaction-uid",
       occurredAt: "2026-09-06 09:00:00",
       now: "2026-09-06 09:00:00",
-      channel: "unspecified",
+      channel: "Message",
       direction: "outbound",
       connected: 1,
       quality: null,
@@ -86,14 +89,63 @@ describe("runQuickLog", () => {
     expect(deps.openPostLogEditor).not.toHaveBeenCalled();
   });
 
-  it("ignores a second request while the consumer's write is pending", () => {
+  it("resolves the channel from the Default Interaction Channel preference", async () => {
+    // pref 'remember' → the remembered value; a concrete pref → that channel.
+    const remembered = createDeps({
+      readChannelPreference: vi.fn(() =>
+        Promise.resolve({ pref: "remember" as const, remembered: "Call" as const }),
+      ),
+    });
+    runQuickLog(remembered.deps, 7);
+    await vi.waitFor(() =>
+      expect(remembered.deps.recordTouchpoint).toHaveBeenCalledOnce(),
+    );
+    expect(remembered.deps.recordTouchpoint).toHaveBeenCalledWith(
+      expect.objectContaining({ channel: "Call" }),
+    );
+
+    const concrete = createDeps({
+      readChannelPreference: vi.fn(() =>
+        Promise.resolve({ pref: "In Person" as const, remembered: null }),
+      ),
+    });
+    runQuickLog(concrete.deps, 7);
+    await vi.waitFor(() =>
+      expect(concrete.deps.recordTouchpoint).toHaveBeenCalledOnce(),
+    );
+    expect(concrete.deps.recordTouchpoint).toHaveBeenCalledWith(
+      expect.objectContaining({ channel: "In Person" }),
+    );
+  });
+
+  it("does NOT write the remembered channel back (Quick Log only consumes it)", async () => {
+    // Quick Log has no updateAppSettings dependency at all; the remembered value
+    // is owned solely by the detailed Log Interaction screen (D-09). Assert the
+    // resolved channel is used without any write-back surface on the deps.
+    const { deps } = createDeps({
+      readChannelPreference: vi.fn(() =>
+        Promise.resolve({ pref: "remember" as const, remembered: "In Person" as const }),
+      ),
+    });
+    runQuickLog(deps, 7);
+    await vi.waitFor(() => expect(deps.recordTouchpoint).toHaveBeenCalledOnce());
+    expect(deps.recordTouchpoint).toHaveBeenCalledWith(
+      expect.objectContaining({ channel: "In Person" }),
+    );
+    expect("updateAppSettings" in deps).toBe(false);
+  });
+
+  it("ignores a second request while the consumer's write is pending", async () => {
     const write = deferred<{ interactionId: number }>();
     const { deps } = createDeps({ recordTouchpoint: vi.fn(() => write.promise) });
 
     runQuickLog(deps, 7);
     runQuickLog(deps, 7);
 
-    expect(deps.recordTouchpoint).toHaveBeenCalledOnce();
+    // The second call is rejected synchronously by pendingRef before it can reach
+    // the (async) write, so recordTouchpoint runs exactly once.
+    await vi.waitFor(() => expect(deps.recordTouchpoint).toHaveBeenCalledOnce());
+    write.resolve({ interactionId: 12 });
   });
 
   it("shows Retry after a failed write and clears the pending guard", async () => {

@@ -503,6 +503,21 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
         pendingRef: quickLogPending,
         undoController: quickLogUndoController.current,
         recordTouchpoint: (input) => recordTouchpoint(getExecutor(), input),
+        readChannelPreference: async () => {
+          // The same app-settings read the detailed Log Interaction screen uses;
+          // a read failure falls back to Message so the immediate write is never
+          // blocked (local-first, no network on this read path).
+          try {
+            const s = await getAppSettings(getExecutor());
+            return {
+              pref: s.defaultInteractionChannel,
+              remembered: s.rememberedInteractionChannel,
+            };
+          } catch (error) {
+            Logger.error(LOG_SCOPE, "failed to read channel preference", error);
+            return { pref: "Message", remembered: null };
+          }
+        },
         localDateTime,
         newUid,
         showSnackbar,

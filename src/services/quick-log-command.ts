@@ -3,7 +3,21 @@
  *
  * Consumers own their refs and inject side effects so the command preserves
  * per-instance single-flight semantics while remaining node-testable.
+ *
+ * CHANNEL (D-09, owner-ratified 34 follow-up): Quick Log seeds the interaction's
+ * channel from the Default Interaction Channel preference via the shared pure
+ * `resolveInitialChannel` — a fixed preference selects that channel, the
+ * `remember` sentinel reads the remembered value (Message fallback). Quick Log
+ * CONSUMES the resolved default but NEVER writes `remembered_interaction_channel`
+ * back: the remembered value stays the "last actively-chosen ordinary-save
+ * channel" owned solely by the detailed Log Interaction screen.
  */
+import type {
+  DefaultInteractionChannel,
+  RememberedInteractionChannel,
+} from "@/db/app-settings-dao";
+import { resolveInitialChannel } from "@/screens/log-interaction-logic";
+
 export interface QuickLogUndoRequest {
   contactId: number;
   interactionId: number;
@@ -40,17 +54,31 @@ export interface QuickLogInput {
   uid: string;
   occurredAt: string;
   now: string;
-  channel: "unspecified";
+  /** Resolved from the Default Interaction Channel preference (D-09). */
+  channel: string;
   direction: "outbound";
   connected: 1;
   quality: null;
   source: "manual";
 }
 
+/** The two channel-preference columns Quick Log resolves its channel from. */
+export interface QuickLogChannelPreference {
+  pref: DefaultInteractionChannel;
+  remembered: RememberedInteractionChannel | null;
+}
+
 export interface RunQuickLogDeps {
   pendingRef: { current: boolean };
   undoController: QuickLogUndoController;
   recordTouchpoint: (input: QuickLogInput) => Promise<{ interactionId: number }>;
+  /**
+   * Read the two channel-preference columns Quick Log seeds its channel from
+   * (the SAME `app-settings` reads the detailed Log Interaction screen uses).
+   * Consumers own the read + a fallback so a settings-read failure never blocks
+   * the immediate write (local-first, no network on this read path).
+   */
+  readChannelPreference: () => Promise<QuickLogChannelPreference>;
   localDateTime: () => string;
   newUid: () => string;
   showSnackbar: (snackbar: QuickLogSnackbar) => void;
@@ -104,17 +132,22 @@ export function runQuickLog(deps: RunQuickLogDeps, contactId: number): void {
   const stamp = deps.localDateTime();
 
   void deps
-    .recordTouchpoint({
-      contactId,
-      uid: deps.newUid(),
-      occurredAt: stamp,
-      now: stamp,
-      channel: "unspecified",
-      direction: "outbound",
-      connected: 1,
-      quality: null,
-      source: "manual",
-    })
+    .readChannelPreference()
+    .then(({ pref, remembered }) =>
+      deps.recordTouchpoint({
+        contactId,
+        uid: deps.newUid(),
+        occurredAt: stamp,
+        now: stamp,
+        // Consume the resolved default channel (D-09); do NOT write remembered
+        // back — the detailed Log Interaction screen owns that write.
+        channel: resolveInitialChannel(pref, remembered),
+        direction: "outbound",
+        connected: 1,
+        quality: null,
+        source: "manual",
+      }),
+    )
     .then(({ interactionId }) => {
       deps.showSnackbar({
         kind: "success",
