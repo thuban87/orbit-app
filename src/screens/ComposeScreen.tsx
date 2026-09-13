@@ -83,6 +83,13 @@ import { getContactHeader } from "@/db/contact-read";
 import { getExecutor, localDateTime } from "@/db/database";
 import { markAssistLogged } from "@/db/interaction-assist-dao";
 import {
+  type AiAvailability,
+  computeAiAvailability,
+  isCredentialFailure,
+  readCredentialPresence,
+  selectAiAffordance,
+} from "@/logic/ai-availability";
+import {
   generateVariants,
   variantTemperature,
 } from "@/logic/ai-generate-variants";
@@ -102,7 +109,9 @@ import {
 import type { ContactMethodType } from "@/logic/contact-method-normalization";
 import { resetToDashboardRoot } from "@/navigation/reset-intents";
 import type { RootStackScreenProps, TabParamList } from "@/navigation/types";
-import { AiError, AiService } from "@/services/AiService";
+import { aiKeyStore } from "@/services/ai-key-store";
+import type { AiProviderId } from "@/services/ai-types";
+import { AiError, type AiErrorCode, AiService } from "@/services/AiService";
 import { performReachOut } from "@/services/reach-out/handoff";
 import { useComposeSession } from "@/stores/compose-session-store";
 import { useTheme } from "@/theme";
@@ -124,6 +133,33 @@ const AI_TEMPERATURE_BASE = 0.7;
 
 /** The number of suggestions the review surface always shows (ADR-079). */
 const AI_VARIANT_COUNT = 3;
+
+/**
+ * Map a SANITIZED AI error code to a short, user-facing recovery line (COMP-13 /
+ * T-35-03). RE-CREATED here — plan 35-01 removed the prior `aiErrorText` with the
+ * old AI block. The `code` is the ONLY thing that ever leaves the adapter
+ * (AiService throws `AiError` whose message IS its code); this never renders raw
+ * provider text and never turns Compose into a provider-troubleshooting surface.
+ */
+function aiErrorText(code: string): string {
+  switch (code) {
+    case "timeout":
+      return "That took too long. Try again?";
+    case "cancelled":
+      return "Cancelled.";
+    case "not_configured":
+      return "Add an AI provider in Settings first.";
+    case "unauthorized":
+      return "Your API key was rejected. Check it in Settings.";
+    case "rate_limited":
+      return "The provider is rate-limiting. Try again shortly.";
+    case "blocked":
+    case "invalid_endpoint":
+      return "That endpoint was refused. Check it in Settings.";
+    default:
+      return "Couldn't draft a message. Try again?";
+  }
+}
 
 /** The compose surface's explicit state machine (A1). */
 type ScreenState = "loading" | "ready" | "missing" | "error";
@@ -184,9 +220,15 @@ export function ComposeScreen({
   // the ENTIRE prior AI wiring so everything here is RE-CREATED, not reused). ──
   // The lifecycle's view-state (idle → resolving/loading → review | error).
   const [aiState, setAiState] = useState<AiSuggestionState>({ status: "idle" });
-  // Provisional AI-affordance gate (Task 2). Task 4 replaces it with the
-  // three-state availability adapter (computeAiAvailability) + credential sourcing.
-  const [aiProviderConfigured, setAiProviderConfigured] = useState(false);
+  // AI availability is SOURCED here (COMP-09 / D-07 / D-12): the active provider +
+  // a credential-PRESENCE boolean (never the key value, never logged) feed the
+  // pure computeAiAvailability adapter — the screen computes no availability state
+  // itself. `credentialFailed` is a session-local lever flipped by an OBSERVED
+  // unauthorized generation error (isCredentialFailure) and cleared on a later
+  // success, moving availability to needs-attention WITHOUT exposing key material.
+  const [activeProvider, setActiveProvider] = useState<AiProviderId>("none");
+  const [credentialPresent, setCredentialPresent] = useState(false);
+  const [credentialFailed, setCredentialFailed] = useState(false);
   // Latest loaded AI settings (provider/model/template), via ref so the lifecycle
   // deps always read the current values without re-creating the lifecycle.
   const settingsRef = useRef<AppSettings | null>(null);
@@ -243,6 +285,23 @@ export function ComposeScreen({
       mountedRef.current = false;
     };
   }, []);
+
+  // Observed-unauthorized availability lever (T-35-25): an unauthorized generation
+  // result flips the session-local `credentialFailed` flag → availability moves to
+  // needs-attention WITHOUT reading or exposing any key material; a later
+  // successful generation (review) clears it. Transient codes (timeout /
+  // rate_limited / network / …) never flip it, so a flaky moment can't masquerade
+  // as a bad key (isCredentialFailure).
+  useEffect(() => {
+    if (
+      aiState.status === "error" &&
+      isCredentialFailure(aiState.code as AiErrorCode)
+    ) {
+      setCredentialFailed(true);
+    } else if (aiState.status === "review") {
+      setCredentialFailed(false);
+    }
+  }, [aiState]);
 
   // Build the ONE lifecycle instance (its deps read the refs above). Created
   // lazily on first render; every dep is INJECTED so the whole flow is the
@@ -374,10 +433,22 @@ export function ComposeScreen({
               if (!cancelled) catalogRef.current = resolveActiveCatalog(cached);
             })
             .catch(() => undefined);
-          // Provisional AI-affordance gate (provider configured at all). Task 4
-          // replaces this with the three-state availability adapter + credential
-          // presence sourcing.
-          setAiProviderConfigured(settings.aiProvider !== "none");
+          // Source AI availability (COMP-09): publish the active provider and
+          // reset the session-local observed-unauthorized lever, then read the
+          // credential PRESENCE off the key store (presence only, never the value)
+          // concurrently so it never blocks header render. readCredentialPresence
+          // narrows 'none' out BEFORE any getKey call (A4). Guarded by `cancelled`.
+          setActiveProvider(settings.aiProvider);
+          setCredentialFailed(false);
+          void readCredentialPresence(settings.aiProvider, (p) =>
+            aiKeyStore.getKey(p),
+          )
+            .then((present) => {
+              if (!cancelled) setCredentialPresent(present);
+            })
+            .catch(() => {
+              if (!cancelled) setCredentialPresent(false);
+            });
           // Resolve the EFFECTIVE actionable primary for BOTH types from the same
           // loaded groups (one read serves resolution AND the picker decision).
           const primaries = selectActionablePrimaryMethods(methodGroups);
@@ -588,6 +659,12 @@ export function ComposeScreen({
     lifecycleRef.current?.chooseSuggestion(index);
   }, []);
 
+  // Needs-Attention repair route — send the user to the EXISTING AI settings
+  // surface (interim per D-12). Compose is never a provider-troubleshooting screen.
+  const onOpenAiSettings = useCallback(() => {
+    navigation.navigate("Settings");
+  }, [navigation]);
+
   // Transmit — in-flight latched (A3). Returns early while a handoff is open and
   // when no destination resolves. The channel + endpoint derive from the USABLE
   // mode (resolveUsableMode: preferred-then-fallback), never a literal or the raw
@@ -772,6 +849,17 @@ export function ComposeScreen({
   // keep-the-original path.
   const aiIsRewrite = body.trim().length > 0;
 
+  // Three-state AI availability (COMP-09 / D-07 / D-12) — CONSUMED from the pure
+  // adapter; the screen computes no availability state itself. Off → no AI
+  // affordance; Ready → the actions; Needs-Attention → a restrained repair notice
+  // that REPLACES (never hides) the actions. `credentialFailed` folds an observed
+  // unauthorized into needs-attention without exposing key material.
+  const aiAvailability: AiAvailability = computeAiAvailability({
+    provider: activeProvider,
+    hasCredential: credentialPresent && !credentialFailed,
+  });
+  const aiPosture = selectAiAffordance(aiAvailability);
+
   // The mode actually usable after preferred-then-fallback drives which type the
   // establish-primary picker targets (COMP-03).
   const usable = resolveUsableMode(mode, hasPhone, hasEmail);
@@ -900,7 +988,7 @@ export function ComposeScreen({
           'Draft with AI' on an empty editor and 'Rewrite with AI' when it holds
           meaningful text. Rendered only when AI is configured and nothing is in
           flight (idle). It NEVER auto-starts; begin() runs only on this tap. */}
-      {aiProviderConfigured && aiState.status === "idle" ? (
+      {aiState.status === "idle" && aiPosture.showAiActions ? (
         <View style={styles.affordance}>
           <Button
             testID="compose-ai-action"
@@ -909,6 +997,36 @@ export function ComposeScreen({
             accessibilityLabel={aiActionLabel}
             onPress={onAiAction}
           />
+        </View>
+      ) : null}
+
+      {/* AI Needs Attention (COMP-09 / D-07 / D-12) — a restrained repair notice
+          that REPLACES the AI actions (never silently hides them, never restores
+          Draft/Rewrite). Caption/label tone on `surface`, no accent CTA styling;
+          routes to the EXISTING AI settings surface as an interim. Manual
+          composition + Research stay fully usable (rendered unconditionally). */}
+      {aiState.status === "idle" && aiPosture.repairNotice ? (
+        <View
+          testID="compose-ai-needs-attention"
+          style={[
+            styles.panel,
+            { backgroundColor: colors.surface, borderColor: colors.border },
+          ]}
+        >
+          <AppText role="label">AI needs attention</AppText>
+          <AppText role="caption">
+            Your AI provider needs attention before Draft or Rewrite can run. Open
+            AI settings to sort it out.
+          </AppText>
+          <View style={styles.affordance}>
+            <Button
+              testID="compose-ai-open-settings"
+              role="tertiary"
+              label="Open AI settings"
+              accessibilityLabel="Open AI settings"
+              onPress={onOpenAiSettings}
+            />
+          </View>
         </View>
       ) : null}
 
@@ -1015,6 +1133,40 @@ export function ComposeScreen({
             />
             <Button
               testID="compose-ai-try-again"
+              role="tertiary"
+              label="Try Again"
+              accessibilityLabel="Try Again"
+              onPress={onAiRetry}
+            />
+          </View>
+        </View>
+      ) : null}
+
+      {/* Failure-safe AI error surface (COMP-13) — the manual draft is preserved
+          (this never touches the editor); a SANITIZED code maps to a short line
+          (never raw provider text), with Try Again / Cancel. Never a provider-
+          troubleshooting screen. */}
+      {aiState.status === "error" ? (
+        <View
+          testID="compose-ai-error"
+          style={[
+            styles.panel,
+            { backgroundColor: colors.surface, borderColor: colors.border },
+          ]}
+        >
+          <AppText testID="compose-ai-error-text" role="body">
+            {aiErrorText(aiState.code)}
+          </AppText>
+          <View style={styles.panelActions}>
+            <Button
+              testID="compose-ai-error-cancel"
+              role="secondary"
+              label="Cancel"
+              accessibilityLabel="Cancel"
+              onPress={onAiCancel}
+            />
+            <Button
+              testID="compose-ai-error-try-again"
               role="tertiary"
               label="Try Again"
               accessibilityLabel="Try Again"

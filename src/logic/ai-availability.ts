@@ -24,7 +24,8 @@
  *
  * NODE-PURE: no UI-runtime import.
  */
-import type { AiProviderId } from "@/services/ai-types";
+import type { AiErrorCode } from "@/services/AiService";
+import type { AiCloudProviderId, AiProviderId } from "@/services/ai-types";
 
 /** The three availability states Compose renders against (D-07). */
 export type AiAvailability = "off" | "ready" | "needs-attention";
@@ -89,4 +90,40 @@ export function selectAiAffordance(
     showAiActions: availability === "ready",
     repairNotice: availability === "needs-attention",
   };
+}
+
+/**
+ * Whether an OBSERVED generation error code indicates a credential failure — i.e.
+ * the stored key is present but the provider REJECTED it (`unauthorized`). This is
+ * the lever that moves availability from 'ready' to 'needs-attention' AFTER a
+ * generation attempt, without ever reading or exposing the key material itself.
+ *
+ * DELIBERATELY narrow: only `unauthorized` qualifies. Transient failures
+ * (`timeout`, `rate_limited`, `network`, a `blocked` egress destination, an
+ * `invalid_endpoint`, a `cancelled` request, etc.) are NOT credential failures —
+ * a rate-limit or a flaky network must never be mistaken for a bad key and demote
+ * a correctly-configured provider. Pure over its input.
+ */
+export function isCredentialFailure(code: AiErrorCode): boolean {
+  return code === "unauthorized";
+}
+
+/**
+ * Source the credential-PRESENCE boolean the availability adapter needs, WITHOUT
+ * exposing any key material (T-35-25). Returns `false` for `provider === 'none'`
+ * WITHOUT calling `getKey` at all — `'none'` has no credential concept and, more
+ * concretely, `getKey`'s parameter type EXCLUDES `'none'` (`AiCloudProviderId =
+ * Exclude<AiProviderId,'none'>`), so passing it would be both a `tsc` error and
+ * semantically wrong. For a cloud provider it reads PRESENCE only
+ * (`!== null` → boolean); the key VALUE is never returned, retained, or logged.
+ * `getKey` degrades a missing/cleared key to `null` (never throws), so absence is
+ * an ordinary needs-attention state.
+ */
+export async function readCredentialPresence(
+  provider: AiProviderId,
+  getKey: (p: AiCloudProviderId) => Promise<string | null>,
+): Promise<boolean> {
+  if (provider === "none") return false;
+  // `provider` is now narrowed to a cloud id — the only kind `getKey` accepts.
+  return (await getKey(provider)) !== null;
 }
