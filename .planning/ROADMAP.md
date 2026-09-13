@@ -843,12 +843,12 @@ Plans:
 
 - [ ] 35-01-PLAN.md — TRACER: end-to-end Text reach-out (blank editor → Transmit → additive "Did you send it?" → confirmed log) + compose-session-store
 - [ ] 35-02-PLAN.md — Data-layer preference foundation: migration 028 + app-settings-dao compose-mode + backup allowlist (one-way migration checkpoint)
-- [ ] 35-04-PLAN.md — AI invocation logic: reshape AiSuggestionLifecycle (single→three, drop ack gate) + ai-availability three-state adapter (D-12)
 - [ ] 35-05-PLAN.md — AI egress shape-carry: ai-context-read carries the ADR-078 gated-note shape (D-13, no egress widening); Off Limits excluded from all AI egress — no avoidance-constraint carry (D-14/ADR-107)
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
 - [ ] 35-03-PLAN.md — Delivery logic: compose-logic Text/Email + no-destination + remembered-mode; handoff email subject/body (no-dep mailto)
+- [ ] 35-04-PLAN.md — AI invocation logic: reshape AiSuggestionLifecycle (single→three, drop ack gate) + ai-availability three-state adapter (D-12) — moved to Wave 2, depends_on [35-01] (35-01 must strip ComposeScreen's old lifecycle wiring first so 35-04's tsc gate passes)
 - [ ] 35-06-PLAN.md — Research side (read-only projection) + session-only Message Focus (≤3, no permission)
 
 **Wave 3** *(blocked on Wave 2 completion)*
