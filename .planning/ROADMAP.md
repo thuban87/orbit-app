@@ -836,14 +836,14 @@ Plans:
 
 **Canonical refs**: docs/dossier/milestone-2/phase-14-messaging-ai-compose-dossier.md; docs/dossier/milestone-2/planning-notes/phase-14-planning-notes.md
 **Schema**: compose preferences — migration 028 (head verified on disk at plan time: 027/TARGET_VERSION 27 → next 028)
-**Plans**: 1/9 plans executed (waves 1–5)
+**Plans**: 2/9 plans executed (waves 1–5)
 
 Plans:
 **Wave 1**
 
 - [x] 35-01-PLAN.md — TRACER: end-to-end Text reach-out (blank editor → Transmit → additive "Did you send it?" → confirmed log) + compose-session-store
 - [ ] 35-02-PLAN.md — Data-layer preference foundation: migration 028 + app-settings-dao compose-mode + backup allowlist (one-way migration checkpoint)
-- [ ] 35-05-PLAN.md — AI egress shape-carry: ai-context-read carries the ADR-078 gated-note shape (D-13, no egress widening); Off Limits excluded from all AI egress — no avoidance-constraint carry (D-14/ADR-107)
+- [x] 35-05-PLAN.md — AI egress shape-carry: ai-context-read carries the ADR-078 gated-note shape (D-13, no egress widening); Off Limits excluded from all AI egress — no avoidance-constraint carry (D-14/ADR-107)
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
@@ -949,7 +949,7 @@ Plans:
 | 32. Interaction History & Insights | 8/8 | In Progress|  |
 | 33. Group Interaction Logging | 7/7 | Complete | 2026-09-12 (physical-Pixel UAT passed; release APK built on droid) |
 | 34. Rapid Capture & Update Flows | 8/8 | Complete | 2026-09-13 |
-| 35. Messaging & AI Compose | 1/9 | In Progress|  |
+| 35. Messaging & AI Compose | 2/9 | In Progress|  |
 | 36. AI Configuration & Prompting | 0/TBD | Not started | - |
 | 37. Settings & Personalization | 0/TBD | Deferred planning | - |
 | 38. Your Week | 0/TBD | Deferred planning | - |
