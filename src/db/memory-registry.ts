@@ -6,10 +6,13 @@
  * metadata are declarative in 24.1; their consumers arrive in Phase 24.2.
  */
 
-/** The durable noun while the owner confirms the final display terminology. */
+/**
+ * The durable noun for a Memory item, used as the fallback label wherever a
+ * specific type/custom label is absent. The owner confirmed "Memory" as the
+ * final terminology (D-11, 2026-09-12); the constant name is retained because it
+ * is the fallback-noun source consumed across the Memory UI.
+ */
 export const PROVISIONAL_MEMORY_LABEL = "Memory";
-/** Human-needed: the final general-type name is intentionally still provisional. */
-export const PROVISIONAL_DEFAULT_MEMORY_TYPE_NAME = "General";
 
 export type MemoryTypeKey = "general" | "imported" | "custom";
 export const DEFAULT_MEMORY_TYPE_KEY: MemoryTypeKey = "general";
@@ -27,7 +30,8 @@ export interface MemoryTypeMeta {
 
 export const MEMORY_TYPE_REGISTRY: Record<MemoryTypeKey, MemoryTypeMeta> = {
   general: {
-    displayName: PROVISIONAL_DEFAULT_MEMORY_TYPE_NAME,
+    // D-11 (owner-resolved 2026-09-12): the default/general type displays as "Memory".
+    displayName: "Memory",
     iconSemantic: "memory",
     cardinality: "many",
     historyAware: false,
@@ -47,7 +51,8 @@ export const MEMORY_TYPE_REGISTRY: Record<MemoryTypeKey, MemoryTypeMeta> = {
     presentationOrder: 25,
   },
   custom: {
-    displayName: PROVISIONAL_MEMORY_LABEL,
+    // D-11: renamed "Memory" → "Custom" so it no longer collides with general's "Memory".
+    displayName: "Custom",
     iconSemantic: "custom_memory",
     cardinality: "many",
     historyAware: false,
