@@ -34,9 +34,12 @@ import {
   setContactFrequencyCore,
   updateContactFull,
 } from "@/db/contacts-dao";
+import { getCurrentStateValue } from "@/db/current-state-history-read";
 import { readDataRevision } from "@/db/data-revision-dao";
 import { MIGRATIONS, TARGET_VERSION } from "@/db/database";
+import { listFuelForEditor } from "@/db/fuel-read";
 import { listMemoriesForContact } from "@/db/memories-read";
+import { listRelationshipsForContact } from "@/db/relationships-read";
 import { runMigrations } from "@/db/migrations/runner";
 import { recordTouchpoint } from "@/db/recency-dao";
 import { inWriteTransaction } from "@/db/transaction";
@@ -1093,6 +1096,243 @@ describe("updateContactFull — Memories knowledge subdomain (CAPT-04, §E)", ()
     const begins = spy.mock.calls.filter(([sql]) => sql === "BEGIN").length;
     expect(begins).toBe(1);
     spy.mockRestore();
+  });
+});
+
+// =============================================================================
+// Plan 34-05 Task 2 — updateContactFull persists the remaining four knowledge
+// subdomains (Relationships, Last Talked About, Current Location, Off Limits) in
+// the SAME single transaction: round-trip, atomic rollback, exactly-once bump,
+// and the kind-scoped off-limits data-loss guard.
+// =============================================================================
+
+describe("updateContactFull — remaining knowledge subdomains (CAPT-04, §E)", () => {
+  async function makeContact(name = "Know Owner"): Promise<number> {
+    const { contactId } = await createContactFull(exec, {
+      uid: uid(),
+      name,
+      intervalDays: 14,
+      now: NOW,
+    });
+    return contactId;
+  }
+
+  function baseEdit(contactId: number, name = "Know Owner") {
+    return {
+      id: contactId,
+      name,
+      intervalDays: 14,
+      rarelyResponds: 0,
+      remindersOff: 0,
+      now: EDIT_NOW,
+    };
+  }
+
+  // --- Relationships --------------------------------------------------------
+  it("round-trips a relationship add/edit/delete through the relationships read", async () => {
+    const contactId = await makeContact();
+
+    await updateContactFull(exec, {
+      ...baseEdit(contactId),
+      relationships: { add: [{ personName: "Alex", relationType: "sibling" }] },
+    });
+    let rows = await listRelationshipsForContact(exec, contactId);
+    expect(rows).toHaveLength(1);
+    expect(rows[0].person_name).toBe("Alex");
+
+    await updateContactFull(exec, {
+      ...baseEdit(contactId),
+      now: "2026-08-15 10:05:00",
+      relationships: { edit: [{ id: rows[0].id, personName: "Alexandra" }] },
+    });
+    rows = await listRelationshipsForContact(exec, contactId);
+    expect(rows).toHaveLength(1); // edited in place — no duplicate
+    expect(rows[0].person_name).toBe("Alexandra");
+
+    await updateContactFull(exec, {
+      ...baseEdit(contactId),
+      now: "2026-08-15 10:06:00",
+      relationships: { delete: [{ id: rows[0].id }] },
+    });
+    expect(await listRelationshipsForContact(exec, contactId)).toEqual([]);
+  });
+
+  // --- Current-state (Last Talked About + Current Location) -----------------
+  it("round-trips last_talked_about and current_location via getCurrentStateValue", async () => {
+    const contactId = await makeContact();
+
+    await updateContactFull(exec, {
+      ...baseEdit(contactId),
+      currentStateEntries: [
+        { fieldKey: "last_talked_about", value: "new job" },
+        { fieldKey: "current_location", value: "Berlin" },
+      ],
+    });
+
+    expect(
+      (await getCurrentStateValue(exec, contactId, "last_talked_about"))?.value,
+    ).toBe("new job");
+    expect(
+      (await getCurrentStateValue(exec, contactId, "current_location"))?.value,
+    ).toBe("Berlin");
+  });
+
+  it("writes NO new current_state row when the value is unchanged", async () => {
+    const contactId = await makeContact();
+    await updateContactFull(exec, {
+      ...baseEdit(contactId),
+      currentStateEntries: [{ fieldKey: "last_talked_about", value: "same" }],
+    });
+
+    const countRows = async () =>
+      (
+        await exec.getFirstAsync<{ n: number }>(
+          "SELECT COUNT(*) AS n FROM current_state_entries WHERE contact_id = ? AND field_key = ?",
+          [contactId, "last_talked_about"],
+        )
+      )?.n ?? 0;
+    expect(await countRows()).toBe(1);
+
+    // Re-submit the SAME value — setCurrentStateValueCore must be skipped.
+    await updateContactFull(exec, {
+      ...baseEdit(contactId),
+      now: "2026-08-15 10:07:00",
+      currentStateEntries: [{ fieldKey: "last_talked_about", value: "same" }],
+    });
+    expect(await countRows()).toBe(1); // no spurious history row
+
+    // A CHANGED value retains the prior as history (demote + insert).
+    await updateContactFull(exec, {
+      ...baseEdit(contactId),
+      now: "2026-08-15 10:08:00",
+      currentStateEntries: [{ fieldKey: "last_talked_about", value: "changed" }],
+    });
+    expect(await countRows()).toBe(2);
+    expect(
+      (await getCurrentStateValue(exec, contactId, "last_talked_about"))?.value,
+    ).toBe("changed");
+  });
+
+  // --- Off Limits (fuel, kind-scoped) ---------------------------------------
+  it("round-trips an off-limits fuel add/edit/delete through listFuelForEditor", async () => {
+    const contactId = await makeContact();
+
+    await updateContactFull(exec, {
+      ...baseEdit(contactId),
+      offLimits: { add: [{ kind: "off_limits", text: "politics" }] },
+    });
+    let fuel = await listFuelForEditor(exec, contactId);
+    expect(fuel).toHaveLength(1);
+    expect(fuel[0].kind).toBe("off_limits");
+    expect(fuel[0].text).toBe("politics");
+
+    await updateContactFull(exec, {
+      ...baseEdit(contactId),
+      now: "2026-08-15 10:05:00",
+      offLimits: { edit: [{ id: fuel[0].id, text: "religion" }] },
+    });
+    fuel = await listFuelForEditor(exec, contactId);
+    expect(fuel).toHaveLength(1); // edited in place
+    expect(fuel[0].kind).toBe("off_limits"); // still off_limits
+    expect(fuel[0].text).toBe("religion");
+
+    await updateContactFull(exec, {
+      ...baseEdit(contactId),
+      now: "2026-08-15 10:06:00",
+      offLimits: { delete: [{ id: fuel[0].id }] },
+    });
+    expect(await listFuelForEditor(exec, contactId)).toEqual([]);
+  });
+
+  it("an Off Limits edit leaves recent/topic/fact/gift fuel rows fully intact (kind-scoped, DATA LOSS guard)", async () => {
+    const contactId = await makeContact();
+    // Seed the contact with one of every OTHER fuel kind plus an off_limits row.
+    for (const kind of ["recent", "topic", "fact", "gift"] as const) {
+      await exec.runAsync(
+        "INSERT INTO fuel (uid, contact_id, kind, label, text, url, created_at, source, modified_at) VALUES (?, ?, ?, NULL, ?, NULL, ?, 'user', ?)",
+        [uid(), contactId, kind, `${kind}-text`, NOW, NOW],
+      );
+    }
+    await updateContactFull(exec, {
+      ...baseEdit(contactId),
+      offLimits: { add: [{ kind: "off_limits", text: "secret" }] },
+    });
+    const [offLimitsRow] = (await listFuelForEditor(exec, contactId)).filter(
+      (r) => r.kind === "off_limits",
+    );
+
+    // Edit AND delete the off_limits row — the other four kinds must survive.
+    await updateContactFull(exec, {
+      ...baseEdit(contactId),
+      now: "2026-08-15 10:05:00",
+      offLimits: { delete: [{ id: offLimitsRow.id }] },
+    });
+
+    const surviving = (await listFuelForEditor(exec, contactId))
+      .map((r) => r.kind)
+      .sort();
+    expect(surviving).toEqual(["fact", "gift", "recent", "topic"]);
+  });
+
+  it("an Off-Limits-DELETE edit advances data_revision by EXACTLY 1 (no double-bump)", async () => {
+    const contactId = await makeContact();
+    await updateContactFull(exec, {
+      ...baseEdit(contactId),
+      offLimits: { add: [{ kind: "off_limits", text: "to remove" }] },
+    });
+    const [row] = await listFuelForEditor(exec, contactId);
+
+    const before = await readDataRevision(exec);
+    await updateContactFull(exec, {
+      ...baseEdit(contactId),
+      now: "2026-08-15 10:06:00",
+      offLimits: { delete: [{ id: row.id }] },
+    });
+    expect(await readDataRevision(exec)).toBe(before + 1);
+  });
+
+  it("an Off-Limits ADD edit advances data_revision by EXACTLY 1", async () => {
+    const contactId = await makeContact();
+    const before = await readDataRevision(exec);
+    await updateContactFull(exec, {
+      ...baseEdit(contactId),
+      offLimits: { add: [{ kind: "off_limits", text: "added" }] },
+    });
+    expect(await readDataRevision(exec)).toBe(before + 1);
+  });
+
+  // --- Atomic rollback across the subdomains --------------------------------
+  it("rolls back the whole edit when a relationship write throws mid-transaction", async () => {
+    const contactId = await makeContact("Original");
+    await expect(
+      updateContactFull(exec, {
+        ...baseEdit(contactId, "Changed"),
+        memories: { add: [{ type: "general", value: "should not persist" }] },
+        // Blank person name throws inside addRelationshipCore → whole rollback.
+        relationships: { add: [{ personName: "   " }] },
+      }),
+    ).rejects.toThrow();
+
+    expect(await name(contactId)).toBe("Original");
+    expect(await listMemoriesForContact(exec, contactId)).toEqual([]);
+    expect(await listRelationshipsForContact(exec, contactId)).toEqual([]);
+  });
+
+  it("rolls back the whole edit when an off-limits fuel delete targets a missing row", async () => {
+    const contactId = await makeContact("Original");
+    await expect(
+      updateContactFull(exec, {
+        ...baseEdit(contactId, "Changed"),
+        currentStateEntries: [{ fieldKey: "current_location", value: "Paris" }],
+        // A non-existent fuel id → deleteFuelCore's assertOneChange throws.
+        offLimits: { delete: [{ id: 999999 }] },
+      }),
+    ).rejects.toThrow();
+
+    expect(await name(contactId)).toBe("Original");
+    expect(
+      await getCurrentStateValue(exec, contactId, "current_location"),
+    ).toBeNull();
   });
 });
 

@@ -224,10 +224,21 @@ export async function confirmFuelCore(
   assertOneChange("confirmFuel", input.id, input.contactId, result.changes);
 }
 
-/** DELETE the matching (id, contact_id) + assertOneChange. */
+/**
+ * DELETE the matching (id, contact_id) + assertOneChange, writing a tombstone.
+ *
+ * The tombstone's `insertTombstoneCore` self-bumps `data_revision` by DEFAULT
+ * (`bumpRevision=true`) — UNLIKE the soft-delete `deleteMemoryCore`/
+ * `deleteRelationshipCore`, which never bump. An aggregate composer that owns the
+ * single bump itself (e.g. `updateContactFull`'s off-limits edit) passes
+ * `bumpRevision:false` to suppress the tombstone self-bump and avoid a double-bump
+ * (Review cycle-4 MEDIUM #2) — mirroring the `insertTombstoneCore(..., {bumpRevision:
+ * false})` precedent the memory/relationship purge cores already use. The standalone
+ * `deleteFuel` wrapper and every other caller keep the default (true).
+ */
 export async function deleteFuelCore(
   exec: SqlExecutor,
-  input: { id: number; contactId: number; now: string },
+  input: { id: number; contactId: number; now: string; bumpRevision?: boolean },
 ): Promise<void> {
   const target = await exec.getFirstAsync<{ uid: string }>(
     "SELECT uid FROM fuel WHERE id = ? AND contact_id = ?",
@@ -237,11 +248,15 @@ export async function deleteFuelCore(
     assertOneChange("deleteFuel", input.id, input.contactId, 0);
     return;
   }
-  await insertTombstoneCore(exec, {
-    entityType: "fuel",
-    entityUid: target.uid,
-    deletedAt: input.now,
-  });
+  await insertTombstoneCore(
+    exec,
+    {
+      entityType: "fuel",
+      entityUid: target.uid,
+      deletedAt: input.now,
+    },
+    { bumpRevision: input.bumpRevision ?? true },
+  );
   const result = await exec.runAsync(
     "DELETE FROM fuel WHERE id = ? AND contact_id = ?",
     [input.id, input.contactId],
