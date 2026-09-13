@@ -70,15 +70,16 @@ import {
 import { getContactHeader } from "@/db/contact-read";
 import { getExecutor, localDateTime } from "@/db/database";
 import { markAssistLogged } from "@/db/interaction-assist-dao";
-import type { ContactMethodType } from "@/logic/contact-method-normalization";
 import {
   actionablePrimaryPhoneDestination,
   type ComposeControls,
   effectiveMode,
   nextRememberedMode,
   resolveComposeControls,
+  resolveCopyTargets,
   resolveUsableMode,
 } from "@/logic/compose-logic";
+import type { ContactMethodType } from "@/logic/contact-method-normalization";
 import { resetToDashboardRoot } from "@/navigation/reset-intents";
 import type { RootStackScreenProps, TabParamList } from "@/navigation/types";
 import { performReachOut } from "@/services/reach-out/handoff";
@@ -135,9 +136,9 @@ export function ComposeScreen({
   // In-flight latch for Transmit (A3) — a rapid double-tap cannot launch two
   // composers. Copy is NEVER gated by this.
   const [sending, setSending] = useState(false);
-  // Transient "Message copied" confirmation via a single setState + setTimeout
-  // (NOT a per-frame animation, per CLAUDE.md).
-  const [copied, setCopied] = useState(false);
+  // Transient copy confirmation ("Message copied" / "Subject copied") via a
+  // single setState + setTimeout (NOT a per-frame animation, per CLAUDE.md).
+  const [copyFeedback, setCopyFeedback] = useState<string | null>(null);
   const copyTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   // The additive "Did you send it?" panel — non-null (carrying the assist UID to
   // log) ONLY after a started handoff that created an assist. `logging` latches
@@ -147,8 +148,10 @@ export function ComposeScreen({
 
   // Session draft state (survives nav/background, not relaunch — COMP-07 / D-10).
   const body = useComposeSession((s) => s.body);
+  const subject = useComposeSession((s) => s.subject);
   const mode = useComposeSession((s) => s.mode);
   const setBody = useComposeSession((s) => s.setBody);
+  const setSubject = useComposeSession((s) => s.setSubject);
   const setMode = useComposeSession((s) => s.setMode);
   const setDestination = useComposeSession((s) => s.setDestination);
   const startSession = useComposeSession((s) => s.startSession);
@@ -282,6 +285,20 @@ export function ComposeScreen({
     };
   }, []);
 
+  // Flash a transient copy confirmation for ~2s (single setState + setTimeout;
+  // never a per-frame animation, per CLAUDE.md). Shared by the body Copy and the
+  // Subject copy affordance.
+  const flashCopyFeedback = useCallback((message: string) => {
+    if (copyTimer.current) {
+      clearTimeout(copyTimer.current);
+    }
+    setCopyFeedback(message);
+    copyTimer.current = setTimeout(() => {
+      setCopyFeedback(null);
+      copyTimer.current = null;
+    }, 2000);
+  }, []);
+
   // Re-read the contact's method groups after a primary swap so the picker
   // condition and resolved destinations reflect the new explicit primary without
   // a full navigation round-trip. Local SQLite read; no network on this path.
@@ -393,6 +410,9 @@ export function ComposeScreen({
         assistEnabled: settings.interactionAssistEnabled === 1,
         now: localDateTime(),
         messageBody: body,
+        // Carried into the mailto Subject on the email arm only; the text/call
+        // arms ignore it (handoff.ts).
+        subject: usable === "email" ? subject : undefined,
       });
       // Show the additive confirmation ONLY for a started handoff that created an
       // assist. A failed launch (handoffStarted false) or opted-out assists
@@ -407,28 +427,50 @@ export function ComposeScreen({
     } finally {
       setSending(false);
     }
-  }, [sending, header, contactId, mode, body, setDestination, persistRememberedMode]);
+  }, [
+    sending,
+    header,
+    contactId,
+    mode,
+    body,
+    subject,
+    setDestination,
+    persistRememberedMode,
+  ]);
 
   // Copy — the guaranteed handoff, NEVER gated by `sending`, NEVER opens the
-  // confirmation panel. On success show a transient "Message copied" for ~2s.
+  // confirmation panel. Copies the BODY only in any mode (resolveCopyTargets.body,
+  // never inlined here); on success shows a transient "Message copied" for ~2s.
   const onCopy = useCallback(async () => {
     try {
-      await Clipboard.setStringAsync(body);
-      if (copyTimer.current) {
-        clearTimeout(copyTimer.current);
-      }
-      setCopied(true);
-      copyTimer.current = setTimeout(() => {
-        setCopied(false);
-        copyTimer.current = null;
-      }, 2000);
+      const targets = resolveCopyTargets(mode, body, subject);
+      await Clipboard.setStringAsync(targets.body);
+      flashCopyFeedback("Message copied");
       // Copy is a commit — advance the remembered mode (COMP-02).
       await persistRememberedMode();
     } catch (err) {
       Logger.error(LOG_SCOPE, "failed to copy draft", err);
       Alert.alert("Couldn't copy", "Please try again.");
     }
-  }, [body, persistRememberedMode]);
+  }, [mode, body, subject, flashCopyFeedback, persistRememberedMode]);
+
+  // Subject copy — the separate lightweight affordance (Email mode only). Copies
+  // the SUBJECT only (resolveCopyTargets.subject, null in Text so it no-ops);
+  // shows "Subject copied". It is NOT the main Copy commit, so it does not
+  // advance the remembered mode.
+  const onCopySubject = useCallback(async () => {
+    const targets = resolveCopyTargets(mode, body, subject);
+    if (targets.subject === null) {
+      return;
+    }
+    try {
+      await Clipboard.setStringAsync(targets.subject);
+      flashCopyFeedback("Subject copied");
+    } catch (err) {
+      Logger.error(LOG_SCOPE, "failed to copy subject", err);
+      Alert.alert("Couldn't copy", "Please try again.");
+    }
+  }, [mode, body, subject, flashCopyFeedback]);
 
   // "Yes, log interaction" — log THIS assist through the sole recency writer at
   // its handoff_at (markAssistLogged reused UNCHANGED, D-06). connected=1 matches
@@ -548,6 +590,45 @@ export function ComposeScreen({
           </AppText>
         </ChromeScrim>
       </View>
+
+      {/* Email Subject field (COMP-04) — rendered only in Email mode, above the
+          Body. Bound to the session store `subject`/`setSubject` (owned by plan
+          35-01), so it survives nav/background exactly like the body. Its own
+          lightweight Copy affordance copies the Subject only. */}
+      {mode === "email" ? (
+        <View testID="compose-subject" style={styles.section}>
+          <ChromeScrim style={styles.labelScrim} radius={RADII.sm}>
+            <AppText role="label">Subject</AppText>
+          </ChromeScrim>
+          <TextInput
+            testID="compose-subject-input"
+            value={subject}
+            onChangeText={setSubject}
+            placeholder="Subject"
+            placeholderTextColor={colors.textSecondary}
+            style={[
+              styles.subjectInput,
+              {
+                backgroundColor: colors.surface,
+                borderColor: colors.border,
+                color: colors.textPrimary,
+                fontSize: TYPOGRAPHY.body.size,
+                lineHeight: TYPOGRAPHY.body.lineHeight,
+                fontFamily: "Inter-Regular",
+              },
+            ]}
+          />
+          <View style={styles.affordance}>
+            <Button
+              testID="compose-copy-subject"
+              role="tertiary"
+              label="Copy subject"
+              accessibilityLabel="Copy subject"
+              onPress={() => void onCopySubject()}
+            />
+          </View>
+        </View>
+      ) : null}
 
       {/* Editor-first: the BLANK multiline body editor is the primary surface. */}
       <View testID="compose-draft" style={styles.section}>
@@ -684,9 +765,9 @@ export function ComposeScreen({
 
       {/* Action row. */}
       <View style={styles.actions}>
-        {copied ? (
+        {copyFeedback !== null ? (
           <AppText testID="compose-copied" role="caption">
-            Message copied
+            {copyFeedback}
           </AppText>
         ) : null}
 
@@ -752,6 +833,12 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     minHeight: 120,
     textAlignVertical: "top",
+  },
+  subjectInput: {
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
   },
   affordance: {
     alignSelf: "flex-start",
