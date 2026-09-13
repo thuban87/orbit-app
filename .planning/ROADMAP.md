@@ -150,7 +150,7 @@ All v1.0 commits are local on `main` and have NOT been pushed.
 - [x] **Phase 31.1: App-Wide System Backgrounds** (INSERTED) - Select the approved bundled art as a persistent system background across regular app screens, with Orrery excluded and Profile photos taking precedence (completed 2026-09-11; owner-approved. Plans 01–04 + corrective 31.1-05 [visibility: veil decoupled from card opacity + ChromeScrim] + enhancement 31.1-06 [mode-aware glassy cards; Android-elevation fix]. The prior 31.1-04 UAT was a false positive — superseded. Release validated on the owner's personal phone. Parked to future: theme-merge into a single Dark/Light switch, Deep Space/Starfield removal.)
 - [x] **Phase 32: Interaction History & Insights** - Activity heatmap (Cycles lens), intensity, Rolodex History Browser, canonical Interaction Detail/Edit (completed 2026-09-11)
 - [x] **Phase 33: Group Interaction Logging** - Group Event parent with canonical child interactions, inheritance/overrides, and atomic fan-out (completed 2026-09-12; physical-Pixel UAT passed; release APK built on droid)
-- [ ] **Phase 34: Rapid Capture & Update Flows** - Streamlined Add Contact, Quick Log with post-log capture, Tone vocabulary, Update Contact chooser loop
+- [x] **Phase 34: Rapid Capture & Update Flows** - Streamlined Add Contact, Quick Log with post-log capture, Tone vocabulary, Update Contact chooser loop (completed 2026-09-13; goal ACHIEVED — verifier 15/15 must-haves, code review 0 blockers/3 warnings-all-fixed/3 info-deferred, on-device UAT passed on the Pixel: migration 027 at user_version=27 + Quick Log channel seeds from the Default Interaction Channel preference (owner decision) both proven against the device DB, Edit Contact 9-section accordion IA confirmed. 3287 tests pass, tsc/colors clean. One non-blocking visual sign-off (motion/scroll feel) left for an owner glance)
 - [ ] **Phase 35: Messaging & AI Compose** - Compose-first drafting workspace, Text/Email transmit handoff, Research side, three-suggestion AI review
 - [ ] **Phase 36: AI Configuration & Prompting** - Three connection lanes, prompt personalization, permission manager, and the final backup format bump (v5 — v4 landed early in 24.1)
 - [ ] **Phase 37: Settings & Personalization** - DEFERRED PLANNING — consolidates the preference/admin seams exported by Phases 22–36
@@ -922,7 +922,7 @@ Plans:
 | 31.1 App-Wide System Backgrounds | 4/4 | In Progress|  |
 | 32. Interaction History & Insights | 8/8 | In Progress|  |
 | 33. Group Interaction Logging | 7/7 | Complete | 2026-09-12 (physical-Pixel UAT passed; release APK built on droid) |
-| 34. Rapid Capture & Update Flows | 8/8 | In Progress|  |
+| 34. Rapid Capture & Update Flows | 8/8 | Complete | 2026-09-13 |
 | 35. Messaging & AI Compose | 0/TBD | Not started | - |
 | 36. AI Configuration & Prompting | 0/TBD | Not started | - |
 | 37. Settings & Personalization | 0/TBD | Deferred planning | - |
