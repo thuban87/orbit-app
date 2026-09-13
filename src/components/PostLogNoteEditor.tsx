@@ -129,6 +129,13 @@ export function PostLogNoteEditor({ target, onClose }: PostLogNoteEditorProps) {
         setError(MISSING_INTERACTION_MESSAGE);
         return;
       }
+      if (result.target !== "note") {
+        // Unreachable for a kind:"note" input — resolvePostLogSave only ever
+        // returns note/missing/noop here — but this narrows PostLogSaveResult
+        // to PostLogNoteResult so the compiler can see interactionId/note.
+        setError(SAVE_FAILED_MESSAGE);
+        return;
+      }
       const now = localDateTime();
       await editTouchpointFull(getExecutor(), {
         interactionId: result.interactionId,
