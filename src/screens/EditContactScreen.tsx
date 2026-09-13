@@ -1,22 +1,24 @@
 /**
  * EditContactScreen (CRUD-03 / CAPT-04) — the always-show edit form, restructured
- * into DIRECT-ACCESS top-level accordion sections that expose the editable record
- * (dossier §E). Every subdomain is a first-class TOP-LEVEL editing section (never a
- * nested Things-to-Remember drawer), composing the SAME canonical editors used
- * elsewhere. This slice ships the metadata sections (Identity, Relationship Basics,
- * Contact Methods, Custom Fields) PLUS the first knowledge subdomain — Memories —
- * wired end-to-end; the remaining four knowledge sections follow.
+ * into DIRECT-ACCESS top-level accordion sections that expose the COMPLETE editable
+ * record (dossier §E): Identity, Relationship Basics, Contact Methods, Last Talked
+ * About, Key People/Relationships, Current Location, Memories, Custom Fields, Off
+ * Limits. Every knowledge subdomain is a first-class TOP-LEVEL editing section (never
+ * a nested knowledge drawer), composing the SAME canonical editors used
+ * elsewhere (MemoryEditor / RelationshipEditor / FuelEditor / current-state inputs).
  *
  * Seeded by `getContactForEdit` (metadata / custom-values / links / methods) PLUS an
  * EXPLICIT per-subdomain read for each knowledge section (`getContactForEdit` returns
  * NO knowledge subdomain — verified contact-read.ts:154-213): Memories →
- * `listMemoriesForContact`.
+ * `listMemoriesForContact`, Key People → `listRelationshipsForContact`, Off Limits →
+ * `listFuelForEditor(...).filter(kind === "off_limits")`, Last Talked About + Current
+ * Location → `getCurrentStateValues`.
  *
  * SINGLE form-level Save over the retained TWO-TRANSACTION boundary (dossier §AE):
- * metadata + knowledge subdomains persist through `updateContactFull` (one txn, the
- * sole `data_revision` bump), THEN links through `applyLinkDiff` (second txn). No
- * per-section saving; no collapsed transaction. Each knowledge section feeds its
- * seed↔draft diff into `buildEditInput` (34-05), which assembles the pinned
+ * metadata + ALL five knowledge subdomains persist through `updateContactFull` (one
+ * txn, the sole `data_revision` bump), THEN links through `applyLinkDiff` (second
+ * txn). No per-section saving; no collapsed transaction. Each knowledge section feeds
+ * its seed↔draft diff into `buildEditInput` (34-05), which assembles the pinned
  * `{ add, edit, delete }` payloads `updateContactFull` applies.
  *
  * LAST-SPOKE BOUNDARY (owner ruling 2026-08-14 / CONTEXT Area 3): the tri-state
@@ -26,6 +28,12 @@
  * recency path (source='manual', direction=null) — the screen NEVER writes
  * `last_contact` directly. A contact that ALREADY has `last_contact` set shows NO
  * last-spoke control here: correcting an existing recency timeline is Phase 6.
+ *
+ * OFF LIMITS is KIND-SCOPED (Review cycle-4 MEDIUM #3, DATA LOSS): its FuelEditor is
+ * seeded ONLY from `off_limits` rows and every add/edit is forced to
+ * `kind:"off_limits"`, so the section can never show/create/edit/delete a
+ * `recent`/`topic`/`fact`/`gift` row; combined with 34-05's kind-scoped diff, a
+ * contact's other fuel kinds survive an Off Limits edit.
  *
  * The screen builds NO SQL and re-implements NO custom widget: the input-shaping
  * correctness lives in the node-tested `edit-contact-logic.ts`. This file is the RN
@@ -60,6 +68,11 @@ import {
 } from "@/components/contact-methods-editor-model";
 import { FieldValueInput } from "@/components/FieldValueInput";
 import { FrequencyPicker } from "@/components/FrequencyPicker";
+import {
+  FuelEditor,
+  type FuelDraft,
+  type FuelEditPatch,
+} from "@/components/FuelEditor";
 import { type LinkDraft, LinksEditor } from "@/components/LinksEditor";
 import {
   initialDraft as initialMemoryDraft,
@@ -68,6 +81,10 @@ import {
   type MemoryEditPatch,
 } from "@/components/MemoryEditor";
 import { PhotoSourcePicker } from "@/components/PhotoSourcePicker";
+import {
+  RelationshipEditor,
+  type RelationshipDraft,
+} from "@/components/RelationshipEditor";
 import { TriStateLastSpoke } from "@/components/TriStateLastSpoke";
 import type { LastSpokeValue } from "@/components/tri-state-last-spoke-logic";
 import { AccordionSection, AppText } from "@/components/ui";
@@ -84,12 +101,20 @@ import {
   listCategories,
 } from "@/db/contact-read";
 import { updateContactFull } from "@/db/contacts-dao";
+import { getCurrentStateValues } from "@/db/current-state-history-read";
 import { getExecutor, localDateTime } from "@/db/database";
 import { listDefs } from "@/db/field-defs-dao";
 import type { CustomFieldDef } from "@/db/field-types";
 import { defsForEditForm } from "@/db/field-values-dao";
+import type { FuelItem } from "@/db/fuel-read";
+import { listFuelForEditor } from "@/db/fuel-read";
 import { setMemoryAllowAi } from "@/db/memories-dao";
 import { listMemoriesForContact, type MemoryRow } from "@/db/memories-read";
+import { CURRENT_STATE_FIELD_REGISTRY } from "@/db/memory-registry";
+import {
+  listRelationshipsForContact,
+  type RelationshipRow,
+} from "@/db/relationships-read";
 import { newUid } from "@/db/uid";
 import type { ContactMethodType } from "@/logic/contact-method-normalization";
 import type { RootStackScreenProps } from "@/navigation/types";
@@ -107,9 +132,12 @@ import { Logger } from "@/utils/logger";
 import {
   buildEditInput,
   canSave,
+  type CurrentStateSeed,
   type EditFormState,
+  type FuelDraftRow,
   isNeverContacted,
   type MemoryDraftRow,
+  type RelationshipDraftRow,
   seedEditState,
 } from "./edit-contact-logic";
 
@@ -171,7 +199,8 @@ function buildLinksForDiff(draft: LinkDraft[]): DraftLink[] {
 // `buildEditInput` (which strips the id from every add). The seed baselines are held
 // separately (`seeded*`) so the seed↔draft diff distinguishes unchanged/added/
 // edited/deleted rows; the editors render each draft row back to its committed-row
-// shape via the `*RowToItem` adapters below.
+// shape via the `*RowToItem` adapters. Each `*RowToDraftRow` seed adapter emits the
+// SAME field shape the editor commits, so an untouched seeded row diffs equal.
 // =============================================================================
 
 /** Seed a Memory draft row from a committed row (keeps its real id + all fields). */
@@ -206,6 +235,76 @@ function memoryDraftRowToItem(
   };
 }
 
+/** Seed a relationship draft row from a committed row (keeps id + all fields). */
+function relationshipRowToDraftRow(row: RelationshipRow): RelationshipDraftRow {
+  return {
+    personName: row.person_name,
+    relationType: row.relation_type,
+    linkedContactId: row.linked_contact_id,
+    note: row.note,
+    pinned: row.pinned === 1,
+    hidden: row.hidden === 1 ? 1 : row.hidden === 0 ? 0 : null,
+    id: row.id,
+  };
+}
+
+/** Render a relationship draft row back to the editor's committed-row shape. */
+function relationshipDraftRowToItem(
+  row: RelationshipDraftRow,
+  contactId: number,
+  linkedName: string | null,
+): RelationshipRow {
+  return {
+    id: row.id ?? 0,
+    uid: "",
+    contact_id: contactId,
+    person_name: row.personName,
+    relation_type: row.relationType ?? null,
+    linked_contact_id: row.linkedContactId ?? null,
+    linked_contact_name: linkedName,
+    note: row.note ?? null,
+    pinned: row.pinned ? 1 : 0,
+    hidden: row.hidden ?? null,
+    created_at: "",
+    modified_at: "",
+    deleted_at: null,
+  };
+}
+
+/**
+ * Seed an off-limits draft row from a committed fuel row. Kind is FORCED to
+ * off_limits (the caller has already filtered to off_limits rows — belt AND
+ * braces against the DATA-LOSS hazard, Review cycle-4 MEDIUM #3).
+ */
+function fuelItemToDraftRow(item: FuelItem): FuelDraftRow {
+  return {
+    kind: "off_limits",
+    label: item.label,
+    text: item.text,
+    url: item.url,
+    id: item.id,
+  };
+}
+
+/** Render an off-limits draft row back to the FuelEditor's committed-row shape. */
+function fuelDraftRowToItem(
+  row: FuelDraftRow,
+  contactId: number,
+  now: string,
+): FuelItem {
+  return {
+    id: row.id ?? 0,
+    contact_id: contactId,
+    kind: "off_limits",
+    label: row.label ?? null,
+    text: row.text ?? null,
+    url: row.url ?? null,
+    // A real stamp so the editor's age line reads "today" for a fresh draft.
+    created_at: now,
+    source: "user",
+  };
+}
+
 const DIRTY_CHECK_NOW = "2000-01-01 00:00:00";
 const DIRTY_CHECK_UID = "dirty-check";
 
@@ -215,6 +314,9 @@ interface SignatureOptions {
   neverContacted: boolean;
   effectivePhoneRegion: string | null;
   seededMemories: MemoryDraftRow[];
+  seededRelationships: RelationshipDraftRow[];
+  seededOffLimits: FuelDraftRow[];
+  seededCurrentState: CurrentStateSeed;
 }
 
 function editInputSignature(
@@ -230,6 +332,9 @@ function editInputSignature(
       now: DIRTY_CHECK_NOW,
       interactionUid: DIRTY_CHECK_UID,
       seededMemories: options.seededMemories,
+      seededRelationships: options.seededRelationships,
+      seededOffLimits: options.seededOffLimits,
+      seededCurrentState: options.seededCurrentState,
     }),
   );
 }
@@ -245,8 +350,13 @@ function valuesSignature(values: Record<string, string | null>): string {
 /** The knowledge seeds every hydration + partial-reseed reads (§E). */
 interface KnowledgeSeeds {
   memories: MemoryDraftRow[];
+  relationships: RelationshipDraftRow[];
+  offLimits: FuelDraftRow[];
+  currentState: CurrentStateSeed;
   /** id → allow_ai, for the Memory editor's edit-only Allow-AI control display. */
   memoryAllowAi: Map<number, number>;
+  /** id → linked contact name, for the relationship editor's "Linked to" line. */
+  relationshipLinkedNames: Map<number, string | null>;
 }
 
 export function EditContactScreen({
@@ -266,16 +376,27 @@ export function EditContactScreen({
   const [seededLinks, setSeededLinks] = useState<ContactLinkRow[]>([]);
   const [linksDraft, setLinksDraft] = useState<LinkDraft[]>([]);
   // Knowledge-subdomain seed baselines (the diff baselines). The editable drafts
-  // live in `form` (memories); buildEditInput diffs each draft against its baseline
-  // here into {add,edit,delete}.
+  // live in `form` (memories/relationships/offLimits/lastTalkedAbout/currentLocation);
+  // buildEditInput diffs each draft against its baseline here into {add,edit,delete}.
   const [seededMemories, setSeededMemories] = useState<MemoryDraftRow[]>([]);
+  const [seededRelationships, setSeededRelationships] = useState<
+    RelationshipDraftRow[]
+  >([]);
+  const [seededOffLimits, setSeededOffLimits] = useState<FuelDraftRow[]>([]);
+  const [seededCurrentState, setSeededCurrentState] = useState<CurrentStateSeed>(
+    {},
+  );
   // The edit-only Allow-AI availability (real app setting, NOT a hardcoded false —
   // Review cycle-4 LOW #4 / D-04). A stubbed false would silently disable the
   // per-Memory Allow-AI control that 34-07's privacy design relies on.
   const [globalAiEnabled, setGlobalAiEnabled] = useState(false);
   // id → allow_ai for existing Memories (display only; the toggle persists
-  // IMMEDIATELY via setMemoryAllowAi, exactly like ThingsToRememberScreen).
+  // IMMEDIATELY via setMemoryAllowAi, mirroring the standalone knowledge surface).
   const memoryAllowAiRef = useRef<Map<number, number>>(new Map());
+  // id → linked contact name for existing relationships (display only).
+  const relationshipLinkedNamesRef = useRef<Map<number, string | null>>(
+    new Map(),
+  );
   // Decrementing synthetic id source for NEW knowledge rows (never collides with a
   // real positive seed id, so a new row is always diffed as an add).
   const newRowIdRef = useRef(-1);
@@ -321,8 +442,12 @@ export function EditContactScreen({
     identity: true,
     relationship: false,
     methods: false,
+    lastTalked: false,
+    keyPeople: false,
+    currentLocation: false,
     memories: false,
     custom: false,
+    offLimits: false,
   });
   const setSectionExpanded = useCallback((sectionId: string, next: boolean) => {
     setExpandedSections((prev) => ({ ...prev, [sectionId]: next }));
@@ -342,16 +467,38 @@ export function EditContactScreen({
   );
 
   // Read every knowledge subdomain seed for the contact (§E). `getContactForEdit`
-  // returns NONE of these, so each needs its OWN explicit read. Used by initial
-  // hydration AND the links-failure partial reseed.
+  // returns NONE of these, so each needs its OWN explicit read. Off Limits is
+  // FILTERED to `kind === "off_limits"` here (listFuelForEditor returns every kind
+  // — a DATA-LOSS guard, Review cycle-4 MEDIUM #3). Used by initial hydration AND
+  // the links-failure partial reseed.
   const readKnowledgeSeeds = useCallback(async (): Promise<KnowledgeSeeds> => {
     const exec = getExecutor();
-    const memoryRows = await listMemoriesForContact(exec, contactId);
+    const [memoryRows, relationshipRows, fuelRows, currentValues] =
+      await Promise.all([
+        listMemoriesForContact(exec, contactId),
+        listRelationshipsForContact(exec, contactId),
+        listFuelForEditor(exec, contactId),
+        getCurrentStateValues(exec, contactId),
+      ]);
     const memoryAllowAi = new Map<number, number>();
     for (const row of memoryRows) memoryAllowAi.set(row.id, row.allow_ai);
+    const relationshipLinkedNames = new Map<number, string | null>();
+    for (const row of relationshipRows) {
+      relationshipLinkedNames.set(row.id, row.linked_contact_name);
+    }
+    const offLimitsRows = fuelRows.filter((row) => row.kind === "off_limits");
+    const currentState: CurrentStateSeed = {};
+    const lta = currentValues.last_talked_about?.value;
+    const loc = currentValues.current_location?.value;
+    if (lta != null) currentState.last_talked_about = lta;
+    if (loc != null) currentState.current_location = loc;
     return {
       memories: memoryRows.map(memoryRowToDraftRow),
+      relationships: relationshipRows.map(relationshipRowToDraftRow),
+      offLimits: offLimitsRows.map(fuelItemToDraftRow),
+      currentState,
       memoryAllowAi,
+      relationshipLinkedNames,
     };
   }, [contactId]);
 
@@ -379,12 +526,20 @@ export function EditContactScreen({
       const nextForm: EditFormState = {
         ...seedEditState(result),
         memories: knowledge.memories,
+        relationships: knowledge.relationships,
+        offLimits: knowledge.offLimits,
+        lastTalkedAbout: knowledge.currentState.last_talked_about ?? "",
+        currentLocation: knowledge.currentState.current_location ?? "",
       };
       memoryAllowAiRef.current = knowledge.memoryAllowAi;
+      relationshipLinkedNamesRef.current = knowledge.relationshipLinkedNames;
       setEditDefs(nextEditDefs);
       setNeverContacted(nextNeverContacted);
       setGlobalAiEnabled(settings.aiProvider !== "none");
       setSeededMemories(knowledge.memories);
+      setSeededRelationships(knowledge.relationships);
+      setSeededOffLimits(knowledge.offLimits);
+      setSeededCurrentState(knowledge.currentState);
       setForm(nextForm);
       setInitialTrackingEnabled(result.contact.trackingEnabled === 1);
       setEffectivePhoneRegion(nextPhoneRegion);
@@ -394,6 +549,9 @@ export function EditContactScreen({
         neverContacted: nextNeverContacted,
         effectivePhoneRegion: nextPhoneRegion,
         seededMemories: knowledge.memories,
+        seededRelationships: knowledge.relationships,
+        seededOffLimits: knowledge.offLimits,
+        seededCurrentState: knowledge.currentState,
       });
       // The committed baseline for orphan cleanup: the pre-edit custom values.
       committedValuesRef.current = { ...result.values };
@@ -530,8 +688,8 @@ export function EditContactScreen({
         : prev,
     );
   }, []);
-  // The Allow-AI toggle persists IMMEDIATELY (not through Save), mirroring
-  // ThingsToRememberScreen — it is a per-item privacy control, not draft state.
+  // The Allow-AI toggle persists IMMEDIATELY (not through Save), mirroring the
+  // standalone knowledge surface — a per-item privacy control, not draft state.
   const setMemoryAllowAiFor = useCallback(
     async (id: number, allow: boolean): Promise<void> => {
       try {
@@ -549,16 +707,108 @@ export function EditContactScreen({
     [contactId],
   );
 
+  // -- Key People / Relationships draft mutators (§E). --
+  const addRelationshipRow = useCallback(
+    async (draft: RelationshipDraft): Promise<boolean> => {
+      const id = newRowIdRef.current--;
+      setForm((prev) =>
+        prev
+          ? {
+              ...prev,
+              relationships: [...(prev.relationships ?? []), { ...draft, id }],
+            }
+          : prev,
+      );
+      return true;
+    },
+    [],
+  );
+  const editRelationshipRow = useCallback(
+    async (id: number, draft: RelationshipDraft): Promise<boolean> => {
+      setForm((prev) =>
+        prev
+          ? {
+              ...prev,
+              relationships: (prev.relationships ?? []).map((row) =>
+                row.id === id ? { ...draft, id } : row,
+              ),
+            }
+          : prev,
+      );
+      return true;
+    },
+    [],
+  );
+  const deleteRelationshipRow = useCallback((id: number) => {
+    setForm((prev) =>
+      prev
+        ? {
+            ...prev,
+            relationships: (prev.relationships ?? []).filter(
+              (row) => row.id !== id,
+            ),
+          }
+        : prev,
+    );
+  }, []);
+
+  // -- Off Limits draft mutators (§E). KIND-SCOPED (Review cycle-4 MEDIUM #3, DATA
+  // LOSS): every add/edit is FORCED to `kind:"off_limits"` regardless of what the
+  // FuelEditor emits, so this section can never create/edit a non-off_limits row;
+  // combined with the seed being pre-filtered to off_limits and buildEditInput's
+  // defensive re-filter, a contact's other fuel kinds can never enter this diff. --
+  const addOffLimitsRow = useCallback(
+    async (draft: FuelDraft): Promise<boolean> => {
+      const id = newRowIdRef.current--;
+      setForm((prev) =>
+        prev
+          ? {
+              ...prev,
+              offLimits: [
+                ...(prev.offLimits ?? []),
+                { ...draft, kind: "off_limits", id },
+              ],
+            }
+          : prev,
+      );
+      return true;
+    },
+    [],
+  );
+  const editOffLimitsRow = useCallback((id: number, patch: FuelEditPatch) => {
+    setForm((prev) =>
+      prev
+        ? {
+            ...prev,
+            offLimits: (prev.offLimits ?? []).map((row) =>
+              row.id === id ? { ...row, ...patch, kind: "off_limits" } : row,
+            ),
+          }
+        : prev,
+    );
+  }, []);
+  const deleteOffLimitsRow = useCallback((id: number) => {
+    setForm((prev) =>
+      prev
+        ? {
+            ...prev,
+            offLimits: (prev.offLimits ?? []).filter((row) => row.id !== id),
+          }
+        : prev,
+    );
+  }, []);
+
   const savable = useMemo(
     () => form !== null && canSave(form) && !saving,
     [form, saving],
   );
 
-  // Re-seed the metadata form AND the knowledge subdomains from the just-committed
+  // Re-seed the metadata form AND every knowledge subdomain from the just-committed
   // rows after a partial save (links failed but metadata+knowledge committed) — so
   // the user never sees a stale or rolled-back view and a retry neither re-adds
   // already-persisted knowledge rows nor mis-detects them. Deliberately leaves
-  // `linksDraft` INTACT for retry.
+  // `linksDraft` INTACT for retry. The off-limits re-read stays FILTERED to
+  // `kind === "off_limits"` (same DATA-LOSS guard as the initial seed).
   async function reseedMetadataAfterPartialSave() {
     try {
       const exec = getExecutor();
@@ -573,11 +823,19 @@ export function EditContactScreen({
         const nextForm: EditFormState = {
           ...seedEditState(result),
           memories: knowledge.memories,
+          relationships: knowledge.relationships,
+          offLimits: knowledge.offLimits,
+          lastTalkedAbout: knowledge.currentState.last_talked_about ?? "",
+          currentLocation: knowledge.currentState.current_location ?? "",
         };
         memoryAllowAiRef.current = knowledge.memoryAllowAi;
+        relationshipLinkedNamesRef.current = knowledge.relationshipLinkedNames;
         setEditDefs(nextEditDefs);
         setNeverContacted(nextNeverContacted);
         setSeededMemories(knowledge.memories);
+        setSeededRelationships(knowledge.relationships);
+        setSeededOffLimits(knowledge.offLimits);
+        setSeededCurrentState(knowledge.currentState);
         setForm(nextForm);
         committedValuesRef.current = { ...result.values };
         seedInputRef.current = editInputSignature(nextForm, {
@@ -586,6 +844,9 @@ export function EditContactScreen({
           neverContacted: nextNeverContacted,
           effectivePhoneRegion,
           seededMemories: knowledge.memories,
+          seededRelationships: knowledge.relationships,
+          seededOffLimits: knowledge.offLimits,
+          seededCurrentState: knowledge.currentState,
         });
         // seededLinks is unchanged: applyLinkDiff rolled back, so the DB links
         // still equal the original baseline — keep it as the retry diff baseline.
@@ -624,9 +885,12 @@ export function EditContactScreen({
         neverContacted,
         effectivePhoneRegion,
         seededMemories,
+        seededRelationships,
+        seededOffLimits,
+        seededCurrentState,
       });
 
-      // TWO-TRANSACTION BOUNDARY (by design): metadata + knowledge subdomains
+      // TWO-TRANSACTION BOUNDARY (by design): metadata + ALL knowledge subdomains
       // (updateContactFull, one txn) and links (applyLinkDiff, second txn) are
       // SEPARATE transactions, so link writes never bloat the metadata transaction.
       // Metadata + knowledge FIRST.
@@ -744,6 +1008,9 @@ export function EditContactScreen({
         neverContacted,
         effectivePhoneRegion,
         seededMemories,
+        seededRelationships,
+        seededOffLimits,
+        seededCurrentState,
       }) ||
       valuesSignature(form.values) !==
         valuesSignature(committedValuesRef.current) ||
@@ -778,12 +1045,25 @@ export function EditContactScreen({
     : "Set birthday";
   const birthdaySeed =
     (form.birthdayInput ? parseDate(form.birthdayInput) : null) ?? new Date();
+  const draftNow = localDateTime();
   const memoryItems = (form.memories ?? []).map((row) =>
     memoryDraftRowToItem(
       row,
       contactId,
       row.id != null ? (memoryAllowAiRef.current.get(row.id) ?? 0) : 0,
     ),
+  );
+  const relationshipItems = (form.relationships ?? []).map((row) =>
+    relationshipDraftRowToItem(
+      row,
+      contactId,
+      row.id != null
+        ? (relationshipLinkedNamesRef.current.get(row.id) ?? null)
+        : null,
+    ),
+  );
+  const offLimitsItems = (form.offLimits ?? []).map((row) =>
+    fuelDraftRowToItem(row, contactId, draftNow),
   );
 
   return (
@@ -1136,6 +1416,66 @@ export function EditContactScreen({
         </View>
       </AccordionSection>
 
+      {/* -- Last Talked About (current-state value). -- */}
+      <AccordionSection
+        sectionId="lastTalked"
+        title="Last Talked About"
+        expanded={expandedSections.lastTalked}
+        onExpandedChange={(next) => setSectionExpanded("lastTalked", next)}
+        containerRef={registerSectionRef("lastTalked")}
+      >
+        <TextInput
+          testID="edit-contact-last-talked"
+          accessibilityLabel={
+            CURRENT_STATE_FIELD_REGISTRY.last_talked_about.displayName
+          }
+          value={form.lastTalkedAbout ?? ""}
+          onChangeText={(v) => setField("lastTalkedAbout", v)}
+          placeholder="What did you last talk about?"
+          placeholderTextColor={colors.textSecondary}
+          style={inputStyle}
+        />
+      </AccordionSection>
+
+      {/* -- Key People / Relationships. -- */}
+      <AccordionSection
+        sectionId="keyPeople"
+        title="Key People"
+        expanded={expandedSections.keyPeople}
+        onExpandedChange={(next) => setSectionExpanded("keyPeople", next)}
+        containerRef={registerSectionRef("keyPeople")}
+      >
+        <RelationshipEditor
+          contactId={contactId}
+          items={relationshipItems}
+          onAdd={addRelationshipRow}
+          onEdit={editRelationshipRow}
+          onDelete={deleteRelationshipRow}
+          onRestore={() => {}}
+        />
+      </AccordionSection>
+
+      {/* -- Current Location (current-state value). -- */}
+      <AccordionSection
+        sectionId="currentLocation"
+        title="Current Location"
+        expanded={expandedSections.currentLocation}
+        onExpandedChange={(next) => setSectionExpanded("currentLocation", next)}
+        containerRef={registerSectionRef("currentLocation")}
+      >
+        <TextInput
+          testID="edit-contact-current-location"
+          accessibilityLabel={
+            CURRENT_STATE_FIELD_REGISTRY.current_location.displayName
+          }
+          value={form.currentLocation ?? ""}
+          onChangeText={(v) => setField("currentLocation", v)}
+          placeholder="Where are they now?"
+          placeholderTextColor={colors.textSecondary}
+          style={inputStyle}
+        />
+      </AccordionSection>
+
       {/* -- Memories (§E). Seeded by its OWN read (listMemoriesForContact); the
           Allow-AI control reflects the REAL app AI setting (getAppSettings), never a
           hardcoded false (Review cycle-4 LOW #4 / D-04). -- */}
@@ -1194,6 +1534,27 @@ export function EditContactScreen({
           </View>
         </AccordionSection>
       ) : null}
+
+      {/* -- Off Limits (§E). KIND-SCOPED to off_limits — seeded ONLY from off_limits
+          fuel, every add/edit forced to kind:"off_limits" so the contact's other
+          fuel kinds can never enter this diff (Review cycle-4 MEDIUM #3). -- */}
+      <AccordionSection
+        sectionId="offLimits"
+        title="Off Limits"
+        expanded={expandedSections.offLimits}
+        onExpandedChange={(next) => setSectionExpanded("offLimits", next)}
+        containerRef={registerSectionRef("offLimits")}
+      >
+        <FuelEditor
+          testID="edit-contact-off-limits"
+          items={offLimitsItems}
+          now={draftNow}
+          onAdd={addOffLimitsRow}
+          onEdit={editOffLimitsRow}
+          onDelete={deleteOffLimitsRow}
+          onConfirm={() => {}}
+        />
+      </AccordionSection>
 
       <Pressable
         testID="edit-contact-save"
