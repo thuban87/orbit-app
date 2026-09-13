@@ -237,7 +237,7 @@ category's phase (see Traceability).
 - [ ] **CAPT-12**: Update Contact opens a compact chooser (Last Talked About, Key People, Current Location, Memory, Off Limits, Contact Method, Contact Frequency, custom fields by name) that returns to the chooser after each save until Done; Category stays Edit-Contact scope
 - [ ] **CAPT-13**: Quick Log, Log Interaction, and Update Contact preselect the contact when the invoking context identifies one; History-originated logging prefills that day
 - [ ] **CAPT-14**: Failed saves preserve form state and never show completion; validation errors reveal and focus the relevant accordion; unchanged forms exit without confirmation
-- [ ] **CAPT-15**: The legacy interaction vocabulary migrates: quality → Tone values and six-value channel → Message/Call/In Person, with legacy values kept representable and every literal consumer updated in the same change
+- [x] **CAPT-15**: The legacy interaction vocabulary migrates: quality → Tone values and six-value channel → Message/Call/In Person, with legacy values kept representable and every literal consumer updated in the same change
 
 ### COMP — Messaging & AI Compose (Phase 35)
 
