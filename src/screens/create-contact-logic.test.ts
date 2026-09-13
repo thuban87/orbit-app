@@ -4,6 +4,8 @@ import type { LastSpokeValue } from "@/components/tri-state-last-spoke-logic";
 import {
   type BuildCreateInputDeps,
   buildCreateInput,
+  coordinateBoundToggle,
+  coordinateCadenceSelection,
   type CreateFormState,
   canSave,
   firstInteractionOccurredAt,
@@ -80,6 +82,56 @@ describe("firstInteractionOccurredAt", () => {
 
   it("returns null for Not yet", () => {
     expect(firstInteractionOccurredAt({ kind: "not-yet" }, NOW)).toBeNull();
+  });
+});
+
+describe("coordinateBoundToggle (Bound/Unbound cadence coordination — CAPT-03)", () => {
+  it("unbinding retains any interval as dormant and never blocks Save", () => {
+    expect(coordinateBoundToggle({ intervalDays: 30 }, false)).toEqual({
+      trackingEnabled: false,
+      intervalDays: 30,
+      intervalValid: true,
+    });
+    expect(coordinateBoundToggle({ intervalDays: null }, false)).toEqual({
+      trackingEnabled: false,
+      intervalDays: null,
+      intervalValid: true,
+    });
+  });
+
+  it("binding with no cadence requires the user to pick a valid interval", () => {
+    expect(coordinateBoundToggle({ intervalDays: null }, true)).toEqual({
+      trackingEnabled: true,
+      intervalDays: null,
+      intervalValid: false,
+    });
+  });
+
+  it("binding with a dormant cadence rebinds valid, reusing the interval", () => {
+    expect(coordinateBoundToggle({ intervalDays: 30 }, true)).toEqual({
+      trackingEnabled: true,
+      intervalDays: 30,
+      intervalValid: true,
+    });
+  });
+
+  it("never models Unbound as interval_days=null (the flag is trackingEnabled)", () => {
+    // A non-positive/invalid dormant interval does not count as a valid cadence.
+    expect(coordinateBoundToggle({ intervalDays: 0 }, true)).toEqual({
+      trackingEnabled: true,
+      intervalDays: 0,
+      intervalValid: false,
+    });
+  });
+});
+
+describe("coordinateCadenceSelection (selecting a cadence turns Bound on)", () => {
+  it("selecting a valid cadence turns Bound on with that interval", () => {
+    expect(coordinateCadenceSelection(14)).toEqual({
+      trackingEnabled: true,
+      intervalDays: 14,
+      intervalValid: true,
+    });
   });
 });
 
