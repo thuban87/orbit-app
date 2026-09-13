@@ -5,16 +5,16 @@ milestone_name: Release Readiness
 current_phase: 35
 current_phase_name: Messaging & AI Compose
 status: executing
-stopped_at: Completed 35-03-PLAN.md
-last_updated: "2026-09-13T16:16:38.000Z"
+stopped_at: Completed 35-04-PLAN.md
+last_updated: "2026-09-13T16:39:34.429Z"
 last_activity: 2026-09-13
 last_activity_desc: "Completed 35-03 (Text/Email delivery logic: mode-aware compose-logic + no-destination fallback + mailto subject/body handoff + setContactMethodPrimary)"
-state_head: c7e469a
+state_head: eda5414a496acccf9fc85db4247a31dee5669792
 progress:
   total_phases: 21
   completed_phases: 9
   total_plans: 137
-  completed_plans: 130
+  completed_plans: 131
 carried_forward:
 
   - "31.1 NOT complete: 31.1-05 corrective (backgrounds were invisible on the owner's release — full-screen scrim at card opacity) is executed + debug-validated + release built/delivered, but the phase stays open until the owner validates the release on his personal phone (the prior 31.1-04 gate's false positive is why). See 31.1-05-PLAN.md, 31.1-UAT.md (superseded + corrective section)."
@@ -279,6 +279,7 @@ at plan time. All new durable preferences are `app_settings` columns, never Asyn
 | Phase 35 P35-01 | 9min | 4 tasks | 6 files |
 | Phase 35 P05 | 7min | 3 tasks | 5 files |
 | Phase 35 P03 | 11min | 4 tasks | 6 files |
+| Phase 35 P35-04 | 13min | 4 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -613,6 +614,8 @@ Foundational decisions affecting current work:
 - [Phase 33]: Group-linked Interaction Detail uses explicit view/edit/participant callbacks and an in-app title Sheet for identity-preserving conversion.
 - [Phase 34]: 34-01 migration 027 adds app_settings default_interaction_channel + remembered_interaction_channel (owner-ratified one-way shape); TARGET_VERSION now 27; no interactions change, no backup-format bump (D-03/D-07)
 - [Phase 34]: 34-01 channel keys are declare-only backup portable (camelCase MANIFEST keys, validated at restore boundary, not emitted) — Phase 36 owns emission + format bump
+- [Phase 35]: [35-04] AI lifecycle reshaped to ADR-079 three-suggestion contract (review:{suggestions: readonly string[]}), single-suggestion confirm-replace retired; ack gate removed cleanly (D-09), DAO ai_ack_* writer left forward-only; HIGH-2 egress-failure aborts controller before nulling so fan-out siblings cancel.
+- [Phase 35]: [35-04] Three-suggestion MECHANISM = node-pure generateVariants fan-out (3 single-draft calls under one signal) + variantTemperature variation lever; AiService single-draft provider contract untouched (Phase 36 owns provider layer). ai-availability adapter is provisional D-12, stable interface Compose consumes.
 
 ### Pending Todos
 
@@ -679,8 +682,8 @@ _Also disposed at this close: 05/deferred-items.md (check:colors doc-comment) ma
 
 ## Session
 
-**Last session:** 2026-09-13T14:35:19.749Z
-**Stopped at:** Completed 35-05-PLAN.md
+**Last session:** 2026-09-13T16:38:51.737Z
+**Stopped at:** Completed 35-04-PLAN.md
 _Prior stop (v1.0):_ Phase 21 UI-SPEC approved; milestone v1.0 closed 2026-09-01.
 _Prior stop (13-04):_ the orrery VISUAL VOCABULARY (theme tokens + two pure resolver modules, node-tested, 29 cases green): (1) five owner-tunable `ThemePalette` tokens seeded in `space-dark.dark` ONLY — `starPalette` (6 colours, gold `#F2C14E` at index 0, then amber/rose-red/violet/cyan/ice-white), `mutedStable/Wobble/Decay` (desaturated same-hue morph endpoints), `rogueExtinguished` (cold blue-grey `#3E4A6B` rogue BODY fill) — with an M6/C2-5 conformance test that IMPORTS the real `SELF_SUN_COLOUR_RE`/`assertSelfSunColour` from app-settings-dao and locks every starPalette entry to the ACTUAL DAO write-path rule (no re-inlined regex). (2) `orrery-ring-logic.ts` `orreryRingStyle(status, colors)` — REUSES `ringVisual` for `{color,opacity,width}` (status→colour mapped once), adds the `strokeStyle` axis (solid→dashed→faded→faintTrace) + `bodyFill` (rogue ring=`colors.rogue`, body=`rogueExtinguished`); `null`→canonical NEUTRAL (`colors.border`), never throws — the single fallback sun-occupant reuses (C2-2). (3) `sun-occupant-logic.ts` `resolveSunOccupant(input)` — NULL/archived/missing→self (A7, glow `selfSunColour ?? starPalette[0]`), live contact→its status glow via `orreryRingStyle(status, colors).color`, never-contacted (status `null`)→the reused neutral border (C2-2); accepts `status: ProfileStatus | null`. 5 commits (1801915 feat tokens+M6; d35d528 RED→4cbfad5 GREEN ring-logic; c923b16 RED→10780dd GREEN sun-occupant); tsc + check:colors clean; no deviations (one in-flight fix: a placeholder hex in the logic test was re-sourced from the palette after check:colors flagged it — C2-3). Committed locally on main (NOT pushed). Next: Wave 2 (13-05 render / 13-06 Settings sun-picker), Wave 3 (13-07 drag-release), Wave 4 (13-08 device UAT, autonomous:false).
 **Resume file:** None
