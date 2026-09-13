@@ -227,7 +227,7 @@ category's phase (see Traceability).
 - [x] **CAPT-02**: Add Contact retains the tri-state last-spoke control (today / on date / not yet) defaulting "today"; "Not yet" creates no interaction (ADR-016 preserved)
 - [x] **CAPT-03**: A contact created with no Contact Frequency is Unbound; selecting a cadence turns Bound on; the user can keep a dormant cadence while Unbound
 - [ ] **CAPT-04**: Edit Contact exposes the complete record as direct-access top-level accordion sections without nesting Things-to-Remember subdomains
-- [ ] **CAPT-05**: Quick Log stays immediate/current-time with truthful feedback and Undo; its success feedback offers Add Note → a small post-log editor saving an Interaction Note or Create Memory Instead (never both), optionally followed by Edit Memory
+- [x] **CAPT-05**: Quick Log stays immediate/current-time with truthful feedback and Undo; its success feedback offers Add Note → a small post-log editor saving an Interaction Note or Create Memory Instead (never both), optionally followed by Edit Memory
 - [ ] **CAPT-06**: The full Memory creation/editing experience lives in Update Contact's Memory editor, with type selected inside and less-common metadata behind More Options
 - [x] **CAPT-07**: Detailed Log Interaction exposes date/time (default now, freely backdateable with no age warnings), Channel, Direction, Connected where meaningful, optional Tone, Note, and Allow AI, with Duration under More Options
 - [x] **CAPT-08**: The Channel chooser offers exactly Message / Call / In Person; Direction defaults Outbound for Message/Call and Mutual for In Person; Connected defaults Yes and is hidden for In Person

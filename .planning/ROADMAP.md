@@ -811,7 +811,7 @@ Plans:
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
-- [ ] 34-06-PLAN.md — Quick Log post-log Note/Memory capture: two-action snackbar + PostLogNoteEditor (CAPT-05/13)
+- [x] 34-06-PLAN.md — Quick Log post-log Note/Memory capture: two-action snackbar + PostLogNoteEditor (CAPT-05/13)
 - [ ] 34-07-PLAN.md — Update Contact chooser loop + full Memory editor (CAPT-06/12/13/14)
 - [ ] 34-08-PLAN.md — Edit Contact IA: top-level accordion sections composing every editor + reveal-and-focus + dirty-state (CAPT-04/14)
 
@@ -922,7 +922,7 @@ Plans:
 | 31.1 App-Wide System Backgrounds | 4/4 | In Progress|  |
 | 32. Interaction History & Insights | 8/8 | In Progress|  |
 | 33. Group Interaction Logging | 7/7 | Complete | 2026-09-12 (physical-Pixel UAT passed; release APK built on droid) |
-| 34. Rapid Capture & Update Flows | 5/8 | In Progress|  |
+| 34. Rapid Capture & Update Flows | 6/8 | In Progress|  |
 | 35. Messaging & AI Compose | 0/TBD | Not started | - |
 | 36. AI Configuration & Prompting | 0/TBD | Not started | - |
 | 37. Settings & Personalization | 0/TBD | Deferred planning | - |

@@ -5,16 +5,16 @@ milestone_name: Release Readiness
 current_phase: 34
 current_phase_name: Rapid Capture & Update Flows
 status: executing
-stopped_at: Completed 34-05-PLAN.md
-last_updated: "2026-09-13T03:05:00.000Z"
+stopped_at: Completed 34-06-PLAN.md
+last_updated: "2026-09-13T03:16:00.000Z"
 last_activity: 2026-09-13
-last_activity_desc: Executed 34-05 (updateContactFull persists the five Edit Contact knowledge subdomains atomically; sole data_revision bumper; kind-scoped off-limits diff; edit-contact-logic diff assembly + resolveErrorSection)
-state_head: 49ca6d1
+last_activity_desc: Executed 34-06 (post-log Note/Memory capture — Add Note secondary action on the Quick Log success snackbar opens PostLogNoteEditor saving an Interaction Note OR a basic Memory via the pure resolvePostLogSave; immediate-write/Undo/single-flight preserved; CAPT-13 preselection confirmed)
+state_head: 7fd3b02
 progress:
   total_phases: 21
   completed_phases: 8
   total_plans: 128
-  completed_plans: 123
+  completed_plans: 124
 carried_forward:
 
   - "31.1 NOT complete: 31.1-05 corrective (backgrounds were invisible on the owner's release — full-screen scrim at card opacity) is executed + debug-validated + release built/delivered, but the phase stays open until the owner validates the release on his personal phone (the prior 31.1-04 gate's false positive is why). See 31.1-05-PLAN.md, 31.1-UAT.md (superseded + corrective section)."
@@ -37,16 +37,16 @@ See: .planning/PROJECT.md (updated 2026-09-10 after Phase 31)
 ## Current Position
 
 Phase: 34 (Rapid Capture & Update Flows) — EXECUTING
-Plan: 6 of 8 (34-01, 34-02, 34-03, 34-04, 34-05 complete)
-Status: Ready to execute Plan 34-06
+Plan: 7 of 8 (34-01, 34-02, 34-03, 34-04, 34-05, 34-06 complete)
+Status: Ready to execute Plan 34-07
 Parked (owner, future): theme-merge into one Dark/Light switch; Deep Space/Starfield removal. See memories mode-aware-glassy-cards, android-elevation-opaque-on-translucent, theme-merge-into-mode-parked.
 FYI (separate): Phase 30 (Orrery Systems) still shows [ ] in ROADMAP with dirty 30-REVIEW files — reconcile independently.
 Carried forward (owner's bucket, NOT resolved here): D-11 default Memory-type display name — reconcile before Phase 34.
 Surface to owner (24.2-07, KNOW-15): milestone plan said Phase 36 owns the backup format-4 bump, but 24.1 already bumped to 4 (d677e2c); Plan 07 emits into the live format 4 with NO bump — that milestone instruction is stale.
 Deferred to Phase 31 (recorded in Plan 05): durable contact-scoped-def ownership + owner-purge semantics. Deferred to Phase 36 (ROADMAP breadcrumb): legacy AI-fuel confirm-path code removal.
-Last activity: 2026-09-13 — Executed 34-05 (updateContactFull persists the five Edit Contact knowledge subdomains — Memories, Key People/Relationships, Last Talked About, Current Location, Off Limits — atomically in its single metadata transaction; sole data_revision bumper; kind-scoped off-limits diff; edit-contact-logic seed-vs-draft assembly + resolveErrorSection). CAPT-04 persistence foundation done; user-facing IA screen is 34-08.
+Last activity: 2026-09-13 — Executed 34-06 (post-log Note/Memory capture for Quick Log, CAPT-05/13). New pure resolvePostLogSave owns the Note-XOR-Memory branch (node-tested); snackbar gains an additive optional secondaryAction; runQuickLog's success snackbar offers Add Note beside Undo bound to the created interactionId; PostLogNoteEditor (own save guard, missing-interaction handling) saves an Interaction Note OR a basic Memory keyed by DEFAULT_MEMORY_TYPE_KEY, with Edit Memory into the full MemoryEditor; wired from HomeScreen + UniversalFab. Immediate-write/Undo/single-flight/channel:'unspecified' all preserved.
 Progress: 11 completed v2.0 phases — 22, 23, 24.1, 24.2, 25, 26, 27, 28, 29, 30, 31
-Next: Execute Plan 34-06 — /gsd-execute-phase 34
+Next: Execute Plan 34-07 — /gsd-execute-phase 34
 
 **Milestone v2.0 structure (pre-decided by the owner from the fifteen milestone-2 dossiers + the
 2026-09-01 cross-dossier audit; not re-derived):** 22 App Shell · 23 Theme · 24 Contact Knowledge ·
@@ -62,7 +62,7 @@ at plan time. All new durable preferences are `app_settings` columns, never Asyn
 
 **Velocity:**
 
-- Total plans completed: 82
+- Total plans completed: 83
 - Average duration: —
 - Total execution time: 0 hours
 
@@ -273,6 +273,7 @@ at plan time. All new durable preferences are `app_settings` columns, never Asyn
 | Phase 34 P01 | 21min | 3 tasks | 9 files |
 | Phase 34 P04 | 24min | 3 tasks | 9 files |
 | Phase 34 P05 | 15min | 3 tasks | 5 files |
+| Phase 34 P06 | 7min | 4 tasks | 10 files |
 
 ## Accumulated Context
 
