@@ -1,17 +1,190 @@
 ---
 phase: 35
 reviewers: [codex, claude]
-reviewed_at: 2026-09-13T09:17:55Z
-cycle: 2
+reviewed_at: 2026-09-13T10:42:31Z
+cycle: 3
 plans_reviewed: [35-01-PLAN.md, 35-02-PLAN.md, 35-03-PLAN.md, 35-04-PLAN.md, 35-05-PLAN.md, 35-06-PLAN.md, 35-07-PLAN.md, 35-08-PLAN.md, 35-09-PLAN.md]
 models:
-  codex: "gpt-5.6-terra (reasoning=medium)"
+  codex: "gpt-5.6-terra (reasoning=low)"
   claude: "unknown"
 model_sources:
-  codex: "config"
+  codex: "banner"
   claude: "unknown"
-cycle_summary: current_high=3 current_actionable=4
+cycle_summary: current_high=0 current_actionable=7
 ---
+
+# Cross-AI Plan Review — Phase 35: Messaging & AI Compose (cycle 3)
+
+Convergence **cycle 3**, re-reviewing the CURRENT plans on disk after the cycle-2 replan (commit `b4d468b`, which implemented owner decision **D-14 / ADR-107** — Off Limits is never sent to AI in any form — and fixed cycle-2 HIGH-2 / HIGH-3 plus four actionable findings). Two source-grounded reviewers ran: **Codex** (`gpt-5.6-terra`, reasoning=**low** this cycle — note the lower effort vs cycle 2's `medium`, via `codex exec` with read-only repo access) and **Claude** (a read-only Claude Code subagent — the `claude -p` CLI lane is not used in this repo due to a known Write-permission failure; model id not recoverable from a subagent, recorded `unknown`). Both cited concrete `file:line` evidence against the live repo; neither ran without repo access. The orchestrator (this aggregator) independently verified every load-bearing claim below against the code on disk — the ADR-107/D-14 off-limits exclusion in `fuel-read.ts` and `ai-context-read.ts`, the abort gap at `ai-suggestion-logic.ts:304-310`, the `resolvePrompt` two-arg signature and budgeting path in `prompt-template.ts`, the `setContactMethodPrimary` DAO contract, the 35-04↔35-01 wave/`depends_on` ordering, and the `lifecycle-consumer-ledger.test.ts:431` exact-string assertion — per "review the code, not the diff."
+
+**Cycle-2 → cycle-3 delta:** cycle 2 recorded `current_high=3 current_actionable=4`. The replan resolved **all 3** cycle-2 HIGHs, verified on disk:
+- **HIGH (off-limits avoidance-constraint AI-permission source)** — resolved by the **owner-ratified D-14 / ADR-107**: plan 35-05 drops `avoidanceConstraints` entirely, carries only the `allow_ai`-gated recent-interaction note, leaves `fuel-read.ts`'s off-limits exclusion unrelaxed, and adds no `fuel` AI-permission column. This is decision-**enforcement**, not reversal-by-agent; the reversal was owner-ratified. **No owner escalation.**
+- **HIGH-2 (35-04 sibling abort)** — resolved: the current egress catch at `ai-suggestion-logic.ts:304-310` nulls `this.controller` **without** `abort()` (verified on disk); plan 35-04 now aborts the controller before nulling on a non-stale rejection (mirroring `onTimeout`), with a two-level test (unit + fan-out e2e).
+- **HIGH-3 (35-08 Rewrite prompt path)** — resolved: `resolvePrompt` is two-arg with no source-draft today (`prompt-template.ts:142`); plan 35-08 now assigns the `resolvePrompt(template, context, sourceDraft?)` extension (files `src/ai/prompt-template.ts` + test) rendering the draft as a fenced/sanitized `MESSAGE TO REWRITE` DATA block — a `resolvePrompt` param, not a `PromptContext` field.
+- The **four cycle-2 actionable findings** are incorporated: 35-06 adds structured relationships (Key People) to the normalized `ResearchItem` projection; 35-07 consumes `listContactMethodGroups` for the establish-primary picker condition; 35-09 deletes the orphaned `ai-suggestion-navigation.test.ts` with its module; the off-limits-source ambiguity was resolved by ADR-107.
+
+Findings below are counted **only** against the current plans; resolved cycle-1/cycle-2 items are excluded. Prior cycles are retained verbatim at the bottom for convergence history.
+
+## Consensus Summary
+
+The three headline cycle-3 fixes all landed correctly and are verifiable against the code on disk. **The off-limits privacy posture (never sent to AI in any form) is sound and multiply-defended** — the SQL exclusion in `fuel-read.ts:133`, the absence of any `fuel` AI-permission column, the carry-only shape in `ai-context-read.ts` (only channel/quality/connected on the un-gated path; only `allow_ai`-gated notes carried), the `aiEligible=false`/`isOffLimits=true` marking of off-limits `ResearchItem`s in 35-06, and the never-Message-Focus store rule. **No plan reverses or weakens a recorded decision — there are no owner escalations this cycle** (the off-limits exclusion is owner-ratified ADR-107, faithfully implemented). All eight cycle-1 HIGH groundings and the migration head (028 = head+1; `TARGET_VERSION` 27) re-check out.
+
+**No HIGH-severity concern survives aggregator verification this cycle (`current_high=0`).** Codex (at reduced `low` effort) raised four HIGHs; on verification against the code, none holds as a HIGH:
+- **Codex "discard/SHELL-07 contract" (HIGH) — invalidated.** Codex claims Back with a non-empty draft "silently discards a meaningful draft." The opposite is true by design: 35-01's `compose-session-store` **persists** body/subject/mode/destination across in-app navigation and backgrounding (D-10; `35-01-PLAN.md:29,97`), clearing only on Transmit-confirmed or relaunch. The current Compose Back handler already routes home with no discard prompt (`ComposeScreen.tsx:403-413`), and adding a discard prompt would contradict D-10's deliberate session-persistence. Not a defect; at most a LOW doc note that Compose intentionally persists, so SHELL-07's discard prompt does not apply.
+- Codex's other three HIGHs (primary-method `method_type` predicate; "meaningfully varied"; Rewrite prompt budget order) are real but are **actionable plan-completeness gaps**, not correctness/data-loss/privacy defects — downgraded to MEDIUM and listed below. Claude independently rated the "varied" item MEDIUM and raised no HIGHs.
+
+The residual risk is a set of actionable MEDIUM plan-hygiene items — two of them **verified execution-time build-breakers** — all fixable with small PLAN.md/artifact edits.
+
+### Agreed Strengths
+- **Off-limits egress fully closed and defense-in-depth** (both lanes; aggregator-verified). `fuel-read.ts:133` excludes `off_limits` in SQL; `fuel` has no `allow_ai`/`share_with_ai` column; 35-05 carries no off-limits shape; 35-06 marks off-limits `aiEligible=false`; ADR-107 on disk matches the plans.
+- **35-04 abort fix precisely located** (both lanes). Egress catch `ai-suggestion-logic.ts:304-310` nulls without abort vs `onTimeout` which aborts-then-nulls; the plan mirrors the timeout path, with a solid two-level test.
+- **Carry-only egress is provably non-transmitting** (both lanes). `resolvePrompt` serializes fields explicitly (no spread), so an optional `PromptContext` field cannot transmit; a sentinel regression fences it.
+- **Assist lifecycle reuse / recency-writer invariant** (both lanes). No new `interactions` writer; `markAssistLogged` stamps `occurredAt = handoff_at` and remaps channel; the returned `{ handoffStarted, assistUid }` closes the fragile re-query.
+- **Migration 028 = head+1 verified** (both lanes); app_settings-only, allowlisted-not-emitted, no `BACKUP_FORMAT_VERSION` bump.
+- **Dual-stack ComposeResearch registration and the new `setContactMethodPrimary` writer are warranted** (both lanes): `ComposeResearch` is registered in neither stack today, and `selectActionablePrimaryMethods` cannot distinguish an explicit primary from a first-actionable fallback.
+
+### Agreed Concerns
+- **COMP-12 "meaningfully varied" is not guaranteed by the chosen mechanism** (Codex HIGH; Claude MEDIUM; aggregator: MEDIUM/actionable). The fan-out is three calls with the **same** prompt/payload/signal; no plan sets a distinct per-call `temperature` (the field exists at `AiService.ts:48`) or any variation instruction, and "exact variation instructions" are deferred to Phase 36 (§U/§Q) — yet COMP-12 is a Phase-35 requirement. At low/zero temperature the three could be identical, visibly failing COMP-12. Claude additionally caught that `provider.generate` takes a single `GenerationInput`, **not** `(prompt, signal)` (`AiService.ts:13,92`), so 35-08's "wire `generateOne = provider.generate`" needs an adapter closure — the natural seam for a minimal variation lever. **Not an owner escalation** (no decision reversed). Fix: have 35-08's `generateOne` adapter apply a minimal deliberate per-call variation (e.g. stepped temperature) so "varied" holds this phase, **or** explicitly record in 35-04/35-08 that variation is provider-nondeterminism-dependent for Phase 35 with a device-gate check of actual variation.
+
+### Divergent Views
+- **Severity of the "varied" gap** — Codex HIGH vs Claude MEDIUM. Aggregator sides with MEDIUM/actionable: real configured providers vary at default sampling, the deferral of variation *instructions* to Phase 36 is a recorded decision, and the fix is a small plan edit — but the plan must not leave COMP-12's "varied" purely to chance, so it is a genuine unresolved actionable item.
+- **Codex-only findings** (Claude did not raise): the SHELL-07 discard claim (aggregator invalidated — see Consensus), the `setContactMethodPrimary` `method_type` predicate hardening (aggregator: valid MEDIUM/actionable), and the Rewrite prompt-budget construction order (aggregator: valid MEDIUM/actionable).
+- **Claude-only findings** (Codex did not raise): the two verified build-breakers — 35-04↔35-01 intra-wave `tsc` ordering and the untouched `lifecycle-consumer-ledger.test.ts:431` assertion — plus the stale `COVERAGE.md`. Aggregator confirmed all three on disk; these are the highest-value actionable items this cycle.
+
+## Aggregator-Verified Actionable Findings (for the planner)
+1. **[MEDIUM · build-breaker · Claude · verified] 35-04 must depend on 35-01.** Both are `wave: 1, depends_on: []`; ComposeScreen (the sole `AiSuggestionLifecycle` consumer) still uses `isProviderAcknowledged` (:196), `acknowledgeProvider` (:203), `"needs-acknowledgement"` (:568), `"confirm-replace"` (:650), `confirmReplace()` (:697) — every member 35-04 removes. If 35-04's per-plan `tsc --noEmit` gate runs before 35-01 strips ComposeScreen, it fails. **Fix:** set `35-04 depends_on: [35-01]` (or sequence 35-01 strictly first within wave 1); add a truth noting ComposeScreen must be stripped first.
+2. **[MEDIUM · build-breaker · Claude · verified] 35-09's `origin:'profile'` edit breaks an untouched ledger test.** `src/db/lifecycle-consumer-ledger.test.ts:431` asserts `toContain('navigation.navigate("Compose", { contactId })')`; 35-09 Task 2 changes `ContactProfileScreen.tsx:335` to add `origin`, so the substring no longer matches and `npm test` (35-09 Task 3 gate) fails. The test is absent from 35-09's `files_modified`/`read_first`. Same orphan-test class 35-09 correctly caught for `ai-suggestion-navigation.test.ts`. **Fix:** add `lifecycle-consumer-ledger.test.ts` to 35-09 scope and update the `:431` assertion to match the `origin`-bearing call while preserving the "Message → Compose is not lifecycle-gated" intent.
+3. **[MEDIUM · consensus] COMP-12 "meaningfully varied" mechanism** — see Agreed Concerns. **Fix:** minimal per-call variation lever in 35-08's `generateOne` adapter, or an explicit recorded deferral + device-gate variation check; also correct 35-08's `generateOne` wiring to adapt `GenerationInput` (not `(prompt, signal)`).
+4. **[MEDIUM · Claude · verified] `COVERAGE.md:13-14` is stale and contradicts ADR-107/D-14.** It still states plan 35-05 carries "two new ADR-078 shapes (avoidance-constraint + gated…)" and a live "Avoidance-constraint carry … INTEGRATE (carry-only)" row. The plans are correct; the risk is a Phase-36 planner/auditor reading COVERAGE.md and re-introducing off-limits avoidance rendering — **re-widening the egress the owner just excluded.** **Fix:** rewrite `:13-14` to name one carried shape (the gated recent-interaction note only) and delete/retire the avoidance-constraint row with an ADR-107 supersession note.
+5. **[MEDIUM · Codex · verified] 35-03 `setContactMethodPrimary` should validate `method_type` in the update predicate.** The plan guards the SET step "to that contact" and clears the prior primary by `(contactId, method_type)`, but does not require `method_type` equality on the promoted row. A caller passing an email method id with `methodType: 'phone'` would clear the phone primary and promote the email row (the partial-unique index would catch a resulting double-primary, but the phone primary is lost). The real picker caller passes consistent data, so this is defensive hardening. **Fix:** `WHERE id = ? AND contact_id = ? AND method_type = ?`, assert exactly one row changed, add a mismatch-type no-write test.
+6. **[MEDIUM · Codex] 35-08 Rewrite prompt-budget construction order.** `resolvePrompt` budgets shared fields against the scaffold (`prompt-template.ts:240`) then hard-trims the assembled string to `TOTAL_LIMIT` (`:269`). The plan says the Rewrite block is "placed alongside the other DATA blocks" and "counted against TOTAL_LIMIT" (implying scaffold inclusion) but does not nail the order or add an exact-limit fence test. **Fix:** state that the Rewrite block + its conditional instruction enter the scaffold before shared-field budgeting, reserve space for the truncation notice, and test that all fences stay balanced at `TOTAL_LIMIT`.
+7. **[MEDIUM · Codex] Screen-heavy plans (35-07/35-08/35-09) lean on `tsc` + `check:colors` + device UAT for behavior.** Mode fallback, no-destination Copy-only, "Yes" logging with the returned assist UID, the Needs-Attention branch, and origin-aware return are not covered by automated component/navigation tests. Partly mitigated by the project's device-UAT norm, but the pure-logic-testable branches (mode fallback, availability states) warrant targeted tests. **Fix:** add component/navigation tests (or explicitly record which behaviors are device-UAT-only) to the screen plans.
+
+**Lower-priority (LOW, noted, not counted in the actionable total):** (a) `35-06` should state explicitly "exclude `hide` relationships from the Research projection" rather than only "honoring `resolveRelationshipVisibility`"; (b) `35-PATTERNS.md`/`35-RESEARCH.md` still describe the retired avoidance-constraint design (historical inputs the plans supersede); (c) `35-01`'s store contract should clarify whether it is a per-contact map or a single active session replaced on a new Compose route.
+
+---
+
+## Codex Review
+
+_`gpt-5.6-terra`, reasoning=low, via `codex exec` (read-only repo). Note: reduced effort vs cycle 2 (`medium`). Aggregator verified each finding against disk; see the aggregator notes above for the HIGH→MEDIUM re-classifications and the invalidated SHELL-07 claim._
+
+
+# Phase 35 plan review
+
+## Summary
+
+The plan set is unusually well-grounded in the existing Compose, assist, navigation, and AI code. It correctly preserves the durable assist lifecycle and owner-ratified ADR-107 exclusion of Off Limits from AI egress. The main gaps are: preservation of the shell’s unsaved-changes contract, a method-type integrity hole in the proposed primary-method writer, lack of a mechanism to make three AI outputs meaningfully varied, and a prompt-budget design issue for Rewrite.
+
+## Strengths
+
+- The assist confirmation design is sound. `createPendingAssist()` writes before handoff and returns its UID ([interaction-assist-dao.ts](/home/bwales/projects/orbit-app/src/db/interaction-assist-dao.ts:27)); `markAssistLogged()` uses the stored `handoff_at` for `occurredAt` and the canonical recency cores ([interaction-assist-dao.ts](/home/bwales/projects/orbit-app/src/db/interaction-assist-dao.ts:99)). Plan 35-01’s explicit returned `{ handoffStarted, assistUid }` eliminates an unsafe “find the latest assist” lookup.
+
+- Plans 35-01 and 35-03 correctly keep the current durable-assist failure behavior: `performReachOut()` creates the assist before native handoff and calls `markAssistFailed()` on handoff failure ([handoff.ts](/home/bwales/projects/orbit-app/src/services/reach-out/handoff.ts:50), [handoff.ts](/home/bwales/projects/orbit-app/src/services/reach-out/handoff.ts:67)). The panel gate on both successful handoff and non-null UID is appropriate.
+
+- Plan 35-03 correctly identifies that SMS availability must not gate email. The current pure control gate is explicitly phone/SMS-specific ([compose-logic.ts](/home/bwales/projects/orbit-app/src/logic/compose-logic.ts:64)), while email currently goes through `Linking.openURL` rather than `expo-sms` ([handoff.ts](/home/bwales/projects/orbit-app/src/services/reach-out/handoff.ts:60)).
+
+- Plan 35-05 respects ADR-107. The live AI context gets fuel only through `getRankedFuel()` ([ai-context-read.ts](/home/bwales/projects/orbit-app/src/db/ai-context-read.ts:243)), and its interaction aggregate intentionally excludes free-text note content ([ai-context-read.ts](/home/bwales/projects/orbit-app/src/db/ai-context-read.ts:101)). Carrying only allow-AI-gated notes while keeping Off Limits out of every AI-facing shape is directionally correct.
+
+- Plan 35-09 correctly notices that `Compose` is separately registered in both stack navigators ([DashboardStack.tsx](/home/bwales/projects/orbit-app/src/navigation/tabs/DashboardStack.tsx:59), [OrreryStack.tsx](/home/bwales/projects/orbit-app/src/navigation/tabs/OrreryStack.tsx:73)). Registering `ComposeResearch` in both is necessary.
+
+## Concerns
+
+- **HIGH — plans 35-01/35-09 omit the existing shell discard contract.** Compose presently intercepts Android Back and resets the parent navigation tree directly ([ComposeScreen.tsx](/home/bwales/projects/orbit-app/src/screens/ComposeScreen.tsx:403)), while the new session store would make a typed draft survive navigation. The project already has a generic `beforeRemove` discard/keep guard ([discard-keep-guard.ts](/home/bwales/projects/orbit-app/src/navigation/discard-keep-guard.ts:23)). No plan requires applying it to a non-empty Compose session before Back, origin-aware return, or a completed-flow route replacement. This risks violating SHELL-07 and silently discarding a meaningful draft.
+
+- **HIGH — plan 35-03’s proposed `setContactMethodPrimary()` must validate `methodType` in the update predicate, not only `contactId`.** The existing diff writer clears a primary by both `contact_id` and `method_type` before updating the selected record ([contact-methods-dao.ts](/home/bwales/projects/orbit-app/src/db/contact-methods-dao.ts:183)). The proposed writer’s description only says the selected ID is “guarded to that contact.” A caller could pass an email method ID with `methodType: "phone"`, clear the phone primary, and then promote the email row. Require `WHERE id = ? AND contact_id = ? AND method_type = ?`, assert exactly one updated row, and add a mismatch-type no-write test.
+
+- **HIGH — plan 35-04 cannot guarantee “meaningfully varied” suggestions with three identical requests.** The proposed `generateVariants(provider.generate, prompt, signal, 3)` sends the same resolved payload three times. The current prompt construction contains no variant slot ([prompt-template.ts](/home/bwales/projects/orbit-app/src/ai/prompt-template.ts:64)), and the current provider call has no per-variant seed or distinction ([ComposeScreen.tsx](/home/bwales/projects/orbit-app/src/screens/ComposeScreen.tsx:215)). Three independent calls may happen to differ, but deterministic or low-temperature providers can return identical text. The plan also defers variation instructions to Phase 36, leaving COMP-12 unmet in Phase 35.
+
+- **HIGH — plan 35-08’s Rewrite budget needs a concrete construction order.** `resolvePrompt()` currently budgets fields against a scaffold ([prompt-template.ts](/home/bwales/projects/orbit-app/src/ai/prompt-template.ts:240)) and only afterwards applies a hard truncation to the fully assembled string ([prompt-template.ts](/home/bwales/projects/orbit-app/src/ai/prompt-template.ts:269)). Simply appending a bounded Rewrite block can force the final hard trim, potentially truncating the closing fence or losing the required category-specific truncation disclosure. The plan must include the Rewrite block and its conditional instruction in the scaffold before calculating remaining capacity, reserve space for its notice, and test that all fences remain balanced at `TOTAL_LIMIT`.
+
+- **MEDIUM — plan 35-06 needs an explicit Research visibility policy.** `listRelationshipsForContact()` returns hidden relationships ([relationships-read.ts](/home/bwales/projects/orbit-app/src/db/relationships-read.ts:21)), while `resolveRelationshipVisibility()` exists specifically to determine presentation ([relationships-read.ts](/home/bwales/projects/orbit-app/src/db/relationships-read.ts:41)). The plan says to honor it but does not state whether Research should hide those records. It should explicitly say “exclude `hide` relationships from Research,” unless the owner intends Research to be an administration surface—which would conflict with its read-only, conversation-focused purpose.
+
+- **MEDIUM — screen-heavy plans lack automated behavioral coverage.** Plans 35-07 through 35-09 mostly verify with TypeScript and color checks. Those checks cannot prove mode fallback, no-destination Copy-only behavior, “Yes” logging with the returned assist UID, the Needs Attention branch, origin-aware return, or that a finished route cannot be resurrected. Current Compose has substantial focus-effect and back-handler behavior ([ComposeScreen.tsx](/home/bwales/projects/orbit-app/src/screens/ComposeScreen.tsx:274), [ComposeScreen.tsx](/home/bwales/projects/orbit-app/src/screens/ComposeScreen.tsx:403)); these need component/navigation tests in addition to Pixel UAT.
+
+- **LOW — plan 35-01’s store contract is ambiguous about multiple contacts.** It calls the state “keyed by contactId” but lists one `contactId` and one body/subject/mode/destination. Define whether it is a map of per-contact sessions or exactly one active session that is replaced when another Compose route opens. The former better matches the stated keyed contract; the latter is acceptable if deliberately specified.
+
+## Suggestions
+
+- Add a dedicated task—preferably in 35-01 before the UI rebuild—to integrate the existing discard/keep navigation guard with session-store dirty state. Ensure it applies to hardware Back, visible Back, origin-aware completion navigation, and research navigation only where appropriate.
+
+- Amend 35-03’s DAO contract and tests:
+
+  - require `methodType` equality in the selected-row update;
+  - assert exactly one row changed;
+  - test an email-ID/phone-type mismatch leaves both primary sets unchanged;
+  - preserve the no-op behavior and avoid a revision bump.
+
+- Resolve the variation mechanism before approving 35-04. A minimal compliant approach is a bounded, non-contact-data per-variant instruction added at prompt construction, such as three internally indexed composition approaches. If that is considered Phase 36 scope, then Phase 35 must explicitly downgrade its success criterion from “meaningfully varied” or obtain an owner decision; identical repeated requests do not satisfy the stated requirement.
+
+- In 35-08, make Rewrite budget allocation structural: build and bound the rewrite data block before budgeting shared fields, then test exact-limit and over-limit prompts for balanced delimiters, preserved rewrite instruction, and a category-only truncation notice.
+
+- Add targeted component/navigation tests for:
+
+  - Text probe-pending versus Email availability;
+  - Copy and Subject Copy updating remembered mode but an ad-hoc switch not doing so;
+  - confirmation shown only for successful assist-backed handoff;
+  - discard guard with a non-empty session;
+  - profile-origin completion returning to Profile in both Dashboard and Orrery stacks;
+  - `requestAiSuggestion` absence and no generation on mount/focus.
+
+## Risk assessment
+
+**Overall: MEDIUM-HIGH.** The data and assist invariants are carefully protected, and the ADR-107 boundary is correctly preserved. However, the missing dirty-draft guard is a user-visible regression against an already-shipped shell invariant; the primary-method writer needs stronger row/type validation; and the planned three-call fan-out does not itself establish meaningful variation. These should be addressed before execution.
+
+---
+
+## Claude Review
+
+_Read-only Claude Code subagent (not the `claude -p` CLI lane). Source-grounded; every file:line opened and confirmed on disk. No owner escalations; no HIGH concerns._
+
+
+Reviewer: independent cross-AI plan reviewer (Claude / Opus)
+Scope: the 9 plans on disk post-b4d618b (35-01..35-09) + context/coverage/requirements, verified against actual source under `src/`.
+
+## 1. Summary
+
+The cycle-3 plans are in strong shape and the three headline fixes all landed correctly and are verifiable against the code on disk: (a) Off Limits is now fully excluded from every AI egress path — plan 35-05 drops `avoidanceConstraints` entirely, carries only the `allow_ai`-gated recent-interaction note, leaves `fuel-read.ts`'s off-limits exclusion unrelaxed, and adds no `fuel` permission column, exactly matching the owner-ratified ADR-107/D-14 (verified on disk: `fuel-read.ts` excludes `off_limits` in SQL and has no `allow_ai`/`share_with_ai` column; `ai-context-read.ts` selects only channel/quality/connected on the un-gated path); (b) the 35-04 sibling-abort fix is real and correctly targeted (the egress catch at `ai-suggestion-logic.ts:306-307` does `this.controller = null` without `abort()` today; the plan aborts before nulling on a non-stale rejection, with a solid end-to-end test); (c) the 35-08 Rewrite prompt path is sound (`resolvePrompt` at `prompt-template.ts:142` is two-arg with no source-draft today; the plan adds an optional bounded/delimited `sourceDraft` param as DATA, not a `PromptContext` field, avoiding a contact-data egress widening). No plan reverses or weakens a recorded decision — there are **no owner escalations**. The remaining concerns are dependency-ordering, test-hygiene, and doc-drift issues, all mechanically fixable; none are correctness, data-loss, or privacy defects.
+
+## 2. Strengths (file:line evidence)
+
+- **Off-limits egress fully closed and defense-in-depth.** `src/db/fuel-read.ts:133` (`RANKED_FUEL_EXCLUSIONS = kind != 'off_limits'`) and the header at `:19-23` confirm `listFuelForEditor` is the ONLY read that surfaces off_limits; a grep confirms `fuel` has no `allow_ai`/`share_with_ai` column. Plan 35-05 correctly leaves this untouched and carries no off-limits shape; plan 35-06 additionally marks off-limits `ResearchItem`s `aiEligible=false`+`isOffLimits=true` and the store rejects them from Message Focus — so off-limits cannot reach AI via the context projection OR the Message-Focus path. ADR-107 on disk (`docs/decisions/ADR-107-...md:16-18,44-46`) matches the plans precisely.
+- **HIGH-1 handoff contract is grounded.** `src/services/reach-out/handoff.ts:49` returns `Promise<void>`; `assistUid` is created at `:50-57` and used only internally for `markAssistFailed` at `:68-69`. Plan 35-01's widening to `{ handoffStarted, assistUid }` and its "panel gates on `handoffStarted && assistUid`, never re-queries the assist table" is the correct fix and closes the fragile re-query trap.
+- **HIGH-2 abort fix precisely located.** `ai-suggestion-logic.ts:304-310` (catch nulls controller without abort) vs `onTimeout` at `:351-354` (aborts then nulls) — the plan mirrors the timeout path into the egress-failure path. The two-level test (unit: recording generate observes `signal.aborted`; e2e: 2nd of three `generateOne` rejects, siblings' signals abort) is well-designed.
+- **Ack-gate removal is clean and correctly scoped.** The `needs-acknowledgement` state (`:87-90`), `confirm-replace` (`:97`), and deps `isProviderAcknowledged`/`acknowledgeProvider` (`:115,:120`) all exist on disk; plan 35-04 removes the logic-module path but deliberately leaves the DAO `acknowledgeProvider` writer and the forward-only `ai_ack_*` columns (D-09/ADR-079). Grep gates enforce no residual reference.
+- **Egress carry-only is provably non-transmitting.** `prompt-types.ts:111` (`PromptContext`) with `sharedMemories?` at `:138` is the correct optional precedent; `resolvePrompt` at `prompt-template.ts:142` serializes fields explicitly (no spread), so adding a field cannot transmit it — and plan 35-05 Task 3 adds a regression proving the sentinel never appears in the payload.
+- **Migration head verified accurate.** Highest migration on disk is `027-default-interaction-channel.ts` and `TARGET_VERSION = DEFAULT_INTERACTION_CHANNEL_SCHEMA_VERSION` (`database.ts:68`), so 35-02's head+1=028 is correct; the plan is app_settings-only, allowlisted-not-emitted, no format bump — matching the milestone schema→consumers→backup order.
+- **HIGH-5/HIGH-7 groundings confirmed.** `ComposeResearch` is registered in neither stack (grep empty) — 35-09's dual-stack registration is warranted. `contact-methods-dao.ts` has no set-primary writer and `contact-methods-read.ts:15-16` shows `selectActionablePrimaryMethods` returns `is_primary&&is_actionable ?? first-actionable`, unable to distinguish an explicit primary from a fallback — validating 35-03's new `setContactMethodPrimary()` and 35-07's use of `listContactMethodGroups` for the picker condition.
+
+## 3. Concerns (severity-tagged, file:line evidence)
+
+- **[MEDIUM] Intra-wave dependency: 35-04 reshapes the lifecycle whose sole consumer (ComposeScreen) is only stripped by 35-01 — both wave 1, no `depends_on` between them, so 35-04's `tsc --noEmit` gate can fail.** `ComposeScreen.tsx` is the ONLY consumer of `AiSuggestionLifecycle` (grep). It currently constructs the lifecycle with `isProviderAcknowledged` (`:196`), `acknowledgeProvider` (`:203`), and reads `aiState.status === "needs-acknowledgement"` (`:568`) / `"confirm-replace"` (`:650`) / calls `ai.confirmReplace()` (`:697`) — every member plan 35-04 removes from the contract. Plan 35-01 (wave 1) strips all of this from ComposeScreen; plan 35-04 (wave 1, `depends_on: []`) reshapes `ai-suggestion-logic.ts`. If 35-04's per-plan tsc gate runs before 35-01 has landed, `tsc --noEmit` fails on the old ComposeScreen. Mechanism: 35-04 narrows the exported `AiSuggestionState` union and `AiSuggestionDeps`, making the pre-35-01 ComposeScreen a type error. Fix: give 35-04 `depends_on: [35-01]` (or sequence 35-01 strictly before 35-04 within wave 1). This is real dependency ordering, not a style nit.
+
+- **[MEDIUM] 35-09's `origin:'profile'` edit breaks an exact-string ledger test that the plan does not touch.** `src/db/lifecycle-consumer-ledger.test.ts:431` asserts `expect(screen).toContain('navigation.navigate("Compose", { contactId })')` against `ContactProfileScreen.tsx`. Plan 35-09 Task 2 changes `ContactProfileScreen.tsx:335` to pass `origin: 'profile'`, producing `navigation.navigate("Compose", { contactId, origin: ... })` — the substring `{ contactId })` no longer matches, so `npm test` (35-09 Task 3's gate) fails. `lifecycle-consumer-ledger.test.ts` is absent from 35-09's `files_modified` and `read_first`, and the ledger assertion is an architectural guard ("Message → Compose is not lifecycle-gated") that needs a deliberate update, not a blind edit. This is the same orphan-test failure class the authors correctly caught for `ai-suggestion-navigation.test.ts` — they found one and missed this second one. Fix: add `src/db/lifecycle-consumer-ledger.test.ts` to 35-09's scope and update the `:431` assertion to match the new `origin`-bearing call (preserving the not-lifecycle-gated intent).
+
+- **[MEDIUM] COVERAGE.md is stale relative to ADR-107/D-14 and contradicts the plans it summarizes.** `COVERAGE.md:13-14` still states "plan 35-05 CARRIES two new ADR-078 shapes (avoidance-constraint + gated recent-interaction note)" and carries a live row "Avoidance-constraint carry (off-limits AI-enabled → negative constraint) | INTEGRATE (carry-only)". This directly contradicts D-14/ADR-107 and the current plan 35-05 (which removed `avoidanceConstraints` entirely). The plans themselves are correct; the risk is that a Phase-36 planner or auditor reads COVERAGE.md and re-introduces an off-limits avoidance-constraint rendering — re-widening egress the owner just excluded. Fix: update `COVERAGE.md:13-14` to describe ONE carried shape (the gated recent-interaction note only) and delete the avoidance-constraint row (or mark it retired by ADR-107). (Note: `35-PATTERNS.md` and `35-RESEARCH.md` also still describe the old avoidance-constraint design — see LOW below.)
+
+- **[MEDIUM] COMP-12's "meaningfully varied" is not guaranteed by the chosen mechanism, and the variation lever is deferred to Phase 36.** The fan-out is three calls to the SAME `provider.generate` with the SAME prompt and SAME signal (`ai-generate-variants.ts` behavior in 35-04; wired in 35-08). `GenerationInput` carries a per-call `temperature` (`AiService.ts:48`), but no plan sets distinct temperatures or any variation instruction — 35-04's own note defers "exact variation instructions" to Phase 36 (§U/§Q). So "three unlabeled *varied* suggestions" (COMP-12) rests entirely on incidental provider sampling nondeterminism; at low/zero temperature the three could be identical, visibly failing COMP-12 in Phase 35 even though COMP-12 is a Phase-35 requirement. Relatedly, `provider.generate` takes a single `GenerationInput` (`AiService.ts:13,92`), not `(prompt, signal)`, so 35-08's "wire `generateOne = provider.generate`" needs an adapter closure — which is the natural seam for a minimal per-call variation lever. Fix: either (i) have 35-08's `generateOne` adapter apply a small deliberate variation (e.g. a nonzero/stepped temperature) so COMP-12's "varied" holds this phase, or (ii) explicitly record in 35-04/35-08 that "meaningfully varied" is accepted as provider-nondeterminism-dependent for Phase 35 with a device-gate check, so the deferral is a conscious call rather than an unstated gap. Not an owner escalation — it does not reverse a decision — but it is a goal-achievement risk worth resolving before execution.
+
+- **[LOW] Upstream research/pattern artifacts still describe the retired avoidance-constraint design.** `35-PATTERNS.md` and `35-RESEARCH.md` (dated before the D-14 revision) reference the avoidance-constraint carry. These are historical inputs the plans supersede, so execution risk is low, but a stale-note pass would prevent confusion. Lower priority than COVERAGE.md because they are not treated as binding contracts.
+
+## 4. Suggestions (specific PLAN.md changes)
+
+1. **35-04-PLAN.md frontmatter:** change `depends_on: []` to `depends_on: [35-01]` (keep `wave: 1` or move to wave 2). Add a truth: "ComposeScreen is the sole lifecycle consumer; 35-01 must strip the old ack/confirm-replace wiring before this reshape so `tsc --noEmit` passes."
+2. **35-09-PLAN.md:** add `src/db/lifecycle-consumer-ledger.test.ts` to `files_modified` and Task 2's `read_first`; add a Task 2 action + acceptance line: "update the `:431` exact-string assertion to match `navigation.navigate(\"Compose\", { contactId, origin: 'profile' })` (or relax it to a regex) while preserving the not-lifecycle-gated intent; `npm test` green."
+3. **COVERAGE.md:** rewrite lines 13-14 to name ONE carried shape (gated recent-interaction note); delete/retire the "Avoidance-constraint carry" row with an ADR-107 supersession note.
+4. **35-08-PLAN.md Task 2:** specify the `generateOne` adapter explicitly (`(prompt, signal) => provider.generate({ ...inputFrom(prompt), signal })`) and decide the "varied" question: either inject a minimal per-call variation there, or add a truth stating variation is provider-nondeterminism-dependent for Phase 35 with a device-gate verification of actual variation.
+5. **Optional:** a stale-note sweep of `35-PATTERNS.md`/`35-RESEARCH.md` for the avoidance-constraint design.
+
+## 5. Risk Assessment
+
+**Overall: LOW-MEDIUM.** The three cycle-3 fixes are correctly specified and verified against disk; the privacy posture (off-limits never sent to AI in any form) is sound and multiply-defended; all HIGH-1..HIGH-8 groundings check out; migration numbering is accurate. No plan reverses or weakens a recorded decision — the off-limits reversal is owner-ratified (ADR-107) and faithfully implemented, so there are no owner escalations. The residual risk is concentrated in two build-breakers that would surface at execution — an intra-wave tsc ordering gap (35-04 vs 35-01) and an untouched exact-string ledger test (35-09) — plus a stale COVERAGE.md that could misdirect Phase 36, and an unresolved "meaningfully varied" gap in the fan-out. All four are mechanically fixable with small PLAN.md edits and none imply data loss, privacy leakage, or an architectural dead-end.
+
+<!-- ============================================================ -->
+<!-- CYCLE 2 + CYCLE 1 ARCHIVE (superseded by cycle 3 / b4d468b).   -->
+<!-- Cycle-2 frontmatter was: cycle: 2, cycle_summary: current_high=3 current_actionable=4. -->
+<!-- Retained verbatim for convergence history. Counts below are prior-cycle. -->
+<!-- ============================================================ -->
+
 
 # Cross-AI Plan Review — Phase 35: Messaging & AI Compose (cycle 2)
 
