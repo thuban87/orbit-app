@@ -3,18 +3,18 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Release Readiness
 current_phase: 35
-current_phase_name: messaging-ai-compose
-status: planned
-stopped_at: Phase 35 planned — 9 plans across 5 waves, ready to execute
-last_updated: "2026-09-13T13:03:46.605Z"
+current_phase_name: Messaging & AI Compose
+status: executing
+stopped_at: Completed 35-01-PLAN.md
+last_updated: "2026-09-13T14:24:51.422Z"
 last_activity: 2026-09-13
-last_activity_desc: Phase 34 complete, transitioned to Phase 35
-state_head: b7d8b8f19ee57adf9f39a2ca1c634eab45651c84
+last_activity_desc: Phase 35 execution started
+state_head: 82ec9883c3b9b1cbea2e986ef09c35a90af23f4b
 progress:
   total_phases: 21
   completed_phases: 9
   total_plans: 137
-  completed_plans: 126
+  completed_plans: 127
 carried_forward:
 
   - "31.1 NOT complete: 31.1-05 corrective (backgrounds were invisible on the owner's release — full-screen scrim at card opacity) is executed + debug-validated + release built/delivered, but the phase stays open until the owner validates the release on his personal phone (the prior 31.1-04 gate's false positive is why). See 31.1-05-PLAN.md, 31.1-UAT.md (superseded + corrective section)."
@@ -32,19 +32,19 @@ carried_forward:
 See: .planning/PROJECT.md (updated 2026-09-10 after Phase 31)
 
 **Core value:** Collapse the taps between "you're overdue with X" and the message actually being sent.
-**Current focus:** Phase 34 — Rapid Capture & Update Flows
+**Current focus:** Phase 35 — Messaging & AI Compose
 
 ## Current Position
 
-Phase: 35 (messaging-ai-compose) — READY TO EXECUTE
-Plan: Not started
+Phase: 35 (Messaging & AI Compose) — EXECUTING
+Plan: 2 of 9
 Status: Ready to execute
 Parked (owner, future): theme-merge into one Dark/Light switch; Deep Space/Starfield removal. See memories mode-aware-glassy-cards, android-elevation-opaque-on-translucent, theme-merge-into-mode-parked.
 FYI (separate): Phase 30 (Orrery Systems) still shows [ ] in ROADMAP with dirty 30-REVIEW files — reconcile independently.
 Carried forward (owner's bucket, NOT resolved here): D-11 default Memory-type display name — reconcile before Phase 34.
 Surface to owner (24.2-07, KNOW-15): milestone plan said Phase 36 owns the backup format-4 bump, but 24.1 already bumped to 4 (d677e2c); Plan 07 emits into the live format 4 with NO bump — that milestone instruction is stale.
 Deferred to Phase 31 (recorded in Plan 05): durable contact-scoped-def ownership + owner-purge semantics. Deferred to Phase 36 (ROADMAP breadcrumb): legacy AI-fuel confirm-path code removal.
-Last activity: 2026-09-13 — Phase 34 complete, transitioned to Phase 35
+Last activity: 2026-09-13 — Phase 35 execution started
 Progress: 11 completed v2.0 phases — 22, 23, 24.1, 24.2, 25, 26, 27, 28, 29, 30, 31
 Next: End-of-phase Pixel UAT for Phase 34 (see 34-08-SUMMARY coverage), then verify/close the phase.
 
@@ -276,6 +276,7 @@ at plan time. All new durable preferences are `app_settings` columns, never Asyn
 | Phase 34 P05 | 15min | 3 tasks | 5 files |
 | Phase 34 P06 | 7min | 4 tasks | 10 files |
 | Phase 34 P08 | 9min | 3 tasks | 1 files |
+| Phase 35 P35-01 | 9min | 4 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -676,11 +677,11 @@ _Also disposed at this close: 05/deferred-items.md (check:colors doc-comment) ma
 
 ## Session
 
-**Last session:** 2026-09-13T07:03:22.783Z
-**Stopped at:** Phase 35 planned — 9 plans across 5 waves, ready to execute
+**Last session:** 2026-09-13T14:24:47.287Z
+**Stopped at:** Completed 35-01-PLAN.md
 _Prior stop (v1.0):_ Phase 21 UI-SPEC approved; milestone v1.0 closed 2026-09-01.
 _Prior stop (13-04):_ the orrery VISUAL VOCABULARY (theme tokens + two pure resolver modules, node-tested, 29 cases green): (1) five owner-tunable `ThemePalette` tokens seeded in `space-dark.dark` ONLY — `starPalette` (6 colours, gold `#F2C14E` at index 0, then amber/rose-red/violet/cyan/ice-white), `mutedStable/Wobble/Decay` (desaturated same-hue morph endpoints), `rogueExtinguished` (cold blue-grey `#3E4A6B` rogue BODY fill) — with an M6/C2-5 conformance test that IMPORTS the real `SELF_SUN_COLOUR_RE`/`assertSelfSunColour` from app-settings-dao and locks every starPalette entry to the ACTUAL DAO write-path rule (no re-inlined regex). (2) `orrery-ring-logic.ts` `orreryRingStyle(status, colors)` — REUSES `ringVisual` for `{color,opacity,width}` (status→colour mapped once), adds the `strokeStyle` axis (solid→dashed→faded→faintTrace) + `bodyFill` (rogue ring=`colors.rogue`, body=`rogueExtinguished`); `null`→canonical NEUTRAL (`colors.border`), never throws — the single fallback sun-occupant reuses (C2-2). (3) `sun-occupant-logic.ts` `resolveSunOccupant(input)` — NULL/archived/missing→self (A7, glow `selfSunColour ?? starPalette[0]`), live contact→its status glow via `orreryRingStyle(status, colors).color`, never-contacted (status `null`)→the reused neutral border (C2-2); accepts `status: ProfileStatus | null`. 5 commits (1801915 feat tokens+M6; d35d528 RED→4cbfad5 GREEN ring-logic; c923b16 RED→10780dd GREEN sun-occupant); tsc + check:colors clean; no deviations (one in-flight fix: a placeholder hex in the logic test was re-sourced from the palette after check:colors flagged it — C2-3). Committed locally on main (NOT pushed). Next: Wave 2 (13-05 render / 13-06 Settings sun-picker), Wave 3 (13-07 drag-release), Wave 4 (13-08 device UAT, autonomous:false).
-**Resume file:** None (Phase 35 planned; next: /gsd-execute-phase 35)
+**Resume file:** None
 are archived under `.planning/milestones/v1.0-phases/`.)
 
 ## Phase 4 — Closeout (2026-08-15) ✅ COMPLETE
