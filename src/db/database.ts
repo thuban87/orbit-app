@@ -50,10 +50,11 @@ import {
   INTERACTION_HISTORY_SCHEMA_VERSION,
   migration025,
 } from "@/db/migrations/025-interaction-history-schema";
+import { migration026 } from "@/db/migrations/026-group-events-schema";
 import {
-  GROUP_EVENTS_SCHEMA_VERSION,
-  migration026,
-} from "@/db/migrations/026-group-events-schema";
+  DEFAULT_INTERACTION_CHANNEL_SCHEMA_VERSION,
+  migration027,
+} from "@/db/migrations/027-default-interaction-channel";
 import { runMigrations } from "@/db/migrations/runner";
 import type { Migration, SqlExecutor } from "@/db/types";
 import { newUid } from "@/db/uid";
@@ -64,7 +65,7 @@ import { formatLocalDate } from "@/utils/dates";
 /** Milliseconds a busy connection waits before erroring (concurrent headless access). */
 export const BUSY_TIMEOUT_MS = 5000;
 /** The schema version this build expects; the runner migrates up to this. */
-export const TARGET_VERSION = GROUP_EVENTS_SCHEMA_VERSION;
+export const TARGET_VERSION = DEFAULT_INTERACTION_CHANNEL_SCHEMA_VERSION;
 
 /** The one authoritative migration registration list, shared by bootstrap and tests. */
 export const MIGRATIONS: Migration[] = [
@@ -94,6 +95,7 @@ export const MIGRATIONS: Migration[] = [
   profilePresentationMigration,
   migration025,
   migration026,
+  migration027,
 ];
 
 const DATABASE_NAME = "orbit.db";
