@@ -853,7 +853,7 @@ Plans:
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
-- [ ] 35-07-PLAN.md — ComposeScreen integration: Text/Email mode + Subject + no-destination + remembered-on-commit
+- [x] 35-07-PLAN.md — ComposeScreen integration: Text/Email mode + Subject + no-destination + remembered-on-commit
 
 **Wave 4** *(blocked on Wave 3 completion)*
 
@@ -949,7 +949,7 @@ Plans:
 | 32. Interaction History & Insights | 8/8 | In Progress|  |
 | 33. Group Interaction Logging | 7/7 | Complete | 2026-09-12 (physical-Pixel UAT passed; release APK built on droid) |
 | 34. Rapid Capture & Update Flows | 8/8 | Complete | 2026-09-13 |
-| 35. Messaging & AI Compose | 5/9 | In Progress|  |
+| 35. Messaging & AI Compose | 7/9 | In Progress|  |
 | 36. AI Configuration & Prompting | 0/TBD | Not started | - |
 | 37. Settings & Personalization | 0/TBD | Deferred planning | - |
 | 38. Your Week | 0/TBD | Deferred planning | - |

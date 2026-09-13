@@ -242,9 +242,9 @@ category's phase (see Traceability).
 ### COMP — Messaging & AI Compose (Phase 35)
 
 - [x] **COMP-01**: Compose opens directly on a blank composition editor — no auto-inserted greeting, AI prose, or prompts
-- [ ] **COMP-02**: User can compose in Text or Email mode, initialized from the Settings default (Text / Email / Remember Last Choice, factory Remember Last Choice) with an ad-hoc per-session switch; the remembered mode updates only on Transmit or Copy
-- [ ] **COMP-03**: Text resolves the primary phone and Email the primary email; a deliberate selection establishes a missing primary; Compose falls back to the usable mode when the preferred one has no destination, and stays usable for drafting/Copy when neither does
-- [ ] **COMP-04**: Email mode exposes Subject + Body; Transmit preserves recipient/subject/body; main Copy copies the body and Subject has its own copy affordance
+- [x] **COMP-02**: User can compose in Text or Email mode, initialized from the Settings default (Text / Email / Remember Last Choice, factory Remember Last Choice) with an ad-hoc per-session switch; the remembered mode updates only on Transmit or Copy
+- [x] **COMP-03**: Text resolves the primary phone and Email the primary email; a deliberate selection establishes a missing primary; Compose falls back to the usable mode when the preferred one has no destination, and stays usable for drafting/Copy when neither does
+- [x] **COMP-04**: Email mode exposes Subject + Body; Transmit preserves recipient/subject/body; main Copy copies the body and Subject has its own copy affordance
 - [x] **COMP-05**: Transmit hands the composition to the external composer and never claims delivery; returning can show a compact "Did you send it?" — only "Yes, log interaction" writes the canonical Message interaction, "Not yet" preserves the session, and Copy never triggers it
 - [x] **COMP-06**: The Compose-attached confirmation coexists with the durable assist lifecycle (ADR-070/071): the app-global banner and pending sheet remain, a dismissal path exists, and the interaction stamps at handoff time
 - [x] **COMP-07**: Compose session state (body, subject, mode, destination, Message Focus) survives in-app navigation and ordinary backgrounding but is not a durable draft — no drafts table, no backup contract
