@@ -767,6 +767,10 @@ export function ComposeScreen({
   // when it holds meaningful text. Emptiness drives the injected isEditorEmpty too.
   const aiActionLabel =
     body.trim().length === 0 ? "Draft with AI" : "Rewrite with AI";
+  // A non-empty editor at review time means this was a Rewrite (the editor is
+  // untouched until Choose this), so the review surface shows the original + a
+  // keep-the-original path.
+  const aiIsRewrite = body.trim().length > 0;
 
   // The mode actually usable after preferred-then-fallback drives which type the
   // establish-primary picker targets (COMP-03).
@@ -905,6 +909,118 @@ export function ComposeScreen({
             accessibilityLabel={aiActionLabel}
             onPress={onAiAction}
           />
+        </View>
+      ) : null}
+
+      {/* Non-destructive pending placeholder (COMP-13) — while the three
+          suggestions generate, the editor is UNTOUCHED and Cancel is available.
+          Exact skeleton styling is device-tuning (backstop); this is the failure-
+          safe backstop that never mutates the manual draft. */}
+      {aiState.status === "resolving" || aiState.status === "loading" ? (
+        <View
+          testID="compose-ai-pending"
+          style={[
+            styles.panel,
+            { backgroundColor: colors.surface, borderColor: colors.border },
+          ]}
+        >
+          <AppText role="body">Drafting a few options…</AppText>
+          <View style={styles.panelActions}>
+            <Button
+              testID="compose-ai-pending-cancel"
+              role="secondary"
+              label="Cancel"
+              accessibilityLabel="Cancel"
+              onPress={onAiCancel}
+            />
+          </View>
+        </View>
+      ) : null}
+
+      {/* Non-destructive three-suggestion review surface (ADR-079 / COMP-12).
+          Exactly three unlabeled suggestions at body size (16/24, no shrink); each
+          has a 'Choose this' primary — the ONLY editor mutation. 'Try Again'
+          replaces the whole set; 'Cancel' dismisses without mutating. For a
+          Rewrite (the editor held text at invocation, still untouched here) the
+          original is shown with a clear keep-the-original path. */}
+      {aiState.status === "review" ? (
+        <View
+          testID="compose-ai-review"
+          style={[
+            styles.panel,
+            { backgroundColor: colors.surface, borderColor: colors.border },
+          ]}
+        >
+          <AppText role="heading">
+            {aiIsRewrite ? "Rewrite suggestions" : "Draft suggestions"}
+          </AppText>
+
+          {aiIsRewrite ? (
+            <View testID="compose-ai-original" style={styles.section}>
+              <ChromeScrim style={styles.labelScrim} radius={RADII.sm}>
+                <AppText role="label">Your original</AppText>
+              </ChromeScrim>
+              <ScrollView
+                style={[styles.aiSuggestionBox, { borderColor: colors.border }]}
+                nestedScrollEnabled
+              >
+                <AppText role="body">{body}</AppText>
+              </ScrollView>
+              <View style={styles.affordance}>
+                <Button
+                  testID="compose-ai-keep-original"
+                  role="secondary"
+                  label="Keep the original"
+                  accessibilityLabel="Keep the original"
+                  onPress={onAiCancel}
+                />
+              </View>
+            </View>
+          ) : null}
+
+          {aiState.suggestions.map((suggestion, index) => (
+            <View
+              // Suggestions are unlabeled and may repeat text; index is the stable
+              // identity within this immutable set (replaced wholesale on retry).
+              // biome-ignore lint/suspicious/noArrayIndexKey: stable within the set
+              key={index}
+              testID={`compose-ai-suggestion-${index}`}
+              style={styles.section}
+            >
+              <ScrollView
+                style={[styles.aiSuggestionBox, { borderColor: colors.border }]}
+                nestedScrollEnabled
+              >
+                <AppText role="body">{suggestion}</AppText>
+              </ScrollView>
+              <View style={styles.affordance}>
+                <Button
+                  testID={`compose-ai-choose-${index}`}
+                  role="primary"
+                  label="Choose this"
+                  accessibilityLabel="Choose this suggestion"
+                  onPress={() => onAiChoose(index)}
+                />
+              </View>
+            </View>
+          ))}
+
+          <View style={styles.panelActions}>
+            <Button
+              testID="compose-ai-cancel"
+              role="secondary"
+              label="Cancel"
+              accessibilityLabel="Cancel"
+              onPress={onAiCancel}
+            />
+            <Button
+              testID="compose-ai-try-again"
+              role="tertiary"
+              label="Try Again"
+              accessibilityLabel="Try Again"
+              onPress={onAiRetry}
+            />
+          </View>
         </View>
       ) : null}
 
@@ -1075,6 +1191,15 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     paddingHorizontal: 12,
     paddingVertical: 10,
+  },
+  // A bounded box so a long suggestion (or the original) scrolls WITHIN the
+  // review surface while staying individually selectable (no shrink — body 16/24).
+  aiSuggestionBox: {
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    maxHeight: 160,
   },
   affordance: {
     alignSelf: "flex-start",
