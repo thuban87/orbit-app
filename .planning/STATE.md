@@ -5,16 +5,16 @@ milestone_name: Release Readiness
 current_phase: 34
 current_phase_name: Rapid Capture & Update Flows
 status: executing
-stopped_at: Completed 34-07-PLAN.md
-last_updated: "2026-09-13T03:45:00.000Z"
+stopped_at: Completed 34-08-PLAN.md
+last_updated: "2026-09-13T04:15:53.608Z"
 last_activity: 2026-09-13
-last_activity_desc: Executed 34-07 (Update Contact chooser + full Memory editor — filled the UpdateContact and Memory placeholder routes. Registry-driven chooser (built-ins + applicable named custom fields + generic Custom Fields, never Category, never empty) returns to itself after each independent inner save until Done; focused editors per row compose canonical controls + DAO wrappers; current-state rows persist via setCurrentStateValue (no interaction, never last_contact); MemoryScreen composes the shipped MemoryEditor for create + edit-in-place with edit-only AI wired from the real provider setting; preselection + failure-safety; node-tested pure chooser-logic. CAPT-06/12/13/14)
-state_head: 0eebdf8
+last_activity_desc: Executed 34-08 (Edit Contact complete-record accordion — restructured EditContactScreen into nine direct-access top-level AccordionSections exposing the complete §E record: Identity, Relationship Basics, Contact Methods, Last Talked About, Key People, Current Location, Memories, Custom Fields, Off Limits. Each knowledge subdomain edits in place and persists through the single Save (updateContactFull then applyLinkDiff, two-transaction boundary retained), seeded from its own explicit read. Off Limits kind-scoped (seed filtered + kind forced) so other fuel kinds survive an edit. MemoryEditor Allow-AI from the real provider setting (D-04). CAPT-14 reveal-and-focus via resolveErrorSection + AccordionSection, meaningful dirty-state guard across all sections, and partial-save reseed re-reading all five knowledge seeds. CAPT-04/14. Phase 34 code complete — all 8 plans executed.)
+state_head: 4a8148334b89a0bd97e248306fc206d2582b8686
 progress:
   total_phases: 21
   completed_phases: 8
   total_plans: 128
-  completed_plans: 125
+  completed_plans: 126
 carried_forward:
 
   - "31.1 NOT complete: 31.1-05 corrective (backgrounds were invisible on the owner's release — full-screen scrim at card opacity) is executed + debug-validated + release built/delivered, but the phase stays open until the owner validates the release on his personal phone (the prior 31.1-04 gate's false positive is why). See 31.1-05-PLAN.md, 31.1-UAT.md (superseded + corrective section)."
@@ -36,17 +36,17 @@ See: .planning/PROJECT.md (updated 2026-09-10 after Phase 31)
 
 ## Current Position
 
-Phase: 34 (Rapid Capture & Update Flows) — EXECUTING
-Plan: 8 of 8 (34-01…34-07 complete)
-Status: Ready to execute Plan 34-08 (last plan in the phase)
+Phase: 34 (Rapid Capture & Update Flows) — CODE COMPLETE (end-of-phase Pixel UAT pending)
+Plan: 8 of 8 (34-01…34-08 complete)
+Status: All 8 plans executed; phase code complete. End-of-phase Pixel UAT + verify/close pending.
 Parked (owner, future): theme-merge into one Dark/Light switch; Deep Space/Starfield removal. See memories mode-aware-glassy-cards, android-elevation-opaque-on-translucent, theme-merge-into-mode-parked.
 FYI (separate): Phase 30 (Orrery Systems) still shows [ ] in ROADMAP with dirty 30-REVIEW files — reconcile independently.
 Carried forward (owner's bucket, NOT resolved here): D-11 default Memory-type display name — reconcile before Phase 34.
 Surface to owner (24.2-07, KNOW-15): milestone plan said Phase 36 owns the backup format-4 bump, but 24.1 already bumped to 4 (d677e2c); Plan 07 emits into the live format 4 with NO bump — that milestone instruction is stale.
 Deferred to Phase 31 (recorded in Plan 05): durable contact-scoped-def ownership + owner-purge semantics. Deferred to Phase 36 (ROADMAP breadcrumb): legacy AI-fuel confirm-path code removal.
-Last activity: 2026-09-13 — Executed 34-07 (Update Contact chooser + full Memory editor, CAPT-06/12/13/14). Filled both placeholder routes. New node-tested pure update-contact-chooser-logic.ts owns row assembly (built-ins from the Contact Knowledge registry + applicability-filtered named custom fields + always-present generic Custom Fields, never Category, never empty) and the repeated-update session selector. UpdateContactScreen routes each row to a focused editor composing the canonical control + DAO wrapper; each inner save persists independently and returns to the chooser with the same contact + "Updated" cue; Done exits. Last Talked About / Current Location persist via setCurrentStateValue (current_state — no interaction, never last_contact), NOT TriStateLastSpoke. MemoryScreen composes the shipped MemoryEditor for create + edit-in-place (contactId-only route, no memoryId), edit-only AI control wired from getAppSettings().aiProvider, create posture registry-default OFF. Preselection + ContactPicker fallback; failure-safe inner saves. Off Limits uses a focused off_limits-scoped fuel editor; Contact Frequency reuses setProfileContactFrequency (cadence-only, §AB).
+Last activity: 2026-09-13 — Executed 34-08 (Edit Contact complete-record accordion, CAPT-04/14). Restructured EditContactScreen into nine direct-access top-level AccordionSections exposing the complete §E editable record (Identity, Relationship Basics, Contact Methods, Last Talked About, Key People, Current Location, Memories, Custom Fields, Off Limits), consuming the 34-03 primitive identically to Add Contact. Each knowledge subdomain edits in place and persists through the SINGLE Save over the retained two-transaction boundary (updateContactFull for metadata+knowledge, then applyLinkDiff), seeded from its OWN explicit read (getContactForEdit returns none of them): listMemoriesForContact, listRelationshipsForContact, listFuelForEditor filtered to off_limits, getCurrentStateValues. Off Limits triple-guarded against destroying other fuel kinds (seed filtered + host forces kind:off_limits + buildEditInput defensive re-filter). MemoryEditor Allow-AI from getAppSettings().aiProvider, never a stub (D-04). CAPT-14: reveal-and-focus via resolveErrorSection + AccordionSection; meaningful dirty-state guard across all sections; partial-save reseed re-reads all five knowledge seeds. Only src/screens/EditContactScreen.tsx modified; tsc + check:colors + tests green. Phase 34 code complete (all 8 plans).
 Progress: 11 completed v2.0 phases — 22, 23, 24.1, 24.2, 25, 26, 27, 28, 29, 30, 31
-Next: Execute Plan 34-08 — /gsd-execute-phase 34
+Next: End-of-phase Pixel UAT for Phase 34 (see 34-08-SUMMARY coverage), then verify/close the phase.
 
 **Milestone v2.0 structure (pre-decided by the owner from the fifteen milestone-2 dossiers + the
 2026-09-01 cross-dossier audit; not re-derived):** 22 App Shell · 23 Theme · 24 Contact Knowledge ·
@@ -274,6 +274,7 @@ at plan time. All new durable preferences are `app_settings` columns, never Asyn
 | Phase 34 P04 | 24min | 3 tasks | 9 files |
 | Phase 34 P05 | 15min | 3 tasks | 5 files |
 | Phase 34 P06 | 7min | 4 tasks | 10 files |
+| Phase 34 P08 | 9min | 3 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -674,8 +675,8 @@ _Also disposed at this close: 05/deferred-items.md (check:colors doc-comment) ma
 
 ## Session
 
-**Last session:** 2026-09-13T02:42:25.351Z
-**Stopped at:** Completed 34-04-PLAN.md
+**Last session:** 2026-09-13T04:15:49.800Z
+**Stopped at:** Completed 34-08-PLAN.md
 _Prior stop (v1.0):_ Phase 21 UI-SPEC approved; milestone v1.0 closed 2026-09-01.
 _Prior stop (13-04):_ the orrery VISUAL VOCABULARY (theme tokens + two pure resolver modules, node-tested, 29 cases green): (1) five owner-tunable `ThemePalette` tokens seeded in `space-dark.dark` ONLY — `starPalette` (6 colours, gold `#F2C14E` at index 0, then amber/rose-red/violet/cyan/ice-white), `mutedStable/Wobble/Decay` (desaturated same-hue morph endpoints), `rogueExtinguished` (cold blue-grey `#3E4A6B` rogue BODY fill) — with an M6/C2-5 conformance test that IMPORTS the real `SELF_SUN_COLOUR_RE`/`assertSelfSunColour` from app-settings-dao and locks every starPalette entry to the ACTUAL DAO write-path rule (no re-inlined regex). (2) `orrery-ring-logic.ts` `orreryRingStyle(status, colors)` — REUSES `ringVisual` for `{color,opacity,width}` (status→colour mapped once), adds the `strokeStyle` axis (solid→dashed→faded→faintTrace) + `bodyFill` (rogue ring=`colors.rogue`, body=`rogueExtinguished`); `null`→canonical NEUTRAL (`colors.border`), never throws — the single fallback sun-occupant reuses (C2-2). (3) `sun-occupant-logic.ts` `resolveSunOccupant(input)` — NULL/archived/missing→self (A7, glow `selfSunColour ?? starPalette[0]`), live contact→its status glow via `orreryRingStyle(status, colors).color`, never-contacted (status `null`)→the reused neutral border (C2-2); accepts `status: ProfileStatus | null`. 5 commits (1801915 feat tokens+M6; d35d528 RED→4cbfad5 GREEN ring-logic; c923b16 RED→10780dd GREEN sun-occupant); tsc + check:colors clean; no deviations (one in-flight fix: a placeholder hex in the logic test was re-sourced from the palette after check:colors flagged it — C2-3). Committed locally on main (NOT pushed). Next: Wave 2 (13-05 render / 13-06 Settings sun-picker), Wave 3 (13-07 drag-release), Wave 4 (13-08 device UAT, autonomous:false).
 **Resume file:** None
