@@ -30,7 +30,10 @@ import {
 } from "@/db/memories-dao";
 import { listMemoriesForContact, type MemoryRow } from "@/db/memories-read";
 import { editTouchpointFull } from "@/db/recency-dao";
-import { resolvePostLogSave } from "@/screens/post-log-note-logic";
+import {
+  resolvePostCreateMemoryTarget,
+  resolvePostLogSave,
+} from "@/screens/post-log-note-logic";
 import { useTheme } from "@/theme";
 import { SPACING } from "@/theme/tokens/spacing";
 import { Logger } from "@/utils/logger";
@@ -179,8 +182,16 @@ export function PostLogNoteEditor({ target, onClose }: PostLogNoteEditorProps) {
         createdAt: now,
         now,
       });
+      // The Memory now durably exists — creation is TERMINAL (review WR-02). A
+      // null re-read must NOT fall back to the re-submittable Add-Note surface
+      // (that allowed a duplicate on a second tap); close instead.
       const row = await reReadCreatedMemory(id, contactId);
-      setCreatedMemory(row);
+      const next = resolvePostCreateMemoryTarget(row);
+      if (next.target === "close") {
+        onClose();
+        return;
+      }
+      setCreatedMemory(next.row);
     } catch (err) {
       Logger.error(LOG_SCOPE, "failed to create memory", err);
       setError(SAVE_FAILED_MESSAGE);

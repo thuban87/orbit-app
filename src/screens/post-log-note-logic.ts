@@ -88,3 +88,25 @@ export function resolvePostLogSave(
   }
   return { target: "note", interactionId: input.interactionId, note: text };
 }
+
+/**
+ * Decide what the editor does AFTER a Memory has already been created (review
+ * WR-02). `addMemory` is the durable write and is TERMINAL: once it returns an
+ * id the Memory exists, so the editor must NEVER route back to the re-submittable
+ * "Add Note" surface — that let a second tap create a duplicate Memory when the
+ * post-create re-read happened to miss the freshly-inserted row.
+ *
+ * - re-read found the row → "edit" (offer the inline Edit-Memory affordance);
+ * - re-read returned null → "close" (the write still committed; there is simply
+ *   nothing to edit inline, so dismiss rather than fall back to Add Note).
+ *
+ * Generic over the row shape so it stays react-native-free and node-testable.
+ */
+export function resolvePostCreateMemoryTarget<T>(
+  reReadRow: T | null,
+): { target: "edit"; row: T } | { target: "close" } {
+  if (reReadRow === null) {
+    return { target: "close" };
+  }
+  return { target: "edit", row: reReadRow };
+}

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { DEFAULT_MEMORY_TYPE_KEY } from "@/db/memory-registry";
 import {
   type PostLogSaveResult,
+  resolvePostCreateMemoryTarget,
   resolvePostLogSave,
 } from "./post-log-note-logic";
 
@@ -96,5 +97,23 @@ describe("resolvePostLogSave", () => {
 
     const memory = resolvePostLogSave({ kind: "memory", text: "  padded  " });
     expect(memory).toMatchObject({ target: "memory", value: "padded" });
+  });
+});
+
+describe("resolvePostCreateMemoryTarget (WR-02)", () => {
+  it("offers inline edit when the created Memory is re-read", () => {
+    const row = { id: 7, value: "coffee" };
+    expect(resolvePostCreateMemoryTarget(row)).toEqual({
+      target: "edit",
+      row,
+    });
+  });
+
+  it("closes (never re-opens Add Note) when the re-read misses the fresh row", () => {
+    // The addMemory write already committed; a null re-read must NOT route back
+    // to the re-submittable Add-Note surface, which would allow a duplicate.
+    expect(resolvePostCreateMemoryTarget<null>(null)).toEqual({
+      target: "close",
+    });
   });
 });
