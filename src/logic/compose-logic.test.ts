@@ -16,7 +16,10 @@ import { describe, expect, it } from "vitest";
 import type { ContactMethodRow } from "@/db/contact-methods-dao";
 import {
   actionablePrimaryPhoneDestination,
+  effectiveMode,
+  nextRememberedMode,
   resolveComposeControls,
+  resolveUsableMode,
 } from "@/logic/compose-logic";
 
 const primaryPhone: ContactMethodRow = {
@@ -96,6 +99,158 @@ describe("resolveComposeControls — CMP-03 Send/Copy capability matrix", () => 
     expect(resolveComposeControls(true, true)).toEqual(
       resolveComposeControls(true, true),
     );
+  });
+});
+
+describe("resolveComposeControls — Text/Email mode (COMP-03, HIGH-2)", () => {
+  // H1 (build-breaker fix): the two NEW params (mode/hasEmail) are OPTIONAL with
+  // defaults ('text'/false), so the wave-1 2-arg call returns the SAME object as
+  // the explicit ('text', false) call for every (hasPhone, smsAvailable) row.
+  it("H1: the 2-arg call equals the explicit ('text', false) call for every row", () => {
+    for (const hasPhone of [true, false]) {
+      for (const smsAvailable of [true, false, null] as const) {
+        expect(resolveComposeControls(hasPhone, smsAvailable)).toEqual(
+          resolveComposeControls(hasPhone, smsAvailable, "text", false),
+        );
+      }
+    }
+  });
+
+  it("Text mode + primary phone + SMS available → Transmit shown, Copy secondary", () => {
+    expect(resolveComposeControls(true, true, "text", false)).toEqual({
+      send: "shown",
+      copyEmphasis: "secondary",
+      addNumber: false,
+      smsUnavailableHelper: false,
+    });
+  });
+
+  it("Text mode + no phone (no email) → Transmit unavailable, Copy sole primary, establish-primary prompt (not an error)", () => {
+    expect(resolveComposeControls(false, true, "text", false)).toEqual({
+      send: "hidden",
+      copyEmphasis: "primary",
+      addNumber: true,
+      smsUnavailableHelper: false,
+    });
+  });
+
+  it("Email mode + primary email → Transmit shown (email), Copy secondary, no SMS helper", () => {
+    expect(resolveComposeControls(false, false, "email", true)).toEqual({
+      send: "shown",
+      copyEmphasis: "secondary",
+      addNumber: false,
+      smsUnavailableHelper: false,
+    });
+  });
+
+  it("Email mode + primary email + smsAvailable===null → Transmit STILL available (SMS probe does not gate Email)", () => {
+    expect(resolveComposeControls(false, null, "email", true)).toEqual({
+      send: "shown",
+      copyEmphasis: "secondary",
+      addNumber: false,
+      smsUnavailableHelper: false,
+    });
+  });
+
+  it("Email mode + primary email + smsAvailable===false → Transmit STILL available (Email has no probe-pending / SMS dependency)", () => {
+    expect(resolveComposeControls(true, false, "email", true)).toEqual({
+      send: "shown",
+      copyEmphasis: "secondary",
+      addNumber: false,
+      smsUnavailableHelper: false,
+    });
+  });
+
+  it("Email mode + no email but phone (SMS available) → falls back to the usable Text mode (Transmit shown)", () => {
+    expect(resolveComposeControls(true, true, "email", false)).toEqual({
+      send: "shown",
+      copyEmphasis: "secondary",
+      addNumber: false,
+      smsUnavailableHelper: false,
+    });
+  });
+
+  it("Email mode + no email but phone (device can't text) → falls back to Text with the SMS-unavailable helper", () => {
+    expect(resolveComposeControls(true, false, "email", false)).toEqual({
+      send: "hidden",
+      copyEmphasis: "primary",
+      addNumber: false,
+      smsUnavailableHelper: true,
+    });
+  });
+
+  it("Text mode + smsAvailable===null (probe pending) → Transmit hidden, Copy primary, no helper (probe-pending gates Text)", () => {
+    expect(resolveComposeControls(true, null, "text", false)).toEqual({
+      send: "hidden",
+      copyEmphasis: "primary",
+      addNumber: false,
+      smsUnavailableHelper: false,
+    });
+  });
+
+  it("Neither phone nor email → Transmit unavailable + Copy sole primary in BOTH modes, never throws", () => {
+    for (const mode of ["text", "email"] as const) {
+      for (const smsAvailable of [true, false, null] as const) {
+        expect(() =>
+          resolveComposeControls(false, smsAvailable, mode, false),
+        ).not.toThrow();
+        expect(resolveComposeControls(false, smsAvailable, mode, false)).toEqual(
+          {
+            send: "hidden",
+            copyEmphasis: "primary",
+            addNumber: true,
+            smsUnavailableHelper: false,
+          },
+        );
+      }
+    }
+  });
+});
+
+describe("resolveUsableMode — preferred-then-fallback destination resolution (COMP-03)", () => {
+  it("Text preferred: uses Text when a phone exists", () => {
+    expect(resolveUsableMode("text", true, false)).toBe("text");
+    expect(resolveUsableMode("text", true, true)).toBe("text");
+  });
+
+  it("Text preferred with no phone: falls back to Email when one exists", () => {
+    expect(resolveUsableMode("text", false, true)).toBe("email");
+  });
+
+  it("Email preferred: uses Email when an email exists", () => {
+    expect(resolveUsableMode("email", false, true)).toBe("email");
+    expect(resolveUsableMode("email", true, true)).toBe("email");
+  });
+
+  it("Email preferred with no email: falls back to Text when a phone exists", () => {
+    expect(resolveUsableMode("email", true, false)).toBe("text");
+  });
+
+  it("neither destination exists → null (no usable mode) in both modes", () => {
+    expect(resolveUsableMode("text", false, false)).toBeNull();
+    expect(resolveUsableMode("email", false, false)).toBeNull();
+  });
+});
+
+describe("effectiveMode — resolves the 'remember' sentinel (COMP-02)", () => {
+  it("'remember' resolves to the remembered concrete mode", () => {
+    expect(effectiveMode("remember", "text")).toBe("text");
+    expect(effectiveMode("remember", "email")).toBe("email");
+  });
+
+  it("a fixed default is used verbatim, ignoring the remembered value", () => {
+    expect(effectiveMode("email", "text")).toBe("email");
+    expect(effectiveMode("text", "email")).toBe("text");
+  });
+});
+
+describe("nextRememberedMode — advances ONLY on a Transmit/Copy commit (COMP-02)", () => {
+  it("returns the ad-hoc mode only when committed is true", () => {
+    expect(nextRememberedMode("text", "email", true)).toBe("email");
+  });
+
+  it("returns the current remembered mode on an ad-hoc in-session switch (not committed)", () => {
+    expect(nextRememberedMode("text", "email", false)).toBe("text");
   });
 });
 
