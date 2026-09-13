@@ -7,6 +7,7 @@ import { MIGRATIONS, TARGET_VERSION } from "@/db/database";
 import { getRankedFuel, RANKED_FUEL_EXCLUSIONS } from "@/db/fuel-read";
 import { runMigrations } from "@/db/migrations/runner";
 import {
+  readPopulatedCustomFields,
   readProfileKnowledge,
   readProfileOffLimits,
 } from "@/db/profile-knowledge-read";
@@ -211,5 +212,75 @@ describe("Profile knowledge projection", () => {
     expect(RANKED_FUEL_EXCLUSIONS).toBe(
       `kind != 'off_limits'\n     AND source != 'ai'\n     AND NULLIF(TRIM(text, char(9) || char(10) || char(11) || char(12) || char(13) || char(160) || ' '), '') IS NOT NULL`,
     );
+  });
+
+  it("readPopulatedCustomFields returns only populated, non-quarantined fields carrying share_with_ai (A2)", async () => {
+    const owner = await contact("Owner");
+    const sharedDef = await exec.runAsync(
+      `INSERT INTO custom_field_defs
+         (uid, col_name, label, type, options, show_on_new, always_show,
+          display_order, share_with_ai, scope, history_retained, field_group,
+          created_at, modified_at)
+       VALUES (?, 'hobby', 'Hobby', 'text', NULL, 0, 0, 0, 1,
+               'global', 0, 'Home', ?, ?)`,
+      [uid(), NOW, NOW],
+    );
+    // always_show = 1 but value NULL → an admin placeholder that must be EXCLUDED.
+    const alwaysShowEmptyDef = await exec.runAsync(
+      `INSERT INTO custom_field_defs
+         (uid, col_name, label, type, options, show_on_new, always_show,
+          display_order, share_with_ai, scope, history_retained, field_group,
+          created_at, modified_at)
+       VALUES (?, 'nickname', 'Nickname', 'text', NULL, 0, 1, 1, 0,
+               'global', 0, NULL, ?, ?)`,
+      [uid(), NOW, NOW],
+    );
+    // Quarantined def with a populated value → must be EXCLUDED.
+    const quarantinedDef = await exec.runAsync(
+      `INSERT INTO custom_field_defs
+         (uid, col_name, label, type, options, show_on_new, always_show,
+          display_order, share_with_ai, scope, history_retained, field_group,
+          quarantined_at, created_at, modified_at)
+       VALUES (?, 'oldfield', 'Old field', 'text', NULL, 0, 0, 2, 1,
+               'global', 0, NULL, ?, ?, ?)`,
+      [uid(), NOW, NOW, NOW],
+    );
+    await exec.runAsync(
+      `INSERT INTO custom_field_values
+         (uid, contact_id, field_def_id, value, created_at, modified_at)
+       VALUES (?, ?, ?, 'Climbing', ?, ?)`,
+      [uid(), owner, sharedDef.lastInsertRowId, NOW, NOW],
+    );
+    await exec.runAsync(
+      `INSERT INTO custom_field_values
+         (uid, contact_id, field_def_id, value, created_at, modified_at)
+       VALUES (?, ?, ?, NULL, ?, ?)`,
+      [uid(), owner, alwaysShowEmptyDef.lastInsertRowId, NOW, NOW],
+    );
+    await exec.runAsync(
+      `INSERT INTO custom_field_values
+         (uid, contact_id, field_def_id, value, created_at, modified_at)
+       VALUES (?, ?, ?, 'quarantined value', ?, ?)`,
+      [uid(), owner, quarantinedDef.lastInsertRowId, NOW, NOW],
+    );
+
+    const groups = await readPopulatedCustomFields(readOnly(), owner);
+    const items = groups.flatMap((group) => group.items);
+
+    // Only the populated, non-quarantined field survives.
+    expect(items).toHaveLength(1);
+    expect(items[0]).toMatchObject({
+      fieldDefId: sharedDef.lastInsertRowId,
+      label: "Hobby",
+      rawValue: "Climbing",
+      shareWithAi: 1,
+    });
+    // The always_show-but-empty placeholder and the quarantined field are excluded.
+    expect(
+      items.some((item) => item.fieldDefId === alwaysShowEmptyDef.lastInsertRowId),
+    ).toBe(false);
+    expect(
+      items.some((item) => item.fieldDefId === quarantinedDef.lastInsertRowId),
+    ).toBe(false);
   });
 });

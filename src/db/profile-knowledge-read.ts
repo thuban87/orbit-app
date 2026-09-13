@@ -128,23 +128,17 @@ async function readCurrentState(
   return result;
 }
 
-async function readCustomFields(
-  exec: ReadOnlyExecutor,
+/**
+ * Group raw custom-field rows into the renderer-neutral `ProfileCustomFieldGroup[]`
+ * shape, preserving `field_group` grouping and query order. Shared by the
+ * heavyweight Profile read (`readCustomFields`) and the narrow populated-only
+ * Research export (`readPopulatedCustomFields`) so their per-item mapping —
+ * option-validated parse, `shareWithAi` truth, history identity — can never drift.
+ */
+function groupCustomFieldRows(
+  rows: CustomFieldDbRow[],
   contactId: number,
-): Promise<ProfileCustomFieldGroup[]> {
-  const rows = await exec.getAllAsync<CustomFieldDbRow>(
-    `SELECT d.id AS field_def_id, v.uid AS value_uid, d.label, d.type,
-            d.options, v.value AS raw_value, d.share_with_ai,
-            d.history_retained, d.field_group
-       FROM custom_field_defs d
-       LEFT JOIN custom_field_values v
-         ON v.field_def_id = d.id AND v.contact_id = ?
-      WHERE d.quarantined_at IS NULL
-        AND (d.scope = 'global' OR v.id IS NOT NULL)
-        AND (d.always_show = 1 OR v.value IS NOT NULL)
-      ORDER BY d.display_order, d.id`,
-    [contactId],
-  );
+): ProfileCustomFieldGroup[] {
   const groups: ProfileCustomFieldGroup[] = [];
   const byName = new Map<string | null, ProfileCustomFieldGroup>();
   for (const row of rows) {
@@ -176,6 +170,58 @@ async function readCustomFields(
     });
   }
   return groups;
+}
+
+async function readCustomFields(
+  exec: ReadOnlyExecutor,
+  contactId: number,
+): Promise<ProfileCustomFieldGroup[]> {
+  const rows = await exec.getAllAsync<CustomFieldDbRow>(
+    `SELECT d.id AS field_def_id, v.uid AS value_uid, d.label, d.type,
+            d.options, v.value AS raw_value, d.share_with_ai,
+            d.history_retained, d.field_group
+       FROM custom_field_defs d
+       LEFT JOIN custom_field_values v
+         ON v.field_def_id = d.id AND v.contact_id = ?
+      WHERE d.quarantined_at IS NULL
+        AND (d.scope = 'global' OR v.id IS NOT NULL)
+        AND (d.always_show = 1 OR v.value IS NOT NULL)
+      ORDER BY d.display_order, d.id`,
+    [contactId],
+  );
+  return groupCustomFieldRows(rows, contactId);
+}
+
+/**
+ * Narrow, POPULATED-only custom-field projection for the Compose Research read
+ * (COMP-08 / A2, plan 35-06). Distinct from the private `readCustomFields` and the
+ * heavyweight `readProfileKnowledge` collection, which both admit `always_show`
+ * defs with an empty value — Research shows only populated conversation-relevant
+ * data, never data-completeness admin scaffolding.
+ *
+ * Returns only NON-QUARANTINED fields with a POPULATED value (`v.value IS NOT
+ * NULL` → `rawValue != null`), each carrying its own `share_with_ai` truth
+ * (`shareWithAi`), with NO PROFILE_REPEATABLE_LIMIT cap. `compose-research-read`
+ * consumes THIS export for its custom-field source; it never imports the private
+ * `readCustomFields` (cross-module-uncallable) nor `readProfileKnowledge`.
+ */
+export async function readPopulatedCustomFields(
+  exec: ReadOnlyExecutor,
+  contactId: number,
+): Promise<ProfileCustomFieldGroup[]> {
+  const rows = await exec.getAllAsync<CustomFieldDbRow>(
+    `SELECT d.id AS field_def_id, v.uid AS value_uid, d.label, d.type,
+            d.options, v.value AS raw_value, d.share_with_ai,
+            d.history_retained, d.field_group
+       FROM custom_field_defs d
+       JOIN custom_field_values v
+         ON v.field_def_id = d.id AND v.contact_id = ?
+      WHERE d.quarantined_at IS NULL
+        AND v.value IS NOT NULL
+      ORDER BY d.display_order, d.id`,
+    [contactId],
+  );
+  return groupCustomFieldRows(rows, contactId);
 }
 
 /** Owner-facing Off Limits projection. It is never reused for ranking or AI. */
