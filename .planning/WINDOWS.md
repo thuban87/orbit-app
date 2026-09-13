@@ -1,10 +1,10 @@
 ---
 schema_version: 1
-open_count: 57
+open_count: 59
 waived_count: 0
 fixed_count: 6
-total_count: 63
-last_updated: 2026-09-12T11:06:50.981Z
+total_count: 65
+last_updated: 2026-09-13T15:54:19.591Z
 ---
 
 # Broken Windows Ledger
@@ -78,6 +78,8 @@ last_updated: 2026-09-12T11:06:50.981Z
 | 61 | 32 | unrun-verify | src/components/history/HistorySection.tsx |  | Device UAT deferred to phase gate: populated/empty/lifecycle-only render, cell->card->sheet, drawer->sheet, empty-date LogContact from Settings-origin, knowledge-change edit from Settings-origin, reduced motion | open |  | 2026-09-12T01:53:34.970Z |  |
 | 62 | 33 | unrun-verify | package.json |  | Full npm test did not reach a final result before the 30-second harness command cap; focused Group Event suites passed. | open |  | 2026-09-12T10:58:15.403Z |  |
 | 63 | 33 | unrun-verify | src/db/group-events-read.test.ts |  | Full npm test exceeded the executor 30-second command cap twice before a final result. | open |  | 2026-09-12T11:06:50.981Z |  |
+| 64 | 35 | deviation | src/db/migrations/006-normalize-custom-field-values.test.ts |  | Pre-existing failure (not from 35-02): 'no such column: allow_ai' in the v5-profile lifecycle test | open |  | 2026-09-13T15:54:19.413Z |  |
+| 65 | 35 | deviation | src/components/orrery/orrery-controls-render.test.tsx |  | Pre-existing render-test failure (not from 35-02) | open |  | 2026-09-13T15:54:19.591Z |  |
 
 ````json
 [
@@ -835,6 +837,30 @@ last_updated: 2026-09-12T11:06:50.981Z
     "status": "open",
     "reason": "",
     "recorded_at": "2026-09-12T11:06:50.981Z",
+    "resolved_at": null
+  },
+  {
+    "id": 64,
+    "kind": "deviation",
+    "phase": "35",
+    "file": "src/db/migrations/006-normalize-custom-field-values.test.ts",
+    "line": null,
+    "description": "Pre-existing failure (not from 35-02): 'no such column: allow_ai' in the v5-profile lifecycle test",
+    "status": "open",
+    "reason": "",
+    "recorded_at": "2026-09-13T15:54:19.413Z",
+    "resolved_at": null
+  },
+  {
+    "id": 65,
+    "kind": "deviation",
+    "phase": "35",
+    "file": "src/components/orrery/orrery-controls-render.test.tsx",
+    "line": null,
+    "description": "Pre-existing render-test failure (not from 35-02)",
+    "status": "open",
+    "reason": "",
+    "recorded_at": "2026-09-13T15:54:19.591Z",
     "resolved_at": null
   }
 ]

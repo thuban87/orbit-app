@@ -836,13 +836,13 @@ Plans:
 
 **Canonical refs**: docs/dossier/milestone-2/phase-14-messaging-ai-compose-dossier.md; docs/dossier/milestone-2/planning-notes/phase-14-planning-notes.md
 **Schema**: compose preferences — migration 028 (head verified on disk at plan time: 027/TARGET_VERSION 27 → next 028)
-**Plans**: 2/9 plans executed (waves 1–5)
+**Plans**: 3/9 plans executed (waves 1–5)
 
 Plans:
 **Wave 1**
 
 - [x] 35-01-PLAN.md — TRACER: end-to-end Text reach-out (blank editor → Transmit → additive "Did you send it?" → confirmed log) + compose-session-store
-- [ ] 35-02-PLAN.md — Data-layer preference foundation: migration 028 + app-settings-dao compose-mode + backup allowlist (one-way migration checkpoint)
+- [x] 35-02-PLAN.md — Data-layer preference foundation: migration 028 + app-settings-dao compose-mode + backup allowlist (one-way migration checkpoint)
 - [x] 35-05-PLAN.md — AI egress shape-carry: ai-context-read carries the ADR-078 gated-note shape (D-13, no egress widening); Off Limits excluded from all AI egress — no avoidance-constraint carry (D-14/ADR-107)
 
 **Wave 2** *(blocked on Wave 1 completion)*
