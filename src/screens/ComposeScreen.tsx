@@ -58,16 +58,26 @@ import { AppText } from "@/components/ui/AppText";
 import { Button } from "@/components/ui/Button";
 import { ChromeScrim } from "@/components/ui/ChromeScrim";
 import { getAppSettings, updateAppSettings } from "@/db/app-settings-dao";
-import { listActionablePrimaryMethods } from "@/db/contact-methods-read";
+import {
+  type ContactMethodRow,
+  setContactMethodPrimary,
+} from "@/db/contact-methods-dao";
+import {
+  type ContactMethodGroups,
+  listContactMethodGroups,
+  selectActionablePrimaryMethods,
+} from "@/db/contact-methods-read";
 import { getContactHeader } from "@/db/contact-read";
 import { getExecutor, localDateTime } from "@/db/database";
 import { markAssistLogged } from "@/db/interaction-assist-dao";
+import type { ContactMethodType } from "@/logic/contact-method-normalization";
 import {
   actionablePrimaryPhoneDestination,
   type ComposeControls,
   effectiveMode,
   nextRememberedMode,
   resolveComposeControls,
+  resolveUsableMode,
 } from "@/logic/compose-logic";
 import { resetToDashboardRoot } from "@/navigation/reset-intents";
 import type { RootStackScreenProps, TabParamList } from "@/navigation/types";
@@ -91,9 +101,24 @@ type Header = {
   modified_at: string;
   /** Non-null when the contact is archived — treated exactly like missing. */
   archived_at: string | null;
-  /** DAO-selected actionable primary destination, or null when none is actionable. */
+  /** DAO-selected actionable primary phone destination, or null when none. */
   actionablePhone: string | null;
+  /** DAO-selected actionable primary email destination, or null when none. */
+  actionableEmail: string | null;
+  /**
+   * The full ordered per-type method groups (per-row is_primary/is_actionable).
+   * Consumed to decide WHEN the establish-primary picker is shown —
+   * selectActionablePrimaryMethods returns only the effective primary and CANNOT
+   * reveal whether it is an explicit stored primary or a first-actionable
+   * fallback (MEDIUM: contact-methods-read.ts:10-19).
+   */
+  methodGroups: ContactMethodGroups;
 };
+
+/** Truncate a long address/number for a display/picker row; full value on select. */
+function truncateMethodValue(value: string): string {
+  return value.length > 32 ? `${value.slice(0, 31)}…` : value;
+}
 
 export function ComposeScreen({
   navigation,
@@ -125,6 +150,7 @@ export function ComposeScreen({
   const mode = useComposeSession((s) => s.mode);
   const setBody = useComposeSession((s) => s.setBody);
   const setMode = useComposeSession((s) => s.setMode);
+  const setDestination = useComposeSession((s) => s.setDestination);
   const startSession = useComposeSession((s) => s.startSession);
   const clearSession = useComposeSession((s) => s.clearSession);
 
@@ -159,14 +185,17 @@ export function ComposeScreen({
       const exec = getExecutor();
       void (async () => {
         try {
-          const [row, actionableMethods, settings] = await Promise.all([
+          const [row, methodGroups, settings] = await Promise.all([
             getContactHeader(exec, contactId),
-            listActionablePrimaryMethods(exec, contactId),
+            listContactMethodGroups(exec, contactId),
             getAppSettings(exec),
           ]);
           if (cancelled) {
             return;
           }
+          // Resolve the EFFECTIVE actionable primary for BOTH types from the same
+          // loaded groups (one read serves resolution AND the picker decision).
+          const primaries = selectActionablePrimaryMethods(methodGroups);
           // Seed the session mode from the durable preference on a FRESH session
           // only (COMP-02). effectiveMode resolves the 'remember' sentinel to the
           // last remembered concrete mode; a fixed default is used verbatim. This
@@ -193,9 +222,9 @@ export function ComposeScreen({
             photo: row.photo,
             modified_at: row.modified_at,
             archived_at: row.archived_at,
-            actionablePhone: actionablePrimaryPhoneDestination(
-              actionableMethods.phone,
-            ),
+            actionablePhone: actionablePrimaryPhoneDestination(primaries.phone),
+            actionableEmail: actionablePrimaryPhoneDestination(primaries.email),
+            methodGroups,
           });
           setScreenState("ready");
         } catch (err) {
@@ -253,6 +282,49 @@ export function ComposeScreen({
     };
   }, []);
 
+  // Re-read the contact's method groups after a primary swap so the picker
+  // condition and resolved destinations reflect the new explicit primary without
+  // a full navigation round-trip. Local SQLite read; no network on this path.
+  const refreshMethods = useCallback(async () => {
+    const exec = getExecutor();
+    const methodGroups = await listContactMethodGroups(exec, contactId);
+    const primaries = selectActionablePrimaryMethods(methodGroups);
+    setHeader((prev) =>
+      prev === null
+        ? prev
+        : {
+            ...prev,
+            actionablePhone: actionablePrimaryPhoneDestination(primaries.phone),
+            actionableEmail: actionablePrimaryPhoneDestination(primaries.email),
+            methodGroups,
+          },
+    );
+  }, [contactId]);
+
+  // A DELIBERATE picker selection establishes the canonical primary for the
+  // active mode via the single-method writer setContactMethodPrimary (plan
+  // 35-03) — NEVER applyContactMethodDiff. Records the chosen endpoint in the
+  // session store and refreshes the resolved methods (COMP-03, T-35-17).
+  const onChoosePrimary = useCallback(
+    async (methodType: ContactMethodType, method: ContactMethodRow) => {
+      try {
+        const exec = getExecutor();
+        await setContactMethodPrimary(exec, {
+          contactId,
+          methodId: method.id,
+          methodType,
+          now: localDateTime(),
+        });
+        setDestination(method.canonical_value);
+        await refreshMethods();
+      } catch (err) {
+        Logger.error(LOG_SCOPE, "failed to set primary method", err);
+        Alert.alert("Couldn't set that", "Please try again.");
+      }
+    },
+    [contactId, setDestination, refreshMethods],
+  );
+
   // Advance the durable "remembered" compose mode — persisted ONLY on a commit
   // (a successful Transmit or Copy), NEVER on an ad-hoc in-session switch
   // (COMP-02). nextRememberedMode(current, adHoc, committed=true) returns the
@@ -285,25 +357,39 @@ export function ComposeScreen({
   }, [mode, setMode]);
 
   // Transmit — in-flight latched (A3). Returns early while a handoff is open and
-  // when there is no phone, then opens the OS SMS composer pre-filled. The channel
-  // derives from the session-store `mode` (currently 'text'), never a literal.
-  // CONSUMES the handoff outcome so the confirmation panel logs the EXACT assist.
+  // when no destination resolves. The channel + endpoint derive from the USABLE
+  // mode (resolveUsableMode: preferred-then-fallback), never a literal or the raw
+  // session mode — so an email-mode draft with no email falls back to the phone
+  // handoff. CONSUMES the handoff outcome so the confirmation panel logs the
+  // EXACT assist.
   const onTransmit = useCallback(async () => {
-    if (sending) {
+    if (sending || header === null) {
       return;
     }
-    const phone = header?.actionablePhone ?? null;
-    if (phone === null) {
+    const usable = resolveUsableMode(
+      mode,
+      header.actionablePhone != null,
+      header.actionableEmail != null,
+    );
+    const endpoint =
+      usable === "email"
+        ? header.actionableEmail
+        : usable === "text"
+          ? header.actionablePhone
+          : null;
+    if (usable === null || endpoint === null) {
       return;
     }
     setSending(true);
     try {
       const exec = getExecutor();
       const settings = await getAppSettings(exec);
+      // Record the destination actually used in the session store (D-10).
+      setDestination(endpoint);
       const outcome = await performReachOut(exec, {
         contactId,
-        channel: mode,
-        endpoint: phone,
+        channel: usable,
+        endpoint,
         assistEnabled: settings.interactionAssistEnabled === 1,
         now: localDateTime(),
         messageBody: body,
@@ -321,14 +407,7 @@ export function ComposeScreen({
     } finally {
       setSending(false);
     }
-  }, [
-    sending,
-    header?.actionablePhone,
-    contactId,
-    mode,
-    body,
-    persistRememberedMode,
-  ]);
+  }, [sending, header, contactId, mode, body, setDestination, persistRememberedMode]);
 
   // Copy — the guaranteed handoff, NEVER gated by `sending`, NEVER opens the
   // confirmation panel. On success show a transient "Message copied" for ~2s.
@@ -417,13 +496,35 @@ export function ComposeScreen({
   // "ready" — derive the controls (A1) through the pure resolver UNCONDITIONALLY.
   // The resolver owns the interim (smsAvailable === null, probe pending) case, so
   // no capability arithmetic is re-derived inline here.
-  const phone = header.actionablePhone;
-  const hasPhone = phone != null;
+  const hasPhone = header.actionablePhone != null;
+  const hasEmail = header.actionableEmail != null;
   const controls: ComposeControls = resolveComposeControls(
     hasPhone,
     smsAvailable,
+    mode,
+    hasEmail,
   );
   const copyPrimary = controls.copyEmphasis === "primary";
+
+  // The mode actually usable after preferred-then-fallback drives which type the
+  // establish-primary picker targets (COMP-03).
+  const usable = resolveUsableMode(mode, hasPhone, hasEmail);
+  const pickerType: ContactMethodType | null =
+    usable === "email" ? "email" : usable === "text" ? "phone" : null;
+  const pickerCandidates =
+    pickerType === null
+      ? []
+      : header.methodGroups[pickerType].filter((m) => m.is_actionable === 1);
+  const hasExplicitPrimary =
+    pickerType !== null &&
+    header.methodGroups[pickerType].some(
+      (m) => m.is_primary === 1 && m.is_actionable === 1,
+    );
+  // Show the picker ONLY with ≥2 actionable candidates AND no explicit stored
+  // primary in the active mode (MEDIUM). A single method or an explicit primary
+  // resolves without one; Transmit stays usable either way (first-actionable
+  // fallback), so the picker is an additive establish affordance, never a gate.
+  const showPicker = pickerCandidates.length >= 2 && !hasExplicitPrimary;
 
   return (
     <ScrollView testID="compose-screen" contentContainerStyle={styles.content}>
@@ -499,16 +600,53 @@ export function ComposeScreen({
         </ChromeScrim>
       ) : null}
 
-      {/* Add-a-phone-number affordance (no-phone only) → Edit. */}
+      {/* No-destination state (COMP-03): NEITHER phone nor email actionable.
+          Transmit is unavailable but this is a usable degraded state — Copy stays
+          the sole primary and an accessible explanation + establish-a-primary
+          route are offered. Never a blocking error (T-35-11). */}
       {controls.addNumber ? (
-        <View style={styles.affordance}>
-          <Button
-            testID="compose-add-number"
-            role="tertiary"
-            label="Add a phone number"
-            accessibilityLabel="Add a phone number"
-            onPress={() => navigation.navigate("Edit", { contactId })}
-          />
+        <>
+          <ChromeScrim style={styles.labelScrim} radius={RADII.sm}>
+            <AppText testID="compose-no-destination" role="caption">
+              No phone number or email — copy your message instead.
+            </AppText>
+          </ChromeScrim>
+          <View style={styles.affordance}>
+            <Button
+              testID="compose-add-number"
+              role="tertiary"
+              label="Add a phone number or email"
+              accessibilityLabel="Add a phone number or email"
+              onPress={() => navigation.navigate("Edit", { contactId })}
+            />
+          </View>
+        </>
+      ) : null}
+
+      {/* Establish-primary picker (COMP-03): multiple actionable destinations for
+          the active mode with no explicit stored primary — ask which becomes the
+          canonical one. The pick calls setContactMethodPrimary. Long values
+          truncate in the row; the FULL value is applied on selection. */}
+      {showPicker && pickerType !== null ? (
+        <View testID="compose-primary-picker" style={styles.section}>
+          <ChromeScrim style={styles.labelScrim} radius={RADII.sm}>
+            <AppText role="label">
+              {pickerType === "email"
+                ? "Which email should Orbit use?"
+                : "Which number should Orbit use?"}
+            </AppText>
+          </ChromeScrim>
+          {pickerCandidates.map((method) => (
+            <View key={method.id} style={styles.affordance}>
+              <Button
+                testID={`compose-primary-option-${method.id}`}
+                role="tertiary"
+                label={truncateMethodValue(method.display_value)}
+                accessibilityLabel={`Use ${method.display_value}`}
+                onPress={() => void onChoosePrimary(pickerType, method)}
+              />
+            </View>
+          ))}
         </View>
       ) : null}
 
