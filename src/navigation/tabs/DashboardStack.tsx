@@ -2,6 +2,7 @@ import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { MergeImpactSummary } from "@/components/MergeImpactSummary";
 import { ArchivedContactsScreen } from "@/screens/ArchivedContactsScreen";
 import { CaptureScreen } from "@/screens/CaptureScreen";
+import { ComposeResearchRoute } from "@/screens/ComposeResearchScreen";
 import { ComposeScreen } from "@/screens/ComposeScreen";
 import { ContactProfileScreen } from "@/screens/ContactProfileScreen";
 import { CreateContactScreen } from "@/screens/CreateContactScreen";
@@ -57,6 +58,10 @@ export function DashboardStack() {
       <Stack.Screen name="EditParticipant" component={EditParticipantScreen} />
       <Stack.Screen name="Create" component={CreateContactScreen} />
       <Stack.Screen name="Compose" component={ComposeScreen} />
+      <Stack.Screen
+        name="ComposeResearch"
+        component={ComposeResearchRoute}
+      />
       <Stack.Screen name="Capture" component={CaptureScreen} />
       <Stack.Screen name="CropPhoto" component={CropPhotoScreen} />
       <Stack.Screen name="Archived" component={ArchivedContactsScreen} />

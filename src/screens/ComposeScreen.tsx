@@ -65,6 +65,7 @@ import { AppText } from "@/components/ui/AppText";
 import { Button } from "@/components/ui/Button";
 import { ChromeScrim } from "@/components/ui/ChromeScrim";
 import { readPromptContext } from "@/db/ai-context-read";
+import { readComposeResearch } from "@/db/compose-research-read";
 import {
   type AppSettings,
   getAppSettings,
@@ -215,6 +216,10 @@ export function ComposeScreen({
   // the "Yes" write so a double-tap cannot double-log (T-35-05).
   const [confirm, setConfirm] = useState<{ assistUid: string } | null>(null);
   const [logging, setLogging] = useState(false);
+  // The count of populated Things-to-Remember Research items for this contact,
+  // driving the compact 'Things to Remember · N' entry (COMP-08). A local SQLite
+  // read on focus — never on the render path, never a blocking network call.
+  const [researchCount, setResearchCount] = useState(0);
 
   // ── AI (re-wired against the reshaped lifecycle, plan 35-04; plan 35-01 removed
   // the ENTIRE prior AI wiring so everything here is RE-CREATED, not reused). ──
@@ -259,6 +264,10 @@ export function ComposeScreen({
   const setDestination = useComposeSession((s) => s.setDestination);
   const startSession = useComposeSession((s) => s.startSession);
   const clearSession = useComposeSession((s) => s.clearSession);
+  // The session-only Message Focus selection (≤3, aiEligible + non-off-limits only —
+  // the store guarantees Off Limits can never enter it), summarised compactly on
+  // the Compose side (COMP-11 / COMP-10 display).
+  const messageFocus = useComposeSession((s) => s.messageFocus);
 
   // Back → Dashboard root. Reset the parent tab tree so this stays correct when
   // Compose was opened from the Orrery stack as well as Dashboard.
@@ -409,6 +418,7 @@ export function ComposeScreen({
       startSession(contactId);
       setScreenState("loading");
       setSmsAvailable(null);
+      setResearchCount(0);
 
       const exec = getExecutor();
       void (async () => {
@@ -494,6 +504,23 @@ export function ComposeScreen({
           }
         }
       })();
+
+      // Populated Things-to-Remember Research count (COMP-08) — SEPARATE from the
+      // header load and non-blocking, so a slow/failed read never gates the editor.
+      // The count reflects the same normalized projection the Research side renders;
+      // the cancelled guard prevents a stale focus's read overwriting the current.
+      readComposeResearch(exec, contactId)
+        .then((rows) => {
+          if (!cancelled) {
+            setResearchCount(rows.length);
+          }
+        })
+        .catch((err) => {
+          Logger.error(LOG_SCOPE, "failed to load research count", err);
+          if (!cancelled) {
+            setResearchCount(0);
+          }
+        });
 
       // SMS capability probe — SEPARATE from the header load so a rejected probe
       // degrades to `false` WITHOUT failing the contact load. The cancelled guard
@@ -983,6 +1010,37 @@ export function ComposeScreen({
           onPress={onSwitchMode}
         />
       </View>
+
+      {/* Things to Remember Research entry (COMP-08) — a tertiary accentText link to
+          the sibling full-screen Research side, carrying the populated count. The
+          navigate PRESERVES the compose session (no startSession/clear here), so the
+          draft, mode, Subject, and Message Focus survive the Compose↔Research
+          transition (COMP-07 / D-10). Shown only when there is populated knowledge. */}
+      {researchCount > 0 ? (
+        <View style={styles.affordance}>
+          <Button
+            testID="compose-research-entry"
+            role="tertiary"
+            label={`Things to Remember · ${researchCount}`}
+            accessibilityLabel={`Things to Remember, ${researchCount} items`}
+            onPress={() =>
+              navigation.navigate("ComposeResearch", { contactId })
+            }
+          />
+        </View>
+      ) : null}
+
+      {/* Compact Message Focus summary (COMP-11) — reflects the ≤3 session-only
+          selection the human toggled Add to AI on the Research side. HIDDEN when
+          empty. Off Limits can never appear here: the store only ever holds
+          aiEligible, non-off-limits items (COMP-10 display / T-35-16). */}
+      {messageFocus.length > 0 ? (
+        <ChromeScrim style={styles.labelScrim} radius={RADII.sm}>
+          <AppText testID="compose-message-focus" role="label">
+            {`Message focus · ${messageFocus.length}`}
+          </AppText>
+        </ChromeScrim>
+      ) : null}
 
       {/* Adaptive AI action (COMP-12 / D-09) — a single primary action that reads
           'Draft with AI' on an empty editor and 'Rewrite with AI' when it holds

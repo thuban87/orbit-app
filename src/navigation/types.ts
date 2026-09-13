@@ -101,6 +101,14 @@ export type DashboardStackParamList = {
    */
   Compose: { contactId: number; requestAiSuggestion?: boolean };
   /**
+   * The read-only "Things to Remember" Research sibling of Compose (COMP-08,
+   * plan 35-06 screen / 35-09 wiring). Carries the SERIALIZABLE `contactId` only —
+   * the screen self-fetches its normalized projection and the session-only Message
+   * Focus store survives the Compose↔Research transition (no callbacks; deep-link
+   * safe). Registered in every stack that hosts Compose so the navigate resolves.
+   */
+  ComposeResearch: { contactId: number };
+  /**
    * The share-sheet capture picker (CAP-01/04). Carries NO params — a system
    * share is consumed by the `ShareIntentProvider` (the single owner of the
    * native pending-share singleton), and the screen drains the payload via
@@ -169,6 +177,9 @@ export type OrreryStackParamList = {
     contactId: number;
   };
   Compose: { contactId: number; requestAiSuggestion?: boolean };
+  /** The read-only Things to Remember Research sibling of Compose — registered
+   *  here too because Compose is hosted in the Orrery stack (COMP-08). */
+  ComposeResearch: { contactId: number };
   CropPhoto: {
     rawUri: string;
     target: PhotoTargetDescriptor;

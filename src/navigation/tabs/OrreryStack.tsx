@@ -2,6 +2,7 @@ import { useNavigation } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { useEffect } from "react";
 import { MergeImpactSummary } from "@/components/MergeImpactSummary";
+import { ComposeResearchRoute } from "@/screens/ComposeResearchScreen";
 import { ComposeScreen } from "@/screens/ComposeScreen";
 import { ContactProfileScreen } from "@/screens/ContactProfileScreen";
 import { CropPhotoScreen } from "@/screens/CropPhotoScreen";
@@ -71,6 +72,10 @@ export function OrreryStack() {
       <Stack.Screen name="EditGroupEvent" component={EditGroupEventScreen} />
       <Stack.Screen name="EditParticipant" component={EditParticipantScreen} />
       <Stack.Screen name="Compose" component={ComposeScreen} />
+      <Stack.Screen
+        name="ComposeResearch"
+        component={ComposeResearchRoute}
+      />
       <Stack.Screen name="CropPhoto" component={CropPhotoScreen} />
       <Stack.Screen name="SurvivorSelect" component={SurvivorSelectScreen} />
       <Stack.Screen name="MergeConflicts" component={MergeConflictsScreen} />

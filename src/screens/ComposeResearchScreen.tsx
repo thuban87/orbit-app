@@ -20,16 +20,20 @@
  *     blocking network call, all colours via theme tokens, all text in AppText
  *     roles, every control padded to the 44px touch-target floor.
  */
-import { useFocusEffect } from "@react-navigation/native";
+import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import { useCallback, useMemo, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { Avatar } from "@/components/Avatar";
 import { AppText } from "@/components/ui";
+import { Button } from "@/components/ui/Button";
 import { MIN_TOUCH_TARGET } from "@/components/ui/button-roles";
 import {
   readComposeResearch,
   type ResearchItem,
 } from "@/db/compose-research-read";
+import { getContactHeader } from "@/db/contact-read";
 import { getExecutor } from "@/db/database";
+import type { RootStackScreenProps } from "@/navigation/types";
 import { useComposeSession } from "@/stores/compose-session-store";
 import { useTheme } from "@/theme";
 import { RADII } from "@/theme/tokens/radii";
@@ -41,6 +45,25 @@ const LOG_SCOPE = "compose-research";
 export interface ComposeResearchScreenProps {
   /** The contact whose knowledge the Research side projects. */
   contactId: number;
+}
+
+/** The minimal contact identity the Research header renders for orientation. */
+interface ResearchHeader {
+  name: string;
+  photo: string | null;
+  modified_at: string;
+}
+
+/**
+ * Navigation adapter (plan 35-09 wiring): extracts the SERIALIZABLE `contactId`
+ * route param and renders the plain-prop screen, so `ComposeResearchScreen` keeps
+ * the stable plain `contactId` contract plan 35-06 established while resolving as a
+ * registered `ComposeResearch` route in both stacks.
+ */
+export function ComposeResearchRoute({
+  route,
+}: RootStackScreenProps<"ComposeResearch">) {
+  return <ComposeResearchScreen contactId={route.params.contactId} />;
 }
 
 /** One consecutive run of items sharing a display group. */
@@ -67,7 +90,9 @@ export function ComposeResearchScreen({
   contactId,
 }: ComposeResearchScreenProps) {
   const { colors } = useTheme();
+  const navigation = useNavigation();
   const [items, setItems] = useState<ResearchItem[]>([]);
+  const [header, setHeader] = useState<ResearchHeader | null>(null);
   const messageFocus = useComposeSession((state) => state.messageFocus);
   const addToFocus = useComposeSession((state) => state.addToFocus);
   const startSession = useComposeSession((state) => state.startSession);
@@ -75,15 +100,32 @@ export function ComposeResearchScreen({
   useFocusEffect(
     useCallback(() => {
       let cancelled = false;
-      // Scope Message Focus to this contact (idempotent for the same contact).
+      // Scope Message Focus to this contact (idempotent for the same contact) so
+      // the session-only selection survives the Compose↔Research transition (D-10).
       startSession(contactId);
-      void readComposeResearch(getExecutor(), contactId)
+      const exec = getExecutor();
+      void readComposeResearch(exec, contactId)
         .then((rows) => {
           if (!cancelled) setItems(rows);
         })
         .catch((error) => {
           Logger.error(LOG_SCOPE, "failed to load research", error);
           if (!cancelled) setItems([]);
+        });
+      // The SAME contact-identity header Compose shows (orientation parity across
+      // the two sibling sides — D-14-010). Local SQLite read; never blocks render.
+      void getContactHeader(exec, contactId)
+        .then((row) => {
+          if (!cancelled && row !== null) {
+            setHeader({
+              name: row.name,
+              photo: row.photo,
+              modified_at: row.modified_at,
+            });
+          }
+        })
+        .catch((error) => {
+          Logger.error(LOG_SCOPE, "failed to load contact header", error);
         });
       return () => {
         cancelled = true;
@@ -100,6 +142,31 @@ export function ComposeResearchScreen({
   return (
     <View style={[styles.screen, { backgroundColor: colors.background }]}>
       <ScrollView contentContainerStyle={styles.content}>
+        {/* Contact-identity header — the SAME Back + Avatar + name heading Compose
+            shows, so the two sibling sides stay oriented (D-14-010). Back pops to
+            Compose with the session (draft + Message Focus) preserved (COMP-07). */}
+        <View style={styles.header}>
+          <Button
+            role="tertiary"
+            label="Back"
+            accessibilityLabel="Back to compose"
+            onPress={() => navigation.goBack()}
+          />
+          {header !== null ? (
+            <>
+              <Avatar
+                photo={header.photo}
+                name={header.name}
+                contactId={contactId}
+                cacheBust={header.modified_at}
+                size={48}
+              />
+              <AppText role="heading" accessibilityRole="header">
+                {header.name}
+              </AppText>
+            </>
+          ) : null}
+        </View>
         {items.length === 0 ? (
           <AppText role="caption">nothing to remember yet</AppText>
         ) : (
@@ -178,6 +245,11 @@ const styles = StyleSheet.create({
   content: {
     padding: SPACING.base,
     gap: SPACING.lg,
+  },
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: SPACING.md,
   },
   group: {
     gap: SPACING.sm,
