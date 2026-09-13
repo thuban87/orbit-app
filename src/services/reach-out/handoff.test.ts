@@ -49,7 +49,7 @@ describe("performReachOut", () => {
       return { result: "unknown" };
     });
 
-    await performReachOut(exec, {
+    const outcome = await performReachOut(exec, {
       ...input,
       channel: "text",
       messageBody: "Thinking of you",
@@ -62,6 +62,9 @@ describe("performReachOut", () => {
     );
     expect(mocks.markAssistFailed).not.toHaveBeenCalled();
     expect(mocks.alert).not.toHaveBeenCalled();
+    // HIGH-1: the created assist UID is EXPOSED so the Compose confirmation panel
+    // can log THIS assist rather than re-querying the table by contact+timestamp.
+    expect(outcome).toEqual({ handoffStarted: true, assistUid: "assist-1" });
   });
 
   it("writes the assist before opening a call URL", async () => {
@@ -75,16 +78,17 @@ describe("performReachOut", () => {
       return true;
     });
 
-    await performReachOut(exec, { ...input, channel: "call" });
+    const outcome = await performReachOut(exec, { ...input, channel: "call" });
 
     expect(events).toEqual(["create", "launch"]);
     expect(mocks.openURL).toHaveBeenCalledWith(`tel:${input.endpoint}`);
+    expect(outcome).toEqual({ handoffStarted: true, assistUid: "assist-1" });
   });
 
-  it("marks only a thrown native launch as failed", async () => {
+  it("marks only a thrown native launch as failed and reports handoffStarted false", async () => {
     mocks.openURL.mockRejectedValueOnce(new Error("no mail client"));
 
-    await performReachOut(exec, { ...input, channel: "email" });
+    const outcome = await performReachOut(exec, { ...input, channel: "email" });
 
     expect(mocks.markAssistFailed).toHaveBeenCalledWith(exec, {
       assistUid: "assist-1",
@@ -94,10 +98,13 @@ describe("performReachOut", () => {
       "Couldn't open your email app",
       "No app on this device can send email.",
     );
+    // A failed native launch never surfaces the confirmation panel — the panel
+    // gates on handoffStarted (T-35-21). assistUid is null so no fragile re-query.
+    expect(outcome).toEqual({ handoffStarted: false, assistUid: null });
   });
 
   it("launches without creating or failing an assist when assist is disabled", async () => {
-    await performReachOut(exec, {
+    const outcome = await performReachOut(exec, {
       ...input,
       channel: "text",
       assistEnabled: false,
@@ -106,5 +113,8 @@ describe("performReachOut", () => {
     expect(mocks.createPendingAssist).not.toHaveBeenCalled();
     expect(mocks.markAssistFailed).not.toHaveBeenCalled();
     expect(mocks.sendSMSAsync).toHaveBeenCalledWith(input.endpoint, "");
+    // Assists opted out: handoff still started, but there is no UID to log, so
+    // the Compose confirmation panel does not appear.
+    expect(outcome).toEqual({ handoffStarted: true, assistUid: null });
   });
 });
