@@ -90,6 +90,71 @@ export function canSave(state: CreateFormState): boolean {
   );
 }
 
+// =============================================================================
+// VALIDATION REVEAL-AND-FOCUS (CAPT-14, dossier §AD).
+//
+// A blocking validation error must REVEAL + FOCUS the AccordionSection that
+// contains it rather than leaving the user hunting collapsed drawers. The
+// error→section resolution is a PURE, node-tested mapping so the contract is
+// proven at the node level (not only device UAT); the screen then drives the
+// AccordionSection validation interface (expand via onExpandedChange + scroll to
+// the registered container ref). The SAME resolver shape is reused by 34-08.
+// =============================================================================
+
+/** One blocking validation error, keyed by a stable field id. */
+export interface ValidationError {
+  field: string;
+  message?: string;
+}
+
+/** Maps a field id to the AccordionSection `sectionId` that contains it. */
+export type SectionFieldMap = Record<string, string>;
+
+/**
+ * The Add-Contact field→section map. Field ids are stable across the form; the
+ * values are the `AccordionSection` sectionIds rendered by CreateContactScreen.
+ */
+export const CREATE_SECTION_FIELD_MAP: SectionFieldMap = {
+  name: "identity",
+  frequency: "relationship",
+  phone: "methods",
+  email: "methods",
+};
+
+/**
+ * The `sectionId` owning the FIRST blocking validation error in the array's
+ * deterministic order, or `null` when there are no (mapped) blocking errors. An
+ * error whose field is not in the map is skipped (resolve the next mapped one).
+ * Pure — react-native-free — so error→section resolution is unit-tested.
+ */
+export function resolveErrorSection(
+  errors: ValidationError[],
+  sectionFieldMap: SectionFieldMap,
+): string | null {
+  for (const error of errors) {
+    const sectionId = sectionFieldMap[error.field];
+    if (sectionId) return sectionId;
+  }
+  return null;
+}
+
+/**
+ * The blocking validation errors for the Add-Contact form, in reveal order:
+ * name first (Identity), then an invalid cadence WHILE Bound (Relationship
+ * Basics). Mirrors `canSave` — Unbound never blocks on cadence — but yields the
+ * per-field detail `resolveErrorSection` routes to a section. Empty = savable.
+ */
+export function collectBlockingErrors(state: CreateFormState): ValidationError[] {
+  const errors: ValidationError[] = [];
+  if (state.name.trim().length === 0) {
+    errors.push({ field: "name", message: "Enter a name to save." });
+  }
+  if (state.trackingEnabled !== false && !state.intervalValid) {
+    errors.push({ field: "frequency", message: "Pick a valid frequency." });
+  }
+  return errors;
+}
+
 /** The cadence-related slice of form state coordinated as one unit (CAPT-03). */
 export interface CadenceFormFields {
   trackingEnabled: boolean;

@@ -20,9 +20,10 @@
  * Every colour resolves through `useTheme().colors.*` (CLAUDE.md / check:colors).
  */
 import { Picker } from "@react-native-picker/picker";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert,
+  findNodeHandle,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -77,10 +78,13 @@ import { useTheme } from "@/theme";
 import { Logger } from "@/utils/logger";
 import {
   buildCreateInput,
+  collectBlockingErrors,
   coordinateBoundToggle,
   coordinateCadenceSelection,
+  CREATE_SECTION_FIELD_MAP,
   type CreateFormState,
   canSave,
+  resolveErrorSection,
 } from "./create-contact-logic";
 
 const LOG_SCOPE = "create-contact";
@@ -223,6 +227,39 @@ export function CreateContactScreen({
     setExpandedSections((prev) => ({ ...prev, [sectionId]: next }));
   }, []);
 
+  // Reveal-and-focus targets (CAPT-14): the scroll container + each section's
+  // root View, so a blocked Save can expand the erroring section and scroll it
+  // (its first invalid field) into view via the AccordionSection interface.
+  const scrollRef = useRef<ScrollView>(null);
+  const sectionRefs = useRef<Record<string, View | null>>({});
+  const registerSectionRef = useCallback(
+    (sectionId: string) => (node: View | null) => {
+      sectionRefs.current[sectionId] = node;
+    },
+    [],
+  );
+  const revealAndFocus = useCallback(
+    (sectionId: string) => {
+      setSectionExpanded(sectionId, true);
+      // Scroll after the expand re-render so the section's laid-out position is
+      // final. Best-effort: the expand is the load-bearing reveal; a measure
+      // failure leaves the section open, just not auto-scrolled.
+      requestAnimationFrame(() => {
+        const node = sectionRefs.current[sectionId];
+        const scroll = scrollRef.current;
+        const scrollHandle = scroll ? findNodeHandle(scroll) : null;
+        if (node && scroll && scrollHandle != null) {
+          node.measureLayout(
+            scrollHandle,
+            (_x, y) => scroll.scrollTo({ y: Math.max(0, y - 16), animated: true }),
+            () => {},
+          );
+        }
+      });
+    },
+    [setSectionExpanded],
+  );
+
   // Show-More advanced enrichment (CAPT-01). All optional; each draft flows into
   // the single atomic create transaction via buildCreateInput — no rendered
   // control fails to persist (Review HIGH #4).
@@ -299,7 +336,16 @@ export function CreateContactScreen({
   const draftNow = localDateTime();
 
   async function handleSave() {
-    if (!canSave(formState) || saving) {
+    if (saving) {
+      return;
+    }
+    // Blocking validation reveals + focuses the erroring accordion rather than
+    // silently no-op'ing a disabled button; the form state is preserved and no
+    // completion is shown (CAPT-14, dossier §AD).
+    const blocking = collectBlockingErrors(formState);
+    if (blocking.length > 0) {
+      const sectionId = resolveErrorSection(blocking, CREATE_SECTION_FIELD_MAP);
+      if (sectionId) revealAndFocus(sectionId);
       return;
     }
     const trimmed = name.trim();
@@ -331,6 +377,7 @@ export function CreateContactScreen({
 
   return (
     <ScrollView
+      ref={scrollRef}
       testID="create-contact-screen"
       contentContainerStyle={styles.content}
     >
@@ -357,6 +404,7 @@ export function CreateContactScreen({
         title="Identity"
         expanded={expandedSections.identity}
         onExpandedChange={(next) => setSectionExpanded("identity", next)}
+        containerRef={registerSectionRef("identity")}
       >
         <View style={styles.field}>
           <AppText role="label" style={{ color: colors.textSecondary }}>
@@ -413,6 +461,7 @@ export function CreateContactScreen({
         title="Relationship Basics"
         expanded={expandedSections.relationship}
         onExpandedChange={(next) => setSectionExpanded("relationship", next)}
+        containerRef={registerSectionRef("relationship")}
       >
         <View style={styles.field}>
           <AppText role="label" style={{ color: colors.textSecondary }}>
@@ -507,6 +556,7 @@ export function CreateContactScreen({
         title="Contact Methods"
         expanded={expandedSections.methods}
         onExpandedChange={(next) => setSectionExpanded("methods", next)}
+        containerRef={registerSectionRef("methods")}
       >
         <ContactMethodsEditor
           testID="create-contact-methods"
@@ -699,12 +749,16 @@ export function CreateContactScreen({
         />
       )}
 
+      {/* Save stays PRESSABLE when the form is incomplete so a blocked press
+          reveals + focuses the erroring section (CAPT-14) rather than being an
+          inert disabled button; it is only truly disabled while a save is in
+          flight. Visual emphasis still follows `savable`. */}
       <Pressable
         testID="create-contact-save"
         accessibilityRole="button"
         accessibilityLabel="Save contact"
-        accessibilityState={{ disabled: !savable }}
-        disabled={!savable}
+        accessibilityState={{ disabled: saving }}
+        disabled={saving}
         onPress={() => void handleSave()}
         style={[
           styles.saveBtn,
@@ -714,14 +768,14 @@ export function CreateContactScreen({
           },
         ]}
       >
-        <Text
+        <AppText
+          role="label"
           style={{
-            color: savable ? colors.background : colors.textSecondary,
-            fontWeight: "600",
+            color: savable ? colors.onAccent : colors.textSecondary,
           }}
         >
           Save contact
-        </Text>
+        </AppText>
       </Pressable>
     </ScrollView>
   );
