@@ -13,6 +13,12 @@ export interface QuickLogUndoController {
   undo(request: QuickLogUndoRequest): Promise<void> | null;
 }
 
+export interface QuickLogSnackbarAction {
+  label: string;
+  accessibilityLabel: string;
+  onPress: () => void;
+}
+
 export interface QuickLogSnackbar {
   kind: "success" | "error";
   label: string;
@@ -21,6 +27,12 @@ export interface QuickLogSnackbar {
     accessibilityLabel: string;
     onPress: () => void;
   };
+  /**
+   * Optional second action on the SUCCESS snackbar: "Add Note" beside "Undo"
+   * (CAPT-05). Undo (SHELL-11) is preserved; tapping either dismisses the
+   * snackbar (mutual exclusion). Omitted on the failure snackbar.
+   */
+  secondaryAction?: QuickLogSnackbarAction;
 }
 
 export interface QuickLogInput {
@@ -45,6 +57,14 @@ export interface RunQuickLogDeps {
   notifySuccessHaptic: () => void | Promise<void>;
   notifyWidgetDataChanged: () => void;
   bumpShellRefresh: () => void;
+  /**
+   * Opens the post-log Note/Memory editor bound to the just-created interaction
+   * (CAPT-05). Invoked by the success snackbar's "Add Note" secondary action.
+   */
+  openPostLogEditor: (args: {
+    interactionId: number;
+    contactId: number;
+  }) => void;
 }
 
 function undoQuickLog(
@@ -103,6 +123,12 @@ export function runQuickLog(deps: RunQuickLogDeps, contactId: number): void {
           label: "Undo",
           accessibilityLabel: "Undo logged interaction",
           onPress: () => undoQuickLog(deps, contactId, interactionId),
+        },
+        secondaryAction: {
+          label: "Add Note",
+          accessibilityLabel: "Add a note to the logged interaction",
+          onPress: () =>
+            deps.openPostLogEditor({ interactionId, contactId }),
         },
       });
       void deps.notifySuccessHaptic();

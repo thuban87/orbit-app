@@ -27,6 +27,7 @@ function createDeps(overrides: Partial<RunQuickLogDeps> = {}) {
     notifySuccessHaptic: vi.fn(),
     notifyWidgetDataChanged: vi.fn(),
     bumpShellRefresh: vi.fn(),
+    openPostLogEditor: vi.fn(),
     ...overrides,
   };
   return { deps, snackbars };
@@ -54,6 +55,35 @@ describe("runQuickLog", () => {
     expect(deps.notifySuccessHaptic).toHaveBeenCalledOnce();
     expect(deps.notifyWidgetDataChanged).toHaveBeenCalledOnce();
     expect(deps.bumpShellRefresh).toHaveBeenCalledOnce();
+  });
+
+  it("offers Undo AND Add Note on success; Add Note opens the post-log editor", async () => {
+    const { deps, snackbars } = createDeps();
+
+    runQuickLog(deps, 7);
+    await vi.waitFor(() => expect(snackbars).toHaveLength(1));
+
+    expect(snackbars[0].action.label).toBe("Undo");
+    expect(snackbars[0].secondaryAction?.label).toBe("Add Note");
+
+    snackbars[0].secondaryAction?.onPress();
+    expect(deps.openPostLogEditor).toHaveBeenCalledWith({
+      interactionId: 12,
+      contactId: 7,
+    });
+  });
+
+  it("omits Add Note on the failure snackbar", async () => {
+    const { deps, snackbars } = createDeps({
+      recordTouchpoint: vi.fn(() => Promise.reject(new Error("write failed"))),
+    });
+
+    runQuickLog(deps, 7);
+    await vi.waitFor(() => expect(snackbars).toHaveLength(1));
+
+    expect(snackbars[0]).toMatchObject({ kind: "error", label: "Couldn't log" });
+    expect(snackbars[0].secondaryAction).toBeUndefined();
+    expect(deps.openPostLogEditor).not.toHaveBeenCalled();
   });
 
   it("ignores a second request while the consumer's write is pending", () => {
